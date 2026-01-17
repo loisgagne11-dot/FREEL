@@ -572,11 +572,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .timeline-dot.late { background: var(--danger); animation: pulse 1s infinite; }
 .timeline-dot.warning { background: var(--warning); }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   SPRINT 8 - V50: NOUVEAUX COMPOSANTS
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* === WIDGET ACTIONS DU JOUR === */
 .actions-widget { background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.08)); border: 1px solid rgba(139,92,246,0.25); border-radius: var(--radius-xl); padding: 16px; margin-bottom: 16px; }
 .actions-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .actions-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
@@ -597,8 +592,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .action-btn.secondary { background: var(--bg-tertiary); color: var(--text-primary); }
 .action-btn.danger { background: var(--danger); }
 .action-btn.success { background: var(--success); }
-
-/* === TIMELINE JALONS LEGAUX (Roadmap Style) === */
 .legal-timeline { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 20px; margin-bottom: 16px; overflow: hidden; }
 .legal-timeline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .legal-timeline-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
@@ -620,8 +613,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .legal-milestone-countdown.urgent { background: var(--danger-glow); color: var(--danger); }
 .legal-milestone-countdown.warning { background: var(--warning-glow); color: var(--warning); }
 .legal-milestone-countdown.ok { background: var(--success-glow); color: var(--success); }
-
-/* === SCORE SANTE ENTREPRISE === */
 .health-score { background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary)); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 20px; margin-bottom: 16px; cursor: pointer; transition: all 0.2s; }
 .health-score:hover { border-color: var(--accent); transform: translateY(-2px); }
 .health-score-header { display: flex; align-items: center; justify-content: space-between; }
@@ -644,11 +635,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .health-metric-icon { font-size: 16px; margin-bottom: 4px; }
 .health-metric-value { font-size: 12px; font-weight: 700; }
 .health-metric-label { font-size: 9px; color: var(--text-muted); }
-
-/* === MODULE TVA INTELLIGENT === */
-.tva-module { background: linear-gradient(135deg, rgba(236,72,153,0.08), rgba(139,92,246,0.08)); border: 1px solid rgba(236,72,153,0.25); border-radius: var(--radius-xl); padding: 16px; margin-bottom: 16px; }
+.tva-module { background: linear-gradient(135deg, rgba(236,72,153,0.08), rgba(139,92,246,0.08)); border: 1px solid rgba(236,72,153,0.25); border-radius: var(--radius-xl); padding: 16px; margin-bottom: 16px; cursor: pointer; }
 .tva-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.tva-status { display: flex; align-items: center; gap: 8px; }
 .tva-status-badge { padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700; }
 .tva-status-badge.franchise { background: var(--success-glow); color: var(--success); }
 .tva-status-badge.assujetti { background: rgba(236,72,153,0.15); color: #ec4899; }
@@ -657,47 +645,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .tva-gauge-fill.safe { background: linear-gradient(90deg, var(--success), #34d399); }
 .tva-gauge-fill.warning { background: linear-gradient(90deg, var(--warning), #fbbf24); }
 .tva-gauge-fill.danger { background: linear-gradient(90deg, var(--danger), #f87171); }
-.tva-gauge-marker { position: absolute; top: -6px; bottom: -6px; width: 2px; background: white; transform: translateX(-50%); }
+.tva-gauge-marker { position: absolute; top: -4px; bottom: -4px; width: 2px; background: white; }
 .tva-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
 .tva-info-item { text-align: center; padding: 10px; background: var(--bg-secondary); border-radius: var(--radius-md); }
 .tva-info-value { font-size: 14px; font-weight: 700; }
 .tva-info-label { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
-.tva-rules { margin-top: 12px; padding: 12px; background: var(--bg-tertiary); border-radius: var(--radius-md); }
-.tva-rule { display: flex; align-items: flex-start; gap: 8px; font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; }
-.tva-rule:last-child { margin-bottom: 0; }
-.tva-rule-icon { flex-shrink: 0; }
-
-/* === QUICK-ADD BUTTONS === */
 .quick-actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .quick-action-btn { display: flex; align-items: center; gap: 6px; padding: 10px 16px; background: var(--bg-secondary); border: 1px dashed var(--glass-border); border-radius: var(--radius-md); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
 .quick-action-btn:hover { border-style: solid; border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
 .quick-action-btn .icon { font-size: 16px; }
-
-/* === VUE CONSOLIDEE CHARGES === */
-.charges-consolidated { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); overflow: hidden; margin-bottom: 16px; }
-.charges-tabs { display: flex; border-bottom: 1px solid var(--glass-border); }
-.charges-tab { flex: 1; padding: 12px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; position: relative; }
-.charges-tab:hover { background: var(--bg-tertiary); }
-.charges-tab.active { color: var(--accent); }
-.charges-tab.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
-.charges-tab-badge { background: var(--danger); color: white; font-size: 10px; padding: 2px 6px; border-radius: 8px; margin-left: 6px; }
-.charges-content { padding: 16px; max-height: 300px; overflow-y: auto; }
-.charge-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-tertiary); border-radius: var(--radius-sm); margin-bottom: 6px; transition: all 0.2s; }
-.charge-row:hover { background: var(--accent-glow); }
-.charge-row.paid { opacity: 0.6; }
-.charge-info { display: flex; align-items: center; gap: 10px; }
-.charge-cat { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
-.charge-cat.urssaf { background: rgba(248,113,113,0.15); color: var(--danger); }
-.charge-cat.tva { background: rgba(236,72,153,0.15); color: #ec4899; }
-.charge-cat.cfp { background: rgba(96,165,250,0.15); color: var(--info); }
-.charge-cat.ir { background: rgba(251,191,36,0.15); color: var(--warning); }
-.charge-cat.other { background: rgba(161,161,170,0.15); color: var(--text-muted); }
-.charge-desc { font-size: 12px; }
-.charge-month { font-size: 10px; color: var(--text-muted); }
-.charge-amount { font-size: 13px; font-weight: 700; }
-.charge-check { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--glass-border); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
-.charge-check:hover { border-color: var(--success); }
-.charge-check.checked { background: var(--success); border-color: var(--success); color: white; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 .aenc-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -1327,7 +1283,6 @@ function parseYM(s) { var p = s.split('-'); return { y: parseInt(p[0]), m: parse
 function fmtMonth(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }); }
 function fmtMonthShort(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''); }
 function fmtLong(d) { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); }
-function fmtShort(d) { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
 
 // SPRINT 3: Fonction highlight pour recherche textuelle (B17)
@@ -5528,291 +5483,66 @@ function showSalaireModalForMonth(monthKey) {
  * Affiche les échéances imminentes
  */
 
-// ═══════════════════════════════════════════════════════════════════════════
-// SPRINT 8 - V50: NOUVELLES FONCTIONS
-// ═══════════════════════════════════════════════════════════════════════════
+function fmtShort(d) { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); }
 
-/**
- * Calcule le score de santé de l'entreprise (0-100)
- * Basé sur: trésorerie, retards, seuils légaux, activité
- */
 function calculateHealthScore() {
   var data = compute();
   var score = 100;
   var details = [];
-  
-  // 1. Trésorerie (25 points max)
   var tresoScore = 25;
-  if (data.cashDispoAbsolu < 0) {
-    tresoScore = 0;
-    details.push({ icon: '🔴', label: 'Cash négatif', impact: -25 });
-  } else if (data.runway < 2) {
-    tresoScore = 5;
-    details.push({ icon: '🟠', label: 'Autonomie < 2 mois', impact: -20 });
-  } else if (data.runway < 4) {
-    tresoScore = 15;
-    details.push({ icon: '🟡', label: 'Autonomie < 4 mois', impact: -10 });
-  } else {
-    details.push({ icon: '🟢', label: 'Trésorerie saine', impact: 0 });
-  }
+  if (data.cashDispoAbsolu < 0) { tresoScore = 0; details.push({ icon: '🔴', label: 'Cash négatif', impact: -25 }); }
+  else if (data.runway < 2) { tresoScore = 5; details.push({ icon: '🟠', label: 'Autonomie < 2 mois', impact: -20 }); }
+  else if (data.runway < 4) { tresoScore = 15; details.push({ icon: '🟡', label: 'Autonomie < 4 mois', impact: -10 }); }
+  else { details.push({ icon: '🟢', label: 'Trésorerie saine', impact: 0 }); }
   score = score - 25 + tresoScore;
-  
-  // 2. Retards factures (25 points max)
   var retardScore = 25;
-  if (data.lateCount > 3) {
-    retardScore = 0;
-    details.push({ icon: '🔴', label: data.lateCount + ' factures en retard', impact: -25 });
-  } else if (data.lateCount > 0) {
-    retardScore = 25 - (data.lateCount * 8);
-    details.push({ icon: '🟠', label: data.lateCount + ' facture(s) en retard', impact: -(data.lateCount * 8) });
-  } else {
-    details.push({ icon: '🟢', label: 'Aucun retard', impact: 0 });
-  }
+  if (data.lateCount > 3) { retardScore = 0; details.push({ icon: '🔴', label: data.lateCount + ' factures en retard', impact: -25 }); }
+  else if (data.lateCount > 0) { retardScore = 25 - (data.lateCount * 8); details.push({ icon: '🟠', label: data.lateCount + ' facture(s) en retard', impact: -(data.lateCount * 8) }); }
+  else { details.push({ icon: '🟢', label: 'Aucun retard', impact: 0 }); }
   score = score - 25 + retardScore;
-  
-  // 3. Seuils légaux (25 points max)
   var seuilScore = 25;
-  var seuilMicro = 77700;
-  var seuilTVA = 36800;
-  var pctMicro = (data.caHTAnnuel || 0) / seuilMicro;
-  var pctTVA = (data.caHTAnnuel || 0) / seuilTVA;
-  
-  if (pctMicro >= 1) {
-    seuilScore = 0;
-    details.push({ icon: '🔴', label: 'Seuil micro dépassé!', impact: -25 });
-  } else if (pctMicro >= 0.9) {
-    seuilScore = 5;
-    details.push({ icon: '🟠', label: 'Proche seuil micro (' + Math.round(pctMicro*100) + '%)', impact: -20 });
-  } else if (!COMPANY.tvaDepuis && pctTVA >= 0.9) {
-    seuilScore = 15;
-    details.push({ icon: '🟡', label: 'Proche seuil TVA (' + Math.round(pctTVA*100) + '%)', impact: -10 });
-  } else {
-    details.push({ icon: '🟢', label: 'Seuils OK', impact: 0 });
-  }
+  var pctMicro = (data.caHTAnnuel || 0) / 77700;
+  if (pctMicro >= 1) { seuilScore = 0; details.push({ icon: '🔴', label: 'Seuil micro dépassé!', impact: -25 }); }
+  else if (pctMicro >= 0.9) { seuilScore = 5; details.push({ icon: '🟠', label: 'Proche seuil micro', impact: -20 }); }
+  else { details.push({ icon: '🟢', label: 'Seuils OK', impact: 0 }); }
   score = score - 25 + seuilScore;
-  
-  // 4. Activité/Taux facturation (25 points max)
   var actScore = 25;
-  if (data.tauxFacturation < 0.5) {
-    actScore = 5;
-    details.push({ icon: '🟠', label: 'Taux facturation faible (' + Math.round(data.tauxFacturation*100) + '%)', impact: -20 });
-  } else if (data.tauxFacturation < 0.7) {
-    actScore = 15;
-    details.push({ icon: '🟡', label: 'Taux facturation moyen', impact: -10 });
-  } else {
-    details.push({ icon: '🟢', label: 'Bonne activité', impact: 0 });
-  }
+  if (data.tauxFacturation < 0.5) { actScore = 5; details.push({ icon: '🟠', label: 'Taux facturation faible', impact: -20 }); }
+  else if (data.tauxFacturation < 0.7) { actScore = 15; details.push({ icon: '🟡', label: 'Taux facturation moyen', impact: -10 }); }
+  else { details.push({ icon: '🟢', label: 'Bonne activité', impact: 0 }); }
   score = score - 25 + actScore;
-  
-  // Classification
   var level = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'warning' : 'danger';
   var label = score >= 80 ? 'Excellente' : score >= 60 ? 'Bonne' : score >= 40 ? 'À surveiller' : 'Critique';
-  
   return { score: Math.max(0, Math.round(score)), level: level, label: label, details: details, data: data };
 }
 
-/**
- * Affiche le détail du score santé dans une modale
- */
 function showHealthScoreDetail() {
   var health = calculateHealthScore();
   $('#formModalTitle').textContent = '🏥 Santé de l\'Entreprise';
   var body = $('#formModalBody');
   body.innerHTML = '';
-  
-  // Score principal
   var scoreDiv = el('div', { style: { textAlign: 'center', marginBottom: '20px' } });
-  var circle = el('div', { class: 'health-score-circle ' + health.level, style: { margin: '0 auto 12px', width: '80px', height: '80px', fontSize: '28px' } }, String(health.score));
-  scoreDiv.appendChild(circle);
+  scoreDiv.appendChild(el('div', { class: 'health-score-circle ' + health.level, style: { margin: '0 auto 12px', width: '80px', height: '80px', fontSize: '28px' } }, String(health.score)));
   scoreDiv.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700' } }, health.label));
-  scoreDiv.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Score global sur 100'));
   body.appendChild(scoreDiv);
-  
-  // Détails
   var detailsDiv = el('div', { class: 'card' });
-  detailsDiv.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700', marginBottom: '12px' } }, '📊 Détail du score'));
-  
   health.details.forEach(function(d) {
     var row = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--glass-border)' } });
     row.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [el('span', {}, d.icon), el('span', { style: { fontSize: '12px' } }, d.label)]));
-    var impactColor = d.impact === 0 ? 'var(--success)' : d.impact > -15 ? 'var(--warning)' : 'var(--danger)';
-    row.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '700', color: impactColor } }, d.impact === 0 ? '+0' : String(d.impact)));
+    row.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '700', color: d.impact === 0 ? 'var(--success)' : 'var(--danger)' } }, d.impact === 0 ? '+0' : String(d.impact)));
     detailsDiv.appendChild(row);
   });
   body.appendChild(detailsDiv);
-  
-  // Recommandations
-  var recoDiv = el('div', { style: { marginTop: '16px', padding: '12px', background: 'var(--accent-glow)', borderRadius: 'var(--radius-md)' } });
-  recoDiv.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700', marginBottom: '8px' } }, '💡 Recommandations'));
-  
-  var recos = [];
-  if (health.data.lateCount > 0) recos.push('• Relancer les ' + health.data.lateCount + ' facture(s) en retard');
-  if (health.data.runway < 4) recos.push('• Augmenter la réserve de trésorerie');
-  if (health.data.tauxFacturation < 0.7) recos.push('• Chercher de nouvelles missions');
-  if (health.data.caHTAnnuel > 36800 * 0.8 && !COMPANY.tvaDepuis) recos.push('• Préparer le passage à la TVA');
-  if (recos.length === 0) recos.push('• Continuez comme ça ! 🎉');
-  
-  recos.forEach(function(r) {
-    recoDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' } }, r));
-  });
-  body.appendChild(recoDiv);
-  
   openModal('formModal');
 }
 
-/**
- * Calcule les jalons légaux pour la timeline
- */
-function getLegalMilestones() {
-  var milestones = [];
-  var today = new Date(TODAY);
-  var currentYear = today.getFullYear();
-  
-  // ACRE Expiration
-  var acre = getAcreInfo();
-  if (COMPANY.acre && acre.expiryDate) {
-    var acreDate = new Date(acre.expiryDate);
-    var acreDays = Math.ceil((acreDate - today) / (1000 * 60 * 60 * 24));
-    milestones.push({
-      id: 'acre',
-      label: 'Fin ACRE',
-      icon: '🎓',
-      date: acre.expiryDate,
-      daysLeft: acreDays,
-      status: acreDays <= 0 ? 'passed' : acreDays <= 30 ? 'urgent' : acreDays <= 90 ? 'current' : 'upcoming',
-      detail: 'Cotisations passent de ' + PCT(LEGAL.urssafAcre2025) + ' à ' + PCT(LEGAL.urssafStd2025),
-      action: null
-    });
-  }
-  
-  // TVA - Projection seuil
-  if (!COMPANY.tvaDepuis) {
-    var tvaProjection = projectTVADate();
-    if (tvaProjection.month) {
-      var tvaDays = tvaProjection.daysLeft;
-      milestones.push({
-        id: 'tva',
-        label: 'Seuil TVA',
-        icon: '🏛️',
-        date: tvaProjection.date,
-        daysLeft: tvaDays,
-        status: tvaDays <= 0 ? 'passed' : tvaDays <= 30 ? 'urgent' : tvaDays <= 90 ? 'current' : 'upcoming',
-        detail: 'Projection: TVA obligatoire en ' + fmtMonth(tvaProjection.month),
-        action: function() { showTVADetail(); }
-      });
-    }
-  } else {
-    // Dates importantes TVA si assujetti
-    var tvaMai = new Date(currentYear, 4, 5);
-    var tvaJuil = new Date(currentYear, 6, 20);
-    var tvaDec = new Date(currentYear, 11, 20);
-    
-    [[tvaMai, 'CA12 TVA', '📋'], [tvaJuil, 'Acompte 55%', '💳'], [tvaDec, 'Acompte 40%', '💳']].forEach(function(t) {
-      var days = Math.ceil((t[0] - today) / (1000 * 60 * 60 * 24));
-      if (days >= -30 && days <= 180) {
-        milestones.push({
-          id: 'tva-' + t[0].getMonth(),
-          label: t[1],
-          icon: t[2],
-          date: localISO(t[0]),
-          daysLeft: days,
-          status: days <= 0 ? 'passed' : days <= 7 ? 'urgent' : days <= 30 ? 'current' : 'upcoming'
-        });
-      }
-    });
-  }
-  
-  // CFE - 15 décembre
-  var cfeDate = new Date(currentYear, 11, 15);
-  var cfeDays = Math.ceil((cfeDate - today) / (1000 * 60 * 60 * 24));
-  if (cfeDays >= -30 && cfeDays <= 180) {
-    milestones.push({
-      id: 'cfe',
-      label: 'CFE',
-      icon: '🏢',
-      date: localISO(cfeDate),
-      daysLeft: cfeDays,
-      status: cfeDays <= 0 ? 'passed' : cfeDays <= 7 ? 'urgent' : cfeDays <= 30 ? 'current' : 'upcoming',
-      detail: 'Cotisation Foncière des Entreprises'
-    });
-  }
-  
-  // URSSAF - prochaine échéance
-  var urssafDeadline = getNextUrssafDeadline();
-  if (urssafDeadline) {
-    milestones.push({
-      id: 'urssaf',
-      label: 'URSSAF',
-      icon: '🏥',
-      date: urssafDeadline.date,
-      daysLeft: urssafDeadline.daysLeft,
-      status: urssafDeadline.daysLeft <= 0 ? 'passed' : urssafDeadline.daysLeft <= 3 ? 'urgent' : urssafDeadline.daysLeft <= 7 ? 'current' : 'upcoming',
-      detail: 'Déclaration ' + urssafDeadline.period
-    });
-  }
-  
-  // IR - si pas PL, déclaration mai
-  if (!COMPANY.prelevementLiberatoire) {
-    var irDate = new Date(currentYear, 4, 25); // 25 mai approx
-    var irDays = Math.ceil((irDate - today) / (1000 * 60 * 60 * 24));
-    if (irDays >= -30 && irDays <= 180) {
-      milestones.push({
-        id: 'ir',
-        label: 'Décla IR',
-        icon: '💰',
-        date: localISO(irDate),
-        daysLeft: irDays,
-        status: irDays <= 0 ? 'passed' : irDays <= 7 ? 'urgent' : irDays <= 30 ? 'current' : 'upcoming',
-        detail: 'Déclaration revenus ' + (currentYear - 1)
-      });
-    }
-  }
-  
-  // Seuil micro-entreprise
-  var data = compute();
-  var seuilMicro = 77700;
-  var pctMicro = (data.caHTAnnuel || 0) / seuilMicro;
-  if (pctMicro >= 0.7) {
-    var monthsRemaining = 12 - today.getMonth();
-    var projectedCA = data.caHTAnnuel + (data.caHTAnnuel / (today.getMonth() + 1)) * monthsRemaining;
-    if (projectedCA >= seuilMicro * 0.9) {
-      milestones.push({
-        id: 'micro',
-        label: 'Seuil Micro',
-        icon: '⚠️',
-        date: null,
-        daysLeft: null,
-        status: pctMicro >= 1 ? 'urgent' : 'current',
-        detail: 'CA: ' + EUR(data.caHTAnnuel) + ' / ' + EUR(seuilMicro) + ' (' + Math.round(pctMicro * 100) + '%)'
-      });
-    }
-  }
-  
-  // Trier par date
-  milestones.sort(function(a, b) {
-    if (a.daysLeft === null) return 1;
-    if (b.daysLeft === null) return -1;
-    return a.daysLeft - b.daysLeft;
-  });
-  
-  return milestones.slice(0, 6); // Max 6 jalons visibles
-}
-
-/**
- * Prochaine échéance URSSAF
- */
 function getNextUrssafDeadline() {
   var today = new Date(TODAY);
   var currentMonth = today.getMonth();
   var currentYear = today.getFullYear();
-  
   if (COMPANY.urssafPeriodicite === 'mensuel') {
     var endOfMonth = new Date(currentYear, currentMonth + 1, 0);
-    return {
-      date: localISO(endOfMonth),
-      daysLeft: Math.ceil((endOfMonth - today) / (1000 * 60 * 60 * 24)),
-      period: fmtMonthShort(ym(currentYear, currentMonth))
-    };
+    return { date: localISO(endOfMonth), daysLeft: Math.ceil((endOfMonth - today) / (1000 * 60 * 60 * 24)), period: fmtMonthShort(ym(currentYear, currentMonth)) };
   } else {
     var quarters = [[0, 31, 'T4'], [3, 30, 'T1'], [6, 31, 'T2'], [9, 31, 'T3']];
     for (var i = 0; i < quarters.length; i++) {
@@ -5820,330 +5550,111 @@ function getNextUrssafDeadline() {
       var deadlineDate = new Date(currentYear, q[0], q[1]);
       if (q[0] === 0 && currentMonth > 1) deadlineDate.setFullYear(currentYear + 1);
       var diff = Math.ceil((deadlineDate - today) / (1000 * 60 * 60 * 24));
-      if (diff >= 0 && diff <= 45) {
-        return { date: localISO(deadlineDate), daysLeft: diff, period: q[2] };
-      }
+      if (diff >= 0 && diff <= 45) return { date: localISO(deadlineDate), daysLeft: diff, period: q[2] };
     }
-    // Prochain trimestre
-    var nextQ = quarters.find(function(q) {
-      var d = new Date(currentYear, q[0], q[1]);
-      return d > today;
-    }) || quarters[0];
-    var nextDate = new Date(currentYear + (nextQ[0] === 0 ? 1 : 0), nextQ[0], nextQ[1]);
-    return { date: localISO(nextDate), daysLeft: Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24)), period: nextQ[2] };
+    return null;
   }
 }
 
-/**
- * Projette le mois d'assujettissement TVA basé sur le CA prévu
- */
+function getLegalMilestones() {
+  var milestones = [];
+  var today = new Date(TODAY);
+  var currentYear = today.getFullYear();
+  var acre = getAcreInfo();
+  if (COMPANY.acre && acre.expiryDate) {
+    var acreDays = Math.ceil((new Date(acre.expiryDate) - today) / (1000 * 60 * 60 * 24));
+    milestones.push({ id: 'acre', label: 'Fin ACRE', icon: '🎓', date: acre.expiryDate, daysLeft: acreDays, status: acreDays <= 0 ? 'passed' : acreDays <= 30 ? 'urgent' : acreDays <= 90 ? 'current' : 'upcoming' });
+  }
+  var cfeDate = new Date(currentYear, 11, 15);
+  var cfeDays = Math.ceil((cfeDate - today) / (1000 * 60 * 60 * 24));
+  if (cfeDays >= -30 && cfeDays <= 180) {
+    milestones.push({ id: 'cfe', label: 'CFE', icon: '🏢', date: localISO(cfeDate), daysLeft: cfeDays, status: cfeDays <= 0 ? 'passed' : cfeDays <= 7 ? 'urgent' : cfeDays <= 30 ? 'current' : 'upcoming' });
+  }
+  var urssaf = getNextUrssafDeadline();
+  if (urssaf) {
+    milestones.push({ id: 'urssaf', label: 'URSSAF', icon: '🏥', date: urssaf.date, daysLeft: urssaf.daysLeft, status: urssaf.daysLeft <= 3 ? 'urgent' : urssaf.daysLeft <= 7 ? 'current' : 'upcoming' });
+  }
+  if (!COMPANY.prelevementLiberatoire) {
+    var irDate = new Date(currentYear, 4, 25);
+    var irDays = Math.ceil((irDate - today) / (1000 * 60 * 60 * 24));
+    if (irDays >= -30 && irDays <= 180) {
+      milestones.push({ id: 'ir', label: 'Décla IR', icon: '💰', date: localISO(irDate), daysLeft: irDays, status: irDays <= 0 ? 'passed' : irDays <= 7 ? 'urgent' : irDays <= 30 ? 'current' : 'upcoming' });
+    }
+  }
+  milestones.sort(function(a, b) { return (a.daysLeft || 999) - (b.daysLeft || 999); });
+  return milestones.slice(0, 5);
+}
+
 function projectTVADate() {
   if (COMPANY.tvaDepuis) return { month: null };
-  
   var data = compute();
-  var seuilTVA = 36800;
-  var seuilMajore = 39100;
   var caActuel = data.caHTAnnuel || 0;
-  
-  if (caActuel >= seuilMajore) {
-    // Déjà dépassé - TVA immédiate
-    return { month: ym(TODAY.getFullYear(), TODAY.getMonth()), daysLeft: 0, date: localISO(TODAY), immediate: true };
-  }
-  
-  if (caActuel >= seuilTVA) {
-    // Entre les deux seuils - attention
-    return { month: ym(TODAY.getFullYear(), 11), daysLeft: Math.ceil((new Date(TODAY.getFullYear(), 11, 31) - TODAY) / (1000 * 60 * 60 * 24)), date: localISO(new Date(TODAY.getFullYear(), 11, 31)), warning: true };
-  }
-  
-  // Projection linéaire
+  if (caActuel >= 39100) return { month: ym(TODAY.getFullYear(), TODAY.getMonth()), daysLeft: 0, immediate: true };
+  if (caActuel >= 36800) return { month: ym(TODAY.getFullYear(), 11), daysLeft: Math.ceil((new Date(TODAY.getFullYear(), 11, 31) - TODAY) / (1000 * 60 * 60 * 24)), warning: true };
   var monthsElapsed = TODAY.getMonth() + 1;
   var caParMois = caActuel / monthsElapsed;
-  
   if (caParMois <= 0) return { month: null };
-  
-  var moisRestants = Math.ceil((seuilTVA - caActuel) / caParMois);
+  var moisRestants = Math.ceil((36800 - caActuel) / caParMois);
   var projectedMonth = TODAY.getMonth() + moisRestants;
   var projectedYear = TODAY.getFullYear() + Math.floor(projectedMonth / 12);
   projectedMonth = projectedMonth % 12;
-  
-  var projectedDate = new Date(projectedYear, projectedMonth, 1);
-  
-  return {
-    month: ym(projectedYear, projectedMonth),
-    daysLeft: Math.ceil((projectedDate - TODAY) / (1000 * 60 * 60 * 24)),
-    date: localISO(projectedDate),
-    caActuel: caActuel,
-    caParMois: Math.round(caParMois),
-    seuilTVA: seuilTVA
-  };
+  return { month: ym(projectedYear, projectedMonth), daysLeft: Math.ceil((new Date(projectedYear, projectedMonth, 1) - TODAY) / (1000 * 60 * 60 * 24)), caActuel: caActuel, caParMois: Math.round(caParMois) };
 }
 
-/**
- * Affiche le détail TVA avec les règles légales
- */
 function showTVADetail() {
   var projection = projectTVADate();
   var data = compute();
-  
   $('#formModalTitle').textContent = '🏛️ TVA - Règles & Projection';
   var body = $('#formModalBody');
   body.innerHTML = '';
-  
-  // Statut actuel
   var statusDiv = el('div', { style: { textAlign: 'center', marginBottom: '20px', padding: '16px', background: COMPANY.tvaDepuis ? 'rgba(236,72,153,0.1)' : 'var(--success-glow)', borderRadius: 'var(--radius-lg)' } });
   statusDiv.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, COMPANY.tvaDepuis ? '🏛️' : '✅'));
   statusDiv.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700' } }, COMPANY.tvaDepuis ? 'Assujetti TVA' : 'Franchise de TVA'));
-  if (COMPANY.tvaDepuis) {
-    statusDiv.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Depuis le ' + fmtLong(COMPANY.tvaDepuis)));
-  }
   body.appendChild(statusDiv);
-  
-  // Jauge CA
-  var seuilTVA = 36800;
-  var seuilMajore = 39100;
-  var pctTVA = Math.min(1, (data.caHTAnnuel || 0) / seuilMajore);
-  var pctSeuil1 = seuilTVA / seuilMajore;
-  
+  var pct = Math.min(1, (data.caHTAnnuel || 0) / 39100);
   var gaugeDiv = el('div', { style: { marginBottom: '20px' } });
-  gaugeDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' } }, [
-    el('span', {}, 'CA ' + TODAY.getFullYear() + ': ' + EUR(data.caHTAnnuel || 0)),
-    el('span', {}, Math.round(pctTVA * 100) + '%')
-  ]));
-  
-  var gauge = el('div', { style: { height: '12px', background: 'var(--bg-tertiary)', borderRadius: '6px', position: 'relative', overflow: 'visible' } });
-  var fill = el('div', { style: { height: '100%', width: (pctTVA * 100) + '%', borderRadius: '6px', background: pctTVA >= 1 ? 'var(--danger)' : pctTVA >= pctSeuil1 ? 'var(--warning)' : 'var(--success)', transition: 'width 0.5s' } });
-  gauge.appendChild(fill);
-  // Marqueur seuil 36800€
-  gauge.appendChild(el('div', { style: { position: 'absolute', left: (pctSeuil1 * 100) + '%', top: '-4px', bottom: '-4px', width: '2px', background: 'white' } }));
+  gaugeDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' } }, [el('span', {}, 'CA: ' + EUR(data.caHTAnnuel || 0)), el('span', {}, Math.round(pct * 100) + '%')]));
+  var gauge = el('div', { style: { height: '12px', background: 'var(--bg-tertiary)', borderRadius: '6px', position: 'relative' } });
+  gauge.appendChild(el('div', { style: { height: '100%', width: (pct * 100) + '%', borderRadius: '6px', background: pct >= 1 ? 'var(--danger)' : pct >= 0.94 ? 'var(--warning)' : 'var(--success)' } }));
   gaugeDiv.appendChild(gauge);
-  gaugeDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, [
-    el('span', {}, '0€'),
-    el('span', { style: { marginLeft: (pctSeuil1 * 100 - 15) + '%' } }, '36 800€'),
-    el('span', {}, '39 100€')
-  ]));
   body.appendChild(gaugeDiv);
-  
-  // Projection
   if (!COMPANY.tvaDepuis && projection.month) {
     var projDiv = el('div', { class: 'card', style: { marginBottom: '16px' } });
     projDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '8px' } }, '📈 Projection'));
-    if (projection.immediate) {
-      projDiv.appendChild(el('div', { style: { color: 'var(--danger)', fontWeight: '700' } }, '⚠️ Seuil majoré dépassé - TVA obligatoire immédiatement!'));
-    } else if (projection.warning) {
-      projDiv.appendChild(el('div', { style: { color: 'var(--warning)' } }, '⚠️ Seuil de base dépassé - Surveillance fin d\'année'));
-    } else {
-      projDiv.appendChild(el('div', {}, 'Au rythme actuel (' + EUR(projection.caParMois) + '/mois):'));
-      projDiv.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', marginTop: '4px' } }, 'TVA obligatoire en ' + fmtMonth(projection.month)));
-    }
+    projDiv.appendChild(el('div', {}, projection.immediate ? '⚠️ Seuil dépassé - TVA immédiate!' : 'TVA obligatoire en ' + fmtMonth(projection.month)));
     body.appendChild(projDiv);
   }
-  
-  // Règles légales
-  var rulesDiv = el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)' } });
-  rulesDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '10px' } }, '📜 Règles TVA Micro-Entreprise'));
-  
-  var rules = [
-    { icon: '📊', text: 'Seuil franchise: 36 800€ HT/an (prestations de services)' },
-    { icon: '⚠️', text: 'Seuil majoré: 39 100€ → TVA dès le 1er jour du mois de dépassement' },
-    { icon: '🔄', text: 'RAZ au 1er janvier: le compteur repart à zéro chaque année' },
-    { icon: '📅', text: 'Dépassement N-1: si > 36 800€ l\'an passé, TVA dès le 1er janvier' },
-    { icon: '↩️', text: 'Retour franchise: possible si CA < seuil pendant 2 ans consécutifs' },
-    { icon: '💳', text: 'Régime simplifié: déclaration CA12 en mai + 2 acomptes (juillet/décembre)' }
-  ];
-  
-  rules.forEach(function(r) {
-    var row = el('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '11px', marginBottom: '6px' } });
-    row.appendChild(el('span', {}, r.icon));
-    row.appendChild(el('span', { style: { color: 'var(--text-secondary)' } }, r.text));
-    rulesDiv.appendChild(row);
-  });
+  var rulesDiv = el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', fontSize: '11px' } });
+  rulesDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '8px' } }, '📜 Règles Micro-Entreprise'));
+  var rules = ['• Seuil franchise: 36 800€/an', '• Seuil majoré: 39 100€ → TVA immédiate', '• RAZ au 1er janvier chaque année', '• Dépassement N-1 > 36 800€ → TVA dès janvier', '• Retour franchise: CA < seuil pendant 2 ans'];
+  rules.forEach(function(r) { rulesDiv.appendChild(el('div', { style: { color: 'var(--text-secondary)', marginBottom: '4px' } }, r)); });
   body.appendChild(rulesDiv);
-  
   openModal('formModal');
 }
 
-/**
- * Génère la liste des actions prioritaires
- */
 function getActionsList() {
   var actions = [];
   var data = compute();
-  
-  // 1. Factures en retard (URGENT)
   if (data.lateCount > 0) {
-    data.facturesAEncaisser.filter(function(f) { return f.isLate; }).forEach(function(f) {
-      actions.push({
-        priority: 1,
-        type: 'urgent',
-        icon: '🚨',
-        label: 'Relancer ' + f.client,
-        sub: EUR(f.ttc) + ' en retard depuis ' + Math.abs(f.daysLate || 30) + 'j',
-        action: function() { showFactureModal(f); },
-        btnLabel: 'Voir',
-        btnClass: 'danger'
-      });
+    data.facturesAEncaisser.filter(function(f) { return f.isLate; }).slice(0, 2).forEach(function(f) {
+      actions.push({ priority: 1, type: 'urgent', icon: '🚨', label: 'Relancer ' + f.client, sub: EUR(f.ttc) + ' en retard', action: function() { showFactureModal(f); }, btnLabel: 'Voir', btnClass: 'danger' });
     });
   }
-  
-  // 2. Charges à payer cette semaine
-  var today = new Date(TODAY);
-  var nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-  data.detailChargesAPayer.slice(0, 3).forEach(function(c) {
-    actions.push({
-      priority: 2,
-      type: 'warning',
-      icon: '💳',
-      label: 'Payer ' + c.cat,
-      sub: EUR(c.montant) + ' · ' + fmtMonthShort(c.mois),
-      action: function() { togglePaid(c.id); },
-      btnLabel: '✓ Payé',
-      btnClass: 'success'
-    });
+  data.detailChargesAPayer.slice(0, 2).forEach(function(c) {
+    actions.push({ priority: 2, type: 'warning', icon: '💳', label: 'Payer ' + c.cat, sub: EUR(c.montant) + ' · ' + fmtMonthShort(c.mois), action: function() { togglePaid(c.id); }, btnLabel: '✓ Payé', btnClass: 'success' });
   });
-  
-  // 3. Salaire recommandé
   if (data.salaireReco >= 500) {
-    actions.push({
-      priority: 3,
-      type: 'success',
-      icon: '💸',
-      label: 'Verser un salaire',
-      sub: EUR(data.salaireReco) + ' disponible',
-      action: function() { showSalaireModal(data.salaireReco); },
-      btnLabel: 'Verser',
-      btnClass: ''
-    });
+    actions.push({ priority: 3, type: 'success', icon: '💸', label: 'Verser un salaire', sub: EUR(data.salaireReco) + ' disponible', action: function() { showSalaireModal(data.salaireReco); }, btnLabel: 'Verser', btnClass: '' });
   }
-  
-  // 4. Brouillons à envoyer
-  data.facturesAEncaisser.filter(function(f) { return f.isBrouillon; }).slice(0, 2).forEach(function(f) {
-    actions.push({
-      priority: 4,
-      type: 'info',
-      icon: '📝',
-      label: 'Envoyer facture ' + f.client,
-      sub: EUR(f.ttc) + ' · ' + fmtMonthShort(f.mois),
-      action: function() { setFactureStatus(f.id, 'envoyée'); },
-      btnLabel: 'Envoyée',
-      btnClass: 'secondary'
-    });
-  });
-  
-  // 5. URSSAF à déclarer
-  var urssaf = getNextUrssafDeadline();
-  if (urssaf && urssaf.daysLeft <= 7) {
-    actions.push({
-      priority: 2,
-      type: 'warning',
-      icon: '🏥',
-      label: 'Déclaration URSSAF',
-      sub: 'Échéance J-' + urssaf.daysLeft + ' · ' + urssaf.period,
-      action: function() { window.open('https://www.autoentrepreneur.urssaf.fr/', '_blank'); },
-      btnLabel: 'Déclarer',
-      btnClass: ''
-    });
-  }
-  
-  // Trier par priorité
   actions.sort(function(a, b) { return a.priority - b.priority; });
-  
-  return actions.slice(0, 5); // Max 5 actions
+  return actions.slice(0, 4);
 }
 
-/**
- * Affiche la vue consolidée des charges
- */
-function showChargesConsolidated() {
-  var data = compute();
-  $('#formModalTitle').textContent = '💳 Gestion des Charges';
-  var body = $('#formModalBody');
-  body.innerHTML = '';
-  
-  // Stats résumé
-  var statsDiv = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' } });
-  statsDiv.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--danger-glow)', borderRadius: 'var(--radius-md)' } }, [
-    el('div', { style: { fontSize: '18px', fontWeight: '700', color: 'var(--danger)' } }, EUR(data.provisionsAbsolues)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'À payer')
-  ]));
-  statsDiv.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--success-glow)', borderRadius: 'var(--radius-md)' } }, [
-    el('div', { style: { fontSize: '18px', fontWeight: '700', color: 'var(--success)' } }, EUR(data.chargesPayees)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Payées')
-  ]));
-  statsDiv.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)' } }, [
-    el('div', { style: { fontSize: '18px', fontWeight: '700' } }, EUR(data.totalCharges)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Total')
-  ]));
-  body.appendChild(statsDiv);
-  
-  // Répartition par type
-  if (data.provAbsoluesByType) {
-    var typesDiv = el('div', { style: { marginBottom: '16px' } });
-    typesDiv.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700', marginBottom: '8px' } }, 'Répartition à payer:'));
-    var typesGrid = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' } });
-    Object.keys(data.provAbsoluesByType).forEach(function(type) {
-      var amount = data.provAbsoluesByType[type];
-      if (amount > 0) {
-        var chip = el('div', { style: { padding: '6px 12px', background: 'var(--bg-tertiary)', borderRadius: '20px', fontSize: '11px' } });
-        chip.appendChild(el('span', { style: { fontWeight: '700' } }, type + ': '));
-        chip.appendChild(el('span', { style: { color: 'var(--danger)' } }, EUR(amount)));
-        typesGrid.appendChild(chip);
-      }
-    });
-    typesDiv.appendChild(typesGrid);
-    body.appendChild(typesDiv);
-  }
-  
-  // Liste des charges à payer
-  if (data.allProvisionsDetail && data.allProvisionsDetail.length > 0) {
-    var listDiv = el('div', { class: 'card', style: { maxHeight: '300px', overflowY: 'auto' } });
-    listDiv.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700', marginBottom: '12px' } }, '📋 Détail à payer (' + data.allProvisionsDetail.length + ')'));
-    
-    data.allProvisionsDetail.forEach(function(c) {
-      var row = el('div', { class: 'charge-row', onclick: function() { togglePaid(c.id); } });
-      var info = el('div', { class: 'charge-info' });
-      var catClass = c.cat === 'URSSAF' ? 'urssaf' : c.cat === 'TVA' ? 'tva' : c.cat === 'CFP' ? 'cfp' : c.cat === 'IR' ? 'ir' : 'other';
-      info.appendChild(el('span', { class: 'charge-cat ' + catClass }, c.cat));
-      info.appendChild(el('div', {}, [el('div', { class: 'charge-desc' }, c.label || c.cat), el('div', { class: 'charge-month' }, fmtMonthShort(c.mois))]));
-      row.appendChild(info);
-      row.appendChild(el('div', { class: 'charge-amount' }, EUR(c.montant)));
-      var check = el('div', { class: 'charge-check' + (isPaid(c.id) ? ' checked' : '') }, isPaid(c.id) ? '✓' : '');
-      row.appendChild(check);
-      listDiv.appendChild(row);
-    });
-    body.appendChild(listDiv);
-  }
-  
-  // Boutons d'action groupée
-  var btnsDiv = el('div', { style: { display: 'flex', gap: '10px', marginTop: '16px' } });
-  if (data.provAbsoluesByType['URSSAF'] > 0) {
-    btnsDiv.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
-      var ids = data.allProvisionsDetail.filter(function(c) { return c.cat === 'URSSAF'; }).map(function(c) { return c.id; });
-      markAllPaid(ids); closeModal('formModal');
-    } }, '✅ URSSAF payé'));
-  }
-  if (data.provAbsoluesByType['TVA'] > 0) {
-    btnsDiv.appendChild(el('button', { class: 'btn', style: { flex: '1', background: '#ec4899', color: 'white' }, onclick: function() {
-      var ids = data.allProvisionsDetail.filter(function(c) { return c.cat === 'TVA'; }).map(function(c) { return c.id; });
-      markAllPaid(ids); closeModal('formModal');
-    } }, '✅ TVA payée'));
-  }
-  body.appendChild(btnsDiv);
-  
-  openModal('formModal');
-}
-
-/**
- * Rendu du widget Actions du Jour
- */
 function renderActionsWidget(container) {
   var actions = getActionsList();
   if (actions.length === 0) return;
-  
   var widget = el('div', { class: 'actions-widget' });
-  var header = el('div', { class: 'actions-header' });
-  header.appendChild(el('div', { class: 'actions-title' }, [el('span', {}, '⚡'), el('span', {}, 'Actions du Jour'), el('span', { class: 'actions-badge' }, String(actions.length))]));
-  widget.appendChild(header);
-  
+  widget.appendChild(el('div', { class: 'actions-header' }, [el('div', { class: 'actions-title' }, [el('span', {}, '⚡'), el('span', {}, 'Actions du Jour'), el('span', { class: 'actions-badge' }, String(actions.length))])]));
   var list = el('div', { class: 'actions-list' });
   actions.forEach(function(a) {
     var item = el('div', { class: 'action-item ' + a.type });
@@ -6156,32 +5667,22 @@ function renderActionsWidget(container) {
   container.appendChild(widget);
 }
 
-/**
- * Rendu de la timeline jalons légaux
- */
 function renderLegalTimeline(container) {
   var milestones = getLegalMilestones();
   if (milestones.length === 0) return;
-  
   var timeline = el('div', { class: 'legal-timeline' });
-  var header = el('div', { class: 'legal-timeline-header' });
-  header.appendChild(el('div', { class: 'legal-timeline-title' }, [el('span', {}, '📅'), el('span', {}, 'Jalons Légaux')]));
-  timeline.appendChild(header);
-  
+  timeline.appendChild(el('div', { class: 'legal-timeline-header' }, [el('div', { class: 'legal-timeline-title' }, [el('span', {}, '📅'), el('span', {}, 'Jalons Légaux')])]));
   var track = el('div', { class: 'legal-timeline-track' });
   track.appendChild(el('div', { class: 'legal-timeline-line' }));
-  
   var items = el('div', { class: 'legal-timeline-items' });
   milestones.forEach(function(m) {
-    var milestone = el('div', { class: 'legal-milestone', onclick: m.action || function() { if (m.detail) toast(m.detail, 'info'); } });
+    var milestone = el('div', { class: 'legal-milestone', onclick: function() { toast(m.label + (m.date ? ' - ' + fmtShort(m.date) : ''), 'info'); } });
     milestone.appendChild(el('div', { class: 'legal-milestone-dot ' + m.status }, m.icon));
     milestone.appendChild(el('div', { class: 'legal-milestone-label' }, m.label));
-    if (m.date) {
-      milestone.appendChild(el('div', { class: 'legal-milestone-date' }, fmtShort(m.date)));
-    }
+    if (m.date) milestone.appendChild(el('div', { class: 'legal-milestone-date' }, fmtShort(m.date)));
     if (m.daysLeft !== null && m.daysLeft >= 0) {
-      var countdownClass = m.daysLeft <= 7 ? 'urgent' : m.daysLeft <= 30 ? 'warning' : 'ok';
-      milestone.appendChild(el('div', { class: 'legal-milestone-countdown ' + countdownClass }, m.daysLeft === 0 ? 'Aujourd\'hui' : 'J-' + m.daysLeft));
+      var cls = m.daysLeft <= 7 ? 'urgent' : m.daysLeft <= 30 ? 'warning' : 'ok';
+      milestone.appendChild(el('div', { class: 'legal-milestone-countdown ' + cls }, m.daysLeft === 0 ? 'Auj.' : 'J-' + m.daysLeft));
     }
     items.appendChild(milestone);
   });
@@ -6190,96 +5691,54 @@ function renderLegalTimeline(container) {
   container.appendChild(timeline);
 }
 
-/**
- * Rendu du score santé
- */
 function renderHealthScore(container) {
   var health = calculateHealthScore();
-  
   var widget = el('div', { class: 'health-score', onclick: showHealthScoreDetail });
   var header = el('div', { class: 'health-score-header' });
   header.appendChild(el('div', { class: 'health-score-title' }, 'Santé Entreprise'));
-  
   var valueDiv = el('div', { class: 'health-score-value' });
   valueDiv.appendChild(el('div', { class: 'health-score-circle ' + health.level }, String(health.score)));
   valueDiv.appendChild(el('div', {}, [el('div', { class: 'health-score-label' }, health.label), el('div', { class: 'health-score-sub' }, 'Cliquer pour détails')]));
   header.appendChild(valueDiv);
   widget.appendChild(header);
-  
-  // Mini métriques
   var details = el('div', { class: 'health-score-details' });
-  var metrics = [
-    { icon: '💰', value: EUR(health.data.cashDispoAbsolu), label: 'Cash' },
-    { icon: '📊', value: PCT(health.data.tauxFacturation), label: 'Activité' },
-    { icon: '⏱️', value: health.data.runway + ' mois', label: 'Autonomie' },
-    { icon: '⚠️', value: String(health.data.lateCount), label: 'Retards' }
-  ];
-  metrics.forEach(function(m) {
-    details.appendChild(el('div', { class: 'health-metric' }, [
-      el('div', { class: 'health-metric-icon' }, m.icon),
-      el('div', { class: 'health-metric-value' }, m.value),
-      el('div', { class: 'health-metric-label' }, m.label)
-    ]));
+  [{ icon: '💰', value: EUR(health.data.cashDispoAbsolu), label: 'Cash' }, { icon: '📊', value: PCT(health.data.tauxFacturation), label: 'Activité' }, { icon: '⏱️', value: health.data.runway + ' mois', label: 'Autonomie' }, { icon: '⚠️', value: String(health.data.lateCount), label: 'Retards' }].forEach(function(m) {
+    details.appendChild(el('div', { class: 'health-metric' }, [el('div', { class: 'health-metric-icon' }, m.icon), el('div', { class: 'health-metric-value' }, m.value), el('div', { class: 'health-metric-label' }, m.label)]));
   });
   widget.appendChild(details);
   container.appendChild(widget);
 }
 
-/**
- * Rendu du module TVA
- */
 function renderTVAModule(container) {
   var data = compute();
   var projection = projectTVADate();
-  var seuilTVA = 36800;
-  var seuilMajore = 39100;
-  var pctTVA = Math.min(1, (data.caHTAnnuel || 0) / seuilMajore);
-  
-  var module = el('div', { class: 'tva-module', onclick: showTVADetail, style: { cursor: 'pointer' } });
+  var pct = Math.min(1, (data.caHTAnnuel || 0) / 39100);
+  var module = el('div', { class: 'tva-module', onclick: showTVADetail });
   var header = el('div', { class: 'tva-header' });
   header.appendChild(el('div', { style: { fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' } }, [el('span', {}, '🏛️'), el('span', {}, 'TVA')]));
-  
-  var status = el('div', { class: 'tva-status' });
-  if (COMPANY.tvaDepuis) {
-    status.appendChild(el('span', { class: 'tva-status-badge assujetti' }, 'Assujetti'));
-  } else {
-    status.appendChild(el('span', { class: 'tva-status-badge franchise' }, 'Franchise'));
-  }
-  header.appendChild(status);
+  header.appendChild(el('span', { class: 'tva-status-badge ' + (COMPANY.tvaDepuis ? 'assujetti' : 'franchise') }, COMPANY.tvaDepuis ? 'Assujetti' : 'Franchise'));
   module.appendChild(header);
-  
-  // Jauge
-  var gaugeClass = pctTVA >= 1 ? 'danger' : pctTVA >= seuilTVA/seuilMajore ? 'warning' : 'safe';
   var gauge = el('div', { class: 'tva-gauge' });
-  gauge.appendChild(el('div', { class: 'tva-gauge-fill ' + gaugeClass, style: { width: (pctTVA * 100) + '%' } }));
-  gauge.appendChild(el('div', { class: 'tva-gauge-marker', style: { left: ((seuilTVA/seuilMajore) * 100) + '%' } }));
+  gauge.appendChild(el('div', { class: 'tva-gauge-fill ' + (pct >= 1 ? 'danger' : pct >= 0.94 ? 'warning' : 'safe'), style: { width: (pct * 100) + '%' } }));
+  gauge.appendChild(el('div', { class: 'tva-gauge-marker', style: { left: '94%' } }));
   module.appendChild(gauge);
-  
-  // Infos
   var info = el('div', { class: 'tva-info' });
   info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, EUR(data.caHTAnnuel || 0)), el('div', { class: 'tva-info-label' }, 'CA ' + TODAY.getFullYear())]));
-  info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, EUR(seuilTVA - (data.caHTAnnuel || 0))), el('div', { class: 'tva-info-label' }, 'Avant seuil')]));
+  info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, EUR(36800 - (data.caHTAnnuel || 0))), el('div', { class: 'tva-info-label' }, 'Avant seuil')]));
   if (!COMPANY.tvaDepuis && projection.month) {
-    info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value', style: { color: projection.daysLeft <= 90 ? 'var(--warning)' : 'var(--text-primary)' } }, fmtMonthShort(projection.month)), el('div', { class: 'tva-info-label' }, 'Projection')]));
+    info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, fmtMonthShort(projection.month)), el('div', { class: 'tva-info-label' }, 'Projection')]));
   } else {
-    info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, Math.round(pctTVA * 100) + '%'), el('div', { class: 'tva-info-label' }, 'Du seuil')]));
+    info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, Math.round(pct * 100) + '%'), el('div', { class: 'tva-info-label' }, 'Du seuil')]));
   }
   module.appendChild(info);
-  
   container.appendChild(module);
 }
 
-/**
- * Rendu des quick-actions
- */
 function renderQuickActions(container) {
   var quick = el('div', { class: 'quick-actions' });
-  
   quick.appendChild(el('div', { class: 'quick-action-btn', onclick: function() { showMonthCongesModal(ym(TODAY.getFullYear(), TODAY.getMonth())); } }, [el('span', { class: 'icon' }, '🏖️'), el('span', {}, 'Congés')]));
   quick.appendChild(el('div', { class: 'quick-action-btn', onclick: function() { showSalaireModal(); } }, [el('span', { class: 'icon' }, '💸'), el('span', {}, 'Salaire')]));
-  quick.appendChild(el('div', { class: 'quick-action-btn', onclick: showChargesConsolidated }, [el('span', { class: 'icon' }, '💳'), el('span', {}, 'Charges')]));
   quick.appendChild(el('div', { class: 'quick-action-btn', onclick: showChargeModal }, [el('span', { class: 'icon' }, '➕'), el('span', {}, 'Dépense')]));
-  
   container.appendChild(quick);
 }
 
@@ -6396,40 +5855,27 @@ function renderDashboard(container) {
   var months = getPeriodMonths();
   
   // ═══════════════════════════════════════════════════════════════════════════
-  // V50 - SPRINT 8: DASHBOARD ACTION-FIRST
-  // 1. SANTÉ & ACTIONS (état global + quoi faire maintenant)
-  // 2. JALONS LÉGAUX (timeline visuelle)
-  // 3. PERFORMANCE (combien je gagne)
-  // 4. TRÉSORERIE (combien j'ai)
+  // V49 - NOUVEL ORDRE ERGONOMIQUE
+  // 1. URGENCES (ce qui nécessite une action immédiate)
+  // 2. PERFORMANCE (combien je gagne)
+  // 3. TRÉSORERIE (combien j'ai)
   // ═══════════════════════════════════════════════════════════════════════════
   
   // ═══════════════════════════════════════════════════════════════════════════
-  // 1. SANTÉ & ACTIONS PRIORITAIRES
+  // 1. URGENCES
   // ═══════════════════════════════════════════════════════════════════════════
   renderHealthScore(container);
   renderActionsWidget(container);
-  
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 2. JALONS LÉGAUX (Timeline visuelle)
-  // ═══════════════════════════════════════════════════════════════════════════
   renderLegalTimeline(container);
-  
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 3. QUICK-ACTIONS (Congés, Salaire, Charges)
-  // ═══════════════════════════════════════════════════════════════════════════
   renderQuickActions(container);
+  if (!COMPANY.tvaDepuis || (data.caHTAnnuel && data.caHTAnnuel > 20000)) { renderTVAModule(container); }
+  
   
   // ═══════════════════════════════════════════════════════════════════════════
-  // 4. TVA MODULE (si pertinent)
-  // ═══════════════════════════════════════════════════════════════════════════
-  if (!COMPANY.tvaDepuis || (data.caHTAnnuel && data.caHTAnnuel > 20000)) {
-    renderTVAModule(container);
-  }
-  
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 5. PERFORMANCE (combien je gagne)
+  // 2. PERFORMANCE (combien je gagne)
   // ═══════════════════════════════════════════════════════════════════════════
   container.appendChild(SectionTitle('📊', 'Performance'));
+  
   // --- KPIs CA ---
   var caKpis = el('div', { class: 'kpi-grid', style: { marginBottom: '12px' } });
   
@@ -7971,97 +7417,6 @@ document.addEventListener('DOMContentLoaded', init);
 
 /*
  * ═══════════════════════════════════════════════════════════════════════════
-/*
- * ═══════════════════════════════════════════════════════════════════════════
- * CHANGELOG FREEL V50 - 17 janvier 2026 (Sprint 8 - Dashboard Action-First)
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * 🔴 NOUVELLES FONCTIONNALITÉS MAJEURES
- * ─────────────────────────────────────
- *
- * 1. WIDGET "ACTIONS DU JOUR"
- *    - Liste priorisée des tâches urgentes
- *    - Quick-actions intégrées (boutons contextuels)
- *    - Priorisation: Retards > Charges > Salaires > Brouillons > URSSAF
- *    - Design moderne avec codes couleur par urgence
- *    - Maximum 5 actions affichées
- *
- * 2. TIMELINE JALONS LÉGAUX (Roadmap Style)
- *    - Design visuel moderne type "roadmap"
- *    - Points colorés par urgence (vert → orange → rouge)
- *    - Animation pulse sur échéances urgentes
- *    - Jalons: ACRE, TVA, CFE, URSSAF, IR, Seuil Micro
- *    - Countdown J-X interactif
- *    - Clic pour détail et action
- *
- * 3. MODULE TVA INTELLIGENT
- *    - Projection automatique du mois d'assujettissement
- *    - Basé sur le CA prévu (extrapolation linéaire)
- *    - Jauge visuelle CA vs seuils (36 800€ / 39 100€)
- *    - Règles légales micro-entreprise affichées:
- *      · Seuil franchise vs seuil majoré
- *      · RAZ au 1er janvier
- *      · Règle dépassement N-1
- *      · Conditions retour franchise
- *      · Régime simplifié (CA12 + acomptes)
- *
- * 4. SCORE SANTÉ ENTREPRISE
- *    - Indicateur synthétique 0-100
- *    - 4 composantes: Trésorerie, Retards, Seuils légaux, Activité
- *    - Drill-down avec détail par composante
- *    - Recommandations personnalisées
- *    - Niveaux: Excellente (80+), Bonne (60+), À surveiller (40+), Critique
- *
- * 5. QUICK-ADD BUTTONS
- *    - Boutons rapides dans le dashboard
- *    - Congés: accès direct au mois courant
- *    - Salaire: avec calcul safe-to-withdraw
- *    - Charges: vue consolidée
- *    - Dépense: ajout rapide
- *
- * 6. VUE CONSOLIDÉE CHARGES
- *    - Toutes les charges en un seul endroit
- *    - Onglets À payer / Payées
- *    - Répartition par type (URSSAF, TVA, CFP, IR)
- *    - Actions groupées (marquer tout URSSAF payé, etc.)
- *    - Statistiques: à payer, payées, total
- *
- * 🟢 NOUVELLES FONCTIONS
- * ──────────────────────
- * - calculateHealthScore(): calcul score santé 0-100
- * - showHealthScoreDetail(): modale détail santé
- * - getLegalMilestones(): jalons légaux pour timeline
- * - getNextUrssafDeadline(): prochaine échéance URSSAF
- * - projectTVADate(): projection date assujettissement TVA
- * - showTVADetail(): modale règles TVA + projection
- * - getActionsList(): liste actions prioritaires
- * - showChargesConsolidated(): modale vue charges
- * - renderActionsWidget(): widget actions du jour
- * - renderLegalTimeline(): timeline jalons légaux
- * - renderHealthScore(): score santé
- * - renderTVAModule(): module TVA
- * - renderQuickActions(): boutons quick-add
- * - fmtShort(): formatage date courte
- *
- * 🟠 RÉORGANISATION DASHBOARD
- * ───────────────────────────
- * AVANT (V49):
- * ├─ Deadlines + Alertes
- * ├─ Performance (KPIs CA)
- * └─ Trésorerie
- *
- * APRÈS (V50):
- * ├─ 1. SANTÉ ENTREPRISE (score global)
- * ├─ 2. ACTIONS DU JOUR (quoi faire maintenant)
- * ├─ 3. JALONS LÉGAUX (timeline visuelle)
- * ├─ 4. QUICK-ACTIONS (congés, salaire, charges)
- * ├─ 5. TVA MODULE (projection + règles)
- * ├─ 6. PERFORMANCE (KPIs CA)
- * └─ 7. TRÉSORERIE
- *
- * ═══════════════════════════════════════════════════════════════════════════
- */
-
  * CHANGELOG FREEL V49 - 11 janvier 2026 (Sprint 7 - Refonte UX)
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -8195,18 +7550,14 @@ document.addEventListener('DOMContentLoaded', init);
  * - Projections intelligentes basées sur missions actives
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * PROCHAINES ÉTAPES (Sprint 9)
+ * PROCHAINES ÉTAPES (Sprint 8)
  * ═══════════════════════════════════════════════════════════════════════════
  * - [ ] Validation numérotation factures sans trous (Art. L441-9)
  * - [ ] TVA déductible sur achats pro
  * - [ ] Tests unitaires calculs fiscaux
  * - [ ] Intégration Supabase
- * - [x] Widget Actions du Jour ✅ V50
- * - [x] Timeline Jalons Légaux ✅ V50
- * - [x] Module TVA Intelligent ✅ V50
- * - [x] Score Santé Entreprise ✅ V50
- * - [x] Quick-Add Buttons ✅ V50
- * - [x] Vue Consolidée Charges ✅ V50
+ * - [x] Rendement compte pro ✅ V47
+ * - [x] Indicateurs cliquabilité corrigés ✅ V47
  */
 </script>
 </body>
