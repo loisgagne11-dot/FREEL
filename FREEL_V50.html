@@ -737,6 +737,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .conges-month-days { font-size: 12px; font-weight: 700; }
 .conges-month.has-conges { background: var(--warning-glow); }
 .conges-month.current { border: 2px solid var(--accent); }
+
+.keyboard-help { position: fixed; bottom: 80px; right: 20px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 16px; max-width: 280px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 1000; display: none; }
+.keyboard-help.show { display: block; animation: slideUp 0.2s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.keyboard-help-title { font-size: 12px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.keyboard-shortcut { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--glass-border); font-size: 11px; }
+.keyboard-shortcut:last-child { border-bottom: none; }
+.keyboard-key { background: var(--bg-tertiary); padding: 3px 8px; border-radius: 4px; font-family: monospace; font-size: 10px; font-weight: 700; }
+.search-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 2000; display: none; align-items: flex-start; justify-content: center; padding-top: 100px; }
+.search-overlay.show { display: flex; animation: fadeIn 0.15s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.search-box { background: var(--bg-secondary); border: 1px solid var(--accent); border-radius: var(--radius-lg); width: 90%; max-width: 500px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.search-input-wrap { display: flex; align-items: center; padding: 16px; gap: 12px; border-bottom: 1px solid var(--glass-border); }
+.search-input-wrap input { flex: 1; background: transparent; border: none; font-size: 16px; color: var(--text-primary); outline: none; }
+.search-results { max-height: 400px; overflow-y: auto; }
+.search-result { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; transition: all 0.1s; }
+.search-result:hover, .search-result.selected { background: var(--accent-glow); }
+.search-result-icon { font-size: 20px; }
+.search-result-info { flex: 1; }
+.search-result-title { font-size: 13px; font-weight: 600; }
+.search-result-sub { font-size: 11px; color: var(--text-muted); }
+.search-result-badge { font-size: 10px; padding: 2px 8px; background: var(--bg-tertiary); border-radius: 4px; }
+.search-empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px; }
+.notif-badge { position: absolute; top: -4px; right: -4px; background: var(--danger); color: white; font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 8px; }
+.backup-indicator { position: fixed; bottom: 20px; left: 20px; background: var(--success); color: white; padding: 8px 14px; border-radius: 20px; font-size: 11px; font-weight: 600; display: none; z-index: 1000; }
+.backup-indicator.show { display: flex; align-items: center; gap: 6px; animation: fadeIn 0.2s ease; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 .aenc-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -2521,6 +2547,7 @@ function saveAll() {
   localStorage.setItem('freel_v39_clients', JSON.stringify(CLIENTS));
   localStorage.setItem('freel_v39_treasury', JSON.stringify(TREASURY));
   localStorage.setItem('freel_v39_ir_config', JSON.stringify(IR_CONFIG));
+  autoBackup();
 }
 
 function loadAll() {
@@ -6279,6 +6306,193 @@ function renderCongesCalendar(container) {
   container.appendChild(widget);
 }
 
+
+var SEARCH_OPEN = false;
+var SEARCH_RESULTS = [];
+var SEARCH_INDEX = 0;
+var HELP_OPEN = false;
+
+function toggleKeyboardHelp() {
+  HELP_OPEN = !HELP_OPEN;
+  var help = $('#keyboardHelp');
+  if (help) help.classList.toggle('show', HELP_OPEN);
+}
+
+function showSearch() {
+  SEARCH_OPEN = true;
+  SEARCH_RESULTS = [];
+  SEARCH_INDEX = 0;
+  var overlay = $('#searchOverlay');
+  if (overlay) {
+    overlay.classList.add('show');
+    var input = overlay.querySelector('input');
+    if (input) { input.value = ''; input.focus(); }
+    updateSearchResults('');
+  }
+}
+
+function hideSearch() {
+  SEARCH_OPEN = false;
+  var overlay = $('#searchOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function performSearch(query) {
+  query = (query || '').toLowerCase().trim();
+  var results = [];
+  
+  if (!query) {
+    SEARCH_RESULTS = [];
+    updateSearchResults('');
+    return;
+  }
+  
+  // Recherche clients
+  CLIENTS.forEach(function(c) {
+    if ((c.nom || '').toLowerCase().includes(query)) {
+      results.push({ type: 'client', icon: '👤', title: c.nom, sub: c.email || 'Client', action: function() { showClientModal(c); } });
+    }
+  });
+  
+  // Recherche missions
+  MISSIONS.forEach(function(m) {
+    if ((m.client || '').toLowerCase().includes(query) || (m.titre || '').toLowerCase().includes(query)) {
+      results.push({ type: 'mission', icon: '💼', title: m.client + (m.titre ? ' - ' + m.titre : ''), sub: EUR(m.tjm) + '/j', action: function() { showMissionModal(m); } });
+    }
+  });
+  
+  // Recherche factures
+  MISSIONS.forEach(function(m) {
+    if (m.factures) {
+      m.factures.forEach(function(f) {
+        if ((f.client || m.client || '').toLowerCase().includes(query) || (f.numero || '').toLowerCase().includes(query)) {
+          results.push({ type: 'facture', icon: '📄', title: (f.client || m.client) + ' · ' + fmtMonthShort(f.mois), sub: EUR(f.ttc) + ' · ' + f.status, action: function() { showFactureModal(f); } });
+        }
+      });
+    }
+  });
+  
+  // Actions rapides
+  if ('salaire'.includes(query)) results.push({ type: 'action', icon: '💸', title: 'Verser un salaire', sub: 'Action rapide', action: function() { showSalaireModal(); } });
+  if ('congés'.includes(query) || 'conges'.includes(query)) results.push({ type: 'action', icon: '🏖️', title: 'Gérer les congés', sub: 'Action rapide', action: function() { showCongesOverview(); } });
+  if ('export'.includes(query) || 'pdf'.includes(query)) results.push({ type: 'action', icon: '📄', title: 'Exporter PDF', sub: 'Action rapide', action: exportPDFReport });
+  if ('objectif'.includes(query)) results.push({ type: 'action', icon: '🎯', title: 'Définir objectif', sub: 'Action rapide', action: showGoalModal });
+  
+  SEARCH_RESULTS = results.slice(0, 10);
+  SEARCH_INDEX = 0;
+  updateSearchResults(query);
+}
+
+function updateSearchResults(query) {
+  var container = $('#searchResults');
+  if (!container) return;
+  container.innerHTML = '';
+  
+  if (SEARCH_RESULTS.length === 0) {
+    container.appendChild(el('div', { class: 'search-empty' }, query ? 'Aucun résultat pour "' + query + '"' : 'Tape pour rechercher...'));
+    return;
+  }
+  
+  SEARCH_RESULTS.forEach(function(r, i) {
+    var item = el('div', { class: 'search-result' + (i === SEARCH_INDEX ? ' selected' : ''), onclick: function() { hideSearch(); r.action(); } });
+    item.appendChild(el('div', { class: 'search-result-icon' }, r.icon));
+    item.appendChild(el('div', { class: 'search-result-info' }, [el('div', { class: 'search-result-title' }, r.title), el('div', { class: 'search-result-sub' }, r.sub)]));
+    item.appendChild(el('div', { class: 'search-result-badge' }, r.type));
+    container.appendChild(item);
+  });
+}
+
+function handleSearchKey(e) {
+  if (e.key === 'Escape') { hideSearch(); return; }
+  if (e.key === 'ArrowDown') { SEARCH_INDEX = Math.min(SEARCH_INDEX + 1, SEARCH_RESULTS.length - 1); updateSearchResults(''); e.preventDefault(); }
+  if (e.key === 'ArrowUp') { SEARCH_INDEX = Math.max(SEARCH_INDEX - 1, 0); updateSearchResults(''); e.preventDefault(); }
+  if (e.key === 'Enter' && SEARCH_RESULTS[SEARCH_INDEX]) { hideSearch(); SEARCH_RESULTS[SEARCH_INDEX].action(); }
+}
+
+function autoBackup() {
+  var data = { company: COMPANY, missions: MISSIONS, clients: CLIENTS, treasury: TREASURY, irConfig: IR_CONFIG, version: 'V50', date: localISO(TODAY) };
+  var key = 'freel_backup_' + localISO(TODAY);
+  localStorage.setItem(key, JSON.stringify(data));
+  
+  // Garder seulement les 7 derniers backups
+  var keys = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && k.startsWith('freel_backup_')) keys.push(k);
+  }
+  keys.sort().reverse();
+  keys.slice(7).forEach(function(k) { localStorage.removeItem(k); });
+  
+  showBackupIndicator();
+}
+
+function showBackupIndicator() {
+  var indicator = $('#backupIndicator');
+  if (indicator) {
+    indicator.classList.add('show');
+    setTimeout(function() { indicator.classList.remove('show'); }, 2000);
+  }
+}
+
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', function(e) {
+    if (SEARCH_OPEN) { handleSearchKey(e); return; }
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) { e.preventDefault(); toggleKeyboardHelp(); }
+    if (e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); showSearch(); }
+    if (e.key === 'Escape') { hideSearch(); if (HELP_OPEN) toggleKeyboardHelp(); }
+    if (e.key === 'n' && !e.metaKey && !e.ctrlKey) showMissionModal();
+    if (e.key === 's' && !e.metaKey && !e.ctrlKey) showSalaireModal();
+    if (e.key === 'c' && !e.metaKey && !e.ctrlKey) showChargeModal();
+    if (e.key === 'e' && !e.metaKey && !e.ctrlKey) exportPDFReport();
+    if (e.key === 'g' && !e.metaKey && !e.ctrlKey) showGoalModal();
+  });
+}
+
+function createSearchOverlay() {
+  var overlay = el('div', { id: 'searchOverlay', class: 'search-overlay', onclick: function(e) { if (e.target === overlay) hideSearch(); } });
+  var box = el('div', { class: 'search-box' });
+  var inputWrap = el('div', { class: 'search-input-wrap' });
+  inputWrap.appendChild(el('span', {}, '🔍'));
+  var input = el('input', { type: 'text', placeholder: 'Rechercher clients, factures, actions...', oninput: function() { performSearch(this.value); } });
+  inputWrap.appendChild(input);
+  inputWrap.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'ESC'));
+  box.appendChild(inputWrap);
+  box.appendChild(el('div', { id: 'searchResults', class: 'search-results' }));
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
+function createKeyboardHelp() {
+  var help = el('div', { id: 'keyboardHelp', class: 'keyboard-help' });
+  help.appendChild(el('div', { class: 'keyboard-help-title' }, [el('span', {}, '⌨️'), el('span', {}, 'Raccourcis')]));
+  var shortcuts = [
+    ['/', 'Recherche'],
+    ['N', 'Nouvelle mission'],
+    ['S', 'Verser salaire'],
+    ['C', 'Ajouter charge'],
+    ['E', 'Export PDF'],
+    ['G', 'Objectif CA'],
+    ['?', 'Aide raccourcis'],
+    ['Esc', 'Fermer']
+  ];
+  shortcuts.forEach(function(s) {
+    var row = el('div', { class: 'keyboard-shortcut' });
+    row.appendChild(el('span', {}, s[1]));
+    row.appendChild(el('span', { class: 'keyboard-key' }, s[0]));
+    help.appendChild(row);
+  });
+  document.body.appendChild(help);
+}
+
+function createBackupIndicator() {
+  var indicator = el('div', { id: 'backupIndicator', class: 'backup-indicator' });
+  indicator.appendChild(el('span', {}, '✓'));
+  indicator.appendChild(el('span', {}, 'Sauvegardé'));
+  document.body.appendChild(indicator);
+}
+
 function renderDashboardDeadlines(container) {
   var deadlines = getUpcomingDeadlines();
   if (deadlines.length === 0) return;
@@ -7928,15 +8142,11 @@ function init() {
   $('#obNext').onclick = nextOnboarding;
   $('#obSkip').onclick = skipOnboarding;
   
-  // Keyboard
-  document.onkeydown = function(e) {
-    if (e.key === 'Escape') closeAllModals();
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-    if (e.key === 'n') showMissionModal();
-    if (e.key === 'c') showChargeModal();
-    if (e.key === 's') showSalaireModal();
-    if (e.key === 'p' && e.ctrlKey) { e.preventDefault(); togglePrivacy(); }
-  };
+  // Sprint 12: Raccourcis clavier améliorés + recherche + backup
+  createSearchOverlay();
+  createKeyboardHelp();
+  createBackupIndicator();
+  initKeyboardShortcuts();
   
   // Privacy toggle
   var privacyBtn = $('#privacyToggle');
