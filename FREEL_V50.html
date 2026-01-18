@@ -817,6 +817,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .nav-tabs { display: none; }
 }
 
+/* Sprint 14: Notification Center */
+.notif-btn { position: relative; }
+.notif-btn .notif-count { position: absolute; top: -2px; right: -2px; background: var(--danger); color: white; font-size: 9px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.notif-center { position: fixed; top: 60px; right: 20px; width: 320px; max-height: 70vh; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); box-shadow: 0 10px 40px rgba(0,0,0,0.4); z-index: 1500; display: none; overflow: hidden; }
+.notif-center.show { display: block; animation: slideDown 0.2s ease; }
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+.notif-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--glass-border); }
+.notif-title { font-size: 13px; font-weight: 700; }
+.notif-clear { font-size: 10px; color: var(--text-muted); cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
+.notif-clear:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.notif-list { max-height: calc(70vh - 50px); overflow-y: auto; }
+.notif-item { display: flex; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--glass-border); cursor: pointer; transition: all 0.15s; }
+.notif-item:hover { background: var(--bg-tertiary); }
+.notif-item.unread { background: var(--accent-glow); }
+.notif-item.urgent { border-left: 3px solid var(--danger); }
+.notif-item.warning { border-left: 3px solid var(--warning); }
+.notif-item.info { border-left: 3px solid var(--info); }
+.notif-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.notif-icon.urgent { background: var(--danger-glow); }
+.notif-icon.warning { background: var(--warning-glow); }
+.notif-icon.info { background: var(--info-glow); }
+.notif-icon.success { background: var(--success-glow); }
+.notif-content { flex: 1; min-width: 0; }
+.notif-text { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+.notif-sub { font-size: 10px; color: var(--text-muted); }
+.notif-time { font-size: 9px; color: var(--text-muted); white-space: nowrap; }
+.notif-empty { padding: 32px; text-align: center; color: var(--text-muted); font-size: 12px; }
+@media (max-width: 480px) { .notif-center { right: 10px; left: 10px; width: auto; top: 50px; } }
+
 .aenc-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .aenc-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 6px; cursor: pointer; font-size: 11px; }
 .aenc-item:hover { background: rgba(255,255,255,0.06); }
@@ -1257,7 +1286,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <input type="month" class="period-input" id="periodStart" style="display:none">
         <input type="month" class="period-input" id="periodEnd" style="display:none">
       </div>
-      <!-- SPRINT 2: Toggle Privacy Mode -->
+      <!-- Sprint 14: Notifications -->
+      <button class="privacy-toggle notif-btn" id="notifBtn" title="Notifications" onclick="toggleNotifCenter()">🔔<span class="notif-count" id="notifBadge" style="display:none">0</span></button>
       <button class="privacy-toggle" id="themeToggle" title="Changer le thème" onclick="toggleTheme()">☀️</button>
       <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité">👁️</button>
       <nav class="nav-tabs">
@@ -6625,6 +6655,182 @@ function initTheme() {
   updateThemeButton();
 }
 
+// Sprint 14: Notification Center
+var NOTIF_OPEN = false;
+var NOTIF_READ = JSON.parse(localStorage.getItem('freel_notif_read') || '[]');
+
+function getNotifications() {
+  var notifs = [];
+  var now = TODAY;
+
+  // Factures en retard
+  MISSIONS.forEach(function(m) {
+    if (m.factures) {
+      m.factures.forEach(function(f) {
+        if (f.status === 'envoyée') {
+          var echeance = parseDate(f.echeance || f.mois);
+          var days = Math.floor((now - echeance) / 86400000);
+          if (days > 0) {
+            notifs.push({
+              id: 'facture_' + f.numero,
+              type: 'urgent',
+              icon: '⚠️',
+              text: 'Facture ' + (f.client || m.client) + ' en retard',
+              sub: EUR(f.ttc) + ' · ' + days + ' jour' + (days > 1 ? 's' : '') + ' de retard',
+              time: days + 'j',
+              action: function() { showFactureModal(f); }
+            });
+          } else if (days >= -3) {
+            notifs.push({
+              id: 'facture_soon_' + f.numero,
+              type: 'warning',
+              icon: '📄',
+              text: 'Facture ' + (f.client || m.client) + ' bientôt due',
+              sub: EUR(f.ttc) + ' · échéance ' + fmtDate(echeance),
+              time: Math.abs(days) + 'j',
+              action: function() { showFactureModal(f); }
+            });
+          }
+        }
+      });
+    }
+  });
+
+  // Échéances légales
+  var deadlines = getUpcomingDeadlines ? getUpcomingDeadlines() : [];
+  deadlines.forEach(function(d) {
+    if (d.daysLeft <= 7) {
+      notifs.push({
+        id: 'deadline_' + d.label.replace(/\s/g, '_'),
+        type: d.daysLeft <= 3 ? 'urgent' : 'warning',
+        icon: d.icon,
+        text: d.label,
+        sub: d.daysLeft === 0 ? 'Aujourd\'hui!' : d.daysLeft === 1 ? 'Demain' : 'Dans ' + d.daysLeft + ' jours',
+        time: 'J-' + d.daysLeft
+      });
+    }
+  });
+
+  // Seuil TVA proche
+  var ca = getTotalCA();
+  var seuilTVA = 36800;
+  if (ca >= seuilTVA * 0.9 && ca < seuilTVA) {
+    notifs.push({
+      id: 'tva_seuil',
+      type: 'info',
+      icon: '📊',
+      text: 'Seuil TVA proche',
+      sub: 'CA: ' + EUR(ca) + ' / ' + EUR(seuilTVA) + ' (' + Math.round(ca/seuilTVA*100) + '%)',
+      time: 'Info'
+    });
+  }
+
+  // ACRE expiration
+  if (COMPANY.dateCreation) {
+    var creation = parseDate(COMPANY.dateCreation);
+    var acreEnd = new Date(creation);
+    acreEnd.setFullYear(acreEnd.getFullYear() + 1);
+    var daysToAcre = Math.floor((acreEnd - now) / 86400000);
+    if (daysToAcre > 0 && daysToAcre <= 30) {
+      notifs.push({
+        id: 'acre_expire',
+        type: daysToAcre <= 7 ? 'warning' : 'info',
+        icon: '🎁',
+        text: 'ACRE expire bientôt',
+        sub: 'Fin le ' + fmtDate(acreEnd) + ' · Cotisations +' + Math.round((0.222 - 0.111) * 100) + '%',
+        time: 'J-' + daysToAcre
+      });
+    }
+  }
+
+  // Marquer comme lu/non lu
+  notifs.forEach(function(n) {
+    n.unread = NOTIF_READ.indexOf(n.id) === -1;
+  });
+
+  return notifs.sort(function(a, b) {
+    if (a.type === 'urgent' && b.type !== 'urgent') return -1;
+    if (b.type === 'urgent' && a.type !== 'urgent') return 1;
+    return 0;
+  });
+}
+
+function toggleNotifCenter() {
+  NOTIF_OPEN = !NOTIF_OPEN;
+  var center = $('#notifCenter');
+  if (center) center.classList.toggle('show', NOTIF_OPEN);
+  if (NOTIF_OPEN) renderNotifList();
+}
+
+function renderNotifList() {
+  var list = $('#notifList');
+  if (!list) return;
+  list.innerHTML = '';
+
+  var notifs = getNotifications();
+  if (notifs.length === 0) {
+    list.appendChild(el('div', { class: 'notif-empty' }, '✓ Aucune notification'));
+    return;
+  }
+
+  notifs.forEach(function(n) {
+    var item = el('div', {
+      class: 'notif-item ' + n.type + (n.unread ? ' unread' : ''),
+      onclick: function() {
+        markNotifRead(n.id);
+        if (n.action) { toggleNotifCenter(); n.action(); }
+      }
+    });
+    item.appendChild(el('div', { class: 'notif-icon ' + n.type }, n.icon));
+    var content = el('div', { class: 'notif-content' });
+    content.appendChild(el('div', { class: 'notif-text' }, n.text));
+    content.appendChild(el('div', { class: 'notif-sub' }, n.sub));
+    item.appendChild(content);
+    item.appendChild(el('div', { class: 'notif-time' }, n.time));
+    list.appendChild(item);
+  });
+}
+
+function markNotifRead(id) {
+  if (NOTIF_READ.indexOf(id) === -1) {
+    NOTIF_READ.push(id);
+    localStorage.setItem('freel_notif_read', JSON.stringify(NOTIF_READ));
+    updateNotifBadge();
+  }
+}
+
+function clearAllNotifs() {
+  var notifs = getNotifications();
+  notifs.forEach(function(n) { markNotifRead(n.id); });
+  renderNotifList();
+}
+
+function updateNotifBadge() {
+  var notifs = getNotifications();
+  var unread = notifs.filter(function(n) { return n.unread; }).length;
+  var badge = $('#notifBadge');
+  if (badge) {
+    badge.textContent = unread;
+    badge.style.display = unread > 0 ? 'flex' : 'none';
+  }
+}
+
+function createNotifCenter() {
+  var center = el('div', { id: 'notifCenter', class: 'notif-center' });
+  var header = el('div', { class: 'notif-header' });
+  header.appendChild(el('div', { class: 'notif-title' }, '🔔 Notifications'));
+  header.appendChild(el('div', { class: 'notif-clear', onclick: clearAllNotifs }, 'Tout marquer lu'));
+  center.appendChild(header);
+  center.appendChild(el('div', { id: 'notifList', class: 'notif-list' }));
+  document.body.appendChild(center);
+
+  document.addEventListener('click', function(e) {
+    if (NOTIF_OPEN && !e.target.closest('.notif-center') && !e.target.closest('.notif-btn')) {
+      toggleNotifCenter();
+    }
+  });
+}
+
 function renderDashboardDeadlines(container) {
   var deadlines = getUpcomingDeadlines();
   if (deadlines.length === 0) return;
@@ -8116,6 +8322,7 @@ function render() {
   
   $$('.nav-tab, .bottom-nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === VIEW); });
   $('#periodYear').textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
+  updateNotifBadge();
 }
 
 // === ONBOARDING ===
@@ -8280,6 +8487,8 @@ function init() {
   createBackupIndicator();
   initKeyboardShortcuts();
   initTheme();
+  createNotifCenter();
+  updateNotifBadge();
 
   // Privacy toggle
   var privacyBtn = $('#privacyToggle');
