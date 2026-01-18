@@ -654,6 +654,45 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .quick-action-btn { display: flex; align-items: center; gap: 6px; padding: 10px 16px; background: var(--bg-secondary); border: 1px dashed var(--glass-border); border-radius: var(--radius-md); font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
 .quick-action-btn:hover { border-style: solid; border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
 .quick-action-btn .icon { font-size: 16px; }
+
+.charges-panel { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); overflow: hidden; margin-bottom: 16px; }
+.charges-tabs { display: flex; border-bottom: 1px solid var(--glass-border); }
+.charges-tab { flex: 1; padding: 12px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; position: relative; color: var(--text-muted); }
+.charges-tab:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.charges-tab.active { color: var(--accent); background: var(--bg-tertiary); }
+.charges-tab.active::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); }
+.charges-tab-badge { background: var(--danger); color: white; font-size: 9px; padding: 2px 6px; border-radius: 8px; margin-left: 6px; }
+.charges-list { padding: 12px; max-height: 280px; overflow-y: auto; }
+.charge-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-tertiary); border-radius: var(--radius-sm); margin-bottom: 6px; cursor: pointer; transition: all 0.2s; }
+.charge-item:hover { background: var(--accent-glow); }
+.charge-item.paid { opacity: 0.5; }
+.charge-cat-badge { font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; margin-right: 10px; }
+.charge-cat-badge.urssaf { background: rgba(248,113,113,0.15); color: var(--danger); }
+.charge-cat-badge.tva { background: rgba(236,72,153,0.15); color: #ec4899; }
+.charge-cat-badge.cfp { background: rgba(96,165,250,0.15); color: var(--info); }
+.charge-cat-badge.ir { background: rgba(251,191,36,0.15); color: var(--warning); }
+.charge-item-info { flex: 1; }
+.charge-item-label { font-size: 12px; font-weight: 500; }
+.charge-item-sub { font-size: 10px; color: var(--text-muted); }
+.charge-item-amount { font-size: 13px; font-weight: 700; margin-right: 12px; }
+.charge-check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--glass-border); display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+.charge-check:hover { border-color: var(--success); background: var(--success-glow); }
+.charge-check.checked { background: var(--success); border-color: var(--success); color: white; }
+.charges-footer { padding: 12px; border-top: 1px solid var(--glass-border); display: flex; gap: 8px; }
+.charges-footer .btn { flex: 1; font-size: 11px; padding: 8px; }
+.compare-widget { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 16px; margin-bottom: 16px; }
+.compare-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.compare-title { font-size: 14px; font-weight: 700; }
+.compare-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.compare-item { text-align: center; padding: 12px; background: var(--bg-tertiary); border-radius: var(--radius-md); }
+.compare-label { font-size: 10px; color: var(--text-muted); margin-bottom: 6px; }
+.compare-values { display: flex; justify-content: center; align-items: baseline; gap: 8px; }
+.compare-current { font-size: 16px; font-weight: 700; }
+.compare-prev { font-size: 11px; color: var(--text-muted); }
+.compare-delta { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block; }
+.compare-delta.up { background: var(--success-glow); color: var(--success); }
+.compare-delta.down { background: var(--danger-glow); color: var(--danger); }
+.compare-delta.neutral { background: var(--bg-primary); color: var(--text-muted); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 .aenc-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -5742,6 +5781,134 @@ function renderQuickActions(container) {
   container.appendChild(quick);
 }
 
+
+var CHARGES_TAB = 'apayer';
+
+function getChargesData() {
+  var data = compute();
+  var aPayer = data.allProvisionsDetail || [];
+  var payees = data.detailChargesPayees || [];
+  var totalAPayer = aPayer.reduce(function(sum, c) { return sum + c.montant; }, 0);
+  var totalPayees = payees.reduce(function(sum, c) { return sum + c.montant; }, 0);
+  return { aPayer: aPayer, payees: payees, totalAPayer: totalAPayer, totalPayees: totalPayees };
+}
+
+function renderChargesPanel(container) {
+  var charges = getChargesData();
+  var panel = el('div', { class: 'charges-panel' });
+  var tabs = el('div', { class: 'charges-tabs' });
+  var tabAPayer = el('div', { class: 'charges-tab' + (CHARGES_TAB === 'apayer' ? ' active' : ''), onclick: function() { CHARGES_TAB = 'apayer'; render(); } });
+  tabAPayer.appendChild(el('span', {}, 'À payer'));
+  if (charges.aPayer.length > 0) tabAPayer.appendChild(el('span', { class: 'charges-tab-badge' }, String(charges.aPayer.length)));
+  tabs.appendChild(tabAPayer);
+  var tabPayees = el('div', { class: 'charges-tab' + (CHARGES_TAB === 'payees' ? ' active' : ''), onclick: function() { CHARGES_TAB = 'payees'; render(); } });
+  tabPayees.appendChild(el('span', {}, 'Payées'));
+  tabs.appendChild(tabPayees);
+  panel.appendChild(tabs);
+  var list = el('div', { class: 'charges-list' });
+  var items = CHARGES_TAB === 'apayer' ? charges.aPayer : charges.payees;
+  if (items.length === 0) {
+    list.appendChild(el('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '12px' } }, CHARGES_TAB === 'apayer' ? '✅ Aucune charge à payer' : 'Aucune charge payée'));
+  } else {
+    items.slice(0, 10).forEach(function(c) {
+      var item = el('div', { class: 'charge-item' + (isPaid(c.id) ? ' paid' : ''), onclick: function() { togglePaid(c.id); } });
+      var catClass = (c.cat || '').toLowerCase().replace(/[^a-z]/g, '');
+      if (!['urssaf', 'tva', 'cfp', 'ir'].includes(catClass)) catClass = 'cfp';
+      item.appendChild(el('span', { class: 'charge-cat-badge ' + catClass }, c.cat || 'Autre'));
+      item.appendChild(el('div', { class: 'charge-item-info' }, [el('div', { class: 'charge-item-label' }, c.label || c.cat), el('div', { class: 'charge-item-sub' }, fmtMonthShort(c.mois))]));
+      item.appendChild(el('div', { class: 'charge-item-amount' }, EUR(c.montant)));
+      item.appendChild(el('div', { class: 'charge-check' + (isPaid(c.id) ? ' checked' : '') }, isPaid(c.id) ? '✓' : ''));
+      list.appendChild(item);
+    });
+  }
+  panel.appendChild(list);
+  if (CHARGES_TAB === 'apayer' && charges.aPayer.length > 0) {
+    var footer = el('div', { class: 'charges-footer' });
+    var types = {};
+    charges.aPayer.forEach(function(c) { types[c.cat] = true; });
+    if (types['URSSAF']) footer.appendChild(el('button', { class: 'btn btn-success', onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'URSSAF'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); saveAll(); render(); toast('URSSAF marqué payé', 'success'); } }, '✓ URSSAF'));
+    if (types['TVA']) footer.appendChild(el('button', { class: 'btn', style: { background: '#ec4899', color: 'white' }, onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'TVA'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); saveAll(); render(); toast('TVA marquée payée', 'success'); } }, '✓ TVA'));
+    panel.appendChild(footer);
+  }
+  container.appendChild(panel);
+}
+
+function getCompareData() {
+  var currentYear = PERIOD.year || TODAY.getFullYear();
+  var prevYear = currentYear - 1;
+  var currentData = { ca: 0, charges: 0, benefice: 0, jours: 0 };
+  var prevData = { ca: 0, charges: 0, benefice: 0, jours: 0 };
+  MISSIONS.forEach(function(mis) {
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var year = parseInt((f.mois || '').substring(0, 4));
+      var ht = f.ht || 0;
+      var rate = getUrssafRate(f.mois);
+      var charges = Math.round(ht * (rate + LEGAL.cfp));
+      if (year === currentYear) { currentData.ca += ht; currentData.charges += charges; currentData.jours += f.jours; }
+      else if (year === prevYear) { prevData.ca += ht; prevData.charges += charges; prevData.jours += f.jours; }
+    });
+  });
+  currentData.benefice = currentData.ca - currentData.charges;
+  prevData.benefice = prevData.ca - prevData.charges;
+  return { current: currentData, prev: prevData, currentYear: currentYear, prevYear: prevYear };
+}
+
+function renderCompareWidget(container) {
+  var cmp = getCompareData();
+  if (cmp.prev.ca === 0 && cmp.current.ca === 0) return;
+  var widget = el('div', { class: 'compare-widget' });
+  widget.appendChild(el('div', { class: 'compare-header' }, [el('div', { class: 'compare-title' }, '📊 ' + cmp.currentYear + ' vs ' + cmp.prevYear)]));
+  var grid = el('div', { class: 'compare-grid' });
+  function addItem(label, current, prev, inverse) {
+    var delta = prev > 0 ? Math.round(((current - prev) / prev) * 100) : (current > 0 ? 100 : 0);
+    var deltaClass = delta > 5 ? (inverse ? 'down' : 'up') : delta < -5 ? (inverse ? 'up' : 'down') : 'neutral';
+    var item = el('div', { class: 'compare-item' });
+    item.appendChild(el('div', { class: 'compare-label' }, label));
+    item.appendChild(el('div', { class: 'compare-values' }, [el('span', { class: 'compare-current' }, EUR(current)), el('span', { class: 'compare-prev' }, 'vs ' + EUR(prev))]));
+    item.appendChild(el('span', { class: 'compare-delta ' + deltaClass }, (delta >= 0 ? '+' : '') + delta + '%'));
+    grid.appendChild(item);
+  }
+  addItem('CA HT', cmp.current.ca, cmp.prev.ca, false);
+  addItem('Charges', cmp.current.charges, cmp.prev.charges, true);
+  addItem('Bénéfice', cmp.current.benefice, cmp.prev.benefice, false);
+  widget.appendChild(grid);
+  container.appendChild(widget);
+}
+
+function showProjectionsModal() {
+  var data = compute();
+  $('#formModalTitle').textContent = '📈 Projections Financières';
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+  var scenarios = [
+    { name: 'Optimiste', months: 12, vacances: 4, color: 'var(--success)' },
+    { name: 'Normal', months: 12, vacances: 5, color: 'var(--info)' },
+    { name: 'Prudent', months: 12, vacances: 7, color: 'var(--warning)' }
+  ];
+  var tjmMoyen = data.tjmEffectif || 450;
+  var joursParMois = 18;
+  scenarios.forEach(function(s) {
+    var moisTravailles = s.months - Math.ceil(s.vacances / joursParMois);
+    var caProj = moisTravailles * joursParMois * tjmMoyen;
+    var chargesProj = Math.round(caProj * (getUrssafRate(ym(TODAY.getFullYear(), 6)) + LEGAL.cfp));
+    var benefProj = caProj - chargesProj;
+    var card = el('div', { style: { padding: '14px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginBottom: '10px', borderLeft: '4px solid ' + s.color } });
+    card.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '8px', color: s.color } }, s.name + ' (' + s.vacances + ' sem. congés)'));
+    var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '12px' } });
+    grid.appendChild(el('div', {}, [el('div', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, 'CA projeté'), el('div', { style: { fontWeight: '700' } }, EUR(caProj))]));
+    grid.appendChild(el('div', {}, [el('div', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, 'Charges'), el('div', { style: { fontWeight: '700' } }, EUR(chargesProj))]));
+    grid.appendChild(el('div', {}, [el('div', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, 'Bénéfice'), el('div', { style: { fontWeight: '700', color: s.color } }, EUR(benefProj))]));
+    card.appendChild(grid);
+    body.appendChild(card);
+  });
+  var note = el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '12px' } });
+  note.innerHTML = 'Basé sur TJM moyen: ' + EUR(tjmMoyen) + ' · ' + joursParMois + 'j/mois';
+  body.appendChild(note);
+  openModal('formModal');
+}
+
 function renderDashboardDeadlines(container) {
   var deadlines = getUpcomingDeadlines();
   if (deadlines.length === 0) return;
@@ -5868,6 +6035,8 @@ function renderDashboard(container) {
   renderActionsWidget(container);
   renderLegalTimeline(container);
   renderQuickActions(container);
+  renderChargesPanel(container);
+  renderCompareWidget(container);
   if (!COMPANY.tvaDepuis || (data.caHTAnnuel && data.caHTAnnuel > 20000)) { renderTVAModule(container); }
   
   
