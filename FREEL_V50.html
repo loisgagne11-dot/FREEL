@@ -706,6 +706,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .insight-chip.positive { background: var(--success-glow); color: var(--success); }
 .insight-chip.negative { background: var(--danger-glow); color: var(--danger); }
 .insight-chip.neutral { background: var(--warning-glow); color: var(--warning); }
+
+.goal-widget { background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(52,211,153,0.05)); border: 1px solid rgba(52,211,153,0.3); border-radius: var(--radius-xl); padding: 16px; margin-bottom: 16px; }
+.goal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.goal-title { font-size: 14px; font-weight: 700; }
+.goal-edit { font-size: 11px; color: var(--accent); cursor: pointer; }
+.goal-progress { height: 12px; background: var(--bg-tertiary); border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+.goal-progress-fill { height: 100%; border-radius: 6px; transition: width 0.5s; background: linear-gradient(90deg, var(--success), #34d399); }
+.goal-progress-fill.warning { background: linear-gradient(90deg, var(--warning), #fbbf24); }
+.goal-progress-fill.behind { background: linear-gradient(90deg, var(--danger), #f87171); }
+.goal-stats { display: flex; justify-content: space-between; font-size: 11px; }
+.goal-current { font-weight: 700; }
+.goal-target { color: var(--text-muted); }
+.goal-pace { margin-top: 8px; font-size: 11px; padding: 6px 10px; background: var(--bg-tertiary); border-radius: var(--radius-sm); }
+.clients-widget { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 16px; margin-bottom: 16px; }
+.clients-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.clients-title { font-size: 14px; font-weight: 700; }
+.client-row { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: var(--bg-tertiary); border-radius: var(--radius-sm); margin-bottom: 6px; cursor: pointer; transition: all 0.2s; }
+.client-row:hover { background: var(--accent-glow); }
+.client-info { flex: 1; }
+.client-name { font-size: 12px; font-weight: 600; }
+.client-sub { font-size: 10px; color: var(--text-muted); }
+.client-ca { font-size: 14px; font-weight: 700; }
+.client-bar { height: 4px; background: var(--bg-primary); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.client-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+.conges-calendar { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 12px; }
+.conges-month { text-align: center; padding: 8px 4px; background: var(--bg-tertiary); border-radius: var(--radius-sm); cursor: pointer; transition: all 0.2s; }
+.conges-month:hover { background: var(--accent-glow); }
+.conges-month-name { font-size: 9px; color: var(--text-muted); margin-bottom: 4px; }
+.conges-month-days { font-size: 12px; font-weight: 700; }
+.conges-month.has-conges { background: var(--warning-glow); }
+.conges-month.current { border: 2px solid var(--accent); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 .aenc-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -6098,6 +6129,156 @@ function renderInsights(container) {
   container.appendChild(div);
 }
 
+
+var GOAL_CA = localStorage.getItem('freel_goal_ca') ? parseInt(localStorage.getItem('freel_goal_ca')) : 0;
+
+function setGoalCA(amount) {
+  GOAL_CA = amount;
+  localStorage.setItem('freel_goal_ca', String(amount));
+}
+
+function showGoalModal() {
+  $('#formModalTitle').textContent = '🎯 Objectif CA Annuel';
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+  body.appendChild(el('div', { style: { marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)' } }, 'Définis ton objectif de chiffre d\'affaires pour ' + (PERIOD.year || TODAY.getFullYear())));
+  body.appendChild(createInput('Objectif CA HT (€)', 'number', 'goalAmount', GOAL_CA || ''));
+  var presets = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' } });
+  [50000, 60000, 70000, 80000, 100000].forEach(function(v) {
+    presets.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { $('#goalAmount').value = v; } }, EUR(v)));
+  });
+  body.appendChild(presets);
+  body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '20px' }, onclick: function() {
+    var amount = parseInt($('#goalAmount').value) || 0;
+    setGoalCA(amount);
+    closeModal('formModal');
+    render();
+    toast('Objectif enregistré !', 'success');
+  } }, '✅ Définir l\'objectif'));
+  openModal('formModal');
+}
+
+function renderGoalWidget(container) {
+  var data = compute();
+  var year = PERIOD.year || TODAY.getFullYear();
+  var currentCA = data.caHT || 0;
+  var monthsPassed = TODAY.getMonth() + 1;
+  var monthsTotal = 12;
+  var expectedPct = monthsPassed / monthsTotal;
+  
+  var widget = el('div', { class: 'goal-widget' });
+  var header = el('div', { class: 'goal-header' });
+  header.appendChild(el('div', { class: 'goal-title' }, '🎯 Objectif ' + year));
+  header.appendChild(el('div', { class: 'goal-edit', onclick: showGoalModal }, '⚙️ Modifier'));
+  widget.appendChild(header);
+  
+  if (!GOAL_CA || GOAL_CA <= 0) {
+    widget.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', fontSize: '12px', color: 'var(--text-muted)' } }, 'Aucun objectif défini'));
+    widget.appendChild(el('button', { class: 'btn btn-sm', style: { width: '100%' }, onclick: showGoalModal }, '+ Définir un objectif'));
+    container.appendChild(widget);
+    return;
+  }
+  
+  var pct = Math.min(1, currentCA / GOAL_CA);
+  var pctExpected = expectedPct;
+  var isOnTrack = pct >= pctExpected * 0.9;
+  var isBehind = pct < pctExpected * 0.7;
+  
+  var progress = el('div', { class: 'goal-progress' });
+  progress.appendChild(el('div', { class: 'goal-progress-fill' + (isBehind ? ' behind' : isOnTrack ? '' : ' warning'), style: { width: (pct * 100) + '%' } }));
+  widget.appendChild(progress);
+  
+  var stats = el('div', { class: 'goal-stats' });
+  stats.appendChild(el('span', { class: 'goal-current' }, EUR(currentCA) + ' (' + Math.round(pct * 100) + '%)'));
+  stats.appendChild(el('span', { class: 'goal-target' }, 'Objectif: ' + EUR(GOAL_CA)));
+  widget.appendChild(stats);
+  
+  var remaining = GOAL_CA - currentCA;
+  var monthsLeft = 12 - monthsPassed;
+  var neededPerMonth = monthsLeft > 0 ? Math.round(remaining / monthsLeft) : remaining;
+  var pace = el('div', { class: 'goal-pace' });
+  if (remaining <= 0) {
+    pace.innerHTML = '🎉 <strong style="color:var(--success)">Objectif atteint !</strong>';
+  } else if (isOnTrack) {
+    pace.innerHTML = '✅ En bonne voie · Besoin: <strong>' + EUR(neededPerMonth) + '/mois</strong>';
+  } else {
+    pace.innerHTML = '⚠️ En retard · Besoin: <strong style="color:var(--warning)">' + EUR(neededPerMonth) + '/mois</strong>';
+  }
+  widget.appendChild(pace);
+  
+  container.appendChild(widget);
+}
+
+function getClientsStats() {
+  var stats = {};
+  MISSIONS.forEach(function(mis) {
+    var clientName = mis.client || 'Sans client';
+    if (!stats[clientName]) stats[clientName] = { ca: 0, jours: 0, factures: 0 };
+    if (mis.factures) {
+      mis.factures.forEach(function(f) {
+        if (f.status === 'payée' && f.jours > 0) {
+          stats[clientName].ca += f.ht || 0;
+          stats[clientName].jours += f.jours || 0;
+          stats[clientName].factures++;
+        }
+      });
+    }
+  });
+  var arr = Object.keys(stats).map(function(name) {
+    return { name: name, ca: stats[name].ca, jours: stats[name].jours, factures: stats[name].factures, tjm: stats[name].jours > 0 ? Math.round(stats[name].ca / stats[name].jours) : 0 };
+  });
+  arr.sort(function(a, b) { return b.ca - a.ca; });
+  return arr;
+}
+
+function renderClientsWidget(container) {
+  var clients = getClientsStats();
+  if (clients.length === 0) return;
+  var maxCA = clients[0].ca || 1;
+  
+  var widget = el('div', { class: 'clients-widget' });
+  widget.appendChild(el('div', { class: 'clients-header' }, [el('div', { class: 'clients-title' }, '👥 CA par Client')]));
+  
+  clients.slice(0, 5).forEach(function(c) {
+    var row = el('div', { class: 'client-row' });
+    row.appendChild(el('div', { class: 'client-info' }, [
+      el('div', { class: 'client-name' }, c.name),
+      el('div', { class: 'client-sub' }, c.jours + 'j · TJM ' + EUR(c.tjm))
+    ]));
+    row.appendChild(el('div', { class: 'client-ca' }, EUR(c.ca)));
+    var bar = el('div', { class: 'client-bar' });
+    bar.appendChild(el('div', { class: 'client-bar-fill', style: { width: (c.ca / maxCA * 100) + '%' } }));
+    row.appendChild(bar);
+    widget.appendChild(row);
+  });
+  
+  container.appendChild(widget);
+}
+
+function renderCongesCalendar(container) {
+  var data = compute();
+  var months = getPeriodMonths();
+  var currentYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  
+  var widget = el('div', { class: 'clients-widget' });
+  widget.appendChild(el('div', { class: 'clients-header' }, [el('div', { class: 'clients-title' }, '🏖️ Congés')]));
+  
+  var calendar = el('div', { class: 'conges-calendar' });
+  months.forEach(function(m) {
+    var wd = data.workedDays[m] || { conges: 0 };
+    var monthDiv = el('div', { class: 'conges-month' + (wd.conges > 0 ? ' has-conges' : '') + (m === currentYm ? ' current' : ''), onclick: function() { showMonthCongesModal(m); } });
+    monthDiv.appendChild(el('div', { class: 'conges-month-name' }, fmtMonthShort(m).substring(0, 4)));
+    monthDiv.appendChild(el('div', { class: 'conges-month-days' }, wd.conges > 0 ? wd.conges + 'j' : '-'));
+    calendar.appendChild(monthDiv);
+  });
+  widget.appendChild(calendar);
+  
+  var total = months.reduce(function(sum, m) { return sum + (data.workedDays[m] ? data.workedDays[m].conges : 0); }, 0);
+  widget.appendChild(el('div', { style: { marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' } }, 'Total: ' + total + ' jours de congés'));
+  
+  container.appendChild(widget);
+}
+
 function renderDashboardDeadlines(container) {
   var deadlines = getUpcomingDeadlines();
   if (deadlines.length === 0) return;
@@ -6228,7 +6409,10 @@ function renderDashboard(container) {
   renderChargesPanel(container);
   renderCompareWidget(container);
   renderSummaryCard(container);
+  renderClientsWidget(container);
+  renderCongesCalendar(container);
   if (!COMPANY.tvaDepuis || (data.caHTAnnuel && data.caHTAnnuel > 20000)) { renderTVAModule(container); }
+  renderGoalWidget(container);
   
   
   // ═══════════════════════════════════════════════════════════════════════════
