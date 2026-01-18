@@ -428,6 +428,28 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   --radius-lg: 16px;
   --radius-xl: 20px;
 }
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --bg-elevated: #ffffff;
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --accent: #059669;
+  --accent-glow: rgba(5, 150, 105, 0.12);
+  --success: #10b981;
+  --success-glow: rgba(16, 185, 129, 0.1);
+  --warning: #f59e0b;
+  --warning-glow: rgba(245, 158, 11, 0.1);
+  --danger: #ef4444;
+  --danger-glow: rgba(239, 68, 68, 0.1);
+  --info: #3b82f6;
+  --info-glow: rgba(59, 130, 246, 0.1);
+  --provision: #8b5cf6;
+  --provision-glow: rgba(139, 92, 246, 0.1);
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; min-height: 100vh; padding-top: 52px; padding-bottom: 72px; }
 
@@ -764,6 +786,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .backup-indicator { position: fixed; bottom: 20px; left: 20px; background: var(--success); color: white; padding: 8px 14px; border-radius: 20px; font-size: 11px; font-weight: 600; display: none; z-index: 1000; }
 .backup-indicator.show { display: flex; align-items: center; gap: 6px; animation: fadeIn 0.2s ease; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+/* Sprint 13: Mobile improvements */
+@media (max-width: 480px) {
+  .header-content { padding: 6px 12px; gap: 8px; }
+  .logo { font-size: 16px; }
+  .period-selector { display: none; }
+  .privacy-toggle { width: 32px; height: 32px; font-size: 14px; }
+  .search-box { width: 95%; margin: 0 10px; }
+  .search-input-wrap { padding: 12px; }
+  .search-input-wrap input { font-size: 14px; }
+  .keyboard-help { right: 10px; bottom: 70px; max-width: 240px; padding: 12px; }
+  .modal-content { width: 95%; margin: 10px; padding: 16px; max-height: 90vh; }
+  .modal-title { font-size: 16px; }
+  .form-row { flex-direction: column; gap: 8px; }
+  .form-group { min-width: 100%; }
+  .fab { width: 48px; height: 48px; font-size: 20px; bottom: 70px; right: 12px; }
+  .backup-indicator { bottom: 70px; left: 12px; padding: 6px 10px; font-size: 10px; }
+  .card { padding: 12px; }
+  .card-title { font-size: 12px; }
+  .kpi { padding: 10px; }
+  .kpi-value { font-size: 18px; }
+  .kpi-label { font-size: 9px; }
+  .timeline-item { padding: 8px 12px; }
+  .action-item { padding: 8px 10px; }
+}
+@media (max-width: 360px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .header-content { justify-content: space-between; }
+  .nav-tabs { display: none; }
+}
 
 .aenc-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .aenc-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(255,255,255,0.03); border-radius: 6px; cursor: pointer; font-size: 11px; }
@@ -1206,6 +1258,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <input type="month" class="period-input" id="periodEnd" style="display:none">
       </div>
       <!-- SPRINT 2: Toggle Privacy Mode -->
+      <button class="privacy-toggle" id="themeToggle" title="Changer le thème" onclick="toggleTheme()">☀️</button>
       <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité">👁️</button>
       <nav class="nav-tabs">
         <button class="nav-tab active" data-view="dashboard">📊</button>
@@ -6377,7 +6430,10 @@ function performSearch(query) {
   if ('congés'.includes(query) || 'conges'.includes(query)) results.push({ type: 'action', icon: '🏖️', title: 'Gérer les congés', sub: 'Action rapide', action: function() { showCongesOverview(); } });
   if ('export'.includes(query) || 'pdf'.includes(query)) results.push({ type: 'action', icon: '📄', title: 'Exporter PDF', sub: 'Action rapide', action: exportPDFReport });
   if ('objectif'.includes(query)) results.push({ type: 'action', icon: '🎯', title: 'Définir objectif', sub: 'Action rapide', action: showGoalModal });
-  
+  if ('backup'.includes(query) || 'json'.includes(query) || 'export'.includes(query)) results.push({ type: 'action', icon: '💾', title: 'Exporter données JSON', sub: 'Backup complet', action: exportJSON });
+  if ('import'.includes(query) || 'restaurer'.includes(query)) results.push({ type: 'action', icon: '📥', title: 'Importer données JSON', sub: 'Restaurer backup', action: importJSON });
+  if ('theme'.includes(query) || 'sombre'.includes(query) || 'clair'.includes(query)) results.push({ type: 'action', icon: '🎨', title: 'Changer le thème', sub: THEME === 'dark' ? 'Passer en clair' : 'Passer en sombre', action: toggleTheme });
+
   SEARCH_RESULTS = results.slice(0, 10);
   SEARCH_INDEX = 0;
   updateSearchResults(query);
@@ -6491,6 +6547,82 @@ function createBackupIndicator() {
   indicator.appendChild(el('span', {}, '✓'));
   indicator.appendChild(el('span', {}, 'Sauvegardé'));
   document.body.appendChild(indicator);
+}
+
+// Sprint 13: Export/Import JSON
+function exportJSON() {
+  var data = {
+    company: COMPANY,
+    missions: MISSIONS,
+    clients: CLIENTS,
+    treasury: TREASURY,
+    irConfig: IR_CONFIG,
+    goalCA: localStorage.getItem('freel_goal_ca'),
+    version: 'V50',
+    exportDate: localISO(TODAY)
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'freel_backup_' + localISO(TODAY) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Export JSON téléchargé', 'success');
+}
+
+function importJSON() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var data = JSON.parse(ev.target.result);
+        if (data.company) COMPANY = Object.assign(COMPANY, data.company);
+        if (data.missions) MISSIONS = data.missions;
+        if (data.clients) CLIENTS = data.clients;
+        if (data.treasury) TREASURY = Object.assign(TREASURY, data.treasury);
+        if (data.irConfig) IR_CONFIG = Object.assign(IR_CONFIG, data.irConfig);
+        if (data.goalCA) localStorage.setItem('freel_goal_ca', data.goalCA);
+        MISSIONS.forEach(buildMission);
+        saveAll();
+        render();
+        toast('Import réussi! Données restaurées.', 'success');
+      } catch (err) {
+        toast('Erreur: fichier JSON invalide', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// Sprint 13: Theme toggle
+var THEME = localStorage.getItem('freel_theme') || 'dark';
+
+function toggleTheme() {
+  THEME = THEME === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', THEME);
+  localStorage.setItem('freel_theme', THEME);
+  updateThemeButton();
+}
+
+function updateThemeButton() {
+  var btn = $('#themeToggle');
+  if (btn) btn.textContent = THEME === 'dark' ? '☀️' : '🌙';
+}
+
+function initTheme() {
+  if (THEME === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+  updateThemeButton();
 }
 
 function renderDashboardDeadlines(container) {
@@ -8147,7 +8279,8 @@ function init() {
   createKeyboardHelp();
   createBackupIndicator();
   initKeyboardShortcuts();
-  
+  initTheme();
+
   // Privacy toggle
   var privacyBtn = $('#privacyToggle');
   if (privacyBtn) {
