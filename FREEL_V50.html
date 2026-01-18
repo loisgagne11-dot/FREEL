@@ -693,6 +693,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .compare-delta.up { background: var(--success-glow); color: var(--success); }
 .compare-delta.down { background: var(--danger-glow); color: var(--danger); }
 .compare-delta.neutral { background: var(--bg-primary); color: var(--text-muted); }
+
+.summary-card { background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary)); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 16px; margin-bottom: 16px; }
+.summary-text { font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+.summary-text strong { color: var(--text-primary); }
+.summary-text .good { color: var(--success); font-weight: 600; }
+.summary-text .warning { color: var(--warning); font-weight: 600; }
+.summary-text .bad { color: var(--danger); font-weight: 600; }
+.export-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: linear-gradient(135deg, var(--accent), #7c3aed); border: none; border-radius: var(--radius-md); color: white; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 12px; }
+.export-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4); }
+.insight-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-tertiary); border-radius: 20px; font-size: 11px; margin: 4px; }
+.insight-chip.positive { background: var(--success-glow); color: var(--success); }
+.insight-chip.negative { background: var(--danger-glow); color: var(--danger); }
+.insight-chip.neutral { background: var(--warning-glow); color: var(--warning); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 .aenc-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
@@ -5909,6 +5922,182 @@ function showProjectionsModal() {
   openModal('formModal');
 }
 
+
+function generateSummaryText() {
+  var data = compute();
+  var health = calculateHealthScore();
+  var cmp = getCompareData();
+  var lines = [];
+  
+  // Intro
+  if (health.score >= 80) lines.push('🎉 <strong>Excellente situation !</strong> Ton activité se porte très bien.');
+  else if (health.score >= 60) lines.push('👍 <strong>Bonne situation.</strong> Quelques points d\'attention.');
+  else if (health.score >= 40) lines.push('⚠️ <strong>Situation à surveiller.</strong> Actions recommandées.');
+  else lines.push('🚨 <strong>Situation critique.</strong> Actions urgentes nécessaires.');
+  
+  // CA
+  var caText = 'CA encaissé : <strong>' + EUR(data.caHT) + '</strong>';
+  if (cmp.prev.ca > 0) {
+    var delta = Math.round(((cmp.current.ca - cmp.prev.ca) / cmp.prev.ca) * 100);
+    caText += delta >= 0 ? ' <span class="good">(+' + delta + '% vs N-1)</span>' : ' <span class="bad">(' + delta + '% vs N-1)</span>';
+  }
+  lines.push(caText);
+  
+  // Trésorerie
+  var tresoClass = data.cashDispoAbsolu >= 5000 ? 'good' : data.cashDispoAbsolu >= 0 ? 'warning' : 'bad';
+  lines.push('Cash disponible : <span class="' + tresoClass + '">' + EUR(data.cashDispoAbsolu) + '</span> (' + data.runway + ' mois d\'autonomie)');
+  
+  // Retards
+  if (data.lateCount > 0) lines.push('<span class="bad">⚠️ ' + data.lateCount + ' facture(s) en retard</span> - Pense à relancer !');
+  
+  // Charges
+  if (data.provisionsAbsolues > 0) lines.push('Charges à payer : <span class="warning">' + EUR(data.provisionsAbsolues) + '</span>');
+  
+  // Salaire
+  if (data.salaireReco >= 500) lines.push('💡 Tu peux te verser <span class="good">' + EUR(data.salaireReco) + '</span> de salaire.');
+  
+  return lines.join('<br>');
+}
+
+function renderSummaryCard(container) {
+  var card = el('div', { class: 'summary-card' });
+  card.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' } }, [el('span', {}, '📋'), el('span', {}, 'En résumé')]));
+  var text = el('div', { class: 'summary-text' });
+  text.innerHTML = generateSummaryText();
+  card.appendChild(text);
+  card.appendChild(el('button', { class: 'export-btn', onclick: exportPDFReport }, [el('span', {}, '📄'), el('span', {}, 'Exporter rapport PDF')]));
+  container.appendChild(card);
+}
+
+function exportPDFReport() {
+  var data = compute();
+  var health = calculateHealthScore();
+  var cmp = getCompareData();
+  
+  var doc = new jspdf.jsPDF();
+  var y = 20;
+  var margin = 20;
+  var pageWidth = doc.internal.pageSize.getWidth();
+  
+  // Titre
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Rapport de Gestion', margin, y);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'normal');
+  doc.text(COMPANY.nom || 'Mon Entreprise', margin, y + 8);
+  doc.text(fmtLong(localISO(TODAY)), margin, y + 14);
+  y += 30;
+  
+  // Score santé
+  doc.setFillColor(health.level === 'excellent' ? 52 : health.level === 'good' ? 96 : health.level === 'warning' ? 251 : 248, health.level === 'excellent' ? 211 : health.level === 'good' ? 165 : health.level === 'warning' ? 191 : 113, health.level === 'excellent' ? 153 : health.level === 'good' ? 250 : health.level === 'warning' ? 36 : 113);
+  doc.roundedRect(margin, y, 50, 25, 3, 3, 'F');
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text(health.score + '/100', margin + 10, y + 16);
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.text('Santé: ' + health.label, margin + 55, y + 16);
+  y += 35;
+  
+  // KPIs
+  doc.setFont('helvetica', 'bold');
+  doc.text('Indicateurs Clés', margin, y);
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  var kpis = [
+    ['CA Encaissé HT', EUR(data.caHT)],
+    ['Bénéfice Net', EUR(data.beneficeNet)],
+    ['Cash Disponible', EUR(data.cashDispoAbsolu)],
+    ['Charges à payer', EUR(data.provisionsAbsolues)],
+    ['TJM Effectif', EUR(data.tjmEffectif)],
+    ['Taux Facturation', PCT(data.tauxFacturation)],
+    ['Autonomie', data.runway + ' mois'],
+    ['Factures en retard', String(data.lateCount)]
+  ];
+  kpis.forEach(function(kpi, i) {
+    var col = i % 2;
+    var row = Math.floor(i / 2);
+    doc.text(kpi[0] + ':', margin + col * 90, y + row * 7);
+    doc.setFont('helvetica', 'bold');
+    doc.text(kpi[1], margin + col * 90 + 50, y + row * 7);
+    doc.setFont('helvetica', 'normal');
+  });
+  y += 35;
+  
+  // Comparatif
+  if (cmp.prev.ca > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Comparatif ' + cmp.currentYear + ' vs ' + cmp.prevYear, margin, y);
+    y += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    var delta = Math.round(((cmp.current.ca - cmp.prev.ca) / cmp.prev.ca) * 100);
+    doc.text('CA: ' + EUR(cmp.current.ca) + ' vs ' + EUR(cmp.prev.ca) + ' (' + (delta >= 0 ? '+' : '') + delta + '%)', margin, y);
+    y += 15;
+  }
+  
+  // Charges détail
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('Charges à Payer', margin, y);
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  var charges = getChargesData();
+  if (charges.aPayer.length === 0) {
+    doc.text('Aucune charge en attente', margin, y);
+  } else {
+    charges.aPayer.slice(0, 8).forEach(function(c, i) {
+      doc.text(c.cat + ' - ' + fmtMonthShort(c.mois) + ': ' + EUR(c.montant), margin, y + i * 5);
+    });
+  }
+  
+  // Pied de page
+  doc.setFontSize(8);
+  doc.setTextColor(128, 128, 128);
+  doc.text('Généré par Freel V50 - ' + localISO(TODAY), margin, 285);
+  
+  doc.save('rapport-gestion-' + localISO(TODAY) + '.pdf');
+  toast('PDF exporté !', 'success');
+}
+
+function getInsights() {
+  var data = compute();
+  var insights = [];
+  
+  if (data.tauxFacturation >= 0.85) insights.push({ type: 'positive', text: 'Excellent taux de facturation' });
+  else if (data.tauxFacturation < 0.6) insights.push({ type: 'negative', text: 'Taux facturation faible' });
+  
+  if (data.runway >= 6) insights.push({ type: 'positive', text: '+6 mois d\'autonomie' });
+  else if (data.runway < 3) insights.push({ type: 'negative', text: 'Autonomie < 3 mois' });
+  
+  if (data.lateCount === 0) insights.push({ type: 'positive', text: 'Aucun retard' });
+  else insights.push({ type: 'negative', text: data.lateCount + ' retard(s)' });
+  
+  var cmp = getCompareData();
+  if (cmp.prev.ca > 0) {
+    var delta = ((cmp.current.ca - cmp.prev.ca) / cmp.prev.ca) * 100;
+    if (delta > 10) insights.push({ type: 'positive', text: 'CA en hausse +' + Math.round(delta) + '%' });
+    else if (delta < -10) insights.push({ type: 'negative', text: 'CA en baisse ' + Math.round(delta) + '%' });
+  }
+  
+  return insights;
+}
+
+function renderInsights(container) {
+  var insights = getInsights();
+  if (insights.length === 0) return;
+  var div = el('div', { style: { marginBottom: '12px', display: 'flex', flexWrap: 'wrap' } });
+  insights.forEach(function(i) {
+    div.appendChild(el('span', { class: 'insight-chip ' + i.type }, i.text));
+  });
+  container.appendChild(div);
+}
+
 function renderDashboardDeadlines(container) {
   var deadlines = getUpcomingDeadlines();
   if (deadlines.length === 0) return;
@@ -6032,11 +6221,13 @@ function renderDashboard(container) {
   // 1. URGENCES
   // ═══════════════════════════════════════════════════════════════════════════
   renderHealthScore(container);
+  renderInsights(container);
   renderActionsWidget(container);
   renderLegalTimeline(container);
   renderQuickActions(container);
   renderChargesPanel(container);
   renderCompareWidget(container);
+  renderSummaryCard(container);
   if (!COMPANY.tvaDepuis || (data.caHTAnnuel && data.caHTAnnuel > 20000)) { renderTVAModule(container); }
   
   
