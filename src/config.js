@@ -1,0 +1,67 @@
+/**
+ * Configuration globale de l'application FREEL V51
+ */
+
+export const APP_VERSION = 51;
+export const STORAGE_VERSION = 'v51';
+export const STORAGE_PREFIX = 'freel_v51';
+
+// Constantes légales (taux 2025-2026)
+export const LEGAL = {
+  urssafStd2025: 0.246,    // 24.6%
+  urssafStd2026: 0.261,    // 26.1% (à confirmer)
+  urssafAcre2025: 0.123,   // 12.3%
+  urssafAcre2026: 0.1305,  // 13.05%
+  cfp: 0.002,              // 0.2% Formation professionnelle
+  impLib: 0.022,           // 2.2% Versement libératoire
+  tvaRate: 0.20,           // 20% TVA
+  tvaStartMonth: '2025-10', // Début assujettissement TVA
+};
+
+// Tranches IR 2025 (progressif)
+export const IR_BRACKETS = [
+  { min: 0, max: 11294, rate: 0 },
+  { min: 11294, max: 28797, rate: 0.11 },
+  { min: 28797, max: 82341, rate: 0.30 },
+  { min: 82341, max: 177106, rate: 0.41 },
+  { min: 177106, max: Infinity, rate: 0.45 }
+];
+
+// Catégories de charges
+export const CHARGE_CATEGORIES = [
+  { id: 'urssaf', label: 'URSSAF', color: '#ff6b6b' },
+  { id: 'ir', label: 'Impôt sur le revenu', color: '#ee5a6f' },
+  { id: 'tva', label: 'TVA', color: '#c92a2a' },
+  { id: 'bank', label: 'Banque', color: '#ffa94d' },
+  { id: 'tools', label: 'Outils', color: '#74c0fc' },
+  { id: 'formation', label: 'Formation', color: '#b197fc' },
+  { id: 'insurance', label: 'Assurance', color: '#f783ac' },
+  { id: 'other', label: 'Autre', color: '#868e96' }
+];
+
+// Scénarios de projection
+export const SCENARIOS = {
+  nominal: { label: 'Nominal', facteur: 1.0, color: '#51cf66' },
+  normal: { label: 'Normal', facteur: 0.9, color: '#ffa94d' },
+  prudent: { label: 'Prudent', facteur: 0.75, color: '#ff6b6b' }
+};
+
+// Configuration Supabase (à remplir avec vos vraies clés)
+export const SUPABASE_CONFIG = {
+  url: import.meta.env.VITE_SUPABASE_URL || '',
+  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+  enabled: false // Activé après configuration
+};
+
+// Raccourcis clavier
+export const SHORTCUTS = [
+  { key: '/', desc: 'Recherche globale' },
+  { key: 'd', desc: 'Dashboard' },
+  { key: 'm', desc: 'Missions' },
+  { key: 't', desc: 'Trésorerie' },
+  { key: 'f', desc: 'Factures' },
+  { key: 'c', desc: 'Charges' },
+  { key: 'n', desc: 'Nouvelle mission' },
+  { key: 'p', desc: 'Privacy mode' },
+  { key: '?', desc: 'Aide' }
+];
