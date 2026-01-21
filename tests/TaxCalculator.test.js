@@ -12,16 +12,16 @@ describe('TaxCalculator', () => {
       const ca = 50000;
       const urssaf = taxCalculator.calculateURSSAF(ca, 2025, false);
 
-      // 50000 * 0.246 (URSSAF) + 50000 * 0.002 (CFP) = 12400
-      expect(urssaf).toBe(12400);
+      // BNC 2025: 50000 * 0.211 (URSSAF) + 50000 * 0.002 (CFP) = 10650
+      expect(urssaf).toBe(10650);
     });
 
     it('calcule l\'URSSAF avec ACRE en 2025', () => {
       const ca = 50000;
       const urssaf = taxCalculator.calculateURSSAF(ca, 2025, true);
 
-      // 50000 * 0.123 (URSSAF ACRE) + 50000 * 0.002 (CFP) = 6250
-      expect(urssaf).toBe(6250);
+      // BNC 2025 ACRE: 50000 * 0.1065 (URSSAF ACRE) + 50000 * 0.002 (CFP) = 5425
+      expect(urssaf).toBe(5425);
     });
 
     it('retourne 0 pour un CA nul', () => {

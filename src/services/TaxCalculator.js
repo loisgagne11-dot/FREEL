@@ -7,6 +7,15 @@ import { LEGAL, IR_BRACKETS } from '../config.js';
 
 class TaxCalculator {
   /**
+   * Arrondir au centime près (éviter problèmes IEEE 754)
+   * @param {number} value
+   * @returns {number}
+   */
+  round(value) {
+    return Math.round(value * 100) / 100;
+  }
+
+  /**
    * Calculer les cotisations URSSAF
    * @param {number} ca - Chiffre d'affaires HT
    * @param {number} year - Année
@@ -46,9 +55,9 @@ class TaxCalculator {
       return { ir: 0, revenuImposable: 0, details: [] };
     }
 
-    // Revenu imposable après abattement
-    const revenuImposable = ca * (1 - abattement);
-    const quotientFamilial = revenuImposable / parts;
+    // Revenu imposable après abattement (arrondi au centime)
+    const revenuImposable = this.round(ca * (1 - abattement));
+    const quotientFamilial = this.round(revenuImposable / parts);
 
     if (versementLib) {
       // Versement libératoire : 2.2% du CA
@@ -180,6 +189,7 @@ class TaxCalculator {
       return {
         urssaf: 0,
         ir: 0,
+        tva: 0,
         total: 0
       };
     }
@@ -190,6 +200,7 @@ class TaxCalculator {
     return {
       urssaf,
       ir,
+      tva: 0, // TVA is calculated separately via calculateTVA()
       total: urssaf + ir
     };
   }

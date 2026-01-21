@@ -22,8 +22,10 @@ class SecurityService {
    * Valider un token CSRF
    */
   validateCSRFToken(token) {
+    if (!token) return false;
     const storedToken = sessionStorage.getItem('csrf_token');
-    return token && storedToken && token === storedToken;
+    if (!storedToken) return false;
+    return token === storedToken;
   }
 
   /**

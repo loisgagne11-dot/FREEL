@@ -6,12 +6,13 @@ export const APP_VERSION = 51;
 export const STORAGE_VERSION = 'v51';
 export const STORAGE_PREFIX = 'freel_v51';
 
-// Constantes légales (taux 2025-2026)
+// Constantes légales (taux 2025-2026 pour BNC - Bénéfices Non Commerciaux)
+// Consultants, freelances IT = régime BNC, pas BIC
 export const LEGAL = {
-  urssafStd2025: 0.246,    // 24.6%
-  urssafStd2026: 0.261,    // 26.1% (à confirmer)
-  urssafAcre2025: 0.123,   // 12.3%
-  urssafAcre2026: 0.1305,  // 13.05%
+  urssafStd2025: 0.211,    // 21.1% (BNC 2025)
+  urssafStd2026: 0.212,    // 21.2% (BNC 2026)
+  urssafAcre2025: 0.1065,  // 10.65% (ACRE 50% du taux normal)
+  urssafAcre2026: 0.106,   // 10.6% (ACRE 2026)
   cfp: 0.002,              // 0.2% Formation professionnelle
   impLib: 0.022,           // 2.2% Versement libératoire
   tvaRate: 0.20,           // 20% TVA
