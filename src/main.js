@@ -8,6 +8,7 @@ import { store } from './services/Store.js';
 import { storage } from './services/Storage.js';
 import { router } from './services/Router.js';
 import { initTheme } from './services/Theme.js';
+import { authService } from './services/AuthService.js';
 import { toast } from './components/Toast.js';
 import { DashboardView } from './views/DashboardView.js';
 import { MissionsView } from './views/MissionsView.js';
@@ -26,6 +27,13 @@ async function init() {
 
     // Initialiser le thème
     initTheme();
+
+    // Initialiser l'authentification (si configuré)
+    try {
+      await authService.initialize();
+    } catch (error) {
+      console.log('Auth initialization skipped:', error.message);
+    }
 
     // Initialiser le router
     router.register('dashboard', () => new DashboardView());
@@ -57,7 +65,7 @@ async function init() {
     }, 30000); // Toutes les 30 secondes
 
     // Log version
-    console.log(`%cFREEL V51%c - Refactored & Optimized`,
+    console.log(`%cFREEL V51%c - Refactored & Optimized + Cloud-enabled`,
       'font-size: 24px; font-weight: bold; color: #845ef7;',
       'font-size: 14px; color: #999;'
     );
