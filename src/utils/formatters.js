@@ -231,10 +231,11 @@ export function validateSIRET(siret) {
   if (!/^\d{14}$/.test(cleaned)) return false;
 
   // Algorithme de Luhn pour validation
+  // Double every second digit from the right (even indices from left)
   let sum = 0;
   for (let i = 0; i < 14; i++) {
     let digit = parseInt(cleaned[i]);
-    if (i % 2 === 1) {
+    if (i % 2 === 0) {
       digit *= 2;
       if (digit > 9) digit -= 9;
     }

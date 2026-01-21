@@ -14,15 +14,16 @@ describe('Formatters', () => {
 
   describe('EUR', () => {
     it('formate un montant positif', () => {
-      expect(EUR(1234.56)).toBe('1 234,56 €');
+      // French locale uses narrow no-break space (U+202F)
+      expect(EUR(1234.56)).toBe('1\u202f234,56\u00a0€');
     });
 
     it('formate un montant négatif', () => {
-      expect(EUR(-1234.56)).toBe('-1 234,56 €');
+      expect(EUR(-1234.56)).toBe('-1\u202f234,56\u00a0€');
     });
 
     it('formate zéro', () => {
-      expect(EUR(0)).toBe('0,00 €');
+      expect(EUR(0)).toBe('0,00\u00a0€');
     });
 
     it('masque en privacy mode', () => {
@@ -32,7 +33,7 @@ describe('Formatters', () => {
 
     it('force l\'affichage même en privacy mode', () => {
       store.set('privacyMode', true);
-      expect(EUR(1234.56, { forceShow: true })).toBe('1 234,56 €');
+      expect(EUR(1234.56, { forceShow: true })).toBe('1\u202f234,56\u00a0€');
     });
 
     it('gère null/undefined', () => {
@@ -44,15 +45,16 @@ describe('Formatters', () => {
 
   describe('PCT', () => {
     it('formate un pourcentage', () => {
-      expect(PCT(0.2465)).toBe('24,7 %');
+      // French locale uses narrow no-break space before %
+      expect(PCT(0.2465)).toBe('24,7\u00a0%');
     });
 
     it('formate zéro', () => {
-      expect(PCT(0)).toBe('0,0 %');
+      expect(PCT(0)).toBe('0,0\u00a0%');
     });
 
     it('formate 100%', () => {
-      expect(PCT(1)).toBe('100,0 %');
+      expect(PCT(1)).toBe('100,0\u00a0%');
     });
 
     it('gère null/undefined', () => {
