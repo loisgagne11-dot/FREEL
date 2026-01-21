@@ -113,8 +113,37 @@ class Store {
    */
   reset() {
     const theme = this.state.theme; // Garder le thème
+
+    // État par défaut
+    const defaultState = {
+      company: null,
+      missions: [],
+      clients: [],
+      treasury: null,
+      irConfig: {},
+      goalCA: 0,
+      view: 'dashboard',
+      theme: 'dark',
+      privacyMode: false,
+      period: { year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
+      searchOpen: false,
+      helpOpen: false,
+      notifOpen: false,
+      alertsOpen: false,
+      factureFilter: 'all',
+      chargesTab: 'apayer',
+      showCumul: false,
+      showCashDispo: false,
+      projectionScenario: 'normal',
+      provView: 'type',
+      computed: {},
+      notifRead: [],
+      user: null,
+      session: null
+    };
+
     this.state = {
-      ...this.constructor.prototype.constructor().state,
+      ...defaultState,
       theme
     };
     this.emit('*', { type: 'reset' });

@@ -277,10 +277,47 @@ export function formModal(title, fields, options = {}) {
         e.preventDefault();
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
-        modal.close();
-        resolve(data);
+
+        // Convertir les types number
+        fields.forEach(field => {
+          if (field.type === 'number' && data[field.name]) {
+            data[field.name] = parseFloat(data[field.name]);
+          }
+        });
+
+        // Validation si un schéma est fourni
+        if (options.schema) {
+          try {
+            const validated = options.schema.parse(data);
+            modal.close();
+            resolve(validated);
+          } catch (error) {
+            // Afficher les erreurs de validation
+            const errorDiv = form.querySelector('.form-errors');
+            if (errorDiv) {
+              errorDiv.innerHTML = '';
+              if (error.errors) {
+                error.errors.forEach(err => {
+                  const errEl = el('div', { className: 'error-message', style: { color: 'var(--color-danger)', fontSize: 'var(--font-size-sm)', marginTop: 'var(--spacing-xs)' } },
+                    `${err.path.join('.')}: ${err.message}`
+                  );
+                  errorDiv.appendChild(errEl);
+                });
+              } else {
+                errorDiv.textContent = 'Erreur de validation';
+              }
+            }
+          }
+        } else {
+          modal.close();
+          resolve(data);
+        }
       }
     });
+
+    // Ajouter un conteneur pour les erreurs
+    const errorContainer = el('div', { className: 'form-errors' });
+    form.appendChild(errorContainer);
 
     // Ajouter les champs
     fields.forEach(field => {
@@ -322,7 +359,8 @@ export function formModal(title, fields, options = {}) {
           className: 'input',
           placeholder: field.placeholder || '',
           required: field.required || false,
-          value: field.value || ''
+          value: field.value || '',
+          step: field.type === 'number' ? 'any' : undefined
         });
       }
 

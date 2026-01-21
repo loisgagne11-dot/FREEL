@@ -6,6 +6,7 @@
 import { store } from './Store.js';
 import { supabaseService } from './SupabaseService.js';
 import { syncService } from './SyncService.js';
+import { securityService } from './SecurityService.js';
 
 class AuthService {
   constructor() {
@@ -121,15 +122,29 @@ class AuthService {
    * Inscription
    */
   async signUp(email, password, metadata = {}) {
+    // Rate limiting: 3 tentatives par email toutes les 15 minutes
+    const rateLimitKey = `auth:signup:${email}`;
+    const rateLimit = securityService.checkRateLimit(rateLimitKey, 3, 15 * 60 * 1000);
+
+    if (!rateLimit.allowed) {
+      securityService.logSecurityEvent('signup_rate_limit_exceeded', { email });
+      return { success: false, error: rateLimit.message };
+    }
+
     try {
       const data = await supabaseService.signUp(email, password, {
         ...metadata,
         app_version: '1.0.0'
       });
 
+      // Succès - réinitialiser le rate limit
+      securityService.resetRateLimit(rateLimitKey);
+      securityService.logSecurityEvent('signup_success', { email });
+
       return { success: true, data };
     } catch (error) {
       console.error('Sign up error:', error);
+      securityService.logSecurityEvent('signup_failure', { email, error: error.message });
       return { success: false, error: error.message };
     }
   }
@@ -138,11 +153,26 @@ class AuthService {
    * Connexion
    */
   async signIn(email, password) {
+    // Rate limiting: 5 tentatives par email toutes les 15 minutes
+    const rateLimitKey = `auth:signin:${email}`;
+    const rateLimit = securityService.checkRateLimit(rateLimitKey, 5, 15 * 60 * 1000);
+
+    if (!rateLimit.allowed) {
+      securityService.logSecurityEvent('signin_rate_limit_exceeded', { email });
+      return { success: false, error: rateLimit.message };
+    }
+
     try {
       const data = await supabaseService.signIn(email, password);
+
+      // Succès - réinitialiser le rate limit
+      securityService.resetRateLimit(rateLimitKey);
+      securityService.logSecurityEvent('signin_success', { email });
+
       return { success: true, data };
     } catch (error) {
       console.error('Sign in error:', error);
+      securityService.logSecurityEvent('signin_failure', { email, error: error.message });
       return { success: false, error: error.message };
     }
   }

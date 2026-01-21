@@ -101,9 +101,11 @@ class StatsService {
       // Calculer les charges
       const year = parseInt(ym.split('-')[0]);
       const urssaf = taxCalculator.calculateURSSAF(totalCA, year, config.acre);
-      const ir = config.versementLib
-        ? taxCalculator.calculateImpotLib(totalCA)
-        : 0;
+      const { ir } = taxCalculator.calculateIR(totalCA, {
+        parts: config.parts || 1,
+        abattement: config.abattement || 0.34,
+        versementLib: config.versementLib || false
+      });
 
       urssafData.push(urssaf);
       irData.push(ir);

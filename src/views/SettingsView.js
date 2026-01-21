@@ -12,6 +12,7 @@ import { syncService } from '../services/SyncService.js';
 import { Modal, formModal } from '../components/Modal.js';
 import { toast } from '../components/Toast.js';
 import { fmtDate } from '../utils/formatters.js';
+import { AuthSignInSchema, AuthSignUpSchema } from '../services/ValidationSchemas.js';
 
 export class SettingsView {
   constructor() {
@@ -232,7 +233,7 @@ export class SettingsView {
         type: 'password',
         required: true
       }
-    ]);
+    ], { schema: AuthSignInSchema });
 
     const result = await authService.signIn(data.email, data.password);
 
@@ -270,7 +271,7 @@ export class SettingsView {
         type: 'password',
         required: true
       }
-    ]);
+    ], { schema: AuthSignUpSchema });
 
     if (data.password !== data.confirmPassword) {
       toast.error('Les mots de passe ne correspondent pas');
