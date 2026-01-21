@@ -9,7 +9,8 @@ import { storageService } from '../services/Storage.js';
 import { authService } from '../services/AuthService.js';
 import { supabaseService } from '../services/SupabaseService.js';
 import { syncService } from '../services/SyncService.js';
-import { Modal, formModal } from '../components/Modal.js';
+import { rgpdService } from '../services/RGPDService.js';
+import { Modal, formModal, confirmModal } from '../components/Modal.js';
 import { toast } from '../components/Toast.js';
 import { fmtDate } from '../utils/formatters.js';
 import { AuthSignInSchema, AuthSignUpSchema } from '../services/ValidationSchemas.js';
@@ -40,6 +41,9 @@ export class SettingsView {
 
       // Données
       this.renderDataSection(),
+
+      // RGPD
+      this.renderRGPDSection(),
 
       // À propos
       this.renderAboutSection()
@@ -181,11 +185,52 @@ export class SettingsView {
         el('button', {
           class: 'btn btn-secondary',
           onclick: () => this.importData()
-        }, '📤 Importer (JSON)'),
+        }, '📤 Importer (JSON)')
+      ])
+    ]);
+  }
+
+  renderRGPDSection() {
+    const consent = rgpdService.getConsent();
+
+    return el('section', { class: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
+      el('h3', {}, '🔒 RGPD & Confidentialité'),
+      el('p', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' } },
+        'Conformité RGPD - Gestion de vos données personnelles'
+      ),
+
+      // Statut du consentement
+      consent && el('div', { style: { marginBottom: 'var(--spacing-md)', padding: 'var(--spacing-sm)', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' } }, [
+        el('div', { style: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' } }, 'Consentement donné le'),
+        el('div', {}, new Date(consent.date).toLocaleString('fr-FR'))
+      ]),
+
+      // Actions RGPD
+      el('div', { style: { display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' } }, [
+        el('button', {
+          class: 'btn btn-primary',
+          onclick: () => this.exportRGPDData()
+        }, '📦 Exporter mes données (RGPD)'),
+        el('button', {
+          class: 'btn btn-secondary',
+          onclick: () => rgpdService.showPrivacyPolicy()
+        }, '📄 Politique de confidentialité'),
+        el('button', {
+          class: 'btn btn-secondary',
+          onclick: () => rgpdService.showLegalNotices()
+        }, '⚖️ Mentions légales')
+      ]),
+
+      // Droit à l'oubli
+      el('div', { style: { marginTop: 'var(--spacing-md)', paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)' } }, [
+        el('div', { style: { fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' } }, 'Droit à l\'oubli'),
+        el('p', { style: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-sm)' } },
+          'Supprimez définitivement toutes vos données (compte, missions, factures, etc.). Cette action est irréversible.'
+        ),
         el('button', {
           class: 'btn btn-danger',
-          onclick: () => this.clearAllData()
-        }, '🗑️ Effacer toutes les données')
+          onclick: () => this.deleteAllRGPDData()
+        }, '🗑️ Supprimer toutes mes données')
       ])
     ]);
   }
@@ -447,32 +492,46 @@ export class SettingsView {
   }
 
   async clearAllData() {
-    const modal = new Modal({
-      title: 'Effacer toutes les données',
-      size: 'sm',
-      closeOnBackdrop: false
-    });
-
-    modal.setBody(el('p', {}, 'Êtes-vous sûr de vouloir effacer toutes les données ? Cette action est irréversible.'));
-    modal.setFooter([
+    const confirmed = await confirmModal(
+      'Êtes-vous sûr de vouloir effacer toutes les données ? Cette action est irréversible.',
       {
-        text: 'Annuler',
-        class: 'btn-secondary',
-        onClick: () => modal.close()
-      },
-      {
-        text: 'Effacer',
-        class: 'btn-danger',
-        onClick: () => {
-          localStorage.clear();
-          toast.success('Données effacées');
-          modal.close();
-          setTimeout(() => window.location.reload(), 1000);
-        }
+        title: 'Effacer toutes les données',
+        danger: true,
+        confirmLabel: 'Effacer',
+        cancelLabel: 'Annuler'
       }
-    ]);
+    );
 
-    modal.open();
+    if (confirmed) {
+      localStorage.clear();
+      toast.success('Données effacées');
+      setTimeout(() => window.location.reload(), 1000);
+    }
+  }
+
+  // Actions - RGPD
+
+  exportRGPDData() {
+    rgpdService.downloadUserDataExport();
+    toast.success('Export RGPD terminé - toutes vos données ont été téléchargées');
+  }
+
+  async deleteAllRGPDData() {
+    const confirmed = await confirmModal(
+      'Êtes-vous sûr de vouloir supprimer définitivement toutes vos données ? Cette action est irréversible et conforme à votre droit à l\'oubli (RGPD). Toutes vos données seront effacées : compte, missions, factures, charges, trésorerie, etc.',
+      {
+        title: '🗑️ Supprimer toutes mes données (RGPD)',
+        danger: true,
+        confirmLabel: 'Supprimer définitivement',
+        cancelLabel: 'Annuler'
+      }
+    );
+
+    if (confirmed) {
+      await rgpdService.deleteAllUserData();
+      toast.success('Toutes vos données ont été supprimées définitivement');
+      setTimeout(() => window.location.reload(), 1500);
+    }
   }
 
   refresh() {

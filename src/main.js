@@ -9,6 +9,7 @@ import { storage } from './services/Storage.js';
 import { router } from './services/Router.js';
 import { initTheme } from './services/Theme.js';
 import { authService } from './services/AuthService.js';
+import { rgpdService } from './services/RGPDService.js';
 import { toast } from './components/Toast.js';
 import { DashboardView } from './views/DashboardView.js';
 import { MissionsView } from './views/MissionsView.js';
@@ -48,6 +49,11 @@ async function init() {
 
     // Démarrer le router
     router.start();
+
+    // Vérifier le consentement RGPD (doit être fait après le router)
+    if (!rgpdService.hasConsent()) {
+      await rgpdService.showConsentModal();
+    }
 
     // Afficher message de bienvenue si première visite
     const company = store.get('company');
