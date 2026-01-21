@@ -258,6 +258,7 @@ class SecurityService {
 }
 
 // Singleton
+export { SecurityService };
 export const securityService = new SecurityService();
 
 // Nettoyer les rate limits expirés toutes les 5 minutes

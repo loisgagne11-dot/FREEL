@@ -284,4 +284,5 @@ class MissionService {
   }
 }
 
+export { MissionService };
 export const missionService = new MissionService();

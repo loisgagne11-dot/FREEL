@@ -251,18 +251,18 @@ export function validate(schema, data) {
     const validated = schema.parse(data);
     return { success: true, data: validated };
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    if (error.errors && Array.isArray(error.errors)) {
       return {
         success: false,
         errors: error.errors.map(err => ({
-          path: err.path.join('.'),
-          message: err.message
+          path: err.path ? err.path.join('.') : 'unknown',
+          message: err.message || 'Validation error'
         }))
       };
     }
     return {
       success: false,
-      errors: [{ path: 'unknown', message: 'Validation error' }]
+      errors: [{ path: 'unknown', message: error.message || 'Validation error' }]
     };
   }
 }

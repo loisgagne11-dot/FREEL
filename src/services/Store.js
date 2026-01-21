@@ -150,6 +150,9 @@ class Store {
   }
 }
 
+// Export class for testing
+export { Store };
+
 // Singleton
 export const store = new Store();
 
