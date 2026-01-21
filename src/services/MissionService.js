@@ -18,10 +18,38 @@ class MissionService {
 
     const start = new Date(mission.debut);
     const end = new Date(mission.fin);
+
+    // Validation: vérifier que les dates sont valides
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      console.error('Invalid dates in mission:', mission.debut, mission.fin);
+      mission.lignes = [];
+      return mission;
+    }
+
+    // Validation: vérifier que la date de fin est après le début
+    if (end < start) {
+      console.error('End date is before start date:', mission.debut, mission.fin);
+      mission.lignes = [];
+      return mission;
+    }
+
+    // Validation: limite de 120 mois (10 ans) pour éviter les boucles infinies
+    const maxMonths = 120;
+    const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+    if (monthsDiff > maxMonths) {
+      console.error('Mission duration exceeds maximum of 10 years:', monthsDiff, 'months');
+      mission.lignes = [];
+      return mission;
+    }
+
     const lignes = [];
 
     let current = new Date(start);
-    while (current <= end) {
+    let iterationCount = 0;
+    const maxIterations = maxMonths + 1;
+
+    while (current <= end && iterationCount < maxIterations) {
+      iterationCount++;
       const year = current.getFullYear();
       const month = current.getMonth() + 1;
       const ym = `${year}-${String(month).padStart(2, '0')}`;

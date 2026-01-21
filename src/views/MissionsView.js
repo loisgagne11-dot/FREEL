@@ -8,6 +8,7 @@ import { missionService } from '../services/MissionService.js';
 import { EUR, PCT, fmtLong, fmtMonthShort } from '../utils/formatters.js';
 import { Modal, formModal } from '../components/Modal.js';
 import { toast } from '../components/Toast.js';
+import { MissionSchema, sanitizeHTML } from '../services/ValidationSchemas.js';
 
 export class MissionsView {
   constructor() {
@@ -132,11 +133,12 @@ export class MissionsView {
 
     try {
       const data = await formModal(
-        isNew ? '💼 Nouvelle Mission' : `✏️ ${mission.client}`,
+        isNew ? '💼 Nouvelle Mission' : `✏️ ${sanitizeHTML(mission.client)}`,
         fields,
         {
           submitLabel: '✅ Enregistrer',
-          size: 'lg'
+          size: 'lg',
+          schema: MissionSchema
         }
       );
 
