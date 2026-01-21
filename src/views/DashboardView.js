@@ -1,15 +1,18 @@
 /**
- * Vue Dashboard - Exemple de vue refactorisée
+ * Vue Dashboard - Vue principale avec KPIs et graphiques
  */
 
 import { el } from '../utils/dom.js';
 import { store } from '../services/Store.js';
 import { EUR, PCT, fmtMonth } from '../utils/formatters.js';
 import { taxCalculator } from '../services/TaxCalculator.js';
+import { statsService } from '../services/StatsService.js';
+import { createChart, ChartPresets } from '../components/Chart.js';
 
 export class DashboardView {
   constructor() {
     this.container = null;
+    this.charts = [];
   }
 
   /**
@@ -150,6 +153,108 @@ export class DashboardView {
   }
 
   /**
+   * Créer la section graphiques
+   */
+  createChartsSection() {
+    const { startYm, endYm } = statsService.getLast12Months();
+
+    return el('section', { className: 'dashboard-section' }, [
+      el('h2', { className: 'dashboard-section-title' }, [
+        el('span', {}, '📊'),
+        el('span', {}, 'Évolution (12 derniers mois)')
+      ]),
+      el('div', { className: 'charts-grid' }, [
+        // CA Evolution
+        el('div', { className: 'chart-card' }, [
+          el('h3', { className: 'chart-title' }, 'Chiffre d\'affaires'),
+          el('div', { className: 'chart-container' }, [
+            el('canvas', { id: 'chart-ca-evolution' })
+          ])
+        ]),
+
+        // CA vs Bénéfice
+        el('div', { className: 'chart-card' }, [
+          el('h3', { className: 'chart-title' }, 'CA vs Bénéfice'),
+          el('div', { className: 'chart-container' }, [
+            el('canvas', { id: 'chart-ca-benefice' })
+          ])
+        ]),
+
+        // Répartition clients
+        el('div', { className: 'chart-card' }, [
+          el('h3', { className: 'chart-title' }, 'Répartition par client'),
+          el('div', { className: 'chart-container' }, [
+            el('canvas', { id: 'chart-clients' })
+          ])
+        ]),
+
+        // Taux de charge
+        el('div', { className: 'chart-card' }, [
+          el('h3', { className: 'chart-title' }, 'Taux de charge mensuel'),
+          el('div', { className: 'chart-container' }, [
+            el('canvas', { id: 'chart-taux-charge' })
+          ])
+        ])
+      ])
+    ]);
+  }
+
+  /**
+   * Initialiser les graphiques
+   */
+  async initCharts() {
+    const { startYm, endYm } = statsService.getLast12Months();
+
+    // CA Evolution
+    const caEvolution = statsService.getCAEvolution(startYm, endYm);
+    const canvasCA = document.getElementById('chart-ca-evolution');
+    if (canvasCA) {
+      const chartCA = await createChart(
+        canvasCA,
+        ChartPresets.caEvolution(caEvolution.labels, caEvolution.data)
+      );
+      this.charts.push(chartCA);
+    }
+
+    // CA vs Bénéfice
+    const caBenefice = statsService.getCAVsBenefice(startYm, endYm);
+    const canvasCaBenefice = document.getElementById('chart-ca-benefice');
+    if (canvasCaBenefice) {
+      const chartCaBenefice = await createChart(
+        canvasCaBenefice,
+        ChartPresets.caVsBenefice(
+          caBenefice.labels,
+          caBenefice.caData,
+          caBenefice.beneficeData
+        )
+      );
+      this.charts.push(chartCaBenefice);
+    }
+
+    // Répartition clients
+    const clients = statsService.getClientsBreakdown(startYm, endYm);
+    const canvasClients = document.getElementById('chart-clients');
+    if (canvasClients && clients.labels.length > 0) {
+      const chartClients = await createChart(
+        canvasClients,
+        ChartPresets.clientsBreakdown(clients.labels, clients.data)
+      );
+      this.charts.push(chartClients);
+    }
+
+    // Taux de charge
+    const tauxCharge = statsService.getTauxCharge(startYm, endYm);
+    const canvasTaux = document.getElementById('chart-taux-charge');
+    if (canvasTaux) {
+      const chartTaux = await createChart(
+        canvasTaux,
+        ChartPresets.tauxCharge(tauxCharge.labels, tauxCharge.data)
+      );
+      this.charts.push(chartTaux);
+    }
+  }
+
+  /**
    * Render
    */
   render() {
@@ -162,8 +267,14 @@ export class DashboardView {
 
       this.createUrgencesSection(),
       this.createPerformanceSection(kpis),
-      this.createTresorerieSection(kpis)
+      this.createTresorerieSection(kpis),
+      this.createChartsSection()
     ]);
+
+    // Initialiser les graphiques après le render
+    setTimeout(() => {
+      this.initCharts();
+    }, 0);
 
     return this.container;
   }
@@ -172,6 +283,12 @@ export class DashboardView {
    * Détruire la vue
    */
   destroy() {
-    // Cleanup si nécessaire
+    // Détruire tous les graphiques
+    this.charts.forEach(chart => {
+      if (chart && typeof chart.destroy === 'function') {
+        chart.destroy();
+      }
+    });
+    this.charts = [];
   }
 }
