@@ -275,4 +275,5 @@ class TaxCalculator {
   }
 }
 
+export { TaxCalculator };
 export const taxCalculator = new TaxCalculator();
