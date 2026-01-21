@@ -179,6 +179,9 @@ class InvoiceService {
       siret: company.siret || '',
       siren: company.siret?.substring(0, 9) || '',
       tvaIntra: company.tvaIntracom || '',
+      apeCode: company.apeCode || '',
+      rcs: company.rcs || '',
+      rcPro: company.rcPro || '',
       iban: company.iban || '',
 
       // Client
@@ -329,9 +332,16 @@ class InvoiceService {
 
     <div class="legal">
       <div style="margin-bottom:8px;"><strong>Conditions de paiement:</strong> Paiement à ${invoiceData.delayDays} jours à compter de la date de facturation. Date d'échéance: ${fmtDate(invoiceData.echeance)}</div>
-      <div style="margin-bottom:8px;">En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée (taux BCE + 10 points), à laquelle s'ajoutera une indemnité forfaitaire pour frais de recouvrement de 40 €. Pas d'escompte pour paiement anticipé.</div>
-      <div>SIREN ${invoiceData.siren} - RCS TOULOUSE - APE 6201Z</div>
-      ${invoiceData.tvaRate === 0 ? '<div style="font-weight:500;margin-top:4px;">TVA non applicable, article 293 B du CGI</div>' : ''}
+      <div style="margin-bottom:8px;">En cas de retard de paiement, une pénalité de 3 fois le taux d'intérêt légal sera appliquée (taux BCE + 10 points), à laquelle s'ajoutera une indemnité forfaitaire pour frais de recouvrement de 40 € (article L.441-10 du Code de commerce). Pas d'escompte pour paiement anticipé.</div>
+      <div style="margin-bottom:4px;">
+        ${invoiceData.siret ? 'SIRET: ' + invoiceData.siret + ' - ' : ''}
+        ${invoiceData.siren ? 'SIREN: ' + invoiceData.siren + ' - ' : ''}
+        ${invoiceData.apeCode || 'APE 6201Z (Programmation informatique)'}
+      </div>
+      ${invoiceData.rcs ? '<div style="margin-bottom:4px;">' + invoiceData.rcs + '</div>' : '<div style="margin-bottom:4px;">Dispensé d\'immatriculation en application de l\'article L. 123-1-1 du Code de commerce</div>'}
+      ${invoiceData.rcPro ? '<div style="margin-bottom:4px;">Assurance RC Pro: ' + invoiceData.rcPro + '</div>' : ''}
+      ${invoiceData.tvaRate === 0 ? '<div style="font-weight:500;margin-top:4px;">TVA non applicable, article 293 B du CGI (franchise en base de TVA)</div>' : ''}
+      <div style="margin-top:8px;font-size:7pt;color:#999;">En vertu de l'article 289 du Code Général des Impôts, cette facture doit être conservée 10 ans à compter de sa date d'émission.</div>
     </div>
   </div>
 </body>
