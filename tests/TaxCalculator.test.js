@@ -153,8 +153,8 @@ describe('TaxCalculator', () => {
   });
 
   describe('checkPlafond', () => {
-    it('vérifie le plafond service (77700€)', () => {
-      const result = taxCalculator.checkPlafond(50000, 'service');
+    it('vérifie le plafond service 2025 (77700€)', () => {
+      const result = taxCalculator.checkPlafond(50000, 'service', 2025);
 
       expect(result.plafond).toBe(77700);
       expect(result.ca).toBe(50000);
@@ -164,9 +164,20 @@ describe('TaxCalculator', () => {
       expect(result.warning).toBe(false);
     });
 
+    it('vérifie le plafond service 2026 (79000€)', () => {
+      const result = taxCalculator.checkPlafond(50000, 'service', 2026);
+
+      expect(result.plafond).toBe(79000);
+      expect(result.ca).toBe(50000);
+      expect(result.usage).toBeCloseTo(0.633, 2);
+      expect(result.remaining).toBe(29000);
+      expect(result.exceeded).toBe(false);
+      expect(result.warning).toBe(false);
+    });
+
     it('alerte à 80% du plafond', () => {
       const ca = 77700 * 0.85; // 85%
-      const result = taxCalculator.checkPlafond(ca, 'service');
+      const result = taxCalculator.checkPlafond(ca, 'service', 2025);
 
       expect(result.warning).toBe(true);
       expect(result.exceeded).toBe(false);
@@ -174,7 +185,7 @@ describe('TaxCalculator', () => {
 
     it('détecte le dépassement', () => {
       const ca = 80000;
-      const result = taxCalculator.checkPlafond(ca, 'service');
+      const result = taxCalculator.checkPlafond(ca, 'service', 2025);
 
       expect(result.exceeded).toBe(true);
       expect(result.remaining).toBe(0);
