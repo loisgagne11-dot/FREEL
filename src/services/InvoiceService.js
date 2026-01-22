@@ -364,4 +364,8 @@ class InvoiceService {
   }
 }
 
+// Export class for testing
+export { InvoiceService };
+
+// Export singleton for app use
 export const invoiceService = new InvoiceService();
