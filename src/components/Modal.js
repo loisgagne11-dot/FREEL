@@ -28,6 +28,9 @@ export class Modal {
   build() {
     const { title, size, footer } = this.options;
 
+    // Generate unique ID for modal title
+    const titleId = `modal-title-${Math.random().toString(36).substr(2, 9)}`;
+
     // Overlay
     this.overlay = el('div', {
       className: 'modal-overlay',
@@ -40,14 +43,21 @@ export class Modal {
 
     // Modal
     this.modal = el('div', {
-      className: `modal modal-${size}`
+      className: `modal modal-${size}`,
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-labelledby': titleId
     });
 
     // Header
     const header = el('div', { className: 'modal-header' }, [
-      el('h2', { className: 'modal-title' }, title),
+      el('h2', {
+        className: 'modal-title',
+        id: titleId
+      }, title),
       el('button', {
         className: 'modal-close',
+        'aria-label': 'Fermer la boîte de dialogue',
         onClick: () => this.close()
       }, '✕')
     ]);
