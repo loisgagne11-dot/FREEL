@@ -54,7 +54,10 @@ class Router {
    * Créer le layout de l'application
    */
   createLayout() {
-    const header = el('header', { className: 'app-header' }, [
+    const header = el('header', {
+      className: 'app-header',
+      role: 'banner'
+    }, [
       el('div', { className: 'app-logo' }, 'FREEL'),
       this.createNav(),
       this.createHeaderActions()
@@ -62,7 +65,9 @@ class Router {
 
     const main = el('main', {
       className: 'app-main',
-      id: 'main-content'
+      id: 'main-content',
+      role: 'main',
+      'aria-label': 'Contenu principal'
     });
 
     const bottomNav = this.createBottomNav();
@@ -76,7 +81,11 @@ class Router {
    * Créer la navigation
    */
   createNav() {
-    const nav = el('nav', { className: 'app-nav' });
+    const nav = el('nav', {
+      className: 'app-nav',
+      role: 'navigation',
+      'aria-label': 'Navigation principale'
+    });
 
     const links = [
       { route: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -90,9 +99,10 @@ class Router {
       const a = el('a', {
         href: `#${link.route}`,
         className: 'nav-link',
-        dataset: { route: link.route }
+        dataset: { route: link.route },
+        'aria-label': link.label
       }, [
-        el('span', {}, link.icon),
+        el('span', { 'aria-hidden': 'true' }, link.icon),
         el('span', {}, link.label)
       ]);
 
@@ -107,6 +117,8 @@ class Router {
    */
   createHeaderActions() {
     const actions = el('div', {
+      role: 'toolbar',
+      'aria-label': 'Actions principales',
       style: {
         display: 'flex',
         gap: 'var(--spacing-sm)',
@@ -117,6 +129,7 @@ class Router {
     // Bouton recherche
     const searchBtn = el('button', {
       className: 'btn-icon',
+      'aria-label': 'Rechercher',
       onClick: () => {
         // TODO: Ouvrir la recherche
         console.log('Search');
@@ -126,6 +139,7 @@ class Router {
     // Bouton paramètres
     const settingsBtn = el('button', {
       className: 'btn-icon',
+      'aria-label': 'Paramètres',
       onClick: () => this.navigate('settings')
     }, '⚙️');
 
@@ -139,7 +153,11 @@ class Router {
    * Créer la bottom nav (mobile)
    */
   createBottomNav() {
-    const nav = el('nav', { className: 'bottom-nav' });
+    const nav = el('nav', {
+      className: 'bottom-nav',
+      role: 'navigation',
+      'aria-label': 'Navigation mobile'
+    });
 
     const links = [
       { route: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -153,9 +171,13 @@ class Router {
       const item = el('a', {
         href: `#${link.route}`,
         className: 'bottom-nav-item',
-        dataset: { route: link.route }
+        dataset: { route: link.route },
+        'aria-label': link.label
       }, [
-        el('span', { style: { fontSize: 'var(--font-size-xl)' } }, link.icon),
+        el('span', {
+          style: { fontSize: 'var(--font-size-xl)' },
+          'aria-hidden': 'true'
+        }, link.icon),
         el('span', {}, link.label)
       ]);
 
@@ -210,12 +232,24 @@ class Router {
   updateActiveLinks(route) {
     // Desktop nav
     $$('.nav-link').forEach(link => {
-      link.classList.toggle('active', link.dataset.route === route);
+      const isActive = link.dataset.route === route;
+      link.classList.toggle('active', isActive);
+      if (isActive) {
+        link.setAttribute('aria-current', 'page');
+      } else {
+        link.removeAttribute('aria-current');
+      }
     });
 
     // Mobile nav
     $$('.bottom-nav-item').forEach(link => {
-      link.classList.toggle('active', link.dataset.route === route);
+      const isActive = link.dataset.route === route;
+      link.classList.toggle('active', isActive);
+      if (isActive) {
+        link.setAttribute('aria-current', 'page');
+      } else {
+        link.removeAttribute('aria-current');
+      }
     });
   }
 }
