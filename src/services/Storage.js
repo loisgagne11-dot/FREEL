@@ -237,7 +237,12 @@ class StorageService {
   }
 }
 
+// Export class for testing
+export { StorageService };
+
+// Export singleton for app use
 export const storage = new StorageService();
+export const storageService = storage; // Alias for compatibility
 
 // Auto-save sur certains changements
 const autoSaveKeys = ['company', 'missions', 'clients', 'treasury', 'irConfig', 'goalCA', 'theme'];
