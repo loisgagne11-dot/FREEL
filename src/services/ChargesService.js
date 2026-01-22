@@ -54,9 +54,9 @@ class ChargesService {
     const acre = config.acre || false;
     const urssaf = taxCalculator.calculateURSSAF(totalCA, year, acre);
 
-    // Calculer IR
+    // Calculer IR (versement libératoire)
     const ir = config.versementLib
-      ? taxCalculator.calculateImpotLib(totalCA)
+      ? totalCA * LEGAL.impLib
       : 0; // Si pas de versement lib, l'IR est calculé annuellement
 
     return {
@@ -416,4 +416,8 @@ class ChargesService {
   }
 }
 
+// Export class for testing
+export { ChargesService };
+
+// Export singleton for app use
 export const chargesService = new ChargesService();
