@@ -3,7 +3,7 @@
  * URSSAF, IR, TVA, etc.
  */
 
-import { LEGAL, IR_BRACKETS } from '../config.js';
+import { LEGAL, IR_BRACKETS_2025, IR_BRACKETS_2026 } from '../config.js';
 
 class TaxCalculator {
   /**
@@ -48,7 +48,8 @@ class TaxCalculator {
     const {
       parts = 1,
       abattement = 0.34, // 34% pour BNC
-      versementLib = false
+      versementLib = false,
+      year = new Date().getFullYear()
     } = config;
 
     if (!ca || ca <= 0) {
@@ -74,11 +75,12 @@ class TaxCalculator {
       };
     }
 
-    // Calcul par tranches
+    // Calcul par tranches (utiliser les tranches de l'année appropriée)
+    const brackets = year >= 2026 ? IR_BRACKETS_2026 : IR_BRACKETS_2025;
     let ir = 0;
     const details = [];
 
-    for (const bracket of IR_BRACKETS) {
+    for (const bracket of brackets) {
       if (quotientFamilial <= bracket.min) break;
 
       const base = Math.min(quotientFamilial, bracket.max) - bracket.min;
@@ -110,13 +112,15 @@ class TaxCalculator {
    * Calculer la TVA
    * @param {number} caHT - CA Hors Taxe
    * @param {string} month - Mois au format YYYY-MM
-   * @returns {object} { tvaCollectee, tvaDue, caHT, caTTC }
+   * @param {number} achatsHT - Achats professionnels HT (optionnel)
+   * @returns {object} { tvaCollectee, tvaDeductible, tvaDue, caHT, caTTC, assujetti }
    */
-  calculateTVA(caHT, month) {
+  calculateTVA(caHT, month, achatsHT = 0) {
     // Vérifier si assujetti à la TVA
     if (month < LEGAL.tvaStartMonth) {
       return {
         tvaCollectee: 0,
+        tvaDeductible: 0,
         tvaDue: 0,
         caHT,
         caTTC: caHT,
@@ -124,19 +128,23 @@ class TaxCalculator {
       };
     }
 
-    const tvaCollectee = caHT * LEGAL.tvaRate;
+    // TVA collectée sur les ventes
+    const tvaCollectee = this.round(caHT * LEGAL.tvaRate);
     const caTTC = caHT + tvaCollectee;
 
-    // TODO: Calculer TVA déductible sur charges
-    const tvaDeductible = 0;
-    const tvaDue = tvaCollectee - tvaDeductible;
+    // TVA déductible sur les achats professionnels
+    const tvaDeductible = this.round(achatsHT * LEGAL.tvaRate);
+
+    // TVA due = TVA collectée - TVA déductible
+    const tvaDue = this.round(tvaCollectee - tvaDeductible);
 
     return {
       tvaCollectee,
       tvaDeductible,
-      tvaDue,
+      tvaDue: Math.max(0, tvaDue), // Ne peut pas être négatif (crédit de TVA géré séparément)
       caHT,
       caTTC,
+      achatsHT,
       assujetti: true
     };
   }
@@ -182,7 +190,9 @@ class TaxCalculator {
       acre = false,
       versementLib = false,
       abattement = 0.34,
-      parts = 1
+      parts = 1,
+      month = null, // Mois pour la TVA (YYYY-MM)
+      achatsHT = 0  // Achats professionnels pour TVA déductible
     } = config;
 
     if (!ca || ca <= 0) {
@@ -195,13 +205,20 @@ class TaxCalculator {
     }
 
     const urssaf = this.calculateURSSAF(ca, year, acre);
-    const { ir } = this.calculateIR(ca, { parts, abattement, versementLib });
+    const { ir } = this.calculateIR(ca, { parts, abattement, versementLib, year });
+
+    // Calculer la TVA si mois fourni
+    let tvaDue = 0;
+    if (month) {
+      const tvaResult = this.calculateTVA(ca, month, achatsHT);
+      tvaDue = tvaResult.tvaDue;
+    }
 
     return {
       urssaf,
       ir,
-      tva: 0, // TVA is calculated separately via calculateTVA()
-      total: urssaf + ir
+      tva: tvaDue,
+      total: urssaf + ir + tvaDue
     };
   }
 
@@ -252,13 +269,18 @@ class TaxCalculator {
   /**
    * Calculer le plafond micro-entreprise
    * @param {string} activity - Type d'activité
+   * @param {number} year - Année
    * @returns {number} Plafond CA annuel
    */
-  getCAPlafond(activity = 'service') {
-    const plafonds = {
-      service: 77700, // Prestations de services (BNC)
-      vente: 188700,  // Vente de marchandises (BIC)
-      mixte: 188700   // Activité mixte
+  getCAPlafond(activity = 'service', year = new Date().getFullYear()) {
+    const plafonds = year >= 2026 ? {
+      service: LEGAL.plafondService2026,
+      vente: LEGAL.plafondVente2026,
+      mixte: LEGAL.plafondVente2026
+    } : {
+      service: LEGAL.plafondService2025,
+      vente: LEGAL.plafondVente2025,
+      mixte: LEGAL.plafondVente2025
     };
 
     return plafonds[activity] || plafonds.service;
@@ -268,10 +290,11 @@ class TaxCalculator {
    * Vérifier le dépassement de plafond
    * @param {number} ca - CA annuel
    * @param {string} activity - Type d'activité
+   * @param {number} year - Année
    * @returns {object} État du plafond
    */
-  checkPlafond(ca, activity = 'service') {
-    const plafond = this.getCAPlafond(activity);
+  checkPlafond(ca, activity = 'service', year = new Date().getFullYear()) {
+    const plafond = this.getCAPlafond(activity, year);
     const usage = ca / plafond;
     const remaining = Math.max(0, plafond - ca);
 

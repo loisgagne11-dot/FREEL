@@ -5,6 +5,7 @@
 
 import { STORAGE_PREFIX } from '../config.js';
 import { store } from './Store.js';
+import { debounce } from '../utils/dom.js';
 
 class StorageService {
   constructor() {
@@ -244,14 +245,25 @@ export { StorageService };
 export const storage = new StorageService();
 export const storageService = storage; // Alias for compatibility
 
-// Auto-save sur certains changements
+// Auto-save sur certains changements (avec debounce pour éviter surcharge localStorage)
 const autoSaveKeys = ['company', 'missions', 'clients', 'treasury', 'irConfig', 'goalCA', 'theme'];
+
+// Créer une fonction debounced pour chaque clé
+const debouncedSaves = {};
 autoSaveKeys.forEach(key => {
-  store.on(key, (value) => {
+  debouncedSaves[key] = debounce((value) => {
     try {
       storage.save(key, value);
     } catch (error) {
       console.error(`Auto-save failed for ${key}:`, error);
+      // En cas d'erreur QuotaExceeded, proposer backup
+      if (error.name === 'QuotaExceededError') {
+        storage.handleQuotaExceeded();
+      }
     }
+  }, 500); // Debounce 500ms
+
+  store.on(key, (value) => {
+    debouncedSaves[key](value);
   });
 });

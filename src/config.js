@@ -1,10 +1,10 @@
 /**
- * Configuration globale de l'application FREEL V51
+ * Configuration globale de l'application FREEL V52
  */
 
-export const APP_VERSION = 51;
-export const STORAGE_VERSION = 'v51';
-export const STORAGE_PREFIX = 'freel_v51';
+export const APP_VERSION = 52;
+export const STORAGE_VERSION = 'v52';
+export const STORAGE_PREFIX = 'freel_v52';
 
 // Constantes légales (taux 2025-2026 pour BNC - Bénéfices Non Commerciaux)
 // Consultants, freelances IT = régime BNC, pas BIC
@@ -15,18 +15,43 @@ export const LEGAL = {
   urssafAcre2026: 0.106,   // 10.6% (ACRE 2026)
   cfp: 0.002,              // 0.2% Formation professionnelle
   impLib: 0.022,           // 2.2% Versement libératoire
-  tvaRate: 0.20,           // 20% TVA
+  tvaRate: 0.20,           // 20% TVA standard
   tvaStartMonth: '2025-10', // Début assujettissement TVA
+
+  // Plafonds micro-entreprise 2025
+  plafondService2025: 77700,  // Prestations de services BNC
+  plafondVente2025: 188700,   // Vente de marchandises/hébergement
+
+  // Plafonds micro-entreprise 2026 (indexés)
+  plafondService2026: 79000,  // Prestations de services BNC
+  plafondVente2026: 192000,   // Vente de marchandises/hébergement
+
+  // Abattements fiscaux
+  abattementBNC: 0.34,        // 34% pour BNC
+  abattementBIC: 0.50,        // 50% pour BIC services
+  abattementVente: 0.71,      // 71% pour vente marchandises
 };
 
 // Tranches IR 2025 (progressif)
-export const IR_BRACKETS = [
+export const IR_BRACKETS_2025 = [
   { min: 0, max: 11294, rate: 0 },
   { min: 11294, max: 28797, rate: 0.11 },
   { min: 28797, max: 82341, rate: 0.30 },
   { min: 82341, max: 177106, rate: 0.41 },
   { min: 177106, max: Infinity, rate: 0.45 }
 ];
+
+// Tranches IR 2026 (indexées +1.8%)
+export const IR_BRACKETS_2026 = [
+  { min: 0, max: 11497, rate: 0 },
+  { min: 11497, max: 29314, rate: 0.11 },
+  { min: 29314, max: 83823, rate: 0.30 },
+  { min: 83823, max: 180274, rate: 0.41 },
+  { min: 180274, max: Infinity, rate: 0.45 }
+];
+
+// Alias pour compatibilité
+export const IR_BRACKETS = IR_BRACKETS_2025;
 
 // Catégories de charges
 export const CHARGE_CATEGORIES = [
