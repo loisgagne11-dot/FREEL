@@ -1,5 +1,5 @@
 /**
- * Point d'entrée principal de FREEL V51
+ * Point d'entrée principal de FREEL V52
  */
 
 import './assets/styles/main.css';
@@ -11,6 +11,7 @@ import { initTheme } from './services/Theme.js';
 import { authService } from './services/AuthService.js';
 import { rgpdService } from './services/RGPDService.js';
 import { toast } from './components/Toast.js';
+import { OnboardingWizard } from './components/OnboardingWizard.js';
 import { DashboardView } from './views/DashboardView.js';
 import { MissionsView } from './views/MissionsView.js';
 import { TreasuryView } from './views/TreasuryView.js';
@@ -55,10 +56,11 @@ async function init() {
       await rgpdService.showConsentModal();
     }
 
-    // Afficher message de bienvenue si première visite
-    const company = store.get('company');
-    if (!company || !company.onboardingDone) {
+    // Vérifier si l'onboarding a été complété
+    const onboardingCompleted = storage.load('onboarding_completed', false);
+    if (!onboardingCompleted) {
       showOnboarding();
+      return; // Ne pas continuer le chargement si onboarding non terminé
     }
 
     // Auto-save périodique
@@ -71,7 +73,7 @@ async function init() {
     }, 30000); // Toutes les 30 secondes
 
     // Log version
-    console.log(`%cFREEL V51%c - Refactored & Optimized + Cloud-enabled`,
+    console.log(`%cFREEL V52%c - Sprint 5: Onboarding + 2026 Values`,
       'font-size: 24px; font-weight: bold; color: #845ef7;',
       'font-size: 14px; color: #999;'
     );
@@ -86,8 +88,8 @@ async function init() {
  * Afficher l'onboarding
  */
 function showOnboarding() {
-  // TODO: Implémenter l'onboarding
-  console.log('Onboarding à implémenter');
+  const wizard = new OnboardingWizard();
+  wizard.open();
 }
 
 /**
@@ -115,5 +117,5 @@ window.FREEL = {
   store,
   storage,
   router,
-  version: 51
+  version: 52
 };
