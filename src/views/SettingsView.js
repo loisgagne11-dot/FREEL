@@ -240,7 +240,7 @@ export class SettingsView {
       el('h3', {}, 'À propos'),
       el('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' } }, [
         el('div', {}, [
-          el('div', { style: { fontWeight: 'var(--font-weight-semibold)' } }, 'FREEL V51'),
+          el('div', { style: { fontWeight: 'var(--font-weight-semibold)' } }, 'FREEL V52'),
           el('div', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' } },
             'Gestion freelance micro-entrepreneur')
         ]),
