@@ -99,11 +99,11 @@ export class FAB {
   addMission() {
     this.close();
     router.navigate('missions');
-    // Déclencher l'ouverture du modal après navigation
+    // Déclencher l'événement pour ouvrir le modal
     setTimeout(() => {
-      const addBtn = document.querySelector('.missions-view button:has-text("+ Nouvelle Mission")');
-      if (addBtn) addBtn.click();
-    }, 100);
+      // Déclencher un événement personnalisé que MissionsView peut écouter
+      window.dispatchEvent(new CustomEvent('fab-add-mission'));
+    }, 200);
   }
 
   /**
