@@ -4,6 +4,7 @@
 
 import { store } from './Store.js';
 import { el, $ } from '../utils/dom.js';
+import { fab } from '../components/FAB.js';
 
 class Router {
   constructor() {
@@ -71,10 +72,12 @@ class Router {
     });
 
     const bottomNav = this.createBottomNav();
+    const fabElement = fab.create();
 
     this.appElement.appendChild(header);
     this.appElement.appendChild(main);
     this.appElement.appendChild(bottomNav);
+    this.appElement.appendChild(fabElement);
   }
 
   /**
