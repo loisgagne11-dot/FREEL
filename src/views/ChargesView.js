@@ -17,26 +17,26 @@ export class ChargesView {
   }
 
   render() {
-    const container = el('div', { class: 'view-container' });
+    const container = el('div', { className: 'view-container' });
 
     // Header
-    const header = el('div', { class: 'view-header' }, [
+    const header = el('div', { className: 'view-header' }, [
       el('div', {}, [
         el('h1', {}, 'Charges sociales et fiscales'),
-        el('p', { class: 'subtitle' }, 'Gestion URSSAF et IR')
+        el('p', { className: 'subtitle' }, 'Gestion URSSAF et IR')
       ]),
-      el('div', { class: 'header-actions' }, [
+      el('div', { className: 'header-actions' }, [
         el('button', {
-          class: 'btn btn-secondary',
-          onclick: () => this.recalculateCharges()
+          className: 'btn btn-secondary',
+          onClick: () => this.recalculateCharges()
         }, '🔄 Recalculer'),
         el('button', {
-          class: 'btn btn-secondary',
-          onclick: () => this.exportCharges()
+          className: 'btn btn-secondary',
+          onClick: () => this.exportCharges()
         }, '📥 Exporter CSV'),
         el('button', {
-          class: 'btn btn-primary',
-          onclick: () => this.generateCharges()
+          className: 'btn btn-primary',
+          onClick: () => this.generateCharges()
         }, '✚ Générer charges')
       ])
     ]);
@@ -52,7 +52,7 @@ export class ChargesView {
     const filters = this.renderFilters();
 
     // Charges list
-    const chargesList = el('div', { class: 'charges-list' });
+    const chargesList = el('div', { className: 'charges-list' });
     this.updateChargesList(chargesList);
 
     container.append(header, yearSelector, kpis, filters, chargesList);
@@ -66,10 +66,10 @@ export class ChargesView {
       years.push(y);
     }
 
-    return el('div', { class: 'year-selector' }, [
+    return el('div', { className: 'year-selector' }, [
       el('label', {}, 'Année :'),
       el('select', {
-        class: 'select',
+        className: 'select',
         value: this.currentYear,
         onchange: (e) => {
           this.currentYear = parseInt(e.target.value);
@@ -82,42 +82,42 @@ export class ChargesView {
   }
 
   renderKPIs(stats) {
-    return el('div', { class: 'kpi-grid' }, [
-      el('div', { class: 'kpi' }, [
-        el('div', { class: 'kpi-label' }, 'Total charges'),
-        el('div', { class: 'kpi-value' }, EUR(stats.total.total)),
-        el('div', { class: 'kpi-trend' }, `${stats.total.count} charges`)
+    return el('div', { className: 'kpi-grid' }, [
+      el('div', { className: 'kpi' }, [
+        el('div', { className: 'kpi-label' }, 'Total charges'),
+        el('div', { className: 'kpi-value' }, EUR(stats.total.total)),
+        el('div', { className: 'kpi-trend' }, `${stats.total.count} charges`)
       ]),
 
-      el('div', { class: 'kpi kpi-success' }, [
-        el('div', { class: 'kpi-label' }, 'Payées'),
-        el('div', { class: 'kpi-value' }, EUR(stats.total.paid)),
-        el('div', { class: 'kpi-trend positive' }, `${stats.total.countPaid} / ${stats.total.count}`)
+      el('div', { className: 'kpi kpi-success' }, [
+        el('div', { className: 'kpi-label' }, 'Payées'),
+        el('div', { className: 'kpi-value' }, EUR(stats.total.paid)),
+        el('div', { className: 'kpi-trend positive' }, `${stats.total.countPaid} / ${stats.total.count}`)
       ]),
 
-      el('div', { class: 'kpi kpi-warning' }, [
-        el('div', { class: 'kpi-label' }, 'Non payées'),
-        el('div', { class: 'kpi-value' }, EUR(stats.total.unpaid)),
-        el('div', { class: 'kpi-trend' }, `${stats.total.count - stats.total.countPaid} charges`)
+      el('div', { className: 'kpi kpi-warning' }, [
+        el('div', { className: 'kpi-label' }, 'Non payées'),
+        el('div', { className: 'kpi-value' }, EUR(stats.total.unpaid)),
+        el('div', { className: 'kpi-trend' }, `${stats.total.count - stats.total.countPaid} charges`)
       ]),
 
-      el('div', { class: 'kpi' }, [
-        el('div', { class: 'kpi-label' }, 'URSSAF'),
-        el('div', { class: 'kpi-value' }, EUR(stats.urssaf.total)),
-        el('div', { class: 'kpi-trend' }, `${stats.urssaf.countPaid}/${stats.urssaf.count} payés`)
+      el('div', { className: 'kpi' }, [
+        el('div', { className: 'kpi-label' }, 'URSSAF'),
+        el('div', { className: 'kpi-value' }, EUR(stats.urssaf.total)),
+        el('div', { className: 'kpi-trend' }, `${stats.urssaf.countPaid}/${stats.urssaf.count} payés`)
       ]),
 
-      el('div', { class: 'kpi' }, [
-        el('div', { class: 'kpi-label' }, 'IR'),
-        el('div', { class: 'kpi-value' }, EUR(stats.ir.total)),
-        el('div', { class: 'kpi-trend' }, `${stats.ir.countPaid}/${stats.ir.count} payés`)
+      el('div', { className: 'kpi' }, [
+        el('div', { className: 'kpi-label' }, 'IR'),
+        el('div', { className: 'kpi-value' }, EUR(stats.ir.total)),
+        el('div', { className: 'kpi-trend' }, `${stats.ir.countPaid}/${stats.ir.count} payés`)
       ])
     ]);
   }
 
   renderFilters() {
-    const filters = el('div', { class: 'filters' }, [
-      el('div', { class: 'filter-tabs' }, [
+    const filters = el('div', { className: 'filters' }, [
+      el('div', { className: 'filter-tabs' }, [
         this.renderFilterTab('all', 'Toutes'),
         this.renderFilterTab('urssaf', 'URSSAF'),
         this.renderFilterTab('ir', 'IR'),
@@ -135,7 +135,7 @@ export class ChargesView {
 
     return el('button', {
       class: this.currentFilter === filter ? 'filter-tab active' : 'filter-tab',
-      onclick: () => {
+      onClick: () => {
         this.currentFilter = filter;
         $$('.filter-tab').forEach(tab => tab.classList.remove('active'));
         event.target.classList.add('active');
@@ -159,16 +159,16 @@ export class ChargesView {
     const ir = charges.filter(c => c.type === 'ir');
 
     if (urssaf.length > 0) {
-      const section = el('div', { class: 'charges-section' }, [
-        el('h3', { class: 'section-title' }, `URSSAF (${urssaf.length})`),
+      const section = el('div', { className: 'charges-section' }, [
+        el('h3', { className: 'section-title' }, `URSSAF (${urssaf.length})`),
         ...urssaf.map(charge => this.renderChargeCard(charge))
       ]);
       container.appendChild(section);
     }
 
     if (ir.length > 0) {
-      const section = el('div', { class: 'charges-section' }, [
-        el('h3', { class: 'section-title' }, `Impôt sur le revenu (${ir.length})`),
+      const section = el('div', { className: 'charges-section' }, [
+        el('h3', { className: 'section-title' }, `Impôt sur le revenu (${ir.length})`),
         ...ir.map(charge => this.renderChargeCard(charge))
       ]);
       container.appendChild(section);
@@ -181,10 +181,10 @@ export class ChargesView {
 
     return el('div', { class: `charge-card ${statusClass}` }, [
       // Header
-      el('div', { class: 'charge-card-header' }, [
+      el('div', { className: 'charge-card-header' }, [
         el('div', {}, [
-          el('div', { class: 'charge-period' }, charge.period),
-          el('div', { class: 'charge-type' }, charge.type.toUpperCase())
+          el('div', { className: 'charge-period' }, charge.period),
+          el('div', { className: 'charge-type' }, charge.type.toUpperCase())
         ]),
         el('div', {
           class: `badge badge-${charge.paid ? 'success' : (isOverdue ? 'danger' : 'warning')}`
@@ -192,54 +192,54 @@ export class ChargesView {
       ]),
 
       // Details
-      el('div', { class: 'charge-card-body' }, [
-        el('div', { class: 'charge-detail' }, [
-          el('span', { class: 'label' }, 'CA période:'),
+      el('div', { className: 'charge-card-body' }, [
+        el('div', { className: 'charge-detail' }, [
+          el('span', { className: 'label' }, 'CA période:'),
           el('span', {}, EUR(charge.ca || 0))
         ]),
-        el('div', { class: 'charge-detail' }, [
-          el('span', { class: 'label' }, 'Montant prévu:'),
-          el('span', { class: 'charge-amount' }, EUR(charge.amount || 0))
+        el('div', { className: 'charge-detail' }, [
+          el('span', { className: 'label' }, 'Montant prévu:'),
+          el('span', { className: 'charge-amount' }, EUR(charge.amount || 0))
         ]),
-        charge.paid && el('div', { class: 'charge-detail' }, [
-          el('span', { class: 'label' }, 'Montant payé:'),
-          el('span', { class: 'text-success' }, EUR(charge.paidAmount || charge.amount || 0))
+        charge.paid && el('div', { className: 'charge-detail' }, [
+          el('span', { className: 'label' }, 'Montant payé:'),
+          el('span', { className: 'text-success' }, EUR(charge.paidAmount || charge.amount || 0))
         ]),
-        el('div', { class: 'charge-detail' }, [
-          el('span', { class: 'label' }, 'Échéance:'),
+        el('div', { className: 'charge-detail' }, [
+          el('span', { className: 'label' }, 'Échéance:'),
           el('span', {
             class: isOverdue ? 'text-danger' : ''
           }, fmtDate(charge.deadline))
         ]),
-        charge.paid && charge.paidAt && el('div', { class: 'charge-detail' }, [
-          el('span', { class: 'label' }, 'Date paiement:'),
+        charge.paid && charge.paidAt && el('div', { className: 'charge-detail' }, [
+          el('span', { className: 'label' }, 'Date paiement:'),
           el('span', {}, fmtDate(charge.paidAt))
         ])
       ]),
 
       // Actions
-      el('div', { class: 'charge-card-actions' }, [
+      el('div', { className: 'charge-card-actions' }, [
         !charge.paid && el('button', {
-          class: 'btn btn-sm btn-success',
-          onclick: () => this.markAsPaid(charge)
+          className: 'btn btn-sm btn-success',
+          onClick: () => this.markAsPaid(charge)
         }, '✓ Marquer payée'),
 
         charge.paid && el('button', {
-          class: 'btn btn-sm btn-secondary',
-          onclick: () => this.markAsUnpaid(charge)
+          className: 'btn btn-sm btn-secondary',
+          onClick: () => this.markAsUnpaid(charge)
         }, '↺ Marquer non payée')
       ])
     ]);
   }
 
   renderEmptyState() {
-    return el('div', { class: 'empty-state' }, [
-      el('div', { class: 'empty-icon' }, '📊'),
+    return el('div', { className: 'empty-state' }, [
+      el('div', { className: 'empty-icon' }, '📊'),
       el('h3', {}, 'Aucune charge'),
       el('p', {}, 'Générez les charges pour cette année'),
       el('button', {
-        class: 'btn btn-primary',
-        onclick: () => this.generateCharges()
+        className: 'btn btn-primary',
+        onClick: () => this.generateCharges()
       }, '✚ Générer charges')
     ]);
   }
@@ -402,7 +402,7 @@ export class ChargesView {
       modal.setFooter([
         {
           text: 'Annuler',
-          class: 'btn-secondary',
+          className: 'btn-secondary',
           onClick: () => {
             modal.close();
             resolve(false);
