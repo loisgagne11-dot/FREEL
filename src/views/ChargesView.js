@@ -71,7 +71,7 @@ export class ChargesView {
       el('select', {
         className: 'select',
         value: this.currentYear,
-        onchange: (e) => {
+        onChange: (e) => {
           this.currentYear = parseInt(e.target.value);
           this.updateView();
         }
@@ -134,7 +134,7 @@ export class ChargesView {
     const charges = this.getFilteredCharges(filter);
 
     return el('button', {
-      class: this.currentFilter === filter ? 'filter-tab active' : 'filter-tab',
+      className: this.currentFilter === filter ? 'filter-tab active' : 'filter-tab',
       onClick: () => {
         this.currentFilter = filter;
         $$('.filter-tab').forEach(tab => tab.classList.remove('active'));
@@ -179,7 +179,7 @@ export class ChargesView {
     const isOverdue = !charge.paid && new Date(charge.deadline) < new Date();
     const statusClass = charge.paid ? 'status-paid' : (isOverdue ? 'status-overdue' : 'status-unpaid');
 
-    return el('div', { class: `charge-card ${statusClass}` }, [
+    return el('div', { className: `charge-card ${statusClass}` }, [
       // Header
       el('div', { className: 'charge-card-header' }, [
         el('div', {}, [
@@ -187,7 +187,7 @@ export class ChargesView {
           el('div', { className: 'charge-type' }, charge.type.toUpperCase())
         ]),
         el('div', {
-          class: `badge badge-${charge.paid ? 'success' : (isOverdue ? 'danger' : 'warning')}`
+          className: `badge badge-${charge.paid ? 'success' : (isOverdue ? 'danger' : 'warning')}`
         }, charge.paid ? '✓ Payée' : (isOverdue ? '⚠️ En retard' : 'Non payée'))
       ]),
 
@@ -208,7 +208,7 @@ export class ChargesView {
         el('div', { className: 'charge-detail' }, [
           el('span', { className: 'label' }, 'Échéance:'),
           el('span', {
-            class: isOverdue ? 'text-danger' : ''
+            className: isOverdue ? 'text-danger' : ''
           }, fmtDate(charge.deadline))
         ]),
         charge.paid && charge.paidAt && el('div', { className: 'charge-detail' }, [
@@ -410,7 +410,7 @@ export class ChargesView {
         },
         {
           text: 'Confirmer',
-          class: type === 'danger' ? 'btn-danger' : 'btn-primary',
+          className: type === 'danger' ? 'btn-danger' : 'btn-primary',
           onClick: () => {
             modal.close();
             resolve(true);

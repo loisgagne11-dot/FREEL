@@ -27,7 +27,7 @@ export class SettingsView {
     const user = auth.user;
     const syncStatus = syncService.getSyncStatus();
 
-    this.container = el('div', { class: 'view-container' }, [
+    this.container = el('div', { className: 'view-container' }, [
       el('h1', { style: { marginBottom: 'var(--spacing-xl)' } }, 'Paramètres'),
 
       // Authentification
@@ -54,7 +54,7 @@ export class SettingsView {
 
   renderAuthSection(isAuthenticated, user) {
     if (isAuthenticated) {
-      return el('section', { class: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
+      return el('section', { className: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
         el('h3', {}, 'Compte'),
         el('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' } }, [
           el('div', {}, [
@@ -63,34 +63,34 @@ export class SettingsView {
           ]),
           el('div', { style: { display: 'flex', gap: 'var(--spacing-md)' } }, [
             el('button', {
-              class: 'btn btn-secondary',
-              onclick: () => this.showChangePasswordModal()
+              className: 'btn btn-secondary',
+              onClick: () => this.showChangePasswordModal()
             }, 'Changer mot de passe'),
             el('button', {
-              class: 'btn btn-danger',
-              onclick: () => this.signOut()
+              className: 'btn btn-danger',
+              onClick: () => this.signOut()
             }, 'Se déconnecter')
           ])
         ])
       ]);
     } else {
-      return el('section', { class: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
+      return el('section', { className: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
         el('h3', {}, 'Synchronisation Cloud'),
         el('p', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' } },
           'Connectez-vous pour synchroniser vos données sur tous vos appareils'
         ),
         el('div', { style: { display: 'flex', gap: 'var(--spacing-md)' } }, [
           el('button', {
-            class: 'btn btn-primary',
-            onclick: () => this.showSignInModal()
+            className: 'btn btn-primary',
+            onClick: () => this.showSignInModal()
           }, 'Se connecter'),
           el('button', {
-            class: 'btn btn-secondary',
-            onclick: () => this.showSignUpModal()
+            className: 'btn btn-secondary',
+            onClick: () => this.showSignUpModal()
           }, 'Créer un compte'),
           el('button', {
-            class: 'btn btn-ghost',
-            onclick: () => this.showConfigureSupabaseModal()
+            className: 'btn btn-ghost',
+            onClick: () => this.showConfigureSupabaseModal()
           }, '⚙️ Configuration')
         ])
       ]);
@@ -98,7 +98,7 @@ export class SettingsView {
   }
 
   renderSyncSection(syncStatus) {
-    return el('section', { class: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
+    return el('section', { className: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
       el('h3', {}, 'Synchronisation'),
       el('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' } }, [
         el('div', {}, [
@@ -114,17 +114,17 @@ export class SettingsView {
         ]),
         el('div', { style: { display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' } }, [
           el('button', {
-            class: 'btn btn-primary',
-            onclick: () => this.syncNow(),
+            className: 'btn btn-primary',
+            onClick: () => this.syncNow(),
             disabled: syncStatus.syncing
           }, '🔄 Synchroniser maintenant'),
           el('button', {
-            class: 'btn btn-secondary',
-            onclick: () => this.toggleAutoSync()
+            className: 'btn btn-secondary',
+            onClick: () => this.toggleAutoSync()
           }, syncStatus.autoSyncEnabled ? 'Désactiver auto-sync' : 'Activer auto-sync'),
           el('button', {
-            class: 'btn btn-secondary',
-            onclick: () => this.toggleRealtimeSync()
+            className: 'btn btn-secondary',
+            onClick: () => this.toggleRealtimeSync()
           }, syncStatus.realtimeSyncEnabled ? 'Désactiver temps réel' : 'Activer temps réel')
         ])
       ])
@@ -134,7 +134,7 @@ export class SettingsView {
   renderAppearanceSection(theme) {
     const privacyMode = store.get('privacyMode') || false;
 
-    return el('section', { class: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
+    return el('section', { className: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
       el('h3', {}, 'Apparence'),
       el('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' } }, [
         el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } }, [
@@ -144,8 +144,8 @@ export class SettingsView {
               theme === 'dark' ? 'Sombre' : 'Clair')
           ]),
           el('button', {
-            class: 'btn btn-ghost',
-            onclick: () => {
+            className: 'btn btn-ghost',
+            onClick: () => {
               toggleTheme();
               toast.success(`Thème ${store.get('theme')} activé`);
               setTimeout(() => this.refresh(), 100);
@@ -159,8 +159,8 @@ export class SettingsView {
               'Masquer les montants')
           ]),
           el('button', {
-            class: 'btn btn-ghost',
-            onclick: () => {
+            className: 'btn btn-ghost',
+            onClick: () => {
               store.set('privacyMode', !privacyMode);
               toast.success(`Mode confidentialité ${!privacyMode ? 'activé' : 'désactivé'}`);
               setTimeout(() => this.refresh(), 100);
@@ -172,19 +172,19 @@ export class SettingsView {
   }
 
   renderDataSection() {
-    return el('section', { class: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
+    return el('section', { className: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
       el('h3', {}, 'Données locales'),
       el('p', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' } },
         'Exportez ou importez vos données stockées localement'
       ),
       el('div', { style: { display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' } }, [
         el('button', {
-          class: 'btn btn-primary',
-          onclick: () => this.exportData()
+          className: 'btn btn-primary',
+          onClick: () => this.exportData()
         }, '📥 Exporter (JSON)'),
         el('button', {
-          class: 'btn btn-secondary',
-          onclick: () => this.importData()
+          className: 'btn btn-secondary',
+          onClick: () => this.importData()
         }, '📤 Importer (JSON)')
       ])
     ]);
@@ -193,7 +193,7 @@ export class SettingsView {
   renderRGPDSection() {
     const consent = rgpdService.getConsent();
 
-    return el('section', { class: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
+    return el('section', { className: 'card', style: { marginBottom: 'var(--spacing-lg)' } }, [
       el('h3', {}, '🔒 RGPD & Confidentialité'),
       el('p', { style: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 'var(--spacing-md)' } },
         'Conformité RGPD - Gestion de vos données personnelles'
@@ -208,16 +208,16 @@ export class SettingsView {
       // Actions RGPD
       el('div', { style: { display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap', marginBottom: 'var(--spacing-md)' } }, [
         el('button', {
-          class: 'btn btn-primary',
-          onclick: () => this.exportRGPDData()
+          className: 'btn btn-primary',
+          onClick: () => this.exportRGPDData()
         }, '📦 Exporter mes données (RGPD)'),
         el('button', {
-          class: 'btn btn-secondary',
-          onclick: () => rgpdService.showPrivacyPolicy()
+          className: 'btn btn-secondary',
+          onClick: () => rgpdService.showPrivacyPolicy()
         }, '📄 Politique de confidentialité'),
         el('button', {
-          class: 'btn btn-secondary',
-          onclick: () => rgpdService.showLegalNotices()
+          className: 'btn btn-secondary',
+          onClick: () => rgpdService.showLegalNotices()
         }, '⚖️ Mentions légales')
       ]),
 
@@ -228,15 +228,15 @@ export class SettingsView {
           'Supprimez définitivement toutes vos données (compte, missions, factures, etc.). Cette action est irréversible.'
         ),
         el('button', {
-          class: 'btn btn-danger',
-          onclick: () => this.deleteAllRGPDData()
+          className: 'btn btn-danger',
+          onClick: () => this.deleteAllRGPDData()
         }, '🗑️ Supprimer toutes mes données')
       ])
     ]);
   }
 
   renderAboutSection() {
-    return el('section', { class: 'card' }, [
+    return el('section', { className: 'card' }, [
       el('h3', {}, 'À propos'),
       el('div', { style: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' } }, [
         el('div', {}, [
