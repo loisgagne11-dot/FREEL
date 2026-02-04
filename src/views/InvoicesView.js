@@ -18,22 +18,22 @@ export class InvoicesView {
   }
 
   render() {
-    const container = el('div', { class: 'view-container' });
+    const container = el('div', { className: 'view-container' });
 
     // Header
-    const header = el('div', { class: 'view-header' }, [
+    const header = el('div', { className: 'view-header' }, [
       el('div', {}, [
         el('h1', {}, 'Factures'),
-        el('p', { class: 'subtitle' }, 'Génération et suivi des factures')
+        el('p', { className: 'subtitle' }, 'Génération et suivi des factures')
       ]),
-      el('div', { class: 'header-actions' }, [
+      el('div', { className: 'header-actions' }, [
         el('button', {
-          class: 'btn btn-secondary',
-          onclick: () => this.exportRegistry()
+          className: 'btn btn-secondary',
+          onClick: () => this.exportRegistry()
         }, '📥 Exporter registre'),
         el('button', {
-          class: 'btn btn-primary',
-          onclick: () => this.showGenerateInvoiceModal()
+          className: 'btn btn-primary',
+          onClick: () => this.showGenerateInvoiceModal()
         }, '✚ Générer facture')
       ])
     ]);
@@ -42,7 +42,7 @@ export class InvoicesView {
     const filters = this.renderFilters();
 
     // Invoice list
-    const invoiceList = el('div', { class: 'invoice-list' });
+    const invoiceList = el('div', { className: 'invoice-list' });
     this.updateInvoiceList(invoiceList);
 
     container.append(header, filters, invoiceList);
@@ -50,11 +50,11 @@ export class InvoicesView {
   }
 
   renderFilters() {
-    const filters = el('div', { class: 'filters' }, [
+    const filters = el('div', { className: 'filters' }, [
       // Search
       el('input', {
         type: 'text',
-        class: 'input',
+        className: 'input',
         placeholder: '🔍 Rechercher (client, mois, numéro)...',
         value: this.searchQuery,
         oninput: (e) => {
@@ -64,7 +64,7 @@ export class InvoicesView {
       }),
 
       // Status filter
-      el('div', { class: 'filter-tabs' }, [
+      el('div', { className: 'filter-tabs' }, [
         this.renderFilterTab('all', 'Toutes'),
         this.renderFilterTab('draft', 'Brouillons'),
         this.renderFilterTab('sent', 'Envoyées'),
@@ -81,7 +81,7 @@ export class InvoicesView {
 
     return el('button', {
       class: this.currentFilter === filter ? 'filter-tab active' : 'filter-tab',
-      onclick: () => {
+      onClick: () => {
         this.currentFilter = filter;
         $$('.filter-tab').forEach(tab => tab.classList.remove('active'));
         event.target.classList.add('active');
@@ -115,8 +115,8 @@ export class InvoicesView {
     Object.keys(grouped).forEach(status => {
       if (grouped[status].length === 0) return;
 
-      const section = el('div', { class: 'invoice-section' }, [
-        el('h3', { class: 'section-title' }, this.getStatusLabel(status)),
+      const section = el('div', { className: 'invoice-section' }, [
+        el('h3', { className: 'section-title' }, this.getStatusLabel(status)),
         ...grouped[status].map(invoice => this.renderInvoiceCard(invoice))
       ]);
 
@@ -130,74 +130,74 @@ export class InvoicesView {
 
     return el('div', { class: `invoice-card ${statusClass}` }, [
       // Header
-      el('div', { class: 'invoice-card-header' }, [
+      el('div', { className: 'invoice-card-header' }, [
         el('div', {}, [
-          el('div', { class: 'invoice-number' }, invoice.numero),
-          el('div', { class: 'invoice-client' }, invoice.client)
+          el('div', { className: 'invoice-number' }, invoice.numero),
+          el('div', { className: 'invoice-client' }, invoice.client)
         ]),
         el('div', { class: `badge badge-${status}` }, this.getStatusLabel(status))
       ]),
 
       // Details
-      el('div', { class: 'invoice-card-body' }, [
-        el('div', { class: 'invoice-detail' }, [
-          el('span', { class: 'label' }, 'Période:'),
+      el('div', { className: 'invoice-card-body' }, [
+        el('div', { className: 'invoice-detail' }, [
+          el('span', { className: 'label' }, 'Période:'),
           el('span', {}, invoice.mois)
         ]),
-        el('div', { class: 'invoice-detail' }, [
-          el('span', { class: 'label' }, 'Date facture:'),
+        el('div', { className: 'invoice-detail' }, [
+          el('span', { className: 'label' }, 'Date facture:'),
           el('span', {}, fmtDate(invoice.date))
         ]),
-        el('div', { class: 'invoice-detail' }, [
-          el('span', { class: 'label' }, 'Échéance:'),
+        el('div', { className: 'invoice-detail' }, [
+          el('span', { className: 'label' }, 'Échéance:'),
           el('span', {
             class: status === 'late' ? 'text-danger' : ''
           }, fmtDate(invoice.echeance))
         ]),
-        el('div', { class: 'invoice-detail' }, [
-          el('span', { class: 'label' }, 'Montant TTC:'),
-          el('span', { class: 'invoice-amount' }, EUR(invoice.montantTTC))
+        el('div', { className: 'invoice-detail' }, [
+          el('span', { className: 'label' }, 'Montant TTC:'),
+          el('span', { className: 'invoice-amount' }, EUR(invoice.montantTTC))
         ])
       ]),
 
       // Actions
-      el('div', { class: 'invoice-card-actions' }, [
+      el('div', { className: 'invoice-card-actions' }, [
         el('button', {
-          class: 'btn btn-sm btn-secondary',
-          onclick: () => this.previewInvoice(invoice)
+          className: 'btn btn-sm btn-secondary',
+          onClick: () => this.previewInvoice(invoice)
         }, '👁️ Aperçu'),
 
         status === 'draft' && el('button', {
-          class: 'btn btn-sm btn-primary',
-          onclick: () => this.markAsSent(invoice)
+          className: 'btn btn-sm btn-primary',
+          onClick: () => this.markAsSent(invoice)
         }, '📤 Marquer envoyée'),
 
         status === 'sent' && el('button', {
-          class: 'btn btn-sm btn-success',
-          onclick: () => this.markAsPaid(invoice)
+          className: 'btn btn-sm btn-success',
+          onClick: () => this.markAsPaid(invoice)
         }, '✓ Marquer payée'),
 
         status === 'late' && el('button', {
-          class: 'btn btn-sm btn-danger',
-          onclick: () => this.sendReminder(invoice)
+          className: 'btn btn-sm btn-danger',
+          onClick: () => this.sendReminder(invoice)
         }, '⚠️ Relancer'),
 
         el('button', {
-          class: 'btn btn-sm btn-secondary',
-          onclick: () => this.downloadInvoice(invoice)
+          className: 'btn btn-sm btn-secondary',
+          onClick: () => this.downloadInvoice(invoice)
         }, '📄 Télécharger'),
 
         el('button', {
-          class: 'btn btn-sm btn-danger',
-          onclick: () => this.deleteInvoice(invoice)
+          className: 'btn btn-sm btn-danger',
+          onClick: () => this.deleteInvoice(invoice)
         }, '🗑️')
       ])
     ]);
   }
 
   renderEmptyState() {
-    return el('div', { class: 'empty-state' }, [
-      el('div', { class: 'empty-icon' }, '📄'),
+    return el('div', { className: 'empty-state' }, [
+      el('div', { className: 'empty-icon' }, '📄'),
       el('h3', {}, 'Aucune facture'),
       el('p', {},
         this.searchQuery
@@ -205,8 +205,8 @@ export class InvoicesView {
           : 'Générez votre première facture pour commencer'
       ),
       !this.searchQuery && el('button', {
-        class: 'btn btn-primary',
-        onclick: () => this.showGenerateInvoiceModal()
+        className: 'btn btn-primary',
+        onClick: () => this.showGenerateInvoiceModal()
       }, '✚ Générer facture')
     ]);
   }
@@ -315,9 +315,9 @@ export class InvoicesView {
 
     modal.setBody(iframe);
     modal.setFooter([
-      { text: 'Télécharger HTML', class: 'btn-secondary', onClick: () => this.downloadInvoice(invoice) },
-      { text: 'Imprimer / PDF', class: 'btn-primary', onClick: () => this.printInvoice(invoice) },
-      { text: 'Fermer', class: 'btn-secondary', onClick: () => modal.close() }
+      { text: 'Télécharger HTML', className: 'btn-secondary', onClick: () => this.downloadInvoice(invoice) },
+      { text: 'Imprimer / PDF', className: 'btn-primary', onClick: () => this.printInvoice(invoice) },
+      { text: 'Fermer', className: 'btn-secondary', onClick: () => modal.close() }
     ]);
 
     modal.open();
@@ -483,7 +483,7 @@ export class InvoicesView {
       modal.setFooter([
         {
           text: 'Annuler',
-          class: 'btn-secondary',
+          className: 'btn-secondary',
           onClick: () => {
             modal.close();
             resolve(false);
