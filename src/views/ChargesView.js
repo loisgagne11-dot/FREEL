@@ -9,11 +9,24 @@ import { chargesService } from '../services/ChargesService.js';
 import { Modal, formModal } from '../components/Modal.js';
 import { toast } from '../components/Toast.js';
 import { EUR, fmtDate, PCT } from '../utils/formatters.js';
+import { createPeriodFilter } from '../components/PeriodFilter.js';
 
 export class ChargesView {
   constructor() {
     this.currentYear = new Date().getFullYear();
     this.currentFilter = 'all'; // all, urssaf, ir, paid, unpaid, overdue
+    this.periodFilter = createPeriodFilter({
+      defaultYear: new Date().getFullYear(),
+      yearsRange: 3,
+      onChange: (period) => {
+        this.currentPeriod = period;
+        if (period.type === 'year') {
+          this.currentYear = period.year;
+        }
+        this.updateView();
+      }
+    });
+    this.currentPeriod = this.periodFilter.getPeriod();
   }
 
   render() {
@@ -41,8 +54,8 @@ export class ChargesView {
       ])
     ]);
 
-    // Year selector
-    const yearSelector = this.renderYearSelector();
+    // Period filter
+    const periodFilterEl = this.periodFilter.render();
 
     // Stats KPIs
     const stats = chargesService.getChargesStats(this.currentYear);
@@ -55,31 +68,10 @@ export class ChargesView {
     const chargesList = el('div', { className: 'charges-list' });
     this.updateChargesList(chargesList);
 
-    container.append(header, yearSelector, kpis, filters, chargesList);
+    container.append(header, periodFilterEl, kpis, filters, chargesList);
     return container;
   }
 
-  renderYearSelector() {
-    const currentYear = new Date().getFullYear();
-    const years = [];
-    for (let y = currentYear - 2; y <= currentYear + 1; y++) {
-      years.push(y);
-    }
-
-    return el('div', { className: 'year-selector' }, [
-      el('label', {}, 'Année :'),
-      el('select', {
-        className: 'select',
-        value: this.currentYear,
-        onchange: (e) => {
-          this.currentYear = parseInt(e.target.value);
-          this.updateView();
-        }
-      }, years.map(y =>
-        el('option', { value: y, selected: y === this.currentYear }, y.toString())
-      ))
-    ]);
-  }
 
   renderKPIs(stats) {
     return el('div', { className: 'kpi-grid' }, [
@@ -134,7 +126,7 @@ export class ChargesView {
     const charges = this.getFilteredCharges(filter);
 
     return el('button', {
-      class: this.currentFilter === filter ? 'filter-tab active' : 'filter-tab',
+      className: this.currentFilter === filter ? 'filter-tab active' : 'filter-tab',
       onClick: () => {
         this.currentFilter = filter;
         $$('.filter-tab').forEach(tab => tab.classList.remove('active'));
@@ -179,7 +171,7 @@ export class ChargesView {
     const isOverdue = !charge.paid && new Date(charge.deadline) < new Date();
     const statusClass = charge.paid ? 'status-paid' : (isOverdue ? 'status-overdue' : 'status-unpaid');
 
-    return el('div', { class: `charge-card ${statusClass}` }, [
+    return el('div', { className: `charge-card ${statusClass}` }, [
       // Header
       el('div', { className: 'charge-card-header' }, [
         el('div', {}, [
@@ -187,7 +179,7 @@ export class ChargesView {
           el('div', { className: 'charge-type' }, charge.type.toUpperCase())
         ]),
         el('div', {
-          class: `badge badge-${charge.paid ? 'success' : (isOverdue ? 'danger' : 'warning')}`
+          className: `badge badge-${charge.paid ? 'success' : (isOverdue ? 'danger' : 'warning')}`
         }, charge.paid ? '✓ Payée' : (isOverdue ? '⚠️ En retard' : 'Non payée'))
       ]),
 
@@ -208,7 +200,7 @@ export class ChargesView {
         el('div', { className: 'charge-detail' }, [
           el('span', { className: 'label' }, 'Échéance:'),
           el('span', {
-            class: isOverdue ? 'text-danger' : ''
+            className: isOverdue ? 'text-danger' : ''
           }, fmtDate(charge.deadline))
         ]),
         charge.paid && charge.paidAt && el('div', { className: 'charge-detail' }, [
@@ -410,7 +402,7 @@ export class ChargesView {
         },
         {
           text: 'Confirmer',
-          class: type === 'danger' ? 'btn-danger' : 'btn-primary',
+          className: type === 'danger' ? 'btn-danger' : 'btn-primary',
           onClick: () => {
             modal.close();
             resolve(true);
