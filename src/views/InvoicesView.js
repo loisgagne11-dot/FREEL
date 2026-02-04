@@ -10,11 +10,21 @@ import { missionService } from '../services/MissionService.js';
 import { Modal, formModal } from '../components/Modal.js';
 import { toast } from '../components/Toast.js';
 import { EUR, fmtDate } from '../utils/formatters.js';
+import { createPeriodFilter } from '../components/PeriodFilter.js';
 
 export class InvoicesView {
   constructor() {
     this.currentFilter = 'all'; // all, draft, sent, paid, late
     this.searchQuery = '';
+    this.periodFilter = createPeriodFilter({
+      defaultYear: new Date().getFullYear(),
+      yearsRange: 3,
+      onChange: (period) => {
+        this.currentPeriod = period;
+        this.updateInvoiceList($('.invoice-list'));
+      }
+    });
+    this.currentPeriod = this.periodFilter.getPeriod();
   }
 
   render() {
@@ -38,6 +48,9 @@ export class InvoicesView {
       ])
     ]);
 
+    // Period filter
+    const periodFilterEl = this.periodFilter.render();
+
     // Filters
     const filters = this.renderFilters();
 
@@ -45,7 +58,7 @@ export class InvoicesView {
     const invoiceList = el('div', { className: 'invoice-list' });
     this.updateInvoiceList(invoiceList);
 
-    container.append(header, filters, invoiceList);
+    container.append(header, periodFilterEl, filters, invoiceList);
     return container;
   }
 
@@ -417,7 +430,15 @@ export class InvoicesView {
   // Helpers
 
   getFilteredInvoices(filter) {
-    const registry = invoiceService.getRegistry();
+    let registry = invoiceService.getRegistry();
+
+    // Filtrer par période
+    if (this.currentPeriod) {
+      registry = registry.filter(inv => {
+        const invoiceDate = new Date(inv.date);
+        return invoiceDate >= this.currentPeriod.start && invoiceDate <= this.currentPeriod.end;
+      });
+    }
 
     if (filter === 'all') return registry;
 
