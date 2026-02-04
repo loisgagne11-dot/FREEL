@@ -8,6 +8,7 @@ import { EUR, PCT, fmtMonth } from '../utils/formatters.js';
 import { taxCalculator } from '../services/TaxCalculator.js';
 import { statsService } from '../services/StatsService.js';
 import { createChart, ChartPresets } from '../components/Chart.js';
+import { createPeriodFilter } from '../components/PeriodFilter.js';
 
 // Nouveaux composants V50
 import { createHealthScoreWidget } from '../components/HealthScore.js';
@@ -23,19 +24,51 @@ export class DashboardView {
   constructor() {
     this.container = null;
     this.charts = [];
+    this.periodFilter = createPeriodFilter({
+      defaultYear: new Date().getFullYear(),
+      yearsRange: 3,
+      onChange: (period) => {
+        this.currentPeriod = period;
+        this.refreshDashboard();
+      }
+    });
+    this.currentPeriod = this.periodFilter.getPeriod();
   }
 
   /**
-   * Calculer les KPIs
+   * Calculer les KPIs (avec filtrage par période)
    */
   calculateKPIs() {
-    const missions = store.get('missions') || [];
+    let missions = store.get('missions') || [];
     const treasury = store.get('treasury') || { soldeInitial: 0, mouvements: [] };
     const company = store.get('company') || {};
 
-    // CA total
+    // Filtrer les missions par période si nécessaire
+    if (this.currentPeriod) {
+      missions = missions.filter(mission => {
+        // Filtrer par lignes qui sont dans la période
+        if (mission.lignes && mission.lignes.length > 0) {
+          return mission.lignes.some(ligne => {
+            if (!ligne.ym) return false;
+            const [year, month] = ligne.ym.split('-').map(Number);
+            const ligneDate = new Date(year, month - 1, 15);
+            return ligneDate >= this.currentPeriod.start && ligneDate <= this.currentPeriod.end;
+          });
+        }
+        return false;
+      });
+    }
+
+    // CA total (pour les lignes dans la période)
     const caTotal = missions.reduce((sum, mission) => {
-      return sum + (mission.montant || 0);
+      if (!mission.lignes) return sum;
+      const filteredLignes = mission.lignes.filter(ligne => {
+        if (!ligne.ym || !this.currentPeriod) return false;
+        const [year, month] = ligne.ym.split('-').map(Number);
+        const ligneDate = new Date(year, month - 1, 15);
+        return ligneDate >= this.currentPeriod.start && ligneDate <= this.currentPeriod.end;
+      });
+      return sum + filteredLignes.reduce((s, l) => s + (l.montant || 0), 0);
     }, 0);
 
     // Calculs fiscaux
@@ -331,6 +364,22 @@ export class DashboardView {
   }
 
   /**
+   * Rafraîchir le dashboard quand la période change
+   */
+  refreshDashboard() {
+    if (!this.container) return;
+
+    // Détruire les anciens graphiques
+    this.destroy();
+
+    // Re-render le dashboard
+    const newContainer = this.render();
+    if (this.container.parentNode) {
+      this.container.parentNode.replaceChild(newContainer, this.container);
+    }
+  }
+
+  /**
    * Render
    */
   render() {
@@ -340,6 +389,9 @@ export class DashboardView {
       el('h1', {
         style: { marginBottom: 'var(--spacing-xl)' }
       }, `Dashboard - ${fmtMonth(new Date().getFullYear(), new Date().getMonth() + 1)}`),
+
+      // Period filter
+      this.periodFilter.render(),
 
       // Section En Résumé (avec export PDF)
       createSummarySection(),
