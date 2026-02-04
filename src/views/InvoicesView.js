@@ -57,7 +57,7 @@ export class InvoicesView {
         className: 'input',
         placeholder: '🔍 Rechercher (client, mois, numéro)...',
         value: this.searchQuery,
-        oninput: (e) => {
+        onInput: (e) => {
           this.searchQuery = e.target.value;
           this.updateInvoiceList($('.invoice-list'));
         }
@@ -80,7 +80,7 @@ export class InvoicesView {
     const count = this.getFilteredInvoices(filter).length;
 
     return el('button', {
-      class: this.currentFilter === filter ? 'filter-tab active' : 'filter-tab',
+      className: this.currentFilter === filter ? 'filter-tab active' : 'filter-tab',
       onClick: () => {
         this.currentFilter = filter;
         $$('.filter-tab').forEach(tab => tab.classList.remove('active'));
@@ -128,14 +128,14 @@ export class InvoicesView {
     const status = this.getInvoiceStatus(invoice);
     const statusClass = `status-${status}`;
 
-    return el('div', { class: `invoice-card ${statusClass}` }, [
+    return el('div', { className: `invoice-card ${statusClass}` }, [
       // Header
       el('div', { className: 'invoice-card-header' }, [
         el('div', {}, [
           el('div', { className: 'invoice-number' }, invoice.numero),
           el('div', { className: 'invoice-client' }, invoice.client)
         ]),
-        el('div', { class: `badge badge-${status}` }, this.getStatusLabel(status))
+        el('div', { className: `badge badge-${status}` }, this.getStatusLabel(status))
       ]),
 
       // Details
@@ -151,7 +151,7 @@ export class InvoicesView {
         el('div', { className: 'invoice-detail' }, [
           el('span', { className: 'label' }, 'Échéance:'),
           el('span', {
-            class: status === 'late' ? 'text-danger' : ''
+            className: status === 'late' ? 'text-danger' : ''
           }, fmtDate(invoice.echeance))
         ]),
         el('div', { className: 'invoice-detail' }, [
@@ -491,7 +491,7 @@ export class InvoicesView {
         },
         {
           text: 'Confirmer',
-          class: type === 'danger' ? 'btn-danger' : 'btn-primary',
+          className: type === 'danger' ? 'btn-danger' : 'btn-primary',
           onClick: () => {
             modal.close();
             resolve(true);
