@@ -9,6 +9,16 @@ import { taxCalculator } from '../services/TaxCalculator.js';
 import { statsService } from '../services/StatsService.js';
 import { createChart, ChartPresets } from '../components/Chart.js';
 
+// Nouveaux composants V50
+import { createHealthScoreWidget } from '../components/HealthScore.js';
+import { createDailyActionsWidget } from '../components/DailyActions.js';
+import { createLegalTimelineWidget } from '../components/LegalTimeline.js';
+import { createInsightsChips } from '../components/InsightsChips.js';
+import { createGoalWidget } from '../components/GoalWidget.js';
+import { createClientsBreakdownWidget } from '../components/ClientsBreakdown.js';
+import { createCongesCalendarWidget } from '../components/CongesCalendar.js';
+import { createSummarySection } from '../components/SummarySection.js';
+
 export class DashboardView {
   constructor() {
     this.container = null;
@@ -73,20 +83,86 @@ export class DashboardView {
   }
 
   /**
-   * Créer la section urgences
+   * Créer la section V50 widgets (Score Santé, Actions, Timeline, etc.)
    */
-  createUrgencesSection() {
-    return el('section', { className: 'dashboard-section' }, [
-      el('h2', { className: 'dashboard-section-title' }, [
-        el('span', {}, '🚨'),
-        el('span', {}, 'Urgences')
-      ]),
-      el('div', { className: 'card' }, [
-        el('p', { style: { color: 'var(--color-text-secondary)' } },
-          'Aucune urgence pour le moment'
-        )
-      ])
-    ]);
+  createV50WidgetsSection() {
+    const section = el('section', { className: 'dashboard-section' });
+
+    // Insights chips (en haut)
+    const insights = createInsightsChips();
+    if (insights) {
+      section.appendChild(insights);
+    }
+
+    // Grille 3 colonnes pour les widgets principaux
+    const widgetsGrid = el('div', {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: 'var(--spacing-lg)',
+        marginBottom: 'var(--spacing-xl)'
+      }
+    });
+
+    // Score Santé
+    const healthScore = createHealthScoreWidget();
+    if (healthScore) {
+      widgetsGrid.appendChild(healthScore);
+    }
+
+    // Actions du Jour
+    const dailyActions = createDailyActionsWidget();
+    if (dailyActions) {
+      widgetsGrid.appendChild(dailyActions);
+    }
+
+    // Objectif CA 2026
+    const goalWidget = createGoalWidget();
+    if (goalWidget) {
+      widgetsGrid.appendChild(goalWidget);
+    }
+
+    section.appendChild(widgetsGrid);
+
+    // Timeline Jalons Légaux (pleine largeur)
+    const legalTimeline = createLegalTimelineWidget();
+    if (legalTimeline) {
+      section.appendChild(legalTimeline);
+    }
+
+    return section;
+  }
+
+  /**
+   * Créer la section widgets secondaires (Clients, Congés)
+   */
+  createSecondaryWidgetsSection() {
+    const section = el('section', { className: 'dashboard-section' });
+
+    const widgetsGrid = el('div', {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: 'var(--spacing-lg)',
+        marginBottom: 'var(--spacing-xl)'
+      }
+    });
+
+    // CA par Client
+    const clientsBreakdown = createClientsBreakdownWidget();
+    if (clientsBreakdown) {
+      widgetsGrid.appendChild(clientsBreakdown);
+    }
+
+    // Calendrier Congés
+    const congesCalendar = createCongesCalendarWidget();
+    if (congesCalendar) {
+      widgetsGrid.appendChild(congesCalendar);
+    }
+
+    section.appendChild(widgetsGrid);
+
+    return section;
   }
 
   /**
@@ -265,9 +341,22 @@ export class DashboardView {
         style: { marginBottom: 'var(--spacing-xl)' }
       }, `Dashboard - ${fmtMonth(new Date().getFullYear(), new Date().getMonth() + 1)}`),
 
-      this.createUrgencesSection(),
+      // Section En Résumé (avec export PDF)
+      createSummarySection(),
+
+      // Widgets V50 (Score Santé, Actions du Jour, Objectif, Timeline)
+      this.createV50WidgetsSection(),
+
+      // Widgets secondaires (CA par Client, Congés)
+      this.createSecondaryWidgetsSection(),
+
+      // Performance (KPIs classiques)
       this.createPerformanceSection(kpis),
+
+      // Trésorerie
       this.createTresorerieSection(kpis),
+
+      // Graphiques (Charts)
       this.createChartsSection()
     ]);
 

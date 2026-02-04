@@ -5,6 +5,7 @@
 @import './variables.css';
 @import './base.css';
 @import './components.css';
+@import './v50-components.css';
 
 /* Layout spécifique FREEL */
 .app-header {
