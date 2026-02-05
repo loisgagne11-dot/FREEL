@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="Freel">
   <meta name="description" content="Gestion freelance intelligente - Suivi CA, charges, trésorerie">
   <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIkZyZWVsIC0gR2VzdGlvbiBGcmVlbGFuY2UiLAogICJzaG9ydF9uYW1lIjogIkZyZWVsIiwKICAiZGVzY3JpcHRpb24iOiAiR2VzdGlvbiBmcmVlbGFuY2UgaW50ZWxsaWdlbnRlIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwYTBhMGIiLAogICJ0aGVtZV9jb2xvciI6ICIjMGEwYTBiIiwKICAiaWNvbnMiOiBbXQp9">
-  <title>Freel V50</title>
+  <title>Freel</title>
   <script>/* jsPDF 4.0 embedded */
 /** @license
  *
@@ -1359,7 +1359,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 49; // SPRINT 7: Refonte ergonomique Dashboard + Rendement configurable
+var APP_VERSION = 50; // V50: Clean slate + fix initialisation dashboard
 var TODAY = new Date();
 var VIEW = 'dashboard';
 var PERIOD = { type: 'year', year: TODAY.getFullYear() };
@@ -8502,11 +8502,14 @@ function init() {
     updateRendementHistorique();
   }
   
-  render();
-  
-  if (!COMPANY.onboardingDone && MISSIONS.length === 0) {
-    showOnboarding();
-  }
+  // V50: Fix - Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
+  requestAnimationFrame(function() {
+    render();
+
+    if (!COMPANY.onboardingDone && MISSIONS.length === 0) {
+      showOnboarding();
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
