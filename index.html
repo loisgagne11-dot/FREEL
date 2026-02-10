@@ -1372,19 +1372,10 @@ var PROV_VIEW = 'type'; // 'type' or 'month'
 var ALERTS_OPEN = false;
 var mainChart = null, soldeChart = null, projectionChart = null, salairesChart = null;
 
-// SPRINT 2: Mode Privacy (floutage des montants)
+// Mode Privacy (floutage des montants)
 var PRIVACY_MODE = false;
 
-// SPRINT 2: Configuration Supabase (sync cloud)
-var SUPABASE_CONFIG = {
-  url: '', // À configurer: https://xxxxx.supabase.co
-  anonKey: '', // À configurer: clé publique anon
-  enabled: false,
-  lastSync: null,
-  syncStatus: 'disconnected' // 'disconnected', 'syncing', 'synced', 'error'
-};
-
-// SPRINT 3: Recherche et Filtres (B17, B18)
+// Recherche et Filtres
 var SEARCH_STATE = {
   factures: { query: '', client: 'all', status: 'all' },
   tresorerie: { query: '', type: 'all', category: 'all' }
@@ -1414,28 +1405,30 @@ var IR_BRACKETS = [
   { max: 11294, rate: 0 }, { max: 28797, rate: 0.11 }, { max: 82341, rate: 0.30 }, { max: 177106, rate: 0.41 }, { max: Infinity, rate: 0.45 }
 ];
 
-var COMPANY = { 
-  nom: 'Loïs MUSIC', 
-  siret: '92859030500015', 
-  debut: '2025-03-02', 
-  acre: true, 
-  prelevementLiberatoire: false, 
-  tvaDepuis: '2025-10', 
-  tvaIntracom: 'FR59928590005', 
-  iban: 'FR7617806006600003912844671', 
-  bic: 'AGRIFRPP878', 
-  adresse: 'Toulouse', 
-  codeApe: '6201Z',
-  email: '', 
-  telephone: '', 
+var COMPANY = {
+  nom: '',
+  siret: '',
+  debut: '',
+  acre: false,
+  prelevementLiberatoire: false,
+  tvaDepuis: '',
+  tvaIntracom: '',
+  iban: '',
+  bic: '',
+  adresse: '',
+  ville: '',
+  codePostal: '',
+  commune: '',
+  codeApe: '',
+  email: '',
+  telephone: '',
   urssafPeriodicite: 'mensuel',
-  onboardingDone: true,
-  // SPRINT 1: Numérotation séquentielle des factures
-  invoiceCounter: {}, // { '2025': 0, '2026': 0, ... } compteur par année
-  invoiceRegistry: [] // Registre des factures émises (livre des recettes)
+  onboardingDone: false,
+  invoiceCounter: {},
+  invoiceRegistry: []
 };
 var MISSIONS = [];
-var CLIENTS = []; // SPRINT 4 A19: Entités clients
+var CLIENTS = []; // Entités clients
 var TREASURY = { 
   soldeInitial: 5000, 
   mouvements: [], 
@@ -1464,7 +1457,7 @@ function toast(msg, type) {
 }
 
 function EUR(n, forceShow) { 
-  // SPRINT 2: Mode Privacy - floute les montants sauf si forceShow
+  // Mode Privacy - floute les montants sauf si forceShow
   if (PRIVACY_MODE && !forceShow) return '•••••€';
   return (n || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }); 
 }
@@ -1477,7 +1470,7 @@ function fmtMonthShort(s) { var p = parseYM(s); return new Date(p.y, p.m).toLoca
 function fmtLong(d) { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
 
-// SPRINT 3: Fonction highlight pour recherche textuelle (B17)
+// Fonction highlight pour recherche textuelle (B17)
 function highlightText(text, query) {
   if (!query || !text) return text;
   var regex = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
@@ -1681,7 +1674,7 @@ function exportLivreRecettes(year) {
   toast('Livre des recettes ' + year + ' exporté!', 'success');
 }
 
-// SPRINT 4 C8: Export FEC (Fichier des Écritures Comptables)
+// Export FEC (Fichier des Écritures Comptables)
 // Format normé DGFIP - Art. L47 A-I LPF
 function exportFEC(year) {
   year = year || TODAY.getFullYear();
@@ -1953,7 +1946,7 @@ function exportLivreRecettesPDF(year) {
   toast('Livre des Recettes ' + year + ' exporté en PDF', 'success');
 }
 
-// SPRINT 4 A19: Gestion des clients
+// Gestion des clients
 function getClient(clientId) {
   return CLIENTS.find(function(c) { return c.id === clientId; });
 }
@@ -2624,27 +2617,40 @@ function createTextarea(label, id, value, placeholder) {
   return g;
 }
 
+// V50: Constante pour le préfixe de stockage
+var STORAGE_PREFIX = 'freel_v50_';
+var OLD_STORAGE_PREFIX = 'freel_v39_';
+
 function saveAll() {
-  localStorage.setItem('freel_v39_company', JSON.stringify(COMPANY));
-  localStorage.setItem('freel_v39_missions', JSON.stringify(MISSIONS));
-  localStorage.setItem('freel_v39_clients', JSON.stringify(CLIENTS));
-  localStorage.setItem('freel_v39_treasury', JSON.stringify(TREASURY));
-  localStorage.setItem('freel_v39_ir_config', JSON.stringify(IR_CONFIG));
+  localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
+  localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
+  localStorage.setItem(STORAGE_PREFIX + 'clients', JSON.stringify(CLIENTS));
+  localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
+  localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
   autoBackup();
 }
 
 function loadAll() {
   try {
-    var c = localStorage.getItem('freel_v39_company');
-    var m = localStorage.getItem('freel_v39_missions');
-    var cl = localStorage.getItem('freel_v39_clients');
-    var t = localStorage.getItem('freel_v39_treasury');
-    var ir = localStorage.getItem('freel_v39_ir_config');
+    // V50: Migration automatique des données v39 vers v50
+    var needsMigration = !localStorage.getItem(STORAGE_PREFIX + 'company') &&
+                         localStorage.getItem(OLD_STORAGE_PREFIX + 'company');
+    var prefix = needsMigration ? OLD_STORAGE_PREFIX : STORAGE_PREFIX;
+
+    var c = localStorage.getItem(prefix + 'company');
+    var m = localStorage.getItem(prefix + 'missions');
+    var cl = localStorage.getItem(prefix + 'clients');
+    var t = localStorage.getItem(prefix + 'treasury');
+    var ir = localStorage.getItem(prefix + 'ir_config');
     if (c) COMPANY = Object.assign(COMPANY, JSON.parse(c));
     if (m) MISSIONS = JSON.parse(m);
     if (cl) CLIENTS = JSON.parse(cl);
     if (t) TREASURY = Object.assign(TREASURY, JSON.parse(t));
     if (ir) IR_CONFIG = JSON.parse(ir);
+
+    // Si migration effectuée, sauvegarder avec le nouveau préfixe
+    if (needsMigration) saveAll();
+
     // Migration: si anciennes données IR dans COMPANY, migrer vers IR_CONFIG
     if (COMPANY.irParts !== undefined) {
       var year = String(TODAY.getFullYear());
@@ -2654,10 +2660,10 @@ function loadAll() {
       IR_CONFIG[year].perAnnuel = COMPANY.perAnnuel || 0;
       delete COMPANY.irParts; delete COMPANY.autresRevenus; delete COMPANY.perAnnuel;
     }
-    // SPRINT 1: Migration - initialiser invoiceCounter et invoiceRegistry si absents
+    // Migration - initialiser invoiceCounter et invoiceRegistry si absents
     if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
     if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
-    // SPRINT 4 A19: Migration clients depuis missions existantes
+    // Migration clients depuis missions existantes
     if (CLIENTS.length === 0 && MISSIONS.length > 0) {
       var clientNames = {};
       MISSIONS.forEach(function(mis) {
@@ -3246,13 +3252,13 @@ function compute() {
   data.tvaTotale = tvaInCharges ? tvaInCharges.montant : 0;
   data.caHT = data.caEnc - data.tvaTotale;
   
-  // SPRINT 1: Correction bénéfice - basé sur CA HT (la TVA n'est pas un revenu)
+  // Correction bénéfice - basé sur CA HT (la TVA n'est pas un revenu)
   // Charges hors TVA collectée (car TVA collectée = dette, pas une charge réelle)
   var chargesHorsTVA = data.totalCharges - data.tvaTotale;
   data.beneficeNet = data.caHT - chargesHorsTVA; // Bénéfice net = CA HT - charges (hors TVA)
   data.margeNette = data.caHT > 0 ? data.beneficeNet / data.caHT : 0;
   
-  // SPRINT 5: Appel aux sous-fonctions (A3)
+  // Appel aux sous-fonctions (A3)
   computeIndicators(data, months);
   computeAlerts(data);
   
@@ -4063,7 +4069,7 @@ function showWaterfallDetail() {
   openModal('formModal');
 }
 
-// SPRINT 2: Mode confidentialité
+// Mode confidentialité
 function togglePrivacy() {
   PRIVACY_MODE = !PRIVACY_MODE;
   var btn = $('#privacyToggle');
@@ -4081,7 +4087,7 @@ function togglePrivacy() {
   if (typeof drawSoldeChart === 'function') drawSoldeChart();
 }
 
-// SPRINT 2: Détail TJM Effectif et TJM Net
+// Détail TJM Effectif et TJM Net
 function showTJMDetail() {
   var data = compute();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
@@ -4158,7 +4164,7 @@ function showTJMDetail() {
   openModal('formModal');
 }
 
-// SPRINT 2: Détail Taux de facturation
+// Détail Taux de facturation
 function showTauxFacturationDetail(data) {
   if (!data) data = compute();
   
@@ -4380,7 +4386,7 @@ function showMissionModal(mission) {
   // Section Mission
   body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' } }, '📋 Informations Mission'));
   
-  // SPRINT 4 A19: Dropdown client si des clients existent
+  // Dropdown client si des clients existent
   if (CLIENTS.length > 0) {
     var clientOptions = [{ value: '', label: '-- Sélectionner --' }];
     CLIENTS.forEach(function(c) { clientOptions.push({ value: c.id, label: c.nom }); });
@@ -4432,7 +4438,7 @@ function showMissionModal(mission) {
   
   var btns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '20px' } });
   btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
-    // SPRINT 4: Gérer client via dropdown ou input texte
+    // Gérer client via dropdown ou input texte
     var clientId = $('#mClientId') ? $('#mClientId').value : '';
     if (clientId && clientId !== '_new_') {
       var cli = getClient(clientId);
@@ -4875,7 +4881,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   var tvaAmount = tvaApplicable ? Math.round(totalHT * LEGAL.tvaRate) : 0;
   var totalTTC = totalHT + tvaAmount;
   
-  // SPRINT 1: Numérotation séquentielle automatique
+  // Numérotation séquentielle automatique
   // Si la facture a déjà un numéro définitif, le réutiliser
   var hasDefinitiveNumber = ligne.invoiceFinalized && ligne.lastInvoiceNum;
   var defaultNum = hasDefinitiveNumber ? ligne.lastInvoiceNum : reserveInvoiceNumber(TODAY.getFullYear());
@@ -4887,7 +4893,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   var body = $('#formModalBody');
   body.innerHTML = '';
   
-  // SPRINT 1: Avertissement si numéro déjà finalisé
+  // Avertissement si numéro déjà finalisé
   if (hasDefinitiveNumber) {
     var lockedInfo = el('div', { style: { background: 'var(--success-glow)', padding: '10px', borderRadius: 'var(--radius-sm)', marginBottom: '12px', fontSize: '11px' } });
     lockedInfo.innerHTML = '🔒 Facture n°' + ligne.lastInvoiceNum + ' déjà enregistrée dans le livre des recettes';
@@ -4916,7 +4922,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
     createInput('Date émission', 'date', 'invDate', defaultDate)
   ]));
   
-  // SPRINT 1: Ajout délai de paiement configurable
+  // Ajout délai de paiement configurable
   fieldsDiv.appendChild(el('div', { class: 'form-row' }, [
     createInput('N° Commande client', 'text', 'invCommande', defaultCommande, 'Ex: 10004903'),
     createInput('Délai paiement (jours)', 'number', 'invDelai', defaultDelai)
@@ -4945,7 +4951,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
     var invoiceDate = $('#invDate').value;
     var delaiPaiement = parseInt($('#invDelai').value) || 30;
     
-    // SPRINT 1: Si pas encore finalisé, enregistrer le numéro définitif
+    // Si pas encore finalisé, enregistrer le numéro définitif
     if (!hasDefinitiveNumber) {
       // Utiliser le numéro séquentiel officiel
       invoiceNum = getNextInvoiceNumber(TODAY.getFullYear());
@@ -5004,7 +5010,7 @@ function openInvoiceHTML(mission, monthYm, options) {
   var numCommande = options.numeroCommande || '';
   var delaiPaiement = options.delaiPaiement || 30;
   
-  // SPRINT 1: Calcul de la date d'échéance
+  // Calcul de la date d'échéance
   var dateEcheance = calculatePaymentDeadline(invoiceDate, delaiPaiement);
   
   var p = parseYM(monthYm);
@@ -5026,8 +5032,8 @@ function openInvoiceHTML(mission, monthYm, options) {
   var invoiceData = {
     num: invoiceNum,
     date: fmtDate(invoiceDate),
-    dateEcheance: fmtDate(dateEcheance), // SPRINT 1: Ajout échéance
-    delaiPaiement: delaiPaiement, // SPRINT 1: Délai en jours
+    dateEcheance: fmtDate(dateEcheance), // Ajout échéance
+    delaiPaiement: delaiPaiement, // Délai en jours
     client: mission.client || '',
     adresseClient: mission.adresseClient || '',
     emetteur: COMPANY.nom || '',
@@ -5202,9 +5208,7 @@ function downloadInvoiceHTML(data) {
     try {
       generateAndDownloadPDF(data);
       return;
-    } catch(e) {
-      console.log('PDF bloque, fallback HTML:', e.message);
-    }
+    } catch(e) { /* PDF failed, fallback to HTML */ }
   }
   
   // Fallback: télécharger en HTML
@@ -5395,7 +5399,7 @@ function generateAndDownloadPDF(data) {
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(130);
-  // SPRINT 1: Conditions de paiement complètes
+  // Conditions de paiement complètes
   doc.text('Conditions de paiement: ' + (data.delaiPaiement || 30) + ' jours. Echeance: ' + (data.dateEcheance || 'A reception'), 20, 250);
   doc.text('En cas de retard de paiement, une penalite de 3 fois le taux d\'interet legal sera appliquee (taux BCE + 10 pts),', 20, 255);
   doc.text('a laquelle s\'ajoutera une indemnite forfaitaire pour frais de recouvrement de 40 EUR. Pas d\'escompte pour paiement anticipe.', 20, 259);
@@ -7194,15 +7198,22 @@ function renderDashboard(container) {
   chartTreso.appendChild(el('div', { class: 'chart-container' }, [el('canvas', { id: 'soldeChart' })]));
   container.appendChild(chartTreso);
   
-  // Dessiner les graphiques
-  setTimeout(function() { drawMainChart(); drawSoldeChart(); }, 50);
+  // Dessiner les graphiques - V50: utiliser requestAnimationFrame pour timing fiable
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      drawMainChart();
+      drawSoldeChart();
+    });
+  });
 }
 
 function drawMainChart() {
   var canvas = $('#mainChart');
-  if (!canvas) return;
+  if (!canvas || !canvas.getContext) return;
   var ctx = canvas.getContext('2d');
+  if (!ctx) return;
   if (mainChart) mainChart.destroy();
+  if (!COMPUTED || !COMPUTED.monthsData) { COMPUTED = compute(); }
   
   var months = getPeriodMonths();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
@@ -7278,9 +7289,11 @@ function drawMainChart() {
 
 function drawSoldeChart() {
   var canvas = $('#soldeChart');
-  if (!canvas) return;
+  if (!canvas || !canvas.getContext) return;
   var ctx = canvas.getContext('2d');
+  if (!ctx) return;
   if (soldeChart) soldeChart.destroy();
+  if (!COMPUTED || !COMPUTED.monthsData) { COMPUTED = compute(); }
   
   var months = getPeriodMonths();
   var labels = months.map(fmtMonthShort);
@@ -7519,7 +7532,7 @@ function renderFactures(container) {
   var data = compute();
   container.appendChild(el('h2', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '16px' } }, '📄 Factures'));
   
-  // SPRINT 3: Barre de recherche (B17)
+  // Barre de recherche (B17)
   var searchBar = el('div', { class: 'search-filter-bar' });
   var searchBox = el('div', { class: 'search-box' });
   var searchInput = el('input', { 
@@ -7587,7 +7600,7 @@ function renderFactures(container) {
     });
   }
   
-  // SPRINT 3: Filtre par recherche textuelle (B17)
+  // Filtre par recherche textuelle (B17)
   var searchQuery = SEARCH_STATE.factures.query.toLowerCase().trim();
   if (searchQuery) {
     factures = factures.filter(function(f) {
@@ -7600,7 +7613,7 @@ function renderFactures(container) {
   
   factures.sort(function(a, b) { return b.mois.localeCompare(a.mois); });
   
-  // SPRINT 3: Afficher nombre de résultats si recherche active
+  // Afficher nombre de résultats si recherche active
   if (searchQuery) {
     container.appendChild(el('div', { class: 'search-results-info' }, [
       el('span', { class: 'count' }, String(factures.length)),
@@ -7625,7 +7638,7 @@ function renderFactures(container) {
     else if (f.status === 'envoyée') { badgeClass = 'badge-warning'; badgeText = '📤 Envoyée'; }
     else { badgeClass = 'badge-muted'; badgeText = '📝 Brouillon'; }
     
-    // SPRINT 3: Highlight recherche si active
+    // Highlight recherche si active
     var clientText = f.client + ' · ' + fmtMonthShort(f.mois);
     if (searchQuery && f.client.toLowerCase().includes(searchQuery)) {
       clientText = highlightText(f.client, searchQuery) + ' · ' + fmtMonthShort(f.mois);
@@ -7811,7 +7824,7 @@ function renderTresorerie(container) {
     });
   }, 50);
   
-  // SPRINT 3: Historique des mouvements avec recherche/filtres (B17, B18)
+  // Historique des mouvements avec recherche/filtres (B17, B18)
   var mouvementsCard = el('div', { class: 'card', style: { marginTop: '16px' } });
   mouvementsCard.appendChild(el('div', { class: 'card-title' }, '📜 Historique des Mouvements'));
   
@@ -8245,7 +8258,7 @@ function renderAdmin(container) {
   ioBtns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer TOUTES les données?')) { localStorage.clear(); location.reload(); } } }, '🗑️ Reset'));
   ioCard.appendChild(ioBtns);
   
-  // SPRINT 1: Exports comptables obligatoires
+  // Exports comptables obligatoires
   ioCard.appendChild(el('div', { style: { marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)' } }));
   ioCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, '📋 Exports Comptables (Art. L123-28 Code Commerce)'));
   var comptaBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
@@ -8271,7 +8284,7 @@ function renderAdmin(container) {
     exportLivreRecettesPDF(year); 
   } }, '📕 Livre PDF'));
   
-  // SPRINT 4 C8: Bouton export FEC
+  // Bouton export FEC
   comptaBtns.appendChild(el('button', { class: 'btn', style: { background: 'var(--info-glow)', borderColor: 'var(--info)' }, onclick: function() { 
     var year = parseInt($('#exportYear').value);
     exportFEC(year); 
@@ -8285,7 +8298,7 @@ function renderAdmin(container) {
   
   ioCard.appendChild(comptaBtns);
   
-  // SPRINT 4 A19: Gestion des clients
+  // Gestion des clients
   ioCard.appendChild(el('div', { style: { marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)' } }));
   ioCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, '🏢 Gestion Clients'));
   var clientsBtns = el('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' } });
@@ -8312,16 +8325,23 @@ function renderAdmin(container) {
 
 function render() {
   var container = $('#app');
+  if (!container) { console.error('Container #app not found'); return; }
   container.innerHTML = '';
-  
-  if (VIEW === 'dashboard') renderDashboard(container);
-  else if (VIEW === 'missions') renderMissions(container);
-  else if (VIEW === 'factures') renderFactures(container);
-  else if (VIEW === 'tresorerie') renderTresorerie(container);
-  else if (VIEW === 'admin') renderAdmin(container);
-  
+
+  try {
+    if (VIEW === 'dashboard') renderDashboard(container);
+    else if (VIEW === 'missions') renderMissions(container);
+    else if (VIEW === 'factures') renderFactures(container);
+    else if (VIEW === 'tresorerie') renderTresorerie(container);
+    else if (VIEW === 'admin') renderAdmin(container);
+  } catch (e) {
+    console.error('Render error:', e);
+    container.innerHTML = '<div style="padding:20px;color:red;">Erreur: ' + e.message + '</div>';
+  }
+
   $$('.nav-tab, .bottom-nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === VIEW); });
-  $('#periodYear').textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
+  var periodYear = $('#periodYear');
+  if (periodYear) periodYear.textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
   updateNotifBadge();
 }
 
@@ -8501,14 +8521,19 @@ function init() {
     if (!TREASURY.rendementHistorique) TREASURY.rendementHistorique = [];
     updateRendementHistorique();
   }
-  
-  // V50: Fix - Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
-  requestAnimationFrame(function() {
-    render();
 
-    if (!COMPANY.onboardingDone && MISSIONS.length === 0) {
-      showOnboarding();
-    }
+  // V50: Fix - Pré-calculer COMPUTED avant le premier rendu
+  COMPUTED = compute();
+
+  // V50: Fix - Double requestAnimationFrame pour s'assurer que le DOM est complètement prêt
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      render();
+
+      if (!COMPANY.onboardingDone && MISSIONS.length === 0) {
+        showOnboarding();
+      }
+    });
   });
 }
 
@@ -8516,7 +8541,42 @@ document.addEventListener('DOMContentLoaded', init);
 
 /*
  * ═══════════════════════════════════════════════════════════════════════════
- * CHANGELOG FREEL V49 - 11 janvier 2026 (Sprint 7 - Refonte UX)
+ * CHANGELOG FREEL V50 - 5 février 2026 (Clean Slate)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🔴 CORRECTIONS CRITIQUES
+ * ────────────────────────
+ * 1. FIX DASHBOARD VIDE AU LANCEMENT
+ *    - Pré-calcul COMPUTED avant le premier render
+ *    - Double requestAnimationFrame pour timing fiable
+ *    - Remplacement setTimeout(50ms) par requestAnimationFrame pour charts
+ *    - Ajout vérifications null/getContext dans draw functions
+ *    - Try-catch autour du render avec message d'erreur visible
+ *
+ * 2. MIGRATION STOCKAGE V39 → V50
+ *    - Nouveau préfixe localStorage: freel_v50_
+ *    - Migration automatique des données v39 existantes
+ *    - Aucune perte de données utilisateur
+ *
+ * 🟠 NETTOYAGE DU CODE
+ * ────────────────────
+ * 3. SUPPRESSION CODE MORT
+ *    - Suppression SUPABASE_CONFIG non utilisé
+ *    - Suppression console.log de debug
+ *    - Nettoyage commentaires "SPRINT X" obsolètes
+ *
+ * 4. INITIALISATION PROPRE
+ *    - COMPANY initialisé avec valeurs vides par défaut
+ *    - Ajout propriétés manquantes: ville, codePostal, commune
+ *    - onboardingDone = false par défaut (nouveaux utilisateurs)
+ *
+ * 5. ROBUSTESSE
+ *    - Null checks dans render() et draw functions
+ *    - Fallback compute() si COMPUTED vide
+ *    - Gestion d'erreur avec message visible
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CHANGELOG FREEL V49 - 11 janvier 2026 (Refonte UX)
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * 🔴 REFONTE ERGONOMIQUE MAJEURE
