@@ -1406,37 +1406,51 @@ var IR_BRACKETS = [
 ];
 
 var COMPANY = {
-  nom: '',
-  siret: '',
-  debut: '',
-  acre: false,
+  nom: 'Loïs MUSIC',
+  siret: '92859030500015',
+  debut: '2025-03-02',
+  acre: true,
   prelevementLiberatoire: false,
-  tvaDepuis: '',
-  tvaIntracom: '',
-  iban: '',
-  bic: '',
-  adresse: '',
+  tvaDepuis: '2025-10',
+  tvaIntracom: 'FR59928590005',
+  iban: 'FR7617806006600003912844671',
+  bic: 'AGRIFRPP878',
+  adresse: 'Toulouse',
   ville: '',
   codePostal: '',
   commune: '',
-  codeApe: '',
+  codeApe: '6201Z',
   email: '',
   telephone: '',
   urssafPeriodicite: 'mensuel',
-  onboardingDone: false,
+  onboardingDone: true,
   invoiceCounter: {},
   invoiceRegistry: []
 };
-var MISSIONS = [];
-var CLIENTS = []; // Entités clients
-var TREASURY = { 
-  soldeInitial: 5000, 
-  mouvements: [], 
+var MISSIONS = [
+  {
+    id: 'MIS' + Date.now(),
+    client: 'ATR',
+    description: 'Mission via Scalian',
+    tjm: 380,
+    debut: '2025-05-12',
+    fin: '2026-03-31',
+    statut: 'en_cours',
+    lignes: {},
+    factures: []
+  }
+];
+var CLIENTS = [
+  { id: 'CLI1', nom: 'ATR', adresse: '', siret: '', contact: '', email: '', notes: '', delaiPaiement: 2, jourPaiement: 15 }
+];
+var TREASURY = {
+  soldeInitial: 5000,
+  mouvements: [],
   paidCharges: {},
-  // V47: Rendement compte pro
-  rendementActif: false,      // Activer/désactiver le calcul des intérêts
-  rendementTaux: 2.0,         // Taux annuel brut en %
-  rendementHistorique: []     // Historique des intérêts calculés [{mois: '2025-01', montant: 12.50, soldeMoyen: 7500}]
+  conges: {}, // { '2025-08': [1,2,3], '2025-12': [23,24,25,26,27,28,29,30,31] }
+  rendementActif: false,
+  rendementTaux: 2.0,
+  rendementHistorique: []
 };
 var IR_CONFIG = {}; // { '2025': { parts: 1, autresRevenus: 0, perAnnuel: 0 }, '2026': {...} }
 var COMPUTED = {};
