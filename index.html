@@ -1382,17 +1382,29 @@ var SEARCH_STATE = {
 };
 
 // Taux officiels URSSAF - Sources: urssaf.fr, décret 2025-943
-// Note V45: Taux 2026 = 26.1% selon certaines sources, à confirmer avec décret officiel
-// En attendant confirmation, utilisation du taux annoncé (25.6% -> 26.1%)
+// V51: Taux officiels 2026 confirmés (source: autoentrepreneur.urssaf.fr)
 var LEGAL = {
-  urssafStd2025: 0.246,    // 24.6% - Confirmé
-  urssafStd2026: 0.261,    // 26.1% - Mis à jour V45 (attention: vérifier décret final)
-  urssafAcre2025: 0.123,   // 12.3% - 50% du taux standard
-  urssafAcre2026: 0.1305,  // 13.05% - 50% du taux standard 2026
-  cfp: 0.002,              // 0.2% - Formation professionnelle
-  impLib: 0.022,           // 2.2% - Versement libératoire BNC
+  // Cotisations URSSAF BNC (prestations de services libérales)
+  urssafStd2025: 0.246,    // 24.6% - 2025
+  urssafStd2026: 0.256,    // 25.6% - 2026 (confirmé URSSAF)
+  urssafAcre2025: 0.123,   // 12.3% - ACRE 2025 (50% du taux standard)
+  urssafAcre2026: 0.128,   // 12.8% - ACRE 2026 (50% du taux standard)
+  cfp: 0.002,              // 0.2% - Formation professionnelle (CFP)
+  impLib: 0.022,           // 2.2% - Versement libératoire IR (BNC)
   tvaRate: 0.20,           // 20% - TVA taux normal
-  lastUpdated: '2026-01-11' // Date mise à jour V45
+
+  // Plafonds micro-entreprise 2025/2026
+  plafondBNC: 77700,       // CA max prestations de services / BNC
+  plafondVente: 188700,    // CA max vente de marchandises
+  seuilTVA: 36800,         // Seuil franchise TVA (services)
+  seuilTVAMajore: 39100,   // Seuil majoré (perte franchise)
+  seuilTVAVente: 91900,    // Seuil franchise TVA (vente)
+  seuilTVAVenteMajore: 101000, // Seuil majoré vente
+
+  // ACRE: 4 trimestres civils (trimestre de création inclus)
+  acreDureeQuarters: 4,
+
+  lastUpdated: '2026-02-11'
 };
 
 var SCENARIOS = {
@@ -2084,11 +2096,19 @@ function daysBiz(year, month) {
 function getAcreInfo() {
   if (!COMPANY.debut || !COMPANY.acre) return { active: false, expiryDate: null, expiryYm: null };
   var start = new Date(COMPANY.debut);
-  var startQ = Math.floor(start.getMonth() / 3);
-  var endQ = startQ + 4;
-  var endYear = start.getFullYear() + Math.floor(endQ / 4);
-  var endQmod = endQ % 4;
-  var expiryDate = new Date(endYear, (endQmod + 1) * 3, 0);
+  var startYear = start.getFullYear();
+  var startQ = Math.floor(start.getMonth() / 3); // 0=Q1, 1=Q2, 2=Q3, 3=Q4
+
+  // ACRE = 4 trimestres CIVILS dont le trimestre de création
+  // Exemple: début mars 2025 (Q1) → Q1+Q2+Q3+Q4 2025 → fin 31/12/2025
+  var endQ = startQ + 3; // Dernier trimestre = startQ + 3 (4 trimestres au total)
+  var endYear = startYear + Math.floor(endQ / 4);
+  var endQmod = endQ % 4; // 0=Q1, 1=Q2, 2=Q3, 3=Q4
+
+  // Dernier jour du trimestre: mois suivant le trimestre, jour 0
+  var expiryMonth = (endQmod + 1) * 3; // Premier mois du trimestre suivant
+  var expiryDate = new Date(endYear, expiryMonth, 0); // Jour 0 = dernier jour du mois précédent
+
   var daysLeft = Math.ceil((expiryDate - TODAY) / (1000 * 60 * 60 * 24));
   var expiryYm = ym(expiryDate.getFullYear(), expiryDate.getMonth());
   return { active: daysLeft > 0, expiryDate: localISO(expiryDate), expiryYm: expiryYm, daysLeft: daysLeft };
@@ -8112,24 +8132,36 @@ function renderAdmin(container) {
   
   // Taux URSSAF
   var ratesInfo = el('div', { class: 'info-box' });
-  ratesInfo.appendChild(el('div', { class: 'info-box-title' }, 'Taux URSSAF (Décret 2025-943)'));
+  ratesInfo.appendChild(el('div', { class: 'info-box-title' }, 'Taux URSSAF BNC (du CA HT)'));
   ratesInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, '2025 - Standard'), el('span', {}, PCT(LEGAL.urssafStd2025))]));
   ratesInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, '2025 - Avec ACRE'), el('span', { style: { color: 'var(--success)' } }, PCT(LEGAL.urssafAcre2025))]));
   ratesInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, '2026 - Standard'), el('span', {}, PCT(LEGAL.urssafStd2026))]));
   ratesInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, '2026 - Avec ACRE'), el('span', { style: { color: 'var(--success)' } }, PCT(LEGAL.urssafAcre2026))]));
-  
+
   // Taux applicable actuellement
   var currentRate = getUrssafRate(ym(TODAY.getFullYear(), TODAY.getMonth()));
-  ratesInfo.appendChild(el('div', { style: { marginTop: '8px', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px' } }, [el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Ton taux actuel: '), el('span', { style: { fontWeight: '700', color: 'var(--accent)' } }, PCT(currentRate))]));
+  var acre = getAcreInfo();
+  var acreStatus = COMPANY.acre ? (acre.active ? ' (ACRE actif jusqu\'au ' + fmtDate(acre.expiryDate) + ')' : ' (ACRE expiré le ' + fmtDate(acre.expiryDate) + ')') : '';
+  ratesInfo.appendChild(el('div', { style: { marginTop: '8px', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px' } }, [el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Ton taux actuel: '), el('span', { style: { fontWeight: '700', color: 'var(--accent)' } }, PCT(currentRate)), el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' } }, acreStatus)]));
   infoCard.appendChild(ratesInfo);
   
   // Autres infos
   var otherInfo = el('div', { class: 'info-box' });
   otherInfo.appendChild(el('div', { class: 'info-box-title' }, 'Autres Cotisations'));
-  otherInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'CFP (Formation)'), el('span', {}, PCT(LEGAL.cfp))]));
-  otherInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Prélèvement Libératoire'), el('span', {}, PCT(LEGAL.impLib))]));
-  otherInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'TVA'), el('span', {}, PCT(LEGAL.tvaRate))]));
+  otherInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'CFP (Formation)'), el('span', {}, PCT(LEGAL.cfp) + ' du CA HT')]));
+  otherInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Prélèvement Libératoire'), el('span', {}, PCT(LEGAL.impLib) + ' du CA HT')]));
+  otherInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'TVA'), el('span', {}, PCT(LEGAL.tvaRate) + ' (sur HT)')]));
   infoCard.appendChild(otherInfo);
+
+  // Plafonds et seuils micro-entreprise
+  var seuilsInfo = el('div', { class: 'info-box' });
+  seuilsInfo.appendChild(el('div', { class: 'info-box-title' }, '📊 Plafonds Micro-entreprise 2025/2026'));
+  seuilsInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'CA max BNC/Services'), el('span', { style: { fontWeight: '700' } }, EUR(LEGAL.plafondBNC))]));
+  seuilsInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'CA max Vente'), el('span', {}, EUR(LEGAL.plafondVente))]));
+  seuilsInfo.appendChild(el('div', { style: { marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Franchise TVA (services):'));
+  seuilsInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Seuil standard'), el('span', {}, EUR(LEGAL.seuilTVA))]));
+  seuilsInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Seuil majoré (perte)'), el('span', { style: { color: 'var(--danger)' } }, EUR(LEGAL.seuilTVAMajore))]));
+  infoCard.appendChild(seuilsInfo);
   
   // Échéances de paiement - format tableau clair
   var echeancesInfo = el('div', { class: 'info-box' });
