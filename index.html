@@ -402,7 +402,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 //# sourceMappingURL=chart.umd.js.map
 </script>
 
-<\!-- Supabase CDN -->
+<!-- Supabase CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
@@ -7483,7 +7483,7 @@ function showChargeDetail(categoryId, data) {
       row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(c.montant)));
       row.appendChild(el('span', {}, status));
       if (!c.paid) {
-        row.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { markChargePaid(c.id); closeModal('dynamicModal'); render(); } }, 'Payer'));
+        row.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { markAllPaid([c.id]); closeModal('dynamicModal'); render(); } }, 'Payer'));
       }
       table.appendChild(row);
     });
