@@ -2947,13 +2947,16 @@ function computeIndicators(data, months) {
   var tauxCharges = getUrssafRate(nowYm) + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
   data.tjmNet = data.tjmEffectif > 0 ? Math.round(data.tjmEffectif * (1 - tauxCharges)) : 0;
   
-  // Runway (autonomie financière)
-  var avgCharges = months.length > 0 ? data.totalCharges / months.length : 2000;
-  data.runway = avgCharges > 0 ? Math.floor(data.cashDispoAbsolu / avgCharges) : 12;
-  
-  // Salaire moyen et recommandé
+  // Salaire moyen (calculé avant runway)
   var salairesNonZero = data.sparklineData.salaires.filter(function(s) { return s > 0; });
   data.salaireMoyen = salairesNonZero.length > 0 ? Math.round(salairesNonZero.reduce(function(a, b) { return a + b; }, 0) / salairesNonZero.length) : 0;
+
+  // V51: Runway (autonomie) = Cash / (Charges + Salaire moyen)
+  var avgCharges = months.length > 0 ? data.totalCharges / months.length : 500;
+  var depensesMensuelles = avgCharges + data.salaireMoyen;
+  data.runway = depensesMensuelles > 0 ? Math.floor(data.cashDispoAbsolu / depensesMensuelles) : 99;
+  data.depensesMensuelles = Math.round(depensesMensuelles); // Pour tooltip
+
   var minReserve = avgCharges * 3;
   data.salaireReco = Math.max(0, Math.floor((data.cashDispoAbsolu - minReserve) / 100) * 100);
 }
