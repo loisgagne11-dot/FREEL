@@ -1685,7 +1685,10 @@ var TREASURY = {
   conges: {}, // { '2025-08': [1,2,3], '2025-12': [23,24,25,26,27,28,29,30,31] }
   rendementActif: false,
   rendementTaux: 2.0,
-  rendementHistorique: []
+  rendementHistorique: [],
+  // V51: Paramètres trésorerie
+  salaireEstime: 2200,    // Salaire mensuel estimé pour calcul autonomie
+  reserveCompte: 150      // Réserve minimum sur compte pro
 };
 var IR_CONFIG = {}; // { '2025': { parts: 1, autresRevenus: 0, perAnnuel: 0 }, '2026': {...} }
 var COMPUTED = {};
@@ -3213,15 +3216,20 @@ function computeIndicators(data, months) {
   var salairesNonZero = data.sparklineData.salaires.filter(function(s) { return s > 0; });
   data.salaireMoyen = salairesNonZero.length > 0 ? Math.round(salairesNonZero.reduce(function(a, b) { return a + b; }, 0) / salairesNonZero.length) : 0;
 
-  // V51: Runway (autonomie) = Cash / (Charges + Salaire moyen)
+  // V51: Runway (autonomie) = Cash / (Charges + Salaire estimé)
   var avgCharges = months.length > 0 ? data.totalCharges / months.length : 500;
-  var depensesMensuelles = avgCharges + data.salaireMoyen;
+  // V51: Utilise le salaire estimé paramétré ou le salaire moyen historique
+  var salaireRef = TREASURY.salaireEstime || data.salaireMoyen || 2000;
+  var depensesMensuelles = avgCharges + salaireRef;
+  data.salaireEstime = salaireRef;
+  data.avgCharges = Math.round(avgCharges);
   data.runway = depensesMensuelles > 0 ? Math.floor(data.cashDispoAbsolu / depensesMensuelles) : 99;
-  data.depensesMensuelles = Math.round(depensesMensuelles); // Pour tooltip
+  data.depensesMensuelles = Math.round(depensesMensuelles);
 
-  var minReserve = avgCharges * 3;
-  data.salaireReco = Math.max(0, Math.floor((data.cashDispoAbsolu - minReserve) / 100) * 100);
-}
+  // V51: Salaire versable = Cash dispo - réserve minimum
+  var reserveMin = TREASURY.reserveCompte || 150;
+  data.salaireVersable = Math.max(0, Math.floor((data.cashDispoAbsolu - reserveMin) / 100) * 100);
+  data.reserveCompte = reserveMin;
 
 /**
  * Génère les alertes basées sur l'état des données
@@ -7250,24 +7258,87 @@ function renderDashboardAlerts(container, data) {
  * Affiche la carte Hero avec cash disponible
  */
 function renderDashboardHero(container, data) {
-  var hero = el('div', { class: 'hero' + (data.soldeAbsolu < 0 ? ' negative' : ''), onclick: showCashDetail });
-  var heroMain = el('div', { class: 'hero-main' });
-  heroMain.appendChild(el('div', { class: 'hero-label' }, 'Cash Disponible'));
-  heroMain.appendChild(el('div', { class: 'hero-value ' + (data.cashDispoAbsolu >= 0 ? 'positive' : 'negative') }, EUR(data.cashDispoAbsolu)));
-  heroMain.appendChild(el('div', { class: 'hero-sub' }, 'Cliquer pour détails & projections'));
-  hero.appendChild(heroMain);
+  // V51: Hero section améliorée avec paramètres éditables
+  var hero = el('div', { class: 'hero' + (data.soldeAbsolu < 0 ? ' negative' : '') });
   
+  // Ligne principale: Cash + Settings
+  var heroHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } });
+  
+  var heroMain = el('div', { class: 'hero-main', onclick: showCashDetail, style: { cursor: 'pointer', flex: 1 } });
+  heroMain.appendChild(el('div', { class: 'hero-label' }, '💰 Cash Disponible'));
+  heroMain.appendChild(el('div', { class: 'hero-value ' + (data.cashDispoAbsolu >= 0 ? 'positive' : 'negative') }, EUR(data.cashDispoAbsolu)));
+  heroHeader.appendChild(heroMain);
+  
+  // Bouton paramètres
+  heroHeader.appendChild(el('button', { 
+    class: 'btn btn-sm', 
+    style: { background: 'var(--bg-tertiary)', border: 'none' },
+    onclick: function(e) { e.stopPropagation(); showTresoSettings(); },
+    title: 'Paramètres trésorerie'
+  }, '⚙️'));
+  
+  hero.appendChild(heroHeader);
+  
+  // Stats: Solde | Provisions | Autonomie
   var heroStats = el('div', { class: 'hero-stats' });
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [el('div', { class: 'hero-stat-value' }, EUR(data.soldeAbsolu)), el('div', { class: 'hero-stat-label' }, 'Solde compte')]));
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [el('div', { class: 'hero-stat-value text-provision' }, EUR(data.provisionsAbsolues)), el('div', { class: 'hero-stat-label' }, 'Provisions')]));
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [el('div', { class: 'hero-stat-value', style: { color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'), el('div', { class: 'hero-stat-label' }, 'Autonomie')]));
+  heroStats.appendChild(el('div', { class: 'hero-stat' }, [
+    el('div', { class: 'hero-stat-value' }, EUR(data.soldeAbsolu)), 
+    el('div', { class: 'hero-stat-label' }, 'Solde compte')
+  ]));
+  heroStats.appendChild(el('div', { class: 'hero-stat' }, [
+    el('div', { class: 'hero-stat-value text-provision' }, EUR(data.provisionsAbsolues)), 
+    el('div', { class: 'hero-stat-label' }, 'Provisions')
+  ]));
+  heroStats.appendChild(el('div', { class: 'hero-stat', title: EUR(data.salaireEstime) + ' salaire + ' + EUR(data.avgCharges) + ' charges/mois' }, [
+    el('div', { class: 'hero-stat-value', style: { color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'), 
+    el('div', { class: 'hero-stat-label' }, 'Autonomie')
+  ]));
   hero.appendChild(heroStats);
+  
+  // V51: Salaire versable + action
+  var salaireDiv = el('div', { style: { 
+    marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+  }});
+  salaireDiv.appendChild(el('div', {}, [
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '💸 Salaire versable'),
+    el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--success)' } }, EUR(data.salaireVersable)),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '(Cash - ' + EUR(data.reserveCompte) + ' réserve)')
+  ]));
+  if (data.salaireVersable >= 500) {
+    salaireDiv.appendChild(el('button', { 
+      class: 'btn btn-success', 
+      onclick: function(e) { e.stopPropagation(); showSalaireModal(data.salaireVersable); }
+    }, 'Verser'));
+  }
+  hero.appendChild(salaireDiv);
+  
   container.appendChild(hero);
 }
 
-/**
- * Affiche les graphiques CA et Trésorerie
- */
+// V51: Modal paramètres trésorerie
+function showTresoSettings() {
+  var content = el('div', { style: { padding: '10px' } });
+  
+  content.appendChild(createInput('Salaire mensuel estimé (€)', 'number', 'tresoSalaireEstime', TREASURY.salaireEstime || 2200));
+  content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '-8px', marginBottom: '12px' } }, 'Utilisé pour calculer l\'autonomie'));
+  
+  content.appendChild(createInput('Réserve minimum compte (€)', 'number', 'tresoReserve', TREASURY.reserveCompte || 150));
+  content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '-8px', marginBottom: '12px' } }, 'Montant à garder sur le compte pro'));
+  
+  content.appendChild(el('button', { class: 'btn btn-primary', style: { width: '100%', marginTop: '12px' }, onclick: function() {
+    TREASURY.salaireEstime = parseFloat($('#tresoSalaireEstime').value) || 2200;
+    TREASURY.reserveCompte = parseFloat($('#tresoReserve').value) || 150;
+    saveAll();
+    closeModal('dynamicModal');
+    render();
+    showToast('✅ Paramètres enregistrés', 'success');
+  }}, '💾 Enregistrer'));
+  
+  showModal('⚙️ Paramètres Trésorerie', content);
+}
+
+
 function renderDashboardCharts(container, months) {
   // Graph CA
   var chartCard = el('div', { class: 'card' });
