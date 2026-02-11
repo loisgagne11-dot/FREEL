@@ -1293,6 +1293,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <button class="privacy-toggle notif-btn" id="notifBtn" title="Notifications" onclick="toggleNotifCenter()">🔔<span class="notif-count" id="notifBadge" style="display:none">0</span></button>
       <button class="privacy-toggle" id="themeToggle" title="Changer le thème" onclick="toggleTheme()">☀️</button>
       <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité">👁️</button>
+      <button class="privacy-toggle" id="authBtn" title="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px"></span>
       <nav class="nav-tabs">
         <button class="nav-tab active" data-view="dashboard">📊</button>
         <button class="nav-tab" data-view="missions">💼</button>
@@ -2845,6 +2846,43 @@ function openModal(id) { $('#' + id).classList.add('active'); }
 function closeModal(id) { $('#' + id).classList.remove('active'); }
 function closeAllModals() { $$('.modal').forEach(function(m) { m.classList.remove('active'); }); }
 
+// V51: Toast notifications
+function showToast(message, type) {
+  type = type || 'info';
+  var colors = { success: 'var(--success)', error: 'var(--danger)', warning: 'var(--warning)', info: 'var(--accent)' };
+  var toast = el('div', { 
+    style: { 
+      position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)', 
+      background: 'var(--bg-elevated)', color: 'var(--text-primary)', 
+      padding: '12px 20px', borderRadius: '8px', fontSize: '14px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 10000,
+      borderLeft: '4px solid ' + (colors[type] || colors.info),
+      animation: 'slideUp 0.3s ease'
+    } 
+  }, message);
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 3000);
+}
+
+// V51: Dynamic modal
+function showModal(title, content) {
+  closeAllModals();
+  var overlay = el('div', { 
+    class: 'modal active', 
+    id: 'dynamicModal',
+    onclick: function(e) { if (e.target === overlay) closeModal('dynamicModal'); }
+  });
+  var modal = el('div', { class: 'modal-content', style: { maxWidth: '400px' } });
+  var header = el('div', { class: 'modal-header' });
+  header.appendChild(el('h3', { class: 'modal-title' }, title));
+  header.appendChild(el('button', { class: 'modal-close', onclick: function() { closeModal('dynamicModal'); } }, '✕'));
+  modal.appendChild(header);
+  modal.appendChild(el('div', { class: 'modal-body' }, [content]));
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+}
+
+
 function createInput(label, type, id, value, placeholder) {
   var g = el('div', { class: 'form-group' });
   g.appendChild(el('label', { class: 'form-label', for: id }, label));
@@ -2883,6 +2921,8 @@ function saveAll() {
   localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
   localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
   autoBackup();
+  // V51: Sync to cloud if connected
+  if (CURRENT_USER && SYNC_ENABLED) syncToCloud();
 }
 
 function loadAll() {
@@ -8735,6 +8775,7 @@ function skipOnboarding() {
 // === INIT ===
 function init() {
   loadAll();
+  initSupabase(); // V51: Initialize cloud sync
   MISSIONS.forEach(buildMission);
   
   // Navigation
