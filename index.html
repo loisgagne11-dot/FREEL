@@ -1296,7 +1296,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <button class="privacy-toggle" id="authBtn" title="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px"></span>
       <nav class="nav-tabs">
         <button class="nav-tab active" data-view="dashboard">📊</button>
-        <button class="nav-tab" data-view="missions">💼</button>
+        
         <button class="nav-tab" data-view="factures">📄</button>
         <button class="nav-tab" data-view="tresorerie">🏦</button>
         <button class="nav-tab" data-view="admin">⚙️</button>
@@ -1308,7 +1308,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
   <nav class="bottom-nav">
     <button class="bottom-nav-tab active" data-view="dashboard"><div class="bottom-nav-icon">📊</div><div class="bottom-nav-label">Dashboard</div></button>
-    <button class="bottom-nav-tab" data-view="missions"><div class="bottom-nav-icon">💼</div><div class="bottom-nav-label">Missions</div></button>
+    
     <button class="bottom-nav-tab" data-view="factures"><div class="bottom-nav-icon">📄</div><div class="bottom-nav-label">Factures</div></button>
     <button class="bottom-nav-tab" data-view="tresorerie"><div class="bottom-nav-icon">🏦</div><div class="bottom-nav-label">Trésorerie</div></button>
     <button class="bottom-nav-tab" data-view="admin"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Admin</div></button>
@@ -1366,6 +1366,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 var APP_VERSION = 50; // V50: Clean slate + fix initialisation dashboard
 var TODAY = new Date();
 var VIEW = 'dashboard';
+var DASHBOARD_SUB = 'accueil'; // V51: sous-onglets dashboard (accueil, analyse, charges)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SUPABASE CLOUD SYNC - V51
@@ -3290,6 +3291,20 @@ function computeAlerts(data) {
 // COMPUTE - Charges liées au mois d'ENCAISSEMENT (pas réalisation)
 function compute() {
   var months = getPeriodMonths();
+  
+  // V51: Sous-onglets dashboard
+  renderDashboardSubTabs(container);
+  
+  // Afficher le contenu selon le sous-onglet actif
+  if (DASHBOARD_SUB === 'charges') {
+    renderChargesSubTab(container, data);
+    return;
+  }
+  if (DASHBOARD_SUB === 'analyse') {
+    renderAnalyseSubTab(container, data, months);
+    return;
+  }
+  // Sinon: Accueil (défaut)
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   
   var data = {
@@ -4480,6 +4495,20 @@ function showTauxFacturationDetail(data) {
   
   // Détail par mois
   var months = getPeriodMonths();
+  
+  // V51: Sous-onglets dashboard
+  renderDashboardSubTabs(container);
+  
+  // Afficher le contenu selon le sous-onglet actif
+  if (DASHBOARD_SUB === 'charges') {
+    renderChargesSubTab(container, data);
+    return;
+  }
+  if (DASHBOARD_SUB === 'analyse') {
+    renderAnalyseSubTab(container, data, months);
+    return;
+  }
+  // Sinon: Accueil (défaut)
   var monthsDiv = el('div', { class: 'card', style: { marginBottom: '16px' } });
   monthsDiv.appendChild(el('div', { class: 'card-title' }, '📆 Détail par mois'));
   
@@ -5088,6 +5117,20 @@ function showCongesOverview() {
   body.innerHTML = '';
   
   var months = getPeriodMonths();
+  
+  // V51: Sous-onglets dashboard
+  renderDashboardSubTabs(container);
+  
+  // Afficher le contenu selon le sous-onglet actif
+  if (DASHBOARD_SUB === 'charges') {
+    renderChargesSubTab(container, data);
+    return;
+  }
+  if (DASHBOARD_SUB === 'analyse') {
+    renderAnalyseSubTab(container, data, months);
+    return;
+  }
+  // Sinon: Accueil (défaut)
   var table = el('table', { class: 'days-table' });
   var thead = el('thead');
   var headerRow = el('tr');
@@ -6670,6 +6713,20 @@ function renderClientsWidget(container) {
 function renderCongesCalendar(container) {
   var data = compute();
   var months = getPeriodMonths();
+  
+  // V51: Sous-onglets dashboard
+  renderDashboardSubTabs(container);
+  
+  // Afficher le contenu selon le sous-onglet actif
+  if (DASHBOARD_SUB === 'charges') {
+    renderChargesSubTab(container, data);
+    return;
+  }
+  if (DASHBOARD_SUB === 'analyse') {
+    renderAnalyseSubTab(container, data, months);
+    return;
+  }
+  // Sinon: Accueil (défaut)
   var currentYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   
   var widget = el('div', { class: 'clients-widget' });
@@ -7240,10 +7297,219 @@ function renderDashboardCharts(container, months) {
   container.appendChild(soldeCard);
 }
 
+function renderDashboardSubTabs(container) {
+  var tabs = [
+    { id: 'accueil', label: 'Accueil', icon: '🏠' },
+    { id: 'analyse', label: 'Analyse', icon: '📊' },
+    { id: 'charges', label: 'Impôts & Charges', icon: '💳' }
+  ];
+  
+  var tabBar = el('div', { class: 'sub-tabs', style: { 
+    display: 'flex', gap: '8px', marginBottom: '16px', 
+    padding: '4px', background: 'var(--bg-secondary)', borderRadius: '12px'
+  }});
+  
+  tabs.forEach(function(tab) {
+    var isActive = DASHBOARD_SUB === tab.id;
+    var btn = el('button', { 
+      class: 'sub-tab' + (isActive ? ' active' : ''),
+      style: {
+        flex: 1, padding: '10px 12px', border: 'none', borderRadius: '8px',
+        background: isActive ? 'var(--accent)' : 'transparent',
+        color: isActive ? 'white' : 'var(--text-secondary)',
+        fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      },
+      onclick: function() { DASHBOARD_SUB = tab.id; render(); }
+    }, tab.icon + ' ' + tab.label);
+    tabBar.appendChild(btn);
+  });
+  
+  container.appendChild(tabBar);
+}
+
+
+// V51: Sous-onglet Impôts & Charges
+function renderChargesSubTab(container, data) {
+  container.appendChild(SectionTitle('💳', 'Impôts & Charges'));
+  
+  // Cartes résumé par catégorie
+  var cardsGrid = el('div', { style: { 
+    display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' 
+  }});
+  
+  var categories = [
+    { id: 'URSSAF', label: 'URSSAF', icon: '🏥', color: 'var(--danger)' },
+    { id: 'TVA', label: 'TVA', icon: '🏛️', color: 'var(--info)' },
+    { id: 'IR', label: 'Impôt Revenu', icon: '💰', color: 'var(--warning)' },
+    { id: 'CFE', label: 'CFE', icon: '🏢', color: 'var(--text-muted)' }
+  ];
+  
+  categories.forEach(function(cat) {
+    var charges = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === cat.id; }) : [];
+    var total = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
+    var unpaid = charges.filter(function(c) { return !c.paid; });
+    var status = unpaid.length > 0 ? '🔴 ' + unpaid.length + ' dû' : '✅ OK';
+    
+    var card = el('div', { 
+      class: 'card',
+      style: { borderLeft: '4px solid ' + cat.color, cursor: 'pointer' },
+      onclick: function() { showChargeDetail(cat.id, data); }
+    });
+    card.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+      el('span', { style: { fontSize: '20px' } }, cat.icon),
+      el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, status)
+    ]));
+    card.appendChild(el('div', { style: { fontWeight: '700', fontSize: '18px', marginTop: '8px' } }, EUR(total)));
+    card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, cat.label));
+    cardsGrid.appendChild(card);
+  });
+  
+  container.appendChild(cardsGrid);
+  
+  // Total
+  var totalAPayer = data.provisionsAbsolues || 0;
+  var totalPaye = data.totalChargesPaid || 0;
+  
+  var totalsDiv = el('div', { class: 'card', style: { display: 'flex', justifyContent: 'space-around', textAlign: 'center' } });
+  totalsDiv.appendChild(el('div', {}, [
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'À payer'),
+    el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--danger)' } }, EUR(totalAPayer))
+  ]));
+  totalsDiv.appendChild(el('div', {}, [
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Payé (période)'),
+    el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--success)' } }, EUR(totalPaye))
+  ]));
+  container.appendChild(totalsDiv);
+}
+
+function showChargeDetail(categoryId, data) {
+  var charges = data.allProvisionsDetail ? data.allProvisionsDetail.filter(function(c) { return c.cat === categoryId; }) : [];
+  var catInfo = {
+    'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: PCT(getUrssafRate(ym(TODAY.getFullYear(), TODAY.getMonth()))) + ' du CA HT', penalty: '5% + 0.2%/mois après 30j' },
+    'TVA': { label: 'TVA - Taxe sur la Valeur Ajoutée', rate: '20% du CA HT', penalty: '10% + intérêts de retard' },
+    'IR': { label: 'Impôt sur le Revenu', rate: 'Barème progressif', penalty: '10% majoration' },
+    'CFE': { label: 'Cotisation Foncière des Entreprises', rate: 'Variable selon commune', penalty: '10% après mise en demeure' }
+  };
+  var info = catInfo[categoryId] || { label: categoryId, rate: '-', penalty: '-' };
+  
+  var content = el('div', { style: { padding: '10px' } });
+  
+  // Info taux
+  var infoBox = el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '12px' } });
+  infoBox.appendChild(el('div', { style: { fontWeight: '600', marginBottom: '8px' } }, info.label));
+  infoBox.appendChild(el('div', {}, [el('span', { style: { color: 'var(--text-muted)' } }, 'Taux: '), el('span', {}, info.rate)]));
+  infoBox.appendChild(el('div', {}, [el('span', { style: { color: 'var(--text-muted)' } }, 'Pénalité retard: '), el('span', { style: { color: 'var(--danger)' } }, info.penalty)]));
+  content.appendChild(infoBox);
+  
+  // Liste des échéances
+  if (charges.length > 0) {
+    var table = el('div', { style: { fontSize: '12px' } });
+    charges.sort(function(a, b) { return a.ym > b.ym ? -1 : 1; }).forEach(function(c) {
+      var status = c.paid ? '✅ Payé' : (c.isLate ? '🔴 Retard' : '⚪ À payer');
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
+      row.appendChild(el('span', {}, fmtMonth(c.ym)));
+      row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(c.montant)));
+      row.appendChild(el('span', {}, status));
+      if (!c.paid) {
+        row.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { markChargePaid(c.id); closeModal('dynamicModal'); render(); } }, 'Payer'));
+      }
+      table.appendChild(row);
+    });
+    content.appendChild(table);
+  } else {
+    content.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '20px' } }, 'Aucune charge pour cette catégorie'));
+  }
+  
+  // Si c'est IR, ajouter bouton simulateur
+  if (categoryId === 'IR') {
+    content.appendChild(el('button', { class: 'btn btn-primary', style: { width: '100%', marginTop: '16px' }, onclick: function() { closeModal('dynamicModal'); showIRModal(); } }, '🧮 Ouvrir Simulateur IR'));
+  }
+  
+  showModal(info.label, content);
+}
+
+
+// V51: Sous-onglet Analyse
+function renderAnalyseSubTab(container, data, months) {
+  // KPIs Performance
+  container.appendChild(SectionTitle('📈', 'Performance'));
+  
+  var kpiGrid = el('div', { class: 'kpi-grid', style: { marginBottom: '16px' } });
+  kpiGrid.appendChild(KPI({ label: 'CA Réalisé', value: EUR(data.caReal), sub: 'Prévu: ' + EUR(data.caPrev), color: 'info', trend: getTrend(data.sparklineData.caReal) }));
+  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success', onclick: showFacturesAEncaisser }));
+  kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger' }));
+  kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent' }));
+  container.appendChild(kpiGrid);
+  
+  // Répartition CA HT
+  container.appendChild(SectionTitle('📊', 'Répartition CA HT'));
+  
+  var caHT = data.caReal || 1;
+  var chargesTotal = data.totalCharges || 0;
+  var salaires = data.salaires || 0;
+  var benefice = Math.max(0, caHT - chargesTotal - salaires);
+  
+  var pctCharges = Math.round((chargesTotal / caHT) * 100);
+  var pctSalaires = Math.round((salaires / caHT) * 100);
+  var pctBenefice = Math.max(0, 100 - pctCharges - pctSalaires);
+  
+  var repartCard = el('div', { class: 'card' });
+  
+  // Barre de répartition
+  var bar = el('div', { style: { display: 'flex', height: '24px', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' } });
+  bar.appendChild(el('div', { style: { width: pctCharges + '%', background: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: '600' } }, pctCharges > 10 ? pctCharges + '%' : ''));
+  bar.appendChild(el('div', { style: { width: pctSalaires + '%', background: 'var(--info)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: '600' } }, pctSalaires > 10 ? pctSalaires + '%' : ''));
+  bar.appendChild(el('div', { style: { width: pctBenefice + '%', background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: '600' } }, pctBenefice > 10 ? pctBenefice + '%' : ''));
+  repartCard.appendChild(bar);
+  
+  // Légende
+  var legend = el('div', { style: { display: 'flex', justifyContent: 'space-around', fontSize: '12px' } });
+  legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
+    el('div', { style: { width: '12px', height: '12px', background: 'var(--danger)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
+    el('span', {}, 'Charges ' + EUR(chargesTotal))
+  ]));
+  legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
+    el('div', { style: { width: '12px', height: '12px', background: 'var(--info)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
+    el('span', {}, 'Salaires ' + EUR(salaires))
+  ]));
+  legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
+    el('div', { style: { width: '12px', height: '12px', background: 'var(--success)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
+    el('span', {}, 'Bénéfice ' + EUR(benefice))
+  ]));
+  repartCard.appendChild(legend);
+  container.appendChild(repartCard);
+  
+  // Comparaison N-1
+  var cmp = getCompareData();
+  if (cmp.prev.ca > 0) {
+    container.appendChild(SectionTitle('📅', 'Comparaison ' + (TODAY.getFullYear() - 1) + ' vs ' + TODAY.getFullYear()));
+    renderCompareWidget(container);
+  }
+  
+  // CA par client
+  container.appendChild(SectionTitle('👥', 'CA par Client'));
+  renderClientsWidget(container);
+}
+
 function renderDashboard(container) {
   var data = compute();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var months = getPeriodMonths();
+  
+  // V51: Sous-onglets dashboard
+  renderDashboardSubTabs(container);
+  
+  // Afficher le contenu selon le sous-onglet actif
+  if (DASHBOARD_SUB === 'charges') {
+    renderChargesSubTab(container, data);
+    return;
+  }
+  if (DASHBOARD_SUB === 'analyse') {
+    renderAnalyseSubTab(container, data, months);
+    return;
+  }
+  // Sinon: Accueil (défaut)
   
   // ═══════════════════════════════════════════════════════════════════════════
   // V49 - NOUVEL ORDRE ERGONOMIQUE
@@ -7514,6 +7780,20 @@ function drawMainChart() {
   if (!COMPUTED || !COMPUTED.monthsData) { COMPUTED = compute(); }
   
   var months = getPeriodMonths();
+  
+  // V51: Sous-onglets dashboard
+  renderDashboardSubTabs(container);
+  
+  // Afficher le contenu selon le sous-onglet actif
+  if (DASHBOARD_SUB === 'charges') {
+    renderChargesSubTab(container, data);
+    return;
+  }
+  if (DASHBOARD_SUB === 'analyse') {
+    renderAnalyseSubTab(container, data, months);
+    return;
+  }
+  // Sinon: Accueil (défaut)
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var labels = months.map(fmtMonthShort);
   var dataPrev = [], dataReal = [], dataEnc = [], dataAEnc = [], dataOff = [];
@@ -7594,6 +7874,20 @@ function drawSoldeChart() {
   if (!COMPUTED || !COMPUTED.monthsData) { COMPUTED = compute(); }
   
   var months = getPeriodMonths();
+  
+  // V51: Sous-onglets dashboard
+  renderDashboardSubTabs(container);
+  
+  // Afficher le contenu selon le sous-onglet actif
+  if (DASHBOARD_SUB === 'charges') {
+    renderChargesSubTab(container, data);
+    return;
+  }
+  if (DASHBOARD_SUB === 'analyse') {
+    renderAnalyseSubTab(container, data, months);
+    return;
+  }
+  // Sinon: Accueil (défaut)
   var labels = months.map(fmtMonthShort);
   var dataSolde = [], dataSalaires = [], dataSoldeProjection = [], dataSalairesProjection = [], dataCashDispoProj = [];
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
@@ -8110,6 +8404,20 @@ function renderTresorerie(container) {
     var ctx = canvas.getContext('2d');
     if (salairesChart) salairesChart.destroy();
     var months = getPeriodMonths();
+  
+  // V51: Sous-onglets dashboard
+  renderDashboardSubTabs(container);
+  
+  // Afficher le contenu selon le sous-onglet actif
+  if (DASHBOARD_SUB === 'charges') {
+    renderChargesSubTab(container, data);
+    return;
+  }
+  if (DASHBOARD_SUB === 'analyse') {
+    renderAnalyseSubTab(container, data, months);
+    return;
+  }
+  // Sinon: Accueil (défaut)
     var labels = months.map(fmtMonthShort);
     var dataSal = months.map(function(m) { return data.monthsData[m] ? data.monthsData[m].salaires : 0; });
     salairesChart = new Chart(ctx, {
