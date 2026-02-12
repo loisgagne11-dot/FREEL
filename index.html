@@ -3300,20 +3300,6 @@ function computeAlerts(data) {
 // COMPUTE - Charges liées au mois d'ENCAISSEMENT (pas réalisation)
 function compute() {
   var months = getPeriodMonths();
-  
-  // V51: Sous-onglets dashboard
-  renderDashboardSubTabs(container);
-  
-  // Afficher le contenu selon le sous-onglet actif
-  if (DASHBOARD_SUB === 'charges') {
-    renderChargesSubTab(container, data);
-    return;
-  }
-  if (DASHBOARD_SUB === 'analyse') {
-    renderAnalyseSubTab(container, data, months);
-    return;
-  }
-  // Sinon: Accueil (défaut)
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   
   var data = {
@@ -7021,6 +7007,22 @@ function initTheme() {
     document.documentElement.setAttribute('data-theme', 'light');
   }
   updateThemeButton();
+}
+
+// Calcule le CA total de l'année en cours
+function getTotalCA() {
+  var currentYear = TODAY.getFullYear();
+  var total = 0;
+  MISSIONS.forEach(function(m) {
+    if (m.factures) {
+      m.factures.forEach(function(f) {
+        if (f.status === 'payée' && f.mois && f.mois.startsWith(currentYear + '-')) {
+          total += (f.montantHT || (f.jours * (m.tjm || 0)));
+        }
+      });
+    }
+  });
+  return total;
 }
 
 // Sprint 14: Notification Center
