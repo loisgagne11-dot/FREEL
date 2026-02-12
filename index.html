@@ -7722,21 +7722,9 @@ function renderDashboard(container) {
   // 3. TRÉSORERIE (combien j'ai)
   // ═══════════════════════════════════════════════════════════════════════════
   container.appendChild(SectionTitle('🏦', 'Trésorerie'));
-  
-  // --- Hero Trésorerie ---
-  var hero = el('div', { class: 'hero interactive' + (data.soldeAbsolu < 0 ? ' negative' : ''), onclick: showCashDetail });
-  var heroMain = el('div', { class: 'hero-main' });
-  heroMain.appendChild(el('div', { class: 'hero-label' }, 'Cash Disponible'));
-  heroMain.appendChild(el('div', { class: 'hero-value ' + (data.cashDispoAbsolu >= 0 ? 'positive' : 'negative') }, EUR(data.cashDispoAbsolu)));
-  heroMain.appendChild(el('div', { class: 'hero-sub' }, 'Solde ' + EUR(data.soldeAbsolu) + ' − Provisions ' + EUR(data.provisionsAbsolues)));
-  hero.appendChild(heroMain);
-  
-  var heroStats = el('div', { class: 'hero-stats' });
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [el('div', { class: 'hero-stat-value' }, EUR(data.soldeAbsolu)), el('div', { class: 'hero-stat-label' }, 'Solde compte')]));
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [el('div', { class: 'hero-stat-value text-provision' }, EUR(data.provisionsAbsolues)), el('div', { class: 'hero-stat-label' }, 'Provisions')]));
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [el('div', { class: 'hero-stat-value', style: { color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'), el('div', { class: 'hero-stat-label' }, 'Autonomie')]));
-  hero.appendChild(heroStats);
-  container.appendChild(hero);
+
+  // V51: Hero amélioré avec paramètres éditables et salaire versable
+  renderDashboardHero(container, data);
   
   // --- KPIs Trésorerie (Rémunération + Rendement) ---
   var tresoKpis = el('div', { class: 'kpi-grid', style: { marginBottom: '12px', marginTop: '12px' } });
