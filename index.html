@@ -3230,6 +3230,7 @@ function computeIndicators(data, months) {
   var reserveMin = TREASURY.reserveCompte || 150;
   data.salaireVersable = Math.max(0, Math.floor((data.cashDispoAbsolu - reserveMin) / 100) * 100);
   data.reserveCompte = reserveMin;
+}
 
 /**
  * Génère les alertes basées sur l'état des données
