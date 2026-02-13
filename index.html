@@ -7672,7 +7672,7 @@ function renderAnalyseSubTab(container, data, months) {
   
   var kpiGrid = el('div', { class: 'kpi-grid', style: { marginBottom: '16px' } });
   kpiGrid.appendChild(KPI({ label: 'CA Réalisé', value: EUR(data.caReal), sub: 'Prévu: ' + EUR(data.caPrev), color: 'info', trend: getTrend(data.sparklineData.caReal) }));
-  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success', onclick: showFacturesAEncaisser }));
+  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success' }));
   kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger' }));
   kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent' }));
   container.appendChild(kpiGrid);
