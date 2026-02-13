@@ -1295,11 +1295,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité">👁️</button>
       <button class="privacy-toggle" id="authBtn" title="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px"></span>
       <nav class="nav-tabs">
-        <button class="nav-tab active" data-view="dashboard">📊</button>
-        
-        <button class="nav-tab" data-view="factures">📄</button>
-        <button class="nav-tab" data-view="tresorerie">🏦</button>
-        <button class="nav-tab" data-view="admin">⚙️</button>
+        <button class="nav-tab active" data-view="accueil">🏠</button>
+        <button class="nav-tab" data-view="performance">📊</button>
+        <button class="nav-tab" data-view="missions">💼</button>
+        <button class="nav-tab" data-view="finances">💰</button>
+        <button class="nav-tab" data-view="params">⚙️</button>
       </nav>
     </div>
   </header>
@@ -1307,11 +1307,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <main class="container" id="app"></main>
 
   <nav class="bottom-nav">
-    <button class="bottom-nav-tab active" data-view="dashboard"><div class="bottom-nav-icon">📊</div><div class="bottom-nav-label">Dashboard</div></button>
-    
-    <button class="bottom-nav-tab" data-view="factures"><div class="bottom-nav-icon">📄</div><div class="bottom-nav-label">Factures</div></button>
-    <button class="bottom-nav-tab" data-view="tresorerie"><div class="bottom-nav-icon">🏦</div><div class="bottom-nav-label">Trésorerie</div></button>
-    <button class="bottom-nav-tab" data-view="admin"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Admin</div></button>
+    <button class="bottom-nav-tab active" data-view="accueil"><div class="bottom-nav-icon">🏠</div><div class="bottom-nav-label">Accueil</div></button>
+    <button class="bottom-nav-tab" data-view="performance"><div class="bottom-nav-icon">📊</div><div class="bottom-nav-label">Perf</div></button>
+    <button class="bottom-nav-tab" data-view="missions"><div class="bottom-nav-icon">💼</div><div class="bottom-nav-label">Missions</div></button>
+    <button class="bottom-nav-tab" data-view="finances"><div class="bottom-nav-icon">💰</div><div class="bottom-nav-label">Finances</div></button>
+    <button class="bottom-nav-tab" data-view="params"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Params</div></button>
   </nav>
 
   <button class="fab" id="fab">+</button>
@@ -1363,9 +1363,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 50; // V50: Clean slate + fix initialisation dashboard
+var APP_VERSION = 52; // V52: Nouvelle navigation simplifiée (Accueil, Performance, Missions, Finances, Params)
 var TODAY = new Date();
-var VIEW = 'dashboard';
+var VIEW = 'accueil';
 var DASHBOARD_SUB = 'accueil'; // V51: sous-onglets dashboard (accueil, analyse, charges)
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -7672,7 +7672,7 @@ function renderAnalyseSubTab(container, data, months) {
   
   var kpiGrid = el('div', { class: 'kpi-grid', style: { marginBottom: '16px' } });
   kpiGrid.appendChild(KPI({ label: 'CA Réalisé', value: EUR(data.caReal), sub: 'Prévu: ' + EUR(data.caPrev), color: 'info', trend: getTrend(data.sparklineData.caReal) }));
-  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success', onclick: showFacturesAEncaisser }));
+  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success' }));
   kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger' }));
   kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent' }));
   container.appendChild(kpiGrid);
@@ -7727,14 +7727,337 @@ function renderAnalyseSubTab(container, data, months) {
   renderClientsWidget(container);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// V52 - NOUVELLE NAVIGATION SIMPLIFIÉE
+// Accueil | Performance | Missions | Finances | Params
+// ═══════════════════════════════════════════════════════════════════════════
+
+function renderAccueil(container) {
+  var data = compute();
+
+  // 1. MA TRÉSORERIE (Hero)
+  renderDashboardHero(container, data);
+
+  // 2. À FAIRE (Actions urgentes + Timeline jalons)
+  container.appendChild(SectionTitle('⚡', 'À Faire'));
+  renderActionsWidget(container);
+  renderLegalTimeline(container);
+
+  // 3. CA ANNUEL avec plafond micro-entrepreneur
+  renderCAPlafondWidget(container);
+
+  // 4. PROJECTION AUTONOMIE
+  renderProjectionAutonomie(container);
+
+  // Insights (conseils contextuels)
+  renderInsights(container);
+}
+
+function renderPerformance(container) {
+  var data = compute();
+  var months = getPeriodMonths();
+
+  // Header
+  var header = el('div', { class: 'page-header' });
+  header.appendChild(el('h2', { class: 'page-title' }, '📊 Performance'));
+  container.appendChild(header);
+
+  // Graphique principal
+  container.appendChild(SectionTitle('📈', 'Évolution CA & Charges'));
+  renderDashboardCharts(container, months);
+
+  // KPIs Performance
+  container.appendChild(SectionTitle('🎯', 'Indicateurs'));
+
+  var kpiGrid = el('div', { class: 'kpi-grid', style: { marginBottom: '16px' } });
+  kpiGrid.appendChild(KPI({ label: 'CA Réalisé', value: EUR(data.caReal), sub: 'Prévu: ' + EUR(data.caPrev), color: 'info', trend: getTrend(data.sparklineData.caReal) }));
+  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success' }));
+  kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger' }));
+  kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent' }));
+  container.appendChild(kpiGrid);
+
+  // Répartition CA HT
+  container.appendChild(SectionTitle('📊', 'Répartition CA HT'));
+
+  var caHT = data.caReal || 1;
+  var chargesTotal = data.totalCharges || 0;
+  var salaires = data.salaires || 0;
+  var benefice = Math.max(0, caHT - chargesTotal - salaires);
+
+  var pctCharges = Math.round((chargesTotal / caHT) * 100);
+  var pctSalaires = Math.round((salaires / caHT) * 100);
+  var pctBenefice = Math.max(0, 100 - pctCharges - pctSalaires);
+
+  var repartCard = el('div', { class: 'card' });
+
+  // Barre de répartition
+  var bar = el('div', { style: { display: 'flex', height: '24px', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' } });
+  bar.appendChild(el('div', { style: { width: pctCharges + '%', background: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: '600' } }, pctCharges > 10 ? pctCharges + '%' : ''));
+  bar.appendChild(el('div', { style: { width: pctSalaires + '%', background: 'var(--info)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: '600' } }, pctSalaires > 10 ? pctSalaires + '%' : ''));
+  bar.appendChild(el('div', { style: { width: pctBenefice + '%', background: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: '600' } }, pctBenefice > 10 ? pctBenefice + '%' : ''));
+  repartCard.appendChild(bar);
+
+  // Légende
+  var legend = el('div', { style: { display: 'flex', justifyContent: 'space-around', fontSize: '12px' } });
+  legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
+    el('div', { style: { width: '12px', height: '12px', background: 'var(--danger)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
+    el('span', {}, 'Charges ' + EUR(chargesTotal))
+  ]));
+  legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
+    el('div', { style: { width: '12px', height: '12px', background: 'var(--info)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
+    el('span', {}, 'Salaires ' + EUR(salaires))
+  ]));
+  legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
+    el('div', { style: { width: '12px', height: '12px', background: 'var(--success)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
+    el('span', {}, 'Bénéfice ' + EUR(benefice))
+  ]));
+  repartCard.appendChild(legend);
+  container.appendChild(repartCard);
+
+  // Comparaison N-1
+  var cmp = getCompareData();
+  if (cmp.prev.ca > 0) {
+    container.appendChild(SectionTitle('📅', 'Comparaison ' + (TODAY.getFullYear() - 1) + ' vs ' + TODAY.getFullYear()));
+    renderCompareWidget(container);
+  }
+
+  // CA par client
+  container.appendChild(SectionTitle('👥', 'CA par Client'));
+  renderClientsWidget(container);
+
+  // Détail des charges
+  container.appendChild(SectionTitle('📋', 'Détail des Charges'));
+  renderChargesSubTab(container, data);
+}
+
+function renderMissionsView(container) {
+  renderMissions(container);
+}
+
+var FINANCES_TAB = 'factures'; // sous-onglet finances: factures ou tresorerie
+
+function renderFinances(container) {
+  // Header avec sous-onglets
+  var header = el('div', { class: 'page-header', style: { marginBottom: '0' } });
+  header.appendChild(el('h2', { class: 'page-title' }, '💰 Finances'));
+  container.appendChild(header);
+
+  // Sous-onglets Factures / Trésorerie
+  var tabs = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px', padding: '4px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+
+  var tabFactures = el('button', {
+    style: { flex: '1', padding: '8px 12px', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'factures' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'factures' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { FINANCES_TAB = 'factures'; render(); }
+  }, '📄 Factures');
+
+  var tabTreso = el('button', {
+    style: { flex: '1', padding: '8px 12px', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'tresorerie' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'tresorerie' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { FINANCES_TAB = 'tresorerie'; render(); }
+  }, '🏦 Trésorerie');
+
+  tabs.appendChild(tabFactures);
+  tabs.appendChild(tabTreso);
+  container.appendChild(tabs);
+
+  // Contenu selon sous-onglet
+  if (FINANCES_TAB === 'tresorerie') {
+    renderTresorerieContent(container);
+  } else {
+    renderFacturesContent(container);
+  }
+}
+
+function renderFacturesContent(container) {
+  var data = compute();
+
+  // V51: Section Indicateurs (KPIs facturation)
+  var indicatorsDiv = el('div', { class: 'card', style: { marginBottom: '16px', padding: '16px' } });
+  indicatorsDiv.appendChild(el('div', { class: 'card-title', style: { marginBottom: '12px' } }, '📊 Indicateurs'));
+
+  var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' } });
+
+  // KPI: À créer
+  var kpiACreer = el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  kpiACreer.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '800', color: 'var(--text-muted)' } }, String(data.facturesStats.brouillon)));
+  kpiACreer.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'À créer'));
+  kpiGrid.appendChild(kpiACreer);
+
+  // KPI: Envoyées
+  var kpiEnvoyees = el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  kpiEnvoyees.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '800', color: 'var(--info)' } }, String(data.facturesStats.envoyees)));
+  kpiEnvoyees.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Envoyées'));
+  kpiGrid.appendChild(kpiEnvoyees);
+
+  // KPI: En retard
+  var kpiRetard = el('div', { style: { textAlign: 'center', padding: '12px', background: data.facturesStats.retard > 0 ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-tertiary)', borderRadius: '8px' } });
+  kpiRetard.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '800', color: data.facturesStats.retard > 0 ? 'var(--danger)' : 'var(--text-muted)' } }, String(data.facturesStats.retard)));
+  kpiRetard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'En retard'));
+  kpiGrid.appendChild(kpiRetard);
+
+  // KPI: Payées
+  var kpiPayees = el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  kpiPayees.appendChild(el('div', { style: { fontSize: '24px', fontWeight: '800', color: 'var(--success)' } }, String(data.facturesStats.payees)));
+  kpiPayees.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Payées'));
+  kpiGrid.appendChild(kpiPayees);
+
+  indicatorsDiv.appendChild(kpiGrid);
+  container.appendChild(indicatorsDiv);
+
+  // Chips de filtre par statut
+  var chips = el('div', { class: 'filter-chips', style: { marginBottom: '16px' } });
+  var totalFactures = data.facturesStats.brouillon + data.facturesStats.envoyees + data.facturesStats.payees;
+  var filters = [
+    { key: 'all', label: 'Toutes', count: totalFactures },
+    { key: 'brouillon', label: 'À créer', count: data.facturesStats.brouillon },
+    { key: 'envoyées', label: 'Envoyées', count: data.facturesStats.envoyees },
+    { key: 'retard', label: 'En retard', count: data.facturesStats.retard },
+    { key: 'payées', label: 'Payées', count: data.facturesStats.payees }
+  ];
+  filters.forEach(function(f) {
+    var chip = el('div', { class: 'filter-chip' + (FACTURE_FILTER === f.key ? ' active' : ''), onclick: function() { FACTURE_FILTER = f.key; render(); } });
+    chip.appendChild(document.createTextNode(f.label));
+    chip.appendChild(el('span', { class: 'count' }, String(f.count)));
+    chips.appendChild(chip);
+  });
+  container.appendChild(chips);
+
+  // Liste des factures
+  var factures = [];
+  MISSIONS.forEach(function(m) {
+    if (m.factures) m.factures.forEach(function(f) {
+      if (!isInPeriod(f.mois) || f.jours <= 0) return;
+      f.paymentMonth = getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
+      var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
+      f.paymentDate = paymentDate;
+      f.isLate = f.status === 'envoyée' && TODAY > paymentDate;
+      factures.push(f);
+    });
+  });
+
+  // Filtre par statut
+  if (FACTURE_FILTER !== 'all') {
+    factures = factures.filter(function(f) {
+      if (FACTURE_FILTER === 'retard') return f.isLate;
+      if (FACTURE_FILTER === 'envoyées') return f.status === 'envoyée';
+      if (FACTURE_FILTER === 'payées') return f.status === 'payée';
+      if (FACTURE_FILTER === 'brouillon') return f.status === 'brouillon';
+      return true;
+    });
+  }
+
+  factures.sort(function(a, b) { return b.mois.localeCompare(a.mois); });
+
+  if (factures.length === 0) {
+    var emptyDiv = el('div', { class: 'no-results' });
+    emptyDiv.appendChild(el('div', { class: 'no-results-icon' }, '📄'));
+    emptyDiv.appendChild(el('div', { class: 'no-results-title' }, 'Aucune facture'));
+    emptyDiv.appendChild(el('div', { class: 'no-results-hint' }, 'Les factures apparaîtront quand tu saisiras des jours'));
+    container.appendChild(emptyDiv);
+    return;
+  }
+
+  factures.forEach(function(f) {
+    var badgeClass, badgeText;
+    if (f.status === 'payée') { badgeClass = 'badge-success'; badgeText = '✅ Payée'; }
+    else if (f.isLate) { badgeClass = 'badge-late'; badgeText = '📤 Envoyée · ⚠️ RETARD'; }
+    else if (f.status === 'envoyée') { badgeClass = 'badge-warning'; badgeText = '📤 Envoyée'; }
+    else { badgeClass = 'badge-muted'; badgeText = '📝 Brouillon'; }
+
+    var card = el('div', { class: 'facture-card', onclick: function() { showFactureModal(f); } });
+    card.appendChild(el('div', { class: 'badge ' + badgeClass, style: { fontSize: '9px', whiteSpace: 'nowrap' } }, badgeText));
+    var infoDiv = el('div', { class: 'facture-info' });
+    infoDiv.appendChild(el('div', { class: 'facture-id' }, f.client + ' · ' + fmtMonthShort(f.mois)));
+    infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
+    card.appendChild(infoDiv);
+    card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
+    container.appendChild(card);
+  });
+}
+
+function renderTresorerieContent(container) {
+  var data = compute();
+
+  // SOLDE COMPTE en premier (ABSOLU)
+  var soldeCard = el('div', { class: 'hero', style: { cursor: 'pointer' }, onclick: showCashDetail });
+  var soldeMain = el('div', { class: 'hero-main' });
+  soldeMain.appendChild(el('div', { class: 'hero-label' }, 'Solde Compte Pro'));
+  soldeMain.appendChild(el('div', { class: 'hero-value ' + (data.soldeAbsolu >= 0 ? 'positive' : 'negative') }, EUR(data.soldeAbsolu)));
+  soldeCard.appendChild(soldeMain);
+  container.appendChild(soldeCard);
+
+  // Actions rapides
+  var actions = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } });
+  actions.appendChild(el('button', { class: 'btn btn-sm', style: { flex: 1 }, onclick: showChargeModal }, '📋 Charge'));
+  actions.appendChild(el('button', { class: 'btn btn-sm btn-success', style: { flex: 1 }, onclick: function() { showSalaireModal(data.salaireReco); } }, '💸 Salaire'));
+  container.appendChild(actions);
+
+  // 4 blocs en grille
+  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' } });
+
+  // Solde Initial (éditable)
+  var soldeInitBlock = el('div', { class: 'treso-item', onclick: function() { showEditSoldeInitial(); } });
+  soldeInitBlock.appendChild(el('div', { class: 'treso-item-value' }, EUR(TREASURY.soldeInitial)));
+  soldeInitBlock.appendChild(el('div', { class: 'treso-item-label' }, '🏦 Solde Initial'));
+  soldeInitBlock.appendChild(el('div', { class: 'treso-item-count' }, '✏️ Modifier'));
+  grid.appendChild(soldeInitBlock);
+
+  // Encaissé
+  var encBlock = el('div', { class: 'treso-item', onclick: function() { showDetailList('Factures Encaissées', data.detailEncaisse, 'success', function(i) { return i.client + ' · ' + fmtMonthShort(i.mois); }); } });
+  encBlock.appendChild(el('div', { class: 'treso-item-value text-success' }, EUR(data.caEnc)));
+  encBlock.appendChild(el('div', { class: 'treso-item-label' }, '💵 Encaissé TTC'));
+  encBlock.appendChild(el('div', { class: 'treso-item-count' }, data.detailEncaisse.length + ' factures'));
+  grid.appendChild(encBlock);
+
+  // Charges Payées
+  var chargesBlock = el('div', { class: 'treso-item', onclick: function() { showDetailList('Charges Payées', data.detailChargesPayees, 'danger', function(i) { return i.cat + (i.source ? ' · ' + i.source : ''); }); } });
+  chargesBlock.appendChild(el('div', { class: 'treso-item-value text-danger' }, EUR(data.chargesPayees)));
+  chargesBlock.appendChild(el('div', { class: 'treso-item-label' }, '📋 Charges Payées'));
+  chargesBlock.appendChild(el('div', { class: 'treso-item-count' }, data.detailChargesPayees.length + ' lignes'));
+  grid.appendChild(chargesBlock);
+
+  // Salaires versés
+  var salairesBlock = el('div', { class: 'treso-item', onclick: function() { showDetailList('Salaires Versés', data.detailSalaires, 'info', function(i) { return fmtMonthShort(i.mois); }); } });
+  salairesBlock.appendChild(el('div', { class: 'treso-item-value text-info' }, EUR(data.salaires)));
+  salairesBlock.appendChild(el('div', { class: 'treso-item-label' }, '💸 Salaires'));
+  salairesBlock.appendChild(el('div', { class: 'treso-item-count' }, data.detailSalaires.length + ' versements'));
+  grid.appendChild(salairesBlock);
+
+  container.appendChild(grid);
+
+  // Indicateurs disponibilité
+  container.appendChild(SectionTitle('📊', 'Disponibilité'));
+
+  var dispoGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' } });
+
+  // Tréso Dispo
+  var dispoBlock = el('div', { class: 'treso-item' });
+  dispoBlock.appendChild(el('div', { class: 'treso-item-value ' + (data.tresoDispo >= 0 ? 'text-success' : 'text-danger') }, EUR(data.tresoDispo)));
+  dispoBlock.appendChild(el('div', { class: 'treso-item-label' }, '💚 Tréso Dispo'));
+  dispoBlock.appendChild(el('div', { class: 'treso-item-count' }, 'Après provisions'));
+  dispoGrid.appendChild(dispoBlock);
+
+  // Autonomie
+  var autoBlock = el('div', { class: 'treso-item' });
+  autoBlock.appendChild(el('div', { class: 'treso-item-value', style: { color: data.autonomieMois >= 6 ? 'var(--success)' : data.autonomieMois >= 3 ? 'var(--warning)' : 'var(--danger)' } }, data.autonomieMois + ' mois'));
+  autoBlock.appendChild(el('div', { class: 'treso-item-label' }, '⏱️ Autonomie'));
+  autoBlock.appendChild(el('div', { class: 'treso-item-count' }, 'Sans nouveau CA'));
+  dispoGrid.appendChild(autoBlock);
+
+  container.appendChild(dispoGrid);
+}
+
+function renderParams(container) {
+  renderAdmin(container);
+}
+
 function renderDashboard(container) {
   var data = compute();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var months = getPeriodMonths();
-  
+
   // V51: Sous-onglets dashboard
   renderDashboardSubTabs(container);
-  
+
   // Afficher le contenu selon le sous-onglet actif
   if (DASHBOARD_SUB === 'charges') {
     renderChargesSubTab(container, data);
@@ -7745,14 +8068,14 @@ function renderDashboard(container) {
     return;
   }
   // Sinon: Accueil (défaut)
-  
+
   // ═══════════════════════════════════════════════════════════════════════════
   // V49 - NOUVEL ORDRE ERGONOMIQUE
   // 1. URGENCES (ce qui nécessite une action immédiate)
   // 2. PERFORMANCE (combien je gagne)
   // 3. TRÉSORERIE (combien j'ai)
   // ═══════════════════════════════════════════════════════════════════════════
-  
+
   // ═══════════════════════════════════════════════════════════════════════════
   // V51 - DASHBOARD ACCUEIL SIMPLIFIÉ
   // 1. TRÉSORERIE (Hero)
@@ -9013,11 +9336,11 @@ function render() {
   container.innerHTML = '';
 
   try {
-    if (VIEW === 'dashboard') renderDashboard(container);
-    else if (VIEW === 'missions') renderMissions(container);
-    else if (VIEW === 'factures') renderFactures(container);
-    else if (VIEW === 'tresorerie') renderTresorerie(container);
-    else if (VIEW === 'admin') renderAdmin(container);
+    if (VIEW === 'accueil') renderAccueil(container);
+    else if (VIEW === 'performance') renderPerformance(container);
+    else if (VIEW === 'missions') renderMissionsView(container);
+    else if (VIEW === 'finances') renderFinances(container);
+    else if (VIEW === 'params') renderParams(container);
   } catch (e) {
     console.error('Render error:', e);
     container.innerHTML = '<div style="padding:20px;color:red;">Erreur: ' + e.message + '</div>';
