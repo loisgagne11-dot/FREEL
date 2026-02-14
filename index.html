@@ -2872,19 +2872,29 @@ function showToast(message, type) {
 // V51: Dynamic modal
 function showModal(title, content) {
   closeAllModals();
-  var overlay = el('div', { 
-    class: 'modal active', 
+  // V55: Supprimer tout dynamicModal existant pour éviter les duplications
+  var existingModal = $('#dynamicModal');
+  if (existingModal) existingModal.remove();
+
+  var overlay = el('div', {
+    class: 'modal active',
     id: 'dynamicModal',
-    onclick: function(e) { if (e.target === overlay) closeModal('dynamicModal'); }
+    onclick: function(e) { if (e.target === overlay) closeDynamicModal(); }
   });
   var modal = el('div', { class: 'modal-content', style: { maxWidth: '400px' } });
   var header = el('div', { class: 'modal-header' });
   header.appendChild(el('h3', { class: 'modal-title' }, title));
-  header.appendChild(el('button', { class: 'modal-close', onclick: function() { closeModal('dynamicModal'); } }, '✕'));
+  header.appendChild(el('button', { class: 'modal-close', onclick: function() { closeDynamicModal(); } }, '✕'));
   modal.appendChild(header);
   modal.appendChild(el('div', { class: 'modal-body' }, [content]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+}
+
+// V55: Fonction dédiée pour fermer et supprimer le modal dynamique
+function closeDynamicModal() {
+  var modal = $('#dynamicModal');
+  if (modal) modal.remove();
 }
 
 
@@ -6844,6 +6854,132 @@ function renderClientsWidget(container) {
   container.appendChild(widget);
 }
 
+// V55: Widget clients avec camembert et barres horizontales pour meilleure visualisation
+function renderClientsWidgetVisual(container, data) {
+  var clients = getClientsStats();
+  if (clients.length === 0) {
+    container.appendChild(el('div', { class: 'card', style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Aucun client'));
+    return;
+  }
+
+  var totalCA = clients.reduce(function(sum, c) { return sum + c.ca; }, 0) || 1;
+  var maxCA = clients[0].ca || 1;
+
+  // Couleurs pour le camembert
+  var colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+  var widget = el('div', { class: 'card' });
+
+  // V55: Layout horizontal avec camembert à gauche et liste à droite
+  var content = el('div', { style: { display: 'flex', gap: '16px', alignItems: 'flex-start' } });
+
+  // Camembert SVG
+  var pieSize = 120;
+  var pieContainer = el('div', { style: { flexShrink: '0' } });
+  var pieDiv = el('div', { style: { position: 'relative', width: pieSize + 'px', height: pieSize + 'px' } });
+
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', pieSize);
+  svg.setAttribute('height', pieSize);
+  svg.setAttribute('viewBox', '0 0 100 100');
+
+  // Dessiner les segments du camembert
+  var cumAngle = -90; // Commencer à 12h
+  clients.slice(0, 6).forEach(function(client, i) {
+    var pct = (client.ca / totalCA) * 100;
+    var angle = (pct / 100) * 360;
+
+    if (pct > 0) {
+      var startAngle = cumAngle * (Math.PI / 180);
+      var endAngle = (cumAngle + angle) * (Math.PI / 180);
+
+      var x1 = 50 + 40 * Math.cos(startAngle);
+      var y1 = 50 + 40 * Math.sin(startAngle);
+      var x2 = 50 + 40 * Math.cos(endAngle);
+      var y2 = 50 + 40 * Math.sin(endAngle);
+
+      var largeArc = angle > 180 ? 1 : 0;
+
+      var path = document.createElementNS(svgNS, 'path');
+      if (clients.length === 1 || pct >= 99.5) {
+        // Cercle complet si un seul client ou 100%
+        path.setAttribute('d', 'M 50 10 A 40 40 0 1 1 49.99 10 Z');
+      } else {
+        path.setAttribute('d', 'M 50 50 L ' + x1 + ' ' + y1 + ' A 40 40 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 + ' Z');
+      }
+      path.setAttribute('fill', colors[i % colors.length]);
+      svg.appendChild(path);
+
+      cumAngle += angle;
+    }
+  });
+
+  // Centre blanc pour effet donut
+  var centerCircle = document.createElementNS(svgNS, 'circle');
+  centerCircle.setAttribute('cx', '50');
+  centerCircle.setAttribute('cy', '50');
+  centerCircle.setAttribute('r', '25');
+  centerCircle.setAttribute('fill', 'var(--bg-secondary)');
+  svg.appendChild(centerCircle);
+
+  pieDiv.appendChild(svg);
+
+  // Total au centre
+  var centerLabel = el('div', { style: {
+    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+    textAlign: 'center', lineHeight: '1.2'
+  }});
+  centerLabel.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Total'));
+  centerLabel.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700' } }, EUR(totalCA, true)));
+  pieDiv.appendChild(centerLabel);
+
+  pieContainer.appendChild(pieDiv);
+  content.appendChild(pieContainer);
+
+  // Liste des clients avec barres horizontales
+  var listContainer = el('div', { style: { flex: '1', minWidth: '0' } });
+
+  clients.slice(0, 6).forEach(function(client, i) {
+    var pct = Math.round((client.ca / totalCA) * 100);
+    var barWidth = (client.ca / maxCA) * 100;
+
+    var row = el('div', { style: { marginBottom: '8px' } });
+
+    // Header: nom + CA + %
+    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', marginBottom: '2px' } });
+    header.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      el('div', { style: { width: '8px', height: '8px', borderRadius: '2px', background: colors[i % colors.length] } }),
+      el('span', { style: { fontWeight: '600' } }, client.name)
+    ]));
+    header.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, EUR(client.ca) + ' (' + pct + '%)'));
+    row.appendChild(header);
+
+    // Barre de progression
+    var barBg = el('div', { style: { height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' } });
+    var barFill = el('div', { style: { height: '100%', width: barWidth + '%', background: colors[i % colors.length], borderRadius: '3px' } });
+    barBg.appendChild(barFill);
+    row.appendChild(barBg);
+
+    // Sous-info
+    row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, client.jours + ' jours · TJM ' + EUR(client.tjm)));
+
+    listContainer.appendChild(row);
+  });
+
+  // Si plus de 6 clients, afficher "et X autres"
+  if (clients.length > 6) {
+    var othersCA = clients.slice(6).reduce(function(sum, c) { return sum + c.ca; }, 0);
+    var othersPct = Math.round((othersCA / totalCA) * 100);
+    listContainer.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' } },
+      '+ ' + (clients.length - 6) + ' autres (' + EUR(othersCA) + ', ' + othersPct + '%)'));
+  }
+
+  content.appendChild(listContainer);
+  widget.appendChild(content);
+  container.appendChild(widget);
+}
+
 function renderCongesCalendar(container) {
   var data = compute();
   var months = getPeriodMonths();
@@ -7546,7 +7682,7 @@ function showTresoSettings() {
     TREASURY.salaireEstime = parseFloat($('#tresoSalaireEstime').value) || 2200;
     TREASURY.reserveCompte = parseFloat($('#tresoReserve').value) || 150;
     saveAll();
-    closeModal('dynamicModal');
+    closeDynamicModal();
     render();
     showToast('✅ Paramètres enregistrés', 'success');
   }}, '💾 Enregistrer'));
@@ -8030,7 +8166,7 @@ function showActionDetail(a) {
   content.appendChild(el('button', {
     class: 'btn ' + (a.btnClass || 'btn-primary'),
     style: { width: '100%', marginTop: '12px' },
-    onclick: function() { closeModal('dynamicModal'); a.action(); }
+    onclick: function() { closeDynamicModal(); a.action(); }
   }, a.btnLabel));
 
   showModal(a.icon + ' Action', content);
@@ -8044,24 +8180,32 @@ function renderDashboardCharts(container, months) {
   var chartActions = el('div', { class: 'card-actions' });
   chartActions.appendChild(el('button', { class: 'btn btn-sm', onclick: showCongesOverview }, '📅 Congés'));
   var toggle = el('div', { class: 'chart-toggle' });
-  toggle.appendChild(el('button', { class: 'chart-toggle-btn' + (!SHOW_CUMUL ? ' active' : ''), onclick: function() { SHOW_CUMUL = false; drawMainChart(); render(); } }, 'Mensuel'));
-  toggle.appendChild(el('button', { class: 'chart-toggle-btn' + (SHOW_CUMUL ? ' active' : ''), onclick: function() { SHOW_CUMUL = true; drawMainChart(); render(); } }, 'Cumulé'));
+  toggle.appendChild(el('button', { class: 'chart-toggle-btn' + (!SHOW_CUMUL ? ' active' : ''), onclick: function() { SHOW_CUMUL = false; render(); } }, 'Mensuel'));
+  toggle.appendChild(el('button', { class: 'chart-toggle-btn' + (SHOW_CUMUL ? ' active' : ''), onclick: function() { SHOW_CUMUL = true; render(); } }, 'Cumulé'));
   chartActions.appendChild(toggle);
   chartTitle.appendChild(chartActions);
   chartCard.appendChild(chartTitle);
-  chartCard.appendChild(el('div', { class: 'chart-container' }, [el('canvas', { id: 'mainChart' })]));
+  // V55: Créer canvas avec style pour garantir les dimensions
+  var chartContainer = el('div', { class: 'chart-container' });
+  var mainCanvas = el('canvas', { id: 'mainChart', style: { width: '100%', height: '100%' } });
+  chartContainer.appendChild(mainCanvas);
+  chartCard.appendChild(chartContainer);
   container.appendChild(chartCard);
-  
+
   // Graph Tréso
   var soldeCard = el('div', { class: 'card' });
   var soldeTitle = el('div', { class: 'card-title' });
   soldeTitle.appendChild(el('span', {}, '📈 Trésorerie & Salaires'));
   var soldeToggle = el('div', { class: 'card-actions chart-toggle' });
-  soldeToggle.appendChild(el('button', { class: 'chart-toggle-btn' + (!SHOW_CASH_DISPO ? ' active' : ''), onclick: function() { SHOW_CASH_DISPO = false; drawSoldeChart(); render(); } }, 'Solde'));
-  soldeToggle.appendChild(el('button', { class: 'chart-toggle-btn' + (SHOW_CASH_DISPO ? ' active' : ''), onclick: function() { SHOW_CASH_DISPO = true; drawSoldeChart(); render(); } }, 'Cash'));
+  soldeToggle.appendChild(el('button', { class: 'chart-toggle-btn' + (!SHOW_CASH_DISPO ? ' active' : ''), onclick: function() { SHOW_CASH_DISPO = false; render(); } }, 'Solde'));
+  soldeToggle.appendChild(el('button', { class: 'chart-toggle-btn' + (SHOW_CASH_DISPO ? ' active' : ''), onclick: function() { SHOW_CASH_DISPO = true; render(); } }, 'Cash'));
   soldeTitle.appendChild(soldeToggle);
   soldeCard.appendChild(soldeTitle);
-  soldeCard.appendChild(el('div', { class: 'chart-container' }, [el('canvas', { id: 'soldeChart' })]));
+  // V55: Créer canvas avec style pour garantir les dimensions
+  var soldeContainer = el('div', { class: 'chart-container' });
+  var soldeCanvas = el('canvas', { id: 'soldeChart', style: { width: '100%', height: '100%' } });
+  soldeContainer.appendChild(soldeCanvas);
+  soldeCard.appendChild(soldeContainer);
   container.appendChild(soldeCard);
 }
 
@@ -8097,98 +8241,96 @@ function renderDashboardSubTabs(container) {
 }
 
 
-// V54: Sous-onglet Impôts & Charges avec graphique par importance
+// V55: Sous-onglet Impôts & Charges avec graphique par importance - CORRECTION VALEURS
 function renderChargesSubTab(container, data) {
   container.appendChild(SectionTitle('💳', 'Impôts & Charges'));
 
   var caHT = data.caReal || 1;
 
-  // V54: Graphique barres horizontales par importance (% du CA HT)
-  var chargeTypes = [];
+  // V55: Utiliser UNIQUEMENT allProvisionsDetail pour éviter le double comptage
+  // Catégories à afficher (toutes, même à 0)
   var categories = [
     { id: 'URSSAF', label: 'URSSAF', icon: '🏥', color: '#ef4444' },
     { id: 'TVA', label: 'TVA', icon: '🏛️', color: '#3b82f6' },
     { id: 'IR', label: 'Impôt Revenu', icon: '💰', color: '#f59e0b' },
     { id: 'CFP', label: 'CFP', icon: '📚', color: '#8b5cf6' },
     { id: 'CFE', label: 'CFE', icon: '🏢', color: '#6b7280' },
-    { id: 'Impôt PL', label: 'Impôt PL', icon: '📋', color: '#f97316' }
+    { id: 'Impôt PL', label: 'Impôt PL', icon: '📋', color: '#f97316' },
+    { id: 'Autres', label: 'Autres dépenses', icon: '📦', color: '#94a3b8' }
   ];
 
+  // V55: Calculer les totaux à partir de allProvisionsDetail (source unique de vérité)
+  var chargeTypes = [];
   categories.forEach(function(cat) {
-    var total = (data.provByType[cat.id] || 0) + (data.provAbsoluesByType && data.provAbsoluesByType[cat.id] ? data.provAbsoluesByType[cat.id] : 0);
-    if (total > 0 || (data.detailChargesAPayer && data.detailChargesAPayer.some(function(c) { return c.cat === cat.id; }))) {
-      var charges = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === cat.id; }) : [];
-      var montant = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
-      if (montant > 0 || total > 0) {
-        chargeTypes.push({ id: cat.id, label: cat.label, icon: cat.icon, color: cat.color, montant: Math.max(montant, total), pctCA: (Math.max(montant, total) / caHT) * 100 });
+    var charges = (data.allProvisionsDetail || []).filter(function(c) {
+      if (cat.id === 'IR') {
+        return c.cat === 'IR Estimé' || c.cat === 'IR';
       }
-    }
+      if (cat.id === 'Autres') {
+        // Autres = tout ce qui n'est pas dans les catégories standard
+        var standard = ['URSSAF', 'TVA', 'IR Estimé', 'IR', 'CFP', 'CFE', 'Impôt PL', 'Impôt'];
+        return !standard.some(function(s) { return c.cat === s || c.cat.indexOf(s) === 0; });
+      }
+      return c.cat === cat.id || c.cat.indexOf(cat.id) === 0;
+    });
+    var montant = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
+    var pctCA = caHT > 0 ? (montant / caHT) * 100 : 0;
+    var unpaidCount = charges.length;
+
+    // V55: Afficher TOUTES les catégories, même à 0
+    chargeTypes.push({
+      id: cat.id,
+      label: cat.label,
+      icon: cat.icon,
+      color: cat.color,
+      montant: montant,
+      pctCA: pctCA,
+      unpaidCount: unpaidCount,
+      isPaid: unpaidCount === 0 && montant === 0
+    });
   });
 
-  // Trier par importance (montant décroissant)
-  chargeTypes.sort(function(a, b) { return b.montant - a.montant; });
+  // Trier par importance (montant décroissant), mais garder les 0 à la fin
+  chargeTypes.sort(function(a, b) {
+    if (a.montant === 0 && b.montant > 0) return 1;
+    if (b.montant === 0 && a.montant > 0) return -1;
+    return b.montant - a.montant;
+  });
 
-  if (chargeTypes.length > 0) {
-    var chartCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
-    chartCard.appendChild(el('div', { class: 'card-title' }, '📊 Répartition des Charges (% du CA HT)'));
+  // V55: Afficher toutes les jauges avec le statut
+  var chartCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+  chartCard.appendChild(el('div', { class: 'card-title' }, '📊 Répartition des Charges (% du CA HT)'));
 
-    var maxMontant = chargeTypes[0].montant;
-    chargeTypes.forEach(function(ct) {
-      var barWidth = maxMontant > 0 ? (ct.montant / maxMontant) * 100 : 0;
+  var maxMontant = Math.max.apply(null, chargeTypes.map(function(ct) { return ct.montant; })) || 1;
 
-      var row = el('div', {
-        style: { marginBottom: '8px', cursor: 'pointer' },
-        onclick: function() { showChargeDetailEnhanced(ct.id, data, caHT); }
-      });
+  chargeTypes.forEach(function(ct) {
+    var barWidth = maxMontant > 0 ? (ct.montant / maxMontant) * 100 : 0;
+    var status = ct.montant === 0 ? '✅' : (ct.unpaidCount > 0 ? '🔴' : '✅');
 
-      // Label + valeur
-      var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' } });
-      header.appendChild(el('span', {}, ct.icon + ' ' + ct.label));
-      header.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(ct.montant) + ' (' + ct.pctCA.toFixed(1) + '%)'));
-      row.appendChild(header);
-
-      // Barre
-      var barBg = el('div', { style: { height: '20px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' } });
-      var barFill = el('div', { style: { height: '100%', width: barWidth + '%', background: ct.color, borderRadius: '4px', transition: 'width 0.3s' } });
-      barBg.appendChild(barFill);
-      row.appendChild(barBg);
-
-      chartCard.appendChild(row);
+    var row = el('div', {
+      style: { marginBottom: '10px', cursor: ct.montant > 0 ? 'pointer' : 'default', opacity: ct.montant === 0 ? '0.6' : '1' },
+      onclick: ct.montant > 0 ? function() { showChargeDetailEnhanced(ct.id, data, caHT); } : null
     });
 
-    container.appendChild(chartCard);
-  }
-
-  // Cartes résumé par catégorie (version compacte)
-  var cardsGrid = el('div', { style: {
-    display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '12px'
-  }});
-
-  [
-    { id: 'URSSAF', label: 'URSSAF', icon: '🏥', color: '#ef4444' },
-    { id: 'TVA', label: 'TVA', icon: '🏛️', color: '#3b82f6' },
-    { id: 'IR', label: 'Impôt', icon: '💰', color: '#f59e0b' },
-    { id: 'CFE', label: 'CFE', icon: '🏢', color: '#6b7280' }
-  ].forEach(function(cat) {
-    var charges = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === cat.id || c.cat.indexOf(cat.id) === 0; }) : [];
-    var total = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
-    var unpaid = charges.filter(function(c) { return !c.paid; });
-    var status = unpaid.length > 0 ? '🔴' : '✅';
-
-    var card = el('div', {
-      class: 'card',
-      style: { borderLeft: '3px solid ' + cat.color, cursor: 'pointer', padding: '10px' },
-      onclick: function() { showChargeDetailEnhanced(cat.id, data, caHT); }
-    });
-    card.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
-      el('span', { style: { fontSize: '14px' } }, cat.icon + ' ' + cat.label),
+    // Label + valeur + statut
+    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '4px' } });
+    header.appendChild(el('span', {}, ct.icon + ' ' + ct.label));
+    header.appendChild(el('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+      el('span', { style: { fontWeight: '600' } }, EUR(ct.montant) + (ct.montant > 0 ? ' (' + ct.pctCA.toFixed(1) + '%)' : '')),
       el('span', { style: { fontSize: '10px' } }, status)
     ]));
-    card.appendChild(el('div', { style: { fontWeight: '700', fontSize: '16px', marginTop: '4px' } }, EUR(total)));
-    cardsGrid.appendChild(card);
+    row.appendChild(header);
+
+    // Barre
+    var barBg = el('div', { style: { height: '20px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' } });
+    var barFill = el('div', { style: { height: '100%', width: barWidth + '%', background: ct.color, borderRadius: '4px', transition: 'width 0.3s', minWidth: ct.montant > 0 ? '2px' : '0' } });
+    barBg.appendChild(barFill);
+    row.appendChild(barBg);
+
+    chartCard.appendChild(row);
   });
 
-  container.appendChild(cardsGrid);
+  container.appendChild(chartCard);
 
   // Total
   var totalAPayer = data.provisionsAbsolues || 0;
@@ -8211,10 +8353,21 @@ function renderChargesSubTab(container, data) {
   container.appendChild(totalsDiv);
 }
 
-// V54: Détail charges amélioré avec historique % CA HT
+// V55: Détail charges amélioré avec historique % CA HT - CORRIGÉ
 function showChargeDetailEnhanced(categoryId, data, caHT) {
-  var charges = data.allProvisionsDetail ? data.allProvisionsDetail.filter(function(c) { return c.cat === categoryId || c.cat.indexOf(categoryId) === 0; }) : [];
-  var chargesAPayer = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === categoryId || c.cat.indexOf(categoryId) === 0; }) : [];
+  // V55: Filtrer allProvisionsDetail pour la catégorie
+  var filterFn = function(c) {
+    if (categoryId === 'IR') {
+      return c.cat === 'IR Estimé' || c.cat === 'IR';
+    }
+    if (categoryId === 'Autres') {
+      var standard = ['URSSAF', 'TVA', 'IR Estimé', 'IR', 'CFP', 'CFE', 'Impôt PL', 'Impôt'];
+      return !standard.some(function(s) { return c.cat === s || c.cat.indexOf(s) === 0; });
+    }
+    return c.cat === categoryId || c.cat.indexOf(categoryId) === 0;
+  };
+
+  var charges = (data.allProvisionsDetail || []).filter(filterFn);
 
   // Déterminer le taux URSSAF en fonction des données présentes
   var urssafRateText = (function() {
@@ -8232,14 +8385,16 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
     'TVA': { label: 'TVA - Taxe sur la Valeur Ajoutée', rate: '20% du CA HT', desc: 'Collectée sur factures, reversée à l\'État' },
     'IR': { label: 'Impôt sur le Revenu', rate: 'Barème progressif ou 2.2% (PL)', desc: 'Impôt sur les bénéfices' },
     'CFP': { label: 'Contribution Formation Pro', rate: '0.2% du CA HT', desc: 'Formation professionnelle' },
-    'CFE': { label: 'Cotisation Foncière des Entreprises', rate: 'Variable selon commune', desc: 'Impôt local' }
+    'CFE': { label: 'Cotisation Foncière des Entreprises', rate: 'Variable selon commune', desc: 'Impôt local' },
+    'Impôt PL': { label: 'Prélèvement Libératoire', rate: '2.2% du CA HT', desc: 'Impôt forfaitaire sur le revenu' },
+    'Autres': { label: 'Autres dépenses', rate: 'Variable', desc: 'Dépenses professionnelles diverses' }
   };
   var info = catInfo[categoryId] || { label: categoryId, rate: '-', desc: '' };
 
   var content = el('div', { style: { padding: '10px' } });
 
-  // Total et % CA
-  var total = chargesAPayer.reduce(function(sum, c) { return sum + c.montant; }, 0);
+  // V55: Utiliser allProvisionsDetail pour le total (source unique de vérité)
+  var total = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
   var pctCA = caHT > 0 ? (total / caHT * 100).toFixed(1) : 0;
 
   content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '12px' } }, [
@@ -8254,14 +8409,14 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
   if (info.desc) infoBox.appendChild(el('div', { style: { color: 'var(--text-muted)', marginTop: '4px' } }, info.desc));
   content.appendChild(infoBox);
 
-  // Historique par mois avec % CA
-  if (chargesAPayer.length > 0) {
+  // V55: Historique par mois avec % CA - utiliser 'charges' au lieu de chargesAPayer
+  if (charges.length > 0) {
     content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '📅 Détail par mois'));
     var list = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
 
     // Grouper par mois
     var byMonth = {};
-    chargesAPayer.forEach(function(c) {
+    charges.forEach(function(c) {
       if (!byMonth[c.mois]) byMonth[c.mois] = [];
       byMonth[c.mois].push(c);
     });
@@ -8287,7 +8442,7 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
           onclick: function(e) {
             e.stopPropagation();
             unpaid.forEach(function(c) { markAllPaid([c.id]); });
-            closeModal('dynamicModal');
+            closeDynamicModal();
             render();
           }
         }, '✓'));
@@ -8344,7 +8499,7 @@ function showChargeDetail(categoryId, data) {
       row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(c.montant)));
       row.appendChild(el('span', {}, status));
       if (!c.paid) {
-        row.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { markAllPaid([c.id]); closeModal('dynamicModal'); render(); } }, 'Payer'));
+        row.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { markAllPaid([c.id]); closeDynamicModal(); render(); } }, 'Payer'));
       }
       table.appendChild(row);
     });
@@ -8355,7 +8510,7 @@ function showChargeDetail(categoryId, data) {
   
   // Si c'est IR, ajouter bouton simulateur
   if (categoryId === 'IR') {
-    content.appendChild(el('button', { class: 'btn btn-primary', style: { width: '100%', marginTop: '16px' }, onclick: function() { closeModal('dynamicModal'); showIRModal(); } }, '🧮 Ouvrir Simulateur IR'));
+    content.appendChild(el('button', { class: 'btn btn-primary', style: { width: '100%', marginTop: '16px' }, onclick: function() { closeDynamicModal(); showIRModal(); } }, '🧮 Ouvrir Simulateur IR'));
   }
   
   showModal(info.label, content);
@@ -8506,20 +8661,21 @@ function renderPerformance(container) {
   repartCard.appendChild(legend);
   container.appendChild(repartCard);
 
-  // Comparaison N-1
+  // V55: Réorganisation du layout selon demande utilisateur
+  // 1. Répartition CA/Bénéf (déjà fait ci-dessus)
+  // 2. Impôts & Charges (détail)
+  renderChargesSubTab(container, data);
+
+  // 3. Comparaison N-1
   var cmp = getCompareData();
   if (cmp.prev.ca > 0) {
     container.appendChild(SectionTitle('📅', 'Comparaison ' + (TODAY.getFullYear() - 1) + ' vs ' + TODAY.getFullYear()));
     renderCompareWidget(container);
   }
 
-  // CA par client
-  container.appendChild(SectionTitle('👥', 'CA par Client'));
-  renderClientsWidget(container);
-
-  // Détail des charges
-  container.appendChild(SectionTitle('📋', 'Détail des Charges'));
-  renderChargesSubTab(container, data);
+  // 4. CA par client (en dernier, avec visualisation améliorée)
+  container.appendChild(SectionTitle('👥', 'Répartition par Client'));
+  renderClientsWidgetVisual(container, data);
 }
 
 function renderMissionsView(container) {
@@ -10115,12 +10271,19 @@ function render() {
   if (periodYear) periodYear.textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
   updateNotifBadge();
 
-  // V54: Dessiner les graphiques après le render si onglet Performance
+  // V55: Dessiner les graphiques après le render si onglet Performance
+  // Utiliser requestAnimationFrame pour un timing plus fiable
   if (VIEW === 'performance') {
-    setTimeout(function() {
-      if ($('#mainChart')) drawMainChart();
-      if ($('#soldeChart')) drawSoldeChart();
-    }, 50);
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        try {
+          if ($('#mainChart')) drawMainChart();
+          if ($('#soldeChart')) drawSoldeChart();
+        } catch (e) {
+          console.error('Chart render error:', e);
+        }
+      });
+    });
   }
 }
 
@@ -10305,10 +10468,17 @@ function init() {
   // V50: Fix - Pré-calculer COMPUTED avant le premier rendu
   COMPUTED = compute();
 
-  // V50: Fix - Double requestAnimationFrame pour s'assurer que le DOM est complètement prêt
+  // V55: Rendu immédiat pour éviter l'écran noir, puis requestAnimationFrame pour les graphiques
+  render();
+
+  // Appel différé pour s'assurer que les graphiques sont correctement initialisés
   requestAnimationFrame(function() {
     requestAnimationFrame(function() {
-      render();
+      // V55: Re-render pour corriger d'éventuels problèmes de timing
+      if (VIEW === 'performance') {
+        if ($('#mainChart')) drawMainChart();
+        if ($('#soldeChart')) drawSoldeChart();
+      }
 
       if (!COMPANY.onboardingDone && MISSIONS.length === 0) {
         showOnboarding();
