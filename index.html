@@ -2320,7 +2320,7 @@ function daysBiz(year, month) {
 
 // ACRE: calcul automatique de la date d'expiration
 function getAcreInfo() {
-  if (!COMPANY.debut || !COMPANY.acre) return { active: false, expiryDate: null, expiryYm: null };
+  if (!COMPANY.debut || !COMPANY.acre) return { active: false, expiryDate: null, expiryYm: null, startYm: null };
   var start = new Date(COMPANY.debut);
   var startYear = start.getFullYear();
   var startQ = Math.floor(start.getMonth() / 3); // 0=Q1, 1=Q2, 2=Q3, 3=Q4
@@ -2337,16 +2337,17 @@ function getAcreInfo() {
 
   var daysLeft = Math.ceil((expiryDate - TODAY) / (1000 * 60 * 60 * 24));
   var expiryYm = ym(expiryDate.getFullYear(), expiryDate.getMonth());
-  return { active: daysLeft > 0, expiryDate: localISO(expiryDate), expiryYm: expiryYm, daysLeft: daysLeft };
+  var startYm = ym(startYear, start.getMonth()); // Premier mois de l'ACRE
+  return { active: daysLeft > 0, expiryDate: localISO(expiryDate), expiryYm: expiryYm, startYm: startYm, daysLeft: daysLeft };
 }
 
 // Taux URSSAF dynamique selon mois et ACRE
 function getUrssafRate(monthYm) {
   var year = monthYm ? parseInt(monthYm.substring(0, 4)) : TODAY.getFullYear();
   var acre = getAcreInfo();
-  
-  // Si ACRE actif ET le mois est avant expiration
-  if (COMPANY.acre && acre.active && monthYm && monthYm <= acre.expiryYm) {
+
+  // Si ACRE configuré ET le mois est dans la période ACRE (entre startYm et expiryYm)
+  if (COMPANY.acre && acre.expiryYm && monthYm && monthYm >= acre.startYm && monthYm <= acre.expiryYm) {
     return year >= 2026 ? LEGAL.urssafAcre2026 : LEGAL.urssafAcre2025;
   }
   return year >= 2026 ? LEGAL.urssafStd2026 : LEGAL.urssafStd2025;
@@ -8215,8 +8216,19 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
   var charges = data.allProvisionsDetail ? data.allProvisionsDetail.filter(function(c) { return c.cat === categoryId || c.cat.indexOf(categoryId) === 0; }) : [];
   var chargesAPayer = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === categoryId || c.cat.indexOf(categoryId) === 0; }) : [];
 
+  // Déterminer le taux URSSAF en fonction des données présentes
+  var urssafRateText = (function() {
+    var acre = getAcreInfo();
+    if (COMPANY.acre && acre.expiryYm) {
+      // ACRE actif ou passé - afficher les deux taux
+      var stdRate = PCT(LEGAL.urssafStd2025);
+      var acreRate = PCT(LEGAL.urssafAcre2025);
+      return acreRate + ' (ACRE) / ' + stdRate + ' (std) du CA HT';
+    }
+    return PCT(getUrssafRate()) + ' du CA HT';
+  })();
   var catInfo = {
-    'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: PCT(getUrssafRate(ym(TODAY.getFullYear(), TODAY.getMonth()))) + ' du CA HT', desc: 'Maladie, retraite, allocations familiales' },
+    'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: urssafRateText, desc: 'Maladie, retraite, allocations familiales' },
     'TVA': { label: 'TVA - Taxe sur la Valeur Ajoutée', rate: '20% du CA HT', desc: 'Collectée sur factures, reversée à l\'État' },
     'IR': { label: 'Impôt sur le Revenu', rate: 'Barème progressif ou 2.2% (PL)', desc: 'Impôt sur les bénéfices' },
     'CFP': { label: 'Contribution Formation Pro', rate: '0.2% du CA HT', desc: 'Formation professionnelle' },
@@ -8258,7 +8270,8 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
       var monthCharges = byMonth[mois];
       var monthTotal = monthCharges.reduce(function(s, c) { return s + c.montant; }, 0);
       var monthData = data.monthsData[mois];
-      var monthCA = monthData ? monthData.real : 0;
+      // Utiliser encHT (CA HT encaissé) pour le calcul du pourcentage, cohérent avec le calcul URSSAF
+      var monthCA = monthData ? (monthData.encHT || monthData.real) : 0;
       var monthPct = monthCA > 0 ? (monthTotal / monthCA * 100).toFixed(1) : '-';
 
       var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '4px', fontSize: '11px' } });
@@ -8294,8 +8307,18 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
 
 function showChargeDetail(categoryId, data) {
   var charges = data.allProvisionsDetail ? data.allProvisionsDetail.filter(function(c) { return c.cat === categoryId; }) : [];
+  // Déterminer le taux URSSAF en fonction des données présentes
+  var urssafRateText = (function() {
+    var acre = getAcreInfo();
+    if (COMPANY.acre && acre.expiryYm) {
+      var stdRate = PCT(LEGAL.urssafStd2025);
+      var acreRate = PCT(LEGAL.urssafAcre2025);
+      return acreRate + ' (ACRE) / ' + stdRate + ' (std) du CA HT';
+    }
+    return PCT(getUrssafRate()) + ' du CA HT';
+  })();
   var catInfo = {
-    'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: PCT(getUrssafRate(ym(TODAY.getFullYear(), TODAY.getMonth()))) + ' du CA HT', penalty: '5% + 0.2%/mois après 30j' },
+    'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: urssafRateText, penalty: '5% + 0.2%/mois après 30j' },
     'TVA': { label: 'TVA - Taxe sur la Valeur Ajoutée', rate: '20% du CA HT', penalty: '10% + intérêts de retard' },
     'IR': { label: 'Impôt sur le Revenu', rate: 'Barème progressif', penalty: '10% majoration' },
     'CFE': { label: 'Cotisation Foncière des Entreprises', rate: 'Variable selon commune', penalty: '10% après mise en demeure' }
