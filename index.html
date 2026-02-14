@@ -4472,6 +4472,144 @@ function showTJMDetail() {
   openModal('formModal');
 }
 
+// V54: Détail CA Réalisé
+function showCARealisedDetail(data) {
+  if (!data) data = compute();
+  var content = el('div', { style: { padding: '10px' } });
+
+  // KPI principal
+  content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px', padding: '20px', background: 'var(--bg-tertiary)', borderRadius: '12px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, 'CA Réalisé HT'),
+    el('div', { style: { fontSize: '32px', fontWeight: '800', color: 'var(--info)' } }, EUR(data.caReal)),
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Prévu: ' + EUR(data.caPrev) + ' · Écart: ' + (data.caReal >= data.caPrev ? '+' : '') + EUR(data.caReal - data.caPrev))
+  ]));
+
+  // Détail par client
+  var clients = getClientsStats();
+  if (clients.length > 0) {
+    content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '👥 CA par Client'));
+    var list = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+    clients.forEach(function(c) {
+      var pct = data.caReal > 0 ? Math.round((c.ca / data.caReal) * 100) : 0;
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '4px', fontSize: '12px' } });
+      row.appendChild(el('span', {}, c.name + ' (' + c.jours + 'j)'));
+      row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(c.ca) + ' (' + pct + '%)'));
+      list.appendChild(row);
+    });
+    content.appendChild(list);
+  }
+
+  // Détail par mois
+  content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', margin: '16px 0 8px', textTransform: 'uppercase' } }, '📅 CA par Mois'));
+  var months = getPeriodMonths();
+  var monthsList = el('div', { style: { maxHeight: '150px', overflowY: 'auto' } });
+  months.forEach(function(m) {
+    var md = data.monthsData[m];
+    if (md && md.real > 0) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: '4px', marginBottom: '2px', fontSize: '11px' } });
+      row.appendChild(el('span', {}, fmtMonthShort(m)));
+      row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(md.real)));
+      monthsList.appendChild(row);
+    }
+  });
+  content.appendChild(monthsList);
+
+  showModal('📊 Détail CA Réalisé', content);
+}
+
+// V54: Détail Encaissé
+function showEncaisseDetail(data) {
+  if (!data) data = compute();
+  var content = el('div', { style: { padding: '10px' } });
+
+  // KPIs
+  var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' } });
+  kpis.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Encaissé HT'),
+    el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--success)' } }, EUR(data.caEnc))
+  ]));
+  kpis.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'À Encaisser'),
+    el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--warning)' } }, EUR(data.caAEnc))
+  ]));
+  content.appendChild(kpis);
+
+  // Factures encaissées
+  if (data.detailEncaisse.length > 0) {
+    content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '✅ Factures Encaissées'));
+    var list = el('div', { style: { maxHeight: '150px', overflowY: 'auto' } });
+    data.detailEncaisse.forEach(function(f) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: '4px', marginBottom: '2px', fontSize: '11px' } });
+      row.appendChild(el('span', {}, f.client + ' · ' + fmtMonthShort(f.mois)));
+      row.appendChild(el('span', { style: { fontWeight: '600', color: 'var(--success)' } }, EUR(f.ht) + ' HT'));
+      list.appendChild(row);
+    });
+    content.appendChild(list);
+  }
+
+  // Factures à encaisser
+  if (data.facturesAEncaisser.length > 0) {
+    content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', margin: '16px 0 8px', textTransform: 'uppercase' } }, '⏳ Factures à Encaisser'));
+    var list2 = el('div', { style: { maxHeight: '150px', overflowY: 'auto' } });
+    data.facturesAEncaisser.forEach(function(f) {
+      var bgColor = f.isLate ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-tertiary)';
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: bgColor, borderRadius: '4px', marginBottom: '2px', fontSize: '11px' } });
+      row.appendChild(el('span', {}, f.client + ' · ' + fmtMonthShort(f.mois) + (f.isLate ? ' ⚠️' : '')));
+      row.appendChild(el('span', { style: { fontWeight: '600', color: f.isLate ? 'var(--danger)' : 'var(--warning)' } }, EUR(f.ht) + ' HT'));
+      list2.appendChild(row);
+    });
+    content.appendChild(list2);
+  }
+
+  showModal('💵 Détail Encaissements', content);
+}
+
+// V54: Détail Bénéfice Net
+function showBeneficeDetail(data) {
+  if (!data) data = compute();
+  var content = el('div', { style: { padding: '10px' } });
+
+  var caHT = data.caReal || 0;
+  var charges = data.chargesPayees + data.chargesAPayer;
+  var salaires = data.salaires || 0;
+  var benefice = caHT - charges - salaires;
+
+  // KPI principal
+  var benColor = benefice >= 0 ? 'var(--success)' : 'var(--danger)';
+  content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px', padding: '20px', background: 'var(--bg-tertiary)', borderRadius: '12px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, 'Bénéfice Net'),
+    el('div', { style: { fontSize: '32px', fontWeight: '800', color: benColor } }, EUR(benefice)),
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Marge: ' + PCT(caHT > 0 ? benefice / caHT : 0))
+  ]));
+
+  // Décomposition
+  content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '📐 Décomposition'));
+  var calc = el('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '12px' } });
+  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'CA Réalisé HT'), el('span', { style: { fontWeight: '600', color: 'var(--success)' } }, '+ ' + EUR(caHT))]));
+  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'Charges sociales & fiscales'), el('span', { style: { fontWeight: '600', color: 'var(--danger)' } }, '- ' + EUR(charges))]));
+  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'Salaires versés'), el('span', { style: { fontWeight: '600', color: 'var(--info)' } }, '- ' + EUR(salaires))]));
+  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: '13px', borderTop: '1px solid var(--border)', marginTop: '8px' } }, [el('span', { style: { fontWeight: '600' } }, 'Bénéfice Net'), el('span', { style: { fontWeight: '700', color: benColor } }, EUR(benefice))]));
+  content.appendChild(calc);
+
+  // Répartition charges
+  content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', margin: '16px 0 8px', textTransform: 'uppercase' } }, '💳 Répartition des Charges'));
+  var chargesTypes = Object.keys(data.provByType || {});
+  if (chargesTypes.length > 0) {
+    var chargesList = el('div', { style: { maxHeight: '120px', overflowY: 'auto' } });
+    chargesTypes.sort(function(a, b) { return data.provByType[b] - data.provByType[a]; }).forEach(function(type) {
+      var montant = data.provByType[type];
+      var pct = caHT > 0 ? Math.round((montant / caHT) * 100) : 0;
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: '4px', marginBottom: '2px', fontSize: '11px' } });
+      row.appendChild(el('span', {}, type));
+      row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(montant) + ' (' + pct + '% CA)'));
+      chargesList.appendChild(row);
+    });
+    content.appendChild(chargesList);
+  }
+
+  showModal('📊 Détail Bénéfice Net', content);
+}
+
 // Détail Taux de facturation
 function showTauxFacturationDetail(data) {
   if (!data) data = compute();
@@ -7258,48 +7396,122 @@ function renderDashboardAlerts(container, data) {
 }
 
 /**
- * Affiche la carte Hero avec cash disponible
+ * Affiche la carte Hero avec cash disponible et camembert répartition
  */
 function renderDashboardHero(container, data) {
-  // V51: Hero section améliorée avec paramètres éditables
+  // V53: Hero section avec camembert répartition
   var hero = el('div', { class: 'hero' + (data.soldeAbsolu < 0 ? ' negative' : '') });
-  
+
   // Ligne principale: Cash + Settings
   var heroHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } });
-  
+
   var heroMain = el('div', { class: 'hero-main', onclick: showCashDetail, style: { cursor: 'pointer', flex: 1 } });
   heroMain.appendChild(el('div', { class: 'hero-label' }, '💰 Cash Disponible'));
   heroMain.appendChild(el('div', { class: 'hero-value ' + (data.cashDispoAbsolu >= 0 ? 'positive' : 'negative') }, EUR(data.cashDispoAbsolu)));
   heroHeader.appendChild(heroMain);
-  
+
   // Bouton paramètres
-  heroHeader.appendChild(el('button', { 
-    class: 'btn btn-sm', 
+  heroHeader.appendChild(el('button', {
+    class: 'btn btn-sm',
     style: { background: 'var(--bg-tertiary)', border: 'none' },
     onclick: function(e) { e.stopPropagation(); showTresoSettings(); },
     title: 'Paramètres trésorerie'
   }, '⚙️'));
-  
+
   hero.appendChild(heroHeader);
-  
-  // Stats: Solde | Provisions | Autonomie
-  var heroStats = el('div', { class: 'hero-stats' });
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [
-    el('div', { class: 'hero-stat-value' }, EUR(data.soldeAbsolu)), 
-    el('div', { class: 'hero-stat-label' }, 'Solde compte')
+
+  // V53: Camembert répartition du compte pro
+  var solde = Math.max(0, data.soldeAbsolu);
+  var pctCash = solde > 0 ? (data.cashDispoAbsolu / solde * 100) : 0;
+  var pctProv = solde > 0 ? (data.provisionsAbsolues / solde * 100) : 0;
+
+  // Correction si cash négatif
+  if (data.cashDispoAbsolu < 0) {
+    pctCash = 0;
+    pctProv = 100;
+  }
+
+  var pieContainer = el('div', { style: {
+    display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px',
+    padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '12px'
+  }});
+
+  // Pie chart SVG
+  var pieSize = 70;
+  var pieDiv = el('div', { style: { position: 'relative', width: pieSize + 'px', height: pieSize + 'px' } });
+  var angle1 = (pctCash / 100) * 360;
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', pieSize);
+  svg.setAttribute('height', pieSize);
+  svg.setAttribute('viewBox', '0 0 100 100');
+
+  // Background circle (provisions)
+  var bgCircle = document.createElementNS(svgNS, 'circle');
+  bgCircle.setAttribute('cx', '50');
+  bgCircle.setAttribute('cy', '50');
+  bgCircle.setAttribute('r', '40');
+  bgCircle.setAttribute('fill', 'none');
+  bgCircle.setAttribute('stroke', '#a855f7');
+  bgCircle.setAttribute('stroke-width', '20');
+  svg.appendChild(bgCircle);
+
+  // Cash disponible arc
+  if (pctCash > 0) {
+    var cashCircle = document.createElementNS(svgNS, 'circle');
+    cashCircle.setAttribute('cx', '50');
+    cashCircle.setAttribute('cy', '50');
+    cashCircle.setAttribute('r', '40');
+    cashCircle.setAttribute('fill', 'none');
+    cashCircle.setAttribute('stroke', '#22c55e');
+    cashCircle.setAttribute('stroke-width', '20');
+    cashCircle.setAttribute('stroke-dasharray', (pctCash * 2.51) + ' 251');
+    cashCircle.setAttribute('transform', 'rotate(-90 50 50)');
+    svg.appendChild(cashCircle);
+  }
+
+  pieDiv.appendChild(svg);
+
+  // Solde au centre
+  var centerLabel = el('div', { style: {
+    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+    fontSize: '10px', fontWeight: '700', textAlign: 'center', lineHeight: '1.2'
+  }});
+  centerLabel.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '800' } }, EUR(data.soldeAbsolu, true)));
+  centerLabel.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)' } }, 'Solde'));
+  pieDiv.appendChild(centerLabel);
+  pieContainer.appendChild(pieDiv);
+
+  // Légende
+  var legend = el('div', { style: { flex: 1, fontSize: '12px' } });
+  legend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } }, [
+    el('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: '#22c55e' } }),
+    el('span', {}, 'Cash: ' + EUR(data.cashDispoAbsolu) + ' (' + Math.round(pctCash) + '%)')
   ]));
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [
-    el('div', { class: 'hero-stat-value text-provision' }, EUR(data.provisionsAbsolues)), 
-    el('div', { class: 'hero-stat-label' }, 'Provisions')
+  legend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+    el('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: '#a855f7' } }),
+    el('span', {}, 'Provisions: ' + EUR(data.provisionsAbsolues) + ' (' + Math.round(pctProv) + '%)')
   ]));
-  heroStats.appendChild(el('div', { class: 'hero-stat', title: EUR(data.salaireEstime) + ' salaire + ' + EUR(data.avgCharges) + ' charges/mois' }, [
-    el('div', { class: 'hero-stat-value', style: { color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'), 
-    el('div', { class: 'hero-stat-label' }, 'Autonomie')
+  pieContainer.appendChild(legend);
+
+  hero.appendChild(pieContainer);
+
+  // Stats: Autonomie cliquable pour projection
+  var heroStats = el('div', { class: 'hero-stats', style: { marginTop: '12px' } });
+  heroStats.appendChild(el('div', {
+    class: 'hero-stat',
+    style: { cursor: 'pointer', padding: '8px', borderRadius: '8px', background: 'var(--bg-tertiary)' },
+    onclick: function(e) { e.stopPropagation(); showProjectionAutonomieModal(); },
+    title: 'Cliquer pour voir la projection d\'autonomie'
+  }, [
+    el('div', { class: 'hero-stat-value', style: { color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'),
+    el('div', { class: 'hero-stat-label' }, '⏱️ Autonomie'),
+    el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' } }, 'Cliquer pour projection')
   ]));
   hero.appendChild(heroStats);
-  
+
   // V51: Salaire versable + action
-  var salaireDiv = el('div', { style: { 
+  var salaireDiv = el('div', { style: {
     marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center'
   }});
@@ -7309,13 +7521,13 @@ function renderDashboardHero(container, data) {
     el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '(Cash - ' + EUR(data.reserveCompte) + ' réserve)')
   ]));
   if (data.salaireVersable >= 500) {
-    salaireDiv.appendChild(el('button', { 
-      class: 'btn btn-success', 
+    salaireDiv.appendChild(el('button', {
+      class: 'btn btn-success',
       onclick: function(e) { e.stopPropagation(); showSalaireModal(data.salaireVersable); }
     }, 'Verser'));
   }
   hero.appendChild(salaireDiv);
-  
+
   container.appendChild(hero);
 }
 
@@ -7503,6 +7715,326 @@ function renderProjectionAutonomie(container) {
   container.appendChild(widget);
 }
 
+// V54: Modal Projection Autonomie simplifiée basée sur la situation réelle
+function showProjectionAutonomieModal() {
+  var data = compute();
+  var content = el('div', { style: { padding: '10px' } });
+
+  // Données actuelles
+  var salaireEstime = data.salaireEstime || TREASURY.salaireEstime || 2200;
+  var cashDispo = data.cashDispoAbsolu || 0;
+
+  // Section: Ma situation actuelle
+  var heroSection = el('div', { style: { textAlign: 'center', marginBottom: '20px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '12px' } });
+  heroSection.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, 'Cash Disponible'));
+  heroSection.appendChild(el('div', { style: { fontSize: '28px', fontWeight: '800', color: cashDispo >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(cashDispo)));
+  heroSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Solde compte: ' + EUR(data.soldeAbsolu) + ' · Provisions: ' + EUR(data.provisionsAbsolues)));
+  content.appendChild(heroSection);
+
+  // Explication simple
+  content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', padding: '12px', background: 'rgba(96, 165, 250, 0.1)', borderRadius: '8px' } },
+    '💡 Si je n\'ai plus aucun revenu, combien de temps puis-je tenir en me versant un salaire mensuel ?'));
+
+  // Input salaire mensuel
+  var inputRow = el('div', { style: { marginBottom: '16px' } });
+  inputRow.appendChild(el('label', { style: { display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '600' } }, '💸 Salaire mensuel que je veux me verser'));
+  var salaireInput = el('input', {
+    type: 'number',
+    id: 'projSalaireMensuel',
+    value: salaireEstime,
+    style: { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '18px', fontWeight: '600' },
+    oninput: function() { updateProjectionCalcSimple(cashDispo); }
+  });
+  inputRow.appendChild(salaireInput);
+  content.appendChild(inputRow);
+
+  // Résultat (calculé en temps réel)
+  var resultDiv = el('div', { id: 'projAutonomieResult' });
+  content.appendChild(resultDiv);
+
+  // Section explication
+  var explainSection = el('div', { style: { padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)', marginTop: '16px' } });
+  explainSection.innerHTML = '<strong>📐 Calcul:</strong> Cash Disponible ÷ Salaire mensuel = Autonomie en mois<br><br>' +
+    '<em>Note: Sans nouveau revenu, vous n\'aurez pas de nouvelles charges sociales à payer.</em>';
+  content.appendChild(explainSection);
+
+  showModal('📅 Projection Annuelle', content);
+
+  // Calcul initial
+  setTimeout(function() { updateProjectionCalcSimple(cashDispo); }, 50);
+}
+
+// V54: Calcul simplifié de projection
+function updateProjectionCalcSimple(cashDispo) {
+  var salaireInput = $('#projSalaireMensuel');
+  var salaire = parseFloat(salaireInput ? salaireInput.value : 0) || 0;
+  var autonomie = salaire > 0 ? Math.floor(cashDispo / salaire) : 0;
+  if (autonomie < 0) autonomie = 0;
+
+  var resultDiv = $('#projAutonomieResult');
+  if (!resultDiv) return;
+  resultDiv.innerHTML = '';
+
+  // Barre visuelle
+  var maxMonths = 12;
+  var pct = Math.min(100, (autonomie / maxMonths) * 100);
+  var barColor = autonomie > 6 ? 'var(--success)' : autonomie > 3 ? 'var(--warning)' : 'var(--danger)';
+
+  // Résultat principal
+  var resultBox = el('div', { style: {
+    textAlign: 'center', padding: '20px', borderRadius: '12px', marginBottom: '12px',
+    background: autonomie > 6 ? 'rgba(34, 197, 94, 0.1)' : autonomie > 3 ? 'rgba(251, 191, 36, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+  }});
+  resultBox.appendChild(el('div', { style: { fontSize: '40px', fontWeight: '800', color: barColor } }, autonomie + ' mois'));
+  resultBox.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' } }, 'd\'autonomie avec ' + EUR(salaire) + '/mois'));
+  resultDiv.appendChild(resultBox);
+
+  // Barre de progression
+  var barContainer = el('div', { style: { marginBottom: '12px' } });
+  var labels = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px' } });
+  labels.appendChild(el('span', {}, '0'));
+  labels.appendChild(el('span', {}, '3m'));
+  labels.appendChild(el('span', {}, '6m'));
+  labels.appendChild(el('span', {}, '12m+'));
+  barContainer.appendChild(labels);
+
+  var bar = el('div', { style: { height: '20px', background: 'var(--bg-tertiary)', borderRadius: '10px', overflow: 'hidden', position: 'relative' } });
+  bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: barColor, borderRadius: '10px', transition: 'width 0.3s' } }));
+  barContainer.appendChild(bar);
+  resultDiv.appendChild(barContainer);
+
+  // Conseil
+  var conseil = el('div', { style: { padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '12px', textAlign: 'center' } });
+  if (autonomie > 12) {
+    conseil.innerHTML = '✅ <strong>Excellent!</strong> Plus d\'un an d\'autonomie.';
+  } else if (autonomie > 6) {
+    conseil.innerHTML = '✅ <strong>Confortable</strong> - Bonne marge de sécurité.';
+  } else if (autonomie > 3) {
+    conseil.innerHTML = '⚠️ <strong>Attention</strong> - Pensez à sécuriser de nouveaux revenus.';
+  } else if (autonomie > 0) {
+    conseil.innerHTML = '🔴 <strong>Urgent</strong> - Réduisez votre salaire ou trouvez des missions.';
+  } else {
+    conseil.innerHTML = '❌ <strong>Insuffisant</strong> - Pas de salaire possible sans nouveau revenu.';
+  }
+  resultDiv.appendChild(conseil);
+
+  // Section: Explication
+  var explainSection = el('div', { style: { padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' } });
+  explainSection.innerHTML = '<strong>💡 Comment c\'est calculé ?</strong><br>' +
+    'Autonomie = Cash Disponible ÷ (Salaire mensuel + Charges récurrentes)<br><br>' +
+    'Cette projection suppose que vous n\'avez aucun nouveau revenu pendant cette période.';
+  content.appendChild(explainSection);
+
+  showModal('⏱️ Projection Autonomie', content);
+
+  // Calcul initial
+  setTimeout(function() { updateProjectionCalc(cashDispo, chargesRecurrentes); }, 100);
+}
+
+function updateProjectionCalc(cashDispo, chargesRecurrentes) {
+  var salaireInput = $('#projSalaireMensuel');
+  var salaire = parseFloat(salaireInput ? salaireInput.value : 0) || 0;
+  var depensesMensuelles = salaire + chargesRecurrentes;
+  var autonomie = depensesMensuelles > 0 ? Math.floor(cashDispo / depensesMensuelles) : 0;
+  if (autonomie < 0) autonomie = 0;
+
+  var resultDiv = $('#projAutonomieResult');
+  if (!resultDiv) return;
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '';
+
+  // Barre visuelle
+  var maxMonths = 12;
+  var pct = Math.min(100, (autonomie / maxMonths) * 100);
+  var barColor = autonomie > 6 ? 'var(--success)' : autonomie > 3 ? 'var(--warning)' : 'var(--danger)';
+
+  var barContainer = el('div', { style: { marginBottom: '16px' } });
+  var bar = el('div', { style: { height: '24px', background: 'var(--bg-tertiary)', borderRadius: '12px', overflow: 'hidden', position: 'relative' } });
+  bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: barColor, borderRadius: '12px', transition: 'width 0.3s' } }));
+
+  // Marqueurs
+  var markers = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } });
+  markers.appendChild(el('span', {}, '0'));
+  markers.appendChild(el('span', {}, '3m'));
+  markers.appendChild(el('span', {}, '6m'));
+  markers.appendChild(el('span', {}, '12m'));
+  barContainer.appendChild(bar);
+  barContainer.appendChild(markers);
+  resultDiv.appendChild(barContainer);
+
+  // Résultat principal
+  var resultBox = el('div', { style: {
+    textAlign: 'center', padding: '16px', borderRadius: '12px',
+    background: autonomie > 6 ? 'rgba(34, 197, 94, 0.1)' : autonomie > 3 ? 'rgba(251, 191, 36, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+  }});
+  resultBox.appendChild(el('div', { style: { fontSize: '32px', fontWeight: '800', color: barColor } }, autonomie + ' mois'));
+  resultBox.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, 'd\'autonomie avec ' + EUR(salaire) + '/mois de salaire'));
+  resultDiv.appendChild(resultBox);
+
+  // Détail calcul
+  var detail = el('div', { style: { marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)' } });
+  detail.innerHTML = '<strong>Détail:</strong> ' + EUR(cashDispo) + ' ÷ (' + EUR(salaire) + ' + ' + EUR(chargesRecurrentes) + ') = ' + autonomie + ' mois';
+  resultDiv.appendChild(detail);
+
+  // Conseil
+  var conseil = el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px' } });
+  if (autonomie > 6) {
+    conseil.innerHTML = '✅ <strong>Confortable</strong> - Vous avez une bonne marge de sécurité.';
+  } else if (autonomie > 3) {
+    conseil.innerHTML = '⚠️ <strong>Attention</strong> - Pensez à sécuriser de nouveaux revenus prochainement.';
+  } else {
+    conseil.innerHTML = '🔴 <strong>Urgent</strong> - Réduisez votre salaire ou trouvez rapidement des missions.';
+  }
+  resultDiv.appendChild(conseil);
+}
+
+// V53: Fusionner Actions + Jalons dans une même forme
+function renderActionsAndMilestones(container) {
+  var actions = getActionsList();
+  var milestones = getLegalMilestones();
+
+  if (actions.length === 0 && milestones.length === 0) return;
+
+  var widget = el('div', { class: 'card', style: { marginBottom: '16px' } });
+  widget.appendChild(el('div', { class: 'card-title' }, '⚡ À Faire'));
+
+  // Section Jalons (en haut)
+  if (milestones.length > 0) {
+    var milestonesSection = el('div', { style: { marginBottom: '16px' } });
+    milestonesSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, '📅 Prochains Jalons'));
+
+    var milestonesGrid = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    milestones.slice(0, 4).forEach(function(m) {
+      var cls = m.daysLeft <= 7 ? 'urgent' : m.daysLeft <= 30 ? 'warning' : 'ok';
+      var bgColor = cls === 'urgent' ? 'rgba(239, 68, 68, 0.1)' : cls === 'warning' ? 'rgba(251, 191, 36, 0.1)' : 'var(--bg-tertiary)';
+      var textColor = cls === 'urgent' ? 'var(--danger)' : cls === 'warning' ? 'var(--warning)' : 'var(--text-secondary)';
+
+      var milestone = el('div', {
+        style: { flex: '1', minWidth: '120px', padding: '10px', background: bgColor, borderRadius: '8px', cursor: 'pointer', textAlign: 'center' },
+        onclick: function() { showMilestoneDetail(m); }
+      });
+      milestone.appendChild(el('div', { style: { fontSize: '16px', marginBottom: '4px' } }, m.icon));
+      milestone.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '2px' } }, m.label));
+      if (m.date) milestone.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, fmtShort(m.date)));
+      if (m.daysLeft !== null && m.daysLeft >= 0) {
+        milestone.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: textColor, marginTop: '4px' } }, m.daysLeft === 0 ? 'Aujourd\'hui' : 'J-' + m.daysLeft));
+      }
+      milestonesGrid.appendChild(milestone);
+    });
+    milestonesSection.appendChild(milestonesGrid);
+    widget.appendChild(milestonesSection);
+  }
+
+  // Section Actions (en bas)
+  if (actions.length > 0) {
+    var actionsSection = el('div');
+    actionsSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, '🎯 Actions Immédiates'));
+
+    var actionsList = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } });
+    actions.forEach(function(a) {
+      var bgColor = a.type === 'urgent' ? 'rgba(239, 68, 68, 0.1)' : a.type === 'warning' ? 'rgba(251, 191, 36, 0.1)' : 'var(--bg-tertiary)';
+      var item = el('div', {
+        style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: bgColor, borderRadius: '8px', cursor: 'pointer' },
+        onclick: function() { showActionDetail(a); }
+      });
+      item.appendChild(el('div', { style: { fontSize: '20px' } }, a.icon));
+      item.appendChild(el('div', { style: { flex: 1 } }, [
+        el('div', { style: { fontSize: '13px', fontWeight: '600' } }, a.label),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, a.sub)
+      ]));
+      item.appendChild(el('button', {
+        class: 'btn btn-sm ' + a.btnClass,
+        onclick: function(e) { e.stopPropagation(); a.action(); }
+      }, a.btnLabel));
+      actionsList.appendChild(item);
+    });
+    actionsSection.appendChild(actionsList);
+    widget.appendChild(actionsSection);
+  }
+
+  container.appendChild(widget);
+}
+
+// V53: Détail d'un jalon
+function showMilestoneDetail(m) {
+  var content = el('div', { style: { padding: '10px' } });
+
+  content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px' } }, [
+    el('div', { style: { fontSize: '40px', marginBottom: '8px' } }, m.icon),
+    el('div', { style: { fontSize: '18px', fontWeight: '700' } }, m.label)
+  ]));
+
+  if (m.date) {
+    content.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', marginBottom: '12px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Date d\'échéance'),
+      el('div', { style: { fontWeight: '700', fontSize: '16px' } }, fmtLong ? fmtLong(m.date) : fmtMonth(m.date)),
+      m.daysLeft !== null ? el('div', { style: { fontSize: '12px', color: m.daysLeft <= 7 ? 'var(--danger)' : m.daysLeft <= 30 ? 'var(--warning)' : 'var(--success)', fontWeight: '600', marginTop: '4px' } }, m.daysLeft === 0 ? 'Aujourd\'hui !' : 'Dans ' + m.daysLeft + ' jours') : null
+    ].filter(Boolean)));
+  }
+
+  if (m.description) {
+    content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' } }, m.description));
+  }
+
+  showModal(m.icon + ' ' + m.label, content);
+}
+
+// V53: Détail d'une action
+function showActionDetail(a) {
+  var data = compute();
+  var content = el('div', { style: { padding: '10px' } });
+
+  content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px' } }, [
+    el('div', { style: { fontSize: '40px', marginBottom: '8px' } }, a.icon),
+    el('div', { style: { fontSize: '18px', fontWeight: '700' } }, a.label)
+  ]));
+
+  content.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', marginBottom: '16px', textAlign: 'center' } }, [
+    el('div', { style: { fontWeight: '600', fontSize: '14px' } }, a.sub)
+  ]));
+
+  // Si c'est une action de type charge à payer, afficher les détails
+  if (a.type === 'warning' && a.label.indexOf('Payer') >= 0) {
+    var chargesAPayer = data.detailChargesAPayer || [];
+    if (chargesAPayer.length > 0) {
+      content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, 'Détail des charges à payer:'));
+      var list = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+      chargesAPayer.slice(0, 10).forEach(function(c) {
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '4px', fontSize: '12px' } });
+        row.appendChild(el('span', {}, c.cat + ' - ' + fmtMonthShort(c.mois)));
+        row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(c.montant)));
+        list.appendChild(row);
+      });
+      content.appendChild(list);
+    }
+  }
+
+  // Si c'est une facture en retard
+  if (a.type === 'urgent' && a.label.indexOf('Relancer') >= 0) {
+    var facturesRetard = data.facturesAEncaisser ? data.facturesAEncaisser.filter(function(f) { return f.isLate; }) : [];
+    if (facturesRetard.length > 0) {
+      content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, 'Factures en retard:'));
+      var list = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+      facturesRetard.forEach(function(f) {
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '6px', marginBottom: '4px', fontSize: '12px' } });
+        row.appendChild(el('span', {}, f.client + ' - ' + fmtMonthShort(f.mois)));
+        row.appendChild(el('span', { style: { fontWeight: '600', color: 'var(--danger)' } }, EUR(f.ttc)));
+        list.appendChild(row);
+      });
+      content.appendChild(list);
+    }
+  }
+
+  // Bouton action
+  content.appendChild(el('button', {
+    class: 'btn ' + (a.btnClass || 'btn-primary'),
+    style: { width: '100%', marginTop: '12px' },
+    onclick: function() { closeModal('dynamicModal'); a.action(); }
+  }, a.btnLabel));
+
+  showModal(a.icon + ' Action', content);
+}
+
 function renderDashboardCharts(container, months) {
   // Graph CA
   var chartCard = el('div', { class: 'card' });
@@ -7564,58 +8096,200 @@ function renderDashboardSubTabs(container) {
 }
 
 
-// V51: Sous-onglet Impôts & Charges
+// V54: Sous-onglet Impôts & Charges avec graphique par importance
 function renderChargesSubTab(container, data) {
   container.appendChild(SectionTitle('💳', 'Impôts & Charges'));
-  
-  // Cartes résumé par catégorie
-  var cardsGrid = el('div', { style: { 
-    display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' 
-  }});
-  
+
+  var caHT = data.caReal || 1;
+
+  // V54: Graphique barres horizontales par importance (% du CA HT)
+  var chargeTypes = [];
   var categories = [
-    { id: 'URSSAF', label: 'URSSAF', icon: '🏥', color: 'var(--danger)' },
-    { id: 'TVA', label: 'TVA', icon: '🏛️', color: 'var(--info)' },
-    { id: 'IR', label: 'Impôt Revenu', icon: '💰', color: 'var(--warning)' },
-    { id: 'CFE', label: 'CFE', icon: '🏢', color: 'var(--text-muted)' }
+    { id: 'URSSAF', label: 'URSSAF', icon: '🏥', color: '#ef4444' },
+    { id: 'TVA', label: 'TVA', icon: '🏛️', color: '#3b82f6' },
+    { id: 'IR', label: 'Impôt Revenu', icon: '💰', color: '#f59e0b' },
+    { id: 'CFP', label: 'CFP', icon: '📚', color: '#8b5cf6' },
+    { id: 'CFE', label: 'CFE', icon: '🏢', color: '#6b7280' },
+    { id: 'Impôt PL', label: 'Impôt PL', icon: '📋', color: '#f97316' }
   ];
-  
+
   categories.forEach(function(cat) {
-    var charges = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === cat.id; }) : [];
+    var total = (data.provByType[cat.id] || 0) + (data.provAbsoluesByType && data.provAbsoluesByType[cat.id] ? data.provAbsoluesByType[cat.id] : 0);
+    if (total > 0 || (data.detailChargesAPayer && data.detailChargesAPayer.some(function(c) { return c.cat === cat.id; }))) {
+      var charges = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === cat.id; }) : [];
+      var montant = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
+      if (montant > 0 || total > 0) {
+        chargeTypes.push({ id: cat.id, label: cat.label, icon: cat.icon, color: cat.color, montant: Math.max(montant, total), pctCA: (Math.max(montant, total) / caHT) * 100 });
+      }
+    }
+  });
+
+  // Trier par importance (montant décroissant)
+  chargeTypes.sort(function(a, b) { return b.montant - a.montant; });
+
+  if (chargeTypes.length > 0) {
+    var chartCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+    chartCard.appendChild(el('div', { class: 'card-title' }, '📊 Répartition des Charges (% du CA HT)'));
+
+    var maxMontant = chargeTypes[0].montant;
+    chargeTypes.forEach(function(ct) {
+      var barWidth = maxMontant > 0 ? (ct.montant / maxMontant) * 100 : 0;
+
+      var row = el('div', {
+        style: { marginBottom: '8px', cursor: 'pointer' },
+        onclick: function() { showChargeDetailEnhanced(ct.id, data, caHT); }
+      });
+
+      // Label + valeur
+      var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' } });
+      header.appendChild(el('span', {}, ct.icon + ' ' + ct.label));
+      header.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(ct.montant) + ' (' + ct.pctCA.toFixed(1) + '%)'));
+      row.appendChild(header);
+
+      // Barre
+      var barBg = el('div', { style: { height: '20px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' } });
+      var barFill = el('div', { style: { height: '100%', width: barWidth + '%', background: ct.color, borderRadius: '4px', transition: 'width 0.3s' } });
+      barBg.appendChild(barFill);
+      row.appendChild(barBg);
+
+      chartCard.appendChild(row);
+    });
+
+    container.appendChild(chartCard);
+  }
+
+  // Cartes résumé par catégorie (version compacte)
+  var cardsGrid = el('div', { style: {
+    display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '12px'
+  }});
+
+  [
+    { id: 'URSSAF', label: 'URSSAF', icon: '🏥', color: '#ef4444' },
+    { id: 'TVA', label: 'TVA', icon: '🏛️', color: '#3b82f6' },
+    { id: 'IR', label: 'Impôt', icon: '💰', color: '#f59e0b' },
+    { id: 'CFE', label: 'CFE', icon: '🏢', color: '#6b7280' }
+  ].forEach(function(cat) {
+    var charges = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === cat.id || c.cat.indexOf(cat.id) === 0; }) : [];
     var total = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
     var unpaid = charges.filter(function(c) { return !c.paid; });
-    var status = unpaid.length > 0 ? '🔴 ' + unpaid.length + ' dû' : '✅ OK';
-    
-    var card = el('div', { 
+    var status = unpaid.length > 0 ? '🔴' : '✅';
+
+    var card = el('div', {
       class: 'card',
-      style: { borderLeft: '4px solid ' + cat.color, cursor: 'pointer' },
-      onclick: function() { showChargeDetail(cat.id, data); }
+      style: { borderLeft: '3px solid ' + cat.color, cursor: 'pointer', padding: '10px' },
+      onclick: function() { showChargeDetailEnhanced(cat.id, data, caHT); }
     });
     card.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
-      el('span', { style: { fontSize: '20px' } }, cat.icon),
-      el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, status)
+      el('span', { style: { fontSize: '14px' } }, cat.icon + ' ' + cat.label),
+      el('span', { style: { fontSize: '10px' } }, status)
     ]));
-    card.appendChild(el('div', { style: { fontWeight: '700', fontSize: '18px', marginTop: '8px' } }, EUR(total)));
-    card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, cat.label));
+    card.appendChild(el('div', { style: { fontWeight: '700', fontSize: '16px', marginTop: '4px' } }, EUR(total)));
     cardsGrid.appendChild(card);
   });
-  
+
   container.appendChild(cardsGrid);
-  
+
   // Total
   var totalAPayer = data.provisionsAbsolues || 0;
   var totalPaye = data.totalChargesPaid || 0;
-  
+  var totalPctCA = caHT > 0 ? ((totalAPayer + totalPaye) / caHT * 100).toFixed(1) : 0;
+
   var totalsDiv = el('div', { class: 'card', style: { display: 'flex', justifyContent: 'space-around', textAlign: 'center' } });
   totalsDiv.appendChild(el('div', {}, [
     el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'À payer'),
-    el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--danger)' } }, EUR(totalAPayer))
+    el('div', { style: { fontWeight: '700', fontSize: '16px', color: 'var(--danger)' } }, EUR(totalAPayer))
   ]));
   totalsDiv.appendChild(el('div', {}, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Payé (période)'),
-    el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--success)' } }, EUR(totalPaye))
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total charges'),
+    el('div', { style: { fontWeight: '700', fontSize: '16px', color: 'var(--text-secondary)' } }, totalPctCA + '% CA')
+  ]));
+  totalsDiv.appendChild(el('div', {}, [
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Payé'),
+    el('div', { style: { fontWeight: '700', fontSize: '16px', color: 'var(--success)' } }, EUR(totalPaye))
   ]));
   container.appendChild(totalsDiv);
+}
+
+// V54: Détail charges amélioré avec historique % CA HT
+function showChargeDetailEnhanced(categoryId, data, caHT) {
+  var charges = data.allProvisionsDetail ? data.allProvisionsDetail.filter(function(c) { return c.cat === categoryId || c.cat.indexOf(categoryId) === 0; }) : [];
+  var chargesAPayer = data.detailChargesAPayer ? data.detailChargesAPayer.filter(function(c) { return c.cat === categoryId || c.cat.indexOf(categoryId) === 0; }) : [];
+
+  var catInfo = {
+    'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: PCT(getUrssafRate(ym(TODAY.getFullYear(), TODAY.getMonth()))) + ' du CA HT', desc: 'Maladie, retraite, allocations familiales' },
+    'TVA': { label: 'TVA - Taxe sur la Valeur Ajoutée', rate: '20% du CA HT', desc: 'Collectée sur factures, reversée à l\'État' },
+    'IR': { label: 'Impôt sur le Revenu', rate: 'Barème progressif ou 2.2% (PL)', desc: 'Impôt sur les bénéfices' },
+    'CFP': { label: 'Contribution Formation Pro', rate: '0.2% du CA HT', desc: 'Formation professionnelle' },
+    'CFE': { label: 'Cotisation Foncière des Entreprises', rate: 'Variable selon commune', desc: 'Impôt local' }
+  };
+  var info = catInfo[categoryId] || { label: categoryId, rate: '-', desc: '' };
+
+  var content = el('div', { style: { padding: '10px' } });
+
+  // Total et % CA
+  var total = chargesAPayer.reduce(function(sum, c) { return sum + c.montant; }, 0);
+  var pctCA = caHT > 0 ? (total / caHT * 100).toFixed(1) : 0;
+
+  content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '12px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, info.label),
+    el('div', { style: { fontSize: '28px', fontWeight: '800', color: 'var(--danger)' } }, EUR(total)),
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, pctCA + '% du CA HT')
+  ]));
+
+  // Info taux
+  var infoBox = el('div', { style: { background: 'rgba(96, 165, 250, 0.1)', padding: '10px', borderRadius: '8px', marginBottom: '16px', fontSize: '11px' } });
+  infoBox.appendChild(el('div', {}, [el('span', { style: { fontWeight: '600' } }, 'Taux: '), el('span', {}, info.rate)]));
+  if (info.desc) infoBox.appendChild(el('div', { style: { color: 'var(--text-muted)', marginTop: '4px' } }, info.desc));
+  content.appendChild(infoBox);
+
+  // Historique par mois avec % CA
+  if (chargesAPayer.length > 0) {
+    content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '📅 Détail par mois'));
+    var list = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+
+    // Grouper par mois
+    var byMonth = {};
+    chargesAPayer.forEach(function(c) {
+      if (!byMonth[c.mois]) byMonth[c.mois] = [];
+      byMonth[c.mois].push(c);
+    });
+
+    Object.keys(byMonth).sort().reverse().forEach(function(mois) {
+      var monthCharges = byMonth[mois];
+      var monthTotal = monthCharges.reduce(function(s, c) { return s + c.montant; }, 0);
+      var monthData = data.monthsData[mois];
+      var monthCA = monthData ? monthData.real : 0;
+      var monthPct = monthCA > 0 ? (monthTotal / monthCA * 100).toFixed(1) : '-';
+
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '4px', fontSize: '11px' } });
+      row.appendChild(el('span', { style: { fontWeight: '600' } }, fmtMonthShort(mois)));
+      row.appendChild(el('span', {}, EUR(monthTotal)));
+      row.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, monthPct + '% CA'));
+
+      // Bouton payer si non payé
+      var unpaid = monthCharges.filter(function(c) { return !isPaid(c.id); });
+      if (unpaid.length > 0) {
+        row.appendChild(el('button', {
+          class: 'btn btn-sm',
+          onclick: function(e) {
+            e.stopPropagation();
+            unpaid.forEach(function(c) { markAllPaid([c.id]); });
+            closeModal('dynamicModal');
+            render();
+          }
+        }, '✓'));
+      } else {
+        row.appendChild(el('span', { style: { color: 'var(--success)', fontSize: '10px' } }, '✅'));
+      }
+
+      list.appendChild(row);
+    });
+    content.appendChild(list);
+  } else {
+    content.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '20px' } }, 'Aucune charge pour cette catégorie'));
+  }
+
+  showModal(info.label, content);
 }
 
 function showChargeDetail(categoryId, data) {
@@ -7735,19 +8409,14 @@ function renderAnalyseSubTab(container, data, months) {
 function renderAccueil(container) {
   var data = compute();
 
-  // 1. MA TRÉSORERIE (Hero)
-  renderDashboardHero(container, data);
-
-  // 2. À FAIRE (Actions urgentes + Timeline jalons)
-  container.appendChild(SectionTitle('⚡', 'À Faire'));
-  renderActionsWidget(container);
-  renderLegalTimeline(container);
-
-  // 3. CA ANNUEL avec plafond micro-entrepreneur
+  // 1. CA ANNUEL avec plafond micro-entrepreneur (en haut)
   renderCAPlafondWidget(container);
 
-  // 4. PROJECTION AUTONOMIE
-  renderProjectionAutonomie(container);
+  // 2. MA TRÉSORERIE (Hero avec camembert)
+  renderDashboardHero(container, data);
+
+  // 3. À FAIRE (Actions + Jalons fusionnés)
+  renderActionsAndMilestones(container);
 
   // Insights (conseils contextuels)
   renderInsights(container);
@@ -7766,14 +8435,14 @@ function renderPerformance(container) {
   container.appendChild(SectionTitle('📈', 'Évolution CA & Charges'));
   renderDashboardCharts(container, months);
 
-  // KPIs Performance
+  // KPIs Performance avec détail au clic
   container.appendChild(SectionTitle('🎯', 'Indicateurs'));
 
   var kpiGrid = el('div', { class: 'kpi-grid', style: { marginBottom: '16px' } });
-  kpiGrid.appendChild(KPI({ label: 'CA Réalisé', value: EUR(data.caReal), sub: 'Prévu: ' + EUR(data.caPrev), color: 'info', trend: getTrend(data.sparklineData.caReal) }));
-  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success' }));
-  kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger' }));
-  kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent' }));
+  kpiGrid.appendChild(KPI({ label: 'CA Réalisé', value: EUR(data.caReal), sub: 'Prévu: ' + EUR(data.caPrev), color: 'info', trend: getTrend(data.sparklineData.caReal), onClick: function() { showCARealisedDetail(data); } }));
+  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success', onClick: function() { showEncaisseDetail(data); } }));
+  kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger', onClick: function() { showBeneficeDetail(data); } }));
+  kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent', onClick: showTJMDetail }));
   container.appendChild(kpiGrid);
 
   // Répartition CA HT
@@ -7834,7 +8503,7 @@ function renderMissionsView(container) {
   renderMissions(container);
 }
 
-var FINANCES_TAB = 'factures'; // sous-onglet finances: factures ou tresorerie
+var FINANCES_TAB = 'factures'; // sous-onglet finances: factures, tresorerie, missions
 
 function renderFinances(container) {
   // Header avec sous-onglets
@@ -7842,29 +8511,101 @@ function renderFinances(container) {
   header.appendChild(el('h2', { class: 'page-title' }, '💰 Finances'));
   container.appendChild(header);
 
-  // Sous-onglets Factures / Trésorerie
-  var tabs = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px', padding: '4px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  // Sous-onglets Factures / Trésorerie / Missions
+  var tabs = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '16px', padding: '4px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
 
   var tabFactures = el('button', {
-    style: { flex: '1', padding: '8px 12px', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'factures' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'factures' ? 'white' : 'var(--text-muted)' },
+    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'factures' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'factures' ? 'white' : 'var(--text-muted)' },
     onclick: function() { FINANCES_TAB = 'factures'; render(); }
   }, '📄 Factures');
 
   var tabTreso = el('button', {
-    style: { flex: '1', padding: '8px 12px', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'tresorerie' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'tresorerie' ? 'white' : 'var(--text-muted)' },
+    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'tresorerie' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'tresorerie' ? 'white' : 'var(--text-muted)' },
     onclick: function() { FINANCES_TAB = 'tresorerie'; render(); }
   }, '🏦 Trésorerie');
 
+  var tabMissions = el('button', {
+    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'missions' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'missions' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { FINANCES_TAB = 'missions'; render(); }
+  }, '💼 Missions');
+
   tabs.appendChild(tabFactures);
   tabs.appendChild(tabTreso);
+  tabs.appendChild(tabMissions);
   container.appendChild(tabs);
 
   // Contenu selon sous-onglet
   if (FINANCES_TAB === 'tresorerie') {
     renderTresorerieContent(container);
+  } else if (FINANCES_TAB === 'missions') {
+    renderMissionsContent(container);
   } else {
     renderFacturesContent(container);
   }
+}
+
+// V54: Contenu Missions dans Finance
+function renderMissionsContent(container) {
+  var data = compute();
+
+  // KPIs Missions
+  var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' } });
+
+  var activeMissions = MISSIONS.filter(function(m) { return m.actif; });
+  var totalCA = 0;
+  var totalJours = 0;
+  MISSIONS.forEach(function(m) {
+    if (m.factures) m.factures.forEach(function(f) {
+      if (isInPeriod(f.mois) && f.jours > 0) {
+        totalCA += f.ht;
+        totalJours += f.jours;
+      }
+    });
+  });
+
+  kpiGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '28px', fontWeight: '800', color: 'var(--accent)' } }, String(activeMissions.length)),
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Missions actives')
+  ]));
+  kpiGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '28px', fontWeight: '800', color: 'var(--success)' } }, EUR(totalCA)),
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'CA Réalisé (période)')
+  ]));
+  container.appendChild(kpiGrid);
+
+  // Bouton ajouter
+  container.appendChild(el('button', { class: 'btn btn-success', style: { width: '100%', marginBottom: '16px' }, onclick: showMissionModal }, '+ Nouvelle Mission'));
+
+  // Liste des missions
+  if (MISSIONS.length === 0) {
+    var emptyDiv = el('div', { class: 'no-results' });
+    emptyDiv.appendChild(el('div', { class: 'no-results-icon' }, '💼'));
+    emptyDiv.appendChild(el('div', { class: 'no-results-title' }, 'Aucune mission'));
+    emptyDiv.appendChild(el('div', { class: 'no-results-hint' }, 'Ajoute ta première mission pour commencer'));
+    container.appendChild(emptyDiv);
+    return;
+  }
+
+  MISSIONS.forEach(function(m) {
+    var jours = 0, ca = 0;
+    if (m.factures) m.factures.forEach(function(f) {
+      if (isInPeriod(f.mois) && f.jours > 0) { jours += f.jours; ca += f.ht; }
+    });
+
+    var card = el('div', { class: 'mission-card', style: { cursor: 'pointer' }, onclick: function() { showMissionModal(m); } });
+    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
+    header.appendChild(el('div', { style: { fontWeight: '700', fontSize: '14px' } }, m.client));
+    header.appendChild(el('div', { class: 'badge ' + (m.actif ? 'badge-success' : 'badge-muted') }, m.actif ? 'Actif' : 'Terminé'));
+    card.appendChild(header);
+
+    var details = el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '12px' } });
+    details.appendChild(el('span', {}, '💶 TJM: ' + EUR(m.tjm)));
+    details.appendChild(el('span', {}, '📅 ' + jours + ' jours'));
+    details.appendChild(el('span', {}, '💰 ' + EUR(ca)));
+    card.appendChild(details);
+
+    container.appendChild(card);
+  });
 }
 
 function renderFacturesContent(container) {
@@ -9350,6 +10091,14 @@ function render() {
   var periodYear = $('#periodYear');
   if (periodYear) periodYear.textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
   updateNotifBadge();
+
+  // V54: Dessiner les graphiques après le render si onglet Performance
+  if (VIEW === 'performance') {
+    setTimeout(function() {
+      if ($('#mainChart')) drawMainChart();
+      if ($('#soldeChart')) drawSoldeChart();
+    }, 50);
+  }
 }
 
 // === ONBOARDING ===
