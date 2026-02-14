@@ -2333,6 +2333,13 @@ function daysBizInRange(year, month, startDay, endDay) {
   return count;
 }
 
+// V57: Déterminer si une mission est active (en cours) basé sur ses dates
+function isMissionActive(mission) {
+  if (!mission.debut || !mission.fin) return false;
+  var today = localISO(TODAY);
+  return today >= mission.debut && today <= mission.fin;
+}
+
 // ACRE: calcul automatique de la date d'expiration
 function getAcreInfo() {
   if (!COMPANY.debut || !COMPANY.acre) return { active: false, expiryDate: null, expiryYm: null, startYm: null };
@@ -2855,7 +2862,17 @@ function buildMission(mis) {
       // Mois complet
       joursOuvrables = daysBiz(d.getFullYear(), d.getMonth());
     }
-    if (existing) { existing.joursOuvrables = joursOuvrables; existing.joursPrevus = existing.joursPrevus || joursOuvrables; newLignes.push(existing); }
+    if (existing) {
+      // V57: Si les jours ouvrables ont changé et que joursPrevus n'a pas été modifié manuellement,
+      // mettre à jour joursPrevus pour refléter le nouveau nombre de jours ouvrables
+      var oldJoursOuvrables = existing.joursOuvrables || 0;
+      if (oldJoursOuvrables !== joursOuvrables && existing.joursPrevus === oldJoursOuvrables) {
+        existing.joursPrevus = joursOuvrables;
+      }
+      existing.joursOuvrables = joursOuvrables;
+      existing.joursPrevus = existing.joursPrevus || joursOuvrables;
+      newLignes.push(existing);
+    }
     else { newLignes.push({ ym: key, joursOuvrables: joursOuvrables, joursPrevus: joursOuvrables, joursReels: 0, conges: 0 }); }
     d.setMonth(d.getMonth() + 1);
   }
@@ -4611,10 +4628,11 @@ function showBeneficeDetail(data) {
   if (!data) data = compute();
   var content = el('div', { style: { padding: '10px' } });
 
-  var caHT = data.caReal || 0;
-  var charges = data.chargesPayees + data.chargesAPayer;
+  // V57: Utiliser CA HT encaissé (pas réalisé) et charges hors TVA
+  var caHT = data.caHT || 0;
+  var chargesHorsTVA = (data.totalCharges || 0) - (data.tvaTotale || 0);
   var salaires = data.salaires || 0;
-  var benefice = caHT - charges - salaires;
+  var benefice = caHT - chargesHorsTVA - salaires;
 
   // KPI principal
   var benColor = benefice >= 0 ? 'var(--success)' : 'var(--danger)';
@@ -4627,8 +4645,8 @@ function showBeneficeDetail(data) {
   // Décomposition
   content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '📐 Décomposition'));
   var calc = el('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '12px' } });
-  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'CA Réalisé HT'), el('span', { style: { fontWeight: '600', color: 'var(--success)' } }, '+ ' + EUR(caHT))]));
-  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'Charges sociales & fiscales'), el('span', { style: { fontWeight: '600', color: 'var(--danger)' } }, '- ' + EUR(charges))]));
+  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'CA Encaissé HT'), el('span', { style: { fontWeight: '600', color: 'var(--success)' } }, '+ ' + EUR(caHT))]));
+  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'Charges sociales & fiscales'), el('span', { style: { fontWeight: '600', color: 'var(--danger)' } }, '- ' + EUR(chargesHorsTVA))]));
   calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'Salaires versés'), el('span', { style: { fontWeight: '600', color: 'var(--info)' } }, '- ' + EUR(salaires))]));
   calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: '13px', borderTop: '1px solid var(--border)', marginTop: '8px' } }, [el('span', { style: { fontWeight: '600' } }, 'Bénéfice Net'), el('span', { style: { fontWeight: '700', color: benColor } }, EUR(benefice))]));
   content.appendChild(calc);
@@ -8276,7 +8294,8 @@ function renderDashboardSubTabs(container) {
 function renderChargesSubTab(container, data) {
   container.appendChild(SectionTitle('💳', 'Impôts & Charges'));
 
-  var caHT = data.caReal || 1;
+  // V57: Utiliser CA HT encaissé pour les calculs
+  var caHT = data.caHT || data.caEnc || 1;
 
   // Catégories avec couleurs
   var categories = [
@@ -8289,10 +8308,14 @@ function renderChargesSubTab(container, data) {
     { id: 'Autres', label: 'Autres', icon: '📦', color: '#94a3b8' }
   ];
 
-  // Calculer les totaux
+  // V57: Utiliser les données filtrées par période (detailChargesPayees + detailChargesAPayer)
+  // au lieu des provisions absolues
+  var periodCharges = (data.detailChargesPayees || []).concat(data.detailChargesAPayer || []);
+
+  // Calculer les totaux - V57: Afficher TOUTES les catégories même à 0
   var chargeTypes = [];
   categories.forEach(function(cat) {
-    var charges = (data.allProvisionsDetail || []).filter(function(c) {
+    var charges = periodCharges.filter(function(c) {
       if (cat.id === 'IR') return c.cat === 'IR Estimé' || c.cat === 'IR';
       if (cat.id === 'Autres') {
         var standard = ['URSSAF', 'TVA', 'IR Estimé', 'IR', 'CFP', 'CFE', 'Impôt PL', 'Impôt'];
@@ -8301,32 +8324,31 @@ function renderChargesSubTab(container, data) {
       return c.cat === cat.id || c.cat.indexOf(cat.id) === 0;
     });
     var montant = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
-    if (montant > 0) {
-      chargeTypes.push({
-        id: cat.id, label: cat.label, icon: cat.icon, color: cat.color,
-        montant: montant, pctCA: (montant / caHT) * 100, unpaidCount: charges.length
-      });
-    }
+    // V57: Calculer paid vs unpaid
+    var paidAmount = charges.filter(function(c) { return !c.id || isPaid(c.id); }).reduce(function(s, c) { return s + c.montant; }, 0);
+    var unpaidAmount = montant - paidAmount;
+    // V57: Inclure TOUTES les catégories, même à 0
+    chargeTypes.push({
+      id: cat.id, label: cat.label, icon: cat.icon, color: cat.color,
+      montant: montant, pctCA: caHT > 0 ? (montant / caHT) * 100 : 0,
+      unpaidCount: charges.filter(function(c) { return c.id && !isPaid(c.id); }).length,
+      paidAmount: paidAmount, unpaidAmount: unpaidAmount
+    });
   });
 
   // Trier par montant décroissant
   chargeTypes.sort(function(a, b) { return b.montant - a.montant; });
 
   var totalCharges = chargeTypes.reduce(function(sum, c) { return sum + c.montant; }, 0) || 1;
-  var maxMontant = chargeTypes.length > 0 ? chargeTypes[0].montant : 1;
+  var chargesWithAmount = chargeTypes.filter(function(c) { return c.montant > 0; });
+  var maxMontant = chargesWithAmount.length > 0 ? chargesWithAmount[0].montant : 1;
 
   var widget = el('div', { class: 'card' });
-
-  if (chargeTypes.length === 0) {
-    widget.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Aucune charge à payer'));
-    container.appendChild(widget);
-    return;
-  }
 
   // V56: Layout horizontal avec camembert à gauche et liste à droite (style clients)
   var content = el('div', { style: { display: 'flex', gap: '16px', alignItems: 'flex-start' } });
 
-  // Camembert SVG
+  // Camembert SVG - V57: Utiliser uniquement les catégories avec montant > 0
   var pieSize = 120;
   var pieContainer = el('div', { style: { flexShrink: '0' } });
   var pieDiv = el('div', { style: { position: 'relative', width: pieSize + 'px', height: pieSize + 'px' } });
@@ -8337,35 +8359,45 @@ function renderChargesSubTab(container, data) {
   svg.setAttribute('height', pieSize);
   svg.setAttribute('viewBox', '0 0 100 100');
 
-  // Dessiner les segments du camembert
-  var cumAngle = -90;
-  chargeTypes.slice(0, 7).forEach(function(charge, i) {
-    var pct = (charge.montant / totalCharges) * 100;
-    var angle = (pct / 100) * 360;
+  // V57: Si aucune charge, afficher cercle vide
+  if (chargesWithAmount.length === 0) {
+    var emptyCircle = document.createElementNS(svgNS, 'circle');
+    emptyCircle.setAttribute('cx', '50');
+    emptyCircle.setAttribute('cy', '50');
+    emptyCircle.setAttribute('r', '40');
+    emptyCircle.setAttribute('fill', 'var(--bg-tertiary)');
+    svg.appendChild(emptyCircle);
+  } else {
+    // Dessiner les segments du camembert
+    var cumAngle = -90;
+    chargesWithAmount.slice(0, 7).forEach(function(charge, i) {
+      var pct = (charge.montant / totalCharges) * 100;
+      var angle = (pct / 100) * 360;
 
-    if (pct > 0) {
-      var startAngle = cumAngle * (Math.PI / 180);
-      var endAngle = (cumAngle + angle) * (Math.PI / 180);
+      if (pct > 0) {
+        var startAngle = cumAngle * (Math.PI / 180);
+        var endAngle = (cumAngle + angle) * (Math.PI / 180);
 
-      var x1 = 50 + 40 * Math.cos(startAngle);
-      var y1 = 50 + 40 * Math.sin(startAngle);
-      var x2 = 50 + 40 * Math.cos(endAngle);
-      var y2 = 50 + 40 * Math.sin(endAngle);
+        var x1 = 50 + 40 * Math.cos(startAngle);
+        var y1 = 50 + 40 * Math.sin(startAngle);
+        var x2 = 50 + 40 * Math.cos(endAngle);
+        var y2 = 50 + 40 * Math.sin(endAngle);
 
-      var largeArc = angle > 180 ? 1 : 0;
+        var largeArc = angle > 180 ? 1 : 0;
 
-      var path = document.createElementNS(svgNS, 'path');
-      if (chargeTypes.length === 1 || pct >= 99.5) {
-        path.setAttribute('d', 'M 50 10 A 40 40 0 1 1 49.99 10 Z');
-      } else {
-        path.setAttribute('d', 'M 50 50 L ' + x1 + ' ' + y1 + ' A 40 40 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 + ' Z');
+        var path = document.createElementNS(svgNS, 'path');
+        if (chargesWithAmount.length === 1 || pct >= 99.5) {
+          path.setAttribute('d', 'M 50 10 A 40 40 0 1 1 49.99 10 Z');
+        } else {
+          path.setAttribute('d', 'M 50 50 L ' + x1 + ' ' + y1 + ' A 40 40 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 + ' Z');
+        }
+        path.setAttribute('fill', charge.color);
+        svg.appendChild(path);
+
+        cumAngle += angle;
       }
-      path.setAttribute('fill', charge.color);
-      svg.appendChild(path);
-
-      cumAngle += angle;
-    }
-  });
+    });
+  }
 
   // Centre blanc pour effet donut
   var centerCircle = document.createElementNS(svgNS, 'circle');
@@ -8389,16 +8421,16 @@ function renderChargesSubTab(container, data) {
   pieContainer.appendChild(pieDiv);
   content.appendChild(pieContainer);
 
-  // Liste des charges avec barres horizontales
+  // Liste des charges avec barres horizontales - V57: Afficher TOUTES les catégories
   var listContainer = el('div', { style: { flex: '1', minWidth: '0' } });
 
-  chargeTypes.slice(0, 7).forEach(function(charge) {
-    var pct = Math.round((charge.montant / totalCharges) * 100);
-    var barWidth = (charge.montant / maxMontant) * 100;
+  chargeTypes.forEach(function(charge) {
+    var pct = totalCharges > 0 ? Math.round((charge.montant / totalCharges) * 100) : 0;
+    var barWidth = maxMontant > 0 ? (charge.montant / maxMontant) * 100 : 0;
 
     var row = el('div', {
-      style: { marginBottom: '8px', cursor: 'pointer' },
-      onclick: function() { showChargeDetailEnhanced(charge.id, data, caHT); }
+      style: { marginBottom: '8px', cursor: charge.montant > 0 ? 'pointer' : 'default', opacity: charge.montant > 0 ? '1' : '0.5' },
+      onclick: charge.montant > 0 ? function() { showChargeDetailEnhanced(charge.id, data, caHT); } : null
     });
 
     // Header: nom + montant + %
@@ -8407,17 +8439,35 @@ function renderChargesSubTab(container, data) {
       el('div', { style: { width: '8px', height: '8px', borderRadius: '2px', background: charge.color } }),
       el('span', { style: { fontWeight: '600' } }, charge.icon + ' ' + charge.label)
     ]));
-    header.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, EUR(charge.montant) + ' (' + pct + '%)'));
+    header.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, charge.montant > 0 ? EUR(charge.montant) + ' (' + pct + '%)' : '0 €'));
     row.appendChild(header);
 
-    // Barre de progression
-    var barBg = el('div', { style: { height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' } });
-    var barFill = el('div', { style: { height: '100%', width: barWidth + '%', background: charge.color, borderRadius: '3px' } });
-    barBg.appendChild(barFill);
+    // V57: Barre de progression avec distinction payé vs provision
+    var barBg = el('div', { style: { height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden', display: 'flex' } });
+    if (charge.montant > 0) {
+      // Partie payée (vert)
+      var paidWidth = charge.paidAmount > 0 ? (charge.paidAmount / charge.montant) * barWidth : 0;
+      if (paidWidth > 0) {
+        barBg.appendChild(el('div', { style: { height: '100%', width: paidWidth + '%', background: 'var(--success)' } }));
+      }
+      // Partie provision (couleur de la catégorie avec opacité)
+      var unpaidWidth = barWidth - paidWidth;
+      if (unpaidWidth > 0) {
+        barBg.appendChild(el('div', { style: { height: '100%', width: unpaidWidth + '%', background: charge.color } }));
+      }
+    }
     row.appendChild(barBg);
 
-    // Sous-info: % du CA
-    row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, charge.pctCA.toFixed(1) + '% du CA HT'));
+    // V57: Sous-info améliorée: % du CA + statut payé/provision
+    var subInfo = charge.pctCA.toFixed(1) + '% du CA HT';
+    if (charge.montant > 0 && charge.paidAmount > 0 && charge.unpaidAmount > 0) {
+      subInfo += ' · ' + EUR(charge.paidAmount, true) + ' payé, ' + EUR(charge.unpaidAmount, true) + ' à payer';
+    } else if (charge.montant > 0 && charge.paidAmount > 0) {
+      subInfo += ' · Tout payé ✓';
+    } else if (charge.montant > 0 && charge.unpaidAmount > 0) {
+      subInfo += ' · ' + EUR(charge.unpaidAmount, true) + ' à provisionner';
+    }
+    row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, subInfo));
 
     listContainer.appendChild(row);
   });
@@ -8441,18 +8491,23 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
     return c.cat === categoryId || c.cat.indexOf(categoryId) === 0;
   };
 
-  var charges = (data.allProvisionsDetail || []).filter(filterFn);
+  // V57: Utiliser les données filtrées par période au lieu des provisions absolues
+  var periodCharges = (data.detailChargesPayees || []).concat(data.detailChargesAPayer || []);
+  var charges = periodCharges.filter(filterFn);
 
-  // Déterminer le taux URSSAF en fonction des données présentes
+  // V57: Déterminer le taux URSSAF en fonction de l'année de la période sélectionnée
   var urssafRateText = (function() {
     var acre = getAcreInfo();
+    // Déterminer l'année de la période actuelle
+    var periodYear = PERIOD.year || TODAY.getFullYear();
+    var stdRate = periodYear >= 2026 ? PCT(LEGAL.urssafStd2026) : PCT(LEGAL.urssafStd2025);
+    var acreRate = periodYear >= 2026 ? PCT(LEGAL.urssafAcre2026) : PCT(LEGAL.urssafAcre2025);
+
     if (COMPANY.acre && acre.expiryYm) {
-      // ACRE actif ou passé - afficher les deux taux
-      var stdRate = PCT(LEGAL.urssafStd2025);
-      var acreRate = PCT(LEGAL.urssafAcre2025);
+      // ACRE actif ou passé - afficher les deux taux selon l'année
       return acreRate + ' (ACRE) / ' + stdRate + ' (std) du CA HT';
     }
-    return PCT(getUrssafRate()) + ' du CA HT';
+    return stdRate + ' du CA HT';
   })();
   var catInfo = {
     'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: urssafRateText, desc: 'Maladie, retraite, allocations familiales' },
@@ -8499,14 +8554,22 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
       var monthCharges = byMonth[mois];
       var monthTotal = monthCharges.reduce(function(s, c) { return s + c.montant; }, 0);
       var monthData = data.monthsData[mois];
-      // Utiliser encHT (CA HT encaissé) pour le calcul du pourcentage, cohérent avec le calcul URSSAF
-      var monthCA = monthData ? (monthData.encHT || monthData.real) : 0;
-      var monthPct = monthCA > 0 ? (monthTotal / monthCA * 100).toFixed(1) : '-';
+      // V57: Utiliser encHT (CA HT encaissé) pour le calcul du pourcentage
+      var monthCA = monthData ? monthData.encHT : 0;
+      // V57: Si pas de CA encaissé ce mois-ci, afficher le taux théorique URSSAF
+      var monthPct;
+      if (monthCA > 0) {
+        monthPct = (monthTotal / monthCA * 100).toFixed(1) + '%';
+      } else {
+        // Calculer le taux théorique basé sur le montant URSSAF
+        var rate = getUrssafRate(mois);
+        monthPct = PCT(rate);
+      }
 
       var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '4px', fontSize: '11px' } });
       row.appendChild(el('span', { style: { fontWeight: '600' } }, fmtMonthShort(mois)));
       row.appendChild(el('span', {}, EUR(monthTotal)));
-      row.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, monthPct + '% CA'));
+      row.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, monthPct + ' CA'));
 
       // Bouton payer si non payé
       var unpaid = monthCharges.filter(function(c) { return !isPaid(c.id); });
@@ -8697,16 +8760,18 @@ function renderPerformance(container) {
   kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent', onClick: showTJMDetail }));
   container.appendChild(kpiGrid);
 
-  // Répartition CA HT
-  container.appendChild(SectionTitle('📊', 'Répartition CA HT'));
+  // V57: Répartition CA HT - Basée sur le CA ENCAISSÉ (pas réalisé)
+  container.appendChild(SectionTitle('📊', 'Répartition CA Encaissé HT'));
 
-  var caHT = data.caReal || 1;
-  var chargesTotal = data.totalCharges || 0;
+  // V57: Utiliser caHT (CA encaissé HT) pour cohérence avec le bénéfice net
+  var caHTEnc = data.caHT || 1;
+  // V57: Charges hors TVA (la TVA n'est pas une charge, c'est une dette)
+  var chargesHorsTVA = (data.totalCharges || 0) - (data.tvaTotale || 0);
   var salaires = data.salaires || 0;
-  var benefice = Math.max(0, caHT - chargesTotal - salaires);
+  var benefice = caHTEnc - chargesHorsTVA - salaires;
 
-  var pctCharges = Math.round((chargesTotal / caHT) * 100);
-  var pctSalaires = Math.round((salaires / caHT) * 100);
+  var pctCharges = caHTEnc > 0 ? Math.round((chargesHorsTVA / caHTEnc) * 100) : 0;
+  var pctSalaires = caHTEnc > 0 ? Math.round((salaires / caHTEnc) * 100) : 0;
   var pctBenefice = Math.max(0, 100 - pctCharges - pctSalaires);
 
   var repartCard = el('div', { class: 'card' });
@@ -8722,7 +8787,7 @@ function renderPerformance(container) {
   var legend = el('div', { style: { display: 'flex', justifyContent: 'space-around', fontSize: '12px' } });
   legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
     el('div', { style: { width: '12px', height: '12px', background: 'var(--danger)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
-    el('span', {}, 'Charges ' + EUR(chargesTotal))
+    el('span', {}, 'Charges ' + EUR(chargesHorsTVA))
   ]));
   legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
     el('div', { style: { width: '12px', height: '12px', background: 'var(--info)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
@@ -8804,7 +8869,8 @@ function renderMissionsContent(container) {
   // KPIs Missions
   var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' } });
 
-  var activeMissions = MISSIONS.filter(function(m) { return m.actif; });
+  // V57: Utiliser isMissionActive() au lieu de m.actif pour déterminer le statut
+  var activeMissions = MISSIONS.filter(function(m) { return isMissionActive(m); });
   var totalCA = 0;
   var totalJours = 0;
   MISSIONS.forEach(function(m) {
@@ -8848,7 +8914,9 @@ function renderMissionsContent(container) {
     var card = el('div', { class: 'mission-card', style: { cursor: 'pointer' }, onclick: function() { showMissionModal(m); } });
     var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
     header.appendChild(el('div', { style: { fontWeight: '700', fontSize: '14px' } }, m.client));
-    header.appendChild(el('div', { class: 'badge ' + (m.actif ? 'badge-success' : 'badge-muted') }, m.actif ? 'Actif' : 'Terminé'));
+    // V57: Utiliser isMissionActive() au lieu de m.actif
+    var isActive = isMissionActive(m);
+    header.appendChild(el('div', { class: 'badge ' + (isActive ? 'badge-success' : 'badge-muted') }, isActive ? 'Actif' : 'Terminé'));
     card.appendChild(header);
 
     var details = el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '12px' } });
