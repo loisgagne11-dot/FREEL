@@ -7258,48 +7258,122 @@ function renderDashboardAlerts(container, data) {
 }
 
 /**
- * Affiche la carte Hero avec cash disponible
+ * Affiche la carte Hero avec cash disponible et camembert répartition
  */
 function renderDashboardHero(container, data) {
-  // V51: Hero section améliorée avec paramètres éditables
+  // V53: Hero section avec camembert répartition
   var hero = el('div', { class: 'hero' + (data.soldeAbsolu < 0 ? ' negative' : '') });
-  
+
   // Ligne principale: Cash + Settings
   var heroHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } });
-  
+
   var heroMain = el('div', { class: 'hero-main', onclick: showCashDetail, style: { cursor: 'pointer', flex: 1 } });
   heroMain.appendChild(el('div', { class: 'hero-label' }, '💰 Cash Disponible'));
   heroMain.appendChild(el('div', { class: 'hero-value ' + (data.cashDispoAbsolu >= 0 ? 'positive' : 'negative') }, EUR(data.cashDispoAbsolu)));
   heroHeader.appendChild(heroMain);
-  
+
   // Bouton paramètres
-  heroHeader.appendChild(el('button', { 
-    class: 'btn btn-sm', 
+  heroHeader.appendChild(el('button', {
+    class: 'btn btn-sm',
     style: { background: 'var(--bg-tertiary)', border: 'none' },
     onclick: function(e) { e.stopPropagation(); showTresoSettings(); },
     title: 'Paramètres trésorerie'
   }, '⚙️'));
-  
+
   hero.appendChild(heroHeader);
-  
-  // Stats: Solde | Provisions | Autonomie
-  var heroStats = el('div', { class: 'hero-stats' });
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [
-    el('div', { class: 'hero-stat-value' }, EUR(data.soldeAbsolu)), 
-    el('div', { class: 'hero-stat-label' }, 'Solde compte')
+
+  // V53: Camembert répartition du compte pro
+  var solde = Math.max(0, data.soldeAbsolu);
+  var pctCash = solde > 0 ? (data.cashDispoAbsolu / solde * 100) : 0;
+  var pctProv = solde > 0 ? (data.provisionsAbsolues / solde * 100) : 0;
+
+  // Correction si cash négatif
+  if (data.cashDispoAbsolu < 0) {
+    pctCash = 0;
+    pctProv = 100;
+  }
+
+  var pieContainer = el('div', { style: {
+    display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px',
+    padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '12px'
+  }});
+
+  // Pie chart SVG
+  var pieSize = 70;
+  var pieDiv = el('div', { style: { position: 'relative', width: pieSize + 'px', height: pieSize + 'px' } });
+  var angle1 = (pctCash / 100) * 360;
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', pieSize);
+  svg.setAttribute('height', pieSize);
+  svg.setAttribute('viewBox', '0 0 100 100');
+
+  // Background circle (provisions)
+  var bgCircle = document.createElementNS(svgNS, 'circle');
+  bgCircle.setAttribute('cx', '50');
+  bgCircle.setAttribute('cy', '50');
+  bgCircle.setAttribute('r', '40');
+  bgCircle.setAttribute('fill', 'none');
+  bgCircle.setAttribute('stroke', '#a855f7');
+  bgCircle.setAttribute('stroke-width', '20');
+  svg.appendChild(bgCircle);
+
+  // Cash disponible arc
+  if (pctCash > 0) {
+    var cashCircle = document.createElementNS(svgNS, 'circle');
+    cashCircle.setAttribute('cx', '50');
+    cashCircle.setAttribute('cy', '50');
+    cashCircle.setAttribute('r', '40');
+    cashCircle.setAttribute('fill', 'none');
+    cashCircle.setAttribute('stroke', '#22c55e');
+    cashCircle.setAttribute('stroke-width', '20');
+    cashCircle.setAttribute('stroke-dasharray', (pctCash * 2.51) + ' 251');
+    cashCircle.setAttribute('transform', 'rotate(-90 50 50)');
+    svg.appendChild(cashCircle);
+  }
+
+  pieDiv.appendChild(svg);
+
+  // Solde au centre
+  var centerLabel = el('div', { style: {
+    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+    fontSize: '10px', fontWeight: '700', textAlign: 'center', lineHeight: '1.2'
+  }});
+  centerLabel.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '800' } }, EUR(data.soldeAbsolu, true)));
+  centerLabel.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)' } }, 'Solde'));
+  pieDiv.appendChild(centerLabel);
+  pieContainer.appendChild(pieDiv);
+
+  // Légende
+  var legend = el('div', { style: { flex: 1, fontSize: '12px' } });
+  legend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } }, [
+    el('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: '#22c55e' } }),
+    el('span', {}, 'Cash: ' + EUR(data.cashDispoAbsolu) + ' (' + Math.round(pctCash) + '%)')
   ]));
-  heroStats.appendChild(el('div', { class: 'hero-stat' }, [
-    el('div', { class: 'hero-stat-value text-provision' }, EUR(data.provisionsAbsolues)), 
-    el('div', { class: 'hero-stat-label' }, 'Provisions')
+  legend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+    el('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: '#a855f7' } }),
+    el('span', {}, 'Provisions: ' + EUR(data.provisionsAbsolues) + ' (' + Math.round(pctProv) + '%)')
   ]));
-  heroStats.appendChild(el('div', { class: 'hero-stat', title: EUR(data.salaireEstime) + ' salaire + ' + EUR(data.avgCharges) + ' charges/mois' }, [
-    el('div', { class: 'hero-stat-value', style: { color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'), 
-    el('div', { class: 'hero-stat-label' }, 'Autonomie')
+  pieContainer.appendChild(legend);
+
+  hero.appendChild(pieContainer);
+
+  // Stats: Autonomie cliquable pour projection
+  var heroStats = el('div', { class: 'hero-stats', style: { marginTop: '12px' } });
+  heroStats.appendChild(el('div', {
+    class: 'hero-stat',
+    style: { cursor: 'pointer', padding: '8px', borderRadius: '8px', background: 'var(--bg-tertiary)' },
+    onclick: function(e) { e.stopPropagation(); showProjectionAutonomieModal(); },
+    title: 'Cliquer pour voir la projection d\'autonomie'
+  }, [
+    el('div', { class: 'hero-stat-value', style: { color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'),
+    el('div', { class: 'hero-stat-label' }, '⏱️ Autonomie'),
+    el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' } }, 'Cliquer pour projection')
   ]));
   hero.appendChild(heroStats);
-  
+
   // V51: Salaire versable + action
-  var salaireDiv = el('div', { style: { 
+  var salaireDiv = el('div', { style: {
     marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center'
   }});
@@ -7309,13 +7383,13 @@ function renderDashboardHero(container, data) {
     el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '(Cash - ' + EUR(data.reserveCompte) + ' réserve)')
   ]));
   if (data.salaireVersable >= 500) {
-    salaireDiv.appendChild(el('button', { 
-      class: 'btn btn-success', 
+    salaireDiv.appendChild(el('button', {
+      class: 'btn btn-success',
       onclick: function(e) { e.stopPropagation(); showSalaireModal(data.salaireVersable); }
     }, 'Verser'));
   }
   hero.appendChild(salaireDiv);
-  
+
   container.appendChild(hero);
 }
 
@@ -7501,6 +7575,286 @@ function renderProjectionAutonomie(container) {
   widget.appendChild(status);
 
   container.appendChild(widget);
+}
+
+// V53: Modal Projection Autonomie personnalisée
+function showProjectionAutonomieModal() {
+  var data = compute();
+  var content = el('div', { style: { padding: '10px' } });
+
+  // Paramètres actuels
+  var salaireEstime = data.salaireEstime || TREASURY.salaireEstime || 2200;
+  var chargesRecurrentes = data.avgCharges || 500;
+  var cashDispo = data.cashDispoAbsolu || 0;
+
+  // Section: Situation actuelle
+  var currentSection = el('div', { style: { marginBottom: '20px' } });
+  currentSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '📊 Situation Actuelle'));
+
+  var currentGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' } });
+  currentGrid.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Cash Disponible'),
+    el('div', { style: { fontWeight: '700', fontSize: '16px', color: cashDispo >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(cashDispo))
+  ]));
+  currentGrid.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Autonomie actuelle'),
+    el('div', { style: { fontWeight: '700', fontSize: '16px', color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois')
+  ]));
+  currentSection.appendChild(currentGrid);
+  content.appendChild(currentSection);
+
+  // Section: Simulation personnalisée
+  var simSection = el('div', { style: { marginBottom: '20px' } });
+  simSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '12px', textTransform: 'uppercase' } }, '🔮 Projection Personnalisée'));
+
+  simSection.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } },
+    'Simulez votre autonomie en ajustant le salaire mensuel que vous souhaitez vous verser (sans nouveaux revenus).'));
+
+  // Input salaire mensuel
+  var inputRow = el('div', { style: { marginBottom: '16px' } });
+  inputRow.appendChild(el('label', { style: { display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '600' } }, '💸 Salaire mensuel souhaité'));
+  var salaireInput = el('input', {
+    type: 'number',
+    id: 'projSalaireMensuel',
+    value: salaireEstime,
+    style: { width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: '16px' }
+  });
+  inputRow.appendChild(salaireInput);
+  simSection.appendChild(inputRow);
+
+  // Charges récurrentes (info)
+  simSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' } },
+    '📋 Charges récurrentes moyennes: ' + EUR(chargesRecurrentes) + '/mois'));
+
+  // Bouton calculer
+  var calcBtn = el('button', {
+    class: 'btn btn-primary',
+    style: { width: '100%', marginBottom: '16px' },
+    onclick: function() { updateProjectionCalc(cashDispo, chargesRecurrentes); }
+  }, '🧮 Calculer l\'autonomie');
+  simSection.appendChild(calcBtn);
+
+  // Résultat
+  var resultDiv = el('div', { id: 'projAutonomieResult', style: { display: 'none' } });
+  simSection.appendChild(resultDiv);
+
+  content.appendChild(simSection);
+
+  // Section: Explication
+  var explainSection = el('div', { style: { padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' } });
+  explainSection.innerHTML = '<strong>💡 Comment c\'est calculé ?</strong><br>' +
+    'Autonomie = Cash Disponible ÷ (Salaire mensuel + Charges récurrentes)<br><br>' +
+    'Cette projection suppose que vous n\'avez aucun nouveau revenu pendant cette période.';
+  content.appendChild(explainSection);
+
+  showModal('⏱️ Projection Autonomie', content);
+
+  // Calcul initial
+  setTimeout(function() { updateProjectionCalc(cashDispo, chargesRecurrentes); }, 100);
+}
+
+function updateProjectionCalc(cashDispo, chargesRecurrentes) {
+  var salaireInput = $('#projSalaireMensuel');
+  var salaire = parseFloat(salaireInput ? salaireInput.value : 0) || 0;
+  var depensesMensuelles = salaire + chargesRecurrentes;
+  var autonomie = depensesMensuelles > 0 ? Math.floor(cashDispo / depensesMensuelles) : 0;
+  if (autonomie < 0) autonomie = 0;
+
+  var resultDiv = $('#projAutonomieResult');
+  if (!resultDiv) return;
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '';
+
+  // Barre visuelle
+  var maxMonths = 12;
+  var pct = Math.min(100, (autonomie / maxMonths) * 100);
+  var barColor = autonomie > 6 ? 'var(--success)' : autonomie > 3 ? 'var(--warning)' : 'var(--danger)';
+
+  var barContainer = el('div', { style: { marginBottom: '16px' } });
+  var bar = el('div', { style: { height: '24px', background: 'var(--bg-tertiary)', borderRadius: '12px', overflow: 'hidden', position: 'relative' } });
+  bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: barColor, borderRadius: '12px', transition: 'width 0.3s' } }));
+
+  // Marqueurs
+  var markers = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } });
+  markers.appendChild(el('span', {}, '0'));
+  markers.appendChild(el('span', {}, '3m'));
+  markers.appendChild(el('span', {}, '6m'));
+  markers.appendChild(el('span', {}, '12m'));
+  barContainer.appendChild(bar);
+  barContainer.appendChild(markers);
+  resultDiv.appendChild(barContainer);
+
+  // Résultat principal
+  var resultBox = el('div', { style: {
+    textAlign: 'center', padding: '16px', borderRadius: '12px',
+    background: autonomie > 6 ? 'rgba(34, 197, 94, 0.1)' : autonomie > 3 ? 'rgba(251, 191, 36, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+  }});
+  resultBox.appendChild(el('div', { style: { fontSize: '32px', fontWeight: '800', color: barColor } }, autonomie + ' mois'));
+  resultBox.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, 'd\'autonomie avec ' + EUR(salaire) + '/mois de salaire'));
+  resultDiv.appendChild(resultBox);
+
+  // Détail calcul
+  var detail = el('div', { style: { marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)' } });
+  detail.innerHTML = '<strong>Détail:</strong> ' + EUR(cashDispo) + ' ÷ (' + EUR(salaire) + ' + ' + EUR(chargesRecurrentes) + ') = ' + autonomie + ' mois';
+  resultDiv.appendChild(detail);
+
+  // Conseil
+  var conseil = el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px' } });
+  if (autonomie > 6) {
+    conseil.innerHTML = '✅ <strong>Confortable</strong> - Vous avez une bonne marge de sécurité.';
+  } else if (autonomie > 3) {
+    conseil.innerHTML = '⚠️ <strong>Attention</strong> - Pensez à sécuriser de nouveaux revenus prochainement.';
+  } else {
+    conseil.innerHTML = '🔴 <strong>Urgent</strong> - Réduisez votre salaire ou trouvez rapidement des missions.';
+  }
+  resultDiv.appendChild(conseil);
+}
+
+// V53: Fusionner Actions + Jalons dans une même forme
+function renderActionsAndMilestones(container) {
+  var actions = getActionsList();
+  var milestones = getLegalMilestones();
+
+  if (actions.length === 0 && milestones.length === 0) return;
+
+  var widget = el('div', { class: 'card', style: { marginBottom: '16px' } });
+  widget.appendChild(el('div', { class: 'card-title' }, '⚡ À Faire'));
+
+  // Section Jalons (en haut)
+  if (milestones.length > 0) {
+    var milestonesSection = el('div', { style: { marginBottom: '16px' } });
+    milestonesSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, '📅 Prochains Jalons'));
+
+    var milestonesGrid = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    milestones.slice(0, 4).forEach(function(m) {
+      var cls = m.daysLeft <= 7 ? 'urgent' : m.daysLeft <= 30 ? 'warning' : 'ok';
+      var bgColor = cls === 'urgent' ? 'rgba(239, 68, 68, 0.1)' : cls === 'warning' ? 'rgba(251, 191, 36, 0.1)' : 'var(--bg-tertiary)';
+      var textColor = cls === 'urgent' ? 'var(--danger)' : cls === 'warning' ? 'var(--warning)' : 'var(--text-secondary)';
+
+      var milestone = el('div', {
+        style: { flex: '1', minWidth: '120px', padding: '10px', background: bgColor, borderRadius: '8px', cursor: 'pointer', textAlign: 'center' },
+        onclick: function() { showMilestoneDetail(m); }
+      });
+      milestone.appendChild(el('div', { style: { fontSize: '16px', marginBottom: '4px' } }, m.icon));
+      milestone.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '2px' } }, m.label));
+      if (m.date) milestone.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, fmtShort(m.date)));
+      if (m.daysLeft !== null && m.daysLeft >= 0) {
+        milestone.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: textColor, marginTop: '4px' } }, m.daysLeft === 0 ? 'Aujourd\'hui' : 'J-' + m.daysLeft));
+      }
+      milestonesGrid.appendChild(milestone);
+    });
+    milestonesSection.appendChild(milestonesGrid);
+    widget.appendChild(milestonesSection);
+  }
+
+  // Section Actions (en bas)
+  if (actions.length > 0) {
+    var actionsSection = el('div');
+    actionsSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, '🎯 Actions Immédiates'));
+
+    var actionsList = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } });
+    actions.forEach(function(a) {
+      var bgColor = a.type === 'urgent' ? 'rgba(239, 68, 68, 0.1)' : a.type === 'warning' ? 'rgba(251, 191, 36, 0.1)' : 'var(--bg-tertiary)';
+      var item = el('div', {
+        style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: bgColor, borderRadius: '8px', cursor: 'pointer' },
+        onclick: function() { showActionDetail(a); }
+      });
+      item.appendChild(el('div', { style: { fontSize: '20px' } }, a.icon));
+      item.appendChild(el('div', { style: { flex: 1 } }, [
+        el('div', { style: { fontSize: '13px', fontWeight: '600' } }, a.label),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, a.sub)
+      ]));
+      item.appendChild(el('button', {
+        class: 'btn btn-sm ' + a.btnClass,
+        onclick: function(e) { e.stopPropagation(); a.action(); }
+      }, a.btnLabel));
+      actionsList.appendChild(item);
+    });
+    actionsSection.appendChild(actionsList);
+    widget.appendChild(actionsSection);
+  }
+
+  container.appendChild(widget);
+}
+
+// V53: Détail d'un jalon
+function showMilestoneDetail(m) {
+  var content = el('div', { style: { padding: '10px' } });
+
+  content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px' } }, [
+    el('div', { style: { fontSize: '40px', marginBottom: '8px' } }, m.icon),
+    el('div', { style: { fontSize: '18px', fontWeight: '700' } }, m.label)
+  ]));
+
+  if (m.date) {
+    content.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', marginBottom: '12px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Date d\'échéance'),
+      el('div', { style: { fontWeight: '700', fontSize: '16px' } }, fmtLong ? fmtLong(m.date) : fmtMonth(m.date)),
+      m.daysLeft !== null ? el('div', { style: { fontSize: '12px', color: m.daysLeft <= 7 ? 'var(--danger)' : m.daysLeft <= 30 ? 'var(--warning)' : 'var(--success)', fontWeight: '600', marginTop: '4px' } }, m.daysLeft === 0 ? 'Aujourd\'hui !' : 'Dans ' + m.daysLeft + ' jours') : null
+    ].filter(Boolean)));
+  }
+
+  if (m.description) {
+    content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' } }, m.description));
+  }
+
+  showModal(m.icon + ' ' + m.label, content);
+}
+
+// V53: Détail d'une action
+function showActionDetail(a) {
+  var data = compute();
+  var content = el('div', { style: { padding: '10px' } });
+
+  content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px' } }, [
+    el('div', { style: { fontSize: '40px', marginBottom: '8px' } }, a.icon),
+    el('div', { style: { fontSize: '18px', fontWeight: '700' } }, a.label)
+  ]));
+
+  content.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', marginBottom: '16px', textAlign: 'center' } }, [
+    el('div', { style: { fontWeight: '600', fontSize: '14px' } }, a.sub)
+  ]));
+
+  // Si c'est une action de type charge à payer, afficher les détails
+  if (a.type === 'warning' && a.label.indexOf('Payer') >= 0) {
+    var chargesAPayer = data.detailChargesAPayer || [];
+    if (chargesAPayer.length > 0) {
+      content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, 'Détail des charges à payer:'));
+      var list = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+      chargesAPayer.slice(0, 10).forEach(function(c) {
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '4px', fontSize: '12px' } });
+        row.appendChild(el('span', {}, c.cat + ' - ' + fmtMonthShort(c.mois)));
+        row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(c.montant)));
+        list.appendChild(row);
+      });
+      content.appendChild(list);
+    }
+  }
+
+  // Si c'est une facture en retard
+  if (a.type === 'urgent' && a.label.indexOf('Relancer') >= 0) {
+    var facturesRetard = data.facturesAEncaisser ? data.facturesAEncaisser.filter(function(f) { return f.isLate; }) : [];
+    if (facturesRetard.length > 0) {
+      content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, 'Factures en retard:'));
+      var list = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+      facturesRetard.forEach(function(f) {
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '6px', marginBottom: '4px', fontSize: '12px' } });
+        row.appendChild(el('span', {}, f.client + ' - ' + fmtMonthShort(f.mois)));
+        row.appendChild(el('span', { style: { fontWeight: '600', color: 'var(--danger)' } }, EUR(f.ttc)));
+        list.appendChild(row);
+      });
+      content.appendChild(list);
+    }
+  }
+
+  // Bouton action
+  content.appendChild(el('button', {
+    class: 'btn ' + (a.btnClass || 'btn-primary'),
+    style: { width: '100%', marginTop: '12px' },
+    onclick: function() { closeModal('dynamicModal'); a.action(); }
+  }, a.btnLabel));
+
+  showModal(a.icon + ' Action', content);
 }
 
 function renderDashboardCharts(container, months) {
@@ -7735,19 +8089,14 @@ function renderAnalyseSubTab(container, data, months) {
 function renderAccueil(container) {
   var data = compute();
 
-  // 1. MA TRÉSORERIE (Hero)
-  renderDashboardHero(container, data);
-
-  // 2. À FAIRE (Actions urgentes + Timeline jalons)
-  container.appendChild(SectionTitle('⚡', 'À Faire'));
-  renderActionsWidget(container);
-  renderLegalTimeline(container);
-
-  // 3. CA ANNUEL avec plafond micro-entrepreneur
+  // 1. CA ANNUEL avec plafond micro-entrepreneur (en haut)
   renderCAPlafondWidget(container);
 
-  // 4. PROJECTION AUTONOMIE
-  renderProjectionAutonomie(container);
+  // 2. MA TRÉSORERIE (Hero avec camembert)
+  renderDashboardHero(container, data);
+
+  // 3. À FAIRE (Actions + Jalons fusionnés)
+  renderActionsAndMilestones(container);
 
   // Insights (conseils contextuels)
   renderInsights(container);
