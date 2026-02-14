@@ -1297,7 +1297,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <nav class="nav-tabs">
         <button class="nav-tab active" data-view="accueil">🏠</button>
         <button class="nav-tab" data-view="performance">📊</button>
-        <button class="nav-tab" data-view="missions">💼</button>
         <button class="nav-tab" data-view="finances">💰</button>
         <button class="nav-tab" data-view="params">⚙️</button>
       </nav>
@@ -1309,7 +1308,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <nav class="bottom-nav">
     <button class="bottom-nav-tab active" data-view="accueil"><div class="bottom-nav-icon">🏠</div><div class="bottom-nav-label">Accueil</div></button>
     <button class="bottom-nav-tab" data-view="performance"><div class="bottom-nav-icon">📊</div><div class="bottom-nav-label">Perf</div></button>
-    <button class="bottom-nav-tab" data-view="missions"><div class="bottom-nav-icon">💼</div><div class="bottom-nav-label">Missions</div></button>
     <button class="bottom-nav-tab" data-view="finances"><div class="bottom-nav-icon">💰</div><div class="bottom-nav-label">Finances</div></button>
     <button class="bottom-nav-tab" data-view="params"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Params</div></button>
   </nav>
@@ -2318,6 +2316,23 @@ function daysBiz(year, month) {
   return count;
 }
 
+// V56: Calcul des jours ouvrables dans une plage de dates pour un mois donné
+// Utile pour le premier/dernier mois d'une mission qui ne couvre pas le mois entier
+function daysBizInRange(year, month, startDay, endDay) {
+  var holidays = frenchHolidays(year);
+  var count = 0;
+  var lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+  var fromDay = Math.max(1, startDay || 1);
+  var toDay = Math.min(lastDayOfMonth, endDay || lastDayOfMonth);
+  var d = new Date(year, month, fromDay);
+  while (d.getDate() <= toDay && d.getMonth() === month) {
+    var dow = d.getDay();
+    if (dow !== 0 && dow !== 6 && holidays.indexOf(localISO(d)) === -1) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
 // ACRE: calcul automatique de la date d'expiration
 function getAcreInfo() {
   if (!COMPANY.debut || !COMPANY.acre) return { active: false, expiryDate: null, expiryYm: null, startYm: null };
@@ -2820,10 +2835,26 @@ function buildMission(mis) {
   lignes.forEach(function(l) { existingMap[l.ym] = l; });
   var newLignes = [];
   var d = new Date(start.getFullYear(), start.getMonth(), 1);
+  var startYm = ym(start.getFullYear(), start.getMonth());
+  var endYm = ym(end.getFullYear(), end.getMonth());
   while (d <= end) {
     var key = ym(d.getFullYear(), d.getMonth());
     var existing = existingMap[key];
-    var joursOuvrables = daysBiz(d.getFullYear(), d.getMonth());
+    // V56: Calculer les jours ouvrables en tenant compte des dates début/fin
+    var joursOuvrables;
+    if (key === startYm && key === endYm) {
+      // Mois unique: du jour de début au jour de fin
+      joursOuvrables = daysBizInRange(d.getFullYear(), d.getMonth(), start.getDate(), end.getDate());
+    } else if (key === startYm) {
+      // Premier mois: du jour de début à la fin du mois
+      joursOuvrables = daysBizInRange(d.getFullYear(), d.getMonth(), start.getDate(), 31);
+    } else if (key === endYm) {
+      // Dernier mois: du début du mois au jour de fin
+      joursOuvrables = daysBizInRange(d.getFullYear(), d.getMonth(), 1, end.getDate());
+    } else {
+      // Mois complet
+      joursOuvrables = daysBiz(d.getFullYear(), d.getMonth());
+    }
     if (existing) { existing.joursOuvrables = joursOuvrables; existing.joursPrevus = existing.joursPrevus || joursOuvrables; newLignes.push(existing); }
     else { newLignes.push({ ym: key, joursOuvrables: joursOuvrables, joursPrevus: joursOuvrables, joursReels: 0, conges: 0 }); }
     d.setMonth(d.getMonth() + 1);
@@ -8185,9 +8216,9 @@ function renderDashboardCharts(container, months) {
   chartActions.appendChild(toggle);
   chartTitle.appendChild(chartActions);
   chartCard.appendChild(chartTitle);
-  // V55: Créer canvas avec style pour garantir les dimensions
+  // V56: Canvas sans style inline pour compatibilité Chart.js
   var chartContainer = el('div', { class: 'chart-container' });
-  var mainCanvas = el('canvas', { id: 'mainChart', style: { width: '100%', height: '100%' } });
+  var mainCanvas = el('canvas', { id: 'mainChart' });
   chartContainer.appendChild(mainCanvas);
   chartCard.appendChild(chartContainer);
   container.appendChild(chartCard);
@@ -8201,9 +8232,9 @@ function renderDashboardCharts(container, months) {
   soldeToggle.appendChild(el('button', { class: 'chart-toggle-btn' + (SHOW_CASH_DISPO ? ' active' : ''), onclick: function() { SHOW_CASH_DISPO = true; render(); } }, 'Cash'));
   soldeTitle.appendChild(soldeToggle);
   soldeCard.appendChild(soldeTitle);
-  // V55: Créer canvas avec style pour garantir les dimensions
+  // V56: Canvas sans style inline pour compatibilité Chart.js
   var soldeContainer = el('div', { class: 'chart-container' });
-  var soldeCanvas = el('canvas', { id: 'soldeChart', style: { width: '100%', height: '100%' } });
+  var soldeCanvas = el('canvas', { id: 'soldeChart' });
   soldeContainer.appendChild(soldeCanvas);
   soldeCard.appendChild(soldeContainer);
   container.appendChild(soldeCard);
@@ -8241,14 +8272,13 @@ function renderDashboardSubTabs(container) {
 }
 
 
-// V55: Sous-onglet Impôts & Charges avec graphique par importance - CORRECTION VALEURS
+// V56: Sous-onglet Impôts & Charges avec camembert style clients
 function renderChargesSubTab(container, data) {
   container.appendChild(SectionTitle('💳', 'Impôts & Charges'));
 
   var caHT = data.caReal || 1;
 
-  // V55: Utiliser UNIQUEMENT allProvisionsDetail pour éviter le double comptage
-  // Catégories à afficher (toutes, même à 0)
+  // Catégories avec couleurs
   var categories = [
     { id: 'URSSAF', label: 'URSSAF', icon: '🏥', color: '#ef4444' },
     { id: 'TVA', label: 'TVA', icon: '🏛️', color: '#3b82f6' },
@@ -8256,101 +8286,145 @@ function renderChargesSubTab(container, data) {
     { id: 'CFP', label: 'CFP', icon: '📚', color: '#8b5cf6' },
     { id: 'CFE', label: 'CFE', icon: '🏢', color: '#6b7280' },
     { id: 'Impôt PL', label: 'Impôt PL', icon: '📋', color: '#f97316' },
-    { id: 'Autres', label: 'Autres dépenses', icon: '📦', color: '#94a3b8' }
+    { id: 'Autres', label: 'Autres', icon: '📦', color: '#94a3b8' }
   ];
 
-  // V55: Calculer les totaux à partir de allProvisionsDetail (source unique de vérité)
+  // Calculer les totaux
   var chargeTypes = [];
   categories.forEach(function(cat) {
     var charges = (data.allProvisionsDetail || []).filter(function(c) {
-      if (cat.id === 'IR') {
-        return c.cat === 'IR Estimé' || c.cat === 'IR';
-      }
+      if (cat.id === 'IR') return c.cat === 'IR Estimé' || c.cat === 'IR';
       if (cat.id === 'Autres') {
-        // Autres = tout ce qui n'est pas dans les catégories standard
         var standard = ['URSSAF', 'TVA', 'IR Estimé', 'IR', 'CFP', 'CFE', 'Impôt PL', 'Impôt'];
         return !standard.some(function(s) { return c.cat === s || c.cat.indexOf(s) === 0; });
       }
       return c.cat === cat.id || c.cat.indexOf(cat.id) === 0;
     });
     var montant = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
-    var pctCA = caHT > 0 ? (montant / caHT) * 100 : 0;
-    var unpaidCount = charges.length;
-
-    // V55: Afficher TOUTES les catégories, même à 0
-    chargeTypes.push({
-      id: cat.id,
-      label: cat.label,
-      icon: cat.icon,
-      color: cat.color,
-      montant: montant,
-      pctCA: pctCA,
-      unpaidCount: unpaidCount,
-      isPaid: unpaidCount === 0 && montant === 0
-    });
+    if (montant > 0) {
+      chargeTypes.push({
+        id: cat.id, label: cat.label, icon: cat.icon, color: cat.color,
+        montant: montant, pctCA: (montant / caHT) * 100, unpaidCount: charges.length
+      });
+    }
   });
 
-  // Trier par importance (montant décroissant), mais garder les 0 à la fin
-  chargeTypes.sort(function(a, b) {
-    if (a.montant === 0 && b.montant > 0) return 1;
-    if (b.montant === 0 && a.montant > 0) return -1;
-    return b.montant - a.montant;
+  // Trier par montant décroissant
+  chargeTypes.sort(function(a, b) { return b.montant - a.montant; });
+
+  var totalCharges = chargeTypes.reduce(function(sum, c) { return sum + c.montant; }, 0) || 1;
+  var maxMontant = chargeTypes.length > 0 ? chargeTypes[0].montant : 1;
+
+  var widget = el('div', { class: 'card' });
+
+  if (chargeTypes.length === 0) {
+    widget.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Aucune charge à payer'));
+    container.appendChild(widget);
+    return;
+  }
+
+  // V56: Layout horizontal avec camembert à gauche et liste à droite (style clients)
+  var content = el('div', { style: { display: 'flex', gap: '16px', alignItems: 'flex-start' } });
+
+  // Camembert SVG
+  var pieSize = 120;
+  var pieContainer = el('div', { style: { flexShrink: '0' } });
+  var pieDiv = el('div', { style: { position: 'relative', width: pieSize + 'px', height: pieSize + 'px' } });
+
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', pieSize);
+  svg.setAttribute('height', pieSize);
+  svg.setAttribute('viewBox', '0 0 100 100');
+
+  // Dessiner les segments du camembert
+  var cumAngle = -90;
+  chargeTypes.slice(0, 7).forEach(function(charge, i) {
+    var pct = (charge.montant / totalCharges) * 100;
+    var angle = (pct / 100) * 360;
+
+    if (pct > 0) {
+      var startAngle = cumAngle * (Math.PI / 180);
+      var endAngle = (cumAngle + angle) * (Math.PI / 180);
+
+      var x1 = 50 + 40 * Math.cos(startAngle);
+      var y1 = 50 + 40 * Math.sin(startAngle);
+      var x2 = 50 + 40 * Math.cos(endAngle);
+      var y2 = 50 + 40 * Math.sin(endAngle);
+
+      var largeArc = angle > 180 ? 1 : 0;
+
+      var path = document.createElementNS(svgNS, 'path');
+      if (chargeTypes.length === 1 || pct >= 99.5) {
+        path.setAttribute('d', 'M 50 10 A 40 40 0 1 1 49.99 10 Z');
+      } else {
+        path.setAttribute('d', 'M 50 50 L ' + x1 + ' ' + y1 + ' A 40 40 0 ' + largeArc + ' 1 ' + x2 + ' ' + y2 + ' Z');
+      }
+      path.setAttribute('fill', charge.color);
+      svg.appendChild(path);
+
+      cumAngle += angle;
+    }
   });
 
-  // V55: Afficher toutes les jauges avec le statut
-  var chartCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
-  chartCard.appendChild(el('div', { class: 'card-title' }, '📊 Répartition des Charges (% du CA HT)'));
+  // Centre blanc pour effet donut
+  var centerCircle = document.createElementNS(svgNS, 'circle');
+  centerCircle.setAttribute('cx', '50');
+  centerCircle.setAttribute('cy', '50');
+  centerCircle.setAttribute('r', '25');
+  centerCircle.setAttribute('fill', 'var(--bg-secondary)');
+  svg.appendChild(centerCircle);
 
-  var maxMontant = Math.max.apply(null, chargeTypes.map(function(ct) { return ct.montant; })) || 1;
+  pieDiv.appendChild(svg);
 
-  chargeTypes.forEach(function(ct) {
-    var barWidth = maxMontant > 0 ? (ct.montant / maxMontant) * 100 : 0;
-    var status = ct.montant === 0 ? '✅' : (ct.unpaidCount > 0 ? '🔴' : '✅');
+  // Total au centre
+  var centerLabel = el('div', { style: {
+    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+    textAlign: 'center', lineHeight: '1.2'
+  }});
+  centerLabel.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Total'));
+  centerLabel.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--danger)' } }, EUR(totalCharges, true)));
+  pieDiv.appendChild(centerLabel);
+
+  pieContainer.appendChild(pieDiv);
+  content.appendChild(pieContainer);
+
+  // Liste des charges avec barres horizontales
+  var listContainer = el('div', { style: { flex: '1', minWidth: '0' } });
+
+  chargeTypes.slice(0, 7).forEach(function(charge) {
+    var pct = Math.round((charge.montant / totalCharges) * 100);
+    var barWidth = (charge.montant / maxMontant) * 100;
 
     var row = el('div', {
-      style: { marginBottom: '10px', cursor: ct.montant > 0 ? 'pointer' : 'default', opacity: ct.montant === 0 ? '0.6' : '1' },
-      onclick: ct.montant > 0 ? function() { showChargeDetailEnhanced(ct.id, data, caHT); } : null
+      style: { marginBottom: '8px', cursor: 'pointer' },
+      onclick: function() { showChargeDetailEnhanced(charge.id, data, caHT); }
     });
 
-    // Label + valeur + statut
-    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', marginBottom: '4px' } });
-    header.appendChild(el('span', {}, ct.icon + ' ' + ct.label));
-    header.appendChild(el('span', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
-      el('span', { style: { fontWeight: '600' } }, EUR(ct.montant) + (ct.montant > 0 ? ' (' + ct.pctCA.toFixed(1) + '%)' : '')),
-      el('span', { style: { fontSize: '10px' } }, status)
+    // Header: nom + montant + %
+    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', marginBottom: '2px' } });
+    header.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      el('div', { style: { width: '8px', height: '8px', borderRadius: '2px', background: charge.color } }),
+      el('span', { style: { fontWeight: '600' } }, charge.icon + ' ' + charge.label)
     ]));
+    header.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, EUR(charge.montant) + ' (' + pct + '%)'));
     row.appendChild(header);
 
-    // Barre
-    var barBg = el('div', { style: { height: '20px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' } });
-    var barFill = el('div', { style: { height: '100%', width: barWidth + '%', background: ct.color, borderRadius: '4px', transition: 'width 0.3s', minWidth: ct.montant > 0 ? '2px' : '0' } });
+    // Barre de progression
+    var barBg = el('div', { style: { height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' } });
+    var barFill = el('div', { style: { height: '100%', width: barWidth + '%', background: charge.color, borderRadius: '3px' } });
     barBg.appendChild(barFill);
     row.appendChild(barBg);
 
-    chartCard.appendChild(row);
+    // Sous-info: % du CA
+    row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, charge.pctCA.toFixed(1) + '% du CA HT'));
+
+    listContainer.appendChild(row);
   });
 
-  container.appendChild(chartCard);
-
-  // Total
-  var totalAPayer = data.provisionsAbsolues || 0;
-  var totalPaye = data.totalChargesPaid || 0;
-  var totalPctCA = caHT > 0 ? ((totalAPayer + totalPaye) / caHT * 100).toFixed(1) : 0;
-
-  var totalsDiv = el('div', { class: 'card', style: { display: 'flex', justifyContent: 'space-around', textAlign: 'center' } });
-  totalsDiv.appendChild(el('div', {}, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'À payer'),
-    el('div', { style: { fontWeight: '700', fontSize: '16px', color: 'var(--danger)' } }, EUR(totalAPayer))
-  ]));
-  totalsDiv.appendChild(el('div', {}, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total charges'),
-    el('div', { style: { fontWeight: '700', fontSize: '16px', color: 'var(--text-secondary)' } }, totalPctCA + '% CA')
-  ]));
-  totalsDiv.appendChild(el('div', {}, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Payé'),
-    el('div', { style: { fontWeight: '700', fontSize: '16px', color: 'var(--success)' } }, EUR(totalPaye))
-  ]));
-  container.appendChild(totalsDiv);
+  content.appendChild(listContainer);
+  widget.appendChild(content);
+  container.appendChild(widget);
 }
 
 // V55: Détail charges amélioré avec historique % CA HT - CORRIGÉ
@@ -9403,7 +9477,8 @@ function renderFactures(container) {
     contratsDiv.appendChild(el('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '12px' } }, 'Aucun contrat. Cliquez sur "+ Nouveau" pour créer votre premier contrat.'));
   } else {
     MISSIONS.forEach(function(m) {
-      var isActive = !m.dateFin || new Date(m.dateFin) >= TODAY;
+      // V56: Utiliser m.fin (pas m.dateFin) - cohérent avec la sauvegarde
+      var isActive = !m.fin || new Date(m.fin) >= TODAY;
       var contratRow = el('div', { style: {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '8px',
@@ -9413,8 +9488,8 @@ function renderFactures(container) {
       var contratInfo = el('div', {});
       contratInfo.appendChild(el('div', { style: { fontWeight: '600' } }, m.client || 'Sans client'));
       contratInfo.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } },
-        EUR(m.tjm || 0) + '/j · ' + (m.dateDebut ? fmtMonthShort(m.dateDebut.substring(0, 7)) : '-') +
-        (m.dateFin ? ' → ' + fmtMonthShort(m.dateFin.substring(0, 7)) : ' → En cours')));
+        EUR(m.tjm || 0) + '/j · ' + (m.debut ? fmtMonthShort(m.debut.substring(0, 7)) : '-') +
+        (m.fin ? ' → ' + fmtMonthShort(m.fin.substring(0, 7)) : ' → En cours')));
       contratRow.appendChild(contratInfo);
 
       var badge = el('span', { style: {
@@ -10258,7 +10333,7 @@ function render() {
   try {
     if (VIEW === 'accueil') renderAccueil(container);
     else if (VIEW === 'performance') renderPerformance(container);
-    else if (VIEW === 'missions') renderMissionsView(container);
+    else if (VIEW === 'missions') { VIEW = 'finances'; FINANCES_TAB = 'missions'; renderFinances(container); }
     else if (VIEW === 'finances') renderFinances(container);
     else if (VIEW === 'params') renderParams(container);
   } catch (e) {
@@ -10490,6 +10565,39 @@ function init() {
 document.addEventListener('DOMContentLoaded', init);
 
 /*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * CHANGELOG FREEL V56 - 14 février 2026
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🔴 CORRECTIONS
+ * ──────────────
+ * 1. GRAPHIQUES PERFORMANCE
+ *    - Fix canvas Chart.js: suppression styles inline qui cassaient le rendu
+ *    - Les graphiques CA et Trésorerie s'affichent maintenant correctement
+ *
+ * 2. CALCUL JOURS TRAVAILLÉS
+ *    - Nouvelle fonction daysBizInRange() pour calcul partiel
+ *    - Prise en compte de la date exacte de début/fin de mission
+ *    - Premier mois: jours ouvrables du jour de début à fin de mois
+ *    - Dernier mois: jours ouvrables du début de mois au jour de fin
+ *
+ * 3. STATUT MISSION
+ *    - Fix: utilisation de m.fin au lieu de m.dateFin (cohérence données)
+ *    - Les missions se terminant après aujourd'hui sont bien marquées "En cours"
+ *
+ * 🟠 AMÉLIORATIONS UX
+ * ──────────────────
+ * 4. WIDGET IMPÔTS & CHARGES
+ *    - Nouveau design camembert (style identique au widget Clients)
+ *    - Visualisation intuitive de la répartition des charges
+ *    - Total au centre du donut
+ *    - Barres horizontales avec couleurs par catégorie
+ *
+ * 5. NAVIGATION SIMPLIFIÉE
+ *    - Suppression onglet Missions (doublon avec Finances > Missions)
+ *    - Navigation à 4 onglets: Accueil, Perf, Finances, Params
+ *    - Redirection automatique si URL mission vers Finances
+ *
  * ═══════════════════════════════════════════════════════════════════════════
  * CHANGELOG FREEL V50 - 5 février 2026 (Clean Slate)
  * ═══════════════════════════════════════════════════════════════════════════
