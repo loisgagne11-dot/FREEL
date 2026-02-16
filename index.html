@@ -2601,6 +2601,50 @@ function getAbsoluteBalance() {
   return balance;
 }
 
+// V59: Retourne le détail de la composition du solde absolu (indépendant du filtre)
+function getAbsoluteBalanceDetail() {
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var detail = {
+    soldeInitial: TREASURY.soldeInitial || 0,
+    encaissements: 0,
+    chargesPayees: 0,
+    salaires: 0,
+    interets: 0
+  };
+
+  MISSIONS.forEach(function(mis) {
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (paymentMonth <= nowYm) {
+        detail.encaissements += f.ttc;
+        var rate = getUrssafRate(paymentMonth);
+        if (isPaid('URSSAF-' + f.id)) detail.chargesPayees += Math.round(f.ht * rate);
+        if (isPaid('CFP-' + f.id)) detail.chargesPayees += Math.round(f.ht * LEGAL.cfp);
+        if (f.tva > 0 && isPaid('TVA-' + f.id)) detail.chargesPayees += Math.round(f.tva);
+        if (COMPANY.prelevementLiberatoire && isPaid('IMPLIB-' + f.id)) detail.chargesPayees += Math.round(f.ht * LEGAL.impLib);
+      }
+    });
+  });
+
+  TREASURY.mouvements.forEach(function(mv) {
+    if (mv.mois <= nowYm) {
+      if (mv.type === 'Charge' && isPaid(mv.id)) detail.chargesPayees += mv.montant;
+      if (mv.type === 'Salaire') detail.salaires += mv.montant;
+    }
+  });
+
+  if (TREASURY.rendementActif && TREASURY.rendementHistorique) {
+    TREASURY.rendementHistorique.forEach(function(int) {
+      if (int.mois <= nowYm) detail.interets += int.montant;
+    });
+  }
+
+  detail.soldeActuel = detail.soldeInitial + detail.encaissements - detail.chargesPayees - detail.salaires + detail.interets;
+  return detail;
+}
+
 // V47: Calcule le solde moyen pour un mois donné (approximation basée sur début + fin)
 function getSoldeMoyenMois(targetYm) {
   // Calculer le solde au début du mois (1er jour)
@@ -4814,16 +4858,19 @@ function renderIRForYear(year) {
   
   form.appendChild(createInput('PER annuel (€)', 'number', 'irPER', cfg.perAnnuel || 0));
   
-  form.appendChild(el('button', { class: 'btn btn-success btn-sm', style: { marginTop: '12px' }, onclick: function() {
-    var y = String(year);
-    if (!IR_CONFIG[y]) IR_CONFIG[y] = {};
-    IR_CONFIG[y].parts = parseFloat($('#irParts').value) || 1;
-    IR_CONFIG[y].autresRevenus = parseFloat($('#irAutres').value) || 0;
-    IR_CONFIG[y].perAnnuel = parseFloat($('#irPER').value) || 0;
-    saveAll();
-    renderIRForYear(year);
-    toast('Paramètres ' + year + ' sauvegardés', 'success');
-  } }, '💾 Sauvegarder'));
+  // V59: IIFE pour capturer correctement la valeur de year
+  form.appendChild(el('button', { class: 'btn btn-success btn-sm', style: { marginTop: '12px' }, onclick: (function(yearToSave) {
+    return function() {
+      var y = String(yearToSave);
+      if (!IR_CONFIG[y]) IR_CONFIG[y] = {};
+      IR_CONFIG[y].parts = parseFloat($('#irParts').value) || 1;
+      IR_CONFIG[y].autresRevenus = parseFloat($('#irAutres').value) || 0;
+      IR_CONFIG[y].perAnnuel = parseFloat($('#irPER').value) || 0;
+      saveAll();
+      renderIRForYear(yearToSave);
+      toast('Paramètres ' + yearToSave + ' sauvegardés', 'success');
+    };
+  })(year) }, '💾 Sauvegarder'));
   
   content.appendChild(form);
   
@@ -6373,7 +6420,7 @@ function getActionsList() {
     });
   }
   data.detailChargesAPayer.slice(0, 2).forEach(function(c) {
-    actions.push({ priority: 2, type: 'warning', icon: '💳', label: 'Payer ' + c.cat, sub: EUR(c.montant) + ' · ' + fmtMonthShort(c.mois), action: function() { togglePaid(c.id); }, btnLabel: '✓ Payé', btnClass: 'success' });
+    actions.push({ priority: 2, type: 'warning', icon: '💳', label: 'Payer ' + c.cat, sub: EUR(c.montant) + ' · ' + fmtMonthShort(c.mois), action: function() { togglePaid(c.id); }, btnLabel: 'Payé', btnClass: 'success' });
   });
   if (data.salaireReco >= 500) {
     actions.push({ priority: 3, type: 'success', icon: '💸', label: 'Verser un salaire', sub: EUR(data.salaireReco) + ' disponible', action: function() { showSalaireModal(data.salaireReco); }, btnLabel: 'Verser', btnClass: '' });
@@ -7715,6 +7762,32 @@ function renderDashboardHero(container, data) {
   }
   hero.appendChild(salaireDiv);
 
+  // V59: Bloc composition compte pro (ABSOLU - indépendant des filtres)
+  var balDetail = getAbsoluteBalanceDetail();
+  var compteBlock = el('div', { style: { marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  compteBlock.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase' } }, '📊 Composition Compte (actuel)'));
+
+  var detailRow = function(label, amount, color) {
+    return el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: '11px' } }, [
+      el('span', {}, label),
+      el('span', { style: { fontWeight: '600', color: color || 'inherit' } }, EUR(amount))
+    ]);
+  };
+
+  compteBlock.appendChild(detailRow('Solde initial', balDetail.soldeInitial));
+  compteBlock.appendChild(detailRow('+ Encaissements TTC', balDetail.encaissements, 'var(--success)'));
+  compteBlock.appendChild(detailRow('- Charges payées', balDetail.chargesPayees, 'var(--danger)'));
+  compteBlock.appendChild(detailRow('- Salaires versés', balDetail.salaires, 'var(--info)'));
+  if (balDetail.interets > 0) {
+    compteBlock.appendChild(detailRow('+ Intérêts compte', balDetail.interets, 'var(--success)'));
+  }
+  compteBlock.appendChild(el('div', { style: { borderTop: '1px solid var(--border)', marginTop: '6px', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '12px' } }, [
+    el('span', {}, '= Solde compte'),
+    el('span', { style: { color: balDetail.soldeActuel >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(balDetail.soldeActuel))
+  ]));
+
+  hero.appendChild(compteBlock);
+
   container.appendChild(hero);
 }
 
@@ -8479,6 +8552,7 @@ function renderChargesSubTab(container, data) {
 }
 
 // V55: Détail charges amélioré avec historique % CA HT - CORRIGÉ
+// V59: Statuts cliquables (payé/provisionné) + montants projetés basés sur missions
 function showChargeDetailEnhanced(categoryId, data, caHT) {
   // V55: Filtrer allProvisionsDetail pour la catégorie
   var filterFn = function(c) {
@@ -8495,6 +8569,42 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
   // V57: Utiliser les données filtrées par période au lieu des provisions absolues
   var periodCharges = (data.detailChargesPayees || []).concat(data.detailChargesAPayer || []);
   var charges = periodCharges.filter(filterFn);
+
+  // V59: Calculer les montants projetés basés sur les missions futures
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var projectedByMonth = {};
+  var totalProjected = 0;
+  MISSIONS.forEach(function(mis) {
+    if (!mis.lignes || !mis.tjm) return;
+    mis.lignes.forEach(function(l) {
+      if (!l.ym || l.ym <= nowYm) return; // Seulement mois futurs
+      if (!isInPeriod(l.ym)) return;
+      var joursEffectifs = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+      if (joursEffectifs <= 0) return;
+      var caHTPrev = joursEffectifs * mis.tjm;
+      var chargeMonth = getPaymentMonth(l.ym, mis.delaiPaiement || 0, mis.jourPaiement || 15);
+      if (!isInPeriod(chargeMonth)) return;
+      var projAmount = 0;
+      if (categoryId === 'URSSAF') {
+        projAmount = Math.round(caHTPrev * getUrssafRate(chargeMonth));
+      } else if (categoryId === 'TVA' && isTVAApplicable(chargeMonth)) {
+        projAmount = Math.round(caHTPrev * 0.2);
+      } else if (categoryId === 'CFP') {
+        projAmount = Math.round(caHTPrev * LEGAL.cfp);
+      } else if (categoryId === 'Impôt PL' && COMPANY.prelevementLiberatoire) {
+        projAmount = Math.round(caHTPrev * LEGAL.impLib);
+      } else if (categoryId === 'IR' && !COMPANY.prelevementLiberatoire) {
+        // IR projeté: estimation proportionnelle
+        var irEst = calculateIR(caHTPrev, parseInt(chargeMonth.substring(0, 4)));
+        projAmount = irEst.impot > 0 ? Math.round(irEst.impot) : 0;
+      }
+      if (projAmount > 0) {
+        if (!projectedByMonth[chargeMonth]) projectedByMonth[chargeMonth] = 0;
+        projectedByMonth[chargeMonth] += projAmount;
+        totalProjected += projAmount;
+      }
+    });
+  });
 
   // V57: Déterminer le taux URSSAF en fonction de l'année de la période sélectionnée
   var urssafRateText = (function() {
@@ -8527,10 +8637,23 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
   var total = charges.reduce(function(sum, c) { return sum + c.montant; }, 0);
   var pctCA = caHT > 0 ? (total / caHT * 100).toFixed(1) : 0;
 
+  // V59: Calculer totaux payé et provisionné
+  var totalPaid = charges.filter(function(c) { return c.id && isPaid(c.id); }).reduce(function(s, c) { return s + c.montant; }, 0);
+  // Pour detailChargesPayees qui n'ont pas d'id, compter comme payé
+  var totalPaidFromPayees = (data.detailChargesPayees || []).filter(filterFn).reduce(function(s, c) { return s + c.montant; }, 0);
+  totalPaid = Math.max(totalPaid, totalPaidFromPayees);
+  var totalUnpaid = total - totalPaid;
+
   content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '12px' } }, [
     el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, info.label),
     el('div', { style: { fontSize: '28px', fontWeight: '800', color: 'var(--danger)' } }, EUR(total)),
-    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, pctCA + '% du CA HT')
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, pctCA + '% du CA HT'),
+    // V59: Résumé payé / provisionné / projeté - badges visibles
+    el('div', { style: { display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '8px', fontSize: '10px' } }, [
+      totalPaid > 0 ? el('span', { style: { background: 'var(--success)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' } }, 'Payé: ' + EUR(totalPaid)) : null,
+      totalUnpaid > 0 ? el('span', { style: { background: '#f59e0b', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' } }, 'Prov: ' + EUR(totalUnpaid)) : null,
+      totalProjected > 0 ? el('span', { style: { background: '#a78bfa', color: 'white', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' } }, 'Projeté: ' + EUR(totalProjected)) : null
+    ].filter(Boolean))
   ]));
 
   // Info taux
@@ -8539,56 +8662,91 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
   if (info.desc) infoBox.appendChild(el('div', { style: { color: 'var(--text-muted)', marginTop: '4px' } }, info.desc));
   content.appendChild(infoBox);
 
-  // V55: Historique par mois avec % CA - utiliser 'charges' au lieu de chargesAPayer
-  if (charges.length > 0) {
+  // V59: Collecter tous les mois (charges réelles + projetées) et fusionner
+  var allMonths = {};
+  charges.forEach(function(c) {
+    if (!allMonths[c.mois]) allMonths[c.mois] = { charges: [], projected: 0 };
+    allMonths[c.mois].charges.push(c);
+  });
+  Object.keys(projectedByMonth).forEach(function(m) {
+    if (!allMonths[m]) allMonths[m] = { charges: [], projected: 0 };
+    allMonths[m].projected = projectedByMonth[m];
+  });
+
+  var sortedMonths = Object.keys(allMonths).sort().reverse();
+
+  if (sortedMonths.length > 0) {
     content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '📅 Détail par mois'));
-    var list = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+    var list = el('div', { style: { maxHeight: '300px', overflowY: 'auto' } });
 
-    // Grouper par mois
-    var byMonth = {};
-    charges.forEach(function(c) {
-      if (!byMonth[c.mois]) byMonth[c.mois] = [];
-      byMonth[c.mois].push(c);
-    });
-
-    Object.keys(byMonth).sort().reverse().forEach(function(mois) {
-      var monthCharges = byMonth[mois];
+    sortedMonths.forEach(function(mois) {
+      var entry = allMonths[mois];
+      var monthCharges = entry.charges;
+      var monthProjected = entry.projected;
       var monthTotal = monthCharges.reduce(function(s, c) { return s + c.montant; }, 0);
       var monthData = data.monthsData[mois];
-      // V57: Utiliser encHT (CA HT encaissé) pour le calcul du pourcentage
       var monthCA = monthData ? monthData.encHT : 0;
-      // V57: Si pas de CA encaissé ce mois-ci, afficher le taux théorique URSSAF
       var monthPct;
       if (monthCA > 0) {
         monthPct = (monthTotal / monthCA * 100).toFixed(1) + '%';
-      } else {
-        // Calculer le taux théorique basé sur le montant URSSAF
+      } else if (categoryId === 'URSSAF') {
         var rate = getUrssafRate(mois);
         monthPct = PCT(rate);
-      }
-
-      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '4px', fontSize: '11px' } });
-      row.appendChild(el('span', { style: { fontWeight: '600' } }, fmtMonthShort(mois)));
-      row.appendChild(el('span', {}, EUR(monthTotal)));
-      row.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, monthPct + ' CA'));
-
-      // Bouton payer si non payé
-      var unpaid = monthCharges.filter(function(c) { return !isPaid(c.id); });
-      if (unpaid.length > 0) {
-        row.appendChild(el('button', {
-          class: 'btn btn-sm',
-          onclick: function(e) {
-            e.stopPropagation();
-            unpaid.forEach(function(c) { markAllPaid([c.id]); });
-            closeDynamicModal();
-            render();
-          }
-        }, '✓'));
       } else {
-        row.appendChild(el('span', { style: { color: 'var(--success)', fontSize: '10px' } }, '✅'));
+        monthPct = '-';
       }
 
-      list.appendChild(row);
+      // V59: Ligne principale avec montant réel
+      if (monthTotal > 0) {
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '2px', fontSize: '11px' } });
+        row.appendChild(el('span', { style: { fontWeight: '600', minWidth: '44px' } }, fmtMonthShort(mois)));
+        row.appendChild(el('span', { style: { fontWeight: '600', minWidth: '65px', textAlign: 'right' } }, EUR(monthTotal)));
+        row.appendChild(el('span', { style: { color: 'var(--text-muted)', minWidth: '55px', textAlign: 'right' } }, monthPct + ' CA'));
+
+        // V59: Statut cliquable: badge "Payé" ou "Provisionné" avec toggle au clic
+        var unpaid = monthCharges.filter(function(c) { return c.id && !isPaid(c.id); });
+        var allPaid = unpaid.length === 0;
+        (function(unpaidList, chargesList, monthMois) {
+          var statusBadge = el('button', {
+            style: {
+              border: 'none', borderRadius: '12px', padding: '4px 12px', fontSize: '10px', fontWeight: '700',
+              cursor: 'pointer', minWidth: '90px', textAlign: 'center', transition: 'all 0.2s',
+              background: allPaid ? 'var(--success)' : '#f59e0b',
+              color: 'white',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+            },
+            title: allPaid ? 'Cliquer pour marquer comme non payé' : 'Cliquer pour marquer comme payé',
+            onclick: function(e) {
+              e.stopPropagation();
+              if (allPaid) {
+                // Toggle back to unpaid
+                chargesList.forEach(function(c) { if (c.id) TREASURY.paidCharges[c.id] = false; });
+              } else {
+                // Mark all as paid
+                unpaidList.forEach(function(c) { if (c.id) TREASURY.paidCharges[c.id] = true; });
+              }
+              saveAll();
+              closeDynamicModal();
+              render();
+              // Re-open the detail after render
+              setTimeout(function() { showChargeDetailEnhanced(categoryId, compute(), data.caHT || caHT); }, 50);
+            }
+          }, allPaid ? 'Payé' : 'Provisionné');
+          row.appendChild(statusBadge);
+        })(unpaid, monthCharges, mois);
+
+        list.appendChild(row);
+      }
+
+      // V59: Ligne projetée si applicable
+      if (monthProjected > 0) {
+        var projRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'rgba(167,139,250,0.08)', borderRadius: '6px', marginBottom: '4px', fontSize: '11px', borderLeft: '3px solid #a78bfa' } });
+        projRow.appendChild(el('span', { style: { fontWeight: '600', minWidth: '44px', color: '#a78bfa' } }, monthTotal > 0 ? '' : fmtMonthShort(mois)));
+        projRow.appendChild(el('span', { style: { fontWeight: '600', minWidth: '65px', textAlign: 'right', color: '#a78bfa' } }, EUR(monthProjected)));
+        projRow.appendChild(el('span', { style: { color: 'var(--text-muted)', minWidth: '55px', textAlign: 'right', fontSize: '10px' } }, 'missions'));
+        projRow.appendChild(el('span', { style: { color: '#a78bfa', fontSize: '10px', fontWeight: '700', minWidth: '90px', textAlign: 'center' } }, '◌ Projeté'));
+        list.appendChild(projRow);
+      }
     });
     content.appendChild(list);
   } else {
@@ -8631,13 +8789,14 @@ function showChargeDetail(categoryId, data) {
   if (charges.length > 0) {
     var table = el('div', { style: { fontSize: '12px' } });
     charges.sort(function(a, b) { return a.ym > b.ym ? -1 : 1; }).forEach(function(c) {
-      var status = c.paid ? '✅ Payé' : (c.isLate ? '🔴 Retard' : '⚪ À payer');
+      var status = c.paid ? 'Payé' : (c.isLate ? 'Retard' : 'À payer');
+      var statusColor = c.paid ? 'var(--success)' : (c.isLate ? 'var(--danger)' : 'var(--text-muted)');
       var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
       row.appendChild(el('span', {}, fmtMonth(c.ym)));
       row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(c.montant)));
-      row.appendChild(el('span', {}, status));
+      row.appendChild(el('span', { style: { color: statusColor, fontWeight: '600', padding: '2px 8px', background: c.paid ? 'rgba(16,185,129,0.15)' : (c.isLate ? 'rgba(239,68,68,0.15)' : 'rgba(156,163,175,0.15)'), borderRadius: '10px', fontSize: '10px' } }, status));
       if (!c.paid) {
-        row.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { markAllPaid([c.id]); closeDynamicModal(); render(); } }, 'Payer'));
+        row.appendChild(el('button', { class: 'btn btn-sm btn-success', onclick: function() { markAllPaid([c.id]); closeDynamicModal(); render(); } }, 'Payer'));
       }
       table.appendChild(row);
     });
@@ -8756,12 +8915,12 @@ function renderPerformance(container) {
 
   var kpiGrid = el('div', { class: 'kpi-grid', style: { marginBottom: '16px' } });
   kpiGrid.appendChild(KPI({ label: 'CA Réalisé', value: EUR(data.caReal), sub: 'Prévu: ' + EUR(data.caPrev), color: 'info', trend: getTrend(data.sparklineData.caReal), onClick: function() { showCARealisedDetail(data); } }));
-  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success', onClick: function() { showEncaisseDetail(data); } }));
+  kpiGrid.appendChild(KPI({ label: 'CA Encaissé HT', value: EUR(data.caHT), sub: 'TTC: ' + EUR(data.caEnc), color: 'success', onClick: function() { showEncaisseDetail(data); } }));
   kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger', onClick: function() { showBeneficeDetail(data); } }));
   kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent', onClick: showTJMDetail }));
-  // V58: Indicateur Impôt avec accès direct au simulateur IR
-  var irEstime = (data.provByType && data.provByType['IR Estimé']) || 0;
-  var impotPL = (data.provByType && data.provByType['Impôt PL']) || 0;
+  // V59: Indicateur Impôt - utiliser provAbsoluesByType (indépendant du filtre)
+  var irEstime = (data.provAbsoluesByType && data.provAbsoluesByType['IR Estimé']) || 0;
+  var impotPL = (data.provAbsoluesByType && data.provAbsoluesByType['Impôt PL']) || 0;
   var totalImpot = irEstime + impotPL;
   var impotLabel = COMPANY.pl ? 'Impôt PL' : 'IR Estimé';
   kpiGrid.appendChild(KPI({ label: impotLabel, value: EUR(totalImpot), sub: '🧮 Simulateur', color: 'warning', onClick: showIRDetail }));
