@@ -9046,35 +9046,74 @@ function renderFinances(container) {
   }
 }
 
-// V54: Contenu Missions dans Finance
+// V60: Contenu Missions dans Finance - avec distinction Réalisé/Encaissé/Latent/Prévu
 function renderMissionsContent(container) {
   var data = compute();
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
 
-  // KPIs Missions
-  var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' } });
-
-  // V57: Utiliser isMissionActive() au lieu de m.actif pour déterminer le statut
+  // V60: Calculer les 4 types de CA
   var activeMissions = MISSIONS.filter(function(m) { return isMissionActive(m); });
-  var totalCA = 0;
+  var aVenirMissions = MISSIONS.filter(function(m) { return getMissionStatus(m) === 'a_venir'; });
+  var caRealise = 0;   // Jours réellement travaillés × TJM
+  var caEncaisse = 0;  // Factures payées (HT)
+  var caLatent = 0;    // Factures envoyées mais pas encore payées
+  var caPrevu = 0;     // CA projeté sur missions futures (jours prévus non encore travaillés)
   var totalJours = 0;
+
   MISSIONS.forEach(function(m) {
+    if (!m.lignes) return;
+    // CA Réalisé = jours réels × TJM
+    m.lignes.forEach(function(l) {
+      if (!isInPeriod(l.ym)) return;
+      var joursEffectifs = l.joursReels > 0 ? l.joursReels : 0;
+      caRealise += joursEffectifs * m.tjm;
+      totalJours += joursEffectifs;
+      // CA Prévu = jours prévus non encore réalisés sur mois futurs
+      if (l.ym > nowYm) {
+        var joursPrevusFuturs = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        if (l.joursReels <= 0) {
+          caPrevu += joursPrevusFuturs * m.tjm;
+        }
+      }
+    });
+    // CA Encaissé et Latent
     if (m.factures) m.factures.forEach(function(f) {
-      if (isInPeriod(f.mois) && f.jours > 0) {
-        totalCA += f.ht;
-        totalJours += f.jours;
+      if (f.jours <= 0) return;
+      var paymentMonth = getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
+      if (!isInPeriod(f.mois) && !isInPeriod(paymentMonth)) return;
+      if (f.status === 'payée' && isInPeriod(paymentMonth)) {
+        caEncaisse += f.ht;
+      } else if (f.status === 'envoyée') {
+        caLatent += f.ht;
       }
     });
   });
 
-  kpiGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
-    el('div', { style: { fontSize: '28px', fontWeight: '800', color: 'var(--accent)' } }, String(activeMissions.length)),
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Missions actives')
-  ]));
-  kpiGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
-    el('div', { style: { fontSize: '28px', fontWeight: '800', color: 'var(--success)' } }, EUR(totalCA)),
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'CA Réalisé (période)')
-  ]));
+  // KPIs Missions - 4 indicateurs + missions actives
+  var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' } });
+
+  var kpiBlock = function(value, label, color, sub) {
+    var block = el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+    block.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '800', color: color } }, value));
+    block.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, label));
+    if (sub) block.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' } }, sub));
+    return block;
+  };
+
+  kpiGrid.appendChild(kpiBlock(String(activeMissions.length) + (aVenirMissions.length > 0 ? ' + ' + aVenirMissions.length : ''), 'Missions actives' + (aVenirMissions.length > 0 ? ' + à venir' : ''), 'var(--accent)', totalJours + ' jours travaillés'));
+  kpiGrid.appendChild(kpiBlock(EUR(caRealise), 'CA Réalisé', 'var(--info)', 'Jours travaillés × TJM'));
+  kpiGrid.appendChild(kpiBlock(EUR(caEncaisse), 'CA Encaissé', 'var(--success)', 'Factures payées HT'));
+  kpiGrid.appendChild(kpiBlock(EUR(caLatent), 'CA Latent', 'var(--warning)', 'Facturé non encaissé'));
+
   container.appendChild(kpiGrid);
+
+  // V60: CA Prévu si existant
+  if (caPrevu > 0) {
+    var prevuBlock = el('div', { style: { textAlign: 'center', padding: '12px', background: 'rgba(139,92,246,0.08)', borderRadius: '8px', marginBottom: '16px', border: '1px dashed rgba(139,92,246,0.3)' } });
+    prevuBlock.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '800', color: '#a78bfa' } }, EUR(caPrevu)));
+    prevuBlock.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '🔮 CA Prévu (missions en cours & à venir)'));
+    container.appendChild(prevuBlock);
+  }
 
   // Bouton ajouter
   container.appendChild(el('button', { class: 'btn btn-success', style: { width: '100%', marginBottom: '16px' }, onclick: showMissionModal }, '+ Nouvelle Mission'));
