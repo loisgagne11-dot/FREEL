@@ -6692,10 +6692,12 @@ function renderChargesPanel(container) {
   container.appendChild(panel);
 }
 
+// V60: Comparaison avec projections
 function getCompareData() {
   var currentYear = PERIOD.year || TODAY.getFullYear();
   var prevYear = currentYear - 1;
-  var currentData = { ca: 0, charges: 0, benefice: 0, jours: 0 };
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var currentData = { ca: 0, caProjecte: 0, charges: 0, benefice: 0, jours: 0 };
   var prevData = { ca: 0, charges: 0, benefice: 0, jours: 0 };
   MISSIONS.forEach(function(mis) {
     if (!mis.factures) return;
@@ -6708,6 +6710,16 @@ function getCompareData() {
       if (year === currentYear) { currentData.ca += ht; currentData.charges += charges; currentData.jours += f.jours; }
       else if (year === prevYear) { prevData.ca += ht; prevData.charges += charges; prevData.jours += f.jours; }
     });
+    // V60: CA projeté pour l'année en cours
+    if (mis.lignes && mis.tjm) {
+      mis.lignes.forEach(function(l) {
+        if (!l.ym || l.ym <= nowYm) return;
+        var lYear = parseInt(l.ym.split('-')[0]);
+        if (lYear !== currentYear) return;
+        var joursFuturs = l.joursReels > 0 ? 0 : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        if (joursFuturs > 0) currentData.caProjecte += joursFuturs * mis.tjm;
+      });
+    }
   });
   currentData.benefice = currentData.ca - currentData.charges;
   prevData.benefice = prevData.ca - prevData.charges;
@@ -6729,7 +6741,11 @@ function renderCompareWidget(container) {
     item.appendChild(el('span', { class: 'compare-delta ' + deltaClass }, (delta >= 0 ? '+' : '') + delta + '%'));
     grid.appendChild(item);
   }
-  addItem('CA HT', cmp.current.ca, cmp.prev.ca, false);
+  addItem('CA HT (réalisé)', cmp.current.ca, cmp.prev.ca, false);
+  // V60: Ajouter la projection si disponible
+  if (cmp.current.caProjecte > 0) {
+    addItem('CA HT (estimé total)', cmp.current.ca + cmp.current.caProjecte, cmp.prev.ca, false);
+  }
   addItem('Charges', cmp.current.charges, cmp.prev.charges, true);
   addItem('Bénéfice', cmp.current.benefice, cmp.prev.benefice, false);
   widget.appendChild(grid);
@@ -7024,11 +7040,13 @@ function renderGoalWidget(container) {
   container.appendChild(widget);
 }
 
+// V60: Inclure CA réalisé + projeté dans les stats par client
 function getClientsStats() {
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var stats = {};
   MISSIONS.forEach(function(mis) {
     var clientName = mis.client || 'Sans client';
-    if (!stats[clientName]) stats[clientName] = { ca: 0, jours: 0, factures: 0 };
+    if (!stats[clientName]) stats[clientName] = { ca: 0, caProjecte: 0, jours: 0, factures: 0 };
     if (mis.factures) {
       mis.factures.forEach(function(f) {
         if (f.status === 'payée' && f.jours > 0) {
@@ -7038,11 +7056,25 @@ function getClientsStats() {
         }
       });
     }
+    // V60: CA projeté (jours futurs non réalisés)
+    if (mis.lignes && mis.tjm) {
+      mis.lignes.forEach(function(l) {
+        if (!l.ym || l.ym <= nowYm) return;
+        if (!isInPeriod(l.ym)) return;
+        var joursFuturs = l.joursReels > 0 ? 0 : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        if (joursFuturs > 0) stats[clientName].caProjecte += joursFuturs * mis.tjm;
+      });
+    }
   });
   var arr = Object.keys(stats).map(function(name) {
-    return { name: name, ca: stats[name].ca, jours: stats[name].jours, factures: stats[name].factures, tjm: stats[name].jours > 0 ? Math.round(stats[name].ca / stats[name].jours) : 0 };
+    return {
+      name: name, ca: stats[name].ca, caProjecte: stats[name].caProjecte,
+      caTotal: stats[name].ca + stats[name].caProjecte,
+      jours: stats[name].jours, factures: stats[name].factures,
+      tjm: stats[name].jours > 0 ? Math.round(stats[name].ca / stats[name].jours) : 0
+    };
   });
-  arr.sort(function(a, b) { return b.ca - a.ca; });
+  arr.sort(function(a, b) { return b.caTotal - a.caTotal; });
   return arr;
 }
 
@@ -7078,8 +7110,10 @@ function renderClientsWidgetVisual(container, data) {
     return;
   }
 
-  var totalCA = clients.reduce(function(sum, c) { return sum + c.ca; }, 0) || 1;
-  var maxCA = clients[0].ca || 1;
+  // V60: Utiliser caTotal (réalisé + projeté) pour le graphique
+  var totalCA = clients.reduce(function(sum, c) { return sum + c.caTotal; }, 0) || 1;
+  var totalProjecte = clients.reduce(function(sum, c) { return sum + c.caProjecte; }, 0);
+  var maxCA = clients[0].caTotal || 1;
 
   // Couleurs pour le camembert
   var colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
@@ -7103,7 +7137,7 @@ function renderClientsWidgetVisual(container, data) {
   // Dessiner les segments du camembert
   var cumAngle = -90; // Commencer à 12h
   clients.slice(0, 6).forEach(function(client, i) {
-    var pct = (client.ca / totalCA) * 100;
+    var pct = (client.caTotal / totalCA) * 100;
     var angle = (pct / 100) * 360;
 
     if (pct > 0) {
@@ -7157,8 +7191,9 @@ function renderClientsWidgetVisual(container, data) {
   var listContainer = el('div', { style: { flex: '1', minWidth: '0' } });
 
   clients.slice(0, 6).forEach(function(client, i) {
-    var pct = Math.round((client.ca / totalCA) * 100);
-    var barWidth = (client.ca / maxCA) * 100;
+    var pct = Math.round((client.caTotal / totalCA) * 100);
+    var barWidthReal = (client.ca / maxCA) * 100;
+    var barWidthProj = (client.caProjecte / maxCA) * 100;
 
     var row = el('div', { style: { marginBottom: '8px' } });
 
@@ -7168,24 +7203,31 @@ function renderClientsWidgetVisual(container, data) {
       el('div', { style: { width: '8px', height: '8px', borderRadius: '2px', background: colors[i % colors.length] } }),
       el('span', { style: { fontWeight: '600' } }, client.name)
     ]));
-    header.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, EUR(client.ca) + ' (' + pct + '%)'));
+    // V60: Afficher réalisé + projeté
+    var caText = EUR(client.ca);
+    if (client.caProjecte > 0) caText += ' + ' + EUR(client.caProjecte);
+    header.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, caText + ' (' + pct + '%)'));
     row.appendChild(header);
 
-    // Barre de progression
-    var barBg = el('div', { style: { height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' } });
-    var barFill = el('div', { style: { height: '100%', width: barWidth + '%', background: colors[i % colors.length], borderRadius: '3px' } });
-    barBg.appendChild(barFill);
+    // V60: Barre de progression double (réalisé + projeté)
+    var barBg = el('div', { style: { height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden', display: 'flex' } });
+    barBg.appendChild(el('div', { style: { height: '100%', width: barWidthReal + '%', background: colors[i % colors.length], borderRadius: '3px 0 0 3px' } }));
+    if (barWidthProj > 0) {
+      barBg.appendChild(el('div', { style: { height: '100%', width: barWidthProj + '%', background: colors[i % colors.length], opacity: '0.4', borderRadius: '0 3px 3px 0' } }));
+    }
     row.appendChild(barBg);
 
     // Sous-info
-    row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, client.jours + ' jours · TJM ' + EUR(client.tjm)));
+    var subText = client.jours + ' jours · TJM ' + EUR(client.tjm);
+    if (client.caProjecte > 0) subText += ' · Projeté: ' + EUR(client.caProjecte);
+    row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, subText));
 
     listContainer.appendChild(row);
   });
 
   // Si plus de 6 clients, afficher "et X autres"
   if (clients.length > 6) {
-    var othersCA = clients.slice(6).reduce(function(sum, c) { return sum + c.ca; }, 0);
+    var othersCA = clients.slice(6).reduce(function(sum, c) { return sum + c.caTotal; }, 0);
     var othersPct = Math.round((othersCA / totalCA) * 100);
     listContainer.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'center' } },
       '+ ' + (clients.length - 6) + ' autres (' + EUR(othersCA) + ', ' + othersPct + '%)'));
