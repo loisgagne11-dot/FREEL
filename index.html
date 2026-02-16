@@ -4637,9 +4637,11 @@ function showEncaisseDetail(data) {
 
   // KPIs
   var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' } });
+  // V60: Afficher le vrai CA HT (pas TTC) quand on dit "Encaissé HT"
   kpis.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '8px' } }, [
     el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Encaissé HT'),
-    el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--success)' } }, EUR(data.caEnc))
+    el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--success)' } }, EUR(data.caHT)),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'TTC: ' + EUR(data.caEnc))
   ]));
   kpis.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '8px' } }, [
     el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'À Encaisser'),
