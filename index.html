@@ -1362,7 +1362,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 52; // V52: Nouvelle navigation simplifiée (Accueil, Performance, Missions, Finances, Params)
+var APP_VERSION = 60; // V60: Améliorations multiples missions, IR, graphiques, projections
 var TODAY = new Date();
 var VIEW = 'accueil';
 var DASHBOARD_SUB = 'accueil'; // V51: sous-onglets dashboard (accueil, analyse, charges)
@@ -2339,6 +2339,15 @@ function isMissionActive(mission) {
   if (!mission.debut || !mission.fin) return false;
   var today = localISO(TODAY);
   return today >= mission.debut && today <= mission.fin;
+}
+
+// V60: Statut mission complet : 'active', 'a_venir', 'terminee'
+function getMissionStatus(mission) {
+  if (!mission.debut || !mission.fin) return 'terminee';
+  var today = localISO(TODAY);
+  if (today < mission.debut) return 'a_venir';
+  if (today > mission.fin) return 'terminee';
+  return 'active';
 }
 
 // ACRE: calcul automatique de la date d'expiration
@@ -9080,9 +9089,11 @@ function renderMissionsContent(container) {
     var card = el('div', { class: 'mission-card', style: { cursor: 'pointer' }, onclick: function() { showMissionModal(m); } });
     var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
     header.appendChild(el('div', { style: { fontWeight: '700', fontSize: '14px' } }, m.client));
-    // V57: Utiliser isMissionActive() au lieu de m.actif
-    var isActive = isMissionActive(m);
-    header.appendChild(el('div', { class: 'badge ' + (isActive ? 'badge-success' : 'badge-muted') }, isActive ? 'Actif' : 'Terminé'));
+    // V60: Statut mission complet : Actif / À venir / Terminé
+    var mStatus = getMissionStatus(m);
+    var badgeCls = mStatus === 'active' ? 'badge-success' : mStatus === 'a_venir' ? 'badge-warning' : 'badge-muted';
+    var badgeTxt = mStatus === 'active' ? 'Actif' : mStatus === 'a_venir' ? 'À venir' : 'Terminé';
+    header.appendChild(el('div', { class: 'badge ' + badgeCls }, badgeTxt));
     card.appendChild(header);
 
     var details = el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '12px' } });
