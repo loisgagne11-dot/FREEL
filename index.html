@@ -2844,7 +2844,8 @@ function getAbsoluteProvisions() {
     MISSIONS.forEach(function(mis) {
       if (!mis.factures) return;
       mis.factures.forEach(function(f) {
-        if (f.status !== 'payée' || f.jours <= 0) return;
+        // V60: Prendre le HT que la facture soit payée ou non (IR basé sur CA réalisé)
+        if (f.jours <= 0) return;
         var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
         if (paymentMonth <= nowYm) {
           var year = paymentMonth.split('-')[0];
@@ -2854,7 +2855,7 @@ function getAbsoluteProvisions() {
         }
       });
     });
-    
+
     // Calculer l'IR pour chaque année séparément
     Object.keys(caParAnnee).forEach(function(year) {
       var anneeData = caParAnnee[year];
@@ -3561,24 +3562,28 @@ function compute() {
     }
   });
   
-  // IR estimé (si pas prél. libératoire) - proportionnel au CA HT de chaque mois
-  if (!COMPANY.prelevementLiberatoire && data.caEnc > 0) {
-    // Calculer CA HT par mois (CA TTC - TVA)
+  // V60: IR estimé (si pas prél. libératoire) - basé sur CA HT encaissé OU réalisé
+  // Utiliser le CA encaissé HT si disponible, sinon le CA réalisé HT comme base
+  if (!COMPANY.prelevementLiberatoire) {
     var caHTParMois = {};
     var caHTTotal = 0;
     months.forEach(function(m) {
       var md = data.monthsData[m];
+      // V60: Prendre le CA HT encaissé en priorité, sinon le CA réalisé (qui est déjà HT)
+      var caHTMois = 0;
       if (md.enc > 0) {
-        // Trouver la TVA de ce mois
         var tvaMois = md.charges.filter(function(c) { return c.cat === 'TVA'; }).reduce(function(a, c) { return a + c.montant; }, 0);
-        var caHTMois = md.enc - tvaMois;
-        if (caHTMois > 0) {
-          caHTParMois[m] = caHTMois;
-          caHTTotal += caHTMois;
-        }
+        caHTMois = md.enc - tvaMois;
+      } else if (md.real > 0) {
+        // CA réalisé = jours × TJM, donc déjà en HT
+        caHTMois = md.real;
+      }
+      if (caHTMois > 0) {
+        caHTParMois[m] = caHTMois;
+        caHTTotal += caHTMois;
       }
     });
-    
+
     if (caHTTotal > 0) {
       var periodYear = parseInt(months[0].split('-')[0]);
       var irAnnuel = calculateIR(caHTTotal, periodYear).impot;
