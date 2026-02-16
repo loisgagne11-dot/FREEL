@@ -4939,21 +4939,33 @@ function renderIRForYear(year) {
   var data = compute();
   var cfg = getIRConfig(year);
   
-  // Calculer le CA HT de l'année sélectionnée (pas forcément l'année de la période actuelle)
-  var caHTAnnee = 0;
+  // V60: Calculer le CA HT encaissé + projeté pour l'année
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var caHTEncaisse = 0;
+  var caHTProjecte = 0;
   MISSIONS.forEach(function(mis) {
     if (!mis.factures) return;
+    // CA encaissé (factures payées)
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       var paymentYear = parseInt(paymentMonth.split('-')[0]);
-      if (paymentYear === year) {
-        caHTAnnee += f.ht;
-      }
+      if (paymentYear === year) caHTEncaisse += f.ht;
     });
+    // CA projeté (jours futurs × TJM)
+    if (mis.lignes && mis.tjm) {
+      mis.lignes.forEach(function(l) {
+        if (!l.ym || l.ym <= nowYm) return;
+        var lYear = parseInt(l.ym.split('-')[0]);
+        if (lYear !== year) return;
+        var joursFuturs = l.joursReels > 0 ? 0 : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        if (joursFuturs > 0) caHTProjecte += joursFuturs * mis.tjm;
+      });
+    }
   });
-  
+  var caHTAnnee = caHTEncaisse + caHTProjecte;
   var ir = calculateIR(caHTAnnee, year);
+  var irEncaisseOnly = calculateIR(caHTEncaisse, year);
   
   // Update boutons année
   [TODAY.getFullYear() - 1, TODAY.getFullYear(), TODAY.getFullYear() + 1].forEach(function(y) {
@@ -4997,7 +5009,14 @@ function renderIRForYear(year) {
   var calc = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: 'var(--radius-md)' } });
   calc.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' } }, '📊 Calcul ' + year));
   
-  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'CA HT ' + year), el('span', { style: { fontWeight: '600' } }, EUR(caHTAnnee))]));
+  // V60: Afficher CA encaissé et projeté séparément
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'CA HT encaissé'), el('span', { style: { fontWeight: '600' } }, EUR(caHTEncaisse))]));
+  if (caHTProjecte > 0) {
+    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#a78bfa' } }, '+ CA HT projeté (missions)'), el('span', { style: { fontWeight: '600', color: '#a78bfa' } }, EUR(caHTProjecte))]));
+    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total estimé ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caHTAnnee))]));
+  } else {
+    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'CA HT ' + year), el('span', { style: { fontWeight: '600' } }, EUR(caHTAnnee))]));
+  }
   calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Abattement 34% (min 305€)'), el('span', { class: 'text-success' }, '- ' + EUR(ir.abattement))]));
   
   if (ir.perAnnuel > 0) {
@@ -5048,6 +5067,16 @@ function renderIRForYear(year) {
   calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'TMI'), el('span', { class: 'text-warning' }, PCT(ir.tmi))]));
   calc.appendChild(el('div', { class: 'detail-separator accent' }));
   calc.appendChild(el('div', { class: 'detail-row highlight' }, [el('span', { style: { fontWeight: '700' } }, 'IR Estimé ' + year), el('span', { style: { fontWeight: '800', fontSize: '20px', color: 'var(--warning)' } }, EUR(ir.impot))]));
+
+  // V60: Si projections incluses, montrer la différence
+  if (caHTProjecte > 0) {
+    calc.appendChild(el('div', { style: { marginTop: '8px', padding: '8px', background: 'rgba(167,139,250,0.08)', borderRadius: '6px', fontSize: '11px', borderLeft: '3px solid #a78bfa' } }, [
+      el('div', { style: { color: '#a78bfa', fontWeight: '600' } }, '🔮 Projection incluse'),
+      el('div', { style: { color: 'var(--text-muted)', marginTop: '4px' } }, 'IR sur encaissé seul: ' + EUR(irEncaisseOnly.impot)),
+      el('div', { style: { color: 'var(--text-muted)' } }, 'Surplus dû aux projections: ' + EUR(ir.impot - irEncaisseOnly.impot))
+    ]));
+  }
+
   content.appendChild(calc);
   
   // Info prélèvement libératoire
