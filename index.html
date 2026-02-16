@@ -3803,6 +3803,109 @@ function computeProjections(scenario, params) {
 
 // === MODALS ===
 
+// V60: Détail cliquable pour chaque ligne de la composition du compte
+function showCompteLineDetail(type) {
+  var data = compute();
+  var content = el('div', { style: { padding: '10px' } });
+  var items = [];
+  var title = '';
+
+  if (type === 'encaissements') {
+    title = '💵 Encaissements TTC';
+    // Grouper par mois puis par client
+    MISSIONS.forEach(function(mis) {
+      if (!mis.factures) return;
+      mis.factures.forEach(function(f) {
+        if (f.status !== 'payée' || f.jours <= 0) return;
+        var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        items.push({ mois: paymentMonth, type: f.client, montant: f.ttc, sub: fmtMonthShort(f.mois) + ' · ' + f.jours + 'j × ' + EUR(mis.tjm) });
+      });
+    });
+  } else if (type === 'charges') {
+    title = '📋 Charges Payées';
+    // Charges auto (URSSAF, TVA, etc.) payées
+    MISSIONS.forEach(function(mis) {
+      if (!mis.factures) return;
+      mis.factures.forEach(function(f) {
+        if (f.status !== 'payée' || f.jours <= 0) return;
+        var pm = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        var rate = getUrssafRate(pm);
+        if (isPaid('URSSAF-' + f.id)) items.push({ mois: pm, type: 'URSSAF', montant: Math.round(f.ht * rate), sub: mis.client });
+        if (isPaid('CFP-' + f.id)) items.push({ mois: pm, type: 'CFP', montant: Math.round(f.ht * LEGAL.cfp), sub: mis.client });
+        if (f.tva > 0 && isPaid('TVA-' + f.id)) items.push({ mois: pm, type: 'TVA', montant: Math.round(f.tva), sub: mis.client });
+        if (COMPANY.prelevementLiberatoire && isPaid('IMPLIB-' + f.id)) items.push({ mois: pm, type: 'Impôt PL', montant: Math.round(f.ht * LEGAL.impLib), sub: mis.client });
+      });
+    });
+    // Charges manuelles payées
+    TREASURY.mouvements.forEach(function(mv) {
+      if (mv.type === 'Charge' && isPaid(mv.id)) {
+        items.push({ mois: mv.mois, type: mv.categorie || 'Autre', montant: mv.montant, sub: mv.description || '' });
+      }
+    });
+  } else if (type === 'salaires') {
+    title = '💸 Salaires Versés';
+    TREASURY.mouvements.forEach(function(mv) {
+      if (mv.type === 'Salaire') {
+        items.push({ mois: mv.mois, type: 'Salaire', montant: mv.montant, sub: '' });
+      }
+    });
+  }
+
+  // Grouper par mois
+  var byMonth = {};
+  items.forEach(function(it) {
+    if (!byMonth[it.mois]) byMonth[it.mois] = [];
+    byMonth[it.mois].push(it);
+  });
+
+  var sortedMonths = Object.keys(byMonth).sort().reverse();
+  var total = items.reduce(function(s, i) { return s + i.montant; }, 0);
+
+  // Total en header
+  content.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '16px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, title),
+    el('div', { style: { fontSize: '24px', fontWeight: '800' } }, EUR(total))
+  ]));
+
+  // Détail par mois
+  var list = el('div', { style: { maxHeight: '350px', overflowY: 'auto' } });
+  sortedMonths.forEach(function(mois) {
+    var monthItems = byMonth[mois];
+    var monthTotal = monthItems.reduce(function(s, i) { return s + i.montant; }, 0);
+    list.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', padding: '8px 0 4px', borderBottom: '1px solid var(--border)' } }, fmtMonth(mois) + ' · ' + EUR(monthTotal)));
+
+    // Grouper par type dans le mois
+    var byType = {};
+    monthItems.forEach(function(it) {
+      if (!byType[it.type]) byType[it.type] = { montant: 0, subs: [] };
+      byType[it.type].montant += it.montant;
+      if (it.sub) byType[it.type].subs.push(it.sub);
+    });
+
+    Object.keys(byType).forEach(function(t) {
+      var entry = byType[t];
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 8px', fontSize: '11px' } });
+      var left = el('div', {});
+      left.appendChild(el('span', { style: { fontWeight: '600' } }, t));
+      if (entry.subs.length > 0 && entry.subs.length <= 3) {
+        left.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, entry.subs.join(', ')));
+      } else if (entry.subs.length > 3) {
+        left.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, entry.subs.length + ' éléments'));
+      }
+      row.appendChild(left);
+      row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(entry.montant)));
+      list.appendChild(row);
+    });
+  });
+  content.appendChild(list);
+
+  if (sortedMonths.length === 0) {
+    content.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '20px' } }, 'Aucun mouvement'));
+  }
+
+  showModal(title, content);
+}
+
 function showCashDetail() {
   var data = compute();
   $('#detailModalTitle').textContent = '💰 Trésorerie & Projections';
@@ -7752,17 +7855,23 @@ function renderDashboardHero(container, data) {
   var compteBlock = el('div', { style: { marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
   compteBlock.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase' } }, '📊 Composition Compte (actuel)'));
 
-  var detailRow = function(label, amount, color) {
-    return el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '3px 0', fontSize: '11px' } }, [
-      el('span', {}, label),
+  // V60: Lignes cliquables avec détail groupé par mois/type
+  var detailRow = function(label, amount, color, onClick) {
+    var row = el('div', {
+      style: { display: 'flex', justifyContent: 'space-between', padding: '5px 4px', fontSize: '11px', borderRadius: '4px', cursor: onClick ? 'pointer' : 'default' },
+      onclick: onClick || null
+    }, [
+      el('span', {}, label + (onClick ? ' ›' : '')),
       el('span', { style: { fontWeight: '600', color: color || 'inherit' } }, EUR(amount))
     ]);
+    if (onClick) { row.onmouseenter = function() { row.style.background = 'var(--bg-secondary)'; }; row.onmouseleave = function() { row.style.background = 'none'; }; }
+    return row;
   };
 
   compteBlock.appendChild(detailRow('Solde initial', balDetail.soldeInitial));
-  compteBlock.appendChild(detailRow('+ Encaissements TTC', balDetail.encaissements, 'var(--success)'));
-  compteBlock.appendChild(detailRow('- Charges payées', balDetail.chargesPayees, 'var(--danger)'));
-  compteBlock.appendChild(detailRow('- Salaires versés', balDetail.salaires, 'var(--info)'));
+  compteBlock.appendChild(detailRow('+ Encaissements TTC', balDetail.encaissements, 'var(--success)', function() { showCompteLineDetail('encaissements'); }));
+  compteBlock.appendChild(detailRow('- Charges payées', balDetail.chargesPayees, 'var(--danger)', function() { showCompteLineDetail('charges'); }));
+  compteBlock.appendChild(detailRow('- Salaires versés', balDetail.salaires, 'var(--info)', function() { showCompteLineDetail('salaires'); }));
   if (balDetail.interets > 0) {
     compteBlock.appendChild(detailRow('+ Intérêts compte', balDetail.interets, 'var(--success)'));
   }
