@@ -7940,14 +7940,31 @@ function showTresoSettings() {
   showModal('⚙️ Paramètres Trésorerie', content);
 }
 
-// V51: Widget CA ANNUEL avec plafond micro-entrepreneur
+// V60: Widget CA ANNUEL avec réalisé + projeté + conséquences plafond
 function renderCAPlafondWidget(container) {
   var data = compute();
   var year = PERIOD.year || TODAY.getFullYear();
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var currentCA = data.caHT || 0;
   var plafond = 77700; // Plafond micro-entrepreneur BNC 2026
-  var pct = Math.min(1, currentCA / plafond);
-  var pctColor = pct >= 0.9 ? 'var(--danger)' : pct >= 0.7 ? 'var(--warning)' : 'var(--success)';
+
+  // V60: Calculer le CA projeté (missions futures sur la même année)
+  var caProjecte = 0;
+  MISSIONS.forEach(function(mis) {
+    if (!mis.lignes || !mis.tjm) return;
+    mis.lignes.forEach(function(l) {
+      if (!l.ym || l.ym <= nowYm) return;
+      var lYear = parseInt(l.ym.split('-')[0]);
+      if (lYear !== year) return;
+      var joursFuturs = l.joursReels > 0 ? 0 : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+      caProjecte += joursFuturs * mis.tjm;
+    });
+  });
+
+  var caTotal = currentCA + caProjecte;
+  var pctRealise = Math.min(1, currentCA / plafond);
+  var pctTotal = Math.min(1.2, caTotal / plafond); // Permettre d'aller au-delà de 100%
+  var pctColor = pctTotal >= 0.9 ? 'var(--danger)' : pctTotal >= 0.7 ? 'var(--warning)' : 'var(--success)';
 
   var widget = el('div', { class: 'card', style: { marginBottom: '16px' } });
 
@@ -7957,56 +7974,78 @@ function renderCAPlafondWidget(container) {
   header.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Plafond micro: ' + EUR(plafond)));
   widget.appendChild(header);
 
-  // Barre de progression avec plafond
+  // Barre de progression avec réalisé + projeté
   var progressContainer = el('div', { style: { position: 'relative', marginBottom: '12px' } });
   var progressBg = el('div', { style: {
-    height: '24px', background: 'var(--bg-tertiary)', borderRadius: '12px', overflow: 'hidden', position: 'relative'
+    height: '28px', background: 'var(--bg-tertiary)', borderRadius: '14px', overflow: 'hidden', position: 'relative', display: 'flex'
   }});
-  var progressFill = el('div', { style: {
-    height: '100%', width: (pct * 100) + '%', background: pctColor, borderRadius: '12px',
-    transition: 'width 0.5s ease'
-  }});
-  progressBg.appendChild(progressFill);
 
-  // Ligne plafond (à 100%)
-  var plafondLine = el('div', { style: {
-    position: 'absolute', right: '0', top: '0', bottom: '0', width: '2px',
-    background: 'var(--text-muted)', opacity: '0.5'
-  }});
-  progressBg.appendChild(plafondLine);
+  // Partie réalisée
+  var realWidth = Math.min(100, pctRealise * 100);
+  progressBg.appendChild(el('div', { style: {
+    height: '100%', width: realWidth + '%', background: pctColor,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    color: 'white', fontSize: '9px', fontWeight: '700'
+  } }, realWidth > 15 ? EUR(currentCA) : ''));
+
+  // Partie projetée
+  if (caProjecte > 0) {
+    var projWidth = Math.min(100 - realWidth, (caProjecte / plafond) * 100);
+    progressBg.appendChild(el('div', { style: {
+      height: '100%', width: projWidth + '%', background: 'rgba(167,139,250,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: 'white', fontSize: '9px', fontWeight: '700',
+      borderLeft: '2px dashed rgba(255,255,255,0.4)'
+    } }, projWidth > 12 ? '+' + EUR(caProjecte) : ''));
+  }
+
   progressContainer.appendChild(progressBg);
   widget.appendChild(progressContainer);
 
-  // Stats
+  // Stats : Réalisé + Projeté
   var stats = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' } });
-  stats.appendChild(el('div', {}, [
-    el('div', { style: { fontSize: '24px', fontWeight: '800', color: pctColor } }, EUR(currentCA)),
-    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, Math.round(pct * 100) + '% du plafond')
-  ]));
 
-  var remaining = plafond - currentCA;
-  if (remaining > 0) {
-    stats.appendChild(el('div', { style: { textAlign: 'right' } }, [
-      el('div', { style: { fontSize: '14px', fontWeight: '600' } }, EUR(remaining)),
-      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'disponible')
-    ]));
-  } else {
-    stats.appendChild(el('div', { style: { textAlign: 'right', color: 'var(--danger)' } }, [
-      el('div', { style: { fontSize: '14px', fontWeight: '600' } }, '⚠️ Plafond dépassé'),
-      el('div', { style: { fontSize: '11px' } }, 'de ' + EUR(Math.abs(remaining)))
-    ]));
+  var leftStats = el('div', {});
+  leftStats.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '800', color: pctColor } }, EUR(currentCA)));
+  leftStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Réalisé · ' + Math.round(pctRealise * 100) + '%'));
+  if (caProjecte > 0) {
+    leftStats.appendChild(el('div', { style: { fontSize: '12px', color: '#a78bfa', fontWeight: '600', marginTop: '2px' } }, '+ ' + EUR(caProjecte) + ' projeté'));
+    leftStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total estimé: ' + EUR(caTotal) + ' (' + Math.round(pctTotal * 100) + '%)'));
   }
+  stats.appendChild(leftStats);
+
+  var remaining = plafond - caTotal;
+  var rightStats = el('div', { style: { textAlign: 'right' } });
+  if (remaining > 0) {
+    rightStats.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600' } }, EUR(remaining)));
+    rightStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'disponible'));
+  } else {
+    rightStats.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--danger)' } }, '⚠️ Dépassement'));
+    rightStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--danger)' } }, EUR(Math.abs(remaining)) + ' au-delà'));
+  }
+  stats.appendChild(rightStats);
   widget.appendChild(stats);
 
-  // Alerte si proche du plafond
-  if (pct >= 0.8 && pct < 1) {
-    var alert = el('div', { style: {
-      marginTop: '12px', padding: '8px 12px', background: 'rgba(251, 191, 36, 0.1)',
-      borderRadius: '8px', fontSize: '12px', color: 'var(--warning)'
-    }});
-    alert.innerHTML = '⚠️ Attention: vous approchez du plafond micro-entrepreneur';
-    widget.appendChild(alert);
+  // V60: Conséquences selon le niveau
+  var conseqDiv = el('div', { style: { marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '11px' } });
+  if (caTotal > plafond) {
+    conseqDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+    conseqDiv.style.color = 'var(--danger)';
+    conseqDiv.innerHTML = '⚠️ <strong>Dépassement du plafond</strong> : Passage obligatoire au régime réel l\'année suivante. Déclarations TVA mensuelles/trimestrielles. Comptabilité plus complexe.';
+  } else if (caTotal > plafond * 0.9) {
+    conseqDiv.style.background = 'rgba(251, 191, 36, 0.1)';
+    conseqDiv.style.color = 'var(--warning)';
+    conseqDiv.innerHTML = '⚠️ <strong>Proche du plafond</strong> : Attention à ne pas dépasser ' + EUR(plafond) + ' sous peine de changement de régime fiscal.';
+  } else if (caTotal > plafond * 0.7) {
+    conseqDiv.style.background = 'rgba(34, 197, 94, 0.05)';
+    conseqDiv.style.color = 'var(--text-muted)';
+    conseqDiv.innerHTML = '✅ Progression saine. Marge de ' + EUR(remaining) + ' avant le plafond.';
+  } else {
+    conseqDiv.style.background = 'rgba(34, 197, 94, 0.05)';
+    conseqDiv.style.color = 'var(--text-muted)';
+    conseqDiv.innerHTML = '✅ Large marge disponible sous le plafond micro-entrepreneur.';
   }
+  widget.appendChild(conseqDiv);
 
   container.appendChild(widget);
 }
