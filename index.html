@@ -866,8 +866,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .card.clickable:hover { border-color: var(--accent); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1); transform: translateY(-1px); }
 .card-title { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 12px; }
 .card-actions { display: flex; gap: 6px; align-items: center; }
-.chart-container { height: 200px; position: relative; }
-.chart-container canvas { width: 100% !important; height: 100% !important; display: block; }
+.chart-container { height: 220px; position: relative; width: 100%; }
+.chart-container canvas { display: block; }
 .chart-toggle { display: flex; gap: 2px; background: var(--bg-tertiary); padding: 2px; border-radius: 6px; }
 .chart-toggle-btn { background: transparent; border: none; color: var(--text-muted); padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .chart-toggle-btn.active { background: var(--accent); color: white; }
@@ -10610,18 +10610,20 @@ function render() {
   if (periodYear) periodYear.textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
   updateNotifBadge();
 
-  // V55: Dessiner les graphiques après le render si onglet Performance
-  // Utiliser requestAnimationFrame pour un timing plus fiable
+  // V60: Dessiner les graphiques après le render si onglet Performance
+  // Combiner requestAnimationFrame + setTimeout pour garantir le layout
   if (VIEW === 'performance') {
     requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
+      setTimeout(function() {
         try {
-          if ($('#mainChart')) drawMainChart();
-          if ($('#soldeChart')) drawSoldeChart();
+          var mc = $('#mainChart');
+          var sc = $('#soldeChart');
+          if (mc && mc.getContext) drawMainChart();
+          if (sc && sc.getContext) drawSoldeChart();
         } catch (e) {
           console.error('Chart render error:', e);
         }
-      });
+      }, 50);
     });
   }
 }
