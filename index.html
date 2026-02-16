@@ -7746,38 +7746,7 @@ function renderDashboardHero(container, data) {
 
   hero.appendChild(pieContainer);
 
-  // Stats: Autonomie cliquable pour projection
-  var heroStats = el('div', { class: 'hero-stats', style: { marginTop: '12px' } });
-  heroStats.appendChild(el('div', {
-    class: 'hero-stat',
-    style: { cursor: 'pointer', padding: '8px', borderRadius: '8px', background: 'var(--bg-tertiary)' },
-    onclick: function(e) { e.stopPropagation(); showProjectionAutonomieModal(); },
-    title: 'Cliquer pour voir la projection d\'autonomie'
-  }, [
-    el('div', { class: 'hero-stat-value', style: { color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'),
-    el('div', { class: 'hero-stat-label' }, '⏱️ Autonomie'),
-    el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' } }, 'Cliquer pour projection')
-  ]));
-  hero.appendChild(heroStats);
-
-  // V51: Salaire versable + action
-  var salaireDiv = el('div', { style: {
-    marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-  }});
-  salaireDiv.appendChild(el('div', {}, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '💸 Salaire versable'),
-    el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--success)' } }, EUR(data.salaireVersable)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '(Cash - ' + EUR(data.reserveCompte) + ' réserve)')
-  ]));
-  if (data.salaireVersable >= 500) {
-    salaireDiv.appendChild(el('button', {
-      class: 'btn btn-success',
-      onclick: function(e) { e.stopPropagation(); showSalaireModal(data.salaireVersable); }
-    }, 'Verser'));
-  }
-  hero.appendChild(salaireDiv);
-
+  // V60: Réorganisation - Composition Compte d'abord, puis Salaire + Autonomie côte à côte en dernier
   // V59: Bloc composition compte pro (ABSOLU - indépendant des filtres)
   var balDetail = getAbsoluteBalanceDetail();
   var compteBlock = el('div', { style: { marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
@@ -7803,6 +7772,39 @@ function renderDashboardHero(container, data) {
   ]));
 
   hero.appendChild(compteBlock);
+
+  // V60: Salaire versable + Autonomie côte à côte en dernier
+  var bottomRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } });
+
+  // Salaire versable
+  var salaireDiv = el('div', { style: {
+    flex: '1', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px'
+  }});
+  salaireDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '💸 Salaire versable'));
+  salaireDiv.appendChild(el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--success)' } }, EUR(data.salaireVersable)));
+  salaireDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Cash - ' + EUR(data.reserveCompte) + ' réserve'));
+  if (data.salaireVersable >= 500) {
+    salaireDiv.appendChild(el('button', {
+      class: 'btn btn-success btn-sm',
+      style: { marginTop: '8px', width: '100%' },
+      onclick: function(e) { e.stopPropagation(); showSalaireModal(data.salaireVersable); }
+    }, 'Verser'));
+  }
+  bottomRow.appendChild(salaireDiv);
+
+  // Autonomie
+  var autoDiv = el('div', {
+    style: { flex: '1', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', cursor: 'pointer' },
+    onclick: function(e) { e.stopPropagation(); showProjectionAutonomieModal(); },
+    title: 'Cliquer pour voir la projection d\'autonomie'
+  });
+  autoDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '⏱️ Autonomie'));
+  autoDiv.appendChild(el('div', { style: { fontWeight: '700', fontSize: '18px', color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'));
+  autoDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Sans nouveau CA'));
+  autoDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--accent)', marginTop: '4px' } }, 'Voir projection →'));
+  bottomRow.appendChild(autoDiv);
+
+  hero.appendChild(bottomRow);
 
   container.appendChild(hero);
 }
