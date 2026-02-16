@@ -8676,6 +8676,55 @@ function renderChargesSubTab(container, data) {
   content.appendChild(listContainer);
   widget.appendChild(content);
   container.appendChild(widget);
+
+  // V60: Graphique composition des provisions (stacked horizontal bar)
+  var provTypes = chargeTypes.filter(function(c) { return c.unpaidAmount > 0; });
+  if (provTypes.length > 0) {
+    var provWidget = el('div', { class: 'card', style: { marginTop: '12px' } });
+    provWidget.appendChild(el('div', { class: 'card-title' }, '🔒 Composition des Provisions'));
+
+    var totalProv = provTypes.reduce(function(s, c) { return s + c.unpaidAmount; }, 0);
+
+    // Stacked bar
+    var stackedBar = el('div', { style: { display: 'flex', height: '28px', borderRadius: '14px', overflow: 'hidden', marginBottom: '12px' } });
+    provTypes.forEach(function(c) {
+      var pctW = totalProv > 0 ? (c.unpaidAmount / totalProv * 100) : 0;
+      if (pctW > 0) {
+        stackedBar.appendChild(el('div', {
+          style: { width: pctW + '%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: '700', minWidth: pctW > 8 ? '0' : '0' },
+          title: c.label + ': ' + EUR(c.unpaidAmount)
+        }, pctW > 12 ? Math.round(pctW) + '%' : ''));
+      }
+    });
+    provWidget.appendChild(stackedBar);
+
+    // Légende détaillée avec barres horizontales
+    provTypes.sort(function(a, b) { return b.unpaidAmount - a.unpaidAmount; });
+    var maxProv = provTypes[0].unpaidAmount || 1;
+    provTypes.forEach(function(c) {
+      var pctOfTotal = totalProv > 0 ? Math.round(c.unpaidAmount / totalProv * 100) : 0;
+      var row = el('div', { style: { marginBottom: '6px' } });
+      var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '2px' } });
+      header.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+        el('div', { style: { width: '8px', height: '8px', borderRadius: '2px', background: c.color } }),
+        el('span', { style: { fontWeight: '600' } }, c.icon + ' ' + c.label)
+      ]));
+      header.appendChild(el('span', {}, EUR(c.unpaidAmount) + ' (' + pctOfTotal + '%)'));
+      row.appendChild(header);
+      var bar = el('div', { style: { height: '4px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden' } });
+      bar.appendChild(el('div', { style: { height: '100%', width: (c.unpaidAmount / maxProv * 100) + '%', background: c.color, borderRadius: '2px' } }));
+      row.appendChild(bar);
+      provWidget.appendChild(row);
+    });
+
+    // Total
+    provWidget.appendChild(el('div', { style: { borderTop: '1px solid var(--border)', marginTop: '8px', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: '700', fontSize: '12px' } }, [
+      el('span', {}, 'Total Provisions'),
+      el('span', { style: { color: 'var(--warning)' } }, EUR(totalProv))
+    ]));
+
+    container.appendChild(provWidget);
+  }
 }
 
 // V55: Détail charges amélioré avec historique % CA HT - CORRIGÉ
