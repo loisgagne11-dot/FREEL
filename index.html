@@ -869,8 +869,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .card.clickable:hover { border-color: var(--accent); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1); transform: translateY(-1px); }
 .card-title { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 12px; }
 .card-actions { display: flex; gap: 6px; align-items: center; }
-.chart-container { height: 220px; position: relative; width: 100%; }
-.chart-container canvas { display: block; }
+.chart-container { height: 220px; min-height: 220px; position: relative; width: 100%; box-sizing: border-box; }
+.chart-container canvas { display: block; width: 100% !important; height: 100% !important; }
 .chart-toggle { display: flex; gap: 2px; background: var(--bg-tertiary); padding: 2px; border-radius: 6px; }
 .chart-toggle-btn { background: transparent; border: none; color: var(--text-muted); padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
 .chart-toggle-btn.active { background: var(--accent); color: white; }
@@ -1723,6 +1723,17 @@ function fmtMonth(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDat
 function fmtMonthShort(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''); }
 function fmtLong(d) { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+function parseDate(s) {
+  if (!s) return new Date();
+  // Format YYYY-MM-DD ou YYYY-MM
+  var parts = s.split('-');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  } else if (parts.length === 2) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+  }
+  return new Date(s);
+}
 
 // Fonction highlight pour recherche textuelle (B17)
 function highlightText(text, query) {
@@ -8674,9 +8685,9 @@ function renderDashboardCharts(container, months) {
   chartActions.appendChild(toggle);
   chartTitle.appendChild(chartActions);
   chartCard.appendChild(chartTitle);
-  // V56: Canvas sans style inline pour compatibilité Chart.js
+  // V61: Canvas avec style explicite pour garantir le rendu Chart.js
   var chartContainer = el('div', { class: 'chart-container' });
-  var mainCanvas = el('canvas', { id: 'mainChart' });
+  var mainCanvas = el('canvas', { id: 'mainChart', style: { width: '100%', height: '100%', display: 'block' } });
   chartContainer.appendChild(mainCanvas);
   chartCard.appendChild(chartContainer);
   container.appendChild(chartCard);
@@ -8690,9 +8701,9 @@ function renderDashboardCharts(container, months) {
   soldeToggle.appendChild(el('button', { class: 'chart-toggle-btn' + (SHOW_CASH_DISPO ? ' active' : ''), onclick: function() { SHOW_CASH_DISPO = true; render(); } }, 'Cash'));
   soldeTitle.appendChild(soldeToggle);
   soldeCard.appendChild(soldeTitle);
-  // V56: Canvas sans style inline pour compatibilité Chart.js
+  // V61: Canvas avec style explicite pour garantir le rendu Chart.js
   var soldeContainer = el('div', { class: 'chart-container' });
-  var soldeCanvas = el('canvas', { id: 'soldeChart' });
+  var soldeCanvas = el('canvas', { id: 'soldeChart', style: { width: '100%', height: '100%', display: 'block' } });
   soldeContainer.appendChild(soldeCanvas);
   soldeCard.appendChild(soldeContainer);
   container.appendChild(soldeCard);
@@ -9800,11 +9811,12 @@ function renderDashboard(container) {
 }
 
 function drawMainChart() {
+  if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }
   var canvas = $('#mainChart');
-  if (!canvas || !canvas.getContext) return;
+  if (!canvas || !canvas.getContext) { console.error('mainChart canvas not found'); return; }
   var ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  if (mainChart) mainChart.destroy();
+  if (!ctx) { console.error('mainChart context failed'); return; }
+  if (mainChart) { mainChart.destroy(); mainChart = null; }
   if (!COMPUTED || !COMPUTED.monthsData) { COMPUTED = compute(); }
 
   var months = getPeriodMonths();
@@ -9880,11 +9892,12 @@ function drawMainChart() {
 }
 
 function drawSoldeChart() {
+  if (typeof Chart === 'undefined') { console.error('Chart.js not loaded'); return; }
   var canvas = $('#soldeChart');
-  if (!canvas || !canvas.getContext) return;
+  if (!canvas || !canvas.getContext) { console.error('soldeChart canvas not found'); return; }
   var ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  if (soldeChart) soldeChart.destroy();
+  if (!ctx) { console.error('soldeChart context failed'); return; }
+  if (soldeChart) { soldeChart.destroy(); soldeChart = null; }
   if (!COMPUTED || !COMPUTED.monthsData) { COMPUTED = compute(); }
   
   var months = getPeriodMonths();
@@ -11057,20 +11070,37 @@ function render() {
   if (periodYear) periodYear.textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
   updateNotifBadge();
 
-  // V60: Dessiner les graphiques après le render si onglet Performance
-  // Combiner requestAnimationFrame + setTimeout pour garantir le layout
+  // V61: Dessiner les graphiques après le render si onglet Performance
+  // Utiliser un délai plus long pour garantir que le DOM est prêt
   if (VIEW === 'performance') {
     requestAnimationFrame(function() {
       setTimeout(function() {
         try {
           var mc = $('#mainChart');
           var sc = $('#soldeChart');
-          if (mc && mc.getContext) drawMainChart();
-          if (sc && sc.getContext) drawSoldeChart();
+          // V61: Forcer les dimensions du canvas avant de dessiner
+          if (mc && mc.getContext) {
+            var mcParent = mc.parentElement;
+            if (mcParent) {
+              mc.style.width = '100%';
+              mc.style.height = '100%';
+            }
+            drawMainChart();
+            if (mainChart) mainChart.resize();
+          }
+          if (sc && sc.getContext) {
+            var scParent = sc.parentElement;
+            if (scParent) {
+              sc.style.width = '100%';
+              sc.style.height = '100%';
+            }
+            drawSoldeChart();
+            if (soldeChart) soldeChart.resize();
+          }
         } catch (e) {
           console.error('Chart render error:', e);
         }
-      }, 50);
+      }, 100);
     });
   }
 }
@@ -11259,20 +11289,27 @@ function init() {
   // V55: Rendu immédiat pour éviter l'écran noir, puis requestAnimationFrame pour les graphiques
   render();
 
-  // Appel différé pour s'assurer que les graphiques sont correctement initialisés
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      // V55: Re-render pour corriger d'éventuels problèmes de timing
-      if (VIEW === 'performance') {
-        if ($('#mainChart')) drawMainChart();
-        if ($('#soldeChart')) drawSoldeChart();
+  // V61: Appel différé avec setTimeout pour garantir le layout complet
+  setTimeout(function() {
+    if (VIEW === 'performance') {
+      try {
+        if ($('#mainChart')) {
+          drawMainChart();
+          if (mainChart) mainChart.resize();
+        }
+        if ($('#soldeChart')) {
+          drawSoldeChart();
+          if (soldeChart) soldeChart.resize();
+        }
+      } catch (e) {
+        console.error('Init chart error:', e);
       }
+    }
 
-      if (!COMPANY.onboardingDone && MISSIONS.length === 0) {
-        showOnboarding();
-      }
-    });
-  });
+    if (!COMPANY.onboardingDone && MISSIONS.length === 0) {
+      showOnboarding();
+    }
+  }, 150);
 }
 
 document.addEventListener('DOMContentLoaded', init);
