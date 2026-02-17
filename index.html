@@ -794,7 +794,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 @media (max-width: 480px) {
   .header-content { padding: 6px 12px; gap: 8px; }
   .logo { font-size: 16px; }
-  .period-selector { display: none; }
+  .period-selector { display: flex; gap: 2px; }
+  .period-selector .period-btn { font-size: 10px; padding: 4px 6px; }
+  .period-selector .year-nav-btn { font-size: 10px; width: 24px; height: 24px; }
+  .period-selector .period-input { font-size: 10px; max-width: 100px; }
   .privacy-toggle { width: 32px; height: 32px; font-size: 14px; }
   .search-box { width: 95%; margin: 0 10px; }
   .search-input-wrap { padding: 12px; }
@@ -1458,9 +1461,9 @@ function showAuthModal() {
     ]));
     
     var btns = el('div', { style: { display: 'flex', gap: '10px' } });
-    btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() { syncToCloud(); closeModal(); } }, '⬆️ Sauvegarder'));
-    btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() { loadFromCloud(); closeModal(); } }, '⬇️ Charger'));
-    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { signOut(); closeModal(); } }, '🚪 Déconnexion'));
+    btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() { syncToCloud(); closeDynamicModal(); } }, '⬆️ Sauvegarder'));
+    btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() { loadFromCloud(); closeDynamicModal(); } }, '⬇️ Charger'));
+    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { signOut(); closeDynamicModal(); } }, '🚪 Déconnexion'));
     content.appendChild(btns);
   } else {
     // Non connecté - formulaire login
@@ -1499,7 +1502,7 @@ function signIn() {
         showToast('❌ ' + result.error.message, 'error');
       } else {
         showToast('✅ Connecté!', 'success');
-        closeModal();
+        closeDynamicModal();
       }
     });
 }
@@ -1519,7 +1522,7 @@ function signUp() {
         showToast('❌ ' + result.error.message, 'error');
       } else {
         showToast('✅ Compte créé! Vérifie ton email.', 'success');
-        closeModal();
+        closeDynamicModal();
       }
     });
 }
@@ -2017,7 +2020,7 @@ function exportFEC(year) {
     entries.push({
       JournalCode: journalCode, JournalLib: 'Ventes',
       EcritureNum: String(ecritureNum).padStart(6, '0'), EcritureDate: dateComp,
-      CompteNum: '411' + (f.clientId ? f.clientId.substr(-4) : '0000'),
+      CompteNum: '411' + (f.clientId ? f.clientId.slice(-4).padStart(4, '0') : '0000'),
       CompteLib: 'Client ' + f.client, CompAuxNum: '', CompAuxLib: '',
       PieceRef: pieceRef, PieceDate: dateComp, EcritureLib: libelle,
       Debit: f.ttc.toFixed(2), Credit: '0.00',
@@ -2998,7 +3001,7 @@ function buildMission(mis) {
     var jours = l.joursReels > 0 ? l.joursReels : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
     l.joursReels = jours;
     var ht = jours * mis.tjm;
-    var tva = isTVAApplicable(l.ym) ? ht * LEGAL.tvaRate : 0;
+    var tva = isTVAApplicable(l.ym) ? Math.round(ht * LEGAL.tvaRate * 100) / 100 : 0;
     if (existing) { existing.jours = jours; existing.ht = ht; existing.tva = tva; existing.ttc = ht + tva; newFactures.push(existing); }
     else { newFactures.push({ id: 'F-' + mis.id + '-' + l.ym, mois: l.ym, client: mis.client, jours: jours, ht: ht, tva: tva, ttc: ht + tva, status: 'brouillon' }); }
   });
@@ -3088,11 +3091,16 @@ var STORAGE_PREFIX = 'freel_v50_';
 var OLD_STORAGE_PREFIX = 'freel_v39_';
 
 function saveAll() {
-  localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
-  localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
-  localStorage.setItem(STORAGE_PREFIX + 'clients', JSON.stringify(CLIENTS));
-  localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
-  localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
+  try {
+    localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
+    localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
+    localStorage.setItem(STORAGE_PREFIX + 'clients', JSON.stringify(CLIENTS));
+    localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
+    localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
+  } catch (e) {
+    showToast('⚠️ Stockage plein! Exportez vos données.', 'error');
+    return;
+  }
   autoBackup();
   // V51: Sync to cloud if connected
   if (CURRENT_USER && SYNC_ENABLED) syncToCloud();
@@ -3181,10 +3189,13 @@ function importData(file) {
       if (data.missions) MISSIONS = data.missions;
       if (data.clients) CLIENTS = data.clients;
       if (data.treasury) TREASURY = Object.assign(TREASURY, data.treasury);
+      if (data.irConfig) Object.assign(IR_CONFIG, data.irConfig);
+      if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
+      if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
       MISSIONS.forEach(buildMission);
       saveAll(); render();
-      toast('Import réussi!', 'success');
-    } catch (err) { toast('Erreur: ' + err.message, 'error'); }
+      showToast('Import réussi!', 'success');
+    } catch (err) { showToast('Erreur: ' + err.message, 'error'); }
   };
   reader.readAsText(file);
 }
@@ -6056,7 +6067,7 @@ function downloadInvoiceHTML(data) {
     try {
       generateAndDownloadPDF(data);
       return;
-    } catch(e) { /* PDF failed, fallback to HTML */ }
+    } catch(e) { console.error('PDF generation failed:', e); }
   }
   
   // Fallback: télécharger en HTML
@@ -6067,7 +6078,7 @@ function downloadInvoiceHTML(data) {
 function generateAndDownloadPDF(data) {
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF();
-  var fmtN = function(n) { return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+  var fmtN = function(n) { return (n == null || isNaN(n) ? 0 : n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
   
   // === EN-TÊTE ÉMETTEUR (gauche) ===
   doc.setFontSize(13);
@@ -10499,22 +10510,9 @@ function renderTresorerie(container) {
     var canvas = $('#tresoSalairesChart');
     if (!canvas) return;
     var ctx = canvas.getContext('2d');
+    if (!ctx) return;
     if (salairesChart) salairesChart.destroy();
     var months = getPeriodMonths();
-  
-  // V51: Sous-onglets dashboard
-  renderDashboardSubTabs(container);
-  
-  // Afficher le contenu selon le sous-onglet actif
-  if (DASHBOARD_SUB === 'charges') {
-    renderChargesSubTab(container, data);
-    return;
-  }
-  if (DASHBOARD_SUB === 'analyse') {
-    renderAnalyseSubTab(container, data, months);
-    return;
-  }
-  // Sinon: Accueil (défaut)
     var labels = months.map(fmtMonthShort);
     var dataSal = months.map(function(m) { return data.monthsData[m] ? data.monthsData[m].salaires : 0; });
     salairesChart = new Chart(ctx, {
@@ -10970,7 +10968,7 @@ function renderAdmin(container) {
   importInput.onchange = function(e) { if (e.target.files[0]) importData(e.target.files[0]); };
   importWrapper.appendChild(importInput);
   ioBtns.appendChild(importWrapper);
-  ioBtns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer TOUTES les données?')) { localStorage.clear(); location.reload(); } } }, '🗑️ Reset'));
+  ioBtns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer TOUTES les données?')) { Object.keys(localStorage).filter(function(k) { return k.indexOf('freel') === 0; }).forEach(function(k) { localStorage.removeItem(k); }); location.reload(); } } }, '🗑️ Reset'));
   ioCard.appendChild(ioBtns);
   
   // Exports comptables obligatoires
