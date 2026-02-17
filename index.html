@@ -1887,6 +1887,61 @@ function getInvoiceRegistry(year) {
   });
 }
 
+// ===== SPRINT 8: VALIDATION NUMÉROTATION FACTURES (Art. L441-9) =====
+// Vérifie que la séquence de numéros est continue (sans trous)
+function validateInvoiceNumbering(year) {
+  year = year || TODAY.getFullYear();
+  var yearStr = String(year);
+  var registry = getInvoiceRegistry(year);
+  if (registry.length === 0) return { valid: true, gaps: [], duplicates: [], total: 0 };
+
+  // Extraire les numéros de la forme YYYY-NNN
+  var numbers = [];
+  var seen = {};
+  var duplicates = [];
+  registry.forEach(function(inv) {
+    if (!inv.numero) return;
+    var match = inv.numero.match(/^(\d{4})-(\d{3})$/);
+    if (match && match[1] === yearStr) {
+      var num = parseInt(match[2]);
+      if (seen[num]) {
+        duplicates.push({ numero: inv.numero, client: inv.client, date: inv.date });
+      } else {
+        seen[num] = inv;
+        numbers.push(num);
+      }
+    }
+  });
+
+  if (numbers.length === 0) return { valid: true, gaps: [], duplicates: duplicates, total: 0 };
+
+  numbers.sort(function(a, b) { return a - b; });
+
+  // Vérifier la séquence (doit commencer à 1 et être continue)
+  var gaps = [];
+  if (numbers[0] !== 1) {
+    for (var i = 1; i < numbers[0]; i++) {
+      gaps.push(yearStr + '-' + String(i).padStart(3, '0'));
+    }
+  }
+  for (var j = 0; j < numbers.length - 1; j++) {
+    if (numbers[j + 1] - numbers[j] > 1) {
+      for (var k = numbers[j] + 1; k < numbers[j + 1]; k++) {
+        gaps.push(yearStr + '-' + String(k).padStart(3, '0'));
+      }
+    }
+  }
+
+  return {
+    valid: gaps.length === 0 && duplicates.length === 0,
+    gaps: gaps,
+    duplicates: duplicates,
+    total: numbers.length,
+    first: yearStr + '-' + String(numbers[0]).padStart(3, '0'),
+    last: yearStr + '-' + String(numbers[numbers.length - 1]).padStart(3, '0')
+  };
+}
+
 function exportLivreRecettes(year) {
   year = year || TODAY.getFullYear();
   var registry = getInvoiceRegistry(year);
@@ -3673,10 +3728,20 @@ function compute() {
     return { cat: cat, montant: chargesByCat[cat] };
   }).sort(function(a, b) { return b.montant - a.montant; });
   
+  // V61: Calculer TVA déductible sur achats pro
+  data.tvaDeductible = 0;
+  TREASURY.mouvements.forEach(function(mv) {
+    if (mv.type === 'Charge' && mv.tvaDeductible > 0 && isInPeriod(mv.mois)) {
+      data.tvaDeductible += mv.tvaDeductible;
+    }
+  });
+
   // Calculer TVA et CA HT pour la marge
   var tvaInCharges = data.chargesDetail.find(function(c) { return c.cat === 'TVA'; });
-  data.tvaTotale = tvaInCharges ? tvaInCharges.montant : 0;
-  data.caHT = data.caEnc - data.tvaTotale;
+  data.tvaCollectee = tvaInCharges ? tvaInCharges.montant : 0;
+  data.tvaTotale = data.tvaCollectee; // Pour rétrocompatibilité
+  data.tvaNette = Math.max(0, data.tvaCollectee - data.tvaDeductible); // TVA à reverser = collectée - déductible
+  data.caHT = data.caEnc - data.tvaCollectee;
   
   // Correction bénéfice - basé sur CA HT (la TVA n'est pas un revenu)
   // Charges hors TVA collectée (car TVA collectée = dette, pas une charge réelle)
@@ -3966,6 +4031,10 @@ function showCashDetail() {
   calc.appendChild(row('💵 CA Encaissé TTC', '+ ' + EUR(data.caEnc), 'var(--success)', true, false, function() { closeModal('detailModal'); showDetailList('Factures Encaissées', data.detailEncaisse, 'success', function(i) { return i.client + ' · ' + fmtMonthShort(i.mois); }); }));
   if (tvaTotal > 0) {
     calc.appendChild(row('↳ TVA collectée', '- ' + EUR(tvaTotal), '#f472b6', false, true));
+    if (data.tvaDeductible > 0) {
+      calc.appendChild(row('↳ TVA déductible (achats)', '+ ' + EUR(data.tvaDeductible), '#34d399', false, true));
+      calc.appendChild(row('↳ TVA nette à reverser', EUR(data.tvaNette), '#f472b6', false, true));
+    }
   }
   calc.appendChild(row('= CA HT', EUR(caHT), 'var(--info)', true));
   
@@ -4015,7 +4084,15 @@ function showCashDetail() {
     return data.soldeAbsolu > 0 ? ' (' + PCT(montant / data.soldeAbsolu) + ')' : '';
   };
   
-  if (allTvaProv > 0) calc.appendChild(row('📦 TVA à reverser' + pctOfSolde(allTvaProv), '- ' + EUR(allTvaProv), '#f472b6', false, false, function() { showProvisionTypeDetail('TVA', allTvaPItems, '#f472b6'); }));
+  if (allTvaProv > 0) {
+    var tvaNetProv = Math.max(0, allTvaProv - (data.tvaDeductible || 0));
+    var tvaLabel = data.tvaDeductible > 0 ? '📦 TVA nette à reverser' + pctOfSolde(tvaNetProv) : '📦 TVA à reverser' + pctOfSolde(allTvaProv);
+    var tvaMontant = data.tvaDeductible > 0 ? tvaNetProv : allTvaProv;
+    calc.appendChild(row(tvaLabel, '- ' + EUR(tvaMontant), '#f472b6', false, false, function() { showProvisionTypeDetail('TVA', allTvaPItems, '#f472b6'); }));
+    if (data.tvaDeductible > 0) {
+      calc.appendChild(row('  ↳ Collectée: ' + EUR(allTvaProv) + ' - Déductible: ' + EUR(data.tvaDeductible), '', '#a78bfa', false, true));
+    }
+  }
   if (allIrProv > 0) calc.appendChild(row('📦 IR à payer' + pctOfSolde(allIrProv), '- ' + EUR(allIrProv), '#fbbf24', false, false, function() { showProvisionTypeDetail('IR', allIrPItems, '#fbbf24'); }));
   
   // Autres provisions groupées par catégorie
@@ -4554,6 +4631,10 @@ function showWaterfallDetail() {
   bloc1.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '① CA TTC → CA HT'));
   bloc1.appendChild(row('CA Encaissé TTC', EUR(data.caEnc), 'var(--success)', true));
   bloc1.appendChild(row('- TVA collectée', '- ' + EUR(tvaTotal), '#f472b6', false, true));
+  if (data.tvaDeductible > 0) {
+    bloc1.appendChild(row('+ TVA déductible', '+ ' + EUR(data.tvaDeductible), '#34d399', false, true));
+    bloc1.appendChild(row('= TVA nette', EUR(data.tvaNette), '#f472b6', false, true));
+  }
   bloc1.appendChild(row('= CA HT', EUR(caHT), 'var(--info)', true));
   body.appendChild(bloc1);
   
@@ -5329,16 +5410,66 @@ function showChargePonctuelle() {
   $('#tabRecurrente').classList.remove('active');
   var content = $('#chargeFormContent');
   content.innerHTML = '';
-  
+
   content.appendChild(createSelect('Catégorie', 'chCat', CHARGE_CATEGORIES, 'Autre'));
   content.appendChild(createInput('Description', 'text', 'chDesc', '', 'Ex: Abonnement Notion'));
   content.appendChild(createInput('Montant (€)', 'number', 'chMontant', ''));
   content.appendChild(createInput('Mois', 'month', 'chMois', ym(TODAY.getFullYear(), TODAY.getMonth())));
+
+  // V61: TVA déductible sur achats pro
+  var tvaSection = el('div', { id: 'chTvaSection', style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: 'var(--radius-md)', marginTop: '12px' } });
+  var tvaToggle = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' } });
+  var tvaCheckbox = el('input', { type: 'checkbox', id: 'chTvaToggle', style: { accentColor: 'var(--accent)' } });
+  tvaToggle.appendChild(tvaCheckbox);
+  tvaToggle.appendChild(el('span', { style: { fontSize: '12px' } }, 'Montant TTC (récupérer la TVA déductible)'));
+  tvaSection.appendChild(tvaToggle);
+  var tvaDetail = el('div', { id: 'chTvaDetail', style: { display: 'none', marginTop: '10px' } });
+  tvaDetail.appendChild(createSelect('Taux TVA', 'chTvaRate', [
+    { value: '20', label: '20% (taux normal)' },
+    { value: '10', label: '10% (taux intermédiaire)' },
+    { value: '5.5', label: '5,5% (taux réduit)' }
+  ], '20'));
+  var tvaInfo = el('div', { id: 'chTvaInfo', style: { fontSize: '11px', color: 'var(--success)', marginTop: '8px' } });
+  tvaDetail.appendChild(tvaInfo);
+  tvaSection.appendChild(tvaDetail);
+  tvaCheckbox.onchange = function() {
+    tvaDetail.style.display = tvaCheckbox.checked ? 'block' : 'none';
+    updateTvaInfo();
+  };
+  var updateTvaInfo = function() {
+    var montantTTC = parseFloat($('#chMontant') ? $('#chMontant').value : 0) || 0;
+    var rate = parseFloat($('#chTvaRate') ? $('#chTvaRate').value : 20) || 20;
+    if (montantTTC > 0 && tvaCheckbox.checked) {
+      var ht = Math.round(montantTTC / (1 + rate / 100) * 100) / 100;
+      var tva = Math.round((montantTTC - ht) * 100) / 100;
+      tvaInfo.textContent = 'HT: ' + ht.toFixed(2) + ' € · TVA récupérable: ' + tva.toFixed(2) + ' €';
+    } else {
+      tvaInfo.textContent = '';
+    }
+  };
+  content.appendChild(tvaSection);
+  // Mettre à jour l'info TVA quand le montant change
+  setTimeout(function() {
+    var montantInput = $('#chMontant');
+    if (montantInput) montantInput.addEventListener('input', updateTvaInfo);
+    var rateSelect = $('#chTvaRate');
+    if (rateSelect) rateSelect.addEventListener('change', updateTvaInfo);
+  }, 50);
+
   content.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '20px' }, onclick: function() {
-    var mv = { id: 'CH' + Date.now(), type: 'Charge', categorie: $('#chCat').value, description: $('#chDesc').value, montant: parseFloat($('#chMontant').value) || 0, mois: $('#chMois').value, date: localISO(TODAY) };
+    var montant = parseFloat($('#chMontant').value) || 0;
+    var isTTC = tvaCheckbox.checked;
+    var tvaRate = parseFloat($('#chTvaRate') ? $('#chTvaRate').value : 0) || 0;
+    var montantHT = montant;
+    var tvaDeductible = 0;
+    if (isTTC && tvaRate > 0) {
+      montantHT = Math.round(montant / (1 + tvaRate / 100) * 100) / 100;
+      tvaDeductible = Math.round((montant - montantHT) * 100) / 100;
+    }
+    var mv = { id: 'CH' + Date.now(), type: 'Charge', categorie: $('#chCat').value, description: $('#chDesc').value, montant: montantHT, montantTTC: isTTC ? montant : montantHT, tvaDeductible: tvaDeductible, tvaRate: isTTC ? tvaRate : 0, mois: $('#chMois').value, date: localISO(TODAY) };
     TREASURY.mouvements.push(mv);
     saveAll(); closeModal('formModal'); render();
-    toast('Charge ajoutée', 'success');
+    toast('Charge ajoutée' + (tvaDeductible > 0 ? ' (TVA ' + tvaDeductible.toFixed(2) + '€ déductible)' : ''), 'success');
   } }, '✅ Ajouter'));
 }
 
@@ -5506,20 +5637,7 @@ function showCongesOverview() {
   body.innerHTML = '';
   
   var months = getPeriodMonths();
-  
-  // V51: Sous-onglets dashboard
-  renderDashboardSubTabs(container);
-  
-  // Afficher le contenu selon le sous-onglet actif
-  if (DASHBOARD_SUB === 'charges') {
-    renderChargesSubTab(container, data);
-    return;
-  }
-  if (DASHBOARD_SUB === 'analyse') {
-    renderAnalyseSubTab(container, data, months);
-    return;
-  }
-  // Sinon: Accueil (défaut)
+
   var table = el('table', { class: 'days-table' });
   var thead = el('thead');
   var headerRow = el('tr');
@@ -10037,6 +10155,30 @@ function renderFactures(container) {
 
   container.appendChild(indicatorsDiv);
 
+  // V61: Validation numérotation factures (Art. L441-9)
+  var numValidation = validateInvoiceNumbering(PERIOD.year || TODAY.getFullYear());
+  if (numValidation.total > 0 && !numValidation.valid) {
+    var alertDiv = el('div', { class: 'card', style: { marginBottom: '16px', padding: '14px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.3)' } });
+    alertDiv.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } }, [
+      el('span', { style: { fontSize: '16px' } }, '⚠️'),
+      el('span', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--danger)' } }, 'Anomalie numérotation factures')
+    ]));
+    if (numValidation.gaps.length > 0) {
+      alertDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' } }, 'Numéros manquants: ' + numValidation.gaps.join(', ')));
+      alertDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Art. L441-9: La numérotation doit être séquentielle et sans trous.'));
+    }
+    if (numValidation.duplicates.length > 0) {
+      alertDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' } }, 'Doublons: ' + numValidation.duplicates.map(function(d) { return d.numero; }).join(', ')));
+    }
+    alertDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px' } }, 'Séquence: ' + numValidation.first + ' → ' + numValidation.last + ' (' + numValidation.total + ' factures)'));
+    container.appendChild(alertDiv);
+  } else if (numValidation.total > 0) {
+    var okDiv = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', fontSize: '11px', color: 'var(--success)' } });
+    okDiv.appendChild(el('span', {}, '✅'));
+    okDiv.appendChild(el('span', {}, 'Numérotation conforme: ' + numValidation.first + ' → ' + numValidation.last + ' (' + numValidation.total + ' factures, aucun trou)'));
+    container.appendChild(okDiv);
+  }
+
   // V51: Section "Mes Contrats" (ex-Missions)
   var contratsDiv = el('div', { class: 'card', style: { marginBottom: '16px', padding: '16px' } });
   var contratsHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } });
@@ -11342,8 +11484,8 @@ document.addEventListener('DOMContentLoaded', init);
  * ═══════════════════════════════════════════════════════════════════════════
  * PROCHAINES ÉTAPES (Sprint 8)
  * ═══════════════════════════════════════════════════════════════════════════
- * - [ ] Validation numérotation factures sans trous (Art. L441-9)
- * - [ ] TVA déductible sur achats pro
+ * - [x] Validation numérotation factures sans trous (Art. L441-9) ✅ V61
+ * - [x] TVA déductible sur achats pro ✅ V61
  * - [ ] Tests unitaires calculs fiscaux
  * - [ ] Intégration Supabase
  * - [x] Rendement compte pro ✅ V47
