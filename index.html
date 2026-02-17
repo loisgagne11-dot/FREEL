@@ -1720,6 +1720,17 @@ function fmtMonth(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDat
 function fmtMonthShort(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''); }
 function fmtLong(d) { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
+function parseDate(s) {
+  if (!s) return new Date();
+  // Format YYYY-MM-DD ou YYYY-MM
+  var parts = s.split('-');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  } else if (parts.length === 2) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+  }
+  return new Date(s);
+}
 
 // Fonction highlight pour recherche textuelle (B17)
 function highlightText(text, query) {
