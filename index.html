@@ -1365,7 +1365,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 66; // V66: IR basé sur CA encaissé (date paiement factures) - correction définition
+var APP_VERSION = 67; // V67: Provisions par type + édition/suppression mouvements
 var TODAY = new Date();
 var VIEW = 'accueil';
 var DASHBOARD_SUB = 'accueil'; // V51: sous-onglets dashboard (accueil, analyse, charges)
@@ -4310,13 +4310,59 @@ function showProvisionTypeDetail(typeName, items, color) {
     yearItems.sort(function(a, b) { return b.montant - a.montant; });
     yearItems.forEach(function(item) {
       var paid = isPaid(item.id);
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px', marginLeft: '12px', cursor: 'pointer' }, onclick: function() { togglePaid(item.id); showProvisionTypeDetail(typeName, items, color); } });
-      row.appendChild(el('div', { class: 'toggle-check ' + (paid ? 'paid' : ''), style: { width: '22px', height: '22px', fontSize: '13px', flexShrink: '0' } }, paid ? '✓' : ''));
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px', marginLeft: '12px' } });
+
+      // Checkbox toggle payé
+      row.appendChild(el('div', {
+        class: 'toggle-check ' + (paid ? 'paid' : ''),
+        style: { width: '22px', height: '22px', fontSize: '13px', flexShrink: '0', cursor: 'pointer' },
+        title: paid ? 'Marquer non payé' : 'Marquer payé',
+        onclick: function(e) { e.stopPropagation(); togglePaid(item.id); showProvisionTypeDetail(typeName, items, color); }
+      }, paid ? '✓' : ''));
+
+      // Info
       row.appendChild(el('div', { style: { flex: '1' } }, [
         el('div', { style: { fontSize: '13px', fontWeight: '600', color: paid ? 'var(--text-muted)' : 'inherit', textDecoration: paid ? 'line-through' : 'none' } }, item.source || item.desc || typeName),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, fmtMonth(item.mois))
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, fmtMonth(item.mois) + (item.id ? ' • ID: ' + item.id.substring(0, 10) : ''))
       ]));
+
+      // Montant
       row.appendChild(el('span', { style: { fontWeight: '700', fontSize: '14px', color: paid ? 'var(--success)' : color } }, EUR(item.montant)));
+
+      // Boutons d'action
+      var actions = el('div', { style: { display: 'flex', gap: '4px' } });
+
+      // Vérifier si c'est un mouvement manuel (éditable/supprimable)
+      var isManualMovement = item.id && (item.id.startsWith('CH') || item.id.startsWith('SAL'));
+
+      // Bouton éditer (seulement pour mouvements manuels)
+      if (isManualMovement) {
+        actions.appendChild(el('button', {
+          class: 'btn btn-sm',
+          style: { padding: '4px 8px', fontSize: '11px' },
+          title: 'Modifier',
+          onclick: function(e) { e.stopPropagation(); closeModal('formModal'); editMovement(item.id); }
+        }, '✏️'));
+      }
+
+      // Bouton supprimer (seulement pour mouvements manuels)
+      if (isManualMovement) {
+        actions.appendChild(el('button', {
+          class: 'btn btn-sm btn-danger',
+          style: { padding: '4px 8px', fontSize: '11px' },
+          title: 'Supprimer',
+          onclick: function(e) {
+            e.stopPropagation();
+            if (confirm('Supprimer cet élément ?')) {
+              deleteMovement(item.id);
+              closeModal('formModal');
+              render();
+            }
+          }
+        }, '🗑️'));
+      }
+
+      row.appendChild(actions);
       body.appendChild(row);
     });
   });
@@ -5611,6 +5657,74 @@ function showSalaireModal(montant) {
     toast('Salaire versé!', 'success');
   } }, '💸 Verser'));
   openModal('formModal');
+}
+
+// V66: Éditer un mouvement (charge ou salaire)
+function editMovement(mvId) {
+  var mv = TREASURY.mouvements.find(function(m) { return m.id === mvId; });
+  if (!mv) { toast('Mouvement non trouvé', 'error'); return; }
+
+  $('#formModalTitle').textContent = '✏️ Modifier ' + (mv.type === 'Salaire' ? 'Salaire' : 'Charge');
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+
+  if (mv.type === 'Salaire') {
+    body.appendChild(createInput('Montant (€)', 'number', 'editMontant', mv.montant));
+    body.appendChild(createInput('Mois', 'month', 'editMois', mv.mois));
+  } else {
+    // Charge
+    var catSelect = el('select', { id: 'editCat', class: 'form-control', style: { marginBottom: '12px' } });
+    ['URSSAF', 'CFP', 'CFE', 'TVA', 'Assurance', 'Comptabilité', 'Logiciel', 'Matériel', 'Transport', 'Repas', 'Télécom', 'Formation', 'Marketing', 'Autre'].forEach(function(c) {
+      var opt = el('option', { value: c }, c);
+      if (mv.categorie === c) opt.selected = true;
+      catSelect.appendChild(opt);
+    });
+    body.appendChild(el('label', { style: { fontSize: '12px', marginBottom: '4px', display: 'block' } }, 'Catégorie'));
+    body.appendChild(catSelect);
+    body.appendChild(createInput('Description', 'text', 'editDesc', mv.description || ''));
+    body.appendChild(createInput('Montant HT (€)', 'number', 'editMontant', mv.montant));
+    body.appendChild(createInput('Mois', 'month', 'editMois', mv.mois));
+  }
+
+  // Boutons
+  var btns = el('div', { style: { display: 'flex', gap: '8px', marginTop: '20px' } });
+
+  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
+    mv.montant = parseFloat($('#editMontant').value) || 0;
+    mv.mois = $('#editMois').value;
+    if (mv.type !== 'Salaire') {
+      mv.categorie = $('#editCat').value;
+      mv.description = $('#editDesc').value;
+    }
+    saveAll();
+    closeModal('formModal');
+    render();
+    toast('Modification enregistrée', 'success');
+  } }, '💾 Sauvegarder'));
+
+  btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() {
+    if (confirm('Supprimer définitivement ?')) {
+      deleteMovement(mvId);
+      closeModal('formModal');
+      render();
+    }
+  } }, '🗑️ Supprimer'));
+
+  body.appendChild(btns);
+  openModal('formModal');
+}
+
+// V66: Supprimer un mouvement
+function deleteMovement(mvId) {
+  var idx = TREASURY.mouvements.findIndex(function(m) { return m.id === mvId; });
+  if (idx >= 0) {
+    TREASURY.mouvements.splice(idx, 1);
+    // Retirer aussi du statut payé si présent
+    var paidIdx = TREASURY.paidCharges.indexOf(mvId);
+    if (paidIdx >= 0) TREASURY.paidCharges.splice(paidIdx, 1);
+    saveAll();
+    toast('Élément supprimé', 'info');
+  }
 }
 
 function showMonthCongesModal(monthYm) {
@@ -8063,6 +8177,22 @@ function renderDashboardHero(container, data) {
     el('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: '#a855f7' } }),
     el('span', {}, 'Provisions: ' + EUR(data.provisionsAbsolues) + ' (' + Math.round(pctProv) + '%)')
   ]));
+
+  // V66: Détail provisions par type
+  if (data.provAbsoluesByType && Object.keys(data.provAbsoluesByType).length > 0) {
+    var provTypes = Object.keys(data.provAbsoluesByType).sort(function(a, b) {
+      return data.provAbsoluesByType[b] - data.provAbsoluesByType[a];
+    });
+    var provDetail = el('div', { style: { marginLeft: '20px', marginTop: '4px', fontSize: '10px', color: 'var(--text-muted)' } });
+    provTypes.forEach(function(type) {
+      var montant = data.provAbsoluesByType[type];
+      if (montant > 0) {
+        provDetail.appendChild(el('div', { style: { marginTop: '2px' } }, '• ' + type + ': ' + EUR(montant)));
+      }
+    });
+    legend.appendChild(provDetail);
+  }
+
   pieContainer.appendChild(legend);
 
   hero.appendChild(pieContainer);
