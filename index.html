@@ -4270,24 +4270,47 @@ function updateProjections() {
   }
 }
 
-function showProvisionTypeDetail(typeName, items, color) {
+function showProvisionTypeDetail(typeName, passedItems, color) {
+  // V67: Recharger les données pour avoir l'état actuel
+  var provData = getAbsoluteProvisions();
+  var items;
+  if (typeName === 'IR' || typeName === 'IR Estimé') {
+    items = provData.detail.filter(function(p) { return p.cat.indexOf('IR') >= 0 || p.cat.indexOf('Impôt') >= 0; });
+  } else {
+    items = provData.detail.filter(function(p) { return p.cat === typeName; });
+  }
+
   var total = items.reduce(function(a, c) { return a + c.montant; }, 0);
-  $('#formModalTitle').textContent = '📦 ' + typeName + ' à payer';
+  // Compter aussi les items déjà payés pour ce type
+  var paidTotal = (passedItems || []).filter(function(i) { return isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+
+  $('#formModalTitle').textContent = '📦 ' + typeName;
   var body = $('#formModalBody');
   body.innerHTML = '';
-  
+
   // Bouton retour
-  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); showProvisionsDetail(); } }, '← Retour'));
-  
-  // Total
+  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); render(); } }, '← Retour'));
+
+  // Total à payer
   body.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total ' + typeName),
-    el('div', { style: { fontWeight: '800', fontSize: '22px', color: color } }, EUR(total))
-  ]));
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'À provisionner'),
+    el('div', { style: { fontWeight: '800', fontSize: '22px', color: color } }, EUR(total)),
+    paidTotal > 0 ? el('div', { style: { fontSize: '11px', color: 'var(--success)', marginTop: '4px' } }, '✓ Déjà payé: ' + EUR(paidTotal)) : null
+  ].filter(Boolean)));
+
+  // Inclure les items payés aussi (pour permettre de les "dé-payer")
+  var allItems = items.slice();
+  if (passedItems) {
+    passedItems.forEach(function(pi) {
+      if (isPaid(pi.id) && !allItems.find(function(a) { return a.id === pi.id; })) {
+        allItems.push(pi);
+      }
+    });
+  }
   
   // Grouper par année
   var byYear = {};
-  items.forEach(function(item) {
+  allItems.forEach(function(item) {
     var year = item.mois ? item.mois.substring(0, 4) : 'Autre';
     if (!byYear[year]) byYear[year] = [];
     byYear[year].push(item);
@@ -4312,12 +4335,17 @@ function showProvisionTypeDetail(typeName, items, color) {
       var paid = isPaid(item.id);
       var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px', marginLeft: '12px' } });
 
-      // Checkbox toggle payé
+      // Checkbox toggle payé (bidirectionnel: payé ↔ provisionné)
       row.appendChild(el('div', {
         class: 'toggle-check ' + (paid ? 'paid' : ''),
         style: { width: '22px', height: '22px', fontSize: '13px', flexShrink: '0', cursor: 'pointer' },
-        title: paid ? 'Marquer non payé' : 'Marquer payé',
-        onclick: function(e) { e.stopPropagation(); togglePaid(item.id); showProvisionTypeDetail(typeName, items, color); }
+        title: paid ? 'Remettre en provision' : 'Marquer payé',
+        onclick: function(e) {
+          e.stopPropagation();
+          TREASURY.paidCharges[item.id] = !isPaid(item.id);
+          saveAll();
+          showProvisionTypeDetail(typeName, allItems, color);
+        }
       }, paid ? '✓' : ''));
 
       // Info
@@ -4367,15 +4395,44 @@ function showProvisionTypeDetail(typeName, items, color) {
     });
   });
   
-  if (items.length > 0) {
-    var unpaidIds = items.filter(function(i) { return !isPaid(i.id); }).map(function(i) { return i.id; });
-    if (unpaidIds.length > 0) {
-      body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '16px' }, onclick: function() { markAllPaid(unpaidIds); closeModal('formModal'); } }, '✅ Tout marquer payé'));
-    }
-  } else {
-    body.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '20px' } }, 'Tout est payé ! 🎉'));
+  // Boutons d'action en masse
+  var btnsDiv = el('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } });
+
+  var unpaidIds = allItems.filter(function(i) { return !isPaid(i.id); }).map(function(i) { return i.id; });
+  var paidIds = allItems.filter(function(i) { return isPaid(i.id); }).map(function(i) { return i.id; });
+
+  if (unpaidIds.length > 0) {
+    btnsDiv.appendChild(el('button', {
+      class: 'btn btn-success',
+      style: { flex: '1' },
+      onclick: function() {
+        unpaidIds.forEach(function(id) { TREASURY.paidCharges[id] = true; });
+        saveAll();
+        showProvisionTypeDetail(typeName, allItems, color);
+      }
+    }, '✅ Tout payer (' + unpaidIds.length + ')'));
   }
-  
+
+  if (paidIds.length > 0) {
+    btnsDiv.appendChild(el('button', {
+      class: 'btn btn-warning',
+      style: { flex: '1' },
+      onclick: function() {
+        paidIds.forEach(function(id) { TREASURY.paidCharges[id] = false; });
+        saveAll();
+        showProvisionTypeDetail(typeName, allItems, color);
+      }
+    }, '↩️ Tout remettre en provision (' + paidIds.length + ')'));
+  }
+
+  if (unpaidIds.length > 0 || paidIds.length > 0) {
+    body.appendChild(btnsDiv);
+  }
+
+  if (allItems.length === 0) {
+    body.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '20px' } }, 'Aucun élément'));
+  }
+
   openModal('formModal');
 }
 
@@ -8178,16 +8235,26 @@ function renderDashboardHero(container, data) {
     el('span', {}, 'Provisions: ' + EUR(data.provisionsAbsolues) + ' (' + Math.round(pctProv) + '%)')
   ]));
 
-  // V66: Détail provisions par type
+  // V67: Détail provisions par type - cliquable pour voir/modifier
   if (data.provAbsoluesByType && Object.keys(data.provAbsoluesByType).length > 0) {
     var provTypes = Object.keys(data.provAbsoluesByType).sort(function(a, b) {
       return data.provAbsoluesByType[b] - data.provAbsoluesByType[a];
     });
-    var provDetail = el('div', { style: { marginLeft: '20px', marginTop: '4px', fontSize: '10px', color: 'var(--text-muted)' } });
+    var provDetail = el('div', { style: { marginLeft: '20px', marginTop: '4px', fontSize: '10px' } });
     provTypes.forEach(function(type) {
       var montant = data.provAbsoluesByType[type];
       if (montant > 0) {
-        provDetail.appendChild(el('div', { style: { marginTop: '2px' } }, '• ' + type + ': ' + EUR(montant)));
+        var items = data.allProvisionsDetail.filter(function(p) { return p.cat === type || (type === 'IR Estimé' && p.cat.indexOf('IR') >= 0); });
+        var typeRow = el('div', {
+          style: { display: 'flex', justifyContent: 'space-between', padding: '3px 6px', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-muted)' },
+          onclick: function() { showProvisionTypeDetail(type, items, '#a855f7'); }
+        }, [
+          el('span', {}, '• ' + type + ' ›'),
+          el('span', { style: { fontWeight: '600', color: '#a855f7' } }, EUR(montant))
+        ]);
+        typeRow.onmouseenter = function() { typeRow.style.background = 'var(--bg-secondary)'; };
+        typeRow.onmouseleave = function() { typeRow.style.background = 'none'; };
+        provDetail.appendChild(typeRow);
       }
     });
     legend.appendChild(provDetail);
