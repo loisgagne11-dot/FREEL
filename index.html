@@ -2950,53 +2950,43 @@ function getAbsoluteProvisions() {
   });
 
   // V65/V69/V70: IR Estimé - provisions mensuelles lissées
-  // Inclut l'année précédente si non payée + année en cours
+  // Règle universelle: l'IR est toujours divisé en 12 acomptes mensuels
   if (!COMPANY.prelevementLiberatoire) {
     var currentYear = TODAY.getFullYear();
     var currentMonth = TODAY.getMonth(); // 0-11
 
-    // V70: Vérifier aussi l'IR de l'année précédente
-    var previousYear = currentYear - 1;
-    var irPrevData = getIRForYear(previousYear);
-    var irPrevId = 'IR-' + previousYear;
-
-    // IR année précédente (montant total, pas lissé car année terminée)
-    if (irPrevData.impot > 0 && !isPaid(irPrevId)) {
-      result.total += irPrevData.impot;
-      result.byType['IR Estimé'] = (result.byType['IR Estimé'] || 0) + irPrevData.impot;
-      result.detail.push({
-        cat: 'IR Estimé',
-        mois: previousYear + '-12',
-        montant: irPrevData.impot,
-        id: irPrevId,
-        source: 'IR ' + previousYear + ' à régulariser · CA: ' + EUR(irPrevData.caTotal)
-      });
-    }
-
-    // IR année en cours (lissé mensuellement)
-    var irData = getIRForYear(currentYear);
-    if (irData.impot > 0) {
+    // Helper pour ajouter les acomptes IR d'une année
+    function addIRMonthlyProvisions(year, irData, maxMonth) {
+      if (irData.impot <= 0) return;
       var irMensuel = Math.round(irData.impot / 12);
 
-      // Créer une provision pour chaque mois de l'année (jusqu'au mois actuel inclus)
-      for (var m = 0; m <= currentMonth; m++) {
+      for (var m = 0; m <= maxMonth; m++) {
         var monthStr = String(m + 1).padStart(2, '0');
-        var irMonthId = 'IR-' + currentYear + '-' + monthStr;
-        var montantMois = (m === 11) ? (irData.impot - irMensuel * 11) : irMensuel; // Ajuster le dernier mois
+        var irMonthId = 'IR-' + year + '-' + monthStr;
+        var montantMois = (m === 11) ? (irData.impot - irMensuel * 11) : irMensuel;
 
         if (!isPaid(irMonthId) && montantMois > 0) {
           result.total += montantMois;
           result.byType['IR Estimé'] = (result.byType['IR Estimé'] || 0) + montantMois;
           result.detail.push({
             cat: 'IR Estimé',
-            mois: currentYear + '-' + monthStr,
+            mois: year + '-' + monthStr,
             montant: montantMois,
             id: irMonthId,
-            source: 'Acompte ' + (m + 1) + '/12 · IR ' + currentYear + ': ' + EUR(irData.impot)
+            source: 'Acompte ' + (m + 1) + '/12 · IR ' + year + ': ' + EUR(irData.impot)
           });
         }
       }
     }
+
+    // IR année précédente (12 mois complets)
+    var previousYear = currentYear - 1;
+    var irPrevData = getIRForYear(previousYear);
+    addIRMonthlyProvisions(previousYear, irPrevData, 11); // 12 mois (0-11)
+
+    // IR année en cours (jusqu'au mois actuel)
+    var irData = getIRForYear(currentYear);
+    addIRMonthlyProvisions(currentYear, irData, currentMonth);
   }
 
   // Charges manuelles
@@ -3051,47 +3041,41 @@ function getAllChargesForType(typeName) {
     });
   });
 
-  // V69/V70: IR Estimé (pour non-PL) - inclut année précédente + année en cours
+  // V69/V70: IR Estimé (pour non-PL) - règle universelle: 12 acomptes mensuels
   if (isIR && !COMPANY.prelevementLiberatoire) {
     var currentYear = TODAY.getFullYear();
     var currentMonth = TODAY.getMonth(); // 0-11
 
-    // V70: IR année précédente (montant total)
-    var previousYear = currentYear - 1;
-    var irPrevData = getIRForYear(previousYear);
-    var irPrevId = 'IR-' + previousYear;
-    if (irPrevData.impot > 0) {
-      items.push({
-        cat: 'IR Estimé',
-        mois: previousYear + '-12',
-        montant: irPrevData.impot,
-        id: irPrevId,
-        source: 'IR ' + previousYear + ' à régulariser · CA: ' + EUR(irPrevData.caTotal)
-      });
-    }
-
-    // IR année en cours (lissé mensuellement)
-    var irData = getIRForYear(currentYear);
-    if (irData.impot > 0) {
+    // Helper pour ajouter les acomptes IR d'une année
+    function addIRItems(year, irData, maxMonth) {
+      if (irData.impot <= 0) return;
       var irMensuel = Math.round(irData.impot / 12);
 
-      // Créer un item pour chaque mois (jusqu'au mois actuel)
-      for (var m = 0; m <= currentMonth; m++) {
+      for (var m = 0; m <= maxMonth; m++) {
         var monthStr = String(m + 1).padStart(2, '0');
-        var irMonthId = 'IR-' + currentYear + '-' + monthStr;
+        var irMonthId = 'IR-' + year + '-' + monthStr;
         var montantMois = (m === 11) ? (irData.impot - irMensuel * 11) : irMensuel;
 
         if (montantMois > 0) {
           items.push({
             cat: 'IR Estimé',
-            mois: currentYear + '-' + monthStr,
+            mois: year + '-' + monthStr,
             montant: montantMois,
             id: irMonthId,
-            source: 'Acompte ' + (m + 1) + '/12 · IR annuel: ' + EUR(irData.impot)
+            source: 'Acompte ' + (m + 1) + '/12 · IR ' + year + ': ' + EUR(irData.impot)
           });
         }
       }
     }
+
+    // IR année précédente (12 mois complets)
+    var previousYear = currentYear - 1;
+    var irPrevData = getIRForYear(previousYear);
+    addIRItems(previousYear, irPrevData, 11);
+
+    // IR année en cours (jusqu'au mois actuel)
+    var irData = getIRForYear(currentYear);
+    addIRItems(currentYear, irData, currentMonth);
   }
 
   // Charges manuelles
