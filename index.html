@@ -1365,7 +1365,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 64; // V64: Correction définitions CA (réalisé/prévu) + IR respecte filtre période
+var APP_VERSION = 65; // V65: IR unifié via getIRForYear() - source unique de vérité
 var TODAY = new Date();
 var VIEW = 'accueil';
 var DASHBOARD_SUB = 'accueil'; // V51: sous-onglets dashboard (accueil, analyse, charges)
@@ -2504,6 +2504,75 @@ function calculateIR(revenuBrut, year) {
   return { revenuNet: revenuNet, quotient: quotient, impot: Math.round(impotBrut * parts), tmi: tmi, parts: parts, perAnnuel: cfg.perAnnuel, autresRevenus: cfg.autresRevenus, tranches: tranchesDetail, abattement: abattement };
 }
 
+// V65: Source unique de vérité pour l'IR d'une année
+// Base = CA Encaissé HT + CA Réalisé HT + CA Prévu HT sur l'année
+function getIRForYear(year) {
+  year = year || TODAY.getFullYear();
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var yearStr = String(year);
+
+  var caEncaisse = 0;  // Factures payées sur l'année
+  var caRealise = 0;   // Jours travaillés (mois passés/actuels) × TJM
+  var caPrevu = 0;     // Jours prévus (mois futurs) × TJM
+  var detail = { encaisse: [], realise: [], prevu: [] };
+
+  MISSIONS.forEach(function(mis) {
+    // CA Encaissé = factures payées dont le paiement est sur l'année
+    if (mis.factures) {
+      mis.factures.forEach(function(f) {
+        if (f.status !== 'payée' || f.jours <= 0) return;
+        var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        var paymentYear = paymentMonth.split('-')[0];
+        if (paymentYear === yearStr) {
+          caEncaisse += f.ht;
+          detail.encaisse.push({ mission: mis.client, mois: paymentMonth, montant: f.ht });
+        }
+      });
+    }
+
+    // CA Réalisé et Prévu = jours travaillés/prévus sur les lignes de mission
+    if (mis.lignes && mis.tjm) {
+      mis.lignes.forEach(function(l) {
+        if (!l.ym) return;
+        var lYear = l.ym.split('-')[0];
+        if (lYear !== yearStr) return;
+
+        if (l.ym <= nowYm) {
+          // Mois passé ou actuel: CA réalisé = jours réels uniquement
+          var joursReels = l.joursReels > 0 ? l.joursReels : 0;
+          var caRealMois = joursReels * mis.tjm;
+          if (caRealMois > 0) {
+            caRealise += caRealMois;
+            detail.realise.push({ mission: mis.client, mois: l.ym, jours: joursReels, montant: caRealMois });
+          }
+        } else {
+          // Mois futur: CA prévu = jours prévus (si pas encore de réels)
+          var joursPrevus = l.joursReels > 0 ? 0 : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+          var caPrevMois = joursPrevus * mis.tjm;
+          if (caPrevMois > 0) {
+            caPrevu += caPrevMois;
+            detail.prevu.push({ mission: mis.client, mois: l.ym, jours: joursPrevus, montant: caPrevMois });
+          }
+        }
+      });
+    }
+  });
+
+  var caTotal = caEncaisse + caRealise + caPrevu;
+  var ir = calculateIR(caTotal, year);
+
+  return {
+    year: year,
+    caEncaisse: caEncaisse,
+    caRealise: caRealise,
+    caPrevu: caPrevu,
+    caTotal: caTotal,
+    ir: ir,
+    impot: ir.impot,
+    detail: detail
+  };
+}
+
 function createSparkline(data, color, height) {
   height = height || 24;
   if (!data || data.length < 2) return '';
@@ -2905,44 +2974,23 @@ function getAbsoluteProvisions() {
     });
   });
   
-  // IR Estimé (si pas prélèvement libératoire) - calculé PAR ANNÉE, proportionnellement au CA de chaque mois
+  // V65: IR Estimé - utilise getIRForYear() comme source unique de vérité
+  // Provisionner l'IR pour l'année en cours (basé sur CA encaissé + réalisé + prévu)
   if (!COMPANY.prelevementLiberatoire) {
-    // Grouper le CA HT par année
-    var caParAnnee = {}; // { '2025': { total: 50000, mois: { '2025-03': 5000, ... } }, '2026': {...} }
-    
-    MISSIONS.forEach(function(mis) {
-      if (!mis.factures) return;
-      mis.factures.forEach(function(f) {
-        // V60: Prendre le HT que la facture soit payée ou non (IR basé sur CA réalisé)
-        if (f.jours <= 0) return;
-        var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-        if (paymentMonth <= nowYm) {
-          var year = paymentMonth.split('-')[0];
-          if (!caParAnnee[year]) caParAnnee[year] = { total: 0, mois: {} };
-          caParAnnee[year].mois[paymentMonth] = (caParAnnee[year].mois[paymentMonth] || 0) + f.ht;
-          caParAnnee[year].total += f.ht;
-        }
+    var currentYear = TODAY.getFullYear();
+    var irData = getIRForYear(currentYear);
+    var irId = 'IR-' + currentYear;
+    if (irData.impot > 0 && !isPaid(irId)) {
+      result.total += irData.impot;
+      result.byType['IR Estimé'] = irData.impot;
+      result.detail.push({
+        cat: 'IR Estimé',
+        mois: currentYear + '-12',
+        montant: irData.impot,
+        id: irId,
+        source: 'CA ' + currentYear + ': ' + EUR(irData.caTotal) + ' (Enc: ' + EUR(irData.caEncaisse) + ' + Réal: ' + EUR(irData.caRealise) + ' + Prév: ' + EUR(irData.caPrevu) + ')'
       });
-    });
-
-    // Calculer l'IR pour chaque année séparément
-    Object.keys(caParAnnee).forEach(function(year) {
-      var anneeData = caParAnnee[year];
-      if (anneeData.total > 0) {
-        var irAnnuel = calculateIR(anneeData.total, parseInt(year)).impot;
-        // Répartir l'IR proportionnellement au CA de chaque mois de cette année
-        Object.keys(anneeData.mois).forEach(function(m) {
-          var caMois = anneeData.mois[m];
-          var irMois = Math.round(irAnnuel * caMois / anneeData.total);
-          var irId = 'IR-' + m;
-          if (irMois > 0 && !isPaid(irId)) {
-            result.total += irMois;
-            result.byType['IR Estimé'] = (result.byType['IR Estimé'] || 0) + irMois;
-            result.detail.push({ cat: 'IR Estimé', mois: m, montant: irMois, id: irId, source: 'CA: ' + EUR(caMois) + ' (année ' + year + ')' });
-          }
-        });
-      }
-    });
+    }
   }
   
   // Charges manuelles
@@ -3653,40 +3701,32 @@ function compute() {
     }
   });
   
-  // V60: IR estimé (si pas prél. libératoire) - basé sur CA HT encaissé OU réalisé
-  // Utiliser le CA encaissé HT si disponible, sinon le CA réalisé HT comme base
+  // V65: IR estimé - utilise getIRForYear() comme source unique de vérité
   if (!COMPANY.prelevementLiberatoire) {
-    var caHTParMois = {};
-    var caHTTotal = 0;
-    months.forEach(function(m) {
-      var md = data.monthsData[m];
-      // V60: Prendre le CA HT encaissé en priorité, sinon le CA réalisé (qui est déjà HT)
-      var caHTMois = 0;
-      if (md.enc > 0) {
-        var tvaMois = md.charges.filter(function(c) { return c.cat === 'TVA'; }).reduce(function(a, c) { return a + c.montant; }, 0);
-        caHTMois = md.enc - tvaMois;
-      } else if (md.real > 0) {
-        // CA réalisé = jours × TJM, donc déjà en HT
-        caHTMois = md.real;
+    var periodYear = parseInt(months[0].split('-')[0]);
+    var irData = getIRForYear(periodYear);
+    var irId = 'IR-' + periodYear;
+    if (irData.impot > 0) {
+      // Ajouter l'IR annuel comme charge à payer
+      var lastMonth = months[months.length - 1];
+      var md = data.monthsData[lastMonth];
+      md.charges.push({ id: irId, cat: 'IR Estimé', desc: 'CA ' + periodYear + ': ' + EUR(irData.caTotal), montant: irData.impot, mois: lastMonth });
+      if (isPaid(irId)) {
+        data.chargesPayees += irData.impot;
+        md.chargesPaid += irData.impot;
+      } else {
+        data.chargesAPayer += irData.impot;
+        md.chargesUnpaid += irData.impot;
+        data.provByMonth[lastMonth] = (data.provByMonth[lastMonth] || 0) + irData.impot;
+        data.provByType['IR Estimé'] = irData.impot;
+        data.detailChargesAPayer.push({
+          cat: 'IR Estimé',
+          mois: lastMonth,
+          montant: irData.impot,
+          id: irId,
+          source: 'CA ' + periodYear + ': Enc ' + EUR(irData.caEncaisse) + ' + Réal ' + EUR(irData.caRealise) + ' + Prév ' + EUR(irData.caPrevu)
+        });
       }
-      if (caHTMois > 0) {
-        caHTParMois[m] = caHTMois;
-        caHTTotal += caHTMois;
-      }
-    });
-
-    if (caHTTotal > 0) {
-      var periodYear = parseInt(months[0].split('-')[0]);
-      var irAnnuel = calculateIR(caHTTotal, periodYear).impot;
-      Object.keys(caHTParMois).forEach(function(m) {
-        var md = data.monthsData[m];
-        var caHTMois = caHTParMois[m];
-        var irMois = Math.round(irAnnuel * caHTMois / caHTTotal);
-        var irId = 'IR-' + m;
-        md.charges.push({ id: irId, cat: 'IR Estimé', desc: 'CA: ' + EUR(caHTMois), montant: irMois, mois: m });
-        if (isPaid(irId)) { data.chargesPayees += irMois; md.chargesPaid += irMois; }
-        else { data.chargesAPayer += irMois; md.chargesUnpaid += irMois; data.provByMonth[m] = (data.provByMonth[m] || 0) + irMois; data.provByType['IR Estimé'] = (data.provByType['IR Estimé'] || 0) + irMois; data.detailChargesAPayer.push({ cat: 'IR Estimé', mois: m, montant: irMois, id: irId, source: 'CA: ' + EUR(caHTMois) }); }
-      });
     }
   }
   
@@ -5053,36 +5093,15 @@ function showIRDetail() {
 }
 
 function renderIRForYear(year) {
-  var data = compute();
   var cfg = getIRConfig(year);
-  
-  // V60: Calculer le CA HT encaissé + projeté pour l'année
-  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
-  var caHTEncaisse = 0;
-  var caHTProjecte = 0;
-  MISSIONS.forEach(function(mis) {
-    if (!mis.factures) return;
-    // CA encaissé (factures payées)
-    mis.factures.forEach(function(f) {
-      if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-      var paymentYear = parseInt(paymentMonth.split('-')[0]);
-      if (paymentYear === year) caHTEncaisse += f.ht;
-    });
-    // CA projeté (jours futurs × TJM)
-    if (mis.lignes && mis.tjm) {
-      mis.lignes.forEach(function(l) {
-        if (!l.ym || l.ym <= nowYm) return;
-        var lYear = parseInt(l.ym.split('-')[0]);
-        if (lYear !== year) return;
-        var joursFuturs = l.joursReels > 0 ? 0 : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
-        if (joursFuturs > 0) caHTProjecte += joursFuturs * mis.tjm;
-      });
-    }
-  });
-  var caHTAnnee = caHTEncaisse + caHTProjecte;
-  var ir = calculateIR(caHTAnnee, year);
-  var irEncaisseOnly = calculateIR(caHTEncaisse, year);
+
+  // V65: Utilise getIRForYear() comme source unique de vérité
+  var irData = getIRForYear(year);
+  var ir = irData.ir;
+  var caHTEncaisse = irData.caEncaisse;
+  var caHTRealise = irData.caRealise;
+  var caHTPrevu = irData.caPrevu;
+  var caHTAnnee = irData.caTotal;
   
   // Update boutons année
   [TODAY.getFullYear() - 1, TODAY.getFullYear(), TODAY.getFullYear() + 1].forEach(function(y) {
@@ -5126,14 +5145,15 @@ function renderIRForYear(year) {
   var calc = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: 'var(--radius-md)' } });
   calc.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' } }, '📊 Calcul ' + year));
   
-  // V60: Afficher CA encaissé et projeté séparément
-  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'CA HT encaissé'), el('span', { style: { fontWeight: '600' } }, EUR(caHTEncaisse))]));
-  if (caHTProjecte > 0) {
-    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#a78bfa' } }, '+ CA HT projeté (missions)'), el('span', { style: { fontWeight: '600', color: '#a78bfa' } }, EUR(caHTProjecte))]));
-    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total estimé ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caHTAnnee))]));
-  } else {
-    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'CA HT ' + year), el('span', { style: { fontWeight: '600' } }, EUR(caHTAnnee))]));
+  // V65: Afficher les 3 composantes du CA (encaissé, réalisé, prévu)
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'CA Encaissé (factures payées)'), el('span', { style: { fontWeight: '600' } }, EUR(caHTEncaisse))]));
+  if (caHTRealise > 0) {
+    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#60a5fa' } }, '+ CA Réalisé (jours travaillés)'), el('span', { style: { fontWeight: '600', color: '#60a5fa' } }, EUR(caHTRealise))]));
   }
+  if (caHTPrevu > 0) {
+    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#a78bfa' } }, '+ CA Prévu (missions futures)'), el('span', { style: { fontWeight: '600', color: '#a78bfa' } }, EUR(caHTPrevu))]));
+  }
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caHTAnnee))]))
   calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Abattement 34% (min 305€)'), el('span', { class: 'text-success' }, '- ' + EUR(ir.abattement))]));
   
   if (ir.perAnnuel > 0) {
@@ -9358,14 +9378,12 @@ function renderPerformance(container) {
   kpiGrid.appendChild(KPI({ label: 'CA Encaissé HT', value: EUR(data.caHT), sub: 'TTC: ' + EUR(data.caEnc), color: 'success', onClick: function() { showEncaisseDetail(data); } }));
   kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger', onClick: function() { showBeneficeDetail(data); } }));
   kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent', onClick: showTJMDetail }));
-  // V64: Indicateur Impôt - calculer IR pour l'année de la période sélectionnée
-  // Base = CA encaissé HT + CA réalisé non encore facturé de la période
+  // V65: Indicateur Impôt - utilise getIRForYear() comme source unique de vérité
   var periodYear = PERIOD.year || TODAY.getFullYear();
-  var caBaseIR = data.caHT + data.caReal; // Encaissé HT + Réalisé HT (selon nouvelles définitions)
-  var irCalcule = calculateIR(caBaseIR, periodYear);
-  var totalImpot = COMPANY.prelevementLiberatoire ? Math.round(caBaseIR * 0.022) : irCalcule.impot;
+  var irData = getIRForYear(periodYear);
+  var totalImpot = COMPANY.prelevementLiberatoire ? Math.round(irData.caTotal * 0.022) : irData.impot;
   var impotLabel = COMPANY.prelevementLiberatoire ? 'Impôt PL' : 'IR Estimé';
-  kpiGrid.appendChild(KPI({ label: impotLabel, value: EUR(totalImpot), sub: periodYear + ' • CA: ' + EUR(caBaseIR), color: 'warning', onClick: showIRDetail }));
+  kpiGrid.appendChild(KPI({ label: impotLabel, value: EUR(totalImpot), sub: periodYear + ' • CA: ' + EUR(irData.caTotal), color: 'warning', onClick: showIRDetail }));
   container.appendChild(kpiGrid);
 
   // V57: Répartition CA HT - Basée sur le CA ENCAISSÉ (pas réalisé)
