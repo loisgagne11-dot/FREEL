@@ -5176,12 +5176,13 @@ function renderIRForYear(year) {
   calc.appendChild(el('div', { class: 'detail-separator accent' }));
   calc.appendChild(el('div', { class: 'detail-row highlight' }, [el('span', { style: { fontWeight: '700' } }, 'IR Estimé ' + year), el('span', { style: { fontWeight: '800', fontSize: '20px', color: 'var(--warning)' } }, EUR(ir.impot))]));
 
-  // V60: Si projections incluses, montrer la différence
-  if (caHTProjecte > 0) {
+  // V66: Si CA à encaisser inclus, montrer la différence
+  if (caAEncaisser > 0) {
+    var irEncaisseSeul = calculateIR(caEncaisse, year);
     calc.appendChild(el('div', { style: { marginTop: '8px', padding: '8px', background: 'rgba(167,139,250,0.08)', borderRadius: '6px', fontSize: '11px', borderLeft: '3px solid #a78bfa' } }, [
-      el('div', { style: { color: '#a78bfa', fontWeight: '600' } }, '🔮 Projection incluse'),
-      el('div', { style: { color: 'var(--text-muted)', marginTop: '4px' } }, 'IR sur encaissé seul: ' + EUR(irEncaisseOnly.impot)),
-      el('div', { style: { color: 'var(--text-muted)' } }, 'Surplus dû aux projections: ' + EUR(ir.impot - irEncaisseOnly.impot))
+      el('div', { style: { color: '#a78bfa', fontWeight: '600' } }, '🔮 Projection incluse (factures à encaisser)'),
+      el('div', { style: { color: 'var(--text-muted)', marginTop: '4px' } }, 'IR sur encaissé seul: ' + EUR(irEncaisseSeul.impot)),
+      el('div', { style: { color: 'var(--text-muted)' } }, 'Surplus dû aux factures à venir: ' + EUR(ir.impot - irEncaisseSeul.impot))
     ]));
   }
 
@@ -5189,8 +5190,9 @@ function renderIRForYear(year) {
   
   // Info prélèvement libératoire
   if (COMPANY.prelevementLiberatoire) {
+    var plImpot = Math.round(caTotal * LEGAL.impLib);
     var plInfo = el('div', { style: { background: 'var(--success-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginTop: '16px', fontSize: '12px' } });
-    plInfo.innerHTML = '✅ <strong>Prélèvement libératoire actif</strong><br>Tu paies ' + PCT(LEGAL.impLib) + ' sur CA encaissé = ' + EUR(Math.round(data.caEnc * LEGAL.impLib));
+    plInfo.innerHTML = '✅ <strong>Prélèvement libératoire actif</strong><br>Tu paies ' + PCT(LEGAL.impLib) + ' sur CA HT = ' + EUR(plImpot);
     content.appendChild(plInfo);
   }
 }
