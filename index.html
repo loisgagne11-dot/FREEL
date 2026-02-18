@@ -2971,27 +2971,25 @@ function getAbsoluteProvisions() {
       return Object.keys(months).map(function(m) { return parseInt(m); }).sort(function(a, b) { return a - b; });
     }
 
-    // Helper pour ajouter les acomptes IR (uniquement pour les mois avec CA)
+    // Helper pour ajouter les acomptes IR (1 acompte par mois avec CA)
+    // L'IR annuel est divisé par 12, chaque mois avec CA = 1 acompte mensuel
     function addIRMonthlyProvisions(year, irData, monthsWithCA) {
       if (irData.impot <= 0 || monthsWithCA.length === 0) return;
-      var nbMois = monthsWithCA.length;
-      var irMensuel = Math.round(irData.impot / nbMois);
+      var irMensuel = Math.round(irData.impot / 12); // Toujours divisé par 12
 
       monthsWithCA.forEach(function(m, idx) {
         var monthStr = String(m + 1).padStart(2, '0');
         var irMonthId = 'IR-' + year + '-' + monthStr;
-        var acompteNum = idx + 1;
-        var montantMois = (idx === nbMois - 1) ? (irData.impot - irMensuel * (nbMois - 1)) : irMensuel;
 
-        if (!isPaid(irMonthId) && montantMois > 0) {
-          result.total += montantMois;
-          result.byType['IR Estimé'] = (result.byType['IR Estimé'] || 0) + montantMois;
+        if (!isPaid(irMonthId) && irMensuel > 0) {
+          result.total += irMensuel;
+          result.byType['IR Estimé'] = (result.byType['IR Estimé'] || 0) + irMensuel;
           result.detail.push({
             cat: 'IR Estimé',
             mois: year + '-' + monthStr,
-            montant: montantMois,
+            montant: irMensuel,
             id: irMonthId,
-            source: 'Acompte ' + acompteNum + '/' + nbMois + ' · IR ' + year + ': ' + EUR(irData.impot)
+            source: 'Acompte · IR ' + year + ': ' + EUR(irData.impot) + ' /12'
           });
         }
       });
@@ -3082,25 +3080,23 @@ function getAllChargesForType(typeName) {
       return Object.keys(months).map(function(m) { return parseInt(m); }).sort(function(a, b) { return a - b; });
     }
 
-    // Helper pour ajouter les acomptes IR (uniquement pour les mois avec CA)
+    // Helper pour ajouter les acomptes IR (1 acompte par mois avec CA)
+    // L'IR annuel est divisé par 12, chaque mois avec CA = 1 acompte mensuel
     function addIRItems(year, irData, monthsWithCA) {
       if (irData.impot <= 0 || monthsWithCA.length === 0) return;
-      var nbMois = monthsWithCA.length;
-      var irMensuel = Math.round(irData.impot / nbMois);
+      var irMensuel = Math.round(irData.impot / 12); // Toujours divisé par 12
 
-      monthsWithCA.forEach(function(m, idx) {
+      monthsWithCA.forEach(function(m) {
         var monthStr = String(m + 1).padStart(2, '0');
         var irMonthId = 'IR-' + year + '-' + monthStr;
-        var acompteNum = idx + 1;
-        var montantMois = (idx === nbMois - 1) ? (irData.impot - irMensuel * (nbMois - 1)) : irMensuel;
 
-        if (montantMois > 0) {
+        if (irMensuel > 0) {
           items.push({
             cat: 'IR Estimé',
             mois: year + '-' + monthStr,
-            montant: montantMois,
+            montant: irMensuel,
             id: irMonthId,
-            source: 'Acompte ' + acompteNum + '/' + nbMois + ' · IR ' + year + ': ' + EUR(irData.impot)
+            source: 'Acompte · IR ' + year + ': ' + EUR(irData.impot) + ' /12'
           });
         }
       });
