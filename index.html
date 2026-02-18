@@ -1365,7 +1365,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 65; // V65: IR unifié via getIRForYear() - source unique de vérité
+var APP_VERSION = 66; // V66: IR basé sur CA encaissé (date paiement factures) - correction définition
 var TODAY = new Date();
 var VIEW = 'accueil';
 var DASHBOARD_SUB = 'accueil'; // V51: sous-onglets dashboard (accueil, analyse, charges)
@@ -2505,67 +2505,42 @@ function calculateIR(revenuBrut, year) {
 }
 
 // V65: Source unique de vérité pour l'IR d'une année
-// Base = CA Encaissé HT + CA Réalisé HT + CA Prévu HT sur l'année
+// L'IR est basé sur le CA ENCAISSÉ (date de réception des paiements) sur l'année fiscale
+// = Factures payées + Factures à recevoir dont le paiement est prévu sur l'année
 function getIRForYear(year) {
   year = year || TODAY.getFullYear();
-  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var yearStr = String(year);
-
-  var caEncaisse = 0;  // Factures payées sur l'année
-  var caRealise = 0;   // Jours travaillés (mois passés/actuels) × TJM
-  var caPrevu = 0;     // Jours prévus (mois futurs) × TJM
-  var detail = { encaisse: [], realise: [], prevu: [] };
+  var caEncaisse = 0;    // Factures déjà payées sur l'année
+  var caAEncaisser = 0;  // Factures non payées mais paiement prévu sur l'année
+  var detail = { encaisse: [], aEncaisser: [] };
 
   MISSIONS.forEach(function(mis) {
-    // CA Encaissé = factures payées dont le paiement est sur l'année
-    if (mis.factures) {
-      mis.factures.forEach(function(f) {
-        if (f.status !== 'payée' || f.jours <= 0) return;
-        var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-        var paymentYear = paymentMonth.split('-')[0];
-        if (paymentYear === yearStr) {
-          caEncaisse += f.ht;
-          detail.encaisse.push({ mission: mis.client, mois: paymentMonth, montant: f.ht });
-        }
-      });
-    }
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.jours <= 0) return;
+      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentYear = paymentMonth.split('-')[0];
+      if (paymentYear !== yearStr) return;
 
-    // CA Réalisé et Prévu = jours travaillés/prévus sur les lignes de mission
-    if (mis.lignes && mis.tjm) {
-      mis.lignes.forEach(function(l) {
-        if (!l.ym) return;
-        var lYear = l.ym.split('-')[0];
-        if (lYear !== yearStr) return;
-
-        if (l.ym <= nowYm) {
-          // Mois passé ou actuel: CA réalisé = jours réels uniquement
-          var joursReels = l.joursReels > 0 ? l.joursReels : 0;
-          var caRealMois = joursReels * mis.tjm;
-          if (caRealMois > 0) {
-            caRealise += caRealMois;
-            detail.realise.push({ mission: mis.client, mois: l.ym, jours: joursReels, montant: caRealMois });
-          }
-        } else {
-          // Mois futur: CA prévu = jours prévus (si pas encore de réels)
-          var joursPrevus = l.joursReels > 0 ? 0 : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
-          var caPrevMois = joursPrevus * mis.tjm;
-          if (caPrevMois > 0) {
-            caPrevu += caPrevMois;
-            detail.prevu.push({ mission: mis.client, mois: l.ym, jours: joursPrevus, montant: caPrevMois });
-          }
-        }
-      });
-    }
+      if (f.status === 'payée') {
+        // Facture déjà payée
+        caEncaisse += f.ht;
+        detail.encaisse.push({ mission: mis.client, mois: paymentMonth, montant: f.ht, numero: f.numero });
+      } else {
+        // Facture non payée mais paiement prévu sur l'année
+        caAEncaisser += f.ht;
+        detail.aEncaisser.push({ mission: mis.client, mois: paymentMonth, montant: f.ht, numero: f.numero, status: f.status });
+      }
+    });
   });
 
-  var caTotal = caEncaisse + caRealise + caPrevu;
+  var caTotal = caEncaisse + caAEncaisser;
   var ir = calculateIR(caTotal, year);
 
   return {
     year: year,
     caEncaisse: caEncaisse,
-    caRealise: caRealise,
-    caPrevu: caPrevu,
+    caAEncaisser: caAEncaisser,
     caTotal: caTotal,
     ir: ir,
     impot: ir.impot,
@@ -2988,7 +2963,7 @@ function getAbsoluteProvisions() {
         mois: currentYear + '-12',
         montant: irData.impot,
         id: irId,
-        source: 'CA ' + currentYear + ': ' + EUR(irData.caTotal) + ' (Enc: ' + EUR(irData.caEncaisse) + ' + Réal: ' + EUR(irData.caRealise) + ' + Prév: ' + EUR(irData.caPrevu) + ')'
+        source: 'CA ' + currentYear + ': ' + EUR(irData.caTotal) + ' (Encaissé: ' + EUR(irData.caEncaisse) + ' + À encaisser: ' + EUR(irData.caAEncaisser) + ')'
       });
     }
   }
@@ -3724,7 +3699,7 @@ function compute() {
           mois: lastMonth,
           montant: irData.impot,
           id: irId,
-          source: 'CA ' + periodYear + ': Enc ' + EUR(irData.caEncaisse) + ' + Réal ' + EUR(irData.caRealise) + ' + Prév ' + EUR(irData.caPrevu)
+          source: 'CA ' + periodYear + ': Encaissé ' + EUR(irData.caEncaisse) + ' + À encaisser ' + EUR(irData.caAEncaisser)
         });
       }
     }
@@ -5098,10 +5073,9 @@ function renderIRForYear(year) {
   // V65: Utilise getIRForYear() comme source unique de vérité
   var irData = getIRForYear(year);
   var ir = irData.ir;
-  var caHTEncaisse = irData.caEncaisse;
-  var caHTRealise = irData.caRealise;
-  var caHTPrevu = irData.caPrevu;
-  var caHTAnnee = irData.caTotal;
+  var caEncaisse = irData.caEncaisse;
+  var caAEncaisser = irData.caAEncaisser;
+  var caTotal = irData.caTotal;
   
   // Update boutons année
   [TODAY.getFullYear() - 1, TODAY.getFullYear(), TODAY.getFullYear() + 1].forEach(function(y) {
@@ -5145,15 +5119,12 @@ function renderIRForYear(year) {
   var calc = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: 'var(--radius-md)' } });
   calc.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' } }, '📊 Calcul ' + year));
   
-  // V65: Afficher les 3 composantes du CA (encaissé, réalisé, prévu)
-  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'CA Encaissé (factures payées)'), el('span', { style: { fontWeight: '600' } }, EUR(caHTEncaisse))]));
-  if (caHTRealise > 0) {
-    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#60a5fa' } }, '+ CA Réalisé (jours travaillés)'), el('span', { style: { fontWeight: '600', color: '#60a5fa' } }, EUR(caHTRealise))]));
+  // V65: Afficher CA encaissé + à encaisser (base de l'IR = date de paiement des factures)
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'CA Encaissé (factures payées)'), el('span', { style: { fontWeight: '600', color: 'var(--success)' } }, EUR(caEncaisse))]));
+  if (caAEncaisser > 0) {
+    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#a78bfa' } }, '+ CA À encaisser (paiement prévu ' + year + ')'), el('span', { style: { fontWeight: '600', color: '#a78bfa' } }, EUR(caAEncaisser))]));
   }
-  if (caHTPrevu > 0) {
-    calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#a78bfa' } }, '+ CA Prévu (missions futures)'), el('span', { style: { fontWeight: '600', color: '#a78bfa' } }, EUR(caHTPrevu))]));
-  }
-  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caHTAnnee))]))
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caTotal))]))
   calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Abattement 34% (min 305€)'), el('span', { class: 'text-success' }, '- ' + EUR(ir.abattement))]));
   
   if (ir.perAnnuel > 0) {
