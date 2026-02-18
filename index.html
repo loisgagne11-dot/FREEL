@@ -2911,7 +2911,7 @@ function getTotalRendement(fromYm, toYm) {
 function getAbsoluteProvisions() {
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var result = { total: 0, byType: {}, detail: [] };
-  
+
   // Charges liées aux factures payées
   MISSIONS.forEach(function(mis) {
     if (!mis.factures) return;
@@ -2924,7 +2924,7 @@ function getAbsoluteProvisions() {
         var cfp = Math.round(f.ht * LEGAL.cfp);
         var tva = f.tva > 0 ? Math.round(f.tva) : 0;
         var impLib = COMPANY.prelevementLiberatoire ? Math.round(f.ht * LEGAL.impLib) : 0;
-        
+
         if (!isPaid('URSSAF-' + f.id)) {
           result.total += urssaf;
           result.byType['URSSAF'] = (result.byType['URSSAF'] || 0) + urssaf;
@@ -2948,7 +2948,7 @@ function getAbsoluteProvisions() {
       }
     });
   });
-  
+
   // V65: IR Estimé - utilise getIRForYear() comme source unique de vérité
   // Provisionner l'IR pour l'année en cours (basé sur CA encaissé + réalisé + prévu)
   if (!COMPANY.prelevementLiberatoire) {
@@ -2967,7 +2967,7 @@ function getAbsoluteProvisions() {
       });
     }
   }
-  
+
   // Charges manuelles
   TREASURY.mouvements.forEach(function(mv) {
     if (mv.mois <= nowYm && mv.type === 'Charge' && !isPaid(mv.id)) {
@@ -2977,8 +2977,81 @@ function getAbsoluteProvisions() {
       result.detail.push({ cat: cat, mois: mv.mois, montant: mv.montant, id: mv.id, source: mv.description || '' });
     }
   });
-  
+
   return result;
+}
+
+// V68: Récupère TOUTES les charges (payées et non payées) pour un type donné
+function getAllChargesForType(typeName) {
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var items = [];
+
+  // Normaliser le nom de type pour la comparaison
+  var isIR = typeName === 'IR' || typeName === 'IR Estimé' || typeName === 'Impôt';
+  var isTVA = typeName === 'TVA';
+  var isURSSAF = typeName === 'URSSAF';
+  var isCFP = typeName === 'CFP';
+
+  // Charges liées aux factures payées
+  MISSIONS.forEach(function(mis) {
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (paymentMonth <= nowYm) {
+        var rate = getUrssafRate(paymentMonth);
+
+        if (isURSSAF) {
+          var urssaf = Math.round(f.ht * rate);
+          items.push({ cat: 'URSSAF', mois: paymentMonth, montant: urssaf, id: 'URSSAF-' + f.id, source: mis.client });
+        }
+        if (isCFP) {
+          var cfp = Math.round(f.ht * LEGAL.cfp);
+          items.push({ cat: 'CFP', mois: paymentMonth, montant: cfp, id: 'CFP-' + f.id, source: mis.client });
+        }
+        if (isTVA && f.tva > 0) {
+          items.push({ cat: 'TVA', mois: paymentMonth, montant: Math.round(f.tva), id: 'TVA-' + f.id, source: mis.client });
+        }
+        if (isIR && COMPANY.prelevementLiberatoire) {
+          var impLib = Math.round(f.ht * LEGAL.impLib);
+          if (impLib > 0) items.push({ cat: 'Impôt PL', mois: paymentMonth, montant: impLib, id: 'IMPLIB-' + f.id, source: mis.client });
+        }
+      }
+    });
+  });
+
+  // IR Estimé (pour non-PL)
+  if (isIR && !COMPANY.prelevementLiberatoire) {
+    var currentYear = TODAY.getFullYear();
+    var irData = getIRForYear(currentYear);
+    var irId = 'IR-' + currentYear;
+    if (irData.impot > 0) {
+      items.push({
+        cat: 'IR Estimé',
+        mois: currentYear + '-12',
+        montant: irData.impot,
+        id: irId,
+        source: 'CA ' + currentYear + ': ' + EUR(irData.caTotal)
+      });
+    }
+  }
+
+  // Charges manuelles
+  TREASURY.mouvements.forEach(function(mv) {
+    if (mv.mois <= nowYm && mv.type === 'Charge') {
+      var cat = mv.categorie || 'Autres';
+      var matchType = (typeName === cat) ||
+                      (isTVA && cat === 'TVA') ||
+                      (isURSSAF && cat === 'URSSAF') ||
+                      (isCFP && cat === 'CFP') ||
+                      (isIR && (cat === 'IR' || cat === 'Impôt' || cat.indexOf('IR') >= 0));
+      if (matchType) {
+        items.push({ cat: cat, mois: mv.mois, montant: mv.montant, id: mv.id, source: mv.description || '' });
+      }
+    }
+  });
+
+  return items;
 }
 
 function buildMission(mis) {
@@ -3920,11 +3993,14 @@ function computeProjections(scenario, params) {
 // === MODALS ===
 
 // V60: Détail cliquable pour chaque ligne de la composition du compte
+// V68: Toggle bidirectionnel pour charges payées + meilleur contraste
 function showCompteLineDetail(type) {
   var data = compute();
   var content = el('div', { style: { padding: '10px' } });
   var items = [];
   var title = '';
+  var isCharges = type === 'charges';
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
 
   if (type === 'encaissements') {
     title = '💵 Encaissements TTC';
@@ -3937,25 +4013,30 @@ function showCompteLineDetail(type) {
         items.push({ mois: paymentMonth, type: f.client, montant: f.ttc, sub: fmtMonthShort(f.mois) + ' · ' + f.jours + 'j × ' + EUR(mis.tjm) });
       });
     });
-  } else if (type === 'charges') {
+  } else if (isCharges) {
     title = '📋 Charges Payées';
-    // Charges auto (URSSAF, TVA, etc.) payées
+    // V68: Collecter TOUTES les charges (payées et non payées) pour permettre toggle bidirectionnel
     MISSIONS.forEach(function(mis) {
       if (!mis.factures) return;
       mis.factures.forEach(function(f) {
         if (f.status !== 'payée' || f.jours <= 0) return;
         var pm = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        if (pm > nowYm) return; // Seulement les charges échues
         var rate = getUrssafRate(pm);
-        if (isPaid('URSSAF-' + f.id)) items.push({ mois: pm, type: 'URSSAF', montant: Math.round(f.ht * rate), sub: mis.client });
-        if (isPaid('CFP-' + f.id)) items.push({ mois: pm, type: 'CFP', montant: Math.round(f.ht * LEGAL.cfp), sub: mis.client });
-        if (f.tva > 0 && isPaid('TVA-' + f.id)) items.push({ mois: pm, type: 'TVA', montant: Math.round(f.tva), sub: mis.client });
-        if (COMPANY.prelevementLiberatoire && isPaid('IMPLIB-' + f.id)) items.push({ mois: pm, type: 'Impôt PL', montant: Math.round(f.ht * LEGAL.impLib), sub: mis.client });
+        var urssafId = 'URSSAF-' + f.id;
+        var cfpId = 'CFP-' + f.id;
+        var tvaId = 'TVA-' + f.id;
+        var implibId = 'IMPLIB-' + f.id;
+        items.push({ id: urssafId, mois: pm, type: 'URSSAF', montant: Math.round(f.ht * rate), sub: mis.client, paid: isPaid(urssafId) });
+        items.push({ id: cfpId, mois: pm, type: 'CFP', montant: Math.round(f.ht * LEGAL.cfp), sub: mis.client, paid: isPaid(cfpId) });
+        if (f.tva > 0) items.push({ id: tvaId, mois: pm, type: 'TVA', montant: Math.round(f.tva), sub: mis.client, paid: isPaid(tvaId) });
+        if (COMPANY.prelevementLiberatoire) items.push({ id: implibId, mois: pm, type: 'Impôt PL', montant: Math.round(f.ht * LEGAL.impLib), sub: mis.client, paid: isPaid(implibId) });
       });
     });
-    // Charges manuelles payées
+    // Charges manuelles
     TREASURY.mouvements.forEach(function(mv) {
-      if (mv.type === 'Charge' && isPaid(mv.id)) {
-        items.push({ mois: mv.mois, type: mv.categorie || 'Autre', montant: mv.montant, sub: mv.description || '' });
+      if (mv.type === 'Charge' && mv.mois <= nowYm) {
+        items.push({ id: mv.id, mois: mv.mois, type: mv.categorie || 'Autre', montant: mv.montant, sub: mv.description || '', paid: isPaid(mv.id) });
       }
     });
   } else if (type === 'salaires') {
@@ -3967,6 +4048,30 @@ function showCompteLineDetail(type) {
     });
   }
 
+  // Calculer totaux payés et non payés pour les charges
+  var paidTotal = isCharges ? items.filter(function(i) { return i.paid; }).reduce(function(s, i) { return s + i.montant; }, 0) : 0;
+  var unpaidTotal = isCharges ? items.filter(function(i) { return !i.paid; }).reduce(function(s, i) { return s + i.montant; }, 0) : 0;
+  var total = items.reduce(function(s, i) { return s + i.montant; }, 0);
+
+  // Header avec totaux
+  if (isCharges) {
+    var headerDiv = el('div', { style: { display: 'flex', gap: '12px', marginBottom: '16px' } });
+    headerDiv.appendChild(el('div', { style: { flex: '1', background: 'rgba(34, 197, 94, 0.15)', padding: '14px', borderRadius: '8px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '10px', color: 'var(--success)', textTransform: 'uppercase', fontWeight: '600' } }, '✓ Payé'),
+      el('div', { style: { fontSize: '22px', fontWeight: '800', color: 'var(--success)' } }, EUR(paidTotal))
+    ]));
+    headerDiv.appendChild(el('div', { style: { flex: '1', background: 'rgba(251, 191, 36, 0.15)', padding: '14px', borderRadius: '8px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '10px', color: 'var(--warning)', textTransform: 'uppercase', fontWeight: '600' } }, 'En provision'),
+      el('div', { style: { fontSize: '22px', fontWeight: '800', color: 'var(--warning)' } }, EUR(unpaidTotal))
+    ]));
+    content.appendChild(headerDiv);
+  } else {
+    content.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '16px' } }, [
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, title),
+      el('div', { style: { fontSize: '24px', fontWeight: '800' } }, EUR(total))
+    ]));
+  }
+
   // Grouper par mois
   var byMonth = {};
   items.forEach(function(it) {
@@ -3975,45 +4080,125 @@ function showCompteLineDetail(type) {
   });
 
   var sortedMonths = Object.keys(byMonth).sort().reverse();
-  var total = items.reduce(function(s, i) { return s + i.montant; }, 0);
-
-  // Total en header
-  content.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '16px' } }, [
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, title),
-    el('div', { style: { fontSize: '24px', fontWeight: '800' } }, EUR(total))
-  ]));
 
   // Détail par mois
   var list = el('div', { style: { maxHeight: '350px', overflowY: 'auto' } });
   sortedMonths.forEach(function(mois) {
     var monthItems = byMonth[mois];
+    var monthPaid = monthItems.filter(function(i) { return i.paid; }).reduce(function(s, i) { return s + i.montant; }, 0);
+    var monthUnpaid = monthItems.filter(function(i) { return !i.paid; }).reduce(function(s, i) { return s + i.montant; }, 0);
     var monthTotal = monthItems.reduce(function(s, i) { return s + i.montant; }, 0);
-    list.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', padding: '8px 0 4px', borderBottom: '1px solid var(--border)' } }, fmtMonth(mois) + ' · ' + EUR(monthTotal)));
+
+    // Header mois avec meilleur contraste
+    var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', fontWeight: '700', color: 'var(--accent)', padding: '10px 8px 6px', borderBottom: '2px solid var(--accent)', marginTop: '8px' } });
+    monthHeader.appendChild(el('span', {}, fmtMonth(mois)));
+    if (isCharges) {
+      monthHeader.appendChild(el('div', { style: { display: 'flex', gap: '8px', fontSize: '11px' } }, [
+        monthPaid > 0 ? el('span', { style: { color: 'var(--success)' } }, '✓ ' + EUR(monthPaid)) : null,
+        monthUnpaid > 0 ? el('span', { style: { color: 'var(--warning)' } }, EUR(monthUnpaid)) : null
+      ].filter(Boolean)));
+    } else {
+      monthHeader.appendChild(el('span', {}, EUR(monthTotal)));
+    }
+    list.appendChild(monthHeader);
 
     // Grouper par type dans le mois
     var byType = {};
     monthItems.forEach(function(it) {
-      if (!byType[it.type]) byType[it.type] = { montant: 0, subs: [] };
-      byType[it.type].montant += it.montant;
-      if (it.sub) byType[it.type].subs.push(it.sub);
+      var key = it.type + (isCharges && it.id ? '-' + it.id : '');
+      if (!byType[key]) byType[key] = { type: it.type, montant: 0, subs: [], id: it.id, paid: it.paid };
+      byType[key].montant += it.montant;
+      if (it.sub && byType[key].subs.indexOf(it.sub) < 0) byType[key].subs.push(it.sub);
     });
 
-    Object.keys(byType).forEach(function(t) {
-      var entry = byType[t];
-      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 8px', fontSize: '11px' } });
-      var left = el('div', {});
-      left.appendChild(el('span', { style: { fontWeight: '600' } }, t));
-      if (entry.subs.length > 0 && entry.subs.length <= 3) {
-        left.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, entry.subs.join(', ')));
-      } else if (entry.subs.length > 3) {
-        left.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, entry.subs.length + ' éléments'));
+    Object.keys(byType).forEach(function(k) {
+      var entry = byType[k];
+      var isPaidItem = entry.paid;
+
+      if (isCharges) {
+        // Affichage avec toggle pour les charges
+        var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', margin: '4px 0', borderRadius: '6px', background: isPaidItem ? 'rgba(34, 197, 94, 0.1)' : 'rgba(251, 191, 36, 0.08)', border: isPaidItem ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(251, 191, 36, 0.2)' } });
+
+        // Toggle checkbox
+        row.appendChild(el('div', {
+          style: { width: '22px', height: '22px', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', background: isPaidItem ? 'var(--success)' : 'transparent', border: isPaidItem ? 'none' : '2px solid var(--warning)', color: isPaidItem ? 'white' : 'var(--warning)' },
+          title: isPaidItem ? 'Remettre en provision' : 'Marquer payé',
+          onclick: function(e) {
+            e.stopPropagation();
+            TREASURY.paidCharges[entry.id] = !isPaidItem;
+            saveAll();
+            closeModal('formModal');
+            showCompteLineDetail(type);
+          }
+        }, isPaidItem ? '✓' : ''));
+
+        // Info
+        var left = el('div', { style: { flex: '1' } });
+        left.appendChild(el('span', { style: { fontWeight: '600', fontSize: '12px', color: isPaidItem ? 'var(--success)' : 'var(--text-primary)' } }, entry.type));
+        if (entry.subs.length > 0) {
+          left.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, entry.subs.slice(0, 2).join(', ') + (entry.subs.length > 2 ? ' +' + (entry.subs.length - 2) : '')));
+        }
+        row.appendChild(left);
+
+        // Montant
+        row.appendChild(el('span', { style: { fontWeight: '700', fontSize: '13px', color: isPaidItem ? 'var(--success)' : 'var(--text-primary)' } }, EUR(entry.montant)));
+
+        list.appendChild(row);
+      } else {
+        // Affichage standard pour non-charges
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 10px', fontSize: '12px', background: 'var(--bg-secondary)', borderRadius: '4px', margin: '3px 0' } });
+        var left = el('div', {});
+        left.appendChild(el('span', { style: { fontWeight: '600' } }, entry.type));
+        if (entry.subs.length > 0 && entry.subs.length <= 3) {
+          left.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, entry.subs.join(', ')));
+        } else if (entry.subs.length > 3) {
+          left.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, entry.subs.length + ' éléments'));
+        }
+        row.appendChild(left);
+        row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(entry.montant)));
+        list.appendChild(row);
       }
-      row.appendChild(left);
-      row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(entry.montant)));
-      list.appendChild(row);
     });
   });
   content.appendChild(list);
+
+  // Boutons d'action en masse pour les charges
+  if (isCharges) {
+    var paidIds = items.filter(function(i) { return i.paid; }).map(function(i) { return i.id; });
+    var unpaidIds = items.filter(function(i) { return !i.paid; }).map(function(i) { return i.id; });
+
+    if (paidIds.length > 0 || unpaidIds.length > 0) {
+      var btnsDiv = el('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } });
+
+      if (unpaidIds.length > 0) {
+        btnsDiv.appendChild(el('button', {
+          class: 'btn btn-success',
+          style: { flex: '1', padding: '10px' },
+          onclick: function() {
+            unpaidIds.forEach(function(id) { TREASURY.paidCharges[id] = true; });
+            saveAll();
+            closeModal('formModal');
+            showCompteLineDetail(type);
+          }
+        }, '✅ Tout payer (' + unpaidIds.length + ')'));
+      }
+
+      if (paidIds.length > 0) {
+        btnsDiv.appendChild(el('button', {
+          class: 'btn btn-warning',
+          style: { flex: '1', padding: '10px' },
+          onclick: function() {
+            paidIds.forEach(function(id) { TREASURY.paidCharges[id] = false; });
+            saveAll();
+            closeModal('formModal');
+            showCompteLineDetail(type);
+          }
+        }, '↩️ Tout en provision (' + paidIds.length + ')'));
+      }
+
+      content.appendChild(btnsDiv);
+    }
+  }
 
   if (sortedMonths.length === 0) {
     content.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '20px' } }, 'Aucun mouvement'));
@@ -4271,18 +4456,19 @@ function updateProjections() {
 }
 
 function showProvisionTypeDetail(typeName, passedItems, color) {
-  // V67: Recharger les données pour avoir l'état actuel
-  var provData = getAbsoluteProvisions();
-  var items;
-  if (typeName === 'IR' || typeName === 'IR Estimé') {
-    items = provData.detail.filter(function(p) { return p.cat.indexOf('IR') >= 0 || p.cat.indexOf('Impôt') >= 0; });
-  } else {
-    items = provData.detail.filter(function(p) { return p.cat === typeName; });
-  }
+  // V68: Utiliser getAllChargesForType pour avoir TOUS les items (payés et non payés)
+  var allItems = getAllChargesForType(typeName);
 
-  var total = items.reduce(function(a, c) { return a + c.montant; }, 0);
-  // Compter aussi les items déjà payés pour ce type
-  var paidTotal = (passedItems || []).filter(function(i) { return isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+  // Calculer totaux payés et non payés
+  var unpaidTotal = 0;
+  var paidTotal = 0;
+  allItems.forEach(function(item) {
+    if (isPaid(item.id)) {
+      paidTotal += item.montant;
+    } else {
+      unpaidTotal += item.montant;
+    }
+  });
 
   $('#formModalTitle').textContent = '📦 ' + typeName;
   var body = $('#formModalBody');
@@ -4291,23 +4477,23 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
   // Bouton retour
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); render(); } }, '← Retour'));
 
-  // Total à payer
-  body.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'À provisionner'),
-    el('div', { style: { fontWeight: '800', fontSize: '22px', color: color } }, EUR(total)),
-    paidTotal > 0 ? el('div', { style: { fontSize: '11px', color: 'var(--success)', marginTop: '4px' } }, '✓ Déjà payé: ' + EUR(paidTotal)) : null
-  ].filter(Boolean)));
+  // Total header avec deux sections
+  var headerDiv = el('div', { style: { display: 'flex', gap: '12px', marginBottom: '16px' } });
 
-  // Inclure les items payés aussi (pour permettre de les "dé-payer")
-  var allItems = items.slice();
-  if (passedItems) {
-    passedItems.forEach(function(pi) {
-      if (isPaid(pi.id) && !allItems.find(function(a) { return a.id === pi.id; })) {
-        allItems.push(pi);
-      }
-    });
-  }
-  
+  // À provisionner
+  headerDiv.appendChild(el('div', { style: { flex: '1', background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', textAlign: 'center' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, 'À provisionner'),
+    el('div', { style: { fontWeight: '800', fontSize: '20px', color: color } }, EUR(unpaidTotal))
+  ]));
+
+  // Déjà payé
+  headerDiv.appendChild(el('div', { style: { flex: '1', background: 'rgba(34, 197, 94, 0.1)', padding: '14px', borderRadius: 'var(--radius-md)', textAlign: 'center' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--success)', textTransform: 'uppercase' } }, 'Déjà payé'),
+    el('div', { style: { fontWeight: '800', fontSize: '20px', color: 'var(--success)' } }, EUR(paidTotal))
+  ]));
+
+  body.appendChild(headerDiv);
+
   // Grouper par année
   var byYear = {};
   allItems.forEach(function(item) {
@@ -4315,47 +4501,59 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
     if (!byYear[year]) byYear[year] = [];
     byYear[year].push(item);
   });
-  
+
   // Afficher par année (triées décroissant)
   var years = Object.keys(byYear).sort(function(a, b) { return b.localeCompare(a); });
-  
+
+  var listContainer = el('div', { style: { maxHeight: '350px', overflowY: 'auto' } });
+
   years.forEach(function(year) {
     var yearItems = byYear[year];
-    var yearTotal = yearItems.reduce(function(a, c) { return a + c.montant; }, 0);
-    
+    var yearUnpaid = yearItems.filter(function(i) { return !isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+    var yearPaid = yearItems.filter(function(i) { return isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+
     // Header année
-    body.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', marginTop: '12px', marginBottom: '8px' } }, [
+    listContainer.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', marginTop: '12px', marginBottom: '8px' } }, [
       el('span', { style: { fontWeight: '700', fontSize: '13px' } }, '📅 ' + year),
-      el('span', { style: { fontWeight: '700', fontSize: '14px', color: color } }, EUR(yearTotal))
+      el('div', { style: { display: 'flex', gap: '12px' } }, [
+        yearUnpaid > 0 ? el('span', { style: { fontWeight: '600', fontSize: '12px', color: color } }, EUR(yearUnpaid) + ' à payer') : null,
+        yearPaid > 0 ? el('span', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--success)' } }, '✓ ' + EUR(yearPaid)) : null
+      ].filter(Boolean))
     ]));
-    
-    // Items de cette année
-    yearItems.sort(function(a, b) { return b.montant - a.montant; });
+
+    // Items de cette année - triés: non payés d'abord, puis payés
+    yearItems.sort(function(a, b) {
+      var aPaid = isPaid(a.id) ? 1 : 0;
+      var bPaid = isPaid(b.id) ? 1 : 0;
+      if (aPaid !== bPaid) return aPaid - bPaid;
+      return b.montant - a.montant;
+    });
+
     yearItems.forEach(function(item) {
       var paid = isPaid(item.id);
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px', marginLeft: '12px' } });
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: paid ? 'rgba(34, 197, 94, 0.08)' : 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px', marginLeft: '12px', border: paid ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid transparent' } });
 
       // Checkbox toggle payé (bidirectionnel: payé ↔ provisionné)
       row.appendChild(el('div', {
         class: 'toggle-check ' + (paid ? 'paid' : ''),
-        style: { width: '22px', height: '22px', fontSize: '13px', flexShrink: '0', cursor: 'pointer' },
+        style: { width: '24px', height: '24px', fontSize: '14px', flexShrink: '0', cursor: 'pointer', background: paid ? 'var(--success)' : 'var(--bg-tertiary)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: paid ? 'white' : 'var(--text-muted)', border: paid ? 'none' : '2px solid var(--border)' },
         title: paid ? 'Remettre en provision' : 'Marquer payé',
         onclick: function(e) {
           e.stopPropagation();
           TREASURY.paidCharges[item.id] = !isPaid(item.id);
           saveAll();
-          showProvisionTypeDetail(typeName, allItems, color);
+          showProvisionTypeDetail(typeName, null, color);
         }
       }, paid ? '✓' : ''));
 
       // Info
       row.appendChild(el('div', { style: { flex: '1' } }, [
-        el('div', { style: { fontSize: '13px', fontWeight: '600', color: paid ? 'var(--text-muted)' : 'inherit', textDecoration: paid ? 'line-through' : 'none' } }, item.source || item.desc || typeName),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, fmtMonth(item.mois) + (item.id ? ' • ID: ' + item.id.substring(0, 10) : ''))
+        el('div', { style: { fontSize: '13px', fontWeight: '600', color: paid ? 'var(--success)' : 'var(--text-primary)', textDecoration: paid ? 'line-through' : 'none' } }, item.source || item.desc || typeName),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, fmtMonth(item.mois))
       ]));
 
       // Montant
-      row.appendChild(el('span', { style: { fontWeight: '700', fontSize: '14px', color: paid ? 'var(--success)' : color } }, EUR(item.montant)));
+      row.appendChild(el('span', { style: { fontWeight: '700', fontSize: '14px', color: paid ? 'var(--success)' : 'var(--text-primary)' } }, EUR(item.montant)));
 
       // Boutons d'action
       var actions = el('div', { style: { display: 'flex', gap: '4px' } });
@@ -4391,10 +4589,12 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
       }
 
       row.appendChild(actions);
-      body.appendChild(row);
+      listContainer.appendChild(row);
     });
   });
-  
+
+  body.appendChild(listContainer);
+
   // Boutons d'action en masse
   var btnsDiv = el('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } });
 
@@ -4408,7 +4608,7 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
       onclick: function() {
         unpaidIds.forEach(function(id) { TREASURY.paidCharges[id] = true; });
         saveAll();
-        showProvisionTypeDetail(typeName, allItems, color);
+        showProvisionTypeDetail(typeName, null, color);
       }
     }, '✅ Tout payer (' + unpaidIds.length + ')'));
   }
@@ -4420,9 +4620,9 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
       onclick: function() {
         paidIds.forEach(function(id) { TREASURY.paidCharges[id] = false; });
         saveAll();
-        showProvisionTypeDetail(typeName, allItems, color);
+        showProvisionTypeDetail(typeName, null, color);
       }
-    }, '↩️ Tout remettre en provision (' + paidIds.length + ')'));
+    }, '↩️ Remettre en provision (' + paidIds.length + ')'));
   }
 
   if (unpaidIds.length > 0 || paidIds.length > 0) {
@@ -5776,9 +5976,10 @@ function deleteMovement(mvId) {
   var idx = TREASURY.mouvements.findIndex(function(m) { return m.id === mvId; });
   if (idx >= 0) {
     TREASURY.mouvements.splice(idx, 1);
-    // Retirer aussi du statut payé si présent
-    var paidIdx = TREASURY.paidCharges.indexOf(mvId);
-    if (paidIdx >= 0) TREASURY.paidCharges.splice(paidIdx, 1);
+    // V68: Retirer aussi du statut payé si présent (paidCharges est un objet, pas un tableau)
+    if (TREASURY.paidCharges[mvId]) {
+      delete TREASURY.paidCharges[mvId];
+    }
     saveAll();
     toast('Élément supprimé', 'info');
   }
