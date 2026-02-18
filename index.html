@@ -2950,39 +2950,38 @@ function getAbsoluteProvisions() {
   });
 
   // V65/V69/V70/V71: IR Estimé - provisions mensuelles lissées sur les mois avec CA
-  // L'IR est divisé sur les mois d'activité, pas forcément 12
+  // On ne provisionne que les mois où il y a effectivement eu du CA encaissé
   if (!COMPANY.prelevementLiberatoire) {
     var currentYear = TODAY.getFullYear();
-    var currentMonth = TODAY.getMonth(); // 0-11
 
-    // V71: Trouver le premier mois avec CA pour une année
-    function getFirstCAMonth(year) {
-      var firstMonth = 11; // Par défaut décembre
+    // V71: Trouver les mois avec CA encaissé pour une année
+    function getMonthsWithCA(year) {
+      var months = {};
       MISSIONS.forEach(function(mis) {
         if (!mis.factures) return;
         mis.factures.forEach(function(f) {
-          if (f.jours <= 0) return;
+          if (f.jours <= 0 || f.status !== 'payée') return;
           var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
           if (paymentMonth.startsWith(year + '-')) {
             var month = parseInt(paymentMonth.split('-')[1]) - 1; // 0-11
-            if (month < firstMonth) firstMonth = month;
+            months[month] = true;
           }
         });
       });
-      return firstMonth;
+      return Object.keys(months).map(function(m) { return parseInt(m); }).sort(function(a, b) { return a - b; });
     }
 
-    // Helper pour ajouter les acomptes IR d'une année (du premier mois CA jusqu'à maxMonth)
-    function addIRMonthlyProvisions(year, irData, startMonth, endMonth) {
-      if (irData.impot <= 0) return;
-      var nbMois = endMonth - startMonth + 1;
+    // Helper pour ajouter les acomptes IR (uniquement pour les mois avec CA)
+    function addIRMonthlyProvisions(year, irData, monthsWithCA) {
+      if (irData.impot <= 0 || monthsWithCA.length === 0) return;
+      var nbMois = monthsWithCA.length;
       var irMensuel = Math.round(irData.impot / nbMois);
 
-      for (var m = startMonth; m <= endMonth; m++) {
+      monthsWithCA.forEach(function(m, idx) {
         var monthStr = String(m + 1).padStart(2, '0');
         var irMonthId = 'IR-' + year + '-' + monthStr;
-        var acompteNum = m - startMonth + 1;
-        var montantMois = (m === endMonth) ? (irData.impot - irMensuel * (nbMois - 1)) : irMensuel;
+        var acompteNum = idx + 1;
+        var montantMois = (idx === nbMois - 1) ? (irData.impot - irMensuel * (nbMois - 1)) : irMensuel;
 
         if (!isPaid(irMonthId) && montantMois > 0) {
           result.total += montantMois;
@@ -2995,19 +2994,19 @@ function getAbsoluteProvisions() {
             source: 'Acompte ' + acompteNum + '/' + nbMois + ' · IR ' + year + ': ' + EUR(irData.impot)
           });
         }
-      }
+      });
     }
 
-    // IR année précédente (du premier mois CA jusqu'à décembre)
+    // IR année précédente (tous les mois avec CA)
     var previousYear = currentYear - 1;
     var irPrevData = getIRForYear(previousYear);
-    var prevFirstMonth = getFirstCAMonth(previousYear);
-    addIRMonthlyProvisions(previousYear, irPrevData, prevFirstMonth, 11);
+    var prevMonthsWithCA = getMonthsWithCA(previousYear);
+    addIRMonthlyProvisions(previousYear, irPrevData, prevMonthsWithCA);
 
-    // IR année en cours (du premier mois CA jusqu'au mois actuel)
+    // IR année en cours (uniquement les mois avec CA encaissé)
     var irData = getIRForYear(currentYear);
-    var currFirstMonth = getFirstCAMonth(currentYear);
-    addIRMonthlyProvisions(currentYear, irData, currFirstMonth, currentMonth);
+    var currMonthsWithCA = getMonthsWithCA(currentYear);
+    addIRMonthlyProvisions(currentYear, irData, currMonthsWithCA);
   }
 
   // Charges manuelles
@@ -3062,39 +3061,38 @@ function getAllChargesForType(typeName) {
     });
   });
 
-  // V69/V70/V71: IR Estimé (pour non-PL) - lissé sur les mois avec CA
+  // V69/V70/V71: IR Estimé (pour non-PL) - uniquement les mois avec CA encaissé
   if (isIR && !COMPANY.prelevementLiberatoire) {
     var currentYear = TODAY.getFullYear();
-    var currentMonth = TODAY.getMonth(); // 0-11
 
-    // V71: Trouver le premier mois avec CA pour une année
-    function getFirstCAMonth(year) {
-      var firstMonth = 11;
+    // V71: Trouver les mois avec CA encaissé pour une année
+    function getMonthsWithCA(year) {
+      var months = {};
       MISSIONS.forEach(function(mis) {
         if (!mis.factures) return;
         mis.factures.forEach(function(f) {
-          if (f.jours <= 0) return;
+          if (f.jours <= 0 || f.status !== 'payée') return;
           var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
           if (paymentMonth.startsWith(year + '-')) {
             var month = parseInt(paymentMonth.split('-')[1]) - 1;
-            if (month < firstMonth) firstMonth = month;
+            months[month] = true;
           }
         });
       });
-      return firstMonth;
+      return Object.keys(months).map(function(m) { return parseInt(m); }).sort(function(a, b) { return a - b; });
     }
 
-    // Helper pour ajouter les acomptes IR d'une année (du premier mois CA jusqu'à endMonth)
-    function addIRItems(year, irData, startMonth, endMonth) {
-      if (irData.impot <= 0) return;
-      var nbMois = endMonth - startMonth + 1;
+    // Helper pour ajouter les acomptes IR (uniquement pour les mois avec CA)
+    function addIRItems(year, irData, monthsWithCA) {
+      if (irData.impot <= 0 || monthsWithCA.length === 0) return;
+      var nbMois = monthsWithCA.length;
       var irMensuel = Math.round(irData.impot / nbMois);
 
-      for (var m = startMonth; m <= endMonth; m++) {
+      monthsWithCA.forEach(function(m, idx) {
         var monthStr = String(m + 1).padStart(2, '0');
         var irMonthId = 'IR-' + year + '-' + monthStr;
-        var acompteNum = m - startMonth + 1;
-        var montantMois = (m === endMonth) ? (irData.impot - irMensuel * (nbMois - 1)) : irMensuel;
+        var acompteNum = idx + 1;
+        var montantMois = (idx === nbMois - 1) ? (irData.impot - irMensuel * (nbMois - 1)) : irMensuel;
 
         if (montantMois > 0) {
           items.push({
@@ -3105,19 +3103,19 @@ function getAllChargesForType(typeName) {
             source: 'Acompte ' + acompteNum + '/' + nbMois + ' · IR ' + year + ': ' + EUR(irData.impot)
           });
         }
-      }
+      });
     }
 
-    // IR année précédente (du premier mois CA jusqu'à décembre)
+    // IR année précédente (tous les mois avec CA)
     var previousYear = currentYear - 1;
     var irPrevData = getIRForYear(previousYear);
-    var prevFirstMonth = getFirstCAMonth(previousYear);
-    addIRItems(previousYear, irPrevData, prevFirstMonth, 11);
+    var prevMonthsWithCA = getMonthsWithCA(previousYear);
+    addIRItems(previousYear, irPrevData, prevMonthsWithCA);
 
-    // IR année en cours (du premier mois CA jusqu'au mois actuel)
+    // IR année en cours (uniquement les mois avec CA encaissé)
     var irData = getIRForYear(currentYear);
-    var currFirstMonth = getFirstCAMonth(currentYear);
-    addIRItems(currentYear, irData, currFirstMonth, currentMonth);
+    var currMonthsWithCA = getMonthsWithCA(currentYear);
+    addIRItems(currentYear, irData, currMonthsWithCA);
   }
 
   // Charges manuelles
