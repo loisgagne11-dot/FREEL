@@ -8767,45 +8767,54 @@ function renderDashboardHero(container, data) {
 
   hero.appendChild(pieContainer);
 
-  // V72: Waterfall Composition Compte - Répartition du CA
+  // V72: Composition Compte Pro - État ABSOLU (pas filtré par période)
   var compteBlock = el('div', { style: { marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
   compteBlock.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', fontWeight: '600', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' } }, [
-    el('span', {}, '📊 Composition CA'),
-    el('span', { style: { fontWeight: '400', fontSize: '9px' } }, 'Clic = détail')
+    el('span', {}, '🏦 Composition Compte Pro'),
+    el('span', { style: { fontWeight: '400', fontSize: '9px' } }, 'État actuel')
   ]));
 
-  // Calculer les données Waterfall depuis CA
-  var caHT = data.caHT || 0;
-  var chargesURSSAF = 0, chargesTVA = 0, chargesIR = 0, autresCharges = 0;
-  (data.detailChargesAPayer || []).concat(data.detailChargesPayees || []).forEach(function(c) {
-    if (c.cat === 'URSSAF' || c.cat === 'CFP') chargesURSSAF += c.montant;
-    else if (c.cat === 'TVA') chargesTVA += c.montant;
-    else if (c.cat === 'IR' || c.cat === 'IR Estimé' || c.cat.indexOf('IR-') === 0) chargesIR += c.montant;
-    else autresCharges += c.montant;
-  });
-  var totalCharges = chargesURSSAF + chargesTVA + chargesIR + autresCharges;
-  var marge = Math.max(0, caHT - totalCharges);
-  var maxVal = Math.max(caHT, 1);
+  // Données ABSOLUES (pas filtrées)
+  var soldeAbs = data.soldeAbsolu || 0;
+  var cashAbs = data.cashDispoAbsolu || 0;
+  var provAbs = data.provisionsAbsolues || 0;
 
-  // Barres Waterfall horizontales compactes
+  // Détail provisions par type (absolues)
+  var provURSSAF = (data.provAbsoluesByType && data.provAbsoluesByType['URSSAF'] || 0) + (data.provAbsoluesByType && data.provAbsoluesByType['CFP'] || 0);
+  var provTVA = data.provAbsoluesByType && data.provAbsoluesByType['TVA'] || 0;
+  var provIR = data.provAbsoluesByType && data.provAbsoluesByType['IR Estimé'] || 0;
+  var provAutres = provAbs - provURSSAF - provTVA - provIR;
+
+  var maxVal = Math.max(soldeAbs, 1);
+
+  // Barres: Solde total puis provisions décroissantes, puis cash disponible
   var waterfallBars = [
-    { id: 'ca', label: 'CA HT', value: caHT, color: 'var(--success)', icon: '💰' },
-    { id: 'urssaf', label: 'Charges', value: chargesURSSAF + autresCharges, color: 'var(--danger)', icon: '📋' },
-    { id: 'tva', label: 'TVA', value: chargesTVA, color: '#ec4899', icon: '🏛️' },
-    { id: 'ir', label: 'IR/Impôts', value: chargesIR, color: '#f59e0b', icon: '🧾' },
-    { id: 'marge', label: 'Marge', value: marge, color: 'var(--accent)', icon: '💎' }
+    { id: 'solde', label: 'Solde', value: soldeAbs, color: 'var(--info)', icon: '💳' }
   ];
 
+  // Ajouter provisions (triées décroissant)
+  var provBars = [
+    { id: 'urssaf', label: 'Prov. URSSAF', value: provURSSAF, color: 'var(--danger)', icon: '📋' },
+    { id: 'tva', label: 'Prov. TVA', value: provTVA, color: '#ec4899', icon: '🏛️' },
+    { id: 'ir', label: 'Prov. IR', value: provIR, color: '#f59e0b', icon: '🧾' },
+    { id: 'autres', label: 'Prov. Autres', value: provAutres, color: '#8b5cf6', icon: '📦' }
+  ].filter(function(b) { return b.value > 0; }).sort(function(a, b) { return b.value - a.value; });
+
+  waterfallBars = waterfallBars.concat(provBars);
+
+  // Cash disponible en dernier
+  waterfallBars.push({ id: 'cash', label: 'Cash Dispo', value: cashAbs, color: 'var(--success)', icon: '💎' });
+
   waterfallBars.forEach(function(bar) {
-    if (bar.value <= 0 && bar.id !== 'marge') return;
+    if (bar.value <= 0 && bar.id !== 'cash') return;
     var pct = maxVal > 0 ? (Math.abs(bar.value) / maxVal * 100) : 0;
     var row = el('div', {
       style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', cursor: 'pointer' },
-      onclick: function() { showWaterfallDetail(bar, data); }
+      onclick: function() { showAbsoluteWaterfallDetail(bar, data); }
     });
 
     // Label
-    row.appendChild(el('div', { style: { width: '70px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' } }, [
+    row.appendChild(el('div', { style: { width: '80px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' } }, [
       el('span', {}, bar.icon),
       el('span', {}, bar.label)
     ]));
@@ -8829,10 +8838,10 @@ function renderDashboardHero(container, data) {
   });
 
   // Résumé
-  var pctMarge = caHT > 0 ? Math.round(marge / caHT * 100) : 0;
+  var pctCashSolde = soldeAbs > 0 ? Math.round(cashAbs / soldeAbs * 100) : 0;
   compteBlock.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '11px' } }, [
-    el('span', { style: { color: 'var(--text-muted)' } }, 'Taux de marge: ' + pctMarge + '%'),
-    el('span', { style: { fontWeight: '700', color: 'var(--accent)' } }, 'Net: ' + EUR(marge))
+    el('span', { style: { color: 'var(--text-muted)' } }, 'Disponible: ' + pctCashSolde + '% du solde'),
+    el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, EUR(cashAbs))
   ]));
 
   hero.appendChild(compteBlock);
@@ -10541,23 +10550,27 @@ function renderAnalyseContent(container) {
   var totalCharges = chargesURSSAF + chargesTVA + chargesIR + autresDepenses;
   var netDisponible = Math.max(0, caHT - totalCharges);
 
-  // Waterfall data
-  var waterfallData = [
-    { id: 'ca', label: 'CA Produit HT', value: caHT, cumul: caHT, type: 'total', color: 'var(--success)', icon: '💰' },
-    { id: 'urssaf', label: 'Charges sociales', value: -chargesURSSAF, cumul: caHT - chargesURSSAF, type: 'decrease', color: 'var(--danger)', icon: '🏥', detail: 'URSSAF + CFP' },
-    { id: 'tva', label: 'TVA à reverser', value: -chargesTVA, cumul: caHT - chargesURSSAF - chargesTVA, type: 'decrease', color: '#ec4899', icon: '🏛️' },
-    { id: 'ir', label: 'IR / Impôts', value: -chargesIR, cumul: caHT - chargesURSSAF - chargesTVA - chargesIR, type: 'decrease', color: '#f59e0b', icon: '🧾' },
-    { id: 'autres', label: 'Autres dépenses', value: -autresDepenses, cumul: caHT - totalCharges, type: 'decrease', color: 'var(--text-muted)', icon: '📋' },
-    { id: 'net', label: 'Marge disponible', value: netDisponible, cumul: netDisponible, type: 'total', color: 'var(--accent)', icon: '💎' }
-  ];
+  // V72: Waterfall data - triées en décroissant (sauf CA en premier et Marge en dernier)
+  var chargesBars = [
+    { id: 'urssaf', label: 'Charges sociales', value: chargesURSSAF, color: 'var(--danger)', icon: '🏥', detail: 'URSSAF + CFP' },
+    { id: 'tva', label: 'TVA à reverser', value: chargesTVA, color: '#ec4899', icon: '🏛️' },
+    { id: 'ir', label: 'IR / Impôts', value: chargesIR, color: '#f59e0b', icon: '🧾' },
+    { id: 'autres', label: 'Autres dépenses', value: autresDepenses, color: 'var(--text-muted)', icon: '📋' }
+  ].filter(function(d) { return d.value > 0; }).sort(function(a, b) { return b.value - a.value; });
 
-  // Filtrer les barres à 0
-  waterfallData = waterfallData.filter(function(d) { return d.value !== 0 || d.type === 'total'; });
+  // Reconstruire avec cumuls
+  var cumul = caHT;
+  var waterfallData = [{ id: 'ca', label: 'CA Produit HT', value: caHT, cumul: caHT, type: 'total', color: 'var(--success)', icon: '💰' }];
+  chargesBars.forEach(function(ch) {
+    cumul -= ch.value;
+    waterfallData.push({ id: ch.id, label: ch.label, value: -ch.value, cumul: cumul, type: 'decrease', color: ch.color, icon: ch.icon, detail: ch.detail });
+  });
+  waterfallData.push({ id: 'net', label: 'Marge disponible', value: netDisponible, cumul: netDisponible, type: 'total', color: 'var(--accent)', icon: '💎' });
 
-  // Card titre
+  // Card titre - V72: Renommé "Composition CA" (filtré par période)
   var card = el('div', { class: 'card', style: { marginBottom: '16px' } });
-  card.appendChild(el('div', { class: 'card-title' }, '📊 Composition du Compte - ' + periodLabel));
-  card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' } }, 'Cliquez sur une barre pour voir le détail'));
+  card.appendChild(el('div', { class: 'card-title' }, '📊 Composition CA - ' + periodLabel));
+  card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' } }, 'Répartition du CA sur la période sélectionnée'));
 
   // Waterfall Chart Container
   var chartContainer = el('div', { style: { position: 'relative', marginBottom: '20px' } });
@@ -10680,7 +10693,70 @@ function renderAnalyseContent(container) {
   container.appendChild(ratiosCard);
 }
 
-// V72: Détail d'une barre du Waterfall (drill-down camembert)
+// V72: Détail du Waterfall ABSOLU (Accueil - état compte pro)
+function showAbsoluteWaterfallDetail(bar, data) {
+  var modal = $('#formModal');
+  $('#formModalTitle').textContent = bar.icon + ' ' + bar.label + ' - Détail';
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+
+  // Montant total
+  body.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
+    el('div', { style: { fontSize: '32px', fontWeight: '800', color: bar.color } }, EUR(bar.value)),
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'État actuel du compte')
+  ]));
+
+  if (bar.id === 'solde') {
+    // Solde = détail des mouvements récents
+    body.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' } }, 'Solde bancaire renseigné dans Trésorerie'));
+  } else if (bar.id === 'cash') {
+    // Cash dispo = salaire versable
+    var salaireVersable = Math.max(0, Math.floor((bar.value - 150) / 100) * 100);
+    body.appendChild(el('div', { style: { padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, 'Salaire versable recommandé'),
+      el('div', { style: { fontSize: '24px', fontWeight: '800', color: 'var(--success)' } }, EUR(salaireVersable)),
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, '(après réserve de 150€)')
+    ]));
+  } else {
+    // Provisions (URSSAF, TVA, IR, Autres) - afficher détail
+    var catMatch = bar.id === 'urssaf' ? ['URSSAF', 'CFP'] : bar.id === 'tva' ? ['TVA'] : bar.id === 'ir' ? ['IR Estimé', 'IR'] : null;
+    var items = (data.allProvisionsDetail || []).filter(function(p) {
+      if (!catMatch) return bar.id === 'autres';
+      return catMatch.some(function(cat) { return p.cat === cat || p.cat.indexOf(cat) >= 0; });
+    });
+
+    if (items.length === 0) {
+      body.appendChild(el('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-muted)' } }, 'Aucun détail'));
+    } else {
+      var list = el('div', { style: { maxHeight: '300px', overflowY: 'auto' } });
+      items.sort(function(a, b) { return b.montant - a.montant; });
+      items.forEach(function(item) {
+        var isPaidItem = isPaid(item.id);
+        var row = el('div', { style: { display: 'flex', alignItems: 'center', padding: '10px', marginBottom: '6px', background: 'var(--bg-tertiary)', borderRadius: '6px', gap: '10px' } });
+        row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', minWidth: '50px' } }, item.mois ? fmtMonthShort(item.mois) : '-'));
+        row.appendChild(el('div', { style: { flex: 1, fontSize: '11px' } }, item.cat + (item.source ? ' · ' + item.source : '')));
+        row.appendChild(el('div', { style: { fontWeight: '700', fontSize: '12px' } }, EUR(item.montant)));
+
+        // Bouton toggle bidirectionnel
+        if (item.id) {
+          row.appendChild(el('button', { class: 'btn btn-sm', style: { fontSize: '10px', background: isPaidItem ? 'var(--warning)' : 'var(--success)' }, onclick: function(e) {
+            e.stopPropagation();
+            togglePaid(item.id);
+            COMPUTED = compute();
+            render();
+            toast(isPaidItem ? 'Remis à payer' : 'Marqué payé', isPaidItem ? 'warning' : 'success');
+          }}, isPaidItem ? '↩' : '✓'));
+        }
+        list.appendChild(row);
+      });
+      body.appendChild(list);
+    }
+  }
+
+  openModal('formModal');
+}
+
+// V72: Détail d'une barre du Waterfall filtré (Performance)
 function showWaterfallDetail(d, data) {
   var modal = $('#formModal');
   $('#formModalTitle').textContent = d.icon + ' ' + d.label;
@@ -10839,16 +10915,16 @@ function showTransactionDetail(catId, subLabel, data) {
     var statusColor = t.status === 'payé' || t.status === 'payée' ? 'var(--success)' : 'var(--warning)';
     row.appendChild(el('div', { style: { fontSize: '9px', padding: '2px 6px', background: statusColor, color: 'white', borderRadius: '4px' } }, t.status));
 
-    // Bouton toggle si à payer
-    if (t.status === 'à payer' && t.id) {
-      row.appendChild(el('button', { class: 'btn btn-sm', style: { fontSize: '10px' }, onclick: function(e) {
+    // V72: Bouton toggle bidirectionnel (payé ↔ à payer)
+    if (t.id) {
+      var isPaidNow = t.status === 'payé' || t.status === 'payée';
+      row.appendChild(el('button', { class: 'btn btn-sm', style: { fontSize: '10px', background: isPaidNow ? 'var(--warning)' : 'var(--success)' }, onclick: function(e) {
         e.stopPropagation();
-        TREASURY.paidCharges[t.id] = true;
-        saveAll();
+        togglePaid(t.id);
         COMPUTED = compute();
         render();
-        toast('Marqué payé', 'success');
-      }}, '✓'));
+        toast(isPaidNow ? 'Remis à payer' : 'Marqué payé', isPaidNow ? 'warning' : 'success');
+      }}, isPaidNow ? '↩' : '✓'));
     }
 
     list.appendChild(row);
