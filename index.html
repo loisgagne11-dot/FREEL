@@ -8678,14 +8678,17 @@ function renderCAPlafondWidget(container) {
   var year = PERIOD.year || TODAY.getFullYear();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var currentCA = data.caHT || 0;
-  var plafond = 77700; // Plafond micro-entrepreneur BNC 2026
+
+  // Seuils micro-entrepreneur BNC 2024-2026
+  var plafond = 77700;        // Plafond normal
+  var seuilMajore = 89500;    // Seuil majoré (sortie immédiate si dépassé)
 
   // V71: Calculer le CA projeté à partir des factures non payées (encaissement prévu sur l'année)
   var caProjecte = 0;
   MISSIONS.forEach(function(mis) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
-      if (f.jours <= 0 || f.status === 'payée') return; // Factures non payées seulement
+      if (f.jours <= 0 || f.status === 'payée') return;
       var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth.startsWith(year + '-') && paymentMonth > nowYm) {
         caProjecte += f.ht;
@@ -8693,45 +8696,75 @@ function renderCAPlafondWidget(container) {
     });
   });
 
+  // V71: CA année précédente pour règle des 2 ans consécutifs
+  var prevYearData = getIRForYear(year - 1);
+  var caPrevYear = prevYearData.caTotal || 0;
+  var prevYearOverLimit = caPrevYear > plafond;
+
   var caTotal = currentCA + caProjecte;
   var pctRealise = Math.min(1, currentCA / plafond);
-  var pctTotal = Math.min(1.2, caTotal / plafond); // Permettre d'aller au-delà de 100%
-  var pctColor = pctTotal >= 0.9 ? 'var(--danger)' : pctTotal >= 0.7 ? 'var(--warning)' : 'var(--success)';
+  var pctTotal = Math.min(1.3, caTotal / plafond);
+  var pctColor = caTotal >= seuilMajore ? 'var(--danger)' : caTotal >= plafond ? '#f97316' : caTotal >= plafond * 0.9 ? 'var(--warning)' : 'var(--success)';
 
   var widget = el('div', { class: 'card', style: { marginBottom: '16px' } });
 
   // Header
   var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } });
   header.appendChild(el('div', { class: 'card-title', style: { margin: 0 } }, '📊 CA Annuel ' + year));
-  header.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Plafond micro: ' + EUR(plafond)));
+  header.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textAlign: 'right' } }, [
+    el('div', {}, 'Plafond: ' + EUR(plafond)),
+    el('div', { style: { color: 'var(--danger)' } }, 'Seuil majoré: ' + EUR(seuilMajore))
+  ]));
   widget.appendChild(header);
 
-  // Barre de progression avec réalisé + projeté
-  var progressContainer = el('div', { style: { position: 'relative', marginBottom: '12px' } });
+  // Barre de progression avec réalisé + projeté + indicateur limite
+  var progressContainer = el('div', { style: { position: 'relative', marginBottom: '16px' } });
+
+  // Barre fond
   var progressBg = el('div', { style: {
-    height: '28px', background: 'var(--bg-tertiary)', borderRadius: '14px', overflow: 'hidden', position: 'relative', display: 'flex'
+    height: '32px', background: 'var(--bg-tertiary)', borderRadius: '16px', overflow: 'visible', position: 'relative', display: 'flex'
   }});
 
-  // Partie réalisée
+  // Partie réalisée (gradient)
   var realWidth = Math.min(100, pctRealise * 100);
-  progressBg.appendChild(el('div', { style: {
-    height: '100%', width: realWidth + '%', background: pctColor,
+  var realBar = el('div', { style: {
+    height: '100%', width: realWidth + '%',
+    background: 'linear-gradient(90deg, ' + pctColor + ' 0%, ' + pctColor + ' 100%)',
+    borderRadius: realWidth >= 99 ? '16px' : '16px 0 0 16px',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: 'white', fontSize: '9px', fontWeight: '700'
-  } }, realWidth > 15 ? EUR(currentCA) : ''));
+    color: 'white', fontSize: '10px', fontWeight: '700',
+    position: 'relative', zIndex: 2
+  } }, realWidth > 20 ? EUR(currentCA) : '');
+  progressBg.appendChild(realBar);
 
-  // Partie projetée
+  // Partie projetée (transparente avec motif)
   if (caProjecte > 0) {
-    var projWidth = Math.min(100 - realWidth, (caProjecte / plafond) * 100);
-    progressBg.appendChild(el('div', { style: {
-      height: '100%', width: projWidth + '%', background: 'rgba(167,139,250,0.5)',
+    var projWidth = Math.min(130 - realWidth, (caProjecte / plafond) * 100);
+    var projBar = el('div', { style: {
+      height: '100%', width: projWidth + '%',
+      background: 'repeating-linear-gradient(90deg, rgba(167,139,250,0.3) 0px, rgba(167,139,250,0.3) 4px, rgba(167,139,250,0.15) 4px, rgba(167,139,250,0.15) 8px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: 'white', fontSize: '9px', fontWeight: '700',
-      borderLeft: '2px dashed rgba(255,255,255,0.4)'
-    } }, projWidth > 12 ? '+' + EUR(caProjecte) : ''));
+      color: '#a78bfa', fontSize: '10px', fontWeight: '700',
+      borderRadius: '0 16px 16px 0',
+      position: 'relative', zIndex: 1
+    } }, projWidth > 15 ? '+' + EUR(caProjecte) : '');
+    progressBg.appendChild(projBar);
   }
 
   progressContainer.appendChild(progressBg);
+
+  // Indicateur limite plafond (ligne verticale)
+  var limitIndicator = el('div', { style: {
+    position: 'absolute', left: 'calc(' + Math.min(100, 100) + '% - 2px)', top: '-4px', bottom: '-4px',
+    width: '3px', background: 'var(--danger)', borderRadius: '2px', zIndex: 10
+  }});
+  var limitLabel = el('div', { style: {
+    position: 'absolute', left: '100%', top: '-18px', transform: 'translateX(-50%)',
+    fontSize: '9px', color: 'var(--danger)', fontWeight: '700', whiteSpace: 'nowrap'
+  } }, '▼ ' + EUR(plafond, true));
+  progressContainer.appendChild(limitIndicator);
+  progressContainer.appendChild(limitLabel);
+
   widget.appendChild(progressContainer);
 
   // Stats : Réalisé + Projeté
@@ -8752,31 +8785,54 @@ function renderCAPlafondWidget(container) {
     rightStats.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600' } }, EUR(remaining)));
     rightStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'disponible'));
   } else {
-    rightStats.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--danger)' } }, '⚠️ Dépassement'));
-    rightStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--danger)' } }, EUR(Math.abs(remaining)) + ' au-delà'));
+    rightStats.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--danger)' } }, '⚠️ +' + EUR(Math.abs(remaining))));
+    rightStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--danger)' } }, 'au-delà plafond'));
   }
   stats.appendChild(rightStats);
   widget.appendChild(stats);
 
-  // V71: Conséquences selon le niveau - amélioré avec plus de contexte
+  // V71: Conséquences avec vraies règles fiscales
   var conseqDiv = el('div', { style: { marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '11px' } });
-  if (caTotal > plafond) {
-    conseqDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+
+  if (caTotal >= seuilMajore) {
+    // Dépassement seuil majoré = sortie immédiate
+    conseqDiv.style.background = 'rgba(239, 68, 68, 0.15)';
+    conseqDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
     conseqDiv.style.color = 'var(--danger)';
-    conseqDiv.innerHTML = '⚠️ <strong>Dépassement du plafond</strong> : Passage obligatoire au régime réel l\'année suivante. Déclarations TVA mensuelles/trimestrielles. Comptabilité plus complexe.';
+    conseqDiv.innerHTML = '🚨 <strong>Seuil majoré dépassé (' + EUR(seuilMajore) + ')</strong><br>Sortie immédiate du régime micro-entrepreneur au 1er janvier ' + (year + 1) + '. Passage obligatoire au régime réel avec TVA et comptabilité complète.';
+  } else if (caTotal > plafond && prevYearOverLimit) {
+    // 2ème année consécutive de dépassement = sortie
+    conseqDiv.style.background = 'rgba(239, 68, 68, 0.15)';
+    conseqDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+    conseqDiv.style.color = 'var(--danger)';
+    conseqDiv.innerHTML = '🚨 <strong>2ème année de dépassement</strong><br>' + (year - 1) + ': ' + EUR(caPrevYear) + ' · ' + year + ': ' + EUR(caTotal) + '<br>Sortie du régime micro au 1er janvier ' + (year + 1) + '. Préparez le passage au réel.';
+  } else if (caTotal > plafond) {
+    // 1ère année de dépassement = tolérance
+    conseqDiv.style.background = 'rgba(251, 191, 36, 0.15)';
+    conseqDiv.style.border = '1px solid rgba(251, 191, 36, 0.3)';
+    conseqDiv.style.color = '#b45309';
+    conseqDiv.innerHTML = '⚠️ <strong>Dépassement plafond - 1ère année</strong><br>Tolérance accordée si le dépassement n\'est pas renouvelé en ' + (year + 1) + '. Restez sous ' + EUR(plafond) + ' l\'an prochain pour conserver le régime micro.';
   } else if (caTotal > plafond * 0.9) {
     conseqDiv.style.background = 'rgba(251, 191, 36, 0.1)';
     conseqDiv.style.color = 'var(--warning)';
-    conseqDiv.innerHTML = '⚠️ <strong>Proche du plafond</strong> : Attention à ne pas dépasser ' + EUR(plafond) + ' sous peine de changement de régime fiscal.';
+    conseqDiv.innerHTML = '⚡ <strong>Proche du plafond</strong> (' + Math.round(pctTotal * 100) + '%)<br>Marge restante: ' + EUR(remaining) + '. Anticipez pour éviter un dépassement.';
   } else if (caTotal > plafond * 0.7) {
-    conseqDiv.style.background = 'rgba(34, 197, 94, 0.05)';
-    conseqDiv.style.color = 'var(--text-muted)';
-    conseqDiv.innerHTML = '✅ Progression saine. Marge de ' + EUR(remaining) + ' avant le plafond.';
+    conseqDiv.style.background = 'rgba(34, 197, 94, 0.08)';
+    conseqDiv.style.color = 'var(--text-secondary)';
+    conseqDiv.innerHTML = '✅ <strong>Bonne progression</strong><br>Marge de ' + EUR(remaining) + ' avant le plafond (' + Math.round((1 - pctTotal) * 100) + '% disponible).';
   } else {
     conseqDiv.style.background = 'rgba(34, 197, 94, 0.05)';
     conseqDiv.style.color = 'var(--text-muted)';
     conseqDiv.innerHTML = '✅ Large marge disponible sous le plafond micro-entrepreneur.';
   }
+
+  // Info année précédente si pertinent
+  if (caPrevYear > 0 && caTotal > plafond * 0.8) {
+    var prevInfo = el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', fontSize: '10px', color: 'var(--text-muted)' } });
+    prevInfo.innerHTML = '📅 CA ' + (year - 1) + ': ' + EUR(caPrevYear) + (prevYearOverLimit ? ' <span style="color:var(--danger)">(> plafond)</span>' : ' <span style="color:var(--success)">(OK)</span>');
+    conseqDiv.appendChild(prevInfo);
+  }
+
   widget.appendChild(conseqDiv);
 
   container.appendChild(widget);
