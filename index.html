@@ -7147,16 +7147,87 @@ function getLegalMilestones() {
   return milestones.slice(0, 5);
 }
 
+// V72: Timeline complète avec TOUS les jalons fiscaux de l'année
+function getAllYearMilestones() {
+  var today = new Date(TODAY);
+  var year = today.getFullYear();
+  var milestones = [];
+
+  function addM(date, label, icon, cat, detail) {
+    var d = new Date(date);
+    var daysLeft = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+    milestones.push({
+      date: localISO(d), daysLeft: daysLeft, label: label, icon: icon, cat: cat, detail: detail || '',
+      status: daysLeft < 0 ? 'passed' : daysLeft === 0 ? 'today' : daysLeft <= 7 ? 'urgent' : daysLeft <= 30 ? 'soon' : 'upcoming'
+    });
+  }
+
+  // URSSAF declarations
+  if (COMPANY.urssafPeriodicite === 'mensuel') {
+    for (var m = 0; m < 12; m++) {
+      var endMonth = new Date(year, m + 1, 0);
+      addM(endMonth, 'URSSAF ' + fmtMonthShort(ym(year, m)), '🏥', 'urssaf', 'Déclaration mensuelle URSSAF');
+    }
+  } else {
+    // Trimestriel: Jan 31, Apr 30, Jul 31, Oct 31
+    addM(new Date(year, 0, 31), 'URSSAF T4 ' + (year - 1), '🏥', 'urssaf', 'Déclaration CA T4 ' + (year - 1));
+    addM(new Date(year, 3, 30), 'URSSAF T1', '🏥', 'urssaf', 'Déclaration CA T1 ' + year);
+    addM(new Date(year, 6, 31), 'URSSAF T2', '🏥', 'urssaf', 'Déclaration CA T2 ' + year);
+    addM(new Date(year, 9, 31), 'URSSAF T3', '🏥', 'urssaf', 'Déclaration CA T3 ' + year);
+  }
+
+  // TVA (si assujetti)
+  var prevYearData = getIRForYear(year - 1);
+  var caPrevYear = prevYearData.caTotal || 0;
+  var isAssujettiTVA = COMPANY.tvaDepuis || caPrevYear > 37500;
+  if (isAssujettiTVA) {
+    // Déclarations TVA trimestrielles (CA3)
+    addM(new Date(year, 3, 24), 'TVA T1', '💰', 'tva', 'Déclaration & paiement TVA T1');
+    addM(new Date(year, 6, 24), 'TVA T2', '💰', 'tva', 'Déclaration & paiement TVA T2');
+    addM(new Date(year, 9, 24), 'TVA T3', '💰', 'tva', 'Déclaration & paiement TVA T3');
+    addM(new Date(year + 1, 0, 24), 'TVA T4', '💰', 'tva', 'Déclaration & paiement TVA T4');
+  }
+
+  // Impôt sur le Revenu
+  if (!COMPANY.prelevementLiberatoire) {
+    // Déclaration annuelle
+    addM(new Date(year, 4, 22), 'Décla IR', '📋', 'ir', 'Déclaration revenus ' + (year - 1) + ' (en ligne)');
+    // Acomptes IR (si pas prélèvement libératoire et pas 1ère année)
+    addM(new Date(year, 0, 15), 'Acompte IR 1', '🧾', 'ir', '1er acompte impôt sur le revenu');
+    addM(new Date(year, 4, 15), 'Acompte IR 2', '🧾', 'ir', '2ème acompte impôt sur le revenu');
+    addM(new Date(year, 8, 15), 'Acompte IR 3', '🧾', 'ir', '3ème acompte impôt sur le revenu');
+    addM(new Date(year, 11, 15), 'Solde IR', '🧾', 'ir', 'Solde impôt sur le revenu');
+  } else {
+    addM(new Date(year, 4, 22), 'Décla IR', '📋', 'ir', 'Déclaration revenus ' + (year - 1) + ' (en ligne, prélèvement libératoire)');
+  }
+
+  // CFE (Cotisation Foncière des Entreprises)
+  addM(new Date(year, 11, 15), 'CFE', '🏢', 'cfe', 'Cotisation Foncière des Entreprises');
+
+  // ACRE
+  var acre = getAcreInfo();
+  if (COMPANY.acre && acre.expiryDate) {
+    addM(new Date(acre.expiryDate), 'Fin ACRE', '🎓', 'acre', 'Fin de l\'exonération ACRE - taux URSSAF plein');
+  }
+
+  milestones.sort(function(a, b) {
+    var da = new Date(a.date);
+    var db = new Date(b.date);
+    return da - db;
+  });
+  return milestones;
+}
+
 function projectTVADate() {
   if (COMPANY.tvaDepuis) return { month: null };
   var data = compute();
   var caActuel = data.caHTAnnuel || 0;
-  if (caActuel >= 39100) return { month: ym(TODAY.getFullYear(), TODAY.getMonth()), daysLeft: 0, immediate: true };
-  if (caActuel >= 36800) return { month: ym(TODAY.getFullYear(), 11), daysLeft: Math.ceil((new Date(TODAY.getFullYear(), 11, 31) - TODAY) / (1000 * 60 * 60 * 24)), warning: true };
+  if (caActuel >= 41250) return { month: ym(TODAY.getFullYear(), TODAY.getMonth()), daysLeft: 0, immediate: true };
+  if (caActuel >= 37500) return { month: ym(TODAY.getFullYear(), 11), daysLeft: Math.ceil((new Date(TODAY.getFullYear(), 11, 31) - TODAY) / (1000 * 60 * 60 * 24)), warning: true };
   var monthsElapsed = TODAY.getMonth() + 1;
   var caParMois = caActuel / monthsElapsed;
   if (caParMois <= 0) return { month: null };
-  var moisRestants = Math.ceil((36800 - caActuel) / caParMois);
+  var moisRestants = Math.ceil((37500 - caActuel) / caParMois);
   var projectedMonth = TODAY.getMonth() + moisRestants;
   var projectedYear = TODAY.getFullYear() + Math.floor(projectedMonth / 12);
   projectedMonth = projectedMonth % 12;
@@ -7173,7 +7244,7 @@ function showTVADetail() {
   statusDiv.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, COMPANY.tvaDepuis ? '🏛️' : '✅'));
   statusDiv.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700' } }, COMPANY.tvaDepuis ? 'Assujetti TVA' : 'Franchise de TVA'));
   body.appendChild(statusDiv);
-  var pct = Math.min(1, (data.caHTAnnuel || 0) / 39100);
+  var pct = Math.min(1, (data.caHTAnnuel || 0) / 41250);
   var gaugeDiv = el('div', { style: { marginBottom: '20px' } });
   gaugeDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' } }, [el('span', {}, 'CA: ' + EUR(data.caHTAnnuel || 0)), el('span', {}, Math.round(pct * 100) + '%')]));
   var gauge = el('div', { style: { height: '12px', background: 'var(--bg-tertiary)', borderRadius: '6px', position: 'relative' } });
@@ -7188,7 +7259,7 @@ function showTVADetail() {
   }
   var rulesDiv = el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', fontSize: '11px' } });
   rulesDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '8px' } }, '📜 Règles Micro-Entreprise'));
-  var rules = ['• Seuil franchise: 36 800€/an', '• Seuil majoré: 39 100€ → TVA immédiate', '• RAZ au 1er janvier chaque année', '• Dépassement N-1 > 36 800€ → TVA dès janvier', '• Retour franchise: CA < seuil pendant 2 ans'];
+  var rules = ['• Seuil franchise: 37 500€/an (services)', '• Seuil majoré: 41 250€ → TVA immédiate', '• CA N-1 > 37 500€ → TVA dès le 1er janvier N', '• CA N-1 ≤ 37 500€ → retour franchise automatique au 1er janv', '• Plus de tolérance depuis 2025 (1 seul dépassement suffit)'];
   rules.forEach(function(r) { rulesDiv.appendChild(el('div', { style: { color: 'var(--text-secondary)', marginBottom: '4px' } }, r)); });
   body.appendChild(rulesDiv);
   openModal('formModal');
@@ -7274,7 +7345,7 @@ function renderHealthScore(container) {
 function renderTVAModule(container) {
   var data = compute();
   var projection = projectTVADate();
-  var pct = Math.min(1, (data.caHTAnnuel || 0) / 39100);
+  var pct = Math.min(1, (data.caHTAnnuel || 0) / 41250);
   var module = el('div', { class: 'tva-module', onclick: showTVADetail });
   var header = el('div', { class: 'tva-header' });
   header.appendChild(el('div', { style: { fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' } }, [el('span', {}, '🏛️'), el('span', {}, 'TVA')]));
@@ -8720,48 +8791,50 @@ function renderCAPlafondWidget(container) {
   widget.appendChild(header);
 
   // Barre de progression avec réalisé + projeté + indicateur limite
-  var progressContainer = el('div', { style: { position: 'relative', marginBottom: '16px' } });
+  // V72: Echelle dynamique - la barre représente de 0 à maxScale
+  var maxScale = Math.max(plafond * 1.15, caTotal * 1.05);
+  var progressContainer = el('div', { style: { position: 'relative', marginBottom: '24px' } });
 
   // Barre fond
   var progressBg = el('div', { style: {
-    height: '32px', background: 'var(--bg-tertiary)', borderRadius: '16px', overflow: 'visible', position: 'relative', display: 'flex'
+    height: '32px', background: 'var(--bg-tertiary)', borderRadius: '16px', overflow: 'hidden', position: 'relative'
   }});
 
-  // Partie réalisée (gradient)
-  var realWidth = Math.min(100, pctRealise * 100);
+  // Partie réalisée
+  var realWidth = Math.min(100, (currentCA / maxScale) * 100);
   var realBar = el('div', { style: {
     height: '100%', width: realWidth + '%',
-    background: 'linear-gradient(90deg, ' + pctColor + ' 0%, ' + pctColor + ' 100%)',
-    borderRadius: realWidth >= 99 ? '16px' : '16px 0 0 16px',
+    background: pctColor,
+    borderRadius: '16px 0 0 16px',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     color: 'white', fontSize: '10px', fontWeight: '700',
-    position: 'relative', zIndex: 2
-  } }, realWidth > 20 ? EUR(currentCA) : '');
+    position: 'absolute', left: '0', top: '0', zIndex: 2
+  } }, realWidth > 18 ? EUR(currentCA) : '');
   progressBg.appendChild(realBar);
 
   // Partie projetée (transparente avec motif)
   if (caProjecte > 0) {
-    var projWidth = Math.min(130 - realWidth, (caProjecte / plafond) * 100);
+    var projWidth = Math.min(100 - realWidth, (caProjecte / maxScale) * 100);
     var projBar = el('div', { style: {
       height: '100%', width: projWidth + '%',
       background: 'repeating-linear-gradient(90deg, rgba(167,139,250,0.3) 0px, rgba(167,139,250,0.3) 4px, rgba(167,139,250,0.15) 4px, rgba(167,139,250,0.15) 8px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       color: '#a78bfa', fontSize: '10px', fontWeight: '700',
-      borderRadius: '0 16px 16px 0',
-      position: 'relative', zIndex: 1
-    } }, projWidth > 15 ? '+' + EUR(caProjecte) : '');
+      position: 'absolute', left: realWidth + '%', top: '0', zIndex: 1
+    } }, projWidth > 12 ? '+' + EUR(caProjecte) : '');
     progressBg.appendChild(projBar);
   }
 
   progressContainer.appendChild(progressBg);
 
-  // Indicateur limite plafond (ligne verticale)
+  // V72: Indicateur limite plafond - positionné proportionnellement à l'échelle
+  var plafondPct = (plafond / maxScale) * 100;
   var limitIndicator = el('div', { style: {
-    position: 'absolute', left: 'calc(' + Math.min(100, 100) + '% - 2px)', top: '-4px', bottom: '-4px',
+    position: 'absolute', left: 'calc(' + plafondPct.toFixed(1) + '% - 1px)', top: '-4px', bottom: '-4px',
     width: '3px', background: 'var(--danger)', borderRadius: '2px', zIndex: 10
   }});
   var limitLabel = el('div', { style: {
-    position: 'absolute', left: '100%', top: '-18px', transform: 'translateX(-50%)',
+    position: 'absolute', left: plafondPct.toFixed(1) + '%', top: '-18px', transform: 'translateX(-50%)',
     fontSize: '9px', color: 'var(--danger)', fontWeight: '700', whiteSpace: 'nowrap'
   } }, '▼ ' + EUR(plafond, true));
   progressContainer.appendChild(limitIndicator);
@@ -8832,20 +8905,51 @@ function renderCAPlafondWidget(container) {
   widget.appendChild(conseqDiv);
 
   // V72: Info TVA séparée (franchise TVA ≠ statut micro)
-  if (currentCA > seuilTVA || caTotal > seuilTVA) {
-    var tvaDiv = el('div', { style: { marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '11px', background: 'rgba(236, 72, 153, 0.1)', border: '1px solid rgba(236, 72, 153, 0.2)' } });
-    if (currentCA > seuilTVAMajore) {
-      tvaDiv.innerHTML = '💰 <strong>TVA applicable</strong><br>CA encaissé > ' + EUR(seuilTVAMajore) + ' (seuil majoré) → Assujettissement TVA immédiat. Facturez la TVA et déclarez-la mensuellement ou trimestriellement.';
-      tvaDiv.style.color = '#db2777';
-    } else if (currentCA > seuilTVA) {
-      tvaDiv.innerHTML = '💰 <strong>Franchise TVA dépassée</strong><br>CA encaissé > ' + EUR(seuilTVA) + ' → TVA applicable au 1er janvier ' + (year + 1) + '. Préparez vos factures avec TVA.';
-      tvaDiv.style.color = '#db2777';
+  // Règles officielles (BOFiP, service-public.fr):
+  // - CA N-1 > 37,500€ → assujetti TVA au 1er janvier N (plus d'année de tolérance depuis 2025)
+  // - CA en cours > 41,250€ (seuil majoré) → assujetti TVA immédiat
+  // - CA N-1 ≤ 37,500€ → retour automatique en franchise au 1er janvier N
+  var prevYearOverTVA = caPrevYear > seuilTVA;
+  var assujettiTVAThisYear = prevYearOverTVA; // Si CA N-1 > seuil → assujetti au 1er janv
+  var tvaDiv = el('div', { style: { marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '11px' } });
+  var showTVA = false;
+
+  if (assujettiTVAThisYear) {
+    // Assujetti TVA cette année car CA année précédente > seuil
+    showTVA = true;
+    tvaDiv.style.background = 'rgba(236, 72, 153, 0.12)';
+    tvaDiv.style.border = '1px solid rgba(236, 72, 153, 0.25)';
+    tvaDiv.style.color = '#db2777';
+    var tvaMsg = '💰 <strong>Assujetti TVA en ' + year + '</strong><br>';
+    tvaMsg += 'CA ' + (year - 1) + ': ' + EUR(caPrevYear) + ' > franchise ' + EUR(seuilTVA) + ' → Vous devez collecter et reverser la TVA toute l\'année ' + year + '.';
+    // Projection pour l'année prochaine
+    if (caTotal <= seuilTVA) {
+      tvaMsg += '<br><span style="color:var(--success)">📉 Si votre CA ' + year + ' reste ≤ ' + EUR(seuilTVA) + ', retour automatique en franchise TVA au 1er janvier ' + (year + 1) + '.</span>';
     } else {
-      tvaDiv.innerHTML = '💰 <strong>Attention TVA</strong><br>CA prévu ' + EUR(caTotal) + ' > franchise ' + EUR(seuilTVA) + '. Prévoyez l\'assujettissement TVA.';
-      tvaDiv.style.color = '#ec4899';
+      tvaMsg += '<br>CA prévu ' + year + ': ' + EUR(caTotal) + ' > ' + EUR(seuilTVA) + ' → Vous resterez assujetti TVA en ' + (year + 1) + '.';
     }
-    widget.appendChild(tvaDiv);
+    tvaDiv.innerHTML = tvaMsg;
+  } else if (currentCA > seuilTVAMajore) {
+    // Seuil majoré dépassé en cours d'année → TVA immédiate
+    showTVA = true;
+    tvaDiv.style.background = 'rgba(236, 72, 153, 0.15)';
+    tvaDiv.style.border = '1px solid rgba(236, 72, 153, 0.3)';
+    tvaDiv.style.color = '#db2777';
+    tvaDiv.innerHTML = '💰 <strong>Seuil majoré TVA dépassé</strong><br>CA encaissé ' + EUR(currentCA) + ' > ' + EUR(seuilTVAMajore) + ' → Assujettissement TVA immédiat. Facturez la TVA dès maintenant.';
+  } else if (currentCA > seuilTVA || caTotal > seuilTVA) {
+    // Seuil de base dépassé cette année → TVA au 1er janvier prochain
+    showTVA = true;
+    tvaDiv.style.background = 'rgba(236, 72, 153, 0.08)';
+    tvaDiv.style.border = '1px solid rgba(236, 72, 153, 0.15)';
+    tvaDiv.style.color = '#ec4899';
+    if (currentCA > seuilTVA) {
+      tvaDiv.innerHTML = '💰 <strong>Franchise TVA dépassée</strong><br>CA encaissé ' + EUR(currentCA) + ' > ' + EUR(seuilTVA) + ' → TVA applicable au 1er janvier ' + (year + 1) + '. Préparez vos factures avec TVA.';
+    } else {
+      tvaDiv.innerHTML = '💰 <strong>Attention TVA</strong><br>CA prévu ' + EUR(caTotal) + ' > franchise ' + EUR(seuilTVA) + '. Si confirmé, assujettissement TVA au 1er janvier ' + (year + 1) + '.';
+    }
   }
+
+  if (showTVA) widget.appendChild(tvaDiv);
 
   container.appendChild(widget);
 }
@@ -9124,31 +9228,111 @@ function renderActionsAndMilestones(container) {
   var widget = el('div', { class: 'card', style: { marginBottom: '16px' } });
   widget.appendChild(el('div', { class: 'card-title' }, '⚡ À Faire'));
 
-  // Section Jalons (en haut)
-  if (milestones.length > 0) {
-    var milestonesSection = el('div', { style: { marginBottom: '16px' } });
-    milestonesSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, '📅 Prochains Jalons'));
+  // V72: Timeline horizontale scrollable avec tous les jalons de l'année
+  var allMilestones = getAllYearMilestones();
+  if (allMilestones.length > 0) {
+    var timelineSection = el('div', { style: { marginBottom: '16px' } });
+    timelineSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+      el('span', {}, '📅 Timeline Fiscale ' + (PERIOD.year || TODAY.getFullYear())),
+      el('span', { style: { fontSize: '9px', opacity: 0.6 } }, '← balayer →')
+    ]));
 
-    var milestonesGrid = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-    milestones.slice(0, 4).forEach(function(m) {
-      var cls = m.daysLeft <= 7 ? 'urgent' : m.daysLeft <= 30 ? 'warning' : 'ok';
-      var bgColor = cls === 'urgent' ? 'rgba(239, 68, 68, 0.1)' : cls === 'warning' ? 'rgba(251, 191, 36, 0.1)' : 'var(--bg-tertiary)';
-      var textColor = cls === 'urgent' ? 'var(--danger)' : cls === 'warning' ? 'var(--warning)' : 'var(--text-secondary)';
+    // Container scrollable
+    var scrollContainer = el('div', { style: {
+      overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch',
+      scrollbarWidth: 'none', msOverflowStyle: 'none', position: 'relative', paddingBottom: '8px'
+    }});
 
-      var milestone = el('div', {
-        style: { flex: '1', minWidth: '120px', padding: '10px', background: bgColor, borderRadius: '8px', cursor: 'pointer', textAlign: 'center' },
+    // La timeline elle-même
+    var timeline = el('div', { style: {
+      display: 'flex', alignItems: 'flex-start', gap: '0',
+      minWidth: 'max-content', position: 'relative', paddingTop: '20px', paddingBottom: '4px'
+    }});
+
+    // Ligne horizontale
+    var line = el('div', { style: {
+      position: 'absolute', top: '38px', left: '30px', right: '30px', height: '2px',
+      background: 'var(--border)', zIndex: 0
+    }});
+    timeline.appendChild(line);
+
+    // Couleurs par catégorie
+    var catColors = { urssaf: '#10b981', tva: '#ec4899', ir: '#f59e0b', cfe: '#8b5cf6', acre: '#06b6d4' };
+    var catBg = { urssaf: 'rgba(16,185,129,0.12)', tva: 'rgba(236,72,153,0.12)', ir: 'rgba(245,158,11,0.12)', cfe: 'rgba(139,92,246,0.12)', acre: 'rgba(6,182,212,0.12)' };
+
+    // Trouver le premier futur pour scroll auto
+    var firstFutureIdx = -1;
+
+    allMilestones.forEach(function(m, idx) {
+      var isPast = m.daysLeft < 0;
+      var isToday = m.daysLeft === 0;
+      var isUrgent = m.daysLeft > 0 && m.daysLeft <= 7;
+      var isSoon = m.daysLeft > 7 && m.daysLeft <= 30;
+      if (firstFutureIdx === -1 && m.daysLeft >= 0) firstFutureIdx = idx;
+
+      var color = catColors[m.cat] || 'var(--text-muted)';
+      var bg = catBg[m.cat] || 'var(--bg-tertiary)';
+
+      var item = el('div', {
+        style: {
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          minWidth: '70px', maxWidth: '80px', position: 'relative', zIndex: 1,
+          opacity: isPast ? '0.4' : '1', cursor: 'pointer',
+          transition: 'transform 0.15s ease'
+        },
         onclick: function() { showMilestoneDetail(m); }
       });
-      milestone.appendChild(el('div', { style: { fontSize: '16px', marginBottom: '4px' } }, m.icon));
-      milestone.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '2px' } }, m.label));
-      if (m.date) milestone.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, fmtShort(m.date)));
-      if (m.daysLeft !== null && m.daysLeft >= 0) {
-        milestone.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: textColor, marginTop: '4px' } }, m.daysLeft === 0 ? 'Aujourd\'hui' : 'J-' + m.daysLeft));
+
+      // Date en haut
+      var dateStr = m.date ? m.date.substring(5) : '';
+      var dateParts = dateStr.split('-');
+      var dateDisplay = dateParts.length === 2 ? dateParts[1] + '/' + dateParts[0] : dateStr;
+      item.appendChild(el('div', { style: {
+        fontSize: '9px', color: isPast ? 'var(--text-muted)' : color, fontWeight: '600', marginBottom: '6px'
+      }}, dateDisplay));
+
+      // Point sur la ligne
+      var dotSize = isToday || isUrgent ? '14px' : '10px';
+      var dotBorder = isToday ? '3px solid var(--danger)' : isUrgent ? '2px solid ' + color : isPast ? '2px solid var(--border)' : '2px solid ' + color;
+      var dotBg = isPast ? 'var(--border)' : isToday ? 'var(--danger)' : bg;
+      item.appendChild(el('div', { style: {
+        width: dotSize, height: dotSize, borderRadius: '50%', background: dotBg,
+        border: dotBorder, marginBottom: '8px', boxShadow: isToday ? '0 0 8px rgba(239,68,68,0.5)' : isUrgent ? '0 0 6px ' + color + '40' : 'none'
+      }}));
+
+      // Icône
+      item.appendChild(el('div', { style: { fontSize: '16px', marginBottom: '2px' } }, m.icon));
+
+      // Label
+      item.appendChild(el('div', { style: {
+        fontSize: '9px', fontWeight: '600', textAlign: 'center', lineHeight: '1.2',
+        color: isPast ? 'var(--text-muted)' : 'var(--text-primary)', maxWidth: '70px'
+      }}, m.label));
+
+      // Badge J-X
+      if (!isPast) {
+        var badgeColor = isToday ? 'var(--danger)' : isUrgent ? 'var(--danger)' : isSoon ? 'var(--warning)' : color;
+        var badgeText = isToday ? 'Auj.' : 'J-' + m.daysLeft;
+        item.appendChild(el('div', { style: {
+          fontSize: '8px', fontWeight: '800', color: 'white', background: badgeColor,
+          borderRadius: '8px', padding: '1px 5px', marginTop: '3px'
+        }}, badgeText));
       }
-      milestonesGrid.appendChild(milestone);
+
+      timeline.appendChild(item);
     });
-    milestonesSection.appendChild(milestonesGrid);
-    widget.appendChild(milestonesSection);
+
+    scrollContainer.appendChild(timeline);
+    timelineSection.appendChild(scrollContainer);
+    widget.appendChild(timelineSection);
+
+    // Scroll auto vers le prochain jalon
+    if (firstFutureIdx > 1) {
+      setTimeout(function() {
+        var scrollTarget = Math.max(0, (firstFutureIdx - 1) * 75);
+        scrollContainer.scrollLeft = scrollTarget;
+      }, 100);
+    }
   }
 
   // Section Actions (en bas)
@@ -9198,8 +9382,9 @@ function showMilestoneDetail(m) {
     ].filter(Boolean)));
   }
 
-  if (m.description) {
-    content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' } }, m.description));
+  var desc = m.description || m.detail;
+  if (desc) {
+    content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' } }, desc));
   }
 
   showModal(m.icon + ' ' + m.label, content);
