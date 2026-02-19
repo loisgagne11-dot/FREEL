@@ -8666,186 +8666,142 @@ function renderDashboardHero(container, data) {
 
   hero.appendChild(heroHeader);
 
-  // V53: Camembert répartition du compte pro
+  // V72: Composition Compte Pro UNIFIÉ - Donut avec Cash + Provisions détaillées
   var solde = Math.max(0, data.soldeAbsolu);
-  var pctCash = solde > 0 ? (data.cashDispoAbsolu / solde * 100) : 0;
-  var pctProv = solde > 0 ? (data.provisionsAbsolues / solde * 100) : 0;
-
-  // Correction si cash négatif
-  if (data.cashDispoAbsolu < 0) {
-    pctCash = 0;
-    pctProv = 100;
-  }
-
-  var pieContainer = el('div', { style: {
-    display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px',
-    padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '12px'
-  }});
-
-  // Pie chart SVG
-  var pieSize = 70;
-  var pieDiv = el('div', { style: { position: 'relative', width: pieSize + 'px', height: pieSize + 'px' } });
-  var angle1 = (pctCash / 100) * 360;
-  var svgNS = 'http://www.w3.org/2000/svg';
-  var svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('width', pieSize);
-  svg.setAttribute('height', pieSize);
-  svg.setAttribute('viewBox', '0 0 100 100');
-
-  // Background circle (provisions)
-  var bgCircle = document.createElementNS(svgNS, 'circle');
-  bgCircle.setAttribute('cx', '50');
-  bgCircle.setAttribute('cy', '50');
-  bgCircle.setAttribute('r', '40');
-  bgCircle.setAttribute('fill', 'none');
-  bgCircle.setAttribute('stroke', '#a855f7');
-  bgCircle.setAttribute('stroke-width', '20');
-  svg.appendChild(bgCircle);
-
-  // Cash disponible arc
-  if (pctCash > 0) {
-    var cashCircle = document.createElementNS(svgNS, 'circle');
-    cashCircle.setAttribute('cx', '50');
-    cashCircle.setAttribute('cy', '50');
-    cashCircle.setAttribute('r', '40');
-    cashCircle.setAttribute('fill', 'none');
-    cashCircle.setAttribute('stroke', '#22c55e');
-    cashCircle.setAttribute('stroke-width', '20');
-    cashCircle.setAttribute('stroke-dasharray', (pctCash * 2.51) + ' 251');
-    cashCircle.setAttribute('transform', 'rotate(-90 50 50)');
-    svg.appendChild(cashCircle);
-  }
-
-  pieDiv.appendChild(svg);
-
-  // Solde au centre
-  var centerLabel = el('div', { style: {
-    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-    fontSize: '10px', fontWeight: '700', textAlign: 'center', lineHeight: '1.2'
-  }});
-  centerLabel.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '800' } }, EUR(data.soldeAbsolu, true)));
-  centerLabel.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)' } }, 'Solde'));
-  pieDiv.appendChild(centerLabel);
-  pieContainer.appendChild(pieDiv);
-
-  // Légende
-  var legend = el('div', { style: { flex: 1, fontSize: '12px' } });
-  legend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } }, [
-    el('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: '#22c55e' } }),
-    el('span', {}, 'Cash: ' + EUR(data.cashDispoAbsolu) + ' (' + Math.round(pctCash) + '%)')
-  ]));
-  legend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
-    el('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: '#a855f7' } }),
-    el('span', {}, 'Provisions: ' + EUR(data.provisionsAbsolues) + ' (' + Math.round(pctProv) + '%)')
-  ]));
-
-  // V67: Détail provisions par type - cliquable pour voir/modifier
-  if (data.provAbsoluesByType && Object.keys(data.provAbsoluesByType).length > 0) {
-    var provTypes = Object.keys(data.provAbsoluesByType).sort(function(a, b) {
-      return data.provAbsoluesByType[b] - data.provAbsoluesByType[a];
-    });
-    var provDetail = el('div', { style: { marginLeft: '20px', marginTop: '4px', fontSize: '10px' } });
-    provTypes.forEach(function(type) {
-      var montant = data.provAbsoluesByType[type];
-      if (montant > 0) {
-        var items = data.allProvisionsDetail.filter(function(p) { return p.cat === type || (type === 'IR Estimé' && p.cat.indexOf('IR') >= 0); });
-        var typeRow = el('div', {
-          style: { display: 'flex', justifyContent: 'space-between', padding: '3px 6px', borderRadius: '4px', cursor: 'pointer', color: 'var(--text-muted)' },
-          onclick: function() { showProvisionTypeDetail(type, items, '#a855f7'); }
-        }, [
-          el('span', {}, '• ' + type + ' ›'),
-          el('span', { style: { fontWeight: '600', color: '#a855f7' } }, EUR(montant))
-        ]);
-        typeRow.onmouseenter = function() { typeRow.style.background = 'var(--bg-secondary)'; };
-        typeRow.onmouseleave = function() { typeRow.style.background = 'none'; };
-        provDetail.appendChild(typeRow);
-      }
-    });
-    legend.appendChild(provDetail);
-  }
-
-  pieContainer.appendChild(legend);
-
-  hero.appendChild(pieContainer);
-
-  // V72: Composition Compte Pro - État ABSOLU (pas filtré par période)
-  var compteBlock = el('div', { style: { marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
-  compteBlock.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '10px', fontWeight: '600', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between' } }, [
-    el('span', {}, '🏦 Composition Compte Pro'),
-    el('span', { style: { fontWeight: '400', fontSize: '9px' } }, 'État actuel')
-  ]));
-
-  // Données ABSOLUES (pas filtrées)
-  var soldeAbs = data.soldeAbsolu || 0;
   var cashAbs = data.cashDispoAbsolu || 0;
   var provAbs = data.provisionsAbsolues || 0;
+  var pctCash = solde > 0 ? (cashAbs / solde * 100) : 0;
+  var pctProv = solde > 0 ? (provAbs / solde * 100) : 0;
 
-  // Détail provisions par type (absolues)
-  var provURSSAF = (data.provAbsoluesByType && data.provAbsoluesByType['URSSAF'] || 0) + (data.provAbsoluesByType && data.provAbsoluesByType['CFP'] || 0);
-  var provTVA = data.provAbsoluesByType && data.provAbsoluesByType['TVA'] || 0;
+  // Correction si cash négatif
+  if (cashAbs < 0) { pctCash = 0; pctProv = 100; }
+
+  // Détail provisions par type
   var provIR = data.provAbsoluesByType && data.provAbsoluesByType['IR Estimé'] || 0;
-  var provAutres = provAbs - provURSSAF - provTVA - provIR;
+  var provTVA = data.provAbsoluesByType && data.provAbsoluesByType['TVA'] || 0;
+  var provURSSAF = (data.provAbsoluesByType && data.provAbsoluesByType['URSSAF'] || 0) + (data.provAbsoluesByType && data.provAbsoluesByType['CFP'] || 0);
+  var provAutres = Math.max(0, provAbs - provIR - provTVA - provURSSAF);
 
-  var maxVal = Math.max(soldeAbs, 1);
+  // Couleurs provisions
+  var colorCash = '#22c55e';
+  var colorIR = '#f59e0b';
+  var colorTVA = '#ec4899';
+  var colorURSSAF = '#f87171';
+  var colorAutres = '#a855f7';
 
-  // Barres: Solde total puis provisions décroissantes, puis cash disponible
-  var waterfallBars = [
-    { id: 'solde', label: 'Solde', value: soldeAbs, color: 'var(--info)', icon: '💳' }
-  ];
+  var compteContainer = el('div', { style: {
+    marginTop: '16px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '12px'
+  }});
 
-  // Ajouter provisions (triées décroissant)
-  var provBars = [
-    { id: 'urssaf', label: 'Prov. URSSAF', value: provURSSAF, color: 'var(--danger)', icon: '📋' },
-    { id: 'tva', label: 'Prov. TVA', value: provTVA, color: '#ec4899', icon: '🏛️' },
-    { id: 'ir', label: 'Prov. IR', value: provIR, color: '#f59e0b', icon: '🧾' },
-    { id: 'autres', label: 'Prov. Autres', value: provAutres, color: '#8b5cf6', icon: '📦' }
-  ].filter(function(b) { return b.value > 0; }).sort(function(a, b) { return b.value - a.value; });
+  // Layout: Donut à gauche, Légende à droite
+  var compteRow = el('div', { style: { display: 'flex', gap: '20px', alignItems: 'center' } });
 
-  waterfallBars = waterfallBars.concat(provBars);
+  // === DONUT CHART avec Chart.js ===
+  var donutDiv = el('div', { style: { position: 'relative', width: '140px', height: '140px', flexShrink: '0' } });
+  var canvasDonut = el('canvas', { id: 'compteDonutCanvas', style: { width: '140px', height: '140px' } });
+  donutDiv.appendChild(canvasDonut);
 
-  // Cash disponible en dernier
-  waterfallBars.push({ id: 'cash', label: 'Cash Dispo', value: cashAbs, color: 'var(--success)', icon: '💎' });
+  // Solde au centre du donut
+  var centerInfo = el('div', { style: {
+    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+    textAlign: 'center', pointerEvents: 'none'
+  }});
+  centerInfo.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '800' } }, EUR(solde, true)));
+  centerInfo.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'Solde'));
+  donutDiv.appendChild(centerInfo);
+  compteRow.appendChild(donutDiv);
 
-  waterfallBars.forEach(function(bar) {
-    if (bar.value <= 0 && bar.id !== 'cash') return;
-    var pct = maxVal > 0 ? (Math.abs(bar.value) / maxVal * 100) : 0;
-    var row = el('div', {
-      style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', cursor: 'pointer' },
-      onclick: function() { showAbsoluteWaterfallDetail(bar, data); }
+  // === LÉGENDE avec pourcentages et drill-down ===
+  var legendDiv = el('div', { style: { flex: 1, fontSize: '12px' } });
+
+  // --- Cash Disponible ---
+  var cashRow = el('div', {
+    style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: '8px', marginBottom: '8px', cursor: 'pointer' },
+    onclick: function() { showCashDetail(); }
+  });
+  cashRow.appendChild(el('div', { style: { width: '14px', height: '14px', borderRadius: '4px', background: colorCash, flexShrink: '0' } }));
+  cashRow.appendChild(el('div', { style: { flex: 1 } }, [
+    el('div', { style: { fontWeight: '700', color: colorCash } }, '💎 Cash Disponible'),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, Math.round(pctCash) + '% du solde')
+  ]));
+  cashRow.appendChild(el('div', { style: { fontWeight: '800', fontSize: '14px', color: colorCash } }, EUR(cashAbs, true)));
+  legendDiv.appendChild(cashRow);
+
+  // --- Provisions (titre) ---
+  var provHeader = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 8px' } });
+  provHeader.appendChild(el('div', { style: { width: '14px', height: '14px', borderRadius: '4px', background: 'linear-gradient(135deg, ' + colorIR + ', ' + colorTVA + ', ' + colorURSSAF + ')', flexShrink: '0' } }));
+  provHeader.appendChild(el('div', { style: { flex: 1, fontWeight: '600' } }, '📊 Provisions'));
+  provHeader.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, Math.round(pctProv) + '%'));
+  provHeader.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(provAbs, true)));
+  legendDiv.appendChild(provHeader);
+
+  // --- Détail provisions (cliquables) ---
+  var provDetails = [
+    { id: 'ir', label: 'IR Estimé', value: provIR, color: colorIR, icon: '🧾' },
+    { id: 'tva', label: 'TVA', value: provTVA, color: colorTVA, icon: '🏛️' },
+    { id: 'urssaf', label: 'URSSAF/CFP', value: provURSSAF, color: colorURSSAF, icon: '📋' },
+    { id: 'autres', label: 'Autres', value: provAutres, color: colorAutres, icon: '📦' }
+  ].filter(function(p) { return p.value > 0; }).sort(function(a, b) { return b.value - a.value; });
+
+  var provList = el('div', { style: { marginLeft: '24px', borderLeft: '2px solid var(--border)', paddingLeft: '12px' } });
+  provDetails.forEach(function(prov) {
+    var pctOfProv = provAbs > 0 ? Math.round(prov.value / provAbs * 100) : 0;
+    var pctOfSolde = solde > 0 ? Math.round(prov.value / solde * 100) : 0;
+    var items = (data.allProvisionsDetail || []).filter(function(p) {
+      if (prov.id === 'ir') return p.cat === 'IR Estimé' || p.cat.indexOf('IR') >= 0;
+      if (prov.id === 'tva') return p.cat === 'TVA';
+      if (prov.id === 'urssaf') return p.cat === 'URSSAF' || p.cat === 'CFP';
+      return p.cat !== 'IR Estimé' && p.cat !== 'TVA' && p.cat !== 'URSSAF' && p.cat !== 'CFP';
     });
 
-    // Label
-    row.appendChild(el('div', { style: { width: '80px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '4px' } }, [
-      el('span', {}, bar.icon),
-      el('span', {}, bar.label)
-    ]));
+    var provRow = el('div', {
+      style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', marginBottom: '2px' },
+      onclick: function() { showProvisionTypeDetail(prov.label, items, prov.color); }
+    });
+    provRow.appendChild(el('div', { style: { width: '10px', height: '10px', borderRadius: '2px', background: prov.color, flexShrink: '0' } }));
+    provRow.appendChild(el('span', { style: { flex: 1, fontSize: '11px' } }, prov.icon + ' ' + prov.label));
+    provRow.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, pctOfSolde + '%'));
+    provRow.appendChild(el('span', { style: { fontWeight: '600', fontSize: '11px', color: prov.color } }, EUR(prov.value, true)));
 
-    // Barre
-    var barContainer = el('div', { style: { flex: 1, height: '18px', background: 'var(--bg-secondary)', borderRadius: '4px', overflow: 'hidden', position: 'relative' } });
-    var barFill = el('div', { style: {
-      height: '100%', width: Math.max(2, pct) + '%', background: bar.color, borderRadius: '4px',
-      display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '4px',
-      fontSize: '9px', color: 'white', fontWeight: '700'
-    } }, pct > 15 ? EUR(bar.value, true) : '');
-    barContainer.appendChild(barFill);
-    row.appendChild(barContainer);
-
-    // Montant à droite si petit
-    if (pct <= 15) {
-      row.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', minWidth: '50px', textAlign: 'right' } }, EUR(bar.value, true)));
-    }
-
-    compteBlock.appendChild(row);
+    provRow.onmouseenter = function() { provRow.style.background = 'var(--bg-tertiary)'; };
+    provRow.onmouseleave = function() { provRow.style.background = 'none'; };
+    provList.appendChild(provRow);
   });
+  legendDiv.appendChild(provList);
 
-  // Résumé
-  var pctCashSolde = soldeAbs > 0 ? Math.round(cashAbs / soldeAbs * 100) : 0;
-  compteBlock.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '11px' } }, [
-    el('span', { style: { color: 'var(--text-muted)' } }, 'Disponible: ' + pctCashSolde + '% du solde'),
-    el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, EUR(cashAbs))
-  ]));
+  compteRow.appendChild(legendDiv);
+  compteContainer.appendChild(compteRow);
+  hero.appendChild(compteContainer);
 
-  hero.appendChild(compteBlock);
+  // Dessiner le donut avec Chart.js
+  setTimeout(function() {
+    var ctx = document.getElementById('compteDonutCanvas');
+    if (!ctx || typeof Chart === 'undefined') return;
+
+    // Données: Cash + provisions détaillées
+    var donutLabels = ['Cash Disponible'];
+    var donutData = [Math.max(0, cashAbs)];
+    var donutColors = [colorCash];
+
+    provDetails.forEach(function(p) {
+      donutLabels.push(p.label);
+      donutData.push(p.value);
+      donutColors.push(p.color);
+    });
+
+    new Chart(ctx.getContext('2d'), {
+      type: 'doughnut',
+      data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 0 }] },
+      options: {
+        responsive: false,
+        cutout: '60%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function(c) { return c.label + ': ' + EUR(c.raw) + ' (' + Math.round(c.raw / solde * 100) + '%)'; } } }
+        }
+      }
+    });
+  }, 100);
 
   // V60: Salaire versable + Autonomie côte à côte en dernier
   var bottomRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } });
