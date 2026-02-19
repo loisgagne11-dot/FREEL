@@ -8680,8 +8680,10 @@ function renderCAPlafondWidget(container) {
   var currentCA = data.caHT || 0;
 
   // Seuils micro-entrepreneur BNC 2024-2026
-  var plafond = 77700;        // Plafond normal
-  var seuilMajore = 89500;    // Seuil majoré (sortie immédiate si dépassé)
+  var plafond = 77700;        // Plafond micro-entrepreneur (régime fiscal)
+  // Note: Le seuil majoré n'existe QUE pour la TVA (41,250€ pour services), pas pour le statut micro
+  var seuilTVA = 37500;       // Franchise TVA (services BNC)
+  var seuilTVAMajore = 41250; // Seuil majoré TVA = assujettissement immédiat
 
   // V71: Calculer le CA projeté à partir des factures non payées (encaissement prévu sur l'année)
   var caProjecte = 0;
@@ -8704,7 +8706,7 @@ function renderCAPlafondWidget(container) {
   var caTotal = currentCA + caProjecte;
   var pctRealise = Math.min(1, currentCA / plafond);
   var pctTotal = Math.min(1.3, caTotal / plafond);
-  var pctColor = caTotal >= seuilMajore ? 'var(--danger)' : caTotal >= plafond ? '#f97316' : caTotal >= plafond * 0.9 ? 'var(--warning)' : 'var(--success)';
+  var pctColor = caTotal >= plafond ? '#f97316' : caTotal >= plafond * 0.9 ? 'var(--warning)' : 'var(--success)';
 
   var widget = el('div', { class: 'card', style: { marginBottom: '16px' } });
 
@@ -8712,8 +8714,8 @@ function renderCAPlafondWidget(container) {
   var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } });
   header.appendChild(el('div', { class: 'card-title', style: { margin: 0 } }, '📊 CA Annuel ' + year));
   header.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textAlign: 'right' } }, [
-    el('div', {}, 'Plafond: ' + EUR(plafond)),
-    el('div', { style: { color: 'var(--danger)' } }, 'Seuil majoré: ' + EUR(seuilMajore))
+    el('div', {}, 'Plafond micro: ' + EUR(plafond)),
+    el('div', { style: { color: currentCA > seuilTVA ? 'var(--warning)' : 'inherit' } }, 'Franchise TVA: ' + EUR(seuilTVA))
   ]));
   widget.appendChild(header);
 
@@ -8794,13 +8796,7 @@ function renderCAPlafondWidget(container) {
   // V71: Conséquences avec vraies règles fiscales
   var conseqDiv = el('div', { style: { marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '11px' } });
 
-  if (caTotal >= seuilMajore) {
-    // Dépassement seuil majoré = sortie immédiate
-    conseqDiv.style.background = 'rgba(239, 68, 68, 0.15)';
-    conseqDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-    conseqDiv.style.color = 'var(--danger)';
-    conseqDiv.innerHTML = '🚨 <strong>Seuil majoré dépassé (' + EUR(seuilMajore) + ')</strong><br>Sortie immédiate du régime micro-entrepreneur au 1er janvier ' + (year + 1) + '. Passage obligatoire au régime réel avec TVA et comptabilité complète.';
-  } else if (caTotal > plafond && prevYearOverLimit) {
+  if (caTotal > plafond && prevYearOverLimit) {
     // 2ème année consécutive de dépassement = sortie
     conseqDiv.style.background = 'rgba(239, 68, 68, 0.15)';
     conseqDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
@@ -8834,6 +8830,22 @@ function renderCAPlafondWidget(container) {
   }
 
   widget.appendChild(conseqDiv);
+
+  // V72: Info TVA séparée (franchise TVA ≠ statut micro)
+  if (currentCA > seuilTVA || caTotal > seuilTVA) {
+    var tvaDiv = el('div', { style: { marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '11px', background: 'rgba(236, 72, 153, 0.1)', border: '1px solid rgba(236, 72, 153, 0.2)' } });
+    if (currentCA > seuilTVAMajore) {
+      tvaDiv.innerHTML = '💰 <strong>TVA applicable</strong><br>CA encaissé > ' + EUR(seuilTVAMajore) + ' (seuil majoré) → Assujettissement TVA immédiat. Facturez la TVA et déclarez-la mensuellement ou trimestriellement.';
+      tvaDiv.style.color = '#db2777';
+    } else if (currentCA > seuilTVA) {
+      tvaDiv.innerHTML = '💰 <strong>Franchise TVA dépassée</strong><br>CA encaissé > ' + EUR(seuilTVA) + ' → TVA applicable au 1er janvier ' + (year + 1) + '. Préparez vos factures avec TVA.';
+      tvaDiv.style.color = '#db2777';
+    } else {
+      tvaDiv.innerHTML = '💰 <strong>Attention TVA</strong><br>CA prévu ' + EUR(caTotal) + ' > franchise ' + EUR(seuilTVA) + '. Prévoyez l\'assujettissement TVA.';
+      tvaDiv.style.color = '#ec4899';
+    }
+    widget.appendChild(tvaDiv);
+  }
 
   container.appendChild(widget);
 }
