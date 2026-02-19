@@ -3935,7 +3935,9 @@ function compute() {
         irDistributed += irPart;
 
         if (irPart > 0) {
-          var irId = 'IR-' + periodYear + '-' + mca.month;
+          // V72: ID canonique IR-{year}-{MM} (cohérent avec getAbsoluteProvisions/getAllChargesForType)
+          var irMonthStr = mca.month.split('-')[1]; // Extraire '01' de '2026-01'
+          var irId = 'IR-' + periodYear + '-' + irMonthStr;
           var md = data.monthsData[mca.month];
           md.charges.push({
             id: irId,
@@ -3947,7 +3949,7 @@ function compute() {
           if (isPaid(irId)) {
             data.chargesPayees += irPart;
             md.chargesPaid += irPart;
-            data.detailChargesPayees.push({ cat: 'IR Estimé', mois: mca.month, montant: irPart });
+            data.detailChargesPayees.push({ cat: 'IR Estimé', mois: mca.month, montant: irPart, id: irId });
           } else {
             data.chargesAPayer += irPart;
             md.chargesUnpaid += irPart;
