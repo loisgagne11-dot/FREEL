@@ -475,6 +475,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .period-btn { background: var(--bg-tertiary); border: 1px solid var(--glass-border); color: var(--text-muted); padding: 4px 8px; border-radius: 6px; font-size: 10px; cursor: pointer; transition: all 0.2s; }
 .period-btn:hover { border-color: var(--accent); color: var(--text-secondary); }
 .period-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+.period-select { background: var(--bg-tertiary); border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 4px 6px; border-radius: 6px; font-size: 10px; cursor: pointer; outline: none; }
+.period-select:focus { border-color: var(--accent); }
 .period-input { background: var(--bg-tertiary); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 4px 6px; border-radius: 6px; font-size: 10px; width: 100px; }
 .year-nav { display: flex; align-items: center; gap: 2px; }
 .year-nav-btn { background: var(--bg-tertiary); border: 1px solid var(--glass-border); color: var(--text-muted); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
@@ -1289,6 +1291,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
           <button class="period-btn active" id="periodYear">2025</button>
           <button class="year-nav-btn" id="nextYear">▶</button>
         </div>
+        <select class="period-select" id="monthFilter" title="Filtrer par mois">
+          <option value="">Année</option>
+          <option value="0">Janvier</option>
+          <option value="1">Février</option>
+          <option value="2">Mars</option>
+          <option value="3">Avril</option>
+          <option value="4">Mai</option>
+          <option value="5">Juin</option>
+          <option value="6">Juillet</option>
+          <option value="7">Août</option>
+          <option value="8">Septembre</option>
+          <option value="9">Octobre</option>
+          <option value="10">Novembre</option>
+          <option value="11">Décembre</option>
+        </select>
         <button class="period-btn" id="periodCustomBtn">Période</button>
         <input type="month" class="period-input" id="periodStart" style="display:none">
         <input type="month" class="period-input" id="periodEnd" style="display:none">
@@ -1587,7 +1604,7 @@ function loadFromCloud() {
     });
 }
 
-var PERIOD = { type: 'year', year: TODAY.getFullYear() };
+var PERIOD = { type: 'year', year: TODAY.getFullYear(), month: null }; // V72: month = null pour année entière, 0-11 pour mois spécifique
 var TIMELINE_IDX = null;
 var FACTURE_FILTER = 'all';
 var SHOW_CUMUL = false;
@@ -2347,13 +2364,25 @@ function calculatePaymentDeadline(invoiceDate, delaiJours) {
 
 function isInPeriod(ymStr) {
   if (!ymStr) return false;
-  if (PERIOD.type === 'year') return ymStr.startsWith(PERIOD.year + '-');
+  if (PERIOD.type === 'year') {
+    // V72: Support filtrage mensuel
+    if (PERIOD.month !== null && PERIOD.month !== undefined && PERIOD.month !== '') {
+      return ymStr === ym(PERIOD.year, parseInt(PERIOD.month));
+    }
+    return ymStr.startsWith(PERIOD.year + '-');
+  }
   return ymStr >= PERIOD.start && ymStr <= PERIOD.end;
 }
 function getPeriodMonths() {
   var months = [];
-  if (PERIOD.type === 'year') { for (var m = 0; m < 12; m++) months.push(ym(PERIOD.year, m)); }
-  else {
+  if (PERIOD.type === 'year') {
+    // V72: Si un mois spécifique est sélectionné, retourner uniquement ce mois
+    if (PERIOD.month !== null && PERIOD.month !== undefined && PERIOD.month !== '') {
+      months.push(ym(PERIOD.year, parseInt(PERIOD.month)));
+    } else {
+      for (var m = 0; m < 12; m++) months.push(ym(PERIOD.year, m));
+    }
+  } else {
     var start = parseYM(PERIOD.start), end = parseYM(PERIOD.end);
     var y = start.y, m = start.m;
     while (y < end.y || (y === end.y && m <= end.m)) { months.push(ym(y, m)); m++; if (m > 11) { m = 0; y++; } }
@@ -3199,14 +3228,25 @@ function buildMission(mis) {
       joursOuvrables = daysBiz(d.getFullYear(), d.getMonth());
     }
     if (existing) {
-      // V57: Si les jours ouvrables ont changé et que joursPrevus n'a pas été modifié manuellement,
-      // mettre à jour joursPrevus pour refléter le nouveau nombre de jours ouvrables
+      // V72: Toujours mettre à jour joursOuvrables selon les vraies dates de mission
       var oldJoursOuvrables = existing.joursOuvrables || 0;
+      existing.joursOuvrables = joursOuvrables;
+
+      // V72: Recalculer joursPrevus si:
+      // - joursOuvrables a changé ET joursPrevus était = ancien joursOuvrables (pas de modif manuelle)
+      // - OU joursPrevus dépasse le nouveau joursOuvrables (impossible de travailler plus que dispo)
       if (oldJoursOuvrables !== joursOuvrables && existing.joursPrevus === oldJoursOuvrables) {
         existing.joursPrevus = joursOuvrables;
+      } else if ((existing.joursPrevus || 0) > joursOuvrables) {
+        // V72: Plafonner joursPrevus aux jours réellement disponibles
+        existing.joursPrevus = joursOuvrables;
       }
-      existing.joursOuvrables = joursOuvrables;
       existing.joursPrevus = existing.joursPrevus || joursOuvrables;
+
+      // V72: joursReels aussi ne peut pas dépasser joursOuvrables
+      if ((existing.joursReels || 0) > joursOuvrables) {
+        existing.joursReels = joursOuvrables;
+      }
       newLignes.push(existing);
     }
     else { newLignes.push({ ym: key, joursOuvrables: joursOuvrables, joursPrevus: joursOuvrables, joursReels: 0, conges: 0 }); }
@@ -10213,9 +10253,16 @@ function renderFinances(container) {
     onclick: function() { FINANCES_TAB = 'missions'; render(); }
   }, '💼 Missions');
 
+  // V72: Nouvel onglet Analyse
+  var tabAnalyse = el('button', {
+    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'analyse' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'analyse' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { FINANCES_TAB = 'analyse'; render(); }
+  }, '📊 Analyse');
+
   tabs.appendChild(tabFactures);
   tabs.appendChild(tabTreso);
   tabs.appendChild(tabMissions);
+  tabs.appendChild(tabAnalyse);
   container.appendChild(tabs);
 
   // Contenu selon sous-onglet
@@ -10223,6 +10270,8 @@ function renderFinances(container) {
     renderTresorerieContent(container);
   } else if (FINANCES_TAB === 'missions') {
     renderMissionsContent(container);
+  } else if (FINANCES_TAB === 'analyse') {
+    renderAnalyseContent(container);
   } else {
     renderFacturesContent(container);
   }
@@ -10346,6 +10395,362 @@ function renderMissionsContent(container) {
   });
 }
 
+// V72: Module Composition Compte avec Waterfall Chart
+function renderAnalyseContent(container) {
+  var data = compute();
+  var periodLabel = PERIOD.month !== null ? fmtMonthShort(ym(PERIOD.year, PERIOD.month)) : PERIOD.year;
+
+  // Calculer les données pour le Waterfall
+  var caHT = data.caHT || 0;
+  var chargesURSSAF = 0;
+  var chargesTVA = 0;
+  var chargesIR = 0;
+  var autresDepenses = 0;
+
+  // URSSAF + CFP
+  if (data.detailChargesAPayer) {
+    data.detailChargesAPayer.forEach(function(c) {
+      if (c.cat === 'URSSAF' || c.cat === 'CFP') chargesURSSAF += c.montant;
+      else if (c.cat === 'TVA') chargesTVA += c.montant;
+      else if (c.cat === 'IR' || c.cat === 'IR Estimé') chargesIR += c.montant;
+      else autresDepenses += c.montant;
+    });
+  }
+  // Ajouter charges déjà payées
+  if (data.detailChargesPayees) {
+    data.detailChargesPayees.forEach(function(c) {
+      if (c.cat === 'URSSAF' || c.cat === 'CFP') chargesURSSAF += c.montant;
+      else if (c.cat === 'TVA') chargesTVA += c.montant;
+      else if (c.cat === 'IR' || c.cat === 'IR Estimé') chargesIR += c.montant;
+      else autresDepenses += c.montant;
+    });
+  }
+
+  var totalCharges = chargesURSSAF + chargesTVA + chargesIR + autresDepenses;
+  var netDisponible = Math.max(0, caHT - totalCharges);
+
+  // Waterfall data
+  var waterfallData = [
+    { id: 'ca', label: 'CA Produit HT', value: caHT, cumul: caHT, type: 'total', color: 'var(--success)', icon: '💰' },
+    { id: 'urssaf', label: 'Charges sociales', value: -chargesURSSAF, cumul: caHT - chargesURSSAF, type: 'decrease', color: 'var(--danger)', icon: '🏥', detail: 'URSSAF + CFP' },
+    { id: 'tva', label: 'TVA à reverser', value: -chargesTVA, cumul: caHT - chargesURSSAF - chargesTVA, type: 'decrease', color: '#ec4899', icon: '🏛️' },
+    { id: 'ir', label: 'IR / Impôts', value: -chargesIR, cumul: caHT - chargesURSSAF - chargesTVA - chargesIR, type: 'decrease', color: '#f59e0b', icon: '🧾' },
+    { id: 'autres', label: 'Autres dépenses', value: -autresDepenses, cumul: caHT - totalCharges, type: 'decrease', color: 'var(--text-muted)', icon: '📋' },
+    { id: 'net', label: 'Marge disponible', value: netDisponible, cumul: netDisponible, type: 'total', color: 'var(--accent)', icon: '💎' }
+  ];
+
+  // Filtrer les barres à 0
+  waterfallData = waterfallData.filter(function(d) { return d.value !== 0 || d.type === 'total'; });
+
+  // Card titre
+  var card = el('div', { class: 'card', style: { marginBottom: '16px' } });
+  card.appendChild(el('div', { class: 'card-title' }, '📊 Composition du Compte - ' + periodLabel));
+  card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '16px' } }, 'Cliquez sur une barre pour voir le détail'));
+
+  // Waterfall Chart Container
+  var chartContainer = el('div', { style: { position: 'relative', marginBottom: '20px' } });
+
+  // Trouver le max pour l'échelle
+  var maxVal = caHT * 1.05;
+  var barHeight = 40;
+  var chartHeight = waterfallData.length * (barHeight + 12);
+
+  // Dessiner le waterfall horizontal
+  var waterfall = el('div', { style: { position: 'relative', height: chartHeight + 'px' } });
+
+  waterfallData.forEach(function(d, idx) {
+    var startPct = 0;
+    var widthPct = 0;
+
+    if (d.type === 'total') {
+      widthPct = Math.abs(d.value) / maxVal * 100;
+    } else {
+      // Pour les decreases, la barre part du cumul précédent
+      var prevCumul = idx > 0 ? waterfallData[idx - 1].cumul : caHT;
+      startPct = d.cumul / maxVal * 100;
+      widthPct = Math.abs(d.value) / maxVal * 100;
+    }
+
+    var row = el('div', { style: {
+      display: 'flex', alignItems: 'center', height: barHeight + 'px', marginBottom: '12px', cursor: 'pointer'
+    }, onclick: function() { showWaterfallDetail(d, data); } });
+
+    // Label gauche
+    var labelDiv = el('div', { style: { width: '130px', paddingRight: '10px', textAlign: 'right', fontSize: '11px' } });
+    labelDiv.appendChild(el('div', { style: { fontWeight: '600' } }, d.icon + ' ' + d.label));
+    labelDiv.appendChild(el('div', { style: { color: d.value >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: '700' } }, (d.value >= 0 ? '+' : '') + EUR(d.value)));
+    row.appendChild(labelDiv);
+
+    // Barre
+    var barContainer = el('div', { style: { flex: 1, position: 'relative', height: '100%', background: 'var(--bg-tertiary)', borderRadius: '8px', overflow: 'hidden' } });
+
+    if (d.type === 'total') {
+      var bar = el('div', { style: {
+        position: 'absolute', left: '0', top: '0', height: '100%',
+        width: widthPct + '%', background: d.color, borderRadius: '8px',
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px',
+        color: 'white', fontSize: '10px', fontWeight: '700', minWidth: '60px'
+      } }, EUR(Math.abs(d.value)));
+      barContainer.appendChild(bar);
+    } else {
+      // Barre de decrease (démarre là où finit le précédent)
+      var bar = el('div', { style: {
+        position: 'absolute', left: startPct + '%', top: '0', height: '100%',
+        width: widthPct + '%', background: d.color, borderRadius: '4px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'white', fontSize: '10px', fontWeight: '700', opacity: '0.9'
+      } }, widthPct > 8 ? EUR(Math.abs(d.value)) : '');
+      barContainer.appendChild(bar);
+
+      // Ligne de connexion
+      if (idx > 0) {
+        var prevCumul = waterfallData[idx - 1].cumul;
+        var linePos = prevCumul / maxVal * 100;
+        var line = el('div', { style: {
+          position: 'absolute', left: linePos + '%', top: '0', height: '100%',
+          width: '2px', background: 'var(--border)', opacity: '0.5'
+        }});
+        barContainer.appendChild(line);
+      }
+    }
+
+    row.appendChild(barContainer);
+    waterfall.appendChild(row);
+  });
+
+  chartContainer.appendChild(waterfall);
+  card.appendChild(chartContainer);
+
+  // Légende
+  var legend = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'center', fontSize: '10px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  var legendItems = [
+    { label: 'Revenu', color: 'var(--success)' },
+    { label: 'Charges sociales', color: 'var(--danger)' },
+    { label: 'TVA', color: '#ec4899' },
+    { label: 'Impôts', color: '#f59e0b' },
+    { label: 'Marge', color: 'var(--accent)' }
+  ];
+  legendItems.forEach(function(l) {
+    var item = el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } });
+    item.appendChild(el('div', { style: { width: '12px', height: '12px', background: l.color, borderRadius: '3px' } }));
+    item.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, l.label));
+    legend.appendChild(item);
+  });
+  card.appendChild(legend);
+
+  container.appendChild(card);
+
+  // Card Ratios
+  var ratiosCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+  ratiosCard.appendChild(el('div', { class: 'card-title' }, '📈 Ratios Clés'));
+
+  var ratiosGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' } });
+
+  var margeRate = caHT > 0 ? Math.round(netDisponible / caHT * 100) : 0;
+  var chargesRate = caHT > 0 ? Math.round(totalCharges / caHT * 100) : 0;
+  var urssafRate = caHT > 0 ? Math.round(chargesURSSAF / caHT * 100) : 0;
+  var irRate = caHT > 0 ? Math.round(chargesIR / caHT * 100) : 0;
+
+  function addRatioCard(label, value, color, percent) {
+    var kpi = el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+    kpi.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '800', color: color } }, percent + '%'));
+    kpi.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, label));
+    kpi.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginTop: '2px' } }, EUR(value)));
+    ratiosGrid.appendChild(kpi);
+  }
+
+  addRatioCard('Marge nette', netDisponible, 'var(--accent)', margeRate);
+  addRatioCard('Total charges', totalCharges, 'var(--danger)', chargesRate);
+  addRatioCard('Charges sociales', chargesURSSAF, 'var(--warning)', urssafRate);
+  addRatioCard('IR / Impôts', chargesIR, '#f59e0b', irRate);
+
+  ratiosCard.appendChild(ratiosGrid);
+  container.appendChild(ratiosCard);
+}
+
+// V72: Détail d'une barre du Waterfall (drill-down camembert)
+function showWaterfallDetail(d, data) {
+  var modal = $('#formModal');
+  $('#formModalTitle').textContent = d.icon + ' ' + d.label;
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+
+  var items = [];
+  var totalCat = 0;
+
+  // Collecter les détails selon la catégorie
+  if (d.id === 'ca') {
+    // Détail CA par client
+    MISSIONS.forEach(function(m) {
+      var clientCA = 0;
+      if (m.factures) m.factures.forEach(function(f) {
+        if (f.status === 'payée' && f.jours > 0 && isInPeriod(getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement))) {
+          clientCA += f.ht;
+        }
+      });
+      if (clientCA > 0) items.push({ label: m.client, value: clientCA, color: 'var(--success)' });
+    });
+    totalCat = data.caHT || 0;
+  } else if (d.id === 'urssaf') {
+    items.push({ label: 'URSSAF', value: 0, color: 'var(--danger)' });
+    items.push({ label: 'CFP', value: 0, color: '#f87171' });
+    (data.detailChargesAPayer || []).concat(data.detailChargesPayees || []).forEach(function(c) {
+      if (c.cat === 'URSSAF') items[0].value += c.montant;
+      else if (c.cat === 'CFP') items[1].value += c.montant;
+    });
+    totalCat = items[0].value + items[1].value;
+  } else if (d.id === 'tva') {
+    items.push({ label: 'TVA à reverser', value: 0, color: '#ec4899' });
+    (data.detailChargesAPayer || []).concat(data.detailChargesPayees || []).forEach(function(c) {
+      if (c.cat === 'TVA') items[0].value += c.montant;
+    });
+    totalCat = items[0].value;
+  } else if (d.id === 'ir') {
+    items.push({ label: 'IR Estimé', value: 0, color: '#f59e0b' });
+    (data.detailChargesAPayer || []).concat(data.detailChargesPayees || []).forEach(function(c) {
+      if (c.cat === 'IR' || c.cat === 'IR Estimé') items[0].value += c.montant;
+    });
+    totalCat = items[0].value;
+  } else if (d.id === 'net') {
+    var marge = data.caHT - (data.provisionsAbsolues || 0) - (data.totalPayees || 0);
+    items.push({ label: 'Cash disponible', value: data.cashDispoAbsolu || 0, color: 'var(--accent)' });
+    items.push({ label: 'Rémunération possible', value: data.salaireReco || 0, color: 'var(--success)' });
+    totalCat = Math.abs(d.value);
+  }
+
+  // Filtrer items vides
+  items = items.filter(function(i) { return i.value > 0; });
+
+  if (items.length === 0) {
+    body.appendChild(el('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-muted)' } }, 'Aucun détail disponible'));
+    openModal('formModal');
+    return;
+  }
+
+  // Montant total
+  body.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
+    el('div', { style: { fontSize: '32px', fontWeight: '800', color: d.color } }, EUR(Math.abs(d.value))),
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, Math.round(Math.abs(d.value) / (data.caHT || 1) * 100) + '% du CA HT')
+  ]));
+
+  // Camembert simplifié (barres horizontales proportionnelles)
+  var pieContainer = el('div', { style: { marginBottom: '20px' } });
+  var maxItemValue = Math.max.apply(null, items.map(function(i) { return i.value; }));
+
+  items.forEach(function(item) {
+    var pct = totalCat > 0 ? Math.round(item.value / totalCat * 100) : 0;
+    var widthPct = maxItemValue > 0 ? (item.value / maxItemValue * 100) : 0;
+
+    var row = el('div', { style: { marginBottom: '12px', cursor: 'pointer' }, onclick: function() {
+      // Niveau 2: détail des écritures
+      showTransactionDetail(d.id, item.label, data);
+    }});
+
+    var labelRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '12px' } });
+    labelRow.appendChild(el('span', { style: { fontWeight: '600' } }, item.label));
+    labelRow.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, EUR(item.value) + ' (' + pct + '%)'));
+    row.appendChild(labelRow);
+
+    var barBg = el('div', { style: { height: '24px', background: 'var(--bg-tertiary)', borderRadius: '6px', overflow: 'hidden' } });
+    barBg.appendChild(el('div', { style: { height: '100%', width: widthPct + '%', background: item.color, borderRadius: '6px', minWidth: '20px' } }));
+    row.appendChild(barBg);
+
+    pieContainer.appendChild(row);
+  });
+
+  body.appendChild(pieContainer);
+  body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textAlign: 'center' } }, 'Cliquez sur une ligne pour voir les écritures'));
+
+  openModal('formModal');
+}
+
+// V72: Niveau 2 - Détail des transactions/écritures
+function showTransactionDetail(catId, subLabel, data) {
+  var transactions = [];
+
+  // Collecter les transactions selon la catégorie
+  if (catId === 'ca') {
+    MISSIONS.forEach(function(m) {
+      if (m.client !== subLabel) return;
+      if (m.factures) m.factures.forEach(function(f) {
+        if (f.status === 'payée' && f.jours > 0 && isInPeriod(getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement))) {
+          transactions.push({ date: f.mois, label: 'Facture ' + f.id, montant: f.ht, status: 'payée' });
+        }
+      });
+    });
+  } else {
+    var catMatch = subLabel;
+    if (catId === 'urssaf' && subLabel === 'URSSAF') catMatch = 'URSSAF';
+    else if (catId === 'urssaf' && subLabel === 'CFP') catMatch = 'CFP';
+    else if (catId === 'tva') catMatch = 'TVA';
+    else if (catId === 'ir') catMatch = 'IR';
+
+    (data.detailChargesAPayer || []).forEach(function(c) {
+      if (c.cat === catMatch || (catId === 'ir' && (c.cat === 'IR' || c.cat === 'IR Estimé'))) {
+        transactions.push({ date: c.mois, label: c.desc || c.cat, montant: c.montant, status: 'à payer', id: c.id });
+      }
+    });
+    (data.detailChargesPayees || []).forEach(function(c) {
+      if (c.cat === catMatch || (catId === 'ir' && (c.cat === 'IR' || c.cat === 'IR Estimé'))) {
+        transactions.push({ date: c.mois, label: c.desc || c.cat, montant: c.montant, status: 'payé', id: c.id });
+      }
+    });
+  }
+
+  var modal = $('#formModal');
+  $('#formModalTitle').textContent = '📋 ' + subLabel + ' - Détail';
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+
+  if (transactions.length === 0) {
+    body.appendChild(el('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-muted)' } }, 'Aucune écriture'));
+    return;
+  }
+
+  // Liste des transactions
+  transactions.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
+
+  var list = el('div', { style: { maxHeight: '400px', overflowY: 'auto' } });
+  var total = 0;
+
+  transactions.forEach(function(t) {
+    total += t.montant;
+    var row = el('div', { style: {
+      display: 'flex', alignItems: 'center', padding: '10px', marginBottom: '8px',
+      background: 'var(--bg-tertiary)', borderRadius: '8px', gap: '12px'
+    }});
+
+    row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', minWidth: '60px' } }, t.date ? fmtMonthShort(t.date) : '-'));
+    row.appendChild(el('div', { style: { flex: 1, fontSize: '12px' } }, t.label));
+    row.appendChild(el('div', { style: { fontWeight: '700', fontSize: '12px' } }, EUR(t.montant)));
+
+    var statusColor = t.status === 'payé' || t.status === 'payée' ? 'var(--success)' : 'var(--warning)';
+    row.appendChild(el('div', { style: { fontSize: '9px', padding: '2px 6px', background: statusColor, color: 'white', borderRadius: '4px' } }, t.status));
+
+    // Bouton toggle si à payer
+    if (t.status === 'à payer' && t.id) {
+      row.appendChild(el('button', { class: 'btn btn-sm', style: { fontSize: '10px' }, onclick: function(e) {
+        e.stopPropagation();
+        TREASURY.paidCharges[t.id] = true;
+        saveAll();
+        COMPUTED = compute();
+        render();
+        toast('Marqué payé', 'success');
+      }}, '✓'));
+    }
+
+    list.appendChild(row);
+  });
+
+  body.appendChild(list);
+
+  // Total
+  body.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '12px', marginTop: '12px', background: 'var(--bg-secondary)', borderRadius: '8px', fontWeight: '700' } }, [
+    el('span', {}, 'Total'),
+    el('span', {}, EUR(total))
+  ]));
+}
+
 function renderFacturesContent(container) {
   var data = compute();
 
@@ -10455,74 +10860,329 @@ function renderFacturesContent(container) {
 
 function renderTresorerieContent(container) {
   var data = compute();
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var selectedMonth = PERIOD.month !== null ? ym(PERIOD.year, PERIOD.month) : nowYm;
 
-  // SOLDE COMPTE en premier (ABSOLU)
-  var soldeCard = el('div', { class: 'hero', style: { cursor: 'pointer' }, onclick: showCashDetail });
-  var soldeMain = el('div', { class: 'hero-main' });
-  soldeMain.appendChild(el('div', { class: 'hero-label' }, 'Solde Compte Pro'));
-  soldeMain.appendChild(el('div', { class: 'hero-value ' + (data.soldeAbsolu >= 0 ? 'positive' : 'negative') }, EUR(data.soldeAbsolu)));
-  soldeCard.appendChild(soldeMain);
-  container.appendChild(soldeCard);
+  // V72: Calculer projection salaire pour chaque mois de l'année
+  var months = [];
+  for (var m = 0; m < 12; m++) months.push(ym(PERIOD.year, m));
+  var salaireProjections = computeSalaireProjections(months, data);
 
-  // Actions rapides
-  var actions = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } });
-  actions.appendChild(el('button', { class: 'btn btn-sm', style: { flex: 1 }, onclick: showChargeModal }, '📋 Charge'));
-  actions.appendChild(el('button', { class: 'btn btn-sm btn-success', style: { flex: 1 }, onclick: function() { showSalaireModal(data.salaireReco); } }, '💸 Salaire'));
-  container.appendChild(actions);
+  // V72: Données du mois sélectionné pour le donut
+  var monthData = getMonthFinancialData(selectedMonth, data);
 
-  // 4 blocs en grille
+  // === SECTION 1: KPI HERO ===
+  var heroSection = el('div', { style: { marginBottom: '16px' } });
+
+  // Solde compte + Cash dispo
+  var heroGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' } });
+
+  var soldeCard = el('div', { class: 'treso-item', style: { cursor: 'pointer' }, onclick: showCashDetail });
+  soldeCard.appendChild(el('div', { class: 'treso-item-value ' + (data.soldeAbsolu >= 0 ? 'text-success' : 'text-danger') }, EUR(data.soldeAbsolu)));
+  soldeCard.appendChild(el('div', { class: 'treso-item-label' }, '🏦 Solde Compte'));
+  heroGrid.appendChild(soldeCard);
+
+  var cashCard = el('div', { class: 'treso-item' });
+  cashCard.appendChild(el('div', { class: 'treso-item-value ' + (data.cashDispoAbsolu >= 0 ? 'text-success' : 'text-danger') }, EUR(data.cashDispoAbsolu)));
+  cashCard.appendChild(el('div', { class: 'treso-item-label' }, '💎 Cash Disponible'));
+  heroGrid.appendChild(cashCard);
+
+  heroSection.appendChild(heroGrid);
+  container.appendChild(heroSection);
+
+  // === SECTION 2: GRAPHIQUE PROJECTION SALAIRE ===
+  var chartCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+  chartCard.appendChild(el('div', { class: 'card-title' }, '📈 Projection Salaire ' + PERIOD.year));
+  chartCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Salaire versable par mois (réalisé + projection)'));
+
+  // Graphique barre simplifiée (sans Chart.js pour éviter dépendance)
+  var chartContainer = el('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '4px', height: '140px', padding: '8px 0' } });
+  var maxSal = Math.max.apply(null, salaireProjections.map(function(s) { return s.salaire; })) || 2000;
+
+  salaireProjections.forEach(function(proj, idx) {
+    var isPast = proj.ym < nowYm;
+    var isCurrent = proj.ym === nowYm;
+    var isFuture = proj.ym > nowYm;
+    var isSelected = proj.ym === selectedMonth;
+    var height = maxSal > 0 ? Math.max(4, (proj.salaire / maxSal) * 100) : 4;
+
+    var barColor = isPast ? 'rgba(96,165,250,0.6)' : isCurrent ? 'var(--accent)' : 'rgba(167,139,250,0.5)';
+    if (proj.salaire <= 0) barColor = 'var(--bg-tertiary)';
+
+    var bar = el('div', { style: {
+      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer'
+    }, onclick: function() {
+      PERIOD.month = idx;
+      render();
+    }});
+
+    // Montant au-dessus
+    if (proj.salaire > 0) {
+      bar.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)', marginBottom: '2px' } }, (proj.salaire / 1000).toFixed(1) + 'k'));
+    }
+
+    // Barre
+    bar.appendChild(el('div', { style: {
+      width: '100%', height: height + '%', background: barColor,
+      borderRadius: '4px 4px 0 0', transition: 'height 0.3s',
+      border: isSelected ? '2px solid var(--accent)' : 'none',
+      boxShadow: isSelected ? '0 0 8px rgba(139,92,246,0.5)' : 'none'
+    }}));
+
+    // Label mois
+    bar.appendChild(el('div', { style: {
+      fontSize: '9px', marginTop: '4px',
+      color: isSelected ? 'var(--accent)' : isCurrent ? 'var(--text-primary)' : 'var(--text-muted)',
+      fontWeight: isSelected || isCurrent ? '700' : '400'
+    }}, fmtMonthShort(proj.ym).substring(0, 3)));
+
+    chartContainer.appendChild(bar);
+  });
+
+  chartCard.appendChild(chartContainer);
+
+  // Légende
+  var legend = el('div', { style: { display: 'flex', gap: '16px', justifyContent: 'center', fontSize: '9px', color: 'var(--text-muted)' } });
+  legend.appendChild(el('span', {}, '● Réalisé'));
+  legend.appendChild(el('span', { style: { color: 'rgba(167,139,250,0.8)' } }, '● Projection'));
+  chartCard.appendChild(legend);
+
+  container.appendChild(chartCard);
+
+  // === SECTION 3: DONUT COMPOSITION MOIS + KPI CENTRAL ===
+  var donutCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+  donutCard.appendChild(el('div', { class: 'card-title' }, '🍩 Composition - ' + fmtMonth(selectedMonth)));
+
+  var donutContainer = el('div', { style: { display: 'flex', alignItems: 'center', gap: '20px', padding: '16px 0' } });
+
+  // Donut (simulé avec divs CSS)
+  var donutSize = 140;
+  var donutWrapper = el('div', { style: {
+    width: donutSize + 'px', height: donutSize + 'px', position: 'relative', flexShrink: 0
+  }});
+
+  // Calculer les segments du donut
+  var segments = [
+    { label: 'CA HT', value: monthData.caHT, color: 'var(--success)' },
+    { label: 'Charges', value: monthData.charges, color: 'var(--danger)' },
+    { label: 'Provisions', value: monthData.provisions, color: 'var(--warning)' },
+    { label: 'Salaires', value: monthData.salaires, color: 'var(--info)' }
+  ];
+  var total = segments.reduce(function(sum, s) { return sum + s.value; }, 0) || 1;
+
+  // Dessiner le donut avec conic-gradient
+  var gradientParts = [];
+  var cumul = 0;
+  segments.forEach(function(s) {
+    if (s.value > 0) {
+      var pct = (s.value / total) * 100;
+      gradientParts.push(s.color + ' ' + cumul + '% ' + (cumul + pct) + '%');
+      cumul += pct;
+    }
+  });
+
+  var donutBg = gradientParts.length > 0 ? 'conic-gradient(' + gradientParts.join(', ') + ')' : 'var(--bg-tertiary)';
+
+  var donutOuter = el('div', { style: {
+    width: '100%', height: '100%', borderRadius: '50%', background: donutBg
+  }});
+
+  // Centre du donut (trou)
+  var donutCenter = el('div', { style: {
+    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+    width: (donutSize * 0.65) + 'px', height: (donutSize * 0.65) + 'px',
+    borderRadius: '50%', background: 'var(--bg-primary)',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+  }});
+
+  // KPI Central: Rémunération recommandée
+  var recoSalaire = monthData.salaireReco;
+  donutCenter.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Versable'));
+  donutCenter.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--accent)' } }, EUR(recoSalaire)));
+
+  donutWrapper.appendChild(donutOuter);
+  donutWrapper.appendChild(donutCenter);
+  donutContainer.appendChild(donutWrapper);
+
+  // Légende donut
+  var donutLegend = el('div', { style: { flex: 1 } });
+  segments.forEach(function(s) {
+    if (s.value > 0) {
+      var pct = Math.round((s.value / total) * 100);
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } });
+      row.appendChild(el('div', { style: { width: '12px', height: '12px', borderRadius: '3px', background: s.color } }));
+      row.appendChild(el('div', { style: { flex: 1, fontSize: '11px' } }, s.label));
+      row.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600' } }, EUR(s.value)));
+      row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, pct + '%'));
+      donutLegend.appendChild(row);
+    }
+  });
+  donutContainer.appendChild(donutLegend);
+
+  donutCard.appendChild(donutContainer);
+  container.appendChild(donutCard);
+
+  // === SECTION 4: ACTIONS DE GESTION ===
+  var actionsCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
+  actionsCard.appendChild(el('div', { class: 'card-title' }, '⚡ Actions - ' + fmtMonth(selectedMonth)));
+
+  // Bouton verser salaire
+  var salaireRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  salaireRow.appendChild(el('div', { style: { flex: 1 } }, [
+    el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '💸 Verser un salaire'),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Recommandé: ' + EUR(recoSalaire))
+  ]));
+  var salaireInput = el('input', { type: 'number', class: 'form-input', style: { width: '100px', fontSize: '12px' }, value: recoSalaire, placeholder: 'Montant' });
+  salaireRow.appendChild(salaireInput);
+  salaireRow.appendChild(el('button', { class: 'btn btn-success btn-sm', onclick: function() {
+    var montant = parseFloat(salaireInput.value) || 0;
+    if (montant <= 0) { toast('Montant invalide', 'error'); return; }
+    TREASURY.salaires = TREASURY.salaires || {};
+    TREASURY.salaires[selectedMonth] = (TREASURY.salaires[selectedMonth] || 0) + montant;
+    saveAll();
+    COMPUTED = compute();
+    render();
+    toast('Salaire de ' + EUR(montant) + ' versé!', 'success');
+  }}, '✓ Verser'));
+  actionsCard.appendChild(salaireRow);
+
+  // Liste des charges du mois avec toggle provision/payé
+  var chargesMois = getChargesForMonth(selectedMonth, data);
+  if (chargesMois.length > 0) {
+    actionsCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '8px', color: 'var(--text-muted)' } }, '📋 Charges du mois'));
+
+    chargesMois.forEach(function(c) {
+      var isPaid = TREASURY.paidCharges && TREASURY.paidCharges[c.id];
+      var row = el('div', { style: {
+        display: 'flex', alignItems: 'center', gap: '10px', padding: '10px',
+        background: isPaid ? 'rgba(34,197,94,0.1)' : 'var(--bg-tertiary)',
+        borderRadius: '6px', marginBottom: '6px'
+      }});
+
+      row.appendChild(el('div', { style: { flex: 1 } }, [
+        el('div', { style: { fontSize: '12px', fontWeight: '600' } }, c.cat),
+        el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, c.desc || '')
+      ]));
+
+      row.appendChild(el('div', { style: { fontWeight: '700', fontSize: '12px' } }, EUR(c.montant)));
+
+      // Toggle button
+      var toggleBtn = el('button', { class: 'btn btn-sm ' + (isPaid ? '' : 'btn-success'), onclick: function() {
+        if (isPaid) {
+          delete TREASURY.paidCharges[c.id];
+        } else {
+          TREASURY.paidCharges = TREASURY.paidCharges || {};
+          TREASURY.paidCharges[c.id] = true;
+        }
+        saveAll();
+        COMPUTED = compute();
+        render();
+        toast(isPaid ? 'Remis en provision' : 'Marqué payé', 'success');
+      }}, isPaid ? '↩ Provision' : '✓ Payé');
+      row.appendChild(toggleBtn);
+
+      actionsCard.appendChild(row);
+    });
+  }
+
+  container.appendChild(actionsCard);
+
+  // === SECTION 5: GRILLE RÉSUMÉ ===
   var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' } });
 
-  // Solde Initial (éditable)
-  var soldeInitBlock = el('div', { class: 'treso-item', onclick: function() { showEditSoldeInitial(); } });
+  var soldeInitBlock = el('div', { class: 'treso-item', onclick: showEditSoldeInitial });
   soldeInitBlock.appendChild(el('div', { class: 'treso-item-value' }, EUR(TREASURY.soldeInitial)));
   soldeInitBlock.appendChild(el('div', { class: 'treso-item-label' }, '🏦 Solde Initial'));
   soldeInitBlock.appendChild(el('div', { class: 'treso-item-count' }, '✏️ Modifier'));
   grid.appendChild(soldeInitBlock);
 
-  // Encaissé
-  var encBlock = el('div', { class: 'treso-item', onclick: function() { showDetailList('Factures Encaissées', data.detailEncaisse, 'success', function(i) { return i.client + ' · ' + fmtMonthShort(i.mois); }); } });
-  encBlock.appendChild(el('div', { class: 'treso-item-value text-success' }, EUR(data.caEnc)));
-  encBlock.appendChild(el('div', { class: 'treso-item-label' }, '💵 Encaissé TTC'));
-  encBlock.appendChild(el('div', { class: 'treso-item-count' }, data.detailEncaisse.length + ' factures'));
-  grid.appendChild(encBlock);
-
-  // Charges Payées
-  var chargesBlock = el('div', { class: 'treso-item', onclick: function() { showDetailList('Charges Payées', data.detailChargesPayees, 'danger', function(i) { return i.cat + (i.source ? ' · ' + i.source : ''); }); } });
-  chargesBlock.appendChild(el('div', { class: 'treso-item-value text-danger' }, EUR(data.chargesPayees)));
-  chargesBlock.appendChild(el('div', { class: 'treso-item-label' }, '📋 Charges Payées'));
-  chargesBlock.appendChild(el('div', { class: 'treso-item-count' }, data.detailChargesPayees.length + ' lignes'));
-  grid.appendChild(chargesBlock);
-
-  // Salaires versés
-  var salairesBlock = el('div', { class: 'treso-item', onclick: function() { showDetailList('Salaires Versés', data.detailSalaires, 'info', function(i) { return fmtMonthShort(i.mois); }); } });
-  salairesBlock.appendChild(el('div', { class: 'treso-item-value text-info' }, EUR(data.salaires)));
-  salairesBlock.appendChild(el('div', { class: 'treso-item-label' }, '💸 Salaires'));
-  salairesBlock.appendChild(el('div', { class: 'treso-item-count' }, data.detailSalaires.length + ' versements'));
-  grid.appendChild(salairesBlock);
-
-  container.appendChild(grid);
-
-  // Indicateurs disponibilité
-  container.appendChild(SectionTitle('📊', 'Disponibilité'));
-
-  var dispoGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' } });
-
-  // Tréso Dispo
-  var dispoBlock = el('div', { class: 'treso-item' });
-  dispoBlock.appendChild(el('div', { class: 'treso-item-value ' + (data.tresoDispo >= 0 ? 'text-success' : 'text-danger') }, EUR(data.tresoDispo)));
-  dispoBlock.appendChild(el('div', { class: 'treso-item-label' }, '💚 Tréso Dispo'));
-  dispoBlock.appendChild(el('div', { class: 'treso-item-count' }, 'Après provisions'));
-  dispoGrid.appendChild(dispoBlock);
-
-  // Autonomie
   var autoBlock = el('div', { class: 'treso-item' });
   autoBlock.appendChild(el('div', { class: 'treso-item-value', style: { color: data.autonomieMois >= 6 ? 'var(--success)' : data.autonomieMois >= 3 ? 'var(--warning)' : 'var(--danger)' } }, data.autonomieMois + ' mois'));
   autoBlock.appendChild(el('div', { class: 'treso-item-label' }, '⏱️ Autonomie'));
   autoBlock.appendChild(el('div', { class: 'treso-item-count' }, 'Sans nouveau CA'));
-  dispoGrid.appendChild(autoBlock);
+  grid.appendChild(autoBlock);
 
-  container.appendChild(dispoGrid);
+  container.appendChild(grid);
+}
+
+// V72: Calculer projection salaire pour chaque mois
+function computeSalaireProjections(months, data) {
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var projections = [];
+
+  // Calcul cumulatif simulé pour projection
+  var runningCash = TREASURY.soldeInitial || 0;
+
+  months.forEach(function(m) {
+    var monthInfo = data.monthsData ? data.monthsData[m] : null;
+    var salaire = 0;
+
+    if (m <= nowYm && monthInfo) {
+      // Mois passé ou en cours: salaire réellement versé
+      salaire = monthInfo.salaires || 0;
+      runningCash += (monthInfo.encaisse || 0) - (monthInfo.charges || 0) - salaire;
+    } else {
+      // Mois futur: projection
+      var futureCA = 0, futureCharges = 0;
+      MISSIONS.forEach(function(mis) {
+        if (!mis.lignes) return;
+        mis.lignes.forEach(function(l) {
+          if (l.ym !== m) return;
+          var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+          futureCA += jours * mis.tjm;
+          var rate = getUrssafRate(m);
+          futureCharges += Math.round(jours * mis.tjm * (rate + LEGAL.cfp));
+        });
+      });
+
+      runningCash += futureCA - futureCharges;
+      // Projection: on peut verser 70% du cash restant
+      salaire = Math.max(0, Math.round(runningCash * 0.7 / 100) * 100);
+      runningCash -= salaire;
+    }
+
+    projections.push({ ym: m, salaire: salaire });
+  });
+
+  return projections;
+}
+
+// V72: Données financières d'un mois spécifique
+function getMonthFinancialData(monthYm, data) {
+  var monthInfo = data.monthsData ? data.monthsData[monthYm] : {};
+  var caHT = monthInfo ? monthInfo.encaisse || 0 : 0;
+  var charges = monthInfo ? monthInfo.charges || 0 : 0;
+  var salaires = monthInfo ? monthInfo.salaires || 0 : 0;
+
+  // Provisions du mois
+  var provisions = 0;
+  if (data.detailChargesAPayer) {
+    data.detailChargesAPayer.forEach(function(c) {
+      if (c.mois === monthYm) provisions += c.montant;
+    });
+  }
+
+  // Salaire recommandé = cash dispo après charges - marge sécurité
+  var disponible = caHT - charges - provisions;
+  var salaireReco = Math.max(0, Math.round(disponible * 0.8 / 100) * 100);
+
+  return { caHT: caHT, charges: charges, provisions: provisions, salaires: salaires, salaireReco: salaireReco };
+}
+
+// V72: Récupérer les charges d'un mois spécifique
+function getChargesForMonth(monthYm, data) {
+  var charges = [];
+  if (data.detailChargesAPayer) {
+    data.detailChargesAPayer.forEach(function(c) {
+      if (c.mois === monthYm) charges.push(c);
+    });
+  }
+  if (data.detailChargesPayees) {
+    data.detailChargesPayees.forEach(function(c) {
+      if (c.mois === monthYm) charges.push(c);
+    });
+  }
+  return charges;
 }
 
 function renderParams(container) {
@@ -11842,6 +12502,9 @@ function render() {
   $$('.nav-tab, .bottom-nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === VIEW); });
   var periodYear = $('#periodYear');
   if (periodYear) periodYear.textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
+  // V72: Synchroniser le dropdown mois
+  var monthFilter = $('#monthFilter');
+  if (monthFilter) monthFilter.value = PERIOD.month !== null && PERIOD.month !== undefined ? String(PERIOD.month) : '';
   updateNotifBadge();
 
   // V61: Dessiner les graphiques après le render si onglet Performance
@@ -12008,11 +12671,21 @@ function init() {
   });
   
   // Period
-  $('#prevYear').onclick = function() { PERIOD.year--; PERIOD.type = 'year'; TIMELINE_IDX = null; render(); };
-  $('#nextYear').onclick = function() { PERIOD.year++; PERIOD.type = 'year'; TIMELINE_IDX = null; render(); };
-  $('#periodYear').onclick = function() { PERIOD.type = 'year'; $$('.period-input').forEach(function(i) { i.style.display = 'none'; }); render(); };
+  $('#prevYear').onclick = function() { PERIOD.year--; PERIOD.type = 'year'; PERIOD.month = null; $('#monthFilter').value = ''; TIMELINE_IDX = null; render(); };
+  $('#nextYear').onclick = function() { PERIOD.year++; PERIOD.type = 'year'; PERIOD.month = null; $('#monthFilter').value = ''; TIMELINE_IDX = null; render(); };
+  $('#periodYear').onclick = function() { PERIOD.type = 'year'; PERIOD.month = null; $('#monthFilter').value = ''; $$('.period-input').forEach(function(i) { i.style.display = 'none'; }); render(); };
+  // V72: Filtre mensuel
+  $('#monthFilter').onchange = function() {
+    var val = this.value;
+    PERIOD.type = 'year';
+    PERIOD.month = val === '' ? null : parseInt(val);
+    TIMELINE_IDX = null;
+    render();
+  };
   $('#periodCustomBtn').onclick = function() {
     PERIOD.type = 'custom';
+    PERIOD.month = null; // V72: Reset month filter
+    $('#monthFilter').value = '';
     PERIOD.start = PERIOD.start || ym(TODAY.getFullYear(), 0);
     PERIOD.end = PERIOD.end || ym(TODAY.getFullYear(), 11);
     $('#periodStart').value = PERIOD.start;
