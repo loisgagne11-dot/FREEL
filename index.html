@@ -3902,17 +3902,18 @@ function compute() {
     }
   });
   
-  // V72: IR estimé - distribuer sur les mois avec CA prévu/réalisé
+  // V72: IR estimé - distribuer sur les mois avec travail (réalisé + prévu)
   if (!COMPANY.prelevementLiberatoire) {
     var periodYear = parseInt(months[0].split('-')[0]);
     var irData = getIRForYear(periodYear);
     if (irData.impot > 0) {
-      // Collecter les mois avec CA (encaissé + réalisé + prévu)
+      // Collecter les mois avec CA HT (réalisé + prévu seulement, pas encaissé pour éviter double comptage)
       var monthsWithCA = [];
       var totalCAForIR = 0;
       months.forEach(function(m) {
         var md = data.monthsData[m];
-        var monthCA = md.enc + md.real + md.prev;
+        // Utiliser uniquement real + prev (travail effectué/planifié), PAS enc (qui est TTC et double compte)
+        var monthCA = (md.real || 0) + (md.prev || 0);
         if (monthCA > 0) {
           monthsWithCA.push({ month: m, ca: monthCA });
           totalCAForIR += monthCA;
@@ -3925,7 +3926,7 @@ function compute() {
         totalCAForIR = 1;
       }
 
-      // Distribuer l'IR proportionnellement au CA de chaque mois
+      // Distribuer l'IR proportionnellement au CA HT de chaque mois
       var irDistributed = 0;
       monthsWithCA.forEach(function(mca, idx) {
         var irPart = idx === monthsWithCA.length - 1
