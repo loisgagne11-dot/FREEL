@@ -1620,160 +1620,31 @@ var SEARCH_STATE = {
   tresorerie: { query: '', type: 'all', category: 'all' }
 };
 
-// ============================================================================
-// LEGAL - Valeurs légales versionnées par année et type d'activité
-// Sources: urssaf.fr, impots.gouv.fr, autoentrepreneur.urssaf.fr
-// ============================================================================
-var LEGAL_BY_YEAR = {
-  2025: {
-    // Cotisations URSSAF par type d'activité
-    urssaf: {
-      BNC:         { standard: 0.246, acre: 0.123 },  // Services libéraux
-      BIC_vente:   { standard: 0.124, acre: 0.062 },  // Vente de marchandises
-      BIC_service: { standard: 0.214, acre: 0.107 }   // Services artisanaux/commerciaux
-    },
-    // Formation professionnelle (CFP)
-    cfp: 0.002,
-    // Versement libératoire IR (optionnel si RFR < seuil)
-    prelevementLiberatoire: {
-      BNC: 0.022,         // 2.2%
-      BIC_vente: 0.01,    // 1.0%
-      BIC_service: 0.017  // 1.7%
-    },
-    // Abattement forfaitaire IR
-    abattement: {
-      BNC: 0.34,          // 34% (min 305€)
-      BIC_vente: 0.71,    // 71% (min 305€)
-      BIC_service: 0.50   // 50% (min 305€)
-    },
-    // Tranches IR (revenus 2025)
-    irBrackets: [
-      { max: 11294, rate: 0 },
-      { max: 28797, rate: 0.11 },
-      { max: 82341, rate: 0.30 },
-      { max: 177106, rate: 0.41 },
-      { max: Infinity, rate: 0.45 }
-    ],
-    // Plafonds CA
-    plafonds: {
-      BNC: 77700,
-      BIC_service: 77700,
-      BIC_vente: 188700
-    },
-    // TVA - Franchise en base
-    tva: {
-      rate: 0.20,
-      seuilService: 36800,
-      seuilServiceMajore: 39100,
-      seuilVente: 91900,
-      seuilVenteMajore: 101000
-    },
-    // ACRE
-    acreDureeQuarters: 4
-  },
-  2026: {
-    // Cotisations URSSAF par type d'activité - TAUX 2026 CONFIRMÉS
-    urssaf: {
-      BNC:         { standard: 0.256, acre: 0.128 },  // 25.6% / 12.8%
-      BIC_vente:   { standard: 0.132, acre: 0.066 },  // 13.2% / 6.6%
-      BIC_service: { standard: 0.232, acre: 0.116 }   // 23.2% / 11.6%
-    },
-    cfp: 0.002,
-    prelevementLiberatoire: {
-      BNC: 0.022,
-      BIC_vente: 0.01,
-      BIC_service: 0.017
-    },
-    abattement: {
-      BNC: 0.34,
-      BIC_vente: 0.71,
-      BIC_service: 0.50
-    },
-    // Tranches IR 2026 (barème revu - source: projet LFI 2026)
-    irBrackets: [
-      { max: 11497, rate: 0 },
-      { max: 29315, rate: 0.11 },
-      { max: 83823, rate: 0.30 },
-      { max: 180294, rate: 0.41 },
-      { max: Infinity, rate: 0.45 }
-    ],
-    plafonds: {
-      BNC: 77700,
-      BIC_service: 77700,
-      BIC_vente: 188700
-    },
-    tva: {
-      rate: 0.20,
-      seuilService: 37500,       // Nouveau seuil 2026
-      seuilServiceMajore: 41250, // Nouveau seuil majoré 2026
-      seuilVente: 85000,         // Nouveau seuil 2026
-      seuilVenteMajore: 93500    // Nouveau seuil majoré 2026
-    },
-    acreDureeQuarters: 4
-  }
+// Taux officiels URSSAF - Sources: urssaf.fr, décret 2025-943
+// V51: Taux officiels 2026 confirmés (source: autoentrepreneur.urssaf.fr)
+var LEGAL = {
+  // Cotisations URSSAF BNC (prestations de services libérales)
+  urssafStd2025: 0.246,    // 24.6% - 2025
+  urssafStd2026: 0.256,    // 25.6% - 2026 (confirmé URSSAF)
+  urssafAcre2025: 0.123,   // 12.3% - ACRE 2025 (50% du taux standard)
+  urssafAcre2026: 0.128,   // 12.8% - ACRE 2026 (50% du taux standard)
+  cfp: 0.002,              // 0.2% - Formation professionnelle (CFP)
+  impLib: 0.022,           // 2.2% - Versement libératoire IR (BNC)
+  tvaRate: 0.20,           // 20% - TVA taux normal
+
+  // Plafonds micro-entreprise 2025/2026
+  plafondBNC: 77700,       // CA max prestations de services / BNC
+  plafondVente: 188700,    // CA max vente de marchandises
+  seuilTVA: 36800,         // Seuil franchise TVA (services)
+  seuilTVAMajore: 39100,   // Seuil majoré (perte franchise)
+  seuilTVAVente: 91900,    // Seuil franchise TVA (vente)
+  seuilTVAVenteMajore: 101000, // Seuil majoré vente
+
+  // ACRE: 4 trimestres civils (trimestre de création inclus)
+  acreDureeQuarters: 4,
+
+  lastUpdated: '2026-02-11'
 };
-
-// Fonction helper pour obtenir les valeurs légales d'une année
-function getLegal(year) {
-  return LEGAL_BY_YEAR[year] || LEGAL_BY_YEAR[2026]; // Fallback sur 2026
-}
-
-// Fonction helper pour obtenir le taux URSSAF
-function getLegalUrssaf(year, typeActivite, hasAcre) {
-  var legal = getLegal(year);
-  var type = typeActivite || 'BNC';
-  var rates = legal.urssaf[type] || legal.urssaf.BNC;
-  return hasAcre ? rates.acre : rates.standard;
-}
-
-// Fonction helper pour obtenir l'abattement IR
-function getLegalAbattement(year, typeActivite) {
-  var legal = getLegal(year);
-  return legal.abattement[typeActivite || 'BNC'] || 0.34;
-}
-
-// Fonction helper pour obtenir les tranches IR
-function getLegalIRBrackets(year) {
-  return getLegal(year).irBrackets;
-}
-
-// Fonction helper pour obtenir les seuils TVA
-function getLegalTVA(year, typeActivite) {
-  var legal = getLegal(year);
-  var isVente = typeActivite === 'BIC_vente';
-  return {
-    rate: legal.tva.rate,
-    seuil: isVente ? legal.tva.seuilVente : legal.tva.seuilService,
-    seuilMajore: isVente ? legal.tva.seuilVenteMajore : legal.tva.seuilServiceMajore
-  };
-}
-
-// Rétro-compatibilité: LEGAL pointe vers les valeurs de l'année courante
-var CURRENT_YEAR = new Date().getFullYear();
-var LEGAL = (function() {
-  var l = getLegal(CURRENT_YEAR);
-  var type = (typeof COMPANY !== 'undefined' && COMPANY.typeActivite) || 'BNC';
-  return {
-    urssaf: l.urssaf[type].standard,
-    urssafAcre: l.urssaf[type].acre,
-    cfp: l.cfp,
-    impLib: l.prelevementLiberatoire[type],
-    tvaRate: l.tva.rate,
-    plafondBNC: l.plafonds.BNC,
-    plafondVente: l.plafonds.BIC_vente,
-    seuilTVA: l.tva.seuilService,
-    seuilTVAMajore: l.tva.seuilServiceMajore,
-    seuilTVAVente: l.tva.seuilVente,
-    seuilTVAVenteMajore: l.tva.seuilVenteMajore,
-    acreDureeQuarters: l.acreDureeQuarters,
-    // Accès direct aux taux par année (rétro-compat)
-    urssafStd2025: 0.246,
-    urssafStd2026: 0.256,
-    urssafAcre2025: 0.123,
-    urssafAcre2026: 0.128,
-    lastUpdated: '2026-02-23'
-  };
-})();
 
 var SCENARIOS = {
   nominal: { id: 'nominal', label: 'Nominal', icon: '⚡', desc: 'Plein régime', vacationWeeks: 0, intercontratMonths: 0 },
@@ -1781,14 +1652,14 @@ var SCENARIOS = {
   recherche: { id: 'recherche', label: 'Prudent', icon: '🔍', desc: 'Intercontrat', vacationWeeks: 5, intercontratMonths: 2 }
 };
 
-// Rétro-compatibilité IR_BRACKETS
-var IR_BRACKETS = getLegalIRBrackets(CURRENT_YEAR);
+var IR_BRACKETS = [
+  { max: 11294, rate: 0 }, { max: 28797, rate: 0.11 }, { max: 82341, rate: 0.30 }, { max: 177106, rate: 0.41 }, { max: Infinity, rate: 0.45 }
+];
 
 var COMPANY = {
   nom: 'Loïs MUSIC',
   siret: '92859030500015',
   debut: '2025-03-02',
-  typeActivite: 'BNC',  // 'BNC' | 'BIC_vente' | 'BIC_service'
   acre: true,
   prelevementLiberatoire: false,
   tvaDepuis: '2025-10',
@@ -2597,17 +2468,16 @@ function getAcreInfo() {
   return { active: daysLeft > 0, expiryDate: localISO(expiryDate), expiryYm: expiryYm, startYm: startYm, daysLeft: daysLeft };
 }
 
-// Taux URSSAF dynamique selon mois, ACRE et type d'activité
+// Taux URSSAF dynamique selon mois et ACRE
 function getUrssafRate(monthYm) {
   var year = monthYm ? parseInt(monthYm.substring(0, 4)) : TODAY.getFullYear();
   var acre = getAcreInfo();
-  var typeActivite = COMPANY.typeActivite || 'BNC';
 
   // Si ACRE configuré ET le mois est dans la période ACRE (entre startYm et expiryYm)
-  var hasAcre = COMPANY.acre && acre.expiryYm && monthYm && monthYm >= acre.startYm && monthYm <= acre.expiryYm;
-
-  // Utiliser la nouvelle fonction helper versionnée
-  return getLegalUrssaf(year, typeActivite, hasAcre);
+  if (COMPANY.acre && acre.expiryYm && monthYm && monthYm >= acre.startYm && monthYm <= acre.expiryYm) {
+    return year >= 2026 ? LEGAL.urssafAcre2026 : LEGAL.urssafAcre2025;
+  }
+  return year >= 2026 ? LEGAL.urssafStd2026 : LEGAL.urssafStd2025;
 }
 
 function isTVAApplicable(dateStr) {
@@ -2618,23 +2488,15 @@ function isTVAApplicable(dateStr) {
 function calculateIR(revenuBrut, year) {
   year = year || TODAY.getFullYear();
   var cfg = getIRConfig(year);
-  var typeActivite = COMPANY.typeActivite || 'BNC';
-
-  // V73: Utiliser l'abattement selon le type d'activité
-  var tauxAbattement = getLegalAbattement(year, typeActivite);
-  var abattement = Math.max(revenuBrut * tauxAbattement, 305); // Minimum 305€, PAS de plafond
-
+  var abattement = Math.max(revenuBrut * 0.34, 305); // Abattement 34% BNC, minimum 305€, PAS de plafond (correction V45)
   var revenuNet = revenuBrut - abattement - (cfg.perAnnuel || 0) + (cfg.autresRevenus || 0);
   var parts = cfg.parts || 1;
   var quotient = revenuNet / parts;
   var impotBrut = 0, prev = 0;
   var tranchesDetail = []; // Détail de chaque tranche
-
-  // V73: Utiliser les tranches IR de l'année spécifiée
-  var brackets = getLegalIRBrackets(year);
-
-  for (var i = 0; i < brackets.length; i++) {
-    var b = brackets[i];
+  
+  for (var i = 0; i < IR_BRACKETS.length; i++) {
+    var b = IR_BRACKETS[i];
     var trancheMin = prev;
     var trancheMax = b.max;
     var trancheBase = 0;
@@ -2662,10 +2524,10 @@ function calculateIR(revenuBrut, year) {
   }
   
   var tmi = 0;
-  for (var j = 0; j < brackets.length; j++) {
-    if (quotient <= brackets[j].max) { tmi = brackets[j].rate; break; }
+  for (var j = 0; j < IR_BRACKETS.length; j++) {
+    if (quotient <= IR_BRACKETS[j].max) { tmi = IR_BRACKETS[j].rate; break; }
   }
-  return { revenuNet: revenuNet, quotient: quotient, impot: Math.round(impotBrut * parts), tmi: tmi, parts: parts, perAnnuel: cfg.perAnnuel, autresRevenus: cfg.autresRevenus, tranches: tranchesDetail, abattement: abattement, tauxAbattement: tauxAbattement };
+  return { revenuNet: revenuNet, quotient: quotient, impot: Math.round(impotBrut * parts), tmi: tmi, parts: parts, perAnnuel: cfg.perAnnuel, autresRevenus: cfg.autresRevenus, tranches: tranchesDetail, abattement: abattement };
 }
 
 // V65: Source unique de vérité pour l'IR d'une année
