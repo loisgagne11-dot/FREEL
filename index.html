@@ -3655,9 +3655,16 @@ function loadAll() {
 }
 
 // Helper pour obtenir config IR d'une année
+// V73: Utilise les valeurs COMPANY comme défaut
 function getIRConfig(year) {
   var y = String(year);
-  if (!IR_CONFIG[y]) IR_CONFIG[y] = { parts: 1, autresRevenus: 0, perAnnuel: 0 };
+  if (!IR_CONFIG[y]) {
+    IR_CONFIG[y] = {
+      parts: COMPANY.quotientFamilial || 1,
+      autresRevenus: (COMPANY.autresRevenus || 0) + (COMPANY.revenusConjoint || 0),
+      perAnnuel: COMPANY.perAnnuel || 0
+    };
+  }
   return IR_CONFIG[y];
 }
 
@@ -7575,6 +7582,28 @@ function getAllYearMilestones() {
     addM(new Date(acre.expiryDate), 'Fin ACRE', '🎓', 'acre', 'Fin de l\'exonération ACRE - taux URSSAF plein');
   }
 
+  // V73: Fins de missions
+  MISSIONS.forEach(function(m) {
+    if (!m.fin) return;
+    var finDate = new Date(m.fin);
+    var finYear = finDate.getFullYear();
+    // Inclure si la fin est dans l'année courante ou proche (6 mois avant/après)
+    var monthsDiff = (finYear - year) * 12 + finDate.getMonth() - today.getMonth();
+    if (monthsDiff >= -2 && monthsDiff <= 12) {
+      milestones.push({
+        date: m.fin,
+        daysLeft: Math.ceil((finDate - today) / (1000 * 60 * 60 * 24)),
+        label: 'Fin ' + m.client,
+        icon: '💼',
+        cat: 'mission',
+        detail: 'Fin de mission ' + m.client + ' - Prévoir renouvellement ou nouvelle mission',
+        status: Math.ceil((finDate - today) / (1000 * 60 * 60 * 24)) < 0 ? 'passed' :
+                Math.ceil((finDate - today) / (1000 * 60 * 60 * 24)) <= 30 ? 'urgent' : 'upcoming',
+        missionId: m.id
+      });
+    }
+  });
+
   milestones.sort(function(a, b) {
     var da = new Date(a.date);
     var db = new Date(b.date);
@@ -9624,8 +9653,8 @@ function renderActionsAndMilestones(container) {
     timeline.appendChild(line);
 
     // Couleurs par catégorie
-    var catColors = { urssaf: '#10b981', tva: '#ec4899', ir: '#f59e0b', cfe: '#8b5cf6', acre: '#06b6d4' };
-    var catBg = { urssaf: 'rgba(16,185,129,0.12)', tva: 'rgba(236,72,153,0.12)', ir: 'rgba(245,158,11,0.12)', cfe: 'rgba(139,92,246,0.12)', acre: 'rgba(6,182,212,0.12)' };
+    var catColors = { urssaf: '#10b981', tva: '#ec4899', ir: '#f59e0b', cfe: '#8b5cf6', acre: '#06b6d4', mission: '#60a5fa' };
+    var catBg = { urssaf: 'rgba(16,185,129,0.12)', tva: 'rgba(236,72,153,0.12)', ir: 'rgba(245,158,11,0.12)', cfe: 'rgba(139,92,246,0.12)', acre: 'rgba(6,182,212,0.12)', mission: 'rgba(96,165,250,0.12)' };
 
     // Trouver le premier futur pour scroll auto
     var firstFutureIdx = -1;
@@ -12607,35 +12636,59 @@ function renderAdmin(container) {
   // Fiscal
   var fiscCard = el('div', { class: 'card' });
   fiscCard.appendChild(el('div', { class: 'card-title' }, '💶 Régime Fiscal'));
-  
+
+  // V73: Type d'activité
+  fiscCard.appendChild(createSelect('Type d\'activité', 'adminTypeActivite', [
+    { value: 'BNC', label: '📋 BNC - Prestations de services (libérales)' },
+    { value: 'BIC_service', label: '🔧 BIC Services - Prestations artisanales/commerciales' },
+    { value: 'BIC_vente', label: '🛒 BIC Vente - Vente de marchandises' }
+  ], COMPANY.typeActivite || 'BNC'));
+  fiscCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px', marginTop: '-8px' } }, 'Affecte les taux URSSAF et l\'abattement IR'));
+
   var acreRow = el('div', { class: 'toggle-row' });
   acreRow.appendChild(el('div', { class: 'toggle-label' }, 'ACRE actif'));
   var acreToggle = el('label', { class: 'toggle-switch' });
   acreToggle.innerHTML = '<input type="checkbox" id="adminAcre" ' + (COMPANY.acre ? 'checked' : '') + '><span class="toggle-slider"></span>';
   acreRow.appendChild(acreToggle);
   fiscCard.appendChild(acreRow);
-  
+
   var plRow = el('div', { class: 'toggle-row' });
   plRow.appendChild(el('div', { class: 'toggle-label' }, 'Prélèvement Libératoire'));
   var plToggle = el('label', { class: 'toggle-switch' });
   plToggle.innerHTML = '<input type="checkbox" id="adminPL" ' + (COMPANY.prelevementLiberatoire ? 'checked' : '') + '><span class="toggle-slider"></span>';
   plRow.appendChild(plToggle);
   fiscCard.appendChild(plRow);
-  
+
   fiscCard.appendChild(createInput('TVA depuis (laisser vide si non assujetti)', 'month', 'adminTVA', COMPANY.tvaDepuis || ''));
-  
+
   // Périodicité URSSAF
   fiscCard.appendChild(createSelect('Périodicité URSSAF', 'adminUrssafPeriod', [
     { value: 'mensuel', label: '📅 Mensuel (fin de chaque mois)' },
     { value: 'trimestriel', label: '📆 Trimestriel (30/04, 31/07, 31/10, 31/01)' }
   ], COMPANY.urssafPeriodicite || 'mensuel'));
-  
-  // Note sur l'IR
-  fiscCard.appendChild(el('div', { style: { marginTop: '12px', padding: '12px', background: 'var(--info-glow)', borderRadius: 'var(--radius-sm)', fontSize: '11px' } }, [
-    el('strong', {}, '💡 Simulation IR: '),
-    document.createTextNode('Clique sur la carte "IR Estimé" du dashboard pour configurer les paramètres (parts fiscales, PER, autres revenus) par année.')
-  ]));
-  
+
+  // V73: Paramètres IR
+  fiscCard.appendChild(el('div', { style: { marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' } }));
+  fiscCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '10px' } }, '📊 Paramètres Impôt sur le Revenu'));
+
+  var irRow = el('div', { class: 'form-row' });
+  irRow.appendChild(createSelect('Quotient familial', 'adminQuotientFamilial', [
+    { value: '1', label: '1 part - Célibataire' },
+    { value: '1.5', label: '1.5 parts - Célibataire + 1 enfant' },
+    { value: '2', label: '2 parts - Couple sans enfant' },
+    { value: '2.5', label: '2.5 parts - Couple + 1 enfant' },
+    { value: '3', label: '3 parts - Couple + 2 enfants' },
+    { value: '3.5', label: '3.5 parts - Couple + 3 enfants' },
+    { value: '4', label: '4 parts - Couple + 4 enfants' }
+  ], String(COMPANY.quotientFamilial || 1)));
+  irRow.appendChild(createInput('Revenus conjoint (€/an)', 'number', 'adminRevenusConjoint', COMPANY.revenusConjoint || 0, '0 si célibataire'));
+  fiscCard.appendChild(irRow);
+
+  var perRow = el('div', { class: 'form-row' });
+  perRow.appendChild(createInput('PER versé (€/an)', 'number', 'adminPER', COMPANY.perAnnuel || 0, 'Plan Épargne Retraite'));
+  perRow.appendChild(createInput('Autres revenus (€/an)', 'number', 'adminAutresRevenus', COMPANY.autresRevenus || 0, 'Revenus locatifs, etc.'));
+  fiscCard.appendChild(perRow);
+
   container.appendChild(fiscCard);
   
   // Trésorerie
@@ -12841,10 +12894,17 @@ function renderAdmin(container) {
     COMPANY.email = $('#adminEmail') ? $('#adminEmail').value : '';
     COMPANY.telephone = $('#adminTel') ? $('#adminTel').value : '';
     COMPANY.debut = $('#adminDebut').value;
+    // V73: Type activité
+    COMPANY.typeActivite = $('#adminTypeActivite') ? $('#adminTypeActivite').value : 'BNC';
     COMPANY.acre = $('#adminAcre').checked;
     COMPANY.prelevementLiberatoire = $('#adminPL').checked;
     COMPANY.tvaDepuis = $('#adminTVA').value || null;
     COMPANY.urssafPeriodicite = $('#adminUrssafPeriod') ? $('#adminUrssafPeriod').value : 'mensuel';
+    // V73: Paramètres IR
+    COMPANY.quotientFamilial = $('#adminQuotientFamilial') ? parseFloat($('#adminQuotientFamilial').value) : 1;
+    COMPANY.revenusConjoint = $('#adminRevenusConjoint') ? parseFloat($('#adminRevenusConjoint').value) || 0 : 0;
+    COMPANY.perAnnuel = $('#adminPER') ? parseFloat($('#adminPER').value) || 0 : 0;
+    COMPANY.autresRevenus = $('#adminAutresRevenus') ? parseFloat($('#adminAutresRevenus').value) || 0 : 0;
     if ($('#adminTVAIntracom')) COMPANY.tvaIntracom = $('#adminTVAIntracom').value || '';
     if ($('#adminIBAN')) COMPANY.iban = $('#adminIBAN').value || '';
     if ($('#adminBIC')) COMPANY.bic = $('#adminBIC').value || '';
