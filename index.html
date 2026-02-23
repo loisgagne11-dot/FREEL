@@ -1374,7 +1374,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 67; // V67: Provisions par type + édition/suppression mouvements
+var APP_VERSION = 73; // V73: Navigation 4 onglets, LEGAL versionné, Config fiscale, Simulateurs IR/CFE, Cloud Sync UI
 var TODAY = new Date();
 var VIEW = 'cockpit';  // V73: cockpit, activite, finances, config
 var ACTIVITE_TAB = 'missions'; // V73: sous-onglets activité (missions, factures)
@@ -1410,17 +1410,50 @@ var ACTIVITE_TAB = 'missions'; // V73: sous-onglets activité (missions, facture
     FOR ALL USING (auth.uid() = user_id);
 */
 
-var SUPABASE_URL = ''; // À remplir avec ton URL Supabase
-var SUPABASE_ANON_KEY = ''; // À remplir avec ta clé anon
+var SUPABASE_URL = ''; // Chargé depuis localStorage
+var SUPABASE_ANON_KEY = ''; // Chargé depuis localStorage
 var supabase = null;
 var CURRENT_USER = null;
 var SYNC_ENABLED = false;
 
+// V73: Charger les credentials Supabase depuis localStorage
+function loadSupabaseCredentials() {
+  try {
+    var stored = localStorage.getItem('freel_supabase');
+    if (stored) {
+      var creds = JSON.parse(stored);
+      SUPABASE_URL = creds.url || '';
+      SUPABASE_ANON_KEY = creds.key || '';
+    }
+  } catch (e) {
+    console.error('Erreur chargement credentials Supabase:', e);
+  }
+}
+
+// V73: Sauvegarder les credentials Supabase
+function saveSupabaseCredentials(url, key) {
+  try {
+    localStorage.setItem('freel_supabase', JSON.stringify({ url: url, key: key }));
+    SUPABASE_URL = url;
+    SUPABASE_ANON_KEY = key;
+    // Réinitialiser la connexion
+    supabase = null;
+    SYNC_ENABLED = false;
+    CURRENT_USER = null;
+    initSupabase();
+  } catch (e) {
+    console.error('Erreur sauvegarde credentials Supabase:', e);
+  }
+}
+
 function initSupabase() {
+  // V73: D'abord charger depuis localStorage
+  loadSupabaseCredentials();
+
   if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     SYNC_ENABLED = true;
-    
+
     // Écouter les changements d'auth
     supabase.auth.onAuthStateChange(function(event, session) {
       CURRENT_USER = session ? session.user : null;
@@ -1429,7 +1462,7 @@ function initSupabase() {
         loadFromCloud();
       }
     });
-    
+
     // Vérifier session existante
     supabase.auth.getSession().then(function(result) {
       if (result.data.session) {
@@ -1455,7 +1488,7 @@ function updateAuthUI() {
 
 function showAuthModal() {
   if (!SYNC_ENABLED) {
-    showToast('⚠️ Supabase non configuré. Voir Admin > Cloud Sync.', 'warning');
+    showToast('⚠️ Supabase non configuré. Voir ⚙️ Config > Cloud Sync.', 'warning');
     return;
   }
   
@@ -13186,7 +13219,100 @@ function renderAdmin(container) {
   ioCard.appendChild(clientsBtns);
   
   container.appendChild(ioCard);
-  
+
+  // V73: Cloud Sync Configuration
+  var cloudCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  cloudCard.appendChild(el('div', { class: 'card-title' }, '☁️ Cloud Sync (Supabase)'));
+
+  // Status indicator
+  var statusDiv = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  if (SYNC_ENABLED) {
+    if (CURRENT_USER) {
+      statusDiv.style.background = 'var(--success-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '✅'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--success)' } }, 'Connecté'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, CURRENT_USER.email)
+      ]));
+    } else {
+      statusDiv.style.background = 'var(--warning-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '⚡'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--warning)' } }, 'Configuré'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur 🔒 pour te connecter')
+      ]));
+    }
+  } else {
+    statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '❌'));
+    statusDiv.appendChild(el('div', {}, [
+      el('div', { style: { fontWeight: '600', color: 'var(--text-muted)' } }, 'Non configuré'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Configure ton projet Supabase ci-dessous')
+    ]));
+  }
+  cloudCard.appendChild(statusDiv);
+
+  // Instructions
+  var instructions = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.5' } });
+  instructions.innerHTML = '<b>Comment configurer:</b><br>' +
+    '1. Crée un compte gratuit sur <a href="https://supabase.com" target="_blank" style="color: var(--accent);">supabase.com</a><br>' +
+    '2. Crée un nouveau projet<br>' +
+    '3. Va dans Settings → API et copie l\'URL et la clé anon<br>' +
+    '4. Exécute le SQL ci-dessous dans SQL Editor';
+  cloudCard.appendChild(instructions);
+
+  // SQL snippet (collapsible)
+  var sqlToggle = el('details', { style: { marginBottom: '12px' } });
+  sqlToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--accent)' } }, '📋 Voir le SQL à exécuter'));
+  var sqlCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
+  sqlCode.textContent = 'CREATE TABLE user_data (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,\n  company JSONB,\n  missions JSONB,\n  treasury JSONB,\n  clients JSONB,\n  updated_at TIMESTAMP DEFAULT NOW()\n);\n\nALTER TABLE user_data ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Users can manage own data" ON user_data\n  FOR ALL USING (auth.uid() = user_id);';
+  sqlToggle.appendChild(sqlCode);
+  cloudCard.appendChild(sqlToggle);
+
+  // Configuration fields
+  cloudCard.appendChild(createInput('URL Supabase', 'url', 'cloudSupabaseUrl', SUPABASE_URL || '', 'https://xxx.supabase.co'));
+  cloudCard.appendChild(createInput('Clé Anon', 'text', 'cloudSupabaseKey', SUPABASE_ANON_KEY || '', 'eyJhbG...'));
+
+  // Save button
+  var cloudBtns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '12px' } });
+  cloudBtns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() {
+    var url = $('#cloudSupabaseUrl').value.trim();
+    var key = $('#cloudSupabaseKey').value.trim();
+    if (!url || !key) {
+      toast('URL et clé requises', 'error');
+      return;
+    }
+    saveSupabaseCredentials(url, key);
+    toast('Configuration Supabase sauvegardée!', 'success');
+    render();
+  } }, '💾 Sauvegarder Config'));
+
+  if (SYNC_ENABLED && !CURRENT_USER) {
+    cloudBtns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: showAuthModal }, '🔐 Se connecter'));
+  }
+  if (SYNC_ENABLED && CURRENT_USER) {
+    cloudBtns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() { syncToCloud(); } }, '⬆️ Sync maintenant'));
+  }
+  cloudCard.appendChild(cloudBtns);
+
+  // Clear config button
+  if (SUPABASE_URL || SUPABASE_ANON_KEY) {
+    cloudCard.appendChild(el('button', { class: 'btn btn-danger btn-sm', style: { marginTop: '10px', width: '100%' }, onclick: function() {
+      if (confirm('Supprimer la configuration Supabase?')) {
+        localStorage.removeItem('freel_supabase');
+        SUPABASE_URL = '';
+        SUPABASE_ANON_KEY = '';
+        supabase = null;
+        SYNC_ENABLED = false;
+        CURRENT_USER = null;
+        updateAuthUI();
+        toast('Configuration Supabase supprimée', 'info');
+        render();
+      }
+    } }, '🗑️ Supprimer la configuration'));
+  }
+
+  container.appendChild(cloudCard);
+
   container.appendChild(el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Freel V' + APP_VERSION + ' · Made with 💚'));
 }
 
