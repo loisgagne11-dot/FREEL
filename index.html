@@ -7058,12 +7058,31 @@ function showMonthDetail(monthKey) {
     el('span', { style: { fontWeight: '800', color: 'var(--info)', fontSize: '18px' } }, EUR(md.salaires))
   ]));
   
+  // V72: Bloc récapitulatif Solde + Cash Dispo
+  var recapBloc = el('div', { style: { marginTop: '16px', borderRadius: 'var(--radius-md)', overflow: 'hidden' } });
+
   // Solde fin de mois
-  body.appendChild(el('div', { style: { background: md.solde >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
-    el('span', { style: { fontWeight: '700', fontSize: '13px' } }, '= Solde fin de mois'),
-    el('span', { style: { fontWeight: '800', fontSize: '20px', color: md.solde >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(md.solde))
+  recapBloc.appendChild(el('div', { style: { background: 'var(--bg-secondary)', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+    el('span', { style: { fontWeight: '600', fontSize: '12px' } }, '📊 Solde compte pro'),
+    el('span', { style: { fontWeight: '700', fontSize: '16px' } }, EUR(md.solde))
   ]));
-  
+
+  // Provisions à ce mois
+  var provMois = chargesTotal - md.chargesPaid;
+  recapBloc.appendChild(el('div', { style: { background: 'var(--bg-secondary)', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
+    el('span', { style: { fontSize: '11px', color: 'var(--provision)' } }, '📦 Provisions (à payer)'),
+    el('span', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--provision)' } }, '- ' + EUR(provMois))
+  ]));
+
+  // Cash Dispo
+  var cashDispoMois = md.cashDispo || (md.solde - provMois);
+  recapBloc.appendChild(el('div', { style: { background: cashDispoMois >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)', padding: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+    el('span', { style: { fontWeight: '700', fontSize: '13px' } }, '= Cash Disponible'),
+    el('span', { style: { fontWeight: '800', fontSize: '20px', color: cashDispoMois >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(cashDispoMois))
+  ]));
+
+  body.appendChild(recapBloc);
+
   openModal('formModal');
 }
 
@@ -11447,7 +11466,36 @@ function drawMainChart() {
     }
     dataOff.push(wd.conges || 0);
   });
-  
+
+  // V72: Plugin pour afficher les montants sur les lignes du graphique CA
+  var caLabelsPlugin = {
+    id: 'caLabelsPlugin',
+    afterDatasetsDraw: function(chart) {
+      var ctx = chart.ctx;
+      // Afficher les valeurs sur Encaissé (index 3) et Réalisé (index 2)
+      [2, 3].forEach(function(datasetIdx) {
+        var dataset = chart.data.datasets[datasetIdx];
+        var meta = chart.getDatasetMeta(datasetIdx);
+        var color = datasetIdx === 2 ? '#22d3ee' : '#34d399';
+        meta.data.forEach(function(point, index) {
+          var value = dataset.data[index];
+          if (value === null || value === 0) return;
+          // Afficher seulement le dernier point non-nul pour chaque série
+          var hasNext = dataset.data.slice(index + 1).some(function(v) { return v !== null && v > 0; });
+          if (hasNext) return;
+          var label = value >= 1000 ? Math.round(value/1000) + 'k€' : Math.round(value) + '€';
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.font = 'bold 10px system-ui';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label, point.x + 6, point.y);
+          ctx.restore();
+        });
+      });
+    }
+  };
+
   mainChart = new Chart(ctx, {
     data: {
       labels: labels,
@@ -11468,7 +11516,8 @@ function drawMainChart() {
         y: { position: 'right', ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } },
         y1: { position: 'left', max: Math.max.apply(null, dataOff) * 3 || 10, ticks: { color: '#f59e0b', font: { size: 9 }, callback: function(v) { return v + 'j'; } }, grid: { display: false } }
       }
-    }
+    },
+    plugins: [caLabelsPlugin]
   });
 }
 
@@ -12124,13 +12173,37 @@ function renderTresorerie(container) {
     var months = getPeriodMonths();
     var labels = months.map(fmtMonthShort);
     var dataSal = months.map(function(m) { return data.monthsData[m] ? data.monthsData[m].salaires : 0; });
+
+    // V72: Plugin pour afficher les montants sur les barres salaires
+    var salairesLabelsPlugin = {
+      id: 'salairesLabelsPlugin',
+      afterDatasetsDraw: function(chart) {
+        var ctx = chart.ctx;
+        var dataset = chart.data.datasets[0];
+        var meta = chart.getDatasetMeta(0);
+        meta.data.forEach(function(bar, index) {
+          var value = dataset.data[index];
+          if (value === null || value === 0) return;
+          var label = value >= 1000 ? Math.round(value/1000) + 'k' : Math.round(value);
+          ctx.save();
+          ctx.fillStyle = '#60a5fa';
+          ctx.font = 'bold 9px system-ui';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText(label + '€', bar.x, bar.y - 4);
+          ctx.restore();
+        });
+      }
+    };
+
     salairesChart = new Chart(ctx, {
       type: 'bar',
       data: { labels: labels, datasets: [
         { label: 'Salaires', data: dataSal, backgroundColor: 'rgba(96,165,250,0.7)', borderRadius: 4 },
         { type: 'line', label: 'Moyenne', data: months.map(function() { return data.salaireMoyen; }), borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, borderDash: [5,5], pointRadius: 0 }
       ]},
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
+      plugins: [salairesLabelsPlugin]
     });
   }, 50);
   
