@@ -1313,10 +1313,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité">👁️</button>
       <button class="privacy-toggle" id="authBtn" title="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px"></span>
       <nav class="nav-tabs">
-        <button class="nav-tab active" data-view="cockpit">🏠</button>
-        <button class="nav-tab" data-view="activite">💼</button>
+        <button class="nav-tab active" data-view="accueil">🏠</button>
+        <button class="nav-tab" data-view="performance">📊</button>
         <button class="nav-tab" data-view="finances">💰</button>
-        <button class="nav-tab" data-view="config">⚙️</button>
+        <button class="nav-tab" data-view="params">⚙️</button>
       </nav>
     </div>
   </header>
@@ -1324,18 +1324,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <main class="container" id="app"></main>
 
   <nav class="bottom-nav">
-    <button class="bottom-nav-tab active" data-view="cockpit"><div class="bottom-nav-icon">🏠</div><div class="bottom-nav-label">Cockpit</div></button>
-    <button class="bottom-nav-tab" data-view="activite"><div class="bottom-nav-icon">💼</div><div class="bottom-nav-label">Activité</div></button>
+    <button class="bottom-nav-tab active" data-view="accueil"><div class="bottom-nav-icon">🏠</div><div class="bottom-nav-label">Accueil</div></button>
+    <button class="bottom-nav-tab" data-view="performance"><div class="bottom-nav-icon">📊</div><div class="bottom-nav-label">Perf</div></button>
     <button class="bottom-nav-tab" data-view="finances"><div class="bottom-nav-icon">💰</div><div class="bottom-nav-label">Finances</div></button>
-    <button class="bottom-nav-tab" data-view="config"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Config</div></button>
+    <button class="bottom-nav-tab" data-view="params"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Params</div></button>
   </nav>
 
   <button class="fab" id="fab">+</button>
   
   <div class="modal" id="fabModal">
     <div class="modal-content" style="max-height: auto; border-radius: var(--radius-xl);">
-      <div class="modal-body" style="padding: 24px;" id="fabModalBody">
-        <!-- Contenu généré dynamiquement par showFabMenu() -->
+      <div class="modal-body" style="padding: 24px;">
+        <div style="display: grid; gap: 12px;">
+          <button class="btn btn-block" onclick="closeModal('fabModal'); showMissionModal();">💼 Nouvelle Mission</button>
+          <button class="btn btn-block" onclick="closeModal('fabModal'); showChargeModal();">📋 Ajouter Charge</button>
+          <button class="btn btn-block btn-success" onclick="closeModal('fabModal'); showSalaireModal();">💸 Verser Salaire</button>
+          <button class="btn btn-ghost btn-block" onclick="closeModal('fabModal');">Annuler</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1376,8 +1381,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <script>
 var APP_VERSION = 67; // V67: Provisions par type + édition/suppression mouvements
 var TODAY = new Date();
-var VIEW = 'cockpit';  // V73: cockpit, activite, finances, config
-var ACTIVITE_TAB = 'missions'; // V73: sous-onglets activité (missions, factures)
+var VIEW = 'accueil';
+var DASHBOARD_SUB = 'accueil'; // V51: sous-onglets dashboard (accueil, analyse, charges)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SUPABASE CLOUD SYNC - V51
@@ -1615,160 +1620,31 @@ var SEARCH_STATE = {
   tresorerie: { query: '', type: 'all', category: 'all' }
 };
 
-// ============================================================================
-// LEGAL - Valeurs légales versionnées par année et type d'activité
-// Sources: urssaf.fr, impots.gouv.fr, autoentrepreneur.urssaf.fr
-// ============================================================================
-var LEGAL_BY_YEAR = {
-  2025: {
-    // Cotisations URSSAF par type d'activité
-    urssaf: {
-      BNC:         { standard: 0.246, acre: 0.123 },  // Services libéraux
-      BIC_vente:   { standard: 0.124, acre: 0.062 },  // Vente de marchandises
-      BIC_service: { standard: 0.214, acre: 0.107 }   // Services artisanaux/commerciaux
-    },
-    // Formation professionnelle (CFP)
-    cfp: 0.002,
-    // Versement libératoire IR (optionnel si RFR < seuil)
-    prelevementLiberatoire: {
-      BNC: 0.022,         // 2.2%
-      BIC_vente: 0.01,    // 1.0%
-      BIC_service: 0.017  // 1.7%
-    },
-    // Abattement forfaitaire IR
-    abattement: {
-      BNC: 0.34,          // 34% (min 305€)
-      BIC_vente: 0.71,    // 71% (min 305€)
-      BIC_service: 0.50   // 50% (min 305€)
-    },
-    // Tranches IR (revenus 2025)
-    irBrackets: [
-      { max: 11294, rate: 0 },
-      { max: 28797, rate: 0.11 },
-      { max: 82341, rate: 0.30 },
-      { max: 177106, rate: 0.41 },
-      { max: Infinity, rate: 0.45 }
-    ],
-    // Plafonds CA
-    plafonds: {
-      BNC: 77700,
-      BIC_service: 77700,
-      BIC_vente: 188700
-    },
-    // TVA - Franchise en base
-    tva: {
-      rate: 0.20,
-      seuilService: 36800,
-      seuilServiceMajore: 39100,
-      seuilVente: 91900,
-      seuilVenteMajore: 101000
-    },
-    // ACRE
-    acreDureeQuarters: 4
-  },
-  2026: {
-    // Cotisations URSSAF par type d'activité - TAUX 2026 CONFIRMÉS
-    urssaf: {
-      BNC:         { standard: 0.256, acre: 0.128 },  // 25.6% / 12.8%
-      BIC_vente:   { standard: 0.132, acre: 0.066 },  // 13.2% / 6.6%
-      BIC_service: { standard: 0.232, acre: 0.116 }   // 23.2% / 11.6%
-    },
-    cfp: 0.002,
-    prelevementLiberatoire: {
-      BNC: 0.022,
-      BIC_vente: 0.01,
-      BIC_service: 0.017
-    },
-    abattement: {
-      BNC: 0.34,
-      BIC_vente: 0.71,
-      BIC_service: 0.50
-    },
-    // Tranches IR 2026 (barème revu - source: projet LFI 2026)
-    irBrackets: [
-      { max: 11497, rate: 0 },
-      { max: 29315, rate: 0.11 },
-      { max: 83823, rate: 0.30 },
-      { max: 180294, rate: 0.41 },
-      { max: Infinity, rate: 0.45 }
-    ],
-    plafonds: {
-      BNC: 77700,
-      BIC_service: 77700,
-      BIC_vente: 188700
-    },
-    tva: {
-      rate: 0.20,
-      seuilService: 37500,       // Nouveau seuil 2026
-      seuilServiceMajore: 41250, // Nouveau seuil majoré 2026
-      seuilVente: 85000,         // Nouveau seuil 2026
-      seuilVenteMajore: 93500    // Nouveau seuil majoré 2026
-    },
-    acreDureeQuarters: 4
-  }
+// Taux officiels URSSAF - Sources: urssaf.fr, décret 2025-943
+// V51: Taux officiels 2026 confirmés (source: autoentrepreneur.urssaf.fr)
+var LEGAL = {
+  // Cotisations URSSAF BNC (prestations de services libérales)
+  urssafStd2025: 0.246,    // 24.6% - 2025
+  urssafStd2026: 0.256,    // 25.6% - 2026 (confirmé URSSAF)
+  urssafAcre2025: 0.123,   // 12.3% - ACRE 2025 (50% du taux standard)
+  urssafAcre2026: 0.128,   // 12.8% - ACRE 2026 (50% du taux standard)
+  cfp: 0.002,              // 0.2% - Formation professionnelle (CFP)
+  impLib: 0.022,           // 2.2% - Versement libératoire IR (BNC)
+  tvaRate: 0.20,           // 20% - TVA taux normal
+
+  // Plafonds micro-entreprise 2025/2026
+  plafondBNC: 77700,       // CA max prestations de services / BNC
+  plafondVente: 188700,    // CA max vente de marchandises
+  seuilTVA: 36800,         // Seuil franchise TVA (services)
+  seuilTVAMajore: 39100,   // Seuil majoré (perte franchise)
+  seuilTVAVente: 91900,    // Seuil franchise TVA (vente)
+  seuilTVAVenteMajore: 101000, // Seuil majoré vente
+
+  // ACRE: 4 trimestres civils (trimestre de création inclus)
+  acreDureeQuarters: 4,
+
+  lastUpdated: '2026-02-11'
 };
-
-// Fonction helper pour obtenir les valeurs légales d'une année
-function getLegal(year) {
-  return LEGAL_BY_YEAR[year] || LEGAL_BY_YEAR[2026]; // Fallback sur 2026
-}
-
-// Fonction helper pour obtenir le taux URSSAF
-function getLegalUrssaf(year, typeActivite, hasAcre) {
-  var legal = getLegal(year);
-  var type = typeActivite || 'BNC';
-  var rates = legal.urssaf[type] || legal.urssaf.BNC;
-  return hasAcre ? rates.acre : rates.standard;
-}
-
-// Fonction helper pour obtenir l'abattement IR
-function getLegalAbattement(year, typeActivite) {
-  var legal = getLegal(year);
-  return legal.abattement[typeActivite || 'BNC'] || 0.34;
-}
-
-// Fonction helper pour obtenir les tranches IR
-function getLegalIRBrackets(year) {
-  return getLegal(year).irBrackets;
-}
-
-// Fonction helper pour obtenir les seuils TVA
-function getLegalTVA(year, typeActivite) {
-  var legal = getLegal(year);
-  var isVente = typeActivite === 'BIC_vente';
-  return {
-    rate: legal.tva.rate,
-    seuil: isVente ? legal.tva.seuilVente : legal.tva.seuilService,
-    seuilMajore: isVente ? legal.tva.seuilVenteMajore : legal.tva.seuilServiceMajore
-  };
-}
-
-// Rétro-compatibilité: LEGAL pointe vers les valeurs de l'année courante
-var CURRENT_YEAR = new Date().getFullYear();
-var LEGAL = (function() {
-  var l = getLegal(CURRENT_YEAR);
-  var type = (typeof COMPANY !== 'undefined' && COMPANY.typeActivite) || 'BNC';
-  return {
-    urssaf: l.urssaf[type].standard,
-    urssafAcre: l.urssaf[type].acre,
-    cfp: l.cfp,
-    impLib: l.prelevementLiberatoire[type],
-    tvaRate: l.tva.rate,
-    plafondBNC: l.plafonds.BNC,
-    plafondVente: l.plafonds.BIC_vente,
-    seuilTVA: l.tva.seuilService,
-    seuilTVAMajore: l.tva.seuilServiceMajore,
-    seuilTVAVente: l.tva.seuilVente,
-    seuilTVAVenteMajore: l.tva.seuilVenteMajore,
-    acreDureeQuarters: l.acreDureeQuarters,
-    // Accès direct aux taux par année (rétro-compat)
-    urssafStd2025: 0.246,
-    urssafStd2026: 0.256,
-    urssafAcre2025: 0.123,
-    urssafAcre2026: 0.128,
-    lastUpdated: '2026-02-23'
-  };
-})();
 
 var SCENARIOS = {
   nominal: { id: 'nominal', label: 'Nominal', icon: '⚡', desc: 'Plein régime', vacationWeeks: 0, intercontratMonths: 0 },
@@ -1776,14 +1652,14 @@ var SCENARIOS = {
   recherche: { id: 'recherche', label: 'Prudent', icon: '🔍', desc: 'Intercontrat', vacationWeeks: 5, intercontratMonths: 2 }
 };
 
-// Rétro-compatibilité IR_BRACKETS
-var IR_BRACKETS = getLegalIRBrackets(CURRENT_YEAR);
+var IR_BRACKETS = [
+  { max: 11294, rate: 0 }, { max: 28797, rate: 0.11 }, { max: 82341, rate: 0.30 }, { max: 177106, rate: 0.41 }, { max: Infinity, rate: 0.45 }
+];
 
 var COMPANY = {
   nom: 'Loïs MUSIC',
   siret: '92859030500015',
   debut: '2025-03-02',
-  typeActivite: 'BNC',  // 'BNC' | 'BIC_vente' | 'BIC_service'
   acre: true,
   prelevementLiberatoire: false,
   tvaDepuis: '2025-10',
@@ -2592,17 +2468,16 @@ function getAcreInfo() {
   return { active: daysLeft > 0, expiryDate: localISO(expiryDate), expiryYm: expiryYm, startYm: startYm, daysLeft: daysLeft };
 }
 
-// Taux URSSAF dynamique selon mois, ACRE et type d'activité
+// Taux URSSAF dynamique selon mois et ACRE
 function getUrssafRate(monthYm) {
   var year = monthYm ? parseInt(monthYm.substring(0, 4)) : TODAY.getFullYear();
   var acre = getAcreInfo();
-  var typeActivite = COMPANY.typeActivite || 'BNC';
 
   // Si ACRE configuré ET le mois est dans la période ACRE (entre startYm et expiryYm)
-  var hasAcre = COMPANY.acre && acre.expiryYm && monthYm && monthYm >= acre.startYm && monthYm <= acre.expiryYm;
-
-  // Utiliser la nouvelle fonction helper versionnée
-  return getLegalUrssaf(year, typeActivite, hasAcre);
+  if (COMPANY.acre && acre.expiryYm && monthYm && monthYm >= acre.startYm && monthYm <= acre.expiryYm) {
+    return year >= 2026 ? LEGAL.urssafAcre2026 : LEGAL.urssafAcre2025;
+  }
+  return year >= 2026 ? LEGAL.urssafStd2026 : LEGAL.urssafStd2025;
 }
 
 function isTVAApplicable(dateStr) {
@@ -2613,23 +2488,15 @@ function isTVAApplicable(dateStr) {
 function calculateIR(revenuBrut, year) {
   year = year || TODAY.getFullYear();
   var cfg = getIRConfig(year);
-  var typeActivite = COMPANY.typeActivite || 'BNC';
-
-  // V73: Utiliser l'abattement selon le type d'activité
-  var tauxAbattement = getLegalAbattement(year, typeActivite);
-  var abattement = Math.max(revenuBrut * tauxAbattement, 305); // Minimum 305€, PAS de plafond
-
+  var abattement = Math.max(revenuBrut * 0.34, 305); // Abattement 34% BNC, minimum 305€, PAS de plafond (correction V45)
   var revenuNet = revenuBrut - abattement - (cfg.perAnnuel || 0) + (cfg.autresRevenus || 0);
   var parts = cfg.parts || 1;
   var quotient = revenuNet / parts;
   var impotBrut = 0, prev = 0;
   var tranchesDetail = []; // Détail de chaque tranche
-
-  // V73: Utiliser les tranches IR de l'année spécifiée
-  var brackets = getLegalIRBrackets(year);
-
-  for (var i = 0; i < brackets.length; i++) {
-    var b = brackets[i];
+  
+  for (var i = 0; i < IR_BRACKETS.length; i++) {
+    var b = IR_BRACKETS[i];
     var trancheMin = prev;
     var trancheMax = b.max;
     var trancheBase = 0;
@@ -2657,10 +2524,10 @@ function calculateIR(revenuBrut, year) {
   }
   
   var tmi = 0;
-  for (var j = 0; j < brackets.length; j++) {
-    if (quotient <= brackets[j].max) { tmi = brackets[j].rate; break; }
+  for (var j = 0; j < IR_BRACKETS.length; j++) {
+    if (quotient <= IR_BRACKETS[j].max) { tmi = IR_BRACKETS[j].rate; break; }
   }
-  return { revenuNet: revenuNet, quotient: quotient, impot: Math.round(impotBrut * parts), tmi: tmi, parts: parts, perAnnuel: cfg.perAnnuel, autresRevenus: cfg.autresRevenus, tranches: tranchesDetail, abattement: abattement, tauxAbattement: tauxAbattement };
+  return { revenuNet: revenuNet, quotient: quotient, impot: Math.round(impotBrut * parts), tmi: tmi, parts: parts, perAnnuel: cfg.perAnnuel, autresRevenus: cfg.autresRevenus, tranches: tranchesDetail, abattement: abattement };
 }
 
 // V65: Source unique de vérité pour l'IR d'une année
@@ -3404,101 +3271,6 @@ function buildMission(mis) {
 function openModal(id) { $('#' + id).classList.add('active'); }
 function closeModal(id) { $('#' + id).classList.remove('active'); }
 function closeAllModals() { $$('.modal').forEach(function(m) { m.classList.remove('active'); }); }
-
-// V73: Menu FAB contextuel selon l'onglet actif
-function showFabMenu() {
-  var body = $('#fabModalBody');
-  body.innerHTML = '';
-
-  var grid = el('div', { style: { display: 'grid', gap: '12px' } });
-
-  // Options communes à tous les onglets
-  var commonActions = [
-    { icon: '💼', label: 'Nouvelle Mission', action: function() { closeModal('fabModal'); showMissionModal(); } },
-    { icon: '💸', label: 'Verser Salaire', action: function() { closeModal('fabModal'); showSalaireModal(); }, class: 'btn-success' }
-  ];
-
-  // Options selon l'onglet
-  if (VIEW === 'cockpit') {
-    // Cockpit: actions rapides globales
-    commonActions.forEach(function(a) {
-      grid.appendChild(el('button', { class: 'btn btn-block ' + (a.class || ''), onclick: a.action }, a.icon + ' ' + a.label));
-    });
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showChargeModal(); } }, '📋 Ajouter Charge'));
-  }
-  else if (VIEW === 'activite') {
-    // Activité: focus sur missions et factures
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
-    // Si des missions existent, proposer de télécharger une facture
-    if (MISSIONS.length > 0) {
-      grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showDownloadInvoiceModal(); } }, '📄 Télécharger Facture'));
-    }
-    grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Salaire'));
-  }
-  else if (VIEW === 'finances') {
-    // Finances: charges et salaires
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showChargeModal(); } }, '📋 Ajouter Charge'));
-    grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Salaire'));
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
-  }
-  else if (VIEW === 'config') {
-    // Config: clients et paramètres
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showClientModal(); } }, '👤 Nouveau Client'));
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
-  }
-
-  // Bouton annuler
-  grid.appendChild(el('button', { class: 'btn btn-ghost btn-block', onclick: function() { closeModal('fabModal'); } }, 'Annuler'));
-
-  body.appendChild(grid);
-  openModal('fabModal');
-}
-
-// Modal pour télécharger une facture (sélection mission + mois)
-function showDownloadInvoiceModal() {
-  $('#formModalTitle').textContent = '📄 Télécharger Facture';
-  var body = $('#formModalBody');
-  body.innerHTML = '';
-
-  // Sélection de la mission
-  var missionSelect = el('select', { id: 'downloadInvoiceMission', style: { width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' } });
-  missionSelect.appendChild(el('option', { value: '' }, '-- Sélectionner une mission --'));
-  MISSIONS.forEach(function(m) {
-    missionSelect.appendChild(el('option', { value: m.id }, m.client + ' (' + m.tjm + '€/j)'));
-  });
-  body.appendChild(el('label', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' } }, 'Mission'));
-  body.appendChild(missionSelect);
-
-  // Container pour les mois (mis à jour dynamiquement)
-  var monthsContainer = el('div', { id: 'downloadInvoiceMonths' });
-  body.appendChild(monthsContainer);
-
-  // Mettre à jour les mois quand une mission est sélectionnée
-  missionSelect.onchange = function() {
-    monthsContainer.innerHTML = '';
-    var missionId = missionSelect.value;
-    if (!missionId) return;
-
-    var mission = MISSIONS.find(function(m) { return m.id === missionId; });
-    if (!mission || !mission.factures) return;
-
-    body.appendChild(el('label', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block', marginTop: '12px' } }, 'Mois à facturer'));
-
-    mission.factures.forEach(function(f) {
-      if (f.jours <= 0) return;
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px', cursor: 'pointer' }, onclick: function() {
-        closeModal('formModal');
-        openInvoiceHTML(mission, f.mois, {});
-      } });
-      row.appendChild(el('span', { style: { flex: 1 } }, fmtMonth(f.mois) + ' - ' + f.jours + ' jours'));
-      row.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(f.jours * mission.tjm)));
-      row.appendChild(el('span', { style: { fontSize: '18px' } }, '→'));
-      monthsContainer.appendChild(row);
-    });
-  };
-
-  openModal('formModal');
-}
 
 // V51: Toast notifications
 function showToast(message, type) {
@@ -12946,176 +12718,17 @@ function renderAdmin(container) {
   container.appendChild(el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Freel V' + APP_VERSION + ' · Made with 💚'));
 }
 
-// ============================================================================
-// V73: NOUVELLES FONCTIONS DE RENDU - 4 ONGLETS
-// ============================================================================
-
-// COCKPIT: Dashboard principal (combine Accueil + éléments clés Performance)
-function renderCockpit(container) {
-  var data = compute();
-
-  // 1. Hero: Cash Disponible avec indicateur santé
-  renderDashboardHero(container, data);
-
-  // 2. CA Annuel avec plafond
-  renderCAPlafondWidget(container);
-
-  // 3. À FAIRE: Actions + Jalons timeline
-  renderActionsAndMilestones(container);
-
-  // 4. Graphiques CA et Trésorerie
-  var chartsCard = el('div', { class: 'card', style: { marginTop: '16px' } });
-  chartsCard.appendChild(el('div', { class: 'card-title' }, '📈 Évolution CA'));
-  chartsCard.appendChild(el('div', { class: 'chart-container', style: { height: '180px' } }, [el('canvas', { id: 'mainChart' })]));
-  container.appendChild(chartsCard);
-
-  var tresoCard = el('div', { class: 'card', style: { marginTop: '16px' } });
-  tresoCard.appendChild(el('div', { class: 'card-title' }, '💰 Trésorerie & Salaires'));
-  tresoCard.appendChild(el('div', { class: 'chart-container', style: { height: '180px' } }, [el('canvas', { id: 'soldeChart' })]));
-  container.appendChild(tresoCard);
-
-  // 5. Insights
-  renderInsights(container);
-}
-
-// ACTIVITÉ: Missions + Factures
-function renderActivite(container) {
-  var data = compute();
-
-  // Sous-onglets: Missions | Factures
-  var tabsContainer = el('div', { style: { display: 'flex', gap: '4px', background: 'var(--bg-tertiary)', padding: '4px', borderRadius: '10px', marginBottom: '16px' } });
-  tabsContainer.appendChild(el('button', {
-    style: { flex: '1', padding: '10px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: ACTIVITE_TAB === 'missions' ? 'var(--accent)' : 'transparent', color: ACTIVITE_TAB === 'missions' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { ACTIVITE_TAB = 'missions'; render(); }
-  }, '💼 Missions'));
-  tabsContainer.appendChild(el('button', {
-    style: { flex: '1', padding: '10px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: ACTIVITE_TAB === 'factures' ? 'var(--accent)' : 'transparent', color: ACTIVITE_TAB === 'factures' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { ACTIVITE_TAB = 'factures'; render(); }
-  }, '📄 Factures'));
-  container.appendChild(tabsContainer);
-
-  if (ACTIVITE_TAB === 'missions') {
-    renderMissionsContent(container);
-  } else {
-    // Factures par mission
-    renderFacturesContent(container);
-  }
-
-  // Graphique CA en bas
-  var caCard = el('div', { class: 'card', style: { marginTop: '16px' } });
-  caCard.appendChild(el('div', { class: 'card-title' }, '📊 Chiffre d\'Affaires'));
-  caCard.appendChild(el('div', { class: 'chart-container', style: { height: '180px' } }, [el('canvas', { id: 'mainChart' })]));
-  container.appendChild(caCard);
-}
-
-// Contenu factures
-function renderFacturesContent(container) {
-  var data = compute();
-
-  // Header
-  var header = el('div', { class: 'page-header' });
-  header.appendChild(el('h2', { class: 'page-title' }, '📄 Factures'));
-  container.appendChild(header);
-
-  // Résumé rapide
-  var summary = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
-  var facturesPaid = 0, facturesOpen = 0, facturesLate = 0;
-  var caEncaisse = 0, caAEncaisser = 0;
-
-  MISSIONS.forEach(function(m) {
-    if (!m.factures) return;
-    m.factures.forEach(function(f) {
-      if (f.jours <= 0) return;
-      var montant = f.jours * m.tjm;
-      if (f.status === 'payée') {
-        facturesPaid++;
-        caEncaisse += montant;
-      } else {
-        facturesOpen++;
-        caAEncaisser += montant;
-        var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
-        if (TODAY > paymentDate) facturesLate++;
-      }
-    });
-  });
-
-  summary.appendChild(el('div', { class: 'mini-stat', style: { background: 'var(--success-glow)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '20px', fontWeight: '700', color: 'var(--success)' } }, String(facturesPaid)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Payées')
-  ]));
-  summary.appendChild(el('div', { class: 'mini-stat', style: { background: 'var(--warning-glow)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '20px', fontWeight: '700', color: 'var(--warning)' } }, String(facturesOpen)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'En attente')
-  ]));
-  summary.appendChild(el('div', { class: 'mini-stat', style: { background: facturesLate > 0 ? 'var(--danger-glow)' : 'var(--bg-secondary)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '20px', fontWeight: '700', color: facturesLate > 0 ? 'var(--danger)' : 'var(--text-muted)' } }, String(facturesLate)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'En retard')
-  ]));
-  container.appendChild(summary);
-
-  // Liste des factures groupées par mission
-  MISSIONS.forEach(function(m) {
-    if (!m.factures || m.factures.length === 0) return;
-
-    var missionCard = el('div', { class: 'card', style: { marginBottom: '12px' } });
-    missionCard.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' } }, [
-      el('span', {}, '💼 ' + m.client),
-      el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, m.tjm + '€/j')
-    ]));
-
-    m.factures.slice().reverse().forEach(function(f) {
-      if (f.jours <= 0) return;
-      var montant = f.jours * m.tjm;
-      var tva = isTVAApplicable(f.mois + '-01') ? Math.round(montant * 0.20) : 0;
-      var isPaid = f.status === 'payée';
-      var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
-      var isLate = !isPaid && TODAY > paymentDate;
-
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px', cursor: 'pointer' }, onclick: function() { showFactureModal(f); } });
-
-      // Status indicator
-      row.appendChild(el('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? 'var(--success)' : isLate ? 'var(--danger)' : 'var(--warning)' } }));
-
-      // Info
-      var info = el('div', { style: { flex: 1 } });
-      info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '500' } }, fmtMonth(f.mois) + ' · ' + f.jours + 'j'));
-      info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, isPaid ? 'Payée' : isLate ? 'En retard' : 'Échéance ' + fmtDate(paymentDate)));
-      row.appendChild(info);
-
-      // Montant
-      row.appendChild(el('div', { style: { textAlign: 'right' } }, [
-        el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(montant + tva)),
-        tva > 0 ? el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'dont TVA ' + EUR(tva)) : null
-      ]));
-
-      missionCard.appendChild(row);
-    });
-
-    container.appendChild(missionCard);
-  });
-}
-
-// CONFIG: Alias vers renderParams
-function renderConfig(container) {
-  renderParams(container);
-}
-
 function render() {
   var container = $('#app');
   if (!container) { console.error('Container #app not found'); return; }
   container.innerHTML = '';
 
   try {
-    // V73: Navigation 4 onglets
-    if (VIEW === 'cockpit') renderCockpit(container);
-    else if (VIEW === 'activite') renderActivite(container);
+    if (VIEW === 'accueil') renderAccueil(container);
+    else if (VIEW === 'performance') renderPerformance(container);
+    else if (VIEW === 'missions') { VIEW = 'finances'; FINANCES_TAB = 'missions'; renderFinances(container); }
     else if (VIEW === 'finances') renderFinances(container);
-    else if (VIEW === 'config') renderConfig(container);
-    // Rétro-compat anciennes vues
-    else if (VIEW === 'accueil') { VIEW = 'cockpit'; renderCockpit(container); }
-    else if (VIEW === 'performance') { VIEW = 'cockpit'; renderCockpit(container); }
-    else if (VIEW === 'missions') { VIEW = 'activite'; ACTIVITE_TAB = 'missions'; renderActivite(container); }
-    else if (VIEW === 'params') { VIEW = 'config'; renderConfig(container); }
+    else if (VIEW === 'params') renderParams(container);
   } catch (e) {
     console.error('Render error:', e);
     container.innerHTML = '<div style="padding:20px;color:red;">Erreur: ' + e.message + '</div>';
@@ -13129,9 +12742,9 @@ function render() {
   if (monthFilter) monthFilter.value = PERIOD.month !== null && PERIOD.month !== undefined ? String(PERIOD.month) : '';
   updateNotifBadge();
 
-  // V73: Dessiner les graphiques après le render si onglet Cockpit ou Activité
+  // V61: Dessiner les graphiques après le render si onglet Performance
   // Utiliser un délai plus long pour garantir que le DOM est prêt
-  if (VIEW === 'cockpit' || VIEW === 'activite') {
+  if (VIEW === 'performance') {
     requestAnimationFrame(function() {
       setTimeout(function() {
         try {
@@ -13305,8 +12918,8 @@ function init() {
     render();
   };
 
-  // FAB - Menu contextuel selon l'onglet
-  $('#fab').onclick = function() { showFabMenu(); };
+  // FAB
+  $('#fab').onclick = function() { openModal('fabModal'); };
   
   // Modals
   $$('.modal').forEach(function(m) {
