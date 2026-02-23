@@ -5852,8 +5852,11 @@ function renderIRForYear(year) {
   if (caAEncaisser > 0) {
     calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#a78bfa' } }, '+ CA À encaisser (paiement prévu ' + year + ')'), el('span', { style: { fontWeight: '600', color: '#a78bfa' } }, EUR(caAEncaisser))]));
   }
-  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caTotal))]))
-  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Abattement 34% (min 305€)'), el('span', { class: 'text-success' }, '- ' + EUR(ir.abattement))]));
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caTotal))]));
+  // V73: Afficher le taux d'abattement selon le type d'activité
+  var typeLabel = COMPANY.typeActivite === 'BIC_vente' ? 'BIC Vente' : COMPANY.typeActivite === 'BIC_service' ? 'BIC Services' : 'BNC';
+  var tauxAbattement = ir.tauxAbattement ? PCT(ir.tauxAbattement) : '34%';
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Abattement ' + tauxAbattement + ' ' + typeLabel + ' (min 305€)'), el('span', { class: 'text-success' }, '- ' + EUR(ir.abattement))]));
   
   if (ir.perAnnuel > 0) {
     calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'PER'), el('span', { class: 'text-success' }, '- ' + EUR(ir.perAnnuel))]));
@@ -5923,6 +5926,177 @@ function renderIRForYear(year) {
     plInfo.innerHTML = '✅ <strong>Prélèvement libératoire actif</strong><br>Tu paies ' + PCT(LEGAL.impLib) + ' sur CA HT = ' + EUR(plImpot);
     content.appendChild(plInfo);
   }
+}
+
+// V73: Simulateur CFE (Cotisation Foncière des Entreprises)
+function showCFESimulator() {
+  var currentYear = PERIOD.year || TODAY.getFullYear();
+
+  $('#formModalTitle').textContent = '🏢 Simulateur CFE';
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+
+  // Explication
+  var intro = el('div', { style: { background: 'var(--info-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '12px' } });
+  intro.innerHTML = '<strong>💡 Comment fonctionne la CFE ?</strong><br><br>' +
+    '• Basée sur le <b>CA de N-2</b> (2 ans avant)<br>' +
+    '• Montant fixé par votre <b>commune</b> selon votre CA<br>' +
+    '• <b>Exonéré</b> la 1ère année d\'activité<br>' +
+    '• <b>Exonéré</b> si CA N-2 < 5 000€<br>' +
+    '• Paiement au <b>15 décembre</b>';
+  body.appendChild(intro);
+
+  // Calcul du CA N-2
+  var yearN2 = currentYear - 2;
+  var caN2Data = getIRForYear(yearN2);
+  var caN2 = caN2Data.caTotal || 0;
+
+  // Formulaire
+  var form = el('div', { style: { background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
+  form.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' } }, '⚙️ Paramètres CFE ' + currentYear));
+
+  // CA N-2 (éditable si l'utilisateur veut simuler autre chose)
+  form.appendChild(createInput('CA ' + yearN2 + ' (N-2) en €', 'number', 'cfeCAN2', caN2));
+
+  // Base minimum CFE selon tranche (valeurs 2024 moyennes)
+  var tranches = [
+    { max: 5000, base: 0, label: 'Exonéré (< 5 000€)' },
+    { max: 10000, base: 243, label: '5 000 - 10 000€' },
+    { max: 32600, base: 486, label: '10 000 - 32 600€' },
+    { max: 100000, base: 968, label: '32 600 - 100 000€' },
+    { max: 250000, base: 2033, label: '100 000 - 250 000€' },
+    { max: 500000, base: 3402, label: '250 000 - 500 000€' },
+    { max: Infinity, base: 6883, label: '> 500 000€' }
+  ];
+
+  // Trouver la tranche applicable
+  function getTranche(ca) {
+    for (var i = 0; i < tranches.length; i++) {
+      if (ca <= tranches[i].max) return tranches[i];
+    }
+    return tranches[tranches.length - 1];
+  }
+
+  // Taux de cotisation (variable par commune, moyenne ~25%)
+  form.appendChild(createInput('Taux communal (en %, voir avis CFE)', 'number', 'cfeTaux', COMPANY.cfeTaux || 25));
+  form.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '-8px', marginBottom: '12px' } }, 'Généralement entre 20% et 40% selon la commune'));
+
+  form.appendChild(el('button', { class: 'btn btn-success btn-sm', onclick: function() {
+    var ca = parseFloat($('#cfeCAN2').value) || 0;
+    var taux = parseFloat($('#cfeTaux').value) || 25;
+    COMPANY.cfeTaux = taux;
+    saveAll();
+    renderCFEResult(ca, taux);
+    toast('Calcul mis à jour', 'success');
+  } }, '🔄 Calculer'));
+
+  body.appendChild(form);
+
+  // Container résultat
+  body.appendChild(el('div', { id: 'cfeResult' }));
+
+  // Calcul initial
+  renderCFEResult(caN2, COMPANY.cfeTaux || 25);
+
+  openModal('formModal');
+}
+
+function renderCFEResult(caN2, tauxCommunal) {
+  var result = $('#cfeResult');
+  result.innerHTML = '';
+
+  var tranches = [
+    { max: 5000, base: 0, label: 'Exonéré' },
+    { max: 10000, base: 243, label: '5k - 10k€' },
+    { max: 32600, base: 486, label: '10k - 32.6k€' },
+    { max: 100000, base: 968, label: '32.6k - 100k€' },
+    { max: 250000, base: 2033, label: '100k - 250k€' },
+    { max: 500000, base: 3402, label: '250k - 500k€' },
+    { max: Infinity, base: 6883, label: '> 500k€' }
+  ];
+
+  // Trouver la tranche
+  var tranche = tranches[0];
+  for (var i = 0; i < tranches.length; i++) {
+    if (caN2 <= tranches[i].max) {
+      tranche = tranches[i];
+      break;
+    }
+  }
+
+  // Calcul CFE
+  var baseMinimum = tranche.base;
+  var cfeEstime = Math.round(baseMinimum * (tauxCommunal / 100));
+
+  // Frais de gestion (3% de la CFE) + taxe pour frais de chambre (~1%)
+  var fraisGestion = Math.round(cfeEstime * 0.03);
+  var taxeChambre = Math.round(cfeEstime * 0.01);
+  var total = cfeEstime + fraisGestion + taxeChambre;
+
+  // Vérifier exonération 1ère année
+  var debutActivite = COMPANY.debut ? new Date(COMPANY.debut) : null;
+  var anneeDebut = debutActivite ? debutActivite.getFullYear() : null;
+  var isPremiereAnnee = anneeDebut && (PERIOD.year || TODAY.getFullYear()) === anneeDebut;
+
+  var calc = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: 'var(--radius-md)' } });
+  calc.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' } }, '📊 Estimation CFE'));
+
+  calc.appendChild(el('div', { class: 'detail-row' }, [
+    el('span', {}, 'CA N-2'),
+    el('span', { style: { fontWeight: '600' } }, EUR(caN2))
+  ]));
+
+  calc.appendChild(el('div', { class: 'detail-row' }, [
+    el('span', {}, 'Tranche applicable'),
+    el('span', { style: { fontWeight: '600', color: baseMinimum === 0 ? 'var(--success)' : 'inherit' } }, tranche.label)
+  ]));
+
+  calc.appendChild(el('div', { class: 'detail-separator' }));
+
+  if (isPremiereAnnee) {
+    calc.appendChild(el('div', { style: { background: 'var(--success-glow)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--success)' } }, '✅ EXONÉRÉ'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Première année d\'activité')
+    ]));
+  } else if (baseMinimum === 0) {
+    calc.appendChild(el('div', { style: { background: 'var(--success-glow)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--success)' } }, '✅ EXONÉRÉ'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, 'CA N-2 inférieur à 5 000€')
+    ]));
+  } else {
+    calc.appendChild(el('div', { class: 'detail-row' }, [
+      el('span', {}, 'Base minimum'),
+      el('span', { style: { fontWeight: '600' } }, EUR(baseMinimum))
+    ]));
+    calc.appendChild(el('div', { class: 'detail-row' }, [
+      el('span', {}, 'Taux communal'),
+      el('span', {}, PCT(tauxCommunal / 100))
+    ]));
+    calc.appendChild(el('div', { class: 'detail-row' }, [
+      el('span', {}, 'CFE brute'),
+      el('span', { style: { fontWeight: '600' } }, EUR(cfeEstime))
+    ]));
+    calc.appendChild(el('div', { class: 'detail-row', style: { fontSize: '11px' } }, [
+      el('span', { style: { color: 'var(--text-muted)' } }, 'Frais de gestion (3%)'),
+      el('span', { style: { color: 'var(--text-muted)' } }, '+ ' + EUR(fraisGestion))
+    ]));
+    calc.appendChild(el('div', { class: 'detail-row', style: { fontSize: '11px' } }, [
+      el('span', { style: { color: 'var(--text-muted)' } }, 'Taxe chambre (~1%)'),
+      el('span', { style: { color: 'var(--text-muted)' } }, '+ ' + EUR(taxeChambre))
+    ]));
+
+    calc.appendChild(el('div', { class: 'detail-separator accent' }));
+    calc.appendChild(el('div', { class: 'detail-row highlight' }, [
+      el('span', { style: { fontWeight: '700' } }, 'CFE Estimée'),
+      el('span', { style: { fontWeight: '800', fontSize: '20px', color: 'var(--warning)' } }, EUR(total))
+    ]));
+  }
+
+  // Note
+  calc.appendChild(el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: '6px', fontSize: '10px', color: 'var(--text-muted)' } },
+    '⚠️ Estimation indicative. Le montant exact figure sur votre avis CFE disponible mi-novembre sur impots.gouv.fr'));
+
+  result.appendChild(calc);
 }
 
 function showMissionModal(mission) {
@@ -12926,7 +13100,17 @@ function renderAdmin(container) {
     saveAll(); render();
     toast('Configuration sauvegardée', 'success');
   } }, '✅ Sauvegarder'));
-  
+
+  // V73: Simulateurs fiscaux
+  var simCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  simCard.appendChild(el('div', { class: 'card-title' }, '🧮 Simulateurs Fiscaux'));
+  var simBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
+  simBtns.appendChild(el('button', { class: 'btn btn-block', onclick: showIRDetail }, '💶 Simulateur IR'));
+  simBtns.appendChild(el('button', { class: 'btn btn-block', onclick: showCFESimulator }, '🏢 Simulateur CFE'));
+  simCard.appendChild(simBtns);
+  simCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '10px' } }, 'Estimez vos impôts selon votre CA et votre situation'));
+  container.appendChild(simCard);
+
   // Export/Import
   var ioCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   ioCard.appendChild(el('div', { class: 'card-title' }, '💾 Données'));
