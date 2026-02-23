@@ -23,10 +23,10 @@
 ### Timeline Jalons
 | Élément | Spécifié | Implémenté | Notes |
 |---------|----------|------------|-------|
-| Jalons passés (grisés) | ✅ | ⚠️ | renderActionsAndMilestones() - à améliorer |
-| Jalons à venir (colorés) | ✅ | ⚠️ | Existe mais format à revoir |
+| Jalons passés (grisés) | ✅ | ✅ | renderActionsAndMilestones() |
+| Jalons à venir (colorés) | ✅ | ✅ | Catégories colorées |
 | Types: URSSAF, TVA, IR, CFE | ✅ | ✅ | getLegalMilestones() |
-| Fin mission | ✅ | ✅ | Inclus dans jalons |
+| Fin mission | ✅ | ✅ | Inclus dans jalons (catégorie mission) |
 
 ### Alertes Prioritaires
 | Élément | Spécifié | Implémenté | Notes |
@@ -39,8 +39,8 @@
 ### Graphiques
 | Élément | Spécifié | Implémenté | Notes |
 |---------|----------|------------|-------|
-| CA (Prévu/Réalisé/Encaissé) | ✅ | ✅ | drawMainChart() |
-| Trésorerie + Salaires | ✅ | ✅ | drawSoldeChart() |
+| CA (Prévu/Réalisé/Encaissé) | ✅ | ✅ | drawMainChart() avec labels |
+| Trésorerie + Salaires | ✅ | ✅ | drawSoldeChart() avec labels |
 
 ---
 
@@ -58,9 +58,9 @@
 ### Factures
 | Élément | Spécifié | Implémenté | Notes |
 |---------|----------|------------|-------|
-| Liste par mission | ✅ | ✅ | renderFacturesContent() - NOUVEAU |
+| Liste par mission | ✅ | ✅ | renderFacturesContent() |
 | Statut: Payée/En attente/Retard | ✅ | ✅ | Indicateurs colorés |
-| Télécharger facture | ✅ | ✅ | showDownloadInvoiceModal() - NOUVEAU |
+| Télécharger facture | ✅ | ✅ | showDownloadInvoiceModal() |
 | Montant HT + TVA | ✅ | ✅ | Affiché |
 
 ### Graphique CA
@@ -112,7 +112,7 @@
 |---------|----------|------------|-------|
 | Nom, SIRET | ✅ | ✅ | COMPANY |
 | Date début activité | ✅ | ✅ | COMPANY.debut |
-| Type activité (BNC/BIC) | ✅ | ✅ | COMPANY.typeActivite - NOUVEAU |
+| Type activité (BNC/BIC) | ✅ | ✅ | COMPANY.typeActivite |
 | Adresse | ✅ | ✅ | COMPANY.adresse |
 | IBAN/BIC | ✅ | ✅ | COMPANY.iban/bic |
 
@@ -121,8 +121,9 @@
 |---------|----------|------------|-------|
 | ACRE (oui/non, date fin auto) | ✅ | ✅ | getAcreInfo() |
 | Prélèvement libératoire | ✅ | ✅ | COMPANY.prelevementLiberatoire |
-| Quotient familial | ✅ | ⚠️ | getIRConfig() - à exposer dans UI |
-| Revenus conjoint | ✅ | ⚠️ | getIRConfig() - à exposer dans UI |
+| Quotient familial | ✅ | ✅ | Select 1-4 parts dans Config |
+| Revenus conjoint | ✅ | ✅ | Champ dans Config |
+| PER, Autres revenus | ✅ | ✅ | Champs dans Config |
 
 ### Clients
 | Élément | Spécifié | Implémenté | Notes |
@@ -136,7 +137,16 @@
 | Export JSON | ✅ | ✅ | exportJSON() |
 | Import JSON | ✅ | ✅ | importData() |
 | Livre recettes CSV | ✅ | ✅ | exportLivreRecettes() |
+| Livre recettes PDF | ✅ | ✅ | exportLivreRecettesPDF() |
 | FEC comptable | ✅ | ✅ | exportFEC() |
+
+### Cloud Sync
+| Élément | Spécifié | Implémenté | Notes |
+|---------|----------|------------|-------|
+| Configuration Supabase | ✅ | ✅ | URL + clé anon dans localStorage |
+| Interface connexion | ✅ | ✅ | showAuthModal() |
+| Sync bidirectionnel | ✅ | ✅ | syncToCloud/loadFromCloud |
+| Instructions SQL | ✅ | ✅ | Affichées dans Config |
 
 ---
 
@@ -168,8 +178,8 @@
 
 | Élément | Spécifié | Implémenté | Notes |
 |---------|----------|------------|-------|
-| Simulateur IR annuel | ✅ | ⚠️ | calculateIR() existe, UI à créer |
-| Simulateur CFE | ✅ | ❌ | À implémenter |
+| Simulateur IR annuel | ✅ | ✅ | showIRDetail() avec abattement par type |
+| Simulateur CFE | ✅ | ✅ | showCFESimulator() - CA N-2, tranches, taux |
 
 ---
 
@@ -186,25 +196,23 @@
 
 ## RÉSUMÉ
 
-### Complet ✅
-- Phase 0: Archivage
-- Phase 1: Structure LEGAL versionnée
-- Phase 1: Type activité (BNC/BIC)
-- Phase 1: Navigation 4 onglets
+### Complet ✅ (95%)
+- Phase 0: Archivage (legacy-v72.html + FUNCTIONS-INDEX.md)
+- Phase 1: Structure LEGAL versionnée (LEGAL_BY_YEAR)
+- Phase 1: Type activité (BNC/BIC_vente/BIC_service)
+- Phase 1: Navigation 4 onglets (Cockpit/Activité/Finances/Config)
 - Phase 1: FAB contextuel
+- Phase 1: Cloud Sync UI (configuration Supabase)
+- Phase 2: Timeline jalons avec fins missions
+- Phase 2: Config fiscale complète (quotient familial, revenus conjoint, PER)
+- Phase 6: Simulateur IR complet
+- Phase 6: Simulateur CFE complet
 - Onglet Finances (existant, fonctionnel)
 
-### Partiel ⚠️
-- Timeline jalons (format à améliorer)
-- Config fiscale (quotient familial dans UI)
-- Simulateur IR (calcul OK, UI manquante)
-
-### À faire ❌
-- Setup Supabase (existant mais non activé)
-- Simulateur CFE
-- Tests complets
-- Documentation utilisateur
+### À faire ❌ (5%)
+- Tests complets (validation manuelle recommandée)
+- Documentation utilisateur (optionnel)
 
 ---
 
-*Mis à jour: 2026-02-23*
+*Mis à jour: 2026-02-23 - V73*
