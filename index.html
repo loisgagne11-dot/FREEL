@@ -1374,7 +1374,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 67; // V67: Provisions par type + édition/suppression mouvements
+var APP_VERSION = 73; // V73: Navigation 4 onglets, LEGAL versionné, Config fiscale, Simulateurs IR/CFE, Cloud Sync UI
 var TODAY = new Date();
 var VIEW = 'cockpit';  // V73: cockpit, activite, finances, config
 var ACTIVITE_TAB = 'missions'; // V73: sous-onglets activité (missions, factures)
@@ -1410,17 +1410,50 @@ var ACTIVITE_TAB = 'missions'; // V73: sous-onglets activité (missions, facture
     FOR ALL USING (auth.uid() = user_id);
 */
 
-var SUPABASE_URL = ''; // À remplir avec ton URL Supabase
-var SUPABASE_ANON_KEY = ''; // À remplir avec ta clé anon
+var SUPABASE_URL = ''; // Chargé depuis localStorage
+var SUPABASE_ANON_KEY = ''; // Chargé depuis localStorage
 var supabase = null;
 var CURRENT_USER = null;
 var SYNC_ENABLED = false;
 
+// V73: Charger les credentials Supabase depuis localStorage
+function loadSupabaseCredentials() {
+  try {
+    var stored = localStorage.getItem('freel_supabase');
+    if (stored) {
+      var creds = JSON.parse(stored);
+      SUPABASE_URL = creds.url || '';
+      SUPABASE_ANON_KEY = creds.key || '';
+    }
+  } catch (e) {
+    console.error('Erreur chargement credentials Supabase:', e);
+  }
+}
+
+// V73: Sauvegarder les credentials Supabase
+function saveSupabaseCredentials(url, key) {
+  try {
+    localStorage.setItem('freel_supabase', JSON.stringify({ url: url, key: key }));
+    SUPABASE_URL = url;
+    SUPABASE_ANON_KEY = key;
+    // Réinitialiser la connexion
+    supabase = null;
+    SYNC_ENABLED = false;
+    CURRENT_USER = null;
+    initSupabase();
+  } catch (e) {
+    console.error('Erreur sauvegarde credentials Supabase:', e);
+  }
+}
+
 function initSupabase() {
+  // V73: D'abord charger depuis localStorage
+  loadSupabaseCredentials();
+
   if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     SYNC_ENABLED = true;
-    
+
     // Écouter les changements d'auth
     supabase.auth.onAuthStateChange(function(event, session) {
       CURRENT_USER = session ? session.user : null;
@@ -1429,7 +1462,7 @@ function initSupabase() {
         loadFromCloud();
       }
     });
-    
+
     // Vérifier session existante
     supabase.auth.getSession().then(function(result) {
       if (result.data.session) {
@@ -1455,7 +1488,7 @@ function updateAuthUI() {
 
 function showAuthModal() {
   if (!SYNC_ENABLED) {
-    showToast('⚠️ Supabase non configuré. Voir Admin > Cloud Sync.', 'warning');
+    showToast('⚠️ Supabase non configuré. Voir ⚙️ Config > Cloud Sync.', 'warning');
     return;
   }
   
@@ -3655,9 +3688,16 @@ function loadAll() {
 }
 
 // Helper pour obtenir config IR d'une année
+// V73: Utilise les valeurs COMPANY comme défaut
 function getIRConfig(year) {
   var y = String(year);
-  if (!IR_CONFIG[y]) IR_CONFIG[y] = { parts: 1, autresRevenus: 0, perAnnuel: 0 };
+  if (!IR_CONFIG[y]) {
+    IR_CONFIG[y] = {
+      parts: COMPANY.quotientFamilial || 1,
+      autresRevenus: (COMPANY.autresRevenus || 0) + (COMPANY.revenusConjoint || 0),
+      perAnnuel: COMPANY.perAnnuel || 0
+    };
+  }
   return IR_CONFIG[y];
 }
 
@@ -5845,8 +5885,11 @@ function renderIRForYear(year) {
   if (caAEncaisser > 0) {
     calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { color: '#a78bfa' } }, '+ CA À encaisser (paiement prévu ' + year + ')'), el('span', { style: { fontWeight: '600', color: '#a78bfa' } }, EUR(caAEncaisser))]));
   }
-  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caTotal))]))
-  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Abattement 34% (min 305€)'), el('span', { class: 'text-success' }, '- ' + EUR(ir.abattement))]));
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', { style: { fontWeight: '700' } }, '= CA HT total ' + year), el('span', { style: { fontWeight: '700' } }, EUR(caTotal))]));
+  // V73: Afficher le taux d'abattement selon le type d'activité
+  var typeLabel = COMPANY.typeActivite === 'BIC_vente' ? 'BIC Vente' : COMPANY.typeActivite === 'BIC_service' ? 'BIC Services' : 'BNC';
+  var tauxAbattement = ir.tauxAbattement ? PCT(ir.tauxAbattement) : '34%';
+  calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Abattement ' + tauxAbattement + ' ' + typeLabel + ' (min 305€)'), el('span', { class: 'text-success' }, '- ' + EUR(ir.abattement))]));
   
   if (ir.perAnnuel > 0) {
     calc.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'PER'), el('span', { class: 'text-success' }, '- ' + EUR(ir.perAnnuel))]));
@@ -5916,6 +5959,177 @@ function renderIRForYear(year) {
     plInfo.innerHTML = '✅ <strong>Prélèvement libératoire actif</strong><br>Tu paies ' + PCT(LEGAL.impLib) + ' sur CA HT = ' + EUR(plImpot);
     content.appendChild(plInfo);
   }
+}
+
+// V73: Simulateur CFE (Cotisation Foncière des Entreprises)
+function showCFESimulator() {
+  var currentYear = PERIOD.year || TODAY.getFullYear();
+
+  $('#formModalTitle').textContent = '🏢 Simulateur CFE';
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+
+  // Explication
+  var intro = el('div', { style: { background: 'var(--info-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '12px' } });
+  intro.innerHTML = '<strong>💡 Comment fonctionne la CFE ?</strong><br><br>' +
+    '• Basée sur le <b>CA de N-2</b> (2 ans avant)<br>' +
+    '• Montant fixé par votre <b>commune</b> selon votre CA<br>' +
+    '• <b>Exonéré</b> la 1ère année d\'activité<br>' +
+    '• <b>Exonéré</b> si CA N-2 < 5 000€<br>' +
+    '• Paiement au <b>15 décembre</b>';
+  body.appendChild(intro);
+
+  // Calcul du CA N-2
+  var yearN2 = currentYear - 2;
+  var caN2Data = getIRForYear(yearN2);
+  var caN2 = caN2Data.caTotal || 0;
+
+  // Formulaire
+  var form = el('div', { style: { background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
+  form.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' } }, '⚙️ Paramètres CFE ' + currentYear));
+
+  // CA N-2 (éditable si l'utilisateur veut simuler autre chose)
+  form.appendChild(createInput('CA ' + yearN2 + ' (N-2) en €', 'number', 'cfeCAN2', caN2));
+
+  // Base minimum CFE selon tranche (valeurs 2024 moyennes)
+  var tranches = [
+    { max: 5000, base: 0, label: 'Exonéré (< 5 000€)' },
+    { max: 10000, base: 243, label: '5 000 - 10 000€' },
+    { max: 32600, base: 486, label: '10 000 - 32 600€' },
+    { max: 100000, base: 968, label: '32 600 - 100 000€' },
+    { max: 250000, base: 2033, label: '100 000 - 250 000€' },
+    { max: 500000, base: 3402, label: '250 000 - 500 000€' },
+    { max: Infinity, base: 6883, label: '> 500 000€' }
+  ];
+
+  // Trouver la tranche applicable
+  function getTranche(ca) {
+    for (var i = 0; i < tranches.length; i++) {
+      if (ca <= tranches[i].max) return tranches[i];
+    }
+    return tranches[tranches.length - 1];
+  }
+
+  // Taux de cotisation (variable par commune, moyenne ~25%)
+  form.appendChild(createInput('Taux communal (en %, voir avis CFE)', 'number', 'cfeTaux', COMPANY.cfeTaux || 25));
+  form.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '-8px', marginBottom: '12px' } }, 'Généralement entre 20% et 40% selon la commune'));
+
+  form.appendChild(el('button', { class: 'btn btn-success btn-sm', onclick: function() {
+    var ca = parseFloat($('#cfeCAN2').value) || 0;
+    var taux = parseFloat($('#cfeTaux').value) || 25;
+    COMPANY.cfeTaux = taux;
+    saveAll();
+    renderCFEResult(ca, taux);
+    toast('Calcul mis à jour', 'success');
+  } }, '🔄 Calculer'));
+
+  body.appendChild(form);
+
+  // Container résultat
+  body.appendChild(el('div', { id: 'cfeResult' }));
+
+  // Calcul initial
+  renderCFEResult(caN2, COMPANY.cfeTaux || 25);
+
+  openModal('formModal');
+}
+
+function renderCFEResult(caN2, tauxCommunal) {
+  var result = $('#cfeResult');
+  result.innerHTML = '';
+
+  var tranches = [
+    { max: 5000, base: 0, label: 'Exonéré' },
+    { max: 10000, base: 243, label: '5k - 10k€' },
+    { max: 32600, base: 486, label: '10k - 32.6k€' },
+    { max: 100000, base: 968, label: '32.6k - 100k€' },
+    { max: 250000, base: 2033, label: '100k - 250k€' },
+    { max: 500000, base: 3402, label: '250k - 500k€' },
+    { max: Infinity, base: 6883, label: '> 500k€' }
+  ];
+
+  // Trouver la tranche
+  var tranche = tranches[0];
+  for (var i = 0; i < tranches.length; i++) {
+    if (caN2 <= tranches[i].max) {
+      tranche = tranches[i];
+      break;
+    }
+  }
+
+  // Calcul CFE
+  var baseMinimum = tranche.base;
+  var cfeEstime = Math.round(baseMinimum * (tauxCommunal / 100));
+
+  // Frais de gestion (3% de la CFE) + taxe pour frais de chambre (~1%)
+  var fraisGestion = Math.round(cfeEstime * 0.03);
+  var taxeChambre = Math.round(cfeEstime * 0.01);
+  var total = cfeEstime + fraisGestion + taxeChambre;
+
+  // Vérifier exonération 1ère année
+  var debutActivite = COMPANY.debut ? new Date(COMPANY.debut) : null;
+  var anneeDebut = debutActivite ? debutActivite.getFullYear() : null;
+  var isPremiereAnnee = anneeDebut && (PERIOD.year || TODAY.getFullYear()) === anneeDebut;
+
+  var calc = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: 'var(--radius-md)' } });
+  calc.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', textTransform: 'uppercase' } }, '📊 Estimation CFE'));
+
+  calc.appendChild(el('div', { class: 'detail-row' }, [
+    el('span', {}, 'CA N-2'),
+    el('span', { style: { fontWeight: '600' } }, EUR(caN2))
+  ]));
+
+  calc.appendChild(el('div', { class: 'detail-row' }, [
+    el('span', {}, 'Tranche applicable'),
+    el('span', { style: { fontWeight: '600', color: baseMinimum === 0 ? 'var(--success)' : 'inherit' } }, tranche.label)
+  ]));
+
+  calc.appendChild(el('div', { class: 'detail-separator' }));
+
+  if (isPremiereAnnee) {
+    calc.appendChild(el('div', { style: { background: 'var(--success-glow)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--success)' } }, '✅ EXONÉRÉ'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Première année d\'activité')
+    ]));
+  } else if (baseMinimum === 0) {
+    calc.appendChild(el('div', { style: { background: 'var(--success-glow)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
+      el('div', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--success)' } }, '✅ EXONÉRÉ'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, 'CA N-2 inférieur à 5 000€')
+    ]));
+  } else {
+    calc.appendChild(el('div', { class: 'detail-row' }, [
+      el('span', {}, 'Base minimum'),
+      el('span', { style: { fontWeight: '600' } }, EUR(baseMinimum))
+    ]));
+    calc.appendChild(el('div', { class: 'detail-row' }, [
+      el('span', {}, 'Taux communal'),
+      el('span', {}, PCT(tauxCommunal / 100))
+    ]));
+    calc.appendChild(el('div', { class: 'detail-row' }, [
+      el('span', {}, 'CFE brute'),
+      el('span', { style: { fontWeight: '600' } }, EUR(cfeEstime))
+    ]));
+    calc.appendChild(el('div', { class: 'detail-row', style: { fontSize: '11px' } }, [
+      el('span', { style: { color: 'var(--text-muted)' } }, 'Frais de gestion (3%)'),
+      el('span', { style: { color: 'var(--text-muted)' } }, '+ ' + EUR(fraisGestion))
+    ]));
+    calc.appendChild(el('div', { class: 'detail-row', style: { fontSize: '11px' } }, [
+      el('span', { style: { color: 'var(--text-muted)' } }, 'Taxe chambre (~1%)'),
+      el('span', { style: { color: 'var(--text-muted)' } }, '+ ' + EUR(taxeChambre))
+    ]));
+
+    calc.appendChild(el('div', { class: 'detail-separator accent' }));
+    calc.appendChild(el('div', { class: 'detail-row highlight' }, [
+      el('span', { style: { fontWeight: '700' } }, 'CFE Estimée'),
+      el('span', { style: { fontWeight: '800', fontSize: '20px', color: 'var(--warning)' } }, EUR(total))
+    ]));
+  }
+
+  // Note
+  calc.appendChild(el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: '6px', fontSize: '10px', color: 'var(--text-muted)' } },
+    '⚠️ Estimation indicative. Le montant exact figure sur votre avis CFE disponible mi-novembre sur impots.gouv.fr'));
+
+  result.appendChild(calc);
 }
 
 function showMissionModal(mission) {
@@ -7574,6 +7788,28 @@ function getAllYearMilestones() {
   if (COMPANY.acre && acre.expiryDate) {
     addM(new Date(acre.expiryDate), 'Fin ACRE', '🎓', 'acre', 'Fin de l\'exonération ACRE - taux URSSAF plein');
   }
+
+  // V73: Fins de missions
+  MISSIONS.forEach(function(m) {
+    if (!m.fin) return;
+    var finDate = new Date(m.fin);
+    var finYear = finDate.getFullYear();
+    // Inclure si la fin est dans l'année courante ou proche (6 mois avant/après)
+    var monthsDiff = (finYear - year) * 12 + finDate.getMonth() - today.getMonth();
+    if (monthsDiff >= -2 && monthsDiff <= 12) {
+      milestones.push({
+        date: m.fin,
+        daysLeft: Math.ceil((finDate - today) / (1000 * 60 * 60 * 24)),
+        label: 'Fin ' + m.client,
+        icon: '💼',
+        cat: 'mission',
+        detail: 'Fin de mission ' + m.client + ' - Prévoir renouvellement ou nouvelle mission',
+        status: Math.ceil((finDate - today) / (1000 * 60 * 60 * 24)) < 0 ? 'passed' :
+                Math.ceil((finDate - today) / (1000 * 60 * 60 * 24)) <= 30 ? 'urgent' : 'upcoming',
+        missionId: m.id
+      });
+    }
+  });
 
   milestones.sort(function(a, b) {
     var da = new Date(a.date);
@@ -9624,8 +9860,8 @@ function renderActionsAndMilestones(container) {
     timeline.appendChild(line);
 
     // Couleurs par catégorie
-    var catColors = { urssaf: '#10b981', tva: '#ec4899', ir: '#f59e0b', cfe: '#8b5cf6', acre: '#06b6d4' };
-    var catBg = { urssaf: 'rgba(16,185,129,0.12)', tva: 'rgba(236,72,153,0.12)', ir: 'rgba(245,158,11,0.12)', cfe: 'rgba(139,92,246,0.12)', acre: 'rgba(6,182,212,0.12)' };
+    var catColors = { urssaf: '#10b981', tva: '#ec4899', ir: '#f59e0b', cfe: '#8b5cf6', acre: '#06b6d4', mission: '#60a5fa' };
+    var catBg = { urssaf: 'rgba(16,185,129,0.12)', tva: 'rgba(236,72,153,0.12)', ir: 'rgba(245,158,11,0.12)', cfe: 'rgba(139,92,246,0.12)', acre: 'rgba(6,182,212,0.12)', mission: 'rgba(96,165,250,0.12)' };
 
     // Trouver le premier futur pour scroll auto
     var firstFutureIdx = -1;
@@ -12607,35 +12843,59 @@ function renderAdmin(container) {
   // Fiscal
   var fiscCard = el('div', { class: 'card' });
   fiscCard.appendChild(el('div', { class: 'card-title' }, '💶 Régime Fiscal'));
-  
+
+  // V73: Type d'activité
+  fiscCard.appendChild(createSelect('Type d\'activité', 'adminTypeActivite', [
+    { value: 'BNC', label: '📋 BNC - Prestations de services (libérales)' },
+    { value: 'BIC_service', label: '🔧 BIC Services - Prestations artisanales/commerciales' },
+    { value: 'BIC_vente', label: '🛒 BIC Vente - Vente de marchandises' }
+  ], COMPANY.typeActivite || 'BNC'));
+  fiscCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px', marginTop: '-8px' } }, 'Affecte les taux URSSAF et l\'abattement IR'));
+
   var acreRow = el('div', { class: 'toggle-row' });
   acreRow.appendChild(el('div', { class: 'toggle-label' }, 'ACRE actif'));
   var acreToggle = el('label', { class: 'toggle-switch' });
   acreToggle.innerHTML = '<input type="checkbox" id="adminAcre" ' + (COMPANY.acre ? 'checked' : '') + '><span class="toggle-slider"></span>';
   acreRow.appendChild(acreToggle);
   fiscCard.appendChild(acreRow);
-  
+
   var plRow = el('div', { class: 'toggle-row' });
   plRow.appendChild(el('div', { class: 'toggle-label' }, 'Prélèvement Libératoire'));
   var plToggle = el('label', { class: 'toggle-switch' });
   plToggle.innerHTML = '<input type="checkbox" id="adminPL" ' + (COMPANY.prelevementLiberatoire ? 'checked' : '') + '><span class="toggle-slider"></span>';
   plRow.appendChild(plToggle);
   fiscCard.appendChild(plRow);
-  
+
   fiscCard.appendChild(createInput('TVA depuis (laisser vide si non assujetti)', 'month', 'adminTVA', COMPANY.tvaDepuis || ''));
-  
+
   // Périodicité URSSAF
   fiscCard.appendChild(createSelect('Périodicité URSSAF', 'adminUrssafPeriod', [
     { value: 'mensuel', label: '📅 Mensuel (fin de chaque mois)' },
     { value: 'trimestriel', label: '📆 Trimestriel (30/04, 31/07, 31/10, 31/01)' }
   ], COMPANY.urssafPeriodicite || 'mensuel'));
-  
-  // Note sur l'IR
-  fiscCard.appendChild(el('div', { style: { marginTop: '12px', padding: '12px', background: 'var(--info-glow)', borderRadius: 'var(--radius-sm)', fontSize: '11px' } }, [
-    el('strong', {}, '💡 Simulation IR: '),
-    document.createTextNode('Clique sur la carte "IR Estimé" du dashboard pour configurer les paramètres (parts fiscales, PER, autres revenus) par année.')
-  ]));
-  
+
+  // V73: Paramètres IR
+  fiscCard.appendChild(el('div', { style: { marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' } }));
+  fiscCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '10px' } }, '📊 Paramètres Impôt sur le Revenu'));
+
+  var irRow = el('div', { class: 'form-row' });
+  irRow.appendChild(createSelect('Quotient familial', 'adminQuotientFamilial', [
+    { value: '1', label: '1 part - Célibataire' },
+    { value: '1.5', label: '1.5 parts - Célibataire + 1 enfant' },
+    { value: '2', label: '2 parts - Couple sans enfant' },
+    { value: '2.5', label: '2.5 parts - Couple + 1 enfant' },
+    { value: '3', label: '3 parts - Couple + 2 enfants' },
+    { value: '3.5', label: '3.5 parts - Couple + 3 enfants' },
+    { value: '4', label: '4 parts - Couple + 4 enfants' }
+  ], String(COMPANY.quotientFamilial || 1)));
+  irRow.appendChild(createInput('Revenus conjoint (€/an)', 'number', 'adminRevenusConjoint', COMPANY.revenusConjoint || 0, '0 si célibataire'));
+  fiscCard.appendChild(irRow);
+
+  var perRow = el('div', { class: 'form-row' });
+  perRow.appendChild(createInput('PER versé (€/an)', 'number', 'adminPER', COMPANY.perAnnuel || 0, 'Plan Épargne Retraite'));
+  perRow.appendChild(createInput('Autres revenus (€/an)', 'number', 'adminAutresRevenus', COMPANY.autresRevenus || 0, 'Revenus locatifs, etc.'));
+  fiscCard.appendChild(perRow);
+
   container.appendChild(fiscCard);
   
   // Trésorerie
@@ -12841,10 +13101,17 @@ function renderAdmin(container) {
     COMPANY.email = $('#adminEmail') ? $('#adminEmail').value : '';
     COMPANY.telephone = $('#adminTel') ? $('#adminTel').value : '';
     COMPANY.debut = $('#adminDebut').value;
+    // V73: Type activité
+    COMPANY.typeActivite = $('#adminTypeActivite') ? $('#adminTypeActivite').value : 'BNC';
     COMPANY.acre = $('#adminAcre').checked;
     COMPANY.prelevementLiberatoire = $('#adminPL').checked;
     COMPANY.tvaDepuis = $('#adminTVA').value || null;
     COMPANY.urssafPeriodicite = $('#adminUrssafPeriod') ? $('#adminUrssafPeriod').value : 'mensuel';
+    // V73: Paramètres IR
+    COMPANY.quotientFamilial = $('#adminQuotientFamilial') ? parseFloat($('#adminQuotientFamilial').value) : 1;
+    COMPANY.revenusConjoint = $('#adminRevenusConjoint') ? parseFloat($('#adminRevenusConjoint').value) || 0 : 0;
+    COMPANY.perAnnuel = $('#adminPER') ? parseFloat($('#adminPER').value) || 0 : 0;
+    COMPANY.autresRevenus = $('#adminAutresRevenus') ? parseFloat($('#adminAutresRevenus').value) || 0 : 0;
     if ($('#adminTVAIntracom')) COMPANY.tvaIntracom = $('#adminTVAIntracom').value || '';
     if ($('#adminIBAN')) COMPANY.iban = $('#adminIBAN').value || '';
     if ($('#adminBIC')) COMPANY.bic = $('#adminBIC').value || '';
@@ -12866,7 +13133,17 @@ function renderAdmin(container) {
     saveAll(); render();
     toast('Configuration sauvegardée', 'success');
   } }, '✅ Sauvegarder'));
-  
+
+  // V73: Simulateurs fiscaux
+  var simCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  simCard.appendChild(el('div', { class: 'card-title' }, '🧮 Simulateurs Fiscaux'));
+  var simBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
+  simBtns.appendChild(el('button', { class: 'btn btn-block', onclick: showIRDetail }, '💶 Simulateur IR'));
+  simBtns.appendChild(el('button', { class: 'btn btn-block', onclick: showCFESimulator }, '🏢 Simulateur CFE'));
+  simCard.appendChild(simBtns);
+  simCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '10px' } }, 'Estimez vos impôts selon votre CA et votre situation'));
+  container.appendChild(simCard);
+
   // Export/Import
   var ioCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   ioCard.appendChild(el('div', { class: 'card-title' }, '💾 Données'));
@@ -12942,7 +13219,100 @@ function renderAdmin(container) {
   ioCard.appendChild(clientsBtns);
   
   container.appendChild(ioCard);
-  
+
+  // V73: Cloud Sync Configuration
+  var cloudCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  cloudCard.appendChild(el('div', { class: 'card-title' }, '☁️ Cloud Sync (Supabase)'));
+
+  // Status indicator
+  var statusDiv = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  if (SYNC_ENABLED) {
+    if (CURRENT_USER) {
+      statusDiv.style.background = 'var(--success-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '✅'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--success)' } }, 'Connecté'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, CURRENT_USER.email)
+      ]));
+    } else {
+      statusDiv.style.background = 'var(--warning-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '⚡'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--warning)' } }, 'Configuré'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur 🔒 pour te connecter')
+      ]));
+    }
+  } else {
+    statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '❌'));
+    statusDiv.appendChild(el('div', {}, [
+      el('div', { style: { fontWeight: '600', color: 'var(--text-muted)' } }, 'Non configuré'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Configure ton projet Supabase ci-dessous')
+    ]));
+  }
+  cloudCard.appendChild(statusDiv);
+
+  // Instructions
+  var instructions = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.5' } });
+  instructions.innerHTML = '<b>Comment configurer:</b><br>' +
+    '1. Crée un compte gratuit sur <a href="https://supabase.com" target="_blank" style="color: var(--accent);">supabase.com</a><br>' +
+    '2. Crée un nouveau projet<br>' +
+    '3. Va dans Settings → API et copie l\'URL et la clé anon<br>' +
+    '4. Exécute le SQL ci-dessous dans SQL Editor';
+  cloudCard.appendChild(instructions);
+
+  // SQL snippet (collapsible)
+  var sqlToggle = el('details', { style: { marginBottom: '12px' } });
+  sqlToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--accent)' } }, '📋 Voir le SQL à exécuter'));
+  var sqlCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
+  sqlCode.textContent = 'CREATE TABLE user_data (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,\n  company JSONB,\n  missions JSONB,\n  treasury JSONB,\n  clients JSONB,\n  updated_at TIMESTAMP DEFAULT NOW()\n);\n\nALTER TABLE user_data ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Users can manage own data" ON user_data\n  FOR ALL USING (auth.uid() = user_id);';
+  sqlToggle.appendChild(sqlCode);
+  cloudCard.appendChild(sqlToggle);
+
+  // Configuration fields
+  cloudCard.appendChild(createInput('URL Supabase', 'url', 'cloudSupabaseUrl', SUPABASE_URL || '', 'https://xxx.supabase.co'));
+  cloudCard.appendChild(createInput('Clé Anon', 'text', 'cloudSupabaseKey', SUPABASE_ANON_KEY || '', 'eyJhbG...'));
+
+  // Save button
+  var cloudBtns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '12px' } });
+  cloudBtns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() {
+    var url = $('#cloudSupabaseUrl').value.trim();
+    var key = $('#cloudSupabaseKey').value.trim();
+    if (!url || !key) {
+      toast('URL et clé requises', 'error');
+      return;
+    }
+    saveSupabaseCredentials(url, key);
+    toast('Configuration Supabase sauvegardée!', 'success');
+    render();
+  } }, '💾 Sauvegarder Config'));
+
+  if (SYNC_ENABLED && !CURRENT_USER) {
+    cloudBtns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: showAuthModal }, '🔐 Se connecter'));
+  }
+  if (SYNC_ENABLED && CURRENT_USER) {
+    cloudBtns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() { syncToCloud(); } }, '⬆️ Sync maintenant'));
+  }
+  cloudCard.appendChild(cloudBtns);
+
+  // Clear config button
+  if (SUPABASE_URL || SUPABASE_ANON_KEY) {
+    cloudCard.appendChild(el('button', { class: 'btn btn-danger btn-sm', style: { marginTop: '10px', width: '100%' }, onclick: function() {
+      if (confirm('Supprimer la configuration Supabase?')) {
+        localStorage.removeItem('freel_supabase');
+        SUPABASE_URL = '';
+        SUPABASE_ANON_KEY = '';
+        supabase = null;
+        SYNC_ENABLED = false;
+        CURRENT_USER = null;
+        updateAuthUI();
+        toast('Configuration Supabase supprimée', 'info');
+        render();
+      }
+    } }, '🗑️ Supprimer la configuration'));
+  }
+
+  container.appendChild(cloudCard);
+
   container.appendChild(el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Freel V' + APP_VERSION + ' · Made with 💚'));
 }
 
