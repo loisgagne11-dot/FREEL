@@ -10799,7 +10799,7 @@ function renderMissionsView(container) {
   renderMissions(container);
 }
 
-var FINANCES_TAB = 'factures'; // sous-onglet finances: factures, tresorerie, missions
+var FINANCES_TAB = 'evolution'; // V73: sous-onglet finances: evolution, performance, conformite
 
 function renderFinances(container) {
   // Header avec sous-onglets
@@ -10807,46 +10807,362 @@ function renderFinances(container) {
   header.appendChild(el('h2', { class: 'page-title' }, '💰 Finances'));
   container.appendChild(header);
 
-  // Sous-onglets Factures / Trésorerie / Missions
+  // V73: Sous-onglets Évolution / Performance / Conformité (selon cahier des charges)
   var tabs = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '16px', padding: '4px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
 
-  var tabFactures = el('button', {
-    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'factures' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'factures' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { FINANCES_TAB = 'factures'; render(); }
-  }, '📄 Factures');
+  var tabEvolution = el('button', {
+    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'evolution' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'evolution' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { FINANCES_TAB = 'evolution'; render(); }
+  }, '📈 Évolution');
 
-  var tabTreso = el('button', {
-    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'tresorerie' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'tresorerie' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { FINANCES_TAB = 'tresorerie'; render(); }
-  }, '🏦 Trésorerie');
+  var tabPerformance = el('button', {
+    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'performance' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'performance' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { FINANCES_TAB = 'performance'; render(); }
+  }, '🎯 Performance');
 
-  var tabMissions = el('button', {
-    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'missions' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'missions' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { FINANCES_TAB = 'missions'; render(); }
-  }, '💼 Missions');
+  var tabConformite = el('button', {
+    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'conformite' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'conformite' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { FINANCES_TAB = 'conformite'; render(); }
+  }, '✅ Conformité');
 
-  // V72: Nouvel onglet Analyse
-  var tabAnalyse = el('button', {
-    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'analyse' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'analyse' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { FINANCES_TAB = 'analyse'; render(); }
-  }, '📊 Analyse');
-
-  tabs.appendChild(tabFactures);
-  tabs.appendChild(tabTreso);
-  tabs.appendChild(tabMissions);
-  tabs.appendChild(tabAnalyse);
+  tabs.appendChild(tabEvolution);
+  tabs.appendChild(tabPerformance);
+  tabs.appendChild(tabConformite);
   container.appendChild(tabs);
 
   // Contenu selon sous-onglet
-  if (FINANCES_TAB === 'tresorerie') {
-    renderTresorerieContent(container);
-  } else if (FINANCES_TAB === 'missions') {
-    renderMissionsContent(container);
-  } else if (FINANCES_TAB === 'analyse') {
-    renderAnalyseContent(container);
+  if (FINANCES_TAB === 'performance') {
+    renderFinancesPerformance(container);
+  } else if (FINANCES_TAB === 'conformite') {
+    renderFinancesConformite(container);
   } else {
-    renderFacturesContent(container);
+    renderFinancesEvolution(container);
   }
+}
+
+// V73: Sous-onglet Évolution - Graphiques Trésorerie & CA, Historique salaires
+function renderFinancesEvolution(container) {
+  var data = compute();
+
+  // Graphique Trésorerie & Salaires
+  var tresoCard = el('div', { class: 'card' });
+  tresoCard.appendChild(el('div', { class: 'card-title' }, '💰 Trésorerie & Salaires'));
+  tresoCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px' } }, [el('canvas', { id: 'soldeChart' })]));
+  container.appendChild(tresoCard);
+
+  // Graphique CA HT
+  var caCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  caCard.appendChild(el('div', { class: 'card-title' }, '📊 CA HT (Prévu / Réalisé / Encaissé)'));
+  caCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px' } }, [el('canvas', { id: 'mainChart' })]));
+  container.appendChild(caCard);
+
+  // Historique Salaires versés
+  var salaires = [];
+  MISSIONS.forEach(function(m) {
+    if (m.salaires) m.salaires.forEach(function(s) {
+      salaires.push({ date: s.date, montant: s.montant, mission: m.client });
+    });
+  });
+  salaires.sort(function(a, b) { return b.date.localeCompare(a.date); });
+
+  if (salaires.length > 0) {
+    var salaireCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+    salaireCard.appendChild(el('div', { class: 'card-title' }, '💸 Historique Salaires'));
+    var salaireList = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+    salaires.slice(0, 10).forEach(function(s) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--glass-border)' } });
+      row.appendChild(el('span', { style: { fontSize: '12px' } }, fmtDate(s.date) + ' - ' + s.mission));
+      row.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--success)' } }, EUR(s.montant)));
+      salaireList.appendChild(row);
+    });
+    salaireCard.appendChild(salaireList);
+    var totalSalaires = salaires.reduce(function(sum, s) { return sum + s.montant; }, 0);
+    salaireCard.appendChild(el('div', { style: { marginTop: '10px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between' } }, [
+      el('span', { style: { fontWeight: '600' } }, 'Total versé'),
+      el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, EUR(totalSalaires))
+    ]));
+    container.appendChild(salaireCard);
+  }
+
+  // Mouvements récents (factures encaissées)
+  renderTresorerieContent(container);
+}
+
+// V73: Sous-onglet Performance - Donut CA, Comparaison N-1, Prévisionnel vs Réalisé
+function renderFinancesPerformance(container) {
+  var data = compute();
+  var currentYear = PERIOD.year;
+  var prevYear = currentYear - 1;
+
+  // Filtres période (déjà en header global)
+
+  // KPIs Performance
+  var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
+
+  // CA Réalisé
+  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé', 'var(--info)'));
+  // CA Encaissé
+  kpiGrid.appendChild(createKPIBlock(EUR(data.caEnc), 'CA Encaissé', 'var(--success)'));
+  // Bénéfice Net
+  kpiGrid.appendChild(createKPIBlock(EUR(data.beneficeNet), 'Bénéfice Net', data.beneficeNet >= 0 ? 'var(--success)' : 'var(--danger)'));
+  container.appendChild(kpiGrid);
+
+  // Donut répartition CA HT par client/mission
+  var caByClient = {};
+  MISSIONS.forEach(function(m) {
+    var ca = 0;
+    if (m.lignes) m.lignes.forEach(function(l) {
+      if (isInPeriod(l.ym) && l.joursReels > 0) {
+        ca += l.joursReels * m.tjm;
+      }
+    });
+    if (ca > 0) {
+      var clientName = m.client || 'Sans client';
+      caByClient[clientName] = (caByClient[clientName] || 0) + ca;
+    }
+  });
+
+  var donutCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  donutCard.appendChild(el('div', { class: 'card-title' }, '🍩 Répartition CA HT par Client'));
+
+  if (Object.keys(caByClient).length > 0) {
+    donutCard.appendChild(el('div', { id: 'caDonutContainer', style: { height: '200px', position: 'relative' } }, [el('canvas', { id: 'caDonutChart' })]));
+    // Legend
+    var legend = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px', justifyContent: 'center' } });
+    var colors = ['#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#f87171'];
+    var i = 0;
+    for (var client in caByClient) {
+      var color = colors[i % colors.length];
+      var pct = Math.round(caByClient[client] / data.caReal * 100) || 0;
+      legend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' } }, [
+        el('span', { style: { width: '10px', height: '10px', borderRadius: '50%', background: color } }),
+        el('span', {}, client + ' (' + pct + '%)')
+      ]));
+      i++;
+    }
+    donutCard.appendChild(legend);
+  } else {
+    donutCard.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Aucun CA sur la période'));
+  }
+  container.appendChild(donutCard);
+
+  // Comparaison N-1
+  var compCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  compCard.appendChild(el('div', { class: 'card-title' }, '📊 Comparaison ' + currentYear + ' vs ' + prevYear));
+
+  // Calculer CA N-1
+  var caN1 = 0;
+  MISSIONS.forEach(function(m) {
+    if (m.lignes) m.lignes.forEach(function(l) {
+      var year = parseInt(String(l.ym).substring(0, 4));
+      if (year === prevYear && l.joursReels > 0) {
+        caN1 += l.joursReels * m.tjm;
+      }
+    });
+  });
+
+  var variation = caN1 > 0 ? ((data.caReal - caN1) / caN1 * 100) : 0;
+  var variationColor = variation >= 0 ? 'var(--success)' : 'var(--danger)';
+  var variationIcon = variation >= 0 ? '📈' : '📉';
+
+  var compGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' } });
+  compGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'CA ' + prevYear),
+    el('div', { style: { fontSize: '16px', fontWeight: '700' } }, EUR(caN1))
+  ]));
+  compGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'CA ' + currentYear),
+    el('div', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--accent)' } }, EUR(data.caReal))
+  ]));
+  compGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Variation'),
+    el('div', { style: { fontSize: '16px', fontWeight: '700', color: variationColor } }, variationIcon + ' ' + (variation >= 0 ? '+' : '') + variation.toFixed(1) + '%')
+  ]));
+  compCard.appendChild(compGrid);
+  container.appendChild(compCard);
+
+  // Prévisionnel vs Réalisé
+  var prevRealCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  prevRealCard.appendChild(el('div', { class: 'card-title' }, '🎯 Prévisionnel vs Réalisé'));
+
+  var caPrev = data.caPrev || 0;
+  var caReal = data.caReal || 0;
+  var ecart = caReal - caPrev;
+  var ecartPct = caPrev > 0 ? (ecart / caPrev * 100) : 0;
+  var ecartColor = ecart >= 0 ? 'var(--success)' : 'var(--danger)';
+
+  var prevRealGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' } });
+  prevRealGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Prévisionnel'),
+    el('div', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--warning)' } }, EUR(caPrev))
+  ]));
+  prevRealGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Réalisé'),
+    el('div', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--info)' } }, EUR(caReal))
+  ]));
+  prevRealGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Écart'),
+    el('div', { style: { fontSize: '16px', fontWeight: '700', color: ecartColor } }, (ecart >= 0 ? '+' : '') + EUR(ecart) + ' (' + (ecart >= 0 ? '+' : '') + ecartPct.toFixed(1) + '%)')
+  ]));
+  prevRealCard.appendChild(prevRealGrid);
+  container.appendChild(prevRealCard);
+
+  // Lien Simulateur IR
+  var simCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  simCard.appendChild(el('button', { class: 'btn btn-primary btn-block', onclick: showIRDetail }, '💶 Ouvrir Simulateur IR'));
+  container.appendChild(simCard);
+
+  // Dessiner le donut après le render
+  setTimeout(function() { drawCADonut(caByClient); }, 100);
+}
+
+// V73: Dessiner le donut CA par client
+function drawCADonut(caByClient) {
+  if (typeof Chart === 'undefined') return;
+  var canvas = $('#caDonutChart');
+  if (!canvas || !canvas.getContext) return;
+  var ctx = canvas.getContext('2d');
+
+  var labels = Object.keys(caByClient);
+  var values = labels.map(function(k) { return caByClient[k]; });
+  var colors = ['#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#f87171'];
+
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors.slice(0, labels.length),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      }
+    }
+  });
+}
+
+// V73: Sous-onglet Conformité - Couverture provisions, Toggle payé, Analyse écart
+function renderFinancesConformite(container) {
+  var data = compute();
+  var provisions = getAbsoluteProvisions();
+
+  // Indicateur couverture global
+  var totalProvisions = provisions.urssaf + provisions.tva + provisions.ir;
+  var totalPayees = (provisions.urssafPaid || 0) + (provisions.tvaPaid || 0) + (provisions.irPaid || 0);
+  var couverture = totalProvisions > 0 ? (totalPayees / totalProvisions * 100) : 100;
+
+  var heroCard = el('div', { class: 'card', style: { background: couverture >= 80 ? 'var(--success-glow)' : couverture >= 50 ? 'var(--warning-glow)' : 'var(--danger-glow)' } });
+  heroCard.appendChild(el('div', { style: { textAlign: 'center' } }, [
+    el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, couverture >= 80 ? '✅' : couverture >= 50 ? '⚠️' : '🚨'),
+    el('div', { style: { fontSize: '28px', fontWeight: '800' } }, couverture.toFixed(0) + '%'),
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Couverture des provisions'),
+    el('div', { style: { fontSize: '11px', marginTop: '8px' } }, EUR(totalPayees) + ' payé sur ' + EUR(totalProvisions) + ' provisionné')
+  ]));
+  container.appendChild(heroCard);
+
+  // Détail par type provision avec toggle
+  var detailCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  detailCard.appendChild(el('div', { class: 'card-title' }, '📋 Détail par Type'));
+
+  var types = [
+    { id: 'urssaf', label: 'URSSAF + CFP', icon: '🏥', total: provisions.urssaf, paid: provisions.urssafPaid || 0 },
+    { id: 'tva', label: 'TVA', icon: '🏛️', total: provisions.tva, paid: provisions.tvaPaid || 0 },
+    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provisions.ir, paid: provisions.irPaid || 0 }
+  ];
+
+  types.forEach(function(t) {
+    if (t.total <= 0) return;
+    var pct = t.total > 0 ? (t.paid / t.total * 100) : 0;
+    var row = el('div', { style: { padding: '12px', marginBottom: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+
+    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
+    header.appendChild(el('span', { style: { fontWeight: '600' } }, t.icon + ' ' + t.label));
+    header.appendChild(el('span', { style: { fontSize: '12px', color: pct >= 100 ? 'var(--success)' : 'var(--warning)' } }, pct.toFixed(0) + '% couvert'));
+    row.appendChild(header);
+
+    // Progress bar
+    var progressBar = el('div', { style: { height: '6px', background: 'var(--bg-secondary)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' } });
+    progressBar.appendChild(el('div', { style: { height: '100%', width: Math.min(100, pct) + '%', background: pct >= 100 ? 'var(--success)' : 'var(--warning)', borderRadius: '3px' } }));
+    row.appendChild(progressBar);
+
+    var details = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' } });
+    details.appendChild(el('span', {}, 'Payé: ' + EUR(t.paid)));
+    details.appendChild(el('span', {}, 'À payer: ' + EUR(t.total - t.paid)));
+    details.appendChild(el('span', {}, 'Total: ' + EUR(t.total)));
+    row.appendChild(details);
+
+    detailCard.appendChild(row);
+  });
+
+  container.appendChild(detailCard);
+
+  // Analyse écart - Prévisions vs Réel
+  var ecartCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  ecartCard.appendChild(el('div', { class: 'card-title' }, '📊 Analyse Écart'));
+
+  var ecarts = [
+    { label: 'CA Prévu', prevu: data.caPrev || 0, reel: data.caReal || 0 },
+    { label: 'Charges Prévues', prevu: data.chargesPrev || data.totalCharges || 0, reel: data.totalCharges || 0 }
+  ];
+
+  ecarts.forEach(function(e) {
+    var ecart = e.reel - e.prevu;
+    var pct = e.prevu > 0 ? (ecart / e.prevu * 100) : 0;
+    var color = ecart >= 0 ? 'var(--success)' : 'var(--danger)';
+    if (e.label.includes('Charges')) color = ecart <= 0 ? 'var(--success)' : 'var(--danger)';
+
+    var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', marginBottom: '6px', background: 'var(--bg-tertiary)', borderRadius: '6px' } });
+    row.appendChild(el('span', { style: { fontWeight: '600', fontSize: '12px' } }, e.label));
+    row.appendChild(el('div', { style: { textAlign: 'right' } }, [
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Prévu: ' + EUR(e.prevu) + ' | Réel: ' + EUR(e.reel)),
+      el('div', { style: { fontSize: '12px', fontWeight: '700', color: color } }, (ecart >= 0 ? '+' : '') + EUR(ecart) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%)')
+    ]));
+    ecartCard.appendChild(row);
+  });
+
+  container.appendChild(ecartCard);
+
+  // Toggle provisions payées (reprendre l'existant)
+  renderProvisionsList(container, data);
+}
+
+// V73: Helper pour créer un KPI block
+function createKPIBlock(value, label, color) {
+  var block = el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  block.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', color: color || 'inherit' } }, value));
+  block.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, label));
+  return block;
+}
+
+// V73: Afficher la liste des provisions avec toggle (pour Conformité)
+function renderProvisionsList(container, data) {
+  var card = el('div', { class: 'card', style: { marginTop: '12px' } });
+  card.appendChild(el('div', { class: 'card-title' }, '💳 Toggle Provisions Payées'));
+
+  if (data.detailChargesAPayer && data.detailChargesAPayer.length > 0) {
+    data.detailChargesAPayer.forEach(function(c) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', marginBottom: '6px', background: 'var(--bg-tertiary)', borderRadius: '6px' } });
+      row.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', fontSize: '12px' } }, c.cat),
+        el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, c.periode || '')
+      ]));
+      row.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
+        el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, EUR(c.montant)),
+        el('button', { class: 'btn btn-sm', style: { padding: '4px 8px', fontSize: '10px' }, onclick: function() { togglePaid(c.id); } }, '✓ Marquer payé')
+      ]));
+      card.appendChild(row);
+    });
+  } else {
+    card.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--success)' } }, '✅ Toutes les provisions sont à jour!'));
+  }
+
+  container.appendChild(card);
 }
 
 // V60: Contenu Missions dans Finance - avec distinction Réalisé/Encaissé/Latent/Prévu
