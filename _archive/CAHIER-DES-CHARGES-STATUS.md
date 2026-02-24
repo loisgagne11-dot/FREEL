@@ -1,160 +1,135 @@
-# Cahier des Charges FREEL - État d'Avancement Complet
+# Cahier des Charges FREEL - Vérification Complète
 
-## PHASE 0: ARCHIVAGE ✅
+## Phase 1 : Structure de base
 
 | Tâche | Statut | Notes |
 |-------|--------|-------|
-| Créer dossier _archive/ | ✅ | Fait |
-| Copier index.html vers legacy-v72.html | ✅ | Backup complet |
-| Documenter fonctions archivées | ✅ | FUNCTIONS-INDEX.md |
+| Nettoyer le code existant | ⚠️ | Archivé mais pas nettoyé |
+| Restructurer navigation 4 onglets | ✅ | Cockpit, Activité, Finances, Config |
+| Implémenter bouton (+) flottant | ✅ | showFabMenu() contextuel |
+| Mettre en place Supabase sync | ⚠️ | UI faite, CDN bloqué Edge |
 
 ---
 
-## PHASE 1: STRUCTURE ✅
+## Phase 2 : Cockpit
 
 | Tâche | Statut | Notes |
 |-------|--------|-------|
-| Navigation 4 onglets | ✅ | Cockpit, Activité, Finances, Config |
-| Bouton flottant (+) centralisé | ✅ | showFabMenu() contextuel |
-| Modèle LEGAL versionné par année | ✅ | LEGAL_BY_YEAR[2025/2026] |
-| Support type activité | ✅ | BNC/BIC_vente/BIC_service |
-| Setup Supabase sync | ⚠️ | UI faite, CDN bloqué sur Edge |
+| Cash Disponible avec modal détail | ✅ | showCashDetail() |
+| Donut Composition Compte (Chart.js) | ✅ | Chart doughnut provisions |
+| Jauge Plafond Micro avec projections | ✅ | renderCAPlafondWidget() |
+| Salaire Versable avec bouton | ✅ | Capacité salaire affichée |
+| Timeline Jalons (scroll horizontal) | ✅ | renderActionsAndMilestones() |
+| Autonomie | ✅ | Runway X mois |
+| Centre d'Actions avec indicateurs santé | ✅ | getActionsList() |
 
 ---
 
-## PHASE 2: COCKPIT ✅
+## Phase 3 : Activité
 
 | Tâche | Statut | Notes |
 |-------|--------|-------|
-| Hero Cash Disponible | ✅ | renderDashboardHero() |
-| Indicateur santé (couleur) | ✅ | Vert/Orange/Rouge |
-| Donut Solde vs Provisions | ✅ | Composition visuelle |
-| Autonomie (X mois) | ✅ | Runway calculé |
-| Timeline jalons passés | ✅ | Grisés |
-| Timeline jalons à venir | ✅ | Colorés par catégorie |
-| Types jalons: URSSAF, TVA, IR, CFE | ✅ | getLegalMilestones() |
-| Fin de mission dans timeline | ✅ | Catégorie 'mission' |
-| Alertes factures en retard | ✅ | computeAlerts() |
-| Alertes charges à payer | ✅ | computeAlerts() |
-| Alertes dépassement plafond | ✅ | computeAlerts() |
-| Actions recommandées | ✅ | getActionsList() |
-| Graphique CA | ✅ | drawMainChart() avec labels |
-| Graphique Trésorerie + Salaires | ✅ | drawSoldeChart() avec labels |
+| Liste Missions avec CRUD sur card | ✅ | renderMissionsContent() |
+| Éditeur de jours intégré | ✅ | showDaysEditor() |
+| Liste Factures avec filtres et CRUD | ✅ | renderFacturesContent() |
+| Génération PDF facture | ✅ | generateInvoicePDF() |
+| Liste Clients avec métriques (DSO, %) | ❌ | DSO non implémenté |
+| Liste Charges manuelles avec CRUD | ✅ | showChargeModal() |
+| KPIs header (CA, Taux occup.) | ⚠️ | CA oui, Taux occup. partiel |
 
 ---
 
-## PHASE 3: ACTIVITÉ ✅
+## Phase 4 : Finances
+
+### Structure actuelle vs spécifiée:
+- **Actuel**: Factures | Trésorerie | Missions
+- **Spécifié**: Évolution | Performance | Conformité
 
 | Tâche | Statut | Notes |
 |-------|--------|-------|
-| Liste missions avec statut | ✅ | renderMissionsContent() |
-| Indicateur En cours/Terminée/À venir | ✅ | getMissionStatus() |
-| TJM, dates, client affichés | ✅ | Carte mission |
-| Jours travaillés/planifiés | ✅ | showDaysEditor() |
-| Clic → édition mission | ✅ | showMissionModal() |
-| Liste factures par mission | ✅ | renderFacturesContent() |
-| Statut Payée/En attente/Retard | ✅ | Indicateurs colorés |
-| Télécharger facture PDF | ✅ | showDownloadInvoiceModal() |
-| Montant HT + TVA affiché | ✅ | Détail facture |
-| Graphique CA Prévu | ✅ | Violet pointillé |
-| Graphique CA Réalisé | ✅ | Cyan |
-| Graphique CA Encaissé | ✅ | Vert |
-| Toggle cumul | ✅ | SHOW_CUMUL |
+| **Sous-onglet Évolution** | | |
+| Graphique Trésorerie & Salaires | ✅ | drawSoldeChart() |
+| Graphique CA HT | ✅ | drawMainChart() |
+| Historique salaires | ✅ | Dans mouvements |
+| **Sous-onglet Performance** | | |
+| Filtres période | ✅ | PERIOD sélecteur |
+| Donut répartition CA HT | ❌ | Non implémenté |
+| Détail provisions/charges/rémunération | ✅ | Affiché |
+| Comparaison N-1 | ❌ | Non implémenté |
+| Prévisionnel vs Réalisé | ⚠️ | Graphique mais pas détaillé |
+| Lien Simulateur IR | ✅ | showIRDetail() |
+| **Sous-onglet Conformité** | | |
+| Indicateur couverture global | ❌ | Non implémenté |
+| Détail par type provision | ✅ | getAbsoluteProvisions() |
+| Toggle payé/non payé synchronisé | ✅ | togglePaid() |
+| Analyse écart | ❌ | Non implémenté |
 
 ---
 
-## PHASE 4: FINANCES ✅
+## Phase 5 : Config
 
 | Tâche | Statut | Notes |
 |-------|--------|-------|
-| Solde compte pro temps réel | ✅ | getAbsoluteBalance() |
-| Détail: Initial + Encaissé - Charges - Salaires | ✅ | showCashDetail() |
-| Provisions par type (URSSAF, TVA, IR) | ✅ | getAbsoluteProvisions() |
-| Toggle paiement provision | ✅ | togglePaid() |
-| Toggle bidirectionnel | ✅ | payé ↔ à payer |
-| Historique mouvements chronologique | ✅ | renderTresorerie() |
-| Filtres (type, recherche) | ✅ | SEARCH_STATE |
-| Encaissements/Charges/Salaires | ✅ | allMouvements |
-| Graphique Solde/Cash Dispo (barres) | ✅ | drawSoldeChart() |
-| Graphique Salaires (ligne) | ✅ | drawSoldeChart() |
-| Projection future | ✅ | dataSoldeProjection |
-| Capacité salaire | ✅ | dataCapaciteSalaire |
-
----
-
-## PHASE 5: CONFIG ✅
-
-| Tâche | Statut | Notes |
-|-------|--------|-------|
-| Nom, SIRET entreprise | ✅ | COMPANY |
-| Date début activité | ✅ | COMPANY.debut |
-| Type activité (BNC/BIC) | ✅ | COMPANY.typeActivite |
-| Adresse | ✅ | COMPANY.adresse |
-| IBAN/BIC | ✅ | COMPANY.iban/bic |
-| ACRE (oui/non, date fin auto) | ✅ | getAcreInfo() |
-| Prélèvement libératoire | ✅ | COMPANY.prelevementLiberatoire |
-| Périodicité URSSAF | ✅ | mensuel/trimestriel |
-| TVA depuis | ✅ | COMPANY.tvaDepuis |
-| Liste clients | ✅ | CLIENTS |
-| Ajout/Édition client | ✅ | showClientModal() |
-| Export JSON | ✅ | exportData() |
-| Import JSON | ✅ | importData() |
-| Livre recettes CSV | ✅ | exportLivreRecettes() |
-| Livre recettes PDF | ✅ | exportLivreRecettesPDF() |
-| FEC comptable | ✅ | exportFEC() |
-| Cloud Sync UI | ✅ | Configuration Supabase |
-
----
-
-## PHASE 6: SIMULATEURS ✅
-
-| Tâche | Statut | Notes |
-|-------|--------|-------|
-| Simulateur IR annuel | ✅ | showIRDetail() |
-| Sélection année | ✅ | 2025/2026 |
-| Quotient familial | ✅ | Éditable dans simulateur |
-| Abattement selon type activité | ✅ | BNC 34%, BIC 50%/71% |
-| Tranches IR détaillées | ✅ | Affichage progressif |
-| Revenus conjoint, PER, autres | ✅ | Paramètres éditables |
+| Section Entreprise | ✅ | COMPANY complet |
+| Section Régime Fiscal (avec calcul ACRE) | ✅ | getAcreInfo() |
+| Simulateur IR complet | ✅ | showIRDetail() |
 | Simulateur CFE | ✅ | showCFESimulator() |
-| CA N-2 | ✅ | Base de calcul |
-| Tranches CFE | ✅ | Barème officiel |
-| Taux communal | ✅ | Configurable |
-| Exonérations | ✅ | 1ère année, CA < 5000€ |
+| Section Trésorerie | ✅ | Solde initial, rendement |
+| Références légales | ✅ | LEGAL_BY_YEAR |
+| Livre des Recettes (vue + export) | ✅ | exportLivreRecettes() |
+| Exports (PDF, CSV, JSON) | ✅ | Tous formats |
+| Sync Supabase | ⚠️ | UI faite |
 
 ---
 
-## PHASE 7: POLISH ⏳
+## Phase 6 : Transverse
 
 | Tâche | Statut | Notes |
 |-------|--------|-------|
-| Tests complets tous scénarios | ⏳ | À faire manuellement |
-| Documentation utilisateur | ⏳ | Optionnel |
-| Optimisation performance | ✅ | App fluide |
-| Cloud Sync fonctionnel | ⚠️ | Tester sur Chrome/Firefox |
+| Recherche globale Cmd+K | ✅ | showSearch() + Cmd+K |
+| Raccourcis clavier | ✅ | initKeyboardShortcuts() |
+| Responsive mobile | ✅ | @media queries |
+| Harmonisation IDs charges (toggle sync) | ✅ | togglePaid synchronisé |
+| Gestion cas nouveaux utilisateurs | ✅ | Onboarding showOnboarding() |
 
 ---
 
-## RÉSUMÉ FINAL
+## Phase 7 : Tests & Polish
 
-| Phase | Statut | Progression |
-|-------|--------|-------------|
-| PHASE 0: Archivage | ✅ | 100% |
-| PHASE 1: Structure | ✅ | 95% (Supabase CDN) |
-| PHASE 2: Cockpit | ✅ | 100% |
-| PHASE 3: Activité | ✅ | 100% |
-| PHASE 4: Finances | ✅ | 100% |
-| PHASE 5: Config | ✅ | 100% |
-| PHASE 6: Simulateurs | ✅ | 100% |
-| PHASE 7: Polish | ⏳ | 50% |
-
-**Total: ~95% complet**
-
-### Reste à faire:
-1. ⏳ Tests manuels complets
-2. ⏳ Cloud Sync (tester sur autre navigateur)
-3. ⏳ Documentation utilisateur (optionnel)
+| Tâche | Statut | Notes |
+|-------|--------|-------|
+| Vérifier toutes les règles métier | ⏳ | En cours |
+| Tester cas limites (TVA, ACRE, N-1 vide) | ⏳ | À faire |
+| Optimiser performance | ✅ | App fluide |
+| Ajustements visuels finaux | ⏳ | En cours |
 
 ---
 
-*Mis à jour: 2026-02-24 - V73*
+## RÉSUMÉ - ÉLÉMENTS MANQUANTS
+
+### ❌ Non implémentés:
+1. **DSO clients** - Métrique délai paiement moyen
+2. **Donut répartition CA HT** - Dans Performance
+3. **Comparaison N-1** - Année précédente
+4. **Indicateur couverture global** - Conformité provisions
+5. **Analyse écart** - Prévu vs réalisé détaillé
+
+### ⚠️ Partiels:
+1. **Sous-onglets Finances** - Structure différente (Factures/Tréso/Missions vs Évolution/Perf/Conformité)
+2. **Supabase** - CDN bloqué sur Edge
+3. **Taux occupation** - Présent mais pas en KPI header
+
+### ✅ Complets:
+- Phase 1: 75%
+- Phase 2: 100%
+- Phase 3: 85%
+- Phase 4: 60%
+- Phase 5: 95%
+- Phase 6: 100%
+- Phase 7: 50%
+
+**TOTAL ESTIMÉ: ~80%**
+
+---
+
+*Mis à jour: 2026-02-24*
