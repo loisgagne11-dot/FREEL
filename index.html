@@ -402,15 +402,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 //# sourceMappingURL=chart.umd.js.map
 </script>
 
-<!-- Supabase CDN (avec fallback si bloqué par tracking prevention) -->
-<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>
-if (!window.supabase) {
-  var s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-  document.head.appendChild(s);
-}
-</script>
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root {
   --bg-primary: #0a0a0b;
@@ -1457,8 +1450,17 @@ function initSupabase() {
   // V73: D'abord charger depuis localStorage
   loadSupabaseCredentials();
 
-  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // V73: Chercher la librairie Supabase (peut être à différents endroits selon le CDN)
+  var supabaseLib = window.supabase || window.Supabase;
+  var createClientFn = null;
+  if (supabaseLib && supabaseLib.createClient) {
+    createClientFn = supabaseLib.createClient;
+  } else if (typeof createClient === 'function') {
+    createClientFn = createClient;
+  }
+
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && createClientFn) {
+    supabase = createClientFn(SUPABASE_URL, SUPABASE_ANON_KEY);
     SYNC_ENABLED = true;
 
     // Écouter les changements d'auth
@@ -13222,7 +13224,7 @@ function renderAdmin(container) {
         el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur 🔒 pour te connecter')
       ]));
     }
-  } else if (SUPABASE_URL && SUPABASE_ANON_KEY && !window.supabase) {
+  } else if (SUPABASE_URL && SUPABASE_ANON_KEY && !(window.supabase || window.Supabase)) {
     // Credentials sauvegardés mais librairie non chargée
     statusDiv.style.background = 'var(--danger-glow)';
     statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '🚫'));
@@ -13295,9 +13297,14 @@ function renderAdmin(container) {
       return;
     }
     // Test simple: vérifier que Supabase répond
+    var supabaseLib = window.supabase || window.Supabase;
+    if (!supabaseLib || !supabaseLib.createClient) {
+      toast('❌ Librairie Supabase non chargée. Recharge la page ou change de navigateur.', 'error');
+      return;
+    }
     toast('Test en cours...', 'info');
     try {
-      var testClient = window.supabase.createClient(url, key);
+      var testClient = supabaseLib.createClient(url, key);
       testClient.auth.getSession().then(function(result) {
         if (result.error) {
           toast('❌ Erreur: ' + result.error.message, 'error');
