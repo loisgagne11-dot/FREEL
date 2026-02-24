@@ -12874,28 +12874,6 @@ function renderAdmin(container) {
     { value: 'trimestriel', label: '📆 Trimestriel (30/04, 31/07, 31/10, 31/01)' }
   ], COMPANY.urssafPeriodicite || 'mensuel'));
 
-  // V73: Paramètres IR
-  fiscCard.appendChild(el('div', { style: { marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' } }));
-  fiscCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '10px' } }, '📊 Paramètres Impôt sur le Revenu'));
-
-  var irRow = el('div', { class: 'form-row' });
-  irRow.appendChild(createSelect('Quotient familial', 'adminQuotientFamilial', [
-    { value: '1', label: '1 part - Célibataire' },
-    { value: '1.5', label: '1.5 parts - Célibataire + 1 enfant' },
-    { value: '2', label: '2 parts - Couple sans enfant' },
-    { value: '2.5', label: '2.5 parts - Couple + 1 enfant' },
-    { value: '3', label: '3 parts - Couple + 2 enfants' },
-    { value: '3.5', label: '3.5 parts - Couple + 3 enfants' },
-    { value: '4', label: '4 parts - Couple + 4 enfants' }
-  ], String(COMPANY.quotientFamilial || 1)));
-  irRow.appendChild(createInput('Revenus conjoint (€/an)', 'number', 'adminRevenusConjoint', COMPANY.revenusConjoint || 0, '0 si célibataire'));
-  fiscCard.appendChild(irRow);
-
-  var perRow = el('div', { class: 'form-row' });
-  perRow.appendChild(createInput('PER versé (€/an)', 'number', 'adminPER', COMPANY.perAnnuel || 0, 'Plan Épargne Retraite'));
-  perRow.appendChild(createInput('Autres revenus (€/an)', 'number', 'adminAutresRevenus', COMPANY.autresRevenus || 0, 'Revenus locatifs, etc.'));
-  fiscCard.appendChild(perRow);
-
   container.appendChild(fiscCard);
   
   // Trésorerie
@@ -13107,11 +13085,6 @@ function renderAdmin(container) {
     COMPANY.prelevementLiberatoire = $('#adminPL').checked;
     COMPANY.tvaDepuis = $('#adminTVA').value || null;
     COMPANY.urssafPeriodicite = $('#adminUrssafPeriod') ? $('#adminUrssafPeriod').value : 'mensuel';
-    // V73: Paramètres IR
-    COMPANY.quotientFamilial = $('#adminQuotientFamilial') ? parseFloat($('#adminQuotientFamilial').value) : 1;
-    COMPANY.revenusConjoint = $('#adminRevenusConjoint') ? parseFloat($('#adminRevenusConjoint').value) || 0 : 0;
-    COMPANY.perAnnuel = $('#adminPER') ? parseFloat($('#adminPER').value) || 0 : 0;
-    COMPANY.autresRevenus = $('#adminAutresRevenus') ? parseFloat($('#adminAutresRevenus').value) || 0 : 0;
     if ($('#adminTVAIntracom')) COMPANY.tvaIntracom = $('#adminTVAIntracom').value || '';
     if ($('#adminIBAN')) COMPANY.iban = $('#adminIBAN').value || '';
     if ($('#adminBIC')) COMPANY.bic = $('#adminBIC').value || '';
@@ -13252,25 +13225,27 @@ function renderAdmin(container) {
   cloudCard.appendChild(statusDiv);
 
   // Instructions
-  var instructions = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.5' } });
+  var instructions = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.6' } });
   instructions.innerHTML = '<b>Comment configurer:</b><br>' +
     '1. Crée un compte gratuit sur <a href="https://supabase.com" target="_blank" style="color: var(--accent);">supabase.com</a><br>' +
-    '2. Crée un nouveau projet<br>' +
-    '3. Va dans Settings → API et copie l\'URL et la clé anon<br>' +
-    '4. Exécute le SQL ci-dessous dans SQL Editor';
+    '2. Crée un nouveau projet (attends ~2 min qu\'il se crée)<br>' +
+    '3. Va dans <b>Project Settings</b> (icône engrenage) → <b>API</b><br>' +
+    '4. Copie <b>Project URL</b> dans le champ ci-dessous<br>' +
+    '5. Copie la clé <b>anon public</b> (sous "Project API keys")<br>' +
+    '6. Exécute le SQL ci-dessous dans <b>SQL Editor</b>';
   cloudCard.appendChild(instructions);
 
   // SQL snippet (collapsible)
   var sqlToggle = el('details', { style: { marginBottom: '12px' } });
-  sqlToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--accent)' } }, '📋 Voir le SQL à exécuter'));
+  sqlToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--accent)' } }, '📋 Voir le SQL à exécuter dans SQL Editor'));
   var sqlCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
   sqlCode.textContent = 'CREATE TABLE user_data (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,\n  company JSONB,\n  missions JSONB,\n  treasury JSONB,\n  clients JSONB,\n  updated_at TIMESTAMP DEFAULT NOW()\n);\n\nALTER TABLE user_data ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Users can manage own data" ON user_data\n  FOR ALL USING (auth.uid() = user_id);';
   sqlToggle.appendChild(sqlCode);
   cloudCard.appendChild(sqlToggle);
 
-  // Configuration fields
-  cloudCard.appendChild(createInput('URL Supabase', 'url', 'cloudSupabaseUrl', SUPABASE_URL || '', 'https://xxx.supabase.co'));
-  cloudCard.appendChild(createInput('Clé Anon', 'text', 'cloudSupabaseKey', SUPABASE_ANON_KEY || '', 'eyJhbG...'));
+  // Configuration fields with clearer labels
+  cloudCard.appendChild(createInput('Project URL (Settings → API)', 'url', 'cloudSupabaseUrl', SUPABASE_URL || '', 'https://abcdefgh.supabase.co'));
+  cloudCard.appendChild(createInput('Clé anon public (Project API keys)', 'text', 'cloudSupabaseKey', SUPABASE_ANON_KEY || '', 'eyJhbGciOiJIUzI1NiIs...'));
 
   // Save button
   var cloudBtns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '12px' } });
@@ -13281,16 +13256,52 @@ function renderAdmin(container) {
       toast('URL et clé requises', 'error');
       return;
     }
+    // Valider le format de l'URL
+    if (!url.includes('.supabase.co')) {
+      toast('URL invalide. Format: https://xxx.supabase.co', 'error');
+      return;
+    }
+    // Valider que la clé ressemble à un JWT
+    if (!key.startsWith('eyJ')) {
+      toast('Clé invalide. Elle doit commencer par eyJ...', 'error');
+      return;
+    }
     saveSupabaseCredentials(url, key);
-    toast('Configuration Supabase sauvegardée!', 'success');
+    toast('Configuration sauvegardée! Clique sur Tester pour vérifier.', 'success');
     render();
-  } }, '💾 Sauvegarder Config'));
+  } }, '💾 Sauvegarder'));
+
+  // Test connection button
+  cloudBtns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() {
+    var url = $('#cloudSupabaseUrl').value.trim();
+    var key = $('#cloudSupabaseKey').value.trim();
+    if (!url || !key) {
+      toast('Configure d\'abord l\'URL et la clé', 'warning');
+      return;
+    }
+    // Test simple: vérifier que Supabase répond
+    toast('Test en cours...', 'info');
+    try {
+      var testClient = window.supabase.createClient(url, key);
+      testClient.auth.getSession().then(function(result) {
+        if (result.error) {
+          toast('❌ Erreur: ' + result.error.message, 'error');
+        } else {
+          toast('✅ Connexion Supabase OK!', 'success');
+        }
+      }).catch(function(err) {
+        toast('❌ Erreur: ' + err.message, 'error');
+      });
+    } catch (e) {
+      toast('❌ Erreur: ' + e.message, 'error');
+    }
+  } }, '🔍 Tester'));
 
   if (SYNC_ENABLED && !CURRENT_USER) {
-    cloudBtns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: showAuthModal }, '🔐 Se connecter'));
+    cloudBtns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: showAuthModal }, '🔐 Connexion'));
   }
   if (SYNC_ENABLED && CURRENT_USER) {
-    cloudBtns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() { syncToCloud(); } }, '⬆️ Sync maintenant'));
+    cloudBtns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() { syncToCloud(); } }, '⬆️ Sync'));
   }
   cloudCard.appendChild(cloudBtns);
 
