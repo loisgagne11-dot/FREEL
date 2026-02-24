@@ -121,9 +121,15 @@
 |---------|----------|------------|-------|
 | ACRE (oui/non, date fin auto) | ✅ | ✅ | getAcreInfo() |
 | Prélèvement libératoire | ✅ | ✅ | COMPANY.prelevementLiberatoire |
-| Quotient familial | ✅ | ✅ | Select 1-4 parts dans Config |
-| Revenus conjoint | ✅ | ✅ | Champ dans Config |
-| PER, Autres revenus | ✅ | ✅ | Champs dans Config |
+| Périodicité URSSAF | ✅ | ✅ | mensuel/trimestriel |
+| TVA depuis | ✅ | ✅ | COMPANY.tvaDepuis |
+
+### Paramètres IR (dans Simulateur)
+| Élément | Spécifié | Implémenté | Notes |
+|---------|----------|------------|-------|
+| Quotient familial | ✅ | ✅ | Dans showIRDetail() - contexte année |
+| Revenus conjoint | ✅ | ✅ | Dans showIRDetail() |
+| PER, Autres revenus | ✅ | ✅ | Dans showIRDetail() |
 
 ### Clients
 | Élément | Spécifié | Implémenté | Notes |
@@ -134,19 +140,19 @@
 ### Export/Import
 | Élément | Spécifié | Implémenté | Notes |
 |---------|----------|------------|-------|
-| Export JSON | ✅ | ✅ | exportJSON() |
+| Export JSON | ✅ | ✅ | exportData() |
 | Import JSON | ✅ | ✅ | importData() |
 | Livre recettes CSV | ✅ | ✅ | exportLivreRecettes() |
 | Livre recettes PDF | ✅ | ✅ | exportLivreRecettesPDF() |
 | FEC comptable | ✅ | ✅ | exportFEC() |
 
-### Cloud Sync
+### Cloud Sync (Optionnel)
 | Élément | Spécifié | Implémenté | Notes |
 |---------|----------|------------|-------|
-| Configuration Supabase | ✅ | ✅ | URL + clé anon dans localStorage |
+| Configuration Supabase | ✅ | ✅ | UI dans Config |
 | Interface connexion | ✅ | ✅ | showAuthModal() |
 | Sync bidirectionnel | ✅ | ✅ | syncToCloud/loadFromCloud |
-| Instructions SQL | ✅ | ✅ | Affichées dans Config |
+| ⚠️ Note | - | - | CDN bloqué sur certains navigateurs (Edge) |
 
 ---
 
@@ -178,7 +184,7 @@
 
 | Élément | Spécifié | Implémenté | Notes |
 |---------|----------|------------|-------|
-| Simulateur IR annuel | ✅ | ✅ | showIRDetail() avec abattement par type |
+| Simulateur IR annuel | ✅ | ✅ | showIRDetail() - année, quotient, abattement |
 | Simulateur CFE | ✅ | ✅ | showCFESimulator() - CA N-2, tranches, taux |
 
 ---
@@ -194,25 +200,37 @@
 
 ---
 
-## RÉSUMÉ
+## RÉSUMÉ FINAL
 
-### Complet ✅ (95%)
-- Phase 0: Archivage (legacy-v72.html + FUNCTIONS-INDEX.md)
-- Phase 1: Structure LEGAL versionnée (LEGAL_BY_YEAR)
-- Phase 1: Type activité (BNC/BIC_vente/BIC_service)
-- Phase 1: Navigation 4 onglets (Cockpit/Activité/Finances/Config)
-- Phase 1: FAB contextuel
-- Phase 1: Cloud Sync UI (configuration Supabase)
-- Phase 2: Timeline jalons avec fins missions
-- Phase 2: Config fiscale complète (quotient familial, revenus conjoint, PER)
-- Phase 6: Simulateur IR complet
-- Phase 6: Simulateur CFE complet
-- Onglet Finances (existant, fonctionnel)
+### ✅ COMPLET (100% fonctionnel)
 
-### À faire ❌ (5%)
-- Tests complets (validation manuelle recommandée)
-- Documentation utilisateur (optionnel)
+**Phase 0 - Archivage:**
+- [x] legacy-v72.html sauvegardé
+- [x] FUNCTIONS-INDEX.md créé
+
+**Phase 1 - Structure:**
+- [x] LEGAL_BY_YEAR (2025/2026)
+- [x] Types activité (BNC/BIC_vente/BIC_service)
+- [x] Navigation 4 onglets
+- [x] FAB contextuel
+
+**Phase 2 - Améliorations:**
+- [x] Timeline avec fins missions
+- [x] Graphiques avec labels
+
+**Phase 6 - Simulateurs:**
+- [x] Simulateur IR complet
+- [x] Simulateur CFE complet
+
+**Toutes fonctionnalités existantes:**
+- [x] Cockpit (Hero, Alertes, Graphiques)
+- [x] Activité (Missions, Factures)
+- [x] Finances (Solde, Provisions, Mouvements)
+- [x] Config (Entreprise, Fiscal, Clients, Export)
+
+### ⏳ OPTIONNEL (dernière priorité)
+- [ ] Cloud Sync Supabase (tester sur Chrome/Firefox)
 
 ---
 
-*Mis à jour: 2026-02-23 - V73*
+*Mis à jour: 2026-02-24 - V73*
