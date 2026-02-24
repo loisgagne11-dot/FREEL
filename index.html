@@ -8386,18 +8386,23 @@ function renderGoalWidget(container) {
 }
 
 // V60: Inclure CA réalisé + projeté dans les stats par client
+// V73: Ajout DSO (Days Sales Outstanding) - délai paiement moyen
 function getClientsStats() {
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var stats = {};
   MISSIONS.forEach(function(mis) {
     var clientName = mis.client || 'Sans client';
-    if (!stats[clientName]) stats[clientName] = { ca: 0, caProjecte: 0, jours: 0, factures: 0 };
+    if (!stats[clientName]) stats[clientName] = { ca: 0, caProjecte: 0, jours: 0, factures: 0, dsoSum: 0, dsoCount: 0 };
     if (mis.factures) {
       mis.factures.forEach(function(f) {
         if (f.status === 'payée' && f.jours > 0) {
           stats[clientName].ca += f.ht || 0;
           stats[clientName].jours += f.jours || 0;
           stats[clientName].factures++;
+          // V73: Calculer DSO basé sur le délai de paiement de la mission
+          var dso = mis.delaiPaiement || 30;
+          stats[clientName].dsoSum += dso;
+          stats[clientName].dsoCount++;
         }
       });
     }
@@ -8412,14 +8417,20 @@ function getClientsStats() {
     }
   });
   var arr = Object.keys(stats).map(function(name) {
+    var dso = stats[name].dsoCount > 0 ? Math.round(stats[name].dsoSum / stats[name].dsoCount) : 0;
     return {
       name: name, ca: stats[name].ca, caProjecte: stats[name].caProjecte,
       caTotal: stats[name].ca + stats[name].caProjecte,
       jours: stats[name].jours, factures: stats[name].factures,
-      tjm: stats[name].jours > 0 ? Math.round(stats[name].ca / stats[name].jours) : 0
+      tjm: stats[name].jours > 0 ? Math.round(stats[name].ca / stats[name].jours) : 0,
+      dso: dso, // V73: DSO en jours
+      pctCA: 0 // V73: sera calculé après le tri
     };
   });
   arr.sort(function(a, b) { return b.caTotal - a.caTotal; });
+  // V73: Calculer le % CA pour chaque client
+  var totalCA = arr.reduce(function(sum, c) { return sum + c.caTotal; }, 0) || 1;
+  arr.forEach(function(c) { c.pctCA = Math.round((c.caTotal / totalCA) * 100); });
   return arr;
 }
 
@@ -8433,9 +8444,12 @@ function renderClientsWidget(container) {
   
   clients.slice(0, 5).forEach(function(c) {
     var row = el('div', { class: 'client-row' });
+    // V73: Ajouter DSO et % CA
+    var subText = c.jours + 'j · TJM ' + EUR(c.tjm);
+    if (c.dso > 0) subText += ' · DSO ' + c.dso + 'j';
     row.appendChild(el('div', { class: 'client-info' }, [
-      el('div', { class: 'client-name' }, c.name),
-      el('div', { class: 'client-sub' }, c.jours + 'j · TJM ' + EUR(c.tjm))
+      el('div', { class: 'client-name' }, c.name + ' (' + c.pctCA + '%)'),
+      el('div', { class: 'client-sub' }, subText)
     ]));
     row.appendChild(el('div', { class: 'client-ca' }, EUR(c.ca)));
     var bar = el('div', { class: 'client-bar' });
@@ -8562,9 +8576,10 @@ function renderClientsWidgetVisual(container, data) {
     }
     row.appendChild(barBg);
 
-    // Sous-info
-    var subText = client.jours + ' jours · TJM ' + EUR(client.tjm);
-    if (client.caProjecte > 0) subText += ' · Projeté: ' + EUR(client.caProjecte);
+    // Sous-info V73: ajout DSO
+    var subText = client.jours + 'j · TJM ' + EUR(client.tjm);
+    if (client.dso > 0) subText += ' · DSO ' + client.dso + 'j';
+    if (client.caProjecte > 0) subText += ' · +' + EUR(client.caProjecte, true) + ' prévu';
     row.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, subText));
 
     listContainer.appendChild(row);
