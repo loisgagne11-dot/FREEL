@@ -8284,6 +8284,59 @@ function getInsights() {
   return insights;
 }
 
+// V74: Indicateurs Santé Société toujours visibles (§3.2.7)
+function renderHealthIndicators(container, data) {
+  var provisions = getAbsoluteProvisions();
+  var totalProvisions = (provisions.urssaf || 0) + (provisions.tva || 0) + (provisions.ir || 0) + (provisions.cfe || 0);
+  var soldeCompte = data.solde || 0;
+  var provisionsCouvertes = soldeCompte >= totalProvisions;
+
+  // Compter factures en retard
+  var facturesRetard = 0;
+  MISSIONS.forEach(function(m) {
+    if (m.factures) m.factures.forEach(function(f) {
+      if (f.status === 'envoyée') {
+        var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
+        if (TODAY > paymentDate) facturesRetard++;
+      }
+    });
+  });
+
+  // Vérifier déclarations (URSSAF du mois en cours)
+  var currentMonth = TODAY.getMonth();
+  var declarationsAJour = true;
+  // Simplification: si on est après le 20 du mois et URSSAF pas payé, pas à jour
+  if (TODAY.getDate() > 20) {
+    var urssafKey = 'URSSAF-' + ym(TODAY.getFullYear(), currentMonth);
+    if (!isPaid(urssafKey)) declarationsAJour = false;
+  }
+
+  var bar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px', marginBottom: '8px' } });
+
+  // Provisions
+  var provDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)') } });
+  provDiv.appendChild(el('div', { style: { fontSize: '16px' } }, provisionsCouvertes ? '✅' : '🚨'));
+  provDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Provisions'));
+  provDiv.appendChild(el('div', { style: { fontSize: '9px', color: provisionsCouvertes ? 'var(--success)' : 'var(--danger)' } }, provisionsCouvertes ? 'couvertes' : 'non couvertes'));
+  bar.appendChild(provDiv);
+
+  // Factures
+  var factDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: facturesRetard === 0 ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (facturesRetard === 0 ? 'var(--success)' : 'var(--warning)') } });
+  factDiv.appendChild(el('div', { style: { fontSize: '16px' } }, facturesRetard === 0 ? '✅' : '⚠️'));
+  factDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Factures'));
+  factDiv.appendChild(el('div', { style: { fontSize: '9px', color: facturesRetard === 0 ? 'var(--success)' : 'var(--warning)' } }, facturesRetard === 0 ? 'à jour' : facturesRetard + ' retard'));
+  bar.appendChild(factDiv);
+
+  // Déclarations
+  var declDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)') } });
+  declDiv.appendChild(el('div', { style: { fontSize: '16px' } }, declarationsAJour ? '✅' : '⚠️'));
+  declDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Déclarations'));
+  declDiv.appendChild(el('div', { style: { fontSize: '9px', color: declarationsAJour ? 'var(--success)' : 'var(--warning)' } }, declarationsAJour ? 'à jour' : 'à faire'));
+  bar.appendChild(declDiv);
+
+  container.appendChild(bar);
+}
+
 function renderInsights(container) {
   var insights = getInsights();
   if (insights.length === 0) return;
