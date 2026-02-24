@@ -8284,6 +8284,59 @@ function getInsights() {
   return insights;
 }
 
+// V74: Indicateurs Santé Société toujours visibles (§3.2.7)
+function renderHealthIndicators(container, data) {
+  var provisions = getAbsoluteProvisions();
+  var totalProvisions = (provisions.urssaf || 0) + (provisions.tva || 0) + (provisions.ir || 0) + (provisions.cfe || 0);
+  var soldeCompte = data.solde || 0;
+  var provisionsCouvertes = soldeCompte >= totalProvisions;
+
+  // Compter factures en retard
+  var facturesRetard = 0;
+  MISSIONS.forEach(function(m) {
+    if (m.factures) m.factures.forEach(function(f) {
+      if (f.status === 'envoyée') {
+        var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
+        if (TODAY > paymentDate) facturesRetard++;
+      }
+    });
+  });
+
+  // Vérifier déclarations (URSSAF du mois en cours)
+  var currentMonth = TODAY.getMonth();
+  var declarationsAJour = true;
+  // Simplification: si on est après le 20 du mois et URSSAF pas payé, pas à jour
+  if (TODAY.getDate() > 20) {
+    var urssafKey = 'URSSAF-' + ym(TODAY.getFullYear(), currentMonth);
+    if (!isPaid(urssafKey)) declarationsAJour = false;
+  }
+
+  var bar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px', marginBottom: '8px' } });
+
+  // Provisions
+  var provDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)') } });
+  provDiv.appendChild(el('div', { style: { fontSize: '16px' } }, provisionsCouvertes ? '✅' : '🚨'));
+  provDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Provisions'));
+  provDiv.appendChild(el('div', { style: { fontSize: '9px', color: provisionsCouvertes ? 'var(--success)' : 'var(--danger)' } }, provisionsCouvertes ? 'couvertes' : 'non couvertes'));
+  bar.appendChild(provDiv);
+
+  // Factures
+  var factDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: facturesRetard === 0 ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (facturesRetard === 0 ? 'var(--success)' : 'var(--warning)') } });
+  factDiv.appendChild(el('div', { style: { fontSize: '16px' } }, facturesRetard === 0 ? '✅' : '⚠️'));
+  factDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Factures'));
+  factDiv.appendChild(el('div', { style: { fontSize: '9px', color: facturesRetard === 0 ? 'var(--success)' : 'var(--warning)' } }, facturesRetard === 0 ? 'à jour' : facturesRetard + ' retard'));
+  bar.appendChild(factDiv);
+
+  // Déclarations
+  var declDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)') } });
+  declDiv.appendChild(el('div', { style: { fontSize: '16px' } }, declarationsAJour ? '✅' : '⚠️'));
+  declDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Déclarations'));
+  declDiv.appendChild(el('div', { style: { fontSize: '9px', color: declarationsAJour ? 'var(--success)' : 'var(--warning)' } }, declarationsAJour ? 'à jour' : 'à faire'));
+  bar.appendChild(declDiv);
+
+  container.appendChild(bar);
+}
+
 function renderInsights(container) {
   var insights = getInsights();
   if (insights.length === 0) return;
@@ -8381,7 +8434,9 @@ function getClientsStats() {
   var stats = {};
   MISSIONS.forEach(function(mis) {
     var clientName = mis.client || 'Sans client';
-    if (!stats[clientName]) stats[clientName] = { ca: 0, caProjecte: 0, jours: 0, factures: 0, dsoSum: 0, dsoCount: 0 };
+    if (!stats[clientName]) stats[clientName] = { ca: 0, caProjecte: 0, jours: 0, factures: 0, dsoSum: 0, dsoCount: 0, missions: 0, delaiContractuel: 0 };
+    stats[clientName].missions++;
+    stats[clientName].delaiContractuel = mis.delaiPaiement || 30; // Dernier délai contractuel connu
     if (mis.factures) {
       mis.factures.forEach(function(f) {
         if (f.status === 'payée' && f.jours > 0) {
@@ -8413,6 +8468,8 @@ function getClientsStats() {
       jours: stats[name].jours, factures: stats[name].factures,
       tjm: stats[name].jours > 0 ? Math.round(stats[name].ca / stats[name].jours) : 0,
       dso: dso, // V73: DSO en jours
+      delaiContractuel: stats[name].delaiContractuel, // V74: délai contractuel
+      missions: stats[name].missions, // V74: nombre de missions
       pctCA: 0 // V73: sera calculé après le tri
     };
   });
@@ -8427,26 +8484,43 @@ function renderClientsWidget(container) {
   var clients = getClientsStats();
   if (clients.length === 0) return;
   var maxCA = clients[0].ca || 1;
-  
+
   var widget = el('div', { class: 'clients-widget' });
-  widget.appendChild(el('div', { class: 'clients-header' }, [el('div', { class: 'clients-title' }, '👥 CA par Client')]));
-  
+  widget.appendChild(el('div', { class: 'clients-header' }, [el('div', { class: 'clients-title' }, '👥 Clients')]));
+
   clients.slice(0, 5).forEach(function(c) {
     var row = el('div', { class: 'client-row' });
-    // V73: Ajouter DSO et % CA
-    var subText = c.jours + 'j · TJM ' + EUR(c.tjm);
-    if (c.dso > 0) subText += ' · DSO ' + c.dso + 'j';
+    // V74: Affichage complet selon §4.2.4 - CA Total (X% du CA), DSO vs contractuel, Missions, Dépendance
+    var subParts = [];
+    subParts.push(c.missions + ' mission' + (c.missions > 1 ? 's' : ''));
+    if (c.dso > 0) {
+      var dsoEcart = c.dso - c.delaiContractuel;
+      var dsoText = 'DSO ' + c.dso + 'j (contrat: ' + c.delaiContractuel + 'j)';
+      if (dsoEcart > 10) dsoText += ' ⚠️+' + dsoEcart + 'j';
+      subParts.push(dsoText);
+    }
+    var subText = subParts.join(' · ');
+
+    var nameDiv = el('div', { class: 'client-name' });
+    nameDiv.appendChild(document.createTextNode(c.name));
+    // V74: Alerte dépendance si >50%
+    if (c.pctCA > 50) {
+      nameDiv.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--warning)', marginLeft: '6px', fontWeight: '600' } }, c.pctCA + '% Dépendance'));
+    } else {
+      nameDiv.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--text-muted)', marginLeft: '6px' } }, c.pctCA + '%'));
+    }
+
     row.appendChild(el('div', { class: 'client-info' }, [
-      el('div', { class: 'client-name' }, c.name + ' (' + c.pctCA + '%)'),
+      nameDiv,
       el('div', { class: 'client-sub' }, subText)
     ]));
-    row.appendChild(el('div', { class: 'client-ca' }, EUR(c.ca)));
+    row.appendChild(el('div', { class: 'client-ca' }, EUR(c.caTotal)));
     var bar = el('div', { class: 'client-bar' });
     bar.appendChild(el('div', { class: 'client-bar-fill', style: { width: (c.ca / maxCA * 100) + '%' } }));
     row.appendChild(bar);
     widget.appendChild(row);
   });
-  
+
   container.appendChild(widget);
 }
 
@@ -8765,7 +8839,7 @@ function initKeyboardShortcuts() {
     if (e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); showSearch(); }
     if (e.key === 'Escape') { hideSearch(); if (HELP_OPEN) toggleKeyboardHelp(); }
     // V74: N = ouvrir menu FAB (§8.2)
-    if (e.key === 'n' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); showFabMenu(); showModal('fabModal'); }
+    if (e.key === 'n' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); showFabMenu(); openModal('fabModal'); }
     if (e.key === 's' && !e.metaKey && !e.ctrlKey) showSalaireModal();
     if (e.key === 'c' && !e.metaKey && !e.ctrlKey) showChargeModal();
     if (e.key === 'e' && !e.metaKey && !e.ctrlKey) exportPDFReport();
@@ -11339,21 +11413,29 @@ function renderMissionsContent(container) {
     });
   });
 
-  // KPIs Missions - 4 indicateurs + missions actives
-  var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' } });
+  // V74: KPIs Header Activité (§4.2.1) - CA Réalisé, Encaissé, À Encaisser, Taux Occup.
+  var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' } });
 
   var kpiBlock = function(value, label, color, sub) {
     var block = el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
-    block.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '800', color: color } }, value));
+    block.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '800', color: color } }, value));
     block.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, label));
     if (sub) block.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' } }, sub));
     return block;
   };
 
-  kpiGrid.appendChild(kpiBlock(String(activeMissions.length) + (aVenirMissions.length > 0 ? ' + ' + aVenirMissions.length : ''), 'Missions actives' + (aVenirMissions.length > 0 ? ' + à venir' : ''), 'var(--accent)', totalJours + ' jours travaillés'));
-  kpiGrid.appendChild(kpiBlock(EUR(caRealise), 'CA Réalisé', 'var(--info)', 'Jours travaillés × TJM'));
-  kpiGrid.appendChild(kpiBlock(EUR(caEncaisse), 'CA Encaissé', 'var(--success)', 'Factures payées HT'));
-  kpiGrid.appendChild(kpiBlock(EUR(caLatent), 'CA Latent', 'var(--warning)', 'Facturé non encaissé'));
+  // Compter factures envoyées (non payées)
+  var facturesEnvoyees = 0;
+  MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) { if (f.status === 'envoyée') facturesEnvoyees++; }); });
+
+  // Taux occupation (§9.10)
+  var joursOuvrables = data.joursOuvrables || 1;
+  var tauxOccup = joursOuvrables > 0 ? Math.round(totalJours / joursOuvrables * 100) : 0;
+
+  kpiGrid.appendChild(kpiBlock(EUR(caRealise), 'CA Réalisé', 'var(--info)', totalJours + 'j travaillés'));
+  kpiGrid.appendChild(kpiBlock(EUR(caEncaisse), 'CA Encaissé', 'var(--success)', 'Factures payées'));
+  kpiGrid.appendChild(kpiBlock(EUR(caLatent), 'À Encaisser', 'var(--warning)', facturesEnvoyees + ' facture' + (facturesEnvoyees > 1 ? 's' : '')));
+  kpiGrid.appendChild(kpiBlock(tauxOccup + '%', 'Taux Occup.', tauxOccup >= 80 ? 'var(--success)' : tauxOccup >= 60 ? 'var(--warning)' : 'var(--danger)', totalJours + 'j/' + joursOuvrables + 'j'));
 
   container.appendChild(kpiGrid);
 
@@ -13589,42 +13671,80 @@ function renderAdmin(container) {
   
   // Exports comptables obligatoires
   ioCard.appendChild(el('div', { style: { marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)' } }));
-  ioCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, '📋 Exports Comptables (Art. L123-28 Code Commerce)'));
-  var comptaBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
-  
-  // Sélecteur d'année pour l'export
+
+  // Sélecteur d'année
   var currentYear = TODAY.getFullYear();
-  var yearSelect = el('select', { class: 'form-select', id: 'exportYear', style: { marginBottom: '8px' } });
+  var yearRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } });
+  yearRow.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700' } }, '📋 Livre des Recettes'));
+  var yearSelect = el('select', { class: 'form-select', id: 'exportYear', style: { width: '90px', fontSize: '12px' }, onchange: function() { render(); } });
   [currentYear - 1, currentYear, currentYear + 1].forEach(function(y) {
     var opt = el('option', { value: y }, String(y));
     if (y === currentYear) opt.selected = true;
     yearSelect.appendChild(opt);
   });
-  ioCard.appendChild(yearSelect);
-  
-  comptaBtns.appendChild(el('button', { class: 'btn', style: { background: 'var(--success-glow)', borderColor: 'var(--success)' }, onclick: function() { 
+  yearRow.appendChild(yearSelect);
+  ioCard.appendChild(yearRow);
+
+  // V74: Vue table permanente Livre des Recettes (§6.2.7)
+  var livreYear = parseInt($('#exportYear') ? $('#exportYear').value : currentYear);
+  var registry = getInvoiceRegistry(livreYear);
+  if (registry.length > 0) {
+    registry.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
+    var tableDiv = el('div', { style: { overflow: 'auto', maxHeight: '250px', marginBottom: '10px', border: '1px solid var(--glass-border)', borderRadius: '8px' } });
+
+    // Table header
+    var thead = el('div', { style: { display: 'grid', gridTemplateColumns: '80px 70px 1fr 90px 60px', gap: '2px', padding: '6px 8px', fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', position: 'sticky', top: '0' } });
+    thead.appendChild(el('span', {}, 'Date'));
+    thead.appendChild(el('span', {}, 'N° Pièce'));
+    thead.appendChild(el('span', {}, 'Client'));
+    thead.appendChild(el('span', { style: { textAlign: 'right' } }, 'Montant HT'));
+    thead.appendChild(el('span', { style: { textAlign: 'right' } }, 'Mode'));
+    tableDiv.appendChild(thead);
+
+    var totalHT = 0;
+    registry.forEach(function(inv) {
+      totalHT += inv.montantHT || 0;
+      var row = el('div', { style: { display: 'grid', gridTemplateColumns: '80px 70px 1fr 90px 60px', gap: '2px', padding: '5px 8px', fontSize: '10px', borderTop: '1px solid var(--bg-tertiary)' } });
+      row.appendChild(el('span', {}, (inv.date || '').substring(0, 10)));
+      row.appendChild(el('span', { style: { fontWeight: '600' } }, inv.numero || ''));
+      row.appendChild(el('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, inv.client || ''));
+      row.appendChild(el('span', { style: { textAlign: 'right', fontWeight: '600' } }, EUR(inv.montantHT || 0)));
+      row.appendChild(el('span', { style: { textAlign: 'right', color: 'var(--text-muted)' } }, (inv.modePaiement || 'Vir.').substring(0, 4)));
+      tableDiv.appendChild(row);
+    });
+
+    // Total
+    var totalRow = el('div', { style: { display: 'grid', gridTemplateColumns: '80px 70px 1fr 90px 60px', gap: '2px', padding: '6px 8px', fontSize: '10px', fontWeight: '700', borderTop: '2px solid var(--glass-border)', background: 'var(--bg-tertiary)' } });
+    totalRow.appendChild(el('span', {}));
+    totalRow.appendChild(el('span', {}));
+    totalRow.appendChild(el('span', {}, 'TOTAL ' + livreYear));
+    totalRow.appendChild(el('span', { style: { textAlign: 'right' } }, EUR(totalHT)));
+    totalRow.appendChild(el('span', {}));
+    tableDiv.appendChild(totalRow);
+
+    ioCard.appendChild(tableDiv);
+
+    // Vérification conformité
+    var check = el('div', { style: { fontSize: '10px', color: 'var(--success)', marginBottom: '8px' } }, '✅ ' + registry.length + ' écriture(s) - Conforme');
+    ioCard.appendChild(check);
+  } else {
+    ioCard.appendChild(el('div', { style: { padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', marginBottom: '8px' } }, 'Aucune facture enregistrée pour ' + livreYear));
+  }
+
+  // Boutons export
+  var comptaBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' } });
+  comptaBtns.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'var(--success-glow)', borderColor: 'var(--success)' }, onclick: function() {
     var year = parseInt($('#exportYear').value);
-    exportLivreRecettes(year); 
-  } }, '📗 Livre CSV'));
-  
-  // V46: Bouton export PDF Livre des Recettes (conformité contrôle fiscal)
-  comptaBtns.appendChild(el('button', { class: 'btn', style: { background: 'var(--danger-glow)', borderColor: 'var(--danger)' }, onclick: function() { 
+    exportLivreRecettes(year);
+  } }, '📗 CSV'));
+  comptaBtns.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'var(--danger-glow)', borderColor: 'var(--danger)' }, onclick: function() {
     var year = parseInt($('#exportYear').value);
-    exportLivreRecettesPDF(year); 
-  } }, '📕 Livre PDF'));
-  
-  // Bouton export FEC
-  comptaBtns.appendChild(el('button', { class: 'btn', style: { background: 'var(--info-glow)', borderColor: 'var(--info)' }, onclick: function() { 
+    exportLivreRecettesPDF(year);
+  } }, '📕 PDF'));
+  comptaBtns.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'var(--info-glow)', borderColor: 'var(--info)' }, onclick: function() {
     var year = parseInt($('#exportYear').value);
-    exportFEC(year); 
-  } }, '📊 Export FEC'));
-  
-  // Statistiques du livre des recettes
-  var registryCount = COMPANY.invoiceRegistry ? COMPANY.invoiceRegistry.length : 0;
-  var registryInfo = el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', gridColumn: 'span 2' } });
-  registryInfo.textContent = '📊 ' + registryCount + ' facture(s) enregistrée(s)';
-  comptaBtns.appendChild(registryInfo);
-  
+    exportFEC(year);
+  } }, '📊 FEC'));
   ioCard.appendChild(comptaBtns);
   
   // Gestion des clients
@@ -13806,6 +13926,9 @@ function renderCockpit(container) {
 
   // 1. Hero: Cash Disponible avec indicateur santé
   renderDashboardHero(container, data);
+
+  // V74: Indicateurs Santé Société toujours visibles (§3.2.7)
+  renderHealthIndicators(container, data);
 
   // 2. CA Annuel avec plafond
   renderCAPlafondWidget(container);
