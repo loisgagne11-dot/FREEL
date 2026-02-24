@@ -2536,6 +2536,19 @@ function isInPeriod(ymStr) {
   }
   return ymStr >= PERIOD.start && ymStr <= PERIOD.end;
 }
+// V74: Navigation mois avec flèches clavier (§8.2)
+function navigatePeriodMonth(delta) {
+  if (PERIOD.month === null || PERIOD.month === undefined || PERIOD.month === '') {
+    // Année entière -> sélectionner le mois en cours
+    PERIOD.month = TODAY.getMonth();
+  } else {
+    var m = parseInt(PERIOD.month) + delta;
+    if (m > 11) { m = 0; PERIOD.year++; }
+    else if (m < 0) { m = 11; PERIOD.year--; }
+    PERIOD.month = m;
+  }
+  render();
+}
 function getPeriodMonths() {
   var months = [];
   if (PERIOD.type === 'year') {
@@ -3453,40 +3466,16 @@ function showFabMenu() {
   body.innerHTML = '';
 
   var grid = el('div', { style: { display: 'grid', gap: '12px' } });
+  var currentYm = ym(TODAY.getFullYear(), TODAY.getMonth());
 
-  // Options communes à tous les onglets
-  var commonActions = [
-    { icon: '💼', label: 'Nouvelle Mission', action: function() { closeModal('fabModal'); showMissionModal(); } },
-    { icon: '💸', label: 'Verser Salaire', action: function() { closeModal('fabModal'); showSalaireModal(); }, class: 'btn-success' }
-  ];
-
-  // Options selon l'onglet
-  if (VIEW === 'cockpit') {
-    // Cockpit: actions rapides globales
-    commonActions.forEach(function(a) {
-      grid.appendChild(el('button', { class: 'btn btn-block ' + (a.class || ''), onclick: a.action }, a.icon + ' ' + a.label));
-    });
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showChargeModal(); } }, '📋 Ajouter Charge'));
-  }
-  else if (VIEW === 'activite') {
-    // Activité: focus sur missions et factures
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
-    // Si des missions existent, proposer de télécharger une facture
-    if (MISSIONS.length > 0) {
-      grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showDownloadInvoiceModal(); } }, '📄 Télécharger Facture'));
-    }
-    grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Salaire'));
-  }
-  else if (VIEW === 'finances') {
-    // Finances: charges et salaires
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showChargeModal(); } }, '📋 Ajouter Charge'));
-    grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Salaire'));
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
-  }
-  else if (VIEW === 'config') {
-    // Config: clients et paramètres
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showClientModal(); } }, '👤 Nouveau Client'));
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
+  // V74: Menu FAB standardisé selon cahier des charges §7.2
+  // Actions communes: Nouvelle Mission, Nouvelle Charge, Verser salaire, Poser congés, Télécharger facture
+  grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
+  grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showChargeModal(); } }, '📋 Nouvelle Charge'));
+  grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Salaire'));
+  grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm); } }, '🏖️ Poser Congés'));
+  if (MISSIONS.length > 0) {
+    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showDownloadInvoiceModal(); } }, '📄 Télécharger Facture'));
   }
 
   // Bouton annuler
@@ -8775,11 +8764,15 @@ function initKeyboardShortcuts() {
     if (e.key === '?' || (e.key === '/' && e.shiftKey)) { e.preventDefault(); toggleKeyboardHelp(); }
     if (e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); showSearch(); }
     if (e.key === 'Escape') { hideSearch(); if (HELP_OPEN) toggleKeyboardHelp(); }
-    if (e.key === 'n' && !e.metaKey && !e.ctrlKey) showMissionModal();
+    // V74: N = ouvrir menu FAB (§8.2)
+    if (e.key === 'n' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); showFabMenu(); showModal('fabModal'); }
     if (e.key === 's' && !e.metaKey && !e.ctrlKey) showSalaireModal();
     if (e.key === 'c' && !e.metaKey && !e.ctrlKey) showChargeModal();
     if (e.key === 'e' && !e.metaKey && !e.ctrlKey) exportPDFReport();
     if (e.key === 'g' && !e.metaKey && !e.ctrlKey) showGoalModal();
+    // V74: Flèches pour navigation mois (§8.2)
+    if (e.key === 'ArrowLeft' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); navigatePeriodMonth(-1); }
+    if (e.key === 'ArrowRight' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); navigatePeriodMonth(1); }
   });
 }
 
@@ -10903,69 +10896,92 @@ function renderFinancesEvolution(container) {
   renderTresorerieContent(container);
 }
 
-// V73: Sous-onglet Performance - Donut CA, Comparaison N-1, Prévisionnel vs Réalisé
+// V74: Sous-onglet Performance - Donut répartition CA, Comparaison N-1 détaillée, Prévisionnel vs Réalisé
 function renderFinancesPerformance(container) {
   var data = compute();
   var currentYear = PERIOD.year;
   var prevYear = currentYear - 1;
-
-  // Filtres période (déjà en header global)
+  var provisions = getAbsoluteProvisions();
 
   // KPIs Performance
   var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
-
-  // CA Réalisé
   kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé', 'var(--info)'));
-  // CA Encaissé
   kpiGrid.appendChild(createKPIBlock(EUR(data.caEnc), 'CA Encaissé', 'var(--success)'));
-  // Bénéfice Net
-  kpiGrid.appendChild(createKPIBlock(EUR(data.beneficeNet), 'Bénéfice Net', data.beneficeNet >= 0 ? 'var(--success)' : 'var(--danger)'));
+  kpiGrid.appendChild(createKPIBlock(EUR(data.cashDispoAbsolu), 'Cash Dispo', data.cashDispoAbsolu >= 0 ? 'var(--success)' : 'var(--danger)'));
   container.appendChild(kpiGrid);
 
-  // Donut répartition CA HT par client/mission
-  var caByClient = {};
-  MISSIONS.forEach(function(m) {
-    var ca = 0;
-    if (m.lignes) m.lignes.forEach(function(l) {
-      if (isInPeriod(l.ym) && l.joursReels > 0) {
-        ca += l.joursReels * m.tjm;
-      }
-    });
-    if (ca > 0) {
-      var clientName = m.client || 'Sans client';
-      caByClient[clientName] = (caByClient[clientName] || 0) + ca;
-    }
-  });
+  // V74: Donut répartition CA HT - Provisions / Charges / Rémunération / Cash dispo (selon cahier des charges §5.4.2)
+  var totalProvisions = (provisions.urssaf || 0) + (provisions.tva || 0) + (provisions.ir || 0) + (provisions.cfe || 0);
+  var totalCharges = data.chargesReelles || 0;
+  var totalRemuneration = data.salaires || 0;
+  var cashDispo = data.cashDispoAbsolu || 0;
+  var caHT = data.caEnc || 1;
 
   var donutCard = el('div', { class: 'card', style: { marginTop: '12px' } });
-  donutCard.appendChild(el('div', { class: 'card-title' }, '🍩 Répartition CA HT par Client'));
+  donutCard.appendChild(el('div', { class: 'card-title' }, '🍩 Répartition CA HT'));
 
-  if (Object.keys(caByClient).length > 0) {
+  if (caHT > 0) {
     donutCard.appendChild(el('div', { id: 'caDonutContainer', style: { height: '200px', position: 'relative' } }, [el('canvas', { id: 'caDonutChart' })]));
-    // Legend
-    var legend = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px', justifyContent: 'center' } });
-    var colors = ['#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#f87171'];
-    var i = 0;
-    for (var client in caByClient) {
-      var color = colors[i % colors.length];
-      var pct = Math.round(caByClient[client] / data.caReal * 100) || 0;
-      legend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' } }, [
-        el('span', { style: { width: '10px', height: '10px', borderRadius: '50%', background: color } }),
-        el('span', {}, client + ' (' + pct + '%)')
+
+    // Centre label: Cash dispo
+    var centerDiv = el('div', { style: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' } });
+    centerDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Cash dispo'));
+    centerDiv.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '700', color: cashDispo >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(cashDispo)));
+    donutCard.querySelector('#caDonutContainer').appendChild(centerDiv);
+
+    // Légende cliquable
+    var legend = el('div', { style: { marginTop: '10px' } });
+    var segments = [
+      { label: 'Provisions', value: totalProvisions, color: '#a78bfa', pct: Math.round(totalProvisions / caHT * 100) },
+      { label: 'Charges', value: totalCharges, color: '#f87171', pct: Math.round(totalCharges / caHT * 100) },
+      { label: 'Rémunération', value: totalRemuneration, color: '#22d3ee', pct: Math.round(totalRemuneration / caHT * 100) },
+      { label: 'Cash dispo', value: Math.max(0, cashDispo), color: '#34d399', pct: Math.max(0, Math.round(cashDispo / caHT * 100)) }
+    ];
+
+    segments.forEach(function(s) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: '11px' } });
+      row.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+        el('span', { style: { width: '10px', height: '10px', borderRadius: '50%', background: s.color, flexShrink: '0' } }),
+        el('span', { style: { fontWeight: '600' } }, s.label + ' (' + s.pct + '%)')
       ]));
-      i++;
-    }
+      row.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, EUR(s.value)));
+      legend.appendChild(row);
+    });
     donutCard.appendChild(legend);
+
+    // V74: Détail sous le donut (§5.4.3)
+    var detailDiv = el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px' } });
+    detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '6px' } }, 'PROVISIONS (' + Math.round(totalProvisions / caHT * 100) + '%)'));
+    var provLines = [
+      { label: 'URSSAF/CFP', value: provisions.urssaf || 0 },
+      { label: 'IR Estimé', value: provisions.ir || 0, tag: 'estimé' },
+      { label: 'CFE', value: provisions.cfe || 0, tag: 'estimé' }
+    ];
+    if (provisions.tva > 0) provLines.push({ label: 'TVA', value: provisions.tva });
+    provLines.forEach(function(p) {
+      var line = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
+      var labelSpan = el('span', {}, '├ ' + p.label);
+      if (p.tag) labelSpan.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--warning)', marginLeft: '4px' } }, '[' + p.tag + ']'));
+      line.appendChild(labelSpan);
+      line.appendChild(el('span', {}, EUR(p.value)));
+      detailDiv.appendChild(line);
+    });
+
+    detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginTop: '8px', marginBottom: '4px' } }, 'RÉMUNÉRATION (' + Math.round(totalRemuneration / caHT * 100) + '%)'));
+    var salMoyenne = data.detailSalaires && data.detailSalaires.length > 0 ? Math.round(totalRemuneration / data.detailSalaires.length) : 0;
+    detailDiv.appendChild(el('div', { style: { padding: '2px 0 2px 12px', color: 'var(--text-muted)' } }, '├ Moyenne: ' + EUR(salMoyenne) + '/mois'));
+
+    donutCard.appendChild(detailDiv);
   } else {
     donutCard.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Aucun CA sur la période'));
   }
   container.appendChild(donutCard);
 
-  // Comparaison N-1
+  // V74: Comparaison N-1 détaillée (§5.4.4)
   var compCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   compCard.appendChild(el('div', { class: 'card-title' }, '📊 Comparaison ' + currentYear + ' vs ' + prevYear));
 
-  // Calculer CA N-1
+  // Calculer données N-1
   var caN1 = 0;
   MISSIONS.forEach(function(m) {
     if (m.lignes) m.lignes.forEach(function(l) {
@@ -10976,50 +10992,101 @@ function renderFinancesPerformance(container) {
     });
   });
 
-  var variation = caN1 > 0 ? ((data.caReal - caN1) / caN1 * 100) : 0;
-  var variationColor = variation >= 0 ? 'var(--success)' : 'var(--danger)';
-  var variationIcon = variation >= 0 ? '📈' : '📉';
+  if (caN1 > 0) {
+    // Tableau comparatif
+    var tauxProv = caHT > 0 ? Math.round(totalProvisions / caHT * 100) : 0;
+    var tauxCharges = caHT > 0 ? Math.round(totalCharges / caHT * 100) : 0;
+    var tauxRemun = caHT > 0 ? Math.round(totalRemuneration / caHT * 100) : 0;
+    var tauxCash = caHT > 0 ? Math.round(cashDispo / caHT * 100) : 0;
 
-  var compGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' } });
-  compGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'CA ' + prevYear),
-    el('div', { style: { fontSize: '16px', fontWeight: '700' } }, EUR(caN1))
-  ]));
-  compGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'CA ' + currentYear),
-    el('div', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--accent)' } }, EUR(data.caReal))
-  ]));
-  compGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Variation'),
-    el('div', { style: { fontSize: '16px', fontWeight: '700', color: variationColor } }, variationIcon + ' ' + (variation >= 0 ? '+' : '') + variation.toFixed(1) + '%')
-  ]));
-  compCard.appendChild(compGrid);
+    var compRows = [
+      { label: 'CA HT', current: EUR(data.caReal), prev: EUR(caN1), delta: ((data.caReal - caN1) / caN1 * 100).toFixed(0) + '%' },
+      { label: 'Taux provisions', current: tauxProv + '%', prev: '-', delta: '-' },
+      { label: 'Taux charges', current: tauxCharges + '%', prev: '-', delta: '-' },
+      { label: 'Taux rémunération', current: tauxRemun + '%', prev: '-', delta: '-' },
+      { label: 'Cash dispo', current: EUR(cashDispo), prev: '-', delta: '-' },
+      { label: 'Rémuné. moyenne', current: EUR(salMoyenne || 0) + '/m', prev: '-', delta: '-' }
+    ];
+
+    // Header
+    var table = el('div', { style: { fontSize: '11px' } });
+    var headerRow = el('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '4px', padding: '6px 0', fontWeight: '700', borderBottom: '1px solid var(--glass-border)' } });
+    headerRow.appendChild(el('span', {}, ''));
+    headerRow.appendChild(el('span', { style: { textAlign: 'right' } }, '' + currentYear));
+    headerRow.appendChild(el('span', { style: { textAlign: 'right' } }, '' + prevYear));
+    headerRow.appendChild(el('span', { style: { textAlign: 'right' } }, 'Delta'));
+    table.appendChild(headerRow);
+
+    compRows.forEach(function(r) {
+      var row = el('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '4px', padding: '5px 0', borderBottom: '1px solid var(--bg-tertiary)' } });
+      row.appendChild(el('span', { style: { fontWeight: '600' } }, r.label));
+      row.appendChild(el('span', { style: { textAlign: 'right', color: 'var(--accent)' } }, r.current));
+      row.appendChild(el('span', { style: { textAlign: 'right', color: 'var(--text-muted)' } }, r.prev));
+      var deltaColor = r.delta.startsWith('-') ? 'var(--danger)' : r.delta === '-' ? 'var(--text-muted)' : 'var(--success)';
+      row.appendChild(el('span', { style: { textAlign: 'right', color: deltaColor, fontWeight: '600' } }, r.delta !== '-' ? (r.delta.startsWith('-') ? '' : '+') + r.delta : r.delta));
+      table.appendChild(row);
+    });
+
+    compCard.appendChild(table);
+  } else {
+    compCard.appendChild(el('div', { style: { padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' } }, 'Comparaison N-1 disponible à partir de ' + (currentYear + 1)));
+  }
   container.appendChild(compCard);
 
-  // Prévisionnel vs Réalisé
+  // V74: Prévisionnel vs Réalisé avec objectif modifiable (§5.4.5)
   var prevRealCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   prevRealCard.appendChild(el('div', { class: 'card-title' }, '🎯 Prévisionnel vs Réalisé'));
 
-  var caPrev = data.caPrev || 0;
+  var objectifCA = COMPANY.objectifCA || data.caPrev || 0;
   var caReal = data.caReal || 0;
-  var ecart = caReal - caPrev;
-  var ecartPct = caPrev > 0 ? (ecart / caPrev * 100) : 0;
-  var ecartColor = ecart >= 0 ? 'var(--success)' : 'var(--danger)';
 
-  var prevRealGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' } });
-  prevRealGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Prévisionnel'),
-    el('div', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--warning)' } }, EUR(caPrev))
-  ]));
-  prevRealGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Réalisé'),
-    el('div', { style: { fontSize: '16px', fontWeight: '700', color: 'var(--info)' } }, EUR(caReal))
-  ]));
-  prevRealGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Écart'),
-    el('div', { style: { fontSize: '16px', fontWeight: '700', color: ecartColor } }, (ecart >= 0 ? '+' : '') + EUR(ecart) + ' (' + (ecart >= 0 ? '+' : '') + ecartPct.toFixed(1) + '%)')
-  ]));
-  prevRealCard.appendChild(prevRealGrid);
+  // Objectif modifiable
+  var objRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } });
+  objRow.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '600' } }, 'Objectif CA annuel'));
+  var objInput = el('input', { type: 'number', value: objectifCA, style: { width: '120px', textAlign: 'right', padding: '4px 8px', border: '1px solid var(--glass-border)', borderRadius: '6px', background: 'var(--bg-tertiary)', color: 'inherit', fontSize: '12px' }, onchange: function() {
+    COMPANY.objectifCA = parseInt(this.value) || 0;
+    saveAll();
+    render();
+  }});
+  objRow.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px' } }, [objInput, el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '€')]));
+  prevRealCard.appendChild(objRow);
+
+  if (objectifCA > 0) {
+    var pctReal = Math.round(caReal / objectifCA * 100);
+    // Projection fin année basée sur rythme actuel
+    var monthsElapsed = TODAY.getMonth() + 1;
+    var projFin = monthsElapsed > 0 ? Math.round(caReal / monthsElapsed * 12) : 0;
+    var ecart = projFin - objectifCA;
+    var ecartColor = ecart >= 0 ? 'var(--success)' : 'var(--danger)';
+
+    // Progress bar
+    var progressDiv = el('div', { style: { marginBottom: '12px' } });
+    progressDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' } }, [
+      el('span', {}, EUR(caReal) + ' réalisé'),
+      el('span', { style: { color: 'var(--text-muted)' } }, pctReal + '%')
+    ]));
+    var bar = el('div', { style: { height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'hidden' } });
+    bar.appendChild(el('div', { style: { height: '100%', width: Math.min(100, pctReal) + '%', background: pctReal >= 100 ? 'var(--success)' : 'var(--accent)', borderRadius: '4px', transition: 'width 0.5s' } }));
+    progressDiv.appendChild(bar);
+    prevRealCard.appendChild(progressDiv);
+
+    var statsGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' } });
+    statsGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Objectif'),
+      el('div', { style: { fontSize: '14px', fontWeight: '700' } }, EUR(objectifCA))
+    ]));
+    statsGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Projection fin'),
+      el('div', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--warning)' } }, EUR(projFin))
+    ]));
+    statsGrid.appendChild(el('div', { style: { textAlign: 'center', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Écart prévu'),
+      el('div', { style: { fontSize: '14px', fontWeight: '700', color: ecartColor } }, (ecart >= 0 ? '+' : '') + EUR(ecart))
+    ]));
+    prevRealCard.appendChild(statsGrid);
+  } else {
+    prevRealCard.appendChild(el('div', { style: { padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' } }, 'Définis un objectif CA annuel ci-dessus'));
+  }
   container.appendChild(prevRealCard);
 
   // Lien Simulateur IR
@@ -11028,33 +11095,32 @@ function renderFinancesPerformance(container) {
   container.appendChild(simCard);
 
   // Dessiner le donut après le render
-  setTimeout(function() { drawCADonut(caByClient); }, 100);
+  setTimeout(function() {
+    drawPerfDonut(totalProvisions, totalCharges, totalRemuneration, Math.max(0, cashDispo));
+  }, 100);
 }
 
-// V73: Dessiner le donut CA par client
-function drawCADonut(caByClient) {
+// V74: Dessiner le donut répartition CA (Provisions/Charges/Rémun/Cash dispo)
+function drawPerfDonut(provisions, charges, remuneration, cashDispo) {
   if (typeof Chart === 'undefined') return;
   var canvas = $('#caDonutChart');
   if (!canvas || !canvas.getContext) return;
   var ctx = canvas.getContext('2d');
 
-  var labels = Object.keys(caByClient);
-  var values = labels.map(function(k) { return caByClient[k]; });
-  var colors = ['#34d399', '#22d3ee', '#a78bfa', '#f472b6', '#fbbf24', '#f87171'];
-
   new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: labels,
+      labels: ['Provisions', 'Charges', 'Rémunération', 'Cash dispo'],
       datasets: [{
-        data: values,
-        backgroundColor: colors.slice(0, labels.length),
+        data: [provisions, charges, remuneration, cashDispo],
+        backgroundColor: ['#a78bfa', '#f87171', '#22d3ee', '#34d399'],
         borderWidth: 0
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      cutout: '60%',
       plugins: {
         legend: { display: false }
       }
@@ -11067,83 +11133,133 @@ function renderFinancesConformite(container) {
   var data = compute();
   var provisions = getAbsoluteProvisions();
 
-  // Indicateur couverture global
-  var totalProvisions = provisions.urssaf + provisions.tva + provisions.ir;
-  var totalPayees = (provisions.urssafPaid || 0) + (provisions.tvaPaid || 0) + (provisions.irPaid || 0);
-  var couverture = totalProvisions > 0 ? (totalPayees / totalProvisions * 100) : 100;
+  // V74: Indicateur couverture global (§5.5.1) - Solde compte vs Provisions dues
+  var totalProvisions = (provisions.urssaf || 0) + (provisions.tva || 0) + (provisions.ir || 0) + (provisions.cfe || 0);
+  var soldeCompte = data.solde || 0;
+  var excedent = soldeCompte - totalProvisions;
+  var couverture = totalProvisions > 0 ? Math.round(soldeCompte / totalProvisions * 100) : 100;
+  var couvertureColor = couverture >= 100 ? 'var(--success)' : couverture >= 80 ? 'var(--warning)' : 'var(--danger)';
 
-  var heroCard = el('div', { class: 'card', style: { background: couverture >= 80 ? 'var(--success-glow)' : couverture >= 50 ? 'var(--warning-glow)' : 'var(--danger-glow)' } });
-  heroCard.appendChild(el('div', { style: { textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, couverture >= 80 ? '✅' : couverture >= 50 ? '⚠️' : '🚨'),
-    el('div', { style: { fontSize: '28px', fontWeight: '800' } }, couverture.toFixed(0) + '%'),
-    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Couverture des provisions'),
-    el('div', { style: { fontSize: '11px', marginTop: '8px' } }, EUR(totalPayees) + ' payé sur ' + EUR(totalProvisions) + ' provisionné')
+  var heroCard = el('div', { class: 'card', style: { background: couverture >= 100 ? 'var(--success-glow)' : couverture >= 80 ? 'var(--warning-glow)' : 'var(--danger-glow)' } });
+  heroCard.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '12px' } }, [
+    el('div', { style: { fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' } }, 'Couverture Provisions'),
+    el('div', { style: { fontSize: '32px', fontWeight: '800', color: couvertureColor } }, couverture + '%')
   ]));
+
+  // Détail formule
+  var formulaDiv = el('div', { style: { fontSize: '12px', lineHeight: '1.8', fontFamily: 'monospace' } });
+  formulaDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
+    el('span', {}, 'Solde compte pro:'),
+    el('span', { style: { fontWeight: '700' } }, EUR(soldeCompte))
+  ]));
+  formulaDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', color: 'var(--danger)' } }, [
+    el('span', {}, '- Provisions dues:'),
+    el('span', { style: { fontWeight: '700' } }, '-' + EUR(totalProvisions))
+  ]));
+  formulaDiv.appendChild(el('div', { style: { borderTop: '1px dashed var(--glass-border)', marginTop: '4px', paddingTop: '4px', display: 'flex', justifyContent: 'space-between', fontWeight: '700', color: excedent >= 0 ? 'var(--success)' : 'var(--danger)' } }, [
+    el('span', {}, excedent >= 0 ? '= Excédent:' : '= Déficit:'),
+    el('span', {}, (excedent >= 0 ? '+' : '') + EUR(excedent))
+  ]));
+  heroCard.appendChild(formulaDiv);
+
+  // Alerte critique si cash < 0
+  if (excedent < 0) {
+    heroCard.appendChild(el('div', { style: { marginTop: '10px', padding: '8px', background: 'rgba(239,68,68,0.15)', borderRadius: '6px', fontSize: '11px', color: 'var(--danger)', fontWeight: '600' } },
+      '🚨 Tu n\'as pas assez sur ton compte pour couvrir tes provisions. Il manque ' + EUR(Math.abs(excedent)) + '.'));
+  }
+
   container.appendChild(heroCard);
 
-  // Détail par type provision avec toggle
+  // V74: Détail par type provision avec fiabilité (§5.5.2)
   var detailCard = el('div', { class: 'card', style: { marginTop: '12px' } });
-  detailCard.appendChild(el('div', { class: 'card-title' }, '📋 Détail par Type'));
+  detailCard.appendChild(el('div', { class: 'card-title' }, '📋 Détail par Type de Provision'));
 
   var types = [
-    { id: 'urssaf', label: 'URSSAF + CFP', icon: '🏥', total: provisions.urssaf, paid: provisions.urssafPaid || 0 },
-    { id: 'tva', label: 'TVA', icon: '🏛️', total: provisions.tva, paid: provisions.tvaPaid || 0 },
-    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provisions.ir, paid: provisions.irPaid || 0 }
+    { id: 'urssaf', label: 'URSSAF', icon: '🏥', total: provisions.urssaf || 0, paid: provisions.urssafPaid || 0, fiabilite: 'Certain' },
+    { id: 'tva', label: 'TVA', icon: '🏛️', total: provisions.tva || 0, paid: provisions.tvaPaid || 0, fiabilite: 'Certain' },
+    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provisions.ir || 0, paid: provisions.irPaid || 0, fiabilite: 'Estimé ±10%' },
+    { id: 'cfe', label: 'CFE', icon: '🏘️', total: provisions.cfe || 0, paid: 0, fiabilite: 'Estimé' }
   ];
 
+  // Header tableau
+  var tableHeader = el('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '4px', padding: '6px 0', fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', borderBottom: '1px solid var(--glass-border)' } });
+  tableHeader.appendChild(el('span', {}, 'Type'));
+  tableHeader.appendChild(el('span', { style: { textAlign: 'right' } }, 'Dû'));
+  tableHeader.appendChild(el('span', { style: { textAlign: 'right' } }, 'Payé'));
+  tableHeader.appendChild(el('span', { style: { textAlign: 'center' } }, 'État'));
+  tableHeader.appendChild(el('span', { style: { textAlign: 'right' } }, 'Fiabilité'));
+  detailCard.appendChild(tableHeader);
+
   types.forEach(function(t) {
-    if (t.total <= 0) return;
-    var pct = t.total > 0 ? (t.paid / t.total * 100) : 0;
-    var row = el('div', { style: { padding: '12px', marginBottom: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+    if (t.total <= 0 && t.paid <= 0) return;
+    var restant = t.total - t.paid;
+    var etat = restant <= 0 ? '✅' : '⚠️';
 
-    var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
-    header.appendChild(el('span', { style: { fontWeight: '600' } }, t.icon + ' ' + t.label));
-    header.appendChild(el('span', { style: { fontSize: '12px', color: pct >= 100 ? 'var(--success)' : 'var(--warning)' } }, pct.toFixed(0) + '% couvert'));
-    row.appendChild(header);
-
-    // Progress bar
-    var progressBar = el('div', { style: { height: '6px', background: 'var(--bg-secondary)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' } });
-    progressBar.appendChild(el('div', { style: { height: '100%', width: Math.min(100, pct) + '%', background: pct >= 100 ? 'var(--success)' : 'var(--warning)', borderRadius: '3px' } }));
-    row.appendChild(progressBar);
-
-    var details = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' } });
-    details.appendChild(el('span', {}, 'Payé: ' + EUR(t.paid)));
-    details.appendChild(el('span', {}, 'À payer: ' + EUR(t.total - t.paid)));
-    details.appendChild(el('span', {}, 'Total: ' + EUR(t.total)));
-    row.appendChild(details);
-
+    var row = el('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '4px', padding: '8px 0', fontSize: '11px', borderBottom: '1px solid var(--bg-tertiary)', alignItems: 'center' } });
+    row.appendChild(el('span', { style: { fontWeight: '600' } }, t.icon + ' ' + t.label));
+    row.appendChild(el('span', { style: { textAlign: 'right' } }, EUR(t.total)));
+    row.appendChild(el('span', { style: { textAlign: 'right', color: 'var(--success)' } }, EUR(t.paid)));
+    row.appendChild(el('span', { style: { textAlign: 'center' } }, etat));
+    row.appendChild(el('span', { style: { textAlign: 'right', fontSize: '10px', color: t.fiabilite === 'Certain' ? 'var(--success)' : 'var(--warning)' } }, t.fiabilite));
     detailCard.appendChild(row);
   });
 
+  // Total
+  var totalPaid = types.reduce(function(s, t) { return s + (t.paid || 0); }, 0);
+  var totalRow = el('div', { style: { display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr', gap: '4px', padding: '8px 0', fontSize: '11px', fontWeight: '700', borderTop: '2px solid var(--glass-border)' } });
+  totalRow.appendChild(el('span', {}, 'Total'));
+  totalRow.appendChild(el('span', { style: { textAlign: 'right' } }, EUR(totalProvisions)));
+  totalRow.appendChild(el('span', { style: { textAlign: 'right', color: 'var(--success)' } }, EUR(totalPaid)));
+  totalRow.appendChild(el('span', { style: { textAlign: 'center' } }, totalPaid >= totalProvisions ? '✅' : '⚠️'));
+  totalRow.appendChild(el('span', {}));
+  detailCard.appendChild(totalRow);
+
   container.appendChild(detailCard);
 
-  // Analyse écart - Prévisions vs Réel
-  var ecartCard = el('div', { class: 'card', style: { marginTop: '12px' } });
-  ecartCard.appendChild(el('div', { class: 'card-title' }, '📊 Analyse Écart'));
+  // V74: Analyse écart avec diagnostic (§5.5.3)
+  if (excedent < 0) {
+    var ecartCard = el('div', { class: 'card', style: { marginTop: '12px', border: '1px solid var(--danger)' } });
+    ecartCard.appendChild(el('div', { class: 'card-title', style: { color: 'var(--danger)' } }, '🚨 Provisions non couvertes'));
+    ecartCard.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700', color: 'var(--danger)', marginBottom: '12px' } }, 'Écart: ' + EUR(excedent)));
 
-  var ecarts = [
-    { label: 'CA Prévu', prevu: data.caPrev || 0, reel: data.caReal || 0 },
-    { label: 'Charges Prévues', prevu: data.chargesPrev || data.totalCharges || 0, reel: data.totalCharges || 0 }
-  ];
+    // Diagnostic
+    var diagDiv = el('div', { style: { padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px', lineHeight: '1.8' } });
+    diagDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '6px' } }, 'Diagnostic:'));
 
-  ecarts.forEach(function(e) {
-    var ecart = e.reel - e.prevu;
-    var pct = e.prevu > 0 ? (ecart / e.prevu * 100) : 0;
-    var color = ecart >= 0 ? 'var(--success)' : 'var(--danger)';
-    if (e.label.includes('Charges')) color = ecart <= 0 ? 'var(--success)' : 'var(--danger)';
+    var lastSalaire = data.detailSalaires && data.detailSalaires.length > 0 ? data.detailSalaires[data.detailSalaires.length - 1] : null;
+    if (lastSalaire && data.salaireVersable < lastSalaire.montant) {
+      diagDiv.appendChild(el('div', {}, '• Dernier salaire (' + EUR(lastSalaire.montant) + ') > capacité réelle (' + EUR(data.salaireVersable) + ')'));
+    }
 
-    var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', marginBottom: '6px', background: 'var(--bg-tertiary)', borderRadius: '6px' } });
-    row.appendChild(el('span', { style: { fontWeight: '600', fontSize: '12px' } }, e.label));
-    row.appendChild(el('div', { style: { textAlign: 'right' } }, [
-      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Prévu: ' + EUR(e.prevu) + ' | Réel: ' + EUR(e.reel)),
-      el('div', { style: { fontSize: '12px', fontWeight: '700', color: color } }, (ecart >= 0 ? '+' : '') + EUR(ecart) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%)')
-    ]));
-    ecartCard.appendChild(row);
-  });
+    // Provisions non payées
+    types.forEach(function(t) {
+      var restant = t.total - (t.paid || 0);
+      if (restant > 0) {
+        diagDiv.appendChild(el('div', {}, '• ' + t.label + ' non payé: ' + EUR(restant)));
+      }
+    });
 
-  container.appendChild(ecartCard);
+    ecartCard.appendChild(diagDiv);
 
-  // Toggle provisions payées (reprendre l'existant)
+    // Actions recommandées
+    var actionsDiv = el('div', { style: { marginTop: '10px', padding: '10px', background: 'rgba(34,197,94,0.1)', borderRadius: '8px', fontSize: '11px', lineHeight: '1.8' } });
+    actionsDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '6px', color: 'var(--success)' } }, 'Actions recommandées:'));
+    if (lastSalaire && data.salaireVersable < lastSalaire.montant) {
+      actionsDiv.appendChild(el('div', {}, '• Réduire le prochain salaire de ' + EUR(lastSalaire.montant - data.salaireVersable)));
+    }
+    actionsDiv.appendChild(el('div', {}, '• Provisionner les échéances avant la date limite'));
+    ecartCard.appendChild(actionsDiv);
+
+    container.appendChild(ecartCard);
+  } else {
+    // Tout est couvert
+    var okCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+    okCard.appendChild(el('div', { class: 'card-title' }, '📊 Analyse Écart'));
+    okCard.appendChild(el('div', { style: { padding: '16px', textAlign: 'center', color: 'var(--success)', fontSize: '12px' } }, '✅ Toutes les provisions sont couvertes par le solde du compte.'));
+    container.appendChild(okCard);
+  }
+
+  // Toggle provisions payées
   renderProvisionsList(container, data);
 }
 
