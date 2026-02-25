@@ -2787,7 +2787,17 @@ function togglePaid(id) { TREASURY.paidCharges[id] = !isPaid(id); saveAll(); ren
 function markAllPaid(ids) { ids.forEach(function(id) { TREASURY.paidCharges[id] = true; }); saveAll(); render(); toast('Marqué payé', 'success'); }
 
 function setFactureStatus(factureId, newStatus) {
-  MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) { if (f.id === factureId) f.status = newStatus; }); });
+  MISSIONS.forEach(function(m) {
+    if (m.factures) m.factures.forEach(function(f) {
+      if (f.id === factureId) {
+        f.status = newStatus;
+        // Enregistrer la date réelle de paiement pour le calcul DSO
+        if (newStatus === 'payée' && !f.datePaiementReel) {
+          f.datePaiementReel = localISO(TODAY);
+        }
+      }
+    });
+  });
   saveAll(); render(); toast('Facture mise à jour', 'success');
 }
 
@@ -4002,6 +4012,31 @@ function computeAlerts(data) {
   if (dayOfMonth >= 15 && dayOfMonth <= 20 && data.provByType['URSSAF'] > 0) {
     data.alerts.push({ type: 'warning', icon: '📅', title: 'Déclaration URSSAF', text: 'À faire avant le 20 du mois' });
   }
+
+  // Alerte visibilité : mission qui se termine dans <= 30 jours sans renouvellement
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var alertThresholdDate = new Date(TODAY);
+  alertThresholdDate.setDate(alertThresholdDate.getDate() + 30);
+  MISSIONS.forEach(function(mis) {
+    if (!mis.fin) return;
+    var finDate = new Date(mis.fin);
+    var finYm = mis.fin.substring(0, 7);
+    if (finDate >= TODAY && finDate <= alertThresholdDate) {
+      var daysLeft = Math.ceil((finDate - TODAY) / (1000 * 60 * 60 * 24));
+      // Vérifier qu'il n'y a pas une autre mission active qui démarre juste après
+      var hasContinuation = MISSIONS.some(function(m2) {
+        return m2.id !== mis.id && m2.debut && m2.debut.substring(0, 7) > finYm;
+      });
+      if (!hasContinuation) {
+        data.alerts.push({
+          type: daysLeft <= 7 ? 'danger' : 'warning',
+          icon: '📅',
+          title: 'Mission ' + mis.client + ' se termine dans ' + daysLeft + 'j',
+          text: 'Aucune mission suivante signée'
+        });
+      }
+    }
+  });
 }
 
 // COMPUTE - Charges liées au mois d'ENCAISSEMENT (pas réalisation)
@@ -8443,8 +8478,15 @@ function getClientsStats() {
           stats[clientName].ca += f.ht || 0;
           stats[clientName].jours += f.jours || 0;
           stats[clientName].factures++;
-          // V73: Calculer DSO basé sur le délai de paiement de la mission
-          var dso = mis.delaiPaiement || 30;
+          // DSO : date réelle si disponible, sinon estimation contractuelle
+          var dso;
+          if (f.datePaiementReel && (f.dateFacture || f.mois)) {
+            var realPayDate = new Date(f.datePaiementReel);
+            var issueDate = f.dateFacture ? new Date(f.dateFacture) : new Date(f.mois + '-01');
+            dso = Math.max(0, Math.round((realPayDate - issueDate) / (1000 * 60 * 60 * 24)));
+          } else {
+            dso = mis.delaiPaiement || 30; // estimation contractuelle
+          }
           stats[clientName].dsoSum += dso;
           stats[clientName].dsoCount++;
         }
@@ -10979,8 +11021,8 @@ function renderFinancesPerformance(container) {
 
   // KPIs Performance
   var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
-  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé', 'var(--info)'));
-  kpiGrid.appendChild(createKPIBlock(EUR(data.caEnc), 'CA Encaissé', 'var(--success)'));
+  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé HT', 'var(--info)'));
+  kpiGrid.appendChild(createKPIBlock(EUR(data.caHT), 'CA Encaissé HT', 'var(--success)'));
   kpiGrid.appendChild(createKPIBlock(EUR(data.cashDispoAbsolu), 'Cash Dispo', data.cashDispoAbsolu >= 0 ? 'var(--success)' : 'var(--danger)'));
   container.appendChild(kpiGrid);
 
@@ -10989,7 +11031,8 @@ function renderFinancesPerformance(container) {
   var totalCharges = data.chargesReelles || 0;
   var totalRemuneration = data.salaires || 0;
   var cashDispo = data.cashDispoAbsolu || 0;
-  var caHT = data.caEnc || 1;
+  // Base HT encaissé pour les ratios du donut — fallback sur caReal si rien n'est encore encaissé
+  var caHT = (data.caHT !== undefined && data.caHT > 0) ? data.caHT : (data.caReal || 1);
 
   var donutCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   donutCard.appendChild(el('div', { class: 'card-title' }, '🍩 Répartition CA HT'));
@@ -11432,9 +11475,9 @@ function renderMissionsContent(container) {
   var joursOuvrables = data.joursOuvrables || 1;
   var tauxOccup = joursOuvrables > 0 ? Math.round(totalJours / joursOuvrables * 100) : 0;
 
-  kpiGrid.appendChild(kpiBlock(EUR(caRealise), 'CA Réalisé', 'var(--info)', totalJours + 'j travaillés'));
-  kpiGrid.appendChild(kpiBlock(EUR(caEncaisse), 'CA Encaissé', 'var(--success)', 'Factures payées'));
-  kpiGrid.appendChild(kpiBlock(EUR(caLatent), 'À Encaisser', 'var(--warning)', facturesEnvoyees + ' facture' + (facturesEnvoyees > 1 ? 's' : '')));
+  kpiGrid.appendChild(kpiBlock(EUR(caRealise), 'CA Réalisé HT', 'var(--info)', totalJours + 'j travaillés'));
+  kpiGrid.appendChild(kpiBlock(EUR(caEncaisse), 'Encaissé HT', 'var(--success)', 'Factures payées'));
+  kpiGrid.appendChild(kpiBlock(EUR(caLatent), 'À Encaisser HT', 'var(--warning)', facturesEnvoyees + ' facture' + (facturesEnvoyees > 1 ? 's' : '')));
   kpiGrid.appendChild(kpiBlock(tauxOccup + '%', 'Taux Occup.', tauxOccup >= 80 ? 'var(--success)' : tauxOccup >= 60 ? 'var(--warning)' : 'var(--danger)', totalJours + 'j/' + joursOuvrables + 'j'));
 
   container.appendChild(kpiGrid);
@@ -11691,11 +11734,12 @@ function showAbsoluteWaterfallDetail(bar, data) {
     body.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' } }, 'Solde bancaire renseigné dans Trésorerie'));
   } else if (bar.id === 'cash') {
     // Cash dispo = salaire versable
-    var salaireVersable = Math.max(0, Math.floor((bar.value - 150) / 100) * 100);
+    var reserve = TREASURY.reserveCompte || 150;
+    var salaireVersable = Math.max(0, Math.floor((bar.value - reserve) / 100) * 100);
     body.appendChild(el('div', { style: { padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', textAlign: 'center' } }, [
       el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, 'Salaire versable recommandé'),
       el('div', { style: { fontSize: '24px', fontWeight: '800', color: 'var(--success)' } }, EUR(salaireVersable)),
-      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, '(après réserve de 150€)')
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, '(après réserve de ' + EUR(reserve) + ')')
     ]));
   } else {
     // Provisions (URSSAF, TVA, IR, Autres) - afficher détail
@@ -13360,6 +13404,10 @@ function renderAdmin(container) {
   ]));
   entCard.appendChild(createInput('Adresse', 'text', 'adminAdresse', COMPANY.adresse || ''));
   entCard.appendChild(el('div', { class: 'form-row' }, [
+    createInput('Code postal', 'text', 'adminCP', COMPANY.codePostal || '', 'Ex: 75001'),
+    createInput('Ville', 'text', 'adminCommune', COMPANY.commune || '', 'Ex: Paris')
+  ]));
+  entCard.appendChild(el('div', { class: 'form-row' }, [
     createInput('Email', 'email', 'adminEmail', COMPANY.email || ''),
     createInput('Téléphone', 'tel', 'adminTel', COMPANY.telephone || '')
   ]));
@@ -13614,6 +13662,8 @@ function renderAdmin(container) {
     COMPANY.siret = $('#adminSiret').value;
     COMPANY.codeApe = $('#adminAPE') ? $('#adminAPE').value : '';
     COMPANY.adresse = $('#adminAdresse') ? $('#adminAdresse').value : '';
+    COMPANY.codePostal = $('#adminCP') ? $('#adminCP').value : '';
+    COMPANY.commune = $('#adminCommune') ? $('#adminCommune').value : '';
     COMPANY.email = $('#adminEmail') ? $('#adminEmail').value : '';
     COMPANY.telephone = $('#adminTel') ? $('#adminTel').value : '';
     COMPANY.debut = $('#adminDebut').value;
@@ -13936,18 +13986,7 @@ function renderCockpit(container) {
   // 3. À FAIRE: Actions + Jalons timeline
   renderActionsAndMilestones(container);
 
-  // 4. Graphiques CA et Trésorerie
-  var chartsCard = el('div', { class: 'card', style: { marginTop: '16px' } });
-  chartsCard.appendChild(el('div', { class: 'card-title' }, '📈 Évolution CA'));
-  chartsCard.appendChild(el('div', { class: 'chart-container', style: { height: '180px' } }, [el('canvas', { id: 'mainChart' })]));
-  container.appendChild(chartsCard);
-
-  var tresoCard = el('div', { class: 'card', style: { marginTop: '16px' } });
-  tresoCard.appendChild(el('div', { class: 'card-title' }, '💰 Trésorerie & Salaires'));
-  tresoCard.appendChild(el('div', { class: 'chart-container', style: { height: '180px' } }, [el('canvas', { id: 'soldeChart' })]));
-  container.appendChild(tresoCard);
-
-  // 5. Insights
+  // 4. Insights (graphiques CA + Tréso disponibles dans Finances > Évolution)
   renderInsights(container);
 }
 
@@ -13974,11 +14013,6 @@ function renderActivite(container) {
     renderFacturesContent(container);
   }
 
-  // Graphique CA en bas
-  var caCard = el('div', { class: 'card', style: { marginTop: '16px' } });
-  caCard.appendChild(el('div', { class: 'card-title' }, '📊 Chiffre d\'Affaires'));
-  caCard.appendChild(el('div', { class: 'chart-container', style: { height: '180px' } }, [el('canvas', { id: 'mainChart' })]));
-  container.appendChild(caCard);
 }
 
 // Contenu factures
@@ -14102,39 +14136,7 @@ function render() {
   if (monthFilter) monthFilter.value = PERIOD.month !== null && PERIOD.month !== undefined ? String(PERIOD.month) : '';
   updateNotifBadge();
 
-  // V73: Dessiner les graphiques après le render si onglet Cockpit ou Activité
-  // Utiliser un délai plus long pour garantir que le DOM est prêt
-  if (VIEW === 'cockpit' || VIEW === 'activite') {
-    requestAnimationFrame(function() {
-      setTimeout(function() {
-        try {
-          var mc = $('#mainChart');
-          var sc = $('#soldeChart');
-          // V61: Forcer les dimensions du canvas avant de dessiner
-          if (mc && mc.getContext) {
-            var mcParent = mc.parentElement;
-            if (mcParent) {
-              mc.style.width = '100%';
-              mc.style.height = '100%';
-            }
-            drawMainChart();
-            if (mainChart) mainChart.resize();
-          }
-          if (sc && sc.getContext) {
-            var scParent = sc.parentElement;
-            if (scParent) {
-              sc.style.width = '100%';
-              sc.style.height = '100%';
-            }
-            drawSoldeChart();
-            if (soldeChart) soldeChart.resize();
-          }
-        } catch (e) {
-          console.error('Chart render error:', e);
-        }
-      }, 100);
-    });
-  }
+  // Graphiques uniquement en Finances > Évolution (gérés par renderFinancesEvolution)
 }
 
 // === ONBOARDING ===
