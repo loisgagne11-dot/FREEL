@@ -1002,6 +1002,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .mission-progress { margin-top: 10px; }
 .mission-progress-bar { height: 4px; background: var(--bg-tertiary); border-radius: 2px; overflow: hidden; }
 .mission-progress-fill { height: 100%; background: var(--accent); transition: width 0.3s; }
+.mission-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; margin-left: 6px; vertical-align: middle; }
+.mission-badge.prospect { background: rgba(167,139,250,0.15); border: 1px solid #a78bfa; color: #a78bfa; }
+.mission-badge.perdue { background: rgba(248,113,113,0.12); border: 1px solid #f87171; color: #f87171; }
+.mission-card.prospect { border-left: 3px solid #a78bfa; }
+.mission-card.perdue { border-left: 3px solid #f87171; opacity: 0.72; }
 
 .facture-card { display: flex; align-items: center; gap: 12px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
 .facture-card:hover { border-color: var(--accent); }
@@ -11066,83 +11071,146 @@ function renderFinancesPerformance(container) {
   var prevYear = currentYear - 1;
   var provisions = getAbsoluteProvisions();
 
+  // V77: CA Latent = factures envoyées non encore encaissées (HT)
+  var caLatent = 0;
+  (MISSIONS || []).forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'envoyée') caLatent += (f.ht || 0); }); });
+
   // KPIs Performance
   var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
   kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé HT', 'var(--info)'));
   kpiGrid.appendChild(createKPIBlock(EUR(data.caHT), 'CA Encaissé HT', 'var(--success)'));
-  kpiGrid.appendChild(createKPIBlock(EUR(data.cashDispoAbsolu), 'Cash Dispo', data.cashDispoAbsolu >= 0 ? 'var(--success)' : 'var(--danger)'));
+  kpiGrid.appendChild(createKPIBlock(EUR(caLatent), 'CA Latent HT', caLatent > 0 ? 'var(--warning)' : 'var(--text-muted)'));
   container.appendChild(kpiGrid);
 
-  // V74: Donut répartition CA HT - Provisions / Charges / Rémunération / Cash dispo (selon cahier des charges §5.4.2)
-  // V75: Fix accès byType (getAbsoluteProvisions retourne {total, byType, detail}, pas {urssaf, tva, ...})
-  var provByType = provisions.byType || {};
-  var totalProvisions = provisions.total || 0;
-  // V75: Fix data.chargesReelles undefined → utiliser chargesPayees (charges déjà réglées)
-  var totalCharges = data.chargesPayees || 0;
-  var totalRemuneration = data.salaires || 0;
-  var cashDispo = data.cashDispoAbsolu || 0;
-  // Base HT encaissé pour les ratios du donut — fallback sur caReal si rien n'est encore encaissé
-  var caHT = (data.caHT !== undefined && data.caHT > 0) ? data.caHT : (data.caReal || 1);
+  // V77: Waterfall CA HT - décomposition de la période (remplace donut conceptuellement faux)
+  // Base = CA HT encaissé période ; reductions = charges + provisions PÉRIODE (excl. TVA sur base HT)
+  var caHT = (data.caHT !== undefined && data.caHT > 0) ? data.caHT : (data.caReal || 0);
+  var chargesMap = {};
+  (data.chargesDetail || []).forEach(function(c) { chargesMap[c.cat] = c.total; });
 
-  var donutCard = el('div', { class: 'card', style: { marginTop: '12px' } });
-  donutCard.appendChild(el('div', { class: 'card-title' }, '🍩 Répartition CA HT'));
+  var segURSSAF = (chargesMap['URSSAF'] || 0) + (chargesMap['CFP'] || 0);
+  var segIR = (chargesMap['Impôt'] || 0) + (chargesMap['IR Estimé'] || 0) + (chargesMap['IR'] || 0);
+  var segSalaires = data.salaires || 0;
+  var segAutres = 0;
+  (data.chargesDetail || []).forEach(function(c) {
+    if (['TVA', 'URSSAF', 'CFP', 'Impôt', 'IR Estimé', 'IR'].indexOf(c.cat) >= 0) return;
+    segAutres += c.total;
+  });
+  var segBenefice = caHT - segURSSAF - segIR - segSalaires - segAutres;
+
+  var waterfallCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  waterfallCard.appendChild(el('div', { class: 'card-title' }, '📊 Décomposition CA HT · Période'));
 
   if (caHT > 0) {
-    donutCard.appendChild(el('div', { id: 'caDonutContainer', style: { height: '200px', position: 'relative' } }, [el('canvas', { id: 'caDonutChart' })]));
+    // Construire segments triés par valeur décroissante
+    var reductions = [
+      { label: 'URSSAF/CFP', value: segURSSAF, color: '#f87171' },
+      { label: 'IR/Impôt', value: segIR, color: '#f59e0b' },
+      { label: 'Salaires', value: segSalaires, color: '#22d3ee' },
+      { label: 'Autres charges', value: segAutres, color: '#a855f7' }
+    ].filter(function(r) { return r.value > 0; }).sort(function(a, b) { return b.value - a.value; });
 
-    // Centre label: Cash dispo
-    var centerDiv = el('div', { style: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' } });
-    centerDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Cash dispo'));
-    centerDiv.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '700', color: cashDispo >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(cashDispo)));
-    donutCard.querySelector('#caDonutContainer').appendChild(centerDiv);
-
-    // Légende cliquable
-    var legend = el('div', { style: { marginTop: '10px' } });
-    var segments = [
-      { label: 'Provisions', value: totalProvisions, color: '#a78bfa', pct: Math.round(totalProvisions / caHT * 100) },
-      { label: 'Charges', value: totalCharges, color: '#f87171', pct: Math.round(totalCharges / caHT * 100) },
-      { label: 'Rémunération', value: totalRemuneration, color: '#22d3ee', pct: Math.round(totalRemuneration / caHT * 100) },
-      { label: 'Cash dispo', value: Math.max(0, cashDispo), color: '#34d399', pct: Math.max(0, Math.round(cashDispo / caHT * 100)) }
-    ];
-
-    segments.forEach(function(s) {
-      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: '11px' } });
-      row.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
-        el('span', { style: { width: '10px', height: '10px', borderRadius: '50%', background: s.color, flexShrink: '0' } }),
-        el('span', { style: { fontWeight: '600' } }, s.label + ' (' + s.pct + '%)')
-      ]));
-      row.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, EUR(s.value)));
-      legend.appendChild(row);
+    // Floating bars waterfall [low, high]
+    var wLabels = ['CA HT'];
+    var wData = [[0, caHT]];
+    var wColors = ['#3b82f6'];
+    var running = caHT;
+    reductions.forEach(function(r) {
+      wLabels.push(r.label);
+      wData.push([running - r.value, running]);
+      wColors.push(r.color);
+      running -= r.value;
     });
-    donutCard.appendChild(legend);
+    wLabels.push('Bénéfice Net');
+    wData.push([0, Math.max(0, segBenefice)]);
+    wColors.push(segBenefice >= 0 ? '#22c55e' : '#f87171');
 
-    // V74: Détail sous le donut (§5.4.3)
+    // Légende rapide (% du CA)
+    var legendDiv = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px', fontSize: '10px' } });
+    reductions.forEach(function(r) {
+      var pct = Math.round(r.value / caHT * 100);
+      var pill = el('span', { style: { padding: '2px 8px', borderRadius: '10px', background: r.color + '22', border: '1px solid ' + r.color, color: r.color, fontWeight: '600' } }, r.label + ' ' + pct + '%');
+      legendDiv.appendChild(pill);
+    });
+    var benPct = Math.round(Math.max(0, segBenefice) / caHT * 100);
+    legendDiv.appendChild(el('span', { style: { padding: '2px 8px', borderRadius: '10px', background: segBenefice >= 0 ? '#22c55e22' : '#f8717122', border: '1px solid ' + (segBenefice >= 0 ? '#22c55e' : '#f87171'), color: segBenefice >= 0 ? '#22c55e' : '#f87171', fontWeight: '700' } }, 'Net ' + benPct + '%'));
+    waterfallCard.appendChild(legendDiv);
+
+    waterfallCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px' } }, [el('canvas', { id: 'caWaterfallChart' })]));
+
+    setTimeout(function() {
+      var canvas = document.getElementById('caWaterfallChart');
+      if (!canvas || typeof Chart === 'undefined') return;
+      if (canvas._chartInstance) canvas._chartInstance.destroy();
+      var chart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: wLabels,
+          datasets: [{ data: wData, backgroundColor: wColors, borderRadius: 4, borderSkipped: false }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: function(c) {
+              var val = Array.isArray(c.raw) ? c.raw[1] - c.raw[0] : c.raw;
+              var pct = caHT > 0 ? Math.round(Math.abs(val) / caHT * 100) : 0;
+              return EUR(val) + ' (' + pct + '%)';
+            }}}
+          },
+          scales: {
+            x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
+            y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? Math.round(v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+          }
+        }
+      });
+      canvas._chartInstance = chart;
+    }, 100);
+
+    // Détail provisions (à payer) + charges payées
     var detailDiv = el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px' } });
-    detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '6px' } }, 'PROVISIONS (' + Math.round(totalProvisions / caHT * 100) + '%)'));
-    var provLines = [
-      { label: 'URSSAF/CFP', value: (provByType['URSSAF'] || 0) + (provByType['CFP'] || 0) },
-      { label: 'IR Estimé', value: provByType['IR Estimé'] || 0, tag: 'estimé' },
-      { label: 'Impôt PL', value: provByType['Impôt'] || 0 }
-    ];
-    if ((provByType['TVA'] || 0) > 0) provLines.push({ label: 'TVA', value: provByType['TVA'] });
-    provLines.forEach(function(p) {
-      var line = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
-      var labelSpan = el('span', {}, '├ ' + p.label);
-      if (p.tag) labelSpan.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--warning)', marginLeft: '4px' } }, '[' + p.tag + ']'));
-      line.appendChild(labelSpan);
-      line.appendChild(el('span', {}, EUR(p.value)));
-      detailDiv.appendChild(line);
-    });
 
-    detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginTop: '8px', marginBottom: '4px' } }, 'RÉMUNÉRATION (' + Math.round(totalRemuneration / caHT * 100) + '%)'));
-    var salMoyenne = data.detailSalaires && data.detailSalaires.length > 0 ? Math.round(totalRemuneration / data.detailSalaires.length) : 0;
-    detailDiv.appendChild(el('div', { style: { padding: '2px 0 2px 12px', color: 'var(--text-muted)' } }, '├ Moyenne: ' + EUR(salMoyenne) + '/mois'));
+    // Provisions à payer (période)
+    var provEntries = Object.keys(data.provByType || {}).filter(function(k) { return k !== 'TVA' && (data.provByType[k] || 0) > 0; })
+      .map(function(k) { return { cat: k, total: data.provByType[k] }; })
+      .sort(function(a, b) { return b.total - a.total; });
+    if (provEntries.length > 0) {
+      detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '4px', color: 'var(--warning)' } }, '⏳ Provisions à payer — ' + EUR(data.provisions)));
+      provEntries.forEach(function(p) {
+        var pct = caHT > 0 ? Math.round(p.total / caHT * 100) : 0;
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
+        row.appendChild(el('span', {}, '├ ' + p.cat));
+        row.appendChild(el('span', {}, pct + '% · ' + EUR(p.total)));
+        detailDiv.appendChild(row);
+      });
+    }
 
-    donutCard.appendChild(detailDiv);
+    // Charges payées (période)
+    if (data.chargesPayees > 0) {
+      detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginTop: '8px', marginBottom: '4px', color: 'var(--danger)' } }, '✅ Charges payées — ' + EUR(data.chargesPayees)));
+      var paidByCat = {};
+      (data.detailChargesPayees || []).forEach(function(c) { if (c.cat !== 'TVA') paidByCat[c.cat] = (paidByCat[c.cat] || 0) + c.montant; });
+      Object.keys(paidByCat).sort(function(a, b) { return paidByCat[b] - paidByCat[a]; }).forEach(function(cat) {
+        var v = paidByCat[cat];
+        var pct = caHT > 0 ? Math.round(v / caHT * 100) : 0;
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
+        row.appendChild(el('span', {}, '├ ' + cat));
+        row.appendChild(el('span', {}, pct + '% · ' + EUR(v)));
+        detailDiv.appendChild(row);
+      });
+      if (data.salaires > 0) {
+        var salPct = caHT > 0 ? Math.round(data.salaires / caHT * 100) : 0;
+        var salRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
+        salRow.appendChild(el('span', {}, '├ Salaires versés'));
+        salRow.appendChild(el('span', {}, salPct + '% · ' + EUR(data.salaires)));
+        detailDiv.appendChild(salRow);
+      }
+    }
+    waterfallCard.appendChild(detailDiv);
   } else {
-    donutCard.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Aucun CA sur la période'));
+    waterfallCard.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Aucun CA encaissé sur la période'));
   }
-  container.appendChild(donutCard);
+  container.appendChild(waterfallCard);
 
   // V74: Comparaison N-1 détaillée (§5.4.4)
   var compCard = el('div', { class: 'card', style: { marginTop: '12px' } });
@@ -12842,14 +12910,16 @@ function renderMissions(container) {
     else if (facturesEnvoyees > 0) { factureStatus = '📤 ' + facturesEnvoyees + ' en attente'; factureStatusColor = 'var(--warning)'; }
     else if (facturesPayees === facturesTotal && facturesTotal > 0) { factureStatus = '✅ Tout payé'; factureStatusColor = 'var(--success)'; }
     
-    // V75: badge prospect/perdue
-    var statutBadge = '';
-    var cardOpacity = '1';
-    if (m.statut === 'prospect') { statutBadge = ' 🔮 Prospect'; cardOpacity = '0.85'; }
-    else if (m.statut === 'perdue') { statutBadge = ' ❌ Perdue'; cardOpacity = '0.55'; }
-    var card = el('div', { class: 'mission-card', style: { opacity: cardOpacity }, onclick: function() { showMissionModal(m); } });
+    // V77: badge prospect/perdue - pill coloré visible
+    var cardClass = 'mission-card';
+    var badgeEl = null;
+    if (m.statut === 'prospect') { cardClass += ' prospect'; badgeEl = el('span', { class: 'mission-badge prospect' }, '🔮 Prospect'); }
+    else if (m.statut === 'perdue') { cardClass += ' perdue'; badgeEl = el('span', { class: 'mission-badge perdue' }, '❌ Perdue'); }
+    var card = el('div', { class: cardClass, onclick: function() { showMissionModal(m); } });
     var cardHeader = el('div', { class: 'mission-header' });
-    cardHeader.appendChild(el('div', {}, [el('div', { class: 'mission-client' }, m.client + statutBadge), el('div', { class: 'mission-titre' }, m.titre || m.site || '')]));
+    var clientNameDiv = el('div', { class: 'mission-client' }, m.client);
+    if (badgeEl) clientNameDiv.appendChild(badgeEl);
+    cardHeader.appendChild(el('div', {}, [clientNameDiv, el('div', { class: 'mission-titre' }, m.titre || m.site || '')]));
     cardHeader.appendChild(el('div', { class: 'mission-status ' + status }, statusLabel));
     card.appendChild(cardHeader);
     
@@ -13129,15 +13199,10 @@ function renderTresorerie(container) {
   actions.appendChild(el('button', { class: 'btn btn-sm btn-success', onclick: function() { showSalaireModal(data.salaireReco); } }, '💸 Salaire'));
   header.appendChild(actions);
   container.appendChild(header);
-  
-  // SOLDE COMPTE en premier (ABSOLU)
-  var soldeCard = el('div', { class: 'hero', style: { cursor: 'default' }, onclick: showCashDetail });
-  var soldeMain = el('div', { class: 'hero-main' });
-  soldeMain.appendChild(el('div', { class: 'hero-label' }, 'Solde Compte Pro'));
-  soldeMain.appendChild(el('div', { class: 'hero-value ' + (data.soldeAbsolu >= 0 ? 'positive' : 'negative') }, EUR(data.soldeAbsolu)));
-  soldeCard.appendChild(soldeMain);
-  container.appendChild(soldeCard);
-  
+
+  // V77: Hero complet Cash Dispo + donut + salaire + autonomie (déplacé depuis Cockpit)
+  renderDashboardHero(container, data);
+
   // 4 blocs en grille
   var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' } });
   
@@ -13254,62 +13319,9 @@ function renderTresorerie(container) {
   provCard.appendChild(provPreview);
   provCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px' } }, 'Cliquer pour détails et paiement rapide'));
   container.appendChild(provCard);
-  
-  // Résultat CASH DISPONIBLE (ABSOLU)
-  var cashCard = el('div', { class: 'card', style: { background: data.cashDispoAbsolu >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)' } });
-  cashCard.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [el('span', { style: { fontWeight: '700', fontSize: '15px' } }, '= Cash Disponible'), el('span', { style: { fontWeight: '800', fontSize: '24px', color: data.cashDispoAbsolu >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(data.cashDispoAbsolu))]));
-  cashCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Autonomie: ' + data.runway + ' mois'));
-  container.appendChild(cashCard);
-  
-  // Graphique Salaires
-  var chartCard = el('div', { class: 'card' });
-  chartCard.appendChild(el('div', { class: 'card-title' }, [el('span', {}, '📊 Évolution Salaires'), el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Moy: ' + EUR(data.salaireMoyen))]));
-  chartCard.appendChild(el('div', { class: 'chart-container' }, [el('canvas', { id: 'tresoSalairesChart' })]));
-  container.appendChild(chartCard);
-  
-  setTimeout(function() {
-    var canvas = $('#tresoSalairesChart');
-    if (!canvas) return;
-    var ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    if (salairesChart) salairesChart.destroy();
-    var months = getPeriodMonths();
-    var labels = months.map(fmtMonthShort);
-    var dataSal = months.map(function(m) { return data.monthsData[m] ? data.monthsData[m].salaires : 0; });
 
-    // V72: Plugin pour afficher les montants sur les barres salaires
-    var salairesLabelsPlugin = {
-      id: 'salairesLabelsPlugin',
-      afterDatasetsDraw: function(chart) {
-        var ctx = chart.ctx;
-        var dataset = chart.data.datasets[0];
-        var meta = chart.getDatasetMeta(0);
-        meta.data.forEach(function(bar, index) {
-          var value = dataset.data[index];
-          if (value === null || value === 0) return;
-          var label = value >= 1000 ? Math.round(value/1000) + 'k' : Math.round(value);
-          ctx.save();
-          ctx.fillStyle = '#60a5fa';
-          ctx.font = 'bold 9px system-ui';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(label + '€', bar.x, bar.y - 4);
-          ctx.restore();
-        });
-      }
-    };
+  // V77: cashCard et graphique salaires supprimés (redondants avec hero en haut)
 
-    salairesChart = new Chart(ctx, {
-      type: 'bar',
-      data: { labels: labels, datasets: [
-        { label: 'Salaires', data: dataSal, backgroundColor: 'rgba(96,165,250,0.7)', borderRadius: 4 },
-        { type: 'line', label: 'Moyenne', data: months.map(function() { return data.salaireMoyen; }), borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, borderDash: [5,5], pointRadius: 0 }
-      ]},
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
-      plugins: [salairesLabelsPlugin]
-    });
-  }, 50);
-  
   // Historique des mouvements avec recherche/filtres (B17, B18)
   var mouvementsCard = el('div', { class: 'card', style: { marginTop: '16px' } });
   mouvementsCard.appendChild(el('div', { class: 'card-title' }, '📜 Historique des Mouvements'));
@@ -14036,11 +14048,31 @@ function renderAdmin(container) {
 // ============================================================================
 
 // COCKPIT: Dashboard santé macro + actions (V75: Cockpit épuré — analytics dans Analyse)
+// V77: Widget compact Cash Dispo pour Cockpit (hero complet déplacé en Trésorerie)
+function renderCockpitCashCompact(container, data) {
+  var card = el('div', { class: 'card', style: {
+    background: data.cashDispoAbsolu >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)',
+    cursor: 'pointer', marginBottom: '12px',
+    borderLeft: '3px solid ' + (data.cashDispoAbsolu >= 0 ? 'var(--success)' : 'var(--danger)')
+  }, onclick: function() { VIEW = 'tresorerie'; render(); } });
+  var row1 = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
+  row1.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' } }, '💰 Cash Disponible'));
+  row1.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--accent)' } }, '→ Trésorerie'));
+  card.appendChild(row1);
+  card.appendChild(el('div', { style: { fontSize: '28px', fontWeight: '800', color: data.cashDispoAbsolu >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(data.cashDispoAbsolu)));
+  var row2 = el('div', { style: { display: 'flex', gap: '16px', marginTop: '8px', fontSize: '11px', flexWrap: 'wrap' } });
+  row2.appendChild(el('span', { style: { color: 'var(--text-muted)' } }, 'Solde: ' + EUR(data.soldeAbsolu)));
+  row2.appendChild(el('span', { style: { color: 'var(--warning)' } }, '▲ Prov: ' + EUR(data.provisionsAbsolues)));
+  row2.appendChild(el('span', { style: { color: data.runway > 3 ? 'var(--success)' : 'var(--danger)', fontWeight: '700' } }, '⏱ ' + data.runway + ' mois'));
+  card.appendChild(row2);
+  container.appendChild(card);
+}
+
 function renderCockpit(container) {
   var data = compute();
 
-  // 1. Hero: Cash Disponible + donut provisions + salaire versable + autonomie
-  renderDashboardHero(container, data);
+  // 1. Cash compact cliquable → Trésorerie (hero complet déplacé en V77)
+  renderCockpitCashCompact(container, data);
 
   // 2. Alertes critiques en tête (insights urgents seulement)
   renderInsightsCritiques(container);
