@@ -11004,45 +11004,29 @@ function renderFinances(container) {
 function renderFinancesEvolution(container) {
   var data = compute();
 
-  // Graphique Trésorerie & Salaires
+  // V78: Graphique Trésorerie avec toggle Solde / Cash Dispo
+  var tresoHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  tresoHeader.appendChild(el('div', { class: 'card-title', style: { margin: 0 } }, '💰 Trésorerie'));
+  var soldeToggle = el('div', { style: { display: 'flex', gap: '4px', background: 'var(--bg-secondary)', borderRadius: '8px', padding: '3px' } });
+  soldeToggle.appendChild(el('button', { style: { padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: !SHOW_CASH_DISPO ? 'var(--accent)' : 'transparent', color: !SHOW_CASH_DISPO ? 'white' : 'var(--text-muted)' }, onclick: function() { SHOW_CASH_DISPO = false; render(); } }, 'Solde'));
+  soldeToggle.appendChild(el('button', { style: { padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: SHOW_CASH_DISPO ? 'var(--accent)' : 'transparent', color: SHOW_CASH_DISPO ? 'white' : 'var(--text-muted)' }, onclick: function() { SHOW_CASH_DISPO = true; render(); } }, 'Cash dispo'));
+  tresoHeader.appendChild(soldeToggle);
   var tresoCard = el('div', { class: 'card' });
-  tresoCard.appendChild(el('div', { class: 'card-title' }, '💰 Trésorerie & Salaires'));
-  tresoCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px' } }, [el('canvas', { id: 'soldeChart' })]));
+  tresoCard.appendChild(tresoHeader);
+  tresoCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px', marginTop: '8px' } }, [el('canvas', { id: 'soldeChart' })]));
   container.appendChild(tresoCard);
 
-  // Graphique CA HT
+  // V78: Graphique CA HT avec toggle Mensuel / Cumulé
+  var caHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  caHeader.appendChild(el('div', { class: 'card-title', style: { margin: 0 } }, '📊 CA HT (Prévu / Réalisé / Encaissé)'));
+  var cumulToggle = el('div', { style: { display: 'flex', gap: '4px', background: 'var(--bg-secondary)', borderRadius: '8px', padding: '3px' } });
+  cumulToggle.appendChild(el('button', { style: { padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: !SHOW_CUMUL ? 'var(--accent)' : 'transparent', color: !SHOW_CUMUL ? 'white' : 'var(--text-muted)' }, onclick: function() { SHOW_CUMUL = false; render(); } }, 'Mensuel'));
+  cumulToggle.appendChild(el('button', { style: { padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: SHOW_CUMUL ? 'var(--accent)' : 'transparent', color: SHOW_CUMUL ? 'white' : 'var(--text-muted)' }, onclick: function() { SHOW_CUMUL = true; render(); } }, 'Cumulé'));
+  caHeader.appendChild(cumulToggle);
   var caCard = el('div', { class: 'card', style: { marginTop: '12px' } });
-  caCard.appendChild(el('div', { class: 'card-title' }, '📊 CA HT (Prévu / Réalisé / Encaissé)'));
-  caCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px' } }, [el('canvas', { id: 'mainChart' })]));
+  caCard.appendChild(caHeader);
+  caCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px', marginTop: '8px' } }, [el('canvas', { id: 'mainChart' })]));
   container.appendChild(caCard);
-
-  // Historique Salaires versés
-  var salaires = [];
-  MISSIONS.forEach(function(m) {
-    if (m.salaires) m.salaires.forEach(function(s) {
-      salaires.push({ date: s.date, montant: s.montant, mission: m.client });
-    });
-  });
-  salaires.sort(function(a, b) { return b.date.localeCompare(a.date); });
-
-  if (salaires.length > 0) {
-    var salaireCard = el('div', { class: 'card', style: { marginTop: '12px' } });
-    salaireCard.appendChild(el('div', { class: 'card-title' }, '💸 Historique Salaires'));
-    var salaireList = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
-    salaires.slice(0, 10).forEach(function(s) {
-      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--glass-border)' } });
-      row.appendChild(el('span', { style: { fontSize: '12px' } }, fmtDate(s.date) + ' - ' + s.mission));
-      row.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--success)' } }, EUR(s.montant)));
-      salaireList.appendChild(row);
-    });
-    salaireCard.appendChild(salaireList);
-    var totalSalaires = salaires.reduce(function(sum, s) { return sum + s.montant; }, 0);
-    salaireCard.appendChild(el('div', { style: { marginTop: '10px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '6px', display: 'flex', justifyContent: 'space-between' } }, [
-      el('span', { style: { fontWeight: '600' } }, 'Total versé'),
-      el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, EUR(totalSalaires))
-    ]));
-    container.appendChild(salaireCard);
-  }
 
   // V77: Graphique Évolution Salaires mensuel (déplacé depuis Trésorerie)
   var salChartCard = el('div', { class: 'card', style: { marginTop: '12px' } });
@@ -11694,7 +11678,7 @@ function renderMissionsContent(container) {
   var joursOuvrables = data.joursOuvrables || 1;
   var tauxOccup = joursOuvrables > 0 ? Math.round(totalJours / joursOuvrables * 100) : 0;
 
-  kpiGrid.appendChild(kpiBlock(EUR(caRealise), 'CA Réalisé HT', 'var(--info)', totalJours + 'j travaillés'));
+  kpiGrid.appendChild(kpiBlock(EUR(caRealise), 'CA Planifié HT', 'var(--info)', totalJours + 'j travaillés'));
   kpiGrid.appendChild(kpiBlock(EUR(caEncaisse), 'Encaissé HT', 'var(--success)', 'Factures payées'));
   kpiGrid.appendChild(kpiBlock(EUR(caLatent), 'À Encaisser HT', 'var(--warning)', facturesEnvoyees + ' facture' + (facturesEnvoyees > 1 ? 's' : '')));
   kpiGrid.appendChild(kpiBlock(tauxOccup + '%', 'Taux Occup.', tauxOccup >= 80 ? 'var(--success)' : tauxOccup >= 60 ? 'var(--warning)' : 'var(--danger)', totalJours + 'j/' + joursOuvrables + 'j'));
@@ -11731,10 +11715,17 @@ function renderMissionsContent(container) {
     var card = el('div', { class: 'mission-card', style: { cursor: 'pointer' }, onclick: function() { showMissionModal(m); } });
     var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
     header.appendChild(el('div', { style: { fontWeight: '700', fontSize: '14px' } }, m.client));
-    // V60: Statut mission complet : Actif / À venir / Terminé
-    var mStatus = getMissionStatus(m);
-    var badgeCls = mStatus === 'active' ? 'badge-success' : mStatus === 'a_venir' ? 'badge-warning' : 'badge-muted';
-    var badgeTxt = mStatus === 'active' ? 'Actif' : mStatus === 'a_venir' ? 'À venir' : 'Terminé';
+    // V78: Statut mission : Prospect / Perdue (m.statut) ou Actif / À venir / Terminé (temporel)
+    var badgeCls, badgeTxt;
+    if (m.statut === 'prospect') {
+      badgeCls = 'badge-info'; badgeTxt = '🔍 Prospect';
+    } else if (m.statut === 'perdue') {
+      badgeCls = 'badge-danger'; badgeTxt = '❌ Perdue';
+    } else {
+      var mStatus = getMissionStatus(m);
+      badgeCls = mStatus === 'active' ? 'badge-success' : mStatus === 'a_venir' ? 'badge-warning' : 'badge-muted';
+      badgeTxt = mStatus === 'active' ? 'Actif' : mStatus === 'a_venir' ? 'À venir' : 'Terminé';
+    }
     header.appendChild(el('div', { class: 'badge ' + badgeCls }, badgeTxt));
     card.appendChild(header);
 
@@ -12934,12 +12925,9 @@ function drawSoldeChart() {
     data: {
       labels: labels,
       datasets: [
+        // V78: Supprimé les lignes salaires (Salaires, Sal.Proj., Capacité, Moy) → graphique Évolution Salaires dédié
         { type: 'bar', label: SHOW_CASH_DISPO ? 'Cash Dispo' : 'Solde', data: dataSolde, backgroundColor: dataSolde.map(function(v) { return v === null ? 'transparent' : (v >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(248,113,113,0.6)'); }), borderRadius: 3, yAxisID: 'y' },
-        { type: 'bar', label: 'Projection', data: dataSoldeProjection, backgroundColor: 'rgba(168,85,247,0.3)', borderColor: 'rgba(168,85,247,0.6)', borderWidth: 1, borderRadius: 3, yAxisID: 'y' },
-        { type: 'line', label: 'Salaires', data: dataSalaires, borderColor: '#22d3ee', borderWidth: 2, tension: 0.3, pointRadius: 3, pointBackgroundColor: '#22d3ee', fill: false, yAxisID: 'y1', spanGaps: false },
-        { type: 'line', label: 'Sal. Proj.', data: dataSalairesProjection, borderColor: 'rgba(34,211,238,0.4)', borderWidth: 2, borderDash: [4, 4], tension: 0.3, pointRadius: 2, pointBackgroundColor: 'rgba(34,211,238,0.4)', fill: false, yAxisID: 'y1', spanGaps: false },
-        { type: 'line', label: 'Capacité', data: dataCapaciteSalaire, borderColor: '#10b981', borderWidth: 1.5, borderDash: [2, 2], tension: 0.3, pointRadius: 2, pointBackgroundColor: '#10b981', fill: false, yAxisID: 'y1' },
-        { type: 'line', label: 'Moy', data: months.map(function() { return COMPUTED.salaireMoyen || 0; }), borderColor: 'rgba(34,211,238,0.5)', borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, yAxisID: 'y1' }
+        { type: 'bar', label: 'Projection', data: dataSoldeProjection, backgroundColor: 'rgba(168,85,247,0.3)', borderColor: 'rgba(168,85,247,0.6)', borderWidth: 1, borderRadius: 3, yAxisID: 'y' }
       ]
     },
     options: {
@@ -12948,8 +12936,7 @@ function drawSoldeChart() {
       plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 } } } },
       scales: {
         x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
-        y: { position: 'left', ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-        y1: { position: 'right', ticks: { color: '#22d3ee', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { display: false } }
+        y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } }
       }
     },
     plugins: [dataLabelsPlugin]
@@ -13529,7 +13516,7 @@ function renderTresorerie(container) {
           return String(x.date).substring(0, 6) === mKey ? acc + x.montant : acc;
         }, 0);
         var sep = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 4px', borderTop: '1px solid var(--glass-border)', marginTop: '4px' } });
-        sep.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, fmtMonthShort(parseInt(mKey))));
+        sep.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, fmtMonthShort(mKey.substring(0, 4) + '-' + mKey.substring(4, 6))));
         sep.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', color: monthBalance >= 0 ? 'var(--success)' : 'var(--danger)' } }, (monthBalance >= 0 ? '+' : '') + EUR(monthBalance)));
         mouvList.appendChild(sep);
       }
