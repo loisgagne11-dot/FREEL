@@ -11118,17 +11118,18 @@ function renderFinancesPerformance(container) {
 
   // V77: Waterfall CA HT - décomposition de la période (remplace donut conceptuellement faux)
   // Base = CA HT encaissé période ; reductions = charges + provisions PÉRIODE (excl. TVA sur base HT)
+  // Note: chargesDetail normalise les catégories : 'IR Estimé' → 'IR', 'Impôt PL' → 'Impôt'
   var caHT = (data.caHT !== undefined && data.caHT > 0) ? data.caHT : (data.caReal || 0);
   var chargesMap = {};
-  (data.chargesDetail || []).forEach(function(c) { chargesMap[c.cat] = c.total; });
+  (data.chargesDetail || []).forEach(function(c) { chargesMap[c.cat] = c.montant; }); // FIX: .montant pas .total
 
   var segURSSAF = (chargesMap['URSSAF'] || 0) + (chargesMap['CFP'] || 0);
-  var segIR = (chargesMap['Impôt'] || 0) + (chargesMap['IR Estimé'] || 0) + (chargesMap['IR'] || 0);
+  var segIR = (chargesMap['Impôt'] || 0) + (chargesMap['IR'] || 0); // FIX: 'IR Estimé' normalisé en 'IR'
   var segSalaires = data.salaires || 0;
   var segAutres = 0;
   (data.chargesDetail || []).forEach(function(c) {
-    if (['TVA', 'URSSAF', 'CFP', 'Impôt', 'IR Estimé', 'IR'].indexOf(c.cat) >= 0) return;
-    segAutres += c.total;
+    if (['TVA', 'URSSAF', 'CFP', 'Impôt', 'IR'].indexOf(c.cat) >= 0) return; // FIX: liste normalisée
+    segAutres += c.montant; // FIX: .montant pas .total
   });
   var segBenefice = caHT - segURSSAF - segIR - segSalaires - segAutres;
 
@@ -13240,8 +13241,8 @@ function renderTresorerie(container) {
   // V77: Hero complet Cash Dispo + donut + salaire + autonomie (déplacé depuis Cockpit)
   renderDashboardHero(container, data);
 
-  // 4 blocs en grille
-  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' } });
+  // 4 blocs en grille (3 cols pour compacité)
+  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' } });
   
   // Solde Initial (éditable)
   var soldeInitBlock = el('div', { class: 'treso-item', onclick: function() { showEditSoldeInitial(); } });
@@ -13341,21 +13342,19 @@ function renderTresorerie(container) {
     container.appendChild(interetsCard);
   }
   
-  // Bloc PROVISIONS (ABSOLUES)
-  var provCard = el('div', { class: 'card', onclick: showProvisionsDetail, style: { cursor: 'pointer' } });
-  var provHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
-  provHeader.appendChild(el('div', { style: { fontWeight: '700' } }, '📦 Provisions à Payer'));
-  provHeader.appendChild(el('div', { class: 'text-provision', style: { fontWeight: '800', fontSize: '20px' } }, EUR(data.provisionsAbsolues)));
-  provCard.appendChild(provHeader);
-  
-  // Aperçu par type
-  var provPreview = el('div', { style: { display: 'flex', gap: '12px', flexWrap: 'wrap' } });
-  Object.keys(data.provByType).forEach(function(cat) {
-    provPreview.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, cat + ': ' + EUR(data.provByType[cat])));
-  });
-  provCard.appendChild(provPreview);
-  provCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px' } }, 'Cliquer pour détails et paiement rapide'));
-  container.appendChild(provCard);
+  // Bouton provisions compact (détail déjà dans le hero ci-dessus)
+  if (data.provisionsAbsolues > 0) {
+    var provBtn = el('div', { class: 'card', onclick: showProvisionsDetail, style: { cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', marginBottom: '8px' } });
+    var provLeft = el('div', {});
+    provLeft.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700' } }, '📦 Provisions à payer'));
+    provLeft.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'Valider les paiements'));
+    provBtn.appendChild(provLeft);
+    var provRight = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+    provRight.appendChild(el('span', { class: 'text-provision', style: { fontWeight: '800', fontSize: '16px' } }, EUR(data.provisionsAbsolues)));
+    provRight.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--accent)' } }, '→'));
+    provBtn.appendChild(provRight);
+    container.appendChild(provBtn);
+  }
 
   // V77: cashCard et graphique salaires supprimés (redondants avec hero en haut)
 
@@ -14110,6 +14109,25 @@ function renderCockpit(container) {
 
   // 1. Cash compact cliquable → Trésorerie (hero complet déplacé en V77)
   renderCockpitCashCompact(container, data);
+
+  // 1b. Barre KPI activité (V77c) - CA encaissé / CA latent / Taux occupation / CA annuel
+  var caLatentCockpit = 0;
+  (MISSIONS || []).forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'envoyée') caLatentCockpit += (f.ht || 0); }); });
+  var txOccup = data.tauxOccupation ? Math.round(data.tauxOccupation * 100) : 0;
+  var kpiBar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } });
+  var kpis = [
+    { label: 'CA Encaissé HT', value: EUR(data.caHT), color: 'var(--success)', click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); } },
+    { label: 'CA Latent HT', value: EUR(caLatentCockpit), color: caLatentCockpit > 0 ? 'var(--warning)' : 'var(--text-muted)', click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } },
+    { label: 'Tx Occupation', value: txOccup + '%', color: txOccup >= 70 ? 'var(--success)' : txOccup >= 40 ? 'var(--warning)' : 'var(--danger)', click: null },
+    { label: 'CA Annuel', value: EUR(data.caHTAnnuel), color: 'var(--info)', click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); } }
+  ];
+  kpis.forEach(function(k) {
+    var kpiDiv = el('div', { style: { textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', cursor: k.click ? 'pointer' : 'default' }, onclick: k.click || null });
+    kpiDiv.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '800', color: k.color } }, k.value));
+    kpiDiv.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase' } }, k.label));
+    kpiBar.appendChild(kpiDiv);
+  });
+  container.appendChild(kpiBar);
 
   // 2. Alertes critiques en tête (insights urgents seulement)
   renderInsightsCritiques(container);
