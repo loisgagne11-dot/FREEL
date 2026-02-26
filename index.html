@@ -5537,9 +5537,8 @@ function togglePrivacy() {
   $$('.kpi-value, .hero-amount, .treso-value').forEach(function(el) {
     el.classList.toggle('privacy-blur', PRIVACY_MODE);
   });
-  // Re-render les graphiques pour masquer/afficher les valeurs
-  if (typeof drawMainChart === 'function') drawMainChart();
-  if (typeof drawSoldeChart === 'function') drawSoldeChart();
+  // Graphiques gérés par renderFinancesEvolution() — re-render suffit
+  render();
 }
 
 // Détail TJM Effectif et TJM Net
@@ -10757,21 +10756,22 @@ function renderAnalyseSubTab(container, data, months) {
   
   var kpiGrid = el('div', { class: 'kpi-grid', style: { marginBottom: '16px' } });
   kpiGrid.appendChild(KPI({ label: 'CA Réalisé', value: EUR(data.caReal), sub: 'Prévu: ' + EUR(data.caPrev), color: 'info', trend: getTrend(data.sparklineData.caReal) }));
-  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caEnc), sub: 'À encaisser: ' + EUR(data.caAEnc), color: 'success' }));
+  kpiGrid.appendChild(KPI({ label: 'Encaissé HT', value: EUR(data.caHT), sub: 'TTC: ' + EUR(data.caEnc) + ' · À enc.: ' + EUR(data.caAEnc), color: 'success' }));
   kpiGrid.appendChild(KPI({ label: 'Bénéfice Net', value: EUR(data.beneficeNet), sub: 'Marge: ' + PCT(data.margeNette), color: data.beneficeNet >= 0 ? 'success' : 'danger' }));
   kpiGrid.appendChild(KPI({ label: 'TJM Effectif', value: EUR(data.tjmEffectif), sub: 'Net: ' + EUR(data.tjmNet), color: 'accent' }));
   container.appendChild(kpiGrid);
   
-  // Répartition CA HT
-  container.appendChild(SectionTitle('📊', 'Répartition CA HT'));
-  
-  var caHT = data.caReal || 1;
-  var chargesTotal = data.totalCharges || 0;
+  // Répartition CA Encaissé HT (cohérent avec onglet Performance)
+  container.appendChild(SectionTitle('📊', 'Répartition CA Encaissé HT'));
+
+  // V75: base = caHT (encaissé HT), fallback caReal si rien encaissé; charges hors TVA (TVA = dette, pas charge)
+  var caHT = (data.caHT > 0 ? data.caHT : data.caReal) || 1;
+  var chargesTotal = (data.totalCharges || 0) - (data.tvaTotale || 0);
   var salaires = data.salaires || 0;
   var benefice = Math.max(0, caHT - chargesTotal - salaires);
-  
-  var pctCharges = Math.round((chargesTotal / caHT) * 100);
-  var pctSalaires = Math.round((salaires / caHT) * 100);
+
+  var pctCharges = caHT > 0 ? Math.round((chargesTotal / caHT) * 100) : 0;
+  var pctSalaires = caHT > 0 ? Math.round((salaires / caHT) * 100) : 0;
   var pctBenefice = Math.max(0, 100 - pctCharges - pctSalaires);
   
   var repartCard = el('div', { class: 'card' });
@@ -11010,6 +11010,16 @@ function renderFinancesEvolution(container) {
 
   // Mouvements récents (factures encaissées)
   renderTresorerieContent(container);
+
+  // V75: Dessiner les graphiques après insertion dans le DOM
+  setTimeout(function() {
+    try {
+      if ($('#mainChart') && $('#mainChart').getContext) drawMainChart();
+      if ($('#soldeChart') && $('#soldeChart').getContext) drawSoldeChart();
+    } catch (e) {
+      console.error('Chart render error:', e);
+    }
+  }, 100);
 }
 
 // V74: Sous-onglet Performance - Donut répartition CA, Comparaison N-1 détaillée, Prévisionnel vs Réalisé
@@ -11027,8 +11037,11 @@ function renderFinancesPerformance(container) {
   container.appendChild(kpiGrid);
 
   // V74: Donut répartition CA HT - Provisions / Charges / Rémunération / Cash dispo (selon cahier des charges §5.4.2)
-  var totalProvisions = (provisions.urssaf || 0) + (provisions.tva || 0) + (provisions.ir || 0) + (provisions.cfe || 0);
-  var totalCharges = data.chargesReelles || 0;
+  // V75: Fix accès byType (getAbsoluteProvisions retourne {total, byType, detail}, pas {urssaf, tva, ...})
+  var provByType = provisions.byType || {};
+  var totalProvisions = provisions.total || 0;
+  // V75: Fix data.chargesReelles undefined → utiliser chargesPayees (charges déjà réglées)
+  var totalCharges = data.chargesPayees || 0;
   var totalRemuneration = data.salaires || 0;
   var cashDispo = data.cashDispoAbsolu || 0;
   // Base HT encaissé pour les ratios du donut — fallback sur caReal si rien n'est encore encaissé
@@ -11070,11 +11083,11 @@ function renderFinancesPerformance(container) {
     var detailDiv = el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px' } });
     detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '6px' } }, 'PROVISIONS (' + Math.round(totalProvisions / caHT * 100) + '%)'));
     var provLines = [
-      { label: 'URSSAF/CFP', value: provisions.urssaf || 0 },
-      { label: 'IR Estimé', value: provisions.ir || 0, tag: 'estimé' },
-      { label: 'CFE', value: provisions.cfe || 0, tag: 'estimé' }
+      { label: 'URSSAF/CFP', value: (provByType['URSSAF'] || 0) + (provByType['CFP'] || 0) },
+      { label: 'IR Estimé', value: provByType['IR Estimé'] || 0, tag: 'estimé' },
+      { label: 'Impôt PL', value: provByType['Impôt'] || 0 }
     ];
-    if (provisions.tva > 0) provLines.push({ label: 'TVA', value: provisions.tva });
+    if ((provByType['TVA'] || 0) > 0) provLines.push({ label: 'TVA', value: provByType['TVA'] });
     provLines.forEach(function(p) {
       var line = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
       var labelSpan = el('span', {}, '├ ' + p.label);
@@ -12581,7 +12594,7 @@ function drawSoldeChart() {
   var dataSolde = [], dataSalaires = [], dataSoldeProjection = [], dataSalairesProjection = [], dataCashDispoProj = [];
   var dataCapaciteSalaire = []; // V72: Capacité salaire pour TOUS les mois
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
-  var RESERVE_MIN = 150; // Garder 150€ minimum sur le compte
+  var RESERVE_MIN = TREASURY.reserveCompte || 150;
 
   // Calculer le dernier solde/cash connu pour les projections
   var lastKnownSolde = COMPUTED.soldeAbsolu || 0;
@@ -14319,23 +14332,8 @@ function init() {
   // V55: Rendu immédiat pour éviter l'écran noir, puis requestAnimationFrame pour les graphiques
   render();
 
-  // V61: Appel différé avec setTimeout pour garantir le layout complet
+  // V75: Charts dessinés par renderFinancesEvolution() via setTimeout interne
   setTimeout(function() {
-    if (VIEW === 'performance') {
-      try {
-        if ($('#mainChart')) {
-          drawMainChart();
-          if (mainChart) mainChart.resize();
-        }
-        if ($('#soldeChart')) {
-          drawSoldeChart();
-          if (soldeChart) soldeChart.resize();
-        }
-      } catch (e) {
-        console.error('Init chart error:', e);
-      }
-    }
-
     if (!COMPANY.onboardingDone && MISSIONS.length === 0) {
       showOnboarding();
     }
