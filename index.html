@@ -1027,13 +1027,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10, 10, 11, 0.95); backdrop-filter: blur(20px); border-top: 1px solid var(--glass-border); display: none; z-index: 100; }
 @media (max-width: 600px) { .bottom-nav { display: flex; } .nav-tabs { display: none; } }
-.bottom-nav-tab { flex: 1; padding: 10px 8px; text-align: center; color: var(--text-muted); background: transparent; border: none; cursor: pointer; transition: all 0.2s; }
+.bottom-nav-tab { flex: 1; padding: 8px 2px; text-align: center; color: var(--text-muted); background: transparent; border: none; cursor: pointer; transition: all 0.2s; }
 .bottom-nav-tab.active { color: var(--accent); }
-.bottom-nav-icon { font-size: 18px; margin-bottom: 2px; }
-.bottom-nav-label { font-size: 9px; font-weight: 600; }
+.bottom-nav-icon { font-size: 17px; margin-bottom: 1px; }
+.bottom-nav-label { font-size: 8px; font-weight: 600; }
 
-.fab { position: fixed; bottom: 80px; right: 20px; width: 52px; height: 52px; background: var(--accent); border: none; border-radius: 50%; color: white; font-size: 24px; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4); transition: all 0.3s; z-index: 90; }
-.fab:hover { transform: scale(1.1); }
+.fab { position: fixed; bottom: 76px; right: 16px; width: 48px; height: 48px; background: var(--accent); border: none; border-radius: 50%; color: white; font-size: 22px; cursor: pointer; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4); transition: all 0.3s; z-index: 90; display: flex; align-items: center; justify-content: center; }
+.fab:hover, .fab.open { transform: rotate(45deg); }
+.fab-item { display: flex; align-items: center; gap: 10px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: 24px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--text-primary); white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+.fab-item:hover { background: var(--bg-tertiary); }
+.fab-item .fab-icon { font-size: 16px; }
 @media (min-width: 601px) { .fab { bottom: 24px; } }
 
 .info-box { background: var(--bg-tertiary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 12px; margin-bottom: 12px; }
@@ -1315,7 +1318,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       <nav class="nav-tabs">
         <button class="nav-tab active" data-view="cockpit">🏠</button>
         <button class="nav-tab" data-view="activite">💼</button>
-        <button class="nav-tab" data-view="finances">💰</button>
+        <button class="nav-tab" data-view="tresorerie">🏦</button>
+        <button class="nav-tab" data-view="finances">📊</button>
         <button class="nav-tab" data-view="config">⚙️</button>
       </nav>
     </div>
@@ -1326,9 +1330,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <nav class="bottom-nav">
     <button class="bottom-nav-tab active" data-view="cockpit"><div class="bottom-nav-icon">🏠</div><div class="bottom-nav-label">Cockpit</div></button>
     <button class="bottom-nav-tab" data-view="activite"><div class="bottom-nav-icon">💼</div><div class="bottom-nav-label">Activité</div></button>
-    <button class="bottom-nav-tab" data-view="finances"><div class="bottom-nav-icon">💰</div><div class="bottom-nav-label">Finances</div></button>
+    <button class="bottom-nav-tab" data-view="tresorerie"><div class="bottom-nav-icon">🏦</div><div class="bottom-nav-label">Tréso</div></button>
+    <button class="bottom-nav-tab" data-view="finances"><div class="bottom-nav-icon">📊</div><div class="bottom-nav-label">Analyse</div></button>
     <button class="bottom-nav-tab" data-view="config"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Config</div></button>
   </nav>
+
+  <!-- FAB saisie rapide -->
+  <button class="fab" id="fabBtn" onclick="toggleFAB()" title="Actions rapides">+</button>
+  <div id="fabMenu" style="display:none;position:fixed;bottom:130px;right:16px;z-index:91;flex-direction:column;gap:8px;align-items:flex-end;"></div>
 
   <button class="fab" id="fab">+</button>
   
@@ -4089,6 +4098,8 @@ function compute() {
   // Réalisé = jours réellement travaillés jusqu'à aujourd'hui (passé + présent)
   // Prévu = jours planifiés dans le futur uniquement
   MISSIONS.forEach(function(mis) {
+    // V75: missions prospect/perdues exclues des calculs CA/charges
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
     if (!mis.lignes) return;
     mis.lignes.forEach(function(l) {
       if (!isInPeriod(l.ym)) return;
@@ -6166,10 +6177,11 @@ function renderCFEResult(caN2, tauxCommunal) {
 
 function showMissionModal(mission) {
   var isNew = !mission;
-  if (isNew) mission = { 
-    id: 'M' + Date.now(), client: '', clientId: '', titre: '', site: '', debut: '', fin: '', 
+  if (isNew) mission = {
+    id: 'M' + Date.now(), client: '', clientId: '', titre: '', site: '', debut: '', fin: '',
     tjm: 0, delaiPaiement: 2, jourPaiement: 15,
-    adresseClient: '', numeroCommande: '', descriptifFacture: ''
+    adresseClient: '', numeroCommande: '', descriptifFacture: '',
+    statut: 'active' // V75: active | prospect | perdue
   };
   
   $('#formModalTitle').textContent = isNew ? '💼 Nouvelle Mission' : '✏️ ' + mission.client;
@@ -6224,6 +6236,13 @@ function showMissionModal(mission) {
   body.appendChild(row2);
   
   // Section Facturation
+  // V75: Statut mission (pipeline)
+  body.appendChild(createSelect('Statut mission', 'mStatut', [
+    { value: 'active', label: '✅ Active — comptée dans les stats' },
+    { value: 'prospect', label: '🔮 Prospect — en cours de négociation' },
+    { value: 'perdue', label: '❌ Perdue — non remportée (historique)' }
+  ], mission.statut || 'active'));
+
   body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '16px', marginBottom: '8px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)', textTransform: 'uppercase' } }, '📄 Informations Facturation'));
   body.appendChild(createInput('Adresse client (pour facture)', 'text', 'mAdresseClient', mission.adresseClient || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
   body.appendChild(createInput('N° Commande client', 'text', 'mNumCommande', mission.numeroCommande || '', 'Ex: 10004903'));
@@ -6249,6 +6268,7 @@ function showMissionModal(mission) {
     mission.adresseClient = $('#mAdresseClient').value;
     mission.numeroCommande = $('#mNumCommande').value;
     mission.descriptifFacture = $('#mDescriptif').value;
+    mission.statut = $('#mStatut') ? $('#mStatut').value : 'active'; // V75
     buildMission(mission);
     if (isNew) MISSIONS.push(mission);
     saveAll(); closeModal('formModal'); render();
@@ -8321,8 +8341,11 @@ function getInsights() {
 // V74: Indicateurs Santé Société toujours visibles (§3.2.7)
 function renderHealthIndicators(container, data) {
   var provisions = getAbsoluteProvisions();
-  var totalProvisions = (provisions.urssaf || 0) + (provisions.tva || 0) + (provisions.ir || 0) + (provisions.cfe || 0);
-  var soldeCompte = data.solde || 0;
+  // V75: fix accès byType (provisions.urssaf était undefined)
+  var provByType = provisions.byType || {};
+  var totalProvisions = provisions.total || 0;
+  // V75: soldeAbsolu (vrai solde bancaire), pas data.solde (filtré période)
+  var soldeCompte = data.soldeAbsolu || 0;
   var provisionsCouvertes = soldeCompte >= totalProvisions;
 
   // Compter factures en retard
@@ -8336,13 +8359,11 @@ function renderHealthIndicators(container, data) {
     });
   });
 
-  // Vérifier déclarations (URSSAF du mois en cours)
-  var currentMonth = TODAY.getMonth();
+  // V75: check URSSAF via provAbsoluesByType (clé URSSAF-{factId} jamais matchée avant)
   var declarationsAJour = true;
-  // Simplification: si on est après le 20 du mois et URSSAF pas payé, pas à jour
   if (TODAY.getDate() > 20) {
-    var urssafKey = 'URSSAF-' + ym(TODAY.getFullYear(), currentMonth);
-    if (!isPaid(urssafKey)) declarationsAJour = false;
+    var urssafDu = (data.provAbsoluesByType && ((data.provAbsoluesByType['URSSAF'] || 0) + (data.provAbsoluesByType['CFP'] || 0))) || 0;
+    if (urssafDu > 0) declarationsAJour = false;
   }
 
   var bar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px', marginBottom: '8px' } });
@@ -8371,11 +8392,25 @@ function renderHealthIndicators(container, data) {
   container.appendChild(bar);
 }
 
+// V75: Alertes critiques (factures très en retard, provisions non couvertes, TVA imminente)
+function renderInsightsCritiques(container) {
+  var insights = getInsights();
+  var critiques = insights.filter(function(i) { return i.type === 'danger' || i.type === 'warning'; });
+  if (critiques.length === 0) return;
+  var div = el('div', { style: { marginBottom: '12px', display: 'flex', flexWrap: 'wrap', gap: '4px' } });
+  critiques.slice(0, 3).forEach(function(i) {
+    div.appendChild(el('span', { class: 'insight-chip ' + i.type }, i.text));
+  });
+  container.appendChild(div);
+}
+
 function renderInsights(container) {
   var insights = getInsights();
-  if (insights.length === 0) return;
+  // En Cockpit on filtre les non-critiques (les critiques sont déjà affichés en haut)
+  var secondary = insights.filter(function(i) { return i.type !== 'danger' && i.type !== 'warning'; });
+  if (secondary.length === 0) return;
   var div = el('div', { style: { marginBottom: '12px', display: 'flex', flexWrap: 'wrap' } });
-  insights.forEach(function(i) {
+  secondary.forEach(function(i) {
     div.appendChild(el('span', { class: 'insight-chip ' + i.type }, i.text));
   });
   container.appendChild(div);
@@ -8413,7 +8448,7 @@ function showGoalModal() {
 function renderGoalWidget(container) {
   var data = compute();
   var year = PERIOD.year || TODAY.getFullYear();
-  var currentCA = data.caHT || 0;
+  var currentCA = data.caHTAnnuel || 0; // V75: annuel, pas filtré par période
   var monthsPassed = TODAY.getMonth() + 1;
   var monthsTotal = 12;
   var expectedPct = monthsPassed / monthsTotal;
@@ -9483,7 +9518,8 @@ function renderCAPlafondWidget(container) {
   var data = compute();
   var year = PERIOD.year || TODAY.getFullYear();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
-  var currentCA = data.caHT || 0;
+  // V75: caHTAnnuel (toute l'année courante), pas caHT filtré par période
+  var currentCA = data.caHTAnnuel || 0;
 
   // Seuils micro-entrepreneur BNC 2024-2026
   var plafond = 77700;        // Plafond micro-entrepreneur (régime fiscal)
@@ -11008,8 +11044,7 @@ function renderFinancesEvolution(container) {
     container.appendChild(salaireCard);
   }
 
-  // Mouvements récents (factures encaissées)
-  renderTresorerieContent(container);
+  // V75: Mouvements déplacés dans l'onglet Trésorerie dédié
 
   // V75: Dessiner les graphiques après insertion dans le DOM
   setTimeout(function() {
@@ -11023,7 +11058,9 @@ function renderFinancesEvolution(container) {
 }
 
 // V74: Sous-onglet Performance - Donut répartition CA, Comparaison N-1 détaillée, Prévisionnel vs Réalisé
+// V75: CA Plafond widget déplacé ici depuis Cockpit
 function renderFinancesPerformance(container) {
+  renderCAPlafondWidget(container);
   var data = compute();
   var currentYear = PERIOD.year;
   var prevYear = currentYear - 1;
@@ -11263,9 +11300,11 @@ function renderFinancesConformite(container) {
   var data = compute();
   var provisions = getAbsoluteProvisions();
 
+  // V75: fix provisions.byType (urssaf/tva/ir étaient undefined) + soldeAbsolu
+  var provByType = provisions.byType || {};
   // V74: Indicateur couverture global (§5.5.1) - Solde compte vs Provisions dues
-  var totalProvisions = (provisions.urssaf || 0) + (provisions.tva || 0) + (provisions.ir || 0) + (provisions.cfe || 0);
-  var soldeCompte = data.solde || 0;
+  var totalProvisions = provisions.total || 0;
+  var soldeCompte = data.soldeAbsolu || 0;
   var excedent = soldeCompte - totalProvisions;
   var couverture = totalProvisions > 0 ? Math.round(soldeCompte / totalProvisions * 100) : 100;
   var couvertureColor = couverture >= 100 ? 'var(--success)' : couverture >= 80 ? 'var(--warning)' : 'var(--danger)';
@@ -11305,10 +11344,10 @@ function renderFinancesConformite(container) {
   detailCard.appendChild(el('div', { class: 'card-title' }, '📋 Détail par Type de Provision'));
 
   var types = [
-    { id: 'urssaf', label: 'URSSAF', icon: '🏥', total: provisions.urssaf || 0, paid: provisions.urssafPaid || 0, fiabilite: 'Certain' },
-    { id: 'tva', label: 'TVA', icon: '🏛️', total: provisions.tva || 0, paid: provisions.tvaPaid || 0, fiabilite: 'Certain' },
-    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provisions.ir || 0, paid: provisions.irPaid || 0, fiabilite: 'Estimé ±10%' },
-    { id: 'cfe', label: 'CFE', icon: '🏘️', total: provisions.cfe || 0, paid: 0, fiabilite: 'Estimé' }
+    { id: 'urssaf', label: 'URSSAF/CFP', icon: '🏥', total: (provByType['URSSAF'] || 0) + (provByType['CFP'] || 0), paid: 0, fiabilite: 'Certain' },
+    { id: 'tva', label: 'TVA', icon: '🏛️', total: provByType['TVA'] || 0, paid: 0, fiabilite: 'Certain' },
+    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provByType['IR Estimé'] || 0, paid: 0, fiabilite: 'Estimé ±10%' },
+    { id: 'impot', label: 'Impôt PL', icon: '💼', total: provByType['Impôt'] || 0, paid: 0, fiabilite: 'Certain' }
   ];
 
   // Header tableau
@@ -12803,9 +12842,14 @@ function renderMissions(container) {
     else if (facturesEnvoyees > 0) { factureStatus = '📤 ' + facturesEnvoyees + ' en attente'; factureStatusColor = 'var(--warning)'; }
     else if (facturesPayees === facturesTotal && facturesTotal > 0) { factureStatus = '✅ Tout payé'; factureStatusColor = 'var(--success)'; }
     
-    var card = el('div', { class: 'mission-card', onclick: function() { showMissionModal(m); } });
+    // V75: badge prospect/perdue
+    var statutBadge = '';
+    var cardOpacity = '1';
+    if (m.statut === 'prospect') { statutBadge = ' 🔮 Prospect'; cardOpacity = '0.85'; }
+    else if (m.statut === 'perdue') { statutBadge = ' ❌ Perdue'; cardOpacity = '0.55'; }
+    var card = el('div', { class: 'mission-card', style: { opacity: cardOpacity }, onclick: function() { showMissionModal(m); } });
     var cardHeader = el('div', { class: 'mission-header' });
-    cardHeader.appendChild(el('div', {}, [el('div', { class: 'mission-client' }, m.client), el('div', { class: 'mission-titre' }, m.titre || m.site || '')]));
+    cardHeader.appendChild(el('div', {}, [el('div', { class: 'mission-client' }, m.client + statutBadge), el('div', { class: 'mission-titre' }, m.titre || m.site || '')]));
     cardHeader.appendChild(el('div', { class: 'mission-status ' + status }, statusLabel));
     card.appendChild(cardHeader);
     
@@ -13479,7 +13523,12 @@ function renderAdmin(container) {
   var tresoCard = el('div', { class: 'card' });
   tresoCard.appendChild(el('div', { class: 'card-title' }, '💰 Trésorerie'));
   tresoCard.appendChild(createInput('Solde initial du compte (€)', 'number', 'adminSolde', TREASURY.soldeInitial));
-  tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '16px' } }, 'Solde de ton compte pro au démarrage de l\'activité'));
+  tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Solde de ton compte pro au démarrage de l\'activité'));
+  // V75: Paramètres tréso consolidés ici (sortis du ⚙️ caché du Cockpit)
+  tresoCard.appendChild(createInput('Salaire mensuel estimé (€)', 'number', 'adminSalaireEstime', TREASURY.salaireEstime || 2200));
+  tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Utilisé pour l\'autonomie et la recommandation de virement'));
+  tresoCard.appendChild(createInput('Réserve minimum compte (€)', 'number', 'adminReserveCompte', TREASURY.reserveCompte || 150));
+  tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '16px' } }, 'Montant minimum à garder sur le compte pro'));
   
   // V47: Option Rendement Compte Pro
   tresoCard.appendChild(el('div', { style: { borderTop: '1px solid var(--glass-border)', paddingTop: '12px', marginTop: '8px' } }));
@@ -13690,6 +13739,9 @@ function renderAdmin(container) {
     if ($('#adminIBAN')) COMPANY.iban = $('#adminIBAN').value || '';
     if ($('#adminBIC')) COMPANY.bic = $('#adminBIC').value || '';
     TREASURY.soldeInitial = parseFloat($('#adminSolde').value) || 0;
+    // V75: Paramètres tréso consolidés dans Config
+    if ($('#adminSalaireEstime')) TREASURY.salaireEstime = parseFloat($('#adminSalaireEstime').value) || 2200;
+    if ($('#adminReserveCompte')) TREASURY.reserveCompte = parseFloat($('#adminReserveCompte').value) || 150;
     // V47: Sauvegarde paramètres rendement
     var wasRendementActif = TREASURY.rendementActif;
     TREASURY.rendementActif = $('#adminRendementActif') ? $('#adminRendementActif').checked : false;
@@ -13983,24 +14035,25 @@ function renderAdmin(container) {
 // V73: NOUVELLES FONCTIONS DE RENDU - 4 ONGLETS
 // ============================================================================
 
-// COCKPIT: Dashboard principal (combine Accueil + éléments clés Performance)
+// COCKPIT: Dashboard santé macro + actions (V75: Cockpit épuré — analytics dans Analyse)
 function renderCockpit(container) {
   var data = compute();
 
-  // 1. Hero: Cash Disponible avec indicateur santé
+  // 1. Hero: Cash Disponible + donut provisions + salaire versable + autonomie
   renderDashboardHero(container, data);
 
-  // V74: Indicateurs Santé Société toujours visibles (§3.2.7)
+  // 2. Alertes critiques en tête (insights urgents seulement)
+  renderInsightsCritiques(container);
+
+  // 3. Indicateurs Santé (3 feux: provisions, retards, déclarations)
   renderHealthIndicators(container, data);
 
-  // 2. CA Annuel avec plafond
-  renderCAPlafondWidget(container);
-
-  // 3. À FAIRE: Actions + Jalons timeline
+  // 4. À FAIRE: Actions + Timeline fiscale (actions immédiates)
   renderActionsAndMilestones(container);
 
-  // 4. Insights (graphiques CA + Tréso disponibles dans Finances > Évolution)
+  // 5. Insights secondaires (en dernier)
   renderInsights(container);
+  // Note: CA Plafond TVA déplacé dans Analyse > Performance (V75)
 }
 
 // ACTIVITÉ: Missions + Factures
@@ -14126,14 +14179,15 @@ function render() {
   container.innerHTML = '';
 
   try {
-    // V73: Navigation 4 onglets
+    // V75: Navigation 5 onglets (Cockpit · Activité · Trésorerie · Analyse · Config)
     if (VIEW === 'cockpit') renderCockpit(container);
     else if (VIEW === 'activite') renderActivite(container);
+    else if (VIEW === 'tresorerie') renderTresorerie(container);
     else if (VIEW === 'finances') renderFinances(container);
     else if (VIEW === 'config') renderConfig(container);
     // Rétro-compat anciennes vues
     else if (VIEW === 'accueil') { VIEW = 'cockpit'; renderCockpit(container); }
-    else if (VIEW === 'performance') { VIEW = 'cockpit'; renderCockpit(container); }
+    else if (VIEW === 'performance') { VIEW = 'finances'; FINANCES_TAB = 'performance'; renderFinances(container); }
     else if (VIEW === 'missions') { VIEW = 'activite'; ACTIVITE_TAB = 'missions'; renderActivite(container); }
     else if (VIEW === 'params') { VIEW = 'config'; renderConfig(container); }
   } catch (e) {
@@ -14267,6 +14321,52 @@ function skipOnboarding() {
   saveAll();
   $('#onboarding').classList.remove('active');
   render();
+}
+
+// === FAB SAISIE RAPIDE (V75) ===
+var FAB_OPEN = false;
+function toggleFAB() {
+  FAB_OPEN = !FAB_OPEN;
+  var btn = $('#fabBtn');
+  var menu = $('#fabMenu');
+  if (!btn || !menu) return;
+  btn.classList.toggle('open', FAB_OPEN);
+  if (FAB_OPEN) {
+    menu.style.display = 'flex';
+    menu.innerHTML = '';
+    var actions = [
+      { icon: '💸', label: 'Verser un salaire', fn: function() { closeFAB(); showSalaireModal(); } },
+      { icon: '➕', label: 'Saisir une dépense', fn: function() { closeFAB(); showChargeModal(); } },
+      { icon: '📄', label: 'Nouvelle facture', fn: function() { closeFAB(); VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } },
+      { icon: '💼', label: 'Nouvelle mission', fn: function() { closeFAB(); showMissionModal(); } },
+      { icon: '🏖️', label: 'Poser des congés', fn: function() { closeFAB(); showCongesOverview(); } },
+      { icon: '✅', label: 'Valider paiement', fn: function() { closeFAB(); VIEW = 'tresorerie'; render(); } }
+    ];
+    actions.forEach(function(a) {
+      var item = el('div', { class: 'fab-item', onclick: a.fn });
+      item.appendChild(el('span', { class: 'fab-icon' }, a.icon));
+      item.appendChild(document.createTextNode(a.label));
+      menu.appendChild(item);
+    });
+    // Fermer si clic hors du FAB
+    setTimeout(function() {
+      document.addEventListener('click', function closeFabOnOutside(e) {
+        if (!e.target.closest('#fabBtn') && !e.target.closest('#fabMenu')) {
+          closeFAB();
+          document.removeEventListener('click', closeFabOnOutside);
+        }
+      });
+    }, 10);
+  } else {
+    menu.style.display = 'none';
+  }
+}
+function closeFAB() {
+  FAB_OPEN = false;
+  var btn = $('#fabBtn');
+  var menu = $('#fabMenu');
+  if (btn) btn.classList.remove('open');
+  if (menu) menu.style.display = 'none';
 }
 
 // === INIT ===
