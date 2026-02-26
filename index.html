@@ -1388,7 +1388,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 73; // V73: Navigation 4 onglets, LEGAL versionné, Config fiscale, Simulateurs IR/CFE, Cloud Sync UI
+var APP_VERSION = 78; // V78: IR filtre prospect/perdue, conformité payé, ACRE getAcreInfo, mouvements par mois, CA Plafond condensé, waterfall labels+detail
 var TODAY = new Date();
 var VIEW = 'cockpit';  // V73: cockpit, activite, finances, config
 var ACTIVITE_TAB = 'missions'; // V73: sous-onglets activité (missions, factures)
@@ -3196,6 +3196,7 @@ function getAbsoluteProvisions() {
     function getMonthsWithCA(year) {
       var months = {};
       MISSIONS.forEach(function(mis) {
+        if (mis.statut === 'prospect' || mis.statut === 'perdue') return; // V78: exclure prospect/perdue
         if (!mis.factures) return;
         mis.factures.forEach(function(f) {
           if (f.jours <= 0 || f.status !== 'payée') return;
@@ -3213,6 +3214,7 @@ function getAbsoluteProvisions() {
     function countMonthsWithPlannedCA(year) {
       var months = {};
       MISSIONS.forEach(function(mis) {
+        if (mis.statut === 'prospect' || mis.statut === 'perdue') return; // V78: exclure prospect/perdue
         if (!mis.factures) return;
         mis.factures.forEach(function(f) {
           if (f.jours <= 0) return;
@@ -6243,7 +6245,7 @@ function showMissionModal(mission) {
   // Section Facturation
   // V75: Statut mission (pipeline)
   body.appendChild(createSelect('Statut mission', 'mStatut', [
-    { value: 'active', label: '✅ Active — comptée dans les stats' },
+    { value: 'active', label: '✅ Validée — comptée dans les stats' },
     { value: 'prospect', label: '🔮 Prospect — en cours de négociation' },
     { value: 'perdue', label: '❌ Perdue — non remportée (historique)' }
   ], mission.statut || 'active'));
@@ -9136,20 +9138,17 @@ function getNotifications() {
     });
   }
 
-  // ACRE expiration
-  if (COMPANY.debut) {
-    var creation = parseDate(COMPANY.debut);
-    var acreEnd = new Date(creation);
-    acreEnd.setFullYear(acreEnd.getFullYear() + 1);
-    var daysToAcre = Math.floor((acreEnd - now) / 86400000);
-    if (daysToAcre > 0 && daysToAcre <= 30) {
+  // ACRE expiration — V78: utiliser getAcreInfo() (calcul par trimestres civils, cohérent avec le reste)
+  if (COMPANY.debut && COMPANY.acre) {
+    var acreInfoNotif = getAcreInfo();
+    if (acreInfoNotif.active && acreInfoNotif.daysLeft > 0 && acreInfoNotif.daysLeft <= 30) {
       notifs.push({
         id: 'acre_expire',
-        type: daysToAcre <= 7 ? 'warning' : 'info',
+        type: acreInfoNotif.daysLeft <= 7 ? 'warning' : 'info',
         icon: '🎁',
         text: 'ACRE expire bientôt',
-        sub: 'Fin le ' + fmtDate(acreEnd) + ' · Cotisations +' + Math.round((0.222 - 0.111) * 100) + '%',
-        time: 'J-' + daysToAcre
+        sub: 'Fin le ' + fmtDate(acreInfoNotif.expiryDate) + ' · J-' + acreInfoNotif.daysLeft,
+        time: 'J-' + acreInfoNotif.daysLeft
       });
     }
   }
@@ -9535,6 +9534,7 @@ function renderCAPlafondWidget(container) {
   // V71: Calculer le CA projeté à partir des factures non payées (encaissement prévu sur l'année)
   var caProjecte = 0;
   MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return; // V78: exclure prospect/perdue
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.jours <= 0 || f.status === 'payée') return;
@@ -9625,8 +9625,7 @@ function renderCAPlafondWidget(container) {
   leftStats.appendChild(el('div', { style: { fontSize: '22px', fontWeight: '800', color: pctColor } }, EUR(currentCA)));
   leftStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Encaissé · ' + Math.round(pctRealise * 100) + '%'));
   if (caProjecte > 0) {
-    leftStats.appendChild(el('div', { style: { fontSize: '12px', color: '#a78bfa', fontWeight: '600', marginTop: '2px' } }, '+ ' + EUR(caProjecte) + ' à encaisser'));
-    leftStats.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total prévu: ' + EUR(caTotal) + ' (' + Math.round(pctTotal * 100) + '%)'));
+    leftStats.appendChild(el('div', { style: { fontSize: '12px', color: '#a78bfa', fontWeight: '600', marginTop: '2px' } }, '+ ' + EUR(caProjecte) + ' à encaisser → ' + EUR(caTotal) + ' total (' + Math.round(pctTotal * 100) + '%)'));
   }
   stats.appendChild(leftStats);
 
@@ -9642,90 +9641,86 @@ function renderCAPlafondWidget(container) {
   stats.appendChild(rightStats);
   widget.appendChild(stats);
 
-  // V71: Conséquences avec vraies règles fiscales
-  var conseqDiv = el('div', { style: { marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '11px' } });
-
+  // V78: Conséquences condensées — résumé 1 ligne + "i" pour le détail
+  var conseqSummary, conseqDetail, conseqBg, conseqBorder, conseqColor;
   if (caTotal > plafond && prevYearOverLimit) {
-    // 2ème année consécutive de dépassement = sortie
-    conseqDiv.style.background = 'rgba(239, 68, 68, 0.15)';
-    conseqDiv.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-    conseqDiv.style.color = 'var(--danger)';
-    conseqDiv.innerHTML = '🚨 <strong>2ème année de dépassement</strong><br>' + (year - 1) + ': ' + EUR(caPrevYear) + ' · ' + year + ': ' + EUR(caTotal) + '<br>Sortie du régime micro au 1er janvier ' + (year + 1) + '. Préparez le passage au réel.';
+    conseqBg = 'rgba(239, 68, 68, 0.15)'; conseqBorder = '1px solid rgba(239, 68, 68, 0.3)'; conseqColor = 'var(--danger)';
+    conseqSummary = '🚨 2ème dépassement → Sortie micro au 1er jan. ' + (year + 1);
+    conseqDetail = (year - 1) + ': ' + EUR(caPrevYear) + ' · ' + year + ': ' + EUR(caTotal) + '. Préparez le passage au régime réel.';
   } else if (caTotal > plafond) {
-    // 1ère année de dépassement = tolérance
-    conseqDiv.style.background = 'rgba(251, 191, 36, 0.15)';
-    conseqDiv.style.border = '1px solid rgba(251, 191, 36, 0.3)';
-    conseqDiv.style.color = '#b45309';
-    conseqDiv.innerHTML = '⚠️ <strong>Dépassement plafond - 1ère année</strong><br>Tolérance accordée si le dépassement n\'est pas renouvelé en ' + (year + 1) + '. Restez sous ' + EUR(plafond) + ' l\'an prochain pour conserver le régime micro.';
+    conseqBg = 'rgba(251, 191, 36, 0.15)'; conseqBorder = '1px solid rgba(251, 191, 36, 0.3)'; conseqColor = '#b45309';
+    conseqSummary = '⚠️ Dépassement plafond · 1ère année — tolérance accordée';
+    conseqDetail = 'Restez sous ' + EUR(plafond) + ' en ' + (year + 1) + ' pour conserver le régime micro-entrepreneur.';
   } else if (caTotal > plafond * 0.9) {
-    conseqDiv.style.background = 'rgba(251, 191, 36, 0.1)';
-    conseqDiv.style.color = 'var(--warning)';
-    conseqDiv.innerHTML = '⚡ <strong>Proche du plafond</strong> (' + Math.round(pctTotal * 100) + '%)<br>Marge restante: ' + EUR(remaining) + '. Anticipez pour éviter un dépassement.';
+    conseqBg = 'rgba(251, 191, 36, 0.1)'; conseqBorder = '1px solid rgba(251, 191, 36, 0.2)'; conseqColor = 'var(--warning)';
+    conseqSummary = '⚡ Proche du plafond · ' + Math.round(pctTotal * 100) + '% · ' + EUR(remaining) + ' restants';
+    conseqDetail = 'Anticipez pour éviter un dépassement. Si dépassement 2 années consécutives : sortie du régime micro.';
   } else if (caTotal > plafond * 0.7) {
-    conseqDiv.style.background = 'rgba(34, 197, 94, 0.08)';
-    conseqDiv.style.color = 'var(--text-secondary)';
-    conseqDiv.innerHTML = '✅ <strong>Bonne progression</strong><br>Marge de ' + EUR(remaining) + ' avant le plafond (' + Math.round((1 - pctTotal) * 100) + '% disponible).';
+    conseqBg = 'rgba(34, 197, 94, 0.08)'; conseqBorder = ''; conseqColor = 'var(--text-secondary)';
+    conseqSummary = '✅ Bonne progression · ' + EUR(remaining) + ' disponible (' + Math.round((1 - pctTotal) * 100) + '%)';
+    conseqDetail = 'Plafond micro-entrepreneur ' + EUR(plafond) + '. ' + (caPrevYear > 0 ? 'CA ' + (year - 1) + ': ' + EUR(caPrevYear) + '.' : '');
   } else {
-    conseqDiv.style.background = 'rgba(34, 197, 94, 0.05)';
-    conseqDiv.style.color = 'var(--text-muted)';
-    conseqDiv.innerHTML = '✅ Large marge disponible sous le plafond micro-entrepreneur.';
+    conseqBg = 'rgba(34, 197, 94, 0.05)'; conseqBorder = ''; conseqColor = 'var(--text-muted)';
+    conseqSummary = '✅ Large marge · ' + EUR(remaining) + ' sous le plafond';
+    conseqDetail = 'Plafond micro-entrepreneur BNC: ' + EUR(plafond) + '.';
   }
-
-  // Info année précédente si pertinent
-  if (caPrevYear > 0 && caTotal > plafond * 0.8) {
-    var prevInfo = el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', fontSize: '10px', color: 'var(--text-muted)' } });
-    prevInfo.innerHTML = '📅 CA ' + (year - 1) + ': ' + EUR(caPrevYear) + (prevYearOverLimit ? ' <span style="color:var(--danger)">(> plafond)</span>' : ' <span style="color:var(--success)">(OK)</span>');
-    conseqDiv.appendChild(prevInfo);
+  var conseqDiv = el('div', { style: { marginTop: '12px', padding: '8px 10px', borderRadius: '8px', fontSize: '11px', background: conseqBg, border: conseqBorder || 'none', color: conseqColor } });
+  var conseqRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  conseqRow.appendChild(el('span', { style: { fontWeight: '600' } }, conseqSummary));
+  var conseqIBtn = el('button', { style: { background: 'none', border: '1px solid currentColor', borderRadius: '50%', cursor: 'pointer', fontSize: '10px', width: '18px', height: '18px', lineHeight: '16px', textAlign: 'center', padding: '0', opacity: '0.7', flexShrink: '0' } }, 'i');
+  conseqRow.appendChild(conseqIBtn);
+  conseqDiv.appendChild(conseqRow);
+  var conseqDetailEl = el('div', { style: { fontSize: '10px', marginTop: '6px', display: 'none', color: 'inherit', opacity: '0.8' } }, conseqDetail);
+  if (caPrevYear > 0 && caTotal > plafond * 0.8 && !conseqDetail.includes((year - 1) + '')) {
+    conseqDetailEl.textContent += ' CA ' + (year - 1) + ': ' + EUR(caPrevYear) + (prevYearOverLimit ? ' (> plafond)' : ' (OK)') + '.';
   }
-
+  conseqDiv.appendChild(conseqDetailEl);
+  conseqIBtn.onclick = function() { conseqDetailEl.style.display = conseqDetailEl.style.display === 'none' ? 'block' : 'none'; };
   widget.appendChild(conseqDiv);
 
-  // V72: Info TVA séparée (franchise TVA ≠ statut micro)
-  // Règles officielles (BOFiP, service-public.fr):
-  // - CA N-1 > 37,500€ → assujetti TVA au 1er janvier N (plus d'année de tolérance depuis 2025)
-  // - CA en cours > 41,250€ (seuil majoré) → assujetti TVA immédiat
-  // - CA N-1 ≤ 37,500€ → retour automatique en franchise au 1er janvier N
+  // V78: Info TVA condensée — résumé 1 ligne + "i" pour le détail (franchise TVA ≠ statut micro)
+  // Règles: CA N-1 > 37500 → assujetti TVA 1er jan N; CA > 41250 → TVA immédiate
   var prevYearOverTVA = caPrevYear > seuilTVA;
-  var assujettiTVAThisYear = prevYearOverTVA; // Si CA N-1 > seuil → assujetti au 1er janv
-  var tvaDiv = el('div', { style: { marginTop: '12px', padding: '10px', borderRadius: '8px', fontSize: '11px' } });
+  var assujettiTVAThisYear = prevYearOverTVA;
   var showTVA = false;
+  var tvaSummary, tvaDetail, tvaBg, tvaBorder, tvaColor;
 
   if (assujettiTVAThisYear) {
-    // Assujetti TVA cette année car CA année précédente > seuil
     showTVA = true;
-    tvaDiv.style.background = 'rgba(236, 72, 153, 0.12)';
-    tvaDiv.style.border = '1px solid rgba(236, 72, 153, 0.25)';
-    tvaDiv.style.color = '#db2777';
-    var tvaMsg = '💰 <strong>Assujetti TVA en ' + year + '</strong><br>';
-    tvaMsg += 'CA ' + (year - 1) + ': ' + EUR(caPrevYear) + ' > franchise ' + EUR(seuilTVA) + ' → Vous devez collecter et reverser la TVA toute l\'année ' + year + '.';
-    // Projection pour l'année prochaine
-    if (caTotal <= seuilTVA) {
-      tvaMsg += '<br><span style="color:var(--success)">📉 Si votre CA ' + year + ' reste ≤ ' + EUR(seuilTVA) + ', retour automatique en franchise TVA au 1er janvier ' + (year + 1) + '.</span>';
-    } else {
-      tvaMsg += '<br>CA prévu ' + year + ': ' + EUR(caTotal) + ' > ' + EUR(seuilTVA) + ' → Vous resterez assujetti TVA en ' + (year + 1) + '.';
-    }
-    tvaDiv.innerHTML = tvaMsg;
+    tvaBg = 'rgba(236, 72, 153, 0.12)'; tvaBorder = '1px solid rgba(236, 72, 153, 0.25)'; tvaColor = '#db2777';
+    tvaSummary = '💰 Assujetti TVA ' + year + ' · collectez et reversez la TVA';
+    tvaDetail = 'CA ' + (year - 1) + ': ' + EUR(caPrevYear) + ' > franchise ' + EUR(seuilTVA) + '. '
+      + (caTotal <= seuilTVA ? 'Si CA ' + year + ' ≤ ' + EUR(seuilTVA) + ' → retour en franchise au 1er jan. ' + (year + 1) + '.'
+                             : 'CA prévu ' + year + ': ' + EUR(caTotal) + ' → resterez assujetti TVA en ' + (year + 1) + '.');
   } else if (currentCA > seuilTVAMajore) {
-    // Seuil majoré dépassé en cours d'année → TVA immédiate
     showTVA = true;
-    tvaDiv.style.background = 'rgba(236, 72, 153, 0.15)';
-    tvaDiv.style.border = '1px solid rgba(236, 72, 153, 0.3)';
-    tvaDiv.style.color = '#db2777';
-    tvaDiv.innerHTML = '💰 <strong>Seuil majoré TVA dépassé</strong><br>CA encaissé ' + EUR(currentCA) + ' > ' + EUR(seuilTVAMajore) + ' → Assujettissement TVA immédiat. Facturez la TVA dès maintenant.';
+    tvaBg = 'rgba(236, 72, 153, 0.15)'; tvaBorder = '1px solid rgba(236, 72, 153, 0.3)'; tvaColor = '#db2777';
+    tvaSummary = '💰 Seuil majoré TVA dépassé · assujettissement immédiat';
+    tvaDetail = 'CA encaissé ' + EUR(currentCA) + ' > seuil majoré ' + EUR(seuilTVAMajore) + '. Facturez la TVA dès maintenant.';
   } else if (currentCA > seuilTVA || caTotal > seuilTVA) {
-    // Seuil de base dépassé cette année → TVA au 1er janvier prochain
     showTVA = true;
-    tvaDiv.style.background = 'rgba(236, 72, 153, 0.08)';
-    tvaDiv.style.border = '1px solid rgba(236, 72, 153, 0.15)';
-    tvaDiv.style.color = '#ec4899';
+    tvaBg = 'rgba(236, 72, 153, 0.08)'; tvaBorder = '1px solid rgba(236, 72, 153, 0.15)'; tvaColor = '#ec4899';
     if (currentCA > seuilTVA) {
-      tvaDiv.innerHTML = '💰 <strong>Franchise TVA dépassée</strong><br>CA encaissé ' + EUR(currentCA) + ' > ' + EUR(seuilTVA) + ' → TVA applicable au 1er janvier ' + (year + 1) + '. Préparez vos factures avec TVA.';
+      tvaSummary = '💰 Franchise TVA dépassée · TVA due au 1er jan. ' + (year + 1);
+      tvaDetail = 'CA encaissé ' + EUR(currentCA) + ' > franchise ' + EUR(seuilTVA) + '. Préparez vos factures avec TVA dès janvier.';
     } else {
-      tvaDiv.innerHTML = '💰 <strong>Attention TVA</strong><br>CA prévu ' + EUR(caTotal) + ' > franchise ' + EUR(seuilTVA) + '. Si confirmé, assujettissement TVA au 1er janvier ' + (year + 1) + '.';
+      tvaSummary = '💰 CA prévu proche de la franchise TVA · à surveiller';
+      tvaDetail = 'CA prévu ' + EUR(caTotal) + ' > franchise ' + EUR(seuilTVA) + '. Si confirmé → assujettissement TVA au 1er jan. ' + (year + 1) + '.';
     }
   }
 
-  if (showTVA) widget.appendChild(tvaDiv);
+  if (showTVA) {
+    var tvaDiv = el('div', { style: { marginTop: '8px', padding: '8px 10px', borderRadius: '8px', fontSize: '11px', background: tvaBg, border: tvaBorder, color: tvaColor } });
+    var tvaRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+    tvaRow.appendChild(el('span', { style: { fontWeight: '600' } }, tvaSummary));
+    var tvaIBtn = el('button', { style: { background: 'none', border: '1px solid currentColor', borderRadius: '50%', cursor: 'pointer', fontSize: '10px', width: '18px', height: '18px', lineHeight: '16px', textAlign: 'center', padding: '0', opacity: '0.7', flexShrink: '0' } }, 'i');
+    tvaRow.appendChild(tvaIBtn);
+    tvaDiv.appendChild(tvaRow);
+    var tvaDetailEl = el('div', { style: { fontSize: '10px', marginTop: '6px', display: 'none', opacity: '0.8' } }, tvaDetail);
+    tvaDiv.appendChild(tvaDetailEl);
+    tvaIBtn.onclick = function() { tvaDetailEl.style.display = tvaDetailEl.style.display === 'none' ? 'block' : 'none'; };
+    widget.appendChild(tvaDiv);
+  }
 
   container.appendChild(widget);
 }
@@ -11111,7 +11106,7 @@ function renderFinancesPerformance(container) {
 
   // KPIs Performance
   var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
-  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé HT', 'var(--info)'));
+  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Planifié HT', 'var(--info)'));
   kpiGrid.appendChild(createKPIBlock(EUR(data.caHT), 'CA Encaissé HT', 'var(--success)'));
   kpiGrid.appendChild(createKPIBlock(EUR(caLatent), 'CA Latent HT', caLatent > 0 ? 'var(--warning)' : 'var(--text-muted)'));
   container.appendChild(kpiGrid);
@@ -11183,6 +11178,32 @@ function renderFinancesPerformance(container) {
           labels: wLabels,
           datasets: [{ data: wData, backgroundColor: wColors, borderRadius: 4, borderSkipped: false }]
         },
+        plugins: [{
+          // V78: Labels EUR + % directement sur les barres
+          id: 'waterfallBarLabels',
+          afterDatasetsDraw: function(ch) {
+            var ctx = ch.ctx;
+            ch.data.datasets.forEach(function(ds, i) {
+              var meta = ch.getDatasetMeta(i);
+              meta.data.forEach(function(bar, idx) {
+                var raw = ds.data[idx];
+                var val = Array.isArray(raw) ? Math.abs(raw[1] - raw[0]) : Math.abs(raw || 0);
+                if (val <= 0) return;
+                var pct = caHT > 0 ? Math.round(val / caHT * 100) : 0;
+                var barH = Math.abs(bar.base - bar.y);
+                if (barH < 14) return; // trop petite barre
+                var text = (val >= 1000 ? Math.round(val / 100) / 10 + 'k€' : Math.round(val) + '€') + ' · ' + pct + '%';
+                ctx.save();
+                ctx.fillStyle = 'rgba(255,255,255,0.95)';
+                ctx.font = 'bold 9px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, bar.x, bar.y + barH / 2);
+                ctx.restore();
+              });
+            });
+          }
+        }],
         options: {
           responsive: true, maintainAspectRatio: false,
           plugins: {
@@ -11202,46 +11223,80 @@ function renderFinancesPerformance(container) {
       canvas._chartInstance = chart;
     }, 100);
 
-    // Détail provisions (à payer) + charges payées
-    var detailDiv = el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px' } });
+    // V78: Détail expandable par segment waterfall
+    var detailContainer = el('div', { style: { marginTop: '10px' } });
 
-    // Provisions à payer (période)
-    var provEntries = Object.keys(data.provByType || {}).filter(function(k) { return k !== 'TVA' && (data.provByType[k] || 0) > 0; })
-      .map(function(k) { return { cat: k, total: data.provByType[k] }; })
-      .sort(function(a, b) { return b.total - a.total; });
-    if (provEntries.length > 0) {
-      detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '4px', color: 'var(--warning)' } }, '⏳ Provisions à payer — ' + EUR(data.provisions)));
-      provEntries.forEach(function(p) {
-        var pct = caHT > 0 ? Math.round(p.total / caHT * 100) : 0;
-        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
-        row.appendChild(el('span', {}, '├ ' + p.cat));
-        row.appendChild(el('span', {}, pct + '% · ' + EUR(p.total)));
-        detailDiv.appendChild(row);
-      });
-    }
+    // Construire le détail par segment : reductions + bénéfice net
+    var paidByCat = {};
+    (data.detailChargesPayees || []).forEach(function(c) { if (c.cat !== 'TVA') paidByCat[c.cat] = (paidByCat[c.cat] || 0) + c.montant; });
 
-    // Charges payées (période)
-    if (data.chargesPayees > 0) {
-      detailDiv.appendChild(el('div', { style: { fontWeight: '700', marginTop: '8px', marginBottom: '4px', color: 'var(--danger)' } }, '✅ Charges payées — ' + EUR(data.chargesPayees)));
-      var paidByCat = {};
-      (data.detailChargesPayees || []).forEach(function(c) { if (c.cat !== 'TVA') paidByCat[c.cat] = (paidByCat[c.cat] || 0) + c.montant; });
-      Object.keys(paidByCat).sort(function(a, b) { return paidByCat[b] - paidByCat[a]; }).forEach(function(cat) {
-        var v = paidByCat[cat];
-        var pct = caHT > 0 ? Math.round(v / caHT * 100) : 0;
-        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
-        row.appendChild(el('span', {}, '├ ' + cat));
-        row.appendChild(el('span', {}, pct + '% · ' + EUR(v)));
-        detailDiv.appendChild(row);
-      });
-      if (data.salaires > 0) {
-        var salPct = caHT > 0 ? Math.round(data.salaires / caHT * 100) : 0;
-        var salRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0 2px 12px', color: 'var(--text-muted)' } });
-        salRow.appendChild(el('span', {}, '├ Salaires versés'));
-        salRow.appendChild(el('span', {}, salPct + '% · ' + EUR(data.salaires)));
-        detailDiv.appendChild(salRow);
+    var allSegs = reductions.concat([{ label: 'Bénéfice Net', value: segBenefice, color: segBenefice >= 0 ? '#22c55e' : '#f87171' }]);
+    allSegs.forEach(function(seg) {
+      var absVal = Math.abs(seg.value);
+      var pct = caHT > 0 ? Math.round(absVal / caHT * 100) : 0;
+
+      // Construire les entrées de détail selon le segment
+      var entries = [];
+      if (seg.label === 'URSSAF/CFP') {
+        ['URSSAF', 'CFP'].forEach(function(cat) {
+          var paid = paidByCat[cat] || 0;
+          var prov = (data.provByType && data.provByType[cat]) || 0;
+          if (paid > 0) entries.push({ label: cat + ' payé', value: paid });
+          if (prov > 0) entries.push({ label: cat + ' à payer', value: prov });
+        });
+      } else if (seg.label === 'IR/Impôt') {
+        ['Impôt', 'IR', 'IR Estimé', 'Impôt PL'].forEach(function(cat) {
+          var paid = paidByCat[cat] || 0;
+          var prov = (data.provByType && data.provByType[cat]) || 0;
+          if (paid > 0) entries.push({ label: cat + ' payé', value: paid });
+          if (prov > 0) entries.push({ label: cat + ' provision', value: prov });
+        });
+      } else if (seg.label === 'Salaires') {
+        (data.detailSalaires || []).forEach(function(s) {
+          entries.push({ label: fmtMonthShort(s.mois), value: s.montant });
+        });
+      } else if (seg.label === 'Autres charges') {
+        var excludedCats = ['TVA', 'URSSAF', 'CFP', 'Impôt', 'IR', 'IR Estimé', 'Impôt PL'];
+        var autresByCat = {};
+        (data.chargesDetail || []).forEach(function(c) {
+          if (excludedCats.indexOf(c.cat) < 0) autresByCat[c.cat] = (autresByCat[c.cat] || 0) + c.montant;
+        });
+        Object.keys(autresByCat).forEach(function(cat) { entries.push({ label: cat, value: autresByCat[cat] }); });
+      } else if (seg.label === 'Bénéfice Net') {
+        entries.push({ label: 'CA HT encaissé', value: caHT });
+        entries.push({ label: '− Charges & provisions', value: caHT - absVal });
       }
-    }
-    waterfallCard.appendChild(detailDiv);
+
+      var segRow = el('div', { style: { display: 'flex', alignItems: 'center', padding: '7px 10px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '3px', cursor: entries.length > 0 ? 'pointer' : 'default' } });
+      var dot = el('span', { style: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '2px', background: seg.color, marginRight: '8px', flexShrink: '0' } });
+      segRow.appendChild(dot);
+      segRow.appendChild(el('span', { style: { flex: '1', fontSize: '11px', fontWeight: '600' } }, seg.label));
+      segRow.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '700', color: seg.color, marginRight: '6px' } }, EUR(absVal)));
+      segRow.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', minWidth: '28px', textAlign: 'right' } }, pct + '%'));
+      if (entries.length > 0) {
+        var arrow = el('span', { style: { fontSize: '11px', color: 'var(--text-muted)', marginLeft: '6px' } }, '›');
+        segRow.appendChild(arrow);
+        var detailRows = el('div', { style: { display: 'none', padding: '4px 10px 8px 24px', background: 'var(--bg-tertiary)', borderRadius: '0 0 8px 8px', marginTop: '-3px', marginBottom: '3px' } });
+        entries.forEach(function(e) {
+          var eRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '2px 0', fontSize: '10px', color: 'var(--text-muted)' } });
+          eRow.appendChild(el('span', {}, e.label));
+          eRow.appendChild(el('span', { style: { fontWeight: '600' } }, EUR(e.value)));
+          detailRows.appendChild(eRow);
+        });
+        var open = false;
+        segRow.onclick = function() {
+          open = !open;
+          detailRows.style.display = open ? 'block' : 'none';
+          segRow.style.borderRadius = open ? '8px 8px 0 0' : '8px';
+          arrow.textContent = open ? '⌄' : '›';
+        };
+        detailContainer.appendChild(segRow);
+        detailContainer.appendChild(detailRows);
+      } else {
+        detailContainer.appendChild(segRow);
+      }
+    });
+    waterfallCard.appendChild(detailContainer);
   } else {
     waterfallCard.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Aucun CA encaissé sur la période'));
   }
@@ -11449,11 +11504,17 @@ function renderFinancesConformite(container) {
   var detailCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   detailCard.appendChild(el('div', { class: 'card-title' }, '📋 Détail par Type de Provision'));
 
+  // V78: Calculer les montants payés par type depuis detailChargesPayees (period-filtered)
+  var paidByTypePeriod = {};
+  (data.detailChargesPayees || []).forEach(function(c) {
+    paidByTypePeriod[c.cat] = (paidByTypePeriod[c.cat] || 0) + c.montant;
+  });
+
   var types = [
-    { id: 'urssaf', label: 'URSSAF/CFP', icon: '🏥', total: (provByType['URSSAF'] || 0) + (provByType['CFP'] || 0), paid: 0, fiabilite: 'Certain' },
-    { id: 'tva', label: 'TVA', icon: '🏛️', total: provByType['TVA'] || 0, paid: 0, fiabilite: 'Certain' },
-    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provByType['IR Estimé'] || 0, paid: 0, fiabilite: 'Estimé ±10%' },
-    { id: 'impot', label: 'Impôt PL', icon: '💼', total: provByType['Impôt'] || 0, paid: 0, fiabilite: 'Certain' }
+    { id: 'urssaf', label: 'URSSAF/CFP', icon: '🏥', total: (provByType['URSSAF'] || 0) + (provByType['CFP'] || 0), paid: (paidByTypePeriod['URSSAF'] || 0) + (paidByTypePeriod['CFP'] || 0), fiabilite: 'Certain' },
+    { id: 'tva', label: 'TVA', icon: '🏛️', total: provByType['TVA'] || 0, paid: paidByTypePeriod['TVA'] || 0, fiabilite: 'Certain' },
+    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provByType['IR Estimé'] || 0, paid: (paidByTypePeriod['Impôt'] || 0) + (paidByTypePeriod['IR'] || 0), fiabilite: 'Estimé ±10%' },
+    { id: 'impot', label: 'Impôt PL', icon: '💼', total: provByType['Impôt'] || 0, paid: paidByTypePeriod['Impôt PL'] || 0, fiabilite: 'Certain' }
   ];
 
   // Header tableau
@@ -13456,26 +13517,37 @@ function renderTresorerie(container) {
     emptyDiv.appendChild(el('div', { class: 'no-results-hint' }, searchQuery ? 'Essayez d\'autres termes' : 'Les mouvements apparaîtront avec l\'activité'));
     mouvementsCard.appendChild(emptyDiv);
   } else {
+    // V78: Groupement par mois avec en-tête mensuel + solde du mois
     var mouvList = el('div', { style: { marginTop: '8px' } });
+    var currentMonthKey = null;
     displayMouvements.forEach(function(m) {
-      var row = el('div', { class: 'detail-row', style: { padding: '10px 0', borderBottom: '1px solid var(--glass-border)' } });
+      var mKey = String(m.date).substring(0, 6); // YYYYMM
+      if (mKey !== currentMonthKey) {
+        currentMonthKey = mKey;
+        // Calcul solde du mois (sur tous les mouvements filtrés, pas juste les 20 affichés)
+        var monthBalance = filteredMouvements.reduce(function(acc, x) {
+          return String(x.date).substring(0, 6) === mKey ? acc + x.montant : acc;
+        }, 0);
+        var sep = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 4px', borderTop: '1px solid var(--glass-border)', marginTop: '4px' } });
+        sep.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, fmtMonthShort(parseInt(mKey))));
+        sep.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', color: monthBalance >= 0 ? 'var(--success)' : 'var(--danger)' } }, (monthBalance >= 0 ? '+' : '') + EUR(monthBalance)));
+        mouvList.appendChild(sep);
+      }
+      var row = el('div', { class: 'detail-row', style: { padding: '7px 0 7px 8px', borderBottom: '1px solid var(--bg-tertiary)' } });
       var left = el('div', { style: { flex: '1' } });
       var labelText = m.label;
-      if (searchQuery && m.label.toLowerCase().includes(searchQuery)) {
-        labelText = highlightText(m.label, searchQuery);
-      }
-      var labelEl = el('div', { style: { fontWeight: '600', fontSize: '13px' } });
+      if (searchQuery && m.label.toLowerCase().includes(searchQuery)) { labelText = highlightText(m.label, searchQuery); }
+      var labelEl = el('div', { style: { fontWeight: '600', fontSize: '12px' } });
       labelEl.innerHTML = labelText;
       left.appendChild(labelEl);
-      left.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, m.detail));
+      if (m.detail) left.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, m.detail));
       row.appendChild(left);
-      row.appendChild(el('div', { style: { fontWeight: '700', color: m.montant >= 0 ? 'var(--success)' : 'var(--danger)' } }, (m.montant >= 0 ? '+' : '') + EUR(m.montant)));
+      row.appendChild(el('div', { style: { fontWeight: '700', fontSize: '12px', color: m.montant >= 0 ? 'var(--success)' : 'var(--danger)' } }, (m.montant >= 0 ? '+' : '') + EUR(m.montant)));
       mouvList.appendChild(row);
     });
     mouvementsCard.appendChild(mouvList);
-    
     if (filteredMouvements.length > 20) {
-      mouvementsCard.appendChild(el('div', { style: { textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', padding: '12px' } }, 'Affichage limité à 20 mouvements'));
+      mouvementsCard.appendChild(el('div', { style: { textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', padding: '12px' } }, 'Affichage limité à 20 mouvements · ' + filteredMouvements.length + ' au total'));
     }
   }
   
