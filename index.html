@@ -2743,6 +2743,7 @@ function getIRForYear(year) {
   var detail = { encaisse: [], aEncaisser: [] };
 
   MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return; // exclure prospect/perdue
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.jours <= 0) return;
@@ -3152,6 +3153,7 @@ function getAbsoluteProvisions() {
 
   // Charges liées aux factures payées
   MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return; // exclure prospect/perdue
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
@@ -3292,6 +3294,7 @@ function getAllChargesForType(typeName) {
 
   // Charges liées aux factures payées
   MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return; // exclure prospect/perdue
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
@@ -4405,16 +4408,20 @@ function computeProjections(scenario, params) {
   // V45: Amélioration - Trouver les missions actives pour chaque mois de l'année projetée
   function getMissionsForMonth(monthYm) {
     return MISSIONS.filter(function(m) {
+      if (m.statut === 'prospect' || m.statut === 'perdue') return false; // exclure prospect/perdue
       if (!m.debut || !m.fin) return false;
       var mDebut = m.debut.substring(0, 7);
       var mFin = m.fin.substring(0, 7);
       return monthYm >= mDebut && monthYm <= mFin;
     });
   }
-  
+
   // Trouver fin dernière mission pour intercontrat
   var lastMissionEnd = null;
-  MISSIONS.forEach(function(m) { if (!lastMissionEnd || m.fin > lastMissionEnd) lastMissionEnd = m.fin; });
+  MISSIONS.forEach(function(m) {
+    if (m.statut === 'prospect' || m.statut === 'perdue') return; // exclure prospect/perdue
+    if (!lastMissionEnd || m.fin > lastMissionEnd) lastMissionEnd = m.fin;
+  });
   var intercontratStartMonth = lastMissionEnd ? parseInt(lastMissionEnd.substring(5, 7)) : 1;
   
   var vacationDaysPerYear = scen.vacationWeeks * 5;
@@ -11086,7 +11093,10 @@ function renderFinancesPerformance(container) {
 
   // V77: CA Latent = factures envoyées non encore encaissées (HT)
   var caLatent = 0;
-  (MISSIONS || []).forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'envoyée') caLatent += (f.ht || 0); }); });
+  (MISSIONS || []).forEach(function(m) {
+    if (m.statut === 'prospect' || m.statut === 'perdue') return; // exclure prospect/perdue
+    (m.factures || []).forEach(function(f) { if (f.status === 'envoyée') caLatent += (f.ht || 0); });
+  });
 
   // KPIs Performance
   var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
@@ -11631,6 +11641,7 @@ function renderMissionsContent(container) {
   var totalJours = 0;
 
   MISSIONS.forEach(function(m) {
+    if (m.statut === 'prospect' || m.statut === 'perdue') return; // exclure prospect/perdue
     if (!m.lignes) return;
     // CA Réalisé = jours réels × TJM
     m.lignes.forEach(function(l) {
