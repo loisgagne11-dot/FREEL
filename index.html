@@ -3152,6 +3152,7 @@ function getAbsoluteProvisions() {
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (!f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         var rate = getUrssafRate(paymentMonth);
         var urssaf = Math.round(f.ht * rate);
@@ -3293,6 +3294,7 @@ function getAllChargesForType(typeName) {
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (!f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         var rate = getUrssafRate(paymentMonth);
 
