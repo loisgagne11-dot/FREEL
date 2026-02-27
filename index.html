@@ -3070,8 +3070,8 @@ function getSoldeMoyenMois(targetYm) {
     }
   });
   
-  // Moyenne simple début/fin
-  return Math.max(0, (soldeDebut + soldeFin) / 2);
+  // Solde fin de mois (identique au graphe Trésorerie)
+  return Math.max(0, soldeFin);
 }
 
 // V47: Calcule les intérêts mensuels du compte pro
@@ -3093,27 +3093,21 @@ function calculerRendementMensuel(targetYm) {
 // V47: Met à jour l'historique des intérêts pour les mois passés
 function updateRendementHistorique() {
   if (!TREASURY.rendementActif) return;
-  if (!TREASURY.rendementHistorique) TREASURY.rendementHistorique = [];
-  
+  // Recalcul complet pour garantir la cohérence avec le graphe Trésorerie
+  TREASURY.rendementHistorique = [];
+
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var startYm = COMPANY.debut ? COMPANY.debut.substr(0, 7) : '2025-01';
-  
-  // Parcourir tous les mois depuis le début jusqu'au mois précédent
+
   var current = startYm;
   while (current < nowYm) {
-    // Vérifier si ce mois a déjà un intérêt enregistré
-    var existing = TREASURY.rendementHistorique.find(function(h) { return h.mois === current; });
-    
-    if (!existing) {
-      var interets = calculerRendementMensuel(current);
-      if (interets.montant > 0) {
-        TREASURY.rendementHistorique.push(interets);
-      }
+    var interets = calculerRendementMensuel(current);
+    if (interets.montant > 0) {
+      TREASURY.rendementHistorique.push(interets);
     }
-    
     current = getNextMonth(current);
   }
-  
+
   // Trier par mois
   TREASURY.rendementHistorique.sort(function(a, b) { return a.mois.localeCompare(b.mois); });
 }
@@ -9612,7 +9606,7 @@ function renderDashboardHero(container, data) {
         cutout: '60%',
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: function(c) { return c.label + ': ' + EUR(c.raw) + ' (' + Math.round(c.raw / solde * 100) + '%)'; } } }
+          tooltip: { backgroundColor: 'rgba(15,15,25,0.92)', titleColor: '#fff', bodyColor: '#e2e8f0', borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1, padding: 10, callbacks: { label: function(c) { return c.label + ': ' + EUR(c.raw) + ' (' + Math.round(c.raw / solde * 100) + '%)'; } } }
         }
       }
     });
@@ -13671,15 +13665,15 @@ function renderTresorerie(container) {
     var mouvList = el('div', { style: { marginTop: '8px' } });
     var currentMonthKey = null;
     displayMouvements.forEach(function(m) {
-      var mKey = String(m.date).substring(0, 6); // YYYYMM
+      var mKey = String(m.date).substring(0, 7); // YYYY-MM
       if (mKey !== currentMonthKey) {
         currentMonthKey = mKey;
         // Calcul solde du mois (sur tous les mouvements filtrés, pas juste les 20 affichés)
         var monthBalance = filteredMouvements.reduce(function(acc, x) {
-          return String(x.date).substring(0, 6) === mKey ? acc + x.montant : acc;
+          return String(x.date).substring(0, 7) === mKey ? acc + x.montant : acc;
         }, 0);
         var sep = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 4px', borderTop: '1px solid var(--glass-border)', marginTop: '4px' } });
-        sep.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, fmtMonthShort(mKey.substring(0, 4) + '-' + mKey.substring(4, 6))));
+        sep.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, fmtMonthShort(mKey)));
         sep.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', color: monthBalance >= 0 ? 'var(--success)' : 'var(--danger)' } }, (monthBalance >= 0 ? '+' : '') + EUR(monthBalance)));
         mouvList.appendChild(sep);
       }
