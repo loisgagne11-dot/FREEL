@@ -2837,7 +2837,7 @@ function getBalanceAtStartOfPeriod() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth < periodStart) {
         balance += f.ttc; // Encaissement TTC
         // Soustraire uniquement les charges PAYÉES
@@ -2871,7 +2871,7 @@ function getProvisionsBeforePeriod() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth < periodStart) {
         var rate = getUrssafRate(paymentMonth);
         if (!isPaid('URSSAF-' + f.id)) provisions += Math.round(f.ht * rate);
@@ -2931,7 +2931,7 @@ function getAbsoluteBalance() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth <= nowYm) {
         balance += f.ttc;
         var rate = getUrssafRate(paymentMonth);
@@ -2942,14 +2942,14 @@ function getAbsoluteBalance() {
       }
     });
   });
-  
+
   TREASURY.mouvements.forEach(function(mv) {
     if (mv.mois <= nowYm) {
       if (mv.type === 'Charge' && isPaid(mv.id)) balance -= mv.montant;
       if (mv.type === 'Salaire') balance -= mv.montant;
     }
   });
-  
+
   // V47: Ajouter les intérêts du compte pro si activé
   if (TREASURY.rendementActif && TREASURY.rendementHistorique) {
     TREASURY.rendementHistorique.forEach(function(int) {
@@ -2977,7 +2977,7 @@ function getAbsoluteBalanceDetail() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth <= nowYm) {
         detail.encaissements += f.ttc;
         var rate = getUrssafRate(paymentMonth);
@@ -3018,7 +3018,7 @@ function getSoldeMoyenMois(targetYm) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth <= prevYm) {
         soldeDebut += f.ttc;
         var rate = getUrssafRate(paymentMonth);
@@ -3051,7 +3051,7 @@ function getSoldeMoyenMois(targetYm) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth === targetYm) {
         soldeFin += f.ttc;
         var rate = getUrssafRate(paymentMonth);
