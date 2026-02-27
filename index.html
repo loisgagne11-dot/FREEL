@@ -3298,7 +3298,7 @@ function getAllChargesForType(typeName) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth <= nowYm) {
         var rate = getUrssafRate(paymentMonth);
 
