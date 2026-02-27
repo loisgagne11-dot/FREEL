@@ -4140,7 +4140,8 @@ function compute() {
     if (mis.factures) {
       mis.factures.forEach(function(f) {
         if (f.jours <= 0) return;
-        var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        var paymentMonth = (f.status === 'payée' && f.datePaiementReel) ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        if (f.status === 'payée' && !f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
         var paymentDate = getPaymentDate(f.mois, mis.delaiPaiement, mis.jourPaiement);
         f.paymentMonth = paymentMonth;
         f.paymentDate = paymentDate;
