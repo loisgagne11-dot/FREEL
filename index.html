@@ -3157,7 +3157,7 @@ function getAbsoluteProvisions() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
       if (paymentMonth <= nowYm) {
         var rate = getUrssafRate(paymentMonth);
         var urssaf = Math.round(f.ht * rate);
@@ -12732,8 +12732,8 @@ function computeSalaireProjections(months, data) {
 // V72: Données financières d'un mois spécifique
 function getMonthFinancialData(monthYm, data) {
   var monthInfo = data.monthsData ? data.monthsData[monthYm] : {};
-  var caHT = monthInfo ? monthInfo.encaisse || 0 : 0;
-  var charges = monthInfo ? monthInfo.charges || 0 : 0;
+  var caHT = monthInfo ? monthInfo.encHT || 0 : 0;
+  var charges = monthInfo ? monthInfo.chargesPaid || 0 : 0;
   var salaires = monthInfo ? monthInfo.salaires || 0 : 0;
 
   // Provisions du mois
