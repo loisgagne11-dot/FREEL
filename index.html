@@ -2932,6 +2932,7 @@ function getAbsoluteBalance() {
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (!f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         balance += f.ttc;
         var rate = getUrssafRate(paymentMonth);
@@ -2978,6 +2979,7 @@ function getAbsoluteBalanceDetail() {
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (!f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         detail.encaissements += f.ttc;
         var rate = getUrssafRate(paymentMonth);
