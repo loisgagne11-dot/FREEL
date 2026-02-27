@@ -4803,7 +4803,10 @@ function showCashDetail() {
   sortedCats.forEach(function(item) {
     var pct = caHT > 0 ? item.total / caHT : 0;
     var color = getChargeColor(item.cat);
-    calc.appendChild(row('📋 ' + item.cat + ' (' + PCT(pct) + ')', '- ' + EUR(item.total), color, false, false, function() { closeModal('detailModal'); showChargeTypeDetail(item.cat, item.items, color); }));
+    var clickFn = (item.cat === 'URSSAF' || item.cat === 'CFP')
+      ? function() { closeModal('detailModal'); showUrssafCfpDetail(); }
+      : (function(cat, items, c) { return function() { closeModal('detailModal'); showChargeTypeDetail(cat, items, c); }; })(item.cat, item.items, color);
+    calc.appendChild(row('📋 ' + item.cat + ' (' + PCT(pct) + ')', '- ' + EUR(item.total), color, false, false, clickFn));
   });
   
   // Salaires
