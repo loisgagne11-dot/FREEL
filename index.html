@@ -2932,7 +2932,7 @@ function getAbsoluteBalance() {
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-      if (!f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
+      if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         balance += f.ttc;
         var rate = getUrssafRate(paymentMonth);
@@ -2979,7 +2979,7 @@ function getAbsoluteBalanceDetail() {
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-      if (!f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
+      if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         detail.encaissements += f.ttc;
         var rate = getUrssafRate(paymentMonth);
@@ -3154,7 +3154,7 @@ function getAbsoluteProvisions() {
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-      if (!f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
+      if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         var rate = getUrssafRate(paymentMonth);
         var urssaf = Math.round(f.ht * rate);
@@ -3296,7 +3296,7 @@ function getAllChargesForType(typeName) {
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
       var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-      if (!f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
+      if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         var rate = getUrssafRate(paymentMonth);
 
@@ -4143,7 +4143,7 @@ function compute() {
       mis.factures.forEach(function(f) {
         if (f.jours <= 0) return;
         var paymentMonth = (f.status === 'payée' && f.datePaiementReel) ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-        if (f.status === 'payée' && !f.datePaiementReel && paymentMonth > nowYm) paymentMonth = nowYm;
+        if (f.status === 'payée' && paymentMonth > nowYm) paymentMonth = nowYm;
         var paymentDate = getPaymentDate(f.mois, mis.delaiPaiement, mis.jourPaiement);
         f.paymentMonth = paymentMonth;
         f.paymentDate = paymentDate;
