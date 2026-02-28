@@ -5308,7 +5308,7 @@ function showUrssafCfpDetail() {
 // Afficher provisions d'un mois spécifique
 function showProvisionMonthDetail(monthKey) {
   var data = compute();
-  var items = data.detailChargesAPayer.filter(function(c) { return c.mois === monthKey; });
+  var items = data.allProvisionsDetail.filter(function(c) { return c.mois === monthKey; });
   var total = items.reduce(function(a, c) { return a + c.montant; }, 0);
   
   $('#formModalTitle').textContent = '📦 Provisions ' + fmtMonth(monthKey);
@@ -5362,23 +5362,25 @@ function getChargeColor(cat) {
 
 function showProvisionsDetail() {
   var data = compute();
+  // Utiliser les provisions ABSOLUES (toutes années, sans filtre de période)
+  var allProv = data.allProvisionsDetail; // depuis getAbsoluteProvisions(), pas filtré
   $('#formModalTitle').textContent = '📦 Provisions à Payer';
   var body = $('#formModalBody');
   body.innerHTML = '';
-  
-  // Total global
-  var grandTotal = data.provisions;
+
+  // Total global (absolu)
+  var grandTotal = data.provisionsAbsolues;
   body.appendChild(el('div', { style: { background: 'var(--provision-glow)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '20px', textAlign: 'center' } }, [
     el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, 'Total à provisionner'),
     el('div', { style: { fontWeight: '800', fontSize: '28px', color: 'var(--provision)' } }, EUR(grandTotal))
   ]));
-  
+
   // Tabs Par Type / Par Mois
   var tabs = el('div', { class: 'filter-tabs', style: { marginBottom: '16px' } });
   tabs.appendChild(el('button', { class: 'filter-tab' + (PROV_VIEW === 'type' ? ' active' : ''), onclick: function() { PROV_VIEW = 'type'; showProvisionsDetail(); } }, '📋 Par Type'));
   tabs.appendChild(el('button', { class: 'filter-tab' + (PROV_VIEW === 'month' ? ' active' : ''), onclick: function() { PROV_VIEW = 'month'; showProvisionsDetail(); } }, '📅 Par Mois'));
   body.appendChild(tabs);
-  
+
   if (PROV_VIEW === 'type') {
     // Grouper par type avec clic pour voir détail
     var types = [
@@ -5387,7 +5389,7 @@ function showProvisionsDetail() {
     ];
 
     types.forEach(function(t) {
-      var items = data.detailChargesAPayer.filter(function(c) {
+      var items = allProv.filter(function(c) {
         if (t.key === 'Impôt') return c.cat.indexOf('Impôt') >= 0 || c.cat.indexOf('IR') >= 0;
         return c.cat === t.key;
       });
@@ -5408,8 +5410,8 @@ function showProvisionsDetail() {
     });
 
     // URSSAF + CFP combinés
-    var urssafItems = data.detailChargesAPayer.filter(function(c) { return c.cat === 'URSSAF'; });
-    var cfpItems = data.detailChargesAPayer.filter(function(c) { return c.cat === 'CFP'; });
+    var urssafItems = allProv.filter(function(c) { return c.cat === 'URSSAF'; });
+    var cfpItems = allProv.filter(function(c) { return c.cat === 'CFP'; });
     var urssafMontant = urssafItems.reduce(function(a, c) { return a + c.montant; }, 0);
     var cfpMontant = cfpItems.reduce(function(a, c) { return a + c.montant; }, 0);
     var ucTotal = urssafMontant + cfpMontant;
@@ -5429,9 +5431,9 @@ function showProvisionsDetail() {
       ]));
       body.appendChild(ucRow);
     }
-    
-    // Autres charges (RC Pro, Mutuelle, etc.)
-    var autresItems = data.detailChargesAPayer.filter(function(c) { 
+
+    // Autres charges (RC Pro, Mutuelle, etc.) — toutes catégories hors TVA/URSSAF/CFP/Impôt/IR
+    var autresItems = allProv.filter(function(c) {
       return c.cat !== 'TVA' && c.cat !== 'URSSAF' && c.cat !== 'CFP' && c.cat.indexOf('Impôt') < 0 && c.cat.indexOf('IR') < 0;
     });
     if (autresItems.length > 0) {
@@ -5448,13 +5450,15 @@ function showProvisionsDetail() {
       ]));
       body.appendChild(row);
     }
-    
+
   } else {
-    // Grouper par mois avec clic pour voir détail
-    var months = Object.keys(data.provByMonth).filter(function(m) { return data.provByMonth[m] > 0; }).sort();
+    // Grouper par mois depuis les provisions absolues (toutes années)
+    var absByMonth = {};
+    allProv.forEach(function(c) { absByMonth[c.mois] = (absByMonth[c.mois] || 0) + c.montant; });
+    var months = Object.keys(absByMonth).filter(function(m) { return absByMonth[m] > 0; }).sort();
     months.forEach(function(m) {
-      var montant = data.provByMonth[m];
-      var items = data.detailChargesAPayer.filter(function(c) { return c.mois === m; });
+      var montant = absByMonth[m];
+      var items = allProv.filter(function(c) { return c.mois === m; });
       var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '10px', cursor: 'pointer' }, onclick: function() { showProvisionMonthDetail(m); } });
       row.appendChild(el('div', { style: { fontSize: '20px' } }, '📅'));
       row.appendChild(el('div', { style: { flex: '1' } }, [
@@ -5468,23 +5472,24 @@ function showProvisionsDetail() {
       body.appendChild(row);
     });
   }
-  
-  // Boutons rapides
+
+  // Boutons rapides (basés sur les provisions absolues)
+  var absTypes = data.provAbsoluesByType;
   if (grandTotal > 0) {
     body.appendChild(el('div', { style: { marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' } }));
     body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' } }, '⚡ Actions rapides'));
     var btns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-    
-    if (data.provByType['URSSAF'] || data.provByType['CFP']) {
-      var ucIds = data.detailChargesAPayer.filter(function(c) { return c.cat === 'URSSAF' || c.cat === 'CFP'; }).map(function(c) { return c.id; });
+
+    if (absTypes['URSSAF'] || absTypes['CFP']) {
+      var ucIds = allProv.filter(function(c) { return c.cat === 'URSSAF' || c.cat === 'CFP'; }).map(function(c) { return c.id; });
       btns.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'var(--danger)', color: 'white' }, onclick: function() { markAllPaid(ucIds); closeModal('formModal'); } }, '✅ URSSAF + CFP'));
     }
-    if (data.provByType['TVA']) {
-      var ids2 = data.detailChargesAPayer.filter(function(c) { return c.cat === 'TVA'; }).map(function(c) { return c.id; });
+    if (absTypes['TVA']) {
+      var ids2 = allProv.filter(function(c) { return c.cat === 'TVA'; }).map(function(c) { return c.id; });
       btns.appendChild(el('button', { class: 'btn btn-sm', style: { background: '#f472b6', color: 'white' }, onclick: function() { markAllPaid(ids2); closeModal('formModal'); } }, '✅ TVA'));
     }
-    if (data.provByType['Impôt'] || data.provByType['Impôt PL'] || data.provByType['IR Estimé']) {
-      var ids3 = data.detailChargesAPayer.filter(function(c) { return c.cat.indexOf('Impôt') >= 0 || c.cat.indexOf('IR') >= 0; }).map(function(c) { return c.id; });
+    if (absTypes['Impôt'] || absTypes['IR Estimé']) {
+      var ids3 = allProv.filter(function(c) { return c.cat.indexOf('Impôt') >= 0 || c.cat.indexOf('IR') >= 0; }).map(function(c) { return c.id; });
       btns.appendChild(el('button', { class: 'btn btn-sm', style: { background: '#fbbf24', color: 'black' }, onclick: function() { markAllPaid(ids3); closeModal('formModal'); } }, '✅ Impôts'));
     }
     body.appendChild(btns);
