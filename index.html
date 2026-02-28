@@ -3284,10 +3284,11 @@ function getAllChargesForType(typeName) {
   var items = [];
 
   // Normaliser le nom de type pour la comparaison
-  var isIR = typeName === 'IR' || typeName === 'IR Estimé' || typeName === 'Impôt';
+  var isIR = typeName === 'IR' || typeName === 'IR Estimé' || typeName === 'Impôt' || typeName === 'Impôt / IR';
   var isTVA = typeName === 'TVA';
   var isURSSAF = typeName === 'URSSAF';
   var isCFP = typeName === 'CFP';
+  var isAutres = typeName === 'Autres' || typeName === 'Autres charges';
 
   // Charges liées aux factures payées
   MISSIONS.forEach(function(mis) {
@@ -3397,11 +3398,18 @@ function getAllChargesForType(typeName) {
   TREASURY.mouvements.forEach(function(mv) {
     if (mv.mois <= nowYm && mv.type === 'Charge') {
       var cat = mv.categorie || 'Autres';
-      var matchType = (typeName === cat) ||
-                      (isTVA && cat === 'TVA') ||
-                      (isURSSAF && cat === 'URSSAF') ||
-                      (isCFP && cat === 'CFP') ||
-                      (isIR && (cat === 'IR' || cat === 'Impôt' || cat.indexOf('IR') >= 0));
+      var matchType;
+      if (isAutres) {
+        // Catch-all: tout ce qui n'est pas TVA / URSSAF / CFP / IR / Impôt
+        matchType = cat !== 'TVA' && cat !== 'URSSAF' && cat !== 'CFP' &&
+                    cat.indexOf('IR') < 0 && cat.indexOf('Impôt') < 0;
+      } else {
+        matchType = (typeName === cat) ||
+                    (isTVA && cat === 'TVA') ||
+                    (isURSSAF && cat === 'URSSAF') ||
+                    (isCFP && cat === 'CFP') ||
+                    (isIR && (cat === 'IR' || cat === 'Impôt' || cat.indexOf('IR') >= 0));
+      }
       if (matchType) {
         items.push({ cat: cat, mois: mv.mois, montant: mv.montant, id: mv.id, source: mv.description || '' });
       }
@@ -9598,7 +9606,10 @@ function renderDashboardHero(container, data) {
 
     var provRow = el('div', {
       style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 6px', borderRadius: '4px', cursor: 'pointer', marginBottom: '2px' },
-      onclick: function() { showProvisionTypeDetail(prov.label, items, prov.color); }
+      onclick: function() {
+        if (prov.id === 'urssaf') { showUrssafCfpDetail(); }
+        else { showProvisionTypeDetail(prov.label, items, prov.color); }
+      }
     });
     provRow.appendChild(el('div', { style: { width: '10px', height: '10px', borderRadius: '2px', background: prov.color, flexShrink: '0' } }));
     provRow.appendChild(el('span', { style: { flex: 1, fontSize: '11px' } }, prov.icon + ' ' + prov.label));
