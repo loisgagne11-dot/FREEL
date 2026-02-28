@@ -5167,8 +5167,31 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
 
 // Afficher détail combiné URSSAF + CFP
 function showUrssafCfpDetail() {
-  var urssafItems = getAllChargesForType('URSSAF');
-  var cfpItems = getAllChargesForType('CFP');
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var urssafItems = [];
+  var cfpItems = [];
+
+  // Charges depuis les factures payées (missions actives)
+  MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var pm = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (pm > nowYm) pm = nowYm;
+      var rate = getUrssafRate(pm);
+      urssafItems.push({ cat: 'URSSAF', mois: pm, montant: Math.round(f.ht * rate), id: 'URSSAF-' + f.id, source: mis.client });
+      cfpItems.push({ cat: 'CFP', mois: pm, montant: Math.round(f.ht * LEGAL.cfp), id: 'CFP-' + f.id, source: mis.client });
+    });
+  });
+
+  // Charges manuelles (mouvements) — tous les mois, y compris futurs
+  TREASURY.mouvements.forEach(function(mv) {
+    if (mv.type !== 'Charge') return;
+    if (mv.categorie === 'URSSAF') urssafItems.push({ cat: 'URSSAF', mois: mv.mois, montant: mv.montant, id: mv.id, source: mv.description || '' });
+    if (mv.categorie === 'CFP') cfpItems.push({ cat: 'CFP', mois: mv.mois, montant: mv.montant, id: mv.id, source: mv.description || '' });
+  });
+
   var allItems = urssafItems.concat(cfpItems);
 
   var urssafUnpaid = urssafItems.filter(function(i) { return !isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
