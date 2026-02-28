@@ -5370,118 +5370,89 @@ function getChargeColor(cat) {
 
 function showProvisionsDetail() {
   var data = compute();
-  // Utiliser les provisions ABSOLUES (toutes années, sans filtre de période)
-  var allProv = data.allProvisionsDetail; // depuis getAbsoluteProvisions(), pas filtré
+  var allProv = data.allProvisionsDetail;
   $('#formModalTitle').textContent = '📦 Provisions à Payer';
   var body = $('#formModalBody');
   body.innerHTML = '';
 
-  // Total global (absolu)
   var grandTotal = data.provisionsAbsolues;
-  body.appendChild(el('div', { style: { background: 'var(--provision-glow)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '20px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, 'Total à provisionner'),
-    el('div', { style: { fontWeight: '800', fontSize: '28px', color: 'var(--provision)' } }, EUR(grandTotal))
+  var unpaidTotal = allProv.filter(function(c) { return !isPaid(c.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+  var paidTotal = allProv.filter(function(c) { return isPaid(c.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+
+  // Header À provisionner / Déjà payé
+  var headerDiv = el('div', { style: { display: 'flex', gap: '12px', marginBottom: '20px' } });
+  headerDiv.appendChild(el('div', { style: { flex: '1', background: 'var(--provision-glow)', padding: '14px', borderRadius: 'var(--radius-md)', textAlign: 'center' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, 'À provisionner'),
+    el('div', { style: { fontWeight: '800', fontSize: '20px', color: 'var(--provision)' } }, EUR(unpaidTotal))
   ]));
+  headerDiv.appendChild(el('div', { style: { flex: '1', background: 'rgba(34, 197, 94, 0.1)', padding: '14px', borderRadius: 'var(--radius-md)', textAlign: 'center' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--success)', textTransform: 'uppercase' } }, 'Déjà payé'),
+    el('div', { style: { fontWeight: '800', fontSize: '20px', color: 'var(--success)' } }, EUR(paidTotal))
+  ]));
+  body.appendChild(headerDiv);
 
-  // Tabs Par Type / Par Mois
-  var tabs = el('div', { class: 'filter-tabs', style: { marginBottom: '16px' } });
-  tabs.appendChild(el('button', { class: 'filter-tab' + (PROV_VIEW === 'type' ? ' active' : ''), onclick: function() { PROV_VIEW = 'type'; showProvisionsDetail(); } }, '📋 Par Type'));
-  tabs.appendChild(el('button', { class: 'filter-tab' + (PROV_VIEW === 'month' ? ' active' : ''), onclick: function() { PROV_VIEW = 'month'; showProvisionsDetail(); } }, '📅 Par Mois'));
-  body.appendChild(tabs);
+  // Grouper par année (décroissant)
+  var byYear = {};
+  allProv.forEach(function(item) {
+    var year = item.mois ? item.mois.substring(0, 4) : 'Autre';
+    if (!byYear[year]) byYear[year] = [];
+    byYear[year].push(item);
+  });
 
-  if (PROV_VIEW === 'type') {
-    // Grouper par type avec clic pour voir détail
-    var types = [
-      { key: 'TVA', label: 'TVA', color: '#f472b6', icon: '🏛️' },
-      { key: 'Impôt', label: 'Impôt / IR', color: '#fbbf24', icon: '💰' }
-    ];
+  var listContainer = el('div', { style: { maxHeight: '400px', overflowY: 'auto' } });
+  var years = Object.keys(byYear).sort(function(a, b) { return b.localeCompare(a); });
 
-    types.forEach(function(t) {
-      var items = allProv.filter(function(c) {
-        if (t.key === 'Impôt') return c.cat.indexOf('Impôt') >= 0 || c.cat.indexOf('IR') >= 0;
-        return c.cat === t.key;
-      });
-      if (items.length === 0) return;
+  years.forEach(function(year) {
+    var yearItems = byYear[year];
+    var yearUnpaid = yearItems.filter(function(i) { return !isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+    var yearPaid = yearItems.filter(function(i) { return isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
 
-      var montant = items.reduce(function(a, c) { return a + c.montant; }, 0);
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '10px', cursor: 'pointer' }, onclick: function() { showProvisionTypeDetail(t.label, items, t.color); } });
-      row.appendChild(el('div', { style: { fontSize: '20px' } }, t.icon));
-      row.appendChild(el('div', { style: { flex: '1' } }, [
-        el('div', { style: { fontSize: '14px', fontWeight: '600', color: t.color } }, t.label),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, items.length + ' élément' + (items.length > 1 ? 's' : ''))
-      ]));
-      row.appendChild(el('div', { style: { textAlign: 'right' } }, [
-        el('div', { style: { fontWeight: '800', fontSize: '16px', color: t.color } }, EUR(montant)),
-        el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '→ Détail')
-      ]));
-      body.appendChild(row);
+    // Header année
+    listContainer.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-sm)', marginTop: '12px', marginBottom: '8px' } }, [
+      el('span', { style: { fontWeight: '700', fontSize: '13px' } }, '📅 ' + year),
+      el('div', { style: { display: 'flex', gap: '12px' } }, [
+        yearUnpaid > 0 ? el('span', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--provision)' } }, EUR(yearUnpaid) + ' à payer') : null,
+        yearPaid > 0 ? el('span', { style: { fontWeight: '600', fontSize: '12px', color: 'var(--success)' } }, '✓ ' + EUR(yearPaid)) : null
+      ].filter(Boolean))
+    ]));
+
+    // Items triés : non payés d'abord, puis par montant décroissant
+    yearItems.sort(function(a, b) {
+      var aPaid = isPaid(a.id) ? 1 : 0;
+      var bPaid = isPaid(b.id) ? 1 : 0;
+      if (aPaid !== bPaid) return aPaid - bPaid;
+      return b.montant - a.montant;
     });
 
-    // URSSAF + CFP combinés
-    var urssafItems = allProv.filter(function(c) { return c.cat === 'URSSAF'; });
-    var cfpItems = allProv.filter(function(c) { return c.cat === 'CFP'; });
-    var urssafMontant = urssafItems.reduce(function(a, c) { return a + c.montant; }, 0);
-    var cfpMontant = cfpItems.reduce(function(a, c) { return a + c.montant; }, 0);
-    var ucTotal = urssafMontant + cfpMontant;
-    if (ucTotal > 0) {
-      var ucSubParts = [];
-      if (urssafMontant > 0) ucSubParts.push(EUR(urssafMontant) + ' URSSAF');
-      if (cfpMontant > 0) ucSubParts.push(EUR(cfpMontant) + ' CFP');
-      var ucRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '10px', cursor: 'pointer' }, onclick: function() { showUrssafCfpDetail(); } });
-      ucRow.appendChild(el('div', { style: { fontSize: '20px' } }, '🏥'));
-      ucRow.appendChild(el('div', { style: { flex: '1' } }, [
-        el('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--danger)' } }, 'URSSAF + CFP'),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'dont : ' + ucSubParts.join(' · '))
-      ]));
-      ucRow.appendChild(el('div', { style: { textAlign: 'right' } }, [
-        el('div', { style: { fontWeight: '800', fontSize: '16px', color: 'var(--danger)' } }, EUR(ucTotal)),
-        el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '→ Détail')
-      ]));
-      body.appendChild(ucRow);
-    }
+    yearItems.forEach(function(item) {
+      var paid = isPaid(item.id);
+      var catColor = getChargeColor(item.cat);
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: paid ? 'rgba(34, 197, 94, 0.08)' : 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px', marginLeft: '12px', border: paid ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid transparent' } });
 
-    // Autres charges (RC Pro, Mutuelle, etc.) — toutes catégories hors TVA/URSSAF/CFP/Impôt/IR
-    var autresItems = allProv.filter(function(c) {
-      return c.cat !== 'TVA' && c.cat !== 'URSSAF' && c.cat !== 'CFP' && c.cat.indexOf('Impôt') < 0 && c.cat.indexOf('IR') < 0;
-    });
-    if (autresItems.length > 0) {
-      var autreMontant = autresItems.reduce(function(a, c) { return a + c.montant; }, 0);
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '10px', cursor: 'pointer' }, onclick: function() { showProvisionTypeDetail('Autres charges', autresItems, 'var(--warning)'); } });
-      row.appendChild(el('div', { style: { fontSize: '20px' } }, '📋'));
+      // Checkbox toggle payé
+      row.appendChild(el('div', {
+        class: 'toggle-check ' + (paid ? 'paid' : ''),
+        style: { width: '24px', height: '24px', fontSize: '14px', flexShrink: '0', cursor: 'pointer', background: paid ? 'var(--success)' : 'var(--bg-tertiary)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: paid ? 'white' : 'var(--text-muted)', border: paid ? 'none' : '2px solid var(--border)' },
+        title: paid ? 'Remettre en provision' : 'Marquer payé',
+        onclick: (function(id) { return function(e) { e.stopPropagation(); TREASURY.paidCharges[id] = !isPaid(id); saveAll(); showProvisionsDetail(); }; })(item.id)
+      }, paid ? '✓' : ''));
+
+      // Info : catégorie + mois
       row.appendChild(el('div', { style: { flex: '1' } }, [
-        el('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--warning)' } }, 'Autres charges'),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, autresItems.length + ' élément' + (autresItems.length > 1 ? 's' : ''))
+        el('div', { style: { fontSize: '13px', fontWeight: '600', color: paid ? 'var(--success)' : catColor, textDecoration: paid ? 'line-through' : 'none' } }, item.source || item.cat),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, fmtMonth(item.mois))
       ]));
-      row.appendChild(el('div', { style: { textAlign: 'right' } }, [
-        el('div', { style: { fontWeight: '800', fontSize: '16px', color: 'var(--warning)' } }, EUR(autreMontant)),
-        el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '→ Détail')
-      ]));
-      body.appendChild(row);
-    }
 
-  } else {
-    // Grouper par mois depuis les provisions absolues (toutes années)
-    var absByMonth = {};
-    allProv.forEach(function(c) { absByMonth[c.mois] = (absByMonth[c.mois] || 0) + c.montant; });
-    var months = Object.keys(absByMonth).filter(function(m) { return absByMonth[m] > 0; }).sort();
-    months.forEach(function(m) {
-      var montant = absByMonth[m];
-      var items = allProv.filter(function(c) { return c.mois === m; });
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', marginBottom: '10px', cursor: 'pointer' }, onclick: function() { showProvisionMonthDetail(m); } });
-      row.appendChild(el('div', { style: { fontSize: '20px' } }, '📅'));
-      row.appendChild(el('div', { style: { flex: '1' } }, [
-        el('div', { style: { fontSize: '14px', fontWeight: '600' } }, fmtMonth(m)),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, items.length + ' charge' + (items.length > 1 ? 's' : ''))
-      ]));
-      row.appendChild(el('div', { style: { textAlign: 'right' } }, [
-        el('div', { style: { fontWeight: '800', fontSize: '16px', color: 'var(--provision)' } }, EUR(montant)),
-        el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '→ Détail')
-      ]));
-      body.appendChild(row);
+      // Montant
+      row.appendChild(el('span', { style: { fontWeight: '700', fontSize: '14px', color: paid ? 'var(--success)' : catColor } }, EUR(item.montant)));
+
+      listContainer.appendChild(row);
     });
-  }
+  });
 
-  // Boutons rapides (basés sur les provisions absolues)
+  body.appendChild(listContainer);
+
+  // Boutons rapides
   var absTypes = data.provAbsoluesByType;
   if (grandTotal > 0) {
     body.appendChild(el('div', { style: { marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--glass-border)' } }));
@@ -5502,7 +5473,7 @@ function showProvisionsDetail() {
     }
     body.appendChild(btns);
   }
-  
+
   openModal('formModal');
 }
 
