@@ -932,6 +932,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .periode-item .form-group { margin-bottom: 8px; }
 .periode-remove { position: absolute; top: 6px; right: 6px; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
 .periode-remove:hover { background: rgba(239,68,68,0.15); }
+.jours-semaine-grid { display: flex; gap: 4px; margin: 8px 0; flex-wrap: wrap; }
+.jour-toggle { display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; user-select: none; }
+.jour-toggle input[type="checkbox"] { display: none; }
+.jour-toggle .jour-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); padding: 6px 10px; border-radius: 6px; border: 1.5px solid var(--glass-border); background: var(--bg-secondary); transition: all 0.15s; min-width: 36px; text-align: center; }
+.jour-toggle input:checked + .jour-label { background: var(--primary); color: #fff; border-color: var(--primary); }
+.jour-toggle .jour-demi { font-size: 9px; color: var(--text-muted); cursor: pointer; padding: 1px 4px; border-radius: 3px; }
+.jour-toggle .jour-demi:hover { background: var(--bg-tertiary); }
+.jour-toggle .jour-demi.active { color: var(--warning); font-weight: 700; }
+.jours-total { font-size: 11px; color: var(--text-secondary); margin-left: 8px; align-self: center; font-weight: 600; }
 .agence-contact { background: var(--bg-tertiary); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 8px; position: relative; }
 .agence-contact .form-group { margin-bottom: 8px; }
 
@@ -3456,10 +3465,17 @@ function getJoursPrevusPourMois(mis, monthKey, joursOuvrables) {
     return holidays.indexOf(localISO(date)) === -1;
   }
 
+  // V81: Mapping jour de semaine (getDay()) → clé joursMap
+  var dowToKey = [null, 'lun', 'mar', 'mer', 'jeu', 'ven', null]; // 0=dim, 1=lun...5=ven, 6=sam
+
   mis.periodes.forEach(function(periode) {
     if (!periode.debut || !periode.fin) return;
     var pStart = new Date(periode.debut);
     var pEnd = new Date(periode.fin);
+
+    // V81: Utiliser joursMap si disponible, sinon fallback sur joursSemaine (rétro-compat)
+    var joursMap = periode.joursMap;
+    var useLegacy = !joursMap;
     var joursSemaine = periode.joursSemaine || 5;
 
     // Intersection entre la période et le mois
@@ -3470,44 +3486,44 @@ function getJoursPrevusPourMois(mis, monthKey, joursOuvrables) {
     // Compter les jours ouvrables couverts dans ce mois par cette période
     totalBizDaysCovered += daysBizInRange(p.y, p.m, overlapStart.getDate(), overlapEnd.getDate());
 
-    // Trouver le lundi de la semaine contenant overlapStart
-    var weekMon = new Date(overlapStart);
-    var dow = weekMon.getDay();
-    weekMon.setDate(weekMon.getDate() - (dow === 0 ? 6 : dow - 1));
-
-    // Parcourir semaine par semaine
-    while (weekMon <= overlapEnd) {
-      // Collecter les jours ouvrables de la semaine (lun-ven) qui sont dans la période
-      var weekBizDays = [];
-      for (var i = 0; i < 5; i++) {
-        var day = new Date(weekMon);
-        day.setDate(day.getDate() + i);
-        // Le jour doit être dans la période
-        if (day < pStart || day > pEnd) continue;
-        // Le jour doit être ouvré
-        if (!isBusinessDay(day)) continue;
-        weekBizDays.push(day);
-      }
-
-      // Appliquer le rythme : travailler les N premiers jours ouvrés de la semaine
-      var daysToWork = Math.min(joursSemaine, weekBizDays.length);
-      var fullDays = Math.floor(daysToWork);
-      var fractional = daysToWork - fullDays;
-
-      for (var j = 0; j < weekBizDays.length && j <= fullDays; j++) {
-        var workDay = weekBizDays[j];
-        // Ce jour est-il dans notre mois cible ?
-        if (workDay.getMonth() === p.m && workDay.getFullYear() === p.y) {
-          if (j < fullDays) {
-            totalWorkedInMonth += 1;
-          } else if (fractional > 0) {
-            totalWorkedInMonth += fractional;
+    if (useLegacy) {
+      // Ancien algorithme: N premiers jours ouvrés de la semaine
+      var weekMon = new Date(overlapStart);
+      var dow = weekMon.getDay();
+      weekMon.setDate(weekMon.getDate() - (dow === 0 ? 6 : dow - 1));
+      while (weekMon <= overlapEnd) {
+        var weekBizDays = [];
+        for (var i = 0; i < 5; i++) {
+          var day = new Date(weekMon);
+          day.setDate(day.getDate() + i);
+          if (day < pStart || day > pEnd) continue;
+          if (!isBusinessDay(day)) continue;
+          weekBizDays.push(day);
+        }
+        var daysToWork = Math.min(joursSemaine, weekBizDays.length);
+        var fullDays = Math.floor(daysToWork);
+        var fractional = daysToWork - fullDays;
+        for (var j = 0; j < weekBizDays.length && j <= fullDays; j++) {
+          var workDay = weekBizDays[j];
+          if (workDay.getMonth() === p.m && workDay.getFullYear() === p.y) {
+            if (j < fullDays) totalWorkedInMonth += 1;
+            else if (fractional > 0) totalWorkedInMonth += fractional;
           }
         }
+        weekMon.setDate(weekMon.getDate() + 7);
       }
-
-      // Semaine suivante
-      weekMon.setDate(weekMon.getDate() + 7);
+    } else {
+      // V81: Nouveau algorithme basé sur joursMap (jours spécifiques)
+      var cursor = new Date(overlapStart);
+      while (cursor <= overlapEnd) {
+        if (isBusinessDay(cursor) && cursor.getMonth() === p.m && cursor.getFullYear() === p.y) {
+          var dayKey = dowToKey[cursor.getDay()];
+          if (dayKey && joursMap[dayKey]) {
+            totalWorkedInMonth += joursMap[dayKey]; // 1 ou 0.5
+          }
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
     }
   });
 
@@ -6544,6 +6560,19 @@ function showMissionModal(mission) {
       periodesContainer.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '8px', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, '5 jours/semaine sur toute la durée'));
     }
     mission.periodes.forEach(function(p, idx) {
+      // V81: Migration joursSemaine → joursMap
+      if (!p.joursMap) {
+        var js = p.joursSemaine || 5;
+        var jours = ['lun','mar','mer','jeu','ven'];
+        p.joursMap = {};
+        var full = Math.floor(js);
+        var frac = js - full;
+        for (var ji = 0; ji < 5; ji++) {
+          if (ji < full) p.joursMap[jours[ji]] = 1;
+          else if (ji === full && frac > 0) p.joursMap[jours[ji]] = frac;
+          else p.joursMap[jours[ji]] = 0;
+        }
+      }
       var item = el('div', { class: 'periode-item' });
       var removeBtn = el('button', { class: 'periode-remove', 'data-pidx': idx, onclick: function() { mission.periodes.splice(idx, 1); renderPeriodes(); } }, '✕');
       item.appendChild(removeBtn);
@@ -6551,20 +6580,70 @@ function showMissionModal(mission) {
       pRow1.appendChild(createInput('Du', 'date', 'mPDeb_' + idx, p.debut));
       pRow1.appendChild(createInput('Au', 'date', 'mPFin_' + idx, p.fin));
       item.appendChild(pRow1);
-      var pRow2 = el('div', { class: 'form-row' });
-      var joursInput = createInput('Jours/semaine', 'number', 'mPJours_' + idx, p.joursSemaine, 'Ex: 2.5');
-      var joursField = joursInput.querySelector('input'); if (joursField) { joursField.setAttribute('step', '0.5'); joursField.setAttribute('min', '0.5'); joursField.setAttribute('max', '5'); }
-      pRow2.appendChild(joursInput);
-      // Permettre un TJM spécifique à la période (optionnel)
-      pRow2.appendChild(createInput('TJM période (optionnel)', 'number', 'mPTjm_' + idx, p.tjm || '', 'Défaut: TJM mission'));
-      item.appendChild(pRow2);
+
+      // V81: Checkboxes par jour de la semaine
+      var joursLabel = el('label', { class: 'form-label', style: { marginTop: '4px' } }, 'Jours travaillés');
+      item.appendChild(joursLabel);
+      var joursGrid = el('div', { class: 'jours-semaine-grid', id: 'mPJoursGrid_' + idx });
+      var jourNames = ['lun','mar','mer','jeu','ven'];
+      var jourLabels = ['Lun','Mar','Mer','Jeu','Ven'];
+      var totalSpan = el('span', { class: 'jours-total', id: 'mPJoursTotal_' + idx }, '');
+      function updateTotal(gridIdx) {
+        var t = 0;
+        jourNames.forEach(function(j) {
+          var cb = $('#mPJour_' + gridIdx + '_' + j);
+          var demiBtn = document.getElementById('mPDemi_' + gridIdx + '_' + j);
+          if (cb && cb.checked) {
+            t += (demiBtn && demiBtn.classList.contains('active')) ? 0.5 : 1;
+          }
+        });
+        var ts = $('#mPJoursTotal_' + gridIdx);
+        if (ts) ts.textContent = t + 'j/sem';
+      }
+      (function(currentIdx) {
+        jourNames.forEach(function(j, ji) {
+          var val = p.joursMap[j] || 0;
+          var isChecked = val > 0;
+          var isDemi = val === 0.5;
+
+          var toggle = el('div', { class: 'jour-toggle' });
+          var cb = el('input', { type: 'checkbox', id: 'mPJour_' + currentIdx + '_' + j });
+          if (isChecked) cb.checked = true;
+          cb.addEventListener('change', function() {
+            var demiBtn = document.getElementById('mPDemi_' + currentIdx + '_' + j);
+            if (!this.checked && demiBtn) demiBtn.classList.remove('active');
+            updateTotal(currentIdx);
+          });
+          var lbl = el('label', { class: 'jour-label', for: 'mPJour_' + currentIdx + '_' + j }, jourLabels[ji]);
+          toggle.appendChild(cb);
+          toggle.appendChild(lbl);
+
+          var demiBtn = el('span', { class: 'jour-demi' + (isDemi ? ' active' : ''), id: 'mPDemi_' + currentIdx + '_' + j }, '½');
+          demiBtn.addEventListener('click', function() {
+            var cbEl = document.getElementById('mPJour_' + currentIdx + '_' + j);
+            if (!cbEl || !cbEl.checked) { cbEl.checked = true; }
+            this.classList.toggle('active');
+            updateTotal(currentIdx);
+          });
+          toggle.appendChild(demiBtn);
+          joursGrid.appendChild(toggle);
+        });
+      })(idx);
+      joursGrid.appendChild(totalSpan);
+      item.appendChild(joursGrid);
+      setTimeout(function() { updateTotal(idx); }, 0);
+
+      // TJM par période (optionnel)
+      var pRowTjm = el('div', { class: 'form-row' });
+      pRowTjm.appendChild(createInput('TJM période (optionnel)', 'number', 'mPTjm_' + idx, p.tjm || '', 'Défaut: TJM mission'));
+      item.appendChild(pRowTjm);
       periodesContainer.appendChild(item);
     });
   }
   renderPeriodes();
 
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '16px' }, onclick: function() {
-    mission.periodes.push({ debut: mission.debut || '', fin: mission.fin || '', joursSemaine: 5, tjm: 0 });
+    mission.periodes.push({ debut: mission.debut || '', fin: mission.fin || '', joursMap: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: 0 });
     renderPeriodes();
   } }, '+ Ajouter une période'));
 
@@ -6674,16 +6753,30 @@ function showMissionModal(mission) {
     mission.jourPaiement = parseInt($('#mJour').value) || 15;
     mission.statut = $('#mStatut') ? $('#mStatut').value : 'active';
 
-    // V79: Sauvegarder périodes de travail
+    // V81: Sauvegarder périodes de travail avec jours spécifiques
     mission.periodes = [];
     var pIdx = 0;
+    var jourKeys = ['lun','mar','mer','jeu','ven'];
     while ($('#mPDeb_' + pIdx)) {
       var pDeb = $('#mPDeb_' + pIdx).value;
       var pFin = $('#mPFin_' + pIdx).value;
-      var pJours = parseFloat($('#mPJours_' + pIdx).value) || 5;
       var pTjm = parseFloat($('#mPTjm_' + pIdx).value) || 0;
+      // V81: Lire joursMap depuis les checkboxes
+      var joursMap = {};
+      var totalJs = 0;
+      jourKeys.forEach(function(j) {
+        var cb = $('#mPJour_' + pIdx + '_' + j);
+        var demiBtn = document.getElementById('mPDemi_' + pIdx + '_' + j);
+        if (cb && cb.checked) {
+          var v = (demiBtn && demiBtn.classList.contains('active')) ? 0.5 : 1;
+          joursMap[j] = v;
+          totalJs += v;
+        } else {
+          joursMap[j] = 0;
+        }
+      });
       if (pDeb && pFin) {
-        mission.periodes.push({ debut: pDeb, fin: pFin, joursSemaine: pJours, tjm: pTjm });
+        mission.periodes.push({ debut: pDeb, fin: pFin, joursMap: joursMap, joursSemaine: totalJs, tjm: pTjm });
       }
       pIdx++;
     }
@@ -12195,7 +12288,18 @@ function renderMissionsContent(container) {
     if (m.debut && m.fin) {
       var dateStr = '📅 ' + fmtDate(new Date(m.debut)) + ' → ' + fmtDate(new Date(m.fin));
       if (m.periodes && m.periodes.length > 0) {
-        dateStr += ' · ' + m.periodes.map(function(p) { return p.joursSemaine + 'j/sem'; }).join(', ');
+        dateStr += ' · ' + m.periodes.map(function(p) {
+          if (p.joursMap) {
+            var jl = { lun: 'L', mar: 'M', mer: 'Me', jeu: 'J', ven: 'V' };
+            var parts = [];
+            ['lun','mar','mer','jeu','ven'].forEach(function(j) {
+              if (p.joursMap[j] === 1) parts.push(jl[j]);
+              else if (p.joursMap[j] === 0.5) parts.push(jl[j] + '½');
+            });
+            return parts.join(' ');
+          }
+          return p.joursSemaine + 'j/sem';
+        }).join(', ');
       }
       card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, dateStr));
     }
@@ -13477,7 +13581,18 @@ function renderMissions(container) {
     // V79: Afficher le rythme si temps partiel
     var rythmeInfo = '';
     if (m.periodes && m.periodes.length > 0) {
-      var rythmes = m.periodes.map(function(p) { return p.joursSemaine + 'j/sem'; });
+      var rythmes = m.periodes.map(function(p) {
+        if (p.joursMap) {
+          var jourLabels = { lun: 'Lun', mar: 'Mar', mer: 'Mer', jeu: 'Jeu', ven: 'Ven' };
+          var parts = [];
+          ['lun','mar','mer','jeu','ven'].forEach(function(j) {
+            if (p.joursMap[j] === 1) parts.push(jourLabels[j]);
+            else if (p.joursMap[j] === 0.5) parts.push(jourLabels[j] + '(½)');
+          });
+          return parts.join(' ');
+        }
+        return p.joursSemaine + 'j/sem';
+      });
       rythmeInfo = ' · ' + rythmes.join(', ');
     }
     card.appendChild(el('div', { class: 'mission-dates' }, '📅 ' + fmtLong(m.debut) + ' → ' + fmtLong(m.fin) + rythmeInfo));
