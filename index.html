@@ -924,6 +924,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.form-row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+.form-section { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.form-section-border { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--glass-border); }
+.periode-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.periode-item { background: var(--bg-tertiary); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 10px; position: relative; }
+.periode-item .form-group { margin-bottom: 8px; }
+.periode-remove { position: absolute; top: 6px; right: 6px; background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
+.periode-remove:hover { background: rgba(239,68,68,0.15); }
+.agence-contact { background: var(--bg-tertiary); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 8px; position: relative; }
+.agence-contact .form-group { margin-bottom: 8px; }
 
 .btn { background: var(--bg-tertiary); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 12px 20px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .btn:hover { background: var(--bg-elevated); border-color: var(--accent); }
@@ -1388,7 +1398,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 78; // V78: IR filtre prospect/perdue, conformité payé, ACRE getAcreInfo, mouvements par mois, CA Plafond condensé, waterfall labels+detail
+var APP_VERSION = 79; // V79: Périodes travail jours/semaine, client opérationnel, agence/intermédiaire, sections mission
 var TODAY = new Date();
 var VIEW = 'cockpit';  // V73: cockpit, activite, finances, config
 var ACTIVITE_TAB = 'missions'; // V73: sous-onglets activité (missions, factures)
@@ -3419,6 +3429,47 @@ function getAllChargesForType(typeName) {
   return items;
 }
 
+// V79: Calculer les jours prévus pour un mois donné en tenant compte des périodes de travail
+// Si des périodes sont définies, on calcule le ratio jours/semaine par rapport aux 5j standard
+// Si aucune période ne couvre le mois, on utilise le fulltime (5j/sem)
+function getJoursPrevusPourMois(mis, monthKey, joursOuvrables) {
+  if (!mis.periodes || mis.periodes.length === 0) return joursOuvrables;
+
+  var p = parseYM(monthKey);
+  var monthStart = new Date(p.y, p.m, 1);
+  var monthEnd = new Date(p.y, p.m + 1, 0); // dernier jour du mois
+
+  // Chercher les périodes qui couvrent ce mois
+  var totalWeightedDays = 0;
+  var totalBizDaysCovered = 0;
+
+  mis.periodes.forEach(function(periode) {
+    if (!periode.debut || !periode.fin) return;
+    var pStart = new Date(periode.debut);
+    var pEnd = new Date(periode.fin);
+
+    // Intersection entre la période et le mois
+    var overlapStart = pStart > monthStart ? pStart : monthStart;
+    var overlapEnd = pEnd < monthEnd ? pEnd : monthEnd;
+
+    if (overlapStart <= overlapEnd) {
+      // Jours ouvrables dans la zone d'overlap
+      var bizDays = daysBizInRange(p.y, p.m, overlapStart.getDate(), overlapEnd.getDate());
+      var ratio = (periode.joursSemaine || 5) / 5;
+      totalWeightedDays += bizDays * ratio;
+      totalBizDaysCovered += bizDays;
+    }
+  });
+
+  // Jours ouvrables non couverts par aucune période → fulltime
+  var uncoveredDays = joursOuvrables - totalBizDaysCovered;
+  if (uncoveredDays > 0) {
+    totalWeightedDays += uncoveredDays; // ratio 1.0 (fulltime)
+  }
+
+  return Math.round(totalWeightedDays * 10) / 10; // Arrondi à 0.5 près
+}
+
 function buildMission(mis) {
   if (!mis.debut || !mis.fin) return;
   var start = new Date(mis.debut), end = new Date(mis.fin);
@@ -3435,41 +3486,41 @@ function buildMission(mis) {
     // V56: Calculer les jours ouvrables en tenant compte des dates début/fin
     var joursOuvrables;
     if (key === startYm && key === endYm) {
-      // Mois unique: du jour de début au jour de fin
       joursOuvrables = daysBizInRange(d.getFullYear(), d.getMonth(), start.getDate(), end.getDate());
     } else if (key === startYm) {
-      // Premier mois: du jour de début à la fin du mois
       joursOuvrables = daysBizInRange(d.getFullYear(), d.getMonth(), start.getDate(), 31);
     } else if (key === endYm) {
-      // Dernier mois: du début du mois au jour de fin
       joursOuvrables = daysBizInRange(d.getFullYear(), d.getMonth(), 1, end.getDate());
     } else {
-      // Mois complet
       joursOuvrables = daysBiz(d.getFullYear(), d.getMonth());
     }
+
+    // V79: Calculer joursPrevus selon le rythme de travail (périodes jours/semaine)
+    var joursPrevusCalcule = getJoursPrevusPourMois(mis, key, joursOuvrables);
+
     if (existing) {
-      // V72: Toujours mettre à jour joursOuvrables selon les vraies dates de mission
       var oldJoursOuvrables = existing.joursOuvrables || 0;
       existing.joursOuvrables = joursOuvrables;
 
-      // V72: Recalculer joursPrevus si:
-      // - joursOuvrables a changé ET joursPrevus était = ancien joursOuvrables (pas de modif manuelle)
-      // - OU joursPrevus dépasse le nouveau joursOuvrables (impossible de travailler plus que dispo)
-      if (oldJoursOuvrables !== joursOuvrables && existing.joursPrevus === oldJoursOuvrables) {
-        existing.joursPrevus = joursOuvrables;
-      } else if ((existing.joursPrevus || 0) > joursOuvrables) {
-        // V72: Plafonner joursPrevus aux jours réellement disponibles
-        existing.joursPrevus = joursOuvrables;
+      // V79: Si des périodes sont définies, toujours recalculer joursPrevus depuis le rythme
+      if (mis.periodes && mis.periodes.length > 0) {
+        existing.joursPrevus = joursPrevusCalcule;
+      } else {
+        // V72: Comportement original sans périodes
+        if (oldJoursOuvrables !== joursOuvrables && existing.joursPrevus === oldJoursOuvrables) {
+          existing.joursPrevus = joursOuvrables;
+        } else if ((existing.joursPrevus || 0) > joursOuvrables) {
+          existing.joursPrevus = joursOuvrables;
+        }
+        existing.joursPrevus = existing.joursPrevus || joursOuvrables;
       }
-      existing.joursPrevus = existing.joursPrevus || joursOuvrables;
 
-      // V72: joursReels aussi ne peut pas dépasser joursOuvrables
       if ((existing.joursReels || 0) > joursOuvrables) {
         existing.joursReels = joursOuvrables;
       }
       newLignes.push(existing);
     }
-    else { newLignes.push({ ym: key, joursOuvrables: joursOuvrables, joursPrevus: joursOuvrables, joursReels: 0, conges: 0 }); }
+    else { newLignes.push({ ym: key, joursOuvrables: joursOuvrables, joursPrevus: joursPrevusCalcule, joursReels: 0, conges: 0 }); }
     d.setMonth(d.getMonth() + 1);
   }
   mis.lignes = newLignes;
@@ -6353,16 +6404,30 @@ function showMissionModal(mission) {
     id: 'M' + Date.now(), client: '', clientId: '', titre: '', site: '', debut: '', fin: '',
     tjm: 0, delaiPaiement: 2, jourPaiement: 15,
     adresseClient: '', numeroCommande: '', descriptifFacture: '',
-    statut: 'active' // V75: active | prospect | perdue
+    statut: 'active', // V75: active | prospect | perdue
+    // V79: Périodes de travail (jours/semaine variables)
+    periodes: [],
+    // V79: Client opérationnel
+    clientOp: { nom: '', contact: '', email: '', telephone: '', adresse: '' },
+    // V79: Agence / intermédiaire
+    agence: { nom: '', contacts: [{ prenom: '', nom: '', email: '', telephone: '' }], adresses: [''] }
   };
-  
+  // V79: Rétro-compatibilité - s'assurer que les nouveaux champs existent
+  if (!mission.periodes) mission.periodes = [];
+  if (!mission.clientOp) mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
+  if (!mission.agence) mission.agence = { nom: '', contacts: [{ prenom: '', nom: '', email: '', telephone: '' }], adresses: [''] };
+  if (!mission.agence.contacts || mission.agence.contacts.length === 0) mission.agence.contacts = [{ prenom: '', nom: '', email: '', telephone: '' }];
+  if (!mission.agence.adresses || mission.agence.adresses.length === 0) mission.agence.adresses = [''];
+
   $('#formModalTitle').textContent = isNew ? '💼 Nouvelle Mission' : '✏️ ' + mission.client;
   var body = $('#formModalBody');
   body.innerHTML = '';
-  
-  // Section Mission
-  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' } }, '📋 Informations Mission'));
-  
+
+  // ═══════════════════════════════════════════════
+  // SECTION 1: Informations Mission
+  // ═══════════════════════════════════════════════
+  body.appendChild(el('div', { class: 'form-section' }, '📋 Informations Mission'));
+
   // Dropdown client si des clients existent
   if (CLIENTS.length > 0) {
     var clientOptions = [{ value: '', label: '-- Sélectionner --' }];
@@ -6392,22 +6457,21 @@ function showMissionModal(mission) {
   } else {
     body.appendChild(createInput('Client', 'text', 'mClient', mission.client));
   }
-  
+
   body.appendChild(createInput('Titre / Projet', 'text', 'mTitre', mission.titre));
   body.appendChild(createInput('Site / Lieu', 'text', 'mSite', mission.site));
-  
+
   var row1 = el('div', { class: 'form-row' });
   row1.appendChild(createInput('Début', 'date', 'mDebut', mission.debut));
   row1.appendChild(createInput('Fin', 'date', 'mFin', mission.fin));
   body.appendChild(row1);
-  
+
   var row2 = el('div', { class: 'form-row-3' });
   row2.appendChild(createInput('TJM (€)', 'number', 'mTJM', mission.tjm));
   row2.appendChild(createSelect('Délai', 'mDelai', [{ value: '1', label: 'M+1' }, { value: '2', label: 'M+2' }, { value: '3', label: 'M+3' }], String(mission.delaiPaiement)));
   row2.appendChild(createInput('Jour paie', 'number', 'mJour', mission.jourPaiement));
   body.appendChild(row2);
-  
-  // Section Facturation
+
   // V75: Statut mission (pipeline)
   body.appendChild(createSelect('Statut mission', 'mStatut', [
     { value: 'active', label: '✅ Validée — comptée dans les stats' },
@@ -6415,11 +6479,132 @@ function showMissionModal(mission) {
     { value: 'perdue', label: '❌ Perdue — non remportée (historique)' }
   ], mission.statut || 'active'));
 
-  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '16px', marginBottom: '8px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)', textTransform: 'uppercase' } }, '📄 Informations Facturation'));
-  body.appendChild(createInput('Adresse client (pour facture)', 'text', 'mAdresseClient', mission.adresseClient || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
+  // ═══════════════════════════════════════════════
+  // SECTION 2: Périodes de travail (jours/semaine)
+  // ═══════════════════════════════════════════════
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '📅 Rythme de travail'));
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px' } }, 'Par défaut: temps plein (5j/sem). Ajoutez des périodes pour un rythme différent.'));
+
+  var periodesContainer = el('div', { class: 'periode-list', id: 'mPeriodesContainer' });
+  body.appendChild(periodesContainer);
+
+  function renderPeriodes() {
+    periodesContainer.innerHTML = '';
+    if (mission.periodes.length === 0) {
+      periodesContainer.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '8px', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, '5 jours/semaine sur toute la durée'));
+    }
+    mission.periodes.forEach(function(p, idx) {
+      var item = el('div', { class: 'periode-item' });
+      var removeBtn = el('button', { class: 'periode-remove', 'data-pidx': idx, onclick: function() { mission.periodes.splice(idx, 1); renderPeriodes(); } }, '✕');
+      item.appendChild(removeBtn);
+      var pRow1 = el('div', { class: 'form-row' });
+      pRow1.appendChild(createInput('Du', 'date', 'mPDeb_' + idx, p.debut));
+      pRow1.appendChild(createInput('Au', 'date', 'mPFin_' + idx, p.fin));
+      item.appendChild(pRow1);
+      var pRow2 = el('div', { class: 'form-row' });
+      var joursInput = createInput('Jours/semaine', 'number', 'mPJours_' + idx, p.joursSemaine, 'Ex: 2.5');
+      var joursField = joursInput.querySelector('input'); if (joursField) { joursField.setAttribute('step', '0.5'); joursField.setAttribute('min', '0.5'); joursField.setAttribute('max', '5'); }
+      pRow2.appendChild(joursInput);
+      // Permettre un TJM spécifique à la période (optionnel)
+      pRow2.appendChild(createInput('TJM période (optionnel)', 'number', 'mPTjm_' + idx, p.tjm || '', 'Défaut: TJM mission'));
+      item.appendChild(pRow2);
+      periodesContainer.appendChild(item);
+    });
+  }
+  renderPeriodes();
+
+  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '16px' }, onclick: function() {
+    mission.periodes.push({ debut: mission.debut || '', fin: mission.fin || '', joursSemaine: 5, tjm: 0 });
+    renderPeriodes();
+  } }, '+ Ajouter une période'));
+
+  // ═══════════════════════════════════════════════
+  // SECTION 3: Client opérationnel
+  // ═══════════════════════════════════════════════
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '🏢 Client opérationnel'));
+  body.appendChild(createInput('Nom du client', 'text', 'mClientOpNom', mission.clientOp.nom, 'Ex: Airbus, ATR...'));
+  var rowCo1 = el('div', { class: 'form-row' });
+  rowCo1.appendChild(createInput('Contact', 'text', 'mClientOpContact', mission.clientOp.contact, 'Nom du contact'));
+  rowCo1.appendChild(createInput('Email', 'email', 'mClientOpEmail', mission.clientOp.email));
+  body.appendChild(rowCo1);
+  var rowCo2 = el('div', { class: 'form-row' });
+  rowCo2.appendChild(createInput('Téléphone', 'tel', 'mClientOpTel', mission.clientOp.telephone));
+  rowCo2.appendChild(createInput('Adresse / Site', 'text', 'mClientOpAdresse', mission.clientOp.adresse, 'Ex: Site Saint-Martin'));
+  body.appendChild(rowCo2);
+
+  // ═══════════════════════════════════════════════
+  // SECTION 4: Agence / Intermédiaire
+  // ═══════════════════════════════════════════════
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '🤝 Agence / Intermédiaire'));
+  body.appendChild(createInput('Nom de l\'agence', 'text', 'mAgenceNom', mission.agence.nom, 'Ex: Scalian, Alten...'));
+
+  // Contacts agence (multiples)
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: '6px', fontWeight: '600' } }, 'Contacts'));
+  var agenceContactsContainer = el('div', { id: 'mAgenceContacts' });
+  body.appendChild(agenceContactsContainer);
+
+  function renderAgenceContacts() {
+    agenceContactsContainer.innerHTML = '';
+    mission.agence.contacts.forEach(function(c, idx) {
+      var contactDiv = el('div', { class: 'agence-contact' });
+      if (mission.agence.contacts.length > 1) {
+        var removeBtn = el('button', { class: 'periode-remove', onclick: function() { mission.agence.contacts.splice(idx, 1); renderAgenceContacts(); } }, '✕');
+        contactDiv.appendChild(removeBtn);
+      }
+      var cRow1 = el('div', { class: 'form-row' });
+      cRow1.appendChild(createInput('Prénom', 'text', 'mAgcPrenom_' + idx, c.prenom));
+      cRow1.appendChild(createInput('Nom', 'text', 'mAgcNom_' + idx, c.nom));
+      contactDiv.appendChild(cRow1);
+      var cRow2 = el('div', { class: 'form-row' });
+      cRow2.appendChild(createInput('Email', 'email', 'mAgcEmail_' + idx, c.email));
+      cRow2.appendChild(createInput('Téléphone', 'tel', 'mAgcTel_' + idx, c.telephone));
+      contactDiv.appendChild(cRow2);
+      agenceContactsContainer.appendChild(contactDiv);
+    });
+  }
+  renderAgenceContacts();
+
+  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() {
+    mission.agence.contacts.push({ prenom: '', nom: '', email: '', telephone: '' });
+    renderAgenceContacts();
+  } }, '+ Ajouter un contact'));
+
+  // Adresses postales agence (multiples)
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: '6px', fontWeight: '600' } }, 'Adresses postales'));
+  var agenceAdressesContainer = el('div', { id: 'mAgenceAdresses' });
+  body.appendChild(agenceAdressesContainer);
+
+  function renderAgenceAdresses() {
+    agenceAdressesContainer.innerHTML = '';
+    mission.agence.adresses.forEach(function(addr, idx) {
+      var addrDiv = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' } });
+      var addrInput = el('input', { class: 'form-input', type: 'text', id: 'mAgcAddr_' + idx, placeholder: 'Ex: 14 Rue Paul Mesple, 31100 Toulouse', style: { flex: '1' } });
+      addrInput.value = addr || '';
+      addrDiv.appendChild(addrInput);
+      if (mission.agence.adresses.length > 1) {
+        addrDiv.appendChild(el('button', { class: 'periode-remove', style: { position: 'static' }, onclick: function() { mission.agence.adresses.splice(idx, 1); renderAgenceAdresses(); } }, '✕'));
+      }
+      agenceAdressesContainer.appendChild(addrDiv);
+    });
+  }
+  renderAgenceAdresses();
+
+  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '16px' }, onclick: function() {
+    mission.agence.adresses.push('');
+    renderAgenceAdresses();
+  } }, '+ Ajouter une adresse'));
+
+  // ═══════════════════════════════════════════════
+  // SECTION 5: Facturation
+  // ═══════════════════════════════════════════════
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '📄 Informations Facturation'));
+  body.appendChild(createInput('Adresse de facturation', 'text', 'mAdresseClient', mission.adresseClient || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
   body.appendChild(createInput('N° Commande client', 'text', 'mNumCommande', mission.numeroCommande || '', 'Ex: 10004903'));
   body.appendChild(createTextarea('Descriptif standard facture', 'mDescriptif', mission.descriptifFacture || '', 'Ex: Prestation de service consultant'));
-  
+
+  // ═══════════════════════════════════════════════
+  // BOUTONS ACTION
+  // ═══════════════════════════════════════════════
   var btns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '20px' } });
   btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
     // Gérer client via dropdown ou input texte
@@ -6437,10 +6622,57 @@ function showMissionModal(mission) {
     mission.tjm = parseFloat($('#mTJM').value) || 0;
     mission.delaiPaiement = parseInt($('#mDelai').value) || 2;
     mission.jourPaiement = parseInt($('#mJour').value) || 15;
+    mission.statut = $('#mStatut') ? $('#mStatut').value : 'active';
+
+    // V79: Sauvegarder périodes de travail
+    mission.periodes = [];
+    var pIdx = 0;
+    while ($('#mPDeb_' + pIdx)) {
+      var pDeb = $('#mPDeb_' + pIdx).value;
+      var pFin = $('#mPFin_' + pIdx).value;
+      var pJours = parseFloat($('#mPJours_' + pIdx).value) || 5;
+      var pTjm = parseFloat($('#mPTjm_' + pIdx).value) || 0;
+      if (pDeb && pFin) {
+        mission.periodes.push({ debut: pDeb, fin: pFin, joursSemaine: pJours, tjm: pTjm });
+      }
+      pIdx++;
+    }
+
+    // V79: Sauvegarder client opérationnel
+    mission.clientOp = {
+      nom: $('#mClientOpNom').value || '',
+      contact: $('#mClientOpContact').value || '',
+      email: $('#mClientOpEmail').value || '',
+      telephone: $('#mClientOpTel').value || '',
+      adresse: $('#mClientOpAdresse').value || ''
+    };
+
+    // V79: Sauvegarder agence
+    mission.agence = { nom: $('#mAgenceNom').value || '', contacts: [], adresses: [] };
+    var acIdx = 0;
+    while ($('#mAgcPrenom_' + acIdx)) {
+      mission.agence.contacts.push({
+        prenom: $('#mAgcPrenom_' + acIdx).value || '',
+        nom: $('#mAgcNom_' + acIdx).value || '',
+        email: $('#mAgcEmail_' + acIdx).value || '',
+        telephone: $('#mAgcTel_' + acIdx).value || ''
+      });
+      acIdx++;
+    }
+    var aaIdx = 0;
+    while ($('#mAgcAddr_' + aaIdx)) {
+      var addr = $('#mAgcAddr_' + aaIdx).value || '';
+      if (addr) mission.agence.adresses.push(addr);
+      aaIdx++;
+    }
+    if (mission.agence.contacts.length === 0) mission.agence.contacts = [{ prenom: '', nom: '', email: '', telephone: '' }];
+    if (mission.agence.adresses.length === 0) mission.agence.adresses = [''];
+
+    // V79: Sauvegarder facturation
     mission.adresseClient = $('#mAdresseClient').value;
     mission.numeroCommande = $('#mNumCommande').value;
     mission.descriptifFacture = $('#mDescriptif').value;
-    mission.statut = $('#mStatut') ? $('#mStatut').value : 'active'; // V75
+
     buildMission(mission);
     if (isNew) MISSIONS.push(mission);
     saveAll(); closeModal('formModal'); render();
@@ -11901,14 +12133,21 @@ function renderMissionsContent(container) {
     header.appendChild(el('div', { class: 'badge ' + badgeCls }, badgeTxt));
     card.appendChild(header);
 
-    // V60: Titre du poste sous le nom du client
-    if (m.titre) {
-      card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', fontStyle: 'italic' } }, m.titre));
+    // V60: Titre du poste sous le nom du client + V79: client op & agence
+    var subLine = m.titre || '';
+    if (m.clientOp && m.clientOp.nom) subLine += (subLine ? ' · ' : '') + '🏢 ' + m.clientOp.nom;
+    if (m.agence && m.agence.nom) subLine += (subLine ? ' · ' : '') + '🤝 ' + m.agence.nom;
+    if (subLine) {
+      card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', fontStyle: 'italic' } }, subLine));
     }
 
-    // V60: Période de la mission
+    // V60: Période de la mission + V79: rythme
     if (m.debut && m.fin) {
-      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, '📅 ' + fmtDate(new Date(m.debut)) + ' → ' + fmtDate(new Date(m.fin))));
+      var dateStr = '📅 ' + fmtDate(new Date(m.debut)) + ' → ' + fmtDate(new Date(m.fin));
+      if (m.periodes && m.periodes.length > 0) {
+        dateStr += ' · ' + m.periodes.map(function(p) { return p.joursSemaine + 'j/sem'; }).join(', ');
+      }
+      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, dateStr));
     }
 
     var details = el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', display: 'flex', gap: '12px' } });
@@ -13177,11 +13416,21 @@ function renderMissions(container) {
     var cardHeader = el('div', { class: 'mission-header' });
     var clientNameDiv = el('div', { class: 'mission-client' }, m.client);
     if (badgeEl) clientNameDiv.appendChild(badgeEl);
-    cardHeader.appendChild(el('div', {}, [clientNameDiv, el('div', { class: 'mission-titre' }, m.titre || m.site || '')]));
+    var subInfo = m.titre || m.site || '';
+    // V79: Afficher client opérationnel et agence
+    if (m.clientOp && m.clientOp.nom) subInfo = (subInfo ? subInfo + ' · ' : '') + '🏢 ' + m.clientOp.nom;
+    if (m.agence && m.agence.nom) subInfo = (subInfo ? subInfo + ' · ' : '') + '🤝 ' + m.agence.nom;
+    cardHeader.appendChild(el('div', {}, [clientNameDiv, el('div', { class: 'mission-titre' }, subInfo)]));
     cardHeader.appendChild(el('div', { class: 'mission-status ' + status }, statusLabel));
     card.appendChild(cardHeader);
-    
-    card.appendChild(el('div', { class: 'mission-dates' }, '📅 ' + fmtLong(m.debut) + ' → ' + fmtLong(m.fin)));
+
+    // V79: Afficher le rythme si temps partiel
+    var rythmeInfo = '';
+    if (m.periodes && m.periodes.length > 0) {
+      var rythmes = m.periodes.map(function(p) { return p.joursSemaine + 'j/sem'; });
+      rythmeInfo = ' · ' + rythmes.join(', ');
+    }
+    card.appendChild(el('div', { class: 'mission-dates' }, '📅 ' + fmtLong(m.debut) + ' → ' + fmtLong(m.fin) + rythmeInfo));
     
     var stats = el('div', { class: 'mission-stats' });
     stats.appendChild(el('div', { class: 'mission-stat' }, [el('div', { class: 'mission-stat-value' }, totalJours + 'j'), el('div', { class: 'mission-stat-label' }, 'Jours')]));
