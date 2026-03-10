@@ -11577,6 +11577,13 @@ function renderFinancesEvolution(container) {
   salChartCard.appendChild(el('div', { class: 'chart-container', style: { height: '160px' } }, [el('canvas', { id: 'tresoSalairesChart' })]));
   container.appendChild(salChartCard);
 
+  // V81: Graphique Jours travaillés par mission (stacked bar)
+  var joursCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  joursCard.appendChild(el('div', { class: 'card-title' }, '📅 Jours travaillés par mission'));
+  joursCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' } }, 'Cliquez sur un mois pour voir la répartition par semaine'));
+  joursCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px' } }, [el('canvas', { id: 'joursParMissionChart' })]));
+  container.appendChild(joursCard);
+
   // V75: Dessiner les graphiques après insertion dans le DOM
   setTimeout(function() {
     try {
@@ -11585,6 +11592,12 @@ function renderFinancesEvolution(container) {
     } catch (e) {
       console.error('Chart render error:', e);
     }
+    // V81: Graphique jours par mission
+    try {
+      var joursCanvas = document.getElementById('joursParMissionChart');
+      if (joursCanvas && joursCanvas.getContext) drawJoursParMissionChart();
+    } catch (e) { console.error('Jours chart error:', e); }
+
     // Graphique salaires
     var canvas = document.getElementById('tresoSalairesChart');
     if (!canvas || typeof Chart === 'undefined') return;
@@ -13508,9 +13521,294 @@ function drawSoldeChart() {
   });
 }
 
+// V81: Graphique jours travaillés par mission (stacked bar) + drill-down par semaine
+var joursParMissionChart = null;
+function drawJoursParMissionChart() {
+  if (typeof Chart === 'undefined') return;
+  var canvas = document.getElementById('joursParMissionChart');
+  if (!canvas || !canvas.getContext) return;
+  var ctx = canvas.getContext('2d');
+  if (joursParMissionChart) { joursParMissionChart.destroy(); joursParMissionChart = null; }
+
+  var months = getPeriodMonths();
+  var labels = months.map(fmtMonthShort);
+  var activeMissions = MISSIONS.filter(function(m) { return m.statut !== 'perdue' && m.lignes && m.lignes.length > 0; });
+  var colors = ['rgba(96,165,250,0.75)', 'rgba(52,211,153,0.75)', 'rgba(251,191,36,0.75)', 'rgba(167,139,250,0.75)', 'rgba(248,113,113,0.75)', 'rgba(34,211,238,0.75)', 'rgba(244,114,182,0.75)', 'rgba(163,230,53,0.75)'];
+  var borderColors = ['#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#22d3ee', '#f472b6', '#a3e635'];
+
+  var datasets = activeMissions.map(function(mis, mi) {
+    var dataArr = months.map(function(monthKey) {
+      var ligne = null;
+      mis.lignes.forEach(function(l) { if (l.ym === monthKey) ligne = l; });
+      return ligne ? (ligne.joursReels || 0) : 0;
+    });
+    return {
+      label: mis.client || mis.titre || 'Mission ' + (mi + 1),
+      data: dataArr,
+      backgroundColor: colors[mi % colors.length],
+      borderColor: borderColors[mi % borderColors.length],
+      borderWidth: 1,
+      borderRadius: 3
+    };
+  });
+
+  var joursLabelPlugin = {
+    id: 'joursLabelPlugin',
+    afterDatasetsDraw: function(chart) {
+      var ctx2 = chart.ctx;
+      var nbDs = chart.data.datasets.length;
+      months.forEach(function(m, idx) {
+        var total = 0;
+        for (var di = 0; di < nbDs; di++) total += chart.data.datasets[di].data[idx] || 0;
+        if (total <= 0) return;
+        var lastMeta = null;
+        for (var di2 = nbDs - 1; di2 >= 0; di2--) {
+          if ((chart.data.datasets[di2].data[idx] || 0) > 0) { lastMeta = chart.getDatasetMeta(di2).data[idx]; break; }
+        }
+        if (!lastMeta) return;
+        ctx2.save();
+        ctx2.fillStyle = '#a1a1aa';
+        ctx2.font = 'bold 9px system-ui';
+        ctx2.textAlign = 'center';
+        ctx2.textBaseline = 'bottom';
+        ctx2.fillText(total + 'j', lastMeta.x, lastMeta.y - 3);
+        ctx2.restore();
+      });
+    }
+  };
+
+  joursParMissionChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      onClick: function(e, els) { if (els.length) showWeeklyBreakdownModal(months[els[0].index]); },
+      plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 } } } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v + 'j'; } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+      }
+    },
+    plugins: [joursLabelPlugin]
+  });
+}
+
+// V81: Modal drill-down par semaine pour un mois donné
+function showWeeklyBreakdownModal(monthKey) {
+  var p = parseYM(monthKey);
+  var monthStart = new Date(p.y, p.m, 1);
+  var monthEnd = new Date(p.y, p.m + 1, 0);
+  var holidays = frenchHolidays(p.y);
+
+  function isBusinessDay(date) {
+    var dow = date.getDay();
+    if (dow === 0 || dow === 6) return false;
+    return holidays.indexOf(localISO(date)) === -1;
+  }
+  var dowToKey = [null, 'lun', 'mar', 'mer', 'jeu', 'ven', null];
+  var jourLabels = { lun: 'Lun', mar: 'Mar', mer: 'Mer', jeu: 'Jeu', ven: 'Ven' };
+
+  var activeMissions = MISSIONS.filter(function(m) { return m.statut !== 'perdue' && m.lignes && m.lignes.length > 0; });
+  var colors = ['#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#22d3ee', '#f472b6', '#a3e635'];
+
+  // Construire les semaines du mois
+  var weeks = [];
+  var cursor = new Date(monthStart);
+  // Trouver le lundi de la première semaine
+  var dow = cursor.getDay();
+  var weekStart = new Date(cursor);
+  weekStart.setDate(weekStart.getDate() - (dow === 0 ? 6 : dow - 1));
+
+  while (weekStart <= monthEnd) {
+    var weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 4); // vendredi
+
+    // Ne garder que les jours dans le mois
+    var effStart = weekStart < monthStart ? monthStart : weekStart;
+    var effEnd = weekEnd > monthEnd ? monthEnd : weekEnd;
+
+    if (effStart.getMonth() === p.m || effEnd.getMonth() === p.m) {
+      var weekDays = [];
+      for (var d = new Date(effStart); d <= effEnd; d.setDate(d.getDate() + 1)) {
+        if (d.getMonth() === p.m && isBusinessDay(d)) {
+          weekDays.push({ date: new Date(d), key: dowToKey[d.getDay()], iso: localISO(d) });
+        }
+      }
+      if (weekDays.length > 0) {
+        var weekNum = Math.ceil((effStart.getDate() + (new Date(p.y, p.m, 1).getDay() || 7) - 1) / 7);
+        weeks.push({ num: weekNum, start: new Date(effStart), end: new Date(effEnd), days: weekDays });
+      }
+    }
+    weekStart.setDate(weekStart.getDate() + 7);
+  }
+
+  // Pour chaque mission, calculer les jours travaillés par semaine
+  var missionWeekData = activeMissions.map(function(mis) {
+    var weekResults = weeks.map(function(week) {
+      var total = 0;
+      var dayDetail = {};
+      week.days.forEach(function(wd) {
+        var worked = 0;
+        // Vérifier si ce jour est dans une période de la mission
+        if (mis.periodes && mis.periodes.length > 0) {
+          mis.periodes.forEach(function(periode) {
+            if (!periode.debut || !periode.fin) return;
+            var pStart = new Date(periode.debut);
+            var pEnd = new Date(periode.fin);
+            if (wd.date >= pStart && wd.date <= pEnd) {
+              if (periode.joursMap) {
+                worked = periode.joursMap[wd.key] || 0;
+              } else {
+                // Fallback joursSemaine legacy
+                var js = periode.joursSemaine || 5;
+                worked = js >= 5 ? 1 : (js > 0 ? 1 : 0); // approximation pour legacy
+              }
+            }
+          });
+        } else {
+          // Pas de périodes = fulltime si dans la durée de la mission
+          if (mis.debut && mis.fin) {
+            var mStart = new Date(mis.debut);
+            var mEnd = new Date(mis.fin);
+            if (wd.date >= mStart && wd.date <= mEnd) worked = 1;
+          }
+        }
+        dayDetail[wd.key] = worked;
+        total += worked;
+      });
+      return { total: total, days: dayDetail };
+    });
+    return { mission: mis, weeks: weekResults };
+  });
+
+  // Construire le contenu du modal
+  var body = el('div', {});
+  body.appendChild(el('div', { style: { margin: '0 0 8px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Survolez les cellules pour voir le détail des jours'));
+
+  // Tableau
+  var table = el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '12px' } });
+
+  // Header
+  var thead = el('thead', {});
+  var headerRow = el('tr', {});
+  headerRow.appendChild(el('th', { style: { textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-muted)', fontSize: '10px' } }, ''));
+  weeks.forEach(function(w, wi) {
+    var d1 = w.start.getDate();
+    var d2 = w.end.getDate();
+    headerRow.appendChild(el('th', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-muted)', fontSize: '10px', minWidth: '50px' } }, 'S' + (wi + 1) + '\n' + d1 + '-' + d2));
+  });
+  headerRow.appendChild(el('th', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-secondary)', fontSize: '10px', fontWeight: '700' } }, 'Total'));
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  // Body - une ligne par mission
+  var tbody = el('tbody', {});
+  var weekTotals = weeks.map(function() { return 0; });
+  var grandTotal = 0;
+
+  missionWeekData.forEach(function(mwd, mi) {
+    var misTotal = 0;
+    var hasAnyDays = false;
+    mwd.weeks.forEach(function(w) { if (w.total > 0) hasAnyDays = true; misTotal += w.total; });
+    if (!hasAnyDays) return;
+
+    var row = el('tr', {});
+    var nameCell = el('td', { style: { padding: '6px 8px', borderBottom: '1px solid var(--glass-border)', fontWeight: '600', whiteSpace: 'nowrap' } });
+    nameCell.appendChild(el('span', { style: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '2px', background: colors[mi % colors.length], marginRight: '6px', verticalAlign: 'middle' } }));
+    nameCell.appendChild(document.createTextNode(mwd.mission.client || mwd.mission.titre || 'Mission'));
+    row.appendChild(nameCell);
+
+    mwd.weeks.forEach(function(w, wi) {
+      var cellContent = '';
+      if (w.total > 0) {
+        // Détail par jour
+        var parts = [];
+        ['lun','mar','mer','jeu','ven'].forEach(function(j) {
+          if (w.days[j] === 1) parts.push(jourLabels[j]);
+          else if (w.days[j] === 0.5) parts.push(jourLabels[j] + '½');
+        });
+        cellContent = w.total + 'j';
+      }
+      var cell = el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: w.total > 0 ? colors[mi % colors.length] : 'var(--text-muted)', fontWeight: w.total > 0 ? '600' : '400' } }, cellContent);
+      if (w.total > 0) {
+        var parts2 = [];
+        ['lun','mar','mer','jeu','ven'].forEach(function(j) {
+          if (w.days[j] === 1) parts2.push(jourLabels[j]);
+          else if (w.days[j] === 0.5) parts2.push(jourLabels[j] + '½');
+        });
+        cell.title = parts2.join(', ');
+      }
+      row.appendChild(cell);
+      weekTotals[wi] += w.total;
+    });
+
+    row.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontWeight: '700', color: 'var(--text-primary)' } }, misTotal + 'j'));
+    grandTotal += misTotal;
+    tbody.appendChild(row);
+  });
+
+  // Ligne total
+  var totalRow = el('tr', { style: { background: 'var(--bg-tertiary)' } });
+  totalRow.appendChild(el('td', { style: { padding: '8px', fontWeight: '700', fontSize: '11px' } }, 'TOTAL'));
+  weekTotals.forEach(function(wt) {
+    totalRow.appendChild(el('td', { style: { textAlign: 'center', padding: '8px 4px', fontWeight: '700', fontSize: '11px' } }, wt + 'j'));
+  });
+  totalRow.appendChild(el('td', { style: { textAlign: 'center', padding: '8px 4px', fontWeight: '700', fontSize: '12px', color: 'var(--accent)' } }, grandTotal + 'j'));
+  tbody.appendChild(totalRow);
+  table.appendChild(tbody);
+  body.appendChild(table);
+
+  // V81: Mini graphique par semaine dans le modal
+  body.appendChild(el('div', { class: 'chart-container', style: { height: '150px', marginTop: '16px' } }, [el('canvas', { id: 'weeklyBreakdownChart' })]));
+
+  // Bouton fermer
+  body.appendChild(el('div', { style: { marginTop: '16px', textAlign: 'right' } }, [
+    el('button', { class: 'btn', onclick: function() { closeModal('formModal'); } }, 'Fermer')
+  ]));
+
+  $('#formModalTitle').textContent = '📅 ' + fmtMonthShort(monthKey) + ' — Détail par semaine';
+  var modalBody = $('#formModalBody');
+  modalBody.innerHTML = '';
+  modalBody.appendChild(body);
+  openModal('formModal');
+
+  // Dessiner le mini chart après insertion DOM
+  setTimeout(function() {
+    var wCanvas = document.getElementById('weeklyBreakdownChart');
+    if (!wCanvas || !wCanvas.getContext || typeof Chart === 'undefined') return;
+    if (wCanvas._chartInstance) wCanvas._chartInstance.destroy();
+
+    var wLabels = weeks.map(function(w, i) { return 'S' + (i + 1); });
+    var wDatasets = [];
+    missionWeekData.forEach(function(mwd, mi) {
+      var hasAny = mwd.weeks.some(function(w) { return w.total > 0; });
+      if (!hasAny) return;
+      wDatasets.push({
+        label: mwd.mission.client || mwd.mission.titre || 'Mission',
+        data: mwd.weeks.map(function(w) { return w.total; }),
+        backgroundColor: colors[mi % colors.length] + 'cc',
+        borderRadius: 3
+      });
+    });
+
+    wCanvas._chartInstance = new Chart(wCanvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: wLabels, datasets: wDatasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { stacked: true, ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
+          y: { stacked: true, ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v + 'j'; } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        }
+      }
+    });
+  }, 150);
+}
+
 function renderMissions(container) {
   var data = compute();
-  
+
   var header = el('div', { class: 'page-header' });
   header.appendChild(el('h2', { class: 'page-title' }, '💼 Missions'));
   container.appendChild(header);
