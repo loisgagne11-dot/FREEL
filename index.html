@@ -2873,6 +2873,10 @@ function setFactureStatus(factureId, newStatus) {
     if (m.factures) m.factures.forEach(function(f) {
       if (f.id === factureId) {
         f.status = newStatus;
+        // Enregistrer la date d'envoi quand on passe en envoyée
+        if (newStatus === 'envoyée' && !f.dateEnvoi) {
+          f.dateEnvoi = localISO(TODAY);
+        }
         // Enregistrer la date réelle de paiement pour le calcul DSO
         if (newStatus === 'payée' && !f.datePaiementReel) {
           f.datePaiementReel = localISO(TODAY);
@@ -5523,31 +5527,45 @@ function getPaymentCycleDates(mission, facture) {
   var debutTravail = new Date(p.y, p.m, 1);
   var finTravail = new Date(p.y, p.m + 1, 0);
 
-  // Étape 2: Envoi facture — fin du mois de travail (convention)
-  var dateEnvoiFacture = new Date(p.y, p.m + 1, 5); // ~5 du mois suivant
+  // Étape 2: Envoi facture — date réelle si disponible, sinon estimée
+  var dateEnvoiFacture;
+  var envoiEstime = false;
+  if (facture.dateEnvoi) {
+    dateEnvoiFacture = new Date(facture.dateEnvoi);
+  } else {
+    dateEnvoiFacture = new Date(p.y, p.m + 1, 5); // estimé ~5 du mois suivant
+    envoiEstime = true;
+  }
+
+  // Étape 2b: Réception facture — date réelle si renseignée
+  var dateReception = facture.dateReception ? new Date(facture.dateReception) : null;
 
   // Étape 3: Encaissement — selon délai paiement mission
   var delaiMois = mission.delaiPaiement || 2;
   var jourPaie = mission.jourPaiement || 15;
   var dateEncaissement = getPaymentDate(facture.mois, delaiMois, jourPaie);
   var moisEncaissement = getPaymentMonth(facture.mois, delaiMois, jourPaie);
+  var encaissementEstime = true;
   // Si paiement réel existe, utiliser celui-ci
   if (facture.datePaiementReel) {
     dateEncaissement = new Date(facture.datePaiementReel);
     moisEncaissement = facture.datePaiementReel.substring(0, 7);
+    encaissementEstime = false;
   }
 
   // Étape 4: Déclaration URSSAF — le mois suivant l'encaissement
+  // Règle: on déclare le CA encaissé du mois M lors de la déclaration du mois M+1
   var pe = parseYM(moisEncaissement);
   var moisDeclaration;
   var dateDeclaration;
+  var moisCAConcerne = moisEncaissement; // le mois dont on déclare le CA
   if (COMPANY.urssafPeriodicite === 'mensuel') {
     // Déclaration mensuelle: fin du mois suivant l'encaissement
     moisDeclaration = ym(pe.y, pe.m + 1);
     var pd = parseYM(moisDeclaration);
     dateDeclaration = new Date(pd.y, pd.m + 1, 0); // dernier jour du mois
   } else {
-    // Trimestriel: fin du mois suivant le trimestre
+    // Trimestriel: fin du mois suivant le trimestre d'encaissement
     var trimestre = Math.floor(pe.m / 3);
     var moisFinTrim = (trimestre + 1) * 3;
     moisDeclaration = ym(pe.y, moisFinTrim);
@@ -5555,9 +5573,8 @@ function getPaymentCycleDates(mission, facture) {
     dateDeclaration = new Date(pd2.y, pd2.m + 1, 0);
   }
 
-  // Étape 5: Paiement cotisation — avec la déclaration (prélèvement immédiat)
+  // Étape 5: Paiement cotisation — prélèvement avec la déclaration
   var datePaiementCotisation = new Date(dateDeclaration.getTime());
-  datePaiementCotisation.setDate(datePaiementCotisation.getDate() + 2);
 
   return {
     moisTravail: moisTravail,
@@ -5565,8 +5582,12 @@ function getPaymentCycleDates(mission, facture) {
     debutTravail: debutTravail,
     finTravail: finTravail,
     dateEnvoiFacture: dateEnvoiFacture,
+    envoiEstime: envoiEstime,
+    dateReception: dateReception,
     dateEncaissement: dateEncaissement,
     moisEncaissement: moisEncaissement,
+    encaissementEstime: encaissementEstime,
+    moisCAConcerne: moisCAConcerne,
     dateDeclaration: dateDeclaration,
     moisDeclaration: moisDeclaration,
     datePaiementCotisation: datePaiementCotisation,
@@ -5625,6 +5646,11 @@ function showPaymentCycleModal(mission, facture) {
     return d.getDate() + ' ' + mois[d.getMonth()] + ' ' + d.getFullYear();
   }
 
+  // Construire la description de traçabilité URSSAF
+  var traceOrigin = 'CA réalisé en ' + cycle.moisTravailLabel + ', encaissé en ' + fmtMonth(cycle.moisEncaissement);
+  var traceDecl = 'Déclaration de ' + fmtMonth(cycle.moisDeclaration) + ' = CA encaissé en ' + fmtMonth(cycle.moisEncaissement);
+  var tracePrelev = 'Prélèvement de ' + fmtMonth(cycle.moisDeclaration) + ' pour le CA de ' + cycle.moisTravailLabel + ' encaissé en ' + fmtMonth(cycle.moisEncaissement);
+
   var steps = [
     {
       icon: '💼', title: 'Travail réalisé',
@@ -5635,29 +5661,29 @@ function showPaymentCycleModal(mission, facture) {
     },
     {
       icon: '📤', title: 'Envoi facture',
-      date: 'Début ' + fmtMonth(ym(cycle.dateEnvoiFacture.getFullYear(), cycle.dateEnvoiFacture.getMonth())),
-      desc: 'Facture ' + (facture.numero || facture.id) + ' · ' + EUR(facture.ttc) + ' TTC' + (facture.tva > 0 ? ' (dont ' + EUR(facture.tva) + ' TVA)' : ''),
+      date: fmtDateFr(cycle.dateEnvoiFacture) + (cycle.envoiEstime ? ' (estimé)' : ''),
+      desc: 'Facture ' + (facture.numero || facture.id) + ' · ' + EUR(facture.ttc) + ' TTC' + (facture.tva > 0 ? ' (dont ' + EUR(facture.tva) + ' TVA)' : '') + (cycle.dateReception ? '\nRéception client: ' + fmtDateFr(cycle.dateReception) : ''),
       amount: facture.status === 'payée' ? '✅ Payée' : facture.status === 'envoyée' ? '📤 Envoyée' : '📝 Brouillon', amountClass: 'neutral',
       stepDate: cycle.dateEnvoiFacture
     },
     {
       icon: '🏦', title: 'Encaissement CA',
-      date: fmtDateFr(cycle.dateEncaissement),
-      desc: 'Délai paiement: M+' + cycle.delaiMois + ', jour ' + cycle.jourPaie + (facture.datePaiementReel ? ' (date réelle)' : ' (estimé)'),
+      date: fmtDateFr(cycle.dateEncaissement) + (cycle.encaissementEstime ? ' (estimé M+' + cycle.delaiMois + ', J' + cycle.jourPaie + ')' : ' (réel)'),
+      desc: 'CA de ' + cycle.moisTravailLabel + ' encaissé sur le compte pro',
       amount: '+' + EUR(facture.ttc) + ' TTC', amountClass: 'revenue',
       stepDate: cycle.dateEncaissement
     },
     {
       icon: '📝', title: 'Déclaration URSSAF',
-      date: fmtMonth(cycle.moisDeclaration) + ' · ' + fmtDateFr(cycle.dateDeclaration),
-      desc: 'Déclaration ' + (COMPANY.urssafPeriodicite === 'mensuel' ? 'mensuelle' : 'trimestrielle') + ' du CA encaissé en ' + fmtMonth(cycle.moisEncaissement),
+      date: fmtDateFr(cycle.dateDeclaration),
+      desc: traceDecl + '\n' + (COMPANY.urssafPeriodicite === 'mensuel' ? 'Déclaration mensuelle' : 'Déclaration trimestrielle') + ' · Échéance: dernier jour du mois',
       amount: 'CA à déclarer: ' + EUR(facture.ht), amountClass: 'neutral',
       stepDate: cycle.dateDeclaration
     },
     {
-      icon: '💸', title: 'Paiement cotisations',
+      icon: '💸', title: 'Prélèvement cotisations',
       date: fmtDateFr(cycle.datePaiementCotisation),
-      desc: 'URSSAF ' + EUR(cotisationUrssaf) + ' (' + PCT(rate) + ') + CFP ' + EUR(cotisationCfp) + (COMPANY.prelevementLiberatoire ? ' + IR lib.' : ''),
+      desc: tracePrelev + '\nURSSAF ' + EUR(cotisationUrssaf) + ' (' + PCT(rate) + ') + CFP ' + EUR(cotisationCfp) + (COMPANY.prelevementLiberatoire ? ' + IR lib.' : ''),
       amount: '-' + EUR(cotisationTotal), amountClass: 'charge',
       stepDate: cycle.datePaiementCotisation
     }
@@ -5677,7 +5703,13 @@ function showPaymentCycleModal(mission, facture) {
     var contentEl = el('div', { class: 'pc-content' });
     contentEl.appendChild(el('div', { class: 'pc-title' }, step.title));
     contentEl.appendChild(el('div', { class: 'pc-date' }, step.date));
-    contentEl.appendChild(el('div', { class: 'pc-desc' }, step.desc));
+    // Support multi-line desc
+    var descEl = el('div', { class: 'pc-desc' });
+    step.desc.split('\n').forEach(function(line, li) {
+      if (li > 0) descEl.appendChild(el('br'));
+      descEl.appendChild(document.createTextNode(line));
+    });
+    contentEl.appendChild(descEl);
     contentEl.appendChild(el('div', { class: 'pc-amount ' + step.amountClass }, step.amount));
     stepEl.appendChild(contentEl);
 
@@ -5719,9 +5751,24 @@ function showPaymentCycleModal(mission, facture) {
   ]));
   body.appendChild(summaryDiv);
 
+  // Traçabilité — résumé clair de la chaîne
+  var traceBox = el('div', { style: { marginTop: '12px', padding: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.08))', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 'var(--radius-md)', fontSize: '11px', lineHeight: '1.8' } });
+  traceBox.appendChild(el('div', { style: { fontWeight: '700', fontSize: '12px', marginBottom: '6px' } }, '🔗 Traçabilité complète'));
+  var traceLines = [
+    '💼 Travail: ' + cycle.moisTravailLabel + ' → ' + EUR(facture.ht) + ' HT',
+    '📤 Facture: envoyée le ' + (facture.dateEnvoi ? fmtDateFr(new Date(facture.dateEnvoi)) : '(non renseigné)') + (cycle.dateReception ? ' · reçue le ' + fmtDateFr(cycle.dateReception) : ''),
+    '🏦 Encaissement: ' + fmtMonth(cycle.moisEncaissement) + (cycle.encaissementEstime ? ' (estimé)' : ' (réel)'),
+    '📝 Déclaration ' + fmtMonth(cycle.moisDeclaration) + ': inclut le CA de ' + fmtMonth(cycle.moisEncaissement),
+    '💸 Prélèvement ' + fmtMonth(cycle.moisDeclaration) + ': ' + EUR(cotisationTotal) + ' pour CA de ' + cycle.moisTravailLabel + ' encaissé en ' + fmtMonth(cycle.moisEncaissement)
+  ];
+  traceLines.forEach(function(line) {
+    traceBox.appendChild(el('div', {}, line));
+  });
+  body.appendChild(traceBox);
+
   // Note légale
-  body.appendChild(el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '6px', fontSize: '10px', color: 'var(--text-muted)', lineHeight: '1.5' } },
-    '💡 Règle URSSAF micro-entrepreneur: vous déclarez le CA encaissé (pas facturé). La déclaration se fait le mois suivant l\'encaissement (' + (COMPANY.urssafPeriodicite === 'mensuel' ? 'mensuel' : 'trimestriel') + '). Le prélèvement des cotisations est simultané à la déclaration.'));
+  body.appendChild(el('div', { style: { marginTop: '8px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '6px', fontSize: '10px', color: 'var(--text-muted)', lineHeight: '1.5' } },
+    '💡 Règle URSSAF: vous déclarez le CA encaissé (pas facturé). Déclaration ' + (COMPANY.urssafPeriodicite === 'mensuel' ? 'mensuelle' : 'trimestrielle') + ' le mois suivant l\'encaissement. Prélèvement automatique avec la déclaration.'));
 
   openModal('formModal');
 }
@@ -5801,13 +5848,17 @@ function renderPaymentCycleOverview(container) {
     var itemCard = el('div', { class: 'pc-overview-card', onclick: (function(m, fa) { return function() { showPaymentCycleModal(m, fa); }; })(mis, f) });
 
     // Header
-    var itemHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
+    var itemHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } });
     itemHeader.appendChild(el('div', {}, [
       el('div', { style: { fontWeight: '700', fontSize: '13px' } }, mis.client + ' · ' + c.moisTravailLabel),
       el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, f.jours + 'j · ' + EUR(f.ht) + ' HT → cotisations ' + EUR(cotisation))
     ]));
     itemHeader.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: currentStep >= 5 ? 'rgba(52,211,153,0.15)' : 'rgba(251,191,36,0.15)', color: currentStep >= 5 ? 'var(--success)' : 'var(--warning)' } }, stepIcons[currentStep] + ' ' + stepLabels[currentStep]));
     itemCard.appendChild(itemHeader);
+
+    // Ligne traçabilité
+    var traceText = '💼' + fmtMonthShort(c.moisTravail) + ' → 🏦' + fmtMonthShort(c.moisEncaissement) + ' → 📝Décl.' + fmtMonthShort(c.moisDeclaration) + ' → 💸Prél.' + fmtMonthShort(c.moisDeclaration);
+    itemCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '6px', fontFamily: 'monospace', letterSpacing: '-0.5px' } }, traceText));
 
     // Mini progress bar des étapes
     var progressDiv = el('div', { style: { display: 'flex', gap: '3px', height: '4px' } });
@@ -5820,11 +5871,11 @@ function renderPaymentCycleOverview(container) {
     // Dates clés en mini timeline
     var datesDiv = el('div', { class: 'pc-overview-months' });
     var miniSteps = [
-      { label: c.moisTravailLabel.substring(0, 4), done: currentStep >= 1 },
-      { label: 'Fact.', done: currentStep >= 2 },
+      { label: fmtMonthShort(c.moisTravail), done: currentStep >= 1 },
+      { label: f.dateEnvoi ? fmtMonthShort(f.dateEnvoi.substring(0, 7)) : 'Fact.', done: currentStep >= 2 },
       { label: fmtMonthShort(c.moisEncaissement), done: currentStep >= 3 },
-      { label: 'Décl.', done: currentStep >= 4 },
-      { label: 'Cotis.', done: currentStep >= 5 }
+      { label: 'Décl.' + fmtMonthShort(c.moisDeclaration).substring(0, 3), done: currentStep >= 4 },
+      { label: 'Prél.' + fmtMonthShort(c.moisDeclaration).substring(0, 3), done: currentStep >= 5 }
     ];
     miniSteps.forEach(function(ms) {
       datesDiv.appendChild(el('span', { class: 'pc-overview-month ' + (ms.done ? 'done' : 'pending') }, ms.label));
@@ -7869,10 +7920,10 @@ function showFactureModal(facture) {
   $('#formModalTitle').textContent = '📄 ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
   var body = $('#formModalBody');
   body.innerHTML = '';
-  
+
   // Trouver la mission associée
   var mission = MISSIONS.find(function(m) { return m.factures && m.factures.some(function(f) { return f.id === facture.id; }); });
-  
+
   var info = el('div', { class: 'card', style: { marginBottom: '16px' } });
   info.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Période'), el('span', {}, fmtMonth(facture.mois))]));
   info.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Jours'), el('span', {}, facture.jours + 'j')]));
@@ -7883,24 +7934,69 @@ function showFactureModal(facture) {
   }
   info.appendChild(el('div', { class: 'detail-row' }, [el('span', {}, 'Paiement attendu'), el('span', {}, fmtMonth(facture.paymentMonth))]));
   body.appendChild(info);
-  
+
   body.appendChild(createSelect('Statut', 'fStatus', [
     { value: 'brouillon', label: '📝 Brouillon' }, { value: 'envoyée', label: '📤 Envoyée' }, { value: 'payée', label: '✅ Payée' }
   ], facture.status));
-  
+
+  // Dates éditables
+  var datesSection = el('div', { style: { marginTop: '12px' } });
+  datesSection.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' } }, 'Dates'));
+  var datesRow = el('div', { class: 'form-row' });
+  datesRow.appendChild(createInput('Date envoi', 'date', 'fDateEnvoi', facture.dateEnvoi || ''));
+  datesRow.appendChild(createInput('Date réception client', 'date', 'fDateReception', facture.dateReception || ''));
+  datesSection.appendChild(datesRow);
+  var datesRow2 = el('div', { class: 'form-row' });
+  datesRow2.appendChild(createInput('Date encaissement réel', 'date', 'fDatePaiementReel', facture.datePaiementReel || ''));
+  datesSection.appendChild(datesRow2);
+  datesSection.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, '💡 Ces dates alimentent le cycle URSSAF. Laissez vide pour utiliser les dates calculées automatiquement.'));
+  body.appendChild(datesSection);
+
   // Boutons
   var btns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '20px' } });
-  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() { setFactureStatus(facture.id, $('#fStatus').value); closeModal('formModal'); } }, '✅ Mettre à jour'));
-  
+  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
+    var newStatus = $('#fStatus').value;
+    // Sauvegarder les dates éditées
+    MISSIONS.forEach(function(m) {
+      if (m.factures) m.factures.forEach(function(f) {
+        if (f.id === facture.id) {
+          f.status = newStatus;
+          // Date envoi
+          var de = $('#fDateEnvoi').value;
+          if (de) f.dateEnvoi = de;
+          else if (newStatus === 'envoyée' && !f.dateEnvoi) f.dateEnvoi = localISO(TODAY);
+          // Date réception
+          var dr = $('#fDateReception').value;
+          if (dr) f.dateReception = dr;
+          else delete f.dateReception;
+          // Date paiement réel
+          var dp = $('#fDatePaiementReel').value;
+          if (dp) f.datePaiementReel = dp;
+          else if (newStatus === 'payée' && !f.datePaiementReel) f.datePaiementReel = localISO(TODAY);
+        }
+      });
+    });
+    saveAll(); render(); closeModal('formModal');
+    toast('Facture mise à jour', 'success');
+  } }, '✅ Mettre à jour'));
+
+  // Bouton cycle URSSAF
+  if (mission) {
+    btns.appendChild(el('button', { class: 'btn', style: { background: 'rgba(139,92,246,0.15)', color: 'var(--accent)' }, onclick: function() {
+      closeModal('formModal');
+      showPaymentCycleModal(mission, facture);
+    } }, '📋 Cycle'));
+  }
+
   // Bouton PDF
   if (mission) {
-    btns.appendChild(el('button', { class: 'btn', style: { background: 'var(--info)', color: 'white' }, onclick: function() { 
-      closeModal('formModal'); 
-      showInvoiceGeneratorModal(mission, facture.mois); 
+    btns.appendChild(el('button', { class: 'btn', style: { background: 'var(--info)', color: 'white' }, onclick: function() {
+      closeModal('formModal');
+      showInvoiceGeneratorModal(mission, facture.mois);
     } }, '📄 Facture'));
   }
   body.appendChild(btns);
-  
+
   openModal('formModal');
 }
 
@@ -8836,7 +8932,9 @@ function getNextUrssafDeadline() {
   var currentYear = today.getFullYear();
   if (COMPANY.urssafPeriodicite === 'mensuel') {
     var endOfMonth = new Date(currentYear, currentMonth + 1, 0);
-    return { date: localISO(endOfMonth), daysLeft: Math.ceil((endOfMonth - today) / (1000 * 60 * 60 * 24)), period: fmtMonthShort(ym(currentYear, currentMonth)) };
+    // En mois M, on déclare le CA encaissé en M-1
+    var moisCAConcerne = currentMonth > 0 ? ym(currentYear, currentMonth - 1) : ym(currentYear - 1, 11);
+    return { date: localISO(endOfMonth), daysLeft: Math.ceil((endOfMonth - today) / (1000 * 60 * 60 * 24)), period: fmtMonthShort(ym(currentYear, currentMonth)), moisCA: moisCAConcerne };
   } else {
     var quarters = [[0, 31, 'T4'], [3, 30, 'T1'], [6, 31, 'T2'], [9, 31, 'T3']];
     for (var i = 0; i < quarters.length; i++) {
@@ -8866,7 +8964,8 @@ function getLegalMilestones() {
   }
   var urssaf = getNextUrssafDeadline();
   if (urssaf) {
-    milestones.push({ id: 'urssaf', label: 'URSSAF', icon: '🏥', date: urssaf.date, daysLeft: urssaf.daysLeft, status: urssaf.daysLeft <= 3 ? 'urgent' : urssaf.daysLeft <= 7 ? 'current' : 'upcoming' });
+    var urssafDetail = urssaf.moisCA ? 'CA de ' + fmtMonthShort(urssaf.moisCA) : '';
+    milestones.push({ id: 'urssaf', label: 'URSSAF' + (urssafDetail ? ' · ' + urssafDetail : ''), icon: '🏥', date: urssaf.date, daysLeft: urssaf.daysLeft, status: urssaf.daysLeft <= 3 ? 'urgent' : urssaf.daysLeft <= 7 ? 'current' : 'upcoming' });
   }
   if (!COMPANY.prelevementLiberatoire) {
     var irDate = new Date(currentYear, 4, 25);
@@ -8894,18 +8993,20 @@ function getAllYearMilestones() {
     });
   }
 
-  // URSSAF declarations
+  // URSSAF declarations — avec détail du mois de CA concerné
   if (COMPANY.urssafPeriodicite === 'mensuel') {
     for (var m = 0; m < 12; m++) {
       var endMonth = new Date(year, m + 1, 0);
-      addM(endMonth, 'URSSAF ' + fmtMonthShort(ym(year, m)), '🏥', 'urssaf', 'Déclaration mensuelle URSSAF');
+      // En mois M, on déclare le CA encaissé en M-1
+      var moisCA = m > 0 ? fmtMonthShort(ym(year, m - 1)) : fmtMonthShort(ym(year - 1, 11));
+      addM(endMonth, 'URSSAF ' + fmtMonthShort(ym(year, m)), '🏥', 'urssaf', 'Déclaration du CA encaissé en ' + moisCA + ' · Prélèvement cotisations pour le CA de ' + moisCA);
     }
   } else {
     // Trimestriel: Jan 31, Apr 30, Jul 31, Oct 31
-    addM(new Date(year, 0, 31), 'URSSAF T4 ' + (year - 1), '🏥', 'urssaf', 'Déclaration CA T4 ' + (year - 1));
-    addM(new Date(year, 3, 30), 'URSSAF T1', '🏥', 'urssaf', 'Déclaration CA T1 ' + year);
-    addM(new Date(year, 6, 31), 'URSSAF T2', '🏥', 'urssaf', 'Déclaration CA T2 ' + year);
-    addM(new Date(year, 9, 31), 'URSSAF T3', '🏥', 'urssaf', 'Déclaration CA T3 ' + year);
+    addM(new Date(year, 0, 31), 'URSSAF T4 ' + (year - 1), '🏥', 'urssaf', 'Déclaration CA encaissé oct-déc ' + (year - 1) + ' · Prélèvement cotisations T4');
+    addM(new Date(year, 3, 30), 'URSSAF T1', '🏥', 'urssaf', 'Déclaration CA encaissé jan-mars ' + year + ' · Prélèvement cotisations T1');
+    addM(new Date(year, 6, 31), 'URSSAF T2', '🏥', 'urssaf', 'Déclaration CA encaissé avr-juin ' + year + ' · Prélèvement cotisations T2');
+    addM(new Date(year, 9, 31), 'URSSAF T3', '🏥', 'urssaf', 'Déclaration CA encaissé juil-sept ' + year + ' · Prélèvement cotisations T3');
   }
 
   // TVA (si assujetti)
