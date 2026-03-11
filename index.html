@@ -13841,6 +13841,7 @@ function showWeeklyBreakdownModal(monthKey) {
   }
 
   // Pour chaque mission, calculer les jours travaillés et congés par semaine
+  // V81fix: Calculer aussi les jours fériés qui seraient travaillés (capacité brute)
   var missionWeekData = activeMissions.map(function(mis) {
     // V81: Index des congés pour cette mission
     var congesSet = {};
@@ -13851,37 +13852,44 @@ function showWeeklyBreakdownModal(monthKey) {
       });
     }
 
+    function getWorkedForDay(wdISO, wdKey) {
+      var worked = 0;
+      var inMission = mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin;
+      if (!inMission) return 0;
+      if (mis.periodes && mis.periodes.length > 0) {
+        var inPeriode = false;
+        mis.periodes.forEach(function(periode) {
+          if (!periode.debut || !periode.fin) return;
+          if (wdISO >= periode.debut && wdISO <= periode.fin) {
+            inPeriode = true;
+            if (periode.joursMap) {
+              worked = periode.joursMap[wdKey] || 0;
+            } else {
+              var js = periode.joursSemaine || 5;
+              worked = js >= 5 ? 1 : (js > 0 ? 1 : 0);
+            }
+          }
+        });
+        if (!inPeriode) worked = 1;
+      } else {
+        worked = 1;
+      }
+      return worked;
+    }
+
     var weekResults = weeks.map(function(week) {
       var total = 0;
+      var holidayWorked = 0;
       var congesTotal = 0;
       var dayDetail = {};
       var congesDetail = {};
-      week.days.forEach(function(wd) {
-        var worked = 0;
-        var wdISO = wd.iso;
-        var inMission = mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin;
-        if (!inMission) { /* hors mission = 0 */ }
-        else if (mis.periodes && mis.periodes.length > 0) {
-          var inPeriode = false;
-          mis.periodes.forEach(function(periode) {
-            if (!periode.debut || !periode.fin) return;
-            if (wdISO >= periode.debut && wdISO <= periode.fin) {
-              inPeriode = true;
-              if (periode.joursMap) {
-                worked = periode.joursMap[wd.key] || 0;
-              } else {
-                var js = periode.joursSemaine || 5;
-                worked = js >= 5 ? 1 : (js > 0 ? 1 : 0);
-              }
-            }
-          });
-          if (!inPeriode) worked = 1;
-        } else {
-          if (inMission) worked = 1;
-        }
 
-        // V81: Déduire les congés
-        var conge = congesSet[wdISO] || 0;
+      // Jours ouvrés normaux
+      week.days.forEach(function(wd) {
+        var worked = getWorkedForDay(wd.iso, wd.key);
+
+        // V81: Congés
+        var conge = congesSet[wd.iso] || 0;
         if (conge > 0 && worked > 0) {
           congesDetail[wd.key] = Math.min(conge, worked);
           congesTotal += congesDetail[wd.key];
@@ -13890,7 +13898,15 @@ function showWeeklyBreakdownModal(monthKey) {
         dayDetail[wd.key] = worked;
         total += worked;
       });
-      return { total: total, days: dayDetail, congesTotal: congesTotal, conges: congesDetail };
+
+      // Jours fériés : calculer ce qui aurait été travaillé
+      week.holidays.forEach(function(h) {
+        var hISO = localISO(h.date);
+        var wouldWork = getWorkedForDay(hISO, h.key);
+        holidayWorked += wouldWork;
+      });
+
+      return { total: total, holidayWorked: holidayWorked, days: dayDetail, congesTotal: congesTotal, conges: congesDetail };
     });
     return { mission: mis, weeks: weekResults };
   });
@@ -13939,7 +13955,11 @@ function showWeeklyBreakdownModal(monthKey) {
   missionWeekData.forEach(function(mwd, mi) {
     var misTotal = 0;
     var hasAnyDays = false;
-    mwd.weeks.forEach(function(w) { if (w.total > 0) hasAnyDays = true; misTotal += w.total; });
+    mwd.weeks.forEach(function(w) {
+      var brut = w.total + w.holidayWorked;
+      if (brut > 0) hasAnyDays = true;
+      misTotal += brut;
+    });
     if (!hasAnyDays) return;
 
     var row = el('tr', {});
@@ -13949,18 +13969,11 @@ function showWeeklyBreakdownModal(monthKey) {
     row.appendChild(nameCell);
 
     mwd.weeks.forEach(function(w, wi) {
-      var cellContent = '';
-      if (w.total > 0) {
-        // Détail par jour
-        var parts = [];
-        ['lun','mar','mer','jeu','ven'].forEach(function(j) {
-          if (w.days[j] === 1) parts.push(jourLabels[j]);
-          else if (w.days[j] === 0.5) parts.push(jourLabels[j] + '½');
-        });
-        cellContent = w.total + 'j';
-      }
-      var cell = el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: w.total > 0 ? colors[mi % colors.length] : 'var(--text-muted)', fontWeight: w.total > 0 ? '600' : '400' } }, cellContent);
-      // Tooltip avec détail des jours travaillés + fériés
+      // V81fix: Capacité brute = jours travaillés + jours fériés qui seraient travaillés
+      var brut = w.total + w.holidayWorked;
+      var cellContent = brut > 0 ? brut + 'j' : '';
+      var cell = el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: brut > 0 ? colors[mi % colors.length] : 'var(--text-muted)', fontWeight: brut > 0 ? '600' : '400' } }, cellContent);
+      // Tooltip avec détail des jours
       var tooltipParts = [];
       ['lun','mar','mer','jeu','ven'].forEach(function(j) {
         if (w.days[j] === 1) tooltipParts.push(jourLabels[j]);
@@ -13971,7 +13984,7 @@ function showWeeklyBreakdownModal(monthKey) {
       }
       if (tooltipParts.length > 0) cell.title = tooltipParts.join(', ');
       row.appendChild(cell);
-      weekTotals[wi] += w.total;
+      weekTotals[wi] += brut;
     });
 
     row.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontWeight: '700', color: 'var(--text-primary)' } }, misTotal + 'j'));
@@ -13979,15 +13992,21 @@ function showWeeklyBreakdownModal(monthKey) {
     tbody.appendChild(row);
   });
 
-  // V81: Ligne Jours fériés
+  // V81fix: Ligne Jours fériés - compter les fériés qui impactent réellement les missions
+  var holidayWeekTotals = weeks.map(function() { return 0; });
   var totalHolidays = 0;
-  var hasAnyHoliday = weeks.some(function(w) { return w.holidays.length > 0; });
+  missionWeekData.forEach(function(mwd) {
+    mwd.weeks.forEach(function(w, wi) {
+      holidayWeekTotals[wi] += w.holidayWorked;
+      totalHolidays += w.holidayWorked;
+    });
+  });
+  var hasAnyHoliday = totalHolidays > 0;
   if (hasAnyHoliday) {
     var holidayRow = el('tr', { style: { background: 'rgba(245,158,11,0.06)' } });
     holidayRow.appendChild(el('td', { style: { padding: '6px 8px', borderBottom: '1px solid var(--glass-border)', fontSize: '11px', color: '#f59e0b', fontWeight: '600' } }, '⚠ Fériés'));
-    weeks.forEach(function(w) {
-      var hCount = w.holidays.length;
-      totalHolidays += hCount;
+    weeks.forEach(function(w, wi) {
+      var hCount = holidayWeekTotals[wi];
       var hNames = w.holidays.map(function(h) { return h.label; }).join(', ');
       holidayRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontSize: '10px', color: hCount > 0 ? '#f59e0b' : 'var(--text-muted)' }, title: hNames || '' }, hCount > 0 ? '-' + hCount + 'j' : ''));
     });
@@ -14021,13 +14040,17 @@ function showWeeklyBreakdownModal(monthKey) {
     tbody.appendChild(congesRow);
   }
 
-  // Ligne total
+  // V81fix: Ligne total = brut - fériés - congés (jours effectivement travaillés)
+  var netWeekTotals = weeks.map(function(w, wi) {
+    return weekTotals[wi] - (holidayWeekTotals[wi] || 0) - (congesWeekTotals[wi] || 0);
+  });
+  var netGrandTotal = grandTotal - totalHolidays - totalCongesAll;
   var totalRow = el('tr', { style: { background: 'var(--bg-tertiary)' } });
   totalRow.appendChild(el('td', { style: { padding: '8px', fontWeight: '700', fontSize: '11px' } }, 'TOTAL'));
-  weekTotals.forEach(function(wt) {
+  netWeekTotals.forEach(function(wt) {
     totalRow.appendChild(el('td', { style: { textAlign: 'center', padding: '8px 4px', fontWeight: '700', fontSize: '11px' } }, wt + 'j'));
   });
-  totalRow.appendChild(el('td', { style: { textAlign: 'center', padding: '8px 4px', fontWeight: '700', fontSize: '12px', color: 'var(--accent)' } }, grandTotal + 'j'));
+  totalRow.appendChild(el('td', { style: { textAlign: 'center', padding: '8px 4px', fontWeight: '700', fontSize: '12px', color: 'var(--accent)' } }, netGrandTotal + 'j'));
   tbody.appendChild(totalRow);
   table.appendChild(tbody);
   body.appendChild(table);
@@ -14054,12 +14077,13 @@ function showWeeklyBreakdownModal(monthKey) {
 
     var wLabels = weeks.map(function(w, i) { return 'S' + (i + 1); });
     var wDatasets = [];
+    // V81fix: Graph = jours nets (total - congés, les fériés sont déjà exclus de total)
     missionWeekData.forEach(function(mwd, mi) {
       var hasAny = mwd.weeks.some(function(w) { return w.total > 0; });
       if (!hasAny) return;
       wDatasets.push({
         label: mwd.mission.client || mwd.mission.titre || 'Mission',
-        data: mwd.weeks.map(function(w) { return w.total; }),
+        data: mwd.weeks.map(function(w) { return Math.max(0, w.total - w.congesTotal); }),
         backgroundColor: colors[mi % colors.length] + 'cc',
         borderRadius: 3
       });
