@@ -13645,14 +13645,20 @@ function showWeeklyBreakdownModal(monthKey) {
 
     if (effStart.getMonth() === p.m || effEnd.getMonth() === p.m) {
       var weekDays = [];
+      var weekHolidays = []; // V81: Collecter les jours fériés de la semaine
       for (var d = new Date(effStart); d <= effEnd; d.setDate(d.getDate() + 1)) {
-        if (d.getMonth() === p.m && isBusinessDay(d)) {
+        if (d.getMonth() !== p.m) continue;
+        var dDow = d.getDay();
+        if (dDow === 0 || dDow === 6) continue; // weekend
+        if (holidays.indexOf(localISO(d)) !== -1) {
+          weekHolidays.push({ date: new Date(d), key: dowToKey[dDow], label: jourLabels[dowToKey[dDow]] + ' ' + d.getDate() });
+        } else {
           weekDays.push({ date: new Date(d), key: dowToKey[d.getDay()], iso: localISO(d) });
         }
       }
-      if (weekDays.length > 0) {
+      if (weekDays.length > 0 || weekHolidays.length > 0) {
         var weekNum = Math.ceil((effStart.getDate() + (new Date(p.y, p.m, 1).getDay() || 7) - 1) / 7);
-        weeks.push({ num: weekNum, start: new Date(effStart), end: new Date(effEnd), days: weekDays });
+        weeks.push({ num: weekNum, start: new Date(effStart), end: new Date(effEnd), days: weekDays, holidays: weekHolidays });
       }
     }
     weekStart.setDate(weekStart.getDate() + 7);
@@ -13701,7 +13707,16 @@ function showWeeklyBreakdownModal(monthKey) {
 
   // Construire le contenu du modal
   var body = el('div', {});
-  body.appendChild(el('div', { style: { margin: '0 0 8px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Survolez les cellules pour voir le détail des jours'));
+  // V81: Compter les fériés du mois
+  var monthHolidayCount = 0;
+  var monthHolidayNames = [];
+  var jourNoms = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  weeks.forEach(function(w) { w.holidays.forEach(function(h) { monthHolidayCount++; monthHolidayNames.push(h.label); }); });
+  var subtitleText = 'Survolez les cellules pour voir le détail des jours';
+  if (monthHolidayCount > 0) {
+    subtitleText = '⚠ ' + monthHolidayCount + ' jour' + (monthHolidayCount > 1 ? 's' : '') + ' férié' + (monthHolidayCount > 1 ? 's' : '') + ' : ' + monthHolidayNames.join(', ');
+  }
+  body.appendChild(el('div', { style: { margin: '0 0 8px', fontSize: '11px', color: monthHolidayCount > 0 ? '#f59e0b' : 'var(--text-muted)' } }, subtitleText));
 
   // Tableau
   var table = el('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: '12px' } });
@@ -13713,7 +13728,14 @@ function showWeeklyBreakdownModal(monthKey) {
   weeks.forEach(function(w, wi) {
     var d1 = w.start.getDate();
     var d2 = w.end.getDate();
-    headerRow.appendChild(el('th', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-muted)', fontSize: '10px', minWidth: '50px' } }, 'S' + (wi + 1) + '\n' + d1 + '-' + d2));
+    var th = el('th', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-muted)', fontSize: '10px', minWidth: '50px' } });
+    th.appendChild(document.createTextNode('S' + (wi + 1) + ' '));
+    th.appendChild(el('span', { style: { fontSize: '9px' } }, d1 + '-' + d2));
+    if (w.holidays.length > 0) {
+      th.appendChild(el('br'));
+      th.appendChild(el('span', { style: { fontSize: '8px', color: '#f59e0b' }, title: w.holidays.map(function(h) { return h.label; }).join(', ') }, '⚠ ' + w.holidays.length + ' férié' + (w.holidays.length > 1 ? 's' : '')));
+    }
+    headerRow.appendChild(th);
   });
   headerRow.appendChild(el('th', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: 'var(--text-secondary)', fontSize: '10px', fontWeight: '700' } }, 'Total'));
   thead.appendChild(headerRow);
@@ -13748,14 +13770,16 @@ function showWeeklyBreakdownModal(monthKey) {
         cellContent = w.total + 'j';
       }
       var cell = el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: w.total > 0 ? colors[mi % colors.length] : 'var(--text-muted)', fontWeight: w.total > 0 ? '600' : '400' } }, cellContent);
-      if (w.total > 0) {
-        var parts2 = [];
-        ['lun','mar','mer','jeu','ven'].forEach(function(j) {
-          if (w.days[j] === 1) parts2.push(jourLabels[j]);
-          else if (w.days[j] === 0.5) parts2.push(jourLabels[j] + '½');
-        });
-        cell.title = parts2.join(', ');
+      // Tooltip avec détail des jours travaillés + fériés
+      var tooltipParts = [];
+      ['lun','mar','mer','jeu','ven'].forEach(function(j) {
+        if (w.days[j] === 1) tooltipParts.push(jourLabels[j]);
+        else if (w.days[j] === 0.5) tooltipParts.push(jourLabels[j] + '½');
+      });
+      if (weeks[wi].holidays.length > 0) {
+        tooltipParts.push('| Férié: ' + weeks[wi].holidays.map(function(h) { return h.label; }).join(', '));
       }
+      if (tooltipParts.length > 0) cell.title = tooltipParts.join(', ');
       row.appendChild(cell);
       weekTotals[wi] += w.total;
     });
@@ -13764,6 +13788,22 @@ function showWeeklyBreakdownModal(monthKey) {
     grandTotal += misTotal;
     tbody.appendChild(row);
   });
+
+  // V81: Ligne Jours fériés
+  var totalHolidays = 0;
+  var hasAnyHoliday = weeks.some(function(w) { return w.holidays.length > 0; });
+  if (hasAnyHoliday) {
+    var holidayRow = el('tr', { style: { background: 'rgba(245,158,11,0.06)' } });
+    holidayRow.appendChild(el('td', { style: { padding: '6px 8px', borderBottom: '1px solid var(--glass-border)', fontSize: '11px', color: '#f59e0b', fontWeight: '600' } }, '⚠ Fériés'));
+    weeks.forEach(function(w) {
+      var hCount = w.holidays.length;
+      totalHolidays += hCount;
+      var hNames = w.holidays.map(function(h) { return h.label; }).join(', ');
+      holidayRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontSize: '10px', color: hCount > 0 ? '#f59e0b' : 'var(--text-muted)' }, title: hNames || '' }, hCount > 0 ? '-' + hCount + 'j' : ''));
+    });
+    holidayRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontWeight: '700', fontSize: '11px', color: '#f59e0b' } }, '-' + totalHolidays + 'j'));
+    tbody.appendChild(holidayRow);
+  }
 
   // Ligne total
   var totalRow = el('tr', { style: { background: 'var(--bg-tertiary)' } });
