@@ -640,6 +640,39 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .legal-milestone-countdown.urgent { background: var(--danger-glow); color: var(--danger); }
 .legal-milestone-countdown.warning { background: var(--warning-glow); color: var(--warning); }
 .legal-milestone-countdown.ok { background: var(--success-glow); color: var(--success); }
+
+/* Cycle de paiement URSSAF */
+.payment-cycle { padding: 16px; }
+.payment-cycle-steps { display: flex; flex-direction: column; gap: 0; position: relative; }
+.payment-cycle-step { display: flex; align-items: flex-start; gap: 14px; position: relative; padding-bottom: 6px; }
+.payment-cycle-step:last-child .pc-connector { display: none; }
+.pc-node { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; position: relative; z-index: 1; }
+.pc-dot { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 3px solid var(--bg-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: all 0.3s; }
+.pc-dot.done { background: var(--success); }
+.pc-dot.current { background: var(--warning); animation: pulse-glow 2s infinite; }
+.pc-dot.upcoming { background: var(--bg-tertiary); border-color: var(--glass-border); }
+.pc-dot.waiting { background: var(--info); }
+.pc-connector { width: 3px; height: 28px; background: linear-gradient(180deg, var(--glass-border), transparent); margin: 4px auto 0; }
+.pc-connector.done { background: linear-gradient(180deg, var(--success), rgba(52,211,153,0.3)); }
+.pc-content { flex: 1; padding: 4px 0 16px; }
+.pc-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.pc-date { font-size: 11px; color: var(--accent); font-weight: 600; }
+.pc-desc { font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+.pc-amount { font-size: 13px; font-weight: 800; margin-top: 4px; padding: 4px 10px; border-radius: 6px; display: inline-block; }
+.pc-amount.revenue { background: rgba(52,211,153,0.12); color: var(--success); }
+.pc-amount.charge { background: rgba(239,68,68,0.12); color: var(--danger); }
+.pc-amount.neutral { background: var(--bg-tertiary); color: var(--text-primary); }
+.pc-summary { margin-top: 16px; padding: 14px; background: linear-gradient(135deg, rgba(139,92,246,0.08), rgba(59,130,246,0.08)); border: 1px solid rgba(139,92,246,0.2); border-radius: var(--radius-md); }
+.pc-summary-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 8px; }
+.pc-summary-row { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
+.pc-overview-card { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; }
+.pc-overview-card:hover { border-color: var(--accent); transform: translateX(4px); }
+.pc-overview-months { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.pc-overview-month { font-size: 10px; padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+.pc-overview-month.done { background: rgba(52,211,153,0.15); color: var(--success); }
+.pc-overview-month.pending { background: rgba(251,191,36,0.15); color: var(--warning); }
+.pc-overview-month.future { background: var(--bg-tertiary); color: var(--text-muted); }
+
 .health-score { background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary)); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 20px; margin-bottom: 16px; cursor: pointer; transition: all 0.2s; }
 .health-score:hover { border-color: var(--accent); transform: translateY(-2px); }
 .health-score-header { display: flex; align-items: center; justify-content: space-between; }
@@ -5474,6 +5507,334 @@ function showUrssafCfpDetail() {
   }
 
   openModal('formModal');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Cycle de paiement URSSAF — Timeline harmonisée
+// ═══════════════════════════════════════════════════════════════
+
+// Calcule les dates du cycle URSSAF pour une facture donnée
+function getPaymentCycleDates(mission, facture) {
+  var p = parseYM(facture.mois);
+  var moisTravail = facture.mois;
+  var moisTravailLabel = fmtMonth(moisTravail);
+
+  // Étape 1: Mois de travail
+  var debutTravail = new Date(p.y, p.m, 1);
+  var finTravail = new Date(p.y, p.m + 1, 0);
+
+  // Étape 2: Envoi facture — fin du mois de travail (convention)
+  var dateEnvoiFacture = new Date(p.y, p.m + 1, 5); // ~5 du mois suivant
+
+  // Étape 3: Encaissement — selon délai paiement mission
+  var delaiMois = mission.delaiPaiement || 2;
+  var jourPaie = mission.jourPaiement || 15;
+  var dateEncaissement = getPaymentDate(facture.mois, delaiMois, jourPaie);
+  var moisEncaissement = getPaymentMonth(facture.mois, delaiMois, jourPaie);
+  // Si paiement réel existe, utiliser celui-ci
+  if (facture.datePaiementReel) {
+    dateEncaissement = new Date(facture.datePaiementReel);
+    moisEncaissement = facture.datePaiementReel.substring(0, 7);
+  }
+
+  // Étape 4: Déclaration URSSAF — le mois suivant l'encaissement
+  var pe = parseYM(moisEncaissement);
+  var moisDeclaration;
+  var dateDeclaration;
+  if (COMPANY.urssafPeriodicite === 'mensuel') {
+    // Déclaration mensuelle: fin du mois suivant l'encaissement
+    moisDeclaration = ym(pe.y, pe.m + 1);
+    var pd = parseYM(moisDeclaration);
+    dateDeclaration = new Date(pd.y, pd.m + 1, 0); // dernier jour du mois
+  } else {
+    // Trimestriel: fin du mois suivant le trimestre
+    var trimestre = Math.floor(pe.m / 3);
+    var moisFinTrim = (trimestre + 1) * 3;
+    moisDeclaration = ym(pe.y, moisFinTrim);
+    var pd2 = parseYM(moisDeclaration);
+    dateDeclaration = new Date(pd2.y, pd2.m + 1, 0);
+  }
+
+  // Étape 5: Paiement cotisation — avec la déclaration (prélèvement immédiat)
+  var datePaiementCotisation = new Date(dateDeclaration.getTime());
+  datePaiementCotisation.setDate(datePaiementCotisation.getDate() + 2);
+
+  return {
+    moisTravail: moisTravail,
+    moisTravailLabel: moisTravailLabel,
+    debutTravail: debutTravail,
+    finTravail: finTravail,
+    dateEnvoiFacture: dateEnvoiFacture,
+    dateEncaissement: dateEncaissement,
+    moisEncaissement: moisEncaissement,
+    dateDeclaration: dateDeclaration,
+    moisDeclaration: moisDeclaration,
+    datePaiementCotisation: datePaiementCotisation,
+    delaiMois: delaiMois,
+    jourPaie: jourPaie
+  };
+}
+
+// Affiche le modal du cycle de paiement URSSAF pour une facture
+function showPaymentCycleModal(mission, facture) {
+  var cycle = getPaymentCycleDates(mission, facture);
+  var today = new Date(TODAY);
+  var rate = getUrssafRate(cycle.moisEncaissement);
+  var cotisationUrssaf = Math.round(facture.ht * rate);
+  var cotisationCfp = Math.round(facture.ht * LEGAL.cfp);
+  var cotisationTotal = cotisationUrssaf + cotisationCfp;
+  if (COMPANY.prelevementLiberatoire) {
+    cotisationTotal += Math.round(facture.ht * LEGAL.impLib);
+  }
+
+  $('#formModalTitle').textContent = '📋 Cycle Paiement · ' + cycle.moisTravailLabel;
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+
+  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); } }, '← Retour'));
+
+  // En-tête mission
+  var headerDiv = el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
+  headerDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+    el('div', {}, [
+      el('div', { style: { fontWeight: '700', fontSize: '14px' } }, mission.client),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, (mission.titre || '') + ' · TJM ' + EUR(mission.tjm))
+    ]),
+    el('div', { style: { textAlign: 'right' } }, [
+      el('div', { style: { fontWeight: '800', fontSize: '18px', color: 'var(--success)' } }, EUR(facture.ht) + ' HT'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, facture.jours + ' jours · ' + EUR(facture.ttc) + ' TTC')
+    ])
+  ]));
+  body.appendChild(headerDiv);
+
+  // Timeline des étapes
+  var stepsDiv = el('div', { class: 'payment-cycle' });
+  var stepsContainer = el('div', { class: 'payment-cycle-steps' });
+
+  function getStepStatus(stepDate) {
+    if (today >= stepDate) return 'done';
+    var diffDays = Math.ceil((stepDate - today) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 7) return 'current';
+    if (diffDays <= 30) return 'waiting';
+    return 'upcoming';
+  }
+
+  function fmtDateFr(d) {
+    var jours = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+    var mois = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+    return d.getDate() + ' ' + mois[d.getMonth()] + ' ' + d.getFullYear();
+  }
+
+  var steps = [
+    {
+      icon: '💼', title: 'Travail réalisé',
+      date: cycle.moisTravailLabel,
+      desc: facture.jours + ' jours travaillés à ' + EUR(mission.tjm) + '/jour',
+      amount: EUR(facture.ht) + ' HT', amountClass: 'revenue',
+      stepDate: cycle.finTravail
+    },
+    {
+      icon: '📤', title: 'Envoi facture',
+      date: 'Début ' + fmtMonth(ym(cycle.dateEnvoiFacture.getFullYear(), cycle.dateEnvoiFacture.getMonth())),
+      desc: 'Facture ' + (facture.numero || facture.id) + ' · ' + EUR(facture.ttc) + ' TTC' + (facture.tva > 0 ? ' (dont ' + EUR(facture.tva) + ' TVA)' : ''),
+      amount: facture.status === 'payée' ? '✅ Payée' : facture.status === 'envoyée' ? '📤 Envoyée' : '📝 Brouillon', amountClass: 'neutral',
+      stepDate: cycle.dateEnvoiFacture
+    },
+    {
+      icon: '🏦', title: 'Encaissement CA',
+      date: fmtDateFr(cycle.dateEncaissement),
+      desc: 'Délai paiement: M+' + cycle.delaiMois + ', jour ' + cycle.jourPaie + (facture.datePaiementReel ? ' (date réelle)' : ' (estimé)'),
+      amount: '+' + EUR(facture.ttc) + ' TTC', amountClass: 'revenue',
+      stepDate: cycle.dateEncaissement
+    },
+    {
+      icon: '📝', title: 'Déclaration URSSAF',
+      date: fmtMonth(cycle.moisDeclaration) + ' · ' + fmtDateFr(cycle.dateDeclaration),
+      desc: 'Déclaration ' + (COMPANY.urssafPeriodicite === 'mensuel' ? 'mensuelle' : 'trimestrielle') + ' du CA encaissé en ' + fmtMonth(cycle.moisEncaissement),
+      amount: 'CA à déclarer: ' + EUR(facture.ht), amountClass: 'neutral',
+      stepDate: cycle.dateDeclaration
+    },
+    {
+      icon: '💸', title: 'Paiement cotisations',
+      date: fmtDateFr(cycle.datePaiementCotisation),
+      desc: 'URSSAF ' + EUR(cotisationUrssaf) + ' (' + PCT(rate) + ') + CFP ' + EUR(cotisationCfp) + (COMPANY.prelevementLiberatoire ? ' + IR lib.' : ''),
+      amount: '-' + EUR(cotisationTotal), amountClass: 'charge',
+      stepDate: cycle.datePaiementCotisation
+    }
+  ];
+
+  steps.forEach(function(step, idx) {
+    var status = getStepStatus(step.stepDate);
+    var stepEl = el('div', { class: 'payment-cycle-step' });
+
+    var nodeEl = el('div', { class: 'pc-node' });
+    nodeEl.appendChild(el('div', { class: 'pc-dot ' + status }, step.icon));
+    if (idx < steps.length - 1) {
+      nodeEl.appendChild(el('div', { class: 'pc-connector' + (status === 'done' ? ' done' : '') }));
+    }
+    stepEl.appendChild(nodeEl);
+
+    var contentEl = el('div', { class: 'pc-content' });
+    contentEl.appendChild(el('div', { class: 'pc-title' }, step.title));
+    contentEl.appendChild(el('div', { class: 'pc-date' }, step.date));
+    contentEl.appendChild(el('div', { class: 'pc-desc' }, step.desc));
+    contentEl.appendChild(el('div', { class: 'pc-amount ' + step.amountClass }, step.amount));
+    stepEl.appendChild(contentEl);
+
+    stepsContainer.appendChild(stepEl);
+  });
+
+  stepsDiv.appendChild(stepsContainer);
+  body.appendChild(stepsDiv);
+
+  // Résumé financier
+  var summaryDiv = el('div', { class: 'pc-summary' });
+  summaryDiv.appendChild(el('div', { class: 'pc-summary-title' }, 'Résumé financier net'));
+  summaryDiv.appendChild(el('div', { class: 'pc-summary-row' }, [
+    el('span', {}, 'CA HT encaissé'),
+    el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, '+' + EUR(facture.ht))
+  ]));
+  summaryDiv.appendChild(el('div', { class: 'pc-summary-row' }, [
+    el('span', {}, 'Cotisations sociales (URSSAF + CFP)'),
+    el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, '-' + EUR(cotisationUrssaf + cotisationCfp))
+  ]));
+  if (COMPANY.prelevementLiberatoire) {
+    var impLib = Math.round(facture.ht * LEGAL.impLib);
+    summaryDiv.appendChild(el('div', { class: 'pc-summary-row' }, [
+      el('span', {}, 'Impôt libératoire'),
+      el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, '-' + EUR(impLib))
+    ]));
+  }
+  if (facture.tva > 0) {
+    summaryDiv.appendChild(el('div', { class: 'pc-summary-row' }, [
+      el('span', {}, 'TVA collectée (à reverser)'),
+      el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, '-' + EUR(Math.round(facture.tva)))
+    ]));
+  }
+  var totalCharges = cotisationTotal + (facture.tva > 0 ? Math.round(facture.tva) : 0);
+  var net = facture.ht - totalCharges;
+  summaryDiv.appendChild(el('div', { class: 'pc-summary-row', style: { borderTop: '1px dashed var(--glass-border)', marginTop: '6px', paddingTop: '6px', fontWeight: '700' } }, [
+    el('span', {}, 'Revenu net estimé'),
+    el('span', { style: { fontSize: '15px', color: net >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(net))
+  ]));
+  body.appendChild(summaryDiv);
+
+  // Note légale
+  body.appendChild(el('div', { style: { marginTop: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '6px', fontSize: '10px', color: 'var(--text-muted)', lineHeight: '1.5' } },
+    '💡 Règle URSSAF micro-entrepreneur: vous déclarez le CA encaissé (pas facturé). La déclaration se fait le mois suivant l\'encaissement (' + (COMPANY.urssafPeriodicite === 'mensuel' ? 'mensuel' : 'trimestriel') + '). Le prélèvement des cotisations est simultané à la déclaration.'));
+
+  openModal('formModal');
+}
+
+// Vue d'ensemble du cycle URSSAF pour toutes les factures actives
+function renderPaymentCycleOverview(container) {
+  var today = new Date(TODAY);
+  var nowYm = ym(today.getFullYear(), today.getMonth());
+
+  var card = el('div', { class: 'card', style: { marginTop: '12px' } });
+  card.appendChild(el('div', { class: 'card-title' }, '📋 Cycle de Paiement URSSAF'));
+
+  // Explication du cycle
+  var explainDiv = el('div', { style: { padding: '12px', background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.08))', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 'var(--radius-md)', marginBottom: '14px', fontSize: '12px', lineHeight: '1.8' } });
+  explainDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '6px', fontSize: '13px' } }, 'Comment fonctionne le cycle ?'));
+
+  var stepsExplain = [
+    { icon: '💼', text: 'Mois N — Vous travaillez et générez du CA' },
+    { icon: '📤', text: 'Fin mois N — Vous envoyez votre facture' },
+    { icon: '🏦', text: 'Mois N+délai — Le client vous paie (selon délai mission)' },
+    { icon: '📝', text: 'Mois suivant encaissement — Vous déclarez le CA encaissé à l\'URSSAF' },
+    { icon: '💸', text: 'Avec la déclaration — Prélèvement automatique des cotisations' }
+  ];
+  stepsExplain.forEach(function(s) {
+    explainDiv.appendChild(el('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, [
+      el('span', { style: { fontSize: '14px', flexShrink: '0' } }, s.icon),
+      el('span', {}, s.text)
+    ]));
+  });
+  card.appendChild(explainDiv);
+
+  // Factures en cours de cycle
+  var activeCycles = [];
+  MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.jours <= 0) return;
+      var cycle = getPaymentCycleDates(mis, f);
+      // Ne montrer que les factures dont le cycle n'est pas entièrement passé (ou passé depuis < 2 mois)
+      var twoMonthsAgo = new Date(today);
+      twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+      if (cycle.datePaiementCotisation >= twoMonthsAgo) {
+        activeCycles.push({ mission: mis, facture: f, cycle: cycle });
+      }
+    });
+  });
+
+  // Trier par date de travail décroissante
+  activeCycles.sort(function(a, b) { return b.facture.mois.localeCompare(a.facture.mois); });
+
+  if (activeCycles.length === 0) {
+    card.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' } }, 'Aucune facture en cours de cycle'));
+    container.appendChild(card);
+    return;
+  }
+
+  // Afficher chaque facture avec son état dans le cycle
+  activeCycles.forEach(function(item) {
+    var f = item.facture;
+    var c = item.cycle;
+    var mis = item.mission;
+    var rate = getUrssafRate(c.moisEncaissement);
+    var cotisation = Math.round(f.ht * (rate + LEGAL.cfp));
+
+    // Déterminer l'étape actuelle
+    var currentStep = 0;
+    if (today >= c.datePaiementCotisation) currentStep = 5;
+    else if (today >= c.dateDeclaration) currentStep = 4;
+    else if (today >= c.dateEncaissement) currentStep = 3;
+    else if (today >= c.dateEnvoiFacture) currentStep = 2;
+    else if (today >= c.finTravail) currentStep = 1;
+
+    var stepLabels = ['Travail', 'Facture', 'Encaissement', 'Déclaration', 'Cotisation', 'Terminé'];
+    var stepIcons = ['💼', '📤', '🏦', '📝', '💸', '✅'];
+
+    var itemCard = el('div', { class: 'pc-overview-card', onclick: (function(m, fa) { return function() { showPaymentCycleModal(m, fa); }; })(mis, f) });
+
+    // Header
+    var itemHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } });
+    itemHeader.appendChild(el('div', {}, [
+      el('div', { style: { fontWeight: '700', fontSize: '13px' } }, mis.client + ' · ' + c.moisTravailLabel),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, f.jours + 'j · ' + EUR(f.ht) + ' HT → cotisations ' + EUR(cotisation))
+    ]));
+    itemHeader.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: currentStep >= 5 ? 'rgba(52,211,153,0.15)' : 'rgba(251,191,36,0.15)', color: currentStep >= 5 ? 'var(--success)' : 'var(--warning)' } }, stepIcons[currentStep] + ' ' + stepLabels[currentStep]));
+    itemCard.appendChild(itemHeader);
+
+    // Mini progress bar des étapes
+    var progressDiv = el('div', { style: { display: 'flex', gap: '3px', height: '4px' } });
+    for (var s = 0; s < 5; s++) {
+      var segColor = s < currentStep ? 'var(--success)' : s === currentStep ? 'var(--warning)' : 'var(--bg-tertiary)';
+      progressDiv.appendChild(el('div', { style: { flex: '1', borderRadius: '2px', background: segColor } }));
+    }
+    itemCard.appendChild(progressDiv);
+
+    // Dates clés en mini timeline
+    var datesDiv = el('div', { class: 'pc-overview-months' });
+    var miniSteps = [
+      { label: c.moisTravailLabel.substring(0, 4), done: currentStep >= 1 },
+      { label: 'Fact.', done: currentStep >= 2 },
+      { label: fmtMonthShort(c.moisEncaissement), done: currentStep >= 3 },
+      { label: 'Décl.', done: currentStep >= 4 },
+      { label: 'Cotis.', done: currentStep >= 5 }
+    ];
+    miniSteps.forEach(function(ms) {
+      datesDiv.appendChild(el('span', { class: 'pc-overview-month ' + (ms.done ? 'done' : 'pending') }, ms.label));
+    });
+    itemCard.appendChild(datesDiv);
+
+    card.appendChild(itemCard);
+  });
+
+  container.appendChild(card);
 }
 
 // Afficher provisions d'un mois spécifique
@@ -12333,6 +12694,9 @@ function renderFinancesConformite(container) {
 
   // Toggle provisions payées
   renderProvisionsList(container, data);
+
+  // Cycle de paiement URSSAF
+  renderPaymentCycleOverview(container);
 }
 
 // V73: Helper pour créer un KPI block
@@ -13006,6 +13370,7 @@ function renderFacturesContent(container) {
       f.paymentMonth = getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
       var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
       f.paymentDate = paymentDate;
+      f._mission = m; // Référence mission pour cycle paiement
       f.isLate = f.status === 'envoyée' && TODAY > paymentDate;
       factures.push(f);
     });
@@ -13047,6 +13412,15 @@ function renderFacturesContent(container) {
     infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
     card.appendChild(infoDiv);
     card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
+    // Bouton cycle URSSAF
+    if (f._mission) {
+      var cycleBtn = el('div', {
+        style: { padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', background: 'rgba(139,92,246,0.12)', color: 'var(--accent)', cursor: 'pointer', flexShrink: '0', whiteSpace: 'nowrap' },
+        title: 'Voir le cycle de paiement URSSAF',
+        onclick: (function(mis, fac) { return function(e) { e.stopPropagation(); showPaymentCycleModal(mis, fac); }; })(f._mission, f)
+      }, '📋 Cycle');
+      card.appendChild(cycleBtn);
+    }
     container.appendChild(card);
   });
 }
@@ -14383,6 +14757,7 @@ function renderFactures(container) {
       f.paymentMonth = getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
       var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
       f.paymentDate = paymentDate;
+      f._mission = m; // Référence mission pour cycle paiement
       // RETARD: facture envoyée ET date paiement dépassée
       f.isLate = f.status === 'envoyée' && TODAY > paymentDate;
       factures.push(f);
@@ -14453,6 +14828,15 @@ function renderFactures(container) {
     infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
     card.appendChild(infoDiv);
     card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
+    // Bouton cycle URSSAF
+    if (f._mission) {
+      var cycleBtn = el('div', {
+        style: { padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', background: 'rgba(139,92,246,0.12)', color: 'var(--accent)', cursor: 'pointer', flexShrink: '0', whiteSpace: 'nowrap' },
+        title: 'Voir le cycle de paiement URSSAF',
+        onclick: (function(mis, fac) { return function(e) { e.stopPropagation(); showPaymentCycleModal(mis, fac); }; })(f._mission, f)
+      }, '📋 Cycle');
+      card.appendChild(cycleBtn);
+    }
     container.appendChild(card);
   });
 }
