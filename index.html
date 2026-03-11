@@ -12259,6 +12259,26 @@ function renderFinances(container) {
 function renderFinancesEvolution(container) {
   var data = compute();
 
+  // Navigation mois/année
+  var nav = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '14px', padding: '8px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' } });
+  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 10px', fontSize: '14px' }, onclick: function() { PERIOD.year--; PERIOD.month = null; render(); } }, '◀'));
+  var yearBtn = el('button', { class: 'btn btn-sm', style: { padding: '4px 14px', fontWeight: '800', fontSize: '14px', background: PERIOD.month === null ? 'var(--accent)' : 'transparent', color: PERIOD.month === null ? 'white' : 'var(--text-primary)' }, onclick: function() { PERIOD.month = null; render(); } }, String(PERIOD.year));
+  nav.appendChild(yearBtn);
+  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 10px', fontSize: '14px' }, onclick: function() { PERIOD.year++; PERIOD.month = null; render(); } }, '▶'));
+
+  var monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+  var monthsRow = el('div', { style: { display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '6px' } });
+  monthNames.forEach(function(name, idx) {
+    var isActive = PERIOD.month === idx;
+    var isCurrent = idx === TODAY.getMonth() && PERIOD.year === TODAY.getFullYear();
+    monthsRow.appendChild(el('button', {
+      style: { padding: '3px 7px', border: 'none', borderRadius: '4px', fontSize: '10px', fontWeight: isActive ? '700' : '500', cursor: 'pointer', background: isActive ? 'var(--accent)' : 'transparent', color: isActive ? 'white' : isCurrent ? 'var(--accent)' : 'var(--text-muted)', textDecoration: isCurrent && !isActive ? 'underline' : 'none' },
+      onclick: (function(m) { return function() { PERIOD.month = PERIOD.month === m ? null : m; render(); }; })(idx)
+    }, name));
+  });
+  nav.appendChild(el('div', { style: { width: '100%' } }, [monthsRow]));
+  container.appendChild(nav);
+
   // V78: Graphique Trésorerie avec toggle Solde / Cash Dispo
   var tresoHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
   tresoHeader.appendChild(el('div', { class: 'card-title', style: { margin: 0 } }, '💰 Trésorerie'));
@@ -14060,7 +14080,7 @@ function drawMainChart() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      onClick: function(e, els) { if (els.length) showMonthCongesModal(months[els[0].index]); },
+      onClick: function(e, els) { if (els.length) { var idx = els[0].index; if (els[0].datasetIndex === 0) showMonthCongesModal(months[idx]); else showMonthDetail(months[idx]); } },
       plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 } } } },
       scales: {
         x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
