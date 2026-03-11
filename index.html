@@ -1075,12 +1075,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .mission-card.prospect { border-left: 3px solid #a78bfa; }
 .mission-card.perdue { border-left: 3px solid #f87171; opacity: 0.72; }
 
-.facture-card { display: flex; align-items: center; gap: 12px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+.facture-card { display: flex; align-items: center; gap: 10px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; flex-wrap: wrap; }
 .facture-card:hover { border-color: var(--accent); }
-.facture-info { flex: 1; }
+.facture-info { flex: 1; min-width: 100px; }
 .facture-id { font-weight: 700; font-size: 13px; }
 .facture-meta { font-size: 11px; color: var(--text-muted); }
-.facture-amount { text-align: right; }
+.facture-cycle { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.facture-cycle-step { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 22px; }
+.facture-cycle-dot { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; transition: all 0.2s; }
+.facture-cycle-dot.done { background: var(--success); }
+.facture-cycle-dot.current { background: var(--warning); animation: pulse-glow 2s infinite; }
+.facture-cycle-dot.upcoming { background: var(--bg-tertiary); opacity: 0.5; }
+.facture-cycle-connector { width: 8px; height: 2px; border-radius: 1px; margin-bottom: 10px; }
+.facture-cycle-connector.done { background: var(--success); }
+.facture-cycle-connector.upcoming { background: var(--bg-tertiary); }
+.facture-cycle-label { font-size: 7px; color: var(--text-muted); font-weight: 600; line-height: 1; white-space: nowrap; }
+.facture-cycle-step.active .facture-cycle-label { color: var(--warning); font-weight: 700; }
+.facture-cycle-step.done .facture-cycle-label { color: var(--success); }
+.facture-cycle-current-label { font-size: 9px; font-weight: 700; color: var(--warning); margin-left: 4px; white-space: nowrap; }
+.facture-amount { text-align: right; flex-shrink: 0; }
 .facture-ht { font-size: 15px; font-weight: 700; }
 .facture-tva { font-size: 10px; color: var(--text-muted); }
 .filter-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -5594,6 +5607,50 @@ function getPaymentCycleDates(mission, facture) {
     delaiMois: delaiMois,
     jourPaie: jourPaie
   };
+}
+
+// Construit le widget inline du cycle URSSAF pour une facture-card
+function buildInlineCycleProgress(mission, facture) {
+  var cycle = getPaymentCycleDates(mission, facture);
+  var today = new Date(TODAY);
+
+  var stepDefs = [
+    { icon: '💼', label: fmtMonthShort(cycle.moisTravail), stepDate: cycle.finTravail },
+    { icon: '📤', label: 'Fact.', stepDate: cycle.dateEnvoiFacture },
+    { icon: '🏦', label: fmtMonthShort(cycle.moisEncaissement), stepDate: cycle.dateEncaissement },
+    { icon: '📝', label: 'Décl.', stepDate: cycle.dateDeclaration },
+    { icon: '💸', label: 'Prél.', stepDate: cycle.datePaiementCotisation }
+  ];
+
+  // Déterminer l'étape actuelle
+  var currentStep = 0;
+  if (today >= cycle.datePaiementCotisation) currentStep = 5;
+  else if (today >= cycle.dateDeclaration) currentStep = 4;
+  else if (today >= cycle.dateEncaissement) currentStep = 3;
+  else if (today >= cycle.dateEnvoiFacture) currentStep = 2;
+  else if (today >= cycle.finTravail) currentStep = 1;
+
+  var container = el('div', { class: 'facture-cycle' });
+
+  stepDefs.forEach(function(s, idx) {
+    var isDone = idx < currentStep;
+    var isCurrent = idx === currentStep;
+    var stepClass = isDone ? 'done' : isCurrent ? 'active' : '';
+
+    var stepEl = el('div', { class: 'facture-cycle-step ' + stepClass });
+    var dotClass = isDone ? 'done' : isCurrent ? 'current' : 'upcoming';
+    stepEl.appendChild(el('div', { class: 'facture-cycle-dot ' + dotClass }, s.icon));
+    stepEl.appendChild(el('div', { class: 'facture-cycle-label' }, s.label));
+    container.appendChild(stepEl);
+
+    // Connecteur entre les étapes (sauf après la dernière)
+    if (idx < stepDefs.length - 1) {
+      var connClass = isDone ? 'done' : 'upcoming';
+      container.appendChild(el('div', { class: 'facture-cycle-connector ' + connClass }));
+    }
+  });
+
+  return container;
 }
 
 // Affiche le modal du cycle de paiement URSSAF pour une facture
@@ -12795,9 +12852,6 @@ function renderFinancesConformite(container) {
 
   // Toggle provisions payées
   renderProvisionsList(container, data);
-
-  // Cycle de paiement URSSAF
-  renderPaymentCycleOverview(container);
 }
 
 // V73: Helper pour créer un KPI block
@@ -13512,16 +13566,11 @@ function renderFacturesContent(container) {
     infoDiv.appendChild(el('div', { class: 'facture-id' }, f.client + ' · ' + fmtMonthShort(f.mois)));
     infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
     card.appendChild(infoDiv);
-    card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
-    // Bouton cycle URSSAF
+    // Cycle URSSAF inline
     if (f._mission) {
-      var cycleBtn = el('div', {
-        style: { padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', background: 'rgba(139,92,246,0.12)', color: 'var(--accent)', cursor: 'pointer', flexShrink: '0', whiteSpace: 'nowrap' },
-        title: 'Voir le cycle de paiement URSSAF',
-        onclick: (function(mis, fac) { return function(e) { e.stopPropagation(); showPaymentCycleModal(mis, fac); }; })(f._mission, f)
-      }, '📋 Cycle');
-      card.appendChild(cycleBtn);
+      card.appendChild(buildInlineCycleProgress(f._mission, f));
     }
+    card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
     container.appendChild(card);
   });
 }
@@ -14928,16 +14977,11 @@ function renderFactures(container) {
     infoDiv.appendChild(idDiv);
     infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
     card.appendChild(infoDiv);
-    card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
-    // Bouton cycle URSSAF
+    // Cycle URSSAF inline
     if (f._mission) {
-      var cycleBtn = el('div', {
-        style: { padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700', background: 'rgba(139,92,246,0.12)', color: 'var(--accent)', cursor: 'pointer', flexShrink: '0', whiteSpace: 'nowrap' },
-        title: 'Voir le cycle de paiement URSSAF',
-        onclick: (function(mis, fac) { return function(e) { e.stopPropagation(); showPaymentCycleModal(mis, fac); }; })(f._mission, f)
-      }, '📋 Cycle');
-      card.appendChild(cycleBtn);
+      card.appendChild(buildInlineCycleProgress(f._mission, f));
     }
+    card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
     container.appendChild(card);
   });
 }
