@@ -4393,65 +4393,65 @@ function compute() {
     }
   });
   
-  // V72: IR estimé - distribuer sur les mois avec travail (réalisé + prévu)
+  // V72/V82: IR estimé - lissage cohérent avec getAbsoluteProvisions/getAllChargesForType
+  // Règle: IR annuel / nb mois prévus, provisionné uniquement sur les mois avec CA encaissé
   if (!COMPANY.prelevementLiberatoire) {
     var periodYear = parseInt(months[0].split('-')[0]);
     var irData = getIRForYear(periodYear);
     if (irData.impot > 0) {
-      // Collecter les mois avec CA HT (réalisé + prévu seulement, pas encaissé pour éviter double comptage)
-      var monthsWithCA = [];
-      var totalCAForIR = 0;
+      // Compter les mois avec prévision de facturation (toutes factures, pas juste payées)
+      var irPlannedMonths = {};
+      MISSIONS.forEach(function(mis) {
+        if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+        if (!mis.factures) return;
+        mis.factures.forEach(function(f) {
+          if (f.jours <= 0) return;
+          var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+          if (paymentMonth.startsWith(periodYear + '-')) {
+            irPlannedMonths[paymentMonth] = true;
+          }
+        });
+      });
+      var nbMoisPrevu = Object.keys(irPlannedMonths).length || 1;
+      var irMensuel = Math.round(irData.impot / nbMoisPrevu);
+
+      // Collecter les mois de la période avec CA encaissé (factures payées)
+      var monthsWithEncaisse = [];
       months.forEach(function(m) {
         var md = data.monthsData[m];
-        // Utiliser uniquement real + prev (travail effectué/planifié), PAS enc (qui est TTC et double compte)
-        var monthCA = (md.real || 0) + (md.prev || 0);
-        if (monthCA > 0) {
-          monthsWithCA.push({ month: m, ca: monthCA });
-          totalCAForIR += monthCA;
+        if ((md.encHT || 0) > 0) {
+          monthsWithEncaisse.push(m);
         }
       });
 
-      // Si aucun mois avec CA, utiliser le dernier mois
-      if (monthsWithCA.length === 0) {
-        monthsWithCA.push({ month: months[months.length - 1], ca: 1 });
-        totalCAForIR = 1;
-      }
-
-      // Distribuer l'IR proportionnellement au CA HT de chaque mois
-      var irDistributed = 0;
-      monthsWithCA.forEach(function(mca, idx) {
-        var irPart = idx === monthsWithCA.length - 1
-          ? irData.impot - irDistributed // Dernier mois: le reste pour éviter erreurs d'arrondi
-          : Math.round(irData.impot * mca.ca / totalCAForIR);
-        irDistributed += irPart;
-
-        if (irPart > 0) {
-          // V72: ID canonique IR-{year}-{MM} (cohérent avec getAbsoluteProvisions/getAllChargesForType)
-          var irMonthStr = mca.month.split('-')[1]; // Extraire '01' de '2026-01'
+      // Distribuer irMensuel sur chaque mois encaissé de la période
+      monthsWithEncaisse.forEach(function(month) {
+        if (irMensuel > 0) {
+          var irMonthStr = month.split('-')[1];
           var irId = 'IR-' + periodYear + '-' + irMonthStr;
-          var md = data.monthsData[mca.month];
+          var md = data.monthsData[month];
           md.charges.push({
             id: irId,
             cat: 'IR Estimé',
-            desc: 'Part mensuelle (' + Math.round(mca.ca / totalCAForIR * 100) + '%)',
-            montant: irPart,
-            mois: mca.month
+            desc: 'Acompte mensuel (' + EUR(irData.impot) + ' /' + nbMoisPrevu + ')',
+            montant: irMensuel,
+            mois: month
           });
           if (isPaid(irId)) {
-            data.chargesPayees += irPart;
-            md.chargesPaid += irPart;
-            data.detailChargesPayees.push({ cat: 'IR Estimé', mois: mca.month, montant: irPart, id: irId });
+            data.chargesPayees += irMensuel;
+            md.chargesPaid += irMensuel;
+            data.detailChargesPayees.push({ cat: 'IR Estimé', mois: month, montant: irMensuel, id: irId });
           } else {
-            data.chargesAPayer += irPart;
-            md.chargesUnpaid += irPart;
-            data.provByMonth[mca.month] = (data.provByMonth[mca.month] || 0) + irPart;
-            data.provByType['IR Estimé'] = (data.provByType['IR Estimé'] || 0) + irPart;
+            data.chargesAPayer += irMensuel;
+            md.chargesUnpaid += irMensuel;
+            data.provByMonth[month] = (data.provByMonth[month] || 0) + irMensuel;
+            data.provByType['IR Estimé'] = (data.provByType['IR Estimé'] || 0) + irMensuel;
             data.detailChargesAPayer.push({
               cat: 'IR Estimé',
-              mois: mca.month,
-              montant: irPart,
+              mois: month,
+              montant: irMensuel,
               id: irId,
-              source: 'IR ' + periodYear + ' (' + EUR(irData.impot) + ' total)'
+              source: 'Acompte · IR ' + periodYear + ': ' + EUR(irData.impot) + ' /' + nbMoisPrevu
             });
           }
         }
