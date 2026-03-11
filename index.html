@@ -3468,10 +3468,16 @@ function getJoursPrevusPourMois(mis, monthKey, joursOuvrables) {
   // V81: Mapping jour de semaine (getDay()) → clé joursMap
   var dowToKey = [null, 'lun', 'mar', 'mer', 'jeu', 'ven', null]; // 0=dim, 1=lun...5=ven, 6=sam
 
+  // V81fix: Parser les dates en local (pas UTC) pour éviter les décalages de fuseau
+  function parseLocalDate(s) {
+    var parts = s.split('-');
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  }
+
   mis.periodes.forEach(function(periode) {
     if (!periode.debut || !periode.fin) return;
-    var pStart = new Date(periode.debut);
-    var pEnd = new Date(periode.fin);
+    var pStart = parseLocalDate(periode.debut);
+    var pEnd = parseLocalDate(periode.fin);
 
     // V81: Utiliser joursMap si disponible, sinon fallback sur joursSemaine (rétro-compat)
     var joursMap = periode.joursMap;
@@ -3527,18 +3533,18 @@ function getJoursPrevusPourMois(mis, monthKey, joursOuvrables) {
     }
   });
 
-  // Jours ouvrables non couverts par aucune période → fulltime
-  var uncoveredDays = joursOuvrables - totalBizDaysCovered;
-  if (uncoveredDays > 0) {
-    totalWorkedInMonth += uncoveredDays; // ratio 1.0 (fulltime)
-  }
+  // Jours ouvrables non couverts par aucune période
+  // Si des périodes existent, les jours non couverts ne sont PAS travaillés
+  // (l'utilisateur a défini explicitement ses jours de travail via les périodes)
 
   return Math.round(totalWorkedInMonth * 10) / 10;
 }
 
 function buildMission(mis) {
   if (!mis.debut || !mis.fin) return;
-  var start = new Date(mis.debut), end = new Date(mis.fin);
+  // V81fix: Parser en local pour éviter décalage UTC
+  function parseLD(s) { var p = s.split('-'); return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2])); }
+  var start = parseLD(mis.debut), end = parseLD(mis.fin);
   var lignes = mis.lignes || [];
   var existingMap = {};
   lignes.forEach(function(l) { existingMap[l.ym] = l; });
@@ -13650,34 +13656,32 @@ function showWeeklyBreakdownModal(monthKey) {
   }
 
   // Pour chaque mission, calculer les jours travaillés par semaine
+  // V81fix: Comparer les dates via ISO strings pour éviter les problèmes UTC vs local
   var missionWeekData = activeMissions.map(function(mis) {
     var weekResults = weeks.map(function(week) {
       var total = 0;
       var dayDetail = {};
       week.days.forEach(function(wd) {
         var worked = 0;
+        var wdISO = wd.iso;
         // Vérifier si ce jour est dans une période de la mission
         if (mis.periodes && mis.periodes.length > 0) {
           mis.periodes.forEach(function(periode) {
             if (!periode.debut || !periode.fin) return;
-            var pStart = new Date(periode.debut);
-            var pEnd = new Date(periode.fin);
-            if (wd.date >= pStart && wd.date <= pEnd) {
+            if (wdISO >= periode.debut && wdISO <= periode.fin) {
               if (periode.joursMap) {
                 worked = periode.joursMap[wd.key] || 0;
               } else {
                 // Fallback joursSemaine legacy
                 var js = periode.joursSemaine || 5;
-                worked = js >= 5 ? 1 : (js > 0 ? 1 : 0); // approximation pour legacy
+                worked = js >= 5 ? 1 : (js > 0 ? 1 : 0);
               }
             }
           });
         } else {
           // Pas de périodes = fulltime si dans la durée de la mission
-          if (mis.debut && mis.fin) {
-            var mStart = new Date(mis.debut);
-            var mEnd = new Date(mis.fin);
-            if (wd.date >= mStart && wd.date <= mEnd) worked = 1;
+          if (mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin) {
+            worked = 1;
           }
         }
         dayDetail[wd.key] = worked;
