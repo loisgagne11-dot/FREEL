@@ -3533,9 +3533,12 @@ function getJoursPrevusPourMois(mis, monthKey, joursOuvrables) {
     }
   });
 
-  // Jours ouvrables non couverts par aucune période
-  // Si des périodes existent, les jours non couverts ne sont PAS travaillés
-  // (l'utilisateur a défini explicitement ses jours de travail via les périodes)
+  // Jours ouvrables non couverts par aucune période mais dans la mission → fulltime
+  // (les périodes définissent un rythme spécifique, le reste de la mission est à temps plein)
+  var uncoveredDays = joursOuvrables - totalBizDaysCovered;
+  if (uncoveredDays > 0) {
+    totalWorkedInMonth += uncoveredDays;
+  }
 
   return Math.round(totalWorkedInMonth * 10) / 10;
 }
@@ -13665,24 +13668,28 @@ function showWeeklyBreakdownModal(monthKey) {
         var worked = 0;
         var wdISO = wd.iso;
         // Vérifier si ce jour est dans une période de la mission
-        if (mis.periodes && mis.periodes.length > 0) {
+        // Vérifier si le jour est dans la durée de la mission
+        var inMission = mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin;
+        if (!inMission) { /* hors mission = 0 */ }
+        else if (mis.periodes && mis.periodes.length > 0) {
+          var inPeriode = false;
           mis.periodes.forEach(function(periode) {
             if (!periode.debut || !periode.fin) return;
             if (wdISO >= periode.debut && wdISO <= periode.fin) {
+              inPeriode = true;
               if (periode.joursMap) {
                 worked = periode.joursMap[wd.key] || 0;
               } else {
-                // Fallback joursSemaine legacy
                 var js = periode.joursSemaine || 5;
                 worked = js >= 5 ? 1 : (js > 0 ? 1 : 0);
               }
             }
           });
+          // Dans la mission mais hors de toute période → fulltime
+          if (!inPeriode) worked = 1;
         } else {
-          // Pas de périodes = fulltime si dans la durée de la mission
-          if (mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin) {
-            worked = 1;
-          }
+          // Pas de périodes = fulltime
+          worked = 1;
         }
         dayDetail[wd.key] = worked;
         total += worked;
