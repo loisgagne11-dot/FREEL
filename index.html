@@ -3598,7 +3598,14 @@ function buildMission(mis) {
   mis.lignes.forEach(function(l) {
     var existing = facturesMap[l.ym];
     // Jours réels = prévus - congés
-    var jours = l.joursReels > 0 ? l.joursReels : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+    // V81: Si des périodes sont définies, toujours recalculer depuis joursPrevus
+    // (ne pas garder l'ancien joursReels qui a pu être calculé avec un ancien algorithme)
+    var jours;
+    if (mis.periodes && mis.periodes.length > 0) {
+      jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+    } else {
+      jours = l.joursReels > 0 ? l.joursReels : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+    }
     l.joursReels = jours;
     var ht = jours * mis.tjm;
     var tva = isTVAApplicable(l.ym) ? Math.round(ht * LEGAL.tvaRate * 100) / 100 : 0;
