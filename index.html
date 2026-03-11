@@ -941,6 +941,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .jour-toggle .jour-demi:hover { background: var(--bg-tertiary); }
 .jour-toggle .jour-demi.active { color: var(--warning); font-weight: 700; }
 .jours-total { font-size: 11px; color: var(--text-secondary); margin-left: 8px; align-self: center; font-weight: 600; }
+.conges-calendar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 8px 0; }
+.conges-calendar .cal-header { font-size: 9px; color: var(--text-muted); text-align: center; font-weight: 700; padding: 4px 0; }
+.conges-day { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; border-radius: 6px; border: 1.5px solid var(--glass-border); background: var(--bg-secondary); cursor: pointer; transition: all 0.15s; user-select: none; min-height: 38px; }
+.conges-day:hover { border-color: var(--accent); }
+.conges-day .cd-num { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.conges-day .cd-dow { font-size: 8px; color: var(--text-muted); }
+.conges-day.conge-full { background: #60a5fa; border-color: #60a5fa; }
+.conges-day.conge-full .cd-num, .conges-day.conge-full .cd-dow { color: #fff; }
+.conges-day.conge-half { background: rgba(96,165,250,0.25); border-color: #60a5fa; }
+.conges-day.conge-half .cd-num { color: #60a5fa; }
+.conges-day.holiday { opacity: 0.4; pointer-events: none; background: rgba(245,158,11,0.1); border-color: transparent; }
+.conges-day.holiday .cd-num { text-decoration: line-through; color: #f59e0b; }
+.conges-day.not-in-mission { opacity: 0.25; pointer-events: none; }
+.conges-mission-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; margin-top: 12px; border-bottom: 1px solid var(--glass-border); }
+.conges-mission-header:first-child { margin-top: 0; }
 .agence-contact { background: var(--bg-tertiary); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 8px; position: relative; }
 .agence-contact .form-group { margin-bottom: 8px; }
 
@@ -3573,6 +3588,16 @@ function buildMission(mis) {
     // V79: Calculer joursPrevus selon le rythme de travail (périodes jours/semaine)
     var joursPrevusCalcule = getJoursPrevusPourMois(mis, key, joursOuvrables);
 
+    // V81: Calculer congés depuis congesDates
+    var congesCalcule = 0;
+    if (mis.congesDates && mis.congesDates.length > 0) {
+      mis.congesDates.forEach(function(cd) {
+        if (cd.indexOf(key) === 0) {
+          congesCalcule += cd.length > 10 ? 0.5 : 1;
+        }
+      });
+    }
+
     if (existing) {
       var oldJoursOuvrables = existing.joursOuvrables || 0;
       existing.joursOuvrables = joursOuvrables;
@@ -3590,12 +3615,16 @@ function buildMission(mis) {
         existing.joursPrevus = existing.joursPrevus || joursOuvrables;
       }
 
+      // V81: Mettre à jour congés depuis congesDates si disponible
+      if (mis.congesDates && mis.congesDates.length > 0) {
+        existing.conges = congesCalcule;
+      }
       if ((existing.joursReels || 0) > joursOuvrables) {
         existing.joursReels = joursOuvrables;
       }
       newLignes.push(existing);
     }
-    else { newLignes.push({ ym: key, joursOuvrables: joursOuvrables, joursPrevus: joursPrevusCalcule, joursReels: 0, conges: 0 }); }
+    else { newLignes.push({ ym: key, joursOuvrables: joursOuvrables, joursPrevus: joursPrevusCalcule, joursReels: 0, conges: congesCalcule }); }
     d.setMonth(d.getMonth() + 1);
   }
   mis.lignes = newLignes;
@@ -6489,13 +6518,16 @@ function showMissionModal(mission) {
     statut: 'active', // V75: active | prospect | perdue
     // V79: Périodes de travail (jours/semaine variables)
     periodes: [],
+    // V81: Congés par date
+    congesDates: [],
     // V79: Client opérationnel
     clientOp: { nom: '', contact: '', email: '', telephone: '', adresse: '' },
     // V79: Agence / intermédiaire
     agence: { nom: '', contacts: [{ prenom: '', nom: '', email: '', telephone: '' }], adresses: [''] }
   };
-  // V79: Rétro-compatibilité - s'assurer que les nouveaux champs existent
+  // V79/V81: Rétro-compatibilité - s'assurer que les nouveaux champs existent
   if (!mission.periodes) mission.periodes = [];
+  if (!mission.congesDates) mission.congesDates = [];
   if (!mission.clientOp) mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
   if (!mission.agence) mission.agence = { nom: '', contacts: [{ prenom: '', nom: '', email: '', telephone: '' }], adresses: [''] };
   if (!mission.agence.contacts || mission.agence.contacts.length === 0) mission.agence.contacts = [{ prenom: '', nom: '', email: '', telephone: '' }];
@@ -7233,48 +7265,192 @@ function deleteMovement(mvId) {
 }
 
 function showMonthCongesModal(monthYm) {
-  $('#formModalTitle').textContent = '📅 Congés - ' + fmtMonth(monthYm);
+  $('#formModalTitle').textContent = '🏖 Congés - ' + fmtMonth(monthYm);
   var body = $('#formModalBody');
   body.innerHTML = '';
-  
-  // Tableau des missions pour ce mois
+
+  var p = parseYM(monthYm);
+  var holidays = frenchHolidays(p.y);
+  var dowLabels = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+  var dowShort = ['D','L','M','Me','J','V','S'];
+
+  // Collecter tous les jours ouvrés du mois
+  var bizDays = [];
+  var d = new Date(p.y, p.m, 1);
+  while (d.getMonth() === p.m) {
+    var dow = d.getDay();
+    if (dow !== 0 && dow !== 6) {
+      var iso = localISO(d);
+      var isHoliday = holidays.indexOf(iso) !== -1;
+      bizDays.push({ date: new Date(d), iso: iso, dow: dow, dowLabel: dowLabels[dow], dowShort: dowShort[dow], day: d.getDate(), isHoliday: isHoliday });
+    }
+    d.setDate(d.getDate() + 1);
+  }
+
   var hasMissions = false;
+  var missionCalendars = []; // pour la sauvegarde
+
   MISSIONS.forEach(function(m) {
     if (!m.lignes) return;
     var ligne = m.lignes.find(function(l) { return l.ym === monthYm; });
-    if (ligne) {
-      hasMissions = true;
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
-      row.appendChild(el('div', { style: { flex: '1' } }, [el('div', { style: { fontWeight: '700' } }, m.client), el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Ouvrés: ' + ligne.joursOuvrables + 'j · Prévus: ' + (ligne.joursPrevus || ligne.joursOuvrables) + 'j')]));
-      var input = el('input', { type: 'number', class: 'form-input', style: { width: '60px', textAlign: 'center' }, value: ligne.conges || 0, min: 0, 'data-mission': m.id });
-      row.appendChild(input);
-      row.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'congés'));
-      body.appendChild(row);
+    if (!ligne) return;
+    hasMissions = true;
+
+    // V81: Initialiser congesDates si inexistant
+    if (!m.congesDates) m.congesDates = [];
+
+    // Header mission
+    var header = el('div', { class: 'conges-mission-header' });
+    header.appendChild(el('div', { style: { fontWeight: '700' } }, m.client || m.titre));
+    var countSpan = el('span', { style: { fontSize: '11px', color: '#60a5fa', fontWeight: '600' }, id: 'congesCount_' + m.id }, '');
+    header.appendChild(countSpan);
+    body.appendChild(header);
+
+    body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Cliquez = journée · Double-clic = demi-journée · Recliquez = annuler'));
+
+    // Calendrier grille
+    var cal = el('div', { class: 'conges-calendar' });
+
+    // Headers jours de la semaine
+    ['Lun','Mar','Mer','Jeu','Ven'].forEach(function(dl) {
+      cal.appendChild(el('div', { class: 'cal-header' }, dl));
+    });
+
+    // Trouver le jour de la semaine du premier jour ouvré
+    // Remplir les cases vides avant le premier jour
+    if (bizDays.length > 0) {
+      var firstDow = bizDays[0].dow; // 1=lun..5=ven
+      for (var fi = 1; fi < firstDow; fi++) {
+        cal.appendChild(el('div', {})); // case vide
+      }
     }
+
+    var calState = {}; // iso -> 'full' | 'half' | null
+
+    // Pré-remplir depuis congesDates existants
+    m.congesDates.forEach(function(cd) {
+      if (cd.indexOf(monthYm) === 0) { // ex: '2026-05-18' starts with '2026-05'
+        var baseDate = cd.substring(0, 10);
+        if (cd.length > 10) {
+          calState[baseDate] = 'half'; // _am ou _pm
+        } else {
+          calState[baseDate] = 'full';
+        }
+      }
+    });
+
+    function updateCongesCount() {
+      var total = 0;
+      Object.keys(calState).forEach(function(k) {
+        if (calState[k] === 'full') total += 1;
+        else if (calState[k] === 'half') total += 0.5;
+      });
+      var cs = document.getElementById('congesCount_' + m.id);
+      if (cs) cs.textContent = total > 0 ? total + 'j de congés' : 'Aucun congé';
+    }
+
+    var prevDay = 0;
+    bizDays.forEach(function(bd) {
+      // Ajouter des cases vides pour les jours manquants (week-ends)
+      var expectedDow = ((prevDay === 0) ? bd.dow : prevDay + 1);
+      if (prevDay > 0 && bd.dow <= prevDay) {
+        // Nouvelle semaine - remplir la fin de la semaine précédente
+        for (var pad = prevDay + 1; pad <= 5; pad++) cal.appendChild(el('div', {}));
+        // Remplir le début de la nouvelle semaine
+        for (var pad2 = 1; pad2 < bd.dow; pad2++) cal.appendChild(el('div', {}));
+      } else if (prevDay > 0) {
+        for (var pad3 = prevDay + 1; pad3 < bd.dow; pad3++) cal.appendChild(el('div', {}));
+      }
+      prevDay = bd.dow;
+
+      // Vérifier si ce jour est dans la mission
+      var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
+
+      var dayEl = el('div', { class: 'conges-day' + (bd.isHoliday ? ' holiday' : '') + (!inMission ? ' not-in-mission' : '') });
+      dayEl.appendChild(el('span', { class: 'cd-num' }, String(bd.day)));
+      dayEl.appendChild(el('span', { class: 'cd-dow' }, bd.isHoliday ? 'Férié' : bd.dowShort));
+
+      if (!bd.isHoliday && inMission) {
+        // Appliquer l'état initial
+        if (calState[bd.iso] === 'full') dayEl.classList.add('conge-full');
+        else if (calState[bd.iso] === 'half') dayEl.classList.add('conge-half');
+
+        (function(iso, element) {
+          var clickTimer = null;
+          element.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; } // double-clic en cours
+            clickTimer = setTimeout(function() {
+              clickTimer = null;
+              // Simple clic : toggle full
+              if (calState[iso] === 'full') {
+                delete calState[iso];
+                element.classList.remove('conge-full', 'conge-half');
+              } else if (calState[iso] === 'half') {
+                delete calState[iso];
+                element.classList.remove('conge-full', 'conge-half');
+              } else {
+                calState[iso] = 'full';
+                element.classList.add('conge-full');
+                element.classList.remove('conge-half');
+              }
+              updateCongesCount();
+            }, 250);
+          });
+          element.addEventListener('dblclick', function(e) {
+            e.preventDefault();
+            if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+            // Double-clic : demi-journée
+            calState[iso] = 'half';
+            element.classList.remove('conge-full');
+            element.classList.add('conge-half');
+            updateCongesCount();
+          });
+        })(bd.iso, dayEl);
+      }
+
+      cal.appendChild(dayEl);
+    });
+
+    body.appendChild(cal);
+    missionCalendars.push({ mission: m, calState: calState });
+    updateCongesCount();
   });
-  
+
   if (!hasMissions) {
     body.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Aucune mission ce mois'));
     openModal('formModal');
     return;
   }
-  
+
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '16px' }, onclick: function() {
-    MISSIONS.forEach(function(m) {
-      var input = $('input[data-mission="' + m.id + '"]');
-      if (input && m.lignes) {
-        var ligne = m.lignes.find(function(l) { return l.ym === monthYm; });
-        if (ligne) {
-          ligne.conges = parseInt(input.value) || 0;
-          ligne.joursReels = Math.max(0, (ligne.joursPrevus || 0) - ligne.conges);
-        }
-        buildMission(m);
+    missionCalendars.forEach(function(mc) {
+      var m = mc.mission;
+      if (!m.congesDates) m.congesDates = [];
+      // Retirer les congés de ce mois
+      m.congesDates = m.congesDates.filter(function(cd) { return cd.indexOf(monthYm) !== 0; });
+      // Ajouter les nouveaux
+      Object.keys(mc.calState).forEach(function(iso) {
+        if (mc.calState[iso] === 'full') m.congesDates.push(iso);
+        else if (mc.calState[iso] === 'half') m.congesDates.push(iso + '_half');
+      });
+      // Recalculer ligne.conges pour ce mois
+      var ligne = m.lignes.find(function(l) { return l.ym === monthYm; });
+      if (ligne) {
+        var congesCount = 0;
+        m.congesDates.forEach(function(cd) {
+          if (cd.indexOf(monthYm) === 0) {
+            congesCount += cd.length > 10 ? 0.5 : 1;
+          }
+        });
+        ligne.conges = congesCount;
       }
+      buildMission(m);
     });
     saveAll(); closeModal('formModal'); render();
     toast('Congés enregistrés', 'success');
   } }, '✅ Enregistrer'));
-  
+
   openModal('formModal');
 }
 
@@ -13664,17 +13840,25 @@ function showWeeklyBreakdownModal(monthKey) {
     weekStart.setDate(weekStart.getDate() + 7);
   }
 
-  // Pour chaque mission, calculer les jours travaillés par semaine
-  // V81fix: Comparer les dates via ISO strings pour éviter les problèmes UTC vs local
+  // Pour chaque mission, calculer les jours travaillés et congés par semaine
   var missionWeekData = activeMissions.map(function(mis) {
+    // V81: Index des congés pour cette mission
+    var congesSet = {};
+    if (mis.congesDates) {
+      mis.congesDates.forEach(function(cd) {
+        var base = cd.substring(0, 10);
+        congesSet[base] = cd.length > 10 ? 0.5 : 1;
+      });
+    }
+
     var weekResults = weeks.map(function(week) {
       var total = 0;
+      var congesTotal = 0;
       var dayDetail = {};
+      var congesDetail = {};
       week.days.forEach(function(wd) {
         var worked = 0;
         var wdISO = wd.iso;
-        // Vérifier si ce jour est dans une période de la mission
-        // Vérifier si le jour est dans la durée de la mission
         var inMission = mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin;
         if (!inMission) { /* hors mission = 0 */ }
         else if (mis.periodes && mis.periodes.length > 0) {
@@ -13691,16 +13875,22 @@ function showWeeklyBreakdownModal(monthKey) {
               }
             }
           });
-          // Dans la mission mais hors de toute période → fulltime
           if (!inPeriode) worked = 1;
         } else {
-          // Pas de périodes = fulltime
-          worked = 1;
+          if (inMission) worked = 1;
         }
+
+        // V81: Déduire les congés
+        var conge = congesSet[wdISO] || 0;
+        if (conge > 0 && worked > 0) {
+          congesDetail[wd.key] = Math.min(conge, worked);
+          congesTotal += congesDetail[wd.key];
+        }
+
         dayDetail[wd.key] = worked;
         total += worked;
       });
-      return { total: total, days: dayDetail };
+      return { total: total, days: dayDetail, congesTotal: congesTotal, conges: congesDetail };
     });
     return { mission: mis, weeks: weekResults };
   });
@@ -13805,20 +13995,29 @@ function showWeeklyBreakdownModal(monthKey) {
     tbody.appendChild(holidayRow);
   }
 
-  // V81: Ligne Congés posés (depuis mission.lignes)
-  var totalConges = 0;
-  activeMissions.forEach(function(mis) {
-    var ligne = null;
-    if (mis.lignes) mis.lignes.forEach(function(l) { if (l.ym === monthKey) ligne = l; });
-    if (ligne && ligne.conges > 0) totalConges += ligne.conges;
+  // V81: Ligne Congés posés par semaine (depuis congesDates)
+  var congesWeekTotals = weeks.map(function() { return 0; });
+  var totalCongesAll = 0;
+  missionWeekData.forEach(function(mwd) {
+    mwd.weeks.forEach(function(w, wi) {
+      congesWeekTotals[wi] += w.congesTotal;
+      totalCongesAll += w.congesTotal;
+    });
   });
-  if (totalConges > 0) {
+  if (totalCongesAll > 0) {
     var congesRow = el('tr', { style: { background: 'rgba(96,165,250,0.06)' } });
     congesRow.appendChild(el('td', { style: { padding: '6px 8px', borderBottom: '1px solid var(--glass-border)', fontSize: '11px', color: '#60a5fa', fontWeight: '600' } }, '🏖 Congés'));
-    weeks.forEach(function() {
-      congesRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontSize: '10px', color: 'var(--text-muted)' } }, ''));
+    congesWeekTotals.forEach(function(ct, wi) {
+      // Tooltip: détail des jours de congés
+      var congesDays = [];
+      missionWeekData.forEach(function(mwd) {
+        ['lun','mar','mer','jeu','ven'].forEach(function(j) {
+          if (mwd.weeks[wi].conges[j]) congesDays.push(jourLabels[j] + (mwd.weeks[wi].conges[j] === 0.5 ? '½' : ''));
+        });
+      });
+      congesRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontSize: '10px', color: ct > 0 ? '#60a5fa' : 'var(--text-muted)' }, title: congesDays.join(', ') }, ct > 0 ? '-' + ct + 'j' : ''));
     });
-    congesRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontWeight: '700', fontSize: '11px', color: '#60a5fa' } }, '-' + totalConges + 'j'));
+    congesRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontWeight: '700', fontSize: '11px', color: '#60a5fa' } }, '-' + totalCongesAll + 'j'));
     tbody.appendChild(congesRow);
   }
 
