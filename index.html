@@ -3225,15 +3225,16 @@ function getAbsoluteProvisions() {
   if (!COMPANY.prelevementLiberatoire) {
     var currentYear = TODAY.getFullYear();
 
-    // V71: Trouver les mois avec CA encaissé (factures payées)
+    // V71/V82: Trouver les mois avec CA encaissé (factures payées) - utilise datePaiementReel si dispo
     function getMonthsWithCA(year) {
       var months = {};
       MISSIONS.forEach(function(mis) {
-        if (mis.statut === 'prospect' || mis.statut === 'perdue') return; // V78: exclure prospect/perdue
+        if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
         if (!mis.factures) return;
         mis.factures.forEach(function(f) {
           if (f.jours <= 0 || f.status !== 'payée') return;
-          var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+          var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+          if (paymentMonth > nowYm) paymentMonth = nowYm;
           if (paymentMonth.startsWith(year + '-')) {
             var month = parseInt(paymentMonth.split('-')[1]) - 1;
             months[month] = true;
@@ -11841,7 +11842,7 @@ function renderFinancesPerformance(container) {
 
   // KPIs Performance
   var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
-  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Planifié HT', 'var(--info)'));
+  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé HT', 'var(--info)'));
   kpiGrid.appendChild(createKPIBlock(EUR(data.caHT), 'CA Encaissé HT', 'var(--success)'));
   kpiGrid.appendChild(createKPIBlock(EUR(caLatent), 'CA Latent HT', caLatent > 0 ? 'var(--warning)' : 'var(--text-muted)'));
   container.appendChild(kpiGrid);
@@ -12248,7 +12249,7 @@ function renderFinancesConformite(container) {
   var types = [
     { id: 'urssaf', label: 'URSSAF/CFP', icon: '🏥', total: (provByType['URSSAF'] || 0) + (provByType['CFP'] || 0), paid: (paidByTypePeriod['URSSAF'] || 0) + (paidByTypePeriod['CFP'] || 0), fiabilite: 'Certain' },
     { id: 'tva', label: 'TVA', icon: '🏛️', total: provByType['TVA'] || 0, paid: paidByTypePeriod['TVA'] || 0, fiabilite: 'Certain' },
-    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provByType['IR Estimé'] || 0, paid: (paidByTypePeriod['Impôt'] || 0) + (paidByTypePeriod['IR'] || 0), fiabilite: 'Estimé ±10%' },
+    { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provByType['IR Estimé'] || 0, paid: (paidByTypePeriod['Impôt'] || 0) + (paidByTypePeriod['IR'] || 0) + (paidByTypePeriod['IR Estimé'] || 0), fiabilite: 'Estimé ±10%' },
     { id: 'impot', label: 'Impôt PL', icon: '💼', total: provByType['Impôt'] || 0, paid: paidByTypePeriod['Impôt PL'] || 0, fiabilite: 'Certain' }
   ];
 
