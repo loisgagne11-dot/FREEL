@@ -16005,16 +16005,19 @@ function renderFacturesContent(container) {
       var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px', cursor: 'pointer' }, onclick: function() { showFactureModal(f); } });
 
       // Status indicator
-      row.appendChild(el('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: isPaid ? 'var(--success)' : isLate ? 'var(--danger)' : 'var(--warning)' } }));
+      row.appendChild(el('div', { style: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: '0', background: isPaid ? 'var(--success)' : isLate ? 'var(--danger)' : 'var(--warning)' } }));
 
       // Info
-      var info = el('div', { style: { flex: 1 } });
+      var info = el('div', { style: { flex: '1', minWidth: '80px' } });
       info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '500' } }, fmtMonth(f.mois) + ' · ' + f.jours + 'j'));
       info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, isPaid ? 'Payée' : isLate ? 'En retard' : 'Échéance ' + fmtDate(paymentDate)));
       row.appendChild(info);
 
+      // Cycle URSSAF inline
+      row.appendChild(buildInlineCycleProgress(m, f));
+
       // Montant
-      row.appendChild(el('div', { style: { textAlign: 'right' } }, [
+      row.appendChild(el('div', { style: { textAlign: 'right', flexShrink: '0' } }, [
         el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(montant + tva)),
         tva > 0 ? el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'dont TVA ' + EUR(tva)) : null
       ]));
