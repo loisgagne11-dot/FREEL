@@ -13556,7 +13556,7 @@ function drawJoursParMissionChart() {
     var dataArr = months.map(function(monthKey) {
       var ligne = null;
       mis.lignes.forEach(function(l) { if (l.ym === monthKey) ligne = l; });
-      return ligne ? (ligne.joursReels || 0) : 0;
+      return ligne ? (ligne.joursPrevus || 0) : 0;
     });
     return {
       label: mis.client || mis.titre || 'Mission ' + (mi + 1),
@@ -13803,6 +13803,23 @@ function showWeeklyBreakdownModal(monthKey) {
     });
     holidayRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontWeight: '700', fontSize: '11px', color: '#f59e0b' } }, '-' + totalHolidays + 'j'));
     tbody.appendChild(holidayRow);
+  }
+
+  // V81: Ligne Congés posés (depuis mission.lignes)
+  var totalConges = 0;
+  activeMissions.forEach(function(mis) {
+    var ligne = null;
+    if (mis.lignes) mis.lignes.forEach(function(l) { if (l.ym === monthKey) ligne = l; });
+    if (ligne && ligne.conges > 0) totalConges += ligne.conges;
+  });
+  if (totalConges > 0) {
+    var congesRow = el('tr', { style: { background: 'rgba(96,165,250,0.06)' } });
+    congesRow.appendChild(el('td', { style: { padding: '6px 8px', borderBottom: '1px solid var(--glass-border)', fontSize: '11px', color: '#60a5fa', fontWeight: '600' } }, '🏖 Congés'));
+    weeks.forEach(function() {
+      congesRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontSize: '10px', color: 'var(--text-muted)' } }, ''));
+    });
+    congesRow.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontWeight: '700', fontSize: '11px', color: '#60a5fa' } }, '-' + totalConges + 'j'));
+    tbody.appendChild(congesRow);
   }
 
   // Ligne total
