@@ -3316,7 +3316,7 @@ function getAbsoluteProvisions() {
             mois: year + '-' + monthStr,
             montant: irMois,
             id: irMonthId,
-            source: 'IR prorata · ' + EUR(entry.caHT) + ' HT encaissé · IR ' + year + ': ' + EUR(irData.impot)
+            source: 'CA encaissé en ' + fmtMonthShort(year + '-' + String(entry.month + 1).padStart(2, '0')) + ' : ' + EUR(entry.caHT) + ' HT'
           });
         }
       });
@@ -3429,7 +3429,7 @@ function getAllChargesForType(typeName) {
             mois: year + '-' + monthStr,
             montant: irMois,
             id: irMonthId,
-            source: 'IR prorata · ' + EUR(entry.caHT) + ' HT encaissé · IR ' + year + ': ' + EUR(irData.impot)
+            source: 'CA encaissé en ' + fmtMonthShort(year + '-' + String(entry.month + 1).padStart(2, '0')) + ' : ' + EUR(entry.caHT) + ' HT'
           });
         }
       });
@@ -4443,7 +4443,7 @@ function compute() {
           md.charges.push({
             id: irId,
             cat: 'IR Estimé',
-            desc: 'IR prorata CA (' + EUR(irMois) + ' sur ' + EUR(md.encHT) + ' HT)',
+            desc: 'CA encaissé en ' + fmtMonthShort(month) + ' : ' + EUR(md.encHT) + ' HT',
             montant: irMois,
             mois: month
           });
@@ -4461,7 +4461,7 @@ function compute() {
               mois: month,
               montant: irMois,
               id: irId,
-              source: 'IR prorata · ' + EUR(md.encHT) + ' HT encaissé · IR ' + periodYear + ': ' + EUR(irData.impot)
+              source: 'CA encaissé en ' + fmtMonthShort(month) + ' : ' + EUR(md.encHT) + ' HT'
             });
           }
         }
@@ -5230,15 +5230,29 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
       ].filter(Boolean))
     ]));
 
-    // Items de cette année - triés: non payés d'abord, puis payés
+    // Items de cette année - triés par mois, puis non payés d'abord
     yearItems.sort(function(a, b) {
+      if (a.mois !== b.mois) return (a.mois || '').localeCompare(b.mois || '');
       var aPaid = isPaid(a.id) ? 1 : 0;
       var bPaid = isPaid(b.id) ? 1 : 0;
       if (aPaid !== bPaid) return aPaid - bPaid;
       return b.montant - a.montant;
     });
 
+    // Regrouper par mois à l'intérieur de l'année
+    var currentMonth = null;
     yearItems.forEach(function(item) {
+      var itemMonth = item.mois ? item.mois.substring(0, 7) : null;
+      if (itemMonth && itemMonth !== currentMonth) {
+        currentMonth = itemMonth;
+        var monthItems = yearItems.filter(function(i) { return i.mois && i.mois.substring(0, 7) === itemMonth; });
+        var monthTotal = monthItems.reduce(function(a, c) { return a + c.montant; }, 0);
+        var monthUnpaid = monthItems.filter(function(i) { return !isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+        listContainer.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 14px 6px 24px', marginTop: '4px' } }, [
+          el('span', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)' } }, '📆 ' + fmtMonth(itemMonth)),
+          el('span', { style: { fontSize: '11px', color: monthUnpaid > 0 ? color : 'var(--success)' } }, monthUnpaid > 0 ? EUR(monthUnpaid) : '✓ ' + EUR(monthTotal))
+        ]));
+      }
       var paid = isPaid(item.id);
       var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: paid ? 'rgba(34, 197, 94, 0.08)' : 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px', marginLeft: '12px', border: paid ? '1px solid rgba(34, 197, 94, 0.2)' : '1px solid transparent' } });
 
