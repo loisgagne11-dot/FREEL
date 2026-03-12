@@ -2818,6 +2818,7 @@ function calculateIR(revenuBrut, year) {
 function getIRForYear(year) {
   year = year || TODAY.getFullYear();
   var yearStr = String(year);
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var caEncaisse = 0;    // Factures déjà payées sur l'année
   var caAEncaisser = 0;  // Factures non payées mais paiement prévu sur l'année
   var detail = { encaisse: [], aEncaisser: [] };
@@ -2827,7 +2828,9 @@ function getIRForYear(year) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.jours <= 0) return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      // Utiliser datePaiementReel pour les factures payées (cohérence avec compute/getMonthsWithCA)
+      var paymentMonth = (f.status === 'payée' && f.datePaiementReel) ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (f.status === 'payée' && paymentMonth > nowYm) paymentMonth = nowYm;
       var paymentYear = paymentMonth.split('-')[0];
       if (paymentYear !== yearStr) return;
 
@@ -8835,6 +8838,102 @@ function showMonthDetail(monthKey) {
   openModal('formModal');
 }
 
+// Détail des factures composant le CA HT d'un mois (affiché au clic sur le graphique CA HT)
+function showMonthCAInvoices(monthKey) {
+  var data = COMPUTED;
+  var md = data.monthsData[monthKey];
+  if (!md) return;
+
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+
+  // Collecter les factures encaissées ce mois + factures à encaisser ce mois
+  var facturesEncaissees = [];
+  var facturesAEncaisser = [];
+  var totalEncHT = 0;
+  var totalAEncHT = 0;
+
+  MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.jours <= 0) return;
+      var paymentMonth = (f.status === 'payée' && f.datePaiementReel) ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (f.status === 'payée' && paymentMonth > nowYm) paymentMonth = nowYm;
+      if (paymentMonth !== monthKey) return;
+
+      if (f.status === 'payée') {
+        facturesEncaissees.push({ client: mis.client, mois: f.mois, montant: f.ht, numero: f.numero, datePaiement: f.datePaiementReel || paymentMonth });
+        totalEncHT += f.ht;
+      } else {
+        facturesAEncaisser.push({ client: mis.client, mois: f.mois, montant: f.ht, numero: f.numero, status: f.status });
+        totalAEncHT += f.ht;
+      }
+    });
+  });
+
+  $('#formModalTitle').textContent = '📊 CA HT ' + fmtMonth(monthKey);
+  var body = $('#formModalBody');
+  body.innerHTML = '';
+
+  // KPI résumé
+  var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' } });
+  kpis.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Encaissé HT'),
+    el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--success)' } }, EUR(totalEncHT))
+  ]));
+  if (totalAEncHT > 0) {
+    kpis.appendChild(el('div', { style: { textAlign: 'center', padding: '12px', background: 'rgba(251, 191, 36, 0.1)', borderRadius: '8px' } }, [
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'À Encaisser HT'),
+      el('div', { style: { fontSize: '20px', fontWeight: '800', color: 'var(--warning)' } }, EUR(totalAEncHT))
+    ]));
+  }
+  body.appendChild(kpis);
+
+  // Factures encaissées
+  if (facturesEncaissees.length > 0) {
+    body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '✅ Factures Encaissées (' + facturesEncaissees.length + ')'));
+    var list = el('div', { style: { maxHeight: '250px', overflowY: 'auto' } });
+    facturesEncaissees.sort(function(a, b) { return b.montant - a.montant; });
+    facturesEncaissees.forEach(function(f) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '4px', fontSize: '12px' } });
+      var info = el('div', { style: { flex: '1' } });
+      info.appendChild(el('div', { style: { fontWeight: '600' } }, f.client));
+      info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, (f.numero ? 'Facture ' + f.numero + ' · ' : '') + 'Mois: ' + fmtMonthShort(f.mois)));
+      row.appendChild(info);
+      row.appendChild(el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, EUR(f.montant) + ' HT'));
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+  }
+
+  // Factures à encaisser
+  if (facturesAEncaisser.length > 0) {
+    body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', margin: '16px 0 8px', textTransform: 'uppercase' } }, '⏳ Factures à Encaisser (' + facturesAEncaisser.length + ')'));
+    var list2 = el('div', { style: { maxHeight: '200px', overflowY: 'auto' } });
+    facturesAEncaisser.sort(function(a, b) { return b.montant - a.montant; });
+    facturesAEncaisser.forEach(function(f) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '4px', fontSize: '12px' } });
+      var info = el('div', { style: { flex: '1' } });
+      info.appendChild(el('div', { style: { fontWeight: '600' } }, f.client));
+      info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, (f.numero ? 'Facture ' + f.numero + ' · ' : '') + 'Mois: ' + fmtMonthShort(f.mois)));
+      row.appendChild(info);
+      row.appendChild(el('span', { style: { fontWeight: '700', color: 'var(--warning)' } }, EUR(f.montant) + ' HT'));
+      list2.appendChild(row);
+    });
+    body.appendChild(list2);
+  }
+
+  // Aucune facture
+  if (facturesEncaissees.length === 0 && facturesAEncaisser.length === 0) {
+    body.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '30px' } }, 'Aucune facture ce mois'));
+  }
+
+  // Bouton pour voir le détail complet du mois (charges, etc.)
+  body.appendChild(el('button', { class: 'btn btn-block', style: { marginTop: '16px', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }, onclick: function() { closeModal('formModal'); showMonthDetail(monthKey); } }, '📅 Voir détail complet du mois'));
+
+  openModal('formModal');
+}
+
 // Popup simplifié pour l'échéancier (juste les charges)
 function showTimelineMonthCharges(monthKey) {
   var data = COMPUTED;
@@ -14072,7 +14171,7 @@ function drawMainChart() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      onClick: function(e, els) { if (els.length) showMonthDetail(months[els[0].index]); },
+      onClick: function(e, els) { if (els.length) showMonthCAInvoices(months[els[0].index]); },
       plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 } } } },
       scales: {
         x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
