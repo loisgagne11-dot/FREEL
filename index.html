@@ -3437,7 +3437,7 @@ function getAllChargesForType(typeName) {
           var sourceText = 'CA encaissé en ' + fmtMonthShort(year + '-' + monthStr) + ' : ' + EUR(entry.caHT) + ' HT';
           if (entry.factures && entry.factures.length > 0) {
             sourceText += '\n' + entry.factures.map(function(fac) {
-              return '• ' + fac.client + (fac.numero ? ' (F' + fac.numero + ')' : '') + ' : ' + EUR(fac.ht) + ' HT';
+              return '• ' + fac.client + ' · ' + fmtMonthShort(fac.mois) + (fac.numero ? ' (F' + fac.numero + ')' : '') + ' : ' + EUR(fac.ht) + ' HT';
             }).join('\n');
           }
           items.push({
