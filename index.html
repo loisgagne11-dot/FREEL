@@ -1897,12 +1897,12 @@ var LEGAL = (function() {
     seuilTVAVente: l.tva.seuilVente,
     seuilTVAVenteMajore: l.tva.seuilVenteMajore,
     acreDureeQuarters: l.acreDureeQuarters,
-    // Accès direct aux taux par année (rétro-compat)
-    urssafStd2025: 0.246,
-    urssafStd2026: 0.256,
-    urssafAcre2025: 0.123,
-    urssafAcre2026: 0.128,
-    lastUpdated: '2026-02-23'
+    // Accès direct aux taux par année (source: LEGAL_BY_YEAR)
+    urssafStd2025: getLegal(2025).urssaf[type].standard,
+    urssafStd2026: getLegal(2026).urssaf[type].standard,
+    urssafAcre2025: getLegal(2025).urssaf[type].acre,
+    urssafAcre2026: getLegal(2026).urssaf[type].acre,
+    lastUpdated: '2026-03-12'
   };
 })();
 
@@ -1914,6 +1914,41 @@ var SCENARIOS = {
 
 // Rétro-compatibilité IR_BRACKETS
 var IR_BRACKETS = getLegalIRBrackets(CURRENT_YEAR);
+
+// ===== SOURCE UNIQUE: Catégories de charges fiscales/sociales =====
+var CHARGE_TYPES = {
+  'URSSAF':    { label: 'URSSAF - Cotisations sociales', shortLabel: 'URSSAF',     icon: '🏥', color: '#ef4444', desc: 'Maladie, retraite, allocations familiales', penalty: '5% + 0.2%/mois après 30j' },
+  'TVA':       { label: 'TVA - Taxe sur la Valeur Ajoutée', shortLabel: 'TVA',     icon: '🏛️', color: '#ec4899', desc: 'Collectée sur factures, reversée à l\'État', penalty: '10% + intérêts de retard' },
+  'IR':        { label: 'Impôt sur le Revenu',          shortLabel: 'Impôt Revenu', icon: '💰', color: '#f59e0b', desc: 'Impôt sur les bénéfices', penalty: '10% majoration' },
+  'CFP':       { label: 'Contribution Formation Pro',   shortLabel: 'CFP',          icon: '📚', color: '#8b5cf6', desc: 'Formation professionnelle', penalty: '5% + intérêts' },
+  'CFE':       { label: 'Cotisation Foncière des Entreprises', shortLabel: 'CFE',   icon: '🏢', color: '#6b7280', desc: 'Impôt local', penalty: '10% après mise en demeure' },
+  'Impôt PL':  { label: 'Prélèvement Libératoire',     shortLabel: 'Impôt PL',     icon: '📋', color: '#f97316', desc: 'Impôt forfaitaire sur le revenu', penalty: '10% majoration' },
+  'Autres':    { label: 'Autres dépenses',              shortLabel: 'Autres',       icon: '📦', color: '#94a3b8', desc: 'Dépenses professionnelles diverses', penalty: '-' }
+};
+
+// Helper: obtenir la couleur d'une catégorie de charge
+function getChargeTypeColor(cat) {
+  if (CHARGE_TYPES[cat]) return CHARGE_TYPES[cat].color;
+  // Fallback pour les variantes (IR Estimé, Impôt, etc.)
+  if (cat && (cat.indexOf('Impôt') >= 0 || cat.indexOf('IR') >= 0)) return CHARGE_TYPES['IR'].color;
+  return CHARGE_TYPES['URSSAF'].color;
+}
+
+// Helper: obtenir les infos d'une catégorie (pour les modales de détail)
+function getChargeTypeInfo(categoryId) {
+  var info = CHARGE_TYPES[categoryId];
+  if (info) return info;
+  // Fallback
+  return { label: categoryId, shortLabel: categoryId, icon: '📋', color: '#94a3b8', desc: '', penalty: '-' };
+}
+
+// Helper: liste ordonnée des catégories (pour graphiques)
+function getChargeTypesList() {
+  return ['URSSAF', 'TVA', 'IR', 'CFP', 'CFE', 'Impôt PL', 'Autres'].map(function(id) {
+    var t = CHARGE_TYPES[id];
+    return { id: id, label: t.shortLabel, icon: t.icon, color: t.color };
+  });
+}
 
 var COMPANY = {
   nom: 'Loïs MUSIC',
@@ -1946,7 +1981,7 @@ var MISSIONS = [
     tjm: 380,
     debut: '2025-05-12',
     fin: '2026-03-31',
-    statut: 'en_cours',
+    statut: 'active',
     lignes: [],
     factures: []
   }
@@ -4042,8 +4077,8 @@ function getUpcomingDeadlines() {
           label: t.label,
           date: t.date,
           daysLeft: diff,
-          color: '#f472b6',
-          icon: '🏛️'
+          color: CHARGE_TYPES['TVA'].color,
+          icon: CHARGE_TYPES['TVA'].icon
         });
       }
     });
@@ -4060,8 +4095,8 @@ function getUpcomingDeadlines() {
         label: 'Acompte IR',
         date: irDate,
         daysLeft: irDiff,
-        color: '#fbbf24',
-        icon: '💰'
+        color: CHARGE_TYPES['IR'].color,
+        icon: CHARGE_TYPES['IR'].icon
       });
     }
   }
@@ -4978,10 +5013,10 @@ function showCashDetail() {
   // CA TTC → HT
   calc.appendChild(row('💵 CA Encaissé TTC', '+ ' + EUR(data.caEnc), 'var(--success)', true, false, function() { closeModal('detailModal'); showDetailList('Factures Encaissées', data.detailEncaisse, 'success', function(i) { return i.client + ' · ' + fmtMonthShort(i.mois); }); }));
   if (tvaTotal > 0) {
-    calc.appendChild(row('↳ TVA collectée', '- ' + EUR(tvaTotal), '#f472b6', false, true));
+    calc.appendChild(row('↳ TVA collectée', '- ' + EUR(tvaTotal), CHARGE_TYPES['TVA'].color, false, true));
     if (data.tvaDeductible > 0) {
       calc.appendChild(row('↳ TVA déductible (achats)', '+ ' + EUR(data.tvaDeductible), '#34d399', false, true));
-      calc.appendChild(row('↳ TVA nette à reverser', EUR(data.tvaNette), '#f472b6', false, true));
+      calc.appendChild(row('↳ TVA nette à reverser', EUR(data.tvaNette), CHARGE_TYPES['TVA'].color, false, true));
     }
   }
   calc.appendChild(row('= CA HT', EUR(caHT), 'var(--info)', true));
@@ -5039,12 +5074,12 @@ function showCashDetail() {
     var tvaNetProv = Math.max(0, allTvaProv - (data.tvaDeductible || 0));
     var tvaLabel = data.tvaDeductible > 0 ? '📦 TVA nette à reverser' + pctOfSolde(tvaNetProv) : '📦 TVA à reverser' + pctOfSolde(allTvaProv);
     var tvaMontant = data.tvaDeductible > 0 ? tvaNetProv : allTvaProv;
-    calc.appendChild(row(tvaLabel, '- ' + EUR(tvaMontant), '#f472b6', false, false, function() { closeModal('detailModal'); showProvisionTypeDetail('TVA', allTvaPItems, '#f472b6'); }));
+    calc.appendChild(row(tvaLabel, '- ' + EUR(tvaMontant), CHARGE_TYPES['TVA'].color, false, false, function() { closeModal('detailModal'); showProvisionTypeDetail('TVA', allTvaPItems, CHARGE_TYPES['TVA'].color); }));
     if (data.tvaDeductible > 0) {
       calc.appendChild(row('  ↳ Collectée: ' + EUR(allTvaProv) + ' - Déductible: ' + EUR(data.tvaDeductible), '', '#a78bfa', false, true));
     }
   }
-  if (allIrProv > 0) calc.appendChild(row('📦 IR à payer' + pctOfSolde(allIrProv), '- ' + EUR(allIrProv), '#fbbf24', false, false, function() { closeModal('detailModal'); showProvisionTypeDetail('IR', allIrPItems, '#fbbf24'); }));
+  if (allIrProv > 0) calc.appendChild(row('📦 IR à payer' + pctOfSolde(allIrProv), '- ' + EUR(allIrProv), CHARGE_TYPES['IR'].color, false, false, function() { closeModal('detailModal'); showProvisionTypeDetail('IR', allIrPItems, CHARGE_TYPES['IR'].color); }));
   
   // URSSAF + CFP combinés (même paiement URSSAF)
   var urssafProv = allAutresPItems.filter(function(c) { return c.cat === 'URSSAF'; }).reduce(function(a, c) { return a + c.montant; }, 0);
@@ -6004,13 +6039,9 @@ function showProvisionMonthDetail(monthKey) {
   openModal('formModal');
 }
 
-// Helper pour couleur par type de charge
+// Helper pour couleur par type de charge (utilise CHARGE_TYPES comme source unique)
 function getChargeColor(cat) {
-  if (cat === 'TVA') return '#f472b6';
-  if (cat.indexOf('Impôt') >= 0 || cat.indexOf('IR') >= 0) return '#fbbf24';
-  if (cat === 'URSSAF') return 'var(--danger)';
-  if (cat === 'CFP') return 'var(--danger)';
-  return 'var(--danger)';
+  return getChargeTypeColor(cat);
 }
 
 function showProvisionsDetail() {
@@ -6110,11 +6141,11 @@ function showProvisionsDetail() {
     }
     if (absTypes['TVA']) {
       var ids2 = allProv.filter(function(c) { return c.cat === 'TVA'; }).map(function(c) { return c.id; });
-      btns.appendChild(el('button', { class: 'btn btn-sm', style: { background: '#f472b6', color: 'white' }, onclick: function() { markAllPaid(ids2); closeModal('formModal'); } }, '✅ TVA'));
+      btns.appendChild(el('button', { class: 'btn btn-sm', style: { background: CHARGE_TYPES['TVA'].color, color: 'white' }, onclick: function() { markAllPaid(ids2); closeModal('formModal'); } }, '✅ TVA'));
     }
     if (absTypes['Impôt'] || absTypes['IR Estimé']) {
       var ids3 = allProv.filter(function(c) { return c.cat.indexOf('Impôt') >= 0 || c.cat.indexOf('IR') >= 0; }).map(function(c) { return c.id; });
-      btns.appendChild(el('button', { class: 'btn btn-sm', style: { background: '#fbbf24', color: 'black' }, onclick: function() { markAllPaid(ids3); closeModal('formModal'); } }, '✅ Impôts'));
+      btns.appendChild(el('button', { class: 'btn btn-sm', style: { background: CHARGE_TYPES['IR'].color, color: 'black' }, onclick: function() { markAllPaid(ids3); closeModal('formModal'); } }, '✅ Impôts'));
     }
     body.appendChild(btns);
   }
@@ -6303,10 +6334,10 @@ function showWaterfallDetail() {
   var bloc1 = el('div', { style: { marginBottom: '20px' } });
   bloc1.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '① CA TTC → CA HT'));
   bloc1.appendChild(row('CA Encaissé TTC', EUR(data.caEnc), 'var(--success)', true));
-  bloc1.appendChild(row('- TVA collectée', '- ' + EUR(tvaTotal), '#f472b6', false, true));
+  bloc1.appendChild(row('- TVA collectée', '- ' + EUR(tvaTotal), CHARGE_TYPES['TVA'].color, false, true));
   if (data.tvaDeductible > 0) {
     bloc1.appendChild(row('+ TVA déductible', '+ ' + EUR(data.tvaDeductible), '#34d399', false, true));
-    bloc1.appendChild(row('= TVA nette', EUR(data.tvaNette), '#f472b6', false, true));
+    bloc1.appendChild(row('= TVA nette', EUR(data.tvaNette), CHARGE_TYPES['TVA'].color, false, true));
   }
   bloc1.appendChild(row('= CA HT', EUR(caHT), 'var(--info)', true));
   body.appendChild(bloc1);
@@ -6331,7 +6362,7 @@ function showWaterfallDetail() {
   bloc3.appendChild(row('Bénéfice Brut', EUR(beneficeBrut), beneficeBrut >= 0 ? 'var(--success)' : 'var(--danger)', true));
   if (irTotal > 0) {
     var irPct = Math.abs(beneficeBrut) > 0 ? irTotal / Math.abs(beneficeBrut) : 0;
-    bloc3.appendChild(row('- Impôt/IR (' + PCT(irPct) + ')', '- ' + EUR(irTotal), '#fbbf24', false, true));
+    bloc3.appendChild(row('- Impôt/IR (' + PCT(irPct) + ')', '- ' + EUR(irTotal), CHARGE_TYPES['IR'].color, false, true));
   }
   body.appendChild(bloc3);
   
@@ -6344,8 +6375,8 @@ function showWaterfallDetail() {
   
   // Légende couleurs
   body.appendChild(el('div', { style: { display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px', fontSize: '10px' } }, [
-    el('span', { style: { color: '#f472b6' } }, '● TVA'),
-    el('span', { style: { color: '#fbbf24' } }, '● IR'),
+    el('span', { style: { color: CHARGE_TYPES['TVA'].color } }, '● TVA'),
+    el('span', { style: { color: CHARGE_TYPES['IR'].color } }, '● IR'),
     el('span', { style: { color: 'var(--danger)' } }, '● Charges')
   ]));
   
@@ -8757,10 +8788,10 @@ function showMonthDetail(monthKey) {
   var donutColors = [];
   var donutLabels = [];
 
-  if (urssafMonth > 0) { donutData.push(urssafMonth); donutColors.push('#f87171'); donutLabels.push('URSSAF/CFP'); }
-  if (tvaMonth > 0) { donutData.push(tvaMonth); donutColors.push('#ec4899'); donutLabels.push('TVA'); }
-  if (irMonth > 0) { donutData.push(irMonth); donutColors.push('#f59e0b'); donutLabels.push('IR/Impôts'); }
-  if (autresCharges > 0) { donutData.push(autresCharges); donutColors.push('#8b5cf6'); donutLabels.push('Autres'); }
+  if (urssafMonth > 0) { donutData.push(urssafMonth); donutColors.push(CHARGE_TYPES['URSSAF'].color); donutLabels.push('URSSAF/CFP'); }
+  if (tvaMonth > 0) { donutData.push(tvaMonth); donutColors.push(CHARGE_TYPES['TVA'].color); donutLabels.push('TVA'); }
+  if (irMonth > 0) { donutData.push(irMonth); donutColors.push(CHARGE_TYPES['IR'].color); donutLabels.push('IR/Impôts'); }
+  if (autresCharges > 0) { donutData.push(autresCharges); donutColors.push(CHARGE_TYPES['Autres'].color); donutLabels.push('Autres'); }
   if (md.salaires > 0) { donutData.push(md.salaires); donutColors.push('#22d3ee'); donutLabels.push('Salaires'); }
   if (capaciteRemuneration > 0) { donutData.push(capaciteRemuneration); donutColors.push('#10b981'); donutLabels.push('Disponible'); }
 
@@ -8792,8 +8823,8 @@ function showMonthDetail(monthKey) {
   ]));
   if (tvaMonth > 0) {
     calc.appendChild(el('div', { class: 'detail-row', style: { paddingLeft: '12px' } }, [
-      el('span', { style: { color: '#f472b6', fontSize: '11px' } }, '↳ TVA'),
-      el('span', { style: { fontWeight: '500', color: '#f472b6', fontSize: '11px' } }, '- ' + EUR(tvaMonth))
+      el('span', { style: { color: CHARGE_TYPES['TVA'].color, fontSize: '11px' } }, '↳ TVA'),
+      el('span', { style: { fontWeight: '500', color: CHARGE_TYPES['TVA'].color, fontSize: '11px' } }, '- ' + EUR(tvaMonth))
     ]));
   }
   calc.appendChild(el('div', { class: 'detail-row', style: { background: 'var(--bg-tertiary)', margin: '6px -14px', padding: '8px 14px' } }, [
@@ -9470,7 +9501,7 @@ function renderChargesPanel(container) {
     var types = {};
     charges.aPayer.forEach(function(c) { types[c.cat] = true; });
     if (types['URSSAF']) footer.appendChild(el('button', { class: 'btn btn-success', onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'URSSAF'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); saveAll(); render(); toast('URSSAF marqué payé', 'success'); } }, '✓ URSSAF'));
-    if (types['TVA']) footer.appendChild(el('button', { class: 'btn', style: { background: '#ec4899', color: 'white' }, onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'TVA'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); saveAll(); render(); toast('TVA marquée payée', 'success'); } }, '✓ TVA'));
+    if (types['TVA']) footer.appendChild(el('button', { class: 'btn', style: { background: CHARGE_TYPES['TVA'].color, color: 'white' }, onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'TVA'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); saveAll(); render(); toast('TVA marquée payée', 'success'); } }, '✓ TVA'));
     panel.appendChild(footer);
   }
   container.appendChild(panel);
@@ -10729,9 +10760,9 @@ function renderDashboardHero(container, data) {
 
   // Couleurs provisions
   var colorCash = '#22c55e';
-  var colorIR = '#f59e0b';
-  var colorTVA = '#ec4899';
-  var colorURSSAF = '#f87171';
+  var colorIR = CHARGE_TYPES['IR'].color;
+  var colorTVA = CHARGE_TYPES['TVA'].color;
+  var colorURSSAF = CHARGE_TYPES['URSSAF'].color;
   var colorAutres = '#a855f7';
 
   var compteContainer = el('div', { style: {
@@ -11091,7 +11122,7 @@ function renderCAPlafondWidget(container) {
     tvaDetail = 'CA encaissé ' + EUR(currentCA) + ' > seuil majoré ' + EUR(seuilTVAMajore) + '. Facturez la TVA dès maintenant.';
   } else if (currentCA > seuilTVA || caTotal > seuilTVA) {
     showTVA = true;
-    tvaBg = 'rgba(236, 72, 153, 0.08)'; tvaBorder = '1px solid rgba(236, 72, 153, 0.15)'; tvaColor = '#ec4899';
+    tvaBg = 'rgba(236, 72, 153, 0.08)'; tvaBorder = '1px solid rgba(236, 72, 153, 0.15)'; tvaColor = CHARGE_TYPES['TVA'].color;
     if (currentCA > seuilTVA) {
       tvaSummary = '💰 Franchise TVA dépassée · TVA due au 1er jan. ' + (year + 1);
       tvaDetail = 'CA encaissé ' + EUR(currentCA) + ' > franchise ' + EUR(seuilTVA) + '. Préparez vos factures avec TVA dès janvier.';
@@ -11420,8 +11451,8 @@ function renderActionsAndMilestones(container) {
     timeline.appendChild(line);
 
     // Couleurs par catégorie
-    var catColors = { urssaf: '#10b981', tva: '#ec4899', ir: '#f59e0b', cfe: '#8b5cf6', acre: '#06b6d4', mission: '#60a5fa' };
-    var catBg = { urssaf: 'rgba(16,185,129,0.12)', tva: 'rgba(236,72,153,0.12)', ir: 'rgba(245,158,11,0.12)', cfe: 'rgba(139,92,246,0.12)', acre: 'rgba(6,182,212,0.12)', mission: 'rgba(96,165,250,0.12)' };
+    var catColors = { urssaf: CHARGE_TYPES['URSSAF'].color, tva: CHARGE_TYPES['TVA'].color, ir: CHARGE_TYPES['IR'].color, cfe: CHARGE_TYPES['CFE'].color, acre: '#06b6d4', mission: '#60a5fa' };
+    var catBg = { urssaf: 'rgba(239,68,68,0.12)', tva: 'rgba(236,72,153,0.12)', ir: 'rgba(245,158,11,0.12)', cfe: 'rgba(107,114,128,0.12)', acre: 'rgba(6,182,212,0.12)', mission: 'rgba(96,165,250,0.12)' };
 
     // Trouver le premier futur pour scroll auto
     var firstFutureIdx = -1;
@@ -11685,16 +11716,8 @@ function renderChargesSubTab(container, data) {
   // V57: Utiliser CA HT encaissé pour les calculs
   var caHT = data.caHT || data.caEnc || 1;
 
-  // Catégories avec couleurs
-  var categories = [
-    { id: 'URSSAF', label: 'URSSAF', icon: '🏥', color: '#ef4444' },
-    { id: 'TVA', label: 'TVA', icon: '🏛️', color: '#3b82f6' },
-    { id: 'IR', label: 'Impôt Revenu', icon: '💰', color: '#f59e0b' },
-    { id: 'CFP', label: 'CFP', icon: '📚', color: '#8b5cf6' },
-    { id: 'CFE', label: 'CFE', icon: '🏢', color: '#6b7280' },
-    { id: 'Impôt PL', label: 'Impôt PL', icon: '📋', color: '#f97316' },
-    { id: 'Autres', label: 'Autres', icon: '📦', color: '#94a3b8' }
-  ];
+  // Catégories avec couleurs (source unique: CHARGE_TYPES)
+  var categories = getChargeTypesList();
 
   // V57: Utiliser les données filtrées par période (detailChargesPayees + detailChargesAPayer)
   // au lieu des provisions absolues
@@ -11983,16 +12006,15 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
     }
     return stdRate + ' du CA HT';
   })();
-  var catInfo = {
-    'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: urssafRateText, desc: 'Maladie, retraite, allocations familiales' },
-    'TVA': { label: 'TVA - Taxe sur la Valeur Ajoutée', rate: '20% du CA HT', desc: 'Collectée sur factures, reversée à l\'État' },
-    'IR': { label: 'Impôt sur le Revenu', rate: 'Barème progressif ou 2.2% (PL)', desc: 'Impôt sur les bénéfices' },
-    'CFP': { label: 'Contribution Formation Pro', rate: '0.2% du CA HT', desc: 'Formation professionnelle' },
-    'CFE': { label: 'Cotisation Foncière des Entreprises', rate: 'Variable selon commune', desc: 'Impôt local' },
-    'Impôt PL': { label: 'Prélèvement Libératoire', rate: '2.2% du CA HT', desc: 'Impôt forfaitaire sur le revenu' },
-    'Autres': { label: 'Autres dépenses', rate: 'Variable', desc: 'Dépenses professionnelles diverses' }
-  };
-  var info = catInfo[categoryId] || { label: categoryId, rate: '-', desc: '' };
+  // Utiliser CHARGE_TYPES comme source unique + enrichir avec le taux URSSAF dynamique
+  var baseInfo = getChargeTypeInfo(categoryId);
+  var rateText = categoryId === 'URSSAF' ? urssafRateText :
+                 categoryId === 'TVA' ? '20% du CA HT' :
+                 categoryId === 'IR' ? 'Barème progressif ou 2.2% (PL)' :
+                 categoryId === 'CFP' ? '0.2% du CA HT' :
+                 categoryId === 'CFE' ? 'Variable selon commune' :
+                 categoryId === 'Impôt PL' ? '2.2% du CA HT' : 'Variable';
+  var info = { label: baseInfo.label, rate: rateText, desc: baseInfo.desc };
 
   var content = el('div', { style: { padding: '10px' } });
 
@@ -12131,13 +12153,13 @@ function showChargeDetail(categoryId, data) {
     }
     return PCT(getUrssafRate()) + ' du CA HT';
   })();
-  var catInfo = {
-    'URSSAF': { label: 'URSSAF - Cotisations sociales', rate: urssafRateText, penalty: '5% + 0.2%/mois après 30j' },
-    'TVA': { label: 'TVA - Taxe sur la Valeur Ajoutée', rate: '20% du CA HT', penalty: '10% + intérêts de retard' },
-    'IR': { label: 'Impôt sur le Revenu', rate: 'Barème progressif', penalty: '10% majoration' },
-    'CFE': { label: 'Cotisation Foncière des Entreprises', rate: 'Variable selon commune', penalty: '10% après mise en demeure' }
-  };
-  var info = catInfo[categoryId] || { label: categoryId, rate: '-', penalty: '-' };
+  // Utiliser CHARGE_TYPES comme source unique + enrichir avec le taux URSSAF dynamique
+  var baseInfo = getChargeTypeInfo(categoryId);
+  var rateText = categoryId === 'URSSAF' ? urssafRateText :
+                 categoryId === 'TVA' ? '20% du CA HT' :
+                 categoryId === 'IR' ? 'Barème progressif' :
+                 categoryId === 'CFE' ? 'Variable selon commune' : '-';
+  var info = { label: baseInfo.label, rate: rateText, penalty: baseInfo.penalty };
   
   var content = el('div', { style: { padding: '10px' } });
   
@@ -12537,8 +12559,8 @@ function renderFinancesPerformance(container) {
   if (caHT > 0) {
     // Construire segments triés par valeur décroissante
     var reductions = [
-      { label: 'URSSAF/CFP', value: segURSSAF, color: '#f87171' },
-      { label: 'IR/Impôt', value: segIR, color: '#f59e0b' },
+      { label: 'URSSAF/CFP', value: segURSSAF, color: CHARGE_TYPES['URSSAF'].color },
+      { label: 'IR/Impôt', value: segIR, color: CHARGE_TYPES['IR'].color },
       { label: 'Salaires', value: segSalaires, color: '#22d3ee' },
       { label: 'Autres charges', value: segAutres, color: '#a855f7' }
     ].filter(function(r) { return r.value > 0; }).sort(function(a, b) { return b.value - a.value; });
@@ -13223,10 +13245,10 @@ function renderAnalyseContent(container) {
 
   // V72: Waterfall data - triées en décroissant (sauf CA en premier et Marge en dernier)
   var chargesBars = [
-    { id: 'urssaf', label: 'Charges sociales', value: chargesURSSAF, color: 'var(--danger)', icon: '🏥', detail: 'URSSAF + CFP' },
-    { id: 'tva', label: 'TVA à reverser', value: chargesTVA, color: '#ec4899', icon: '🏛️' },
-    { id: 'ir', label: 'IR / Impôts', value: chargesIR, color: '#f59e0b', icon: '🧾' },
-    { id: 'autres', label: 'Autres dépenses', value: autresDepenses, color: 'var(--text-muted)', icon: '📋' }
+    { id: 'urssaf', label: 'Charges sociales', value: chargesURSSAF, color: CHARGE_TYPES['URSSAF'].color, icon: CHARGE_TYPES['URSSAF'].icon, detail: 'URSSAF + CFP' },
+    { id: 'tva', label: 'TVA à reverser', value: chargesTVA, color: CHARGE_TYPES['TVA'].color, icon: CHARGE_TYPES['TVA'].icon },
+    { id: 'ir', label: 'IR / Impôts', value: chargesIR, color: CHARGE_TYPES['IR'].color, icon: '🧾' },
+    { id: 'autres', label: 'Autres dépenses', value: autresDepenses, color: CHARGE_TYPES['Autres'].color, icon: CHARGE_TYPES['Autres'].icon }
   ].filter(function(d) { return d.value > 0; }).sort(function(a, b) { return b.value - a.value; });
 
   // Reconstruire avec cumuls
@@ -13322,8 +13344,8 @@ function renderAnalyseContent(container) {
   var legendItems = [
     { label: 'Revenu', color: 'var(--success)' },
     { label: 'Charges sociales', color: 'var(--danger)' },
-    { label: 'TVA', color: '#ec4899' },
-    { label: 'Impôts', color: '#f59e0b' },
+    { label: 'TVA', color: CHARGE_TYPES['TVA'].color },
+    { label: 'Impôts', color: CHARGE_TYPES['IR'].color },
     { label: 'Marge', color: 'var(--accent)' }
   ];
   legendItems.forEach(function(l) {
@@ -13358,7 +13380,7 @@ function renderAnalyseContent(container) {
   addRatioCard('Marge nette', netDisponible, 'var(--accent)', margeRate);
   addRatioCard('Total charges', totalCharges, 'var(--danger)', chargesRate);
   addRatioCard('Charges sociales', chargesURSSAF, 'var(--warning)', urssafRate);
-  addRatioCard('IR / Impôts', chargesIR, '#f59e0b', irRate);
+  addRatioCard('IR / Impôts', chargesIR, CHARGE_TYPES['IR'].color, irRate);
 
   ratiosCard.appendChild(ratiosGrid);
   container.appendChild(ratiosCard);
@@ -13453,20 +13475,20 @@ function showWaterfallDetail(d, data) {
     totalCat = data.caHT || 0;
   } else if (d.id === 'urssaf') {
     items.push({ label: 'URSSAF', value: 0, color: 'var(--danger)' });
-    items.push({ label: 'CFP', value: 0, color: '#f87171' });
+    items.push({ label: 'CFP', value: 0, color: CHARGE_TYPES['CFP'].color });
     (data.detailChargesAPayer || []).concat(data.detailChargesPayees || []).forEach(function(c) {
       if (c.cat === 'URSSAF') items[0].value += c.montant;
       else if (c.cat === 'CFP') items[1].value += c.montant;
     });
     totalCat = items[0].value + items[1].value;
   } else if (d.id === 'tva') {
-    items.push({ label: 'TVA à reverser', value: 0, color: '#ec4899' });
+    items.push({ label: 'TVA à reverser', value: 0, color: CHARGE_TYPES['TVA'].color });
     (data.detailChargesAPayer || []).concat(data.detailChargesPayees || []).forEach(function(c) {
       if (c.cat === 'TVA') items[0].value += c.montant;
     });
     totalCat = items[0].value;
   } else if (d.id === 'ir') {
-    items.push({ label: 'IR Estimé', value: 0, color: '#f59e0b' });
+    items.push({ label: 'IR Estimé', value: 0, color: CHARGE_TYPES['IR'].color });
     (data.detailChargesAPayer || []).concat(data.detailChargesPayees || []).forEach(function(c) {
       if (c.cat === 'IR' || c.cat === 'IR Estimé') items[0].value += c.montant;
     });
@@ -15619,12 +15641,12 @@ function renderAdmin(container) {
   // Prélèvement Libératoire ou IR
   if (COMPANY.prelevementLiberatoire) {
     echeancesInfo.appendChild(createEcheanceRow(
-      '💰', 'Prélèvement Libératoire (' + PCT(LEGAL.impLib) + ')', 'Avec URSSAF', '#fbbf24',
+      CHARGE_TYPES['IR'].icon, 'Prélèvement Libératoire (' + PCT(LEGAL.impLib) + ')', 'Avec URSSAF', CHARGE_TYPES['IR'].color,
       'Prélevé automatiquement en même temps que les cotisations URSSAF.<br>Condition: RFR N-2 ≤ 29 315€ (1 part)'
     ));
   } else {
     echeancesInfo.appendChild(createEcheanceRow(
-      '💰', 'Impôt sur le Revenu', '15 de chaque mois', '#fbbf24',
+      CHARGE_TYPES['IR'].icon, 'Impôt sur le Revenu', '15 de chaque mois', CHARGE_TYPES['IR'].color,
       '<b>Acomptes mensuels:</b> 15/01, 15/02, 15/03...<br><b>Trimestriel:</b> 15/02, 15/05, 15/08, 15/11<br><b>Déclaration:</b> Mai-Juin · <b>Solde:</b> 25 septembre'
     ));
   }
@@ -15632,7 +15654,7 @@ function renderAdmin(container) {
   // TVA
   if (COMPANY.tvaDepuis) {
     echeancesInfo.appendChild(createEcheanceRow(
-      '🏛️', 'TVA (régime simplifié)', 'Mai + Acomptes', '#f472b6',
+      '🏛️', 'TVA (régime simplifié)', 'Mai + Acomptes', CHARGE_TYPES['TVA'].color,
       '<b>Déclaration CA12:</b> ~5 mai (2ème jour ouvré après 1er mai)<br><b>Acompte 55%:</b> 15-24 juillet<br><b>Acompte 40%:</b> 15-24 décembre'
     ));
   } else {
