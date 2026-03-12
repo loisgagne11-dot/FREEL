@@ -12344,14 +12344,15 @@ function renderFinancesEvolution(container) {
     if (canvas._chartInstance) canvas._chartInstance.destroy();
     var months = getPeriodMonths();
     var dataSal = months.map(function(m) { return data.monthsData[m] ? data.monthsData[m].salaires : 0; });
-    // Capacité rémunération par mois = CA HT encaissé - charges (URSSAF + CFP + impLib si applicable)
+    // Capacité rémunération par mois = CA HT - toutes charges hors TVA (URSSAF, CFP, IR, impLib, charges manuelles...)
     var dataCapacite = months.map(function(m) {
       var md = data.monthsData[m];
       if (!md || !md.encHT) return 0;
-      var ca = md.encHT;
-      var rate = getUrssafRate(m);
-      var totalRate = rate + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
-      return Math.round(ca * (1 - totalRate));
+      var chargesHorsTVA = 0;
+      (md.charges || []).forEach(function(ch) {
+        if (ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
+      });
+      return Math.max(0, md.encHT - chargesHorsTVA);
     });
     var salLabelPlugin = {
       id: 'salLabelPlugin',
