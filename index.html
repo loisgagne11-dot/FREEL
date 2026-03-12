@@ -3299,18 +3299,13 @@ function getAbsoluteProvisions() {
     // Helper pour ajouter les acomptes IR au prorata du CA HT encaissé
     function addIRMonthlyProvisions(year, irData, monthsWithCA) {
       if (irData.impot <= 0 || monthsWithCA.length === 0) return;
-      var totalCA = monthsWithCA.reduce(function(acc, e) { return acc + e.caHT; }, 0);
+      var caTotalAnnuel = irData.caTotal || monthsWithCA.reduce(function(acc, e) { return acc + e.caHT; }, 0);
       var irDistribue = 0;
 
       monthsWithCA.forEach(function(entry, idx) {
         var monthStr = String(entry.month + 1).padStart(2, '0');
         var irMonthId = 'IR-' + year + '-' + monthStr;
-        var irMois;
-        if (idx === monthsWithCA.length - 1) {
-          irMois = irData.impot - irDistribue;
-        } else {
-          irMois = totalCA > 0 ? Math.round(irData.impot * entry.caHT / totalCA) : 0;
-        }
+        var irMois = caTotalAnnuel > 0 ? Math.round(irData.impot * entry.caHT / caTotalAnnuel) : 0;
         irDistribue += irMois;
 
         if (!isPaid(irMonthId) && irMois > 0) {
@@ -3419,18 +3414,13 @@ function getAllChargesForType(typeName) {
     // Helper pour ajouter les acomptes IR au prorata du CA HT encaissé
     function addIRItems(year, irData, monthsWithCA) {
       if (irData.impot <= 0 || monthsWithCA.length === 0) return;
-      var totalCA = monthsWithCA.reduce(function(acc, e) { return acc + e.caHT; }, 0);
+      var caTotalAnnuel = irData.caTotal || monthsWithCA.reduce(function(acc, e) { return acc + e.caHT; }, 0);
       var irDistribue = 0;
 
       monthsWithCA.forEach(function(entry, idx) {
         var monthStr = String(entry.month + 1).padStart(2, '0');
         var irMonthId = 'IR-' + year + '-' + monthStr;
-        var irMois;
-        if (idx === monthsWithCA.length - 1) {
-          irMois = irData.impot - irDistribue;
-        } else {
-          irMois = totalCA > 0 ? Math.round(irData.impot * entry.caHT / totalCA) : 0;
-        }
+        var irMois = caTotalAnnuel > 0 ? Math.round(irData.impot * entry.caHT / caTotalAnnuel) : 0;
         irDistribue += irMois;
 
         if (irMois > 0) {
@@ -4440,17 +4430,12 @@ function compute() {
       });
 
       // Distribuer l'IR au prorata du CA HT encaissé par mois
-      // Un mois avec 2× plus de CA = 2× plus d'IR provisionné
+      // Dénominateur = CA total annuel prévu (encaissé + à encaisser) pour ne pas concentrer l'IR sur les seuls mois passés
       var irDistribue = 0;
+      var caTotalAnnuel = irData.caTotal || totalEncHT;
       monthsWithEncaisse.forEach(function(month, idx) {
         var md = data.monthsData[month];
-        var irMois;
-        if (idx === monthsWithEncaisse.length - 1) {
-          // Dernier mois : reste pour éviter les erreurs d'arrondi
-          irMois = irData.impot - irDistribue;
-        } else {
-          irMois = totalEncHT > 0 ? Math.round(irData.impot * md.encHT / totalEncHT) : 0;
-        }
+        var irMois = caTotalAnnuel > 0 ? Math.round(irData.impot * md.encHT / caTotalAnnuel) : 0;
         irDistribue += irMois;
         if (irMois > 0) {
           var irMonthStr = month.split('-')[1];
