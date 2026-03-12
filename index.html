@@ -3397,21 +3397,27 @@ function getAllChargesForType(typeName) {
   if (isIR && !COMPANY.prelevementLiberatoire) {
     var currentYear = TODAY.getFullYear();
 
-    // Trouver les mois avec CA encaissé (factures payées) + montant HT par mois
+    // Trouver les mois avec CA encaissé (factures payées) + montant HT par mois + détail factures
+    // Utilise datePaiementReel si disponible (cohérence avec compute/getAbsoluteProvisions)
     function getMonthsWithCA(year) {
       var monthsCA = {};
+      var monthsFactures = {};
       MISSIONS.forEach(function(mis) {
+        if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
         if (!mis.factures) return;
         mis.factures.forEach(function(f) {
           if (f.jours <= 0 || f.status !== 'payée') return;
-          var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+          var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+          if (paymentMonth > nowYm) paymentMonth = nowYm;
           if (paymentMonth.startsWith(year + '-')) {
             var month = parseInt(paymentMonth.split('-')[1]) - 1;
             monthsCA[month] = (monthsCA[month] || 0) + (f.ht || 0);
+            if (!monthsFactures[month]) monthsFactures[month] = [];
+            monthsFactures[month].push({ client: mis.client, numero: f.numero, ht: f.ht, mois: f.mois });
           }
         });
       });
-      return Object.keys(monthsCA).map(function(m) { return { month: parseInt(m), caHT: monthsCA[m] }; }).sort(function(a, b) { return a.month - b.month; });
+      return Object.keys(monthsCA).map(function(m) { return { month: parseInt(m), caHT: monthsCA[m], factures: monthsFactures[parseInt(m)] || [] }; }).sort(function(a, b) { return a.month - b.month; });
     }
 
     // Helper pour ajouter les acomptes IR au prorata du CA HT encaissé
@@ -3427,12 +3433,20 @@ function getAllChargesForType(typeName) {
         irDistribue += irMois;
 
         if (irMois > 0) {
+          // Construire la source avec le détail des factures
+          var sourceText = 'CA encaissé en ' + fmtMonthShort(year + '-' + monthStr) + ' : ' + EUR(entry.caHT) + ' HT';
+          if (entry.factures && entry.factures.length > 0) {
+            sourceText += '\n' + entry.factures.map(function(fac) {
+              return '• ' + fac.client + (fac.numero ? ' (F' + fac.numero + ')' : '') + ' : ' + EUR(fac.ht) + ' HT';
+            }).join('\n');
+          }
           items.push({
             cat: 'IR Estimé',
             mois: year + '-' + monthStr,
             montant: irMois,
             id: irMonthId,
-            source: 'CA encaissé en ' + fmtMonthShort(year + '-' + String(entry.month + 1).padStart(2, '0')) + ' : ' + EUR(entry.caHT) + ' HT'
+            source: sourceText,
+            factures: entry.factures || []
           });
         }
       });
@@ -5272,11 +5286,19 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
         }
       }, paid ? '✓' : ''));
 
-      // Info
-      row.appendChild(el('div', { style: { flex: '1' } }, [
-        el('div', { style: { fontSize: '13px', fontWeight: '600', color: paid ? 'var(--success)' : 'var(--text-primary)', textDecoration: paid ? 'line-through' : 'none' } }, item.source || item.desc || typeName),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, fmtMonth(item.mois))
-      ]));
+      // Info - avec détail des factures si disponible
+      var infoDiv = el('div', { style: { flex: '1' } });
+      var sourceLines = (item.source || item.desc || typeName).split('\n');
+      infoDiv.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: paid ? 'var(--success)' : 'var(--text-primary)', textDecoration: paid ? 'line-through' : 'none' } }, sourceLines[0]));
+      // Afficher les factures détaillées si présentes
+      if (sourceLines.length > 1) {
+        for (var si = 1; si < sourceLines.length; si++) {
+          infoDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' } }, sourceLines[si]));
+        }
+      } else {
+        infoDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Factures du mois de ' + fmtMonth(item.mois)));
+      }
+      row.appendChild(infoDiv);
 
       // Montant
       row.appendChild(el('span', { style: { fontWeight: '700', fontSize: '14px', color: paid ? 'var(--success)' : 'var(--text-primary)' } }, EUR(item.montant)));
