@@ -1155,7 +1155,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 #app { padding-bottom: 20px; }
 
-/* SPRINT 2: Toggle Privacy Mode */
+/* Toggle Privacy Mode */
 .privacy-toggle {
   background: transparent;
   border: 1px solid var(--glass-border);
@@ -1184,7 +1184,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   pointer-events: none;
 }
 
-/* SPRINT 2: Indicateur sync cloud */
+/* Indicateur sync cloud */
 .sync-indicator {
   display: flex;
   align-items: center;
@@ -1212,13 +1212,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   50% { opacity: 0.3; }
 }
 
-/* SPRINT 3: Hiérarchie visuelle 3 niveaux (B16) */
+/* Hiérarchie visuelle 3 niveaux */
 .text-hero { font-size: 42px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; }
 .text-kpi { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
 .text-detail { font-size: 11px; color: var(--text-muted); }
 .text-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
 
-/* SPRINT 3: Barre de recherche et filtres (B17, B18) */
+/* Barre de recherche et filtres */
 .search-filter-bar {
   display: flex;
   gap: 10px;
@@ -1421,10 +1421,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   </nav>
 
   <!-- FAB saisie rapide -->
-  <button class="fab" id="fabBtn" onclick="toggleFAB()" title="Actions rapides">+</button>
-  <div id="fabMenu" style="display:none;position:fixed;bottom:130px;right:16px;z-index:91;flex-direction:column;gap:8px;align-items:flex-end;"></div>
-
-  <button class="fab" id="fab">+</button>
+  <button class="fab" id="fab" title="Actions rapides">+</button>
   
   <div class="modal" id="fabModal">
     <div class="modal-content" style="max-height: auto; border-radius: var(--radius-xl);">
@@ -1468,18 +1465,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
   </div>
 <script>
-var APP_VERSION = 79; // V79: Périodes travail jours/semaine, client opérationnel, agence/intermédiaire, sections mission
+var APP_VERSION = 80;
 var TODAY = new Date();
-var VIEW = 'cockpit';  // V73: cockpit, activite, finances, config
-var ACTIVITE_TAB = 'missions'; // V73: sous-onglets activité (missions, factures)
+
+// Gestionnaire d'erreurs global
+window.addEventListener('error', function(event) {
+  console.error('Erreur applicative:', event.error || event.message);
+});
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('Promesse non gérée:', event.reason);
+});
+var VIEW = 'cockpit';
+var ACTIVITE_TAB = 'missions';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SUPABASE CLOUD SYNC - V51
-// ═══════════════════════════════════════════════════════════════════════════
-// Pour activer la sync cloud:
-// 1. Créer un projet gratuit sur https://supabase.com
-// 2. Copier l'URL et la clé anon depuis Settings > API
-// 3. Créer une table 'user_data' avec la structure SQL ci-dessous
+// SUPABASE CLOUD SYNC
 // ═══════════════════════════════════════════════════════════════════════════
 /*
   SQL pour créer la table dans Supabase:
@@ -1510,7 +1510,6 @@ var supabase = null;
 var CURRENT_USER = null;
 var SYNC_ENABLED = false;
 
-// V73: Charger les credentials Supabase depuis localStorage
 function loadSupabaseCredentials() {
   try {
     var stored = localStorage.getItem('freel_supabase');
@@ -1524,7 +1523,6 @@ function loadSupabaseCredentials() {
   }
 }
 
-// V73: Sauvegarder les credentials Supabase
 function saveSupabaseCredentials(url, key) {
   try {
     localStorage.setItem('freel_supabase', JSON.stringify({ url: url, key: key }));
@@ -1573,7 +1571,7 @@ function initSupabase() {
         updateAuthUI();
         loadFromCloud();
       }
-    });
+    }).catch(function(err) { console.warn('Session check failed:', err.message); });
   }
 }
 
@@ -1649,18 +1647,19 @@ function signIn() {
         showToast('✅ Connecté!', 'success');
         closeDynamicModal();
       }
-    });
+    })
+    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
 }
 
 function signUp() {
   var email = $('#authEmail').value;
   var password = $('#authPassword').value;
-  
+
   if (!email || !password) {
     showToast('Email et mot de passe requis', 'error');
     return;
   }
-  
+
   supabase.auth.signUp({ email: email, password: password })
     .then(function(result) {
       if (result.error) {
@@ -1669,7 +1668,8 @@ function signUp() {
         showToast('✅ Compte créé! Vérifie ton email.', 'success');
         closeDynamicModal();
       }
-    });
+    })
+    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
 }
 
 function signOut() {
@@ -1677,7 +1677,8 @@ function signOut() {
     CURRENT_USER = null;
     updateAuthUI();
     showToast('🚪 Déconnecté', 'info');
-  });
+  })
+  .catch(function(err) { showToast('❌ Erreur déconnexion: ' + err.message, 'error'); });
 }
 
 function syncToCloud() {
@@ -1701,38 +1702,39 @@ function syncToCloud() {
       } else {
         showToast('☁️ Données sauvegardées!', 'success');
       }
-    });
+    })
+    .catch(function(err) { showToast('❌ Erreur réseau sync: ' + err.message, 'error'); });
 }
 
 function loadFromCloud() {
   if (!CURRENT_USER || !supabase) return;
-  
+
   supabase.from('user_data')
     .select('*')
     .eq('user_id', CURRENT_USER.id)
     .single()
     .then(function(result) {
       if (result.error) {
-        if (result.error.code !== 'PGRST116') { // Not found is OK for new users
+        if (result.error.code !== 'PGRST116') {
           showToast('❌ Erreur: ' + result.error.message, 'error');
         }
       } else if (result.data) {
-        // Charger les données du cloud
         if (result.data.company) COMPANY = result.data.company;
         if (result.data.missions) MISSIONS = result.data.missions;
         if (result.data.clients) CLIENTS = result.data.clients;
         if (result.data.treasury) TREASURY = result.data.treasury;
         if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
-        
-        saveAll(); // Sauvegarder localement aussi
+
+        saveAll();
         COMPUTED = compute();
         render();
         showToast('☁️ Données chargées du cloud!', 'success');
       }
-    });
+    })
+    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
 }
 
-var PERIOD = { type: 'year', year: TODAY.getFullYear(), month: null }; // V72: month = null pour année entière, 0-11 pour mois spécifique
+var PERIOD = { type: 'year', year: TODAY.getFullYear(), month: null };
 var TIMELINE_IDX = null;
 var FACTURE_FILTER = 'all';
 var SHOW_CUMUL = false;
@@ -1846,32 +1848,28 @@ var LEGAL_BY_YEAR = {
 
 // Fonction helper pour obtenir les valeurs légales d'une année
 function getLegal(year) {
-  return LEGAL_BY_YEAR[year] || LEGAL_BY_YEAR[2026]; // Fallback sur 2026
+  return LEGAL_BY_YEAR[year] || LEGAL_BY_YEAR[2026];
 }
 
-// Fonction helper pour obtenir le taux URSSAF
 function getLegalUrssaf(year, typeActivite, hasAcre) {
-  var legal = getLegal(year);
-  var type = typeActivite || 'BNC';
-  var rates = legal.urssaf[type] || legal.urssaf.BNC;
+  const legal = getLegal(year);
+  const type = typeActivite || 'BNC';
+  const rates = legal.urssaf[type] || legal.urssaf.BNC;
   return hasAcre ? rates.acre : rates.standard;
 }
 
-// Fonction helper pour obtenir l'abattement IR
 function getLegalAbattement(year, typeActivite) {
-  var legal = getLegal(year);
+  const legal = getLegal(year);
   return legal.abattement[typeActivite || 'BNC'] || 0.34;
 }
 
-// Fonction helper pour obtenir les tranches IR
 function getLegalIRBrackets(year) {
   return getLegal(year).irBrackets;
 }
 
-// Fonction helper pour obtenir les seuils TVA
 function getLegalTVA(year, typeActivite) {
-  var legal = getLegal(year);
-  var isVente = typeActivite === 'BIC_vente';
+  const legal = getLegal(year);
+  const isVente = typeActivite === 'BIC_vente';
   return {
     rate: legal.tva.rate,
     seuil: isVente ? legal.tva.seuilVente : legal.tva.seuilService,
@@ -2983,6 +2981,22 @@ function getBalanceAtStartOfPeriod() {
   return balance;
 }
 
+// Helper: calcule les charges associées à une facture payée
+function computeInvoiceCharges(f, paymentMonth) {
+  const rate = getUrssafRate(paymentMonth);
+  return {
+    urssaf: Math.round(f.ht * rate),
+    cfp: Math.round(f.ht * LEGAL.cfp),
+    tva: f.tva > 0 ? Math.round(f.tva) : 0,
+    impLib: COMPANY.prelevementLiberatoire ? Math.round(f.ht * LEGAL.impLib) : 0
+  };
+}
+
+// Helper: retourne le mois de paiement effectif d'une facture
+function getEffectivePaymentMonth(f, mis) {
+  return f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+}
+
 // Calcule les provisions NON PAYÉES avant la période (report)
 function getProvisionsBeforePeriod() {
   var periodStart = PERIOD.type === 'year' ? ym(PERIOD.year, 0) : PERIOD.start;
@@ -2993,13 +3007,13 @@ function getProvisionsBeforePeriod() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = getEffectivePaymentMonth(f, mis);
       if (paymentMonth < periodStart) {
-        var rate = getUrssafRate(paymentMonth);
-        if (!isPaid('URSSAF-' + f.id)) provisions += Math.round(f.ht * rate);
-        if (!isPaid('CFP-' + f.id)) provisions += Math.round(f.ht * LEGAL.cfp);
-        if (f.tva > 0 && !isPaid('TVA-' + f.id)) provisions += Math.round(f.tva);
-        if (COMPANY.prelevementLiberatoire && !isPaid('IMPLIB-' + f.id)) provisions += Math.round(f.ht * LEGAL.impLib);
+        var charges = computeInvoiceCharges(f, paymentMonth);
+        if (!isPaid('URSSAF-' + f.id)) provisions += charges.urssaf;
+        if (!isPaid('CFP-' + f.id)) provisions += charges.cfp;
+        if (charges.tva > 0 && !isPaid('TVA-' + f.id)) provisions += charges.tva;
+        if (charges.impLib > 0 && !isPaid('IMPLIB-' + f.id)) provisions += charges.impLib;
       }
     });
   });
@@ -3053,15 +3067,15 @@ function getAbsoluteBalance() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = getEffectivePaymentMonth(f, mis);
       if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         balance += f.ttc;
-        var rate = getUrssafRate(paymentMonth);
-        if (isPaid('URSSAF-' + f.id)) balance -= Math.round(f.ht * rate);
-        if (isPaid('CFP-' + f.id)) balance -= Math.round(f.ht * LEGAL.cfp);
-        if (f.tva > 0 && isPaid('TVA-' + f.id)) balance -= Math.round(f.tva);
-        if (COMPANY.prelevementLiberatoire && isPaid('IMPLIB-' + f.id)) balance -= Math.round(f.ht * LEGAL.impLib);
+        var charges = computeInvoiceCharges(f, paymentMonth);
+        if (isPaid('URSSAF-' + f.id)) balance -= charges.urssaf;
+        if (isPaid('CFP-' + f.id)) balance -= charges.cfp;
+        if (charges.tva > 0 && isPaid('TVA-' + f.id)) balance -= charges.tva;
+        if (charges.impLib > 0 && isPaid('IMPLIB-' + f.id)) balance -= charges.impLib;
       }
     });
   });
@@ -3073,7 +3087,6 @@ function getAbsoluteBalance() {
     }
   });
 
-  // V47: Ajouter les intérêts du compte pro si activé
   if (TREASURY.rendementActif && TREASURY.rendementHistorique) {
     TREASURY.rendementHistorique.forEach(function(int) {
       if (int.mois <= nowYm) {
@@ -3081,7 +3094,7 @@ function getAbsoluteBalance() {
       }
     });
   }
-  
+
   return balance;
 }
 
@@ -3100,15 +3113,15 @@ function getAbsoluteBalanceDetail() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = getEffectivePaymentMonth(f, mis);
       if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         detail.encaissements += f.ttc;
-        var rate = getUrssafRate(paymentMonth);
-        if (isPaid('URSSAF-' + f.id)) detail.chargesPayees += Math.round(f.ht * rate);
-        if (isPaid('CFP-' + f.id)) detail.chargesPayees += Math.round(f.ht * LEGAL.cfp);
-        if (f.tva > 0 && isPaid('TVA-' + f.id)) detail.chargesPayees += Math.round(f.tva);
-        if (COMPANY.prelevementLiberatoire && isPaid('IMPLIB-' + f.id)) detail.chargesPayees += Math.round(f.ht * LEGAL.impLib);
+        var charges = computeInvoiceCharges(f, paymentMonth);
+        if (isPaid('URSSAF-' + f.id)) detail.chargesPayees += charges.urssaf;
+        if (isPaid('CFP-' + f.id)) detail.chargesPayees += charges.cfp;
+        if (charges.tva > 0 && isPaid('TVA-' + f.id)) detail.chargesPayees += charges.tva;
+        if (charges.impLib > 0 && isPaid('IMPLIB-' + f.id)) detail.chargesPayees += charges.impLib;
       }
     });
   });
@@ -3142,47 +3155,46 @@ function getSoldeMoyenMois(targetYm) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = getEffectivePaymentMonth(f, mis);
       if (paymentMonth <= prevYm) {
         soldeDebut += f.ttc;
-        var rate = getUrssafRate(paymentMonth);
-        if (isPaid('URSSAF-' + f.id)) soldeDebut -= Math.round(f.ht * rate);
-        if (isPaid('CFP-' + f.id)) soldeDebut -= Math.round(f.ht * LEGAL.cfp);
-        if (f.tva > 0 && isPaid('TVA-' + f.id)) soldeDebut -= Math.round(f.tva);
-        if (COMPANY.prelevementLiberatoire && isPaid('IMPLIB-' + f.id)) soldeDebut -= Math.round(f.ht * LEGAL.impLib);
+        var charges = computeInvoiceCharges(f, paymentMonth);
+        if (isPaid('URSSAF-' + f.id)) soldeDebut -= charges.urssaf;
+        if (isPaid('CFP-' + f.id)) soldeDebut -= charges.cfp;
+        if (charges.tva > 0 && isPaid('TVA-' + f.id)) soldeDebut -= charges.tva;
+        if (charges.impLib > 0 && isPaid('IMPLIB-' + f.id)) soldeDebut -= charges.impLib;
       }
     });
   });
-  
+
   TREASURY.mouvements.forEach(function(mv) {
     if (mv.mois <= prevYm) {
       if (mv.type === 'Charge' && isPaid(mv.id)) soldeDebut -= mv.montant;
       if (mv.type === 'Salaire') soldeDebut -= mv.montant;
     }
   });
-  
-  // Intérêts des mois précédents
+
   if (TREASURY.rendementHistorique) {
     TREASURY.rendementHistorique.forEach(function(int) {
       if (int.mois < targetYm) soldeDebut += int.montant;
     });
   }
-  
+
   // Calculer le solde à la fin du mois
   var soldeFin = soldeDebut;
-  
+
   MISSIONS.forEach(function(mis) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = getEffectivePaymentMonth(f, mis);
       if (paymentMonth === targetYm) {
         soldeFin += f.ttc;
-        var rate = getUrssafRate(paymentMonth);
-        if (isPaid('URSSAF-' + f.id)) soldeFin -= Math.round(f.ht * rate);
-        if (isPaid('CFP-' + f.id)) soldeFin -= Math.round(f.ht * LEGAL.cfp);
-        if (f.tva > 0 && isPaid('TVA-' + f.id)) soldeFin -= Math.round(f.tva);
-        if (COMPANY.prelevementLiberatoire && isPaid('IMPLIB-' + f.id)) soldeFin -= Math.round(f.ht * LEGAL.impLib);
+        var charges = computeInvoiceCharges(f, paymentMonth);
+        if (isPaid('URSSAF-' + f.id)) soldeFin -= charges.urssaf;
+        if (isPaid('CFP-' + f.id)) soldeFin -= charges.cfp;
+        if (charges.tva > 0 && isPaid('TVA-' + f.id)) soldeFin -= charges.tva;
+        if (charges.impLib > 0 && isPaid('IMPLIB-' + f.id)) soldeFin -= charges.impLib;
       }
     });
   });
@@ -3275,34 +3287,30 @@ function getAbsoluteProvisions() {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status !== 'payée' || f.jours <= 0) return;
-      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      var paymentMonth = getEffectivePaymentMonth(f, mis);
       if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
-        var rate = getUrssafRate(paymentMonth);
-        var urssaf = Math.round(f.ht * rate);
-        var cfp = Math.round(f.ht * LEGAL.cfp);
-        var tva = f.tva > 0 ? Math.round(f.tva) : 0;
-        var impLib = COMPANY.prelevementLiberatoire ? Math.round(f.ht * LEGAL.impLib) : 0;
+        var charges = computeInvoiceCharges(f, paymentMonth);
 
         if (!isPaid('URSSAF-' + f.id)) {
-          result.total += urssaf;
-          result.byType['URSSAF'] = (result.byType['URSSAF'] || 0) + urssaf;
-          result.detail.push({ cat: 'URSSAF', mois: paymentMonth, montant: urssaf, id: 'URSSAF-' + f.id, source: mis.client });
+          result.total += charges.urssaf;
+          result.byType['URSSAF'] = (result.byType['URSSAF'] || 0) + charges.urssaf;
+          result.detail.push({ cat: 'URSSAF', mois: paymentMonth, montant: charges.urssaf, id: 'URSSAF-' + f.id, source: mis.client });
         }
         if (!isPaid('CFP-' + f.id)) {
-          result.total += cfp;
-          result.byType['CFP'] = (result.byType['CFP'] || 0) + cfp;
-          result.detail.push({ cat: 'CFP', mois: paymentMonth, montant: cfp, id: 'CFP-' + f.id, source: mis.client });
+          result.total += charges.cfp;
+          result.byType['CFP'] = (result.byType['CFP'] || 0) + charges.cfp;
+          result.detail.push({ cat: 'CFP', mois: paymentMonth, montant: charges.cfp, id: 'CFP-' + f.id, source: mis.client });
         }
-        if (tva > 0 && !isPaid('TVA-' + f.id)) {
-          result.total += tva;
-          result.byType['TVA'] = (result.byType['TVA'] || 0) + tva;
-          result.detail.push({ cat: 'TVA', mois: paymentMonth, montant: tva, id: 'TVA-' + f.id, source: mis.client });
+        if (charges.tva > 0 && !isPaid('TVA-' + f.id)) {
+          result.total += charges.tva;
+          result.byType['TVA'] = (result.byType['TVA'] || 0) + charges.tva;
+          result.detail.push({ cat: 'TVA', mois: paymentMonth, montant: charges.tva, id: 'TVA-' + f.id, source: mis.client });
         }
-        if (impLib > 0 && !isPaid('IMPLIB-' + f.id)) {
-          result.total += impLib;
-          result.byType['Impôt'] = (result.byType['Impôt'] || 0) + impLib;
-          result.detail.push({ cat: 'Impôt PL', mois: paymentMonth, montant: impLib, id: 'IMPLIB-' + f.id, source: mis.client });
+        if (charges.impLib > 0 && !isPaid('IMPLIB-' + f.id)) {
+          result.total += charges.impLib;
+          result.byType['Impôt'] = (result.byType['Impôt'] || 0) + charges.impLib;
+          result.detail.push({ cat: 'Impôt PL', mois: paymentMonth, montant: charges.impLib, id: 'IMPLIB-' + f.id, source: mis.client });
         }
       }
     });
@@ -3728,7 +3736,6 @@ function openModal(id) { $('#' + id).classList.add('active'); }
 function closeModal(id) { $('#' + id).classList.remove('active'); }
 function closeAllModals() { $$('.modal').forEach(function(m) { m.classList.remove('active'); }); }
 
-// V73: Menu FAB contextuel selon l'onglet actif
 function showFabMenu() {
   var body = $('#fabModalBody');
   body.innerHTML = '';
@@ -3799,7 +3806,6 @@ function showDownloadInvoiceModal() {
   openModal('formModal');
 }
 
-// V51: Toast notifications
 function showToast(message, type) {
   type = type || 'info';
   var colors = { success: 'var(--success)', error: 'var(--danger)', warning: 'var(--warning)', info: 'var(--accent)' };
@@ -3889,7 +3895,6 @@ function saveAll() {
     return;
   }
   autoBackup();
-  // V51: Sync to cloud if connected
   if (CURRENT_USER && SYNC_ENABLED) syncToCloud();
 }
 
@@ -4249,8 +4254,8 @@ function computeAlerts(data) {
   });
   data.caHTAnnuel = currentYearCA;
   
-  var seuilMicro = 77700;
-  var seuilTVA = 36800;
+  var seuilMicro = LEGAL.plafondBNC;
+  var seuilTVA = LEGAL.seuilTVA;
   var pctMicro = currentYearCA / seuilMicro;
   var pctTVA = currentYearCA / seuilTVA;
   
@@ -7298,6 +7303,13 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   var btns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '20px' } });
   btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
+    // Validation des champs obligatoires
+    var tjmVal = parseFloat($('#mTJM').value);
+    var clientVal = ($('#mClientId') ? $('#mClientId').value : '') || ($('#mClient') ? $('#mClient').value : '');
+    if (!clientVal || clientVal === '_new_') { showToast('⚠️ Client requis', 'warning'); return; }
+    if (!$('#mDebut').value) { showToast('⚠️ Date de début requise', 'warning'); return; }
+    if (isNaN(tjmVal) || tjmVal < 0) { showToast('⚠️ TJM invalide', 'warning'); return; }
+
     // Gérer client via dropdown ou input texte
     var clientId = $('#mClientId') ? $('#mClientId').value : '';
     if (clientId && clientId !== '_new_') {
@@ -7583,6 +7595,8 @@ function showChargePonctuelle() {
 
   content.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '20px' }, onclick: function() {
     var montant = parseFloat($('#chMontant').value) || 0;
+    if (montant <= 0) { showToast('⚠️ Montant invalide', 'warning'); return; }
+    if (!$('#chMois').value) { showToast('⚠️ Mois requis', 'warning'); return; }
     var isTTC = tvaCheckbox.checked;
     var tvaRate = parseFloat($('#chTvaRate') ? $('#chTvaRate').value : 0) || 0;
     var montantHT = montant;
@@ -8155,7 +8169,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   // Avertissement si numéro déjà finalisé
   if (hasDefinitiveNumber) {
     var lockedInfo = el('div', { style: { background: 'var(--success-glow)', padding: '10px', borderRadius: 'var(--radius-sm)', marginBottom: '12px', fontSize: '11px' } });
-    lockedInfo.innerHTML = '🔒 Facture n°' + ligne.lastInvoiceNum + ' déjà enregistrée dans le livre des recettes';
+    lockedInfo.textContent = '🔒 Facture n°' + ligne.lastInvoiceNum + ' déjà enregistrée dans le livre des recettes';
     body.appendChild(lockedInfo);
   }
   
@@ -8197,7 +8211,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   
   if (missingInfos.length > 0) {
     var warning = el('div', { style: { background: 'var(--warning-glow)', padding: '10px', borderRadius: 'var(--radius-sm)', marginBottom: '12px', fontSize: '10px' } });
-    warning.innerHTML = '⚠️ Infos manquantes: ' + missingInfos.join(', ') + ' → Compléter dans Admin';
+    warning.textContent = '⚠️ Infos manquantes: ' + missingInfos.join(', ') + ' → Compléter dans Admin';
     body.appendChild(warning);
   }
   
@@ -8330,7 +8344,13 @@ function showInvoicePreview(data) {
   // Toolbar
   var toolbar = document.createElement('div');
   toolbar.style.cssText = 'background:#1a1a2e;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #333;position:sticky;top:0;z-index:1;';
-  toolbar.innerHTML = '<div style="display:flex;align-items:center;gap:12px;"><span style="font-size:18px;">📄</span><span style="font-weight:600;color:#fff;">Facture ' + data.num + '</span><span style="font-size:11px;color:#888;">Ctrl+P pour imprimer/PDF</span></div>';
+  var toolbarContent = document.createElement('div');
+  toolbarContent.style.cssText = 'display:flex;align-items:center;gap:12px;';
+  var iconSpan = document.createElement('span'); iconSpan.style.fontSize = '18px'; iconSpan.textContent = '📄';
+  var numSpan = document.createElement('span'); numSpan.style.cssText = 'font-weight:600;color:#fff;'; numSpan.textContent = 'Facture ' + data.num;
+  var hintSpan = document.createElement('span'); hintSpan.style.cssText = 'font-size:11px;color:#888;'; hintSpan.textContent = 'Ctrl+P pour imprimer/PDF';
+  toolbarContent.appendChild(iconSpan); toolbarContent.appendChild(numSpan); toolbarContent.appendChild(hintSpan);
+  toolbar.appendChild(toolbarContent);
   
   var btns = document.createElement('div');
   btns.style.cssText = 'display:flex;gap:10px;';
@@ -9116,7 +9136,7 @@ function calculateHealthScore() {
   else { details.push({ icon: '🟢', label: 'Aucun retard', impact: 0 }); }
   score = score - 25 + retardScore;
   var seuilScore = 25;
-  var pctMicro = (data.caHTAnnuel || 0) / 77700;
+  var pctMicro = (data.caHTAnnuel || 0) / LEGAL.plafondBNC;
   if (pctMicro >= 1) { seuilScore = 0; details.push({ icon: '🔴', label: 'Seuil micro dépassé!', impact: -25 }); }
   else if (pctMicro >= 0.9) { seuilScore = 5; details.push({ icon: '🟠', label: 'Proche seuil micro', impact: -20 }); }
   else { details.push({ icon: '🟢', label: 'Seuils OK', impact: 0 }); }
@@ -9437,7 +9457,7 @@ function renderTVAModule(container) {
   module.appendChild(gauge);
   var info = el('div', { class: 'tva-info' });
   info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, EUR(data.caHTAnnuel || 0)), el('div', { class: 'tva-info-label' }, 'CA ' + TODAY.getFullYear())]));
-  info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, EUR(36800 - (data.caHTAnnuel || 0))), el('div', { class: 'tva-info-label' }, 'Avant seuil')]));
+  info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, EUR(LEGAL.seuilTVA - (data.caHTAnnuel || 0))), el('div', { class: 'tva-info-label' }, 'Avant seuil')]));
   if (!COMPANY.tvaDepuis && projection.month) {
     info.appendChild(el('div', { class: 'tva-info-item' }, [el('div', { class: 'tva-info-value' }, fmtMonthShort(projection.month)), el('div', { class: 'tva-info-label' }, 'Projection')]));
   } else {
@@ -10309,20 +10329,24 @@ function handleSearchKey(e) {
 }
 
 function autoBackup() {
-  var data = { company: COMPANY, missions: MISSIONS, clients: CLIENTS, treasury: TREASURY, irConfig: IR_CONFIG, version: 'V50', date: localISO(TODAY) };
-  var key = 'freel_backup_' + localISO(TODAY);
-  localStorage.setItem(key, JSON.stringify(data));
-  
-  // Garder seulement les 7 derniers backups
-  var keys = [];
-  for (var i = 0; i < localStorage.length; i++) {
-    var k = localStorage.key(i);
-    if (k && k.startsWith('freel_backup_')) keys.push(k);
+  try {
+    var data = { company: COMPANY, missions: MISSIONS, clients: CLIENTS, treasury: TREASURY, irConfig: IR_CONFIG, version: 'V50', date: localISO(TODAY) };
+    var key = 'freel_backup_' + localISO(TODAY);
+    localStorage.setItem(key, JSON.stringify(data));
+
+    // Garder seulement les 7 derniers backups
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.startsWith('freel_backup_')) keys.push(k);
+    }
+    keys.sort().reverse();
+    keys.slice(7).forEach(function(k) { localStorage.removeItem(k); });
+
+    showBackupIndicator();
+  } catch (e) {
+    console.warn('Backup failed:', e.message);
   }
-  keys.sort().reverse();
-  keys.slice(7).forEach(function(k) { localStorage.removeItem(k); });
-  
-  showBackupIndicator();
 }
 
 function showBackupIndicator() {
@@ -10948,11 +10972,9 @@ function renderCAPlafondWidget(container) {
   // V75: caHTAnnuel (toute l'année courante), pas caHT filtré par période
   var currentCA = data.caHTAnnuel || 0;
 
-  // Seuils micro-entrepreneur BNC 2024-2026
-  var plafond = 77700;        // Plafond micro-entrepreneur (régime fiscal)
-  // Note: Le seuil majoré n'existe QUE pour la TVA (41,250€ pour services), pas pour le statut micro
-  var seuilTVA = 37500;       // Franchise TVA (services BNC)
-  var seuilTVAMajore = 41250; // Seuil majoré TVA = assujettissement immédiat
+  var plafond = LEGAL.plafondBNC;
+  var seuilTVA = LEGAL.seuilTVA;
+  var seuilTVAMajore = LEGAL.seuilTVAMajore;
 
   // V71: Calculer le CA projeté à partir des factures non payées (encaissement prévu sur l'année)
   var caProjecte = 0;
@@ -16223,7 +16245,9 @@ function render() {
     else if (VIEW === 'params') { VIEW = 'config'; renderConfig(container); }
   } catch (e) {
     console.error('Render error:', e);
-    container.innerHTML = '<div style="padding:20px;color:red;">Erreur: ' + e.message + '</div>';
+    var errDiv = el('div', { style: { padding: '20px', color: 'red' } });
+    errDiv.textContent = 'Erreur: ' + e.message;
+    container.appendChild(errDiv);
   }
 
   $$('.nav-tab, .bottom-nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === VIEW); });
@@ -16354,56 +16378,12 @@ function skipOnboarding() {
   render();
 }
 
-// === FAB SAISIE RAPIDE (V75) ===
-var FAB_OPEN = false;
-function toggleFAB() {
-  FAB_OPEN = !FAB_OPEN;
-  var btn = $('#fabBtn');
-  var menu = $('#fabMenu');
-  if (!btn || !menu) return;
-  btn.classList.toggle('open', FAB_OPEN);
-  if (FAB_OPEN) {
-    menu.style.display = 'flex';
-    menu.innerHTML = '';
-    var actions = [
-      { icon: '💸', label: 'Verser un salaire', fn: function() { closeFAB(); showSalaireModal(); } },
-      { icon: '➕', label: 'Saisir une dépense', fn: function() { closeFAB(); showChargeModal(); } },
-      { icon: '📄', label: 'Nouvelle facture', fn: function() { closeFAB(); VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } },
-      { icon: '💼', label: 'Nouvelle mission', fn: function() { closeFAB(); showMissionModal(); } },
-      { icon: '🏖️', label: 'Poser des congés', fn: function() { closeFAB(); showCongesOverview(); } },
-      { icon: '✅', label: 'Valider paiement', fn: function() { closeFAB(); VIEW = 'tresorerie'; render(); } }
-    ];
-    actions.forEach(function(a) {
-      var item = el('div', { class: 'fab-item', onclick: a.fn });
-      item.appendChild(el('span', { class: 'fab-icon' }, a.icon));
-      item.appendChild(document.createTextNode(a.label));
-      menu.appendChild(item);
-    });
-    // Fermer si clic hors du FAB
-    setTimeout(function() {
-      document.addEventListener('click', function closeFabOnOutside(e) {
-        if (!e.target.closest('#fabBtn') && !e.target.closest('#fabMenu')) {
-          closeFAB();
-          document.removeEventListener('click', closeFabOnOutside);
-        }
-      });
-    }, 10);
-  } else {
-    menu.style.display = 'none';
-  }
-}
-function closeFAB() {
-  FAB_OPEN = false;
-  var btn = $('#fabBtn');
-  var menu = $('#fabMenu');
-  if (btn) btn.classList.remove('open');
-  if (menu) menu.style.display = 'none';
-}
+// === FAB SAISIE RAPIDE ===
 
 // === INIT ===
 function init() {
   loadAll();
-  initSupabase(); // V51: Initialize cloud sync
+  initSupabase();
   MISSIONS.forEach(buildMission);
   
   // Navigation
@@ -16424,8 +16404,8 @@ function init() {
     render();
   };
 
-  // FAB - Menu contextuel selon l'onglet
-  $('#fab').onclick = function() { showFabMenu(); };
+  // FAB - Menu contextuel
+  $('#fab').onclick = function() { showFabMenu(); openModal('fabModal'); };
   
   // Modals
   $$('.modal').forEach(function(m) {
