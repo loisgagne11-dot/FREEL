@@ -3025,7 +3025,7 @@ function getProvisionsBeforePeriod() {
       if (!mis.factures) return;
       mis.factures.forEach(function(f) {
         if (f.status !== 'payée' || f.jours <= 0) return;
-        var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        var paymentMonth = getEffectivePaymentMonth(f, mis);
         if (paymentMonth < periodStart) {
           var year = paymentMonth.split('-')[0];
           if (!caParAnnee[year]) caParAnnee[year] = { total: 0, mois: {} };
@@ -4245,7 +4245,7 @@ function computeAlerts(data) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status === 'payée' && f.jours > 0) {
-        var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        var paymentMonth = getEffectivePaymentMonth(f, mis);
         if (paymentMonth.startsWith(currentYear + '-')) {
           currentYearCA += f.ht;
         }
@@ -7397,7 +7397,7 @@ function showMissionModal(mission) {
   } }, '✅ Enregistrer'));
   if (!isNew) {
     btns.appendChild(el('button', { class: 'btn', onclick: function() { closeModal('formModal'); showDaysEditor(mission); } }, '📅'));
-    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer?')) { MISSIONS = MISSIONS.filter(function(m) { return m.id !== mission.id; }); saveAll(); closeModal('formModal'); render(); } } }, '🗑️'));
+    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer?')) { MISSIONS = MISSIONS.filter(function(m) { return m.id !== mission.id; }); if (COMPANY.invoiceRegistry) { COMPANY.invoiceRegistry = COMPANY.invoiceRegistry.filter(function(inv) { return inv.missionId !== mission.id; }); } saveAll(); closeModal('formModal'); render(); } } }, '🗑️'));
   }
   body.appendChild(btns);
   openModal('formModal');
@@ -8151,7 +8151,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   var jours = ligne.joursReels || ligne.joursPrevus || 0;
   var totalHT = jours * mission.tjm;
   var tvaApplicable = isTVAApplicable(monthYm + '-01');
-  var tvaAmount = tvaApplicable ? Math.round(totalHT * LEGAL.tvaRate) : 0;
+  var tvaAmount = tvaApplicable ? Math.round(totalHT * LEGAL.tvaRate * 100) / 100 : 0;
   var totalTTC = totalHT + tvaAmount;
   
   // Numérotation séquentielle automatique
@@ -8269,13 +8269,14 @@ function showInvoiceGeneratorModal(mission, monthYm) {
 
 // Générer et afficher la facture avec preview
 function openInvoiceHTML(mission, monthYm, options) {
+  if (!mission.lignes) { toast('Aucune ligne pour cette mission', 'error'); return; }
   var ligne = mission.lignes.find(function(l) { return l.ym === monthYm; });
   if (!ligne) { toast('Aucune donnée pour ce mois', 'error'); return; }
   
   var jours = ligne.joursReels || ligne.joursPrevus || 0;
   var totalHT = jours * mission.tjm;
   var tvaApplicable = isTVAApplicable(monthYm + '-01');
-  var tvaAmount = tvaApplicable ? Math.round(totalHT * LEGAL.tvaRate) : 0;
+  var tvaAmount = tvaApplicable ? Math.round(totalHT * LEGAL.tvaRate * 100) / 100 : 0;
   var totalTTC = totalHT + tvaAmount;
   
   var invoiceNum = options.invoiceNum || '';
@@ -16131,95 +16132,7 @@ function renderActivite(container) {
 
 }
 
-// Contenu factures
-function renderFacturesContent(container) {
-  var data = compute();
-
-  // Header
-  var header = el('div', { class: 'page-header' });
-  header.appendChild(el('h2', { class: 'page-title' }, '📄 Factures'));
-  container.appendChild(header);
-
-  // Résumé rapide
-  var summary = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' } });
-  var facturesPaid = 0, facturesOpen = 0, facturesLate = 0;
-  var caEncaisse = 0, caAEncaisser = 0;
-
-  MISSIONS.forEach(function(m) {
-    if (!m.factures) return;
-    m.factures.forEach(function(f) {
-      if (f.jours <= 0) return;
-      var montant = f.jours * m.tjm;
-      if (f.status === 'payée') {
-        facturesPaid++;
-        caEncaisse += montant;
-      } else {
-        facturesOpen++;
-        caAEncaisser += montant;
-        var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
-        if (TODAY > paymentDate) facturesLate++;
-      }
-    });
-  });
-
-  summary.appendChild(el('div', { class: 'mini-stat', style: { background: 'var(--success-glow)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '20px', fontWeight: '700', color: 'var(--success)' } }, String(facturesPaid)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Payées')
-  ]));
-  summary.appendChild(el('div', { class: 'mini-stat', style: { background: 'var(--warning-glow)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '20px', fontWeight: '700', color: 'var(--warning)' } }, String(facturesOpen)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'En attente')
-  ]));
-  summary.appendChild(el('div', { class: 'mini-stat', style: { background: facturesLate > 0 ? 'var(--danger-glow)' : 'var(--bg-secondary)', padding: '12px', borderRadius: '8px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '20px', fontWeight: '700', color: facturesLate > 0 ? 'var(--danger)' : 'var(--text-muted)' } }, String(facturesLate)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'En retard')
-  ]));
-  container.appendChild(summary);
-
-  // Liste des factures groupées par mission
-  MISSIONS.forEach(function(m) {
-    if (!m.factures || m.factures.length === 0) return;
-
-    var missionCard = el('div', { class: 'card', style: { marginBottom: '12px' } });
-    missionCard.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' } }, [
-      el('span', {}, '💼 ' + m.client),
-      el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, m.tjm + '€/j')
-    ]));
-
-    m.factures.slice().reverse().forEach(function(f) {
-      if (f.jours <= 0) return;
-      var montant = f.jours * m.tjm;
-      var tva = isTVAApplicable(f.mois + '-01') ? Math.round(montant * 0.20) : 0;
-      var isPaid = f.status === 'payée';
-      var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
-      var isLate = !isPaid && TODAY > paymentDate;
-
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: '6px', marginBottom: '6px', cursor: 'pointer' }, onclick: function() { showFactureModal(f); } });
-
-      // Status indicator
-      row.appendChild(el('div', { style: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: '0', background: isPaid ? 'var(--success)' : isLate ? 'var(--danger)' : 'var(--warning)' } }));
-
-      // Info
-      var info = el('div', { style: { flex: '1', minWidth: '80px' } });
-      info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '500' } }, fmtMonth(f.mois) + ' · ' + f.jours + 'j'));
-      info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, isPaid ? 'Payée' : isLate ? 'En retard' : 'Échéance ' + fmtDate(paymentDate)));
-      row.appendChild(info);
-
-      // Cycle URSSAF inline
-      row.appendChild(buildInlineCycleProgress(m, f));
-
-      // Montant
-      row.appendChild(el('div', { style: { textAlign: 'right', flexShrink: '0' } }, [
-        el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(montant + tva)),
-        tva > 0 ? el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'dont TVA ' + EUR(tva)) : null
-      ]));
-
-      missionCard.appendChild(row);
-    });
-
-    container.appendChild(missionCard);
-  });
-}
+// V83: renderFacturesContent supprimé ici (doublon) — la version avec filtres par statut est définie plus haut (l.13658)
 
 // CONFIG: Alias vers renderParams
 function renderConfig(container) {
