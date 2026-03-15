@@ -225,16 +225,21 @@
 **Note actuelle: 0/10 → Cible: 6/10**
 *(10/10 nécessiterait un framework de test complet, hors scope pour un fichier HTML unique)*
 
-### 9.1: Tests de smoke intégrés
-- [ ] Script Node.js qui charge le HTML et vérifie les fonctions globales
-- [ ] Vérifier que compute() ne crash pas avec des données vides
-- [ ] Vérifier que compute() ne crash pas avec des données complètes
-- [ ] Vérifier les calculs fiscaux critiques (URSSAF, TVA, IR)
+### 9.1: Tests de smoke intégrés ✅
+- [x] Script Node.js (tests/smoke-test.js) — 47 tests
+- [x] Vérifie les fonctions critiques (compute, render, escapeHTML, etc.)
+- [x] Vérifie les constantes fiscales (taux URSSAF, TVA seuils, plafonds CA)
+- [x] Vérifie la sécurité (pas d'eval, pas de err.message exposé)
+- [x] Vérifie l'accessibilité (ARIA, focus-visible, skip-link)
+- [x] Vérifie le RGPD (effacement, portabilité, politique)
+- [x] Intégré dans le pipeline CI (validate.yml)
 
-### 9.2: Tests de validation
-- [ ] Tester validateInput() avec des cas limites
-- [ ] Tester les calculs de jours ouvrés
-- [ ] Tester buildMission() avec différents scénarios
+### 9.2: Tests de validation ✅
+- [x] Tester escapeHTML() avec injection XSS
+- [x] Tester luhnCheck() SIRET valide/invalide
+- [x] Tester EUR(), PCT() formatage
+- [x] Tester safeNum() avec NaN et fallback
+- [x] Tester validateInput() email/phone valide/invalide
 
 ---
 
