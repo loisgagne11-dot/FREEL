@@ -1770,11 +1770,11 @@ var SEARCH_STATE = {
 // ============================================================================
 var LEGAL_BY_YEAR = {
   2025: {
-    // Cotisations URSSAF par type d'activité
+    // Cotisations URSSAF par type d'activité — Taux vérifiés urssaf.fr mars 2026
     urssaf: {
-      BNC:         { standard: 0.246, acre: 0.123 },  // Services libéraux
-      BIC_vente:   { standard: 0.124, acre: 0.062 },  // Vente de marchandises
-      BIC_service: { standard: 0.214, acre: 0.107 }   // Services artisanaux/commerciaux
+      BNC:         { standard: 0.246, acre: 0.123 },   // 24.6% / 12.3% - Services libéraux
+      BIC_vente:   { standard: 0.123, acre: 0.0615 },  // 12.3% / 6.15% - Vente de marchandises
+      BIC_service: { standard: 0.212, acre: 0.106 }    // 21.2% / 10.6% - Services artisanaux/commerciaux
     },
     // Formation professionnelle (CFP)
     cfp: 0.002,
@@ -1804,23 +1804,23 @@ var LEGAL_BY_YEAR = {
       BIC_service: 77700,
       BIC_vente: 188700
     },
-    // TVA - Franchise en base
+    // TVA - Franchise en base — Seuils loi Midy (3 nov 2025), applicables dès 2025
     tva: {
       rate: 0.20,
-      seuilService: 36800,
-      seuilServiceMajore: 39100,
-      seuilVente: 91900,
-      seuilVenteMajore: 101000
+      seuilService: 37500,        // Prestations de services
+      seuilServiceMajore: 41250,  // Seuil majoré services
+      seuilVente: 85000,          // Vente de marchandises
+      seuilVenteMajore: 93500     // Seuil majoré vente
     },
     // ACRE
     acreDureeQuarters: 4
   },
   2026: {
-    // Cotisations URSSAF par type d'activité - TAUX 2026 CONFIRMÉS
+    // Cotisations URSSAF par type d'activité — Taux vérifiés urssaf.fr mars 2026
     urssaf: {
-      BNC:         { standard: 0.256, acre: 0.128 },  // 25.6% / 12.8%
-      BIC_vente:   { standard: 0.132, acre: 0.066 },  // 13.2% / 6.6%
-      BIC_service: { standard: 0.232, acre: 0.116 }   // 23.2% / 11.6%
+      BNC:         { standard: 0.256, acre: 0.128 },   // 25.6% / 12.8% - Hausse progressive BNC
+      BIC_vente:   { standard: 0.123, acre: 0.0615 },  // 12.3% / 6.15% - Inchangé
+      BIC_service: { standard: 0.212, acre: 0.106 }    // 21.2% / 10.6% - Inchangé
     },
     cfp: 0.002,
     prelevementLiberatoire: {
@@ -1841,17 +1841,18 @@ var LEGAL_BY_YEAR = {
       { max: 180294, rate: 0.41 },
       { max: Infinity, rate: 0.45 }
     ],
+    // Plafonds CA micro-entreprise 2026-2028 (loi de finances 2026)
     plafonds: {
-      BNC: 77700,
-      BIC_service: 77700,
-      BIC_vente: 188700
+      BNC: 83600,          // Hausse: 77700 → 83600
+      BIC_service: 83600,  // Hausse: 77700 → 83600
+      BIC_vente: 203100    // Hausse: 188700 → 203100
     },
     tva: {
       rate: 0.20,
-      seuilService: 37500,       // Nouveau seuil 2026
-      seuilServiceMajore: 41250, // Nouveau seuil majoré 2026
-      seuilVente: 85000,         // Nouveau seuil 2026
-      seuilVenteMajore: 93500    // Nouveau seuil majoré 2026
+      seuilService: 37500,       // Inchangé (réforme 25k€ rejetée)
+      seuilServiceMajore: 41250,
+      seuilVente: 85000,
+      seuilVenteMajore: 93500
     },
     acreDureeQuarters: 4
   }
@@ -2223,7 +2224,9 @@ function registerInvoice(invoiceData) {
     montantTTC: invoiceData.montantTTC,
     modePaiement: invoiceData.modePaiement || 'Virement',
     missionId: invoiceData.missionId || null,
-    mois: invoiceData.mois || null
+    mois: invoiceData.mois || null,
+    // SPRINT 5: Piste d'audit — timestamp de création
+    createdAt: new Date().toISOString()
   };
   
   COMPANY.invoiceRegistry.push(entry);
