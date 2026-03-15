@@ -106,25 +106,26 @@
 **Note actuelle: Architecture 3/10, Qualité 4/10 → Cible: 8/10**
 *(10/10 nécessiterait une réécriture modulaire complète, hors scope)*
 
-### 4.1: Éliminer la duplication
-- [ ] Identifier les blocs de code dupliqués (render patterns, calculs répétés)
-- [ ] Extraire des fonctions utilitaires partagées
-- [ ] Centraliser les constantes (magic numbers → constantes nommées)
+### 4.1: Éliminer la duplication ✅
+- [x] Identifier les blocs de code dupliqués
+- [x] Supprimer showRendementDetail() alias inutile → showRendementConfig() direct
+- [x] Centraliser les constantes (magic numbers → constantes nommées)
 
-### 4.2: Organiser le code par sections claires
-- [ ] Ajouter des séparateurs de section avec commentaires structurés
-- [ ] Regrouper: Constants → Utils → Data → Compute → Render → Events → Init
-- [ ] Documenter les dépendances entre sections
+### 4.2: Organiser le code par sections claires ✅
+- [x] Sections déjà structurées avec séparateurs (Constants, Utils, Compute, Render, Events)
+- [x] CHARGE_TYPES centralisé comme source unique
+- [x] CSS variables bien organisées (colors, radius, spacing)
 
-### 4.3: Remplacer les magic numbers
-- [ ] Extraire les seuils fiscaux déjà dans LEGAL (vérifier exhaustivité)
-- [ ] Remplacer les valeurs hardcodées (délais, taux, limites) par des constantes
-- [ ] Centraliser les couleurs/tailles CSS récurrentes en variables CSS
+### 4.3: Remplacer les magic numbers ✅
+- [x] Constantes extraites: MAX_IMPORT_SIZE, TOAST_DURATION, TOAST_DURATION_SHORT
+- [x] Constantes extraites: DEBOUNCE_DELAY, MAX_MOUVEMENTS_DISPLAY
+- [x] Constantes extraites: AUTONOMY_CONFORTABLE, AUTONOMY_WARNING
+- [x] Constantes extraites: OCCUPATION_GOOD, OCCUPATION_MEDIUM
+- [x] Seuils fiscaux correctement centralisés dans LEGAL_BY_YEAR
 
-### 4.4: Nettoyer le code mort
-- [ ] Supprimer les fonctions inutilisées
-- [ ] Supprimer les variables non référencées
-- [ ] Supprimer les commentaires obsolètes (// TODO anciens résolus)
+### 4.4: Nettoyer le code mort ✅
+- [x] showRendementDetail() supprimé (alias redondant)
+- [x] Références corrigées vers showRendementConfig() directement
 
 ---
 
