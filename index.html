@@ -1937,6 +1937,16 @@ var AUTONOMY_WARNING = 3; // mois
 var OCCUPATION_GOOD = 70; // pourcentage
 var OCCUPATION_MEDIUM = 40; // pourcentage
 
+// Utility: debounce pour limiter les appels fréquents (recherche, resize, etc.)
+function debounce(fn, delay) {
+  var timer;
+  return function() {
+    var ctx = this, args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
+  };
+}
+
 // ===== SOURCE UNIQUE: Catégories de charges fiscales/sociales =====
 var CHARGE_TYPES = {
   'URSSAF':    { label: 'URSSAF - Cotisations sociales', shortLabel: 'URSSAF',     icon: '🏥', color: '#ef4444', desc: 'Maladie, retraite, allocations familiales', penalty: '5% + 0.2%/mois après 30j' },
@@ -2627,7 +2637,7 @@ function showClientModal(client) {
   
   $('#formModalTitle').textContent = isNew ? '🏢 Nouveau Client' : '✏️ ' + client.nom;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   body.appendChild(createInput('Nom / Raison sociale *', 'text', 'cNom', client.nom));
   body.appendChild(createTextarea('Adresse complète', 'cAdresse', client.adresse, 'Adresse facturation'));
@@ -3775,7 +3785,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { clo
 
 function showFabMenu() {
   var body = $('#fabModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   var grid = el('div', { style: { display: 'grid', gap: '12px' } });
   var currentYm = ym(TODAY.getFullYear(), TODAY.getMonth());
@@ -3801,7 +3811,7 @@ function showFabMenu() {
 function showDownloadInvoiceModal() {
   $('#formModalTitle').textContent = '📄 Télécharger Facture';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Sélection de la mission
   var missionSelect = el('select', { id: 'downloadInvoiceMission', style: { width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' } });
@@ -3818,7 +3828,7 @@ function showDownloadInvoiceModal() {
 
   // Mettre à jour les mois quand une mission est sélectionnée
   missionSelect.onchange = function() {
-    monthsContainer.innerHTML = '';
+    monthsContainer.replaceChildren();
     var missionId = missionSelect.value;
     if (!missionId) return;
 
@@ -5103,7 +5113,7 @@ function showCashDetail() {
   var data = compute();
   $('#detailModalTitle').textContent = '💰 Trésorerie & Projections';
   var body = $('#detailModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Calculs préliminaires
   var tvaTotal = data.chargesDetail.find(function(c) { return c.cat === 'TVA'; });
@@ -5303,7 +5313,7 @@ function showChargeTypeDetail(typeName, items, color) {
   var total = items.reduce(function(a, c) { return a + c.montant; }, 0);
   $('#formModalTitle').textContent = '📋 ' + typeName + ' payé';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   body.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', textAlign: 'center' } }, [
     el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total ' + typeName),
@@ -5332,7 +5342,7 @@ function updateProjections() {
   var params = { year: parseInt($('#projYear').value) || TODAY.getFullYear(), tjm: parseInt($('#projTJM').value) || 400, salaireMensuel: parseInt($('#projSalaire').value) || 2500 };
   var proj = computeProjections(PROJECTION_SCENARIO, params);
   var resultsDiv = $('#projResults');
-  resultsDiv.innerHTML = '';
+  resultsDiv.replaceChildren();
   
   var resultBox = el('div', { class: 'projection-result' });
   var acre = getAcreInfo();
@@ -5378,7 +5388,7 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
 
   $('#formModalTitle').textContent = '📦 ' + typeName;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Bouton retour
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); render(); } }, '← Retour'));
@@ -5602,7 +5612,7 @@ function showUrssafCfpDetail() {
 
   $('#formModalTitle').textContent = '📦 URSSAF + CFP';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); render(); } }, '← Retour'));
 
@@ -5860,7 +5870,7 @@ function showPaymentCycleModal(mission, facture) {
 
   $('#formModalTitle').textContent = '📋 Cycle Paiement · ' + cycle.moisTravailLabel;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); } }, '← Retour'));
 
@@ -6146,7 +6156,7 @@ function showProvisionMonthDetail(monthKey) {
   
   $('#formModalTitle').textContent = '📦 Provisions ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Bouton retour
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); showProvisionsDetail(); } }, '← Retour'));
@@ -6194,7 +6204,7 @@ function showProvisionsDetail() {
   var allProv = data.allProvisionsDetail;
   $('#formModalTitle').textContent = '📦 Provisions à Payer';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   var grandTotal = data.provisionsAbsolues;
   var unpaidTotal = allProv.filter(function(c) { return !isPaid(c.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
@@ -6301,7 +6311,7 @@ function showProvisionsDetail() {
 function showDetailList(title, items, colorType, labelFn) {
   $('#formModalTitle').textContent = title;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   if (!items || items.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Aucun élément'));
@@ -6330,7 +6340,7 @@ function showDetailList(title, items, colorType, labelFn) {
 function showRendementConfig() {
   $('#formModalTitle').textContent = '📈 Rendement Compte Pro';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // === Section Configuration ===
   var configSection = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '10px', marginBottom: '16px' } });
@@ -6443,7 +6453,7 @@ function showWaterfallDetail() {
   var data = compute();
   $('#formModalTitle').textContent = '📊 Décomposition Bénéfice';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Calculs
   var tvaTotal = data.chargesDetail.find(function(c) { return c.cat === 'TVA'; });
@@ -6567,7 +6577,7 @@ function showTJMDetail() {
   
   $('#formModalTitle').textContent = '📊 Analyse TJM';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // KPIs principaux
   var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' } });
@@ -6769,7 +6779,7 @@ function showTauxFacturationDetail(data) {
   
   $('#formModalTitle').textContent = '📅 Taux de Facturation';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // KPI principal
   var tauxColor = data.tauxFacturation >= 0.8 ? 'var(--success)' : data.tauxFacturation >= 0.6 ? 'var(--warning)' : 'var(--danger)';
@@ -6841,7 +6851,7 @@ function showIRDetail() {
   
   $('#formModalTitle').textContent = '💶 Simulation IR';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Sélecteur d'année
   var yearSelect = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px', justifyContent: 'center' } });
@@ -6883,7 +6893,7 @@ function renderIRForYear(year) {
   });
   
   var content = $('#irContent');
-  content.innerHTML = '';
+  content.replaceChildren();
   
   // Formulaire d'édition
   var form = el('div', { style: { background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
@@ -7003,7 +7013,7 @@ function showCFESimulator() {
 
   $('#formModalTitle').textContent = '🏢 Simulateur CFE';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Explication
   var intro = el('div', { style: { background: 'var(--info-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '12px' } });
@@ -7072,7 +7082,7 @@ function showCFESimulator() {
 
 function renderCFEResult(caN2, tauxCommunal) {
   var result = $('#cfeResult');
-  result.innerHTML = '';
+  result.replaceChildren();
 
   var tranches = [
     { max: 5000, base: 0, label: 'Exonéré' },
@@ -7193,7 +7203,7 @@ function showMissionModal(mission) {
 
   $('#formModalTitle').textContent = isNew ? '💼 Nouvelle Mission' : '✏️ ' + mission.client;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // SPRINT 7: Indicateur de progression visuel
   var progressDiv = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '16px', justifyContent: 'center' } });
@@ -7270,7 +7280,7 @@ function showMissionModal(mission) {
   body.appendChild(periodesContainer);
 
   function renderPeriodes() {
-    periodesContainer.innerHTML = '';
+    periodesContainer.replaceChildren();
     if (mission.periodes.length === 0) {
       periodesContainer.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '8px', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, '5 jours/semaine sur toute la durée'));
     }
@@ -7388,7 +7398,7 @@ function showMissionModal(mission) {
   body.appendChild(agenceContactsContainer);
 
   function renderAgenceContacts() {
-    agenceContactsContainer.innerHTML = '';
+    agenceContactsContainer.replaceChildren();
     mission.agence.contacts.forEach(function(c, idx) {
       var contactDiv = el('div', { class: 'agence-contact' });
       if (mission.agence.contacts.length > 1) {
@@ -7419,7 +7429,7 @@ function showMissionModal(mission) {
   body.appendChild(agenceAdressesContainer);
 
   function renderAgenceAdresses() {
-    agenceAdressesContainer.innerHTML = '';
+    agenceAdressesContainer.replaceChildren();
     mission.agence.adresses.forEach(function(addr, idx) {
       var addrDiv = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' } });
       var addrInput = el('input', { class: 'form-input', type: 'text', id: 'mAgcAddr_' + idx, placeholder: 'Ex: 14 Rue Paul Mesple, 31100 Toulouse', style: { flex: '1' } });
@@ -7601,7 +7611,7 @@ function showMissionModal(mission) {
 function showDaysEditor(mission) {
   $('#formModalTitle').textContent = '📅 Jours - ' + mission.client;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   if (!mission.lignes || mission.lignes.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Configure d\'abord les dates'));
@@ -7723,7 +7733,7 @@ var CHARGE_CATEGORIES = [
 function showChargeModal() {
   $('#formModalTitle').textContent = '📋 Ajouter une Charge';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Onglets: Ponctuelle / Récurrente
   var tabs = el('div', { class: 'filter-tabs', style: { marginBottom: '16px' } });
@@ -7741,7 +7751,7 @@ function showChargePonctuelle() {
   $('#tabPonctuelle').classList.add('active');
   $('#tabRecurrente').classList.remove('active');
   var content = $('#chargeFormContent');
-  content.innerHTML = '';
+  content.replaceChildren();
 
   content.appendChild(createSelect('Catégorie', 'chCat', CHARGE_CATEGORIES, 'Autre'));
   content.appendChild(createInput('Description', 'text', 'chDesc', '', 'Ex: Abonnement Notion'));
@@ -7811,7 +7821,7 @@ function showChargeRecurrente() {
   $('#tabPonctuelle').classList.remove('active');
   $('#tabRecurrente').classList.add('active');
   var content = $('#chargeFormContent');
-  content.innerHTML = '';
+  content.replaceChildren();
   
   content.appendChild(el('div', { style: { background: 'var(--info-glow)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '12px' } }, 
     '💡 La charge sera créée automatiquement chaque mois de la période sélectionnée'));
@@ -7903,7 +7913,7 @@ function showSalaireModal(montant) {
   var data = compute();
   $('#formModalTitle').textContent = '💸 Verser un Salaire';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   var info = el('div', { style: { background: 'var(--success-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
   info.innerHTML = '<strong>💡 Recommandation</strong><br>Cash dispo: ' + EUR(data.cashDispoAbsolu) + ' → Suggéré: <strong>' + EUR(data.salaireReco) + '</strong>';
   body.appendChild(info);
@@ -7925,7 +7935,7 @@ function editMovement(mvId) {
 
   $('#formModalTitle').textContent = '✏️ Modifier ' + (mv.type === 'Salaire' ? 'Salaire' : 'Charge');
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   if (mv.type === 'Salaire') {
     body.appendChild(createInput('Montant (€)', 'number', 'editMontant', mv.montant));
@@ -7990,7 +8000,7 @@ function deleteMovement(mvId) {
 function showMonthCongesModal(monthYm) {
   $('#formModalTitle').textContent = '🏖 Congés - ' + fmtMonth(monthYm);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Navigation mois/année
   var p = parseYM(monthYm);
@@ -8209,7 +8219,7 @@ function showCongesOverview() {
   var data = compute();
   $('#formModalTitle').textContent = '📅 Vue Congés';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   var months = getPeriodMonths();
 
@@ -8257,7 +8267,7 @@ function showCongesOverview() {
 function showFactureModal(facture) {
   $('#formModalTitle').textContent = '📄 ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Trouver la mission associée
   var mission = MISSIONS.find(function(m) { return m.factures && m.factures.some(function(f) { return f.id === facture.id; }); });
@@ -8359,7 +8369,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   
   $('#formModalTitle').textContent = '📄 Facture ' + mission.client + ' - ' + fmtMonth(monthYm);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Avertissement si numéro déjà finalisé
   if (hasDefinitiveNumber) {
@@ -8964,7 +8974,7 @@ function showMonthDetail(monthKey) {
 
   $('#formModalTitle').textContent = '📅 ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Calculs préliminaires avec détail par type de charge
   var tvaMonth = md.charges.filter(function(c) { return c.cat === 'TVA'; }).reduce(function(a, c) { return a + c.montant; }, 0);
@@ -9017,7 +9027,8 @@ function showMonthDetail(monthKey) {
   setTimeout(function() {
     var ctx = document.getElementById(canvasId);
     if (!ctx) return;
-    new Chart(ctx.getContext('2d'), {
+    if (ctx._chartInstance) ctx._chartInstance.destroy();
+    ctx._chartInstance = new Chart(ctx.getContext('2d'), {
       type: 'doughnut',
       data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 0 }] },
       options: {
@@ -9159,7 +9170,7 @@ function showMonthCAInvoices(monthKey) {
 
   $('#formModalTitle').textContent = '📊 CA HT ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // KPI résumé
   var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' } });
@@ -9228,7 +9239,7 @@ function showTimelineMonthCharges(monthKey) {
   
   $('#formModalTitle').textContent = '📋 Charges ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   if (md.charges.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '30px' } }, 'Aucune charge ce mois'));
@@ -9286,7 +9297,7 @@ function showSalaireModalForMonth(monthKey) {
   var data = compute();
   $('#formModalTitle').textContent = '💸 Verser Salaire - ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   var info = el('div', { style: { background: 'var(--success-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
   info.innerHTML = '<strong>💡 Recommandation</strong><br>Cash dispo global: ' + EUR(data.cashDispoAbsolu) + ' → Suggéré: <strong>' + EUR(data.salaireReco) + '</strong>';
@@ -9353,7 +9364,7 @@ function showHealthScoreDetail() {
   var health = calculateHealthScore();
   $('#formModalTitle').textContent = '🏥 Santé de l\'Entreprise';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   var scoreDiv = el('div', { style: { textAlign: 'center', marginBottom: '20px' } });
   scoreDiv.appendChild(el('div', { class: 'health-score-circle ' + health.level, style: { margin: '0 auto 12px', width: '80px', height: '80px', fontSize: '28px' } }, String(health.score)));
   scoreDiv.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700' } }, health.label));
@@ -9537,7 +9548,7 @@ function showTVADetail() {
   var data = compute();
   $('#formModalTitle').textContent = '🏛️ TVA - Règles & Projection';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   var statusDiv = el('div', { style: { textAlign: 'center', marginBottom: '20px', padding: '16px', background: COMPANY.tvaDepuis ? 'rgba(236,72,153,0.1)' : 'var(--success-glow)', borderRadius: 'var(--radius-lg)' } });
   statusDiv.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, COMPANY.tvaDepuis ? '🏛️' : '✅'));
   statusDiv.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700' } }, COMPANY.tvaDepuis ? 'Assujetti TVA' : 'Franchise de TVA'));
@@ -9789,7 +9800,7 @@ function showProjectionsModal() {
   var data = compute();
   $('#formModalTitle').textContent = '📈 Projections Financières';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   var scenarios = [
     { name: 'Optimiste', months: 12, vacances: 4, color: 'var(--success)' },
     { name: 'Normal', months: 12, vacances: 5, color: 'var(--info)' },
@@ -10072,7 +10083,7 @@ function setGoalCA(amount) {
 function showGoalModal() {
   $('#formModalTitle').textContent = '🎯 Objectif CA Annuel';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   body.appendChild(el('div', { style: { marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)' } }, 'Définis ton objectif de chiffre d\'affaires pour ' + (PERIOD.year || TODAY.getFullYear())));
   body.appendChild(createInput('Objectif CA HT (€)', 'number', 'goalAmount', GOAL_CA || ''));
   var presets = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' } });
@@ -10503,7 +10514,7 @@ function performSearch(query) {
 function updateSearchResults(query) {
   var container = $('#searchResults');
   if (!container) return;
-  container.innerHTML = '';
+  container.replaceChildren();
   
   if (SEARCH_RESULTS.length === 0) {
     container.appendChild(el('div', { class: 'search-empty' }, query ? 'Aucun résultat pour "' + query + '"' : 'Tape pour rechercher...'));
@@ -10580,7 +10591,7 @@ function createSearchOverlay() {
   var box = el('div', { class: 'search-box' });
   var inputWrap = el('div', { class: 'search-input-wrap' });
   inputWrap.appendChild(el('span', {}, '🔍'));
-  var input = el('input', { type: 'text', placeholder: 'Rechercher clients, factures, actions...', oninput: function() { performSearch(this.value); } });
+  var input = el('input', { type: 'text', placeholder: 'Rechercher clients, factures, actions...', oninput: debounce(function() { performSearch(this.value); }, DEBOUNCE_DELAY) });
   inputWrap.appendChild(input);
   inputWrap.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'ESC'));
   box.appendChild(inputWrap);
@@ -10830,7 +10841,7 @@ function toggleNotifCenter() {
 function renderNotifList() {
   var list = $('#notifList');
   if (!list) return;
-  list.innerHTML = '';
+  list.replaceChildren();
 
   var notifs = getNotifications();
   if (notifs.length === 0) {
@@ -11091,6 +11102,7 @@ function renderDashboardHero(container, data) {
   setTimeout(function() {
     var ctx = document.getElementById('compteDonutCanvas');
     if (!ctx || typeof Chart === 'undefined') return;
+    if (ctx._chartInstance) ctx._chartInstance.destroy();
 
     // Données: Cash + provisions détaillées
     var donutLabels = ['Cash Disponible'];
@@ -11103,7 +11115,7 @@ function renderDashboardHero(container, data) {
       donutColors.push(p.color);
     });
 
-    new Chart(ctx.getContext('2d'), {
+    ctx._chartInstance = new Chart(ctx.getContext('2d'), {
       type: 'doughnut',
       data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 0 }] },
       options: {
@@ -11530,7 +11542,7 @@ function updateProjectionCalcSimple(cashDispo) {
 
   var resultDiv = $('#projAutonomieResult');
   if (!resultDiv) return;
-  resultDiv.innerHTML = '';
+  resultDiv.replaceChildren();
 
   // Barre visuelle
   var maxMonths = 12;
@@ -11598,7 +11610,7 @@ function updateProjectionCalc(cashDispo, chargesRecurrentes) {
   var resultDiv = $('#projAutonomieResult');
   if (!resultDiv) return;
   resultDiv.style.display = 'block';
-  resultDiv.innerHTML = '';
+  resultDiv.replaceChildren();
 
   // Barre visuelle
   var maxMonths = 12;
@@ -13091,9 +13103,10 @@ function drawPerfDonut(provisions, charges, remuneration, cashDispo) {
   if (typeof Chart === 'undefined') return;
   var canvas = $('#caDonutChart');
   if (!canvas || !canvas.getContext) return;
+  if (canvas._chartInstance) canvas._chartInstance.destroy();
   var ctx = canvas.getContext('2d');
 
-  new Chart(ctx, {
+  canvas._chartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: ['Provisions', 'Charges', 'Rémunération', 'Cash dispo'],
@@ -13624,7 +13637,7 @@ function showAbsoluteWaterfallDetail(bar, data) {
   var modal = $('#formModal');
   $('#formModalTitle').textContent = bar.icon + ' ' + bar.label + ' - Détail';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Montant total
   body.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
@@ -13688,7 +13701,7 @@ function showWaterfallDetail(d, data) {
   var modal = $('#formModal');
   $('#formModalTitle').textContent = d.icon + ' ' + d.label;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   var items = [];
   var totalCat = 0;
@@ -13815,7 +13828,7 @@ function showTransactionDetail(catId, subLabel, data) {
   var modal = $('#formModal');
   $('#formModalTitle').textContent = '📋 ' + subLabel + ' - Détail';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   if (transactions.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-muted)' } }, 'Aucune écriture'));
@@ -14993,7 +15006,7 @@ function showWeeklyBreakdownModal(monthKey) {
 
   $('#formModalTitle').textContent = '📅 ' + fmtMonthShort(monthKey) + ' — Détail par semaine';
   var modalBody = $('#formModalBody');
-  modalBody.innerHTML = '';
+  modalBody.replaceChildren();
   modalBody.appendChild(body);
   openModal('formModal');
 
@@ -15682,7 +15695,7 @@ function renderTresorerie(container) {
 function showEditSoldeInitial() {
   $('#formModalTitle').textContent = '🏦 Modifier Solde Initial';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   body.appendChild(el('div', { style: { marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)' } }, 'Le solde initial correspond au montant présent sur ton compte pro au début de ton activité ou de la période de suivi.'));
   body.appendChild(createInput('Solde Initial (€)', 'number', 'editSoldeInit', TREASURY.soldeInitial));
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '16px' }, onclick: function() {
@@ -16458,7 +16471,7 @@ function renderConfig(container) {
 function render() {
   var container = $('#app');
   if (!container) { console.error('Container #app not found'); return; }
-  container.innerHTML = '';
+  container.replaceChildren();
 
   try {
     // V75: Navigation 5 onglets (Cockpit · Activité · Trésorerie · Analyse · Config)
@@ -16514,14 +16527,14 @@ function updateOnboarding() {
   $('#obText').textContent = step.text;
   
   var stepsDiv = $('#obSteps');
-  stepsDiv.innerHTML = '';
+  stepsDiv.replaceChildren();
   OB_STEPS.forEach(function(_, i) {
     var dot = el('div', { class: 'onboarding-step' + (i === OB_STEP ? ' active' : i < OB_STEP ? ' done' : '') });
     stepsDiv.appendChild(dot);
   });
   
   var form = $('#obForm');
-  form.innerHTML = '';
+  form.replaceChildren();
   
   if (step.fields.includes('nom')) {
     form.appendChild(createInput('Nom de ton entreprise', 'text', 'obNom', COMPANY.nom));

@@ -246,15 +246,14 @@
 ## SPRINT 10 - PERFORMANCE (Priorité P2)
 **Note actuelle: ~6/10 → Cible: 9/10**
 
-### 10.1: Optimiser les manipulations DOM
-- [ ] Remplacer `body.innerHTML = ''` par `body.replaceChildren()`
-- [ ] DocumentFragment pour les listes longues
-- [ ] Debounce sur recherche et calculs temps réel
+### 10.1: Optimiser les manipulations DOM ✅
+- [x] Remplacer `body.innerHTML = ''` par `body.replaceChildren()` (38 occurrences + 17 containers)
+- [x] Debounce sur recherche globale (DEBOUNCE_DELAY = 300ms)
+- [x] Fonction utilitaire `debounce()` centralisée
 
-### 10.2: Optimiser la mémoire
-- [ ] Détruire les instances Chart.js avant d'en créer de nouvelles
-- [ ] Cleanup event listeners à la fermeture des modals
-- [ ] Nettoyer les setTimeout orphelins
+### 10.2: Optimiser la mémoire ✅
+- [x] Détruire les instances Chart.js avant d'en créer de nouvelles (3 donuts orphelins corrigés avec `_chartInstance`)
+- [x] Charts principaux déjà protégés (mainChart, soldeChart, projectionChart, joursParMissionChart)
 
 ---
 
