@@ -1924,6 +1924,18 @@ var SCENARIOS = {
 // Rétro-compatibilité IR_BRACKETS
 var IR_BRACKETS = getLegalIRBrackets(CURRENT_YEAR);
 
+// ===== SPRINT 4: CONSTANTES CENTRALISÉES =====
+// Limites et seuils réutilisés dans l'app
+var MAX_IMPORT_SIZE = 5 * 1024 * 1024; // 5 Mo
+var TOAST_DURATION = 4000; // ms
+var TOAST_DURATION_SHORT = 3000; // ms
+var DEBOUNCE_DELAY = 300; // ms pour les recherches
+var MAX_MOUVEMENTS_DISPLAY = 20; // limite affichage mouvements
+var AUTONOMY_CONFORTABLE = 6; // mois
+var AUTONOMY_WARNING = 3; // mois
+var OCCUPATION_GOOD = 70; // pourcentage
+var OCCUPATION_MEDIUM = 40; // pourcentage
+
 // ===== SOURCE UNIQUE: Catégories de charges fiscales/sociales =====
 var CHARGE_TYPES = {
   'URSSAF':    { label: 'URSSAF - Cotisations sociales', shortLabel: 'URSSAF',     icon: '🏥', color: '#ef4444', desc: 'Maladie, retraite, allocations familiales', penalty: '5% + 0.2%/mois après 30j' },
@@ -2031,7 +2043,7 @@ function toast(msg, type) {
   type = type || 'info';
   var t = el('div', { class: 'toast ' + type }, [el('span', {}, msg), el('button', { class: 'toast-close', onclick: function() { t.remove(); } }, '×')]);
   $('#toastContainer').appendChild(t);
-  setTimeout(function() { if (t.parentNode) t.remove(); }, 4000);
+  setTimeout(function() { if (t.parentNode) t.remove(); }, TOAST_DURATION);
 }
 
 function EUR(n, forceShow) { 
@@ -3842,7 +3854,7 @@ function showToast(message, type) {
     } 
   }, message);
   document.body.appendChild(toast);
-  setTimeout(function() { toast.remove(); }, 3000);
+  setTimeout(function() { toast.remove(); }, TOAST_DURATION_SHORT);
 }
 
 // V51: Dynamic modal
@@ -4040,7 +4052,7 @@ function exportData() {
 
 function importData(file) {
   // SPRINT 1: Sécurité — limiter taille fichier (5 Mo max)
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > MAX_IMPORT_SIZE) {
     showToast('Fichier trop volumineux (max 5 Mo)', 'error');
     return;
   }
@@ -6369,7 +6381,7 @@ function showRendementConfig() {
 }
 
 // Alias pour compatibilité
-function showRendementDetail() { showRendementConfig(); }
+// SPRINT 4: showRendementDetail supprimé — utiliser showRendementConfig() directement
 
 function showWaterfallDetail() {
   var data = compute();
@@ -10527,7 +10539,7 @@ function importJSON() {
     var file = e.target.files[0];
     if (!file) return;
     // SPRINT 1: Sécurité — limiter taille fichier (5 Mo max)
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_IMPORT_SIZE) {
       toast('Fichier trop volumineux (max 5 Mo)', 'error');
       return;
     }
@@ -15316,7 +15328,7 @@ function renderTresorerie(container) {
   var totalInterets = TREASURY.rendementActif ? getTotalRendement() : 0;
   var interetsBlock = el('div', { class: 'treso-item', onclick: function() { 
     if (TREASURY.rendementActif) {
-      showRendementDetail(); 
+      showRendementConfig(); 
     } else {
       // Rediriger vers Admin pour activer
       toast('Active le rendement dans Admin > Trésorerie', 'info');
@@ -16708,7 +16720,7 @@ document.addEventListener('DOMContentLoaded', init);
  *    - calculerRendementMensuel(ym): calcule les intérêts d'un mois
  *    - updateRendementHistorique(): met à jour l'historique des intérêts
  *    - getTotalRendement(): total des intérêts perçus
- *    - showRendementDetail(): modale détail des intérêts
+ *    - showRendementConfig(): modale détail des intérêts
  *    - getNextMonth/getPreviousMonth: helpers navigation mois
  *
  * 🟠 CORRECTIONS UX/UI
