@@ -16092,6 +16092,79 @@ function renderAdmin(container) {
 
   container.appendChild(cloudCard);
 
+  // ===== SPRINT 2: RGPD & DONNÉES =====
+  var rgpdCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  rgpdCard.appendChild(el('div', { class: 'card-title' }, '🔒 Vie privée & RGPD'));
+
+  // Mention légale / transparence
+  var rgpdInfo = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.6' } });
+  rgpdInfo.appendChild(el('p', { style: { margin: '0 0 8px 0' } }, '📋 Vos données sont stockées localement sur votre appareil (localStorage). Aucune donnée n\'est envoyée à un serveur sauf si vous activez la synchronisation Supabase.'));
+  if (SYNC_ENABLED) {
+    rgpdInfo.appendChild(el('p', { style: { margin: '0', color: 'var(--warning)' } }, '⚠️ Sync cloud activée : vos données sont envoyées vers votre instance Supabase. Consultez la politique de confidentialité de Supabase.'));
+  }
+  rgpdCard.appendChild(rgpdInfo);
+
+  // Export données personnelles (portabilité RGPD)
+  var rgpdBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' } });
+  rgpdBtns.appendChild(el('button', { class: 'btn', onclick: function() {
+    // Export RGPD complet de toutes les données personnelles
+    var allData = {
+      exportDate: new Date().toISOString(),
+      exportType: 'RGPD_PORTABILITE',
+      company: COMPANY,
+      missions: MISSIONS,
+      clients: CLIENTS,
+      treasury: TREASURY,
+      irConfig: IR_CONFIG,
+      congesDates: localStorage.getItem(STORAGE_PREFIX + 'conges') ? JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'conges')) : [],
+      goalCA: localStorage.getItem('freel_goal_ca') || null,
+      theme: localStorage.getItem('freel_theme') || null,
+      notificationsRead: localStorage.getItem('freel_notif_read') || null
+    };
+    var blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'freel-rgpd-export-' + localISO(TODAY) + '.json'; a.click();
+    URL.revokeObjectURL(a.href);
+    toast('Export RGPD complet téléchargé', 'success');
+  } }, '📦 Exporter mes données (RGPD)'));
+
+  // Droit à l'effacement
+  rgpdBtns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() {
+    // Double confirmation
+    if (!confirm('⚠️ SUPPRESSION DÉFINITIVE\n\nToutes vos données seront supprimées :\n- Entreprise, missions, clients\n- Trésorerie, factures\n- Configuration fiscale\n\nCette action est IRRÉVERSIBLE.\n\nContinuer ?')) return;
+    var confirmText = prompt('Pour confirmer, tapez SUPPRIMER :');
+    if (confirmText !== 'SUPPRIMER') {
+      toast('Suppression annulée', 'info');
+      return;
+    }
+    // Purger localStorage complet
+    Object.keys(localStorage).filter(function(k) { return k.indexOf('freel') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
+    // Purger Supabase si connecté
+    if (SYNC_ENABLED && CURRENT_USER && supabase) {
+      supabase.from('user_data').delete().eq('user_id', CURRENT_USER.id).then(function() {
+        console.log('Cloud data deleted');
+      }).catch(function(err) { console.error('Cloud delete error:', err); });
+      supabase.auth.signOut();
+    }
+    toast('Toutes vos données ont été supprimées', 'success');
+    setTimeout(function() { location.reload(); }, 1500);
+  } }, '🗑️ Supprimer toutes mes données'));
+  rgpdCard.appendChild(rgpdBtns);
+
+  // Politique de confidentialité
+  var policyDetails = el('details', { style: { fontSize: '10px', color: 'var(--text-muted)' } });
+  policyDetails.appendChild(el('summary', { style: { cursor: 'pointer', color: 'var(--accent)', fontWeight: '600' } }, '📜 Politique de confidentialité'));
+  var policyContent = el('div', { style: { marginTop: '8px', lineHeight: '1.6', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '6px' } });
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0', fontWeight: '600' } }, 'FREEL — Gestion Freelance Intelligente'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Données collectées : informations entreprise, missions, clients, factures, configuration fiscale. Toutes saisies manuellement par vous.'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Stockage : exclusivement dans le localStorage de votre navigateur. Aucun serveur tiers, aucun cookie de tracking, aucune analytique.'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Cloud (optionnel) : si activé, vos données sont synchronisées vers votre propre instance Supabase. Vous êtes responsable de la sécurité de votre instance.'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Vos droits : accès, rectification, portabilité (export JSON) et effacement (bouton ci-dessus). Conformément au RGPD (UE 2016/679).'));
+  policyContent.appendChild(el('p', { style: { margin: '0' } }, 'Contact : via le dépôt GitHub du projet.'));
+  policyDetails.appendChild(policyContent);
+  rgpdCard.appendChild(policyDetails);
+
+  container.appendChild(rgpdCard);
+
   container.appendChild(el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Freel V' + APP_VERSION + ' · Made with 💚'));
 }
 
