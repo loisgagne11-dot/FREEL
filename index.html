@@ -1642,13 +1642,15 @@ function signIn() {
   supabase.auth.signInWithPassword({ email: email, password: password })
     .then(function(result) {
       if (result.error) {
-        showToast('❌ ' + result.error.message, 'error');
+        // SPRINT 1: Sécurité — ne pas exposer les messages d'erreur Supabase
+        console.error('Sign in error:', result.error);
+        showToast('❌ Connexion échouée. Vérifiez vos identifiants.', 'error');
       } else {
         showToast('✅ Connecté!', 'success');
         closeDynamicModal();
       }
     })
-    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
+    .catch(function(err) { console.error('Network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
 function signUp() {
@@ -1663,13 +1665,14 @@ function signUp() {
   supabase.auth.signUp({ email: email, password: password })
     .then(function(result) {
       if (result.error) {
-        showToast('❌ ' + result.error.message, 'error');
+        console.error('Sign up error:', result.error);
+        showToast('❌ Inscription échouée. Vérifiez les informations saisies.', 'error');
       } else {
         showToast('✅ Compte créé! Vérifie ton email.', 'success');
         closeDynamicModal();
       }
     })
-    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
+    .catch(function(err) { console.error('Network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
 function signOut() {
@@ -1678,12 +1681,12 @@ function signOut() {
     updateAuthUI();
     showToast('🚪 Déconnecté', 'info');
   })
-  .catch(function(err) { showToast('❌ Erreur déconnexion: ' + err.message, 'error'); });
+  .catch(function(err) { console.error('Sign out error:', err); showToast('❌ Erreur de déconnexion, réessayez.', 'error'); });
 }
 
 function syncToCloud() {
   if (!CURRENT_USER || !supabase) return;
-  
+
   var data = {
     user_id: CURRENT_USER.id,
     company: COMPANY,
@@ -1693,17 +1696,18 @@ function syncToCloud() {
     ir_config: IR_CONFIG,
     updated_at: new Date().toISOString()
   };
-  
+
   supabase.from('user_data')
     .upsert(data, { onConflict: 'user_id' })
     .then(function(result) {
       if (result.error) {
-        showToast('❌ Erreur sync: ' + result.error.message, 'error');
+        console.error('Sync error:', result.error);
+        showToast('❌ Erreur de synchronisation, réessayez.', 'error');
       } else {
         showToast('☁️ Données sauvegardées!', 'success');
       }
     })
-    .catch(function(err) { showToast('❌ Erreur réseau sync: ' + err.message, 'error'); });
+    .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
 function loadFromCloud() {
@@ -1716,7 +1720,8 @@ function loadFromCloud() {
     .then(function(result) {
       if (result.error) {
         if (result.error.code !== 'PGRST116') {
-          showToast('❌ Erreur: ' + result.error.message, 'error');
+          console.error('Cloud load error:', result.error);
+          showToast('❌ Erreur de chargement des données cloud.', 'error');
         }
       } else if (result.data) {
         if (result.data.company) COMPANY = result.data.company;
@@ -1731,7 +1736,7 @@ function loadFromCloud() {
         showToast('☁️ Données chargées du cloud!', 'success');
       }
     })
-    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
+    .catch(function(err) { console.error('Cloud network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
 var PERIOD = { type: 'year', year: TODAY.getFullYear(), month: null };
@@ -2010,6 +2015,12 @@ function el(tag, attrs, children) {
   if (children) (Array.isArray(children) ? children : [children]).forEach(function(c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
   return e;
 }
+// SPRINT 1: Sécurité — Échappement HTML pour prévenir XSS
+function escapeHTML(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function toast(msg, type) {
   type = type || 'info';
   var t = el('div', { class: 'toast ' + type }, [el('span', {}, msg), el('button', { class: 'toast-close', onclick: function() { t.remove(); } }, '×')]);
@@ -2043,10 +2054,13 @@ function parseDate(s) {
 }
 
 // Fonction highlight pour recherche textuelle (B17)
+// SPRINT 1: Sécurité — échappe le texte avant d'appliquer le highlight
 function highlightText(text, query) {
-  if (!query || !text) return text;
-  var regex = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-  return text.replace(regex, '<span class="search-highlight">$1</span>');
+  if (!query || !text) return escapeHTML(text);
+  var escaped = escapeHTML(text);
+  var escapedQuery = escapeHTML(query);
+  var regex = new RegExp('(' + escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  return escaped.replace(regex, '<span class="search-highlight">$1</span>');
 }
 
 // ===== SPRINT 5: COMPOSANTS UI RÉUTILISABLES (A12) =====
@@ -3980,10 +3994,23 @@ function exportData() {
 }
 
 function importData(file) {
+  // SPRINT 1: Sécurité — limiter taille fichier (5 Mo max)
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('Fichier trop volumineux (max 5 Mo)', 'error');
+    return;
+  }
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
       var data = JSON.parse(e.target.result);
+      // SPRINT 1: Valider la structure du JSON importé
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        showToast('Format de fichier invalide', 'error'); return;
+      }
+      if (data.company && typeof data.company !== 'object') { showToast('Données company invalides', 'error'); return; }
+      if (data.missions && !Array.isArray(data.missions)) { showToast('Données missions invalides', 'error'); return; }
+      if (data.clients && !Array.isArray(data.clients)) { showToast('Données clients invalides', 'error'); return; }
+      if (data.treasury && typeof data.treasury !== 'object') { showToast('Données treasury invalides', 'error'); return; }
       if (data.company) COMPANY = Object.assign(COMPANY, data.company);
       if (data.missions) MISSIONS = data.missions;
       if (data.clients) CLIENTS = data.clients;
@@ -3994,7 +4021,7 @@ function importData(file) {
       MISSIONS.forEach(buildMission);
       saveAll(); render();
       showToast('Import réussi!', 'success');
-    } catch (err) { showToast('Erreur: ' + err.message, 'error'); }
+    } catch (err) { console.error('Import error:', err); showToast('Erreur: fichier JSON invalide', 'error'); }
   };
   reader.readAsText(file);
 }
@@ -8393,35 +8420,37 @@ function showInvoicePreview(data) {
 // Générer le contenu HTML de la facture (pour preview)
 function generateInvoiceHTMLContent(d) {
   var fmtEur = function(n) { return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; };
-  
+  // SPRINT 1: Sécurité — échapper toutes les données utilisateur
+  var e = escapeHTML;
+
   return '<div style="display:flex;justify-content:space-between;margin-bottom:25px;">' +
     // Emetteur (gauche)
     '<div style="flex:1;">' +
       '<div style="font-size:14pt;font-weight:bold;color:#1a1a2e;margin-bottom:8px;">Entreprise individuelle</div>' +
-      '<div style="font-size:12pt;font-weight:bold;margin-bottom:4px;">' + d.emetteur + '</div>' +
+      '<div style="font-size:12pt;font-weight:bold;margin-bottom:4px;">' + e(d.emetteur) + '</div>' +
       '<div style="color:#555;font-size:9pt;line-height:1.5;">' +
-        (d.adresseEmetteur ? d.adresseEmetteur + '<br>' : '') +
+        (d.adresseEmetteur ? e(d.adresseEmetteur) + '<br>' : '') +
         'France<br>' +
-        (d.siret ? 'SIRET: ' + d.siret + '<br>' : '') +
-        (d.tvaIntra ? 'TVA Intra: ' + d.tvaIntra : '') +
+        (d.siret ? 'SIRET: ' + e(d.siret) + '<br>' : '') +
+        (d.tvaIntra ? 'TVA Intra: ' + e(d.tvaIntra) : '') +
       '</div>' +
     '</div>' +
     // Client (droite)
     '<div style="background:#f0f4f8;border-left:4px solid #0099ff;padding:15px;min-width:200px;">' +
       '<div style="font-size:9pt;color:#666;margin-bottom:4px;">FACTURER À</div>' +
-      '<div style="font-weight:bold;font-size:11pt;">' + d.client + '</div>' +
-      (d.adresseClient ? '<div style="color:#555;font-size:9pt;margin-top:4px;">' + d.adresseClient.replace(/,/g, '<br>') + '</div>' : '') +
+      '<div style="font-weight:bold;font-size:11pt;">' + e(d.client) + '</div>' +
+      (d.adresseClient ? '<div style="color:#555;font-size:9pt;margin-top:4px;">' + e(d.adresseClient).replace(/,/g, '<br>') + '</div>' : '') +
     '</div>' +
   '</div>' +
   // Infos facture
   '<div style="display:flex;gap:30px;margin-bottom:20px;font-size:10pt;padding:12px;background:#f8f9fa;border-radius:6px;">' +
-    '<div><span style="color:#666;">Facture N° </span><strong style="color:#1a1a2e;">' + d.num + '</strong></div>' +
-    '<div><span style="color:#666;">Date: </span><strong>' + d.date + '</strong></div>' +
-    '<div><span style="color:#666;">Échéance: </span><strong style="color:#c53030;">' + d.dateEcheance + '</strong></div>' +
-    (d.numCommande ? '<div><span style="color:#666;">Réf. commande: </span><strong>' + d.numCommande + '</strong></div>' : '') +
+    '<div><span style="color:#666;">Facture N° </span><strong style="color:#1a1a2e;">' + e(d.num) + '</strong></div>' +
+    '<div><span style="color:#666;">Date: </span><strong>' + e(d.date) + '</strong></div>' +
+    '<div><span style="color:#666;">Échéance: </span><strong style="color:#c53030;">' + e(d.dateEcheance) + '</strong></div>' +
+    (d.numCommande ? '<div><span style="color:#666;">Réf. commande: </span><strong>' + e(d.numCommande) + '</strong></div>' : '') +
   '</div>' +
   // Titre
-  '<div style="font-size:11pt;font-weight:bold;color:#1a1a2e;margin-bottom:15px;">' + d.titre + '</div>' +
+  '<div style="font-size:11pt;font-weight:bold;color:#1a1a2e;margin-bottom:15px;">' + e(d.titre) + '</div>' +
   // Tableau prestations avec totaux intégrés
   '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
     '<thead><tr style="background:#1a1a2e;color:#fff;">' +
@@ -8435,13 +8464,13 @@ function generateInvoiceHTMLContent(d) {
     '<tbody>' +
       '<tr style="border-bottom:1px solid #eee;">' +
         '<td style="padding:12px 10px;vertical-align:top;">' +
-          '<div style="font-weight:500;">' + d.descriptif + '</div>' +
-          '<div style="font-size:9pt;color:#666;margin-top:4px;">Période: ' + d.periode + '</div>' +
+          '<div style="font-weight:500;">' + e(d.descriptif) + '</div>' +
+          '<div style="font-size:9pt;color:#666;margin-top:4px;">Période: ' + e(d.periode) + '</div>' +
         '</td>' +
-        '<td style="padding:12px 10px;text-align:center;">' + d.jours + '</td>' +
+        '<td style="padding:12px 10px;text-align:center;">' + e(d.jours) + '</td>' +
         '<td style="padding:12px 10px;text-align:center;">jour(s)</td>' +
         '<td style="padding:12px 10px;text-align:right;">' + fmtEur(d.tjm) + '</td>' +
-        '<td style="padding:12px 10px;text-align:center;">' + d.tvaRate + '%</td>' +
+        '<td style="padding:12px 10px;text-align:center;">' + e(d.tvaRate) + '%</td>' +
         '<td style="padding:12px 10px;text-align:right;font-weight:500;">' + fmtEur(d.totalHT) + '</td>' +
       '</tr>' +
       // Ligne vide séparatrice
@@ -8455,7 +8484,7 @@ function generateInvoiceHTMLContent(d) {
       // TVA
       '<tr style="background:#f8f9fa;">' +
         '<td colspan="4"></td>' +
-        '<td style="padding:8px 10px;text-align:right;font-weight:500;color:#666;">TVA ' + d.tvaRate + '%</td>' +
+        '<td style="padding:8px 10px;text-align:right;font-weight:500;color:#666;">TVA ' + e(d.tvaRate) + '%</td>' +
         '<td style="padding:8px 10px;text-align:right;font-weight:600;">' + fmtEur(d.tvaAmount) + '</td>' +
       '</tr>' +
       // Total TTC
@@ -8469,14 +8498,14 @@ function generateInvoiceHTMLContent(d) {
   // Coordonnées bancaires
   (d.iban ? '<div style="background:#f8f9fa;border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:20px;">' +
     '<div style="font-weight:bold;margin-bottom:8px;font-size:10pt;">💳 Coordonnées bancaires</div>' +
-    '<div style="font-family:monospace;font-size:11pt;letter-spacing:1px;">' + d.iban + '</div>' +
+    '<div style="font-family:monospace;font-size:11pt;letter-spacing:1px;">' + e(d.iban) + '</div>' +
   '</div>' : '') +
   // Mentions légales - SPRINT 1: Conditions de paiement complètes (Art. L441-9)
   '<div style="font-size:8pt;color:#888;line-height:1.6;border-top:1px solid #ddd;padding-top:15px;">' +
-    '<div style="margin-bottom:8px;"><strong>Conditions de paiement:</strong> Paiement à ' + (d.delaiPaiement || 30) + ' jours à compter de la date de facturation. Date d\'échéance: ' + d.dateEcheance + '</div>' +
+    '<div style="margin-bottom:8px;"><strong>Conditions de paiement:</strong> Paiement à ' + (d.delaiPaiement || 30) + ' jours à compter de la date de facturation. Date d\'échéance: ' + e(d.dateEcheance) + '</div>' +
     '<div style="margin-bottom:8px;">En cas de retard de paiement, une pénalité de 3 fois le taux d\'intérêt légal sera appliquée (taux BCE + 10 points), ' +
     'à laquelle s\'ajoutera une indemnité forfaitaire pour frais de recouvrement de 40 €. Pas d\'escompte pour paiement anticipé.</div>' +
-    '<div>SIREN ' + d.siren + ' - RCS TOULOUSE - APE 6201Z</div>' +
+    '<div>SIREN ' + e(d.siren) + ' - RCS TOULOUSE - APE 6201Z</div>' +
     (d.tvaRate === 0 ? '<div style="font-weight:500;margin-top:4px;">TVA non applicable, article 293 B du CGI</div>' : '') +
   '</div>';
 }
@@ -10452,10 +10481,22 @@ function importJSON() {
   input.onchange = function(e) {
     var file = e.target.files[0];
     if (!file) return;
+    // SPRINT 1: Sécurité — limiter taille fichier (5 Mo max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Fichier trop volumineux (max 5 Mo)', 'error');
+      return;
+    }
     var reader = new FileReader();
     reader.onload = function(ev) {
       try {
         var data = JSON.parse(ev.target.result);
+        // SPRINT 1: Valider la structure du JSON importé
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+          toast('Format de fichier invalide', 'error'); return;
+        }
+        if (data.company && typeof data.company !== 'object') { toast('Données invalides', 'error'); return; }
+        if (data.missions && !Array.isArray(data.missions)) { toast('Données invalides', 'error'); return; }
+        if (data.clients && !Array.isArray(data.clients)) { toast('Données invalides', 'error'); return; }
         if (data.company) COMPANY = Object.assign(COMPANY, data.company);
         if (data.missions) MISSIONS = data.missions;
         if (data.clients) CLIENTS = data.clients;
@@ -10467,6 +10508,7 @@ function importJSON() {
         render();
         toast('Import réussi! Données restaurées.', 'success');
       } catch (err) {
+        console.error('Import error:', err);
         toast('Erreur: fichier JSON invalide', 'error');
       }
     };
@@ -16001,15 +16043,18 @@ function renderAdmin(container) {
       var testClient = supabaseLib.createClient(url, key);
       testClient.auth.getSession().then(function(result) {
         if (result.error) {
-          toast('❌ Erreur: ' + result.error.message, 'error');
+          console.error('Supabase test error:', result.error);
+          toast('❌ Connexion Supabase échouée. Vérifiez URL et clé.', 'error');
         } else {
           toast('✅ Connexion Supabase OK!', 'success');
         }
       }).catch(function(err) {
-        toast('❌ Erreur: ' + err.message, 'error');
+        console.error('Supabase test network error:', err);
+        toast('❌ Erreur réseau, vérifiez l\'URL Supabase.', 'error');
       });
     } catch (e) {
-      toast('❌ Erreur: ' + e.message, 'error');
+      console.error('Supabase init error:', e);
+      toast('❌ Configuration Supabase invalide.', 'error');
     }
   } }, '🔍 Tester'));
 
@@ -16021,7 +16066,14 @@ function renderAdmin(container) {
   }
   cloudCard.appendChild(cloudBtns);
 
-  // Clear config button
+  // SPRINT 1: Sécurité — avertissement stockage credentials en clair
+  if (SUPABASE_URL || SUPABASE_ANON_KEY) {
+    var secWarning = el('div', { style: { marginTop: '10px', padding: '8px 12px', background: 'rgba(255,180,0,0.1)', border: '1px solid var(--warning)', borderRadius: '6px', fontSize: '10px', color: 'var(--warning)' } });
+    secWarning.appendChild(el('span', {}, '⚠️ Les clés Supabase sont stockées en clair dans le navigateur. Ne partagez pas cet appareil et utilisez la clé anon (publique) uniquement.'));
+    cloudCard.appendChild(secWarning);
+  }
+
+  // Clear config button — purge credentials
   if (SUPABASE_URL || SUPABASE_ANON_KEY) {
     cloudCard.appendChild(el('button', { class: 'btn btn-danger btn-sm', style: { marginTop: '10px', width: '100%' }, onclick: function() {
       if (confirm('Supprimer la configuration Supabase?')) {

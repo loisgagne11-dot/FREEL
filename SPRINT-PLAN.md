@@ -20,32 +20,32 @@
 ## SPRINT 1 - SÉCURITÉ (Priorité P0 - BLOQUANT)
 **Note actuelle: 2/10 → Cible: 10/10**
 
-### 1.1: Créer une fonction d'échappement HTML
-- [ ] Ajouter `escapeHTML(str)` qui échappe `<>&"'`
-- [ ] Utiliser partout où des données utilisateur sont injectées dans du HTML
+### 1.1: Créer une fonction d'échappement HTML ✅
+- [x] Ajouter `escapeHTML(str)` qui échappe `<>&"'`
+- [x] Utiliser partout où des données utilisateur sont injectées dans du HTML
 
-### 1.2: Sécuriser TOUS les innerHTML avec données utilisateur
-- [ ] Auditer chaque innerHTML contenant des données user (noms, adresses, SIRET, descriptions)
-- [ ] Remplacer par `textContent` quand HTML n'est pas nécessaire
-- [ ] Appliquer `escapeHTML()` quand innerHTML est requis avec données user
-- [ ] Focus critique: `generateInvoiceHTMLContent()` — toutes les propriétés non échappées
-- [ ] Focus critique: modales salaire, infos financières, recommandations
-- [ ] Focus: `d.adresseClient.replace(/,/g, '<br>')` — injection directe
+### 1.2: Sécuriser TOUS les innerHTML avec données utilisateur ✅
+- [x] Auditer chaque innerHTML contenant des données user (noms, adresses, SIRET, descriptions)
+- [x] Remplacer par `textContent` quand HTML n'est pas nécessaire
+- [x] Appliquer `escapeHTML()` quand innerHTML est requis avec données user
+- [x] Focus critique: `generateInvoiceHTMLContent()` — toutes les propriétés non échappées
+- [x] Focus critique: modales salaire, infos financières, recommandations
+- [x] Focus: `d.adresseClient.replace(/,/g, '<br>')` — injection directe (escape avant replace)
 
-### 1.3: Sécuriser l'import JSON
-- [ ] Valider la structure du JSON importé (schéma attendu)
-- [ ] Vérifier les types de chaque champ avant application
-- [ ] Rejeter les données malformées avec message clair
-- [ ] Limiter la taille du fichier importé
+### 1.3: Sécuriser l'import JSON ✅
+- [x] Valider la structure du JSON importé (schéma attendu)
+- [x] Vérifier les types de chaque champ avant application
+- [x] Rejeter les données malformées avec message clair
+- [x] Limiter la taille du fichier importé (5 Mo max)
 
-### 1.4: Sécuriser les erreurs exposées
-- [ ] Masquer `err.message` dans les toast Supabase → messages génériques
-- [ ] Ne jamais exposer de stack traces côté utilisateur
-- [ ] Logger les erreurs en console uniquement
+### 1.4: Sécuriser les erreurs exposées ✅
+- [x] Masquer `err.message` dans les toast Supabase → messages génériques
+- [x] Ne jamais exposer de stack traces côté utilisateur
+- [x] Logger les erreurs en console uniquement
 
-### 1.5: Sécuriser le stockage credentials
-- [ ] Avertir l'utilisateur que les clés Supabase sont stockées en clair
-- [ ] Ajouter une option de déconnexion qui purge les credentials
+### 1.5: Sécuriser le stockage credentials ✅
+- [x] Avertir l'utilisateur que les clés Supabase sont stockées en clair
+- [x] Ajouter une option de déconnexion qui purge les credentials (existant)
 
 ---
 
