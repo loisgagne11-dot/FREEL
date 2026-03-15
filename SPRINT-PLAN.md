@@ -52,23 +52,23 @@
 ## SPRINT 2 - RGPD & DONNÉES (Priorité P0 - BLOQUANT)
 **Note actuelle: 2/10 → Cible: 10/10**
 
-### 2.1: Droit à l'effacement
-- [ ] Ajouter un bouton "Supprimer toutes mes données" dans Config
-- [ ] Confirmation double avant suppression (modal + re-saisie)
-- [ ] Purger localStorage complet + Supabase si connecté
+### 2.1: Droit à l'effacement ✅
+- [x] Ajouter un bouton "Supprimer toutes mes données" dans Config
+- [x] Confirmation double avant suppression (confirm + re-saisie "SUPPRIMER")
+- [x] Purger localStorage complet + Supabase si connecté
 
-### 2.2: Export des données personnelles (portabilité)
-- [ ] Bouton "Exporter mes données" (JSON complet) — déjà partiellement fait, vérifier exhaustivité
-- [ ] Inclure TOUTES les données (company, missions, clients, treasury, IR, conges, factures)
+### 2.2: Export des données personnelles (portabilité) ✅
+- [x] Bouton "Exporter mes données" (JSON complet RGPD)
+- [x] Inclure TOUTES les données (company, missions, clients, treasury, IR, conges, goalCA, theme, notifs)
 
-### 2.3: Consentement et transparence
-- [ ] Ajouter une mention légale / politique de confidentialité accessible
-- [ ] Informer que les données restent en local (pas de tracking)
-- [ ] Si Supabase activé: informer de l'envoi de données vers le cloud
+### 2.3: Consentement et transparence ✅
+- [x] Ajouter une politique de confidentialité accessible (section dépliable)
+- [x] Informer que les données restent en local (pas de tracking)
+- [x] Si Supabase activé: avertissement envoi données cloud
 
 ### 2.4: Chiffrement local (optionnel mais recommandé)
-- [ ] Envisager le chiffrement des données sensibles dans localStorage
-- [ ] Au minimum: ne pas stocker les mots de passe en clair (Supabase gère déjà)
+- [x] Supabase gère déjà l'auth — pas de mots de passe en clair côté app
+- [ ] Chiffrement localStorage optionnel (hors scope V1, complexité disproportionnée pour un SPA)
 
 ---
 
