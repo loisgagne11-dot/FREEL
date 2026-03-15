@@ -52,6 +52,14 @@ jobs:
           grep -q 'LEGAL_BY_YEAR' index.html || { echo "::error::Missing LEGAL_BY_YEAR"; exit 1; }
           echo "HTML structure validation passed"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run smoke tests
+        run: node tests/smoke-test.js
+
       - name: Check no secrets committed
         run: |
           # Check for .env files
