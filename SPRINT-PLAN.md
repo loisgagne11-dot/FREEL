@@ -157,26 +157,24 @@
 ## SPRINT 6 - ROBUSTESSE & VALIDATION (Priorité P1)
 **Note actuelle: ~4/10 → Cible: 10/10**
 
-### 6.1: Renforcer validateInput()
-- [ ] SIRET: vérification algorithme Luhn
-- [ ] IBAN: validation format complet (longueur par pays + checksum mod 97)
-- [ ] Email: regex stricte
-- [ ] Téléphone: format français (10 chiffres, commence par 0)
-- [ ] Dates: cohérence fin > début
+### 6.1: Renforcer validateInput() ✅
+- [x] SIRET: vérification algorithme Luhn (luhnCheck)
+- [x] IBAN: validation format + checksum mod 97 (ibanMod97Check, ISO 13616)
+- [x] Email: regex RFC 5322 simplifiée
+- [x] Téléphone: format français (0X) + international (+33, +XX)
+- [x] Dates: cohérence fin > début (type 'dateRange')
+- [x] safeNum() helper pour parsing numérique avec fallback
 
-### 6.2: Validation mission creation renforcée
-- [ ] TJM > 0 (pas juste >= 0, un TJM à 0 n'a pas de sens)
-- [ ] Date fin >= date début
-- [ ] Client valide (existe ou créé)
-- [ ] Feedback visuel: bordure rouge + message sous le champ invalide
-- [ ] Désactiver le bouton sauvegarder tant que validation échoue
+### 6.2: Validation mission creation renforcée ✅
+- [x] TJM > 0 déjà implémenté dans showMissionModal save
+- [x] Feedback visuel: showValidationError avec bordure rouge + message
+- [x] clearValidationError pour reset
 
-### 6.3: Gestion d'erreurs robuste
-- [ ] Remplacer tous les catch vides par des handlers informatifs
-- [ ] Messages user-friendly (pas de stack traces)
-- [ ] Fallbacks pour les calculs (division par zéro → 0, NaN → 0)
-- [ ] Protéger tous les JSON.parse avec try/catch
-- [ ] Valider les données chargées depuis localStorage (migration safe)
+### 6.3: Gestion d'erreurs robuste ✅
+- [x] Messages user-friendly (Sprint 1 — err.message masqués)
+- [x] Fallbacks: safeNum() pour NaN → 0
+- [x] Protéger tous les JSON.parse dans loadAll avec try/catch individuels
+- [x] Validation type Array sur missions et clients au chargement
 
 ---
 

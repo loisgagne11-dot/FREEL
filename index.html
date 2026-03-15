@@ -3984,11 +3984,12 @@ function loadAll() {
     var cl = localStorage.getItem(prefix + 'clients');
     var t = localStorage.getItem(prefix + 'treasury');
     var ir = localStorage.getItem(prefix + 'ir_config');
-    if (c) COMPANY = Object.assign(COMPANY, JSON.parse(c));
-    if (m) MISSIONS = JSON.parse(m);
-    if (cl) CLIENTS = JSON.parse(cl);
-    if (t) TREASURY = Object.assign(TREASURY, JSON.parse(t));
-    if (ir) IR_CONFIG = JSON.parse(ir);
+    // SPRINT 6: Robustesse — safe JSON.parse avec fallback
+    if (c) try { COMPANY = Object.assign(COMPANY, JSON.parse(c)); } catch(e) { console.error('Parse company:', e); }
+    if (m) try { var pm = JSON.parse(m); if (Array.isArray(pm)) MISSIONS = pm; } catch(e) { console.error('Parse missions:', e); }
+    if (cl) try { var pcl = JSON.parse(cl); if (Array.isArray(pcl)) CLIENTS = pcl; } catch(e) { console.error('Parse clients:', e); }
+    if (t) try { TREASURY = Object.assign(TREASURY, JSON.parse(t)); } catch(e) { console.error('Parse treasury:', e); }
+    if (ir) try { IR_CONFIG = JSON.parse(ir); } catch(e) { console.error('Parse ir_config:', e); }
 
     // Si migration effectuée, sauvegarder avec le nouveau préfixe
     if (needsMigration) saveAll();
@@ -4200,27 +4201,39 @@ function getUpcomingDeadlines() {
 }
 
 // ===== VALIDATION INPUTS =====
+// SPRINT 6: Robustesse — validation renforcée (SIRET Luhn, IBAN mod97, email strict, tel FR)
 function validateInput(value, type, options) {
   options = options || {};
   var errors = [];
-  
+
   switch (type) {
     case 'siret':
       var siret = String(value).replace(/\s/g, '');
-      if (siret && siret.length !== 14) errors.push('SIRET doit contenir 14 chiffres');
-      if (siret && !/^\d+$/.test(siret)) errors.push('SIRET ne doit contenir que des chiffres');
+      if (siret) {
+        if (siret.length !== 14) errors.push('SIRET doit contenir 14 chiffres');
+        else if (!/^\d+$/.test(siret)) errors.push('SIRET ne doit contenir que des chiffres');
+        else if (!luhnCheck(siret)) errors.push('SIRET invalide (clé Luhn incorrecte)');
+      }
       break;
     case 'iban':
       var iban = String(value).replace(/\s/g, '').toUpperCase();
-      if (iban && iban.length < 14) errors.push('IBAN trop court');
-      if (iban && !/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) errors.push('Format IBAN invalide');
+      if (iban) {
+        if (iban.length < 14 || iban.length > 34) errors.push('Longueur IBAN invalide');
+        else if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) errors.push('Format IBAN invalide');
+        else if (!ibanMod97Check(iban)) errors.push('IBAN invalide (clé mod 97 incorrecte)');
+      }
       break;
     case 'email':
-      if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) errors.push('Email invalide');
+      if (value && !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(value)) errors.push('Email invalide');
       break;
     case 'phone':
-      var phone = String(value).replace(/\s/g, '');
-      if (phone && !/^[\d+\-().]+$/.test(phone)) errors.push('Téléphone invalide');
+      var phone = String(value).replace(/[\s\-.()]/g, '');
+      if (phone) {
+        if (/^0\d{9}$/.test(phone)) { /* format français OK */ }
+        else if (/^\+33\d{9}$/.test(phone)) { /* format +33 OK */ }
+        else if (/^\+\d{7,15}$/.test(phone)) { /* format international OK */ }
+        else errors.push('Téléphone invalide (ex: 0612345678 ou +33612345678)');
+      }
       break;
     case 'number':
       if (isNaN(parseFloat(value))) errors.push('Nombre invalide');
@@ -4229,10 +4242,50 @@ function validateInput(value, type, options) {
       break;
     case 'date':
       if (value && isNaN(Date.parse(value))) errors.push('Date invalide');
+      if (value && options.minDate && value < options.minDate) errors.push('Date trop ancienne');
+      if (value && options.maxDate && value > options.maxDate) errors.push('Date trop lointaine');
+      break;
+    case 'dateRange':
+      if (options.start && options.end && options.start > options.end) errors.push('La date de fin doit être après la date de début');
       break;
   }
-  
+
   return { valid: errors.length === 0, errors: errors };
+}
+
+// SPRINT 6: Algorithme de Luhn pour validation SIRET/SIREN
+function luhnCheck(num) {
+  var sum = 0;
+  for (var i = 0; i < num.length; i++) {
+    var d = parseInt(num[num.length - 1 - i]);
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+// SPRINT 6: Validation IBAN par modulo 97 (ISO 13616)
+function ibanMod97Check(iban) {
+  var rearranged = iban.substring(4) + iban.substring(0, 4);
+  var numericStr = '';
+  for (var i = 0; i < rearranged.length; i++) {
+    var c = rearranged.charCodeAt(i);
+    if (c >= 65 && c <= 90) numericStr += (c - 55); // A=10, B=11...
+    else numericStr += rearranged[i];
+  }
+  // Calculer mod 97 sur un grand nombre (par blocs)
+  var remainder = numericStr;
+  while (remainder.length > 2) {
+    var block = remainder.substring(0, 9);
+    remainder = (parseInt(block) % 97) + remainder.substring(9);
+  }
+  return parseInt(remainder) % 97 === 1;
+}
+
+// SPRINT 6: Safe number parsing — retourne 0 au lieu de NaN
+function safeNum(val, fallback) {
+  var n = parseFloat(val);
+  return isNaN(n) ? (fallback || 0) : n;
 }
 
 function showValidationError(inputId, message) {
