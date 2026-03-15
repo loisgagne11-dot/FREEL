@@ -955,6 +955,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .form-label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; }
 .form-input, .form-select { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 12px; border-radius: var(--radius-sm); font-size: 14px; transition: all 0.2s; }
 .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
+/* SPRINT 3: Accessibilité — :focus-visible visible sur tous les éléments interactifs */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.skip-link:focus { top: 0 !important; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .form-row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
@@ -1368,11 +1372,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </style>
 </head>
 <body>
-  <div class="toast-container" id="toastContainer"></div>
-  
-  <header class="header">
+  <!-- SPRINT 3: Accessibilité — skip-to-content -->
+  <a href="#app" class="skip-link" style="position:absolute;top:-40px;left:0;background:var(--accent);color:#fff;padding:8px 16px;z-index:10000;font-weight:700;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Aller au contenu principal</a>
+  <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
+
+  <header class="header" role="banner">
     <div class="header-content">
-      <div class="logo">Freel</div>
+      <div class="logo" aria-label="Freel - Gestion Freelance">Freel</div>
       <div class="period-selector">
         <div class="year-nav">
           <button class="year-nav-btn" id="prevYear">◀</button>
@@ -1396,32 +1402,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </select>
       </div>
       <!-- Sprint 14: Notifications -->
-      <button class="privacy-toggle notif-btn" id="notifBtn" title="Notifications" onclick="toggleNotifCenter()">🔔<span class="notif-count" id="notifBadge" style="display:none">0</span></button>
-      <button class="privacy-toggle" id="themeToggle" title="Changer le thème" onclick="toggleTheme()">☀️</button>
-      <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité">👁️</button>
-      <button class="privacy-toggle" id="authBtn" title="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px"></span>
-      <nav class="nav-tabs">
-        <button class="nav-tab active" data-view="cockpit">🏠</button>
-        <button class="nav-tab" data-view="activite">💼</button>
-        <button class="nav-tab" data-view="tresorerie">🏦</button>
-        <button class="nav-tab" data-view="finances">📊</button>
-        <button class="nav-tab" data-view="config">⚙️</button>
+      <button class="privacy-toggle notif-btn" id="notifBtn" title="Notifications" aria-label="Notifications" onclick="toggleNotifCenter()">🔔<span class="notif-count" id="notifBadge" style="display:none" aria-hidden="true">0</span></button>
+      <button class="privacy-toggle" id="themeToggle" title="Changer le thème" aria-label="Changer le thème" onclick="toggleTheme()">☀️</button>
+      <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité" aria-label="Mode confidentialité">👁️</button>
+      <button class="privacy-toggle" id="authBtn" title="Cloud Sync" aria-label="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px" aria-hidden="true"></span>
+      <nav class="nav-tabs" role="tablist" aria-label="Navigation principale">
+        <button class="nav-tab active" data-view="cockpit" role="tab" aria-selected="true" aria-label="Cockpit">🏠</button>
+        <button class="nav-tab" data-view="activite" role="tab" aria-selected="false" aria-label="Activité">💼</button>
+        <button class="nav-tab" data-view="tresorerie" role="tab" aria-selected="false" aria-label="Trésorerie">🏦</button>
+        <button class="nav-tab" data-view="finances" role="tab" aria-selected="false" aria-label="Analyse financière">📊</button>
+        <button class="nav-tab" data-view="config" role="tab" aria-selected="false" aria-label="Configuration">⚙️</button>
       </nav>
     </div>
   </header>
 
-  <main class="container" id="app"></main>
+  <main class="container" id="app" role="tabpanel" aria-label="Contenu principal"></main>
 
-  <nav class="bottom-nav">
-    <button class="bottom-nav-tab active" data-view="cockpit"><div class="bottom-nav-icon">🏠</div><div class="bottom-nav-label">Cockpit</div></button>
-    <button class="bottom-nav-tab" data-view="activite"><div class="bottom-nav-icon">💼</div><div class="bottom-nav-label">Activité</div></button>
-    <button class="bottom-nav-tab" data-view="tresorerie"><div class="bottom-nav-icon">🏦</div><div class="bottom-nav-label">Tréso</div></button>
-    <button class="bottom-nav-tab" data-view="finances"><div class="bottom-nav-icon">📊</div><div class="bottom-nav-label">Analyse</div></button>
-    <button class="bottom-nav-tab" data-view="config"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Config</div></button>
+  <nav class="bottom-nav" role="tablist" aria-label="Navigation principale mobile">
+    <button class="bottom-nav-tab active" data-view="cockpit" role="tab" aria-selected="true" aria-label="Cockpit"><div class="bottom-nav-icon" aria-hidden="true">🏠</div><div class="bottom-nav-label">Cockpit</div></button>
+    <button class="bottom-nav-tab" data-view="activite" role="tab" aria-selected="false" aria-label="Activité"><div class="bottom-nav-icon" aria-hidden="true">💼</div><div class="bottom-nav-label">Activité</div></button>
+    <button class="bottom-nav-tab" data-view="tresorerie" role="tab" aria-selected="false" aria-label="Trésorerie"><div class="bottom-nav-icon" aria-hidden="true">🏦</div><div class="bottom-nav-label">Tréso</div></button>
+    <button class="bottom-nav-tab" data-view="finances" role="tab" aria-selected="false" aria-label="Analyse financière"><div class="bottom-nav-icon" aria-hidden="true">📊</div><div class="bottom-nav-label">Analyse</div></button>
+    <button class="bottom-nav-tab" data-view="config" role="tab" aria-selected="false" aria-label="Configuration"><div class="bottom-nav-icon" aria-hidden="true">⚙️</div><div class="bottom-nav-label">Config</div></button>
   </nav>
 
   <!-- FAB saisie rapide -->
-  <button class="fab" id="fab" title="Actions rapides">+</button>
+  <button class="fab" id="fab" title="Actions rapides" aria-label="Actions rapides">+</button>
   
   <div class="modal" id="fabModal">
     <div class="modal-content" style="max-height: auto; border-radius: var(--radius-xl);">
@@ -3749,6 +3755,8 @@ function buildMission(mis) {
 function openModal(id) { $('#' + id).classList.add('active'); }
 function closeModal(id) { $('#' + id).classList.remove('active'); }
 function closeAllModals() { $$('.modal').forEach(function(m) { m.classList.remove('active'); }); }
+// SPRINT 3: Accessibilité — Escape ferme tous les modals et overlays
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeDynamicModal(); closeAllModals(); } });
 
 function showFabMenu() {
   var body = $('#fabModalBody');
@@ -3838,25 +3846,34 @@ function showToast(message, type) {
 }
 
 // V51: Dynamic modal
+// SPRINT 3: Accessibilité — role=dialog, aria-modal, focus trap, Escape
 function showModal(title, content) {
   closeAllModals();
-  // V55: Supprimer tout dynamicModal existant pour éviter les duplications
   var existingModal = $('#dynamicModal');
   if (existingModal) existingModal.remove();
 
   var overlay = el('div', {
     class: 'modal active',
     id: 'dynamicModal',
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-label': title,
     onclick: function(e) { if (e.target === overlay) closeDynamicModal(); }
   });
   var modal = el('div', { class: 'modal-content', style: { maxWidth: '400px' } });
   var header = el('div', { class: 'modal-header' });
   header.appendChild(el('h3', { class: 'modal-title' }, title));
-  header.appendChild(el('button', { class: 'modal-close', onclick: function() { closeDynamicModal(); } }, '✕'));
+  var closeBtn = el('button', { class: 'modal-close', 'aria-label': 'Fermer', onclick: function() { closeDynamicModal(); } }, '✕');
+  header.appendChild(closeBtn);
   modal.appendChild(header);
   modal.appendChild(el('div', { class: 'modal-body' }, [content]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+  // Focus trap + auto-focus
+  trapFocus(overlay);
+  var firstFocusable = modal.querySelector('input, select, textarea, button');
+  if (firstFocusable) firstFocusable.focus();
+  else closeBtn.focus();
 }
 
 // V55: Fonction dédiée pour fermer et supprimer le modal dynamique
@@ -3865,29 +3882,57 @@ function closeDynamicModal() {
   if (modal) modal.remove();
 }
 
+// SPRINT 3: Accessibilité — focus trap pour modals
+function trapFocus(modalEl) {
+  modalEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeDynamicModal();
+      closeAllModals();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    var focusables = modalEl.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (focusables.length === 0) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+}
 
-function createInput(label, type, id, value, placeholder) {
+
+// SPRINT 3: Accessibilité — for/id association, aria-required sur champs obligatoires
+function createInput(label, type, id, value, placeholder, required) {
   var g = el('div', { class: 'form-group' });
-  g.appendChild(el('label', { class: 'form-label', for: id }, label));
-  var inp = el('input', { class: 'form-input', type: type, id: id, placeholder: placeholder || '' });
+  g.appendChild(el('label', { class: 'form-label', for: id }, label + (required ? ' *' : '')));
+  var attrs = { class: 'form-input', type: type, id: id, placeholder: placeholder || '' };
+  if (required) { attrs['aria-required'] = 'true'; attrs.required = 'required'; }
+  var inp = el('input', attrs);
   if (value !== undefined && value !== null) inp.value = value;
   g.appendChild(inp);
   return g;
 }
 
-function createSelect(label, id, options, value) {
+function createSelect(label, id, options, value, required) {
   var g = el('div', { class: 'form-group' });
-  g.appendChild(el('label', { class: 'form-label', for: id }, label));
-  var sel = el('select', { class: 'form-select', id: id });
+  g.appendChild(el('label', { class: 'form-label', for: id }, label + (required ? ' *' : '')));
+  var attrs = { class: 'form-select', id: id };
+  if (required) { attrs['aria-required'] = 'true'; }
+  var sel = el('select', attrs);
   options.forEach(function(o) { var opt = el('option', { value: o.value }, o.label); if (o.value === value) opt.selected = true; sel.appendChild(opt); });
   g.appendChild(sel);
   return g;
 }
 
-function createTextarea(label, id, value, placeholder) {
+function createTextarea(label, id, value, placeholder, required) {
   var g = el('div', { class: 'form-group' });
-  g.appendChild(el('label', { class: 'form-label', for: id }, label));
-  var ta = el('textarea', { class: 'form-input', id: id, rows: 3, placeholder: placeholder || '', style: { resize: 'vertical', minHeight: '60px' } });
+  g.appendChild(el('label', { class: 'form-label', for: id }, label + (required ? ' *' : '')));
+  var attrs = { class: 'form-input', id: id, rows: 3, placeholder: placeholder || '', style: { resize: 'vertical', minHeight: '60px' } };
+  if (required) { attrs['aria-required'] = 'true'; }
+  var ta = el('textarea', attrs);
   ta.value = value || '';
   g.appendChild(ta);
   return g;
@@ -16288,7 +16333,8 @@ function render() {
     container.appendChild(errDiv);
   }
 
-  $$('.nav-tab, .bottom-nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === VIEW); });
+  // SPRINT 3: Accessibilité — mettre à jour aria-selected sur les onglets
+  $$('.nav-tab, .bottom-nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === VIEW); t.setAttribute('aria-selected', t.dataset.view === VIEW ? 'true' : 'false'); });
   var periodYear = $('#periodYear');
   if (periodYear) periodYear.textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
   // V72: Synchroniser le dropdown mois

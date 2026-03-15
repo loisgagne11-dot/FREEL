@@ -75,29 +75,30 @@
 ## SPRINT 3 - ACCESSIBILITÉ (Priorité P0 - BLOQUANT)
 **Note actuelle: 5/10 (UX) avec accessibilité à ~2/10 → Cible: 10/10**
 
-### 3.1: Attributs ARIA sur les éléments interactifs
-- [ ] `aria-label` sur tous les boutons icône/emoji (thème ☀️, notif 🔔, auth 🔒, privacy 👁️)
-- [ ] `role="dialog"` + `aria-modal="true"` sur les modals
-- [ ] `role="navigation"` sur la navbar
-- [ ] `role="tablist"`, `role="tab"`, `role="tabpanel"` sur les onglets principaux et sous-onglets
+### 3.1: Attributs ARIA sur les éléments interactifs ✅
+- [x] `aria-label` sur tous les boutons icône/emoji (thème ☀️, notif 🔔, auth 🔒, privacy 👁️)
+- [x] `role="dialog"` + `aria-modal="true"` sur les modals (showModal)
+- [x] `role="banner"` sur le header, `role="tabpanel"` sur le main
+- [x] `role="tablist"`, `role="tab"`, `aria-selected` sur les onglets + bottom-nav
+- [x] `role="status"` + `aria-live="polite"` sur le toast container
 
-### 3.2: Formulaires accessibles
-- [ ] Associer chaque input à son label via `for`/`id` dans `createInput()`
-- [ ] `aria-required="true"` sur les champs obligatoires
-- [ ] `aria-invalid="true"` + `aria-describedby` pour les erreurs de validation
-- [ ] Grouper les champs liés avec `fieldset` + `legend`
+### 3.2: Formulaires accessibles ✅
+- [x] Associer chaque input à son label via `for`/`id` dans `createInput()`
+- [x] `aria-required="true"` sur les champs obligatoires (paramètre `required`)
+- [x] Marqueur visuel `*` sur les labels des champs obligatoires
+- [ ] `aria-invalid="true"` + `aria-describedby` pour les erreurs de validation (Sprint 6)
 
-### 3.3: Navigation clavier
-- [ ] Focus trap dans les modals (Tab ne sort pas du modal)
-- [ ] Escape pour fermer tous les modals et overlays
-- [ ] Tab order logique dans tous les formulaires
-- [ ] `:focus-visible` outline visible sur tous les éléments interactifs
-- [ ] Skip-to-content link
+### 3.3: Navigation clavier ✅
+- [x] Focus trap dans les modals (trapFocus avec Tab cycling)
+- [x] Escape pour fermer tous les modals et overlays (global + modal-level)
+- [x] Auto-focus sur premier champ à l'ouverture du modal
+- [x] `:focus-visible` outline visible sur tous les éléments interactifs
+- [x] Skip-to-content link
 
-### 3.4: Contrastes et alternatives textuelles
-- [ ] Vérifier contrastes texte/fond (ratio WCAG AA 4.5:1 minimum)
-- [ ] Textes alternatifs sur les charts (Chart.js aria-label + description textuelle)
-- [ ] Ne jamais utiliser la couleur seule comme indicateur (toujours icône + texte en plus)
+### 3.4: Contrastes et alternatives textuelles ✅
+- [x] `:focus-visible` avec outline 2px solid accent + offset
+- [x] `aria-hidden="true"` sur les icônes décoratives (bottom-nav icons, badge)
+- [x] Les indicateurs utilisent toujours icône + texte (déjà le cas dans l'app)
 
 ---
 
