@@ -208,14 +208,16 @@
 ## SPRINT 8 - DEVOPS & CI/CD (Priorité P2)
 **Note actuelle: 3/10 → Cible: 8/10**
 
-### 8.1: Enrichir le pipeline
-- [ ] Ajouter validation HTML dans deploy.yml
-- [ ] Ajouter un check de taille fichier (alerte si > 2MB)
-- [ ] Vérifier que les fonctions critiques sont définies (smoke test)
+### 8.1: Enrichir le pipeline ✅
+- [x] Nouveau workflow validate.yml (push + PR sur main)
+- [x] Check taille fichier (warning si > 2MB)
+- [x] Validation structure HTML (tags critiques, fonctions essentielles)
+- [x] Smoke test: vérifie compute(), render(), escapeHTML(), LEGAL_BY_YEAR
 
-### 8.2: Scan sécurité basique
-- [ ] Script qui vérifie l'absence de patterns dangereux (eval, document.write)
-- [ ] Vérifier qu'aucun secret n'est commité (.env, clés API)
+### 8.2: Scan sécurité basique ✅
+- [x] Détection eval() et document.write()
+- [x] Vérification absence de secrets (.env, credentials hardcodées)
+- [x] Warning sur patterns suspects
 
 ---
 
