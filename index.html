@@ -7170,18 +7170,17 @@ function renderCFEResult(caN2, tauxCommunal) {
 
 function showMissionModal(mission) {
   var isNew = !mission;
+  // SPRINT 7: Pré-remplissage intelligent pour les nouvelles missions
+  var tomorrow = new Date(TODAY); tomorrow.setDate(tomorrow.getDate() + 1);
+  var tomorrowStr = localISO(tomorrow);
   if (isNew) mission = {
-    id: 'M' + Date.now(), client: '', clientId: '', titre: '', site: '', debut: '', fin: '',
+    id: 'M' + Date.now(), client: '', clientId: '', titre: '', site: '', debut: tomorrowStr, fin: '',
     tjm: 0, delaiPaiement: 2, jourPaiement: 15,
     adresseClient: '', numeroCommande: '', descriptifFacture: '',
-    statut: 'active', // V75: active | prospect | perdue
-    // V79: Périodes de travail (jours/semaine variables)
+    statut: 'active',
     periodes: [],
-    // V81: Congés par date
     congesDates: [],
-    // V79: Client opérationnel
     clientOp: { nom: '', contact: '', email: '', telephone: '', adresse: '' },
-    // V79: Agence / intermédiaire
     agence: { nom: '', contacts: [{ prenom: '', nom: '', email: '', telephone: '' }], adresses: [''] }
   };
   // V79/V81: Rétro-compatibilité - s'assurer que les nouveaux champs existent
@@ -7196,10 +7195,17 @@ function showMissionModal(mission) {
   var body = $('#formModalBody');
   body.innerHTML = '';
 
+  // SPRINT 7: Indicateur de progression visuel
+  var progressDiv = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '16px', justifyContent: 'center' } });
+  ['1. Mission', '2. Rythme', '3. Client Op.', '4. Agence', '5. Facturation'].forEach(function(s, i) {
+    progressDiv.appendChild(el('div', { style: { padding: '4px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: '700', background: i === 0 ? 'var(--accent)' : 'var(--bg-tertiary)', color: i === 0 ? '#fff' : 'var(--text-muted)' }, 'data-step': i }, s));
+  });
+  body.appendChild(progressDiv);
+
   // ═══════════════════════════════════════════════
   // SECTION 1: Informations Mission
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section' }, '📋 Informations Mission'));
+  body.appendChild(el('div', { class: 'form-section' }, '1️⃣ Informations Mission'));
 
   // Dropdown client si des clients existent
   if (CLIENTS.length > 0) {
@@ -7231,8 +7237,8 @@ function showMissionModal(mission) {
     body.appendChild(createInput('Client', 'text', 'mClient', mission.client));
   }
 
-  body.appendChild(createInput('Titre / Projet', 'text', 'mTitre', mission.titre));
-  body.appendChild(createInput('Site / Lieu', 'text', 'mSite', mission.site));
+  body.appendChild(createInput('Titre / Projet', 'text', 'mTitre', mission.titre, 'Ex: Développement ERP'));
+  body.appendChild(createInput('Site / Lieu', 'text', 'mSite', mission.site, 'Ex: Toulouse, Remote'));
 
   var row1 = el('div', { class: 'form-row' });
   row1.appendChild(createInput('Début', 'date', 'mDebut', mission.debut));
@@ -7240,10 +7246,12 @@ function showMissionModal(mission) {
   body.appendChild(row1);
 
   var row2 = el('div', { class: 'form-row-3' });
-  row2.appendChild(createInput('TJM (€)', 'number', 'mTJM', mission.tjm));
-  row2.appendChild(createSelect('Délai', 'mDelai', [{ value: '1', label: 'M+1' }, { value: '2', label: 'M+2' }, { value: '3', label: 'M+3' }], String(mission.delaiPaiement)));
-  row2.appendChild(createInput('Jour paie', 'number', 'mJour', mission.jourPaiement));
+  row2.appendChild(createInput('TJM (€)', 'number', 'mTJM', mission.tjm, 'Ex: 550', true));
+  row2.appendChild(createSelect('Délai paiement', 'mDelai', [{ value: '1', label: 'M+1 (30j)' }, { value: '2', label: 'M+2 (60j)' }, { value: '3', label: 'M+3 (90j)' }], String(mission.delaiPaiement)));
+  row2.appendChild(createInput('Jour paie', 'number', 'mJour', mission.jourPaiement, '15'));
   body.appendChild(row2);
+  // SPRINT 7: Tooltip aide TJM
+  body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', marginTop: '-4px' } }, '💡 TJM = Taux Journalier Moyen. Délai = mois après facturation pour recevoir le paiement.'));
 
   // V75: Statut mission (pipeline)
   body.appendChild(createSelect('Statut mission', 'mStatut', [
@@ -7255,7 +7263,7 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   // SECTION 2: Périodes de travail (jours/semaine)
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '📅 Rythme de travail'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '2️⃣ Rythme de travail'));
   body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px' } }, 'Par défaut: temps plein (5j/sem). Ajoutez des périodes pour un rythme différent.'));
 
   var periodesContainer = el('div', { class: 'periode-list', id: 'mPeriodesContainer' });
@@ -7357,7 +7365,7 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   // SECTION 3: Client opérationnel
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '🏢 Client opérationnel'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '3️⃣ Client opérationnel'));
   body.appendChild(createInput('Nom du client', 'text', 'mClientOpNom', mission.clientOp.nom, 'Ex: Airbus, ATR...'));
   var rowCo1 = el('div', { class: 'form-row' });
   rowCo1.appendChild(createInput('Contact', 'text', 'mClientOpContact', mission.clientOp.contact, 'Nom du contact'));
@@ -7371,7 +7379,7 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   // SECTION 4: Agence / Intermédiaire
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '🤝 Agence / Intermédiaire'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '4️⃣ Agence / Intermédiaire'));
   body.appendChild(createInput('Nom de l\'agence', 'text', 'mAgenceNom', mission.agence.nom, 'Ex: Scalian, Alten...'));
 
   // Contacts agence (multiples)
@@ -7433,10 +7441,44 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   // SECTION 5: Facturation
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '📄 Informations Facturation'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '5️⃣ Informations Facturation'));
   body.appendChild(createInput('Adresse de facturation', 'text', 'mAdresseClient', mission.adresseClient || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
   body.appendChild(createInput('N° Commande client', 'text', 'mNumCommande', mission.numeroCommande || '', 'Ex: 10004903'));
   body.appendChild(createTextarea('Descriptif standard facture', 'mDescriptif', mission.descriptifFacture || '', 'Ex: Prestation de service consultant'));
+
+  // SPRINT 7: Affichage en temps réel du total jours/CA estimé
+  var estimateDiv = el('div', { id: 'missionEstimate', style: { padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginTop: '12px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' } });
+  estimateDiv.textContent = 'Remplissez les dates et le TJM pour voir l\'estimation';
+  body.appendChild(estimateDiv);
+
+  function updateEstimate() {
+    var tjm = parseFloat($('#mTJM') ? $('#mTJM').value : 0) || 0;
+    var debut = $('#mDebut') ? $('#mDebut').value : '';
+    var fin = $('#mFin') ? $('#mFin').value : '';
+    var estDiv = $('#missionEstimate');
+    if (!estDiv || !tjm || !debut) return;
+    if (!fin) { estDiv.textContent = 'Ajoutez une date de fin pour voir l\'estimation'; return; }
+    var d1 = new Date(debut), d2 = new Date(fin);
+    if (d2 <= d1) { estDiv.textContent = '⚠️ La date de fin doit être après la date de début'; estDiv.style.color = 'var(--danger)'; return; }
+    // Estimation simple: jours ouvrés entre les 2 dates
+    var jours = 0;
+    var cur = new Date(d1);
+    while (cur <= d2) { var dow = cur.getDay(); if (dow !== 0 && dow !== 6) jours++; cur.setDate(cur.getDate() + 1); }
+    var caEstime = jours * tjm;
+    estDiv.style.color = 'var(--success)';
+    estDiv.textContent = '📊 Estimation: ' + jours + ' jours ouvrés · CA HT: ' + EUR(caEstime, true);
+  }
+  // Mettre à jour l'estimation quand les champs changent
+  setTimeout(function() {
+    ['mTJM', 'mDebut', 'mFin'].forEach(function(id) {
+      var inp = $('#' + id);
+      if (inp) { inp.addEventListener('input', updateEstimate); inp.addEventListener('change', updateEstimate); }
+    });
+    updateEstimate();
+    // SPRINT 7: Auto-focus sur le premier champ
+    var firstInput = body.querySelector('select, input[type="text"]');
+    if (firstInput) firstInput.focus();
+  }, 50);
 
   // ═══════════════════════════════════════════════
   // BOUTONS ACTION
@@ -7448,7 +7490,7 @@ function showMissionModal(mission) {
     var clientVal = ($('#mClientId') ? $('#mClientId').value : '') || ($('#mClient') ? $('#mClient').value : '');
     if (!clientVal || clientVal === '_new_') { showToast('⚠️ Client requis', 'warning'); return; }
     if (!$('#mDebut').value) { showToast('⚠️ Date de début requise', 'warning'); return; }
-    if (isNaN(tjmVal) || tjmVal < 0) { showToast('⚠️ TJM invalide', 'warning'); return; }
+    if (isNaN(tjmVal) || tjmVal <= 0) { showToast('⚠️ TJM doit être supérieur à 0', 'warning'); showValidationError('mTJM', 'TJM requis et > 0'); return; }
 
     // Gérer client via dropdown ou input texte
     var clientId = $('#mClientId') ? $('#mClientId').value : '';
@@ -7493,6 +7535,19 @@ function showMissionModal(mission) {
         mission.periodes.push({ debut: pDeb, fin: pFin, joursMap: joursMap, joursSemaine: totalJs, tjm: pTjm });
       }
       pIdx++;
+    }
+
+    // SPRINT 7: Validation chevauchements de périodes
+    if (mission.periodes.length > 1) {
+      for (var pi = 0; pi < mission.periodes.length; pi++) {
+        for (var pj = pi + 1; pj < mission.periodes.length; pj++) {
+          var a = mission.periodes[pi], b = mission.periodes[pj];
+          if (a.debut && a.fin && b.debut && b.fin && a.debut <= b.fin && b.debut <= a.fin) {
+            showToast('⚠️ Les périodes ' + (pi + 1) + ' et ' + (pj + 1) + ' se chevauchent', 'warning');
+            return;
+          }
+        }
+      }
     }
 
     // V79: Sauvegarder client opérationnel
@@ -14977,19 +15032,42 @@ function showWeeklyBreakdownModal(monthKey) {
   }, 150);
 }
 
+// SPRINT 7: Filtre statut mission
+var MISSION_FILTER = MISSION_FILTER || 'all';
+
 function renderMissions(container) {
   var data = compute();
 
   var header = el('div', { class: 'page-header' });
   header.appendChild(el('h2', { class: 'page-title' }, '💼 Missions'));
   container.appendChild(header);
-  
+
   if (MISSIONS.length === 0) {
     container.appendChild(el('div', { class: 'empty-state' }, [el('div', { class: 'empty-icon' }, '💼'), el('div', { class: 'empty-title' }, 'Aucune mission'), el('div', { class: 'empty-text' }, 'Ajoute ta première mission pour commencer'), el('button', { class: 'btn btn-success', onclick: showMissionModal }, '+ Nouvelle Mission')]));
     return;
   }
-  
-  MISSIONS.forEach(function(m) {
+
+  // SPRINT 7: Filtres par statut
+  var counts = { all: MISSIONS.length, active: 0, prospect: 0, perdue: 0 };
+  MISSIONS.forEach(function(m) { if (m.statut) counts[m.statut] = (counts[m.statut] || 0) + 1; else counts.active++; });
+  var filterBar = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '12px', background: 'var(--bg-tertiary)', padding: '4px', borderRadius: '10px' } });
+  [
+    { key: 'all', label: 'Toutes (' + counts.all + ')' },
+    { key: 'active', label: '✅ Actives (' + (counts.active || 0) + ')' },
+    { key: 'prospect', label: '🔮 Prospects (' + (counts.prospect || 0) + ')' },
+    { key: 'perdue', label: '❌ Perdues (' + (counts.perdue || 0) + ')' }
+  ].forEach(function(f) {
+    var btn = el('button', { class: 'nav-tab' + (MISSION_FILTER === f.key ? ' active' : ''), style: { fontSize: '10px', padding: '4px 8px' }, onclick: function() { MISSION_FILTER = f.key; render(); } }, f.label);
+    filterBar.appendChild(btn);
+  });
+  container.appendChild(filterBar);
+
+  var filteredMissions = MISSIONS.filter(function(m) {
+    if (MISSION_FILTER === 'all') return true;
+    return (m.statut || 'active') === MISSION_FILTER;
+  });
+
+  filteredMissions.forEach(function(m) {
     var now = localISO(TODAY);
     var status = m.fin < now ? 'ended' : m.debut > now ? 'upcoming' : 'active';
     var statusLabel = status === 'active' ? 'En cours' : status === 'upcoming' ? 'À venir' : 'Terminée';

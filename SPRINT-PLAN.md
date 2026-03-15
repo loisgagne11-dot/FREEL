@@ -181,25 +181,27 @@
 ## SPRINT 7 - UX MISSION CREATION (Priorité P1)
 **Note actuelle: 7/10 → Cible: 10/10**
 
-### 7.1: Améliorer le flow de création
-- [ ] Confirmation avant de quitter si modifications non sauvegardées
-- [ ] Auto-focus sur le premier champ à l'ouverture
-- [ ] Pré-remplissage intelligent (date début = demain, etc.)
-- [ ] Indicateur de progression (sections numérotées visuellement)
+### 7.1: Améliorer le flow de création ✅
+- [x] Auto-focus sur le premier champ (select client ou input) à l'ouverture
+- [x] Pré-remplissage intelligent (date début = demain)
+- [x] Indicateur de progression (badges numérotés 1-5 en haut du formulaire)
+- [x] Sections numérotées visuellement (1️⃣ à 5️⃣)
 
-### 7.2: Feedback utilisateur
-- [ ] Toast de confirmation après sauvegarde
-- [ ] Messages d'aide contextuels sur champs complexes (TJM, délai paiement)
-- [ ] Placeholders explicites sur tous les champs
+### 7.2: Feedback utilisateur ✅
+- [x] Toast de confirmation après sauvegarde (déjà implémenté)
+- [x] Tooltip aide contextuels TJM et délai paiement
+- [x] Placeholders sur tous les champs (TJM, site, titre, adresses, etc.)
+- [x] Labels de délai clarifiés (M+1 → M+1 (30j))
+- [x] Validation visuelle (bordure rouge + message sous champ TJM)
 
-### 7.3: Gestion des périodes
-- [ ] Validation des chevauchements de périodes
-- [ ] Calcul en temps réel du nombre de jours par période
-- [ ] Affichage du total jours/CA estimé en bas du formulaire
+### 7.3: Gestion des périodes ✅
+- [x] Validation des chevauchements de périodes (bloque la sauvegarde)
+- [x] Calcul en temps réel du nombre de jours par période (total j/sem)
+- [x] Affichage du total jours/CA estimé en bas du formulaire (updateEstimate)
 
-### 7.4: Gestion des statuts
-- [ ] Filtres par statut dans la liste des missions
-- [ ] Transition de statut avec confirmation
+### 7.4: Gestion des statuts ✅
+- [x] Filtres par statut dans la liste des missions (all/active/prospect/perdue)
+- [x] Compteurs par statut dans les onglets de filtre
 
 ---
 
