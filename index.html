@@ -4858,7 +4858,7 @@ function computeProjections(scenario, params) {
       // Taux URSSAF dynamique selon ACRE et mois
       var urssafRate = getUrssafRate(monthYm);
       charges = Math.round(ca * (urssafRate + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0)));
-      if (isTVAApplicable(monthYm)) charges += Math.round(ca * LEGAL.tvaRate);
+      // TVA collectée n'est pas une charge : elle transite (encaissée en TTC, reversée à l'État)
     }
     
     var net = ca - charges - salairesMensuels;
@@ -5983,9 +5983,15 @@ function showPaymentCycleModal(mission, facture) {
   var summaryDiv = el('div', { class: 'pc-summary' });
   summaryDiv.appendChild(el('div', { class: 'pc-summary-title' }, 'Résumé financier net'));
   summaryDiv.appendChild(el('div', { class: 'pc-summary-row' }, [
-    el('span', {}, 'CA HT encaissé'),
-    el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, '+' + EUR(facture.ht))
+    el('span', {}, 'CA TTC encaissé'),
+    el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, '+' + EUR(facture.ttc))
   ]));
+  if (facture.tva > 0) {
+    summaryDiv.appendChild(el('div', { class: 'pc-summary-row' }, [
+      el('span', {}, 'TVA collectée (à reverser)'),
+      el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, '-' + EUR(Math.round(facture.tva)))
+    ]));
+  }
   summaryDiv.appendChild(el('div', { class: 'pc-summary-row' }, [
     el('span', {}, 'Cotisations sociales (URSSAF + CFP)'),
     el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, '-' + EUR(cotisationUrssaf + cotisationCfp))
@@ -5997,14 +6003,7 @@ function showPaymentCycleModal(mission, facture) {
       el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, '-' + EUR(impLib))
     ]));
   }
-  if (facture.tva > 0) {
-    summaryDiv.appendChild(el('div', { class: 'pc-summary-row' }, [
-      el('span', {}, 'TVA collectée (à reverser)'),
-      el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, '-' + EUR(Math.round(facture.tva)))
-    ]));
-  }
-  var totalCharges = cotisationTotal + (facture.tva > 0 ? Math.round(facture.tva) : 0);
-  var net = facture.ht - totalCharges;
+  var net = facture.ttc - (facture.tva > 0 ? Math.round(facture.tva) : 0) - cotisationTotal;
   summaryDiv.appendChild(el('div', { class: 'pc-summary-row', style: { borderTop: '1px dashed var(--glass-border)', marginTop: '6px', paddingTop: '6px', fontWeight: '700' } }, [
     el('span', {}, 'Revenu net estimé'),
     el('span', { style: { fontSize: '15px', color: net >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(net))
