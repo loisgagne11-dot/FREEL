@@ -1,0 +1,68 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check file size
+        run: |
+          SIZE=$(stat -f%z index.html 2>/dev/null || stat -c%s index.html)
+          echo "index.html size: $SIZE bytes ($(($SIZE / 1024))KB)"
+          if [ "$SIZE" -gt 2097152 ]; then
+            echo "::warning::index.html exceeds 2MB ($SIZE bytes)"
+          fi
+
+      - name: Security scan - dangerous patterns
+        run: |
+          ERRORS=0
+          # Check for eval() usage
+          if grep -n 'eval(' index.html | grep -v '// ' | grep -v 'SPRINT'; then
+            echo "::error::eval() detected - potential code injection"
+            ERRORS=$((ERRORS + 1))
+          fi
+          # Check for document.write (exclude minified vendor libs like jsPDF)
+          if grep -n 'document\.write(' index.html | grep -v 'jsPDF\|@license\|function.*var.*var.*var'; then
+            echo "::error::document.write() detected"
+            ERRORS=$((ERRORS + 1))
+          fi
+          # Check for hardcoded secrets
+          if grep -n 'password.*=' index.html | grep -v 'getElementById\|value\|\.password\|placeholder\|type.*password\|auth\.\|label'; then
+            echo "::warning::Possible hardcoded credential detected"
+          fi
+          echo "Security scan completed with $ERRORS errors"
+          exit $ERRORS
+
+      - name: Validate HTML structure
+        run: |
+          # Check that critical elements exist
+          grep -q '<html' index.html || { echo "::error::Missing <html> tag"; exit 1; }
+          grep -q '</html>' index.html || { echo "::error::Missing </html> tag"; exit 1; }
+          grep -q 'function compute()' index.html || { echo "::error::Missing compute() function"; exit 1; }
+          grep -q 'function render()' index.html || { echo "::error::Missing render() function"; exit 1; }
+          grep -q 'function escapeHTML(' index.html || { echo "::error::Missing escapeHTML() function"; exit 1; }
+          grep -q 'LEGAL_BY_YEAR' index.html || { echo "::error::Missing LEGAL_BY_YEAR"; exit 1; }
+          echo "HTML structure validation passed"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run smoke tests
+        run: node tests/smoke-test.js
+
+      - name: Check no secrets committed
+        run: |
+          # Check for .env files
+          if [ -f .env ]; then echo "::error::.env file committed!"; exit 1; fi
+          if [ -f .env.local ]; then echo "::error::.env.local file committed!"; exit 1; fi
+          echo "No secrets found"
