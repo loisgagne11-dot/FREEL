@@ -12786,17 +12786,34 @@ function renderFinancesEvolution(container) {
     if (!canvas || typeof Chart === 'undefined') return;
     if (canvas._chartInstance) canvas._chartInstance.destroy();
     var months = getPeriodMonths();
+    var nowYm2 = ym(TODAY.getFullYear(), TODAY.getMonth());
+    var futureStartSal = -1;
     var dataSal = months.map(function(m) { return data.monthsData[m] ? data.monthsData[m].salaires : 0; });
-    // Capacité rémunération par mois = CA HT - toutes charges hors TVA (URSSAF, CFP, IR, impLib, charges manuelles...)
-    var dataCapacite = months.map(function(m) {
+    // Capacité rémunération par mois = CA HT - toutes charges hors TVA
+    // Pour les mois futurs : utiliser les encaissements projetés (encHT + à encaisser)
+    var dataCapacite = months.map(function(m, idx) {
       var md = data.monthsData[m];
-      if (!md || !md.encHT) return 0;
+      if (!md) return 0;
+      var isFuture = m > nowYm2;
+      if (isFuture && futureStartSal === -1) futureStartSal = idx;
+      var revenu = md.encHT || 0;
+      // Pour les mois futurs, ajouter les factures à encaisser projetées
+      if (isFuture) {
+        (data.facturesAEncaisser || []).forEach(function(f) {
+          if (f.paymentMonth === m) revenu += f.ht || 0;
+        });
+      }
+      if (!revenu) return 0;
       var chargesHorsTVA = 0;
       (md.charges || []).forEach(function(ch) {
         if (ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
       });
-      return Math.max(0, md.encHT - chargesHorsTVA);
+      return Math.max(0, revenu - chargesHorsTVA);
     });
+    if (futureStartSal === -1) futureStartSal = months.length;
+    // Capacité moyenne (sur les mois ayant une capacité > 0)
+    var capNonZero = dataCapacite.filter(function(v) { return v > 0; });
+    var capMoyenne = capNonZero.length > 0 ? capNonZero.reduce(function(a, b) { return a + b; }, 0) / capNonZero.length : 0;
     var salLabelPlugin = {
       id: 'salLabelPlugin',
       afterDatasetsDraw: function(ch) {
@@ -12815,8 +12832,9 @@ function renderFinancesEvolution(container) {
       type: 'bar',
       data: { labels: months.map(fmtMonthShort), datasets: [
         { label: 'Salaires', data: dataSal, backgroundColor: 'rgba(96,165,250,0.7)', borderRadius: 4 },
-        { type: 'line', label: 'Moy', data: months.map(function() { return data.salaireMoyen; }), borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, pointRadius: 0 },
-        { type: 'line', label: 'Capacité', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, borderDash: [4, 3], pointRadius: 4, pointBackgroundColor: '#34d399', pointBorderColor: '#34d399', backgroundColor: 'rgba(52,211,153,0.08)', fill: false }
+        { type: 'line', label: 'Moy. salaire', data: months.map(function() { return data.salaireMoyen; }), borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, pointRadius: 0 },
+        { type: 'line', label: 'Capacité', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, pointRadius: 3, pointBackgroundColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), pointBorderColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), backgroundColor: 'rgba(52,211,153,0.08)', fill: false, segment: { borderColor: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? '#a78bfa' : '#34d399'; }, borderDash: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? [4, 3] : []; } }, spanGaps: true },
+        { type: 'line', label: 'Moy. capacité', data: months.map(function() { return Math.round(capMoyenne); }), borderColor: 'rgba(52,211,153,0.35)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false }
       ]},
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a1a1aa', font: { size: 9 }, boxWidth: 12, padding: 8 } } }, scales: { x: { ticks: { color: '#71717a', font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
       plugins: [salLabelPlugin]
@@ -14036,25 +14054,54 @@ function renderFacturesContent(container) {
     return;
   }
 
+  // Regrouper les factures par mois
+  var facturesByMonth = {};
+  var monthOrder = [];
   factures.forEach(function(f) {
-    var badgeClass, badgeText;
-    if (f.status === 'payée') { badgeClass = 'badge-success'; badgeText = '✅ Payée'; }
-    else if (f.isLate) { badgeClass = 'badge-late'; badgeText = '📤 Envoyée · ⚠️ RETARD'; }
-    else if (f.status === 'envoyée') { badgeClass = 'badge-warning'; badgeText = '📤 Envoyée'; }
-    else { badgeClass = 'badge-muted'; badgeText = '📝 Brouillon'; }
-
-    var card = el('div', { class: 'facture-card', onclick: function() { showFactureModal(f); } });
-    card.appendChild(el('div', { class: 'badge ' + badgeClass, style: { fontSize: '9px', whiteSpace: 'nowrap' } }, badgeText));
-    var infoDiv = el('div', { class: 'facture-info' });
-    infoDiv.appendChild(el('div', { class: 'facture-id' }, f.client + ' · ' + fmtMonthShort(f.mois)));
-    infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
-    card.appendChild(infoDiv);
-    // Cycle URSSAF inline
-    if (f._mission) {
-      card.appendChild(buildInlineCycleProgress(f._mission, f));
+    if (!facturesByMonth[f.mois]) {
+      facturesByMonth[f.mois] = [];
+      monthOrder.push(f.mois);
     }
-    card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
-    container.appendChild(card);
+    facturesByMonth[f.mois].push(f);
+  });
+  monthOrder.sort(function(a, b) { return b.localeCompare(a); });
+
+  monthOrder.forEach(function(mois) {
+    var monthFactures = facturesByMonth[mois];
+    var totalHT = monthFactures.reduce(function(s, f) { return s + f.ht; }, 0);
+    var totalTVA = monthFactures.reduce(function(s, f) { return s + (f.tva || 0); }, 0);
+
+    // Header du mois
+    var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', margin: '12px 0 6px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--accent)' } });
+    monthHeader.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'capitalize' } }, fmtMonth(mois)));
+    var monthStats = el('div', { style: { textAlign: 'right' } });
+    monthStats.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(totalHT) + ' HT'));
+    if (totalTVA > 0) monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '') + ' · TVA ' + EUR(totalTVA)));
+    else monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '')));
+    monthHeader.appendChild(monthStats);
+    container.appendChild(monthHeader);
+
+    // Factures du mois
+    monthFactures.forEach(function(f) {
+      var badgeClass, badgeText;
+      if (f.status === 'payée') { badgeClass = 'badge-success'; badgeText = '✅ Payée'; }
+      else if (f.isLate) { badgeClass = 'badge-late'; badgeText = '📤 Envoyée · ⚠️ RETARD'; }
+      else if (f.status === 'envoyée') { badgeClass = 'badge-warning'; badgeText = '📤 Envoyée'; }
+      else { badgeClass = 'badge-muted'; badgeText = '📝 Brouillon'; }
+
+      var card = el('div', { class: 'facture-card', onclick: function() { showFactureModal(f); } });
+      card.appendChild(el('div', { class: 'badge ' + badgeClass, style: { fontSize: '9px', whiteSpace: 'nowrap' } }, badgeText));
+      var infoDiv = el('div', { class: 'facture-info' });
+      infoDiv.appendChild(el('div', { class: 'facture-id' }, f.client));
+      infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
+      card.appendChild(infoDiv);
+      // Cycle URSSAF inline
+      if (f._mission) {
+        card.appendChild(buildInlineCycleProgress(f._mission, f));
+      }
+      card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
+      container.appendChild(card);
+    });
   });
 }
 
