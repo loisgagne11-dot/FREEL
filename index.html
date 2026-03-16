@@ -14542,37 +14542,49 @@ function drawMainChart() {
   // Si pas de mois futur trouvé, mettre l'index à la fin
   if (futureStartIdx === -1) futureStartIdx = months.length;
 
-  // Fonction segment pour changer couleur/style passé vs futur
-  function segmentStyle(pastColor, futureColor, futureDash) {
+  // Fonction segment : même couleur, juste pointillé pour le futur
+  function segmentStyle(color, futureDash) {
     return {
-      borderColor: function(ctx) { return ctx.p0DataIndex >= futureStartIdx - 1 && ctx.p1DataIndex >= futureStartIdx ? futureColor : pastColor; },
       borderDash: function(ctx) { return ctx.p0DataIndex >= futureStartIdx - 1 && ctx.p1DataIndex >= futureStartIdx ? futureDash : []; }
     };
   }
 
-  // Fonction point pour changer couleur des points passé vs futur
-  function pointColors(pastColor, futureColor) {
-    return months.map(function(m) { return m > nowYm ? futureColor : pastColor; });
-  }
-
-  // Plugin pour afficher les montants sur les lignes du graphique CA
+  // Plugin pour afficher les montants + ligne verticale "Aujourd'hui"
   var caLabelsPlugin = {
     id: 'caLabelsPlugin',
     afterDatasetsDraw: function(chart) {
       var ctx2 = chart.ctx;
+      // Ligne verticale "Aujourd'hui" entre passé et futur
+      if (futureStartIdx > 0 && futureStartIdx < months.length) {
+        var xScale = chart.scales.x;
+        var yScale = chart.scales.y;
+        // Positionner entre le dernier mois présent et le premier mois futur
+        var xPos = (xScale.getPixelForValue(futureStartIdx - 1) + xScale.getPixelForValue(futureStartIdx)) / 2;
+        ctx2.save();
+        ctx2.beginPath();
+        ctx2.setLineDash([4, 4]);
+        ctx2.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx2.lineWidth = 1;
+        ctx2.moveTo(xPos, yScale.top);
+        ctx2.lineTo(xPos, yScale.bottom);
+        ctx2.stroke();
+        // Label "Aujourd'hui"
+        ctx2.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx2.font = '9px system-ui';
+        ctx2.textAlign = 'center';
+        ctx2.fillText("Aujourd'hui", xPos, yScale.top - 4);
+        ctx2.restore();
+      }
       // Afficher les valeurs sur Réalisation (index 1) et Encaissement (index 2)
       [1, 2].forEach(function(datasetIdx) {
         var dataset = chart.data.datasets[datasetIdx];
         var meta = chart.getDatasetMeta(datasetIdx);
-        var pastColor = datasetIdx === 1 ? '#22d3ee' : '#34d399';
-        var futColor = datasetIdx === 1 ? '#a78bfa' : '#71717a';
+        var color = datasetIdx === 1 ? '#22d3ee' : '#34d399';
         meta.data.forEach(function(point, index) {
           var value = dataset.data[index];
           if (value === null || value === 0) return;
-          // Afficher seulement le dernier point non-nul pour chaque série
           var hasNext = dataset.data.slice(index + 1).some(function(v) { return v !== null && v > 0; });
           if (hasNext) return;
-          var color = index >= futureStartIdx ? futColor : pastColor;
           var label = value >= 1000 ? Math.round(value/1000) + 'k€' : Math.round(value) + '€';
           ctx2.save();
           ctx2.fillStyle = color;
@@ -14591,8 +14603,8 @@ function drawMainChart() {
       labels: labels,
       datasets: [
         { type: 'bar', label: 'Congés', data: dataOff, backgroundColor: 'rgba(251,191,36,0.4)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 2, yAxisID: 'y1', barPercentage: 0.25 },
-        { type: 'line', label: 'Réalisé / Prévu', data: dataRealisation, borderColor: '#22d3ee', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 2, pointBackgroundColor: pointColors('#22d3ee', '#a78bfa'), segment: segmentStyle('#22d3ee', '#a78bfa', [6, 3]), spanGaps: true, yAxisID: 'y' },
-        { type: 'line', label: 'Encaissé / Proj.', data: dataEncaissement, borderColor: '#34d399', borderWidth: 2, tension: 0.3, pointRadius: 2, pointBackgroundColor: pointColors('#34d399', '#71717a'), segment: segmentStyle('#34d399', '#71717a', [3, 3]), spanGaps: true, yAxisID: 'y' }
+        { type: 'line', label: 'Réalisé / Prévu', data: dataRealisation, borderColor: '#22d3ee', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 2, pointBackgroundColor: '#22d3ee', segment: segmentStyle('#22d3ee', [6, 3]), spanGaps: true, yAxisID: 'y' },
+        { type: 'line', label: 'Encaissé / Proj.', data: dataEncaissement, borderColor: '#34d399', borderWidth: 2, tension: 0.3, pointRadius: 2, pointBackgroundColor: '#34d399', segment: segmentStyle('#34d399', [3, 3]), spanGaps: true, yAxisID: 'y' }
       ]
     },
     options: {
@@ -14610,11 +14622,11 @@ function drawMainChart() {
       plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 },
         generateLabels: function(chart) {
           return [
-            { text: 'Congés', fillStyle: 'rgba(251,191,36,0.4)', strokeStyle: '#f59e0b', lineWidth: 1, datasetIndex: 0 },
-            { text: 'Réalisé', fillStyle: '#22d3ee', strokeStyle: '#22d3ee', lineWidth: 2, datasetIndex: 1 },
-            { text: 'Prévu', fillStyle: '#a78bfa', strokeStyle: '#a78bfa', lineWidth: 1.5, lineDash: [6, 3], datasetIndex: 1 },
-            { text: 'Encaissé', fillStyle: '#34d399', strokeStyle: '#34d399', lineWidth: 2, datasetIndex: 2 },
-            { text: 'Proj. Enc.', fillStyle: '#71717a', strokeStyle: '#71717a', lineWidth: 1.5, lineDash: [3, 3], datasetIndex: 2 }
+            { text: 'Congés', fontColor: '#a1a1aa', fillStyle: 'rgba(251,191,36,0.4)', strokeStyle: '#f59e0b', lineWidth: 1, datasetIndex: 0 },
+            { text: 'Réalisé', fontColor: '#a1a1aa', fillStyle: '#22d3ee', strokeStyle: '#22d3ee', lineWidth: 2, datasetIndex: 1 },
+            { text: 'Prévu', fontColor: '#a1a1aa', fillStyle: '#22d3ee', strokeStyle: '#22d3ee', lineWidth: 1.5, lineDash: [6, 3], datasetIndex: 1 },
+            { text: 'Encaissé', fontColor: '#a1a1aa', fillStyle: '#34d399', strokeStyle: '#34d399', lineWidth: 2, datasetIndex: 2 },
+            { text: 'Proj. Enc.', fontColor: '#a1a1aa', fillStyle: '#34d399', strokeStyle: '#34d399', lineWidth: 1.5, lineDash: [3, 3], datasetIndex: 2 }
           ];
         }
       } } },
