@@ -955,6 +955,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .form-label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; }
 .form-input, .form-select { width: 100%; background: var(--bg-tertiary); border: 1px solid var(--glass-border); color: var(--text-primary); padding: 12px; border-radius: var(--radius-sm); font-size: 14px; transition: all 0.2s; }
 .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
+/* SPRINT 3: Accessibilité — :focus-visible visible sur tous les éléments interactifs */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.skip-link:focus { top: 0 !important; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .form-row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
@@ -1368,11 +1372,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </style>
 </head>
 <body>
-  <div class="toast-container" id="toastContainer"></div>
-  
-  <header class="header">
+  <!-- SPRINT 3: Accessibilité — skip-to-content -->
+  <a href="#app" class="skip-link" style="position:absolute;top:-40px;left:0;background:var(--accent);color:#fff;padding:8px 16px;z-index:10000;font-weight:700;transition:top 0.2s;" onfocus="this.style.top='0'" onblur="this.style.top='-40px'">Aller au contenu principal</a>
+  <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
+
+  <header class="header" role="banner">
     <div class="header-content">
-      <div class="logo">Freel</div>
+      <div class="logo" aria-label="Freel - Gestion Freelance">Freel</div>
       <div class="period-selector">
         <div class="year-nav">
           <button class="year-nav-btn" id="prevYear">◀</button>
@@ -1396,32 +1402,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </select>
       </div>
       <!-- Sprint 14: Notifications -->
-      <button class="privacy-toggle notif-btn" id="notifBtn" title="Notifications" onclick="toggleNotifCenter()">🔔<span class="notif-count" id="notifBadge" style="display:none">0</span></button>
-      <button class="privacy-toggle" id="themeToggle" title="Changer le thème" onclick="toggleTheme()">☀️</button>
-      <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité">👁️</button>
-      <button class="privacy-toggle" id="authBtn" title="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px"></span>
-      <nav class="nav-tabs">
-        <button class="nav-tab active" data-view="cockpit">🏠</button>
-        <button class="nav-tab" data-view="activite">💼</button>
-        <button class="nav-tab" data-view="tresorerie">🏦</button>
-        <button class="nav-tab" data-view="finances">📊</button>
-        <button class="nav-tab" data-view="config">⚙️</button>
+      <button class="privacy-toggle notif-btn" id="notifBtn" title="Notifications" aria-label="Notifications" onclick="toggleNotifCenter()">🔔<span class="notif-count" id="notifBadge" style="display:none" aria-hidden="true">0</span></button>
+      <button class="privacy-toggle" id="themeToggle" title="Changer le thème" aria-label="Changer le thème" onclick="toggleTheme()">☀️</button>
+      <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité" aria-label="Mode confidentialité">👁️</button>
+      <button class="privacy-toggle" id="authBtn" title="Cloud Sync" aria-label="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px" aria-hidden="true"></span>
+      <nav class="nav-tabs" role="tablist" aria-label="Navigation principale">
+        <button class="nav-tab active" data-view="cockpit" role="tab" aria-selected="true" aria-label="Cockpit">🏠</button>
+        <button class="nav-tab" data-view="activite" role="tab" aria-selected="false" aria-label="Activité">💼</button>
+        <button class="nav-tab" data-view="tresorerie" role="tab" aria-selected="false" aria-label="Trésorerie">🏦</button>
+        <button class="nav-tab" data-view="finances" role="tab" aria-selected="false" aria-label="Analyse financière">📊</button>
+        <button class="nav-tab" data-view="config" role="tab" aria-selected="false" aria-label="Configuration">⚙️</button>
       </nav>
     </div>
   </header>
 
-  <main class="container" id="app"></main>
+  <main class="container" id="app" role="tabpanel" aria-label="Contenu principal"></main>
 
-  <nav class="bottom-nav">
-    <button class="bottom-nav-tab active" data-view="cockpit"><div class="bottom-nav-icon">🏠</div><div class="bottom-nav-label">Cockpit</div></button>
-    <button class="bottom-nav-tab" data-view="activite"><div class="bottom-nav-icon">💼</div><div class="bottom-nav-label">Activité</div></button>
-    <button class="bottom-nav-tab" data-view="tresorerie"><div class="bottom-nav-icon">🏦</div><div class="bottom-nav-label">Tréso</div></button>
-    <button class="bottom-nav-tab" data-view="finances"><div class="bottom-nav-icon">📊</div><div class="bottom-nav-label">Analyse</div></button>
-    <button class="bottom-nav-tab" data-view="config"><div class="bottom-nav-icon">⚙️</div><div class="bottom-nav-label">Config</div></button>
+  <nav class="bottom-nav" role="tablist" aria-label="Navigation principale mobile">
+    <button class="bottom-nav-tab active" data-view="cockpit" role="tab" aria-selected="true" aria-label="Cockpit"><div class="bottom-nav-icon" aria-hidden="true">🏠</div><div class="bottom-nav-label">Cockpit</div></button>
+    <button class="bottom-nav-tab" data-view="activite" role="tab" aria-selected="false" aria-label="Activité"><div class="bottom-nav-icon" aria-hidden="true">💼</div><div class="bottom-nav-label">Activité</div></button>
+    <button class="bottom-nav-tab" data-view="tresorerie" role="tab" aria-selected="false" aria-label="Trésorerie"><div class="bottom-nav-icon" aria-hidden="true">🏦</div><div class="bottom-nav-label">Tréso</div></button>
+    <button class="bottom-nav-tab" data-view="finances" role="tab" aria-selected="false" aria-label="Analyse financière"><div class="bottom-nav-icon" aria-hidden="true">📊</div><div class="bottom-nav-label">Analyse</div></button>
+    <button class="bottom-nav-tab" data-view="config" role="tab" aria-selected="false" aria-label="Configuration"><div class="bottom-nav-icon" aria-hidden="true">⚙️</div><div class="bottom-nav-label">Config</div></button>
   </nav>
 
   <!-- FAB saisie rapide -->
-  <button class="fab" id="fab" title="Actions rapides">+</button>
+  <button class="fab" id="fab" title="Actions rapides" aria-label="Actions rapides">+</button>
   
   <div class="modal" id="fabModal">
     <div class="modal-content" style="max-height: auto; border-radius: var(--radius-xl);">
@@ -1642,13 +1648,15 @@ function signIn() {
   supabase.auth.signInWithPassword({ email: email, password: password })
     .then(function(result) {
       if (result.error) {
-        showToast('❌ ' + result.error.message, 'error');
+        // SPRINT 1: Sécurité — ne pas exposer les messages d'erreur Supabase
+        console.error('Sign in error:', result.error);
+        showToast('❌ Connexion échouée. Vérifiez vos identifiants.', 'error');
       } else {
         showToast('✅ Connecté!', 'success');
         closeDynamicModal();
       }
     })
-    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
+    .catch(function(err) { console.error('Network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
 function signUp() {
@@ -1663,13 +1671,14 @@ function signUp() {
   supabase.auth.signUp({ email: email, password: password })
     .then(function(result) {
       if (result.error) {
-        showToast('❌ ' + result.error.message, 'error');
+        console.error('Sign up error:', result.error);
+        showToast('❌ Inscription échouée. Vérifiez les informations saisies.', 'error');
       } else {
         showToast('✅ Compte créé! Vérifie ton email.', 'success');
         closeDynamicModal();
       }
     })
-    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
+    .catch(function(err) { console.error('Network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
 function signOut() {
@@ -1678,12 +1687,12 @@ function signOut() {
     updateAuthUI();
     showToast('🚪 Déconnecté', 'info');
   })
-  .catch(function(err) { showToast('❌ Erreur déconnexion: ' + err.message, 'error'); });
+  .catch(function(err) { console.error('Sign out error:', err); showToast('❌ Erreur de déconnexion, réessayez.', 'error'); });
 }
 
 function syncToCloud() {
   if (!CURRENT_USER || !supabase) return;
-  
+
   var data = {
     user_id: CURRENT_USER.id,
     company: COMPANY,
@@ -1693,17 +1702,18 @@ function syncToCloud() {
     ir_config: IR_CONFIG,
     updated_at: new Date().toISOString()
   };
-  
+
   supabase.from('user_data')
     .upsert(data, { onConflict: 'user_id' })
     .then(function(result) {
       if (result.error) {
-        showToast('❌ Erreur sync: ' + result.error.message, 'error');
+        console.error('Sync error:', result.error);
+        showToast('❌ Erreur de synchronisation, réessayez.', 'error');
       } else {
         showToast('☁️ Données sauvegardées!', 'success');
       }
     })
-    .catch(function(err) { showToast('❌ Erreur réseau sync: ' + err.message, 'error'); });
+    .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
 function loadFromCloud() {
@@ -1716,7 +1726,8 @@ function loadFromCloud() {
     .then(function(result) {
       if (result.error) {
         if (result.error.code !== 'PGRST116') {
-          showToast('❌ Erreur: ' + result.error.message, 'error');
+          console.error('Cloud load error:', result.error);
+          showToast('❌ Erreur de chargement des données cloud.', 'error');
         }
       } else if (result.data) {
         if (result.data.company) COMPANY = result.data.company;
@@ -1731,7 +1742,7 @@ function loadFromCloud() {
         showToast('☁️ Données chargées du cloud!', 'success');
       }
     })
-    .catch(function(err) { showToast('❌ Erreur réseau: ' + err.message, 'error'); });
+    .catch(function(err) { console.error('Cloud network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
 var PERIOD = { type: 'year', year: TODAY.getFullYear(), month: null };
@@ -1759,11 +1770,11 @@ var SEARCH_STATE = {
 // ============================================================================
 var LEGAL_BY_YEAR = {
   2025: {
-    // Cotisations URSSAF par type d'activité
+    // Cotisations URSSAF par type d'activité — Taux vérifiés urssaf.fr mars 2026
     urssaf: {
-      BNC:         { standard: 0.246, acre: 0.123 },  // Services libéraux
-      BIC_vente:   { standard: 0.124, acre: 0.062 },  // Vente de marchandises
-      BIC_service: { standard: 0.214, acre: 0.107 }   // Services artisanaux/commerciaux
+      BNC:         { standard: 0.246, acre: 0.123 },   // 24.6% / 12.3% - Services libéraux
+      BIC_vente:   { standard: 0.123, acre: 0.0615 },  // 12.3% / 6.15% - Vente de marchandises
+      BIC_service: { standard: 0.212, acre: 0.106 }    // 21.2% / 10.6% - Services artisanaux/commerciaux
     },
     // Formation professionnelle (CFP)
     cfp: 0.002,
@@ -1793,23 +1804,23 @@ var LEGAL_BY_YEAR = {
       BIC_service: 77700,
       BIC_vente: 188700
     },
-    // TVA - Franchise en base
+    // TVA - Franchise en base — Seuils loi Midy (3 nov 2025), applicables dès 2025
     tva: {
       rate: 0.20,
-      seuilService: 36800,
-      seuilServiceMajore: 39100,
-      seuilVente: 91900,
-      seuilVenteMajore: 101000
+      seuilService: 37500,        // Prestations de services
+      seuilServiceMajore: 41250,  // Seuil majoré services
+      seuilVente: 85000,          // Vente de marchandises
+      seuilVenteMajore: 93500     // Seuil majoré vente
     },
     // ACRE
     acreDureeQuarters: 4
   },
   2026: {
-    // Cotisations URSSAF par type d'activité - TAUX 2026 CONFIRMÉS
+    // Cotisations URSSAF par type d'activité — Taux vérifiés urssaf.fr mars 2026
     urssaf: {
-      BNC:         { standard: 0.256, acre: 0.128 },  // 25.6% / 12.8%
-      BIC_vente:   { standard: 0.132, acre: 0.066 },  // 13.2% / 6.6%
-      BIC_service: { standard: 0.232, acre: 0.116 }   // 23.2% / 11.6%
+      BNC:         { standard: 0.256, acre: 0.128 },   // 25.6% / 12.8% - Hausse progressive BNC
+      BIC_vente:   { standard: 0.123, acre: 0.0615 },  // 12.3% / 6.15% - Inchangé
+      BIC_service: { standard: 0.212, acre: 0.106 }    // 21.2% / 10.6% - Inchangé
     },
     cfp: 0.002,
     prelevementLiberatoire: {
@@ -1830,17 +1841,18 @@ var LEGAL_BY_YEAR = {
       { max: 180294, rate: 0.41 },
       { max: Infinity, rate: 0.45 }
     ],
+    // Plafonds CA micro-entreprise 2026-2028 (loi de finances 2026)
     plafonds: {
-      BNC: 77700,
-      BIC_service: 77700,
-      BIC_vente: 188700
+      BNC: 83600,          // Hausse: 77700 → 83600
+      BIC_service: 83600,  // Hausse: 77700 → 83600
+      BIC_vente: 203100    // Hausse: 188700 → 203100
     },
     tva: {
       rate: 0.20,
-      seuilService: 37500,       // Nouveau seuil 2026
-      seuilServiceMajore: 41250, // Nouveau seuil majoré 2026
-      seuilVente: 85000,         // Nouveau seuil 2026
-      seuilVenteMajore: 93500    // Nouveau seuil majoré 2026
+      seuilService: 37500,       // Inchangé (réforme 25k€ rejetée)
+      seuilServiceMajore: 41250,
+      seuilVente: 85000,
+      seuilVenteMajore: 93500
     },
     acreDureeQuarters: 4
   }
@@ -1912,6 +1924,28 @@ var SCENARIOS = {
 
 // Rétro-compatibilité IR_BRACKETS
 var IR_BRACKETS = getLegalIRBrackets(CURRENT_YEAR);
+
+// ===== SPRINT 4: CONSTANTES CENTRALISÉES =====
+// Limites et seuils réutilisés dans l'app
+var MAX_IMPORT_SIZE = 5 * 1024 * 1024; // 5 Mo
+var TOAST_DURATION = 4000; // ms
+var TOAST_DURATION_SHORT = 3000; // ms
+var DEBOUNCE_DELAY = 300; // ms pour les recherches
+var MAX_MOUVEMENTS_DISPLAY = 20; // limite affichage mouvements
+var AUTONOMY_CONFORTABLE = 6; // mois
+var AUTONOMY_WARNING = 3; // mois
+var OCCUPATION_GOOD = 70; // pourcentage
+var OCCUPATION_MEDIUM = 40; // pourcentage
+
+// Utility: debounce pour limiter les appels fréquents (recherche, resize, etc.)
+function debounce(fn, delay) {
+  var timer;
+  return function() {
+    var ctx = this, args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function() { fn.apply(ctx, args); }, delay);
+  };
+}
 
 // ===== SOURCE UNIQUE: Catégories de charges fiscales/sociales =====
 var CHARGE_TYPES = {
@@ -2010,11 +2044,17 @@ function el(tag, attrs, children) {
   if (children) (Array.isArray(children) ? children : [children]).forEach(function(c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
   return e;
 }
+// SPRINT 1: Sécurité — Échappement HTML pour prévenir XSS
+function escapeHTML(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function toast(msg, type) {
   type = type || 'info';
   var t = el('div', { class: 'toast ' + type }, [el('span', {}, msg), el('button', { class: 'toast-close', onclick: function() { t.remove(); } }, '×')]);
   $('#toastContainer').appendChild(t);
-  setTimeout(function() { if (t.parentNode) t.remove(); }, 4000);
+  setTimeout(function() { if (t.parentNode) t.remove(); }, TOAST_DURATION);
 }
 
 function EUR(n, forceShow) { 
@@ -2043,10 +2083,13 @@ function parseDate(s) {
 }
 
 // Fonction highlight pour recherche textuelle (B17)
+// SPRINT 1: Sécurité — échappe le texte avant d'appliquer le highlight
 function highlightText(text, query) {
-  if (!query || !text) return text;
-  var regex = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-  return text.replace(regex, '<span class="search-highlight">$1</span>');
+  if (!query || !text) return escapeHTML(text);
+  var escaped = escapeHTML(text);
+  var escapedQuery = escapeHTML(query);
+  var regex = new RegExp('(' + escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  return escaped.replace(regex, '<span class="search-highlight">$1</span>');
 }
 
 // ===== SPRINT 5: COMPOSANTS UI RÉUTILISABLES (A12) =====
@@ -2191,7 +2234,9 @@ function registerInvoice(invoiceData) {
     montantTTC: invoiceData.montantTTC,
     modePaiement: invoiceData.modePaiement || 'Virement',
     missionId: invoiceData.missionId || null,
-    mois: invoiceData.mois || null
+    mois: invoiceData.mois || null,
+    // SPRINT 5: Piste d'audit — timestamp de création
+    createdAt: new Date().toISOString()
   };
   
   COMPANY.invoiceRegistry.push(entry);
@@ -2592,7 +2637,7 @@ function showClientModal(client) {
   
   $('#formModalTitle').textContent = isNew ? '🏢 Nouveau Client' : '✏️ ' + client.nom;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   body.appendChild(createInput('Nom / Raison sociale *', 'text', 'cNom', client.nom));
   body.appendChild(createTextarea('Adresse complète', 'cAdresse', client.adresse, 'Adresse facturation'));
@@ -3735,10 +3780,12 @@ function buildMission(mis) {
 function openModal(id) { $('#' + id).classList.add('active'); }
 function closeModal(id) { $('#' + id).classList.remove('active'); }
 function closeAllModals() { $$('.modal').forEach(function(m) { m.classList.remove('active'); }); }
+// SPRINT 3: Accessibilité — Escape ferme tous les modals et overlays
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeDynamicModal(); closeAllModals(); } });
 
 function showFabMenu() {
   var body = $('#fabModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   var grid = el('div', { style: { display: 'grid', gap: '12px' } });
   var currentYm = ym(TODAY.getFullYear(), TODAY.getMonth());
@@ -3764,7 +3811,7 @@ function showFabMenu() {
 function showDownloadInvoiceModal() {
   $('#formModalTitle').textContent = '📄 Télécharger Facture';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Sélection de la mission
   var missionSelect = el('select', { id: 'downloadInvoiceMission', style: { width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' } });
@@ -3781,7 +3828,7 @@ function showDownloadInvoiceModal() {
 
   // Mettre à jour les mois quand une mission est sélectionnée
   missionSelect.onchange = function() {
-    monthsContainer.innerHTML = '';
+    monthsContainer.replaceChildren();
     var missionId = missionSelect.value;
     if (!missionId) return;
 
@@ -3820,29 +3867,38 @@ function showToast(message, type) {
     } 
   }, message);
   document.body.appendChild(toast);
-  setTimeout(function() { toast.remove(); }, 3000);
+  setTimeout(function() { toast.remove(); }, TOAST_DURATION_SHORT);
 }
 
 // V51: Dynamic modal
+// SPRINT 3: Accessibilité — role=dialog, aria-modal, focus trap, Escape
 function showModal(title, content) {
   closeAllModals();
-  // V55: Supprimer tout dynamicModal existant pour éviter les duplications
   var existingModal = $('#dynamicModal');
   if (existingModal) existingModal.remove();
 
   var overlay = el('div', {
     class: 'modal active',
     id: 'dynamicModal',
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-label': title,
     onclick: function(e) { if (e.target === overlay) closeDynamicModal(); }
   });
   var modal = el('div', { class: 'modal-content', style: { maxWidth: '400px' } });
   var header = el('div', { class: 'modal-header' });
   header.appendChild(el('h3', { class: 'modal-title' }, title));
-  header.appendChild(el('button', { class: 'modal-close', onclick: function() { closeDynamicModal(); } }, '✕'));
+  var closeBtn = el('button', { class: 'modal-close', 'aria-label': 'Fermer', onclick: function() { closeDynamicModal(); } }, '✕');
+  header.appendChild(closeBtn);
   modal.appendChild(header);
   modal.appendChild(el('div', { class: 'modal-body' }, [content]));
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
+  // Focus trap + auto-focus
+  trapFocus(overlay);
+  var firstFocusable = modal.querySelector('input, select, textarea, button');
+  if (firstFocusable) firstFocusable.focus();
+  else closeBtn.focus();
 }
 
 // V55: Fonction dédiée pour fermer et supprimer le modal dynamique
@@ -3851,29 +3907,57 @@ function closeDynamicModal() {
   if (modal) modal.remove();
 }
 
+// SPRINT 3: Accessibilité — focus trap pour modals
+function trapFocus(modalEl) {
+  modalEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeDynamicModal();
+      closeAllModals();
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    var focusables = modalEl.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (focusables.length === 0) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+}
 
-function createInput(label, type, id, value, placeholder) {
+
+// SPRINT 3: Accessibilité — for/id association, aria-required sur champs obligatoires
+function createInput(label, type, id, value, placeholder, required) {
   var g = el('div', { class: 'form-group' });
-  g.appendChild(el('label', { class: 'form-label', for: id }, label));
-  var inp = el('input', { class: 'form-input', type: type, id: id, placeholder: placeholder || '' });
+  g.appendChild(el('label', { class: 'form-label', for: id }, label + (required ? ' *' : '')));
+  var attrs = { class: 'form-input', type: type, id: id, placeholder: placeholder || '' };
+  if (required) { attrs['aria-required'] = 'true'; attrs.required = 'required'; }
+  var inp = el('input', attrs);
   if (value !== undefined && value !== null) inp.value = value;
   g.appendChild(inp);
   return g;
 }
 
-function createSelect(label, id, options, value) {
+function createSelect(label, id, options, value, required) {
   var g = el('div', { class: 'form-group' });
-  g.appendChild(el('label', { class: 'form-label', for: id }, label));
-  var sel = el('select', { class: 'form-select', id: id });
+  g.appendChild(el('label', { class: 'form-label', for: id }, label + (required ? ' *' : '')));
+  var attrs = { class: 'form-select', id: id };
+  if (required) { attrs['aria-required'] = 'true'; }
+  var sel = el('select', attrs);
   options.forEach(function(o) { var opt = el('option', { value: o.value }, o.label); if (o.value === value) opt.selected = true; sel.appendChild(opt); });
   g.appendChild(sel);
   return g;
 }
 
-function createTextarea(label, id, value, placeholder) {
+function createTextarea(label, id, value, placeholder, required) {
   var g = el('div', { class: 'form-group' });
-  g.appendChild(el('label', { class: 'form-label', for: id }, label));
-  var ta = el('textarea', { class: 'form-input', id: id, rows: 3, placeholder: placeholder || '', style: { resize: 'vertical', minHeight: '60px' } });
+  g.appendChild(el('label', { class: 'form-label', for: id }, label + (required ? ' *' : '')));
+  var attrs = { class: 'form-input', id: id, rows: 3, placeholder: placeholder || '', style: { resize: 'vertical', minHeight: '60px' } };
+  if (required) { attrs['aria-required'] = 'true'; }
+  var ta = el('textarea', attrs);
   ta.value = value || '';
   g.appendChild(ta);
   return g;
@@ -3910,11 +3994,12 @@ function loadAll() {
     var cl = localStorage.getItem(prefix + 'clients');
     var t = localStorage.getItem(prefix + 'treasury');
     var ir = localStorage.getItem(prefix + 'ir_config');
-    if (c) COMPANY = Object.assign(COMPANY, JSON.parse(c));
-    if (m) MISSIONS = JSON.parse(m);
-    if (cl) CLIENTS = JSON.parse(cl);
-    if (t) TREASURY = Object.assign(TREASURY, JSON.parse(t));
-    if (ir) IR_CONFIG = JSON.parse(ir);
+    // SPRINT 6: Robustesse — safe JSON.parse avec fallback
+    if (c) try { COMPANY = Object.assign(COMPANY, JSON.parse(c)); } catch(e) { console.error('Parse company:', e); }
+    if (m) try { var pm = JSON.parse(m); if (Array.isArray(pm)) MISSIONS = pm; } catch(e) { console.error('Parse missions:', e); }
+    if (cl) try { var pcl = JSON.parse(cl); if (Array.isArray(pcl)) CLIENTS = pcl; } catch(e) { console.error('Parse clients:', e); }
+    if (t) try { TREASURY = Object.assign(TREASURY, JSON.parse(t)); } catch(e) { console.error('Parse treasury:', e); }
+    if (ir) try { IR_CONFIG = JSON.parse(ir); } catch(e) { console.error('Parse ir_config:', e); }
 
     // Si migration effectuée, sauvegarder avec le nouveau préfixe
     if (needsMigration) saveAll();
@@ -3980,10 +4065,23 @@ function exportData() {
 }
 
 function importData(file) {
+  // SPRINT 1: Sécurité — limiter taille fichier (5 Mo max)
+  if (file.size > MAX_IMPORT_SIZE) {
+    showToast('Fichier trop volumineux (max 5 Mo)', 'error');
+    return;
+  }
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
       var data = JSON.parse(e.target.result);
+      // SPRINT 1: Valider la structure du JSON importé
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+        showToast('Format de fichier invalide', 'error'); return;
+      }
+      if (data.company && typeof data.company !== 'object') { showToast('Données company invalides', 'error'); return; }
+      if (data.missions && !Array.isArray(data.missions)) { showToast('Données missions invalides', 'error'); return; }
+      if (data.clients && !Array.isArray(data.clients)) { showToast('Données clients invalides', 'error'); return; }
+      if (data.treasury && typeof data.treasury !== 'object') { showToast('Données treasury invalides', 'error'); return; }
       if (data.company) COMPANY = Object.assign(COMPANY, data.company);
       if (data.missions) MISSIONS = data.missions;
       if (data.clients) CLIENTS = data.clients;
@@ -3994,7 +4092,7 @@ function importData(file) {
       MISSIONS.forEach(buildMission);
       saveAll(); render();
       showToast('Import réussi!', 'success');
-    } catch (err) { showToast('Erreur: ' + err.message, 'error'); }
+    } catch (err) { console.error('Import error:', err); showToast('Erreur: fichier JSON invalide', 'error'); }
   };
   reader.readAsText(file);
 }
@@ -4113,27 +4211,39 @@ function getUpcomingDeadlines() {
 }
 
 // ===== VALIDATION INPUTS =====
+// SPRINT 6: Robustesse — validation renforcée (SIRET Luhn, IBAN mod97, email strict, tel FR)
 function validateInput(value, type, options) {
   options = options || {};
   var errors = [];
-  
+
   switch (type) {
     case 'siret':
       var siret = String(value).replace(/\s/g, '');
-      if (siret && siret.length !== 14) errors.push('SIRET doit contenir 14 chiffres');
-      if (siret && !/^\d+$/.test(siret)) errors.push('SIRET ne doit contenir que des chiffres');
+      if (siret) {
+        if (siret.length !== 14) errors.push('SIRET doit contenir 14 chiffres');
+        else if (!/^\d+$/.test(siret)) errors.push('SIRET ne doit contenir que des chiffres');
+        else if (!luhnCheck(siret)) errors.push('SIRET invalide (clé Luhn incorrecte)');
+      }
       break;
     case 'iban':
       var iban = String(value).replace(/\s/g, '').toUpperCase();
-      if (iban && iban.length < 14) errors.push('IBAN trop court');
-      if (iban && !/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) errors.push('Format IBAN invalide');
+      if (iban) {
+        if (iban.length < 14 || iban.length > 34) errors.push('Longueur IBAN invalide');
+        else if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(iban)) errors.push('Format IBAN invalide');
+        else if (!ibanMod97Check(iban)) errors.push('IBAN invalide (clé mod 97 incorrecte)');
+      }
       break;
     case 'email':
-      if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) errors.push('Email invalide');
+      if (value && !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(value)) errors.push('Email invalide');
       break;
     case 'phone':
-      var phone = String(value).replace(/\s/g, '');
-      if (phone && !/^[\d+\-().]+$/.test(phone)) errors.push('Téléphone invalide');
+      var phone = String(value).replace(/[\s\-.()]/g, '');
+      if (phone) {
+        if (/^0\d{9}$/.test(phone)) { /* format français OK */ }
+        else if (/^\+33\d{9}$/.test(phone)) { /* format +33 OK */ }
+        else if (/^\+\d{7,15}$/.test(phone)) { /* format international OK */ }
+        else errors.push('Téléphone invalide (ex: 0612345678 ou +33612345678)');
+      }
       break;
     case 'number':
       if (isNaN(parseFloat(value))) errors.push('Nombre invalide');
@@ -4142,10 +4252,50 @@ function validateInput(value, type, options) {
       break;
     case 'date':
       if (value && isNaN(Date.parse(value))) errors.push('Date invalide');
+      if (value && options.minDate && value < options.minDate) errors.push('Date trop ancienne');
+      if (value && options.maxDate && value > options.maxDate) errors.push('Date trop lointaine');
+      break;
+    case 'dateRange':
+      if (options.start && options.end && options.start > options.end) errors.push('La date de fin doit être après la date de début');
       break;
   }
-  
+
   return { valid: errors.length === 0, errors: errors };
+}
+
+// SPRINT 6: Algorithme de Luhn pour validation SIRET/SIREN
+function luhnCheck(num) {
+  var sum = 0;
+  for (var i = 0; i < num.length; i++) {
+    var d = parseInt(num[num.length - 1 - i]);
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+  }
+  return sum % 10 === 0;
+}
+
+// SPRINT 6: Validation IBAN par modulo 97 (ISO 13616)
+function ibanMod97Check(iban) {
+  var rearranged = iban.substring(4) + iban.substring(0, 4);
+  var numericStr = '';
+  for (var i = 0; i < rearranged.length; i++) {
+    var c = rearranged.charCodeAt(i);
+    if (c >= 65 && c <= 90) numericStr += (c - 55); // A=10, B=11...
+    else numericStr += rearranged[i];
+  }
+  // Calculer mod 97 sur un grand nombre (par blocs)
+  var remainder = numericStr;
+  while (remainder.length > 2) {
+    var block = remainder.substring(0, 9);
+    remainder = (parseInt(block) % 97) + remainder.substring(9);
+  }
+  return parseInt(remainder) % 97 === 1;
+}
+
+// SPRINT 6: Safe number parsing — retourne 0 au lieu de NaN
+function safeNum(val, fallback) {
+  var n = parseFloat(val);
+  return isNaN(n) ? (fallback || 0) : n;
 }
 
 function showValidationError(inputId, message) {
@@ -4963,7 +5113,7 @@ function showCashDetail() {
   var data = compute();
   $('#detailModalTitle').textContent = '💰 Trésorerie & Projections';
   var body = $('#detailModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Calculs préliminaires
   var tvaTotal = data.chargesDetail.find(function(c) { return c.cat === 'TVA'; });
@@ -5163,7 +5313,7 @@ function showChargeTypeDetail(typeName, items, color) {
   var total = items.reduce(function(a, c) { return a + c.montant; }, 0);
   $('#formModalTitle').textContent = '📋 ' + typeName + ' payé';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   body.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', textAlign: 'center' } }, [
     el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total ' + typeName),
@@ -5192,7 +5342,7 @@ function updateProjections() {
   var params = { year: parseInt($('#projYear').value) || TODAY.getFullYear(), tjm: parseInt($('#projTJM').value) || 400, salaireMensuel: parseInt($('#projSalaire').value) || 2500 };
   var proj = computeProjections(PROJECTION_SCENARIO, params);
   var resultsDiv = $('#projResults');
-  resultsDiv.innerHTML = '';
+  resultsDiv.replaceChildren();
   
   var resultBox = el('div', { class: 'projection-result' });
   var acre = getAcreInfo();
@@ -5238,7 +5388,7 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
 
   $('#formModalTitle').textContent = '📦 ' + typeName;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Bouton retour
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); render(); } }, '← Retour'));
@@ -5462,7 +5612,7 @@ function showUrssafCfpDetail() {
 
   $('#formModalTitle').textContent = '📦 URSSAF + CFP';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); render(); } }, '← Retour'));
 
@@ -5720,7 +5870,7 @@ function showPaymentCycleModal(mission, facture) {
 
   $('#formModalTitle').textContent = '📋 Cycle Paiement · ' + cycle.moisTravailLabel;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); } }, '← Retour'));
 
@@ -6006,7 +6156,7 @@ function showProvisionMonthDetail(monthKey) {
   
   $('#formModalTitle').textContent = '📦 Provisions ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Bouton retour
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() { closeModal('formModal'); showProvisionsDetail(); } }, '← Retour'));
@@ -6054,7 +6204,7 @@ function showProvisionsDetail() {
   var allProv = data.allProvisionsDetail;
   $('#formModalTitle').textContent = '📦 Provisions à Payer';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   var grandTotal = data.provisionsAbsolues;
   var unpaidTotal = allProv.filter(function(c) { return !isPaid(c.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
@@ -6161,7 +6311,7 @@ function showProvisionsDetail() {
 function showDetailList(title, items, colorType, labelFn) {
   $('#formModalTitle').textContent = title;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   if (!items || items.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Aucun élément'));
@@ -6190,7 +6340,7 @@ function showDetailList(title, items, colorType, labelFn) {
 function showRendementConfig() {
   $('#formModalTitle').textContent = '📈 Rendement Compte Pro';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // === Section Configuration ===
   var configSection = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: '10px', marginBottom: '16px' } });
@@ -6297,13 +6447,13 @@ function showRendementConfig() {
 }
 
 // Alias pour compatibilité
-function showRendementDetail() { showRendementConfig(); }
+// SPRINT 4: showRendementDetail supprimé — utiliser showRendementConfig() directement
 
 function showWaterfallDetail() {
   var data = compute();
   $('#formModalTitle').textContent = '📊 Décomposition Bénéfice';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Calculs
   var tvaTotal = data.chargesDetail.find(function(c) { return c.cat === 'TVA'; });
@@ -6427,7 +6577,7 @@ function showTJMDetail() {
   
   $('#formModalTitle').textContent = '📊 Analyse TJM';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // KPIs principaux
   var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' } });
@@ -6629,7 +6779,7 @@ function showTauxFacturationDetail(data) {
   
   $('#formModalTitle').textContent = '📅 Taux de Facturation';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // KPI principal
   var tauxColor = data.tauxFacturation >= 0.8 ? 'var(--success)' : data.tauxFacturation >= 0.6 ? 'var(--warning)' : 'var(--danger)';
@@ -6701,7 +6851,7 @@ function showIRDetail() {
   
   $('#formModalTitle').textContent = '💶 Simulation IR';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Sélecteur d'année
   var yearSelect = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px', justifyContent: 'center' } });
@@ -6743,7 +6893,7 @@ function renderIRForYear(year) {
   });
   
   var content = $('#irContent');
-  content.innerHTML = '';
+  content.replaceChildren();
   
   // Formulaire d'édition
   var form = el('div', { style: { background: 'var(--bg-secondary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
@@ -6863,7 +7013,7 @@ function showCFESimulator() {
 
   $('#formModalTitle').textContent = '🏢 Simulateur CFE';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Explication
   var intro = el('div', { style: { background: 'var(--info-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '12px' } });
@@ -6932,7 +7082,7 @@ function showCFESimulator() {
 
 function renderCFEResult(caN2, tauxCommunal) {
   var result = $('#cfeResult');
-  result.innerHTML = '';
+  result.replaceChildren();
 
   var tranches = [
     { max: 5000, base: 0, label: 'Exonéré' },
@@ -7030,18 +7180,17 @@ function renderCFEResult(caN2, tauxCommunal) {
 
 function showMissionModal(mission) {
   var isNew = !mission;
+  // SPRINT 7: Pré-remplissage intelligent pour les nouvelles missions
+  var tomorrow = new Date(TODAY); tomorrow.setDate(tomorrow.getDate() + 1);
+  var tomorrowStr = localISO(tomorrow);
   if (isNew) mission = {
-    id: 'M' + Date.now(), client: '', clientId: '', titre: '', site: '', debut: '', fin: '',
+    id: 'M' + Date.now(), client: '', clientId: '', titre: '', site: '', debut: tomorrowStr, fin: '',
     tjm: 0, delaiPaiement: 2, jourPaiement: 15,
     adresseClient: '', numeroCommande: '', descriptifFacture: '',
-    statut: 'active', // V75: active | prospect | perdue
-    // V79: Périodes de travail (jours/semaine variables)
+    statut: 'active',
     periodes: [],
-    // V81: Congés par date
     congesDates: [],
-    // V79: Client opérationnel
     clientOp: { nom: '', contact: '', email: '', telephone: '', adresse: '' },
-    // V79: Agence / intermédiaire
     agence: { nom: '', contacts: [{ prenom: '', nom: '', email: '', telephone: '' }], adresses: [''] }
   };
   // V79/V81: Rétro-compatibilité - s'assurer que les nouveaux champs existent
@@ -7054,12 +7203,19 @@ function showMissionModal(mission) {
 
   $('#formModalTitle').textContent = isNew ? '💼 Nouvelle Mission' : '✏️ ' + mission.client;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
+
+  // SPRINT 7: Indicateur de progression visuel
+  var progressDiv = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '16px', justifyContent: 'center' } });
+  ['1. Mission', '2. Rythme', '3. Client Op.', '4. Agence', '5. Facturation'].forEach(function(s, i) {
+    progressDiv.appendChild(el('div', { style: { padding: '4px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: '700', background: i === 0 ? 'var(--accent)' : 'var(--bg-tertiary)', color: i === 0 ? '#fff' : 'var(--text-muted)' }, 'data-step': i }, s));
+  });
+  body.appendChild(progressDiv);
 
   // ═══════════════════════════════════════════════
   // SECTION 1: Informations Mission
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section' }, '📋 Informations Mission'));
+  body.appendChild(el('div', { class: 'form-section' }, '1️⃣ Informations Mission'));
 
   // Dropdown client si des clients existent
   if (CLIENTS.length > 0) {
@@ -7091,8 +7247,8 @@ function showMissionModal(mission) {
     body.appendChild(createInput('Client', 'text', 'mClient', mission.client));
   }
 
-  body.appendChild(createInput('Titre / Projet', 'text', 'mTitre', mission.titre));
-  body.appendChild(createInput('Site / Lieu', 'text', 'mSite', mission.site));
+  body.appendChild(createInput('Titre / Projet', 'text', 'mTitre', mission.titre, 'Ex: Développement ERP'));
+  body.appendChild(createInput('Site / Lieu', 'text', 'mSite', mission.site, 'Ex: Toulouse, Remote'));
 
   var row1 = el('div', { class: 'form-row' });
   row1.appendChild(createInput('Début', 'date', 'mDebut', mission.debut));
@@ -7100,10 +7256,12 @@ function showMissionModal(mission) {
   body.appendChild(row1);
 
   var row2 = el('div', { class: 'form-row-3' });
-  row2.appendChild(createInput('TJM (€)', 'number', 'mTJM', mission.tjm));
-  row2.appendChild(createSelect('Délai', 'mDelai', [{ value: '1', label: 'M+1' }, { value: '2', label: 'M+2' }, { value: '3', label: 'M+3' }], String(mission.delaiPaiement)));
-  row2.appendChild(createInput('Jour paie', 'number', 'mJour', mission.jourPaiement));
+  row2.appendChild(createInput('TJM (€)', 'number', 'mTJM', mission.tjm, 'Ex: 550', true));
+  row2.appendChild(createSelect('Délai paiement', 'mDelai', [{ value: '1', label: 'M+1 (30j)' }, { value: '2', label: 'M+2 (60j)' }, { value: '3', label: 'M+3 (90j)' }], String(mission.delaiPaiement)));
+  row2.appendChild(createInput('Jour paie', 'number', 'mJour', mission.jourPaiement, '15'));
   body.appendChild(row2);
+  // SPRINT 7: Tooltip aide TJM
+  body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', marginTop: '-4px' } }, '💡 TJM = Taux Journalier Moyen. Délai = mois après facturation pour recevoir le paiement.'));
 
   // V75: Statut mission (pipeline)
   body.appendChild(createSelect('Statut mission', 'mStatut', [
@@ -7115,14 +7273,14 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   // SECTION 2: Périodes de travail (jours/semaine)
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '📅 Rythme de travail'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '2️⃣ Rythme de travail'));
   body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px' } }, 'Par défaut: temps plein (5j/sem). Ajoutez des périodes pour un rythme différent.'));
 
   var periodesContainer = el('div', { class: 'periode-list', id: 'mPeriodesContainer' });
   body.appendChild(periodesContainer);
 
   function renderPeriodes() {
-    periodesContainer.innerHTML = '';
+    periodesContainer.replaceChildren();
     if (mission.periodes.length === 0) {
       periodesContainer.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '8px', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, '5 jours/semaine sur toute la durée'));
     }
@@ -7217,7 +7375,7 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   // SECTION 3: Client opérationnel
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '🏢 Client opérationnel'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '3️⃣ Client opérationnel'));
   body.appendChild(createInput('Nom du client', 'text', 'mClientOpNom', mission.clientOp.nom, 'Ex: Airbus, ATR...'));
   var rowCo1 = el('div', { class: 'form-row' });
   rowCo1.appendChild(createInput('Contact', 'text', 'mClientOpContact', mission.clientOp.contact, 'Nom du contact'));
@@ -7231,7 +7389,7 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   // SECTION 4: Agence / Intermédiaire
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '🤝 Agence / Intermédiaire'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '4️⃣ Agence / Intermédiaire'));
   body.appendChild(createInput('Nom de l\'agence', 'text', 'mAgenceNom', mission.agence.nom, 'Ex: Scalian, Alten...'));
 
   // Contacts agence (multiples)
@@ -7240,7 +7398,7 @@ function showMissionModal(mission) {
   body.appendChild(agenceContactsContainer);
 
   function renderAgenceContacts() {
-    agenceContactsContainer.innerHTML = '';
+    agenceContactsContainer.replaceChildren();
     mission.agence.contacts.forEach(function(c, idx) {
       var contactDiv = el('div', { class: 'agence-contact' });
       if (mission.agence.contacts.length > 1) {
@@ -7271,7 +7429,7 @@ function showMissionModal(mission) {
   body.appendChild(agenceAdressesContainer);
 
   function renderAgenceAdresses() {
-    agenceAdressesContainer.innerHTML = '';
+    agenceAdressesContainer.replaceChildren();
     mission.agence.adresses.forEach(function(addr, idx) {
       var addrDiv = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' } });
       var addrInput = el('input', { class: 'form-input', type: 'text', id: 'mAgcAddr_' + idx, placeholder: 'Ex: 14 Rue Paul Mesple, 31100 Toulouse', style: { flex: '1' } });
@@ -7293,10 +7451,44 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   // SECTION 5: Facturation
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '📄 Informations Facturation'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '5️⃣ Informations Facturation'));
   body.appendChild(createInput('Adresse de facturation', 'text', 'mAdresseClient', mission.adresseClient || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
   body.appendChild(createInput('N° Commande client', 'text', 'mNumCommande', mission.numeroCommande || '', 'Ex: 10004903'));
   body.appendChild(createTextarea('Descriptif standard facture', 'mDescriptif', mission.descriptifFacture || '', 'Ex: Prestation de service consultant'));
+
+  // SPRINT 7: Affichage en temps réel du total jours/CA estimé
+  var estimateDiv = el('div', { id: 'missionEstimate', style: { padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginTop: '12px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' } });
+  estimateDiv.textContent = 'Remplissez les dates et le TJM pour voir l\'estimation';
+  body.appendChild(estimateDiv);
+
+  function updateEstimate() {
+    var tjm = parseFloat($('#mTJM') ? $('#mTJM').value : 0) || 0;
+    var debut = $('#mDebut') ? $('#mDebut').value : '';
+    var fin = $('#mFin') ? $('#mFin').value : '';
+    var estDiv = $('#missionEstimate');
+    if (!estDiv || !tjm || !debut) return;
+    if (!fin) { estDiv.textContent = 'Ajoutez une date de fin pour voir l\'estimation'; return; }
+    var d1 = new Date(debut), d2 = new Date(fin);
+    if (d2 <= d1) { estDiv.textContent = '⚠️ La date de fin doit être après la date de début'; estDiv.style.color = 'var(--danger)'; return; }
+    // Estimation simple: jours ouvrés entre les 2 dates
+    var jours = 0;
+    var cur = new Date(d1);
+    while (cur <= d2) { var dow = cur.getDay(); if (dow !== 0 && dow !== 6) jours++; cur.setDate(cur.getDate() + 1); }
+    var caEstime = jours * tjm;
+    estDiv.style.color = 'var(--success)';
+    estDiv.textContent = '📊 Estimation: ' + jours + ' jours ouvrés · CA HT: ' + EUR(caEstime, true);
+  }
+  // Mettre à jour l'estimation quand les champs changent
+  setTimeout(function() {
+    ['mTJM', 'mDebut', 'mFin'].forEach(function(id) {
+      var inp = $('#' + id);
+      if (inp) { inp.addEventListener('input', updateEstimate); inp.addEventListener('change', updateEstimate); }
+    });
+    updateEstimate();
+    // SPRINT 7: Auto-focus sur le premier champ
+    var firstInput = body.querySelector('select, input[type="text"]');
+    if (firstInput) firstInput.focus();
+  }, 50);
 
   // ═══════════════════════════════════════════════
   // BOUTONS ACTION
@@ -7308,7 +7500,7 @@ function showMissionModal(mission) {
     var clientVal = ($('#mClientId') ? $('#mClientId').value : '') || ($('#mClient') ? $('#mClient').value : '');
     if (!clientVal || clientVal === '_new_') { showToast('⚠️ Client requis', 'warning'); return; }
     if (!$('#mDebut').value) { showToast('⚠️ Date de début requise', 'warning'); return; }
-    if (isNaN(tjmVal) || tjmVal < 0) { showToast('⚠️ TJM invalide', 'warning'); return; }
+    if (isNaN(tjmVal) || tjmVal <= 0) { showToast('⚠️ TJM doit être supérieur à 0', 'warning'); showValidationError('mTJM', 'TJM requis et > 0'); return; }
 
     // Gérer client via dropdown ou input texte
     var clientId = $('#mClientId') ? $('#mClientId').value : '';
@@ -7353,6 +7545,19 @@ function showMissionModal(mission) {
         mission.periodes.push({ debut: pDeb, fin: pFin, joursMap: joursMap, joursSemaine: totalJs, tjm: pTjm });
       }
       pIdx++;
+    }
+
+    // SPRINT 7: Validation chevauchements de périodes
+    if (mission.periodes.length > 1) {
+      for (var pi = 0; pi < mission.periodes.length; pi++) {
+        for (var pj = pi + 1; pj < mission.periodes.length; pj++) {
+          var a = mission.periodes[pi], b = mission.periodes[pj];
+          if (a.debut && a.fin && b.debut && b.fin && a.debut <= b.fin && b.debut <= a.fin) {
+            showToast('⚠️ Les périodes ' + (pi + 1) + ' et ' + (pj + 1) + ' se chevauchent', 'warning');
+            return;
+          }
+        }
+      }
     }
 
     // V79: Sauvegarder client opérationnel
@@ -7406,7 +7611,7 @@ function showMissionModal(mission) {
 function showDaysEditor(mission) {
   $('#formModalTitle').textContent = '📅 Jours - ' + mission.client;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   if (!mission.lignes || mission.lignes.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Configure d\'abord les dates'));
@@ -7528,7 +7733,7 @@ var CHARGE_CATEGORIES = [
 function showChargeModal() {
   $('#formModalTitle').textContent = '📋 Ajouter une Charge';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Onglets: Ponctuelle / Récurrente
   var tabs = el('div', { class: 'filter-tabs', style: { marginBottom: '16px' } });
@@ -7546,7 +7751,7 @@ function showChargePonctuelle() {
   $('#tabPonctuelle').classList.add('active');
   $('#tabRecurrente').classList.remove('active');
   var content = $('#chargeFormContent');
-  content.innerHTML = '';
+  content.replaceChildren();
 
   content.appendChild(createSelect('Catégorie', 'chCat', CHARGE_CATEGORIES, 'Autre'));
   content.appendChild(createInput('Description', 'text', 'chDesc', '', 'Ex: Abonnement Notion'));
@@ -7616,7 +7821,7 @@ function showChargeRecurrente() {
   $('#tabPonctuelle').classList.remove('active');
   $('#tabRecurrente').classList.add('active');
   var content = $('#chargeFormContent');
-  content.innerHTML = '';
+  content.replaceChildren();
   
   content.appendChild(el('div', { style: { background: 'var(--info-glow)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '12px' } }, 
     '💡 La charge sera créée automatiquement chaque mois de la période sélectionnée'));
@@ -7708,7 +7913,7 @@ function showSalaireModal(montant) {
   var data = compute();
   $('#formModalTitle').textContent = '💸 Verser un Salaire';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   var info = el('div', { style: { background: 'var(--success-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
   info.innerHTML = '<strong>💡 Recommandation</strong><br>Cash dispo: ' + EUR(data.cashDispoAbsolu) + ' → Suggéré: <strong>' + EUR(data.salaireReco) + '</strong>';
   body.appendChild(info);
@@ -7730,7 +7935,7 @@ function editMovement(mvId) {
 
   $('#formModalTitle').textContent = '✏️ Modifier ' + (mv.type === 'Salaire' ? 'Salaire' : 'Charge');
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   if (mv.type === 'Salaire') {
     body.appendChild(createInput('Montant (€)', 'number', 'editMontant', mv.montant));
@@ -7795,7 +8000,7 @@ function deleteMovement(mvId) {
 function showMonthCongesModal(monthYm) {
   $('#formModalTitle').textContent = '🏖 Congés - ' + fmtMonth(monthYm);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Navigation mois/année
   var p = parseYM(monthYm);
@@ -8014,7 +8219,7 @@ function showCongesOverview() {
   var data = compute();
   $('#formModalTitle').textContent = '📅 Vue Congés';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   var months = getPeriodMonths();
 
@@ -8062,7 +8267,7 @@ function showCongesOverview() {
 function showFactureModal(facture) {
   $('#formModalTitle').textContent = '📄 ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Trouver la mission associée
   var mission = MISSIONS.find(function(m) { return m.factures && m.factures.some(function(f) { return f.id === facture.id; }); });
@@ -8164,7 +8369,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   
   $('#formModalTitle').textContent = '📄 Facture ' + mission.client + ' - ' + fmtMonth(monthYm);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   // Avertissement si numéro déjà finalisé
   if (hasDefinitiveNumber) {
@@ -8393,35 +8598,37 @@ function showInvoicePreview(data) {
 // Générer le contenu HTML de la facture (pour preview)
 function generateInvoiceHTMLContent(d) {
   var fmtEur = function(n) { return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; };
-  
+  // SPRINT 1: Sécurité — échapper toutes les données utilisateur
+  var e = escapeHTML;
+
   return '<div style="display:flex;justify-content:space-between;margin-bottom:25px;">' +
     // Emetteur (gauche)
     '<div style="flex:1;">' +
       '<div style="font-size:14pt;font-weight:bold;color:#1a1a2e;margin-bottom:8px;">Entreprise individuelle</div>' +
-      '<div style="font-size:12pt;font-weight:bold;margin-bottom:4px;">' + d.emetteur + '</div>' +
+      '<div style="font-size:12pt;font-weight:bold;margin-bottom:4px;">' + e(d.emetteur) + '</div>' +
       '<div style="color:#555;font-size:9pt;line-height:1.5;">' +
-        (d.adresseEmetteur ? d.adresseEmetteur + '<br>' : '') +
+        (d.adresseEmetteur ? e(d.adresseEmetteur) + '<br>' : '') +
         'France<br>' +
-        (d.siret ? 'SIRET: ' + d.siret + '<br>' : '') +
-        (d.tvaIntra ? 'TVA Intra: ' + d.tvaIntra : '') +
+        (d.siret ? 'SIRET: ' + e(d.siret) + '<br>' : '') +
+        (d.tvaIntra ? 'TVA Intra: ' + e(d.tvaIntra) : '') +
       '</div>' +
     '</div>' +
     // Client (droite)
     '<div style="background:#f0f4f8;border-left:4px solid #0099ff;padding:15px;min-width:200px;">' +
       '<div style="font-size:9pt;color:#666;margin-bottom:4px;">FACTURER À</div>' +
-      '<div style="font-weight:bold;font-size:11pt;">' + d.client + '</div>' +
-      (d.adresseClient ? '<div style="color:#555;font-size:9pt;margin-top:4px;">' + d.adresseClient.replace(/,/g, '<br>') + '</div>' : '') +
+      '<div style="font-weight:bold;font-size:11pt;">' + e(d.client) + '</div>' +
+      (d.adresseClient ? '<div style="color:#555;font-size:9pt;margin-top:4px;">' + e(d.adresseClient).replace(/,/g, '<br>') + '</div>' : '') +
     '</div>' +
   '</div>' +
   // Infos facture
   '<div style="display:flex;gap:30px;margin-bottom:20px;font-size:10pt;padding:12px;background:#f8f9fa;border-radius:6px;">' +
-    '<div><span style="color:#666;">Facture N° </span><strong style="color:#1a1a2e;">' + d.num + '</strong></div>' +
-    '<div><span style="color:#666;">Date: </span><strong>' + d.date + '</strong></div>' +
-    '<div><span style="color:#666;">Échéance: </span><strong style="color:#c53030;">' + d.dateEcheance + '</strong></div>' +
-    (d.numCommande ? '<div><span style="color:#666;">Réf. commande: </span><strong>' + d.numCommande + '</strong></div>' : '') +
+    '<div><span style="color:#666;">Facture N° </span><strong style="color:#1a1a2e;">' + e(d.num) + '</strong></div>' +
+    '<div><span style="color:#666;">Date: </span><strong>' + e(d.date) + '</strong></div>' +
+    '<div><span style="color:#666;">Échéance: </span><strong style="color:#c53030;">' + e(d.dateEcheance) + '</strong></div>' +
+    (d.numCommande ? '<div><span style="color:#666;">Réf. commande: </span><strong>' + e(d.numCommande) + '</strong></div>' : '') +
   '</div>' +
   // Titre
-  '<div style="font-size:11pt;font-weight:bold;color:#1a1a2e;margin-bottom:15px;">' + d.titre + '</div>' +
+  '<div style="font-size:11pt;font-weight:bold;color:#1a1a2e;margin-bottom:15px;">' + e(d.titre) + '</div>' +
   // Tableau prestations avec totaux intégrés
   '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
     '<thead><tr style="background:#1a1a2e;color:#fff;">' +
@@ -8435,13 +8642,13 @@ function generateInvoiceHTMLContent(d) {
     '<tbody>' +
       '<tr style="border-bottom:1px solid #eee;">' +
         '<td style="padding:12px 10px;vertical-align:top;">' +
-          '<div style="font-weight:500;">' + d.descriptif + '</div>' +
-          '<div style="font-size:9pt;color:#666;margin-top:4px;">Période: ' + d.periode + '</div>' +
+          '<div style="font-weight:500;">' + e(d.descriptif) + '</div>' +
+          '<div style="font-size:9pt;color:#666;margin-top:4px;">Période: ' + e(d.periode) + '</div>' +
         '</td>' +
-        '<td style="padding:12px 10px;text-align:center;">' + d.jours + '</td>' +
+        '<td style="padding:12px 10px;text-align:center;">' + e(d.jours) + '</td>' +
         '<td style="padding:12px 10px;text-align:center;">jour(s)</td>' +
         '<td style="padding:12px 10px;text-align:right;">' + fmtEur(d.tjm) + '</td>' +
-        '<td style="padding:12px 10px;text-align:center;">' + d.tvaRate + '%</td>' +
+        '<td style="padding:12px 10px;text-align:center;">' + e(d.tvaRate) + '%</td>' +
         '<td style="padding:12px 10px;text-align:right;font-weight:500;">' + fmtEur(d.totalHT) + '</td>' +
       '</tr>' +
       // Ligne vide séparatrice
@@ -8455,7 +8662,7 @@ function generateInvoiceHTMLContent(d) {
       // TVA
       '<tr style="background:#f8f9fa;">' +
         '<td colspan="4"></td>' +
-        '<td style="padding:8px 10px;text-align:right;font-weight:500;color:#666;">TVA ' + d.tvaRate + '%</td>' +
+        '<td style="padding:8px 10px;text-align:right;font-weight:500;color:#666;">TVA ' + e(d.tvaRate) + '%</td>' +
         '<td style="padding:8px 10px;text-align:right;font-weight:600;">' + fmtEur(d.tvaAmount) + '</td>' +
       '</tr>' +
       // Total TTC
@@ -8469,14 +8676,14 @@ function generateInvoiceHTMLContent(d) {
   // Coordonnées bancaires
   (d.iban ? '<div style="background:#f8f9fa;border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:20px;">' +
     '<div style="font-weight:bold;margin-bottom:8px;font-size:10pt;">💳 Coordonnées bancaires</div>' +
-    '<div style="font-family:monospace;font-size:11pt;letter-spacing:1px;">' + d.iban + '</div>' +
+    '<div style="font-family:monospace;font-size:11pt;letter-spacing:1px;">' + e(d.iban) + '</div>' +
   '</div>' : '') +
   // Mentions légales - SPRINT 1: Conditions de paiement complètes (Art. L441-9)
   '<div style="font-size:8pt;color:#888;line-height:1.6;border-top:1px solid #ddd;padding-top:15px;">' +
-    '<div style="margin-bottom:8px;"><strong>Conditions de paiement:</strong> Paiement à ' + (d.delaiPaiement || 30) + ' jours à compter de la date de facturation. Date d\'échéance: ' + d.dateEcheance + '</div>' +
+    '<div style="margin-bottom:8px;"><strong>Conditions de paiement:</strong> Paiement à ' + (d.delaiPaiement || 30) + ' jours à compter de la date de facturation. Date d\'échéance: ' + e(d.dateEcheance) + '</div>' +
     '<div style="margin-bottom:8px;">En cas de retard de paiement, une pénalité de 3 fois le taux d\'intérêt légal sera appliquée (taux BCE + 10 points), ' +
     'à laquelle s\'ajoutera une indemnité forfaitaire pour frais de recouvrement de 40 €. Pas d\'escompte pour paiement anticipé.</div>' +
-    '<div>SIREN ' + d.siren + ' - RCS TOULOUSE - APE 6201Z</div>' +
+    '<div>SIREN ' + e(d.siren) + ' - RCS TOULOUSE - APE 6201Z</div>' +
     (d.tvaRate === 0 ? '<div style="font-weight:500;margin-top:4px;">TVA non applicable, article 293 B du CGI</div>' : '') +
   '</div>';
 }
@@ -8767,7 +8974,7 @@ function showMonthDetail(monthKey) {
 
   $('#formModalTitle').textContent = '📅 ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Calculs préliminaires avec détail par type de charge
   var tvaMonth = md.charges.filter(function(c) { return c.cat === 'TVA'; }).reduce(function(a, c) { return a + c.montant; }, 0);
@@ -8820,7 +9027,8 @@ function showMonthDetail(monthKey) {
   setTimeout(function() {
     var ctx = document.getElementById(canvasId);
     if (!ctx) return;
-    new Chart(ctx.getContext('2d'), {
+    if (ctx._chartInstance) ctx._chartInstance.destroy();
+    ctx._chartInstance = new Chart(ctx.getContext('2d'), {
       type: 'doughnut',
       data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 0 }] },
       options: {
@@ -8962,7 +9170,7 @@ function showMonthCAInvoices(monthKey) {
 
   $('#formModalTitle').textContent = '📊 CA HT ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // KPI résumé
   var kpis = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' } });
@@ -9031,7 +9239,7 @@ function showTimelineMonthCharges(monthKey) {
   
   $('#formModalTitle').textContent = '📋 Charges ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   if (md.charges.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '30px' } }, 'Aucune charge ce mois'));
@@ -9089,7 +9297,7 @@ function showSalaireModalForMonth(monthKey) {
   var data = compute();
   $('#formModalTitle').textContent = '💸 Verser Salaire - ' + fmtMonth(monthKey);
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   
   var info = el('div', { style: { background: 'var(--success-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
   info.innerHTML = '<strong>💡 Recommandation</strong><br>Cash dispo global: ' + EUR(data.cashDispoAbsolu) + ' → Suggéré: <strong>' + EUR(data.salaireReco) + '</strong>';
@@ -9156,7 +9364,7 @@ function showHealthScoreDetail() {
   var health = calculateHealthScore();
   $('#formModalTitle').textContent = '🏥 Santé de l\'Entreprise';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   var scoreDiv = el('div', { style: { textAlign: 'center', marginBottom: '20px' } });
   scoreDiv.appendChild(el('div', { class: 'health-score-circle ' + health.level, style: { margin: '0 auto 12px', width: '80px', height: '80px', fontSize: '28px' } }, String(health.score)));
   scoreDiv.appendChild(el('div', { style: { fontSize: '18px', fontWeight: '700' } }, health.label));
@@ -9340,7 +9548,7 @@ function showTVADetail() {
   var data = compute();
   $('#formModalTitle').textContent = '🏛️ TVA - Règles & Projection';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   var statusDiv = el('div', { style: { textAlign: 'center', marginBottom: '20px', padding: '16px', background: COMPANY.tvaDepuis ? 'rgba(236,72,153,0.1)' : 'var(--success-glow)', borderRadius: 'var(--radius-lg)' } });
   statusDiv.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '8px' } }, COMPANY.tvaDepuis ? '🏛️' : '✅'));
   statusDiv.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700' } }, COMPANY.tvaDepuis ? 'Assujetti TVA' : 'Franchise de TVA'));
@@ -9592,7 +9800,7 @@ function showProjectionsModal() {
   var data = compute();
   $('#formModalTitle').textContent = '📈 Projections Financières';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   var scenarios = [
     { name: 'Optimiste', months: 12, vacances: 4, color: 'var(--success)' },
     { name: 'Normal', months: 12, vacances: 5, color: 'var(--info)' },
@@ -9875,7 +10083,7 @@ function setGoalCA(amount) {
 function showGoalModal() {
   $('#formModalTitle').textContent = '🎯 Objectif CA Annuel';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   body.appendChild(el('div', { style: { marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)' } }, 'Définis ton objectif de chiffre d\'affaires pour ' + (PERIOD.year || TODAY.getFullYear())));
   body.appendChild(createInput('Objectif CA HT (€)', 'number', 'goalAmount', GOAL_CA || ''));
   var presets = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' } });
@@ -10306,7 +10514,7 @@ function performSearch(query) {
 function updateSearchResults(query) {
   var container = $('#searchResults');
   if (!container) return;
-  container.innerHTML = '';
+  container.replaceChildren();
   
   if (SEARCH_RESULTS.length === 0) {
     container.appendChild(el('div', { class: 'search-empty' }, query ? 'Aucun résultat pour "' + query + '"' : 'Tape pour rechercher...'));
@@ -10383,7 +10591,7 @@ function createSearchOverlay() {
   var box = el('div', { class: 'search-box' });
   var inputWrap = el('div', { class: 'search-input-wrap' });
   inputWrap.appendChild(el('span', {}, '🔍'));
-  var input = el('input', { type: 'text', placeholder: 'Rechercher clients, factures, actions...', oninput: function() { performSearch(this.value); } });
+  var input = el('input', { type: 'text', placeholder: 'Rechercher clients, factures, actions...', oninput: debounce(function() { performSearch(this.value); }, DEBOUNCE_DELAY) });
   inputWrap.appendChild(input);
   inputWrap.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'ESC'));
   box.appendChild(inputWrap);
@@ -10452,10 +10660,22 @@ function importJSON() {
   input.onchange = function(e) {
     var file = e.target.files[0];
     if (!file) return;
+    // SPRINT 1: Sécurité — limiter taille fichier (5 Mo max)
+    if (file.size > MAX_IMPORT_SIZE) {
+      toast('Fichier trop volumineux (max 5 Mo)', 'error');
+      return;
+    }
     var reader = new FileReader();
     reader.onload = function(ev) {
       try {
         var data = JSON.parse(ev.target.result);
+        // SPRINT 1: Valider la structure du JSON importé
+        if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+          toast('Format de fichier invalide', 'error'); return;
+        }
+        if (data.company && typeof data.company !== 'object') { toast('Données invalides', 'error'); return; }
+        if (data.missions && !Array.isArray(data.missions)) { toast('Données invalides', 'error'); return; }
+        if (data.clients && !Array.isArray(data.clients)) { toast('Données invalides', 'error'); return; }
         if (data.company) COMPANY = Object.assign(COMPANY, data.company);
         if (data.missions) MISSIONS = data.missions;
         if (data.clients) CLIENTS = data.clients;
@@ -10467,6 +10687,7 @@ function importJSON() {
         render();
         toast('Import réussi! Données restaurées.', 'success');
       } catch (err) {
+        console.error('Import error:', err);
         toast('Erreur: fichier JSON invalide', 'error');
       }
     };
@@ -10620,7 +10841,7 @@ function toggleNotifCenter() {
 function renderNotifList() {
   var list = $('#notifList');
   if (!list) return;
-  list.innerHTML = '';
+  list.replaceChildren();
 
   var notifs = getNotifications();
   if (notifs.length === 0) {
@@ -10881,6 +11102,7 @@ function renderDashboardHero(container, data) {
   setTimeout(function() {
     var ctx = document.getElementById('compteDonutCanvas');
     if (!ctx || typeof Chart === 'undefined') return;
+    if (ctx._chartInstance) ctx._chartInstance.destroy();
 
     // Données: Cash + provisions détaillées
     var donutLabels = ['Cash Disponible'];
@@ -10893,7 +11115,7 @@ function renderDashboardHero(container, data) {
       donutColors.push(p.color);
     });
 
-    new Chart(ctx.getContext('2d'), {
+    ctx._chartInstance = new Chart(ctx.getContext('2d'), {
       type: 'doughnut',
       data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 0 }] },
       options: {
@@ -11320,7 +11542,7 @@ function updateProjectionCalcSimple(cashDispo) {
 
   var resultDiv = $('#projAutonomieResult');
   if (!resultDiv) return;
-  resultDiv.innerHTML = '';
+  resultDiv.replaceChildren();
 
   // Barre visuelle
   var maxMonths = 12;
@@ -11388,7 +11610,7 @@ function updateProjectionCalc(cashDispo, chargesRecurrentes) {
   var resultDiv = $('#projAutonomieResult');
   if (!resultDiv) return;
   resultDiv.style.display = 'block';
-  resultDiv.innerHTML = '';
+  resultDiv.replaceChildren();
 
   // Barre visuelle
   var maxMonths = 12;
@@ -12881,9 +13103,10 @@ function drawPerfDonut(provisions, charges, remuneration, cashDispo) {
   if (typeof Chart === 'undefined') return;
   var canvas = $('#caDonutChart');
   if (!canvas || !canvas.getContext) return;
+  if (canvas._chartInstance) canvas._chartInstance.destroy();
   var ctx = canvas.getContext('2d');
 
-  new Chart(ctx, {
+  canvas._chartInstance = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: ['Provisions', 'Charges', 'Rémunération', 'Cash dispo'],
@@ -13414,7 +13637,7 @@ function showAbsoluteWaterfallDetail(bar, data) {
   var modal = $('#formModal');
   $('#formModalTitle').textContent = bar.icon + ' ' + bar.label + ' - Détail';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   // Montant total
   body.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
@@ -13478,7 +13701,7 @@ function showWaterfallDetail(d, data) {
   var modal = $('#formModal');
   $('#formModalTitle').textContent = d.icon + ' ' + d.label;
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   var items = [];
   var totalCat = 0;
@@ -13605,7 +13828,7 @@ function showTransactionDetail(catId, subLabel, data) {
   var modal = $('#formModal');
   $('#formModalTitle').textContent = '📋 ' + subLabel + ' - Détail';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
 
   if (transactions.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', padding: '20px', color: 'var(--text-muted)' } }, 'Aucune écriture'));
@@ -14783,7 +15006,7 @@ function showWeeklyBreakdownModal(monthKey) {
 
   $('#formModalTitle').textContent = '📅 ' + fmtMonthShort(monthKey) + ' — Détail par semaine';
   var modalBody = $('#formModalBody');
-  modalBody.innerHTML = '';
+  modalBody.replaceChildren();
   modalBody.appendChild(body);
   openModal('formModal');
 
@@ -14822,19 +15045,42 @@ function showWeeklyBreakdownModal(monthKey) {
   }, 150);
 }
 
+// SPRINT 7: Filtre statut mission
+var MISSION_FILTER = MISSION_FILTER || 'all';
+
 function renderMissions(container) {
   var data = compute();
 
   var header = el('div', { class: 'page-header' });
   header.appendChild(el('h2', { class: 'page-title' }, '💼 Missions'));
   container.appendChild(header);
-  
+
   if (MISSIONS.length === 0) {
     container.appendChild(el('div', { class: 'empty-state' }, [el('div', { class: 'empty-icon' }, '💼'), el('div', { class: 'empty-title' }, 'Aucune mission'), el('div', { class: 'empty-text' }, 'Ajoute ta première mission pour commencer'), el('button', { class: 'btn btn-success', onclick: showMissionModal }, '+ Nouvelle Mission')]));
     return;
   }
-  
-  MISSIONS.forEach(function(m) {
+
+  // SPRINT 7: Filtres par statut
+  var counts = { all: MISSIONS.length, active: 0, prospect: 0, perdue: 0 };
+  MISSIONS.forEach(function(m) { if (m.statut) counts[m.statut] = (counts[m.statut] || 0) + 1; else counts.active++; });
+  var filterBar = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '12px', background: 'var(--bg-tertiary)', padding: '4px', borderRadius: '10px' } });
+  [
+    { key: 'all', label: 'Toutes (' + counts.all + ')' },
+    { key: 'active', label: '✅ Actives (' + (counts.active || 0) + ')' },
+    { key: 'prospect', label: '🔮 Prospects (' + (counts.prospect || 0) + ')' },
+    { key: 'perdue', label: '❌ Perdues (' + (counts.perdue || 0) + ')' }
+  ].forEach(function(f) {
+    var btn = el('button', { class: 'nav-tab' + (MISSION_FILTER === f.key ? ' active' : ''), style: { fontSize: '10px', padding: '4px 8px' }, onclick: function() { MISSION_FILTER = f.key; render(); } }, f.label);
+    filterBar.appendChild(btn);
+  });
+  container.appendChild(filterBar);
+
+  var filteredMissions = MISSIONS.filter(function(m) {
+    if (MISSION_FILTER === 'all') return true;
+    return (m.statut || 'active') === MISSION_FILTER;
+  });
+
+  filteredMissions.forEach(function(m) {
     var now = localISO(TODAY);
     var status = m.fin < now ? 'ended' : m.debut > now ? 'upcoming' : 'active';
     var statusLabel = status === 'active' ? 'En cours' : status === 'upcoming' ? 'À venir' : 'Terminée';
@@ -15229,7 +15475,7 @@ function renderTresorerie(container) {
   var totalInterets = TREASURY.rendementActif ? getTotalRendement() : 0;
   var interetsBlock = el('div', { class: 'treso-item', onclick: function() { 
     if (TREASURY.rendementActif) {
-      showRendementDetail(); 
+      showRendementConfig(); 
     } else {
       // Rediriger vers Admin pour activer
       toast('Active le rendement dans Admin > Trésorerie', 'info');
@@ -15449,7 +15695,7 @@ function renderTresorerie(container) {
 function showEditSoldeInitial() {
   $('#formModalTitle').textContent = '🏦 Modifier Solde Initial';
   var body = $('#formModalBody');
-  body.innerHTML = '';
+  body.replaceChildren();
   body.appendChild(el('div', { style: { marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)' } }, 'Le solde initial correspond au montant présent sur ton compte pro au début de ton activité ou de la période de suivi.'));
   body.appendChild(createInput('Solde Initial (€)', 'number', 'editSoldeInit', TREASURY.soldeInitial));
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '16px' }, onclick: function() {
@@ -16001,15 +16247,18 @@ function renderAdmin(container) {
       var testClient = supabaseLib.createClient(url, key);
       testClient.auth.getSession().then(function(result) {
         if (result.error) {
-          toast('❌ Erreur: ' + result.error.message, 'error');
+          console.error('Supabase test error:', result.error);
+          toast('❌ Connexion Supabase échouée. Vérifiez URL et clé.', 'error');
         } else {
           toast('✅ Connexion Supabase OK!', 'success');
         }
       }).catch(function(err) {
-        toast('❌ Erreur: ' + err.message, 'error');
+        console.error('Supabase test network error:', err);
+        toast('❌ Erreur réseau, vérifiez l\'URL Supabase.', 'error');
       });
     } catch (e) {
-      toast('❌ Erreur: ' + e.message, 'error');
+      console.error('Supabase init error:', e);
+      toast('❌ Configuration Supabase invalide.', 'error');
     }
   } }, '🔍 Tester'));
 
@@ -16021,7 +16270,14 @@ function renderAdmin(container) {
   }
   cloudCard.appendChild(cloudBtns);
 
-  // Clear config button
+  // SPRINT 1: Sécurité — avertissement stockage credentials en clair
+  if (SUPABASE_URL || SUPABASE_ANON_KEY) {
+    var secWarning = el('div', { style: { marginTop: '10px', padding: '8px 12px', background: 'rgba(255,180,0,0.1)', border: '1px solid var(--warning)', borderRadius: '6px', fontSize: '10px', color: 'var(--warning)' } });
+    secWarning.appendChild(el('span', {}, '⚠️ Les clés Supabase sont stockées en clair dans le navigateur. Ne partagez pas cet appareil et utilisez la clé anon (publique) uniquement.'));
+    cloudCard.appendChild(secWarning);
+  }
+
+  // Clear config button — purge credentials
   if (SUPABASE_URL || SUPABASE_ANON_KEY) {
     cloudCard.appendChild(el('button', { class: 'btn btn-danger btn-sm', style: { marginTop: '10px', width: '100%' }, onclick: function() {
       if (confirm('Supprimer la configuration Supabase?')) {
@@ -16039,6 +16295,79 @@ function renderAdmin(container) {
   }
 
   container.appendChild(cloudCard);
+
+  // ===== SPRINT 2: RGPD & DONNÉES =====
+  var rgpdCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  rgpdCard.appendChild(el('div', { class: 'card-title' }, '🔒 Vie privée & RGPD'));
+
+  // Mention légale / transparence
+  var rgpdInfo = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.6' } });
+  rgpdInfo.appendChild(el('p', { style: { margin: '0 0 8px 0' } }, '📋 Vos données sont stockées localement sur votre appareil (localStorage). Aucune donnée n\'est envoyée à un serveur sauf si vous activez la synchronisation Supabase.'));
+  if (SYNC_ENABLED) {
+    rgpdInfo.appendChild(el('p', { style: { margin: '0', color: 'var(--warning)' } }, '⚠️ Sync cloud activée : vos données sont envoyées vers votre instance Supabase. Consultez la politique de confidentialité de Supabase.'));
+  }
+  rgpdCard.appendChild(rgpdInfo);
+
+  // Export données personnelles (portabilité RGPD)
+  var rgpdBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' } });
+  rgpdBtns.appendChild(el('button', { class: 'btn', onclick: function() {
+    // Export RGPD complet de toutes les données personnelles
+    var allData = {
+      exportDate: new Date().toISOString(),
+      exportType: 'RGPD_PORTABILITE',
+      company: COMPANY,
+      missions: MISSIONS,
+      clients: CLIENTS,
+      treasury: TREASURY,
+      irConfig: IR_CONFIG,
+      congesDates: localStorage.getItem(STORAGE_PREFIX + 'conges') ? JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'conges')) : [],
+      goalCA: localStorage.getItem('freel_goal_ca') || null,
+      theme: localStorage.getItem('freel_theme') || null,
+      notificationsRead: localStorage.getItem('freel_notif_read') || null
+    };
+    var blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'freel-rgpd-export-' + localISO(TODAY) + '.json'; a.click();
+    URL.revokeObjectURL(a.href);
+    toast('Export RGPD complet téléchargé', 'success');
+  } }, '📦 Exporter mes données (RGPD)'));
+
+  // Droit à l'effacement
+  rgpdBtns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() {
+    // Double confirmation
+    if (!confirm('⚠️ SUPPRESSION DÉFINITIVE\n\nToutes vos données seront supprimées :\n- Entreprise, missions, clients\n- Trésorerie, factures\n- Configuration fiscale\n\nCette action est IRRÉVERSIBLE.\n\nContinuer ?')) return;
+    var confirmText = prompt('Pour confirmer, tapez SUPPRIMER :');
+    if (confirmText !== 'SUPPRIMER') {
+      toast('Suppression annulée', 'info');
+      return;
+    }
+    // Purger localStorage complet
+    Object.keys(localStorage).filter(function(k) { return k.indexOf('freel') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
+    // Purger Supabase si connecté
+    if (SYNC_ENABLED && CURRENT_USER && supabase) {
+      supabase.from('user_data').delete().eq('user_id', CURRENT_USER.id).then(function() {
+        console.log('Cloud data deleted');
+      }).catch(function(err) { console.error('Cloud delete error:', err); });
+      supabase.auth.signOut();
+    }
+    toast('Toutes vos données ont été supprimées', 'success');
+    setTimeout(function() { location.reload(); }, 1500);
+  } }, '🗑️ Supprimer toutes mes données'));
+  rgpdCard.appendChild(rgpdBtns);
+
+  // Politique de confidentialité
+  var policyDetails = el('details', { style: { fontSize: '10px', color: 'var(--text-muted)' } });
+  policyDetails.appendChild(el('summary', { style: { cursor: 'pointer', color: 'var(--accent)', fontWeight: '600' } }, '📜 Politique de confidentialité'));
+  var policyContent = el('div', { style: { marginTop: '8px', lineHeight: '1.6', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '6px' } });
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0', fontWeight: '600' } }, 'FREEL — Gestion Freelance Intelligente'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Données collectées : informations entreprise, missions, clients, factures, configuration fiscale. Toutes saisies manuellement par vous.'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Stockage : exclusivement dans le localStorage de votre navigateur. Aucun serveur tiers, aucun cookie de tracking, aucune analytique.'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Cloud (optionnel) : si activé, vos données sont synchronisées vers votre propre instance Supabase. Vous êtes responsable de la sécurité de votre instance.'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Vos droits : accès, rectification, portabilité (export JSON) et effacement (bouton ci-dessus). Conformément au RGPD (UE 2016/679).'));
+  policyContent.appendChild(el('p', { style: { margin: '0' } }, 'Contact : via le dépôt GitHub du projet.'));
+  policyDetails.appendChild(policyContent);
+  rgpdCard.appendChild(policyDetails);
+
+  container.appendChild(rgpdCard);
 
   container.appendChild(el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Freel V' + APP_VERSION + ' · Made with 💚'));
 }
@@ -16142,7 +16471,7 @@ function renderConfig(container) {
 function render() {
   var container = $('#app');
   if (!container) { console.error('Container #app not found'); return; }
-  container.innerHTML = '';
+  container.replaceChildren();
 
   try {
     // V75: Navigation 5 onglets (Cockpit · Activité · Trésorerie · Analyse · Config)
@@ -16163,7 +16492,8 @@ function render() {
     container.appendChild(errDiv);
   }
 
-  $$('.nav-tab, .bottom-nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === VIEW); });
+  // SPRINT 3: Accessibilité — mettre à jour aria-selected sur les onglets
+  $$('.nav-tab, .bottom-nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === VIEW); t.setAttribute('aria-selected', t.dataset.view === VIEW ? 'true' : 'false'); });
   var periodYear = $('#periodYear');
   if (periodYear) periodYear.textContent = PERIOD.type === 'year' ? PERIOD.year : 'Custom';
   // V72: Synchroniser le dropdown mois
@@ -16197,14 +16527,14 @@ function updateOnboarding() {
   $('#obText').textContent = step.text;
   
   var stepsDiv = $('#obSteps');
-  stepsDiv.innerHTML = '';
+  stepsDiv.replaceChildren();
   OB_STEPS.forEach(function(_, i) {
     var dot = el('div', { class: 'onboarding-step' + (i === OB_STEP ? ' active' : i < OB_STEP ? ' done' : '') });
     stepsDiv.appendChild(dot);
   });
   
   var form = $('#obForm');
-  form.innerHTML = '';
+  form.replaceChildren();
   
   if (step.fields.includes('nom')) {
     form.appendChild(createInput('Nom de ton entreprise', 'text', 'obNom', COMPANY.nom));
@@ -16537,7 +16867,7 @@ document.addEventListener('DOMContentLoaded', init);
  *    - calculerRendementMensuel(ym): calcule les intérêts d'un mois
  *    - updateRendementHistorique(): met à jour l'historique des intérêts
  *    - getTotalRendement(): total des intérêts perçus
- *    - showRendementDetail(): modale détail des intérêts
+ *    - showRendementConfig(): modale détail des intérêts
  *    - getNextMonth/getPreviousMonth: helpers navigation mois
  *
  * 🟠 CORRECTIONS UX/UI
