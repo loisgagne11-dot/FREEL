@@ -8968,6 +8968,7 @@ function downloadInvoiceAsHTML(data) {
 
 function showMonthDetail(monthKey) {
   var data = COMPUTED;
+  if (!data || !data.monthsData) data = compute();
   var md = data.monthsData[monthKey];
   if (!md) return;
 
@@ -8982,60 +8983,45 @@ function showMonthDetail(monthKey) {
   var body = $('#formModalBody');
   body.replaceChildren();
 
-  // Pour les mois futurs, calculer les projections à partir des missions planifiées
-  var projCA = 0, projCharges = [], projSalaire = 0;
-  var missionDetails = [];
-  if (isFuture) {
+  // === CALCUL IDENTIQUE AU GRAPHIQUE (lignes dataCapacite dans renderFinancesEvolution) ===
+  // revenu = md.encHT (+ factures à encaisser HT pour mois futurs)
+  var revenu = md.encHT || 0;
+  var revenuDetails = []; // pour afficher le détail
+
+  // Collecter les factures encaissées qui composent encHT
+  if (!isFuture) {
     MISSIONS.forEach(function(mis) {
-      if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
-      if (!mis.lignes) return;
-      mis.lignes.forEach(function(l) {
-        if (l.ym !== monthKey) return;
-        var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
-        if (jours <= 0) return;
-        var ca = jours * mis.tjm;
-        projCA += ca;
-        missionDetails.push({ client: mis.client || mis.titre, tjm: mis.tjm, jours: jours, ca: ca });
-      });
-    });
-    if (data.facturesAEncaisser) {
-      data.facturesAEncaisser.forEach(function(f) {
-        if (f.paymentMonth === monthKey) {
-          projCA += f.ht || 0;
-          missionDetails.push({ client: f.client + ' (facture)', tjm: 0, jours: 0, ca: f.ht || 0 });
+      if (!mis.factures) return;
+      mis.factures.forEach(function(f) {
+        if (f.status === 'payée' && f.paymentMonth === monthKey) {
+          revenuDetails.push({ client: mis.client || mis.titre, montant: f.ht || 0, type: 'encaissé' });
         }
       });
-    }
-    var rate = getUrssafRate(monthKey);
-    var urssafEst = Math.round(projCA * rate);
-    var cfpEst = Math.round(projCA * LEGAL.cfp);
-    if (urssafEst > 0) projCharges.push({ cat: 'URSSAF', desc: PCT(rate), montant: urssafEst });
-    if (cfpEst > 0) projCharges.push({ cat: 'CFP', desc: 'Formation', montant: cfpEst });
-    if (COMPANY.prelevementLiberatoire) {
-      var impEst = Math.round(projCA * LEGAL.impLib);
-      if (impEst > 0) projCharges.push({ cat: 'Impôt PL', desc: PCT(LEGAL.impLib), montant: impEst });
-    }
-    var months2 = []; for (var mm = 0; mm < 12; mm++) months2.push(ym(parseInt(monthKey.substring(0, 4)), mm));
-    var salProjs = computeSalaireProjections(months2, data);
-    salProjs.forEach(function(sp) { if (sp.ym === monthKey) projSalaire = sp.salaire; });
+    });
   }
 
-  // Variables unifiées pour passé et futur
-  var charges = isFuture ? projCharges : md.charges;
-  var tvaMonth = charges.filter(function(c) { return c.cat === 'TVA'; }).reduce(function(a, c) { return a + c.montant; }, 0);
-  var urssafMonth = charges.filter(function(c) { return c.cat === 'URSSAF' || c.cat === 'CFP'; }).reduce(function(a, c) { return a + c.montant; }, 0);
-  var irMonth = charges.filter(function(c) { return c.cat === 'IR Estimé' || c.cat === 'IR' || c.cat === 'Impôt PL'; }).reduce(function(a, c) { return a + c.montant; }, 0);
-  var autresCharges = charges.filter(function(c) { return c.cat !== 'TVA' && c.cat !== 'URSSAF' && c.cat !== 'CFP' && c.cat !== 'IR Estimé' && c.cat !== 'IR' && c.cat !== 'Impôt PL'; }).reduce(function(a, c) { return a + c.montant; }, 0);
-  var chargesTotal = charges.reduce(function(a, c) { return a + c.montant; }, 0);
+  // Pour les mois futurs, ajouter les factures à encaisser projetées
+  if (isFuture) {
+    (data.facturesAEncaisser || []).forEach(function(f) {
+      if (f.paymentMonth === monthKey) {
+        revenu += f.ht || 0;
+        revenuDetails.push({ client: f.client || 'Facture', montant: f.ht || 0, type: 'à encaisser' });
+      }
+    });
+  }
 
-  var caHT = isFuture ? projCA : (md.enc - tvaMonth);
-  var chargesHorsTVA = chargesTotal - tvaMonth;
-  var salaireMois = isFuture ? projSalaire : md.salaires;
-  var disponible = caHT - chargesHorsTVA;
+  // chargesHorsTVA = sum(md.charges where cat !== 'TVA') — identique au graphique
+  var charges = md.charges || [];
+  var chargesHorsTVA = 0;
+  charges.forEach(function(ch) {
+    if (ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
+  });
 
-  // Capacité de rémunération
-  var capaciteRemuneration = Math.max(0, caHT - chargesHorsTVA - salaireMois);
-  var salaireRecommande = Math.max(0, Math.floor((capaciteRemuneration - 150) / 100) * 100);
+  // Capacité = revenu - chargesHorsTVA — EXACTEMENT comme le graphique
+  var capacite = Math.max(0, revenu - chargesHorsTVA);
+
+  // Salaires déjà versés ce mois
+  var salaireMois = md.salaires || 0;
 
   // === BADGE STATUT ===
   body.appendChild(el('div', { style: { display: 'flex', justifyContent: 'center', marginBottom: '16px' } }, [
@@ -9045,36 +9031,34 @@ function showMonthDetail(monthKey) {
     } }, statusLabel)
   ]));
 
-  // === HERO : Montant versable ===
-  var heroColor = disponible >= 0 ? '#10b981' : '#ef4444';
-  var heroBg = disponible >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)';
-  var heroBorder = disponible >= 0 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)';
+  // === HERO : Capacité (même valeur que la ligne verte du graphique) ===
+  var heroColor = capacite > 0 ? '#10b981' : '#ef4444';
+  var heroBg = capacite > 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)';
+  var heroBorder = capacite > 0 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)';
   body.appendChild(el('div', { style: {
     textAlign: 'center', padding: '20px 16px', marginBottom: '16px',
     background: heroBg, borderRadius: '16px', border: '1px solid ' + heroBorder
   } }, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600' } }, isFuture ? 'Versable estimé' : 'Je peux me verser'),
-    el('div', { style: { fontSize: '32px', fontWeight: '900', color: heroColor, lineHeight: '1', marginBottom: '8px', fontFamily: 'var(--font-mono, monospace)' } }, EUR(disponible)),
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'CA HT ' + EUR(caHT) + ' \u2212 Charges ' + EUR(chargesHorsTVA))
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600' } }, isFuture ? 'Capacité projetée' : 'Capacité rémunération'),
+    el('div', { style: { fontSize: '32px', fontWeight: '900', color: heroColor, lineHeight: '1', marginBottom: '8px', fontFamily: 'var(--font-mono, monospace)' } }, EUR(capacite)),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'CA HT ' + EUR(revenu) + ' \u2212 Charges ' + EUR(chargesHorsTVA))
   ]));
 
   // === BARRE DE RÉPARTITION VISUELLE ===
-  var barTotal = caHT || 1;
+  var barTotal = revenu || 1;
   var segments = [];
   if (chargesHorsTVA > 0) segments.push({ label: 'Charges', value: chargesHorsTVA, color: '#ef4444' });
-  if (salaireMois > 0) segments.push({ label: 'Salaires versés', value: salaireMois, color: '#22d3ee' });
-  if (disponible > 0) segments.push({ label: 'Disponible', value: disponible, color: '#10b981' });
+  if (salaireMois > 0) segments.push({ label: 'Salaires versés', value: salaireMois, color: '#60a5fa' });
+  if (capacite > 0) segments.push({ label: 'Disponible', value: capacite, color: '#10b981' });
 
-  if (segments.length > 0 && caHT > 0) {
+  if (segments.length > 0 && revenu > 0) {
     var barContainer = el('div', { style: { marginBottom: '16px' } });
-    // Barre
     var barTrack = el('div', { style: { display: 'flex', height: '10px', borderRadius: '6px', overflow: 'hidden', background: 'var(--bg-tertiary)' } });
     segments.forEach(function(s) {
       var pct = Math.max(2, (s.value / barTotal) * 100);
       barTrack.appendChild(el('div', { style: { width: pct + '%', background: s.color, transition: 'width 0.4s ease' } }));
     });
     barContainer.appendChild(barTrack);
-    // Légende barre
     var barLegend = el('div', { style: { display: 'flex', justifyContent: 'center', gap: '14px', marginTop: '8px' } });
     segments.forEach(function(s) {
       barLegend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-muted)' } }, [
@@ -9086,7 +9070,7 @@ function showMonthDetail(monthKey) {
     body.appendChild(barContainer);
   }
 
-  // === CASCADE : du CA au montant disponible ===
+  // === CASCADE : du CA HT à la capacité ===
   var cascade = el('div', { style: { marginBottom: '16px', background: 'var(--bg-secondary)', overflow: 'hidden', borderRadius: '12px', border: '1px solid var(--glass-border)' } });
 
   // Helper pour une ligne de cascade
@@ -9108,60 +9092,48 @@ function showMonthDetail(monthKey) {
       transition: 'background 0.15s'
     }, onclick: clickFn, onmouseenter: clickFn ? function() { this.style.background = 'rgba(255,255,255,0.06)'; } : null, onmouseleave: clickFn ? function() { this.style.background = bg; } : null });
 
-    var labelEl = el('span', { style: {
+    row.appendChild(el('span', { style: {
       fontSize: isTotal ? '13px' : (isDetail ? '12px' : '12px'),
       fontWeight: isTotal ? '700' : (isDetail ? '400' : '500'),
       color: isDetail ? 'var(--text-muted)' : (isTotal ? color : 'var(--text-primary)')
-    } }, label);
+    } }, label));
 
-    var prefix = isSubtract ? '- ' : '';
-    var amountEl = el('span', { style: {
+    var prefix = isSubtract ? '- ' : (opts.add ? '+ ' : '');
+    row.appendChild(el('span', { style: {
       fontSize: isTotal ? '15px' : (isDetail ? '12px' : '13px'),
       fontWeight: isTotal ? '800' : '500',
       color: color,
       fontFamily: 'var(--font-mono, monospace)'
-    } }, prefix + EUR(Math.abs(amount)));
+    } }, prefix + EUR(Math.abs(amount))));
 
-    row.appendChild(labelEl);
-    row.appendChild(amountEl);
     return row;
   }
 
-  // Section header
-  var sectionTitle = isFuture ? 'Projection' : 'Détail';
-  cascade.appendChild(el('div', { style: { padding: '12px 16px 8px', fontSize: '11px', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' } }, sectionTitle));
+  // Section CA HT
+  cascade.appendChild(el('div', { style: { padding: '12px 16px 8px', fontSize: '11px', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' } }, isFuture ? 'CA HT projeté' : 'CA HT encaissé'));
 
-  if (isFuture) {
-    // --- FUTUR: Cascade projetée ---
-    if (missionDetails.length > 0) {
-      missionDetails.forEach(function(m) {
-        var desc = m.jours > 0 ? m.jours + 'j \u00d7 ' + EUR(m.tjm) : 'facture';
-        cascade.appendChild(cascadeRow(m.client, m.ca, { detail: true, color: 'var(--success)' }));
-        // Sous-label description
-        cascade.lastChild.querySelector('span').appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' } }, desc));
-      });
-    } else {
-      cascade.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '8px 16px', fontStyle: 'italic' } }, 'Aucune mission planifiée'));
-    }
-    cascade.appendChild(cascadeRow('CA HT Projeté', caHT, { total: true, color: 'var(--info)' }));
+  // Détail revenus
+  if (revenuDetails.length > 0) {
+    revenuDetails.forEach(function(r) {
+      cascade.appendChild(cascadeRow(r.client + (isFuture ? ' (' + r.type + ')' : ''), r.montant, { detail: true, color: 'var(--success)' }));
+    });
+  } else if (revenu > 0) {
+    cascade.appendChild(cascadeRow(isFuture ? 'CA projeté' : 'Encaissé HT', revenu, { color: 'var(--success)' }));
   } else {
-    // --- PASSÉ/COURANT: Cascade réelle ---
-    cascade.appendChild(cascadeRow('CA Encaissé TTC', md.enc, { color: 'var(--success)' }));
-    if (tvaMonth > 0) {
-      cascade.appendChild(cascadeRow('TVA collectée', tvaMonth, { detail: true, subtract: true, color: CHARGE_TYPES['TVA'].color }));
-    }
-    cascade.appendChild(cascadeRow('CA HT', caHT, { total: true, color: 'var(--info)' }));
+    cascade.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '8px 16px', fontStyle: 'italic' } }, isFuture ? 'Aucun encaissement prévu' : 'Aucun encaissement'));
   }
 
-  // --- Charges (commun futur/passé) ---
-  if (charges.length > 0) {
-    cascade.appendChild(el('div', { style: { padding: '10px 16px 6px', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', borderTop: '1px solid rgba(255,255,255,0.06)' } }, isFuture ? 'Charges estimées' : 'Charges'));
+  cascade.appendChild(cascadeRow('CA HT', revenu, { total: true, color: 'var(--info)' }));
 
-    var sortedCharges = charges.filter(function(c) { return c.cat !== 'TVA'; }).slice().sort(function(a, b) { return b.montant - a.montant; });
+  // Section Charges hors TVA
+  var sortedCharges = charges.filter(function(c) { return c.cat !== 'TVA'; }).slice().sort(function(a, b) { return b.montant - a.montant; });
+  if (sortedCharges.length > 0) {
+    cascade.appendChild(el('div', { style: { padding: '10px 16px 6px', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', borderTop: '1px solid rgba(255,255,255,0.06)' } }, 'Charges (hors TVA)'));
+
     sortedCharges.forEach(function(ch) {
       var paid = !isFuture && isPaid(ch.id);
       var color = getChargeColor(ch.cat);
-      var pct = caHT > 0 ? ' · ' + PCT(ch.montant / caHT) : '';
+      var pct = revenu > 0 ? ' \u00b7 ' + PCT(ch.montant / revenu) : '';
       var label = (paid ? '\u2713 ' : '') + ch.cat + (ch.desc ? ' \u00b7 ' + ch.desc : '') + pct;
       cascade.appendChild(cascadeRow(label, ch.montant, {
         subtract: true,
@@ -9171,19 +9143,44 @@ function showMonthDetail(monthKey) {
       }));
     });
 
-    cascade.appendChild(cascadeRow('Après charges', caHT - chargesHorsTVA, { total: true, color: (caHT - chargesHorsTVA) >= 0 ? 'var(--info)' : 'var(--danger)' }));
-
     if (!isFuture) {
-      var unpaidIds = charges.filter(function(c) { return !isPaid(c.id); }).map(function(c) { return c.id; });
+      var unpaidIds = charges.filter(function(c) { return c.cat !== 'TVA' && !isPaid(c.id); }).map(function(c) { return c.id; });
       if (unpaidIds.length > 0) {
         cascade.appendChild(el('div', { style: { padding: '8px 16px' } }, [
           el('button', { class: 'btn btn-success btn-sm btn-block', style: { borderRadius: '8px', fontSize: '12px' }, onclick: function() { markAllPaid(unpaidIds); closeModal('formModal'); } }, 'Tout marquer payé')
         ]));
       }
     }
-  } else {
-    cascade.appendChild(cascadeRow('Après charges', caHT, { total: true, color: 'var(--info)' }));
   }
+
+  // === RÉSULTAT : Capacité ===
+  cascade.appendChild(el('div', { style: {
+    padding: '14px 16px',
+    background: capacite > 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    borderTop: '1px solid rgba(255,255,255,0.06)'
+  } }, [
+    el('span', { style: { fontWeight: '700', fontSize: '13px' } }, 'Capacité rémunération'),
+    el('span', { style: { fontWeight: '900', fontSize: '20px', color: capacite > 0 ? '#10b981' : '#ef4444', fontFamily: 'var(--font-mono, monospace)' } }, EUR(capacite))
+  ]));
+
+  // Salaires déjà versés
+  if (salaireMois > 0) {
+    cascade.appendChild(el('div', { style: {
+      padding: '10px 16px',
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      background: 'rgba(96,165,250,0.06)',
+      borderTop: '1px solid rgba(255,255,255,0.04)'
+    } }, [
+      el('span', { style: { fontSize: '12px', color: '#60a5fa', fontWeight: '500' } }, 'Salaires déjà versés'),
+      el('span', { style: { fontSize: '14px', color: '#60a5fa', fontWeight: '700', fontFamily: 'var(--font-mono, monospace)' } }, EUR(salaireMois))
+    ]));
+  }
+
+  // Formule
+  cascade.appendChild(el('div', { style: { padding: '8px 16px 10px', fontSize: '9px', color: 'var(--text-muted)', textAlign: 'center' } },
+    'CA HT ' + EUR(revenu) + ' \u2212 Charges hors TVA ' + EUR(chargesHorsTVA) + ' = ' + EUR(capacite)
+  ));
 
   body.appendChild(cascade);
 
