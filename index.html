@@ -14513,28 +14513,32 @@ function drawMainChart() {
     var md = COMPUTED.monthsData[m] || {};
     var wd = COMPUTED.workedDays[m] || {};
     var isFuture = m > nowYm;
+    var isCurrent = m === nowYm;
     var encHT = md.encHT || 0;
 
     if (isFuture && futureStartIdx === -1) futureStartIdx = idx;
 
-    // Calculer le "à encaisser HT" pour les mois futurs
+    // Calculer le "à encaisser HT" pour les mois futurs ET le mois en cours
     var aEncHT = 0;
-    if (isFuture) {
+    if (isFuture || isCurrent) {
       COMPUTED.facturesAEncaisser.forEach(function(f) {
         if (f.paymentMonth === m) aEncHT += f.ht || 0;
       });
     }
 
+    // Pour le mois en cours : afficher la prévision si rien n'a été encaissé, sinon l'encaissé réel
+    var encValue = isFuture ? encHT + aEncHT : (isCurrent && encHT === 0 ? aEncHT : encHT);
+
     if (SHOW_CUMUL) {
       cumR += isFuture ? (md.prev || 0) : (md.real || 0);
-      cumE += isFuture ? encHT + aEncHT : encHT;
+      cumE += encValue;
       dataRealisation.push(cumR);
       dataEncaissement.push(cumE);
     } else {
       // Courbe unifiée : réalisé pour passé/présent, prévu pour futur
       dataRealisation.push(isFuture ? (md.prev || 0) : (md.real || 0));
-      // Courbe unifiée : encaissé pour passé/présent, encaissé + à encaisser pour futur
-      dataEncaissement.push(isFuture ? encHT + aEncHT : encHT);
+      // Courbe unifiée : encaissé pour passé/présent (avec fallback prévision), projection pour futur
+      dataEncaissement.push(encValue);
     }
     dataOff.push(wd.conges || 0);
   });
