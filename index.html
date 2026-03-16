@@ -3771,7 +3771,7 @@ function buildMission(mis) {
     l.joursReels = jours;
     var ht = jours * mis.tjm;
     var tva = isTVAApplicable(l.ym) ? Math.round(ht * LEGAL.tvaRate * 100) / 100 : 0;
-    if (existing) { existing.jours = jours; existing.ht = ht; existing.tva = tva; existing.ttc = ht + tva; newFactures.push(existing); }
+    if (existing) { existing.jours = jours; existing.ht = ht; existing.tva = tva; existing.ttc = ht + tva; existing.client = mis.client; newFactures.push(existing); }
     else { newFactures.push({ id: 'F-' + mis.id + '-' + l.ym, mois: l.ym, client: mis.client, jours: jours, ht: ht, tva: tva, ttc: ht + tva, status: 'brouillon' }); }
   });
   mis.factures = newFactures;
@@ -7375,7 +7375,7 @@ function showMissionModal(mission) {
   // SECTION 3: Client opérationnel
   // ═══════════════════════════════════════════════
   body.appendChild(el('div', { class: 'form-section form-section-border' }, '3️⃣ Client opérationnel'));
-  body.appendChild(createInput('Nom du client', 'text', 'mClientOpNom', mission.clientOp.nom, 'Ex: Airbus, ATR...'));
+  body.appendChild(createInput('Nom du client final', 'text', 'mClientOpNom', mission.clientOp.nom, 'Ex: Airbus, ATR (client où tu travailles)'));
   var rowCo1 = el('div', { class: 'form-row' });
   rowCo1.appendChild(createInput('Contact', 'text', 'mClientOpContact', mission.clientOp.contact, 'Nom du contact'));
   rowCo1.appendChild(createInput('Email', 'email', 'mClientOpEmail', mission.clientOp.email));
