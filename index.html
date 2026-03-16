@@ -7475,29 +7475,56 @@ function showMissionModal(mission) {
     while (cur <= d2) { var dow = cur.getDay(); if (dow !== 0 && dow !== 6) jours++; cur.setDate(cur.getDate() + 1); }
     var caEstime = jours * tjm;
 
-    // Calcul des provisions estimées (URSSAF, CFP, TVA, Impôt)
-    var yearEstimate = parseInt(debut.substring(0, 4)) || CURRENT_YEAR;
-    var ymEstimate = debut.substring(0, 7);
-    var urssafRate = getUrssafRate(ymEstimate);
+    // Calcul des provisions mois par mois (même logique que buildMission + compute)
     var cfpRate = LEGAL.cfp;
-    var provUrssaf = Math.round(caEstime * urssafRate);
-    var provCfp = Math.round(caEstime * cfpRate);
-    var provTva = 0;
-    if (COMPANY.tvaDepuis && debut >= COMPANY.tvaDepuis) {
-      provTva = Math.round(caEstime * LEGAL.tvaRate);
-    }
-    var provImpot = 0;
+    var provUrssaf = 0, provCfp = 0, provTva = 0, provImpot = 0;
     var impotLabel = '';
+    var acreInfo = getAcreInfo();
+    var hasAnyAcre = false, hasAnyNonAcre = false;
+    var mCur = new Date(d1.getFullYear(), d1.getMonth(), 1);
+    while (mCur <= d2) {
+      var mKey = ym(mCur.getFullYear(), mCur.getMonth());
+      // Jours ouvrés de ce mois (borné par début/fin de mission)
+      var startYmKey = ym(d1.getFullYear(), d1.getMonth());
+      var endYmKey = ym(d2.getFullYear(), d2.getMonth());
+      var mJours;
+      if (mKey === startYmKey && mKey === endYmKey) {
+        mJours = daysBizInRange(mCur.getFullYear(), mCur.getMonth(), d1.getDate(), d2.getDate());
+      } else if (mKey === startYmKey) {
+        mJours = daysBizInRange(mCur.getFullYear(), mCur.getMonth(), d1.getDate(), 31);
+      } else if (mKey === endYmKey) {
+        mJours = daysBizInRange(mCur.getFullYear(), mCur.getMonth(), 1, d2.getDate());
+      } else {
+        mJours = daysBiz(mCur.getFullYear(), mCur.getMonth());
+      }
+      var mHt = mJours * tjm;
+      // Taux URSSAF du mois (tient compte de l'ACRE mois par mois)
+      var mRate = getUrssafRate(mKey);
+      provUrssaf += Math.round(mHt * mRate);
+      provCfp += Math.round(mHt * cfpRate);
+      // TVA du mois
+      if (COMPANY.tvaDepuis && mKey >= COMPANY.tvaDepuis.substring(0, 7)) {
+        provTva += Math.round(mHt * LEGAL.tvaRate);
+      }
+      // Tracker si ACRE partiel
+      var mHasAcre = COMPANY.acre && acreInfo.expiryYm && mKey >= acreInfo.startYm && mKey <= acreInfo.expiryYm;
+      if (mHasAcre) hasAnyAcre = true; else hasAnyNonAcre = true;
+      mCur.setMonth(mCur.getMonth() + 1);
+    }
+    // Impôt sur le CA total
     if (COMPANY.prelevementLiberatoire) {
       provImpot = Math.round(caEstime * LEGAL.impLib);
       impotLabel = 'Impôt PL';
     } else {
+      var yearEstimate = parseInt(debut.substring(0, 4)) || CURRENT_YEAR;
       var irResult = calculateIR(caEstime, yearEstimate);
       provImpot = irResult.impot || 0;
       impotLabel = 'IR estimé';
     }
     var totalProvisions = provUrssaf + provCfp + provTva + provImpot;
     var netEstime = caEstime - totalProvisions;
+    // Taux URSSAF moyen pondéré pour l'affichage
+    var urssafPct = caEstime > 0 ? ((provUrssaf / caEstime) * 100).toFixed(1) : '0.0';
 
     estDiv.style.color = '';
     estDiv.innerHTML = '';
@@ -7506,8 +7533,10 @@ function showMissionModal(mission) {
       '📊 ' + jours + ' jours ouvrés · CA HT: ' + EUR(caEstime, true));
     estDiv.appendChild(mainLine);
     // Tableau des provisions
+    var urssafLabel = 'URSSAF (' + urssafPct + '%)';
+    if (hasAnyAcre && hasAnyNonAcre) urssafLabel = 'URSSAF (moy. ' + urssafPct + '%)';
     var provLines = [
-      { label: 'URSSAF (' + (urssafRate * 100).toFixed(1) + '%)', value: provUrssaf, color: '#ef4444' },
+      { label: urssafLabel, value: provUrssaf, color: '#ef4444' },
       { label: 'CFP (' + (cfpRate * 100).toFixed(1) + '%)', value: provCfp, color: '#8b5cf6' }
     ];
     if (provTva > 0) provLines.push({ label: 'TVA (20%)', value: provTva, color: '#ec4899' });
@@ -7522,10 +7551,11 @@ function showMissionModal(mission) {
     totalLine.appendChild(el('span', { style: { color: 'var(--danger)', fontWeight: '600' } }, 'Total charges: −' + EUR(totalProvisions, true)));
     totalLine.appendChild(el('span', { style: { color: 'var(--success)', fontWeight: '700' } }, 'Net estimé: ' + EUR(netEstime, true)));
     estDiv.appendChild(totalLine);
-    // Note ACRE si applicable
-    var acre = getAcreInfo();
-    if (COMPANY.acre && acre.expiryYm && ymEstimate >= acre.startYm && ymEstimate <= acre.expiryYm) {
-      estDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '✨ Taux ACRE appliqué (réduction cotisations)'));
+    // Note ACRE
+    if (hasAnyAcre && hasAnyNonAcre) {
+      estDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--warning)', marginTop: '4px' } }, '⚠️ ACRE partiel : taux réduit sur certains mois, taux plein sur les autres'));
+    } else if (hasAnyAcre) {
+      estDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '✨ Taux ACRE appliqué sur toute la mission'));
     }
   }
   // Mettre à jour l'estimation quand les champs changent
