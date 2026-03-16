@@ -7474,8 +7474,59 @@ function showMissionModal(mission) {
     var cur = new Date(d1);
     while (cur <= d2) { var dow = cur.getDay(); if (dow !== 0 && dow !== 6) jours++; cur.setDate(cur.getDate() + 1); }
     var caEstime = jours * tjm;
-    estDiv.style.color = 'var(--success)';
-    estDiv.textContent = '📊 Estimation: ' + jours + ' jours ouvrés · CA HT: ' + EUR(caEstime, true);
+
+    // Calcul des provisions estimées (URSSAF, CFP, TVA, Impôt)
+    var yearEstimate = parseInt(debut.substring(0, 4)) || CURRENT_YEAR;
+    var ymEstimate = debut.substring(0, 7);
+    var urssafRate = getUrssafRate(ymEstimate);
+    var cfpRate = LEGAL.cfp;
+    var provUrssaf = Math.round(caEstime * urssafRate);
+    var provCfp = Math.round(caEstime * cfpRate);
+    var provTva = 0;
+    if (COMPANY.tvaDepuis && debut >= COMPANY.tvaDepuis) {
+      provTva = Math.round(caEstime * LEGAL.tvaRate);
+    }
+    var provImpot = 0;
+    var impotLabel = '';
+    if (COMPANY.prelevementLiberatoire) {
+      provImpot = Math.round(caEstime * LEGAL.impLib);
+      impotLabel = 'Impôt PL';
+    } else {
+      var irResult = calculateIR(caEstime, yearEstimate);
+      provImpot = irResult.impot || 0;
+      impotLabel = 'IR estimé';
+    }
+    var totalProvisions = provUrssaf + provCfp + provTva + provImpot;
+    var netEstime = caEstime - totalProvisions;
+
+    estDiv.style.color = '';
+    estDiv.innerHTML = '';
+    // Ligne principale CA
+    var mainLine = el('div', { style: { fontWeight: '700', fontSize: '12px', color: 'var(--success)', marginBottom: '8px' } },
+      '📊 ' + jours + ' jours ouvrés · CA HT: ' + EUR(caEstime, true));
+    estDiv.appendChild(mainLine);
+    // Tableau des provisions
+    var provLines = [
+      { label: 'URSSAF (' + (urssafRate * 100).toFixed(1) + '%)', value: provUrssaf, color: '#ef4444' },
+      { label: 'CFP (' + (cfpRate * 100).toFixed(1) + '%)', value: provCfp, color: '#8b5cf6' }
+    ];
+    if (provTva > 0) provLines.push({ label: 'TVA (20%)', value: provTva, color: '#ec4899' });
+    provLines.push({ label: impotLabel, value: provImpot, color: '#f59e0b' });
+    var provDiv = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 12px', justifyContent: 'center', marginBottom: '8px' } });
+    provLines.forEach(function(p) {
+      provDiv.appendChild(el('span', { style: { fontSize: '10px', color: p.color, fontWeight: '600' } }, p.label + ': −' + EUR(p.value, true)));
+    });
+    estDiv.appendChild(provDiv);
+    // Total provisions et net
+    var totalLine = el('div', { style: { fontSize: '11px', borderTop: '1px solid var(--border)', paddingTop: '6px', display: 'flex', justifyContent: 'space-between' } });
+    totalLine.appendChild(el('span', { style: { color: 'var(--danger)', fontWeight: '600' } }, 'Total charges: −' + EUR(totalProvisions, true)));
+    totalLine.appendChild(el('span', { style: { color: 'var(--success)', fontWeight: '700' } }, 'Net estimé: ' + EUR(netEstime, true)));
+    estDiv.appendChild(totalLine);
+    // Note ACRE si applicable
+    var acre = getAcreInfo();
+    if (COMPANY.acre && acre.expiryYm && ymEstimate >= acre.startYm && ymEstimate <= acre.expiryYm) {
+      estDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '✨ Taux ACRE appliqué (réduction cotisations)'));
+    }
   }
   // Mettre à jour l'estimation quand les champs changent
   setTimeout(function() {
