@@ -9134,7 +9134,75 @@ function showMonthDetail(monthKey) {
   openModal('formModal');
 }
 
-// Détail des factures composant le CA HT d'un mois (affiché au clic sur le graphique CA HT)
+// Détail des missions composant le CA réalisé/prévu d'un mois (clic sur courbe Réalisé/Prévu)
+function showMonthCARealisations(monthKey) {
+  var data = COMPUTED;
+  var md = data.monthsData[monthKey];
+  if (!md) return;
+
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var isFuture = monthKey > nowYm;
+  var totalCA = isFuture ? (md.prev || 0) : (md.real || 0);
+  var typeLabel = isFuture ? 'Prévu' : 'Réalisé';
+  var typeColor = isFuture ? '#a78bfa' : '#22d3ee';
+
+  // Collecter les missions qui contribuent au CA de ce mois
+  var missionDetails = [];
+  MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+    if (!mis.lignes) return;
+    mis.lignes.forEach(function(l) {
+      if (l.ym !== monthKey) return;
+      var jours, ca;
+      if (isFuture) {
+        jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        ca = jours * mis.tjm;
+      } else {
+        jours = l.joursReels > 0 ? l.joursReels : 0;
+        ca = jours * mis.tjm;
+      }
+      if (jours <= 0) return;
+      missionDetails.push({ client: mis.client, tjm: mis.tjm, jours: jours, ca: ca, missionId: mis.id });
+    });
+  });
+
+  $('#formModalTitle').textContent = '📊 CA ' + typeLabel + ' HT — ' + fmtMonth(monthKey);
+  var body = $('#formModalBody');
+  body.replaceChildren();
+
+  // KPI résumé
+  var kpiBox = el('div', { style: { textAlign: 'center', padding: '16px', background: isFuture ? 'rgba(167, 139, 250, 0.1)' : 'rgba(34, 211, 238, 0.1)', borderRadius: '8px', marginBottom: '16px' } }, [
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' } }, 'CA ' + typeLabel + ' HT'),
+    el('div', { style: { fontSize: '24px', fontWeight: '800', color: typeColor } }, EUR(totalCA))
+  ]);
+  body.appendChild(kpiBox);
+
+  // Liste des missions
+  if (missionDetails.length > 0) {
+    body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase' } }, '🏢 Missions (' + missionDetails.length + ')'));
+    var list = el('div', { style: { maxHeight: '300px', overflowY: 'auto' } });
+    missionDetails.sort(function(a, b) { return b.ca - a.ca; });
+    missionDetails.forEach(function(m) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '4px', fontSize: '12px' } });
+      var info = el('div', { style: { flex: '1' } });
+      info.appendChild(el('div', { style: { fontWeight: '600' } }, m.client));
+      info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, m.jours + 'j × ' + EUR(m.tjm) + '/j'));
+      row.appendChild(info);
+      row.appendChild(el('span', { style: { fontWeight: '700', color: typeColor } }, EUR(m.ca) + ' HT'));
+      list.appendChild(row);
+    });
+    body.appendChild(list);
+  } else {
+    body.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '30px' } }, 'Aucune mission ce mois'));
+  }
+
+  // Bouton pour voir le détail complet du mois
+  body.appendChild(el('button', { class: 'btn btn-block', style: { marginTop: '16px', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }, onclick: function() { closeModal('formModal'); showMonthDetail(monthKey); } }, '📅 Voir détail complet du mois'));
+
+  openModal('formModal');
+}
+
+// Détail des factures composant le CA HT d'un mois (affiché au clic sur courbe Encaissé/Proj.)
 function showMonthCAInvoices(monthKey) {
   var data = COMPUTED;
   var md = data.monthsData[monthKey];
@@ -14388,75 +14456,84 @@ function drawMainChart() {
   var months = getPeriodMonths();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var labels = months.map(fmtMonthShort);
-  var dataPrev = [], dataReal = [], dataEnc = [], dataAEnc = [], dataOff = [];
-  var cumP = 0, cumR = 0, cumE = 0, cumA = 0;
-  
-  months.forEach(function(m) {
+  var dataRealisation = [], dataEncaissement = [], dataOff = [];
+  var cumR = 0, cumE = 0;
+
+  // Trouver l'index de transition passé → futur pour le segment styling
+  var futureStartIdx = -1;
+
+  months.forEach(function(m, idx) {
     var md = COMPUTED.monthsData[m] || {};
     var wd = COMPUTED.workedDays[m] || {};
     var isFuture = m > nowYm;
-    var hasReal = (md.real || 0) > 0;
-    // Utiliser les valeurs HT : real et prev sont déjà en HT, encHT pour l'encaissé
     var encHT = md.encHT || 0;
-    var hasEnc = encHT > 0;
-    
-    // Calculer le "à encaisser HT" pour ce mois à partir des factures
+
+    if (isFuture && futureStartIdx === -1) futureStartIdx = idx;
+
+    // Calculer le "à encaisser HT" pour les mois futurs
     var aEncHT = 0;
     if (isFuture) {
       COMPUTED.facturesAEncaisser.forEach(function(f) {
-        if (f.paymentMonth === m) {
-          aEncHT += f.ht || 0;
-        }
+        if (f.paymentMonth === m) aEncHT += f.ht || 0;
       });
     }
-    
-    if (SHOW_CUMUL) { 
-      cumP += md.prev || 0; 
-      cumR += md.real || 0; 
-      cumE += encHT; 
-      if (isFuture) cumA += aEncHT;
-      
-      // Prévu: masquer si on a des données réalisées cumulées
-      dataPrev.push(cumR > 0 ? null : cumP); 
-      dataReal.push(cumR); 
-      dataEnc.push(cumE); 
-      // Projection: seulement pour mois futurs sans encaissé
-      dataAEnc.push(isFuture && cumA > 0 ? cumE + cumA : null);
-    } else { 
-      // Prévu: masquer si on a du réalisé ce mois
-      dataPrev.push(hasReal ? null : (md.prev || 0)); 
-      dataReal.push(md.real || 0); 
-      dataEnc.push(encHT); 
-      // Projection: seulement pour mois futurs
-      dataAEnc.push(isFuture ? encHT + aEncHT : null);
+
+    if (SHOW_CUMUL) {
+      cumR += isFuture ? (md.prev || 0) : (md.real || 0);
+      cumE += isFuture ? encHT + aEncHT : encHT;
+      dataRealisation.push(cumR);
+      dataEncaissement.push(cumE);
+    } else {
+      // Courbe unifiée : réalisé pour passé/présent, prévu pour futur
+      dataRealisation.push(isFuture ? (md.prev || 0) : (md.real || 0));
+      // Courbe unifiée : encaissé pour passé/présent, encaissé + à encaisser pour futur
+      dataEncaissement.push(isFuture ? encHT + aEncHT : encHT);
     }
     dataOff.push(wd.conges || 0);
   });
 
-  // V72: Plugin pour afficher les montants sur les lignes du graphique CA
+  // Si pas de mois futur trouvé, mettre l'index à la fin
+  if (futureStartIdx === -1) futureStartIdx = months.length;
+
+  // Fonction segment pour changer couleur/style passé vs futur
+  function segmentStyle(pastColor, futureColor, futureDash) {
+    return {
+      borderColor: function(ctx) { return ctx.p0DataIndex >= futureStartIdx - 1 && ctx.p1DataIndex >= futureStartIdx ? futureColor : pastColor; },
+      borderDash: function(ctx) { return ctx.p0DataIndex >= futureStartIdx - 1 && ctx.p1DataIndex >= futureStartIdx ? futureDash : []; }
+    };
+  }
+
+  // Fonction point pour changer couleur des points passé vs futur
+  function pointColors(pastColor, futureColor) {
+    return months.map(function(m) { return m > nowYm ? futureColor : pastColor; });
+  }
+
+  // Plugin pour afficher les montants sur les lignes du graphique CA
   var caLabelsPlugin = {
     id: 'caLabelsPlugin',
     afterDatasetsDraw: function(chart) {
-      var ctx = chart.ctx;
-      // Afficher les valeurs sur Encaissé (index 3) et Réalisé (index 2)
-      [2, 3].forEach(function(datasetIdx) {
+      var ctx2 = chart.ctx;
+      // Afficher les valeurs sur Réalisation (index 1) et Encaissement (index 2)
+      [1, 2].forEach(function(datasetIdx) {
         var dataset = chart.data.datasets[datasetIdx];
         var meta = chart.getDatasetMeta(datasetIdx);
-        var color = datasetIdx === 2 ? '#22d3ee' : '#34d399';
+        var pastColor = datasetIdx === 1 ? '#22d3ee' : '#34d399';
+        var futColor = datasetIdx === 1 ? '#a78bfa' : '#71717a';
         meta.data.forEach(function(point, index) {
           var value = dataset.data[index];
           if (value === null || value === 0) return;
           // Afficher seulement le dernier point non-nul pour chaque série
           var hasNext = dataset.data.slice(index + 1).some(function(v) { return v !== null && v > 0; });
           if (hasNext) return;
+          var color = index >= futureStartIdx ? futColor : pastColor;
           var label = value >= 1000 ? Math.round(value/1000) + 'k€' : Math.round(value) + '€';
-          ctx.save();
-          ctx.fillStyle = color;
-          ctx.font = 'bold 10px system-ui';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(label, point.x + 6, point.y);
-          ctx.restore();
+          ctx2.save();
+          ctx2.fillStyle = color;
+          ctx2.font = 'bold 10px system-ui';
+          ctx2.textAlign = 'left';
+          ctx2.textBaseline = 'middle';
+          ctx2.fillText(label, point.x + 6, point.y);
+          ctx2.restore();
         });
       });
     }
@@ -14467,16 +14544,33 @@ function drawMainChart() {
       labels: labels,
       datasets: [
         { type: 'bar', label: 'Congés', data: dataOff, backgroundColor: 'rgba(251,191,36,0.4)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 2, yAxisID: 'y1', barPercentage: 0.25 },
-        { type: 'line', label: 'Prévu', data: dataPrev, borderColor: '#a78bfa', borderWidth: 1.5, borderDash: [6, 3], tension: 0.3, pointRadius: 2, pointBackgroundColor: '#a78bfa', spanGaps: false, yAxisID: 'y' },
-        { type: 'line', label: 'Réalisé', data: dataReal, borderColor: '#22d3ee', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 2, pointBackgroundColor: '#22d3ee', yAxisID: 'y' },
-        { type: 'line', label: 'Encaissé', data: dataEnc, borderColor: '#34d399', borderWidth: 2, tension: 0.3, pointRadius: 2, pointBackgroundColor: '#34d399', yAxisID: 'y' },
-        { type: 'line', label: 'Proj. Enc.', data: dataAEnc, borderColor: '#71717a', borderWidth: 1.5, borderDash: [3, 3], tension: 0.3, pointRadius: 2, pointBackgroundColor: '#71717a', spanGaps: true, yAxisID: 'y' }
+        { type: 'line', label: 'Réalisé / Prévu', data: dataRealisation, borderColor: '#22d3ee', borderWidth: 2, fill: false, tension: 0.3, pointRadius: 2, pointBackgroundColor: pointColors('#22d3ee', '#a78bfa'), segment: segmentStyle('#22d3ee', '#a78bfa', [6, 3]), spanGaps: true, yAxisID: 'y' },
+        { type: 'line', label: 'Encaissé / Proj.', data: dataEncaissement, borderColor: '#34d399', borderWidth: 2, tension: 0.3, pointRadius: 2, pointBackgroundColor: pointColors('#34d399', '#71717a'), segment: segmentStyle('#34d399', '#71717a', [3, 3]), spanGaps: true, yAxisID: 'y' }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      onClick: function(e, els) { if (els.length) showMonthCAInvoices(months[els[0].index]); },
-      plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 } } } },
+      onClick: function(e, els) {
+        if (!els.length) return;
+        var idx = els[0].index;
+        var dsIdx = els[0].datasetIndex;
+        // Dataset 1 = Réalisé/Prévu → détail missions
+        // Dataset 2 = Encaissé/Proj. → détail factures
+        if (dsIdx === 1) showMonthCARealisations(months[idx]);
+        else if (dsIdx === 2) showMonthCAInvoices(months[idx]);
+        else showMonthDetail(months[idx]);
+      },
+      plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 },
+        generateLabels: function(chart) {
+          return [
+            { text: 'Congés', fillStyle: 'rgba(251,191,36,0.4)', strokeStyle: '#f59e0b', lineWidth: 1, datasetIndex: 0 },
+            { text: 'Réalisé', fillStyle: '#22d3ee', strokeStyle: '#22d3ee', lineWidth: 2, datasetIndex: 1 },
+            { text: 'Prévu', fillStyle: '#a78bfa', strokeStyle: '#a78bfa', lineWidth: 1.5, lineDash: [6, 3], datasetIndex: 1 },
+            { text: 'Encaissé', fillStyle: '#34d399', strokeStyle: '#34d399', lineWidth: 2, datasetIndex: 2 },
+            { text: 'Proj. Enc.', fillStyle: '#71717a', strokeStyle: '#71717a', lineWidth: 1.5, lineDash: [3, 3], datasetIndex: 2 }
+          ];
+        }
+      } } },
       scales: {
         x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
         y: { position: 'right', ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } },
