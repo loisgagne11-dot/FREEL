@@ -9185,36 +9185,21 @@ function showMonthDetail(monthKey) {
     cascade.appendChild(cascadeRow('= Après charges', caHT, { total: true, color: 'var(--info)' }));
   }
 
-  // --- Salaires ---
-  cascade.appendChild(el('div', { style: { padding: '8px 14px 4px', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderTop: '2px solid var(--border)' } }, isFuture ? 'Salaire projeté' : 'Salaires versés'));
-
-  if (salaireMois > 0) {
-    cascade.appendChild(cascadeRow(isFuture ? '💸 Salaire projeté' : '💸 Salaires versés', salaireMois, { subtract: true, color: '#22d3ee' }));
-  } else {
-    cascade.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', padding: '4px 14px 4px 28px', fontStyle: 'italic' } }, 'Aucun salaire versé'));
-  }
-
-  if (!isFuture) {
-    cascade.appendChild(el('div', { style: { padding: '4px 14px 8px' } }, [
-      el('button', { class: 'btn btn-sm', style: { padding: '4px 10px', fontSize: '10px' }, onclick: function() { closeModal('formModal'); showSalaireModalForMonth(monthKey); } }, '+ Verser un salaire')
-    ]));
-  }
-
-  // --- RÉSULTAT FINAL: Montant disponible ---
-  var disponible = capaciteRemuneration;
+  // --- RÉSULTAT FINAL: Montant que je peux me verser (CA HT - charges) ---
+  var disponible = caHT - chargesHorsTVA;
   cascade.appendChild(el('div', { style: {
     padding: '14px',
     background: disponible >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)',
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     borderTop: '2px solid var(--border)'
   } }, [
-    el('span', { style: { fontWeight: '800', fontSize: '14px' } }, '= Disponible'),
+    el('span', { style: { fontWeight: '800', fontSize: '14px' } }, '= Je peux me verser'),
     el('span', { style: { fontWeight: '900', fontSize: '22px', color: disponible >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(disponible))
   ]));
 
   // Formule explicative
   cascade.appendChild(el('div', { style: { padding: '6px 14px 10px', fontSize: '9px', color: 'var(--text-muted)', textAlign: 'center' } },
-    'CA HT ' + EUR(caHT) + ' − Charges ' + EUR(chargesHorsTVA) + ' − Salaires ' + EUR(salaireMois) + ' = ' + EUR(disponible)
+    'CA HT ' + EUR(caHT) + ' − Charges ' + EUR(chargesHorsTVA) + ' = ' + EUR(disponible)
   ));
 
   body.appendChild(cascade);
