@@ -9082,177 +9082,142 @@ function showMonthDetail(monthKey) {
     });
   }, 100);
 
-  // === Résumé rapide ===
-  var calc = el('div', { class: 'card', style: { marginBottom: '16px', background: 'var(--bg-secondary)', padding: '14px' } });
+  // === CASCADE / WATERFALL : du CA au montant disponible ===
+  var cascade = el('div', { class: 'card', style: { marginBottom: '16px', background: 'var(--bg-secondary)', padding: '0', overflow: 'hidden', borderRadius: 'var(--radius-md)' } });
+
+  // Helper pour une ligne de cascade
+  function cascadeRow(label, amount, opts) {
+    opts = opts || {};
+    var isTotal = opts.total || false;
+    var isSubtract = opts.subtract || false;
+    var isDetail = opts.detail || false;
+    var color = opts.color || 'var(--text-primary)';
+    var bg = isTotal ? (opts.totalBg || 'var(--bg-tertiary)') : 'transparent';
+    var clickFn = opts.onclick || null;
+
+    var row = el('div', { style: {
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: isTotal ? '10px 14px' : (isDetail ? '4px 14px 4px 28px' : '6px 14px'),
+      background: bg,
+      borderBottom: isTotal ? 'none' : '1px solid var(--border)',
+      cursor: clickFn ? 'pointer' : 'default'
+    }, onclick: clickFn });
+
+    var labelEl = el('span', { style: {
+      fontSize: isTotal ? '13px' : (isDetail ? '11px' : '12px'),
+      fontWeight: isTotal ? '800' : (isDetail ? '400' : '600'),
+      color: isDetail ? 'var(--text-muted)' : (isTotal ? color : 'var(--text-primary)')
+    } }, label);
+
+    var prefix = isSubtract ? '- ' : (isTotal ? '' : '');
+    var amountEl = el('span', { style: {
+      fontSize: isTotal ? '16px' : (isDetail ? '11px' : '13px'),
+      fontWeight: isTotal ? '800' : '600',
+      color: color,
+      fontFamily: 'var(--font-mono, monospace)'
+    } }, prefix + EUR(Math.abs(amount)));
+
+    row.appendChild(labelEl);
+    row.appendChild(amountEl);
+    return row;
+  }
+
+  // Titre
+  cascade.appendChild(el('div', { style: { padding: '10px 14px 6px', fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' } }, isFuture ? '🔮 Cascade de projection' : '📊 Détail du montant disponible'));
 
   if (isFuture) {
-    // Titre projection
-    calc.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--accent)', fontWeight: '600', marginBottom: '10px', textTransform: 'uppercase' } }, '🔮 Projection basée sur les missions planifiées'));
-
-    // Détail des missions contribuant au CA
+    // --- FUTUR: Cascade projetée ---
+    // Détail missions
     if (missionDetails.length > 0) {
       missionDetails.forEach(function(m) {
         var desc = m.jours > 0 ? m.jours + 'j × ' + EUR(m.tjm) : 'facture';
-        calc.appendChild(el('div', { class: 'detail-row', style: { paddingLeft: '8px' } }, [
-          el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '↳ ' + m.client + ' (' + desc + ')'),
-          el('span', { style: { fontWeight: '500', fontSize: '11px', color: 'var(--success)' } }, '+ ' + EUR(m.ca))
-        ]));
+        cascade.appendChild(cascadeRow('↳ ' + m.client + ' (' + desc + ')', m.ca, { detail: true, color: 'var(--success)' }));
       });
     } else {
-      calc.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', fontStyle: 'italic' } }, 'Aucune mission planifiée ce mois'));
+      cascade.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', padding: '6px 14px', fontStyle: 'italic' } }, 'Aucune mission planifiée'));
     }
-
-    // CA HT projeté
-    calc.appendChild(el('div', { class: 'detail-row', style: { background: 'var(--bg-tertiary)', margin: '6px -14px', padding: '8px 14px' } }, [
-      el('span', { style: { fontWeight: '700', fontSize: '12px' } }, '= CA HT Projeté'),
-      el('span', { style: { fontWeight: '700', color: 'var(--info)', fontSize: '14px' } }, EUR(caHT))
-    ]));
+    // = CA HT
+    cascade.appendChild(cascadeRow('= CA HT Projeté', caHT, { total: true, color: 'var(--info)' }));
   } else {
-    // Mois passé/courant: CA encaissé
-    calc.appendChild(el('div', { class: 'detail-row' }, [
-      el('span', { style: { fontSize: '12px' } }, '💵 CA Encaissé TTC'),
-      el('span', { class: 'text-success', style: { fontWeight: '700' } }, EUR(md.enc))
-    ]));
+    // --- PASSÉ/COURANT: Cascade réelle ---
+    // CA Encaissé TTC
+    cascade.appendChild(cascadeRow('💵 CA Encaissé TTC', md.enc, { color: 'var(--success)' }));
+    // - TVA
     if (tvaMonth > 0) {
-      calc.appendChild(el('div', { class: 'detail-row', style: { paddingLeft: '12px' } }, [
-        el('span', { style: { color: CHARGE_TYPES['TVA'].color, fontSize: '11px' } }, '↳ TVA'),
-        el('span', { style: { fontWeight: '500', color: CHARGE_TYPES['TVA'].color, fontSize: '11px' } }, '- ' + EUR(tvaMonth))
-      ]));
+      cascade.appendChild(cascadeRow('↳ TVA collectée', tvaMonth, { detail: true, subtract: true, color: CHARGE_TYPES['TVA'].color }));
     }
-    calc.appendChild(el('div', { class: 'detail-row', style: { background: 'var(--bg-tertiary)', margin: '6px -14px', padding: '8px 14px' } }, [
-      el('span', { style: { fontWeight: '700', fontSize: '12px' } }, '= CA HT'),
-      el('span', { style: { fontWeight: '700', color: 'var(--info)', fontSize: '14px' } }, EUR(caHT))
-    ]));
+    // = CA HT
+    cascade.appendChild(cascadeRow('= CA HT', caHT, { total: true, color: 'var(--info)' }));
   }
 
-  body.appendChild(calc);
-
-  // === Charges ===
+  // --- Charges (commun futur/passé) ---
   if (charges.length > 0) {
-    body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, isFuture ? 'Charges estimées' : 'Charges du mois'));
+    // Sous-titre charges
+    cascade.appendChild(el('div', { style: { padding: '8px 14px 4px', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderTop: '2px solid var(--border)' } }, isFuture ? 'Charges estimées' : 'Charges & Provisions'));
 
-    var sortedCharges = charges.slice().sort(function(a, b) { return b.montant - a.montant; });
-
+    var sortedCharges = charges.filter(function(c) { return c.cat !== 'TVA'; }).slice().sort(function(a, b) { return b.montant - a.montant; });
     sortedCharges.forEach(function(ch) {
       var paid = !isFuture && isPaid(ch.id);
-      var pct = caHT > 0 ? ch.montant / caHT : 0;
       var color = getChargeColor(ch.cat);
-
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px', cursor: isFuture ? 'default' : 'pointer' }, onclick: isFuture ? null : function() { togglePaid(ch.id); closeModal('formModal'); showMonthDetail(monthKey); } });
-
-      if (!isFuture) {
-        row.appendChild(el('div', { class: 'toggle-check ' + (paid ? 'paid' : ''), style: { width: '20px', height: '20px', fontSize: '12px', flexShrink: '0' } }, paid ? '✓' : ''));
-      }
-
-      var info = el('div', { style: { flex: '1', minWidth: '0' } });
-      info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '500', color: paid ? 'var(--text-muted)' : color, textDecoration: paid ? 'line-through' : 'none' } }, ch.cat + (ch.desc ? ' · ' + ch.desc : '')));
-      info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, PCT(pct) + ' du CA HT'));
-      row.appendChild(info);
-
-      row.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', color: paid ? 'var(--success)' : color } }, EUR(ch.montant)));
-
-      body.appendChild(row);
+      var pct = caHT > 0 ? ' (' + PCT(ch.montant / caHT) + ')' : '';
+      var label = (paid ? '✓ ' : '') + ch.cat + (ch.desc ? ' · ' + ch.desc : '') + pct;
+      cascade.appendChild(cascadeRow(label, ch.montant, {
+        subtract: true,
+        detail: true,
+        color: paid ? 'var(--text-muted)' : color,
+        onclick: isFuture ? null : function() { togglePaid(ch.id); closeModal('formModal'); showMonthDetail(monthKey); }
+      }));
     });
+
+    // Total charges hors TVA
+    cascade.appendChild(cascadeRow('= Après charges', caHT - chargesHorsTVA, { total: true, color: (caHT - chargesHorsTVA) >= 0 ? 'var(--info)' : 'var(--danger)' }));
 
     if (!isFuture) {
       var unpaidIds = charges.filter(function(c) { return !isPaid(c.id); }).map(function(c) { return c.id; });
       if (unpaidIds.length > 0) {
-        body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '12px' }, onclick: function() { markAllPaid(unpaidIds); closeModal('formModal'); } }, '✅ Tout marquer payé'));
+        cascade.appendChild(el('div', { style: { padding: '6px 14px' } }, [
+          el('button', { class: 'btn btn-success btn-sm btn-block', onclick: function() { markAllPaid(unpaidIds); closeModal('formModal'); } }, '✅ Tout marquer payé')
+        ]));
       }
     }
-  } else if (isFuture && projCA === 0) {
-    body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', fontStyle: 'italic', textAlign: 'center', padding: '12px' } }, 'Pas de charges estimées (aucun CA projeté)'));
+  } else {
+    // Pas de charges
+    cascade.appendChild(cascadeRow('= Après charges', caHT, { total: true, color: 'var(--info)' }));
   }
 
-  // Salaires
-  body.appendChild(el('div', { style: { marginTop: '16px', padding: '14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
-    el('div', {}, [
-      el('div', { style: { fontSize: '12px', fontWeight: '600' } }, isFuture ? '💸 Salaire projeté' : '💸 Salaires versés'),
-      isFuture
-        ? el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'basé sur 70% du cash restant')
-        : el('button', { class: 'btn btn-sm', style: { marginTop: '6px', padding: '4px 10px', fontSize: '10px' }, onclick: function() { closeModal('formModal'); showSalaireModalForMonth(monthKey); } }, '+ Verser')
-    ]),
-    el('span', { style: { fontWeight: '800', color: 'var(--info)', fontSize: '18px' } }, EUR(salaireMois))
+  // --- Salaires ---
+  cascade.appendChild(el('div', { style: { padding: '8px 14px 4px', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderTop: '2px solid var(--border)' } }, isFuture ? 'Salaire projeté' : 'Salaires versés'));
+
+  if (salaireMois > 0) {
+    cascade.appendChild(cascadeRow(isFuture ? '💸 Salaire projeté' : '💸 Salaires versés', salaireMois, { subtract: true, color: '#22d3ee' }));
+  } else {
+    cascade.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', padding: '4px 14px 4px 28px', fontStyle: 'italic' } }, 'Aucun salaire versé'));
+  }
+
+  if (!isFuture) {
+    cascade.appendChild(el('div', { style: { padding: '4px 14px 8px' } }, [
+      el('button', { class: 'btn btn-sm', style: { padding: '4px 10px', fontSize: '10px' }, onclick: function() { closeModal('formModal'); showSalaireModalForMonth(monthKey); } }, '+ Verser un salaire')
+    ]));
+  }
+
+  // --- RÉSULTAT FINAL: Montant disponible ---
+  var disponible = capaciteRemuneration;
+  cascade.appendChild(el('div', { style: {
+    padding: '14px',
+    background: disponible >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    borderTop: '2px solid var(--border)'
+  } }, [
+    el('span', { style: { fontWeight: '800', fontSize: '14px' } }, '= Disponible'),
+    el('span', { style: { fontWeight: '900', fontSize: '22px', color: disponible >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(disponible))
   ]));
 
-  // Bloc récapitulatif Solde + Cash Dispo
-  var recapBloc = el('div', { style: { marginTop: '16px', borderRadius: 'var(--radius-md)', overflow: 'hidden' } });
+  // Formule explicative
+  cascade.appendChild(el('div', { style: { padding: '6px 14px 10px', fontSize: '9px', color: 'var(--text-muted)', textAlign: 'center' } },
+    'CA HT ' + EUR(caHT) + ' − Charges ' + EUR(chargesHorsTVA) + ' − Salaires ' + EUR(salaireMois) + ' = ' + EUR(disponible)
+  ));
 
-  if (isFuture) {
-    // Projection: expliquer le rationnel solde / cash
-    // Calculer le solde et cash projeté en simulant à partir des données absolues
-    var projSolde2 = data.soldeAbsolu || 0;
-    var projProv2 = data.provisionsAbsolues || 0;
-    var futureMonths = [];
-    for (var mi = 0; mi < 12; mi++) futureMonths.push(ym(parseInt(monthKey.substring(0, 4)), mi));
-    futureMonths.forEach(function(fm) {
-      if (fm <= nowYm2 || fm > monthKey) return;
-      // Simuler les CA et charges futures
-      var fmCA = 0;
-      MISSIONS.forEach(function(mis2) {
-        if (mis2.statut === 'prospect' || mis2.statut === 'perdue') return;
-        if (!mis2.lignes) return;
-        mis2.lignes.forEach(function(l2) {
-          if (l2.ym !== fm) return;
-          fmCA += Math.max(0, (l2.joursPrevus || 0) - (l2.conges || 0)) * mis2.tjm;
-        });
-      });
-      if (data.facturesAEncaisser) {
-        data.facturesAEncaisser.forEach(function(f2) {
-          if (f2.paymentMonth === fm) fmCA += f2.ht || 0;
-        });
-      }
-      var fmRate = getUrssafRate(fm);
-      var fmCharges = Math.round(fmCA * (fmRate + LEGAL.cfp));
-      if (COMPANY.prelevementLiberatoire) fmCharges += Math.round(fmCA * LEGAL.impLib);
-      projSolde2 += fmCA;
-      projProv2 += fmCharges;
-    });
-
-    var projCashDispo2 = projSolde2 - projProv2;
-
-    // Rationnel solde
-    recapBloc.appendChild(el('div', { style: { background: 'var(--bg-secondary)', padding: '12px 14px' } }, [
-      el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
-        el('span', { style: { fontWeight: '600', fontSize: '12px' } }, '📊 Solde projeté'),
-        el('span', { style: { fontWeight: '700', fontSize: '16px' } }, EUR(projSolde2))
-      ]),
-      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Solde actuel ' + EUR(data.soldeAbsolu) + ' + CA projeté cumulé')
-    ]));
-
-    recapBloc.appendChild(el('div', { style: { background: 'var(--bg-secondary)', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
-      el('span', { style: { fontSize: '11px', color: 'var(--provision)' } }, '📦 Provisions projetées'),
-      el('span', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--provision)' } }, '- ' + EUR(projProv2))
-    ]));
-
-    recapBloc.appendChild(el('div', { style: { background: projCashDispo2 >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)', padding: '14px' } }, [
-      el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
-        el('span', { style: { fontWeight: '700', fontSize: '13px' } }, '= Cash Disponible Projeté'),
-        el('span', { style: { fontWeight: '800', fontSize: '20px', color: projCashDispo2 >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(projCashDispo2))
-      ]),
-      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, 'Solde projeté - Provisions cumulées')
-    ]));
-  } else {
-    // Mois passé/courant: données réelles
-    recapBloc.appendChild(el('div', { style: { background: 'var(--bg-secondary)', padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
-      el('span', { style: { fontWeight: '600', fontSize: '12px' } }, '📊 Solde compte pro'),
-      el('span', { style: { fontWeight: '700', fontSize: '16px' } }, EUR(md.solde))
-    ]));
-
-    var provMois = chargesTotal - md.chargesPaid;
-    recapBloc.appendChild(el('div', { style: { background: 'var(--bg-secondary)', padding: '8px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)' } }, [
-      el('span', { style: { fontSize: '11px', color: 'var(--provision)' } }, '📦 Provisions (à payer)'),
-      el('span', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--provision)' } }, '- ' + EUR(provMois))
-    ]));
-
-    var cashDispoMois = md.cashDispo || (md.solde - provMois);
-    recapBloc.appendChild(el('div', { style: { background: cashDispoMois >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)', padding: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
-      el('span', { style: { fontWeight: '700', fontSize: '13px' } }, '= Cash Disponible'),
-      el('span', { style: { fontWeight: '800', fontSize: '20px', color: cashDispoMois >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(cashDispoMois))
-    ]));
-  }
-
-  body.appendChild(recapBloc);
+  body.appendChild(cascade);
 
   openModal('formModal');
 }
