@@ -12881,6 +12881,46 @@ function renderFinancesEvolution(container) {
   var salChartCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   salChartCard.appendChild(el('div', { class: 'card-title' }, [el('span', {}, '💸 Évolution Salaires'), el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, ' · Moy: ' + EUR(data.salaireMoyen))]));
   salChartCard.appendChild(el('div', { class: 'chart-container', style: { height: '160px' } }, [el('canvas', { id: 'tresoSalairesChart' })]));
+
+  // Visuel explicatif : comment la capacité est calculée à partir du CA
+  var nowYmExpl = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var mdExpl = data.monthsData[nowYmExpl];
+  var explCA = 0, explCharges = 0, explCapacite = 0;
+  if (mdExpl) {
+    var tvaExpl = 0;
+    (mdExpl.charges || []).forEach(function(ch) { if (ch.cat === 'TVA') tvaExpl += ch.montant; });
+    explCA = (mdExpl.enc || 0) - tvaExpl;
+    (mdExpl.charges || []).forEach(function(ch) { if (ch.cat !== 'TVA') explCharges += ch.montant; });
+    explCapacite = Math.max(0, explCA - explCharges);
+  }
+
+  var capaciteExplainer = el('div', { style: { marginTop: '10px', padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid #34d399' } });
+  capaciteExplainer.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: '#34d399', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, 'Comment est calculée la capacité ?'));
+
+  // Formule visuelle
+  var formulaRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' } });
+  formulaRow.appendChild(el('div', { style: { background: 'rgba(96,165,250,0.15)', color: '#60a5fa', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700' } }, 'CA HT'));
+  formulaRow.appendChild(el('span', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' } }, '−'));
+  formulaRow.appendChild(el('div', { style: { background: 'rgba(239,68,68,0.15)', color: '#f87171', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700' } }, 'Charges'));
+  formulaRow.appendChild(el('span', { style: { fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' } }, '='));
+  formulaRow.appendChild(el('div', { style: { background: 'rgba(52,211,153,0.15)', color: '#34d399', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700' } }, 'Capacité'));
+  capaciteExplainer.appendChild(formulaRow);
+
+  // Exemple chiffré du mois en cours
+  if (explCA > 0) {
+    var exRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', padding: '8px 0 0', borderTop: '1px solid var(--border)' } });
+    exRow.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic' } }, fmtMonth(nowYmExpl) + ' :'));
+    exRow.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '600', color: '#60a5fa' } }, EUR(explCA)));
+    exRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '−'));
+    exRow.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '600', color: '#f87171' } }, EUR(explCharges)));
+    exRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '='));
+    exRow.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '700', color: '#34d399' } }, EUR(explCapacite)));
+    capaciteExplainer.appendChild(exRow);
+  }
+
+  capaciteExplainer.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px' } }, 'La capacité représente le montant maximum que vous pouvez vous verser en salaire après déduction des charges (URSSAF, CFP, IR…) sur votre CA HT.'));
+
+  salChartCard.appendChild(capaciteExplainer);
   container.appendChild(salChartCard);
 
   // V81: Graphique Jours travaillés par mission (stacked bar)
@@ -12959,7 +12999,7 @@ function renderFinancesEvolution(container) {
         { type: 'line', label: 'Capacité', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, pointRadius: 3, pointBackgroundColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), pointBorderColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), backgroundColor: 'rgba(52,211,153,0.08)', fill: false, segment: { borderColor: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? '#a78bfa' : '#34d399'; }, borderDash: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? [4, 3] : []; } }, spanGaps: true },
         { type: 'line', label: 'Moy. capacité', data: months.map(function() { return Math.round(capMoyenne); }), borderColor: 'rgba(52,211,153,0.35)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false }
       ]},
-      options: { responsive: true, maintainAspectRatio: false, onClick: function(e, els) { if (els.length) showMonthDetail(months[els[0].index]); }, plugins: { legend: { display: true, labels: { color: '#a1a1aa', font: { size: 9 }, boxWidth: 12, padding: 8 } } }, scales: { x: { ticks: { color: '#71717a', font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a1a1aa', font: { size: 9 }, boxWidth: 12, padding: 8 } } }, scales: { x: { ticks: { color: '#71717a', font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
       plugins: [salLabelPlugin]
     });
     canvas._chartInstance = c;
