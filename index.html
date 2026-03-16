@@ -8975,7 +8975,10 @@ function showMonthDetail(monthKey) {
   var isFuture = monthKey > nowYm2;
   var isCurrent = monthKey === nowYm2;
 
-  $('#formModalTitle').textContent = '📅 ' + fmtMonth(monthKey) + (isFuture ? ' (Projection)' : isCurrent ? ' (En cours)' : '');
+  var statusLabel = isFuture ? 'Projection' : isCurrent ? 'En cours' : 'Clôturé';
+  var statusColor = isFuture ? '#a78bfa' : isCurrent ? '#f59e0b' : '#10b981';
+
+  $('#formModalTitle').textContent = fmtMonth(monthKey);
   var body = $('#formModalBody');
   body.replaceChildren();
 
@@ -8995,7 +8998,6 @@ function showMonthDetail(monthKey) {
         missionDetails.push({ client: mis.client || mis.titre, tjm: mis.tjm, jours: jours, ca: ca });
       });
     });
-    // Ajouter factures à encaisser
     if (data.facturesAEncaisser) {
       data.facturesAEncaisser.forEach(function(f) {
         if (f.paymentMonth === monthKey) {
@@ -9004,7 +9006,6 @@ function showMonthDetail(monthKey) {
         }
       });
     }
-    // Estimer les charges
     var rate = getUrssafRate(monthKey);
     var urssafEst = Math.round(projCA * rate);
     var cfpEst = Math.round(projCA * LEGAL.cfp);
@@ -9014,7 +9015,6 @@ function showMonthDetail(monthKey) {
       var impEst = Math.round(projCA * LEGAL.impLib);
       if (impEst > 0) projCharges.push({ cat: 'Impôt PL', desc: PCT(LEGAL.impLib), montant: impEst });
     }
-    // Salaire projeté via computeSalaireProjections
     var months2 = []; for (var mm = 0; mm < 12; mm++) months2.push(ym(parseInt(monthKey.substring(0, 4)), mm));
     var salProjs = computeSalaireProjections(months2, data);
     salProjs.forEach(function(sp) { if (sp.ym === monthKey) projSalaire = sp.salaire; });
@@ -9031,59 +9031,63 @@ function showMonthDetail(monthKey) {
   var caHT = isFuture ? projCA : (md.enc - tvaMonth);
   var chargesHorsTVA = chargesTotal - tvaMonth;
   var salaireMois = isFuture ? projSalaire : md.salaires;
+  var disponible = caHT - chargesHorsTVA;
 
   // Capacité de rémunération
   var capaciteRemuneration = Math.max(0, caHT - chargesHorsTVA - salaireMois);
   var salaireRecommande = Math.max(0, Math.floor((capaciteRemuneration - 150) / 100) * 100);
 
-  // === DONUT CHART - Composition du mois ===
-  var donutContainer = el('div', { style: { position: 'relative', marginBottom: '20px' } });
-  var canvasId = 'monthDetailDonut_' + monthKey.replace('-', '');
-  var canvas = el('canvas', { id: canvasId, style: { width: '100%', height: '180px' } });
-  donutContainer.appendChild(canvas);
+  // === BADGE STATUT ===
+  body.appendChild(el('div', { style: { display: 'flex', justifyContent: 'center', marginBottom: '16px' } }, [
+    el('span', { style: {
+      display: 'inline-block', padding: '3px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '600',
+      background: statusColor + '20', color: statusColor, border: '1px solid ' + statusColor + '40'
+    } }, statusLabel)
+  ]));
 
-  var centerLabel = el('div', { style: {
-    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-    textAlign: 'center', pointerEvents: 'none', width: '120px'
+  // === HERO : Montant versable ===
+  var heroColor = disponible >= 0 ? '#10b981' : '#ef4444';
+  var heroBg = disponible >= 0 ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)';
+  var heroBorder = disponible >= 0 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)';
+  body.appendChild(el('div', { style: {
+    textAlign: 'center', padding: '20px 16px', marginBottom: '16px',
+    background: heroBg, borderRadius: '16px', border: '1px solid ' + heroBorder
   } }, [
-    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '2px' } }, 'Capacité salaire'),
-    el('div', { style: { fontSize: '20px', fontWeight: '800', color: salaireRecommande > 0 ? 'var(--success)' : 'var(--text-muted)' } }, EUR(salaireRecommande)),
-    el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, isFuture ? 'projeté' : 'recommandé')
-  ]);
-  donutContainer.appendChild(centerLabel);
-  body.appendChild(donutContainer);
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600' } }, isFuture ? 'Versable estimé' : 'Je peux me verser'),
+    el('div', { style: { fontSize: '32px', fontWeight: '900', color: heroColor, lineHeight: '1', marginBottom: '8px', fontFamily: 'var(--font-mono, monospace)' } }, EUR(disponible)),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'CA HT ' + EUR(caHT) + ' \u2212 Charges ' + EUR(chargesHorsTVA))
+  ]));
 
-  var donutData = [];
-  var donutColors = [];
-  var donutLabels = [];
+  // === BARRE DE RÉPARTITION VISUELLE ===
+  var barTotal = caHT || 1;
+  var segments = [];
+  if (chargesHorsTVA > 0) segments.push({ label: 'Charges', value: chargesHorsTVA, color: '#ef4444' });
+  if (salaireMois > 0) segments.push({ label: 'Salaires versés', value: salaireMois, color: '#22d3ee' });
+  if (disponible > 0) segments.push({ label: 'Disponible', value: disponible, color: '#10b981' });
 
-  if (urssafMonth > 0) { donutData.push(urssafMonth); donutColors.push(CHARGE_TYPES['URSSAF'].color); donutLabels.push('URSSAF/CFP'); }
-  if (tvaMonth > 0) { donutData.push(tvaMonth); donutColors.push(CHARGE_TYPES['TVA'].color); donutLabels.push('TVA'); }
-  if (irMonth > 0) { donutData.push(irMonth); donutColors.push(CHARGE_TYPES['IR'].color); donutLabels.push('IR/Impôts'); }
-  if (autresCharges > 0) { donutData.push(autresCharges); donutColors.push(CHARGE_TYPES['Autres'].color); donutLabels.push('Autres'); }
-  if (salaireMois > 0) { donutData.push(salaireMois); donutColors.push('#22d3ee'); donutLabels.push('Salaires'); }
-  if (capaciteRemuneration > 0) { donutData.push(capaciteRemuneration); donutColors.push('#10b981'); donutLabels.push('Disponible'); }
-
-  setTimeout(function() {
-    var ctx = document.getElementById(canvasId);
-    if (!ctx) return;
-    if (ctx._chartInstance) ctx._chartInstance.destroy();
-    ctx._chartInstance = new Chart(ctx.getContext('2d'), {
-      type: 'doughnut',
-      data: { labels: donutLabels, datasets: [{ data: donutData, backgroundColor: donutColors, borderWidth: 0 }] },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-          legend: { display: true, position: 'bottom', labels: { color: '#a1a1aa', boxWidth: 10, padding: 8, font: { size: 10 } } },
-          tooltip: { callbacks: { label: function(ctx) { return ctx.label + ': ' + EUR(ctx.raw); } } }
-        }
-      }
+  if (segments.length > 0 && caHT > 0) {
+    var barContainer = el('div', { style: { marginBottom: '16px' } });
+    // Barre
+    var barTrack = el('div', { style: { display: 'flex', height: '10px', borderRadius: '6px', overflow: 'hidden', background: 'var(--bg-tertiary)' } });
+    segments.forEach(function(s) {
+      var pct = Math.max(2, (s.value / barTotal) * 100);
+      barTrack.appendChild(el('div', { style: { width: pct + '%', background: s.color, transition: 'width 0.4s ease' } }));
     });
-  }, 100);
+    barContainer.appendChild(barTrack);
+    // Légende barre
+    var barLegend = el('div', { style: { display: 'flex', justifyContent: 'center', gap: '14px', marginTop: '8px' } });
+    segments.forEach(function(s) {
+      barLegend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-muted)' } }, [
+        el('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: '0' } }),
+        el('span', {}, s.label + ' ' + EUR(s.value))
+      ]));
+    });
+    barContainer.appendChild(barLegend);
+    body.appendChild(barContainer);
+  }
 
-  // === CASCADE / WATERFALL : du CA au montant disponible ===
-  var cascade = el('div', { class: 'card', style: { marginBottom: '16px', background: 'var(--bg-secondary)', padding: '0', overflow: 'hidden', borderRadius: 'var(--radius-md)' } });
+  // === CASCADE : du CA au montant disponible ===
+  var cascade = el('div', { style: { marginBottom: '16px', background: 'var(--bg-secondary)', overflow: 'hidden', borderRadius: '12px', border: '1px solid var(--glass-border)' } });
 
   // Helper pour une ligne de cascade
   function cascadeRow(label, amount, opts) {
@@ -9092,27 +9096,28 @@ function showMonthDetail(monthKey) {
     var isSubtract = opts.subtract || false;
     var isDetail = opts.detail || false;
     var color = opts.color || 'var(--text-primary)';
-    var bg = isTotal ? (opts.totalBg || 'var(--bg-tertiary)') : 'transparent';
     var clickFn = opts.onclick || null;
 
+    var bg = isTotal ? 'rgba(255,255,255,0.03)' : 'transparent';
     var row = el('div', { style: {
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      padding: isTotal ? '10px 14px' : (isDetail ? '4px 14px 4px 28px' : '6px 14px'),
+      padding: isTotal ? '10px 16px' : (isDetail ? '6px 16px 6px 32px' : '8px 16px'),
       background: bg,
-      borderBottom: isTotal ? 'none' : '1px solid var(--border)',
-      cursor: clickFn ? 'pointer' : 'default'
-    }, onclick: clickFn });
+      borderBottom: '1px solid rgba(255,255,255,0.04)',
+      cursor: clickFn ? 'pointer' : 'default',
+      transition: 'background 0.15s'
+    }, onclick: clickFn, onmouseenter: clickFn ? function() { this.style.background = 'rgba(255,255,255,0.06)'; } : null, onmouseleave: clickFn ? function() { this.style.background = bg; } : null });
 
     var labelEl = el('span', { style: {
-      fontSize: isTotal ? '13px' : (isDetail ? '11px' : '12px'),
-      fontWeight: isTotal ? '800' : (isDetail ? '400' : '600'),
+      fontSize: isTotal ? '13px' : (isDetail ? '12px' : '12px'),
+      fontWeight: isTotal ? '700' : (isDetail ? '400' : '500'),
       color: isDetail ? 'var(--text-muted)' : (isTotal ? color : 'var(--text-primary)')
     } }, label);
 
-    var prefix = isSubtract ? '- ' : (isTotal ? '' : '');
+    var prefix = isSubtract ? '- ' : '';
     var amountEl = el('span', { style: {
-      fontSize: isTotal ? '16px' : (isDetail ? '11px' : '13px'),
-      fontWeight: isTotal ? '800' : '600',
+      fontSize: isTotal ? '15px' : (isDetail ? '12px' : '13px'),
+      fontWeight: isTotal ? '800' : '500',
       color: color,
       fontFamily: 'var(--font-mono, monospace)'
     } }, prefix + EUR(Math.abs(amount)));
@@ -9122,45 +9127,42 @@ function showMonthDetail(monthKey) {
     return row;
   }
 
-  // Titre
-  cascade.appendChild(el('div', { style: { padding: '10px 14px 6px', fontSize: '10px', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' } }, isFuture ? '🔮 Cascade de projection' : '📊 Détail du montant disponible'));
+  // Section header
+  var sectionTitle = isFuture ? 'Projection' : 'Détail';
+  cascade.appendChild(el('div', { style: { padding: '12px 16px 8px', fontSize: '11px', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.8px' } }, sectionTitle));
 
   if (isFuture) {
     // --- FUTUR: Cascade projetée ---
-    // Détail missions
     if (missionDetails.length > 0) {
       missionDetails.forEach(function(m) {
-        var desc = m.jours > 0 ? m.jours + 'j × ' + EUR(m.tjm) : 'facture';
-        cascade.appendChild(cascadeRow('↳ ' + m.client + ' (' + desc + ')', m.ca, { detail: true, color: 'var(--success)' }));
+        var desc = m.jours > 0 ? m.jours + 'j \u00d7 ' + EUR(m.tjm) : 'facture';
+        cascade.appendChild(cascadeRow(m.client, m.ca, { detail: true, color: 'var(--success)' }));
+        // Sous-label description
+        cascade.lastChild.querySelector('span').appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' } }, desc));
       });
     } else {
-      cascade.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', padding: '6px 14px', fontStyle: 'italic' } }, 'Aucune mission planifiée'));
+      cascade.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '8px 16px', fontStyle: 'italic' } }, 'Aucune mission planifiée'));
     }
-    // = CA HT
-    cascade.appendChild(cascadeRow('= CA HT Projeté', caHT, { total: true, color: 'var(--info)' }));
+    cascade.appendChild(cascadeRow('CA HT Projeté', caHT, { total: true, color: 'var(--info)' }));
   } else {
     // --- PASSÉ/COURANT: Cascade réelle ---
-    // CA Encaissé TTC
-    cascade.appendChild(cascadeRow('💵 CA Encaissé TTC', md.enc, { color: 'var(--success)' }));
-    // - TVA
+    cascade.appendChild(cascadeRow('CA Encaissé TTC', md.enc, { color: 'var(--success)' }));
     if (tvaMonth > 0) {
-      cascade.appendChild(cascadeRow('↳ TVA collectée', tvaMonth, { detail: true, subtract: true, color: CHARGE_TYPES['TVA'].color }));
+      cascade.appendChild(cascadeRow('TVA collectée', tvaMonth, { detail: true, subtract: true, color: CHARGE_TYPES['TVA'].color }));
     }
-    // = CA HT
-    cascade.appendChild(cascadeRow('= CA HT', caHT, { total: true, color: 'var(--info)' }));
+    cascade.appendChild(cascadeRow('CA HT', caHT, { total: true, color: 'var(--info)' }));
   }
 
   // --- Charges (commun futur/passé) ---
   if (charges.length > 0) {
-    // Sous-titre charges
-    cascade.appendChild(el('div', { style: { padding: '8px 14px 4px', fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderTop: '2px solid var(--border)' } }, isFuture ? 'Charges estimées' : 'Charges & Provisions'));
+    cascade.appendChild(el('div', { style: { padding: '10px 16px 6px', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', borderTop: '1px solid rgba(255,255,255,0.06)' } }, isFuture ? 'Charges estimées' : 'Charges'));
 
     var sortedCharges = charges.filter(function(c) { return c.cat !== 'TVA'; }).slice().sort(function(a, b) { return b.montant - a.montant; });
     sortedCharges.forEach(function(ch) {
       var paid = !isFuture && isPaid(ch.id);
       var color = getChargeColor(ch.cat);
-      var pct = caHT > 0 ? ' (' + PCT(ch.montant / caHT) + ')' : '';
-      var label = (paid ? '✓ ' : '') + ch.cat + (ch.desc ? ' · ' + ch.desc : '') + pct;
+      var pct = caHT > 0 ? ' · ' + PCT(ch.montant / caHT) : '';
+      var label = (paid ? '\u2713 ' : '') + ch.cat + (ch.desc ? ' \u00b7 ' + ch.desc : '') + pct;
       cascade.appendChild(cascadeRow(label, ch.montant, {
         subtract: true,
         detail: true,
@@ -9169,38 +9171,19 @@ function showMonthDetail(monthKey) {
       }));
     });
 
-    // Total charges hors TVA
-    cascade.appendChild(cascadeRow('= Après charges', caHT - chargesHorsTVA, { total: true, color: (caHT - chargesHorsTVA) >= 0 ? 'var(--info)' : 'var(--danger)' }));
+    cascade.appendChild(cascadeRow('Après charges', caHT - chargesHorsTVA, { total: true, color: (caHT - chargesHorsTVA) >= 0 ? 'var(--info)' : 'var(--danger)' }));
 
     if (!isFuture) {
       var unpaidIds = charges.filter(function(c) { return !isPaid(c.id); }).map(function(c) { return c.id; });
       if (unpaidIds.length > 0) {
-        cascade.appendChild(el('div', { style: { padding: '6px 14px' } }, [
-          el('button', { class: 'btn btn-success btn-sm btn-block', onclick: function() { markAllPaid(unpaidIds); closeModal('formModal'); } }, '✅ Tout marquer payé')
+        cascade.appendChild(el('div', { style: { padding: '8px 16px' } }, [
+          el('button', { class: 'btn btn-success btn-sm btn-block', style: { borderRadius: '8px', fontSize: '12px' }, onclick: function() { markAllPaid(unpaidIds); closeModal('formModal'); } }, 'Tout marquer payé')
         ]));
       }
     }
   } else {
-    // Pas de charges
-    cascade.appendChild(cascadeRow('= Après charges', caHT, { total: true, color: 'var(--info)' }));
+    cascade.appendChild(cascadeRow('Après charges', caHT, { total: true, color: 'var(--info)' }));
   }
-
-  // --- RÉSULTAT FINAL: Montant que je peux me verser (CA HT - charges) ---
-  var disponible = caHT - chargesHorsTVA;
-  cascade.appendChild(el('div', { style: {
-    padding: '14px',
-    background: disponible >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    borderTop: '2px solid var(--border)'
-  } }, [
-    el('span', { style: { fontWeight: '800', fontSize: '14px' } }, '= Je peux me verser'),
-    el('span', { style: { fontWeight: '900', fontSize: '22px', color: disponible >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(disponible))
-  ]));
-
-  // Formule explicative
-  cascade.appendChild(el('div', { style: { padding: '6px 14px 10px', fontSize: '9px', color: 'var(--text-muted)', textAlign: 'center' } },
-    'CA HT ' + EUR(caHT) + ' − Charges ' + EUR(chargesHorsTVA) + ' = ' + EUR(disponible)
-  ));
 
   body.appendChild(cascade);
 
@@ -12830,6 +12813,7 @@ function renderFinancesEvolution(container) {
   // V77: Graphique Évolution Salaires mensuel (déplacé depuis Trésorerie)
   var salChartCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   salChartCard.appendChild(el('div', { class: 'card-title' }, [el('span', {}, '💸 Évolution Salaires'), el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, ' · Moy: ' + EUR(data.salaireMoyen))]));
+  salChartCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Cliquez sur un mois pour voir le détail CA → Versable'));
   salChartCard.appendChild(el('div', { class: 'chart-container', style: { height: '160px' } }, [el('canvas', { id: 'tresoSalairesChart' })]));
 
   container.appendChild(salChartCard);
@@ -12910,7 +12894,7 @@ function renderFinancesEvolution(container) {
         { type: 'line', label: 'Capacité', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, pointRadius: 3, pointBackgroundColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), pointBorderColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), backgroundColor: 'rgba(52,211,153,0.08)', fill: false, segment: { borderColor: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? '#a78bfa' : '#34d399'; }, borderDash: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? [4, 3] : []; } }, spanGaps: true },
         { type: 'line', label: 'Moy. capacité', data: months.map(function() { return Math.round(capMoyenne); }), borderColor: 'rgba(52,211,153,0.35)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false }
       ]},
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, labels: { color: '#a1a1aa', font: { size: 9 }, boxWidth: 12, padding: 8 } } }, scales: { x: { ticks: { color: '#71717a', font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
+      options: { responsive: true, maintainAspectRatio: false, onClick: function(e, els) { if (els.length) showMonthDetail(months[els[0].index]); }, plugins: { legend: { display: true, labels: { color: '#a1a1aa', font: { size: 9 }, boxWidth: 12, padding: 8 } } }, scales: { x: { ticks: { color: '#71717a', font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
       plugins: [salLabelPlugin]
     });
     canvas._chartInstance = c;
@@ -14928,7 +14912,6 @@ function drawSoldeChart() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      onClick: function(e, els) { if (els.length && (els[0].datasetIndex === 0 || els[0].datasetIndex === 1)) showMonthDetail(months[els[0].index]); },
       plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 } } } },
       scales: {
         x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
