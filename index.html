@@ -3759,11 +3759,11 @@ function buildMission(mis) {
   var newFactures = [];
   mis.lignes.forEach(function(l) {
     var existing = facturesMap[l.ym];
-    // Jours réels = prévus - congés
-    // V81: Si des périodes sont définies, toujours recalculer depuis joursPrevus
-    // (ne pas garder l'ancien joursReels qui a pu être calculé avec un ancien algorithme)
+    // V78: joursReelsOverride prime sur le calcul théorique
     var jours;
-    if (mis.periodes && mis.periodes.length > 0) {
+    if (l.joursReelsOverride !== undefined && l.joursReelsOverride !== null) {
+      jours = l.joursReelsOverride; // Override manuel: rythme réel
+    } else if (mis.periodes && mis.periodes.length > 0) {
       jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
     } else {
       jours = l.joursReels > 0 ? l.joursReels : Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
@@ -3794,7 +3794,7 @@ function showFabMenu() {
   // Actions communes: Nouvelle Mission, Nouvelle Charge, Verser salaire, Poser congés, Télécharger facture
   grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
   grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showChargeModal(); } }, '📋 Nouvelle Charge'));
-  grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Salaire'));
+  grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Rémunération'));
   grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm); } }, '🏖️ Poser Congés'));
   if (MISSIONS.length > 0) {
     grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showDownloadInvoiceModal(); } }, '📄 Télécharger Facture'));
@@ -3980,6 +3980,14 @@ function saveAll() {
   }
   autoBackup();
   if (CURRENT_USER && SYNC_ENABLED) syncToCloud();
+}
+
+// V78: Auto-save on page unload and visibility change for safety
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', function() { saveAll(); });
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') saveAll();
+  });
 }
 
 function loadAll() {
@@ -4385,7 +4393,7 @@ function computeAlerts(data) {
   
   // Salaire recommandé
   if (data.salaireReco >= 500) {
-    data.alerts.push({ type: 'success', icon: '💡', title: 'Salaire possible: ' + EUR(data.salaireReco), text: 'Cash disponible suffisant', action: 'salaire' });
+    data.alerts.push({ type: 'success', icon: '💡', title: 'Rémunération possible: ' + EUR(data.salaireReco), text: 'Cash disponible suffisant', action: 'salaire' });
   }
   
   // Seuil micro-entreprise
@@ -4942,7 +4950,7 @@ function showCompteLineDetail(type) {
       }
     });
   } else if (type === 'salaires') {
-    title = '💸 Salaires Versés';
+    title = '💸 Rémunérations Versées';
     TREASURY.mouvements.forEach(function(mv) {
       if (mv.type === 'Salaire') {
         items.push({ mois: mv.mois, type: 'Salaire', montant: mv.montant, sub: '' });
@@ -5198,7 +5206,7 @@ function showCashDetail() {
   // Salaires
   if (data.salaires > 0) {
     var salPct = caHT > 0 ? data.salaires / caHT : 0;
-    calc.appendChild(row('💸 Salaires (' + PCT(salPct) + ')', '- ' + EUR(data.salaires), 'var(--info)', false, false, function() { closeModal('detailModal'); showDetailList('Salaires Versés', data.detailSalaires, 'info', function(i) { return fmtMonth(i.mois); }); }));
+    calc.appendChild(row('💸 Rémunérations (' + PCT(salPct) + ')', '- ' + EUR(data.salaires), 'var(--info)', false, false, function() { closeModal('detailModal'); showDetailList('Rémunérations Versées', data.detailSalaires, 'info', function(i) { return fmtMonth(i.mois); }); }));
   }
   
   // SOLDE COMPTE (ABSOLU) - BASE 100%
@@ -5286,7 +5294,7 @@ function showCashDetail() {
   var paramsDiv = el('div', { class: 'projection-params' });
   paramsDiv.appendChild(el('div', { class: 'projection-param' }, [el('label', {}, 'Année'), el('input', { type: 'number', id: 'projYear', value: projYear })]));
   paramsDiv.appendChild(el('div', { class: 'projection-param' }, [el('label', {}, 'TJM (€)'), el('input', { type: 'number', id: 'projTJM', value: defaultTJM })]));
-  paramsDiv.appendChild(el('div', { class: 'projection-param' }, [el('label', {}, 'Salaire/mois'), el('input', { type: 'number', id: 'projSalaire', value: defaultSalaire })]));
+  paramsDiv.appendChild(el('div', { class: 'projection-param' }, [el('label', {}, 'Rémunération/mois'), el('input', { type: 'number', id: 'projSalaire', value: defaultSalaire })]));
   paramsDiv.appendChild(el('div', { class: 'projection-param', style: { alignItems: 'flex-end' } }, [el('button', { class: 'btn btn-sm btn-success', onclick: updateProjections }, '🔄 Calculer')]));
   section2.appendChild(paramsDiv);
   
@@ -6749,7 +6757,7 @@ function showBeneficeDetail(data) {
   var calc = el('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '8px', padding: '12px' } });
   calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'CA Encaissé HT'), el('span', { style: { fontWeight: '600', color: 'var(--success)' } }, '+ ' + EUR(caHT))]));
   calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'Charges sociales & fiscales'), el('span', { style: { fontWeight: '600', color: 'var(--danger)' } }, '- ' + EUR(chargesHorsTVA))]));
-  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'Salaires versés'), el('span', { style: { fontWeight: '600', color: 'var(--info)' } }, '- ' + EUR(salaires))]));
+  calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: '12px' } }, [el('span', {}, 'Rémunérations versées'), el('span', { style: { fontWeight: '600', color: 'var(--info)' } }, '- ' + EUR(salaires))]));
   calc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: '13px', borderTop: '1px solid var(--border)', marginTop: '8px' } }, [el('span', { style: { fontWeight: '600' } }, 'Bénéfice Net'), el('span', { style: { fontWeight: '700', color: benColor } }, EUR(benefice))]));
   content.appendChild(calc);
 
@@ -7706,54 +7714,64 @@ function showDaysEditor(mission) {
   $('#formModalTitle').textContent = '📅 Jours - ' + mission.client;
   var body = $('#formModalBody');
   body.replaceChildren();
-  
+
   if (!mission.lignes || mission.lignes.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--text-muted)' } }, 'Configure d\'abord les dates'));
     openModal('formModal');
     return;
   }
-  
+
+  // V78: Explication du rythme théorique vs réel
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px' } },
+    '💡 Prévus = jours théoriques (rythme configuré). Réels = jours réellement travaillés. Modifiez les Réels si le mois réel diffère du prévu.'));
+
   var table = el('table', { class: 'days-table' });
   var thead = el('thead');
   var headerRow = el('tr');
   ['Mois', 'Ouvrés', 'Prévus', 'Congés', 'Réels', 'CA'].forEach(function(h) { headerRow.appendChild(el('th', {}, h)); });
   thead.appendChild(headerRow);
   table.appendChild(thead);
-  
+
   var tbody = el('tbody', { id: 'daysBody' });
   mission.lignes.forEach(function(l, idx) {
     var tr = el('tr');
     tr.appendChild(el('td', { class: 'month-cell' }, fmtMonthShort(l.ym)));
     tr.appendChild(el('td', {}, String(l.joursOuvrables)));
-    
+
     var prevInput = el('input', { type: 'number', value: l.joursPrevus || 0, min: 0, max: l.joursOuvrables, 'data-idx': idx, 'data-field': 'joursPrevus' });
     prevInput.oninput = function() { recalcDaysTable(mission); };
     tr.appendChild(el('td', {}, [prevInput]));
-    
+
     var congesInput = el('input', { type: 'number', value: l.conges || 0, min: 0, 'data-idx': idx, 'data-field': 'conges' });
     congesInput.oninput = function() { recalcDaysTable(mission); };
     tr.appendChild(el('td', {}, [congesInput]));
-    
-    var reels = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
-    tr.appendChild(el('td', { class: 'computed', 'data-idx': idx, 'data-type': 'reels' }, String(reels)));
-    tr.appendChild(el('td', { class: 'computed', 'data-idx': idx, 'data-type': 'ca' }, EUR(reels * mission.tjm)));
+
+    // V78: Réels = éditable (override du calcul théorique)
+    var computedReels = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+    var actualReels = l.joursReelsOverride !== undefined && l.joursReelsOverride !== null ? l.joursReelsOverride : computedReels;
+    var isOverridden = l.joursReelsOverride !== undefined && l.joursReelsOverride !== null;
+    var reelsInput = el('input', { type: 'number', value: actualReels, min: 0, step: 0.5, 'data-idx': idx, 'data-field': 'joursReels', style: isOverridden ? 'background: rgba(251,191,36,0.15); border-color: var(--warning);' : '' });
+    reelsInput.oninput = function() { recalcDaysTable(mission); };
+    tr.appendChild(el('td', {}, [reelsInput]));
+    tr.appendChild(el('td', { class: 'computed', 'data-idx': idx, 'data-type': 'ca' }, EUR(actualReels * mission.tjm)));
     tbody.appendChild(tr);
   });
-  
+
   var totalRow = el('tr', { class: 'total-row' });
   totalRow.appendChild(el('td', {}, 'TOTAL'));
   ['totalOuvres', 'totalPrevus', 'totalConges', 'totalReels', 'totalCA'].forEach(function(id) { totalRow.appendChild(el('td', { id: id }, '')); });
   tbody.appendChild(totalRow);
   table.appendChild(tbody);
   body.appendChild(table);
-  
-  var actions = el('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } });
+
+  var actions = el('div', { style: { display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' } });
   actions.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { fillAllDays(mission, 'all'); } }, 'Tous les jours'));
   actions.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { fillAllDays(mission, 'none'); } }, 'Reset'));
+  actions.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'rgba(251,191,36,0.15)', borderColor: 'var(--warning)' }, onclick: function() { resetReelsToTheorique(mission); } }, '↻ Réels = Prévus'));
   body.appendChild(actions);
-  
+
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '16px' }, onclick: function() { saveDaysFromEditor(mission); closeModal('formModal'); render(); toast('Jours enregistrés', 'success'); } }, '✅ Enregistrer'));
-  
+
   openModal('formModal');
   recalcDaysTable(mission);
 }
@@ -7763,13 +7781,19 @@ function recalcDaysTable(mission) {
   mission.lignes.forEach(function(l, idx) {
     var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
     var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
+    var reelsInput = $('input[data-idx="' + idx + '"][data-field="joursReels"]');
     if (!prevInput || !congesInput) return;
-    var prevus = parseInt(prevInput.value) || 0;
-    var conges = parseInt(congesInput.value) || 0;
-    var reels = Math.max(0, prevus - conges);
-    var reelsCell = $('td[data-idx="' + idx + '"][data-type="reels"]');
+    var prevus = parseFloat(prevInput.value) || 0;
+    var conges = parseFloat(congesInput.value) || 0;
+    var computedReels = Math.max(0, prevus - conges);
+    // V78: Si l'utilisateur a modifié les réels, utiliser sa valeur (override)
+    var reels = reelsInput ? (parseFloat(reelsInput.value) || 0) : computedReels;
+    var isOverridden = reelsInput && Math.abs(reels - computedReels) > 0.01;
+    if (reelsInput) {
+      reelsInput.style.background = isOverridden ? 'rgba(251,191,36,0.15)' : '';
+      reelsInput.style.borderColor = isOverridden ? 'var(--warning)' : '';
+    }
     var caCell = $('td[data-idx="' + idx + '"][data-type="ca"]');
-    if (reelsCell) reelsCell.textContent = reels;
     if (caCell) caCell.textContent = EUR(reels * mission.tjm);
     totals.ouvres += l.joursOuvrables;
     totals.prevus += prevus;
@@ -7788,20 +7812,54 @@ function saveDaysFromEditor(mission) {
   mission.lignes.forEach(function(l, idx) {
     var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
     var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
-    if (prevInput) l.joursPrevus = parseInt(prevInput.value) || 0;
-    if (congesInput) l.conges = parseInt(congesInput.value) || 0;
-    l.joursReels = Math.max(0, l.joursPrevus - l.conges);
+    var reelsInput = $('input[data-idx="' + idx + '"][data-field="joursReels"]');
+    if (prevInput) l.joursPrevus = parseFloat(prevInput.value) || 0;
+    if (congesInput) l.conges = parseFloat(congesInput.value) || 0;
+    var computedReels = Math.max(0, l.joursPrevus - l.conges);
+    // V78: Sauvegarder l'override si différent du calcul théorique
+    if (reelsInput) {
+      var reelsVal = parseFloat(reelsInput.value) || 0;
+      if (Math.abs(reelsVal - computedReels) > 0.01) {
+        l.joursReelsOverride = reelsVal;
+      } else {
+        delete l.joursReelsOverride; // Pas d'override si identique au théorique
+      }
+      l.joursReels = reelsVal;
+    } else {
+      l.joursReels = computedReels;
+    }
   });
   buildMission(mission);
   saveAll();
+}
+
+// V78: Reset tous les réels à la valeur théorique (prévus - congés)
+function resetReelsToTheorique(mission) {
+  mission.lignes.forEach(function(l, idx) {
+    var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
+    var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
+    var reelsInput = $('input[data-idx="' + idx + '"][data-field="joursReels"]');
+    var prevus = prevInput ? (parseFloat(prevInput.value) || 0) : (l.joursPrevus || 0);
+    var conges = congesInput ? (parseFloat(congesInput.value) || 0) : (l.conges || 0);
+    if (reelsInput) reelsInput.value = Math.max(0, prevus - conges);
+  });
+  recalcDaysTable(mission);
 }
 
 function fillAllDays(mission, mode) {
   mission.lignes.forEach(function(l, idx) {
     var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
     var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
-    if (mode === 'all') { if (prevInput) prevInput.value = l.joursOuvrables; if (congesInput) congesInput.value = 0; }
-    else { if (prevInput) prevInput.value = 0; if (congesInput) congesInput.value = 0; }
+    var reelsInput = $('input[data-idx="' + idx + '"][data-field="joursReels"]');
+    if (mode === 'all') {
+      if (prevInput) prevInput.value = l.joursOuvrables;
+      if (congesInput) congesInput.value = 0;
+      if (reelsInput) reelsInput.value = l.joursOuvrables;
+    } else {
+      if (prevInput) prevInput.value = 0;
+      if (congesInput) congesInput.value = 0;
+      if (reelsInput) reelsInput.value = 0;
+    }
   });
   recalcDaysTable(mission);
 }
@@ -8005,7 +8063,7 @@ function showChargeRecurrente() {
 
 function showSalaireModal(montant) {
   var data = compute();
-  $('#formModalTitle').textContent = '💸 Verser un Salaire';
+  $('#formModalTitle').textContent = '💸 Verser une Rémunération';
   var body = $('#formModalBody');
   body.replaceChildren();
   var info = el('div', { style: { background: 'var(--success-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
@@ -8017,7 +8075,7 @@ function showSalaireModal(montant) {
     var mv = { id: 'SAL' + Date.now(), type: 'Salaire', montant: parseFloat($('#salMontant').value) || 0, mois: $('#salMois').value, date: localISO(TODAY) };
     TREASURY.mouvements.push(mv);
     saveAll(); closeModal('formModal'); render();
-    toast('Salaire versé!', 'success');
+    toast('Rémunération versée!', 'success');
   } }, '💸 Verser'));
   openModal('formModal');
 }
@@ -8027,7 +8085,7 @@ function editMovement(mvId) {
   var mv = TREASURY.mouvements.find(function(m) { return m.id === mvId; });
   if (!mv) { toast('Mouvement non trouvé', 'error'); return; }
 
-  $('#formModalTitle').textContent = '✏️ Modifier ' + (mv.type === 'Salaire' ? 'Salaire' : 'Charge');
+  $('#formModalTitle').textContent = '✏️ Modifier ' + (mv.type === 'Salaire' ? 'Rémunération' : 'Charge');
   var body = $('#formModalBody');
   body.replaceChildren();
 
@@ -9236,7 +9294,7 @@ function showMonthDetail(monthKey) {
   var barTotal = revenu || 1;
   var segments = [];
   if (chargesHorsTVA > 0) segments.push({ label: 'Charges', value: chargesHorsTVA, color: '#ef4444' });
-  if (salaireMois > 0) segments.push({ label: 'Salaires versés', value: salaireMois, color: '#60a5fa' });
+  if (salaireMois > 0) segments.push({ label: 'Rémunérations versées', value: salaireMois, color: '#60a5fa' });
   if (capacite > 0) segments.push({ label: 'Disponible', value: capacite, color: '#10b981' });
 
   if (segments.length > 0 && revenu > 0) {
@@ -9377,7 +9435,7 @@ function showMonthDetail(monthKey) {
       background: 'rgba(96,165,250,0.06)',
       borderTop: '1px solid rgba(255,255,255,0.04)'
     } }, [
-      el('span', { style: { fontSize: '12px', color: '#60a5fa', fontWeight: '500' } }, 'Salaires déjà versés'),
+      el('span', { style: { fontSize: '12px', color: '#60a5fa', fontWeight: '500' } }, 'Rémunérations déjà versées'),
       el('span', { style: { fontSize: '14px', color: '#60a5fa', fontWeight: '700', fontFamily: 'var(--font-mono, monospace)' } }, EUR(salaireMois))
     ]));
   }
@@ -9499,7 +9557,7 @@ function showMonthDetail(monthKey) {
     ]));
     if (salaireMois > 0) {
       detailCalc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
-        el('span', {}, '− Salaires déjà versés'),
+        el('span', {}, '− Rémunérations déjà versées'),
         el('span', { style: { fontFamily: 'var(--font-mono, monospace)', fontWeight: '600', color: '#60a5fa' } }, '− ' + EUR(salaireMois))
       ]));
     }
@@ -9739,7 +9797,7 @@ function showTresoMonthDetail(monthKey) {
     }
     // - Salaires
     if (monthSalaires > 0) {
-      cascadeSolde.appendChild(cascadeRow('Salaires versés', monthSalaires, { subtract: true, color: '#22d3ee' }));
+      cascadeSolde.appendChild(cascadeRow('Rémunérations versées', monthSalaires, { subtract: true, color: '#22d3ee' }));
     }
     // = Solde
     cascadeSolde.appendChild(cascadeRow('Solde fin ' + fmtMonthShort(monthKey), monthSolde, { total: true, color: monthSolde >= 0 ? 'var(--success)' : 'var(--danger)' }));
@@ -9747,7 +9805,7 @@ function showTresoMonthDetail(monthKey) {
     // Projection
     cascadeSolde.appendChild(cascadeRow('Solde actuel', prevMonthSolde, { color: 'var(--text-primary)' }));
     if (monthEnc > 0) cascadeSolde.appendChild(cascadeRow('CA projeté TTC', monthEnc, { add: true, color: 'var(--success)' }));
-    if (monthSalaires > 0) cascadeSolde.appendChild(cascadeRow('Salaire estimé', monthSalaires, { subtract: true, color: '#22d3ee' }));
+    if (monthSalaires > 0) cascadeSolde.appendChild(cascadeRow('Rémunération estimée', monthSalaires, { subtract: true, color: '#22d3ee' }));
     cascadeSolde.appendChild(cascadeRow('Solde projeté', monthSolde, { total: true, color: monthSolde >= 0 ? 'var(--success)' : 'var(--danger)' }));
   }
 
@@ -10088,7 +10146,7 @@ function showSalaireModalForMonth(monthKey) {
     var mv = { id: 'SAL' + Date.now(), type: 'Salaire', montant: parseFloat($('#salMontant').value) || 0, mois: monthKey, date: localISO(TODAY) };
     TREASURY.mouvements.push(mv);
     saveAll(); closeModal('formModal'); render();
-    toast('Salaire versé!', 'success');
+    toast('Rémunération versée!', 'success');
   } }, '💸 Verser'));
   
   openModal('formModal');
@@ -10361,7 +10419,7 @@ function getActionsList() {
     actions.push({ priority: 2, type: 'warning', icon: '💳', label: 'Payer ' + c.cat, sub: EUR(c.montant) + ' · ' + fmtMonthShort(c.mois), action: function() { togglePaid(c.id); }, btnLabel: 'Payé', btnClass: 'success' });
   });
   if (data.salaireReco >= 500) {
-    actions.push({ priority: 3, type: 'success', icon: '💸', label: 'Verser un salaire', sub: EUR(data.salaireReco) + ' disponible', action: function() { showSalaireModal(data.salaireReco); }, btnLabel: 'Verser', btnClass: '' });
+    actions.push({ priority: 3, type: 'success', icon: '💸', label: 'Verser une rémunération', sub: EUR(data.salaireReco) + ' disponible', action: function() { showSalaireModal(data.salaireReco); }, btnLabel: 'Verser', btnClass: '' });
   }
   actions.sort(function(a, b) { return a.priority - b.priority; });
   return actions.slice(0, 4);
@@ -10454,7 +10512,7 @@ function renderTVAModule(container) {
 function renderQuickActions(container) {
   var quick = el('div', { class: 'quick-actions' });
   quick.appendChild(el('div', { class: 'quick-action-btn', onclick: function() { showMonthCongesModal(ym(TODAY.getFullYear(), TODAY.getMonth())); } }, [el('span', { class: 'icon' }, '🏖️'), el('span', {}, 'Congés')]));
-  quick.appendChild(el('div', { class: 'quick-action-btn', onclick: function() { showSalaireModal(); } }, [el('span', { class: 'icon' }, '💸'), el('span', {}, 'Salaire')]));
+  quick.appendChild(el('div', { class: 'quick-action-btn', onclick: function() { showSalaireModal(); } }, [el('span', { class: 'icon' }, '💸'), el('span', {}, 'Rémunération')]));
   quick.appendChild(el('div', { class: 'quick-action-btn', onclick: showChargeModal }, [el('span', { class: 'icon' }, '➕'), el('span', {}, 'Dépense')]));
   container.appendChild(quick);
 }
@@ -10635,7 +10693,7 @@ function generateSummaryText() {
   if (data.provisionsAbsolues > 0) lines.push('Charges à payer : <span class="warning">' + EUR(data.provisionsAbsolues) + '</span>');
   
   // Salaire
-  if (data.salaireReco >= 500) lines.push('💡 Tu peux te verser <span class="good">' + EUR(data.salaireReco) + '</span> de salaire.');
+  if (data.salaireReco >= 500) lines.push('💡 Tu peux te verser <span class="good">' + EUR(data.salaireReco) + '</span> de rémunération.');
   
   return lines.join('<br>');
 }
@@ -11273,7 +11331,7 @@ function performSearch(query) {
   });
   
   // Actions rapides
-  if ('salaire'.includes(query)) results.push({ type: 'action', icon: '💸', title: 'Verser un salaire', sub: 'Action rapide', action: function() { showSalaireModal(); } });
+  if ('salaire'.includes(query)) results.push({ type: 'action', icon: '💸', title: 'Verser une rémunération', sub: 'Action rapide', action: function() { showSalaireModal(); } });
   if ('congés'.includes(query) || 'conges'.includes(query)) results.push({ type: 'action', icon: '🏖️', title: 'Gérer les congés', sub: 'Action rapide', action: function() { showCongesOverview(); } });
   if ('export'.includes(query) || 'pdf'.includes(query)) results.push({ type: 'action', icon: '📄', title: 'Exporter PDF', sub: 'Action rapide', action: exportPDFReport });
   if ('objectif'.includes(query)) results.push({ type: 'action', icon: '🎯', title: 'Définir objectif', sub: 'Action rapide', action: showGoalModal });
@@ -11381,7 +11439,7 @@ function createKeyboardHelp() {
   var shortcuts = [
     ['/', 'Recherche'],
     ['N', 'Nouvelle mission'],
-    ['S', 'Verser salaire'],
+    ['S', 'Verser rémunération'],
     ['C', 'Ajouter charge'],
     ['E', 'Export PDF'],
     ['G', 'Objectif CA'],
@@ -11911,7 +11969,7 @@ function renderDashboardHero(container, data) {
   var salaireDiv = el('div', { style: {
     flex: '1', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px'
   }});
-  salaireDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '💸 Salaire versable'));
+  salaireDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '💸 Rémunération versable'));
   salaireDiv.appendChild(el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--success)' } }, EUR(data.salaireVersable)));
   salaireDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Cash - ' + EUR(data.reserveCompte) + ' réserve'));
   if (data.salaireVersable >= 500) {
@@ -11944,7 +12002,7 @@ function renderDashboardHero(container, data) {
 function showTresoSettings() {
   var content = el('div', { style: { padding: '10px' } });
   
-  content.appendChild(createInput('Salaire mensuel estimé (€)', 'number', 'tresoSalaireEstime', TREASURY.salaireEstime || 2200));
+  content.appendChild(createInput('Rémunération mensuelle estimée (€)', 'number', 'tresoSalaireEstime', TREASURY.salaireEstime || 2200));
   content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '-8px', marginBottom: '12px' } }, 'Utilisé pour calculer l\'autonomie'));
   
   content.appendChild(createInput('Réserve minimum compte (€)', 'number', 'tresoReserve', TREASURY.reserveCompte || 150));
@@ -12185,7 +12243,7 @@ function renderProjectionAutonomie(container) {
   // Dépenses mensuelles
   var depenses = el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } });
   depenses.innerHTML = 'Dépenses mensuelles: <strong>' + EUR(depensesMensuelles) + '</strong> (' +
-    EUR(data.salaireEstime || 2200) + ' salaire + ' + EUR(data.avgCharges || 500) + ' charges)';
+    EUR(data.salaireEstime || 2200) + ' rémunération + ' + EUR(data.avgCharges || 500) + ' charges)';
   widget.appendChild(depenses);
 
   // Barre horizontale avec zones
@@ -12277,11 +12335,11 @@ function showProjectionAutonomieModal() {
 
   // Explication simple
   content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', padding: '12px', background: 'rgba(96, 165, 250, 0.1)', borderRadius: '8px' } },
-    '💡 Si je n\'ai plus aucun revenu, combien de temps puis-je tenir en me versant un salaire mensuel ?'));
+    '💡 Si je n\'ai plus aucun revenu, combien de temps puis-je tenir en me versant une rémunération mensuelle ?'));
 
   // Input salaire mensuel
   var inputRow = el('div', { style: { marginBottom: '16px' } });
-  inputRow.appendChild(el('label', { style: { display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '600' } }, '💸 Salaire mensuel que je veux me verser'));
+  inputRow.appendChild(el('label', { style: { display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: '600' } }, '💸 Rémunération mensuelle que je veux me verser'));
   var salaireInput = el('input', {
     type: 'number',
     id: 'projSalaireMensuel',
@@ -12298,7 +12356,7 @@ function showProjectionAutonomieModal() {
 
   // Section explication
   var explainSection = el('div', { style: { padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)', marginTop: '16px' } });
-  explainSection.innerHTML = '<strong>📐 Calcul:</strong> Cash Disponible ÷ Salaire mensuel = Autonomie en mois<br><br>' +
+  explainSection.innerHTML = '<strong>📐 Calcul:</strong> Cash Disponible ÷ Rémunération mensuelle = Autonomie en mois<br><br>' +
     '<em>Note: Sans nouveau revenu, vous n\'aurez pas de nouvelles charges sociales à payer.</em>';
   content.appendChild(explainSection);
 
@@ -12356,16 +12414,16 @@ function updateProjectionCalcSimple(cashDispo) {
   } else if (autonomie > 3) {
     conseil.innerHTML = '⚠️ <strong>Attention</strong> - Pensez à sécuriser de nouveaux revenus.';
   } else if (autonomie > 0) {
-    conseil.innerHTML = '🔴 <strong>Urgent</strong> - Réduisez votre salaire ou trouvez des missions.';
+    conseil.innerHTML = '🔴 <strong>Urgent</strong> - Réduisez votre rémunération ou trouvez des missions.';
   } else {
-    conseil.innerHTML = '❌ <strong>Insuffisant</strong> - Pas de salaire possible sans nouveau revenu.';
+    conseil.innerHTML = '❌ <strong>Insuffisant</strong> - Pas de rémunération possible sans nouveau revenu.';
   }
   resultDiv.appendChild(conseil);
 
   // Section: Explication
   var explainSection = el('div', { style: { padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', fontSize: '11px', color: 'var(--text-muted)' } });
   explainSection.innerHTML = '<strong>💡 Comment c\'est calculé ?</strong><br>' +
-    'Autonomie = Cash Disponible ÷ (Salaire mensuel + Charges récurrentes)<br><br>' +
+    'Autonomie = Cash Disponible ÷ (Rémunération mensuelle + Charges récurrentes)<br><br>' +
     'Cette projection suppose que vous n\'avez aucun nouveau revenu pendant cette période.';
   content.appendChild(explainSection);
 
@@ -12412,7 +12470,7 @@ function updateProjectionCalc(cashDispo, chargesRecurrentes) {
     background: autonomie > 6 ? 'rgba(34, 197, 94, 0.1)' : autonomie > 3 ? 'rgba(251, 191, 36, 0.1)' : 'rgba(239, 68, 68, 0.1)'
   }});
   resultBox.appendChild(el('div', { style: { fontSize: '32px', fontWeight: '800', color: barColor } }, autonomie + ' mois'));
-  resultBox.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, 'd\'autonomie avec ' + EUR(salaire) + '/mois de salaire'));
+  resultBox.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' } }, 'd\'autonomie avec ' + EUR(salaire) + '/mois de rémunération'));
   resultDiv.appendChild(resultBox);
 
   // Détail calcul
@@ -12427,7 +12485,7 @@ function updateProjectionCalc(cashDispo, chargesRecurrentes) {
   } else if (autonomie > 3) {
     conseil.innerHTML = '⚠️ <strong>Attention</strong> - Pensez à sécuriser de nouveaux revenus prochainement.';
   } else {
-    conseil.innerHTML = '🔴 <strong>Urgent</strong> - Réduisez votre salaire ou trouvez rapidement des missions.';
+    conseil.innerHTML = '🔴 <strong>Urgent</strong> - Réduisez votre rémunération ou trouvez rapidement des missions.';
   }
   resultDiv.appendChild(conseil);
 }
@@ -12683,7 +12741,7 @@ function renderDashboardCharts(container, months) {
   // Graph Tréso
   var soldeCard = el('div', { class: 'card' });
   var soldeTitle = el('div', { class: 'card-title' });
-  soldeTitle.appendChild(el('span', {}, '📈 Trésorerie & Salaires'));
+  soldeTitle.appendChild(el('span', {}, '📈 Trésorerie & Rémunérations'));
   var soldeToggle = el('div', { class: 'card-actions chart-toggle' });
   soldeToggle.appendChild(el('button', { class: 'chart-toggle-btn' + (!SHOW_CASH_DISPO ? ' active' : ''), onclick: function() { SHOW_CASH_DISPO = false; render(); } }, 'Solde'));
   soldeToggle.appendChild(el('button', { class: 'chart-toggle-btn' + (SHOW_CASH_DISPO ? ' active' : ''), onclick: function() { SHOW_CASH_DISPO = true; render(); } }, 'Cash'));
@@ -13167,8 +13225,9 @@ function showChargeDetail(categoryId, data) {
   var urssafRateText = (function() {
     var acre = getAcreInfo();
     if (COMPANY.acre && acre.expiryYm) {
-      var stdRate = PCT(LEGAL.urssafStd2025);
-      var acreRate = PCT(LEGAL.urssafAcre2025);
+      var periodYear = PERIOD.year || TODAY.getFullYear();
+      var stdRate = periodYear >= 2026 ? PCT(LEGAL.urssafStd2026) : PCT(LEGAL.urssafStd2025);
+      var acreRate = periodYear >= 2026 ? PCT(LEGAL.urssafAcre2026) : PCT(LEGAL.urssafAcre2025);
       return acreRate + ' (ACRE) / ' + stdRate + ' (std) du CA HT';
     }
     return PCT(getUrssafRate()) + ' du CA HT';
@@ -13261,7 +13320,7 @@ function renderAnalyseSubTab(container, data, months) {
   ]));
   legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
     el('div', { style: { width: '12px', height: '12px', background: 'var(--info)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
-    el('span', {}, 'Salaires ' + EUR(salaires))
+    el('span', {}, 'Rémunérations ' + EUR(salaires))
   ]));
   legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
     el('div', { style: { width: '12px', height: '12px', background: 'var(--success)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
@@ -13363,7 +13422,7 @@ function renderPerformance(container) {
   ]));
   legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
     el('div', { style: { width: '12px', height: '12px', background: 'var(--info)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
-    el('span', {}, 'Salaires ' + EUR(salaires))
+    el('span', {}, 'Rémunérations ' + EUR(salaires))
   ]));
   legend.appendChild(el('div', { style: { textAlign: 'center' } }, [
     el('div', { style: { width: '12px', height: '12px', background: 'var(--success)', borderRadius: '3px', display: 'inline-block', marginRight: '4px' } }),
@@ -13465,7 +13524,7 @@ function renderFinancesEvolution(container) {
 
   // V77: Graphique Évolution Salaires mensuel (déplacé depuis Trésorerie)
   var salChartCard = el('div', { class: 'card', style: { marginTop: '12px' } });
-  salChartCard.appendChild(el('div', { class: 'card-title' }, [el('span', {}, '💸 Évolution Salaires'), el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, ' · Moy: ' + EUR(data.salaireMoyen))]));
+  salChartCard.appendChild(el('div', { class: 'card-title' }, [el('span', {}, '💸 Évolution Rémunérations'), el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, ' · Moy: ' + EUR(data.salaireMoyen))]));
   salChartCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Cliquez sur un mois pour voir le détail CA → Versable'));
   salChartCard.appendChild(el('div', { class: 'chart-container', style: { height: '160px' } }, [el('canvas', { id: 'tresoSalairesChart' })]));
 
@@ -13574,8 +13633,8 @@ function renderFinancesEvolution(container) {
     var c = new Chart(canvas.getContext('2d'), {
       type: 'bar',
       data: { labels: months.map(fmtMonthShort), datasets: [
-        { label: 'Salaires', data: dataSal, backgroundColor: 'rgba(96,165,250,0.7)', borderRadius: 4 },
-        { type: 'line', label: 'Moy. salaire', data: months.map(function() { return data.salaireMoyen; }), borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, pointRadius: 0 },
+        { label: 'Rémunérations', data: dataSal, backgroundColor: 'rgba(96,165,250,0.7)', borderRadius: 4 },
+        { type: 'line', label: 'Moy. rémunération', data: months.map(function() { return data.salaireMoyen; }), borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, pointRadius: 0 },
         { type: 'line', label: 'Capacité', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, pointRadius: 3, pointBackgroundColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), pointBorderColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), backgroundColor: 'rgba(52,211,153,0.08)', fill: false, segment: { borderColor: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? '#a78bfa' : '#34d399'; }, borderDash: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? [4, 3] : []; } }, spanGaps: true },
         { type: 'line', label: 'Moy. capacité', data: months.map(function() { return Math.round(capMoyenne); }), borderColor: 'rgba(52,211,153,0.35)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false }
       ]},
@@ -13634,7 +13693,7 @@ function renderFinancesPerformance(container) {
     var reductions = [
       { label: 'URSSAF/CFP', value: segURSSAF, color: CHARGE_TYPES['URSSAF'].color },
       { label: 'IR/Impôt', value: segIR, color: CHARGE_TYPES['IR'].color },
-      { label: 'Salaires', value: segSalaires, color: '#22d3ee' },
+      { label: 'Rémunérations', value: segSalaires, color: '#22d3ee' },
       { label: 'Autres charges', value: segAutres, color: '#a855f7' }
     ].filter(function(r) { return r.value > 0; }).sort(function(a, b) { return b.value - a.value; });
 
@@ -13749,7 +13808,7 @@ function renderFinancesPerformance(container) {
           if (paid > 0) entries.push({ label: cat + ' payé', value: paid });
           if (prov > 0) entries.push({ label: cat + ' provision', value: prov });
         });
-      } else if (seg.label === 'Salaires') {
+      } else if (seg.label === 'Rémunérations') {
         (data.detailSalaires || []).forEach(function(s) {
           entries.push({ label: fmtMonthShort(s.mois), value: s.montant });
         });
@@ -14063,7 +14122,7 @@ function renderFinancesConformite(container) {
 
     var lastSalaire = data.detailSalaires && data.detailSalaires.length > 0 ? data.detailSalaires[data.detailSalaires.length - 1] : null;
     if (lastSalaire && data.salaireVersable < lastSalaire.montant) {
-      diagDiv.appendChild(el('div', {}, '• Dernier salaire (' + EUR(lastSalaire.montant) + ') > capacité réelle (' + EUR(data.salaireVersable) + ')'));
+      diagDiv.appendChild(el('div', {}, '• Dernière rémunération (' + EUR(lastSalaire.montant) + ') > capacité réelle (' + EUR(data.salaireVersable) + ')'));
     }
 
     // Provisions non payées
@@ -14080,7 +14139,7 @@ function renderFinancesConformite(container) {
     var actionsDiv = el('div', { style: { marginTop: '10px', padding: '10px', background: 'rgba(34,197,94,0.1)', borderRadius: '8px', fontSize: '11px', lineHeight: '1.8' } });
     actionsDiv.appendChild(el('div', { style: { fontWeight: '700', marginBottom: '6px', color: 'var(--success)' } }, 'Actions recommandées:'));
     if (lastSalaire && data.salaireVersable < lastSalaire.montant) {
-      actionsDiv.appendChild(el('div', {}, '• Réduire le prochain salaire de ' + EUR(lastSalaire.montant - data.salaireVersable)));
+      actionsDiv.appendChild(el('div', {}, '• Réduire la prochaine rémunération de ' + EUR(lastSalaire.montant - data.salaireVersable)));
     }
     actionsDiv.appendChild(el('div', {}, '• Provisionner les échéances avant la date limite'));
     ecartCard.appendChild(actionsDiv);
@@ -14477,11 +14536,11 @@ function showAbsoluteWaterfallDetail(bar, data) {
     // Solde = détail des mouvements récents
     body.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '20px' } }, 'Solde bancaire renseigné dans Trésorerie'));
   } else if (bar.id === 'cash') {
-    // Cash dispo = salaire versable
+    // Cash dispo = rémunération versable
     var reserve = TREASURY.reserveCompte || 150;
     var salaireVersable = Math.max(0, Math.floor((bar.value - reserve) / 100) * 100);
     body.appendChild(el('div', { style: { padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', textAlign: 'center' } }, [
-      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, 'Salaire versable recommandé'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, 'Rémunération versable recommandée'),
       el('div', { style: { fontSize: '24px', fontWeight: '800', color: 'var(--success)' } }, EUR(salaireVersable)),
       el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, '(après réserve de ' + EUR(reserve) + ')')
     ]));
@@ -14882,8 +14941,8 @@ function renderTresorerieContent(container) {
 
   // === SECTION 2: GRAPHIQUE PROJECTION SALAIRE ===
   var chartCard = el('div', { class: 'card', style: { marginBottom: '16px' } });
-  chartCard.appendChild(el('div', { class: 'card-title' }, '📈 Projection Salaire ' + PERIOD.year));
-  chartCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Salaire versable par mois (réalisé + projection)'));
+  chartCard.appendChild(el('div', { class: 'card-title' }, '📈 Projection Rémunération ' + PERIOD.year));
+  chartCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Rémunération versable par mois (réalisé + projection)'));
 
   // Graphique barre simplifiée (sans Chart.js pour éviter dépendance)
   var chartContainer = el('div', { style: { display: 'flex', alignItems: 'flex-end', gap: '4px', height: '140px', padding: '8px 0' } });
@@ -14956,7 +15015,7 @@ function renderTresorerieContent(container) {
     { label: 'CA HT', value: monthData.caHT, color: 'var(--success)' },
     { label: 'Charges', value: monthData.charges, color: 'var(--danger)' },
     { label: 'Provisions', value: monthData.provisions, color: 'var(--warning)' },
-    { label: 'Salaires', value: monthData.salaires, color: 'var(--info)' }
+    { label: 'Rémunérations', value: monthData.salaires, color: 'var(--info)' }
   ];
   var total = segments.reduce(function(sum, s) { return sum + s.value; }, 0) || 1;
 
@@ -15019,7 +15078,7 @@ function renderTresorerieContent(container) {
   // Bouton verser salaire
   var salaireRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
   salaireRow.appendChild(el('div', { style: { flex: 1 } }, [
-    el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '💸 Verser un salaire'),
+    el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '💸 Verser une rémunération'),
     el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Recommandé: ' + EUR(recoSalaire))
   ]));
   var salaireInput = el('input', { type: 'number', class: 'form-input', style: { width: '100px', fontSize: '12px' }, value: recoSalaire, placeholder: 'Montant' });
@@ -15032,7 +15091,7 @@ function renderTresorerieContent(container) {
     saveAll();
     COMPUTED = compute();
     render();
-    toast('Salaire de ' + EUR(montant) + ' versé!', 'success');
+    toast('Rémunération de ' + EUR(montant) + ' versée!', 'success');
   }}, '✓ Verser'));
   actionsCard.appendChild(salaireRow);
 
@@ -16407,7 +16466,7 @@ function renderTresorerie(container) {
   header.appendChild(el('h2', { class: 'page-title' }, '🏦 Trésorerie'));
   var actions = el('div', { class: 'page-actions' });
   actions.appendChild(el('button', { class: 'btn btn-sm', onclick: showChargeModal }, '📋 Charge'));
-  actions.appendChild(el('button', { class: 'btn btn-sm btn-success', onclick: function() { showSalaireModal(data.salaireReco); } }, '💸 Salaire'));
+  actions.appendChild(el('button', { class: 'btn btn-sm btn-success', onclick: function() { showSalaireModal(data.salaireReco); } }, '💸 Rémunération'));
   header.appendChild(actions);
   container.appendChild(header);
 
@@ -16439,9 +16498,9 @@ function renderTresorerie(container) {
   grid.appendChild(chargesBlock);
   
   // Salaires
-  var salBlock = el('div', { class: 'treso-item', onclick: function() { showDetailList('Salaires Versés', data.detailSalaires, 'info', function(i) { return fmtMonth(i.mois); }); } });
+  var salBlock = el('div', { class: 'treso-item', onclick: function() { showDetailList('Rémunérations Versées', data.detailSalaires, 'info', function(i) { return fmtMonth(i.mois); }); } });
   salBlock.appendChild(el('div', { class: 'treso-item-value text-info' }, EUR(data.salaires)));
-  salBlock.appendChild(el('div', { class: 'treso-item-label' }, '💸 Salaires'));
+  salBlock.appendChild(el('div', { class: 'treso-item-label' }, '💸 Rémunérations'));
   salBlock.appendChild(el('div', { class: 'treso-item-count' }, data.detailSalaires.length + ' versements'));
   grid.appendChild(salBlock);
   
@@ -16567,7 +16626,7 @@ function renderTresorerie(container) {
     onchange: function(e) { SEARCH_STATE.tresorerie.type = e.target.value; render(); }
   });
   typeFilter.appendChild(el('option', { value: 'all', selected: SEARCH_STATE.tresorerie.type === 'all' }, 'Tous les types'));
-  typeFilter.appendChild(el('option', { value: 'salaire', selected: SEARCH_STATE.tresorerie.type === 'salaire' }, '💸 Salaires'));
+  typeFilter.appendChild(el('option', { value: 'salaire', selected: SEARCH_STATE.tresorerie.type === 'salaire' }, '💸 Rémunérations'));
   typeFilter.appendChild(el('option', { value: 'charge', selected: SEARCH_STATE.tresorerie.type === 'charge' }, '📋 Charges'));
   typeFilter.appendChild(el('option', { value: 'encaissement', selected: SEARCH_STATE.tresorerie.type === 'encaissement' }, '💵 Encaissements'));
   searchBar.appendChild(typeFilter);
@@ -16579,7 +16638,7 @@ function renderTresorerie(container) {
   
   // Salaires
   data.detailSalaires.forEach(function(s) {
-    allMouvements.push({ type: 'salaire', label: '💸 Salaire', detail: fmtMonth(s.mois), montant: -s.montant, date: s.mois + '-01', category: 'Salaire' });
+    allMouvements.push({ type: 'salaire', label: '💸 Rémunération', detail: fmtMonth(s.mois), montant: -s.montant, date: s.mois + '-01', category: 'Salaire' });
   });
   
   // Charges payées
@@ -16757,7 +16816,7 @@ function renderAdmin(container) {
   tresoCard.appendChild(createInput('Solde initial du compte (€)', 'number', 'adminSolde', TREASURY.soldeInitial));
   tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Solde de ton compte pro au démarrage de l\'activité'));
   // V75: Paramètres tréso consolidés ici (sortis du ⚙️ caché du Cockpit)
-  tresoCard.appendChild(createInput('Salaire mensuel estimé (€)', 'number', 'adminSalaireEstime', TREASURY.salaireEstime || 2200));
+  tresoCard.appendChild(createInput('Rémunération mensuelle estimée (€)', 'number', 'adminSalaireEstime', TREASURY.salaireEstime || 2200));
   tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Utilisé pour l\'autonomie et la recommandation de virement'));
   tresoCard.appendChild(createInput('Réserve minimum compte (€)', 'number', 'adminReserveCompte', TREASURY.reserveCompte || 150));
   tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '16px' } }, 'Montant minimum à garder sur le compte pro'));
@@ -16943,7 +17002,7 @@ function renderAdmin(container) {
   summaryInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'CA Encaissé (TTC)'), el('span', { style: { fontWeight: '700', color: 'var(--success)' } }, EUR(data.caEnc))]));
   summaryInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Total Charges'), el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, EUR(data.totalCharges))]));
   summaryInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Bénéfice Net'), el('span', { style: { fontWeight: '700', color: data.beneficeNet >= 0 ? 'var(--success)' : 'var(--danger)' } }, EUR(data.beneficeNet))]));
-  summaryInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Salaires Versés'), el('span', { style: { fontWeight: '700', color: 'var(--info)' } }, EUR(data.salaires))]));
+  summaryInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Rémunérations Versées'), el('span', { style: { fontWeight: '700', color: 'var(--info)' } }, EUR(data.salaires))]));
   summaryInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Jours Travaillés'), el('span', { style: { fontWeight: '700' } }, data.joursReal + 'j')]));
   summaryInfo.appendChild(el('div', { class: 'info-row' }, [el('span', { class: 'info-row-label' }, 'Jours Congés'), el('span', { style: { fontWeight: '700', color: 'var(--warning)' } }, data.joursOff + 'j')]));
   infoCard.appendChild(summaryInfo);
@@ -17383,10 +17442,10 @@ function renderCockpit(container) {
   var txOccup = data.tauxOccupation ? Math.round(data.tauxOccupation * 100) : 0;
   var kpiBar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } });
   var kpis = [
+    { label: 'Cash Dispo', value: EUR(data.cashDispoAbsolu), color: data.cashDispoAbsolu > 0 ? 'var(--success)' : 'var(--danger)', click: function() { VIEW = 'tresorerie'; render(); } },
     { label: 'CA Encaissé HT', value: EUR(data.caHT), color: 'var(--success)', click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); } },
-    { label: 'CA Latent HT', value: EUR(caLatentCockpit), color: caLatentCockpit > 0 ? 'var(--warning)' : 'var(--text-muted)', click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } },
-    { label: 'Tx Occupation', value: txOccup + '%', color: txOccup >= 70 ? 'var(--success)' : txOccup >= 40 ? 'var(--warning)' : 'var(--danger)', click: null },
-    { label: 'CA Annuel', value: EUR(data.caHTAnnuel), color: 'var(--info)', click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); } }
+    { label: 'Autonomie', value: data.runway + ' mois', color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)', click: function() { showProjectionAutonomieModal(); } },
+    { label: 'Tx Occupation', value: txOccup + '%', color: txOccup >= 70 ? 'var(--success)' : txOccup >= 40 ? 'var(--warning)' : 'var(--danger)', click: null }
   ];
   kpis.forEach(function(k) {
     var kpiDiv = el('div', { style: { textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', cursor: k.click ? 'pointer' : 'default' }, onclick: k.click || null });
@@ -17396,18 +17455,12 @@ function renderCockpit(container) {
   });
   container.appendChild(kpiBar);
 
-  // 2. Alertes critiques en tête (insights urgents seulement)
-  renderInsightsCritiques(container);
-
-  // 3. Indicateurs Santé (3 feux: provisions, retards, déclarations)
+  // 2. Indicateurs Santé (3 feux: provisions, retards, déclarations)
   renderHealthIndicators(container, data);
 
-  // 4. À FAIRE: Actions + Timeline fiscale (actions immédiates)
+  // 3. À FAIRE: Actions + Timeline fiscale (actions immédiates)
   renderActionsAndMilestones(container);
-
-  // 5. Insights secondaires (en dernier)
-  renderInsights(container);
-  // Note: CA Plafond TVA déplacé dans Analyse > Performance (V75)
+  // Note: Insights supprimés (V78) — les alertes critiques sont déjà dans les indicateurs santé
 }
 
 // ACTIVITÉ: Missions + Factures
