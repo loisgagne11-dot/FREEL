@@ -7521,7 +7521,17 @@ function showMissionModal(mission) {
       provImpot = irResult.impot || 0;
       impotLabel = 'IR estimé';
     }
-    var totalCharges = provUrssaf + provCfp + provImpot;
+    // RC Pro & charges récurrentes proratisées sur la durée de la mission
+    var provRecurrentes = 0;
+    var moisEstim = {};
+    var mEstim = new Date(d1.getFullYear(), d1.getMonth(), 1);
+    while (mEstim <= d2) { moisEstim[ym(mEstim.getFullYear(), mEstim.getMonth())] = true; mEstim.setMonth(mEstim.getMonth() + 1); }
+    TREASURY.mouvements.forEach(function(mv) {
+      if (mv.recurrent && mv.type === 'Charge' && moisEstim[mv.mois]) {
+        provRecurrentes += mv.montant;
+      }
+    });
+    var totalCharges = provUrssaf + provCfp + provImpot + provRecurrentes;
     var netEstime = caEstime - totalCharges;
     // Taux URSSAF moyen pondéré pour l'affichage
     var urssafPct = caEstime > 0 ? ((provUrssaf / caEstime) * 100).toFixed(1) : '0.0';
@@ -7540,6 +7550,7 @@ function showMissionModal(mission) {
       { label: 'CFP (' + (cfpRate * 100).toFixed(1) + '%)', value: provCfp, color: '#8b5cf6' }
     ];
     provLines.push({ label: impotLabel, value: provImpot, color: '#f59e0b' });
+    if (provRecurrentes > 0) provLines.push({ label: 'RC Pro & charges', value: provRecurrentes, color: '#94a3b8' });
     var provDiv = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 12px', justifyContent: 'center', marginBottom: '8px' } });
     provLines.forEach(function(p) {
       provDiv.appendChild(el('span', { style: { fontSize: '10px', color: p.color, fontWeight: '600' } }, p.label + ': −' + EUR(p.value, true)));
@@ -15865,19 +15876,39 @@ function renderMissions(container) {
         totalCharges += chargesCA;
       }
     });
-    if (m.factures) m.factures.forEach(function(f) { 
-      if (isInPeriod(f.mois) && f.jours > 0) { 
-        facturesTotal++; 
-        if (f.status === 'payée') facturesPayees++; 
+    // IR barème progressif (si pas PL)
+    var irMission = 0;
+    if (!COMPANY.prelevementLiberatoire && totalCA > 0) {
+      var yearMission = parseInt((m.debut || '').substring(0, 4)) || CURRENT_YEAR;
+      var irResult = calculateIR(totalCA, yearMission);
+      irMission = irResult.impot || 0;
+      totalCharges += irMission;
+    }
+    // RC Pro & charges récurrentes proratisées sur la durée de la mission
+    var chargesRecMission = 0;
+    if (m.debut && m.fin) {
+      var moisMission = {};
+      if (m.lignes) m.lignes.forEach(function(l) { if (isInPeriod(l.ym)) moisMission[l.ym] = true; });
+      TREASURY.mouvements.forEach(function(mv) {
+        if (mv.recurrent && mv.type === 'Charge' && moisMission[mv.mois]) {
+          chargesRecMission += mv.montant;
+        }
+      });
+      totalCharges += chargesRecMission;
+    }
+    if (m.factures) m.factures.forEach(function(f) {
+      if (isInPeriod(f.mois) && f.jours > 0) {
+        facturesTotal++;
+        if (f.status === 'payée') facturesPayees++;
         else if (f.status === 'envoyée') {
           facturesEnvoyees++;
           var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
           if (TODAY > paymentDate) facturesRetard++;
         }
-      } 
+      }
     });
-    
-    // Bénéfice = CA HT - Charges (URSSAF + CFP + IR)
+
+    // Bénéfice = CA HT - Charges (URSSAF + CFP + IR + RC Pro/récurrentes)
     var benefice = totalCA - totalCharges;
     var margePct = totalCA > 0 ? benefice / totalCA : 0;
     var progress = facturesTotal > 0 ? facturesPayees / facturesTotal : 0;
