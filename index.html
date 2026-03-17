@@ -4710,13 +4710,13 @@ function compute() {
   
   // Calcul solde progressif et cash dispo cumulé
   var soldeRunning = data.soldeDebut;
-  var provisionsCumulees = 0;
+  var provisionsCumulees = data.provisionsReport; // Inclure les provisions non payées avant la période (historique)
   months.forEach(function(m) {
     var md = data.monthsData[m];
     soldeRunning += md.enc - md.chargesPaid - md.salaires;
     provisionsCumulees += md.chargesUnpaid;
     md.solde = soldeRunning;
-    md.cashDispo = soldeRunning - provisionsCumulees; // Cash dispo = solde - TOUTES provisions jusqu'ici
+    md.cashDispo = soldeRunning - provisionsCumulees; // Cash dispo = solde - TOUTES provisions (historiques + période)
   });
   
   data.solde = data.soldeDebut + data.caEnc - data.chargesPayees - data.salaires;
@@ -9601,10 +9601,10 @@ function showTresoMonthDetail(monthKey) {
 
   // === Calculer le solde progressif jusqu'au mois sélectionné ===
   var soldeRunning = data.soldeDebut;
-  var provisionsCumulees = 0;
+  var provisionsCumulees = data.provisionsReport; // Inclure provisions historiques
   var monthSolde = 0, monthCashDispo = 0;
   var prevMonthSolde = data.soldeDebut;
-  var prevMonthCashDispo = data.soldeDebut;
+  var prevMonthCashDispo = data.soldeDebut - data.provisionsReport;
   var monthEnc = 0, monthChargesPaid = 0, monthSalaires = 0, monthChargesUnpaid = 0;
   var foundMonth = false;
 
