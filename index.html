@@ -9249,9 +9249,10 @@ function showMonthDetail(monthKey) {
     barContainer.appendChild(barTrack);
     var barLegend = el('div', { style: { display: 'flex', justifyContent: 'center', gap: '14px', marginTop: '8px' } });
     segments.forEach(function(s) {
+      var pctLabel = Math.round((s.value / barTotal) * 100);
       barLegend.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-muted)' } }, [
         el('div', { style: { width: '8px', height: '8px', borderRadius: '50%', background: s.color, flexShrink: '0' } }),
-        el('span', {}, s.label + ' ' + EUR(s.value))
+        el('span', {}, s.label + ' ' + EUR(s.value) + ' (' + pctLabel + '%)')
       ]));
     });
     barContainer.appendChild(barLegend);
