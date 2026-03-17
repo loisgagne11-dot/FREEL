@@ -9092,11 +9092,78 @@ function showMonthDetail(monthKey) {
         revenuDetails.push({ client: f.client || 'Facture', montant: f.ht || 0, type: 'à encaisser' });
       }
     });
+    // Ajouter aussi le CA projeté des lignes de mission non encore facturées
+    MISSIONS.forEach(function(mis) {
+      if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+      if (!mis.lignes) return;
+      mis.lignes.forEach(function(l) {
+        if (l.ym !== monthKey) return;
+        var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        if (jours <= 0) return;
+        var alreadyCovered = false;
+        if (mis.factures) mis.factures.forEach(function(f) { if (f.mois === l.ym) alreadyCovered = true; });
+        if (alreadyCovered) return;
+        var caHT = jours * mis.tjm;
+        revenu += caHT;
+        revenuDetails.push({ client: mis.client || mis.titre, montant: caHT, type: 'projeté (' + jours + 'j × ' + EUR(mis.tjm) + ')' });
+      });
+    });
   }
 
   // chargesHorsTVA = sum(md.charges where cat !== 'TVA') — identique au graphique
-  var charges = md.charges || [];
+  var charges = (md.charges || []).slice(); // copie pour ne pas modifier l'original
   var chargesHorsTVA = 0;
+
+  // Pour les mois futurs, estimer les charges (URSSAF, CFP, TVA, Impôt PL) à partir du revenu projeté
+  if (isFuture && revenu > 0) {
+    // Recalculer les charges estimées pour chaque source de revenu futur
+    var estimatedCharges = [];
+    var rate = getUrssafRate(monthKey);
+
+    // Factures à encaisser
+    (data.facturesAEncaisser || []).forEach(function(f) {
+      if (f.paymentMonth !== monthKey) return;
+      var ht = f.ht || 0;
+      if (ht <= 0) return;
+      var src = f.client || 'Facture';
+      estimatedCharges.push({ id: 'EST-URSSAF-' + f.id, cat: 'URSSAF', desc: PCT(rate) + ' · ' + src, montant: Math.round(ht * rate), source: src });
+      estimatedCharges.push({ id: 'EST-CFP-' + f.id, cat: 'CFP', desc: 'Formation · ' + src, montant: Math.round(ht * LEGAL.cfp), source: src });
+      if (f.tva > 0) {
+        estimatedCharges.push({ id: 'EST-TVA-' + f.id, cat: 'TVA', desc: 'Collectée · ' + src, montant: Math.round(f.tva), source: src });
+      }
+      if (COMPANY.prelevementLiberatoire) {
+        estimatedCharges.push({ id: 'EST-IMPLIB-' + f.id, cat: 'Impôt PL', desc: PCT(LEGAL.impLib) + ' · ' + src, montant: Math.round(ht * LEGAL.impLib), source: src });
+      }
+    });
+
+    // Lignes de mission projetées (non facturées)
+    MISSIONS.forEach(function(mis) {
+      if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+      if (!mis.lignes) return;
+      mis.lignes.forEach(function(l) {
+        if (l.ym !== monthKey) return;
+        var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        if (jours <= 0) return;
+        var alreadyCovered = false;
+        if (mis.factures) mis.factures.forEach(function(f) { if (f.mois === l.ym) alreadyCovered = true; });
+        if (alreadyCovered) return;
+        var ht = jours * mis.tjm;
+        var src = mis.client || mis.titre;
+        estimatedCharges.push({ id: 'EST-URSSAF-' + mis.id + '-' + l.ym, cat: 'URSSAF', desc: PCT(rate) + ' · ' + src, montant: Math.round(ht * rate), source: src });
+        estimatedCharges.push({ id: 'EST-CFP-' + mis.id + '-' + l.ym, cat: 'CFP', desc: 'Formation · ' + src, montant: Math.round(ht * LEGAL.cfp), source: src });
+        if (isTVAApplicable(l.ym)) {
+          var tva = Math.round(ht * LEGAL.tvaRate);
+          estimatedCharges.push({ id: 'EST-TVA-' + mis.id + '-' + l.ym, cat: 'TVA', desc: 'Collectée · ' + src, montant: tva, source: src });
+        }
+        if (COMPANY.prelevementLiberatoire) {
+          estimatedCharges.push({ id: 'EST-IMPLIB-' + mis.id + '-' + l.ym, cat: 'Impôt PL', desc: PCT(LEGAL.impLib) + ' · ' + src, montant: Math.round(ht * LEGAL.impLib), source: src });
+        }
+      });
+    });
+
+    charges = estimatedCharges;
+  }
+
   charges.forEach(function(ch) {
     if (ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
   });
@@ -9212,7 +9279,7 @@ function showMonthDetail(monthKey) {
   // Section Charges hors TVA
   var sortedCharges = charges.filter(function(c) { return c.cat !== 'TVA'; }).slice().sort(function(a, b) { return b.montant - a.montant; });
   if (sortedCharges.length > 0) {
-    cascade.appendChild(el('div', { style: { padding: '10px 16px 6px', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', borderTop: '1px solid rgba(255,255,255,0.06)' } }, 'Charges (hors TVA)'));
+    cascade.appendChild(el('div', { style: { padding: '10px 16px 6px', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', borderTop: '1px solid rgba(255,255,255,0.06)' } }, isFuture ? 'Charges estimées (hors TVA)' : 'Charges (hors TVA)'));
 
     sortedCharges.forEach(function(ch) {
       var paid = !isFuture && isPaid(ch.id);
@@ -9237,6 +9304,22 @@ function showMonthDetail(monthKey) {
     }
   }
 
+  // Section TVA (si applicable)
+  var tvaCharges = charges.filter(function(c) { return c.cat === 'TVA'; });
+  var totalTVA = 0;
+  tvaCharges.forEach(function(c) { totalTVA += c.montant; });
+  if (tvaCharges.length > 0) {
+    cascade.appendChild(el('div', { style: { padding: '10px 16px 6px', fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', borderTop: '1px solid rgba(255,255,255,0.06)' } }, isFuture ? 'TVA estimée' : 'TVA'));
+    tvaCharges.forEach(function(ch) {
+      var paid = !isFuture && isPaid(ch.id);
+      cascade.appendChild(cascadeRow((paid ? '\u2713 ' : '') + ch.cat + (ch.desc ? ' · ' + ch.desc : ''), ch.montant, {
+        subtract: true, detail: true,
+        color: paid ? 'var(--text-muted)' : '#f59e0b',
+        onclick: isFuture ? null : function() { togglePaid(ch.id); closeModal('formModal'); showMonthDetail(monthKey); }
+      }));
+    });
+  }
+
   // === RÉSULTAT : Capacité ===
   cascade.appendChild(el('div', { style: {
     padding: '14px 16px',
@@ -9244,7 +9327,7 @@ function showMonthDetail(monthKey) {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     borderTop: '1px solid rgba(255,255,255,0.06)'
   } }, [
-    el('span', { style: { fontWeight: '700', fontSize: '13px' } }, 'Capacité rémunération'),
+    el('span', { style: { fontWeight: '700', fontSize: '13px' } }, isFuture ? 'Capacité projetée' : 'Capacité rémunération'),
     el('span', { style: { fontWeight: '900', fontSize: '20px', color: capacite > 0 ? '#10b981' : '#ef4444', fontFamily: 'var(--font-mono, monospace)' } }, EUR(capacite))
   ]));
 
@@ -9531,7 +9614,47 @@ function showTresoMonthDetail(monthKey) {
       cascadeCash.appendChild(cascadeRow(cat, provByType[cat], { detail: true, subtract: true, color: 'var(--text-muted)' }));
     });
   } else {
-    cascadeCash.appendChild(cascadeRow('Provisions cumulées', projProvisions, { subtract: true, color: '#f59e0b' }));
+    cascadeCash.appendChild(cascadeRow('Provisions cumulées estimées', projProvisions, { subtract: true, color: '#f59e0b' }));
+
+    // Détail provisions estimées par type pour les mois futurs
+    var provByTypeFuture = {};
+    // Provisions passées (charges non payées des mois passés)
+    for (var jp = 0; jp < months.length; jp++) {
+      var mp = months[jp];
+      if (mp > nowYm2) break;
+      var mdp = data.monthsData[mp];
+      if (mdp && mdp.charges) {
+        mdp.charges.forEach(function(ch) {
+          if (!isPaid(ch.id)) {
+            provByTypeFuture[ch.cat] = (provByTypeFuture[ch.cat] || 0) + ch.montant;
+          }
+        });
+      }
+    }
+    // Provisions futures estimées
+    var futureProvByType = {};
+    for (var jf = 0; jf < months.length; jf++) {
+      var mf = months[jf];
+      if (mf <= nowYm2 || mf > monthKey) continue;
+      var caFM = futureCAByMonth[mf] || 0;
+      var chgFM = futureChargesByMonth[mf] || 0;
+      if (chgFM > 0) {
+        // Estimer la répartition par type
+        var rateFM = getUrssafRate(mf);
+        var totalRateFM = rateFM + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
+        if (totalRateFM > 0) {
+          provByTypeFuture['URSSAF'] = (provByTypeFuture['URSSAF'] || 0) + Math.round(chgFM * rateFM / totalRateFM);
+          provByTypeFuture['CFP'] = (provByTypeFuture['CFP'] || 0) + Math.round(chgFM * LEGAL.cfp / totalRateFM);
+          if (COMPANY.prelevementLiberatoire) {
+            provByTypeFuture['Impôt PL'] = (provByTypeFuture['Impôt PL'] || 0) + Math.round(chgFM * LEGAL.impLib / totalRateFM);
+          }
+        }
+      }
+    }
+    var provTypesFuture = Object.keys(provByTypeFuture).sort(function(a, b) { return provByTypeFuture[b] - provByTypeFuture[a]; });
+    provTypesFuture.forEach(function(cat) {
+      cascadeCash.appendChild(cascadeRow(cat, provByTypeFuture[cat], { detail: true, subtract: true, color: 'var(--text-muted)' }));
+    });
   }
 
   cascadeCash.appendChild(cascadeRow('Cash Disponible', monthCashDispo, { total: true, color: monthCashDispo >= 0 ? 'var(--success)' : 'var(--danger)' }));
@@ -13208,20 +13331,40 @@ function renderFinancesEvolution(container) {
     var dataCapacite = months.map(function(m, idx) {
       var md = data.monthsData[m];
       if (!md) return 0;
-      var isFuture = m > nowYm2;
-      if (isFuture && futureStartSal === -1) futureStartSal = idx;
+      var mIsFuture = m > nowYm2;
+      if (mIsFuture && futureStartSal === -1) futureStartSal = idx;
       var revenu = md.encHT || 0;
-      // Pour les mois futurs, ajouter les factures à encaisser projetées
-      if (isFuture) {
+      // Pour les mois futurs, ajouter les factures à encaisser projetées + lignes mission non facturées
+      if (mIsFuture) {
         (data.facturesAEncaisser || []).forEach(function(f) {
           if (f.paymentMonth === m) revenu += f.ht || 0;
+        });
+        MISSIONS.forEach(function(mis) {
+          if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+          if (!mis.lignes) return;
+          mis.lignes.forEach(function(l) {
+            if (l.ym !== m) return;
+            var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+            if (jours <= 0) return;
+            var alreadyCovered = false;
+            if (mis.factures) mis.factures.forEach(function(f) { if (f.mois === l.ym) alreadyCovered = true; });
+            if (alreadyCovered) return;
+            revenu += jours * mis.tjm;
+          });
         });
       }
       if (!revenu) return 0;
       var chargesHorsTVA = 0;
-      (md.charges || []).forEach(function(ch) {
-        if (ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
-      });
+      if (mIsFuture) {
+        // Estimer les charges pour les mois futurs
+        var rate = getUrssafRate(m);
+        var tauxTotal = rate + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
+        chargesHorsTVA = Math.round(revenu * tauxTotal);
+      } else {
+        (md.charges || []).forEach(function(ch) {
+          if (ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
+        });
+      }
       return Math.max(0, revenu - chargesHorsTVA);
     });
     if (futureStartSal === -1) futureStartSal = months.length;
