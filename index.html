@@ -9362,6 +9362,142 @@ function showMonthDetail(monthKey) {
 
   body.appendChild(cascade);
 
+  // === SECTION SALAIRE VERSABLE : projection précise basée sur le cash dispo ===
+  var RESERVE_MIN = TREASURY.reserveCompte || 150;
+  var months = getPeriodMonths();
+  var nowYm2b = ym(TODAY.getFullYear(), TODAY.getMonth());
+
+  // Calculer le cash dispo progressif jusqu'au mois sélectionné
+  var projSolde = data.soldeAbsolu || 0;
+  var projProvisions = data.provisionsAbsolues || 0;
+  var projCashDispo = projSolde - projProvisions;
+  var monthCashDispo = 0;
+  var monthSoldeCompte = 0;
+  var monthProvisions = 0;
+  var foundVersable = false;
+
+  if (!isFuture) {
+    // Pour le mois courant/passé, utiliser le cash dispo actuel
+    monthCashDispo = data.cashDispoAbsolu || 0;
+    monthSoldeCompte = data.soldeAbsolu || 0;
+    monthProvisions = data.provisionsAbsolues || 0;
+    foundVersable = true;
+  } else {
+    // Pour les mois futurs, projeter le cash dispo mois par mois
+    var futureCAByMonth = {};
+    var futureChargesByMonth = {};
+    (data.facturesAEncaisser || []).forEach(function(f) {
+      if (f.paymentMonth > nowYm2b) {
+        futureCAByMonth[f.paymentMonth] = (futureCAByMonth[f.paymentMonth] || 0) + (f.ttc || 0);
+        var rate = getUrssafRate(f.paymentMonth);
+        var chg = Math.round((f.ht || 0) * (rate + LEGAL.cfp));
+        if (f.tva > 0) chg += f.tva;
+        if (COMPANY.prelevementLiberatoire) chg += Math.round((f.ht || 0) * LEGAL.impLib);
+        futureChargesByMonth[f.paymentMonth] = (futureChargesByMonth[f.paymentMonth] || 0) + chg;
+      }
+    });
+    MISSIONS.forEach(function(mis) {
+      if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+      if (!mis.lignes) return;
+      mis.lignes.forEach(function(l) {
+        if (l.ym <= nowYm2b) return;
+        var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        if (jours <= 0) return;
+        var caHT = jours * mis.tjm;
+        var alreadyCovered = false;
+        if (mis.factures) mis.factures.forEach(function(f) { if (f.mois === l.ym) alreadyCovered = true; });
+        if (alreadyCovered) return;
+        futureCAByMonth[l.ym] = (futureCAByMonth[l.ym] || 0) + caHT;
+        var rate = getUrssafRate(l.ym);
+        var chg = Math.round(caHT * (rate + LEGAL.cfp));
+        if (COMPANY.prelevementLiberatoire) chg += Math.round(caHT * LEGAL.impLib);
+        futureChargesByMonth[l.ym] = (futureChargesByMonth[l.ym] || 0) + chg;
+      });
+    });
+
+    for (var vi = 0; vi < months.length; vi++) {
+      var vm = months[vi];
+      if (vm <= nowYm2b) continue;
+      var caMonth = futureCAByMonth[vm] || 0;
+      var chargesMonth = futureChargesByMonth[vm] || 0;
+      projSolde += caMonth;
+      projProvisions += chargesMonth;
+      projCashDispo = projSolde - projProvisions;
+      // Simuler le versement des mois précédents
+      if (vm < monthKey) {
+        var prevVersable = Math.max(0, Math.floor((projCashDispo - RESERVE_MIN) / 100) * 100);
+        projSolde -= prevVersable;
+        projCashDispo = projSolde - projProvisions;
+      }
+      if (vm === monthKey) {
+        monthCashDispo = projCashDispo;
+        monthSoldeCompte = projSolde;
+        monthProvisions = projProvisions;
+        foundVersable = true;
+        break;
+      }
+    }
+  }
+
+  if (foundVersable) {
+    var salaireVersable = Math.max(0, Math.floor((monthCashDispo - salaireMois - RESERVE_MIN) / 100) * 100);
+    var versableColor = salaireVersable > 0 ? '#22d3ee' : '#71717a';
+    var versableBg = salaireVersable > 0 ? 'rgba(34,211,238,0.08)' : 'rgba(113,113,122,0.06)';
+    var versableBorder = salaireVersable > 0 ? 'rgba(34,211,238,0.25)' : 'rgba(113,113,122,0.15)';
+
+    var versableSection = el('div', { style: {
+      marginTop: '12px', padding: '16px', borderRadius: '12px',
+      background: versableBg, border: '1px solid ' + versableBorder
+    } });
+
+    versableSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: '600' } },
+      isFuture ? '💰 Salaire versable projeté' : '💰 Salaire versable'
+    ));
+
+    versableSection.appendChild(el('div', { style: { fontSize: '28px', fontWeight: '900', color: versableColor, fontFamily: 'var(--font-mono, monospace)', marginBottom: '10px' } }, EUR(salaireVersable)));
+
+    // Détail du calcul
+    var detailCalc = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', lineHeight: '1.8' } });
+    detailCalc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
+      el('span', {}, 'Solde compte ' + (isFuture ? 'projeté' : '')),
+      el('span', { style: { fontFamily: 'var(--font-mono, monospace)', fontWeight: '600', color: 'var(--text-primary)' } }, EUR(monthSoldeCompte))
+    ]));
+    detailCalc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
+      el('span', {}, '− Charges à payer (provisions)'),
+      el('span', { style: { fontFamily: 'var(--font-mono, monospace)', fontWeight: '600', color: '#ef4444' } }, '− ' + EUR(monthProvisions))
+    ]));
+    detailCalc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.06)' } }, [
+      el('span', { style: { fontWeight: '600' } }, '= Cash disponible'),
+      el('span', { style: { fontFamily: 'var(--font-mono, monospace)', fontWeight: '700', color: monthCashDispo >= 0 ? '#10b981' : '#ef4444' } }, EUR(monthCashDispo))
+    ]));
+    if (salaireMois > 0) {
+      detailCalc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
+        el('span', {}, '− Salaires déjà versés'),
+        el('span', { style: { fontFamily: 'var(--font-mono, monospace)', fontWeight: '600', color: '#60a5fa' } }, '− ' + EUR(salaireMois))
+      ]));
+    }
+    detailCalc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
+      el('span', {}, '− Réserve compte (' + EUR(RESERVE_MIN) + ')'),
+      el('span', { style: { fontFamily: 'var(--font-mono, monospace)', fontWeight: '600', color: 'var(--text-muted)' } }, '− ' + EUR(RESERVE_MIN))
+    ]));
+    detailCalc.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', paddingTop: '6px', borderTop: '1px dashed rgba(255,255,255,0.08)', marginTop: '4px' } }, [
+      el('span', { style: { fontWeight: '700', color: versableColor } }, '= Versable (arrondi 100€)'),
+      el('span', { style: { fontFamily: 'var(--font-mono, monospace)', fontWeight: '900', fontSize: '14px', color: versableColor } }, EUR(salaireVersable))
+    ]));
+    versableSection.appendChild(detailCalc);
+
+    // Bouton verser pour le mois courant
+    if (isCurrent && salaireVersable > 0) {
+      versableSection.appendChild(el('button', {
+        class: 'btn btn-success btn-block',
+        style: { marginTop: '12px', borderRadius: '10px', fontWeight: '700', fontSize: '14px', padding: '10px' },
+        onclick: function() { closeModal('formModal'); showSalaireModal(salaireVersable); }
+      }, '💸 Verser ' + EUR(salaireVersable)));
+    }
+
+    body.appendChild(versableSection);
+  }
+
   openModal('formModal');
 }
 
