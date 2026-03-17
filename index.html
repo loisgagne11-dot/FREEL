@@ -7521,8 +7521,8 @@ function showMissionModal(mission) {
       provImpot = irResult.impot || 0;
       impotLabel = 'IR estimé';
     }
-    var totalProvisions = provUrssaf + provCfp + provTva + provImpot;
-    var netEstime = caEstime - totalProvisions;
+    var totalCharges = provUrssaf + provCfp + provImpot;
+    var netEstime = caEstime - totalCharges;
     // Taux URSSAF moyen pondéré pour l'affichage
     var urssafPct = caEstime > 0 ? ((provUrssaf / caEstime) * 100).toFixed(1) : '0.0';
 
@@ -7539,18 +7539,21 @@ function showMissionModal(mission) {
       { label: urssafLabel, value: provUrssaf, color: '#ef4444' },
       { label: 'CFP (' + (cfpRate * 100).toFixed(1) + '%)', value: provCfp, color: '#8b5cf6' }
     ];
-    if (provTva > 0) provLines.push({ label: 'TVA (20%)', value: provTva, color: '#ec4899' });
     provLines.push({ label: impotLabel, value: provImpot, color: '#f59e0b' });
     var provDiv = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 12px', justifyContent: 'center', marginBottom: '8px' } });
     provLines.forEach(function(p) {
       provDiv.appendChild(el('span', { style: { fontSize: '10px', color: p.color, fontWeight: '600' } }, p.label + ': −' + EUR(p.value, true)));
     });
     estDiv.appendChild(provDiv);
-    // Total provisions et net
+    // Total charges et net
     var totalLine = el('div', { style: { fontSize: '11px', borderTop: '1px solid var(--border)', paddingTop: '6px', display: 'flex', justifyContent: 'space-between' } });
-    totalLine.appendChild(el('span', { style: { color: 'var(--danger)', fontWeight: '600' } }, 'Total charges: −' + EUR(totalProvisions, true)));
+    totalLine.appendChild(el('span', { style: { color: 'var(--danger)', fontWeight: '600' } }, 'Total charges: −' + EUR(totalCharges, true)));
     totalLine.appendChild(el('span', { style: { color: 'var(--success)', fontWeight: '700' } }, 'Net estimé: ' + EUR(netEstime, true)));
     estDiv.appendChild(totalLine);
+    // TVA info séparée (neutre pour le freelance)
+    if (provTva > 0) {
+      estDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, 'TVA à collecter/reverser : ' + EUR(provTva, true) + ' (neutre)'));
+    }
     // Note ACRE
     if (hasAnyAcre && hasAnyNonAcre) {
       estDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--warning)', marginTop: '4px' } }, '⚠️ ACRE partiel : taux réduit sur certains mois, taux plein sur les autres'));
