@@ -9172,6 +9172,32 @@ function showMonthDetail(monthKey) {
       });
     });
 
+    // Ajouter IR Estimé pour les mois futurs (si pas en prélèvement libératoire)
+    if (!COMPANY.prelevementLiberatoire && revenu > 0) {
+      var periodYear = parseInt(monthKey.split('-')[0]);
+      var irData = getIRForYear(periodYear);
+      if (irData.impot > 0 && irData.caTotal > 0) {
+        var irTaux = irData.impot / irData.caTotal;
+        var irMois = Math.round(revenu * irTaux);
+        if (irMois > 0) {
+          estimatedCharges.push({
+            id: 'EST-IR-' + monthKey,
+            cat: 'IR Estimé',
+            desc: 'CA projeté en ' + fmtMonthShort(monthKey) + ' : ' + EUR(revenu) + ' HT · ' + PCT(irTaux),
+            montant: irMois,
+            source: 'IR Estimé'
+          });
+        }
+      }
+    }
+
+    // Conserver les charges manuelles (RC Pro, assurance, etc.) déjà présentes dans md.charges
+    (md.charges || []).forEach(function(ch) {
+      if (ch.manual) {
+        estimatedCharges.push(ch);
+      }
+    });
+
     charges = estimatedCharges;
   }
 
@@ -13503,10 +13529,22 @@ function renderFinancesEvolution(container) {
       if (!revenu) return 0;
       var chargesHorsTVA = 0;
       if (mIsFuture) {
-        // Estimer les charges pour les mois futurs
+        // Estimer les charges pour les mois futurs (URSSAF + CFP + Impôt PL + IR Estimé)
         var rate = getUrssafRate(m);
         var tauxTotal = rate + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
+        // Ajouter IR Estimé si pas en prélèvement libératoire
+        if (!COMPANY.prelevementLiberatoire) {
+          var irYr = parseInt(m.split('-')[0]);
+          var irD = getIRForYear(irYr);
+          if (irD.impot > 0 && irD.caTotal > 0) {
+            tauxTotal += irD.impot / irD.caTotal;
+          }
+        }
         chargesHorsTVA = Math.round(revenu * tauxTotal);
+        // Ajouter les charges manuelles (RC Pro, assurance, etc.)
+        (md.charges || []).forEach(function(ch) {
+          if (ch.manual && ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
+        });
       } else {
         (md.charges || []).forEach(function(ch) {
           if (ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
