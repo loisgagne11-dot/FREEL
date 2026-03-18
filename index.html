@@ -1483,6 +1483,7 @@ window.addEventListener('unhandledrejection', function(event) {
 });
 var VIEW = 'cockpit';
 var ACTIVITE_TAB = 'missions';
+var TRESORERIE_TAB = 'flux'; // sous-onglet trésorerie: flux, provisions
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SUPABASE CLOUD SYNC
@@ -10857,22 +10858,22 @@ function renderHealthIndicators(container, data) {
 
   var bar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px', marginBottom: '8px' } });
 
-  // Provisions
-  var provDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)') } });
+  // Provisions (cliquable → Trésorerie > Provisions)
+  var provDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'provisions'; render(); } });
   provDiv.appendChild(el('div', { style: { fontSize: '16px' } }, provisionsCouvertes ? '✅' : '🚨'));
   provDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Provisions'));
   provDiv.appendChild(el('div', { style: { fontSize: '9px', color: provisionsCouvertes ? 'var(--success)' : 'var(--danger)' } }, provisionsCouvertes ? 'couvertes' : 'non couvertes'));
   bar.appendChild(provDiv);
 
-  // Factures
-  var factDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: facturesRetard === 0 ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (facturesRetard === 0 ? 'var(--success)' : 'var(--warning)') } });
+  // Factures (cliquable → Activité > Factures)
+  var factDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: facturesRetard === 0 ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (facturesRetard === 0 ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } });
   factDiv.appendChild(el('div', { style: { fontSize: '16px' } }, facturesRetard === 0 ? '✅' : '⚠️'));
   factDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Factures'));
   factDiv.appendChild(el('div', { style: { fontSize: '9px', color: facturesRetard === 0 ? 'var(--success)' : 'var(--warning)' } }, facturesRetard === 0 ? 'à jour' : facturesRetard + ' retard'));
   bar.appendChild(factDiv);
 
-  // Déclarations
-  var declDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)') } });
+  // Déclarations (cliquable → Trésorerie > Provisions)
+  var declDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'provisions'; render(); } });
   declDiv.appendChild(el('div', { style: { fontSize: '16px' } }, declarationsAJour ? '✅' : '⚠️'));
   declDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Déclarations'));
   declDiv.appendChild(el('div', { style: { fontSize: '9px', color: declarationsAJour ? 'var(--success)' : 'var(--warning)' } }, declarationsAJour ? 'à jour' : 'à faire'));
@@ -13452,7 +13453,7 @@ function renderMissionsView(container) {
   renderMissions(container);
 }
 
-var FINANCES_TAB = 'evolution'; // V73: sous-onglet finances: evolution, performance, conformite
+var FINANCES_TAB = 'evolution'; // sous-onglet finances: evolution, performance
 
 function renderFinances(container) {
   // Header avec sous-onglets
@@ -13460,7 +13461,7 @@ function renderFinances(container) {
   header.appendChild(el('h2', { class: 'page-title' }, '💰 Finances'));
   container.appendChild(header);
 
-  // V73: Sous-onglets Évolution / Performance / Conformité (selon cahier des charges)
+  // Sous-onglets Évolution / Performance
   var tabs = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '16px', padding: '4px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
 
   var tabEvolution = el('button', {
@@ -13473,21 +13474,20 @@ function renderFinances(container) {
     onclick: function() { FINANCES_TAB = 'performance'; render(); }
   }, '🎯 Performance');
 
-  var tabConformite = el('button', {
-    style: { flex: '1', padding: '8px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: FINANCES_TAB === 'conformite' ? 'var(--accent)' : 'transparent', color: FINANCES_TAB === 'conformite' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { FINANCES_TAB = 'conformite'; render(); }
-  }, '✅ Conformité');
-
   tabs.appendChild(tabEvolution);
   tabs.appendChild(tabPerformance);
-  tabs.appendChild(tabConformite);
   container.appendChild(tabs);
 
   // Contenu selon sous-onglet
   if (FINANCES_TAB === 'performance') {
     renderFinancesPerformance(container);
   } else if (FINANCES_TAB === 'conformite') {
-    renderFinancesConformite(container);
+    // Rétro-compat: rediriger vers Trésorerie > Provisions
+    FINANCES_TAB = 'evolution';
+    VIEW = 'tresorerie';
+    TRESORERIE_TAB = 'provisions';
+    render();
+    return;
   } else {
     renderFinancesEvolution(container);
   }
@@ -16460,15 +16460,32 @@ function renderFactures(container) {
 
 function renderTresorerie(container) {
   var data = compute();
-  
+
   // Header avec actions
-  var header = el('div', { class: 'page-header' });
+  var header = el('div', { class: 'page-header', style: { marginBottom: '0' } });
   header.appendChild(el('h2', { class: 'page-title' }, '🏦 Trésorerie'));
   var actions = el('div', { class: 'page-actions' });
   actions.appendChild(el('button', { class: 'btn btn-sm', onclick: showChargeModal }, '📋 Charge'));
   actions.appendChild(el('button', { class: 'btn btn-sm btn-success', onclick: function() { showSalaireModal(data.salaireReco); } }, '💸 Rémunération'));
   header.appendChild(actions);
   container.appendChild(header);
+
+  // Sous-onglets: Flux | Provisions
+  var tabsContainer = el('div', { style: { display: 'flex', gap: '4px', background: 'var(--bg-tertiary)', padding: '4px', borderRadius: '10px', marginBottom: '16px' } });
+  tabsContainer.appendChild(el('button', {
+    style: { flex: '1', padding: '10px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: TRESORERIE_TAB === 'flux' ? 'var(--accent)' : 'transparent', color: TRESORERIE_TAB === 'flux' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { TRESORERIE_TAB = 'flux'; render(); }
+  }, '💰 Flux'));
+  tabsContainer.appendChild(el('button', {
+    style: { flex: '1', padding: '10px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: TRESORERIE_TAB === 'provisions' ? 'var(--accent)' : 'transparent', color: TRESORERIE_TAB === 'provisions' ? 'white' : 'var(--text-muted)' },
+    onclick: function() { TRESORERIE_TAB = 'provisions'; render(); }
+  }, '✅ Provisions'));
+  container.appendChild(tabsContainer);
+
+  if (TRESORERIE_TAB === 'provisions') {
+    renderFinancesConformite(container);
+    return;
+  }
 
   // V77: Hero complet Cash Dispo + donut + salaire + autonomie (déplacé depuis Cockpit)
   renderDashboardHero(container, data);
@@ -17416,7 +17433,7 @@ function renderCockpitCashCompact(container, data) {
     background: data.cashDispoAbsolu >= 0 ? 'var(--success-glow)' : 'var(--danger-glow)',
     cursor: 'pointer', marginBottom: '12px',
     borderLeft: '3px solid ' + (data.cashDispoAbsolu >= 0 ? 'var(--success)' : 'var(--danger)')
-  }, onclick: function() { VIEW = 'tresorerie'; render(); } });
+  }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'flux'; render(); } });
   var row1 = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
   row1.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' } }, '💰 Cash Disponible'));
   row1.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--accent)' } }, '→ Trésorerie'));
@@ -17442,10 +17459,10 @@ function renderCockpit(container) {
   var txOccup = data.tauxOccupation ? Math.round(data.tauxOccupation * 100) : 0;
   var kpiBar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } });
   var kpis = [
-    { label: 'Cash Dispo', value: EUR(data.cashDispoAbsolu), color: data.cashDispoAbsolu > 0 ? 'var(--success)' : 'var(--danger)', click: function() { VIEW = 'tresorerie'; render(); } },
     { label: 'CA Encaissé HT', value: EUR(data.caHT), color: 'var(--success)', click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); } },
+    { label: 'CA Latent HT', value: EUR(caLatentCockpit), color: caLatentCockpit > 0 ? 'var(--warning)' : 'var(--text-muted)', click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } },
     { label: 'Autonomie', value: data.runway + ' mois', color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)', click: function() { showProjectionAutonomieModal(); } },
-    { label: 'Tx Occupation', value: txOccup + '%', color: txOccup >= 70 ? 'var(--success)' : txOccup >= 40 ? 'var(--warning)' : 'var(--danger)', click: null }
+    { label: 'Tx Occupation', value: txOccup + '%', color: txOccup >= 70 ? 'var(--success)' : txOccup >= 40 ? 'var(--warning)' : 'var(--danger)', click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'missions'; render(); } }
   ];
   kpis.forEach(function(k) {
     var kpiDiv = el('div', { style: { textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', cursor: k.click ? 'pointer' : 'default' }, onclick: k.click || null });
