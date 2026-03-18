@@ -468,7 +468,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .header-content { max-width: 900px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; gap: 12px; }
 .logo { font-size: 20px; font-weight: 800; background: linear-gradient(135deg, var(--accent), #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px; }
 .nav-tabs { display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 10px; margin-left: auto; }
-.nav-tab { background: transparent; color: var(--text-muted); border: none; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s; }
+.nav-tab { background: transparent; color: var(--text-muted); border: none; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1.2; }
+.nav-tab-icon { font-size: 14px; }
+.nav-tab-label { font-size: 9px; letter-spacing: 0.3px; }
 .nav-tab:hover { color: var(--text-secondary); }
 .nav-tab.active { background: var(--accent); color: white; }
 .period-selector { display: flex; align-items: center; gap: 4px; }
@@ -1407,11 +1409,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
       <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité" aria-label="Mode confidentialité">👁️</button>
       <button class="privacy-toggle" id="authBtn" title="Cloud Sync" aria-label="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px" aria-hidden="true"></span>
       <nav class="nav-tabs" role="tablist" aria-label="Navigation principale">
-        <button class="nav-tab active" data-view="cockpit" role="tab" aria-selected="true" aria-label="Cockpit">🏠</button>
-        <button class="nav-tab" data-view="activite" role="tab" aria-selected="false" aria-label="Activité">💼</button>
-        <button class="nav-tab" data-view="tresorerie" role="tab" aria-selected="false" aria-label="Trésorerie">🏦</button>
-        <button class="nav-tab" data-view="finances" role="tab" aria-selected="false" aria-label="Analyse financière">📊</button>
-        <button class="nav-tab" data-view="config" role="tab" aria-selected="false" aria-label="Configuration">⚙️</button>
+        <button class="nav-tab active" data-view="cockpit" role="tab" aria-selected="true" aria-label="Cockpit"><span class="nav-tab-icon">🏠</span><span class="nav-tab-label">Cockpit</span></button>
+        <button class="nav-tab" data-view="activite" role="tab" aria-selected="false" aria-label="Activité"><span class="nav-tab-icon">💼</span><span class="nav-tab-label">Activité</span></button>
+        <button class="nav-tab" data-view="tresorerie" role="tab" aria-selected="false" aria-label="Trésorerie"><span class="nav-tab-icon">🏦</span><span class="nav-tab-label">Tréso</span></button>
+        <button class="nav-tab" data-view="finances" role="tab" aria-selected="false" aria-label="Analyse financière"><span class="nav-tab-icon">📊</span><span class="nav-tab-label">Analyse</span></button>
+        <button class="nav-tab" data-view="config" role="tab" aria-selected="false" aria-label="Configuration"><span class="nav-tab-icon">⚙️</span><span class="nav-tab-label">Config</span></button>
       </nav>
     </div>
   </header>
@@ -1484,6 +1486,7 @@ window.addEventListener('unhandledrejection', function(event) {
 var VIEW = 'cockpit';
 var ACTIVITE_TAB = 'missions';
 var TRESORERIE_TAB = 'flux'; // sous-onglet trésorerie: flux, provisions
+var CONFIG_TAB = 'entreprise'; // sous-onglet config: entreprise, infos, donnees, cloud
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SUPABASE CLOUD SYNC
@@ -16758,7 +16761,41 @@ function showEditSoldeInitial() {
 
 function renderAdmin(container) {
   container.appendChild(el('h2', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '16px' } }, '⚙️ Administration'));
-  
+
+  // Sub-tabs navigation
+  var configTabs = [
+    { id: 'entreprise', label: 'Mon Entreprise', icon: '🏢' },
+    { id: 'infos', label: 'Infos & Outils', icon: '📊' },
+    { id: 'donnees', label: 'Données', icon: '💾' },
+    { id: 'cloud', label: 'Cloud & Vie privée', icon: '☁️' }
+  ];
+
+  var configTabBar = el('div', { style: {
+    display: 'flex', gap: '6px', marginBottom: '16px',
+    padding: '4px', background: 'var(--bg-secondary)', borderRadius: '12px',
+    overflowX: 'auto'
+  }});
+
+  configTabs.forEach(function(tab) {
+    var isActive = CONFIG_TAB === tab.id;
+    var btn = el('button', {
+      style: {
+        flex: 1, padding: '10px 8px', border: 'none', borderRadius: '8px',
+        background: isActive ? 'var(--accent)' : 'transparent',
+        color: isActive ? 'white' : 'var(--text-secondary)',
+        fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+        transition: 'all 0.2s ease', whiteSpace: 'nowrap', minWidth: '0'
+      },
+      onclick: function() { CONFIG_TAB = tab.id; render(); }
+    }, tab.icon + ' ' + tab.label);
+    configTabBar.appendChild(btn);
+  });
+
+  container.appendChild(configTabBar);
+
+  // ===== TAB: Mon Entreprise =====
+  if (CONFIG_TAB === 'entreprise') {
+
   // Entreprise
   var entCard = el('div', { class: 'card' });
   entCard.appendChild(el('div', { class: 'card-title' }, '🏢 Entreprise'));
@@ -16881,7 +16918,49 @@ function renderAdmin(container) {
   }
   
   container.appendChild(tresoCard);
-  
+
+  // Save button for entreprise tab
+  container.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '12px' }, onclick: function() {
+    COMPANY.nom = $('#adminNom').value;
+    COMPANY.siret = $('#adminSiret').value;
+    COMPANY.codeApe = $('#adminAPE') ? $('#adminAPE').value : '';
+    COMPANY.adresse = $('#adminAdresse') ? $('#adminAdresse').value : '';
+    COMPANY.codePostal = $('#adminCP') ? $('#adminCP').value : '';
+    COMPANY.commune = $('#adminCommune') ? $('#adminCommune').value : '';
+    COMPANY.email = $('#adminEmail') ? $('#adminEmail').value : '';
+    COMPANY.telephone = $('#adminTel') ? $('#adminTel').value : '';
+    COMPANY.debut = $('#adminDebut').value;
+    COMPANY.typeActivite = $('#adminTypeActivite') ? $('#adminTypeActivite').value : 'BNC';
+    COMPANY.acre = $('#adminAcre').checked;
+    COMPANY.prelevementLiberatoire = $('#adminPL').checked;
+    COMPANY.tvaDepuis = $('#adminTVA').value || null;
+    COMPANY.urssafPeriodicite = $('#adminUrssafPeriod') ? $('#adminUrssafPeriod').value : 'mensuel';
+    if ($('#adminTVAIntracom')) COMPANY.tvaIntracom = $('#adminTVAIntracom').value || '';
+    if ($('#adminIBAN')) COMPANY.iban = $('#adminIBAN').value || '';
+    if ($('#adminBIC')) COMPANY.bic = $('#adminBIC').value || '';
+    TREASURY.soldeInitial = parseFloat($('#adminSolde').value) || 0;
+    if ($('#adminSalaireEstime')) TREASURY.salaireEstime = parseFloat($('#adminSalaireEstime').value) || 2200;
+    if ($('#adminReserveCompte')) TREASURY.reserveCompte = parseFloat($('#adminReserveCompte').value) || 150;
+    var wasRendementActif = TREASURY.rendementActif;
+    TREASURY.rendementActif = $('#adminRendementActif') ? $('#adminRendementActif').checked : false;
+    TREASURY.rendementTaux = $('#adminRendementTaux') ? parseFloat($('#adminRendementTaux').value) || 2 : 2;
+    if (TREASURY.rendementActif && !wasRendementActif) {
+      TREASURY.rendementHistorique = [];
+      updateRendementHistorique();
+    }
+    if (TREASURY.rendementActif) {
+      TREASURY.rendementHistorique = [];
+      updateRendementHistorique();
+    }
+    saveAll(); render();
+    toast('Configuration sauvegardée', 'success');
+  } }, '✅ Sauvegarder'));
+
+  } // end TAB entreprise
+
+  // ===== TAB: Infos & Outils =====
+  if (CONFIG_TAB === 'infos') {
+
   // Info URSSAF et ACRE
   var acre = getAcreInfo();
   var infoCard = el('div', { class: 'card' });
@@ -17025,48 +17104,6 @@ function renderAdmin(container) {
   infoCard.appendChild(summaryInfo);
   
   container.appendChild(infoCard);
-  
-  // Sauvegarder
-  container.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '12px' }, onclick: function() {
-    COMPANY.nom = $('#adminNom').value;
-    COMPANY.siret = $('#adminSiret').value;
-    COMPANY.codeApe = $('#adminAPE') ? $('#adminAPE').value : '';
-    COMPANY.adresse = $('#adminAdresse') ? $('#adminAdresse').value : '';
-    COMPANY.codePostal = $('#adminCP') ? $('#adminCP').value : '';
-    COMPANY.commune = $('#adminCommune') ? $('#adminCommune').value : '';
-    COMPANY.email = $('#adminEmail') ? $('#adminEmail').value : '';
-    COMPANY.telephone = $('#adminTel') ? $('#adminTel').value : '';
-    COMPANY.debut = $('#adminDebut').value;
-    // V73: Type activité
-    COMPANY.typeActivite = $('#adminTypeActivite') ? $('#adminTypeActivite').value : 'BNC';
-    COMPANY.acre = $('#adminAcre').checked;
-    COMPANY.prelevementLiberatoire = $('#adminPL').checked;
-    COMPANY.tvaDepuis = $('#adminTVA').value || null;
-    COMPANY.urssafPeriodicite = $('#adminUrssafPeriod') ? $('#adminUrssafPeriod').value : 'mensuel';
-    if ($('#adminTVAIntracom')) COMPANY.tvaIntracom = $('#adminTVAIntracom').value || '';
-    if ($('#adminIBAN')) COMPANY.iban = $('#adminIBAN').value || '';
-    if ($('#adminBIC')) COMPANY.bic = $('#adminBIC').value || '';
-    TREASURY.soldeInitial = parseFloat($('#adminSolde').value) || 0;
-    // V75: Paramètres tréso consolidés dans Config
-    if ($('#adminSalaireEstime')) TREASURY.salaireEstime = parseFloat($('#adminSalaireEstime').value) || 2200;
-    if ($('#adminReserveCompte')) TREASURY.reserveCompte = parseFloat($('#adminReserveCompte').value) || 150;
-    // V47: Sauvegarde paramètres rendement
-    var wasRendementActif = TREASURY.rendementActif;
-    TREASURY.rendementActif = $('#adminRendementActif') ? $('#adminRendementActif').checked : false;
-    TREASURY.rendementTaux = $('#adminRendementTaux') ? parseFloat($('#adminRendementTaux').value) || 2 : 2;
-    // Si rendement vient d'être activé, calculer l'historique
-    if (TREASURY.rendementActif && !wasRendementActif) {
-      TREASURY.rendementHistorique = [];
-      updateRendementHistorique();
-    }
-    // Si taux changé et rendement actif, recalculer
-    if (TREASURY.rendementActif) {
-      TREASURY.rendementHistorique = [];
-      updateRendementHistorique();
-    }
-    saveAll(); render();
-    toast('Configuration sauvegardée', 'success');
-  } }, '✅ Sauvegarder'));
 
   // V73: Simulateurs fiscaux
   var simCard = el('div', { class: 'card', style: { marginTop: '12px' } });
@@ -17077,6 +17114,11 @@ function renderAdmin(container) {
   simCard.appendChild(simBtns);
   simCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '10px' } }, 'Estimez vos impôts selon votre CA et votre situation'));
   container.appendChild(simCard);
+
+  } // end TAB infos
+
+  // ===== TAB: Données =====
+  if (CONFIG_TAB === 'donnees') {
 
   // Export/Import
   var ioCard = el('div', { class: 'card', style: { marginTop: '12px' } });
@@ -17191,6 +17233,11 @@ function renderAdmin(container) {
   ioCard.appendChild(clientsBtns);
   
   container.appendChild(ioCard);
+
+  } // end TAB donnees
+
+  // ===== TAB: Cloud & Vie privée =====
+  if (CONFIG_TAB === 'cloud') {
 
   // V73: Cloud Sync Configuration
   var cloudCard = el('div', { class: 'card', style: { marginTop: '12px' } });
@@ -17418,6 +17465,8 @@ function renderAdmin(container) {
   rgpdCard.appendChild(policyDetails);
 
   container.appendChild(rgpdCard);
+
+  } // end TAB cloud
 
   container.appendChild(el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Freel V' + APP_VERSION + ' · Made with 💚'));
 }
