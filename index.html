@@ -835,7 +835,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .period-selector .period-btn { font-size: 10px; padding: 4px 6px; }
   .period-selector .year-nav-btn { font-size: 10px; width: 24px; height: 24px; }
   .period-selector .period-input { font-size: 10px; max-width: 100px; }
-  .privacy-toggle { width: 32px; height: 32px; font-size: 14px; }
+  .privacy-toggle { width: 26px; height: 26px; font-size: 12px; padding: 2px; }
   .search-box { width: 95%; margin: 0 10px; }
   .search-input-wrap { padding: 12px; }
   .search-input-wrap input { font-size: 14px; }
@@ -1165,12 +1165,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .privacy-toggle {
   background: transparent;
   border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 16px;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 13px;
   cursor: pointer;
   transition: all 0.2s;
-  margin-right: 8px;
+  margin-right: 4px;
+  line-height: 1;
 }
 .privacy-toggle:hover { background: var(--bg-tertiary); }
 .privacy-toggle.active { 
@@ -1407,7 +1408,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
       <button class="privacy-toggle notif-btn" id="notifBtn" title="Notifications" aria-label="Notifications" onclick="toggleNotifCenter()">🔔<span class="notif-count" id="notifBadge" style="display:none" aria-hidden="true">0</span></button>
       <button class="privacy-toggle" id="themeToggle" title="Changer le thème" aria-label="Changer le thème" onclick="toggleTheme()">☀️</button>
       <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité" aria-label="Mode confidentialité">👁️</button>
-      <button class="privacy-toggle" id="authBtn" title="Cloud Sync" aria-label="Cloud Sync" onclick="showAuthModal()">🔒</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px" aria-hidden="true"></span>
+      <button class="privacy-toggle" id="authBtn" title="Synchronisation Cloud" aria-label="Synchronisation Cloud" onclick="showAuthModal()">☁️</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px" aria-hidden="true"></span>
       <nav class="nav-tabs" role="tablist" aria-label="Navigation principale">
         <button class="nav-tab active" data-view="cockpit" role="tab" aria-selected="true" aria-label="Cockpit"><span class="nav-tab-icon">🏠</span><span class="nav-tab-label">Cockpit</span></button>
         <button class="nav-tab" data-view="activite" role="tab" aria-selected="false" aria-label="Activité"><span class="nav-tab-icon">💼</span><span class="nav-tab-label">Activité</span></button>
@@ -1589,7 +1590,7 @@ function updateAuthUI() {
   var authBtn = $('#authBtn');
   var authStatus = $('#authStatus');
   if (authBtn) {
-    authBtn.textContent = CURRENT_USER ? '🔓' : '🔒';
+    authBtn.textContent = CURRENT_USER ? '☁️' : '☁️';
     authBtn.title = CURRENT_USER ? 'Connecté: ' + CURRENT_USER.email : 'Se connecter';
   }
   if (authStatus) {
@@ -3427,6 +3428,18 @@ function getAbsoluteProvisions() {
     var irData = getIRForYear(currentYear);
     var currMonthsWithCA = getMonthsWithCA(currentYear);
     addIRMonthlyProvisions(currentYear, irData, currMonthsWithCA);
+  }
+
+  // V79: CFE - provision annuelle (échéance 15 décembre)
+  var currentYear = TODAY.getFullYear();
+  var cfeId = 'CFE-' + currentYear;
+  if (!isPaid(cfeId)) {
+    var cfeEstime = computeCFEEstimate(currentYear);
+    if (cfeEstime > 0) {
+      result.total += cfeEstime;
+      result.byType['CFE'] = (result.byType['CFE'] || 0) + cfeEstime;
+      result.detail.push({ cat: 'CFE', mois: currentYear + '-12', montant: cfeEstime, id: cfeId, source: 'Échéance 15 décembre' });
+    }
   }
 
   // Charges manuelles
@@ -7089,6 +7102,53 @@ function showCFESimulator() {
   renderCFEResult(caN2, COMPANY.cfeTaux || 25);
 
   openModal('formModal');
+}
+
+// V79: Calcul CFE réutilisable pour provisions
+function computeCFEEstimate(year) {
+  var currentYear = year || TODAY.getFullYear();
+  var yearN2 = currentYear - 2;
+
+  // Vérifier exonération 1ère année
+  var debutActivite = COMPANY.debut ? new Date(COMPANY.debut) : null;
+  var anneeDebut = debutActivite ? debutActivite.getFullYear() : null;
+  if (anneeDebut && currentYear === anneeDebut) return 0;
+
+  // CA N-2 depuis les factures payées
+  var caN2Total = 0;
+  MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var fYear = parseInt((f.mois || '').substring(0, 4));
+      if (fYear === yearN2) caN2Total += (f.ht || 0);
+    });
+  });
+
+  if (caN2Total <= 0) return 0;
+
+  var tranches = [
+    { max: 5000, base: 0 },
+    { max: 10000, base: 243 },
+    { max: 32600, base: 486 },
+    { max: 100000, base: 968 },
+    { max: 250000, base: 2033 },
+    { max: 500000, base: 3402 },
+    { max: Infinity, base: 6883 }
+  ];
+
+  var baseMinimum = 0;
+  for (var i = 0; i < tranches.length; i++) {
+    if (caN2Total <= tranches[i].max) { baseMinimum = tranches[i].base; break; }
+  }
+  if (baseMinimum === 0) return 0;
+
+  var tauxCommunal = COMPANY.cfeTaux || 25;
+  var cfeEstime = Math.round(baseMinimum * (tauxCommunal / 100));
+  var fraisGestion = Math.round(cfeEstime * 0.03);
+  var taxeChambre = Math.round(cfeEstime * 0.01);
+  return cfeEstime + fraisGestion + taxeChambre;
 }
 
 function renderCFEResult(caN2, tauxCommunal) {
@@ -13500,18 +13560,7 @@ function renderFinances(container) {
 function renderFinancesEvolution(container) {
   var data = compute();
 
-  // V78: Graphique Trésorerie avec toggle Solde / Cash Dispo
-  var tresoHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
-  tresoHeader.appendChild(el('div', { class: 'card-title', style: { margin: 0 } }, '💰 Trésorerie'));
-  var soldeToggle = el('div', { style: { display: 'flex', gap: '4px', background: 'var(--bg-secondary)', borderRadius: '8px', padding: '3px' } });
-  soldeToggle.appendChild(el('button', { style: { padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: !SHOW_CASH_DISPO ? 'var(--accent)' : 'transparent', color: !SHOW_CASH_DISPO ? 'white' : 'var(--text-muted)' }, onclick: function() { SHOW_CASH_DISPO = false; render(); } }, 'Solde'));
-  soldeToggle.appendChild(el('button', { style: { padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: SHOW_CASH_DISPO ? 'var(--accent)' : 'transparent', color: SHOW_CASH_DISPO ? 'white' : 'var(--text-muted)' }, onclick: function() { SHOW_CASH_DISPO = true; render(); } }, 'Cash dispo'));
-  tresoHeader.appendChild(soldeToggle);
-  var tresoCard = el('div', { class: 'card' });
-  tresoCard.appendChild(tresoHeader);
-  tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Cliquez sur un mois pour voir le détail du solde et du cash dispo'));
-  tresoCard.appendChild(el('div', { class: 'chart-container', style: { height: '200px', marginTop: '8px' } }, [el('canvas', { id: 'soldeChart' })]));
-  container.appendChild(tresoCard);
+  // V79: Graphique Trésorerie déplacé vers onglet Trésorerie
 
   // V78: Graphique CA HT avec toggle Mensuel / Cumulé
   var caHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
@@ -13544,7 +13593,6 @@ function renderFinancesEvolution(container) {
   setTimeout(function() {
     try {
       if ($('#mainChart') && $('#mainChart').getContext) drawMainChart();
-      if ($('#soldeChart') && $('#soldeChart').getContext) drawSoldeChart();
     } catch (e) {
       console.error('Chart render error:', e);
     }
@@ -14075,6 +14123,7 @@ function renderFinancesConformite(container) {
     { id: 'urssaf', label: 'URSSAF/CFP', icon: '🏥', total: (provByType['URSSAF'] || 0) + (provByType['CFP'] || 0), paid: (paidByTypePeriod['URSSAF'] || 0) + (paidByTypePeriod['CFP'] || 0), fiabilite: 'Certain' },
     { id: 'tva', label: 'TVA', icon: '🏛️', total: provByType['TVA'] || 0, paid: paidByTypePeriod['TVA'] || 0, fiabilite: 'Certain' },
     { id: 'ir', label: 'IR Estimé', icon: '🧾', total: provByType['IR Estimé'] || 0, paid: (paidByTypePeriod['Impôt'] || 0) + (paidByTypePeriod['IR'] || 0) + (paidByTypePeriod['IR Estimé'] || 0), fiabilite: 'Estimé ±10%' },
+    { id: 'cfe', label: 'CFE', icon: '🏢', total: provByType['CFE'] || 0, paid: paidByTypePeriod['CFE'] || 0, fiabilite: 'Estimé ±15%' },
     { id: 'impot', label: 'Impôt PL', icon: '💼', total: provByType['Impôt'] || 0, paid: paidByTypePeriod['Impôt PL'] || 0, fiabilite: 'Certain' }
   ];
 
@@ -16610,6 +16659,23 @@ function renderTresorerie(container) {
 
   // V77: cashCard et graphique salaires supprimés (redondants avec hero en haut)
 
+  // V79: Graphique Trésorerie (déplacé depuis Évolution)
+  var soldeChartCard = el('div', { class: 'card', style: { marginTop: '12px', marginBottom: '12px' } });
+  var soldeChartHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  soldeChartHeader.appendChild(el('div', { class: 'card-title', style: { margin: 0 } }, '💰 Évolution Trésorerie'));
+  var tresoSoldeToggle = el('div', { style: { display: 'flex', gap: '4px', background: 'var(--bg-secondary)', borderRadius: '8px', padding: '3px' } });
+  tresoSoldeToggle.appendChild(el('button', { style: { padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: !SHOW_CASH_DISPO ? 'var(--accent)' : 'transparent', color: !SHOW_CASH_DISPO ? 'white' : 'var(--text-muted)' }, onclick: function() { SHOW_CASH_DISPO = false; render(); } }, 'Solde'));
+  tresoSoldeToggle.appendChild(el('button', { style: { padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', background: SHOW_CASH_DISPO ? 'var(--accent)' : 'transparent', color: SHOW_CASH_DISPO ? 'white' : 'var(--text-muted)' }, onclick: function() { SHOW_CASH_DISPO = true; render(); } }, 'Cash dispo'));
+  soldeChartHeader.appendChild(tresoSoldeToggle);
+  soldeChartCard.appendChild(soldeChartHeader);
+  soldeChartCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Cliquez sur un mois pour voir le détail'));
+  soldeChartCard.appendChild(el('div', { class: 'chart-container', style: { height: '220px', marginTop: '8px' } }, [el('canvas', { id: 'soldeChart' })]));
+  container.appendChild(soldeChartCard);
+
+  setTimeout(function() {
+    if ($('#soldeChart') && $('#soldeChart').getContext) drawSoldeChart();
+  }, 100);
+
   // Historique des mouvements avec recherche/filtres (B17, B18)
   var mouvementsCard = el('div', { class: 'card', style: { marginTop: '16px' } });
   mouvementsCard.appendChild(el('div', { class: 'card-title' }, '📜 Historique des Mouvements'));
@@ -17258,7 +17324,7 @@ function renderAdmin(container) {
       statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '⚡'));
       statusDiv.appendChild(el('div', {}, [
         el('div', { style: { fontWeight: '600', color: 'var(--warning)' } }, 'Configuré'),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur 🔒 pour te connecter')
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur ☁️ pour te connecter')
       ]));
     }
   } else if (SUPABASE_URL && SUPABASE_ANON_KEY && !(window.supabase || window.Supabase)) {
