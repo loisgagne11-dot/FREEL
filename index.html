@@ -1653,9 +1653,16 @@ function signIn() {
   supabase.auth.signInWithPassword({ email: email, password: password })
     .then(function(result) {
       if (result.error) {
-        // SPRINT 1: Sécurité — ne pas exposer les messages d'erreur Supabase
         console.error('Sign in error:', result.error);
-        showToast('❌ Connexion échouée. Vérifiez vos identifiants.', 'error');
+        var msg = '❌ Connexion échouée. ';
+        if (result.error.message && result.error.message.includes('Email not confirmed')) {
+          msg += 'Email non confirmé. Va dans Supabase → Authentication → Providers → Email et désactive "Confirm email", puis recrée ton compte.';
+        } else if (result.error.message && result.error.message.includes('Invalid login')) {
+          msg += 'Email ou mot de passe incorrect.';
+        } else {
+          msg += (result.error.message || 'Vérifiez vos identifiants.');
+        }
+        showToast(msg, 'error');
       } else {
         showToast('✅ Connecté!', 'success');
         closeDynamicModal();
@@ -1677,9 +1684,20 @@ function signUp() {
     .then(function(result) {
       if (result.error) {
         console.error('Sign up error:', result.error);
-        showToast('❌ Inscription échouée. Vérifiez les informations saisies.', 'error');
+        var msg = '❌ Inscription échouée. ';
+        if (result.error.message && result.error.message.includes('already registered')) {
+          msg += 'Cet email est déjà utilisé. Essaie de te connecter.';
+        } else {
+          msg += (result.error.message || 'Vérifiez les informations saisies.');
+        }
+        showToast(msg, 'error');
       } else {
-        showToast('✅ Compte créé! Vérifie ton email.', 'success');
+        // Vérifier si email confirmation est activée
+        if (result.data && result.data.user && !result.data.session) {
+          showToast('⚠️ Compte créé mais email de confirmation requis. Désactive "Confirm email" dans Supabase → Auth → Providers → Email, puis recrée ton compte.', 'warning');
+        } else {
+          showToast('✅ Compte créé et connecté!', 'success');
+        }
         closeDynamicModal();
       }
     })
@@ -1713,7 +1731,15 @@ function syncToCloud() {
     .then(function(result) {
       if (result.error) {
         console.error('Sync error:', result.error);
-        showToast('❌ Erreur de synchronisation, réessayez.', 'error');
+        var msg = '❌ Sync échouée: ';
+        if (result.error.message && result.error.message.includes('column')) {
+          msg += 'Colonne manquante. Exécute le SQL de migration dans Config → Cloud Sync.';
+        } else if (result.error.code === '42P10' || (result.error.message && result.error.message.includes('unique'))) {
+          msg += 'Contrainte UNIQUE manquante sur user_id. Exécute le SQL de migration.';
+        } else {
+          msg += (result.error.message || 'réessayez.');
+        }
+        showToast(msg, 'error');
       } else {
         showToast('☁️ Données sauvegardées!', 'success');
       }
@@ -1730,9 +1756,15 @@ function loadFromCloud() {
     .single()
     .then(function(result) {
       if (result.error) {
-        if (result.error.code !== 'PGRST116') {
+        if (result.error.code === 'PGRST116') {
+          // Pas de données cloud encore — normal pour un premier usage
+          console.log('No cloud data yet (first sync)');
+        } else if (result.error.code === '42501' || (result.error.message && result.error.message.includes('policy'))) {
+          console.error('Cloud load error (RLS):', result.error);
+          showToast('❌ Erreur RLS: vérifie que la policy est bien créée dans Supabase (SQL Editor).', 'error');
+        } else {
           console.error('Cloud load error:', result.error);
-          showToast('❌ Erreur de chargement des données cloud.', 'error');
+          showToast('❌ Chargement cloud échoué: ' + (result.error.message || 'erreur inconnue'), 'error');
         }
       } else if (result.data) {
         if (result.data.company) COMPANY = result.data.company;
@@ -17349,18 +17381,28 @@ function renderAdmin(container) {
   instructions.innerHTML = '<b>Comment configurer:</b><br>' +
     '1. Crée un compte gratuit sur <a href="https://supabase.com" target="_blank" style="color: var(--accent);">supabase.com</a><br>' +
     '2. Crée un nouveau projet (attends ~2 min qu\'il se crée)<br>' +
-    '3. Va dans <b>Project Settings</b> (icône engrenage) → <b>API</b><br>' +
-    '4. Copie <b>Project URL</b> dans le champ ci-dessous<br>' +
-    '5. Copie la clé <b>anon public</b> (sous "Project API keys")<br>' +
-    '6. Exécute le SQL ci-dessous dans <b>SQL Editor</b>';
+    '3. Va dans <b>SQL Editor</b> et exécute le SQL ci-dessous<br>' +
+    '4. Va dans <b>Authentication → Providers → Email</b> et <b>désactive "Confirm email"</b><br>' +
+    '5. Va dans <b>Project Settings</b> (engrenage) → <b>API</b><br>' +
+    '6. Copie <b>Project URL</b> et la clé <b>anon public</b> ci-dessous<br>' +
+    '<span style="color:var(--warning)">⚠️ Si tu as déjà créé la table, exécute le SQL de migration ci-dessous pour la mettre à jour.</span>';
   cloudCard.appendChild(instructions);
 
   // SQL snippet (collapsible)
   var sqlToggle = el('details', { style: { marginBottom: '12px' } });
   sqlToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--accent)' } }, '📋 Voir le SQL à exécuter dans SQL Editor'));
   var sqlCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
-  sqlCode.textContent = 'CREATE TABLE user_data (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,\n  company JSONB,\n  missions JSONB,\n  treasury JSONB,\n  clients JSONB,\n  updated_at TIMESTAMP DEFAULT NOW()\n);\n\nALTER TABLE user_data ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Users can manage own data" ON user_data\n  FOR ALL USING (auth.uid() = user_id);';
+  sqlCode.textContent = 'CREATE TABLE user_data (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,\n  company JSONB,\n  missions JSONB,\n  treasury JSONB,\n  clients JSONB,\n  ir_config JSONB,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\n);\n\nALTER TABLE user_data ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Users can manage own data" ON user_data\n  FOR ALL USING (auth.uid() = user_id);';
   sqlToggle.appendChild(sqlCode);
+
+  // Migration SQL for existing tables
+  var migrationToggle = el('details', { style: { marginTop: '8px' } });
+  migrationToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--warning)' } }, '🔧 SQL de migration (si table déjà créée)'));
+  var migrationCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
+  migrationCode.textContent = '-- Ajouter la colonne ir_config si manquante\nALTER TABLE user_data ADD COLUMN IF NOT EXISTS ir_config JSONB;\n\n-- Ajouter la contrainte UNIQUE sur user_id si manquante\nALTER TABLE user_data ADD CONSTRAINT user_data_user_id_key UNIQUE (user_id);';
+  migrationToggle.appendChild(migrationCode);
+  sqlToggle.appendChild(migrationToggle);
+
   cloudCard.appendChild(sqlToggle);
 
   // Configuration fields with clearer labels
