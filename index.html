@@ -9147,27 +9147,22 @@ function showMonthCongesModal(monthYm, mode) {
         });
       }
 
-      // État activité: iso -> 0 | 0.5 | 1
+      // État activité: construire depuis le planning net + ajustements
+      // Même logique que getWorkedForDay dans le détail par semaine
       var actState = {};
-      // Pré-remplir depuis le planning net (normaliser à 0, 0.5 ou 1)
-      Object.keys(scheduledNet).forEach(function(iso) {
-        var v = scheduledNet[iso];
-        if (v > 0) actState[iso] = v >= 0.75 ? 1 : (v >= 0.25 ? 0.5 : 0);
-      });
-      // Appliquer les ajustements existants par-dessus (seulement pour les jours dans la mission)
-      var missionBizDays = {};
       bizDays.forEach(function(bd) {
-        if (!bd.isHoliday && m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin) {
-          missionBizDays[bd.iso] = true;
+        if (bd.isHoliday) return;
+        var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
+        if (!inMission) return;
+
+        // Priorité: ajustements > planning net
+        if (ligne.ajustements && ligne.ajustements.hasOwnProperty(bd.iso)) {
+          actState[bd.iso] = ligne.ajustements[bd.iso];
+        } else if (scheduledNet[bd.iso] !== undefined && scheduledNet[bd.iso] > 0) {
+          var v = scheduledNet[bd.iso];
+          actState[bd.iso] = v >= 0.75 ? 1 : (v >= 0.25 ? 0.5 : 0);
         }
       });
-      if (ligne.ajustements) {
-        Object.keys(ligne.ajustements).forEach(function(iso) {
-          if (missionBizDays[iso]) {
-            actState[iso] = ligne.ajustements[iso];
-          }
-        });
-      }
 
       function updateActCount() {
         var total = 0;
@@ -9200,8 +9195,9 @@ function showMonthCongesModal(monthYm, mode) {
 
         var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
         var val = actState[bd.iso] || 0;
-        var scheduledVal = scheduledNet[bd.iso] || 0;
-        var isModified = inMission && !bd.isHoliday && scheduledVal > 0 && val !== scheduledVal;
+        var rawSched = scheduledNet[bd.iso] || 0;
+        var scheduledVal = rawSched >= 0.75 ? 1 : (rawSched >= 0.25 ? 0.5 : 0);
+        var isModified = inMission && !bd.isHoliday && scheduledVal > 0 && Math.abs(val - scheduledVal) > 0.01;
         var isAdded = inMission && !bd.isHoliday && scheduledVal === 0 && val > 0;
 
         var cls = 'conges-day';
@@ -9236,11 +9232,12 @@ function showMonthCongesModal(monthYm, mode) {
               else if (next >= 0.25) element.classList.add('act-half');
               else element.classList.add('act-off');
 
-              // Recalculer modified/added
-              var sVal = scheduledNet[iso] || 0;
+              // Recalculer modified/added (normaliser scheduledNet)
+              var rawS = scheduledNet[iso] || 0;
+              var sNorm = rawS >= 0.75 ? 1 : (rawS >= 0.25 ? 0.5 : 0);
               element.classList.remove('act-modified', 'act-added');
-              if (sVal > 0 && next !== sVal) element.classList.add('act-modified');
-              if (sVal === 0 && next > 0) element.classList.add('act-added');
+              if (sNorm > 0 && Math.abs(next - sNorm) > 0.01) element.classList.add('act-modified');
+              if (sNorm === 0 && next > 0) element.classList.add('act-added');
 
               updateActCount();
             });
