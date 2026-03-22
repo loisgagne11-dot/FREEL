@@ -2350,7 +2350,7 @@ function syncToCloud() {
       } else {
         LAST_SYNC_TIME = new Date();
         updateAuthUI();
-        showToast('☁️ Données sauvegardées!', 'success');
+        showBackupIndicator();
       }
     })
     .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
@@ -2387,7 +2387,7 @@ function loadFromCloud() {
         render();
         LAST_SYNC_TIME = new Date();
         updateAuthUI();
-        showToast('☁️ Données chargées du cloud!', 'success');
+        showBackupIndicator();
       }
     })
     .catch(function(err) { console.error('Cloud network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
@@ -11562,27 +11562,27 @@ function renderHealthIndicators(container, data) {
     if (urssafDu > 0) declarationsAJour = false;
   }
 
-  var bar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '12px', marginBottom: '8px' } });
+  var bar = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', marginBottom: '8px' } });
 
   // Provisions (cliquable → Trésorerie > Provisions)
-  var provDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'provisions'; render(); } });
-  provDiv.appendChild(el('div', { style: { fontSize: '16px' } }, provisionsCouvertes ? '✅' : '🚨'));
-  provDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Provisions'));
-  provDiv.appendChild(el('div', { style: { fontSize: '9px', color: provisionsCouvertes ? 'var(--success)' : 'var(--danger)' } }, provisionsCouvertes ? 'couvertes' : 'non couvertes'));
+  var provDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'provisions'; render(); } });
+  provDiv.appendChild(el('div', { style: { fontSize: '14px' } }, provisionsCouvertes ? '✅' : '🚨'));
+  provDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', marginTop: '2px' } }, 'Provisions'));
+  provDiv.appendChild(el('div', { style: { fontSize: '8px', color: provisionsCouvertes ? 'var(--success)' : 'var(--danger)' } }, provisionsCouvertes ? 'couvertes' : 'non couvertes'));
   bar.appendChild(provDiv);
 
   // Factures (cliquable → Activité > Factures)
-  var factDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: facturesRetard === 0 ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (facturesRetard === 0 ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } });
-  factDiv.appendChild(el('div', { style: { fontSize: '16px' } }, facturesRetard === 0 ? '✅' : '⚠️'));
-  factDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Factures'));
-  factDiv.appendChild(el('div', { style: { fontSize: '9px', color: facturesRetard === 0 ? 'var(--success)' : 'var(--warning)' } }, facturesRetard === 0 ? 'à jour' : facturesRetard + ' retard'));
+  var factDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: facturesRetard === 0 ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (facturesRetard === 0 ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } });
+  factDiv.appendChild(el('div', { style: { fontSize: '14px' } }, facturesRetard === 0 ? '✅' : '⚠️'));
+  factDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', marginTop: '2px' } }, 'Factures'));
+  factDiv.appendChild(el('div', { style: { fontSize: '8px', color: facturesRetard === 0 ? 'var(--success)' : 'var(--warning)' } }, facturesRetard === 0 ? 'à jour' : facturesRetard + ' retard'));
   bar.appendChild(factDiv);
 
   // Déclarations (cliquable → Trésorerie > Provisions)
-  var declDiv = el('div', { style: { textAlign: 'center', padding: '10px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'provisions'; render(); } });
-  declDiv.appendChild(el('div', { style: { fontSize: '16px' } }, declarationsAJour ? '✅' : '⚠️'));
-  declDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '600', marginTop: '2px' } }, 'Déclarations'));
-  declDiv.appendChild(el('div', { style: { fontSize: '9px', color: declarationsAJour ? 'var(--success)' : 'var(--warning)' } }, declarationsAJour ? 'à jour' : 'à faire'));
+  var declDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'provisions'; render(); } });
+  declDiv.appendChild(el('div', { style: { fontSize: '14px' } }, declarationsAJour ? '✅' : '⚠️'));
+  declDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', marginTop: '2px' } }, 'Déclarations'));
+  declDiv.appendChild(el('div', { style: { fontSize: '8px', color: declarationsAJour ? 'var(--success)' : 'var(--warning)' } }, declarationsAJour ? 'à jour' : 'à faire'));
   bar.appendChild(declDiv);
 
   container.appendChild(bar);
@@ -12165,7 +12165,7 @@ function createKeyboardHelp() {
 function createBackupIndicator() {
   var indicator = el('div', { id: 'backupIndicator', class: 'backup-indicator' });
   indicator.appendChild(el('span', {}, '✓'));
-  indicator.appendChild(el('span', {}, 'Sauvegardé'));
+  indicator.appendChild(el('span', {}, 'Synchronisé'));
   document.body.appendChild(indicator);
 }
 
@@ -15540,8 +15540,6 @@ function renderFacturesContent(container) {
     });
   }
 
-  factures.sort(function(a, b) { return b.mois.localeCompare(a.mois); });
-
   if (factures.length === 0) {
     var emptyDiv = el('div', { class: 'no-results' });
     emptyDiv.appendChild(el('div', { class: 'no-results-icon' }, '📄'));
@@ -15551,55 +15549,74 @@ function renderFacturesContent(container) {
     return;
   }
 
-  // Regrouper les factures par mois
-  var facturesByMonth = {};
-  var monthOrder = [];
-  factures.forEach(function(f) {
-    if (!facturesByMonth[f.mois]) {
-      facturesByMonth[f.mois] = [];
-      monthOrder.push(f.mois);
+  // Séparer factures réalisées (mois <= mois courant) et à venir (mois futur)
+  var nowYmStr = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var facturesRealisees = factures.filter(function(f) { return f.mois <= nowYmStr; });
+  var facturesAVenir = factures.filter(function(f) { return f.mois > nowYmStr; });
+
+  // Trier: réalisées du plus récent au plus ancien, à venir du plus proche au plus loin
+  facturesRealisees.sort(function(a, b) { return b.mois.localeCompare(a.mois); });
+  facturesAVenir.sort(function(a, b) { return a.mois.localeCompare(b.mois); });
+
+  // Fonction pour afficher un groupe de factures par mois
+  function renderFactureGroup(groupFactures, sectionLabel, borderColor) {
+    if (groupFactures.length === 0) return;
+
+    if (sectionLabel) {
+      container.appendChild(el('div', { class: 'section-title', style: { marginTop: '16px' } }, sectionLabel));
     }
-    facturesByMonth[f.mois].push(f);
-  });
-  monthOrder.sort(function(a, b) { return b.localeCompare(a); });
 
-  monthOrder.forEach(function(mois) {
-    var monthFactures = facturesByMonth[mois];
-    var totalHT = monthFactures.reduce(function(s, f) { return s + f.ht; }, 0);
-    var totalTVA = monthFactures.reduce(function(s, f) { return s + (f.tva || 0); }, 0);
-
-    // Header du mois
-    var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', margin: '12px 0 6px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid var(--accent)' } });
-    monthHeader.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'capitalize' } }, fmtMonth(mois)));
-    var monthStats = el('div', { style: { textAlign: 'right' } });
-    monthStats.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(totalHT) + ' HT'));
-    if (totalTVA > 0) monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '') + ' · TVA ' + EUR(totalTVA)));
-    else monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '')));
-    monthHeader.appendChild(monthStats);
-    container.appendChild(monthHeader);
-
-    // Factures du mois
-    monthFactures.forEach(function(f) {
-      var badgeClass, badgeText;
-      if (f.status === 'payée') { badgeClass = 'badge-success'; badgeText = '✅ Payée'; }
-      else if (f.isLate) { badgeClass = 'badge-late'; badgeText = '📤 Envoyée · ⚠️ RETARD'; }
-      else if (f.status === 'envoyée') { badgeClass = 'badge-warning'; badgeText = '📤 Envoyée'; }
-      else { badgeClass = 'badge-muted'; badgeText = '📝 Brouillon'; }
-
-      var card = el('div', { class: 'facture-card', onclick: function() { showFactureModal(f); } });
-      card.appendChild(el('div', { class: 'badge ' + badgeClass, style: { fontSize: '9px', whiteSpace: 'nowrap' } }, badgeText));
-      var infoDiv = el('div', { class: 'facture-info' });
-      infoDiv.appendChild(el('div', { class: 'facture-id' }, f.client));
-      infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
-      card.appendChild(infoDiv);
-      // Cycle URSSAF inline
-      if (f._mission) {
-        card.appendChild(buildInlineCycleProgress(f._mission, f));
-      }
-      card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
-      container.appendChild(card);
+    // Regrouper par mois
+    var byMonth = {};
+    var order = [];
+    groupFactures.forEach(function(f) {
+      if (!byMonth[f.mois]) { byMonth[f.mois] = []; order.push(f.mois); }
+      byMonth[f.mois].push(f);
     });
-  });
+
+    order.forEach(function(mois) {
+      var monthFactures = byMonth[mois];
+      var totalHT = monthFactures.reduce(function(s, f) { return s + f.ht; }, 0);
+      var totalTVA = monthFactures.reduce(function(s, f) { return s + (f.tva || 0); }, 0);
+
+      // Header du mois
+      var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', margin: '12px 0 6px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid ' + borderColor } });
+      monthHeader.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'capitalize' } }, fmtMonth(mois)));
+      var monthStats = el('div', { style: { textAlign: 'right' } });
+      monthStats.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(totalHT) + ' HT'));
+      if (totalTVA > 0) monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '') + ' · TVA ' + EUR(totalTVA)));
+      else monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '')));
+      monthHeader.appendChild(monthStats);
+      container.appendChild(monthHeader);
+
+      // Factures du mois
+      monthFactures.forEach(function(f) {
+        var badgeClass, badgeText;
+        if (f.status === 'payée') { badgeClass = 'badge-success'; badgeText = '✅ Payée'; }
+        else if (f.isLate) { badgeClass = 'badge-late'; badgeText = '📤 Envoyée · ⚠️ RETARD'; }
+        else if (f.status === 'envoyée') { badgeClass = 'badge-warning'; badgeText = '📤 Envoyée'; }
+        else { badgeClass = 'badge-muted'; badgeText = '📝 Brouillon'; }
+
+        var card = el('div', { class: 'facture-card', onclick: function() { showFactureModal(f); } });
+        card.appendChild(el('div', { class: 'badge ' + badgeClass, style: { fontSize: '9px', whiteSpace: 'nowrap' } }, badgeText));
+        var infoDiv = el('div', { class: 'facture-info' });
+        infoDiv.appendChild(el('div', { class: 'facture-id' }, f.client));
+        infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
+        card.appendChild(infoDiv);
+        if (f._mission) {
+          card.appendChild(buildInlineCycleProgress(f._mission, f));
+        }
+        card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
+        container.appendChild(card);
+      });
+    });
+  }
+
+  // Afficher les factures réalisées en premier (mois récent → ancien)
+  renderFactureGroup(facturesRealisees, facturesAVenir.length > 0 ? '📋 Factures réalisées' : null, 'var(--accent)');
+
+  // Puis les factures à venir
+  renderFactureGroup(facturesAVenir, '📅 Factures à venir', 'var(--info)');
 }
 
 function renderTresorerieContent(container) {
@@ -17472,28 +17489,30 @@ function renderAdmin(container) {
   container.appendChild(el('h2', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '16px' } }, '⚙️ Administration'));
 
   // Sub-tabs navigation
+  var isMobileConfig = window.innerWidth <= 600;
   var configTabs = [
-    { id: 'entreprise', label: 'Mon Entreprise', icon: '🏢' },
-    { id: 'infos', label: 'Infos & Outils', icon: '📊' },
+    { id: 'entreprise', label: isMobileConfig ? 'Entreprise' : 'Mon Entreprise', icon: '🏢' },
+    { id: 'infos', label: isMobileConfig ? 'Outils' : 'Infos & Outils', icon: '📊' },
     { id: 'donnees', label: 'Données', icon: '💾' },
-    { id: 'cloud', label: 'Cloud & Vie privée', icon: '☁️' }
+    { id: 'cloud', label: isMobileConfig ? 'Cloud' : 'Cloud & Vie privée', icon: '☁️' }
   ];
 
   var configTabBar = el('div', { style: {
-    display: 'flex', gap: '6px', marginBottom: '16px',
+    display: 'flex', gap: '4px', marginBottom: '16px',
     padding: '4px', background: 'var(--bg-secondary)', borderRadius: '12px',
-    overflowX: 'auto'
+    overflowX: 'auto', WebkitOverflowScrolling: 'touch'
   }});
 
   configTabs.forEach(function(tab) {
     var isActive = CONFIG_TAB === tab.id;
     var btn = el('button', {
       style: {
-        flex: 1, padding: '10px 8px', border: 'none', borderRadius: '8px',
+        flex: '1 1 0', padding: isMobileConfig ? '8px 4px' : '10px 8px', border: 'none', borderRadius: '8px',
         background: isActive ? 'var(--accent)' : 'transparent',
         color: isActive ? 'white' : 'var(--text-secondary)',
-        fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-        transition: 'all 0.2s ease', whiteSpace: 'nowrap', minWidth: '0'
+        fontSize: isMobileConfig ? '10px' : '11px', fontWeight: '600', cursor: 'pointer',
+        transition: 'all 0.2s ease', whiteSpace: 'nowrap', minWidth: '0',
+        textOverflow: 'ellipsis', overflow: 'hidden'
       },
       onclick: function() { CONFIG_TAB = tab.id; render(); }
     }, tab.icon + ' ' + tab.label);
@@ -18246,7 +18265,8 @@ function renderCockpit(container) {
   var caLatentCockpit = 0;
   (MISSIONS || []).forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'envoyée') caLatentCockpit += (f.ht || 0); }); });
   var txOccup = data.tauxOccupation ? Math.round(data.tauxOccupation * 100) : 0;
-  var kpiBar = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '12px' } });
+  var isMobile = window.innerWidth <= 600;
+  var kpiBar = el('div', { class: 'kpi-grid', style: { marginBottom: '12px', gap: '6px' } });
   var kpis = [
     { label: 'CA Encaissé HT', value: EUR(data.caHT), color: 'var(--success)', click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); } },
     { label: 'CA Latent HT', value: EUR(caLatentCockpit), color: caLatentCockpit > 0 ? 'var(--warning)' : 'var(--text-muted)', click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } },
@@ -18254,8 +18274,8 @@ function renderCockpit(container) {
     { label: 'Tx Occupation', value: txOccup + '%', color: txOccup >= 70 ? 'var(--success)' : txOccup >= 40 ? 'var(--warning)' : 'var(--danger)', click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'missions'; render(); } }
   ];
   kpis.forEach(function(k) {
-    var kpiDiv = el('div', { style: { textAlign: 'center', padding: '8px 4px', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', cursor: k.click ? 'pointer' : 'default' }, onclick: k.click || null });
-    kpiDiv.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '800', color: k.color } }, k.value));
+    var kpiDiv = el('div', { style: { textAlign: 'center', padding: isMobile ? '6px 4px' : '8px 4px', background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', cursor: k.click ? 'pointer' : 'default' }, onclick: k.click || null });
+    kpiDiv.appendChild(el('div', { style: { fontSize: isMobile ? '12px' : '13px', fontWeight: '800', color: k.color } }, k.value));
     kpiDiv.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase' } }, k.label));
     kpiBar.appendChild(kpiDiv);
   });
@@ -18432,7 +18452,7 @@ function renderCompteProfil(container) {
 
   if (CURRENT_USER) {
     var cloudBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
-    cloudBtns.appendChild(el('button', { class: 'btn btn-primary', onclick: function() { syncToCloud(); showToast('Sauvegarde en cours...', 'info'); } }, 'Sauvegarder'));
+    cloudBtns.appendChild(el('button', { class: 'btn btn-primary', onclick: function() { syncToCloud(); } }, 'Sauvegarder'));
     cloudBtns.appendChild(el('button', { class: 'btn', onclick: function() {
       if (confirm('Charger les données du cloud ? Cela remplacera vos données locales.')) {
         loadFromCloud();
