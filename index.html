@@ -492,7 +492,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 @keyframes toastIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
 .header { position: fixed; top: 0; left: 0; right: 0; background: rgba(10, 10, 11, 0.92); backdrop-filter: blur(20px); border-bottom: 1px solid var(--glass-border); z-index: 100; }
-.header-content { max-width: 900px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; gap: 12px; }
+.header-content { max-width: 900px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; gap: 12px; overflow-x: hidden; }
 .logo { font-size: 20px; font-weight: 800; background: linear-gradient(135deg, var(--accent), #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px; }
 .nav-tabs { display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 10px; margin-left: auto; }
 .nav-tab { background: transparent; color: var(--text-muted); border: none; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1.2; }
@@ -854,37 +854,333 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .backup-indicator.show { display: flex; align-items: center; gap: 6px; animation: fadeIn 0.2s ease; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-/* Sprint 13: Mobile improvements */
-@media (max-width: 480px) {
-  .header-content { padding: 6px 12px; gap: 8px; }
-  .logo { font-size: 16px; }
-  .period-selector { display: flex; gap: 2px; }
+/* =============================================
+   MOBILE OPTIMIZATION - Responsive Design
+   ============================================= */
+
+/* --- Tablette / Petit écran (max 768px) --- */
+@media (max-width: 768px) {
+  .container { padding: 12px; }
+  .hero { padding: 20px; }
+  .hero-value { font-size: 40px; }
+  .hero-stats { gap: 16px; }
+  .text-hero { font-size: 36px; }
+  .health-score-details { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .compare-grid { grid-template-columns: 1fr; gap: 10px; }
+  .compare-item { display: flex; justify-content: space-between; align-items: center; text-align: left; padding: 10px 14px; }
+  .projection-metrics { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .legal-timeline-items { flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .legal-milestone { width: 70px; }
+  .legal-timeline-line { display: none; }
+  .annual-summary { gap: 8px; }
+  .annual-value { font-size: 18px; }
+  .conges-calendar { grid-template-columns: repeat(5, 1fr); }
+}
+
+/* --- Mobile principal (max 600px) --- */
+@media (max-width: 600px) {
+  /* Header mobile: compacter les éléments */
+  .header-content { padding: 6px 10px; gap: 6px; }
+  .logo { font-size: 17px; }
+  .period-selector { gap: 3px; }
   .period-selector .period-btn { font-size: 10px; padding: 4px 6px; }
-  .period-selector .year-nav-btn { font-size: 10px; width: 24px; height: 24px; }
-  .period-selector .period-input { font-size: 10px; max-width: 100px; }
-  .privacy-toggle { width: 26px; height: 26px; font-size: 12px; padding: 2px; }
-  .search-box { width: 95%; margin: 0 10px; }
-  .search-input-wrap { padding: 12px; }
-  .search-input-wrap input { font-size: 14px; }
-  .keyboard-help { right: 10px; bottom: 70px; max-width: 240px; padding: 12px; }
-  .modal-content { width: 95%; margin: 10px; padding: 16px; max-height: 90vh; }
-  .modal-title { font-size: 16px; }
-  .form-row { flex-direction: column; gap: 8px; }
-  .form-group { min-width: 100%; }
-  .fab { width: 48px; height: 48px; font-size: 20px; bottom: 70px; right: 12px; }
-  .backup-indicator { bottom: 70px; left: 12px; padding: 6px 10px; font-size: 10px; }
-  .card { padding: 12px; }
-  .card-title { font-size: 12px; }
+  .period-selector .year-nav-btn { font-size: 10px; width: 22px; height: 22px; }
+  .period-selector .period-select { font-size: 10px; padding: 4px 4px; }
+  .period-selector .period-input { font-size: 10px; max-width: 90px; }
+  .privacy-toggle { width: 28px; height: 28px; font-size: 13px; padding: 2px; min-width: 28px; flex-shrink: 0; }
+
+  /* Container et espacement */
+  .container { padding: 10px; }
+  #app { padding-bottom: 12px; }
+
+  /* Hero section */
+  .hero { padding: 16px; margin-bottom: 12px; border-radius: var(--radius-lg); }
+  .hero-value { font-size: 36px; letter-spacing: -1.5px; }
+  .hero-sub { font-size: 11px; }
+  .hero-stats { gap: 12px; margin-top: 12px; padding-top: 12px; flex-wrap: wrap; }
+  .hero-stat-value { font-size: 16px; }
+  .hero.interactive::after { font-size: 9px; padding: 3px 8px; right: 10px; top: 10px; }
+  .text-hero { font-size: 30px; letter-spacing: -1px; }
+
+  /* KPI */
   .kpi { padding: 10px; }
   .kpi-value { font-size: 18px; }
   .kpi-label { font-size: 9px; }
-  .timeline-item { padding: 8px 12px; }
-  .action-item { padding: 8px 10px; }
+  .kpi-sub { font-size: 9px; }
+  .kpi.interactive::after { font-size: 8px; padding: 2px 5px; right: 6px; top: 6px; }
+
+  /* Health score */
+  .health-score { padding: 14px; border-radius: var(--radius-lg); }
+  .health-score-circle { width: 52px; height: 52px; font-size: 20px; }
+  .health-score-label { font-size: 14px; }
+  .health-score-details { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+  /* TVA module */
+  .tva-module { padding: 14px; border-radius: var(--radius-lg); }
+  .tva-info { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tva-info-item { padding: 8px 4px; }
+  .tva-info-value { font-size: 12px; }
+  .tva-info-label { font-size: 9px; }
+
+  /* Compare widget */
+  .compare-widget { padding: 12px; border-radius: var(--radius-lg); }
+  .compare-grid { grid-template-columns: 1fr; gap: 8px; }
+  .compare-item { display: flex; justify-content: space-between; align-items: center; text-align: left; padding: 10px 12px; }
+
+  /* Goal widget */
+  .goal-widget { padding: 12px; border-radius: var(--radius-lg); }
+
+  /* Clients widget */
+  .clients-widget { padding: 12px; border-radius: var(--radius-lg); }
+  .client-row { padding: 8px; }
+  .client-name { font-size: 12px; }
+  .client-ca { font-size: 13px; }
+
+  /* Mission cards */
+  .mission-card { padding: 12px; margin-bottom: 10px; border-radius: var(--radius-md); }
+  .mission-client { font-size: 14px; }
+  .mission-stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .mission-stat { padding: 6px; }
+  .mission-stat-value { font-size: 12px; }
+  .mission-stat-label { font-size: 7px; }
+
+  /* Facture cards */
+  .facture-card { padding: 10px 12px; gap: 8px; }
+  .facture-info { min-width: 80px; }
+  .facture-id { font-size: 12px; }
+  .facture-meta { font-size: 10px; }
+  .facture-ht { font-size: 13px; }
+  .facture-cycle { gap: 2px; }
+  .facture-cycle-dot { width: 16px; height: 16px; font-size: 8px; }
+  .facture-cycle-label { font-size: 6px; }
+
+  /* Charges panel */
+  .charges-panel { border-radius: var(--radius-lg); }
+  .charges-tab { font-size: 11px; padding: 10px 6px; }
+  .charges-list { padding: 10px; max-height: 240px; }
+  .charge-item { padding: 8px 10px; }
+  .charge-item-label { font-size: 11px; }
+  .charge-item-amount { font-size: 12px; }
+  .charge-cat-badge { font-size: 8px; padding: 2px 6px; margin-right: 6px; }
+
+  /* Actions widget */
+  .actions-widget { padding: 12px; border-radius: var(--radius-lg); }
+  .action-item { padding: 10px; gap: 10px; }
+  .action-icon { font-size: 18px; }
+  .action-label { font-size: 12px; }
+  .action-sub { font-size: 10px; }
+  .action-btn { padding: 6px 10px; font-size: 10px; }
+
+  /* Legal timeline */
+  .legal-timeline { padding: 14px; border-radius: var(--radius-lg); }
+  .legal-timeline-items { flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .legal-milestone { width: 65px; }
+  .legal-milestone-dot { width: 28px; height: 28px; font-size: 12px; }
+  .legal-milestone-label { font-size: 9px; margin-top: 6px; }
+  .legal-milestone-date { font-size: 8px; }
+  .legal-timeline-line { display: none; }
+
+  /* Payment cycle */
+  .payment-cycle { padding: 12px; }
+  .pc-dot { width: 30px; height: 30px; font-size: 14px; }
+  .pc-title { font-size: 12px; }
+  .pc-date { font-size: 10px; }
+  .pc-desc { font-size: 10px; }
+  .pc-amount { font-size: 12px; padding: 3px 8px; }
+
+  /* Treso items */
+  .treso-item { padding: 6px 8px; }
+  .treso-item-value { font-size: 13px; }
+  .treso-item-label { font-size: 8px; }
+  .treso-item::after { width: 12px; height: 12px; font-size: 8px; right: 4px; top: 4px; }
+
+  /* Cards generiques */
+  .card { padding: 12px; margin-bottom: 10px; border-radius: var(--radius-md); }
+  .card-title { font-size: 12px; }
+  .chart-container { height: 180px; min-height: 180px; }
+
+  /* Summary & insights */
+  .summary-card { padding: 14px; border-radius: var(--radius-lg); }
+  .summary-text { font-size: 12px; }
+  .insight-chip { padding: 5px 10px; font-size: 10px; margin: 2px; }
+
+  /* Quick actions */
+  .quick-actions { gap: 6px; }
+  .quick-action-btn { padding: 8px 12px; font-size: 11px; }
+  .quick-action-btn .icon { font-size: 14px; }
+
+  /* Alerts */
+  .alert { padding: 10px 12px; gap: 10px; font-size: 12px; }
+  .alert-icon { font-size: 16px; }
+  .alert-title { font-size: 12px; }
+  .alert-text { font-size: 10px; }
+  .alert-btn { padding: 5px 12px; font-size: 10px; }
+
+  /* Sections */
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 11px; margin-bottom: 8px; }
+
+  /* Annual summary */
+  .annual-value { font-size: 18px; }
+  .annual-item { padding: 12px; }
+
+  /* Projections */
+  .projection-tabs { gap: 4px; }
+  .projection-tab { padding: 8px; }
+  .projection-tab-icon { font-size: 16px; }
+  .projection-tab-label { font-size: 10px; }
+  .projection-tab-desc { font-size: 8px; }
+  .projection-params { grid-template-columns: 1fr; gap: 8px; }
+  .projection-metrics { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .projection-metric-value { font-size: 16px; }
+  .projection-metric-label { font-size: 9px; }
+  .projection-chart { height: 150px; }
+
+  /* Search overlay */
+  .search-overlay { padding-top: 60px; }
+  .search-box { width: 95%; margin: 0 auto; max-width: none; }
+  .search-input-wrap { padding: 12px; }
+  .search-input-wrap input { font-size: 16px; }
+  .search-result { padding: 10px 14px; }
+
+  /* Formulaires */
+  .form-row { grid-template-columns: 1fr; gap: 8px; }
+  .form-row-3 { grid-template-columns: 1fr; gap: 8px; }
+  .form-row-4 { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .form-group { min-width: 100%; }
+  .form-input, .form-select { padding: 10px; font-size: 16px; }
+  .form-label { font-size: 10px; }
+
+  /* Modal */
+  .modal { padding: 0; align-items: flex-end; }
+  .modal-content { width: 100%; max-width: 100%; max-height: 92vh; border-radius: var(--radius-xl) var(--radius-xl) 0 0; animation: slideUp 0.3s ease; }
+  .modal-header { padding: 16px; }
+  .modal-title { font-size: 16px; }
+  .modal-body { padding: 16px; }
+
+  /* Tables */
+  .days-table { font-size: 11px; }
+  .days-table th { padding: 8px 6px; font-size: 9px; }
+  .days-table td { padding: 6px; }
+  .days-table input { width: 42px; padding: 4px; font-size: 11px; }
+
+  /* Filter bar & chips */
+  .search-filter-bar { gap: 8px; }
+  .filter-chips { gap: 4px; }
+  .filter-chip { padding: 5px 10px; font-size: 10px; }
+  .filter-dropdown { font-size: 11px; padding: 8px 28px 8px 10px; min-width: 100px; }
+
+  /* Buttons */
+  .btn { padding: 10px 16px; font-size: 12px; }
+  .btn-sm { padding: 6px 12px; font-size: 10px; }
+  .export-btn { padding: 10px; font-size: 12px; }
+
+  /* Bottom nav & FAB */
+  .bottom-nav-tab { padding: 6px 2px; }
+  .bottom-nav-icon { font-size: 18px; }
+  .bottom-nav-label { font-size: 9px; }
+  .fab { width: 48px; height: 48px; font-size: 20px; bottom: 70px; right: 12px; }
+  .fab-item { font-size: 11px; padding: 7px 12px; }
+
+  /* Notifications */
+  .notif-center { right: 10px; left: 10px; width: auto; top: 52px; max-height: 75vh; }
+  .notif-item { padding: 10px 14px; gap: 10px; }
+  .notif-icon { width: 32px; height: 32px; font-size: 14px; }
+  .notif-text { font-size: 11px; }
+  .notif-sub { font-size: 9px; }
+
+  /* Keyboard help */
+  .keyboard-help { right: 10px; bottom: 70px; max-width: 240px; padding: 12px; }
+
+  /* Backup indicator */
+  .backup-indicator { bottom: 70px; left: 12px; padding: 6px 10px; font-size: 10px; }
+
+  /* Onboarding */
+  .onboarding { padding: 16px; }
+  .onboarding-card { max-width: 100%; }
+  .onboarding-icon { font-size: 48px; margin-bottom: 16px; }
+  .onboarding-title { font-size: 22px; }
+  .onboarding-text { font-size: 13px; margin-bottom: 24px; }
+
+  /* Conges calendar */
+  .conges-calendar { grid-template-columns: repeat(5, 1fr); gap: 3px; }
+  .conges-day { padding: 4px 2px; min-height: 34px; }
+  .conges-day .cd-num { font-size: 11px; }
+
+  /* Timeline horizontal scroll */
+  .timeline { gap: 3px; }
+  .timeline-item { width: 54px; padding: 6px 3px; }
+  .timeline-month { font-size: 9px; }
+  .timeline-amount { font-size: 10px; }
+
+  /* Toggle rows */
+  .toggle-row { padding: 10px 0; }
+  .toggle-label { font-size: 12px; }
+
+  /* Detail rows */
+  .detail-row { padding: 8px 0; font-size: 12px; }
+
+  /* Info boxes */
+  .info-box { padding: 10px; }
+  .info-row { font-size: 11px; }
+
+  /* Page header */
+  .page-header { margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .page-title { font-size: 18px; }
+  .page-actions { gap: 6px; }
+  .page-actions .btn { padding: 8px 12px; font-size: 11px; }
+
+  /* Badges */
+  .badge { padding: 3px 8px; font-size: 9px; }
+
+  /* Empty state */
+  .empty-state { padding: 32px 16px; }
+  .empty-icon { font-size: 40px; }
+  .empty-title { font-size: 16px; }
+  .empty-text { font-size: 12px; }
 }
+
+/* --- Petit mobile (max 480px) --- */
+@media (max-width: 480px) {
+  .header-content { padding: 6px 8px; gap: 4px; }
+  .logo { font-size: 15px; }
+  .period-selector .year-nav-btn { width: 20px; height: 20px; font-size: 9px; }
+  .period-selector .period-btn { font-size: 9px; padding: 3px 5px; }
+  .period-selector .period-select { font-size: 9px; padding: 3px; }
+  .privacy-toggle { width: 26px; height: 26px; font-size: 12px; }
+
+  .hero-value { font-size: 32px; }
+  .hero { padding: 14px; }
+  .text-hero { font-size: 26px; }
+
+  .mission-stats { grid-template-columns: repeat(2, 1fr); }
+  .mission-stat:last-child { grid-column: span 2; }
+
+  .tva-info { grid-template-columns: 1fr 1fr; gap: 6px; }
+
+  .projection-metrics { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .projection-metric:last-child { grid-column: span 2; text-align: center; }
+
+  .conges-calendar { grid-template-columns: repeat(4, 1fr); }
+
+  .facture-card { flex-direction: column; align-items: stretch; }
+  .facture-cycle { justify-content: center; padding: 6px 0; }
+  .facture-amount { text-align: left; display: flex; justify-content: space-between; align-items: center; }
+}
+
+/* --- Très petit mobile (max 360px) --- */
 @media (max-width: 360px) {
   .kpi-grid { grid-template-columns: 1fr; }
   .header-content { justify-content: space-between; }
   .nav-tabs { display: none; }
+  .health-score-details { grid-template-columns: 1fr 1fr; }
+  .hero-value { font-size: 28px; }
+  .hero-stats { flex-direction: column; gap: 8px; }
+  .hero-stat { display: flex; justify-content: space-between; align-items: center; text-align: left; }
+  .annual-summary { grid-template-columns: 1fr; }
+  .tva-info { grid-template-columns: 1fr; }
+  .mission-stats { grid-template-columns: 1fr 1fr; }
+  .conges-calendar { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* Sprint 14: Notification Center */
@@ -1438,6 +1734,45 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--warning);
   padding: 0 2px;
   border-radius: 2px;
+}
+
+/* Light theme: header & bottom-nav background fix */
+[data-theme="light"] .header { background: rgba(248, 250, 252, 0.92); }
+[data-theme="light"] .bottom-nav { background: rgba(248, 250, 252, 0.95); }
+
+/* Mobile: Override inline-style grids with !important */
+@media (max-width: 600px) {
+  /* Force 2-col for inline 4-col and 3-col grids */
+  [style*="grid"][style*="repeat(4"] { grid-template-columns: repeat(2, 1fr) !important; }
+  [style*="grid"][style*="repeat(3"] { grid-template-columns: repeat(2, 1fr) !important; }
+  /* Force multi-col data tables to scroll */
+  [style*="grid"][style*="2fr 1fr 1fr 1fr 1fr"] { grid-template-columns: 2fr 1fr 1fr !important; font-size: 10px !important; overflow-x: auto !important; }
+  [style*="grid"][style*="2fr 1fr 1fr 1fr"] { font-size: 10px !important; }
+  /* Scrollable horizontal overflow wrapper */
+  .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+@media (max-width: 480px) {
+  [style*="grid"][style*="repeat(4"] { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+  [style*="grid"][style*="repeat(3"] { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+  [style*="grid"][style*="2fr 1fr 1fr 1fr 1fr"] { grid-template-columns: 1fr 1fr !important; }
+  [style*="grid"][style*="1fr 1fr"][style*="gap: '12px'"] { gap: 6px !important; }
+}
+@media (max-width: 360px) {
+  [style*="grid"][style*="repeat(4"] { grid-template-columns: 1fr !important; }
+  [style*="grid"][style*="repeat(3"] { grid-template-columns: 1fr !important; }
+}
+
+/* Safe area for notch phones (iPhone X+) */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+  body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+}
+
+/* Smooth scrolling on mobile */
+@media (max-width: 600px) {
+  html { scroll-behavior: smooth; -webkit-tap-highlight-color: transparent; }
+  * { -webkit-tap-highlight-color: transparent; }
+  input, select, textarea { font-size: 16px !important; }
 }
 
 /* Impression facture */
@@ -18352,6 +18687,30 @@ function renderCompteSecurite(container) {
   container.appendChild(dangerCard);
 }
 
+// Mobile grid adaptation for inline-style grids
+function adaptMobileGrids() {
+  var w = window.innerWidth;
+  if (w > 600) return;
+  var grids = document.querySelectorAll('#app [style]');
+  grids.forEach(function(g) {
+    var s = g.style;
+    if (s.display !== 'grid' || !s.gridTemplateColumns) return;
+    var cols = s.gridTemplateColumns;
+    if (w <= 360) {
+      if (cols.indexOf('repeat(4') > -1 || cols.indexOf('repeat(3') > -1) s.gridTemplateColumns = '1fr';
+      else if (cols.indexOf('2fr 1fr 1fr 1fr 1fr') > -1) s.gridTemplateColumns = '2fr 1fr 1fr';
+    } else if (w <= 480) {
+      if (cols.indexOf('repeat(4') > -1) s.gridTemplateColumns = 'repeat(2, 1fr)';
+      if (cols.indexOf('repeat(3') > -1) s.gridTemplateColumns = 'repeat(2, 1fr)';
+      if (cols.indexOf('2fr 1fr 1fr 1fr 1fr') > -1) { s.gridTemplateColumns = '2fr 1fr 1fr'; s.fontSize = '10px'; }
+    } else {
+      if (cols.indexOf('repeat(4') > -1) s.gridTemplateColumns = 'repeat(2, 1fr)';
+      if (cols.indexOf('2fr 1fr 1fr 1fr 1fr') > -1) { s.gridTemplateColumns = '2fr 1fr 1fr 1fr'; s.fontSize = '10px'; }
+    }
+  });
+}
+window.addEventListener('resize', function() { if (window.innerWidth <= 600) adaptMobileGrids(); });
+
 function render() {
   var container = $('#app');
   if (!container) { console.error('Container #app not found'); return; }
@@ -18385,6 +18744,9 @@ function render() {
   var monthFilter = $('#monthFilter');
   if (monthFilter) monthFilter.value = PERIOD.month !== null && PERIOD.month !== undefined ? String(PERIOD.month) : '';
   updateNotifBadge();
+
+  // Mobile: adapter les grilles inline-style
+  adaptMobileGrids();
 
   // Graphiques uniquement en Finances > Évolution (gérés par renderFinancesEvolution)
 }
