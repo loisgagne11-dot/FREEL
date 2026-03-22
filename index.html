@@ -4464,6 +4464,8 @@ function getScheduledDaysForMonth(mis, monthKey) {
   });
 
   // Jours non couverts par des périodes mais dans la mission = fulltime
+  // Seulement si AUCUNE période n'est définie (mission sans rythme spécifique)
+  if (mis.periodes && mis.periodes.length > 0) return result;
   var misStart2 = mis.debut ? parseLD(mis.debut) : monthStart;
   var misEnd2 = mis.fin ? parseLD(mis.fin) : monthEnd;
   var c2 = new Date(Math.max(monthStart, misStart2));
