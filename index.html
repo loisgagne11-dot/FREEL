@@ -989,10 +989,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .pc-amount { font-size: 12px; padding: 3px 8px; }
 
   /* Treso items */
-  .treso-item { padding: 6px 8px; }
-  .treso-item-value { font-size: 13px; }
-  .treso-item-label { font-size: 8px; }
-  .treso-item::after { width: 12px; height: 12px; font-size: 8px; right: 4px; top: 4px; }
+  .treso-item { padding: 6px 4px; }
+  .treso-item-value { font-size: 12px; }
+  .treso-item-label { font-size: 7px; }
+  .treso-item-count { font-size: 7px; }
+  .treso-item::after { width: 10px; height: 10px; font-size: 7px; right: 3px; top: 3px; }
 
   /* Cards generiques */
   .card { padding: 12px; margin-bottom: 10px; border-radius: var(--radius-md); }
@@ -12552,15 +12553,18 @@ function renderDashboardHero(container, data) {
   var colorAutres = '#a855f7';
 
   var compteContainer = el('div', { style: {
-    marginTop: '16px', padding: '16px', background: 'var(--bg-tertiary)', borderRadius: '12px'
+    marginTop: '12px', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '12px'
   }});
 
-  // Layout: Donut à gauche, Légende à droite
-  var compteRow = el('div', { style: { display: 'flex', gap: '20px', alignItems: 'center' } });
+  var isMobileHero = window.innerWidth <= 600;
+
+  // Layout: Donut à gauche, Légende à droite (colonne sur mobile)
+  var compteRow = el('div', { style: { display: 'flex', gap: isMobileHero ? '12px' : '20px', alignItems: 'center', flexDirection: isMobileHero ? 'column' : 'row' } });
 
   // === DONUT CHART avec Chart.js ===
-  var donutDiv = el('div', { style: { position: 'relative', width: '140px', height: '140px', flexShrink: '0' } });
-  var canvasDonut = el('canvas', { id: 'compteDonutCanvas', style: { width: '140px', height: '140px' } });
+  var donutSize = isMobileHero ? '110px' : '140px';
+  var donutDiv = el('div', { style: { position: 'relative', width: donutSize, height: donutSize, flexShrink: '0' } });
+  var canvasDonut = el('canvas', { id: 'compteDonutCanvas', style: { width: donutSize, height: donutSize } });
   donutDiv.appendChild(canvasDonut);
 
   // Solde au centre du donut
@@ -12568,7 +12572,7 @@ function renderDashboardHero(container, data) {
     position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
     textAlign: 'center', pointerEvents: 'none'
   }});
-  centerInfo.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '800' } }, EUR(solde, true)));
+  centerInfo.appendChild(el('div', { style: { fontSize: isMobileHero ? '14px' : '16px', fontWeight: '800' } }, EUR(solde, true)));
   centerInfo.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'Solde'));
   donutDiv.appendChild(centerInfo);
   compteRow.appendChild(donutDiv);
@@ -12670,15 +12674,15 @@ function renderDashboardHero(container, data) {
   }, 100);
 
   // V60: Salaire versable + Autonomie côte à côte en dernier
-  var bottomRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } });
+  var bottomRow = el('div', { style: { display: 'flex', gap: '6px', marginTop: '10px' } });
 
   // Salaire versable
   var salaireDiv = el('div', { style: {
-    flex: '1', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px'
+    flex: '1', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px'
   }});
-  salaireDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '💸 Rémunération versable'));
-  salaireDiv.appendChild(el('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--success)' } }, EUR(data.salaireVersable)));
-  salaireDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Cash - ' + EUR(data.reserveCompte) + ' réserve'));
+  salaireDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '💸 Rémunération versable'));
+  salaireDiv.appendChild(el('div', { style: { fontWeight: '700', fontSize: '16px', color: 'var(--success)' } }, EUR(data.salaireVersable)));
+  salaireDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'Cash - ' + EUR(data.reserveCompte) + ' réserve'));
   if (data.salaireVersable >= 500) {
     salaireDiv.appendChild(el('button', {
       class: 'btn btn-success btn-sm',
@@ -12690,14 +12694,14 @@ function renderDashboardHero(container, data) {
 
   // Autonomie
   var autoDiv = el('div', {
-    style: { flex: '1', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', cursor: 'pointer' },
+    style: { flex: '1', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', cursor: 'pointer' },
     onclick: function(e) { e.stopPropagation(); showProjectionAutonomieModal(); },
     title: 'Cliquer pour voir la projection d\'autonomie'
   });
-  autoDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '⏱️ Autonomie'));
-  autoDiv.appendChild(el('div', { style: { fontWeight: '700', fontSize: '18px', color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'));
-  autoDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Sans nouveau CA'));
-  autoDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--accent)', marginTop: '4px' } }, 'Voir projection →'));
+  autoDiv.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '⏱️ Autonomie'));
+  autoDiv.appendChild(el('div', { style: { fontWeight: '700', fontSize: '16px', color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)' } }, data.runway + ' mois'));
+  autoDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'Sans nouveau CA'));
+  autoDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--accent)', marginTop: '2px' } }, 'Voir projection →'));
   bottomRow.appendChild(autoDiv);
 
   hero.appendChild(bottomRow);
@@ -17202,8 +17206,9 @@ function renderTresorerie(container) {
   // V77: Hero complet Cash Dispo + donut + salaire + autonomie (déplacé depuis Cockpit)
   renderDashboardHero(container, data);
 
-  // 4 blocs en grille (3 cols pour compacité)
-  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' } });
+  // 5 blocs en grille compacte (3 cols sur mobile aussi)
+  var isMobileTreso = window.innerWidth <= 480;
+  var grid = el('div', { style: { display: 'grid', gridTemplateColumns: isMobileTreso ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' } });
   
   // Solde Initial (éditable)
   var soldeInitBlock = el('div', { class: 'treso-item', onclick: function() { showEditSoldeInitial(); } });
@@ -18715,9 +18720,13 @@ function adaptMobileGrids() {
   grids.forEach(function(g) {
     var s = g.style;
     if (s.display !== 'grid' || !s.gridTemplateColumns) return;
+    // Skip grids that already use CSS classes (kpi-grid) or contain treso-items
+    if (g.classList.contains('kpi-grid')) return;
+    if (g.querySelector && g.querySelector('.treso-item')) return;
     var cols = s.gridTemplateColumns;
     if (w <= 360) {
-      if (cols.indexOf('repeat(4') > -1 || cols.indexOf('repeat(3') > -1) s.gridTemplateColumns = '1fr';
+      if (cols.indexOf('repeat(4') > -1) s.gridTemplateColumns = '1fr 1fr';
+      else if (cols.indexOf('repeat(3') > -1) s.gridTemplateColumns = '1fr 1fr';
       else if (cols.indexOf('2fr 1fr 1fr 1fr 1fr') > -1) s.gridTemplateColumns = '2fr 1fr 1fr';
     } else if (w <= 480) {
       if (cols.indexOf('repeat(4') > -1) s.gridTemplateColumns = 'repeat(2, 1fr)';
