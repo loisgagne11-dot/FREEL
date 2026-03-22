@@ -1317,6 +1317,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .conges-day.holiday { opacity: 0.4; pointer-events: none; background: rgba(245,158,11,0.1); border-color: transparent; }
 .conges-day.holiday .cd-num { text-decoration: line-through; color: #f59e0b; }
 .conges-day.not-in-mission { opacity: 0.25; pointer-events: none; }
+/* Suivi d'activité: états du calendrier */
+.conges-day.act-worked { background: #22c55e; border-color: #22c55e; }
+.conges-day.act-worked .cd-num, .conges-day.act-worked .cd-dow { color: #fff; }
+.conges-day.act-half { background: rgba(34,197,94,0.3); border-color: #22c55e; }
+.conges-day.act-half .cd-num { color: #22c55e; }
+.conges-day.act-off { background: var(--bg-secondary); border-color: var(--glass-border); opacity: 0.5; }
+.conges-day.act-off .cd-num { color: var(--text-muted); }
+/* Jour modifié par rapport à la prévision */
+.conges-day.act-modified { box-shadow: inset 0 0 0 2px #f59e0b; }
+.conges-day.act-modified .cd-dow { color: #f59e0b !important; font-weight: 700; }
+/* Jour ajouté (pas dans la prévision) */
+.conges-day.act-added { box-shadow: inset 0 0 0 2px #60a5fa; }
+.conges-day.act-added .cd-dow { color: #60a5fa !important; font-weight: 700; }
+/* Mode toggle congés/activité */
+.cal-mode-toggle { display: flex; gap: 4px; background: var(--bg-tertiary); padding: 3px; border-radius: 8px; margin-bottom: 12px; }
+.cal-mode-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
+.cal-mode-btn.active { background: var(--accent); color: white; }
+.cal-mode-btn:not(.active) { background: transparent; color: var(--text-muted); }
+.cal-legend { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; font-size: 9px; color: var(--text-muted); }
+.cal-legend-item { display: flex; align-items: center; gap: 4px; }
+.cal-legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 .conges-mission-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; margin-top: 12px; border-bottom: 1px solid var(--glass-border); }
 .conges-mission-header:first-child { margin-top: 0; }
 .agence-contact { background: var(--bg-tertiary); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 8px; position: relative; }
@@ -1900,6 +1921,7 @@ window.addEventListener('unhandledrejection', function(event) {
 var VIEW = 'cockpit';
 var ACTIVITE_TAB = 'missions';
 var TRESORERIE_TAB = 'flux'; // sous-onglet trésorerie: flux, provisions
+var CAL_MODE = 'conges'; // mode calendrier: 'conges' ou 'activite'
 var CONFIG_TAB = 'entreprise'; // sous-onglet config: entreprise, infos, donnees, cloud
 var COMPTE_TAB = 'profil'; // sous-onglet compte: profil, preferences, securite
 
@@ -4343,6 +4365,118 @@ function getJoursPrevusPourMois(mis, monthKey, joursOuvrables) {
   return Math.round(totalWorkedInMonth * 10) / 10;
 }
 
+// Retourne une map { 'YYYY-MM-DD': 0.5|1 } des jours planifiés pour un mois donné
+function getScheduledDaysForMonth(mis, monthKey) {
+  var p = parseYM(monthKey);
+  var monthStart = new Date(p.y, p.m, 1);
+  var monthEnd = new Date(p.y, p.m + 1, 0);
+  var result = {};
+
+  var holidayCache = {};
+  function getHolidays(yr) {
+    if (!holidayCache[yr]) holidayCache[yr] = frenchHolidays(yr);
+    return holidayCache[yr];
+  }
+  function isBusinessDay(date) {
+    var dow = date.getDay();
+    if (dow === 0 || dow === 6) return false;
+    return getHolidays(date.getFullYear()).indexOf(localISO(date)) === -1;
+  }
+
+  var dowToKey = [null, 'lun', 'mar', 'mer', 'jeu', 'ven', null];
+
+  function parseLD(s) { var pts = s.split('-'); return new Date(parseInt(pts[0]), parseInt(pts[1]) - 1, parseInt(pts[2])); }
+
+  if (!mis.periodes || mis.periodes.length === 0) {
+    // Pas de périodes: tous les jours ouvrés dans la mission = 1
+    var misStart = mis.debut ? parseLD(mis.debut) : monthStart;
+    var misEnd = mis.fin ? parseLD(mis.fin) : monthEnd;
+    var c = new Date(Math.max(monthStart, misStart));
+    var cEnd = new Date(Math.min(monthEnd, misEnd));
+    while (c <= cEnd) {
+      if (isBusinessDay(c) && c.getMonth() === p.m) {
+        result[localISO(c)] = 1;
+      }
+      c.setDate(c.getDate() + 1);
+    }
+    return result;
+  }
+
+  // Avec périodes: mapper chaque jour selon joursMap
+  var coveredDates = {};
+  mis.periodes.forEach(function(periode) {
+    if (!periode.debut || !periode.fin) return;
+    var pStart = parseLD(periode.debut);
+    var pEnd = parseLD(periode.fin);
+    var joursMap = periode.joursMap;
+    var useLegacy = !joursMap;
+    var joursSemaine = periode.joursSemaine || 5;
+
+    var overlapStart = pStart > monthStart ? pStart : monthStart;
+    var overlapEnd = pEnd < monthEnd ? pEnd : monthEnd;
+    if (overlapStart > overlapEnd) return;
+
+    if (useLegacy) {
+      // Legacy: N premiers jours ouvrés de chaque semaine
+      var weekMon = new Date(overlapStart);
+      var dow = weekMon.getDay();
+      weekMon.setDate(weekMon.getDate() - (dow === 0 ? 6 : dow - 1));
+      while (weekMon <= overlapEnd) {
+        var weekBizDays = [];
+        for (var i = 0; i < 5; i++) {
+          var day = new Date(weekMon);
+          day.setDate(day.getDate() + i);
+          if (day < pStart || day > pEnd) continue;
+          if (!isBusinessDay(day)) continue;
+          weekBizDays.push(day);
+        }
+        var daysToWork = Math.min(joursSemaine, weekBizDays.length);
+        var fullDays = Math.floor(daysToWork);
+        var fractional = daysToWork - fullDays;
+        for (var j = 0; j < weekBizDays.length && j <= fullDays; j++) {
+          var workDay = weekBizDays[j];
+          if (workDay.getMonth() === p.m && workDay.getFullYear() === p.y) {
+            var iso = localISO(workDay);
+            if (j < fullDays) { result[iso] = 1; coveredDates[iso] = true; }
+            else if (fractional > 0) { result[iso] = fractional; coveredDates[iso] = true; }
+          }
+        }
+        weekMon.setDate(weekMon.getDate() + 7);
+      }
+    } else {
+      var cursor = new Date(overlapStart);
+      while (cursor <= overlapEnd) {
+        if (isBusinessDay(cursor) && cursor.getMonth() === p.m && cursor.getFullYear() === p.y) {
+          var dayKey = dowToKey[cursor.getDay()];
+          if (dayKey && joursMap[dayKey]) {
+            var isoD = localISO(cursor);
+            result[isoD] = joursMap[dayKey];
+            coveredDates[isoD] = true;
+          }
+        }
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+  });
+
+  // Jours non couverts par des périodes mais dans la mission = fulltime
+  var misStart2 = mis.debut ? parseLD(mis.debut) : monthStart;
+  var misEnd2 = mis.fin ? parseLD(mis.fin) : monthEnd;
+  var c2 = new Date(Math.max(monthStart, misStart2));
+  var cEnd2 = new Date(Math.min(monthEnd, misEnd2));
+  while (c2 <= cEnd2) {
+    if (isBusinessDay(c2) && c2.getMonth() === p.m) {
+      var iso2 = localISO(c2);
+      if (!coveredDates[iso2] && !result[iso2]) {
+        result[iso2] = 1;
+      }
+    }
+    c2.setDate(c2.getDate() + 1);
+  }
+
+  return result;
+}
+
 function buildMission(mis) {
   if (!mis.debut || !mis.fin) return;
   // V81fix: Parser en local pour éviter décalage UTC
@@ -4420,9 +4554,33 @@ function buildMission(mis) {
   var newFactures = [];
   mis.lignes.forEach(function(l) {
     var existing = facturesMap[l.ym];
-    // V78: joursReelsOverride prime sur le calcul théorique
+    // Priorité: ajustements > joursReelsOverride > calcul théorique
     var jours;
-    if (l.joursReelsOverride !== undefined && l.joursReelsOverride !== null) {
+    if (l.ajustements && Object.keys(l.ajustements).length > 0) {
+      // Suivi d'activité: recalculer depuis le planning + ajustements
+      var scheduled = getScheduledDaysForMonth(mis, l.ym);
+      // Retirer les congés du planning
+      if (mis.congesDates) {
+        mis.congesDates.forEach(function(cd) {
+          if (cd.indexOf(l.ym) === 0) {
+            var baseDate = cd.substring(0, 10);
+            if (scheduled[baseDate]) {
+              if (cd.length > 10) scheduled[baseDate] = Math.max(0, scheduled[baseDate] - 0.5);
+              else delete scheduled[baseDate];
+            }
+          }
+        });
+      }
+      // Appliquer les ajustements
+      Object.keys(l.ajustements).forEach(function(iso) {
+        scheduled[iso] = l.ajustements[iso];
+      });
+      // Supprimer les jours à 0
+      jours = 0;
+      Object.keys(scheduled).forEach(function(iso) {
+        if (scheduled[iso] > 0) jours += scheduled[iso];
+      });
+    } else if (l.joursReelsOverride !== undefined && l.joursReelsOverride !== null) {
       jours = l.joursReelsOverride; // Override manuel: rythme réel
     } else if (mis.periodes && mis.periodes.length > 0) {
       jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
@@ -4458,6 +4616,7 @@ function showFabMenu() {
   grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Rémunération'));
   grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm); } }, '🏖️ Poser Congés'));
   if (MISSIONS.length > 0) {
+    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm, 'activite'); } }, '📋 Suivi d\'activité'));
     grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showDownloadInvoiceModal(); } }, '📄 Télécharger Facture'));
   }
 
@@ -8476,6 +8635,11 @@ function showDaysEditor(mission) {
   actions.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { fillAllDays(mission, 'all'); } }, 'Tous les jours'));
   actions.appendChild(el('button', { class: 'btn btn-sm', onclick: function() { fillAllDays(mission, 'none'); } }, 'Reset'));
   actions.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'rgba(251,191,36,0.15)', borderColor: 'var(--warning)' }, onclick: function() { resetReelsToTheorique(mission); } }, '↻ Réels = Prévus'));
+  actions.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'rgba(34,197,94,0.15)', borderColor: '#22c55e', color: '#22c55e' }, onclick: function() {
+    var currentYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+    closeModal('formModal');
+    showMonthCongesModal(currentYm, 'activite');
+  } }, '📋 Suivi activité'));
   body.appendChild(actions);
 
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '16px' }, onclick: function() { saveDaysFromEditor(mission); closeModal('formModal'); render(); toast('Jours enregistrés', 'success'); } }, '✅ Enregistrer'));
@@ -8857,26 +9021,30 @@ function deleteMovement(mvId) {
   }
 }
 
-function showMonthCongesModal(monthYm) {
-  $('#formModalTitle').textContent = '🏖 Congés - ' + fmtMonth(monthYm);
+function showMonthCongesModal(monthYm, mode) {
+  if (mode) CAL_MODE = mode;
+  var isActivity = CAL_MODE === 'activite';
+  $('#formModalTitle').textContent = isActivity ? '📋 Suivi d\'activité - ' + fmtMonth(monthYm) : '🏖 Congés - ' + fmtMonth(monthYm);
   var body = $('#formModalBody');
   body.replaceChildren();
+
+  // Toggle Congés / Suivi d'activité
+  var modeToggle = el('div', { class: 'cal-mode-toggle' });
+  modeToggle.appendChild(el('button', { class: 'cal-mode-btn' + (CAL_MODE === 'conges' ? ' active' : ''), onclick: function() { closeModal('formModal'); showMonthCongesModal(monthYm, 'conges'); } }, '🏖️ Congés'));
+  modeToggle.appendChild(el('button', { class: 'cal-mode-btn' + (CAL_MODE === 'activite' ? ' active' : ''), onclick: function() { closeModal('formModal'); showMonthCongesModal(monthYm, 'activite'); } }, '📋 Suivi d\'activité'));
+  body.appendChild(modeToggle);
 
   // Navigation mois/année
   var p = parseYM(monthYm);
   var nav = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', marginBottom: '14px', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)', flexWrap: 'wrap' } });
   // Flèches année
-  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 8px', fontSize: '12px' }, onclick: function() { closeModal('formModal'); showMonthCongesModal(ym(p.y - 1, p.m)); } }, '◀◀'));
-  // Flèche mois précédent
+  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 8px', fontSize: '12px' }, onclick: function() { closeModal('formModal'); showMonthCongesModal(ym(p.y - 1, p.m), CAL_MODE); } }, '◀◀'));
   var prevM = p.m > 0 ? ym(p.y, p.m - 1) : ym(p.y - 1, 11);
-  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 10px', fontSize: '14px' }, onclick: function() { closeModal('formModal'); showMonthCongesModal(prevM); } }, '◀'));
-  // Mois courant
+  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 10px', fontSize: '14px' }, onclick: function() { closeModal('formModal'); showMonthCongesModal(prevM, CAL_MODE); } }, '◀'));
   nav.appendChild(el('div', { style: { fontWeight: '800', fontSize: '14px', padding: '0 6px', minWidth: '100px', textAlign: 'center' } }, fmtMonth(monthYm)));
-  // Flèche mois suivant
   var nextM = p.m < 11 ? ym(p.y, p.m + 1) : ym(p.y + 1, 0);
-  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 10px', fontSize: '14px' }, onclick: function() { closeModal('formModal'); showMonthCongesModal(nextM); } }, '▶'));
-  // Flèches année
-  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 8px', fontSize: '12px' }, onclick: function() { closeModal('formModal'); showMonthCongesModal(ym(p.y + 1, p.m)); } }, '▶▶'));
+  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 10px', fontSize: '14px' }, onclick: function() { closeModal('formModal'); showMonthCongesModal(nextM, CAL_MODE); } }, '▶'));
+  nav.appendChild(el('button', { class: 'btn btn-sm', style: { padding: '4px 8px', fontSize: '12px' }, onclick: function() { closeModal('formModal'); showMonthCongesModal(ym(p.y + 1, p.m), CAL_MODE); } }, '▶▶'));
 
   // Boutons mois rapides
   var monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
@@ -8923,119 +9091,226 @@ function showMonthCongesModal(monthYm) {
     // Header mission
     var header = el('div', { class: 'conges-mission-header' });
     header.appendChild(el('div', { style: { fontWeight: '700' } }, m.client || m.titre));
-    var countSpan = el('span', { style: { fontSize: '11px', color: '#60a5fa', fontWeight: '600' }, id: 'congesCount_' + m.id }, '');
+    var countSpan = el('span', { style: { fontSize: '11px', color: isActivity ? '#22c55e' : '#60a5fa', fontWeight: '600' }, id: 'congesCount_' + m.id }, '');
     header.appendChild(countSpan);
     body.appendChild(header);
 
-    body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Cliquez = journée · Double-clic = demi-journée · Recliquez = annuler'));
+    if (isActivity) {
+      // ========== MODE SUIVI D'ACTIVITÉ ==========
+      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Cliquez = cycler (travaillé → demi → off) · Les modifications sont surlignées'));
 
-    // Calendrier grille
-    var cal = el('div', { class: 'conges-calendar' });
-
-    // Headers jours de la semaine
-    ['Lun','Mar','Mer','Jeu','Ven'].forEach(function(dl) {
-      cal.appendChild(el('div', { class: 'cal-header' }, dl));
-    });
-
-    // Trouver le jour de la semaine du premier jour ouvré
-    // Remplir les cases vides avant le premier jour
-    if (bizDays.length > 0) {
-      var firstDow = bizDays[0].dow; // 1=lun..5=ven
-      for (var fi = 1; fi < firstDow; fi++) {
-        cal.appendChild(el('div', {})); // case vide
-      }
-    }
-
-    var calState = {}; // iso -> 'full' | 'half' | null
-
-    // Pré-remplir depuis congesDates existants
-    m.congesDates.forEach(function(cd) {
-      if (cd.indexOf(monthYm) === 0) { // ex: '2026-05-18' starts with '2026-05'
-        var baseDate = cd.substring(0, 10);
-        if (cd.length > 10) {
-          calState[baseDate] = 'half'; // _am ou _pm
-        } else {
-          calState[baseDate] = 'full';
-        }
-      }
-    });
-
-    function updateCongesCount() {
-      var total = 0;
-      Object.keys(calState).forEach(function(k) {
-        if (calState[k] === 'full') total += 1;
-        else if (calState[k] === 'half') total += 0.5;
+      // Légende
+      var legend = el('div', { class: 'cal-legend' });
+      [
+        { color: '#22c55e', label: 'Travaillé' },
+        { color: 'rgba(34,197,94,0.3)', label: 'Demi-journée', border: '#22c55e' },
+        { color: 'var(--bg-secondary)', label: 'Non travaillé' },
+        { color: '#f59e0b', label: 'Modifié', isBorder: true },
+        { color: '#60a5fa', label: 'Ajouté', isBorder: true }
+      ].forEach(function(item) {
+        var dot = el('div', { class: 'cal-legend-dot', style: { background: item.isBorder ? 'transparent' : item.color, border: item.isBorder ? '2px solid ' + item.color : item.border ? '1px solid ' + item.border : 'none' } });
+        var li = el('div', { class: 'cal-legend-item' });
+        li.appendChild(dot);
+        li.appendChild(document.createTextNode(item.label));
+        legend.appendChild(li);
       });
-      var cs = document.getElementById('congesCount_' + m.id);
-      if (cs) cs.textContent = total > 0 ? total + 'j de congés' : 'Aucun congé';
-    }
+      body.appendChild(legend);
 
-    var prevDay = 0;
-    bizDays.forEach(function(bd) {
-      // Ajouter des cases vides pour les jours manquants (week-ends)
-      var expectedDow = ((prevDay === 0) ? bd.dow : prevDay + 1);
-      if (prevDay > 0 && bd.dow <= prevDay) {
-        // Nouvelle semaine - remplir la fin de la semaine précédente
-        for (var pad = prevDay + 1; pad <= 5; pad++) cal.appendChild(el('div', {}));
-        // Remplir le début de la nouvelle semaine
-        for (var pad2 = 1; pad2 < bd.dow; pad2++) cal.appendChild(el('div', {}));
-      } else if (prevDay > 0) {
-        for (var pad3 = prevDay + 1; pad3 < bd.dow; pad3++) cal.appendChild(el('div', {}));
+      // Récupérer le planning prévu
+      var scheduled = getScheduledDaysForMonth(m, monthYm);
+      // Retirer les congés du planning pour obtenir le "prévu net"
+      var scheduledNet = {};
+      Object.keys(scheduled).forEach(function(k) { scheduledNet[k] = scheduled[k]; });
+      if (m.congesDates) {
+        m.congesDates.forEach(function(cd) {
+          if (cd.indexOf(monthYm) === 0) {
+            var baseDate = cd.substring(0, 10);
+            if (scheduledNet[baseDate]) {
+              if (cd.length > 10) scheduledNet[baseDate] = Math.max(0, scheduledNet[baseDate] - 0.5);
+              else delete scheduledNet[baseDate];
+            }
+          }
+        });
       }
-      prevDay = bd.dow;
 
-      // Vérifier si ce jour est dans la mission
-      var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
+      // État activité: iso -> 0 | 0.5 | 1
+      var actState = {};
+      // Pré-remplir depuis le planning net
+      Object.keys(scheduledNet).forEach(function(iso) {
+        if (scheduledNet[iso] > 0) actState[iso] = scheduledNet[iso] >= 1 ? 1 : 0.5;
+      });
+      // Appliquer les ajustements existants par-dessus
+      if (ligne.ajustements) {
+        Object.keys(ligne.ajustements).forEach(function(iso) {
+          actState[iso] = ligne.ajustements[iso];
+        });
+      }
 
-      var dayEl = el('div', { class: 'conges-day' + (bd.isHoliday ? ' holiday' : '') + (!inMission ? ' not-in-mission' : '') });
-      dayEl.appendChild(el('span', { class: 'cd-num' }, String(bd.day)));
-      dayEl.appendChild(el('span', { class: 'cd-dow' }, bd.isHoliday ? 'Férié' : bd.dowShort));
+      function updateActCount() {
+        var total = 0;
+        Object.keys(actState).forEach(function(k) {
+          if (actState[k] > 0) total += actState[k];
+        });
+        var cs = document.getElementById('congesCount_' + m.id);
+        if (cs) cs.textContent = total + 'j travaillés';
+      }
 
-      if (!bd.isHoliday && inMission) {
-        // Appliquer l'état initial
-        if (calState[bd.iso] === 'full') dayEl.classList.add('conge-full');
-        else if (calState[bd.iso] === 'half') dayEl.classList.add('conge-half');
+      // Calendrier grille
+      var cal = el('div', { class: 'conges-calendar' });
+      ['Lun','Mar','Mer','Jeu','Ven'].forEach(function(dl) { cal.appendChild(el('div', { class: 'cal-header' }, dl)); });
+      if (bizDays.length > 0) {
+        var firstDow = bizDays[0].dow;
+        for (var fi = 1; fi < firstDow; fi++) cal.appendChild(el('div', {}));
+      }
 
-        (function(iso, element) {
-          var clickTimer = null;
-          element.addEventListener('click', function(e) {
-            e.preventDefault();
-            if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; } // double-clic en cours
-            clickTimer = setTimeout(function() {
-              clickTimer = null;
-              // Simple clic : toggle full
-              if (calState[iso] === 'full') {
-                delete calState[iso];
-                element.classList.remove('conge-full', 'conge-half');
-              } else if (calState[iso] === 'half') {
-                delete calState[iso];
-                element.classList.remove('conge-full', 'conge-half');
-              } else {
-                calState[iso] = 'full';
-                element.classList.add('conge-full');
-                element.classList.remove('conge-half');
-              }
+      var prevDay = 0;
+      bizDays.forEach(function(bd) {
+        if (prevDay > 0 && bd.dow <= prevDay) {
+          for (var pad = prevDay + 1; pad <= 5; pad++) cal.appendChild(el('div', {}));
+          for (var pad2 = 1; pad2 < bd.dow; pad2++) cal.appendChild(el('div', {}));
+        } else if (prevDay > 0) {
+          for (var pad3 = prevDay + 1; pad3 < bd.dow; pad3++) cal.appendChild(el('div', {}));
+        }
+        prevDay = bd.dow;
+
+        var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
+        var val = actState[bd.iso] || 0;
+        var scheduledVal = scheduledNet[bd.iso] || 0;
+        var isModified = inMission && !bd.isHoliday && scheduledVal > 0 && val !== scheduledVal;
+        var isAdded = inMission && !bd.isHoliday && scheduledVal === 0 && val > 0;
+
+        var cls = 'conges-day';
+        if (bd.isHoliday) cls += ' holiday';
+        if (!inMission) cls += ' not-in-mission';
+        if (inMission && !bd.isHoliday) {
+          if (val >= 1) cls += ' act-worked';
+          else if (val === 0.5) cls += ' act-half';
+          else cls += ' act-off';
+          if (isModified) cls += ' act-modified';
+          if (isAdded) cls += ' act-added';
+        }
+
+        var dayEl = el('div', { class: cls });
+        dayEl.appendChild(el('span', { class: 'cd-num' }, String(bd.day)));
+        dayEl.appendChild(el('span', { class: 'cd-dow' }, bd.isHoliday ? 'Férié' : bd.dowShort));
+
+        if (!bd.isHoliday && inMission) {
+          (function(iso, element) {
+            element.addEventListener('click', function(e) {
+              e.preventDefault();
+              var cur = actState[iso] || 0;
+              // Cycle: 1 → 0.5 → 0 → 1
+              var next;
+              if (cur >= 1) next = 0.5;
+              else if (cur === 0.5) next = 0;
+              else next = 1;
+              actState[iso] = next;
+
+              element.className = 'conges-day';
+              if (next >= 1) element.classList.add('act-worked');
+              else if (next === 0.5) element.classList.add('act-half');
+              else element.classList.add('act-off');
+
+              // Recalculer modified/added
+              var sVal = scheduledNet[iso] || 0;
+              element.classList.remove('act-modified', 'act-added');
+              if (sVal > 0 && next !== sVal) element.classList.add('act-modified');
+              if (sVal === 0 && next > 0) element.classList.add('act-added');
+
+              updateActCount();
+            });
+          })(bd.iso, dayEl);
+        }
+        cal.appendChild(dayEl);
+      });
+
+      body.appendChild(cal);
+      missionCalendars.push({ mission: m, actState: actState, scheduledNet: scheduledNet, isActivity: true });
+      updateActCount();
+
+    } else {
+      // ========== MODE CONGÉS (existant) ==========
+      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Cliquez = journée · Double-clic = demi-journée · Recliquez = annuler'));
+
+      var cal = el('div', { class: 'conges-calendar' });
+      ['Lun','Mar','Mer','Jeu','Ven'].forEach(function(dl) { cal.appendChild(el('div', { class: 'cal-header' }, dl)); });
+      if (bizDays.length > 0) {
+        var firstDow = bizDays[0].dow;
+        for (var fi = 1; fi < firstDow; fi++) cal.appendChild(el('div', {}));
+      }
+
+      var calState = {};
+      m.congesDates.forEach(function(cd) {
+        if (cd.indexOf(monthYm) === 0) {
+          var baseDate = cd.substring(0, 10);
+          calState[baseDate] = cd.length > 10 ? 'half' : 'full';
+        }
+      });
+
+      function updateCongesCount() {
+        var total = 0;
+        Object.keys(calState).forEach(function(k) {
+          if (calState[k] === 'full') total += 1;
+          else if (calState[k] === 'half') total += 0.5;
+        });
+        var cs = document.getElementById('congesCount_' + m.id);
+        if (cs) cs.textContent = total > 0 ? total + 'j de congés' : 'Aucun congé';
+      }
+
+      var prevDay = 0;
+      bizDays.forEach(function(bd) {
+        if (prevDay > 0 && bd.dow <= prevDay) {
+          for (var pad = prevDay + 1; pad <= 5; pad++) cal.appendChild(el('div', {}));
+          for (var pad2 = 1; pad2 < bd.dow; pad2++) cal.appendChild(el('div', {}));
+        } else if (prevDay > 0) {
+          for (var pad3 = prevDay + 1; pad3 < bd.dow; pad3++) cal.appendChild(el('div', {}));
+        }
+        prevDay = bd.dow;
+
+        var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
+        var dayEl = el('div', { class: 'conges-day' + (bd.isHoliday ? ' holiday' : '') + (!inMission ? ' not-in-mission' : '') });
+        dayEl.appendChild(el('span', { class: 'cd-num' }, String(bd.day)));
+        dayEl.appendChild(el('span', { class: 'cd-dow' }, bd.isHoliday ? 'Férié' : bd.dowShort));
+
+        if (!bd.isHoliday && inMission) {
+          if (calState[bd.iso] === 'full') dayEl.classList.add('conge-full');
+          else if (calState[bd.iso] === 'half') dayEl.classList.add('conge-half');
+
+          (function(iso, element) {
+            var clickTimer = null;
+            element.addEventListener('click', function(e) {
+              e.preventDefault();
+              if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; return; }
+              clickTimer = setTimeout(function() {
+                clickTimer = null;
+                if (calState[iso]) {
+                  delete calState[iso];
+                  element.classList.remove('conge-full', 'conge-half');
+                } else {
+                  calState[iso] = 'full';
+                  element.classList.add('conge-full');
+                  element.classList.remove('conge-half');
+                }
+                updateCongesCount();
+              }, 250);
+            });
+            element.addEventListener('dblclick', function(e) {
+              e.preventDefault();
+              if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+              calState[iso] = 'half';
+              element.classList.remove('conge-full');
+              element.classList.add('conge-half');
               updateCongesCount();
-            }, 250);
-          });
-          element.addEventListener('dblclick', function(e) {
-            e.preventDefault();
-            if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-            // Double-clic : demi-journée
-            calState[iso] = 'half';
-            element.classList.remove('conge-full');
-            element.classList.add('conge-half');
-            updateCongesCount();
-          });
-        })(bd.iso, dayEl);
-      }
+            });
+          })(bd.iso, dayEl);
+        }
+        cal.appendChild(dayEl);
+      });
 
-      cal.appendChild(dayEl);
-    });
-
-    body.appendChild(cal);
-    missionCalendars.push({ mission: m, calState: calState });
-    updateCongesCount();
+      body.appendChild(cal);
+      missionCalendars.push({ mission: m, calState: calState, isActivity: false });
+      updateCongesCount();
+    }
   });
 
   if (!hasMissions) {
@@ -9047,10 +9322,29 @@ function showMonthCongesModal(monthYm) {
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '16px' }, onclick: function() {
     missionCalendars.forEach(function(mc) {
       var m = mc.mission;
+
+      if (mc.isActivity) {
+        // Sauvegarder les ajustements d'activité
+        var ligne = m.lignes.find(function(l) { return l.ym === monthYm; });
+        if (ligne) {
+          var ajustements = {};
+          Object.keys(mc.actState).forEach(function(iso) {
+            var actual = mc.actState[iso] || 0;
+            var expected = mc.scheduledNet[iso] || 0;
+            // Ne stocker que les différences par rapport au planning
+            if (actual !== expected) {
+              ajustements[iso] = actual;
+            }
+          });
+          ligne.ajustements = Object.keys(ajustements).length > 0 ? ajustements : undefined;
+        }
+        buildMission(m);
+        return;
+      }
+
+      // Sauvegarder congés
       if (!m.congesDates) m.congesDates = [];
-      // Retirer les congés de ce mois
       m.congesDates = m.congesDates.filter(function(cd) { return cd.indexOf(monthYm) !== 0; });
-      // Ajouter les nouveaux
       Object.keys(mc.calState).forEach(function(iso) {
         if (mc.calState[iso] === 'full') m.congesDates.push(iso);
         else if (mc.calState[iso] === 'half') m.congesDates.push(iso + '_half');
@@ -9069,7 +9363,7 @@ function showMonthCongesModal(monthYm) {
       buildMission(m);
     });
     saveAll(); closeModal('formModal'); render();
-    toast('Congés enregistrés', 'success');
+    toast(isActivity ? 'Activité enregistrée' : 'Congés enregistrés', 'success');
   } }, '✅ Enregistrer'));
 
   openModal('formModal');
@@ -15605,7 +15899,12 @@ function renderFacturesContent(container) {
         card.appendChild(el('div', { class: 'badge ' + badgeClass, style: { fontSize: '9px', whiteSpace: 'nowrap' } }, badgeText));
         var infoDiv = el('div', { class: 'facture-info' });
         infoDiv.appendChild(el('div', { class: 'facture-id' }, f.client));
-        infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
+        var metaRow = el('div', { class: 'facture-meta', style: { display: 'flex', alignItems: 'center', gap: '6px' } });
+        metaRow.appendChild(document.createTextNode(f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
+        // Bouton ajuster activité
+        var ajustBtn = el('button', { style: { border: 'none', background: 'rgba(34,197,94,0.15)', color: '#22c55e', fontSize: '9px', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }, onclick: function(e) { e.stopPropagation(); showMonthCongesModal(f.mois, 'activite'); } }, '⚙ Ajuster');
+        metaRow.appendChild(ajustBtn);
+        infoDiv.appendChild(metaRow);
         card.appendChild(infoDiv);
         if (f._mission) {
           card.appendChild(buildInlineCycleProgress(f._mission, f));
