@@ -1593,8 +1593,8 @@ var COMPTE_TAB = 'profil'; // sous-onglet compte: profil, preferences, securite
     FOR ALL USING (auth.uid() = user_id);
 */
 
-var SUPABASE_URL = ''; // Chargé depuis localStorage
-var SUPABASE_ANON_KEY = ''; // Chargé depuis localStorage
+var SUPABASE_URL = 'https://gorewyleblikjgvmenml.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvcmV3eWxlYmxpa2pndm1lbm1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NzUyOTMsImV4cCI6MjA4NzQ1MTI5M30.l40BEOxT69IOf65UofDH-zu3ig_UKwzc5yP2bxv-tp8';
 var _supabaseLib = null; // Référence à la librairie CDN (createClient)
 var supabaseClient = null; // Instance du client Supabase
 var CURRENT_USER = null;
@@ -1607,8 +1607,8 @@ function loadSupabaseCredentials() {
     var stored = localStorage.getItem('freel_supabase');
     if (stored) {
       var creds = JSON.parse(stored);
-      SUPABASE_URL = creds.url || '';
-      SUPABASE_ANON_KEY = creds.key || '';
+      if (creds.url) SUPABASE_URL = creds.url;
+      if (creds.key) SUPABASE_ANON_KEY = creds.key;
     }
   } catch (e) {
     console.error('Erreur chargement credentials Supabase:', e);
