@@ -1743,12 +1743,12 @@ function showAuthModal() {
     // Résumé des données synchronisées
     var missionCount = MISSIONS ? MISSIONS.length : 0;
     var clientCount = CLIENTS ? CLIENTS.length : 0;
-    var treasuryCount = TREASURY ? TREASURY.length : 0;
-    var hasCompany = COMPANY && COMPANY.name;
+    var treasuryCount = TREASURY && TREASURY.mouvements ? TREASURY.mouvements.length : 0;
+    var hasCompany = COMPANY && COMPANY.nom;
 
     var dataGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' } });
     var dataItems = [
-      { label: 'Entreprise', value: hasCompany ? COMPANY.name : 'Non configurée', icon: '🏢', ok: !!hasCompany },
+      { label: 'Entreprise', value: hasCompany ? COMPANY.nom : 'Non configurée', icon: '🏢', ok: !!hasCompany },
       { label: 'Missions', value: missionCount + ' mission' + (missionCount > 1 ? 's' : ''), icon: '💼', ok: missionCount > 0 },
       { label: 'Clients', value: clientCount + ' client' + (clientCount > 1 ? 's' : ''), icon: '👥', ok: clientCount > 0 },
       { label: 'Trésorerie', value: treasuryCount + ' flux', icon: '🏦', ok: treasuryCount > 0 }
