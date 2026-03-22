@@ -1246,6 +1246,54 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   50% { opacity: 0.3; }
 }
 
+/* Cloud sync button states */
+#authBtn.cloud-synced {
+  background: var(--success-glow);
+  border-color: var(--success);
+  position: relative;
+}
+#authBtn.cloud-synced::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  border: 1px solid var(--bg-card);
+}
+#authBtn.cloud-connected {
+  background: var(--warning-glow);
+  border-color: var(--warning);
+  position: relative;
+}
+#authBtn.cloud-connected::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+  border: 1px solid var(--bg-card);
+}
+#authBtn.cloud-disconnected {
+  position: relative;
+}
+#authBtn.cloud-disconnected::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  border: 1px solid var(--bg-card);
+}
+
 /* Hiérarchie visuelle 3 niveaux */
 .text-hero { font-size: 42px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; }
 .text-kpi { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
@@ -1548,6 +1596,8 @@ var _supabaseLib = null; // Référence à la librairie CDN (createClient)
 var supabaseClient = null; // Instance du client Supabase
 var CURRENT_USER = null;
 var SYNC_ENABLED = false;
+var LAST_SYNC_TIME = null; // Timestamp de la dernière synchro réussie
+var CLOUD_SYNC_STATE = 'disconnected'; // 'disconnected', 'connected', 'synced', 'syncing', 'error'
 
 function loadSupabaseCredentials() {
   try {
@@ -1632,12 +1682,40 @@ function updateAuthUI() {
   var authBtn = $('#authBtn');
   var authStatus = $('#authStatus');
   if (authBtn) {
-    authBtn.textContent = CURRENT_USER ? '☁️' : '☁️';
-    authBtn.title = CURRENT_USER ? 'Connecté: ' + CURRENT_USER.email : 'Se connecter';
+    authBtn.textContent = '☁️';
+    authBtn.className = 'privacy-toggle';
+    if (CURRENT_USER) {
+      if (LAST_SYNC_TIME) {
+        authBtn.classList.add('cloud-synced');
+        authBtn.title = 'Synchronisé - ' + CURRENT_USER.email + '\nDernière synchro: ' + formatSyncTime(LAST_SYNC_TIME);
+        CLOUD_SYNC_STATE = 'synced';
+      } else {
+        authBtn.classList.add('cloud-connected');
+        authBtn.title = 'Connecté (non synchronisé) - ' + CURRENT_USER.email;
+        CLOUD_SYNC_STATE = 'connected';
+      }
+    } else {
+      authBtn.classList.add('cloud-disconnected');
+      authBtn.title = 'Cloud Sync - Non connecté';
+      CLOUD_SYNC_STATE = 'disconnected';
+    }
   }
   if (authStatus) {
-    authStatus.textContent = CURRENT_USER ? '☁️ Sync' : '';
+    authStatus.textContent = '';
   }
+}
+
+function formatSyncTime(date) {
+  if (!date) return '';
+  var d = new Date(date);
+  var now = new Date();
+  var diffMs = now - d;
+  var diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "à l'instant";
+  if (diffMin < 60) return 'il y a ' + diffMin + ' min';
+  var diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return 'il y a ' + diffH + 'h';
+  return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function showAuthModal() {
@@ -1645,42 +1723,223 @@ function showAuthModal() {
     showToast('⚠️ Supabase non configuré. Voir ⚙️ Config > Cloud Sync.', 'warning');
     return;
   }
-  
+
   var content = el('div', { style: { padding: '20px' } });
-  
+
   if (CURRENT_USER) {
-    // Déjà connecté
+    // Déjà connecté - afficher le dashboard de synchro
+    var syncColor = LAST_SYNC_TIME ? 'var(--success)' : 'var(--warning)';
+    var syncIcon = LAST_SYNC_TIME ? '✅' : '⚠️';
+    var syncText = LAST_SYNC_TIME ? 'Synchronisé' : 'Non synchronisé';
+    var syncDetail = LAST_SYNC_TIME ? 'Dernière synchro : ' + formatSyncTime(LAST_SYNC_TIME) : 'Aucune synchronisation effectuée';
+
     content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
       el('div', { style: { fontSize: '40px', marginBottom: '10px' } }, '👤'),
-      el('div', { style: { fontWeight: '600' } }, CURRENT_USER.email),
-      el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, '☁️ Données synchronisées')
+      el('div', { style: { fontWeight: '600', fontSize: '16px' } }, CURRENT_USER.email),
+      el('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '6px 14px', borderRadius: '20px', background: LAST_SYNC_TIME ? 'var(--success-glow)' : 'var(--warning-glow)', color: syncColor, fontSize: '13px', fontWeight: '600' } }, syncIcon + ' ' + syncText),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, syncDetail)
     ]));
-    
+
+    // Résumé des données synchronisées
+    var missionCount = MISSIONS ? MISSIONS.length : 0;
+    var clientCount = CLIENTS ? CLIENTS.length : 0;
+    var treasuryCount = TREASURY ? TREASURY.length : 0;
+    var hasCompany = COMPANY && COMPANY.name;
+
+    var dataGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' } });
+    var dataItems = [
+      { label: 'Entreprise', value: hasCompany ? COMPANY.name : 'Non configurée', icon: '🏢', ok: !!hasCompany },
+      { label: 'Missions', value: missionCount + ' mission' + (missionCount > 1 ? 's' : ''), icon: '💼', ok: missionCount > 0 },
+      { label: 'Clients', value: clientCount + ' client' + (clientCount > 1 ? 's' : ''), icon: '👥', ok: clientCount > 0 },
+      { label: 'Trésorerie', value: treasuryCount + ' flux', icon: '🏦', ok: treasuryCount > 0 }
+    ];
+    dataItems.forEach(function(item) {
+      dataGrid.appendChild(el('div', { style: { padding: '10px', borderRadius: '8px', background: 'var(--bg-tertiary)', fontSize: '12px' } }, [
+        el('div', { style: { marginBottom: '4px' } }, item.icon + ' ' + item.label),
+        el('div', { style: { fontWeight: '600', color: item.ok ? 'var(--text-primary)' : 'var(--text-muted)' } }, item.value)
+      ]));
+    });
+    content.appendChild(dataGrid);
+
     var btns = el('div', { style: { display: 'flex', gap: '10px' } });
     btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() { syncToCloud(); closeDynamicModal(); } }, '⬆️ Sauvegarder'));
     btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() { loadFromCloud(); closeDynamicModal(); } }, '⬇️ Charger'));
-    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { signOut(); closeDynamicModal(); } }, '🚪 Déconnexion'));
     content.appendChild(btns);
+
+    var logoutRow = el('div', { style: { marginTop: '12px', textAlign: 'center' } });
+    logoutRow.appendChild(el('button', { class: 'btn btn-danger', style: { fontSize: '12px' }, onclick: function() { signOut(); closeDynamicModal(); } }, '🚪 Déconnexion'));
+    content.appendChild(logoutRow);
   } else {
     // Non connecté - formulaire login
-    content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
-      el('div', { style: { fontSize: '40px', marginBottom: '10px' } }, '☁️'),
-      el('div', { style: { fontWeight: '600' } }, 'Cloud Sync'),
-      el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Synchronise tes données sur tous tes appareils')
-    ]));
-    
-    var form = el('div');
-    form.appendChild(createInput('Email', 'email', 'authEmail', ''));
-    form.appendChild(createInput('Mot de passe', 'password', 'authPassword', ''));
-    content.appendChild(form);
-    
-    var btns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '16px' } });
-    btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: signIn }, '🔐 Connexion'));
-    btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: signUp }, '✨ Créer compte'));
-    content.appendChild(btns);
+    showAuthLoginForm(content);
   }
-  
+
   showModal('Cloud Sync', content);
+}
+
+function showAuthLoginForm(content) {
+  content.innerHTML = '';
+  var wrapper = el('div', { style: { padding: content.children.length ? '0' : '0' } });
+
+  wrapper.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
+    el('div', { style: { fontSize: '40px', marginBottom: '10px' } }, '☁️'),
+    el('div', { style: { fontWeight: '600' } }, 'Cloud Sync'),
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Synchronise tes données sur tous tes appareils')
+  ]));
+
+  var form = el('div');
+  form.appendChild(createInput('Email', 'email', 'authEmail', ''));
+  form.appendChild(createInput('Mot de passe', 'password', 'authPassword', ''));
+  wrapper.appendChild(form);
+
+  var btns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '16px' } });
+  btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: signIn }, '🔐 Connexion'));
+  btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() { showAuthSignupForm(content); } }, '✨ Créer un compte'));
+  wrapper.appendChild(btns);
+
+  content.appendChild(wrapper);
+}
+
+function showAuthSignupForm(content) {
+  content.innerHTML = '';
+  var wrapper = el('div');
+
+  wrapper.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
+    el('div', { style: { fontSize: '40px', marginBottom: '10px' } }, '✨'),
+    el('div', { style: { fontWeight: '600' } }, 'Créer un compte'),
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Remplis le formulaire pour activer Cloud Sync')
+  ]));
+
+  var form = el('div');
+  form.appendChild(createInput('Email', 'email', 'signupEmail', ''));
+  form.appendChild(createInput('Confirmer email', 'email', 'signupEmailConfirm', ''));
+  form.appendChild(createInput('Mot de passe (min. 8 caractères)', 'password', 'signupPassword', ''));
+  form.appendChild(createInput('Confirmer mot de passe', 'password', 'signupPasswordConfirm', ''));
+
+  // Indicateur de force du mot de passe
+  var strengthBar = el('div', { id: 'passwordStrength', style: { marginTop: '4px', marginBottom: '12px' } }, [
+    el('div', { style: { display: 'flex', gap: '3px', marginBottom: '4px' } }, [
+      el('div', { id: 'str1', style: { flex: 1, height: '4px', borderRadius: '2px', background: 'var(--bg-tertiary)' } }),
+      el('div', { id: 'str2', style: { flex: 1, height: '4px', borderRadius: '2px', background: 'var(--bg-tertiary)' } }),
+      el('div', { id: 'str3', style: { flex: 1, height: '4px', borderRadius: '2px', background: 'var(--bg-tertiary)' } }),
+      el('div', { id: 'str4', style: { flex: 1, height: '4px', borderRadius: '2px', background: 'var(--bg-tertiary)' } })
+    ]),
+    el('div', { id: 'strLabel', style: { fontSize: '11px', color: 'var(--text-muted)' } }, '')
+  ]);
+  form.appendChild(strengthBar);
+
+  // Conditions d'acceptation
+  var terms = el('label', { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', cursor: 'pointer' } }, [
+    el('input', { type: 'checkbox', id: 'signupTerms', style: { marginTop: '2px' } }),
+    el('span', {}, "J'accepte que mes données soient stockées de manière sécurisée pour la synchronisation cloud")
+  ]);
+  form.appendChild(terms);
+
+  wrapper.appendChild(form);
+
+  // Erreur zone
+  wrapper.appendChild(el('div', { id: 'signupError', style: { fontSize: '12px', color: 'var(--danger)', marginBottom: '8px', display: 'none' } }));
+
+  var btns = el('div', { style: { display: 'flex', gap: '10px' } });
+  btns.appendChild(el('button', { class: 'btn', style: { flex: '0 0 auto' }, onclick: function() { showAuthLoginForm(content); } }, '← Retour'));
+  btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() { processSignUp(content); } }, '✨ Créer mon compte'));
+  wrapper.appendChild(btns);
+
+  content.appendChild(wrapper);
+
+  // Écouter les changements de mot de passe pour la jauge de force
+  setTimeout(function() {
+    var pwInput = $('#signupPassword');
+    if (pwInput) {
+      pwInput.addEventListener('input', function() { updatePasswordStrength(pwInput.value); });
+    }
+  }, 50);
+}
+
+function updatePasswordStrength(password) {
+  var score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  var colors = ['var(--danger)', 'var(--warning)', '#f59e0b', 'var(--success)'];
+  var labels = ['Faible', 'Moyen', 'Bon', 'Fort'];
+
+  for (var i = 1; i <= 4; i++) {
+    var bar = $('#str' + i);
+    if (bar) bar.style.background = i <= score ? colors[score - 1] : 'var(--bg-tertiary)';
+  }
+  var lbl = $('#strLabel');
+  if (lbl) {
+    lbl.textContent = password.length > 0 ? labels[Math.max(0, score - 1)] : '';
+    lbl.style.color = password.length > 0 ? colors[Math.max(0, score - 1)] : 'var(--text-muted)';
+  }
+}
+
+function processSignUp(content) {
+  var email = $('#signupEmail') ? $('#signupEmail').value.trim() : '';
+  var emailConfirm = $('#signupEmailConfirm') ? $('#signupEmailConfirm').value.trim() : '';
+  var password = $('#signupPassword') ? $('#signupPassword').value : '';
+  var passwordConfirm = $('#signupPasswordConfirm') ? $('#signupPasswordConfirm').value : '';
+  var terms = $('#signupTerms') ? $('#signupTerms').checked : false;
+  var errorDiv = $('#signupError');
+
+  function showError(msg) {
+    if (errorDiv) { errorDiv.textContent = msg; errorDiv.style.display = 'block'; }
+  }
+
+  // Validations
+  if (!email || !emailConfirm || !password || !passwordConfirm) {
+    showError('Tous les champs sont obligatoires.');
+    return;
+  }
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    showError("L'adresse email n'est pas valide.");
+    return;
+  }
+  if (email !== emailConfirm) {
+    showError('Les adresses email ne correspondent pas.');
+    return;
+  }
+  if (password.length < 8) {
+    showError('Le mot de passe doit contenir au moins 8 caractères.');
+    return;
+  }
+  if (password !== passwordConfirm) {
+    showError('Les mots de passe ne correspondent pas.');
+    return;
+  }
+  if (!terms) {
+    showError("Tu dois accepter les conditions pour continuer.");
+    return;
+  }
+
+  if (errorDiv) errorDiv.style.display = 'none';
+
+  // Appel Supabase signup
+  supabaseClient.auth.signUp({ email: email, password: password })
+    .then(function(result) {
+      if (result.error) {
+        console.error('Sign up error:', result.error);
+        var msg = '';
+        if (result.error.message && result.error.message.includes('already registered')) {
+          msg = 'Cet email est déjà utilisé. Essaie de te connecter.';
+        } else {
+          msg = result.error.message || 'Erreur lors de la création du compte.';
+        }
+        showError(msg);
+      } else {
+        if (result.data && result.data.user && !result.data.session) {
+          showToast('📧 Compte créé ! Un email de confirmation a été envoyé à ' + email + '. Vérifie ta boîte mail pour activer ton compte.', 'success');
+        } else {
+          showToast('✅ Compte créé et connecté !', 'success');
+        }
+        closeDynamicModal();
+      }
+    })
+    .catch(function(err) { console.error('Network error:', err); showError('Erreur réseau, réessaie plus tard.'); });
 }
 
 function signIn() {
@@ -1698,7 +1957,7 @@ function signIn() {
         console.error('Sign in error:', result.error);
         var msg = '❌ Connexion échouée. ';
         if (result.error.message && result.error.message.includes('Email not confirmed')) {
-          msg += 'Email non confirmé. Va dans Supabase → Authentication → Providers → Email et désactive "Confirm email", puis recrée ton compte.';
+          msg += 'Email non confirmé. Vérifie ta boîte mail (et tes spams) pour le lien de confirmation.';
         } else if (result.error.message && result.error.message.includes('Invalid login')) {
           msg += 'Email ou mot de passe incorrect.';
         } else {
@@ -1713,42 +1972,10 @@ function signIn() {
     .catch(function(err) { console.error('Network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
-function signUp() {
-  var email = $('#authEmail').value;
-  var password = $('#authPassword').value;
-
-  if (!email || !password) {
-    showToast('Email et mot de passe requis', 'error');
-    return;
-  }
-
-  supabaseClient.auth.signUp({ email: email, password: password })
-    .then(function(result) {
-      if (result.error) {
-        console.error('Sign up error:', result.error);
-        var msg = '❌ Inscription échouée. ';
-        if (result.error.message && result.error.message.includes('already registered')) {
-          msg += 'Cet email est déjà utilisé. Essaie de te connecter.';
-        } else {
-          msg += (result.error.message || 'Vérifiez les informations saisies.');
-        }
-        showToast(msg, 'error');
-      } else {
-        // Vérifier si email confirmation est activée
-        if (result.data && result.data.user && !result.data.session) {
-          showToast('⚠️ Compte créé mais email de confirmation requis. Désactive "Confirm email" dans Supabase → Auth → Providers → Email, puis recrée ton compte.', 'warning');
-        } else {
-          showToast('✅ Compte créé et connecté!', 'success');
-        }
-        closeDynamicModal();
-      }
-    })
-    .catch(function(err) { console.error('Network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
-}
-
 function signOut() {
   supabaseClient.auth.signOut().then(function() {
     CURRENT_USER = null;
+    LAST_SYNC_TIME = null;
     updateAuthUI();
     showToast('🚪 Déconnecté', 'info');
   })
@@ -1783,6 +2010,8 @@ function syncToCloud() {
         }
         showToast(msg, 'error');
       } else {
+        LAST_SYNC_TIME = new Date();
+        updateAuthUI();
         showToast('☁️ Données sauvegardées!', 'success');
       }
     })
@@ -1818,6 +2047,8 @@ function loadFromCloud() {
         saveAll();
         COMPUTED = compute();
         render();
+        LAST_SYNC_TIME = new Date();
+        updateAuthUI();
         showToast('☁️ Données chargées du cloud!', 'success');
       }
     })
