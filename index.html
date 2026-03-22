@@ -4577,8 +4577,15 @@ function buildMission(mis) {
           }
         });
       }
-      // Appliquer les ajustements
+      // Appliquer les ajustements (seulement pour les jours ouvrés du mois dans la mission)
+      var pym = parseYM(l.ym);
+      var ajHolidays = frenchHolidays(pym.y);
       Object.keys(l.ajustements).forEach(function(iso) {
+        // Vérifier que le jour est dans le mois et dans la mission
+        if (iso.indexOf(l.ym) !== 0) return;
+        if (mis.debut && iso < mis.debut) return;
+        if (mis.fin && iso > mis.fin) return;
+        if (ajHolidays.indexOf(iso) !== -1) return;
         scheduled[iso] = l.ajustements[iso];
       });
       // Compter les jours > 0
@@ -9147,10 +9154,18 @@ function showMonthCongesModal(monthYm, mode) {
         var v = scheduledNet[iso];
         if (v > 0) actState[iso] = v >= 0.75 ? 1 : (v >= 0.25 ? 0.5 : 0);
       });
-      // Appliquer les ajustements existants par-dessus
+      // Appliquer les ajustements existants par-dessus (seulement pour les jours dans la mission)
+      var missionBizDays = {};
+      bizDays.forEach(function(bd) {
+        if (!bd.isHoliday && m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin) {
+          missionBizDays[bd.iso] = true;
+        }
+      });
       if (ligne.ajustements) {
         Object.keys(ligne.ajustements).forEach(function(iso) {
-          actState[iso] = ligne.ajustements[iso];
+          if (missionBizDays[iso]) {
+            actState[iso] = ligne.ajustements[iso];
+          }
         });
       }
 
@@ -16711,7 +16726,9 @@ function drawJoursParMissionChart() {
     var dataArr = months.map(function(monthKey) {
       var ligne = null;
       mis.lignes.forEach(function(l) { if (l.ym === monthKey) ligne = l; });
-      return ligne ? Math.max(0, (ligne.joursPrevus || 0) - (ligne.conges || 0)) : 0;
+      if (!ligne) return 0;
+      // Utiliser joursReels (qui intègre ajustements > joursReelsOverride > théorique)
+      return ligne.joursReels || Math.max(0, (ligne.joursPrevus || 0) - (ligne.conges || 0));
     });
     return {
       label: mis.client || mis.titre || 'Mission ' + (mi + 1),
