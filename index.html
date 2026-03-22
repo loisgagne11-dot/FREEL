@@ -1490,6 +1490,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
         <button class="nav-tab" data-view="tresorerie" role="tab" aria-selected="false" aria-label="Trésorerie"><span class="nav-tab-icon">🏦</span><span class="nav-tab-label">Tréso</span></button>
         <button class="nav-tab" data-view="finances" role="tab" aria-selected="false" aria-label="Analyse financière"><span class="nav-tab-icon">📊</span><span class="nav-tab-label">Analyse</span></button>
         <button class="nav-tab" data-view="config" role="tab" aria-selected="false" aria-label="Configuration"><span class="nav-tab-icon">⚙️</span><span class="nav-tab-label">Config</span></button>
+        <button class="nav-tab" data-view="compte" role="tab" aria-selected="false" aria-label="Mon Compte"><span class="nav-tab-icon">👤</span><span class="nav-tab-label">Compte</span></button>
       </nav>
     </div>
   </header>
@@ -1502,6 +1503,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     <button class="bottom-nav-tab" data-view="tresorerie" role="tab" aria-selected="false" aria-label="Trésorerie"><div class="bottom-nav-icon" aria-hidden="true">🏦</div><div class="bottom-nav-label">Tréso</div></button>
     <button class="bottom-nav-tab" data-view="finances" role="tab" aria-selected="false" aria-label="Analyse financière"><div class="bottom-nav-icon" aria-hidden="true">📊</div><div class="bottom-nav-label">Analyse</div></button>
     <button class="bottom-nav-tab" data-view="config" role="tab" aria-selected="false" aria-label="Configuration"><div class="bottom-nav-icon" aria-hidden="true">⚙️</div><div class="bottom-nav-label">Config</div></button>
+    <button class="bottom-nav-tab" data-view="compte" role="tab" aria-selected="false" aria-label="Mon Compte"><div class="bottom-nav-icon" aria-hidden="true">👤</div><div class="bottom-nav-label">Compte</div></button>
   </nav>
 
   <!-- FAB saisie rapide -->
@@ -1563,6 +1565,7 @@ var VIEW = 'cockpit';
 var ACTIVITE_TAB = 'missions';
 var TRESORERIE_TAB = 'flux'; // sous-onglet trésorerie: flux, provisions
 var CONFIG_TAB = 'entreprise'; // sous-onglet config: entreprise, infos, donnees, cloud
+var COMPTE_TAB = 'profil'; // sous-onglet compte: profil, preferences, securite
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SUPABASE CLOUD SYNC
@@ -17963,6 +17966,392 @@ function renderConfig(container) {
   renderParams(container);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPTE: Onglet Mon Compte (Profil, Préférences, Sécurité & Données)
+// ═══════════════════════════════════════════════════════════════════════════
+function renderCompte(container) {
+  container.appendChild(el('h2', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '16px' } }, '👤 Mon Compte'));
+
+  // Sub-tabs
+  var compteTabs = [
+    { id: 'profil', label: 'Mon Profil', icon: '👤' },
+    { id: 'preferences', label: 'Préférences', icon: '🎨' },
+    { id: 'securite', label: 'Sécurité & Données', icon: '🔒' }
+  ];
+
+  var tabBar = el('div', { style: {
+    display: 'flex', gap: '6px', marginBottom: '16px',
+    padding: '4px', background: 'var(--bg-secondary)', borderRadius: '12px',
+    overflowX: 'auto'
+  }});
+
+  compteTabs.forEach(function(tab) {
+    var isActive = COMPTE_TAB === tab.id;
+    var btn = el('button', {
+      style: {
+        flex: 1, padding: '10px 8px', border: 'none', borderRadius: '8px',
+        background: isActive ? 'var(--accent)' : 'transparent',
+        color: isActive ? 'white' : 'var(--text-secondary)',
+        fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+        transition: 'all 0.2s ease', whiteSpace: 'nowrap', minWidth: '0'
+      },
+      onclick: function() { COMPTE_TAB = tab.id; render(); }
+    }, tab.icon + ' ' + tab.label);
+    tabBar.appendChild(btn);
+  });
+  container.appendChild(tabBar);
+
+  // ===== TAB: Mon Profil =====
+  if (COMPTE_TAB === 'profil') {
+    renderCompteProfil(container);
+  }
+
+  // ===== TAB: Préférences =====
+  if (COMPTE_TAB === 'preferences') {
+    renderComptePreferences(container);
+  }
+
+  // ===== TAB: Sécurité & Données =====
+  if (COMPTE_TAB === 'securite') {
+    renderCompteSecurite(container);
+  }
+}
+
+// --- Mon Profil ---
+function renderCompteProfil(container) {
+  // Carte profil principale
+  var profileCard = el('div', { class: 'card', style: { textAlign: 'center', padding: '24px' } });
+
+  // Avatar
+  var avatarDiv = el('div', { style: {
+    width: '80px', height: '80px', borderRadius: '50%',
+    background: 'linear-gradient(135deg, var(--accent), #059669)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    margin: '0 auto 12px', fontSize: '36px', color: 'white'
+  }});
+  avatarDiv.textContent = CURRENT_USER ? CURRENT_USER.email.charAt(0).toUpperCase() : (COMPANY.nom ? COMPANY.nom.charAt(0).toUpperCase() : '?');
+  profileCard.appendChild(avatarDiv);
+
+  // Email / Nom
+  if (CURRENT_USER) {
+    profileCard.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '4px' } }, CURRENT_USER.email));
+    profileCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, COMPANY.nom || 'Entreprise non configurée'));
+  } else {
+    profileCard.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '4px' } }, COMPANY.nom || 'Mon Entreprise'));
+    profileCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Non connecté au cloud'));
+  }
+
+  // Status sync badge
+  var syncBadge = el('div', { style: {
+    display: 'inline-flex', alignItems: 'center', gap: '6px',
+    padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
+    background: CURRENT_USER ? 'var(--success-glow)' : 'var(--bg-tertiary)',
+    color: CURRENT_USER ? 'var(--success)' : 'var(--text-muted)'
+  }});
+  syncBadge.textContent = CURRENT_USER ? 'Synchronisé' : 'Hors ligne';
+  profileCard.appendChild(syncBadge);
+
+  if (LAST_SYNC_TIME) {
+    profileCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' } }, 'Dernière synchro : ' + formatSyncTime(LAST_SYNC_TIME)));
+  }
+
+  container.appendChild(profileCard);
+
+  // Résumé des données
+  var statsCard = el('div', { class: 'card' });
+  statsCard.appendChild(el('div', { class: 'card-title' }, 'Résumé de vos données'));
+
+  var missionCount = MISSIONS ? MISSIONS.length : 0;
+  var clientCount = CLIENTS ? CLIENTS.length : 0;
+  var treasuryCount = TREASURY && TREASURY.mouvements ? TREASURY.mouvements.length : 0;
+  var factureCount = 0;
+  if (MISSIONS) {
+    MISSIONS.forEach(function(m) {
+      if (m.factures) factureCount += m.factures.length;
+    });
+  }
+
+  var statsGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
+  var statsItems = [
+    { label: 'Missions', value: missionCount, icon: '💼' },
+    { label: 'Clients', value: clientCount, icon: '👥' },
+    { label: 'Factures', value: factureCount, icon: '📄' },
+    { label: 'Mouvements', value: treasuryCount, icon: '🏦' }
+  ];
+  statsItems.forEach(function(item) {
+    var stat = el('div', { style: {
+      padding: '12px', borderRadius: '10px', background: 'var(--bg-tertiary)',
+      textAlign: 'center'
+    }});
+    stat.appendChild(el('div', { style: { fontSize: '24px', marginBottom: '4px' } }, item.icon));
+    stat.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '800' } }, String(item.value)));
+    stat.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, item.label));
+    statsGrid.appendChild(stat);
+  });
+  statsCard.appendChild(statsGrid);
+  container.appendChild(statsCard);
+
+  // Actions cloud
+  var cloudCard = el('div', { class: 'card' });
+  cloudCard.appendChild(el('div', { class: 'card-title' }, 'Synchronisation Cloud'));
+
+  if (CURRENT_USER) {
+    var cloudBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
+    cloudBtns.appendChild(el('button', { class: 'btn btn-primary', onclick: function() { syncToCloud(); showToast('Sauvegarde en cours...', 'info'); } }, 'Sauvegarder'));
+    cloudBtns.appendChild(el('button', { class: 'btn', onclick: function() {
+      if (confirm('Charger les données du cloud ? Cela remplacera vos données locales.')) {
+        loadFromCloud();
+        showToast('Chargement en cours...', 'info');
+      }
+    } }, 'Charger'));
+    cloudCard.appendChild(cloudBtns);
+
+    cloudCard.appendChild(el('div', { style: { marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)' } }, 'La synchronisation est automatique à chaque modification.'));
+
+    // Déconnexion
+    cloudCard.appendChild(el('div', { style: { marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)', textAlign: 'center' } }));
+    cloudCard.appendChild(el('button', { class: 'btn', style: { color: 'var(--danger)', borderColor: 'var(--danger)' }, onclick: function() {
+      if (confirm('Se déconnecter du cloud ?')) signOut();
+    } }, 'Déconnexion'));
+  } else if (SYNC_ENABLED) {
+    cloudCard.appendChild(el('div', { style: { textAlign: 'center', padding: '12px' } }, [
+      el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Cloud configuré mais non connecté'),
+      el('button', { class: 'btn btn-primary', onclick: showAuthModal }, 'Se connecter')
+    ]));
+  } else {
+    cloudCard.appendChild(el('div', { style: { textAlign: 'center', padding: '12px' } }, [
+      el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Configure le cloud dans Config > Cloud pour activer la synchronisation.'),
+      el('button', { class: 'btn', onclick: function() { VIEW = 'config'; CONFIG_TAB = 'cloud'; render(); } }, 'Aller dans Config')
+    ]));
+  }
+  container.appendChild(cloudCard);
+}
+
+// --- Préférences ---
+function renderComptePreferences(container) {
+  // Apparence
+  var themeCard = el('div', { class: 'card' });
+  themeCard.appendChild(el('div', { class: 'card-title' }, 'Apparence'));
+
+  // Thème
+  var themeRow = el('div', { class: 'toggle-row' });
+  themeRow.appendChild(el('div', {}, [
+    el('div', { class: 'toggle-label' }, 'Mode sombre'),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Basculer entre le thème clair et sombre')
+  ]));
+  var themeToggle = el('label', { class: 'toggle-switch' });
+  var themeInput = el('input', { type: 'checkbox', checked: THEME === 'dark', onchange: function() { toggleTheme(); } });
+  themeToggle.appendChild(themeInput);
+  themeToggle.appendChild(el('span', { class: 'toggle-slider' }));
+  themeRow.appendChild(themeToggle);
+  themeCard.appendChild(themeRow);
+
+  // Mode confidentialité
+  var privacyRow = el('div', { class: 'toggle-row' });
+  privacyRow.appendChild(el('div', {}, [
+    el('div', { class: 'toggle-label' }, 'Mode confidentialité'),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Floute les montants pour protéger votre écran (Ctrl+P)')
+  ]));
+  var privacyToggleSwitch = el('label', { class: 'toggle-switch' });
+  var privacyInput = el('input', { type: 'checkbox', checked: PRIVACY_MODE, onchange: function() { togglePrivacy(); } });
+  privacyToggleSwitch.appendChild(privacyInput);
+  privacyToggleSwitch.appendChild(el('span', { class: 'toggle-slider' }));
+  privacyRow.appendChild(privacyToggleSwitch);
+  themeCard.appendChild(privacyRow);
+
+  container.appendChild(themeCard);
+
+  // Affichage
+  var displayCard = el('div', { class: 'card' });
+  displayCard.appendChild(el('div', { class: 'card-title' }, 'Affichage'));
+
+  // Cash disponible vs solde
+  var cashRow = el('div', { class: 'toggle-row' });
+  cashRow.appendChild(el('div', {}, [
+    el('div', { class: 'toggle-label' }, 'Afficher Cash Disponible'),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Affiche le cash disponible (solde - provisions) au lieu du solde brut')
+  ]));
+  var cashToggle = el('label', { class: 'toggle-switch' });
+  var cashInput = el('input', { type: 'checkbox', checked: SHOW_CASH_DISPO, onchange: function() {
+    SHOW_CASH_DISPO = this.checked;
+    render();
+  } });
+  cashToggle.appendChild(cashInput);
+  cashToggle.appendChild(el('span', { class: 'toggle-slider' }));
+  cashRow.appendChild(cashToggle);
+  displayCard.appendChild(cashRow);
+
+  // Affichage cumulé
+  var cumulRow = el('div', { class: 'toggle-row' });
+  cumulRow.appendChild(el('div', {}, [
+    el('div', { class: 'toggle-label' }, 'Vue cumulée'),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Affiche les graphiques en mode cumulé')
+  ]));
+  var cumulToggle = el('label', { class: 'toggle-switch' });
+  var cumulInput = el('input', { type: 'checkbox', checked: SHOW_CUMUL, onchange: function() {
+    SHOW_CUMUL = this.checked;
+    render();
+  } });
+  cumulToggle.appendChild(cumulInput);
+  cumulToggle.appendChild(el('span', { class: 'toggle-slider' }));
+  cumulRow.appendChild(cumulToggle);
+  displayCard.appendChild(cumulRow);
+
+  // Vue provisions par défaut
+  displayCard.appendChild(createSelect('Vue provisions par défaut', 'compteProvView', [
+    { value: 'type', label: 'Par type de charge' },
+    { value: 'month', label: 'Par mois' }
+  ], PROV_VIEW || 'type'));
+  // Save on change
+  var provSelect = displayCard.querySelector('#compteProvView');
+  if (provSelect) {
+    provSelect.addEventListener('change', function() {
+      PROV_VIEW = this.value;
+      render();
+    });
+  }
+
+  container.appendChild(displayCard);
+
+  // Objectifs
+  var goalsCard = el('div', { class: 'card' });
+  goalsCard.appendChild(el('div', { class: 'card-title' }, 'Objectifs'));
+
+  var goalInput = createInput('Objectif CA annuel (€)', 'number', 'compteGoalCA', GOAL_CA || '', 'Ex: 50000');
+  goalsCard.appendChild(goalInput);
+  goalsCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Définissez un objectif pour suivre votre progression dans le Cockpit'));
+
+  goalsCard.appendChild(el('button', { class: 'btn btn-primary', onclick: function() {
+    var val = parseInt($('#compteGoalCA').value) || 0;
+    setGoalCA(val);
+    showToast('Objectif CA sauvegardé : ' + EUR(val), 'success');
+    render();
+  } }, 'Sauvegarder l\'objectif'));
+
+  container.appendChild(goalsCard);
+}
+
+// --- Sécurité & Données ---
+function renderCompteSecurite(container) {
+  // Sauvegarde locale
+  var backupCard = el('div', { class: 'card' });
+  backupCard.appendChild(el('div', { class: 'card-title' }, 'Sauvegardes locales'));
+
+  // Lister les backups existants
+  var backupKeys = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var key = localStorage.key(i);
+    if (key && key.indexOf('freel_backup_') === 0) {
+      backupKeys.push(key);
+    }
+  }
+  backupKeys.sort().reverse();
+
+  if (backupKeys.length > 0) {
+    backupCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--success)', marginBottom: '10px' } }, backupKeys.length + ' sauvegarde(s) automatique(s)'));
+    var backupList = el('div', { style: { maxHeight: '150px', overflow: 'auto' } });
+    backupKeys.forEach(function(bk) {
+      var dateStr = bk.replace('freel_backup_', '');
+      var row = el('div', { style: {
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '8px', borderRadius: '6px', background: 'var(--bg-tertiary)', marginBottom: '4px', fontSize: '11px'
+      }});
+      row.appendChild(el('span', {}, dateStr));
+      var restoreBtn = el('button', { class: 'btn btn-sm', style: { fontSize: '10px', padding: '4px 8px' }, onclick: (function(k) { return function() {
+        if (confirm('Restaurer la sauvegarde du ' + k.replace('freel_backup_', '') + ' ? Cela remplacera vos données actuelles.')) {
+          try {
+            var backup = JSON.parse(localStorage.getItem(k));
+            if (backup.company) COMPANY = backup.company;
+            if (backup.missions) MISSIONS = backup.missions;
+            if (backup.clients) CLIENTS = backup.clients;
+            if (backup.treasury) TREASURY = backup.treasury;
+            if (backup.irConfig) IR_CONFIG = backup.irConfig;
+            saveAll();
+            COMPUTED = compute();
+            render();
+            showToast('Sauvegarde restaurée', 'success');
+          } catch (e) {
+            showToast('Erreur de restauration', 'error');
+          }
+        }
+      }; })(bk) }, 'Restaurer');
+      row.appendChild(restoreBtn);
+      backupList.appendChild(row);
+    });
+    backupCard.appendChild(backupList);
+  } else {
+    backupCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '12px', textAlign: 'center' } }, 'Aucune sauvegarde automatique'));
+  }
+
+  backupCard.appendChild(el('button', { class: 'btn', style: { marginTop: '12px', width: '100%' }, onclick: function() {
+    autoBackup();
+    showToast('Sauvegarde créée', 'success');
+    render();
+  } }, 'Créer une sauvegarde maintenant'));
+
+  container.appendChild(backupCard);
+
+  // Export / Import
+  var ioCard = el('div', { class: 'card' });
+  ioCard.appendChild(el('div', { class: 'card-title' }, 'Export & Import'));
+
+  var ioBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
+  ioBtns.appendChild(el('button', { class: 'btn', onclick: exportData }, 'Exporter (JSON)'));
+  var importWrapper = el('div', { class: 'file-input-wrapper' });
+  importWrapper.appendChild(el('button', { class: 'btn btn-block' }, 'Importer (JSON)'));
+  var importInput = el('input', { type: 'file', accept: '.json' });
+  importInput.onchange = function(e) { if (e.target.files[0]) importData(e.target.files[0]); };
+  importWrapper.appendChild(importInput);
+  ioBtns.appendChild(importWrapper);
+  ioCard.appendChild(ioBtns);
+
+  ioCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px' } }, 'Exportez vos données pour les sauvegarder ou les transférer sur un autre appareil.'));
+
+  container.appendChild(ioCard);
+
+  // Vie privée
+  var privacyCard = el('div', { class: 'card' });
+  privacyCard.appendChild(el('div', { class: 'card-title' }, 'Vie privée & RGPD'));
+
+  privacyCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.8' } }, [
+    el('div', { style: { marginBottom: '8px' } }, 'Vos données sont stockées localement sur votre appareil (localStorage). Aucune donnée n\'est envoyée à des tiers.'),
+    el('div', { style: { marginBottom: '8px' } }, SYNC_ENABLED ?
+      'La synchronisation cloud est activée. Vos données sont stockées de manière chiffrée sur votre projet Supabase personnel.' :
+      'La synchronisation cloud n\'est pas activée. Vos données restent uniquement sur cet appareil.'),
+    el('div', {}, 'Vous pouvez à tout moment exporter ou supprimer l\'ensemble de vos données.')
+  ]));
+
+  container.appendChild(privacyCard);
+
+  // Zone danger
+  var dangerCard = el('div', { class: 'card', style: { borderColor: 'var(--danger)', borderWidth: '1px', borderStyle: 'solid' } });
+  dangerCard.appendChild(el('div', { class: 'card-title', style: { color: 'var(--danger)' } }, 'Zone dangereuse'));
+
+  dangerCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Ces actions sont irréversibles. Exportez vos données avant de procéder.'));
+
+  var dangerBtns = el('div', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap' } });
+  dangerBtns.appendChild(el('button', { class: 'btn', style: { color: 'var(--danger)', borderColor: 'var(--danger)' }, onclick: function() {
+    if (confirm('Réinitialiser les notifications lues ?')) {
+      localStorage.removeItem('freel_notif_read');
+      NOTIF_READ = [];
+      showToast('Notifications réinitialisées', 'success');
+      render();
+    }
+  } }, 'Réinitialiser notifications'));
+
+  dangerBtns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() {
+    if (confirm('ATTENTION : Supprimer TOUTES les données FREEL ? Cette action est irréversible !')) {
+      if (confirm('Êtes-vous vraiment sûr ? Toutes vos missions, clients, factures et données seront perdues.')) {
+        Object.keys(localStorage).filter(function(k) { return k.indexOf('freel') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
+        location.reload();
+      }
+    }
+  } }, 'Supprimer toutes les données'));
+  dangerCard.appendChild(dangerBtns);
+
+  container.appendChild(dangerCard);
+}
+
 function render() {
   var container = $('#app');
   if (!container) { console.error('Container #app not found'); return; }
@@ -17975,6 +18364,7 @@ function render() {
     else if (VIEW === 'tresorerie') renderTresorerie(container);
     else if (VIEW === 'finances') renderFinances(container);
     else if (VIEW === 'config') renderConfig(container);
+    else if (VIEW === 'compte') renderCompte(container);
     // Rétro-compat anciennes vues
     else if (VIEW === 'accueil') { VIEW = 'cockpit'; renderCockpit(container); }
     else if (VIEW === 'performance') { VIEW = 'finances'; FINANCES_TAB = 'performance'; renderFinances(container); }
