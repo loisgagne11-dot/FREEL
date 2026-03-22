@@ -4579,11 +4579,12 @@ function buildMission(mis) {
       Object.keys(l.ajustements).forEach(function(iso) {
         scheduled[iso] = l.ajustements[iso];
       });
-      // Supprimer les jours à 0
+      // Compter les jours > 0
       jours = 0;
       Object.keys(scheduled).forEach(function(iso) {
         if (scheduled[iso] > 0) jours += scheduled[iso];
       });
+      jours = Math.round(jours * 10) / 10;
     } else if (l.joursReelsOverride !== undefined && l.joursReelsOverride !== null) {
       jours = l.joursReelsOverride; // Override manuel: rythme réel
     } else if (mis.periodes && mis.periodes.length > 0) {
@@ -9139,9 +9140,10 @@ function showMonthCongesModal(monthYm, mode) {
 
       // État activité: iso -> 0 | 0.5 | 1
       var actState = {};
-      // Pré-remplir depuis le planning net
+      // Pré-remplir depuis le planning net (normaliser à 0, 0.5 ou 1)
       Object.keys(scheduledNet).forEach(function(iso) {
-        if (scheduledNet[iso] > 0) actState[iso] = scheduledNet[iso] >= 1 ? 1 : 0.5;
+        var v = scheduledNet[iso];
+        if (v > 0) actState[iso] = v >= 0.75 ? 1 : (v >= 0.25 ? 0.5 : 0);
       });
       // Appliquer les ajustements existants par-dessus
       if (ligne.ajustements) {
@@ -9153,8 +9155,10 @@ function showMonthCongesModal(monthYm, mode) {
       function updateActCount() {
         var total = 0;
         Object.keys(actState).forEach(function(k) {
-          if (actState[k] > 0) total += actState[k];
+          var v = actState[k];
+          if (typeof v === 'number' && v > 0.01) total += v;
         });
+        total = Math.round(total * 10) / 10;
         var cs = document.getElementById('congesCount_' + m.id);
         if (cs) cs.textContent = total + 'j travaillés';
       }
@@ -9187,8 +9191,8 @@ function showMonthCongesModal(monthYm, mode) {
         if (bd.isHoliday) cls += ' holiday';
         if (!inMission) cls += ' not-in-mission';
         if (inMission && !bd.isHoliday) {
-          if (val >= 1) cls += ' act-worked';
-          else if (val === 0.5) cls += ' act-half';
+          if (val >= 0.75) cls += ' act-worked';
+          else if (val >= 0.25) cls += ' act-half';
           else cls += ' act-off';
           if (isModified) cls += ' act-modified';
           if (isAdded) cls += ' act-added';
@@ -9205,14 +9209,14 @@ function showMonthCongesModal(monthYm, mode) {
               var cur = actState[iso] || 0;
               // Cycle: 1 → 0.5 → 0 → 1
               var next;
-              if (cur >= 1) next = 0.5;
-              else if (cur === 0.5) next = 0;
+              if (cur >= 0.75) next = 0.5;
+              else if (cur >= 0.25) next = 0;
               else next = 1;
               actState[iso] = next;
 
               element.className = 'conges-day';
-              if (next >= 1) element.classList.add('act-worked');
-              else if (next === 0.5) element.classList.add('act-half');
+              if (next >= 0.75) element.classList.add('act-worked');
+              else if (next >= 0.25) element.classList.add('act-half');
               else element.classList.add('act-off');
 
               // Recalculer modified/added
