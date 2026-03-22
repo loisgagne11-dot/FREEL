@@ -402,8 +402,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 //# sourceMappingURL=chart.umd.js.map
 </script>
 
-<!-- Supabase CDN -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- Supabase CDN with fallbacks for browsers that block certain CDNs -->
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+if (!(window.supabase || window.Supabase)) {
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+  document.head.appendChild(s);
+}
+</script>
 <style>
 :root {
   --bg-primary: #0a0a0b;
