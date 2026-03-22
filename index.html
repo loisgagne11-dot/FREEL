@@ -402,14 +402,34 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 //# sourceMappingURL=chart.umd.js.map
 </script>
 
-<!-- Supabase CDN with fallbacks for browsers that block certain CDNs -->
-<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- Supabase CDN with multiple fallbacks -->
 <script>
-if (!(window.supabase || window.Supabase)) {
-  var s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
-  document.head.appendChild(s);
-}
+(function() {
+  var cdns = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+    'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/supabase/2.47.12/umd/supabase.min.js'
+  ];
+  var idx = 0;
+  window._supabaseReady = new Promise(function(resolve) {
+    function tryLoad() {
+      if (idx >= cdns.length) { console.error('Supabase CDN: all fallbacks failed'); resolve(false); return; }
+      var s = document.createElement('script');
+      s.src = cdns[idx];
+      s.crossOrigin = 'anonymous';
+      s.onload = function() {
+        var lib = window.supabase || window.Supabase;
+        if (lib && lib.createClient) {
+          console.log('Supabase loaded from CDN #' + (idx + 1));
+          resolve(true);
+        } else { idx++; tryLoad(); }
+      };
+      s.onerror = function() { console.warn('Supabase CDN #' + (idx + 1) + ' failed, trying next...'); idx++; tryLoad(); };
+      document.head.appendChild(s);
+    }
+    tryLoad();
+  });
+})();
 </script>
 <style>
 :root {
@@ -1524,7 +1544,8 @@ var CONFIG_TAB = 'entreprise'; // sous-onglet config: entreprise, infos, donnees
 
 var SUPABASE_URL = ''; // Chargé depuis localStorage
 var SUPABASE_ANON_KEY = ''; // Chargé depuis localStorage
-var supabase = null;
+var _supabaseLib = null; // Référence à la librairie CDN (createClient)
+var supabaseClient = null; // Instance du client Supabase
 var CURRENT_USER = null;
 var SYNC_ENABLED = false;
 
@@ -1546,8 +1567,8 @@ function saveSupabaseCredentials(url, key) {
     localStorage.setItem('freel_supabase', JSON.stringify({ url: url, key: key }));
     SUPABASE_URL = url;
     SUPABASE_ANON_KEY = key;
-    // Réinitialiser la connexion
-    supabase = null;
+    // Réinitialiser la connexion (sans toucher à _supabaseLib)
+    supabaseClient = null;
     SYNC_ENABLED = false;
     CURRENT_USER = null;
     initSupabase();
@@ -1557,24 +1578,38 @@ function saveSupabaseCredentials(url, key) {
 }
 
 function initSupabase() {
-  // V73: D'abord charger depuis localStorage
+  // D'abord charger depuis localStorage
   loadSupabaseCredentials();
 
-  // V73: Chercher la librairie Supabase (peut être à différents endroits selon le CDN)
-  var supabaseLib = window.supabase || window.Supabase;
-  var createClientFn = null;
-  if (supabaseLib && supabaseLib.createClient) {
-    createClientFn = supabaseLib.createClient;
-  } else if (typeof createClient === 'function') {
-    createClientFn = createClient;
-  }
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
 
-  if (SUPABASE_URL && SUPABASE_ANON_KEY && createClientFn) {
-    supabase = createClientFn(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Attendre que la librairie Supabase soit chargée (CDN async)
+  window._supabaseReady.then(function(loaded) {
+    if (!loaded) {
+      console.warn('Supabase library could not be loaded from any CDN');
+      return;
+    }
+
+    // Stocker la référence à la librairie une seule fois
+    if (!_supabaseLib) {
+      var lib = window.supabase || window.Supabase;
+      if (lib && lib.createClient) {
+        _supabaseLib = lib;
+      } else if (typeof createClient === 'function') {
+        _supabaseLib = { createClient: createClient };
+      }
+    }
+
+    if (!_supabaseLib || !_supabaseLib.createClient) {
+      console.warn('Supabase createClient not found');
+      return;
+    }
+
+    supabaseClient = _supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     SYNC_ENABLED = true;
 
     // Écouter les changements d'auth
-    supabase.auth.onAuthStateChange(function(event, session) {
+    supabaseClient.auth.onAuthStateChange(function(event, session) {
       CURRENT_USER = session ? session.user : null;
       updateAuthUI();
       if (event === 'SIGNED_IN') {
@@ -1583,14 +1618,14 @@ function initSupabase() {
     });
 
     // Vérifier session existante
-    supabase.auth.getSession().then(function(result) {
+    supabaseClient.auth.getSession().then(function(result) {
       if (result.data.session) {
         CURRENT_USER = result.data.session.user;
         updateAuthUI();
         loadFromCloud();
       }
     }).catch(function(err) { console.warn('Session check failed:', err.message); });
-  }
+  });
 }
 
 function updateAuthUI() {
@@ -1657,7 +1692,7 @@ function signIn() {
     return;
   }
   
-  supabase.auth.signInWithPassword({ email: email, password: password })
+  supabaseClient.auth.signInWithPassword({ email: email, password: password })
     .then(function(result) {
       if (result.error) {
         console.error('Sign in error:', result.error);
@@ -1687,7 +1722,7 @@ function signUp() {
     return;
   }
 
-  supabase.auth.signUp({ email: email, password: password })
+  supabaseClient.auth.signUp({ email: email, password: password })
     .then(function(result) {
       if (result.error) {
         console.error('Sign up error:', result.error);
@@ -1712,7 +1747,7 @@ function signUp() {
 }
 
 function signOut() {
-  supabase.auth.signOut().then(function() {
+  supabaseClient.auth.signOut().then(function() {
     CURRENT_USER = null;
     updateAuthUI();
     showToast('🚪 Déconnecté', 'info');
@@ -1721,7 +1756,7 @@ function signOut() {
 }
 
 function syncToCloud() {
-  if (!CURRENT_USER || !supabase) return;
+  if (!CURRENT_USER || !supabaseClient) return;
 
   var data = {
     user_id: CURRENT_USER.id,
@@ -1733,7 +1768,7 @@ function syncToCloud() {
     updated_at: new Date().toISOString()
   };
 
-  supabase.from('user_data')
+  supabaseClient.from('user_data')
     .upsert(data, { onConflict: 'user_id' })
     .then(function(result) {
       if (result.error) {
@@ -1755,9 +1790,9 @@ function syncToCloud() {
 }
 
 function loadFromCloud() {
-  if (!CURRENT_USER || !supabase) return;
+  if (!CURRENT_USER || !supabaseClient) return;
 
-  supabase.from('user_data')
+  supabaseClient.from('user_data')
     .select('*')
     .eq('user_id', CURRENT_USER.id)
     .single()
@@ -17366,14 +17401,26 @@ function renderAdmin(container) {
         el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur ☁️ pour te connecter')
       ]));
     }
-  } else if (SUPABASE_URL && SUPABASE_ANON_KEY && !(window.supabase || window.Supabase)) {
-    // Credentials sauvegardés mais librairie non chargée
-    statusDiv.style.background = 'var(--danger-glow)';
-    statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '🚫'));
-    statusDiv.appendChild(el('div', {}, [
-      el('div', { style: { fontWeight: '600', color: 'var(--danger)' } }, 'Librairie Supabase bloquée'),
-      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Ton navigateur bloque le chargement. Désactive le blocage de suivi (Tracking Prevention) dans les paramètres ou essaie un autre navigateur.')
-    ]));
+  } else if (SUPABASE_URL && SUPABASE_ANON_KEY && !SYNC_ENABLED) {
+    // Credentials sauvegardés mais librairie en cours de chargement ou bloquée
+    var libLoaded = !!(_supabaseLib || window.supabase || window.Supabase);
+    if (!libLoaded) {
+      statusDiv.style.background = 'var(--warning-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '⏳'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--warning)' } }, 'Chargement en cours...'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'La librairie Supabase se charge. Recharge la page si ça persiste.')
+      ]));
+      // Re-render once supabase is ready
+      window._supabaseReady.then(function() { if (VIEW === 'config') render(); });
+    } else {
+      statusDiv.style.background = 'var(--warning-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '⚡'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--warning)' } }, 'Configuré'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur ☁️ pour te connecter')
+      ]));
+    }
   } else {
     statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '❌'));
     statusDiv.appendChild(el('div', {}, [
@@ -17448,30 +17495,39 @@ function renderAdmin(container) {
       toast('Configure d\'abord l\'URL et la clé', 'warning');
       return;
     }
-    // Test simple: vérifier que Supabase répond
-    var supabaseLib = window.supabase || window.Supabase;
-    if (!supabaseLib || !supabaseLib.createClient) {
-      toast('❌ Librairie Supabase non chargée. Recharge la page ou change de navigateur.', 'error');
-      return;
-    }
     toast('Test en cours...', 'info');
-    try {
-      var testClient = supabaseLib.createClient(url, key);
-      testClient.auth.getSession().then(function(result) {
-        if (result.error) {
-          console.error('Supabase test error:', result.error);
-          toast('❌ Connexion Supabase échouée. Vérifiez URL et clé.', 'error');
-        } else {
-          toast('✅ Connexion Supabase OK!', 'success');
-        }
-      }).catch(function(err) {
-        console.error('Supabase test network error:', err);
-        toast('❌ Erreur réseau, vérifiez l\'URL Supabase.', 'error');
-      });
-    } catch (e) {
-      console.error('Supabase init error:', e);
-      toast('❌ Configuration Supabase invalide.', 'error');
-    }
+    window._supabaseReady.then(function(loaded) {
+      var lib = _supabaseLib || window.supabase || window.Supabase;
+      if (!loaded || !lib || !lib.createClient) {
+        toast('❌ Librairie Supabase non chargée. Recharge la page ou change de navigateur.', 'error');
+        return;
+      }
+      try {
+        var testClient = lib.createClient(url, key);
+        testClient.auth.getSession().then(function(result) {
+          if (result.error) {
+            console.error('Supabase test error:', result.error);
+            toast('❌ Connexion échouée. Vérifie URL et clé anon.', 'error');
+          } else {
+            // Tester aussi que la table user_data existe
+            testClient.from('user_data').select('id').limit(0).then(function(r2) {
+              if (r2.error) {
+                console.error('Table test error:', r2.error);
+                toast('⚠️ Connexion OK mais table user_data introuvable. Exécute le SQL ci-dessus dans SQL Editor.', 'warning');
+              } else {
+                toast('✅ Connexion Supabase OK! Table user_data trouvée.', 'success');
+              }
+            });
+          }
+        }).catch(function(err) {
+          console.error('Supabase test network error:', err);
+          toast('❌ Erreur réseau. Vérifie l\'URL Supabase.', 'error');
+        });
+      } catch (e) {
+        console.error('Supabase init error:', e);
+        toast('❌ Configuration Supabase invalide.', 'error');
+      }
+    });
   } }, '🔍 Tester'));
 
   if (SYNC_ENABLED && !CURRENT_USER) {
@@ -17496,7 +17552,7 @@ function renderAdmin(container) {
         localStorage.removeItem('freel_supabase');
         SUPABASE_URL = '';
         SUPABASE_ANON_KEY = '';
-        supabase = null;
+        supabaseClient = null;
         SYNC_ENABLED = false;
         CURRENT_USER = null;
         updateAuthUI();
@@ -17555,11 +17611,11 @@ function renderAdmin(container) {
     // Purger localStorage complet
     Object.keys(localStorage).filter(function(k) { return k.indexOf('freel') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
     // Purger Supabase si connecté
-    if (SYNC_ENABLED && CURRENT_USER && supabase) {
-      supabase.from('user_data').delete().eq('user_id', CURRENT_USER.id).then(function() {
+    if (SYNC_ENABLED && CURRENT_USER && supabaseClient) {
+      supabaseClient.from('user_data').delete().eq('user_id', CURRENT_USER.id).then(function() {
         console.log('Cloud data deleted');
       }).catch(function(err) { console.error('Cloud delete error:', err); });
-      supabase.auth.signOut();
+      supabaseClient.auth.signOut();
     }
     toast('Toutes vos données ont été supprimées', 'success');
     setTimeout(function() { location.reload(); }, 1500);
