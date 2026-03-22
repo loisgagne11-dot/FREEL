@@ -4433,12 +4433,16 @@ function getScheduledDaysForMonth(mis, monthKey) {
         var daysToWork = Math.min(joursSemaine, weekBizDays.length);
         var fullDays = Math.floor(daysToWork);
         var fractional = daysToWork - fullDays;
+        // Marquer tous les jours de la semaine comme couverts
+        weekBizDays.forEach(function(wd) {
+          if (wd.getMonth() === p.m && wd.getFullYear() === p.y) coveredDates[localISO(wd)] = true;
+        });
         for (var j = 0; j < weekBizDays.length && j <= fullDays; j++) {
           var workDay = weekBizDays[j];
           if (workDay.getMonth() === p.m && workDay.getFullYear() === p.y) {
             var iso = localISO(workDay);
-            if (j < fullDays) { result[iso] = 1; coveredDates[iso] = true; }
-            else if (fractional > 0) { result[iso] = fractional; coveredDates[iso] = true; }
+            if (j < fullDays) { result[iso] = 1; }
+            else if (fractional > 0) { result[iso] = fractional; }
           }
         }
         weekMon.setDate(weekMon.getDate() + 7);
@@ -4448,10 +4452,10 @@ function getScheduledDaysForMonth(mis, monthKey) {
       while (cursor <= overlapEnd) {
         if (isBusinessDay(cursor) && cursor.getMonth() === p.m && cursor.getFullYear() === p.y) {
           var dayKey = dowToKey[cursor.getDay()];
+          var isoD = localISO(cursor);
+          coveredDates[isoD] = true; // Marquer couvert même si 0
           if (dayKey && joursMap[dayKey]) {
-            var isoD = localISO(cursor);
             result[isoD] = joursMap[dayKey];
-            coveredDates[isoD] = true;
           }
         }
         cursor.setDate(cursor.getDate() + 1);
