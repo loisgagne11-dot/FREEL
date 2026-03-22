@@ -16831,7 +16831,19 @@ function showWeeklyBreakdownModal(monthKey) {
       });
     }
 
+    // Index des ajustements pour cette mission sur ce mois
+    var ajustementsMap = {};
+    var ligne = mis.lignes ? mis.lignes.find(function(l) { return l.ym === monthKey; }) : null;
+    if (ligne && ligne.ajustements) {
+      Object.keys(ligne.ajustements).forEach(function(iso) {
+        ajustementsMap[iso] = ligne.ajustements[iso];
+      });
+    }
+
     function getWorkedForDay(wdISO, wdKey) {
+      // Priorité: ajustements d'activité > planning théorique
+      if (ajustementsMap.hasOwnProperty(wdISO)) return ajustementsMap[wdISO];
+
       var worked = 0;
       var inMission = mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin;
       if (!inMission) return 0;
@@ -16867,9 +16879,9 @@ function showWeeklyBreakdownModal(monthKey) {
       week.days.forEach(function(wd) {
         var worked = getWorkedForDay(wd.iso, wd.key);
 
-        // V81: Congés
+        // V81: Congés (pas sur les jours ajustés, l'ajustement est déjà le réel)
         var conge = congesSet[wd.iso] || 0;
-        if (conge > 0 && worked > 0) {
+        if (conge > 0 && worked > 0 && !ajustementsMap.hasOwnProperty(wd.iso)) {
           congesDetail[wd.key] = Math.min(conge, worked);
           congesTotal += congesDetail[wd.key];
         }
