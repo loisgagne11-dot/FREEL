@@ -11630,7 +11630,7 @@ function renderActionsWidget(container) {
   widget.appendChild(el('div', { class: 'actions-header' }, [el('div', { class: 'actions-title' }, [el('span', {}, '⚡'), el('span', {}, 'Actions du Jour'), el('span', { class: 'actions-badge' }, String(actions.length))])]));
   var list = el('div', { class: 'actions-list' });
   actions.forEach(function(a) {
-    var item = el('div', { class: 'action-item ' + a.type });
+    var item = el('div', { class: 'action-item ' + a.type, style: { cursor: 'pointer' }, onclick: function() { a.action(); } });
     item.appendChild(el('div', { class: 'action-icon' }, a.icon));
     item.appendChild(el('div', { class: 'action-content' }, [el('div', { class: 'action-label' }, a.label), el('div', { class: 'action-sub' }, a.sub)]));
     item.appendChild(el('button', { class: 'action-btn ' + a.btnClass, onclick: function(e) { e.stopPropagation(); a.action(); } }, a.btnLabel));
