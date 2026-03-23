@@ -13413,18 +13413,12 @@ function renderCAPlafondWidget(container) {
 
   var widget = el('div', { class: 'card', style: { marginBottom: '16px', padding: '20px' } });
 
-  // ── Ligne 1 : Titre + montant encaissé ──
-  var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' } });
-  topRow.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' } }, 'CA ' + year));
-  topRow.appendChild(el('div', { style: { display: 'flex', alignItems: 'baseline', gap: '6px' } }, [
-    el('span', { style: { fontSize: '24px', fontWeight: '800', color: accentColor, letterSpacing: '-0.5px' } }, EUR(currentCA)),
-    el('span', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, '/ ' + EUR(plafond))
-  ]));
-  widget.appendChild(topRow);
+  // ── Ligne 1 : Titre seul ──
+  widget.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '16px' } }, 'CA ' + year));
 
-  // ── Barre de progression fine ──
+  // ── Barre de progression fine avec labels ──
   var maxScale = Math.max(plafond * 1.1, caTotal * 1.05);
-  var barContainer = el('div', { style: { position: 'relative', marginBottom: '20px' } });
+  var barContainer = el('div', { style: { position: 'relative', marginBottom: '28px', marginTop: '18px' } });
 
   var barBg = el('div', { style: { height: '8px', background: 'var(--bg-tertiary)', borderRadius: '4px', overflow: 'visible', position: 'relative' } });
 
@@ -13435,8 +13429,10 @@ function renderCAPlafondWidget(container) {
   } }));
 
   // Barre projetée (hachurée)
+  var projEndPct = realW;
   if (caProjecte > 0) {
     var projW = Math.min(100 - realW, (caProjecte / maxScale) * 100);
+    projEndPct = realW + projW;
     barBg.appendChild(el('div', { style: {
       height: '100%', width: projW + '%',
       background: 'repeating-linear-gradient(90deg, rgba(167,139,250,0.4) 0px, rgba(167,139,250,0.4) 3px, transparent 3px, transparent 6px)',
@@ -13446,12 +13442,30 @@ function renderCAPlafondWidget(container) {
 
   barContainer.appendChild(barBg);
 
-  // Marqueur plafond
+  // Label montant actuel (au-dessus, à la fin de la barre réalisée)
+  barContainer.appendChild(el('div', { style: {
+    position: 'absolute', left: realW.toFixed(1) + '%', top: '-16px',
+    transform: 'translateX(-50%)', fontSize: '10px', fontWeight: '700', color: accentColor, whiteSpace: 'nowrap'
+  } }, EUR(currentCA)));
+
+  // Label CA projeté total (en-dessous, à la fin de la barre violette) — seulement si projection
+  if (caProjecte > 0) {
+    barContainer.appendChild(el('div', { style: {
+      position: 'absolute', left: projEndPct.toFixed(1) + '%', top: '12px',
+      transform: 'translateX(-50%)', fontSize: '10px', fontWeight: '600', color: '#a78bfa', whiteSpace: 'nowrap'
+    } }, EUR(caTotal) + ' prévu'));
+  }
+
+  // Marqueur plafond + label
   var plafondPct = Math.min(100, (plafond / maxScale) * 100);
   barContainer.appendChild(el('div', { style: {
     position: 'absolute', left: plafondPct.toFixed(1) + '%', top: '-3px', width: '2px', height: '14px',
     background: 'var(--danger)', borderRadius: '1px', zIndex: 10, transform: 'translateX(-1px)'
   } }));
+  barContainer.appendChild(el('div', { style: {
+    position: 'absolute', left: plafondPct.toFixed(1) + '%', top: '14px',
+    transform: 'translateX(-50%)', fontSize: '9px', fontWeight: '600', color: 'var(--danger)', whiteSpace: 'nowrap'
+  } }, EUR(plafond)));
 
   widget.appendChild(barContainer);
 
