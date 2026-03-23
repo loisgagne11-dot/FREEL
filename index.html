@@ -15308,50 +15308,12 @@ function renderFinancesPerformance(container) {
   kpiGrid.appendChild(createKPIBlock(EUR(caLatent), 'CA Latent HT', caLatent > 0 ? 'var(--warning)' : 'var(--text-muted)'));
   container.appendChild(kpiGrid);
 
-  // V77: Waterfall CA HT - décomposition de la période
-  // Base = CA HT encaissé + projeté ; reductions = charges + provisions (excl. TVA sur base HT)
+  // V77: Waterfall CA HT - décomposition de la période (remplace donut conceptuellement faux)
+  // Base = CA HT encaissé période ; reductions = charges + provisions PÉRIODE (excl. TVA sur base HT)
+  // Note: chargesDetail normalise les catégories : 'IR Estimé' → 'IR', 'Impôt PL' → 'Impôt'
   var caHT = (data.caHT !== undefined && data.caHT > 0) ? data.caHT : (data.caReal || 0);
   var chargesMap = {};
   (data.chargesDetail || []).forEach(function(c) { chargesMap[c.cat] = c.montant; });
-
-  // Ajouter les projections futures si la période inclut des mois futurs
-  var nowYmPerf = ym(TODAY.getFullYear(), TODAY.getMonth());
-  var periodMonths = getPeriodMonths();
-  var futureMonths = periodMonths.filter(function(m) { return m > nowYmPerf; });
-  var projectedCAHT = 0;
-  var projectedCharges = { URSSAF: 0, CFP: 0, IR: 0, 'Impôt': 0 };
-  if (futureMonths.length > 0) {
-    // Factures à encaisser dans les mois futurs de la période
-    (COMPUTED.facturesAEncaisser || []).forEach(function(f) {
-      if (f.paymentMonth && futureMonths.indexOf(f.paymentMonth) >= 0) {
-        projectedCAHT += f.ht || 0;
-        var rate = getUrssafRate(f.paymentMonth);
-        projectedCharges['URSSAF'] += Math.round((f.ht || 0) * rate);
-        projectedCharges['CFP'] += Math.round((f.ht || 0) * LEGAL.cfp);
-        if (COMPANY.prelevementLiberatoire) projectedCharges['Impôt'] += Math.round((f.ht || 0) * LEGAL.impLib);
-      }
-    });
-    // Missions planifiées sans facture
-    MISSIONS.forEach(function(mis) {
-      if (mis.statut === 'prospect' || mis.statut === 'perdue' || !mis.lignes) return;
-      mis.lignes.forEach(function(l) {
-        if (futureMonths.indexOf(l.ym) < 0) return;
-        var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
-        if (jours <= 0) return;
-        var alreadyCovered = (mis.factures || []).some(function(f) { return f.mois === l.ym; });
-        if (alreadyCovered) return;
-        var caHTMois = jours * mis.tjm;
-        projectedCAHT += caHTMois;
-        var rate = getUrssafRate(l.ym);
-        projectedCharges['URSSAF'] += Math.round(caHTMois * rate);
-        projectedCharges['CFP'] += Math.round(caHTMois * LEGAL.cfp);
-        if (COMPANY.prelevementLiberatoire) projectedCharges['Impôt'] += Math.round(caHTMois * LEGAL.impLib);
-      });
-    });
-  }
-  caHT += projectedCAHT;
-  // Merge projected charges
-  Object.keys(projectedCharges).forEach(function(k) { chargesMap[k] = (chargesMap[k] || 0) + projectedCharges[k]; });
 
   var segURSSAF = (chargesMap['URSSAF'] || 0) + (chargesMap['CFP'] || 0);
   var segIR = (chargesMap['Impôt'] || 0) + (chargesMap['IR'] || 0);
