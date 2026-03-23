@@ -1231,6 +1231,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .card.clickable { cursor: pointer; }
 .card.clickable:hover { border-color: var(--accent); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1); transform: translateY(-1px); }
 .card-title { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.card-title.collapsible { cursor: pointer; user-select: none; }
+.card-title.collapsible::after { content: '▼'; font-size: 10px; color: var(--text-muted); transition: transform 0.2s; margin-left: 8px; }
+.card-title.collapsible.collapsed::after { transform: rotate(-90deg); }
+.card-body-collapsible { overflow: hidden; transition: max-height 0.3s ease, opacity 0.2s ease; }
+.card-body-collapsible.collapsed { max-height: 0 !important; opacity: 0; padding: 0; }
 .card-actions { display: flex; gap: 6px; align-items: center; }
 .chart-container { height: 220px; min-height: 220px; position: relative; width: 100%; box-sizing: border-box; }
 .chart-container canvas { display: block; width: 100% !important; height: 100% !important; }
@@ -2717,6 +2722,49 @@ function el(tag, attrs, children) {
   if (children) (Array.isArray(children) ? children : [children]).forEach(function(c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
   return e;
 }
+// Helper: rend une card repliable avec titre cliquable
+function makeCollapsible(card, titleEl, storageKey, startCollapsed) {
+  titleEl.classList.add('collapsible');
+  var bodyWrap = el('div', { class: 'card-body-collapsible' });
+  // Move all children after title into the wrapper
+  var children = [];
+  var foundTitle = false;
+  Array.from(card.childNodes).forEach(function(c) {
+    if (c === titleEl) { foundTitle = true; return; }
+    if (foundTitle) children.push(c);
+  });
+  children.forEach(function(c) { bodyWrap.appendChild(c); });
+  card.appendChild(bodyWrap);
+  // Restore state from localStorage
+  var collapsed = startCollapsed;
+  if (storageKey) {
+    var saved = localStorage.getItem('collapse_' + storageKey);
+    if (saved !== null) collapsed = saved === '1';
+  }
+  if (collapsed) {
+    titleEl.classList.add('collapsed');
+    bodyWrap.classList.add('collapsed');
+  } else {
+    bodyWrap.style.maxHeight = 'none';
+  }
+  titleEl.onclick = function() {
+    var isCollapsed = bodyWrap.classList.contains('collapsed');
+    if (isCollapsed) {
+      bodyWrap.classList.remove('collapsed');
+      bodyWrap.style.maxHeight = bodyWrap.scrollHeight + 'px';
+      titleEl.classList.remove('collapsed');
+      setTimeout(function() { bodyWrap.style.maxHeight = 'none'; }, 300);
+    } else {
+      bodyWrap.style.maxHeight = bodyWrap.scrollHeight + 'px';
+      bodyWrap.offsetHeight; // force reflow
+      bodyWrap.classList.add('collapsed');
+      titleEl.classList.add('collapsed');
+    }
+    if (storageKey) localStorage.setItem('collapse_' + storageKey, isCollapsed ? '0' : '1');
+  };
+  return card;
+}
+
 // SPRINT 1: Sécurité — Échappement HTML pour prévenir XSS
 function escapeHTML(str) {
   if (str == null) return '';
@@ -4702,9 +4750,8 @@ function showFabMenu() {
   grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMissionModal(); } }, '💼 Nouvelle Mission'));
   grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showChargeModal(); } }, '📋 Nouvelle Charge'));
   grid.appendChild(el('button', { class: 'btn btn-block btn-success', onclick: function() { closeModal('fabModal'); showSalaireModal(); } }, '💸 Verser Rémunération'));
-  grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm); } }, '🏖️ Poser Congés'));
+  grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm); } }, '📋 Activité & Congés'));
   if (MISSIONS.length > 0) {
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm, 'activite'); } }, '📋 Suivi d\'activité'));
     grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showDownloadInvoiceModal(); } }, '📄 Télécharger Facture'));
   }
 
@@ -17621,11 +17668,11 @@ function renderTresorerie(container) {
   
   // V48: Intérêts Compte Pro - TOUJOURS AFFICHÉ (actif ou non)
   var totalInterets = TREASURY.rendementActif ? getTotalRendement() : 0;
-  var interetsBlock = el('div', { class: 'treso-item', onclick: function() { 
-    if (TREASURY.rendementActif) {
-      showRendementConfig(); 
-    } else {
-      // Rediriger vers Admin pour activer
+  var interetsBlock = el('div', { class: 'treso-item', onclick: function() {
+    if (TREASURY.rendementActif && TREASURY.rendementHistorique && TREASURY.rendementHistorique.length > 0) {
+      var card = document.getElementById('interetsHistoriqueCard');
+      if (card) card.style.display = card.style.display === 'none' ? '' : 'none';
+    } else if (!TREASURY.rendementActif) {
       toast('Active le rendement dans Admin > Trésorerie', 'info');
       VIEW = 'params';
       render();
@@ -17652,7 +17699,7 @@ function renderTresorerie(container) {
   
   // V48: CARD TRAÇABILITÉ DES INTÉRÊTS (si rendement actif)
   if (TREASURY.rendementActif && TREASURY.rendementHistorique && TREASURY.rendementHistorique.length > 0) {
-    var interetsCard = el('div', { class: 'card', style: { background: 'linear-gradient(135deg, var(--success-glow), transparent)' } });
+    var interetsCard = el('div', { id: 'interetsHistoriqueCard', class: 'card', style: { background: 'linear-gradient(135deg, var(--success-glow), transparent)', display: 'none' } });
     var interetsHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' } });
     interetsHeader.appendChild(el('div', { style: { fontWeight: '700' } }, '📈 Historique Intérêts Compte Pro'));
     interetsHeader.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', padding: '4px 8px', borderRadius: '12px' } }, TREASURY.rendementTaux + '% brut annuel'));
@@ -17912,7 +17959,8 @@ function renderAdmin(container) {
 
   // Entreprise
   var entCard = el('div', { class: 'card' });
-  entCard.appendChild(el('div', { class: 'card-title' }, '🏢 Entreprise'));
+  var entTitle = el('div', { class: 'card-title' }, '🏢 Entreprise');
+  entCard.appendChild(entTitle);
   entCard.appendChild(createInput('Nom / Raison sociale', 'text', 'adminNom', COMPANY.nom));
   entCard.appendChild(el('div', { class: 'form-row' }, [
     createInput('SIRET', 'text', 'adminSiret', COMPANY.siret),
@@ -17940,11 +17988,13 @@ function renderAdmin(container) {
     createInput('IBAN', 'text', 'adminIBAN', COMPANY.iban || '', 'Ex: FR76 1234...'),
     createInput('BIC', 'text', 'adminBIC', COMPANY.bic || '', 'Ex: BNPAFRPP')
   ]));
+  makeCollapsible(entCard, entTitle, 'cfg_entreprise', false);
   container.appendChild(entCard);
-  
+
   // Fiscal
   var fiscCard = el('div', { class: 'card' });
-  fiscCard.appendChild(el('div', { class: 'card-title' }, '💶 Régime Fiscal'));
+  var fiscTitle = el('div', { class: 'card-title' }, '💶 Régime Fiscal');
+  fiscCard.appendChild(fiscTitle);
 
   // V73: Type d'activité
   fiscCard.appendChild(createSelect('Type d\'activité', 'adminTypeActivite', [
@@ -17976,11 +18026,13 @@ function renderAdmin(container) {
     { value: 'trimestriel', label: '📆 Trimestriel (30/04, 31/07, 31/10, 31/01)' }
   ], COMPANY.urssafPeriodicite || 'mensuel'));
 
+  makeCollapsible(fiscCard, fiscTitle, 'cfg_fiscal', false);
   container.appendChild(fiscCard);
-  
+
   // Trésorerie
   var tresoCard = el('div', { class: 'card' });
-  tresoCard.appendChild(el('div', { class: 'card-title' }, '💰 Trésorerie'));
+  var tresoTitle = el('div', { class: 'card-title' }, '💰 Trésorerie');
+  tresoCard.appendChild(tresoTitle);
   tresoCard.appendChild(createInput('Solde initial du compte (€)', 'number', 'adminSolde', TREASURY.soldeInitial));
   tresoCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Solde de ton compte pro au démarrage de l\'activité'));
   // V75: Paramètres tréso consolidés ici (sortis du ⚙️ caché du Cockpit)
@@ -18031,6 +18083,7 @@ function renderAdmin(container) {
     tresoCard.appendChild(histInfo);
   }
   
+  makeCollapsible(tresoCard, tresoTitle, 'cfg_tresorerie', false);
   container.appendChild(tresoCard);
 
   // Save button for entreprise tab
