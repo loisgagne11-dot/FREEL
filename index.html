@@ -5399,21 +5399,22 @@ function computeAlerts(data) {
     data.alerts.push({ type: 'success', icon: '💡', title: 'Rémunération possible: ' + EUR(data.salaireReco), text: 'Cash disponible suffisant', action: 'salaire' });
   }
   
-  // Seuil micro-entreprise
+  // Seuil micro-entreprise — utilise PERIOD.year pour suivre la période sélectionnée
   var currentYearCA = 0;
-  var currentYear = TODAY.getFullYear();
+  var caYear = PERIOD.year || TODAY.getFullYear();
   MISSIONS.forEach(function(mis) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
       if (f.status === 'payée' && f.jours > 0) {
         var paymentMonth = getEffectivePaymentMonth(f, mis);
-        if (paymentMonth.startsWith(currentYear + '-')) {
+        if (paymentMonth.startsWith(caYear + '-')) {
           currentYearCA += f.ht;
         }
       }
     });
   });
   data.caHTAnnuel = currentYearCA;
+  data.caHTYear = caYear;
   
   var seuilMicro = LEGAL.plafondBNC;
   var seuilTVA = LEGAL.seuilTVA;
@@ -13382,21 +13383,28 @@ function renderCAPlafondWidget(container) {
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var currentCA = data.caHTAnnuel || 0;
 
-  var plafond = LEGAL.plafondBNC;
-  var seuilTVA = LEGAL.seuilTVA;
-  var seuilTVAMajore = LEGAL.seuilTVAMajore;
+  // Plafonds/seuils dynamiques selon l'année sélectionnée
+  var legalYear = getLegal(year);
+  var type = (typeof COMPANY !== 'undefined' && COMPANY.typeActivite) || 'BNC';
+  var plafond = legalYear.plafonds[type] || legalYear.plafonds.BNC;
+  var seuilTVA = type.indexOf('vente') >= 0 ? legalYear.tva.seuilVente : legalYear.tva.seuilService;
+  var seuilTVAMajore = type.indexOf('vente') >= 0 ? legalYear.tva.seuilVenteMajore : legalYear.tva.seuilServiceMajore;
 
   // CA projeté (factures non payées, encaissement prévu cette année)
+  // Pour une année passée, pas de projection
   var caProjecte = 0;
-  MISSIONS.forEach(function(mis) {
-    if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
-    if (!mis.factures) return;
-    mis.factures.forEach(function(f) {
-      if (f.jours <= 0 || f.status === 'payée') return;
-      var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
-      if (paymentMonth.startsWith(year + '-') && paymentMonth > nowYm) caProjecte += f.ht;
+  var currentRealYear = TODAY.getFullYear();
+  if (year >= currentRealYear) {
+    MISSIONS.forEach(function(mis) {
+      if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+      if (!mis.factures) return;
+      mis.factures.forEach(function(f) {
+        if (f.jours <= 0 || f.status === 'payée') return;
+        var paymentMonth = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        if (paymentMonth.startsWith(year + '-') && paymentMonth > nowYm) caProjecte += f.ht;
+      });
     });
-  });
+  }
 
   // CA année précédente pour règle des 2 ans
   var prevYearData = getIRForYear(year - 1);
