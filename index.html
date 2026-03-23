@@ -15308,20 +15308,58 @@ function renderFinancesPerformance(container) {
   kpiGrid.appendChild(createKPIBlock(EUR(caLatent), 'CA Latent HT', caLatent > 0 ? 'var(--warning)' : 'var(--text-muted)'));
   container.appendChild(kpiGrid);
 
-  // V77: Waterfall CA HT - décomposition de la période (remplace donut conceptuellement faux)
-  // Base = CA HT encaissé période ; reductions = charges + provisions PÉRIODE (excl. TVA sur base HT)
-  // Note: chargesDetail normalise les catégories : 'IR Estimé' → 'IR', 'Impôt PL' → 'Impôt'
+  // V77: Waterfall CA HT - décomposition de la période
+  // Base = CA HT encaissé + projeté ; reductions = charges + provisions (excl. TVA sur base HT)
   var caHT = (data.caHT !== undefined && data.caHT > 0) ? data.caHT : (data.caReal || 0);
   var chargesMap = {};
-  (data.chargesDetail || []).forEach(function(c) { chargesMap[c.cat] = c.montant; }); // FIX: .montant pas .total
+  (data.chargesDetail || []).forEach(function(c) { chargesMap[c.cat] = c.montant; });
+
+  // Ajouter les projections futures si la période inclut des mois futurs
+  var nowYmPerf = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var periodMonths = getPeriodMonths();
+  var futureMonths = periodMonths.filter(function(m) { return m > nowYmPerf; });
+  var projectedCAHT = 0;
+  var projectedCharges = { URSSAF: 0, CFP: 0, IR: 0, 'Impôt': 0 };
+  if (futureMonths.length > 0) {
+    // Factures à encaisser dans les mois futurs de la période
+    (COMPUTED.facturesAEncaisser || []).forEach(function(f) {
+      if (f.paymentMonth && futureMonths.indexOf(f.paymentMonth) >= 0) {
+        projectedCAHT += f.ht || 0;
+        var rate = getUrssafRate(f.paymentMonth);
+        projectedCharges['URSSAF'] += Math.round((f.ht || 0) * rate);
+        projectedCharges['CFP'] += Math.round((f.ht || 0) * LEGAL.cfp);
+        if (COMPANY.prelevementLiberatoire) projectedCharges['Impôt'] += Math.round((f.ht || 0) * LEGAL.impLib);
+      }
+    });
+    // Missions planifiées sans facture
+    MISSIONS.forEach(function(mis) {
+      if (mis.statut === 'prospect' || mis.statut === 'perdue' || !mis.lignes) return;
+      mis.lignes.forEach(function(l) {
+        if (futureMonths.indexOf(l.ym) < 0) return;
+        var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+        if (jours <= 0) return;
+        var alreadyCovered = (mis.factures || []).some(function(f) { return f.mois === l.ym; });
+        if (alreadyCovered) return;
+        var caHTMois = jours * mis.tjm;
+        projectedCAHT += caHTMois;
+        var rate = getUrssafRate(l.ym);
+        projectedCharges['URSSAF'] += Math.round(caHTMois * rate);
+        projectedCharges['CFP'] += Math.round(caHTMois * LEGAL.cfp);
+        if (COMPANY.prelevementLiberatoire) projectedCharges['Impôt'] += Math.round(caHTMois * LEGAL.impLib);
+      });
+    });
+  }
+  caHT += projectedCAHT;
+  // Merge projected charges
+  Object.keys(projectedCharges).forEach(function(k) { chargesMap[k] = (chargesMap[k] || 0) + projectedCharges[k]; });
 
   var segURSSAF = (chargesMap['URSSAF'] || 0) + (chargesMap['CFP'] || 0);
-  var segIR = (chargesMap['Impôt'] || 0) + (chargesMap['IR'] || 0); // FIX: 'IR Estimé' normalisé en 'IR'
+  var segIR = (chargesMap['Impôt'] || 0) + (chargesMap['IR'] || 0);
   var segSalaires = data.salaires || 0;
   var segAutres = 0;
   (data.chargesDetail || []).forEach(function(c) {
-    if (['TVA', 'URSSAF', 'CFP', 'Impôt', 'IR'].indexOf(c.cat) >= 0) return; // FIX: liste normalisée
-    segAutres += c.montant; // FIX: .montant pas .total
+    if (['TVA', 'URSSAF', 'CFP', 'Impôt', 'IR'].indexOf(c.cat) >= 0) return;
+    segAutres += c.montant;
   });
   var segBenefice = caHT - segURSSAF - segIR - segSalaires - segAutres;
 
@@ -15510,15 +15548,37 @@ function renderFinancesPerformance(container) {
   var compCard = el('div', { class: 'card', style: { marginTop: '12px' } });
   compCard.appendChild(el('div', { class: 'card-title' }, '📊 Comparaison ' + currentYear + ' vs ' + prevYear));
 
-  // Calculer données N-1
+  // Calculer données N-1 : CA HT encaissé via factures payées + CA réalisé via jours
   var caN1 = 0;
+  var caN1Encaisse = 0;
+  var chargesN1 = { urssaf: 0, salaires: 0 };
   MISSIONS.forEach(function(m) {
+    if (m.statut === 'prospect' || m.statut === 'perdue') return;
+    // CA via factures payées en N-1
+    (m.factures || []).forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var pm = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
+      if (pm && parseInt(pm.substring(0, 4)) === prevYear) {
+        caN1Encaisse += f.ht || 0;
+        var rate = getUrssafRate(pm);
+        chargesN1.urssaf += Math.round((f.ht || 0) * (rate + LEGAL.cfp));
+      }
+    });
+    // CA via jours réels en N-1 (fallback si pas de factures)
     if (m.lignes) m.lignes.forEach(function(l) {
       var year = parseInt(String(l.ym).substring(0, 4));
       if (year === prevYear && l.joursReels > 0) {
         caN1 += l.joursReels * m.tjm;
       }
     });
+  });
+  // Prendre le meilleur indicateur : CA encaissé si dispo, sinon CA réalisé
+  if (caN1Encaisse > 0) caN1 = caN1Encaisse;
+  // Salaires N-1
+  (TREASURY.salaires || []).forEach(function(s) {
+    if (s.mois && parseInt(s.mois.substring(0, 4)) === prevYear) {
+      chargesN1.salaires += s.montant || 0;
+    }
   });
 
   if (caN1 > 0) {
@@ -15528,11 +15588,15 @@ function renderFinancesPerformance(container) {
     var tauxRemun = caHT > 0 ? Math.round(totalRemuneration / caHT * 100) : 0;
     var tauxCash = caHT > 0 ? Math.round(cashDispo / caHT * 100) : 0;
 
+    var tauxProvN1 = caN1 > 0 ? Math.round(chargesN1.urssaf / caN1 * 100) : 0;
+    var tauxRemunN1 = caN1 > 0 ? Math.round(chargesN1.salaires / caN1 * 100) : 0;
+    function compDelta(cur, prev) { return prev > 0 ? ((cur - prev) / prev * 100).toFixed(0) + '%' : '-'; }
     var compRows = [
-      { label: 'CA HT', current: EUR(data.caReal), prev: EUR(caN1), delta: ((data.caReal - caN1) / caN1 * 100).toFixed(0) + '%' },
-      { label: 'Taux provisions', current: tauxProv + '%', prev: '-', delta: '-' },
-      { label: 'Taux charges', current: tauxCharges + '%', prev: '-', delta: '-' },
-      { label: 'Taux rémunération', current: tauxRemun + '%', prev: '-', delta: '-' },
+      { label: 'CA HT', current: EUR(data.caReal), prev: EUR(caN1), delta: compDelta(data.caReal, caN1) },
+      { label: 'Charges URSSAF/CFP', current: EUR(segURSSAF), prev: chargesN1.urssaf > 0 ? EUR(chargesN1.urssaf) : '-', delta: chargesN1.urssaf > 0 ? compDelta(segURSSAF, chargesN1.urssaf) : '-' },
+      { label: 'Taux provisions', current: tauxProv + '%', prev: tauxProvN1 > 0 ? tauxProvN1 + '%' : '-', delta: '-' },
+      { label: 'Rémunérations', current: EUR(totalRemuneration), prev: chargesN1.salaires > 0 ? EUR(chargesN1.salaires) : '-', delta: chargesN1.salaires > 0 ? compDelta(totalRemuneration, chargesN1.salaires) : '-' },
+      { label: 'Taux rémunération', current: tauxRemun + '%', prev: tauxRemunN1 > 0 ? tauxRemunN1 + '%' : '-', delta: '-' },
       { label: 'Cash dispo', current: EUR(cashDispo), prev: '-', delta: '-' },
       { label: 'Rémuné. moyenne', current: EUR(salMoyenne || 0) + '/m', prev: '-', delta: '-' }
     ];
@@ -17296,30 +17360,12 @@ function drawSoldeChart() {
     }
   };
 
-  // Séparer la courbe cash dispo en passé (trait plein) et futur (pointillés)
-  var dataCashDispoPast = [];
-  var dataCashDispoFuture = [];
-  months.forEach(function(m, i) {
-    if (m > nowYm) {
-      dataCashDispoPast.push(i > 0 && months[i-1] <= nowYm ? dataCashDispoLine[i-1] : null); // point de jonction
-      dataCashDispoFuture.push(dataCashDispoLine[i]);
-    } else {
-      dataCashDispoPast.push(dataCashDispoLine[i]);
-      dataCashDispoFuture.push(null);
-    }
-  });
-  // Point de jonction : le dernier mois passé est aussi le premier point futur
-  months.forEach(function(m, i) {
-    if (m === nowYm) dataCashDispoFuture[i] = dataCashDispoLine[i];
-  });
-
-  // Couleurs courbe cash dispo : vert si positif, rouge si négatif
-  var cashDispoColors = dataCashDispoPast.map(function(v) {
+  // Couleurs points cash dispo : vert si positif, rouge si négatif
+  var cashDispoPointColors = dataCashDispoLine.map(function(v) {
     return v === null ? 'transparent' : (v >= 0 ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)');
   });
-  var cashDispoFutureColors = dataCashDispoFuture.map(function(v) {
-    return v === null ? 'transparent' : (v >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)');
-  });
+  // Pointillés pour les mois futurs
+  var isFutureByIndex = months.map(function(m) { return m > nowYm; });
 
   soldeChart = new Chart(ctx, {
     data: {
@@ -17329,16 +17375,19 @@ function drawSoldeChart() {
         { type: 'bar', label: 'Solde', data: dataSolde, backgroundColor: 'rgba(59,130,246,0.6)', borderColor: 'rgba(59,130,246,0.8)', borderWidth: 1, borderRadius: 3, yAxisID: 'y' },
         // Barres projection futur (bleu pointillé = contour seulement)
         { type: 'bar', label: 'Projection', data: dataSoldeProjection, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.5)', borderWidth: 2, borderRadius: 3, borderDash: [4, 3], yAxisID: 'y' },
-        // Courbe cash dispo passé (trait plein, vert/rouge par segment)
-        { type: 'line', label: 'Cash Dispo', data: dataCashDispoPast, borderColor: function(ctx) { var v = ctx.raw; return v >= 0 ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)'; }, segment: { borderColor: function(ctx) { var v = ctx.p1.parsed.y; return v >= 0 ? 'rgba(34,197,94,1)' : 'rgba(239,68,68,1)'; } }, borderWidth: 2.5, pointRadius: 3, pointBackgroundColor: cashDispoColors, fill: false, tension: 0.3, yAxisID: 'y', spanGaps: true },
-        // Courbe cash dispo futur (pointillés, vert/rouge)
-        { type: 'line', label: 'Cash Dispo (proj.)', data: dataCashDispoFuture, borderColor: function(ctx) { var v = ctx.raw; return v >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)'; }, segment: { borderColor: function(ctx) { var v = ctx.p1.parsed.y; return v >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)'; }, borderDash: [6, 4] }, borderWidth: 2, pointRadius: 3, pointBackgroundColor: cashDispoFutureColors, borderDash: [6, 4], fill: false, tension: 0.3, yAxisID: 'y', spanGaps: true }
+        // Courbe cash dispo : ligne grise, points vert/rouge
+        { type: 'line', label: 'Cash Dispo', data: dataCashDispoLine,
+          borderColor: 'rgba(160,160,160,0.5)',
+          segment: { borderDash: function(ctx) { return isFutureByIndex[ctx.p1DataIndex] ? [6, 4] : []; } },
+          borderWidth: 2, pointRadius: 4, pointBackgroundColor: cashDispoPointColors,
+          pointBorderColor: cashDispoPointColors, pointBorderWidth: 0,
+          fill: false, tension: 0.3, yAxisID: 'y', spanGaps: true }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       onClick: function(e, els) { if (els.length) showTresoMonthDetail(months[els[0].index]); },
-      plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 }, filter: function(item) { return item.text !== 'Cash Dispo (proj.)'; } } } },
+      plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 } } } },
       scales: {
         x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
         y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } }
