@@ -11572,19 +11572,55 @@ function showTVADetail() {
 function getActionsList() {
   var actions = [];
   var data = compute();
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+
+  // 1. Factures en retard (priorité max)
   if (data.lateCount > 0) {
     data.facturesAEncaisser.filter(function(f) { return f.isLate; }).slice(0, 2).forEach(function(f) {
       actions.push({ priority: 1, type: 'urgent', icon: '🚨', label: 'Relancer ' + f.client, sub: EUR(f.ttc) + ' en retard', action: function() { showFactureModal(f); }, btnLabel: 'Voir', btnClass: 'danger' });
     });
   }
-  data.detailChargesAPayer.slice(0, 2).forEach(function(c) {
-    actions.push({ priority: 2, type: 'warning', icon: '💳', label: 'Payer ' + c.cat, sub: EUR(c.montant) + ' · ' + fmtMonthShort(c.mois), action: function() { togglePaid(c.id); }, btnLabel: 'Payé', btnClass: 'success' });
-  });
-  if (data.salaireReco >= 500) {
-    actions.push({ priority: 3, type: 'success', icon: '💸', label: 'Verser une rémunération', sub: EUR(data.salaireReco) + ' disponible', action: function() { showSalaireModal(data.salaireReco); }, btnLabel: 'Verser', btnClass: '' });
+
+  // 2. Déclaration URSSAF si on est dans la fenêtre (après le 20 du mois)
+  var nextUrssaf = getNextUrssafDeadline();
+  if (nextUrssaf && nextUrssaf.daysLeft >= 0 && nextUrssaf.daysLeft <= 12) {
+    var urssafMilestone = getAllYearMilestones().filter(function(ms) { return ms.cat === 'urssaf' && ms.daysLeft >= 0; })[0];
+    if (urssafMilestone) {
+      actions.push({ priority: 2, type: 'warning', icon: '🏥', label: 'Déclarer URSSAF', sub: 'J-' + nextUrssaf.daysLeft + ' · CA ' + fmtMonthShort(nextUrssaf.moisCA), action: function() { showMilestoneDetail(urssafMilestone); }, btnLabel: 'Déclarer', btnClass: 'warning' });
+    }
   }
+
+  // 3. Charges réellement dues (mois de prélèvement <= mois en cours)
+  var chargesDues = (data.detailChargesAPayer || []).filter(function(c) {
+    return c.mois <= nowYm;
+  });
+  // Regrouper par catégorie pour éviter les doublons
+  var chargesByCat = {};
+  chargesDues.forEach(function(c) {
+    if (!chargesByCat[c.cat]) chargesByCat[c.cat] = { cat: c.cat, total: 0, ids: [], count: 0 };
+    chargesByCat[c.cat].total += c.montant;
+    chargesByCat[c.cat].ids.push(c.id);
+    chargesByCat[c.cat].count++;
+  });
+  Object.keys(chargesByCat).slice(0, 2).forEach(function(cat) {
+    var g = chargesByCat[cat];
+    actions.push({ priority: 3, type: 'warning', icon: '💳', label: 'Payer ' + g.cat, sub: EUR(g.total) + (g.count > 1 ? ' · ' + g.count + ' lignes' : ''), action: function() { g.ids.forEach(function(id) { togglePaid(id); }); }, btnLabel: 'Payé ✓', btnClass: 'success' });
+  });
+
+  // 4. Versement rémunération
+  if (data.salaireReco >= 500) {
+    actions.push({ priority: 4, type: 'success', icon: '💸', label: 'Verser une rémunération', sub: EUR(data.salaireReco) + ' disponible', action: function() { showSalaireModal(data.salaireReco); }, btnLabel: 'Verser', btnClass: '' });
+  }
+
+  // 5. Factures brouillon à envoyer
+  var brouillons = [];
+  MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'brouillon') brouillons.push(f); }); });
+  if (brouillons.length > 0) {
+    actions.push({ priority: 5, type: 'info', icon: '📄', label: brouillons.length + ' facture(s) à envoyer', sub: 'Brouillons en attente', action: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); }, btnLabel: 'Voir', btnClass: '' });
+  }
+
   actions.sort(function(a, b) { return a.priority - b.priority; });
-  return actions.slice(0, 4);
+  return actions.slice(0, 5);
 }
 
 function renderActionsWidget(container) {
@@ -13775,22 +13811,29 @@ function renderActionsAndMilestones(container) {
   // Section Actions (en bas)
   if (actions.length > 0) {
     var actionsSection = el('div');
-    actionsSection.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', marginBottom: '8px' } }, '🎯 Actions Immédiates'));
+    var actionsHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } });
+    actionsHeader.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700' } }, '🎯 Actions Immédiates'));
+    actionsHeader.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '800', color: 'white', background: actions.some(function(a) { return a.type === 'urgent'; }) ? 'var(--danger)' : 'var(--warning)', borderRadius: '10px', padding: '2px 8px', minWidth: '20px', textAlign: 'center' } }, String(actions.length)));
+    actionsSection.appendChild(actionsHeader);
 
-    var actionsList = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } });
+    var actionsList = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } });
     actions.forEach(function(a) {
-      var bgColor = a.type === 'urgent' ? 'rgba(239, 68, 68, 0.1)' : a.type === 'warning' ? 'rgba(251, 191, 36, 0.1)' : 'var(--bg-tertiary)';
+      var borderColor = a.type === 'urgent' ? 'var(--danger)' : a.type === 'warning' ? 'var(--warning)' : a.type === 'success' ? 'var(--success)' : 'var(--accent)';
+      var bgColor = a.type === 'urgent' ? 'rgba(239,68,68,0.08)' : a.type === 'warning' ? 'rgba(251,191,36,0.06)' : a.type === 'success' ? 'rgba(34,197,94,0.06)' : 'var(--bg-tertiary)';
       var item = el('div', {
-        style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: bgColor, borderRadius: '8px', cursor: 'pointer' },
-        onclick: function() { showActionDetail(a); }
+        style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: bgColor, borderRadius: '10px', cursor: 'pointer', borderLeft: '4px solid ' + borderColor, transition: 'transform 0.1s' },
+        onclick: function() { if (a.type === 'warning' && a.label.indexOf('URSSAF') >= 0) { a.action(); } else { showActionDetail(a); } }
       });
-      item.appendChild(el('div', { style: { fontSize: '20px' } }, a.icon));
-      item.appendChild(el('div', { style: { flex: 1 } }, [
-        el('div', { style: { fontSize: '13px', fontWeight: '600' } }, a.label),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, a.sub)
+      item.onmouseenter = function() { item.style.transform = 'translateX(2px)'; };
+      item.onmouseleave = function() { item.style.transform = 'none'; };
+      item.appendChild(el('div', { style: { fontSize: '22px', width: '32px', textAlign: 'center', flexShrink: '0' } }, a.icon));
+      item.appendChild(el('div', { style: { flex: 1, minWidth: 0 } }, [
+        el('div', { style: { fontSize: '13px', fontWeight: '700' } }, a.label),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' } }, a.sub)
       ]));
       item.appendChild(el('button', {
-        class: 'btn btn-sm ' + a.btnClass,
+        class: 'btn btn-sm',
+        style: { background: borderColor, color: 'white', border: 'none', fontWeight: '700', fontSize: '11px', padding: '6px 14px', borderRadius: '8px', whiteSpace: 'nowrap' },
         onclick: function(e) { e.stopPropagation(); a.action(); }
       }, a.btnLabel));
       actionsList.appendChild(item);
@@ -13806,25 +13849,109 @@ function renderActionsAndMilestones(container) {
 function showMilestoneDetail(m) {
   var content = el('div', { style: { padding: '10px' } });
 
+  // Header
+  var badgeColor = m.daysLeft <= 0 ? 'var(--text-muted)' : m.daysLeft <= 7 ? 'var(--danger)' : m.daysLeft <= 30 ? 'var(--warning)' : 'var(--success)';
   content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px' } }, [
-    el('div', { style: { fontSize: '40px', marginBottom: '8px' } }, m.icon),
-    el('div', { style: { fontSize: '18px', fontWeight: '700' } }, m.label)
+    el('div', { style: { fontSize: '36px', marginBottom: '4px' } }, m.icon),
+    el('div', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '8px' } }, m.label),
+    m.date ? el('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', background: 'var(--bg-tertiary)', borderRadius: '20px', fontSize: '12px' } }, [
+      el('span', {}, m.date.substring(8) + '/' + m.date.substring(5, 7) + '/' + m.date.substring(0, 4)),
+      m.daysLeft >= 0 ? el('span', { style: { fontWeight: '800', color: badgeColor, background: badgeColor + '18', padding: '2px 8px', borderRadius: '10px' } }, m.daysLeft === 0 ? 'Aujourd\'hui' : 'J-' + m.daysLeft) : el('span', { style: { color: 'var(--text-muted)' } }, 'Passé')
+    ]) : null
+  ].filter(Boolean)));
+
+  // Description
+  var desc = m.description || m.detail;
+  if (desc) content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', textAlign: 'center' } }, desc));
+
+  // Détail enrichi pour URSSAF
+  if (m.cat === 'urssaf') {
+    var data = compute();
+    // Déterminer le mois de CA concerné par cette déclaration
+    var mDate = m.date ? parseYM(m.date.substring(0, 7)) : null;
+    var moisCAList = [];
+    if (COMPANY.urssafPeriodicite === 'mensuel' && mDate) {
+      moisCAList.push(ym(mDate.m === 0 ? mDate.y - 1 : mDate.y, mDate.m === 0 ? 11 : mDate.m - 1));
+    } else if (mDate) {
+      // Trimestriel: 3 mois du trimestre précédent
+      var qEnd = mDate.m; // mois de la déclaration
+      for (var qi = 1; qi <= 3; qi++) {
+        var cm = qEnd - qi;
+        moisCAList.push(ym(cm < 0 ? mDate.y - 1 : mDate.y, cm < 0 ? cm + 12 : cm));
+      }
+      moisCAList.reverse();
+    }
+
+    // Trouver les factures encaissées pendant ces mois
+    var facturesConcernees = [];
+    var totalCA = 0;
+    MISSIONS.forEach(function(mis) {
+      if (!mis.factures) return;
+      mis.factures.forEach(function(f) {
+        if (f.status !== 'payée' || f.jours <= 0) return;
+        var pm = f.paymentMonth || ((f.datePaiementReel) ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement));
+        if (moisCAList.indexOf(pm) >= 0) {
+          facturesConcernees.push({ client: mis.client || mis.titre, mois: f.mois, ht: f.ht, tva: f.tva || 0, pm: pm });
+          totalCA += f.ht;
+        }
+      });
+    });
+
+    var rate = getUrssafRate(moisCAList[0] || ym(TODAY.getFullYear(), TODAY.getMonth()));
+    var urssafDu = Math.round(totalCA * rate);
+    var cfpDu = Math.round(totalCA * LEGAL.cfp);
+
+    // Récapitulatif
+    content.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', borderRadius: '10px', padding: '14px', marginBottom: '12px' } }, [
+      el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' } }, '📋 À déclarer'),
+      el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '13px' } }, [
+        el('span', {}, 'CA HT encaissé'), el('span', { style: { fontWeight: '800', color: 'var(--success)' } }, EUR(totalCA))
+      ]),
+      el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '12px', borderTop: '1px solid var(--glass-border)' } }, [
+        el('span', { style: { color: 'var(--text-muted)' } }, 'URSSAF (' + (rate * 100).toFixed(1) + '%)'),
+        el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, EUR(urssafDu))
+      ]),
+      el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '12px' } }, [
+        el('span', { style: { color: 'var(--text-muted)' } }, 'CFP (' + (LEGAL.cfp * 100).toFixed(2) + '%)'),
+        el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, EUR(cfpDu))
+      ]),
+      COMPANY.prelevementLiberatoire ? el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '12px' } }, [
+        el('span', { style: { color: 'var(--text-muted)' } }, 'Impôt PL (' + (LEGAL.impLib * 100).toFixed(1) + '%)'),
+        el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, EUR(Math.round(totalCA * LEGAL.impLib)))
+      ]) : null,
+      el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0 2px', fontSize: '13px', borderTop: '2px solid var(--glass-border)', fontWeight: '800' } }, [
+        el('span', {}, 'Total à payer'),
+        el('span', { style: { color: 'var(--danger)' } }, EUR(urssafDu + cfpDu + (COMPANY.prelevementLiberatoire ? Math.round(totalCA * LEGAL.impLib) : 0)))
+      ])
+    ].filter(Boolean)));
+
+    // Détail factures concernées
+    if (facturesConcernees.length > 0) {
+      content.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '6px' } }, '💼 Factures encaissées (' + moisCAList.map(fmtMonthShort).join(', ') + ')'));
+      facturesConcernees.forEach(function(fc) {
+        content.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '4px', fontSize: '12px' } }, [
+          el('div', {}, [
+            el('div', { style: { fontWeight: '600' } }, fc.client),
+            el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Travail ' + fmtMonthShort(fc.mois) + ' · Encaissé ' + fmtMonthShort(fc.pm))
+          ]),
+          el('div', { style: { fontWeight: '700', textAlign: 'right' } }, EUR(fc.ht) + ' HT')
+        ]));
+      });
+    } else {
+      content.appendChild(el('div', { style: { padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, 'Aucune facture encaissée sur cette période'));
+    }
+  }
+
+  // Bouton fermer
+  content.appendChild(el('div', { style: { marginTop: '16px', textAlign: 'right' } }, [
+    el('button', { class: 'btn', onclick: function() { closeModal('formModal'); } }, 'Fermer')
   ]));
 
-  if (m.date) {
-    content.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: '8px', marginBottom: '12px', textAlign: 'center' } }, [
-      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Date d\'échéance'),
-      el('div', { style: { fontWeight: '700', fontSize: '16px' } }, fmtLong ? fmtLong(m.date) : fmtMonth(m.date)),
-      m.daysLeft !== null ? el('div', { style: { fontSize: '12px', color: m.daysLeft <= 7 ? 'var(--danger)' : m.daysLeft <= 30 ? 'var(--warning)' : 'var(--success)', fontWeight: '600', marginTop: '4px' } }, m.daysLeft === 0 ? 'Aujourd\'hui !' : 'Dans ' + m.daysLeft + ' jours') : null
-    ].filter(Boolean)));
-  }
-
-  var desc = m.description || m.detail;
-  if (desc) {
-    content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' } }, desc));
-  }
-
-  showModal(m.icon + ' ' + m.label, content);
+  $('#formModalTitle').textContent = m.icon + ' ' + m.label;
+  var modalBody = $('#formModalBody');
+  modalBody.replaceChildren();
+  modalBody.appendChild(content);
+  openModal('formModal');
 }
 
 // V53: Détail d'une action
