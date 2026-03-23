@@ -12003,7 +12003,7 @@ function renderHealthIndicators(container, data) {
   var bar = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', marginBottom: '8px' } });
 
   // Provisions (cliquable → Trésorerie > Provisions)
-  var provDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'provisions'; render(); } });
+  var provDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; render(); setTimeout(showCouvertureProvisionsModal, 100); } });
   provDiv.appendChild(el('div', { style: { fontSize: '14px' } }, provisionsCouvertes ? '✅' : '🚨'));
   provDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', marginTop: '2px' } }, 'Provisions'));
   provDiv.appendChild(el('div', { style: { fontSize: '8px', color: provisionsCouvertes ? 'var(--success)' : 'var(--danger)' } }, provisionsCouvertes ? 'couvertes' : 'non couvertes'));
@@ -12017,7 +12017,7 @@ function renderHealthIndicators(container, data) {
   bar.appendChild(factDiv);
 
   // Déclarations (cliquable → Trésorerie > Provisions)
-  var declDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; TRESORERIE_TAB = 'provisions'; render(); } });
+  var declDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; render(); setTimeout(showCouvertureProvisionsModal, 100); } });
   declDiv.appendChild(el('div', { style: { fontSize: '14px' } }, declarationsAJour ? '✅' : '⚠️'));
   declDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', marginTop: '2px' } }, 'Déclarations'));
   declDiv.appendChild(el('div', { style: { fontSize: '8px', color: declarationsAJour ? 'var(--success)' : 'var(--warning)' } }, declarationsAJour ? 'à jour' : 'à faire'));
@@ -14632,8 +14632,8 @@ function renderFinances(container) {
     // Rétro-compat: rediriger vers Trésorerie > Provisions
     FINANCES_TAB = 'evolution';
     VIEW = 'tresorerie';
-    TRESORERIE_TAB = 'provisions';
     render();
+    setTimeout(showCouvertureProvisionsModal, 100);
     return;
   } else {
     renderFinancesEvolution(container);
@@ -17614,23 +17614,6 @@ function renderTresorerie(container) {
   header.appendChild(actions);
   container.appendChild(header);
 
-  // Sous-onglets: Flux | Provisions
-  var tabsContainer = el('div', { style: { display: 'flex', gap: '4px', background: 'var(--bg-tertiary)', padding: '4px', borderRadius: '10px', marginBottom: '16px' } });
-  tabsContainer.appendChild(el('button', {
-    style: { flex: '1', padding: '10px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: TRESORERIE_TAB === 'flux' ? 'var(--accent)' : 'transparent', color: TRESORERIE_TAB === 'flux' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { TRESORERIE_TAB = 'flux'; render(); }
-  }, '💰 Flux'));
-  tabsContainer.appendChild(el('button', {
-    style: { flex: '1', padding: '10px', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', background: TRESORERIE_TAB === 'provisions' ? 'var(--accent)' : 'transparent', color: TRESORERIE_TAB === 'provisions' ? 'white' : 'var(--text-muted)' },
-    onclick: function() { TRESORERIE_TAB = 'provisions'; render(); }
-  }, '✅ Provisions'));
-  container.appendChild(tabsContainer);
-
-  if (TRESORERIE_TAB === 'provisions') {
-    renderFinancesConformite(container);
-    return;
-  }
-
   // V77: Hero complet Cash Dispo + donut + salaire + autonomie (déplacé depuis Cockpit)
   renderDashboardHero(container, data);
 
@@ -17736,21 +17719,23 @@ function renderTresorerie(container) {
     container.appendChild(interetsCard);
   }
   
-  // Bouton provisions compact (détail déjà dans le hero ci-dessus)
+  // Indicateur couverture provisions (compact)
   if (data.provisionsAbsolues > 0) {
-    var provBtn = el('div', { class: 'card', onclick: showProvisionsDetail, style: { cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', marginBottom: '8px' } });
-    var provLeft = el('div', {});
-    provLeft.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700' } }, '📦 Provisions à payer'));
-    provLeft.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'Valider les paiements'));
-    provBtn.appendChild(provLeft);
-    var provRight = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
-    provRight.appendChild(el('span', { class: 'text-provision', style: { fontWeight: '800', fontSize: '16px' } }, EUR(data.provisionsAbsolues)));
-    provRight.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--accent)' } }, '→'));
-    provBtn.appendChild(provRight);
-    container.appendChild(provBtn);
+    var totalProv = data.provisionsAbsolues;
+    var soldeC = data.soldeAbsolu || 0;
+    var couv = totalProv > 0 ? Math.round(soldeC / totalProv * 100) : 100;
+    var couvColor = couv >= 100 ? 'var(--success)' : couv >= 80 ? 'var(--warning)' : 'var(--danger)';
+    var couvBg = couv >= 100 ? 'rgba(34,197,94,0.08)' : couv >= 80 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
+    var couvIndicator = el('div', { class: 'card', style: { cursor: 'pointer', padding: '10px 14px', marginBottom: '8px', background: couvBg, border: '1px solid ' + couvColor + '33' }, onclick: function() { showCouvertureProvisionsModal(); } });
+    var couvRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+    couvRow.appendChild(el('div', {}, [
+      el('div', { style: { fontSize: '11px', fontWeight: '700' } }, '🔒 Couverture Provisions'),
+      el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, EUR(totalProv) + ' provisionnés · Cliquer pour détail')
+    ]));
+    couvRow.appendChild(el('div', { style: { fontWeight: '800', fontSize: '18px', color: couvColor } }, couv + '%'));
+    couvIndicator.appendChild(couvRow);
+    container.appendChild(couvIndicator);
   }
-
-  // V77: cashCard et graphique salaires supprimés (redondants avec hero en haut)
 
   // V79: Graphique Trésorerie (déplacé depuis Évolution)
   var soldeChartCard = el('div', { class: 'card', style: { marginTop: '12px', marginBottom: '12px' } });
@@ -17769,139 +17754,224 @@ function renderTresorerie(container) {
     if ($('#soldeChart') && $('#soldeChart').getContext) drawSoldeChart();
   }, 100);
 
-  // Historique des mouvements avec recherche/filtres (B17, B18)
+  // Mouvements: mois en cours + à venir + historique plié
   var mouvementsCard = el('div', { class: 'card', style: { marginTop: '16px' } });
-  mouvementsCard.appendChild(el('div', { class: 'card-title' }, '📜 Historique des Mouvements'));
-  
-  // Barre de recherche et filtres
-  var searchBar = el('div', { class: 'search-filter-bar', style: { marginTop: '12px' } });
-  var searchBox = el('div', { class: 'search-box' });
-  var searchInput = el('input', { 
-    type: 'text', 
-    placeholder: 'Rechercher...', 
-    value: SEARCH_STATE.tresorerie.query,
-    oninput: function(e) {
-      SEARCH_STATE.tresorerie.query = e.target.value;
-      clearBtn.classList.toggle('visible', e.target.value.length > 0);
-      render();
-    }
-  });
-  var clearBtn = el('button', { 
-    class: 'clear-search' + (SEARCH_STATE.tresorerie.query ? ' visible' : ''), 
-    onclick: function() { 
-      SEARCH_STATE.tresorerie.query = ''; 
-      searchInput.value = ''; 
-      clearBtn.classList.remove('visible');
-      render(); 
-    } 
-  }, '×');
-  searchBox.appendChild(searchInput);
-  searchBox.appendChild(clearBtn);
-  searchBar.appendChild(searchBox);
-  
-  // Filtre par type
-  var typeFilter = el('select', { 
-    class: 'filter-dropdown',
-    onchange: function(e) { SEARCH_STATE.tresorerie.type = e.target.value; render(); }
-  });
-  typeFilter.appendChild(el('option', { value: 'all', selected: SEARCH_STATE.tresorerie.type === 'all' }, 'Tous les types'));
-  typeFilter.appendChild(el('option', { value: 'salaire', selected: SEARCH_STATE.tresorerie.type === 'salaire' }, '💸 Rémunérations'));
-  typeFilter.appendChild(el('option', { value: 'charge', selected: SEARCH_STATE.tresorerie.type === 'charge' }, '📋 Charges'));
-  typeFilter.appendChild(el('option', { value: 'encaissement', selected: SEARCH_STATE.tresorerie.type === 'encaissement' }, '💵 Encaissements'));
-  searchBar.appendChild(typeFilter);
-  
-  mouvementsCard.appendChild(searchBar);
-  
-  // Collecter tous les mouvements
+  mouvementsCard.appendChild(el('div', { class: 'card-title' }, '📜 Mouvements'));
+
+  // Collecter tous les mouvements (passés)
   var allMouvements = [];
-  
-  // Salaires
   data.detailSalaires.forEach(function(s) {
-    allMouvements.push({ type: 'salaire', label: '💸 Rémunération', detail: fmtMonth(s.mois), montant: -s.montant, date: s.mois + '-01', category: 'Salaire' });
+    allMouvements.push({ type: 'salaire', label: 'Rémunération', icon: '💸', detail: '', montant: -s.montant, date: s.mois + '-01', category: 'Salaire' });
   });
-  
-  // Charges payées
   data.detailChargesPayees.forEach(function(c) {
-    allMouvements.push({ type: 'charge', label: '📋 ' + c.cat, detail: c.source || '', montant: -c.montant, date: c.mois + '-01', category: c.cat });
+    allMouvements.push({ type: 'charge', label: c.cat, icon: '📋', detail: c.source || '', montant: -c.montant, date: c.mois + '-01', category: c.cat });
   });
-  
-  // Encaissements
-  data.detailEncaisse.forEach(function(e) {
-    allMouvements.push({ type: 'encaissement', label: '💵 ' + e.client, detail: fmtMonth(e.mois), montant: e.ht + (e.tva || 0), date: e.paymentMonth + '-01', category: 'Encaissement' });
+  data.detailEncaisse.forEach(function(enc) {
+    allMouvements.push({ type: 'encaissement', label: enc.client, icon: '💵', detail: enc.desc || '', montant: enc.ht + (enc.tva || 0), date: enc.paymentMonth + '-01', category: 'Encaissement' });
   });
-  
-  // Tri par date décroissante
   allMouvements.sort(function(a, b) { return b.date.localeCompare(a.date); });
-  
-  // Filtrage
-  var searchQuery = SEARCH_STATE.tresorerie.query.toLowerCase().trim();
-  var typeFilterValue = SEARCH_STATE.tresorerie.type;
-  
-  var filteredMouvements = allMouvements.filter(function(m) {
-    // Filtre par type
-    if (typeFilterValue !== 'all' && m.type !== typeFilterValue) return false;
-    // Filtre par recherche
-    if (searchQuery) {
-      return m.label.toLowerCase().includes(searchQuery) ||
-             m.detail.toLowerCase().includes(searchQuery) ||
-             m.category.toLowerCase().includes(searchQuery);
+
+  // Provisions à venir (mois prochain)
+  var nextYm = ym(TODAY.getMonth() === 11 ? TODAY.getFullYear() + 1 : TODAY.getFullYear(), TODAY.getMonth() === 11 ? 0 : TODAY.getMonth() + 1);
+  var currentYmKey = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var aVenir = [];
+  (data.detailChargesAPayer || []).forEach(function(c) {
+    if (c.mois >= currentYmKey) {
+      aVenir.push({ label: c.cat, icon: '📋', detail: c.periode || '', montant: -c.montant, date: c.mois + '-01', category: c.cat });
     }
-    return true;
   });
-  
-  // Limiter à 20 mouvements pour la lisibilité
-  var displayMouvements = filteredMouvements.slice(0, 20);
-  
-  // Afficher résultats
-  if (searchQuery || typeFilterValue !== 'all') {
-    mouvementsCard.appendChild(el('div', { class: 'search-results-info', style: { textAlign: 'left', padding: '8px 0' } }, [
-      el('span', { class: 'count' }, String(filteredMouvements.length)),
-      document.createTextNode(' mouvement(s) trouvé(s)')
+  aVenir.sort(function(a, b) { return a.date.localeCompare(b.date); });
+
+  // Grouper par mois
+  var monthMap = {};
+  allMouvements.forEach(function(m) {
+    var mk = String(m.date).substring(0, 7);
+    if (!monthMap[mk]) monthMap[mk] = [];
+    monthMap[mk].push(m);
+  });
+  var monthKeys = Object.keys(monthMap).sort(function(a, b) { return b.localeCompare(a); });
+
+  // Helper: rendre un groupe de mouvements avec regroupement par catégorie
+  function renderMonthGroup(mouvs, parentEl) {
+    // Grouper par catégorie
+    var catMap = {};
+    mouvs.forEach(function(m) {
+      var key = m.category;
+      if (!catMap[key]) catMap[key] = { items: [], total: 0, icon: m.icon, label: m.label };
+      catMap[key].items.push(m);
+      catMap[key].total += m.montant;
+    });
+    var cats = Object.keys(catMap);
+    cats.forEach(function(cat) {
+      var g = catMap[cat];
+      var catTotal = g.total;
+      var catColor = catTotal >= 0 ? 'var(--success)' : 'var(--danger)';
+      if (g.items.length === 1) {
+        // Ligne simple
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderBottom: '1px solid var(--bg-tertiary)' } });
+        row.appendChild(el('div', {}, [
+          el('div', { style: { fontWeight: '600', fontSize: '12px' } }, g.icon + ' ' + g.items[0].label),
+          g.items[0].detail ? el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, g.items[0].detail) : null
+        ].filter(Boolean)));
+        row.appendChild(el('div', { style: { fontWeight: '700', fontSize: '12px', color: catColor, whiteSpace: 'nowrap' } }, (catTotal >= 0 ? '+' : '') + EUR(catTotal)));
+        parentEl.appendChild(row);
+      } else {
+        // Groupe repliable
+        var groupEl = el('div', { style: { borderBottom: '1px solid var(--bg-tertiary)' } });
+        var groupHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer' } });
+        var arrowSpan = el('span', { style: { fontSize: '9px', color: 'var(--text-muted)', marginRight: '6px', transition: 'transform 0.2s', display: 'inline-block' } }, '▶');
+        groupHeader.appendChild(el('div', { style: { display: 'flex', alignItems: 'center' } }, [
+          arrowSpan,
+          el('span', { style: { fontWeight: '600', fontSize: '12px' } }, g.icon + ' ' + cat),
+          el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', marginLeft: '6px' } }, '(' + g.items.length + ')')
+        ]));
+        groupHeader.appendChild(el('div', { style: { fontWeight: '700', fontSize: '12px', color: catColor, whiteSpace: 'nowrap' } }, (catTotal >= 0 ? '+' : '') + EUR(catTotal)));
+        groupEl.appendChild(groupHeader);
+        var detailDiv = el('div', { style: { display: 'none', marginLeft: '20px', paddingBottom: '4px' } });
+        g.items.forEach(function(item) {
+          var subRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 10px', fontSize: '11px', color: 'var(--text-secondary)' } });
+          subRow.appendChild(el('span', {}, item.detail || item.label));
+          subRow.appendChild(el('span', { style: { color: item.montant >= 0 ? 'var(--success)' : 'var(--danger)' } }, (item.montant >= 0 ? '+' : '') + EUR(item.montant)));
+          detailDiv.appendChild(subRow);
+        });
+        groupEl.appendChild(detailDiv);
+        groupHeader.onclick = function() {
+          var open = detailDiv.style.display !== 'none';
+          detailDiv.style.display = open ? 'none' : 'block';
+          arrowSpan.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+        };
+        parentEl.appendChild(groupEl);
+      }
+    });
+  }
+
+  // Section "À venir" (provisions futures)
+  if (aVenir.length > 0) {
+    var aVenirSection = el('div', { style: { marginBottom: '12px' } });
+    aVenirSection.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(245,158,11,0.08)', borderRadius: '8px', marginBottom: '4px' } }, [
+      el('span', { style: { fontSize: '11px', fontWeight: '700', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '⏳ À venir'),
+      el('span', { style: { fontSize: '10px', fontWeight: '700', color: '#f59e0b' } }, EUR(aVenir.reduce(function(s, m) { return s + m.montant; }, 0)))
+    ]));
+    renderMonthGroup(aVenir, aVenirSection);
+    mouvementsCard.appendChild(aVenirSection);
+  }
+
+  // Mois en cours
+  var currentMonthMovs = monthMap[currentYmKey];
+  if (currentMonthMovs && currentMonthMovs.length > 0) {
+    var curSection = el('div', { style: { marginBottom: '12px' } });
+    var curBalance = currentMonthMovs.reduce(function(s, m) { return s + m.montant; }, 0);
+    curSection.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(16,185,129,0.08)', borderRadius: '8px', marginBottom: '4px' } }, [
+      el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '📍 ' + fmtMonth(currentYmKey)),
+      el('span', { style: { fontSize: '10px', fontWeight: '700', color: curBalance >= 0 ? 'var(--success)' : 'var(--danger)' } }, (curBalance >= 0 ? '+' : '') + EUR(curBalance))
+    ]));
+    renderMonthGroup(currentMonthMovs, curSection);
+    mouvementsCard.appendChild(curSection);
+  }
+
+  // Historique passé (plié sous "Voir plus")
+  var pastMonths = monthKeys.filter(function(mk) { return mk < currentYmKey; });
+  if (pastMonths.length > 0) {
+    var histSection = el('div', {});
+    var histToggle = el('div', { style: { display: 'flex', justifyContent: 'center', padding: '10px', cursor: 'pointer', color: 'var(--accent)', fontSize: '12px', fontWeight: '600' } }, '▼ Voir l\'historique (' + pastMonths.length + ' mois)');
+    var histContent = el('div', { style: { display: 'none' } });
+
+    pastMonths.forEach(function(mk) {
+      var mouvs = monthMap[mk];
+      var balance = mouvs.reduce(function(s, m) { return s + m.montant; }, 0);
+      var monthSection = el('div', { style: { marginBottom: '8px' } });
+      monthSection.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '4px' } }, [
+        el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, fmtMonth(mk)),
+        el('span', { style: { fontSize: '10px', fontWeight: '700', color: balance >= 0 ? 'var(--success)' : 'var(--danger)' } }, (balance >= 0 ? '+' : '') + EUR(balance))
+      ]));
+      renderMonthGroup(mouvs, monthSection);
+      histContent.appendChild(monthSection);
+    });
+
+    histToggle.onclick = function() {
+      var open = histContent.style.display !== 'none';
+      histContent.style.display = open ? 'none' : 'block';
+      histToggle.textContent = open ? '▼ Voir l\'historique (' + pastMonths.length + ' mois)' : '▲ Masquer l\'historique';
+    };
+    histSection.appendChild(histToggle);
+    histSection.appendChild(histContent);
+    mouvementsCard.appendChild(histSection);
+  }
+
+  if (allMouvements.length === 0 && aVenir.length === 0) {
+    mouvementsCard.appendChild(el('div', { style: { padding: '20px', textAlign: 'center', color: 'var(--text-muted)' } }, 'Aucun mouvement'));
+  }
+
+  container.appendChild(mouvementsCard);
+}
+
+// Modal détail couverture provisions avec analyse écart
+function showCouvertureProvisionsModal() {
+  var data = compute();
+  var provisions = getAbsoluteProvisions();
+  var provByType = provisions.byType || {};
+  var totalProvisions = provisions.total || 0;
+  var soldeCompte = data.soldeAbsolu || 0;
+  var excedent = soldeCompte - totalProvisions;
+  var couverture = totalProvisions > 0 ? Math.round(soldeCompte / totalProvisions * 100) : 100;
+  var couvertureColor = couverture >= 100 ? 'var(--success)' : couverture >= 80 ? 'var(--warning)' : 'var(--danger)';
+
+  $('#formModalTitle').textContent = '🔒 Couverture Provisions';
+  var body = $('#formModalBody');
+  body.replaceChildren();
+
+  // Hero couverture
+  body.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px' } }, [
+    el('div', { style: { fontSize: '36px', fontWeight: '800', color: couvertureColor } }, couverture + '%'),
+    el('div', { style: { fontSize: '12px', fontFamily: 'monospace', marginTop: '8px', display: 'flex', justifyContent: 'space-between' } }, [
+      el('span', {}, 'Solde compte:'), el('span', { style: { fontWeight: '700' } }, EUR(soldeCompte))
+    ]),
+    el('div', { style: { fontSize: '12px', fontFamily: 'monospace', display: 'flex', justifyContent: 'space-between', color: 'var(--danger)' } }, [
+      el('span', {}, '- Provisions dues:'), el('span', { style: { fontWeight: '700' } }, '-' + EUR(totalProvisions))
+    ]),
+    el('div', { style: { fontSize: '12px', fontFamily: 'monospace', display: 'flex', justifyContent: 'space-between', fontWeight: '700', borderTop: '1px dashed var(--glass-border)', marginTop: '4px', paddingTop: '4px', color: excedent >= 0 ? 'var(--success)' : 'var(--danger)' } }, [
+      el('span', {}, excedent >= 0 ? '= Excédent:' : '= Déficit:'), el('span', {}, (excedent >= 0 ? '+' : '') + EUR(excedent))
+    ])
+  ]));
+
+  // Détail par type
+  var paidByType = {};
+  (data.detailChargesPayees || []).forEach(function(c) { paidByType[c.cat] = (paidByType[c.cat] || 0) + c.montant; });
+
+  var types = [
+    { label: 'URSSAF/CFP', icon: '🏥', total: (provByType['URSSAF'] || 0) + (provByType['CFP'] || 0), paid: (paidByType['URSSAF'] || 0) + (paidByType['CFP'] || 0), fiabilite: 'Certain' },
+    { label: 'TVA', icon: '🏛️', total: provByType['TVA'] || 0, paid: paidByType['TVA'] || 0, fiabilite: 'Certain' },
+    { label: 'IR Estimé', icon: '🧾', total: provByType['IR Estimé'] || 0, paid: (paidByType['Impôt'] || 0) + (paidByType['IR'] || 0) + (paidByType['IR Estimé'] || 0), fiabilite: 'Estimé ±10%' },
+    { label: 'CFE', icon: '🏢', total: provByType['CFE'] || 0, paid: paidByType['CFE'] || 0, fiabilite: 'Estimé ±15%' },
+    { label: 'Impôt PL', icon: '💼', total: provByType['Impôt'] || 0, paid: paidByType['Impôt PL'] || 0, fiabilite: 'Certain' }
+  ];
+
+  types.forEach(function(t) {
+    if (t.total <= 0 && t.paid <= 0) return;
+    var restant = t.total - t.paid;
+    var etat = restant <= 0;
+    var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', marginBottom: '4px', background: 'var(--bg-tertiary)', borderRadius: '8px', borderLeft: '3px solid ' + (etat ? 'var(--success)' : 'var(--danger)') } });
+    row.appendChild(el('div', {}, [
+      el('div', { style: { fontWeight: '600', fontSize: '12px' } }, t.icon + ' ' + t.label),
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Dû: ' + EUR(t.total) + ' · Payé: ' + EUR(t.paid) + ' · ' + t.fiabilite)
+    ]));
+    row.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', color: etat ? 'var(--success)' : 'var(--danger)' } }, etat ? '✅' : EUR(restant) + ' restant'));
+    body.appendChild(row);
+  });
+
+  // Analyse écart si déficit
+  if (excedent < 0) {
+    body.appendChild(el('div', { style: { marginTop: '16px', padding: '12px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px', fontSize: '11px', lineHeight: '1.8' } }, [
+      el('div', { style: { fontWeight: '700', color: 'var(--danger)', marginBottom: '6px' } }, '🚨 Analyse écart: ' + EUR(excedent)),
+      el('div', {}, '• Provisionner les échéances avant la date limite'),
+      el('div', {}, '• Ajuster la prochaine rémunération en conséquence')
     ]));
   }
-  
-  if (displayMouvements.length === 0) {
-    var emptyDiv = el('div', { class: 'no-results', style: { padding: '20px' } });
-    emptyDiv.appendChild(el('div', { class: 'no-results-icon' }, '📜'));
-    emptyDiv.appendChild(el('div', { class: 'no-results-title' }, 'Aucun mouvement'));
-    emptyDiv.appendChild(el('div', { class: 'no-results-hint' }, searchQuery ? 'Essayez d\'autres termes' : 'Les mouvements apparaîtront avec l\'activité'));
-    mouvementsCard.appendChild(emptyDiv);
-  } else {
-    // V78: Groupement par mois avec en-tête mensuel + solde du mois
-    var mouvList = el('div', { style: { marginTop: '8px' } });
-    var currentMonthKey = null;
-    displayMouvements.forEach(function(m) {
-      var mKey = String(m.date).substring(0, 7); // YYYY-MM
-      if (mKey !== currentMonthKey) {
-        currentMonthKey = mKey;
-        // Calcul solde du mois (sur tous les mouvements filtrés, pas juste les 20 affichés)
-        var monthBalance = filteredMouvements.reduce(function(acc, x) {
-          return String(x.date).substring(0, 7) === mKey ? acc + x.montant : acc;
-        }, 0);
-        var sep = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0 4px', borderTop: '1px solid var(--glass-border)', marginTop: '4px' } });
-        sep.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, fmtMonthShort(mKey)));
-        sep.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', color: monthBalance >= 0 ? 'var(--success)' : 'var(--danger)' } }, (monthBalance >= 0 ? '+' : '') + EUR(monthBalance)));
-        mouvList.appendChild(sep);
-      }
-      var row = el('div', { class: 'detail-row', style: { padding: '7px 0 7px 8px', borderBottom: '1px solid var(--bg-tertiary)' } });
-      var left = el('div', { style: { flex: '1' } });
-      var labelText = m.label;
-      if (searchQuery && m.label.toLowerCase().includes(searchQuery)) { labelText = highlightText(m.label, searchQuery); }
-      var labelEl = el('div', { style: { fontWeight: '600', fontSize: '12px' } });
-      labelEl.innerHTML = labelText;
-      left.appendChild(labelEl);
-      if (m.detail) left.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, m.detail));
-      row.appendChild(left);
-      row.appendChild(el('div', { style: { fontWeight: '700', fontSize: '12px', color: m.montant >= 0 ? 'var(--success)' : 'var(--danger)' } }, (m.montant >= 0 ? '+' : '') + EUR(m.montant)));
-      mouvList.appendChild(row);
-    });
-    mouvementsCard.appendChild(mouvList);
-    if (filteredMouvements.length > 20) {
-      mouvementsCard.appendChild(el('div', { style: { textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', padding: '12px' } }, 'Affichage limité à 20 mouvements · ' + filteredMouvements.length + ' au total'));
-    }
-  }
-  
-  container.appendChild(mouvementsCard);
+
+  body.appendChild(el('div', { style: { marginTop: '16px', textAlign: 'right' } }, [
+    el('button', { class: 'btn', onclick: function() { closeModal('formModal'); } }, 'Fermer')
+  ]));
+  openModal('formModal');
 }
 
 function showEditSoldeInitial() {
