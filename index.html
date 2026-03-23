@@ -645,11 +645,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .action-content { flex: 1; min-width: 0; }
 .action-label { font-size: 13px; font-weight: 600; }
 .action-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.action-btn { background: var(--accent); color: white; border: none; padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
-.action-btn:hover { background: var(--accent-hover); transform: scale(1.05); }
-.action-btn.secondary { background: var(--bg-tertiary); color: var(--text-primary); }
-.action-btn.danger { background: var(--danger); }
-.action-btn.success { background: var(--success); }
+.action-item.done { opacity: 0.5; border-left-color: var(--success) !important; background: linear-gradient(90deg, rgba(52,211,153,0.05), transparent) !important; }
+.action-item.done .action-label { text-decoration: line-through; color: var(--text-muted); }
+.action-check { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--glass-border); background: transparent; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: transparent; transition: all 0.2s; }
+.action-check:hover { border-color: var(--success); background: rgba(52,211,153,0.1); }
+.action-check:not(.checked):hover::after { content: '✓'; color: var(--success); font-size: 14px; font-weight: 800; }
+.action-check.checked { border-color: var(--success); background: var(--success); color: white; }
+.action-check.checked:hover { background: var(--warning); border-color: var(--warning); }
+.actions-history { margin-top: 12px; border-top: 1px solid var(--glass-border); padding-top: 10px; }
+.actions-history-header { font-size: 11px; color: var(--text-muted); font-weight: 600; cursor: pointer; padding: 4px 0; user-select: none; }
+.actions-history-header:hover { color: var(--text-secondary); }
+.actions-history-list { margin-top: 6px; }
+.actions-history-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; font-size: 11px; background: var(--bg-tertiary); border-radius: 6px; margin-bottom: 3px; }
+.actions-history-label { color: var(--text-secondary); display: flex; align-items: center; }
+.actions-history-date { color: var(--text-muted); font-size: 10px; }
+.actions-history-undo { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; color: var(--text-muted); transition: all 0.15s; }
+.actions-history-undo:hover { background: rgba(251,191,36,0.15); color: var(--warning); }
 .legal-timeline { background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 20px; margin-bottom: 16px; overflow: hidden; }
 .legal-timeline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .legal-timeline-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
@@ -971,7 +982,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .action-icon { font-size: 18px; }
   .action-label { font-size: 12px; }
   .action-sub { font-size: 10px; }
-  .action-btn { padding: 6px 10px; font-size: 10px; }
+  .action-check { width: 24px; height: 24px; font-size: 12px; }
 
   /* Legal timeline */
   .legal-timeline { padding: 14px; border-radius: var(--radius-lg); }
@@ -2707,6 +2718,7 @@ var TREASURY = {
   rendementActif: false,
   rendementTaux: 2.0,
   rendementHistorique: [],
+  actionsDone: [], // [{ id: 'urssaf_2025-03', label: '...', date: '2025-03-23', type: 'charge'|'urssaf'|'relance'|... }]
   // V51: Paramètres trésorerie
   salaireEstime: 2200,    // Salaire mensuel estimé pour calcul autonomie
   reserveCompte: 150      // Réserve minimum sur compte pro
@@ -11569,6 +11581,30 @@ function showTVADetail() {
   openModal('formModal');
 }
 
+function isActionDone(actionId) {
+  if (!TREASURY.actionsDone) return false;
+  return TREASURY.actionsDone.some(function(a) { return a.id === actionId; });
+}
+
+function markActionDone(actionId, label) {
+  if (!TREASURY.actionsDone) TREASURY.actionsDone = [];
+  if (isActionDone(actionId)) return;
+  TREASURY.actionsDone.push({ id: actionId, label: label, date: TODAY.toISOString().substring(0, 10) });
+  saveAll(); render();
+}
+
+function undoActionDone(actionId) {
+  if (!TREASURY.actionsDone) return;
+  TREASURY.actionsDone = TREASURY.actionsDone.filter(function(a) { return a.id !== actionId; });
+  saveAll(); render();
+}
+
+function getActionsForCurrentMonth() {
+  if (!TREASURY.actionsDone) return [];
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  return TREASURY.actionsDone.filter(function(a) { return a.date && a.date.substring(0, 7) === nowYm; });
+}
+
 function getActionsList() {
   var actions = [];
   var data = compute();
@@ -11577,16 +11613,26 @@ function getActionsList() {
   // 1. Factures en retard (priorité max)
   if (data.lateCount > 0) {
     data.facturesAEncaisser.filter(function(f) { return f.isLate; }).slice(0, 2).forEach(function(f) {
-      actions.push({ priority: 1, type: 'urgent', icon: '🚨', label: 'Relancer ' + f.client, sub: EUR(f.ttc) + ' en retard', action: function() { showFactureModal(f); }, btnLabel: 'Voir', btnClass: 'danger' });
+      var aid = 'relance_' + (f.id || f.client + '_' + f.mois);
+      actions.push({ id: aid, priority: 1, type: 'urgent', icon: '🚨', label: 'Relancer ' + f.client, sub: EUR(f.ttc) + ' en retard',
+        detail: function() { showFactureModal(f); },
+        complete: function() { markActionDone(aid, 'Relancer ' + f.client + ' ' + EUR(f.ttc)); },
+        done: isActionDone(aid)
+      });
     });
   }
 
-  // 2. Déclaration URSSAF si on est dans la fenêtre (après le 20 du mois)
+  // 2. Déclaration URSSAF si on est dans la fenêtre (J-12)
   var nextUrssaf = getNextUrssafDeadline();
   if (nextUrssaf && nextUrssaf.daysLeft >= 0 && nextUrssaf.daysLeft <= 12) {
     var urssafMilestone = getAllYearMilestones().filter(function(ms) { return ms.cat === 'urssaf' && ms.daysLeft >= 0; })[0];
     if (urssafMilestone) {
-      actions.push({ priority: 2, type: 'warning', icon: '🏥', label: 'Déclarer URSSAF', sub: 'J-' + nextUrssaf.daysLeft + ' · CA ' + fmtMonthShort(nextUrssaf.moisCA), action: function() { showMilestoneDetail(urssafMilestone); }, btnLabel: 'Déclarer', btnClass: 'warning' });
+      var aid = 'urssaf_' + nextUrssaf.moisCA;
+      actions.push({ id: aid, priority: 2, type: 'warning', icon: '🏥', label: 'Déclarer URSSAF', sub: 'J-' + nextUrssaf.daysLeft + ' · CA ' + fmtMonthShort(nextUrssaf.moisCA),
+        detail: function() { showMilestoneDetail(urssafMilestone); },
+        complete: function() { markActionDone(aid, 'Déclaration URSSAF ' + fmtMonthShort(nextUrssaf.moisCA)); },
+        done: isActionDone(aid)
+      });
     }
   }
 
@@ -11594,49 +11640,111 @@ function getActionsList() {
   var chargesDues = (data.detailChargesAPayer || []).filter(function(c) {
     return c.mois <= nowYm;
   });
-  // Regrouper par catégorie pour éviter les doublons
   var chargesByCat = {};
   chargesDues.forEach(function(c) {
-    if (!chargesByCat[c.cat]) chargesByCat[c.cat] = { cat: c.cat, total: 0, ids: [], count: 0 };
+    if (!chargesByCat[c.cat]) chargesByCat[c.cat] = { cat: c.cat, total: 0, ids: [], charges: [], count: 0 };
     chargesByCat[c.cat].total += c.montant;
     chargesByCat[c.cat].ids.push(c.id);
+    chargesByCat[c.cat].charges.push(c);
     chargesByCat[c.cat].count++;
   });
-  Object.keys(chargesByCat).slice(0, 2).forEach(function(cat) {
+  Object.keys(chargesByCat).slice(0, 3).forEach(function(cat) {
     var g = chargesByCat[cat];
-    actions.push({ priority: 3, type: 'warning', icon: '💳', label: 'Payer ' + g.cat, sub: EUR(g.total) + (g.count > 1 ? ' · ' + g.count + ' lignes' : ''), action: function() { g.ids.forEach(function(id) { togglePaid(id); }); }, btnLabel: 'Payé ✓', btnClass: 'success' });
+    var aid = 'charge_' + cat.toLowerCase().replace(/\s/g, '') + '_' + nowYm;
+    actions.push({ id: aid, priority: 3, type: 'warning', icon: '💳', label: 'Payer ' + g.cat, sub: EUR(g.total) + (g.count > 1 ? ' · ' + g.count + ' lignes' : ''),
+      detail: function() { showChargeActionDetail(g); },
+      complete: function() { g.ids.forEach(function(id) { TREASURY.paidCharges[id] = true; }); markActionDone(aid, 'Payer ' + g.cat + ' ' + EUR(g.total)); },
+      done: isActionDone(aid)
+    });
   });
 
   // 4. Versement rémunération
   if (data.salaireReco >= 500) {
-    actions.push({ priority: 4, type: 'success', icon: '💸', label: 'Verser une rémunération', sub: EUR(data.salaireReco) + ' disponible', action: function() { showSalaireModal(data.salaireReco); }, btnLabel: 'Verser', btnClass: '' });
+    var aid = 'salaire_' + nowYm;
+    actions.push({ id: aid, priority: 4, type: 'success', icon: '💸', label: 'Verser une rémunération', sub: EUR(data.salaireReco) + ' disponible',
+      detail: function() { showSalaireModal(data.salaireReco); },
+      complete: function() { markActionDone(aid, 'Versement rémunération ' + EUR(data.salaireReco)); },
+      done: isActionDone(aid)
+    });
   }
 
   // 5. Factures brouillon à envoyer
   var brouillons = [];
   MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'brouillon') brouillons.push(f); }); });
   if (brouillons.length > 0) {
-    actions.push({ priority: 5, type: 'info', icon: '📄', label: brouillons.length + ' facture(s) à envoyer', sub: 'Brouillons en attente', action: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); }, btnLabel: 'Voir', btnClass: '' });
+    var aid = 'brouillons_' + nowYm;
+    actions.push({ id: aid, priority: 5, type: 'info', icon: '📄', label: brouillons.length + ' facture(s) à envoyer', sub: 'Brouillons en attente',
+      detail: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); },
+      complete: function() { markActionDone(aid, 'Envoyer ' + brouillons.length + ' facture(s)'); },
+      done: isActionDone(aid)
+    });
   }
 
-  actions.sort(function(a, b) { return a.priority - b.priority; });
-  return actions.slice(0, 5);
+  actions.sort(function(a, b) {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return a.priority - b.priority;
+  });
+  return actions.slice(0, 8);
 }
 
 function renderActionsWidget(container) {
   var actions = getActionsList();
-  if (actions.length === 0) return;
+  var doneThisMonth = getActionsForCurrentMonth();
+  if (actions.length === 0 && doneThisMonth.length === 0) return;
   var widget = el('div', { class: 'actions-widget' });
-  widget.appendChild(el('div', { class: 'actions-header' }, [el('div', { class: 'actions-title' }, [el('span', {}, '⚡'), el('span', {}, 'Actions du Jour'), el('span', { class: 'actions-badge' }, String(actions.length))])]));
+  var pending = actions.filter(function(a) { return !a.done; });
+  widget.appendChild(el('div', { class: 'actions-header' }, [el('div', { class: 'actions-title' }, [el('span', {}, '⚡'), el('span', {}, 'Actions du Jour'), pending.length > 0 ? el('span', { class: 'actions-badge' }, String(pending.length)) : null].filter(Boolean))]));
   var list = el('div', { class: 'actions-list' });
   actions.forEach(function(a) {
-    var item = el('div', { class: 'action-item ' + a.type, style: { cursor: 'pointer' }, onclick: function() { a.action(); } });
+    var item = el('div', { class: 'action-item ' + a.type + (a.done ? ' done' : ''), onclick: function() { a.detail(); } });
     item.appendChild(el('div', { class: 'action-icon' }, a.icon));
-    item.appendChild(el('div', { class: 'action-content' }, [el('div', { class: 'action-label' }, a.label), el('div', { class: 'action-sub' }, a.sub)]));
-    item.appendChild(el('button', { class: 'action-btn ' + a.btnClass, onclick: function(e) { e.stopPropagation(); a.action(); } }, a.btnLabel));
+    item.appendChild(el('div', { class: 'action-content' }, [
+      el('div', { class: 'action-label' }, a.label),
+      el('div', { class: 'action-sub' }, a.sub)
+    ]));
+    // Checkbox button: cliquer = marquer fait / défaire
+    var checkBtn = el('button', {
+      class: 'action-check' + (a.done ? ' checked' : ''),
+      title: a.done ? 'Annuler' : 'Marquer comme fait',
+      onclick: function(e) {
+        e.stopPropagation();
+        if (a.done) { undoActionDone(a.id); } else { a.complete(); }
+      }
+    }, a.done ? '✓' : '');
+    item.appendChild(checkBtn);
     list.appendChild(item);
   });
   widget.appendChild(list);
+
+  // Historique des actions du mois
+  if (doneThisMonth.length > 0) {
+    var histSection = el('div', { class: 'actions-history' });
+    var histHeader = el('div', { class: 'actions-history-header', onclick: function() {
+      var list = histSection.querySelector('.actions-history-list');
+      var arrow = histHeader.querySelector('.hist-arrow');
+      if (list.style.display === 'none') { list.style.display = 'block'; arrow.textContent = '▾'; }
+      else { list.style.display = 'none'; arrow.textContent = '▸'; }
+    } });
+    histHeader.appendChild(el('span', { class: 'hist-arrow' }, '▸'));
+    histHeader.appendChild(el('span', {}, ' Historique du mois (' + doneThisMonth.length + ')'));
+    histSection.appendChild(histHeader);
+    var histList = el('div', { class: 'actions-history-list', style: { display: 'none' } });
+    doneThisMonth.forEach(function(a) {
+      var row = el('div', { class: 'actions-history-item' });
+      row.appendChild(el('span', { class: 'actions-history-label' }, [
+        el('span', { style: { color: 'var(--success)', marginRight: '6px' } }, '✓'),
+        el('span', {}, a.label)
+      ]));
+      row.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+        el('span', { class: 'actions-history-date' }, a.date.substring(8) + '/' + a.date.substring(5, 7)),
+        el('button', { class: 'actions-history-undo', title: 'Annuler', onclick: function(e) { e.stopPropagation(); undoActionDone(a.id); } }, '↩')
+      ]));
+      histList.appendChild(row);
+    });
+    histSection.appendChild(histList);
+    widget.appendChild(histSection);
+  }
+
   container.appendChild(widget);
 }
 
@@ -13955,6 +14063,40 @@ function showMilestoneDetail(m) {
 }
 
 // V53: Détail d'une action
+function showChargeActionDetail(group) {
+  var content = el('div', { style: { padding: '10px' } });
+  content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '16px' } }, [
+    el('div', { style: { fontSize: '36px', marginBottom: '4px' } }, '💳'),
+    el('div', { style: { fontSize: '16px', fontWeight: '700' } }, 'Payer ' + group.cat),
+    el('div', { style: { fontSize: '22px', fontWeight: '800', color: 'var(--warning)', marginTop: '8px' } }, EUR(group.total))
+  ]));
+
+  // Détail par ligne
+  content.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' } }, '📋 Détail des lignes'));
+  var list = el('div', { style: { maxHeight: '250px', overflowY: 'auto' } });
+  group.charges.forEach(function(c) {
+    var isPaidItem = isPaid(c.id);
+    var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: isPaidItem ? 'rgba(52,211,153,0.1)' : 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '4px', fontSize: '12px', borderLeft: '3px solid ' + (isPaidItem ? 'var(--success)' : 'var(--warning)') } });
+    row.appendChild(el('div', {}, [
+      el('div', { style: { fontWeight: '600' } }, c.cat + (c.detail ? ' · ' + c.detail : '')),
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Période ' + fmtMonthShort(c.mois) + (isPaidItem ? ' · Payé' : ' · À payer'))
+    ]));
+    row.appendChild(el('span', { style: { fontWeight: '700', color: isPaidItem ? 'var(--success)' : 'var(--text-primary)' } }, EUR(c.montant)));
+    list.appendChild(row);
+  });
+  content.appendChild(list);
+
+  content.appendChild(el('div', { style: { marginTop: '16px', textAlign: 'right' } }, [
+    el('button', { class: 'btn', onclick: function() { closeModal('formModal'); } }, 'Fermer')
+  ]));
+
+  $('#formModalTitle').textContent = '💳 ' + group.cat;
+  var modalBody = $('#formModalBody');
+  modalBody.replaceChildren();
+  modalBody.appendChild(content);
+  openModal('formModal');
+}
+
 function showActionDetail(a) {
   var data = compute();
   var content = el('div', { style: { padding: '10px' } });
