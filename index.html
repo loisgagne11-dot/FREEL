@@ -4485,6 +4485,78 @@ function getScheduledDaysForMonth(mis, monthKey) {
   return result;
 }
 
+// Shared: calcul jours travaillés pour un jour donné (utilisé par chart ET détail hebdo)
+function getWorkedForDayShared(mis, wdISO, wdKey, ajustementsMap) {
+  // Priorité: ajustements d'activité > planning théorique
+  if (ajustementsMap && ajustementsMap.hasOwnProperty(wdISO)) return ajustementsMap[wdISO];
+  var worked = 0;
+  var inMission = mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin;
+  if (!inMission) return 0;
+  if (mis.periodes && mis.periodes.length > 0) {
+    var inPeriode = false;
+    mis.periodes.forEach(function(periode) {
+      if (!periode.debut || !periode.fin) return;
+      if (wdISO >= periode.debut && wdISO <= periode.fin) {
+        inPeriode = true;
+        if (periode.joursMap) {
+          worked = periode.joursMap[wdKey] || 0;
+        } else {
+          var js = periode.joursSemaine || 5;
+          worked = js >= 5 ? 1 : (js > 0 ? 1 : 0);
+        }
+      }
+    });
+    if (!inPeriode) worked = 1;
+  } else {
+    worked = 1;
+  }
+  return worked;
+}
+
+// Shared: calcul jours NET travaillés pour un mois (chart + détail)
+function getNetWorkedForMonth(mis, monthKey) {
+  var p = parseYM(monthKey);
+  var monthStart = new Date(p.y, p.m, 1);
+  var monthEnd = new Date(p.y, p.m + 1, 0);
+  var holidays = frenchHolidays(p.y);
+  var dowToKey = [null, 'lun', 'mar', 'mer', 'jeu', 'ven', null];
+
+  // Index des congés
+  var congesSet = {};
+  if (mis.congesDates) {
+    mis.congesDates.forEach(function(cd) {
+      var base = cd.substring(0, 10);
+      congesSet[base] = cd.length > 10 ? 0.5 : 1;
+    });
+  }
+
+  // Index des ajustements
+  var ajustementsMap = {};
+  var ligne = mis.lignes ? mis.lignes.find(function(l) { return l.ym === monthKey; }) : null;
+  if (ligne && ligne.ajustements) {
+    Object.keys(ligne.ajustements).forEach(function(iso) {
+      ajustementsMap[iso] = ligne.ajustements[iso];
+    });
+  }
+
+  var total = 0;
+  for (var d = new Date(monthStart); d <= monthEnd; d.setDate(d.getDate() + 1)) {
+    var dow = d.getDay();
+    if (dow === 0 || dow === 6) continue; // weekend
+    var iso = localISO(d);
+    if (holidays.indexOf(iso) !== -1) continue; // férié
+    var wdKey = dowToKey[dow];
+    var worked = getWorkedForDayShared(mis, iso, wdKey, ajustementsMap);
+    // Soustraire congés (sauf si ajustement explicite)
+    var conge = congesSet[iso] || 0;
+    if (conge > 0 && worked > 0 && !ajustementsMap.hasOwnProperty(iso)) {
+      worked = Math.max(0, worked - conge);
+    }
+    total += worked;
+  }
+  return total;
+}
+
 function buildMission(mis) {
   if (!mis.debut || !mis.fin) return;
   // V81fix: Parser en local pour éviter décalage UTC
@@ -16723,11 +16795,7 @@ function drawJoursParMissionChart() {
 
   var datasets = activeMissions.map(function(mis, mi) {
     var dataArr = months.map(function(monthKey) {
-      var ligne = null;
-      mis.lignes.forEach(function(l) { if (l.ym === monthKey) ligne = l; });
-      if (!ligne) return 0;
-      // Utiliser joursReels (qui intègre ajustements > joursReelsOverride > théorique)
-      return ligne.joursReels || Math.max(0, (ligne.joursPrevus || 0) - (ligne.conges || 0));
+      return getNetWorkedForMonth(mis, monthKey);
     });
     return {
       label: mis.client || mis.titre || 'Mission ' + (mi + 1),
@@ -16857,31 +16925,7 @@ function showWeeklyBreakdownModal(monthKey) {
     }
 
     function getWorkedForDay(wdISO, wdKey) {
-      // Priorité: ajustements d'activité > planning théorique
-      if (ajustementsMap.hasOwnProperty(wdISO)) return ajustementsMap[wdISO];
-
-      var worked = 0;
-      var inMission = mis.debut && mis.fin && wdISO >= mis.debut && wdISO <= mis.fin;
-      if (!inMission) return 0;
-      if (mis.periodes && mis.periodes.length > 0) {
-        var inPeriode = false;
-        mis.periodes.forEach(function(periode) {
-          if (!periode.debut || !periode.fin) return;
-          if (wdISO >= periode.debut && wdISO <= periode.fin) {
-            inPeriode = true;
-            if (periode.joursMap) {
-              worked = periode.joursMap[wdKey] || 0;
-            } else {
-              var js = periode.joursSemaine || 5;
-              worked = js >= 5 ? 1 : (js > 0 ? 1 : 0);
-            }
-          }
-        });
-        if (!inPeriode) worked = 1;
-      } else {
-        worked = 1;
-      }
-      return worked;
+      return getWorkedForDayShared(mis, wdISO, wdKey, ajustementsMap);
     }
 
     var weekResults = weeks.map(function(week) {
