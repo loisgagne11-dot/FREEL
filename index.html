@@ -11687,15 +11687,29 @@ function renderActionsWidget(container) {
       el('div', { class: 'action-label' }, a.label),
       el('div', { class: 'action-sub' }, a.sub)
     ]));
-    // Checkbox button: cliquer = marquer fait / défaire
-    var checkBtn = el('button', {
-      class: 'action-check' + (a.done ? ' checked' : ''),
-      title: a.done ? 'Annuler' : 'Marquer comme fait',
-      onclick: function(e) {
+    // Checkbox: cliquer = marquer fait / défaire
+    var checkBtn = document.createElement('button');
+    checkBtn.type = 'button';
+    checkBtn.className = 'action-check' + (a.done ? ' checked' : '');
+    checkBtn.title = a.done ? 'Annuler' : 'Marquer comme fait';
+    if (a.done) checkBtn.textContent = '✓';
+    (function(action, btn, row) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
         e.stopPropagation();
-        if (a.done) { undoActionDone(a.id); } else { a.complete(); }
-      }
-    }, a.done ? '✓' : '');
+        e.stopImmediatePropagation();
+        if (action.done) {
+          undoActionDone(action.id);
+        } else {
+          // Feedback visuel immédiat avant render
+          btn.classList.add('checked');
+          btn.textContent = '✓';
+          row.classList.add('done');
+          action.complete();
+        }
+        return false;
+      });
+    })(a, checkBtn, item);
     item.appendChild(checkBtn);
     list.appendChild(item);
   });
@@ -13902,36 +13916,95 @@ function renderActionsAndMilestones(container) {
   }
 
   // Section Actions (en bas)
-  if (actions.length > 0) {
+  var doneThisMonth = getActionsForCurrentMonth();
+  var pending = actions.filter(function(a) { return !a.done; });
+  if (actions.length > 0 || doneThisMonth.length > 0) {
     var actionsSection = el('div');
     var actionsHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } });
     actionsHeader.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700' } }, '🎯 Actions Immédiates'));
-    actionsHeader.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '800', color: 'white', background: actions.some(function(a) { return a.type === 'urgent'; }) ? 'var(--danger)' : 'var(--warning)', borderRadius: '10px', padding: '2px 8px', minWidth: '20px', textAlign: 'center' } }, String(actions.length)));
+    if (pending.length > 0) {
+      actionsHeader.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '800', color: 'white', background: pending.some(function(a) { return a.type === 'urgent'; }) ? 'var(--danger)' : 'var(--warning)', borderRadius: '10px', padding: '2px 8px', minWidth: '20px', textAlign: 'center' } }, String(pending.length)));
+    }
     actionsSection.appendChild(actionsHeader);
 
     var actionsList = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } });
     actions.forEach(function(a) {
       var borderColor = a.type === 'urgent' ? 'var(--danger)' : a.type === 'warning' ? 'var(--warning)' : a.type === 'success' ? 'var(--success)' : 'var(--accent)';
-      var bgColor = a.type === 'urgent' ? 'rgba(239,68,68,0.08)' : a.type === 'warning' ? 'rgba(251,191,36,0.06)' : a.type === 'success' ? 'rgba(34,197,94,0.06)' : 'var(--bg-tertiary)';
+      var bgColor = a.done ? 'rgba(52,211,153,0.06)' : a.type === 'urgent' ? 'rgba(239,68,68,0.08)' : a.type === 'warning' ? 'rgba(251,191,36,0.06)' : a.type === 'success' ? 'rgba(34,197,94,0.06)' : 'var(--bg-tertiary)';
       var item = el('div', {
-        style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: bgColor, borderRadius: '10px', cursor: 'pointer', borderLeft: '4px solid ' + borderColor, transition: 'transform 0.1s' },
-        onclick: function() { if (a.type === 'warning' && a.label.indexOf('URSSAF') >= 0) { a.action(); } else { showActionDetail(a); } }
+        style: {
+          display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px',
+          background: bgColor, borderRadius: '10px', cursor: 'pointer',
+          borderLeft: '4px solid ' + (a.done ? 'var(--success)' : borderColor),
+          transition: 'transform 0.1s', opacity: a.done ? '0.5' : '1'
+        },
+        onclick: function() { a.detail(); }
       });
       item.onmouseenter = function() { item.style.transform = 'translateX(2px)'; };
       item.onmouseleave = function() { item.style.transform = 'none'; };
       item.appendChild(el('div', { style: { fontSize: '22px', width: '32px', textAlign: 'center', flexShrink: '0' } }, a.icon));
       item.appendChild(el('div', { style: { flex: 1, minWidth: 0 } }, [
-        el('div', { style: { fontSize: '13px', fontWeight: '700' } }, a.label),
+        el('div', { style: { fontSize: '13px', fontWeight: '700', textDecoration: a.done ? 'line-through' : 'none', color: a.done ? 'var(--text-muted)' : 'inherit' } }, a.label),
         el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' } }, a.sub)
       ]));
-      item.appendChild(el('button', {
-        class: 'btn btn-sm',
-        style: { background: borderColor, color: 'white', border: 'none', fontWeight: '700', fontSize: '11px', padding: '6px 14px', borderRadius: '8px', whiteSpace: 'nowrap' },
-        onclick: function(e) { e.stopPropagation(); a.action(); }
-      }, a.btnLabel));
+      // Checkbox rond
+      var checkBtn = document.createElement('button');
+      checkBtn.type = 'button';
+      checkBtn.className = 'action-check' + (a.done ? ' checked' : '');
+      checkBtn.title = a.done ? 'Annuler' : 'Marquer comme fait';
+      if (a.done) checkBtn.textContent = '✓';
+      (function(action, btn, row) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          if (action.done) {
+            undoActionDone(action.id);
+          } else {
+            btn.classList.add('checked');
+            btn.textContent = '✓';
+            row.style.opacity = '0.5';
+            action.complete();
+          }
+        });
+      })(a, checkBtn, item);
+      item.appendChild(checkBtn);
       actionsList.appendChild(item);
     });
     actionsSection.appendChild(actionsList);
+
+    // Historique du mois (dépliable)
+    if (doneThisMonth.length > 0) {
+      var histSection = el('div', { style: { marginTop: '10px', borderTop: '1px solid var(--glass-border)', paddingTop: '8px' } });
+      var histHeader = el('div', {
+        style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', cursor: 'pointer', padding: '4px 0', userSelect: 'none' },
+        onclick: function() {
+          var list = histSection.querySelector('.hist-list');
+          var arrow = histHeader.querySelector('.hist-arrow');
+          if (list.style.display === 'none') { list.style.display = 'block'; arrow.textContent = '▾'; }
+          else { list.style.display = 'none'; arrow.textContent = '▸'; }
+        }
+      });
+      histHeader.appendChild(el('span', { class: 'hist-arrow' }, '▸'));
+      histHeader.appendChild(el('span', {}, ' Historique du mois (' + doneThisMonth.length + ')'));
+      histSection.appendChild(histHeader);
+      var histList = el('div', { class: 'hist-list', style: { display: 'none', marginTop: '6px' } });
+      doneThisMonth.forEach(function(a) {
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', fontSize: '11px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '3px' } });
+        row.appendChild(el('span', { style: { color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' } }, [
+          el('span', { style: { color: 'var(--success)', marginRight: '6px' } }, '✓'),
+          el('span', {}, a.label)
+        ]));
+        row.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+          el('span', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, a.date.substring(8) + '/' + a.date.substring(5, 7)),
+          el('button', { type: 'button', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }, title: 'Annuler', onclick: function(e) { e.stopPropagation(); undoActionDone(a.id); } }, '↩')
+        ]));
+        histList.appendChild(row);
+      });
+      histSection.appendChild(histList);
+      actionsSection.appendChild(histSection);
+    }
+
     widget.appendChild(actionsSection);
   }
 
