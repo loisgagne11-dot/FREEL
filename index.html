@@ -3708,6 +3708,20 @@ function getPaymentMonth(mois, delaiMois, jourPaiement) {
   return ym(d.getFullYear(), d.getMonth());
 }
 
+// Calcul du mois réel de prélèvement URSSAF/CFP/Impôt PL
+// Mensuel: M+1 après encaissement (on déclare le CA du mois M fin M+1)
+// Trimestriel: fin du mois suivant le trimestre d'encaissement
+function getUrssafDebitMonth(encaissementMonth) {
+  var pe = parseYM(encaissementMonth);
+  if (COMPANY.urssafPeriodicite === 'mensuel') {
+    return ym(pe.m === 11 ? pe.y + 1 : pe.y, pe.m === 11 ? 0 : pe.m + 1);
+  } else {
+    var trimestre = Math.floor(pe.m / 3);
+    var moisFinTrim = (trimestre + 1) * 3;
+    return ym(moisFinTrim >= 12 ? pe.y + 1 : pe.y, moisFinTrim >= 12 ? moisFinTrim - 12 : moisFinTrim);
+  }
+}
+
 function getPaymentDate(mois, delaiMois, jourPaiement) {
   var p = parseYM(mois);
   return new Date(p.y, p.m + (delaiMois || 2), jourPaiement || 15);
@@ -5528,41 +5542,44 @@ function compute() {
           data.facturesStats.payees++;
           
           // CHARGES LIÉES AU MOIS D'ENCAISSEMENT
+          // Le mois de prélèvement réel suit le cycle de déclaration URSSAF (M+1 mensuel / fin trimestre+1)
           if (inPeriodPayment) {
-            var chargeMonth = paymentMonth;
-            var chMd = data.monthsData[chargeMonth];
+            var debitMonth = getUrssafDebitMonth(paymentMonth);
+            var chargeMonth = debitMonth;
+            var chMd = data.monthsData[chargeMonth] || data.monthsData[paymentMonth];
+            var chMdKey = data.monthsData[chargeMonth] ? chargeMonth : paymentMonth;
             if (chMd) {
-              var rate = getUrssafRate(chargeMonth);
-              
+              var rate = getUrssafRate(paymentMonth);
+
               // URSSAF
               var urssaf = Math.round(f.ht * rate);
               var urssafId = 'URSSAF-' + f.id;
-              chMd.charges.push({ id: urssafId, cat: 'URSSAF', desc: PCT(rate), montant: urssaf, mois: chargeMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
-              if (isPaid(urssafId)) { data.chargesPayees += urssaf; chMd.chargesPaid += urssaf; data.detailChargesPayees.push({ cat: 'URSSAF', mois: chargeMonth, montant: urssaf, source: f.client }); }
-              else { data.chargesAPayer += urssaf; chMd.chargesUnpaid += urssaf; data.provByMonth[chargeMonth] = (data.provByMonth[chargeMonth] || 0) + urssaf; data.provByType['URSSAF'] = (data.provByType['URSSAF'] || 0) + urssaf; data.detailChargesAPayer.push({ cat: 'URSSAF', mois: chargeMonth, montant: urssaf, id: urssafId, source: f.client }); }
-              
+              chMd.charges.push({ id: urssafId, cat: 'URSSAF', desc: PCT(rate), montant: urssaf, mois: chMdKey, source: f.client + ' ' + fmtMonthShort(f.mois) });
+              if (isPaid(urssafId)) { data.chargesPayees += urssaf; chMd.chargesPaid += urssaf; data.detailChargesPayees.push({ cat: 'URSSAF', mois: chMdKey, montant: urssaf, source: f.client }); }
+              else { data.chargesAPayer += urssaf; chMd.chargesUnpaid += urssaf; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + urssaf; data.provByType['URSSAF'] = (data.provByType['URSSAF'] || 0) + urssaf; data.detailChargesAPayer.push({ cat: 'URSSAF', mois: chMdKey, montant: urssaf, id: urssafId, source: f.client }); }
+
               // CFP
               var cfp = Math.round(f.ht * LEGAL.cfp);
               var cfpId = 'CFP-' + f.id;
-              chMd.charges.push({ id: cfpId, cat: 'CFP', desc: 'Formation', montant: cfp, mois: chargeMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
-              if (isPaid(cfpId)) { data.chargesPayees += cfp; chMd.chargesPaid += cfp; data.detailChargesPayees.push({ cat: 'CFP', mois: chargeMonth, montant: cfp, source: f.client }); }
-              else { data.chargesAPayer += cfp; chMd.chargesUnpaid += cfp; data.provByMonth[chargeMonth] = (data.provByMonth[chargeMonth] || 0) + cfp; data.provByType['CFP'] = (data.provByType['CFP'] || 0) + cfp; data.detailChargesAPayer.push({ cat: 'CFP', mois: chargeMonth, montant: cfp, id: cfpId, source: f.client }); }
-              
-              // TVA
+              chMd.charges.push({ id: cfpId, cat: 'CFP', desc: 'Formation', montant: cfp, mois: chMdKey, source: f.client + ' ' + fmtMonthShort(f.mois) });
+              if (isPaid(cfpId)) { data.chargesPayees += cfp; chMd.chargesPaid += cfp; data.detailChargesPayees.push({ cat: 'CFP', mois: chMdKey, montant: cfp, source: f.client }); }
+              else { data.chargesAPayer += cfp; chMd.chargesUnpaid += cfp; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + cfp; data.provByType['CFP'] = (data.provByType['CFP'] || 0) + cfp; data.detailChargesAPayer.push({ cat: 'CFP', mois: chMdKey, montant: cfp, id: cfpId, source: f.client }); }
+
+              // TVA (même cycle de déclaration)
               if (f.tva > 0) {
                 var tvaId = 'TVA-' + f.id;
-                chMd.charges.push({ id: tvaId, cat: 'TVA', desc: 'Collectée', montant: Math.round(f.tva), mois: chargeMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
-                if (isPaid(tvaId)) { data.chargesPayees += Math.round(f.tva); chMd.chargesPaid += Math.round(f.tva); data.detailChargesPayees.push({ cat: 'TVA', mois: chargeMonth, montant: Math.round(f.tva), source: f.client }); }
-                else { data.chargesAPayer += Math.round(f.tva); chMd.chargesUnpaid += Math.round(f.tva); data.provByMonth[chargeMonth] = (data.provByMonth[chargeMonth] || 0) + Math.round(f.tva); data.provByType['TVA'] = (data.provByType['TVA'] || 0) + Math.round(f.tva); data.detailChargesAPayer.push({ cat: 'TVA', mois: chargeMonth, montant: Math.round(f.tva), id: tvaId, source: f.client }); }
+                chMd.charges.push({ id: tvaId, cat: 'TVA', desc: 'Collectée', montant: Math.round(f.tva), mois: chMdKey, source: f.client + ' ' + fmtMonthShort(f.mois) });
+                if (isPaid(tvaId)) { data.chargesPayees += Math.round(f.tva); chMd.chargesPaid += Math.round(f.tva); data.detailChargesPayees.push({ cat: 'TVA', mois: chMdKey, montant: Math.round(f.tva), source: f.client }); }
+                else { data.chargesAPayer += Math.round(f.tva); chMd.chargesUnpaid += Math.round(f.tva); data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + Math.round(f.tva); data.provByType['TVA'] = (data.provByType['TVA'] || 0) + Math.round(f.tva); data.detailChargesAPayer.push({ cat: 'TVA', mois: chMdKey, montant: Math.round(f.tva), id: tvaId, source: f.client }); }
               }
-              
-              // Impôt (prél. libératoire)
+
+              // Impôt (prél. libératoire - même cycle)
               if (COMPANY.prelevementLiberatoire) {
                 var impLib = Math.round(f.ht * LEGAL.impLib);
                 var impId = 'IMPLIB-' + f.id;
-                chMd.charges.push({ id: impId, cat: 'Impôt PL', desc: PCT(LEGAL.impLib), montant: impLib, mois: chargeMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
-                if (isPaid(impId)) { data.chargesPayees += impLib; chMd.chargesPaid += impLib; data.detailChargesPayees.push({ cat: 'Impôt PL', mois: chargeMonth, montant: impLib, source: f.client }); }
-                else { data.chargesAPayer += impLib; chMd.chargesUnpaid += impLib; data.provByMonth[chargeMonth] = (data.provByMonth[chargeMonth] || 0) + impLib; data.provByType['Impôt'] = (data.provByType['Impôt'] || 0) + impLib; data.detailChargesAPayer.push({ cat: 'Impôt PL', mois: chargeMonth, montant: impLib, id: impId, source: f.client }); }
+                chMd.charges.push({ id: impId, cat: 'Impôt PL', desc: PCT(LEGAL.impLib), montant: impLib, mois: chMdKey, source: f.client + ' ' + fmtMonthShort(f.mois) });
+                if (isPaid(impId)) { data.chargesPayees += impLib; chMd.chargesPaid += impLib; data.detailChargesPayees.push({ cat: 'Impôt PL', mois: chMdKey, montant: impLib, source: f.client }); }
+                else { data.chargesAPayer += impLib; chMd.chargesUnpaid += impLib; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + impLib; data.provByType['Impôt'] = (data.provByType['Impôt'] || 0) + impLib; data.detailChargesAPayer.push({ cat: 'Impôt PL', mois: chMdKey, montant: impLib, id: impId, source: f.client }); }
               }
             }
           }
