@@ -6681,9 +6681,9 @@ function showUrssafCfpDetail() {
       ].filter(Boolean))
     ]));
 
-    // Trier par mois, puis non payés d'abord
+    // Trier par mois (plus récent d'abord), puis non payés d'abord
     yearItems.sort(function(a, b) {
-      if (a.mois !== b.mois) return (a.mois || '').localeCompare(b.mois || '');
+      if (a.mois !== b.mois) return (b.mois || '').localeCompare(a.mois || '');
       var aPaid = isPaid(a.id) ? 1 : 0;
       var bPaid = isPaid(b.id) ? 1 : 0;
       if (aPaid !== bPaid) return aPaid - bPaid;
@@ -17153,6 +17153,7 @@ function drawSoldeChart() {
   var labels = months.map(fmtMonthShort);
   var dataSolde = [], dataSalaires = [], dataSoldeProjection = [], dataSalairesProjection = [], dataCashDispoProj = [];
   var dataCapaciteSalaire = []; // V72: Capacité salaire pour TOUS les mois
+  var dataCashDispoLine = []; // Courbe cash dispo (solde - provisions - charges)
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var RESERVE_MIN = TREASURY.reserveCompte || 150;
 
@@ -17238,7 +17239,8 @@ function drawSoldeChart() {
       dataSoldeProjection.push(SHOW_CASH_DISPO ? projCashDispo : projSolde);
       dataSalairesProjection.push(salaireVersable);
       dataCashDispoProj.push(projCashDispo);
-      dataCapaciteSalaire.push(salaireVersable); // Même valeur pour futur
+      dataCapaciteSalaire.push(salaireVersable);
+      dataCashDispoLine.push(projCashDispo); // Courbe cash dispo futur
     } else {
       // Mois passé ou actuel: données réelles
       dataSolde.push(md ? (SHOW_CASH_DISPO ? md.cashDispo : md.solde) : 0);
@@ -17246,6 +17248,7 @@ function drawSoldeChart() {
       dataSoldeProjection.push(null);
       dataSalairesProjection.push(null);
       dataCashDispoProj.push(null);
+      dataCashDispoLine.push(md ? md.cashDispo : 0); // Courbe cash dispo passé
 
       // V72: Calculer capacité salaire pour mois passés aussi
       if (md) {
@@ -17289,22 +17292,7 @@ function drawSoldeChart() {
         });
       });
       
-      // Afficher "Moy: X€" sur la ligne moyenne (index 5 maintenant)
-      var moyDataset = chart.data.datasets[5];
-      if (moyDataset && COMPUTED.salaireMoyen > 0) {
-        var moyMeta = chart.getDatasetMeta(5);
-        var lastPoint = moyMeta.data[moyMeta.data.length - 1];
-        if (lastPoint) {
-          ctx.save();
-          ctx.fillStyle = 'rgba(34,211,238,0.8)';
-          ctx.font = 'bold 9px system-ui';
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'middle';
-          var moyLabel = 'Moy: ' + (COMPUTED.salaireMoyen >= 1000 ? Math.round(COMPUTED.salaireMoyen/1000) + 'k€' : COMPUTED.salaireMoyen + '€');
-          ctx.fillText(moyLabel, lastPoint.x + 5, lastPoint.y);
-          ctx.restore();
-        }
-      }
+      // Pas de label "Moy" sur ce graphique (lignes salaires dans graphique dédié)
     }
   };
 
@@ -17312,9 +17300,11 @@ function drawSoldeChart() {
     data: {
       labels: labels,
       datasets: [
-        // V78: Supprimé les lignes salaires (Salaires, Sal.Proj., Capacité, Moy) → graphique Évolution Salaires dédié
+        // Barres solde (vert/rouge selon positif/négatif, violet pour projection)
         { type: 'bar', label: SHOW_CASH_DISPO ? 'Cash Dispo' : 'Solde', data: dataSolde, backgroundColor: dataSolde.map(function(v) { return v === null ? 'transparent' : (v >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(248,113,113,0.6)'); }), borderRadius: 3, yAxisID: 'y' },
-        { type: 'bar', label: 'Projection', data: dataSoldeProjection, backgroundColor: 'rgba(168,85,247,0.3)', borderColor: 'rgba(168,85,247,0.6)', borderWidth: 1, borderRadius: 3, yAxisID: 'y' }
+        { type: 'bar', label: 'Projection', data: dataSoldeProjection, backgroundColor: 'rgba(168,85,247,0.3)', borderColor: 'rgba(168,85,247,0.6)', borderWidth: 1, borderRadius: 3, yAxisID: 'y' },
+        // Courbe cash dispo (argent réellement libre après toutes provisions)
+        { type: 'line', label: 'Cash Dispo', data: dataCashDispoLine, borderColor: 'rgba(34,211,238,0.8)', backgroundColor: 'rgba(34,211,238,0.1)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: 'rgba(34,211,238,1)', fill: false, tension: 0.3, yAxisID: 'y' }
       ]
     },
     options: {
@@ -18182,9 +18172,22 @@ function renderTresorerie(container) {
     interetsBlock.appendChild(el('div', { class: 'treso-item-count' }, 'Cliquer pour configurer'));
   }
   grid.appendChild(interetsBlock);
-  
+
+  // Couverture Provisions (6ème KPI dans la grille)
+  if (data.provisionsAbsolues > 0) {
+    var totalProv = data.provisionsAbsolues;
+    var soldeC = data.soldeAbsolu || 0;
+    var couv = totalProv > 0 ? Math.round(soldeC / totalProv * 100) : 100;
+    var couvColor = couv >= 100 ? 'var(--success)' : couv >= 80 ? 'var(--warning)' : 'var(--danger)';
+    var couvBlock = el('div', { class: 'treso-item', onclick: function() { showCouvertureProvisionsModal(); } });
+    couvBlock.appendChild(el('div', { class: 'treso-item-value', style: { color: couvColor } }, couv + '%'));
+    couvBlock.appendChild(el('div', { class: 'treso-item-label' }, '🔒 Couverture'));
+    couvBlock.appendChild(el('div', { class: 'treso-item-count' }, EUR(totalProv) + ' provisionnés'));
+    grid.appendChild(couvBlock);
+  }
+
   container.appendChild(grid);
-  
+
   // V48: CARD TRAÇABILITÉ DES INTÉRÊTS (si rendement actif)
   if (TREASURY.rendementActif && TREASURY.rendementHistorique && TREASURY.rendementHistorique.length > 0) {
     var interetsCard = el('div', { id: 'interetsHistoriqueCard', class: 'card', style: { background: 'linear-gradient(135deg, var(--success-glow), transparent)', display: 'none' } });
@@ -18224,24 +18227,6 @@ function renderTresorerie(container) {
     container.appendChild(interetsCard);
   }
   
-  // Indicateur couverture provisions (compact)
-  if (data.provisionsAbsolues > 0) {
-    var totalProv = data.provisionsAbsolues;
-    var soldeC = data.soldeAbsolu || 0;
-    var couv = totalProv > 0 ? Math.round(soldeC / totalProv * 100) : 100;
-    var couvColor = couv >= 100 ? 'var(--success)' : couv >= 80 ? 'var(--warning)' : 'var(--danger)';
-    var couvBg = couv >= 100 ? 'rgba(34,197,94,0.08)' : couv >= 80 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
-    var couvIndicator = el('div', { class: 'card', style: { cursor: 'pointer', padding: '10px 14px', marginBottom: '8px', background: couvBg, border: '1px solid ' + couvColor + '33' }, onclick: function() { showCouvertureProvisionsModal(); } });
-    var couvRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
-    couvRow.appendChild(el('div', {}, [
-      el('div', { style: { fontSize: '11px', fontWeight: '700' } }, '🔒 Couverture Provisions'),
-      el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, EUR(totalProv) + ' provisionnés · Cliquer pour détail')
-    ]));
-    couvRow.appendChild(el('div', { style: { fontWeight: '800', fontSize: '18px', color: couvColor } }, couv + '%'));
-    couvIndicator.appendChild(couvRow);
-    container.appendChild(couvIndicator);
-  }
-
   // V79: Graphique Trésorerie (déplacé depuis Évolution)
   var soldeChartCard = el('div', { class: 'card', style: { marginTop: '12px', marginBottom: '12px' } });
   var soldeChartHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
@@ -18276,13 +18261,20 @@ function renderTresorerie(container) {
   });
   allMouvements.sort(function(a, b) { return b.date.localeCompare(a.date); });
 
-  // Provisions à venir (mois prochain)
-  var nextYm = ym(TODAY.getMonth() === 11 ? TODAY.getFullYear() + 1 : TODAY.getFullYear(), TODAY.getMonth() === 11 ? 0 : TODAY.getMonth() + 1);
+  // Dépenses à venir : provisions non payées + mouvements récurrents futurs
   var currentYmKey = ym(TODAY.getFullYear(), TODAY.getMonth());
   var aVenir = [];
+  // Provisions (charges non payées du mois suivant et au-delà)
   (data.detailChargesAPayer || []).forEach(function(c) {
-    if (c.mois >= currentYmKey) {
-      aVenir.push({ label: c.cat, icon: '📋', detail: c.periode || '', montant: -c.montant, date: c.mois + '-01', category: c.cat });
+    if (c.mois > currentYmKey) {
+      var paiementInfo = c.moisPaiement ? ' → prélevé ' + fmtMonthShort(c.moisPaiement) : '';
+      aVenir.push({ label: c.cat, icon: '📋', detail: (c.source || '') + paiementInfo, montant: -c.montant, date: c.mois + '-01', category: c.cat, moisKey: c.mois });
+    }
+  });
+  // Mouvements récurrents futurs (dépenses planifiées)
+  TREASURY.mouvements.forEach(function(mv) {
+    if (mv.mois > currentYmKey) {
+      aVenir.push({ label: mv.categorie || mv.description || 'Dépense', icon: mv.type === 'Charge' ? '📋' : '💵', detail: mv.description || '', montant: mv.type === 'Charge' ? -mv.montant : mv.montant, date: mv.mois + '-01', category: mv.categorie || mv.description || 'Autre', moisKey: mv.mois });
     }
   });
   aVenir.sort(function(a, b) { return a.date.localeCompare(b.date); });
@@ -18350,27 +18342,59 @@ function renderTresorerie(container) {
     });
   }
 
-  // Section "À venir" (provisions futures)
+  // Section "À venir" — groupé par mois puis par catégorie
   if (aVenir.length > 0) {
     var aVenirSection = el('div', { style: { marginBottom: '12px' } });
     aVenirSection.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(245,158,11,0.08)', borderRadius: '8px', marginBottom: '4px' } }, [
       el('span', { style: { fontSize: '11px', fontWeight: '700', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '⏳ À venir'),
       el('span', { style: { fontSize: '10px', fontWeight: '700', color: '#f59e0b' } }, EUR(aVenir.reduce(function(s, m) { return s + m.montant; }, 0)))
     ]));
-    renderMonthGroup(aVenir, aVenirSection);
+    // Sous-grouper par mois
+    var aVenirByMonth = {};
+    aVenir.forEach(function(m) {
+      var mk = m.moisKey || String(m.date).substring(0, 7);
+      if (!aVenirByMonth[mk]) aVenirByMonth[mk] = [];
+      aVenirByMonth[mk].push(m);
+    });
+    var aVenirMonths = Object.keys(aVenirByMonth).sort();
+    aVenirMonths.forEach(function(mk) {
+      var mouvs = aVenirByMonth[mk];
+      var balance = mouvs.reduce(function(s, m) { return s + m.montant; }, 0);
+      aVenirSection.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 10px 4px 16px' } }, [
+        el('span', { style: { fontSize: '10px', fontWeight: '600', color: 'var(--text-muted)' } }, '📆 ' + fmtMonth(mk)),
+        el('span', { style: { fontSize: '10px', fontWeight: '600', color: 'var(--danger)' } }, EUR(balance))
+      ]));
+      renderMonthGroup(mouvs, aVenirSection);
+    });
     mouvementsCard.appendChild(aVenirSection);
   }
 
-  // Mois en cours
-  var currentMonthMovs = monthMap[currentYmKey];
-  if (currentMonthMovs && currentMonthMovs.length > 0) {
+  // Mois en cours — inclure les provisions non payées du mois
+  var currentMonthMovs = (monthMap[currentYmKey] || []).slice();
+  // Ajouter les provisions du mois en cours (charges à payer)
+  (data.detailChargesAPayer || []).forEach(function(c) {
+    if (c.mois === currentYmKey) {
+      var paiementInfo = c.moisPaiement ? ' → prélevé ' + fmtMonthShort(c.moisPaiement) : '';
+      currentMonthMovs.push({ label: c.cat + ' (provision)', icon: '📋', detail: (c.source || '') + paiementInfo, montant: -c.montant, date: c.mois + '-01', category: c.cat });
+    }
+  });
+  // Ajouter les mouvements récurrents du mois en cours
+  TREASURY.mouvements.forEach(function(mv) {
+    if (mv.mois === currentYmKey) {
+      var alreadyIn = currentMonthMovs.some(function(m) { return m.id === mv.id; });
+      if (!alreadyIn) {
+        currentMonthMovs.push({ label: mv.categorie || mv.description || 'Dépense', icon: mv.type === 'Charge' ? '📋' : '💵', detail: mv.description || '', montant: mv.type === 'Charge' ? -mv.montant : mv.montant, date: mv.mois + '-01', category: mv.categorie || mv.description || 'Autre' });
+      }
+    }
+  });
+  {
     var curSection = el('div', { style: { marginBottom: '12px' } });
     var curBalance = currentMonthMovs.reduce(function(s, m) { return s + m.montant; }, 0);
     curSection.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'rgba(16,185,129,0.08)', borderRadius: '8px', marginBottom: '4px' } }, [
       el('span', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '📍 ' + fmtMonth(currentYmKey)),
-      el('span', { style: { fontSize: '10px', fontWeight: '700', color: curBalance >= 0 ? 'var(--success)' : 'var(--danger)' } }, (curBalance >= 0 ? '+' : '') + EUR(curBalance))
+      el('span', { style: { fontSize: '10px', fontWeight: '700', color: curBalance >= 0 ? 'var(--success)' : 'var(--danger)' } }, currentMonthMovs.length > 0 ? ((curBalance >= 0 ? '+' : '') + EUR(curBalance)) : 'Aucun mouvement')
     ]));
-    renderMonthGroup(currentMonthMovs, curSection);
+    if (currentMonthMovs.length > 0) renderMonthGroup(currentMonthMovs, curSection);
     mouvementsCard.appendChild(curSection);
   }
 
