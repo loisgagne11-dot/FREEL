@@ -3719,16 +3719,35 @@ function getPaymentMonth(mois, delaiMois, jourPaiement) {
   return ym(d.getFullYear(), d.getMonth());
 }
 
-// Calcul du mois réel de prélèvement URSSAF/CFP/Impôt PL
-// Mensuel: M+1 après encaissement (on déclare le CA du mois M fin M+1)
-// Trimestriel: fin du mois suivant le trimestre d'encaissement
+// ═══════════════════════════════════════════════════════════════════════
+// RÈGLE CYCLE URSSAF MICRO-ENTREPRENEUR
+// ───────────────────────────────────────────────────────────────────────
+// Encaissement (M) → Déclaration (M+1) → Prélèvement URSSAF (M+2)
+//
+// Exemple mensuel :
+//   Facture encaissée en janvier (M)
+//   → Déclaration du CA en février (M+1), deadline = fin février
+//   → Prélèvement sur le compte en mars (M+2)
+//
+// Exemple trimestriel :
+//   CA encaissé T1 (jan-mars)
+//   → Déclaration en avril (mois suivant la fin du trimestre)
+//   → Prélèvement en mai (mois d'après)
+//
+// PROVISION : on provisionne au mois de l'encaissement (M),
+//   avec indication du mois de paiement réel (M+2).
+//   Ex: en février, on voit "provision pour avril".
+// ═══════════════════════════════════════════════════════════════════════
 function getUrssafDebitMonth(encaissementMonth) {
   var pe = parseYM(encaissementMonth);
   if (COMPANY.urssafPeriodicite === 'mensuel') {
-    return ym(pe.m === 11 ? pe.y + 1 : pe.y, pe.m === 11 ? 0 : pe.m + 1);
+    // M+2 : déclaration M+1, prélèvement M+2
+    var newM = pe.m + 2;
+    return ym(newM >= 12 ? pe.y + 1 : pe.y, newM >= 12 ? newM - 12 : newM);
   } else {
+    // Trimestriel : fin du trimestre + 2 mois (déclaration M+1, prélèvement M+2)
     var trimestre = Math.floor(pe.m / 3);
-    var moisFinTrim = (trimestre + 1) * 3;
+    var moisFinTrim = (trimestre + 1) * 3 + 1; // +1 pour le mois après la déclaration
     return ym(moisFinTrim >= 12 ? pe.y + 1 : pe.y, moisFinTrim >= 12 ? moisFinTrim - 12 : moisFinTrim);
   }
 }
@@ -4082,28 +4101,28 @@ function getAbsoluteProvisions() {
       if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         var charges = computeInvoiceCharges(f, paymentMonth);
-        // Mois de prélèvement réel selon cycle URSSAF (M+1 mensuel, fin trimestre+1 trimestriel)
+        // Provision au mois de l'encaissement, moisPaiement = quand l'URSSAF prélève (M+2)
         var debitMonth = getUrssafDebitMonth(paymentMonth);
 
         if (!isPaid('URSSAF-' + f.id)) {
           result.total += charges.urssaf;
           result.byType['URSSAF'] = (result.byType['URSSAF'] || 0) + charges.urssaf;
-          result.detail.push({ cat: 'URSSAF', mois: debitMonth, montant: charges.urssaf, id: 'URSSAF-' + f.id, source: mis.client });
+          result.detail.push({ cat: 'URSSAF', mois: paymentMonth, moisPaiement: debitMonth, montant: charges.urssaf, id: 'URSSAF-' + f.id, source: mis.client });
         }
         if (!isPaid('CFP-' + f.id)) {
           result.total += charges.cfp;
           result.byType['CFP'] = (result.byType['CFP'] || 0) + charges.cfp;
-          result.detail.push({ cat: 'CFP', mois: debitMonth, montant: charges.cfp, id: 'CFP-' + f.id, source: mis.client });
+          result.detail.push({ cat: 'CFP', mois: paymentMonth, moisPaiement: debitMonth, montant: charges.cfp, id: 'CFP-' + f.id, source: mis.client });
         }
         if (charges.tva > 0 && !isPaid('TVA-' + f.id)) {
           result.total += charges.tva;
           result.byType['TVA'] = (result.byType['TVA'] || 0) + charges.tva;
-          result.detail.push({ cat: 'TVA', mois: debitMonth, montant: charges.tva, id: 'TVA-' + f.id, source: mis.client });
+          result.detail.push({ cat: 'TVA', mois: paymentMonth, moisPaiement: debitMonth, montant: charges.tva, id: 'TVA-' + f.id, source: mis.client });
         }
         if (charges.impLib > 0 && !isPaid('IMPLIB-' + f.id)) {
           result.total += charges.impLib;
           result.byType['Impôt'] = (result.byType['Impôt'] || 0) + charges.impLib;
-          result.detail.push({ cat: 'Impôt PL', mois: debitMonth, montant: charges.impLib, id: 'IMPLIB-' + f.id, source: mis.client });
+          result.detail.push({ cat: 'Impôt PL', mois: paymentMonth, moisPaiement: debitMonth, montant: charges.impLib, id: 'IMPLIB-' + f.id, source: mis.client });
         }
       }
     });
@@ -4220,23 +4239,23 @@ function getAllChargesForType(typeName) {
       if (paymentMonth > nowYm) paymentMonth = nowYm;
       if (paymentMonth <= nowYm) {
         var rate = getUrssafRate(paymentMonth);
-        // Mois de prélèvement réel selon cycle URSSAF
+        // Provision au mois de l'encaissement, moisPaiement = prélèvement réel (M+2)
         var debitMonth = getUrssafDebitMonth(paymentMonth);
 
         if (isURSSAF) {
           var urssaf = Math.round(f.ht * rate);
-          items.push({ cat: 'URSSAF', mois: debitMonth, montant: urssaf, id: 'URSSAF-' + f.id, source: mis.client });
+          items.push({ cat: 'URSSAF', mois: paymentMonth, moisPaiement: debitMonth, montant: urssaf, id: 'URSSAF-' + f.id, source: mis.client });
         }
         if (isCFP) {
           var cfp = Math.round(f.ht * LEGAL.cfp);
-          items.push({ cat: 'CFP', mois: debitMonth, montant: cfp, id: 'CFP-' + f.id, source: mis.client });
+          items.push({ cat: 'CFP', mois: paymentMonth, moisPaiement: debitMonth, montant: cfp, id: 'CFP-' + f.id, source: mis.client });
         }
         if (isTVA && f.tva > 0) {
-          items.push({ cat: 'TVA', mois: debitMonth, montant: Math.round(f.tva), id: 'TVA-' + f.id, source: mis.client });
+          items.push({ cat: 'TVA', mois: paymentMonth, moisPaiement: debitMonth, montant: Math.round(f.tva), id: 'TVA-' + f.id, source: mis.client });
         }
         if (isIR && COMPANY.prelevementLiberatoire) {
           var impLib = Math.round(f.ht * LEGAL.impLib);
-          if (impLib > 0) items.push({ cat: 'Impôt PL', mois: debitMonth, montant: impLib, id: 'IMPLIB-' + f.id, source: mis.client });
+          if (impLib > 0) items.push({ cat: 'Impôt PL', mois: paymentMonth, moisPaiement: debitMonth, montant: impLib, id: 'IMPLIB-' + f.id, source: mis.client });
         }
       }
     });
@@ -5556,43 +5575,45 @@ function compute() {
           }
           data.facturesStats.payees++;
           
-          // CHARGES LIÉES AU MOIS D'ENCAISSEMENT
-          // Le mois de prélèvement réel suit le cycle de déclaration URSSAF (M+1 mensuel / fin trimestre+1)
+          // PROVISIONS AU MOIS D'ENCAISSEMENT
+          // Règle: Encaissement M → Déclaration M+1 → Prélèvement M+2
+          // On provisionne immédiatement au mois d'encaissement (quand l'argent arrive)
           if (inPeriodPayment) {
             var debitMonth = getUrssafDebitMonth(paymentMonth);
-            var chargeMonth = debitMonth;
-            var chMd = data.monthsData[chargeMonth] || data.monthsData[paymentMonth];
-            var chMdKey = data.monthsData[chargeMonth] ? chargeMonth : paymentMonth;
+            // Provisionner au mois d'encaissement (paymentMonth), pas au mois de prélèvement
+            var chMd = data.monthsData[paymentMonth];
+            var chMdKey = paymentMonth;
             if (chMd) {
               var rate = getUrssafRate(paymentMonth);
+              var provLabel = ' · prov. pour ' + fmtMonthShort(debitMonth);
 
               // URSSAF
               var urssaf = Math.round(f.ht * rate);
               var urssafId = 'URSSAF-' + f.id;
-              chMd.charges.push({ id: urssafId, cat: 'URSSAF', desc: PCT(rate), montant: urssaf, mois: chMdKey, source: f.client + ' ' + fmtMonthShort(f.mois) });
+              chMd.charges.push({ id: urssafId, cat: 'URSSAF', desc: PCT(rate) + provLabel, montant: urssaf, mois: chMdKey, moisPaiement: debitMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
               if (isPaid(urssafId)) { data.chargesPayees += urssaf; chMd.chargesPaid += urssaf; data.detailChargesPayees.push({ cat: 'URSSAF', mois: chMdKey, montant: urssaf, source: f.client }); }
-              else { data.chargesAPayer += urssaf; chMd.chargesUnpaid += urssaf; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + urssaf; data.provByType['URSSAF'] = (data.provByType['URSSAF'] || 0) + urssaf; data.detailChargesAPayer.push({ cat: 'URSSAF', mois: chMdKey, montant: urssaf, id: urssafId, source: f.client }); }
+              else { data.chargesAPayer += urssaf; chMd.chargesUnpaid += urssaf; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + urssaf; data.provByType['URSSAF'] = (data.provByType['URSSAF'] || 0) + urssaf; data.detailChargesAPayer.push({ cat: 'URSSAF', mois: chMdKey, moisPaiement: debitMonth, montant: urssaf, id: urssafId, source: f.client }); }
 
               // CFP
               var cfp = Math.round(f.ht * LEGAL.cfp);
               var cfpId = 'CFP-' + f.id;
-              chMd.charges.push({ id: cfpId, cat: 'CFP', desc: 'Formation', montant: cfp, mois: chMdKey, source: f.client + ' ' + fmtMonthShort(f.mois) });
+              chMd.charges.push({ id: cfpId, cat: 'CFP', desc: 'Formation' + provLabel, montant: cfp, mois: chMdKey, moisPaiement: debitMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
               if (isPaid(cfpId)) { data.chargesPayees += cfp; chMd.chargesPaid += cfp; data.detailChargesPayees.push({ cat: 'CFP', mois: chMdKey, montant: cfp, source: f.client }); }
-              else { data.chargesAPayer += cfp; chMd.chargesUnpaid += cfp; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + cfp; data.provByType['CFP'] = (data.provByType['CFP'] || 0) + cfp; data.detailChargesAPayer.push({ cat: 'CFP', mois: chMdKey, montant: cfp, id: cfpId, source: f.client }); }
+              else { data.chargesAPayer += cfp; chMd.chargesUnpaid += cfp; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + cfp; data.provByType['CFP'] = (data.provByType['CFP'] || 0) + cfp; data.detailChargesAPayer.push({ cat: 'CFP', mois: chMdKey, moisPaiement: debitMonth, montant: cfp, id: cfpId, source: f.client }); }
 
               // TVA (même cycle de déclaration)
               if (f.tva > 0) {
                 var tvaId = 'TVA-' + f.id;
-                chMd.charges.push({ id: tvaId, cat: 'TVA', desc: 'Collectée', montant: Math.round(f.tva), mois: chMdKey, source: f.client + ' ' + fmtMonthShort(f.mois) });
+                chMd.charges.push({ id: tvaId, cat: 'TVA', desc: 'Collectée' + provLabel, montant: Math.round(f.tva), mois: chMdKey, moisPaiement: debitMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
                 if (isPaid(tvaId)) { data.chargesPayees += Math.round(f.tva); chMd.chargesPaid += Math.round(f.tva); data.detailChargesPayees.push({ cat: 'TVA', mois: chMdKey, montant: Math.round(f.tva), source: f.client }); }
-                else { data.chargesAPayer += Math.round(f.tva); chMd.chargesUnpaid += Math.round(f.tva); data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + Math.round(f.tva); data.provByType['TVA'] = (data.provByType['TVA'] || 0) + Math.round(f.tva); data.detailChargesAPayer.push({ cat: 'TVA', mois: chMdKey, montant: Math.round(f.tva), id: tvaId, source: f.client }); }
+                else { data.chargesAPayer += Math.round(f.tva); chMd.chargesUnpaid += Math.round(f.tva); data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + Math.round(f.tva); data.provByType['TVA'] = (data.provByType['TVA'] || 0) + Math.round(f.tva); data.detailChargesAPayer.push({ cat: 'TVA', mois: chMdKey, moisPaiement: debitMonth, montant: Math.round(f.tva), id: tvaId, source: f.client }); }
               }
 
               // Impôt (prél. libératoire - même cycle)
               if (COMPANY.prelevementLiberatoire) {
                 var impLib = Math.round(f.ht * LEGAL.impLib);
                 var impId = 'IMPLIB-' + f.id;
-                chMd.charges.push({ id: impId, cat: 'Impôt PL', desc: PCT(LEGAL.impLib), montant: impLib, mois: chMdKey, source: f.client + ' ' + fmtMonthShort(f.mois) });
+                chMd.charges.push({ id: impId, cat: 'Impôt PL', desc: PCT(LEGAL.impLib) + provLabel, montant: impLib, mois: chMdKey, moisPaiement: debitMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
                 if (isPaid(impId)) { data.chargesPayees += impLib; chMd.chargesPaid += impLib; data.detailChargesPayees.push({ cat: 'Impôt PL', mois: chMdKey, montant: impLib, source: f.client }); }
                 else { data.chargesAPayer += impLib; chMd.chargesUnpaid += impLib; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + impLib; data.provByType['Impôt'] = (data.provByType['Impôt'] || 0) + impLib; data.detailChargesAPayer.push({ cat: 'Impôt PL', mois: chMdKey, montant: impLib, id: impId, source: f.client }); }
               }
@@ -6571,19 +6592,28 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
 
 // Afficher détail combiné URSSAF + CFP
 function showUrssafCfpDetail() {
-  // Utiliser compute() comme source unique de vérité (mêmes mois que mouvements)
-  var data = compute();
-  var allProv = data.allProvisionsDetail || [];
+  var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var urssafItems = [];
+  var cfpItems = [];
 
-  // Filtrer URSSAF + CFP depuis la source unique
-  var urssafItems = allProv.filter(function(i) { return i.cat === 'URSSAF'; });
-  var cfpItems = allProv.filter(function(i) { return i.cat === 'CFP'; });
+  // Charges depuis les factures payées — provisionnées au mois d'encaissement
+  MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var pm = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (pm > nowYm) pm = nowYm;
+      var rate = getUrssafRate(pm);
+      var debitMonth = getUrssafDebitMonth(pm);
+      urssafItems.push({ cat: 'URSSAF', mois: pm, moisPaiement: debitMonth, montant: Math.round(f.ht * rate), id: 'URSSAF-' + f.id, source: mis.client, factureMois: f.mois, ht: f.ht });
+      cfpItems.push({ cat: 'CFP', mois: pm, moisPaiement: debitMonth, montant: Math.round(f.ht * LEGAL.cfp), id: 'CFP-' + f.id, source: mis.client, factureMois: f.mois, ht: f.ht });
+    });
+  });
 
-  // Ajouter aussi les charges manuelles (mouvements) non déjà dans allProv
+  // Charges manuelles (mouvements) — tous les mois, y compris futurs
   TREASURY.mouvements.forEach(function(mv) {
     if (mv.type !== 'Charge') return;
-    var alreadyIn = allProv.some(function(p) { return p.id === mv.id; });
-    if (alreadyIn) return;
     if (mv.categorie === 'URSSAF') urssafItems.push({ cat: 'URSSAF', mois: mv.mois, montant: mv.montant, id: mv.id, source: mv.description || '' });
     if (mv.categorie === 'CFP') cfpItems.push({ cat: 'CFP', mois: mv.mois, montant: mv.montant, id: mv.id, source: mv.description || '' });
   });
@@ -6669,8 +6699,15 @@ function showUrssafCfpDetail() {
         var monthItems = yearItems.filter(function(i) { return i.mois && i.mois.substring(0, 7) === itemMonth; });
         var monthTotal = monthItems.reduce(function(a, c) { return a + c.montant; }, 0);
         var monthUnpaid = monthItems.filter(function(i) { return !isPaid(i.id); }).reduce(function(a, c) { return a + c.montant; }, 0);
+        // Sous-header mois avec indication du mois de prélèvement
+        var paiementLabel = '';
+        var firstWithPaiement = monthItems.find(function(i) { return i.moisPaiement; });
+        if (firstWithPaiement) paiementLabel = ' → prélèvement ' + fmtMonthShort(firstWithPaiement.moisPaiement);
         listContainer.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 14px 6px 24px', marginTop: '4px' } }, [
-          el('span', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)' } }, '📆 ' + fmtMonth(itemMonth)),
+          el('span', { style: { fontSize: '11px', fontWeight: '600', color: 'var(--text-muted)' } }, [
+            el('span', {}, '📆 Encaissé ' + fmtMonth(itemMonth)),
+            paiementLabel ? el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', opacity: '0.7' } }, paiementLabel) : null
+          ].filter(Boolean)),
           el('span', { style: { fontSize: '11px', color: monthUnpaid > 0 ? 'var(--danger)' : 'var(--success)' } }, monthUnpaid > 0 ? EUR(monthUnpaid) : '✓ ' + EUR(monthTotal))
         ]));
       }
@@ -6683,9 +6720,14 @@ function showUrssafCfpDetail() {
         title: paid ? 'Remettre en provision' : 'Marquer payé',
         onclick: (function(id) { return function(e) { e.stopPropagation(); TREASURY.paidCharges[id] = !isPaid(id); saveAll(); showUrssafCfpDetail(); }; })(item.id)
       }, paid ? '✓' : ''));
+      // Détail : source, catégorie, mois de travail si dispo, mois de paiement
+      var subParts = [];
+      if (item.factureMois) subParts.push('Travail ' + fmtMonthShort(item.factureMois));
+      subParts.push('Encaissé ' + fmtMonthShort(item.mois));
+      if (item.moisPaiement) subParts.push('Prélevé ' + fmtMonthShort(item.moisPaiement));
       itemRow.appendChild(el('div', { style: { flex: '1' } }, [
         el('div', { style: { fontSize: '12px', fontWeight: '600', color: paid ? 'var(--success)' : 'var(--text-primary)', textDecoration: paid ? 'line-through' : 'none' } }, (item.source || item.cat) + ' · ' + item.cat),
-        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, fmtMonth(item.mois))
+        el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, subParts.join(' · '))
       ]));
       itemRow.appendChild(el('span', { style: { fontWeight: '700', fontSize: '13px', color: paid ? 'var(--success)' : 'var(--text-primary)' } }, EUR(item.montant)));
       listContainer.appendChild(itemRow);
@@ -11449,20 +11491,21 @@ function getAllYearMilestones() {
     });
   }
 
-  // URSSAF declarations — avec détail du mois de CA concerné
+  // URSSAF declarations — Cycle: encaissement M → déclaration M+1 → prélèvement M+2
   if (COMPANY.urssafPeriodicite === 'mensuel') {
     for (var m = 0; m < 12; m++) {
       var endMonth = new Date(year, m + 1, 0);
-      // En mois M, on déclare le CA encaissé en M-1
-      var moisCA = m > 0 ? fmtMonthShort(ym(year, m - 1)) : fmtMonthShort(ym(year - 1, 11));
-      addM(endMonth, 'URSSAF ' + fmtMonthShort(ym(year, m)), '🏥', 'urssaf', 'Déclaration du CA encaissé en ' + moisCA + ' · Prélèvement cotisations pour le CA de ' + moisCA);
+      // En mois M+1, on déclare le CA encaissé en M. Le prélèvement sera en M+2.
+      var moisCA = m > 0 ? ym(year, m - 1) : ym(year - 1, 11);
+      var moisPrelev = getUrssafDebitMonth(moisCA);
+      addM(endMonth, 'URSSAF ' + fmtMonthShort(ym(year, m)), '🏥', 'urssaf', 'Déclaration du CA encaissé en ' + fmtMonthShort(moisCA) + ' · Prélèvement en ' + fmtMonthShort(moisPrelev));
     }
   } else {
     // Trimestriel: Jan 31, Apr 30, Jul 31, Oct 31
-    addM(new Date(year, 0, 31), 'URSSAF T4 ' + (year - 1), '🏥', 'urssaf', 'Déclaration CA encaissé oct-déc ' + (year - 1) + ' · Prélèvement cotisations T4');
-    addM(new Date(year, 3, 30), 'URSSAF T1', '🏥', 'urssaf', 'Déclaration CA encaissé jan-mars ' + year + ' · Prélèvement cotisations T1');
-    addM(new Date(year, 6, 31), 'URSSAF T2', '🏥', 'urssaf', 'Déclaration CA encaissé avr-juin ' + year + ' · Prélèvement cotisations T2');
-    addM(new Date(year, 9, 31), 'URSSAF T3', '🏥', 'urssaf', 'Déclaration CA encaissé juil-sept ' + year + ' · Prélèvement cotisations T3');
+    addM(new Date(year, 0, 31), 'URSSAF T4 ' + (year - 1), '🏥', 'urssaf', 'Déclaration CA encaissé oct-déc ' + (year - 1) + ' · Prélèvement en ' + fmtMonthShort(ym(year, 1)));
+    addM(new Date(year, 3, 30), 'URSSAF T1', '🏥', 'urssaf', 'Déclaration CA encaissé jan-mars ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 4)));
+    addM(new Date(year, 6, 31), 'URSSAF T2', '🏥', 'urssaf', 'Déclaration CA encaissé avr-juin ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 7)));
+    addM(new Date(year, 9, 31), 'URSSAF T3', '🏥', 'urssaf', 'Déclaration CA encaissé juil-sept ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 10)));
   }
 
   // TVA (si assujetti)
@@ -11633,6 +11676,7 @@ function getActionsList() {
     var actionType = isOverdue ? 'urgent' : m.daysLeft <= 3 ? 'urgent' : 'warning';
 
     actions.push({ id: aid, priority: isOverdue ? 0 : 2, type: actionType, icon: m.icon, label: m.label, sub: prefix + (m.detail || m.label),
+      deadline: m.date, daysLeft: m.daysLeft,
       detail: function() { showMilestoneDetail(m); },
       complete: function() { markActionDone(aid, m.label + ' ' + (m.date || '')); },
       done: isActionDone(aid)
@@ -11679,10 +11723,17 @@ function renderActionsWidget(container) {
   actions.forEach(function(a) {
     var item = el('div', { class: 'action-item ' + a.type + (a.done ? ' done' : ''), onclick: function() { a.detail(); } });
     item.appendChild(el('div', { class: 'action-icon' }, a.icon));
-    item.appendChild(el('div', { class: 'action-content' }, [
+    var contentChildren = [
       el('div', { class: 'action-label' }, a.label),
       el('div', { class: 'action-sub' }, a.sub)
-    ]));
+    ];
+    if (a.deadline) {
+      var deadlineColor = a.daysLeft <= 0 ? 'var(--danger)' : a.daysLeft <= 3 ? 'var(--warning)' : 'var(--text-muted)';
+      var dateStr = a.deadline.substring(8) + '/' + a.deadline.substring(5, 7);
+      var deadlineText = a.daysLeft < 0 ? 'Échéance ' + dateStr + ' (en retard)' : a.daysLeft === 0 ? 'Échéance aujourd\'hui' : 'Avant le ' + dateStr;
+      contentChildren.push(el('div', { style: { fontSize: '10px', fontWeight: '600', color: deadlineColor, marginTop: '2px' } }, '⏰ ' + deadlineText));
+    }
+    item.appendChild(el('div', { class: 'action-content' }, contentChildren));
     // Checkbox: cliquer = marquer fait / défaire
     var checkBtn = document.createElement('button');
     checkBtn.type = 'button';
@@ -14081,10 +14132,18 @@ function showMilestoneDetail(m) {
         el('span', { style: { color: 'var(--text-muted)' } }, 'Impôt PL (' + (LEGAL.impLib * 100).toFixed(1) + '%)'),
         el('span', { style: { fontWeight: '700', color: 'var(--danger)' } }, EUR(Math.round(totalCA * LEGAL.impLib)))
       ]) : null,
-      el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0 2px', fontSize: '13px', borderTop: '2px solid var(--glass-border)', fontWeight: '800' } }, [
-        el('span', {}, 'Total à payer'),
-        el('span', { style: { color: 'var(--danger)' } }, EUR(urssafDu + cfpDu + (COMPANY.prelevementLiberatoire ? Math.round(totalCA * LEGAL.impLib) : 0)))
-      ])
+      (function() {
+        // Calculer le mois de prélèvement réel (M+2 après le mois de CA)
+        var moisPaiementStr = '';
+        if (moisCAList.length > 0) {
+          var lastMoisCA = moisCAList[moisCAList.length - 1];
+          moisPaiementStr = fmtMonthShort(getUrssafDebitMonth(lastMoisCA));
+        }
+        return el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0 2px', fontSize: '13px', borderTop: '2px solid var(--glass-border)', fontWeight: '800' } }, [
+          el('span', {}, 'Total à payer' + (moisPaiementStr ? ' (prélevé en ' + moisPaiementStr + ')' : '')),
+          el('span', { style: { color: 'var(--danger)' } }, EUR(urssafDu + cfpDu + (COMPANY.prelevementLiberatoire ? Math.round(totalCA * LEGAL.impLib) : 0)))
+        ]);
+      })()
     ].filter(Boolean)));
 
     // Détail factures concernées
