@@ -2956,7 +2956,7 @@ function getGlobalInvoiceCount() {
   var countFactures = 0;
   MISSIONS.forEach(function(mis) {
     (mis.factures || []).forEach(function(f) {
-      if (f.numero && f.status !== 'brouillon') countFactures++;
+      if (f.status && f.status !== 'brouillon') countFactures++;
     });
   });
   // 3) Registre des factures
@@ -10518,9 +10518,12 @@ function generateInvoiceHTMLContent(d) {
   return '' +
     // === ÉMETTEUR (haut gauche) ===
     '<div style="color:' + col + ';font-size:9.5pt;line-height:1.6;margin-bottom:30px;">' +
-      '<div>Entreprise individuelle ' + e(d.emetteur) + '</div>' +
+      '<div style="font-size:12pt;font-weight:bold;">' + e(d.emetteur) + '</div>' +
+      '<div>Micro-entreprise</div>' +
       (d.adresseEmetteur ? '<div>' + e(d.adresseEmetteur).replace(/,/g, '<br>') + '</div>' : '') +
-      '<div>FR</div>' +
+      '<div>France</div>' +
+      '<div style="font-size:7pt;color:#999;margin-top:4px;">SIRET : ' + e(d.siret) + '  |  SIREN : ' + e(d.siren) + '</div>' +
+      (d.tvaIntra ? '<div style="font-size:7pt;color:#999;">TVA Intracom. : ' + e(d.tvaIntra) + '</div>' : '') +
     '</div>' +
 
     // === CLIENT (droite, en gras) ===
@@ -10535,9 +10538,12 @@ function generateInvoiceHTMLContent(d) {
       '<div style="font-weight:bold;font-size:11pt;color:' + col + ';">Facture N° ' + e(d.num) + '</div>' +
       (d.numCommande ? '<div style="color:' + col + ';font-size:9.5pt;">' + e(d.client) + ' Commande n°' + e(d.numCommande) + ' pour la période de ' + e(d.titre).split(' - ').pop() + '</div>' : '') +
     '</div>' +
-    '<div style="display:flex;justify-content:space-between;margin-bottom:25px;font-size:9.5pt;color:#333;">' +
+    '<div style="margin-bottom:4px;font-size:9.5pt;color:#333;">' +
       '<div>Date d\'émission : ' + e(d.date) + '</div>' +
+    '</div>' +
+    '<div style="text-align:right;margin-bottom:25px;font-size:9.5pt;color:#333;">' +
       '<div>Règlement : ' + e(d.delaiLabel || ((d.delaiPaiement || 30) + ' jours')) + '</div>' +
+      (d.dateEcheance ? '<div>Échéance : ' + e(d.dateEcheance) + '</div>' : '') +
     '</div>' +
 
     // === TABLEAU ===
@@ -10559,7 +10565,7 @@ function generateInvoiceHTMLContent(d) {
           '<td style="padding:12px 10px;text-align:center;font-size:9pt;">jours</td>' +
           '<td style="padding:12px 10px;text-align:right;font-size:9pt;">' + fmtEur(d.tjm) + '</td>' +
           '<td style="padding:12px 10px;text-align:center;font-size:9pt;">' + (d.tvaRate || 0) + '%</td>' +
-          '<td style="padding:12px 10px;text-align:right;font-weight:bold;font-size:9pt;">' + fmtEur(d.totalHT) + '</td>' +
+          '<td style="padding:12px 10px;text-align:right;font-weight:bold;font-size:9pt;">' + fmtEur(d.totalHT) + ' €</td>' +
         '</tr>' +
       '</tbody>' +
     '</table>' +
@@ -10577,11 +10583,12 @@ function generateInvoiceHTMLContent(d) {
     '</div>' +
 
     // === MENTIONS LÉGALES (bas de page, sobre) ===
-    '<div style="font-size:8pt;color:#888;line-height:1.7;border-top:1px solid #ddd;padding-top:15px;margin-top:auto;">' +
-      '<div>En cas de retard de paiement, une pénalité de 3 fois le taux d\'intérêt légal sera appliquée, à laquelle s\'ajoutera une indemnité forfaitaire pour frais de recouvrement de 40€.</div>' +
+    '<div style="font-size:8pt;color:#888;line-height:1.7;border-top:1px solid #ddd;padding-top:15px;margin-top:auto;text-align:center;">' +
+      (d.dateEcheance ? '<div>Paiement attendu au plus tard le ' + e(d.dateEcheance) + '. En cas de retard, pénalité de 3x le taux d\'intérêt légal</div>' +
+        '<div>+ indemnité forfaitaire de recouvrement de 40€.</div>' :
+        '<div>En cas de retard de paiement, pénalité de 3x le taux d\'intérêt légal + indemnité forfaitaire de 40€.</div>') +
       (d.tvaRate === 0 ? '<div style="margin-top:6px;">TVA non applicable, article 293 B du CGI.</div>' : '') +
-      (d.tvaIntra ? '<div style="margin-top:6px;">N° TVA intracommunautaire : ' + e(d.tvaIntra) + '. En attente de numéro de TVA intracommunautaire. Je vous le transmets dès que je l\'obtiens.</div>' : '') +
-      '<div style="margin-top:6px;">SIRET ' + e(d.siret) + ' - SIREN ' + e(d.siren) + '</div>' +
+      '<div style="margin-top:6px;">Micro-entreprise - Dispense d\'immatriculation au RCS et au RM</div>' +
     '</div>';
 }
 
@@ -10705,7 +10712,7 @@ function generateAndDownloadPDF(data) {
   doc.text(fmtN(data.tjm), 155, dataY, { align: 'right' });
   doc.text((data.tvaRate || 0) + '%', 166, dataY);
   doc.setFont('helvetica', 'bold');
-  doc.text(fmtN(data.totalHT), rM, dataY, { align: 'right' });
+  doc.text(fmtN(data.totalHT) + ' ' + eur, rM, dataY, { align: 'right' });
 
   var sepY = dataY + 10;
   doc.setDrawColor(200);
@@ -10756,9 +10763,7 @@ function generateAndDownloadPDF(data) {
     legLines.push('En cas de retard, penalite de 3x le taux d\'interet legal + indemnite forfaitaire de 40' + eur + '.');
   }
   if (data.tvaRate === 0) legLines.push('TVA non applicable, article 293 B du CGI.');
-  if (data.tvaIntra) legLines.push('N' + deg + ' TVA intracommunautaire : ' + data.tvaIntra);
   legLines.push('Micro-entreprise - Dispense d\'immatriculation au RCS et au RM');
-  legLines.push('SIRET ' + data.siret + ' - SIREN ' + (data.siren || ''));
   legLines.forEach(function(line) { doc.text(line, cx, legY, { align: 'center' }); legY += 3.5; });
 
   // Nom de fichier: N° facture - CLIENT - N° commande
