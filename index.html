@@ -9813,12 +9813,13 @@ function showSendInvoiceModal(facture) {
     } }, '📄 Générer') : el('button', { class: 'btn', style: { fontSize: '11px', padding: '6px 12px' }, onclick: function() {
       var invData = buildInvoiceDataFromFacture(mission, facture);
       if (invData) {
-        downloadInvoiceHTML(invData);
+        closeModal('formModal');
+        showInvoicePreview(invData);
       } else {
         closeModal('formModal');
         showInvoiceGeneratorModal(mission, facture.mois);
       }
-    } }, '📥 Télécharger')
+    } }, '👁 Prévisualiser')
   ]);
   stepsDiv.appendChild(step1);
 
@@ -10024,7 +10025,7 @@ function showSendInvoiceModal(facture) {
   // Helper: télécharger le PDF de cette facture
   function autoDownloadPDF() {
     var invData = buildInvoiceDataFromFacture(mission, facture);
-    if (invData && invData.num) {
+    if (invData) {
       downloadInvoiceHTML(invData);
       return true;
     }
@@ -10034,7 +10035,7 @@ function showSendInvoiceModal(facture) {
   // Boutons d'action
   var btns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
 
-  // Bouton principal: Télécharger PDF + Ouvrir email + Marquer envoyée
+  // Bouton principal: Prévisualiser + Télécharger + Ouvrir email
   btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1', fontWeight: '700', minWidth: '200px' }, onclick: function() {
     var email = document.getElementById('sendInvoiceEmail').value.trim();
     var subject = document.getElementById('sendInvoiceSubject').value;
@@ -10048,32 +10049,37 @@ function showSendInvoiceModal(facture) {
 
     saveEmailIfNew(email);
 
-    // 1. Télécharger le PDF automatiquement
-    var pdfOk = autoDownloadPDF();
+    // Construire les données de facture
+    var invData = buildInvoiceDataFromFacture(mission, facture);
+    if (!invData) {
+      toast('Impossible de générer la facture — vérifiez les données', 'error');
+      return;
+    }
 
-    // 2. Mettre la facture en "envoyée"
-    MISSIONS.forEach(function(m) {
-      if (m.factures) m.factures.forEach(function(f) {
-        if (f.id === facture.id && f.status === 'brouillon') {
-          f.status = 'envoyée';
-          f.dateEnvoi = localISO(TODAY);
-        }
-      });
-    });
-    saveAll();
-
-    // 3. Ouvrir mailto (petit délai pour que le PDF se télécharge d'abord)
-    setTimeout(function() {
-      var mailto = 'mailto:' + encodeURIComponent(email) +
-        '?subject=' + encodeURIComponent(subject) +
-        '&body=' + encodeURIComponent(mailBody);
-      window.open(mailto, '_blank');
-    }, pdfOk ? 500 : 0);
-
+    // Fermer le modal d'envoi
     closeModal('formModal');
-    render();
-    toast(pdfOk ? 'PDF téléchargé + email ouvert — joignez le PDF et envoyez !' : 'Email ouvert — générez d\'abord le PDF (étape 1)', pdfOk ? 'success' : 'warning');
-  } }, '📧 Télécharger PDF + Ouvrir email'));
+
+    // Ouvrir la prévisualisation avec les boutons Télécharger + Email
+    showInvoicePreviewWithSend(invData, {
+      email: email,
+      subject: subject,
+      body: mailBody,
+      facture: facture,
+      onSend: function() {
+        // Marquer la facture comme envoyée
+        MISSIONS.forEach(function(m) {
+          if (m.factures) m.factures.forEach(function(f) {
+            if (f.id === facture.id && f.status === 'brouillon') {
+              f.status = 'envoyée';
+              f.dateEnvoi = localISO(TODAY);
+            }
+          });
+        });
+        saveAll();
+        render();
+      }
+    });
+  } }, '👁 Prévisualiser & Envoyer'));
 
   // Bouton secondaire: juste marquer envoyée
   btns.appendChild(el('button', { class: 'btn', style: { background: 'var(--bg-tertiary)', fontSize: '11px' }, onclick: function() {
@@ -10348,6 +10354,96 @@ function showInvoicePreview(data) {
   overlay.appendChild(container);
   document.body.appendChild(overlay);
   
+  // Fermer avec Escape
+  var escHandler = function(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
+  document.addEventListener('keydown', escHandler);
+}
+
+// Prévisualisation avec workflow d'envoi intégré
+function showInvoicePreviewWithSend(data, sendOpts) {
+  // Supprimer overlay existant
+  var existing = document.getElementById('invoicePreviewOverlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'invoicePreviewOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;flex-direction:column;overflow:auto;';
+
+  // Toolbar
+  var toolbar = document.createElement('div');
+  toolbar.style.cssText = 'background:#1a1a2e;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #333;position:sticky;top:0;z-index:1;flex-wrap:wrap;gap:8px;';
+  var toolbarLeft = document.createElement('div');
+  toolbarLeft.style.cssText = 'display:flex;align-items:center;gap:10px;';
+  var iconSpan = document.createElement('span'); iconSpan.style.fontSize = '18px'; iconSpan.textContent = '📄';
+  var numSpan = document.createElement('span'); numSpan.style.cssText = 'font-weight:600;color:#fff;font-size:14px;'; numSpan.textContent = 'Facture ' + (data.num || 'Brouillon');
+  toolbarLeft.appendChild(iconSpan);
+  toolbarLeft.appendChild(numSpan);
+  toolbar.appendChild(toolbarLeft);
+
+  var toolbarBtns = document.createElement('div');
+  toolbarBtns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+
+  // Bouton 1: Télécharger PDF
+  var btnDownload = document.createElement('button');
+  btnDownload.textContent = '📥 Télécharger PDF';
+  btnDownload.style.cssText = 'background:linear-gradient(135deg,#00d9ff,#0099ff);color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;';
+  btnDownload.onclick = function() {
+    downloadInvoiceHTML(data);
+    btnDownload.textContent = '✅ PDF téléchargé';
+    btnDownload.style.background = '#22c55e';
+    setTimeout(function() { btnDownload.textContent = '📥 Télécharger PDF'; btnDownload.style.background = 'linear-gradient(135deg,#00d9ff,#0099ff)'; }, 2000);
+  };
+  toolbarBtns.appendChild(btnDownload);
+
+  // Bouton 2: Envoyer par email (ouvre mailto + marque envoyée)
+  var btnEmail = document.createElement('button');
+  btnEmail.textContent = '📧 Ouvrir email & marquer envoyée';
+  btnEmail.style.cssText = 'background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;';
+  btnEmail.onclick = function() {
+    // Ouvrir mailto
+    var mailto = 'mailto:' + encodeURIComponent(sendOpts.email) +
+      '?subject=' + encodeURIComponent(sendOpts.subject) +
+      '&body=' + encodeURIComponent(sendOpts.body);
+    window.open(mailto, '_blank');
+
+    // Marquer comme envoyée
+    if (sendOpts.onSend) sendOpts.onSend();
+
+    btnEmail.textContent = '✅ Marquée envoyée';
+    btnEmail.style.background = '#22c55e';
+    btnEmail.disabled = true;
+    toast('Email ouvert — joignez le PDF téléchargé et envoyez !', 'success');
+  };
+  toolbarBtns.appendChild(btnEmail);
+
+  // Bouton 3: Fermer
+  var btnClose = document.createElement('button');
+  btnClose.textContent = '✕';
+  btnClose.style.cssText = 'background:#444;color:#fff;border:none;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:16px;';
+  btnClose.onclick = function() { overlay.remove(); };
+  toolbarBtns.appendChild(btnClose);
+
+  toolbar.appendChild(toolbarBtns);
+  overlay.appendChild(toolbar);
+
+  // Info workflow
+  var infoBar = document.createElement('div');
+  infoBar.style.cssText = 'background:rgba(139,92,246,0.15);padding:10px 20px;font-size:11px;color:#c4b5fd;display:flex;align-items:center;gap:12px;flex-wrap:wrap;';
+  infoBar.innerHTML = '<span style="font-weight:700;">Workflow :</span> <span>① Vérifiez la facture ci-dessous</span> <span>→</span> <span>② Téléchargez le PDF</span> <span>→</span> <span>③ Ouvrez l\'email & joignez le PDF</span>';
+  overlay.appendChild(infoBar);
+
+  // Container facture
+  var container = document.createElement('div');
+  container.style.cssText = 'flex:1;display:flex;justify-content:center;padding:20px;';
+
+  var invoice = document.createElement('div');
+  invoice.style.cssText = 'background:#fff;width:210mm;min-height:297mm;padding:20mm;box-sizing:border-box;color:#000;font-family:Arial,sans-serif;font-size:10pt;box-shadow:0 0 30px rgba(0,0,0,0.3);';
+  invoice.innerHTML = generateInvoiceHTMLContent(data);
+
+  container.appendChild(invoice);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+
   // Fermer avec Escape
   var escHandler = function(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
   document.addEventListener('keydown', escHandler);
