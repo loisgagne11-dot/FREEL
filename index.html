@@ -638,7 +638,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .action-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; }
 .action-item:hover { border-color: var(--accent); transform: translateX(4px); }
 .action-item.overdue { border-left: 3px solid var(--danger); background: linear-gradient(90deg, rgba(248,113,113,0.12), transparent); }
-.action-item.current { border-left: 3px solid var(--accent); background: linear-gradient(90deg, rgba(139,92,246,0.06), transparent); }
+.action-item.current { border-left: 3px solid var(--border); }
+.action-item.completed-action { border-left: 3px solid var(--success); background: linear-gradient(90deg, rgba(52,211,153,0.08), transparent); opacity: 0.85; }
 .action-icon { font-size: 20px; flex-shrink: 0; }
 .action-content { flex: 1; min-width: 0; }
 .action-label { font-size: 13px; font-weight: 600; }
@@ -9898,11 +9899,27 @@ function showSendInvoiceModal(facture) {
   var defaultSubject = 'Facture ' + invoiceNum + ' - ' + companyName + ' - ' + fmtMonth(facture.mois);
   var defaultBody = 'Bonjour,\n\nVeuillez trouver ci-joint la facture n°' + invoiceNum + ' pour la période de ' + fmtMonth(facture.mois) + '.\n\nMontant : ' + EUR(facture.ttc || facture.ht) + (facture.tva > 0 ? ' TTC' : ' HT') + '\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n' + companyName;
 
+  // Expéditeur configurable
+  var emailExpediteur = COMPANY.emailExpediteur || COMPANY.email || senderEmail || '';
+
   var step3 = el('div', { style: { padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } });
   step3.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' } }, [
     el('span', { style: { fontSize: '16px' } }, '📧'),
     el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '3. Email pré-rempli')
   ]));
+
+  // Info sur le fonctionnement
+  var infoBox = el('div', { style: { fontSize: '10px', padding: '8px', background: 'rgba(0,153,255,0.08)', borderRadius: '6px', marginBottom: '8px', lineHeight: '1.5' } });
+  infoBox.appendChild(el('div', { style: { fontWeight: '700', color: 'var(--info)', marginBottom: '2px' } }, 'Comment ça marche :'));
+  infoBox.appendChild(el('div', { style: { color: 'var(--text-secondary)' } }, '1. Le PDF est téléchargé automatiquement'));
+  infoBox.appendChild(el('div', { style: { color: 'var(--text-secondary)' } }, '2. Votre client mail s\'ouvre (Outlook, Gmail...)'));
+  infoBox.appendChild(el('div', { style: { color: 'var(--text-secondary)' } }, '3. Joignez le PDF téléchargé et envoyez'));
+  if (emailExpediteur) {
+    infoBox.appendChild(el('div', { style: { color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' } }, 'Expéditeur: votre compte ' + emailExpediteur + ' (paramétrable dans Admin > Entreprise)'));
+  } else {
+    infoBox.appendChild(el('div', { style: { color: 'var(--warning)', marginTop: '4px' } }, '⚠️ Configurez votre email d\'envoi dans Admin > Entreprise'));
+  }
+  step3.appendChild(infoBox);
 
   var subjectInput = document.createElement('input');
   subjectInput.type = 'text';
@@ -9919,7 +9936,6 @@ function showSendInvoiceModal(facture) {
   bodyTextarea.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
   step3.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '2px', marginTop: '4px' } }, 'Corps du message'));
   step3.appendChild(bodyTextarea);
-  step3.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '💡 Le mail s\'ouvrira dans votre client mail — joignez le PDF téléchargé à l\'étape 1'));
   stepsDiv.appendChild(step3);
 
   body.appendChild(stepsDiv);
@@ -9948,11 +9964,21 @@ function showSendInvoiceModal(facture) {
     toast('Email sauvegardé (' + where + ')', 'success');
   }
 
-  // Boutons d'action
-  var btns = el('div', { style: { display: 'flex', gap: '8px' } });
+  // Helper: télécharger le PDF de cette facture
+  function autoDownloadPDF() {
+    var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === facture.mois; }) : null;
+    if (ligne && ligne.lastInvoiceData) {
+      downloadInvoiceHTML(ligne.lastInvoiceData);
+      return true;
+    }
+    return false;
+  }
 
-  // Bouton principal: Ouvrir email
-  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1', fontWeight: '700' }, onclick: function() {
+  // Boutons d'action
+  var btns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+
+  // Bouton principal: Télécharger PDF + Ouvrir email + Marquer envoyée
+  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1', fontWeight: '700', minWidth: '200px' }, onclick: function() {
     var email = document.getElementById('sendInvoiceEmail').value.trim();
     var subject = document.getElementById('sendInvoiceSubject').value;
     var mailBody = document.getElementById('sendInvoiceBody').value;
@@ -9965,7 +9991,10 @@ function showSendInvoiceModal(facture) {
 
     saveEmailIfNew(email);
 
-    // Mettre la facture en "envoyée"
+    // 1. Télécharger le PDF automatiquement
+    var pdfOk = autoDownloadPDF();
+
+    // 2. Mettre la facture en "envoyée"
     MISSIONS.forEach(function(m) {
       if (m.factures) m.factures.forEach(function(f) {
         if (f.id === facture.id && f.status === 'brouillon') {
@@ -9976,19 +10005,21 @@ function showSendInvoiceModal(facture) {
     });
     saveAll();
 
-    // Ouvrir mailto
-    var mailto = 'mailto:' + encodeURIComponent(email) +
-      '?subject=' + encodeURIComponent(subject) +
-      '&body=' + encodeURIComponent(mailBody);
-    window.open(mailto, '_blank');
+    // 3. Ouvrir mailto (petit délai pour que le PDF se télécharge d'abord)
+    setTimeout(function() {
+      var mailto = 'mailto:' + encodeURIComponent(email) +
+        '?subject=' + encodeURIComponent(subject) +
+        '&body=' + encodeURIComponent(mailBody);
+      window.open(mailto, '_blank');
+    }, pdfOk ? 500 : 0);
 
     closeModal('formModal');
     render();
-    toast('Email ouvert — joignez le PDF et envoyez !', 'success');
-  } }, '📧 Ouvrir l\'email & marquer envoyée'));
+    toast(pdfOk ? 'PDF téléchargé + email ouvert — joignez le PDF et envoyez !' : 'Email ouvert — générez d\'abord le PDF (étape 1)', pdfOk ? 'success' : 'warning');
+  } }, '📧 Télécharger PDF + Ouvrir email'));
 
   // Bouton secondaire: juste marquer envoyée
-  btns.appendChild(el('button', { class: 'btn', style: { background: 'var(--bg-tertiary)' }, onclick: function() {
+  btns.appendChild(el('button', { class: 'btn', style: { background: 'var(--bg-tertiary)', fontSize: '11px' }, onclick: function() {
     var email = document.getElementById('sendInvoiceEmail').value.trim();
     saveEmailIfNew(email);
     MISSIONS.forEach(function(m) {
@@ -9999,6 +10030,20 @@ function showSendInvoiceModal(facture) {
     saveAll(); render(); closeModal('formModal');
     toast('Facture marquée comme envoyée', 'success');
   } }, 'Juste marquer envoyée'));
+
+  // Bouton test email
+  btns.appendChild(el('button', { class: 'btn', style: { background: 'rgba(0,153,255,0.1)', color: 'var(--info)', fontSize: '11px' }, onclick: function() {
+    var testEmail = emailExpediteur || (typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? CURRENT_USER.email : '') || '';
+    if (!testEmail) {
+      toast('Configurez votre email dans Admin > Entreprise', 'error');
+      return;
+    }
+    var testMailto = 'mailto:' + encodeURIComponent(testEmail) +
+      '?subject=' + encodeURIComponent('[TEST] Facture - ' + companyName) +
+      '&body=' + encodeURIComponent('Ceci est un email de test depuis FREEL.\n\nSi vous recevez ce message, l\'envoi de factures par email est correctement configuré.\n\nExpéditeur attendu: ' + testEmail);
+    window.open(testMailto, '_blank');
+    toast('Email de test ouvert — vérifiez l\'expéditeur dans votre client mail', 'info');
+  } }, 'Tester'));
 
   body.appendChild(btns);
   openModal('formModal');
@@ -11926,6 +11971,21 @@ function markActionDone(actionId, label) {
 
 function undoActionDone(actionId) {
   if (!TREASURY.actionsDone) return;
+
+  // Si c'est une action d'envoi de facture (send_F-xxx), réverter le statut
+  if (actionId.indexOf('send_') === 0) {
+    var factureId = actionId.substring(5); // enlever "send_"
+    MISSIONS.forEach(function(m) {
+      if (m.factures) m.factures.forEach(function(f) {
+        if (f.id === factureId && f.status === 'envoyée') {
+          f.status = 'brouillon';
+          delete f.dateEnvoi;
+        }
+      });
+    });
+    toast('Facture remise en brouillon', 'info');
+  }
+
   TREASURY.actionsDone = TREASURY.actionsDone.filter(function(a) { return a.id !== actionId; });
   saveAll(); render();
 }
@@ -12137,30 +12197,33 @@ function renderActionsWidget(container) {
     widget.appendChild(currentSection);
   }
 
-  // Section: Réalisées ce mois (masquée, vert)
+  // Section: Réalisées ce mois (masquée/pliée, cartes vertes)
   if (doneThisMonth.length > 0) {
-    var histSection = el('div', { class: 'actions-history' });
-    var histHeader = el('div', { class: 'actions-history-header', onclick: function() {
-      var list = histSection.querySelector('.actions-history-list');
+    var histSection = el('div', { style: { marginTop: '8px' } });
+    var histHeader = el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '1px', padding: '4px 0', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', userSelect: 'none' }, onclick: function() {
+      var list = histSection.querySelector('.actions-done-list');
       var arrow = histHeader.querySelector('.hist-arrow');
-      if (list.style.display === 'none') { list.style.display = 'block'; arrow.textContent = '▾'; }
+      if (list.style.display === 'none') { list.style.display = 'flex'; arrow.textContent = '▾'; }
       else { list.style.display = 'none'; arrow.textContent = '▸'; }
     } });
-    histHeader.appendChild(el('span', { class: 'hist-arrow', style: { color: 'var(--success)' } }, '▸'));
-    histHeader.appendChild(el('span', { style: { color: 'var(--success)' } }, ' Réalisées ce mois (' + doneThisMonth.length + ')'));
+    histHeader.appendChild(el('span', { class: 'hist-arrow' }, '▸'));
+    histHeader.appendChild(el('span', {}, 'Réalisées ce mois (' + doneThisMonth.length + ')'));
     histSection.appendChild(histHeader);
-    var histList = el('div', { class: 'actions-history-list', style: { display: 'none' } });
+
+    var histList = el('div', { class: 'actions-list actions-done-list', style: { display: 'none' } });
     doneThisMonth.forEach(function(a) {
-      var row = el('div', { class: 'actions-history-item' });
-      row.appendChild(el('span', { class: 'actions-history-label' }, [
-        el('span', { style: { color: 'var(--success)', marginRight: '6px' } }, '✓'),
-        el('span', {}, a.label)
+      var item = el('div', { class: 'action-item completed-action' });
+      item.appendChild(el('div', { class: 'action-icon', style: { fontSize: '16px' } }, '✅'));
+      item.appendChild(el('div', { class: 'action-content' }, [
+        el('div', { class: 'action-label', style: { textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '12px' } }, a.label),
+        el('div', { class: 'action-sub' }, a.date.substring(8) + '/' + a.date.substring(5, 7))
       ]));
-      row.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
-        el('span', { class: 'actions-history-date' }, a.date.substring(8) + '/' + a.date.substring(5, 7)),
-        el('button', { class: 'actions-history-undo', title: 'Annuler', onclick: function(e) { e.stopPropagation(); undoActionDone(a.id); } }, '↩')
-      ]));
-      histList.appendChild(row);
+      var undoBtn = el('button', { class: 'btn', style: { padding: '4px 10px', fontSize: '10px', background: 'rgba(251,191,36,0.15)', color: 'var(--warning)', fontWeight: '600' }, title: 'Annuler cette action', onclick: function(e) {
+        e.stopPropagation();
+        undoActionDone(a.id);
+      } }, '↩ Annuler');
+      item.appendChild(undoBtn);
+      histList.appendChild(item);
     });
     histSection.appendChild(histList);
     widget.appendChild(histSection);
@@ -18929,6 +18992,23 @@ function renderAdmin(container) {
     createInput('Téléphone', 'tel', 'adminTel', COMPANY.telephone || '')
   ]));
   entCard.appendChild(createInput('Date de création', 'date', 'adminDebut', COMPANY.debut));
+
+  // Section email d'envoi de factures
+  entCard.appendChild(el('div', { style: { marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)' } }));
+  entCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' } }, '📧 Email d\'envoi de factures'));
+  entCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: '1.5' } }, 'L\'envoi de facture ouvre votre client mail (Outlook, Gmail, Thunderbird...) avec un email pré-rempli. L\'expéditeur sera le compte configuré dans votre client mail. Pour envoyer depuis une adresse professionnelle, ajoutez-la comme compte dans votre client mail.'));
+  entCard.appendChild(createInput('Email expéditeur (affiché dans les factures)', 'email', 'adminEmailExpediteur', COMPANY.emailExpediteur || COMPANY.email || '', 'Ex: facturation@monentreprise.fr'));
+  var testEmailBtn = el('button', { class: 'btn', style: { marginTop: '6px', fontSize: '11px', padding: '8px 16px', background: 'rgba(0,153,255,0.1)', color: 'var(--info)' }, onclick: function() {
+    var testAddr = $('#adminEmailExpediteur') ? $('#adminEmailExpediteur').value : (COMPANY.email || '');
+    if (!testAddr) { toast('Renseignez un email d\'abord', 'error'); return; }
+    var mailto = 'mailto:' + encodeURIComponent(testAddr) +
+      '?subject=' + encodeURIComponent('[TEST] Configuration email - ' + (COMPANY.nom || 'FREEL')) +
+      '&body=' + encodeURIComponent('Ceci est un email de test.\n\nSi vous le recevez depuis la bonne adresse, votre configuration est correcte.\n\nVérifiez :\n- L\'adresse expéditeur est bien votre adresse professionnelle\n- Le mail est bien arrivé dans votre boîte de réception');
+    window.open(mailto, '_blank');
+    toast('Email de test ouvert — vérifiez l\'expéditeur', 'info');
+  } }, '🧪 Envoyer un email de test');
+  entCard.appendChild(testEmailBtn);
+  entCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px' } }, '💡 Astuce: si vous voulez envoyer depuis une adresse pro, ajoutez cette adresse comme \"compte d\'envoi\" dans Outlook (Fichier > Paramètres du compte) ou Gmail (Paramètres > Comptes > Envoyer des e-mails en tant que).'));
   
   // Si TVA active, afficher champ TVA intracom
   if (COMPANY.tvaDepuis) {
@@ -19048,6 +19128,7 @@ function renderAdmin(container) {
     COMPANY.codePostal = $('#adminCP') ? $('#adminCP').value : '';
     COMPANY.commune = $('#adminCommune') ? $('#adminCommune').value : '';
     COMPANY.email = $('#adminEmail') ? $('#adminEmail').value : '';
+    COMPANY.emailExpediteur = $('#adminEmailExpediteur') ? $('#adminEmailExpediteur').value : '';
     COMPANY.telephone = $('#adminTel') ? $('#adminTel').value : '';
     COMPANY.debut = $('#adminDebut').value;
     COMPANY.typeActivite = $('#adminTypeActivite') ? $('#adminTypeActivite').value : 'BNC';
