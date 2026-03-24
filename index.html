@@ -2694,7 +2694,8 @@ var COMPANY = {
   urssafPeriodicite: 'mensuel',
   onboardingDone: true,
   invoiceCounter: {},
-  invoiceRegistry: []
+  invoiceRegistry: [],
+  invoiceFormat: 'YYYY-NNN'  // Format de numérotation: 'YYYY-NNN', 'YYYY-MM-DD-NNNNNN', 'F-YYYY-NNN', 'YYYYMM-NNN'
 };
 var MISSIONS = [
   {
@@ -2927,30 +2928,35 @@ function Card(opts) {
 // ===== SPRINT 1: NUMÉROTATION SÉQUENTIELLE DES FACTURES =====
 // Conforme Art. L441-9 Code de Commerce
 
-function getNextInvoiceNumber(year) {
-  year = year || TODAY.getFullYear();
-  var yearStr = String(year);
-  
-  // Initialiser le compteur pour cette année si nécessaire
-  if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
-  if (!COMPANY.invoiceCounter[yearStr]) COMPANY.invoiceCounter[yearStr] = 0;
-  
-  // Incrémenter et retourner
-  COMPANY.invoiceCounter[yearStr]++;
-  var num = COMPANY.invoiceCounter[yearStr];
-  
-  // Format: YYYY-NNN (ex: 2025-001, 2025-002, ...)
-  return yearStr + '-' + String(num).padStart(3, '0');
+function formatInvoiceNumber(num, date) {
+  var fmt = COMPANY.invoiceFormat || 'YYYY-NNN';
+  var d = date ? new Date(date) : TODAY;
+  var y = String(d.getFullYear());
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  switch (fmt) {
+    case 'YYYY-MM-DD-NNNNNN': return y + '-' + mm + '-' + dd + '-' + String(num).padStart(6, '0');
+    case 'F-YYYY-NNN': return 'F-' + y + '-' + String(num).padStart(3, '0');
+    case 'YYYYMM-NNN': return y + mm + '-' + String(num).padStart(3, '0');
+    default: return y + '-' + String(num).padStart(3, '0');
+  }
 }
 
-function reserveInvoiceNumber(year) {
-  // Réserve un numéro sans l'enregistrer (pour prévisualisation)
+function getNextInvoiceNumber(year, date) {
   year = year || TODAY.getFullYear();
   var yearStr = String(year);
   if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
   if (!COMPANY.invoiceCounter[yearStr]) COMPANY.invoiceCounter[yearStr] = 0;
-  var nextNum = COMPANY.invoiceCounter[yearStr] + 1;
-  return yearStr + '-' + String(nextNum).padStart(3, '0');
+  COMPANY.invoiceCounter[yearStr]++;
+  return formatInvoiceNumber(COMPANY.invoiceCounter[yearStr], date);
+}
+
+function reserveInvoiceNumber(year, date) {
+  year = year || TODAY.getFullYear();
+  var yearStr = String(year);
+  if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
+  if (!COMPANY.invoiceCounter[yearStr]) COMPANY.invoiceCounter[yearStr] = 0;
+  return formatInvoiceNumber(COMPANY.invoiceCounter[yearStr] + 1, date);
 }
 
 function registerInvoice(invoiceData) {
@@ -5031,9 +5037,10 @@ function loadAll() {
       IR_CONFIG[year].perAnnuel = COMPANY.perAnnuel || 0;
       delete COMPANY.irParts; delete COMPANY.autresRevenus; delete COMPANY.perAnnuel;
     }
-    // Migration - initialiser invoiceCounter et invoiceRegistry si absents
+    // Migration - initialiser invoiceCounter, invoiceRegistry et invoiceFormat si absents
     if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
     if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
+    if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
     // Migration clients depuis missions existantes
     if (CLIENTS.length === 0 && MISSIONS.length > 0) {
       var clientNames = {};
@@ -8537,6 +8544,12 @@ function showMissionModal(mission) {
   body.appendChild(el('div', { class: 'form-section form-section-border' }, '5️⃣ Informations Facturation'));
   body.appendChild(createInput('Adresse de facturation', 'text', 'mAdresseClient', mission.adresseClient || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
   body.appendChild(createInput('N° Commande client', 'text', 'mNumCommande', mission.numeroCommande || '', 'Ex: 10004903'));
+  var curDelaiVal = mission.delaiFinDeMois ? (mission.delaiPaiementFacture || 30) + '_fdm' : String(mission.delaiPaiementFacture || 30);
+  body.appendChild(createSelect('Délai de paiement facture', 'mDelaiFacture', [
+    { value: '30', label: '30 jours' }, { value: '30_fdm', label: '30 jours fin de mois' },
+    { value: '45', label: '45 jours' }, { value: '45_fdm', label: '45 jours fin de mois' },
+    { value: '60', label: '60 jours' }, { value: '60_fdm', label: '60 jours fin de mois' }
+  ], curDelaiVal));
   body.appendChild(createTextarea('Descriptif standard facture', 'mDescriptif', mission.descriptifFacture || '', 'Ex: Prestation de service consultant'));
 
   // SPRINT 7: Affichage en temps réel du total jours/CA estimé
@@ -8772,6 +8785,9 @@ function showMissionModal(mission) {
     mission.adresseClient = $('#mAdresseClient').value;
     mission.numeroCommande = $('#mNumCommande').value;
     mission.descriptifFacture = $('#mDescriptif').value;
+    var delaiFactVal = $('#mDelaiFacture') ? $('#mDelaiFacture').value : '30';
+    mission.delaiPaiementFacture = parseInt(delaiFactVal) || 30;
+    mission.delaiFinDeMois = delaiFactVal.indexOf('_fdm') > -1;
 
     buildMission(mission);
     if (isNew) MISSIONS.push(mission);
@@ -9795,13 +9811,13 @@ function showSendInvoiceModal(facture) {
   var totalTTC = facture.ttc || totalHT + tvaAmount;
 
   var hasNumber = facture.numero || (ligne && ligne.invoiceFinalized && ligne.lastInvoiceNum);
-  var defaultNum = hasNumber ? (facture.numero || ligne.lastInvoiceNum) : reserveInvoiceNumber(TODAY.getFullYear());
   var defaultDate = (ligne && ligne.lastInvoiceDate) || localISO(TODAY);
+  var defaultNum = hasNumber ? (facture.numero || ligne.lastInvoiceNum) : reserveInvoiceNumber(TODAY.getFullYear(), defaultDate);
   var defaultCommande = (ligne && ligne.numeroCommande) || mission.numeroCommande || '';
-  var defaultDelai = mission.delaiPaiementFacture || 30;
+  var defaultDelai = mission.delaiPaiementFacture || 0;
   var defaultFDM = mission.delaiFinDeMois || false;
   var defaultAdresse = mission.adresseClient || (clientObj ? clientObj.adresse : '') || '';
-  var defaultDescriptif = mission.descriptifFacture || ('Facture pour prestation de service consultant ' + (mission.titre || mission.client));
+  var defaultDescriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || mission.client));
   var p = parseYM(facture.mois);
   var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
@@ -9816,127 +9832,182 @@ function showSendInvoiceModal(facture) {
   var seen = {}; allEmails = allEmails.filter(function(e) { if (seen[e.email]) return false; seen[e.email] = true; return true; });
   var bestEmail = allEmails.length > 0 ? allEmails[0].email : '';
 
+  // Détecter les champs manquants
+  var missing = [];
+  if (!defaultAdresse) missing.push('adresse');
+  if (!defaultDelai) missing.push('delai');
+  if (!bestEmail) missing.push('email');
+
   $('#formModalTitle').textContent = '📤 Facture · ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
   var body = $('#formModalBody');
   body.replaceChildren();
 
-  // === RÉSUMÉ ===
-  var summary = el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  // === RÉSUMÉ COMPACT ===
+  var summary = el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
   summary.appendChild(el('div', {}, [
-    el('div', { style: { fontWeight: '700', fontSize: '14px' } }, facture.client),
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, moisNom + ' · ' + jours + 'j × ' + EUR(mission.tjm))
+    el('div', { style: { fontWeight: '700', fontSize: '13px' } }, facture.client),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, moisNom + ' · ' + jours + 'j × ' + EUR(mission.tjm))
   ]));
-  summary.appendChild(el('div', { style: { fontWeight: '800', fontSize: '18px', color: 'var(--success)' } }, EUR(totalTTC) + (tvaApplicable ? ' TTC' : '')));
+  summary.appendChild(el('div', { style: { textAlign: 'right' } }, [
+    el('div', { style: { fontWeight: '800', fontSize: '17px', color: 'var(--success)' } }, EUR(totalTTC)),
+    tvaApplicable ? el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'TTC (HT: ' + EUR(totalHT) + ')') : null
+  ].filter(Boolean)));
   body.appendChild(summary);
 
-  // === TIMELINE ÉTAPES ===
-  var timelineDiv = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0', marginBottom: '14px', padding: '8px 0' } });
-  var steps = ['① Valider les infos', '② Télécharger le PDF', '③ Joindre au mail'];
-  steps.forEach(function(s, i) {
-    timelineDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', color: 'var(--text-muted)', padding: '4px 8px', background: 'var(--bg-secondary)', borderRadius: '10px' } }, s));
-    if (i < steps.length - 1) timelineDiv.appendChild(el('div', { style: { width: '16px', height: '1px', background: 'var(--glass-border)' } }));
-  });
-  body.appendChild(timelineDiv);
+  // === INFOS FACTURE (auto-remplies, lecture seule sauf si manquantes) ===
+  var infoRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } });
+  // Numéro (toujours auto)
+  var numDiv = el('div', { style: { flex: '1', background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' } });
+  numDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' } }, 'N° Facture'));
+  numDiv.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '2px' } }, defaultNum));
+  infoRow.appendChild(numDiv);
+  // Date
+  var dateDiv = el('div', { style: { flex: '1', background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 'var(--radius-sm)' } });
+  dateDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', fontWeight: '600', textTransform: 'uppercase' } }, 'Date émission'));
+  dateDiv.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '2px' } }, fmtDate(defaultDate)));
+  infoRow.appendChild(dateDiv);
+  body.appendChild(infoRow);
 
-  // === SECTION: INFORMATIONS FACTURE ===
-  var secInfo = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
-  secInfo.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '📋 Facture'));
+  // Période + descriptif (compact)
+  var detailRow = el('div', { style: { background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', marginBottom: '8px', fontSize: '11px' } });
+  detailRow.appendChild(el('div', { style: { color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' } }, '📅 du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom));
+  detailRow.appendChild(el('div', { style: { color: 'var(--text-secondary)' } }, defaultDescriptif));
+  if (defaultCommande) detailRow.appendChild(el('div', { style: { color: 'var(--text-muted)', fontSize: '9px', marginTop: '2px' } }, 'Commande: ' + defaultCommande));
+  body.appendChild(detailRow);
 
-  var numInput = createInput('N° Facture', 'text', 'invNum', defaultNum);
-  if (hasNumber) { numInput.querySelector('input').readOnly = true; numInput.querySelector('input').style.opacity = '0.6'; }
-  secInfo.appendChild(el('div', { class: 'form-row' }, [numInput, createInput('Date émission', 'date', 'invDate', defaultDate)]));
-  secInfo.appendChild(createInput('N° Commande', 'text', 'invCommande', defaultCommande, 'Optionnel'));
-  body.appendChild(secInfo);
+  // === SECTION CHAMPS MANQUANTS (inline) ===
+  if (missing.length > 0) {
+    var missingDiv = el('div', { style: { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '10px' } });
+    missingDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--warning)', marginBottom: '8px' } }, '⚠️ Informations manquantes — à compléter'));
 
-  // === SECTION: CLIENT ===
-  var secClient = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
-  secClient.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '🏢 Client'));
-  secClient.appendChild(createInput('Adresse facturation', 'text', 'invAdresse', defaultAdresse, '14 RUE PAUL MESPLE, 31100 TOULOUSE'));
-  body.appendChild(secClient);
+    if (missing.indexOf('adresse') > -1) {
+      missingDiv.appendChild(createInput('Adresse de facturation *', 'text', 'invAdresse', '', 'Ex: 14 RUE PAUL MESPLE, 31100 TOULOUSE'));
+    }
+    if (missing.indexOf('delai') > -1) {
+      missingDiv.appendChild(createSelect('Délai de paiement *', 'invDelaiType', [
+        { value: '', label: '— Choisir —' },
+        { value: '30', label: '30 jours' }, { value: '30_fdm', label: '30 jours fin de mois' },
+        { value: '45', label: '45 jours' }, { value: '45_fdm', label: '45 jours fin de mois' },
+        { value: '60', label: '60 jours' }, { value: '60_fdm', label: '60 jours fin de mois' }
+      ], ''));
+    }
+    if (missing.indexOf('email') > -1) {
+      missingDiv.appendChild(createInput('Email destinataire *', 'email', 'sendInvoiceEmail', '', 'email@client.com'));
+    }
 
-  // === SECTION: PAIEMENT ===
-  var secPay = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
-  secPay.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '💰 Paiement'));
-  secPay.appendChild(createSelect('Délai', 'invDelaiType', [
-    { value: '30', label: '30 jours' }, { value: '30_fdm', label: '30 jours fin de mois' },
-    { value: '45', label: '45 jours' }, { value: '45_fdm', label: '45 jours fin de mois' },
-    { value: '60', label: '60 jours' }, { value: '60_fdm', label: '60 jours fin de mois' }
-  ], defaultFDM ? defaultDelai + '_fdm' : String(defaultDelai)));
-  secPay.appendChild(el('div', { id: 'invEcheancePreview', style: { fontSize: '10px', color: 'var(--info)', marginTop: '4px', fontWeight: '600' } }));
-  body.appendChild(secPay);
+    missingDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px' } }, 'Ces infos seront sauvegardées dans la mission pour les prochaines factures.'));
+    body.appendChild(missingDiv);
+  }
 
-  // === SECTION: DESCRIPTIF ===
-  var secDesc = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
-  secDesc.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '📝 Prestation'));
-  var descTA = document.createElement('textarea'); descTA.id = 'invDescriptif'; descTA.value = defaultDescriptif; descTA.rows = 2;
-  descTA.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
-  secDesc.appendChild(descTA);
-  secDesc.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '📅 Période: du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom));
-  body.appendChild(secDesc);
+  // === INFOS DÉJÀ RENSEIGNÉES (résumé compact) ===
+  if (missing.indexOf('adresse') === -1 || missing.indexOf('delai') === -1) {
+    var readyDiv = el('div', { style: { background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', marginBottom: '8px', fontSize: '11px' } });
+    if (missing.indexOf('adresse') === -1) {
+      readyDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '2px' } }, [
+        el('span', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, '🏢 Adresse'),
+        el('span', { style: { fontWeight: '600' } }, defaultAdresse)
+      ]));
+    }
+    if (missing.indexOf('delai') === -1) {
+      var echeance = calculatePaymentDeadline(defaultDate, defaultDelai, defaultFDM);
+      readyDiv.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '2px' } }, [
+        el('span', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, '💰 Paiement'),
+        el('span', { style: { fontWeight: '600' } }, defaultDelai + 'j' + (defaultFDM ? ' FDM' : '') + ' → ' + fmtDate(echeance))
+      ]));
+    }
+    body.appendChild(readyDiv);
+  }
 
-  // === SECTION: EMAIL ===
+  // === EMAIL ===
   var secEmail = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '10px' } });
-  secEmail.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '📧 Email'));
+  secEmail.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' } }, '📧 Email'));
 
-  var emailInput = document.createElement('input'); emailInput.type = 'email'; emailInput.id = 'sendInvoiceEmail';
-  emailInput.value = bestEmail; emailInput.placeholder = 'email@client.com';
-  emailInput.style.cssText = 'width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:12px;box-sizing:border-box;margin-bottom:6px;';
-  secEmail.appendChild(emailInput);
-
-  if (allEmails.length > 1) {
-    var contactsList = el('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' } });
-    allEmails.forEach(function(entry) {
-      contactsList.appendChild(el('button', { class: 'btn', style: { fontSize: '9px', padding: '3px 8px', background: 'var(--bg-tertiary)' }, onclick: function() { emailInput.value = entry.email; } }, entry.email));
-    });
-    secEmail.appendChild(contactsList);
+  // Si email déjà connu, afficher en mode compact, sinon c'est dans missing
+  var emailInput;
+  if (missing.indexOf('email') === -1) {
+    emailInput = document.createElement('input'); emailInput.type = 'email'; emailInput.id = 'sendInvoiceEmail';
+    emailInput.value = bestEmail; emailInput.placeholder = 'email@client.com';
+    emailInput.style.cssText = 'width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:12px;box-sizing:border-box;margin-bottom:4px;';
+    secEmail.appendChild(emailInput);
+    if (allEmails.length > 1) {
+      var contactsList = el('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '4px' } });
+      allEmails.forEach(function(entry) {
+        contactsList.appendChild(el('button', { class: 'btn', style: { fontSize: '9px', padding: '2px 8px', background: 'var(--bg-tertiary)' }, onclick: function() { emailInput.value = entry.email; } }, entry.email));
+      });
+      secEmail.appendChild(contactsList);
+    }
   }
 
   var companyName = COMPANY.nom || 'Mon entreprise';
-  var invoiceNum = hasNumber ? defaultNum : 'XXXX';
+  var invoiceNum = hasNumber ? defaultNum : defaultNum; // toujours afficher le numéro réservé
   var defaultSubject = 'Facture ' + invoiceNum + ' - ' + companyName + ' - ' + moisNom;
-  var defaultMailBody = 'Bonjour,\n\nVeuillez trouver ci-joint la facture n°' + invoiceNum + ' pour la période de ' + moisNom + '.\n\nMontant : ' + EUR(totalTTC) + (tvaApplicable ? ' TTC' : '') + '\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n' + companyName;
+  var defaultMailBody = 'Bonjour,\n\nVeuillez trouver ci-joint la facture n°' + invoiceNum + ' pour la période de ' + moisNom + '.\n\nMontant : ' + EUR(totalTTC) + (tvaApplicable ? ' TTC' : '') + '\n\nCordialement,\n' + companyName;
 
+  // Objet et corps en mode collapsible
+  var emailDetailToggle = el('button', { class: 'btn', style: { fontSize: '9px', padding: '3px 8px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)', width: '100%', marginBottom: '4px' }, onclick: function() {
+    var d = document.getElementById('emailDetailFields');
+    d.style.display = d.style.display === 'none' ? 'block' : 'none';
+    emailDetailToggle.textContent = d.style.display === 'none' ? '▸ Personnaliser l\'email' : '▾ Masquer';
+  } }, '▸ Personnaliser l\'email');
+  secEmail.appendChild(emailDetailToggle);
+
+  var emailFields = el('div', { id: 'emailDetailFields', style: { display: 'none' } });
   var subjectInput = document.createElement('input'); subjectInput.type = 'text'; subjectInput.id = 'sendInvoiceSubject'; subjectInput.value = defaultSubject;
   subjectInput.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;box-sizing:border-box;margin-bottom:4px;';
-  secEmail.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' } }, 'Objet'));
-  secEmail.appendChild(subjectInput);
-
+  emailFields.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' } }, 'Objet'));
+  emailFields.appendChild(subjectInput);
   var bodyTA = document.createElement('textarea'); bodyTA.id = 'sendInvoiceBody'; bodyTA.value = defaultMailBody; bodyTA.rows = 4;
   bodyTA.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
-  secEmail.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px', marginTop: '4px' } }, 'Message'));
-  secEmail.appendChild(bodyTA);
+  emailFields.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px', marginTop: '4px' } }, 'Message'));
+  emailFields.appendChild(bodyTA);
+  secEmail.appendChild(emailFields);
   body.appendChild(secEmail);
 
   // === BOUTON PRINCIPAL ===
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { padding: '14px', fontWeight: '700', fontSize: '13px' }, onclick: function() {
-    var email = emailInput.value.trim();
-    if (!email || email.indexOf('@') < 0) { toast('Email invalide', 'error'); emailInput.focus(); return; }
+    var emailEl = document.getElementById('sendInvoiceEmail');
+    var email = emailEl ? emailEl.value.trim() : '';
+    if (!email || email.indexOf('@') < 0) { toast('Email destinataire requis', 'error'); if (emailEl) emailEl.focus(); return; }
 
-    // Récupérer les valeurs du formulaire
-    var invoiceDate = $('#invDate') ? $('#invDate').value : defaultDate;
-    var typeVal = $('#invDelaiType') ? $('#invDelaiType').value : '30';
-    var fdm = typeVal.indexOf('_fdm') > -1;
-    var delai = parseInt(typeVal) || 30;
-    var descriptif = $('#invDescriptif') ? $('#invDescriptif').value : defaultDescriptif;
-    var adresseClient = $('#invAdresse') ? $('#invAdresse').value : '';
-    var numCommande = $('#invCommande') ? $('#invCommande').value : '';
+    // Vérifier champs manquants remplis
+    var adresseClient = defaultAdresse;
+    if (missing.indexOf('adresse') > -1) {
+      adresseClient = $('#invAdresse') ? $('#invAdresse').value.trim() : '';
+      if (!adresseClient) { toast('Adresse de facturation requise', 'error'); if ($('#invAdresse')) $('#invAdresse').focus(); return; }
+    }
 
-    // Sauvegarder les infos dans la mission
-    mission.delaiPaiementFacture = delai;
-    mission.delaiFinDeMois = fdm;
-    mission.descriptifFacture = descriptif;
-    if (adresseClient) mission.adresseClient = adresseClient;
+    var delai = defaultDelai;
+    var fdm = defaultFDM;
+    if (missing.indexOf('delai') > -1) {
+      var typeVal = $('#invDelaiType') ? $('#invDelaiType').value : '';
+      if (!typeVal) { toast('Délai de paiement requis', 'error'); return; }
+      fdm = typeVal.indexOf('_fdm') > -1;
+      delai = parseInt(typeVal) || 30;
+    }
+
+    var descriptif = defaultDescriptif;
+    var numCommande = defaultCommande;
+
+    // Sauvegarder dans la mission pour les prochaines fois
+    if (missing.indexOf('adresse') > -1) mission.adresseClient = adresseClient;
+    if (missing.indexOf('delai') > -1) { mission.delaiPaiementFacture = delai; mission.delaiFinDeMois = fdm; }
     if (numCommande && ligne) ligne.numeroCommande = numCommande;
 
-    // Générer le numéro si pas encore fait
+    // Sauvegarder email dans le client
+    if (email && !allEmails.some(function(e) { return e.email === email; })) {
+      var c = getClientByName(mission.client);
+      if (c) c.email = email; else CLIENTS.push({ id: 'CLI' + Date.now(), nom: mission.client, email: email, adresse: adresseClient, siret: '', contact: '', notes: '', delaiPaiement: mission.delaiPaiement || 2, jourPaiement: mission.jourPaiement || 15 });
+    }
+
+    // Générer le numéro
+    var invoiceDate = defaultDate;
     var finalNum = defaultNum;
     if (!hasNumber && ligne) {
-      finalNum = getNextInvoiceNumber(TODAY.getFullYear());
+      finalNum = getNextInvoiceNumber(TODAY.getFullYear(), invoiceDate);
       registerInvoice({ numero: finalNum, date: invoiceDate, client: facture.client, nature: descriptif, montantHT: totalHT, tva: tvaAmount, montantTTC: totalTTC, missionId: mission.id, mois: facture.mois });
       ligne.invoiceFinalized = true;
       ligne.lastInvoiceNum = finalNum;
       ligne.lastInvoiceDate = invoiceDate;
-      // Mettre à jour le numéro dans la facture
       MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) { if (f.id === facture.id) f.numero = finalNum; }); });
     }
 
@@ -9944,12 +10015,6 @@ function showSendInvoiceModal(facture) {
     MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) {
       if (f.id === facture.id && f.status === 'brouillon') { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); }
     }); });
-
-    // Sauvegarder email
-    if (email && !allEmails.some(function(e) { return e.email === email; })) {
-      var c = getClientByName(mission.client);
-      if (c) c.email = email; else CLIENTS.push({ id: 'CLI' + Date.now(), nom: mission.client, email: email, adresse: adresseClient, siret: '', contact: '', notes: '', delaiPaiement: mission.delaiPaiement || 2, jourPaiement: mission.jourPaiement || 15 });
-    }
     saveAll();
 
     // Construire et télécharger le PDF
@@ -9968,8 +10033,8 @@ function showSendInvoiceModal(facture) {
     };
     downloadInvoiceHTML(invData);
 
-    // Ouvrir email après petit délai
-    var subject = subjectInput.value.replace('XXXX', finalNum);
+    // Ouvrir email
+    var subject = subjectInput.value.replace(/XXXX/g, finalNum);
     var mailBody = bodyTA.value.replace(/XXXX/g, finalNum);
     setTimeout(function() {
       window.open('mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(mailBody), '_blank');
@@ -9977,7 +10042,7 @@ function showSendInvoiceModal(facture) {
 
     closeModal('formModal');
     render();
-    toast('PDF téléchargé + email ouvert — joignez le PDF !', 'success');
+    toast('PDF téléchargé + email ouvert', 'success');
   } }, '📤 Valider, télécharger et envoyer'));
 
   // Bouton secondaire
@@ -9987,21 +10052,6 @@ function showSendInvoiceModal(facture) {
   } }, 'Juste marquer envoyée'));
 
   openModal('formModal');
-
-  // Init échéance
-  function updateEcheance() {
-    var dateVal = $('#invDate') ? $('#invDate').value : defaultDate;
-    var typeVal = $('#invDelaiType') ? $('#invDelaiType').value : '30';
-    var fdm = typeVal.indexOf('_fdm') > -1;
-    var d = parseInt(typeVal) || 30;
-    var ech = calculatePaymentDeadline(dateVal, d, fdm);
-    $('#invEcheancePreview').textContent = '📅 Échéance: ' + fmtDate(ech);
-  }
-  setTimeout(function() {
-    updateEcheance();
-    if ($('#invDelaiType')) $('#invDelaiType').addEventListener('change', updateEcheance);
-    if ($('#invDate')) $('#invDate').addEventListener('change', updateEcheance);
-  }, 50);
 }
 
 // Modal pour personnaliser et générer la facture PDF
@@ -10016,7 +10066,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   var totalTTC = totalHT + tvaAmount;
 
   var hasDefinitiveNumber = ligne.invoiceFinalized && ligne.lastInvoiceNum;
-  var defaultNum = hasDefinitiveNumber ? ligne.lastInvoiceNum : reserveInvoiceNumber(TODAY.getFullYear());
+  var defaultNum = hasDefinitiveNumber ? ligne.lastInvoiceNum : reserveInvoiceNumber(TODAY.getFullYear(), localISO(TODAY));
   var defaultDate = ligne.lastInvoiceDate || localISO(TODAY);
   var defaultCommande = ligne.numeroCommande || mission.numeroCommande || '';
   var defaultDelai = mission.delaiPaiementFacture || 30;
@@ -10172,7 +10222,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
 
     // Si pas encore finalisé, enregistrer le numéro définitif
     if (!hasDefinitiveNumber) {
-      invoiceNum = getNextInvoiceNumber(TODAY.getFullYear());
+      invoiceNum = getNextInvoiceNumber(TODAY.getFullYear(), invoiceDate);
       registerInvoice({
         numero: invoiceNum,
         date: invoiceDate,
@@ -19137,72 +19187,17 @@ function renderAdmin(container) {
   ]));
   entCard.appendChild(createInput('Date de création', 'date', 'adminDebut', COMPANY.debut));
 
-  // Section email d'envoi de factures
-  entCard.appendChild(el('div', { style: { marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)' } }));
-  entCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' } }, '📧 Email d\'envoi de factures'));
-  entCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: '1.5' } }, 'L\'envoi de facture ouvre votre client mail (Outlook, Gmail, Thunderbird...) avec un email pré-rempli. L\'expéditeur sera le compte configuré dans votre client mail. Pour envoyer depuis une adresse professionnelle, ajoutez-la comme compte dans votre client mail.'));
-  entCard.appendChild(createInput('Email expéditeur (affiché dans les factures)', 'email', 'adminEmailExpediteur', COMPANY.emailExpediteur || COMPANY.email || '', 'Ex: facturation@monentreprise.fr'));
-  var testEmailBtn = el('button', { class: 'btn', style: { marginTop: '6px', fontSize: '11px', padding: '8px 16px', background: 'rgba(0,153,255,0.1)', color: 'var(--info)' }, onclick: function() {
-    var testAddr = $('#adminEmailExpediteur') ? $('#adminEmailExpediteur').value : (COMPANY.email || '');
-    if (!testAddr) { toast('Renseignez un email d\'abord', 'error'); return; }
-    var mailto = 'mailto:' + encodeURIComponent(testAddr) +
-      '?subject=' + encodeURIComponent('[TEST] Configuration email - ' + (COMPANY.nom || 'FREEL')) +
-      '&body=' + encodeURIComponent('Ceci est un email de test.\n\nSi vous le recevez depuis la bonne adresse, votre configuration est correcte.\n\nVérifiez :\n- L\'adresse expéditeur est bien votre adresse professionnelle\n- Le mail est bien arrivé dans votre boîte de réception');
-    window.open(mailto, '_blank');
-    toast('Email de test ouvert — vérifiez l\'expéditeur', 'info');
-  } }, '🧪 Envoyer un email de test');
-  entCard.appendChild(testEmailBtn);
-  entCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '6px' } }, '💡 Astuce: si vous voulez envoyer depuis une adresse pro, ajoutez cette adresse comme \"compte d\'envoi\" dans Outlook (Fichier > Paramètres du compte) ou Gmail (Paramètres > Comptes > Envoyer des e-mails en tant que).'));
-  
   // Si TVA active, afficher champ TVA intracom
   if (COMPANY.tvaDepuis) {
     entCard.appendChild(createInput('N° TVA Intracommunautaire', 'text', 'adminTVAIntracom', COMPANY.tvaIntracom || '', 'Ex: FR12345678901'));
   }
-  
+
   entCard.appendChild(el('div', { style: { marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)' } }));
-  entCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, '💳 Coordonnées bancaires (pour factures)'));
+  entCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } }, '💳 Coordonnées bancaires'));
   entCard.appendChild(el('div', { class: 'form-row' }, [
     createInput('IBAN', 'text', 'adminIBAN', COMPANY.iban || '', 'Ex: FR76 1234...'),
     createInput('BIC', 'text', 'adminBIC', COMPANY.bic || '', 'Ex: BNPAFRPP')
   ]));
-
-  // Section: Dossier de stockage des factures
-  entCard.appendChild(el('div', { style: { marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)' } }));
-  entCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' } }, '📁 Dossier de stockage des factures'));
-  entCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: '1.5' } }, 'Sélectionnez un dossier sur votre ordinateur où les factures PDF seront automatiquement sauvegardées. Si non configuré, les PDF seront téléchargés normalement.'));
-
-  var folderStatusDiv = el('div', { id: 'invoiceFolderStatus', style: { marginBottom: '8px' } });
-  if (window._invoiceDirHandle) {
-    folderStatusDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--success)', fontWeight: '600' } }, '✅ Dossier configuré: ' + (window._invoiceDirHandle.name || 'sélectionné')));
-  } else {
-    folderStatusDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Aucun dossier sélectionné (téléchargement standard)'));
-  }
-  entCard.appendChild(folderStatusDiv);
-
-  var folderBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-
-  if (window.showDirectoryPicker) {
-    folderBtns.appendChild(el('button', { class: 'btn', style: { fontSize: '11px', padding: '8px 16px', background: 'rgba(0,153,255,0.1)', color: 'var(--info)' }, onclick: function() {
-      window.showDirectoryPicker({ mode: 'readwrite' }).then(function(handle) {
-        window._invoiceDirHandle = handle;
-        toast('Dossier sélectionné: ' + handle.name, 'success');
-        render();
-      }).catch(function(e) {
-        if (e.name !== 'AbortError') toast('Erreur: ' + e.message, 'error');
-      });
-    } }, '📁 Choisir un dossier'));
-
-    if (window._invoiceDirHandle) {
-      folderBtns.appendChild(el('button', { class: 'btn', style: { fontSize: '11px', padding: '8px 12px', background: 'rgba(248,113,113,0.1)', color: 'var(--danger)' }, onclick: function() {
-        window._invoiceDirHandle = null;
-        toast('Dossier de stockage retiré', 'info');
-        render();
-      } }, '✕ Retirer'));
-    }
-  } else {
-    folderBtns.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--warning)', padding: '6px 0' } }, '⚠️ Cette fonctionnalité nécessite Chrome ou Edge (non supporté par Firefox/Safari)'));
-  }
-  entCard.appendChild(folderBtns);
 
   makeCollapsible(entCard, entTitle, 'cfg_entreprise', false);
   container.appendChild(entCard);
@@ -19302,6 +19297,79 @@ function renderAdmin(container) {
   makeCollapsible(tresoCard, tresoTitle, 'cfg_tresorerie', false);
   container.appendChild(tresoCard);
 
+  // Facturation
+  var factCard = el('div', { class: 'card' });
+  var factTitle = el('div', { class: 'card-title' }, '🧾 Facturation');
+  factCard.appendChild(factTitle);
+
+  // Numérotation
+  factCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '6px' } }, 'Format de numérotation'));
+  var currentFmt = COMPANY.invoiceFormat || 'YYYY-NNN';
+  var currentCounter = (COMPANY.invoiceCounter && COMPANY.invoiceCounter[String(TODAY.getFullYear())]) || 0;
+  var previewNum = currentCounter + 1;
+  var fmtOptions = [
+    { value: 'YYYY-NNN', label: 'YYYY-NNN', example: formatInvoiceNumber(previewNum, TODAY) },
+    { value: 'YYYY-MM-DD-NNNNNN', label: 'YYYY-MM-DD-NNNNNN', example: formatInvoiceNumber(previewNum, TODAY) }
+  ];
+  // Temporarily override to generate examples
+  var origFmt = COMPANY.invoiceFormat;
+  var fmtExamples = {};
+  ['YYYY-NNN', 'YYYY-MM-DD-NNNNNN', 'F-YYYY-NNN', 'YYYYMM-NNN'].forEach(function(f) {
+    COMPANY.invoiceFormat = f;
+    fmtExamples[f] = formatInvoiceNumber(previewNum, TODAY);
+  });
+  COMPANY.invoiceFormat = origFmt;
+
+  factCard.appendChild(createSelect('Format', 'adminInvoiceFormat', [
+    { value: 'YYYY-NNN', label: 'YYYY-NNN  →  ' + fmtExamples['YYYY-NNN'] },
+    { value: 'YYYY-MM-DD-NNNNNN', label: 'YYYY-MM-DD-NNNNNN  →  ' + fmtExamples['YYYY-MM-DD-NNNNNN'] },
+    { value: 'F-YYYY-NNN', label: 'F-YYYY-NNN  →  ' + fmtExamples['F-YYYY-NNN'] },
+    { value: 'YYYYMM-NNN', label: 'YYYYMM-NNN  →  ' + fmtExamples['YYYYMM-NNN'] }
+  ], currentFmt));
+
+  var fmtPreview = el('div', { id: 'invoiceFmtPreview', style: { fontSize: '11px', color: 'var(--info)', fontWeight: '600', marginTop: '-4px', marginBottom: '10px' } },
+    'Prochaine facture: ' + fmtExamples[currentFmt]);
+  factCard.appendChild(fmtPreview);
+
+  // Compteur actuel
+  factCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' } },
+    'Compteur ' + TODAY.getFullYear() + ': ' + currentCounter + ' facture' + (currentCounter > 1 ? 's' : '') + ' émise' + (currentCounter > 1 ? 's' : '')));
+
+  // Email d'envoi (déplacé ici depuis Entreprise)
+  factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
+  factCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '4px' } }, '📧 Email d\'envoi'));
+  factCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', lineHeight: '1.4' } }, 'L\'envoi de facture ouvre votre client mail avec un email pré-rempli.'));
+  factCard.appendChild(createInput('Email expéditeur', 'email', 'adminEmailFact', COMPANY.emailExpediteur || COMPANY.email || '', 'facturation@monentreprise.fr'));
+
+  // Dossier stockage (déplacé ici)
+  factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
+  factCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '4px' } }, '📁 Dossier de stockage'));
+  var folderStatus2 = el('div', { style: { marginBottom: '6px' } });
+  if (window._invoiceDirHandle) {
+    folderStatus2.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--success)', fontWeight: '600' } }, '✅ ' + (window._invoiceDirHandle.name || 'Dossier sélectionné')));
+  } else {
+    folderStatus2.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Non configuré (téléchargement standard)'));
+  }
+  factCard.appendChild(folderStatus2);
+  if (window.showDirectoryPicker) {
+    var folderBtns2 = el('div', { style: { display: 'flex', gap: '8px' } });
+    folderBtns2.appendChild(el('button', { class: 'btn', style: { fontSize: '10px', padding: '6px 12px', background: 'rgba(0,153,255,0.1)', color: 'var(--info)' }, onclick: function() {
+      window.showDirectoryPicker({ mode: 'readwrite' }).then(function(handle) {
+        window._invoiceDirHandle = handle;
+        toast('Dossier: ' + handle.name, 'success'); render();
+      }).catch(function(e) { if (e.name !== 'AbortError') toast('Erreur: ' + e.message, 'error'); });
+    } }, '📁 Choisir'));
+    if (window._invoiceDirHandle) {
+      folderBtns2.appendChild(el('button', { class: 'btn', style: { fontSize: '10px', padding: '6px 12px', background: 'rgba(248,113,113,0.1)', color: 'var(--danger)' }, onclick: function() {
+        window._invoiceDirHandle = null; toast('Retiré', 'info'); render();
+      } }, '✕'));
+    }
+    factCard.appendChild(folderBtns2);
+  }
+
+  makeCollapsible(factCard, factTitle, 'cfg_facturation', false);
+  container.appendChild(factCard);
+
   // Save button for entreprise tab
   container.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '12px' }, onclick: function() {
     COMPANY.nom = $('#adminNom').value;
@@ -19322,6 +19390,8 @@ function renderAdmin(container) {
     if ($('#adminTVAIntracom')) COMPANY.tvaIntracom = $('#adminTVAIntracom').value || '';
     if ($('#adminIBAN')) COMPANY.iban = $('#adminIBAN').value || '';
     if ($('#adminBIC')) COMPANY.bic = $('#adminBIC').value || '';
+    if ($('#adminInvoiceFormat')) COMPANY.invoiceFormat = $('#adminInvoiceFormat').value || 'YYYY-NNN';
+    if ($('#adminEmailFact')) COMPANY.emailExpediteur = $('#adminEmailFact').value || COMPANY.emailExpediteur || '';
     TREASURY.soldeInitial = parseFloat($('#adminSolde').value) || 0;
     if ($('#adminSalaireEstime')) TREASURY.salaireEstime = parseFloat($('#adminSalaireEstime').value) || 2200;
     if ($('#adminReserveCompte')) TREASURY.reserveCompte = parseFloat($('#adminReserveCompte').value) || 150;
