@@ -2943,6 +2943,11 @@ function formatInvoiceNumber(num, date) {
 }
 
 function getGlobalInvoiceCount() {
+  // La source de vérité est le registre des factures (chaque facture émise y est)
+  // Fallback sur le compteur si le registre est vide (données legacy)
+  if (COMPANY.invoiceRegistry && COMPANY.invoiceRegistry.length > 0) {
+    return COMPANY.invoiceRegistry.length;
+  }
   if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
   var total = 0;
   Object.keys(COMPANY.invoiceCounter).forEach(function(k) { total += COMPANY.invoiceCounter[k] || 0; });
@@ -8314,27 +8319,6 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   body.appendChild(el('div', { class: 'form-section' }, '1️⃣ Mission'));
 
-  // Dropdown client si des clients existent
-  if (CLIENTS.length > 0) {
-    var clientOptions = [{ value: '', label: '-- Sélectionner --' }];
-    CLIENTS.forEach(function(c) { clientOptions.push({ value: c.id, label: c.nom }); });
-    clientOptions.push({ value: '_new_', label: '+ Nouveau client...' });
-    body.appendChild(createSelect('Client', 'mClientId', clientOptions, mission.clientId || ''));
-    setTimeout(function() {
-      var sel = $('#mClientId');
-      if (sel) {
-        sel.addEventListener('change', function() {
-          if (sel.value === '_new_') {
-            closeModal('formModal');
-            showClientModal();
-          }
-        });
-      }
-    }, 0);
-  } else {
-    body.appendChild(createInput('Client', 'text', 'mClient', mission.client));
-  }
-
   body.appendChild(createInput('Titre / Projet', 'text', 'mTitre', mission.titre, 'Ex: Développement ERP'));
   body.appendChild(createInput('Lieu', 'text', 'mSite', mission.site, 'Ex: Toulouse, Remote'));
   body.appendChild(el('div', { class: 'form-row' }, [
@@ -8523,12 +8507,14 @@ function showMissionModal(mission) {
   body.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '-6px', marginBottom: '8px' } }, 'Le nom et l\'adresse du destinataire seront repris automatiquement sur la facture.'));
 
   body.appendChild(el('div', { class: 'form-row' }, [
-    createSelect('Délai paiement', 'mDelai', [
-      { value: '1', label: 'M+1 (30j)' }, { value: '2', label: 'M+2 (60j)' }, { value: '3', label: 'M+3 (90j)' }
+    createSelect('Payé le', 'mDelai', [
+      { value: '1', label: 'M+1 (mois suivant la facture)' },
+      { value: '2', label: 'M+2 (2 mois après)' },
+      { value: '3', label: 'M+3 (3 mois après)' }
     ], String(mission.delaiPaiement)),
-    createInput('Jour de paie', 'number', 'mJour', mission.jourPaiement, '15')
+    createInput('Jour du mois', 'number', 'mJour', mission.jourPaiement, '2')
   ]));
-  body.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '-6px', marginBottom: '8px' } }, 'Quand vous êtes payé (suivi de trésorerie).'));
+  body.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '-6px', marginBottom: '8px' } }, 'Ex: M+2 le 2 = facture de mars payée le 2 juin. Pour le suivi de trésorerie.'));
 
   var curDelaiVal = mission.delaiFinDeMois ? (mission.delaiPaiementFacture || 30) + '_fdm' : String(mission.delaiPaiementFacture || '');
   body.appendChild(createSelect('Délai de paiement facture', 'mDelaiFacture', [
@@ -8678,21 +8664,14 @@ function showMissionModal(mission) {
   btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
     // Validation des champs obligatoires
     var tjmVal = parseFloat($('#mTJM').value);
-    var clientVal = ($('#mClientId') ? $('#mClientId').value : '') || ($('#mClient') ? $('#mClient').value : '');
-    if (!clientVal || clientVal === '_new_') { showToast('⚠️ Client requis', 'warning'); return; }
     if (!$('#mDebut').value) { showToast('⚠️ Date de début requise', 'warning'); return; }
     if (isNaN(tjmVal) || tjmVal <= 0) { showToast('⚠️ TJM doit être supérieur à 0', 'warning'); showValidationError('mTJM', 'TJM requis et > 0'); return; }
+    var clientOpNom = $('#mClientOpNom') ? $('#mClientOpNom').value.trim() : '';
+    if (!clientOpNom) { showToast('⚠️ Client opérationnel requis', 'warning'); return; }
 
-    // Gérer client via dropdown ou input texte
-    var clientId = $('#mClientId') ? $('#mClientId').value : '';
-    if (clientId && clientId !== '_new_') {
-      var cli = getClient(clientId);
-      mission.clientId = clientId;
-      mission.client = cli ? cli.nom : '';
-    } else if ($('#mClient')) {
-      mission.client = $('#mClient').value;
-      mission.clientId = '';
-    }
+    // Le client = client opérationnel
+    mission.client = clientOpNom;
+    mission.clientId = '';
     mission.titre = $('#mTitre').value; mission.site = $('#mSite').value;
     mission.debut = $('#mDebut').value; mission.fin = $('#mFin').value;
     mission.tjm = parseFloat($('#mTJM').value) || 0;
@@ -9754,7 +9733,6 @@ function buildInvoiceDataFromFacture(mission, facture) {
   moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
 
   var finMoisDate = new Date(p.y, p.m + 1, 0).getDate();
-  var jourFin = Math.min(jours, finMoisDate) || finMoisDate;
   var siren = COMPANY.siret ? COMPANY.siret.substring(0, 9) : '';
 
   var titre = mission.client || '';
@@ -9762,7 +9740,7 @@ function buildInvoiceDataFromFacture(mission, facture) {
   titre += ' - ' + moisNom;
 
   var descriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || ''));
-  var periode = 'du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
+  var periode = 'du 01 au ' + String(finMoisDate).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
 
   return {
     num: invoiceNum,
@@ -9832,7 +9810,6 @@ function showSendInvoiceModal(facture) {
   var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
   var finMoisDate = new Date(p.y, p.m + 1, 0).getDate();
-  var jourFin = Math.min(jours, finMoisDate) || finMoisDate;
 
   // Emails connus
   var allEmails = [];
@@ -9878,11 +9855,27 @@ function showSendInvoiceModal(facture) {
   infoRow.appendChild(dateDiv);
   body.appendChild(infoRow);
 
-  // Période + descriptif (compact)
+  // Période + descriptif + n° commande
   var detailRow = el('div', { style: { background: 'var(--bg-secondary)', padding: '8px 10px', borderRadius: 'var(--radius-sm)', marginBottom: '8px', fontSize: '11px' } });
-  detailRow.appendChild(el('div', { style: { color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' } }, '📅 du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom));
+  detailRow.appendChild(el('div', { style: { color: 'var(--text-muted)', fontSize: '9px', marginBottom: '2px' } }, '📅 du 01 au ' + String(finMoisDate).padStart(2, '0') + ' ' + moisNom));
   detailRow.appendChild(el('div', { style: { color: 'var(--text-secondary)' } }, defaultDescriptif));
-  if (defaultCommande) detailRow.appendChild(el('div', { style: { color: 'var(--text-muted)', fontSize: '9px', marginTop: '2px' } }, 'Commande: ' + defaultCommande));
+  // N° commande éditable (avec mémoire des commandes précédentes)
+  var cmdRow = el('div', { style: { marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' } });
+  cmdRow.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--text-muted)', fontWeight: '600', whiteSpace: 'nowrap' } }, 'N° Commande'));
+  var cmdInput = document.createElement('input'); cmdInput.type = 'text'; cmdInput.id = 'invCommande'; cmdInput.value = defaultCommande;
+  cmdInput.placeholder = 'Ex: 10005231';
+  cmdInput.style.cssText = 'flex:1;padding:5px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;box-sizing:border-box;';
+  cmdRow.appendChild(cmdInput);
+  // Suggestions commandes précédentes
+  var pastCommandes = [];
+  if (mission.lignes) mission.lignes.forEach(function(l) { if (l.numeroCommande && pastCommandes.indexOf(l.numeroCommande) === -1) pastCommandes.push(l.numeroCommande); });
+  if (mission.numeroCommande && pastCommandes.indexOf(mission.numeroCommande) === -1) pastCommandes.unshift(mission.numeroCommande);
+  if (pastCommandes.length > 0 && !defaultCommande) {
+    pastCommandes.forEach(function(pc) {
+      cmdRow.appendChild(el('button', { class: 'btn', style: { fontSize: '9px', padding: '2px 6px', background: 'var(--bg-tertiary)', whiteSpace: 'nowrap' }, onclick: function() { cmdInput.value = pc; } }, pc));
+    });
+  }
+  detailRow.appendChild(cmdRow);
   body.appendChild(detailRow);
 
   // === SECTION CHAMPS MANQUANTS (inline) ===
@@ -9996,7 +9989,7 @@ function showSendInvoiceModal(facture) {
     }
 
     var descriptif = defaultDescriptif;
-    var numCommande = defaultCommande;
+    var numCommande = $('#invCommande') ? $('#invCommande').value.trim() : defaultCommande;
 
     // Sauvegarder dans la mission pour les prochaines fois
     if (missing.indexOf('adresse') > -1) mission.adresseClient = adresseClient;
@@ -10030,7 +10023,7 @@ function showSendInvoiceModal(facture) {
     // Construire et télécharger le PDF
     var dateEcheance = calculatePaymentDeadline(invoiceDate, delai, fdm);
     var siren = COMPANY.siret ? COMPANY.siret.substring(0, 9) : '';
-    var periode = 'du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
+    var periode = 'du 01 au ' + String(finMoisDate).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
     var titre = facture.client; if (numCommande) titre += ' - Commande n°' + numCommande; titre += ' - ' + moisNom;
     var invData = {
       num: finalNum, date: fmtDate(invoiceDate), dateEcheance: fmtDate(dateEcheance),
@@ -10197,7 +10190,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   sec4.appendChild(descTextarea);
 
   // Période (affichée, calculée auto)
-  sec4.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px' } }, '📅 Période: du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom));
+  sec4.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px' } }, '📅 Période: du 01 au ' + String(finMoisDate).padStart(2, '0') + ' ' + moisNom));
   body.appendChild(sec4);
 
   // Vérification infos entreprise
@@ -10322,7 +10315,7 @@ function openInvoiceHTML(mission, monthYm, options) {
   if (numCommande) titre += ' - Commande n°' + numCommande;
   titre += ' - ' + moisNom;
 
-  var periode = 'du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
+  var periode = 'du 01 au ' + String(finMoisDate).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
 
   // Données facture pour l'affichage
   var invoiceData = {
@@ -10592,65 +10585,75 @@ function downloadInvoiceHTML(data) {
 function generateAndDownloadPDF(data) {
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF();
-  // Formatage des nombres: remplacer espaces insécables par espaces normaux (jsPDF ne gère pas U+202F)
   var fmtN = function(n) { return (n == null || isNaN(n) ? 0 : n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/[\u00A0\u202F]/g, ' '); };
-  var col = [61, 90, 128]; // bleu acier #3d5a80
+  var col = [61, 90, 128]; // bleu acier
+  var deg = String.fromCharCode(176);
+  var eur = String.fromCharCode(8364);
 
-  // === ÉMETTEUR (haut gauche) ===
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  // === ÉMETTEUR (haut gauche) — toutes les infos société ===
+  var yE = 20;
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
   doc.setTextColor(col[0], col[1], col[2]);
-  var yE = 22;
-  doc.text('Entreprise individuelle ' + data.emetteur, 20, yE); yE += 5;
+  doc.text(data.emetteur, 20, yE); yE += 6;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(80);
+  doc.text('Micro-entreprise', 20, yE); yE += 4;
   if (data.adresseEmetteur) {
-    var addrParts = data.adresseEmetteur.split(',');
-    addrParts.forEach(function(part) { doc.text(part.trim(), 20, yE); yE += 5; });
+    data.adresseEmetteur.split(',').forEach(function(part) { doc.text(part.trim(), 20, yE); yE += 4; });
   }
-  doc.text('FR', 20, yE); yE += 5;
+  doc.text('France', 20, yE); yE += 4;
+  doc.text('SIRET : ' + data.siret, 20, yE); yE += 4;
+  if (data.siren) { doc.text('SIREN : ' + data.siren, 20, yE); yE += 4; }
+  if (data.tvaIntra) { doc.text('TVA Intracom. : ' + data.tvaIntra, 20, yE); yE += 4; }
+  if (data.iban) { doc.text('IBAN : ' + data.iban, 20, yE); yE += 4; }
 
-  // === CLIENT (haut droite, en gras) ===
+  // === CLIENT (haut droite) ===
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(26, 26, 46);
-  doc.text(data.client, 195, 22, { align: 'right' });
+  doc.text(data.client, 195, 20, { align: 'right' });
   if (data.adresseClient) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80);
-    var clientLines = data.adresseClient.split(',');
-    var yC = 28;
-    clientLines.forEach(function(line) { doc.text(line.trim(), 195, yC, { align: 'right' }); yC += 5; });
+    var yC = 27;
+    data.adresseClient.split(',').forEach(function(line) { doc.text(line.trim(), 195, yC, { align: 'right' }); yC += 5; });
     doc.text('France', 195, yC, { align: 'right' });
   }
 
   // === FACTURE N° ===
-  var yF = Math.max(yE, 50) + 5;
-  doc.setFontSize(11);
+  var yF = Math.max(yE, 58) + 4;
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(col[0], col[1], col[2]);
-  doc.text('Facture N' + String.fromCharCode(176) + ' ' + data.num, 20, yF);
-  yF += 6;
+  doc.text('Facture N' + deg + ' ' + data.num, 20, yF);
+  yF += 7;
 
-  // Commande + période
+  // Sous-titre commande
   if (data.numCommande) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text(data.client + ' Commande n' + String.fromCharCode(176) + data.numCommande + ' pour la periode de ' + (data.titre.split(' - ').pop() || ''), 20, yF);
+    doc.setTextColor(51);
+    doc.text('Commande n' + deg + data.numCommande, 20, yF);
     yF += 6;
   }
 
-  // Date + règlement
+  // Date émission + Règlement + Échéance
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(51);
   doc.text('Date d\'emission : ' + data.date, 20, yF);
-  doc.text('Reglement : ' + (data.delaiLabel || ((data.delaiPaiement || 30) + ' jours')), 140, yF);
-  yF += 12;
+  doc.text('Reglement : ' + (data.delaiLabel || ((data.delaiPaiement || 30) + ' jours')), 110, yF);
+  yF += 5;
+  if (data.dateEcheance) {
+    doc.text('Echeance de paiement : ' + data.dateEcheance, 20, yF);
+  }
+  yF += 10;
 
   // === TABLEAU ===
   var tableY = yF;
-
-  // Header
   doc.setFillColor(col[0], col[1], col[2]);
   doc.rect(20, tableY, 175, 10, 'F');
   doc.setFontSize(8);
@@ -10663,17 +10666,14 @@ function generateAndDownloadPDF(data) {
   doc.text('TVA', 170, tableY + 7);
   doc.text('Montant HT', 186, tableY + 7);
 
-  // Ligne de données
   tableY += 14;
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(0);
   doc.setFontSize(9);
 
-  var descText = 'Descriptif : ' + data.descriptif + ' ' + data.periode + '.';
+  var descText = data.descriptif + '\nPeriode : ' + data.periode;
   var descLines = doc.splitTextToSize(descText, 84);
-  descLines.forEach(function(line, idx) {
-    doc.text(line, 22, tableY + (idx * 5));
-  });
+  descLines.forEach(function(line, idx) { doc.text(line, 22, tableY + (idx * 5)); });
 
   var dataY = tableY + Math.max((descLines.length - 1) * 5, 0);
   doc.text(fmtN(data.jours), 112, dataY, { align: 'center' });
@@ -10683,21 +10683,19 @@ function generateAndDownloadPDF(data) {
   doc.setFont('helvetica', 'bold');
   doc.text(fmtN(data.totalHT), 195, dataY, { align: 'right' });
 
-  // Ligne séparation
   var sepY = dataY + 10;
   doc.setDrawColor(200);
   doc.line(20, sepY, 195, sepY);
 
-  // === TOTAUX (alignés à droite) ===
+  // === TOTAUX ===
   var totY = sepY + 12;
-
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(80);
   doc.text('Total HT', 148, totY);
   doc.setTextColor(col[0], col[1], col[2]);
   doc.setFont('helvetica', 'bold');
-  doc.text(fmtN(data.totalHT) + ' ' + String.fromCharCode(8364), 195, totY, { align: 'right' });
+  doc.text(fmtN(data.totalHT) + ' ' + eur, 195, totY, { align: 'right' });
 
   if (data.tvaRate > 0) {
     totY += 8;
@@ -10706,10 +10704,9 @@ function generateAndDownloadPDF(data) {
     doc.text('TVA ' + data.tvaRate + '%', 148, totY);
     doc.setTextColor(col[0], col[1], col[2]);
     doc.setFont('helvetica', 'bold');
-    doc.text(fmtN(data.tvaAmount) + ' ' + String.fromCharCode(8364), 195, totY, { align: 'right' });
+    doc.text(fmtN(data.tvaAmount) + ' ' + eur, 195, totY, { align: 'right' });
   }
 
-  // Total TTC avec fond
   totY += 10;
   doc.setDrawColor(180);
   doc.line(140, totY - 4, 195, totY - 4);
@@ -10719,21 +10716,28 @@ function generateAndDownloadPDF(data) {
   doc.setFontSize(10);
   doc.setTextColor(26, 26, 46);
   doc.text('Total TTC', 143, totY + 4);
-  doc.text(fmtN(data.totalTTC) + ' ' + String.fromCharCode(8364), 193, totY + 4, { align: 'right' });
+  doc.text(fmtN(data.totalTTC) + ' ' + eur, 193, totY + 4, { align: 'right' });
 
   // === MENTIONS LÉGALES (bas de page) ===
+  var legY = 245;
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(130);
-  doc.text('En cas de retard de paiement, une penalite de 3 fois le taux d\'interet legal sera appliquee, a laquelle s\'ajoutera une', 20, 252);
-  doc.text('indemnite forfaitaire pour frais de recouvrement de 40' + String.fromCharCode(8364) + '.', 20, 256);
+  if (data.dateEcheance) {
+    doc.text('Paiement attendu au plus tard le ' + data.dateEcheance + '. En cas de retard, une penalite de 3 fois le taux', 20, legY); legY += 4;
+    doc.text('d\'interet legal sera appliquee, a laquelle s\'ajoutera une indemnite forfaitaire de recouvrement de 40' + eur + '.', 20, legY); legY += 4;
+  } else {
+    doc.text('En cas de retard de paiement, une penalite de 3 fois le taux d\'interet legal sera appliquee, a laquelle', 20, legY); legY += 4;
+    doc.text('s\'ajoutera une indemnite forfaitaire pour frais de recouvrement de 40' + eur + '.', 20, legY); legY += 4;
+  }
   if (data.tvaRate === 0) {
-    doc.text('TVA non applicable, article 293 B du CGI.', 20, 261);
+    doc.text('TVA non applicable, article 293 B du CGI.', 20, legY); legY += 4;
   }
   if (data.tvaIntra) {
-    doc.text('N' + String.fromCharCode(176) + ' TVA intracommunautaire : ' + data.tvaIntra, 20, data.tvaRate === 0 ? 265 : 261);
+    doc.text('N' + deg + ' TVA intracommunautaire : ' + data.tvaIntra, 20, legY); legY += 4;
   }
-  doc.text('SIRET ' + data.siret + ' - SIREN ' + data.siren, 20, 270);
+  doc.text('Micro-entreprise - Dispense d\'immatriculation au RCS et au RM', 20, legY); legY += 4;
+  doc.text('SIRET ' + data.siret + ' - SIREN ' + data.siren, 20, legY);
   
   // Nom de fichier: N° facture - CLIENT - N° commande
   var filenameParts = [data.num, (data.client || '').toUpperCase()];
