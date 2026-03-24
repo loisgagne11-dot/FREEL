@@ -9712,6 +9712,235 @@ function showFactureModal(facture) {
   openModal('formModal');
 }
 
+// Modal workflow d'envoi de facture: PDF + email + gestion email manquant
+function showSendInvoiceModal(facture) {
+  var mission = MISSIONS.find(function(m) { return m.factures && m.factures.some(function(f) { return f.id === facture.id; }); });
+  if (!mission) { toast('Mission introuvable', 'error'); return; }
+
+  $('#formModalTitle').textContent = '📤 Envoyer la facture · ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
+  var body = $('#formModalBody');
+  body.replaceChildren();
+
+  // Résumé de la facture
+  var summary = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
+  summary.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } }, [
+    el('span', { style: { fontWeight: '700', fontSize: '14px' } }, facture.client),
+    el('span', { style: { fontWeight: '800', fontSize: '18px', color: 'var(--success)' } }, EUR(facture.ttc || facture.ht) + (facture.tva > 0 ? ' TTC' : ' HT'))
+  ]));
+  summary.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' } }, [
+    el('span', {}, fmtMonth(facture.mois) + ' · ' + facture.jours + 'j'),
+    el('span', {}, facture.numero ? 'N° ' + facture.numero : 'Brouillon (pas encore générée)')
+  ]));
+  body.appendChild(summary);
+
+  // Étapes du workflow
+  var stepsDiv = el('div', { style: { marginBottom: '16px' } });
+  stepsDiv.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' } }, 'Workflow d\'envoi'));
+
+  // Étape 1: Générer le PDF
+  var hasNumber = facture.numero || (mission.lignes && mission.lignes.find(function(l) { return l.ym === facture.mois && l.invoiceFinalized; }));
+  var step1Icon = hasNumber ? '✅' : '⬜';
+  var step1 = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } }, [
+    el('span', { style: { fontSize: '16px' } }, step1Icon),
+    el('div', { style: { flex: '1' } }, [
+      el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '1. Générer le PDF'),
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, hasNumber ? 'Facture n°' + (facture.numero || '') + ' générée' : 'Cliquez pour créer le PDF de la facture')
+    ]),
+    !hasNumber ? el('button', { class: 'btn', style: { fontSize: '11px', padding: '6px 12px', background: 'var(--info)', color: 'white' }, onclick: function() {
+      closeModal('formModal');
+      showInvoiceGeneratorModal(mission, facture.mois);
+    } }, '📄 Générer') : el('button', { class: 'btn', style: { fontSize: '11px', padding: '6px 12px' }, onclick: function() {
+      // Re-télécharger le PDF existant
+      var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === facture.mois; }) : null;
+      if (ligne && ligne.lastInvoiceData) {
+        downloadInvoiceHTML(ligne.lastInvoiceData);
+      } else {
+        closeModal('formModal');
+        showInvoiceGeneratorModal(mission, facture.mois);
+      }
+    } }, '📥 Télécharger')
+  ]);
+  stepsDiv.appendChild(step1);
+
+  // Déterminer l'email du destinataire
+  var clientObj = getClientByName(mission.client);
+  var agenceEmail = mission.agence && mission.agence.contacts && mission.agence.contacts[0] ? mission.agence.contacts[0].email : '';
+  var clientOpEmail = mission.clientOp ? mission.clientOp.email : '';
+  var clientEmail = clientObj ? clientObj.email : '';
+  var bestEmail = agenceEmail || clientOpEmail || clientEmail || '';
+  var emailSource = agenceEmail ? 'agence' : clientOpEmail ? 'client final' : clientEmail ? 'fiche client' : '';
+
+  // Étape 2: Email du destinataire
+  var step2 = el('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } }, [
+    el('span', { style: { fontSize: '16px', marginTop: '2px' } }, bestEmail ? '✅' : '⚠️'),
+    el('div', { style: { flex: '1' } })
+  ]);
+
+  var step2Content = step2.querySelector('div');
+  step2Content.appendChild(el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '2. Destinataire'));
+
+  if (bestEmail) {
+    step2Content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Email trouvé (' + emailSource + ')'));
+    var emailRow = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } });
+    var emailInput = document.createElement('input');
+    emailInput.type = 'email';
+    emailInput.id = 'sendInvoiceEmail';
+    emailInput.value = bestEmail;
+    emailInput.style.cssText = 'flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:12px;';
+    emailRow.appendChild(emailInput);
+    step2Content.appendChild(emailRow);
+  } else {
+    step2Content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--warning)', marginBottom: '6px' } }, '⚠️ Aucun email trouvé pour ce client'));
+    step2Content.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' } }, 'Renseignez l\'email — il sera sauvegardé automatiquement'));
+    var emailRow = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } });
+    var emailInput = document.createElement('input');
+    emailInput.type = 'email';
+    emailInput.id = 'sendInvoiceEmail';
+    emailInput.placeholder = 'email@client.com';
+    emailInput.style.cssText = 'flex:1;padding:8px 10px;border-radius:6px;border:2px solid var(--warning);background:var(--bg-primary);color:var(--text-primary);font-size:12px;';
+    emailRow.appendChild(emailInput);
+    step2Content.appendChild(emailRow);
+
+    // Sélecteur: où sauvegarder l'email
+    var saveTarget = el('div', { style: { marginTop: '6px' } });
+    var sel = document.createElement('select');
+    sel.id = 'sendInvoiceEmailTarget';
+    sel.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;';
+    var optClient = document.createElement('option'); optClient.value = 'client'; optClient.textContent = 'Sauvegarder dans la fiche client (' + mission.client + ')';
+    var optAgence = document.createElement('option'); optAgence.value = 'agence'; optAgence.textContent = 'Sauvegarder dans l\'agence/ESN';
+    var optClientOp = document.createElement('option'); optClientOp.value = 'clientOp'; optClientOp.textContent = 'Sauvegarder dans le client final (opérationnel)';
+    sel.appendChild(optClient); sel.appendChild(optAgence); sel.appendChild(optClientOp);
+    saveTarget.appendChild(sel);
+    step2Content.appendChild(saveTarget);
+  }
+  stepsDiv.appendChild(step2);
+
+  // Étape 3: Aperçu email
+  var companyName = COMPANY.nom || 'Mon entreprise';
+  var invoiceNum = facture.numero || 'XXXX';
+  var defaultSubject = 'Facture ' + invoiceNum + ' - ' + companyName + ' - ' + fmtMonth(facture.mois);
+  var defaultBody = 'Bonjour,\n\nVeuillez trouver ci-joint la facture n°' + invoiceNum + ' pour la période de ' + fmtMonth(facture.mois) + '.\n\nMontant : ' + EUR(facture.ttc || facture.ht) + (facture.tva > 0 ? ' TTC' : ' HT') + '\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n' + companyName;
+
+  var step3 = el('div', { style: { padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } });
+  step3.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' } }, [
+    el('span', { style: { fontSize: '16px' } }, '📧'),
+    el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '3. Email pré-rempli')
+  ]));
+
+  var subjectInput = document.createElement('input');
+  subjectInput.type = 'text';
+  subjectInput.id = 'sendInvoiceSubject';
+  subjectInput.value = defaultSubject;
+  subjectInput.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;margin-bottom:6px;box-sizing:border-box;';
+  step3.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '2px' } }, 'Objet'));
+  step3.appendChild(subjectInput);
+
+  var bodyTextarea = document.createElement('textarea');
+  bodyTextarea.id = 'sendInvoiceBody';
+  bodyTextarea.value = defaultBody;
+  bodyTextarea.rows = 6;
+  bodyTextarea.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
+  step3.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '2px', marginTop: '4px' } }, 'Corps du message'));
+  step3.appendChild(bodyTextarea);
+  step3.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '💡 N\'oubliez pas de joindre le PDF téléchargé à l\'étape 1'));
+  stepsDiv.appendChild(step3);
+
+  body.appendChild(stepsDiv);
+
+  // Boutons d'action
+  var btns = el('div', { style: { display: 'flex', gap: '8px' } });
+
+  // Bouton principal: Ouvrir email
+  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1', fontWeight: '700' }, onclick: function() {
+    var email = document.getElementById('sendInvoiceEmail') ? document.getElementById('sendInvoiceEmail').value.trim() : '';
+    var subject = document.getElementById('sendInvoiceSubject').value;
+    var mailBody = document.getElementById('sendInvoiceBody').value;
+
+    if (!email || email.indexOf('@') < 0) {
+      toast('Veuillez renseigner un email valide', 'error');
+      var inp = document.getElementById('sendInvoiceEmail');
+      if (inp) { inp.focus(); inp.style.borderColor = 'var(--danger)'; }
+      return;
+    }
+
+    // Sauvegarder l'email si nouveau
+    var target = document.getElementById('sendInvoiceEmailTarget');
+    if (target) {
+      var where = target.value;
+      if (where === 'client') {
+        var c = getClientByName(mission.client);
+        if (c) { c.email = email; }
+        else {
+          CLIENTS.push({ id: 'CLI' + Date.now(), nom: mission.client, email: email, adresse: '', siret: '', contact: '', notes: '', delaiPaiement: mission.delaiPaiement || 2, jourPaiement: mission.jourPaiement || 15 });
+        }
+      } else if (where === 'agence') {
+        if (!mission.agence) mission.agence = { nom: '', contacts: [], adresses: [] };
+        if (!mission.agence.contacts) mission.agence.contacts = [];
+        if (mission.agence.contacts.length > 0) { mission.agence.contacts[0].email = email; }
+        else { mission.agence.contacts.push({ prenom: '', nom: '', email: email, telephone: '' }); }
+      } else if (where === 'clientOp') {
+        if (!mission.clientOp) mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
+        mission.clientOp.email = email;
+      }
+      saveAll();
+      toast('Email sauvegardé', 'success');
+    }
+
+    // Mettre la facture en "envoyée"
+    MISSIONS.forEach(function(m) {
+      if (m.factures) m.factures.forEach(function(f) {
+        if (f.id === facture.id && f.status === 'brouillon') {
+          f.status = 'envoyée';
+          f.dateEnvoi = localISO(TODAY);
+        }
+      });
+    });
+    saveAll();
+
+    // Ouvrir mailto
+    var mailto = 'mailto:' + encodeURIComponent(email) +
+      '?subject=' + encodeURIComponent(subject) +
+      '&body=' + encodeURIComponent(mailBody);
+    window.open(mailto, '_blank');
+
+    closeModal('formModal');
+    render();
+    toast('Email ouvert — joignez le PDF et envoyez !', 'success');
+  } }, '📧 Ouvrir l\'email & marquer envoyée'));
+
+  // Bouton secondaire: juste marquer envoyée
+  btns.appendChild(el('button', { class: 'btn', style: { background: 'var(--bg-tertiary)' }, onclick: function() {
+    var email = document.getElementById('sendInvoiceEmail') ? document.getElementById('sendInvoiceEmail').value.trim() : '';
+    // Sauvegarder l'email si renseigné
+    if (email && email.indexOf('@') >= 0) {
+      var target = document.getElementById('sendInvoiceEmailTarget');
+      if (target) {
+        var where = target.value;
+        if (where === 'client') { var c = getClientByName(mission.client); if (c) c.email = email; }
+        else if (where === 'agence') {
+          if (!mission.agence) mission.agence = { nom: '', contacts: [], adresses: [] };
+          if (!mission.agence.contacts) mission.agence.contacts = [];
+          if (mission.agence.contacts.length > 0) mission.agence.contacts[0].email = email;
+          else mission.agence.contacts.push({ prenom: '', nom: '', email: email, telephone: '' });
+        } else if (where === 'clientOp') {
+          if (!mission.clientOp) mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
+          mission.clientOp.email = email;
+        }
+      }
+    }
+    MISSIONS.forEach(function(m) {
+      if (m.factures) m.factures.forEach(function(f) {
+        if (f.id === facture.id) { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); }
+      });
+    });
+    saveAll(); render(); closeModal('formModal');
+    toast('Facture marquée comme envoyée', 'success');
+  } }, 'Juste marquer envoyée'));
+
+  body.appendChild(btns);
+  openModal('formModal');
+}
+
 // Modal pour personnaliser et générer la facture PDF
 function showInvoiceGeneratorModal(mission, monthYm) {
   var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === monthYm; }) : null;
@@ -11694,17 +11923,60 @@ function getActionsList() {
     });
   }
 
-  // 4. Factures brouillon à envoyer
+  // 4. Factures brouillon à envoyer — une action par facture avec workflow d'envoi
   var brouillons = [];
-  MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'brouillon') brouillons.push(f); }); });
-  if (brouillons.length > 0) {
-    var aid = 'brouillons_' + nowYm;
-    actions.push({ id: aid, priority: 5, type: 'info', icon: '📄', label: brouillons.length + ' facture(s) à envoyer', sub: 'Brouillons en attente',
-      detail: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); },
-      complete: function() { markActionDone(aid, 'Envoyer ' + brouillons.length + ' facture(s)'); },
+  MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'brouillon' && f.jours > 0) brouillons.push(f); }); });
+  brouillons.forEach(function(f) {
+    var aid = 'send_' + f.id;
+    actions.push({ id: aid, priority: 3, type: 'info', icon: '📤', label: 'Envoyer facture ' + f.client, sub: fmtMonthShort(f.mois) + ' · ' + EUR(f.ttc || f.ht),
+      detail: function() { showSendInvoiceModal(f); },
+      complete: function() { markActionDone(aid, 'Facture ' + f.client + ' ' + fmtMonthShort(f.mois)); },
       done: isActionDone(aid)
     });
-  }
+  });
+
+  // 5. Factures envoyées non payées (rappel de suivi, pas en retard)
+  var envoyeesNonLate = [];
+  MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'envoyée' && !f.isLate && f.jours > 0) envoyeesNonLate.push(f); }); });
+  envoyeesNonLate.forEach(function(f) {
+    var aid = 'suivi_' + f.id;
+    actions.push({ id: aid, priority: 6, type: 'neutral', icon: '⏳', label: 'Suivre paiement ' + f.client, sub: fmtMonthShort(f.mois) + ' · ' + EUR(f.ttc || f.ht) + ' · Attendu ' + fmtMonthShort(f.paymentMonth || ''),
+      detail: function() { showFactureModal(f); },
+      complete: function() { markActionDone(aid, 'Suivi ' + f.client + ' ' + EUR(f.ttc || f.ht)); },
+      done: isActionDone(aid)
+    });
+  });
+
+  // 6. Saisir les jours du mois en cours (missions actives sans joursReels)
+  MISSIONS.forEach(function(m) {
+    if (m.statut !== 'active' || !m.lignes) return;
+    var ligne = m.lignes.find(function(l) { return l.ym === nowYm; });
+    if (ligne && (ligne.joursPrevus > 0 || ligne.joursReels > 0) && !ligne.joursReels) {
+      var aid = 'saisie_jours_' + m.id + '_' + nowYm;
+      actions.push({ id: aid, priority: 4, type: 'warning', icon: '📝', label: 'Saisir jours ' + m.client, sub: fmtMonthShort(nowYm) + ' · ' + (ligne.joursPrevus || 0) + 'j prévus',
+        detail: function() { VIEW = 'activite'; ACTIVITE_TAB = 'overview'; render(); },
+        complete: function() { markActionDone(aid, 'Jours saisis ' + m.client + ' ' + fmtMonthShort(nowYm)); },
+        done: isActionDone(aid)
+      });
+    }
+  });
+
+  // 7. Factures à créer (mois passés avec jours réels mais pas de facture)
+  MISSIONS.forEach(function(m) {
+    if (m.statut !== 'active' || !m.lignes) return;
+    m.lignes.forEach(function(l) {
+      if (l.ym >= nowYm || l.joursReels <= 0) return; // seulement mois passés avec des jours
+      var hasFacture = (m.factures || []).some(function(f) { return f.mois === l.ym && f.jours > 0; });
+      if (!hasFacture) {
+        var aid = 'creer_facture_' + m.id + '_' + l.ym;
+        actions.push({ id: aid, priority: 3, type: 'warning', icon: '🧾', label: 'Créer facture ' + m.client, sub: fmtMonthShort(l.ym) + ' · ' + l.joursReels + 'j × ' + EUR(m.tjm),
+          detail: function() { showInvoiceGeneratorModal(m, l.ym); },
+          complete: function() { markActionDone(aid, 'Facture créée ' + m.client + ' ' + fmtMonthShort(l.ym)); },
+          done: isActionDone(aid)
+        });
+      }
+    });
+  });
 
   actions.sort(function(a, b) {
     if (a.done !== b.done) return a.done ? 1 : -1;
