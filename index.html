@@ -2942,21 +2942,26 @@ function formatInvoiceNumber(num, date) {
   }
 }
 
+function getGlobalInvoiceCount() {
+  if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
+  var total = 0;
+  Object.keys(COMPANY.invoiceCounter).forEach(function(k) { total += COMPANY.invoiceCounter[k] || 0; });
+  return total;
+}
+
 function getNextInvoiceNumber(year, date) {
   year = year || TODAY.getFullYear();
   var yearStr = String(year);
   if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
   if (!COMPANY.invoiceCounter[yearStr]) COMPANY.invoiceCounter[yearStr] = 0;
   COMPANY.invoiceCounter[yearStr]++;
-  return formatInvoiceNumber(COMPANY.invoiceCounter[yearStr], date);
+  var globalNum = getGlobalInvoiceCount();
+  return formatInvoiceNumber(globalNum, date);
 }
 
 function reserveInvoiceNumber(year, date) {
-  year = year || TODAY.getFullYear();
-  var yearStr = String(year);
-  if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
-  if (!COMPANY.invoiceCounter[yearStr]) COMPANY.invoiceCounter[yearStr] = 0;
-  return formatInvoiceNumber(COMPANY.invoiceCounter[yearStr] + 1, date);
+  var globalNum = getGlobalInvoiceCount() + 1;
+  return formatInvoiceNumber(globalNum, date);
 }
 
 function registerInvoice(invoiceData) {
@@ -10725,8 +10730,10 @@ function generateAndDownloadPDF(data) {
   }
   doc.text('SIRET ' + data.siret + ' - SIREN ' + data.siren, 20, 270);
   
-  // Nom de fichier
-  var filename = 'Facture-' + data.num + '.pdf';
+  // Nom de fichier: N° facture - CLIENT - N° commande
+  var filenameParts = [data.num, (data.client || '').toUpperCase()];
+  if (data.numCommande) filenameParts.push(data.numCommande);
+  var filename = filenameParts.join(' - ') + '.pdf';
 
   // Si un dossier de sauvegarde est configuré, y écrire directement
   if (window._invoiceDirHandle) {
@@ -10815,7 +10822,9 @@ function downloadInvoiceAsHTML(data) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'Facture-' + data.num + '.html';
+    var htmlFilenameParts = [data.num, (data.client || '').toUpperCase()];
+    if (data.numCommande) htmlFilenameParts.push(data.numCommande);
+    a.download = htmlFilenameParts.join(' - ') + '.html';
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
@@ -19305,12 +19314,8 @@ function renderAdmin(container) {
   // Numérotation
   factCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '6px' } }, 'Format de numérotation'));
   var currentFmt = COMPANY.invoiceFormat || 'YYYY-NNN';
-  var currentCounter = (COMPANY.invoiceCounter && COMPANY.invoiceCounter[String(TODAY.getFullYear())]) || 0;
-  var previewNum = currentCounter + 1;
-  var fmtOptions = [
-    { value: 'YYYY-NNN', label: 'YYYY-NNN', example: formatInvoiceNumber(previewNum, TODAY) },
-    { value: 'YYYY-MM-DD-NNNNNN', label: 'YYYY-MM-DD-NNNNNN', example: formatInvoiceNumber(previewNum, TODAY) }
-  ];
+  var globalCount = getGlobalInvoiceCount();
+  var previewNum = globalCount + 1;
   // Temporarily override to generate examples
   var origFmt = COMPANY.invoiceFormat;
   var fmtExamples = {};
@@ -19333,7 +19338,7 @@ function renderAdmin(container) {
 
   // Compteur actuel
   factCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' } },
-    'Compteur ' + TODAY.getFullYear() + ': ' + currentCounter + ' facture' + (currentCounter > 1 ? 's' : '') + ' émise' + (currentCounter > 1 ? 's' : '')));
+    'Total: ' + globalCount + ' facture' + (globalCount > 1 ? 's' : '') + ' émise' + (globalCount > 1 ? 's' : '')));
 
   // Email d'envoi (déplacé ici depuis Entreprise)
   factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
