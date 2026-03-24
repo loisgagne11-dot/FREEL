@@ -3425,10 +3425,14 @@ function showClientModal(client) {
   openModal('formModal');
 }
 
-function calculatePaymentDeadline(invoiceDate, delaiJours) {
+function calculatePaymentDeadline(invoiceDate, delaiJours, finDeMois) {
   delaiJours = delaiJours || 30;
   var date = new Date(invoiceDate);
   date.setDate(date.getDate() + delaiJours);
+  if (finDeMois) {
+    // Fin de mois: aller au dernier jour du mois résultant
+    date = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  }
   return localISO(date);
 }
 
@@ -9731,14 +9735,16 @@ function buildInvoiceDataFromFacture(mission, facture) {
   var invoiceDate = facture.dateEmission || ligne.lastInvoiceDate || localISO(TODAY);
   var numCommande = facture.numeroCommande || ligne.numeroCommande || mission.numeroCommande || '';
   var delaiPaiement = mission.delaiPaiementFacture || 30;
-  var dateEcheance = calculatePaymentDeadline(invoiceDate, delaiPaiement);
+  var finDeMois = mission.delaiFinDeMois || false;
+  var dateEcheance = calculatePaymentDeadline(invoiceDate, delaiPaiement, finDeMois);
+  var delaiLabel = delaiPaiement + ' jours' + (finDeMois ? ' fin de mois' : '');
 
   var p = parseYM(facture.mois);
   var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
 
-  var finMois = new Date(p.y, p.m + 1, 0).getDate();
-  var jourFin = Math.min(jours, finMois) || finMois;
+  var finMoisDate = new Date(p.y, p.m + 1, 0).getDate();
+  var jourFin = Math.min(jours, finMoisDate) || finMoisDate;
   var siren = COMPANY.siret ? COMPANY.siret.substring(0, 9) : '';
 
   var titre = mission.client || '';
@@ -9753,6 +9759,8 @@ function buildInvoiceDataFromFacture(mission, facture) {
     date: fmtDate(invoiceDate),
     dateEcheance: fmtDate(dateEcheance),
     delaiPaiement: delaiPaiement,
+    delaiLabel: delaiLabel,
+    finDeMois: finDeMois,
     client: mission.client || '',
     adresseClient: mission.adresseClient || '',
     emetteur: COMPANY.nom || '',
@@ -10116,124 +10124,221 @@ function showSendInvoiceModal(facture) {
 function showInvoiceGeneratorModal(mission, monthYm) {
   var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === monthYm; }) : null;
   if (!ligne) { toast('Aucune donnée pour ce mois', 'error'); return; }
-  
+
   var jours = ligne.joursReels || ligne.joursPrevus || 0;
   var totalHT = jours * mission.tjm;
   var tvaApplicable = isTVAApplicable(monthYm + '-01');
   var tvaAmount = tvaApplicable ? Math.round(totalHT * LEGAL.tvaRate * 100) / 100 : 0;
   var totalTTC = totalHT + tvaAmount;
-  
-  // Numérotation séquentielle automatique
-  // Si la facture a déjà un numéro définitif, le réutiliser
+
   var hasDefinitiveNumber = ligne.invoiceFinalized && ligne.lastInvoiceNum;
   var defaultNum = hasDefinitiveNumber ? ligne.lastInvoiceNum : reserveInvoiceNumber(TODAY.getFullYear());
   var defaultDate = ligne.lastInvoiceDate || localISO(TODAY);
   var defaultCommande = ligne.numeroCommande || mission.numeroCommande || '';
   var defaultDelai = mission.delaiPaiementFacture || 30;
-  
+  var defaultFinDeMois = mission.delaiFinDeMois || false;
+
+  // Récupérer l'adresse client depuis la mission ou le client
+  var clientObj = getClientByName(mission.client);
+  var defaultAdresseClient = mission.adresseClient || (clientObj ? clientObj.adresse : '') || '';
+
+  // Intitulé de mission comme descriptif par défaut
+  var defaultDescriptif = mission.descriptifFacture || ('Facture pour prestation de service consultant ' + (mission.titre || mission.client) + ' sur le projet ' + (mission.titre || ''));
+
+  var p = parseYM(monthYm);
+  var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+  var finMois = new Date(p.y, p.m + 1, 0).getDate();
+  var jourFin = Math.min(jours, finMois) || finMois;
+
   $('#formModalTitle').textContent = '📄 Facture ' + mission.client + ' - ' + fmtMonth(monthYm);
   var body = $('#formModalBody');
   body.replaceChildren();
-  
+
   // Avertissement si numéro déjà finalisé
   if (hasDefinitiveNumber) {
-    var lockedInfo = el('div', { style: { background: 'var(--success-glow)', padding: '10px', borderRadius: 'var(--radius-sm)', marginBottom: '12px', fontSize: '11px' } });
-    lockedInfo.textContent = '🔒 Facture n°' + ligne.lastInvoiceNum + ' déjà enregistrée dans le livre des recettes';
-    body.appendChild(lockedInfo);
+    body.appendChild(el('div', { style: { background: 'var(--success-glow)', padding: '10px', borderRadius: 'var(--radius-sm)', marginBottom: '12px', fontSize: '11px' } }, '🔒 Facture n°' + ligne.lastInvoiceNum + ' déjà enregistrée dans le livre des recettes'));
   }
-  
+
   // Aperçu montants
   var summary = el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '12px', textAlign: 'center' } });
   summary.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, jours + ' jours × ' + EUR(mission.tjm)));
   summary.appendChild(el('div', { style: { fontSize: '20px', fontWeight: '700', color: 'var(--success)' } }, EUR(totalTTC) + ' TTC'));
   summary.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, EUR(totalHT) + ' HT' + (tvaApplicable ? ' + ' + EUR(tvaAmount) + ' TVA' : '')));
   body.appendChild(summary);
-  
-  // Champs facture
-  var fieldsDiv = el('div', { style: { background: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '12px' } });
-  
-  // N° Facture (lecture seule si finalisé)
+
+  // === SECTION 1: Informations de la facture ===
+  var sec1 = el('div', { style: { background: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '10px' } });
+  sec1.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px' } }, '📋 Informations facture'));
+
   var numInput = createInput('N° Facture', 'text', 'invNum', defaultNum);
   if (hasDefinitiveNumber) {
     numInput.querySelector('input').readOnly = true;
     numInput.querySelector('input').style.opacity = '0.7';
   }
-  
-  fieldsDiv.appendChild(el('div', { class: 'form-row' }, [
+  sec1.appendChild(el('div', { class: 'form-row' }, [
     numInput,
     createInput('Date émission', 'date', 'invDate', defaultDate)
   ]));
-  
-  // Ajout délai de paiement configurable
-  fieldsDiv.appendChild(el('div', { class: 'form-row' }, [
-    createInput('N° Commande client', 'text', 'invCommande', defaultCommande, 'Ex: 10004903'),
-    createInput('Délai paiement (jours)', 'number', 'invDelai', defaultDelai)
-  ]));
-  
-  body.appendChild(fieldsDiv);
-  
+  sec1.appendChild(createInput('N° Commande client', 'text', 'invCommande', defaultCommande, 'Ex: 10005231'));
+  body.appendChild(sec1);
+
+  // === SECTION 2: Client / Adresse de facturation ===
+  var sec2 = el('div', { style: { background: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '10px' } });
+  sec2.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px' } }, '🏢 Adresse de facturation'));
+  sec2.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' } }, 'Sera sauvegardée dans la mission pour les prochaines factures'));
+  sec2.appendChild(createInput('Nom du client', 'text', 'invClient', mission.client));
+  sec2.appendChild(createInput('Adresse de facturation', 'text', 'invAdresse', defaultAdresseClient, 'Ex: 14 RUE PAUL MESPLE, 31100 TOULOUSE'));
+  body.appendChild(sec2);
+
+  // === SECTION 3: Conditions de paiement ===
+  var sec3 = el('div', { style: { background: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '10px' } });
+  sec3.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px' } }, '💰 Conditions de paiement'));
+
+  sec3.appendChild(createSelect('Délai de règlement', 'invDelaiType', [
+    { value: '30', label: '30 jours' },
+    { value: '30_fdm', label: '30 jours fin de mois' },
+    { value: '45', label: '45 jours' },
+    { value: '45_fdm', label: '45 jours fin de mois' },
+    { value: '60', label: '60 jours' },
+    { value: '60_fdm', label: '60 jours fin de mois' },
+    { value: 'custom', label: 'Personnalisé' }
+  ], defaultFinDeMois ? defaultDelai + '_fdm' : String(defaultDelai)));
+
+  var customDelaiRow = el('div', { id: 'invCustomDelaiRow', class: 'form-row', style: { display: 'none', marginTop: '6px' } });
+  customDelaiRow.appendChild(createInput('Jours', 'number', 'invDelaiCustom', defaultDelai));
+  var fdmToggle = el('div', { class: 'toggle-row', style: { flex: '1' } });
+  fdmToggle.appendChild(el('div', { class: 'toggle-label', style: { fontSize: '11px' } }, 'Fin de mois'));
+  var fdmSwitch = el('label', { class: 'toggle-switch' });
+  fdmSwitch.innerHTML = '<input type="checkbox" id="invFDM" ' + (defaultFinDeMois ? 'checked' : '') + '><span class="toggle-slider"></span>';
+  fdmToggle.appendChild(fdmSwitch);
+  customDelaiRow.appendChild(fdmToggle);
+  sec3.appendChild(customDelaiRow);
+
+  // Date d'échéance calculée
+  var echeancePreview = el('div', { id: 'invEcheancePreview', style: { fontSize: '10px', color: 'var(--info)', marginTop: '6px', fontWeight: '600' } });
+  sec3.appendChild(echeancePreview);
+
+  // Fonction de calcul de l'échéance en temps réel
+  function updateEcheance() {
+    var dateVal = $('#invDate') ? $('#invDate').value : defaultDate;
+    var typeVal = $('#invDelaiType') ? $('#invDelaiType').value : '30';
+    var delai, fdm;
+    if (typeVal === 'custom') {
+      delai = parseInt($('#invDelaiCustom') ? $('#invDelaiCustom').value : defaultDelai) || 30;
+      fdm = $('#invFDM') ? $('#invFDM').checked : false;
+      $('#invCustomDelaiRow').style.display = 'flex';
+    } else {
+      $('#invCustomDelaiRow').style.display = 'none';
+      fdm = typeVal.indexOf('_fdm') > -1;
+      delai = parseInt(typeVal) || 30;
+    }
+    var echeance = calculatePaymentDeadline(dateVal, delai, fdm);
+    var label = delai + ' jours' + (fdm ? ' fin de mois' : '');
+    $('#invEcheancePreview').textContent = '📅 Échéance: ' + fmtDate(echeance) + ' (' + label + ')';
+  }
+
+  body.appendChild(sec3);
+
+  // === SECTION 4: Descriptif de la prestation ===
+  var sec4 = el('div', { style: { background: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '10px' } });
+  sec4.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px' } }, '📝 Descriptif prestation'));
+  sec4.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' } }, 'Apparaîtra dans le tableau de la facture'));
+
+  var descTextarea = document.createElement('textarea');
+  descTextarea.id = 'invDescriptif';
+  descTextarea.value = defaultDescriptif;
+  descTextarea.rows = 3;
+  descTextarea.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
+  sec4.appendChild(descTextarea);
+
+  // Période (affichée, calculée auto)
+  sec4.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '6px' } }, '📅 Période: du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom));
+  body.appendChild(sec4);
+
   // Vérification infos entreprise
   var missingInfos = [];
-  if (!COMPANY.nom) missingInfos.push('Nom');
+  if (!COMPANY.nom) missingInfos.push('Nom entreprise');
   if (!COMPANY.siret) missingInfos.push('SIRET');
-  if (!COMPANY.adresse) missingInfos.push('Adresse');
-  
+  if (!COMPANY.adresse) missingInfos.push('Adresse entreprise');
+  if (!defaultAdresseClient) missingInfos.push('Adresse client');
+
   if (missingInfos.length > 0) {
-    var warning = el('div', { style: { background: 'var(--warning-glow)', padding: '10px', borderRadius: 'var(--radius-sm)', marginBottom: '12px', fontSize: '10px' } });
-    warning.textContent = '⚠️ Infos manquantes: ' + missingInfos.join(', ') + ' → Compléter dans Admin';
-    body.appendChild(warning);
+    body.appendChild(el('div', { style: { background: 'rgba(251,191,36,0.1)', padding: '10px', borderRadius: 'var(--radius-sm)', marginBottom: '10px', fontSize: '10px', color: 'var(--warning)' } }, '⚠️ À compléter: ' + missingInfos.join(', ')));
   }
-  
-  // Instructions
+
   body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px', textAlign: 'center' } }, '💡 Le numéro sera verrouillé après génération (Art. L441-9)'));
-  
+
   // Bouton générer
   body.appendChild(el('button', { class: 'btn btn-success btn-block', onclick: function() {
     var invoiceNum = $('#invNum').value;
     var invoiceDate = $('#invDate').value;
-    var delaiPaiement = parseInt($('#invDelai').value) || 30;
-    
+    var typeVal = $('#invDelaiType') ? $('#invDelaiType').value : '30';
+    var delaiPaiement, finDeMois;
+    if (typeVal === 'custom') {
+      delaiPaiement = parseInt($('#invDelaiCustom').value) || 30;
+      finDeMois = $('#invFDM') ? $('#invFDM').checked : false;
+    } else {
+      finDeMois = typeVal.indexOf('_fdm') > -1;
+      delaiPaiement = parseInt(typeVal) || 30;
+    }
+    var descriptif = $('#invDescriptif') ? $('#invDescriptif').value : defaultDescriptif;
+    var adresseClient = $('#invAdresse') ? $('#invAdresse').value : '';
+    var clientName = $('#invClient') ? $('#invClient').value : mission.client;
+
     // Si pas encore finalisé, enregistrer le numéro définitif
     if (!hasDefinitiveNumber) {
-      // Utiliser le numéro séquentiel officiel
       invoiceNum = getNextInvoiceNumber(TODAY.getFullYear());
-      
-      // Enregistrer dans le livre des recettes
       registerInvoice({
         numero: invoiceNum,
         date: invoiceDate,
-        client: mission.client,
-        nature: mission.descriptifFacture || 'Prestation de service',
+        client: clientName,
+        nature: descriptif,
         montantHT: totalHT,
         tva: tvaAmount,
         montantTTC: totalTTC,
         missionId: mission.id,
         mois: monthYm
       });
-      
-      // Marquer comme finalisé
       ligne.invoiceFinalized = true;
     }
-    
+
     var opts = {
       invoiceNum: invoiceNum,
       invoiceDate: invoiceDate,
-      numeroCommande: $('#invCommande').value,
-      delaiPaiement: delaiPaiement
+      numeroCommande: $('#invCommande') ? $('#invCommande').value : '',
+      delaiPaiement: delaiPaiement,
+      finDeMois: finDeMois,
+      descriptif: descriptif,
+      adresseClient: adresseClient,
+      clientName: clientName
     };
-    
-    // Sauvegarder les valeurs dans la ligne
+
+    // Sauvegarder dans la ligne et la mission pour réutilisation
     ligne.lastInvoiceNum = opts.invoiceNum;
     ligne.lastInvoiceDate = opts.invoiceDate;
     ligne.numeroCommande = opts.numeroCommande;
     mission.delaiPaiementFacture = delaiPaiement;
+    mission.delaiFinDeMois = finDeMois;
+    mission.descriptifFacture = descriptif;
+    mission.adresseClient = adresseClient;
+    if (clientName !== mission.client && clientObj) clientObj.adresse = adresseClient;
     saveAll();
-    
+
     openInvoiceHTML(mission, monthYm, opts);
     closeModal('formModal');
   } }, hasDefinitiveNumber ? '📄 Régénérer Facture' : '📄 Générer & Enregistrer'));
-  
+
   openModal('formModal');
+
+  // Initialiser l'échéance et les listeners
+  setTimeout(function() {
+    updateEcheance();
+    if ($('#invDelaiType')) $('#invDelaiType').addEventListener('change', updateEcheance);
+    if ($('#invDate')) $('#invDate').addEventListener('change', updateEcheance);
+    if ($('#invDelaiCustom')) $('#invDelaiCustom').addEventListener('input', updateEcheance);
+    if ($('#invFDM')) $('#invFDM').addEventListener('change', updateEcheance);
+  }, 50);
 }
 
 // Générer et afficher la facture avec preview
@@ -10252,33 +10357,39 @@ function openInvoiceHTML(mission, monthYm, options) {
   var invoiceDate = options.invoiceDate || localISO(TODAY);
   var numCommande = options.numeroCommande || '';
   var delaiPaiement = options.delaiPaiement || 30;
-  
-  // Calcul de la date d'échéance
-  var dateEcheance = calculatePaymentDeadline(invoiceDate, delaiPaiement);
-  
+  var finDeMois = options.finDeMois || mission.delaiFinDeMois || false;
+  var clientName = options.clientName || mission.client || '';
+  var adresseClient = options.adresseClient || mission.adresseClient || '';
+  var descriptif = options.descriptif || mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || ''));
+
+  // Calcul de la date d'échéance avec fin de mois
+  var dateEcheance = calculatePaymentDeadline(invoiceDate, delaiPaiement, finDeMois);
+  var delaiLabel = delaiPaiement + ' jours' + (finDeMois ? ' fin de mois' : '');
+
   var p = parseYM(monthYm);
   var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
-  
-  var finMois = new Date(p.y, p.m + 1, 0).getDate();
-  var jourFin = Math.min(jours, finMois) || finMois;
+
+  var finMoisDate = new Date(p.y, p.m + 1, 0).getDate();
+  var jourFin = Math.min(jours, finMoisDate) || finMoisDate;
   var siren = COMPANY.siret ? COMPANY.siret.substring(0, 9) : '';
-  
-  var titre = mission.client || '';
+
+  var titre = clientName;
   if (numCommande) titre += ' - Commande n°' + numCommande;
   titre += ' - ' + moisNom;
-  
-  var descriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || ''));
+
   var periode = 'du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
-  
+
   // Données facture pour l'affichage
   var invoiceData = {
     num: invoiceNum,
     date: fmtDate(invoiceDate),
-    dateEcheance: fmtDate(dateEcheance), // Ajout échéance
-    delaiPaiement: delaiPaiement, // Délai en jours
-    client: mission.client || '',
-    adresseClient: mission.adresseClient || '',
+    dateEcheance: fmtDate(dateEcheance),
+    delaiPaiement: delaiPaiement,
+    delaiLabel: delaiLabel,
+    finDeMois: finDeMois,
+    client: clientName,
+    adresseClient: adresseClient,
     emetteur: COMPANY.nom || '',
     adresseEmetteur: (COMPANY.adresse || '') + (COMPANY.codePostal ? ', ' + COMPANY.codePostal : '') + (COMPANY.commune ? ' ' + COMPANY.commune : ''),
     siret: COMPANY.siret || '',
@@ -10445,7 +10556,7 @@ function showInvoicePreviewWithSend(data, sendOpts) {
 
 // Générer le contenu HTML de la facture (pour preview)
 function generateInvoiceHTMLContent(d) {
-  var fmtEur = function(n) { return (n == null || isNaN(n) ? 0 : n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+  var fmtEur = function(n) { return (n == null || isNaN(n) ? 0 : n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/[\u00A0\u202F]/g, ' '); };
   var e = escapeHTML;
   var col = '#3d5a80'; // bleu acier
 
@@ -10471,7 +10582,7 @@ function generateInvoiceHTMLContent(d) {
     '</div>' +
     '<div style="display:flex;justify-content:space-between;margin-bottom:25px;font-size:9.5pt;color:#333;">' +
       '<div>Date d\'émission : ' + e(d.date) + '</div>' +
-      '<div>Règlement : ' + (d.delaiPaiement || 30) + ' jours</div>' +
+      '<div>Règlement : ' + e(d.delaiLabel || ((d.delaiPaiement || 30) + ' jours')) + '</div>' +
     '</div>' +
 
     // === TABLEAU ===
@@ -10537,7 +10648,8 @@ function downloadInvoiceHTML(data) {
 function generateAndDownloadPDF(data) {
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF();
-  var fmtN = function(n) { return (n == null || isNaN(n) ? 0 : n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
+  // Formatage des nombres: remplacer espaces insécables par espaces normaux (jsPDF ne gère pas U+202F)
+  var fmtN = function(n) { return (n == null || isNaN(n) ? 0 : n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/[\u00A0\u202F]/g, ' '); };
   var col = [61, 90, 128]; // bleu acier #3d5a80
 
   // === ÉMETTEUR (haut gauche) ===
@@ -10588,7 +10700,7 @@ function generateAndDownloadPDF(data) {
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(51);
   doc.text('Date d\'emission : ' + data.date, 20, yF);
-  doc.text('Reglement : ' + (data.delaiPaiement || 30) + ' jours', 140, yF);
+  doc.text('Reglement : ' + (data.delaiLabel || ((data.delaiPaiement || 30) + ' jours')), 140, yF);
   yF += 12;
 
   // === TABLEAU ===
@@ -10715,7 +10827,7 @@ function generateAndDownloadPDF(data) {
 
 // Fallback: télécharger en HTML
 function downloadInvoiceAsHTML(data) {
-  var fmtEur = function(n) { return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' EUR'; };
+  var fmtEur = function(n) { return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}).replace(/[\u00A0\u202F]/g, ' ') + ' EUR'; };
   
   var htmlContent = '<!DOCTYPE html>\n<html lang="fr">\n<head>\n<meta charset="UTF-8">\n<title>Facture ' + data.num + '</title>\n' +
     '<style>\n' +
