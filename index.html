@@ -10383,40 +10383,40 @@ function showInvoicePreviewWithSend(data, sendOpts) {
   var toolbarBtns = document.createElement('div');
   toolbarBtns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
 
-  // Bouton 1: Télécharger PDF
-  var btnDownload = document.createElement('button');
-  btnDownload.textContent = '📥 Télécharger PDF';
-  btnDownload.style.cssText = 'background:linear-gradient(135deg,#00d9ff,#0099ff);color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;';
-  btnDownload.onclick = function() {
+  // Bouton unique: Télécharger PDF + Ouvrir email + Marquer envoyée
+  var btnSend = document.createElement('button');
+  btnSend.textContent = '📥 Télécharger PDF + 📧 Envoyer';
+  btnSend.style.cssText = 'background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;';
+  btnSend.onclick = function() {
+    // 1. Télécharger le PDF
     downloadInvoiceHTML(data);
-    btnDownload.textContent = '✅ PDF téléchargé';
-    btnDownload.style.background = '#22c55e';
-    setTimeout(function() { btnDownload.textContent = '📥 Télécharger PDF'; btnDownload.style.background = 'linear-gradient(135deg,#00d9ff,#0099ff)'; }, 2000);
-  };
-  toolbarBtns.appendChild(btnDownload);
 
-  // Bouton 2: Envoyer par email (ouvre mailto + marque envoyée)
-  var btnEmail = document.createElement('button');
-  btnEmail.textContent = '📧 Ouvrir email & marquer envoyée';
-  btnEmail.style.cssText = 'background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;';
-  btnEmail.onclick = function() {
-    // Ouvrir mailto
-    var mailto = 'mailto:' + encodeURIComponent(sendOpts.email) +
-      '?subject=' + encodeURIComponent(sendOpts.subject) +
-      '&body=' + encodeURIComponent(sendOpts.body);
-    window.open(mailto, '_blank');
+    // 2. Ouvrir mailto (petit délai pour que le PDF se lance d'abord)
+    setTimeout(function() {
+      var mailto = 'mailto:' + encodeURIComponent(sendOpts.email) +
+        '?subject=' + encodeURIComponent(sendOpts.subject) +
+        '&body=' + encodeURIComponent(sendOpts.body);
+      window.open(mailto, '_blank');
+    }, 300);
 
-    // Marquer comme envoyée
+    // 3. Marquer comme envoyée
     if (sendOpts.onSend) sendOpts.onSend();
 
-    btnEmail.textContent = '✅ Marquée envoyée';
-    btnEmail.style.background = '#22c55e';
-    btnEmail.disabled = true;
-    toast('Email ouvert — joignez le PDF téléchargé et envoyez !', 'success');
+    btnSend.textContent = '✅ PDF téléchargé + email ouvert';
+    btnSend.style.background = '#16a34a';
+    btnSend.disabled = true;
+    toast('PDF téléchargé + email ouvert — joignez le PDF et envoyez !', 'success');
   };
-  toolbarBtns.appendChild(btnEmail);
+  toolbarBtns.appendChild(btnSend);
 
-  // Bouton 3: Fermer
+  // Bouton: juste télécharger
+  var btnDL = document.createElement('button');
+  btnDL.textContent = '📥 PDF seul';
+  btnDL.style.cssText = 'background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:500;font-size:12px;';
+  btnDL.onclick = function() { downloadInvoiceHTML(data); toast('PDF téléchargé', 'success'); };
+  toolbarBtns.appendChild(btnDL);
+
+  // Fermer
   var btnClose = document.createElement('button');
   btnClose.textContent = '✕';
   btnClose.style.cssText = 'background:#444;color:#fff;border:none;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:16px;';
@@ -10425,12 +10425,6 @@ function showInvoicePreviewWithSend(data, sendOpts) {
 
   toolbar.appendChild(toolbarBtns);
   overlay.appendChild(toolbar);
-
-  // Info workflow
-  var infoBar = document.createElement('div');
-  infoBar.style.cssText = 'background:rgba(139,92,246,0.15);padding:10px 20px;font-size:11px;color:#c4b5fd;display:flex;align-items:center;gap:12px;flex-wrap:wrap;';
-  infoBar.innerHTML = '<span style="font-weight:700;">Workflow :</span> <span>① Vérifiez la facture ci-dessous</span> <span>→</span> <span>② Téléchargez le PDF</span> <span>→</span> <span>③ Ouvrez l\'email & joignez le PDF</span>';
-  overlay.appendChild(infoBar);
 
   // Container facture
   var container = document.createElement('div');
@@ -10451,95 +10445,78 @@ function showInvoicePreviewWithSend(data, sendOpts) {
 
 // Générer le contenu HTML de la facture (pour preview)
 function generateInvoiceHTMLContent(d) {
-  var fmtEur = function(n) { return n.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' €'; };
-  // SPRINT 1: Sécurité — échapper toutes les données utilisateur
+  var fmtEur = function(n) { return (n == null || isNaN(n) ? 0 : n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
   var e = escapeHTML;
+  var col = '#3d5a80'; // bleu acier
 
-  return '<div style="display:flex;justify-content:space-between;margin-bottom:25px;">' +
-    // Emetteur (gauche)
-    '<div style="flex:1;">' +
-      '<div style="font-size:14pt;font-weight:bold;color:#1a1a2e;margin-bottom:8px;">Entreprise individuelle</div>' +
-      '<div style="font-size:12pt;font-weight:bold;margin-bottom:4px;">' + e(d.emetteur) + '</div>' +
-      '<div style="color:#555;font-size:9pt;line-height:1.5;">' +
-        (d.adresseEmetteur ? e(d.adresseEmetteur) + '<br>' : '') +
-        'France<br>' +
-        (d.siret ? 'SIRET: ' + e(d.siret) + '<br>' : '') +
-        (d.tvaIntra ? 'TVA Intra: ' + e(d.tvaIntra) : '') +
-      '</div>' +
+  return '' +
+    // === ÉMETTEUR (haut gauche) ===
+    '<div style="color:' + col + ';font-size:9.5pt;line-height:1.6;margin-bottom:30px;">' +
+      '<div>Entreprise individuelle ' + e(d.emetteur) + '</div>' +
+      (d.adresseEmetteur ? '<div>' + e(d.adresseEmetteur).replace(/,/g, '<br>') + '</div>' : '') +
+      '<div>FR</div>' +
     '</div>' +
-    // Client (droite)
-    '<div style="background:#f0f4f8;border-left:4px solid #0099ff;padding:15px;min-width:200px;">' +
-      '<div style="font-size:9pt;color:#666;margin-bottom:4px;">FACTURER À</div>' +
-      '<div style="font-weight:bold;font-size:11pt;">' + e(d.client) + '</div>' +
-      (d.adresseClient ? '<div style="color:#555;font-size:9pt;margin-top:4px;">' + e(d.adresseClient).replace(/,/g, '<br>') + '</div>' : '') +
+
+    // === CLIENT (droite, en gras) ===
+    '<div style="text-align:right;margin-bottom:30px;">' +
+      '<div style="font-weight:bold;font-size:12pt;color:#1a1a2e;">' + e(d.client) + '</div>' +
+      (d.adresseClient ? '<div style="color:#555;font-size:9pt;line-height:1.5;margin-top:4px;">' + e(d.adresseClient).replace(/,/g, '<br>') + '</div>' : '') +
+      '<div style="color:#555;font-size:9pt;">France</div>' +
     '</div>' +
-  '</div>' +
-  // Infos facture
-  '<div style="display:flex;gap:30px;margin-bottom:20px;font-size:10pt;padding:12px;background:#f8f9fa;border-radius:6px;">' +
-    '<div><span style="color:#666;">Facture N° </span><strong style="color:#1a1a2e;">' + e(d.num) + '</strong></div>' +
-    '<div><span style="color:#666;">Date: </span><strong>' + e(d.date) + '</strong></div>' +
-    '<div><span style="color:#666;">Échéance: </span><strong style="color:#c53030;">' + e(d.dateEcheance) + '</strong></div>' +
-    (d.numCommande ? '<div><span style="color:#666;">Réf. commande: </span><strong>' + e(d.numCommande) + '</strong></div>' : '') +
-  '</div>' +
-  // Titre
-  '<div style="font-size:11pt;font-weight:bold;color:#1a1a2e;margin-bottom:15px;">' + e(d.titre) + '</div>' +
-  // Tableau prestations avec totaux intégrés
-  '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;">' +
-    '<thead><tr style="background:#1a1a2e;color:#fff;">' +
-      '<th style="padding:10px;text-align:left;font-weight:500;">Désignation</th>' +
-      '<th style="padding:10px;text-align:center;width:50px;font-weight:500;">Qté</th>' +
-      '<th style="padding:10px;text-align:center;width:50px;font-weight:500;">Unité</th>' +
-      '<th style="padding:10px;text-align:right;width:80px;font-weight:500;">P.U. HT</th>' +
-      '<th style="padding:10px;text-align:center;width:45px;font-weight:500;">TVA</th>' +
-      '<th style="padding:10px;text-align:right;width:90px;font-weight:500;">Montant HT</th>' +
-    '</tr></thead>' +
-    '<tbody>' +
-      '<tr style="border-bottom:1px solid #eee;">' +
-        '<td style="padding:12px 10px;vertical-align:top;">' +
-          '<div style="font-weight:500;">' + e(d.descriptif) + '</div>' +
-          '<div style="font-size:9pt;color:#666;margin-top:4px;">Période: ' + e(d.periode) + '</div>' +
-        '</td>' +
-        '<td style="padding:12px 10px;text-align:center;">' + e(d.jours) + '</td>' +
-        '<td style="padding:12px 10px;text-align:center;">jour(s)</td>' +
-        '<td style="padding:12px 10px;text-align:right;">' + fmtEur(d.tjm) + '</td>' +
-        '<td style="padding:12px 10px;text-align:center;">' + e(d.tvaRate) + '%</td>' +
-        '<td style="padding:12px 10px;text-align:right;font-weight:500;">' + fmtEur(d.totalHT) + '</td>' +
-      '</tr>' +
-      // Ligne vide séparatrice
-      '<tr><td colspan="6" style="padding:5px;"></td></tr>' +
-      // Total HT
-      '<tr style="background:#f8f9fa;">' +
-        '<td colspan="4"></td>' +
-        '<td style="padding:8px 10px;text-align:right;font-weight:500;color:#666;">Total HT</td>' +
-        '<td style="padding:8px 10px;text-align:right;font-weight:600;">' + fmtEur(d.totalHT) + '</td>' +
-      '</tr>' +
-      // TVA
-      '<tr style="background:#f8f9fa;">' +
-        '<td colspan="4"></td>' +
-        '<td style="padding:8px 10px;text-align:right;font-weight:500;color:#666;">TVA ' + e(d.tvaRate) + '%</td>' +
-        '<td style="padding:8px 10px;text-align:right;font-weight:600;">' + fmtEur(d.tvaAmount) + '</td>' +
-      '</tr>' +
-      // Total TTC
-      '<tr style="background:#1a1a2e;color:#fff;">' +
-        '<td colspan="4"></td>' +
-        '<td style="padding:10px;text-align:right;font-weight:bold;">TOTAL TTC</td>' +
-        '<td style="padding:10px;text-align:right;font-weight:bold;font-size:12pt;">' + fmtEur(d.totalTTC) + '</td>' +
-      '</tr>' +
-    '</tbody>' +
-  '</table>' +
-  // Coordonnées bancaires
-  (d.iban ? '<div style="background:#f8f9fa;border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:20px;">' +
-    '<div style="font-weight:bold;margin-bottom:8px;font-size:10pt;">💳 Coordonnées bancaires</div>' +
-    '<div style="font-family:monospace;font-size:11pt;letter-spacing:1px;">' + e(d.iban) + '</div>' +
-  '</div>' : '') +
-  // Mentions légales - SPRINT 1: Conditions de paiement complètes (Art. L441-9)
-  '<div style="font-size:8pt;color:#888;line-height:1.6;border-top:1px solid #ddd;padding-top:15px;">' +
-    '<div style="margin-bottom:8px;"><strong>Conditions de paiement:</strong> Paiement à ' + (d.delaiPaiement || 30) + ' jours à compter de la date de facturation. Date d\'échéance: ' + e(d.dateEcheance) + '</div>' +
-    '<div style="margin-bottom:8px;">En cas de retard de paiement, une pénalité de 3 fois le taux d\'intérêt légal sera appliquée (taux BCE + 10 points), ' +
-    'à laquelle s\'ajoutera une indemnité forfaitaire pour frais de recouvrement de 40 €. Pas d\'escompte pour paiement anticipé.</div>' +
-    '<div>SIREN ' + e(d.siren) + ' - RCS TOULOUSE - APE 6201Z</div>' +
-    (d.tvaRate === 0 ? '<div style="font-weight:500;margin-top:4px;">TVA non applicable, article 293 B du CGI</div>' : '') +
-  '</div>';
+
+    // === FACTURE N° + COMMANDE + PÉRIODE ===
+    '<div style="margin-bottom:4px;">' +
+      '<div style="font-weight:bold;font-size:11pt;color:' + col + ';">Facture N° ' + e(d.num) + '</div>' +
+      (d.numCommande ? '<div style="color:' + col + ';font-size:9.5pt;">' + e(d.client) + ' Commande n°' + e(d.numCommande) + ' pour la période de ' + e(d.titre).split(' - ').pop() + '</div>' : '') +
+    '</div>' +
+    '<div style="display:flex;justify-content:space-between;margin-bottom:25px;font-size:9.5pt;color:#333;">' +
+      '<div>Date d\'émission : ' + e(d.date) + '</div>' +
+      '<div>Règlement : ' + (d.delaiPaiement || 30) + ' jours</div>' +
+    '</div>' +
+
+    // === TABLEAU ===
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;">' +
+      '<thead><tr style="background:' + col + ';color:#fff;">' +
+        '<th style="padding:8px 10px;text-align:left;font-weight:500;font-size:9pt;">Désignation</th>' +
+        '<th style="padding:8px 10px;text-align:center;width:60px;font-weight:500;font-size:9pt;">Quantité</th>' +
+        '<th style="padding:8px 10px;text-align:center;width:50px;font-weight:500;font-size:9pt;">Unité</th>' +
+        '<th style="padding:8px 10px;text-align:right;width:70px;font-weight:500;font-size:9pt;">Prix unitaire</th>' +
+        '<th style="padding:8px 10px;text-align:center;width:45px;font-weight:500;font-size:9pt;">TVA</th>' +
+        '<th style="padding:8px 10px;text-align:right;width:90px;font-weight:500;font-size:9pt;">Montant HT</th>' +
+      '</tr></thead>' +
+      '<tbody>' +
+        '<tr style="border-bottom:1px solid #ddd;">' +
+          '<td style="padding:12px 10px;vertical-align:top;font-size:9pt;">' +
+            '<div>Descriptif : ' + e(d.descriptif) + ' ' + e(d.periode) + '.</div>' +
+          '</td>' +
+          '<td style="padding:12px 10px;text-align:center;font-size:9pt;">' + fmtEur(d.jours) + '</td>' +
+          '<td style="padding:12px 10px;text-align:center;font-size:9pt;">jours</td>' +
+          '<td style="padding:12px 10px;text-align:right;font-size:9pt;">' + fmtEur(d.tjm) + '</td>' +
+          '<td style="padding:12px 10px;text-align:center;font-size:9pt;">' + (d.tvaRate || 0) + '%</td>' +
+          '<td style="padding:12px 10px;text-align:right;font-weight:bold;font-size:9pt;">' + fmtEur(d.totalHT) + '</td>' +
+        '</tr>' +
+      '</tbody>' +
+    '</table>' +
+
+    // === TOTAUX (alignés à droite) ===
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:30px;">' +
+      '<table style="border-collapse:collapse;min-width:250px;">' +
+        '<tr><td style="padding:6px 15px;text-align:left;font-size:9.5pt;color:#555;">Total HT</td>' +
+            '<td style="padding:6px 15px;text-align:right;font-weight:bold;font-size:9.5pt;color:' + col + ';">' + fmtEur(d.totalHT) + ' €</td></tr>' +
+        (d.tvaRate > 0 ? '<tr><td style="padding:6px 15px;text-align:left;font-size:9.5pt;color:#555;">TVA ' + d.tvaRate + '%</td>' +
+            '<td style="padding:6px 15px;text-align:right;font-weight:bold;font-size:9.5pt;color:' + col + ';">' + fmtEur(d.tvaAmount) + ' €</td></tr>' : '') +
+        '<tr style="border-top:1px solid #ccc;"><td style="padding:8px 15px;text-align:left;font-weight:bold;font-size:10pt;">Total TTC</td>' +
+            '<td style="padding:8px 15px;text-align:right;font-weight:bold;font-size:10pt;background:#f0f4f8;border-radius:4px;">' + fmtEur(d.totalTTC) + ' €</td></tr>' +
+      '</table>' +
+    '</div>' +
+
+    // === MENTIONS LÉGALES (bas de page, sobre) ===
+    '<div style="font-size:8pt;color:#888;line-height:1.7;border-top:1px solid #ddd;padding-top:15px;margin-top:auto;">' +
+      '<div>En cas de retard de paiement, une pénalité de 3 fois le taux d\'intérêt légal sera appliquée, à laquelle s\'ajoutera une indemnité forfaitaire pour frais de recouvrement de 40€.</div>' +
+      (d.tvaRate === 0 ? '<div style="margin-top:6px;">TVA non applicable, article 293 B du CGI.</div>' : '') +
+      (d.tvaIntra ? '<div style="margin-top:6px;">N° TVA intracommunautaire : ' + e(d.tvaIntra) + '. En attente de numéro de TVA intracommunautaire. Je vous le transmets dès que je l\'obtiens.</div>' : '') +
+      '<div style="margin-top:6px;">SIRET ' + e(d.siret) + ' - SIREN ' + e(d.siren) + '</div>' +
+    '</div>';
 }
 
 // Télécharger la facture - PDF si possible, sinon HTML
@@ -10561,193 +10538,146 @@ function generateAndDownloadPDF(data) {
   var jsPDF = window.jspdf.jsPDF;
   var doc = new jsPDF();
   var fmtN = function(n) { return (n == null || isNaN(n) ? 0 : n).toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2}); };
-  
-  // === EN-TÊTE ÉMETTEUR (gauche) ===
-  doc.setFontSize(13);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(26, 26, 46);
-  doc.text('Entreprise individuelle', 20, 22);
-  
-  doc.setFontSize(11);
-  doc.text(data.emetteur, 20, 30);
-  
+  var col = [61, 90, 128]; // bleu acier #3d5a80
+
+  // === ÉMETTEUR (haut gauche) ===
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100);
-  var yE = 38;
+  doc.setTextColor(col[0], col[1], col[2]);
+  var yE = 22;
+  doc.text('Entreprise individuelle ' + data.emetteur, 20, yE); yE += 5;
   if (data.adresseEmetteur) {
-    var addrLines = data.adresseEmetteur.split(',');
-    addrLines.forEach(function(line) {
-      doc.text(line.trim(), 20, yE);
-      yE += 5;
-    });
+    var addrParts = data.adresseEmetteur.split(',');
+    addrParts.forEach(function(part) { doc.text(part.trim(), 20, yE); yE += 5; });
   }
-  doc.text('France', 20, yE); yE += 5;
-  if (data.siret) { doc.text('SIRET: ' + data.siret, 20, yE); yE += 5; }
-  if (data.tvaIntra) { doc.text('TVA Intra: ' + data.tvaIntra, 20, yE); }
-  
-  // === CLIENT (droite) ===
-  doc.setFillColor(240, 244, 248);
-  doc.rect(120, 18, 75, 30, 'F');
-  doc.setFillColor(0, 153, 255);
-  doc.rect(120, 18, 3, 30, 'F');
-  
-  doc.setFontSize(8);
-  doc.setTextColor(100);
-  doc.text('FACTURER A', 128, 25);
-  
+  doc.text('FR', 20, yE); yE += 5;
+
+  // === CLIENT (haut droite, en gras) ===
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0);
-  doc.text(data.client, 128, 33);
-  
+  doc.setTextColor(26, 26, 46);
+  doc.text(data.client, 195, 22, { align: 'right' });
   if (data.adresseClient) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(80);
-    var clientAddr = data.adresseClient.replace(/,/g, ' - ');
-    if (clientAddr.length > 40) clientAddr = clientAddr.substring(0, 40) + '...';
-    doc.text(clientAddr, 128, 41);
+    var clientLines = data.adresseClient.split(',');
+    var yC = 28;
+    clientLines.forEach(function(line) { doc.text(line.trim(), 195, yC, { align: 'right' }); yC += 5; });
+    doc.text('France', 195, yC, { align: 'right' });
   }
-  
-  // === INFOS FACTURE ===
-  var yInfo = 60;
-  doc.setFillColor(248, 249, 250);
-  doc.rect(20, yInfo - 5, 175, 18, 'F');
-  
-  doc.setFontSize(9);
-  doc.setTextColor(100);
-  doc.setFont('helvetica', 'normal');
-  doc.text('Facture N.', 25, yInfo + 2);
-  doc.text('Date:', 70, yInfo + 2);
-  doc.text('Echeance:', 115, yInfo + 2);
-  if (data.numCommande) doc.text('Ref. commande:', 155, yInfo + 2);
-  
-  doc.setTextColor(26, 26, 46);
-  doc.setFont('helvetica', 'bold');
-  doc.text(data.num, 25, yInfo + 8);
-  doc.text(data.date, 70, yInfo + 8);
-  doc.setTextColor(180, 0, 0); // Rouge pour l'échéance
-  doc.text(data.dateEcheance || '30 jours', 115, yInfo + 8);
-  doc.setTextColor(26, 26, 46);
-  if (data.numCommande) doc.text(data.numCommande, 155, yInfo + 8);
-  
-  // === TITRE ===
+
+  // === FACTURE N° ===
+  var yF = Math.max(yE, 50) + 5;
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(26, 26, 46);
-  var titreLines = doc.splitTextToSize(data.titre, 170);
-  doc.text(titreLines, 20, 88);
-  
+  doc.setTextColor(col[0], col[1], col[2]);
+  doc.text('Facture N' + String.fromCharCode(176) + ' ' + data.num, 20, yF);
+  yF += 6;
+
+  // Commande + période
+  if (data.numCommande) {
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(data.client + ' Commande n' + String.fromCharCode(176) + data.numCommande + ' pour la periode de ' + (data.titre.split(' - ').pop() || ''), 20, yF);
+    yF += 6;
+  }
+
+  // Date + règlement
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(51);
+  doc.text('Date d\'emission : ' + data.date, 20, yF);
+  doc.text('Reglement : ' + (data.delaiPaiement || 30) + ' jours', 140, yF);
+  yF += 12;
+
   // === TABLEAU ===
-  var tableY = 100;
-  
+  var tableY = yF;
+
   // Header
-  doc.setFillColor(26, 26, 46);
+  doc.setFillColor(col[0], col[1], col[2]);
   doc.rect(20, tableY, 175, 10, 'F');
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255);
   doc.text('Designation', 22, tableY + 7);
-  doc.text('Qte', 110, tableY + 7);
-  doc.text('Unite', 125, tableY + 7);
-  doc.text('P.U. HT', 145, tableY + 7);
-  doc.text('TVA', 165, tableY + 7);
-  doc.text('Montant HT', 180, tableY + 7);
-  
+  doc.text('Quantite', 108, tableY + 7);
+  doc.text('Unite', 128, tableY + 7);
+  doc.text('Prix unitaire', 146, tableY + 7);
+  doc.text('TVA', 170, tableY + 7);
+  doc.text('Montant HT', 186, tableY + 7);
+
   // Ligne de données
-  tableY += 12;
+  tableY += 14;
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(0);
   doc.setFontSize(9);
-  
-  var descLines = doc.splitTextToSize(data.descriptif, 85);
+
+  var descText = 'Descriptif : ' + data.descriptif + ' ' + data.periode + '.';
+  var descLines = doc.splitTextToSize(descText, 84);
   descLines.forEach(function(line, idx) {
-    doc.text(line, 22, tableY + 5 + (idx * 4));
+    doc.text(line, 22, tableY + (idx * 5));
   });
-  
-  doc.setFontSize(8);
-  doc.setTextColor(100);
-  doc.text('Periode: ' + data.periode, 22, tableY + 5 + descLines.length * 4 + 2);
-  
-  var dataY = tableY + 5 + Math.max(descLines.length * 4, 4);
-  doc.setTextColor(0);
-  doc.setFontSize(9);
-  doc.text(String(data.jours), 110, dataY);
-  doc.text('jour(s)', 125, dataY);
-  doc.text(fmtN(data.tjm), 145, dataY);
-  doc.text(data.tvaRate + '%', 165, dataY);
+
+  var dataY = tableY + Math.max((descLines.length - 1) * 5, 0);
+  doc.text(fmtN(data.jours), 112, dataY, { align: 'center' });
+  doc.text('jours', 132, dataY);
+  doc.text(fmtN(data.tjm), 160, dataY, { align: 'right' });
+  doc.text((data.tvaRate || 0) + '%', 174, dataY);
   doc.setFont('helvetica', 'bold');
-  doc.text(fmtN(data.totalHT), 180, dataY);
-  
+  doc.text(fmtN(data.totalHT), 195, dataY, { align: 'right' });
+
   // Ligne séparation
+  var sepY = dataY + 10;
   doc.setDrawColor(200);
-  doc.line(20, dataY + 8, 195, dataY + 8);
-  
-  // === TOTAUX (dans le tableau) ===
-  var totY = dataY + 16;
-  
-  // Total HT
-  doc.setFillColor(248, 249, 250);
-  doc.rect(120, totY - 4, 75, 10, 'F');
+  doc.line(20, sepY, 195, sepY);
+
+  // === TOTAUX (alignés à droite) ===
+  var totY = sepY + 12;
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(100);
-  doc.text('Total HT', 145, totY + 2);
-  doc.setTextColor(0);
+  doc.setTextColor(80);
+  doc.text('Total HT', 148, totY);
+  doc.setTextColor(col[0], col[1], col[2]);
   doc.setFont('helvetica', 'bold');
-  doc.text(fmtN(data.totalHT) + ' EUR', 192, totY + 2, { align: 'right' });
-  
-  // TVA
-  totY += 10;
-  doc.setFillColor(248, 249, 250);
-  doc.rect(120, totY - 4, 75, 10, 'F');
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100);
-  doc.text('TVA ' + data.tvaRate + '%', 145, totY + 2);
-  doc.setTextColor(0);
-  doc.setFont('helvetica', 'bold');
-  doc.text(fmtN(data.tvaAmount) + ' EUR', 192, totY + 2, { align: 'right' });
-  
-  // Total TTC
-  totY += 10;
-  doc.setFillColor(26, 26, 46);
-  doc.rect(120, totY - 4, 75, 12, 'F');
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255);
-  doc.text('TOTAL TTC', 145, totY + 3);
-  doc.text(fmtN(data.totalTTC) + ' EUR', 192, totY + 3, { align: 'right' });
-  
-  // === COORDONNÉES BANCAIRES ===
-  if (data.iban) {
-    var ibanY = totY + 20;
-    doc.setFillColor(248, 249, 250);
-    doc.setDrawColor(200);
-    doc.roundedRect(20, ibanY, 175, 16, 2, 2, 'FD');
-    
-    doc.setFontSize(9);
+  doc.text(fmtN(data.totalHT) + ' ' + String.fromCharCode(8364), 195, totY, { align: 'right' });
+
+  if (data.tvaRate > 0) {
+    totY += 8;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80);
+    doc.text('TVA ' + data.tvaRate + '%', 148, totY);
+    doc.setTextColor(col[0], col[1], col[2]);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0);
-    doc.text('Coordonnees bancaires', 25, ibanY + 6);
-    
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(10);
-    doc.text(data.iban, 25, ibanY + 12);
+    doc.text(fmtN(data.tvaAmount) + ' ' + String.fromCharCode(8364), 195, totY, { align: 'right' });
   }
-  
-  // === FOOTER ===
+
+  // Total TTC avec fond
+  totY += 10;
+  doc.setDrawColor(180);
+  doc.line(140, totY - 4, 195, totY - 4);
+  doc.setFillColor(240, 244, 248);
+  doc.rect(140, totY - 3, 55, 11, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(26, 26, 46);
+  doc.text('Total TTC', 143, totY + 4);
+  doc.text(fmtN(data.totalTTC) + ' ' + String.fromCharCode(8364), 193, totY + 4, { align: 'right' });
+
+  // === MENTIONS LÉGALES (bas de page) ===
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(130);
-  // Conditions de paiement complètes
-  doc.text('Conditions de paiement: ' + (data.delaiPaiement || 30) + ' jours. Echeance: ' + (data.dateEcheance || 'A reception'), 20, 250);
-  doc.text('En cas de retard de paiement, une penalite de 3 fois le taux d\'interet legal sera appliquee (taux BCE + 10 pts),', 20, 255);
-  doc.text('a laquelle s\'ajoutera une indemnite forfaitaire pour frais de recouvrement de 40 EUR. Pas d\'escompte pour paiement anticipe.', 20, 259);
-  doc.text('SIREN ' + data.siren + ' - RCS TOULOUSE - APE 6201Z', 20, 265);
+  doc.text('En cas de retard de paiement, une penalite de 3 fois le taux d\'interet legal sera appliquee, a laquelle s\'ajoutera une', 20, 252);
+  doc.text('indemnite forfaitaire pour frais de recouvrement de 40' + String.fromCharCode(8364) + '.', 20, 256);
   if (data.tvaRate === 0) {
-    doc.text('TVA non applicable, article 293 B du CGI', 20, 269);
+    doc.text('TVA non applicable, article 293 B du CGI.', 20, 261);
   }
+  if (data.tvaIntra) {
+    doc.text('N' + String.fromCharCode(176) + ' TVA intracommunautaire : ' + data.tvaIntra, 20, data.tvaRate === 0 ? 265 : 261);
+  }
+  doc.text('SIRET ' + data.siret + ' - SIREN ' + data.siren, 20, 270);
   
   // Nom de fichier
   var filename = 'Facture-' + data.num + '.pdf';
