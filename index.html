@@ -637,9 +637,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .actions-list { display: flex; flex-direction: column; gap: 8px; }
 .action-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; }
 .action-item:hover { border-color: var(--accent); transform: translateX(4px); }
-.action-item.overdue { border-left: 3px solid var(--danger); background: linear-gradient(90deg, rgba(248,113,113,0.12), transparent); }
-.action-item.current { border-left: 3px solid var(--border); }
-.action-item.completed-action { border-left: 3px solid var(--success); background: linear-gradient(90deg, rgba(52,211,153,0.08), transparent); opacity: 0.85; }
+.action-item.overdue { border-left: 4px solid var(--danger); background: linear-gradient(90deg, rgba(248,113,113,0.15), transparent); }
+.action-item.current { border-left: 4px solid var(--glass-border); background: var(--bg-secondary); }
+.action-item.completed-action { border-left: 4px solid var(--success); background: linear-gradient(90deg, rgba(52,211,153,0.10), transparent); }
 .action-icon { font-size: 20px; flex-shrink: 0; }
 .action-content { flex: 1; min-width: 0; }
 .action-label { font-size: 13px; font-weight: 600; }
@@ -12136,12 +12136,13 @@ function renderActionsWidget(container) {
     var item = el('div', { class: cardClass, onclick: function() { a.detail(); } });
     item.appendChild(el('div', { class: 'action-icon' }, a.icon));
 
-    // Couleur du texte contextuel (TVA rose, URSSAF bleu, etc.)
+    // Couleur du texte: couleur du sujet si cat, sinon rouge si overdue, sinon défaut
     var labelColor = '';
-    if (a.cat === 'tva') labelColor = 'var(--pink, #ec4899)';
+    if (a.cat === 'tva') labelColor = '#ec4899';
     else if (a.cat === 'urssaf') labelColor = 'var(--info)';
     else if (a.cat === 'ir') labelColor = 'var(--warning)';
     else if (a.cat === 'cfe') labelColor = 'var(--accent)';
+    else if (a.type === 'overdue') labelColor = 'var(--danger)';
 
     var contentChildren = [
       el('div', { class: 'action-label', style: labelColor ? { color: labelColor } : {} }, a.label),
