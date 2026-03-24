@@ -8282,6 +8282,8 @@ function showMissionModal(mission) {
     id: 'M' + Date.now(), client: '', clientId: '', titre: '', site: '', debut: tomorrowStr, fin: '',
     tjm: 0, delaiPaiement: 2, jourPaiement: 15,
     adresseClient: '', numeroCommande: '', descriptifFacture: '',
+    delaiPaiementFacture: 0, delaiFinDeMois: false,
+    factureDestinataire: 'agence', modeTravail: 'presentiel',
     statut: 'active',
     periodes: [],
     congesDates: [],
@@ -8302,15 +8304,15 @@ function showMissionModal(mission) {
 
   // SPRINT 7: Indicateur de progression visuel
   var progressDiv = el('div', { style: { display: 'flex', gap: '4px', marginBottom: '16px', justifyContent: 'center' } });
-  ['1. Mission', '2. Rythme', '3. Client Op.', '4. Agence', '5. Facturation'].forEach(function(s, i) {
+  ['1. Mission', '2. Planning', '3. Client Op.', '4. Agence', '5. Facturation'].forEach(function(s, i) {
     progressDiv.appendChild(el('div', { style: { padding: '4px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: '700', background: i === 0 ? 'var(--accent)' : 'var(--bg-tertiary)', color: i === 0 ? '#fff' : 'var(--text-muted)' }, 'data-step': i }, s));
   });
   body.appendChild(progressDiv);
 
   // ═══════════════════════════════════════════════
-  // SECTION 1: Informations Mission
+  // SECTION 1: Mission
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section' }, '1️⃣ Informations Mission'));
+  body.appendChild(el('div', { class: 'form-section' }, '1️⃣ Mission'));
 
   // Dropdown client si des clients existent
   if (CLIENTS.length > 0) {
@@ -8325,15 +8327,6 @@ function showMissionModal(mission) {
           if (sel.value === '_new_') {
             closeModal('formModal');
             showClientModal();
-          } else if (sel.value) {
-            var cli = getClient(sel.value);
-            if (cli && cli.adresse && !$('#mAdresseClient').value) {
-              $('#mAdresseClient').value = cli.adresse;
-            }
-            if (cli) {
-              $('#mDelai').value = String(cli.delaiPaiement || 2);
-              $('#mJour').value = cli.jourPaiement || 15;
-            }
           }
         });
       }
@@ -8343,33 +8336,34 @@ function showMissionModal(mission) {
   }
 
   body.appendChild(createInput('Titre / Projet', 'text', 'mTitre', mission.titre, 'Ex: Développement ERP'));
-  body.appendChild(createInput('Site / Lieu', 'text', 'mSite', mission.site, 'Ex: Toulouse, Remote'));
-
-  var row1 = el('div', { class: 'form-row' });
-  row1.appendChild(createInput('Début', 'date', 'mDebut', mission.debut));
-  row1.appendChild(createInput('Fin', 'date', 'mFin', mission.fin));
-  body.appendChild(row1);
-
-  var row2 = el('div', { class: 'form-row-3' });
-  row2.appendChild(createInput('TJM (€)', 'number', 'mTJM', mission.tjm, 'Ex: 550', true));
-  row2.appendChild(createSelect('Délai paiement', 'mDelai', [{ value: '1', label: 'M+1 (30j)' }, { value: '2', label: 'M+2 (60j)' }, { value: '3', label: 'M+3 (90j)' }], String(mission.delaiPaiement)));
-  row2.appendChild(createInput('Jour paie', 'number', 'mJour', mission.jourPaiement, '15'));
-  body.appendChild(row2);
-  // SPRINT 7: Tooltip aide TJM
-  body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', marginTop: '-4px' } }, '💡 TJM = Taux Journalier Moyen. Délai = mois après facturation pour recevoir le paiement.'));
-
-  // V75: Statut mission (pipeline)
-  body.appendChild(createSelect('Statut mission', 'mStatut', [
-    { value: 'active', label: '✅ Validée — comptée dans les stats' },
-    { value: 'prospect', label: '🔮 Prospect — en cours de négociation' },
-    { value: 'perdue', label: '❌ Perdue — non remportée (historique)' }
-  ], mission.statut || 'active'));
+  body.appendChild(createInput('Lieu', 'text', 'mSite', mission.site, 'Ex: Toulouse, Remote'));
+  body.appendChild(el('div', { class: 'form-row' }, [
+    createInput('Début', 'date', 'mDebut', mission.debut),
+    createInput('Fin', 'date', 'mFin', mission.fin)
+  ]));
+  body.appendChild(el('div', { class: 'form-row' }, [
+    createInput('TJM (€)', 'number', 'mTJM', mission.tjm, 'Ex: 550', true),
+    createSelect('Statut', 'mStatut', [
+      { value: 'active', label: '✅ Validée' },
+      { value: 'prospect', label: '🔮 Prospect' },
+      { value: 'perdue', label: '❌ Perdue' }
+    ], mission.statut || 'active')
+  ]));
 
   // ═══════════════════════════════════════════════
-  // SECTION 2: Périodes de travail (jours/semaine)
+  // SECTION 2: Planning
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '2️⃣ Rythme de travail'));
-  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px' } }, 'Par défaut: temps plein (5j/sem). Ajoutez des périodes pour un rythme différent.'));
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '2️⃣ Planning'));
+
+  // Mode de travail
+  if (!mission.modeTravail) mission.modeTravail = 'presentiel';
+  body.appendChild(createSelect('Mode', 'mModeTravail', [
+    { value: 'presentiel', label: '🏢 Présentiel' },
+    { value: 'teletravail', label: '🏠 Télétravail' },
+    { value: 'mix', label: '🔄 Mixte (présentiel + télétravail)' }
+  ], mission.modeTravail));
+
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '10px' } }, 'Par défaut: 5j/sem. Ajoutez des périodes pour un rythme différent.'));
 
   var periodesContainer = el('div', { class: 'periode-list', id: 'mPeriodesContainer' });
   body.appendChild(periodesContainer);
@@ -8486,6 +8480,7 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   body.appendChild(el('div', { class: 'form-section form-section-border' }, '4️⃣ Agence / Intermédiaire'));
   body.appendChild(createInput('Nom de l\'agence', 'text', 'mAgenceNom', mission.agence.nom, 'Ex: Scalian, Alten...'));
+  body.appendChild(createInput('Adresse', 'text', 'mAgenceAdresse', (mission.agence.adresses && mission.agence.adresses[0]) || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
 
   // Contacts agence (multiples)
   body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: '6px', fontWeight: '600' } }, 'Contacts'));
@@ -8497,65 +8492,55 @@ function showMissionModal(mission) {
     mission.agence.contacts.forEach(function(c, idx) {
       var contactDiv = el('div', { class: 'agence-contact' });
       if (mission.agence.contacts.length > 1) {
-        var removeBtn = el('button', { class: 'periode-remove', onclick: function() { mission.agence.contacts.splice(idx, 1); renderAgenceContacts(); } }, '✕');
-        contactDiv.appendChild(removeBtn);
+        contactDiv.appendChild(el('button', { class: 'periode-remove', onclick: function() { mission.agence.contacts.splice(idx, 1); renderAgenceContacts(); } }, '✕'));
       }
-      var cRow1 = el('div', { class: 'form-row' });
-      cRow1.appendChild(createInput('Prénom', 'text', 'mAgcPrenom_' + idx, c.prenom));
-      cRow1.appendChild(createInput('Nom', 'text', 'mAgcNom_' + idx, c.nom));
-      contactDiv.appendChild(cRow1);
-      var cRow2 = el('div', { class: 'form-row' });
-      cRow2.appendChild(createInput('Email', 'email', 'mAgcEmail_' + idx, c.email));
-      cRow2.appendChild(createInput('Téléphone', 'tel', 'mAgcTel_' + idx, c.telephone));
-      contactDiv.appendChild(cRow2);
+      contactDiv.appendChild(createInput('Nom du contact', 'text', 'mAgcNom_' + idx, [c.prenom, c.nom].filter(Boolean).join(' ') || '', 'Ex: Jean Dupont'));
+      contactDiv.appendChild(el('div', { class: 'form-row' }, [
+        createInput('Email', 'email', 'mAgcEmail_' + idx, c.email),
+        createInput('Téléphone', 'tel', 'mAgcTel_' + idx, c.telephone)
+      ]));
       agenceContactsContainer.appendChild(contactDiv);
     });
   }
   renderAgenceContacts();
 
-  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '12px' }, onclick: function() {
+  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '16px' }, onclick: function() {
     mission.agence.contacts.push({ prenom: '', nom: '', email: '', telephone: '' });
     renderAgenceContacts();
   } }, '+ Ajouter un contact'));
 
-  // Adresses postales agence (multiples)
-  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: '6px', fontWeight: '600' } }, 'Adresses postales'));
-  var agenceAdressesContainer = el('div', { id: 'mAgenceAdresses' });
-  body.appendChild(agenceAdressesContainer);
-
-  function renderAgenceAdresses() {
-    agenceAdressesContainer.replaceChildren();
-    mission.agence.adresses.forEach(function(addr, idx) {
-      var addrDiv = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' } });
-      var addrInput = el('input', { class: 'form-input', type: 'text', id: 'mAgcAddr_' + idx, placeholder: 'Ex: 14 Rue Paul Mesple, 31100 Toulouse', style: { flex: '1' } });
-      addrInput.value = addr || '';
-      addrDiv.appendChild(addrInput);
-      if (mission.agence.adresses.length > 1) {
-        addrDiv.appendChild(el('button', { class: 'periode-remove', style: { position: 'static' }, onclick: function() { mission.agence.adresses.splice(idx, 1); renderAgenceAdresses(); } }, '✕'));
-      }
-      agenceAdressesContainer.appendChild(addrDiv);
-    });
-  }
-  renderAgenceAdresses();
-
-  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '16px' }, onclick: function() {
-    mission.agence.adresses.push('');
-    renderAgenceAdresses();
-  } }, '+ Ajouter une adresse'));
-
   // ═══════════════════════════════════════════════
   // SECTION 5: Facturation
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '5️⃣ Informations Facturation'));
-  body.appendChild(createInput('Adresse de facturation', 'text', 'mAdresseClient', mission.adresseClient || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
-  body.appendChild(createInput('N° Commande client', 'text', 'mNumCommande', mission.numeroCommande || '', 'Ex: 10004903'));
-  var curDelaiVal = mission.delaiFinDeMois ? (mission.delaiPaiementFacture || 30) + '_fdm' : String(mission.delaiPaiementFacture || 30);
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '5️⃣ Facturation'));
+
+  // Facture à adresser à
+  if (!mission.factureDestinataire) mission.factureDestinataire = 'agence';
+  body.appendChild(createSelect('Facture à adresser à', 'mFactureDest', [
+    { value: 'agence', label: '🏢 Agence / Intermédiaire' },
+    { value: 'clientOp', label: '👤 Client opérationnel' }
+  ], mission.factureDestinataire));
+  body.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '-6px', marginBottom: '8px' } }, 'Le nom et l\'adresse du destinataire seront repris automatiquement sur la facture.'));
+
+  body.appendChild(el('div', { class: 'form-row' }, [
+    createSelect('Délai paiement', 'mDelai', [
+      { value: '1', label: 'M+1 (30j)' }, { value: '2', label: 'M+2 (60j)' }, { value: '3', label: 'M+3 (90j)' }
+    ], String(mission.delaiPaiement)),
+    createInput('Jour de paie', 'number', 'mJour', mission.jourPaiement, '15')
+  ]));
+  body.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '-6px', marginBottom: '8px' } }, 'Quand vous êtes payé (suivi de trésorerie).'));
+
+  var curDelaiVal = mission.delaiFinDeMois ? (mission.delaiPaiementFacture || 30) + '_fdm' : String(mission.delaiPaiementFacture || '');
   body.appendChild(createSelect('Délai de paiement facture', 'mDelaiFacture', [
+    { value: '', label: '— Non renseigné —' },
     { value: '30', label: '30 jours' }, { value: '30_fdm', label: '30 jours fin de mois' },
     { value: '45', label: '45 jours' }, { value: '45_fdm', label: '45 jours fin de mois' },
     { value: '60', label: '60 jours' }, { value: '60_fdm', label: '60 jours fin de mois' }
   ], curDelaiVal));
-  body.appendChild(createTextarea('Descriptif standard facture', 'mDescriptif', mission.descriptifFacture || '', 'Ex: Prestation de service consultant'));
+  body.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '-6px', marginBottom: '8px' } }, 'Mention légale sur la facture. Si non renseigné, sera demandé à l\'envoi.'));
+
+  body.appendChild(createInput('N° Commande', 'text', 'mNumCommande', mission.numeroCommande || '', 'Optionnel — sera demandé à la génération'));
+  body.appendChild(createTextarea('Descriptif facture', 'mDescriptif', mission.descriptifFacture || '', 'Ex: Prestation de service consultant'));
 
   // SPRINT 7: Affichage en temps réel du total jours/CA estimé
   var estimateDiv = el('div', { id: 'missionEstimate', style: { padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginTop: '12px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' } });
@@ -8711,9 +8696,8 @@ function showMissionModal(mission) {
     mission.titre = $('#mTitre').value; mission.site = $('#mSite').value;
     mission.debut = $('#mDebut').value; mission.fin = $('#mFin').value;
     mission.tjm = parseFloat($('#mTJM').value) || 0;
-    mission.delaiPaiement = parseInt($('#mDelai').value) || 2;
-    mission.jourPaiement = parseInt($('#mJour').value) || 15;
     mission.statut = $('#mStatut') ? $('#mStatut').value : 'active';
+    mission.modeTravail = $('#mModeTravail') ? $('#mModeTravail').value : 'presentiel';
 
     // V81: Sauvegarder périodes de travail avec jours spécifiques
     mission.periodes = [];
@@ -8765,34 +8749,39 @@ function showMissionModal(mission) {
       adresse: $('#mClientOpAdresse').value || ''
     };
 
-    // V79: Sauvegarder agence
-    mission.agence = { nom: $('#mAgenceNom').value || '', contacts: [], adresses: [] };
+    // Sauvegarder agence
+    var agenceAddr = $('#mAgenceAdresse') ? $('#mAgenceAdresse').value || '' : '';
+    mission.agence = { nom: $('#mAgenceNom').value || '', contacts: [], adresses: [agenceAddr] };
     var acIdx = 0;
-    while ($('#mAgcPrenom_' + acIdx)) {
+    while ($('#mAgcNom_' + acIdx)) {
+      var contactName = $('#mAgcNom_' + acIdx).value || '';
+      // Séparer le nom complet en prenom + nom si possible
+      var parts = contactName.trim().split(/\s+/);
       mission.agence.contacts.push({
-        prenom: $('#mAgcPrenom_' + acIdx).value || '',
-        nom: $('#mAgcNom_' + acIdx).value || '',
+        prenom: parts.length > 1 ? parts.slice(0, -1).join(' ') : '',
+        nom: parts.length > 1 ? parts[parts.length - 1] : contactName,
         email: $('#mAgcEmail_' + acIdx).value || '',
         telephone: $('#mAgcTel_' + acIdx).value || ''
       });
       acIdx++;
     }
-    var aaIdx = 0;
-    while ($('#mAgcAddr_' + aaIdx)) {
-      var addr = $('#mAgcAddr_' + aaIdx).value || '';
-      if (addr) mission.agence.adresses.push(addr);
-      aaIdx++;
-    }
     if (mission.agence.contacts.length === 0) mission.agence.contacts = [{ prenom: '', nom: '', email: '', telephone: '' }];
-    if (mission.agence.adresses.length === 0) mission.agence.adresses = [''];
 
-    // V79: Sauvegarder facturation
-    mission.adresseClient = $('#mAdresseClient').value;
+    // Sauvegarder facturation
+    mission.factureDestinataire = $('#mFactureDest') ? $('#mFactureDest').value : 'agence';
+    mission.delaiPaiement = parseInt($('#mDelai').value) || 2;
+    mission.jourPaiement = parseInt($('#mJour').value) || 15;
     mission.numeroCommande = $('#mNumCommande').value;
     mission.descriptifFacture = $('#mDescriptif').value;
-    var delaiFactVal = $('#mDelaiFacture') ? $('#mDelaiFacture').value : '30';
-    mission.delaiPaiementFacture = parseInt(delaiFactVal) || 30;
+    var delaiFactVal = $('#mDelaiFacture') ? $('#mDelaiFacture').value : '';
+    mission.delaiPaiementFacture = delaiFactVal ? (parseInt(delaiFactVal) || 30) : 0;
     mission.delaiFinDeMois = delaiFactVal.indexOf('_fdm') > -1;
+    // Dériver adresseClient du destinataire choisi
+    if (mission.factureDestinataire === 'agence') {
+      mission.adresseClient = agenceAddr;
+    } else {
+      mission.adresseClient = mission.clientOp.adresse || '';
+    }
 
     buildMission(mission);
     if (isNew) MISSIONS.push(mission);
@@ -9782,8 +9771,13 @@ function buildInvoiceDataFromFacture(mission, facture) {
     delaiPaiement: delaiPaiement,
     delaiLabel: delaiLabel,
     finDeMois: finDeMois,
-    client: mission.client || '',
-    adresseClient: mission.adresseClient || '',
+    client: (function() {
+      var dest = mission.factureDestinataire || 'agence';
+      if (dest === 'agence' && mission.agence && mission.agence.nom) return mission.agence.nom;
+      if (dest === 'clientOp' && mission.clientOp && mission.clientOp.nom) return mission.clientOp.nom;
+      return mission.client || '';
+    })(),
+    adresseClient: mission.adresseClient || (mission.factureDestinataire === 'clientOp' && mission.clientOp ? mission.clientOp.adresse : (mission.agence && mission.agence.adresses ? mission.agence.adresses[0] : '')) || '',
     emetteur: COMPANY.nom || '',
     adresseEmetteur: (COMPANY.adresse || '') + (COMPANY.codePostal ? ', ' + COMPANY.codePostal : '') + (COMPANY.commune ? ' ' + COMPANY.commune : ''),
     siret: COMPANY.siret || '',
@@ -9821,7 +9815,18 @@ function showSendInvoiceModal(facture) {
   var defaultCommande = (ligne && ligne.numeroCommande) || mission.numeroCommande || '';
   var defaultDelai = mission.delaiPaiementFacture || 0;
   var defaultFDM = mission.delaiFinDeMois || false;
-  var defaultAdresse = mission.adresseClient || (clientObj ? clientObj.adresse : '') || '';
+  // Adresse selon destinataire facture
+  var factDest = mission.factureDestinataire || 'agence';
+  var defaultAdresse = mission.adresseClient || '';
+  if (!defaultAdresse) {
+    if (factDest === 'agence' && mission.agence && mission.agence.adresses && mission.agence.adresses[0]) defaultAdresse = mission.agence.adresses[0];
+    else if (factDest === 'clientOp' && mission.clientOp && mission.clientOp.adresse) defaultAdresse = mission.clientOp.adresse;
+    else if (clientObj && clientObj.adresse) defaultAdresse = clientObj.adresse;
+  }
+  // Nom du destinataire facture
+  var factureClientNom = facture.client;
+  if (factDest === 'agence' && mission.agence && mission.agence.nom) factureClientNom = mission.agence.nom;
+  else if (factDest === 'clientOp' && mission.clientOp && mission.clientOp.nom) factureClientNom = mission.clientOp.nom;
   var defaultDescriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || mission.client));
   var p = parseYM(facture.mois);
   var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -10030,7 +10035,7 @@ function showSendInvoiceModal(facture) {
     var invData = {
       num: finalNum, date: fmtDate(invoiceDate), dateEcheance: fmtDate(dateEcheance),
       delaiPaiement: delai, delaiLabel: delai + ' jours' + (fdm ? ' fin de mois' : ''), finDeMois: fdm,
-      client: facture.client, adresseClient: adresseClient,
+      client: factureClientNom, adresseClient: adresseClient,
       emetteur: COMPANY.nom || '', adresseEmetteur: (COMPANY.adresse || '') + (COMPANY.codePostal ? ', ' + COMPANY.codePostal : '') + (COMPANY.commune ? ' ' + COMPANY.commune : ''),
       siret: COMPANY.siret || '', siren: siren, tvaIntra: COMPANY.tvaIntracom || '', iban: COMPANY.iban || '',
       titre: titre, descriptif: descriptif, periode: periode,
