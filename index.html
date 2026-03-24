@@ -14368,25 +14368,41 @@ function renderActionsAndMilestones(container) {
   // Section Actions (en bas)
   var doneThisMonth = getActionsForCurrentMonth();
   var pending = actions.filter(function(a) { return !a.done; });
+  var overdueActions = pending.filter(function(a) { return a.type === 'overdue'; });
+  var currentActions = pending.filter(function(a) { return a.type !== 'overdue'; });
+
   if (actions.length > 0 || doneThisMonth.length > 0) {
     var actionsSection = el('div');
     var actionsHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } });
     actionsHeader.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700' } }, '🎯 Actions Immédiates'));
     if (pending.length > 0) {
-      actionsHeader.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '800', color: 'white', background: pending.some(function(a) { return a.type === 'urgent'; }) ? 'var(--danger)' : 'var(--warning)', borderRadius: '10px', padding: '2px 8px', minWidth: '20px', textAlign: 'center' } }, String(pending.length)));
+      actionsHeader.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '800', color: 'white', background: overdueActions.length > 0 ? 'var(--danger)' : 'var(--warning)', borderRadius: '10px', padding: '2px 8px', minWidth: '20px', textAlign: 'center' } }, String(pending.length)));
     }
     actionsSection.appendChild(actionsHeader);
 
-    var actionsList = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } });
-    actions.forEach(function(a) {
-      var borderColor = a.type === 'urgent' ? 'var(--danger)' : a.type === 'warning' ? 'var(--warning)' : a.type === 'success' ? 'var(--success)' : 'var(--accent)';
-      var bgColor = a.done ? 'rgba(52,211,153,0.06)' : a.type === 'urgent' ? 'rgba(239,68,68,0.08)' : a.type === 'warning' ? 'rgba(251,191,36,0.06)' : a.type === 'success' ? 'rgba(34,197,94,0.06)' : 'var(--bg-tertiary)';
+    // Helper: couleur du label selon le sujet
+    function getLabelColor(a) {
+      if (a.cat === 'tva') return '#ec4899';
+      if (a.cat === 'urssaf') return '#60a5fa';
+      if (a.cat === 'ir') return '#fbbf24';
+      if (a.cat === 'cfe') return '#a78bfa';
+      return '';
+    }
+
+    // Helper: render une carte action
+    function renderActionItem(a, section) {
+      var isOverdue = section === 'overdue';
+      var borderColor = isOverdue ? 'var(--danger)' : 'var(--glass-border)';
+      var bgColor = isOverdue ? 'rgba(248,113,113,0.12)' : 'var(--bg-tertiary)';
+      var labelColor = getLabelColor(a);
+      if (!labelColor && isOverdue) labelColor = 'var(--danger)';
+
       var item = el('div', {
         style: {
           display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px',
           background: bgColor, borderRadius: '10px', cursor: 'pointer',
-          borderLeft: '4px solid ' + (a.done ? 'var(--success)' : borderColor),
-          transition: 'transform 0.1s', opacity: a.done ? '0.5' : '1'
+          borderLeft: '4px solid ' + borderColor,
+          transition: 'transform 0.1s'
         },
         onclick: function() { a.detail(); }
       });
@@ -14394,62 +14410,81 @@ function renderActionsAndMilestones(container) {
       item.onmouseleave = function() { item.style.transform = 'none'; };
       item.appendChild(el('div', { style: { fontSize: '22px', width: '32px', textAlign: 'center', flexShrink: '0' } }, a.icon));
       item.appendChild(el('div', { style: { flex: 1, minWidth: 0 } }, [
-        el('div', { style: { fontSize: '13px', fontWeight: '700', textDecoration: a.done ? 'line-through' : 'none', color: a.done ? 'var(--text-muted)' : 'inherit' } }, a.label),
+        el('div', { style: { fontSize: '13px', fontWeight: '700', color: labelColor || 'inherit' } }, a.label),
         el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' } }, a.sub)
       ]));
       // Checkbox rond
       var checkBtn = document.createElement('button');
       checkBtn.type = 'button';
-      checkBtn.className = 'action-check' + (a.done ? ' checked' : '');
-      checkBtn.title = a.done ? 'Annuler' : 'Marquer comme fait';
-      if (a.done) checkBtn.textContent = '✓';
+      checkBtn.className = 'action-check';
+      checkBtn.title = 'Marquer comme fait';
       (function(action, btn, row) {
         btn.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          if (action.done) {
-            undoActionDone(action.id);
-          } else {
-            btn.classList.add('checked');
-            btn.textContent = '✓';
-            row.style.opacity = '0.5';
-            action.complete();
-          }
+          e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+          btn.classList.add('checked'); btn.textContent = '✓';
+          row.style.opacity = '0.5';
+          action.complete();
         });
       })(a, checkBtn, item);
       item.appendChild(checkBtn);
-      actionsList.appendChild(item);
-    });
+      return item;
+    }
+
+    var actionsList = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } });
+
+    // Section: En retard (rouge)
+    if (overdueActions.length > 0) {
+      actionsList.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '1px', padding: '6px 0 4px', display: 'flex', alignItems: 'center', gap: '6px' } }, [
+        el('span', {}, '●'),
+        el('span', {}, 'En retard (' + overdueActions.length + ')')
+      ]));
+      overdueActions.forEach(function(a) { actionsList.appendChild(renderActionItem(a, 'overdue')); });
+    }
+
+    // Section: Ce mois-ci (neutre)
+    if (currentActions.length > 0) {
+      if (overdueActions.length > 0) {
+        actionsList.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', padding: '8px 0 4px', display: 'flex', alignItems: 'center', gap: '6px' } }, [
+          el('span', {}, '●'),
+          el('span', {}, 'Ce mois (' + currentActions.length + ')')
+        ]));
+      }
+      currentActions.forEach(function(a) { actionsList.appendChild(renderActionItem(a, 'current')); });
+    }
     actionsSection.appendChild(actionsList);
 
-    // Historique du mois (dépliable)
+    // Section: Réalisées ce mois (pliée, cartes vertes)
     if (doneThisMonth.length > 0) {
       var histSection = el('div', { style: { marginTop: '10px', borderTop: '1px solid var(--glass-border)', paddingTop: '8px' } });
       var histHeader = el('div', {
-        style: { fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600', cursor: 'pointer', padding: '4px 0', userSelect: 'none' },
+        style: { fontSize: '10px', fontWeight: '700', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '1px', cursor: 'pointer', padding: '4px 0', userSelect: 'none', display: 'flex', alignItems: 'center', gap: '6px' },
         onclick: function() {
           var list = histSection.querySelector('.hist-list');
           var arrow = histHeader.querySelector('.hist-arrow');
-          if (list.style.display === 'none') { list.style.display = 'block'; arrow.textContent = '▾'; }
+          if (list.style.display === 'none') { list.style.display = 'flex'; arrow.textContent = '▾'; }
           else { list.style.display = 'none'; arrow.textContent = '▸'; }
         }
       });
       histHeader.appendChild(el('span', { class: 'hist-arrow' }, '▸'));
-      histHeader.appendChild(el('span', {}, ' Historique du mois (' + doneThisMonth.length + ')'));
+      histHeader.appendChild(el('span', {}, ' Réalisées ce mois (' + doneThisMonth.length + ')'));
       histSection.appendChild(histHeader);
-      var histList = el('div', { class: 'hist-list', style: { display: 'none', marginTop: '6px' } });
+      var histList = el('div', { class: 'hist-list', style: { display: 'none', flexDirection: 'column', gap: '6px', marginTop: '6px' } });
       doneThisMonth.forEach(function(a) {
-        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', fontSize: '11px', background: 'var(--bg-tertiary)', borderRadius: '6px', marginBottom: '3px' } });
-        row.appendChild(el('span', { style: { color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' } }, [
-          el('span', { style: { color: 'var(--success)', marginRight: '6px' } }, '✓'),
-          el('span', {}, a.label)
+        var item = el('div', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
+            background: 'rgba(52,211,153,0.08)', borderRadius: '10px',
+            borderLeft: '4px solid var(--success)'
+          }
+        });
+        item.appendChild(el('div', { style: { fontSize: '16px', width: '32px', textAlign: 'center', flexShrink: '0' } }, '✅'));
+        item.appendChild(el('div', { style: { flex: 1, minWidth: 0 } }, [
+          el('div', { style: { fontSize: '12px', fontWeight: '600', textDecoration: 'line-through', color: 'var(--text-muted)' } }, a.label),
+          el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, a.date.substring(8) + '/' + a.date.substring(5, 7))
         ]));
-        row.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
-          el('span', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, a.date.substring(8) + '/' + a.date.substring(5, 7)),
-          el('button', { type: 'button', style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-muted)' }, title: 'Annuler', onclick: function(e) { e.stopPropagation(); undoActionDone(a.id); } }, '↩')
-        ]));
-        histList.appendChild(row);
+        var undoBtn = el('button', { type: 'button', style: { background: 'rgba(251,191,36,0.15)', border: 'none', cursor: 'pointer', fontSize: '10px', padding: '4px 10px', borderRadius: '6px', color: 'var(--warning)', fontWeight: '600' }, title: 'Annuler', onclick: function(e) { e.stopPropagation(); undoActionDone(a.id); } }, '↩ Annuler');
+        item.appendChild(undoBtn);
+        histList.appendChild(item);
       });
       histSection.appendChild(histList);
       actionsSection.appendChild(histSection);
