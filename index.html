@@ -637,16 +637,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .actions-list { display: flex; flex-direction: column; gap: 8px; }
 .action-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s; }
 .action-item:hover { border-color: var(--accent); transform: translateX(4px); }
-.action-item.urgent { border-left: 3px solid var(--danger); background: linear-gradient(90deg, rgba(248,113,113,0.08), transparent); }
-.action-item.warning { border-left: 3px solid var(--warning); background: linear-gradient(90deg, rgba(251,191,36,0.08), transparent); }
-.action-item.info { border-left: 3px solid var(--info); }
-.action-item.success { border-left: 3px solid var(--success); background: linear-gradient(90deg, rgba(52,211,153,0.08), transparent); }
+.action-item.overdue { border-left: 3px solid var(--danger); background: linear-gradient(90deg, rgba(248,113,113,0.12), transparent); }
+.action-item.current { border-left: 3px solid var(--accent); background: linear-gradient(90deg, rgba(139,92,246,0.06), transparent); }
 .action-icon { font-size: 20px; flex-shrink: 0; }
 .action-content { flex: 1; min-width: 0; }
 .action-label { font-size: 13px; font-weight: 600; }
 .action-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.action-item.done { opacity: 0.5; border-left-color: var(--success) !important; background: linear-gradient(90deg, rgba(52,211,153,0.05), transparent) !important; }
+.action-item.done { opacity: 0.4; border-left-color: var(--success) !important; background: linear-gradient(90deg, rgba(52,211,153,0.05), transparent) !important; }
 .action-item.done .action-label { text-decoration: line-through; color: var(--text-muted); }
+.action-item.urgent { border-left: 3px solid var(--danger); background: linear-gradient(90deg, rgba(248,113,113,0.08), transparent); }
+.action-item.warning { border-left: 3px solid var(--warning); background: linear-gradient(90deg, rgba(251,191,36,0.08), transparent); }
+.action-item.info { border-left: 3px solid var(--info); }
+.action-item.success { border-left: 3px solid var(--success); background: linear-gradient(90deg, rgba(52,211,153,0.08), transparent); }
 .action-check { width: 28px; height: 28px; min-width: 28px; border-radius: 50%; border: 2.5px solid var(--border); background: var(--bg-tertiary); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0; transition: all 0.2s; -webkit-tap-highlight-color: transparent; position: relative; }
 .action-check:hover, .action-check:active { border-color: var(--success); background: rgba(52,211,153,0.15); }
 .action-check.checked { border-color: var(--success); background: var(--success); font-size: 14px; font-weight: 800; color: white; }
@@ -9762,57 +9764,132 @@ function showSendInvoiceModal(facture) {
   ]);
   stepsDiv.appendChild(step1);
 
-  // Déterminer l'email du destinataire
+  // Collecter tous les emails connus pour ce client/mission
   var clientObj = getClientByName(mission.client);
-  var agenceEmail = mission.agence && mission.agence.contacts && mission.agence.contacts[0] ? mission.agence.contacts[0].email : '';
-  var clientOpEmail = mission.clientOp ? mission.clientOp.email : '';
-  var clientEmail = clientObj ? clientObj.email : '';
-  var bestEmail = agenceEmail || clientOpEmail || clientEmail || '';
-  var emailSource = agenceEmail ? 'agence' : clientOpEmail ? 'client final' : clientEmail ? 'fiche client' : '';
-
-  // Étape 2: Email du destinataire
-  var step2 = el('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } }, [
-    el('span', { style: { fontSize: '16px', marginTop: '2px' } }, bestEmail ? '✅' : '⚠️'),
-    el('div', { style: { flex: '1' } })
-  ]);
-
-  var step2Content = step2.querySelector('div');
-  step2Content.appendChild(el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '2. Destinataire'));
-
-  if (bestEmail) {
-    step2Content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Email trouvé (' + emailSource + ')'));
-    var emailRow = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } });
-    var emailInput = document.createElement('input');
-    emailInput.type = 'email';
-    emailInput.id = 'sendInvoiceEmail';
-    emailInput.value = bestEmail;
-    emailInput.style.cssText = 'flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:12px;';
-    emailRow.appendChild(emailInput);
-    step2Content.appendChild(emailRow);
-  } else {
-    step2Content.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--warning)', marginBottom: '6px' } }, '⚠️ Aucun email trouvé pour ce client'));
-    step2Content.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' } }, 'Renseignez l\'email — il sera sauvegardé automatiquement'));
-    var emailRow = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } });
-    var emailInput = document.createElement('input');
-    emailInput.type = 'email';
-    emailInput.id = 'sendInvoiceEmail';
-    emailInput.placeholder = 'email@client.com';
-    emailInput.style.cssText = 'flex:1;padding:8px 10px;border-radius:6px;border:2px solid var(--warning);background:var(--bg-primary);color:var(--text-primary);font-size:12px;';
-    emailRow.appendChild(emailInput);
-    step2Content.appendChild(emailRow);
-
-    // Sélecteur: où sauvegarder l'email
-    var saveTarget = el('div', { style: { marginTop: '6px' } });
-    var sel = document.createElement('select');
-    sel.id = 'sendInvoiceEmailTarget';
-    sel.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;';
-    var optClient = document.createElement('option'); optClient.value = 'client'; optClient.textContent = 'Sauvegarder dans la fiche client (' + mission.client + ')';
-    var optAgence = document.createElement('option'); optAgence.value = 'agence'; optAgence.textContent = 'Sauvegarder dans l\'agence/ESN';
-    var optClientOp = document.createElement('option'); optClientOp.value = 'clientOp'; optClientOp.textContent = 'Sauvegarder dans le client final (opérationnel)';
-    sel.appendChild(optClient); sel.appendChild(optAgence); sel.appendChild(optClientOp);
-    saveTarget.appendChild(sel);
-    step2Content.appendChild(saveTarget);
+  var allEmails = [];
+  if (mission.agence && mission.agence.contacts) {
+    mission.agence.contacts.forEach(function(c) {
+      if (c.email) allEmails.push({ email: c.email, source: 'Agence' + (c.prenom || c.nom ? ' (' + [c.prenom, c.nom].filter(Boolean).join(' ') + ')' : ''), where: 'agence' });
+    });
   }
+  if (mission.clientOp && mission.clientOp.email) {
+    allEmails.push({ email: mission.clientOp.email, source: 'Client final' + (mission.clientOp.contact ? ' (' + mission.clientOp.contact + ')' : ''), where: 'clientOp' });
+  }
+  if (clientObj && clientObj.email) {
+    allEmails.push({ email: clientObj.email, source: 'Fiche client (' + clientObj.nom + ')', where: 'client' });
+  }
+  // Dédupliquer par email
+  var seen = {};
+  allEmails = allEmails.filter(function(e) { if (seen[e.email]) return false; seen[e.email] = true; return true; });
+  var bestEmail = allEmails.length > 0 ? allEmails[0].email : '';
+  var bestSource = allEmails.length > 0 ? allEmails[0].where : '';
+
+  // Étape 2: Destinataire
+  var step2 = el('div', { style: { padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } });
+
+  var step2Header = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' } });
+  step2Header.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
+    el('span', { style: { fontSize: '16px' } }, bestEmail ? '✅' : '⚠️'),
+    el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '2. Destinataire')
+  ]));
+  step2.appendChild(step2Header);
+
+  // Info expéditeur
+  var senderEmail = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email : (COMPANY.email || '');
+  if (senderEmail) {
+    step2.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' } }, [
+      el('span', {}, 'Expéditeur: '),
+      el('span', { style: { fontWeight: '600' } }, senderEmail),
+      el('span', { style: { color: 'var(--text-muted)' } }, '(votre client mail)')
+    ]));
+  }
+
+  if (!bestEmail) {
+    step2.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--warning)', marginBottom: '6px', padding: '6px 8px', background: 'rgba(251,191,36,0.1)', borderRadius: '6px' } }, '⚠️ Aucun email trouvé pour ce client — renseignez-le ci-dessous'));
+  }
+
+  // Champ email avec source
+  var emailRow = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' } });
+  var emailInput = document.createElement('input');
+  emailInput.type = 'email';
+  emailInput.id = 'sendInvoiceEmail';
+  emailInput.value = bestEmail;
+  emailInput.placeholder = 'email@client.com';
+  emailInput.style.cssText = 'flex:1;padding:8px 10px;border-radius:6px;border:1px solid ' + (bestEmail ? 'var(--border)' : 'var(--warning)') + ';background:var(--bg-primary);color:var(--text-primary);font-size:12px;';
+  emailRow.appendChild(emailInput);
+
+  // Bouton supprimer l'email du champ
+  var clearBtn = el('button', { class: 'btn', style: { padding: '6px 8px', fontSize: '11px', background: 'transparent', color: 'var(--text-muted)', minWidth: 'auto' }, title: 'Effacer', onclick: function(e) {
+    e.stopPropagation();
+    emailInput.value = '';
+    emailInput.focus();
+    emailInput.style.borderColor = 'var(--warning)';
+  } }, '✕');
+  emailRow.appendChild(clearBtn);
+  step2.appendChild(emailRow);
+
+  // Liste déroulante des contacts connus (1 clic pour accéder)
+  if (allEmails.length > 0) {
+    var contactsToggle = el('div', { style: { marginTop: '4px' } });
+    var toggleBtn = el('button', { class: 'btn', style: { fontSize: '10px', padding: '4px 10px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, onclick: function(e) {
+      e.stopPropagation();
+      var list = contactsToggle.querySelector('.contacts-dropdown');
+      list.style.display = list.style.display === 'none' ? 'block' : 'none';
+      toggleBtn.querySelector('.toggle-arrow').textContent = list.style.display === 'none' ? '▸' : '▾';
+    } }, [
+      el('span', {}, '📋 Contacts enregistrés (' + allEmails.length + ')'),
+      el('span', { class: 'toggle-arrow' }, '▸')
+    ]);
+    contactsToggle.appendChild(toggleBtn);
+
+    var dropdown = el('div', { class: 'contacts-dropdown', style: { display: 'none', marginTop: '4px', background: 'var(--bg-primary)', borderRadius: '6px', border: '1px solid var(--border)', overflow: 'hidden' } });
+    allEmails.forEach(function(entry) {
+      var contactRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: '11px' }, onclick: function() {
+        emailInput.value = entry.email;
+        emailInput.style.borderColor = 'var(--border)';
+        // Masquer le sélecteur de sauvegarde si l'email existe déjà
+        var saveDiv = document.getElementById('sendInvoiceSaveTarget');
+        if (saveDiv) saveDiv.style.display = 'none';
+      } });
+      contactRow.onmouseover = function() { contactRow.style.background = 'var(--bg-tertiary)'; };
+      contactRow.onmouseout = function() { contactRow.style.background = 'transparent'; };
+      contactRow.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600' } }, entry.email),
+        el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, entry.source)
+      ]));
+      contactRow.appendChild(el('span', { style: { color: 'var(--accent)', fontSize: '12px' } }, '→'));
+      dropdown.appendChild(contactRow);
+    });
+    contactsToggle.appendChild(dropdown);
+    step2.appendChild(contactsToggle);
+  }
+
+  // Sélecteur: où sauvegarder (toujours visible pour permettre de sauvegarder un nouvel email)
+  var saveTargetDiv = el('div', { id: 'sendInvoiceSaveTarget', style: { marginTop: '8px', padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: '6px', display: bestEmail ? 'none' : 'block' } });
+  saveTargetDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Sauvegarder le nouvel email dans :'));
+  var sel = document.createElement('select');
+  sel.id = 'sendInvoiceEmailTarget';
+  sel.style.cssText = 'width:100%;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;';
+  [
+    { value: 'client', label: 'Fiche client (' + mission.client + ')' },
+    { value: 'agence', label: 'Agence / ESN' },
+    { value: 'clientOp', label: 'Client final (opérationnel)' }
+  ].forEach(function(opt) {
+    var o = document.createElement('option');
+    o.value = opt.value; o.textContent = opt.label;
+    sel.appendChild(o);
+  });
+  saveTargetDiv.appendChild(sel);
+  step2.appendChild(saveTargetDiv);
+
+  // Afficher le sélecteur quand l'email saisi diffère des emails connus
+  emailInput.addEventListener('input', function() {
+    var val = emailInput.value.trim();
+    var isNew = val && !allEmails.some(function(e) { return e.email === val; });
+    saveTargetDiv.style.display = isNew ? 'block' : 'none';
+    emailInput.style.borderColor = val && val.indexOf('@') >= 0 ? 'var(--border)' : 'var(--warning)';
+  });
+
   stepsDiv.appendChild(step2);
 
   // Étape 3: Aperçu email
@@ -9842,49 +9919,51 @@ function showSendInvoiceModal(facture) {
   bodyTextarea.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
   step3.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '2px', marginTop: '4px' } }, 'Corps du message'));
   step3.appendChild(bodyTextarea);
-  step3.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '💡 N\'oubliez pas de joindre le PDF téléchargé à l\'étape 1'));
+  step3.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '💡 Le mail s\'ouvrira dans votre client mail — joignez le PDF téléchargé à l\'étape 1'));
   stepsDiv.appendChild(step3);
 
   body.appendChild(stepsDiv);
+
+  // Helper: sauvegarder un email s'il est nouveau
+  function saveEmailIfNew(email) {
+    if (!email || email.indexOf('@') < 0) return;
+    var isKnown = allEmails.some(function(e) { return e.email === email; });
+    if (isKnown) return;
+    var target = document.getElementById('sendInvoiceEmailTarget');
+    var where = target ? target.value : 'client';
+    if (where === 'client') {
+      var c = getClientByName(mission.client);
+      if (c) { c.email = email; }
+      else { CLIENTS.push({ id: 'CLI' + Date.now(), nom: mission.client, email: email, adresse: '', siret: '', contact: '', notes: '', delaiPaiement: mission.delaiPaiement || 2, jourPaiement: mission.jourPaiement || 15 }); }
+    } else if (where === 'agence') {
+      if (!mission.agence) mission.agence = { nom: '', contacts: [], adresses: [] };
+      if (!mission.agence.contacts) mission.agence.contacts = [];
+      if (mission.agence.contacts.length > 0) { mission.agence.contacts[0].email = email; }
+      else { mission.agence.contacts.push({ prenom: '', nom: '', email: email, telephone: '' }); }
+    } else if (where === 'clientOp') {
+      if (!mission.clientOp) mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
+      mission.clientOp.email = email;
+    }
+    saveAll();
+    toast('Email sauvegardé (' + where + ')', 'success');
+  }
 
   // Boutons d'action
   var btns = el('div', { style: { display: 'flex', gap: '8px' } });
 
   // Bouton principal: Ouvrir email
   btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1', fontWeight: '700' }, onclick: function() {
-    var email = document.getElementById('sendInvoiceEmail') ? document.getElementById('sendInvoiceEmail').value.trim() : '';
+    var email = document.getElementById('sendInvoiceEmail').value.trim();
     var subject = document.getElementById('sendInvoiceSubject').value;
     var mailBody = document.getElementById('sendInvoiceBody').value;
 
     if (!email || email.indexOf('@') < 0) {
       toast('Veuillez renseigner un email valide', 'error');
-      var inp = document.getElementById('sendInvoiceEmail');
-      if (inp) { inp.focus(); inp.style.borderColor = 'var(--danger)'; }
+      emailInput.focus(); emailInput.style.borderColor = 'var(--danger)';
       return;
     }
 
-    // Sauvegarder l'email si nouveau
-    var target = document.getElementById('sendInvoiceEmailTarget');
-    if (target) {
-      var where = target.value;
-      if (where === 'client') {
-        var c = getClientByName(mission.client);
-        if (c) { c.email = email; }
-        else {
-          CLIENTS.push({ id: 'CLI' + Date.now(), nom: mission.client, email: email, adresse: '', siret: '', contact: '', notes: '', delaiPaiement: mission.delaiPaiement || 2, jourPaiement: mission.jourPaiement || 15 });
-        }
-      } else if (where === 'agence') {
-        if (!mission.agence) mission.agence = { nom: '', contacts: [], adresses: [] };
-        if (!mission.agence.contacts) mission.agence.contacts = [];
-        if (mission.agence.contacts.length > 0) { mission.agence.contacts[0].email = email; }
-        else { mission.agence.contacts.push({ prenom: '', nom: '', email: email, telephone: '' }); }
-      } else if (where === 'clientOp') {
-        if (!mission.clientOp) mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
-        mission.clientOp.email = email;
-      }
-      saveAll();
-      toast('Email sauvegardé', 'success');
-    }
+    saveEmailIfNew(email);
 
     // Mettre la facture en "envoyée"
     MISSIONS.forEach(function(m) {
@@ -9910,24 +9989,8 @@ function showSendInvoiceModal(facture) {
 
   // Bouton secondaire: juste marquer envoyée
   btns.appendChild(el('button', { class: 'btn', style: { background: 'var(--bg-tertiary)' }, onclick: function() {
-    var email = document.getElementById('sendInvoiceEmail') ? document.getElementById('sendInvoiceEmail').value.trim() : '';
-    // Sauvegarder l'email si renseigné
-    if (email && email.indexOf('@') >= 0) {
-      var target = document.getElementById('sendInvoiceEmailTarget');
-      if (target) {
-        var where = target.value;
-        if (where === 'client') { var c = getClientByName(mission.client); if (c) c.email = email; }
-        else if (where === 'agence') {
-          if (!mission.agence) mission.agence = { nom: '', contacts: [], adresses: [] };
-          if (!mission.agence.contacts) mission.agence.contacts = [];
-          if (mission.agence.contacts.length > 0) mission.agence.contacts[0].email = email;
-          else mission.agence.contacts.push({ prenom: '', nom: '', email: email, telephone: '' });
-        } else if (where === 'clientOp') {
-          if (!mission.clientOp) mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
-          mission.clientOp.email = email;
-        }
-      }
-    }
+    var email = document.getElementById('sendInvoiceEmail').value.trim();
+    saveEmailIfNew(email);
     MISSIONS.forEach(function(m) {
       if (m.factures) m.factures.forEach(function(f) {
         if (f.id === facture.id) { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); }
@@ -11879,11 +11942,13 @@ function getActionsList() {
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   var today = new Date(TODAY);
 
+  // === ACTIONS EN RETARD (type: 'overdue') ===
+
   // 1. Factures en retard (priorité max)
   if (data.lateCount > 0) {
-    data.facturesAEncaisser.filter(function(f) { return f.isLate; }).slice(0, 2).forEach(function(f) {
+    data.facturesAEncaisser.filter(function(f) { return f.isLate; }).forEach(function(f) {
       var aid = 'relance_' + (f.id || f.client + '_' + f.mois);
-      actions.push({ id: aid, priority: 1, type: 'urgent', icon: '🚨', label: 'Relancer ' + f.client, sub: EUR(f.ttc) + ' en retard',
+      actions.push({ id: aid, priority: 1, type: 'overdue', icon: '🚨', label: 'Relancer ' + f.client, sub: EUR(f.ttc) + ' en retard · ' + fmtMonthShort(f.mois),
         detail: function() { showFactureModal(f); },
         complete: function() { markActionDone(aid, 'Relancer ' + f.client + ' ' + EUR(f.ttc)); },
         done: isActionDone(aid)
@@ -11891,85 +11956,34 @@ function getActionsList() {
     });
   }
 
-  // 2. Jalons fiscaux à venir ou en retard (URSSAF, TVA, IR, CFE)
+  // 2. Jalons fiscaux en retard
   var allMilestones = getAllYearMilestones();
   allMilestones.forEach(function(m) {
-    // Inclure si: en retard (daysLeft < 0 et <= 30 jours de retard) OU à venir dans 12 jours
+    if (m.cat === 'mission' || m.cat === 'acre') return;
     var isOverdue = m.daysLeft < 0 && m.daysLeft >= -30;
     var isUpcoming = m.daysLeft >= 0 && m.daysLeft <= 12;
     if (!isOverdue && !isUpcoming) return;
-    // Exclure missions, acre, cfe (sauf si imminent)
-    if (m.cat === 'mission' || m.cat === 'acre') return;
 
     var aid = 'milestone_' + m.cat + '_' + m.date;
     var prefix = isOverdue ? '⚠️ EN RETARD · ' : 'J-' + m.daysLeft + ' · ';
-    var actionType = isOverdue ? 'urgent' : m.daysLeft <= 3 ? 'urgent' : 'warning';
 
-    actions.push({ id: aid, priority: isOverdue ? 0 : 2, type: actionType, icon: m.icon, label: m.label, sub: prefix + (m.detail || m.label),
-      deadline: m.date, daysLeft: m.daysLeft,
+    actions.push({ id: aid, priority: isOverdue ? 0 : 2, type: isOverdue ? 'overdue' : 'current', icon: m.icon, label: m.label, sub: prefix + (m.detail || m.label),
+      deadline: m.date, daysLeft: m.daysLeft, cat: m.cat,
       detail: function() { showMilestoneDetail(m); },
       complete: function() { markActionDone(aid, m.label + ' ' + (m.date || '')); },
       done: isActionDone(aid)
     });
   });
 
-  // 3. Versement rémunération
-  if (data.salaireReco >= 500) {
-    var aid = 'salaire_' + nowYm;
-    actions.push({ id: aid, priority: 4, type: 'success', icon: '💸', label: 'Verser une rémunération', sub: EUR(data.salaireReco) + ' disponible',
-      detail: function() { showSalaireModal(data.salaireReco); },
-      complete: function() { markActionDone(aid, 'Versement rémunération ' + EUR(data.salaireReco)); },
-      done: isActionDone(aid)
-    });
-  }
-
-  // 4. Factures brouillon à envoyer — une action par facture avec workflow d'envoi
-  var brouillons = [];
-  MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'brouillon' && f.jours > 0) brouillons.push(f); }); });
-  brouillons.forEach(function(f) {
-    var aid = 'send_' + f.id;
-    actions.push({ id: aid, priority: 3, type: 'info', icon: '📤', label: 'Envoyer facture ' + f.client, sub: fmtMonthShort(f.mois) + ' · ' + EUR(f.ttc || f.ht),
-      detail: function() { showSendInvoiceModal(f); },
-      complete: function() { markActionDone(aid, 'Facture ' + f.client + ' ' + fmtMonthShort(f.mois)); },
-      done: isActionDone(aid)
-    });
-  });
-
-  // 5. Factures envoyées non payées (rappel de suivi, pas en retard)
-  var envoyeesNonLate = [];
-  MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'envoyée' && !f.isLate && f.jours > 0) envoyeesNonLate.push(f); }); });
-  envoyeesNonLate.forEach(function(f) {
-    var aid = 'suivi_' + f.id;
-    actions.push({ id: aid, priority: 6, type: 'neutral', icon: '⏳', label: 'Suivre paiement ' + f.client, sub: fmtMonthShort(f.mois) + ' · ' + EUR(f.ttc || f.ht) + ' · Attendu ' + fmtMonthShort(f.paymentMonth || ''),
-      detail: function() { showFactureModal(f); },
-      complete: function() { markActionDone(aid, 'Suivi ' + f.client + ' ' + EUR(f.ttc || f.ht)); },
-      done: isActionDone(aid)
-    });
-  });
-
-  // 6. Saisir les jours du mois en cours (missions actives sans joursReels)
-  MISSIONS.forEach(function(m) {
-    if (m.statut !== 'active' || !m.lignes) return;
-    var ligne = m.lignes.find(function(l) { return l.ym === nowYm; });
-    if (ligne && (ligne.joursPrevus > 0 || ligne.joursReels > 0) && !ligne.joursReels) {
-      var aid = 'saisie_jours_' + m.id + '_' + nowYm;
-      actions.push({ id: aid, priority: 4, type: 'warning', icon: '📝', label: 'Saisir jours ' + m.client, sub: fmtMonthShort(nowYm) + ' · ' + (ligne.joursPrevus || 0) + 'j prévus',
-        detail: function() { VIEW = 'activite'; ACTIVITE_TAB = 'overview'; render(); },
-        complete: function() { markActionDone(aid, 'Jours saisis ' + m.client + ' ' + fmtMonthShort(nowYm)); },
-        done: isActionDone(aid)
-      });
-    }
-  });
-
-  // 7. Factures à créer (mois passés avec jours réels mais pas de facture)
+  // 3. Factures à créer (mois passés avec jours réels mais pas de facture) — en retard
   MISSIONS.forEach(function(m) {
     if (m.statut !== 'active' || !m.lignes) return;
     m.lignes.forEach(function(l) {
-      if (l.ym >= nowYm || l.joursReels <= 0) return; // seulement mois passés avec des jours
+      if (l.ym >= nowYm || l.joursReels <= 0) return;
       var hasFacture = (m.factures || []).some(function(f) { return f.mois === l.ym && f.jours > 0; });
       if (!hasFacture) {
         var aid = 'creer_facture_' + m.id + '_' + l.ym;
-        actions.push({ id: aid, priority: 3, type: 'warning', icon: '🧾', label: 'Créer facture ' + m.client, sub: fmtMonthShort(l.ym) + ' · ' + l.joursReels + 'j × ' + EUR(m.tjm),
+        actions.push({ id: aid, priority: 1, type: 'overdue', icon: '🧾', label: 'Créer facture ' + m.client, sub: fmtMonthShort(l.ym) + ' · ' + l.joursReels + 'j × ' + EUR(m.tjm),
           detail: function() { showInvoiceGeneratorModal(m, l.ym); },
           complete: function() { markActionDone(aid, 'Facture créée ' + m.client + ' ' + fmtMonthShort(l.ym)); },
           done: isActionDone(aid)
@@ -11978,26 +11992,99 @@ function getActionsList() {
     });
   });
 
+  // === ACTIONS DU MOIS COURANT (type: 'current') ===
+
+  // 4. Factures brouillon à envoyer — seulement mois courant ou passé
+  var brouillons = [];
+  MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'brouillon' && f.jours > 0 && f.mois <= nowYm) brouillons.push(f); }); });
+  brouillons.forEach(function(f) {
+    var aid = 'send_' + f.id;
+    actions.push({ id: aid, priority: 3, type: 'current', icon: '📤', label: 'Envoyer facture ' + f.client, sub: fmtMonthShort(f.mois) + ' · ' + EUR(f.ttc || f.ht),
+      detail: function() { showSendInvoiceModal(f); },
+      complete: function() { markActionDone(aid, 'Facture ' + f.client + ' ' + fmtMonthShort(f.mois)); },
+      done: isActionDone(aid)
+    });
+  });
+
+  // 5. Saisir les jours du mois en cours
+  MISSIONS.forEach(function(m) {
+    if (m.statut !== 'active' || !m.lignes) return;
+    var ligne = m.lignes.find(function(l) { return l.ym === nowYm; });
+    if (ligne && (ligne.joursPrevus > 0) && !ligne.joursReels) {
+      var aid = 'saisie_jours_' + m.id + '_' + nowYm;
+      actions.push({ id: aid, priority: 4, type: 'current', icon: '📝', label: 'Saisir jours ' + m.client, sub: fmtMonthShort(nowYm) + ' · ' + (ligne.joursPrevus || 0) + 'j prévus',
+        detail: function() { VIEW = 'activite'; ACTIVITE_TAB = 'overview'; render(); },
+        complete: function() { markActionDone(aid, 'Jours saisis ' + m.client + ' ' + fmtMonthShort(nowYm)); },
+        done: isActionDone(aid)
+      });
+    }
+  });
+
+  // 6. Versement rémunération
+  if (data.salaireReco >= 500) {
+    var aid = 'salaire_' + nowYm;
+    actions.push({ id: aid, priority: 5, type: 'current', icon: '💸', label: 'Verser une rémunération', sub: EUR(data.salaireReco) + ' disponible',
+      detail: function() { showSalaireModal(data.salaireReco); },
+      complete: function() { markActionDone(aid, 'Versement rémunération ' + EUR(data.salaireReco)); },
+      done: isActionDone(aid)
+    });
+  }
+
+  // 7. Factures envoyées non payées — suivi (mois courant ou passé)
+  var envoyeesNonLate = [];
+  MISSIONS.forEach(function(m) { (m.factures || []).forEach(function(f) { if (f.status === 'envoyée' && !f.isLate && f.jours > 0 && f.mois <= nowYm) envoyeesNonLate.push(f); }); });
+  envoyeesNonLate.forEach(function(f) {
+    var aid = 'suivi_' + f.id;
+    actions.push({ id: aid, priority: 6, type: 'current', icon: '⏳', label: 'Suivre paiement ' + f.client, sub: fmtMonthShort(f.mois) + ' · ' + EUR(f.ttc || f.ht) + ' · Attendu ' + fmtMonthShort(f.paymentMonth || ''),
+      detail: function() { showFactureModal(f); },
+      complete: function() { markActionDone(aid, 'Suivi ' + f.client + ' ' + EUR(f.ttc || f.ht)); },
+      done: isActionDone(aid)
+    });
+  });
+
+  // Séparer: overdue d'abord, puis current, exclure les done (ils vont dans historique)
   actions.sort(function(a, b) {
     if (a.done !== b.done) return a.done ? 1 : -1;
+    var typeOrder = { overdue: 0, current: 1 };
+    var ta = typeOrder[a.type] != null ? typeOrder[a.type] : 1;
+    var tb = typeOrder[b.type] != null ? typeOrder[b.type] : 1;
+    if (ta !== tb) return ta - tb;
     return a.priority - b.priority;
   });
-  return actions.slice(0, 10);
+  return actions;
 }
 
 function renderActionsWidget(container) {
   var actions = getActionsList();
   var doneThisMonth = getActionsForCurrentMonth();
-  if (actions.length === 0 && doneThisMonth.length === 0) return;
-  var widget = el('div', { class: 'actions-widget' });
   var pending = actions.filter(function(a) { return !a.done; });
+  var overdueActions = pending.filter(function(a) { return a.type === 'overdue'; });
+  var currentActions = pending.filter(function(a) { return a.type === 'current'; });
+
+  if (pending.length === 0 && doneThisMonth.length === 0) return;
+
+  var widget = el('div', { class: 'actions-widget' });
   widget.appendChild(el('div', { class: 'actions-header' }, [el('div', { class: 'actions-title' }, [el('span', {}, '⚡'), el('span', {}, 'Actions du Jour'), pending.length > 0 ? el('span', { class: 'actions-badge' }, String(pending.length)) : null].filter(Boolean))]));
-  var list = el('div', { class: 'actions-list' });
-  actions.forEach(function(a) {
-    var item = el('div', { class: 'action-item ' + a.type + (a.done ? ' done' : ''), onclick: function() { a.detail(); } });
+
+  // Helper: render une action card
+  function renderActionCard(a) {
+    // Couleur de la carte: rouge pour overdue, couleur standard pour current
+    var cardClass = 'action-item';
+    if (a.type === 'overdue') cardClass += ' overdue';
+    else cardClass += ' current';
+
+    var item = el('div', { class: cardClass, onclick: function() { a.detail(); } });
     item.appendChild(el('div', { class: 'action-icon' }, a.icon));
+
+    // Couleur du texte contextuel (TVA rose, URSSAF bleu, etc.)
+    var labelColor = '';
+    if (a.cat === 'tva') labelColor = 'var(--pink, #ec4899)';
+    else if (a.cat === 'urssaf') labelColor = 'var(--info)';
+    else if (a.cat === 'ir') labelColor = 'var(--warning)';
+    else if (a.cat === 'cfe') labelColor = 'var(--accent)';
+
     var contentChildren = [
-      el('div', { class: 'action-label' }, a.label),
+      el('div', { class: 'action-label', style: labelColor ? { color: labelColor } : {} }, a.label),
       el('div', { class: 'action-sub' }, a.sub)
     ];
     if (a.deadline) {
@@ -12007,35 +12094,50 @@ function renderActionsWidget(container) {
       contentChildren.push(el('div', { style: { fontSize: '10px', fontWeight: '600', color: deadlineColor, marginTop: '2px' } }, '⏰ ' + deadlineText));
     }
     item.appendChild(el('div', { class: 'action-content' }, contentChildren));
-    // Checkbox: cliquer = marquer fait / défaire
+
     var checkBtn = document.createElement('button');
     checkBtn.type = 'button';
-    checkBtn.className = 'action-check' + (a.done ? ' checked' : '');
-    checkBtn.title = a.done ? 'Annuler' : 'Marquer comme fait';
-    if (a.done) checkBtn.textContent = '✓';
+    checkBtn.className = 'action-check';
+    checkBtn.title = 'Marquer comme fait';
     (function(action, btn, row) {
       btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        if (action.done) {
-          undoActionDone(action.id);
-        } else {
-          // Feedback visuel immédiat avant render
-          btn.classList.add('checked');
-          btn.textContent = '✓';
-          row.classList.add('done');
-          action.complete();
-        }
+        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+        btn.classList.add('checked'); btn.textContent = '✓'; row.classList.add('done');
+        action.complete();
         return false;
       });
     })(a, checkBtn, item);
     item.appendChild(checkBtn);
-    list.appendChild(item);
-  });
-  widget.appendChild(list);
+    return item;
+  }
 
-  // Historique des actions du mois
+  // Section: En retard (rouge)
+  if (overdueActions.length > 0) {
+    var overdueSection = el('div', { style: { marginBottom: '8px' } });
+    overdueSection.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '1px', padding: '4px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      el('span', {}, '●'),
+      el('span', {}, 'En retard (' + overdueActions.length + ')')
+    ]));
+    var overdueList = el('div', { class: 'actions-list' });
+    overdueActions.forEach(function(a) { overdueList.appendChild(renderActionCard(a)); });
+    overdueSection.appendChild(overdueList);
+    widget.appendChild(overdueSection);
+  }
+
+  // Section: Ce mois-ci
+  if (currentActions.length > 0) {
+    var currentSection = el('div', { style: { marginBottom: '8px' } });
+    currentSection.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', padding: '4px 0', display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      el('span', {}, '●'),
+      el('span', {}, 'Ce mois (' + currentActions.length + ')')
+    ]));
+    var currentList = el('div', { class: 'actions-list' });
+    currentActions.forEach(function(a) { currentList.appendChild(renderActionCard(a)); });
+    currentSection.appendChild(currentList);
+    widget.appendChild(currentSection);
+  }
+
+  // Section: Réalisées ce mois (masquée, vert)
   if (doneThisMonth.length > 0) {
     var histSection = el('div', { class: 'actions-history' });
     var histHeader = el('div', { class: 'actions-history-header', onclick: function() {
@@ -12044,8 +12146,8 @@ function renderActionsWidget(container) {
       if (list.style.display === 'none') { list.style.display = 'block'; arrow.textContent = '▾'; }
       else { list.style.display = 'none'; arrow.textContent = '▸'; }
     } });
-    histHeader.appendChild(el('span', { class: 'hist-arrow' }, '▸'));
-    histHeader.appendChild(el('span', {}, ' Historique du mois (' + doneThisMonth.length + ')'));
+    histHeader.appendChild(el('span', { class: 'hist-arrow', style: { color: 'var(--success)' } }, '▸'));
+    histHeader.appendChild(el('span', { style: { color: 'var(--success)' } }, ' Réalisées ce mois (' + doneThisMonth.length + ')'));
     histSection.appendChild(histHeader);
     var histList = el('div', { class: 'actions-history-list', style: { display: 'none' } });
     doneThisMonth.forEach(function(a) {
