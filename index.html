@@ -9716,6 +9716,64 @@ function showFactureModal(facture) {
 }
 
 // Modal workflow d'envoi de facture: PDF + email + gestion email manquant
+// Helper: reconstruire les données de facture à partir de mission + facture
+function buildInvoiceDataFromFacture(mission, facture) {
+  var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === facture.mois; }) : null;
+  if (!ligne) return null;
+
+  var jours = facture.jours || ligne.joursReels || ligne.joursPrevus || 0;
+  var totalHT = facture.ht || jours * mission.tjm;
+  var tvaApplicable = isTVAApplicable(facture.mois + '-01');
+  var tvaAmount = facture.tva || (tvaApplicable ? Math.round(totalHT * LEGAL.tvaRate * 100) / 100 : 0);
+  var totalTTC = facture.ttc || totalHT + tvaAmount;
+
+  var invoiceNum = facture.numero || ligne.lastInvoiceNum || '';
+  var invoiceDate = facture.dateEmission || ligne.lastInvoiceDate || localISO(TODAY);
+  var numCommande = facture.numeroCommande || ligne.numeroCommande || mission.numeroCommande || '';
+  var delaiPaiement = mission.delaiPaiementFacture || 30;
+  var dateEcheance = calculatePaymentDeadline(invoiceDate, delaiPaiement);
+
+  var p = parseYM(facture.mois);
+  var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+
+  var finMois = new Date(p.y, p.m + 1, 0).getDate();
+  var jourFin = Math.min(jours, finMois) || finMois;
+  var siren = COMPANY.siret ? COMPANY.siret.substring(0, 9) : '';
+
+  var titre = mission.client || '';
+  if (numCommande) titre += ' - Commande n°' + numCommande;
+  titre += ' - ' + moisNom;
+
+  var descriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || ''));
+  var periode = 'du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
+
+  return {
+    num: invoiceNum,
+    date: fmtDate(invoiceDate),
+    dateEcheance: fmtDate(dateEcheance),
+    delaiPaiement: delaiPaiement,
+    client: mission.client || '',
+    adresseClient: mission.adresseClient || '',
+    emetteur: COMPANY.nom || '',
+    adresseEmetteur: (COMPANY.adresse || '') + (COMPANY.codePostal ? ', ' + COMPANY.codePostal : '') + (COMPANY.commune ? ' ' + COMPANY.commune : ''),
+    siret: COMPANY.siret || '',
+    siren: siren,
+    tvaIntra: COMPANY.tvaIntracom || '',
+    iban: COMPANY.iban || '',
+    titre: titre,
+    descriptif: descriptif,
+    periode: periode,
+    jours: jours,
+    tjm: mission.tjm,
+    totalHT: totalHT,
+    tvaRate: tvaApplicable ? 20 : 0,
+    tvaAmount: tvaAmount,
+    totalTTC: totalTTC,
+    numCommande: numCommande
+  };
+}
+
 function showSendInvoiceModal(facture) {
   var mission = MISSIONS.find(function(m) { return m.factures && m.factures.some(function(f) { return f.id === facture.id; }); });
   if (!mission) { toast('Mission introuvable', 'error'); return; }
@@ -9753,10 +9811,9 @@ function showSendInvoiceModal(facture) {
       closeModal('formModal');
       showInvoiceGeneratorModal(mission, facture.mois);
     } }, '📄 Générer') : el('button', { class: 'btn', style: { fontSize: '11px', padding: '6px 12px' }, onclick: function() {
-      // Re-télécharger le PDF existant
-      var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === facture.mois; }) : null;
-      if (ligne && ligne.lastInvoiceData) {
-        downloadInvoiceHTML(ligne.lastInvoiceData);
+      var invData = buildInvoiceDataFromFacture(mission, facture);
+      if (invData) {
+        downloadInvoiceHTML(invData);
       } else {
         closeModal('formModal');
         showInvoiceGeneratorModal(mission, facture.mois);
@@ -9966,9 +10023,9 @@ function showSendInvoiceModal(facture) {
 
   // Helper: télécharger le PDF de cette facture
   function autoDownloadPDF() {
-    var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === facture.mois; }) : null;
-    if (ligne && ligne.lastInvoiceData) {
-      downloadInvoiceHTML(ligne.lastInvoiceData);
+    var invData = buildInvoiceDataFromFacture(mission, facture);
+    if (invData && invData.num) {
+      downloadInvoiceHTML(invData);
       return true;
     }
     return false;
@@ -10596,9 +10653,38 @@ function generateAndDownloadPDF(data) {
     doc.text('TVA non applicable, article 293 B du CGI', 20, 269);
   }
   
-  // Télécharger
-  doc.save('Facture-' + data.num + '.pdf');
-  toast('PDF telecharge!', 'success');
+  // Nom de fichier
+  var filename = 'Facture-' + data.num + '.pdf';
+
+  // Si un dossier de sauvegarde est configuré, y écrire directement
+  if (window._invoiceDirHandle) {
+    (async function() {
+      try {
+        // Vérifier que le handle est toujours valide
+        var perm = await window._invoiceDirHandle.queryPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+          perm = await window._invoiceDirHandle.requestPermission({ mode: 'readwrite' });
+        }
+        if (perm === 'granted') {
+          var fileHandle = await window._invoiceDirHandle.getFileHandle(filename, { create: true });
+          var writable = await fileHandle.createWritable();
+          var pdfBlob = doc.output('blob');
+          await writable.write(pdfBlob);
+          await writable.close();
+          toast('PDF sauvegardé dans le dossier: ' + filename, 'success');
+          return;
+        }
+      } catch(e) {
+        console.warn('Sauvegarde dossier échouée, fallback téléchargement:', e);
+      }
+      // Fallback
+      doc.save(filename);
+      toast('PDF téléchargé!', 'success');
+    })();
+  } else {
+    doc.save(filename);
+    toast('PDF téléchargé!', 'success');
+  }
 }
 
 // Fallback: télécharger en HTML
@@ -19057,6 +19143,45 @@ function renderAdmin(container) {
     createInput('IBAN', 'text', 'adminIBAN', COMPANY.iban || '', 'Ex: FR76 1234...'),
     createInput('BIC', 'text', 'adminBIC', COMPANY.bic || '', 'Ex: BNPAFRPP')
   ]));
+
+  // Section: Dossier de stockage des factures
+  entCard.appendChild(el('div', { style: { marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)' } }));
+  entCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' } }, '📁 Dossier de stockage des factures'));
+  entCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: '1.5' } }, 'Sélectionnez un dossier sur votre ordinateur où les factures PDF seront automatiquement sauvegardées. Si non configuré, les PDF seront téléchargés normalement.'));
+
+  var folderStatusDiv = el('div', { id: 'invoiceFolderStatus', style: { marginBottom: '8px' } });
+  if (window._invoiceDirHandle) {
+    folderStatusDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--success)', fontWeight: '600' } }, '✅ Dossier configuré: ' + (window._invoiceDirHandle.name || 'sélectionné')));
+  } else {
+    folderStatusDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Aucun dossier sélectionné (téléchargement standard)'));
+  }
+  entCard.appendChild(folderStatusDiv);
+
+  var folderBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+
+  if (window.showDirectoryPicker) {
+    folderBtns.appendChild(el('button', { class: 'btn', style: { fontSize: '11px', padding: '8px 16px', background: 'rgba(0,153,255,0.1)', color: 'var(--info)' }, onclick: function() {
+      window.showDirectoryPicker({ mode: 'readwrite' }).then(function(handle) {
+        window._invoiceDirHandle = handle;
+        toast('Dossier sélectionné: ' + handle.name, 'success');
+        render();
+      }).catch(function(e) {
+        if (e.name !== 'AbortError') toast('Erreur: ' + e.message, 'error');
+      });
+    } }, '📁 Choisir un dossier'));
+
+    if (window._invoiceDirHandle) {
+      folderBtns.appendChild(el('button', { class: 'btn', style: { fontSize: '11px', padding: '8px 12px', background: 'rgba(248,113,113,0.1)', color: 'var(--danger)' }, onclick: function() {
+        window._invoiceDirHandle = null;
+        toast('Dossier de stockage retiré', 'info');
+        render();
+      } }, '✕ Retirer'));
+    }
+  } else {
+    folderBtns.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--warning)', padding: '6px 0' } }, '⚠️ Cette fonctionnalité nécessite Chrome ou Edge (non supporté par Firefox/Safari)'));
+  }
+  entCard.appendChild(folderBtns);
+
   makeCollapsible(entCard, entTitle, 'cfg_entreprise', false);
   container.appendChild(entCard);
 
