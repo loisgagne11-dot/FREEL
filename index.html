@@ -9785,339 +9785,223 @@ function buildInvoiceDataFromFacture(mission, facture) {
 function showSendInvoiceModal(facture) {
   var mission = MISSIONS.find(function(m) { return m.factures && m.factures.some(function(f) { return f.id === facture.id; }); });
   if (!mission) { toast('Mission introuvable', 'error'); return; }
+  var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === facture.mois; }) : null;
+  var clientObj = getClientByName(mission.client);
 
-  $('#formModalTitle').textContent = '📤 Envoyer la facture · ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
+  var jours = (ligne ? ligne.joursReels || ligne.joursPrevus : facture.jours) || 0;
+  var totalHT = facture.ht || jours * mission.tjm;
+  var tvaApplicable = isTVAApplicable(facture.mois + '-01');
+  var tvaAmount = facture.tva || (tvaApplicable ? Math.round(totalHT * LEGAL.tvaRate * 100) / 100 : 0);
+  var totalTTC = facture.ttc || totalHT + tvaAmount;
+
+  var hasNumber = facture.numero || (ligne && ligne.invoiceFinalized && ligne.lastInvoiceNum);
+  var defaultNum = hasNumber ? (facture.numero || ligne.lastInvoiceNum) : reserveInvoiceNumber(TODAY.getFullYear());
+  var defaultDate = (ligne && ligne.lastInvoiceDate) || localISO(TODAY);
+  var defaultCommande = (ligne && ligne.numeroCommande) || mission.numeroCommande || '';
+  var defaultDelai = mission.delaiPaiementFacture || 30;
+  var defaultFDM = mission.delaiFinDeMois || false;
+  var defaultAdresse = mission.adresseClient || (clientObj ? clientObj.adresse : '') || '';
+  var defaultDescriptif = mission.descriptifFacture || ('Facture pour prestation de service consultant ' + (mission.titre || mission.client));
+  var p = parseYM(facture.mois);
+  var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+  var finMoisDate = new Date(p.y, p.m + 1, 0).getDate();
+  var jourFin = Math.min(jours, finMoisDate) || finMoisDate;
+
+  // Emails connus
+  var allEmails = [];
+  if (mission.agence && mission.agence.contacts) mission.agence.contacts.forEach(function(c) { if (c.email) allEmails.push({ email: c.email, source: 'Agence', where: 'agence' }); });
+  if (mission.clientOp && mission.clientOp.email) allEmails.push({ email: mission.clientOp.email, source: 'Client final', where: 'clientOp' });
+  if (clientObj && clientObj.email) allEmails.push({ email: clientObj.email, source: 'Fiche client', where: 'client' });
+  var seen = {}; allEmails = allEmails.filter(function(e) { if (seen[e.email]) return false; seen[e.email] = true; return true; });
+  var bestEmail = allEmails.length > 0 ? allEmails[0].email : '';
+
+  $('#formModalTitle').textContent = '📤 Facture · ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
   var body = $('#formModalBody');
   body.replaceChildren();
 
-  // Résumé de la facture
-  var summary = el('div', { style: { background: 'var(--bg-tertiary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
-  summary.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' } }, [
-    el('span', { style: { fontWeight: '700', fontSize: '14px' } }, facture.client),
-    el('span', { style: { fontWeight: '800', fontSize: '18px', color: 'var(--success)' } }, EUR(facture.ttc || facture.ht) + (facture.tva > 0 ? ' TTC' : ' HT'))
+  // === RÉSUMÉ ===
+  var summary = el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  summary.appendChild(el('div', {}, [
+    el('div', { style: { fontWeight: '700', fontSize: '14px' } }, facture.client),
+    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, moisNom + ' · ' + jours + 'j × ' + EUR(mission.tjm))
   ]));
-  summary.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' } }, [
-    el('span', {}, fmtMonth(facture.mois) + ' · ' + facture.jours + 'j'),
-    el('span', {}, facture.numero ? 'N° ' + facture.numero : 'Brouillon (pas encore générée)')
-  ]));
+  summary.appendChild(el('div', { style: { fontWeight: '800', fontSize: '18px', color: 'var(--success)' } }, EUR(totalTTC) + (tvaApplicable ? ' TTC' : '')));
   body.appendChild(summary);
 
-  // Étapes du workflow
-  var stepsDiv = el('div', { style: { marginBottom: '16px' } });
-  stepsDiv.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' } }, 'Workflow d\'envoi'));
+  // === TIMELINE ÉTAPES ===
+  var timelineDiv = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0', marginBottom: '14px', padding: '8px 0' } });
+  var steps = ['① Valider les infos', '② Télécharger le PDF', '③ Joindre au mail'];
+  steps.forEach(function(s, i) {
+    timelineDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', color: 'var(--text-muted)', padding: '4px 8px', background: 'var(--bg-secondary)', borderRadius: '10px' } }, s));
+    if (i < steps.length - 1) timelineDiv.appendChild(el('div', { style: { width: '16px', height: '1px', background: 'var(--glass-border)' } }));
+  });
+  body.appendChild(timelineDiv);
 
-  // Étape 1: Générer le PDF
-  var hasNumber = facture.numero || (mission.lignes && mission.lignes.find(function(l) { return l.ym === facture.mois && l.invoiceFinalized; }));
-  var step1Icon = hasNumber ? '✅' : '⬜';
-  var step1 = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } }, [
-    el('span', { style: { fontSize: '16px' } }, step1Icon),
-    el('div', { style: { flex: '1' } }, [
-      el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '1. Générer le PDF'),
-      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, hasNumber ? 'Facture n°' + (facture.numero || '') + ' générée' : 'Cliquez pour créer le PDF de la facture')
-    ]),
-    !hasNumber ? el('button', { class: 'btn', style: { fontSize: '11px', padding: '6px 12px', background: 'var(--info)', color: 'white' }, onclick: function() {
-      closeModal('formModal');
-      showInvoiceGeneratorModal(mission, facture.mois);
-    } }, '📄 Générer') : el('button', { class: 'btn', style: { fontSize: '11px', padding: '6px 12px' }, onclick: function() {
-      var invData = buildInvoiceDataFromFacture(mission, facture);
-      if (invData) {
-        closeModal('formModal');
-        showInvoicePreview(invData);
-      } else {
-        closeModal('formModal');
-        showInvoiceGeneratorModal(mission, facture.mois);
-      }
-    } }, '👁 Prévisualiser')
-  ]);
-  stepsDiv.appendChild(step1);
+  // === SECTION: INFORMATIONS FACTURE ===
+  var secInfo = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
+  secInfo.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '📋 Facture'));
 
-  // Collecter tous les emails connus pour ce client/mission
-  var clientObj = getClientByName(mission.client);
-  var allEmails = [];
-  if (mission.agence && mission.agence.contacts) {
-    mission.agence.contacts.forEach(function(c) {
-      if (c.email) allEmails.push({ email: c.email, source: 'Agence' + (c.prenom || c.nom ? ' (' + [c.prenom, c.nom].filter(Boolean).join(' ') + ')' : ''), where: 'agence' });
-    });
-  }
-  if (mission.clientOp && mission.clientOp.email) {
-    allEmails.push({ email: mission.clientOp.email, source: 'Client final' + (mission.clientOp.contact ? ' (' + mission.clientOp.contact + ')' : ''), where: 'clientOp' });
-  }
-  if (clientObj && clientObj.email) {
-    allEmails.push({ email: clientObj.email, source: 'Fiche client (' + clientObj.nom + ')', where: 'client' });
-  }
-  // Dédupliquer par email
-  var seen = {};
-  allEmails = allEmails.filter(function(e) { if (seen[e.email]) return false; seen[e.email] = true; return true; });
-  var bestEmail = allEmails.length > 0 ? allEmails[0].email : '';
-  var bestSource = allEmails.length > 0 ? allEmails[0].where : '';
+  var numInput = createInput('N° Facture', 'text', 'invNum', defaultNum);
+  if (hasNumber) { numInput.querySelector('input').readOnly = true; numInput.querySelector('input').style.opacity = '0.6'; }
+  secInfo.appendChild(el('div', { class: 'form-row' }, [numInput, createInput('Date émission', 'date', 'invDate', defaultDate)]));
+  secInfo.appendChild(createInput('N° Commande', 'text', 'invCommande', defaultCommande, 'Optionnel'));
+  body.appendChild(secInfo);
 
-  // Étape 2: Destinataire
-  var step2 = el('div', { style: { padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } });
+  // === SECTION: CLIENT ===
+  var secClient = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
+  secClient.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '🏢 Client'));
+  secClient.appendChild(createInput('Adresse facturation', 'text', 'invAdresse', defaultAdresse, '14 RUE PAUL MESPLE, 31100 TOULOUSE'));
+  body.appendChild(secClient);
 
-  var step2Header = el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' } });
-  step2Header.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, [
-    el('span', { style: { fontSize: '16px' } }, bestEmail ? '✅' : '⚠️'),
-    el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '2. Destinataire')
-  ]));
-  step2.appendChild(step2Header);
+  // === SECTION: PAIEMENT ===
+  var secPay = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
+  secPay.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '💰 Paiement'));
+  secPay.appendChild(createSelect('Délai', 'invDelaiType', [
+    { value: '30', label: '30 jours' }, { value: '30_fdm', label: '30 jours fin de mois' },
+    { value: '45', label: '45 jours' }, { value: '45_fdm', label: '45 jours fin de mois' },
+    { value: '60', label: '60 jours' }, { value: '60_fdm', label: '60 jours fin de mois' }
+  ], defaultFDM ? defaultDelai + '_fdm' : String(defaultDelai)));
+  secPay.appendChild(el('div', { id: 'invEcheancePreview', style: { fontSize: '10px', color: 'var(--info)', marginTop: '4px', fontWeight: '600' } }));
+  body.appendChild(secPay);
 
-  // Info expéditeur
-  var senderEmail = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.email) ? CURRENT_USER.email : (COMPANY.email || '');
-  if (senderEmail) {
-    step2.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' } }, [
-      el('span', {}, 'Expéditeur: '),
-      el('span', { style: { fontWeight: '600' } }, senderEmail),
-      el('span', { style: { color: 'var(--text-muted)' } }, '(votre client mail)')
-    ]));
-  }
+  // === SECTION: DESCRIPTIF ===
+  var secDesc = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '8px' } });
+  secDesc.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '📝 Prestation'));
+  var descTA = document.createElement('textarea'); descTA.id = 'invDescriptif'; descTA.value = defaultDescriptif; descTA.rows = 2;
+  descTA.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
+  secDesc.appendChild(descTA);
+  secDesc.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px' } }, '📅 Période: du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom));
+  body.appendChild(secDesc);
 
-  if (!bestEmail) {
-    step2.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--warning)', marginBottom: '6px', padding: '6px 8px', background: 'rgba(251,191,36,0.1)', borderRadius: '6px' } }, '⚠️ Aucun email trouvé pour ce client — renseignez-le ci-dessous'));
-  }
+  // === SECTION: EMAIL ===
+  var secEmail = el('div', { style: { background: 'var(--bg-secondary)', padding: '10px', borderRadius: 'var(--radius-md)', marginBottom: '10px' } });
+  secEmail.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' } }, '📧 Email'));
 
-  // Champ email avec source
-  var emailRow = el('div', { style: { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px' } });
-  var emailInput = document.createElement('input');
-  emailInput.type = 'email';
-  emailInput.id = 'sendInvoiceEmail';
-  emailInput.value = bestEmail;
-  emailInput.placeholder = 'email@client.com';
-  emailInput.style.cssText = 'flex:1;padding:8px 10px;border-radius:6px;border:1px solid ' + (bestEmail ? 'var(--border)' : 'var(--warning)') + ';background:var(--bg-primary);color:var(--text-primary);font-size:12px;';
-  emailRow.appendChild(emailInput);
+  var emailInput = document.createElement('input'); emailInput.type = 'email'; emailInput.id = 'sendInvoiceEmail';
+  emailInput.value = bestEmail; emailInput.placeholder = 'email@client.com';
+  emailInput.style.cssText = 'width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:12px;box-sizing:border-box;margin-bottom:6px;';
+  secEmail.appendChild(emailInput);
 
-  // Bouton supprimer l'email du champ
-  var clearBtn = el('button', { class: 'btn', style: { padding: '6px 8px', fontSize: '11px', background: 'transparent', color: 'var(--text-muted)', minWidth: 'auto' }, title: 'Effacer', onclick: function(e) {
-    e.stopPropagation();
-    emailInput.value = '';
-    emailInput.focus();
-    emailInput.style.borderColor = 'var(--warning)';
-  } }, '✕');
-  emailRow.appendChild(clearBtn);
-  step2.appendChild(emailRow);
-
-  // Liste déroulante des contacts connus (1 clic pour accéder)
-  if (allEmails.length > 0) {
-    var contactsToggle = el('div', { style: { marginTop: '4px' } });
-    var toggleBtn = el('button', { class: 'btn', style: { fontSize: '10px', padding: '4px 10px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }, onclick: function(e) {
-      e.stopPropagation();
-      var list = contactsToggle.querySelector('.contacts-dropdown');
-      list.style.display = list.style.display === 'none' ? 'block' : 'none';
-      toggleBtn.querySelector('.toggle-arrow').textContent = list.style.display === 'none' ? '▸' : '▾';
-    } }, [
-      el('span', {}, '📋 Contacts enregistrés (' + allEmails.length + ')'),
-      el('span', { class: 'toggle-arrow' }, '▸')
-    ]);
-    contactsToggle.appendChild(toggleBtn);
-
-    var dropdown = el('div', { class: 'contacts-dropdown', style: { display: 'none', marginTop: '4px', background: 'var(--bg-primary)', borderRadius: '6px', border: '1px solid var(--border)', overflow: 'hidden' } });
+  if (allEmails.length > 1) {
+    var contactsList = el('div', { style: { display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '6px' } });
     allEmails.forEach(function(entry) {
-      var contactRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)', fontSize: '11px' }, onclick: function() {
-        emailInput.value = entry.email;
-        emailInput.style.borderColor = 'var(--border)';
-        // Masquer le sélecteur de sauvegarde si l'email existe déjà
-        var saveDiv = document.getElementById('sendInvoiceSaveTarget');
-        if (saveDiv) saveDiv.style.display = 'none';
-      } });
-      contactRow.onmouseover = function() { contactRow.style.background = 'var(--bg-tertiary)'; };
-      contactRow.onmouseout = function() { contactRow.style.background = 'transparent'; };
-      contactRow.appendChild(el('div', {}, [
-        el('div', { style: { fontWeight: '600' } }, entry.email),
-        el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, entry.source)
-      ]));
-      contactRow.appendChild(el('span', { style: { color: 'var(--accent)', fontSize: '12px' } }, '→'));
-      dropdown.appendChild(contactRow);
+      contactsList.appendChild(el('button', { class: 'btn', style: { fontSize: '9px', padding: '3px 8px', background: 'var(--bg-tertiary)' }, onclick: function() { emailInput.value = entry.email; } }, entry.email));
     });
-    contactsToggle.appendChild(dropdown);
-    step2.appendChild(contactsToggle);
+    secEmail.appendChild(contactsList);
   }
 
-  // Sélecteur: où sauvegarder (toujours visible pour permettre de sauvegarder un nouvel email)
-  var saveTargetDiv = el('div', { id: 'sendInvoiceSaveTarget', style: { marginTop: '8px', padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: '6px', display: bestEmail ? 'none' : 'block' } });
-  saveTargetDiv.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginBottom: '4px' } }, 'Sauvegarder le nouvel email dans :'));
-  var sel = document.createElement('select');
-  sel.id = 'sendInvoiceEmailTarget';
-  sel.style.cssText = 'width:100%;padding:5px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;';
-  [
-    { value: 'client', label: 'Fiche client (' + mission.client + ')' },
-    { value: 'agence', label: 'Agence / ESN' },
-    { value: 'clientOp', label: 'Client final (opérationnel)' }
-  ].forEach(function(opt) {
-    var o = document.createElement('option');
-    o.value = opt.value; o.textContent = opt.label;
-    sel.appendChild(o);
-  });
-  saveTargetDiv.appendChild(sel);
-  step2.appendChild(saveTargetDiv);
-
-  // Afficher le sélecteur quand l'email saisi diffère des emails connus
-  emailInput.addEventListener('input', function() {
-    var val = emailInput.value.trim();
-    var isNew = val && !allEmails.some(function(e) { return e.email === val; });
-    saveTargetDiv.style.display = isNew ? 'block' : 'none';
-    emailInput.style.borderColor = val && val.indexOf('@') >= 0 ? 'var(--border)' : 'var(--warning)';
-  });
-
-  stepsDiv.appendChild(step2);
-
-  // Étape 3: Aperçu email
   var companyName = COMPANY.nom || 'Mon entreprise';
-  var invoiceNum = facture.numero || 'XXXX';
-  var defaultSubject = 'Facture ' + invoiceNum + ' - ' + companyName + ' - ' + fmtMonth(facture.mois);
-  var defaultBody = 'Bonjour,\n\nVeuillez trouver ci-joint la facture n°' + invoiceNum + ' pour la période de ' + fmtMonth(facture.mois) + '.\n\nMontant : ' + EUR(facture.ttc || facture.ht) + (facture.tva > 0 ? ' TTC' : ' HT') + '\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n' + companyName;
+  var invoiceNum = hasNumber ? defaultNum : 'XXXX';
+  var defaultSubject = 'Facture ' + invoiceNum + ' - ' + companyName + ' - ' + moisNom;
+  var defaultMailBody = 'Bonjour,\n\nVeuillez trouver ci-joint la facture n°' + invoiceNum + ' pour la période de ' + moisNom + '.\n\nMontant : ' + EUR(totalTTC) + (tvaApplicable ? ' TTC' : '') + '\n\nJe reste à votre disposition pour toute question.\n\nCordialement,\n' + companyName;
 
-  // Expéditeur configurable
-  var emailExpediteur = COMPANY.emailExpediteur || COMPANY.email || senderEmail || '';
+  var subjectInput = document.createElement('input'); subjectInput.type = 'text'; subjectInput.id = 'sendInvoiceSubject'; subjectInput.value = defaultSubject;
+  subjectInput.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;box-sizing:border-box;margin-bottom:4px;';
+  secEmail.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px' } }, 'Objet'));
+  secEmail.appendChild(subjectInput);
 
-  var step3 = el('div', { style: { padding: '10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } });
-  step3.appendChild(el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' } }, [
-    el('span', { style: { fontSize: '16px' } }, '📧'),
-    el('div', { style: { fontWeight: '600', fontSize: '12px' } }, '3. Email pré-rempli')
-  ]));
+  var bodyTA = document.createElement('textarea'); bodyTA.id = 'sendInvoiceBody'; bodyTA.value = defaultMailBody; bodyTA.rows = 4;
+  bodyTA.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--glass-border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
+  secEmail.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginBottom: '2px', marginTop: '4px' } }, 'Message'));
+  secEmail.appendChild(bodyTA);
+  body.appendChild(secEmail);
 
-  // Info sur le fonctionnement
-  var infoBox = el('div', { style: { fontSize: '10px', padding: '8px', background: 'rgba(0,153,255,0.08)', borderRadius: '6px', marginBottom: '8px', lineHeight: '1.5' } });
-  infoBox.appendChild(el('div', { style: { fontWeight: '700', color: 'var(--info)', marginBottom: '2px' } }, 'Comment ça marche :'));
-  infoBox.appendChild(el('div', { style: { color: 'var(--text-secondary)' } }, '1. Le PDF est téléchargé automatiquement'));
-  infoBox.appendChild(el('div', { style: { color: 'var(--text-secondary)' } }, '2. Votre client mail s\'ouvre (Outlook, Gmail...)'));
-  infoBox.appendChild(el('div', { style: { color: 'var(--text-secondary)' } }, '3. Joignez le PDF téléchargé et envoyez'));
-  if (emailExpediteur) {
-    infoBox.appendChild(el('div', { style: { color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' } }, 'Expéditeur: votre compte ' + emailExpediteur + ' (paramétrable dans Admin > Entreprise)'));
-  } else {
-    infoBox.appendChild(el('div', { style: { color: 'var(--warning)', marginTop: '4px' } }, '⚠️ Configurez votre email d\'envoi dans Admin > Entreprise'));
-  }
-  step3.appendChild(infoBox);
+  // === BOUTON PRINCIPAL ===
+  body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { padding: '14px', fontWeight: '700', fontSize: '13px' }, onclick: function() {
+    var email = emailInput.value.trim();
+    if (!email || email.indexOf('@') < 0) { toast('Email invalide', 'error'); emailInput.focus(); return; }
 
-  var subjectInput = document.createElement('input');
-  subjectInput.type = 'text';
-  subjectInput.id = 'sendInvoiceSubject';
-  subjectInput.value = defaultSubject;
-  subjectInput.style.cssText = 'width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;margin-bottom:6px;box-sizing:border-box;';
-  step3.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '2px' } }, 'Objet'));
-  step3.appendChild(subjectInput);
+    // Récupérer les valeurs du formulaire
+    var invoiceDate = $('#invDate') ? $('#invDate').value : defaultDate;
+    var typeVal = $('#invDelaiType') ? $('#invDelaiType').value : '30';
+    var fdm = typeVal.indexOf('_fdm') > -1;
+    var delai = parseInt(typeVal) || 30;
+    var descriptif = $('#invDescriptif') ? $('#invDescriptif').value : defaultDescriptif;
+    var adresseClient = $('#invAdresse') ? $('#invAdresse').value : '';
+    var numCommande = $('#invCommande') ? $('#invCommande').value : '';
 
-  var bodyTextarea = document.createElement('textarea');
-  bodyTextarea.id = 'sendInvoiceBody';
-  bodyTextarea.value = defaultBody;
-  bodyTextarea.rows = 6;
-  bodyTextarea.style.cssText = 'width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-primary);color:var(--text-primary);font-size:11px;resize:vertical;box-sizing:border-box;';
-  step3.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '2px', marginTop: '4px' } }, 'Corps du message'));
-  step3.appendChild(bodyTextarea);
-  stepsDiv.appendChild(step3);
+    // Sauvegarder les infos dans la mission
+    mission.delaiPaiementFacture = delai;
+    mission.delaiFinDeMois = fdm;
+    mission.descriptifFacture = descriptif;
+    if (adresseClient) mission.adresseClient = adresseClient;
+    if (numCommande && ligne) ligne.numeroCommande = numCommande;
 
-  body.appendChild(stepsDiv);
+    // Générer le numéro si pas encore fait
+    var finalNum = defaultNum;
+    if (!hasNumber && ligne) {
+      finalNum = getNextInvoiceNumber(TODAY.getFullYear());
+      registerInvoice({ numero: finalNum, date: invoiceDate, client: facture.client, nature: descriptif, montantHT: totalHT, tva: tvaAmount, montantTTC: totalTTC, missionId: mission.id, mois: facture.mois });
+      ligne.invoiceFinalized = true;
+      ligne.lastInvoiceNum = finalNum;
+      ligne.lastInvoiceDate = invoiceDate;
+      // Mettre à jour le numéro dans la facture
+      MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) { if (f.id === facture.id) f.numero = finalNum; }); });
+    }
 
-  // Helper: sauvegarder un email s'il est nouveau
-  function saveEmailIfNew(email) {
-    if (!email || email.indexOf('@') < 0) return;
-    var isKnown = allEmails.some(function(e) { return e.email === email; });
-    if (isKnown) return;
-    var target = document.getElementById('sendInvoiceEmailTarget');
-    var where = target ? target.value : 'client';
-    if (where === 'client') {
+    // Marquer envoyée
+    MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) {
+      if (f.id === facture.id && f.status === 'brouillon') { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); }
+    }); });
+
+    // Sauvegarder email
+    if (email && !allEmails.some(function(e) { return e.email === email; })) {
       var c = getClientByName(mission.client);
-      if (c) { c.email = email; }
-      else { CLIENTS.push({ id: 'CLI' + Date.now(), nom: mission.client, email: email, adresse: '', siret: '', contact: '', notes: '', delaiPaiement: mission.delaiPaiement || 2, jourPaiement: mission.jourPaiement || 15 }); }
-    } else if (where === 'agence') {
-      if (!mission.agence) mission.agence = { nom: '', contacts: [], adresses: [] };
-      if (!mission.agence.contacts) mission.agence.contacts = [];
-      if (mission.agence.contacts.length > 0) { mission.agence.contacts[0].email = email; }
-      else { mission.agence.contacts.push({ prenom: '', nom: '', email: email, telephone: '' }); }
-    } else if (where === 'clientOp') {
-      if (!mission.clientOp) mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
-      mission.clientOp.email = email;
+      if (c) c.email = email; else CLIENTS.push({ id: 'CLI' + Date.now(), nom: mission.client, email: email, adresse: adresseClient, siret: '', contact: '', notes: '', delaiPaiement: mission.delaiPaiement || 2, jourPaiement: mission.jourPaiement || 15 });
     }
     saveAll();
-    toast('Email sauvegardé (' + where + ')', 'success');
-  }
 
-  // Helper: télécharger le PDF de cette facture
-  function autoDownloadPDF() {
-    var invData = buildInvoiceDataFromFacture(mission, facture);
-    if (invData) {
-      downloadInvoiceHTML(invData);
-      return true;
-    }
-    return false;
-  }
+    // Construire et télécharger le PDF
+    var dateEcheance = calculatePaymentDeadline(invoiceDate, delai, fdm);
+    var siren = COMPANY.siret ? COMPANY.siret.substring(0, 9) : '';
+    var periode = 'du 01 au ' + String(jourFin).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
+    var titre = facture.client; if (numCommande) titre += ' - Commande n°' + numCommande; titre += ' - ' + moisNom;
+    var invData = {
+      num: finalNum, date: fmtDate(invoiceDate), dateEcheance: fmtDate(dateEcheance),
+      delaiPaiement: delai, delaiLabel: delai + ' jours' + (fdm ? ' fin de mois' : ''), finDeMois: fdm,
+      client: facture.client, adresseClient: adresseClient,
+      emetteur: COMPANY.nom || '', adresseEmetteur: (COMPANY.adresse || '') + (COMPANY.codePostal ? ', ' + COMPANY.codePostal : '') + (COMPANY.commune ? ' ' + COMPANY.commune : ''),
+      siret: COMPANY.siret || '', siren: siren, tvaIntra: COMPANY.tvaIntracom || '', iban: COMPANY.iban || '',
+      titre: titre, descriptif: descriptif, periode: periode,
+      jours: jours, tjm: mission.tjm, totalHT: totalHT, tvaRate: tvaApplicable ? 20 : 0, tvaAmount: tvaAmount, totalTTC: totalTTC, numCommande: numCommande
+    };
+    downloadInvoiceHTML(invData);
 
-  // Boutons d'action
-  var btns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    // Ouvrir email après petit délai
+    var subject = subjectInput.value.replace('XXXX', finalNum);
+    var mailBody = bodyTA.value.replace(/XXXX/g, finalNum);
+    setTimeout(function() {
+      window.open('mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(mailBody), '_blank');
+    }, 400);
 
-  // Bouton principal: Prévisualiser + Télécharger + Ouvrir email
-  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1', fontWeight: '700', minWidth: '200px' }, onclick: function() {
-    var email = document.getElementById('sendInvoiceEmail').value.trim();
-    var subject = document.getElementById('sendInvoiceSubject').value;
-    var mailBody = document.getElementById('sendInvoiceBody').value;
-
-    if (!email || email.indexOf('@') < 0) {
-      toast('Veuillez renseigner un email valide', 'error');
-      emailInput.focus(); emailInput.style.borderColor = 'var(--danger)';
-      return;
-    }
-
-    saveEmailIfNew(email);
-
-    // Construire les données de facture
-    var invData = buildInvoiceDataFromFacture(mission, facture);
-    if (!invData) {
-      toast('Impossible de générer la facture — vérifiez les données', 'error');
-      return;
-    }
-
-    // Fermer le modal d'envoi
     closeModal('formModal');
+    render();
+    toast('PDF téléchargé + email ouvert — joignez le PDF !', 'success');
+  } }, '📤 Valider, télécharger et envoyer'));
 
-    // Ouvrir la prévisualisation avec les boutons Télécharger + Email
-    showInvoicePreviewWithSend(invData, {
-      email: email,
-      subject: subject,
-      body: mailBody,
-      facture: facture,
-      onSend: function() {
-        // Marquer la facture comme envoyée
-        MISSIONS.forEach(function(m) {
-          if (m.factures) m.factures.forEach(function(f) {
-            if (f.id === facture.id && f.status === 'brouillon') {
-              f.status = 'envoyée';
-              f.dateEnvoi = localISO(TODAY);
-            }
-          });
-        });
-        saveAll();
-        render();
-      }
-    });
-  } }, '👁 Prévisualiser & Envoyer'));
-
-  // Bouton secondaire: juste marquer envoyée
-  btns.appendChild(el('button', { class: 'btn', style: { background: 'var(--bg-tertiary)', fontSize: '11px' }, onclick: function() {
-    var email = document.getElementById('sendInvoiceEmail').value.trim();
-    saveEmailIfNew(email);
-    MISSIONS.forEach(function(m) {
-      if (m.factures) m.factures.forEach(function(f) {
-        if (f.id === facture.id) { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); }
-      });
-    });
-    saveAll(); render(); closeModal('formModal');
-    toast('Facture marquée comme envoyée', 'success');
+  // Bouton secondaire
+  body.appendChild(el('button', { class: 'btn btn-block', style: { marginTop: '6px', background: 'var(--bg-tertiary)', fontSize: '11px' }, onclick: function() {
+    MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) { if (f.id === facture.id) { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); } }); });
+    saveAll(); render(); closeModal('formModal'); toast('Marquée envoyée', 'success');
   } }, 'Juste marquer envoyée'));
 
-  // Bouton test email
-  btns.appendChild(el('button', { class: 'btn', style: { background: 'rgba(0,153,255,0.1)', color: 'var(--info)', fontSize: '11px' }, onclick: function() {
-    var testEmail = emailExpediteur || (typeof CURRENT_USER !== 'undefined' && CURRENT_USER ? CURRENT_USER.email : '') || '';
-    if (!testEmail) {
-      toast('Configurez votre email dans Admin > Entreprise', 'error');
-      return;
-    }
-    var testMailto = 'mailto:' + encodeURIComponent(testEmail) +
-      '?subject=' + encodeURIComponent('[TEST] Facture - ' + companyName) +
-      '&body=' + encodeURIComponent('Ceci est un email de test depuis FREEL.\n\nSi vous recevez ce message, l\'envoi de factures par email est correctement configuré.\n\nExpéditeur attendu: ' + testEmail);
-    window.open(testMailto, '_blank');
-    toast('Email de test ouvert — vérifiez l\'expéditeur dans votre client mail', 'info');
-  } }, 'Tester'));
-
-  body.appendChild(btns);
   openModal('formModal');
+
+  // Init échéance
+  function updateEcheance() {
+    var dateVal = $('#invDate') ? $('#invDate').value : defaultDate;
+    var typeVal = $('#invDelaiType') ? $('#invDelaiType').value : '30';
+    var fdm = typeVal.indexOf('_fdm') > -1;
+    var d = parseInt(typeVal) || 30;
+    var ech = calculatePaymentDeadline(dateVal, d, fdm);
+    $('#invEcheancePreview').textContent = '📅 Échéance: ' + fmtDate(ech);
+  }
+  setTimeout(function() {
+    updateEcheance();
+    if ($('#invDelaiType')) $('#invDelaiType').addEventListener('change', updateEcheance);
+    if ($('#invDate')) $('#invDate').addEventListener('change', updateEcheance);
+  }, 50);
 }
 
 // Modal pour personnaliser et générer la facture PDF
