@@ -2942,39 +2942,77 @@ function formatInvoiceNumber(num, date) {
   }
 }
 
+function extractSequenceFromInvoiceNum(num) {
+  // Extraire le numéro séquentiel d'un numéro de facture
+  // Formats: YYYY-NNN, YYYY-MM-DD-NNNNNN, F-YYYY-NNN, YYYYMM-NNN
+  if (!num) return 0;
+  var parts = num.split('-');
+  var last = parts[parts.length - 1];
+  return parseInt(last, 10) || 0;
+}
+
 function getGlobalInvoiceCount() {
-  // Compte toutes les factures émises : on prend le max de toutes les sources
-  // 1) Factures finalisées dans les lignes de missions
-  var countLignes = 0;
+  // Compteur global explicite (source de vérité principale, fixé manuellement ou auto)
+  var countGlobal = COMPANY.invoiceGlobalCounter || 0;
+  if (countGlobal > 0) return countGlobal;
+
+  // Fallback: déduire le compteur depuis les données existantes
+  var maxSeq = 0;
+
+  // 1) Extraire le max depuis les numéros de factures existants (lignes)
   MISSIONS.forEach(function(mis) {
     if (!mis.lignes) return;
     mis.lignes.forEach(function(l) {
-      if (l.invoiceFinalized && l.lastInvoiceNum) countLignes++;
+      if (l.lastInvoiceNum) {
+        var seq = extractSequenceFromInvoiceNum(l.lastInvoiceNum);
+        if (seq > maxSeq) maxSeq = seq;
+      }
     });
   });
-  // 2) Factures avec statut envoyée/payée/encaissée dans mis.factures
-  var countFactures = 0;
+
+  // 2) Extraire le max depuis les factures avec numéro
   MISSIONS.forEach(function(mis) {
     (mis.factures || []).forEach(function(f) {
-      if (f.status && f.status !== 'brouillon') countFactures++;
+      if (f.numero) {
+        var seq = extractSequenceFromInvoiceNum(f.numero);
+        if (seq > maxSeq) maxSeq = seq;
+      }
     });
   });
+
   // 3) Registre des factures
-  var countRegistry = (COMPANY.invoiceRegistry && COMPANY.invoiceRegistry.length) || 0;
-  // 4) Compteur global explicite
-  var countGlobal = COMPANY.invoiceGlobalCounter || 0;
+  if (COMPANY.invoiceRegistry) {
+    COMPANY.invoiceRegistry.forEach(function(inv) {
+      if (inv.numero) {
+        var seq = extractSequenceFromInvoiceNum(inv.numero);
+        if (seq > maxSeq) maxSeq = seq;
+      }
+    });
+  }
+
+  // 4) Compter tous les mois passés avec jours travaillés (= factures émises)
+  var nowYm = String(TODAY.getFullYear()) + '-' + String(TODAY.getMonth() + 1).padStart(2, '0');
+  var countPastMonths = 0;
+  MISSIONS.forEach(function(mis) {
+    (mis.factures || []).forEach(function(f) {
+      if (f.jours > 0 && f.mois && f.mois <= nowYm) countPastMonths++;
+    });
+  });
+
   // 5) Somme des compteurs par année
   var countPerYear = 0;
   if (COMPANY.invoiceCounter) {
     Object.keys(COMPANY.invoiceCounter).forEach(function(k) { countPerYear += COMPANY.invoiceCounter[k] || 0; });
   }
-  return Math.max(countLignes, countFactures, countRegistry, countGlobal, countPerYear);
+
+  return Math.max(maxSeq, countPastMonths, (COMPANY.invoiceRegistry || []).length, countPerYear);
 }
 
 function getNextInvoiceNumber(year, date) {
   var globalNum = getGlobalInvoiceCount() + 1;
-  // Sauvegarder le compteur global pour cohérence
+  // Sauvegarder le compteur global immédiatement pour ne jamais le perdre
   COMPANY.invoiceGlobalCounter = globalNum;
+  saveAll();
   return formatInvoiceNumber(globalNum, date);
 }
 
@@ -5065,7 +5103,38 @@ function loadAll() {
     if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
     if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
     if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
-    if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
+    if (COMPANY.invoiceGlobalCounter === undefined || COMPANY.invoiceGlobalCounter === 0) {
+      // Auto-calcul du compteur: compter tous les mois passés avec jours > 0 (= facture émise)
+      var nowYm = String(TODAY.getFullYear()) + '-' + String(TODAY.getMonth() + 1).padStart(2, '0');
+      var autoCount = 0;
+      MISSIONS.forEach(function(mis) {
+        (mis.factures || []).forEach(function(f) {
+          // Chaque mois passé avec du travail réalisé = une facture émise
+          if (f.jours > 0 && f.mois && f.mois <= nowYm) autoCount++;
+        });
+      });
+      // Aussi considérer le max des numéros séquentiels existants
+      var maxSeq = 0;
+      MISSIONS.forEach(function(mis) {
+        (mis.lignes || []).forEach(function(l) {
+          if (l.lastInvoiceNum) {
+            var seq = extractSequenceFromInvoiceNum(l.lastInvoiceNum);
+            if (seq > maxSeq) maxSeq = seq;
+          }
+        });
+      });
+      // Et les compteurs par année
+      var yearSum = 0;
+      if (COMPANY.invoiceCounter) {
+        Object.keys(COMPANY.invoiceCounter).forEach(function(k) { yearSum += COMPANY.invoiceCounter[k] || 0; });
+      }
+      COMPANY.invoiceGlobalCounter = Math.max(autoCount, maxSeq, yearSum);
+      if (COMPANY.invoiceGlobalCounter > 0) {
+        setTimeout(function() {
+          toast('Compteur factures initialisé à ' + COMPANY.invoiceGlobalCounter + '. Corrigez dans Config > Facturation si nécessaire.', 'info');
+        }, 2000);
+      }
+    }
     // Migration clients depuis missions existantes
     if (CLIENTS.length === 0 && MISSIONS.length > 0) {
       var clientNames = {};
@@ -17193,7 +17262,7 @@ function renderFacturesContent(container) {
       var totalTVA = monthFactures.reduce(function(s, f) { return s + (f.tva || 0); }, 0);
 
       // Header du mois
-      var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', margin: '12px 0 6px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid ' + borderColor } });
+      var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', margin: '16px 0 6px', background: 'linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid ' + borderColor } });
       monthHeader.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'capitalize' } }, fmtMonth(mois)));
       var monthStats = el('div', { style: { textAlign: 'right' } });
       monthStats.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(totalHT) + ' HT'));
