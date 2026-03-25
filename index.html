@@ -2425,6 +2425,10 @@ function loadFromCloud() {
         if (result.data.treasury) TREASURY = result.data.treasury;
         if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
 
+        // Reconstruire lignes/factures puis réparer la numérotation
+        MISSIONS.forEach(buildMission);
+        repairInvoiceNumbers();
+
         saveAll();
         COMPUTED = compute();
         render();
