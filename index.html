@@ -17262,10 +17262,10 @@ function renderFacturesContent(container) {
       var totalTVA = monthFactures.reduce(function(s, f) { return s + (f.tva || 0); }, 0);
 
       // Header du mois
-      var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', margin: '16px 0 6px', background: 'linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary))', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid ' + borderColor } });
-      monthHeader.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', textTransform: 'capitalize' } }, fmtMonth(mois)));
+      var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', margin: '16px 0 6px', background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid ' + borderColor } });
+      monthHeader.appendChild(el('div', { style: { fontWeight: '800', fontSize: '14px', textTransform: 'capitalize', color: 'var(--text-primary)' } }, fmtMonth(mois)));
       var monthStats = el('div', { style: { textAlign: 'right' } });
-      monthStats.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px' } }, EUR(totalHT) + ' HT'));
+      monthStats.appendChild(el('div', { style: { fontWeight: '800', fontSize: '14px', color: 'var(--text-primary)' } }, EUR(totalHT) + ' HT'));
       if (totalTVA > 0) monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '') + ' · TVA ' + EUR(totalTVA)));
       else monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '')));
       monthHeader.appendChild(monthStats);
@@ -17282,7 +17282,12 @@ function renderFacturesContent(container) {
         var card = el('div', { class: 'facture-card', onclick: function() { showFactureModal(f); } });
         card.appendChild(el('div', { class: 'badge ' + badgeClass, style: { fontSize: '9px', whiteSpace: 'nowrap' } }, badgeText));
         var infoDiv = el('div', { class: 'facture-info' });
-        infoDiv.appendChild(el('div', { class: 'facture-id' }, f.client));
+        var clientRow = el('div', { class: 'facture-id', style: { display: 'flex', alignItems: 'center', gap: '6px' } });
+        clientRow.appendChild(document.createTextNode(f.client));
+        if (f.numero) {
+          clientRow.appendChild(el('span', { style: { fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: '600', letterSpacing: '0.3px' } }, f.numero));
+        }
+        infoDiv.appendChild(clientRow);
         var metaRow = el('div', { class: 'facture-meta', style: { display: 'flex', alignItems: 'center', gap: '6px' } });
         metaRow.appendChild(document.createTextNode(f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
         // Bouton ajuster activité
