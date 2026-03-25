@@ -9825,7 +9825,7 @@ function buildInvoiceDataFromFacture(mission, facture) {
   var totalTTC = facture.ttc || totalHT + tvaAmount;
 
   var invoiceNum = facture.numero || ligne.lastInvoiceNum || '';
-  var invoiceDate = facture.dateEmission || ligne.lastInvoiceDate || localISO(TODAY);
+  var invoiceDate = facture.dateEmission || localISO(TODAY);
   var numCommande = facture.numeroCommande || ligne.numeroCommande || mission.numeroCommande || '';
   var delaiPaiement = mission.delaiPaiementFacture || 30;
   var finDeMois = mission.delaiFinDeMois || false;
@@ -10625,7 +10625,7 @@ function generateInvoiceHTMLContent(d) {
     // === FACTURE N° + COMMANDE + PÉRIODE ===
     '<div style="margin-bottom:4px;">' +
       '<div style="font-weight:bold;font-size:11pt;color:' + col + ';">Facture N° ' + e(d.num) + '</div>' +
-      (d.numCommande ? '<div style="color:' + col + ';font-size:9.5pt;">' + e(d.client) + ' Commande n°' + e(d.numCommande) + ' pour la période de ' + e(d.titre).split(' - ').pop() + '</div>' : '') +
+      (d.numCommande ? '<div style="font-size:9.5pt;color:#333;">Commande n°' + e(d.numCommande) + '</div>' : '') +
     '</div>' +
     '<div style="margin-bottom:4px;font-size:9.5pt;color:#333;">' +
       '<div>Date d\'émission : ' + e(d.date) + '</div>' +
@@ -10648,7 +10648,8 @@ function generateInvoiceHTMLContent(d) {
       '<tbody>' +
         '<tr style="border-bottom:1px solid #ddd;">' +
           '<td style="padding:12px 10px;vertical-align:top;font-size:9pt;">' +
-            '<div>Descriptif : ' + e(d.descriptif) + ' ' + e(d.periode) + '.</div>' +
+            '<div>' + e(d.descriptif) + '</div>' +
+            '<div>Periode : ' + e(d.periode) + '</div>' +
           '</td>' +
           '<td style="padding:12px 10px;text-align:center;font-size:9pt;">' + fmtEur(d.jours) + '</td>' +
           '<td style="padding:12px 10px;text-align:center;font-size:9pt;">jours</td>' +
