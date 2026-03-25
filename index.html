@@ -10625,7 +10625,7 @@ function generateInvoiceHTMLContent(d) {
     // === FACTURE N° + COMMANDE + PÉRIODE ===
     '<div style="margin-bottom:4px;">' +
       '<div style="font-weight:bold;font-size:11pt;color:' + col + ';">Facture N° ' + e(d.num) + '</div>' +
-      (d.numCommande ? '<div style="font-size:9.5pt;color:#333;">Commande n°' + e(d.numCommande) + '</div>' : '') +
+      (d.numCommande ? '<div style="color:' + col + ';font-size:9.5pt;">' + e(d.client) + ' Commande n\u00b0' + e(d.numCommande) + ' pour la p\u00e9riode de ' + e(d.titre).split(' - ').pop() + '</div>' : '') +
     '</div>' +
     '<div style="margin-bottom:4px;font-size:9.5pt;color:#333;">' +
       '<div>Date d\'émission : ' + e(d.date) + '</div>' +
@@ -10648,8 +10648,7 @@ function generateInvoiceHTMLContent(d) {
       '<tbody>' +
         '<tr style="border-bottom:1px solid #ddd;">' +
           '<td style="padding:12px 10px;vertical-align:top;font-size:9pt;">' +
-            '<div>' + e(d.descriptif) + '</div>' +
-            '<div>Periode : ' + e(d.periode) + '</div>' +
+            '<div>Descriptif : ' + e(d.descriptif) + ' ' + e(d.periode) + '.</div>' +
           '</td>' +
           '<td style="padding:12px 10px;text-align:center;font-size:9pt;">' + fmtEur(d.jours) + '</td>' +
           '<td style="padding:12px 10px;text-align:center;font-size:9pt;">jours</td>' +
@@ -10752,7 +10751,8 @@ function generateAndDownloadPDF(data) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(51);
-    doc.text('Commande n' + deg + data.numCommande, 20, yF);
+    var cmdText = data.client + ' Commande n' + deg + data.numCommande + ' pour la periode de ' + (data.titre || '').split(' - ').pop();
+    doc.text(cmdText, 20, yF);
     yF += 6;
   }
 
@@ -10792,7 +10792,7 @@ function generateAndDownloadPDF(data) {
   doc.setTextColor(0);
   doc.setFontSize(9);
 
-  var descText = data.descriptif + '\nPeriode : ' + data.periode;
+  var descText = 'Descriptif : ' + data.descriptif + ' ' + data.periode + '.';
   var descLines = doc.splitTextToSize(descText, 80);
   descLines.forEach(function(line, idx) { doc.text(line, 22, tableY + (idx * 5)); });
 
