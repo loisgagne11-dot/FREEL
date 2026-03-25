@@ -2970,83 +2970,102 @@ function reserveInvoiceNumber(year, date) {
 }
 
 function repairInvoiceNumbers() {
-  // Réparation: réattribuer TOUS les numéros de factures dans l'ordre chronologique
-  // Collecte toutes les factures avec jours > 0 de toutes les missions
-  var allFactures = [];
-  MISSIONS.forEach(function(mis) {
-    (mis.factures || []).forEach(function(f) {
-      if (f.jours > 0) {
-        allFactures.push({ facture: f, mission: mis });
-      }
+  try {
+    console.log('[FREEL] repairInvoiceNumbers: début...');
+    // Réparation: réattribuer TOUS les numéros de factures dans l'ordre chronologique
+    var allFactures = [];
+    MISSIONS.forEach(function(mis) {
+      if (!mis.factures) return;
+      mis.factures.forEach(function(f) {
+        if (f.jours > 0) {
+          allFactures.push({ facture: f, mission: mis });
+        }
+      });
     });
-  });
 
-  // Tri chronologique par mois (YYYY-MM)
-  allFactures.sort(function(a, b) {
-    var cmp = a.facture.mois.localeCompare(b.facture.mois);
-    if (cmp !== 0) return cmp;
-    // Si même mois, trier par nom de client pour un ordre déterministe
-    return (a.facture.client || '').localeCompare(b.facture.client || '');
-  });
+    console.log('[FREEL] repairInvoiceNumbers: ' + allFactures.length + ' factures trouvées');
 
-  // Réinitialiser le registre
-  COMPANY.invoiceRegistry = [];
+    if (allFactures.length === 0) return 0;
 
-  // Attribuer les numéros séquentiels
-  allFactures.forEach(function(item, idx) {
-    var num = idx + 1;
-    var f = item.facture;
-    var mis = item.mission;
-    // Date de facture = dernier jour du mois facturé
-    var parts = f.mois.split('-');
-    var y = parseInt(parts[0]); var m = parseInt(parts[1]);
-    var lastDay = new Date(y, m, 0);
-    var invoiceDate = lastDay.toISOString().split('T')[0];
-    var formattedNum = formatInvoiceNumber(num, invoiceDate);
+    // Tri chronologique par mois (YYYY-MM) puis par nom client
+    allFactures.sort(function(a, b) {
+      var cmp = a.facture.mois.localeCompare(b.facture.mois);
+      if (cmp !== 0) return cmp;
+      return (a.facture.client || '').localeCompare(b.facture.client || '');
+    });
 
-    // Mettre à jour la facture
-    f.numero = formattedNum;
+    // Réinitialiser le registre
+    COMPANY.invoiceRegistry = [];
 
-    // Mettre à jour la ligne correspondante
-    if (mis.lignes) {
-      var matchLigne = mis.lignes.find(function(l) { return l.ym === f.mois; });
-      if (matchLigne) {
-        matchLigne.lastInvoiceNum = formattedNum;
-        matchLigne.invoiceFinalized = true;
-        matchLigne.lastInvoiceDate = invoiceDate;
+    // Attribuer les numéros séquentiels
+    for (var i = 0; i < allFactures.length; i++) {
+      var num = i + 1;
+      var f = allFactures[i].facture;
+      var mis = allFactures[i].mission;
+      // Date de facture = dernier jour du mois facturé
+      var parts = f.mois.split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10);
+      var lastDay = new Date(y, m, 0);
+      var invoiceDate = y + '-' + String(m).padStart(2, '0') + '-' + String(lastDay.getDate()).padStart(2, '0');
+      var formattedNum = formatInvoiceNumber(num, invoiceDate);
+
+      // Mettre à jour la facture
+      f.numero = formattedNum;
+      console.log('[FREEL] Facture #' + num + ': ' + f.mois + ' ' + f.client + ' → ' + formattedNum);
+
+      // Mettre à jour la ligne correspondante
+      if (mis.lignes) {
+        for (var j = 0; j < mis.lignes.length; j++) {
+          if (mis.lignes[j].ym === f.mois) {
+            mis.lignes[j].lastInvoiceNum = formattedNum;
+            mis.lignes[j].invoiceFinalized = true;
+            mis.lignes[j].lastInvoiceDate = invoiceDate;
+            break;
+          }
+        }
       }
+
+      // Ajouter au registre
+      COMPANY.invoiceRegistry.push({
+        id: 'INV-REPAIR-' + num,
+        numero: formattedNum,
+        date: invoiceDate,
+        dateEncaissement: null,
+        client: f.client,
+        nature: 'Prestation de service',
+        montantHT: f.ht,
+        tva: f.tva || 0,
+        montantTTC: f.ttc || f.ht + (f.tva || 0),
+        modePaiement: 'Virement',
+        missionId: mis.id,
+        mois: f.mois,
+        createdAt: new Date().toISOString()
+      });
     }
 
-    // Ajouter au registre
-    COMPANY.invoiceRegistry.push({
-      id: 'INV-REPAIR-' + num,
-      numero: formattedNum,
-      date: invoiceDate,
-      dateEncaissement: null,
-      client: f.client,
-      nature: 'Prestation de service',
-      montantHT: f.ht,
-      tva: f.tva || 0,
-      montantTTC: f.ttc || f.ht + (f.tva || 0),
-      modePaiement: 'Virement',
-      missionId: mis.id,
-      mois: f.mois,
-      createdAt: new Date().toISOString()
-    });
-  });
+    // Mettre à jour le compteur global
+    COMPANY.invoiceGlobalCounter = allFactures.length;
 
-  // Mettre à jour le compteur global
-  COMPANY.invoiceGlobalCounter = allFactures.length;
+    // Mettre à jour les compteurs par année
+    COMPANY.invoiceCounter = {};
+    for (var k = 0; k < allFactures.length; k++) {
+      var yr = allFactures[k].facture.mois.split('-')[0];
+      COMPANY.invoiceCounter[yr] = (COMPANY.invoiceCounter[yr] || 0) + 1;
+    }
 
-  // Mettre à jour les compteurs par année
-  COMPANY.invoiceCounter = {};
-  allFactures.forEach(function(item) {
-    var y = item.facture.mois.split('-')[0];
-    COMPANY.invoiceCounter[y] = (COMPANY.invoiceCounter[y] || 0) + 1;
-  });
+    // Sauvegarder directement dans localStorage (éviter saveAll qui peut planter au boot)
+    try {
+      localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
+      localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
+    } catch(e) { console.error('[FREEL] repairInvoiceNumbers save error:', e); }
 
-  saveAll();
-  return allFactures.length;
+    console.log('[FREEL] repairInvoiceNumbers: terminé, ' + allFactures.length + ' factures numérotées, compteur=' + COMPANY.invoiceGlobalCounter);
+    return allFactures.length;
+  } catch(e) {
+    console.error('[FREEL] repairInvoiceNumbers ERREUR:', e);
+    return 0;
+  }
 }
 
 function registerInvoice(invoiceData) {
