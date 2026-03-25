@@ -1351,9 +1351,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .conges-day.act-added { box-shadow: inset 0 0 0 2px #60a5fa; }
 .conges-day.act-added .cd-dow { color: #60a5fa !important; font-weight: 700; }
 /* Indicateur lieu de travail (TT / Site) */
-.cd-loc { font-size: 7px; font-weight: 700; letter-spacing: 0.3px; padding: 0 2px; border-radius: 2px; line-height: 1.2; }
-.cd-loc.loc-tt { color: #818cf8; }
-.cd-loc.loc-site { color: #f97316; }
+.cd-loc { font-size: 8px; font-weight: 700; letter-spacing: 0.3px; padding: 1px 3px; border-radius: 3px; line-height: 1.2; display: inline-block; min-width: 20px; text-align: center; -webkit-tap-highlight-color: transparent; user-select: none; }
+.cd-loc.loc-tt { color: #818cf8; background: rgba(129,140,248,0.15); }
+.cd-loc.loc-site { color: #f97316; background: rgba(249,115,22,0.15); }
 /* Mode toggle congés/activité */
 .cal-mode-toggle { display: flex; gap: 4px; background: var(--bg-tertiary); padding: 3px; border-radius: 8px; margin-bottom: 12px; }
 .cal-mode-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
@@ -4931,7 +4931,9 @@ function showFabMenu() {
   grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm); } }, '📋 Activité & Congés'));
   if (MISSIONS.length > 0) {
     grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showDownloadInvoiceModal(); } }, '📄 Télécharger Facture'));
-    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showCRAModal(); } }, '📋 Télécharger CRA'));
+    if (MISSIONS.some(function(m) { return m.craMensuel; })) {
+      grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showCRAModal(); } }, '📋 Télécharger CRA'));
+    }
   }
 
   // Bouton annuler
@@ -8637,6 +8639,22 @@ function showMissionModal(mission) {
   body.appendChild(createInput('N° Commande', 'text', 'mNumCommande', mission.numeroCommande || '', 'Optionnel — sera demandé à la génération'));
   body.appendChild(createTextarea('Descriptif facture', 'mDescriptif', mission.descriptifFacture || '', 'Ex: Prestation de service consultant'));
 
+  // CRA mensuel
+  var craDiv = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0' } });
+  var craCheck = el('input', { type: 'checkbox', id: 'mCRA', style: { width: '16px', height: '16px' } });
+  if (mission.craMensuel) craCheck.checked = true;
+  craDiv.appendChild(craCheck);
+  craDiv.appendChild(el('label', { for: 'mCRA', style: { fontSize: '12px', cursor: 'pointer' } }, 'CRA mensuel requis (Compte Rendu d\'Activité)'));
+  body.appendChild(craDiv);
+
+  // Lieu de travail par défaut
+  var locDiv = el('div', { class: 'form-row', style: { marginBottom: '8px' } });
+  locDiv.appendChild(createSelect('Lieu par défaut', 'mDefaultLoc', [
+    { value: 'site', label: 'Sur site' },
+    { value: 'tt', label: 'Télétravail' }
+  ], mission.defaultWorkLocation || 'site'));
+  body.appendChild(locDiv);
+
   // SPRINT 7: Affichage en temps réel du total jours/CA estimé
   var estimateDiv = el('div', { id: 'missionEstimate', style: { padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginTop: '12px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' } });
   estimateDiv.textContent = 'Remplissez les dates et le TJM pour voir l\'estimation';
@@ -8861,6 +8879,8 @@ function showMissionModal(mission) {
     mission.jourPaiement = parseInt($('#mJour').value) || 15;
     mission.numeroCommande = $('#mNumCommande').value;
     mission.descriptifFacture = $('#mDescriptif').value;
+    mission.craMensuel = $('#mCRA') ? $('#mCRA').checked : false;
+    mission.defaultWorkLocation = $('#mDefaultLoc') ? $('#mDefaultLoc').value : 'site';
     var delaiFactVal = $('#mDelaiFacture') ? $('#mDelaiFacture').value : '';
     mission.delaiPaiementFacture = delaiFactVal ? (parseInt(delaiFactVal) || 30) : 0;
     mission.delaiFinDeMois = delaiFactVal.indexOf('_fdm') > -1;
@@ -9404,7 +9424,7 @@ function showMonthCongesModal(monthYm, mode) {
 
     if (isActivity) {
       // ========== MODE SUIVI D'ACTIVITÉ ==========
-      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Cliquez = cycler (travaillé → demi → off) · Les modifications sont surlignées'));
+      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Numéro = cycler activité · Badge TT/Site = basculer lieu'));
 
       // Légende
       var legend = el('div', { class: 'cal-legend' });
@@ -9414,7 +9434,7 @@ function showMonthCongesModal(monthYm, mode) {
         { color: 'var(--bg-secondary)', label: 'Non travaillé' },
         { color: '#f59e0b', label: 'Modifié', isBorder: true },
         { color: '#60a5fa', label: 'Ajouté', isBorder: true },
-        { color: '#f97316', label: 'Site (clic droit = basculer)', isText: true, textColor: '#f97316' },
+        { color: '#f97316', label: 'Site', isText: true, textColor: '#f97316' },
         { color: '#818cf8', label: 'TT', isText: true, textColor: '#818cf8' }
       ].forEach(function(item) {
         var dot;
@@ -9520,22 +9540,27 @@ function showMonthCongesModal(monthYm, mode) {
         }
 
         var dayEl = el('div', { class: cls });
-        dayEl.appendChild(el('span', { class: 'cd-num' }, String(bd.day)));
-        // Afficher lieu de travail si jour travaillé
-        var locLabel = '';
+        // Numéro du jour (tapable pour cycle activité)
+        var numEl = el('span', { class: 'cd-num' }, String(bd.day));
+        dayEl.appendChild(numEl);
+        // Badge TT/Site (tapable pour basculer) ou label jour
         if (!bd.isHoliday && inMission && val > 0) {
           var loc = locState[bd.iso] || 'site';
-          locLabel = loc === 'tt' ? 'TT' : 'Site';
-          dayEl.appendChild(el('span', { class: 'cd-loc ' + (loc === 'tt' ? 'loc-tt' : 'loc-site'), id: 'loc_' + bd.iso.replace(/-/g, '') }, locLabel));
+          var locEl = el('span', {
+            class: 'cd-loc ' + (loc === 'tt' ? 'loc-tt' : 'loc-site'),
+            id: 'loc_' + bd.iso.replace(/-/g, ''),
+            style: { cursor: 'pointer', padding: '1px 4px', borderRadius: '3px', background: loc === 'tt' ? 'rgba(129,140,248,0.2)' : 'rgba(249,115,22,0.2)' }
+          }, loc === 'tt' ? 'TT' : 'Site');
+          dayEl.appendChild(locEl);
         } else {
           dayEl.appendChild(el('span', { class: 'cd-dow' }, bd.isHoliday ? 'Férié' : bd.dowShort));
         }
 
         if (!bd.isHoliday && inMission) {
-          (function(iso, element) {
-            // Clic = cycle activité (1 → 0.5 → 0 → 1)
-            element.addEventListener('click', function(e) {
-              e.preventDefault();
+          (function(iso, element, numSpan) {
+            // Tap sur le numéro = cycle activité (1 → 0.5 → 0 → 1)
+            numSpan.addEventListener('click', function(e) {
+              e.preventDefault(); e.stopPropagation();
               var cur = actState[iso] || 0;
               var next;
               if (cur >= 0.75) next = 0.5;
@@ -9554,37 +9579,51 @@ function showMonthCongesModal(monthYm, mode) {
               if (sNorm > 0 && Math.abs(next - sNorm) > 0.01) element.classList.add('act-modified');
               if (sNorm === 0 && next > 0) element.classList.add('act-added');
 
-              // Mettre à jour l'indicateur lieu
-              var locEl = document.getElementById('loc_' + iso.replace(/-/g, ''));
+              // Mettre à jour le badge lieu
+              var existingLoc = document.getElementById('loc_' + iso.replace(/-/g, ''));
               if (next > 0) {
                 if (!locState[iso]) locState[iso] = m.defaultWorkLocation || 'site';
-                if (!locEl) {
-                  // Remplacer le cd-dow par un cd-loc
+                if (!existingLoc) {
                   var dowEl = element.querySelector('.cd-dow');
                   if (dowEl) dowEl.remove();
-                  var newLoc = el('span', { class: 'cd-loc ' + (locState[iso] === 'tt' ? 'loc-tt' : 'loc-site'), id: 'loc_' + iso.replace(/-/g, '') }, locState[iso] === 'tt' ? 'TT' : 'Site');
+                  var newLoc = el('span', {
+                    class: 'cd-loc ' + (locState[iso] === 'tt' ? 'loc-tt' : 'loc-site'),
+                    id: 'loc_' + iso.replace(/-/g, ''),
+                    style: { cursor: 'pointer', padding: '1px 4px', borderRadius: '3px', background: locState[iso] === 'tt' ? 'rgba(129,140,248,0.2)' : 'rgba(249,115,22,0.2)' }
+                  }, locState[iso] === 'tt' ? 'TT' : 'Site');
+                  // Attacher le handler au nouveau badge
+                  newLoc.addEventListener('click', function(ev) {
+                    ev.preventDefault(); ev.stopPropagation();
+                    var c = locState[iso] || 'site';
+                    var n = c === 'site' ? 'tt' : 'site';
+                    locState[iso] = n;
+                    newLoc.textContent = n === 'tt' ? 'TT' : 'Site';
+                    newLoc.className = 'cd-loc ' + (n === 'tt' ? 'loc-tt' : 'loc-site');
+                    newLoc.style.background = n === 'tt' ? 'rgba(129,140,248,0.2)' : 'rgba(249,115,22,0.2)';
+                  });
                   element.appendChild(newLoc);
                 }
               } else {
                 delete locState[iso];
-                if (locEl) { locEl.remove(); element.appendChild(el('span', { class: 'cd-dow' }, '')); }
+                if (existingLoc) { existingLoc.remove(); element.appendChild(el('span', { class: 'cd-dow' }, '')); }
               }
               updateActCount();
             });
-            // Long-press ou clic droit = basculer TT/Site
-            element.addEventListener('contextmenu', function(e) {
-              e.preventDefault();
-              if ((actState[iso] || 0) <= 0) return;
-              var cur = locState[iso] || 'site';
-              var next = cur === 'site' ? 'tt' : 'site';
-              locState[iso] = next;
-              var locEl = document.getElementById('loc_' + iso.replace(/-/g, ''));
-              if (locEl) {
-                locEl.textContent = next === 'tt' ? 'TT' : 'Site';
-                locEl.className = 'cd-loc ' + (next === 'tt' ? 'loc-tt' : 'loc-site');
-              }
-            });
-          })(bd.iso, dayEl);
+
+            // Tap sur le badge TT/Site = basculer
+            var locBadge = document.getElementById('loc_' + iso.replace(/-/g, ''));
+            if (locBadge) {
+              locBadge.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                var cur = locState[iso] || 'site';
+                var next = cur === 'site' ? 'tt' : 'site';
+                locState[iso] = next;
+                locBadge.textContent = next === 'tt' ? 'TT' : 'Site';
+                locBadge.className = 'cd-loc ' + (next === 'tt' ? 'loc-tt' : 'loc-site');
+                locBadge.style.background = next === 'tt' ? 'rgba(129,140,248,0.2)' : 'rgba(249,115,22,0.2)';
+              });
+            }
+          })(bd.iso, dayEl, numEl);
         }
         cal.appendChild(dayEl);
       });
@@ -10250,7 +10289,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   var defaultAdresseClient = mission.adresseClient || (clientObj ? clientObj.adresse : '') || '';
 
   // Intitulé de mission comme descriptif par défaut
-  var defaultDescriptif = mission.descriptifFacture || ('Facture pour prestation de service consultant ' + (mission.titre || mission.client) + ' sur le projet ' + (mission.titre || ''));
+  var defaultDescriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || mission.client));
 
   var p = parseYM(monthYm);
   var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -10711,7 +10750,7 @@ function generateInvoiceHTMLContent(d) {
       '<tbody>' +
         '<tr style="border-bottom:1px solid #ddd;">' +
           '<td style="padding:12px 10px;vertical-align:top;font-size:9pt;">' +
-            '<div>Descriptif : ' + e(d.descriptif) + ' ' + e(d.periode) + '.</div>' +
+            '<div>' + e(d.descriptif) + ' ' + e(d.periode) + '.</div>' +
           '</td>' +
           '<td style="padding:12px 10px;text-align:center;font-size:9pt;">' + fmtEur(d.jours) + '</td>' +
           '<td style="padding:12px 10px;text-align:center;font-size:9pt;">jours</td>' +
@@ -10855,7 +10894,7 @@ function generateAndDownloadPDF(data) {
   doc.setTextColor(0);
   doc.setFontSize(9);
 
-  var descText = 'Descriptif : ' + data.descriptif + ' ' + data.periode + '.';
+  var descText = data.descriptif + ' ' + data.periode + '.';
   var descLines = doc.splitTextToSize(descText, 80);
   descLines.forEach(function(line, idx) { doc.text(line, 22, tableY + (idx * 5)); });
 
