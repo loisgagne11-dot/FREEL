@@ -1350,6 +1350,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Jour ajouté (pas dans la prévision) */
 .conges-day.act-added { box-shadow: inset 0 0 0 2px #60a5fa; }
 .conges-day.act-added .cd-dow { color: #60a5fa !important; font-weight: 700; }
+/* Indicateur lieu de travail (TT / Site) */
+.cd-loc { font-size: 7px; font-weight: 700; letter-spacing: 0.3px; padding: 0 2px; border-radius: 2px; line-height: 1.2; }
+.cd-loc.loc-tt { color: #818cf8; }
+.cd-loc.loc-site { color: #f97316; }
 /* Mode toggle congés/activité */
 .cal-mode-toggle { display: flex; gap: 4px; background: var(--bg-tertiary); padding: 3px; border-radius: 8px; margin-bottom: 12px; }
 .cal-mode-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
@@ -4927,6 +4931,7 @@ function showFabMenu() {
   grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showMonthCongesModal(currentYm); } }, '📋 Activité & Congés'));
   if (MISSIONS.length > 0) {
     grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showDownloadInvoiceModal(); } }, '📄 Télécharger Facture'));
+    grid.appendChild(el('button', { class: 'btn btn-block', onclick: function() { closeModal('fabModal'); showCRAModal(); } }, '📋 Télécharger CRA'));
   }
 
   // Bouton annuler
@@ -9408,9 +9413,16 @@ function showMonthCongesModal(monthYm, mode) {
         { color: 'rgba(34,197,94,0.3)', label: 'Demi-journée', border: '#22c55e' },
         { color: 'var(--bg-secondary)', label: 'Non travaillé' },
         { color: '#f59e0b', label: 'Modifié', isBorder: true },
-        { color: '#60a5fa', label: 'Ajouté', isBorder: true }
+        { color: '#60a5fa', label: 'Ajouté', isBorder: true },
+        { color: '#f97316', label: 'Site (clic droit = basculer)', isText: true, textColor: '#f97316' },
+        { color: '#818cf8', label: 'TT', isText: true, textColor: '#818cf8' }
       ].forEach(function(item) {
-        var dot = el('div', { class: 'cal-legend-dot', style: { background: item.isBorder ? 'transparent' : item.color, border: item.isBorder ? '2px solid ' + item.color : item.border ? '1px solid ' + item.border : 'none' } });
+        var dot;
+        if (item.isText) {
+          dot = el('div', { style: { fontSize: '8px', fontWeight: '700', color: item.textColor, minWidth: '10px', textAlign: 'center' } }, item.label === 'TT' ? 'TT' : 'Site');
+        } else {
+          dot = el('div', { class: 'cal-legend-dot', style: { background: item.isBorder ? 'transparent' : item.color, border: item.isBorder ? '2px solid ' + item.color : item.border ? '1px solid ' + item.border : 'none' } });
+        }
         var li = el('div', { class: 'cal-legend-item' });
         li.appendChild(dot);
         li.appendChild(document.createTextNode(item.label));
@@ -9436,8 +9448,12 @@ function showMonthCongesModal(monthYm, mode) {
       }
 
       // État activité: construire depuis le planning net + ajustements
-      // Même logique que getWorkedForDay dans le détail par semaine
       var actState = {};
+      // Lieu de travail (TT / Site)
+      var locState = {};
+      if (ligne.workLocation) {
+        Object.keys(ligne.workLocation).forEach(function(k) { locState[k] = ligne.workLocation[k]; });
+      }
       bizDays.forEach(function(bd) {
         if (bd.isHoliday) return;
         var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
@@ -9449,6 +9465,10 @@ function showMonthCongesModal(monthYm, mode) {
         } else if (scheduledNet[bd.iso] !== undefined && scheduledNet[bd.iso] > 0) {
           var v = scheduledNet[bd.iso];
           actState[bd.iso] = v >= 0.75 ? 1 : (v >= 0.25 ? 0.5 : 0);
+        }
+        // Défaut: site si pas de lieu défini et jour travaillé
+        if (!locState[bd.iso] && (actState[bd.iso] || 0) > 0) {
+          locState[bd.iso] = m.defaultWorkLocation || 'site';
         }
       });
 
@@ -9501,14 +9521,22 @@ function showMonthCongesModal(monthYm, mode) {
 
         var dayEl = el('div', { class: cls });
         dayEl.appendChild(el('span', { class: 'cd-num' }, String(bd.day)));
-        dayEl.appendChild(el('span', { class: 'cd-dow' }, bd.isHoliday ? 'Férié' : bd.dowShort));
+        // Afficher lieu de travail si jour travaillé
+        var locLabel = '';
+        if (!bd.isHoliday && inMission && val > 0) {
+          var loc = locState[bd.iso] || 'site';
+          locLabel = loc === 'tt' ? 'TT' : 'Site';
+          dayEl.appendChild(el('span', { class: 'cd-loc ' + (loc === 'tt' ? 'loc-tt' : 'loc-site'), id: 'loc_' + bd.iso.replace(/-/g, '') }, locLabel));
+        } else {
+          dayEl.appendChild(el('span', { class: 'cd-dow' }, bd.isHoliday ? 'Férié' : bd.dowShort));
+        }
 
         if (!bd.isHoliday && inMission) {
           (function(iso, element) {
+            // Clic = cycle activité (1 → 0.5 → 0 → 1)
             element.addEventListener('click', function(e) {
               e.preventDefault();
               var cur = actState[iso] || 0;
-              // Cycle: 1 → 0.5 → 0 → 1
               var next;
               if (cur >= 0.75) next = 0.5;
               else if (cur >= 0.25) next = 0;
@@ -9520,14 +9548,41 @@ function showMonthCongesModal(monthYm, mode) {
               else if (next >= 0.25) element.classList.add('act-half');
               else element.classList.add('act-off');
 
-              // Recalculer modified/added (normaliser scheduledNet)
               var rawS = scheduledNet[iso] || 0;
               var sNorm = rawS >= 0.75 ? 1 : (rawS >= 0.25 ? 0.5 : 0);
               element.classList.remove('act-modified', 'act-added');
               if (sNorm > 0 && Math.abs(next - sNorm) > 0.01) element.classList.add('act-modified');
               if (sNorm === 0 && next > 0) element.classList.add('act-added');
 
+              // Mettre à jour l'indicateur lieu
+              var locEl = document.getElementById('loc_' + iso.replace(/-/g, ''));
+              if (next > 0) {
+                if (!locState[iso]) locState[iso] = m.defaultWorkLocation || 'site';
+                if (!locEl) {
+                  // Remplacer le cd-dow par un cd-loc
+                  var dowEl = element.querySelector('.cd-dow');
+                  if (dowEl) dowEl.remove();
+                  var newLoc = el('span', { class: 'cd-loc ' + (locState[iso] === 'tt' ? 'loc-tt' : 'loc-site'), id: 'loc_' + iso.replace(/-/g, '') }, locState[iso] === 'tt' ? 'TT' : 'Site');
+                  element.appendChild(newLoc);
+                }
+              } else {
+                delete locState[iso];
+                if (locEl) { locEl.remove(); element.appendChild(el('span', { class: 'cd-dow' }, '')); }
+              }
               updateActCount();
+            });
+            // Long-press ou clic droit = basculer TT/Site
+            element.addEventListener('contextmenu', function(e) {
+              e.preventDefault();
+              if ((actState[iso] || 0) <= 0) return;
+              var cur = locState[iso] || 'site';
+              var next = cur === 'site' ? 'tt' : 'site';
+              locState[iso] = next;
+              var locEl = document.getElementById('loc_' + iso.replace(/-/g, ''));
+              if (locEl) {
+                locEl.textContent = next === 'tt' ? 'TT' : 'Site';
+                locEl.className = 'cd-loc ' + (next === 'tt' ? 'loc-tt' : 'loc-site');
+              }
             });
           })(bd.iso, dayEl);
         }
@@ -9535,7 +9590,7 @@ function showMonthCongesModal(monthYm, mode) {
       });
 
       body.appendChild(cal);
-      missionCalendars.push({ mission: m, actState: actState, scheduledNet: scheduledNet, isActivity: true });
+      missionCalendars.push({ mission: m, actState: actState, locState: locState, scheduledNet: scheduledNet, isActivity: true });
       updateActCount();
 
     } else {
@@ -9647,6 +9702,14 @@ function showMonthCongesModal(monthYm, mode) {
             }
           });
           ligne.ajustements = Object.keys(ajustements).length > 0 ? ajustements : undefined;
+          // Sauvegarder le lieu de travail
+          if (mc.locState) {
+            var wl = {};
+            Object.keys(mc.locState).forEach(function(iso) {
+              if ((mc.actState[iso] || 0) > 0) wl[iso] = mc.locState[iso];
+            });
+            ligne.workLocation = Object.keys(wl).length > 0 ? wl : undefined;
+          }
         }
         buildMission(m);
         return;
@@ -10890,6 +10953,368 @@ function generateAndDownloadPDF(data) {
     doc.save(filename);
     toast('PDF téléchargé!', 'success');
   }
+}
+
+// ===== CRA (Compte Rendu d'Activité) =====
+
+function showCRAModal() {
+  var body = $('#formModalBody');
+  body.replaceChildren();
+  $('#formModalTitle').textContent = '📋 Télécharger CRA';
+
+  var currentYm = ym(TODAY.getFullYear(), TODAY.getMonth());
+
+  MISSIONS.forEach(function(m) {
+    if (!m.lignes || m.lignes.length === 0) return;
+    var missionDiv = el('div', { style: { marginBottom: '12px' } });
+    missionDiv.appendChild(el('div', { style: { fontWeight: '700', fontSize: '13px', marginBottom: '6px' } }, m.client || m.titre));
+
+    // Afficher les 6 derniers mois avec jours > 0
+    var recentLignes = m.lignes.filter(function(l) { return l.ym <= currentYm && (l.joursReels || 0) > 0; }).slice(-6).reverse();
+    if (recentLignes.length === 0) {
+      missionDiv.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Aucune activité récente'));
+    }
+    recentLignes.forEach(function(l) {
+      var btn = el('button', { class: 'btn btn-block', style: { marginBottom: '4px', textAlign: 'left', display: 'flex', justifyContent: 'space-between' }, onclick: function() {
+        closeModal('formModal');
+        var craData = buildCRAData(m, l.ym);
+        showCRAPreviewWithSend(craData, m);
+      } });
+      btn.appendChild(el('span', {}, fmtMonth(l.ym)));
+      btn.appendChild(el('span', { style: { color: 'var(--text-muted)', fontSize: '11px' } }, l.joursReels + 'j'));
+      missionDiv.appendChild(btn);
+    });
+    body.appendChild(missionDiv);
+  });
+
+  body.appendChild(el('button', { class: 'btn btn-ghost btn-block', style: { marginTop: '12px' }, onclick: function() { closeModal('formModal'); } }, 'Annuler'));
+  openModal('formModal');
+}
+
+function buildCRAData(mission, monthYm) {
+  var p = parseYM(monthYm);
+  var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === monthYm; }) : null;
+  if (!ligne) return null;
+
+  var moisNoms = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  var moisNom = moisNoms[p.m] + ' ' + p.y;
+
+  // Construire les données par semaine
+  var scheduledDays = getScheduledDaysForMonth(mission, monthYm);
+  var workLocation = ligne.workLocation || {};
+  var ajustements = ligne.ajustements || {};
+  var daysInMonth = new Date(p.y, p.m + 1, 0).getDate();
+
+  var weeks = [];
+  var currentWeek = null;
+
+  for (var d = 1; d <= daysInMonth; d++) {
+    var date = new Date(p.y, p.m, d);
+    var dow = date.getDay(); // 0=dim, 1=lun, ..., 6=sam
+    if (dow === 0 || dow === 6) continue; // Weekend
+
+    var iso = localISO(date);
+    var weekNum = getWeekNumber(date);
+
+    if (!currentWeek || currentWeek.num !== weekNum) {
+      currentWeek = { num: weekNum, days: [], totalJours: 0, ttDays: 0, siteDays: 0 };
+      weeks.push(currentWeek);
+    }
+
+    // Déterminer si le jour est travaillé
+    var worked = 0;
+    if (ajustements.hasOwnProperty(iso)) {
+      worked = ajustements[iso];
+    } else {
+      var sched = scheduledDays[iso] || 0;
+      worked = sched >= 0.75 ? 1 : (sched >= 0.25 ? 0.5 : 0);
+    }
+
+    // Vérifier si c'est un congé
+    if (mission.congesDates) {
+      mission.congesDates.forEach(function(cd) {
+        if (cd === iso) worked = 0;
+        else if (cd === iso + '_half') worked = Math.max(0, worked - 0.5);
+      });
+    }
+
+    // Vérifier si c'est un jour férié
+    var holidays = frenchHolidays(p.y);
+    if (holidays[iso]) worked = 0;
+
+    var inMission = mission.debut && mission.fin && iso >= mission.debut && iso <= mission.fin;
+    if (!inMission) worked = 0;
+
+    var loc = workLocation[iso] || (mission.defaultWorkLocation || 'site');
+    var dowNames = ['','Lun','Mar','Mer','Jeu','Ven'];
+
+    currentWeek.days.push({
+      date: iso,
+      day: d,
+      dow: dow,
+      dowName: dowNames[dow],
+      worked: worked,
+      location: worked > 0 ? loc : null
+    });
+
+    currentWeek.totalJours += worked;
+    if (worked > 0 && loc === 'tt') currentWeek.ttDays += worked;
+    if (worked > 0 && loc === 'site') currentWeek.siteDays += worked;
+  }
+
+  var totalJours = weeks.reduce(function(s, w) { return s + w.totalJours; }, 0);
+  var totalTT = weeks.reduce(function(s, w) { return s + w.ttDays; }, 0);
+  var totalSite = weeks.reduce(function(s, w) { return s + w.siteDays; }, 0);
+
+  return {
+    mission: mission,
+    mois: moisNom,
+    monthYm: monthYm,
+    client: mission.client || mission.titre,
+    emetteur: COMPANY.nom || '',
+    weeks: weeks,
+    totalJours: totalJours,
+    totalTT: totalTT,
+    totalSite: totalSite,
+    numCommande: mission.numeroCommande || '',
+    titre: mission.titre || mission.client
+  };
+}
+
+function getWeekNumber(d) {
+  var dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  dt.setUTCDate(dt.getUTCDate() + 4 - (dt.getUTCDay() || 7));
+  var yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  return Math.ceil((((dt - yearStart) / 86400000) + 1) / 7);
+}
+
+function generateCRAHTMLContent(data) {
+  var e = escapeHTML;
+  var col = '#3d5a80';
+
+  var html = '' +
+    '<div style="display:flex;justify-content:space-between;margin-bottom:30px;">' +
+      '<div style="color:' + col + ';font-size:9.5pt;line-height:1.6;">' +
+        '<div style="font-size:12pt;font-weight:bold;">' + e(data.emetteur) + '</div>' +
+        '<div>Micro-entreprise</div>' +
+      '</div>' +
+      '<div style="text-align:right;">' +
+        '<div style="font-weight:bold;font-size:11pt;">' + e(data.client) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="margin-bottom:20px;">' +
+      '<div style="font-weight:bold;font-size:13pt;color:' + col + ';">Compte Rendu d\'Activit\u00e9</div>' +
+      '<div style="font-size:10pt;color:#333;">' + e(data.mois) + '</div>' +
+      (data.numCommande ? '<div style="font-size:9pt;color:#555;">Commande n\u00b0' + e(data.numCommande) + '</div>' : '') +
+      '<div style="font-size:9pt;color:#555;">Consultant : ' + e(data.emetteur) + '</div>' +
+    '</div>';
+
+  // Tableau par semaine
+  html += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:9pt;">' +
+    '<thead><tr style="background:#3d5a80;color:#fff;">' +
+      '<th style="padding:8px 6px;text-align:left;">Semaine</th>' +
+      '<th style="padding:8px 6px;text-align:left;">Jours</th>' +
+      '<th style="padding:8px 6px;text-align:center;">Sur site</th>' +
+      '<th style="padding:8px 6px;text-align:center;">T\u00e9l\u00e9travail</th>' +
+      '<th style="padding:8px 6px;text-align:right;">Total</th>' +
+    '</tr></thead><tbody>';
+
+  data.weeks.forEach(function(week) {
+    var daysDesc = week.days.filter(function(d) { return d.worked > 0; }).map(function(d) {
+      var label = d.dowName + ' ' + d.day;
+      if (d.worked === 0.5) label += ' (\u00bd)';
+      if (d.location === 'tt') label += ' TT';
+      return label;
+    }).join(', ');
+
+    html += '<tr style="border-bottom:1px solid #ddd;">' +
+      '<td style="padding:8px 6px;font-weight:600;">S' + week.num + '</td>' +
+      '<td style="padding:8px 6px;color:#555;">' + (daysDesc || '-') + '</td>' +
+      '<td style="padding:8px 6px;text-align:center;">' + (week.siteDays > 0 ? week.siteDays : '-') + '</td>' +
+      '<td style="padding:8px 6px;text-align:center;">' + (week.ttDays > 0 ? week.ttDays : '-') + '</td>' +
+      '<td style="padding:8px 6px;text-align:right;font-weight:600;">' + week.totalJours + 'j</td>' +
+    '</tr>';
+  });
+
+  html += '</tbody></table>';
+
+  // Total
+  html += '<table style="width:250px;margin-left:auto;border-collapse:collapse;font-size:10pt;">' +
+    '<tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;">Jours sur site</td><td style="padding:6px;text-align:right;font-weight:600;">' + data.totalSite + 'j</td></tr>' +
+    '<tr style="border-bottom:1px solid #ddd;"><td style="padding:6px;">Jours en t\u00e9l\u00e9travail</td><td style="padding:6px;text-align:right;font-weight:600;">' + data.totalTT + 'j</td></tr>' +
+    '<tr style="background:#f0f4f8;"><td style="padding:8px;font-weight:bold;">Total</td><td style="padding:8px;text-align:right;font-weight:bold;font-size:11pt;">' + data.totalJours + ' jours</td></tr>' +
+  '</table>';
+
+  html += '<div style="margin-top:40px;display:flex;justify-content:space-between;font-size:9pt;color:#555;">' +
+    '<div>Signature consultant :</div>' +
+    '<div>Signature client :</div>' +
+  '</div>';
+
+  return html;
+}
+
+function showCRAPreviewWithSend(data, mission) {
+  if (!data) { toast('Aucune donn\u00e9e CRA pour ce mois', 'error'); return; }
+
+  var existing = document.getElementById('invoicePreviewOverlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'invoicePreviewOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;flex-direction:column;overflow:auto;';
+
+  var toolbar = document.createElement('div');
+  toolbar.style.cssText = 'background:#1a1a2e;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #333;position:sticky;top:0;z-index:1;flex-wrap:wrap;gap:8px;';
+  var toolbarLeft = document.createElement('div');
+  toolbarLeft.style.cssText = 'display:flex;align-items:center;gap:10px;';
+  toolbarLeft.appendChild(el('span', { style: { fontSize: '18px' } }, '📋'));
+  toolbarLeft.appendChild(el('span', { style: { fontWeight: '600', color: '#fff', fontSize: '14px' } }, 'CRA ' + data.mois + ' - ' + data.client));
+  toolbar.appendChild(toolbarLeft);
+
+  var toolbarBtns = document.createElement('div');
+  toolbarBtns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+
+  // Bouton: Télécharger PDF + Email
+  var email = '';
+  if (mission.emailClient || mission.contact) email = mission.emailClient || '';
+  var subject = 'CRA ' + data.mois + ' - ' + data.emetteur;
+  var emailBody = 'Bonjour,\n\nVeuillez trouver ci-joint le Compte Rendu d\'Activit\u00e9 pour ' + data.mois + '.\n\nTotal : ' + data.totalJours + ' jours (' + data.totalSite + 'j site, ' + data.totalTT + 'j TT)\n\nCordialement,\n' + data.emetteur;
+
+  var btnSend = document.createElement('button');
+  btnSend.textContent = '📥 PDF + 📧 Envoyer';
+  btnSend.style.cssText = 'background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;';
+  btnSend.onclick = function() {
+    generateCRAPDF(data);
+    setTimeout(function() {
+      var mailto = 'mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(emailBody);
+      window.open(mailto, '_blank');
+    }, 300);
+    btnSend.textContent = '✅ PDF + email';
+    btnSend.disabled = true;
+  };
+  toolbarBtns.appendChild(btnSend);
+
+  var btnDL = document.createElement('button');
+  btnDL.textContent = '📥 PDF seul';
+  btnDL.style.cssText = 'background:rgba(255,255,255,0.1);color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;';
+  btnDL.onclick = function() { generateCRAPDF(data); };
+  toolbarBtns.appendChild(btnDL);
+
+  var btnClose = document.createElement('button');
+  btnClose.textContent = '✕';
+  btnClose.style.cssText = 'background:#444;color:#fff;border:none;width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:16px;';
+  btnClose.onclick = function() { overlay.remove(); };
+  toolbarBtns.appendChild(btnClose);
+
+  toolbar.appendChild(toolbarBtns);
+  overlay.appendChild(toolbar);
+
+  var container = document.createElement('div');
+  container.style.cssText = 'flex:1;display:flex;justify-content:center;padding:20px;';
+  var doc = document.createElement('div');
+  doc.style.cssText = 'background:#fff;width:210mm;min-height:297mm;padding:20mm;box-sizing:border-box;color:#000;font-family:Arial,sans-serif;font-size:10pt;box-shadow:0 0 30px rgba(0,0,0,0.3);';
+  doc.innerHTML = generateCRAHTMLContent(data);
+  container.appendChild(doc);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+
+  var escHandler = function(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
+  document.addEventListener('keydown', escHandler);
+}
+
+function generateCRAPDF(data) {
+  if (!window.jspdf || !window.jspdf.jsPDF) { toast('jsPDF non disponible', 'error'); return; }
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF();
+  var col = [61, 90, 128];
+  var deg = String.fromCharCode(176);
+
+  // Emetteur
+  var y = 20;
+  doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(col[0], col[1], col[2]);
+  doc.text(data.emetteur, 20, y); y += 5;
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
+  doc.text('Micro-entreprise', 20, y); y += 10;
+
+  // Client
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(0);
+  doc.text(data.client, 190, 20, { align: 'right' }); y += 5;
+
+  // Titre CRA
+  y = 45;
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(col[0], col[1], col[2]);
+  doc.text('Compte Rendu d\'Activite', 20, y); y += 7;
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(51);
+  doc.text(data.mois, 20, y); y += 5;
+  if (data.numCommande) { doc.text('Commande n' + deg + data.numCommande, 20, y); y += 5; }
+  doc.text('Consultant : ' + data.emetteur, 20, y); y += 12;
+
+  // Tableau
+  var tableX = 20; var tableW = 170;
+  var colWidths = [18, 82, 22, 26, 22]; // S, Jours, Site, TT, Total
+
+  // Header
+  doc.setFillColor(col[0], col[1], col[2]);
+  doc.rect(tableX, y - 4, tableW, 8, 'F');
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(255);
+  var headers = ['Sem.', 'Jours', 'Sur site', 'Teletravail', 'Total'];
+  var cx = tableX;
+  headers.forEach(function(h, i) {
+    var align = i >= 2 ? 'center' : 'left';
+    if (i === 4) align = 'right';
+    var xPos = cx + (align === 'center' ? colWidths[i] / 2 : (align === 'right' ? colWidths[i] - 2 : 2));
+    doc.text(h, xPos, y, { align: align });
+    cx += colWidths[i];
+  });
+  y += 8;
+
+  // Rows
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(0); doc.setFontSize(8);
+  data.weeks.forEach(function(week) {
+    if (y > 260) { doc.addPage(); y = 20; }
+    var daysDesc = week.days.filter(function(d) { return d.worked > 0; }).map(function(d) {
+      var label = d.dowName + ' ' + d.day;
+      if (d.worked === 0.5) label += ' (1/2)';
+      if (d.location === 'tt') label += ' TT';
+      return label;
+    }).join(', ');
+
+    doc.setDrawColor(220); doc.line(tableX, y + 2, tableX + tableW, y + 2);
+
+    cx = tableX;
+    doc.setFont('helvetica', 'bold');
+    doc.text('S' + week.num, cx + 2, y); cx += colWidths[0];
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(80);
+    var descLines = doc.splitTextToSize(daysDesc || '-', colWidths[1] - 4);
+    descLines.forEach(function(line, idx) { doc.text(line, cx + 2, y + (idx * 4)); });
+    doc.setTextColor(0); cx += colWidths[1];
+    doc.text(week.siteDays > 0 ? String(week.siteDays) : '-', cx + colWidths[2] / 2, y, { align: 'center' }); cx += colWidths[2];
+    doc.text(week.ttDays > 0 ? String(week.ttDays) : '-', cx + colWidths[3] / 2, y, { align: 'center' }); cx += colWidths[3];
+    doc.setFont('helvetica', 'bold');
+    doc.text(week.totalJours + 'j', cx + colWidths[4] - 2, y, { align: 'right' });
+
+    y += Math.max(descLines.length * 4, 6) + 2;
+  });
+
+  // Totaux
+  y += 6;
+  doc.setDrawColor(180); doc.line(130, y - 2, 190, y - 2);
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(51);
+  doc.text('Jours sur site', 132, y + 3); doc.text(data.totalSite + 'j', 188, y + 3, { align: 'right' }); y += 6;
+  doc.text('Jours en teletravail', 132, y + 3); doc.text(data.totalTT + 'j', 188, y + 3, { align: 'right' }); y += 8;
+  doc.setFillColor(240, 244, 248); doc.rect(130, y - 2, 60, 10, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(26, 26, 46);
+  doc.text('Total', 132, y + 5); doc.text(data.totalJours + ' jours', 188, y + 5, { align: 'right' });
+
+  // Signatures
+  y += 25;
+  doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
+  doc.text('Signature consultant :', 20, y);
+  doc.text('Signature client :', 130, y);
+
+  var filename = 'CRA ' + data.mois + ' - ' + (data.client || '').toUpperCase() + '.pdf';
+  doc.save(filename);
+  toast('CRA PDF telecharge!', 'success');
 }
 
 // Fallback: télécharger en HTML
