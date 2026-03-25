@@ -17262,8 +17262,8 @@ function renderFacturesContent(container) {
       var totalTVA = monthFactures.reduce(function(s, f) { return s + (f.tva || 0); }, 0);
 
       // Header du mois
-      var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', margin: '16px 0 6px', background: 'rgba(255,255,255,0.06)', borderRadius: 'var(--radius-sm)', borderLeft: '3px solid ' + borderColor } });
-      monthHeader.appendChild(el('div', { style: { fontWeight: '800', fontSize: '14px', textTransform: 'capitalize', color: 'var(--text-primary)' } }, fmtMonth(mois)));
+      var monthHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', margin: '20px 0 8px', background: 'none', borderBottom: '1px solid ' + borderColor } });
+      monthHeader.appendChild(el('div', { style: { fontWeight: '800', fontSize: '14px', textTransform: 'capitalize', color: borderColor } }, fmtMonth(mois)));
       var monthStats = el('div', { style: { textAlign: 'right' } });
       monthStats.appendChild(el('div', { style: { fontWeight: '800', fontSize: '14px', color: 'var(--text-primary)' } }, EUR(totalHT) + ' HT'));
       if (totalTVA > 0) monthStats.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, monthFactures.length + ' facture' + (monthFactures.length > 1 ? 's' : '') + ' · TVA ' + EUR(totalTVA)));
@@ -17284,8 +17284,20 @@ function renderFacturesContent(container) {
         var infoDiv = el('div', { class: 'facture-info' });
         var clientRow = el('div', { class: 'facture-id', style: { display: 'flex', alignItems: 'center', gap: '6px' } });
         clientRow.appendChild(document.createTextNode(f.client));
-        if (f.numero) {
-          clientRow.appendChild(el('span', { style: { fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: '600', letterSpacing: '0.3px' } }, f.numero));
+        // Chercher le numéro de facture depuis toutes les sources
+        var displayNum = f.numero;
+        if (!displayNum && f._mission && f._mission.lignes) {
+          var matchLigne = f._mission.lignes.find(function(l) { return l.ym === f.mois; });
+          if (matchLigne && matchLigne.lastInvoiceNum) displayNum = matchLigne.lastInvoiceNum;
+        }
+        if (!displayNum && COMPANY.invoiceRegistry) {
+          var regEntry = COMPANY.invoiceRegistry.find(function(r) { return r.mois === f.mois && r.missionId === (f._mission && f._mission.id); });
+          if (regEntry) displayNum = regEntry.numero;
+        }
+        if (displayNum) {
+          clientRow.appendChild(el('span', { style: { fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(99,102,241,0.15)', color: '#818cf8', fontWeight: '600', letterSpacing: '0.3px' } }, displayNum));
+        } else if (f.status !== 'brouillon') {
+          clientRow.appendChild(el('span', { style: { fontSize: '9px', padding: '1px 5px', borderRadius: '3px', background: 'rgba(251,146,60,0.15)', color: '#fb923c', fontWeight: '600' } }, 'N° manquant'));
         }
         infoDiv.appendChild(clientRow);
         var metaRow = el('div', { class: 'facture-meta', style: { display: 'flex', alignItems: 'center', gap: '6px' } });
