@@ -1326,7 +1326,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .jours-total { font-size: 11px; color: var(--text-secondary); margin-left: 8px; align-self: center; font-weight: 600; }
 .conges-calendar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 8px 0; }
 .conges-calendar .cal-header { font-size: 9px; color: var(--text-muted); text-align: center; font-weight: 700; padding: 4px 0; }
-.conges-day { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; border-radius: 6px; border: 1.5px solid var(--glass-border); background: var(--bg-secondary); cursor: pointer; transition: all 0.15s; user-select: none; min-height: 38px; }
+.conges-day { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 6px 2px; border-radius: 6px; border: 1.5px solid var(--glass-border); background: var(--bg-secondary); cursor: pointer; transition: all 0.15s; user-select: none; min-height: 38px; }
 .conges-day:hover { border-color: var(--accent); }
 .conges-day .cd-num { font-size: 12px; font-weight: 600; color: var(--text-primary); }
 .conges-day .cd-dow { font-size: 8px; color: var(--text-muted); }
@@ -1340,20 +1340,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Suivi d'activité: états du calendrier */
 .conges-day.act-worked { background: #22c55e; border-color: #22c55e; }
 .conges-day.act-worked .cd-num, .conges-day.act-worked .cd-dow { color: #fff; }
-.conges-day.act-half { background: rgba(34,197,94,0.3); border-color: #22c55e; }
-.conges-day.act-half .cd-num { color: #22c55e; }
+.conges-day.act-half { position: relative; overflow: hidden; border-color: #22c55e; background: var(--bg-secondary); }
+.conges-day.act-half::before { content: ''; position: absolute; inset: 0; background: #22c55e; clip-path: polygon(0 0, 100% 0, 0 100%); z-index: 0; }
+.conges-day.act-half .cd-num { position: relative; z-index: 1; color: #fff; text-shadow: 0 0 3px rgba(0,0,0,0.3); }
+.conges-day.act-half .cd-loc { position: relative; z-index: 1; }
 .conges-day.act-off { background: var(--bg-secondary); border-color: var(--glass-border); opacity: 0.5; }
 .conges-day.act-off .cd-num { color: var(--text-muted); }
-/* Jour modifié par rapport à la prévision */
-.conges-day.act-modified { box-shadow: inset 0 0 0 2px #f59e0b; }
-.conges-day.act-modified .cd-dow { color: #f59e0b !important; font-weight: 700; }
-/* Jour ajouté (pas dans la prévision) */
-.conges-day.act-added { box-shadow: inset 0 0 0 2px #60a5fa; }
-.conges-day.act-added .cd-dow { color: #60a5fa !important; font-weight: 700; }
-/* Indicateur lieu de travail (TT / Site) */
-.cd-loc { font-size: 8px; font-weight: 700; letter-spacing: 0.3px; padding: 1px 3px; border-radius: 3px; line-height: 1.2; display: inline-block; min-width: 20px; text-align: center; -webkit-tap-highlight-color: transparent; user-select: none; }
-.cd-loc.loc-tt { color: #818cf8; background: rgba(129,140,248,0.15); }
-.cd-loc.loc-site { color: #f97316; background: rgba(249,115,22,0.15); }
+/* Emoji lieu de travail (TT / Site / Mixte) en haut à droite */
+.cd-loc { position: absolute; top: 1px; right: 2px; font-size: 10px; line-height: 1; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; z-index: 2; }
 /* Mode toggle congés/activité */
 .cal-mode-toggle { display: flex; gap: 4px; background: var(--bg-tertiary); padding: 3px; border-radius: 8px; margin-bottom: 12px; }
 .cal-mode-btn { flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
@@ -9424,24 +9418,27 @@ function showMonthCongesModal(monthYm, mode) {
 
     if (isActivity) {
       // ========== MODE SUIVI D'ACTIVITÉ ==========
-      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Numéro = cycler activité · Badge TT/Site = basculer lieu'));
+      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Tap numéro = cycler activité · Tap emoji = cycler lieu'));
 
       // Légende
       var legend = el('div', { class: 'cal-legend' });
       [
-        { color: '#22c55e', label: 'Travaillé' },
-        { color: 'rgba(34,197,94,0.3)', label: 'Demi-journée', border: '#22c55e' },
-        { color: 'var(--bg-secondary)', label: 'Non travaillé' },
-        { color: '#f59e0b', label: 'Modifié', isBorder: true },
-        { color: '#60a5fa', label: 'Ajouté', isBorder: true },
-        { color: '#f97316', label: 'Site', isText: true, textColor: '#f97316' },
-        { color: '#818cf8', label: 'TT', isText: true, textColor: '#818cf8' }
+        { color: '#22c55e', label: 'Journée' },
+        { type: 'half', label: 'Demi-journée' },
+        { color: 'var(--bg-secondary)', label: 'Off' },
+        { type: 'emoji', emoji: '🏢', label: 'Site' },
+        { type: 'emoji', emoji: '🏠', label: 'TT' },
+        { type: 'emoji', emoji: '🔀', label: 'Mixte' }
       ].forEach(function(item) {
         var dot;
-        if (item.isText) {
-          dot = el('div', { style: { fontSize: '8px', fontWeight: '700', color: item.textColor, minWidth: '10px', textAlign: 'center' } }, item.label === 'TT' ? 'TT' : 'Site');
+        if (item.type === 'emoji') {
+          dot = el('div', { style: { fontSize: '12px', lineHeight: '1' } }, item.emoji);
+        } else if (item.type === 'half') {
+          dot = el('div', { class: 'cal-legend-dot', style: { background: 'var(--bg-secondary)', border: '1px solid #22c55e', position: 'relative', overflow: 'hidden' } });
+          var tri = el('div', { style: { position: 'absolute', inset: '0', background: '#22c55e', clipPath: 'polygon(0 0, 100% 0, 0 100%)' } });
+          dot.appendChild(tri);
         } else {
-          dot = el('div', { class: 'cal-legend-dot', style: { background: item.isBorder ? 'transparent' : item.color, border: item.isBorder ? '2px solid ' + item.color : item.border ? '1px solid ' + item.border : 'none' } });
+          dot = el('div', { class: 'cal-legend-dot', style: { background: item.color } });
         }
         var li = el('div', { class: 'cal-legend-item' });
         li.appendChild(dot);
@@ -9523,10 +9520,6 @@ function showMonthCongesModal(monthYm, mode) {
 
         var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
         var val = actState[bd.iso] || 0;
-        var rawSched = scheduledNet[bd.iso] || 0;
-        var scheduledVal = rawSched >= 0.75 ? 1 : (rawSched >= 0.25 ? 0.5 : 0);
-        var isModified = inMission && !bd.isHoliday && scheduledVal > 0 && Math.abs(val - scheduledVal) > 0.01;
-        var isAdded = inMission && !bd.isHoliday && scheduledVal === 0 && val > 0;
 
         var cls = 'conges-day';
         if (bd.isHoliday) cls += ' holiday';
@@ -9535,25 +9528,24 @@ function showMonthCongesModal(monthYm, mode) {
           if (val >= 0.75) cls += ' act-worked';
           else if (val >= 0.25) cls += ' act-half';
           else cls += ' act-off';
-          if (isModified) cls += ' act-modified';
-          if (isAdded) cls += ' act-added';
         }
 
         var dayEl = el('div', { class: cls });
         // Numéro du jour (tapable pour cycle activité)
         var numEl = el('span', { class: 'cd-num' }, String(bd.day));
         dayEl.appendChild(numEl);
-        // Badge TT/Site (tapable pour basculer) ou label jour
+        // Emoji lieu en haut à droite (🏢 site, 🏠 TT, 🔀 mixte)
+        var locEmojis = { site: '🏢', tt: '🏠', mixte: '🔀' };
+        var locCycle = ['site', 'tt', 'mixte'];
         if (!bd.isHoliday && inMission && val > 0) {
           var loc = locState[bd.iso] || 'site';
           var locEl = el('span', {
-            class: 'cd-loc ' + (loc === 'tt' ? 'loc-tt' : 'loc-site'),
-            id: 'loc_' + bd.iso.replace(/-/g, ''),
-            style: { cursor: 'pointer', padding: '1px 4px', borderRadius: '3px', background: loc === 'tt' ? 'rgba(129,140,248,0.2)' : 'rgba(249,115,22,0.2)' }
-          }, loc === 'tt' ? 'TT' : 'Site');
+            class: 'cd-loc',
+            id: 'loc_' + bd.iso.replace(/-/g, '')
+          }, locEmojis[loc] || '🏢');
           dayEl.appendChild(locEl);
-        } else {
-          dayEl.appendChild(el('span', { class: 'cd-dow' }, bd.isHoliday ? 'Férié' : bd.dowShort));
+        } else if (!inMission || bd.isHoliday) {
+          // Pas de badge pour les jours hors mission/fériés
         }
 
         if (!bd.isHoliday && inMission) {
@@ -9573,54 +9565,37 @@ function showMonthCongesModal(monthYm, mode) {
               else if (next >= 0.25) element.classList.add('act-half');
               else element.classList.add('act-off');
 
-              var rawS = scheduledNet[iso] || 0;
-              var sNorm = rawS >= 0.75 ? 1 : (rawS >= 0.25 ? 0.5 : 0);
-              element.classList.remove('act-modified', 'act-added');
-              if (sNorm > 0 && Math.abs(next - sNorm) > 0.01) element.classList.add('act-modified');
-              if (sNorm === 0 && next > 0) element.classList.add('act-added');
-
-              // Mettre à jour le badge lieu
+              // Mettre à jour l'emoji lieu
               var existingLoc = document.getElementById('loc_' + iso.replace(/-/g, ''));
               if (next > 0) {
                 if (!locState[iso]) locState[iso] = m.defaultWorkLocation || 'site';
                 if (!existingLoc) {
-                  var dowEl = element.querySelector('.cd-dow');
-                  if (dowEl) dowEl.remove();
-                  var newLoc = el('span', {
-                    class: 'cd-loc ' + (locState[iso] === 'tt' ? 'loc-tt' : 'loc-site'),
-                    id: 'loc_' + iso.replace(/-/g, ''),
-                    style: { cursor: 'pointer', padding: '1px 4px', borderRadius: '3px', background: locState[iso] === 'tt' ? 'rgba(129,140,248,0.2)' : 'rgba(249,115,22,0.2)' }
-                  }, locState[iso] === 'tt' ? 'TT' : 'Site');
-                  // Attacher le handler au nouveau badge
+                  var newLoc = el('span', { class: 'cd-loc', id: 'loc_' + iso.replace(/-/g, '') }, locEmojis[locState[iso]] || '🏢');
                   newLoc.addEventListener('click', function(ev) {
                     ev.preventDefault(); ev.stopPropagation();
-                    var c = locState[iso] || 'site';
-                    var n = c === 'site' ? 'tt' : 'site';
-                    locState[iso] = n;
-                    newLoc.textContent = n === 'tt' ? 'TT' : 'Site';
-                    newLoc.className = 'cd-loc ' + (n === 'tt' ? 'loc-tt' : 'loc-site');
-                    newLoc.style.background = n === 'tt' ? 'rgba(129,140,248,0.2)' : 'rgba(249,115,22,0.2)';
+                    var ci = locCycle.indexOf(locState[iso] || 'site');
+                    var ni = (ci + 1) % locCycle.length;
+                    locState[iso] = locCycle[ni];
+                    newLoc.textContent = locEmojis[locCycle[ni]];
                   });
                   element.appendChild(newLoc);
                 }
               } else {
                 delete locState[iso];
-                if (existingLoc) { existingLoc.remove(); element.appendChild(el('span', { class: 'cd-dow' }, '')); }
+                if (existingLoc) existingLoc.remove();
               }
               updateActCount();
             });
 
-            // Tap sur le badge TT/Site = basculer
+            // Tap sur l'emoji = cycler lieu (site → tt → mixte → site)
             var locBadge = document.getElementById('loc_' + iso.replace(/-/g, ''));
             if (locBadge) {
               locBadge.addEventListener('click', function(e) {
                 e.preventDefault(); e.stopPropagation();
-                var cur = locState[iso] || 'site';
-                var next = cur === 'site' ? 'tt' : 'site';
-                locState[iso] = next;
-                locBadge.textContent = next === 'tt' ? 'TT' : 'Site';
-                locBadge.className = 'cd-loc ' + (next === 'tt' ? 'loc-tt' : 'loc-site');
-                locBadge.style.background = next === 'tt' ? 'rgba(129,140,248,0.2)' : 'rgba(249,115,22,0.2)';
+                var ci = locCycle.indexOf(locState[iso] || 'site');
+                var ni = (ci + 1) % locCycle.length;
+                locState[iso] = locCycle[ni];
+                locBadge.textContent = locEmojis[locCycle[ni]];
               });
             }
           })(bd.iso, dayEl, numEl);
@@ -9629,6 +9604,13 @@ function showMonthCongesModal(monthYm, mode) {
       });
 
       body.appendChild(cal);
+
+      // Résumé planifié sous le calendrier
+      var planTotal = 0;
+      Object.keys(scheduledNet).forEach(function(k) { var v = scheduledNet[k]; if (v > 0.01) planTotal += v; });
+      planTotal = Math.round(planTotal * 10) / 10;
+      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '6px 0 0' } }, 'Planifié: ' + planTotal + 'j'));
+
       missionCalendars.push({ mission: m, actState: actState, locState: locState, scheduledNet: scheduledNet, isActivity: true });
       updateActCount();
 
@@ -9916,6 +9898,20 @@ function showFactureModal(facture) {
 
 // Modal workflow d'envoi de facture: PDF + email + gestion email manquant
 // Helper: reconstruire les données de facture à partir de mission + facture
+// Nettoyer le descriptif facture: retirer les doublons "sur le projet XXX" et "Facture pour"
+function cleanDescriptifFacture(desc) {
+  if (!desc) return desc;
+  // Retirer préfixes indésirables
+  desc = desc.replace(/^Descriptif\s*:\s*/i, '');
+  desc = desc.replace(/^Facture pour /i, '');
+  // Retirer "sur le projet XXX" (duplication du titre)
+  desc = desc.replace(/\s+sur le projet\s+[^d].*?(?=\s+du\s|\s*$)/i, '');
+  desc = desc.trim();
+  // Capitaliser la première lettre
+  if (desc.length > 0) desc = desc.charAt(0).toUpperCase() + desc.slice(1);
+  return desc;
+}
+
 function buildInvoiceDataFromFacture(mission, facture) {
   var ligne = mission.lignes ? mission.lignes.find(function(l) { return l.ym === facture.mois; }) : null;
   if (!ligne) return null;
@@ -9945,7 +9941,7 @@ function buildInvoiceDataFromFacture(mission, facture) {
   if (numCommande) titre += ' - Commande n°' + numCommande;
   titre += ' - ' + moisNom;
 
-  var descriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || ''));
+  var descriptif = cleanDescriptifFacture(mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || '')));
   var periode = 'du 01 au ' + String(finMoisDate).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
 
   return {
@@ -10011,7 +10007,7 @@ function showSendInvoiceModal(facture) {
   var factureClientNom = facture.client;
   if (factDest === 'agence' && mission.agence && mission.agence.nom) factureClientNom = mission.agence.nom;
   else if (factDest === 'clientOp' && mission.clientOp && mission.clientOp.nom) factureClientNom = mission.clientOp.nom;
-  var defaultDescriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || mission.client));
+  var defaultDescriptif = cleanDescriptifFacture(mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || mission.client)));
   var p = parseYM(facture.mois);
   var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   moisNom = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
@@ -10289,7 +10285,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   var defaultAdresseClient = mission.adresseClient || (clientObj ? clientObj.adresse : '') || '';
 
   // Intitulé de mission comme descriptif par défaut
-  var defaultDescriptif = mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || mission.client));
+  var defaultDescriptif = cleanDescriptifFacture(mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || mission.client)));
 
   var p = parseYM(monthYm);
   var moisNom = new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -11097,8 +11093,11 @@ function buildCRAData(mission, monthYm) {
     });
 
     currentWeek.totalJours += worked;
-    if (worked > 0 && loc === 'tt') currentWeek.ttDays += worked;
-    if (worked > 0 && loc === 'site') currentWeek.siteDays += worked;
+    if (worked > 0) {
+      if (loc === 'tt') currentWeek.ttDays += worked;
+      else if (loc === 'mixte') { currentWeek.ttDays += worked * 0.5; currentWeek.siteDays += worked * 0.5; }
+      else currentWeek.siteDays += worked;
+    }
   }
 
   var totalJours = weeks.reduce(function(s, w) { return s + w.totalJours; }, 0);
@@ -11162,7 +11161,8 @@ function generateCRAHTMLContent(data) {
     var daysDesc = week.days.filter(function(d) { return d.worked > 0; }).map(function(d) {
       var label = d.dowName + ' ' + d.day;
       if (d.worked === 0.5) label += ' (\u00bd)';
-      if (d.location === 'tt') label += ' TT';
+      var locIcons = { site: '\ud83c\udfe2', tt: '\ud83c\udfe0', mixte: '\ud83d\udd00' };
+      if (d.location) label += ' ' + (locIcons[d.location] || '');
       return label;
     }).join(', ');
 
