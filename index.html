@@ -3030,13 +3030,17 @@ function repairInvoiceNumbers() {
 
       // Ajouter au registre uniquement si la facture est payée (Art. L123-28)
       if (f.status === 'payée') {
+        // Déterminer le client de facturation selon factureDestinataire
+        var repairClient = f.client;
+        if (mis.factureDestinataire === 'agence' && mis.agence && mis.agence.nom) repairClient = mis.agence.nom;
+        else if (mis.factureDestinataire === 'clientOp' && mis.clientOp && mis.clientOp.nom) repairClient = mis.clientOp.nom;
         COMPANY.invoiceRegistry.push({
           id: 'INV-REPAIR-' + num,
           numero: formattedNum,
           date: invoiceDate,
           dateEncaissement: f.datePaiementReel || invoiceDate,
-          client: f.client,
-          nature: 'Prestation de service',
+          client: repairClient,
+          nature: f.nature || 'Prestation de service',
           montantHT: f.ht,
           tva: f.tva || 0,
           montantTTC: f.ttc || f.ht + (f.tva || 0),
@@ -3099,11 +3103,13 @@ function registerInvoice(invoiceData) {
 }
 
 function getInvoiceRegistry(year) {
-  // Retourne le livre des recettes pour une année
+  // Retourne le livre des recettes pour une année (par date d'encaissement - Art. L123-28)
   if (!COMPANY.invoiceRegistry) return [];
   if (!year) return COMPANY.invoiceRegistry;
+  var yr = String(year);
   return COMPANY.invoiceRegistry.filter(function(inv) {
-    return inv.date && inv.date.startsWith(String(year));
+    var refDate = inv.dateEncaissement || inv.date;
+    return refDate && refDate.startsWith(yr);
   });
 }
 
@@ -3837,11 +3843,15 @@ function setFactureStatus(factureId, newStatus) {
         if (newStatus === 'payée' && f.numero) {
           var alreadyInRegistry = (COMPANY.invoiceRegistry || []).some(function(inv) { return inv.numero === f.numero; });
           if (!alreadyInRegistry) {
+            // Déterminer le client de facturation selon factureDestinataire
+            var registryClient = f.client || m.client;
+            if (m.factureDestinataire === 'agence' && m.agence && m.agence.nom) registryClient = m.agence.nom;
+            else if (m.factureDestinataire === 'clientOp' && m.clientOp && m.clientOp.nom) registryClient = m.clientOp.nom;
             registerInvoice({
               numero: f.numero,
               date: f.date || f.mois + '-01',
               dateEncaissement: f.datePaiementReel || localISO(TODAY),
-              client: f.client || m.client,
+              client: registryClient,
               nature: f.nature || 'Prestation de service',
               montantHT: f.ht,
               tva: f.tva || 0,
@@ -9890,6 +9900,28 @@ function showFactureModal(facture) {
           var dp = $('#fDatePaiementReel').value;
           if (dp) f.datePaiementReel = dp;
           else if (newStatus === 'payée' && !f.datePaiementReel) f.datePaiementReel = localISO(TODAY);
+          // Art. L123-28 : enregistrer au livre des recettes au paiement effectif
+          if (newStatus === 'payée' && f.numero) {
+            var alreadyInRegistry = (COMPANY.invoiceRegistry || []).some(function(inv) { return inv.numero === f.numero; });
+            if (!alreadyInRegistry) {
+              var regClient = f.client || m.client;
+              if (m.factureDestinataire === 'agence' && m.agence && m.agence.nom) regClient = m.agence.nom;
+              else if (m.factureDestinataire === 'clientOp' && m.clientOp && m.clientOp.nom) regClient = m.clientOp.nom;
+              registerInvoice({
+                numero: f.numero,
+                date: f.date || f.mois + '-01',
+                dateEncaissement: f.datePaiementReel || localISO(TODAY),
+                client: regClient,
+                nature: f.nature || 'Prestation de service',
+                montantHT: f.ht,
+                tva: f.tva || 0,
+                montantTTC: f.ttc || f.ht + (f.tva || 0),
+                modePaiement: f.modePaiement || 'Virement',
+                missionId: m.id,
+                mois: f.mois
+              });
+            }
+          }
         }
       });
     });
@@ -20238,9 +20270,18 @@ function renderAdmin(container) {
   var yearRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } });
   yearRow.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '700' } }, '📋 Livre des Recettes'));
   var yearSelect = el('select', { class: 'form-select', id: 'exportYear', style: { width: '90px', fontSize: '12px' }, onchange: function() { render(); } });
-  [currentYear - 1, currentYear, currentYear + 1].forEach(function(y) {
+  // Afficher toutes les années ayant des écritures + année courante ±1
+  var registryYears = {};
+  (COMPANY.invoiceRegistry || []).forEach(function(inv) {
+    var y = parseInt((inv.dateEncaissement || inv.date || '').substring(0, 4));
+    if (y) registryYears[y] = true;
+  });
+  registryYears[currentYear - 1] = true;
+  registryYears[currentYear] = true;
+  registryYears[currentYear + 1] = true;
+  Object.keys(registryYears).sort().forEach(function(y) {
     var opt = el('option', { value: y }, String(y));
-    if (y === currentYear) opt.selected = true;
+    if (parseInt(y) === currentYear) opt.selected = true;
     yearSelect.appendChild(opt);
   });
   yearRow.appendChild(yearSelect);
@@ -20250,35 +20291,40 @@ function renderAdmin(container) {
   var livreYear = parseInt($('#exportYear') ? $('#exportYear').value : currentYear);
   var registry = getInvoiceRegistry(livreYear);
   if (registry.length > 0) {
-    registry.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
-    var tableDiv = el('div', { style: { overflow: 'auto', maxHeight: '250px', marginBottom: '10px', border: '1px solid var(--glass-border)', borderRadius: '8px' } });
+    // Trier par date d'encaissement (obligatoire Art. L123-28)
+    registry.sort(function(a, b) { return (a.dateEncaissement || a.date || '').localeCompare(b.dateEncaissement || b.date || ''); });
+    var tableDiv = el('div', { style: { overflow: 'auto', maxHeight: '300px', marginBottom: '10px', border: '1px solid var(--glass-border)', borderRadius: '8px' } });
 
-    // Table header
-    var thead = el('div', { style: { display: 'grid', gridTemplateColumns: '80px 70px 1fr 90px 60px', gap: '2px', padding: '6px 8px', fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', position: 'sticky', top: '0' } });
-    thead.appendChild(el('span', {}, 'Date'));
-    thead.appendChild(el('span', {}, 'N° Pièce'));
+    // Table header — colonnes conformes Art. L123-28 Code de Commerce
+    var gridCols = '82px 68px 1fr 1fr 80px 70px';
+    var thead = el('div', { style: { display: 'grid', gridTemplateColumns: gridCols, gap: '2px', padding: '6px 8px', fontSize: '9px', fontWeight: '700', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', position: 'sticky', top: '0' } });
+    thead.appendChild(el('span', {}, 'Encaissement'));
+    thead.appendChild(el('span', {}, 'N° Facture'));
     thead.appendChild(el('span', {}, 'Client'));
-    thead.appendChild(el('span', { style: { textAlign: 'right' } }, 'Montant HT'));
+    thead.appendChild(el('span', {}, 'Nature'));
+    thead.appendChild(el('span', { style: { textAlign: 'right' } }, 'Montant'));
     thead.appendChild(el('span', { style: { textAlign: 'right' } }, 'Mode'));
     tableDiv.appendChild(thead);
 
     var totalHT = 0;
     registry.forEach(function(inv) {
       totalHT += inv.montantHT || 0;
-      var row = el('div', { style: { display: 'grid', gridTemplateColumns: '80px 70px 1fr 90px 60px', gap: '2px', padding: '5px 8px', fontSize: '10px', borderTop: '1px solid var(--bg-tertiary)' } });
-      row.appendChild(el('span', {}, (inv.date || '').substring(0, 10)));
+      var row = el('div', { style: { display: 'grid', gridTemplateColumns: gridCols, gap: '2px', padding: '5px 8px', fontSize: '10px', borderTop: '1px solid var(--bg-tertiary)' } });
+      row.appendChild(el('span', {}, (inv.dateEncaissement || inv.date || '').substring(0, 10)));
       row.appendChild(el('span', { style: { fontWeight: '600' } }, inv.numero || ''));
       row.appendChild(el('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, inv.client || ''));
+      row.appendChild(el('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)' } }, inv.nature || ''));
       row.appendChild(el('span', { style: { textAlign: 'right', fontWeight: '600' } }, EUR(inv.montantHT || 0)));
-      row.appendChild(el('span', { style: { textAlign: 'right', color: 'var(--text-muted)' } }, (inv.modePaiement || 'Vir.').substring(0, 4)));
+      row.appendChild(el('span', { style: { textAlign: 'right', color: 'var(--text-muted)' } }, inv.modePaiement || 'Virement'));
       tableDiv.appendChild(row);
     });
 
     // Total
-    var totalRow = el('div', { style: { display: 'grid', gridTemplateColumns: '80px 70px 1fr 90px 60px', gap: '2px', padding: '6px 8px', fontSize: '10px', fontWeight: '700', borderTop: '2px solid var(--glass-border)', background: 'var(--bg-tertiary)' } });
+    var totalRow = el('div', { style: { display: 'grid', gridTemplateColumns: gridCols, gap: '2px', padding: '6px 8px', fontSize: '10px', fontWeight: '700', borderTop: '2px solid var(--glass-border)', background: 'var(--bg-tertiary)' } });
     totalRow.appendChild(el('span', {}));
     totalRow.appendChild(el('span', {}));
     totalRow.appendChild(el('span', {}, 'TOTAL ' + livreYear));
+    totalRow.appendChild(el('span', {}));
     totalRow.appendChild(el('span', { style: { textAlign: 'right' } }, EUR(totalHT)));
     totalRow.appendChild(el('span', {}));
     tableDiv.appendChild(totalRow);
