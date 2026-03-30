@@ -3028,22 +3028,24 @@ function repairInvoiceNumbers() {
         }
       }
 
-      // Ajouter au registre
-      COMPANY.invoiceRegistry.push({
-        id: 'INV-REPAIR-' + num,
-        numero: formattedNum,
-        date: invoiceDate,
-        dateEncaissement: null,
-        client: f.client,
-        nature: 'Prestation de service',
-        montantHT: f.ht,
-        tva: f.tva || 0,
-        montantTTC: f.ttc || f.ht + (f.tva || 0),
-        modePaiement: 'Virement',
-        missionId: mis.id,
-        mois: f.mois,
-        createdAt: new Date().toISOString()
-      });
+      // Ajouter au registre uniquement si la facture est payée (Art. L123-28)
+      if (f.status === 'payée') {
+        COMPANY.invoiceRegistry.push({
+          id: 'INV-REPAIR-' + num,
+          numero: formattedNum,
+          date: invoiceDate,
+          dateEncaissement: f.datePaiementReel || invoiceDate,
+          client: f.client,
+          nature: 'Prestation de service',
+          montantHT: f.ht,
+          tva: f.tva || 0,
+          montantTTC: f.ttc || f.ht + (f.tva || 0),
+          modePaiement: f.modePaiement || 'Virement',
+          missionId: mis.id,
+          mois: f.mois,
+          createdAt: new Date().toISOString()
+        });
+      }
     }
 
     // Mettre à jour le compteur global
@@ -3830,6 +3832,25 @@ function setFactureStatus(factureId, newStatus) {
         // Enregistrer la date réelle de paiement pour le calcul DSO
         if (newStatus === 'payée' && !f.datePaiementReel) {
           f.datePaiementReel = localISO(TODAY);
+        }
+        // Conformité Art. L123-28 : enregistrer au livre des recettes uniquement au paiement effectif
+        if (newStatus === 'payée' && f.numero) {
+          var alreadyInRegistry = (COMPANY.invoiceRegistry || []).some(function(inv) { return inv.numero === f.numero; });
+          if (!alreadyInRegistry) {
+            registerInvoice({
+              numero: f.numero,
+              date: f.date || f.mois + '-01',
+              dateEncaissement: f.datePaiementReel || localISO(TODAY),
+              client: f.client || m.client,
+              nature: f.nature || 'Prestation de service',
+              montantHT: f.ht,
+              tva: f.tva || 0,
+              montantTTC: f.ttc || f.ht + (f.tva || 0),
+              modePaiement: f.modePaiement || 'Virement',
+              missionId: m.id,
+              mois: f.mois
+            });
+          }
         }
       }
     });
@@ -8892,7 +8913,7 @@ function showMissionModal(mission) {
   } }, '✅ Enregistrer'));
   if (!isNew) {
     btns.appendChild(el('button', { class: 'btn', onclick: function() { closeModal('formModal'); showDaysEditor(mission); } }, '📅'));
-    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer?')) { MISSIONS = MISSIONS.filter(function(m) { return m.id !== mission.id; }); if (COMPANY.invoiceRegistry) { COMPANY.invoiceRegistry = COMPANY.invoiceRegistry.filter(function(inv) { return inv.missionId !== mission.id; }); } saveAll(); closeModal('formModal'); render(); } } }, '🗑️'));
+    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer?')) { MISSIONS = MISSIONS.filter(function(m) { return m.id !== mission.id; }); if (COMPANY.invoiceRegistry) { COMPANY.invoiceRegistry.forEach(function(inv) { if (inv.missionId === mission.id) { inv.missionId = null; inv.missionDeleted = true; } }); } saveAll(); closeModal('formModal'); render(); } } }, '🗑️'));
   }
   body.appendChild(btns);
   openModal('formModal');
@@ -10209,7 +10230,7 @@ function showSendInvoiceModal(facture) {
     var finalNum = defaultNum;
     if (!hasNumber && ligne) {
       finalNum = getNextInvoiceNumber(TODAY.getFullYear(), invoiceDate);
-      registerInvoice({ numero: finalNum, date: invoiceDate, client: facture.client, nature: descriptif, montantHT: totalHT, tva: tvaAmount, montantTTC: totalTTC, missionId: mission.id, mois: facture.mois });
+      // Conformité Art. L123-28 : l'enregistrement au livre des recettes se fait au paiement, pas à l'envoi
       ligne.invoiceFinalized = true;
       ligne.lastInvoiceNum = finalNum;
       ligne.lastInvoiceDate = invoiceDate;
@@ -10428,20 +10449,16 @@ function showInvoiceGeneratorModal(mission, monthYm) {
     var adresseClient = $('#invAdresse') ? $('#invAdresse').value : '';
     var clientName = $('#invClient') ? $('#invClient').value : mission.client;
 
+    // Art. L441-9 : l'adresse du client est obligatoire sur la facture
+    if (!adresseClient.trim()) {
+      toast('Adresse client obligatoire pour générer une facture (Art. L441-9)', 'error');
+      return;
+    }
+
     // Si pas encore finalisé, enregistrer le numéro définitif
     if (!hasDefinitiveNumber) {
       invoiceNum = getNextInvoiceNumber(TODAY.getFullYear(), invoiceDate);
-      registerInvoice({
-        numero: invoiceNum,
-        date: invoiceDate,
-        client: clientName,
-        nature: descriptif,
-        montantHT: totalHT,
-        tva: tvaAmount,
-        montantTTC: totalTTC,
-        missionId: mission.id,
-        mois: monthYm
-      });
+      // Conformité Art. L123-28 : l'enregistrement au livre des recettes se fait au paiement, pas à la génération
       ligne.invoiceFinalized = true;
     }
 
@@ -10950,6 +10967,7 @@ function generateAndDownloadPDF(data) {
   } else {
     legLines.push('En cas de retard, penalite de 3x le taux d\'interet legal + indemnite forfaitaire de 40' + eur + '.');
   }
+  legLines.push('Pas d\'escompte pour paiement anticipe.');
   if (data.tvaRate === 0) legLines.push('TVA non applicable, article 293 B du CGI.');
   legLines.push('Micro-entreprise - Dispense d\'immatriculation au RCS et au RM');
   legLines.forEach(function(line) { doc.text(line, cx, legY, { align: 'center' }); legY += 3.5; });
