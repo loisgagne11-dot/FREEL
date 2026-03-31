@@ -2371,6 +2371,7 @@ function signOut() {
   .catch(function(err) { console.error('Sign out error:', err); showToast('❌ Erreur de déconnexion, réessayez.', 'error'); });
 }
 
+var _lastSyncToast = 0;
 function syncToCloud() {
   if (!CURRENT_USER || !supabaseClient) return;
 
@@ -2402,6 +2403,11 @@ function syncToCloud() {
       } else {
         LAST_SYNC_TIME = new Date();
         updateAuthUI();
+        var now = Date.now();
+        if (now - _lastSyncToast > 10000) {
+          showToast('☁️ Sauvegardé', 'success');
+          _lastSyncToast = now;
+        }
       }
     })
     .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
@@ -5153,26 +5159,30 @@ function cleanupLocalStorage() {
 }
 
 function saveAll() {
-  // 1. Sauvegarder en localStorage (un seul objet combiné pour économiser l'espace)
+  var localOk = false;
+  // 1. Tenter localStorage (best-effort)
   try {
     var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
-    // Supprimer les anciennes clés séparées (libère l'espace AVANT d'écrire)
     ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
       localStorage.removeItem(STORAGE_PREFIX + k);
     });
     localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle);
+    localOk = true;
   } catch (e) {
     cleanupLocalStorage();
     try {
-      var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
-      localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle);
+      var bundle2 = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
+      localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle2);
+      localOk = true;
     } catch (e2) {
-      console.warn('[FREEL] localStorage plein, cloud uniquement');
+      // localStorage plein — OK si cloud disponible
     }
   }
-  // 2. En plus, sync vers le cloud si connecté
+  // 2. Sync cloud si connecté
   if (CURRENT_USER && SYNC_ENABLED) {
     syncToCloud();
+  } else if (!localOk) {
+    showToast('⚠️ Stockage plein! Connectez-vous pour sauvegarder en ligne.', 'error');
   }
 }
 
