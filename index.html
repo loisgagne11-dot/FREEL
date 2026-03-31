@@ -5151,12 +5151,7 @@ function cleanupLocalStorage() {
 }
 
 function saveAll() {
-  // Utilisateur connecté : sauvegarde cloud uniquement, pas de localStorage
-  if (CURRENT_USER && SYNC_ENABLED) {
-    syncToCloud();
-    return;
-  }
-  // Mode hors-ligne : localStorage
+  // 1. Toujours sauvegarder en localStorage (fiable, synchrone)
   try {
     localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
     localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
@@ -5164,7 +5159,6 @@ function saveAll() {
     localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
     localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
   } catch (e) {
-    // Libérer de l'espace et réessayer
     cleanupLocalStorage();
     try {
       localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
@@ -5172,10 +5166,13 @@ function saveAll() {
       localStorage.setItem(STORAGE_PREFIX + 'clients', JSON.stringify(CLIENTS));
       localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
       localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
-      showToast('💾 Espace libéré, données sauvegardées.', 'success');
     } catch (e2) {
-      showToast('⚠️ Stockage plein! Connectez-vous pour sauvegarder en ligne.', 'error');
+      showToast('⚠️ Stockage local plein!', 'error');
     }
+  }
+  // 2. En plus, sync vers le cloud si connecté
+  if (CURRENT_USER && SYNC_ENABLED) {
+    syncToCloud();
   }
 }
 
