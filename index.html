@@ -865,8 +865,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .search-result-badge { font-size: 10px; padding: 2px 8px; background: var(--bg-tertiary); border-radius: 4px; }
 .search-empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 12px; }
 .notif-badge { position: absolute; top: -4px; right: -4px; background: var(--danger); color: white; font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 8px; }
-.backup-indicator { position: fixed; bottom: 20px; left: 20px; background: var(--success); color: white; padding: 8px 14px; border-radius: 20px; font-size: 11px; font-weight: 600; display: none; z-index: 1000; }
-.backup-indicator.show { display: flex; align-items: center; gap: 6px; animation: fadeIn 0.2s ease; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 /* =============================================
@@ -1109,8 +1107,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   .keyboard-help { right: 10px; bottom: 70px; max-width: 240px; padding: 12px; }
 
   /* Backup indicator */
-  .backup-indicator { bottom: 70px; left: 12px; padding: 6px 10px; font-size: 10px; }
-
   /* Onboarding */
   .onboarding { padding: 16px; }
   .onboarding-card { max-width: 100%; }
@@ -2355,8 +2351,21 @@ function signOut() {
   supabaseClient.auth.signOut().then(function() {
     CURRENT_USER = null;
     LAST_SYNC_TIME = null;
+    // Purger toutes les données utilisateur du localStorage
+    ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
+      localStorage.removeItem(STORAGE_PREFIX + k);
+    });
+    cleanupLocalStorage();
+    // Réinitialiser les données en mémoire (état vierge)
+    COMPANY = { nom: '', siret: '', debut: '', typeActivite: 'BNC', acre: false, prelevementLiberatoire: false, tvaDepuis: '', tvaIntracom: '', iban: '', bic: '', adresse: '', ville: '', codePostal: '', commune: '', codeApe: '', email: '', telephone: '', urssafPeriodicite: 'mensuel', onboardingDone: false, invoiceCounter: {}, invoiceRegistry: [], invoiceFormat: 'YYYY-NNN', invoiceGlobalCounter: 0 };
+    MISSIONS = [];
+    CLIENTS = [];
+    TREASURY = { soldeInitial: 0, mouvements: [], paidCharges: {}, conges: {}, rendementActif: false, rendementTaux: 2.0, rendementHistorique: [], actionsDone: [], salaireEstime: 0, reserveCompte: 0 };
+    IR_CONFIG = {};
+    COMPUTED = compute();
     updateAuthUI();
-    showToast('🚪 Déconnecté', 'info');
+    render();
+    showToast('🚪 Déconnecté — données locales supprimées', 'info');
   })
   .catch(function(err) { console.error('Sign out error:', err); showToast('❌ Erreur de déconnexion, réessayez.', 'error'); });
 }
@@ -2391,7 +2400,6 @@ function syncToCloud() {
       } else {
         LAST_SYNC_TIME = new Date();
         updateAuthUI();
-        showBackupIndicator();
       }
     })
     .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
@@ -2427,12 +2435,10 @@ function loadFromCloud() {
         MISSIONS.forEach(buildMission);
         repairInvoiceNumbers();
 
-        saveAll();
         COMPUTED = compute();
         render();
         LAST_SYNC_TIME = new Date();
         updateAuthUI();
-        showBackupIndicator();
       }
     })
     .catch(function(err) { console.error('Cloud network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
@@ -5128,7 +5134,25 @@ function createTextarea(label, id, value, placeholder, required) {
 var STORAGE_PREFIX = 'freel_v50_';
 var OLD_STORAGE_PREFIX = 'freel_v39_';
 
+// Nettoyage des données inutiles dans localStorage (backups, legacy, UI state)
+function cleanupLocalStorage() {
+  var toRemove = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (k && (k.startsWith('freel_backup_') || k.startsWith(OLD_STORAGE_PREFIX) || k.startsWith('collapse_'))) {
+      toRemove.push(k);
+    }
+  }
+  toRemove.forEach(function(k) { localStorage.removeItem(k); });
+}
+
 function saveAll() {
+  // Utilisateur connecté : sauvegarde cloud uniquement, pas de localStorage
+  if (CURRENT_USER && SYNC_ENABLED) {
+    syncToCloud();
+    return;
+  }
+  // Mode hors-ligne : localStorage
   try {
     localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
     localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
@@ -5136,11 +5160,19 @@ function saveAll() {
     localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
     localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
   } catch (e) {
-    showToast('⚠️ Stockage plein! Exportez vos données.', 'error');
-    return;
+    // Libérer de l'espace et réessayer
+    cleanupLocalStorage();
+    try {
+      localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
+      localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
+      localStorage.setItem(STORAGE_PREFIX + 'clients', JSON.stringify(CLIENTS));
+      localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
+      localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
+      showToast('💾 Espace libéré, données sauvegardées.', 'success');
+    } catch (e2) {
+      showToast('⚠️ Stockage plein! Connectez-vous pour sauvegarder en ligne.', 'error');
+    }
   }
-  autoBackup();
-  if (CURRENT_USER && SYNC_ENABLED) syncToCloud();
 }
 
 // V78: Auto-save on page unload and visibility change for safety
@@ -5170,8 +5202,15 @@ function loadAll() {
     if (t) try { TREASURY = Object.assign(TREASURY, JSON.parse(t)); } catch(e) { console.error('Parse treasury:', e); }
     if (ir) try { IR_CONFIG = JSON.parse(ir); } catch(e) { console.error('Parse ir_config:', e); }
 
-    // Si migration effectuée, sauvegarder avec le nouveau préfixe
-    if (needsMigration) saveAll();
+    // Si migration effectuée, sauvegarder avec le nouveau préfixe et nettoyer v39
+    if (needsMigration) {
+      saveAll();
+      ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
+        localStorage.removeItem(OLD_STORAGE_PREFIX + k);
+      });
+    }
+    // Nettoyage des backups et données obsolètes à chaque démarrage
+    cleanupLocalStorage();
 
     // Migration: si anciennes données IR dans COMPANY, migrer vers IR_CONFIG
     if (COMPANY.irParts !== undefined) {
@@ -13968,34 +14007,6 @@ function handleSearchKey(e) {
   if (e.key === 'Enter' && SEARCH_RESULTS[SEARCH_INDEX]) { hideSearch(); SEARCH_RESULTS[SEARCH_INDEX].action(); }
 }
 
-function autoBackup() {
-  try {
-    var data = { company: COMPANY, missions: MISSIONS, clients: CLIENTS, treasury: TREASURY, irConfig: IR_CONFIG, version: 'V50', date: localISO(TODAY) };
-    var key = 'freel_backup_' + localISO(TODAY);
-    localStorage.setItem(key, JSON.stringify(data));
-
-    // Garder seulement les 7 derniers backups
-    var keys = [];
-    for (var i = 0; i < localStorage.length; i++) {
-      var k = localStorage.key(i);
-      if (k && k.startsWith('freel_backup_')) keys.push(k);
-    }
-    keys.sort().reverse();
-    keys.slice(7).forEach(function(k) { localStorage.removeItem(k); });
-
-    showBackupIndicator();
-  } catch (e) {
-    console.warn('Backup failed:', e.message);
-  }
-}
-
-function showBackupIndicator() {
-  var indicator = $('#backupIndicator');
-  if (indicator) {
-    indicator.classList.add('show');
-    setTimeout(function() { indicator.classList.remove('show'); }, 2000);
-  }
-}
 
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', function(e) {
@@ -14051,13 +14062,6 @@ function createKeyboardHelp() {
     help.appendChild(row);
   });
   document.body.appendChild(help);
-}
-
-function createBackupIndicator() {
-  var indicator = el('div', { id: 'backupIndicator', class: 'backup-indicator' });
-  indicator.appendChild(el('span', {}, '✓'));
-  indicator.appendChild(el('span', {}, 'Synchronisé'));
-  document.body.appendChild(indicator);
 }
 
 // Sprint 13: Export/Import JSON
@@ -21002,63 +21006,6 @@ function renderComptePreferences(container) {
 
 // --- Sécurité & Données ---
 function renderCompteSecurite(container) {
-  // Sauvegarde locale
-  var backupCard = el('div', { class: 'card' });
-  backupCard.appendChild(el('div', { class: 'card-title' }, 'Sauvegardes locales'));
-
-  // Lister les backups existants
-  var backupKeys = [];
-  for (var i = 0; i < localStorage.length; i++) {
-    var key = localStorage.key(i);
-    if (key && key.indexOf('freel_backup_') === 0) {
-      backupKeys.push(key);
-    }
-  }
-  backupKeys.sort().reverse();
-
-  if (backupKeys.length > 0) {
-    backupCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--success)', marginBottom: '10px' } }, backupKeys.length + ' sauvegarde(s) automatique(s)'));
-    var backupList = el('div', { style: { maxHeight: '150px', overflow: 'auto' } });
-    backupKeys.forEach(function(bk) {
-      var dateStr = bk.replace('freel_backup_', '');
-      var row = el('div', { style: {
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '8px', borderRadius: '6px', background: 'var(--bg-tertiary)', marginBottom: '4px', fontSize: '11px'
-      }});
-      row.appendChild(el('span', {}, dateStr));
-      var restoreBtn = el('button', { class: 'btn btn-sm', style: { fontSize: '10px', padding: '4px 8px' }, onclick: (function(k) { return function() {
-        if (confirm('Restaurer la sauvegarde du ' + k.replace('freel_backup_', '') + ' ? Cela remplacera vos données actuelles.')) {
-          try {
-            var backup = JSON.parse(localStorage.getItem(k));
-            if (backup.company) COMPANY = backup.company;
-            if (backup.missions) MISSIONS = backup.missions;
-            if (backup.clients) CLIENTS = backup.clients;
-            if (backup.treasury) TREASURY = backup.treasury;
-            if (backup.irConfig) IR_CONFIG = backup.irConfig;
-            saveAll();
-            COMPUTED = compute();
-            render();
-            showToast('Sauvegarde restaurée', 'success');
-          } catch (e) {
-            showToast('Erreur de restauration', 'error');
-          }
-        }
-      }; })(bk) }, 'Restaurer');
-      row.appendChild(restoreBtn);
-      backupList.appendChild(row);
-    });
-    backupCard.appendChild(backupList);
-  } else {
-    backupCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', padding: '12px', textAlign: 'center' } }, 'Aucune sauvegarde automatique'));
-  }
-
-  backupCard.appendChild(el('button', { class: 'btn', style: { marginTop: '12px', width: '100%' }, onclick: function() {
-    autoBackup();
-    showToast('Sauvegarde créée', 'success');
-    render();
-  } }, 'Créer une sauvegarde maintenant'));
-
-  container.appendChild(backupCard);
 
   // Export / Import
   var ioCard = el('div', { class: 'card' });
@@ -21351,7 +21298,6 @@ function init() {
   // Sprint 12: Raccourcis clavier améliorés + recherche + backup
   createSearchOverlay();
   createKeyboardHelp();
-  createBackupIndicator();
   initKeyboardShortcuts();
   initTheme();
   createNotifCenter();
