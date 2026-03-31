@@ -2373,19 +2373,20 @@ function signOut() {
 function syncToCloud() {
   if (!CURRENT_USER || !supabaseClient) return;
 
-  var data = {
-    user_id: CURRENT_USER.id,
-    company: COMPANY,
-    missions: MISSIONS,
-    clients: CLIENTS,
-    treasury: TREASURY,
-    ir_config: IR_CONFIG,
-    updated_at: new Date().toISOString()
-  };
+  try {
+    var data = {
+      user_id: CURRENT_USER.id,
+      company: COMPANY,
+      missions: MISSIONS,
+      clients: CLIENTS,
+      treasury: TREASURY,
+      ir_config: IR_CONFIG,
+      updated_at: new Date().toISOString()
+    };
 
-  supabaseClient.from('user_data')
-    .upsert(data, { onConflict: 'user_id' })
-    .then(function(result) {
+    supabaseClient.from('user_data')
+      .upsert(data, { onConflict: 'user_id' })
+      .then(function(result) {
       if (result.error) {
         console.error('Sync error:', result.error);
         var msg = '❌ Sync échouée: ';
@@ -2403,6 +2404,9 @@ function syncToCloud() {
       }
     })
     .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
+  } catch (e) {
+    console.error('[FREEL] syncToCloud error:', e);
+  }
 }
 
 function loadFromCloud() {
@@ -3104,7 +3108,7 @@ function registerInvoice(invoiceData) {
   };
   
   COMPANY.invoiceRegistry.push(entry);
-  saveAll();
+  // Note: l'appelant est responsable d'appeler saveAll() après
   return entry;
 }
 
@@ -9921,51 +9925,60 @@ function showFactureModal(facture) {
   // Boutons
   var btns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '20px' } });
   btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
-    var newStatus = $('#fStatus').value;
-    // Sauvegarder les dates éditées
-    MISSIONS.forEach(function(m) {
-      if (m.factures) m.factures.forEach(function(f) {
-        if (f.id === facture.id) {
-          f.status = newStatus;
-          // Date envoi
-          var de = $('#fDateEnvoi').value;
-          if (de) f.dateEnvoi = de;
-          else if (newStatus === 'envoyée' && !f.dateEnvoi) f.dateEnvoi = localISO(TODAY);
-          // Date réception
-          var dr = $('#fDateReception').value;
-          if (dr) f.dateReception = dr;
-          else delete f.dateReception;
-          // Date paiement réel
-          var dp = $('#fDatePaiementReel').value;
-          if (dp) f.datePaiementReel = dp;
-          else if (newStatus === 'payée' && !f.datePaiementReel) f.datePaiementReel = localISO(TODAY);
-          // Art. L123-28 : enregistrer au livre des recettes au paiement effectif
-          if (newStatus === 'payée' && f.numero) {
-            var alreadyInRegistry = (COMPANY.invoiceRegistry || []).some(function(inv) { return inv.numero === f.numero; });
-            if (!alreadyInRegistry) {
-              var regClient = f.client || m.client;
-              if (m.factureDestinataire === 'agence' && m.agence && m.agence.nom) regClient = m.agence.nom;
-              else if (m.factureDestinataire === 'clientOp' && m.clientOp && m.clientOp.nom) regClient = m.clientOp.nom;
-              registerInvoice({
-                numero: f.numero,
-                date: f.date || f.mois + '-01',
-                dateEncaissement: f.datePaiementReel || localISO(TODAY),
-                client: regClient,
-                nature: f.nature || 'Prestation de service',
-                montantHT: f.ht,
-                tva: f.tva || 0,
-                montantTTC: f.ttc || f.ht + (f.tva || 0),
-                modePaiement: f.modePaiement || 'Virement',
-                missionId: m.id,
-                mois: f.mois
-              });
+    try {
+      var newStatus = $('#fStatus').value;
+      // Sauvegarder les dates éditées
+      MISSIONS.forEach(function(m) {
+        if (m.factures) m.factures.forEach(function(f) {
+          if (f.id === facture.id) {
+            f.status = newStatus;
+            // Date envoi
+            var de = $('#fDateEnvoi').value;
+            if (de) f.dateEnvoi = de;
+            else if (newStatus === 'envoyée' && !f.dateEnvoi) f.dateEnvoi = localISO(TODAY);
+            // Date réception
+            var dr = $('#fDateReception').value;
+            if (dr) f.dateReception = dr;
+            else delete f.dateReception;
+            // Date paiement réel
+            var dp = $('#fDatePaiementReel').value;
+            if (dp) f.datePaiementReel = dp;
+            else if (newStatus === 'payée' && !f.datePaiementReel) f.datePaiementReel = localISO(TODAY);
+            // Art. L123-28 : enregistrer au livre des recettes au paiement effectif
+            if (newStatus === 'payée' && f.numero) {
+              var alreadyInRegistry = (COMPANY.invoiceRegistry || []).some(function(inv) { return inv.numero === f.numero; });
+              if (!alreadyInRegistry) {
+                var regClient = f.client || m.client;
+                if (m.factureDestinataire === 'agence' && m.agence && m.agence.nom) regClient = m.agence.nom;
+                else if (m.factureDestinataire === 'clientOp' && m.clientOp && m.clientOp.nom) regClient = m.clientOp.nom;
+                registerInvoice({
+                  numero: f.numero,
+                  date: f.date || f.mois + '-01',
+                  dateEncaissement: f.datePaiementReel || localISO(TODAY),
+                  client: regClient,
+                  nature: f.nature || 'Prestation de service',
+                  montantHT: f.ht,
+                  tva: f.tva || 0,
+                  montantTTC: f.ttc || f.ht + (f.tva || 0),
+                  modePaiement: f.modePaiement || 'Virement',
+                  missionId: m.id,
+                  mois: f.mois
+                });
+              }
             }
           }
-        }
+        });
       });
-    });
-    saveAll(); render(); closeModal('formModal');
-    toast('Facture mise à jour', 'success');
+      saveAll();
+      toast('Facture mise à jour', 'success');
+    } catch (e) {
+      console.error('[FREEL] Erreur mise à jour facture:', e);
+      toast('Erreur: ' + (e.message || 'mise à jour échouée'), 'error');
+    } finally {
+      COMPUTED = compute();
+      render();
+      closeModal('formModal');
+    }
   } }, '✅ Mettre à jour'));
 
   // Bouton cycle URSSAF
