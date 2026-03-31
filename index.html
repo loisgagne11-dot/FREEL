@@ -2352,6 +2352,7 @@ function signOut() {
     CURRENT_USER = null;
     LAST_SYNC_TIME = null;
     // Purger toutes les données utilisateur du localStorage
+    localStorage.removeItem(STORAGE_PREFIX + 'bundle');
     ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
       localStorage.removeItem(STORAGE_PREFIX + k);
     });
@@ -3072,10 +3073,10 @@ function repairInvoiceNumbers() {
       COMPANY.invoiceCounter[yr] = (COMPANY.invoiceCounter[yr] || 0) + 1;
     }
 
-    // Sauvegarder directement dans localStorage (éviter saveAll qui peut planter au boot)
+    // Sauvegarder directement en bundle (éviter saveAll qui peut planter au boot)
     try {
-      localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
-      localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
+      var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
+      localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle);
     } catch(e) { console.error('[FREEL] repairInvoiceNumbers save error:', e); }
 
     console.log('[FREEL] repairInvoiceNumbers: terminé, ' + allFactures.length + ' factures numérotées, compteur=' + COMPANY.invoiceGlobalCounter);
@@ -5138,36 +5139,35 @@ function createTextarea(label, id, value, placeholder, required) {
 var STORAGE_PREFIX = 'freel_v50_';
 var OLD_STORAGE_PREFIX = 'freel_v39_';
 
-// Nettoyage des données inutiles dans localStorage (backups, legacy, UI state)
+// Nettoyage agressif du localStorage — supprime tout sauf les clés essentielles et Supabase auth
 function cleanupLocalStorage() {
+  var keepPrefixes = [STORAGE_PREFIX, 'freel_supabase', 'freel_theme', 'freel_goal_ca', 'sb-'];
   var toRemove = [];
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
-    if (k && (k.startsWith('freel_backup_') || k.startsWith(OLD_STORAGE_PREFIX) || k.startsWith('collapse_'))) {
-      toRemove.push(k);
-    }
+    if (!k) continue;
+    var keep = keepPrefixes.some(function(p) { return k.startsWith(p); });
+    if (!keep) toRemove.push(k);
   }
   toRemove.forEach(function(k) { localStorage.removeItem(k); });
 }
 
 function saveAll() {
-  // 1. Toujours sauvegarder en localStorage (fiable, synchrone)
+  // 1. Sauvegarder en localStorage (un seul objet combiné pour économiser l'espace)
   try {
-    localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
-    localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
-    localStorage.setItem(STORAGE_PREFIX + 'clients', JSON.stringify(CLIENTS));
-    localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
-    localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
+    var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
+    // Supprimer les anciennes clés séparées (libère l'espace AVANT d'écrire)
+    ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
+      localStorage.removeItem(STORAGE_PREFIX + k);
+    });
+    localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle);
   } catch (e) {
     cleanupLocalStorage();
     try {
-      localStorage.setItem(STORAGE_PREFIX + 'company', JSON.stringify(COMPANY));
-      localStorage.setItem(STORAGE_PREFIX + 'missions', JSON.stringify(MISSIONS));
-      localStorage.setItem(STORAGE_PREFIX + 'clients', JSON.stringify(CLIENTS));
-      localStorage.setItem(STORAGE_PREFIX + 'treasury', JSON.stringify(TREASURY));
-      localStorage.setItem(STORAGE_PREFIX + 'ir_config', JSON.stringify(IR_CONFIG));
+      var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
+      localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle);
     } catch (e2) {
-      showToast('⚠️ Stockage local plein!', 'error');
+      console.warn('[FREEL] localStorage plein, cloud uniquement');
     }
   }
   // 2. En plus, sync vers le cloud si connecté
@@ -5186,32 +5186,46 @@ if (typeof window !== 'undefined') {
 
 function loadAll() {
   try {
-    // V50: Migration automatique des données v39 vers v50
-    var needsMigration = !localStorage.getItem(STORAGE_PREFIX + 'company') &&
-                         localStorage.getItem(OLD_STORAGE_PREFIX + 'company');
-    var prefix = needsMigration ? OLD_STORAGE_PREFIX : STORAGE_PREFIX;
-
-    var c = localStorage.getItem(prefix + 'company');
-    var m = localStorage.getItem(prefix + 'missions');
-    var cl = localStorage.getItem(prefix + 'clients');
-    var t = localStorage.getItem(prefix + 'treasury');
-    var ir = localStorage.getItem(prefix + 'ir_config');
-    // SPRINT 6: Robustesse — safe JSON.parse avec fallback
-    if (c) try { COMPANY = Object.assign(COMPANY, JSON.parse(c)); } catch(e) { console.error('Parse company:', e); }
-    if (m) try { var pm = JSON.parse(m); if (Array.isArray(pm)) MISSIONS = pm; } catch(e) { console.error('Parse missions:', e); }
-    if (cl) try { var pcl = JSON.parse(cl); if (Array.isArray(pcl)) CLIENTS = pcl; } catch(e) { console.error('Parse clients:', e); }
-    if (t) try { TREASURY = Object.assign(TREASURY, JSON.parse(t)); } catch(e) { console.error('Parse treasury:', e); }
-    if (ir) try { IR_CONFIG = JSON.parse(ir); } catch(e) { console.error('Parse ir_config:', e); }
-
-    // Si migration effectuée, sauvegarder avec le nouveau préfixe et nettoyer v39
-    if (needsMigration) {
-      saveAll();
-      ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
-        localStorage.removeItem(OLD_STORAGE_PREFIX + k);
-      });
-    }
-    // Nettoyage des backups et données obsolètes à chaque démarrage
+    // Nettoyage agressif au démarrage
     cleanupLocalStorage();
+
+    // Charger depuis le bundle (nouveau format) ou les clés séparées (ancien format)
+    var bundleStr = localStorage.getItem(STORAGE_PREFIX + 'bundle');
+    if (bundleStr) {
+      try {
+        var bundle = JSON.parse(bundleStr);
+        if (bundle.c) COMPANY = Object.assign(COMPANY, bundle.c);
+        if (bundle.m && Array.isArray(bundle.m)) MISSIONS = bundle.m;
+        if (bundle.cl && Array.isArray(bundle.cl)) CLIENTS = bundle.cl;
+        if (bundle.t) TREASURY = Object.assign(TREASURY, bundle.t);
+        if (bundle.ir) IR_CONFIG = bundle.ir;
+      } catch(e) { console.error('Parse bundle:', e); }
+    } else {
+      // Fallback: anciennes clés séparées (v50 ou v39)
+      var needsMigration = !localStorage.getItem(STORAGE_PREFIX + 'company') &&
+                           localStorage.getItem(OLD_STORAGE_PREFIX + 'company');
+      var prefix = needsMigration ? OLD_STORAGE_PREFIX : STORAGE_PREFIX;
+
+      var c = localStorage.getItem(prefix + 'company');
+      var m = localStorage.getItem(prefix + 'missions');
+      var cl = localStorage.getItem(prefix + 'clients');
+      var t = localStorage.getItem(prefix + 'treasury');
+      var ir = localStorage.getItem(prefix + 'ir_config');
+      if (c) try { COMPANY = Object.assign(COMPANY, JSON.parse(c)); } catch(e) { console.error('Parse company:', e); }
+      if (m) try { var pm = JSON.parse(m); if (Array.isArray(pm)) MISSIONS = pm; } catch(e) { console.error('Parse missions:', e); }
+      if (cl) try { var pcl = JSON.parse(cl); if (Array.isArray(pcl)) CLIENTS = pcl; } catch(e) { console.error('Parse clients:', e); }
+      if (t) try { TREASURY = Object.assign(TREASURY, JSON.parse(t)); } catch(e) { console.error('Parse treasury:', e); }
+      if (ir) try { IR_CONFIG = JSON.parse(ir); } catch(e) { console.error('Parse ir_config:', e); }
+
+      // Migrer vers le bundle et nettoyer les anciennes clés
+      if (c || needsMigration) {
+        ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
+          localStorage.removeItem(STORAGE_PREFIX + k);
+          localStorage.removeItem(OLD_STORAGE_PREFIX + k);
+        });
+        saveAll(); // Sauvegarde en bundle
+      }
+    }
 
     // Migration: si anciennes données IR dans COMPANY, migrer vers IR_CONFIG
     if (COMPANY.irParts !== undefined) {
