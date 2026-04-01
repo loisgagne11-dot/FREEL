@@ -2033,12 +2033,16 @@ function initSupabase() {
 
     supabaseClient = _supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     SYNC_ENABLED = true;
+    var _cloudLoadedOnce = false;
 
     // Écouter les changements d'auth
     supabaseClient.auth.onAuthStateChange(function(event, session) {
       CURRENT_USER = session ? session.user : null;
       updateAuthUI();
-      if (event === 'SIGNED_IN') {
+      // Ne charger du cloud qu'UNE SEULE FOIS (évite l'écrasement des données locales
+      // quand Supabase rafraîchit le token et réémet SIGNED_IN)
+      if (event === 'SIGNED_IN' && !_cloudLoadedOnce) {
+        _cloudLoadedOnce = true;
         loadFromCloud();
       }
     });
@@ -2048,7 +2052,10 @@ function initSupabase() {
       if (result.data.session) {
         CURRENT_USER = result.data.session.user;
         updateAuthUI();
-        loadFromCloud();
+        if (!_cloudLoadedOnce) {
+          _cloudLoadedOnce = true;
+          loadFromCloud();
+        }
       }
     }).catch(function(err) { console.warn('Session check failed:', err.message); });
   });
@@ -2780,7 +2787,7 @@ function makeCollapsible(card, titleEl, storageKey, startCollapsed) {
   // Restore state from localStorage
   var collapsed = startCollapsed;
   if (storageKey) {
-    var saved = localStorage.getItem('collapse_' + storageKey);
+    var saved = localStorage.getItem('freel_collapse_' + storageKey);
     if (saved !== null) collapsed = saved === '1';
   }
   if (collapsed) {
@@ -2802,7 +2809,7 @@ function makeCollapsible(card, titleEl, storageKey, startCollapsed) {
       bodyWrap.classList.add('collapsed');
       titleEl.classList.add('collapsed');
     }
-    if (storageKey) localStorage.setItem('collapse_' + storageKey, isCollapsed ? '0' : '1');
+    if (storageKey) localStorage.setItem('freel_collapse_' + storageKey, isCollapsed ? '0' : '1');
   };
   return card;
 }
@@ -3087,11 +3094,8 @@ function repairInvoiceNumbers() {
       COMPANY.invoiceCounter[yr] = (COMPANY.invoiceCounter[yr] || 0) + 1;
     }
 
-    // Sauvegarder directement en bundle (éviter saveAll qui peut planter au boot)
-    try {
-      var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
-      localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle);
-    } catch(e) { console.error('[FREEL] repairInvoiceNumbers save error:', e); }
+    // Sauvegarder via saveAll (localStorage + cloud)
+    saveAll();
 
     console.log('[FREEL] repairInvoiceNumbers: terminé, ' + allFactures.length + ' factures numérotées, compteur=' + COMPANY.invoiceGlobalCounter);
     return allFactures.length;
@@ -5151,11 +5155,10 @@ function createTextarea(label, id, value, placeholder, required) {
 
 // V50: Constante pour le préfixe de stockage
 var STORAGE_PREFIX = 'freel_v50_';
-var OLD_STORAGE_PREFIX = 'freel_v39_';
 
 // Nettoyage agressif du localStorage — supprime tout sauf les clés essentielles et Supabase auth
 function cleanupLocalStorage() {
-  var keepPrefixes = [STORAGE_PREFIX, 'freel_supabase', 'freel_theme', 'freel_goal_ca', 'sb-'];
+  var keepPrefixes = [STORAGE_PREFIX, 'freel_supabase', 'freel_theme', 'freel_goal_ca', 'freel_collapse_', 'freel_notif_read', 'sb-'];
   var toRemove = [];
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
@@ -5219,31 +5222,6 @@ function loadAll() {
         if (bundle.ir) IR_CONFIG = bundle.ir;
         if (bundle._ts) _localSaveTimestamp = bundle._ts;
       } catch(e) { console.error('Parse bundle:', e); }
-    } else {
-      // Fallback: anciennes clés séparées (v50 ou v39)
-      var needsMigration = !localStorage.getItem(STORAGE_PREFIX + 'company') &&
-                           localStorage.getItem(OLD_STORAGE_PREFIX + 'company');
-      var prefix = needsMigration ? OLD_STORAGE_PREFIX : STORAGE_PREFIX;
-
-      var c = localStorage.getItem(prefix + 'company');
-      var m = localStorage.getItem(prefix + 'missions');
-      var cl = localStorage.getItem(prefix + 'clients');
-      var t = localStorage.getItem(prefix + 'treasury');
-      var ir = localStorage.getItem(prefix + 'ir_config');
-      if (c) try { COMPANY = Object.assign(COMPANY, JSON.parse(c)); } catch(e) { console.error('Parse company:', e); }
-      if (m) try { var pm = JSON.parse(m); if (Array.isArray(pm)) MISSIONS = pm; } catch(e) { console.error('Parse missions:', e); }
-      if (cl) try { var pcl = JSON.parse(cl); if (Array.isArray(pcl)) CLIENTS = pcl; } catch(e) { console.error('Parse clients:', e); }
-      if (t) try { TREASURY = Object.assign(TREASURY, JSON.parse(t)); } catch(e) { console.error('Parse treasury:', e); }
-      if (ir) try { IR_CONFIG = JSON.parse(ir); } catch(e) { console.error('Parse ir_config:', e); }
-
-      // Migrer vers le bundle et nettoyer les anciennes clés
-      if (c || needsMigration) {
-        ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
-          localStorage.removeItem(STORAGE_PREFIX + k);
-          localStorage.removeItem(OLD_STORAGE_PREFIX + k);
-        });
-        saveAll(); // Sauvegarde en bundle
-      }
     }
 
     // Migration: si anciennes données IR dans COMPANY, migrer vers IR_CONFIG
