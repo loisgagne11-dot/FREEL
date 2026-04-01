@@ -5159,9 +5159,24 @@ function cleanupLocalStorage() {
 }
 
 function saveAll() {
-  // Connecté → cloud uniquement, pas de localStorage
+  // Connecté → cloud uniquement
   if (CURRENT_USER && SYNC_ENABLED) {
     syncToCloud();
+    return;
+  }
+  // Supabase configuré mais session pas en mémoire → tenter de récupérer
+  if (supabaseClient && !CURRENT_USER) {
+    supabaseClient.auth.getSession().then(function(result) {
+      if (result.data.session) {
+        CURRENT_USER = result.data.session.user;
+        SYNC_ENABLED = true;
+        syncToCloud();
+      } else {
+        showToast('⚠️ Session expirée. Reconnectez-vous dans Config → Cloud.', 'error');
+      }
+    }).catch(function() {
+      showToast('⚠️ Impossible de vérifier la session cloud.', 'error');
+    });
     return;
   }
   // Hors-ligne → localStorage
