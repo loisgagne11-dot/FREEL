@@ -2037,7 +2037,13 @@ function initSupabase() {
 
     // Écouter les changements d'auth
     supabaseClient.auth.onAuthStateChange(function(event, session) {
-      CURRENT_USER = session ? session.user : null;
+      // Ne vider CURRENT_USER que sur SIGNED_OUT explicite
+      // (TOKEN_REFRESHED peut émettre session=null temporairement)
+      if (session) {
+        CURRENT_USER = session.user;
+      } else if (event === 'SIGNED_OUT') {
+        CURRENT_USER = null;
+      }
       updateAuthUI();
       // Ne charger du cloud qu'UNE SEULE FOIS (évite l'écrasement des données locales
       // quand Supabase rafraîchit le token et réémet SIGNED_IN)
