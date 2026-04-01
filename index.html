@@ -5189,7 +5189,7 @@ function saveAll() {
       localOk = true;
     } catch (e2) { /* localStorage plein */ }
   }
-  // 2. Cloud sync
+  // 2. Cloud sync — diagnostic visible sur chaque chemin
   if (CURRENT_USER && SYNC_ENABLED) {
     syncToCloud();
   } else if (supabaseClient) {
@@ -5198,14 +5198,14 @@ function saveAll() {
         CURRENT_USER = result.data.session.user;
         SYNC_ENABLED = true;
         syncToCloud();
-      } else if (!localOk) {
-        showToast('⚠️ Session expirée + stockage plein. Reconnectez-vous dans Config.', 'error');
+      } else {
+        showToast('⚠️ Pas de session active. Reconnectez-vous dans Config → Cloud.', 'error');
       }
-    }).catch(function() {
-      if (!localOk) showToast('⚠️ Sauvegarde impossible (hors-ligne + stockage plein)', 'error');
+    }).catch(function(err) {
+      showToast('⚠️ Erreur vérification session cloud', 'error');
     });
-  } else if (!localOk) {
-    showToast('⚠️ Sauvegarde impossible. Activez le cloud dans Config.', 'error');
+  } else {
+    showToast('⚠️ Cloud indisponible (client=' + !!supabaseClient + ' user=' + !!CURRENT_USER + ' sync=' + SYNC_ENABLED + ' local=' + localOk + ')', 'warning');
   }
 }
 
