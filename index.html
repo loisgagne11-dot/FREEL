@@ -1972,6 +1972,7 @@ var supabaseClient = null; // Instance du client Supabase
 var CURRENT_USER = null;
 var SYNC_ENABLED = false;
 var LAST_SYNC_TIME = null; // Timestamp de la dernière synchro réussie
+var _localSaveTimestamp = 0; // Timestamp du dernier save localStorage
 var CLOUD_SYNC_STATE = 'disconnected'; // 'disconnected', 'connected', 'synced', 'syncing', 'error'
 
 function loadSupabaseCredentials() {
@@ -2436,6 +2437,13 @@ function loadFromCloud() {
           showToast('❌ Chargement cloud échoué: ' + (result.error.message || 'erreur inconnue'), 'error');
         }
       } else if (result.data) {
+        // Comparer timestamps : si localStorage est plus récent, ne pas écraser
+        var cloudTime = result.data.updated_at ? new Date(result.data.updated_at).getTime() : 0;
+        if (_localSaveTimestamp > cloudTime) {
+          // Données locales plus récentes → sync vers cloud
+          syncToCloud();
+          return;
+        }
         if (result.data.company) COMPANY = result.data.company;
         if (result.data.missions) MISSIONS = result.data.missions;
         if (result.data.clients) CLIENTS = result.data.clients;
@@ -5159,29 +5167,9 @@ function cleanupLocalStorage() {
 }
 
 function saveAll() {
-  // Connecté → cloud uniquement
-  if (CURRENT_USER && SYNC_ENABLED) {
-    syncToCloud();
-    return;
-  }
-  // Supabase configuré mais session pas en mémoire → tenter de récupérer
-  if (supabaseClient && !CURRENT_USER) {
-    supabaseClient.auth.getSession().then(function(result) {
-      if (result.data.session) {
-        CURRENT_USER = result.data.session.user;
-        SYNC_ENABLED = true;
-        syncToCloud();
-      } else {
-        showToast('⚠️ Session expirée. Reconnectez-vous dans Config → Cloud.', 'error');
-      }
-    }).catch(function() {
-      showToast('⚠️ Impossible de vérifier la session cloud.', 'error');
-    });
-    return;
-  }
-  // Hors-ligne → localStorage
+  // 1. Toujours tenter localStorage (fallback fiable)
   try {
-    var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
+    var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() });
     ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
       localStorage.removeItem(STORAGE_PREFIX + k);
     });
@@ -5189,11 +5177,20 @@ function saveAll() {
   } catch (e) {
     cleanupLocalStorage();
     try {
-      var bundle2 = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG });
-      localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle2);
-    } catch (e2) {
-      showToast('⚠️ Stockage plein! Connectez-vous pour sauvegarder en ligne.', 'error');
-    }
+      localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() }));
+    } catch (e2) { /* localStorage plein, pas grave si cloud fonctionne */ }
+  }
+  // 2. Cloud sync
+  if (CURRENT_USER && SYNC_ENABLED) {
+    syncToCloud();
+  } else if (supabaseClient) {
+    supabaseClient.auth.getSession().then(function(result) {
+      if (result.data.session) {
+        CURRENT_USER = result.data.session.user;
+        SYNC_ENABLED = true;
+        syncToCloud();
+      }
+    }).catch(function() {});
   }
 }
 
@@ -5220,6 +5217,7 @@ function loadAll() {
         if (bundle.cl && Array.isArray(bundle.cl)) CLIENTS = bundle.cl;
         if (bundle.t) TREASURY = Object.assign(TREASURY, bundle.t);
         if (bundle.ir) IR_CONFIG = bundle.ir;
+        if (bundle._ts) _localSaveTimestamp = bundle._ts;
       } catch(e) { console.error('Parse bundle:', e); }
     } else {
       // Fallback: anciennes clés séparées (v50 ou v39)
