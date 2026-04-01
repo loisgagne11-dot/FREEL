@@ -2379,7 +2379,6 @@ function signOut() {
   .catch(function(err) { console.error('Sign out error:', err); showToast('❌ Erreur de déconnexion, réessayez.', 'error'); });
 }
 
-var _lastSyncToast = 0;
 function syncToCloud() {
   if (!CURRENT_USER || !supabaseClient) return;
 
@@ -2411,11 +2410,7 @@ function syncToCloud() {
       } else {
         LAST_SYNC_TIME = new Date();
         updateAuthUI();
-        var now = Date.now();
-        if (now - _lastSyncToast > 10000) {
-          showToast('☁️ Sauvegardé', 'success');
-          _lastSyncToast = now;
-        }
+        showToast('☁️ Sauvegardé', 'success');
       }
     })
     .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
@@ -5170,18 +5165,21 @@ function cleanupLocalStorage() {
 }
 
 function saveAll() {
-  // 1. Toujours tenter localStorage (fallback fiable)
+  var localOk = false;
+  // 1. Tenter localStorage
   try {
     var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() });
     ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
       localStorage.removeItem(STORAGE_PREFIX + k);
     });
     localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle);
+    localOk = true;
   } catch (e) {
     cleanupLocalStorage();
     try {
       localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() }));
-    } catch (e2) { /* localStorage plein, pas grave si cloud fonctionne */ }
+      localOk = true;
+    } catch (e2) { /* localStorage plein */ }
   }
   // 2. Cloud sync
   if (CURRENT_USER && SYNC_ENABLED) {
@@ -5192,14 +5190,19 @@ function saveAll() {
         CURRENT_USER = result.data.session.user;
         SYNC_ENABLED = true;
         syncToCloud();
+      } else if (!localOk) {
+        showToast('⚠️ Session expirée + stockage plein. Reconnectez-vous dans Config.', 'error');
       }
-    }).catch(function() {});
+    }).catch(function() {
+      if (!localOk) showToast('⚠️ Sauvegarde impossible (hors-ligne + stockage plein)', 'error');
+    });
+  } else if (!localOk) {
+    showToast('⚠️ Sauvegarde impossible. Activez le cloud dans Config.', 'error');
   }
 }
 
-// V78: Auto-save on page unload and visibility change for safety
+// Auto-save quand l'onglet devient caché (le sync cloud a le temps de finir)
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', function() { saveAll(); });
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'hidden') saveAll();
   });
