@@ -5153,7 +5153,7 @@ var STORAGE_PREFIX = 'freel_v50_';
 
 // Nettoyage agressif du localStorage — supprime tout sauf les clés essentielles et Supabase auth
 function cleanupLocalStorage() {
-  var keepPrefixes = [STORAGE_PREFIX, 'freel_supabase', 'freel_theme', 'freel_goal_ca', 'freel_collapse_', 'freel_notif_read', 'sb-'];
+  var keepPrefixes = [STORAGE_PREFIX, 'freel_supabase', 'freel_theme', 'freel_goal_ca', 'freel_collapse_', 'freel_notif_read', 'freel_ts', 'sb-'];
   var toRemove = [];
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
@@ -5166,6 +5166,8 @@ function cleanupLocalStorage() {
 
 function saveAll() {
   var localOk = false;
+  // Timestamp dans une clé minuscule (réussit toujours, même si localStorage est quasi plein)
+  try { localStorage.setItem('freel_ts', String(Date.now())); } catch(e) {}
   // 1. Tenter localStorage
   try {
     var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() });
@@ -5213,7 +5215,11 @@ function loadAll() {
     // Nettoyage agressif au démarrage
     cleanupLocalStorage();
 
-    // Charger depuis le bundle (nouveau format) ou les clés séparées (ancien format)
+    // Lire le timestamp de dernière sauvegarde (clé séparée, fiable même si le bundle n'a pas _ts)
+    var tsStr = localStorage.getItem('freel_ts');
+    if (tsStr) _localSaveTimestamp = parseInt(tsStr) || 0;
+
+    // Charger depuis le bundle
     var bundleStr = localStorage.getItem(STORAGE_PREFIX + 'bundle');
     if (bundleStr) {
       try {
