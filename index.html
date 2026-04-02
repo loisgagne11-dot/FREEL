@@ -9972,11 +9972,12 @@ function showFactureModal(facture) {
   btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
     try {
       var newStatus = $('#fStatus').value;
-      showToast('🔧 DEBUG: facture.id=' + facture.id + ' newStatus=' + newStatus, 'info');
       var _matched = false;
+      var _allIds = [];
       // Sauvegarder les dates éditées
       MISSIONS.forEach(function(m) {
         if (m.factures) m.factures.forEach(function(f) {
+          if (f.mois && f.mois.indexOf('2026-02') !== -1) _allIds.push(f.id);
           if (f.id === facture.id) {
             _matched = true;
             f.status = newStatus;
@@ -10017,21 +10018,8 @@ function showFactureModal(facture) {
           }
         });
       });
-      showToast('🔧 DEBUG: matched=' + _matched, _matched ? 'success' : 'error');
       saveAll();
-      // Vérifier ce qui est dans localStorage après save
-      try {
-        var _b = JSON.parse(localStorage.getItem('freel_v50_bundle'));
-        var _found = [];
-        if (_b && _b.m) _b.m.forEach(function(m) {
-          if (m.factures) m.factures.forEach(function(f) {
-            if (f.mois && f.mois.indexOf('2026-02') !== -1) {
-              _found.push(m.client + ': status=' + f.status);
-            }
-          });
-        });
-        showToast('🔧 LOCALSTORAGE après save: ' + (_found.join(', ') || 'aucune fev'), 'info');
-      } catch(e) {}
+      alert('DEBUG SAVE:\n- newStatus sélectionné: ' + newStatus + '\n- facture.id cherché: ' + facture.id + '\n- matched: ' + _matched + '\n- IDs fév existants: ' + _allIds.join(', ') + '\n- facture.mois: ' + facture.mois);
       toast('Facture mise à jour', 'success');
     } catch (e) {
       console.error('[FREEL] Erreur mise à jour facture:', e);
