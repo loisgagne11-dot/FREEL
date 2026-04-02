@@ -5191,8 +5191,10 @@ function saveAll() {
   }
   // 2. Cloud sync — diagnostic visible sur chaque chemin
   if (CURRENT_USER && SYNC_ENABLED) {
+    showToast('💾 Sync en cours... (user=OK, sync=OK)', 'info');
     syncToCloud();
   } else if (supabaseClient) {
+    showToast('💾 Récupération session... (client=OK, user=' + !!CURRENT_USER + ', sync=' + SYNC_ENABLED + ')', 'info');
     supabaseClient.auth.getSession().then(function(result) {
       if (result.data.session) {
         CURRENT_USER = result.data.session.user;
