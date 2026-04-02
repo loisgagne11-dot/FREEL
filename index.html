@@ -2454,7 +2454,16 @@ function loadFromCloud() {
           syncToCloud();
           return;
         }
-        showToast('⚠️ CLOUD GAGNE (cloud=' + cloudTime + ' >= local=' + _localSaveTimestamp + ') → ÉCRASE LOCAL', 'warning');
+        // DIAGNOSTIC: montrer les status cloud AVANT écrasement
+        var cloudFevInfo = [];
+        if (result.data.missions) result.data.missions.forEach(function(m) {
+          if (m.factures) m.factures.forEach(function(f) {
+            if (f.mois && (f.mois.indexOf('2026-02') !== -1)) {
+              cloudFevInfo.push(m.client + ': status=' + f.status);
+            }
+          });
+        });
+        showToast('⚠️ CLOUD GAGNE → ÉCRASE (fev cloud: ' + (cloudFevInfo.join(', ') || 'aucune') + ')', 'warning');
         if (result.data.company) COMPANY = result.data.company;
         if (result.data.missions) MISSIONS = result.data.missions;
         if (result.data.clients) CLIENTS = result.data.clients;
@@ -21309,12 +21318,12 @@ function _diagFactures(label) {
   var info = [];
   MISSIONS.forEach(function(m) {
     if (m.factures) m.factures.forEach(function(f) {
-      if (f.mois && f.mois.indexOf('2026-03') !== -1) {
-        info.push(m.client + ' ' + f.mois + ': status=' + f.status + ' dateEnvoi=' + (f.dateEnvoi || 'VIDE') + ' jours=' + f.jours);
+      if (f.mois && (f.mois.indexOf('2026-02') !== -1 || f.mois.indexOf('2026-03') !== -1)) {
+        info.push(m.client + ' ' + f.mois + ': status=' + f.status);
       }
     });
   });
-  showToast('📊 ' + label + ': ' + (info.length > 0 ? info.join(' | ') : 'AUCUNE facture mars'), 'info');
+  showToast('📊 ' + label + ': ' + (info.length > 0 ? info.join(' | ') : 'AUCUNE'), 'info');
 }
 
 function init() {
