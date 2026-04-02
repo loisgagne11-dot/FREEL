@@ -5240,6 +5240,17 @@ if (typeof window !== 'undefined') {
 
 function loadAll() {
   try {
+    // DEBUG: Lire le bundle BRUT avant tout traitement
+    try {
+      var _rawBundle = JSON.parse(localStorage.getItem('freel_v50_bundle'));
+      var _rawFev = [];
+      if (_rawBundle && _rawBundle.m) _rawBundle.m.forEach(function(mm) {
+        if (mm.factures) mm.factures.forEach(function(ff) {
+          if (ff.mois && ff.mois.indexOf('2026-02') !== -1) _rawFev.push(ff.id + '=' + ff.status);
+        });
+      });
+      alert('LOAD DEBUG - localStorage BRUT avant loadAll:\n' + (_rawFev.join('\n') || 'aucune facture fév'));
+    } catch(e) {}
     // Nettoyage agressif au démarrage
     cleanupLocalStorage();
 
@@ -10019,7 +10030,17 @@ function showFactureModal(facture) {
         });
       });
       saveAll();
-      alert('DEBUG SAVE:\n- newStatus sélectionné: ' + newStatus + '\n- facture.id cherché: ' + facture.id + '\n- matched: ' + _matched + '\n- IDs fév existants: ' + _allIds.join(', ') + '\n- facture.mois: ' + facture.mois);
+      // Vérifier localStorage immédiatement
+      var _lsCheck = 'ERREUR';
+      try {
+        var _b2 = JSON.parse(localStorage.getItem('freel_v50_bundle'));
+        if (_b2 && _b2.m) _b2.m.forEach(function(mm) {
+          if (mm.factures) mm.factures.forEach(function(ff) {
+            if (ff.id === facture.id) _lsCheck = ff.status;
+          });
+        });
+      } catch(e) { _lsCheck = 'PARSE ERROR: ' + e.message; }
+      alert('DEBUG SAVE:\n- matched: ' + _matched + '\n- newStatus: ' + newStatus + '\n- EN MÉMOIRE après save: ' + facture.status + '\n- LOCALSTORAGE après save: ' + _lsCheck);
       toast('Facture mise à jour', 'success');
     } catch (e) {
       console.error('[FREEL] Erreur mise à jour facture:', e);
