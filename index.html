@@ -3095,8 +3095,14 @@ function repairInvoiceNumbers() {
       COMPANY.invoiceCounter[yr] = (COMPANY.invoiceCounter[yr] || 0) + 1;
     }
 
-    // Sauvegarder via saveAll (localStorage + cloud)
-    saveAll();
+    // Sauvegarder uniquement en localStorage (pas de cloud sync au démarrage,
+    // loadFromCloud() se chargera de la synchronisation une fois l'auth prête)
+    try {
+      var now = Date.now();
+      _localSaveTimestamp = now;
+      localStorage.setItem('freel_ts', String(now));
+      localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: now }));
+    } catch(e) { /* localStorage plein, pas critique au démarrage */ }
 
     console.log('[FREEL] repairInvoiceNumbers: terminé, ' + allFactures.length + ' factures numérotées, compteur=' + COMPANY.invoiceGlobalCounter);
     return allFactures.length;
@@ -5173,10 +5179,12 @@ function cleanupLocalStorage() {
 function saveAll() {
   var localOk = false;
   // Timestamp dans une clé minuscule (réussit toujours, même si localStorage est quasi plein)
-  try { localStorage.setItem('freel_ts', String(Date.now())); } catch(e) {}
+  var now = Date.now();
+  _localSaveTimestamp = now;
+  try { localStorage.setItem('freel_ts', String(now)); } catch(e) {}
   // 1. Tenter localStorage
   try {
-    var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() });
+    var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: now });
     ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
       localStorage.removeItem(STORAGE_PREFIX + k);
     });
@@ -5189,12 +5197,10 @@ function saveAll() {
       localOk = true;
     } catch (e2) { /* localStorage plein */ }
   }
-  // 2. Cloud sync — diagnostic visible sur chaque chemin
+  // 2. Cloud sync
   if (CURRENT_USER && SYNC_ENABLED) {
-    showToast('💾 Sync en cours... (user=OK, sync=OK)', 'info');
     syncToCloud();
   } else if (supabaseClient) {
-    showToast('💾 Récupération session... (client=OK, user=' + !!CURRENT_USER + ', sync=' + SYNC_ENABLED + ')', 'info');
     supabaseClient.auth.getSession().then(function(result) {
       if (result.data.session) {
         CURRENT_USER = result.data.session.user;
@@ -5207,7 +5213,9 @@ function saveAll() {
       showToast('⚠️ Erreur vérification session cloud', 'error');
     });
   } else {
-    showToast('⚠️ Cloud indisponible (client=' + !!supabaseClient + ' user=' + !!CURRENT_USER + ' sync=' + SYNC_ENABLED + ' local=' + localOk + ')', 'warning');
+    // Cloud pas encore initialisé (normal au démarrage) — sync silencieux
+    console.log('[FREEL] saveAll: cloud pas prêt (client=' + !!supabaseClient + ' user=' + !!CURRENT_USER + ' sync=' + SYNC_ENABLED + ')');
+
   }
 }
 
