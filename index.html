@@ -21305,14 +21305,29 @@ function skipOnboarding() {
 // === FAB SAISIE RAPIDE ===
 
 // === INIT ===
+function _diagFactures(label) {
+  var info = [];
+  MISSIONS.forEach(function(m) {
+    if (m.factures) m.factures.forEach(function(f) {
+      if (f.mois && f.mois.indexOf('2026-03') !== -1) {
+        info.push(m.client + ' ' + f.mois + ': status=' + f.status + ' dateEnvoi=' + (f.dateEnvoi || 'VIDE') + ' jours=' + f.jours);
+      }
+    });
+  });
+  showToast('📊 ' + label + ': ' + (info.length > 0 ? info.join(' | ') : 'AUCUNE facture mars'), 'info');
+}
+
 function init() {
   loadAll();
+  _diagFactures('Après loadAll');
   initSupabase();
   MISSIONS.forEach(buildMission);
+  _diagFactures('Après buildMission');
 
   // Réparation automatique de la numérotation des factures
   // Attribue des numéros séquentiels chronologiques à TOUTES les factures
   repairInvoiceNumbers();
+  _diagFactures('Après repairInvoiceNumbers');
 
   // Navigation
   $$('.nav-tab, .bottom-nav-tab').forEach(function(t) {
