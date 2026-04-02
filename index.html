@@ -2428,6 +2428,8 @@ function syncToCloud() {
 function loadFromCloud() {
   if (!CURRENT_USER || !supabaseClient) return;
 
+  showToast('🔍 loadFromCloud: début (localTS=' + _localSaveTimestamp + ')', 'info');
+
   supabaseClient.from('user_data')
     .select('*')
     .eq('user_id', CURRENT_USER.id)
@@ -2435,7 +2437,7 @@ function loadFromCloud() {
     .then(function(result) {
       if (result.error) {
         if (result.error.code === 'PGRST116') {
-          // Pas de données cloud encore — normal pour un premier usage
+          showToast('🔍 Cloud: aucune donnée (premier usage)', 'info');
           console.log('No cloud data yet (first sync)');
         } else if (result.error.code === '42501' || (result.error.message && result.error.message.includes('policy'))) {
           console.error('Cloud load error (RLS):', result.error);
@@ -2448,10 +2450,11 @@ function loadFromCloud() {
         // Comparer timestamps : si localStorage est plus récent, ne pas écraser
         var cloudTime = result.data.updated_at ? new Date(result.data.updated_at).getTime() : 0;
         if (_localSaveTimestamp > cloudTime) {
-          // Données locales plus récentes → sync vers cloud
+          showToast('🔍 LOCAL GAGNE (local=' + _localSaveTimestamp + ' > cloud=' + cloudTime + ') → push to cloud', 'success');
           syncToCloud();
           return;
         }
+        showToast('⚠️ CLOUD GAGNE (cloud=' + cloudTime + ' >= local=' + _localSaveTimestamp + ') → ÉCRASE LOCAL', 'warning');
         if (result.data.company) COMPANY = result.data.company;
         if (result.data.missions) MISSIONS = result.data.missions;
         if (result.data.clients) CLIENTS = result.data.clients;
