@@ -5240,17 +5240,6 @@ if (typeof window !== 'undefined') {
 
 function loadAll() {
   try {
-    // DEBUG: Lire le bundle BRUT avant tout traitement
-    try {
-      var _rawBundle = JSON.parse(localStorage.getItem('freel_v50_bundle'));
-      var _rawFev = [];
-      if (_rawBundle && _rawBundle.m) _rawBundle.m.forEach(function(mm) {
-        if (mm.factures) mm.factures.forEach(function(ff) {
-          if (ff.mois && ff.mois.indexOf('2026-02') !== -1) _rawFev.push(ff.id + '=' + ff.status);
-        });
-      });
-      alert('LOAD DEBUG - localStorage BRUT avant loadAll:\n' + (_rawFev.join('\n') || 'aucune facture fév'));
-    } catch(e) {}
     // Nettoyage agressif au démarrage
     cleanupLocalStorage();
 
@@ -10030,17 +10019,6 @@ function showFactureModal(facture) {
         });
       });
       saveAll();
-      // Vérifier localStorage immédiatement
-      var _lsCheck = 'ERREUR';
-      try {
-        var _b2 = JSON.parse(localStorage.getItem('freel_v50_bundle'));
-        if (_b2 && _b2.m) _b2.m.forEach(function(mm) {
-          if (mm.factures) mm.factures.forEach(function(ff) {
-            if (ff.id === facture.id) _lsCheck = ff.status;
-          });
-        });
-      } catch(e) { _lsCheck = 'PARSE ERROR: ' + e.message; }
-      alert('DEBUG SAVE:\n- matched: ' + _matched + '\n- newStatus: ' + newStatus + '\n- EN MÉMOIRE après save: ' + facture.status + '\n- LOCALSTORAGE après save: ' + _lsCheck);
       toast('Facture mise à jour', 'success');
     } catch (e) {
       console.error('[FREEL] Erreur mise à jour facture:', e);
@@ -17828,7 +17806,7 @@ function renderFacturesContent(container) {
       f.paymentMonth = getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
       var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
       f.paymentDate = paymentDate;
-      f._mission = m; // Référence mission pour cycle paiement
+      f._missionId = m.id; // ID mission pour cycle paiement (évite référence circulaire)
       f.isLate = f.status === 'envoyée' && TODAY > paymentDate;
       factures.push(f);
     });
@@ -17909,12 +17887,13 @@ function renderFacturesContent(container) {
         clientRow.appendChild(document.createTextNode(f.client));
         // Chercher le numéro de facture depuis toutes les sources
         var displayNum = f.numero;
-        if (!displayNum && f._mission && f._mission.lignes) {
-          var matchLigne = f._mission.lignes.find(function(l) { return l.ym === f.mois; });
+        var _fm = f._missionId && MISSIONS.find(function(mm) { return mm.id === f._missionId; });
+        if (!displayNum && _fm && _fm.lignes) {
+          var matchLigne = _fm.lignes.find(function(l) { return l.ym === f.mois; });
           if (matchLigne && matchLigne.lastInvoiceNum) displayNum = matchLigne.lastInvoiceNum;
         }
         if (!displayNum && COMPANY.invoiceRegistry) {
-          var regEntry = COMPANY.invoiceRegistry.find(function(r) { return r.mois === f.mois && r.missionId === (f._mission && f._mission.id); });
+          var regEntry = COMPANY.invoiceRegistry.find(function(r) { return r.mois === f.mois && r.missionId === f._missionId; });
           if (regEntry) displayNum = regEntry.numero;
         }
         if (displayNum) {
@@ -17930,8 +17909,8 @@ function renderFacturesContent(container) {
         metaRow.appendChild(ajustBtn);
         infoDiv.appendChild(metaRow);
         card.appendChild(infoDiv);
-        if (f._mission) {
-          card.appendChild(buildInlineCycleProgress(f._mission, f));
+        if (_fm) {
+          card.appendChild(buildInlineCycleProgress(_fm, f));
         }
         card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
         container.appendChild(card);
@@ -19407,7 +19386,7 @@ function renderFactures(container) {
       f.paymentMonth = getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
       var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
       f.paymentDate = paymentDate;
-      f._mission = m; // Référence mission pour cycle paiement
+      f._missionId = m.id; // ID mission pour cycle paiement (évite référence circulaire)
       // RETARD: facture envoyée ET date paiement dépassée
       f.isLate = f.status === 'envoyée' && TODAY > paymentDate;
       factures.push(f);
@@ -19478,8 +19457,9 @@ function renderFactures(container) {
     infoDiv.appendChild(el('div', { class: 'facture-meta' }, f.jours + 'j · Paiement ' + fmtMonthShort(f.paymentMonth)));
     card.appendChild(infoDiv);
     // Cycle URSSAF inline
-    if (f._mission) {
-      card.appendChild(buildInlineCycleProgress(f._mission, f));
+    var _fm2 = f._missionId && MISSIONS.find(function(mm) { return mm.id === f._missionId; });
+    if (_fm2) {
+      card.appendChild(buildInlineCycleProgress(_fm2, f));
     }
     card.appendChild(el('div', { class: 'facture-amount' }, [el('div', { class: 'facture-ht' }, EUR(f.ht)), f.tva > 0 ? el('div', { class: 'facture-tva' }, 'TVA ' + EUR(f.tva)) : null]));
     container.appendChild(card);
