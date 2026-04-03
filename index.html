@@ -404,6 +404,35 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 //# sourceMappingURL=chart.umd.js.map
 </script>
 
+<!-- Supabase CDN with multiple fallbacks -->
+<script>
+(function() {
+  var cdns = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+    'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/supabase/2.47.12/umd/supabase.min.js'
+  ];
+  var idx = 0;
+  window._supabaseReady = new Promise(function(resolve) {
+    function tryLoad() {
+      if (idx >= cdns.length) { console.error('Supabase CDN: all fallbacks failed'); resolve(false); return; }
+      var s = document.createElement('script');
+      s.src = cdns[idx];
+      s.crossOrigin = 'anonymous';
+      s.onload = function() {
+        var lib = window.supabase || window.Supabase;
+        if (lib && lib.createClient) {
+          console.log('Supabase loaded from CDN #' + (idx + 1));
+          resolve(true);
+        } else { idx++; tryLoad(); }
+      };
+      s.onerror = function() { console.warn('Supabase CDN #' + (idx + 1) + ' failed, trying next...'); idx++; tryLoad(); };
+      document.head.appendChild(s);
+    }
+    tryLoad();
+  });
+})();
+</script>
 <style>
 :root {
   --bg-primary: #0a0a0b;
@@ -1549,6 +1578,54 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   50% { opacity: 0.3; }
 }
 
+/* Cloud sync button states */
+#authBtn.cloud-synced {
+  background: var(--success-glow);
+  border-color: var(--success);
+  position: relative;
+}
+#authBtn.cloud-synced::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  border: 1px solid var(--bg-card);
+}
+#authBtn.cloud-connected {
+  background: var(--warning-glow);
+  border-color: var(--warning);
+  position: relative;
+}
+#authBtn.cloud-connected::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warning);
+  border: 1px solid var(--bg-card);
+}
+#authBtn.cloud-disconnected {
+  position: relative;
+}
+#authBtn.cloud-disconnected::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  border: 1px solid var(--bg-card);
+}
+
 /* Hiérarchie visuelle 3 niveaux */
 .text-hero { font-size: 42px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; }
 .text-kpi { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
@@ -1777,6 +1854,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
       <button class="privacy-toggle notif-btn" id="notifBtn" title="Notifications" aria-label="Notifications" onclick="toggleNotifCenter()">🔔<span class="notif-count" id="notifBadge" style="display:none" aria-hidden="true">0</span></button>
       <button class="privacy-toggle" id="themeToggle" title="Changer le thème" aria-label="Changer le thème" onclick="toggleTheme()">☀️</button>
       <button class="privacy-toggle" id="privacyToggle" title="Mode confidentialité" aria-label="Mode confidentialité">👁️</button>
+      <button class="privacy-toggle" id="authBtn" title="Synchronisation Cloud" aria-label="Synchronisation Cloud" onclick="showAuthModal()">☁️</button><span id="authStatus" style="font-size:10px;color:var(--success);margin-left:2px" aria-hidden="true"></span>
       <nav class="nav-tabs" role="tablist" aria-label="Navigation principale">
         <button class="nav-tab active" data-view="cockpit" role="tab" aria-selected="true" aria-label="Cockpit"><span class="nav-tab-icon">🏠</span><span class="nav-tab-label">Cockpit</span></button>
         <button class="nav-tab" data-view="activite" role="tab" aria-selected="false" aria-label="Activité"><span class="nav-tab-icon">💼</span><span class="nav-tab-label">Activité</span></button>
@@ -1858,19 +1936,552 @@ var VIEW = 'cockpit';
 var ACTIVITE_TAB = 'missions';
 var TRESORERIE_TAB = 'flux'; // sous-onglet trésorerie: flux, provisions
 var CAL_MODE = 'conges'; // mode calendrier: 'conges' ou 'activite'
-var CONFIG_TAB = 'entreprise'; // sous-onglet config: entreprise, infos, donnees
+var CONFIG_TAB = 'entreprise'; // sous-onglet config: entreprise, infos, donnees, cloud
 var COMPTE_TAB = 'profil'; // sous-onglet compte: profil, preferences, securite
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SUPABASE CLOUD SYNC
+// ═══════════════════════════════════════════════════════════════════════════
+/*
+  SQL pour créer la table dans Supabase:
+  
+  CREATE TABLE user_data (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    company JSONB,
+    missions JSONB,
+    clients JSONB,
+    treasury JSONB,
+    ir_config JSONB,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id)
+  );
+  
+  -- Activer RLS
+  ALTER TABLE user_data ENABLE ROW LEVEL SECURITY;
+  
+  -- Policy: utilisateurs peuvent lire/écrire leurs propres données
+  CREATE POLICY "Users can manage own data" ON user_data
+    FOR ALL USING (auth.uid() = user_id);
+*/
 
+var SUPABASE_URL = 'https://gorewyleblikjgvmenml.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvcmV3eWxlYmxpa2pndm1lbm1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NzUyOTMsImV4cCI6MjA4NzQ1MTI5M30.l40BEOxT69IOf65UofDH-zu3ig_UKwzc5yP2bxv-tp8';
+var _supabaseLib = null; // Référence à la librairie CDN (createClient)
+var supabaseClient = null; // Instance du client Supabase
+var CURRENT_USER = null;
+var SYNC_ENABLED = false;
+var LAST_SYNC_TIME = null; // Timestamp de la dernière synchro réussie
 var _localSaveTimestamp = 0; // Timestamp du dernier save localStorage
+var CLOUD_SYNC_STATE = 'disconnected'; // 'disconnected', 'connected', 'synced', 'syncing', 'error'
 
+function loadSupabaseCredentials() {
+  try {
+    var stored = localStorage.getItem('freel_supabase');
+    if (stored) {
+      var creds = JSON.parse(stored);
+      if (creds.url) SUPABASE_URL = creds.url;
+      if (creds.key) SUPABASE_ANON_KEY = creds.key;
+    }
+  } catch (e) {
+    console.error('Erreur chargement credentials Supabase:', e);
+  }
+}
 
+function saveSupabaseCredentials(url, key) {
+  try {
+    localStorage.setItem('freel_supabase', JSON.stringify({ url: url, key: key }));
+    SUPABASE_URL = url;
+    SUPABASE_ANON_KEY = key;
+    // Réinitialiser la connexion (sans toucher à _supabaseLib)
+    supabaseClient = null;
+    SYNC_ENABLED = false;
+    CURRENT_USER = null;
+    initSupabase();
+  } catch (e) {
+    console.error('Erreur sauvegarde credentials Supabase:', e);
+  }
+}
 
+function initSupabase() {
+  // D'abord charger depuis localStorage
+  loadSupabaseCredentials();
 
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
 
+  // Attendre que la librairie Supabase soit chargée (CDN async)
+  window._supabaseReady.then(function(loaded) {
+    if (!loaded) {
+      console.warn('Supabase library could not be loaded from any CDN');
+      return;
+    }
 
+    // Stocker la référence à la librairie une seule fois
+    if (!_supabaseLib) {
+      var lib = window.supabase || window.Supabase;
+      if (lib && lib.createClient) {
+        _supabaseLib = lib;
+      } else if (typeof createClient === 'function') {
+        _supabaseLib = { createClient: createClient };
+      }
+    }
 
+    if (!_supabaseLib || !_supabaseLib.createClient) {
+      console.warn('Supabase createClient not found');
+      return;
+    }
 
+    supabaseClient = _supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    SYNC_ENABLED = true;
+    var _cloudLoadedOnce = false;
+
+    // Écouter les changements d'auth
+    supabaseClient.auth.onAuthStateChange(function(event, session) {
+      // Ne vider CURRENT_USER que sur SIGNED_OUT explicite
+      // (TOKEN_REFRESHED peut émettre session=null temporairement)
+      if (session) {
+        CURRENT_USER = session.user;
+      } else if (event === 'SIGNED_OUT') {
+        CURRENT_USER = null;
+      }
+      updateAuthUI();
+      // Ne charger du cloud qu'UNE SEULE FOIS (évite l'écrasement des données locales
+      // quand Supabase rafraîchit le token et réémet SIGNED_IN)
+      if (event === 'SIGNED_IN' && !_cloudLoadedOnce) {
+        _cloudLoadedOnce = true;
+        loadFromCloud();
+      }
+    });
+
+    // Vérifier session existante
+    supabaseClient.auth.getSession().then(function(result) {
+      if (result.data.session) {
+        CURRENT_USER = result.data.session.user;
+        updateAuthUI();
+        if (!_cloudLoadedOnce) {
+          _cloudLoadedOnce = true;
+          loadFromCloud();
+        }
+      }
+    }).catch(function(err) { console.warn('Session check failed:', err.message); });
+  });
+}
+
+function updateAuthUI() {
+  var authBtn = $('#authBtn');
+  var authStatus = $('#authStatus');
+  if (authBtn) {
+    authBtn.textContent = '☁️';
+    authBtn.className = 'privacy-toggle';
+    if (CURRENT_USER) {
+      if (LAST_SYNC_TIME) {
+        authBtn.classList.add('cloud-synced');
+        authBtn.title = 'Synchronisé - ' + CURRENT_USER.email + '\nDernière synchro: ' + formatSyncTime(LAST_SYNC_TIME);
+        CLOUD_SYNC_STATE = 'synced';
+      } else {
+        authBtn.classList.add('cloud-connected');
+        authBtn.title = 'Connecté (non synchronisé) - ' + CURRENT_USER.email;
+        CLOUD_SYNC_STATE = 'connected';
+      }
+    } else {
+      authBtn.classList.add('cloud-disconnected');
+      authBtn.title = 'Cloud Sync - Non connecté';
+      CLOUD_SYNC_STATE = 'disconnected';
+    }
+  }
+  if (authStatus) {
+    authStatus.textContent = '';
+  }
+}
+
+function formatSyncTime(date) {
+  if (!date) return '';
+  var d = new Date(date);
+  var now = new Date();
+  var diffMs = now - d;
+  var diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "à l'instant";
+  if (diffMin < 60) return 'il y a ' + diffMin + ' min';
+  var diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return 'il y a ' + diffH + 'h';
+  return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function showAuthModal() {
+  if (!SYNC_ENABLED) {
+    showToast('⚠️ Supabase non configuré. Voir ⚙️ Config > Cloud Sync.', 'warning');
+    return;
+  }
+
+  var content = el('div', { style: { padding: '20px' } });
+
+  if (CURRENT_USER) {
+    // Déjà connecté - afficher le dashboard de synchro
+    var syncColor = LAST_SYNC_TIME ? 'var(--success)' : 'var(--warning)';
+    var syncIcon = LAST_SYNC_TIME ? '✅' : '⚠️';
+    var syncText = LAST_SYNC_TIME ? 'Synchronisé' : 'Non synchronisé';
+    var syncDetail = LAST_SYNC_TIME ? 'Dernière synchro : ' + formatSyncTime(LAST_SYNC_TIME) : 'Aucune synchronisation effectuée';
+
+    content.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
+      el('div', { style: { fontSize: '40px', marginBottom: '10px' } }, '👤'),
+      el('div', { style: { fontWeight: '600', fontSize: '16px' } }, CURRENT_USER.email),
+      el('div', { style: { display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '6px 14px', borderRadius: '20px', background: LAST_SYNC_TIME ? 'var(--success-glow)' : 'var(--warning-glow)', color: syncColor, fontSize: '13px', fontWeight: '600' } }, syncIcon + ' ' + syncText),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' } }, syncDetail)
+    ]));
+
+    // Résumé des données synchronisées
+    var missionCount = MISSIONS ? MISSIONS.length : 0;
+    var clientCount = CLIENTS ? CLIENTS.length : 0;
+    var treasuryCount = TREASURY && TREASURY.mouvements ? TREASURY.mouvements.length : 0;
+    var hasCompany = COMPANY && COMPANY.nom;
+
+    var dataGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' } });
+    var dataItems = [
+      { label: 'Entreprise', value: hasCompany ? COMPANY.nom : 'Non configurée', icon: '🏢', ok: !!hasCompany },
+      { label: 'Missions', value: missionCount + ' mission' + (missionCount > 1 ? 's' : ''), icon: '💼', ok: missionCount > 0 },
+      { label: 'Clients', value: clientCount + ' client' + (clientCount > 1 ? 's' : ''), icon: '👥', ok: clientCount > 0 },
+      { label: 'Trésorerie', value: treasuryCount + ' flux', icon: '🏦', ok: treasuryCount > 0 }
+    ];
+    dataItems.forEach(function(item) {
+      dataGrid.appendChild(el('div', { style: { padding: '10px', borderRadius: '8px', background: 'var(--bg-tertiary)', fontSize: '12px' } }, [
+        el('div', { style: { marginBottom: '4px' } }, item.icon + ' ' + item.label),
+        el('div', { style: { fontWeight: '600', color: item.ok ? 'var(--text-primary)' : 'var(--text-muted)' } }, item.value)
+      ]));
+    });
+    content.appendChild(dataGrid);
+
+    var btns = el('div', { style: { display: 'flex', gap: '10px' } });
+    btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() { syncToCloud(); closeDynamicModal(); } }, '⬆️ Sauvegarder'));
+    btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() { loadFromCloud(); closeDynamicModal(); } }, '⬇️ Charger'));
+    content.appendChild(btns);
+
+    var logoutRow = el('div', { style: { marginTop: '12px', textAlign: 'center' } });
+    logoutRow.appendChild(el('button', { class: 'btn btn-danger', style: { fontSize: '12px' }, onclick: function() { signOut(); closeDynamicModal(); } }, '🚪 Déconnexion'));
+    content.appendChild(logoutRow);
+  } else {
+    // Non connecté - formulaire login
+    showAuthLoginForm(content);
+  }
+
+  showModal('Cloud Sync', content);
+}
+
+function showAuthLoginForm(content) {
+  content.innerHTML = '';
+  var wrapper = el('div', { style: { padding: content.children.length ? '0' : '0' } });
+
+  wrapper.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
+    el('div', { style: { fontSize: '40px', marginBottom: '10px' } }, '☁️'),
+    el('div', { style: { fontWeight: '600' } }, 'Cloud Sync'),
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Synchronise tes données sur tous tes appareils')
+  ]));
+
+  var form = el('div');
+  form.appendChild(createInput('Email', 'email', 'authEmail', ''));
+  form.appendChild(createInput('Mot de passe', 'password', 'authPassword', ''));
+  wrapper.appendChild(form);
+
+  var btns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '16px' } });
+  btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: signIn }, '🔐 Connexion'));
+  btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() { showAuthSignupForm(content); } }, '✨ Créer un compte'));
+  wrapper.appendChild(btns);
+
+  content.appendChild(wrapper);
+}
+
+function showAuthSignupForm(content) {
+  content.innerHTML = '';
+  var wrapper = el('div');
+
+  wrapper.appendChild(el('div', { style: { textAlign: 'center', marginBottom: '20px' } }, [
+    el('div', { style: { fontSize: '40px', marginBottom: '10px' } }, '✨'),
+    el('div', { style: { fontWeight: '600' } }, 'Créer un compte'),
+    el('div', { style: { fontSize: '12px', color: 'var(--text-muted)' } }, 'Remplis le formulaire pour activer Cloud Sync')
+  ]));
+
+  var form = el('div');
+  form.appendChild(createInput('Email', 'email', 'signupEmail', ''));
+  form.appendChild(createInput('Confirmer email', 'email', 'signupEmailConfirm', ''));
+  form.appendChild(createInput('Mot de passe (min. 8 caractères)', 'password', 'signupPassword', ''));
+  form.appendChild(createInput('Confirmer mot de passe', 'password', 'signupPasswordConfirm', ''));
+
+  // Indicateur de force du mot de passe
+  var strengthBar = el('div', { id: 'passwordStrength', style: { marginTop: '4px', marginBottom: '12px' } }, [
+    el('div', { style: { display: 'flex', gap: '3px', marginBottom: '4px' } }, [
+      el('div', { id: 'str1', style: { flex: 1, height: '4px', borderRadius: '2px', background: 'var(--bg-tertiary)' } }),
+      el('div', { id: 'str2', style: { flex: 1, height: '4px', borderRadius: '2px', background: 'var(--bg-tertiary)' } }),
+      el('div', { id: 'str3', style: { flex: 1, height: '4px', borderRadius: '2px', background: 'var(--bg-tertiary)' } }),
+      el('div', { id: 'str4', style: { flex: 1, height: '4px', borderRadius: '2px', background: 'var(--bg-tertiary)' } })
+    ]),
+    el('div', { id: 'strLabel', style: { fontSize: '11px', color: 'var(--text-muted)' } }, '')
+  ]);
+  form.appendChild(strengthBar);
+
+  // Conditions d'acceptation
+  var terms = el('label', { style: { display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', cursor: 'pointer' } }, [
+    el('input', { type: 'checkbox', id: 'signupTerms', style: { marginTop: '2px' } }),
+    el('span', {}, "J'accepte que mes données soient stockées de manière sécurisée pour la synchronisation cloud")
+  ]);
+  form.appendChild(terms);
+
+  wrapper.appendChild(form);
+
+  // Erreur zone
+  wrapper.appendChild(el('div', { id: 'signupError', style: { fontSize: '12px', color: 'var(--danger)', marginBottom: '8px', display: 'none' } }));
+
+  var btns = el('div', { style: { display: 'flex', gap: '10px' } });
+  btns.appendChild(el('button', { class: 'btn', style: { flex: '0 0 auto' }, onclick: function() { showAuthLoginForm(content); } }, '← Retour'));
+  btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() { processSignUp(content); } }, '✨ Créer mon compte'));
+  wrapper.appendChild(btns);
+
+  content.appendChild(wrapper);
+
+  // Écouter les changements de mot de passe pour la jauge de force
+  setTimeout(function() {
+    var pwInput = $('#signupPassword');
+    if (pwInput) {
+      pwInput.addEventListener('input', function() { updatePasswordStrength(pwInput.value); });
+    }
+  }, 50);
+}
+
+function updatePasswordStrength(password) {
+  var score = 0;
+  if (password.length >= 8) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  var colors = ['var(--danger)', 'var(--warning)', '#f59e0b', 'var(--success)'];
+  var labels = ['Faible', 'Moyen', 'Bon', 'Fort'];
+
+  for (var i = 1; i <= 4; i++) {
+    var bar = $('#str' + i);
+    if (bar) bar.style.background = i <= score ? colors[score - 1] : 'var(--bg-tertiary)';
+  }
+  var lbl = $('#strLabel');
+  if (lbl) {
+    lbl.textContent = password.length > 0 ? labels[Math.max(0, score - 1)] : '';
+    lbl.style.color = password.length > 0 ? colors[Math.max(0, score - 1)] : 'var(--text-muted)';
+  }
+}
+
+function processSignUp(content) {
+  var email = $('#signupEmail') ? $('#signupEmail').value.trim() : '';
+  var emailConfirm = $('#signupEmailConfirm') ? $('#signupEmailConfirm').value.trim() : '';
+  var password = $('#signupPassword') ? $('#signupPassword').value : '';
+  var passwordConfirm = $('#signupPasswordConfirm') ? $('#signupPasswordConfirm').value : '';
+  var terms = $('#signupTerms') ? $('#signupTerms').checked : false;
+  var errorDiv = $('#signupError');
+
+  function showError(msg) {
+    if (errorDiv) { errorDiv.textContent = msg; errorDiv.style.display = 'block'; }
+  }
+
+  // Validations
+  if (!email || !emailConfirm || !password || !passwordConfirm) {
+    showError('Tous les champs sont obligatoires.');
+    return;
+  }
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    showError("L'adresse email n'est pas valide.");
+    return;
+  }
+  if (email !== emailConfirm) {
+    showError('Les adresses email ne correspondent pas.');
+    return;
+  }
+  if (password.length < 8) {
+    showError('Le mot de passe doit contenir au moins 8 caractères.');
+    return;
+  }
+  if (password !== passwordConfirm) {
+    showError('Les mots de passe ne correspondent pas.');
+    return;
+  }
+  if (!terms) {
+    showError("Tu dois accepter les conditions pour continuer.");
+    return;
+  }
+
+  if (errorDiv) errorDiv.style.display = 'none';
+
+  // Appel Supabase signup
+  supabaseClient.auth.signUp({ email: email, password: password })
+    .then(function(result) {
+      if (result.error) {
+        console.error('Sign up error:', result.error);
+        var msg = '';
+        if (result.error.message && result.error.message.includes('already registered')) {
+          msg = 'Cet email est déjà utilisé. Essaie de te connecter.';
+        } else {
+          msg = result.error.message || 'Erreur lors de la création du compte.';
+        }
+        showError(msg);
+      } else {
+        if (result.data && result.data.user && !result.data.session) {
+          showToast('📧 Compte créé ! Un email de confirmation a été envoyé à ' + email + '. Vérifie ta boîte mail pour activer ton compte.', 'success');
+        } else {
+          showToast('✅ Compte créé et connecté !', 'success');
+        }
+        closeDynamicModal();
+      }
+    })
+    .catch(function(err) { console.error('Network error:', err); showError('Erreur réseau, réessaie plus tard.'); });
+}
+
+function signIn() {
+  var email = $('#authEmail').value;
+  var password = $('#authPassword').value;
+  
+  if (!email || !password) {
+    showToast('Email et mot de passe requis', 'error');
+    return;
+  }
+  
+  supabaseClient.auth.signInWithPassword({ email: email, password: password })
+    .then(function(result) {
+      if (result.error) {
+        console.error('Sign in error:', result.error);
+        var msg = '❌ Connexion échouée. ';
+        if (result.error.message && result.error.message.includes('Email not confirmed')) {
+          msg += 'Email non confirmé. Vérifie ta boîte mail (et tes spams) pour le lien de confirmation.';
+        } else if (result.error.message && result.error.message.includes('Invalid login')) {
+          msg += 'Email ou mot de passe incorrect.';
+        } else {
+          msg += (result.error.message || 'Vérifiez vos identifiants.');
+        }
+        showToast(msg, 'error');
+      } else {
+        showToast('✅ Connecté!', 'success');
+        closeDynamicModal();
+      }
+    })
+    .catch(function(err) { console.error('Network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
+}
+
+function signOut() {
+  supabaseClient.auth.signOut().then(function() {
+    CURRENT_USER = null;
+    LAST_SYNC_TIME = null;
+    // Purger toutes les données utilisateur du localStorage
+    localStorage.removeItem(STORAGE_PREFIX + 'bundle');
+    ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
+      localStorage.removeItem(STORAGE_PREFIX + k);
+    });
+    cleanupLocalStorage();
+    // Réinitialiser les données en mémoire (état vierge)
+    COMPANY = { nom: '', siret: '', debut: '', typeActivite: 'BNC', acre: false, prelevementLiberatoire: false, tvaDepuis: '', tvaIntracom: '', iban: '', bic: '', adresse: '', ville: '', codePostal: '', commune: '', codeApe: '', email: '', telephone: '', urssafPeriodicite: 'mensuel', onboardingDone: false, invoiceCounter: {}, invoiceRegistry: [], invoiceFormat: 'YYYY-NNN', invoiceGlobalCounter: 0 };
+    MISSIONS = [];
+    CLIENTS = [];
+    TREASURY = { soldeInitial: 0, mouvements: [], paidCharges: {}, conges: {}, rendementActif: false, rendementTaux: 2.0, rendementHistorique: [], actionsDone: [], salaireEstime: 0, reserveCompte: 0 };
+    IR_CONFIG = {};
+    COMPUTED = compute();
+    updateAuthUI();
+    render();
+    showToast('🚪 Déconnecté — données locales supprimées', 'info');
+  })
+  .catch(function(err) { console.error('Sign out error:', err); showToast('❌ Erreur de déconnexion, réessayez.', 'error'); });
+}
+
+function syncToCloud() {
+  if (!CURRENT_USER || !supabaseClient) return;
+
+  try {
+    var data = {
+      user_id: CURRENT_USER.id,
+      company: COMPANY,
+      missions: MISSIONS,
+      clients: CLIENTS,
+      treasury: TREASURY,
+      ir_config: IR_CONFIG,
+      updated_at: new Date().toISOString()
+    };
+
+    supabaseClient.from('user_data')
+      .upsert(data, { onConflict: 'user_id' })
+      .then(function(result) {
+      if (result.error) {
+        console.error('Sync error:', result.error);
+        var msg = '❌ Sync échouée: ';
+        if (result.error.message && result.error.message.includes('column')) {
+          msg += 'Colonne manquante. Exécute le SQL de migration dans Config → Cloud Sync.';
+        } else if (result.error.code === '42P10' || (result.error.message && result.error.message.includes('unique'))) {
+          msg += 'Contrainte UNIQUE manquante sur user_id. Exécute le SQL de migration.';
+        } else {
+          msg += (result.error.message || 'réessayez.');
+        }
+        showToast(msg, 'error');
+      } else {
+        LAST_SYNC_TIME = new Date();
+        updateAuthUI();
+        showToast('☁️ Sauvegardé', 'success');
+      }
+    })
+    .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
+  } catch (e) {
+    console.error('[FREEL] syncToCloud error:', e);
+  }
+}
+
+function loadFromCloud() {
+  if (!CURRENT_USER || !supabaseClient) return;
+
+  showToast('🔍 loadFromCloud: début (localTS=' + _localSaveTimestamp + ')', 'info');
+
+  supabaseClient.from('user_data')
+    .select('*')
+    .eq('user_id', CURRENT_USER.id)
+    .single()
+    .then(function(result) {
+      if (result.error) {
+        if (result.error.code === 'PGRST116') {
+          showToast('🔍 Cloud: aucune donnée (premier usage)', 'info');
+          console.log('No cloud data yet (first sync)');
+        } else if (result.error.code === '42501' || (result.error.message && result.error.message.includes('policy'))) {
+          console.error('Cloud load error (RLS):', result.error);
+          showToast('❌ Erreur RLS: vérifie que la policy est bien créée dans Supabase (SQL Editor).', 'error');
+        } else {
+          console.error('Cloud load error:', result.error);
+          showToast('❌ Chargement cloud échoué: ' + (result.error.message || 'erreur inconnue'), 'error');
+        }
+      } else if (result.data) {
+        // Comparer timestamps : si localStorage est plus récent, ne pas écraser
+        var cloudTime = result.data.updated_at ? new Date(result.data.updated_at).getTime() : 0;
+        if (_localSaveTimestamp > cloudTime) {
+          showToast('🔍 LOCAL GAGNE (local=' + _localSaveTimestamp + ' > cloud=' + cloudTime + ') → push to cloud', 'success');
+          syncToCloud();
+          return;
+        }
+        // DIAGNOSTIC: montrer les status cloud AVANT écrasement
+        var cloudFevInfo = [];
+        if (result.data.missions) result.data.missions.forEach(function(m) {
+          if (m.factures) m.factures.forEach(function(f) {
+            if (f.mois && (f.mois.indexOf('2026-02') !== -1)) {
+              cloudFevInfo.push(m.client + ': status=' + f.status);
+            }
+          });
+        });
+        showToast('⚠️ CLOUD GAGNE → ÉCRASE (fev cloud: ' + (cloudFevInfo.join(', ') || 'aucune') + ')', 'warning');
+        if (result.data.company) COMPANY = result.data.company;
+        if (result.data.missions) MISSIONS = result.data.missions;
+        if (result.data.clients) CLIENTS = result.data.clients;
+        if (result.data.treasury) TREASURY = result.data.treasury;
+        if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
+
+        // Reconstruire lignes/factures puis réparer la numérotation
+        MISSIONS.forEach(buildMission);
+        repairInvoiceNumbers();
+
+        COMPUTED = compute();
+        render();
+        LAST_SYNC_TIME = new Date();
+        updateAuthUI();
+      }
+    })
+    .catch(function(err) { console.error('Cloud network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
+}
 
 var PERIOD = { type: 'year', year: TODAY.getFullYear(), month: null };
 var TIMELINE_IDX = null;
@@ -2496,7 +3107,8 @@ function repairInvoiceNumbers() {
       COMPANY.invoiceCounter[yr] = (COMPANY.invoiceCounter[yr] || 0) + 1;
     }
 
-    // Sauvegarder en localStorage
+    // Sauvegarder uniquement en localStorage (pas de cloud sync au démarrage,
+    // loadFromCloud() se chargera de la synchronisation une fois l'auth prête)
     try {
       var now = Date.now();
       _localSaveTimestamp = now;
@@ -4563,9 +5175,9 @@ function createTextarea(label, id, value, placeholder, required) {
 // V50: Constante pour le préfixe de stockage
 var STORAGE_PREFIX = 'freel_v50_';
 
-// Nettoyage agressif du localStorage — supprime tout sauf les clés essentielles
+// Nettoyage agressif du localStorage — supprime tout sauf les clés essentielles et Supabase auth
 function cleanupLocalStorage() {
-  var keepPrefixes = [STORAGE_PREFIX, 'freel_theme', 'freel_goal_ca', 'freel_collapse_', 'freel_notif_read', 'freel_ts'];
+  var keepPrefixes = [STORAGE_PREFIX, 'freel_supabase', 'freel_theme', 'freel_goal_ca', 'freel_collapse_', 'freel_notif_read', 'freel_ts', 'sb-'];
   var toRemove = [];
   for (var i = 0; i < localStorage.length; i++) {
     var k = localStorage.key(i);
@@ -4577,20 +5189,45 @@ function cleanupLocalStorage() {
 }
 
 function saveAll() {
+  var localOk = false;
+  // Timestamp dans une clé minuscule (réussit toujours, même si localStorage est quasi plein)
   var now = Date.now();
   _localSaveTimestamp = now;
   try { localStorage.setItem('freel_ts', String(now)); } catch(e) {}
+  // 1. Tenter localStorage
   try {
     var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: now });
     ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
       localStorage.removeItem(STORAGE_PREFIX + k);
     });
     localStorage.setItem(STORAGE_PREFIX + 'bundle', bundle);
+    localOk = true;
   } catch (e) {
     cleanupLocalStorage();
     try {
       localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() }));
-    } catch (e2) { console.error('[FREEL] saveAll: localStorage plein', e2); }
+      localOk = true;
+    } catch (e2) { /* localStorage plein */ }
+  }
+  // 2. Cloud sync
+  if (CURRENT_USER && SYNC_ENABLED) {
+    syncToCloud();
+  } else if (supabaseClient) {
+    supabaseClient.auth.getSession().then(function(result) {
+      if (result.data.session) {
+        CURRENT_USER = result.data.session.user;
+        SYNC_ENABLED = true;
+        syncToCloud();
+      } else {
+        showToast('⚠️ Pas de session active. Reconnectez-vous dans Config → Cloud.', 'error');
+      }
+    }).catch(function(err) {
+      showToast('⚠️ Erreur vérification session cloud', 'error');
+    });
+  } else {
+    // Cloud pas encore initialisé (normal au démarrage) — sync silencieux
+    console.log('[FREEL] saveAll: cloud pas prêt (client=' + !!supabaseClient + ' user=' + !!CURRENT_USER + ' sync=' + SYNC_ENABLED + ')');
+
   }
 }
 
@@ -19233,7 +19870,8 @@ function renderAdmin(container) {
   var configTabs = [
     { id: 'entreprise', label: isMobileConfig ? 'Entreprise' : 'Mon Entreprise', icon: '🏢' },
     { id: 'infos', label: isMobileConfig ? 'Outils' : 'Infos & Outils', icon: '📊' },
-    { id: 'donnees', label: 'Données', icon: '💾' }
+    { id: 'donnees', label: 'Données', icon: '💾' },
+    { id: 'cloud', label: isMobileConfig ? 'Cloud' : 'Cloud & Vie privée', icon: '☁️' }
   ];
 
   var configTabBar = el('div', { style: {
@@ -19806,8 +20444,195 @@ function renderAdmin(container) {
   
   container.appendChild(ioCard);
 
-  // ===== RGPD & Vie privée (dans l'onglet Données) =====
+  } // end TAB donnees
 
+  // ===== TAB: Cloud & Vie privée =====
+  if (CONFIG_TAB === 'cloud') {
+
+  // V73: Cloud Sync Configuration
+  var cloudCard = el('div', { class: 'card', style: { marginTop: '12px' } });
+  cloudCard.appendChild(el('div', { class: 'card-title' }, '☁️ Cloud Sync (Supabase)'));
+
+  // Status indicator
+  var statusDiv = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+  if (SYNC_ENABLED) {
+    if (CURRENT_USER) {
+      statusDiv.style.background = 'var(--success-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '✅'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--success)' } }, 'Connecté'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, CURRENT_USER.email)
+      ]));
+    } else {
+      statusDiv.style.background = 'var(--warning-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '⚡'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--warning)' } }, 'Configuré'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur ☁️ pour te connecter')
+      ]));
+    }
+  } else if (SUPABASE_URL && SUPABASE_ANON_KEY && !SYNC_ENABLED) {
+    // Credentials sauvegardés mais librairie en cours de chargement ou bloquée
+    var libLoaded = !!(_supabaseLib || window.supabase || window.Supabase);
+    if (!libLoaded) {
+      statusDiv.style.background = 'var(--warning-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '⏳'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--warning)' } }, 'Chargement en cours...'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'La librairie Supabase se charge. Recharge la page si ça persiste.')
+      ]));
+      // Re-render once supabase is ready
+      window._supabaseReady.then(function() { if (VIEW === 'config') render(); });
+    } else {
+      statusDiv.style.background = 'var(--warning-glow)';
+      statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '⚡'));
+      statusDiv.appendChild(el('div', {}, [
+        el('div', { style: { fontWeight: '600', color: 'var(--warning)' } }, 'Configuré'),
+        el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Clique sur ☁️ pour te connecter')
+      ]));
+    }
+  } else {
+    statusDiv.appendChild(el('span', { style: { fontSize: '18px' } }, '❌'));
+    statusDiv.appendChild(el('div', {}, [
+      el('div', { style: { fontWeight: '600', color: 'var(--text-muted)' } }, 'Non configuré'),
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Configure ton projet Supabase ci-dessous')
+    ]));
+  }
+  cloudCard.appendChild(statusDiv);
+
+  // Instructions
+  var instructions = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.6' } });
+  instructions.innerHTML = '<b>Comment configurer:</b><br>' +
+    '1. Crée un compte gratuit sur <a href="https://supabase.com" target="_blank" style="color: var(--accent);">supabase.com</a><br>' +
+    '2. Crée un nouveau projet (attends ~2 min qu\'il se crée)<br>' +
+    '3. Va dans <b>SQL Editor</b> et exécute le SQL ci-dessous<br>' +
+    '4. Va dans <b>Authentication → Providers → Email</b> et <b>désactive "Confirm email"</b><br>' +
+    '5. Va dans <b>Project Settings</b> (engrenage) → <b>API</b><br>' +
+    '6. Copie <b>Project URL</b> et la clé <b>anon public</b> ci-dessous<br>' +
+    '<span style="color:var(--warning)">⚠️ Si tu as déjà créé la table, exécute le SQL de migration ci-dessous pour la mettre à jour.</span>';
+  cloudCard.appendChild(instructions);
+
+  // SQL snippet (collapsible)
+  var sqlToggle = el('details', { style: { marginBottom: '12px' } });
+  sqlToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--accent)' } }, '📋 Voir le SQL à exécuter dans SQL Editor'));
+  var sqlCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
+  sqlCode.textContent = 'CREATE TABLE user_data (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,\n  company JSONB,\n  missions JSONB,\n  treasury JSONB,\n  clients JSONB,\n  ir_config JSONB,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\n);\n\nALTER TABLE user_data ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Users can manage own data" ON user_data\n  FOR ALL USING (auth.uid() = user_id);';
+  sqlToggle.appendChild(sqlCode);
+
+  // Migration SQL for existing tables
+  var migrationToggle = el('details', { style: { marginTop: '8px' } });
+  migrationToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--warning)' } }, '🔧 SQL de migration (si table déjà créée)'));
+  var migrationCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
+  migrationCode.textContent = '-- Ajouter la colonne ir_config si manquante\nALTER TABLE user_data ADD COLUMN IF NOT EXISTS ir_config JSONB;\n\n-- Ajouter la contrainte UNIQUE sur user_id si manquante\nALTER TABLE user_data ADD CONSTRAINT user_data_user_id_key UNIQUE (user_id);';
+  migrationToggle.appendChild(migrationCode);
+  sqlToggle.appendChild(migrationToggle);
+
+  cloudCard.appendChild(sqlToggle);
+
+  // Configuration fields with clearer labels
+  cloudCard.appendChild(createInput('Project URL (Settings → API)', 'url', 'cloudSupabaseUrl', SUPABASE_URL || '', 'https://abcdefgh.supabase.co'));
+  cloudCard.appendChild(createInput('Clé anon public (Project API keys)', 'text', 'cloudSupabaseKey', SUPABASE_ANON_KEY || '', 'eyJhbGciOiJIUzI1NiIs...'));
+
+  // Save button
+  var cloudBtns = el('div', { style: { display: 'flex', gap: '10px', marginTop: '12px' } });
+  cloudBtns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() {
+    var url = $('#cloudSupabaseUrl').value.trim();
+    var key = $('#cloudSupabaseKey').value.trim();
+    if (!url || !key) {
+      toast('URL et clé requises', 'error');
+      return;
+    }
+    // Valider le format de l'URL
+    if (!url.includes('.supabase.co')) {
+      toast('URL invalide. Format: https://xxx.supabase.co', 'error');
+      return;
+    }
+    // Valider que la clé ressemble à un JWT
+    if (!key.startsWith('eyJ')) {
+      toast('Clé invalide. Elle doit commencer par eyJ...', 'error');
+      return;
+    }
+    saveSupabaseCredentials(url, key);
+    toast('Configuration sauvegardée! Clique sur Tester pour vérifier.', 'success');
+    render();
+  } }, '💾 Sauvegarder'));
+
+  // Test connection button
+  cloudBtns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() {
+    var url = $('#cloudSupabaseUrl').value.trim();
+    var key = $('#cloudSupabaseKey').value.trim();
+    if (!url || !key) {
+      toast('Configure d\'abord l\'URL et la clé', 'warning');
+      return;
+    }
+    toast('Test en cours...', 'info');
+    window._supabaseReady.then(function(loaded) {
+      var lib = _supabaseLib || window.supabase || window.Supabase;
+      if (!loaded || !lib || !lib.createClient) {
+        toast('❌ Librairie Supabase non chargée. Recharge la page ou change de navigateur.', 'error');
+        return;
+      }
+      try {
+        var testClient = lib.createClient(url, key);
+        testClient.auth.getSession().then(function(result) {
+          if (result.error) {
+            console.error('Supabase test error:', result.error);
+            toast('❌ Connexion échouée. Vérifie URL et clé anon.', 'error');
+          } else {
+            // Tester aussi que la table user_data existe
+            testClient.from('user_data').select('id').limit(0).then(function(r2) {
+              if (r2.error) {
+                console.error('Table test error:', r2.error);
+                toast('⚠️ Connexion OK mais table user_data introuvable. Exécute le SQL ci-dessus dans SQL Editor.', 'warning');
+              } else {
+                toast('✅ Connexion Supabase OK! Table user_data trouvée.', 'success');
+              }
+            });
+          }
+        }).catch(function(err) {
+          console.error('Supabase test network error:', err);
+          toast('❌ Erreur réseau. Vérifie l\'URL Supabase.', 'error');
+        });
+      } catch (e) {
+        console.error('Supabase init error:', e);
+        toast('❌ Configuration Supabase invalide.', 'error');
+      }
+    });
+  } }, '🔍 Tester'));
+
+  if (SYNC_ENABLED && !CURRENT_USER) {
+    cloudBtns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: showAuthModal }, '🔐 Connexion'));
+  }
+  if (SYNC_ENABLED && CURRENT_USER) {
+    cloudBtns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() { syncToCloud(); } }, '⬆️ Sync'));
+  }
+  cloudCard.appendChild(cloudBtns);
+
+  // SPRINT 1: Sécurité — avertissement stockage credentials en clair
+  if (SUPABASE_URL || SUPABASE_ANON_KEY) {
+    var secWarning = el('div', { style: { marginTop: '10px', padding: '8px 12px', background: 'rgba(255,180,0,0.1)', border: '1px solid var(--warning)', borderRadius: '6px', fontSize: '10px', color: 'var(--warning)' } });
+    secWarning.appendChild(el('span', {}, '⚠️ Les clés Supabase sont stockées en clair dans le navigateur. Ne partagez pas cet appareil et utilisez la clé anon (publique) uniquement.'));
+    cloudCard.appendChild(secWarning);
+  }
+
+  // Clear config button — purge credentials
+  if (SUPABASE_URL || SUPABASE_ANON_KEY) {
+    cloudCard.appendChild(el('button', { class: 'btn btn-danger btn-sm', style: { marginTop: '10px', width: '100%' }, onclick: function() {
+      if (confirm('Supprimer la configuration Supabase?')) {
+        localStorage.removeItem('freel_supabase');
+        SUPABASE_URL = '';
+        SUPABASE_ANON_KEY = '';
+        supabaseClient = null;
+        SYNC_ENABLED = false;
+        CURRENT_USER = null;
+        updateAuthUI();
+        toast('Configuration Supabase supprimée', 'info');
+        render();
+      }
+    } }, '🗑️ Supprimer la configuration'));
+  }
+
+  container.appendChild(cloudCard);
 
   // ===== SPRINT 2: RGPD & DONNÉES =====
   var rgpdCard = el('div', { class: 'card', style: { marginTop: '12px' } });
@@ -19815,7 +20640,10 @@ function renderAdmin(container) {
 
   // Mention légale / transparence
   var rgpdInfo = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.6' } });
-  rgpdInfo.appendChild(el('p', { style: { margin: '0 0 8px 0' } }, '📋 Vos données sont stockées localement sur votre appareil (localStorage). Aucune donnée n\'est envoyée à un serveur.'));
+  rgpdInfo.appendChild(el('p', { style: { margin: '0 0 8px 0' } }, '📋 Vos données sont stockées localement sur votre appareil (localStorage). Aucune donnée n\'est envoyée à un serveur sauf si vous activez la synchronisation Supabase.'));
+  if (SYNC_ENABLED) {
+    rgpdInfo.appendChild(el('p', { style: { margin: '0', color: 'var(--warning)' } }, '⚠️ Sync cloud activée : vos données sont envoyées vers votre instance Supabase. Consultez la politique de confidentialité de Supabase.'));
+  }
   rgpdCard.appendChild(rgpdInfo);
 
   // Export données personnelles (portabilité RGPD)
@@ -19852,6 +20680,13 @@ function renderAdmin(container) {
     }
     // Purger localStorage complet
     Object.keys(localStorage).filter(function(k) { return k.indexOf('freel') === 0; }).forEach(function(k) { localStorage.removeItem(k); });
+    // Purger Supabase si connecté
+    if (SYNC_ENABLED && CURRENT_USER && supabaseClient) {
+      supabaseClient.from('user_data').delete().eq('user_id', CURRENT_USER.id).then(function() {
+        console.log('Cloud data deleted');
+      }).catch(function(err) { console.error('Cloud delete error:', err); });
+      supabaseClient.auth.signOut();
+    }
     toast('Toutes vos données ont été supprimées', 'success');
     setTimeout(function() { location.reload(); }, 1500);
   } }, '🗑️ Supprimer toutes mes données'));
@@ -19864,6 +20699,7 @@ function renderAdmin(container) {
   policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0', fontWeight: '600' } }, 'FREEL — Gestion Freelance Intelligente'));
   policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Données collectées : informations entreprise, missions, clients, factures, configuration fiscale. Toutes saisies manuellement par vous.'));
   policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Stockage : exclusivement dans le localStorage de votre navigateur. Aucun serveur tiers, aucun cookie de tracking, aucune analytique.'));
+  policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Cloud (optionnel) : si activé, vos données sont synchronisées vers votre propre instance Supabase. Vous êtes responsable de la sécurité de votre instance.'));
   policyContent.appendChild(el('p', { style: { margin: '0 0 6px 0' } }, 'Vos droits : accès, rectification, portabilité (export JSON) et effacement (bouton ci-dessus). Conformément au RGPD (UE 2016/679).'));
   policyContent.appendChild(el('p', { style: { margin: '0' } }, 'Contact : via le dépôt GitHub du projet.'));
   policyDetails.appendChild(policyContent);
@@ -19871,7 +20707,7 @@ function renderAdmin(container) {
 
   container.appendChild(rgpdCard);
 
-  } // end TAB donnees
+  } // end TAB cloud
 
   container.appendChild(el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)' } }, 'Freel V' + APP_VERSION + ' · Made with 💚'));
 }
@@ -20030,22 +20866,31 @@ function renderCompteProfil(container) {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     margin: '0 auto 12px', fontSize: '36px', color: 'white'
   }});
-  avatarDiv.textContent = COMPANY.nom ? COMPANY.nom.charAt(0).toUpperCase() : '?';
+  avatarDiv.textContent = CURRENT_USER ? CURRENT_USER.email.charAt(0).toUpperCase() : (COMPANY.nom ? COMPANY.nom.charAt(0).toUpperCase() : '?');
   profileCard.appendChild(avatarDiv);
 
-  // Nom entreprise
-  profileCard.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '4px' } }, COMPANY.nom || 'Mon Entreprise'));
-  profileCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Sauvegarde locale'));
+  // Email / Nom
+  if (CURRENT_USER) {
+    profileCard.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '4px' } }, CURRENT_USER.email));
+    profileCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, COMPANY.nom || 'Entreprise non configurée'));
+  } else {
+    profileCard.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', marginBottom: '4px' } }, COMPANY.nom || 'Mon Entreprise'));
+    profileCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Non connecté au cloud'));
+  }
 
-  // Status sauvegarde
-  var saveBadge = el('div', { style: {
+  // Status sync badge
+  var syncBadge = el('div', { style: {
     display: 'inline-flex', alignItems: 'center', gap: '6px',
     padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-    background: 'var(--bg-tertiary)',
-    color: 'var(--text-muted)'
+    background: CURRENT_USER ? 'var(--success-glow)' : 'var(--bg-tertiary)',
+    color: CURRENT_USER ? 'var(--success)' : 'var(--text-muted)'
   }});
-  saveBadge.textContent = 'Sauvegarde locale';
-  profileCard.appendChild(saveBadge);
+  syncBadge.textContent = CURRENT_USER ? 'Synchronisé' : 'Hors ligne';
+  profileCard.appendChild(syncBadge);
+
+  if (LAST_SYNC_TIME) {
+    profileCard.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' } }, 'Dernière synchro : ' + formatSyncTime(LAST_SYNC_TIME)));
+  }
 
   container.appendChild(profileCard);
 
@@ -20083,6 +20928,40 @@ function renderCompteProfil(container) {
   statsCard.appendChild(statsGrid);
   container.appendChild(statsCard);
 
+  // Actions cloud
+  var cloudCard = el('div', { class: 'card' });
+  cloudCard.appendChild(el('div', { class: 'card-title' }, 'Synchronisation Cloud'));
+
+  if (CURRENT_USER) {
+    var cloudBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
+    cloudBtns.appendChild(el('button', { class: 'btn btn-primary', onclick: function() { syncToCloud(); } }, 'Sauvegarder'));
+    cloudBtns.appendChild(el('button', { class: 'btn', onclick: function() {
+      if (confirm('Charger les données du cloud ? Cela remplacera vos données locales.')) {
+        loadFromCloud();
+        showToast('Chargement en cours...', 'info');
+      }
+    } }, 'Charger'));
+    cloudCard.appendChild(cloudBtns);
+
+    cloudCard.appendChild(el('div', { style: { marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)' } }, 'La synchronisation est automatique à chaque modification.'));
+
+    // Déconnexion
+    cloudCard.appendChild(el('div', { style: { marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--glass-border)', textAlign: 'center' } }));
+    cloudCard.appendChild(el('button', { class: 'btn', style: { color: 'var(--danger)', borderColor: 'var(--danger)' }, onclick: function() {
+      if (confirm('Se déconnecter du cloud ?')) signOut();
+    } }, 'Déconnexion'));
+  } else if (SYNC_ENABLED) {
+    cloudCard.appendChild(el('div', { style: { textAlign: 'center', padding: '12px' } }, [
+      el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Cloud configuré mais non connecté'),
+      el('button', { class: 'btn btn-primary', onclick: showAuthModal }, 'Se connecter')
+    ]));
+  } else {
+    cloudCard.appendChild(el('div', { style: { textAlign: 'center', padding: '12px' } }, [
+      el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' } }, 'Configure le cloud dans Config > Cloud pour activer la synchronisation.'),
+      el('button', { class: 'btn', onclick: function() { VIEW = 'config'; CONFIG_TAB = 'cloud'; render(); } }, 'Aller dans Config')
+    ]));
+  }
+  container.appendChild(cloudCard);
 }
 
 // --- Préférences ---
@@ -20216,6 +21095,9 @@ function renderCompteSecurite(container) {
 
   privacyCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.8' } }, [
     el('div', { style: { marginBottom: '8px' } }, 'Vos données sont stockées localement sur votre appareil (localStorage). Aucune donnée n\'est envoyée à des tiers.'),
+    el('div', { style: { marginBottom: '8px' } }, SYNC_ENABLED ?
+      'La synchronisation cloud est activée. Vos données sont stockées de manière chiffrée sur votre projet Supabase personnel.' :
+      'La synchronisation cloud n\'est pas activée. Vos données restent uniquement sur cet appareil.'),
     el('div', {}, 'Vous pouvez à tout moment exporter ou supprimer l\'ensemble de vos données.')
   ]));
 
@@ -20438,13 +21320,29 @@ function skipOnboarding() {
 // === FAB SAISIE RAPIDE ===
 
 // === INIT ===
+function _diagFactures(label) {
+  var info = [];
+  MISSIONS.forEach(function(m) {
+    if (m.factures) m.factures.forEach(function(f) {
+      if (f.mois && (f.mois.indexOf('2026-02') !== -1 || f.mois.indexOf('2026-03') !== -1)) {
+        info.push(m.client + ' ' + f.mois + ': status=' + f.status);
+      }
+    });
+  });
+  showToast('📊 ' + label + ': ' + (info.length > 0 ? info.join(' | ') : 'AUCUNE'), 'info');
+}
+
 function init() {
   loadAll();
+  _diagFactures('Après loadAll');
+  initSupabase();
   MISSIONS.forEach(buildMission);
+  _diagFactures('Après buildMission');
 
   // Réparation automatique de la numérotation des factures
   // Attribue des numéros séquentiels chronologiques à TOUTES les factures
   repairInvoiceNumbers();
+  _diagFactures('Après repairInvoiceNumbers');
 
   // Navigation
   $$('.nav-tab, .bottom-nav-tab').forEach(function(t) {
