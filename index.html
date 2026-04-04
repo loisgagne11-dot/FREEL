@@ -2380,6 +2380,9 @@ function signOut() {
 }
 
 // Sync intelligent : compare timestamps cloud vs local, prend la version la plus récente
+// Au démarrage quand connecté : le cloud est TOUJOURS la source de vérité.
+// Le localStorage ne sert que de cache hors-ligne.
+// Si pas de données cloud → pousser le local (première connexion).
 function smartSync() {
   if (!CURRENT_USER || !supabaseClient) return;
 
@@ -2389,57 +2392,52 @@ function smartSync() {
     .single()
     .then(function(result) {
       if (result.error) {
-        // Pas de données cloud (PGRST116) ou autre erreur → pousser le local
-        if (result.error.code !== 'PGRST116') {
-          console.warn('Smart sync check error:', result.error);
+        if (result.error.code === 'PGRST116') {
+          // Aucune donnée cloud → première connexion, pousser le local
+          syncToCloud();
+        } else {
+          console.warn('Smart sync error:', result.error);
+          // Erreur réseau/autre : garder les données locales, ne pas écraser
         }
-        syncToCloud();
         return;
       }
       if (!result.data) { syncToCloud(); return; }
 
-      var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : 0;
-      var localTs = _localSaveTimestamp || 0;
+      // ☁️ Données cloud existantes → TOUJOURS les appliquer (cloud = source de vérité)
+      if (result.data.company) COMPANY = Object.assign({}, result.data.company);
+      if (result.data.missions && Array.isArray(result.data.missions)) MISSIONS = result.data.missions;
+      if (result.data.clients && Array.isArray(result.data.clients)) CLIENTS = result.data.clients;
+      if (result.data.treasury) TREASURY = Object.assign({}, result.data.treasury);
+      if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
 
-      if (cloudTs > localTs) {
-        // ☁️ Cloud plus récent → appliquer silencieusement sans confirmation
-        if (result.data.company) COMPANY = Object.assign({}, result.data.company);
-        if (result.data.missions && Array.isArray(result.data.missions)) MISSIONS = result.data.missions;
-        if (result.data.clients && Array.isArray(result.data.clients)) CLIENTS = result.data.clients;
-        if (result.data.treasury) TREASURY = Object.assign({}, result.data.treasury);
-        if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
+      // Migrations essentielles
+      if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
+      if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
+      if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
+      if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
 
-        // Appliquer migrations essentielles
-        if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
-        if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
-        if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
-        if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
+      MISSIONS.forEach(buildMission);
+      repairInvoiceNumbers();
+      COMPUTED = compute();
+      render();
 
-        MISSIONS.forEach(buildMission);
-        repairInvoiceNumbers();
-        COMPUTED = compute();
-        render();
+      // Mettre à jour le cache local avec les données cloud
+      var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : Date.now();
+      _localSaveTimestamp = cloudTs;
+      try { localStorage.setItem('freel_ts', String(cloudTs)); } catch(e) {}
+      try {
+        localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({
+          c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: cloudTs
+        }));
+      } catch(e) {}
 
-        // Sauvegarder le cloud en local pour cohérence
-        _localSaveTimestamp = cloudTs;
-        try { localStorage.setItem('freel_ts', String(cloudTs)); } catch(e) {}
-        try {
-          localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({
-            c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: cloudTs
-          }));
-        } catch(e) {}
-
-        LAST_SYNC_TIME = new Date();
-        updateAuthUI();
-        toast('☁️ Données synchronisées depuis le cloud', 'success');
-      } else {
-        // 💾 Local plus récent (ou identique) → pousser vers cloud
-        syncToCloud();
-      }
+      LAST_SYNC_TIME = new Date();
+      updateAuthUI();
+      toast('☁️ Synchronisé', 'success');
     })
     .catch(function(err) {
       console.warn('Smart sync network error:', err);
-      syncToCloud(); // fallback : pousser le local
+      // Pas de réseau → garder les données locales (mode hors-ligne)
     });
 }
 
