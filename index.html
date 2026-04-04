@@ -2033,23 +2033,19 @@ function initSupabase() {
 
     supabaseClient = _supabaseLib.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     SYNC_ENABLED = true;
-    var _cloudLoadedOnce = false;
 
     // Écouter les changements d'auth
     supabaseClient.auth.onAuthStateChange(function(event, session) {
-      // Ne vider CURRENT_USER que sur SIGNED_OUT explicite
-      // (TOKEN_REFRESHED peut émettre session=null temporairement)
       if (session) {
         CURRENT_USER = session.user;
       } else if (event === 'SIGNED_OUT') {
         CURRENT_USER = null;
       }
       updateAuthUI();
-      // Ne charger du cloud qu'UNE SEULE FOIS (évite l'écrasement des données locales
-      // quand Supabase rafraîchit le token et réémet SIGNED_IN)
-      if (event === 'SIGNED_IN' && !_cloudLoadedOnce) {
-        _cloudLoadedOnce = true;
-        loadFromCloud();
+      // Au login, pousser les données locales vers le cloud (safe)
+      // L'utilisateur tire du cloud manuellement via le bouton "Charger"
+      if (event === 'SIGNED_IN') {
+        syncToCloud();
       }
     });
 
@@ -2058,10 +2054,7 @@ function initSupabase() {
       if (result.data.session) {
         CURRENT_USER = result.data.session.user;
         updateAuthUI();
-        if (!_cloudLoadedOnce) {
-          _cloudLoadedOnce = true;
-          loadFromCloud();
-        }
+        syncToCloud();
       }
     }).catch(function(err) { console.warn('Session check failed:', err.message); });
   });
@@ -2365,24 +2358,11 @@ function signOut() {
   supabaseClient.auth.signOut().then(function() {
     CURRENT_USER = null;
     LAST_SYNC_TIME = null;
-    // Purger toutes les données utilisateur du localStorage
-    localStorage.removeItem(STORAGE_PREFIX + 'bundle');
-    ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
-      localStorage.removeItem(STORAGE_PREFIX + k);
-    });
-    cleanupLocalStorage();
-    // Réinitialiser les données en mémoire (état vierge)
-    COMPANY = { nom: '', siret: '', debut: '', typeActivite: 'BNC', acre: false, prelevementLiberatoire: false, tvaDepuis: '', tvaIntracom: '', iban: '', bic: '', adresse: '', ville: '', codePostal: '', commune: '', codeApe: '', email: '', telephone: '', urssafPeriodicite: 'mensuel', onboardingDone: false, invoiceCounter: {}, invoiceRegistry: [], invoiceFormat: 'YYYY-NNN', invoiceGlobalCounter: 0 };
-    MISSIONS = [];
-    CLIENTS = [];
-    TREASURY = { soldeInitial: 0, mouvements: [], paidCharges: {}, conges: {}, rendementActif: false, rendementTaux: 2.0, rendementHistorique: [], actionsDone: [], salaireEstime: 0, reserveCompte: 0 };
-    IR_CONFIG = {};
-    COMPUTED = compute();
     updateAuthUI();
     render();
-    showToast('🚪 Déconnecté — données locales supprimées', 'info');
+    toast('Déconnecté du cloud. Vos données locales sont conservées.', 'info');
   })
-  .catch(function(err) { console.error('Sign out error:', err); showToast('❌ Erreur de déconnexion, réessayez.', 'error'); });
+  .catch(function(err) { console.error('Sign out error:', err); toast('Erreur de déconnexion', 'error'); });
 }
 
 function syncToCloud() {
@@ -2428,8 +2408,6 @@ function syncToCloud() {
 function loadFromCloud() {
   if (!CURRENT_USER || !supabaseClient) return;
 
-  showToast('🔍 loadFromCloud: début (localTS=' + _localSaveTimestamp + ')', 'info');
-
   supabaseClient.from('user_data')
     .select('*')
     .eq('user_id', CURRENT_USER.id)
@@ -2437,50 +2415,48 @@ function loadFromCloud() {
     .then(function(result) {
       if (result.error) {
         if (result.error.code === 'PGRST116') {
-          showToast('🔍 Cloud: aucune donnée (premier usage)', 'info');
-          console.log('No cloud data yet (first sync)');
-        } else if (result.error.code === '42501' || (result.error.message && result.error.message.includes('policy'))) {
-          console.error('Cloud load error (RLS):', result.error);
-          showToast('❌ Erreur RLS: vérifie que la policy est bien créée dans Supabase (SQL Editor).', 'error');
+          toast('Aucune donnée dans le cloud', 'info');
         } else {
           console.error('Cloud load error:', result.error);
-          showToast('❌ Chargement cloud échoué: ' + (result.error.message || 'erreur inconnue'), 'error');
+          toast('Erreur chargement cloud: ' + (result.error.message || 'erreur'), 'error');
         }
-      } else if (result.data) {
-        // Comparer timestamps : si localStorage est plus récent, ne pas écraser
-        var cloudTime = result.data.updated_at ? new Date(result.data.updated_at).getTime() : 0;
-        if (_localSaveTimestamp > cloudTime) {
-          showToast('🔍 LOCAL GAGNE (local=' + _localSaveTimestamp + ' > cloud=' + cloudTime + ') → push to cloud', 'success');
-          syncToCloud();
-          return;
-        }
-        // DIAGNOSTIC: montrer les status cloud AVANT écrasement
-        var cloudFevInfo = [];
-        if (result.data.missions) result.data.missions.forEach(function(m) {
-          if (m.factures) m.factures.forEach(function(f) {
-            if (f.mois && (f.mois.indexOf('2026-02') !== -1)) {
-              cloudFevInfo.push(m.client + ': status=' + f.status);
-            }
-          });
-        });
-        showToast('⚠️ CLOUD GAGNE → ÉCRASE (fev cloud: ' + (cloudFevInfo.join(', ') || 'aucune') + ')', 'warning');
-        if (result.data.company) COMPANY = result.data.company;
-        if (result.data.missions) MISSIONS = result.data.missions;
-        if (result.data.clients) CLIENTS = result.data.clients;
-        if (result.data.treasury) TREASURY = result.data.treasury;
-        if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
-
-        // Reconstruire lignes/factures puis réparer la numérotation
-        MISSIONS.forEach(buildMission);
-        repairInvoiceNumbers();
-
-        COMPUTED = compute();
-        render();
-        LAST_SYNC_TIME = new Date();
-        updateAuthUI();
+        return;
       }
+      if (!result.data) return;
+
+      // Toujours demander confirmation avant d'écraser
+      var cloudMissions = (result.data.missions || []).length;
+      var cloudClients = (result.data.clients || []).length;
+      var localMissions = MISSIONS.length;
+      var localClients = CLIENTS.length;
+      var cloudDate = result.data.updated_at ? new Date(result.data.updated_at).toLocaleString('fr-FR') : 'inconnue';
+
+      var msg = 'Remplacer vos données locales par celles du cloud ?\n\n' +
+        'CLOUD : ' + cloudMissions + ' mission(s), ' + cloudClients + ' client(s)\n' +
+        '(dernière mise à jour : ' + cloudDate + ')\n\n' +
+        'LOCAL : ' + localMissions + ' mission(s), ' + localClients + ' client(s)\n\n' +
+        'Vos données locales seront écrasées.';
+
+      if (!confirm(msg)) {
+        toast('Chargement annulé', 'info');
+        return;
+      }
+
+      if (result.data.company) COMPANY = result.data.company;
+      if (result.data.missions) MISSIONS = result.data.missions;
+      if (result.data.clients) CLIENTS = result.data.clients;
+      if (result.data.treasury) TREASURY = result.data.treasury;
+      if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
+
+      MISSIONS.forEach(buildMission);
+      repairInvoiceNumbers();
+      COMPUTED = compute();
+      render();
+      LAST_SYNC_TIME = new Date();
+      updateAuthUI();
+      toast('Données chargées depuis le cloud', 'success');
     })
-    .catch(function(err) { console.error('Cloud network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
+    .catch(function(err) { console.error('Cloud network error:', err); toast('Erreur réseau cloud', 'error'); });
 }
 
 var PERIOD = { type: 'year', year: TODAY.getFullYear(), month: null };
@@ -5209,25 +5185,9 @@ function saveAll() {
       localOk = true;
     } catch (e2) { /* localStorage plein */ }
   }
-  // 2. Cloud sync
+  // Cloud sync (silencieux — ne sync que si connecté)
   if (CURRENT_USER && SYNC_ENABLED) {
     syncToCloud();
-  } else if (supabaseClient) {
-    supabaseClient.auth.getSession().then(function(result) {
-      if (result.data.session) {
-        CURRENT_USER = result.data.session.user;
-        SYNC_ENABLED = true;
-        syncToCloud();
-      } else {
-        showToast('⚠️ Pas de session active. Reconnectez-vous dans Config → Cloud.', 'error');
-      }
-    }).catch(function(err) {
-      showToast('⚠️ Erreur vérification session cloud', 'error');
-    });
-  } else {
-    // Cloud pas encore initialisé (normal au démarrage) — sync silencieux
-    console.log('[FREEL] saveAll: cloud pas prêt (client=' + !!supabaseClient + ' user=' + !!CURRENT_USER + ' sync=' + SYNC_ENABLED + ')');
-
   }
 }
 
@@ -21320,29 +21280,13 @@ function skipOnboarding() {
 // === FAB SAISIE RAPIDE ===
 
 // === INIT ===
-function _diagFactures(label) {
-  var info = [];
-  MISSIONS.forEach(function(m) {
-    if (m.factures) m.factures.forEach(function(f) {
-      if (f.mois && (f.mois.indexOf('2026-02') !== -1 || f.mois.indexOf('2026-03') !== -1)) {
-        info.push(m.client + ' ' + f.mois + ': status=' + f.status);
-      }
-    });
-  });
-  showToast('📊 ' + label + ': ' + (info.length > 0 ? info.join(' | ') : 'AUCUNE'), 'info');
-}
-
 function init() {
   loadAll();
-  _diagFactures('Après loadAll');
   initSupabase();
   MISSIONS.forEach(buildMission);
-  _diagFactures('Après buildMission');
 
   // Réparation automatique de la numérotation des factures
-  // Attribue des numéros séquentiels chronologiques à TOUTES les factures
   repairInvoiceNumbers();
-  _diagFactures('Après repairInvoiceNumbers');
 
   // Navigation
   $$('.nav-tab, .bottom-nav-tab').forEach(function(t) {
