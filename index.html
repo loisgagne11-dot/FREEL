@@ -3073,32 +3073,108 @@ function repairInvoiceNumbers() {
     console.log('[FREEL] repairInvoiceNumbers: début...');
     // Réparation: réattribuer TOUS les numéros de factures dans l'ordre chronologique
     var allFactures = [];
+    // Les factures verrouillées manuellement (numeroLock) ne sont pas renumérotées
+    // afin de préserver une permutation explicite faite par l'utilisateur.
+    var lockedFactures = [];
     MISSIONS.forEach(function(mis) {
       if (!mis.factures) return;
       mis.factures.forEach(function(f) {
         if (f.jours > 0) {
-          allFactures.push({ facture: f, mission: mis });
+          if (f.numeroLock) {
+            lockedFactures.push({ facture: f, mission: mis });
+          } else {
+            allFactures.push({ facture: f, mission: mis });
+          }
         }
       });
     });
 
-    console.log('[FREEL] repairInvoiceNumbers: ' + allFactures.length + ' factures trouvées');
+    console.log('[FREEL] repairInvoiceNumbers: ' + allFactures.length + ' factures trouvées (+ ' + lockedFactures.length + ' verrouillées)');
 
-    if (allFactures.length === 0) return 0;
+    if (allFactures.length === 0 && lockedFactures.length === 0) return 0;
 
-    // Tri chronologique par mois (YYYY-MM) puis par nom client
+    // Tri chronologique: mois → date d'envoi réelle → client → id (pour stabilité)
     allFactures.sort(function(a, b) {
       var cmp = a.facture.mois.localeCompare(b.facture.mois);
       if (cmp !== 0) return cmp;
-      return (a.facture.client || '').localeCompare(b.facture.client || '');
+      // Départage par date d'envoi réelle (ordre d'émission effectif)
+      var da = a.facture.dateEnvoi || '';
+      var db = b.facture.dateEnvoi || '';
+      if (da && db) {
+        cmp = da.localeCompare(db);
+        if (cmp !== 0) return cmp;
+      } else if (da && !db) {
+        return -1; // factures envoyées avant brouillons
+      } else if (!da && db) {
+        return 1;
+      }
+      // Fallback : nom client puis id pour stabilité
+      cmp = (a.facture.client || '').localeCompare(b.facture.client || '');
+      if (cmp !== 0) return cmp;
+      return (a.facture.id || '').localeCompare(b.facture.id || '');
     });
 
     // Réinitialiser le registre
     COMPANY.invoiceRegistry = [];
 
-    // Attribuer les numéros séquentiels
+    // Collecter les numéros déjà réservés par les factures verrouillées
+    // afin que les factures non-verrouillées évitent ces positions.
+    var lockedSeqNumbers = {};
+    lockedFactures.forEach(function(item) {
+      if (item.facture.numero) {
+        var mLock = String(item.facture.numero).match(/(\d+)$/);
+        if (mLock) lockedSeqNumbers[parseInt(mLock[1], 10)] = true;
+      }
+    });
+
+    // Ajouter les factures verrouillées payées au registre (elles conservent leur numéro tel quel)
+    lockedFactures.forEach(function(item) {
+      var fL = item.facture;
+      var misL = item.mission;
+      // Mettre à jour la ligne correspondante pour garder lastInvoiceNum synchronisé
+      if (misL.lignes && fL.numero) {
+        for (var jL = 0; jL < misL.lignes.length; jL++) {
+          if (misL.lignes[jL].ym === fL.mois) {
+            misL.lignes[jL].lastInvoiceNum = fL.numero;
+            misL.lignes[jL].invoiceFinalized = true;
+            break;
+          }
+        }
+      }
+      if (fL.status === 'payée') {
+        var repairClientL = fL.client;
+        if (misL.factureDestinataire === 'agence' && misL.agence && misL.agence.nom) repairClientL = misL.agence.nom;
+        else if (misL.factureDestinataire === 'clientOp' && misL.clientOp && misL.clientOp.nom) repairClientL = misL.clientOp.nom;
+        var partsL = (fL.mois || '').split('-');
+        var yL = parseInt(partsL[0], 10);
+        var mL = parseInt(partsL[1], 10);
+        var lastDayL = new Date(yL, mL, 0);
+        var invoiceDateL = yL + '-' + String(mL).padStart(2, '0') + '-' + String(lastDayL.getDate()).padStart(2, '0');
+        COMPANY.invoiceRegistry.push({
+          id: 'INV-LOCK-' + (fL.numero || fL.id),
+          numero: fL.numero,
+          date: invoiceDateL,
+          dateEncaissement: fL.datePaiementReel || invoiceDateL,
+          client: repairClientL,
+          nature: fL.nature || 'Prestation de service',
+          montantHT: fL.ht,
+          tva: fL.tva || 0,
+          montantTTC: fL.ttc || fL.ht + (fL.tva || 0),
+          modePaiement: fL.modePaiement || 'Virement',
+          missionId: misL.id,
+          mois: fL.mois,
+          createdAt: new Date().toISOString()
+        });
+      }
+    });
+
+    // Attribuer les numéros séquentiels aux factures non-verrouillées,
+    // en sautant les numéros déjà réservés par les factures verrouillées.
+    var nextNum = 1;
     for (var i = 0; i < allFactures.length; i++) {
-      var num = i + 1;
+      while (lockedSeqNumbers[nextNum]) nextNum++;
+      var num = nextNum;
+      nextNum++;
       var f = allFactures[i].facture;
       var mis = allFactures[i].mission;
       // Date de facture = dernier jour du mois facturé
@@ -3149,14 +3225,18 @@ function repairInvoiceNumbers() {
       }
     }
 
-    // Mettre à jour le compteur global
-    COMPANY.invoiceGlobalCounter = allFactures.length;
+    // Mettre à jour le compteur global (inclut les factures verrouillées)
+    COMPANY.invoiceGlobalCounter = allFactures.length + lockedFactures.length;
 
-    // Mettre à jour les compteurs par année
+    // Mettre à jour les compteurs par année (inclut les factures verrouillées)
     COMPANY.invoiceCounter = {};
     for (var k = 0; k < allFactures.length; k++) {
       var yr = allFactures[k].facture.mois.split('-')[0];
       COMPANY.invoiceCounter[yr] = (COMPANY.invoiceCounter[yr] || 0) + 1;
+    }
+    for (var kL = 0; kL < lockedFactures.length; kL++) {
+      var yrL = lockedFactures[kL].facture.mois.split('-')[0];
+      COMPANY.invoiceCounter[yrL] = (COMPANY.invoiceCounter[yrL] || 0) + 1;
     }
 
     // Sauvegarder uniquement en localStorage (pas de cloud sync au démarrage,
@@ -3174,6 +3254,57 @@ function repairInvoiceNumbers() {
     console.error('[FREEL] repairInvoiceNumbers ERREUR:', e);
     return 0;
   }
+}
+
+// Permute les numéros de deux factures (correction manuelle d'un ordre inversé)
+// Pose numeroLock=true sur les deux pour empêcher repairInvoiceNumbers() de les ré-inverser.
+function swapInvoiceNumbers(factureId1, factureId2) {
+  if (!factureId1 || !factureId2 || factureId1 === factureId2) return false;
+  var f1 = null, mis1 = null, f2 = null, mis2 = null;
+  for (var i = 0; i < MISSIONS.length; i++) {
+    var mis = MISSIONS[i];
+    if (!mis.factures) continue;
+    for (var j = 0; j < mis.factures.length; j++) {
+      var f = mis.factures[j];
+      if (f.id === factureId1) { f1 = f; mis1 = mis; }
+      else if (f.id === factureId2) { f2 = f; mis2 = mis; }
+    }
+  }
+  if (!f1 || !f2) return false;
+  if (!f1.numero || !f2.numero) return false;
+
+  // Échanger les numéros
+  var tmp = f1.numero;
+  f1.numero = f2.numero;
+  f2.numero = tmp;
+
+  // Verrouiller pour ne plus être renumérotées automatiquement
+  f1.numeroLock = true;
+  f2.numeroLock = true;
+
+  // Mettre à jour les lignes correspondantes
+  function updateLigne(mis, f) {
+    if (!mis.lignes) return;
+    for (var k = 0; k < mis.lignes.length; k++) {
+      if (mis.lignes[k].ym === f.mois) {
+        mis.lignes[k].lastInvoiceNum = f.numero;
+        mis.lignes[k].invoiceFinalized = true;
+        break;
+      }
+    }
+  }
+  updateLigne(mis1, f1);
+  updateLigne(mis2, f2);
+
+  // Mettre à jour le registre légal si les entrées y figurent
+  if (COMPANY.invoiceRegistry && COMPANY.invoiceRegistry.length) {
+    COMPANY.invoiceRegistry.forEach(function(entry) {
+      if (entry.missionId === mis1.id && entry.mois === f1.mois) entry.numero = f1.numero;
+      else if (entry.missionId === mis2.id && entry.mois === f2.mois) entry.numero = f2.numero;
+    });
+  }
+
+  return true;
 }
 
 function registerInvoice(invoiceData) {
@@ -10448,6 +10579,78 @@ function showSendInvoiceModal(facture) {
     MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) { if (f.id === facture.id) { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); } }); });
     saveAll(); render(); closeModal('formModal'); toast('Marquée envoyée', 'success');
   } }, 'Juste marquer envoyée'));
+
+  openModal('formModal');
+}
+
+// Modal de permutation de deux numéros de facture (correction manuelle)
+function showInvoiceSwapModal() {
+  // Collecter toutes les factures ayant un numéro attribué
+  var allFact = [];
+  MISSIONS.forEach(function(mis) {
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.numero && f.jours > 0) {
+        allFact.push({ id: f.id, numero: f.numero, client: f.client || mis.client || '', mois: f.mois, lock: !!f.numeroLock });
+      }
+    });
+  });
+  // Tri par numéro (ordre de lecture naturel)
+  allFact.sort(function(a, b) { return String(a.numero).localeCompare(String(b.numero)); });
+
+  if (allFact.length < 2) {
+    toast('Il faut au moins 2 factures numérotées pour permuter', 'error');
+    return;
+  }
+
+  $('#formModalTitle').textContent = '🔄 Permuter deux numéros de facture';
+  var body = $('#formModalBody');
+  body.replaceChildren();
+
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.4' } },
+    'Sélectionne les deux factures dont les numéros sont inversés. Leurs numéros seront échangés et les factures seront verrouillées pour ne plus être renumérotées automatiquement.'));
+
+  function buildOptions() {
+    return allFact.map(function(f) {
+      var label = f.numero + ' — ' + f.client + ' — ' + (f.mois || '') + (f.lock ? ' 🔒' : '');
+      return el('option', { value: f.id }, label);
+    });
+  }
+
+  var label1 = el('div', { style: { fontSize: '10px', fontWeight: '600', marginBottom: '4px' } }, 'Facture A');
+  var select1 = el('select', { id: 'swapInvSel1', style: { width: '100%', padding: '8px', fontSize: '11px', borderRadius: '6px', border: '1px solid var(--glass-border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', marginBottom: '10px' } }, buildOptions());
+
+  var label2 = el('div', { style: { fontSize: '10px', fontWeight: '600', marginBottom: '4px' } }, 'Facture B');
+  var select2 = el('select', { id: 'swapInvSel2', style: { width: '100%', padding: '8px', fontSize: '11px', borderRadius: '6px', border: '1px solid var(--glass-border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', marginBottom: '12px' } }, buildOptions());
+
+  // Par défaut, pré-sélectionner les deux premières factures différentes
+  if (allFact.length >= 2) {
+    select1.value = allFact[0].id;
+    select2.value = allFact[1].id;
+  }
+
+  body.appendChild(label1);
+  body.appendChild(select1);
+  body.appendChild(label2);
+  body.appendChild(select2);
+
+  body.appendChild(el('button', { class: 'btn btn-success btn-block', onclick: function() {
+    var id1 = select1.value;
+    var id2 = select2.value;
+    if (!id1 || !id2 || id1 === id2) {
+      toast('Sélectionne deux factures différentes', 'error');
+      return;
+    }
+    var ok = swapInvoiceNumbers(id1, id2);
+    if (!ok) {
+      toast('Impossible de permuter ces factures', 'error');
+      return;
+    }
+    saveAll();
+    closeModal('formModal');
+    toast('Numéros permutés et verrouillés', 'success');
+    render();
+  } }, '🔄 Permuter'));
 
   openModal('formModal');
 }
@@ -20112,6 +20315,14 @@ function renderAdmin(container) {
   } }, 'Corriger');
   counterRow.appendChild(counterBtn);
   factCard.appendChild(counterRow);
+
+  // Bouton Permuter deux numéros de facture (cas d'un ordre inversé)
+  factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
+  factCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '4px' } }, '🔄 Permuter deux numéros de facture'));
+  factCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', lineHeight: '1.4' } }, 'Si deux factures ont des numéros inversés par rapport à l\'ordre d\'émission, permute-les manuellement. Elles seront ensuite verrouillées pour ne plus être renumérotées automatiquement.'));
+  factCard.appendChild(el('button', { class: 'btn', style: { fontSize: '10px', padding: '6px 12px' }, onclick: function() {
+    showInvoiceSwapModal();
+  } }, '🔄 Permuter deux numéros'));
 
   // Email d'envoi (déplacé ici depuis Entreprise)
   factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
