@@ -1445,6 +1445,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .facture-card { display: flex; align-items: center; gap: 10px; background: var(--bg-secondary); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; flex-wrap: wrap; }
 .facture-card:hover { border-color: var(--accent); }
+.facture-drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 28px; flex-shrink: 0; color: var(--text-muted); font-size: 14px; line-height: 1; cursor: grab; user-select: none; touch-action: none; border-radius: 4px; transition: background 0.15s, color 0.15s; }
+.facture-drag-handle:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.facture-drag-handle:active { cursor: grabbing; }
+.facture-card.dragging { opacity: 0.45; border-color: var(--accent); }
+.facture-card.drop-target { border-color: var(--success) !important; background: rgba(34,197,94,0.12); box-shadow: 0 0 0 2px rgba(34,197,94,0.4); }
+.facture-drag-ghost { position: fixed; pointer-events: none; z-index: 9999; opacity: 0.85; transform: translate(-50%, -50%); box-shadow: 0 10px 30px rgba(0,0,0,0.4); border: 1px solid var(--accent); }
 .facture-info { flex: 1; min-width: 100px; }
 .facture-id { font-weight: 700; font-size: 13px; }
 .facture-meta { font-size: 11px; color: var(--text-muted); }
@@ -3305,6 +3311,87 @@ function swapInvoiceNumbers(factureId1, factureId2) {
   }
 
   return true;
+}
+
+function attachInvoiceDragHandlers(handle, card, factureId, mois) {
+  var state = null;
+
+  function findDropTarget(cx, cy) {
+    var prev = card.style.visibility;
+    card.style.visibility = 'hidden';
+    var hit = document.elementFromPoint(cx, cy);
+    card.style.visibility = prev;
+    if (!hit) return null;
+    var tc = hit.closest ? hit.closest('.facture-card') : null;
+    if (!tc || tc === card) return null;
+    if (tc.getAttribute('data-facture-mois') !== mois) return null;
+    var tid = tc.getAttribute('data-facture-id');
+    if (!tid || tid === factureId) return null;
+    return tc;
+  }
+
+  function cleanup() {
+    if (!state) return;
+    card.classList.remove('dragging');
+    if (state.currentTarget) state.currentTarget.classList.remove('drop-target');
+    if (state.ghost && state.ghost.parentNode) state.ghost.parentNode.removeChild(state.ghost);
+    try { handle.releasePointerCapture(state.pointerId); } catch (e) {}
+    state = null;
+  }
+
+  handle.addEventListener('pointerdown', function(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    state = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, ghost: null, currentTarget: null, started: false };
+    try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+
+  handle.addEventListener('pointermove', function(e) {
+    if (!state || e.pointerId !== state.pointerId) return;
+    var dx = e.clientX - state.startX, dy = e.clientY - state.startY;
+    if (!state.started) {
+      if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+      state.started = true;
+      card.classList.add('dragging');
+      var rect = card.getBoundingClientRect();
+      var ghost = card.cloneNode(true);
+      ghost.className = 'facture-card facture-drag-ghost';
+      ghost.style.width = rect.width + 'px';
+      ghost.style.left = e.clientX + 'px';
+      ghost.style.top = e.clientY + 'px';
+      document.body.appendChild(ghost);
+      state.ghost = ghost;
+    }
+    if (state.ghost) {
+      state.ghost.style.left = e.clientX + 'px';
+      state.ghost.style.top = e.clientY + 'px';
+    }
+    var t = findDropTarget(e.clientX, e.clientY);
+    if (t !== state.currentTarget) {
+      if (state.currentTarget) state.currentTarget.classList.remove('drop-target');
+      state.currentTarget = t;
+      if (t) t.classList.add('drop-target');
+    }
+  });
+
+  function finish(e, commit) {
+    if (!state || e.pointerId !== state.pointerId) return;
+    var target = state.currentTarget;
+    if (commit && state.started && target) {
+      var targetId = target.getAttribute('data-facture-id');
+      var ok = swapInvoiceNumbers(factureId, targetId);
+      cleanup();
+      if (ok) { saveAll(); toast('Numéros permutés', 'success'); render(); }
+      else { toast('Permutation impossible', 'error'); }
+      return;
+    }
+    cleanup();
+  }
+
+  handle.addEventListener('pointerup', function(e) { finish(e, true); });
+  handle.addEventListener('pointercancel', function(e) { finish(e, false); });
+  handle.addEventListener('lostpointercapture', function(e) { finish(e, false); });
 }
 
 function registerInvoice(invoiceData) {
@@ -10579,78 +10666,6 @@ function showSendInvoiceModal(facture) {
     MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) { if (f.id === facture.id) { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); } }); });
     saveAll(); render(); closeModal('formModal'); toast('Marquée envoyée', 'success');
   } }, 'Juste marquer envoyée'));
-
-  openModal('formModal');
-}
-
-// Modal de permutation de deux numéros de facture (correction manuelle)
-function showInvoiceSwapModal() {
-  // Collecter toutes les factures ayant un numéro attribué
-  var allFact = [];
-  MISSIONS.forEach(function(mis) {
-    if (!mis.factures) return;
-    mis.factures.forEach(function(f) {
-      if (f.numero && f.jours > 0) {
-        allFact.push({ id: f.id, numero: f.numero, client: f.client || mis.client || '', mois: f.mois, lock: !!f.numeroLock });
-      }
-    });
-  });
-  // Tri par numéro (ordre de lecture naturel)
-  allFact.sort(function(a, b) { return String(a.numero).localeCompare(String(b.numero)); });
-
-  if (allFact.length < 2) {
-    toast('Il faut au moins 2 factures numérotées pour permuter', 'error');
-    return;
-  }
-
-  $('#formModalTitle').textContent = '🔄 Permuter deux numéros de facture';
-  var body = $('#formModalBody');
-  body.replaceChildren();
-
-  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', lineHeight: '1.4' } },
-    'Sélectionne les deux factures dont les numéros sont inversés. Leurs numéros seront échangés et les factures seront verrouillées pour ne plus être renumérotées automatiquement.'));
-
-  function buildOptions() {
-    return allFact.map(function(f) {
-      var label = f.numero + ' — ' + f.client + ' — ' + (f.mois || '') + (f.lock ? ' 🔒' : '');
-      return el('option', { value: f.id }, label);
-    });
-  }
-
-  var label1 = el('div', { style: { fontSize: '10px', fontWeight: '600', marginBottom: '4px' } }, 'Facture A');
-  var select1 = el('select', { id: 'swapInvSel1', style: { width: '100%', padding: '8px', fontSize: '11px', borderRadius: '6px', border: '1px solid var(--glass-border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', marginBottom: '10px' } }, buildOptions());
-
-  var label2 = el('div', { style: { fontSize: '10px', fontWeight: '600', marginBottom: '4px' } }, 'Facture B');
-  var select2 = el('select', { id: 'swapInvSel2', style: { width: '100%', padding: '8px', fontSize: '11px', borderRadius: '6px', border: '1px solid var(--glass-border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', marginBottom: '12px' } }, buildOptions());
-
-  // Par défaut, pré-sélectionner les deux premières factures différentes
-  if (allFact.length >= 2) {
-    select1.value = allFact[0].id;
-    select2.value = allFact[1].id;
-  }
-
-  body.appendChild(label1);
-  body.appendChild(select1);
-  body.appendChild(label2);
-  body.appendChild(select2);
-
-  body.appendChild(el('button', { class: 'btn btn-success btn-block', onclick: function() {
-    var id1 = select1.value;
-    var id2 = select2.value;
-    if (!id1 || !id2 || id1 === id2) {
-      toast('Sélectionne deux factures différentes', 'error');
-      return;
-    }
-    var ok = swapInvoiceNumbers(id1, id2);
-    if (!ok) {
-      toast('Impossible de permuter ces factures', 'error');
-      return;
-    }
-    saveAll();
-    closeModal('formModal');
-    toast('Numéros permutés et verrouillés', 'success');
-    render();
-  } }, '🔄 Permuter'));
 
   openModal('formModal');
 }
@@ -18112,6 +18127,7 @@ function renderFacturesContent(container) {
       container.appendChild(monthHeader);
 
       // Factures du mois
+      var monthCount = monthFactures.length;
       monthFactures.forEach(function(f) {
         var badgeClass, badgeText;
         if (f.status === 'payée') { badgeClass = 'badge-success'; badgeText = '✅ Payée'; }
@@ -18120,6 +18136,13 @@ function renderFacturesContent(container) {
         else { badgeClass = 'badge-muted'; badgeText = '📝 Brouillon'; }
 
         var card = el('div', { class: 'facture-card', onclick: function() { showFactureModal(f); } });
+        card.setAttribute('data-facture-id', f.id);
+        card.setAttribute('data-facture-mois', f.mois);
+        if (monthCount >= 2 && f.numero) {
+          var dragHandle = el('div', { class: 'facture-drag-handle', title: 'Glisser pour permuter avec une autre facture du même mois' }, '⋮⋮');
+          card.appendChild(dragHandle);
+          attachInvoiceDragHandlers(dragHandle, card, f.id, f.mois);
+        }
         card.appendChild(el('div', { class: 'badge ' + badgeClass, style: { fontSize: '9px', whiteSpace: 'nowrap' } }, badgeText));
         var infoDiv = el('div', { class: 'facture-info' });
         var clientRow = el('div', { class: 'facture-id', style: { display: 'flex', alignItems: 'center', gap: '6px' } });
@@ -20315,14 +20338,6 @@ function renderAdmin(container) {
   } }, 'Corriger');
   counterRow.appendChild(counterBtn);
   factCard.appendChild(counterRow);
-
-  // Bouton Permuter deux numéros de facture (cas d'un ordre inversé)
-  factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
-  factCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '4px' } }, '🔄 Permuter deux numéros de facture'));
-  factCard.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', lineHeight: '1.4' } }, 'Si deux factures ont des numéros inversés par rapport à l\'ordre d\'émission, permute-les manuellement. Elles seront ensuite verrouillées pour ne plus être renumérotées automatiquement.'));
-  factCard.appendChild(el('button', { class: 'btn', style: { fontSize: '10px', padding: '6px 12px' }, onclick: function() {
-    showInvoiceSwapModal();
-  } }, '🔄 Permuter deux numéros'));
 
   // Email d'envoi (déplacé ici depuis Entreprise)
   factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
