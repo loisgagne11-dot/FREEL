@@ -3816,10 +3816,8 @@ function showClientModal(client) {
     delaiPaiement: 2, jourPaiement: 15
   };
   
-  $('#formModalTitle').textContent = isNew ? '🏢 Nouveau Client' : '✏️ ' + client.nom;
-  var body = $('#formModalBody');
-  body.replaceChildren();
-  
+  var body = openFormModal(isNew ? '🏢 Nouveau Client' : '✏️ ' + client.nom);
+
   body.appendChild(createInput('Nom / Raison sociale *', 'text', 'cNom', client.nom));
   body.appendChild(createTextarea('Adresse complète', 'cAdresse', client.adresse, 'Adresse facturation'));
   body.appendChild(createInput('SIRET', 'text', 'cSiret', client.siret));
@@ -5264,6 +5262,24 @@ function buildMission(mis) {
 
 function openModal(id) { $('#' + id).classList.add('active'); }
 function closeModal(id) { $('#' + id).classList.remove('active'); }
+
+function openFormModal(title, renderFn) {
+  $('#formModalTitle').textContent = title;
+  var body = $('#formModalBody');
+  body.replaceChildren();
+  if (renderFn) renderFn(body);
+  openModal('formModal');
+  return body;
+}
+
+function openDetailModal(title, renderFn) {
+  $('#detailModalTitle').textContent = title;
+  var body = $('#detailModalBody');
+  body.replaceChildren();
+  if (renderFn) renderFn(body);
+  openModal('detailModal');
+  return body;
+}
 function closeAllModals() { $$('.modal').forEach(function(m) { m.classList.remove('active'); }); }
 // SPRINT 3: Accessibilité — Escape ferme tous les modals et overlays
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeDynamicModal(); closeAllModals(); } });
@@ -5297,9 +5313,7 @@ function showFabMenu() {
 
 // Modal pour télécharger une facture (sélection mission + mois)
 function showDownloadInvoiceModal() {
-  $('#formModalTitle').textContent = '📄 Télécharger Facture';
-  var body = $('#formModalBody');
-  body.replaceChildren();
+  var body = openFormModal('📄 Télécharger Facture');
 
   // Sélection de la mission
   var missionSelect = el('select', { id: 'downloadInvoiceMission', style: { width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' } });
@@ -9476,9 +9490,7 @@ var CHARGE_CATEGORIES = [
 ];
 
 function showChargeModal() {
-  $('#formModalTitle').textContent = '📋 Ajouter une Charge';
-  var body = $('#formModalBody');
-  body.replaceChildren();
+  var body = openFormModal('📋 Ajouter une Charge');
   
   // Onglets: Ponctuelle / Récurrente
   var tabs = el('div', { class: 'filter-tabs', style: { marginBottom: '16px' } });
@@ -9656,9 +9668,7 @@ function showChargeRecurrente() {
 
 function showSalaireModal(montant) {
   var data = compute();
-  $('#formModalTitle').textContent = '💸 Verser une Rémunération';
-  var body = $('#formModalBody');
-  body.replaceChildren();
+  var body = openFormModal('💸 Verser une Rémunération');
   var info = el('div', { style: { background: 'var(--success-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
   info.innerHTML = '<strong>💡 Recommandation</strong><br>Cash dispo: ' + EUR(data.cashDispoAbsolu) + ' → Suggéré: <strong>' + EUR(data.salaireReco) + '</strong>';
   body.appendChild(info);
@@ -10213,9 +10223,8 @@ function showCongesOverview() {
 }
 
 function showFactureModal(facture) {
-  $('#formModalTitle').textContent = '📄 ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
+  openFormModal('📄 ' + facture.client + ' · ' + fmtMonthShort(facture.mois));
   var body = $('#formModalBody');
-  body.replaceChildren();
 
   // Trouver la mission associée
   var mission = MISSIONS.find(function(m) { return m.factures && m.factures.some(function(f) { return f.id === facture.id; }); });
