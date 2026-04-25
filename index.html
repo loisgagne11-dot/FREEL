@@ -5247,7 +5247,13 @@ function buildMission(mis) {
     l.joursReels = jours;
     var ht = jours * mis.tjm;
     var tva = isTVAApplicable(l.ym) ? Math.round(ht * LEGAL.tvaRate * 100) / 100 : 0;
-    if (existing) { existing.jours = jours; existing.ht = ht; existing.tva = tva; existing.ttc = ht + tva; existing.client = mis.client; newFactures.push(existing); }
+    if (existing) {
+      if (existing.status === 'payée') {
+        newFactures.push(existing);
+      } else {
+        existing.jours = jours; existing.ht = ht; existing.tva = tva; existing.ttc = ht + tva; existing.client = mis.client; newFactures.push(existing);
+      }
+    }
     else { newFactures.push({ id: 'F-' + mis.id + '-' + l.ym, mois: l.ym, client: mis.client, jours: jours, ht: ht, tva: tva, ttc: ht + tva, status: 'brouillon' }); }
   });
   mis.factures = newFactures;
@@ -9375,6 +9381,11 @@ function recalcDaysTable(mission) {
 }
 
 function saveDaysFromEditor(mission) {
+  var paidMonths = [];
+  if (mission.factures) mission.factures.forEach(function(f) { if (f.status === 'payée') paidMonths.push(f.mois); });
+  if (paidMonths.length > 0) {
+    toast('Attention : les mois avec facture payée (' + paidMonths.map(fmtMonthShort).join(', ') + ') ne seront pas recalculés (Art. L123-28)', 'info');
+  }
   mission.lignes.forEach(function(l, idx) {
     var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
     var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
@@ -10234,6 +10245,10 @@ function showFactureModal(facture) {
           if (f.mois && f.mois.indexOf('2026-02') !== -1) _allIds.push(f.id);
           if (f.id === facture.id) {
             _matched = true;
+            if (f.status === 'payée' && newStatus !== 'payée') {
+              toast('Impossible de modifier le statut d\'une facture payée (Art. L123-28)', 'error');
+              return;
+            }
             f.status = newStatus;
             // Date envoi
             var de = $('#fDateEnvoi').value;
@@ -14487,7 +14502,8 @@ function getTotalCA() {
 
 // Sprint 14: Notification Center
 var NOTIF_OPEN = false;
-var NOTIF_READ = JSON.parse(localStorage.getItem('freel_notif_read') || '[]');
+var NOTIF_READ = [];
+try { NOTIF_READ = JSON.parse(localStorage.getItem('freel_notif_read') || '[]'); } catch(e) { console.warn('[FREEL] freel_notif_read corrompu, reset'); }
 
 function getNotifications() {
   var notifs = [];
@@ -20920,7 +20936,7 @@ function renderAdmin(container) {
       clients: CLIENTS,
       treasury: TREASURY,
       irConfig: IR_CONFIG,
-      congesDates: localStorage.getItem(STORAGE_PREFIX + 'conges') ? JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'conges')) : [],
+      congesDates: (function() { try { var raw = localStorage.getItem(STORAGE_PREFIX + 'conges'); return raw ? JSON.parse(raw) : []; } catch(e) { return []; } })(),
       goalCA: localStorage.getItem('freel_goal_ca') || null,
       theme: localStorage.getItem('freel_theme') || null,
       notificationsRead: localStorage.getItem('freel_notif_read') || null
