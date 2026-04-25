@@ -2833,6 +2833,9 @@ var TREASURY = {
 };
 var IR_CONFIG = {}; // { '2025': { parts: 1, autresRevenus: 0, perAnnuel: 0 }, '2026': {...} }
 var COMPUTED = {};
+var _computeVersion = 0;
+var _computeCachedVersion = -1;
+function invalidateCompute() { _computeVersion++; }
 
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
@@ -3893,7 +3896,6 @@ function isInPeriod(ymStr) {
 // V74: Navigation mois avec flèches clavier (§8.2)
 function navigatePeriodMonth(delta) {
   if (PERIOD.month === null || PERIOD.month === undefined || PERIOD.month === '') {
-    // Année entière -> sélectionner le mois en cours
     PERIOD.month = TODAY.getMonth();
   } else {
     var m = parseInt(PERIOD.month) + delta;
@@ -3901,6 +3903,7 @@ function navigatePeriodMonth(delta) {
     else if (m < 0) { m = 11; PERIOD.year--; }
     PERIOD.month = m;
   }
+  invalidateCompute();
   render();
 }
 function getPeriodMonths() {
@@ -5464,13 +5467,12 @@ function cleanupLocalStorage() {
   toRemove.forEach(function(k) { localStorage.removeItem(k); });
 }
 
-function saveAll() {
+function _saveAllImmediate() {
+  invalidateCompute();
   var localOk = false;
-  // Timestamp dans une clé minuscule (réussit toujours, même si localStorage est quasi plein)
   var now = Date.now();
   _localSaveTimestamp = now;
   try { localStorage.setItem('freel_ts', String(now)); } catch(e) {}
-  // 1. Tenter localStorage
   try {
     var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: now });
     ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
@@ -5483,18 +5485,28 @@ function saveAll() {
     try {
       localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() }));
       localOk = true;
-    } catch (e2) { /* localStorage plein */ }
+    } catch (e2) {
+      if (e2.name === 'QuotaExceededError') toast('Stockage local plein — certaines données ne seront pas sauvegardées', 'error');
+    }
   }
-  // Cloud sync (silencieux — ne sync que si connecté)
   if (CURRENT_USER && SYNC_ENABLED) {
     syncToCloud();
   }
 }
 
-// Auto-save quand l'onglet devient caché (le sync cloud a le temps de finir)
+var _saveAllTimer = null;
+function saveAll() {
+  if (_saveAllTimer) clearTimeout(_saveAllTimer);
+  _saveAllTimer = setTimeout(function() { _saveAllTimer = null; _saveAllImmediate(); }, 50);
+}
+
+// Auto-save quand l'onglet devient caché (immédiat, pas debounced — le navigateur peut tuer le timer)
 if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'hidden') saveAll();
+    if (document.visibilityState === 'hidden') {
+      if (_saveAllTimer) { clearTimeout(_saveAllTimer); _saveAllTimer = null; }
+      _saveAllImmediate();
+    }
   });
 }
 
@@ -5974,6 +5986,10 @@ function computeAlerts(data) {
 
 // COMPUTE - Charges liées au mois d'ENCAISSEMENT (pas réalisation)
 function compute() {
+  if (_computeCachedVersion === _computeVersion && COMPUTED && COMPUTED.monthsData) {
+    return COMPUTED;
+  }
+  _computeCachedVersion = _computeVersion;
   var months = getPeriodMonths();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   
@@ -21439,6 +21455,7 @@ function adaptMobileGrids() {
 window.addEventListener('resize', function() { if (window.innerWidth <= 600) adaptMobileGrids(); });
 
 function render() {
+  invalidateCompute();
   var container = $('#app');
   if (!container) { console.error('Container #app not found'); return; }
   container.replaceChildren();
