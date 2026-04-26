@@ -2588,6 +2588,7 @@ function loadFromCloud() {
 var PERIOD = { type: 'year', year: TODAY.getFullYear(), month: null };
 var TIMELINE_IDX = null;
 var FACTURE_FILTER = 'all';
+var FACTURE_SELECTION = {};
 var SHOW_CUMUL = false;
 var SHOW_CASH_DISPO = false;
 var PROJECTION_SCENARIO = 'normal';
@@ -2957,6 +2958,8 @@ function ym(y, m) { return y + '-' + String(m + 1).padStart(2, '0'); }
 function parseYM(s) { var p = s.split('-'); return { y: parseInt(p[0]), m: parseInt(p[1]) - 1 }; }
 function fmtMonth(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' }); }
 function fmtMonthShort(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', ''); }
+function fmtMonthLong(s) { var p = parseYM(s); return new Date(p.y, p.m).toLocaleDateString('fr-FR', { month: 'long' }); }
+function fmtMonthLongFromDate(d) { return d.toLocaleDateString('fr-FR', { month: 'long' }); }
 function fmtLong(d) { return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); }
 function fmtDate(d) { return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
 function parseDate(s) {
@@ -4242,6 +4245,17 @@ function setFactureStatus(factureId, newStatus) {
     });
   });
   saveAll(); render(); toast('Facture mise à jour', 'success');
+}
+
+function bulkSetFactureStatus(newStatus) {
+  var ids = Object.keys(FACTURE_SELECTION).filter(function(k) { return FACTURE_SELECTION[k]; });
+  if (ids.length === 0) return;
+  ids.forEach(function(id) { setFactureStatus(id, newStatus); });
+  FACTURE_SELECTION = {};
+  saveAll();
+  invalidateCompute();
+  render();
+  toast(ids.length + ' facture(s) → ' + newStatus, 'success');
 }
 
 function getPaymentMonth(mois, delaiMois, jourPaiement) {
@@ -5721,9 +5735,11 @@ function getUpcomingDeadlines() {
   if (COMPANY.urssafPeriodicite === 'mensuel') {
     // Mensuel: fin de chaque mois
     if (daysUntilEndOfMonth <= 7) {
+      var declMonth = fmtMonthLongFromDate(new Date(currentYear, currentMonth));
+      var caMonth = fmtMonthLongFromDate(new Date(currentYear, currentMonth - 1));
       deadlines.push({
         type: 'URSSAF',
-        label: 'Déclaration URSSAF',
+        label: 'URSSAF : déclaration de ' + declMonth + ' pour ' + caMonth,
         date: new Date(currentYear, currentMonth, endOfMonth),
         daysLeft: daysUntilEndOfMonth,
         color: 'var(--danger)',
@@ -5738,14 +5754,17 @@ function getUpcomingDeadlines() {
       { m: 6, d: 31 },  // 31 juillet (T2)
       { m: 9, d: 31 }   // 31 octobre (T3)
     ];
+    var trimLabels = { 0: 'oct-déc', 3: 'jan-mars', 6: 'avr-juin', 9: 'juil-sept' };
     trimestreDates.forEach(function(td) {
       var deadlineDate = new Date(currentYear, td.m, td.d);
       if (td.m === 0 && currentMonth > 1) deadlineDate.setFullYear(currentYear + 1);
       var diff = Math.ceil((deadlineDate - today) / (1000 * 60 * 60 * 24));
       if (diff >= 0 && diff <= 14) {
+        var tNum = td.m === 0 ? '4' : String(Math.floor(td.m / 3));
+        var declM = fmtMonthLongFromDate(deadlineDate);
         deadlines.push({
           type: 'URSSAF',
-          label: 'Déclaration URSSAF T' + (td.m === 0 ? '4' : Math.floor(td.m / 3)),
+          label: 'URSSAF : déclaration de ' + declM + ' pour ' + (trimLabels[td.m] || 'T' + tNum),
           date: deadlineDate,
           daysLeft: diff,
           color: 'var(--danger)',
@@ -5952,15 +5971,58 @@ function computeIndicators(data, months) {
   var salairesNonZero = data.sparklineData.salaires.filter(function(s) { return s > 0; });
   data.salaireMoyen = salairesNonZero.length > 0 ? Math.round(salairesNonZero.reduce(function(a, b) { return a + b; }, 0) / salairesNonZero.length) : 0;
 
-  // V51: Runway (autonomie) = Cash / (Charges + Salaire estimé)
+  // Taux de recouvrement et DSO global
+  var totalPayees = 0, totalEmises = 0, dsoGlobalSum = 0, dsoGlobalCount = 0;
+  MISSIONS.forEach(function(mis) {
+    if (!mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.jours <= 0) return;
+      if (f.status === 'payée' || f.status === 'envoyée') totalEmises++;
+      if (f.status === 'payée') {
+        totalPayees++;
+        if (f.dateEnvoi && f.datePaiementReel) {
+          var envoi = new Date(f.dateEnvoi);
+          var paie = new Date(f.datePaiementReel);
+          var dsoJ = Math.max(0, Math.round((paie - envoi) / (1000 * 60 * 60 * 24)));
+          dsoGlobalSum += dsoJ;
+          dsoGlobalCount++;
+        }
+      }
+    });
+  });
+  data.tauxRecouvrement = totalEmises > 0 ? totalPayees / totalEmises : 0;
+  data.dsoGlobal = dsoGlobalCount > 0 ? Math.round(dsoGlobalSum / dsoGlobalCount) : 0;
+  data.facturesStats.delaiMoyen = data.dsoGlobal;
+
+  // Runway (autonomie) = Cash / (Charges + Salaire estimé)
   var avgCharges = months.length > 0 ? data.totalCharges / months.length : 500;
-  // V51: Utilise le salaire estimé paramétré ou le salaire moyen historique
   var salaireRef = TREASURY.salaireEstime || data.salaireMoyen || 2000;
   var depensesMensuelles = avgCharges + salaireRef;
   data.salaireEstime = salaireRef;
   data.avgCharges = Math.round(avgCharges);
   data.runway = depensesMensuelles > 0 ? Math.floor(data.cashDispoAbsolu / depensesMensuelles) : 99;
   data.depensesMensuelles = Math.round(depensesMensuelles);
+
+  // Runway enrichi : mois par mois avec CA prévu des missions connues
+  var nowYmInd = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var runwayCash = data.cashDispoAbsolu;
+  var runwayEnrichi = 0;
+  for (var rm = 0; rm < 24 && runwayCash > 0; rm++) {
+    var rDate = new Date(TODAY.getFullYear(), TODAY.getMonth() + rm + 1);
+    var rYm = ym(rDate.getFullYear(), rDate.getMonth());
+    var revenuMois = 0;
+    MISSIONS.forEach(function(mis) {
+      if (mis.statut === 'prospect' || mis.statut === 'perdue' || !mis.factures) return;
+      mis.factures.forEach(function(f) {
+        if (f.jours <= 0 || f.status === 'payée') return;
+        var pm = getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+        if (pm === rYm) revenuMois += f.ht || 0;
+      });
+    });
+    runwayCash = runwayCash + revenuMois - depensesMensuelles;
+    if (runwayCash > 0) runwayEnrichi++;
+  }
+  data.runwayEnrichi = runwayEnrichi;
 
   // V51: Salaire versable = Cash dispo - réserve minimum
   var reserveMin = TREASURY.reserveCompte || 150;
@@ -6031,7 +6093,9 @@ function computeAlerts(data) {
   // URSSAF reminder
   var dayOfMonth = TODAY.getDate();
   if (dayOfMonth >= 15 && dayOfMonth <= 20 && data.provByType['URSSAF'] > 0) {
-    data.alerts.push({ type: 'warning', icon: '📅', title: 'Déclaration URSSAF', text: 'À faire avant le 20 du mois' });
+    var alertDeclM = fmtMonthLongFromDate(TODAY);
+    var alertCaM = fmtMonthLongFromDate(new Date(TODAY.getFullYear(), TODAY.getMonth() - 1));
+    data.alerts.push({ type: 'warning', icon: '📅', title: 'URSSAF : déclaration de ' + alertDeclM + ' pour ' + alertCaM, text: 'À faire avant la fin du mois' });
   }
 
   // Alerte visibilité : mission qui se termine dans <= 30 jours sans renouvellement
@@ -6086,7 +6150,7 @@ function compute() {
     tjmEffectif: 0, tauxOccupation: 0, salaireReco: 0, salaireMoyen: 0,
     monthsData: {}, workedDays: {}, sparklineData: { caReal: [], caEnc: [], aEnc: [], salaires: [] },
     facturesAEncaisser: [], alerts: [],
-    facturesStats: { payees: 0, envoyees: 0, retard: 0, brouillon: 0 },
+    facturesStats: { payees: 0, envoyees: 0, retard: 0, brouillon: 0, aDeclarer: 0 },
     detailEncaisse: [], detailChargesPayees: [], detailChargesAPayer: [], detailSalaires: [],
     provByType: {}, provByMonth: {},
     totalCharges: 0, chargesDetail: []
@@ -6175,7 +6239,8 @@ function compute() {
             data.detailEncaisse.push({ client: f.client, mois: f.mois, montant: f.ttc, ht: f.ht, paymentMonth: paymentMonth });
           }
           data.facturesStats.payees++;
-          
+          if (!isPaid('URSSAF-' + f.id)) { data.facturesStats.aDeclarer++; f._aDeclarer = true; }
+
           // PROVISIONS AU MOIS D'ENCAISSEMENT
           // Règle: Encaissement M → Déclaration M+1 → Prélèvement M+2
           // On provisionne immédiatement au mois d'encaissement (quand l'argent arrive)
@@ -7564,9 +7629,9 @@ function showPaymentCycleModal(mission, facture) {
       stepDate: cycle.dateEncaissement
     },
     {
-      icon: '📝', title: 'Déclaration URSSAF',
+      icon: '📝', title: 'URSSAF : déclaration de ' + fmtMonthLong(cycle.moisDeclaration) + ' pour ' + fmtMonthLong(cycle.moisEncaissement),
       date: fmtDateFr(cycle.dateDeclaration),
-      desc: traceDecl + '\n' + (COMPANY.urssafPeriodicite === 'mensuel' ? 'Déclaration mensuelle' : 'Déclaration trimestrielle') + ' · Échéance: dernier jour du mois',
+      desc: traceDecl + '\n' + (COMPANY.urssafPeriodicite === 'mensuel' ? 'Mensuelle' : 'Trimestrielle') + ' · Échéance: dernier jour du mois',
       amount: 'CA à déclarer: ' + EUR(facture.ht), amountClass: 'neutral',
       stepDate: cycle.dateDeclaration
     },
@@ -7647,8 +7712,8 @@ function showPaymentCycleModal(mission, facture) {
     '💼 Travail: ' + cycle.moisTravailLabel + ' → ' + EUR(facture.ht) + ' HT',
     '📤 Facture: envoyée le ' + (facture.dateEnvoi ? fmtDateFr(new Date(facture.dateEnvoi)) : '(non renseigné)') + (cycle.dateReception ? ' · reçue le ' + fmtDateFr(cycle.dateReception) : ''),
     '🏦 Encaissement: ' + fmtMonth(cycle.moisEncaissement) + (cycle.encaissementEstime ? ' (estimé)' : ' (réel)'),
-    '📝 Déclaration ' + fmtMonth(cycle.moisDeclaration) + ': inclut le CA de ' + fmtMonth(cycle.moisEncaissement),
-    '💸 Prélèvement ' + fmtMonth(cycle.moisDeclaration) + ': ' + EUR(cotisationTotal) + ' pour CA de ' + cycle.moisTravailLabel + ' encaissé en ' + fmtMonth(cycle.moisEncaissement)
+    '📝 Déclaration de ' + fmtMonthLong(cycle.moisDeclaration) + ' pour ' + fmtMonthLong(cycle.moisEncaissement) + ' : CA ' + EUR(facture.ht) + ' HT à reporter',
+    '💸 Prélèvement ' + fmtMonth(cycle.moisDeclaration) + ' : ' + EUR(cotisationTotal) + ' pour CA de ' + cycle.moisTravailLabel + ' encaissé en ' + fmtMonth(cycle.moisEncaissement)
   ];
   traceLines.forEach(function(line) {
     traceBox.appendChild(el('div', {}, line));
@@ -13097,17 +13162,17 @@ function getAllYearMilestones() {
   if (COMPANY.urssafPeriodicite === 'mensuel') {
     for (var m = 0; m < 12; m++) {
       var endMonth = new Date(year, m + 1, 0);
-      // En mois M+1, on déclare le CA encaissé en M. Le prélèvement sera en M+2.
       var moisCA = m > 0 ? ym(year, m - 1) : ym(year - 1, 11);
       var moisPrelev = getUrssafDebitMonth(moisCA);
-      addM(endMonth, 'URSSAF ' + fmtMonthShort(ym(year, m)), '🏥', 'urssaf', 'Déclaration du CA encaissé en ' + fmtMonthShort(moisCA) + ' · Prélèvement en ' + fmtMonthShort(moisPrelev));
+      var tlDeclM = fmtMonthLong(ym(year, m));
+      var tlCaM = fmtMonthLong(moisCA);
+      addM(endMonth, 'URSSAF ' + fmtMonthShort(ym(year, m)), '🏥', 'urssaf', 'Déclaration de ' + tlDeclM + ' pour ' + tlCaM + ' · Prélèvement en ' + fmtMonthShort(moisPrelev));
     }
   } else {
-    // Trimestriel: Jan 31, Apr 30, Jul 31, Oct 31
-    addM(new Date(year, 0, 31), 'URSSAF T4 ' + (year - 1), '🏥', 'urssaf', 'Déclaration CA encaissé oct-déc ' + (year - 1) + ' · Prélèvement en ' + fmtMonthShort(ym(year, 1)));
-    addM(new Date(year, 3, 30), 'URSSAF T1', '🏥', 'urssaf', 'Déclaration CA encaissé jan-mars ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 4)));
-    addM(new Date(year, 6, 31), 'URSSAF T2', '🏥', 'urssaf', 'Déclaration CA encaissé avr-juin ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 7)));
-    addM(new Date(year, 9, 31), 'URSSAF T3', '🏥', 'urssaf', 'Déclaration CA encaissé juil-sept ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 10)));
+    addM(new Date(year, 0, 31), 'URSSAF T4 ' + (year - 1), '🏥', 'urssaf', 'Déclaration de janvier pour oct-déc ' + (year - 1) + ' · Prélèvement en ' + fmtMonthShort(ym(year, 1)));
+    addM(new Date(year, 3, 30), 'URSSAF T1', '🏥', 'urssaf', 'Déclaration d\'avril pour jan-mars ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 4)));
+    addM(new Date(year, 6, 31), 'URSSAF T2', '🏥', 'urssaf', 'Déclaration de juillet pour avr-juin ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 7)));
+    addM(new Date(year, 9, 31), 'URSSAF T3', '🏥', 'urssaf', 'Déclaration d\'octobre pour juil-sept ' + year + ' · Prélèvement en ' + fmtMonthShort(ym(year, 10)));
   }
 
   // TVA (si assujetti)
@@ -13116,23 +13181,23 @@ function getAllYearMilestones() {
   var isAssujettiTVA = COMPANY.tvaDepuis || caPrevYear > 37500;
   if (isAssujettiTVA) {
     // Déclarations TVA trimestrielles (CA3)
-    addM(new Date(year, 3, 24), 'TVA T1', '💰', 'tva', 'Déclaration & paiement TVA T1');
-    addM(new Date(year, 6, 24), 'TVA T2', '💰', 'tva', 'Déclaration & paiement TVA T2');
-    addM(new Date(year, 9, 24), 'TVA T3', '💰', 'tva', 'Déclaration & paiement TVA T3');
-    addM(new Date(year + 1, 0, 24), 'TVA T4', '💰', 'tva', 'Déclaration & paiement TVA T4');
+    addM(new Date(year, 3, 24), 'TVA T1', '💰', 'tva', 'Déclaration d\'avril pour jan-mars · TVA collectée - TVA déductible');
+    addM(new Date(year, 6, 24), 'TVA T2', '💰', 'tva', 'Déclaration de juillet pour avr-juin · TVA collectée - TVA déductible');
+    addM(new Date(year, 9, 24), 'TVA T3', '💰', 'tva', 'Déclaration d\'octobre pour juil-sept · TVA collectée - TVA déductible');
+    addM(new Date(year + 1, 0, 24), 'TVA T4', '💰', 'tva', 'Déclaration de janvier pour oct-déc · TVA collectée - TVA déductible');
   }
 
   // Impôt sur le Revenu
+  var irPrevYear = getIRForYear(year - 1);
+  var irCaLabel = irPrevYear.caTotal > 0 ? ' · CA ' + (year - 1) + ' : ' + EUR(irPrevYear.caTotal) + ' HT' : '';
   if (!COMPANY.prelevementLiberatoire) {
-    // Déclaration annuelle
-    addM(new Date(year, 4, 22), 'Décla IR', '📋', 'ir', 'Déclaration revenus ' + (year - 1) + ' (en ligne)');
-    // Acomptes IR (si pas prélèvement libératoire et pas 1ère année)
-    addM(new Date(year, 0, 15), 'Acompte IR 1', '🧾', 'ir', '1er acompte impôt sur le revenu');
-    addM(new Date(year, 4, 15), 'Acompte IR 2', '🧾', 'ir', '2ème acompte impôt sur le revenu');
-    addM(new Date(year, 8, 15), 'Acompte IR 3', '🧾', 'ir', '3ème acompte impôt sur le revenu');
+    addM(new Date(year, 4, 22), 'Décla IR', '📋', 'ir', 'Déclaration revenus ' + (year - 1) + ' · Reporter le CA BNC micro' + irCaLabel);
+    addM(new Date(year, 0, 15), 'Acompte IR 1', '🧾', 'ir', '1er acompte IR · Basé sur la déclaration N-1');
+    addM(new Date(year, 4, 15), 'Acompte IR 2', '🧾', 'ir', '2ème acompte IR');
+    addM(new Date(year, 8, 15), 'Acompte IR 3', '🧾', 'ir', '3ème acompte IR · Ajustable si revenus en baisse');
     addM(new Date(year, 11, 15), 'Solde IR', '🧾', 'ir', 'Solde impôt sur le revenu');
   } else {
-    addM(new Date(year, 4, 22), 'Décla IR', '📋', 'ir', 'Déclaration revenus ' + (year - 1) + ' (en ligne, prélèvement libératoire)');
+    addM(new Date(year, 4, 22), 'Décla IR', '📋', 'ir', 'Déclaration revenus ' + (year - 1) + ' · Prélèvement libératoire' + irCaLabel);
   }
 
   // CFE (Cotisation Foncière des Entreprises)
@@ -13337,7 +13402,7 @@ function getActionsList() {
     if (ligne && (ligne.joursPrevus > 0) && !ligne.joursReels) {
       var aid = 'saisie_jours_' + m.id + '_' + nowYm;
       actions.push({ id: aid, priority: 4, type: 'current', icon: '📝', label: 'Saisir jours ' + m.client, sub: fmtMonthShort(nowYm) + ' · ' + (ligne.joursPrevus || 0) + 'j prévus',
-        detail: function() { VIEW = 'activite'; ACTIVITE_TAB = 'overview'; render(); },
+        detail: (function(mis) { return function() { showDaysEditor(mis); }; })(m),
         complete: function() { markActionDone(aid, 'Jours saisis ' + m.client + ' ' + fmtMonthShort(nowYm)); },
         done: isActionDone(aid)
       });
@@ -15168,6 +15233,22 @@ function renderCAPlafondWidget(container) {
 
   widget.appendChild(metricsRow);
 
+  // ── Barre franchise TVA (si pas déjà assujetti) ──
+  if (!COMPANY.tvaDepuis && seuilTVA > 0) {
+    var tvaBarContainer = el('div', { style: { marginBottom: '12px', marginTop: '4px' } });
+    tvaBarContainer.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: '600' } }, '💰 Franchise TVA'));
+    var tvaPct = Math.min(1, currentCA / seuilTVA);
+    var tvaColor = tvaPct >= 1 ? 'var(--danger)' : tvaPct >= 0.9 ? 'var(--warning)' : '#db2777';
+    var tvaBarBg = el('div', { style: { height: '6px', background: 'var(--bg-tertiary)', borderRadius: '3px', position: 'relative' } });
+    tvaBarBg.appendChild(el('div', { style: { height: '100%', width: Math.min(100, tvaPct * 100) + '%', background: tvaColor, borderRadius: '3px' } }));
+    tvaBarContainer.appendChild(tvaBarBg);
+    var tvaMetrics = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginTop: '4px' } });
+    tvaMetrics.appendChild(el('div', { style: { color: tvaColor, fontWeight: '600' } }, Math.round(tvaPct * 100) + '% · ' + EUR(currentCA)));
+    tvaMetrics.appendChild(el('div', { style: { color: 'var(--text-muted)' } }, 'Seuil ' + EUR(seuilTVA)));
+    tvaBarContainer.appendChild(tvaMetrics);
+    widget.appendChild(tvaBarContainer);
+  }
+
   // ── Alertes contextuelles (une seule, la plus pertinente) ──
   var alertText = '', alertColor = '', alertBg = '', alertIcon = '';
 
@@ -16710,6 +16791,7 @@ function renderPerformance(container) {
   var totalImpot = COMPANY.prelevementLiberatoire ? Math.round(irData.caTotal * 0.022) : irData.impot;
   var impotLabel = COMPANY.prelevementLiberatoire ? 'Impôt PL' : 'IR Estimé';
   kpiGrid.appendChild(KPI({ label: impotLabel, value: EUR(totalImpot), sub: periodYear + ' • CA: ' + EUR(irData.caTotal), color: 'warning', onClick: showIRDetail }));
+  kpiGrid.appendChild(KPI({ label: 'Recouvrement', value: PCT(data.tauxRecouvrement), sub: 'DSO moyen: ' + data.dsoGlobal + 'j', color: data.tauxRecouvrement >= 0.9 ? 'success' : data.tauxRecouvrement >= 0.7 ? 'warning' : 'danger' }));
   container.appendChild(kpiGrid);
 
   // V57: Répartition CA HT - Basée sur le CA ENCAISSÉ (pas réalisé)
@@ -18145,6 +18227,7 @@ function renderFacturesContent(container) {
     { key: 'brouillon', label: 'À créer', count: data.facturesStats.brouillon },
     { key: 'envoyées', label: 'Envoyées', count: data.facturesStats.envoyees },
     { key: 'retard', label: 'En retard', count: data.facturesStats.retard },
+    { key: 'aDeclarer', label: 'À déclarer', count: data.facturesStats.aDeclarer },
     { key: 'payées', label: 'Payées', count: data.facturesStats.payees }
   ];
   filters.forEach(function(f) {
@@ -18163,7 +18246,7 @@ function renderFacturesContent(container) {
       f.paymentMonth = getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
       var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
       f.paymentDate = paymentDate;
-      f._missionId = m.id; // ID mission pour cycle paiement (évite référence circulaire)
+      f._missionId = m.id;
       f.isLate = f.status === 'envoyée' && TODAY > paymentDate;
       factures.push(f);
     });
@@ -18176,8 +18259,20 @@ function renderFacturesContent(container) {
       if (FACTURE_FILTER === 'envoyées') return f.status === 'envoyée';
       if (FACTURE_FILTER === 'payées') return f.status === 'payée';
       if (FACTURE_FILTER === 'brouillon') return f.status === 'brouillon';
+      if (FACTURE_FILTER === 'aDeclarer') return f._aDeclarer;
       return true;
     });
+  }
+
+  // Bulk action bar
+  var selCount = Object.keys(FACTURE_SELECTION).filter(function(k) { return FACTURE_SELECTION[k]; }).length;
+  if (selCount > 0) {
+    var bulkBar = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', marginBottom: '12px', background: 'var(--accent-glow, rgba(0,153,255,0.1))', borderRadius: '8px', border: '1px solid var(--accent)' } });
+    bulkBar.appendChild(el('span', { style: { fontSize: '12px', fontWeight: '700', color: 'var(--accent)' } }, selCount + ' sélectionnée(s)'));
+    bulkBar.appendChild(el('button', { class: 'btn btn-sm', style: { fontSize: '10px', padding: '4px 10px', background: 'var(--info)', color: 'white', border: 'none', borderRadius: '6px' }, onclick: function() { bulkSetFactureStatus('envoyée'); } }, '📤 Envoyée'));
+    bulkBar.appendChild(el('button', { class: 'btn btn-sm', style: { fontSize: '10px', padding: '4px 10px', background: 'var(--success)', color: 'white', border: 'none', borderRadius: '6px' }, onclick: function() { bulkSetFactureStatus('payée'); } }, '✅ Payée'));
+    bulkBar.appendChild(el('button', { class: 'btn btn-sm', style: { fontSize: '10px', padding: '4px 10px' }, onclick: function() { FACTURE_SELECTION = {}; render(); } }, '✕ Désélectionner'));
+    container.appendChild(bulkBar);
   }
 
   if (factures.length === 0) {
@@ -18241,6 +18336,13 @@ function renderFacturesContent(container) {
         var card = el('div', { class: 'facture-card', onclick: function() { showFactureModal(f); } });
         card.setAttribute('data-facture-id', f.id);
         card.setAttribute('data-facture-mois', f.mois);
+        // Checkbox de sélection bulk
+        var cbx = el('input', { type: 'checkbox', style: { width: '16px', height: '16px', flexShrink: '0', cursor: 'pointer', accentColor: 'var(--accent)' } });
+        cbx.checked = !!FACTURE_SELECTION[f.id];
+        (function(fid, cb) {
+          cb.onclick = function(e) { e.stopPropagation(); FACTURE_SELECTION[fid] = cb.checked; render(); };
+        })(f.id, cbx);
+        card.appendChild(cbx);
         if (monthCount >= 2 && f.numero) {
           var dragHandle = el('div', { class: 'facture-drag-handle', title: 'Glisser pour permuter avec une autre facture du même mois' }, '⋮⋮');
           card.appendChild(dragHandle);
@@ -19734,6 +19836,7 @@ function renderFactures(container) {
     { key: 'brouillon', label: 'À créer', count: data.facturesStats.brouillon },
     { key: 'envoyées', label: 'Envoyées', count: data.facturesStats.envoyees },
     { key: 'retard', label: 'En retard', count: data.facturesStats.retard },
+    { key: 'aDeclarer', label: 'À déclarer', count: data.facturesStats.aDeclarer },
     { key: 'payées', label: 'Encaissé', count: data.facturesStats.payees }
   ];
   filters.forEach(function(f) {
@@ -19743,7 +19846,7 @@ function renderFactures(container) {
     chips.appendChild(chip);
   });
   container.appendChild(chips);
-  
+
   var factures = [];
   MISSIONS.forEach(function(m) {
     if (m.factures) m.factures.forEach(function(f) {
@@ -19751,13 +19854,12 @@ function renderFactures(container) {
       f.paymentMonth = getPaymentMonth(f.mois, m.delaiPaiement, m.jourPaiement);
       var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
       f.paymentDate = paymentDate;
-      f._missionId = m.id; // ID mission pour cycle paiement (évite référence circulaire)
-      // RETARD: facture envoyée ET date paiement dépassée
+      f._missionId = m.id;
       f.isLate = f.status === 'envoyée' && TODAY > paymentDate;
       factures.push(f);
     });
   });
-  
+
   // Filtre par statut
   if (FACTURE_FILTER !== 'all') {
     factures = factures.filter(function(f) {
@@ -19765,6 +19867,7 @@ function renderFactures(container) {
       if (FACTURE_FILTER === 'envoyées') return f.status === 'envoyée';
       if (FACTURE_FILTER === 'payées') return f.status === 'payée';
       if (FACTURE_FILTER === 'brouillon') return f.status === 'brouillon';
+      if (FACTURE_FILTER === 'aDeclarer') return f._aDeclarer;
       return true;
     });
   }
@@ -21131,8 +21234,8 @@ function renderCockpit(container) {
   var kpiBar = el('div', { class: 'kpi-grid', style: { marginBottom: '12px', gap: '6px' } });
   var kpis = [
     { label: 'CA Encaissé HT', value: EUR(data.caHT), color: 'var(--success)', click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); } },
-    { label: 'CA Latent HT', value: EUR(caLatentCockpit), color: caLatentCockpit > 0 ? 'var(--warning)' : 'var(--text-muted)', click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } },
-    { label: 'Autonomie', value: data.runway + ' mois', color: data.runway > 6 ? 'var(--success)' : data.runway > 3 ? 'var(--warning)' : 'var(--danger)', click: function() { showProjectionAutonomieModal(); } },
+    { label: 'Bénéfice Net', value: EUR(data.beneficeNet), color: data.beneficeNet >= 0 ? 'var(--success)' : 'var(--danger)', click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); } },
+    { label: 'Autonomie', value: (data.runwayEnrichi || data.runway) + ' mois', color: (data.runwayEnrichi || data.runway) > 6 ? 'var(--success)' : (data.runwayEnrichi || data.runway) > 3 ? 'var(--warning)' : 'var(--danger)', click: function() { showProjectionAutonomieModal(); } },
     { label: 'Tx Occupation', value: txOccup + '%', color: txOccup >= 70 ? 'var(--success)' : txOccup >= 40 ? 'var(--warning)' : 'var(--danger)', click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'missions'; render(); } }
   ];
   kpis.forEach(function(k) {
