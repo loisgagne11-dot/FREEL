@@ -1994,6 +1994,7 @@ var CURRENT_USER = null;
 var SYNC_ENABLED = false;
 var LAST_SYNC_TIME = null; // Timestamp de la dernière synchro réussie
 var _localSaveTimestamp = 0; // Timestamp du dernier save localStorage
+var _lastCloudTimestamp = 0; // Timestamp updated_at du cloud au dernier sync
 var CLOUD_SYNC_STATE = 'disconnected'; // 'disconnected', 'connected', 'synced', 'syncing', 'error'
 
 function loadSupabaseCredentials() {
@@ -2387,6 +2388,34 @@ function signOut() {
 
 // Sync intelligent : compare timestamps cloud vs local, prend la version la plus récente
 // Au démarrage quand connecté : le cloud est TOUJOURS la source de vérité.
+function _applyCloudData(cloudData, cloudTs) {
+  if (cloudData.company) COMPANY = Object.assign({}, cloudData.company);
+  if (cloudData.missions && Array.isArray(cloudData.missions)) MISSIONS = cloudData.missions;
+  if (cloudData.clients && Array.isArray(cloudData.clients)) CLIENTS = cloudData.clients;
+  if (cloudData.treasury) TREASURY = Object.assign({}, cloudData.treasury);
+  if (cloudData.ir_config) IR_CONFIG = cloudData.ir_config;
+  if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
+  if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
+  if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
+  if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
+  if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
+  MISSIONS.forEach(buildMission);
+  repairInvoiceNumbers();
+  COMPUTED = compute();
+  render();
+  _localSaveTimestamp = cloudTs;
+  _lastCloudTimestamp = cloudTs;
+  try { localStorage.setItem('freel_ts', String(cloudTs)); } catch(e) {}
+  try {
+    localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({
+      c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: cloudTs
+    }));
+  } catch(e) {}
+  LAST_SYNC_TIME = new Date();
+  updateAuthUI();
+  toast('☁️ Synchronisé', 'success');
+}
+
 // Le localStorage ne sert que de cache hors-ligne.
 // Si pas de données cloud → pousser le local (première connexion).
 function smartSync() {
@@ -2409,37 +2438,16 @@ function smartSync() {
       }
       if (!result.data) { syncToCloud(); return; }
 
-      // ☁️ Données cloud existantes → TOUJOURS les appliquer (cloud = source de vérité)
-      if (result.data.company) COMPANY = Object.assign({}, result.data.company);
-      if (result.data.missions && Array.isArray(result.data.missions)) MISSIONS = result.data.missions;
-      if (result.data.clients && Array.isArray(result.data.clients)) CLIENTS = result.data.clients;
-      if (result.data.treasury) TREASURY = Object.assign({}, result.data.treasury);
-      if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
-
-      // Migrations essentielles
-      if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
-      if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
-      if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
-      if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
-
-      MISSIONS.forEach(buildMission);
-      repairInvoiceNumbers();
-      COMPUTED = compute();
-      render();
-
-      // Mettre à jour le cache local avec les données cloud
       var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : Date.now();
-      _localSaveTimestamp = cloudTs;
-      try { localStorage.setItem('freel_ts', String(cloudTs)); } catch(e) {}
-      try {
-        localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({
-          c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: cloudTs
-        }));
-      } catch(e) {}
 
-      LAST_SYNC_TIME = new Date();
-      updateAuthUI();
-      toast('☁️ Synchronisé', 'success');
+      // Si le local a des modifications plus récentes que le cloud, demander à l'utilisateur
+      if (_localSaveTimestamp > cloudTs + 2000) {
+        showSyncConflictModal(cloudTs);
+        return;
+      }
+
+      // ☁️ Données cloud existantes → appliquer (cloud = source de vérité)
+      _applyCloudData(result.data, cloudTs);
     })
     .catch(function(err) {
       console.warn('Smart sync network error:', err);
@@ -2447,23 +2455,20 @@ function smartSync() {
     });
 }
 
-function syncToCloud() {
-  if (!CURRENT_USER || !supabaseClient) return;
-
-  try {
-    var data = {
-      user_id: CURRENT_USER.id,
-      company: COMPANY,
-      missions: MISSIONS,
-      clients: CLIENTS,
-      treasury: TREASURY,
-      ir_config: IR_CONFIG,
-      updated_at: new Date().toISOString()
-    };
-
-    supabaseClient.from('user_data')
-      .upsert(data, { onConflict: 'user_id' })
-      .then(function(result) {
+function _doSyncToCloud() {
+  var now = new Date();
+  var data = {
+    user_id: CURRENT_USER.id,
+    company: COMPANY,
+    missions: MISSIONS,
+    clients: CLIENTS,
+    treasury: TREASURY,
+    ir_config: IR_CONFIG,
+    updated_at: now.toISOString()
+  };
+  supabaseClient.from('user_data')
+    .upsert(data, { onConflict: 'user_id' })
+    .then(function(result) {
       if (result.error) {
         console.error('Sync error:', result.error);
         var msg = '❌ Sync échouée: ';
@@ -2476,15 +2481,65 @@ function syncToCloud() {
         }
         showToast(msg, 'error');
       } else {
-        LAST_SYNC_TIME = new Date();
+        _lastCloudTimestamp = now.getTime();
+        LAST_SYNC_TIME = now;
         updateAuthUI();
         showToast('☁️ Sauvegardé', 'success');
       }
     })
     .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
+}
+
+function syncToCloud(forceOverwrite) {
+  if (!CURRENT_USER || !supabaseClient) return;
+  try {
+    if (forceOverwrite || !_lastCloudTimestamp) {
+      _doSyncToCloud();
+      return;
+    }
+    supabaseClient.from('user_data')
+      .select('updated_at')
+      .eq('user_id', CURRENT_USER.id)
+      .single()
+      .then(function(result) {
+        if (result.error || !result.data) { _doSyncToCloud(); return; }
+        var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : 0;
+        if (cloudTs > _lastCloudTimestamp + 2000) {
+          showSyncConflictModal(cloudTs);
+        } else {
+          _doSyncToCloud();
+        }
+      })
+      .catch(function() { _doSyncToCloud(); });
   } catch (e) {
     console.error('[FREEL] syncToCloud error:', e);
   }
+}
+
+function showSyncConflictModal(cloudTs) {
+  var cloudDate = new Date(cloudTs).toLocaleString('fr-FR');
+  var localDate = new Date(_localSaveTimestamp).toLocaleString('fr-FR');
+  var content = el('div', {});
+  content.appendChild(el('p', { style: { marginBottom: '12px', color: 'var(--warning)' } },
+    '⚠️ Les données cloud ont été modifiées depuis un autre appareil.'));
+  var table = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', fontSize: '13px' } });
+  table.appendChild(el('div', { style: { padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px' } },
+    [el('div', { style: { fontWeight: '600', marginBottom: '4px' } }, '☁️ Cloud'), el('div', {}, cloudDate)]));
+  table.appendChild(el('div', { style: { padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px' } },
+    [el('div', { style: { fontWeight: '600', marginBottom: '4px' } }, '💻 Local'), el('div', {}, localDate)]));
+  content.appendChild(table);
+  var btns = el('div', { style: { display: 'flex', gap: '8px' } });
+  btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() {
+    closeDynamicModal(); _doSyncToCloud();
+  } }, '⬆️ Écraser le cloud'));
+  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() {
+    closeDynamicModal(); loadFromCloud();
+  } }, '⬇️ Garder le cloud'));
+  btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() {
+    closeDynamicModal(); toast('Sync annulée', 'info');
+  } }, 'Annuler'));
+  content.appendChild(btns);
+  showModal('Conflit de synchronisation', content);
 }
 
 function loadFromCloud() {
@@ -2524,19 +2579,8 @@ function loadFromCloud() {
         return;
       }
 
-      if (result.data.company) COMPANY = result.data.company;
-      if (result.data.missions) MISSIONS = result.data.missions;
-      if (result.data.clients) CLIENTS = result.data.clients;
-      if (result.data.treasury) TREASURY = result.data.treasury;
-      if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
-
-      MISSIONS.forEach(buildMission);
-      repairInvoiceNumbers();
-      COMPUTED = compute();
-      render();
-      LAST_SYNC_TIME = new Date();
-      updateAuthUI();
-      toast('Données chargées depuis le cloud', 'success');
+      var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : Date.now();
+      _applyCloudData(result.data, cloudTs);
     })
     .catch(function(err) { console.error('Cloud network error:', err); toast('Erreur réseau cloud', 'error'); });
 }
@@ -2800,7 +2844,8 @@ var COMPANY = {
   onboardingDone: true,
   invoiceCounter: {},
   invoiceRegistry: [],
-  invoiceFormat: 'YYYY-NNN'  // Format de numérotation: 'YYYY-NNN', 'YYYY-MM-DD-NNNNNN', 'F-YYYY-NNN', 'YYYYMM-NNN'
+  invoiceFormat: 'YYYY-NNN',
+  invoiceAuditLog: []
 };
 var MISSIONS = [
   {
@@ -2833,6 +2878,9 @@ var TREASURY = {
 };
 var IR_CONFIG = {}; // { '2025': { parts: 1, autresRevenus: 0, perAnnuel: 0 }, '2026': {...} }
 var COMPUTED = {};
+var _computeVersion = 0;
+var _computeCachedVersion = -1;
+function invalidateCompute() { _computeVersion++; }
 
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
@@ -3262,8 +3310,17 @@ function repairInvoiceNumbers() {
   }
 }
 
-// Permute les numéros de deux factures (correction manuelle d'un ordre inversé)
-// Pose numeroLock=true sur les deux pour empêcher repairInvoiceNumbers() de les ré-inverser.
+function logInvoiceAudit(action, factureId, details) {
+  if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
+  COMPANY.invoiceAuditLog.push({
+    ts: new Date().toISOString(),
+    action: action,
+    factureId: factureId,
+    details: details || ''
+  });
+  if (COMPANY.invoiceAuditLog.length > 500) COMPANY.invoiceAuditLog = COMPANY.invoiceAuditLog.slice(-500);
+}
+
 function swapInvoiceNumbers(factureId1, factureId2) {
   if (!factureId1 || !factureId2 || factureId1 === factureId2) return false;
   var f1 = null, mis1 = null, f2 = null, mis2 = null;
@@ -3310,6 +3367,7 @@ function swapInvoiceNumbers(factureId1, factureId2) {
     });
   }
 
+  logInvoiceAudit('swap', factureId1, f1.numero + ' ↔ ' + f2.numero + ' (' + f1.client + ' / ' + f2.client + ')');
   return true;
 }
 
@@ -3813,10 +3871,8 @@ function showClientModal(client) {
     delaiPaiement: 2, jourPaiement: 15
   };
   
-  $('#formModalTitle').textContent = isNew ? '🏢 Nouveau Client' : '✏️ ' + client.nom;
-  var body = $('#formModalBody');
-  body.replaceChildren();
-  
+  var body = openFormModal(isNew ? '🏢 Nouveau Client' : '✏️ ' + client.nom);
+
   body.appendChild(createInput('Nom / Raison sociale *', 'text', 'cNom', client.nom));
   body.appendChild(createTextarea('Adresse complète', 'cAdresse', client.adresse, 'Adresse facturation'));
   body.appendChild(createInput('SIRET', 'text', 'cSiret', client.siret));
@@ -3893,7 +3949,6 @@ function isInPeriod(ymStr) {
 // V74: Navigation mois avec flèches clavier (§8.2)
 function navigatePeriodMonth(delta) {
   if (PERIOD.month === null || PERIOD.month === undefined || PERIOD.month === '') {
-    // Année entière -> sélectionner le mois en cours
     PERIOD.month = TODAY.getMonth();
   } else {
     var m = parseInt(PERIOD.month) + delta;
@@ -3901,6 +3956,7 @@ function navigatePeriodMonth(delta) {
     else if (m < 0) { m = 11; PERIOD.year--; }
     PERIOD.month = m;
   }
+  invalidateCompute();
   render();
 }
 function getPeriodMonths() {
@@ -4148,7 +4204,9 @@ function setFactureStatus(factureId, newStatus) {
   MISSIONS.forEach(function(m) {
     if (m.factures) m.factures.forEach(function(f) {
       if (f.id === factureId) {
+        var oldStatus = f.status;
         f.status = newStatus;
+        if (oldStatus !== newStatus) logInvoiceAudit('status', factureId, oldStatus + ' → ' + newStatus + ' (' + (f.numero || f.client) + ')');
         // Enregistrer la date d'envoi quand on passe en envoyée
         if (newStatus === 'envoyée' && !f.dateEnvoi) {
           f.dateEnvoi = localISO(TODAY);
@@ -5247,14 +5305,42 @@ function buildMission(mis) {
     l.joursReels = jours;
     var ht = jours * mis.tjm;
     var tva = isTVAApplicable(l.ym) ? Math.round(ht * LEGAL.tvaRate * 100) / 100 : 0;
-    if (existing) { existing.jours = jours; existing.ht = ht; existing.tva = tva; existing.ttc = ht + tva; existing.client = mis.client; newFactures.push(existing); }
-    else { newFactures.push({ id: 'F-' + mis.id + '-' + l.ym, mois: l.ym, client: mis.client, jours: jours, ht: ht, tva: tva, ttc: ht + tva, status: 'brouillon' }); }
+    if (existing) {
+      if (existing.status === 'payée') {
+        newFactures.push(existing);
+      } else {
+        existing.jours = jours; existing.ht = ht; existing.tva = tva; existing.ttc = ht + tva; existing.client = mis.client; newFactures.push(existing);
+      }
+    }
+    else {
+      var newF = { id: 'F-' + mis.id + '-' + l.ym, mois: l.ym, client: mis.client, jours: jours, ht: ht, tva: tva, ttc: ht + tva, status: 'brouillon' };
+      newFactures.push(newF);
+      logInvoiceAudit('create', newF.id, newF.client + ' · ' + l.ym + ' · ' + ht + '€ HT');
+    }
   });
   mis.factures = newFactures;
 }
 
 function openModal(id) { $('#' + id).classList.add('active'); }
 function closeModal(id) { $('#' + id).classList.remove('active'); }
+
+function openFormModal(title, renderFn) {
+  $('#formModalTitle').textContent = title;
+  var body = $('#formModalBody');
+  body.replaceChildren();
+  if (renderFn) renderFn(body);
+  openModal('formModal');
+  return body;
+}
+
+function openDetailModal(title, renderFn) {
+  $('#detailModalTitle').textContent = title;
+  var body = $('#detailModalBody');
+  body.replaceChildren();
+  if (renderFn) renderFn(body);
+  openModal('detailModal');
+  return body;
+}
 function closeAllModals() { $$('.modal').forEach(function(m) { m.classList.remove('active'); }); }
 // SPRINT 3: Accessibilité — Escape ferme tous les modals et overlays
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeDynamicModal(); closeAllModals(); } });
@@ -5288,9 +5374,7 @@ function showFabMenu() {
 
 // Modal pour télécharger une facture (sélection mission + mois)
 function showDownloadInvoiceModal() {
-  $('#formModalTitle').textContent = '📄 Télécharger Facture';
-  var body = $('#formModalBody');
-  body.replaceChildren();
+  var body = openFormModal('📄 Télécharger Facture');
 
   // Sélection de la mission
   var missionSelect = el('select', { id: 'downloadInvoiceMission', style: { width: '100%', padding: '10px', marginBottom: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' } });
@@ -5458,13 +5542,12 @@ function cleanupLocalStorage() {
   toRemove.forEach(function(k) { localStorage.removeItem(k); });
 }
 
-function saveAll() {
+function _saveAllImmediate() {
+  invalidateCompute();
   var localOk = false;
-  // Timestamp dans une clé minuscule (réussit toujours, même si localStorage est quasi plein)
   var now = Date.now();
   _localSaveTimestamp = now;
   try { localStorage.setItem('freel_ts', String(now)); } catch(e) {}
-  // 1. Tenter localStorage
   try {
     var bundle = JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: now });
     ['company', 'missions', 'clients', 'treasury', 'ir_config'].forEach(function(k) {
@@ -5477,18 +5560,28 @@ function saveAll() {
     try {
       localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({ c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: Date.now() }));
       localOk = true;
-    } catch (e2) { /* localStorage plein */ }
+    } catch (e2) {
+      if (e2.name === 'QuotaExceededError') toast('Stockage local plein — certaines données ne seront pas sauvegardées', 'error');
+    }
   }
-  // Cloud sync (silencieux — ne sync que si connecté)
   if (CURRENT_USER && SYNC_ENABLED) {
     syncToCloud();
   }
 }
 
-// Auto-save quand l'onglet devient caché (le sync cloud a le temps de finir)
+var _saveAllTimer = null;
+function saveAll() {
+  if (_saveAllTimer) clearTimeout(_saveAllTimer);
+  _saveAllTimer = setTimeout(function() { _saveAllTimer = null; _saveAllImmediate(); }, 50);
+}
+
+// Auto-save quand l'onglet devient caché (immédiat, pas debounced — le navigateur peut tuer le timer)
 if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'hidden') saveAll();
+    if (document.visibilityState === 'hidden') {
+      if (_saveAllTimer) { clearTimeout(_saveAllTimer); _saveAllTimer = null; }
+      _saveAllImmediate();
+    }
   });
 }
 
@@ -5524,11 +5617,11 @@ function loadAll() {
       IR_CONFIG[year].perAnnuel = COMPANY.perAnnuel || 0;
       delete COMPANY.irParts; delete COMPANY.autresRevenus; delete COMPANY.perAnnuel;
     }
-    // Migration - initialiser invoiceCounter, invoiceRegistry et invoiceFormat si absents
     if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
     if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
     if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
     if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
+    if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
     // Migration clients depuis missions existantes
     if (CLIENTS.length === 0 && MISSIONS.length > 0) {
       var clientNames = {};
@@ -5602,6 +5695,7 @@ function importData(file) {
       if (data.irConfig) IR_CONFIG = Object.assign(IR_CONFIG, data.irConfig);
       if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
       if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
+      if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
       MISSIONS.forEach(buildMission);
       saveAll(); render();
       showToast('Import réussi!', 'success');
@@ -5968,6 +6062,10 @@ function computeAlerts(data) {
 
 // COMPUTE - Charges liées au mois d'ENCAISSEMENT (pas réalisation)
 function compute() {
+  if (_computeCachedVersion === _computeVersion && COMPUTED && COMPUTED.monthsData) {
+    return COMPUTED;
+  }
+  _computeCachedVersion = _computeVersion;
   var months = getPeriodMonths();
   var nowYm = ym(TODAY.getFullYear(), TODAY.getMonth());
   
@@ -9375,6 +9473,11 @@ function recalcDaysTable(mission) {
 }
 
 function saveDaysFromEditor(mission) {
+  var paidMonths = [];
+  if (mission.factures) mission.factures.forEach(function(f) { if (f.status === 'payée') paidMonths.push(f.mois); });
+  if (paidMonths.length > 0) {
+    toast('Attention : les mois avec facture payée (' + paidMonths.map(fmtMonthShort).join(', ') + ') ne seront pas recalculés (Art. L123-28)', 'info');
+  }
   mission.lignes.forEach(function(l, idx) {
     var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
     var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
@@ -9449,9 +9552,7 @@ var CHARGE_CATEGORIES = [
 ];
 
 function showChargeModal() {
-  $('#formModalTitle').textContent = '📋 Ajouter une Charge';
-  var body = $('#formModalBody');
-  body.replaceChildren();
+  var body = openFormModal('📋 Ajouter une Charge');
   
   // Onglets: Ponctuelle / Récurrente
   var tabs = el('div', { class: 'filter-tabs', style: { marginBottom: '16px' } });
@@ -9629,9 +9730,7 @@ function showChargeRecurrente() {
 
 function showSalaireModal(montant) {
   var data = compute();
-  $('#formModalTitle').textContent = '💸 Verser une Rémunération';
-  var body = $('#formModalBody');
-  body.replaceChildren();
+  var body = openFormModal('💸 Verser une Rémunération');
   var info = el('div', { style: { background: 'var(--success-glow)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' } });
   info.innerHTML = '<strong>💡 Recommandation</strong><br>Cash dispo: ' + EUR(data.cashDispoAbsolu) + ' → Suggéré: <strong>' + EUR(data.salaireReco) + '</strong>';
   body.appendChild(info);
@@ -10186,9 +10285,8 @@ function showCongesOverview() {
 }
 
 function showFactureModal(facture) {
-  $('#formModalTitle').textContent = '📄 ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
+  openFormModal('📄 ' + facture.client + ' · ' + fmtMonthShort(facture.mois));
   var body = $('#formModalBody');
-  body.replaceChildren();
 
   // Trouver la mission associée
   var mission = MISSIONS.find(function(m) { return m.factures && m.factures.some(function(f) { return f.id === facture.id; }); });
@@ -10234,6 +10332,10 @@ function showFactureModal(facture) {
           if (f.mois && f.mois.indexOf('2026-02') !== -1) _allIds.push(f.id);
           if (f.id === facture.id) {
             _matched = true;
+            if (f.status === 'payée' && newStatus !== 'payée') {
+              toast('Impossible de modifier le statut d\'une facture payée (Art. L123-28)', 'error');
+              return;
+            }
             f.status = newStatus;
             // Date envoi
             var de = $('#fDateEnvoi').value;
@@ -14487,7 +14589,8 @@ function getTotalCA() {
 
 // Sprint 14: Notification Center
 var NOTIF_OPEN = false;
-var NOTIF_READ = JSON.parse(localStorage.getItem('freel_notif_read') || '[]');
+var NOTIF_READ = [];
+try { NOTIF_READ = JSON.parse(localStorage.getItem('freel_notif_read') || '[]'); } catch(e) { console.warn('[FREEL] freel_notif_read corrompu, reset'); }
 
 function getNotifications() {
   var notifs = [];
@@ -20371,6 +20474,21 @@ function renderAdmin(container) {
     factCard.appendChild(folderBtns2);
   }
 
+  // Audit log
+  var auditLog = COMPANY.invoiceAuditLog || [];
+  if (auditLog.length > 0) {
+    factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
+    factCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '6px' } }, '📋 Journal des modifications (' + auditLog.length + ')'));
+    var logList = el('div', { style: { maxHeight: '150px', overflowY: 'auto', fontSize: '10px', color: 'var(--text-muted)', lineHeight: '1.6' } });
+    var icons = { create: '🆕', status: '📝', swap: '🔄', delete: '🗑️' };
+    auditLog.slice(-20).reverse().forEach(function(entry) {
+      var d = new Date(entry.ts);
+      var line = (icons[entry.action] || '•') + ' ' + d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' — ' + (entry.details || entry.action);
+      logList.appendChild(el('div', {}, line));
+    });
+    factCard.appendChild(logList);
+  }
+
   makeCollapsible(factCard, factTitle, 'cfg_facturation', false);
   container.appendChild(factCard);
 
@@ -20920,7 +21038,7 @@ function renderAdmin(container) {
       clients: CLIENTS,
       treasury: TREASURY,
       irConfig: IR_CONFIG,
-      congesDates: localStorage.getItem(STORAGE_PREFIX + 'conges') ? JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'conges')) : [],
+      congesDates: (function() { try { var raw = localStorage.getItem(STORAGE_PREFIX + 'conges'); return raw ? JSON.parse(raw) : []; } catch(e) { return []; } })(),
       goalCA: localStorage.getItem('freel_goal_ca') || null,
       theme: localStorage.getItem('freel_theme') || null,
       notificationsRead: localStorage.getItem('freel_notif_read') || null
@@ -21423,6 +21541,7 @@ function adaptMobileGrids() {
 window.addEventListener('resize', function() { if (window.innerWidth <= 600) adaptMobileGrids(); });
 
 function render() {
+  invalidateCompute();
   var container = $('#app');
   if (!container) { console.error('Container #app not found'); return; }
   container.replaceChildren();
