@@ -1994,6 +1994,7 @@ var CURRENT_USER = null;
 var SYNC_ENABLED = false;
 var LAST_SYNC_TIME = null; // Timestamp de la dernière synchro réussie
 var _localSaveTimestamp = 0; // Timestamp du dernier save localStorage
+var _lastCloudTimestamp = 0; // Timestamp updated_at du cloud au dernier sync
 var CLOUD_SYNC_STATE = 'disconnected'; // 'disconnected', 'connected', 'synced', 'syncing', 'error'
 
 function loadSupabaseCredentials() {
@@ -2387,6 +2388,34 @@ function signOut() {
 
 // Sync intelligent : compare timestamps cloud vs local, prend la version la plus récente
 // Au démarrage quand connecté : le cloud est TOUJOURS la source de vérité.
+function _applyCloudData(cloudData, cloudTs) {
+  if (cloudData.company) COMPANY = Object.assign({}, cloudData.company);
+  if (cloudData.missions && Array.isArray(cloudData.missions)) MISSIONS = cloudData.missions;
+  if (cloudData.clients && Array.isArray(cloudData.clients)) CLIENTS = cloudData.clients;
+  if (cloudData.treasury) TREASURY = Object.assign({}, cloudData.treasury);
+  if (cloudData.ir_config) IR_CONFIG = cloudData.ir_config;
+  if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
+  if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
+  if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
+  if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
+  if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
+  MISSIONS.forEach(buildMission);
+  repairInvoiceNumbers();
+  COMPUTED = compute();
+  render();
+  _localSaveTimestamp = cloudTs;
+  _lastCloudTimestamp = cloudTs;
+  try { localStorage.setItem('freel_ts', String(cloudTs)); } catch(e) {}
+  try {
+    localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({
+      c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: cloudTs
+    }));
+  } catch(e) {}
+  LAST_SYNC_TIME = new Date();
+  updateAuthUI();
+  toast('☁️ Synchronisé', 'success');
+}
+
 // Le localStorage ne sert que de cache hors-ligne.
 // Si pas de données cloud → pousser le local (première connexion).
 function smartSync() {
@@ -2409,37 +2438,16 @@ function smartSync() {
       }
       if (!result.data) { syncToCloud(); return; }
 
-      // ☁️ Données cloud existantes → TOUJOURS les appliquer (cloud = source de vérité)
-      if (result.data.company) COMPANY = Object.assign({}, result.data.company);
-      if (result.data.missions && Array.isArray(result.data.missions)) MISSIONS = result.data.missions;
-      if (result.data.clients && Array.isArray(result.data.clients)) CLIENTS = result.data.clients;
-      if (result.data.treasury) TREASURY = Object.assign({}, result.data.treasury);
-      if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
-
-      // Migrations essentielles
-      if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
-      if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
-      if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
-      if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
-
-      MISSIONS.forEach(buildMission);
-      repairInvoiceNumbers();
-      COMPUTED = compute();
-      render();
-
-      // Mettre à jour le cache local avec les données cloud
       var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : Date.now();
-      _localSaveTimestamp = cloudTs;
-      try { localStorage.setItem('freel_ts', String(cloudTs)); } catch(e) {}
-      try {
-        localStorage.setItem(STORAGE_PREFIX + 'bundle', JSON.stringify({
-          c: COMPANY, m: MISSIONS, cl: CLIENTS, t: TREASURY, ir: IR_CONFIG, _ts: cloudTs
-        }));
-      } catch(e) {}
 
-      LAST_SYNC_TIME = new Date();
-      updateAuthUI();
-      toast('☁️ Synchronisé', 'success');
+      // Si le local a des modifications plus récentes que le cloud, demander à l'utilisateur
+      if (_localSaveTimestamp > cloudTs + 2000) {
+        showSyncConflictModal(cloudTs);
+        return;
+      }
+
+      // ☁️ Données cloud existantes → appliquer (cloud = source de vérité)
+      _applyCloudData(result.data, cloudTs);
     })
     .catch(function(err) {
       console.warn('Smart sync network error:', err);
@@ -2447,23 +2455,20 @@ function smartSync() {
     });
 }
 
-function syncToCloud() {
-  if (!CURRENT_USER || !supabaseClient) return;
-
-  try {
-    var data = {
-      user_id: CURRENT_USER.id,
-      company: COMPANY,
-      missions: MISSIONS,
-      clients: CLIENTS,
-      treasury: TREASURY,
-      ir_config: IR_CONFIG,
-      updated_at: new Date().toISOString()
-    };
-
-    supabaseClient.from('user_data')
-      .upsert(data, { onConflict: 'user_id' })
-      .then(function(result) {
+function _doSyncToCloud() {
+  var now = new Date();
+  var data = {
+    user_id: CURRENT_USER.id,
+    company: COMPANY,
+    missions: MISSIONS,
+    clients: CLIENTS,
+    treasury: TREASURY,
+    ir_config: IR_CONFIG,
+    updated_at: now.toISOString()
+  };
+  supabaseClient.from('user_data')
+    .upsert(data, { onConflict: 'user_id' })
+    .then(function(result) {
       if (result.error) {
         console.error('Sync error:', result.error);
         var msg = '❌ Sync échouée: ';
@@ -2476,15 +2481,65 @@ function syncToCloud() {
         }
         showToast(msg, 'error');
       } else {
-        LAST_SYNC_TIME = new Date();
+        _lastCloudTimestamp = now.getTime();
+        LAST_SYNC_TIME = now;
         updateAuthUI();
         showToast('☁️ Sauvegardé', 'success');
       }
     })
     .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
+}
+
+function syncToCloud(forceOverwrite) {
+  if (!CURRENT_USER || !supabaseClient) return;
+  try {
+    if (forceOverwrite || !_lastCloudTimestamp) {
+      _doSyncToCloud();
+      return;
+    }
+    supabaseClient.from('user_data')
+      .select('updated_at')
+      .eq('user_id', CURRENT_USER.id)
+      .single()
+      .then(function(result) {
+        if (result.error || !result.data) { _doSyncToCloud(); return; }
+        var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : 0;
+        if (cloudTs > _lastCloudTimestamp + 2000) {
+          showSyncConflictModal(cloudTs);
+        } else {
+          _doSyncToCloud();
+        }
+      })
+      .catch(function() { _doSyncToCloud(); });
   } catch (e) {
     console.error('[FREEL] syncToCloud error:', e);
   }
+}
+
+function showSyncConflictModal(cloudTs) {
+  var cloudDate = new Date(cloudTs).toLocaleString('fr-FR');
+  var localDate = new Date(_localSaveTimestamp).toLocaleString('fr-FR');
+  var content = el('div', {});
+  content.appendChild(el('p', { style: { marginBottom: '12px', color: 'var(--warning)' } },
+    '⚠️ Les données cloud ont été modifiées depuis un autre appareil.'));
+  var table = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', fontSize: '13px' } });
+  table.appendChild(el('div', { style: { padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px' } },
+    [el('div', { style: { fontWeight: '600', marginBottom: '4px' } }, '☁️ Cloud'), el('div', {}, cloudDate)]));
+  table.appendChild(el('div', { style: { padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px' } },
+    [el('div', { style: { fontWeight: '600', marginBottom: '4px' } }, '💻 Local'), el('div', {}, localDate)]));
+  content.appendChild(table);
+  var btns = el('div', { style: { display: 'flex', gap: '8px' } });
+  btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() {
+    closeDynamicModal(); _doSyncToCloud();
+  } }, '⬆️ Écraser le cloud'));
+  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() {
+    closeDynamicModal(); loadFromCloud();
+  } }, '⬇️ Garder le cloud'));
+  btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() {
+    closeDynamicModal(); toast('Sync annulée', 'info');
+  } }, 'Annuler'));
+  content.appendChild(btns);
+  showModal('Conflit de synchronisation', content);
 }
 
 function loadFromCloud() {
@@ -2524,19 +2579,8 @@ function loadFromCloud() {
         return;
       }
 
-      if (result.data.company) COMPANY = result.data.company;
-      if (result.data.missions) MISSIONS = result.data.missions;
-      if (result.data.clients) CLIENTS = result.data.clients;
-      if (result.data.treasury) TREASURY = result.data.treasury;
-      if (result.data.ir_config) IR_CONFIG = result.data.ir_config;
-
-      MISSIONS.forEach(buildMission);
-      repairInvoiceNumbers();
-      COMPUTED = compute();
-      render();
-      LAST_SYNC_TIME = new Date();
-      updateAuthUI();
-      toast('Données chargées depuis le cloud', 'success');
+      var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : Date.now();
+      _applyCloudData(result.data, cloudTs);
     })
     .catch(function(err) { console.error('Cloud network error:', err); toast('Erreur réseau cloud', 'error'); });
 }
@@ -2800,7 +2844,8 @@ var COMPANY = {
   onboardingDone: true,
   invoiceCounter: {},
   invoiceRegistry: [],
-  invoiceFormat: 'YYYY-NNN'  // Format de numérotation: 'YYYY-NNN', 'YYYY-MM-DD-NNNNNN', 'F-YYYY-NNN', 'YYYYMM-NNN'
+  invoiceFormat: 'YYYY-NNN',
+  invoiceAuditLog: []
 };
 var MISSIONS = [
   {
@@ -3265,8 +3310,17 @@ function repairInvoiceNumbers() {
   }
 }
 
-// Permute les numéros de deux factures (correction manuelle d'un ordre inversé)
-// Pose numeroLock=true sur les deux pour empêcher repairInvoiceNumbers() de les ré-inverser.
+function logInvoiceAudit(action, factureId, details) {
+  if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
+  COMPANY.invoiceAuditLog.push({
+    ts: new Date().toISOString(),
+    action: action,
+    factureId: factureId,
+    details: details || ''
+  });
+  if (COMPANY.invoiceAuditLog.length > 500) COMPANY.invoiceAuditLog = COMPANY.invoiceAuditLog.slice(-500);
+}
+
 function swapInvoiceNumbers(factureId1, factureId2) {
   if (!factureId1 || !factureId2 || factureId1 === factureId2) return false;
   var f1 = null, mis1 = null, f2 = null, mis2 = null;
@@ -3313,6 +3367,7 @@ function swapInvoiceNumbers(factureId1, factureId2) {
     });
   }
 
+  logInvoiceAudit('swap', factureId1, f1.numero + ' ↔ ' + f2.numero + ' (' + f1.client + ' / ' + f2.client + ')');
   return true;
 }
 
@@ -4149,7 +4204,9 @@ function setFactureStatus(factureId, newStatus) {
   MISSIONS.forEach(function(m) {
     if (m.factures) m.factures.forEach(function(f) {
       if (f.id === factureId) {
+        var oldStatus = f.status;
         f.status = newStatus;
+        if (oldStatus !== newStatus) logInvoiceAudit('status', factureId, oldStatus + ' → ' + newStatus + ' (' + (f.numero || f.client) + ')');
         // Enregistrer la date d'envoi quand on passe en envoyée
         if (newStatus === 'envoyée' && !f.dateEnvoi) {
           f.dateEnvoi = localISO(TODAY);
@@ -5255,7 +5312,11 @@ function buildMission(mis) {
         existing.jours = jours; existing.ht = ht; existing.tva = tva; existing.ttc = ht + tva; existing.client = mis.client; newFactures.push(existing);
       }
     }
-    else { newFactures.push({ id: 'F-' + mis.id + '-' + l.ym, mois: l.ym, client: mis.client, jours: jours, ht: ht, tva: tva, ttc: ht + tva, status: 'brouillon' }); }
+    else {
+      var newF = { id: 'F-' + mis.id + '-' + l.ym, mois: l.ym, client: mis.client, jours: jours, ht: ht, tva: tva, ttc: ht + tva, status: 'brouillon' };
+      newFactures.push(newF);
+      logInvoiceAudit('create', newF.id, newF.client + ' · ' + l.ym + ' · ' + ht + '€ HT');
+    }
   });
   mis.factures = newFactures;
 }
@@ -5556,11 +5617,11 @@ function loadAll() {
       IR_CONFIG[year].perAnnuel = COMPANY.perAnnuel || 0;
       delete COMPANY.irParts; delete COMPANY.autresRevenus; delete COMPANY.perAnnuel;
     }
-    // Migration - initialiser invoiceCounter, invoiceRegistry et invoiceFormat si absents
     if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
     if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
     if (!COMPANY.invoiceFormat) COMPANY.invoiceFormat = 'YYYY-NNN';
     if (COMPANY.invoiceGlobalCounter === undefined) COMPANY.invoiceGlobalCounter = 0;
+    if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
     // Migration clients depuis missions existantes
     if (CLIENTS.length === 0 && MISSIONS.length > 0) {
       var clientNames = {};
@@ -5634,6 +5695,7 @@ function importData(file) {
       if (data.irConfig) IR_CONFIG = Object.assign(IR_CONFIG, data.irConfig);
       if (!COMPANY.invoiceCounter) COMPANY.invoiceCounter = {};
       if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
+      if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
       MISSIONS.forEach(buildMission);
       saveAll(); render();
       showToast('Import réussi!', 'success');
@@ -20410,6 +20472,21 @@ function renderAdmin(container) {
       } }, '✕'));
     }
     factCard.appendChild(folderBtns2);
+  }
+
+  // Audit log
+  var auditLog = COMPANY.invoiceAuditLog || [];
+  if (auditLog.length > 0) {
+    factCard.appendChild(el('div', { style: { marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--glass-border)' } }));
+    factCard.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', marginBottom: '6px' } }, '📋 Journal des modifications (' + auditLog.length + ')'));
+    var logList = el('div', { style: { maxHeight: '150px', overflowY: 'auto', fontSize: '10px', color: 'var(--text-muted)', lineHeight: '1.6' } });
+    var icons = { create: '🆕', status: '📝', swap: '🔄', delete: '🗑️' };
+    auditLog.slice(-20).reverse().forEach(function(entry) {
+      var d = new Date(entry.ts);
+      var line = (icons[entry.action] || '•') + ' ' + d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + ' — ' + (entry.details || entry.action);
+      logList.appendChild(el('div', {}, line));
+    });
+    factCard.appendChild(logList);
   }
 
   makeCollapsible(factCard, factTitle, 'cfg_facturation', false);
