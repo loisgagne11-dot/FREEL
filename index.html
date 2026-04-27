@@ -2165,7 +2165,7 @@ function showAuthModal() {
     content.appendChild(dataGrid);
 
     var btns = el('div', { style: { display: 'flex', gap: '10px' } });
-    btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() { syncToCloud(); closeDynamicModal(); } }, '⬆️ Sauvegarder'));
+    btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() { _doSyncToCloud(); closeDynamicModal(); } }, '⬆️ Sauvegarder'));
     btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() { loadFromCloud(); closeDynamicModal(); } }, '⬇️ Charger'));
     content.appendChild(btns);
 
@@ -2376,6 +2376,7 @@ function signIn() {
 }
 
 function signOut() {
+  _unsubscribeRealtime();
   supabaseClient.auth.signOut().then(function() {
     CURRENT_USER = null;
     LAST_SYNC_TIME = null;
@@ -2386,8 +2387,6 @@ function signOut() {
   .catch(function(err) { console.error('Sign out error:', err); toast('Erreur de déconnexion', 'error'); });
 }
 
-// Sync intelligent : compare timestamps cloud vs local, prend la version la plus récente
-// Au démarrage quand connecté : le cloud est TOUJOURS la source de vérité.
 function _applyCloudData(cloudData, cloudTs) {
   if (cloudData.company) COMPANY = Object.assign({}, cloudData.company);
   if (cloudData.missions && Array.isArray(cloudData.missions)) MISSIONS = cloudData.missions;
@@ -2417,8 +2416,6 @@ function _applyCloudData(cloudData, cloudTs) {
   toast('☁️ Synchronisé', 'success');
 }
 
-// Le localStorage ne sert que de cache hors-ligne.
-// Si pas de données cloud → pousser le local (première connexion).
 function smartSync() {
   if (!CURRENT_USER || !supabaseClient) return;
 
@@ -2429,31 +2426,25 @@ function smartSync() {
     .then(function(result) {
       if (result.error) {
         if (result.error.code === 'PGRST116') {
-          // Aucune donnée cloud → première connexion, pousser le local
-          syncToCloud();
+          _doSyncToCloud();
         } else {
           console.warn('Smart sync error:', result.error);
-          // Erreur réseau/autre : garder les données locales, ne pas écraser
         }
         return;
       }
-      if (!result.data) { syncToCloud(); return; }
+      if (!result.data) { _doSyncToCloud(); return; }
 
       var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : Date.now();
 
-      // Si le local a des modifications plus récentes que le cloud, demander à l'utilisateur
-      if (_localSaveTimestamp > cloudTs + 2000) {
-        showSyncConflictModal(cloudTs);
-        return;
+      if (cloudTs > _lastCloudTimestamp) {
+        _applyCloudData(result.data, cloudTs);
       }
-
-      // ☁️ Données cloud existantes → appliquer (cloud = source de vérité)
-      _applyCloudData(result.data, cloudTs);
     })
     .catch(function(err) {
       console.warn('Smart sync network error:', err);
-      // Pas de réseau → garder les données locales (mode hors-ligne)
     });
+
+  _subscribeRealtime();
 }
 
 function _doSyncToCloud() {
@@ -2467,10 +2458,12 @@ function _doSyncToCloud() {
     ir_config: IR_CONFIG,
     updated_at: now.toISOString()
   };
+  _realtimeIgnoreNext = true;
   supabaseClient.from('user_data')
     .upsert(data, { onConflict: 'user_id' })
     .then(function(result) {
       if (result.error) {
+        _realtimeIgnoreNext = false;
         console.error('Sync error:', result.error);
         var msg = '❌ Sync échouée: ';
         if (result.error.message && result.error.message.includes('column')) {
@@ -2485,62 +2478,57 @@ function _doSyncToCloud() {
         _lastCloudTimestamp = now.getTime();
         LAST_SYNC_TIME = now;
         updateAuthUI();
-        showToast('☁️ Sauvegardé', 'success');
       }
     })
-    .catch(function(err) { console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
+    .catch(function(err) { _realtimeIgnoreNext = false; console.error('Sync network error:', err); showToast('❌ Erreur réseau, réessayez plus tard.', 'error'); });
 }
 
-function syncToCloud(forceOverwrite) {
+var _cloudSyncTimer = null;
+var _cloudSyncPending = false;
+function syncToCloud() {
   if (!CURRENT_USER || !supabaseClient) return;
-  try {
-    if (forceOverwrite || !_lastCloudTimestamp) {
+  _cloudSyncPending = true;
+  if (_cloudSyncTimer) return;
+  _cloudSyncTimer = setTimeout(function() {
+    _cloudSyncTimer = null;
+    if (_cloudSyncPending) {
+      _cloudSyncPending = false;
       _doSyncToCloud();
-      return;
     }
-    supabaseClient.from('user_data')
-      .select('updated_at')
-      .eq('user_id', CURRENT_USER.id)
-      .single()
-      .then(function(result) {
-        if (result.error || !result.data) { _doSyncToCloud(); return; }
-        var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : 0;
-        if (cloudTs > _lastCloudTimestamp + 2000) {
-          showSyncConflictModal(cloudTs);
-        } else {
-          _doSyncToCloud();
-        }
+  }, 2000);
+}
+
+var _realtimeChannel = null;
+var _realtimeIgnoreNext = false;
+function _subscribeRealtime() {
+  if (_realtimeChannel || !supabaseClient || !CURRENT_USER) return;
+  try {
+    _realtimeChannel = supabaseClient
+      .channel('user_data_changes')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'user_data',
+        filter: 'user_id=eq.' + CURRENT_USER.id
+      }, function(payload) {
+        if (_realtimeIgnoreNext) { _realtimeIgnoreNext = false; return; }
+        var row = payload.new;
+        if (!row) return;
+        var cloudTs = row.updated_at ? new Date(row.updated_at).getTime() : Date.now();
+        if (cloudTs <= _lastCloudTimestamp) return;
+        _applyCloudData(row, cloudTs);
       })
-      .catch(function() { _doSyncToCloud(); });
+      .subscribe();
   } catch (e) {
-    console.error('[FREEL] syncToCloud error:', e);
+    console.warn('[FREEL] Realtime subscription error:', e);
   }
 }
 
-function showSyncConflictModal(cloudTs) {
-  var cloudDate = new Date(cloudTs).toLocaleString('fr-FR');
-  var localDate = new Date(_localSaveTimestamp).toLocaleString('fr-FR');
-  var content = el('div', {});
-  content.appendChild(el('p', { style: { marginBottom: '12px', color: 'var(--warning)' } },
-    '⚠️ Les données cloud ont été modifiées depuis un autre appareil.'));
-  var table = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', fontSize: '13px' } });
-  table.appendChild(el('div', { style: { padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px' } },
-    [el('div', { style: { fontWeight: '600', marginBottom: '4px' } }, '☁️ Cloud'), el('div', {}, cloudDate)]));
-  table.appendChild(el('div', { style: { padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '6px' } },
-    [el('div', { style: { fontWeight: '600', marginBottom: '4px' } }, '💻 Local'), el('div', {}, localDate)]));
-  content.appendChild(table);
-  var btns = el('div', { style: { display: 'flex', gap: '8px' } });
-  btns.appendChild(el('button', { class: 'btn btn-primary', style: { flex: 1 }, onclick: function() {
-    closeDynamicModal(); _doSyncToCloud();
-  } }, '⬆️ Écraser le cloud'));
-  btns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() {
-    closeDynamicModal(); loadFromCloud();
-  } }, '⬇️ Garder le cloud'));
-  btns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: function() {
-    closeDynamicModal(); toast('Sync annulée', 'info');
-  } }, 'Annuler'));
-  content.appendChild(btns);
-  showModal('Conflit de synchronisation', content);
+function _unsubscribeRealtime() {
+  if (_realtimeChannel && supabaseClient) {
+    try { supabaseClient.removeChannel(_realtimeChannel); } catch(e) {}
+    _realtimeChannel = null;
+  }
 }
 
 function loadFromCloud() {
@@ -2561,24 +2549,6 @@ function loadFromCloud() {
         return;
       }
       if (!result.data) return;
-
-      // Toujours demander confirmation avant d'écraser
-      var cloudMissions = (result.data.missions || []).length;
-      var cloudClients = (result.data.clients || []).length;
-      var localMissions = MISSIONS.length;
-      var localClients = CLIENTS.length;
-      var cloudDate = result.data.updated_at ? new Date(result.data.updated_at).toLocaleString('fr-FR') : 'inconnue';
-
-      var msg = 'Remplacer vos données locales par celles du cloud ?\n\n' +
-        'CLOUD : ' + cloudMissions + ' mission(s), ' + cloudClients + ' client(s)\n' +
-        '(dernière mise à jour : ' + cloudDate + ')\n\n' +
-        'LOCAL : ' + localMissions + ' mission(s), ' + localClients + ' client(s)\n\n' +
-        'Vos données locales seront écrasées.';
-
-      if (!confirm(msg)) {
-        toast('Chargement annulé', 'info');
-        return;
-      }
 
       var cloudTs = result.data.updated_at ? new Date(result.data.updated_at).getTime() : Date.now();
       _applyCloudData(result.data, cloudTs);
@@ -5590,12 +5560,14 @@ function saveAll() {
   _saveAllTimer = setTimeout(function() { _saveAllTimer = null; _saveAllImmediate(); }, 50);
 }
 
-// Auto-save quand l'onglet devient caché (immédiat, pas debounced — le navigateur peut tuer le timer)
+// Auto-save quand l'onglet devient caché + re-sync quand il redevient visible
 if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'hidden') {
       if (_saveAllTimer) { clearTimeout(_saveAllTimer); _saveAllTimer = null; }
       _saveAllImmediate();
+    } else if (document.visibilityState === 'visible') {
+      if (CURRENT_USER && supabaseClient) smartSync();
     }
   });
 }
@@ -21000,14 +20972,14 @@ function renderAdmin(container) {
   var sqlToggle = el('details', { style: { marginBottom: '12px' } });
   sqlToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--accent)' } }, '📋 Voir le SQL à exécuter dans SQL Editor'));
   var sqlCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
-  sqlCode.textContent = 'CREATE TABLE user_data (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,\n  company JSONB,\n  missions JSONB,\n  treasury JSONB,\n  clients JSONB,\n  ir_config JSONB,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\n);\n\nALTER TABLE user_data ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Users can manage own data" ON user_data\n  FOR ALL USING (auth.uid() = user_id);';
+  sqlCode.textContent = 'CREATE TABLE user_data (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,\n  company JSONB,\n  missions JSONB,\n  treasury JSONB,\n  clients JSONB,\n  ir_config JSONB,\n  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()\n);\n\nALTER TABLE user_data ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Users can manage own data" ON user_data\n  FOR ALL USING (auth.uid() = user_id);\n\n-- Activer le Realtime pour sync instantanée entre appareils\nALTER PUBLICATION supabase_realtime ADD TABLE user_data;';
   sqlToggle.appendChild(sqlCode);
 
   // Migration SQL for existing tables
   var migrationToggle = el('details', { style: { marginTop: '8px' } });
   migrationToggle.appendChild(el('summary', { style: { fontSize: '11px', cursor: 'pointer', color: 'var(--warning)' } }, '🔧 SQL de migration (si table déjà créée)'));
   var migrationCode = el('pre', { style: { fontSize: '10px', background: 'var(--bg-secondary)', padding: '10px', borderRadius: '6px', overflow: 'auto', marginTop: '8px' } });
-  migrationCode.textContent = '-- Ajouter la colonne ir_config si manquante\nALTER TABLE user_data ADD COLUMN IF NOT EXISTS ir_config JSONB;\n\n-- Ajouter la contrainte UNIQUE sur user_id si manquante\nALTER TABLE user_data ADD CONSTRAINT user_data_user_id_key UNIQUE (user_id);';
+  migrationCode.textContent = '-- Ajouter la colonne ir_config si manquante\nALTER TABLE user_data ADD COLUMN IF NOT EXISTS ir_config JSONB;\n\n-- Ajouter la contrainte UNIQUE sur user_id si manquante\nALTER TABLE user_data ADD CONSTRAINT user_data_user_id_key UNIQUE (user_id);\n\n-- Activer le Realtime (sync instantanée entre appareils)\nALTER PUBLICATION supabase_realtime ADD TABLE user_data;';
   migrationToggle.appendChild(migrationCode);
   sqlToggle.appendChild(migrationToggle);
 
@@ -21088,7 +21060,7 @@ function renderAdmin(container) {
     cloudBtns.appendChild(el('button', { class: 'btn', style: { flex: 1 }, onclick: showAuthModal }, '🔐 Connexion'));
   }
   if (SYNC_ENABLED && CURRENT_USER) {
-    cloudBtns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() { syncToCloud(); } }, '⬆️ Sync'));
+    cloudBtns.appendChild(el('button', { class: 'btn btn-success', style: { flex: 1 }, onclick: function() { _doSyncToCloud(); } }, '⬆️ Sync'));
   }
   cloudCard.appendChild(cloudBtns);
 
@@ -21418,13 +21390,8 @@ function renderCompteProfil(container) {
 
   if (CURRENT_USER) {
     var cloudBtns = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' } });
-    cloudBtns.appendChild(el('button', { class: 'btn btn-primary', onclick: function() { syncToCloud(); } }, 'Sauvegarder'));
-    cloudBtns.appendChild(el('button', { class: 'btn', onclick: function() {
-      if (confirm('Charger les données du cloud ? Cela remplacera vos données locales.')) {
-        loadFromCloud();
-        showToast('Chargement en cours...', 'info');
-      }
-    } }, 'Charger'));
+    cloudBtns.appendChild(el('button', { class: 'btn btn-primary', onclick: function() { _doSyncToCloud(); } }, 'Sauvegarder'));
+    cloudBtns.appendChild(el('button', { class: 'btn', onclick: function() { loadFromCloud(); } }, 'Charger'));
     cloudCard.appendChild(cloudBtns);
 
     cloudCard.appendChild(el('div', { style: { marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)' } }, 'La synchronisation est automatique à chaque modification.'));
