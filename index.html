@@ -4171,8 +4171,8 @@ function getTrend(data) {
 }
 
 function isPaid(id) { return TREASURY.paidCharges[id] === true; }
-function togglePaid(id) { TREASURY.paidCharges[id] = !isPaid(id); saveAll(); render(); }
-function markAllPaid(ids) { ids.forEach(function(id) { TREASURY.paidCharges[id] = true; }); saveAll(); render(); toast('Marqué payé', 'success'); }
+function togglePaid(id) { TREASURY.paidCharges[id] = !isPaid(id); invalidateCompute(); saveAll(); render(); }
+function markAllPaid(ids) { ids.forEach(function(id) { TREASURY.paidCharges[id] = true; }); invalidateCompute(); saveAll(); render(); toast('Marqué payé', 'success'); }
 
 function setFactureStatus(factureId, newStatus) {
   MISSIONS.forEach(function(m) {
@@ -4215,7 +4215,7 @@ function setFactureStatus(factureId, newStatus) {
       }
     });
   });
-  saveAll(); render(); toast('Facture mise à jour', 'success');
+  invalidateCompute(); saveAll(); render(); toast('Facture mise à jour', 'success');
 }
 
 function bulkSetFactureStatus(newStatus) {
@@ -5684,7 +5684,7 @@ function importData(file) {
       if (!COMPANY.invoiceRegistry) COMPANY.invoiceRegistry = [];
       if (!COMPANY.invoiceAuditLog) COMPANY.invoiceAuditLog = [];
       MISSIONS.forEach(buildMission);
-      saveAll(); render();
+      invalidateCompute(); saveAll(); render();
       showToast('Import réussi!', 'success');
     } catch (err) { console.error('Import error:', err); showToast('Erreur: fichier JSON invalide', 'error'); }
   };
@@ -6230,21 +6230,21 @@ function compute() {
               var urssaf = Math.round(f.ht * rate);
               var urssafId = 'URSSAF-' + f.id;
               chMd.charges.push({ id: urssafId, cat: 'URSSAF', desc: PCT(rate) + provLabel, montant: urssaf, mois: chMdKey, moisPaiement: debitMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
-              if (isPaid(urssafId)) { data.chargesPayees += urssaf; chMd.chargesPaid += urssaf; data.detailChargesPayees.push({ cat: 'URSSAF', mois: chMdKey, montant: urssaf, source: f.client }); }
+              if (isPaid(urssafId)) { data.chargesPayees += urssaf; chMd.chargesPaid += urssaf; data.detailChargesPayees.push({ cat: 'URSSAF', mois: chMdKey, moisPaiement: debitMonth, montant: urssaf, source: f.client }); }
               else { data.chargesAPayer += urssaf; chMd.chargesUnpaid += urssaf; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + urssaf; data.provByType['URSSAF'] = (data.provByType['URSSAF'] || 0) + urssaf; data.detailChargesAPayer.push({ cat: 'URSSAF', mois: chMdKey, moisPaiement: debitMonth, montant: urssaf, id: urssafId, source: f.client }); }
 
               // CFP
               var cfp = Math.round(f.ht * LEGAL.cfp);
               var cfpId = 'CFP-' + f.id;
               chMd.charges.push({ id: cfpId, cat: 'CFP', desc: 'Formation' + provLabel, montant: cfp, mois: chMdKey, moisPaiement: debitMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
-              if (isPaid(cfpId)) { data.chargesPayees += cfp; chMd.chargesPaid += cfp; data.detailChargesPayees.push({ cat: 'CFP', mois: chMdKey, montant: cfp, source: f.client }); }
+              if (isPaid(cfpId)) { data.chargesPayees += cfp; chMd.chargesPaid += cfp; data.detailChargesPayees.push({ cat: 'CFP', mois: chMdKey, moisPaiement: debitMonth, montant: cfp, source: f.client }); }
               else { data.chargesAPayer += cfp; chMd.chargesUnpaid += cfp; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + cfp; data.provByType['CFP'] = (data.provByType['CFP'] || 0) + cfp; data.detailChargesAPayer.push({ cat: 'CFP', mois: chMdKey, moisPaiement: debitMonth, montant: cfp, id: cfpId, source: f.client }); }
 
               // TVA (même cycle de déclaration)
               if (f.tva > 0) {
                 var tvaId = 'TVA-' + f.id;
                 chMd.charges.push({ id: tvaId, cat: 'TVA', desc: 'Collectée' + provLabel, montant: Math.round(f.tva), mois: chMdKey, moisPaiement: debitMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
-                if (isPaid(tvaId)) { data.chargesPayees += Math.round(f.tva); chMd.chargesPaid += Math.round(f.tva); data.detailChargesPayees.push({ cat: 'TVA', mois: chMdKey, montant: Math.round(f.tva), source: f.client }); }
+                if (isPaid(tvaId)) { data.chargesPayees += Math.round(f.tva); chMd.chargesPaid += Math.round(f.tva); data.detailChargesPayees.push({ cat: 'TVA', mois: chMdKey, moisPaiement: debitMonth, montant: Math.round(f.tva), source: f.client }); }
                 else { data.chargesAPayer += Math.round(f.tva); chMd.chargesUnpaid += Math.round(f.tva); data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + Math.round(f.tva); data.provByType['TVA'] = (data.provByType['TVA'] || 0) + Math.round(f.tva); data.detailChargesAPayer.push({ cat: 'TVA', mois: chMdKey, moisPaiement: debitMonth, montant: Math.round(f.tva), id: tvaId, source: f.client }); }
               }
 
@@ -6253,8 +6253,8 @@ function compute() {
                 var impLib = Math.round(f.ht * LEGAL.impLib);
                 var impId = 'IMPLIB-' + f.id;
                 chMd.charges.push({ id: impId, cat: 'Impôt PL', desc: PCT(LEGAL.impLib) + provLabel, montant: impLib, mois: chMdKey, moisPaiement: debitMonth, source: f.client + ' ' + fmtMonthShort(f.mois) });
-                if (isPaid(impId)) { data.chargesPayees += impLib; chMd.chargesPaid += impLib; data.detailChargesPayees.push({ cat: 'Impôt PL', mois: chMdKey, montant: impLib, source: f.client }); }
-                else { data.chargesAPayer += impLib; chMd.chargesUnpaid += impLib; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + impLib; data.provByType['Impôt'] = (data.provByType['Impôt'] || 0) + impLib; data.detailChargesAPayer.push({ cat: 'Impôt PL', mois: chMdKey, montant: impLib, id: impId, source: f.client }); }
+                if (isPaid(impId)) { data.chargesPayees += impLib; chMd.chargesPaid += impLib; data.detailChargesPayees.push({ cat: 'Impôt PL', mois: chMdKey, moisPaiement: debitMonth, montant: impLib, source: f.client }); }
+                else { data.chargesAPayer += impLib; chMd.chargesUnpaid += impLib; data.provByMonth[chMdKey] = (data.provByMonth[chMdKey] || 0) + impLib; data.provByType['Impôt'] = (data.provByType['Impôt'] || 0) + impLib; data.detailChargesAPayer.push({ cat: 'Impôt PL', mois: chMdKey, moisPaiement: debitMonth, montant: impLib, id: impId, source: f.client }); }
               }
             }
           }
@@ -6683,6 +6683,7 @@ function showCompteLineDetail(type) {
           onclick: function(e) {
             e.stopPropagation();
             TREASURY.paidCharges[entry.id] = !isPaidItem;
+            invalidateCompute();
             saveAll();
             closeModal('formModal');
             showCompteLineDetail(type);
@@ -6733,6 +6734,7 @@ function showCompteLineDetail(type) {
           style: { flex: '1', padding: '10px' },
           onclick: function() {
             unpaidIds.forEach(function(id) { TREASURY.paidCharges[id] = true; });
+            invalidateCompute();
             saveAll();
             closeModal('formModal');
             showCompteLineDetail(type);
@@ -6746,6 +6748,7 @@ function showCompteLineDetail(type) {
           style: { flex: '1', padding: '10px' },
           onclick: function() {
             paidIds.forEach(function(id) { TREASURY.paidCharges[id] = false; });
+            invalidateCompute();
             saveAll();
             closeModal('formModal');
             showCompteLineDetail(type);
@@ -7126,6 +7129,7 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
         onclick: function(e) {
           e.stopPropagation();
           TREASURY.paidCharges[item.id] = !isPaid(item.id);
+          invalidateCompute();
           saveAll();
           showProvisionTypeDetail(typeName, null, color);
         }
@@ -7200,6 +7204,7 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
       style: { flex: '1' },
       onclick: function() {
         unpaidIds.forEach(function(id) { TREASURY.paidCharges[id] = true; });
+        invalidateCompute();
         saveAll();
         showProvisionTypeDetail(typeName, null, color);
       }
@@ -7212,6 +7217,7 @@ function showProvisionTypeDetail(typeName, passedItems, color) {
       style: { flex: '1' },
       onclick: function() {
         paidIds.forEach(function(id) { TREASURY.paidCharges[id] = false; });
+        invalidateCompute();
         saveAll();
         showProvisionTypeDetail(typeName, null, color);
       }
@@ -7357,7 +7363,7 @@ function showUrssafCfpDetail() {
         class: 'toggle-check ' + (paid ? 'paid' : ''),
         style: { width: '24px', height: '24px', fontSize: '14px', flexShrink: '0', cursor: 'pointer', background: paid ? 'var(--success)' : 'var(--bg-tertiary)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: paid ? 'white' : 'var(--text-muted)', border: paid ? 'none' : '2px solid var(--border)' },
         title: paid ? 'Remettre en provision' : 'Marquer payé',
-        onclick: (function(id) { return function(e) { e.stopPropagation(); TREASURY.paidCharges[id] = !isPaid(id); saveAll(); showUrssafCfpDetail(); }; })(item.id)
+        onclick: (function(id) { return function(e) { e.stopPropagation(); TREASURY.paidCharges[id] = !isPaid(id); invalidateCompute(); saveAll(); showUrssafCfpDetail(); }; })(item.id)
       }, paid ? '✓' : ''));
       // Détail : source, catégorie, mois de travail si dispo, mois de paiement
       var subParts = [];
@@ -7382,10 +7388,10 @@ function showUrssafCfpDetail() {
   if (unpaidIds.length > 0 || paidIds.length > 0) {
     var btnsDiv = el('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } });
     if (unpaidIds.length > 0) {
-      btnsDiv.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() { unpaidIds.forEach(function(id) { TREASURY.paidCharges[id] = true; }); saveAll(); showUrssafCfpDetail(); } }, '✅ Tout payer (' + unpaidIds.length + ')'));
+      btnsDiv.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() { unpaidIds.forEach(function(id) { TREASURY.paidCharges[id] = true; }); invalidateCompute(); saveAll(); showUrssafCfpDetail(); } }, '✅ Tout payer (' + unpaidIds.length + ')'));
     }
     if (paidIds.length > 0) {
-      btnsDiv.appendChild(el('button', { class: 'btn btn-warning', style: { flex: '1' }, onclick: function() { paidIds.forEach(function(id) { TREASURY.paidCharges[id] = false; }); saveAll(); showUrssafCfpDetail(); } }, '↩️ Remettre en provision (' + paidIds.length + ')'));
+      btnsDiv.appendChild(el('button', { class: 'btn btn-warning', style: { flex: '1' }, onclick: function() { paidIds.forEach(function(id) { TREASURY.paidCharges[id] = false; }); invalidateCompute(); saveAll(); showUrssafCfpDetail(); } }, '↩️ Remettre en provision (' + paidIds.length + ')'));
     }
     body.appendChild(btnsDiv);
   }
@@ -7932,7 +7938,7 @@ function showProvisionsDetail() {
         class: 'toggle-check ' + (paid ? 'paid' : ''),
         style: { width: '24px', height: '24px', fontSize: '14px', flexShrink: '0', cursor: 'pointer', background: paid ? 'var(--success)' : 'var(--bg-tertiary)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: paid ? 'white' : 'var(--text-muted)', border: paid ? 'none' : '2px solid var(--border)' },
         title: paid ? 'Remettre en provision' : 'Marquer payé',
-        onclick: (function(id) { return function(e) { e.stopPropagation(); TREASURY.paidCharges[id] = !isPaid(id); saveAll(); showProvisionsDetail(); }; })(item.id)
+        onclick: (function(id) { return function(e) { e.stopPropagation(); TREASURY.paidCharges[id] = !isPaid(id); invalidateCompute(); saveAll(); showProvisionsDetail(); }; })(item.id)
       }, paid ? '✓' : ''));
 
       // Info : catégorie + mois
@@ -9396,12 +9402,12 @@ function showMissionModal(mission) {
 
     buildMission(mission);
     if (isNew) MISSIONS.push(mission);
-    saveAll(); closeModal('formModal'); render();
+    invalidateCompute(); saveAll(); closeModal('formModal'); render();
     toast(isNew ? 'Mission créée!' : 'Mission mise à jour', 'success');
   } }, '✅ Enregistrer'));
   if (!isNew) {
     btns.appendChild(el('button', { class: 'btn', onclick: function() { closeModal('formModal'); showDaysEditor(mission); } }, '📅'));
-    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer?')) { MISSIONS = MISSIONS.filter(function(m) { return m.id !== mission.id; }); if (COMPANY.invoiceRegistry) { COMPANY.invoiceRegistry.forEach(function(inv) { if (inv.missionId === mission.id) { inv.missionId = null; inv.missionDeleted = true; } }); } saveAll(); closeModal('formModal'); render(); } } }, '🗑️'));
+    btns.appendChild(el('button', { class: 'btn btn-danger', onclick: function() { if (confirm('Supprimer?')) { MISSIONS = MISSIONS.filter(function(m) { return m.id !== mission.id; }); if (COMPANY.invoiceRegistry) { COMPANY.invoiceRegistry.forEach(function(inv) { if (inv.missionId === mission.id) { inv.missionId = null; inv.missionDeleted = true; } }); } invalidateCompute(); saveAll(); closeModal('formModal'); render(); } } }, '🗑️'));
   }
   body.appendChild(btns);
   openModal('formModal');
@@ -9537,6 +9543,7 @@ function saveDaysFromEditor(mission) {
     }
   });
   buildMission(mission);
+  invalidateCompute();
   saveAll();
 }
 
@@ -9669,7 +9676,7 @@ function showChargePonctuelle() {
     }
     var mv = { id: 'CH' + Date.now(), type: 'Charge', categorie: $('#chCat').value, description: $('#chDesc').value, montant: montantHT, montantTTC: isTTC ? montant : montantHT, tvaDeductible: tvaDeductible, tvaRate: isTTC ? tvaRate : 0, mois: $('#chMois').value, date: localISO(TODAY) };
     TREASURY.mouvements.push(mv);
-    saveAll(); closeModal('formModal'); render();
+    invalidateCompute(); saveAll(); closeModal('formModal'); render();
     toast('Charge ajoutée' + (tvaDeductible > 0 ? ' (TVA ' + tvaDeductible.toFixed(2) + '€ déductible)' : ''), 'success');
   } }, '✅ Ajouter'));
 }
@@ -9725,7 +9732,7 @@ function showChargeRecurrente() {
       count++;
     }
     
-    saveAll(); closeModal('formModal'); render();
+    invalidateCompute(); saveAll(); closeModal('formModal'); render();
     toast(count + ' charges récurrentes créées', 'success');
   } }, '🔄 Créer ' + 'les charges'));
   
@@ -9757,7 +9764,7 @@ function showChargeRecurrente() {
             var idx = TREASURY.mouvements.findIndex(function(m) { return m.id === item.id; });
             if (idx >= 0) TREASURY.mouvements.splice(idx, 1);
           });
-          saveAll(); showChargeModal(); render();
+          invalidateCompute(); saveAll(); showChargeModal(); render();
           toast('Charges supprimées', 'success');
         }
       } }, '🗑️'));
@@ -9777,7 +9784,7 @@ function showSalaireModal(montant) {
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '20px' }, onclick: function() {
     var mv = { id: 'SAL' + Date.now(), type: 'Salaire', montant: parseFloat($('#salMontant').value) || 0, mois: $('#salMois').value, date: localISO(TODAY) };
     TREASURY.mouvements.push(mv);
-    saveAll(); closeModal('formModal'); render();
+    invalidateCompute(); saveAll(); closeModal('formModal'); render();
     toast('Rémunération versée!', 'success');
   } }, '💸 Verser'));
   openModal('formModal');
@@ -9820,6 +9827,7 @@ function editMovement(mvId) {
       mv.categorie = $('#editCat').value;
       mv.description = $('#editDesc').value;
     }
+    invalidateCompute();
     saveAll();
     closeModal('formModal');
     render();
@@ -9847,6 +9855,7 @@ function deleteMovement(mvId) {
     if (TREASURY.paidCharges[mvId]) {
       delete TREASURY.paidCharges[mvId];
     }
+    invalidateCompute();
     saveAll();
     toast('Élément supprimé', 'info');
   }
@@ -10266,7 +10275,7 @@ function showMonthCongesModal(monthYm, mode) {
       }
       buildMission(m);
     });
-    saveAll(); closeModal('formModal'); render();
+    invalidateCompute(); saveAll(); closeModal('formModal'); render();
     toast(isActivity ? 'Activité enregistrée' : 'Congés enregistrés', 'success');
   } }, '✅ Enregistrer'));
 
@@ -10418,6 +10427,7 @@ function showFactureModal(facture) {
       console.error('[FREEL] Erreur mise à jour facture:', e);
       toast('Erreur: ' + (e.message || 'mise à jour échouée'), 'error');
     } finally {
+      invalidateCompute();
       COMPUTED = compute();
       render();
       closeModal('formModal');
@@ -10804,7 +10814,7 @@ function showSendInvoiceModal(facture) {
   // Bouton secondaire
   body.appendChild(el('button', { class: 'btn btn-block', style: { marginTop: '6px', background: 'var(--bg-tertiary)', fontSize: '11px' }, onclick: function() {
     MISSIONS.forEach(function(m) { if (m.factures) m.factures.forEach(function(f) { if (f.id === facture.id) { f.status = 'envoyée'; f.dateEnvoi = localISO(TODAY); } }); });
-    saveAll(); render(); closeModal('formModal'); toast('Marquée envoyée', 'success');
+    invalidateCompute(); saveAll(); render(); closeModal('formModal'); toast('Marquée envoyée', 'success');
   } }, 'Juste marquer envoyée'));
 
   openModal('formModal');
@@ -11602,25 +11612,27 @@ function buildCRAData(mission, monthYm) {
     }
 
     // Déterminer si le jour est travaillé
+    // Priorité aux ajustements explicites (cohérent avec getNetWorkedForMonth)
+    var hasAjustement = ajustements.hasOwnProperty(iso);
     var worked = 0;
-    if (ajustements.hasOwnProperty(iso)) {
+    if (hasAjustement) {
       worked = ajustements[iso];
     } else {
       var sched = scheduledDays[iso] || 0;
       worked = sched >= 0.75 ? 1 : (sched >= 0.25 ? 0.5 : 0);
     }
 
-    // Vérifier si c'est un congé
-    if (mission.congesDates) {
+    // Vérifier si c'est un congé — uniquement si pas d'ajustement explicite
+    if (!hasAjustement && mission.congesDates) {
       mission.congesDates.forEach(function(cd) {
         if (cd === iso) worked = 0;
         else if (cd === iso + '_half') worked = Math.max(0, worked - 0.5);
       });
     }
 
-    // Vérifier si c'est un jour férié
+    // Vérifier si c'est un jour férié (frenchHolidays renvoie un tableau d'ISO)
     var holidays = frenchHolidays(p.y);
-    if (holidays[iso]) worked = 0;
+    if (!hasAjustement && holidays.indexOf(iso) !== -1) worked = 0;
 
     var inMission = mission.debut && mission.fin && iso >= mission.debut && iso <= mission.fin;
     if (!inMission) worked = 0;
@@ -12996,7 +13008,7 @@ function showSalaireModalForMonth(monthKey) {
   body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '20px' }, onclick: function() {
     var mv = { id: 'SAL' + Date.now(), type: 'Salaire', montant: parseFloat($('#salMontant').value) || 0, mois: monthKey, date: localISO(TODAY) };
     TREASURY.mouvements.push(mv);
-    saveAll(); closeModal('formModal'); render();
+    invalidateCompute(); saveAll(); closeModal('formModal'); render();
     toast('Rémunération versée!', 'success');
   } }, '💸 Verser'));
   
@@ -13289,7 +13301,7 @@ function undoActionDone(actionId) {
   }
 
   TREASURY.actionsDone = TREASURY.actionsDone.filter(function(a) { return a.id !== actionId; });
-  saveAll(); render();
+  invalidateCompute(); saveAll(); render();
 }
 
 function getActionsForCurrentMonth() {
@@ -13655,8 +13667,8 @@ function renderChargesPanel(container) {
     var footer = el('div', { class: 'charges-footer' });
     var types = {};
     charges.aPayer.forEach(function(c) { types[c.cat] = true; });
-    if (types['URSSAF']) footer.appendChild(el('button', { class: 'btn btn-success', onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'URSSAF'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); saveAll(); render(); toast('URSSAF marqué payé', 'success'); } }, '✓ URSSAF'));
-    if (types['TVA']) footer.appendChild(el('button', { class: 'btn', style: { background: CHARGE_TYPES['TVA'].color, color: 'white' }, onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'TVA'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); saveAll(); render(); toast('TVA marquée payée', 'success'); } }, '✓ TVA'));
+    if (types['URSSAF']) footer.appendChild(el('button', { class: 'btn btn-success', onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'URSSAF'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); invalidateCompute(); saveAll(); render(); toast('URSSAF marqué payé', 'success'); } }, '✓ URSSAF'));
+    if (types['TVA']) footer.appendChild(el('button', { class: 'btn', style: { background: CHARGE_TYPES['TVA'].color, color: 'white' }, onclick: function() { charges.aPayer.filter(function(c) { return c.cat === 'TVA'; }).forEach(function(c) { TREASURY.paidCharges[c.id] = true; }); invalidateCompute(); saveAll(); render(); toast('TVA marquée payée', 'success'); } }, '✓ TVA'));
     panel.appendChild(footer);
   }
   container.appendChild(panel);
@@ -14631,56 +14643,12 @@ var NOTIF_READ = [];
 try { NOTIF_READ = JSON.parse(localStorage.getItem('freel_notif_read') || '[]'); } catch(e) { console.warn('[FREEL] freel_notif_read corrompu, reset'); }
 
 function getNotifications() {
+  // La cloche est complémentaire du widget "Actions du Jour" :
+  //  - Actions du Jour = to-dos actionnables (factures à relancer/envoyer, jalons fiscaux, saisie jours, rémunération)
+  //  - Cloche        = alertes informationnelles passives (seuils légaux, expirations) qui ne sont pas
+  //                    forcément des actions à cocher mais des situations à connaître.
+  // → On évite de dupliquer ici factures en retard / échéances fiscales (déjà dans Actions du Jour).
   var notifs = [];
-  var now = TODAY;
-
-  // Factures en retard
-  MISSIONS.forEach(function(m) {
-    if (m.factures) {
-      m.factures.forEach(function(f) {
-        if (f.status === 'envoyée') {
-          var echeance = parseDate(f.echeance || f.mois);
-          var days = Math.floor((now - echeance) / 86400000);
-          if (days > 0) {
-            notifs.push({
-              id: 'facture_' + f.numero,
-              type: 'urgent',
-              icon: '⚠️',
-              text: 'Facture ' + (f.client || m.client) + ' en retard',
-              sub: EUR(f.ttc) + ' · ' + days + ' jour' + (days > 1 ? 's' : '') + ' de retard',
-              time: days + 'j',
-              action: function() { showFactureModal(f); }
-            });
-          } else if (days >= -3) {
-            notifs.push({
-              id: 'facture_soon_' + f.numero,
-              type: 'warning',
-              icon: '📄',
-              text: 'Facture ' + (f.client || m.client) + ' bientôt due',
-              sub: EUR(f.ttc) + ' · échéance ' + fmtDate(echeance),
-              time: Math.abs(days) + 'j',
-              action: function() { showFactureModal(f); }
-            });
-          }
-        }
-      });
-    }
-  });
-
-  // Échéances légales
-  var deadlines = getUpcomingDeadlines ? getUpcomingDeadlines() : [];
-  deadlines.forEach(function(d) {
-    if (d.daysLeft <= 7) {
-      notifs.push({
-        id: 'deadline_' + d.label.replace(/\s/g, '_'),
-        type: d.daysLeft <= 3 ? 'urgent' : 'warning',
-        icon: d.icon,
-        text: d.label,
-        sub: d.daysLeft === 0 ? 'Aujourd\'hui!' : d.daysLeft === 1 ? 'Demain' : 'Dans ' + d.daysLeft + ' jours',
-        time: 'J-' + d.daysLeft
-      });
-    }
-  });
 
   // Seuil TVA proche
   var ca = getTotalCA();
@@ -16563,6 +16531,7 @@ function showChargeDetailEnhanced(categoryId, data, caHT) {
                 // Mark all as paid
                 unpaidList.forEach(function(c) { if (c.id) TREASURY.paidCharges[c.id] = true; });
               }
+              invalidateCompute();
               saveAll();
               closeDynamicModal();
               render();
@@ -20058,7 +20027,10 @@ function renderTresorerie(container) {
     allMouvements.push({ type: 'salaire', label: 'Rémunération', icon: '💸', detail: '', montant: -s.montant, date: s.mois + '-01', category: 'Salaire' });
   });
   data.detailChargesPayees.forEach(function(c) {
-    allMouvements.push({ type: 'charge', label: c.cat, icon: '📋', detail: c.source || '', montant: -c.montant, date: c.mois + '-01', category: c.cat });
+    // moisPaiement = mois de prélèvement réel (M+2 pour URSSAF/CFP/TVA/Impôt PL)
+    // mois = mois d'encaissement (utilisé pour la provision); le mouvement bancaire suit moisPaiement
+    var displayMonth = c.moisPaiement || c.mois;
+    allMouvements.push({ type: 'charge', label: c.cat, icon: '📋', detail: c.source || '', montant: -c.montant, date: displayMonth + '-01', category: c.cat });
   });
   data.detailEncaisse.forEach(function(enc) {
     allMouvements.push({ type: 'encaissement', label: enc.client, icon: '💵', detail: enc.desc || '', montant: enc.ht + (enc.tva || 0), date: enc.paymentMonth + '-01', category: 'Encaissement' });
@@ -20604,7 +20576,7 @@ function renderAdmin(container) {
       TREASURY.rendementHistorique = [];
       updateRendementHistorique();
     }
-    saveAll(); render();
+    invalidateCompute(); saveAll(); render();
     toast('Configuration sauvegardée', 'success');
   } }, '✅ Sauvegarder'));
 
@@ -20826,19 +20798,21 @@ function renderAdmin(container) {
     thead.appendChild(el('span', {}, 'N° Facture'));
     thead.appendChild(el('span', {}, 'Client'));
     thead.appendChild(el('span', {}, 'Nature'));
-    thead.appendChild(el('span', { style: { textAlign: 'right' } }, 'Montant'));
+    thead.appendChild(el('span', { style: { textAlign: 'right' } }, 'Montant TTC'));
     thead.appendChild(el('span', { style: { textAlign: 'right' } }, 'Mode'));
     tableDiv.appendChild(thead);
 
-    var totalHT = 0;
+    // Art. L123-28 : recettes encaissées = montant effectivement reçu (TTC)
+    var totalTTC = 0;
     registry.forEach(function(inv) {
-      totalHT += inv.montantHT || 0;
+      var ttc = inv.montantTTC || ((inv.montantHT || 0) + (inv.tva || 0));
+      totalTTC += ttc;
       var row = el('div', { style: { display: 'grid', gridTemplateColumns: gridCols, gap: '2px', padding: '5px 8px', fontSize: '10px', borderTop: '1px solid var(--bg-tertiary)' } });
       row.appendChild(el('span', {}, (inv.dateEncaissement || inv.date || '').substring(0, 10)));
       row.appendChild(el('span', { style: { fontWeight: '600' } }, inv.numero || ''));
       row.appendChild(el('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, inv.client || ''));
       row.appendChild(el('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-muted)' } }, inv.nature || ''));
-      row.appendChild(el('span', { style: { textAlign: 'right', fontWeight: '600' } }, EUR(inv.montantHT || 0)));
+      row.appendChild(el('span', { style: { textAlign: 'right', fontWeight: '600' } }, EUR(ttc)));
       row.appendChild(el('span', { style: { textAlign: 'right', color: 'var(--text-muted)' } }, inv.modePaiement || 'Virement'));
       tableDiv.appendChild(row);
     });
@@ -20849,7 +20823,7 @@ function renderAdmin(container) {
     totalRow.appendChild(el('span', {}));
     totalRow.appendChild(el('span', {}, 'TOTAL ' + livreYear));
     totalRow.appendChild(el('span', {}));
-    totalRow.appendChild(el('span', { style: { textAlign: 'right' } }, EUR(totalHT)));
+    totalRow.appendChild(el('span', { style: { textAlign: 'right' } }, EUR(totalTTC)));
     totalRow.appendChild(el('span', {}));
     tableDiv.appendChild(totalRow);
 
