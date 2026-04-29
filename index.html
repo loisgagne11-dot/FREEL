@@ -8922,6 +8922,7 @@ function showMissionModal(mission) {
   if (!mission.agence) mission.agence = { nom: '', contacts: [{ prenom: '', nom: '', email: '', telephone: '' }], adresses: [''] };
   if (!mission.agence.contacts || mission.agence.contacts.length === 0) mission.agence.contacts = [{ prenom: '', nom: '', email: '', telephone: '' }];
   if (!mission.agence.adresses || mission.agence.adresses.length === 0) mission.agence.adresses = [''];
+  if (!mission.entites) mission.entites = [];
 
   $('#formModalTitle').textContent = isNew ? '💼 Nouvelle Mission' : '✏️ ' + mission.client;
   var body = $('#formModalBody');
@@ -9078,6 +9079,42 @@ function showMissionModal(mission) {
   rowCo2.appendChild(createInput('Téléphone', 'tel', 'mClientOpTel', mission.clientOp.telephone));
   rowCo2.appendChild(createInput('Adresse / Site', 'text', 'mClientOpAdresse', mission.clientOp.adresse, 'Ex: Site Saint-Martin'));
   body.appendChild(rowCo2);
+
+  // Entités bénéficiaires (sous-organisations, ex: H4E + M3S sur la même mission)
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '12px', marginBottom: '6px', fontWeight: '600' } }, 'Entités bénéficiaires (optionnel)'));
+  body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' } }, 'Permet de tracer les jours travaillés par sous-entité (ex: H4E, M3S) sans changer la facturation.'));
+  var entitesContainer = el('div', { id: 'mEntitesContainer' });
+  body.appendChild(entitesContainer);
+
+  var entitePalette = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
+  function renderEntites() {
+    entitesContainer.replaceChildren();
+    if (mission.entites.length === 0) {
+      entitesContainer.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', padding: '8px', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, 'Aucune entité — facturation simple sur le destinataire de section 5'));
+    }
+    mission.entites.forEach(function(ent, idx) {
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '6px' } });
+      var swatch = el('input', { type: 'color', id: 'mEntColor_' + idx, value: ent.couleur || entitePalette[idx % entitePalette.length], style: { width: '32px', height: '28px', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '0', background: 'transparent' } });
+      row.appendChild(swatch);
+      var nameInput = el('input', { type: 'text', id: 'mEntNom_' + idx, value: ent.nom || '', placeholder: 'Ex: H4E', class: 'form-input', style: { flex: '1', fontSize: '12px', padding: '6px 8px' } });
+      row.appendChild(nameInput);
+      var rmBtn = el('button', { class: 'periode-remove', style: { position: 'static' }, onclick: function() { mission.entites.splice(idx, 1); renderEntites(); } }, '✕');
+      row.appendChild(rmBtn);
+      entitesContainer.appendChild(row);
+    });
+  }
+  renderEntites();
+  body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '16px' }, onclick: function() {
+    // Lire les valeurs actuelles avant d'ajouter pour ne pas perdre les saisies
+    mission.entites.forEach(function(ent, idx) {
+      var nm = $('#mEntNom_' + idx); var col = $('#mEntColor_' + idx);
+      if (nm) ent.nom = nm.value;
+      if (col) ent.couleur = col.value;
+    });
+    var newIdx = mission.entites.length;
+    mission.entites.push({ id: 'ent_' + Date.now() + '_' + newIdx, nom: '', couleur: entitePalette[newIdx % entitePalette.length] });
+    renderEntites();
+  } }, '+ Ajouter une entité'));
 
   // ═══════════════════════════════════════════════
   // SECTION 4: Agence / Intermédiaire
@@ -9364,6 +9401,37 @@ function showMissionModal(mission) {
       adresse: $('#mClientOpAdresse').value || ''
     };
 
+    // Sauvegarder entités bénéficiaires (filtrer celles sans nom)
+    var savedEntites = [];
+    var oldEntiteIds = {};
+    (mission.entites || []).forEach(function(e) { oldEntiteIds[e.id] = true; });
+    mission.entites.forEach(function(ent, idx) {
+      var nm = $('#mEntNom_' + idx); var col = $('#mEntColor_' + idx);
+      var nom = nm ? nm.value.trim() : '';
+      if (!nom) return;
+      savedEntites.push({ id: ent.id, nom: nom, couleur: col ? col.value : ent.couleur });
+    });
+    mission.entites = savedEntites;
+    // Nettoyer les attributions vers entités supprimées
+    var validIds = {};
+    savedEntites.forEach(function(e) { validIds[e.id] = true; });
+    if (mission.lignes) {
+      mission.lignes.forEach(function(l) {
+        if (l.entiteByDay) {
+          Object.keys(l.entiteByDay).forEach(function(iso) {
+            if (!validIds[l.entiteByDay[iso]]) delete l.entiteByDay[iso];
+          });
+          if (Object.keys(l.entiteByDay).length === 0) delete l.entiteByDay;
+        }
+        if (l.entiteProjection) {
+          Object.keys(l.entiteProjection).forEach(function(eid) {
+            if (!validIds[eid]) delete l.entiteProjection[eid];
+          });
+          if (Object.keys(l.entiteProjection).length === 0) delete l.entiteProjection;
+        }
+      });
+    }
+
     // Sauvegarder agence
     var agenceAddr = $('#mAgenceAdresse') ? $('#mAgenceAdresse').value || '' : '';
     mission.agence = { nom: $('#mAgenceNom').value || '', contacts: [], adresses: [agenceAddr] };
@@ -9424,9 +9492,13 @@ function showDaysEditor(mission) {
     return;
   }
 
+  var hasEntitesEditor = mission.entites && mission.entites.length > 0;
+
   // V78: Explication du rythme théorique vs réel
   body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px' } },
-    '💡 Prévus = jours théoriques (rythme configuré). Réels = jours réellement travaillés. Modifiez les Réels si le mois réel diffère du prévu.'));
+    hasEntitesEditor
+      ? '💡 Prévus = jours théoriques. La répartition par entité (sous chaque mois) doit sommer à Prévus. Réels = jours réellement travaillés.'
+      : '💡 Prévus = jours théoriques (rythme configuré). Réels = jours réellement travaillés. Modifiez les Réels si le mois réel diffère du prévu.'));
 
   var table = el('table', { class: 'days-table' });
   var thead = el('thead');
@@ -9458,6 +9530,26 @@ function showDaysEditor(mission) {
     tr.appendChild(el('td', {}, [reelsInput]));
     tr.appendChild(el('td', { class: 'computed', 'data-idx': idx, 'data-type': 'ca' }, EUR(actualReels * mission.tjm)));
     tbody.appendChild(tr);
+
+    // Sous-rangées : répartition de la projection par entité
+    if (hasEntitesEditor) {
+      mission.entites.forEach(function(ent) {
+        var subTr = el('tr', { 'data-entrow': idx + '_' + ent.id, style: { background: 'var(--bg-tertiary)' } });
+        subTr.appendChild(el('td', { style: { paddingLeft: '20px', fontSize: '11px', color: 'var(--text-secondary)' } }, [
+          el('span', { style: { display: 'inline-block', width: '8px', height: '8px', background: ent.couleur, borderRadius: '2px', marginRight: '6px', verticalAlign: 'middle' } }),
+          document.createTextNode('↳ ' + ent.nom)
+        ]));
+        subTr.appendChild(el('td', {}, ''));
+        var entVal = (l.entiteProjection && l.entiteProjection[ent.id]) || 0;
+        var entInput = el('input', { type: 'number', value: entVal, min: 0, step: 0.5, 'data-idx': idx, 'data-field': 'entProj', 'data-entid': ent.id, style: { fontSize: '11px' } });
+        entInput.oninput = function() { recalcDaysTable(mission); };
+        subTr.appendChild(el('td', {}, [entInput]));
+        subTr.appendChild(el('td', {}, ''));
+        subTr.appendChild(el('td', {}, ''));
+        subTr.appendChild(el('td', {}, ''));
+        tbody.appendChild(subTr);
+      });
+    }
   });
 
   var totalRow = el('tr', { class: 'total-row' });
@@ -9486,6 +9578,7 @@ function showDaysEditor(mission) {
 
 function recalcDaysTable(mission) {
   var totals = { ouvres: 0, prevus: 0, conges: 0, reels: 0, ca: 0 };
+  var hasEntitesEditor = mission.entites && mission.entites.length > 0;
   mission.lignes.forEach(function(l, idx) {
     var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
     var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
@@ -9503,6 +9596,24 @@ function recalcDaysTable(mission) {
     }
     var caCell = $('td[data-idx="' + idx + '"][data-type="ca"]');
     if (caCell) caCell.textContent = EUR(reels * mission.tjm);
+
+    // Validation visuelle de la somme par entité vs prévus
+    if (hasEntitesEditor) {
+      var entSum = 0;
+      mission.entites.forEach(function(ent) {
+        var ei = $('input[data-idx="' + idx + '"][data-field="entProj"][data-entid="' + ent.id + '"]');
+        if (ei) entSum += parseFloat(ei.value) || 0;
+      });
+      mission.entites.forEach(function(ent) {
+        var ei = $('input[data-idx="' + idx + '"][data-field="entProj"][data-entid="' + ent.id + '"]');
+        if (!ei) return;
+        var mismatch = Math.abs(entSum - prevus) > 0.01 && entSum > 0;
+        ei.style.background = mismatch ? 'rgba(251,191,36,0.15)' : '';
+        ei.style.borderColor = mismatch ? 'var(--warning)' : '';
+        ei.title = mismatch ? 'Somme entités (' + entSum + ') ≠ Prévus (' + prevus + ')' : '';
+      });
+    }
+
     totals.ouvres += l.joursOuvrables;
     totals.prevus += prevus;
     totals.conges += conges;
@@ -9522,6 +9633,7 @@ function saveDaysFromEditor(mission) {
   if (paidMonths.length > 0) {
     toast('Attention : les mois avec facture payée (' + paidMonths.map(fmtMonthShort).join(', ') + ') ne seront pas recalculés (Art. L123-28)', 'info');
   }
+  var hasEntitesSave = mission.entites && mission.entites.length > 0;
   mission.lignes.forEach(function(l, idx) {
     var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
     var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
@@ -9540,6 +9652,20 @@ function saveDaysFromEditor(mission) {
       l.joursReels = reelsVal;
     } else {
       l.joursReels = computedReels;
+    }
+    // Sauvegarder la projection par entité (uniquement les valeurs > 0)
+    if (hasEntitesSave) {
+      var proj = {};
+      mission.entites.forEach(function(ent) {
+        var ei = $('input[data-idx="' + idx + '"][data-field="entProj"][data-entid="' + ent.id + '"]');
+        if (ei) {
+          var v = parseFloat(ei.value) || 0;
+          if (v > 0) proj[ent.id] = v;
+        }
+      });
+      l.entiteProjection = Object.keys(proj).length > 0 ? proj : undefined;
+    } else if (l.entiteProjection) {
+      delete l.entiteProjection;
     }
   });
   buildMission(mission);
@@ -9937,7 +10063,10 @@ function showMonthCongesModal(monthYm, mode) {
 
     if (isActivity) {
       // ========== MODE SUIVI D'ACTIVITÉ ==========
-      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, 'Tap numéro = cycler activité · Tap emoji = cycler lieu'));
+      var helpText = (m.entites && m.entites.length > 0)
+        ? 'Tap numéro = cycler activité · Tap emoji = cycler lieu · Tap pastille = cycler entité'
+        : 'Tap numéro = cycler activité · Tap emoji = cycler lieu';
+      body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, helpText));
 
       // Légende
       var legend = el('div', { class: 'cal-legend' });
@@ -9990,6 +10119,16 @@ function showMonthCongesModal(monthYm, mode) {
       if (ligne.workLocation) {
         Object.keys(ligne.workLocation).forEach(function(k) { locState[k] = ligne.workLocation[k]; });
       }
+      // Entité bénéficiaire par jour (si la mission a des entités)
+      var entState = {};
+      if (ligne.entiteByDay) {
+        Object.keys(ligne.entiteByDay).forEach(function(k) { entState[k] = ligne.entiteByDay[k]; });
+      }
+      var hasEntites = m.entites && m.entites.length > 0;
+      var currentEntId = hasEntites ? m.entites[0].id : null;
+      var entById = {};
+      if (hasEntites) m.entites.forEach(function(e) { entById[e.id] = e; });
+
       bizDays.forEach(function(bd) {
         if (bd.isHoliday) return;
         var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
@@ -10006,17 +10145,60 @@ function showMonthCongesModal(monthYm, mode) {
         if (!locState[bd.iso] && (actState[bd.iso] || 0) > 0) {
           locState[bd.iso] = m.defaultWorkLocation || 'site';
         }
+        // Défaut: 1ère entité si pas d'entité définie et jour travaillé
+        if (hasEntites && !entState[bd.iso] && (actState[bd.iso] || 0) > 0) {
+          entState[bd.iso] = m.entites[0].id;
+        }
       });
 
       function updateActCount() {
         var total = 0;
+        var byEnt = {};
         Object.keys(actState).forEach(function(k) {
           var v = actState[k];
-          if (typeof v === 'number' && v > 0.01) total += v;
+          if (typeof v === 'number' && v > 0.01) {
+            total += v;
+            if (hasEntites) {
+              var eid = entState[k] || (m.entites[0] && m.entites[0].id);
+              if (eid) byEnt[eid] = (byEnt[eid] || 0) + v;
+            }
+          }
         });
         total = Math.round(total * 10) / 10;
         var cs = document.getElementById('congesCount_' + m.id);
-        if (cs) cs.textContent = total + 'j travaillés';
+        if (cs) {
+          var label = total + 'j travaillés';
+          if (hasEntites) {
+            var parts = m.entites.map(function(e) { return e.nom + ': ' + (Math.round((byEnt[e.id] || 0) * 10) / 10) + 'j'; });
+            label += ' · ' + parts.join(' · ');
+          }
+          cs.textContent = label;
+        }
+      }
+
+      // Sélecteur d'entité courante (si la mission a des entités)
+      if (hasEntites) {
+        var entBar = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', margin: '6px 0 8px', padding: '6px 8px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+        entBar.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)', fontWeight: '600' } }, 'Entité active :'));
+        m.entites.forEach(function(e, idx) {
+          var btn = el('button', {
+            id: 'entBtn_' + m.id + '_' + e.id,
+            style: { padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', border: '2px solid ' + e.couleur, background: idx === 0 ? e.couleur : 'transparent', color: idx === 0 ? '#fff' : e.couleur }
+          }, e.nom);
+          btn.addEventListener('click', function(ev) {
+            ev.preventDefault(); ev.stopPropagation();
+            currentEntId = e.id;
+            // Mettre à jour visuel des boutons
+            m.entites.forEach(function(other) {
+              var ob = document.getElementById('entBtn_' + m.id + '_' + other.id);
+              if (!ob) return;
+              if (other.id === currentEntId) { ob.style.background = other.couleur; ob.style.color = '#fff'; }
+              else { ob.style.background = 'transparent'; ob.style.color = other.couleur; }
+            });
+          });
+          entBar.appendChild(btn);
+        });
+        body.appendChild(entBar);
       }
 
       // Calendrier grille
@@ -10050,9 +10232,25 @@ function showMonthCongesModal(monthYm, mode) {
         }
 
         var dayEl = el('div', { class: cls });
+        // Bordure colorée si entité (jour travaillé)
+        if (hasEntites && val > 0 && entState[bd.iso] && entById[entState[bd.iso]]) {
+          dayEl.style.boxShadow = 'inset 0 0 0 2px ' + entById[entState[bd.iso]].couleur;
+        }
         // Numéro du jour (tapable pour cycle activité)
         var numEl = el('span', { class: 'cd-num' }, String(bd.day));
         dayEl.appendChild(numEl);
+        // Pastille entité en bas (si applicable)
+        var entBadgeId = 'ent_' + bd.iso.replace(/-/g, '') + '_' + m.id;
+        if (hasEntites && !bd.isHoliday && inMission && val > 0) {
+          var ent = entById[entState[bd.iso]] || m.entites[0];
+          var entBadge = el('span', {
+            class: 'cd-ent',
+            id: entBadgeId,
+            style: { position: 'absolute', bottom: '2px', left: '2px', fontSize: '8px', fontWeight: '700', padding: '1px 4px', borderRadius: '3px', background: ent.couleur, color: '#fff', lineHeight: '1', cursor: 'pointer' },
+            title: 'Cliquer pour cycler entité'
+          }, ent.nom.substring(0, 3).toUpperCase());
+          dayEl.appendChild(entBadge);
+        }
         // Emoji lieu en haut à droite (🏢 site, 🏠 TT, 🔀 mixte)
         var locEmojis = { site: '🏢', tt: '🏠', mixte: '🔀' };
         var locCycle = ['site', 'tt', 'mixte'];
@@ -10068,7 +10266,7 @@ function showMonthCongesModal(monthYm, mode) {
         }
 
         if (!bd.isHoliday && inMission) {
-          (function(iso, element, numSpan) {
+          (function(iso, element, numSpan, badgeId) {
             // Tap sur le numéro = cycle activité (1 → 0.5 → 0 → 1)
             numSpan.addEventListener('click', function(e) {
               e.preventDefault(); e.stopPropagation();
@@ -10099,9 +10297,43 @@ function showMonthCongesModal(monthYm, mode) {
                   });
                   element.appendChild(newLoc);
                 }
+                // Attribution entité = entité courante (par défaut)
+                if (hasEntites) {
+                  if (!entState[iso]) entState[iso] = currentEntId;
+                  var ent = entById[entState[iso]] || m.entites[0];
+                  element.style.boxShadow = 'inset 0 0 0 2px ' + ent.couleur;
+                  var existingBadge = document.getElementById(badgeId);
+                  if (!existingBadge) {
+                    var nb = el('span', {
+                      class: 'cd-ent',
+                      id: badgeId,
+                      style: { position: 'absolute', bottom: '2px', left: '2px', fontSize: '8px', fontWeight: '700', padding: '1px 4px', borderRadius: '3px', background: ent.couleur, color: '#fff', lineHeight: '1', cursor: 'pointer' },
+                      title: 'Cliquer pour cycler entité'
+                    }, ent.nom.substring(0, 3).toUpperCase());
+                    nb.addEventListener('click', function(ev) {
+                      ev.preventDefault(); ev.stopPropagation();
+                      var ids = m.entites.map(function(x) { return x.id; });
+                      var curIdx = ids.indexOf(entState[iso] || ids[0]);
+                      var nextIdx = (curIdx + 1) % ids.length;
+                      entState[iso] = ids[nextIdx];
+                      var newEnt = entById[entState[iso]];
+                      element.style.boxShadow = 'inset 0 0 0 2px ' + newEnt.couleur;
+                      nb.textContent = newEnt.nom.substring(0, 3).toUpperCase();
+                      nb.style.background = newEnt.couleur;
+                      updateActCount();
+                    });
+                    element.appendChild(nb);
+                  }
+                }
               } else {
                 delete locState[iso];
                 if (existingLoc) existingLoc.remove();
+                if (hasEntites) {
+                  delete entState[iso];
+                  element.style.boxShadow = '';
+                  var oldBadge = document.getElementById(badgeId);
+                  if (oldBadge) oldBadge.remove();
+                }
               }
               updateActCount();
             });
@@ -10117,7 +10349,24 @@ function showMonthCongesModal(monthYm, mode) {
                 locBadge.textContent = locEmojis[locCycle[ni]];
               });
             }
-          })(bd.iso, dayEl, numEl);
+
+            // Tap sur la pastille entité = cycler entité
+            var entBadgeEl = document.getElementById(badgeId);
+            if (entBadgeEl && hasEntites) {
+              entBadgeEl.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                var ids = m.entites.map(function(x) { return x.id; });
+                var curIdx = ids.indexOf(entState[iso] || ids[0]);
+                var nextIdx = (curIdx + 1) % ids.length;
+                entState[iso] = ids[nextIdx];
+                var newEnt = entById[entState[iso]];
+                element.style.boxShadow = 'inset 0 0 0 2px ' + newEnt.couleur;
+                entBadgeEl.textContent = newEnt.nom.substring(0, 3).toUpperCase();
+                entBadgeEl.style.background = newEnt.couleur;
+                updateActCount();
+              });
+            }
+          })(bd.iso, dayEl, numEl, entBadgeId);
         }
         cal.appendChild(dayEl);
       });
@@ -10130,7 +10379,7 @@ function showMonthCongesModal(monthYm, mode) {
       planTotal = Math.round(planTotal * 10) / 10;
       body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '6px 0 0' } }, 'Planifié: ' + planTotal + 'j'));
 
-      missionCalendars.push({ mission: m, actState: actState, locState: locState, scheduledNet: scheduledNet, isActivity: true });
+      missionCalendars.push({ mission: m, actState: actState, locState: locState, entState: entState, scheduledNet: scheduledNet, isActivity: true });
       updateActCount();
 
     } else {
@@ -10249,6 +10498,16 @@ function showMonthCongesModal(monthYm, mode) {
               if ((mc.actState[iso] || 0) > 0) wl[iso] = mc.locState[iso];
             });
             ligne.workLocation = Object.keys(wl).length > 0 ? wl : undefined;
+          }
+          // Sauvegarder l'attribution d'entité par jour (uniquement pour les jours travaillés)
+          if (mc.entState && m.entites && m.entites.length > 0) {
+            var ebd = {};
+            Object.keys(mc.entState).forEach(function(iso) {
+              if ((mc.actState[iso] || 0) > 0) ebd[iso] = mc.entState[iso];
+            });
+            ligne.entiteByDay = Object.keys(ebd).length > 0 ? ebd : undefined;
+          } else if (ligne.entiteByDay) {
+            delete ligne.entiteByDay;
           }
         }
         buildMission(m);
@@ -11593,6 +11852,10 @@ function buildCRAData(mission, monthYm) {
   var scheduledDays = getScheduledDaysForMonth(mission, monthYm);
   var workLocation = ligne.workLocation || {};
   var ajustements = ligne.ajustements || {};
+  var entiteByDay = ligne.entiteByDay || {};
+  var hasEntites = mission.entites && mission.entites.length > 0;
+  var entitesById = {};
+  if (hasEntites) mission.entites.forEach(function(e) { entitesById[e.id] = e; });
   var daysInMonth = new Date(p.y, p.m + 1, 0).getDate();
 
   var weeks = [];
@@ -11638,6 +11901,7 @@ function buildCRAData(mission, monthYm) {
     if (!inMission) worked = 0;
 
     var loc = workLocation[iso] || (mission.defaultWorkLocation || 'site');
+    var entId = worked > 0 && hasEntites ? (entiteByDay[iso] || mission.entites[0].id) : null;
     var dowNames = ['','Lun','Mar','Mer','Jeu','Ven'];
 
     currentWeek.days.push({
@@ -11646,7 +11910,8 @@ function buildCRAData(mission, monthYm) {
       dow: dow,
       dowName: dowNames[dow],
       worked: worked,
-      location: worked > 0 ? loc : null
+      location: worked > 0 ? loc : null,
+      entiteId: entId
     });
 
     currentWeek.totalJours += worked;
@@ -11661,6 +11926,20 @@ function buildCRAData(mission, monthYm) {
   var totalTT = weeks.reduce(function(s, w) { return s + w.ttDays; }, 0);
   var totalSite = weeks.reduce(function(s, w) { return s + w.siteDays; }, 0);
 
+  // Totaux par entité
+  var entiteTotals = [];
+  if (hasEntites) {
+    var byId = {};
+    weeks.forEach(function(w) {
+      w.days.forEach(function(d) {
+        if (d.worked > 0 && d.entiteId) byId[d.entiteId] = (byId[d.entiteId] || 0) + d.worked;
+      });
+    });
+    mission.entites.forEach(function(e) {
+      entiteTotals.push({ id: e.id, nom: e.nom, couleur: e.couleur, total: Math.round((byId[e.id] || 0) * 10) / 10 });
+    });
+  }
+
   return {
     mission: mission,
     mois: moisNom,
@@ -11671,6 +11950,8 @@ function buildCRAData(mission, monthYm) {
     totalJours: totalJours,
     totalTT: totalTT,
     totalSite: totalSite,
+    entiteTotals: entiteTotals,
+    entitesById: entitesById,
     numCommande: mission.numeroCommande || '',
     titre: mission.titre || mission.client
   };
@@ -11714,12 +11995,19 @@ function generateCRAHTMLContent(data) {
       '<th style="padding:8px 6px;text-align:right;">Total</th>' +
     '</tr></thead><tbody>';
 
+  var hasEntitesCRA = data.entiteTotals && data.entiteTotals.length > 0;
+
   data.weeks.forEach(function(week) {
     var daysDesc = week.days.filter(function(d) { return d.worked > 0; }).map(function(d) {
       var label = d.dowName + ' ' + d.day;
       if (d.worked === 0.5) label += ' (\u00bd)';
       var locIcons = { site: '\ud83c\udfe2', tt: '\ud83c\udfe0', mixte: '\ud83d\udd00' };
       if (d.location) label += ' ' + (locIcons[d.location] || '');
+      // Pastille entit\u00e9 (initiales color\u00e9es) si applicable
+      if (hasEntitesCRA && d.entiteId && data.entitesById[d.entiteId]) {
+        var ent = data.entitesById[d.entiteId];
+        label += ' <span style="display:inline-block;background:' + ent.couleur + ';color:#fff;font-size:7pt;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:2px;">' + e(ent.nom.substring(0, 3).toUpperCase()) + '</span>';
+      }
       return label;
     }).join(', ');
 
@@ -11733,6 +12021,26 @@ function generateCRAHTMLContent(data) {
   });
 
   html += '</tbody></table>';
+
+  // R\u00e9partition par entit\u00e9 b\u00e9n\u00e9ficiaire (si applicable)
+  if (hasEntitesCRA) {
+    html += '<div style="font-weight:bold;font-size:10pt;color:' + col + ';margin:20px 0 8px;">R\u00e9partition par entit\u00e9 b\u00e9n\u00e9ficiaire</div>';
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:9pt;">';
+    html += '<thead><tr style="background:#f0f4f8;">' +
+      '<th style="padding:6px 8px;text-align:left;">Entit\u00e9</th>' +
+      '<th style="padding:6px 8px;text-align:right;">Jours travaill\u00e9s</th>' +
+      '<th style="padding:6px 8px;text-align:right;">% du total</th>' +
+    '</tr></thead><tbody>';
+    data.entiteTotals.forEach(function(et) {
+      var pct = data.totalJours > 0 ? Math.round(et.total / data.totalJours * 1000) / 10 : 0;
+      html += '<tr style="border-bottom:1px solid #ddd;">' +
+        '<td style="padding:6px 8px;"><span style="display:inline-block;width:10px;height:10px;background:' + et.couleur + ';border-radius:2px;margin-right:6px;vertical-align:middle;"></span>' + e(et.nom) + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:600;">' + et.total + 'j</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#777;">' + pct + '%</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+  }
 
   // Total
   html += '<table style="width:250px;margin-left:auto;border-collapse:collapse;font-size:10pt;">' +
