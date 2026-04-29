@@ -12174,12 +12174,17 @@ function generateCRAPDF(data) {
 
   // Rows
   doc.setFont('helvetica', 'normal'); doc.setTextColor(0); doc.setFontSize(8);
+  var hasEntitesPDF = data.entiteTotals && data.entiteTotals.length > 0;
   data.weeks.forEach(function(week) {
     if (y > 260) { doc.addPage(); y = 20; }
     var daysDesc = week.days.filter(function(d) { return d.worked > 0; }).map(function(d) {
       var label = d.dowName + ' ' + d.day;
       if (d.worked === 0.5) label += ' (1/2)';
       if (d.location === 'tt') label += ' TT';
+      // Pastille entité = initiales (le PDF jsPDF n'affiche pas de couleur ici, on met les 3 lettres entre crochets)
+      if (hasEntitesPDF && d.entiteId && data.entitesById[d.entiteId]) {
+        label += ' [' + data.entitesById[d.entiteId].nom.substring(0, 3).toUpperCase() + ']';
+      }
       return label;
     }).join(', ');
 
@@ -12199,6 +12204,37 @@ function generateCRAPDF(data) {
 
     y += Math.max(descLines.length * 4, 6) + 2;
   });
+
+  // Répartition par entité bénéficiaire
+  if (hasEntitesPDF) {
+    if (y > 240) { doc.addPage(); y = 20; }
+    y += 8;
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(col[0], col[1], col[2]);
+    doc.text('Repartition par entite beneficiaire', 20, y); y += 6;
+    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(80);
+    doc.setFillColor(240, 244, 248);
+    doc.rect(20, y - 4, 170, 7, 'F');
+    doc.text('Entite', 24, y); doc.text('Jours travailles', 130, y, { align: 'right' }); doc.text('% du total', 188, y, { align: 'right' });
+    y += 7;
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(0);
+    data.entiteTotals.forEach(function(et) {
+      if (y > 270) { doc.addPage(); y = 20; }
+      // Petit carré coloré (RGB depuis hex)
+      var hex = (et.couleur || '#888888').replace('#', '');
+      var r = parseInt(hex.substring(0, 2), 16);
+      var g = parseInt(hex.substring(2, 4), 16);
+      var b = parseInt(hex.substring(4, 6), 16);
+      doc.setFillColor(r, g, b);
+      doc.rect(22, y - 3, 3, 3, 'F');
+      doc.setTextColor(0);
+      doc.text(et.nom || '', 28, y);
+      doc.text(et.total + 'j', 130, y, { align: 'right' });
+      var pct = data.totalJours > 0 ? Math.round(et.total / data.totalJours * 1000) / 10 : 0;
+      doc.text(pct + '%', 188, y, { align: 'right' });
+      doc.setDrawColor(220); doc.line(20, y + 2, 190, y + 2);
+      y += 6;
+    });
+  }
 
   // Totaux
   y += 6;
