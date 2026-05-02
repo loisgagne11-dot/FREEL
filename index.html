@@ -2852,7 +2852,58 @@ var IR_CONFIG = {}; // { '2025': { parts: 1, autresRevenus: 0, perAnnuel: 0 }, '
 var COMPUTED = {};
 var _computeVersion = 0;
 var _computeCachedVersion = -1;
-function invalidateCompute() { _computeVersion++; }
+var _prevPeriodCache = {};
+function invalidateCompute() { _computeVersion++; _prevPeriodCache = {}; }
+
+// Renvoie le PERIOD précédent (mois précédent si filtre mensuel, année précédente sinon)
+function getPreviousPeriod() {
+  if (PERIOD.type === 'year' && PERIOD.month !== null && PERIOD.month !== undefined && PERIOD.month !== '') {
+    var m = parseInt(PERIOD.month) - 1;
+    var y = PERIOD.year;
+    if (m < 0) { m = 11; y--; }
+    return { type: 'year', year: y, month: m };
+  }
+  if (PERIOD.type === 'year') {
+    return { type: 'year', year: PERIOD.year - 1, month: null };
+  }
+  return null; // Période custom : pas de précédent défini
+}
+
+// Calcule un snapshot des KPIs pour le PERIOD précédent. Cache le résultat.
+// Stratégie : on swap PERIOD temporairement, on force compute(), on snapshot, on restaure.
+function computePreviousPeriod() {
+  var prev = getPreviousPeriod();
+  if (!prev) return null;
+  var key = prev.type + '_' + prev.year + '_' + (prev.month == null ? 'X' : prev.month);
+  if (_prevPeriodCache[key]) return _prevPeriodCache[key];
+
+  var savedPeriod = { type: PERIOD.type, year: PERIOD.year, month: PERIOD.month, start: PERIOD.start, end: PERIOD.end };
+  PERIOD = prev;
+  _computeCachedVersion = -1; // force compute() à recalculer
+  var prevData = compute();
+  var snapshot = {
+    caHT: prevData.caHT || 0,
+    caEnc: prevData.caEnc || 0,
+    caReal: prevData.caReal || 0,
+    beneficeNet: prevData.beneficeNet || 0,
+    margeNette: prevData.margeNette || 0,
+    joursReal: prevData.joursReal || 0,
+    joursOuvrables: prevData.joursOuvrables || 0,
+    tauxOccupation: prevData.tauxOccupation || 0,
+    tjmEffectif: prevData.tjmEffectif || 0,
+    dsoGlobal: prevData.dsoGlobal || 0,
+    nbClientsActifs: prevData.nbClientsActifs || 0,
+    concentrationTop: prevData.concentrationTop || 0,
+    salaires: prevData.salaires || 0,
+    burnRateMensuel: prevData.burnRateMensuel || 0
+  };
+  // Restaurer PERIOD courant et recalculer pour remettre COMPUTED dans son état attendu
+  PERIOD = savedPeriod;
+  _computeCachedVersion = -1;
+  compute();
+  _prevPeriodCache[key] = snapshot;
+  return snapshot;
+}
 
 function $(sel) { return document.querySelector(sel); }
 function $$(sel) { return document.querySelectorAll(sel); }
@@ -14343,52 +14394,88 @@ function getInsights() {
 // V74: Indicateurs Santé Société toujours visibles (§3.2.7)
 function renderHealthIndicators(container, data) {
   var provisions = getAbsoluteProvisions();
-  // V75: fix accès byType (provisions.urssaf était undefined)
   var provByType = provisions.byType || {};
   var totalProvisions = provisions.total || 0;
-  // V75: soldeAbsolu (vrai solde bancaire), pas data.solde (filtré période)
   var soldeCompte = data.soldeAbsolu || 0;
   var provisionsCouvertes = soldeCompte >= totalProvisions;
+  var ecart = soldeCompte - totalProvisions;
 
-  // Compter factures en retard
+  // Compter factures en retard + détail des plus anciennes
   var facturesRetard = 0;
+  var retardItems = [];
   MISSIONS.forEach(function(m) {
     if (m.factures) m.factures.forEach(function(f) {
       if (f.status === 'envoyée') {
         var paymentDate = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
-        if (TODAY > paymentDate) facturesRetard++;
+        if (TODAY > paymentDate) {
+          facturesRetard++;
+          var daysLate = Math.floor((TODAY - paymentDate) / 86400000);
+          retardItems.push({ client: m.client, ttc: f.ttc, days: daysLate });
+        }
       }
     });
   });
+  retardItems.sort(function(a, b) { return b.days - a.days; });
 
-  // V75: check URSSAF via provAbsoluesByType (clé URSSAF-{factId} jamais matchée avant)
+  // Déclarations : prochaine échéance URSSAF/TVA/IR
   var declarationsAJour = true;
+  var declReason = '';
   if (TODAY.getDate() > 20) {
     var urssafDu = (data.provAbsoluesByType && ((data.provAbsoluesByType['URSSAF'] || 0) + (data.provAbsoluesByType['CFP'] || 0))) || 0;
-    if (urssafDu > 0) declarationsAJour = false;
+    if (urssafDu > 0) {
+      declarationsAJour = false;
+      declReason = 'URSSAF/CFP non payée : ' + EUR(urssafDu);
+    }
+  }
+
+  // Diagnostic "pourquoi" pour chaque indicateur
+  var provReason = '';
+  if (!provisionsCouvertes) {
+    var deficit = Math.abs(ecart);
+    var causes = [];
+    var topProvType = null, topProvAmount = 0;
+    Object.keys(provByType).forEach(function(k) {
+      if ((provByType[k] || 0) > topProvAmount) { topProvType = k; topProvAmount = provByType[k]; }
+    });
+    if (topProvType) causes.push('Plus gros poste : ' + topProvType + ' ' + EUR(topProvAmount));
+    if (data.salaireMoyen && data.salaireMoyen > 0 && data.salaireVersable < data.salaireMoyen) {
+      causes.push('Dernière rémunération > capacité actuelle');
+    }
+    provReason = 'Manque ' + EUR(deficit) + (causes.length ? ' · ' + causes[0] : '');
   }
 
   var bar = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px', marginBottom: '8px' } });
 
-  // Provisions (cliquable → Trésorerie > Provisions)
-  var provDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)', borderRadius: '8px', border: '1px solid ' + (provisionsCouvertes ? 'var(--success)' : 'var(--danger)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; render(); setTimeout(showCouvertureProvisionsModal, 100); } });
+  // Provisions
+  var provBg = provisionsCouvertes ? 'var(--success-glow)' : 'var(--danger-glow)';
+  var provBd = provisionsCouvertes ? 'var(--success)' : 'var(--danger)';
+  var provDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: provBg, borderRadius: '8px', border: '1px solid ' + provBd, cursor: 'pointer' }, onclick: function() { showCouvertureProvisionsModal(); } });
   provDiv.appendChild(el('div', { style: { fontSize: '14px' } }, provisionsCouvertes ? '✅' : '🚨'));
   provDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', marginTop: '2px' } }, 'Provisions'));
-  provDiv.appendChild(el('div', { style: { fontSize: '8px', color: provisionsCouvertes ? 'var(--success)' : 'var(--danger)' } }, provisionsCouvertes ? 'couvertes' : 'non couvertes'));
+  provDiv.appendChild(el('div', { style: { fontSize: '8px', color: provBd } }, provisionsCouvertes ? 'couvertes' : 'non couvertes'));
+  if (provReason) provDiv.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.2', fontStyle: 'italic' }, title: provReason }, '⚠ ' + (provReason.length > 32 ? provReason.substring(0, 30) + '…' : provReason)));
   bar.appendChild(provDiv);
 
-  // Factures (cliquable → Activité > Factures)
-  var factDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: facturesRetard === 0 ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (facturesRetard === 0 ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; render(); } });
+  // Factures
+  var factColor = facturesRetard === 0 ? 'var(--success)' : 'var(--warning)';
+  var factDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: facturesRetard === 0 ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + factColor, cursor: 'pointer' }, onclick: function() { VIEW = 'activite'; ACTIVITE_TAB = 'factures'; FACTURE_FILTER = 'retard'; render(); } });
   factDiv.appendChild(el('div', { style: { fontSize: '14px' } }, facturesRetard === 0 ? '✅' : '⚠️'));
   factDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', marginTop: '2px' } }, 'Factures'));
-  factDiv.appendChild(el('div', { style: { fontSize: '8px', color: facturesRetard === 0 ? 'var(--success)' : 'var(--warning)' } }, facturesRetard === 0 ? 'à jour' : facturesRetard + ' retard'));
+  factDiv.appendChild(el('div', { style: { fontSize: '8px', color: factColor } }, facturesRetard === 0 ? 'à jour' : facturesRetard + ' retard'));
+  if (retardItems.length > 0) {
+    var top = retardItems[0];
+    var why = top.client + ' · J+' + top.days;
+    factDiv.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.2', fontStyle: 'italic' }, title: 'Plus en retard : ' + top.client + ' · ' + EUR(top.ttc) + ' · ' + top.days + 'j de retard' }, '⚠ ' + (why.length > 32 ? why.substring(0, 30) + '…' : why)));
+  }
   bar.appendChild(factDiv);
 
-  // Déclarations (cliquable → Trésorerie > Provisions)
-  var declDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + (declarationsAJour ? 'var(--success)' : 'var(--warning)'), cursor: 'pointer' }, onclick: function() { VIEW = 'tresorerie'; render(); setTimeout(showCouvertureProvisionsModal, 100); } });
+  // Déclarations
+  var declColor = declarationsAJour ? 'var(--success)' : 'var(--warning)';
+  var declDiv = el('div', { style: { flex: '1', textAlign: 'center', padding: '8px 4px', background: declarationsAJour ? 'var(--success-glow)' : 'var(--warning-glow)', borderRadius: '8px', border: '1px solid ' + declColor, cursor: 'pointer' }, onclick: function() { showCouvertureProvisionsModal(); } });
   declDiv.appendChild(el('div', { style: { fontSize: '14px' } }, declarationsAJour ? '✅' : '⚠️'));
   declDiv.appendChild(el('div', { style: { fontSize: '9px', fontWeight: '600', marginTop: '2px' } }, 'Déclarations'));
-  declDiv.appendChild(el('div', { style: { fontSize: '8px', color: declarationsAJour ? 'var(--success)' : 'var(--warning)' } }, declarationsAJour ? 'à jour' : 'à faire'));
+  declDiv.appendChild(el('div', { style: { fontSize: '8px', color: declColor } }, declarationsAJour ? 'à jour' : 'à faire'));
+  if (declReason) declDiv.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: '1.2', fontStyle: 'italic' }, title: declReason }, '⚠ ' + (declReason.length > 32 ? declReason.substring(0, 30) + '…' : declReason)));
   bar.appendChild(declDiv);
 
   container.appendChild(bar);
@@ -17433,15 +17520,21 @@ function renderFinancesPerformance(container) {
     (m.factures || []).forEach(function(f) { if (f.status === 'envoyée') caLatent += (f.ht || 0); });
   });
 
-  // 🏢 Indicateurs société : performance financière
-  container.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', margin: '4px 0 6px' } }, '🏢 Performance financière'));
+  // 🏢 Indicateurs société : performance financière (avec trends vs période précédente)
+  var prevP = computePreviousPeriod();
+  var prevLbl = (PERIOD.type === 'year' && PERIOD.month != null && PERIOD.month !== '') ? 'mois préc.' : (PERIOD.year - 1);
+  var perfHeader = el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', margin: '4px 0 6px', display: 'flex', justifyContent: 'space-between' } });
+  perfHeader.appendChild(el('span', {}, '🏢 Performance financière'));
+  if (prevP) perfHeader.appendChild(el('span', { style: { fontSize: '9px', textTransform: 'none', letterSpacing: 'normal', fontWeight: '500' } }, '↗/↘ vs ' + prevLbl));
+  container.appendChild(perfHeader);
   var kpiGrid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' } });
-  kpiGrid.appendChild(createKPIBlock(EUR(data.caHT), 'CA Encaissé HT', 'var(--success)', { scope: 'societe', tooltip: 'Total HT effectivement encaissé sur la période.' }));
-  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé HT', '#a78bfa', { scope: 'societe', tooltip: 'CA généré par les jours réellement travaillés (peut différer du encaissé à cause des délais de paiement).' }));
+  kpiGrid.appendChild(createKPIBlock(EUR(data.caHT), 'CA Encaissé HT', 'var(--success)', { scope: 'societe', tooltip: 'Total HT effectivement encaissé sur la période.', trend: prevP ? computeTrend(data.caHT, prevP.caHT) : null }));
+  kpiGrid.appendChild(createKPIBlock(EUR(data.caReal), 'CA Réalisé HT', '#a78bfa', { scope: 'societe', tooltip: 'CA généré par les jours réellement travaillés (peut différer du encaissé à cause des délais de paiement).', trend: prevP ? computeTrend(data.caReal, prevP.caReal) : null }));
   kpiGrid.appendChild(createKPIBlock(EUR(caLatent), 'CA Latent HT', caLatent > 0 ? 'var(--warning)' : 'var(--text-muted)', { scope: 'societe', tooltip: 'Factures envoyées non encore payées (HT).' }));
   var margePct = Math.round((data.margeNette || 0) * 100);
   var margeColor = margePct >= 50 ? 'var(--success)' : margePct >= 30 ? 'var(--warning)' : 'var(--danger)';
-  kpiGrid.appendChild(createKPIBlock(margePct + '%', 'Marge Nette', margeColor, { scope: 'societe', tooltip: '(CA HT − URSSAF − TVA reversée − IR − rémunérations − autres charges) / CA HT.', sub: EUR(data.beneficeNet) + ' net' }));
+  var prevMargePctP = prevP ? Math.round((prevP.margeNette || 0) * 100) : null;
+  kpiGrid.appendChild(createKPIBlock(margePct + '%', 'Marge Nette', margeColor, { scope: 'societe', tooltip: '(CA HT − URSSAF − TVA reversée − IR − rémunérations − autres charges) / CA HT.', sub: EUR(data.beneficeNet) + ' net', trend: prevP ? computeTrend(margePct, prevMargePctP) : null }));
   container.appendChild(kpiGrid);
 
   // 🏢 Mix client : concentration, nb clients, top
@@ -19268,6 +19361,30 @@ function drawMainChart() {
         ctx2.fillText("Aujourd'hui", xPos, yScale.top - 4);
         ctx2.restore();
       }
+      // Ligne objectif annuel (horizontale pointillée) si GOAL_CA défini
+      if (GOAL_CA && GOAL_CA > 0) {
+        var goalMonthly = SHOW_CUMUL ? GOAL_CA : Math.round(GOAL_CA / 12);
+        var yAxis = chart.scales.y;
+        var yPos = yAxis.getPixelForValue(goalMonthly);
+        if (yPos > yAxis.top && yPos < yAxis.bottom) {
+          ctx2.save();
+          ctx2.beginPath();
+          ctx2.setLineDash([4, 3]);
+          ctx2.strokeStyle = 'rgba(167,139,250,0.5)';
+          ctx2.lineWidth = 1.5;
+          ctx2.moveTo(chart.scales.x.left, yPos);
+          ctx2.lineTo(chart.scales.x.right, yPos);
+          ctx2.stroke();
+          // Label
+          ctx2.fillStyle = 'rgba(167,139,250,0.8)';
+          ctx2.font = 'bold 9px system-ui';
+          ctx2.textAlign = 'right';
+          ctx2.textBaseline = 'bottom';
+          ctx2.fillText('🎯 Obj. ' + (SHOW_CUMUL ? 'annuel' : 'mensuel') + ': ' + (goalMonthly >= 1000 ? Math.round(goalMonthly/1000) + 'k€' : goalMonthly + '€'), chart.scales.x.right - 4, yPos - 2);
+          ctx2.restore();
+        }
+      }
+
       // Afficher les valeurs sur Réalisation (index 1) et Encaissement (index 2) sur tous les points
       [1, 2].forEach(function(datasetIdx) {
         var dataset = chart.data.datasets[datasetIdx];
@@ -21766,30 +21883,41 @@ function renderCockpit(container) {
   var isMobile = window.innerWidth <= 600;
 
   // Petit titre de section
-  container.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', margin: '12px 0 6px' } }, '🏢 Performance société'));
+  var prevPeriodData = computePreviousPeriod();
+  var prevLabel = (PERIOD.type === 'year' && PERIOD.month != null && PERIOD.month !== '') ? 'mois préc.' : (PERIOD.year - 1);
+  var sectionTitle = el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', margin: '12px 0 6px', display: 'flex', justifyContent: 'space-between' } });
+  sectionTitle.appendChild(el('span', {}, '🏢 Performance société'));
+  if (prevPeriodData) sectionTitle.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 'normal', fontWeight: '500' } }, '↗/↘ vs ' + prevLabel));
+  container.appendChild(sectionTitle);
 
   var kpiBar = el('div', { class: 'kpi-grid', style: { marginBottom: '12px', gap: '6px' } });
+  var prevMargePct = prevPeriodData ? Math.round((prevPeriodData.margeNette || 0) * 100) : null;
+  var prevTxOcc = prevPeriodData ? Math.round((prevPeriodData.tauxOccupation || 0) * 100) : null;
   var kpis = [
     {
       label: 'CA Encaissé HT', value: EUR(data.caHT), color: 'var(--success)',
       tooltip: 'Somme des factures payées sur la période. Indicateur de revenu effectif.',
+      trend: prevPeriodData ? computeTrend(data.caHT, prevPeriodData.caHT) : null,
       click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); }
     },
     {
       label: 'Marge Nette', value: margePct + '%', color: margePct >= 50 ? 'var(--success)' : margePct >= 30 ? 'var(--warning)' : 'var(--danger)',
       tooltip: 'Bénéfice Net / CA HT. Formule : (CA encaissé HT − URSSAF − TVA reversée − IR − rémunérations − autres charges) / CA HT.',
       sub: EUR(data.beneficeNet) + ' net',
+      trend: (prevPeriodData && prevMargePct != null) ? computeTrend(margePct, prevMargePct) : null,
       click: function() { VIEW = 'finances'; FINANCES_TAB = 'performance'; render(); }
     },
     {
       label: 'TJM Effectif', value: EUR(data.tjmEffectif), color: 'var(--info)',
       tooltip: 'CA Réalisé HT / jours travaillés. Le vrai prix de revient quotidien (proche du TJM facturé moyen).',
+      trend: prevPeriodData ? computeTrend(data.tjmEffectif, prevPeriodData.tjmEffectif) : null,
       click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'missions'; render(); }
     },
     {
       label: 'Tx Occupation', value: txOccup + '%', color: txOccup >= 70 ? 'var(--success)' : txOccup >= 40 ? 'var(--warning)' : 'var(--danger)',
       sub: data.joursReal + 'j / ' + data.joursOuvrables + 'j',
       tooltip: 'Jours travaillés / jours ouvrés sur la période (hors weekends et fériés).',
+      trend: prevPeriodData ? computeTrend(txOccup, prevTxOcc) : null,
       click: function() { VIEW = 'activite'; ACTIVITE_TAB = 'missions'; render(); }
     }
   ];
@@ -21800,6 +21928,10 @@ function renderCockpit(container) {
     var lbl = el('div', { style: { fontSize: '8px', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', cursor: k.tooltip ? 'help' : 'default' }, title: k.tooltip || '' }, k.label + (k.tooltip ? ' ⓘ' : ''));
     kpiDiv.appendChild(lbl);
     if (k.sub) kpiDiv.appendChild(el('div', { style: { fontSize: '8px', color: 'var(--text-muted)', marginTop: '1px' } }, k.sub));
+    if (k.trend) {
+      var trendCol = k.trend.direction === 'up' ? 'var(--success)' : k.trend.direction === 'down' ? 'var(--danger)' : 'var(--text-muted)';
+      kpiDiv.appendChild(el('div', { style: { fontSize: '8px', color: trendCol, marginTop: '1px', fontWeight: '700' } }, k.trend.label));
+    }
     kpiBar.appendChild(kpiDiv);
   });
   container.appendChild(kpiBar);
