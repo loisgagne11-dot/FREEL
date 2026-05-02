@@ -7021,10 +7021,29 @@ function updateProjections() {
     var ctx = canvas.getContext('2d');
     if (projectionChart) projectionChart.destroy();
     // V45: Couleurs différentes selon mission active ou non
+    var projValueLabels = {
+      id: 'projValueLabels',
+      afterDatasetsDraw: function(ch) {
+        var ctx2 = ch.ctx;
+        ch.getDatasetMeta(0).data.forEach(function(point, i) {
+          var v = proj.results[i].solde;
+          if (v === null || v === undefined) return;
+          var label = Math.abs(v) >= 1000 ? Math.round(v/1000) + 'k€' : Math.round(v) + '€';
+          ctx2.save();
+          ctx2.fillStyle = v >= 0 ? '#10b981' : '#ef4444';
+          ctx2.font = 'bold 9px system-ui';
+          ctx2.textAlign = 'center';
+          ctx2.textBaseline = 'bottom';
+          ctx2.fillText(label, point.x, point.y - 6);
+          ctx2.restore();
+        });
+      }
+    };
     projectionChart = new Chart(ctx, {
       type: 'line',
       data: { labels: proj.results.map(function(r) { return r.label + (r.isIntercontrat ? ' 🔍' : r.hasActiveMission ? ' ✓' : ''); }), datasets: [{ label: 'Solde', data: proj.results.map(function(r) { return r.solde; }), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: proj.results.map(function(r) { return r.isIntercontrat ? '#f59e0b' : r.hasActiveMission ? '#10b981' : '#6b7280'; }) }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
+      plugins: [projValueLabels]
     });
   }
 }
@@ -17296,6 +17315,28 @@ function renderFinancesEvolution(container) {
       id: 'salLabelPlugin',
       afterDatasetsDraw: function(ch) {
         var ctx2 = ch.ctx;
+
+        // Ligne verticale "Aujourd'hui"
+        if (futureStartSal > 0 && futureStartSal < months.length) {
+          var xScale = ch.scales.x;
+          var yScale = ch.scales.y;
+          var xPos = (xScale.getPixelForValue(futureStartSal - 1) + xScale.getPixelForValue(futureStartSal)) / 2;
+          ctx2.save();
+          ctx2.beginPath();
+          ctx2.setLineDash([4, 4]);
+          ctx2.strokeStyle = 'rgba(255,255,255,0.25)';
+          ctx2.lineWidth = 1;
+          ctx2.moveTo(xPos, yScale.top);
+          ctx2.lineTo(xPos, yScale.bottom);
+          ctx2.stroke();
+          ctx2.fillStyle = 'rgba(255,255,255,0.4)';
+          ctx2.font = '9px system-ui';
+          ctx2.textAlign = 'center';
+          ctx2.fillText("Aujourd'hui", xPos, yScale.top - 4);
+          ctx2.restore();
+        }
+
+        // Valeurs sur les barres rémunération
         ch.getDatasetMeta(0).data.forEach(function(bar, i) {
           var v = dataSal[i];
           if (!v) return;
@@ -17304,6 +17345,22 @@ function renderFinancesEvolution(container) {
           ctx2.fillText((v >= 1000 ? Math.round(v/1000) + 'k' : v) + '€', bar.x, bar.y - 2);
           ctx2.restore();
         });
+
+        // Valeurs sur la courbe Capacité (dataset 2)
+        var capMeta = ch.getDatasetMeta(2);
+        if (capMeta) {
+          capMeta.data.forEach(function(point, i) {
+            var v = dataCapacite[i];
+            if (!v || v === 0) return;
+            ctx2.save();
+            ctx2.fillStyle = i >= futureStartSal ? '#a78bfa' : '#34d399';
+            ctx2.font = 'bold 9px system-ui';
+            ctx2.textAlign = 'center';
+            ctx2.textBaseline = 'top';
+            ctx2.fillText((v >= 1000 ? Math.round(v/1000) + 'k' : v) + '€', point.x, point.y + 6);
+            ctx2.restore();
+          });
+        }
       }
     };
     var c = new Chart(canvas.getContext('2d'), {
@@ -19183,7 +19240,7 @@ function drawMainChart() {
         ctx2.fillText("Aujourd'hui", xPos, yScale.top - 4);
         ctx2.restore();
       }
-      // Afficher les valeurs sur Réalisation (index 1) et Encaissement (index 2)
+      // Afficher les valeurs sur Réalisation (index 1) et Encaissement (index 2) sur tous les points
       [1, 2].forEach(function(datasetIdx) {
         var dataset = chart.data.datasets[datasetIdx];
         var meta = chart.getDatasetMeta(datasetIdx);
@@ -19191,15 +19248,15 @@ function drawMainChart() {
         meta.data.forEach(function(point, index) {
           var value = dataset.data[index];
           if (value === null || value === 0) return;
-          var hasNext = dataset.data.slice(index + 1).some(function(v) { return v !== null && v > 0; });
-          if (hasNext) return;
           var label = value >= 1000 ? Math.round(value/1000) + 'k€' : Math.round(value) + '€';
           ctx2.save();
           ctx2.fillStyle = color;
-          ctx2.font = 'bold 10px system-ui';
-          ctx2.textAlign = 'left';
-          ctx2.textBaseline = 'middle';
-          ctx2.fillText(label, point.x + 6, point.y);
+          ctx2.font = 'bold 9px system-ui';
+          ctx2.textAlign = 'center';
+          ctx2.textBaseline = 'bottom';
+          // Décaler verticalement pour éviter chevauchement entre les 2 datasets
+          var yOffset = datasetIdx === 1 ? -8 : -18;
+          ctx2.fillText(label, point.x, point.y + yOffset);
           ctx2.restore();
         });
       });
@@ -19372,11 +19429,35 @@ function drawSoldeChart() {
     }
   });
   
-  // Plugin pour afficher les montants sur les barres
+  // Trouver l'index transition passé → futur pour la ligne "Aujourd'hui"
+  var futureStartIdxSolde = months.findIndex(function(m) { return m > nowYm; });
+
+  // Plugin pour afficher les montants sur les barres + ligne "Aujourd'hui"
   var dataLabelsPlugin = {
     id: 'dataLabelsPlugin',
     afterDatasetsDraw: function(chart) {
       var ctx = chart.ctx;
+
+      // Ligne verticale "Aujourd'hui" entre passé et futur
+      if (futureStartIdxSolde > 0 && futureStartIdxSolde < months.length) {
+        var xScale = chart.scales.x;
+        var yScale = chart.scales.y;
+        var xPos = (xScale.getPixelForValue(futureStartIdxSolde - 1) + xScale.getPixelForValue(futureStartIdxSolde)) / 2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.lineWidth = 1;
+        ctx.moveTo(xPos, yScale.top);
+        ctx.lineTo(xPos, yScale.bottom);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '9px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText("Aujourd'hui", xPos, yScale.top - 4);
+        ctx.restore();
+      }
+
       chart.data.datasets.forEach(function(dataset, i) {
         if (dataset.type !== 'bar') return;
         var meta = chart.getDatasetMeta(i);
@@ -19399,8 +19480,23 @@ function drawSoldeChart() {
           ctx.restore();
         });
       });
-      
-      // Pas de label "Moy" sur ce graphique (lignes salaires dans graphique dédié)
+
+      // Valeurs sur la courbe Cash Dispo
+      var cashMeta = chart.getDatasetMeta(2);
+      if (cashMeta) {
+        cashMeta.data.forEach(function(point, index) {
+          var value = chart.data.datasets[2].data[index];
+          if (value === null) return;
+          var label = Math.abs(value) >= 1000 ? Math.round(value/1000) + 'k€' : Math.round(value) + '€';
+          ctx.save();
+          ctx.fillStyle = value >= 0 ? '#22c55e' : '#ef4444';
+          ctx.font = 'bold 9px system-ui';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(label, point.x, point.y + 8);
+          ctx.restore();
+        });
+      }
     }
   };
 
@@ -19470,14 +19566,55 @@ function drawJoursParMissionChart() {
     };
   });
 
+  var nowYmJM = ym(TODAY.getFullYear(), TODAY.getMonth());
+  var futureStartJM = months.findIndex(function(m) { return m > nowYmJM; });
+
   var joursLabelPlugin = {
     id: 'joursLabelPlugin',
     afterDatasetsDraw: function(chart) {
       var ctx2 = chart.ctx;
       var nbDs = chart.data.datasets.length;
+
+      // Ligne verticale "Aujourd'hui"
+      if (futureStartJM > 0 && futureStartJM < months.length) {
+        var xScale = chart.scales.x;
+        var yScale = chart.scales.y;
+        var xPos = (xScale.getPixelForValue(futureStartJM - 1) + xScale.getPixelForValue(futureStartJM)) / 2;
+        ctx2.save();
+        ctx2.beginPath();
+        ctx2.setLineDash([4, 4]);
+        ctx2.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx2.lineWidth = 1;
+        ctx2.moveTo(xPos, yScale.top);
+        ctx2.lineTo(xPos, yScale.bottom);
+        ctx2.stroke();
+        ctx2.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx2.font = '9px system-ui';
+        ctx2.textAlign = 'center';
+        ctx2.fillText("Aujourd'hui", xPos, yScale.top - 4);
+        ctx2.restore();
+      }
+
+      // Valeur dans chaque segment significatif (≥ 1j) + total au-dessus
       months.forEach(function(m, idx) {
         var total = 0;
-        for (var di = 0; di < nbDs; di++) total += chart.data.datasets[di].data[idx] || 0;
+        for (var di = 0; di < nbDs; di++) {
+          var val = chart.data.datasets[di].data[idx] || 0;
+          total += val;
+          if (val >= 1) {
+            var bar = chart.getDatasetMeta(di).data[idx];
+            if (!bar) continue;
+            var barH = Math.abs(bar.base - bar.y);
+            if (barH < 14) continue;
+            ctx2.save();
+            ctx2.fillStyle = '#fff';
+            ctx2.font = 'bold 9px system-ui';
+            ctx2.textAlign = 'center';
+            ctx2.textBaseline = 'middle';
+            ctx2.fillText(val + 'j', bar.x, bar.y + barH / 2);
+            ctx2.restore();
+          }
+        }
         if (total <= 0) return;
         var lastMeta = null;
         for (var di2 = nbDs - 1; di2 >= 0; di2--) {
@@ -19803,6 +19940,48 @@ function showWeeklyBreakdownModal(monthKey) {
       });
     });
 
+    var weeklyValueLabels = {
+      id: 'weeklyValueLabels',
+      afterDatasetsDraw: function(ch) {
+        var ctx2 = ch.ctx;
+        var nb = ch.data.datasets.length;
+        // Total au-dessus de chaque colonne
+        wLabels.forEach(function(_, idx) {
+          var total = 0;
+          for (var di = 0; di < nb; di++) total += ch.data.datasets[di].data[idx] || 0;
+          if (total <= 0) return;
+          var lastBar = null;
+          for (var di2 = nb - 1; di2 >= 0; di2--) {
+            if ((ch.data.datasets[di2].data[idx] || 0) > 0) { lastBar = ch.getDatasetMeta(di2).data[idx]; break; }
+          }
+          if (!lastBar) return;
+          ctx2.save();
+          ctx2.fillStyle = '#a1a1aa';
+          ctx2.font = 'bold 9px system-ui';
+          ctx2.textAlign = 'center';
+          ctx2.textBaseline = 'bottom';
+          ctx2.fillText(total + 'j', lastBar.x, lastBar.y - 3);
+          ctx2.restore();
+        });
+        // Valeur dans chaque segment significatif
+        for (var di3 = 0; di3 < nb; di3++) {
+          var meta = ch.getDatasetMeta(di3);
+          meta.data.forEach(function(bar, idx) {
+            var v = ch.data.datasets[di3].data[idx] || 0;
+            if (v < 1) return;
+            var barH = Math.abs(bar.base - bar.y);
+            if (barH < 14) return;
+            ctx2.save();
+            ctx2.fillStyle = '#fff';
+            ctx2.font = 'bold 9px system-ui';
+            ctx2.textAlign = 'center';
+            ctx2.textBaseline = 'middle';
+            ctx2.fillText(v + 'j', bar.x, bar.y + barH / 2);
+            ctx2.restore();
+          });
+        }
+      }
+    };
     wCanvas._chartInstance = new Chart(wCanvas.getContext('2d'), {
       type: 'bar',
       data: { labels: wLabels, datasets: wDatasets },
@@ -19813,7 +19992,8 @@ function showWeeklyBreakdownModal(monthKey) {
           x: { stacked: true, ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
           y: { stacked: true, ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v + 'j'; } }, grid: { color: 'rgba(255,255,255,0.04)' } }
         }
-      }
+      },
+      plugins: [weeklyValueLabels]
     });
   }, 150);
 }
