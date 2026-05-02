@@ -5944,8 +5944,9 @@ function computeIndicators(data, months) {
   var salairesNonZero = data.sparklineData.salaires.filter(function(s) { return s > 0; });
   data.salaireMoyen = salairesNonZero.length > 0 ? Math.round(salairesNonZero.reduce(function(a, b) { return a + b; }, 0) / salairesNonZero.length) : 0;
 
-  // Taux de recouvrement et DSO global
+  // Taux de recouvrement et DSO global + DSO par client
   var totalPayees = 0, totalEmises = 0, dsoGlobalSum = 0, dsoGlobalCount = 0;
+  var dsoByClient = {}; // { clientName: { sum, count } }
   MISSIONS.forEach(function(mis) {
     if (!mis.factures) return;
     mis.factures.forEach(function(f) {
@@ -5959,6 +5960,10 @@ function computeIndicators(data, months) {
           var dsoJ = Math.max(0, Math.round((paie - envoi) / (1000 * 60 * 60 * 24)));
           dsoGlobalSum += dsoJ;
           dsoGlobalCount++;
+          var clName = mis.client || 'Inconnu';
+          if (!dsoByClient[clName]) dsoByClient[clName] = { sum: 0, count: 0 };
+          dsoByClient[clName].sum += dsoJ;
+          dsoByClient[clName].count++;
         }
       }
     });
@@ -5966,6 +5971,46 @@ function computeIndicators(data, months) {
   data.tauxRecouvrement = totalEmises > 0 ? totalPayees / totalEmises : 0;
   data.dsoGlobal = dsoGlobalCount > 0 ? Math.round(dsoGlobalSum / dsoGlobalCount) : 0;
   data.facturesStats.delaiMoyen = data.dsoGlobal;
+  // Map DSO par client (moyenne, count)
+  data.dsoByClient = {};
+  Object.keys(dsoByClient).forEach(function(c) {
+    data.dsoByClient[c] = { dso: Math.round(dsoByClient[c].sum / dsoByClient[c].count), nb: dsoByClient[c].count };
+  });
+
+  // CA HT par client (sur la période) + concentration + nb clients actifs
+  var caByClient = {};
+  MISSIONS.forEach(function(mis) {
+    if (mis.statut === 'prospect' || mis.statut === 'perdue' || !mis.factures) return;
+    mis.factures.forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var paymentMonth = f.datePaiementReel ? f.datePaiementReel.substring(0, 7) : getPaymentMonth(f.mois, mis.delaiPaiement, mis.jourPaiement);
+      if (!isInPeriod(paymentMonth)) return;
+      var name = mis.client || 'Inconnu';
+      caByClient[name] = (caByClient[name] || 0) + (f.ht || 0);
+    });
+  });
+  var clientList = Object.keys(caByClient).map(function(c) { return { client: c, ca: caByClient[c] }; }).sort(function(a, b) { return b.ca - a.ca; });
+  data.caByClient = clientList;
+  data.nbClientsActifs = clientList.length;
+  var totalCAClients = clientList.reduce(function(s, c) { return s + c.ca; }, 0);
+  data.concentrationTop = (clientList.length > 0 && totalCAClients > 0) ? clientList[0].ca / totalCAClients : 0;
+  data.topClient = clientList.length > 0 ? clientList[0].client : '';
+
+  // Burn Rate mensuel = moyenne des charges manuelles récurrentes (TREASURY.mouvements de type Charge récurrentes)
+  // + estimation charges fixes (URSSAF/CFP/IR/TVA non-récurrentes ne comptent pas comme "fixes")
+  var burnSum = 0, burnCount = 0;
+  if (TREASURY.mouvements) {
+    var byMonth = {};
+    TREASURY.mouvements.forEach(function(mv) {
+      if (mv.type !== 'Charge') return;
+      if (!mv.recurrent) return;
+      byMonth[mv.mois] = (byMonth[mv.mois] || 0) + (mv.montant || 0);
+    });
+    Object.keys(byMonth).forEach(function(m) {
+      if (isInPeriod(m)) { burnSum += byMonth[m]; burnCount++; }
+    });
+  }
+  data.burnRateMensuel = burnCount > 0 ? Math.round(burnSum / burnCount) : 0;
 
   // Runway (autonomie) = Cash / (Charges + Salaire estimé)
   var avgCharges = months.length > 0 ? data.totalCharges / months.length : 500;
@@ -17918,10 +17963,55 @@ function renderFinancesConformite(container) {
 }
 
 // V73: Helper pour créer un KPI block
-function createKPIBlock(value, label, color) {
-  var block = el('div', { style: { textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px' } });
+// Helper: % de tendance entre 2 valeurs (renvoie {direction, pct, label})
+function computeTrend(current, previous) {
+  if (previous == null || previous === 0) return null;
+  var pct = Math.round((current - previous) / Math.abs(previous) * 100);
+  if (pct === 0) return { direction: 'flat', pct: 0, label: '=' };
+  var arrow = pct > 0 ? '↗' : '↘';
+  return { direction: pct > 0 ? 'up' : 'down', pct: pct, label: arrow + ' ' + (pct > 0 ? '+' : '') + pct + '%' };
+}
+
+// Helper: créer un bloc KPI avec marqueur scope (mission/societe), tooltip, trend, click
+// opts: { scope: 'mission'|'societe', tooltip: '...', trend: {direction,label}, click: fn, sub: '...' }
+function createKPIBlock(value, label, color, opts) {
+  opts = opts || {};
+  var block = el('div', { style: { position: 'relative', textAlign: 'center', padding: '12px', background: 'var(--bg-tertiary)', borderRadius: '8px', cursor: opts.click ? 'pointer' : 'default' } });
+  if (opts.click) block.addEventListener('click', opts.click);
+
+  // Badge scope (top-right)
+  if (opts.scope) {
+    var badge = el('span', {
+      style: {
+        position: 'absolute', top: '4px', right: '6px', fontSize: '10px',
+        opacity: '0.6', cursor: opts.tooltip ? 'help' : 'default'
+      },
+      title: opts.scope === 'mission' ? 'Indicateur portefeuille missions' : 'Indicateur société'
+    }, opts.scope === 'mission' ? '🎯' : '🏢');
+    block.appendChild(badge);
+  }
+
+  // Valeur
   block.appendChild(el('div', { style: { fontSize: '16px', fontWeight: '700', color: color || 'inherit' } }, value));
-  block.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, label));
+
+  // Label avec tooltip optionnel
+  var labelEl = el('div', {
+    style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', cursor: opts.tooltip ? 'help' : 'default' },
+    title: opts.tooltip || ''
+  }, label + (opts.tooltip ? ' ⓘ' : ''));
+  block.appendChild(labelEl);
+
+  // Sous-texte (ex: "5 missions actives")
+  if (opts.sub) {
+    block.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' } }, opts.sub));
+  }
+
+  // Tendance
+  if (opts.trend) {
+    var trendColor = opts.trend.direction === 'up' ? 'var(--success)' : opts.trend.direction === 'down' ? 'var(--danger)' : 'var(--text-muted)';
+    block.appendChild(el('div', { style: { fontSize: '9px', color: trendColor, marginTop: '2px', fontWeight: '600' } }, opts.trend.label));
+  }
+
   return block;
 }
 
