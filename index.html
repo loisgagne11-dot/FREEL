@@ -10028,6 +10028,404 @@ function showChargeRecurrente() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// IMPORT RELEVÉ BANCAIRE (CSV / OFX) + RAPPROCHEMENT AUTOMATIQUE
+// ═══════════════════════════════════════════════════════════════════════
+
+function showBankImportModal() {
+  $('#formModalTitle').textContent = '🏦 Import relevé bancaire';
+  var body = $('#formModalBody');
+  body.replaceChildren();
+
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', lineHeight: '1.6' } },
+    'Importe le relevé exporté depuis ta banque (CSV ou OFX). FREEL essaiera de rapprocher automatiquement chaque opération avec tes factures, charges et rémunérations.'));
+
+  // Zone d'import
+  var dropZone = el('div', { style: { border: '2px dashed var(--accent)', borderRadius: '10px', padding: '24px', textAlign: 'center', cursor: 'pointer', marginBottom: '12px', background: 'rgba(167,139,250,0.05)' } });
+  dropZone.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '6px' } }, '📂'));
+  dropZone.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600' } }, 'Glissez votre fichier ici'));
+  dropZone.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' } }, 'ou cliquez pour sélectionner (.csv, .ofx, .qfx)'));
+  body.appendChild(dropZone);
+
+  var fileInput = el('input', { type: 'file', accept: '.csv,.ofx,.qfx,text/csv,text/plain' });
+  fileInput.style.display = 'none';
+  body.appendChild(fileInput);
+
+  dropZone.addEventListener('click', function() { fileInput.click(); });
+  dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.style.background = 'rgba(167,139,250,0.15)'; });
+  dropZone.addEventListener('dragleave', function() { dropZone.style.background = 'rgba(167,139,250,0.05)'; });
+  dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.style.background = 'rgba(167,139,250,0.05)';
+    if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', function() {
+    if (fileInput.files.length > 0) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        var content = ev.target.result;
+        var transactions = parseBankFile(content, file.name);
+        if (!transactions || transactions.length === 0) {
+          toast('Aucune transaction trouvée dans ce fichier', 'warning');
+          return;
+        }
+        var matches = reconcileTransactions(transactions);
+        renderReconciliationResult(matches, body, file.name);
+      } catch (err) {
+        console.error('Import bancaire erreur:', err);
+        toast('Format non reconnu — essayez un autre fichier', 'error');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  body.appendChild(el('div', { style: { marginTop: '12px', fontSize: '10px', color: 'var(--text-muted)' } },
+    '💡 Formats supportés : CSV (séparateurs , ou ;) et OFX/QFX. Aucune donnée n\'est envoyée sur Internet — le rapprochement se fait localement.'));
+
+  body.appendChild(el('button', { class: 'btn btn-block', style: { marginTop: '12px' }, onclick: function() { closeModal('formModal'); } }, 'Fermer'));
+  openModal('formModal');
+}
+
+// Parser auto CSV ou OFX
+function parseBankFile(content, filename) {
+  var lower = (filename || '').toLowerCase();
+  // OFX detection : tag <STMTTRN> ou extension .ofx/.qfx
+  if (content.indexOf('<STMTTRN>') !== -1 || lower.endsWith('.ofx') || lower.endsWith('.qfx')) {
+    return parseOFX(content);
+  }
+  return parseCSV(content);
+}
+
+function parseOFX(content) {
+  // OFX/QFX : extraire chaque <STMTTRN>...</STMTTRN>
+  var transactions = [];
+  var blockRe = /<STMTTRN>([\s\S]*?)<\/STMTTRN>/g;
+  var match;
+  while ((match = blockRe.exec(content)) !== null) {
+    var block = match[1];
+    var date = (block.match(/<DTPOSTED>([^<\n]+)/i) || [])[1] || '';
+    var amount = (block.match(/<TRNAMT>([^<\n]+)/i) || [])[1] || '';
+    var name = (block.match(/<NAME>([^<\n]+)/i) || [])[1] || '';
+    var memo = (block.match(/<MEMO>([^<\n]+)/i) || [])[1] || '';
+    // Date format YYYYMMDD ou YYYYMMDDhhmmss
+    var iso = '';
+    if (date.length >= 8) iso = date.substring(0, 4) + '-' + date.substring(4, 6) + '-' + date.substring(6, 8);
+    var amt = parseFloat(amount.replace(',', '.')) || 0;
+    if (iso && amt) {
+      transactions.push({ date: iso, libelle: (name + ' ' + memo).trim(), montant: amt, sens: amt >= 0 ? 'in' : 'out' });
+    }
+  }
+  return transactions;
+}
+
+function parseCSV(content) {
+  // Détecter le séparateur (; ou ,) en regardant la première ligne non-vide
+  var lines = content.split(/\r?\n/).filter(function(l) { return l.trim().length > 0; });
+  if (lines.length === 0) return [];
+  var sep = lines[0].split(';').length > lines[0].split(',').length ? ';' : ',';
+
+  // Tenter de détecter les colonnes en lisant la première ligne
+  var header = lines[0].split(sep).map(function(s) { return s.replace(/^"|"$/g, '').toLowerCase().trim(); });
+  var dateIdx = -1, amountIdx = -1, labelIdx = -1, debitIdx = -1, creditIdx = -1;
+  header.forEach(function(h, i) {
+    if (h.indexOf('date') !== -1 && dateIdx === -1) dateIdx = i;
+    if (h.indexOf('libell') !== -1 || h.indexOf('label') !== -1 || h.indexOf('description') !== -1 || h.indexOf('intitul') !== -1 || h.indexOf('nature') !== -1) labelIdx = i;
+    if (h.indexOf('montant') !== -1 || h === 'amount' || h === 'amt') amountIdx = i;
+    if (h.indexOf('débit') !== -1 || h.indexOf('debit') !== -1) debitIdx = i;
+    if (h.indexOf('crédit') !== -1 || h.indexOf('credit') !== -1) creditIdx = i;
+  });
+
+  // Si pas d'entête détectée mais format probable (date au début) : essai par positions
+  var startLine = (dateIdx >= 0 || amountIdx >= 0 || (debitIdx >= 0 && creditIdx >= 0)) ? 1 : 0;
+  if (startLine === 0) {
+    // Première ligne ressemble à des données : essayer de deviner
+    var cells = lines[0].split(sep);
+    if (cells.length >= 3) {
+      // Probable : Date, Libellé, Montant
+      dateIdx = 0; labelIdx = 1; amountIdx = cells.length - 1;
+      // Ou : Date, Date, Libellé, Montant (Boursorama-style)
+      if (cells.length >= 4) labelIdx = 2;
+    }
+  }
+
+  if (dateIdx < 0 || (amountIdx < 0 && (debitIdx < 0 || creditIdx < 0))) return [];
+
+  var transactions = [];
+  for (var i = startLine; i < lines.length; i++) {
+    var cells2 = parseCSVLine(lines[i], sep);
+    if (cells2.length < Math.max(dateIdx, amountIdx, debitIdx, creditIdx, labelIdx) + 1) continue;
+    var rawDate = (cells2[dateIdx] || '').replace(/"/g, '').trim();
+    var iso = parseFlexibleDate(rawDate);
+    if (!iso) continue;
+    var amt = 0;
+    if (amountIdx >= 0) {
+      amt = parseAmount(cells2[amountIdx]);
+    } else {
+      var d = parseAmount(cells2[debitIdx]);
+      var c = parseAmount(cells2[creditIdx]);
+      amt = c - Math.abs(d);
+    }
+    if (amt === 0) continue;
+    var lib = labelIdx >= 0 ? (cells2[labelIdx] || '').replace(/"/g, '').trim() : '';
+    transactions.push({ date: iso, libelle: lib, montant: amt, sens: amt >= 0 ? 'in' : 'out' });
+  }
+  return transactions;
+}
+
+function parseCSVLine(line, sep) {
+  // Gère les guillemets simples
+  var result = [];
+  var cur = '', inQuote = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (ch === '"') { inQuote = !inQuote; continue; }
+    if (ch === sep && !inQuote) { result.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseFlexibleDate(s) {
+  if (!s) return '';
+  // Formats supportés : YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, YYYYMMDD
+  var m;
+  if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return m[1] + '-' + m[2] + '-' + m[3];
+  if ((m = s.match(/^(\d{2})[\/\-\.](\d{2})[\/\-\.](\d{4})/))) return m[3] + '-' + m[2] + '-' + m[1];
+  if ((m = s.match(/^(\d{4})(\d{2})(\d{2})/))) return m[1] + '-' + m[2] + '-' + m[3];
+  return '';
+}
+
+function parseAmount(s) {
+  if (!s) return 0;
+  s = String(s).replace(/"/g, '').trim();
+  // Format français : 1 234,56 ou anglais : 1,234.56
+  // Détection : si , est suivi de 2 chiffres puis fin → décimal français
+  if (/,\d{1,2}$/.test(s) && s.indexOf('.') === -1) {
+    s = s.replace(/\s/g, '').replace(',', '.');
+  } else {
+    s = s.replace(/\s/g, '').replace(/,/g, '');
+  }
+  var n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+// Rapprochement automatique : pour chaque transaction, trouver le meilleur candidat
+// dans factures payées + mouvements + paidCharges
+function reconcileTransactions(transactions) {
+  // Construire la liste des candidats (toutes les sorties/entrées attendues)
+  var candidates = [];
+  MISSIONS.forEach(function(m) {
+    (m.factures || []).forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var pm = getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement);
+      var pmStr = f.datePaiementReel || localISO(pm);
+      candidates.push({
+        type: 'facture', sens: 'in',
+        montant: f.ttc || f.ht || 0,
+        date: pmStr,
+        label: 'Facture ' + (f.numero || '') + ' · ' + (f.client || m.client || ''),
+        ref: { kind: 'facture', missionId: m.id, factureId: f.id }
+      });
+    });
+  });
+  (TREASURY.mouvements || []).forEach(function(mv) {
+    var dateRef = mv.date || (mv.mois + '-15');
+    if (mv.type === 'Charge' && isPaid(mv.id)) {
+      candidates.push({
+        type: 'charge', sens: 'out',
+        montant: -(mv.montantTTC || mv.montant || 0),
+        date: dateRef,
+        label: 'Charge ' + (mv.categorie || '') + ' · ' + (mv.description || ''),
+        ref: { kind: 'charge', mouvementId: mv.id }
+      });
+    } else if (mv.type === 'Salaire') {
+      candidates.push({
+        type: 'salaire', sens: 'out',
+        montant: -(mv.montant || 0),
+        date: dateRef,
+        label: 'Rémunération',
+        ref: { kind: 'salaire', mouvementId: mv.id }
+      });
+    }
+  });
+  // Provisions URSSAF/CFP/TVA payées (issues de factures)
+  MISSIONS.forEach(function(m) {
+    (m.factures || []).forEach(function(f) {
+      if (f.status !== 'payée' || f.jours <= 0) return;
+      var pm = f.datePaiementReel || localISO(getPaymentDate(f.mois, m.delaiPaiement, m.jourPaiement));
+      var debitMonth = getUrssafDebitMonth(pm.substring(0, 7));
+      var debitDate = debitMonth + '-15'; // estimation prélèvement vers le 15
+      var rate = getUrssafRate(pm.substring(0, 7));
+      var urssafAmt = Math.round((f.ht || 0) * rate);
+      if (isPaid('URSSAF-' + f.id) && urssafAmt > 0) {
+        candidates.push({ type: 'urssaf', sens: 'out', montant: -urssafAmt, date: debitDate, label: 'URSSAF · ' + fmtMonthShort(pm.substring(0, 7)), ref: { kind: 'paidCharge', id: 'URSSAF-' + f.id } });
+      }
+      if (isPaid('CFP-' + f.id)) {
+        var cfpAmt = Math.round((f.ht || 0) * LEGAL.cfp);
+        if (cfpAmt > 0) candidates.push({ type: 'cfp', sens: 'out', montant: -cfpAmt, date: debitDate, label: 'CFP · ' + fmtMonthShort(pm.substring(0, 7)), ref: { kind: 'paidCharge', id: 'CFP-' + f.id } });
+      }
+    });
+  });
+
+  // Score : 0 = parfait, plus c'est haut moins c'est bon
+  function scoreCandidate(tx, cand) {
+    if (Math.abs(tx.montant - cand.montant) > 0.5) return 9999; // montant doit être proche
+    var dt = Math.abs(new Date(tx.date) - new Date(cand.date)) / 86400000;
+    if (dt > 14) return 9999;
+    return Math.abs(tx.montant - cand.montant) * 10 + dt;
+  }
+
+  // Pour chaque transaction, trouver le meilleur candidat (greedy, sans réutiliser)
+  var usedRefs = {};
+  var matches = transactions.map(function(tx) {
+    var best = null, bestScore = 9999;
+    candidates.forEach(function(cand) {
+      var key = cand.ref.kind + '_' + (cand.ref.id || cand.ref.factureId || cand.ref.mouvementId);
+      if (usedRefs[key]) return;
+      var sc = scoreCandidate(tx, cand);
+      if (sc < bestScore) { bestScore = sc; best = cand; }
+    });
+    if (best && bestScore < 9999) {
+      var k = best.ref.kind + '_' + (best.ref.id || best.ref.factureId || best.ref.mouvementId);
+      usedRefs[k] = true;
+      return { tx: tx, match: best, score: bestScore };
+    }
+    return { tx: tx, match: null, score: null };
+  });
+
+  return matches;
+}
+
+function renderReconciliationResult(matches, body, filename) {
+  body.replaceChildren();
+  $('#formModalTitle').textContent = '🏦 Rapprochement · ' + filename;
+
+  var matched = matches.filter(function(m) { return m.match; });
+  var unmatched = matches.filter(function(m) { return !m.match; });
+
+  // Résumé
+  var summary = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '12px' } });
+  summary.appendChild(el('div', { style: { textAlign: 'center', padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, [
+    el('div', { style: { fontSize: '22px', fontWeight: '800', color: 'var(--text-primary)' } }, String(matches.length)),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Opérations')
+  ]));
+  summary.appendChild(el('div', { style: { textAlign: 'center', padding: '10px', background: 'var(--success-glow)', borderRadius: '8px', border: '1px solid var(--success)' } }, [
+    el('div', { style: { fontSize: '22px', fontWeight: '800', color: 'var(--success)' } }, String(matched.length)),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Rapprochées')
+  ]));
+  summary.appendChild(el('div', { style: { textAlign: 'center', padding: '10px', background: unmatched.length > 0 ? 'var(--warning-glow)' : 'var(--bg-tertiary)', borderRadius: '8px', border: unmatched.length > 0 ? '1px solid var(--warning)' : '1px solid var(--glass-border)' } }, [
+    el('div', { style: { fontSize: '22px', fontWeight: '800', color: unmatched.length > 0 ? 'var(--warning)' : 'var(--text-muted)' } }, String(unmatched.length)),
+    el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, 'Non rapprochées')
+  ]));
+  body.appendChild(summary);
+
+  // Section Rapprochées
+  if (matched.length > 0) {
+    body.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '8px 0 4px' } }, '✅ Rapprochées (' + matched.length + ')'));
+    matched.forEach(function(m, idx) {
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 10px', marginBottom: '4px', background: 'var(--bg-tertiary)', borderRadius: '6px', borderLeft: '3px solid var(--success)' } });
+      var left = el('div', { style: { flex: '1', minWidth: 0 } });
+      left.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, m.tx.libelle || '(sans libellé)'));
+      left.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, fmtDate(new Date(m.tx.date)) + ' · ' + EUR(m.tx.montant) + ' → ' + m.match.label));
+      row.appendChild(left);
+      var actions = el('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } });
+      var checkbox = el('input', { type: 'checkbox', checked: true, 'data-idx': idx, 'data-match': '1', style: { width: '16px', height: '16px', cursor: 'pointer' } });
+      actions.appendChild(checkbox);
+      row.appendChild(actions);
+      body.appendChild(row);
+    });
+  }
+
+  // Section Non rapprochées
+  if (unmatched.length > 0) {
+    body.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', margin: '12px 0 4px' } }, '⚠ Non rapprochées (' + unmatched.length + ')'));
+    body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', fontStyle: 'italic' } }, 'Ces opérations n\'ont pas de correspondant. Vous pouvez créer une charge / encaissement manuel pour les sorties.'));
+    unmatched.forEach(function(m, idx) {
+      var color = m.tx.montant > 0 ? 'var(--success)' : 'var(--danger)';
+      var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 10px', marginBottom: '4px', background: 'var(--bg-tertiary)', borderRadius: '6px', borderLeft: '3px solid ' + color } });
+      var left = el('div', { style: { flex: '1', minWidth: 0 } });
+      left.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, m.tx.libelle || '(sans libellé)'));
+      left.appendChild(el('div', { style: { fontSize: '10px', color: color } }, fmtDate(new Date(m.tx.date)) + ' · ' + (m.tx.montant >= 0 ? '+' : '') + EUR(m.tx.montant)));
+      row.appendChild(left);
+      if (m.tx.montant < 0) {
+        // Sortie : proposer de créer une charge
+        var btn = el('button', { class: 'btn btn-sm', style: { fontSize: '10px', padding: '4px 8px' } }, '+ Charge');
+        btn.addEventListener('click', function() {
+          // Créer un mouvement Charge prérempli
+          var mv = {
+            id: 'CH' + Date.now(),
+            type: 'Charge',
+            categorie: 'Autre',
+            description: m.tx.libelle || '(import bancaire)',
+            montant: Math.abs(m.tx.montant),
+            mois: m.tx.date.substring(0, 7),
+            date: m.tx.date,
+            bankReconciled: true,
+            bankImportDate: m.tx.date
+          };
+          TREASURY.mouvements.push(mv);
+          TREASURY.paidCharges[mv.id] = true; // marquée payée puisque le débit est constaté
+          invalidateCompute(); saveAll();
+          row.style.opacity = '0.5';
+          btn.textContent = '✓ Créée';
+          btn.disabled = true;
+          toast('Charge créée et marquée payée', 'success');
+        });
+        row.appendChild(btn);
+      } else {
+        row.appendChild(el('span', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, '🔍 Encaissement à identifier'));
+      }
+      body.appendChild(row);
+    });
+  }
+
+  // Boutons d'action
+  var btnRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } });
+  if (matched.length > 0) {
+    btnRow.appendChild(el('button', { class: 'btn btn-success', style: { flex: '1' }, onclick: function() {
+      // Confirmer les rapprochements cochés : marquer bankReconciled = true sur les items
+      var checks = body.querySelectorAll('input[type="checkbox"][data-match="1"]');
+      var applied = 0;
+      checks.forEach(function(cb) {
+        if (!cb.checked) return;
+        var m = matched[parseInt(cb.dataset.idx)];
+        if (!m) return;
+        var ref = m.match.ref;
+        if (ref.kind === 'facture') {
+          MISSIONS.forEach(function(mis) {
+            if (mis.id !== ref.missionId) return;
+            (mis.factures || []).forEach(function(f) {
+              if (f.id === ref.factureId) { f.bankReconciled = true; f.bankImportDate = m.tx.date; applied++; }
+            });
+          });
+        } else if (ref.kind === 'charge' || ref.kind === 'salaire') {
+          (TREASURY.mouvements || []).forEach(function(mv) {
+            if (mv.id === ref.mouvementId) { mv.bankReconciled = true; mv.bankImportDate = m.tx.date; applied++; }
+          });
+        } else if (ref.kind === 'paidCharge') {
+          if (!TREASURY.bankReconciledIds) TREASURY.bankReconciledIds = {};
+          TREASURY.bankReconciledIds[ref.id] = m.tx.date;
+          applied++;
+        }
+      });
+      // Mémoriser l'import
+      if (!TREASURY.bankImports) TREASURY.bankImports = [];
+      TREASURY.bankImports.push({ date: localISO(TODAY), filename: filename, total: matches.length, matched: applied });
+      invalidateCompute(); saveAll();
+      toast(applied + ' opération(s) rapprochée(s)', 'success');
+      closeModal('formModal');
+      render();
+    } }, '✅ Confirmer ' + matched.length + ' rapprochement' + (matched.length > 1 ? 's' : '')));
+  }
+  btnRow.appendChild(el('button', { class: 'btn', onclick: function() { closeModal('formModal'); } }, 'Annuler'));
+  body.appendChild(btnRow);
+}
+
 function showSalaireModal(montant) {
   var data = compute();
   var body = openFormModal('💸 Verser une Rémunération');
@@ -21079,6 +21477,7 @@ function renderTresorerie(container) {
   var actions = el('div', { class: 'page-actions' });
   actions.appendChild(el('button', { class: 'btn btn-sm', onclick: showChargeModal }, '📋 Charge'));
   actions.appendChild(el('button', { class: 'btn btn-sm btn-success', onclick: function() { showSalaireModal(data.salaireReco); } }, '💸 Rémunération'));
+  actions.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'rgba(167,139,250,0.15)', borderColor: '#a78bfa', color: '#a78bfa' }, onclick: showBankImportModal, title: 'Importer un relevé bancaire (CSV ou OFX)' }, '🏦 Import relevé'));
   header.appendChild(actions);
   container.appendChild(header);
 
