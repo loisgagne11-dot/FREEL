@@ -2855,7 +2855,10 @@ var _computeCachedVersion = -1;
 var _prevPeriodCache = {};
 function invalidateCompute() { _computeVersion++; _prevPeriodCache = {}; }
 
-// Renvoie le PERIOD précédent (mois précédent si filtre mensuel, année précédente sinon)
+// Renvoie le PERIOD précédent. Logique :
+//  - Filtre mensuel actif → mois précédent
+//  - Vue annuelle, année courante → "YTD" de l'année précédente (Jan→mois courant)
+//  - Vue annuelle, année passée ou future → année précédente complète
 function getPreviousPeriod() {
   if (PERIOD.type === 'year' && PERIOD.month !== null && PERIOD.month !== undefined && PERIOD.month !== '') {
     var m = parseInt(PERIOD.month) - 1;
@@ -2864,9 +2867,20 @@ function getPreviousPeriod() {
     return { type: 'year', year: y, month: m };
   }
   if (PERIOD.type === 'year') {
+    var todayYear = TODAY.getFullYear();
+    var todayMonth = TODAY.getMonth(); // 0-indexed
+    if (PERIOD.year === todayYear) {
+      // Année en cours → comparer à la même durée écoulée année précédente
+      return {
+        type: 'custom',
+        start: (PERIOD.year - 1) + '-01',
+        end: ym(PERIOD.year - 1, todayMonth)
+      };
+    }
+    // Année complète passée/future → année précédente complète
     return { type: 'year', year: PERIOD.year - 1, month: null };
   }
-  return null; // Période custom : pas de précédent défini
+  return null;
 }
 
 // Calcule un snapshot des KPIs pour le PERIOD précédent. Cache le résultat.
@@ -10436,6 +10450,7 @@ function showMonthCongesModal(monthYm, mode) {
                       nb.textContent = newEnt.nom.substring(0, 3).toUpperCase();
                       nb.style.background = newEnt.couleur;
                       updateActCount();
+                      if (body._persistMonthCalendar) body._persistMonthCalendar();
                     });
                     element.appendChild(nb);
                   }
@@ -10451,6 +10466,7 @@ function showMonthCongesModal(monthYm, mode) {
                 }
               }
               updateActCount();
+              if (body._persistMonthCalendar) body._persistMonthCalendar();
             });
 
             // Tap sur l'emoji = cycler lieu (site → tt → mixte → site)
@@ -10462,6 +10478,7 @@ function showMonthCongesModal(monthYm, mode) {
                 var ni = (ci + 1) % locCycle.length;
                 locState[iso] = locCycle[ni];
                 locBadge.textContent = locEmojis[locCycle[ni]];
+                if (body._persistMonthCalendar) body._persistMonthCalendar();
               });
             }
 
@@ -10479,6 +10496,7 @@ function showMonthCongesModal(monthYm, mode) {
                 entBadgeEl.textContent = newEnt.nom.substring(0, 3).toUpperCase();
                 entBadgeEl.style.background = newEnt.couleur;
                 updateActCount();
+                if (body._persistMonthCalendar) body._persistMonthCalendar();
               });
             }
           })(bd.iso, dayEl, numEl, entBadgeId);
@@ -10561,6 +10579,7 @@ function showMonthCongesModal(monthYm, mode) {
                   element.classList.remove('conge-half');
                 }
                 updateCongesCount();
+                if (body._persistMonthCalendar) body._persistMonthCalendar();
               }, 250);
             });
             element.addEventListener('dblclick', function(e) {
@@ -10570,6 +10589,7 @@ function showMonthCongesModal(monthYm, mode) {
               element.classList.remove('conge-full');
               element.classList.add('conge-half');
               updateCongesCount();
+              if (body._persistMonthCalendar) body._persistMonthCalendar();
             });
           })(bd.iso, dayEl);
         }
@@ -10588,25 +10608,20 @@ function showMonthCongesModal(monthYm, mode) {
     return;
   }
 
-  body.appendChild(el('button', { class: 'btn btn-success btn-block', style: { marginTop: '16px' }, onclick: function() {
+  // Persistance auto à chaque modification (pas de bouton Enregistrer)
+  function persistMonthCalendar() {
     missionCalendars.forEach(function(mc) {
       var m = mc.mission;
-
       if (mc.isActivity) {
-        // Sauvegarder les ajustements d'activité
         var ligne = m.lignes.find(function(l) { return l.ym === monthYm; });
         if (ligne) {
           var ajustements = {};
           Object.keys(mc.actState).forEach(function(iso) {
             var actual = mc.actState[iso] || 0;
             var expected = mc.scheduledNet[iso] || 0;
-            // Ne stocker que les différences par rapport au planning
-            if (actual !== expected) {
-              ajustements[iso] = actual;
-            }
+            if (actual !== expected) ajustements[iso] = actual;
           });
           ligne.ajustements = Object.keys(ajustements).length > 0 ? ajustements : undefined;
-          // Sauvegarder le lieu de travail
           if (mc.locState) {
             var wl = {};
             Object.keys(mc.locState).forEach(function(iso) {
@@ -10614,44 +10629,55 @@ function showMonthCongesModal(monthYm, mode) {
             });
             ligne.workLocation = Object.keys(wl).length > 0 ? wl : undefined;
           }
-          // Sauvegarder l'attribution d'entité par jour (uniquement pour les jours travaillés)
           if (mc.entState && m.entites && m.entites.length > 0) {
             var ebd = {};
             Object.keys(mc.entState).forEach(function(iso) {
               if ((mc.actState[iso] || 0) > 0) ebd[iso] = mc.entState[iso];
             });
             ligne.entiteByDay = Object.keys(ebd).length > 0 ? ebd : undefined;
-          } else if (ligne.entiteByDay) {
+          } else if (ligne && ligne.entiteByDay) {
             delete ligne.entiteByDay;
           }
         }
         buildMission(m);
         return;
       }
-
-      // Sauvegarder congés
+      // Mode congés
       if (!m.congesDates) m.congesDates = [];
       m.congesDates = m.congesDates.filter(function(cd) { return cd.indexOf(monthYm) !== 0; });
       Object.keys(mc.calState).forEach(function(iso) {
         if (mc.calState[iso] === 'full') m.congesDates.push(iso);
         else if (mc.calState[iso] === 'half') m.congesDates.push(iso + '_half');
       });
-      // Recalculer ligne.conges pour ce mois
-      var ligne = m.lignes.find(function(l) { return l.ym === monthYm; });
-      if (ligne) {
+      var ligneC = m.lignes.find(function(l) { return l.ym === monthYm; });
+      if (ligneC) {
         var congesCount = 0;
         m.congesDates.forEach(function(cd) {
-          if (cd.indexOf(monthYm) === 0) {
-            congesCount += cd.length > 10 ? 0.5 : 1;
-          }
+          if (cd.indexOf(monthYm) === 0) congesCount += cd.length > 10 ? 0.5 : 1;
         });
-        ligne.conges = congesCount;
+        ligneC.conges = congesCount;
       }
       buildMission(m);
     });
-    invalidateCompute(); saveAll(); closeModal('formModal'); render();
-    toast(isActivity ? 'Activité enregistrée' : 'Congés enregistrés', 'success');
-  } }, '✅ Enregistrer'));
+    invalidateCompute();
+    saveAll();
+    // Indicateur visuel discret de sauvegarde
+    var ind = $('#calAutoSaveIndicator');
+    if (ind) {
+      ind.textContent = '✓ Enregistré';
+      ind.style.opacity = '1';
+      clearTimeout(ind._fadeTimer);
+      ind._fadeTimer = setTimeout(function() { ind.style.opacity = '0.4'; }, 1200);
+    }
+  }
+  // Exposer pour que les click handlers puissent appeler ce save
+  body._persistMonthCalendar = persistMonthCalendar;
+
+  // Footer : indicateur d'auto-save + bouton Fermer
+  var footer = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', gap: '8px' } });
+  footer.appendChild(el('div', { id: 'calAutoSaveIndicator', style: { fontSize: '11px', color: 'var(--success)', opacity: '0.4', transition: 'opacity 0.3s' } }, '✓ Auto-enregistré'));
+  footer.appendChild(el('button', { class: 'btn btn-block', style: { flex: 1, maxWidth: '180px' }, onclick: function() { closeModal('formModal'); render(); } }, 'Fermer'));
+  body.appendChild(footer);
 
   openModal('formModal');
 }
@@ -15661,11 +15687,27 @@ function renderCAPlafondWidget(container) {
     el('div', { style: { fontWeight: '700', color: caProjecte > 0 ? '#a78bfa' : 'var(--text-muted)' } }, caProjecte > 0 ? '+' + EUR(caProjecte) : '-')
   ]));
 
-  // Restant / Dépassement
+  // Restant / Dépassement (avec conversion en jours si TJM dispo)
+  var tjmRef = data.tjmEffectif || 0;
+  // Fallback : moyenne pondérée des TJM des missions actives
+  if (!tjmRef) {
+    var sumCa = 0, sumJ = 0;
+    MISSIONS.forEach(function(mis) {
+      if (mis.statut === 'prospect' || mis.statut === 'perdue' || !mis.lignes) return;
+      mis.lignes.forEach(function(l) {
+        var jr = l.joursReels || 0;
+        if (jr > 0) { sumJ += jr; sumCa += jr * (mis.tjm || 0); }
+      });
+    });
+    tjmRef = sumJ > 0 ? Math.round(sumCa / sumJ) : 0;
+  }
+  var joursRestants = (remaining > 0 && tjmRef > 0) ? Math.floor(remaining / tjmRef) : 0;
+  var disponibleSub = remaining >= 0 && joursRestants > 0 ? joursRestants + 'j à ' + EUR(tjmRef) : null;
   metricsRow.appendChild(el('div', { style: { textAlign: 'right' } }, [
     el('div', { style: { color: 'var(--text-muted)', fontSize: '10px' } }, remaining >= 0 ? 'Disponible' : 'Dépassement'),
-    el('div', { style: { fontWeight: '700', color: remaining >= 0 ? 'var(--text-primary)' : 'var(--danger)' } }, remaining >= 0 ? EUR(remaining) : '+' + EUR(Math.abs(remaining)))
-  ]));
+    el('div', { style: { fontWeight: '700', color: remaining >= 0 ? 'var(--text-primary)' : 'var(--danger)' } }, remaining >= 0 ? EUR(remaining) : '+' + EUR(Math.abs(remaining))),
+    disponibleSub ? el('div', { style: { fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }, title: 'Calculé sur ton TJM effectif (CA réel / jours travaillés)' }, '≈ ' + disponibleSub) : null
+  ].filter(Boolean)));
 
   widget.appendChild(metricsRow);
 
@@ -17380,8 +17422,30 @@ function renderFinancesEvolution(container) {
     var nowYm2 = ym(TODAY.getFullYear(), TODAY.getMonth());
     var futureStartSal = -1;
     var dataSal = months.map(function(m) { return data.monthsData[m] ? data.monthsData[m].salaires : 0; });
-    // Capacité rémunération par mois = CA HT - toutes charges hors TVA
-    // Pour les mois futurs : utiliser les encaissements projetés (encHT + à encaisser)
+    // Capacité PRÉVUE (théorique, indépendante du passé/futur) : basée sur joursPrevus de chaque mission
+    // × TJM × (1 - taux charges estimé). Reste stable même quand le mois passe en réalisé.
+    var dataCapacitePrevue = months.map(function(m) {
+      var revenuTheorique = 0;
+      MISSIONS.forEach(function(mis) {
+        if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
+        if (!mis.lignes) return;
+        mis.lignes.forEach(function(l) {
+          if (l.ym !== m) return;
+          var joursTheo = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
+          revenuTheorique += joursTheo * mis.tjm;
+        });
+      });
+      if (!revenuTheorique) return 0;
+      var rate = getUrssafRate(m);
+      var taux = rate + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
+      if (!COMPANY.prelevementLiberatoire) {
+        var irYr = parseInt(m.split('-')[0]);
+        var irD = getIRForYear(irYr);
+        if (irD.impot > 0 && irD.caTotal > 0) taux += irD.impot / irD.caTotal;
+      }
+      return Math.max(0, Math.round(revenuTheorique * (1 - taux)));
+    });
+    // Capacité RÉALISÉE (current behavior) : recalculée selon les données effectives
     var dataCapacite = months.map(function(m, idx) {
       var md = data.monthsData[m];
       if (!md) return 0;
@@ -17410,19 +17474,14 @@ function renderFinancesEvolution(container) {
       if (!revenu) return 0;
       var chargesHorsTVA = 0;
       if (mIsFuture) {
-        // Estimer les charges pour les mois futurs (URSSAF + CFP + Impôt PL + IR Estimé)
-        var rate = getUrssafRate(m);
-        var tauxTotal = rate + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
-        // Ajouter IR Estimé si pas en prélèvement libératoire
+        var rate2 = getUrssafRate(m);
+        var tauxTotal = rate2 + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
         if (!COMPANY.prelevementLiberatoire) {
-          var irYr = parseInt(m.split('-')[0]);
-          var irD = getIRForYear(irYr);
-          if (irD.impot > 0 && irD.caTotal > 0) {
-            tauxTotal += irD.impot / irD.caTotal;
-          }
+          var irYr2 = parseInt(m.split('-')[0]);
+          var irD2 = getIRForYear(irYr2);
+          if (irD2.impot > 0 && irD2.caTotal > 0) tauxTotal += irD2.impot / irD2.caTotal;
         }
         chargesHorsTVA = Math.round(revenu * tauxTotal);
-        // Ajouter les charges manuelles (RC Pro, assurance, etc.)
         (md.charges || []).forEach(function(ch) {
           if (ch.manual && ch.cat !== 'TVA') chargesHorsTVA += ch.montant;
         });
@@ -17494,8 +17553,9 @@ function renderFinancesEvolution(container) {
       data: { labels: months.map(fmtMonthShort), datasets: [
         { label: 'Rémunérations', data: dataSal, backgroundColor: 'rgba(96,165,250,0.7)', borderRadius: 4 },
         { type: 'line', label: 'Moy. rémunération', data: months.map(function() { return data.salaireMoyen; }), borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, pointRadius: 0 },
-        { type: 'line', label: 'Capacité', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, pointRadius: 3, pointBackgroundColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), pointBorderColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), backgroundColor: 'rgba(52,211,153,0.08)', fill: false, segment: { borderColor: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? '#a78bfa' : '#34d399'; }, borderDash: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? [4, 3] : []; } }, spanGaps: true },
-        { type: 'line', label: 'Moy. capacité', data: months.map(function() { return Math.round(capMoyenne); }), borderColor: 'rgba(52,211,153,0.35)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false }
+        { type: 'line', label: 'Capacité réalisée', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, pointRadius: 3, pointBackgroundColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), pointBorderColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), backgroundColor: 'rgba(52,211,153,0.08)', fill: false, segment: { borderColor: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? '#a78bfa' : '#34d399'; }, borderDash: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? [4, 3] : []; } }, spanGaps: true },
+        { type: 'line', label: 'Moy. capacité', data: months.map(function() { return Math.round(capMoyenne); }), borderColor: 'rgba(52,211,153,0.35)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false },
+        { type: 'line', label: 'Capacité prévue', data: dataCapacitePrevue, borderColor: 'rgba(167,139,250,0.7)', borderWidth: 1.5, pointRadius: 2, pointBackgroundColor: 'rgba(167,139,250,0.7)', backgroundColor: 'transparent', fill: false, borderDash: [3, 3], spanGaps: true }
       ]},
       options: { responsive: true, maintainAspectRatio: false, onClick: function(e, els) { if (els.length) showMonthDetail(months[els[0].index]); }, plugins: { legend: { display: true, labels: { color: '#a1a1aa', font: { size: 9 }, boxWidth: 12, padding: 8 } } }, scales: { x: { ticks: { color: '#71717a', font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
       plugins: [salLabelPlugin]
@@ -17522,7 +17582,10 @@ function renderFinancesPerformance(container) {
 
   // 🏢 Indicateurs société : performance financière (avec trends vs période précédente)
   var prevP = computePreviousPeriod();
-  var prevLbl = (PERIOD.type === 'year' && PERIOD.month != null && PERIOD.month !== '') ? 'mois préc.' : (PERIOD.year - 1);
+  var prevLbl;
+  if (PERIOD.type === 'year' && PERIOD.month != null && PERIOD.month !== '') prevLbl = 'mois préc.';
+  else if (PERIOD.type === 'year' && PERIOD.year === TODAY.getFullYear()) prevLbl = (PERIOD.year - 1) + ' YTD';
+  else prevLbl = String(PERIOD.year - 1);
   var perfHeader = el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', margin: '4px 0 6px', display: 'flex', justifyContent: 'space-between' } });
   perfHeader.appendChild(el('span', {}, '🏢 Performance financière'));
   if (prevP) perfHeader.appendChild(el('span', { style: { fontSize: '9px', textTransform: 'none', letterSpacing: 'normal', fontWeight: '500' } }, '↗/↘ vs ' + prevLbl));
@@ -18101,8 +18164,9 @@ function renderMissionsContent(container) {
 
     var card = el('div', { class: 'mission-card', style: { cursor: 'pointer' }, onclick: function() { showMissionModal(m); } });
     var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
-    header.appendChild(el('div', { style: { fontWeight: '700', fontSize: '14px' } }, m.client));
-    // V78: Statut mission : Prospect / Perdue (m.statut) ou Actif / À venir / Terminé (temporel)
+    // Titre mission en gros, fallback sur client si pas de titre
+    var titrePrincipal = m.titre || m.client || 'Mission sans titre';
+    header.appendChild(el('div', { style: { fontWeight: '700', fontSize: '14px' } }, titrePrincipal));
     var badgeCls, badgeTxt;
     if (m.statut === 'prospect') {
       badgeCls = 'badge-info'; badgeTxt = '🔍 Prospect';
@@ -18116,12 +18180,23 @@ function renderMissionsContent(container) {
     header.appendChild(el('div', { class: 'badge ' + badgeCls }, badgeTxt));
     card.appendChild(header);
 
-    // V60: Titre du poste sous le nom du client + V79: client op & agence
-    var subLine = m.titre || '';
-    if (m.clientOp && m.clientOp.nom) subLine += (subLine ? ' · ' : '') + '🏢 ' + m.clientOp.nom;
-    if (m.agence && m.agence.nom) subLine += (subLine ? ' · ' : '') + '🤝 ' + m.agence.nom;
-    if (subLine) {
-      card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px', fontStyle: 'italic' } }, subLine));
+    // Ligne 1 : intermédiaires (agence + client opérationnel/facturé)
+    var intermediaires = [];
+    if (m.agence && m.agence.nom) intermediaires.push('🤝 ' + m.agence.nom);
+    if (m.client && m.client !== titrePrincipal) intermediaires.push('💼 ' + m.client);
+    if (m.clientOp && m.clientOp.nom && m.clientOp.nom !== m.client) intermediaires.push('🏢 ' + m.clientOp.nom);
+    if (intermediaires.length > 0) {
+      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' } }, intermediaires.join(' · ')));
+    }
+
+    // Ligne 2 : entités bénéficiaires (clients finaux)
+    if (m.entites && m.entites.length > 0) {
+      var entLine = el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' } });
+      entLine.appendChild(el('span', { style: { fontStyle: 'italic' } }, '🎯 Pour : '));
+      m.entites.forEach(function(e, idx) {
+        entLine.appendChild(el('span', { style: { padding: '1px 6px', borderRadius: '3px', background: e.couleur + '22', border: '1px solid ' + e.couleur, color: e.couleur, fontWeight: '600' } }, e.nom));
+      });
+      card.appendChild(entLine);
     }
 
     // V60: Période de la mission + V79: rythme
@@ -19961,15 +20036,13 @@ function showWeeklyBreakdownModal(monthKey) {
     var row = el('tr', {});
     var nameCell = el('td', { style: { padding: '6px 8px', borderBottom: '1px solid var(--glass-border)', fontWeight: '600', whiteSpace: 'nowrap' } });
     nameCell.appendChild(el('span', { style: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '2px', background: colors[mi % colors.length], marginRight: '6px', verticalAlign: 'middle' } }));
-    nameCell.appendChild(document.createTextNode(mwd.mission.client || mwd.mission.titre || 'Mission'));
+    nameCell.appendChild(document.createTextNode(mwd.mission.titre || mwd.mission.client || 'Mission'));
     row.appendChild(nameCell);
 
     mwd.weeks.forEach(function(w, wi) {
-      // V81fix: Capacité brute = jours travaillés + jours fériés qui seraient travaillés
       var brut = w.total + w.holidayWorked;
       var cellContent = brut > 0 ? brut + 'j' : '';
       var cell = el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', color: brut > 0 ? colors[mi % colors.length] : 'var(--text-muted)', fontWeight: brut > 0 ? '600' : '400' } }, cellContent);
-      // Tooltip avec détail des jours
       var tooltipParts = [];
       ['lun','mar','mer','jeu','ven'].forEach(function(j) {
         if (w.days[j] === 1) tooltipParts.push(jourLabels[j]);
@@ -19986,6 +20059,44 @@ function showWeeklyBreakdownModal(monthKey) {
     row.appendChild(el('td', { style: { textAlign: 'center', padding: '6px 4px', borderBottom: '1px solid var(--glass-border)', fontWeight: '700', color: 'var(--text-primary)' } }, misTotal + 'j'));
     grandTotal += misTotal;
     tbody.appendChild(row);
+
+    // Sous-rangées par entité (si la mission a des entités configurées)
+    if (mwd.mission.entites && mwd.mission.entites.length > 0) {
+      var ligneM = mwd.mission.lignes ? mwd.mission.lignes.find(function(l) { return l.ym === monthKey; }) : null;
+      var entByDay = ligneM && ligneM.entiteByDay ? ligneM.entiteByDay : {};
+      var entProj = ligneM && ligneM.entiteProjection ? ligneM.entiteProjection : null;
+
+      mwd.mission.entites.forEach(function(ent) {
+        // Pour chaque semaine, calculer les jours attribués à cette entité
+        var weekValues = mwd.weeks.map(function(w, wi) {
+          var sum = 0;
+          weeks[wi].days.forEach(function(wd) {
+            var workedThisDay = w.days[wd.key] || 0;
+            if (workedThisDay <= 0) return;
+            // Si entiteByDay défini pour ce jour, utilise-le ; sinon, défaut = 1ère entité
+            var assigned = entByDay[wd.iso] || mwd.mission.entites[0].id;
+            if (assigned === ent.id) sum += workedThisDay;
+          });
+          return sum;
+        });
+        var entTotal = weekValues.reduce(function(s, v) { return s + v; }, 0);
+        if (entTotal === 0) return;
+
+        var entRow = el('tr', { style: { background: 'rgba(255,255,255,0.02)' } });
+        var entCell = el('td', { style: { padding: '4px 8px', paddingLeft: '24px', borderBottom: '1px solid var(--glass-border)', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap' } });
+        entCell.appendChild(el('span', { style: { display: 'inline-block', width: '6px', height: '6px', borderRadius: '2px', background: ent.couleur, marginRight: '6px', verticalAlign: 'middle' } }));
+        entCell.appendChild(document.createTextNode('↳ ' + ent.nom));
+        entRow.appendChild(entCell);
+
+        weekValues.forEach(function(v) {
+          entRow.appendChild(el('td', { style: { textAlign: 'center', padding: '4px', borderBottom: '1px solid var(--glass-border)', fontSize: '10px', color: v > 0 ? ent.couleur : 'var(--text-muted)' } }, v > 0 ? v + 'j' : ''));
+        });
+
+        var prevuTxt = entProj && entProj[ent.id] ? ' / ' + entProj[ent.id] + ' prévu' : '';
+        entRow.appendChild(el('td', { style: { textAlign: 'center', padding: '4px', borderBottom: '1px solid var(--glass-border)', fontSize: '10px', fontWeight: '600', color: ent.couleur }, title: prevuTxt ? 'Prévu: ' + entProj[ent.id] + 'j' : '' }, entTotal + 'j' + (prevuTxt ? ' *' : '')));
+        tbody.appendChild(entRow);
+      });
+    }
   });
 
   // V81fix: Ligne Jours fériés - compter les fériés qui impactent réellement les missions
@@ -21884,7 +21995,14 @@ function renderCockpit(container) {
 
   // Petit titre de section
   var prevPeriodData = computePreviousPeriod();
-  var prevLabel = (PERIOD.type === 'year' && PERIOD.month != null && PERIOD.month !== '') ? 'mois préc.' : (PERIOD.year - 1);
+  var prevLabel;
+  if (PERIOD.type === 'year' && PERIOD.month != null && PERIOD.month !== '') {
+    prevLabel = 'mois préc.';
+  } else if (PERIOD.type === 'year' && PERIOD.year === TODAY.getFullYear()) {
+    prevLabel = (PERIOD.year - 1) + ' YTD';
+  } else {
+    prevLabel = String(PERIOD.year - 1);
+  }
   var sectionTitle = el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', margin: '12px 0 6px', display: 'flex', justifyContent: 'space-between' } });
   sectionTitle.appendChild(el('span', {}, '🏢 Performance société'));
   if (prevPeriodData) sectionTitle.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--text-muted)', textTransform: 'none', letterSpacing: 'normal', fontWeight: '500' } }, '↗/↘ vs ' + prevLabel));
