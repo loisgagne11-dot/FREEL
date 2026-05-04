@@ -10695,6 +10695,53 @@ function showMonthCongesModal(monthYm, mode) {
   var hasMissions = false;
   var missionCalendars = []; // pour la sauvegarde
 
+  // Helpers SPLIT — un jour peut avoir 2 entités à 0.5 chacune
+  // Format : entState[iso] = "SPLIT:idA:idB" (string) au lieu d'un id simple
+  function isSplit(s) { return typeof s === 'string' && s.indexOf('SPLIT:') === 0; }
+  function splitIds(s) { return isSplit(s) ? s.substring(6).split(':') : []; }
+  function makeSplit(idA, idB) { return 'SPLIT:' + idA + ':' + idB; }
+  // Calcule le prochain état entité au clic sur la pastille.
+  // Si 2 entités : A → B → SPLIT(A,B) → A
+  // Si N>2 : cycle simple A → B → C → … → A
+  function nextEntCycle(currentVal, entites) {
+    if (!entites || entites.length === 0) return null;
+    var ids = entites.map(function(x) { return x.id; });
+    if (entites.length === 2) {
+      var splitVal = makeSplit(ids[0], ids[1]);
+      if (currentVal === ids[0]) return ids[1];
+      if (currentVal === ids[1]) return splitVal;
+      if (isSplit(currentVal)) return ids[0];
+      return ids[0];
+    }
+    if (isSplit(currentVal)) return ids[0];
+    var idx = ids.indexOf(currentVal);
+    return idx === -1 ? ids[0] : ids[(idx + 1) % ids.length];
+  }
+  // Construit la pastille (single ou split). Retourne le DOM element.
+  function buildEntBadge(entVal, entites, entById, badgeId) {
+    if (isSplit(entVal)) {
+      var ids = splitIds(entVal);
+      var entA = entById[ids[0]] || entites[0];
+      var entB = entById[ids[1]] || entites[1] || entA;
+      var badge = el('span', {
+        class: 'cd-ent',
+        id: badgeId,
+        style: { position: 'absolute', bottom: '2px', left: '2px', fontSize: '7px', fontWeight: '700', borderRadius: '3px', overflow: 'hidden', display: 'inline-flex', cursor: 'pointer', lineHeight: '1' },
+        title: 'Demi-jour : ' + entA.nom + ' + ' + entB.nom + ' (cliquer pour cycler)'
+      });
+      badge.appendChild(el('span', { style: { padding: '2px 3px', background: entA.couleur, color: '#fff' } }, entA.nom.substring(0, 2).toUpperCase()));
+      badge.appendChild(el('span', { style: { padding: '2px 3px', background: entB.couleur, color: '#fff' } }, entB.nom.substring(0, 2).toUpperCase()));
+      return badge;
+    }
+    var ent = entById[entVal] || entites[0];
+    return el('span', {
+      class: 'cd-ent',
+      id: badgeId,
+      style: { position: 'absolute', bottom: '2px', left: '2px', fontSize: '8px', fontWeight: '700', padding: '1px 4px', borderRadius: '3px', background: ent.couleur, color: '#fff', lineHeight: '1', cursor: 'pointer' },
+      title: 'Cliquer pour cycler entité' + (entites.length === 2 ? ' (1/2 + 1/2 disponible)' : '')
+    }, ent.nom.substring(0, 3).toUpperCase());
+  }
+
   MISSIONS.forEach(function(m) {
     if (!m.lignes) return;
     var ligne = m.lignes.find(function(l) { return l.ym === monthYm; });
@@ -10779,6 +10826,32 @@ function showMonthCongesModal(monthYm, mode) {
       var entById = {};
       if (hasEntites) m.entites.forEach(function(e) { entById[e.id] = e; });
 
+      // Attache le handler de cycle entité (gère SPLIT) sur une pastille donnée
+      function attachEntBadgeClick(badge, iso, dayEl, badgeId) {
+        badge.addEventListener('click', function(ev) {
+          ev.preventDefault(); ev.stopPropagation();
+          var nextVal = nextEntCycle(entState[iso], m.entites);
+          if (!nextVal) return;
+          entState[iso] = nextVal;
+          // Si on entre en SPLIT, l'activité doit être pleine (= 0.5 + 0.5 = 1)
+          if (isSplit(nextVal)) {
+            actState[iso] = 1;
+            dayEl.className = 'conges-day act-worked';
+          }
+          // Re-render badge (le DOM existant est remplacé)
+          var oldBadge = document.getElementById(badgeId);
+          if (oldBadge) oldBadge.remove();
+          var newBadge = buildEntBadge(entState[iso], m.entites, entById, badgeId);
+          dayEl.appendChild(newBadge);
+          attachEntBadgeClick(newBadge, iso, dayEl, badgeId);
+          // Bordure du jour = couleur de la 1ère entité
+          var firstId = isSplit(nextVal) ? splitIds(nextVal)[0] : nextVal;
+          if (entById[firstId]) dayEl.style.boxShadow = 'inset 0 0 0 2px ' + entById[firstId].couleur;
+          updateActCount();
+          if (body._persistMonthCalendar) body._persistMonthCalendar();
+        });
+      }
+
       bizDays.forEach(function(bd) {
         if (bd.isHoliday) return;
         var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
@@ -10818,8 +10891,13 @@ function showMonthCongesModal(monthYm, mode) {
           if (typeof v === 'number' && v > 0.01) {
             total += v;
             if (hasEntites) {
-              var eid = entState[k] || (m.entites[0] && m.entites[0].id);
-              if (eid) byEnt[eid] = (byEnt[eid] || 0) + v;
+              var assignment = entState[k] || (m.entites[0] && m.entites[0].id);
+              if (isSplit(assignment)) {
+                // Split = 0.5 + 0.5 (force jour plein)
+                splitIds(assignment).forEach(function(id) { byEnt[id] = (byEnt[id] || 0) + 0.5; });
+              } else if (assignment) {
+                byEnt[assignment] = (byEnt[assignment] || 0) + v;
+              }
             }
           }
         });
@@ -10891,9 +10969,10 @@ function showMonthCongesModal(monthYm, mode) {
         }
 
         var dayEl = el('div', { class: cls });
-        // Bordure colorée si entité (jour travaillé)
-        if (hasEntites && val > 0 && entState[bd.iso] && entById[entState[bd.iso]]) {
-          dayEl.style.boxShadow = 'inset 0 0 0 2px ' + entById[entState[bd.iso]].couleur;
+        // Bordure colorée si entité (jour travaillé) — pour SPLIT, première couleur
+        if (hasEntites && val > 0 && entState[bd.iso]) {
+          var firstId = isSplit(entState[bd.iso]) ? splitIds(entState[bd.iso])[0] : entState[bd.iso];
+          if (entById[firstId]) dayEl.style.boxShadow = 'inset 0 0 0 2px ' + entById[firstId].couleur;
         }
         // Numéro du jour (tapable pour cycle activité)
         var numEl = el('span', { class: 'cd-num' }, String(bd.day));
@@ -10901,14 +10980,7 @@ function showMonthCongesModal(monthYm, mode) {
         // Pastille entité en bas (si applicable)
         var entBadgeId = 'ent_' + bd.iso.replace(/-/g, '') + '_' + m.id;
         if (hasEntites && !bd.isHoliday && inMission && val > 0) {
-          var ent = entById[entState[bd.iso]] || m.entites[0];
-          var entBadge = el('span', {
-            class: 'cd-ent',
-            id: entBadgeId,
-            style: { position: 'absolute', bottom: '2px', left: '2px', fontSize: '8px', fontWeight: '700', padding: '1px 4px', borderRadius: '3px', background: ent.couleur, color: '#fff', lineHeight: '1', cursor: 'pointer' },
-            title: 'Cliquer pour cycler entité'
-          }, ent.nom.substring(0, 3).toUpperCase());
-          dayEl.appendChild(entBadge);
+          dayEl.appendChild(buildEntBadge(entState[bd.iso], m.entites, entById, entBadgeId));
         }
         // Emoji lieu en haut à droite (🏢 site, 🏠 TT, 🔀 mixte)
         var locEmojis = { site: '🏢', tt: '🏠', mixte: '🔀' };
@@ -10935,6 +11007,13 @@ function showMonthCongesModal(monthYm, mode) {
               else if (cur >= 0.25) next = 0;
               else next = 1;
               actState[iso] = next;
+              // Si on passe en demi-journée, casser un éventuel SPLIT (un demi-jour ne peut pas
+              // être partagé entre 2 entités, ça équivaudrait à 0.25 + 0.25)
+              if (next === 0.5 && hasEntites && isSplit(entState[iso])) {
+                entState[iso] = splitIds(entState[iso])[0];
+                var existingBadge = document.getElementById(badgeId);
+                if (existingBadge) existingBadge.remove();
+              }
 
               element.className = 'conges-day';
               if (next >= 0.75) element.classList.add('act-worked');
@@ -10956,33 +11035,16 @@ function showMonthCongesModal(monthYm, mode) {
                   });
                   element.appendChild(newLoc);
                 }
-                // Attribution entité = entité courante (par défaut)
+                // Attribution entité = entité courante (par défaut). Le badge intègre SPLIT.
                 if (hasEntites) {
                   if (!entState[iso]) entState[iso] = currentEntId;
-                  var ent = entById[entState[iso]] || m.entites[0];
-                  element.style.boxShadow = 'inset 0 0 0 2px ' + ent.couleur;
+                  var firstId = isSplit(entState[iso]) ? splitIds(entState[iso])[0] : entState[iso];
+                  if (entById[firstId]) element.style.boxShadow = 'inset 0 0 0 2px ' + entById[firstId].couleur;
                   var existingBadge = document.getElementById(badgeId);
                   if (!existingBadge) {
-                    var nb = el('span', {
-                      class: 'cd-ent',
-                      id: badgeId,
-                      style: { position: 'absolute', bottom: '2px', left: '2px', fontSize: '8px', fontWeight: '700', padding: '1px 4px', borderRadius: '3px', background: ent.couleur, color: '#fff', lineHeight: '1', cursor: 'pointer' },
-                      title: 'Cliquer pour cycler entité'
-                    }, ent.nom.substring(0, 3).toUpperCase());
-                    nb.addEventListener('click', function(ev) {
-                      ev.preventDefault(); ev.stopPropagation();
-                      var ids = m.entites.map(function(x) { return x.id; });
-                      var curIdx = ids.indexOf(entState[iso] || ids[0]);
-                      var nextIdx = (curIdx + 1) % ids.length;
-                      entState[iso] = ids[nextIdx];
-                      var newEnt = entById[entState[iso]];
-                      element.style.boxShadow = 'inset 0 0 0 2px ' + newEnt.couleur;
-                      nb.textContent = newEnt.nom.substring(0, 3).toUpperCase();
-                      nb.style.background = newEnt.couleur;
-                      updateActCount();
-                      if (body._persistMonthCalendar) body._persistMonthCalendar();
-                    });
+                    var nb = buildEntBadge(entState[iso], m.entites, entById, badgeId);
                     element.appendChild(nb);
+                    attachEntBadgeClick(nb, iso, element, badgeId);
                   }
                 }
               } else {
@@ -11012,22 +11074,10 @@ function showMonthCongesModal(monthYm, mode) {
               });
             }
 
-            // Tap sur la pastille entité = cycler entité
+            // Tap sur la pastille entité = cycler entité (gère SPLIT 2 entités)
             var entBadgeEl = document.getElementById(badgeId);
             if (entBadgeEl && hasEntites) {
-              entBadgeEl.addEventListener('click', function(e) {
-                e.preventDefault(); e.stopPropagation();
-                var ids = m.entites.map(function(x) { return x.id; });
-                var curIdx = ids.indexOf(entState[iso] || ids[0]);
-                var nextIdx = (curIdx + 1) % ids.length;
-                entState[iso] = ids[nextIdx];
-                var newEnt = entById[entState[iso]];
-                element.style.boxShadow = 'inset 0 0 0 2px ' + newEnt.couleur;
-                entBadgeEl.textContent = newEnt.nom.substring(0, 3).toUpperCase();
-                entBadgeEl.style.background = newEnt.couleur;
-                updateActCount();
-                if (body._persistMonthCalendar) body._persistMonthCalendar();
-              });
+              attachEntBadgeClick(entBadgeEl, iso, element, badgeId);
             }
           })(bd.iso, dayEl, numEl, entBadgeId);
         }
@@ -12647,13 +12697,18 @@ function buildCRAData(mission, monthYm) {
   var totalTT = weeks.reduce(function(s, w) { return s + w.ttDays; }, 0);
   var totalSite = weeks.reduce(function(s, w) { return s + w.siteDays; }, 0);
 
-  // Totaux par entité
+  // Totaux par entité — gère SPLIT (½ + ½ sur 2 entités)
   var entiteTotals = [];
   if (hasEntites) {
     var byId = {};
     weeks.forEach(function(w) {
       w.days.forEach(function(d) {
-        if (d.worked > 0 && d.entiteId) byId[d.entiteId] = (byId[d.entiteId] || 0) + d.worked;
+        if (d.worked <= 0 || !d.entiteId) return;
+        if (typeof d.entiteId === 'string' && d.entiteId.indexOf('SPLIT:') === 0) {
+          d.entiteId.substring(6).split(':').forEach(function(id) { byId[id] = (byId[id] || 0) + 0.5; });
+        } else {
+          byId[d.entiteId] = (byId[d.entiteId] || 0) + d.worked;
+        }
       });
     });
     mission.entites.forEach(function(e) {
@@ -12724,10 +12779,18 @@ function generateCRAHTMLContent(data) {
       if (d.worked === 0.5) label += ' (\u00bd)';
       var locIcons = { site: '\ud83c\udfe2', tt: '\ud83c\udfe0', mixte: '\ud83d\udd00' };
       if (d.location) label += ' ' + (locIcons[d.location] || '');
-      // Pastille entit\u00e9 (initiales color\u00e9es) si applicable
-      if (hasEntitesCRA && d.entiteId && data.entitesById[d.entiteId]) {
-        var ent = data.entitesById[d.entiteId];
-        label += ' <span style="display:inline-block;background:' + ent.couleur + ';color:#fff;font-size:7pt;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:2px;">' + e(ent.nom.substring(0, 3).toUpperCase()) + '</span>';
+      // Pastille entit\u00e9 (g\u00e8re SPLIT 2 demi-jours)
+      if (hasEntitesCRA && d.entiteId) {
+        if (typeof d.entiteId === 'string' && d.entiteId.indexOf('SPLIT:') === 0) {
+          var ids = d.entiteId.substring(6).split(':');
+          ids.forEach(function(id, ii) {
+            var en = data.entitesById[id]; if (!en) return;
+            label += (ii === 0 ? ' \u00bd' : '+\u00bd') + '<span style="display:inline-block;background:' + en.couleur + ';color:#fff;font-size:7pt;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:2px;">' + e(en.nom.substring(0, 3).toUpperCase()) + '</span>';
+          });
+        } else if (data.entitesById[d.entiteId]) {
+          var ent = data.entitesById[d.entiteId];
+          label += ' <span style="display:inline-block;background:' + ent.couleur + ';color:#fff;font-size:7pt;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:2px;">' + e(ent.nom.substring(0, 3).toUpperCase()) + '</span>';
+        }
       }
       return label;
     }).join(', ');
@@ -12903,8 +12966,14 @@ function generateCRAPDF(data) {
       if (d.worked === 0.5) label += ' (1/2)';
       if (d.location === 'tt') label += ' TT';
       // Pastille entité = initiales (le PDF jsPDF n'affiche pas de couleur ici, on met les 3 lettres entre crochets)
-      if (hasEntitesPDF && d.entiteId && data.entitesById[d.entiteId]) {
-        label += ' [' + data.entitesById[d.entiteId].nom.substring(0, 3).toUpperCase() + ']';
+      if (hasEntitesPDF && d.entiteId) {
+        if (typeof d.entiteId === 'string' && d.entiteId.indexOf('SPLIT:') === 0) {
+          var idsP = d.entiteId.substring(6).split(':');
+          var labels = idsP.map(function(id) { return data.entitesById[id] ? data.entitesById[id].nom.substring(0, 3).toUpperCase() : ''; }).filter(Boolean);
+          if (labels.length) label += ' [½' + labels.join(' +½') + ']';
+        } else if (data.entitesById[d.entiteId]) {
+          label += ' [' + data.entitesById[d.entiteId].nom.substring(0, 3).toUpperCase() + ']';
+        }
       }
       return label;
     }).join(', ');
@@ -19198,10 +19267,13 @@ function renderMissionsContent(container) {
         // Priorité : entiteByDay réels (jours travaillés) sinon entiteProjection (théorique)
         if (l.entiteByDay) {
           var realByDay = l.entiteByDay;
-          // Approximation : compter les jours par entité depuis entiteByDay (1 entrée = 1 jour théorique)
           Object.keys(realByDay).forEach(function(iso) {
             var eid = realByDay[iso];
-            byEnt[eid] = (byEnt[eid] || 0) + 1;
+            if (typeof eid === 'string' && eid.indexOf('SPLIT:') === 0) {
+              eid.substring(6).split(':').forEach(function(id) { byEnt[id] = (byEnt[id] || 0) + 0.5; });
+            } else {
+              byEnt[eid] = (byEnt[eid] || 0) + 1;
+            }
           });
         } else if (l.entiteProjection) {
           Object.keys(l.entiteProjection).forEach(function(eid) {
@@ -21047,9 +21119,13 @@ function showWeeklyBreakdownModal(monthKey) {
           weeks[wi].days.forEach(function(wd) {
             var workedThisDay = w.days[wd.key] || 0;
             if (workedThisDay <= 0) return;
-            // Si entiteByDay défini pour ce jour, utilise-le ; sinon, défaut = 1ère entité
             var assigned = entByDay[wd.iso] || mwd.mission.entites[0].id;
-            if (assigned === ent.id) sum += workedThisDay;
+            if (typeof assigned === 'string' && assigned.indexOf('SPLIT:') === 0) {
+              // Split = ½ pour chacun des 2 ids
+              if (assigned.indexOf(':' + ent.id) !== -1 || assigned.indexOf('SPLIT:' + ent.id + ':') === 0) sum += 0.5;
+            } else if (assigned === ent.id) {
+              sum += workedThisDay;
+            }
           });
           return sum;
         });
