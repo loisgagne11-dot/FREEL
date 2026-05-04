@@ -2983,10 +2983,23 @@ function toast(msg, type) {
   setTimeout(function() { if (t.parentNode) t.remove(); }, TOAST_DURATION);
 }
 
-function EUR(n, forceShow) { 
+function EUR(n, forceShow) {
   // Mode Privacy - floute les montants sauf si forceShow
   if (PRIVACY_MODE && !forceShow) return '•••••€';
-  return (n || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }); 
+  return (n || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+}
+// Format compact pour les graphes : 6000→6k€, 4346→4,3k€, 999→999€, négatifs respectés
+function EURK(n) {
+  var v = n == null ? 0 : n;
+  var sign = v < 0 ? '-' : '';
+  var abs = Math.abs(v);
+  if (abs < 1000) return sign + Math.round(abs) + '€';
+  var k = abs / 1000;
+  if (k >= 100) return sign + Math.round(k) + 'k€';
+  // Sinon : 1 décimale, mais retire .0
+  var rounded = Math.round(k * 10) / 10;
+  if (rounded === Math.floor(rounded)) return sign + rounded + 'k€';
+  return sign + rounded.toFixed(1).replace('.', ',') + 'k€';
 }
 function PCT(n) { return ((n || 0) * 100).toFixed(1) + '%'; }
 function localISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -7128,7 +7141,7 @@ function updateProjections() {
         ch.getDatasetMeta(0).data.forEach(function(point, i) {
           var v = proj.results[i].solde;
           if (v === null || v === undefined) return;
-          var label = Math.abs(v) >= 1000 ? Math.round(v/1000) + 'k€' : Math.round(v) + '€';
+          var label = EURK(v);
           ctx2.save();
           ctx2.fillStyle = v >= 0 ? '#10b981' : '#ef4444';
           ctx2.font = 'bold 9px system-ui';
@@ -7142,7 +7155,7 @@ function updateProjections() {
     projectionChart = new Chart(ctx, {
       type: 'line',
       data: { labels: proj.results.map(function(r) { return r.label + (r.isIntercontrat ? ' 🔍' : r.hasActiveMission ? ' ✓' : ''); }), datasets: [{ label: 'Solde', data: proj.results.map(function(r) { return r.solde; }), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: proj.results.map(function(r) { return r.isIntercontrat ? '#f59e0b' : r.hasActiveMission ? '#10b981' : '#6b7280'; }) }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return EURK(v); } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
       plugins: [projValueLabels]
     });
   }
@@ -9564,6 +9577,10 @@ function showMissionModal(mission) {
     mission.statut = $('#mStatut') ? $('#mStatut').value : 'active';
     mission.modeTravail = $('#mModeTravail') ? $('#mModeTravail').value : 'presentiel';
 
+    // Snapshot du rythme AVANT pour détecter un changement (déclenche prompt de reset
+    // des activités manuelles si la mission existe déjà)
+    var rythmeAvant = JSON.stringify(mission.periodes || []);
+
     // V81: Sauvegarder périodes de travail avec jours spécifiques
     mission.periodes = [];
     var pIdx = 0;
@@ -9701,6 +9718,25 @@ function showMissionModal(mission) {
       mission.adresseClient = agenceAddr;
     } else {
       mission.adresseClient = mission.clientOp.adresse || '';
+    }
+
+    // Détection changement de rythme + ajustements manuels existants → proposer reset
+    var rythmeApres = JSON.stringify(mission.periodes || []);
+    if (!isNew && rythmeAvant !== rythmeApres) {
+      var nbAjustements = 0;
+      (mission.lignes || []).forEach(function(l) {
+        if (l.ajustements) nbAjustements += Object.keys(l.ajustements).length;
+      });
+      if (nbAjustements > 0) {
+        var msg = 'Le rythme de la mission a changé.\n\n' + nbAjustements + ' modification(s) manuelle(s) d\'activité existent (jours cochés/décochés dans le suivi).\n\nLes effacer pour appliquer le nouveau rythme automatiquement ?\n\n• OK = réinitialiser les activités\n• Annuler = conserver les modifications (peuvent être obsolètes)';
+        if (confirm(msg)) {
+          (mission.lignes || []).forEach(function(l) {
+            delete l.ajustements;
+            delete l.workLocation;
+            delete l.entiteByDay;
+          });
+        }
+      }
     }
 
     buildMission(mission);
@@ -11167,9 +11203,29 @@ function showMonthCongesModal(monthYm, mode) {
   // Exposer pour que les click handlers puissent appeler ce save
   body._persistMonthCalendar = persistMonthCalendar;
 
-  // Footer : indicateur d'auto-save + bouton Fermer
-  var footer = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', gap: '8px' } });
+  // Footer : reset + indicateur d'auto-save + bouton Fermer
+  var footer = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', gap: '8px', flexWrap: 'wrap' } });
   footer.appendChild(el('div', { id: 'calAutoSaveIndicator', style: { fontSize: '11px', color: 'var(--success)', opacity: '0.4', transition: 'opacity 0.3s' } }, '✓ Auto-enregistré'));
+  // Bouton Reset : efface ajustements + workLocation + entiteByDay du mois pour toutes les missions
+  // → on revient au remplissage automatique selon le rythme défini sur la mission
+  if (isActivity) {
+    footer.appendChild(el('button', { class: 'btn btn-sm', style: { background: 'rgba(251,191,36,0.15)', borderColor: 'var(--warning)', color: 'var(--warning)' }, title: 'Effacer toutes les modifications manuelles de ce mois et revenir au rythme défini sur la mission', onclick: function() {
+      if (!confirm('Réinitialiser les activités de ' + fmtMonth(monthYm) + ' ?\n\nToutes les modifications manuelles (jours, lieux, attributions par client) seront effacées et remplacées par le rythme automatique défini sur chaque mission.')) return;
+      MISSIONS.forEach(function(m) {
+        if (!m.lignes) return;
+        var ligne = m.lignes.find(function(l) { return l.ym === monthYm; });
+        if (!ligne) return;
+        delete ligne.ajustements;
+        delete ligne.workLocation;
+        delete ligne.entiteByDay;
+        buildMission(m);
+      });
+      invalidateCompute(); saveAll();
+      closeModal('formModal');
+      showMonthCongesModal(monthYm, 'activite');
+      toast('Activités réinitialisées sur ' + fmtMonth(monthYm), 'success');
+    } }, '↻ Reset activité'));
+  }
   footer.appendChild(el('button', { class: 'btn btn-block', style: { flex: 1, maxWidth: '180px' }, onclick: function() { closeModal('formModal'); render(); } }, 'Fermer'));
   body.appendChild(footer);
 
@@ -17946,38 +18002,20 @@ function renderFinancesEvolution(container) {
     var nowYm2 = ym(TODAY.getFullYear(), TODAY.getMonth());
     var futureStartSal = -1;
     var dataSal = months.map(function(m) { return data.monthsData[m] ? data.monthsData[m].salaires : 0; });
-    // Capacité PRÉVUE (théorique, indépendante du passé/futur) : basée sur joursPrevus de chaque mission
-    // × TJM × (1 - taux charges estimé). Reste stable même quand le mois passe en réalisé.
-    var dataCapacitePrevue = months.map(function(m) {
-      var revenuTheorique = 0;
-      MISSIONS.forEach(function(mis) {
-        if (mis.statut === 'prospect' || mis.statut === 'perdue') return;
-        if (!mis.lignes) return;
-        mis.lignes.forEach(function(l) {
-          if (l.ym !== m) return;
-          var joursTheo = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
-          revenuTheorique += joursTheo * mis.tjm;
-        });
-      });
-      if (!revenuTheorique) return 0;
-      var rate = getUrssafRate(m);
-      var taux = rate + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
-      if (!COMPANY.prelevementLiberatoire) {
-        var irYr = parseInt(m.split('-')[0]);
-        var irD = getIRForYear(irYr);
-        if (irD.impot > 0 && irD.caTotal > 0) taux += irD.impot / irD.caTotal;
-      }
-      return Math.max(0, Math.round(revenuTheorique * (1 - taux)));
-    });
-    // Capacité RÉALISÉE (current behavior) : recalculée selon les données effectives
+    // Capacité (réelle pour mois passés clos ; projetée sinon) :
+    //   = revenu HT du mois (encaissé OU à encaisser projeté si rien d'encaissé) − charges hors TVA
+    // Inclut les factures status 'envoyée' (latentes) et les missions planifiées non facturées.
     var dataCapacite = months.map(function(m, idx) {
       var md = data.monthsData[m];
       if (!md) return 0;
       var mIsFuture = m > nowYm2;
       if (mIsFuture && futureStartSal === -1) futureStartSal = idx;
       var revenu = md.encHT || 0;
-      // Pour les mois futurs, ajouter les factures à encaisser projetées + lignes mission non facturées
-      if (mIsFuture) {
+      // Si revenu encaissé = 0 OU mois futur, regarder ce qui est attendu :
+      //   - factures envoyées non payées dont paymentMonth = m
+      //   - missions planifiées sans facture pour ce mois
+      var useProjection = mIsFuture || revenu === 0;
+      if (useProjection) {
         (data.facturesAEncaisser || []).forEach(function(f) {
           if (f.paymentMonth === m) revenu += f.ht || 0;
         });
@@ -17989,7 +18027,7 @@ function renderFinancesEvolution(container) {
             var jours = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
             if (jours <= 0) return;
             var alreadyCovered = false;
-            if (mis.factures) mis.factures.forEach(function(f) { if (f.mois === l.ym) alreadyCovered = true; });
+            if (mis.factures) mis.factures.forEach(function(f) { if (f.mois === l.ym && f.jours > 0) alreadyCovered = true; });
             if (alreadyCovered) return;
             revenu += jours * mis.tjm;
           });
@@ -17997,7 +18035,7 @@ function renderFinancesEvolution(container) {
       }
       if (!revenu) return 0;
       var chargesHorsTVA = 0;
-      if (mIsFuture) {
+      if (useProjection) {
         var rate2 = getUrssafRate(m);
         var tauxTotal = rate2 + LEGAL.cfp + (COMPANY.prelevementLiberatoire ? LEGAL.impLib : 0);
         if (!COMPANY.prelevementLiberatoire) {
@@ -18051,7 +18089,7 @@ function renderFinancesEvolution(container) {
           if (!v) return;
           ctx2.save(); ctx2.fillStyle = '#60a5fa'; ctx2.font = 'bold 9px system-ui';
           ctx2.textAlign = 'center'; ctx2.textBaseline = 'bottom';
-          ctx2.fillText((v >= 1000 ? Math.round(v/1000) + 'k' : v) + '€', bar.x, bar.y - 2);
+          ctx2.fillText(EURK(v), bar.x, bar.y - 2);
           ctx2.restore();
         });
 
@@ -18066,7 +18104,7 @@ function renderFinancesEvolution(container) {
             ctx2.font = 'bold 9px system-ui';
             ctx2.textAlign = 'center';
             ctx2.textBaseline = 'top';
-            ctx2.fillText((v >= 1000 ? Math.round(v/1000) + 'k' : v) + '€', point.x, point.y + 6);
+            ctx2.fillText(EURK(v), point.x, point.y + 6);
             ctx2.restore();
           });
         }
@@ -18077,11 +18115,10 @@ function renderFinancesEvolution(container) {
       data: { labels: months.map(fmtMonthShort), datasets: [
         { label: 'Rémunérations', data: dataSal, backgroundColor: 'rgba(96,165,250,0.7)', borderRadius: 4 },
         { type: 'line', label: 'Moy. rémunération', data: months.map(function() { return data.salaireMoyen; }), borderColor: 'rgba(96,165,250,0.4)', borderWidth: 2, pointRadius: 0 },
-        { type: 'line', label: 'Capacité réalisée', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, pointRadius: 3, pointBackgroundColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), pointBorderColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), backgroundColor: 'rgba(52,211,153,0.08)', fill: false, segment: { borderColor: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? '#a78bfa' : '#34d399'; }, borderDash: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? [4, 3] : []; } }, spanGaps: true },
-        { type: 'line', label: 'Moy. capacité', data: months.map(function() { return Math.round(capMoyenne); }), borderColor: 'rgba(52,211,153,0.35)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false },
-        { type: 'line', label: 'Capacité prévue', data: dataCapacitePrevue, borderColor: 'rgba(167,139,250,0.7)', borderWidth: 1.5, pointRadius: 2, pointBackgroundColor: 'rgba(167,139,250,0.7)', backgroundColor: 'transparent', fill: false, borderDash: [3, 3], spanGaps: true }
+        { type: 'line', label: 'Capacité', data: dataCapacite, borderColor: '#34d399', borderWidth: 2, pointRadius: 3, pointBackgroundColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), pointBorderColor: months.map(function(m) { return m > nowYm2 ? '#a78bfa' : '#34d399'; }), backgroundColor: 'rgba(52,211,153,0.08)', fill: false, segment: { borderColor: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? '#a78bfa' : '#34d399'; }, borderDash: function(ctx) { return ctx.p1DataIndex >= futureStartSal ? [4, 3] : []; } }, spanGaps: true },
+        { type: 'line', label: 'Moy. capacité', data: months.map(function() { return Math.round(capMoyenne); }), borderColor: 'rgba(52,211,153,0.35)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false }
       ]},
-      options: { responsive: true, maintainAspectRatio: false, onClick: function(e, els) { if (els.length) showMonthDetail(months[els[0].index]); }, plugins: { legend: { display: true, labels: { color: '#a1a1aa', font: { size: 9 }, boxWidth: 12, padding: 8 } } }, scales: { x: { ticks: { color: '#71717a', font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
+      options: { responsive: true, maintainAspectRatio: false, onClick: function(e, els) { if (els.length) showMonthDetail(months[els[0].index]); }, plugins: { legend: { display: true, labels: { color: '#a1a1aa', font: { size: 9 }, boxWidth: 12, padding: 8 } } }, scales: { x: { ticks: { color: '#71717a', font: { size: 9 } }, grid: { display: false } }, y: { ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return EURK(v); } }, grid: { color: 'rgba(255,255,255,0.04)' } } } },
       plugins: [salLabelPlugin]
     });
     canvas._chartInstance = c;
@@ -18358,7 +18395,7 @@ function renderFinancesPerformance(container) {
           },
           scales: {
             x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
-            y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? Math.round(v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+            y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return EURK(v); } }, grid: { color: 'rgba(255,255,255,0.04)' } }
           }
         }
       });
@@ -20405,7 +20442,7 @@ function drawMainChart() {
         meta.data.forEach(function(point, index) {
           var value = dataset.data[index];
           if (value === null || value === 0) return;
-          var label = value >= 1000 ? Math.round(value/1000) + 'k€' : Math.round(value) + '€';
+          var label = EURK(value);
           ctx2.save();
           ctx2.fillStyle = color;
           ctx2.font = 'bold 9px system-ui';
@@ -20454,7 +20491,7 @@ function drawMainChart() {
       } } },
       scales: {
         x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
-        y: { position: 'right', ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+        y: { position: 'right', ticks: { color: '#71717a', font: { size: 9 }, callback: function(v) { return EURK(v); } }, grid: { color: 'rgba(255,255,255,0.04)' } },
         y1: { position: 'left', max: Math.max.apply(null, dataOff) * 3 || 10, ticks: { color: '#f59e0b', font: { size: 9 }, callback: function(v) { return v + 'j'; } }, grid: { display: false } }
       }
     },
@@ -20622,7 +20659,7 @@ function drawSoldeChart() {
         meta.data.forEach(function(bar, index) {
           var value = dataset.data[index];
           if (value === null || value === 0) return;
-          var label = value >= 1000 ? Math.round(value/1000) + 'k' : Math.round(value);
+          var label = EURK(value);
           ctx.save();
           if (isProjection) {
             ctx.fillStyle = 'rgba(59,130,246,0.7)';
@@ -20633,7 +20670,7 @@ function drawSoldeChart() {
           ctx.textAlign = 'center';
           ctx.textBaseline = value >= 0 ? 'bottom' : 'top';
           var y = value >= 0 ? bar.y - 4 : bar.y + 4;
-          ctx.fillText(label + '€', bar.x, y);
+          ctx.fillText(label, bar.x, y);
           ctx.restore();
         });
       });
@@ -20644,7 +20681,7 @@ function drawSoldeChart() {
         cashMeta.data.forEach(function(point, index) {
           var value = chart.data.datasets[2].data[index];
           if (value === null) return;
-          var label = Math.abs(value) >= 1000 ? Math.round(value/1000) + 'k€' : Math.round(value) + '€';
+          var label = EURK(value);
           ctx.save();
           ctx.fillStyle = value >= 0 ? '#22c55e' : '#ef4444';
           ctx.font = 'bold 9px system-ui';
@@ -20687,7 +20724,7 @@ function drawSoldeChart() {
       plugins: { legend: { position: 'top', align: 'end', labels: { color: '#a1a1aa', boxWidth: 8, padding: 6, font: { size: 9 } } } },
       scales: {
         x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return v >= 1000 ? (v/1000) + 'k€' : v + '€'; } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        y: { ticks: { color: '#71717a', font: { size: 10 }, callback: function(v) { return EURK(v); } }, grid: { color: 'rgba(255,255,255,0.04)' } }
       }
     },
     plugins: [dataLabelsPlugin]
