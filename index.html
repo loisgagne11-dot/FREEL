@@ -9043,6 +9043,29 @@ function showMissionModal(mission) {
   if (!mission.agence.adresses || mission.agence.adresses.length === 0) mission.agence.adresses = [''];
   if (!mission.entites) mission.entites = [];
 
+  // Migration : fusionner mission.clientOp (legacy singleton) dans mission.entites[] si pas déjà présent.
+  // Désormais entites[] = "clients opérationnels" (renommage UI).
+  if (mission.clientOp && mission.clientOp.nom && mission.entites.length === 0) {
+    mission.entites.push({
+      id: 'co_' + Date.now(),
+      nom: mission.clientOp.nom,
+      couleur: '#22c55e',
+      adresse: mission.clientOp.adresse || '',
+      contact: mission.clientOp.contact || '',
+      email: mission.clientOp.email || '',
+      telephone: mission.clientOp.telephone || ''
+    });
+  }
+  // Champs étendus pour anciens entites
+  mission.entites.forEach(function(e) {
+    if (!e.adresse) e.adresse = '';
+    if (!e.contact) e.contact = '';
+    if (!e.email) e.email = '';
+    if (!e.telephone) e.telephone = '';
+    // joursParSemaine: { lun: 0..1, mar: 0..1, ... } — utilisé seulement si plusieurs clientOps
+    if (!e.joursParSemaine) e.joursParSemaine = null;
+  });
+
   $('#formModalTitle').textContent = isNew ? '💼 Nouvelle Mission' : '✏️ ' + mission.client;
   var body = $('#formModalBody');
   body.replaceChildren();
@@ -9186,54 +9209,119 @@ function showMissionModal(mission) {
   } }, '+ Ajouter une période'));
 
   // ═══════════════════════════════════════════════
-  // SECTION 3: Client opérationnel
+  // SECTION 3: Clients opérationnels (lieu de prestation)
   // ═══════════════════════════════════════════════
-  body.appendChild(el('div', { class: 'form-section form-section-border' }, '3️⃣ Client opérationnel'));
-  body.appendChild(createInput('Nom du client final', 'text', 'mClientOpNom', mission.clientOp.nom, 'Ex: Airbus, ATR (client où tu travailles)'));
-  var rowCo1 = el('div', { class: 'form-row' });
-  rowCo1.appendChild(createInput('Contact', 'text', 'mClientOpContact', mission.clientOp.contact, 'Nom du contact'));
-  rowCo1.appendChild(createInput('Email', 'email', 'mClientOpEmail', mission.clientOp.email));
-  body.appendChild(rowCo1);
-  var rowCo2 = el('div', { class: 'form-row' });
-  rowCo2.appendChild(createInput('Téléphone', 'tel', 'mClientOpTel', mission.clientOp.telephone));
-  rowCo2.appendChild(createInput('Adresse / Site', 'text', 'mClientOpAdresse', mission.clientOp.adresse, 'Ex: Site Saint-Martin'));
-  body.appendChild(rowCo2);
+  body.appendChild(el('div', { class: 'form-section form-section-border' }, '3️⃣ Clients opérationnels'));
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' } },
+    'Pour qui tu travailles concrètement (lieu de prestation, client final). Si plusieurs, tu peux indiquer le rythme par client (jours/semaine).'));
 
-  // Entités bénéficiaires (sous-organisations, ex: H4E + M3S sur la même mission)
-  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '12px', marginBottom: '6px', fontWeight: '600' } }, 'Entités bénéficiaires (optionnel)'));
-  body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' } }, 'Permet de tracer les jours travaillés par sous-entité (ex: H4E, M3S) sans changer la facturation.'));
   var entitesContainer = el('div', { id: 'mEntitesContainer' });
   body.appendChild(entitesContainer);
 
   var entitePalette = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ec4899', '#14b8a6', '#f97316', '#6366f1'];
+
   function renderEntites() {
     entitesContainer.replaceChildren();
     if (mission.entites.length === 0) {
-      entitesContainer.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', padding: '8px', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '8px' } }, 'Aucune entité — facturation simple sur le destinataire de section 5'));
+      entitesContainer.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', padding: '8px', textAlign: 'center', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '8px' } }, 'Aucun client opérationnel — ajoute-en au moins un.'));
     }
+    var multipleMode = mission.entites.length > 1;
     mission.entites.forEach(function(ent, idx) {
-      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '6px' } });
+      var card = el('div', { style: { padding: '10px', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '8px', borderLeft: '3px solid ' + (ent.couleur || entitePalette[idx % entitePalette.length]) } });
+      // Header : couleur + nom + remove
+      var head = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } });
       var swatch = el('input', { type: 'color', id: 'mEntColor_' + idx, value: ent.couleur || entitePalette[idx % entitePalette.length], style: { width: '32px', height: '28px', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '0', background: 'transparent' } });
-      row.appendChild(swatch);
-      var nameInput = el('input', { type: 'text', id: 'mEntNom_' + idx, value: ent.nom || '', placeholder: 'Ex: H4E', class: 'form-input', style: { flex: '1', fontSize: '12px', padding: '6px 8px' } });
-      row.appendChild(nameInput);
-      var rmBtn = el('button', { class: 'periode-remove', style: { position: 'static' }, onclick: function() { mission.entites.splice(idx, 1); renderEntites(); } }, '✕');
-      row.appendChild(rmBtn);
-      entitesContainer.appendChild(row);
+      head.appendChild(swatch);
+      var nameInput = el('input', { type: 'text', id: 'mEntNom_' + idx, value: ent.nom || '', placeholder: 'Ex: Airbus, H4E…', class: 'form-input', style: { flex: '1', fontSize: '13px', fontWeight: '600', padding: '6px 8px' } });
+      head.appendChild(nameInput);
+      head.appendChild(el('button', { class: 'periode-remove', style: { position: 'static' }, onclick: function() {
+        // Lire valeurs avant suppression
+        mission.entites.forEach(function(e, i) { syncEntiteFromInputs(e, i); });
+        mission.entites.splice(idx, 1);
+        renderEntites();
+      } }, '✕'));
+      card.appendChild(head);
+
+      // Adresse
+      var rowAdr = el('div', { class: 'form-row' });
+      rowAdr.appendChild(createInput('Adresse / Site', 'text', 'mEntAdresse_' + idx, ent.adresse || '', 'Ex: Site Saint-Martin, Toulouse'));
+      card.appendChild(rowAdr);
+      // Contact + email + tel
+      var rowC1 = el('div', { class: 'form-row' });
+      rowC1.appendChild(createInput('Contact', 'text', 'mEntContact_' + idx, ent.contact || ''));
+      rowC1.appendChild(createInput('Email', 'email', 'mEntEmail_' + idx, ent.email || ''));
+      card.appendChild(rowC1);
+      var rowC2 = el('div', { class: 'form-row' });
+      rowC2.appendChild(createInput('Téléphone', 'tel', 'mEntTel_' + idx, ent.telephone || ''));
+      card.appendChild(rowC2);
+
+      // Rythme par jour de la semaine — visible seulement si plusieurs clients
+      if (multipleMode) {
+        card.appendChild(el('label', { class: 'form-label', style: { marginTop: '4px' } }, 'Jours travaillés (par défaut)'));
+        var jpsGrid = el('div', { class: 'jours-semaine-grid', style: { marginBottom: '4px' } });
+        var jourKeys = ['lun','mar','mer','jeu','ven'];
+        var jourLabs = ['Lun','Mar','Mer','Jeu','Ven'];
+        jourKeys.forEach(function(j, ji) {
+          var val = ent.joursParSemaine ? (ent.joursParSemaine[j] || 0) : 0;
+          var toggle = el('div', { class: 'jour-toggle' });
+          var cb = el('input', { type: 'checkbox', id: 'mEntJ_' + idx + '_' + j });
+          if (val > 0) cb.checked = true;
+          var lbl = el('label', { class: 'jour-label', for: 'mEntJ_' + idx + '_' + j }, jourLabs[ji]);
+          toggle.appendChild(cb);
+          toggle.appendChild(lbl);
+          var demi = el('span', { class: 'jour-demi' + (val === 0.5 ? ' active' : ''), id: 'mEntJDemi_' + idx + '_' + j }, '½');
+          demi.addEventListener('click', function() {
+            var cbEl = document.getElementById('mEntJ_' + idx + '_' + j);
+            if (!cbEl.checked) cbEl.checked = true;
+            this.classList.toggle('active');
+          });
+          toggle.appendChild(demi);
+          jpsGrid.appendChild(toggle);
+        });
+        card.appendChild(jpsGrid);
+      }
+      entitesContainer.appendChild(card);
     });
   }
+
+  function syncEntiteFromInputs(ent, idx) {
+    var nm = $('#mEntNom_' + idx); var col = $('#mEntColor_' + idx);
+    var adr = $('#mEntAdresse_' + idx); var ct = $('#mEntContact_' + idx);
+    var em = $('#mEntEmail_' + idx); var tel = $('#mEntTel_' + idx);
+    if (nm) ent.nom = nm.value;
+    if (col) ent.couleur = col.value;
+    if (adr) ent.adresse = adr.value;
+    if (ct) ent.contact = ct.value;
+    if (em) ent.email = em.value;
+    if (tel) ent.telephone = tel.value;
+    // Rythme par jour
+    var jps = {};
+    var hasJps = false;
+    ['lun','mar','mer','jeu','ven'].forEach(function(j) {
+      var cb = document.getElementById('mEntJ_' + idx + '_' + j);
+      var demi = document.getElementById('mEntJDemi_' + idx + '_' + j);
+      if (cb && cb.checked) {
+        jps[j] = (demi && demi.classList.contains('active')) ? 0.5 : 1;
+        hasJps = true;
+      } else {
+        jps[j] = 0;
+      }
+    });
+    ent.joursParSemaine = hasJps ? jps : null;
+  }
+
   renderEntites();
   body.appendChild(el('button', { class: 'btn btn-sm', style: { marginBottom: '16px' }, onclick: function() {
-    // Lire les valeurs actuelles avant d'ajouter pour ne pas perdre les saisies
-    mission.entites.forEach(function(ent, idx) {
-      var nm = $('#mEntNom_' + idx); var col = $('#mEntColor_' + idx);
-      if (nm) ent.nom = nm.value;
-      if (col) ent.couleur = col.value;
-    });
+    mission.entites.forEach(function(ent, idx) { syncEntiteFromInputs(ent, idx); });
     var newIdx = mission.entites.length;
-    mission.entites.push({ id: 'ent_' + Date.now() + '_' + newIdx, nom: '', couleur: entitePalette[newIdx % entitePalette.length] });
+    mission.entites.push({
+      id: 'co_' + Date.now() + '_' + newIdx,
+      nom: '', couleur: entitePalette[newIdx % entitePalette.length],
+      adresse: '', contact: '', email: '', telephone: '',
+      joursParSemaine: null
+    });
     renderEntites();
-  } }, '+ Ajouter une entité'));
+  } }, '+ Ajouter un client opérationnel'));
 
   // ═══════════════════════════════════════════════
   // SECTION 4: Agence / Intermédiaire
@@ -9458,11 +9546,17 @@ function showMissionModal(mission) {
     var tjmVal = parseFloat($('#mTJM').value);
     if (!$('#mDebut').value) { showToast('⚠️ Date de début requise', 'warning'); return; }
     if (isNaN(tjmVal) || tjmVal <= 0) { showToast('⚠️ TJM doit être supérieur à 0', 'warning'); showValidationError('mTJM', 'TJM requis et > 0'); return; }
-    var clientOpNom = $('#mClientOpNom') ? $('#mClientOpNom').value.trim() : '';
-    if (!clientOpNom) { showToast('⚠️ Client opérationnel requis', 'warning'); return; }
+    // Lire les clients opérationnels depuis la liste (entites)
+    var nbEntites = mission.entites ? mission.entites.length : 0;
+    var firstNom = '';
+    if (nbEntites > 0) {
+      var firstNomInput = $('#mEntNom_0');
+      firstNom = firstNomInput ? firstNomInput.value.trim() : (mission.entites[0].nom || '');
+    }
+    if (!firstNom) { showToast('⚠️ Au moins un client opérationnel requis', 'warning'); return; }
 
-    // Le client = client opérationnel
-    mission.client = clientOpNom;
+    // Le "client" principal = nom du premier client opérationnel
+    mission.client = firstNom;
     mission.clientId = '';
     mission.titre = $('#mTitre').value; mission.site = $('#mSite').value;
     mission.debut = $('#mDebut').value; mission.fin = $('#mFin').value;
@@ -9511,26 +9605,48 @@ function showMissionModal(mission) {
       }
     }
 
-    // V79: Sauvegarder client opérationnel
-    mission.clientOp = {
-      nom: $('#mClientOpNom').value || '',
-      contact: $('#mClientOpContact').value || '',
-      email: $('#mClientOpEmail').value || '',
-      telephone: $('#mClientOpTel').value || '',
-      adresse: $('#mClientOpAdresse').value || ''
-    };
-
-    // Sauvegarder entités bénéficiaires (filtrer celles sans nom)
+    // Sauvegarder clients opérationnels (entites[]) avec rythme par client si renseigné
     var savedEntites = [];
-    var oldEntiteIds = {};
-    (mission.entites || []).forEach(function(e) { oldEntiteIds[e.id] = true; });
     mission.entites.forEach(function(ent, idx) {
       var nm = $('#mEntNom_' + idx); var col = $('#mEntColor_' + idx);
       var nom = nm ? nm.value.trim() : '';
       if (!nom) return;
-      savedEntites.push({ id: ent.id, nom: nom, couleur: col ? col.value : ent.couleur });
+      var adr = $('#mEntAdresse_' + idx); var ct = $('#mEntContact_' + idx);
+      var em = $('#mEntEmail_' + idx); var tel = $('#mEntTel_' + idx);
+      var jps = {};
+      var hasJps = false;
+      ['lun','mar','mer','jeu','ven'].forEach(function(j) {
+        var cb = document.getElementById('mEntJ_' + idx + '_' + j);
+        var demi = document.getElementById('mEntJDemi_' + idx + '_' + j);
+        if (cb && cb.checked) {
+          jps[j] = (demi && demi.classList.contains('active')) ? 0.5 : 1;
+          hasJps = true;
+        } else jps[j] = 0;
+      });
+      savedEntites.push({
+        id: ent.id || ('co_' + Date.now() + '_' + idx),
+        nom: nom,
+        couleur: col ? col.value : (ent.couleur || '#22c55e'),
+        adresse: adr ? adr.value : '',
+        contact: ct ? ct.value : '',
+        email: em ? em.value : '',
+        telephone: tel ? tel.value : '',
+        joursParSemaine: hasJps ? jps : null
+      });
     });
     mission.entites = savedEntites;
+    // Sync legacy mission.clientOp avec le premier (pour rétro-compat sur factures + adresses)
+    if (savedEntites.length > 0) {
+      mission.clientOp = {
+        nom: savedEntites[0].nom,
+        contact: savedEntites[0].contact || '',
+        email: savedEntites[0].email || '',
+        telephone: savedEntites[0].telephone || '',
+        adresse: savedEntites[0].adresse || ''
+      };
+    } else {
+      mission.clientOp = { nom: '', contact: '', email: '', telephone: '', adresse: '' };
+    }
     // Nettoyer les attributions vers entités supprimées
     var validIds = {};
     savedEntites.forEach(function(e) { validIds[e.id] = true; });
@@ -10643,9 +10759,18 @@ function showMonthCongesModal(monthYm, mode) {
         if (!locState[bd.iso] && (actState[bd.iso] || 0) > 0) {
           locState[bd.iso] = m.defaultWorkLocation || 'site';
         }
-        // Défaut: 1ère entité si pas d'entité définie et jour travaillé
+        // Défaut entité : si plusieurs clients ont un rythme jours/semaine défini,
+        // utiliser le premier qui couvre ce jour de la semaine. Sinon : 1ère entité.
         if (hasEntites && !entState[bd.iso] && (actState[bd.iso] || 0) > 0) {
-          entState[bd.iso] = m.entites[0].id;
+          var dowKey = ['','lun','mar','mer','jeu','ven'][bd.dow] || null;
+          var matched = null;
+          if (dowKey) {
+            for (var ei = 0; ei < m.entites.length; ei++) {
+              var jps = m.entites[ei].joursParSemaine;
+              if (jps && (jps[dowKey] || 0) > 0) { matched = m.entites[ei].id; break; }
+            }
+          }
+          entState[bd.iso] = matched || m.entites[0].id;
         }
       });
 
