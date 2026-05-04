@@ -5278,23 +5278,13 @@ function buildMission(mis) {
       var oldJoursOuvrables = existing.joursOuvrables || 0;
       existing.joursOuvrables = joursOuvrables;
 
-      // V79: Si des périodes sont définies, toujours recalculer joursPrevus depuis le rythme
-      if (mis.periodes && mis.periodes.length > 0) {
-        existing.joursPrevus = joursPrevusCalcule;
-      } else {
-        // V72: Comportement original sans périodes
-        if (oldJoursOuvrables !== joursOuvrables && existing.joursPrevus === oldJoursOuvrables) {
-          existing.joursPrevus = joursOuvrables;
-        } else if ((existing.joursPrevus || 0) > joursOuvrables) {
-          existing.joursPrevus = joursOuvrables;
-        }
-        existing.joursPrevus = existing.joursPrevus || joursOuvrables;
-      }
+      // Source unique de vérité : joursPrevus dérive TOUJOURS du rythme (périodes ou défaut 5j/sem).
+      // Pour dévier du rythme, il faut éditer le rythme (périodes) — pas joursPrevus directement.
+      existing.joursPrevus = joursPrevusCalcule;
 
-      // V81: Mettre à jour congés depuis congesDates si disponible
-      if (mis.congesDates && mis.congesDates.length > 0) {
-        existing.conges = congesCalcule;
-      }
+      // Idem : conges dérivent de congesDates uniquement
+      existing.conges = congesCalcule;
+
       if ((existing.joursReels || 0) > joursOuvrables) {
         existing.joursReels = joursOuvrables;
       }
@@ -9623,11 +9613,9 @@ function showDaysEditor(mission) {
 
   var hasEntitesEditor = mission.entites && mission.entites.length > 0;
 
-  // V78: Explication du rythme théorique vs réel
-  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px' } },
-    hasEntitesEditor
-      ? '💡 Prévus = jours théoriques. La répartition par entité (sous chaque mois) doit sommer à Prévus. Réels = jours réellement travaillés.'
-      : '💡 Prévus = jours théoriques (rythme configuré). Réels = jours réellement travaillés. Modifiez les Réels si le mois réel diffère du prévu.'));
+  body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px', padding: '8px', background: 'var(--bg-tertiary)', borderRadius: '8px', lineHeight: '1.5' } },
+    '💡 Prévus = dérivé du rythme (édite la mission pour le changer). Congés = depuis le suivi d\'activité. Réels = jours effectivement travaillés (modifiable ici).' +
+    (hasEntitesEditor ? ' Sous chaque mois, la répartition par entité.' : '')));
 
   var table = el('table', { class: 'days-table' });
   var thead = el('thead');
@@ -9642,13 +9630,11 @@ function showDaysEditor(mission) {
     tr.appendChild(el('td', { class: 'month-cell' }, fmtMonthShort(l.ym)));
     tr.appendChild(el('td', {}, String(l.joursOuvrables)));
 
-    var prevInput = el('input', { type: 'number', value: l.joursPrevus || 0, min: 0, max: l.joursOuvrables, 'data-idx': idx, 'data-field': 'joursPrevus' });
-    prevInput.oninput = function() { recalcDaysTable(mission); };
-    tr.appendChild(el('td', {}, [prevInput]));
+    // Prévus en lecture seule : dérivé du rythme (sources unique de vérité)
+    tr.appendChild(el('td', { 'data-idx': idx, 'data-field': 'joursPrevusDisplay', style: { color: 'var(--text-muted)', cursor: 'help' }, title: 'Calculé depuis le rythme de la mission. Pour le changer, ajoute/modifie une période dans la mission.' }, String(l.joursPrevus || 0)));
 
-    var congesInput = el('input', { type: 'number', value: l.conges || 0, min: 0, 'data-idx': idx, 'data-field': 'conges' });
-    congesInput.oninput = function() { recalcDaysTable(mission); };
-    tr.appendChild(el('td', {}, [congesInput]));
+    // Congés en lecture seule : depuis congesDates (source unique)
+    tr.appendChild(el('td', { 'data-idx': idx, 'data-field': 'congesDisplay', style: { color: 'var(--text-muted)', cursor: 'help' }, title: 'Depuis le calendrier d\'activité (mode Congés). Cliquez sur "📋 Suivi activité" pour les modifier.' }, String(l.conges || 0)));
 
     // V78: Réels = éditable (override du calcul théorique)
     var computedReels = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
@@ -9709,14 +9695,11 @@ function recalcDaysTable(mission) {
   var totals = { ouvres: 0, prevus: 0, conges: 0, reels: 0, ca: 0 };
   var hasEntitesEditor = mission.entites && mission.entites.length > 0;
   mission.lignes.forEach(function(l, idx) {
-    var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
-    var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
     var reelsInput = $('input[data-idx="' + idx + '"][data-field="joursReels"]');
-    if (!prevInput || !congesInput) return;
-    var prevus = parseFloat(prevInput.value) || 0;
-    var conges = parseFloat(congesInput.value) || 0;
+    // Prévus & Congés sont en lecture seule (dérivés du rythme + congesDates)
+    var prevus = l.joursPrevus || 0;
+    var conges = l.conges || 0;
     var computedReels = Math.max(0, prevus - conges);
-    // V78: Si l'utilisateur a modifié les réels, utiliser sa valeur (override)
     var reels = reelsInput ? (parseFloat(reelsInput.value) || 0) : computedReels;
     var isOverridden = reelsInput && Math.abs(reels - computedReels) > 0.01;
     if (reelsInput) {
@@ -9764,13 +9747,10 @@ function saveDaysFromEditor(mission) {
   }
   var hasEntitesSave = mission.entites && mission.entites.length > 0;
   mission.lignes.forEach(function(l, idx) {
-    var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
-    var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
+    // joursPrevus & conges = read-only (dérivés du rythme + congesDates)
+    // On ne sauvegarde QUE l'override de joursReels
     var reelsInput = $('input[data-idx="' + idx + '"][data-field="joursReels"]');
-    if (prevInput) l.joursPrevus = parseFloat(prevInput.value) || 0;
-    if (congesInput) l.conges = parseFloat(congesInput.value) || 0;
-    var computedReels = Math.max(0, l.joursPrevus - l.conges);
-    // V78: Sauvegarder l'override si différent du calcul théorique
+    var computedReels = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
     if (reelsInput) {
       var reelsVal = parseFloat(reelsInput.value) || 0;
       if (Math.abs(reelsVal - computedReels) > 0.01) {
@@ -9805,30 +9785,21 @@ function saveDaysFromEditor(mission) {
 // V78: Reset tous les réels à la valeur théorique (prévus - congés)
 function resetReelsToTheorique(mission) {
   mission.lignes.forEach(function(l, idx) {
-    var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
-    var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
     var reelsInput = $('input[data-idx="' + idx + '"][data-field="joursReels"]');
-    var prevus = prevInput ? (parseFloat(prevInput.value) || 0) : (l.joursPrevus || 0);
-    var conges = congesInput ? (parseFloat(congesInput.value) || 0) : (l.conges || 0);
+    var prevus = l.joursPrevus || 0;
+    var conges = l.conges || 0;
     if (reelsInput) reelsInput.value = Math.max(0, prevus - conges);
   });
   recalcDaysTable(mission);
 }
 
 function fillAllDays(mission, mode) {
+  // Ne touche que les Réels (Prévus & Conges sont dérivés du rythme/calendrier)
   mission.lignes.forEach(function(l, idx) {
-    var prevInput = $('input[data-idx="' + idx + '"][data-field="joursPrevus"]');
-    var congesInput = $('input[data-idx="' + idx + '"][data-field="conges"]');
     var reelsInput = $('input[data-idx="' + idx + '"][data-field="joursReels"]');
-    if (mode === 'all') {
-      if (prevInput) prevInput.value = l.joursOuvrables;
-      if (congesInput) congesInput.value = 0;
-      if (reelsInput) reelsInput.value = l.joursOuvrables;
-    } else {
-      if (prevInput) prevInput.value = 0;
-      if (congesInput) congesInput.value = 0;
-      if (reelsInput) reelsInput.value = 0;
-    }
+    if (!reelsInput) return;
+    if (mode === 'all') reelsInput.value = l.joursOuvrables;
+    else reelsInput.value = 0;
   });
   recalcDaysTable(mission);
 }
@@ -11293,11 +11264,36 @@ function buildInvoiceDataFromFacture(mission, facture) {
   var finMoisDate = new Date(p.y, p.m + 1, 0).getDate();
   var siren = COMPANY.siret ? COMPANY.siret.substring(0, 9) : '';
 
-  var titre = mission.client || '';
+  // Destinataire de la facture (suivant factureDestinataire)
+  var destNom = (function() {
+    var dest = mission.factureDestinataire || 'agence';
+    if (dest === 'agence' && mission.agence && mission.agence.nom) return mission.agence.nom;
+    if (dest === 'clientOp' && mission.clientOp && mission.clientOp.nom) return mission.clientOp.nom;
+    return mission.client || '';
+  })();
+
+  // Titre de prestation = titre mission (priorité) puis fallback sur mission.client
+  var titreMission = mission.titre || mission.client || '';
+  // Sous-titre "chez X via Y" pour le bloc destinataire
+  var sousLigne = '';
+  var dest = mission.factureDestinataire || 'agence';
+  if (dest === 'agence') {
+    // Facturation à l'agence : indiquer le client opérationnel ("chez")
+    if (mission.clientOp && mission.clientOp.nom && mission.clientOp.nom !== destNom) {
+      sousLigne = 'Prestation chez ' + mission.clientOp.nom;
+    }
+  } else {
+    // Facturation au clientOp : indiquer l'agence ("via") si applicable
+    if (mission.agence && mission.agence.nom && mission.agence.nom !== destNom) {
+      sousLigne = 'Via ' + mission.agence.nom;
+    }
+  }
+
+  var titre = destNom;
   if (numCommande) titre += ' - Commande n°' + numCommande;
   titre += ' - ' + moisNom;
 
-  var descriptif = cleanDescriptifFacture(mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || '')));
+  var descriptif = cleanDescriptifFacture(mission.descriptifFacture || ('Prestation de service consultant ' + titreMission));
   var periode = 'du 01 au ' + String(finMoisDate).padStart(2, '0') + ' ' + moisNom.split(' ')[0] + ' ' + p.y;
 
   return {
@@ -11307,12 +11303,9 @@ function buildInvoiceDataFromFacture(mission, facture) {
     delaiPaiement: delaiPaiement,
     delaiLabel: delaiLabel,
     finDeMois: finDeMois,
-    client: (function() {
-      var dest = mission.factureDestinataire || 'agence';
-      if (dest === 'agence' && mission.agence && mission.agence.nom) return mission.agence.nom;
-      if (dest === 'clientOp' && mission.clientOp && mission.clientOp.nom) return mission.clientOp.nom;
-      return mission.client || '';
-    })(),
+    client: destNom,
+    sousLigne: sousLigne,
+    titreMission: titreMission,
     adresseClient: mission.adresseClient || (mission.factureDestinataire === 'clientOp' && mission.clientOp ? mission.clientOp.adresse : (mission.agence && mission.agence.adresses ? mission.agence.adresses[0] : '')) || '',
     emetteur: COMPANY.nom || '',
     adresseEmetteur: (COMPANY.adresse || '') + (COMPANY.codePostal ? ', ' + COMPANY.codePostal : '') + (COMPANY.commune ? ' ' + COMPANY.commune : ''),
@@ -11383,16 +11376,22 @@ function showSendInvoiceModal(facture) {
   if (!defaultDelai) missing.push('delai');
   if (!bestEmail) missing.push('email');
 
-  $('#formModalTitle').textContent = '📤 Facture · ' + facture.client + ' · ' + fmtMonthShort(facture.mois);
+  $('#formModalTitle').textContent = '📤 Facture · ' + factureClientNom + ' · ' + fmtMonthShort(facture.mois);
   var body = $('#formModalBody');
   body.replaceChildren();
 
   // === RÉSUMÉ COMPACT ===
   var summary = el('div', { style: { background: 'var(--bg-tertiary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+  // Sous-titre : titre mission + chez qui (clientOp) + via qui (agence si différente du destinataire)
+  var subInfoParts = [];
+  if (mission.titre && mission.titre !== factureClientNom) subInfoParts.push(mission.titre);
+  if (mission.clientOp && mission.clientOp.nom && mission.clientOp.nom !== factureClientNom) subInfoParts.push('chez ' + mission.clientOp.nom);
+  if (factDest === 'clientOp' && mission.agence && mission.agence.nom) subInfoParts.push('via ' + mission.agence.nom);
   summary.appendChild(el('div', {}, [
-    el('div', { style: { fontWeight: '700', fontSize: '13px' } }, facture.client),
+    el('div', { style: { fontWeight: '700', fontSize: '13px' } }, factureClientNom),
+    subInfoParts.length > 0 ? el('div', { style: { fontSize: '10px', color: 'var(--text-secondary)', marginTop: '1px' } }, subInfoParts.join(' · ')) : null,
     el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, moisNom + ' · ' + jours + 'j × ' + EUR(mission.tjm))
-  ]));
+  ].filter(Boolean)));
   summary.appendChild(el('div', { style: { textAlign: 'right' } }, [
     el('div', { style: { fontWeight: '800', fontSize: '17px', color: 'var(--success)' } }, EUR(totalTTC)),
     tvaApplicable ? el('div', { style: { fontSize: '9px', color: 'var(--text-muted)' } }, 'TTC (HT: ' + EUR(totalHT) + ')') : null
@@ -12070,12 +12069,14 @@ function generateInvoiceHTMLContent(d) {
       '<div style="font-weight:bold;font-size:12pt;color:#1a1a2e;">' + e(d.client) + '</div>' +
       (d.adresseClient ? '<div style="color:#555;font-size:9pt;line-height:1.5;margin-top:4px;">' + e(d.adresseClient).replace(/,/g, '<br>') + '</div>' : '') +
       '<div style="color:#555;font-size:9pt;">France</div>' +
+      (d.sousLigne ? '<div style="color:#777;font-size:8.5pt;font-style:italic;margin-top:4px;">' + e(d.sousLigne) + '</div>' : '') +
     '</div>' +
 
     // === FACTURE N° + COMMANDE + PÉRIODE ===
     '<div style="margin-bottom:4px;">' +
       '<div style="font-weight:bold;font-size:11pt;color:' + col + ';">Facture N° ' + e(d.num) + '</div>' +
-      (d.numCommande ? '<div style="color:' + col + ';font-size:9.5pt;">' + e(d.client) + ' Commande n\u00b0' + e(d.numCommande) + ' pour la p\u00e9riode de ' + e(d.titre).split(' - ').pop() + '</div>' : '') +
+      (d.titreMission ? '<div style="color:#1a1a2e;font-size:10pt;font-weight:600;margin-top:2px;">' + e(d.titreMission) + '</div>' : '') +
+      (d.numCommande ? '<div style="color:' + col + ';font-size:9.5pt;">Commande n\u00b0' + e(d.numCommande) + ' \u2014 p\u00e9riode de ' + e(d.titre).split(' - ').pop() + '</div>' : '') +
     '</div>' +
     '<div style="margin-bottom:4px;font-size:9.5pt;color:#333;">' +
       '<div>Date d\'émission : ' + e(d.date) + '</div>' +
@@ -18956,13 +18957,12 @@ function renderMissionsContent(container) {
     header.appendChild(el('div', { class: 'badge ' + badgeCls }, badgeTxt));
     card.appendChild(header);
 
-    // Ligne 1 : intermédiaires (agence + client opérationnel/facturé)
-    var intermediaires = [];
-    if (m.agence && m.agence.nom) intermediaires.push('🤝 ' + m.agence.nom);
-    if (m.client && m.client !== titrePrincipal) intermediaires.push('💼 ' + m.client);
-    if (m.clientOp && m.clientOp.nom && m.clientOp.nom !== m.client) intermediaires.push('🏢 ' + m.clientOp.nom);
-    if (intermediaires.length > 0) {
-      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' } }, intermediaires.join(' · ')));
+    // Ligne 1 : "chez X" (clientOp/lieu de prestation) "via Y" (agence/intermédiaire)
+    var infoLine = [];
+    if (m.clientOp && m.clientOp.nom) infoLine.push('🏢 chez ' + m.clientOp.nom);
+    if (m.agence && m.agence.nom) infoLine.push('🤝 via ' + m.agence.nom);
+    if (infoLine.length > 0) {
+      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' } }, infoLine.join(' · ')));
     }
 
     // Ligne 2 : entités bénéficiaires (clients finaux)
