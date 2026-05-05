@@ -7079,33 +7079,67 @@ function showCashDetail() {
   setTimeout(updateProjections, 100);
 }
 
-// Afficher détail d'un type de charge
+// Afficher détail d'un type de charge — groupé par mois de paiement, sources lisibles
 function showChargeTypeDetail(typeName, items, color) {
   var total = items.reduce(function(a, c) { return a + c.montant; }, 0);
   $('#formModalTitle').textContent = '📋 ' + typeName + ' payé';
   var body = $('#formModalBody');
   body.replaceChildren();
-  
-  body.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px', textAlign: 'center' } }, [
-    el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total ' + typeName),
-    el('div', { style: { fontWeight: '800', fontSize: '20px', color: color } }, EUR(total))
+
+  // En-tête avec total + nb opérations
+  body.appendChild(el('div', { style: { background: 'var(--bg-tertiary)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, [
+    el('div', {}, [
+      el('div', { style: { fontSize: '11px', color: 'var(--text-muted)' } }, 'Total ' + typeName + ' payé'),
+      el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' } }, items.length + ' opération' + (items.length > 1 ? 's' : ''))
+    ]),
+    el('div', { style: { fontWeight: '800', fontSize: '22px', color: color } }, EUR(total))
   ]));
-  
-  if (items.length > 0) {
-    items.sort(function(a, b) { return b.montant - a.montant; });
-    items.forEach(function(item) {
-      body.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginBottom: '6px' } }, [
-        el('div', {}, [
-          el('div', { style: { fontSize: '12px', fontWeight: '500' } }, item.source || typeName),
-          el('div', { style: { fontSize: '10px', color: 'var(--text-muted)' } }, fmtMonth(item.mois))
-        ]),
-        el('span', { style: { fontWeight: '600', color: color } }, EUR(item.montant))
-      ]));
-    });
-  } else {
+
+  if (items.length === 0) {
     body.appendChild(el('div', { style: { textAlign: 'center', color: 'var(--text-muted)', padding: '20px' } }, 'Aucune charge'));
+    openModal('formModal');
+    return;
   }
-  
+
+  // Grouper par mois de paiement (ou mois d'origine si moisPaiement absent)
+  var groups = {};
+  items.forEach(function(it) {
+    var key = it.moisPaiement || it.mois || '—';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(it);
+  });
+  // Trier mois décroissant (plus récent en premier)
+  var monthKeys = Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); });
+
+  monthKeys.forEach(function(mKey) {
+    var grp = groups[mKey];
+    var grpTotal = grp.reduce(function(a, c) { return a + c.montant; }, 0);
+    var grpLabel = mKey === '—' ? '—' : fmtMonth(mKey);
+
+    // En-tête de groupe (mois)
+    var grpHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '8px 4px 6px', borderBottom: '1px solid var(--glass-border)', marginTop: '8px' } }, [
+      el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, '📅 Payé en ' + grpLabel),
+      el('div', { style: { fontSize: '13px', fontWeight: '700', color: color } }, EUR(grpTotal))
+    ]);
+    body.appendChild(grpHeader);
+
+    // Lignes : tri par montant décroissant
+    grp.sort(function(a, b) { return b.montant - a.montant; });
+    grp.forEach(function(item) {
+      var sourceTxt = item.source || typeName;
+      var hasOrigin = item.mois && item.mois !== mKey;
+      var subTxt = hasOrigin ? 'Au titre de ' + fmtMonth(item.mois) : '';
+      var line = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)', marginTop: '4px' } }, [
+        el('div', { style: { flex: '1', minWidth: '0' } }, [
+          el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, sourceTxt),
+          subTxt ? el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' } }, subTxt) : null
+        ].filter(Boolean)),
+        el('span', { style: { fontWeight: '700', color: color, fontSize: '13px', marginLeft: '8px' } }, EUR(item.montant))
+      ]);
+      body.appendChild(line);
+    });
+  });
+
   openModal('formModal');
 }
 
@@ -10883,6 +10917,32 @@ function showMonthCongesModal(monthYm, mode) {
         }
       });
 
+      // Pré-remplissage depuis la facture: si pas d'ajustement manuel, caler le total
+      // sur la facture du mois (ou ligne.joursReels) en retirant les jours en fin de mois.
+      if (!ligne.ajustements || Object.keys(ligne.ajustements).length === 0) {
+        var factMois = (m.factures || []).find(function(f) { return f.mois === monthYm; });
+        var targetJours = null;
+        if (factMois && typeof factMois.jours === 'number') targetJours = factMois.jours;
+        else if (typeof ligne.joursReelsOverride === 'number') targetJours = ligne.joursReelsOverride;
+        if (targetJours !== null) {
+          var currentTotal = 0;
+          Object.keys(actState).forEach(function(k) { if (actState[k] > 0) currentTotal += actState[k]; });
+          currentTotal = Math.round(currentTotal * 10) / 10;
+          var diff = Math.round((currentTotal - targetJours) * 10) / 10;
+          if (diff > 0) {
+            // Retirer du surplus en partant des dates les plus tardives
+            var workedIsos = Object.keys(actState).filter(function(k) { return actState[k] > 0; }).sort();
+            for (var wi = workedIsos.length - 1; wi >= 0 && diff > 0; wi--) {
+              var iso = workedIsos[wi];
+              var cur = actState[iso];
+              if (diff >= 1 && cur === 1) { actState[iso] = 0; diff = Math.round((diff - 1) * 10) / 10; }
+              else if (diff >= 0.5 && cur >= 0.5) { actState[iso] = cur - 0.5; diff = Math.round((diff - 0.5) * 10) / 10; }
+              else break;
+            }
+          }
+        }
+      }
+
       function updateActCount() {
         var total = 0;
         var byEnt = {};
@@ -11866,9 +11926,20 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   var defaultDelai = mission.delaiPaiementFacture || 30;
   var defaultFinDeMois = mission.delaiFinDeMois || false;
 
-  // Récupérer l'adresse client depuis la mission ou le client
+  // Destinataire facture: agence (intermédiaire) OU clientOp
+  var factDest = mission.factureDestinataire || 'agence';
   var clientObj = getClientByName(mission.client);
-  var defaultAdresseClient = mission.adresseClient || (clientObj ? clientObj.adresse : '') || '';
+  var defaultClientName, defaultAdresseClient;
+  if (factDest === 'agence' && mission.agence && mission.agence.nom) {
+    defaultClientName = mission.agence.nom;
+    defaultAdresseClient = mission.adresseClient || (mission.agence.adresses && mission.agence.adresses[0]) || '';
+  } else if (factDest === 'clientOp' && mission.clientOp && mission.clientOp.nom) {
+    defaultClientName = mission.clientOp.nom;
+    defaultAdresseClient = mission.adresseClient || mission.clientOp.adresse || '';
+  } else {
+    defaultClientName = mission.client;
+    defaultAdresseClient = mission.adresseClient || (clientObj ? clientObj.adresse : '') || '';
+  }
 
   // Intitulé de mission comme descriptif par défaut
   var defaultDescriptif = cleanDescriptifFacture(mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || mission.client)));
@@ -11915,7 +11986,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   var sec2 = el('div', { style: { background: 'var(--bg-secondary)', padding: '12px', borderRadius: 'var(--radius-md)', marginBottom: '10px' } });
   sec2.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px' } }, '🏢 Adresse de facturation'));
   sec2.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' } }, 'Sera sauvegardée dans la mission pour les prochaines factures'));
-  sec2.appendChild(createInput('Nom du client', 'text', 'invClient', mission.client));
+  sec2.appendChild(createInput('Nom du client', 'text', 'invClient', defaultClientName));
   sec2.appendChild(createInput('Adresse de facturation', 'text', 'invAdresse', defaultAdresseClient, 'Ex: 14 RUE PAUL MESPLE, 31100 TOULOUSE'));
   body.appendChild(sec2);
 
@@ -12080,10 +12151,21 @@ function openInvoiceHTML(mission, monthYm, options) {
   var invoiceNum = options.invoiceNum || '';
   var invoiceDate = options.invoiceDate || localISO(TODAY);
   var numCommande = options.numeroCommande || '';
-  var delaiPaiement = options.delaiPaiement || 30;
-  var finDeMois = options.finDeMois || mission.delaiFinDeMois || false;
-  var clientName = options.clientName || mission.client || '';
-  var adresseClient = options.adresseClient || mission.adresseClient || '';
+  var delaiPaiement = options.delaiPaiement || mission.delaiPaiementFacture || 30;
+  var finDeMois = options.finDeMois !== undefined ? options.finDeMois : (mission.delaiFinDeMois || false);
+  // Destinataire selon mission.factureDestinataire (agence = intermédiaire / clientOp)
+  var _factDest = mission.factureDestinataire || 'agence';
+  var _defaultName = mission.client || '';
+  var _defaultAdr = mission.adresseClient || '';
+  if (_factDest === 'agence' && mission.agence && mission.agence.nom) {
+    _defaultName = mission.agence.nom;
+    if (!_defaultAdr) _defaultAdr = (mission.agence.adresses && mission.agence.adresses[0]) || '';
+  } else if (_factDest === 'clientOp' && mission.clientOp && mission.clientOp.nom) {
+    _defaultName = mission.clientOp.nom;
+    if (!_defaultAdr) _defaultAdr = mission.clientOp.adresse || '';
+  }
+  var clientName = options.clientName || _defaultName;
+  var adresseClient = options.adresseClient || _defaultAdr;
   var descriptif = options.descriptif || mission.descriptifFacture || ('Prestation de service consultant ' + (mission.titre || ''));
 
   // Calcul de la date d'échéance avec fin de mois
@@ -19232,31 +19314,27 @@ function renderMissionsContent(container) {
     details.appendChild(el('span', {}, '💰 ' + EUR(ca)));
     card.appendChild(details);
 
-    // % avancement mission (jours réels / jours prévus total) — sur toute la mission, pas la période
-    if (m.lignes && m.lignes.length > 0) {
-      var totalReels = 0, totalPrevus = 0, totalReelsPeriode = 0, totalPrevusPeriode = 0;
-      m.lignes.forEach(function(l) {
-        var prevusNet = Math.max(0, (l.joursPrevus || 0) - (l.conges || 0));
-        totalReels += l.joursReels || 0;
-        totalPrevus += prevusNet;
-        if (isInPeriod(l.ym)) {
-          totalReelsPeriode += l.joursReels || 0;
-          totalPrevusPeriode += prevusNet;
-        }
-      });
-      if (totalPrevus > 0) {
-        var pctAv = Math.min(100, Math.round(totalReels / totalPrevus * 100));
-        var avBar = el('div', { style: { marginTop: '8px', cursor: 'help' }, title: 'Avancement total de la mission : ' + totalReels + 'j réalisés sur ' + totalPrevus + 'j prévus' });
-        var avHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '3px', color: 'var(--text-muted)' } }, [
-          el('span', {}, '⏳ Avancement total mission'),
-          el('span', { style: { fontWeight: '700', color: pctAv >= 80 ? 'var(--success)' : pctAv >= 50 ? 'var(--info)' : 'var(--warning)' } }, pctAv + '%')
-        ]);
-        avBar.appendChild(avHeader);
-        var bar = el('div', { style: { height: '4px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden' } });
-        bar.appendChild(el('div', { style: { width: pctAv + '%', height: '100%', background: pctAv >= 80 ? 'var(--success)' : pctAv >= 50 ? 'var(--info)' : 'var(--warning)' } }));
-        avBar.appendChild(bar);
-        card.appendChild(avBar);
-      }
+    // % avancement temporel mission (durée écoulée / durée totale) — basé sur les dates
+    if (m.debut && m.fin) {
+      var dStart = new Date(m.debut), dEnd = new Date(m.fin), dNow = new Date(localISO(TODAY));
+      var totalMs = dEnd - dStart;
+      var elapsedMs = Math.min(Math.max(0, dNow - dStart), totalMs);
+      var pctAv = totalMs > 0 ? Math.round(elapsedMs / totalMs * 100) : (dNow >= dEnd ? 100 : 0);
+      pctAv = Math.max(0, Math.min(100, pctAv));
+      var titleTxt;
+      if (dNow < dStart) titleTxt = 'Mission à venir (démarre le ' + fmtDate(m.debut) + ')';
+      else if (dNow >= dEnd) titleTxt = 'Mission terminée (fin le ' + fmtDate(m.fin) + ')';
+      else titleTxt = 'Mission en cours : ' + fmtDate(m.debut) + ' → ' + fmtDate(m.fin);
+      var avBar = el('div', { style: { marginTop: '8px', cursor: 'help' }, title: titleTxt });
+      var avHeader = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginBottom: '3px', color: 'var(--text-muted)' } }, [
+        el('span', {}, '⏳ Avancement mission'),
+        el('span', { style: { fontWeight: '700', color: pctAv >= 80 ? 'var(--success)' : pctAv >= 50 ? 'var(--info)' : 'var(--warning)' } }, pctAv + '%')
+      ]);
+      avBar.appendChild(avHeader);
+      var bar = el('div', { style: { height: '4px', background: 'var(--bg-tertiary)', borderRadius: '2px', overflow: 'hidden' } });
+      bar.appendChild(el('div', { style: { width: pctAv + '%', height: '100%', background: pctAv >= 80 ? 'var(--success)' : pctAv >= 50 ? 'var(--info)' : 'var(--warning)' } }));
+      avBar.appendChild(bar);
+      card.appendChild(avBar);
     }
 
     // Répartition par entité (si applicable)
