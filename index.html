@@ -1335,6 +1335,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .conges-day.conge-half .cd-num { color: #60a5fa; }
 .conges-day.holiday { opacity: 0.4; pointer-events: none; background: rgba(245,158,11,0.1); border-color: transparent; }
 .conges-day.holiday .cd-num { text-decoration: line-through; color: #f59e0b; }
+/* Jour férié travaillable (mode activité) : cliquable, marqueur orange en coin */
+.conges-day.holiday-workable { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.45); }
+.conges-day.holiday-workable .cd-num { color: #f59e0b; }
+.conges-day.holiday-workable::after { content: ''; position: absolute; top: 3px; left: 3px; width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; z-index: 2; }
 .conges-day.not-in-mission { opacity: 0.25; pointer-events: none; }
 /* Suivi d'activité: états du calendrier */
 .conges-day.act-worked { background: #22c55e; border-color: #22c55e; }
@@ -5234,7 +5238,8 @@ function getNetWorkedForMonth(mis, monthKey) {
     var dow = d.getDay();
     if (dow === 0 || dow === 6) continue; // weekend
     var iso = localISO(d);
-    if (holidays.indexOf(iso) !== -1) continue; // férié
+    // Férié : ignoré sauf si un ajustement explicite indique qu'on a travaillé ce jour-là
+    if (holidays.indexOf(iso) !== -1 && !ajustementsMap.hasOwnProperty(iso)) continue;
     var wdKey = dowToKey[dow];
     var worked = getWorkedForDayShared(mis, iso, wdKey, ajustementsMap);
     // Soustraire congés (sauf si ajustement explicite)
@@ -10795,8 +10800,8 @@ function showMonthCongesModal(monthYm, mode) {
     if (isActivity) {
       // ========== MODE SUIVI D'ACTIVITÉ ==========
       var helpText = (m.entites && m.entites.length > 0)
-        ? 'Tap numéro = cycler activité · Tap emoji = cycler lieu · Tap pastille = cycler entité'
-        : 'Tap numéro = cycler activité · Tap emoji = cycler lieu';
+        ? 'Tap numéro = cycler activité · Tap emoji = cycler lieu · Tap pastille = cycler entité · Les jours fériés (●) sont travaillables'
+        : 'Tap numéro = cycler activité · Tap emoji = cycler lieu · Les jours fériés (●) sont travaillables';
       body.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', margin: '4px 0 6px' } }, helpText));
 
       // Légende
@@ -10807,11 +10812,15 @@ function showMonthCongesModal(monthYm, mode) {
         { color: 'var(--bg-secondary)', label: 'Off' },
         { type: 'emoji', emoji: '🏢', label: 'Site' },
         { type: 'emoji', emoji: '🏠', label: 'TT' },
-        { type: 'emoji', emoji: '🔀', label: 'Mixte' }
+        { type: 'emoji', emoji: '🔀', label: 'Mixte' },
+        { type: 'holiday', label: 'Férié (travaillable)' }
       ].forEach(function(item) {
         var dot;
         if (item.type === 'emoji') {
           dot = el('div', { style: { fontSize: '12px', lineHeight: '1' } }, item.emoji);
+        } else if (item.type === 'holiday') {
+          dot = el('div', { class: 'cal-legend-dot', style: { background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.45)', position: 'relative' } });
+          dot.appendChild(el('div', { style: { position: 'absolute', top: '1px', left: '1px', width: '4px', height: '4px', borderRadius: '50%', background: '#f59e0b' } }));
         } else if (item.type === 'half') {
           dot = el('div', { class: 'cal-legend-dot', style: { background: 'var(--bg-secondary)', border: '1px solid #22c55e', position: 'relative', overflow: 'hidden' } });
           var tri = el('div', { style: { position: 'absolute', inset: '0', background: '#22c55e', clipPath: 'polygon(0 0, 100% 0, 0 100%)' } });
@@ -10887,7 +10896,9 @@ function showMonthCongesModal(monthYm, mode) {
       }
 
       bizDays.forEach(function(bd) {
-        if (bd.isHoliday) return;
+        // Les jours fériés ne sont plus ignorés : on peut travailler un férié.
+        // Ils restent par défaut non travaillés (absents du planning net), mais on
+        // recharge un éventuel ajustement manuel existant.
         var inMission = m.debut && m.fin && bd.iso >= m.debut && bd.iso <= m.fin;
         if (!inMission) return;
 
@@ -11020,12 +11031,14 @@ function showMonthCongesModal(monthYm, mode) {
         var val = actState[bd.iso] || 0;
 
         var cls = 'conges-day';
-        if (bd.isHoliday) cls += ' holiday';
+        // En mode activité, un férié reste travaillable (classe légère "holiday-workable")
+        // au lieu d'être verrouillé. Hors mission il garde l'aspect férié verrouillé classique.
+        if (bd.isHoliday) cls += inMission ? ' holiday-workable' : ' holiday';
         if (!inMission) cls += ' not-in-mission';
-        if (inMission && !bd.isHoliday) {
+        if (inMission) {
           if (val >= 0.75) cls += ' act-worked';
           else if (val >= 0.25) cls += ' act-half';
-          else cls += ' act-off';
+          else if (!bd.isHoliday) cls += ' act-off';
         }
 
         var dayEl = el('div', { class: cls });
@@ -11039,25 +11052,23 @@ function showMonthCongesModal(monthYm, mode) {
         dayEl.appendChild(numEl);
         // Pastille entité en bas (si applicable)
         var entBadgeId = 'ent_' + bd.iso.replace(/-/g, '') + '_' + m.id;
-        if (hasEntites && !bd.isHoliday && inMission && val > 0) {
+        if (hasEntites && inMission && val > 0) {
           dayEl.appendChild(buildEntBadge(entState[bd.iso], m.entites, entById, entBadgeId));
         }
         // Emoji lieu en haut à droite (🏢 site, 🏠 TT, 🔀 mixte)
         var locEmojis = { site: '🏢', tt: '🏠', mixte: '🔀' };
         var locCycle = ['site', 'tt', 'mixte'];
-        if (!bd.isHoliday && inMission && val > 0) {
+        if (inMission && val > 0) {
           var loc = locState[bd.iso] || 'site';
           var locEl = el('span', {
             class: 'cd-loc',
             id: 'loc_' + bd.iso.replace(/-/g, '')
           }, locEmojis[loc] || '🏢');
           dayEl.appendChild(locEl);
-        } else if (!inMission || bd.isHoliday) {
-          // Pas de badge pour les jours hors mission/fériés
         }
 
-        if (!bd.isHoliday && inMission) {
-          (function(iso, element, numSpan, badgeId) {
+        if (inMission) {
+          (function(iso, element, numSpan, badgeId, isHol) {
             // Tap sur le numéro = cycle activité (1 → 0.5 → 0 → 1)
             numSpan.addEventListener('click', function(e) {
               e.preventDefault(); e.stopPropagation();
@@ -11075,10 +11086,10 @@ function showMonthCongesModal(monthYm, mode) {
                 if (existingBadge) existingBadge.remove();
               }
 
-              element.className = 'conges-day';
+              element.className = 'conges-day' + (isHol ? ' holiday-workable' : '');
               if (next >= 0.75) element.classList.add('act-worked');
               else if (next >= 0.25) element.classList.add('act-half');
-              else element.classList.add('act-off');
+              else if (!isHol) element.classList.add('act-off');
 
               // Mettre à jour l'emoji lieu
               var existingLoc = document.getElementById('loc_' + iso.replace(/-/g, ''));
@@ -11139,7 +11150,7 @@ function showMonthCongesModal(monthYm, mode) {
             if (entBadgeEl && hasEntites) {
               attachEntBadgeClick(entBadgeEl, iso, element, badgeId);
             }
-          })(bd.iso, dayEl, numEl, entBadgeId);
+          })(bd.iso, dayEl, numEl, entBadgeId, bd.isHoliday);
         }
         cal.appendChild(dayEl);
       });
