@@ -2798,49 +2798,41 @@ function getChargeTypesList() {
   });
 }
 
+// Valeurs par défaut NEUTRES uniquement.
+// Ne jamais coder ici de données réelles (nom, SIRET, IBAN, BIC, TVA
+// intracom, adresse, clients, missions, montants) : ce fichier est servi
+// publiquement, et ces valeurs s'affichent à tout visiteur dont le
+// stockage local est vide. Les données réelles arrivent par l'onboarding
+// puis par la synchronisation du compte.
 var COMPANY = {
-  nom: 'Loïs MUSIC',
-  siret: '92859030500015',
-  debut: '2025-03-02',
+  nom: '',
+  siret: '',
+  debut: '',
   typeActivite: 'BNC',  // 'BNC' | 'BIC_vente' | 'BIC_service'
-  acre: true,
+  acre: false,
   prelevementLiberatoire: false,
-  tvaDepuis: '2025-10',
-  tvaIntracom: 'FR59928590005',
-  iban: 'IBAN_REMOVED',
-  bic: 'BIC_REMOVED',
-  adresse: 'Toulouse',
+  tvaDepuis: '',
+  tvaIntracom: '',
+  iban: '',
+  bic: '',
+  adresse: '',
   ville: '',
   codePostal: '',
   commune: '',
-  codeApe: '6201Z',
+  codeApe: '',
   email: '',
   telephone: '',
   urssafPeriodicite: 'mensuel',
-  onboardingDone: true,
+  onboardingDone: false,
   invoiceCounter: {},
   invoiceRegistry: [],
   invoiceFormat: 'YYYY-NNN',
   invoiceAuditLog: []
 };
-var MISSIONS = [
-  {
-    id: 'MIS' + Date.now(),
-    client: 'ATR',
-    description: 'Mission via Scalian',
-    tjm: 380,
-    debut: '2025-05-12',
-    fin: '2026-03-31',
-    statut: 'active',
-    lignes: [],
-    factures: []
-  }
-];
-var CLIENTS = [
-  { id: 'CLI1', nom: 'ATR', adresse: '', siret: '', contact: '', email: '', notes: '', delaiPaiement: 2, jourPaiement: 15 }
-];
+var MISSIONS = [];
+var CLIENTS = [];
 var TREASURY = {
-  soldeInitial: 5000,
+  soldeInitial: 0,
   mouvements: [],
   paidCharges: {},
   conges: {}, // { '2025-08': [1,2,3], '2025-12': [23,24,25,26,27,28,29,30,31] }
@@ -2849,8 +2841,8 @@ var TREASURY = {
   rendementHistorique: [],
   actionsDone: [], // [{ id: 'urssaf_2025-03', label: '...', date: '2025-03-23', type: 'charge'|'urssaf'|'relance'|... }]
   // V51: Paramètres trésorerie
-  salaireEstime: 2200,    // Salaire mensuel estimé pour calcul autonomie
-  reserveCompte: 150      // Réserve minimum sur compte pro
+  salaireEstime: 0,       // Salaire mensuel estimé pour calcul autonomie
+  reserveCompte: 0        // Réserve minimum sur compte pro
 };
 var IR_CONFIG = {}; // { '2025': { parts: 1, autresRevenus: 0, perAnnuel: 0 }, '2026': {...} }
 var COMPUTED = {};
