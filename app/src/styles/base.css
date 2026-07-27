@@ -1,0 +1,94 @@
+/* ============================================================
+   Freel — reset et base typographique
+   S'applique après tokens.css : tout ici passe par var(--...), jamais de
+   couleur en dur (les 4 palettes n'auraient sinon aucun effet sur ces
+   règles). Reprend le body/.big/.lbl du design v1.11 (cascade freel.css
+   + v1.11.css déjà résolue à la main, cf. commentaires).
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  /* dvh plutôt que vh : sur mobile, vh compte la hauteur de la barre
+     d'adresse comme si elle était toujours cachée, ce qui provoque un
+     débordement/rebond au premier chargement. dvh suit la barre réelle. */
+  min-height: 100dvh;
+}
+
+body {
+  min-height: 100dvh;
+  /* Dégradé radial du design v1.11 (V11.CSS:108) : un tint diffus en
+     haut-gauche, pas un simple fond plat. */
+  background:
+    radial-gradient(1200px 700px at 18% -8%, var(--bg-tint) 0%, transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: "Hanken Grotesk", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 14.5px;
+  line-height: 1.45;
+  letter-spacing: -.005em;
+}
+
+a {
+  color: var(--green);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--text);
+}
+
+/* Anneau de focus visible, unique et cohérent sur les 4 palettes — le
+   design d'origine ne stylait le focus que sur les champs de formulaire
+   (audit §6) ; on l'étend ici à tout élément focusable au clavier. */
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--green-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- utilitaires repris du design ---------- */
+
+/* Valeur monétaire/chiffrée mise en avant (montants, KPI). Cascade
+   d'origine : freel.css pose la règle, v1.11.css la resserre
+   (letter-spacing -.03em -> -.035em, chargé après donc gagnant) —
+   résolue ici en une seule déclaration finale. */
+.big {
+  font-family: var(--mono);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.035em;
+}
+
+/* Libellé de section en petites capitales. Cascade d'origine :
+   freel.css pose text-transform/font-weight, v1.11.css resserre
+   font-size/letter-spacing/color — résolue ici en une seule déclaration. */
+.lbl {
+  font-size: 10.5px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  font-weight: 600;
+}

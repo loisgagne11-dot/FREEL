@@ -1,0 +1,264 @@
+/* ============================================================
+   Freel — tokens de design (4 palettes)
+   Source de vérité des valeurs : design_handoff_freel_v1.11/app/v1.11.css
+   (lignes 10-110) + freel.css (tokens fixes hérités). Commutation par
+   [data-theme] sur <html>, posé avant le premier rendu par le script
+   inline de index.html pour éviter le flash.
+
+   Le sélecteur du bloc "sombre" est ":root,[data-theme=\"sombre\"]" à
+   dessein : il sert de valeur par défaut tant qu'aucun data-theme n'est
+   encore posé sur <html> (avant hydratation, tests, etc.), et sert aussi
+   le thème sombre explicite.
+   ============================================================ */
+
+:root,
+[data-theme="sombre"] {
+  --bg: #090c0a;
+  --bg-tint: #121a14;
+  --panel: #111511;
+  --panel-2: #171c16;
+  --panel-3: #1d231b;
+  --line: rgba(196, 214, 196, .07);
+  --line-2: rgba(196, 214, 196, .13);
+  --tint-1: rgba(196, 214, 196, .025);
+  --tint-2: rgba(196, 214, 196, .045);
+  --tint-3: rgba(196, 214, 196, .07);
+  --text: #eef2ec;
+  --muted: #8b9489;
+  --muted-2: #646b62;
+  --green: #5fd39a;
+  --green-lite: #6fdca6;
+  --green-deep: #1d6644;
+  --green-glow: rgba(95, 211, 154, .12);
+  --green-line: rgba(95, 211, 154, .28);
+  --amber: #e0b672;
+  --amber-soft: rgba(224, 182, 114, .13);
+  --amber-line: rgba(224, 182, 114, .28);
+  --red: #e2715f;
+  --red-soft: rgba(226, 113, 95, .14);
+  --red-line: rgba(226, 113, 95, .3);
+  --blue: #6fb6e0;
+  --sable: #cba86f;
+  --on-accent: #04140c;
+  --rail-a: #121712;
+  --rail-b: #090c0a;
+  --top-a: rgba(9, 12, 10, .97);
+  --top-b: rgba(9, 12, 10, .82);
+  --scrim: rgba(4, 6, 4, .68);
+  --dock: rgba(23, 28, 22, .9);
+  --card-a: var(--panel-2);
+  --card-b: var(--panel);
+  --r: 20px;
+  --r-sm: 13px;
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --sh-2: 0 2px 6px rgba(0, 0, 0, .32), 0 22px 44px -24px rgba(0, 0, 0, .9);
+  --sh-3: 0 4px 12px rgba(0, 0, 0, .38), 0 34px 60px -26px rgba(0, 0, 0, .95);
+  --sh-sheet: -30px 0 90px rgba(0, 0, 0, .7);
+  color-scheme: dark;
+
+  /* --- Correction audit (03-design-system.md §1, piège #9) : --c-ir,
+     --c-cfe, --slate et --blue-soft sont des couleurs de freel.css jamais
+     rethémées dans le design d'origine (contrairement à --c-urssaf/--c-tva
+     qui se recolorent par indirection var()). Le design ne fournit aucune
+     valeur par thème pour elles : celles ci-dessous et dans les 3 autres
+     blocs sont un choix d'implémentation (teintes cohérentes avec chaque
+     palette), pas une valeur reprise de la maquette. La valeur "sombre"
+     reprend exactement l'original de freel.css, seule référence fournie. */
+  --c-ir: #b79ae4;
+  --c-cfe: #d9926a;
+  --slate: #7c8794;
+  --blue-soft: rgba(111, 182, 224, .13);
+}
+
+/* ---------- palette NUIT — le calme, en version sombre ---------- */
+[data-theme="nuit"] {
+  --bg: #15170f;
+  --bg-tint: #1f2318;
+  --panel: #212418;
+  --panel-2: #262a1d;
+  --panel-3: #2f3325;
+  --line: rgba(226, 231, 201, .10);
+  --line-2: rgba(226, 231, 201, .19);
+  --tint-1: rgba(226, 231, 201, .035);
+  --tint-2: rgba(226, 231, 201, .06);
+  --tint-3: rgba(226, 231, 201, .10);
+  --text: #eeeade;
+  --muted: #a9ab95;
+  --muted-2: #8b8d78;
+  --green: #a3c489;
+  --green-lite: #b4d49b;
+  --green-deep: #3b4a2c;
+  --green-glow: rgba(163, 196, 137, .15);
+  --green-line: rgba(163, 196, 137, .38);
+  --amber: #dcb578;
+  --amber-soft: rgba(220, 181, 120, .15);
+  --amber-line: rgba(220, 181, 120, .34);
+  --red: #d18a72;
+  --red-soft: rgba(209, 138, 114, .16);
+  --red-line: rgba(209, 138, 114, .36);
+  --blue: #8fb2c6;
+  --sable: #cba87a;
+  --on-accent: #191c10;
+  --rail-a: #1a1d13;
+  --rail-b: #15170f;
+  --top-a: rgba(21, 23, 15, .97);
+  --top-b: rgba(21, 23, 15, .82);
+  --scrim: rgba(10, 12, 6, .66);
+  --dock: rgba(40, 44, 30, .9);
+  --card-a: #282c1e;
+  --card-b: #232619;
+  --r: 22px;
+  --r-sm: 14px;
+  --sh-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --sh-2: 0 1px 3px rgba(0, 0, 0, .3), 0 18px 38px -22px rgba(0, 0, 0, .85);
+  --sh-3: 0 3px 8px rgba(0, 0, 0, .36), 0 30px 56px -24px rgba(0, 0, 0, .9);
+  --sh-sheet: -26px 0 80px rgba(0, 0, 0, .6);
+  color-scheme: dark;
+
+  /* Implémentation (voir commentaire du bloc sombre) : mêmes teintes que
+     --c-ir/--c-cfe/--slate/--blue mais désaturées et rapprochées du
+     grain olive de "nuit", à l'image de la transformation déjà observée
+     sur --blue entre sombre et nuit dans le design fourni. */
+  --c-ir: #b7a8d6;
+  --c-cfe: #d2a17e;
+  --slate: #93998a;
+  --blue-soft: rgba(143, 178, 198, .15);
+}
+
+/* ---------- palette CLAIR ---------- */
+[data-theme="clair"] {
+  --bg: #f6f8f6;
+  --bg-tint: #e7efe9;
+  --panel: #ffffff;
+  --panel-2: #ffffff;
+  --panel-3: #eef1ed;
+  --line: rgba(28, 40, 33, .10);
+  --line-2: rgba(28, 40, 33, .18);
+  --tint-1: rgba(28, 40, 33, .028);
+  --tint-2: rgba(28, 40, 33, .045);
+  --tint-3: rgba(28, 40, 33, .08);
+  --text: #18201c;
+  --muted: #5c6862;
+  --muted-2: #69736c;
+  --green: #17845a;
+  --green-lite: #1d9668;
+  --green-deep: #d6ebe0;
+  --green-glow: rgba(23, 132, 90, .09);
+  --green-line: rgba(23, 132, 90, .3);
+  --amber: #8d6413;
+  --amber-soft: rgba(196, 152, 44, .14);
+  --amber-line: rgba(196, 152, 44, .4);
+  --red: #b13c28;
+  --red-soft: rgba(177, 60, 40, .10);
+  --red-line: rgba(177, 60, 40, .32);
+  --blue: #2b6ba6;
+  --sable: #a07c3a;
+  --on-accent: #ffffff;
+  --rail-a: #ffffff;
+  --rail-b: #f0f3f0;
+  --top-a: rgba(255, 255, 255, .97);
+  --top-b: rgba(255, 255, 255, .85);
+  --scrim: rgba(20, 30, 25, .34);
+  --dock: rgba(255, 255, 255, .9);
+  --card-a: #ffffff;
+  --card-b: #ffffff;
+  /* --- Correction audit (03-design-system.md §1, piège #3) : le bloc
+     "clair" du design d'origine ne redéfinit pas --r/--r-sm et hérite
+     donc silencieusement du thème sombre via le sélecteur combiné
+     ":root,[data-theme=\"sombre\"]". Ici chaque thème est isolé (pas de
+     sélecteur partagé), donc l'héritage accidentel ne peut pas se
+     reproduire tel quel — mais on fixe explicitement la même valeur que
+     "sombre" (20px/13px) pour que ce soit un choix documenté et non un
+     oubli. Le rapport d'audit ne justifie pas de valeur différente. */
+  --r: 20px;
+  --r-sm: 13px;
+  --sh-1: 0 1px 2px rgba(24, 34, 28, .06);
+  --sh-2: 0 1px 2px rgba(24, 34, 28, .05), 0 10px 26px -18px rgba(24, 34, 28, .28);
+  --sh-3: 0 2px 5px rgba(24, 34, 28, .07), 0 20px 40px -20px rgba(24, 34, 28, .34);
+  --sh-sheet: -24px 0 70px rgba(24, 34, 28, .20);
+  color-scheme: light;
+
+  /* Implémentation (voir commentaire du bloc sombre) : teintes assombries
+     pour rester lisibles sur fond blanc, avec le même ratio d'assombrissement
+     que celui déjà appliqué par le design à --blue/--red entre sombre et clair. */
+  --c-ir: #7a4fb3;
+  --c-cfe: #a85a2e;
+  --slate: #57626c;
+  --blue-soft: rgba(43, 107, 166, .14);
+}
+
+/* ---------- palette CALME (sauge / argile) ---------- */
+[data-theme="calme"] {
+  --bg: #f1efe6;
+  --bg-tint: #e4e6d4;
+  --panel: #fffdf7;
+  --panel-2: #fffdf7;
+  --panel-3: #ebe8d9;
+  --line: rgba(38, 40, 31, .11);
+  --line-2: rgba(38, 40, 31, .19);
+  --tint-1: rgba(38, 40, 31, .03);
+  --tint-2: rgba(38, 40, 31, .05);
+  --tint-3: rgba(38, 40, 31, .09);
+  --text: #26281f;
+  --muted: #5f6153;
+  --muted-2: #75776a;
+  --green: #6f8f61;
+  --green-lite: #7d9b6f;
+  --green-deep: #e2eddb;
+  --green-glow: rgba(125, 155, 111, .15);
+  --green-line: rgba(125, 155, 111, .42);
+  --amber: #8a6224;
+  --amber-soft: #f3e4cd;
+  --amber-line: rgba(196, 160, 106, .55);
+  --red: #96432f;
+  --red-soft: #f2ded8;
+  --red-line: rgba(192, 112, 92, .5);
+  --blue: #5f7f96;
+  --sable: #c4a06a;
+  --on-accent: #ffffff;
+  --rail-a: #eae7db;
+  --rail-b: #e3e0d2;
+  --top-a: rgba(241, 239, 230, .97);
+  --top-b: rgba(241, 239, 230, .84);
+  --scrim: rgba(38, 40, 31, .38);
+  --dock: rgba(255, 253, 247, .9);
+  --card-a: #fffdf7;
+  --card-b: #fdfbf3;
+  --r: 22px;
+  --r-sm: 14px;
+  --sh-1: 0 1px 2px rgba(38, 40, 31, .07);
+  --sh-2: 0 1px 3px rgba(38, 40, 31, .06), 0 12px 28px -20px rgba(38, 40, 31, .34);
+  --sh-3: 0 3px 6px rgba(38, 40, 31, .08), 0 22px 44px -22px rgba(38, 40, 31, .4);
+  --sh-sheet: -24px 0 70px rgba(38, 40, 31, .22);
+  color-scheme: light;
+
+  /* Implémentation (voir commentaire du bloc sombre). --amber-soft et
+     --red-soft du design passent ici à une couleur plate opaque plutôt
+     qu'une rgba (déjà le cas dans l'original) ; --blue-soft suit la même
+     convention pour rester cohérent au sein du thème. */
+  --c-ir: #7d6a9e;
+  --c-cfe: #9c6a44;
+  --slate: #6b6f61;
+  --blue-soft: #dde6ea;
+}
+
+/* ---------- tokens fixes hérités de freel.css ----------
+   Déclarés une seule fois : soit ce sont des valeurs réellement invariantes
+   (--mono), soit une indirection var() qui se rethème déjà automatiquement
+   par la cascade parce qu'elle pointe vers un token themé ci-dessus
+   (--c-urssaf, --c-tva, et désormais --c-tva-bg grâce à --blue-soft).
+   --c-ir-bg/--c-cfe-bg/--slate-soft ne font PAS partie des 4 tokens
+   signalés par l'audit comme à corriger ; ils restent donc figés à la
+   valeur unique du design, à l'identique des 4 palettes. */
+:root {
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --c-urssaf: var(--amber);
+  --c-urssaf-bg: var(--amber-soft);
+  --c-tva: var(--blue);
+  --c-tva-bg: var(--blue-soft);
+
+  --c-ir-bg: rgba(183, 154, 228, .14);
+  --c-cfe-bg: rgba(217, 146, 106, .14);
+  --slate-soft: rgba(124, 135, 148, .14);
+}
