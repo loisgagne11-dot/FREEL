@@ -2674,9 +2674,94 @@ var LEGAL_BY_YEAR = {
   }
 };
 
-// Fonction helper pour obtenir les valeurs légales d'une année
+// ===== Barème des cotisations par PÉRIODE (et non par année) =====
+//
+// Le taux de cotisations BNC change en cours d'année : il a augmenté au
+// 1er juillet 2024, et de nouveau au 1er juillet 2026. Une table indexée
+// par année ne peut pas exprimer cela — elle appliquerait un taux unique
+// à des mois qui relèvent de deux barèmes différents.
+//
+// Chaque entrée porte sa période de validité, sa source et la date à
+// laquelle un humain l'a vérifiée. Ne JAMAIS modifier une période passée :
+// recalculer un trimestre antérieur doit redonner le montant déclaré à
+// l'époque. Pour un nouveau taux, ajouter une entrée.
+//
+// `au: null` signifie « toujours en vigueur ».
+var URSSAF_PERIODS = [
+  {
+    du: '2024-01', au: '2024-06',
+    taux: { BNC: 0.211, BIC_vente: 0.123, BIC_service: 0.212 },
+    source: 'urssaf.fr', verifieLe: '2026-07-27'
+  },
+  {
+    du: '2024-07', au: '2024-12',
+    taux: { BNC: 0.231, BIC_vente: 0.123, BIC_service: 0.212 },
+    source: 'urssaf.fr', verifieLe: '2026-07-27'
+  },
+  {
+    du: '2025-01', au: '2025-12',
+    taux: { BNC: 0.246, BIC_vente: 0.123, BIC_service: 0.212 },
+    source: 'urssaf.fr', verifieLe: '2026-07-27'
+  },
+  {
+    du: '2026-01', au: '2026-06',
+    taux: { BNC: 0.256, BIC_vente: 0.123, BIC_service: 0.212 },
+    source: 'urssaf.fr', verifieLe: '2026-07-27'
+  },
+  {
+    du: '2026-07', au: null,
+    taux: { BNC: 0.261, BIC_vente: 0.123, BIC_service: 0.212 },
+    source: 'urssaf.fr', verifieLe: '2026-07-27'
+  }
+];
+
+// Renvoie la période de barème applicable à un mois 'YYYY-MM', ou null si
+// aucune ne le couvre. Pas de repli silencieux : l'appelant décide quoi
+// faire d'une absence, selon que le chiffre engage ou non (cf. ci-dessous).
+function getUrssafPeriod(ym) {
+  if (!ym) return null;
+  for (var i = 0; i < URSSAF_PERIODS.length; i++) {
+    var p = URSSAF_PERIODS[i];
+    if (ym >= p.du && (p.au === null || ym <= p.au)) return p;
+  }
+  return null;
+}
+
+// Taux applicable à un mois donné. `hasAcre` applique l'abattement ACRE.
+//
+// Réserve sur l'ACRE : l'abattement est ici de 50 % des cotisations, ce
+// qui correspond à la convention en place dans l'app. Un changement au
+// 1er juillet 2026 (abattement ramené à 25 %) est possible mais NON
+// confirmé — à vérifier avant de recalculer un trimestre sous ACRE.
+var URSSAF_ACRE_ABATTEMENT = 0.5;
+
+function getUrssafRateAt(ym, typeActivite, hasAcre) {
+  var p = getUrssafPeriod(ym);
+  if (!p) return null;
+  var type = typeActivite || 'BNC';
+  var taux = (type in p.taux) ? p.taux[type] : p.taux.BNC;
+  return hasAcre ? taux * URSSAF_ACRE_ABATTEMENT : taux;
+}
+
+// Dernière période connue, utilisée pour les PRÉVISIONS uniquement.
+// Un chiffre qui engage (déclaration, montant à payer, export légal) ne
+// doit jamais s'appuyer dessus : il doit refuser de s'afficher.
+function getDerniereUrssafPeriod() {
+  return URSSAF_PERIODS[URSSAF_PERIODS.length - 1] || null;
+}
+
+// Fonction helper pour obtenir les valeurs légales d'une année.
+// Le repli sur l'année la plus récente disponible est conservé pour ne pas
+// casser les 11 appelants, mais il n'est plus codé en dur sur 2026 : il
+// suivra l'ajout d'une année future.
 function getLegal(year) {
-  return LEGAL_BY_YEAR[year] || LEGAL_BY_YEAR[2026];
+  if (LEGAL_BY_YEAR[year]) return LEGAL_BY_YEAR[year];
+  var annees = Object.keys(LEGAL_BY_YEAR).map(Number).sort(function (a, b) { return a - b; });
+  var cible = annees[annees.length - 1];
+  for (var i = 0; i < annees.length; i++) {
+    if (annees[i] >= year) { cible = annees[i]; break; }
+  }
+  return LEGAL_BY_YEAR[cible];
 }
 
 function getLegalUrssaf(year, typeActivite, hasAcre) {
@@ -2730,6 +2815,37 @@ var LEGAL = (function() {
     urssafAcre2026: getLegal(2026).urssaf[type].acre,
     lastUpdated: '2026-03-12'
   };
+})();
+
+// Correction d'un bug d'ordre de déclaration : l'IIFE ci-dessus lit COMPANY
+// pour résoudre le type d'activité, mais COMPANY est déclaré PLUS BAS dans
+// le fichier. Par hoisting de `var`, il valait `undefined` à cet instant, si
+// bien que `type` retombait toujours sur 'BNC' — quel que soit le type
+// d'activité réellement configuré.
+//
+// Les champs qui dépendent du type deviennent donc des accesseurs, évalués
+// à la lecture et non au chargement. Les autres champs restent des valeurs.
+(function () {
+  function typeCourant() {
+    return (typeof COMPANY !== 'undefined' && COMPANY && COMPANY.typeActivite) || 'BNC';
+  }
+  var dependantsDuType = {
+    urssaf: function (l, t) { return l.urssaf[t].standard; },
+    urssafAcre: function (l, t) { return l.urssaf[t].acre; },
+    impLib: function (l, t) { return l.prelevementLiberatoire[t]; },
+    urssafStd2025: function (_, t) { return getLegal(2025).urssaf[t].standard; },
+    urssafStd2026: function (_, t) { return getLegal(2026).urssaf[t].standard; },
+    urssafAcre2025: function (_, t) { return getLegal(2025).urssaf[t].acre; },
+    urssafAcre2026: function (_, t) { return getLegal(2026).urssaf[t].acre; }
+  };
+  Object.keys(dependantsDuType).forEach(function (cle) {
+    var resoudre = dependantsDuType[cle];
+    Object.defineProperty(LEGAL, cle, {
+      get: function () { return resoudre(getLegal(CURRENT_YEAR), typeCourant()); },
+      enumerable: true,
+      configurable: true
+    });
+  });
 })();
 
 var SCENARIOS = {
@@ -4105,17 +4221,111 @@ function getAcreInfo() {
   return { active: daysLeft > 0, expiryDate: localISO(expiryDate), expiryYm: expiryYm, startYm: startYm, daysLeft: daysLeft };
 }
 
-// Taux URSSAF dynamique selon mois, ACRE et type d'activité
+// Taux URSSAF dynamique selon mois, ACRE et type d'activité.
+//
+// Résolu par PÉRIODE et non par année : le taux BNC change au 1er juillet
+// 2024 et au 1er juillet 2026, donc deux mois de la même année civile
+// peuvent relever de deux barèmes différents. Tronquer à l'année, comme le
+// faisait la version précédente, appliquait 25,6 % à juillet 2026 au lieu
+// de 26,1 %.
+//
+// Si aucune période ne couvre le mois demandé, on retombe sur la dernière
+// période connue : c'est une HYPOTHÈSE de prévision, signalée par
+// getUrssafRateInfo() ci-dessous. Tout affichage qui engage (déclaration,
+// montant à payer, export légal) doit interroger getUrssafRateInfo() et
+// refuser de produire un chiffre quand `estHypothese` est vrai.
 function getUrssafRate(monthYm) {
-  var year = monthYm ? parseInt(monthYm.substring(0, 4)) : TODAY.getFullYear();
+  var info = getUrssafRateInfo(monthYm);
+  return info.taux;
+}
+
+// Version complète : le taux, sa provenance, et s'il s'agit d'une hypothèse.
+function getUrssafRateInfo(monthYm) {
+  var ym = monthYm || (TODAY.getFullYear() + '-' + String(TODAY.getMonth() + 1).padStart(2, '0'));
   var acre = getAcreInfo();
-  var typeActivite = COMPANY.typeActivite || 'BNC';
+  var typeActivite = (typeof COMPANY !== 'undefined' && COMPANY.typeActivite) || 'BNC';
 
   // Si ACRE configuré ET le mois est dans la période ACRE (entre startYm et expiryYm)
-  var hasAcre = COMPANY.acre && acre.expiryYm && monthYm && monthYm >= acre.startYm && monthYm <= acre.expiryYm;
+  var hasAcre = !!(COMPANY.acre && acre.expiryYm && ym >= acre.startYm && ym <= acre.expiryYm);
 
-  // Utiliser la nouvelle fonction helper versionnée
-  return getLegalUrssaf(year, typeActivite, hasAcre);
+  var taux = getUrssafRateAt(ym, typeActivite, hasAcre);
+  if (taux !== null) {
+    var p = getUrssafPeriod(ym);
+    return {
+      taux: taux, hasAcre: hasAcre, estHypothese: false, estRefuse: false,
+      periode: p, source: p.source, verifieLe: p.verifieLe
+    };
+  }
+
+  // Aucune période ne couvre ce mois. Le sens du repli dépend du SENS DU
+  // TEMPS, et cette asymétrie est essentielle :
+  //
+  //  - vers le FUTUR, reprendre le dernier taux connu est une prévision
+  //    légitime : un taux reste en vigueur jusqu'à publication d'un
+  //    nouveau. On le sert, marqué comme hypothèse ;
+  //  - vers le PASSÉ, il n'y a rien à prévoir. Le taux d'un mois écoulé
+  //    est un fait publié. Appliquer le taux d'aujourd'hui à 2019 ne
+  //    serait pas une approximation, ce serait un chiffre faux — et
+  //    potentiellement repris dans un recalcul de déclaration. On refuse.
+  var derniere = getDerniereUrssafPeriod();
+  var premiere = URSSAF_PERIODS[0] || null;
+
+  if (premiere && ym < premiere.du) {
+    return {
+      taux: null, hasAcre: hasAcre, estHypothese: false, estRefuse: true,
+      periode: null, source: null, verifieLe: null,
+      motif: 'Aucun barème connu pour ' + ym + ' — période antérieure au plus ancien barème saisi ('
+        + premiere.du + '). Un taux passé ne peut pas être extrapolé.'
+    };
+  }
+
+  if (!derniere) {
+    return {
+      taux: null, hasAcre: hasAcre, estHypothese: false, estRefuse: true,
+      periode: null, source: null, verifieLe: null,
+      motif: 'Aucun barème saisi.'
+    };
+  }
+
+  var tauxBase = (typeActivite in derniere.taux) ? derniere.taux[typeActivite] : derniere.taux.BNC;
+  return {
+    taux: hasAcre ? tauxBase * URSSAF_ACRE_ABATTEMENT : tauxBase,
+    hasAcre: hasAcre,
+    estHypothese: true,
+    estRefuse: false,
+    periode: derniere,
+    source: derniere.source,
+    verifieLe: derniere.verifieLe
+  };
+}
+
+// Un chiffre qui ENGAGE (déclaration URSSAF, montant à payer, échéance,
+// export du livre des recettes) doit passer par ici et s'abstenir de
+// s'afficher si le résultat est faux. Une prévision, elle, peut se
+// contenter de getUrssafRateInfo() et afficher l'hypothèse.
+function peutEngagerSurUrssaf(monthYm) {
+  var info = getUrssafRateInfo(monthYm);
+  return !info.estRefuse && !info.estHypothese;
+}
+
+// Motif de refus lisible, à afficher à la place du montant.
+function motifRefusUrssaf(monthYm) {
+  var info = getUrssafRateInfo(monthYm);
+  if (info.estRefuse) return info.motif;
+  if (info.estHypothese) {
+    return 'Barème non publié pour ' + (monthYm || 'cette période')
+      + ' — montant indisponible tant que le taux officiel n\'est pas saisi.';
+  }
+  return null;
+}
+
+// Libellé de l'hypothèse, à afficher partout où une prévision s'appuie sur
+// un barème non encore publié. L'hypothèse doit être visible, jamais tacite.
+function getUrssafHypotheseLabel(monthYm) {
+  var info = getUrssafRateInfo(monthYm);
+  if (!info.estHypothese || !info.periode) return null;
+  return 'Projection au taux de ' + PCT(info.taux) + ' en vigueur depuis le '
+    + info.periode.du + ' — barème non publié pour cette période';
 }
 
 function isTVAApplicable(dateStr) {
