@@ -78,7 +78,29 @@ Quand un taux change, vous ajoutez une période depuis l'app : valeur, date de d
 
 Un indicateur qui affiche l'état **réel** : millésime chargé, date de dernière vérification, et une alerte quand une période arrive à échéance ou qu'une valeur n'a pas été revue depuis plus de six mois. À l'opposé du bandeau actuel, qui affirme « Barèmes 2026 à jour · vérifiés le 11 juil. 2026 » alors que le système calcule avec ceux de 2025. **Une fausse assurance de conformité est plus dangereuse qu'une absence d'information.**
 
-#### 6. Des tests figés par période
+#### 6. Alerte d'échéance de barème, et blocage en sécurité fermée
+
+Deux niveaux, distincts :
+
+**Alerte** — dès qu'une période de validité arrive à son terme (`au` approchant) ou qu'une valeur en vigueur n'a pas été revérifiée depuis plus de six mois, un sujet apparaît dans « À traiter » : *« Nouveau taux à saisir — cotisations, à compter du 01/07/2026 »*, avec un lien direct vers l'écran d'édition du barème.
+
+**Blocage** — si le calcul demande une valeur pour une date **non couverte** par une période validée, il **refuse de produire un résultat**. Pas de repli, pas de valeur par défaut, pas d'extrapolation de la dernière période connue.
+
+Ce que le blocage interdit précisément :
+
+| Action | Comportement si le barème ne couvre pas la période |
+|---|---|
+| Afficher un montant de cotisations, une provision, un versable | Bloqué — l'emplacement affiche « barème manquant » et l'action pour le saisir |
+| Générer une déclaration ou un récapitulatif d'échéance | Bloqué |
+| Exporter le livre des recettes ou un dossier de contrôle | Bloqué |
+| Consulter et saisir des faits (recettes, dépenses, missions) | **Autorisé** — la saisie ne dépend d'aucun taux |
+| Consulter une période passée déjà couverte | **Autorisé** |
+
+Le principe est la **sécurité fermée** : en cas de doute, l'app se taire plutôt que d'avancer un chiffre. C'est l'inverse exact du comportement actuel, où `getLegal()` retombe silencieusement sur 2026 et où le bandeau affirme une conformité que rien ne vérifie. **Un montant absent se voit ; un montant faux se déclare.**
+
+Corollaire à ne pas oublier : le blocage doit rester **franchissable en lecture** pour ne jamais enfermer l'utilisateur hors de ses propres données, et il ne doit jamais empêcher un export de sauvegarde.
+
+#### 7. Des tests figés par période
 
 Un jeu de référence par période : pour telles entrées à telle date, tel résultat attendu. Ajouter un taux futur ne peut alors pas casser silencieusement le calcul d'un trimestre passé — le test échoue au lieu de laisser passer.
 
