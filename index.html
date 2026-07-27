@@ -6328,7 +6328,43 @@ function computeIndicators(data, months) {
  * Génère les alertes basées sur l'état des données
  * @param {Object} data - Objet data de compute()
  */
+// Échéances réglementaires à date fixe, indépendantes de l'activité.
+// Contrairement aux autres alertes, elles ne dépendent d'aucun calcul :
+// elles tombent à une date, qu'on soit prêt ou non.
+var ECHEANCES_REGLEMENTAIRES = [
+  {
+    id: 'facturation-electronique-reception',
+    date: '2026-09-01',
+    preavisJours: 120,
+    titre: 'Facturation électronique : réception obligatoire',
+    texte: 'À compter du 1er septembre 2026, toute entreprise doit être en mesure de '
+      + 'RECEVOIR ses factures fournisseurs au format électronique, via une plateforme '
+      + 'agréée (PDP). L\'obligation d\'émission arrive plus tard. Démarche : choisir une '
+      + 'PDP et déclarer son adresse de réception. Vérifier le calendrier sur impots.gouv.fr.'
+  }
+];
+
+function computeEcheancesReglementaires(data) {
+  var aujourdhui = localISO(TODAY);
+  ECHEANCES_REGLEMENTAIRES.forEach(function (e) {
+    var joursRestants = Math.round((new Date(e.date) - new Date(aujourdhui)) / 86400000);
+    if (joursRestants > e.preavisJours) return; // trop tôt pour alerter
+    var passee = joursRestants < 0;
+    data.alerts.push({
+      type: passee || joursRestants <= 30 ? 'danger' : 'warning',
+      icon: passee ? '🚨' : '📅',
+      title: e.titre + (passee
+        ? ' — échéance dépassée depuis le ' + fmtLong(e.date)
+        : ' — dans ' + joursRestants + ' jour' + (joursRestants > 1 ? 's' : '')),
+      text: e.texte
+    });
+  });
+}
+
 function computeAlerts(data) {
+  // Échéances réglementaires à date fixe (facturation électronique, etc.)
+  computeEcheancesReglementaires(data);
+
   // ACRE expiration
   var acre = getAcreInfo();
   if (COMPANY.acre && acre.active && acre.daysLeft <= 90) {
