@@ -43,6 +43,47 @@ Deux conséquences directes pour l'implémentation :
 
 **Reste à cadrer** : l'ACRE. Un changement au 1er juillet 2026 est probable (abattement passant de 50 % à 25 % des cotisations) mais non confirmé. L'ACRE du propriétaire est éteinte depuis le T1 2026 — sans effet sur les calculs courants, mais nécessaire pour recalculer un trimestre passé.
 
+### D1 en détail — le mécanisme d'évolution des taux officiels
+
+**Contrainte de départ : il n'existe aucune API officielle** pour les taux URSSAF, seuils de TVA, tranches d'IR ou grilles de CFE. `urssaf.fr` est du HTML dont la structure change, et qui répond 503 de façon aléatoire. Automatiser la récupération produirait une dépendance fragile qui casserait sans avertir — c'est-à-dire exactement le défaut qu'on cherche à supprimer.
+
+**Le mécanisme retenu : le barème est une donnée éditable, pas du code.**
+
+#### 1. Toute valeur officielle est une entrée datée
+
+Aucune constante numérique nulle part. Chaque valeur porte :
+
+| Champ | Rôle |
+|---|---|
+| `valeur` | Le nombre |
+| `du` / `au` | Sa période de validité (`au` vide = toujours en vigueur) |
+| `source` | L'URL ou le document d'où elle vient |
+| `verifieLe` | La date à laquelle un humain l'a confirmée |
+
+Les valeurs concernées : taux de cotisations, CFP, versement libératoire, abattement forfaitaire, plafonds micro, seuils de TVA (franchise et majoré), tranches d'IR, grille de base minimum CFE, taux et durée de l'ACRE.
+
+#### 2. Le calcul résout le taux à la date, jamais à l'année
+
+La fonction de calcul reçoit une **date** et demande au barème la valeur en vigueur ce jour-là. C'est ce qui rend impossible le bug actuel de `getLegal()`, qui retombe silencieusement sur 2026.
+
+#### 3. Les anciennes valeurs ne sont jamais supprimées
+
+Ajouter une période ne modifie pas les précédentes. Recalculer un trimestre 2024 en 2029 doit redonner le montant déclaré à l'époque. **Écraser un taux réécrirait l'historique fiscal** — c'est le mode de défaillance à interdire par construction.
+
+#### 4. Un écran d'édition du barème, dans Config
+
+Quand un taux change, vous ajoutez une période depuis l'app : valeur, date de début, source, date de vérification. Aucune mise à jour de l'application n'est nécessaire, aucun développeur non plus. C'est ce point qui rend le mécanisme durable : **le barème cesse d'être une dépendance envers celui qui a écrit le code.**
+
+#### 5. Un rappel de fraîcheur, honnête
+
+Un indicateur qui affiche l'état **réel** : millésime chargé, date de dernière vérification, et une alerte quand une période arrive à échéance ou qu'une valeur n'a pas été revue depuis plus de six mois. À l'opposé du bandeau actuel, qui affirme « Barèmes 2026 à jour · vérifiés le 11 juil. 2026 » alors que le système calcule avec ceux de 2025. **Une fausse assurance de conformité est plus dangereuse qu'une absence d'information.**
+
+#### 6. Des tests figés par période
+
+Un jeu de référence par période : pour telles entrées à telle date, tel résultat attendu. Ajouter un taux futur ne peut alors pas casser silencieusement le calcul d'un trimestre passé — le test échoue au lieu de laisser passer.
+
+**Ce que ça donne concrètement.** Le passage de 25,60 % à 26,10 % au 1er juillet 2026 — celui qui a fait diverger toutes mes sources — devient une ligne ajoutée dans un écran, avec sa source et sa date. Rien à recompiler, rien à re-tester à la main, et les trimestres antérieurs restent exacts.
+
 ### Deux bugs qui invalident D1 aujourd'hui
 
 Trouvés pendant la revue, à ne pas importer :
