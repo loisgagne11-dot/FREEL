@@ -84,21 +84,24 @@ Deux niveaux, distincts :
 
 **Alerte** — dès qu'une période de validité arrive à son terme (`au` approchant) ou qu'une valeur en vigueur n'a pas été revérifiée depuis plus de six mois, un sujet apparaît dans « À traiter » : *« Nouveau taux à saisir — cotisations, à compter du 01/07/2026 »*, avec un lien direct vers l'écran d'édition du barème.
 
-**Blocage** — si le calcul demande une valeur pour une date **non couverte** par une période validée, il **refuse de produire un résultat**. Pas de repli, pas de valeur par défaut, pas d'extrapolation de la dernière période connue.
+**Blocage — mais seulement là où un chiffre engage.** Le critère n'est pas « le barème est incomplet », c'est **« ce chiffre engage-t-il l'utilisateur ? »**. Deux régimes distincts :
 
-Ce que le blocage interdit précisément :
+| Nature du chiffre | Barème absent pour la période | Comportement |
+|---|---|---|
+| **Engageant** — déclaration URSSAF, montant à payer, échéance à honorer, export du livre des recettes ou dossier de contrôle, tout montant repris dans un formulaire officiel | **Bloqué.** Pas de repli, pas d'extrapolation, pas de valeur par défaut | « Barème manquant pour cette période » + l'action pour le saisir |
+| **Prévisionnel** — projection de trésorerie, autonomie en mois, simulation, « combien je pourrai me verser », graphes d'évolution future | **Autorisé** | Calculé sur le **dernier taux connu**, affiché comme **hypothèse explicite** : mention visible du taux retenu et de sa date d'origine |
+| **Saisie de faits** — recettes, dépenses, missions, congés | **Autorisé** | Aucune dépendance à un taux |
+| **Consultation d'une période couverte** | — | **Autorisé** |
+| **Export de sauvegarde** | — | **Toujours autorisé**, sans condition |
 
-| Action | Comportement si le barème ne couvre pas la période |
-|---|---|
-| Afficher un montant de cotisations, une provision, un versable | Bloqué — l'emplacement affiche « barème manquant » et l'action pour le saisir |
-| Générer une déclaration ou un récapitulatif d'échéance | Bloqué |
-| Exporter le livre des recettes ou un dossier de contrôle | Bloqué |
-| Consulter et saisir des faits (recettes, dépenses, missions) | **Autorisé** — la saisie ne dépend d'aucun taux |
-| Consulter une période passée déjà couverte | **Autorisé** |
+La distinction est celle du risque réel : se tromper d'un point de cotisation dans une **projection à six mois** n'a aucune conséquence, et bloquer l'écran priverait l'utilisateur de son outil de pilotage. Se tromper dans une **déclaration** coûte un redressement.
 
-Le principe est la **sécurité fermée** : en cas de doute, l'app se taire plutôt que d'avancer un chiffre. C'est l'inverse exact du comportement actuel, où `getLegal()` retombe silencieusement sur 2026 et où le bandeau affirme une conformité que rien ne vérifie. **Un montant absent se voit ; un montant faux se déclare.**
+Deux règles pour que le prévisionnel reste honnête :
 
-Corollaire à ne pas oublier : le blocage doit rester **franchissable en lecture** pour ne jamais enfermer l'utilisateur hors de ses propres données, et il ne doit jamais empêcher un export de sauvegarde.
+- L'hypothèse est **toujours visible**, jamais implicite. « Projection au taux de 26,10 % en vigueur depuis le 01/07/2026 » — l'utilisateur doit savoir sur quoi il regarde.
+- Une prévision **ne devient jamais** un montant engageant par simple passage du temps. Quand la période arrive à échéance et que le barème n'a pas été mis à jour, l'alerte se déclenche et le chiffre bascule de « hypothèse » à « bloqué ».
+
+Le principe reste la **sécurité fermée sur l'opposable** : sur un chiffre qui engage, l'app se tait plutôt que d'avancer une valeur. C'est l'inverse du comportement actuel, où `getLegal()` retombe silencieusement sur 2026 et où le bandeau affirme une conformité que rien ne vérifie. **Un montant absent se voit ; un montant faux se déclare.**
 
 #### 7. Des tests figés par période
 
