@@ -20,9 +20,28 @@ Prérequis : [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) · Revues : 
 
 **Aucun gain de versable n'est promis.** Le volet 2 de D3 joue en sens inverse du volet 1 et pèse plus lourd en fin de trimestre.
 
-### Bloquant avant la première ligne de calcul
+### Barème des cotisations — tranché
 
-Le taux de cotisations micro-BNC 2026 a **cinq** candidats, pas quatre : le monolithe en porte un cinquième, `0,256` (`index.html:2637`), avec des plafonds étiquetés « projet LFI 2026 » mais présentés comme « vérifiés ». L'expert propose **26,1 %**, confiance moyenne-haute. **À confirmer sur `urssaf.fr`.**
+Taux global de cotisations sociales, micro-BNC libéral non réglementé :
+
+| Du | Au | Taux |
+|---|---|---|
+| 2024-01-01 | 2024-06-30 | **21,10 %** |
+| 2024-07-01 | 2024-12-31 | **23,10 %** |
+| 2025-01-01 | 2025-12-31 | **24,60 %** |
+| 2026-01-01 | 2026-06-30 | **25,60 %** |
+| 2026-07-01 | — | **26,10 %** |
+
+**Ceci résout l'apparente contradiction des sources** : 25,60 % et 26,10 % ne sont pas deux valeurs concurrentes pour 2026, ce sont deux semestres. Les quatre valeurs du bundle de design (21,2 / 24,6 / 11,6 / 10,6 %) et la cinquième du monolithe (`0,256`, `index.html:2637`) sont chacune un instantané figé d'une période — voilà pourquoi elles divergent toutes. Le problème n'était pas une erreur de valeur, c'était l'absence de dimension temporelle. C'est l'argument central de D1.
+
+Deux conséquences directes pour l'implémentation :
+
+1. **La bascule tombe au 1er juillet.** Aucune période déclarative mensuelle ou trimestrielle ne chevauche donc un changement de taux — les frontières s'alignent. Simplification réelle.
+2. **Mais tout agrégat annuel chevauche.** Le provisionnement doit appliquer le taux à la **date d'encaissement de chaque recette**, jamais un taux unique à l'année. Un `CA_2026 × taux` est faux par construction. Ceci se combine au volet 2 de D3 : la dette naît à l'encaissement, et le taux se lit à cette même date.
+
+*Source : valeurs fournies par le propriétaire. `urssaf.fr` renvoie 503 sur ses 4 pages de barème. À recouper une fois avec un avis d'appel de cotisations réel — une erreur de taux coûte plusieurs milliers d'euros par an, c'est le seul chiffre du projet qui mérite une double vérification.*
+
+**Reste à cadrer** : l'ACRE. Un changement au 1er juillet 2026 est probable (abattement passant de 50 % à 25 % des cotisations) mais non confirmé. L'ACRE du propriétaire est éteinte depuis le T1 2026 — sans effet sur les calculs courants, mais nécessaire pour recalculer un trimestre passé.
 
 ### Deux bugs qui invalident D1 aujourd'hui
 
