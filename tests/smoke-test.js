@@ -407,6 +407,28 @@ if (appScript) {
       return sandbox.getUrssafRateAt('2026-07', 'BNC', false)
         !== sandbox.getUrssafRateAt('2026-07', 'BIC_vente', false);
     });
+    // ===== Échéances réglementaires à date fixe =====
+    section('Échéances réglementaires');
+
+    verifie('La réception obligatoire des factures électroniques est suivie', function () {
+      return sandbox.ECHEANCES_REGLEMENTAIRES.some(function (e) {
+        return e.id === 'facturation-electronique-reception' && e.date === '2026-09-01';
+      });
+    });
+    verifie('Chaque échéance porte une date, un préavis, un titre et un texte', function () {
+      return sandbox.ECHEANCES_REGLEMENTAIRES.every(function (e) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(e.date) && typeof e.preavisJours === 'number'
+          && !!e.titre && !!e.texte;
+      });
+    });
+    verifie('Une échéance dans le préavis produit une alerte', function () {
+      const data = { alerts: [] };
+      sandbox.computeEcheancesReglementaires(data);
+      return data.alerts.some(function (a) {
+        return a.title.indexOf('Facturation électronique') >= 0;
+      });
+    });
+
     verifie('getLegal() ne retombe plus sur un 2026 codé en dur', function () {
       // Une année future doit résoudre vers la plus récente disponible,
       // et suivre automatiquement l'ajout d'une année ultérieure.
