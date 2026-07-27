@@ -43,7 +43,7 @@ function section(title) {
 // réel (61) pour qu'un bloc entier qui cesse de s'exécuter fasse échouer
 // la suite. À augmenter quand on ajoute des tests, JAMAIS à baisser pour
 // faire passer la suite : une marge trop large rend ce garde-fou inutile.
-const MIN_ASSERTIONS = 58;
+const MIN_ASSERTIONS = 84;
 
 // Valeurs de test synthétiques (surtout pas de données réelles).
 const SIRET_VALIDE = '12345678901237';   // Luhn valide (vérifié)
@@ -302,6 +302,117 @@ if (appScript) {
         return t >= 0.05 && t <= 0.40;
       });
       return taux.length > 0;
+    });
+
+    // ===== Barème résolu par période =====
+    // Le taux BNC change EN COURS D'ANNÉE (1er juillet 2024 et 2026). Une
+    // résolution par année appliquait 25,6 % à juillet 2026 au lieu de
+    // 26,1 %. Ces assertions verrouillent la résolution par mois.
+    section('Barème par période');
+
+    const attendus = [
+      ['2024-03', 0.211, '1er semestre 2024'],
+      ['2024-06', 0.211, 'juin 2024, dernier mois du 1er semestre'],
+      ['2024-07', 0.231, 'juillet 2024, bascule mi-année'],
+      ['2024-12', 0.231, '2e semestre 2024'],
+      ['2025-01', 0.246, '2025, taux unique'],
+      ['2025-12', 0.246, 'décembre 2025'],
+      ['2026-01', 0.256, '1er semestre 2026'],
+      ['2026-06', 0.256, 'juin 2026, dernier mois avant bascule'],
+      ['2026-07', 0.261, 'juillet 2026, bascule mi-année'],
+      ['2026-12', 0.261, 'décembre 2026']
+    ];
+    attendus.forEach(function (cas) {
+      verifie('Taux BNC ' + cas[0] + ' = ' + (cas[1] * 100).toFixed(1) + '% (' + cas[2] + ')', function () {
+        return sandbox.getUrssafRateAt(cas[0], 'BNC', false) === cas[1];
+      });
+    });
+
+    verifie('Les deux semestres 2026 diffèrent (une table par année ne peut pas l\'exprimer)', function () {
+      return sandbox.getUrssafRateAt('2026-06', 'BNC', false)
+        !== sandbox.getUrssafRateAt('2026-07', 'BNC', false);
+    });
+    verifie('ACRE applique bien un abattement de 50 %', function () {
+      return sandbox.getUrssafRateAt('2026-07', 'BNC', true) === 0.261 * 0.5;
+    });
+    verifie('Un mois antérieur à toute période connue ne renvoie pas de taux', function () {
+      return sandbox.getUrssafRateAt('2019-01', 'BNC', false) === null;
+    });
+    verifie('Chaque période porte sa source et sa date de vérification', function () {
+      return sandbox.URSSAF_PERIODS.every(function (p) {
+        return !!p.source && /^\d{4}-\d{2}-\d{2}$/.test(p.verifieLe) && !!p.du;
+      });
+    });
+    verifie('Les périodes sont contiguës et sans chevauchement', function () {
+      const P = sandbox.URSSAF_PERIODS;
+      for (let i = 0; i < P.length - 1; i++) {
+        if (P[i].au === null) return false;          // seule la dernière est ouverte
+        if (!(P[i].au < P[i + 1].du)) return false;  // pas de chevauchement
+      }
+      return P[P.length - 1].au === null;            // la dernière reste ouverte
+    });
+
+    // ===== Hypothèse de prévision =====
+    // Un barème absent est autorisé en PRÉVISION, sur le dernier taux connu,
+    // à condition que l'hypothèse soit explicite. Il doit être refusé sur un
+    // chiffre qui engage.
+    section('Hypothèse de prévision');
+
+    verifie('Une période couverte n\'est pas une hypothèse', function () {
+      const info = sandbox.getUrssafRateInfo('2026-07');
+      return info.estHypothese === false && info.estRefuse === false;
+    });
+    verifie('Le futur reste couvert par la période ouverte (un taux court jusqu\'au suivant)', function () {
+      const info = sandbox.getUrssafRateInfo('2031-03');
+      return info.estRefuse === false && info.taux === 0.261;
+    });
+    verifie('Aucun libellé d\'hypothèse sur une période publiée', function () {
+      return sandbox.getUrssafHypotheseLabel('2026-07') === null;
+    });
+
+    // Asymétrie du temps : on extrapole vers le futur, jamais vers le passé.
+    // Le taux d'un mois écoulé est un fait publié, pas une prévision.
+    verifie('Un mois antérieur au plus ancien barème est REFUSÉ, pas extrapolé', function () {
+      const info = sandbox.getUrssafRateInfo('2019-01');
+      return info.estRefuse === true && info.taux === null;
+    });
+    verifie('Le refus porte un motif lisible', function () {
+      const m = sandbox.motifRefusUrssaf('2019-01');
+      return typeof m === 'string' && m.indexOf('2019-01') >= 0 && m.indexOf('extrapol') >= 0;
+    });
+    verifie('Aucun motif de refus sur une période publiée', function () {
+      return sandbox.motifRefusUrssaf('2026-07') === null;
+    });
+    verifie('peutEngagerSurUrssaf() autorise une période publiée', function () {
+      return sandbox.peutEngagerSurUrssaf('2026-07') === true;
+    });
+    verifie('peutEngagerSurUrssaf() refuse une période sans barème', function () {
+      return sandbox.peutEngagerSurUrssaf('2019-01') === false;
+    });
+
+    // ===== Régime d'activité =====
+    // Bug corrigé : l'IIFE LEGAL lisait COMPANY avant sa déclaration, donc
+    // le type retombait toujours sur BNC.
+    section('Régime d\'activité');
+
+    verifie('LEGAL.urssaf suit le type d\'activité configuré', function () {
+      const avant = sandbox.LEGAL.urssaf;
+      sandbox.COMPANY.typeActivite = 'BIC_vente';
+      const apres = sandbox.LEGAL.urssaf;
+      sandbox.COMPANY.typeActivite = 'BNC';
+      const retabli = sandbox.LEGAL.urssaf;
+      return avant !== apres && avant === retabli;
+    });
+    verifie('getUrssafRateAt distingue BNC et BIC_vente', function () {
+      return sandbox.getUrssafRateAt('2026-07', 'BNC', false)
+        !== sandbox.getUrssafRateAt('2026-07', 'BIC_vente', false);
+    });
+    verifie('getLegal() ne retombe plus sur un 2026 codé en dur', function () {
+      // Une année future doit résoudre vers la plus récente disponible,
+      // et suivre automatiquement l'ajout d'une année ultérieure.
+      const annees = Object.keys(sandbox.LEGAL_BY_YEAR).map(Number).sort();
+      const derniere = annees[annees.length - 1];
+      return sandbox.getLegal(derniere + 5) === sandbox.LEGAL_BY_YEAR[derniere];
     });
   }
 }
