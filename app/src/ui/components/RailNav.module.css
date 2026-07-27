@@ -1,0 +1,158 @@
+/* ============================================================
+   RailNav — une seule structure DOM, deux formes pilotées par media
+   query : dock flottant en pilule (mobile, base) puis rail latéral fixe
+   (desktop, min-width). Mobile-first en couches min-width, comme partout
+   dans cette coquille — jamais de disposition recalculée en JS (invariant
+   n°7 du projet).
+   ============================================================ */
+
+.rail {
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: calc(13px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100vw - 20px);
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  background: var(--dock);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--sh-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+.lien {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Cible tactile 44px minimum, y compris pour les onglets icône seule. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 13px;
+  border-radius: 100px;
+  color: var(--muted);
+  transition: background .16s, color .16s;
+}
+
+.lien:hover {
+  color: var(--text);
+}
+
+.icone {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.icone svg {
+  width: 100%;
+  height: 100%;
+}
+
+.libelle {
+  display: none;
+  font-size: 13px;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Seul l'onglet actif porte son libellé en portrait — contrainte des six
+   onglets dans une largeur de dock étroite (~340px). */
+.actif .libelle {
+  display: inline;
+}
+
+.actif {
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* En portrait (base mobile-first), le badge se pose au coin de l'icône :
+   le libellé est masqué pour la plupart des onglets, il n'y a pas de fin
+   de ligne où l'accrocher comme en desktop. */
+.badge {
+  position: absolute;
+  top: -2px;
+  left: 24px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 20px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  background: var(--amber-soft);
+  color: var(--amber);
+  box-shadow: inset 0 0 0 1px var(--amber-line);
+}
+
+/* ---------- desktop : rail latéral fixe, 212px, tous les libellés visibles ---------- */
+@media (min-width: 761px) {
+  .rail {
+    position: static;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    width: 212px;
+    max-width: none;
+    height: 100dvh;
+    padding: 24px 14px;
+    border: none;
+    border-right: 1px solid var(--line);
+    border-radius: 0;
+    background: linear-gradient(180deg, var(--rail-a), var(--rail-b) 70%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+    overflow-x: visible;
+    overflow-y: auto;
+  }
+
+  .lien {
+    min-width: 0;
+    padding: 11px 13px;
+    border-radius: 14px;
+  }
+
+  .libelle {
+    display: inline;
+    font-size: 14px;
+  }
+
+  .actif {
+    background: linear-gradient(180deg, var(--panel-3), var(--panel-2));
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--line-2);
+  }
+
+  .badge {
+    position: static;
+    margin-left: auto;
+    min-width: 19px;
+    height: 19px;
+    font-size: 10.5px;
+  }
+}
