@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { dateISO, euros, mois } from '../domain/types';
+import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
-import { type Faits, faitsVides } from './schema';
+import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe, sousAcreLe
+  caEncaisseAnnee, etatAchats, etatPilote, moisCourant, recettesEncaissees,
+  regimeDe, regimeTvaAu, sousAcreLe
 } from './selecteurs';
 
 function faits(modifications: Partial<Faits> = {}): Faits {
@@ -187,5 +188,99 @@ describe('état de l\'écran Pilote', () => {
   it('ne stocke aucun dérivé : deux appels sur les mêmes faits donnent le même résultat', () => {
     const f = faits({ soldeInitial: euros(10000), reserve: euros(500) });
     expect(etatPilote(f, [], maintenant)).toEqual(etatPilote(f, [], maintenant));
+  });
+});
+
+describe('écran Achats', () => {
+  function depense(m: Partial<Depense> = {}): Depense {
+    return {
+      id: 'd', libelle: 'Abonnement', fournisseur: 'F', provenance: 'france',
+      montantTtc: euros(120), tauxTva: ratio(0.20), payeeLe: dateISO('2026-09-10'),
+      justificatifId: 'p1', rapprochement: 'rapproche', ...m
+    };
+  }
+
+  const ASSUJETTI_DEPUIS_JUILLET = faits({
+    entreprise: { ...faitsVides().entreprise, tvaDepuis: mois('2026-07') },
+    banqueReliee: true
+  });
+
+  // Franchir le seuil en cours d'année est le cas ordinaire. Appliquer le
+  // régime d'aujourd'hui à une dépense de mars rendrait déductible une TVA
+  // qui ne l'était pas.
+  it('résout le régime de TVA à la date de paiement de chaque dépense', () => {
+    const etat = etatAchats({
+      ...ASSUJETTI_DEPUIS_JUILLET,
+      depenses: [
+        depense({ id: 'avant', payeeLe: dateISO('2026-03-10') }),
+        depense({ id: 'apres', payeeLe: dateISO('2026-09-10') })
+      ]
+    });
+    const parId = new Map(etat.lignes.map((l) => [l.depense.id, l]));
+    expect(parId.get('avant')?.regimeTva).toBe('franchise');
+    expect(parId.get('apres')?.regimeTva).toBe('assujetti');
+    expect(etat.resume.tvaRecuperable).toBe(20);
+  });
+
+  it('rattache une dépense sans date au régime courant, faute de mieux', () => {
+    const etat = etatAchats(
+      { ...ASSUJETTI_DEPUIS_JUILLET, depenses: [depense({ payeeLe: null })] },
+      new Date('2026-09-15T12:00:00Z')
+    );
+    expect(etat.lignes[0]?.regimeTva).toBe('assujetti');
+    expect(etat.sansDate).toBe(1);
+  });
+
+  // Une dépense non datée est le premier problème à traiter, pas une ligne à
+  // reléguer en bas de liste.
+  it('range de la plus récente à la plus ancienne, les non datées en tête', () => {
+    const etat = etatAchats({
+      ...ASSUJETTI_DEPUIS_JUILLET,
+      depenses: [
+        depense({ id: 'vieille', payeeLe: dateISO('2026-08-01') }),
+        depense({ id: 'sans-date', payeeLe: null }),
+        depense({ id: 'recente', payeeLe: dateISO('2026-09-30') })
+      ]
+    });
+    expect(etat.lignes.map((l) => l.depense.id)).toEqual(['sans-date', 'recente', 'vieille']);
+  });
+
+  // Sans compte relié, afficher « rapprochée » affirmerait un contrôle qui
+  // n'a plus lieu.
+  it('ne présente rien comme rapproché quand aucune banque n\'est reliée', () => {
+    const etat = etatAchats({
+      ...ASSUJETTI_DEPUIS_JUILLET, banqueReliee: false, depenses: [depense()]
+    });
+    expect(etat.lignes[0]?.rapprochement).toBe('sans_banque');
+    expect(etat.banqueReliee).toBe(false);
+  });
+
+  it('chiffre la TVA perdue faute de pièce', () => {
+    const etat = etatAchats({
+      ...ASSUJETTI_DEPUIS_JUILLET,
+      depenses: [depense({ justificatifId: null })]
+    });
+    expect(etat.resume.tvaPerdueFauteDePiece).toBe(20);
+    expect(etat.lignes[0]?.tva.motifNonRecuperable).toBe('justificatif_manquant');
+  });
+
+  it('sur un fichier vierge, ne produit que des zéros', () => {
+    const etat = etatAchats(faits());
+    expect(etat.lignes).toEqual([]);
+    expect(etat.resume.nombre).toBe(0);
+  });
+});
+
+describe('régime de TVA par période', () => {
+  it('est la franchise tant qu\'aucun assujettissement n\'est déclaré', () => {
+    expect(regimeTvaAu(faits(), mois('2026-09'))).toBe('franchise');
+  });
+
+  // Le mois d'assujettissement est inclus : on est redevable dès ce mois-là.
+  it('bascule à partir du mois d\'assujettissement, celui-ci compris', () => {
+    const f = faits({ entreprise: { ...faitsVides().entreprise, tvaDepuis: mois('2026-07') } });
+    expect(regimeTvaAu(f, mois('2026-06'))).toBe('franchise');
+    expect(regimeTvaAu(f, mois('2026-07'))).toBe('assujetti');
+    expect(regimeTvaAu(f, mois('2026-08'))).toBe('assujetti');
   });
 });

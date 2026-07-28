@@ -1,0 +1,331 @@
+/* Écran Achats. Aucune couleur en dur, mobile-first, aucune largeur calculée
+   en JS — l'invariant n°7 veut que la mise en page reste entièrement CSS. */
+
+.entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.titre {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.actionPrincipale {
+  /* 44 px de haut : la cible minimale au doigt, comme pour le « i » d'Info. */
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.actionPrincipale:hover { border-color: var(--green); }
+
+.grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.chiffre {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  min-width: 0;
+}
+
+.libelle {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.montant {
+  font-size: 19px;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.accent { color: var(--green); }
+.attention { color: var(--amber); }
+.danger { color: var(--red); }
+
+.bandeau {
+  display: block;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.bandeau strong { color: var(--text); font-weight: 600; }
+.bandeauDanger { border-left-color: var(--red); }
+.bandeauAttention { border-left-color: var(--amber); }
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  min-width: 0;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.compteur {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--amber);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.vide {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.liste {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.ligne { border-bottom: 1px solid var(--line); }
+.ligne:last-child { border-bottom: none; }
+
+/* La ligne entière est le bouton : au doigt comme au clavier, une seule cible
+   plutôt qu'un chevron de 16 px à viser. */
+.ouvrir {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 4px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.ouvrir:hover { background: var(--panel-2); }
+
+.ligneTitre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ligneLibelle {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--text);
+  /* Un libellé long se coupe plutôt que d'élargir le document : le débordement
+     horizontal a déjà été constaté sur un autre écran. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ligneMontant {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ligneMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-2);
+  min-width: 0;
+}
+
+.manquant { color: var(--amber); }
+
+.pastilles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pastille {
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--muted-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.pastilleAccent { color: var(--green); border-color: var(--line-2); }
+.pastilleDanger { color: var(--red); border-color: var(--line-2); }
+
+/* ── Panneau de détail ─────────────────────────────────────────────────── */
+
+.detail { display: flex; flex-direction: column; gap: 16px; }
+
+.faits { display: flex; flex-direction: column; }
+
+.fait {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.fait:last-child { border-bottom: none; }
+
+.fait dd {
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 0;
+}
+
+.bloc { display: flex; flex-direction: column; gap: 8px; }
+
+.titreBloc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.verdict { font-size: 13px; line-height: 1.55; color: var(--muted); }
+.verdictAccent { font-size: 13px; line-height: 1.55; color: var(--green); }
+.verdictAttention { font-size: 13px; line-height: 1.55; color: var(--amber); }
+.verdictDanger { font-size: 13px; line-height: 1.55; color: var(--red); }
+
+.champFichier {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bloc input[type='file'] {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 100%;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.action {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.action:hover { color: var(--text); }
+.action:disabled { opacity: 0.55; cursor: default; }
+.actionActive { color: var(--text); border-color: var(--green); }
+
+.supprimer {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--red);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+/* ── Formulaire ────────────────────────────────────────────────────────── */
+
+.formulaire { display: flex; flex-direction: column; gap: 12px; }
+
+.champ { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+.champ label {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.champ input,
+.champ select {
+  /* `width: 100%` sur une boîte à bordure : sans `border-box`, les champs
+     dépasseraient du panneau de la largeur des bordures. */
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.champ input:focus-visible,
+.champ select:focus-visible { border-color: var(--green); outline: none; }
+
+@media (min-width: 761px) {
+  .entete { grid-column: 1 / -1; }
+  .grille { grid-column: 1 / -1; }
+  .bandeau { grid-column: 1 / -1; }
+  .carte { grid-column: 1 / -1; }
+}

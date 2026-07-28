@@ -21,9 +21,9 @@ au dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **263** |
-| Build | **233 Ko** d'entrée, 74 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko) |
-| Responsive | **60 combinaisons** (5 tailles × 4 palettes × 3 écrans) |
+| Tests | **341** |
+| Build | **237 Ko** d'entrée, 76 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko) |
+| Responsive | **80 combinaisons** (5 tailles × 4 palettes × 4 écrans) |
 | Migration | conforme |
 
 Un nombre de tests en baisse, ou un build qui franchit 250 Ko, signale une
@@ -239,9 +239,28 @@ tests verts.
 - [ ] jsPDF différé ; retirer les méta anti-cache (concerne le legacy)
 
 ### J5 · Achats, Activité, Config
-- [ ] Justificatifs sur **IndexedDB**, invariant « pas de TVA sans pièce »
-- [ ] État de rapprochement explicite et corrigeable (`matched`/`pending`/`nobank`)
-- [ ] Autoliquidation TVA sur achats hors de France, et DES
+- [x] ~~Justificatifs sur **IndexedDB**, invariant « pas de TVA sans pièce »~~ —
+      **fait.** `infra/justificatifs.ts` : le fichier est conservé, avec une
+      empreinte SHA-256 et l'horodatage du dépôt. C'est l'empreinte, recalculée
+      par `verifierIntegrite()`, qui donne à la copie numérique sa valeur
+      probante — l'ancienne version n'avait qu'un booléen `piece: true`, sans
+      fichier ni trace, classé « sans valeur probante » par l'audit.
+- [x] ~~Écran Achats~~ — **fait.** L'écran chiffre ce que les pièces manquantes
+      coûtent (`tvaPerdueFauteDePiece`) : « justificatif manquant » n'incite
+      personne à chercher une facture, un montant si.
+- [x] ~~État de rapprochement explicite et corrigeable~~ — **fait.**
+      `rapproche` / `en_attente` / `sans_banque`, stocké et non redéduit à
+      l'affichage. Invariant : jamais « rapproché » sans relevé disponible.
+- [x] ~~Autoliquidation TVA sur achats hors de France~~ — **détectée et
+      signalée** : TVA due **et** non déductible. La déclaration (DES) reste à
+      produire.
+- [x] ~~Reprise des charges de l'ancienne trésorerie~~ — **fait.** Les
+      mouvements de type `Charge` deviennent des dépenses, toutes avec
+      `justificatifId: null` : la migration ne peut pas inventer les pièces
+      manquantes, et le rapport le dit, chiffres à l'appui.
+- [ ] Écran Activité : plan de charge et congés, missions et factures,
+      occupation et délai de paiement par client
+- [ ] Déclaration d'échanges de services (DES) proprement dite
 - [ ] Livre des recettes conforme : `paidAt`, `modeReglement`, journal en ajout
       seul, correction par annulation
 - [ ] Écran d'édition du barème dans Config + alerte de fraîcheur
@@ -266,6 +285,7 @@ tests verts.
 | **Taux de cotisations** | Valeurs du propriétaire, à recouper **une fois** avec un avis d'appel réel. `urssaf.fr` renvoie 503 sur ses pages de barème. C'est le seul chiffre du projet où une erreur coûte plusieurs milliers d'euros par an |
 | **ACRE au 01/07/2026** | Passage de l'abattement de 50 % à 25 % **probable mais non confirmé**. Sans effet sur le propriétaire (ACRE éteinte depuis le T1 2026), nécessaire pour recalculer un trimestre passé |
 | **Export FEC** | Retiré du périmètre (D6). Code conservé sur la branche de sauvegarde |
+| **Relevé bancaire** | Aucun n'est importé : `Faits.banqueReliee` vaut `false`, et l'écran Achats l'annonce au lieu d'afficher un rapprochement fictif. L'import de relevé est la brique qui manque, et elle débloquera aussi `selecteurs.solde()` |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
 
 ---

@@ -25,7 +25,12 @@ import {
   type EntreeATraiter, type SujetATraiter,
   sujetsATraiter
 } from '../domain/calculs/aTraiter';
-import type { Faits } from './schema';
+import {
+  type ContexteDepenses, type EtatRapprochement, type RegimeTva,
+  type ResumeDepenses, type TvaDepense,
+  rapprochementEffectif, resumerDepenses, tvaDeDepense
+} from '../domain/calculs/depenses';
+import type { Depense, Faits } from './schema';
 
 /** Le mois courant, dérivé de l'horloge et jamais codé en dur. */
 export function moisCourant(maintenant: Date = new Date()): Mois {
@@ -231,6 +236,93 @@ export function etatPilote(
     tauxImpotIndisponible: tauxImpotR.statut === 'refuse',
     motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null
   };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Écran Achats
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Le régime de TVA en vigueur à un mois donné.
+ *
+ * Résolu par période, comme les taux URSSAF, et pour la même raison : une
+ * entreprise qui franchit le seuil en cours d'année relève de la franchise
+ * avant, et de l'assujettissement après. Appliquer le régime d'aujourd'hui à
+ * une dépense de mars rendrait déductible une TVA qui ne l'était pas.
+ */
+export function regimeTvaAu(faits: Faits, m: Mois): RegimeTva {
+  const depuis = faits.entreprise.tvaDepuis;
+  return depuis !== null && m >= depuis ? 'assujetti' : 'franchise';
+}
+
+/**
+ * Le contexte d'une dépense : régime à sa date de paiement, et disponibilité
+ * d'un relevé bancaire.
+ *
+ * Une dépense sans date est rattachée au régime courant : c'est la seule
+ * hypothèse défendable, et l'écran signale par ailleurs que la date manque.
+ */
+export function contexteDepense(
+  faits: Faits,
+  maintenant: Date = new Date()
+): (d: Depense) => ContexteDepenses {
+  const courant = moisCourant(maintenant);
+  return (d) => ({
+    regimeTva: regimeTvaAu(faits, d.payeeLe === null ? courant : moisDe(d.payeeLe)),
+    banqueSynchronisee: faits.banqueReliee
+  });
+}
+
+/** Une dépense accompagnée de ce que le domaine en dit. */
+export interface LigneDepense {
+  readonly depense: Depense;
+  readonly tva: TvaDepense;
+  readonly rapprochement: EtatRapprochement;
+  readonly regimeTva: RegimeTva;
+}
+
+export interface EtatAchats {
+  readonly lignes: readonly LigneDepense[];
+  readonly resume: ResumeDepenses;
+  readonly banqueReliee: boolean;
+  /** Dépenses dont la date de paiement manque : ni exercice, ni régime. */
+  readonly sansDate: number;
+}
+
+/**
+ * L'état de l'écran Achats.
+ *
+ * Les dépenses sont rendues de la plus récente à la plus ancienne, celles sans
+ * date en tête : une dépense non datée est le premier problème à traiter, pas
+ * une ligne à reléguer en bas de liste.
+ */
+export function etatAchats(faits: Faits, maintenant: Date = new Date()): EtatAchats {
+  const contexte = contexteDepense(faits, maintenant);
+
+  const lignes = [...faits.depenses]
+    .sort(comparerParDate)
+    .map((depense) => {
+      const c = contexte(depense);
+      return {
+        depense,
+        tva: tvaDeDepense(depense, c),
+        rapprochement: rapprochementEffectif(depense, c),
+        regimeTva: c.regimeTva
+      };
+    });
+
+  return {
+    lignes,
+    resume: resumerDepenses(faits.depenses, contexte),
+    banqueReliee: faits.banqueReliee,
+    sansDate: faits.depenses.filter((d) => d.payeeLe === null).length
+  };
+}
+
+function comparerParDate(a: Depense, b: Depense): number {
+  if (a.payeeLe === null) return b.payeeLe === null ? 0 : -1;
+  if (b.payeeLe === null) return 1;
+  return b.payeeLe.localeCompare(a.payeeLe);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

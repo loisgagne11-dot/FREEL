@@ -43,7 +43,8 @@ const PALETTES = ['sombre', 'nuit', 'clair', 'calme'];
 const ECRANS = [
   { hash: '#/pilote', nom: 'pilote' },
   { hash: '#/argent', nom: 'argent' },
-  { hash: '#/outils', nom: 'outils' }
+  { hash: '#/outils', nom: 'outils' },
+  { hash: '#/achats', nom: 'achats' }
 ];
 
 const TYPES = {

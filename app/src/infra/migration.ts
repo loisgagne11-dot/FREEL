@@ -28,10 +28,10 @@
  * lisible : c'est la condition pour qu'il puisse cohabiter en lecture seule.
  */
 
-import { type DateISO, type Mois, type TypeActivite, euros } from '../domain/types';
+import { type DateISO, type Mois, type TypeActivite, euros, ratio } from '../domain/types';
 import {
   CLE_INSTANTANE_AVANT_MIGRATION, CLE_STOCKAGE, VERSION_SCHEMA,
-  type Client, type Faits, type Mission, type Recette,
+  type Client, type Depense, type Faits, type Mission, type Recette,
   entrepriseVide, faitsVides
 } from '../state/schema';
 
@@ -64,6 +64,7 @@ export interface RapportMigration {
     readonly clients: number;
     readonly missions: number;
     readonly recettes: number;
+    readonly depenses: number;
     readonly periodesDeclarees: number;
   };
   readonly anomalies: readonly Anomalie[];
@@ -183,6 +184,85 @@ function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[]
   return recettes;
 }
 
+/**
+ * Extrait les dépenses des mouvements de trésorerie de l'ancienne structure.
+ *
+ * L'ancien modèle ne connaissait pas la dépense : il avait des « mouvements »
+ * de trésorerie, dont certains de type `Charge`. Ces mouvements portaient un
+ * montant, une TVA déductible calculée à la saisie et un mois — mais **aucune
+ * pièce**, aucun fournisseur, aucune provenance. C'est ce que l'audit
+ * comptable relevait : la TVA était annoncée déductible sans qu'aucun
+ * justificatif n'existe nulle part.
+ *
+ * La migration ne peut pas inventer les pièces manquantes. Elle fait la seule
+ * chose honnête : reprendre les montants, poser `justificatifId: null`, et
+ * laisser le domaine en tirer la conséquence — cette TVA n'est pas
+ * récupérable tant que la pièce n'est pas déposée. L'écran Achats chiffre
+ * alors ce que l'absence de pièces coûte, au lieu de la passer sous silence.
+ */
+function extraireDepenses(mouvements: unknown[], anomalies: Anomalie[]): Depense[] {
+  const depenses: Depense[] = [];
+  mouvements.forEach((mvBrut, i) => {
+    const mv = objet(mvBrut);
+    if (texte(mv['type']) !== 'Charge') return;
+
+    // L'ancien modèle stockait le HT dans `montant` et le TTC à part, ce
+    // dernier n'étant renseigné que si la saisie s'était faite en TTC.
+    const ttc = nombre(mv['montantTTC']) || nombre(mv['montant']);
+    // `tvaRate` était en points de pourcentage (20), pas en ratio (0,20).
+    const taux = nombre(mv['tvaRate']) / 100;
+
+    const payeeLe = dateOuNull(mv['date']) ?? premierJourDuMois(texte(mv['mois']));
+    if (payeeLe === null) {
+      anomalies.push({
+        gravite: 'avertissement',
+        message: `Charge « ${texte(mv['description']) || i + 1} » sans date exploitable : `
+          + 'la date de paiement est à ressaisir. Sans elle, la dépense ne peut être '
+          + 'rattachée ni à un exercice, ni à un régime de TVA.'
+      });
+    }
+
+    depenses.push({
+      id: texte(mv['id']) || `dep-${i}`,
+      libelle: texte(mv['description']),
+      // Le fournisseur n'existait pas ; la catégorie en tient lieu le temps
+      // que l'utilisateur le renseigne. La perdre serait pire.
+      fournisseur: texte(mv['categorie']),
+      // Aucune provenance n'était saisie : tout est réputé français, ce qui
+      // était l'hypothèse implicite de l'ancienne application. Les achats
+      // hors de France sont à requalifier à la main.
+      provenance: 'france',
+      montantTtc: euros(ttc),
+      tauxTva: ratio(taux),
+      payeeLe,
+      justificatifId: null,
+      rapprochement: 'en_attente'
+    });
+  });
+
+  if (depenses.length > 0) {
+    anomalies.push({
+      gravite: 'avertissement',
+      message: `${depenses.length} charge(s) reprise(s) en dépenses, toutes sans `
+        + 'justificatif : l\'ancien modèle n\'en conservait aucun. La TVA de ces '
+        + 'dépenses n\'est pas récupérable tant que la pièce n\'est pas déposée.'
+    });
+  }
+  return depenses;
+}
+
+/**
+ * Repli sur le premier jour quand seul le mois était connu.
+ *
+ * Le mois est l'information que l'ancienne application saisissait réellement ;
+ * le premier du mois ne fabrique donc pas une période, il en choisit un jour à
+ * l'intérieur de celle qui était connue. Quand même le mois manque, la
+ * fonction rend `null` plutôt qu'une date d'apparence plausible.
+ */
+function premierJourDuMois(m: string): DateISO | null {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(m) ? `${m}-01` as DateISO : null;
+}
+
 function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: string[]): Faits {
   const c = objet(legacy['c']);
   const t = objet(legacy['t']);
@@ -232,8 +312,16 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
 
   // Champs de l'ancienne trésorerie qu'aucun champ du nouveau schéma n'accueille.
   // Ils sont listés au lieu d'être perdus en silence.
-  for (const champ of ['rendementActif', 'rendementTaux', 'rendementHistorique', 'actionsDone', 'paidCharges', 'conges', 'mouvements']) {
+  for (const champ of ['rendementActif', 'rendementTaux', 'rendementHistorique', 'actionsDone', 'paidCharges', 'conges']) {
     if (champ in t) champsNonRepris.push(`treasury.${champ}`);
+  }
+  // Des mouvements, seules les charges sont reprises — en dépenses. Les autres
+  // (salaires, apports) n'ont pas encore de place dans le nouveau schéma, et
+  // le taire les ferait disparaître sans trace.
+  const mouvements = tableau(t['mouvements']);
+  const depenses = extraireDepenses(mouvements, anomalies);
+  if (mouvements.length > depenses.length) {
+    champsNonRepris.push('treasury.mouvements (hors charges)');
   }
 
   return {
@@ -262,6 +350,11 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     clients,
     missions,
     recettes: extraireRecettes(missionsBrutes, anomalies),
+    depenses,
+    // L'ancienne application rapprochait contre un relevé importé à la main,
+    // jamais contre un compte relié. Aucun fait ne permet de dire qu'un compte
+    // l'est : on part de `false`, l'utilisateur le renseignera.
+    banqueReliee: false,
     soldeInitial: euros(nombre(t['soldeInitial'])),
     // La réserve unifiée (D4) reprend le plancher de compte de l'ancienne
     // version, seule des trois implémentations concurrentes à être un montant.
@@ -283,7 +376,7 @@ export function analyser(stockage: Stockage): RapportMigration {
   if (legacy === null) {
     return {
       aDesDonneesLegacy: false, dejaMigre,
-      comptes: { clients: 0, missions: 0, recettes: 0, periodesDeclarees: 0 },
+      comptes: { clients: 0, missions: 0, recettes: 0, depenses: 0, periodesDeclarees: 0 },
       anomalies: stockage.getItem(CLE_BUNDLE_LEGACY) !== null
         ? [{ gravite: 'bloquante', message: 'Données de l\'ancienne application illisibles (JSON invalide).' }]
         : [],
@@ -309,6 +402,7 @@ export function analyser(stockage: Stockage): RapportMigration {
       clients: faits.clients.length,
       missions: faits.missions.length,
       recettes: faits.recettes.length,
+      depenses: faits.depenses.length,
       periodesDeclarees: faits.periodesDeclarees.length
     },
     anomalies,
@@ -437,6 +531,18 @@ export function verifierAbsenceDePerte(legacy: Inconnu, faits: Faits): readonly 
   const totalSortie = faits.recettes.reduce<number>((s, r) => s + r.montant, 0);
   if (Math.abs(totalEntree - totalSortie) > 0.01) {
     pertes.push(`Montant total des recettes : ${totalEntree} en entrée, ${totalSortie} en sortie.`);
+  }
+
+  // Les charges de l'ancienne trésorerie deviennent des dépenses. Le contrôle
+  // porte sur le nombre, pas sur le montant : le TTC reconstitué diffère
+  // légitimement du HT stocké côté legacy, et comparer les deux ferait crier à
+  // la perte alors que rien n'est perdu.
+  const chargesBrutes = tableau(objet(legacy['t'])['mouvements'])
+    .filter((mv) => texte(objet(mv)['type']) === 'Charge');
+  if (faits.depenses.length !== chargesBrutes.length) {
+    pertes.push(
+      `Dépenses : ${chargesBrutes.length} charges en entrée, ${faits.depenses.length} en sortie.`
+    );
   }
 
   return pertes;
