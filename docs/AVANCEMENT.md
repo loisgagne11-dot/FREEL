@@ -15,7 +15,7 @@ Tout ce qui est décrit ci-dessous est donc **sur `main`** et déployé : l'audi
 le plan, les corrections J0 de l'app existante, et le socle de la nouvelle
 application sous `app/`.
 
-**Sanité au moment de la reprise** — `cd app && npm run verifier` : 170 tests,
+**Sanité au moment de la reprise** — `cd app && npm run verifier` : 189 tests,
 typage strict, build à 198 Ko / 63 Ko gzippé, 20 combinaisons responsive
 conformes. Si l'un de ces chiffres a baissé, quelque chose a régressé.
 
@@ -197,10 +197,17 @@ tests verts.
 - [ ] Matrice Playwright + **assertion de zéro débordement horizontal à 390 px**
 
 ### J3 · Pilote + Outils
+- [x] ~~Écran Pilote, zéro nombre en dur~~ — **fait.** Couche d'état
+      (`state/store.ts`, un seul écrivain par fait) et sélecteurs
+      (`state/selecteurs.ts`, aucun dérivé stocké). Curseur de réserve = seule
+      source de la réserve (D4). Vérification de bout en bout dans un vrai
+      navigateur : données de l'ancien format migrées, affichées, provisions
+      volet 2 comprises, idempotence au rechargement.
 - [ ] Primitives d'UI accessibles : `role="dialog"`, piège de focus, sémantique
-      d'onglets, région live, cibles tactiles 44 px (le `.info` du design est à 18)
+      d'onglets, région live (le `.info` du design est à 18 px, cible à 44)
 - [ ] `allTodos()` réel (partir de `computeAlerts` de l'ancienne app)
-- [ ] Écran Pilote, zéro nombre en dur
+- [ ] Mouvements bancaires : `selecteurs.solde()` renvoie pour l'instant le seul
+      solde initial. Un seul endroit à changer, volontairement isolé
 - [ ] Outils remonté ici : l'écran le moins cher prouve le noyau tôt
 - [ ] Comparateur micro-BNC vs déclaration contrôlée **avant le 30/09**
 
