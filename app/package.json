@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "verifier:responsive": "node scripts/verifier-responsive.mjs",
     "verifier:responsive:captures": "node scripts/verifier-responsive.mjs --captures",
-    "verifier": "npm run typecheck && npm test && npm run build && npm run verifier:responsive"
+    "verifier": "npm run typecheck && npm test && npm run build && npm run verifier:responsive && npm run verifier:migration",
+    "verifier:migration": "node scripts/verifier-migration-bout-en-bout.mjs"
   },
   "dependencies": {
     "react": "^19.2.0",

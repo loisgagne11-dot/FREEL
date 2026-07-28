@@ -1,0 +1,238 @@
+/* Écran Pilote.
+   Aucune couleur en dur : tout passe par les tokens, pour que les 4 palettes
+   fonctionnent sans retouche. Mobile-first en couches min-width. */
+
+.entete {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.titre {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.periode {
+  color: var(--muted);
+  font-size: 12.5px;
+  text-transform: capitalize;
+}
+
+/* ---------- bandeaux ---------- */
+
+.bandeau {
+  border-radius: var(--r-sm);
+  padding: 11px 13px;
+  border: 1px solid var(--line-2);
+  background: var(--tint-2);
+}
+
+.bandeauInfo {
+  border-color: var(--green-line);
+  background: var(--green-glow);
+}
+
+.bandeauAlerte {
+  border-color: var(--amber-line);
+  background: var(--amber-soft);
+}
+
+.bandeauTitre {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.bandeauCorps {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.motifs {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+/* ---------- le chiffre principal ---------- */
+
+.versable {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+  box-shadow: var(--sh-2);
+}
+
+.montantPrincipal {
+  font-size: clamp(34px, 11vw, 46px);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  font-weight: 640;
+  color: var(--green);
+  /* `tabular-nums` évite que le chiffre saute pendant le glissement du
+     curseur de réserve : sans lui, la largeur varie à chaque valeur. */
+  font-variant-numeric: tabular-nums;
+  margin: 4px 0 2px;
+}
+
+.libelle {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.sousLigne {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.note {
+  color: var(--muted-2);
+}
+
+/* ---------- rangée de chiffres ---------- */
+
+.grille {
+  display: grid;
+  /* `auto-fit` avec un minimum : deux colonnes sur mobile, quatre en desktop,
+     sans media query et sans jamais déborder. */
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.chiffre {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  min-width: 0;
+}
+
+.montant {
+  font-size: 19px;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.attention { color: var(--amber); }
+.danger { color: var(--red); }
+
+/* ---------- cartes ---------- */
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+}
+
+.titreCarte {
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.aideCarte {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ligne:last-child { border-bottom: none; }
+
+.ligne dd {
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.total {
+  border-top: 1px solid var(--line-2);
+  margin-top: 3px;
+  padding-top: 11px;
+}
+
+.total dt, .total dd { color: var(--text); }
+
+.aide {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted-2);
+  margin-top: 2px;
+}
+
+/* ---------- curseur ---------- */
+
+.curseurRangee {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.curseur {
+  flex: 1;
+  min-width: 0;
+  /* Hauteur de la zone cliquable portée à 44 px : la piste reste fine
+     visuellement, mais la cible tactile respecte le minimum. */
+  height: 44px;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+.curseur:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+
+.curseurValeur {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  min-width: 5.5ch;
+  text-align: right;
+}
+
+/* ---------- desktop : portées de colonnes dans la grille 12 de la coquille ---------- */
+
+@media (min-width: 761px) {
+  .entete { grid-column: 1 / -1; }
+  .bandeau { grid-column: 1 / -1; }
+  .versable { grid-column: 1 / span 5; }
+  .grille { grid-column: 6 / -1; align-content: start; }
+  .carte { grid-column: span 6; }
+}
