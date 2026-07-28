@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover : nécessaire pour que les safe-area-inset-*
+         (encoche/bord arrondi iOS) soient exploitables sous le dock de
+         nav flottant. Jamais user-scalable=no : casserait le zoom, une
+         régression d'accessibilité que le design n'impose pas. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Freel</title>
+    <link rel="stylesheet" href="/src/styles/tokens.css" />
+    <link rel="stylesheet" href="/src/styles/base.css" />
+    <!-- Applique le thème persisté avant le premier rendu, pour éviter le
+         flash du thème par défaut le temps que React monte. Logique
+         reprise à l'identique du design (README du handoff §thème) :
+         mêmes clé de stockage et repli que ui/theme.ts. -->
+    <script>
+      try {
+        document.documentElement.setAttribute('data-theme', localStorage.getItem('freel-v111-theme') || 'sombre');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'sombre');
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

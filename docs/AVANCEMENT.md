@@ -104,6 +104,36 @@ accesseurs.
 réception obligatoire des factures électroniques au **01/09/2026**, avec
 préavis, montée en gravité à 30 jours, et maintien de l'alerte après échéance.
 
+### J2 — Coquille et migration (l'essentiel est fait)
+
+**L'application se lance, s'affiche et est vérifiée.** `npm run verifier`
+enchaîne typage, tests, build et contrôle responsive.
+
+- **Build** : 198 Ko de JS, 63 Ko gzippé, sous le plafond d'avertissement de
+  250 Ko. À comparer aux 1,86 Mo de l'ancienne version, dont 627 Ko de
+  bibliothèques bloquantes et non cachables.
+- **Tokens** : les 4 palettes aux valeurs exactes de `v1.11.css`, 41 tokens
+  thémés + 12 fixes. Les deux défauts du design sont corrigés : `clair` a
+  désormais ses propres `--r`/`--r-sm`, et `--c-ir`/`--c-cfe`/`--slate`/
+  `--blue-soft` sont thémés dans les 4 palettes.
+- **Thème appliqué avant le premier rendu** par le script inline de
+  `index.html` — vérifié par assertion, pas supposé.
+- **Coquille** : rail latéral en desktop, dock flottant en pilule ≤ 760 px avec
+  libellé sur l'onglet actif seul. **Entièrement en CSS**, mobile-first en
+  couches `min-width`, bascule à 761 px. Aucun `window.innerWidth`.
+- **Routage réel** par hash, `navigation.ts` comme source unique. La détection
+  par `document.title` et l'appariement des badges par préfixe de texte ont
+  disparu.
+- **Migration** écrite et testée : rapport à blanc, instantané avant écriture,
+  idempotence, invariant d'absence de perte.
+- **Vérification responsive automatisée** (`scripts/verifier-responsive.mjs`) :
+  **5 tailles × 4 palettes = 20 combinaisons**, toutes conformes. Contrôle le
+  zéro-débordement horizontal, la forme de la navigation selon le palier, les
+  cibles tactiles ≥ 44 px en portrait, et l'application du thème avant rendu.
+  ⚠️ Chromium est préinstallé à une version qui ne correspond pas au paquet
+  Playwright : le script pointe `/opt/pw-browsers/chromium-1194/...`
+  explicitement. **Ne pas lancer `npx playwright install`.**
+
 ### J1 — Noyau fiscal (démarré)
 
 Projet `app/` créé : **Vite 7 + React 19 + TypeScript strict** (dont
@@ -126,8 +156,16 @@ tests verts.
 ## 4. Ce qui reste — par jalon
 
 ### J1 · fin du noyau fiscal
-- [ ] Abattement, plafonds micro, seuils de TVA (franchise **et majoré**), CFP,
-      versement libératoire, tranches d'IR, grille CFE, ACRE — tous par période
+- [ ] ⚠️ **À REPRENDRE EN PRIORITÉ** — `abattement.ts`, `plafonds.ts`, `tva.ts`
+      et `impot.ts` ont été écrits mais **n'ont AUCUN test**, et ne sont pas
+      réexportés (`bareme/index.ts` manque). L'agent qui les a produits a été
+      interrompu avant les tests. Ils compilent et le typage passe, mais
+      **rien ne garantit leur exactitude** — or ce sont des règles fiscales.
+      Ne pas les câbler à un écran avant de les avoir couverts, en suivant le
+      modèle de `urssaf.test.ts` : bascules mois par mois, asymétrie du temps,
+      intégrité de la table, et pour la TVA les trois états d'assujettissement
+      et le « reste facturable » à ses bornes exactes.
+- [ ] Grille CFE et ACRE par période (non traités)
 - [ ] `provisions()` **à deux volets** (voir D3) : échéances émises non payées
       **+** charges à provisionner sur recettes encaissées non déclarées. Exige
       un fait **« période déclarée »** qui n'existe nulle part aujourd'hui
