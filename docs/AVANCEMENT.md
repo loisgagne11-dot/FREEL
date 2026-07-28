@@ -5,9 +5,19 @@ premier, avant tout autre document. Il est mis à jour à chaque fin de lot de
 travail. Si son contenu contredit un autre document, c'est lui qui fait foi
 sur l'état d'avancement — les autres font foi sur les décisions.
 
-**Dernière mise à jour** : 27 juillet 2026
-**Branche de travail** : `claude/orchestration-redesign-screens-0ee3sz`
-**PR ouverte** : [#245](https://github.com/loisgagne11-dot/FREEL/pull/245)
+**Dernière mise à jour** : 28 juillet 2026
+**Branche de travail** : `claude/orchestration-redesign-screens-0ee3sz`, repartie de `main`
+**PR #245** : **MERGÉE.** Elle est close, elle ne peut plus porter de travail —
+toute suite donne lieu à une **nouvelle** PR. Ne pas y ajouter de commits, ne
+pas la rouvrir.
+
+Tout ce qui est décrit ci-dessous est donc **sur `main`** et déployé : l'audit,
+le plan, les corrections J0 de l'app existante, et le socle de la nouvelle
+application sous `app/`.
+
+**Sanité au moment de la reprise** — `cd app && npm run verifier` : 85 tests,
+typage strict, build à 198 Ko / 63 Ko gzippé, 20 combinaisons responsive
+conformes. Si l'un de ces chiffres a baissé, quelque chose a régressé.
 
 ---
 
