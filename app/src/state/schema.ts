@@ -13,6 +13,18 @@
  */
 
 import type { DateISO, Euros, Mois, TypeActivite } from '../domain/types';
+import type { Depense } from '../domain/calculs/depenses';
+
+/**
+ * La dépense est définie par le domaine, pas par le schéma.
+ *
+ * C'est le sens de la dépendance qui compte : les règles de TVA déductible
+ * énoncent ce qu'une dépense doit porter (un identifiant de pièce, pas un
+ * booléen ; une provenance, pas une supposition), et le stockage suit. Dans
+ * l'autre sens, on stockerait une forme commode dont les règles devraient
+ * ensuite s'accommoder.
+ */
+export type { Depense };
 
 export const VERSION_SCHEMA = 1 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
@@ -88,6 +100,15 @@ export interface Faits {
   readonly clients: readonly Client[];
   readonly missions: readonly Mission[];
   readonly recettes: readonly Recette[];
+  readonly depenses: readonly Depense[];
+  /**
+   * `true` quand des opérations bancaires sont disponibles pour rapprocher.
+   *
+   * Fait, et non déduction : sans lui, une dépense marquée « rapprochée » sous
+   * une ancienne configuration continuerait de s'afficher comme telle après la
+   * déconnexion du compte, en affirmant un contrôle qui n'a plus lieu.
+   */
+  readonly banqueReliee: boolean;
   readonly soldeInitial: Euros;
   /** Matelas de sécurité, montant absolu. Source unique (D4). */
   readonly reserve: Euros;
@@ -111,7 +132,7 @@ export function faitsVides(): Faits {
   return {
     version: VERSION_SCHEMA,
     entreprise: entrepriseVide(),
-    clients: [], missions: [], recettes: [],
+    clients: [], missions: [], recettes: [], depenses: [], banqueReliee: false,
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     periodesDeclarees: [], configImpotBrute: {}
   };

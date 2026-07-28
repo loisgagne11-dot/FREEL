@@ -18,7 +18,8 @@
 
 import { create } from 'zustand';
 import { type Euros, type Mois, euros } from '../domain/types';
-import { CLE_STOCKAGE, type Faits, faitsVides } from './schema';
+import { CLE_STOCKAGE, type Depense, type Faits, faitsVides } from './schema';
+import type { EtatRapprochement } from '../domain/calculs/depenses';
 import { type Stockage, migrer } from '../infra/migration';
 
 /** Le stockage du navigateur, ou `null` quand il est indisponible. */
@@ -64,6 +65,32 @@ interface MagasinFaits {
    */
   readonly marquerPeriodeDeclaree: (m: Mois) => void;
   readonly annulerPeriodeDeclaree: (m: Mois) => void;
+
+  /* ── Dépenses ─────────────────────────────────────────────────────────── */
+
+  /**
+   * Ajoute une dépense. L'identifiant est attribué ici, jamais par l'écran :
+   * deux écrans qui les fabriqueraient chacun de leur côté finiraient par en
+   * produire deux identiques.
+   */
+  readonly ajouterDepense: (saisie: Omit<Depense, 'id'>) => string;
+  readonly modifierDepense: (id: string, modification: Partial<Omit<Depense, 'id'>>) => void;
+  readonly supprimerDepense: (id: string) => void;
+
+  /**
+   * Rattache une pièce à une dépense — ou la détache avec `null`.
+   *
+   * C'est la seule action qui rend une TVA récupérable, et c'est voulu :
+   * l'invariant « pas de TVA récupérable sans pièce » n'est pas contournable
+   * par une autre porte.
+   */
+  readonly attacherJustificatif: (id: string, justificatifId: string | null) => void;
+
+  /** Corrige l'état de rapprochement d'une dépense. */
+  readonly definirRapprochement: (id: string, etat: EtatRapprochement) => void;
+
+  /** Déclare qu'un relevé bancaire est disponible pour rapprocher. */
+  readonly definirBanqueReliee: (reliee: boolean) => void;
 }
 
 /**
@@ -162,5 +189,65 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     };
     set({ faits });
     persister(stockageActif, faits);
+  },
+
+  ajouterDepense: (saisie) => {
+    const actuel = get().faits;
+    const id = identifiantDepense(actuel.depenses);
+    const faits: Faits = { ...actuel, depenses: [...actuel.depenses, { ...saisie, id }] };
+    set({ faits });
+    persister(stockageActif, faits);
+    return id;
+  },
+
+  modifierDepense: (id, modification) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      // `id` est retiré de la modification par le type : une dépense ne change
+      // pas d'identité, sinon les pièces qui la référencent la perdent.
+      depenses: actuel.depenses.map((d) => (d.id === id ? { ...d, ...modification } : d))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  supprimerDepense: (id) => {
+    const actuel = get().faits;
+    const faits: Faits = { ...actuel, depenses: actuel.depenses.filter((d) => d.id !== id) };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  attacherJustificatif: (id, justificatifId) => {
+    get().modifierDepense(id, { justificatifId });
+  },
+
+  definirRapprochement: (id, etat) => {
+    get().modifierDepense(id, { rapprochement: etat });
+  },
+
+  definirBanqueReliee: (reliee) => {
+    const faits: Faits = { ...get().faits, banqueReliee: reliee };
+    set({ faits });
+    persister(stockageActif, faits);
   }
 }));
+
+/**
+ * Identifiant d'une nouvelle dépense.
+ *
+ * L'horloge seule ne suffit pas : deux ajouts dans la même milliseconde — un
+ * import de plusieurs lignes, par exemple — produiraient le même identifiant,
+ * et la seconde dépense écraserait la première à la relecture. Le suffixe
+ * aléatoire rend la collision négligeable, et le préfixe temporel garde
+ * l'ordre de création lisible.
+ */
+function identifiantDepense(existantes: readonly Depense[]): string {
+  const connus = new Set(existantes.map((d) => d.id));
+  let id = '';
+  do {
+    id = `dep-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  } while (connus.has(id));
+  return id;
+}
