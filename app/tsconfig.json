@@ -5,7 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
 
     /* Strictesse maximale. Ce projet manipule des règles fiscales : une
        valeur potentiellement absente doit être traitée comme telle, et un

@@ -1,0 +1,217 @@
+/* Écran Outils. Mêmes règles que Pilote : aucune couleur en dur, mobile-first. */
+
+.entete {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.titre {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.periode {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+/* ---------- saisie ---------- */
+
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.libelleChamp {
+  font-size: 12.5px;
+  color: var(--text);
+  font-weight: 540;
+}
+
+.saisie {
+  /* 44 px de hauteur : la cible tactile minimale s'applique aussi aux champs. */
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-3);
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  /* 16 px minimum évite le zoom automatique de Safari iOS à la mise au point ;
+     on reste au-dessus via la taille de police effective du champ. */
+  font-family: inherit;
+}
+
+.saisie:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+  border-color: var(--green-line);
+}
+
+.aideChamp {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.attente {
+  font-size: 12.5px;
+  color: var(--muted-2);
+}
+
+/* ---------- résultats ---------- */
+
+.refus {
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--amber-line);
+  background: var(--amber-soft);
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.refus strong { color: var(--text); }
+
+.hypothese {
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--tint-2);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.resultats {
+  display: flex;
+  flex-direction: column;
+}
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ligne:last-child { border-bottom: none; }
+
+.ligne dd {
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.total {
+  border-top: 1px solid var(--line-2);
+  margin-top: 3px;
+  padding-top: 11px;
+}
+
+.total dt { color: var(--text); }
+.total dd { color: var(--green); font-size: 17px; }
+
+.actionDetail {
+  margin-top: 14px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--tint-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.actionDetail:hover { background: var(--tint-3); }
+
+.actionDetail:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* ---------- table du détail, dans le panneau ---------- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.legende {
+  text-align: left;
+  font-size: 12px;
+  color: var(--muted);
+  padding-bottom: 8px;
+}
+
+.table th {
+  text-align: right;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  font-weight: 500;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.table th:first-child, .table td:first-child { text-align: left; }
+
+.table td {
+  text-align: right;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+
+/* Une tranche non atteinte reste visible — elle explique le barème — mais
+   estompée, pour qu'on voie d'un coup d'œil où s'arrête l'imposition. */
+.ligneInactive td { color: var(--muted-2); }
+
+.source {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  line-height: 1.5;
+}
+
+@media (min-width: 761px) {
+  .entete { grid-column: 1 / -1; }
+  .carte { grid-column: 1 / span 7; }
+}

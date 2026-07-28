@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check file size
         run: |
@@ -53,12 +53,30 @@ jobs:
           echo "HTML structure validation passed"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
 
       - name: Run smoke tests
         run: node tests/smoke-test.js
+
+      # La nouvelle application est vérifiée ICI, sur les pull requests, et
+      # non seulement au déploiement. Sans cela le vert de cette validation ne
+      # dirait rien de app/ : une régression du noyau fiscal ne serait
+      # découverte qu'après la fusion, une fois sur main.
+      - name: Install app dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Typecheck and test the new app
+        working-directory: app
+        run: npm run typecheck && npm test
+
+      - name: Build the new app
+        working-directory: app
+        run: npm run build
 
       - name: Check no secrets committed
         run: |

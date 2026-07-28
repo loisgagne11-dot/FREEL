@@ -35,6 +35,17 @@ const TAILLES = [
 
 const PALETTES = ['sombre', 'nuit', 'clair', 'calme'];
 
+/**
+ * Les écrans réellement construits. Ne tester que l'accueil laissait les autres
+ * hors contrôle : un débordement horizontal sur Argent, l'écran le plus dense,
+ * n'aurait été vu par personne.
+ */
+const ECRANS = [
+  { hash: '#/pilote', nom: 'pilote' },
+  { hash: '#/argent', nom: 'argent' },
+  { hash: '#/outils', nom: 'outils' }
+];
+
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -92,7 +103,12 @@ for (const taille of TAILLES) {
     }, palette);
 
     const page = await contexte.newPage();
-    await page.goto(base, { waitUntil: 'networkidle' });
+
+    for (const ecran of ECRANS) {
+    await page.goto(base + ecran.hash, { waitUntil: 'networkidle' });
+    // Les écrans autres que l'accueil sont chargés à la demande : on attend que
+    // leur titre soit rendu, sinon on mesurerait l'écran d'attente.
+    await page.waitForSelector('h1', { timeout: 10000 });
 
     const mesures = await page.evaluate(() => {
       const nav = document.querySelector('nav');
@@ -112,7 +128,7 @@ for (const taille of TAILLES) {
       };
     });
 
-    const prefixe = `[${palette}]`;
+    const prefixe = `[${palette}/${ecran.nom}]`;
     constate(mesures.theme === palette, `${prefixe} thème appliqué avant le rendu`);
     // Le point dur : zéro débordement horizontal. Une tolérance de 1 px
     // absorbe les arrondis de rendu, pas une colonne trop large.
@@ -135,8 +151,9 @@ for (const taille of TAILLES) {
 
     if (AVEC_CAPTURES) {
       await page.screenshot({
-        path: new URL(`../captures/${taille.nom}-${palette}.png`, import.meta.url).pathname
+        path: new URL(`../captures/${taille.nom}-${palette}-${ecran.nom}.png`, import.meta.url).pathname
       });
+    }
     }
     await contexte.close();
   }
@@ -147,7 +164,10 @@ serveur.close();
 
 console.log(`\n${'═'.repeat(52)}`);
 if (echecs.length === 0) {
-  console.log(`✅ ${TAILLES.length} tailles × ${PALETTES.length} palettes : tout est conforme`);
+  console.log(
+    `✅ ${TAILLES.length} tailles × ${PALETTES.length} palettes × ${ECRANS.length} écrans `
+    + `= ${TAILLES.length * PALETTES.length * ECRANS.length} combinaisons : tout est conforme`
+  );
 } else {
   console.log(`❌ ${echecs.length} échec(s) :`);
   echecs.forEach((e) => console.log(`   · ${e}`));

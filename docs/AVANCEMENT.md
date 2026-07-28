@@ -15,9 +15,20 @@ Tout ce qui est décrit ci-dessous est donc **sur `main`** et déployé : l'audi
 le plan, les corrections J0 de l'app existante, et le socle de la nouvelle
 application sous `app/`.
 
-**Sanité au moment de la reprise** — `cd app && npm run verifier` : 85 tests,
-typage strict, build à 198 Ko / 63 Ko gzippé, 20 combinaisons responsive
-conformes. Si l'un de ces chiffres a baissé, quelque chose a régressé.
+**Sanité au moment de la reprise** — `cd app && npm run verifier` enchaîne
+typage, tests, build, contrôle responsive et migration de bout en bout. Repères
+au dernier passage :
+
+| Repère | Valeur |
+|---|---|
+| Tests | **263** |
+| Build | **233 Ko** d'entrée, 74 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko) |
+| Responsive | **60 combinaisons** (5 tailles × 4 palettes × 3 écrans) |
+| Migration | conforme |
+
+Un nombre de tests en baisse, ou un build qui franchit 250 Ko, signale une
+régression. Le poids monte à mesure que les écrans arrivent : le tenir sous le
+plafond fait partie du travail, pas de l'optimisation tardive.
 
 ---
 
@@ -166,15 +177,10 @@ tests verts.
 ## 4. Ce qui reste — par jalon
 
 ### J1 · fin du noyau fiscal
-- [ ] ⚠️ **À REPRENDRE EN PRIORITÉ** — `abattement.ts`, `plafonds.ts`, `tva.ts`
-      et `impot.ts` ont été écrits mais **n'ont AUCUN test**, et ne sont pas
-      réexportés (`bareme/index.ts` manque). L'agent qui les a produits a été
-      interrompu avant les tests. Ils compilent et le typage passe, mais
-      **rien ne garantit leur exactitude** — or ce sont des règles fiscales.
-      Ne pas les câbler à un écran avant de les avoir couverts, en suivant le
-      modèle de `urssaf.test.ts` : bascules mois par mois, asymétrie du temps,
-      intégrité de la table, et pour la TVA les trois états d'assujettissement
-      et le « reste facturable » à ses bornes exactes.
+- [x] ~~Abattement, plafonds, TVA, impôt~~ — **fait et couvert.** 82 tests
+      ajoutés, `bareme/index.ts` en place avec `verifierIntegriteBareme()`.
+      Tests éprouvés par mutation : réintroduire le facteur `× 1,56` déclenche
+      2 échecs, inverser la borne du seuil majoré 1 échec.
 - [ ] Grille CFE et ACRE par période (non traités)
 - [ ] `provisions()` **à deux volets** (voir D3) : échéances émises non payées
       **+** charges à provisionner sur recettes encaissées non déclarées. Exige
@@ -202,16 +208,35 @@ tests verts.
 - [ ] Matrice Playwright + **assertion de zéro débordement horizontal à 390 px**
 
 ### J3 · Pilote + Outils
-- [ ] Primitives d'UI accessibles : `role="dialog"`, piège de focus, sémantique
-      d'onglets, région live, cibles tactiles 44 px (le `.info` du design est à 18)
-- [ ] `allTodos()` réel (partir de `computeAlerts` de l'ancienne app)
-- [ ] Écran Pilote, zéro nombre en dur
+- [x] ~~Écran Pilote, zéro nombre en dur~~ — **fait.** Couche d'état
+      (`state/store.ts`, un seul écrivain par fait) et sélecteurs
+      (`state/selecteurs.ts`, aucun dérivé stocké). Curseur de réserve = seule
+      source de la réserve (D4). Vérification de bout en bout dans un vrai
+      navigateur : données de l'ancien format migrées, affichées, provisions
+      volet 2 comprises, idempotence au rechargement.
+- [x] ~~Primitives d'UI accessibles~~ — **Sheet** (dialogue modal, piège de
+      focus dans les deux sens, Échap, voile, restitution du focus, verrou de
+      défilement) et **Info** (motif « i », cible 44 px au lieu de 18,
+      `aria-describedby`, clic garanti au clavier). 22 tests en jsdom, éprouvés
+      par mutation. Restent à faire : sémantique d'onglets ARIA et région live
+      pour les toasts.
+- [x] ~~`allTodos()` réel~~ — **fait**, `domain/calculs/aTraiter.ts`, 26 tests.
+- [x] ~~Écran Outils~~ — **fait.** Simulateur d'IR câblé sur le barème
+      (abattement, tranches, calcul progressif), détail par tranche dans le
+      panneau latéral, hypothèse affichée quand les tranches ne sont pas
+      publiées pour la période.
+- [ ] Mouvements bancaires : `selecteurs.solde()` renvoie pour l'instant le seul
+      solde initial. Un seul endroit à changer, volontairement isolé
 - [ ] Outils remonté ici : l'écran le moins cher prouve le noyau tôt
 - [ ] Comparateur micro-BNC vs déclaration contrôlée **avant le 30/09**
 
 ### J4 · Argent
-- [ ] Les 9 graphes Chart.js → SVG maison ; jsPDF différé ; retirer les méta anti-cache
+- [x] ~~Écran Argent~~ — **fait.** Deux sections en onglets ARIA, enveloppes de
+      provision à deux volets, chiffre d'affaires mois par mois.
+- [x] ~~Graphes Chart.js → SVG~~ — `GrapheBarres`, sans dépendance, avec la
+      donnée doublée en tableau accessible.
 - [ ] Cycle d'échéance enrichi (à déclarer → déclarée → payée, daté)
+- [ ] jsPDF différé ; retirer les méta anti-cache (concerne le legacy)
 
 ### J5 · Achats, Activité, Config
 - [ ] Justificatifs sur **IndexedDB**, invariant « pas de TVA sans pièce »
