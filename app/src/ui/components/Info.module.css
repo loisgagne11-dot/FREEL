@@ -1,0 +1,101 @@
+/* Motif « texte replié derrière un i ». */
+
+.enveloppe {
+  display: inline;
+  position: relative;
+}
+
+/* La cible atteignable fait 44 px, alors que le rond visible en fait 18 :
+   on agrandit la zone sans grossir le dessin. `vertical-align: middle` évite
+   que ce bouton haut de 44 px n'écarte les lignes du paragraphe. */
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -13px -13px -13px -3px;
+  vertical-align: middle;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: help;
+}
+
+.rond {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 100px;
+  border: 1px solid var(--line-2);
+  background: var(--tint-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.bouton:hover .rond,
+.bouton[aria-expanded='true'] .rond {
+  border-color: var(--green-line);
+  background: var(--green-glow);
+  color: var(--green);
+}
+
+.bouton:focus-visible {
+  outline: none;
+}
+
+.bouton:focus-visible .rond {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* Replié par défaut. `clip-path` plutôt que `display: none` : l'élément reste
+   dans l'arbre d'accessibilité, ce qui permet à `aria-describedby` de le
+   désigner et à un lecteur d'écran de le lire à la demande. */
+.texte {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-3);
+  box-shadow: var(--sh-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.5;
+  text-transform: none;
+  letter-spacing: normal;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .texte { transition: none; }
+}
+
+/* Survol : confort, sur les pointeurs qui en ont un. */
+@media (hover: hover) {
+  .enveloppe:hover .texte {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Clic ou clavier : le chemin garanti, sur tous les appareils. */
+.fige {
+  opacity: 1;
+  pointer-events: auto;
+}
