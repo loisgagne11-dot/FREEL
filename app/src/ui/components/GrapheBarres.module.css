@@ -1,0 +1,85 @@
+/* Graphe à barres en SVG. Aucune dépendance, aucune couleur en dur. */
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.titre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.015em;
+}
+
+.legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.entreeLegende {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pastille {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.trace {
+  width: 100%;
+  /* Hauteur fixe et `preserveAspectRatio: none` : le graphe s'étire en largeur
+     sans grandir en hauteur, donc il ne pousse jamais la page en portrait. */
+  height: 180px;
+  display: block;
+  overflow: visible;
+}
+
+.valeur {
+  fill: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  /* Le SVG est étiré horizontalement par `preserveAspectRatio: none`, ce qui
+     déformerait le texte. `vector-effect` ne s'applique pas au texte, donc on
+     laisse la déformation minime : la hauteur du viewBox correspond aux pixels
+     réels, seule la largeur varie. */
+}
+
+.categorie {
+  fill: var(--muted-2);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+/* Masqué visuellement, présent dans le DOM et l'arbre d'accessibilité.
+   `display: none` ou `visibility: hidden` le retireraient des lecteurs
+   d'écran, ce qui annulerait tout l'intérêt de ce tableau. */
+.tableauMasque {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Repère d'échelle affiché quand les étiquettes par barre ne tiennent pas. */
+.repere {
+  fill: var(--muted-2);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}

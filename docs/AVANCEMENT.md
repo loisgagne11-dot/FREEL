@@ -21,9 +21,9 @@ au dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **237** |
-| Build | **237 Ko**, 75 Ko gzippé (plafond d'avertissement à 250 Ko) |
-| Responsive | **20 combinaisons** (5 tailles × 4 palettes) |
+| Tests | **263** |
+| Build | **233 Ko** d'entrée, 74 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko) |
+| Responsive | **60 combinaisons** (5 tailles × 4 palettes × 3 écrans) |
 | Migration | conforme |
 
 Un nombre de tests en baisse, ou un build qui franchit 250 Ko, signale une
@@ -231,8 +231,12 @@ tests verts.
 - [ ] Comparateur micro-BNC vs déclaration contrôlée **avant le 30/09**
 
 ### J4 · Argent
-- [ ] Les 9 graphes Chart.js → SVG maison ; jsPDF différé ; retirer les méta anti-cache
+- [x] ~~Écran Argent~~ — **fait.** Deux sections en onglets ARIA, enveloppes de
+      provision à deux volets, chiffre d'affaires mois par mois.
+- [x] ~~Graphes Chart.js → SVG~~ — `GrapheBarres`, sans dépendance, avec la
+      donnée doublée en tableau accessible.
 - [ ] Cycle d'échéance enrichi (à déclarer → déclarée → payée, daté)
+- [ ] jsPDF différé ; retirer les méta anti-cache (concerne le legacy)
 
 ### J5 · Achats, Activité, Config
 - [ ] Justificatifs sur **IndexedDB**, invariant « pas de TVA sans pièce »

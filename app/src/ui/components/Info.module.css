@@ -1,13 +1,33 @@
-/* Motif « texte replié derrière un i ». */
+/* Motif « texte replié derrière un i ».
+   ─────────────────────────────────────────────────────────────────────────
+   ÉCART ASSUMÉ PAR RAPPORT AU DESIGN, ET POURQUOI
+
+   Le design décrit une infobulle : survol pour révéler, clic pour figer. Une
+   première implémentation l'a rendue en `position: absolute`, large de 320 px
+   et ancrée au bouton. Elle causait un débordement horizontal réel, détecté
+   par la vérification automatisée : sur un écran de 360 px, l'écran Argent
+   mesurait 541 px de large. Un élément absolument positionné compte dans la
+   largeur du document même à `opacity: 0` — il suffisait donc qu'un « i » soit
+   placé à droite pour que la page déborde, sans que rien ne soit visible.
+
+   Ancrer à droite déplace le problème vers la gauche ; clamper la largeur en
+   CSS pur demanderait de connaître la distance au bord, ce que seul le JS sait
+   — et la mise en page ne se calcule pas en JS (invariant n°7).
+
+   Le texte est donc rendu DANS LE FLUX quand il est déplié : il pousse le
+   contenu vers le bas, ce qui ne peut jamais déborder latéralement. Corollaire
+   assumé : **le survol ne révèle plus**, seul le clic ouvre. Une révélation au
+   survol dans le flux ferait sauter la mise en page au passage du pointeur, et
+   le survol n'existait de toute façon ni au clavier ni au toucher — le clic
+   était déjà le seul chemin garanti pour la majorité des usages.
+   ───────────────────────────────────────────────────────────────────────── */
 
 .enveloppe {
-  display: inline;
-  position: relative;
+  display: contents;
 }
 
 /* La cible atteignable fait 44 px, alors que le rond visible en fait 18 :
-   on agrandit la zone sans grossir le dessin. `vertical-align: middle` évite
-   que ce bouton haut de 44 px n'écarte les lignes du paragraphe. */
+   on agrandit la zone sans grossir le dessin. */
 .bouton {
   display: inline-flex;
   align-items: center;
@@ -19,7 +39,8 @@
   padding: 0;
   border: none;
   background: none;
-  cursor: help;
+  cursor: pointer;
+  flex: none;
 }
 
 .rond {
@@ -45,30 +66,46 @@
   color: var(--green);
 }
 
-.bouton:focus-visible {
-  outline: none;
-}
+.bouton:focus-visible { outline: none; }
 
 .bouton:focus-visible .rond {
   outline: 2px solid var(--green);
   outline-offset: 2px;
 }
 
-/* Replié par défaut. `clip-path` plutôt que `display: none` : l'élément reste
-   dans l'arbre d'accessibilité, ce qui permet à `aria-describedby` de le
-   désigner et à un lecteur d'écran de le lire à la demande. */
+/* Replié : masqué visuellement, mais toujours dans le DOM et dans l'arbre
+   d'accessibilité — c'est ce qui permet à `aria-describedby` de le désigner.
+   Cette technique ne contribue PAS à la largeur du document, contrairement à un
+   bloc absolument positionné de 320 px. */
 .texte {
   position: absolute;
-  left: 0;
-  top: calc(100% + 6px);
-  z-index: 50;
-  width: max-content;
-  max-width: min(320px, calc(100vw - 32px));
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Déplié : dans le flux, sur toute la largeur disponible. Ne peut pas déborder
+   latéralement, quelle que soit la position du « i » dans la mise en page. */
+.fige {
+  position: static;
+  width: auto;
+  height: auto;
+  /* La base flex/grid du conteneur peut être une rangée : `flex-basis: 100%`
+     force le texte à passer à la ligne plutôt qu'à s'insérer à côté du titre. */
+  flex-basis: 100%;
   padding: 9px 11px;
-  border-radius: var(--r-sm);
+  margin: 8px 0 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
   border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
   background: var(--panel-3);
-  box-shadow: var(--sh-2);
   color: var(--muted);
   font-size: 12px;
   font-weight: 400;
@@ -76,26 +113,4 @@
   line-height: 1.5;
   text-transform: none;
   letter-spacing: normal;
-
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .texte { transition: none; }
-}
-
-/* Survol : confort, sur les pointeurs qui en ont un. */
-@media (hover: hover) {
-  .enveloppe:hover .texte {
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
-
-/* Clic ou clavier : le chemin garanti, sur tous les appareils. */
-.fige {
-  opacity: 1;
-  pointer-events: auto;
 }
