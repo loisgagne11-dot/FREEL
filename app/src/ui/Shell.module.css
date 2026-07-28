@@ -1,0 +1,134 @@
+/* Coquille de page.
+   Mobile-first en couches `min-width`, comme RailNav : la disposition ne se
+   calcule jamais en JavaScript (invariant n°7). L'ancienne version recalculait
+   ses grilles avec `window.innerWidth` et ne les restaurait jamais en
+   élargissant la fenêtre au-delà de 600 px. */
+
+.app {
+  /* `dvh` et non `vh` : sur mobile, le clavier virtuel réduit la fenêtre et
+     `vh` continue de désigner la hauteur sans clavier, ce qui pousse le
+     contenu sous l'écran. */
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.colonne {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0; /* autorise les enfants à rétrécir plutôt qu'à déborder */
+}
+
+/* ---------- barre du haut ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  /* Le dégradé de la barre est un token, comme tout le reste de la matière. */
+  background: linear-gradient(180deg, var(--top-a), var(--top-b));
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  min-height: 52px;
+}
+
+.titre {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: 15px;
+  color: var(--text);
+  /* Le titre cède avant de pousser la barre : c'est lui qui tronque, pas la
+     page qui déborde. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- zone de contenu ---------- */
+
+.contenu {
+  flex: 1;
+  padding: 14px;
+  /* Réserve la place du dock flottant ET de la safe-area iOS. Sans
+     `env(safe-area-inset-bottom)`, le dock chevauche la barre système sur
+     iPhone et le dernier élément de la page devient inatteignable. */
+  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  min-width: 0;
+}
+
+/* Le contenu est focusable par le lien d'évitement (`tabIndex={-1}`) : on
+   n'affiche pas d'anneau quand le focus vient d'un clic, seulement au
+   clavier. */
+.contenu:focus {
+  outline: none;
+}
+
+.contenu:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+}
+
+/* ---------- lien d'évitement ---------- */
+
+/* Masqué hors focus, mais jamais retiré du flux d'accessibilité : `display:
+   none` le rendrait inatteignable au clavier, ce qui annulerait son intérêt. */
+.lienEvitement {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--panel-3);
+  color: var(--text);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  text-decoration: none;
+}
+
+.lienEvitement:focus {
+  left: 8px;
+  top: 8px;
+}
+
+/* ---------- desktop : rail latéral, contenu décalé ---------- */
+
+@media (min-width: 761px) {
+  .app {
+    /* Le rail occupe la première colonne, la page la seconde. Le rail se
+       place lui-même en `static` à ce palier (voir RailNav.module.css). */
+    flex-direction: row;
+  }
+
+  .contenu {
+    padding: 18px 20px;
+    /* Plus de dock en desktop : la réserve de place n'a plus lieu d'être. */
+    padding-bottom: 24px;
+    /* Grille 12 colonnes du design, à la disposition des écrans. */
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 14px;
+    align-content: start;
+  }
+
+  /* Par défaut un enfant direct occupe toute la largeur ; chaque écran
+     redéfinit ses propres portées de colonnes. */
+  .contenu > * {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .topbar {
+    padding: 12px 20px;
+  }
+}
