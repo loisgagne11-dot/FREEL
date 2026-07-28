@@ -14,7 +14,12 @@ export default defineConfig({
     target: 'es2022'
   },
   test: {
+    // Le domaine et l'état se testent sans DOM : `node` est plus rapide et
+    // garantit au passage qu'ils n'en dépendent pas. Seuls les composants
+    // demandent un DOM, déclaré par une annotation en tête de leur fichier
+    // (`@vitest-environment jsdom`).
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx']
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    globals: true
   }
 });

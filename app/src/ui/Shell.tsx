@@ -1,10 +1,17 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { RailNav } from './components/RailNav';
 import { useRoute } from './useRoute';
+import type { IdEcran } from './navigation';
 import styles from './Shell.module.css';
 
 export interface ProprietesShell {
   readonly children: ReactNode;
+  /**
+   * Compteurs « à traiter » par écran, pour les badges de navigation. La
+   * coquille ne les calcule pas : elle les reçoit, pour rester ignorante du
+   * métier.
+   */
+  readonly compteurs?: Partial<Record<IdEcran, number>>;
 }
 
 const ID_CONTENU = 'contenu-principal';
@@ -31,7 +38,7 @@ function surClicEvitement(evenement: MouseEvent<HTMLAnchorElement>): void {
  * uniquement de `useRoute`, qui lit la même source (`navigation.ts`) que
  * RailNav, donc les deux ne peuvent jamais diverger sur « quel écran ».
  */
-export function Shell({ children }: ProprietesShell) {
+export function Shell({ children, compteurs }: ProprietesShell) {
   const { ecran } = useRoute();
 
   return (
@@ -40,7 +47,7 @@ export function Shell({ children }: ProprietesShell) {
         Aller au contenu
       </a>
 
-      <RailNav ecranActif={ecran.id} />
+      <RailNav ecranActif={ecran.id} {...(compteurs ? { compteurs } : {})} />
 
       <div className={styles.colonne}>
         <header className={styles.topbar}>
