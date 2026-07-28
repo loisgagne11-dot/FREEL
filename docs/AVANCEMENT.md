@@ -15,7 +15,7 @@ Tout ce qui est décrit ci-dessous est donc **sur `main`** et déployé : l'audi
 le plan, les corrections J0 de l'app existante, et le socle de la nouvelle
 application sous `app/`.
 
-**Sanité au moment de la reprise** — `cd app && npm run verifier` : 85 tests,
+**Sanité au moment de la reprise** — `cd app && npm run verifier` : 170 tests,
 typage strict, build à 198 Ko / 63 Ko gzippé, 20 combinaisons responsive
 conformes. Si l'un de ces chiffres a baissé, quelque chose a régressé.
 
@@ -166,15 +166,10 @@ tests verts.
 ## 4. Ce qui reste — par jalon
 
 ### J1 · fin du noyau fiscal
-- [ ] ⚠️ **À REPRENDRE EN PRIORITÉ** — `abattement.ts`, `plafonds.ts`, `tva.ts`
-      et `impot.ts` ont été écrits mais **n'ont AUCUN test**, et ne sont pas
-      réexportés (`bareme/index.ts` manque). L'agent qui les a produits a été
-      interrompu avant les tests. Ils compilent et le typage passe, mais
-      **rien ne garantit leur exactitude** — or ce sont des règles fiscales.
-      Ne pas les câbler à un écran avant de les avoir couverts, en suivant le
-      modèle de `urssaf.test.ts` : bascules mois par mois, asymétrie du temps,
-      intégrité de la table, et pour la TVA les trois états d'assujettissement
-      et le « reste facturable » à ses bornes exactes.
+- [x] ~~Abattement, plafonds, TVA, impôt~~ — **fait et couvert.** 82 tests
+      ajoutés, `bareme/index.ts` en place avec `verifierIntegriteBareme()`.
+      Tests éprouvés par mutation : réintroduire le facteur `× 1,56` déclenche
+      2 échecs, inverser la borne du seuil majoré 1 échec.
 - [ ] Grille CFE et ACRE par période (non traités)
 - [ ] `provisions()` **à deux volets** (voir D3) : échéances émises non payées
       **+** charges à provisionner sur recettes encaissées non déclarées. Exige
