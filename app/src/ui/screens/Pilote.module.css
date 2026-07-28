@@ -236,3 +236,114 @@
   .grille { grid-column: 6 / -1; align-content: start; }
   .carte { grid-column: span 6; }
 }
+
+/* ---------- à traiter ---------- */
+
+.compteur {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 100px;
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-line);
+  color: var(--amber);
+  font-size: 11.5px;
+  font-weight: 620;
+  vertical-align: middle;
+}
+
+.sujets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.sujet {
+  display: grid;
+  /* La puce et l'action gardent leur largeur, le corps absorbe le reste et
+     peut rétrécir : c'est ce qui évite tout débordement en portrait. */
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sujet:last-child { border-bottom: none; }
+
+.puce {
+  width: 9px;
+  height: 9px;
+  border-radius: 100px;
+  margin-top: 5px;
+  flex: none;
+}
+
+.puceRetard { background: var(--red); }
+.puceAFaire { background: var(--amber); }
+.puceInfo { background: var(--blue); }
+
+.sujetCorps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sujetIntitule {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text);
+}
+
+/* La gravité est écrite, pas seulement colorée : la couleur seule exclut les
+   personnes qui ne la distinguent pas. */
+.sujetGravite {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  font-weight: 500;
+}
+
+.sujetContexte {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.sujetAction {
+  flex: none;
+  align-self: center;
+  /* 44 px de cible tactile, sans grossir le bouton visuellement. */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--tint-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 560;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sujetAction:hover {
+  background: var(--tint-3);
+  color: var(--text);
+}
+
+.sujetAction:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
-import { etatPilote, moisCourant } from '../../state/selecteurs';
+import { aTraiter, etatPilote, moisCourant } from '../../state/selecteurs';
+import type { SujetATraiter } from '../../domain/calculs/aTraiter';
 import { eur, moisLong, moisTexte } from '../format';
 import styles from './Pilote.module.css';
 
@@ -23,6 +24,7 @@ export function Pilote() {
   const mois = moisCourant();
   // Recalculé à chaque changement de faits, jamais stocké.
   const etat = useMemo(() => etatPilote(faits), [faits]);
+  const sujets = useMemo(() => aTraiter(faits), [faits]);
 
   return (
     <>
@@ -111,12 +113,68 @@ export function Pilote() {
         </dl>
       </section>
 
+      <ATraiter sujets={sujets} />
+
       <CurseurReserve
         reserve={etat.tresorerie.reserve}
         maximum={Math.max(etat.tresorerie.solde, etat.tresorerie.reserve)}
         onChange={(v) => definirReserve(euros(v))}
       />
     </>
+  );
+}
+
+/**
+ * Les décisions du jour.
+ *
+ * Sur Pilote, poste de pilotage, la liste n'est pas filtrée : elle montre tous
+ * les sujets, quel que soit l'écran qui les règle. C'est la règle du design, et
+ * c'est ce qui fait de cet écran la décision du jour plutôt qu'un écran parmi
+ * six.
+ *
+ * Une liste vide n'est pas un vide à masquer : c'est une information, et la
+ * meilleure qu'on puisse donner.
+ */
+function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] }) {
+  return (
+    <section className={styles.carte} aria-labelledby="titre-a-traiter">
+      <h2 id="titre-a-traiter" className={styles.titreCarte}>
+        À traiter
+        {sujets.length > 0 && <span className={styles.compteur}>{sujets.length}</span>}
+      </h2>
+
+      {sujets.length === 0 ? (
+        <p className={styles.aideCarte}>Rien ne réclame votre attention aujourd’hui.</p>
+      ) : (
+        <ul className={styles.sujets}>
+          {sujets.map((s) => (
+            <li key={s.id} className={styles.sujet}>
+              <span
+                className={`${styles.puce} ${
+                  s.gravite === 'retard' ? styles.puceRetard
+                  : s.gravite === 'a_faire' ? styles.puceAFaire
+                  : styles.puceInfo
+                }`}
+                aria-hidden="true"
+              />
+              <div className={styles.sujetCorps}>
+                <span className={styles.sujetIntitule}>
+                  {s.intitule}
+                  {/* Le libellé porte déjà la quantité quand elle compte ; on
+                      n'affiche pas « 1 » qui n'apprendrait rien. */}
+                  <span className={styles.sujetGravite}>
+                    {s.gravite === 'retard' ? 'En retard'
+                      : s.gravite === 'a_faire' ? 'À faire' : 'Information'}
+                  </span>
+                </span>
+                <span className={styles.sujetContexte}>{s.contexte}</span>
+              </div>
+              <a className={styles.sujetAction} href={`#/${s.ecran}`}>{s.action}</a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 
