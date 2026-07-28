@@ -1,0 +1,92 @@
+/* Panneau latéral de détail.
+   Largeur 580 px en desktop (valeur du design), pleine largeur en portrait. */
+
+.voile {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--scrim);
+  /* Le flou du voile aide à séparer les plans, mais reste discret pour ne pas
+     rendre illisible le contexte qu'on garde volontairement visible. */
+  backdrop-filter: blur(2px);
+}
+
+.panneau {
+  position: fixed;
+  z-index: 90;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--line-2);
+  box-shadow: var(--sh-sheet);
+}
+
+.panneau:focus {
+  outline: none;
+}
+
+.entete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  /* L'en-tête reste visible quand le corps défile : le titre est le repère
+     qui dit de quoi parle le panneau. */
+  flex: none;
+}
+
+.titre {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.fermer {
+  flex: none;
+  /* 44 px de cible tactile. Le prototype posait un ✕ de 18 px, sous le
+     minimum recommandé, difficile à atteindre au pouce. */
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--tint-2);
+  color: var(--muted);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.fermer:hover {
+  background: var(--tint-3);
+  color: var(--text);
+}
+
+.fermer:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.corps {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  /* Safe-area en portrait : sans cela, la fin du contenu passe sous la barre
+     système de l'iPhone. */
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 761px) {
+  .panneau {
+    width: 580px;
+  }
+}

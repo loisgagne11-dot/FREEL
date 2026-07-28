@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Shell } from './ui/Shell';
 import { useRoute } from './ui/useRoute';
 import { Pilote } from './ui/screens/Pilote';
+import { Outils } from './ui/screens/Outils';
 import { useFaits } from './state/store';
 import { aTraiter } from './state/selecteurs';
 import { compteursParEcran } from './domain/calculs/aTraiter';
@@ -14,7 +15,7 @@ import type { IdEcran } from './ui/navigation';
  * Aucun de ces textes ne contient de chiffre, et c'est délibéré : l'invariant
  * n°2 veut qu'aucun écran ne porte de nombre en propre.
  */
-const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote'>, readonly string[]>> = {
+const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote' | 'outils'>, readonly string[]>> = {
   activite: [
     'Plan de charge et congés, calendrier intégré à la page',
     'Missions et factures',
@@ -30,11 +31,6 @@ const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote'>, readonly string[]>> =
     'Rapprochement bancaire à l\'état explicite et corrigeable',
     'Fournisseur, et détection des achats hors de France'
   ],
-  outils: [
-    'Impôt et CFE',
-    'Compte professionnel et banque',
-    'Compte rendu d\'activité'
-  ],
   config: [
     'Profil, statut, régime fiscal',
     'Édition du barème : ajouter une période sans toucher au code',
@@ -47,7 +43,9 @@ const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote'>, readonly string[]>> =
  * que d'afficher un squelette plausible : pendant une réécriture, un écran vide
  * qui s'annonce comme tel vaut mieux qu'un écran qui a l'air fini.
  */
-function EcranAConstruire({ id, libelle }: { id: Exclude<IdEcran, 'pilote'>; libelle: string }) {
+function EcranAConstruire(
+  { id, libelle }: { id: Exclude<IdEcran, 'pilote' | 'outils'>; libelle: string }
+) {
   return (
     <section aria-labelledby="titre-ecran">
       <h1 id="titre-ecran" style={{ fontSize: '21px', letterSpacing: '-0.035em', marginBottom: '6px' }}>
@@ -67,6 +65,7 @@ function EcranAConstruire({ id, libelle }: { id: Exclude<IdEcran, 'pilote'>; lib
 function Ecran() {
   const { ecran } = useRoute();
   if (ecran.id === 'pilote') return <Pilote />;
+  if (ecran.id === 'outils') return <Outils />;
   return <EcranAConstruire id={ecran.id} libelle={ecran.libelle} />;
 }
 

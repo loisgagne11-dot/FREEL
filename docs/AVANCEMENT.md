@@ -15,7 +15,7 @@ Tout ce qui est décrit ci-dessous est donc **sur `main`** et déployé : l'audi
 le plan, les corrections J0 de l'app existante, et le socle de la nouvelle
 application sous `app/`.
 
-**Sanité au moment de la reprise** — `cd app && npm run verifier` : 189 tests,
+**Sanité au moment de la reprise** — `cd app && npm run verifier` : 237 tests,
 typage strict, build à 198 Ko / 63 Ko gzippé, 20 combinaisons responsive
 conformes. Si l'un de ces chiffres a baissé, quelque chose a régressé.
 
@@ -203,9 +203,17 @@ tests verts.
       source de la réserve (D4). Vérification de bout en bout dans un vrai
       navigateur : données de l'ancien format migrées, affichées, provisions
       volet 2 comprises, idempotence au rechargement.
-- [ ] Primitives d'UI accessibles : `role="dialog"`, piège de focus, sémantique
-      d'onglets, région live (le `.info` du design est à 18 px, cible à 44)
-- [ ] `allTodos()` réel (partir de `computeAlerts` de l'ancienne app)
+- [x] ~~Primitives d'UI accessibles~~ — **Sheet** (dialogue modal, piège de
+      focus dans les deux sens, Échap, voile, restitution du focus, verrou de
+      défilement) et **Info** (motif « i », cible 44 px au lieu de 18,
+      `aria-describedby`, clic garanti au clavier). 22 tests en jsdom, éprouvés
+      par mutation. Restent à faire : sémantique d'onglets ARIA et région live
+      pour les toasts.
+- [x] ~~`allTodos()` réel~~ — **fait**, `domain/calculs/aTraiter.ts`, 26 tests.
+- [x] ~~Écran Outils~~ — **fait.** Simulateur d'IR câblé sur le barème
+      (abattement, tranches, calcul progressif), détail par tranche dans le
+      panneau latéral, hypothèse affichée quand les tranches ne sont pas
+      publiées pour la période.
 - [ ] Mouvements bancaires : `selecteurs.solde()` renvoie pour l'instant le seul
       solde initial. Un seul endroit à changer, volontairement isolé
 - [ ] Outils remonté ici : l'écran le moins cher prouve le noyau tôt
