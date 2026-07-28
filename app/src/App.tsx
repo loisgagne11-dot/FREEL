@@ -1,9 +1,25 @@
-import { useEffect, useMemo } from 'react';
+import { Suspense, lazy, useEffect, useMemo } from 'react';
 import { Shell } from './ui/Shell';
 import { useRoute } from './ui/useRoute';
-import { Pilote } from './ui/screens/Pilote';
-import { Outils } from './ui/screens/Outils';
 import { useFaits } from './state/store';
+
+/**
+ * Les écrans sont chargés à la demande.
+ *
+ * Le budget de performance est fixé à 250 Ko (voir `vite.config.ts`), et
+ * l'ancienne version chargeait 627 Ko de bibliothèques bloquantes avant le
+ * premier rendu. Avec trois écrans seulement, le paquet unique atteignait déjà
+ * 245 Ko : les six l'auraient franchi. Découper par écran fait qu'on ne
+ * télécharge que ce qu'on regarde, et que le coût d'un écran supplémentaire ne
+ * pèse plus sur le premier affichage.
+ *
+ * Pilote n'est PAS découpé : c'est l'écran d'entrée, et le découper ajouterait
+ * un aller-retour réseau juste avant le contenu qu'on vient chercher.
+ */
+import { Pilote } from './ui/screens/Pilote';
+
+const Argent = lazy(() => import('./ui/screens/Argent').then((m) => ({ default: m.Argent })));
+const Outils = lazy(() => import('./ui/screens/Outils').then((m) => ({ default: m.Outils })));
 import { aTraiter } from './state/selecteurs';
 import { compteursParEcran } from './domain/calculs/aTraiter';
 import type { IdEcran } from './ui/navigation';
@@ -15,16 +31,11 @@ import type { IdEcran } from './ui/navigation';
  * Aucun de ces textes ne contient de chiffre, et c'est délibéré : l'invariant
  * n°2 veut qu'aucun écran ne porte de nombre en propre.
  */
-const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote' | 'outils'>, readonly string[]>> = {
+const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote' | 'outils' | 'argent'>, readonly string[]>> = {
   activite: [
     'Plan de charge et congés, calendrier intégré à la page',
     'Missions et factures',
     'Taux d\'occupation et délai de paiement par client'
-  ],
-  argent: [
-    'Trésorerie : solde, mouvements, enveloppes de provision',
-    'Performance : chiffre d\'affaires réalisé et encaissé',
-    'Échéancier des obligations, avec leur statut daté'
   ],
   achats: [
     'Dépenses avec justificatif — pas de TVA récupérable sans pièce',
@@ -44,7 +55,7 @@ const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote' | 'outils'>, readonly s
  * qui s'annonce comme tel vaut mieux qu'un écran qui a l'air fini.
  */
 function EcranAConstruire(
-  { id, libelle }: { id: Exclude<IdEcran, 'pilote' | 'outils'>; libelle: string }
+  { id, libelle }: { id: Exclude<IdEcran, 'pilote' | 'outils' | 'argent'>; libelle: string }
 ) {
   return (
     <section aria-labelledby="titre-ecran">
@@ -62,10 +73,24 @@ function EcranAConstruire(
   );
 }
 
+/**
+ * Attente de chargement d'un écran. Sobre et sans animation : sur une connexion
+ * correcte le fragment arrive en quelques dizaines de millisecondes, et un
+ * squelette clignotant serait plus dérangeant que le vide.
+ */
+function EnChargement() {
+  return (
+    <p role="status" style={{ color: 'var(--muted-2)', fontSize: '13px' }}>
+      Chargement…
+    </p>
+  );
+}
+
 function Ecran() {
   const { ecran } = useRoute();
   if (ecran.id === 'pilote') return <Pilote />;
   if (ecran.id === 'outils') return <Outils />;
+  if (ecran.id === 'argent') return <Argent />;
   return <EcranAConstruire id={ecran.id} libelle={ecran.libelle} />;
 }
 
@@ -83,7 +108,9 @@ export function App() {
 
   return (
     <Shell compteurs={compteurs}>
-      <Ecran />
+      <Suspense fallback={<EnChargement />}>
+        <Ecran />
+      </Suspense>
     </Shell>
   );
 }

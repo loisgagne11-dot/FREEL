@@ -16,8 +16,12 @@ import styles from './Info.module.css';
  *     en CSS : un lecteur d'écran ne pouvait pas le rattacher au « i », et le
  *     survol n'existe pas au clavier ni au toucher.
  *
- * Le survol reste un confort ; le clic est le chemin garanti, et il fonctionne
- * au clavier comme au doigt.
+ * Un troisième écart, imposé par un bug réel : le texte est rendu **dans le
+ * flux** quand il est déplié, et non en infobulle absolument positionnée. Cette
+ * dernière causait un débordement horizontal détecté par la vérification
+ * automatisée — un bloc absolument positionné compte dans la largeur du
+ * document même invisible. Conséquence assumée : le survol ne révèle plus, seul
+ * le clic ouvre. Le détail du raisonnement est dans `Info.module.css`.
  */
 
 export interface ProprietesInfo {

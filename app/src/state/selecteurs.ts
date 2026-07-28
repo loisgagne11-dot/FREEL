@@ -232,3 +232,77 @@ export function etatPilote(
     motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null
   };
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Écran Argent
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface MoisChiffre {
+  readonly mois: Mois;
+  /** Recettes émises sur le mois, encaissées ou non. */
+  readonly realise: Euros;
+  /** Recettes encaissées sur le mois. */
+  readonly encaisse: Euros;
+}
+
+/**
+ * Chiffre d'affaires mois par mois, réalisé et encaissé.
+ *
+ * Les deux courbes ne mesurent pas la même chose et l'écart entre elles EST
+ * l'information : le réalisé dit ce qui a été facturé, l'encaissé ce qui est
+ * arrivé sur le compte. C'est cet écart qui se transforme en trou de
+ * trésorerie, et la raison pour laquelle les seuils fiscaux se calculent sur
+ * l'encaissé, jamais sur le facturé.
+ */
+export function chiffreParMois(faits: Faits, annee: number): readonly MoisChiffre[] {
+  const mois: MoisChiffre[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const cle = `${annee}-${String(m).padStart(2, '0')}` as Mois;
+    const realise = faits.recettes
+      .filter((r) => r.emiseLe !== null && r.emiseLe.startsWith(cle))
+      .reduce<number>((s, r) => s + r.montant, 0);
+    const encaisse = faits.recettes
+      .filter((r) => r.encaisseeLe !== null && r.encaisseeLe.startsWith(cle))
+      .reduce<number>((s, r) => s + r.montant, 0);
+    mois.push({ mois: cle, realise: euros(realise), encaisse: euros(encaisse) });
+  }
+  return mois;
+}
+
+export interface EtatArgent {
+  readonly annee: number;
+  readonly parMois: readonly MoisChiffre[];
+  readonly caEncaisse: Euros;
+  readonly caRealise: Euros;
+  /** Écart entre facturé et encaissé : ce qui reste à rentrer. */
+  readonly resteARentrer: Euros;
+  readonly tresorerie: ResultatTresorerie;
+  readonly voletConstate: Euros;
+  readonly voletAProvisionner: Euros;
+}
+
+export function etatArgent(
+  faits: Faits,
+  echeances: readonly Echeance[] = [],
+  maintenant: Date = new Date()
+): EtatArgent {
+  const annee = maintenant.getFullYear();
+  const parMois = chiffreParMois(faits, annee);
+  const caRealise = euros(parMois.reduce<number>((s, m) => s + m.realise, 0));
+  const caEncaisse = euros(parMois.reduce<number>((s, m) => s + m.encaisse, 0));
+  const pilote = etatPilote(faits, echeances, maintenant);
+
+  return {
+    annee,
+    parMois,
+    caEncaisse,
+    caRealise,
+    // Jamais négatif : un encaissé supérieur au réalisé de l'année signifie
+    // qu'on a encaissé des factures d'une année antérieure, pas qu'il reste
+    // un montant négatif à rentrer.
+    resteARentrer: euros(Math.max(0, caRealise - caEncaisse)),
+    tresorerie: pilote.tresorerie,
+    voletConstate: pilote.voletConstate,
+    voletAProvisionner: pilote.voletAProvisionner
+  };
+}

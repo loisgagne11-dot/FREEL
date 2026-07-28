@@ -1,0 +1,72 @@
+/* Onglets de section.
+   Le design veut un libellé actif contrasté, un inactif estompé, un filet vert
+   sous l'actif et un séparateur sous la rangée — l'ancienne version montrait
+   deux cartes indistinctes, si bien qu'on ne voyait pas qu'il y avait un choix. */
+
+.rangee {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  /* Défilement horizontal plutôt que débordement : au-delà de deux ou trois
+     onglets en portrait, la rangée doit glisser, pas pousser la page. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.rangee::-webkit-scrollbar { display: none; }
+
+.onglet {
+  flex: none;
+  /* 44 px de cible tactile. */
+  min-height: 44px;
+  padding: 0 14px;
+  border: none;
+  background: none;
+  color: var(--muted-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 540;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  /* Le filet actif est posé en bordure, décalé pour recouvrir celui de la
+     rangée : sans ce recouvrement, on verrait deux traits superposés. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onglet { transition: none; }
+}
+
+.onglet:hover {
+  color: var(--text);
+}
+
+.actif {
+  color: var(--text);
+  font-weight: 620;
+  border-bottom-color: var(--green);
+}
+
+.onglet:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -2px;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+
+.panneau {
+  padding-top: 14px;
+}
+
+/* Le panneau est focusable pour que Tab y entre en sortant du groupe ; on
+   n'affiche pas d'anneau quand le focus vient d'un clic. */
+.panneau:focus { outline: none; }
+
+.panneau:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 4px;
+  border-radius: var(--r-sm);
+}
