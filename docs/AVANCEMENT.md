@@ -15,9 +15,20 @@ Tout ce qui est décrit ci-dessous est donc **sur `main`** et déployé : l'audi
 le plan, les corrections J0 de l'app existante, et le socle de la nouvelle
 application sous `app/`.
 
-**Sanité au moment de la reprise** — `cd app && npm run verifier` : 237 tests,
-typage strict, build à 198 Ko / 63 Ko gzippé, 20 combinaisons responsive
-conformes. Si l'un de ces chiffres a baissé, quelque chose a régressé.
+**Sanité au moment de la reprise** — `cd app && npm run verifier` enchaîne
+typage, tests, build, contrôle responsive et migration de bout en bout. Repères
+au dernier passage :
+
+| Repère | Valeur |
+|---|---|
+| Tests | **237** |
+| Build | **237 Ko**, 75 Ko gzippé (plafond d'avertissement à 250 Ko) |
+| Responsive | **20 combinaisons** (5 tailles × 4 palettes) |
+| Migration | conforme |
+
+Un nombre de tests en baisse, ou un build qui franchit 250 Ko, signale une
+régression. Le poids monte à mesure que les écrans arrivent : le tenir sous le
+plafond fait partie du travail, pas de l'optimisation tardive.
 
 ---
 
