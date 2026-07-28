@@ -10,7 +10,10 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verifier:responsive": "node scripts/verifier-responsive.mjs",
+    "verifier:responsive:captures": "node scripts/verifier-responsive.mjs --captures",
+    "verifier": "npm run typecheck && npm test && npm run build && npm run verifier:responsive"
   },
   "dependencies": {
     "react": "^19.2.0",
@@ -21,6 +24,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "playwright": "^1.62.0",
     "typescript": "^5.7.0",
     "vite": "^7.0.0",
     "vitest": "^3.0.0"
