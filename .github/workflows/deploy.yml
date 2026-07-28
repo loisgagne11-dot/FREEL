@@ -28,10 +28,53 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install app dependencies
+        working-directory: app
+        run: npm ci
+
+      # Le noyau fiscal et la migration passent avant le déploiement. Publier
+      # une version dont les calculs échouent serait pire que ne rien publier :
+      # les chiffres se retrouvent dans des déclarations.
+      - name: Typecheck and test the new app
+        working-directory: app
+        run: npm run typecheck && npm test
+
+      - name: Build the new app
+        working-directory: app
+        run: npm run build
+
+      # Répertoire de publication construit explicitement, plutôt que d'envoyer
+      # la racine du dépôt telle quelle : celle-ci contient désormais app/ avec
+      # ses node_modules et ses sources, qui n'ont rien à faire en ligne.
+      #
+      # Coexistence des deux versions (cf. docs/PLAN-REFONTE.md) :
+      #   /            l'application actuelle, inchangée
+      #   /v2/         la nouvelle, en construction
+      # À la bascule, la nouvelle passera à la racine et l'ancienne sous
+      # /legacy/, neutralisée en écriture.
+      - name: Assemble the site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site/v2
+          cp index.html _site/index.html
+          cp -R app/dist/. _site/v2/
+          # Empêche Jekyll d'ignorer les fichiers commençant par un tiret bas.
+          touch _site/.nojekyll
+          echo "Contenu publié :"
+          find _site -maxdepth 2 -type f | sort
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment
