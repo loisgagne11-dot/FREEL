@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Shell } from './ui/Shell';
 import { useRoute } from './ui/useRoute';
 import { Pilote } from './ui/screens/Pilote';
 import { useFaits } from './state/store';
+import { aTraiter } from './state/selecteurs';
+import { compteursParEcran } from './domain/calculs/aTraiter';
 import type { IdEcran } from './ui/navigation';
 
 /**
@@ -70,13 +72,18 @@ function Ecran() {
 
 export function App() {
   const initialiser = useFaits((e) => e.initialiser);
+  const faits = useFaits((e) => e.faits);
+
+  // Les badges viennent de la même requête que la liste de l'écran Pilote :
+  // une seule source, donc jamais de badge qui contredit la liste.
+  const compteurs = useMemo(() => compteursParEcran(aTraiter(faits)), [faits]);
 
   // Chargement et migration au démarrage, une seule fois. `initialiser` est
   // idempotent côté migration : un second appel ne réécrit rien.
   useEffect(() => { initialiser(); }, [initialiser]);
 
   return (
-    <Shell>
+    <Shell compteurs={compteurs}>
       <Ecran />
     </Shell>
   );

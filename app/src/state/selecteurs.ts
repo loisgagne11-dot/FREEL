@@ -21,6 +21,10 @@ import {
   provisions as calculerProvisions
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
+import {
+  type EntreeATraiter, type SujetATraiter,
+  sujetsATraiter
+} from '../domain/calculs/aTraiter';
 import type { Faits } from './schema';
 
 /** Le mois courant, dérivé de l'horloge et jamais codé en dur. */
@@ -88,6 +92,93 @@ function ajouterMois(m: Mois, n: number): Mois {
   const annee = Math.floor(total / 12);
   const mois = String((total % 12) + 1).padStart(2, '0');
   return `${annee}-${mois}` as Mois;
+}
+
+/**
+ * Construit l'entrée de la requête « à traiter » depuis les faits.
+ *
+ * Le délai de paiement vient du client quand il est connu, sinon d'un défaut :
+ * une facture sans délai renseigné ne doit pas être réputée jamais échue, sinon
+ * les retards les plus anciens seraient précisément ceux qu'on ne verrait pas.
+ */
+const DELAI_PAIEMENT_DEFAUT = 30;
+
+export function entreeATraiter(
+  faits: Faits,
+  echeancesReglementaires: EntreeATraiter['echeancesReglementaires'] = [],
+  maintenant: Date = new Date()
+): EntreeATraiter {
+  const delaiParClient = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
+  return {
+    aujourdhui: dateISOde(maintenant),
+    typeActivite: faits.entreprise.typeActivite,
+    recettes: faits.recettes.map((r) => ({
+      id: r.id,
+      montant: r.montant,
+      emiseLe: r.emiseLe,
+      encaisseeLe: r.encaisseeLe,
+      modeReglement: r.modeReglement,
+      clientNom: r.clientNom,
+      delaiPaiementJours: delaiParClient.get(r.clientNom) ?? DELAI_PAIEMENT_DEFAUT
+    })),
+    periodesDeclarees: faits.periodesDeclarees,
+    periodicite: faits.entreprise.urssafPeriodicite,
+    debutActivite: faits.entreprise.debutActivite === null
+      ? null
+      : moisDe(faits.entreprise.debutActivite),
+    echeancesReglementaires
+  };
+}
+
+/** Date du jour au format ISO, dérivée de l'horloge locale. */
+function dateISOde(d: Date): DateISO {
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const jj = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${jj}` as DateISO;
+}
+
+/**
+ * Échéances réglementaires à date fixe, filtrées sur leur préavis.
+ *
+ * Ces obligations ne dépendent d'aucun calcul : elles tombent à une date, que
+ * l'utilisateur soit prêt ou non.
+ */
+export const ECHEANCES_REGLEMENTAIRES: readonly {
+  readonly id: string;
+  readonly intitule: string;
+  readonly date: DateISO;
+  readonly preavisJours: number;
+}[] = [
+  {
+    id: 'facturation-electronique-reception',
+    intitule: 'Facturation électronique : réception obligatoire',
+    date: '2026-09-01' as DateISO,
+    preavisJours: 120
+  }
+];
+
+export function echeancesReglementairesActives(
+  maintenant: Date = new Date()
+): EntreeATraiter['echeancesReglementaires'] {
+  const aujourdhui = dateISOde(maintenant);
+  return ECHEANCES_REGLEMENTAIRES
+    .filter((e) => {
+      const jours = Math.round(
+        (new Date(e.date).getTime() - new Date(aujourdhui).getTime()) / 86400000
+      );
+      return jours <= e.preavisJours;
+    })
+    .map((e) => ({ id: e.id, intitule: e.intitule, date: e.date }));
+}
+
+/** Les sujets à traiter, calculés depuis les faits. Jamais stockés. */
+export function aTraiter(
+  faits: Faits,
+  maintenant: Date = new Date()
+): readonly SujetATraiter[] {
+  return sujetsATraiter(
+    entreeATraiter(faits, echeancesReglementairesActives(maintenant), maintenant)
+  );
 }
 
 export interface EtatPilote {
