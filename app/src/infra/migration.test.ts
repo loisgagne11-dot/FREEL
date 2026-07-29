@@ -58,7 +58,10 @@ function bundleLegacy() {
         // Pas une dépense : ne doit pas être repris comme telle.
         { id: 'SAL1', type: 'Salaire', montant: 1500, mois: '2026-06', date: '2026-06-28' }
       ],
-      paidCharges: {}, conges: {}, rendementActif: false
+      paidCharges: {},
+      // Format d'origine : les numéros de jour groupés par mois.
+      conges: { '2026-08': [10, 11, 12], '2026-12': [24, 31], '2026-02': [30] },
+      rendementActif: false
     },
     ir: { '2026': { parts: 1 } },
     _ts: 1750000000000
@@ -101,7 +104,7 @@ describe('rapport à blanc', () => {
   // Les champs sans destination ne doivent pas disparaître en silence.
   it('énumère les champs de l\'ancienne trésorerie non repris', () => {
     const r = analyser(avecLegacy());
-    expect(r.champsNonRepris).toContain('treasury.conges');
+    expect(r.champsNonRepris).toContain('treasury.paidCharges');
     // Les charges deviennent des dépenses ; le reste des mouvements — salaires,
     // apports — n'a pas encore de place et doit être annoncé comme tel.
     expect(r.champsNonRepris).toContain('treasury.mouvements (hors charges)');
@@ -247,6 +250,28 @@ describe('reprise des charges en dépenses', () => {
     const r = migrer(avecLegacy());
     if (r.statut !== 'migre') throw new Error('migration attendue');
     expect(r.faits.banqueReliee).toBe(false);
+  });
+});
+
+describe('reprise des congés', () => {
+  function conges() {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    return r.faits.conges;
+  }
+
+  // Le format par mois obligeait à reconstruire une date à chaque lecture et
+  // rendait impossible une plage à cheval sur deux mois.
+  it('convertit les numéros de jour en dates pleines, triées', () => {
+    expect(conges()).toEqual([
+      '2026-08-10', '2026-08-11', '2026-08-12', '2026-12-24', '2026-12-31'
+    ]);
+  });
+
+  // Reporter silencieusement un 30 février sur le 2 mars poserait un congé un
+  // jour où l'utilisateur travaillait.
+  it('écarte un jour qui n\'existe pas dans son mois', () => {
+    expect(conges().some((d) => d.startsWith('2026-02'))).toBe(false);
   });
 });
 
