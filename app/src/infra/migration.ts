@@ -185,6 +185,29 @@ function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[]
 }
 
 /**
+ * Convertit les congés de l'ancienne structure en dates pleines.
+ *
+ * L'ancien format groupait les numéros de jour par mois — `{ '2025-08':
+ * [1, 2, 3] }` — ce qui obligeait à reconstruire une date à chaque lecture et
+ * rendait impossible une plage à cheval sur deux mois. Un numéro de jour hors
+ * du mois (un 31 février, par exemple) est écarté : reporter silencieusement
+ * sur le mois suivant poserait un congé un jour où l'utilisateur travaillait.
+ */
+function extraireConges(parMois: Inconnu): DateISO[] {
+  const dates = new Set<string>();
+  for (const [m, jours] of Object.entries(parMois)) {
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m)) continue;
+    const dansLeMois = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0)).getUTCDate();
+    for (const jourBrut of tableau(jours)) {
+      const jour = Math.trunc(nombre(jourBrut));
+      if (jour < 1 || jour > dansLeMois) continue;
+      dates.add(`${m}-${String(jour).padStart(2, '0')}`);
+    }
+  }
+  return [...dates].sort() as DateISO[];
+}
+
+/**
  * Extrait les dépenses des mouvements de trésorerie de l'ancienne structure.
  *
  * L'ancien modèle ne connaissait pas la dépense : il avait des « mouvements »
@@ -312,7 +335,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
 
   // Champs de l'ancienne trésorerie qu'aucun champ du nouveau schéma n'accueille.
   // Ils sont listés au lieu d'être perdus en silence.
-  for (const champ of ['rendementActif', 'rendementTaux', 'rendementHistorique', 'actionsDone', 'paidCharges', 'conges']) {
+  for (const champ of ['rendementActif', 'rendementTaux', 'rendementHistorique', 'actionsDone', 'paidCharges']) {
     if (champ in t) champsNonRepris.push(`treasury.${champ}`);
   }
   // Des mouvements, seules les charges sont reprises — en dépenses. Les autres
@@ -351,6 +374,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     missions,
     recettes: extraireRecettes(missionsBrutes, anomalies),
     depenses,
+    conges: extraireConges(objet(t['conges'])),
     // L'ancienne application rapprochait contre un relevé importé à la main,
     // jamais contre un compte relié. Aucun fait ne permet de dire qu'un compte
     // l'est : on part de `false`, l'utilisateur le renseignera.

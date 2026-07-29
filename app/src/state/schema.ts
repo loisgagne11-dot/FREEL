@@ -102,6 +102,15 @@ export interface Faits {
   readonly recettes: readonly Recette[];
   readonly depenses: readonly Depense[];
   /**
+   * Jours posés en congé, en dates pleines.
+   *
+   * L'ancienne application les stockait par mois (`{ '2025-08': [1, 2, 3] }`),
+   * ce qui obligeait à reconstruire une date à chaque lecture et rendait
+   * impossible une plage à cheval sur deux mois. Une liste de dates se trie,
+   * se compare et se déduplique sans conversion.
+   */
+  readonly conges: readonly DateISO[];
+  /**
    * `true` quand des opérations bancaires sont disponibles pour rapprocher.
    *
    * Fait, et non déduction : sans lui, une dépense marquée « rapprochée » sous
@@ -132,7 +141,8 @@ export function faitsVides(): Faits {
   return {
     version: VERSION_SCHEMA,
     entreprise: entrepriseVide(),
-    clients: [], missions: [], recettes: [], depenses: [], banqueReliee: false,
+    clients: [], missions: [], recettes: [], depenses: [], conges: [],
+    banqueReliee: false,
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     periodesDeclarees: [], configImpotBrute: {}
   };

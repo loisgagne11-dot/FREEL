@@ -44,7 +44,8 @@ const ECRANS = [
   { hash: '#/pilote', nom: 'pilote' },
   { hash: '#/argent', nom: 'argent' },
   { hash: '#/outils', nom: 'outils' },
-  { hash: '#/achats', nom: 'achats' }
+  { hash: '#/achats', nom: 'achats' },
+  { hash: '#/activite', nom: 'activite' }
 ];
 
 const TYPES = {

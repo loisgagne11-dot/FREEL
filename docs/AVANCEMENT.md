@@ -21,9 +21,9 @@ au dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **341** |
-| Build | **237 Ko** d'entrée, 76 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko) |
-| Responsive | **80 combinaisons** (5 tailles × 4 palettes × 4 écrans) |
+| Tests | **393** |
+| Build | **241 Ko** d'entrée, 77 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko, **9 Ko de marge**) |
+| Responsive | **100 combinaisons** (5 tailles × 4 palettes × 5 écrans) |
 | Migration | conforme |
 
 Un nombre de tests en baisse, ou un build qui franchit 250 Ko, signale une
@@ -258,8 +258,17 @@ tests verts.
       mouvements de type `Charge` deviennent des dépenses, toutes avec
       `justificatifId: null` : la migration ne peut pas inventer les pièces
       manquantes, et le rapport le dit, chiffres à l'appui.
-- [ ] Écran Activité : plan de charge et congés, missions et factures,
-      occupation et délai de paiement par client
+- [x] ~~Écran Activité~~ — **fait.** Calendrier des congés **dans la page** et
+      non dans une modale : on voit les jours posés et leur effet sur
+      l'occupation en même temps, ce qui est la seule question qu'on se pose en
+      les posant.
+- [x] ~~Taux d'occupation sur un dénominateur réel~~ — jours ouvrables du mois,
+      jours fériés **calculés** (comput de Pâques compris) et congés déduits.
+      L'ancienne version divisait par 20, une constante : un mois de mai à
+      19 jours ouvrés donnait 95 % à qui avait travaillé tous les jours.
+- [x] ~~Délai de paiement par client~~ — **médiane** et non moyenne : un client
+      qui paie à 30 jours neuf fois et à 300 une fois n'est pas un client à
+      57 jours.
 - [ ] Déclaration d'échanges de services (DES) proprement dite
 - [ ] Livre des recettes conforme : `paidAt`, `modeReglement`, journal en ajout
       seul, correction par annulation
@@ -285,6 +294,7 @@ tests verts.
 | **Taux de cotisations** | Valeurs du propriétaire, à recouper **une fois** avec un avis d'appel réel. `urssaf.fr` renvoie 503 sur ses pages de barème. C'est le seul chiffre du projet où une erreur coûte plusieurs milliers d'euros par an |
 | **ACRE au 01/07/2026** | Passage de l'abattement de 50 % à 25 % **probable mais non confirmé**. Sans effet sur le propriétaire (ACRE éteinte depuis le T1 2026), nécessaire pour recalculer un trimestre passé |
 | **Export FEC** | Retiré du périmètre (D6). Code conservé sur la branche de sauvegarde |
+| **Marge de build** | 9 Ko sous le plafond de 250 Ko. Le poids vient surtout de React ; le code propre au projet pèse peu. Si l'écran Config fait franchir la limite, découper le chunk partagé (domaine + sélecteurs, tiré dans l'entrée parce que plusieurs écrans différés l'importent) avant de toucher au plafond |
 | **Relevé bancaire** | Aucun n'est importé : `Faits.banqueReliee` vaut `false`, et l'écran Achats l'annonce au lieu d'afficher un rapprochement fictif. L'import de relevé est la brique qui manque, et elle débloquera aussi `selecteurs.solde()` |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
 

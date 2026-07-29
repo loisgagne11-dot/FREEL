@@ -1,0 +1,280 @@
+/* Écran Activité. Mobile-first, aucune couleur en dur, aucune largeur en JS. */
+
+.entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.titre {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.navigationMois {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pas {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pas:hover { color: var(--text); border-color: var(--green); }
+
+.moisCourant {
+  min-width: 9.5ch;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text);
+  /* La première lettre du mois vient en minuscule de l'API d'internationalisation. */
+  text-transform: capitalize;
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.chiffre {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  min-width: 0;
+}
+
+.libelle {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.montant {
+  font-size: 19px;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.accent { color: var(--green); }
+.attention { color: var(--amber); }
+
+.bandeau {
+  display: block;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  min-width: 0;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 12px;
+  text-transform: none;
+}
+
+.vide { color: var(--muted); font-size: 13px; }
+
+/* ── Calendrier ────────────────────────────────────────────────────────── */
+
+.calendrier { margin-bottom: 14px; }
+
+.enteteSemaine,
+.grilleJours {
+  display: grid;
+  /* Sept colonnes égales qui se partagent la largeur disponible : le
+     calendrier suit le conteneur sans qu'aucune taille soit calculée en JS. */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.jourSemaine {
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted-2);
+  padding-bottom: 4px;
+}
+
+.caseVide { aspect-ratio: 1; }
+
+.case {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Carrée quelle que soit la largeur : au doigt, les cases restent de
+     dimensions confortables jusqu'à 320 px de fenêtre. */
+  aspect-ratio: 1;
+  min-width: 0;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.caseActionnable { cursor: pointer; border-color: var(--line); }
+.caseActionnable:hover { border-color: var(--green); color: var(--text); }
+
+.weekEnd { background: transparent; color: var(--muted-2); opacity: 0.55; }
+.ferie { background: transparent; color: var(--amber); opacity: 0.75; }
+
+.conge {
+  background: var(--panel);
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 620;
+}
+
+/* Nom accessible sans encombrement visuel. Pas de `display: none`, qui le
+   retirerait aussi de l'arbre d'accessibilité. */
+.invisible {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Détail et listes ──────────────────────────────────────────────────── */
+
+.detail { display: flex; flex-direction: column; }
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ligne:last-child { border-bottom: none; }
+
+.ligne dd {
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.total {
+  border-top: 1px solid var(--line-2);
+  margin-top: 3px;
+  padding-top: 11px;
+}
+
+.total dt { color: var(--text); }
+.total dd { color: var(--green); font-size: 16px; }
+
+.liste { list-style: none; display: flex; flex-direction: column; }
+
+.ligneListe {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.ligneListe:last-child { border-bottom: none; }
+
+.ligneTitre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ligneLibelle {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ligneMontant {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ligneMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-2);
+  min-width: 0;
+}
+
+.alerte { font-size: 12px; color: var(--amber); }
+
+@media (min-width: 761px) {
+  .entete { grid-column: 1 / -1; }
+  .sections { grid-column: 1 / -1; }
+}
