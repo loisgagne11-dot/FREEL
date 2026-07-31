@@ -67,13 +67,92 @@ export const PERIODES_URSSAF: readonly PeriodeBareme[] = [
  */
 export const ABATTEMENT_ACRE = ratio(0.5);
 
-/** La période couvrant ce mois, ou `undefined` si aucune ne le couvre. */
-export function periodePour(m: Mois): PeriodeBareme | undefined {
-  return PERIODES_URSSAF.find((per) => m >= per.du && (per.au === null || m <= per.au));
+/**
+ * Fusionne le barème livré avec le code et les périodes saisies par
+ * l'utilisateur.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI L'UTILISATEUR PEUT AJOUTER UNE PÉRIODE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les taux officiels changent, et l'application ne peut pas être redéployée à
+ * chaque publication. Sans porte d'entrée, un taux périmé resterait appliqué
+ * indéfiniment — ou, avec le garde-fou de fraîcheur, l'application se
+ * bloquerait sans que personne puisse la débloquer.
+ *
+ * L'ajout ne remplace pas la vérification : la période saisie porte la source
+ * indiquée par l'utilisateur — « avis d'appel du 12/01/2027 », par exemple —
+ * et la date à laquelle il l'a saisie. C'est la même exigence que pour les
+ * périodes livrées avec le code, appliquée à la même table.
+ *
+ * Une période saisie qui recouvre exactement une période livrée l'emporte :
+ * c'est le seul moyen de corriger une valeur livrée fausse sans attendre un
+ * déploiement. Toute autre superposition est refusée par `validerAjout`.
+ */
+export function fusionnerPeriodes(
+  base: readonly PeriodeBareme[],
+  ajouts: readonly PeriodeBareme[]
+): readonly PeriodeBareme[] {
+  const parDebut = new Map(base.map((per) => [per.du, per]));
+  for (const ajout of ajouts) parDebut.set(ajout.du, ajout);
+
+  const triees = [...parDebut.values()].sort((a, b) => a.du.localeCompare(b.du));
+
+  // Une période nouvellement ajoutée ferme celle qui restait ouverte : deux
+  // périodes ouvertes en même temps rendraient la résolution ambiguë, et la
+  // plus ancienne l'emporterait par simple ordre de parcours.
+  return triees.map((per, i) => {
+    const suivante = triees[i + 1];
+    if (suivante === undefined) return per;
+    if (per.au !== null && per.au < suivante.du) return per;
+    return { ...per, au: moisPrecedent(suivante.du) };
+  });
 }
 
-const premiere = (): PeriodeBareme | undefined => PERIODES_URSSAF[0];
-const derniere = (): PeriodeBareme | undefined => PERIODES_URSSAF[PERIODES_URSSAF.length - 1];
+function moisPrecedent(m: Mois): Mois {
+  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) - 1;
+  const annee = Math.floor(total / 12);
+  const mm = String((total % 12) + 1).padStart(2, '0');
+  return `${annee}-${mm}` as Mois;
+}
+
+/** Refus motivé d'un ajout, ou `null` quand l'ajout est recevable. */
+export function validerAjout(
+  existantes: readonly PeriodeBareme[],
+  nouvelle: { readonly du: Mois; readonly source: string }
+): string | null {
+  if (nouvelle.source.trim() === '') {
+    return 'Une source est obligatoire : d\'où vient ce taux ? '
+      + 'Un taux sans provenance ne peut pas être vérifié plus tard.';
+  }
+
+  const derniereConnue = existantes[existantes.length - 1];
+  if (derniereConnue === undefined) return null;
+
+  // Le point dur : recalculer un trimestre passé doit redonner le montant
+  // réellement déclaré à l'époque. Réécrire une période close le rendrait
+  // impossible, et ferait diverger l'application des déclarations envoyées.
+  const couvre = existantes.find((per) => nouvelle.du > per.du && (per.au === null || nouvelle.du <= per.au));
+  if (couvre !== undefined && couvre.au !== null) {
+    return `La période ${nouvelle.du} tombe à l'intérieur d'une période close `
+      + `(${couvre.du} à ${couvre.au}). Modifier un barème passé ferait diverger `
+      + 'les recalculs des déclarations déjà envoyées. Seul un début de période '
+      + 'existant peut être corrigé, à l\'identique.';
+  }
+
+  return null;
+}
+
+/** La période couvrant ce mois, ou `undefined` si aucune ne le couvre. */
+export function periodePour(
+  m: Mois,
+  periodes: readonly PeriodeBareme[] = PERIODES_URSSAF
+): PeriodeBareme | undefined {
+  return periodes.find((per) => m >= per.du && (per.au === null || m <= per.au));
+}
+
+const premiere = (t: readonly PeriodeBareme[]): PeriodeBareme | undefined => t[0];
+const derniere = (t: readonly PeriodeBareme[]): PeriodeBareme | undefined => t[t.length - 1];
 
 /**
  * Taux de cotisations applicable à un mois.
@@ -90,12 +169,13 @@ const derniere = (): PeriodeBareme | undefined => PERIODES_URSSAF[PERIODES_URSSA
 export function tauxCotisations(
   m: Mois,
   type: TypeActivite,
-  sousAcre: boolean
+  sousAcre: boolean,
+  periodes: readonly PeriodeBareme[] = PERIODES_URSSAF
 ): Resolution<Ratio> {
   const appliquer = (brut: Ratio): Ratio =>
     (sousAcre ? brut * ABATTEMENT_ACRE : brut) as Ratio;
 
-  const couvrante = periodePour(m);
+  const couvrante = periodePour(m, periodes);
   if (couvrante) {
     return {
       statut: 'publie',
@@ -105,7 +185,7 @@ export function tauxCotisations(
     };
   }
 
-  const debut = premiere();
+  const debut = premiere(periodes);
   if (debut !== undefined && m < debut.du) {
     return {
       statut: 'refuse',
@@ -115,7 +195,7 @@ export function tauxCotisations(
     };
   }
 
-  const fin = derniere();
+  const fin = derniere(periodes);
   if (fin === undefined) {
     return { statut: 'refuse', motif: 'Aucun barème saisi.' };
   }

@@ -43,7 +43,7 @@ import {
   type DateISO, type Euros, type Mois, type Resolution, type TypeActivite,
   euros, moisDe
 } from '../types';
-import { tauxCotisations } from '../bareme/urssaf';
+import { type PeriodeBareme, tauxCotisations } from '../bareme/urssaf';
 
 /** Nature d'une somme due. Sert à expliquer un montant, jamais à le calculer. */
 export type NatureDette = 'urssaf' | 'tva' | 'impot' | 'cfe' | 'cfp';
@@ -88,6 +88,15 @@ export const estDeclare = (p: PeriodesDeclarees, m: Mois): boolean => p.mois.inc
 export interface ContexteProvisions {
   readonly typeActivite: TypeActivite;
   readonly sousAcreLe: (m: Mois) => boolean;
+  /**
+   * Le barème de cotisations à appliquer.
+   *
+   * Passé en paramètre plutôt que lu directement : l'utilisateur peut ajouter
+   * une période sans redéploiement (voir `bareme/urssaf`, `fusionnerPeriodes`),
+   * et le calcul doit voir cette table-là, pas seulement celle du code.
+   * Omis, il retombe sur le barème livré.
+   */
+  readonly periodesUrssaf?: readonly PeriodeBareme[];
   /**
    * Part de l'impôt et des contributions à provisionner en plus des
    * cotisations sociales, exprimée en ratio du chiffre d'affaires encaissé.
@@ -145,7 +154,9 @@ export function voletAProvisionner(
     // compter deux fois.
     if (estDeclare(declarees, m)) continue;
 
-    const taux: Resolution<number> = tauxCotisations(m, ctx.typeActivite, ctx.sousAcreLe(m));
+    const taux: Resolution<number> = tauxCotisations(
+      m, ctx.typeActivite, ctx.sousAcreLe(m), ctx.periodesUrssaf
+    );
     if (taux.statut === 'refuse') {
       nonCalculables.push({ id: r.id, motif: taux.motif });
       continue;

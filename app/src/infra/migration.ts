@@ -379,6 +379,9 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // jamais contre un compte relié. Aucun fait ne permet de dire qu'un compte
     // l'est : on part de `false`, l'utilisateur le renseignera.
     banqueReliee: false,
+    // L'ancien modèle n'avait pas de barème éditable : les taux y étaient en
+    // dur dans le code. Rien à reprendre.
+    periodesUrssafAjoutees: [],
     soldeInitial: euros(nombre(t['soldeInitial'])),
     // La réserve unifiée (D4) reprend le plancher de compte de l'ancienne
     // version, seule des trois implémentations concurrentes à être un montant.

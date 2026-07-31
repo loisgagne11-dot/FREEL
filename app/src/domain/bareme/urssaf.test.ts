@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { mois, ratio, type TypeActivite } from '../types';
+import { dateISO, mois, ratio, type TypeActivite } from '../types';
 import {
-  ABATTEMENT_ACRE, PERIODES_URSSAF, libelleHypothese, periodePour,
-  tauxCotisations, verifierIntegrite
+  ABATTEMENT_ACRE, PERIODES_URSSAF, fusionnerPeriodes, libelleHypothese,
+  periodePour, tauxCotisations, validerAjout, verifierIntegrite
 } from './urssaf';
 
 /** Raccourci de lecture : le taux, ou null si le barème refuse. */
@@ -116,5 +116,108 @@ describe('garde-fous de typage', () => {
     expect(() => mois('2026-13')).toThrow(RangeError);
     expect(() => mois('2026-7')).toThrow(RangeError);
     expect(() => mois('juillet 2026')).toThrow(RangeError);
+  });
+});
+
+describe('barème complété par l’utilisateur', () => {
+  const per = (du: string, au: string | null, bnc: number, source = 'avis d’appel') => ({
+    du: mois(du),
+    au: au === null ? null : mois(au),
+    taux: { BNC: ratio(bnc), BIC_vente: ratio(0.123), BIC_service: ratio(0.212) },
+    source,
+    verifieLe: dateISO('2027-01-15')
+  });
+
+  const BASE = [
+    per('2026-01', '2026-06', 0.256),
+    per('2026-07', null, 0.261)
+  ];
+
+  // Sans cette porte d'entrée, un taux périmé resterait appliqué
+  // indéfiniment — ou l'alerte de fraîcheur bloquerait sans qu'on puisse
+  // la lever.
+  it('prolonge le barème sans redéploiement', () => {
+    const fusionne = fusionnerPeriodes(BASE, [per('2027-01', null, 0.272)]);
+    expect(fusionne).toHaveLength(3);
+    expect(tauxCotisations(mois('2027-03'), 'BNC', false, fusionne)).toMatchObject({
+      statut: 'publie', valeur: 0.272
+    });
+  });
+
+  // Deux périodes ouvertes rendraient la résolution ambiguë : la plus
+  // ancienne l'emporterait par simple ordre de parcours.
+  it('ferme la période qui restait ouverte', () => {
+    const fusionne = fusionnerPeriodes(BASE, [per('2027-01', null, 0.272)]);
+    expect(fusionne[1]?.au).toBe('2026-12');
+    expect(fusionne.filter((p) => p.au === null)).toHaveLength(1);
+  });
+
+  // Le taux d'un mois écoulé est un fait publié : le recalcul d'un trimestre
+  // passé doit redonner le montant réellement déclaré à l'époque.
+  it('n’altère pas les périodes antérieures', () => {
+    const fusionne = fusionnerPeriodes(BASE, [per('2027-01', null, 0.272)]);
+    expect(tauxCotisations(mois('2026-03'), 'BNC', false, fusionne)).toMatchObject({
+      statut: 'publie', valeur: 0.256
+    });
+  });
+
+  // Le seul moyen de corriger une valeur livrée fausse sans attendre un
+  // déploiement.
+  it('permet de corriger une période livrée, à début identique', () => {
+    const fusionne = fusionnerPeriodes(BASE, [per('2026-07', null, 0.259)]);
+    expect(fusionne).toHaveLength(2);
+    expect(tauxCotisations(mois('2026-09'), 'BNC', false, fusionne)).toMatchObject({
+      valeur: 0.259
+    });
+  });
+
+  it('conserve la source saisie, qui devient traçable', () => {
+    const fusionne = fusionnerPeriodes(BASE, [per('2027-01', null, 0.272, 'avis du 12/01/2027')]);
+    const r = tauxCotisations(mois('2027-03'), 'BNC', false, fusionne);
+    expect(r.statut === 'publie' && r.source).toBe('avis du 12/01/2027');
+  });
+
+  it('applique l’abattement ACRE sur un taux ajouté comme sur un autre', () => {
+    const fusionne = fusionnerPeriodes(BASE, [per('2027-01', null, 0.272)]);
+    const r = tauxCotisations(mois('2027-03'), 'BNC', true, fusionne);
+    expect(r.statut === 'publie' && r.valeur).toBeCloseTo(0.136, 10);
+  });
+});
+
+describe('contrôles à l’ajout d’une période', () => {
+  const per = (du: string, au: string | null, bnc: number) => ({
+    du: mois(du),
+    au: au === null ? null : mois(au),
+    taux: { BNC: ratio(bnc), BIC_vente: ratio(0.123), BIC_service: ratio(0.212) },
+    source: 'urssaf.fr',
+    verifieLe: dateISO('2027-01-15')
+  });
+
+  const BASE = [per('2026-01', '2026-06', 0.256), per('2026-07', null, 0.261)];
+
+  it('accepte une période qui prolonge la dernière', () => {
+    expect(validerAjout(BASE, { du: mois('2027-01'), source: 'avis d’appel' })).toBeNull();
+  });
+
+  // Une valeur sans provenance ne peut pas être vérifiée plus tard.
+  it('exige une source', () => {
+    const refus = validerAjout(BASE, { du: mois('2027-01'), source: '   ' });
+    expect(refus).toMatch(/source/i);
+  });
+
+  // Réécrire une période close ferait diverger les recalculs des
+  // déclarations déjà envoyées.
+  it('refuse une période tombant à l’intérieur d’une période close', () => {
+    const refus = validerAjout(BASE, { du: mois('2026-03'), source: 'urssaf.fr' });
+    expect(refus).toMatch(/barème passé|période close/i);
+  });
+
+  it('accepte de corriger un début de période existant', () => {
+    expect(validerAjout(BASE, { du: mois('2026-01'), source: 'urssaf.fr' })).toBeNull();
+    expect(validerAjout(BASE, { du: mois('2026-07'), source: 'urssaf.fr' })).toBeNull();
+  });
+
+  it('accepte tout sur une table vide', () => {
+    expect(validerAjout([], { du: mois('2020-01'), source: 'urssaf.fr' })).toBeNull();
   });
 });

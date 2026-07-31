@@ -21,9 +21,9 @@ au dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **393** |
-| Build | **241 Ko** d'entrée, 77 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko, **9 Ko de marge**) |
-| Responsive | **100 combinaisons** (5 tailles × 4 palettes × 5 écrans) |
+| Tests | **423** |
+| Build | **243 Ko** d'entrée, 78 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko, **7 Ko de marge**) |
+| Responsive | **120 combinaisons** (5 tailles × 4 palettes × **6 écrans**) |
 | Migration | conforme |
 
 Un nombre de tests en baisse, ou un build qui franchit 250 Ko, signale une
@@ -269,11 +269,19 @@ tests verts.
 - [x] ~~Délai de paiement par client~~ — **médiane** et non moyenne : un client
       qui paie à 30 jours neuf fois et à 300 une fois n'est pas un client à
       57 jours.
+- [x] ~~Écran Config, et l'édition du barème~~ — **fait.** Une période URSSAF
+      s'ajoute depuis l'application, avec sa source et la date de saisie. C'est
+      ce qui rend le barème maintenable : sans cette porte, un taux périmé
+      resterait appliqué indéfiniment, ou l'alerte de fraîcheur bloquerait les
+      déclarations sans que personne puisse la lever. Le domaine refuse de
+      réécrire une période close — recalculer un trimestre passé doit redonner
+      le montant réellement déclaré à l'époque.
+- [x] ~~Retirer la section « Propositions Claude Code »~~ (D5) — **fait**, elle
+      n'existe pas dans le nouvel écran.
 - [ ] Déclaration d'échanges de services (DES) proprement dite
 - [ ] Livre des recettes conforme : `paidAt`, `modeReglement`, journal en ajout
       seul, correction par annulation
-- [ ] Écran d'édition du barème dans Config + alerte de fraîcheur
-- [ ] Retirer la section « Propositions Claude Code » (D5)
+- [ ] Import de relevé bancaire (débloque aussi `selecteurs.solde()`)
 
 ### J6 · bascule (après le 31/10)
 - [ ] Nouvelle version à la racine, ancienne **neutralisée en écriture** sous `/legacy/`
@@ -294,7 +302,7 @@ tests verts.
 | **Taux de cotisations** | Valeurs du propriétaire, à recouper **une fois** avec un avis d'appel réel. `urssaf.fr` renvoie 503 sur ses pages de barème. C'est le seul chiffre du projet où une erreur coûte plusieurs milliers d'euros par an |
 | **ACRE au 01/07/2026** | Passage de l'abattement de 50 % à 25 % **probable mais non confirmé**. Sans effet sur le propriétaire (ACRE éteinte depuis le T1 2026), nécessaire pour recalculer un trimestre passé |
 | **Export FEC** | Retiré du périmètre (D6). Code conservé sur la branche de sauvegarde |
-| **Marge de build** | 9 Ko sous le plafond de 250 Ko. Le poids vient surtout de React ; le code propre au projet pèse peu. Si l'écran Config fait franchir la limite, découper le chunk partagé (domaine + sélecteurs, tiré dans l'entrée parce que plusieurs écrans différés l'importent) avant de toucher au plafond |
+| **Marge de build** | 7 Ko sous le plafond de 250 Ko. Le poids vient surtout de React ; le code propre au projet pèse peu. Si l'écran Config fait franchir la limite, découper le chunk partagé (domaine + sélecteurs, tiré dans l'entrée parce que plusieurs écrans différés l'importent) avant de toucher au plafond |
 | **Relevé bancaire** | Aucun n'est importé : `Faits.banqueReliee` vaut `false`, et l'écran Achats l'annonce au lieu d'afficher un rapprochement fictif. L'import de relevé est la brique qui manque, et elle débloquera aussi `selecteurs.solde()` |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
 

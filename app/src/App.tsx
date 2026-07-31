@@ -22,6 +22,7 @@ const Argent = lazy(() => import('./ui/screens/Argent').then((m) => ({ default: 
 const Outils = lazy(() => import('./ui/screens/Outils').then((m) => ({ default: m.Outils })));
 const Achats = lazy(() => import('./ui/screens/Achats').then((m) => ({ default: m.Achats })));
 const Activite = lazy(() => import('./ui/screens/Activite').then((m) => ({ default: m.Activite })));
+const Config = lazy(() => import('./ui/screens/Config').then((m) => ({ default: m.Config })));
 import { aTraiter } from './state/selecteurs';
 import { compteursParEcran } from './domain/calculs/aTraiter';
 import type { IdEcran } from './ui/navigation';
@@ -85,6 +86,7 @@ function Ecran() {
   if (ecran.id === 'argent') return <Argent />;
   if (ecran.id === 'achats') return <Achats />;
   if (ecran.id === 'activite') return <Activite />;
+  if (ecran.id === 'config') return <Config />;
   return <EcranAConstruire id={ecran.id} libelle={ecran.libelle} />;
 }
 
