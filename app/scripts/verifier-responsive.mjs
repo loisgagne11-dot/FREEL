@@ -45,7 +45,8 @@ const ECRANS = [
   { hash: '#/argent', nom: 'argent' },
   { hash: '#/outils', nom: 'outils' },
   { hash: '#/achats', nom: 'achats' },
-  { hash: '#/activite', nom: 'activite' }
+  { hash: '#/activite', nom: 'activite' },
+  { hash: '#/config', nom: 'config' }
 ];
 
 const TYPES = {

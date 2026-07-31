@@ -14,6 +14,7 @@
 
 import type { DateISO, Euros, Mois, TypeActivite } from '../domain/types';
 import type { Depense } from '../domain/calculs/depenses';
+import type { PeriodeBareme } from '../domain/bareme/urssaf';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -118,6 +119,16 @@ export interface Faits {
    * déconnexion du compte, en affirmant un contrôle qui n'a plus lieu.
    */
   readonly banqueReliee: boolean;
+  /**
+   * Périodes de barème URSSAF saisies par l'utilisateur.
+   *
+   * Elles s'ajoutent à celles livrées avec le code, sans les remplacer : les
+   * taux officiels changent et l'application ne peut pas être redéployée à
+   * chaque publication. Sans cette porte d'entrée, un taux périmé resterait
+   * appliqué indéfiniment — ou l'alerte de fraîcheur bloquerait les
+   * déclarations sans que personne puisse la lever.
+   */
+  readonly periodesUrssafAjoutees: readonly PeriodeBareme[];
   readonly soldeInitial: Euros;
   /** Matelas de sécurité, montant absolu. Source unique (D4). */
   readonly reserve: Euros;
@@ -142,7 +153,7 @@ export function faitsVides(): Faits {
     version: VERSION_SCHEMA,
     entreprise: entrepriseVide(),
     clients: [], missions: [], recettes: [], depenses: [], conges: [],
-    banqueReliee: false,
+    banqueReliee: false, periodesUrssafAjoutees: [],
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     periodesDeclarees: [], configImpotBrute: {}
   };

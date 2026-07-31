@@ -34,7 +34,23 @@ import {
   type DelaiClient, type Jour, type PlanDeCharge,
   calendrierDuMois, chargeDuMois, delaisParClient, planDeCharge
 } from '../domain/calculs/activite';
+import {
+  PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
+} from '../domain/bareme/urssaf';
 import type { Depense, Faits, Mission } from './schema';
+
+/**
+ * Le barème URSSAF effectivement appliqué.
+ *
+ * Une seule source pour toute l'application : les périodes livrées avec le
+ * code, complétées par celles que l'utilisateur a saisies. Tout calcul qui
+ * lirait `PERIODES_URSSAF` directement verrait un barème différent de celui
+ * affiché dans Config — exactement le genre de divergence que la refonte
+ * cherche à rendre impossible.
+ */
+export function periodesUrssafEffectives(faits: Faits): readonly PeriodeBareme[] {
+  return fusionnerPeriodes(PERIODES_URSSAF, faits.periodesUrssafAjoutees);
+}
 
 /** Le mois courant, dérivé de l'horloge et jamais codé en dur. */
 export function moisCourant(maintenant: Date = new Date()): Mois {
@@ -132,6 +148,7 @@ export function entreeATraiter(
     })),
     periodesDeclarees: faits.periodesDeclarees,
     periodicite: faits.entreprise.urssafPeriodicite,
+    periodesUrssaf: periodesUrssafEffectives(faits),
     debutActivite: faits.entreprise.debutActivite === null
       ? null
       : moisDe(faits.entreprise.debutActivite),
@@ -224,7 +241,12 @@ export function etatPilote(
     echeances,
     recettesEncaissees(faits),
     { mois: faits.periodesDeclarees },
-    { typeActivite: type, sousAcreLe: sousAcreLe(faits), tauxImpotEtContributions: tauxImpot }
+    {
+      typeActivite: type,
+      sousAcreLe: sousAcreLe(faits),
+      tauxImpotEtContributions: tauxImpot,
+      periodesUrssaf: periodesUrssafEffectives(faits)
+    }
   );
 
   const tresorerie = calculerTresorerie(

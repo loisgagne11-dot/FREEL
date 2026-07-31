@@ -18,7 +18,10 @@
 
 import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, euros } from '../domain/types';
-import { CLE_STOCKAGE, type Depense, type Faits, faitsVides } from './schema';
+import { CLE_STOCKAGE, type Depense, type Entreprise, type Faits, faitsVides } from './schema';
+import {
+  PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
+} from '../domain/bareme/urssaf';
 import type { EtatRapprochement } from '../domain/calculs/depenses';
 import { type Stockage, migrer } from '../infra/migration';
 
@@ -101,6 +104,21 @@ interface MagasinFaits {
   readonly basculerConge: (jour: DateISO) => void;
   /** Pose ou retire une plage entière, sans jamais dupliquer une date déjà posée. */
   readonly poserPlageDeConges: (jours: readonly DateISO[], pose: boolean) => void;
+
+  /* ── Profil et barème ─────────────────────────────────────────────────── */
+
+  readonly modifierEntreprise: (modification: Partial<Entreprise>) => void;
+
+  /**
+   * Ajoute une période de barème URSSAF.
+   *
+   * Rend le motif du refus, ou `null` si l'ajout a été enregistré. Le contrôle
+   * vit dans le domaine (`validerAjout`) : un écran ne doit pas pouvoir
+   * réécrire un barème passé, sous peine de faire diverger l'application des
+   * déclarations déjà envoyées.
+   */
+  readonly ajouterPeriodeUrssaf: (periode: PeriodeBareme) => string | null;
+  readonly retirerPeriodeUrssaf: (du: Mois) => void;
 }
 
 /**
@@ -246,6 +264,42 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
   basculerConge: (jour) => {
     const actuel = get().faits;
     get().poserPlageDeConges([jour], !actuel.conges.includes(jour));
+  },
+
+  modifierEntreprise: (modification) => {
+    const actuel = get().faits;
+    const faits: Faits = { ...actuel, entreprise: { ...actuel.entreprise, ...modification } };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  ajouterPeriodeUrssaf: (periode) => {
+    const actuel = get().faits;
+    const effectives = fusionnerPeriodes(PERIODES_URSSAF, actuel.periodesUrssafAjoutees);
+    const refus = validerAjout(effectives, periode);
+    if (refus !== null) return refus;
+
+    // Une saisie sur un début de période déjà ajouté la remplace, plutôt que
+    // d'empiler deux versions dont on ne saurait laquelle fait foi.
+    const ajoutees = [
+      ...actuel.periodesUrssafAjoutees.filter((p) => p.du !== periode.du),
+      periode
+    ].sort((a, b) => a.du.localeCompare(b.du));
+
+    const faits: Faits = { ...actuel, periodesUrssafAjoutees: ajoutees };
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
+  },
+
+  retirerPeriodeUrssaf: (du) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      periodesUrssafAjoutees: actuel.periodesUrssafAjoutees.filter((p) => p.du !== du)
+    };
+    set({ faits });
+    persister(stockageActif, faits);
   },
 
   poserPlageDeConges: (jours, pose) => {
