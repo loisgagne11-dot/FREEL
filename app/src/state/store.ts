@@ -19,8 +19,12 @@
 import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, euros } from '../domain/types';
 import {
-  CLE_STOCKAGE, type Depense, type Entreprise, type Faits, type Recette, faitsVides
+  CLE_STOCKAGE, type Client, type Depense, type Entreprise, type Faits,
+  type Mission, type Recette, faitsVides
 } from './schema';
+import {
+  nomAPropager, peutSupprimerClient, peutSupprimerMission, validerNomClient
+} from '../domain/calculs/carnet';
 import {
   type ModeReglement, ecritureDAnnulation, prochainNumero
 } from '../domain/calculs/livreRecettes';
@@ -208,6 +212,39 @@ interface MagasinFaits {
    * réserver créerait précisément le trou qu'on cherche à éviter.
    */
   readonly supprimerBrouillon: (id: string) => string | null;
+
+  /* ── Carnet : clients et missions ─────────────────────────────────────── */
+
+  /**
+   * Ajoute un client. Rend le motif du refus, ou `null`.
+   *
+   * Le nom est contrôlé par le domaine : il sert de clé de rattachement, donc
+   * il ne peut être ni vide ni homonyme d'un client existant.
+   */
+  readonly ajouterClient: (saisie: Omit<Client, 'id'>) => string | null;
+
+  /**
+   * Modifie un client, en PROPAGEANT un éventuel renommage.
+   *
+   * Missions et recettes rattachées suivent, dans la même écriture. Sans cela,
+   * renommer « Dupont » en « Dupont SARL » laisserait derrière lui des recettes
+   * attachées à un nom que plus aucun client ne porte : elles sortiraient des
+   * délais de paiement et de la déclaration européenne de services sans que
+   * rien ne le signale.
+   */
+  readonly modifierClient: (
+    id: string, modification: Partial<Omit<Client, 'id'>>
+  ) => string | null;
+
+  /** Supprime un client, si rien ne lui est rattaché. */
+  readonly supprimerClient: (id: string) => string | null;
+
+  readonly ajouterMission: (saisie: Omit<Mission, 'id'>) => string;
+  readonly modifierMission: (
+    id: string, modification: Partial<Omit<Mission, 'id'>>
+  ) => void;
+  /** Supprime une mission, si aucune recette de son client ne relève de sa période. */
+  readonly supprimerMission: (id: string) => string | null;
 }
 
 /**
@@ -377,6 +414,114 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     };
     set({ faits });
     persister(stockageActif, faits);
+  },
+
+  ajouterClient: (saisie) => {
+    const actuel = get().faits;
+    const refus = validerNomClient(saisie.nom, actuel.clients);
+    if (refus !== null) return refus.message;
+
+    const client: Client = {
+      ...saisie,
+      nom: saisie.nom.trim(),
+      id: `cli-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    };
+    const faits: Faits = { ...actuel, clients: [...actuel.clients, client] };
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
+  },
+
+  modifierClient: (id, modification) => {
+    const actuel = get().faits;
+    const existant = actuel.clients.find((c) => c.id === id);
+    if (existant === undefined) return 'Client introuvable.';
+
+    if (modification.nom !== undefined) {
+      const refus = validerNomClient(modification.nom, actuel.clients, id);
+      if (refus !== null) return refus.message;
+    }
+
+    const nouveauNom = modification.nom === undefined
+      ? null
+      : nomAPropager(existant.nom, modification.nom);
+
+    const clients = actuel.clients.map((c) =>
+      (c.id === id ? { ...c, ...modification, nom: nouveauNom ?? c.nom } : c));
+
+    // La propagation est faite ici, dans la même écriture que la modification :
+    // un renommage à moitié appliqué serait pire que pas de renommage du tout.
+    const faits: Faits = nouveauNom === null
+      ? { ...actuel, clients }
+      : {
+        ...actuel,
+        clients,
+        missions: actuel.missions.map((m) =>
+          (m.clientNom === existant.nom ? { ...m, clientNom: nouveauNom, clientId: id } : m)),
+        recettes: actuel.recettes.map((r) =>
+          (r.clientNom === existant.nom ? { ...r, clientNom: nouveauNom } : r))
+      };
+
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
+  },
+
+  supprimerClient: (id) => {
+    const actuel = get().faits;
+    const existant = actuel.clients.find((c) => c.id === id);
+    if (existant === undefined) return 'Client introuvable.';
+
+    const refus = peutSupprimerClient(existant.nom, actuel.missions, actuel.recettes);
+    if (refus !== null) return refus.message;
+
+    const faits: Faits = { ...actuel, clients: actuel.clients.filter((c) => c.id !== id) };
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
+  },
+
+  ajouterMission: (saisie) => {
+    const actuel = get().faits;
+    const id = `mis-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    // Le client est rattaché par identifiant quand il existe au carnet, tout
+    // en conservant son nom : c'est le nom qui porte le rattachement des
+    // recettes, et le perdre couperait la mission de son chiffre d'affaires.
+    const client = actuel.clients.find((c) => c.nom === saisie.clientNom.trim());
+    const mission: Mission = {
+      ...saisie,
+      id,
+      clientNom: saisie.clientNom.trim(),
+      clientId: client?.id ?? null
+    };
+    const faits: Faits = { ...actuel, missions: [...actuel.missions, mission] };
+    set({ faits });
+    persister(stockageActif, faits);
+    return id;
+  },
+
+  modifierMission: (id, modification) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      missions: actuel.missions.map((m) => (m.id === id ? { ...m, ...modification } : m))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  supprimerMission: (id) => {
+    const actuel = get().faits;
+    const existante = actuel.missions.find((m) => m.id === id);
+    if (existante === undefined) return 'Mission introuvable.';
+
+    const refus = peutSupprimerMission(existante, actuel.recettes);
+    if (refus !== null) return refus.message;
+
+    const faits: Faits = { ...actuel, missions: actuel.missions.filter((m) => m.id !== id) };
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
   },
 
   remplacerParBundle: (bundle) => {

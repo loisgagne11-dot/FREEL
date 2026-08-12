@@ -82,20 +82,28 @@ encore la remplacer, et le tableau ci-dessous dit précisément ce qui manque.
 | Saisir une **dépense** avec justificatif | ❌ | ✅ |
 | Importer un relevé bancaire | ❌ | ✅ |
 | Livre des recettes conforme, DES | ❌ | ✅ |
-| **Créer un client** | ✅ | ❌ |
-| **Créer une mission** | ✅ | ❌ |
+| **Créer un client** | ✅ | ✅ |
+| **Créer une mission** | ✅ | ✅ |
 | **Émettre une facture, et son PDF** | ✅ | ❌ |
 | **Écrire dans Supabase** (synchro) | ✅ | ❌ lecture seule |
 
-Les quatre dernières lignes sont le chemin critique vers la suppression du
-legacy. Tant qu'elles ne sont pas faites, retirer `index.html` priverait
+Les deux dernières lignes sont ce qui reste du chemin critique vers la
+suppression du legacy. Tant qu'elles ne sont pas faites, retirer `index.html` priverait
 l'utilisateur de son outil de facturation — et une facture non émise est un
 revenu non encaissé.
 
 **Ordre à respecter, et pourquoi.** Clients et missions d'abord, car une
-facture s'y rattache ; la facturation ensuite ; l'écriture Supabase en
-dernier, parce qu'elle est la seule opération qui peut abîmer des données
-existantes et qu'elle demande donc que le reste soit sûr.
+facture s'y rattache — **fait le 12/08** ; la facturation ensuite ; l'écriture
+Supabase en dernier, parce qu'elle est la seule opération qui peut abîmer des
+données existantes et qu'elle demande donc que le reste soit sûr.
+
+**Un piège du modèle, traité.** Le rattachement d'une recette à son client se
+fait par **nom**, l'ancienne application n'ayant jamais posé d'identifiant.
+Renommer un client casserait donc silencieusement ses missions et ses recettes.
+Le magasin propage le nouveau nom dans la même écriture, et l'écran avertit
+avant d'enregistrer. Passer aux identifiants serait la bonne forme, mais
+supposerait de deviner à quel client rattacher chaque recette historique —
+c'est-à-dire d'inventer un lien.
 
 ---
 
