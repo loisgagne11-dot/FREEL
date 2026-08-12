@@ -46,7 +46,8 @@ const ECRANS = [
   { hash: '#/outils', nom: 'outils' },
   { hash: '#/achats', nom: 'achats' },
   { hash: '#/activite', nom: 'activite' },
-  { hash: '#/config', nom: 'config' }
+  { hash: '#/config', nom: 'config' },
+  { hash: '#/facture', nom: 'facture' }
 ];
 
 const TYPES = {
@@ -139,7 +140,7 @@ for (const taille of TAILLES) {
       mesures.largeurDocument <= mesures.largeurFenetre + 1,
       `${prefixe} aucun débordement horizontal (${mesures.largeurDocument} ≤ ${mesures.largeurFenetre})`
     );
-    constate(mesures.navPresente && mesures.nbLiens === 6, `${prefixe} 6 onglets de navigation`);
+    constate(mesures.navPresente && mesures.nbLiens === 7, `${prefixe} 7 onglets de navigation`);
     constate(mesures.contenuPresent, `${prefixe} contenu principal présent et ciblable`);
 
     if (taille.portrait) {

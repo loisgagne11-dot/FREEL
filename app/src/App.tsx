@@ -23,48 +23,9 @@ const Outils = lazy(() => import('./ui/screens/Outils').then((m) => ({ default: 
 const Achats = lazy(() => import('./ui/screens/Achats').then((m) => ({ default: m.Achats })));
 const Activite = lazy(() => import('./ui/screens/Activite').then((m) => ({ default: m.Activite })));
 const Config = lazy(() => import('./ui/screens/Config').then((m) => ({ default: m.Config })));
+const Facture = lazy(() => import('./ui/screens/Facture').then((m) => ({ default: m.Facture })));
 import { aTraiter } from './state/selecteurs';
 import { compteursParEcran } from './domain/calculs/aTraiter';
-import type { IdEcran } from './ui/navigation';
-
-/**
- * Ce que chaque écran restant apportera. Sert de repère pendant la
- * construction et de rappel du périmètre.
- *
- * Aucun de ces textes ne contient de chiffre, et c'est délibéré : l'invariant
- * n°2 veut qu'aucun écran ne porte de nombre en propre.
- */
-const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote' | 'outils' | 'argent' | 'achats' | 'activite'>, readonly string[]>> = {
-  config: [
-    'Profil, statut, régime fiscal',
-    'Édition du barème : ajouter une période sans toucher au code',
-    'Données, export, sauvegarde et synchronisation'
-  ]
-};
-
-/**
- * Espace réservé d'un écran non encore construit. Il dit ce qui manque plutôt
- * que d'afficher un squelette plausible : pendant une réécriture, un écran vide
- * qui s'annonce comme tel vaut mieux qu'un écran qui a l'air fini.
- */
-function EcranAConstruire(
-  { id, libelle }: { id: Exclude<IdEcran, 'pilote' | 'outils' | 'argent' | 'achats' | 'activite'>; libelle: string }
-) {
-  return (
-    <section aria-labelledby="titre-ecran">
-      <h1 id="titre-ecran" style={{ fontSize: '21px', letterSpacing: '-0.035em', marginBottom: '6px' }}>
-        {libelle}
-      </h1>
-      <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '16px' }}>
-        Écran à construire. Le socle est en place&nbsp;: noyau fiscal, migration,
-        état, tokens et coquille.
-      </p>
-      <ul style={{ color: 'var(--muted)', fontSize: '13px', lineHeight: 1.7, paddingLeft: '18px' }}>
-        {ATTENDU[id].map((ligne) => <li key={ligne}>{ligne}</li>)}
-      </ul>
-    </section>
-  );
-}
 
 /**
  * Attente de chargement d'un écran. Sobre et sans animation : sur une connexion
@@ -79,15 +40,28 @@ function EnChargement() {
   );
 }
 
+/**
+ * L'écran courant.
+ *
+ * L'exhaustivité est vérifiée par le compilateur : `jamais` est de type
+ * `never`, donc ajouter un écran à la navigation sans le router ici ne
+ * compile pas. Un `return null` final aurait laissé passer un écran blanc.
+ */
 function Ecran() {
   const { ecran } = useRoute();
-  if (ecran.id === 'pilote') return <Pilote />;
-  if (ecran.id === 'outils') return <Outils />;
-  if (ecran.id === 'argent') return <Argent />;
-  if (ecran.id === 'achats') return <Achats />;
-  if (ecran.id === 'activite') return <Activite />;
-  if (ecran.id === 'config') return <Config />;
-  return <EcranAConstruire id={ecran.id} libelle={ecran.libelle} />;
+  switch (ecran.id) {
+    case 'pilote': return <Pilote />;
+    case 'activite': return <Activite />;
+    case 'argent': return <Argent />;
+    case 'facture': return <Facture />;
+    case 'achats': return <Achats />;
+    case 'outils': return <Outils />;
+    case 'config': return <Config />;
+    default: {
+      const jamais: never = ecran.id;
+      return jamais;
+    }
+  }
 }
 
 export function App() {

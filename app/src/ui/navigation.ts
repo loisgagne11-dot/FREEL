@@ -11,7 +11,8 @@
  */
 
 /** Identifiant stable d'un écran. Ne varie jamais, contrairement au libellé affiché. */
-export type IdEcran = 'pilote' | 'activite' | 'argent' | 'achats' | 'outils' | 'config';
+export type IdEcran =
+  | 'pilote' | 'activite' | 'argent' | 'facture' | 'achats' | 'outils' | 'config';
 
 /** Icône sobre au trait, exprimée comme l'attribut `d` d'un unique `<path>` sur un viewBox 24x24. */
 export interface Ecran {
@@ -46,6 +47,13 @@ export const ECRANS: readonly Ecran[] = [
     chemin: '#/argent',
     // Portefeuille : trésorerie et performance.
     icone: 'M3 6 H18 V19 H3 Z M3 6 L6 3 L15 3 L18 6 M14 12 H17 V15 H14 Z'
+  },
+  {
+    id: 'facture',
+    libelle: 'Facturer',
+    chemin: '#/facture',
+    // Document : émettre une facture.
+    icone: 'M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M9 12 H16 M9 16 H14'
   },
   {
     id: 'achats',

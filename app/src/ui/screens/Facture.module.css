@@ -1,0 +1,340 @@
+/* Émission de facture. Mobile-first à l'écran, mise en page A4 à l'impression. */
+
+.entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.titre {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.numero {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.actionPrincipale {
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+  align-self: start;
+  margin-top: 12px;
+}
+
+.actionPrincipale:hover:enabled { border-color: var(--green); }
+.actionPrincipale:disabled { opacity: 0.5; cursor: default; }
+
+.action {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.action:hover { color: var(--text); }
+
+.bandeau {
+  display: block;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.bandeauDanger { border-left-color: var(--red); }
+.bandeau strong { color: var(--text); font-weight: 600; }
+
+.manques {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted-2);
+}
+
+.manques li { padding-left: 11px; border-left: 2px solid var(--red); }
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  min-width: 0;
+}
+
+.carte + .carte { margin-top: 12px; }
+
+.titreCarte {
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.note {
+  margin-top: 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  border-left: 3px solid var(--green);
+  padding-left: 11px;
+}
+
+/* ── Saisie ────────────────────────────────────────────────────────────── */
+
+.formulaire {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+/* Une ligne de prestation : empilée en portrait, en rang dès qu'il y a la
+   place. La bascule vient du contenu, sans point de rupture arbitraire. */
+.ligneSaisie {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.champ, .champEtroit { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+.champ label, .champEtroit label {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.champ input, .champ select,
+.champEtroit input, .champEtroit select {
+  /* Sans `border-box`, un champ à 100 % déborde de la largeur des bordures. */
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.champ input:focus-visible, .champ select:focus-visible,
+.champEtroit input:focus-visible, .champEtroit select:focus-visible {
+  border-color: var(--green);
+  outline: none;
+}
+
+.aide { font-size: 11.5px; line-height: 1.5; color: var(--amber); }
+
+.retirer {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+
+.retirer:hover { color: var(--red); border-color: var(--red); }
+
+/* ── Totaux ────────────────────────────────────────────────────────────── */
+
+.detail { display: flex; flex-direction: column; }
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.ligne:last-child { border-bottom: none; }
+
+.ligne dd {
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.total { border-top: 1px solid var(--line-2); margin-top: 3px; padding-top: 11px; }
+.total dt { color: var(--text); }
+.total dd { color: var(--green); font-size: 16px; }
+
+/* ── Le document ───────────────────────────────────────────────────────── */
+
+.document {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 20px 18px;
+  margin-top: 12px;
+  min-width: 0;
+}
+
+.docEntete {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line-2);
+}
+
+.docTitre { text-align: right; }
+
+.docFacture {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.docNumero {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.docNom { font-size: 14px; font-weight: 620; color: var(--text); }
+.docLigne { font-size: 12px; line-height: 1.6; color: var(--muted); }
+
+.docLabel {
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  margin-bottom: 4px;
+}
+
+.docClient { padding: 16px 0; }
+
+/* Le tableau des prestations défile dans son conteneur plutôt que d'élargir
+   la page : l'invariant de non-débordement porte sur le document. */
+.docTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  display: block;
+  overflow-x: auto;
+}
+
+.docTable thead th {
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  font-weight: 500;
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--line-2);
+  white-space: nowrap;
+}
+
+.docTable td {
+  padding: 9px 10px 9px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  vertical-align: top;
+}
+
+.docTable td:not(:first-child) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.docTotaux { margin-top: 16px; margin-left: auto; max-width: 340px; }
+
+.docPied {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.docMention {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted-2);
+  margin-bottom: 6px;
+}
+
+/* ── Impression ────────────────────────────────────────────────────────── */
+
+/* Le même balisage sert à l'écran et au papier : un gabarit distinct pour
+   l'impression finirait par diverger de ce qui est affiché, et l'utilisateur
+   signerait un document qu'il n'a pas relu. */
+@media print {
+  .entete, .bandeau, .carte { display: none !important; }
+
+  .document {
+    background: #fff;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    color: #000;
+  }
+
+  /* Les couleurs de thème deviennent du noir sur blanc : une facture imprimée
+     en gris clair sur fond sombre serait illisible et coûterait une cartouche. */
+  .document, .docNom, .docLigne, .docLabel, .docFacture, .docNumero,
+  .docTable td, .docTable thead th, .docMention, .ligne, .ligne dd,
+  .total dt, .total dd {
+    color: #000 !important;
+  }
+
+  .docLigne, .docLabel, .docMention, .docTable thead th { color: #333 !important; }
+
+  .docTable { display: table; overflow: visible; }
+  .docEntete, .docPied, .docTable thead th, .docTable td { border-color: #999 !important; }
+  .ligne { border-color: #ddd !important; }
+  .total { border-color: #999 !important; }
+
+  /* Ne jamais couper une ligne de prestation entre deux pages. */
+  .docTable tr { break-inside: avoid; }
+  .docPied { break-inside: avoid; }
+}
+
+@page { margin: 18mm 15mm; }
