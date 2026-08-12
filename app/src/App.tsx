@@ -20,6 +20,9 @@ import { Pilote } from './ui/screens/Pilote';
 
 const Argent = lazy(() => import('./ui/screens/Argent').then((m) => ({ default: m.Argent })));
 const Outils = lazy(() => import('./ui/screens/Outils').then((m) => ({ default: m.Outils })));
+const Achats = lazy(() => import('./ui/screens/Achats').then((m) => ({ default: m.Achats })));
+const Activite = lazy(() => import('./ui/screens/Activite').then((m) => ({ default: m.Activite })));
+const Config = lazy(() => import('./ui/screens/Config').then((m) => ({ default: m.Config })));
 import { aTraiter } from './state/selecteurs';
 import { compteursParEcran } from './domain/calculs/aTraiter';
 import type { IdEcran } from './ui/navigation';
@@ -31,17 +34,7 @@ import type { IdEcran } from './ui/navigation';
  * Aucun de ces textes ne contient de chiffre, et c'est délibéré : l'invariant
  * n°2 veut qu'aucun écran ne porte de nombre en propre.
  */
-const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote' | 'outils' | 'argent'>, readonly string[]>> = {
-  activite: [
-    'Plan de charge et congés, calendrier intégré à la page',
-    'Missions et factures',
-    'Taux d\'occupation et délai de paiement par client'
-  ],
-  achats: [
-    'Dépenses avec justificatif — pas de TVA récupérable sans pièce',
-    'Rapprochement bancaire à l\'état explicite et corrigeable',
-    'Fournisseur, et détection des achats hors de France'
-  ],
+const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote' | 'outils' | 'argent' | 'achats' | 'activite'>, readonly string[]>> = {
   config: [
     'Profil, statut, régime fiscal',
     'Édition du barème : ajouter une période sans toucher au code',
@@ -55,7 +48,7 @@ const ATTENDU: Readonly<Record<Exclude<IdEcran, 'pilote' | 'outils' | 'argent'>,
  * qui s'annonce comme tel vaut mieux qu'un écran qui a l'air fini.
  */
 function EcranAConstruire(
-  { id, libelle }: { id: Exclude<IdEcran, 'pilote' | 'outils' | 'argent'>; libelle: string }
+  { id, libelle }: { id: Exclude<IdEcran, 'pilote' | 'outils' | 'argent' | 'achats' | 'activite'>; libelle: string }
 ) {
   return (
     <section aria-labelledby="titre-ecran">
@@ -91,6 +84,9 @@ function Ecran() {
   if (ecran.id === 'pilote') return <Pilote />;
   if (ecran.id === 'outils') return <Outils />;
   if (ecran.id === 'argent') return <Argent />;
+  if (ecran.id === 'achats') return <Achats />;
+  if (ecran.id === 'activite') return <Activite />;
+  if (ecran.id === 'config') return <Config />;
   return <EcranAConstruire id={ecran.id} libelle={ecran.libelle} />;
 }
 

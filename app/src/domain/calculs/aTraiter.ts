@@ -23,7 +23,7 @@ import {
 } from '../types';
 import { resteAvantMajore } from '../bareme/tva';
 import { plafondMicro } from '../bareme/plafonds';
-import { PERIODES_URSSAF } from '../bareme/urssaf';
+import { PERIODES_URSSAF, type PeriodeBareme } from '../bareme/urssaf';
 
 /** L'écran qui règle le sujet. Sert au badge de navigation et au lien. */
 export type EcranCible = 'pilote' | 'activite' | 'argent' | 'achats' | 'outils' | 'config';
@@ -65,6 +65,13 @@ export interface EntreeATraiter {
   readonly periodicite: 'mensuel' | 'trimestriel';
   /** Mois de début d'activité : rien n'est dû avant. */
   readonly debutActivite: Mois | null;
+  /**
+   * Le barème de cotisations effectivement appliqué, périodes saisies par
+   * l'utilisateur comprises. L'alerte de fraîcheur doit porter sur la table
+   * réellement utilisée : sans cela, ajouter une période à jour laisserait
+   * l'alerte allumée, et l'utilisateur cesserait de la croire.
+   */
+  readonly periodesUrssaf?: readonly PeriodeBareme[];
   /** Échéances réglementaires à date fixe, déjà filtrées sur leur préavis. */
   readonly echeancesReglementaires: readonly {
     readonly id: string;
@@ -176,8 +183,10 @@ function periodesADeclarer(e: EntreeATraiter): readonly Mois[] {
 }
 
 /** Le mois de la dernière vérification de barème la plus ancienne. */
-function fraicheurBaremeLaPlusAncienne(): Mois | null {
-  const dates = PERIODES_URSSAF.map((p) => p.verifieLe).sort();
+function fraicheurBaremeLaPlusAncienne(
+  periodes: readonly PeriodeBareme[]
+): Mois | null {
+  const dates = periodes.map((p) => p.verifieLe).sort();
   const plusAncienne = dates[0];
   return plusAncienne === undefined ? null : moisDe(plusAncienne);
 }
@@ -297,7 +306,7 @@ export function sujetsATraiter(
   }
 
   /* ---------- fraîcheur du barème ---------- */
-  const verifieLe = fraicheurBaremeLaPlusAncienne();
+  const verifieLe = fraicheurBaremeLaPlusAncienne(e.periodesUrssaf ?? PERIODES_URSSAF);
   if (verifieLe !== null && ajouterMois(verifieLe, seuils.moisFraicheurBareme) < moisCourant) {
     sujets.push({
       id: 'bareme-a-verifier',

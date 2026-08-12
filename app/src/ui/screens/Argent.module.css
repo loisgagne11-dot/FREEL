@@ -116,3 +116,84 @@
   .entete { grid-column: 1 / -1; }
   .sections { grid-column: 1 / -1; }
 }
+
+/* ── Livre des recettes ────────────────────────────────────────────────── */
+
+.vide { color: var(--muted); font-size: 13px; }
+
+.ecarts { list-style: none; display: flex; flex-direction: column; gap: 7px; }
+
+.ecart {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  padding-left: 11px;
+  border-left: 2px solid var(--red);
+}
+
+.liste { list-style: none; display: flex; flex-direction: column; }
+
+.ligneEcriture {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.ligneEcriture:last-child { border-bottom: none; }
+
+.ligneTitre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ligneLibelle {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--text);
+  /* Un libellé long se coupe plutôt que d'élargir le document. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ligneMontant {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ligneMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-2);
+  min-width: 0;
+}
+
+.alerteLigne { font-size: 12px; line-height: 1.5; color: var(--red); }
+
+.actionLigne {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--muted-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.actionLigne:hover { color: var(--text); border-color: var(--line-2); }

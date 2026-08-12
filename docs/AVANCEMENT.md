@@ -21,14 +21,24 @@ au dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **263** |
-| Build | **233 Ko** d'entrée, 74 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko) |
-| Responsive | **60 combinaisons** (5 tailles × 4 palettes × 3 écrans) |
+| Tests | **481** |
+| Build | **54 Ko** de code applicatif, 188 Ko de bibliothèques, 256 Ko au premier rendu (82 Ko gzippé) |
+| Budget | conforme sur les **4 postes** vérifiés |
+| Responsive | **120 combinaisons** (5 tailles × 4 palettes × **6 écrans**) |
 | Migration | conforme |
 
-Un nombre de tests en baisse, ou un build qui franchit 250 Ko, signale une
-régression. Le poids monte à mesure que les écrans arrivent : le tenir sous le
-plafond fait partie du travail, pas de l'optimisation tardive.
+Un nombre de tests en baisse, ou un budget dépassé, signale une régression.
+
+**Le budget a changé de forme le 12/08.** Il était un plafond unique de 250 Ko
+sur le paquet d'entrée ; la mesure a montré ce que ce chiffre recouvrait :
+192 Ko de React et 55 Ko de code applicatif. Le seuil surveillait donc surtout
+une dépendance qui ne bouge pas, et laissait le code du projet grossir sans
+qu'on s'en aperçoive — jusqu'à frôler la limite d'un coup, à l'écran Config.
+
+`scripts/verifier-budget.mjs` vérifie désormais quatre postes séparément. Avant
+de relever l'un d'eux : vérifier qu'un écran n'a pas été tiré dans l'entrée par
+un import partagé. C'est la cause la plus fréquente, et relever le plafond la
+masquerait.
 
 ---
 
@@ -239,13 +249,59 @@ tests verts.
 - [ ] jsPDF différé ; retirer les méta anti-cache (concerne le legacy)
 
 ### J5 · Achats, Activité, Config
-- [ ] Justificatifs sur **IndexedDB**, invariant « pas de TVA sans pièce »
-- [ ] État de rapprochement explicite et corrigeable (`matched`/`pending`/`nobank`)
-- [ ] Autoliquidation TVA sur achats hors de France, et DES
-- [ ] Livre des recettes conforme : `paidAt`, `modeReglement`, journal en ajout
-      seul, correction par annulation
-- [ ] Écran d'édition du barème dans Config + alerte de fraîcheur
-- [ ] Retirer la section « Propositions Claude Code » (D5)
+- [x] ~~Justificatifs sur **IndexedDB**, invariant « pas de TVA sans pièce »~~ —
+      **fait.** `infra/justificatifs.ts` : le fichier est conservé, avec une
+      empreinte SHA-256 et l'horodatage du dépôt. C'est l'empreinte, recalculée
+      par `verifierIntegrite()`, qui donne à la copie numérique sa valeur
+      probante — l'ancienne version n'avait qu'un booléen `piece: true`, sans
+      fichier ni trace, classé « sans valeur probante » par l'audit.
+- [x] ~~Écran Achats~~ — **fait.** L'écran chiffre ce que les pièces manquantes
+      coûtent (`tvaPerdueFauteDePiece`) : « justificatif manquant » n'incite
+      personne à chercher une facture, un montant si.
+- [x] ~~État de rapprochement explicite et corrigeable~~ — **fait.**
+      `rapproche` / `en_attente` / `sans_banque`, stocké et non redéduit à
+      l'affichage. Invariant : jamais « rapproché » sans relevé disponible.
+- [x] ~~Autoliquidation TVA sur achats hors de France~~ — **détectée et
+      signalée** : TVA due **et** non déductible. La déclaration (DES) reste à
+      produire.
+- [x] ~~Reprise des charges de l'ancienne trésorerie~~ — **fait.** Les
+      mouvements de type `Charge` deviennent des dépenses, toutes avec
+      `justificatifId: null` : la migration ne peut pas inventer les pièces
+      manquantes, et le rapport le dit, chiffres à l'appui.
+- [x] ~~Écran Activité~~ — **fait.** Calendrier des congés **dans la page** et
+      non dans une modale : on voit les jours posés et leur effet sur
+      l'occupation en même temps, ce qui est la seule question qu'on se pose en
+      les posant.
+- [x] ~~Taux d'occupation sur un dénominateur réel~~ — jours ouvrables du mois,
+      jours fériés **calculés** (comput de Pâques compris) et congés déduits.
+      L'ancienne version divisait par 20, une constante : un mois de mai à
+      19 jours ouvrés donnait 95 % à qui avait travaillé tous les jours.
+- [x] ~~Délai de paiement par client~~ — **médiane** et non moyenne : un client
+      qui paie à 30 jours neuf fois et à 300 une fois n'est pas un client à
+      57 jours.
+- [x] ~~Écran Config, et l'édition du barème~~ — **fait.** Une période URSSAF
+      s'ajoute depuis l'application, avec sa source et la date de saisie. C'est
+      ce qui rend le barème maintenable : sans cette porte, un taux périmé
+      resterait appliqué indéfiniment, ou l'alerte de fraîcheur bloquerait les
+      déclarations sans que personne puisse la lever. Le domaine refuse de
+      réécrire une période close — recalculer un trimestre passé doit redonner
+      le montant réellement déclaré à l'époque.
+- [x] ~~Retirer la section « Propositions Claude Code »~~ (D5) — **fait**, elle
+      n'existe pas dans le nouvel écran.
+- [ ] Déclaration d'échanges de services (DES) proprement dite
+- [x] ~~Livre des recettes conforme~~ — **fait.** Le registre se tient en
+      **ajout seul** : une recette encaissée ne se modifie pas et ne se
+      supprime pas, elle s'annule par une écriture inverse datée du jour de la
+      correction. Les deux écritures restent visibles, leur somme est nulle.
+      Un registre qu'on peut réécrire ne prouve rien.
+      · Mentions obligatoires constatées une par une (date d'encaissement, mode
+        de règlement, identité du client, référence de pièce) — l'écart est
+        **nommé**, « registre non conforme » n'aide personne à le corriger.
+      · Numérotation : trous et doublons signalés. Un numéro absent se lit, en
+        contrôle, comme une facture retirée du registre.
+      · Un brouillon jamais émis se supprime et libère son numéro ; une facture
+        émise ne se supprime plus, elle s'annule par un avoir.
+- [ ] Import de relevé bancaire (débloque aussi `selecteurs.solde()`)
 
 ### J6 · bascule (après le 31/10)
 - [ ] Nouvelle version à la racine, ancienne **neutralisée en écriture** sous `/legacy/`
@@ -266,6 +322,8 @@ tests verts.
 | **Taux de cotisations** | Valeurs du propriétaire, à recouper **une fois** avec un avis d'appel réel. `urssaf.fr` renvoie 503 sur ses pages de barème. C'est le seul chiffre du projet où une erreur coûte plusieurs milliers d'euros par an |
 | **ACRE au 01/07/2026** | Passage de l'abattement de 50 % à 25 % **probable mais non confirmé**. Sans effet sur le propriétaire (ACRE éteinte depuis le T1 2026), nécessaire pour recalculer un trimestre passé |
 | **Export FEC** | Retiré du périmètre (D6). Code conservé sur la branche de sauvegarde |
+| **Marge de build** | Réglé. React est sorti dans un chunk `vendor` : il ne change pas d'un déploiement à l'autre, donc le cache du navigateur le conserve. Modifier une ligne de code invalidait 248 Ko ; désormais 55 |
+| **Relevé bancaire** | Aucun n'est importé : `Faits.banqueReliee` vaut `false`, et l'écran Achats l'annonce au lieu d'afficher un rapprochement fictif. L'import de relevé est la brique qui manque, et elle débloquera aussi `selecteurs.solde()` |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
 
 ---

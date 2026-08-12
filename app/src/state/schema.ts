@@ -13,6 +13,20 @@
  */
 
 import type { DateISO, Euros, Mois, TypeActivite } from '../domain/types';
+import type { Depense } from '../domain/calculs/depenses';
+import type { PeriodeBareme } from '../domain/bareme/urssaf';
+import type { ModeReglement } from '../domain/calculs/livreRecettes';
+
+/**
+ * La dépense est définie par le domaine, pas par le schéma.
+ *
+ * C'est le sens de la dépendance qui compte : les règles de TVA déductible
+ * énoncent ce qu'une dépense doit porter (un identifiant de pièce, pas un
+ * booléen ; une provenance, pas une supposition), et le stockage suit. Dans
+ * l'autre sens, on stockerait une forme commode dont les règles devraient
+ * ensuite s'accommoder.
+ */
+export type { Depense };
 
 export const VERSION_SCHEMA = 1 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
@@ -78,8 +92,19 @@ export interface Recette {
   readonly montant: Euros;
   readonly emiseLe: DateISO | null;
   readonly encaisseeLe: DateISO | null;
-  readonly modeReglement: 'virement' | 'cheque' | 'especes' | 'carte' | 'autre' | null;
+  readonly modeReglement: ModeReglement | null;
   readonly numero: string;
+  /**
+   * Identifiant de l'écriture que celle-ci annule.
+   *
+   * Le livre des recettes se tient en AJOUT SEUL : une recette encaissée ne se
+   * modifie pas et ne se supprime pas, elle s'annule par une écriture inverse
+   * qui laisse la trace de la correction. Un registre qu'on peut réécrire ne
+   * prouve rien — et c'est précisément ce qu'un contrôle vérifie.
+   */
+  readonly annuleEcriture?: string | null;
+  /** Recette globalisée en fin de journée, sans identité de client. */
+  readonly globalisee?: boolean;
 }
 
 export interface Faits {
@@ -88,6 +113,34 @@ export interface Faits {
   readonly clients: readonly Client[];
   readonly missions: readonly Mission[];
   readonly recettes: readonly Recette[];
+  readonly depenses: readonly Depense[];
+  /**
+   * Jours posés en congé, en dates pleines.
+   *
+   * L'ancienne application les stockait par mois (`{ '2025-08': [1, 2, 3] }`),
+   * ce qui obligeait à reconstruire une date à chaque lecture et rendait
+   * impossible une plage à cheval sur deux mois. Une liste de dates se trie,
+   * se compare et se déduplique sans conversion.
+   */
+  readonly conges: readonly DateISO[];
+  /**
+   * `true` quand des opérations bancaires sont disponibles pour rapprocher.
+   *
+   * Fait, et non déduction : sans lui, une dépense marquée « rapprochée » sous
+   * une ancienne configuration continuerait de s'afficher comme telle après la
+   * déconnexion du compte, en affirmant un contrôle qui n'a plus lieu.
+   */
+  readonly banqueReliee: boolean;
+  /**
+   * Périodes de barème URSSAF saisies par l'utilisateur.
+   *
+   * Elles s'ajoutent à celles livrées avec le code, sans les remplacer : les
+   * taux officiels changent et l'application ne peut pas être redéployée à
+   * chaque publication. Sans cette porte d'entrée, un taux périmé resterait
+   * appliqué indéfiniment — ou l'alerte de fraîcheur bloquerait les
+   * déclarations sans que personne puisse la lever.
+   */
+  readonly periodesUrssafAjoutees: readonly PeriodeBareme[];
   readonly soldeInitial: Euros;
   /** Matelas de sécurité, montant absolu. Source unique (D4). */
   readonly reserve: Euros;
@@ -111,7 +164,8 @@ export function faitsVides(): Faits {
   return {
     version: VERSION_SCHEMA,
     entreprise: entrepriseVide(),
-    clients: [], missions: [], recettes: [],
+    clients: [], missions: [], recettes: [], depenses: [], conges: [],
+    banqueReliee: false, periodesUrssafAjoutees: [],
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     periodesDeclarees: [], configImpotBrute: {}
   };
