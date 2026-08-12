@@ -1,0 +1,95 @@
+import { describe, expect, it } from 'vitest';
+import {
+  VERSION_SCHEMA, completerFaits, entrepriseVide, faitsVides, motifRefusFaits
+} from './schema';
+
+/**
+ * Validation d'un bloc de faits.
+ *
+ * Ces contrôles n'avaient pas lieu d'être tant que les faits ne venaient que
+ * du navigateur : l'application relisait ce qu'elle avait écrit. Ils
+ * deviennent nécessaires dès qu'un bloc arrive d'un compte distant, donc
+ * potentiellement d'une AUTRE version de l'application.
+ */
+
+describe('acceptation d’un bloc de faits', () => {
+  it('accepte ce que l’application produit elle-même', () => {
+    expect(motifRefusFaits(faitsVides())).toBeNull();
+  });
+
+  it('refuse ce qui n’est pas un objet', () => {
+    expect(motifRefusFaits(null)).not.toBeNull();
+    expect(motifRefusFaits('des faits')).not.toBeNull();
+    expect(motifRefusFaits([])).not.toBeNull();
+  });
+
+  it('refuse un bloc sans numéro de schéma', () => {
+    const { version: _version, ...sansVersion } = faitsVides();
+    expect(motifRefusFaits(sansVersion)).toMatch(/numéro de schéma/i);
+  });
+
+  /**
+   * Le point dur. Une version ancienne de l'application qui charge un bloc
+   * récent en ignore les champs inconnus — puis les EFFACE au premier renvoi
+   * sur le compte. Elle détruirait le travail fait sur une version plus
+   * récente, depuis un autre appareil, sans que rien ne l'annonce.
+   */
+  it('refuse un schéma plus récent que celui qu’il sait lire', () => {
+    const motif = motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 });
+    expect(motif).toMatch(/plus récente/i);
+    expect(motif).toContain(String(VERSION_SCHEMA + 1));
+  });
+
+  // Un schéma antérieur est légitime : il lui manque les champs ajoutés depuis.
+  it('accepte un schéma antérieur', () => {
+    expect(motifRefusFaits({ version: 0, clients: [] })).toBeNull();
+  });
+
+  it('refuse une liste qui n’en est pas une', () => {
+    expect(motifRefusFaits({ ...faitsVides(), recettes: {} })).toMatch(/recettes/);
+    expect(motifRefusFaits({ ...faitsVides(), depenses: 'aucune' })).toMatch(/depenses/);
+  });
+
+  it('refuse un montant qui n’est pas un nombre fini', () => {
+    expect(motifRefusFaits({ ...faitsVides(), reserve: '1000' })).toMatch(/reserve/);
+    expect(motifRefusFaits({ ...faitsVides(), soldeInitial: Number.NaN })).toMatch(/soldeInitial/);
+  });
+
+  it('refuse une entreprise qui n’est pas un objet', () => {
+    expect(motifRefusFaits({ ...faitsVides(), entreprise: 'Moi' })).toMatch(/entreprise/);
+  });
+});
+
+describe('complétion d’un bloc accepté', () => {
+  it('comble les listes absentes plutôt que de les laisser indéfinies', () => {
+    const faits = completerFaits({ version: 0 });
+    expect(faits.clients).toEqual([]);
+    expect(faits.recettes).toEqual([]);
+    expect(faits.mouvementsBancaires).toEqual([]);
+    expect(faits.entreprise).toEqual(entrepriseVide());
+  });
+
+  it('conserve ce que le bloc porte', () => {
+    const faits = completerFaits({
+      version: VERSION_SCHEMA,
+      clients: [{ id: 'c1', nom: 'Client de démonstration' }],
+      reserve: 3000
+    });
+    expect(faits.clients).toHaveLength(1);
+    expect(faits.reserve).toBe(3000);
+  });
+
+  // Les champs manquants viennent d'être comblés : le bloc n'est plus à
+  // l'ancien format, et le renvoyer sous son ancien numéro le ferait migrer
+  // une seconde fois au prochain chargement.
+  it('porte le numéro de schéma de ce code après complétion', () => {
+    expect(completerFaits({ version: 0 }).version).toBe(VERSION_SCHEMA);
+  });
+
+  it('complète une entreprise partielle sans perdre ses champs', () => {
+    const faits = completerFaits({ version: 0, entreprise: { nom: 'Entreprise de démo' } });
+    expect(faits.entreprise.nom).toBe('Entreprise de démo');
+    expect(faits.entreprise.typeActivite).toBe('BNC');
+    expect(faits.entreprise.onboardingFait).toBe(false);
+  });
+});

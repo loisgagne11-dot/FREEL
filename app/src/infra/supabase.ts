@@ -45,7 +45,18 @@ export interface Session {
 
 export type Resultat<T> =
   | { readonly statut: 'ok'; readonly valeur: T }
-  | { readonly statut: 'erreur'; readonly motif: string };
+  | {
+    readonly statut: 'erreur';
+    readonly motif: string;
+    /**
+     * Code HTTP, absent quand aucune réponse n'est parvenue.
+     *
+     * Le message ne suffit pas à décider : un 409 sur l'écriture signifie
+     * « la ligne existe déjà », ce qui n'est pas une panne mais un conflit à
+     * traiter. Distinguer les deux sur le texte du message serait fragile.
+     */
+    readonly code?: number;
+  };
 
 /** Clé de conservation de la session. Distincte de celle des faits. */
 export const CLE_SESSION = 'freel.session.supabase.v1' as const;
@@ -89,7 +100,7 @@ async function appeler(
     const corps: unknown = texte === '' ? null : JSON.parse(texte);
 
     if (!reponse.ok) {
-      return { statut: 'erreur', motif: messageDErreur(reponse.status, corps) };
+      return { statut: 'erreur', motif: messageDErreur(reponse.status, corps), code: reponse.status };
     }
     return { statut: 'ok', valeur: corps };
   } catch {
@@ -131,7 +142,9 @@ function messageDErreur(code: number, corps: unknown): string {
     return 'Accès refusé. La session a peut-être expiré : reconnectez-vous.';
   }
   if (code === 404) {
-    return 'Table introuvable côté serveur. La base n’est pas encore préparée pour cette version.';
+    return 'Table introuvable côté serveur : la base n’est pas encore préparée pour '
+      + 'cette version. Exécutez le script « docs/supabase.sql » dans l’éditeur SQL '
+      + 'du projet, puis réessayez.';
   }
   if (code === 429) {
     return 'Trop de tentatives. Attendez une minute avant de réessayer.';
@@ -282,6 +295,172 @@ export function bundleDepuisLegacy(donnees: DonneesLegacy): Record<string, unkno
     t: donnees.treasury,
     ir: donnees.ir_config
   };
+}
+
+/* ── Faits de la nouvelle application ──────────────────────────────────── */
+
+/**
+ * Table de la nouvelle application.
+ *
+ * DISTINCTE de `user_data`, et ce n'est pas un détail d'organisation : tant
+ * que les deux versions coexistent, écrire dans la table de l'ancienne
+ * signifierait qu'un essai de la nouvelle peut abîmer des données comptables
+ * dont l'ancienne se sert encore. Deux tables, deux vies, aucune interférence.
+ *
+ * Le script de création est dans `docs/supabase.sql`.
+ */
+export const TABLE_FAITS = 'freel_faits';
+
+export interface InstantaneDistant {
+  /** Le bloc de faits, non validé : c'est au schéma de dire s'il est lisible. */
+  readonly faits: unknown;
+  /**
+   * Compteur d'écritures. Le garde-fou contre l'écrasement silencieux.
+   *
+   * Une écriture ne s'applique que si la version distante est encore celle
+   * qu'on a lue. Sinon, quelqu'un a écrit entre-temps, et poursuivre
+   * effacerait son travail sans que personne le voie.
+   */
+  readonly version: number;
+  readonly schema: number;
+  /**
+   * Horloge de l'appareil qui a écrit. INDICATIF, affiché seulement.
+   *
+   * Ne sert jamais à arbitrer : deux appareils dont les horloges divergent
+   * de quelques minutes désigneraient le mauvais gagnant. C'est le compteur
+   * de version, et lui seul, qui tranche.
+   */
+  readonly majLe: string | null;
+}
+
+/**
+ * L'issue d'une écriture.
+ *
+ * `conflit` n'est pas une erreur : rien n'est cassé, l'écriture a simplement
+ * été refusée parce que le compte a bougé. Les confondre conduirait à
+ * proposer « réessayez », qui écraserait justement ce qu'il fallait préserver.
+ */
+export type ResultatEcriture =
+  | { readonly statut: 'ok'; readonly instantane: InstantaneDistant }
+  | {
+    readonly statut: 'conflit';
+    /** L'état distant au moment du refus, ou `null` s'il n'a pas pu être relu. */
+    readonly distant: InstantaneDistant | null;
+  }
+  | { readonly statut: 'erreur'; readonly motif: string };
+
+function instantaneDepuis(ligne: Record<string, unknown>): InstantaneDistant {
+  const version = ligne['version'];
+  const schema = ligne['schema'];
+  return {
+    faits: ligne['faits'],
+    // Une version illisible devient 0, qui ne correspondra à aucune ligne :
+    // la prochaine écriture sera refusée plutôt que d'écraser à l'aveugle.
+    version: typeof version === 'number' && Number.isFinite(version) ? version : 0,
+    schema: typeof schema === 'number' && Number.isFinite(schema) ? schema : 0,
+    majLe: typeof ligne['maj_le'] === 'string' ? ligne['maj_le'] : null
+  };
+}
+
+function cheminDuCompte(session: Session): string {
+  return `/rest/v1/${TABLE_FAITS}?user_id=eq.${encodeURIComponent(session.utilisateurId)}`;
+}
+
+/**
+ * Lit les faits enregistrés sur le compte.
+ *
+ * Rend `null` quand le compte n'a encore rien : un compte neuf n'est pas une
+ * erreur, et l'afficher comme telle découragerait la première écriture.
+ */
+export async function tirerFaits(
+  config: ConfigSupabase,
+  session: Session
+): Promise<Resultat<InstantaneDistant | null>> {
+  const r = await appeler(
+    config,
+    `${cheminDuCompte(session)}&select=version,schema,faits,maj_le`,
+    { jeton: session.jeton }
+  );
+  if (r.statut === 'erreur') return r;
+
+  const lignes = Array.isArray(r.valeur) ? r.valeur : [];
+  const premiere = lignes[0] as Record<string, unknown> | undefined;
+  return {
+    statut: 'ok',
+    valeur: premiere === undefined ? null : instantaneDepuis(premiere)
+  };
+}
+
+/** Relit l'état distant après un refus, sans convertir un échec en erreur. */
+async function relireApresRefus(
+  config: ConfigSupabase,
+  session: Session
+): Promise<InstantaneDistant | null> {
+  const r = await tirerFaits(config, session);
+  return r.statut === 'ok' ? r.valeur : null;
+}
+
+/**
+ * Enregistre les faits sur le compte, SANS jamais écraser à l'aveugle.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE VERROU EST DANS LA REQUÊTE, PAS DANS L'APPLICATION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `versionAttendue` est celle lue au dernier échange. L'écriture porte le
+ * filtre `version=eq.<attendue>` : c'est le SERVEUR qui vérifie, en une seule
+ * opération atomique. Une vérification côté application — lire, comparer,
+ * écrire — laisserait entre la lecture et l'écriture une fenêtre où l'autre
+ * appareil se glisse. C'est exactement la perte qu'on cherche à empêcher.
+ *
+ * Aucune ligne modifiée signifie que la version distante a changé : refus.
+ *
+ * `versionAttendue` à `null` déclare une première écriture. Si une ligne
+ * existe déjà, le serveur rejette l'insertion (clé primaire) : là encore un
+ * conflit, pas une erreur — le compte contient quelque chose qu'on croyait
+ * absent, et l'utilisateur doit voir quoi avant de décider.
+ */
+export async function pousserFaits(
+  config: ConfigSupabase,
+  session: Session,
+  faits: unknown,
+  schema: number,
+  versionAttendue: number | null
+): Promise<ResultatEcriture> {
+  const commun = {
+    faits,
+    schema,
+    // Horloge du poste : affichée, jamais utilisée pour arbitrer.
+    maj_le: new Date().toISOString()
+  };
+  const entete = { Prefer: 'return=representation' };
+
+  const r = versionAttendue === null
+    ? await appeler(config, `/rest/v1/${TABLE_FAITS}`, {
+      method: 'POST',
+      jeton: session.jeton,
+      headers: entete,
+      body: JSON.stringify({ ...commun, user_id: session.utilisateurId, version: 1 })
+    })
+    : await appeler(config, `${cheminDuCompte(session)}&version=eq.${versionAttendue}`, {
+      method: 'PATCH',
+      jeton: session.jeton,
+      headers: entete,
+      body: JSON.stringify({ ...commun, version: versionAttendue + 1 })
+    });
+
+  if (r.statut === 'erreur') {
+    // 409 : violation de clé primaire — la ligne existait déjà.
+    if (r.code === 409) return { statut: 'conflit', distant: await relireApresRefus(config, session) };
+    return { statut: 'erreur', motif: r.motif };
+  }
+
+  const lignes = Array.isArray(r.valeur) ? r.valeur : [];
+  const ecrite = lignes[0] as Record<string, unknown> | undefined;
+  if (ecrite === undefined) {
+    return { statut: 'conflit', distant: await relireApresRefus(config, session) };
+  }
+  return { statut: 'ok', instantane: instantaneDepuis(ecrite) };
 }
 
 /* ── Conservation locale ───────────────────────────────────────────────── */

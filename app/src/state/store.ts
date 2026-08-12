@@ -20,7 +20,7 @@ import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, euros } from '../domain/types';
 import {
   CLE_STOCKAGE, type Client, type Depense, type Entreprise, type Faits,
-  type Mission, type Recette, faitsVides
+  type Mission, type Recette, completerFaits, faitsVides, motifRefusFaits
 } from './schema';
 import {
   nomAPropager, peutSupprimerClient, peutSupprimerMission, validerNomClient
@@ -139,6 +139,19 @@ interface MagasinFaits {
    * ferait disparaître une saisie faite hors ligne sans que personne le voie.
    */
   readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => void;
+
+  /**
+   * Remplace les faits par un bloc venu du compte distant.
+   *
+   * Contrairement à `remplacerParBundle`, qui convertit la structure de
+   * l'ancienne application, ce bloc est DÉJÀ au format de celle-ci — il a été
+   * écrit par elle, depuis un autre appareil. Il est validé avant d'entrer :
+   * un bloc écrit par une version plus récente est refusé, plutôt que rogné
+   * des champs que ce code ne connaît pas.
+   *
+   * Rend le motif du refus, ou `null` si l'adoption a eu lieu.
+   */
+  readonly adopterFaitsDistants: (brut: unknown) => string | null;
 
   /* ── Congés ───────────────────────────────────────────────────────────── */
 
@@ -528,6 +541,15 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     const faits = convertirBundle(bundle).faits;
     set({ faits });
     persister(stockageActif, faits);
+  },
+
+  adopterFaitsDistants: (brut) => {
+    const motif = motifRefusFaits(brut);
+    if (motif !== null) return motif;
+    const faits = completerFaits(brut);
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
   },
 
   viderReleve: () => {

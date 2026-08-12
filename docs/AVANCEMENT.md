@@ -85,11 +85,49 @@ encore la remplacer, et le tableau ci-dessous dit précisément ce qui manque.
 | **Créer un client** | ✅ | ✅ |
 | **Créer une mission** | ✅ | ✅ |
 | **Émettre une facture, et son PDF** | ✅ | ✅ |
-| **Écrire dans Supabase** (synchro) | ✅ | ❌ lecture seule |
+| **Écrire dans Supabase** (synchro) | ✅ | ✅ (12/08, table distincte) |
 
-**Il ne reste que la dernière ligne** avant de pouvoir retirer le legacy. Tant qu'elles ne sont pas faites, retirer `index.html` priverait
-l'utilisateur de son outil de facturation — et une facture non émise est un
-revenu non encaissé.
+**La parité fonctionnelle est atteinte.** Le legacy peut être retiré au
+calendrier prévu (J6, après le 31/10) sans priver l'utilisateur d'une fonction
+— notamment de son outil de facturation, une facture non émise étant un revenu
+non encaissé.
+
+**L'écriture Supabase, et pourquoi elle n'écrase jamais en silence.** Les faits
+de cette version vont dans `freel_faits`, **pas** dans `user_data` : deux
+tables, deux vies, l'ancienne application reste utilisable et un essai de la
+nouvelle ne peut pas abîmer ses données. Le script de création est dans
+`docs/supabase.sql` (RLS activée, aucune règle de suppression).
+
+Chaque ligne porte un compteur `version`. L'application n'écrit qu'avec le
+filtre `version = <celle qu'elle a lue>` : c'est le **serveur** qui vérifie, en
+une opération atomique. Une vérification côté application — lire, comparer,
+écrire — laisserait entre la lecture et l'écriture une fenêtre où le second
+appareil se glisse, et c'est exactement la perte à empêcher. Zéro ligne
+modifiée ⇒ refus, et l'écran présente les deux états côte à côte plutôt que de
+proposer « réessayez », qui écraserait justement ce qu'il fallait préserver.
+
+Trois refus délibérés, tous du même ordre — ne rien faire vaut mieux que faire
+à l'aveugle :
+
+- **aucune fusion automatique.** Réunir deux jeux d'écritures comptables
+  demande de savoir, ligne à ligne, laquelle fait foi ; le deviner produirait
+  un registre que personne n'a validé ;
+- **envoi indisponible tant que l'état du compte est inconnu.** `'inconnu'`
+  n'est pas `null` : l'un dit « le compte est vide », l'autre « on n'a pas
+  réussi à regarder ». Les confondre autoriserait un premier envoi qui
+  écraserait en fait des données existantes ;
+- **un bloc écrit par une version plus récente est refusé, pas raboté.** Le
+  charger reviendrait à en ignorer les champs inconnus, puis à les effacer au
+  premier renvoi : une version ancienne détruirait le travail fait sur une
+  plus récente.
+
+Ce dernier point a exigé de valider les faits à l'entrée (`motifRefusFaits`).
+Tant qu'ils ne venaient que de `localStorage`, un `JSON.parse(...) as Faits`
+passait : l'application relisait ce qu'elle avait écrit. Venant du réseau, le
+transtypage laissait entrer un `recettes` qui n'est pas un tableau, et l'erreur
+n'apparaissait qu'à l'affichage — après avoir écrasé l'état local. Portée
+réelle du contrôle : la **forme de premier niveau**, pas le contenu de chaque
+enregistrement.
 
 **Ordre respecté.** Clients et missions d'abord, car une facture s'y rattache
 — fait le 12/08 ; la facturation ensuite — faite le 12/08 ; l'écriture Supabase
@@ -407,6 +445,14 @@ tests verts.
 - [x] ~~`banqueReliee` retiré du schéma~~ — il était devenu DÉRIVABLE dès que
       les mouvements ont existé. Le garder aurait enfreint l'invariant n°5, et
       permis qu'un booléen à `true` coexiste avec une liste vide.
+- [x] ~~Écriture Supabase~~ — table `freel_faits`, distincte de `user_data`.
+      Verrou optimiste : le filtre `version=eq.<lue>` voyage dans la requête,
+      donc la vérification est **atomique et faite par le serveur**. Zéro ligne
+      modifiée ⇒ refus, deux états montrés côte à côte, aucune fusion devinée.
+      L'envoi reste indisponible tant que l'état du compte est inconnu.
+- [x] ~~Validation des faits à l'entrée~~ — `motifRefusFaits` refuse un bloc
+      écrit par une version plus récente **plutôt que d'en raboter les champs
+      inconnus**, qui seraient effacés au premier renvoi.
 
 ### J6 · bascule (après le 31/10)
 - [ ] Nouvelle version à la racine, ancienne **neutralisée en écriture** sous `/legacy/`
@@ -416,7 +462,13 @@ tests verts.
 - [ ] Test Playwright prouvant zéro écriture et zéro requête depuis `/legacy/`
 
 ### Hors séquence
-- [ ] Règles RLS Supabase durcies (vérifiées actives, à documenter) — 1 h
+- [ ] Règles RLS Supabase durcies (vérifiées actives, à documenter) — 1 h.
+      **Fait pour `freel_faits`** : règles écrites et commentées dans
+      `docs/supabase.sql`, sans règle de suppression — rien dans l'application
+      ne supprime les données comptables d'un compte, et une règle qui
+      l'autoriserait ne servirait qu'à rendre possible un accident. **Reste à
+      faire** : vérifier et documenter celles de `user_data`, que cette version
+      ne fait que lire.
 
 ---
 

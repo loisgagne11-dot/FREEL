@@ -1,42 +1,51 @@
 import { useEffect, useId, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
-  type ConfigSupabase, type DonneesLegacy, type Session,
+  type ConfigSupabase, type DonneesLegacy, type InstantaneDistant, type Session,
   bundleDepuisLegacy, chargerDonneesLegacy, configDeBuild, configEffective,
-  ecrireConfig, ecrireSession, lireSession, rafraichir, seConnecter,
-  seDeconnecter, sessionValide
+  ecrireConfig, ecrireSession, lireSession, pousserFaits, rafraichir,
+  seConnecter, seDeconnecter, sessionValide, tirerFaits
 } from '../../infra/supabase';
+import {
+  VERSION_SCHEMA, type Faits, completerFaits, motifRefusFaits
+} from '../../state/schema';
 import { convertirBundle, type RapportMigration } from '../../infra/migration';
 import { Info } from '../components/Info';
 import { dateCourte } from '../format';
 import styles from './Compte.module.css';
 
 /**
- * Compte distant — connexion et chargement des données.
+ * Compte distant — connexion, chargement et enregistrement.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * ON MONTRE AVANT DE REMPLACER
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Charger les données du compte ÉCRASE l'état local. C'est ce qu'on veut
+ * Récupérer les données du compte ÉCRASE l'état local. C'est ce qu'on veut
  * — c'est le sens d'un compte partagé entre appareils — mais le faire en
  * silence ferait disparaître une saisie faite hors ligne sans que personne le
- * voie. L'écran affiche donc d'abord ce qui serait chargé, avec le même
- * rapport que la migration locale, et attend une confirmation.
- *
- * La conversion passe par `convertirBundle`, celle-là même qu'emploie la
- * migration depuis le navigateur : deux chemins distincts finiraient par
- * diverger, et l'application dirait alors deux choses différentes selon
- * l'origine de la donnée.
+ * voie. L'écran affiche donc d'abord ce qui serait chargé, et attend une
+ * confirmation.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * CE QUI N'EST PAS ÉCRIT
+ * DEUX TABLES, ET UNE SEULE REÇOIT DES ÉCRITURES
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Rien n'est envoyé au serveur. La table de l'ancienne application est lue,
- * jamais modifiée : c'est la condition pour que l'ancienne version reste
- * utilisable pendant toute la cohabitation, et pour qu'un essai de la nouvelle
- * ne puisse pas abîmer des données comptables.
+ * La table de l'ancienne application est LUE, jamais modifiée : c'est la
+ * condition pour que l'ancienne version reste utilisable pendant toute la
+ * cohabitation, et pour qu'un essai de la nouvelle ne puisse pas abîmer des
+ * données comptables. Les faits de cette version-ci vont dans une table
+ * distincte, la seule où l'écran écrive.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * AUCUN ENVOI À L'AVEUGLE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Chaque envoi porte la version qu'on a lue. Si le compte a bougé depuis, le
+ * serveur refuse, et l'écran présente les deux états côte à côte : c'est à
+ * l'utilisateur de trancher, en sachant ce qu'il perd de chaque côté. Tant
+ * que l'état du compte n'est pas connu, l'envoi reste indisponible — envoyer
+ * sans savoir sur quoi on écrit est précisément ce qu'il faut empêcher.
  */
 
 /** Le stockage du navigateur, ou un substitut inerte s'il est bloqué. */
@@ -55,15 +64,51 @@ function stockageNavigateur() {
   }
 }
 
+/**
+ * Ce qu'on sait de la ligne du compte.
+ *
+ * `'inconnu'` n'est pas `null` : l'un dit « le compte est vide », l'autre
+ * « on n'a pas réussi à regarder ». Les confondre autoriserait un premier
+ * envoi qui écraserait en fait des données existantes.
+ */
+type EtatDistant = InstantaneDistant | null | 'inconnu';
+
 type Etat =
   | { readonly phase: 'deconnecte' }
   | { readonly phase: 'connecte'; readonly session: Session }
   | {
-    readonly phase: 'apercu';
+    readonly phase: 'apercu-legacy';
     readonly session: Session;
     readonly donnees: DonneesLegacy;
     readonly rapport: RapportMigration;
+  }
+  | {
+    readonly phase: 'apercu-distant';
+    readonly session: Session;
+    readonly instantane: InstantaneDistant;
+    readonly faits: Faits;
+  }
+  | {
+    readonly phase: 'conflit';
+    readonly session: Session;
+    readonly distant: InstantaneDistant | null;
   };
+
+interface Resume {
+  readonly clients: number;
+  readonly missions: number;
+  readonly recettes: number;
+  readonly depenses: number;
+}
+
+function resumer(faits: Faits): Resume {
+  return {
+    clients: faits.clients.length,
+    missions: faits.missions.length,
+    recettes: faits.recettes.length,
+    depenses: faits.depenses.length
+  };
+}
 
 export interface ProprietesCompte {
   /** Injectable pour les tests, où `window` n'a pas de stockage utile. */
@@ -73,9 +118,12 @@ export interface ProprietesCompte {
 export function Compte({ stockage }: ProprietesCompte = {}) {
   const local = stockage ?? stockageNavigateur();
   const remplacerParBundle = useFaits((e) => e.remplacerParBundle);
+  const adopterFaitsDistants = useFaits((e) => e.adopterFaitsDistants);
+  const faitsLocaux = useFaits((e) => e.faits);
 
   const [config, setConfig] = useState<ConfigSupabase | null>(() => configEffective(local));
   const [etat, setEtat] = useState<Etat>({ phase: 'deconnecte' });
+  const [distant, setDistant] = useState<EtatDistant>('inconnu');
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -90,12 +138,14 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
 
     if (sessionValide(session)) {
       setEtat({ phase: 'connecte', session });
+      void relireEtatDistant(session);
       return;
     }
     void rafraichir(config, session).then((r) => {
       if (r.statut === 'ok') {
         ecrireSession(local, r.valeur);
         setEtat({ phase: 'connecte', session: r.valeur });
+        void relireEtatDistant(r.valeur);
       } else {
         ecrireSession(local, null);
       }
@@ -111,18 +161,96 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     }} />;
   }
 
+  /**
+   * Va chercher où en est le compte.
+   *
+   * Un échec laisse l'état à `'inconnu'`, ce qui interdit l'envoi. C'est
+   * voulu : écrire sans savoir ce qu'on recouvre est la seule façon de perdre
+   * des données sans s'en apercevoir.
+   */
+  async function relireEtatDistant(session: Session): Promise<InstantaneDistant | null> {
+    if (config === null) return null;
+    const r = await tirerFaits(config, session);
+    if (r.statut === 'erreur') {
+      setDistant('inconnu');
+      setErreur(r.motif);
+      return null;
+    }
+    setDistant(r.valeur);
+    return r.valeur;
+  }
+
   async function connecter(email: string, motDePasse: string): Promise<void> {
     if (config === null) return;
     setEnCours(true);
     setErreur(null);
     const r = await seConnecter(config, email, motDePasse);
-    setEnCours(false);
-    if (r.statut === 'erreur') { setErreur(r.motif); return; }
+    if (r.statut === 'erreur') { setEnCours(false); setErreur(r.motif); return; }
     ecrireSession(local, r.valeur);
     setEtat({ phase: 'connecte', session: r.valeur });
+    await relireEtatDistant(r.valeur);
+    setEnCours(false);
   }
 
-  async function apercevoir(session: Session): Promise<void> {
+  /* ── Envoyer ─────────────────────────────────────────────────────────── */
+
+  async function envoyer(session: Session, versionAttendue: number | null): Promise<void> {
+    if (config === null) return;
+    setEnCours(true);
+    setErreur(null);
+    setMessage(null);
+
+    const r = await pousserFaits(
+      config, session, faitsLocaux, VERSION_SCHEMA, versionAttendue
+    );
+    setEnCours(false);
+
+    if (r.statut === 'erreur') { setErreur(r.motif); return; }
+    if (r.statut === 'conflit') {
+      setDistant(r.distant);
+      setEtat({ phase: 'conflit', session, distant: r.distant });
+      return;
+    }
+    setDistant(r.instantane);
+    setEtat({ phase: 'connecte', session });
+    setMessage('Données de cet appareil enregistrées sur le compte.');
+  }
+
+  /* ── Récupérer ───────────────────────────────────────────────────────── */
+
+  async function recuperer(session: Session): Promise<void> {
+    setEnCours(true);
+    setErreur(null);
+    setMessage(null);
+
+    const instantane = await relireEtatDistant(session);
+    setEnCours(false);
+    if (instantane === null) {
+      setMessage('Ce compte ne contient encore aucune donnée de cette version.');
+      return;
+    }
+
+    // Un bloc écrit par une version plus récente est refusé ici, avant tout
+    // remplacement : le charger reviendrait à effacer ce que ce code ne sait
+    // pas lire dès le premier renvoi.
+    const motif = motifRefusFaits(instantane.faits);
+    if (motif !== null) { setErreur(motif); return; }
+
+    setEtat({
+      phase: 'apercu-distant', session, instantane, faits: completerFaits(instantane.faits)
+    });
+  }
+
+  function confirmerRecuperation(session: Session, faits: Faits): void {
+    const motif = adopterFaitsDistants(faits);
+    if (motif !== null) { setErreur(motif); return; }
+    setEtat({ phase: 'connecte', session });
+    setMessage('Données du compte chargées. Elles remplacent l’état de cet appareil.');
+  }
+
+  /* ── Ancienne application ────────────────────────────────────────────── */
+
+  async function apercevoirLegacy(session: Session): Promise<void> {
     if (config === null) return;
     setEnCours(true);
     setErreur(null);
@@ -132,23 +260,24 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     setEnCours(false);
     if (r.statut === 'erreur') { setErreur(r.motif); return; }
     if (r.valeur === null) {
-      setMessage('Ce compte ne contient encore aucune donnée.');
+      setMessage('Ce compte ne contient aucune donnée de l’ancienne application.');
       return;
     }
     const { rapport } = convertirBundle(bundleDepuisLegacy(r.valeur));
-    setEtat({ phase: 'apercu', session, donnees: r.valeur, rapport });
+    setEtat({ phase: 'apercu-legacy', session, donnees: r.valeur, rapport });
   }
 
-  function confirmer(donnees: DonneesLegacy, session: Session): void {
+  function confirmerLegacy(donnees: DonneesLegacy, session: Session): void {
     remplacerParBundle(bundleDepuisLegacy(donnees));
     setEtat({ phase: 'connecte', session });
-    setMessage('Données du compte chargées. Elles remplacent l’état local.');
+    setMessage('Données de l’ancienne application chargées sur cet appareil.');
   }
 
   async function deconnecter(session: Session): Promise<void> {
     if (config !== null) await seDeconnecter(config, session);
     ecrireSession(local, null);
     setEtat({ phase: 'deconnecte' });
+    setDistant('inconnu');
     setMessage(null);
   }
 
@@ -157,10 +286,10 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
       <h2 id={`${idChamp}-titre`} className={styles.titreCarte}>
         Compte et synchronisation
         <Info libelle="Ce que fait la connexion au compte">
-          Elle lit les données enregistrées par l’ancienne application et les
-          convertit dans le nouveau modèle. <strong>Rien n’est écrit sur le
-          serveur</strong>&nbsp;: l’ancienne version reste utilisable, et un
-          essai de la nouvelle ne peut pas abîmer des données comptables.
+          Elle enregistre et relit les données de cette version dans une table
+          qui lui est propre. <strong>La table de l’ancienne application n’est
+          jamais modifiée</strong>&nbsp;: elle reste utilisable, et un essai de
+          cette version ne peut pas abîmer ses données.
         </Info>
       </h2>
 
@@ -182,31 +311,75 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
           </dl>
 
           {etat.phase === 'connecte' && (
-            <div className={styles.actions}>
-              <button
-                type="button"
-                className={styles.actionPrincipale}
-                disabled={enCours}
-                onClick={() => void apercevoir(etat.session)}
-              >
-                {enCours ? 'Lecture…' : 'Charger les données du compte'}
-              </button>
-              <button
-                type="button"
-                className={styles.action}
-                onClick={() => void deconnecter(etat.session)}
-              >
-                Se déconnecter
-              </button>
-            </div>
+            <>
+              <EtatDuCompte distant={distant} local={resumer(faitsLocaux)} />
+              <div className={styles.actions}>
+                <button
+                  type="button"
+                  className={styles.actionPrincipale}
+                  disabled={enCours || distant === 'inconnu'}
+                  onClick={() => void envoyer(
+                    etat.session, distant === 'inconnu' ? null : distant?.version ?? null
+                  )}
+                >
+                  {enCours ? 'Envoi…' : 'Envoyer sur le compte'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.action}
+                  disabled={enCours}
+                  onClick={() => void recuperer(etat.session)}
+                >
+                  Récupérer depuis le compte
+                </button>
+                <button
+                  type="button"
+                  className={styles.action}
+                  disabled={enCours}
+                  onClick={() => void apercevoirLegacy(etat.session)}
+                >
+                  Reprendre l’ancienne application
+                </button>
+                <button
+                  type="button"
+                  className={styles.action}
+                  onClick={() => void deconnecter(etat.session)}
+                >
+                  Se déconnecter
+                </button>
+              </div>
+            </>
           )}
 
-          {etat.phase === 'apercu' && (
+          {etat.phase === 'apercu-legacy' && (
             <Apercu
+              titre="Données de l’ancienne application"
               rapport={etat.rapport}
               majLe={etat.donnees.updated_at}
-              onConfirmer={() => confirmer(etat.donnees, etat.session)}
+              onConfirmer={() => confirmerLegacy(etat.donnees, etat.session)}
               onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
+            />
+          )}
+
+          {etat.phase === 'apercu-distant' && (
+            <ApercuDistant
+              resume={resumer(etat.faits)}
+              majLe={etat.instantane.majLe}
+              onConfirmer={() => confirmerRecuperation(etat.session, etat.faits)}
+              onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
+            />
+          )}
+
+          {etat.phase === 'conflit' && (
+            <Conflit
+              distant={etat.distant}
+              local={resumer(faitsLocaux)}
+              enCours={enCours}
+              onEcraser={() => void envoyer(etat.session, etat.distant?.version ?? null)}
+              onAbandonner={() => {
+                setEtat({ phase: 'connecte', session: etat.session });
+                setMessage('Envoi abandonné. Rien n’a été modifié sur le compte.');
+              }}
             />
           )}
         </>
@@ -219,14 +392,164 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
 }
 
 /**
- * Ce qui serait chargé.
+ * Où en est le compte par rapport à cet appareil.
+ *
+ * Sans ce repère, « Envoyer » et « Récupérer » sont deux boutons qu'on
+ * actionne au hasard, dont l'un écrase toujours quelque chose.
+ */
+function EtatDuCompte({ distant, local }: { distant: EtatDistant; local: Resume }) {
+  if (distant === 'inconnu') {
+    return (
+      <p className={styles.avertissement}>
+        L’état du compte n’a pas pu être lu. L’envoi reste indisponible tant
+        qu’on ignore ce qu’il contient&nbsp;: écrire sans le savoir pourrait
+        recouvrir des données sans que rien ne l’annonce.
+      </p>
+    );
+  }
+
+  if (distant === null) {
+    return (
+      <p className={styles.explication}>
+        Ce compte ne contient encore rien pour cette version. Le premier envoi
+        y déposera les {local.recettes} recette(s) et {local.depenses} dépense(s)
+        de cet appareil.
+      </p>
+    );
+  }
+
+  return (
+    <dl className={styles.detail}>
+      <div className={styles.ligne}>
+        <dt>Compte enregistré le</dt>
+        <dd>{distant.majLe === null ? '—' : dateCourte(distant.majLe.slice(0, 10))}</dd>
+      </div>
+      <div className={styles.ligne}>
+        <dt>Cet appareil</dt>
+        <dd>{local.recettes} recette(s), {local.depenses} dépense(s)</dd>
+      </div>
+    </dl>
+  );
+}
+
+/**
+ * Le compte a bougé entre la lecture et l'envoi.
+ *
+ * Aucune fusion automatique n'est tentée. Réunir deux jeux d'écritures
+ * comptables demande de savoir, ligne à ligne, laquelle fait foi ; le deviner
+ * produirait un registre que personne n'a validé. On présente donc les deux
+ * états et on laisse choisir — en disant ce que chaque choix efface.
+ */
+function Conflit(
+  { distant, local, enCours, onEcraser, onAbandonner }: {
+    distant: InstantaneDistant | null;
+    local: Resume;
+    enCours: boolean;
+    onEcraser: () => void;
+    onAbandonner: () => void;
+  }
+) {
+  const lisible = distant !== null && motifRefusFaits(distant.faits) === null;
+  const cote = lisible && distant !== null ? resumer(completerFaits(distant.faits)) : null;
+
+  return (
+    <div className={styles.apercu}>
+      <p className={styles.avertissement}>
+        Le compte a été modifié depuis la dernière lecture, sans doute par un
+        autre appareil. <strong>Rien n’a été enregistré</strong>&nbsp;: écraser
+        ces modifications sans les montrer les aurait fait disparaître en
+        silence.
+      </p>
+
+      <dl className={styles.detail}>
+        <div className={styles.ligne}>
+          <dt>Cet appareil</dt>
+          <dd>{local.recettes} recette(s), {local.depenses} dépense(s)</dd>
+        </div>
+        <div className={styles.ligne}>
+          <dt>Le compte</dt>
+          <dd>
+            {cote === null
+              ? 'contenu illisible'
+              : `${cote.recettes} recette(s), ${cote.depenses} dépense(s)`}
+          </dd>
+        </div>
+        {distant?.majLe != null && (
+          <div className={styles.ligne}>
+            <dt>Enregistré le</dt>
+            <dd>{dateCourte(distant.majLe.slice(0, 10))}</dd>
+          </div>
+        )}
+      </dl>
+
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={styles.action}
+          disabled={enCours}
+          onClick={onEcraser}
+        >
+          Écraser le compte avec cet appareil
+        </button>
+        <button type="button" className={styles.actionPrincipale} onClick={onAbandonner}>
+          Abandonner l’envoi
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Ce qui serait chargé depuis la table de cette version. */
+function ApercuDistant(
+  { resume, majLe, onConfirmer, onAnnuler }: {
+    resume: Resume;
+    majLe: string | null;
+    onConfirmer: () => void;
+    onAnnuler: () => void;
+  }
+) {
+  return (
+    <div className={styles.apercu}>
+      <p className={styles.avertissement}>
+        Ces données <strong>remplaceront</strong> l’état actuel de cet appareil.
+        Ce qui n’a pas été envoyé sur le compte sera perdu.
+      </p>
+
+      <dl className={styles.detail}>
+        {majLe !== null && (
+          <div className={styles.ligne}>
+            <dt>Enregistré le</dt>
+            <dd>{dateCourte(majLe.slice(0, 10))}</dd>
+          </div>
+        )}
+        <div className={styles.ligne}><dt>Clients</dt><dd>{resume.clients}</dd></div>
+        <div className={styles.ligne}><dt>Missions</dt><dd>{resume.missions}</dd></div>
+        <div className={styles.ligne}><dt>Recettes</dt><dd>{resume.recettes}</dd></div>
+        <div className={styles.ligne}><dt>Dépenses</dt><dd>{resume.depenses}</dd></div>
+      </dl>
+
+      <div className={styles.actions}>
+        <button type="button" className={styles.actionPrincipale} onClick={onConfirmer}>
+          Remplacer les données de cet appareil
+        </button>
+        <button type="button" className={styles.action} onClick={onAnnuler}>
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Ce qui serait chargé depuis l'ancienne application.
  *
  * Le même rapport que la migration locale : nombres par entité, anomalies, et
  * champs sans destination. Un chargement qui ne dit rien de ce qu'il apporte
  * ne permet pas de constater une perte.
  */
 function Apercu(
-  { rapport, majLe, onConfirmer, onAnnuler }: {
+  { titre, rapport, majLe, onConfirmer, onAnnuler }: {
+    titre: string;
     rapport: RapportMigration;
     majLe: string | null;
     onConfirmer: () => void;
@@ -237,8 +560,8 @@ function Apercu(
   return (
     <div className={styles.apercu}>
       <p className={styles.avertissement}>
-        Ces données <strong>remplaceront</strong> l’état actuel de cet appareil.
-        Ce qui n’a pas été enregistré sur le compte sera perdu.
+        {titre} — elles <strong>remplaceront</strong> l’état actuel de cet
+        appareil. Ce qui n’a pas été enregistré sur le compte sera perdu.
       </p>
 
       <dl className={styles.detail}>
@@ -334,7 +657,8 @@ function SaisieConfig(
           Dans le tableau de bord Supabase, section <em>Project Settings → API</em>
           &nbsp;: l’URL du projet et la clé <em>anon public</em>. Cette clé est
           faite pour être publique&nbsp;; ce qui protège les données, ce sont les
-          règles d’accès définies sur le serveur.
+          règles d’accès définies sur le serveur. Le script de préparation de la
+          base est fourni dans <em>docs/supabase.sql</em>.
         </Info>
       </h2>
 
