@@ -382,9 +382,15 @@ if (appScript) {
     });
 
     // ===== Barème résolu par période =====
-    // Le taux BNC change EN COURS D'ANNÉE (1er juillet 2024 et 2026). Une
-    // résolution par année appliquait 25,6 % à juillet 2026 au lieu de
-    // 26,1 %. Ces assertions verrouillent la résolution par mois.
+    // Le taux BNC a changé EN COURS D'ANNÉE au 1er juillet 2024 : une
+    // résolution par année civile appliquerait 21,1 % à tout 2024, alors que
+    // le second semestre est à 23,1 %. Ces assertions verrouillent la
+    // résolution par mois.
+    //
+    // Une bascule à 26,1 % au 1er juillet 2026 avait aussi été inscrite ici.
+    // Elle n'a jamais eu lieu : le décret n° 2025-943 du 8 septembre 2025 a
+    // plafonné la dernière marche à 25,6 %. Les assertions qui l'attendaient
+    // verrouillaient donc une erreur.
     section('Barème par période');
 
     const attendus = [
@@ -394,10 +400,10 @@ if (appScript) {
       ['2024-12', 0.231, '2e semestre 2024'],
       ['2025-01', 0.246, '2025, taux unique'],
       ['2025-12', 0.246, 'décembre 2025'],
-      ['2026-01', 0.256, '1er semestre 2026'],
-      ['2026-06', 0.256, 'juin 2026, dernier mois avant bascule'],
-      ['2026-07', 0.261, 'juillet 2026, bascule mi-année'],
-      ['2026-12', 0.261, 'décembre 2026']
+      ['2026-01', 0.256, 'janvier 2026'],
+      ['2026-07', 0.256, 'juillet 2026 : pas de bascule, contrairement au calendrier initial'],
+      ['2026-12', 0.256, 'décembre 2026'],
+      ['2027-06', 0.256, '2027, période toujours ouverte']
     ];
     attendus.forEach(function (cas) {
       verifie('Taux BNC ' + cas[0] + ' = ' + (cas[1] * 100).toFixed(1) + '% (' + cas[2] + ')', function () {
@@ -405,12 +411,12 @@ if (appScript) {
       });
     });
 
-    verifie('Les deux semestres 2026 diffèrent (une table par année ne peut pas l\'exprimer)', function () {
-      return sandbox.getUrssafRateAt('2026-06', 'BNC', false)
-        !== sandbox.getUrssafRateAt('2026-07', 'BNC', false);
+    verifie('Les deux semestres 2024 diffèrent (une table par année ne peut pas l\'exprimer)', function () {
+      return sandbox.getUrssafRateAt('2024-06', 'BNC', false)
+        !== sandbox.getUrssafRateAt('2024-07', 'BNC', false);
     });
     verifie('ACRE applique bien un abattement de 50 %', function () {
-      return sandbox.getUrssafRateAt('2026-07', 'BNC', true) === 0.261 * 0.5;
+      return sandbox.getUrssafRateAt('2026-07', 'BNC', true) === 0.256 * 0.5;
     });
     verifie('Un mois antérieur à toute période connue ne renvoie pas de taux', function () {
       return sandbox.getUrssafRateAt('2019-01', 'BNC', false) === null;
@@ -441,7 +447,7 @@ if (appScript) {
     });
     verifie('Le futur reste couvert par la période ouverte (un taux court jusqu\'au suivant)', function () {
       const info = sandbox.getUrssafRateInfo('2031-03');
-      return info.estRefuse === false && info.taux === 0.261;
+      return info.estRefuse === false && info.taux === 0.256;
     });
     verifie('Aucun libellé d\'hypothèse sur une période publiée', function () {
       return sandbox.getUrssafHypotheseLabel('2026-07') === null;

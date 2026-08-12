@@ -45,7 +45,7 @@ describe('volet 2 — charges sur recettes encaissées non déclarées', () => {
   // l'encaissement et l'appel de cotisations, la dette existe déjà.
   it('provisionne les cotisations dues sur une recette encaissée non déclarée', () => {
     const r = voletAProvisionner([rec('r1', 10000, '2026-07-15')], declarees(), ctx());
-    expect(r.montant).toBe(2610); // 10 000 × 26,1 % (juillet 2026)
+    expect(r.montant).toBe(2560); // 10 000 × 26,1 % (juillet 2026)
   });
 
   it('ignore une recette dont la période est déjà déclarée, pour ne pas compter deux fois', () => {
@@ -55,22 +55,25 @@ describe('volet 2 — charges sur recettes encaissées non déclarées', () => {
 
   // Le taux se lit au mois d'encaissement : un CA annuel × taux unique serait
   // faux, puisque le taux change au 1er juillet.
-  it('résout le taux au mois d\'encaissement, de part et d\'autre de la bascule', () => {
-    const juin = voletAProvisionner([rec('r1', 10000, '2026-06-30')], declarees(), ctx());
-    const juillet = voletAProvisionner([rec('r2', 10000, '2026-07-01')], declarees(), ctx());
-    expect(juin.montant).toBe(2560);
-    expect(juillet.montant).toBe(2610);
+  // La bascule qui existe réellement est celle du 1er juillet 2024 : 21,1 %
+  // avant, 23,1 % après. Celle de juillet 2026 avait été programmée puis
+  // annulée par le décret n° 2025-943.
+  it('résout le taux au mois d\'encaissement, de part et d\'autre d\'une bascule', () => {
+    const juin = voletAProvisionner([rec('r1', 10000, '2024-06-30')], declarees(), ctx());
+    const juillet = voletAProvisionner([rec('r2', 10000, '2024-07-01')], declarees(), ctx());
+    expect(juin.montant).toBe(2110);
+    expect(juillet.montant).toBe(2310);
     expect(juin.montant).not.toBe(juillet.montant);
   });
 
   it('ajoute l\'impôt et les contributions au taux de cotisations', () => {
     const r = voletAProvisionner([rec('r1', 10000, '2026-07-15')], declarees(), ctx(0.022));
-    expect(r.montant).toBe(2830); // 10 000 × (26,1 % + 2,2 %)
+    expect(r.montant).toBe(2780); // 10 000 × (25,6 % + 2,2 %)
   });
 
   it('applique l\'abattement ACRE quand la recette y est éligible', () => {
     const r = voletAProvisionner([rec('r1', 10000, '2026-07-15')], declarees(), ctx(0, 'BNC', true));
-    expect(r.montant).toBe(1305); // 10 000 × 13,05 %
+    expect(r.montant).toBe(1280); // 10 000 × 13,05 %
   });
 
   // Une recette non calculable ne doit pas disparaître en silence : le total
@@ -88,7 +91,7 @@ describe('volet 2 — charges sur recettes encaissées non déclarées', () => {
       [rec('vieux', 10000, '2019-03-10'), rec('r1', 10000, '2026-07-15')],
       declarees(), ctx()
     );
-    expect(r.montant).toBe(2610);
+    expect(r.montant).toBe(2560);
     expect(r.nonCalculables).toHaveLength(1);
   });
 });
@@ -102,8 +105,8 @@ describe('les deux volets réunis', () => {
       ctx()
     );
     expect(d.voletConstate).toBe(1000);
-    expect(d.voletAProvisionner).toBe(2610);
-    expect(d.total).toBe(3610);
+    expect(d.voletAProvisionner).toBe(2560);
+    expect(d.total).toBe(3560);
     expect(d.recettesNonCalculables).toHaveLength(0);
   });
 
@@ -113,13 +116,13 @@ describe('les deux volets réunis', () => {
     const recettes = [rec('r1', 10000, '2026-07-15')];
 
     const avant = provisions([], recettes, declarees(), ctx());
-    expect(avant.voletAProvisionner).toBe(2610);
+    expect(avant.voletAProvisionner).toBe(2560);
     expect(avant.voletConstate).toBe(0);
 
     // Après déclaration, l'URSSAF émet l'échéance correspondante.
-    const apres = provisions([ech('urssaf-T3', 2610, false)], recettes, declarees('2026-07'), ctx());
+    const apres = provisions([ech('urssaf-T3', 2560, false)], recettes, declarees('2026-07'), ctx());
     expect(apres.voletAProvisionner).toBe(0);
-    expect(apres.voletConstate).toBe(2610);
+    expect(apres.voletConstate).toBe(2560);
 
     // Le total ne bouge pas : c'est la même dette, vue à deux stades.
     expect(apres.total).toBe(avant.total);

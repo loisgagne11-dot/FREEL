@@ -5,6 +5,7 @@ import { PERIODES_URSSAF, type PeriodeBareme } from '../../domain/bareme/urssaf'
 import { dateISO, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE } from '../../state/schema';
+import { Compte } from './Compte';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte } from '../format';
@@ -33,12 +34,13 @@ import styles from './Config.module.css';
  * (décision D5) : elle proposait des actions que rien ne rattachait aux faits.
  */
 
-type Section = 'profil' | 'bareme' | 'donnees';
+type Section = 'profil' | 'bareme' | 'donnees' | 'compte';
 
 const SECTIONS = [
   { id: 'profil' as Section, libelle: 'Profil' },
   { id: 'bareme' as Section, libelle: 'Barème' },
-  { id: 'donnees' as Section, libelle: 'Données' }
+  { id: 'donnees' as Section, libelle: 'Données' },
+  { id: 'compte' as Section, libelle: 'Compte' }
 ];
 
 const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: string }[] = [
@@ -77,6 +79,13 @@ export function Config() {
 
         <PanneauOnglet idGroupe={idGroupe} id="donnees" actif={section === 'donnees'}>
           <Donnees nomFichier={nomExport(faits.entreprise)} />
+        </PanneauOnglet>
+
+        <PanneauOnglet idGroupe={idGroupe} id="compte" actif={section === 'compte'}>
+          {/* Monté seulement à l'ouverture : reprendre une session et
+              interroger le serveur n'a pas à se produire chaque fois qu'on
+              vient régler son profil. */}
+          {section === 'compte' && <Compte />}
         </PanneauOnglet>
       </div>
     </>

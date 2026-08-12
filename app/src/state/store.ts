@@ -29,7 +29,7 @@ import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
 } from '../domain/bareme/urssaf';
 import type { EtatRapprochement } from '../domain/calculs/depenses';
-import { type Stockage, migrer } from '../infra/migration';
+import { type Stockage, convertirBundle, migrer } from '../infra/migration';
 
 /** Le stockage du navigateur, ou `null` quand il est indisponible. */
 function stockageNavigateur(): Stockage | null {
@@ -124,6 +124,17 @@ interface MagasinFaits {
 
   /** Efface tous les mouvements importés. Ne touche à aucune écriture. */
   readonly viderReleve: () => void;
+
+  /* ── Compte distant ───────────────────────────────────────────────────── */
+
+  /**
+   * Remplace les faits par ceux d'un bundle distant.
+   *
+   * Écrase l'état local : c'est délibéré, et c'est pourquoi l'écran montre
+   * d'abord ce qui serait chargé et demande confirmation. Charger en silence
+   * ferait disparaître une saisie faite hors ligne sans que personne le voie.
+   */
+  readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => void;
 
   /* ── Congés ───────────────────────────────────────────────────────────── */
 
@@ -364,6 +375,12 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
       mouvementsBancaires: actuel.mouvementsBancaires.map((m) =>
         (m.id === mouvementId ? { ...m, sansContrepartie: sans, rapprocheAvec: null } : m))
     };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  remplacerParBundle: (bundle) => {
+    const faits = convertirBundle(bundle).faits;
     set({ faits });
     persister(stockageActif, faits);
   },
