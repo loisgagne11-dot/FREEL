@@ -304,30 +304,44 @@ tests verts.
       Tests éprouvés par mutation : réintroduire le facteur `× 1,56` déclenche
       2 échecs, inverser la borne du seuil majoré 1 échec.
 - [ ] Grille CFE et ACRE par période (non traités)
-- [ ] `provisions()` **à deux volets** (voir D3) : échéances émises non payées
-      **+** charges à provisionner sur recettes encaissées non déclarées. Exige
-      un fait **« période déclarée »** qui n'existe nulle part aujourd'hui
-- [ ] `dispo()`, `versable()`, réserve unifiée (D4)
-- [ ] Régime d'imposition comme discriminant (D2) : VL ⇒ 2,2 % intégré au
-      prélèvement URSSAF et **aucun** acompte PAS ; barème ⇒ acompte PAS
-      **saisi** (montant notifié par la DGFiP, pas calculable)
+- [x] ~~`provisions()` **à deux volets** (D3)~~ — `domain/calculs/provisions.ts`.
+      Le fait « période déclarée » qui manquait existe : `periodesDeclarees`
+      dans le schéma. C'est lui qui fait basculer la dette du volet
+      « à provisionner » vers le volet « constaté » ; sans lui les provisions
+      surestiment la dette.
+- [x] ~~`dispo()`, `versable()`, réserve unifiée (D4)~~ —
+      `domain/calculs/tresorerie.ts`. Le `dispo` peut être négatif, le
+      `versable` est borné à zéro : afficher un versable négatif inviterait à
+      lire une dette comme un revenu.
+- [x] ~~Régime d'imposition comme discriminant (D2)~~ — `versementLiberatoire`
+      est un discriminant **exclusif** dans le schéma. VL ⇒ 2,2 % intégré au
+      prélèvement URSSAF et aucun acompte PAS ; barème ⇒ acompte PAS **saisi**,
+      jamais calculé, puisque le montant est notifié par la DGFiP.
 - [ ] Harnais différentiel contre l'app actuelle, distinguant **régression** et
       **correction intentionnelle** adossée à une décision datée
 
 ### J2 · coquille et migration
-- [ ] Tokens : les 4 palettes, valeurs exactes de `v1.11.css`. **Corriger au
-      passage** : `clair` ne redéfinit pas `--r`/`--r-sm` et hérite donc du
-      thème sombre ; `--c-ir`, `--c-cfe`, `--slate`, `--blue-soft` ne sont
-      jamais rethémées
-- [ ] Application du thème **avant le premier rendu** (script inline, évite le flash)
-- [ ] Rail 212 px desktop / dock flottant en pilule ≤ 760 px, libellé sur
-      l'onglet actif seul
-- [ ] Routage réel, une route par écran. **Supprimer** la détection par
-      `document.title` et l'appariement des badges par préfixe de texte
-- [ ] Migration `freel_v50_*` → nouveau schéma : rapport à blanc, instantané
-      exporté **avant** toute écriture, idempotence, invariant d'absence de perte
-- [ ] Migration du **blob cloud** Supabase, pas seulement du local
-- [ ] Matrice Playwright + **assertion de zéro débordement horizontal à 390 px**
+- [x] ~~Tokens : les 4 palettes~~ — y compris les corrections repérées à
+      l'audit (`clair` qui héritait des rayons du thème sombre, variables
+      jamais rethémées).
+- [x] ~~Thème appliqué **avant le premier rendu**~~ — script inline, et le
+      vérificateur responsive l'assert sur chaque combinaison : sans assertion,
+      un flash ne se voit que sur la machine de quelqu'un d'autre.
+- [x] ~~Rail 212 px desktop / dock flottant ≤ 760 px~~ — vérifié par assertion
+      sur `position` (`static` en desktop, `fixed` en portrait), pas par
+      capture d'écran de complaisance.
+- [x] ~~Routage réel, une route par écran~~ — la détection par
+      `document.title` et l'appariement des badges par préfixe de texte ont
+      disparu. Le routage est exhaustif (`const jamais: never`) : ajouter un
+      écran sans le router ne compile pas.
+- [x] ~~Migration `freel_v50_*` → nouveau schéma~~ — rapport à blanc,
+      instantané exporté **avant** toute écriture, idempotence, invariant
+      d'absence de perte.
+- [x] ~~Migration du **blob cloud** Supabase~~ — même chemin de conversion que
+      le local : deux chemins distincts finiraient par diverger, et
+      l'application dirait deux choses différentes selon l'origine de la donnée.
+- [x] ~~Matrice Playwright~~ — 140 combinaisons (5 tailles × 4 palettes ×
+      7 écrans), **assertion de zéro débordement horizontal** comprise.
 
 ### J3 · Pilote + Outils
 - [x] ~~Écran Pilote, zéro nombre en dur~~ — **fait.** Couche d'état
@@ -347,10 +361,15 @@ tests verts.
       (abattement, tranches, calcul progressif), détail par tranche dans le
       panneau latéral, hypothèse affichée quand les tranches ne sont pas
       publiées pour la période.
-- [ ] Mouvements bancaires : `selecteurs.solde()` renvoie pour l'instant le seul
-      solde initial. Un seul endroit à changer, volontairement isolé
-- [ ] Outils remonté ici : l'écran le moins cher prouve le noyau tôt
-- [ ] Comparateur micro-BNC vs déclaration contrôlée **avant le 30/09**
+- [x] ~~Mouvements bancaires dans `selecteurs.solde()`~~ — solde initial **plus**
+      les mouvements importés. L'isolement volontaire a tenu : un seul endroit
+      à changer le jour où le relevé a existé.
+- [x] ~~Outils remonté ici~~ — l'écran le moins cher a prouvé le noyau tôt.
+- [ ] **Comparateur micro-BNC vs déclaration contrôlée — échéance 30/09.**
+      Seul élément du plan qui porte une date de valeur : passé le 30/09,
+      l'option ne peut plus être exercée pour l'année, et le comparateur ne
+      servirait qu'à constater ce qu'on n'a plus le droit de choisir.
+      **Non commencé.**
 
 ### J4 · Argent
 - [x] ~~Écran Argent~~ — **fait.** Deux sections en onglets ARIA, enveloppes de
@@ -511,7 +530,7 @@ n'apparaissent pas partout » après connexion à Supabase.
 | **ACRE au 01/07/2026** | Passage de l'abattement de 50 % à 25 % **probable mais non confirmé**. Sans effet sur le propriétaire (ACRE éteinte depuis le T1 2026), nécessaire pour recalculer un trimestre passé |
 | **Export FEC** | Retiré du périmètre (D6). Code conservé sur la branche de sauvegarde |
 | **Marge de build** | Réglé. React est sorti dans un chunk `vendor` : il ne change pas d'un déploiement à l'autre, donc le cache du navigateur le conserve. Modifier une ligne de code invalidait 248 Ko ; désormais 55 |
-| **Relevé bancaire** | Aucun n'est importé : `Faits.banqueReliee` vaut `false`, et l'écran Achats l'annonce au lieu d'afficher un rapprochement fictif. L'import de relevé est la brique qui manque, et elle débloquera aussi `selecteurs.solde()` |
+| **Relevé bancaire** | **Réglé.** L'import CSV existe, `selecteurs.solde()` compte les mouvements, et `banqueReliee` a été retiré du schéma : il était devenu dérivable (un relevé est disponible si et seulement s'il y a des mouvements), et le garder aurait permis qu'un booléen à `true` coexiste avec une liste vide |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
 
 ---

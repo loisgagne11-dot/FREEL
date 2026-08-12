@@ -55,6 +55,44 @@
 
 .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
+/* Une opération = son bouton ET sa conséquence.
+   Les deux ne se séparent pas : un libellé seul ne dit jamais ce qu'il
+   écrase, et c'est justement ce qu'il faut lire avant de cliquer. */
+.operations {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 0;
+}
+
+.operation {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.consequence {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted-2);
+  margin: 0;
+}
+
+.consequence strong { color: var(--muted); font-weight: 600; }
+
+.secondaires {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
 .actionPrincipale {
   min-height: 44px;
   padding: 0 15px;

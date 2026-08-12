@@ -221,11 +221,21 @@ describe('lecture des faits du compte', () => {
     expect(r.statut === 'ok' && r.valeur?.version).toBe(0);
   });
 
+  /**
+   * Nommer le fichier ne suffit pas.
+   *
+   * La première version du message disait « exécutez docs/supabase.sql », et
+   * la première personne à le lire a collé ce CHEMIN dans l'éditeur SQL —
+   * « syntax error at or near "docs" ». Le message doit dire quoi faire du
+   * fichier, pas seulement lequel.
+   */
   it('indique quoi faire quand la table n’existe pas encore', async () => {
     vi.stubGlobal('fetch', repondre({ message: 'relation does not exist' }, 404));
     const r = await tirerFaits(CONFIG, SESSION);
     expect(r.statut).toBe('erreur');
-    if (r.statut === 'erreur') expect(r.motif).toContain('docs/supabase.sql');
+    if (r.statut !== 'erreur') return;
+    expect(r.motif).toContain('docs/supabase.sql');
+    expect(r.motif).toMatch(/contenu/i);
   });
 });
 
