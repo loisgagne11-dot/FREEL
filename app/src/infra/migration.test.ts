@@ -189,6 +189,58 @@ describe('conversion des données', () => {
     expect(parNumero.get('2026-002')?.encaisseeLe).toBeNull();         // « envoyée »
   });
 
+  /**
+   * Le livre des recettes ne reçoit QUE ce qui a été émis.
+   *
+   * L'ancienne application fabrique une facture par mois à venir de chaque
+   * mission, jusqu'à sa date de fin, avec `status: 'brouillon'` — une
+   * projection de chiffre d'affaires, pas une facture. Les importer remplissait
+   * le registre d'écritures datées dans le futur.
+   *
+   * Constaté le 12/08 sur des données réelles : des écritures datées de
+   * janvier 2027, un « facturé sur l'année » deux fois trop élevé, des
+   * « factures en retard » qui n'ont jamais existé, et des périodes à
+   * déclarer sur du néant.
+   */
+  it('n\'inscrit pas les brouillons au livre des recettes', () => {
+    const stockage = avecLegacy();
+    const bundle = JSON.parse(stockage.getItem(CLE_BUNDLE_LEGACY) as string) as Record<string, unknown>;
+    const missions = bundle['m'] as Record<string, unknown>[];
+    (missions[0]!['factures'] as unknown[]).push(
+      { id: 'F-futur-1', mois: '2026-11', ht: 9460, status: 'brouillon' },
+      { id: 'F-futur-2', mois: '2027-01', ht: 8600, status: 'brouillon' }
+    );
+    stockage.setItem(CLE_BUNDLE_LEGACY, JSON.stringify(bundle));
+
+    const r = migrer(stockage);
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+
+    expect(r.faits.recettes).toHaveLength(3);
+    expect(r.faits.recettes.some((x) => x.id.startsWith('F-futur'))).toBe(false);
+    // Aucune écriture postérieure au dernier encaissement réel : le registre
+    // ne projette pas.
+    expect(r.faits.recettes.every((x) => (x.emiseLe ?? '') < '2026-08')).toBe(true);
+  });
+
+  // Écarter n'est pas perdre : ce qui n'entre pas doit être dit, avec son
+  // montant, sinon l'utilisateur croit à une disparition.
+  it('signale les brouillons écartés, avec leur nombre et leur total', () => {
+    const stockage = avecLegacy();
+    const bundle = JSON.parse(stockage.getItem(CLE_BUNDLE_LEGACY) as string) as Record<string, unknown>;
+    const missions = bundle['m'] as Record<string, unknown>[];
+    (missions[0]!['factures'] as unknown[]).push(
+      { id: 'F-futur-1', mois: '2026-11', ht: 1000, status: 'brouillon' },
+      { id: 'F-futur-2', mois: '2027-01', ht: 2000, status: 'brouillon' }
+    );
+    stockage.setItem(CLE_BUNDLE_LEGACY, JSON.stringify(bundle));
+
+    const rapport = analyser(stockage);
+    const signalement = rapport.anomalies.find((a) => /brouillon/i.test(a.message));
+    expect(signalement).toBeDefined();
+    expect(signalement?.message).toContain('2 facture');
+    expect(signalement?.message).toContain('3000');
+  });
+
   // Perdre la date d'émission empêcherait la déclaration européenne de
   // services de voir la prestation.
   it('retombe sur le mois de la facture quand la date d\'envoi manque', () => {

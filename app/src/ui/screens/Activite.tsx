@@ -412,7 +412,11 @@ function LigneMissionAffichee(
       <button type="button" className={styles.ouvrir} onClick={onOuvrir}>
       <span className={styles.ligneTitre}>
         <span className={styles.ligneLibelle}>
-          {mission.description || 'Mission sans description'}
+          {/* Le nom du client vaut mieux qu'un « sans description » : dans
+              l'ancienne application, c'est lui qui identifiait la mission, et
+              une mission désignée par son absence de nom est illisible dans
+              une liste. */}
+          {mission.description || mission.clientNom || 'Mission sans description'}
         </span>
         <span className={styles.ligneMontant}>{eur(ligne.facture)}</span>
       </span>
