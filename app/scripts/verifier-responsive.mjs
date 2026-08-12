@@ -126,6 +126,16 @@ for (const taille of TAILLES) {
         navPresente: nav !== null,
         navPosition: style?.position ?? null,
         nbLiens: liens.length,
+        // On mesure le LIBELLÉ, pas le texte du lien : celui-ci contient
+        // aussi le chiffre du badge, présent même quand le libellé est masqué.
+        // `offsetParent === null` détecte un `display: none`, y compris posé
+        // par une règle de média.
+        nbLibellesVisibles: liens.filter(
+          (a) => a.querySelector('[data-role="libelle"]')?.offsetParent != null
+        ).length,
+        libelleSurLActif: liens
+          .filter((a) => a.querySelector('[data-role="libelle"]')?.offsetParent != null)
+          .every((a) => a.getAttribute('aria-current') === 'page'),
         hauteurMiniLien: hauteurs.length > 0 ? Math.min(...hauteurs) : 0,
         contenuPresent: document.getElementById('contenu-principal') !== null,
         couleurFond: getComputedStyle(document.body).backgroundColor
@@ -145,12 +155,29 @@ for (const taille of TAILLES) {
 
     if (taille.portrait) {
       constate(mesures.navPosition === 'fixed', `${prefixe} dock flottant en portrait`);
+      // Exigence de la cible : sept onglets dans ~340 px ne tiennent que si
+      // un seul porte son libellé. La règle vit en CSS ; sans assertion, une
+      // refonte de la feuille la casserait sans que rien ne le signale.
+      constate(
+        mesures.nbLibellesVisibles === 1,
+        `${prefixe} un seul libellé d'onglet en portrait (${mesures.nbLibellesVisibles})`
+      );
+      constate(
+        mesures.libelleSurLActif,
+        `${prefixe} le libellé visible est celui de l'onglet actif`
+      );
       constate(
         mesures.hauteurMiniLien >= 44,
         `${prefixe} cibles tactiles ≥ 44 px (${Math.round(mesures.hauteurMiniLien)} px)`
       );
     } else {
       constate(mesures.navPosition === 'static', `${prefixe} rail latéral en desktop`);
+      // En desktop la place existe : tous les onglets sont nommés. Un rail
+      // d'icônes muettes obligerait à deviner.
+      constate(
+        mesures.nbLibellesVisibles === ECRANS.length,
+        `${prefixe} tous les onglets nommés en desktop (${mesures.nbLibellesVisibles})`
+      );
     }
 
     if (AVEC_CAPTURES) {

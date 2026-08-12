@@ -44,7 +44,11 @@ export function RailNav({ ecranActif, compteurs }: ProprietesRailNav) {
                 <path d={ecran.icone} />
               </svg>
             </span>
-            <span className={styles.libelle} aria-hidden="true">
+            {/* `data-role` nomme le libellé pour le vérificateur responsive :
+                l'exigence « un seul onglet nommé en portrait » se mesure sur
+                CET élément, pas sur le texte du lien — qui contient aussi le
+                chiffre du badge. */}
+            <span className={styles.libelle} data-role="libelle" aria-hidden="true">
               {ecran.libelle}
             </span>
             {aCompteur && (
