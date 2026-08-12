@@ -143,15 +143,22 @@ constate(affichage.nombres.includes(20000), 'le solde migré est affiché', '20 
 constate(affichage.nombres.includes(1500), 'la réserve migrée est affichée', '1 500 €');
 
 // Volet 2 : la recette de 10 000 € encaissée en juillet 2026, période non
-// déclarée, doit être provisionnée. Au taux du 2ᵉ semestre 2026 (26,1 %) plus
-// la CFP (0,2 %), cela fait 2 630 €.
-const provisionAttendue = Math.round(10000 * (0.261 + 0.002));
+// déclarée, doit être provisionnée. Au taux en vigueur depuis janvier 2026
+// (25,6 %) plus la CFP (0,2 %), cela fait 2 580 €.
+//
+// Ce contrôle attendait 2 630 €, au taux de 26,1 % : celui-ci avait été
+// programmé pour juillet 2026, puis annulé par le décret n° 2025-943 du
+// 8 septembre 2025. Le script figeait donc l'erreur au même titre que les
+// tests unitaires.
+const provisionAttendue = Math.round(10000 * (0.256 + 0.002));
 constate(
   affichage.nombres.includes(provisionAttendue),
   'la charge sur recette encaissée est provisionnée (volet 2 de D3)',
   `${provisionAttendue} €`
 );
-// Et le versable en découle : 20 000 − 2 630 − 1 500 = 15 870.
+// Et le versable en découle, sans être écrit en dur : 20 000 − provision
+// − 1 500. Le calculer à partir de la provision plutôt que de le figer évite
+// qu'une correction de barème en laisse un des deux à jour et pas l'autre.
 const versableAttendu = 20000 - provisionAttendue - 1500;
 constate(
   affichage.nombres.includes(versableAttendu),
