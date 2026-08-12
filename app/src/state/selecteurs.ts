@@ -37,7 +37,11 @@ import {
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
-import type { Depense, Faits, Mission } from './schema';
+import {
+  type EcartConformite, type TotalLivre,
+  ecrituresDuLivre, totaliser, verifierConformite
+} from '../domain/calculs/livreRecettes';
+import type { Depense, Faits, Mission, Recette } from './schema';
 
 /**
  * Le barème URSSAF effectivement appliqué.
@@ -261,6 +265,48 @@ export function etatPilote(
     autonomie: autonomieMois(tresorerie.versable, faits.besoinMensuel),
     tauxImpotIndisponible: tauxImpotR.statut === 'refuse',
     motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Livre des recettes
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface EtatLivre {
+  readonly ecritures: readonly Recette[];
+  readonly total: TotalLivre;
+  readonly ecarts: readonly EcartConformite[];
+  /** Écarts rattachés à une écriture, pour les afficher sur la ligne. */
+  readonly ecartsParEcriture: ReadonlyMap<string, readonly EcartConformite[]>;
+  /** Factures émises et non encaissées : elles n'entrent pas encore au livre. */
+  readonly enAttente: readonly Recette[];
+}
+
+/**
+ * L'état du livre des recettes.
+ *
+ * Le registre ne contient QUE des encaissements : une facture émise et non
+ * réglée n'y figure pas, et l'y faire figurer serait déclarer une recette qui
+ * n'a pas eu lieu. Elle est rendue à part, pour rester visible sans être
+ * comptée.
+ */
+export function etatLivre(faits: Faits): EtatLivre {
+  const ecarts = verifierConformite(faits.recettes);
+  const parEcriture = new Map<string, EcartConformite[]>();
+  for (const ecart of ecarts) {
+    if (ecart.ecritureId === null) continue;
+    const liste = parEcriture.get(ecart.ecritureId);
+    if (liste) liste.push(ecart); else parEcriture.set(ecart.ecritureId, [ecart]);
+  }
+
+  return {
+    ecritures: ecrituresDuLivre(faits.recettes) as readonly Recette[],
+    total: totaliser(faits.recettes),
+    ecarts,
+    ecartsParEcriture: parEcriture,
+    enAttente: faits.recettes
+      .filter((r) => r.encaisseeLe === null && r.emiseLe !== null)
+      .sort((a, b) => (b.emiseLe as DateISO).localeCompare(a.emiseLe as DateISO))
   };
 }
 

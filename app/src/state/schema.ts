@@ -15,6 +15,7 @@
 import type { DateISO, Euros, Mois, TypeActivite } from '../domain/types';
 import type { Depense } from '../domain/calculs/depenses';
 import type { PeriodeBareme } from '../domain/bareme/urssaf';
+import type { ModeReglement } from '../domain/calculs/livreRecettes';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -91,8 +92,19 @@ export interface Recette {
   readonly montant: Euros;
   readonly emiseLe: DateISO | null;
   readonly encaisseeLe: DateISO | null;
-  readonly modeReglement: 'virement' | 'cheque' | 'especes' | 'carte' | 'autre' | null;
+  readonly modeReglement: ModeReglement | null;
   readonly numero: string;
+  /**
+   * Identifiant de l'écriture que celle-ci annule.
+   *
+   * Le livre des recettes se tient en AJOUT SEUL : une recette encaissée ne se
+   * modifie pas et ne se supprime pas, elle s'annule par une écriture inverse
+   * qui laisse la trace de la correction. Un registre qu'on peut réécrire ne
+   * prouve rien — et c'est précisément ce qu'un contrôle vérifie.
+   */
+  readonly annuleEcriture?: string | null;
+  /** Recette globalisée en fin de journée, sans identité de client. */
+  readonly globalisee?: boolean;
 }
 
 export interface Faits {

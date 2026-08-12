@@ -21,14 +21,24 @@ au dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **423** |
-| Build | **243 Ko** d'entrée, 78 Ko gzippé — écrans découpés à la demande (plafond à 250 Ko, **7 Ko de marge**) |
+| Tests | **481** |
+| Build | **54 Ko** de code applicatif, 188 Ko de bibliothèques, 256 Ko au premier rendu (82 Ko gzippé) |
+| Budget | conforme sur les **4 postes** vérifiés |
 | Responsive | **120 combinaisons** (5 tailles × 4 palettes × **6 écrans**) |
 | Migration | conforme |
 
-Un nombre de tests en baisse, ou un build qui franchit 250 Ko, signale une
-régression. Le poids monte à mesure que les écrans arrivent : le tenir sous le
-plafond fait partie du travail, pas de l'optimisation tardive.
+Un nombre de tests en baisse, ou un budget dépassé, signale une régression.
+
+**Le budget a changé de forme le 12/08.** Il était un plafond unique de 250 Ko
+sur le paquet d'entrée ; la mesure a montré ce que ce chiffre recouvrait :
+192 Ko de React et 55 Ko de code applicatif. Le seuil surveillait donc surtout
+une dépendance qui ne bouge pas, et laissait le code du projet grossir sans
+qu'on s'en aperçoive — jusqu'à frôler la limite d'un coup, à l'écran Config.
+
+`scripts/verifier-budget.mjs` vérifie désormais quatre postes séparément. Avant
+de relever l'un d'eux : vérifier qu'un écran n'a pas été tiré dans l'entrée par
+un import partagé. C'est la cause la plus fréquente, et relever le plafond la
+masquerait.
 
 ---
 
@@ -279,8 +289,18 @@ tests verts.
 - [x] ~~Retirer la section « Propositions Claude Code »~~ (D5) — **fait**, elle
       n'existe pas dans le nouvel écran.
 - [ ] Déclaration d'échanges de services (DES) proprement dite
-- [ ] Livre des recettes conforme : `paidAt`, `modeReglement`, journal en ajout
-      seul, correction par annulation
+- [x] ~~Livre des recettes conforme~~ — **fait.** Le registre se tient en
+      **ajout seul** : une recette encaissée ne se modifie pas et ne se
+      supprime pas, elle s'annule par une écriture inverse datée du jour de la
+      correction. Les deux écritures restent visibles, leur somme est nulle.
+      Un registre qu'on peut réécrire ne prouve rien.
+      · Mentions obligatoires constatées une par une (date d'encaissement, mode
+        de règlement, identité du client, référence de pièce) — l'écart est
+        **nommé**, « registre non conforme » n'aide personne à le corriger.
+      · Numérotation : trous et doublons signalés. Un numéro absent se lit, en
+        contrôle, comme une facture retirée du registre.
+      · Un brouillon jamais émis se supprime et libère son numéro ; une facture
+        émise ne se supprime plus, elle s'annule par un avoir.
 - [ ] Import de relevé bancaire (débloque aussi `selecteurs.solde()`)
 
 ### J6 · bascule (après le 31/10)
@@ -302,7 +322,7 @@ tests verts.
 | **Taux de cotisations** | Valeurs du propriétaire, à recouper **une fois** avec un avis d'appel réel. `urssaf.fr` renvoie 503 sur ses pages de barème. C'est le seul chiffre du projet où une erreur coûte plusieurs milliers d'euros par an |
 | **ACRE au 01/07/2026** | Passage de l'abattement de 50 % à 25 % **probable mais non confirmé**. Sans effet sur le propriétaire (ACRE éteinte depuis le T1 2026), nécessaire pour recalculer un trimestre passé |
 | **Export FEC** | Retiré du périmètre (D6). Code conservé sur la branche de sauvegarde |
-| **Marge de build** | 7 Ko sous le plafond de 250 Ko. Le poids vient surtout de React ; le code propre au projet pèse peu. Si l'écran Config fait franchir la limite, découper le chunk partagé (domaine + sélecteurs, tiré dans l'entrée parce que plusieurs écrans différés l'importent) avant de toucher au plafond |
+| **Marge de build** | Réglé. React est sorti dans un chunk `vendor` : il ne change pas d'un déploiement à l'autre, donc le cache du navigateur le conserve. Modifier une ligne de code invalidait 248 Ko ; désormais 55 |
 | **Relevé bancaire** | Aucun n'est importé : `Faits.banqueReliee` vaut `false`, et l'écran Achats l'annonce au lieu d'afficher un rapprochement fictif. L'import de relevé est la brique qui manque, et elle débloquera aussi `selecteurs.solde()` |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
 
