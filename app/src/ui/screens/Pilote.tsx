@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
-import { aTraiter, etatPilote, moisCourant } from '../../state/selecteurs';
+import { aTraiter, etatPilote, moisCourant, soldeEstSuivi } from '../../state/selecteurs';
 import type { SujetATraiter } from '../../domain/calculs/aTraiter';
 import { eur, moisLong, moisTexte } from '../format';
 import styles from './Pilote.module.css';
@@ -76,7 +76,13 @@ export function Pilote() {
       </section>
 
       <div className={styles.grille}>
-        <Chiffre libelle="Solde" valeur={eur(etat.tresorerie.solde)} />
+        <Chiffre
+          libelle="Solde"
+          valeur={eur(etat.tresorerie.solde)}
+          {...(soldeEstSuivi(faits)
+            ? {}
+            : { precision: 'saisi, aucun relevé importé' })}
+        />
         <Chiffre
           libelle="À garder de côté"
           valeur={eur(etat.tresorerie.provisions)}
@@ -198,10 +204,19 @@ function Bandeau(
 }
 
 function Chiffre(
-  { libelle, valeur, ton = 'neutre' }: {
+  { libelle, valeur, ton = 'neutre', precision }: {
     libelle: string;
     valeur: string;
     ton?: 'neutre' | 'attention' | 'danger';
+    /**
+     * D'où sort le chiffre, quand ce n'est pas évident.
+     *
+     * Un solde sans relevé importé n'est pas suivi : c'est le montant saisi,
+     * figé. L'afficher comme les autres le ferait lire comme une position
+     * bancaire à jour — et une position bancaire fausse commande de mauvaises
+     * décisions de trésorerie.
+     */
+    precision?: string;
   }
 ) {
   const classeTon = ton === 'danger' ? styles.danger : ton === 'attention' ? styles.attention : '';
@@ -209,6 +224,7 @@ function Chiffre(
     <div className={styles.chiffre}>
       <span className={styles.libelle}>{libelle}</span>
       <span className={`${styles.montant} ${classeTon}`}>{valeur}</span>
+      {precision !== undefined && <span className={styles.precision}>{precision}</span>}
     </div>
   );
 }

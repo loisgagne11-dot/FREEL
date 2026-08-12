@@ -1,0 +1,60 @@
+/* Indicateurs système de la barre du haut.
+   Aucune couleur en dur : tout passe par les tokens, pour que les 4 palettes
+   s'appliquent aussi au sélecteur qui permet d'en changer. */
+
+.pastilles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pastille {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.libelle {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.choix {
+  box-sizing: border-box;
+  /* 44 px : la cible minimale au doigt, y compris dans la barre du haut. */
+  min-height: 44px;
+  padding: 0 9px;
+  border-radius: 100px;
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.choix:hover { border-color: var(--green); }
+.choix:focus-visible { border-color: var(--green); outline: none; }
+
+/* Exigence de la cible : sous 1320 px, les libellés des pastilles système
+   disparaissent — la place revient au titre de l'écran. Le nom accessible
+   du champ, lui, doit survivre : on ne peut donc pas le retirer du DOM. */
+@media (max-width: 1319px) {
+  .libelle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+}

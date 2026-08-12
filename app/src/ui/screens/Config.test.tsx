@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { mois } from '../../domain/types';
+import { dateISO, euros, mois } from '../../domain/types';
 import { PERIODES_URSSAF } from '../../domain/bareme/urssaf';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
@@ -230,5 +230,64 @@ describe('propositions retirées', () => {
   it('ne comporte plus de section « Propositions Claude Code »', () => {
     render(<Config />);
     expect(screen.queryByText(/Propositions Claude/i)).toBeNull();
+  });
+});
+
+/**
+ * Trésorerie — deux faits qui n'avaient aucune porte d'entrée.
+ *
+ * `soldeInitial` et `besoinMensuel` existaient dans le schéma et dans le
+ * magasin, mais aucun écran ne les écrivait. Un utilisateur venu de l'ancienne
+ * application héritait d'un solde qu'il ne pouvait pas corriger et d'une
+ * autonomie bloquée à zéro. Un fait qu'on ne peut pas saisir est un fait qui
+ * restera faux.
+ */
+describe('trésorerie', () => {
+  it('écrit le solde du compte dans les faits', async () => {
+    render(<Config />);
+    const utilisateur = utilisateurTest();
+
+    const champ = screen.getByRole('spinbutton', { name: /Solde du compte/ });
+    await utilisateur.clear(champ);
+    await utilisateur.type(champ, '53984');
+
+    expect(useFaits.getState().faits.soldeInitial).toBe(53984);
+  });
+
+  it('écrit le besoin mensuel, sans lequel l’autonomie reste à zéro', async () => {
+    render(<Config />);
+    const utilisateur = utilisateurTest();
+
+    const champ = screen.getByRole('spinbutton', { name: /Besoin mensuel/ });
+    await utilisateur.clear(champ);
+    await utilisateur.type(champ, '2500');
+
+    expect(useFaits.getState().faits.besoinMensuel).toBe(2500);
+  });
+
+  /**
+   * Le libellé doit dire ce que le montant SIGNIFIE, et cela change selon
+   * qu'un relevé est importé ou non : point de départ d'une suite de
+   * mouvements, ou solde affiché tel quel. Un seul libellé pour les deux
+   * situations en rendrait une des deux fausse.
+   */
+  it('dit que le montant vaut solde tant qu’aucun relevé n’est importé', () => {
+    render(<Config />);
+    expect(screen.getByRole('spinbutton', { name: /Solde du compte aujourd/ })).toBeTruthy();
+    expect(screen.getByText(/Aucun relevé n’est importé/)).toBeTruthy();
+  });
+
+  it('change de libellé dès qu’un relevé est importé', () => {
+    const faits: Faits = {
+      ...faitsVides(),
+      mouvementsBancaires: [{
+        id: 'mv1', date: dateISO('2026-08-01'), libelle: 'Virement',
+        montant: euros(1000), rapprocheAvec: null, sansContrepartie: false
+      }]
+    };
+    useFaits.setState({ faits });
+    render(<Config />);
+
+    expect(screen.getByRole('spinbutton', { name: /avant le premier mouvement/ })).toBeTruthy();
   });
 });

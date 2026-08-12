@@ -162,11 +162,37 @@ function lireLegacy(stockage: Stockage): Inconnu | null {
  */
 function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[] {
   const recettes: Recette[] = [];
+  /** Montants des brouillons écartés. Signalés, jamais perdus en silence. */
+  const brouillonsIgnores: number[] = [];
+
   missions.forEach((mBrut, iMission) => {
     const m = objet(mBrut);
     const factures = tableau(m['factures']);
     factures.forEach((fBrut, iFacture) => {
       const f = objet(fBrut);
+
+      // ── Les brouillons ne sont PAS des recettes ────────────────────────
+      //
+      // L'ancienne application fabrique une facture par mois à venir de
+      // chaque mission, jusqu'à la date de fin, avec `status: 'brouillon'`
+      // (voir `buildMission`). Ce sont des PROJECTIONS de chiffre d'affaires,
+      // pas des factures : rien n'a été émis, rien n'est dû, le client ne les
+      // a jamais reçues.
+      //
+      // Les importer remplissait le livre des recettes d'écritures datées de
+      // plusieurs mois dans le futur, gonflait le chiffre d'affaires de
+      // l'année, faisait apparaître des « factures en retard » qui n'existent
+      // pas et des périodes à déclarer sur du néant. Un livre des recettes
+      // qui contient des prévisions n'est pas un livre des recettes.
+      //
+      // Constaté le 12/08 sur des données réelles : 22 écritures dont une
+      // datée de janvier 2027, et un « facturé sur l'année » deux fois trop
+      // élevé.
+      if (texte(f['status']).toLowerCase() === 'brouillon') {
+        brouillonsIgnores.push(nombre(f['ht'] ?? f['montantHT'] ?? f['montant']));
+        return;
+      }
+
       const encaisseeLe = dateOuNull(
         f['datePaiementReel'] ?? f['datePaiement'] ?? f['paidAt'] ?? f['dateEncaissement']
       );
@@ -211,6 +237,19 @@ function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[]
       });
     });
   });
+
+  if (brouillonsIgnores.length > 0) {
+    const total = brouillonsIgnores.reduce((s, m) => s + m, 0);
+    anomalies.push({
+      gravite: 'avertissement',
+      message: `${brouillonsIgnores.length} facture(s) à l'état de brouillon `
+        + `(${Math.round(total)} € au total) n'ont pas été reprises : l'ancienne `
+        + `application les fabriquait à l'avance, mois par mois, pour projeter le `
+        + `chiffre d'affaires. Rien n'a été émis, donc rien n'entre au livre des `
+        + `recettes. Les factures réellement dues restent à émettre depuis l'écran `
+        + `Facturer.`
+    });
+  }
   return recettes;
 }
 

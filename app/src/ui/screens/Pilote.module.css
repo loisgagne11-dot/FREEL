@@ -88,6 +88,16 @@
   color: var(--muted-2);
 }
 
+/* D'où sort le chiffre, quand ce n'est pas évident. Discret, mais présent :
+   un solde non suivi lu comme une position bancaire à jour commande de
+   mauvaises décisions de trésorerie. */
+.precision {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--muted-2);
+  font-style: italic;
+}
+
 .sousLigne {
   font-size: 12.5px;
   color: var(--muted);

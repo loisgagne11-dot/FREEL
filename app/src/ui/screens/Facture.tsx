@@ -89,6 +89,22 @@ export function Facture() {
   const etat = useMemo(() => etatFacture(facture), [facture]);
   const emissionPossible = etat.manques.length === 0;
 
+  /**
+   * La saisie a-t-elle commencé ?
+   *
+   * Une facture vierge manque forcément de tout : nom du client, adresse,
+   * désignation, montant. Afficher « 4 mentions obligatoires manquent » en
+   * rouge avant la première frappe reproche à l'utilisateur de n'avoir pas
+   * encore rempli un formulaire qu'il vient d'ouvrir. Un avertissement qu'on
+   * voit systématiquement cesse d'être lu — y compris le jour où il porte sur
+   * une vraie omission, juste avant l'émission.
+   *
+   * Le contrôle ne change pas d'un iota : l'émission reste bloquée tant qu'il
+   * manque une mention. Seul le moment où on le DIT change.
+   */
+  const aCommence = clientNom !== ''
+    || lignes.some((l) => l.designation !== '' || l.prixUnitaireHt > 0);
+
   function emettre(): void {
     if (!emissionPossible) return;
     ajouterRecette({
@@ -147,7 +163,7 @@ export function Facture() {
         <span className={styles.numero}>{numero}</span>
       </header>
 
-      {etat.manques.length > 0 && (
+      {aCommence && etat.manques.length > 0 && (
         <div className={`${styles.bandeau} ${styles.bandeauDanger}`} role="status">
           <p>
             <strong>{etat.manques.length}</strong> mention
