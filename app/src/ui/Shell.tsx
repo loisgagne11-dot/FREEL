@@ -1,5 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { RailNav } from './components/RailNav';
+import { PastillesSysteme } from './components/PastillesSysteme';
 import { useRoute } from './useRoute';
 import type { IdEcran } from './navigation';
 import styles from './Shell.module.css';
@@ -55,10 +56,10 @@ export function Shell({ children, compteurs }: ProprietesShell) {
           <div className={styles.grow} />
           {/* Emplacements réservés — leur contenu est propre à chaque écran
               (sélecteur de période) ou vient de services transverses pas
-              encore construits (pastilles système, dont le sélecteur de
-              palette ; actions Exporter/Nouveau). On ne les invente pas ici. */}
+              encore construits (actions Exporter/Nouveau). On ne les invente
+              pas ici. */}
           <div data-emplacement="selecteur-periode" />
-          <div data-emplacement="pastilles-systeme" />
+          <PastillesSysteme />
           <div data-emplacement="actions" />
         </header>
 

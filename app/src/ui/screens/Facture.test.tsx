@@ -48,11 +48,26 @@ async function remplir(utilisateur: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('mentions obligatoires', () => {
-  // Découvrir qu'il manque l'adresse du client après avoir tout rempli fait
-  // perdre la saisie.
-  it('constate les manques pendant la saisie, pas à l’émission', () => {
+  /**
+   * Une facture vierge manque forcément de tout. Le lui reprocher avant la
+   * première frappe apprend à l'utilisateur que l'avertissement est un décor
+   * — et il ne le lira plus le jour où il porte sur une vraie omission.
+   */
+  it('ne reproche rien sur une facture encore vierge', () => {
     semer();
     render(<Facture />);
+    expect(screen.queryByText(/mentions? obligatoires? manque/)).toBeNull();
+    // Le contrôle n'a pas disparu pour autant.
+    expect(screen.getByRole('button', { name: /Compléter les mentions/ }))
+      .toHaveProperty('disabled', true);
+  });
+
+  // Découvrir qu'il manque l'adresse du client après avoir tout rempli fait
+  // perdre la saisie : le constat vient pendant, pas à l'émission.
+  it('constate les manques dès que la saisie commence', async () => {
+    semer();
+    render(<Facture />);
+    await userEvent.setup().type(screen.getByLabelText('Client'), 'Client France');
     expect(screen.getByText(/mentions? obligatoires? manque/)).toBeTruthy();
   });
 
@@ -73,9 +88,10 @@ describe('mentions obligatoires', () => {
       .toHaveProperty('disabled', false);
   });
 
-  it('chiffre l’amende encourue', () => {
+  it('chiffre l’amende encourue', async () => {
     semer();
     render(<Facture />);
+    await userEvent.setup().type(screen.getByLabelText('Client'), 'Client France');
     expect(screen.getByText(/d’amende/)).toBeTruthy();
   });
 
