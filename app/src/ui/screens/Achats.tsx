@@ -11,7 +11,9 @@ import {
   deposerJustificatif, stockageIndexedDB, verifierIntegrite
 } from '../../infra/justificatifs';
 import { Info } from '../components/Info';
+import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
+import { Releve } from './Releve';
 import { dateCourte, eur, eurExact } from '../format';
 import styles from './Achats.module.css';
 
@@ -44,6 +46,13 @@ export interface ProprietesAchats {
   readonly stockage?: StockageJustificatifs;
 }
 
+type Section = 'depenses' | 'releve';
+
+const SECTIONS = [
+  { id: 'depenses' as Section, libelle: 'Dépenses' },
+  { id: 'releve' as Section, libelle: 'Relevé bancaire' }
+];
+
 /** Ce qu'un panneau latéral affiche à un instant donné. */
 type Panneau =
   | { readonly type: 'ferme' }
@@ -60,6 +69,7 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
   const supprimerDepense = useFaits((e) => e.supprimerDepense);
 
   const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
+  const [section, setSection] = useState<Section>('depenses');
   const idGroupe = useId();
 
   const etat = useMemo(() => etatAchats(faits), [faits]);
@@ -73,14 +83,33 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
     <>
       <header className={styles.entete}>
         <h1 className={styles.titre}>Achats</h1>
-        <button
-          type="button"
-          className={styles.actionPrincipale}
-          onClick={() => setPanneau({ type: 'ajout' })}
-        >
-          Ajouter une dépense
-        </button>
+        {section === 'depenses' && (
+          <button
+            type="button"
+            className={styles.actionPrincipale}
+            onClick={() => setPanneau({ type: 'ajout' })}
+          >
+            Ajouter une dépense
+          </button>
+        )}
       </header>
+
+      <div className={styles.sections}>
+        <Onglets
+          idGroupe={idGroupe}
+          onglets={SECTIONS}
+          actif={section}
+          onChange={setSection}
+          libelle="Sections de l’écran Achats"
+        />
+
+        <PanneauOnglet idGroupe={idGroupe} id="releve" actif={section === 'releve'}>
+          {/* Monté seulement à l'ouverture : lire un relevé et calculer les
+              candidats n'a pas à peser sur l'affichage des dépenses. */}
+          {section === 'releve' && <Releve />}
+        </PanneauOnglet>
+
+        <PanneauOnglet idGroupe={idGroupe} id="depenses" actif={section === 'depenses'}>
 
       <div className={styles.grille}>
         <Chiffre libelle="Total TTC" valeur={eur(etat.resume.totalTtc)} />
@@ -174,6 +203,9 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
             </ul>
           )}
       </section>
+
+        </PanneauOnglet>
+      </div>
 
       <Sheet
         ouvert={selection !== null}

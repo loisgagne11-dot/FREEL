@@ -301,7 +301,23 @@ tests verts.
         contrôle, comme une facture retirée du registre.
       · Un brouillon jamais émis se supprime et libère son numéro ; une facture
         émise ne se supprime plus, elle s'annule par un avoir.
-- [ ] Import de relevé bancaire (débloque aussi `selecteurs.solde()`)
+- [x] ~~Import de relevé bancaire~~ — **fait.** Lecture CSV qui **dit ce qu'elle
+      a compris** (séparateur, colonnes, format de date, lignes écartées et
+      pourquoi) : il n'existe pas de format d'export bancaire, et une colonne
+      mal interprétée produirait des montants plausibles que rien ne
+      signalerait. Réimporter un relevé qui recouvre le précédent — le cas
+      ordinaire — n'ajoute que ce qui manque : le solde ne double pas.
+- [x] ~~`selecteurs.solde()` réel~~ — solde initial plus les mouvements. La
+      fonction avait été isolée dès le départ pour que ce changement n'ait
+      qu'un seul endroit à toucher : **aucun écran n'a eu à être modifié**.
+- [x] ~~Rapprochement bancaire~~ — l'écran **propose**, l'utilisateur tranche.
+      Un candidat unique reste un candidat : le valider d'office ferait ce
+      qu'on reproche à l'ancienne version, en plus discret. Le montant doit
+      correspondre **au centime** — une tolérance masquerait un écart de
+      règlement, ce qu'un rapprochement est censé faire apparaître.
+- [x] ~~`banqueReliee` retiré du schéma~~ — il était devenu DÉRIVABLE dès que
+      les mouvements ont existé. Le garder aurait enfreint l'invariant n°5, et
+      permis qu'un booléen à `true` coexiste avec une liste vide.
 
 ### J6 · bascule (après le 31/10)
 - [ ] Nouvelle version à la racine, ancienne **neutralisée en écriture** sous `/legacy/`

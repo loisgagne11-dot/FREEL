@@ -32,6 +32,12 @@
 
 .actionPrincipale:hover { border-color: var(--green); }
 
+.sections {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .grille {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -325,7 +331,14 @@
 
 @media (min-width: 761px) {
   .entete { grid-column: 1 / -1; }
-  .grille { grid-column: 1 / -1; }
+  .sections { grid-column: 1 / -1; }
+  .sections {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.grille { grid-column: 1 / -1; }
   .bandeau { grid-column: 1 / -1; }
   .carte { grid-column: 1 / -1; }
 }

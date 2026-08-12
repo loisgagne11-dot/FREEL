@@ -41,6 +41,10 @@ import {
   type EcartConformite, type TotalLivre,
   ecrituresDuLivre, totaliser, verifierConformite
 } from '../domain/calculs/livreRecettes';
+import {
+  type EcritureRapprochable, type MouvementBancaire, type ResumeRapprochement,
+  candidatsPour, resumerRapprochement, soldeBancaire
+} from '../domain/calculs/banque';
 import type { Depense, Faits, Mission, Recette } from './schema';
 
 /**
@@ -94,14 +98,27 @@ export function caEncaisseAnnee(faits: Faits, annee: number): Euros {
 /**
  * Le solde bancaire.
  *
- * Provisoirement le solde initial : les mouvements bancaires ne sont pas
- * encore modélisés (ils arriveront avec l'écran Achats et le rapprochement).
- * Isolé dans une fonction pour que l'ajout des mouvements n'ait qu'un seul
- * endroit à changer, et pour que l'approximation soit visible plutôt que
- * dispersée dans les écrans.
+ * Solde initial plus les mouvements importés. Cette fonction avait été isolée
+ * dès le départ pour que l'arrivée des mouvements n'ait qu'un seul endroit à
+ * changer : c'est ce qui vient de se produire, et aucun écran n'a eu à être
+ * touché.
+ *
+ * Sans relevé importé, elle rend le solde initial — et l'écran doit alors dire
+ * que le solde n'est pas suivi, plutôt que d'afficher un chiffre figé comme
+ * s'il était à jour. Voir `soldeEstSuivi`.
  */
 export function solde(faits: Faits): Euros {
-  return faits.soldeInitial;
+  return soldeBancaire(faits.soldeInitial, faits.mouvementsBancaires);
+}
+
+/**
+ * Un relevé est-il disponible ?
+ *
+ * Dérivé, jamais stocké : un booléen `banqueReliee` à `true` pourrait
+ * coexister avec une liste de mouvements vide, et rien ne le signalerait.
+ */
+export function soldeEstSuivi(faits: Faits): boolean {
+  return faits.mouvementsBancaires.length > 0;
 }
 
 /** Sous ACRE à ce mois, d'après la date de début d'activité et la durée d'ACRE. */
@@ -451,7 +468,7 @@ export function contexteDepense(
   const courant = moisCourant(maintenant);
   return (d) => ({
     regimeTva: regimeTvaAu(faits, d.payeeLe === null ? courant : moisDe(d.payeeLe)),
-    banqueSynchronisee: faits.banqueReliee
+    banqueSynchronisee: soldeEstSuivi(faits)
   });
 }
 
@@ -467,6 +484,10 @@ export interface EtatAchats {
   readonly lignes: readonly LigneDepense[];
   readonly resume: ResumeDepenses;
   readonly banqueReliee: boolean;
+  readonly resumeBanque: ResumeRapprochement;
+  readonly mouvements: readonly MouvementBancaire[];
+  /** Candidats par mouvement, calculés une fois pour l'écran. */
+  readonly candidats: ReadonlyMap<string, readonly EcritureRapprochable[]>;
   /** Dépenses dont la date de paiement manque : ni exercice, ni régime. */
   readonly sansDate: number;
 }
@@ -480,6 +501,7 @@ export interface EtatAchats {
  */
 export function etatAchats(faits: Faits, maintenant: Date = new Date()): EtatAchats {
   const contexte = contexteDepense(faits, maintenant);
+  const ecritures = ecrituresRapprochables(faits);
 
   const lignes = [...faits.depenses]
     .sort(comparerParDate)
@@ -496,9 +518,52 @@ export function etatAchats(faits: Faits, maintenant: Date = new Date()): EtatAch
   return {
     lignes,
     resume: resumerDepenses(faits.depenses, contexte),
-    banqueReliee: faits.banqueReliee,
+    banqueReliee: soldeEstSuivi(faits),
+    resumeBanque: resumerRapprochement(faits.mouvementsBancaires, ecritures),
+    mouvements: faits.mouvementsBancaires,
+    candidats: new Map(
+      faits.mouvementsBancaires.map((m) => [m.id, candidatsPour(m, ecritures)])
+    ),
     sansDate: faits.depenses.filter((d) => d.payeeLe === null).length
   };
+}
+
+/**
+ * Les écritures qu'un mouvement bancaire peut venir confirmer.
+ *
+ * Dépenses et recettes ensemble, avec leur sens : c'est le domaine qui
+ * décidera qu'un débit ne peut correspondre qu'à une dépense. Les rassembler
+ * ici évite que l'écran ait à connaître cette règle.
+ */
+export function ecrituresRapprochables(faits: Faits): readonly EcritureRapprochable[] {
+  const rattachees = new Set(
+    faits.mouvementsBancaires
+      .map((m) => m.rapprocheAvec)
+      .filter((id): id is string => id !== null)
+  );
+
+  const depenses = faits.depenses.map((d) => ({
+    id: d.id,
+    libelle: d.libelle || d.fournisseur,
+    montant: d.montantTtc,
+    date: d.payeeLe,
+    nature: 'depense' as const,
+    dejaRapprochee: rattachees.has(d.id)
+  }));
+
+  // Une annulation n'est pas encaissée deux fois : elle ne se rapproche pas.
+  const recettes = faits.recettes
+    .filter((r) => r.encaisseeLe !== null && r.annuleEcriture == null)
+    .map((r) => ({
+      id: r.id,
+      libelle: r.libelle || r.clientNom,
+      montant: r.montant,
+      date: r.encaisseeLe,
+      nature: 'recette' as const,
+      dejaRapprochee: rattachees.has(r.id)
+    }));
+
+  return [...depenses, ...recettes];
 }
 
 function comparerParDate(a: Depense, b: Depense): number {

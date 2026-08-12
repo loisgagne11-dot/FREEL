@@ -174,7 +174,7 @@ describe('achats hors de France', () => {
 
 describe('rapprochement bancaire', () => {
   it('n’offre aucun réglage tant qu’aucun relevé n’est disponible', async () => {
-    semer({ depenses: [depense()], banqueReliee: false });
+    semer({ depenses: [depense()], mouvementsBancaires: [] });
     rendre();
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
@@ -184,7 +184,13 @@ describe('rapprochement bancaire', () => {
   });
 
   it('devient corrigeable dès qu’un relevé est disponible', async () => {
-    semer({ depenses: [depense()], banqueReliee: true });
+    semer({
+      depenses: [depense()],
+      mouvementsBancaires: [{
+        id: 'mvt-1', date: dateISO('2026-09-10'), libelle: 'PRLV',
+        montant: euros(-999), rapprocheAvec: null, sansContrepartie: false
+      }]
+    });
     rendre();
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));

@@ -378,7 +378,9 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // L'ancienne application rapprochait contre un relevé importé à la main,
     // jamais contre un compte relié. Aucun fait ne permet de dire qu'un compte
     // l'est : on part de `false`, l'utilisateur le renseignera.
-    banqueReliee: false,
+    // L'ancienne application n'importait pas de relevé : elle appariait des
+    // opérations saisies à la main, sans les conserver comme des faits.
+    mouvementsBancaires: [],
     // L'ancien modèle n'avait pas de barème éditable : les taux y étaient en
     // dur dans le code. Rien à reprendre.
     periodesUrssafAjoutees: [],
