@@ -24,11 +24,12 @@ import {
 import {
   type ModeReglement, ecritureDAnnulation, prochainNumero
 } from '../domain/calculs/livreRecettes';
+import { importerMouvements } from '../domain/calculs/banque';
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
 } from '../domain/bareme/urssaf';
 import type { EtatRapprochement } from '../domain/calculs/depenses';
-import { type Stockage, migrer } from '../infra/migration';
+import { type Stockage, convertirBundle, migrer } from '../infra/migration';
 
 /** Le stockage du navigateur, ou `null` quand il est indisponible. */
 function stockageNavigateur(): Stockage | null {
@@ -97,8 +98,43 @@ interface MagasinFaits {
   /** Corrige l'état de rapprochement d'une dépense. */
   readonly definirRapprochement: (id: string, etat: EtatRapprochement) => void;
 
-  /** Déclare qu'un relevé bancaire est disponible pour rapprocher. */
-  readonly definirBanqueReliee: (reliee: boolean) => void;
+  /* ── Relevé bancaire ──────────────────────────────────────────────────── */
+
+  /**
+   * Ajoute les opérations d'un relevé.
+   *
+   * Idempotent : réimporter un relevé qui chevauche le précédent — le cas
+   * ordinaire — n'ajoute que ce qui manque et ne double pas le solde. Rend le
+   * nombre d'opérations ajoutées et le nombre déjà connues.
+   */
+  readonly importerReleve: (
+    lignes: readonly { readonly date: DateISO; readonly libelle: string; readonly montant: Euros }[]
+  ) => { readonly ajoutes: number; readonly deja: number };
+
+  /**
+   * Rattache un mouvement à une écriture — ou le détache avec `null`.
+   *
+   * L'appariement est une décision de l'utilisateur, jamais une déduction :
+   * l'ancienne application appariait seule et n'en laissait aucune trace.
+   */
+  readonly rapprocherMouvement: (mouvementId: string, ecritureId: string | null) => void;
+
+  /** Déclare qu'aucune écriture ne correspond : frais bancaires, apport… */
+  readonly marquerSansContrepartie: (mouvementId: string, sans: boolean) => void;
+
+  /** Efface tous les mouvements importés. Ne touche à aucune écriture. */
+  readonly viderReleve: () => void;
+
+  /* ── Compte distant ───────────────────────────────────────────────────── */
+
+  /**
+   * Remplace les faits par ceux d'un bundle distant.
+   *
+   * Écrase l'état local : c'est délibéré, et c'est pourquoi l'écran montre
+   * d'abord ce qui serait chargé et demande confirmation. Charger en silence
+   * ferait disparaître une saisie faite hors ligne sans que personne le voie.
+   */
+  readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => void;
 
   /* ── Congés ───────────────────────────────────────────────────────────── */
 
@@ -308,8 +344,49 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     get().modifierDepense(id, { rapprochement: etat });
   },
 
-  definirBanqueReliee: (reliee) => {
-    const faits: Faits = { ...get().faits, banqueReliee: reliee };
+  importerReleve: (lignes) => {
+    const actuel = get().faits;
+    const resultat = importerMouvements(actuel.mouvementsBancaires, lignes);
+    const faits: Faits = { ...actuel, mouvementsBancaires: resultat.mouvements };
+    set({ faits });
+    persister(stockageActif, faits);
+    return { ajoutes: resultat.ajoutes, deja: resultat.deja };
+  },
+
+  rapprocherMouvement: (mouvementId, ecritureId) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      mouvementsBancaires: actuel.mouvementsBancaires.map((m) =>
+        (m.id === mouvementId
+          // Rapprocher lève l'état « sans contrepartie » : les deux se
+          // contrediraient, et l'écran devrait alors arbitrer.
+          ? { ...m, rapprocheAvec: ecritureId, sansContrepartie: false }
+          : m))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  marquerSansContrepartie: (mouvementId, sans) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      mouvementsBancaires: actuel.mouvementsBancaires.map((m) =>
+        (m.id === mouvementId ? { ...m, sansContrepartie: sans, rapprocheAvec: null } : m))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  remplacerParBundle: (bundle) => {
+    const faits = convertirBundle(bundle).faits;
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  viderReleve: () => {
+    const faits: Faits = { ...get().faits, mouvementsBancaires: [] };
     set({ faits });
     persister(stockageActif, faits);
   },

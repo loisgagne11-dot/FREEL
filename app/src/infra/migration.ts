@@ -378,7 +378,9 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // L'ancienne application rapprochait contre un relevé importé à la main,
     // jamais contre un compte relié. Aucun fait ne permet de dire qu'un compte
     // l'est : on part de `false`, l'utilisateur le renseignera.
-    banqueReliee: false,
+    // L'ancienne application n'importait pas de relevé : elle appariait des
+    // opérations saisies à la main, sans les conserver comme des faits.
+    mouvementsBancaires: [],
     // L'ancien modèle n'avait pas de barème éditable : les taux y étaient en
     // dur dans le code. Rien à reprendre.
     periodesUrssafAjoutees: [],
@@ -392,6 +394,40 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // sinon le volet 2 des provisions surestimera la dette.
     periodesDeclarees: [],
     configImpotBrute: objet(legacy['ir'])
+  };
+}
+
+/**
+ * Convertit un bundle en faits, avec son rapport.
+ *
+ * Exposé pour que les données venues de Supabase passent par EXACTEMENT la
+ * même conversion que celles du navigateur. Deux chemins de conversion
+ * distincts finiraient par diverger, et l'application dirait alors deux choses
+ * différentes selon l'origine de la donnée — le genre d'écart que l'audit a
+ * relevé partout dans l'ancienne version.
+ */
+export function convertirBundle(
+  bundle: Readonly<Record<string, unknown>>
+): { readonly faits: Faits; readonly rapport: RapportMigration } {
+  const anomalies: Anomalie[] = [];
+  const champsNonRepris: string[] = [];
+  const faits = convertir(bundle as Inconnu, anomalies, champsNonRepris);
+
+  return {
+    faits,
+    rapport: {
+      aDesDonneesLegacy: true,
+      dejaMigre: false,
+      comptes: {
+        clients: faits.clients.length,
+        missions: faits.missions.length,
+        recettes: faits.recettes.length,
+        depenses: faits.depenses.length,
+        periodesDeclarees: faits.periodesDeclarees.length
+      },
+      anomalies,
+      champsNonRepris
+    }
   };
 }
 

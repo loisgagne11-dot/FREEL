@@ -21,8 +21,8 @@ au dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **481** |
-| Build | **54 Ko** de code applicatif, 188 Ko de bibliothèques, 256 Ko au premier rendu (82 Ko gzippé) |
+| Tests | **565** (+ 91 côté legacy) |
+| Build | **58 Ko** de code applicatif, 188 Ko de bibliothèques, 260 Ko au premier rendu |
 | Budget | conforme sur les **4 postes** vérifiés |
 | Responsive | **120 combinaisons** (5 tailles × 4 palettes × **6 écrans**) |
 | Migration | conforme |
@@ -301,7 +301,23 @@ tests verts.
         contrôle, comme une facture retirée du registre.
       · Un brouillon jamais émis se supprime et libère son numéro ; une facture
         émise ne se supprime plus, elle s'annule par un avoir.
-- [ ] Import de relevé bancaire (débloque aussi `selecteurs.solde()`)
+- [x] ~~Import de relevé bancaire~~ — **fait.** Lecture CSV qui **dit ce qu'elle
+      a compris** (séparateur, colonnes, format de date, lignes écartées et
+      pourquoi) : il n'existe pas de format d'export bancaire, et une colonne
+      mal interprétée produirait des montants plausibles que rien ne
+      signalerait. Réimporter un relevé qui recouvre le précédent — le cas
+      ordinaire — n'ajoute que ce qui manque : le solde ne double pas.
+- [x] ~~`selecteurs.solde()` réel~~ — solde initial plus les mouvements. La
+      fonction avait été isolée dès le départ pour que ce changement n'ait
+      qu'un seul endroit à toucher : **aucun écran n'a eu à être modifié**.
+- [x] ~~Rapprochement bancaire~~ — l'écran **propose**, l'utilisateur tranche.
+      Un candidat unique reste un candidat : le valider d'office ferait ce
+      qu'on reproche à l'ancienne version, en plus discret. Le montant doit
+      correspondre **au centime** — une tolérance masquerait un écart de
+      règlement, ce qu'un rapprochement est censé faire apparaître.
+- [x] ~~`banqueReliee` retiré du schéma~~ — il était devenu DÉRIVABLE dès que
+      les mouvements ont existé. Le garder aurait enfreint l'invariant n°5, et
+      permis qu'un booléen à `true` coexiste avec une liste vide.
 
 ### J6 · bascule (après le 31/10)
 - [ ] Nouvelle version à la racine, ancienne **neutralisée en écriture** sous `/legacy/`
@@ -319,7 +335,7 @@ tests verts.
 
 | Sujet | État |
 |---|---|
-| **Taux de cotisations** | Valeurs du propriétaire, à recouper **une fois** avec un avis d'appel réel. `urssaf.fr` renvoie 503 sur ses pages de barème. C'est le seul chiffre du projet où une erreur coûte plusieurs milliers d'euros par an |
+| **Taux de cotisations** | **Erreur corrigée le 12/08.** La table portait une bascule à 26,1 % au 1er juillet 2026. Ce taux avait bien été programmé, mais le **décret n° 2025-943 du 8 septembre 2025** a plafonné la dernière marche à **25,6 %** : la bascule n'a jamais eu lieu. Les deux applications surestimaient donc les cotisations d'un demi-point depuis juillet 2026. `urssaf.fr` renvoie toujours 503 ; la correction s'appuie sur deux sources secondaires concordantes citant le décret. Un avis d'appel réel reste le recoupement de premier ordre |
 | **ACRE au 01/07/2026** | Passage de l'abattement de 50 % à 25 % **probable mais non confirmé**. Sans effet sur le propriétaire (ACRE éteinte depuis le T1 2026), nécessaire pour recalculer un trimestre passé |
 | **Export FEC** | Retiré du périmètre (D6). Code conservé sur la branche de sauvegarde |
 | **Marge de build** | Réglé. React est sorti dans un chunk `vendor` : il ne change pas d'un déploiement à l'autre, donc le cache du navigateur le conserve. Modifier une ligne de code invalidait 248 Ko ; désormais 55 |

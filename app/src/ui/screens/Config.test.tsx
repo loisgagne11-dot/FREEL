@@ -88,7 +88,16 @@ describe('barème affiché', () => {
   it('affiche la source et la date de vérification de chaque période', async () => {
     await ouvrirBareme();
     const table = screen.getByRole('table');
-    expect(within(table).getAllByText('urssaf.fr').length).toBe(PERIODES_URSSAF.length);
+    // Une cellule de source par période. Elles ne portent pas toutes la même
+    // valeur depuis que la période 2026 cite le décret qui l'a fixée : on
+    // compte donc les occurrences de chaque source distincte.
+    const parSource = new Map<string, number>();
+    for (const p of PERIODES_URSSAF) {
+      parSource.set(p.source, (parSource.get(p.source) ?? 0) + 1);
+    }
+    for (const [source, attendu] of parSource) {
+      expect(within(table).getAllByText(source)).toHaveLength(attendu);
+    }
   });
 });
 
@@ -177,7 +186,7 @@ describe('ajout d’une période', () => {
   // déploiement.
   it('permet de corriger une période livrée, à début identique', async () => {
     await ouvrirBareme();
-    await saisirPeriode(utilisateurTest(), { du: '2026-07', bnc: '25,9', source: 'avis réel' });
+    await saisirPeriode(utilisateurTest(), { du: '2026-01', bnc: '25,9', source: 'avis réel' });
 
     expect(useFaits.getState().faits.periodesUrssafAjoutees).toHaveLength(1);
     const effectives = periodesUrssafEffectives(useFaits.getState().faits);

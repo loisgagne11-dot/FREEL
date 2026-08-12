@@ -146,7 +146,7 @@ describe('état de l\'écran Pilote', () => {
       [], maintenant
     );
     // 26,1 % de cotisations + 0,2 % de CFP (régime du barème par défaut)
-    expect(e.voletAProvisionner).toBeCloseTo(10000 * (0.261 + 0.002), 2);
+    expect(e.voletAProvisionner).toBeCloseTo(10000 * (0.256 + 0.002), 2);
     expect(e.voletConstate).toBe(0);
   });
 
@@ -202,7 +202,12 @@ describe('écran Achats', () => {
 
   const ASSUJETTI_DEPUIS_JUILLET = faits({
     entreprise: { ...faitsVides().entreprise, tvaDepuis: mois('2026-07') },
-    banqueReliee: true
+    // Un relevé importé : c'est lui, et non un booléen, qui rend le
+    // rapprochement possible.
+    mouvementsBancaires: [{
+      id: 'mvt-1', date: dateISO('2026-09-10'), libelle: 'PRLV',
+      montant: euros(-120), rapprocheAvec: null, sansContrepartie: false
+    }]
   });
 
   // Franchir le seuil en cours d'année est le cas ordinaire. Appliquer le
@@ -249,7 +254,7 @@ describe('écran Achats', () => {
   // n'a plus lieu.
   it('ne présente rien comme rapproché quand aucune banque n\'est reliée', () => {
     const etat = etatAchats({
-      ...ASSUJETTI_DEPUIS_JUILLET, banqueReliee: false, depenses: [depense()]
+      ...ASSUJETTI_DEPUIS_JUILLET, mouvementsBancaires: [], depenses: [depense()]
     });
     expect(etat.lignes[0]?.rapprochement).toBe('sans_banque');
     expect(etat.banqueReliee).toBe(false);

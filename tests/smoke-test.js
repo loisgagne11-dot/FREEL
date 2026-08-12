@@ -109,6 +109,83 @@ fuites.forEach(function(f) {
 });
 assert(/onboardingDone:\s*false/.test(html), 'onboardingDone par défaut à false (onboarding déclenché)');
 
+// Le contrôle ci-dessus ne portait que sur `index.html`. Une copie d'archive
+// du même fichier a longtemps gardé nom, SIRET, n° de TVA et ville en dur,
+// sur un dépôt public, sans qu'aucun test ne la regarde. Le garde-fou balaie
+// donc désormais TOUS les fichiers servis ou versionnés.
+section('Absence de données personnelles — dépôt entier');
+
+const fsMod = require('fs');
+const pathMod = require('path');
+const RACINE = pathMod.join(__dirname, '..');
+const IGNORES = new Set(['node_modules', '.git', 'dist', 'captures', 'coverage']);
+const EXTENSIONS = ['.html', '.js', '.ts', '.tsx', '.json', '.md', '.css'];
+
+function fichiersDuDepot(dossier) {
+  const trouves = [];
+  for (const entree of fsMod.readdirSync(dossier, { withFileTypes: true })) {
+    if (IGNORES.has(entree.name)) continue;
+    const chemin = pathMod.join(dossier, entree.name);
+    if (entree.isDirectory()) trouves.push.apply(trouves, fichiersDuDepot(chemin));
+    else if (EXTENSIONS.indexOf(pathMod.extname(entree.name)) !== -1) trouves.push(chemin);
+  }
+  return trouves;
+}
+
+/**
+ * Motifs interdits.
+ *
+ * Ils décrivent des FORMES de données personnelles, pas des valeurs :
+ * inscrire la valeur réelle dans le test la republierait à l'endroit même
+ * censé la faire disparaître.
+ */
+const MOTIFS_INTERDITS = [
+  [/\bsiret:\s*['"]([0-9]{9,})/gi, 'SIRET en dur dans une valeur par défaut'],
+  [/\biban:\s*['"](FR[0-9]{2}[0-9A-Z]{10,})/gi, 'IBAN français en dur'],
+  [/tvaIntracom:\s*['"](FR[0-9]{2,})/gi, 'n° de TVA intracommunautaire en dur'],
+  [/\b(RCS\s+[A-ZÉÈÀÂÎÔÛ]{4,})/g, 'ville de RCS en dur dans une mention légale']
+];
+
+/**
+ * Une valeur manifestement inventée.
+ *
+ * Les jeux d'essai de la migration DOIVENT porter des valeurs au bon format,
+ * sinon ils ne testeraient pas grand-chose. Exclure les fichiers de test en
+ * bloc serait pire : de vraies données pourraient s'y loger sans que rien ne
+ * les voie. On reconnaît donc le factice à sa forme — que des zéros, une
+ * séquence croissante, ou un seul chiffre répété.
+ */
+function estManifestementFactice(valeur) {
+  const chiffres = String(valeur).replace(/[^0-9]/g, '');
+  if (chiffres.length === 0) return false;
+  if (/^0+$/.test(chiffres)) return true;
+  if (/^(\d)\1+$/.test(chiffres)) return true;
+  // « 123456789 », « 12345678901237 » : les huit premiers chiffres se suivent.
+  return /^0?123456789/.test(chiffres);
+}
+
+const fuitesTrouvees = [];
+fichiersDuDepot(RACINE).forEach(function(chemin) {
+  // Ce fichier décrit les motifs : il les contient par construction.
+  if (chemin === __filename) return;
+  const contenu = fsMod.readFileSync(chemin, 'utf8');
+  MOTIFS_INTERDITS.forEach(function(motif) {
+    const expression = new RegExp(motif[0].source, motif[0].flags);
+    let trouve;
+    while ((trouve = expression.exec(contenu)) !== null) {
+      if (estManifestementFactice(trouve[1])) continue;
+      fuitesTrouvees.push(pathMod.relative(RACINE, chemin) + ' — ' + motif[1]);
+      break;
+    }
+  });
+});
+
+assert(
+  fuitesTrouvees.length === 0,
+  'Aucune donnée personnelle en dur dans le dépôt' +
+    (fuitesTrouvees.length ? ' — trouvé : ' + fuitesTrouvees.join(' ; ') : '')
+);
+
 // ===== 5. Vérifier la sécurité =====
 section('Sécurité');
 
@@ -305,9 +382,15 @@ if (appScript) {
     });
 
     // ===== Barème résolu par période =====
-    // Le taux BNC change EN COURS D'ANNÉE (1er juillet 2024 et 2026). Une
-    // résolution par année appliquait 25,6 % à juillet 2026 au lieu de
-    // 26,1 %. Ces assertions verrouillent la résolution par mois.
+    // Le taux BNC a changé EN COURS D'ANNÉE au 1er juillet 2024 : une
+    // résolution par année civile appliquerait 21,1 % à tout 2024, alors que
+    // le second semestre est à 23,1 %. Ces assertions verrouillent la
+    // résolution par mois.
+    //
+    // Une bascule à 26,1 % au 1er juillet 2026 avait aussi été inscrite ici.
+    // Elle n'a jamais eu lieu : le décret n° 2025-943 du 8 septembre 2025 a
+    // plafonné la dernière marche à 25,6 %. Les assertions qui l'attendaient
+    // verrouillaient donc une erreur.
     section('Barème par période');
 
     const attendus = [
@@ -317,10 +400,10 @@ if (appScript) {
       ['2024-12', 0.231, '2e semestre 2024'],
       ['2025-01', 0.246, '2025, taux unique'],
       ['2025-12', 0.246, 'décembre 2025'],
-      ['2026-01', 0.256, '1er semestre 2026'],
-      ['2026-06', 0.256, 'juin 2026, dernier mois avant bascule'],
-      ['2026-07', 0.261, 'juillet 2026, bascule mi-année'],
-      ['2026-12', 0.261, 'décembre 2026']
+      ['2026-01', 0.256, 'janvier 2026'],
+      ['2026-07', 0.256, 'juillet 2026 : pas de bascule, contrairement au calendrier initial'],
+      ['2026-12', 0.256, 'décembre 2026'],
+      ['2027-06', 0.256, '2027, période toujours ouverte']
     ];
     attendus.forEach(function (cas) {
       verifie('Taux BNC ' + cas[0] + ' = ' + (cas[1] * 100).toFixed(1) + '% (' + cas[2] + ')', function () {
@@ -328,12 +411,12 @@ if (appScript) {
       });
     });
 
-    verifie('Les deux semestres 2026 diffèrent (une table par année ne peut pas l\'exprimer)', function () {
-      return sandbox.getUrssafRateAt('2026-06', 'BNC', false)
-        !== sandbox.getUrssafRateAt('2026-07', 'BNC', false);
+    verifie('Les deux semestres 2024 diffèrent (une table par année ne peut pas l\'exprimer)', function () {
+      return sandbox.getUrssafRateAt('2024-06', 'BNC', false)
+        !== sandbox.getUrssafRateAt('2024-07', 'BNC', false);
     });
     verifie('ACRE applique bien un abattement de 50 %', function () {
-      return sandbox.getUrssafRateAt('2026-07', 'BNC', true) === 0.261 * 0.5;
+      return sandbox.getUrssafRateAt('2026-07', 'BNC', true) === 0.256 * 0.5;
     });
     verifie('Un mois antérieur à toute période connue ne renvoie pas de taux', function () {
       return sandbox.getUrssafRateAt('2019-01', 'BNC', false) === null;
@@ -364,7 +447,7 @@ if (appScript) {
     });
     verifie('Le futur reste couvert par la période ouverte (un taux court jusqu\'au suivant)', function () {
       const info = sandbox.getUrssafRateInfo('2031-03');
-      return info.estRefuse === false && info.taux === 0.261;
+      return info.estRefuse === false && info.taux === 0.256;
     });
     verifie('Aucun libellé d\'hypothèse sur une période publiée', function () {
       return sandbox.getUrssafHypotheseLabel('2026-07') === null;
