@@ -335,7 +335,7 @@ tests verts.
 
 | Sujet | État |
 |---|---|
-| **Taux de cotisations** | Valeurs du propriétaire, à recouper **une fois** avec un avis d'appel réel. `urssaf.fr` renvoie 503 sur ses pages de barème. C'est le seul chiffre du projet où une erreur coûte plusieurs milliers d'euros par an |
+| **Taux de cotisations** | **Erreur corrigée le 12/08.** La table portait une bascule à 26,1 % au 1er juillet 2026. Ce taux avait bien été programmé, mais le **décret n° 2025-943 du 8 septembre 2025** a plafonné la dernière marche à **25,6 %** : la bascule n'a jamais eu lieu. Les deux applications surestimaient donc les cotisations d'un demi-point depuis juillet 2026. `urssaf.fr` renvoie toujours 503 ; la correction s'appuie sur deux sources secondaires concordantes citant le décret. Un avis d'appel réel reste le recoupement de premier ordre |
 | **ACRE au 01/07/2026** | Passage de l'abattement de 50 % à 25 % **probable mais non confirmé**. Sans effet sur le propriétaire (ACRE éteinte depuis le T1 2026), nécessaire pour recalculer un trimestre passé |
 | **Export FEC** | Retiré du périmètre (D6). Code conservé sur la branche de sauvegarde |
 | **Marge de build** | Réglé. React est sorti dans un chunk `vendor` : il ne change pas d'un déploiement à l'autre, donc le cache du navigateur le conserve. Modifier une ligne de code invalidait 248 Ko ; désormais 55 |

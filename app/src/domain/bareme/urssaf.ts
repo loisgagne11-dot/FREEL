@@ -18,9 +18,17 @@
  *  3. Les périodes sont contiguës, sans trou ni chevauchement. Seule la
  *     dernière reste ouverte (`au: null` = toujours en vigueur).
  *
- * ⚠️ Les valeurs ci-dessous restent à recouper une fois avec un avis
- * d'appel de cotisations réel. urssaf.fr renvoie 503 sur ses pages de
- * barème, elles proviennent donc d'une source secondaire.
+ * ⚠️ VÉRIFICATION DU 12/08/2026 — une erreur corrigée.
+ *
+ * La table portait une bascule à 26,1 % au 1er juillet 2026. Ce taux avait
+ * bien été programmé par la réforme de 2024, mais le décret n° 2025-943 du
+ * 8 septembre 2025 a plafonné la dernière marche à 25,6 %. La bascule n'a
+ * donc jamais eu lieu, et l'application surestimait les cotisations d'un
+ * demi-point sur toute recette encaissée depuis juillet 2026.
+ *
+ * urssaf.fr renvoie toujours 503 sur ses pages de barème ; la correction
+ * s'appuie sur deux sources secondaires concordantes qui citent le décret.
+ * Un avis d'appel réel reste le seul recoupement de premier ordre.
  */
 
 import {
@@ -50,11 +58,15 @@ const p = (
 });
 
 export const PERIODES_URSSAF: readonly PeriodeBareme[] = [
-  p('2024-01', '2024-06', 0.211, 0.123, 0.212, 'urssaf.fr', '2026-07-27'),
-  p('2024-07', '2024-12', 0.231, 0.123, 0.212, 'urssaf.fr', '2026-07-27'),
-  p('2025-01', '2025-12', 0.246, 0.123, 0.212, 'urssaf.fr', '2026-07-27'),
-  p('2026-01', '2026-06', 0.256, 0.123, 0.212, 'urssaf.fr', '2026-07-27'),
-  p('2026-07', null, 0.261, 0.123, 0.212, 'urssaf.fr', '2026-07-27')
+  p('2024-01', '2024-06', 0.211, 0.123, 0.212, 'urssaf.fr', '2026-08-12'),
+  p('2024-07', '2024-12', 0.231, 0.123, 0.212, 'urssaf.fr', '2026-08-12'),
+  p('2025-01', '2025-12', 0.246, 0.123, 0.212, 'urssaf.fr', '2026-08-12'),
+  // 26,1 % avait été programmé pour 2026 par la réforme de 2024, puis le
+  // décret n° 2025-943 du 8 septembre 2025 a plafonné la dernière marche à
+  // 25,6 %. La bascule au 1er juillet 2026 n'a donc jamais eu lieu : la
+  // période reste ouverte au taux de janvier.
+  p('2026-01', null, 0.256, 0.123, 0.212,
+    'décret n° 2025-943 du 08/09/2025 ; compta-online, l-expert-comptable', '2026-08-12')
 ];
 
 /**

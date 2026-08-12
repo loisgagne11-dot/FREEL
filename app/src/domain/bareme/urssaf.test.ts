@@ -13,7 +13,9 @@ function taux(m: string, type: TypeActivite = 'BNC', acre = false): number | nul
 
 describe('barème URSSAF — résolution par période', () => {
   // Le cœur du sujet : le taux BNC change EN COURS D'ANNÉE, au 1er juillet
-  // 2024 et au 1er juillet 2026. Ces cas verrouillent les bascules, mois
+  // 2024. Une bascule au 1er juillet 2026 avait aussi été inscrite ici :
+  // elle n'a jamais eu lieu, le décret n° 2025-943 du 8 septembre 2025 ayant
+  // plafonné la dernière marche à 25,6 %. Ces cas verrouillent les bascules, mois
   // par mois, de part et d'autre de chaque frontière.
   const attendus: readonly [string, number, string][] = [
     ['2024-01', 0.211, 'début du 1er semestre 2024'],
@@ -23,27 +25,28 @@ describe('barème URSSAF — résolution par période', () => {
     ['2025-01', 0.246, '2025, taux unique sur l\'année'],
     ['2025-12', 0.246, 'fin 2025'],
     ['2026-01', 0.256, 'début du 1er semestre 2026'],
-    ['2026-06', 0.256, 'dernier mois avant la bascule de juillet 2026'],
-    ['2026-07', 0.261, 'bascule du 1er juillet 2026'],
-    ['2026-12', 0.261, 'fin 2026']
+    ['2026-06', 0.256, 'juin 2026'],
+    ['2026-07', 0.256, 'juillet 2026 : la bascule prévue n\'a pas eu lieu'],
+    ['2026-12', 0.256, 'fin 2026']
   ];
 
   it.each(attendus)('%s → %d (%s)', (m, attendu) => {
     expect(taux(m)).toBe(attendu);
   });
 
-  it('distingue les deux semestres 2026, ce qu\'une table annuelle ne peut pas faire', () => {
-    expect(taux('2026-06')).not.toBe(taux('2026-07'));
+  // C'est 2024 qui le démontre : ses deux semestres relèvent de deux taux.
+  it('distingue les deux semestres 2024, ce qu\'une table annuelle ne peut pas faire', () => {
+    expect(taux('2024-06')).not.toBe(taux('2024-07'));
   });
 
   it('applique le taux par type d\'activité', () => {
-    expect(taux('2026-07', 'BNC')).toBe(0.261);
+    expect(taux('2026-07', 'BNC')).toBe(0.256);
     expect(taux('2026-07', 'BIC_vente')).toBe(0.123);
     expect(taux('2026-07', 'BIC_service')).toBe(0.212);
   });
 
   it('applique l\'abattement ACRE', () => {
-    expect(taux('2026-07', 'BNC', true)).toBeCloseTo(0.261 * ABATTEMENT_ACRE, 10);
+    expect(taux('2026-07', 'BNC', true)).toBeCloseTo(0.256 * ABATTEMENT_ACRE, 10);
   });
 });
 
@@ -53,7 +56,7 @@ describe('asymétrie du temps', () => {
   it('sert le dernier taux connu pour un mois futur non publié', () => {
     const r = tauxCotisations(mois('2031-03'), 'BNC', false);
     expect(r.statut).toBe('publie'); // la dernière période reste ouverte
-    expect(r.statut !== 'refuse' && r.valeur).toBe(0.261);
+    expect(r.statut !== 'refuse' && r.valeur).toBe(0.256);
   });
 
   it('refuse un mois antérieur au plus ancien barème, au lieu de l\'extrapoler', () => {
@@ -90,7 +93,8 @@ describe('provenance et intégrité de la table', () => {
   });
 
   it('périodePour trouve la période et rien pour un mois non couvert', () => {
-    expect(periodePour(mois('2026-07'))?.du).toBe('2026-07');
+    // Juillet 2026 relève de la période ouverte depuis janvier.
+    expect(periodePour(mois('2026-07'))?.du).toBe('2026-01');
     expect(periodePour(mois('2019-01'))).toBeUndefined();
   });
 });
@@ -103,10 +107,10 @@ describe('l\'hypothèse doit être explicite', () => {
   it('produit un libellé chiffré et daté sur une hypothèse', () => {
     // Construction directe : la table réelle n'a pas de trou vers le futur.
     const label = libelleHypothese({
-      statut: 'hypothese', valeur: ratio(0.261),
+      statut: 'hypothese', valeur: ratio(0.256),
       source: 'urssaf.fr', verifieLe: '2026-07-27' as never, depuis: mois('2026-07')
     });
-    expect(label).toContain('26,1 %');
+    expect(label).toContain('25,6 %');
     expect(label).toContain('2026-07');
   });
 });

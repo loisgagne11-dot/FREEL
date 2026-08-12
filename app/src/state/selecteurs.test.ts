@@ -146,7 +146,7 @@ describe('état de l\'écran Pilote', () => {
       [], maintenant
     );
     // 26,1 % de cotisations + 0,2 % de CFP (régime du barème par défaut)
-    expect(e.voletAProvisionner).toBeCloseTo(10000 * (0.261 + 0.002), 2);
+    expect(e.voletAProvisionner).toBeCloseTo(10000 * (0.256 + 0.002), 2);
     expect(e.voletConstate).toBe(0);
   });
 

@@ -397,6 +397,40 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
   };
 }
 
+/**
+ * Convertit un bundle en faits, avec son rapport.
+ *
+ * Exposé pour que les données venues de Supabase passent par EXACTEMENT la
+ * même conversion que celles du navigateur. Deux chemins de conversion
+ * distincts finiraient par diverger, et l'application dirait alors deux choses
+ * différentes selon l'origine de la donnée — le genre d'écart que l'audit a
+ * relevé partout dans l'ancienne version.
+ */
+export function convertirBundle(
+  bundle: Readonly<Record<string, unknown>>
+): { readonly faits: Faits; readonly rapport: RapportMigration } {
+  const anomalies: Anomalie[] = [];
+  const champsNonRepris: string[] = [];
+  const faits = convertir(bundle as Inconnu, anomalies, champsNonRepris);
+
+  return {
+    faits,
+    rapport: {
+      aDesDonneesLegacy: true,
+      dejaMigre: false,
+      comptes: {
+        clients: faits.clients.length,
+        missions: faits.missions.length,
+        recettes: faits.recettes.length,
+        depenses: faits.depenses.length,
+        periodesDeclarees: faits.periodesDeclarees.length
+      },
+      anomalies,
+      champsNonRepris
+    }
+  };
+}
+
 /** Rapport à blanc. N'écrit rien, ne modifie rien. */
 export function analyser(stockage: Stockage): RapportMigration {
   const dejaMigre = stockage.getItem(CLE_STOCKAGE) !== null;
