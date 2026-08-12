@@ -21,8 +21,8 @@ au dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **481** |
-| Build | **54 Ko** de code applicatif, 188 Ko de bibliothèques, 256 Ko au premier rendu (82 Ko gzippé) |
+| Tests | **565** (+ 91 côté legacy) |
+| Build | **58 Ko** de code applicatif, 188 Ko de bibliothèques, 260 Ko au premier rendu |
 | Budget | conforme sur les **4 postes** vérifiés |
 | Responsive | **120 combinaisons** (5 tailles × 4 palettes × **6 écrans**) |
 | Migration | conforme |
