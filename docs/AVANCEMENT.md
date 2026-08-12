@@ -70,6 +70,35 @@ la recréation du dépôt.
 
 ---
 
+## 0 bis. Pourquoi `index.html` est encore là
+
+**Ce n'est pas du code mort : c'est l'application en production**, celle qui
+est servie et qui fait tourner l'activité. La nouvelle version ne peut pas
+encore la remplacer, et le tableau ci-dessous dit précisément ce qui manque.
+
+| Fonction | `index.html` (legacy) | `app/` (nouvelle) |
+|---|---|---|
+| Consulter, calculer, provisionner | ✅ | ✅ |
+| Saisir une **dépense** avec justificatif | ❌ | ✅ |
+| Importer un relevé bancaire | ❌ | ✅ |
+| Livre des recettes conforme, DES | ❌ | ✅ |
+| **Créer un client** | ✅ | ❌ |
+| **Créer une mission** | ✅ | ❌ |
+| **Émettre une facture, et son PDF** | ✅ | ❌ |
+| **Écrire dans Supabase** (synchro) | ✅ | ❌ lecture seule |
+
+Les quatre dernières lignes sont le chemin critique vers la suppression du
+legacy. Tant qu'elles ne sont pas faites, retirer `index.html` priverait
+l'utilisateur de son outil de facturation — et une facture non émise est un
+revenu non encaissé.
+
+**Ordre à respecter, et pourquoi.** Clients et missions d'abord, car une
+facture s'y rattache ; la facturation ensuite ; l'écriture Supabase en
+dernier, parce qu'elle est la seule opération qui peut abîmer des données
+existantes et qu'elle demande donc que le reste soit sûr.
+
+---
+
 ## 1. À lire, dans cet ordre
 
 | Ordre | Document | Ce qu'il apporte |
@@ -77,10 +106,13 @@ la recréation du dépôt.
 | 1 | **ce fichier** | Où on en est, quoi faire ensuite |
 | 2 | [`PLAN-REFONTE.md`](./PLAN-REFONTE.md) | Les 6 décisions arbitrées (D1–D6), le barème par périodes, les 7 jalons |
 | 3 | [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) | Le diagnostic complet |
-| 4 | [`audit/05-spec-ecrans.md`](./audit/05-spec-ecrans.md) | La spec écran par écran, à consulter au moment d'implémenter chaque écran |
-| 5 | [`audit/03-design-system.md`](./audit/03-design-system.md) | Tokens, media queries, responsabilités du shell |
+| 4 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
 
-Les autres rapports d'`audit/` sont des références ponctuelles.
+Les neuf rapports d'audit détaillés ont été retirés du dépôt le 12/08/2026.
+Leur substance est dans le document 3, et les décisions qu'ils ont produites
+sont devenues du code commenté — c'est là qu'il faut les lire désormais. Ils
+restent dans l'historique git (`git show 9d97b6b:docs/audit/05-spec-ecrans.md`)
+si un point de spécification manque.
 
 ---
 
