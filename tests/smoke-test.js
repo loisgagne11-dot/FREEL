@@ -109,6 +109,83 @@ fuites.forEach(function(f) {
 });
 assert(/onboardingDone:\s*false/.test(html), 'onboardingDone par défaut à false (onboarding déclenché)');
 
+// Le contrôle ci-dessus ne portait que sur `index.html`. Une copie d'archive
+// du même fichier a longtemps gardé nom, SIRET, n° de TVA et ville en dur,
+// sur un dépôt public, sans qu'aucun test ne la regarde. Le garde-fou balaie
+// donc désormais TOUS les fichiers servis ou versionnés.
+section('Absence de données personnelles — dépôt entier');
+
+const fsMod = require('fs');
+const pathMod = require('path');
+const RACINE = pathMod.join(__dirname, '..');
+const IGNORES = new Set(['node_modules', '.git', 'dist', 'captures', 'coverage']);
+const EXTENSIONS = ['.html', '.js', '.ts', '.tsx', '.json', '.md', '.css'];
+
+function fichiersDuDepot(dossier) {
+  const trouves = [];
+  for (const entree of fsMod.readdirSync(dossier, { withFileTypes: true })) {
+    if (IGNORES.has(entree.name)) continue;
+    const chemin = pathMod.join(dossier, entree.name);
+    if (entree.isDirectory()) trouves.push.apply(trouves, fichiersDuDepot(chemin));
+    else if (EXTENSIONS.indexOf(pathMod.extname(entree.name)) !== -1) trouves.push(chemin);
+  }
+  return trouves;
+}
+
+/**
+ * Motifs interdits.
+ *
+ * Ils décrivent des FORMES de données personnelles, pas des valeurs :
+ * inscrire la valeur réelle dans le test la republierait à l'endroit même
+ * censé la faire disparaître.
+ */
+const MOTIFS_INTERDITS = [
+  [/\bsiret:\s*['"]([0-9]{9,})/gi, 'SIRET en dur dans une valeur par défaut'],
+  [/\biban:\s*['"](FR[0-9]{2}[0-9A-Z]{10,})/gi, 'IBAN français en dur'],
+  [/tvaIntracom:\s*['"](FR[0-9]{2,})/gi, 'n° de TVA intracommunautaire en dur'],
+  [/\b(RCS\s+[A-ZÉÈÀÂÎÔÛ]{4,})/g, 'ville de RCS en dur dans une mention légale']
+];
+
+/**
+ * Une valeur manifestement inventée.
+ *
+ * Les jeux d'essai de la migration DOIVENT porter des valeurs au bon format,
+ * sinon ils ne testeraient pas grand-chose. Exclure les fichiers de test en
+ * bloc serait pire : de vraies données pourraient s'y loger sans que rien ne
+ * les voie. On reconnaît donc le factice à sa forme — que des zéros, une
+ * séquence croissante, ou un seul chiffre répété.
+ */
+function estManifestementFactice(valeur) {
+  const chiffres = String(valeur).replace(/[^0-9]/g, '');
+  if (chiffres.length === 0) return false;
+  if (/^0+$/.test(chiffres)) return true;
+  if (/^(\d)\1+$/.test(chiffres)) return true;
+  // « 123456789 », « 12345678901237 » : les huit premiers chiffres se suivent.
+  return /^0?123456789/.test(chiffres);
+}
+
+const fuitesTrouvees = [];
+fichiersDuDepot(RACINE).forEach(function(chemin) {
+  // Ce fichier décrit les motifs : il les contient par construction.
+  if (chemin === __filename) return;
+  const contenu = fsMod.readFileSync(chemin, 'utf8');
+  MOTIFS_INTERDITS.forEach(function(motif) {
+    const expression = new RegExp(motif[0].source, motif[0].flags);
+    let trouve;
+    while ((trouve = expression.exec(contenu)) !== null) {
+      if (estManifestementFactice(trouve[1])) continue;
+      fuitesTrouvees.push(pathMod.relative(RACINE, chemin) + ' — ' + motif[1]);
+      break;
+    }
+  });
+});
+
+assert(
+  fuitesTrouvees.length === 0,
+  'Aucune donnée personnelle en dur dans le dépôt' +
+    (fuitesTrouvees.length ? ' — trouvé : ' + fuitesTrouvees.join(' ; ') : '')
+);
+
 // ===== 5. Vérifier la sécurité =====
 section('Sécurité');
 

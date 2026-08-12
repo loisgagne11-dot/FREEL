@@ -3995,7 +3995,7 @@ function exportLivreRecettesPDF(year) {
   doc.setFontSize(8);
   doc.text('Certifié sincère et conforme,', margin, y);
   y += 5;
-  doc.text('Fait à ' + (COMPANY.ville || 'Toulouse') + ', le ' + TODAY.toLocaleDateString('fr-FR'), margin, y);
+  doc.text('Fait à ' + (COMPANY.ville || COMPANY.commune || '') + ', le ' + TODAY.toLocaleDateString('fr-FR'), margin, y);
   y += 12;
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(7);
@@ -9373,7 +9373,7 @@ function showMissionModal(mission) {
   body.appendChild(el('div', { class: 'form-section' }, '1️⃣ Mission'));
 
   body.appendChild(createInput('Titre / Projet', 'text', 'mTitre', mission.titre, 'Ex: Développement ERP'));
-  body.appendChild(createInput('Lieu', 'text', 'mSite', mission.site, 'Ex: Toulouse, Remote'));
+  body.appendChild(createInput('Lieu', 'text', 'mSite', mission.site, 'Ex: Paris, Remote'));
   body.appendChild(el('div', { class: 'form-row' }, [
     createInput('Début', 'date', 'mDebut', mission.debut),
     createInput('Fin', 'date', 'mFin', mission.fin)
@@ -9534,7 +9534,7 @@ function showMissionModal(mission) {
 
       // Adresse
       var rowAdr = el('div', { class: 'form-row' });
-      rowAdr.appendChild(createInput('Adresse / Site', 'text', 'mEntAdresse_' + idx, ent.adresse || '', 'Ex: Site Saint-Martin, Toulouse'));
+      rowAdr.appendChild(createInput('Adresse / Site', 'text', 'mEntAdresse_' + idx, ent.adresse || '', 'Ex: Site Exemple, Paris'));
       card.appendChild(rowAdr);
       // Contact + email + tel
       var rowC1 = el('div', { class: 'form-row' });
@@ -9618,7 +9618,7 @@ function showMissionModal(mission) {
   // ═══════════════════════════════════════════════
   body.appendChild(el('div', { class: 'form-section form-section-border' }, '4️⃣ Agence / Intermédiaire'));
   body.appendChild(createInput('Nom de l\'agence', 'text', 'mAgenceNom', mission.agence.nom, 'Ex: Scalian, Alten...'));
-  body.appendChild(createInput('Adresse', 'text', 'mAgenceAdresse', (mission.agence.adresses && mission.agence.adresses[0]) || '', 'Ex: 14 Rue Paul Mesple, 31100 Toulouse'));
+  body.appendChild(createInput('Adresse', 'text', 'mAgenceAdresse', (mission.agence.adresses && mission.agence.adresses[0]) || '', 'Ex: 1 rue de l\'Exemple, 75001 Paris'));
 
   // Contacts agence (multiples)
   body.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: '6px', fontWeight: '600' } }, 'Contacts'));
@@ -11981,7 +11981,7 @@ function showSendInvoiceModal(facture) {
     missingDiv.appendChild(el('div', { style: { fontSize: '10px', fontWeight: '700', color: 'var(--warning)', marginBottom: '8px' } }, '⚠️ Informations manquantes — à compléter'));
 
     if (missing.indexOf('adresse') > -1) {
-      missingDiv.appendChild(createInput('Adresse de facturation *', 'text', 'invAdresse', '', 'Ex: 14 RUE PAUL MESPLE, 31100 TOULOUSE'));
+      missingDiv.appendChild(createInput('Adresse de facturation *', 'text', 'invAdresse', '', 'Ex: 1 RUE DE L\'EXEMPLE, 75001 PARIS'));
     }
     if (missing.indexOf('delai') > -1) {
       missingDiv.appendChild(createSelect('Délai de paiement *', 'invDelaiType', [
@@ -12236,7 +12236,7 @@ function showInvoiceGeneratorModal(mission, monthYm) {
   sec2.appendChild(el('div', { style: { fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px' } }, '🏢 Adresse de facturation'));
   sec2.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px' } }, 'Sera sauvegardée dans la mission pour les prochaines factures'));
   sec2.appendChild(createInput('Nom du client', 'text', 'invClient', defaultClientName));
-  sec2.appendChild(createInput('Adresse de facturation', 'text', 'invAdresse', defaultAdresseClient, 'Ex: 14 RUE PAUL MESPLE, 31100 TOULOUSE'));
+  sec2.appendChild(createInput('Adresse de facturation', 'text', 'invAdresse', defaultAdresseClient, 'Ex: 1 RUE DE L\'EXEMPLE, 75001 PARIS'));
   body.appendChild(sec2);
 
   // === SECTION 3: Conditions de paiement ===
@@ -13426,7 +13426,7 @@ function downloadInvoiceAsHTML(data) {
     '<tr class="grand-total"><td colspan="4"></td><td style="text-align:right;color:#fff">TOTAL TTC</td><td style="text-align:right;font-size:12pt">' + fmtEur(data.totalTTC) + '</td></tr>\n' +
     '</tbody></table>\n' +
     (data.iban ? '<div class="iban"><strong>Coordonnees bancaires</strong><br><span style="font-family:monospace;font-size:11pt">' + data.iban + '</span></div>\n' : '') +
-    '<div class="footer">En cas de retard de paiement, penalite de 3x le taux legal + 40 EUR de frais.<br>SIREN ' + data.siren + ' - RCS TOULOUSE' + (data.tvaRate === 0 ? '<br>TVA non applicable, article 293 B du CGI' : '') + '</div>\n' +
+    '<div class="footer">En cas de retard de paiement, penalite de 3x le taux legal + 40 EUR de frais.<br>SIREN ' + data.siren + '' + (data.tvaRate === 0 ? '<br>TVA non applicable, article 293 B du CGI' : '') + '</div>\n' +
     '</body></html>';
   
   try {
