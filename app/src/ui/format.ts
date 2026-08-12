@@ -36,6 +36,21 @@ export function moisLong(m: string): string {
 }
 
 /**
+ * Une date ISO en français court : « 10 juil. 2026 ».
+ *
+ * `null` rend un tiret cadratin et non une date du jour : une date inconnue
+ * doit se voir, pas se deviner.
+ */
+export function dateCourte(d: string | null): string {
+  if (d === null || d === '') return '—';
+  const t = new Date(`${d}T00:00:00`);
+  if (Number.isNaN(t.getTime())) return d;
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  }).format(t);
+}
+
+/**
  * Nombre de mois en texte. `null` quand la valeur n'a pas de sens — l'ancienne
  * application affichait dans ce cas une autonomie fantaisiste.
  */

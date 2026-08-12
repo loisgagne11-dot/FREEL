@@ -35,7 +35,33 @@ function bundleLegacy() {
     ],
     t: {
       soldeInitial: 5000, salaireEstime: 2200, reserveCompte: 150,
-      mouvements: [], paidCharges: {}, conges: {}, rendementActif: false
+      mouvements: [
+        // Saisie en TTC : l'ancien modèle gardait le HT dans `montant` et
+        // calculait la TVA déductible au moment de la saisie.
+        {
+          id: 'CH1', type: 'Charge', categorie: 'Logiciels', description: 'Abonnement',
+          montant: 100, montantTTC: 120, tvaDeductible: 20, tvaRate: 20,
+          mois: '2026-06', date: '2026-06-04'
+        },
+        // Saisie en HT, sans TVA : `montantTTC` absent.
+        {
+          id: 'CH2', type: 'Charge', categorie: 'Banque', description: 'Frais de tenue',
+          montant: 12, tvaRate: 0, mois: '2026-06', date: '2026-06-30'
+        },
+        // Datée au mois seulement — cas courant des saisies rétroactives.
+        {
+          id: 'CH3', type: 'Charge', categorie: 'Déplacements', description: 'Train',
+          montant: 80, montantTTC: 88, tvaRate: 10, mois: '2026-05'
+        },
+        // Ni date ni mois exploitables.
+        { id: 'CH4', type: 'Charge', categorie: '', description: 'Sans date', montant: 40 },
+        // Pas une dépense : ne doit pas être repris comme telle.
+        { id: 'SAL1', type: 'Salaire', montant: 1500, mois: '2026-06', date: '2026-06-28' }
+      ],
+      paidCharges: {},
+      // Format d'origine : les numéros de jour groupés par mois.
+      conges: { '2026-08': [10, 11, 12], '2026-12': [24, 31], '2026-02': [30] },
+      rendementActif: false
     },
     ir: { '2026': { parts: 1 } },
     _ts: 1750000000000
@@ -78,8 +104,14 @@ describe('rapport à blanc', () => {
   // Les champs sans destination ne doivent pas disparaître en silence.
   it('énumère les champs de l\'ancienne trésorerie non repris', () => {
     const r = analyser(avecLegacy());
-    expect(r.champsNonRepris).toContain('treasury.mouvements');
-    expect(r.champsNonRepris).toContain('treasury.conges');
+    expect(r.champsNonRepris).toContain('treasury.paidCharges');
+    // Les charges deviennent des dépenses ; le reste des mouvements — salaires,
+    // apports — n'a pas encore de place et doit être annoncé comme tel.
+    expect(r.champsNonRepris).toContain('treasury.mouvements (hors charges)');
+  });
+
+  it('compte les dépenses qui seraient reprises', () => {
+    expect(analyser(avecLegacy()).comptes.depenses).toBe(4);
   });
 
   // Sans ce fait, le volet 2 des provisions surestime la dette.
@@ -154,6 +186,95 @@ describe('conversion des données', () => {
   });
 });
 
+describe('reprise des charges en dépenses', () => {
+  function depenses() {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    return r.faits.depenses;
+  }
+
+  it('ne reprend que les mouvements de type Charge', () => {
+    expect(depenses().map((d) => d.id)).toEqual(['CH1', 'CH2', 'CH3', 'CH4']);
+  });
+
+  // L'ancien modèle gardait le HT dans `montant` ; la dépense se raisonne en
+  // TTC, parce que c'est le montant réellement sorti du compte.
+  it('reprend le TTC quand il existe, et le montant seul sinon', () => {
+    const [ch1, ch2] = depenses();
+    expect(ch1?.montantTtc).toBe(120);
+    expect(ch2?.montantTtc).toBe(12);
+  });
+
+  it('convertit le taux de TVA en ratio', () => {
+    const [ch1, ch2, ch3] = depenses();
+    expect(ch1?.tauxTva).toBe(0.20);
+    expect(ch2?.tauxTva).toBe(0);
+    expect(ch3?.tauxTva).toBe(0.10);
+  });
+
+  // Le point central : l'ancienne application annonçait une TVA déductible
+  // sans qu'aucune pièce n'existe nulle part. La migration ne peut pas les
+  // inventer, et ne doit pas faire comme si elles étaient là.
+  it('pose toutes les pièces comme manquantes, sans exception', () => {
+    expect(depenses().every((d) => d.justificatifId === null)).toBe(true);
+  });
+
+  it('le dit dans le rapport, chiffres à l\'appui', () => {
+    const r = analyser(avecLegacy());
+    expect(r.anomalies.some((a) => /sans justificatif/i.test(a.message))).toBe(true);
+  });
+
+  it('retient le premier du mois quand seul le mois était saisi', () => {
+    expect(depenses()[2]?.payeeLe).toBe('2026-05-01');
+  });
+
+  // Fabriquer une date plausible rattacherait la dépense à un exercice et à un
+  // régime de TVA choisis au hasard.
+  it('laisse la date vide plutôt que d\'en inventer une, et le signale', () => {
+    expect(depenses()[3]?.payeeLe).toBeNull();
+    const r = analyser(avecLegacy());
+    expect(r.anomalies.some((a) => /sans date exploitable/i.test(a.message))).toBe(true);
+  });
+
+  it('conserve la catégorie faute de fournisseur, plutôt que de la perdre', () => {
+    expect(depenses()[0]?.fournisseur).toBe('Logiciels');
+  });
+
+  // Aucune provenance n'était saisie : la supposer française était déjà
+  // l'hypothèse implicite de l'ancienne application. On la rend explicite.
+  it('répute les achats français, à requalifier à la main', () => {
+    expect(depenses().every((d) => d.provenance === 'france')).toBe(true);
+  });
+
+  it('ne prétend pas qu\'un compte bancaire est relié', () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    expect(r.faits.banqueReliee).toBe(false);
+  });
+});
+
+describe('reprise des congés', () => {
+  function conges() {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    return r.faits.conges;
+  }
+
+  // Le format par mois obligeait à reconstruire une date à chaque lecture et
+  // rendait impossible une plage à cheval sur deux mois.
+  it('convertit les numéros de jour en dates pleines, triées', () => {
+    expect(conges()).toEqual([
+      '2026-08-10', '2026-08-11', '2026-08-12', '2026-12-24', '2026-12-31'
+    ]);
+  });
+
+  // Reporter silencieusement un 30 février sur le 2 mars poserait un congé un
+  // jour où l'utilisateur travaillait.
+  it('écarte un jour qui n\'existe pas dans son mois', () => {
+    expect(conges().some((d) => d.startsWith('2026-02'))).toBe(false);
+  });
+});
+
 describe('invariant d\'absence de perte', () => {
   it('ne perd ni client, ni mission, ni recette, ni euro', () => {
     const legacy = bundleLegacy();
@@ -167,6 +288,14 @@ describe('invariant d\'absence de perte', () => {
     const r = migrer(avecLegacy());
     if (r.statut !== 'migre') throw new Error('migration attendue');
     const ampute = { ...r.faits, recettes: r.faits.recettes.slice(1) };
+    expect(verifierAbsenceDePerte(legacy as never, ampute)).not.toEqual([]);
+  });
+
+  it('détecte aussi une dépense perdue en route', () => {
+    const legacy = bundleLegacy();
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    const ampute = { ...r.faits, depenses: r.faits.depenses.slice(1) };
     expect(verifierAbsenceDePerte(legacy as never, ampute)).not.toEqual([]);
   });
 });

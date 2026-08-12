@@ -25,7 +25,36 @@ import {
   type EntreeATraiter, type SujetATraiter,
   sujetsATraiter
 } from '../domain/calculs/aTraiter';
-import type { Faits } from './schema';
+import {
+  type ContexteDepenses, type EtatRapprochement, type RegimeTva,
+  type ResumeDepenses, type TvaDepense,
+  rapprochementEffectif, resumerDepenses, tvaDeDepense
+} from '../domain/calculs/depenses';
+import {
+  type DelaiClient, type Jour, type PlanDeCharge,
+  calendrierDuMois, chargeDuMois, delaisParClient, planDeCharge
+} from '../domain/calculs/activite';
+import {
+  PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
+} from '../domain/bareme/urssaf';
+import {
+  type EcartConformite, type TotalLivre,
+  ecrituresDuLivre, totaliser, verifierConformite
+} from '../domain/calculs/livreRecettes';
+import type { Depense, Faits, Mission, Recette } from './schema';
+
+/**
+ * Le barème URSSAF effectivement appliqué.
+ *
+ * Une seule source pour toute l'application : les périodes livrées avec le
+ * code, complétées par celles que l'utilisateur a saisies. Tout calcul qui
+ * lirait `PERIODES_URSSAF` directement verrait un barème différent de celui
+ * affiché dans Config — exactement le genre de divergence que la refonte
+ * cherche à rendre impossible.
+ */
+export function periodesUrssafEffectives(faits: Faits): readonly PeriodeBareme[] {
+  return fusionnerPeriodes(PERIODES_URSSAF, faits.periodesUrssafAjoutees);
+}
 
 /** Le mois courant, dérivé de l'horloge et jamais codé en dur. */
 export function moisCourant(maintenant: Date = new Date()): Mois {
@@ -123,6 +152,7 @@ export function entreeATraiter(
     })),
     periodesDeclarees: faits.periodesDeclarees,
     periodicite: faits.entreprise.urssafPeriodicite,
+    periodesUrssaf: periodesUrssafEffectives(faits),
     debutActivite: faits.entreprise.debutActivite === null
       ? null
       : moisDe(faits.entreprise.debutActivite),
@@ -215,7 +245,12 @@ export function etatPilote(
     echeances,
     recettesEncaissees(faits),
     { mois: faits.periodesDeclarees },
-    { typeActivite: type, sousAcreLe: sousAcreLe(faits), tauxImpotEtContributions: tauxImpot }
+    {
+      typeActivite: type,
+      sousAcreLe: sousAcreLe(faits),
+      tauxImpotEtContributions: tauxImpot,
+      periodesUrssaf: periodesUrssafEffectives(faits)
+    }
   );
 
   const tresorerie = calculerTresorerie(
@@ -231,6 +266,245 @@ export function etatPilote(
     tauxImpotIndisponible: tauxImpotR.statut === 'refuse',
     motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null
   };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Livre des recettes
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface EtatLivre {
+  readonly ecritures: readonly Recette[];
+  readonly total: TotalLivre;
+  readonly ecarts: readonly EcartConformite[];
+  /** Écarts rattachés à une écriture, pour les afficher sur la ligne. */
+  readonly ecartsParEcriture: ReadonlyMap<string, readonly EcartConformite[]>;
+  /** Factures émises et non encaissées : elles n'entrent pas encore au livre. */
+  readonly enAttente: readonly Recette[];
+}
+
+/**
+ * L'état du livre des recettes.
+ *
+ * Le registre ne contient QUE des encaissements : une facture émise et non
+ * réglée n'y figure pas, et l'y faire figurer serait déclarer une recette qui
+ * n'a pas eu lieu. Elle est rendue à part, pour rester visible sans être
+ * comptée.
+ */
+export function etatLivre(faits: Faits): EtatLivre {
+  const ecarts = verifierConformite(faits.recettes);
+  const parEcriture = new Map<string, EcartConformite[]>();
+  for (const ecart of ecarts) {
+    if (ecart.ecritureId === null) continue;
+    const liste = parEcriture.get(ecart.ecritureId);
+    if (liste) liste.push(ecart); else parEcriture.set(ecart.ecritureId, [ecart]);
+  }
+
+  return {
+    ecritures: ecrituresDuLivre(faits.recettes) as readonly Recette[],
+    total: totaliser(faits.recettes),
+    ecarts,
+    ecartsParEcriture: parEcriture,
+    enAttente: faits.recettes
+      .filter((r) => r.encaisseeLe === null && r.emiseLe !== null)
+      .sort((a, b) => (b.emiseLe as DateISO).localeCompare(a.emiseLe as DateISO))
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Écran Activité
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Tarif journalier par nom de client.
+ *
+ * Une mission active l'emporte sur une mission terminée : c'est le tarif en
+ * vigueur qui convertit une recette récente en jours, pas celui d'un contrat
+ * clos il y a deux ans.
+ */
+export function tarifsParClient(faits: Faits): ReadonlyMap<string, Euros> {
+  const tarifs = new Map<string, Euros>();
+  for (const m of [...faits.missions].sort(prioriteMission)) {
+    const nom = m.clientNom;
+    if (nom === '' || m.tjm <= 0) continue;
+    if (!tarifs.has(nom)) tarifs.set(nom, m.tjm);
+  }
+  return tarifs;
+}
+
+/** Les missions actives d'abord, puis les terminées, puis les prospects. */
+function prioriteMission(a: Mission, b: Mission): number {
+  const rang = (m: Mission) => (m.statut === 'active' ? 0 : m.statut === 'terminee' ? 1 : 2);
+  return rang(a) - rang(b);
+}
+
+/** Une mission accompagnée de ce qu'elle a produit. */
+export interface LigneMission {
+  readonly mission: Mission;
+  readonly facture: Euros;
+  readonly encaisse: Euros;
+  readonly resteARentrer: Euros;
+}
+
+export interface EtatActivite {
+  readonly mois: Mois;
+  readonly calendrier: readonly Jour[];
+  readonly plan: PlanDeCharge;
+  /** Recettes du mois dont le tarif est inconnu : la mesure est partielle. */
+  readonly recettesSansTarif: number;
+  readonly missions: readonly LigneMission[];
+  readonly delais: readonly DelaiClient[];
+  /** Jours de congé posés sur l'année du mois affiché. */
+  readonly congesDeLAnnee: number;
+}
+
+/**
+ * L'état de l'écran Activité, pour un mois donné.
+ *
+ * Le mois est un paramètre et non une constante : l'ancienne application
+ * recalculait tout sur « le mois courant » lu à l'affichage, si bien que
+ * consulter un mois passé était impossible sans changer l'horloge du poste.
+ */
+export function etatActivite(
+  faits: Faits,
+  m: Mois,
+  maintenant: Date = new Date()
+): EtatActivite {
+  const tarifs = tarifsParClient(faits);
+  const charge = chargeDuMois(faits.recettes, tarifs, m);
+  const annee = m.slice(0, 4);
+
+  return {
+    mois: m,
+    calendrier: calendrierDuMois(m, faits.conges),
+    plan: planDeCharge(m, faits.conges, charge.jours),
+    recettesSansTarif: charge.recettesSansTarif,
+    missions: lignesDeMission(faits),
+    delais: delaisParClient(faits.recettes, dateDuJour(maintenant)),
+    congesDeLAnnee: faits.conges.filter((d) => d.startsWith(annee)).length
+  };
+}
+
+/**
+ * Ce que chaque mission a produit.
+ *
+ * Le rattachement se fait par nom de client, l'ancien modèle ne portant pas de
+ * lien entre une facture et la mission qui l'a produite. Un client à plusieurs
+ * missions voit donc son chiffre d'affaires porté par la première d'entre
+ * elles : c'est une approximation, et l'écran ne la présente pas autrement.
+ */
+function lignesDeMission(faits: Faits): readonly LigneMission[] {
+  const dejaCompte = new Set<string>();
+  return [...faits.missions].sort(prioriteMission).map((mission) => {
+    const premiere = !dejaCompte.has(mission.clientNom);
+    dejaCompte.add(mission.clientNom);
+    const recettes = premiere
+      ? faits.recettes.filter((r) => r.clientNom === mission.clientNom)
+      : [];
+
+    const facture = recettes.reduce<number>((s, r) => s + r.montant, 0);
+    const encaisse = recettes
+      .filter((r) => r.encaisseeLe !== null)
+      .reduce<number>((s, r) => s + r.montant, 0);
+
+    return {
+      mission,
+      facture: euros(facture),
+      encaisse: euros(encaisse),
+      resteARentrer: euros(facture - encaisse)
+    };
+  });
+}
+
+/** La date du jour, au format ISO, sans passer par le fuseau local. */
+export function dateDuJour(maintenant: Date = new Date()): DateISO {
+  return maintenant.toISOString().slice(0, 10) as DateISO;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Écran Achats
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Le régime de TVA en vigueur à un mois donné.
+ *
+ * Résolu par période, comme les taux URSSAF, et pour la même raison : une
+ * entreprise qui franchit le seuil en cours d'année relève de la franchise
+ * avant, et de l'assujettissement après. Appliquer le régime d'aujourd'hui à
+ * une dépense de mars rendrait déductible une TVA qui ne l'était pas.
+ */
+export function regimeTvaAu(faits: Faits, m: Mois): RegimeTva {
+  const depuis = faits.entreprise.tvaDepuis;
+  return depuis !== null && m >= depuis ? 'assujetti' : 'franchise';
+}
+
+/**
+ * Le contexte d'une dépense : régime à sa date de paiement, et disponibilité
+ * d'un relevé bancaire.
+ *
+ * Une dépense sans date est rattachée au régime courant : c'est la seule
+ * hypothèse défendable, et l'écran signale par ailleurs que la date manque.
+ */
+export function contexteDepense(
+  faits: Faits,
+  maintenant: Date = new Date()
+): (d: Depense) => ContexteDepenses {
+  const courant = moisCourant(maintenant);
+  return (d) => ({
+    regimeTva: regimeTvaAu(faits, d.payeeLe === null ? courant : moisDe(d.payeeLe)),
+    banqueSynchronisee: faits.banqueReliee
+  });
+}
+
+/** Une dépense accompagnée de ce que le domaine en dit. */
+export interface LigneDepense {
+  readonly depense: Depense;
+  readonly tva: TvaDepense;
+  readonly rapprochement: EtatRapprochement;
+  readonly regimeTva: RegimeTva;
+}
+
+export interface EtatAchats {
+  readonly lignes: readonly LigneDepense[];
+  readonly resume: ResumeDepenses;
+  readonly banqueReliee: boolean;
+  /** Dépenses dont la date de paiement manque : ni exercice, ni régime. */
+  readonly sansDate: number;
+}
+
+/**
+ * L'état de l'écran Achats.
+ *
+ * Les dépenses sont rendues de la plus récente à la plus ancienne, celles sans
+ * date en tête : une dépense non datée est le premier problème à traiter, pas
+ * une ligne à reléguer en bas de liste.
+ */
+export function etatAchats(faits: Faits, maintenant: Date = new Date()): EtatAchats {
+  const contexte = contexteDepense(faits, maintenant);
+
+  const lignes = [...faits.depenses]
+    .sort(comparerParDate)
+    .map((depense) => {
+      const c = contexte(depense);
+      return {
+        depense,
+        tva: tvaDeDepense(depense, c),
+        rapprochement: rapprochementEffectif(depense, c),
+        regimeTva: c.regimeTva
+      };
+    });
+
+  return {
+    lignes,
+    resume: resumerDepenses(faits.depenses, contexte),
+    banqueReliee: faits.banqueReliee,
+    sansDate: faits.depenses.filter((d) => d.payeeLe === null).length
+  };
+}
+
+function comparerParDate(a: Depense, b: Depense): number {
+  if (a.payeeLe === null) return b.payeeLe === null ? 0 : -1;
+  if (b.payeeLe === null) return 1;
+  return b.payeeLe.localeCompare(a.payeeLe);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

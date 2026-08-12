@@ -58,11 +58,16 @@ export type {
   RegimeImposition, TrancheIR, VersementLiberatoireCalcule
 } from './impot';
 
+export {
+  ANNEES_CONSERVATION, SEUIL_GLOBALISATION_DETAIL, verifierIntegriteRecettes
+} from './recettes';
+
 import { verifierIntegriteAbattement } from './abattement';
 import { verifierIntegriteImpot } from './impot';
 import { verifierIntegritePlafonds } from './plafonds';
 import { verifierIntegriteTva } from './tva';
 import { verifierIntegrite as verifierIntegriteUrssafInterne } from './urssaf';
+import { verifierIntegriteRecettes as verifierIntegriteRecettesInterne } from './recettes';
 
 /**
  * Contrôle d'intégrité de l'ensemble du barème, préfixé par table.
@@ -77,6 +82,7 @@ export function verifierIntegriteBareme(): readonly string[] {
     ...verifierIntegriteAbattement().map((a) => `[abattement] ${a}`),
     ...verifierIntegritePlafonds().map((a) => `[plafonds] ${a}`),
     ...verifierIntegriteTva().map((a) => `[tva] ${a}`),
-    ...verifierIntegriteImpot().map((a) => `[impôt] ${a}`)
+    ...verifierIntegriteImpot().map((a) => `[impôt] ${a}`),
+    ...verifierIntegriteRecettesInterne().map((a) => `[recettes] ${a}`)
   ];
 }
