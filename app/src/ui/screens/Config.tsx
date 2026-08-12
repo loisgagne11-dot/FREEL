@@ -1,8 +1,8 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { periodesUrssafEffectives } from '../../state/selecteurs';
+import { periodesUrssafEffectives, soldeEstSuivi } from '../../state/selecteurs';
 import { PERIODES_URSSAF, type PeriodeBareme } from '../../domain/bareme/urssaf';
-import { dateISO, mois, ratio, type TypeActivite } from '../../domain/types';
+import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE } from '../../state/schema';
 import { Compte } from './Compte';
@@ -71,6 +71,7 @@ export function Config() {
 
         <PanneauOnglet idGroupe={idGroupe} id="profil" actif={section === 'profil'}>
           <Profil />
+          <Tresorerie />
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="bareme" actif={section === 'bareme'}>
@@ -89,6 +90,97 @@ export function Config() {
         </PanneauOnglet>
       </div>
     </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Trésorerie
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Le point de départ du solde, et le besoin mensuel.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX FAITS QUI N'AVAIENT AUCUNE PORTE D'ENTRÉE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `soldeInitial` et `besoinMensuel` existaient dans le schéma et dans le
+ * magasin, mais aucun écran ne les écrivait. Un utilisateur venu de
+ * l'ancienne application héritait donc d'un solde qu'il ne pouvait pas
+ * corriger, et d'une autonomie bloquée à zéro mois faute de besoin déclaré.
+ * Un fait qu'on ne peut pas saisir est un fait qui restera faux.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CE QUE « SOLDE DU COMPTE » VEUT DIRE ICI
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne application SIMULAIT un solde : solde initial, plus les
+ * encaissements, moins les charges cochées payées. Un chiffre calculé, qui
+ * dérive de la réalité dès qu'une case est mal cochée.
+ *
+ * Ici, le solde vient de la banque : ce montant est le point de départ, et
+ * les mouvements d'un relevé importé s'y ajoutent. Tant qu'aucun relevé n'est
+ * importé, le solde affiché est exactement ce montant — l'écran Pilote le dit
+ * plutôt que de le présenter comme suivi.
+ */
+function Tresorerie() {
+  const faits = useFaits((e) => e.faits);
+  const definirSoldeInitial = useFaits((e) => e.definirSoldeInitial);
+  const definirBesoinMensuel = useFaits((e) => e.definirBesoinMensuel);
+  const idChamp = useId();
+  const suivi = soldeEstSuivi(faits);
+
+  return (
+    <section className={styles.carte} aria-labelledby={`${idChamp}-titre`}>
+      <h2 id={`${idChamp}-titre`} className={styles.titreCarte}>
+        Trésorerie
+        <Info libelle="D’où vient le solde">
+          Le solde de cette application vient de votre <strong>banque</strong>,
+          pas d’un calcul. Vous indiquez ici le point de départ&nbsp;; les
+          mouvements d’un relevé importé s’y ajoutent ensuite. L’ancienne
+          version, elle, simulait le solde à partir des encaissements et des
+          charges cochées payées — un chiffre qui dérive dès qu’une case est
+          mal cochée.
+        </Info>
+      </h2>
+
+      <div className={styles.formulaire}>
+        <Champ
+          id={`${idChamp}-solde`}
+          libelle={suivi ? 'Solde avant le premier mouvement importé' : 'Solde du compte aujourd’hui'}
+          aide={suivi
+            ? 'Un relevé est importé : ce montant est le point de départ auquel '
+              + 'ses mouvements s’ajoutent. Le modifier décale tout le solde.'
+            : 'Aucun relevé n’est importé : c’est ce montant qui s’affiche comme '
+              + 'solde. Reportez celui de votre compte bancaire.'}
+        >
+          <input
+            id={`${idChamp}-solde`}
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            value={faits.soldeInitial}
+            onChange={(e) => definirSoldeInitial(euros(Number(e.target.value) || 0))}
+          />
+        </Champ>
+
+        <Champ
+          id={`${idChamp}-besoin`}
+          libelle="Besoin mensuel"
+          aide="Ce qu’il vous faut pour vivre chaque mois. Sert à calculer votre
+                autonomie ; à zéro, l’autonomie affichée reste à zéro mois."
+        >
+          <input
+            id={`${idChamp}-besoin`}
+            type="number"
+            inputMode="decimal"
+            step="1"
+            value={faits.besoinMensuel}
+            onChange={(e) => definirBesoinMensuel(euros(Number(e.target.value) || 0))}
+          />
+        </Champ>
+      </div>
+    </section>
   );
 }
 
