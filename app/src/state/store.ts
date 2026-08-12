@@ -18,7 +18,12 @@
 
 import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, euros } from '../domain/types';
-import { CLE_STOCKAGE, type Depense, type Entreprise, type Faits, faitsVides } from './schema';
+import {
+  CLE_STOCKAGE, type Depense, type Entreprise, type Faits, type Recette, faitsVides
+} from './schema';
+import {
+  type ModeReglement, ecritureDAnnulation, prochainNumero
+} from '../domain/calculs/livreRecettes';
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
 } from '../domain/bareme/urssaf';
@@ -119,6 +124,54 @@ interface MagasinFaits {
    */
   readonly ajouterPeriodeUrssaf: (periode: PeriodeBareme) => string | null;
   readonly retirerPeriodeUrssaf: (du: Mois) => void;
+
+  /* ── Livre des recettes ───────────────────────────────────────────────── */
+
+  /**
+   * Ajoute une recette. Le numéro est attribué ici s'il n'est pas fourni :
+   * la continuité de la numérotation est une exigence du registre, pas une
+   * commodité d'affichage.
+   */
+  readonly ajouterRecette: (
+    saisie: Omit<Recette, 'id' | 'numero'> & { readonly numero?: string }
+  ) => string;
+
+  /**
+   * Passe une recette en encaissé.
+   *
+   * La date ET le mode de règlement sont exigés ensemble : ce sont deux
+   * mentions obligatoires du livre des recettes, et l'ancienne application
+   * n'en portait aucune. Rend le motif du refus, ou `null`.
+   */
+  readonly encaisserRecette: (
+    id: string,
+    encaisseeLe: DateISO,
+    modeReglement: ModeReglement
+  ) => string | null;
+
+  /**
+   * Annule une recette ÉMISE par une écriture inverse.
+   *
+   * Rien n'est supprimé : les deux écritures restent visibles et leur somme
+   * est nulle. Un registre qu'on peut réécrire ne prouve rien.
+   *
+   * Une facture émise mais jamais encaissée s'annule elle aussi — c'est un
+   * avoir. L'écriture inverse reste alors hors du livre (`encaisseeLe` à
+   * `null`), le livre des recettes n'enregistrant que des encaissements, mais
+   * elle neutralise le montant resté à rentrer.
+   */
+  readonly annulerRecette: (id: string, aujourdhui?: DateISO) => string | null;
+
+  /**
+   * Supprime un BROUILLON — une recette jamais émise.
+   *
+   * Le critère est l'émission, pas l'encaissement : un numéro porté par une
+   * facture sortie de chez l'utilisateur ne peut plus disparaître, sous peine
+   * de laisser un trou dans la numérotation. Un brouillon, lui, n'a jamais
+   * circulé : le supprimer libère son numéro, et c'est ce qu'il faut — le
+   * réserver créerait précisément le trou qu'on cherche à éviter.
+   */
+  readonly supprimerBrouillon: (id: string) => string | null;
 }
 
 /**
@@ -300,6 +353,83 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     };
     set({ faits });
     persister(stockageActif, faits);
+  },
+
+  ajouterRecette: (saisie) => {
+    const actuel = get().faits;
+    const id = `rec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const annee = Number((saisie.emiseLe ?? saisie.encaisseeLe ?? '')
+      .slice(0, 4)) || new Date().getFullYear();
+    const recette: Recette = {
+      ...saisie,
+      id,
+      numero: saisie.numero?.trim() || prochainNumero(actuel.recettes, annee)
+    };
+    const faits: Faits = { ...actuel, recettes: [...actuel.recettes, recette] };
+    set({ faits });
+    persister(stockageActif, faits);
+    return id;
+  },
+
+  encaisserRecette: (id, encaisseeLe, modeReglement) => {
+    const actuel = get().faits;
+    const recette = actuel.recettes.find((r) => r.id === id);
+    if (recette === undefined) return 'Recette introuvable.';
+    if (recette.encaisseeLe !== null) {
+      // Réencaisser reviendrait à modifier une écriture déjà portée au
+      // registre. La correction passe par une annulation.
+      return 'Cette recette est déjà encaissée. Pour la corriger, annulez-la : '
+        + 'le livre des recettes se tient en ajout seul.';
+    }
+    const faits: Faits = {
+      ...actuel,
+      recettes: actuel.recettes.map((r) =>
+        (r.id === id ? { ...r, encaisseeLe, modeReglement } : r))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
+  },
+
+  annulerRecette: (id, aujourdhui) => {
+    const actuel = get().faits;
+    const origine = actuel.recettes.find((r) => r.id === id);
+    if (origine === undefined) return 'Recette introuvable.';
+    if (origine.emiseLe === null) {
+      return 'Ce brouillon n’a jamais été émis : il se supprime, il n’y a rien '
+        + 'à annuler.';
+    }
+    const jour = aujourdhui ?? (new Date().toISOString().slice(0, 10) as DateISO);
+    const inverse = ecritureDAnnulation(origine, jour, `${origine.id}-annulation`);
+    if (actuel.recettes.some((r) => r.id === inverse.id)) {
+      return 'Cette recette a déjà été annulée.';
+    }
+
+    // Une facture jamais encaissée n'a pas d'écriture au livre : l'avoir n'en
+    // crée donc pas non plus. Il neutralise le reste à rentrer, sans inscrire
+    // au registre un encaissement qui n'a pas eu lieu.
+    const ecriture = origine.encaisseeLe === null
+      ? { ...inverse, encaisseeLe: null }
+      : inverse;
+
+    const faits: Faits = { ...actuel, recettes: [...actuel.recettes, ecriture] };
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
+  },
+
+  supprimerBrouillon: (id) => {
+    const actuel = get().faits;
+    const recette = actuel.recettes.find((r) => r.id === id);
+    if (recette === undefined) return 'Recette introuvable.';
+    if (recette.emiseLe !== null) {
+      return 'Cette facture a été émise : son numéro est sorti, et le supprimer '
+        + 'laisserait un trou dans la numérotation. Annulez-la par un avoir.';
+    }
+    const faits: Faits = { ...actuel, recettes: actuel.recettes.filter((r) => r.id !== id) };
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
   },
 
   poserPlageDeConges: (jours, pose) => {

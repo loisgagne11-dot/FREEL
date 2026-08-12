@@ -3,8 +3,8 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  caEncaisseAnnee, etatAchats, etatPilote, moisCourant, recettesEncaissees,
-  regimeDe, regimeTvaAu, sousAcreLe
+  caEncaisseAnnee, etatAchats, etatLivre, etatPilote, moisCourant,
+  recettesEncaissees, regimeDe, regimeTvaAu, sousAcreLe
 } from './selecteurs';
 
 function faits(modifications: Partial<Faits> = {}): Faits {
@@ -282,5 +282,62 @@ describe('régime de TVA par période', () => {
     expect(regimeTvaAu(f, mois('2026-06'))).toBe('franchise');
     expect(regimeTvaAu(f, mois('2026-07'))).toBe('assujetti');
     expect(regimeTvaAu(f, mois('2026-08'))).toBe('assujetti');
+  });
+});
+
+describe('livre des recettes', () => {
+  const rec = (m: Partial<Faits['recettes'][number]> = {}) => ({
+    id: 'r1', clientNom: 'ClientA', libelle: 'Mission', montant: euros(4000),
+    emiseLe: dateISO('2026-06-30'), encaisseeLe: dateISO('2026-07-15'),
+    modeReglement: 'virement' as const, numero: '2026-001', ...m
+  });
+
+  // L'y faire figurer serait déclarer une recette qui n'a pas eu lieu, et
+  // payer des cotisations dessus.
+  it('ne porte au registre que les encaissements', () => {
+    const etat = etatLivre(faits({
+      recettes: [
+        rec({ id: 'encaissee' }),
+        rec({ id: 'attente', numero: '2026-002', encaisseeLe: null, modeReglement: null })
+      ]
+    }));
+    expect(etat.ecritures.map((e) => e.id)).toEqual(['encaissee']);
+    expect(etat.enAttente.map((e) => e.id)).toEqual(['attente']);
+    expect(etat.total.total).toBe(4000);
+  });
+
+  it('range les écritures dans l’ordre des encaissements', () => {
+    const etat = etatLivre(faits({
+      recettes: [
+        rec({ id: 'tard', numero: '2026-002', encaisseeLe: dateISO('2026-09-01') }),
+        rec({ id: 'tot', numero: '2026-001', encaisseeLe: dateISO('2026-07-01') })
+      ]
+    }));
+    expect(etat.ecritures.map((e) => e.id)).toEqual(['tot', 'tard']);
+  });
+
+  // La facture la plus ancienne est celle qui inquiète : elle vient en tête.
+  it('range les factures en attente de la plus récente à la plus ancienne', () => {
+    const etat = etatLivre(faits({
+      recettes: [
+        rec({ id: 'vieille', numero: '2026-001', emiseLe: dateISO('2026-05-01'), encaisseeLe: null }),
+        rec({ id: 'recente', numero: '2026-002', emiseLe: dateISO('2026-08-01'), encaisseeLe: null })
+      ]
+    }));
+    expect(etat.enAttente.map((e) => e.id)).toEqual(['recente', 'vieille']);
+  });
+
+  // Un écart affiché seulement dans un récapitulatif oblige à retrouver la
+  // ligne concernée à la main.
+  it('rattache chaque écart à son écriture', () => {
+    const etat = etatLivre(faits({ recettes: [rec({ modeReglement: null })] }));
+    expect(etat.ecartsParEcriture.get('r1')?.[0]?.nature).toBe('mode_reglement_manquant');
+  });
+
+  it('sur un fichier vierge, ne produit ni écriture ni écart', () => {
+    const etat = etatLivre(faits());
+    expect(etat.ecritures).toEqual([]);
+    expect(etat.ecarts).toEqual([]);
+    expect(etat.total.total).toBe(0);
   });
 });

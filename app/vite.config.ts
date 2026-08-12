@@ -7,11 +7,23 @@ export default defineConfig({
   // les chemins relatifs évitent d'avoir à connaître la base au build.
   base: './',
   build: {
-    // Budget de performance : l'ancienne version chargeait 627 Ko de
-    // bibliothèques bloquantes (jsPDF + Chart.js) avant le premier rendu.
-    // Un avertissement au-delà de 250 Ko force à s'en apercevoir.
-    chunkSizeWarningLimit: 250,
-    target: 'es2022'
+    // Le budget réel est vérifié par `scripts/verifier-budget.mjs`, poste par
+    // poste. Cet avertissement-ci ne sert qu'à faire remarquer un chunk
+    // anormalement gros pendant un build local.
+    chunkSizeWarningLimit: 200,
+    target: 'es2022',
+    rollupOptions: {
+      output: {
+        /**
+         * React et Zustand à part.
+         *
+         * Ils ne changent pas d'un déploiement à l'autre : les séparer laisse
+         * le cache du navigateur les conserver. Dans un paquet unique,
+         * modifier une ligne de code invalidait 248 Ko ; ici, 55.
+         */
+        manualChunks: { vendor: ['react', 'react-dom', 'react-dom/client', 'zustand'] }
+      }
+    }
   },
   test: {
     // Le domaine et l'état se testent sans DOM : `node` est plus rapide et
