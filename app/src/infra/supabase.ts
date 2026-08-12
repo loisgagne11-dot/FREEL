@@ -142,9 +142,14 @@ function messageDErreur(code: number, corps: unknown): string {
     return 'Accès refusé. La session a peut-être expiré : reconnectez-vous.';
   }
   if (code === 404) {
+    // Le message a d'abord dit « exécutez docs/supabase.sql », et la première
+    // personne à le lire a collé ce CHEMIN dans l'éditeur SQL — d'où un
+    // « syntax error at or near "docs" ». Un message qui nomme un fichier sans
+    // dire quoi en faire se lit comme une commande à taper.
     return 'Table introuvable côté serveur : la base n’est pas encore préparée pour '
-      + 'cette version. Exécutez le script « docs/supabase.sql » dans l’éditeur SQL '
-      + 'du projet, puis réessayez.';
+      + 'cette version. Ouvrez le fichier « docs/supabase.sql » du dépôt, copiez '
+      + 'son CONTENU dans l’éditeur SQL du projet Supabase, exécutez-le, puis '
+      + 'réessayez.';
   }
   if (code === 429) {
     return 'Trop de tentatives. Attendez une minute avant de réessayer.';

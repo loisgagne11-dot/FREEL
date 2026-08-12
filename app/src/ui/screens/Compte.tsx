@@ -657,8 +657,10 @@ function SaisieConfig(
           Dans le tableau de bord Supabase, section <em>Project Settings → API</em>
           &nbsp;: l’URL du projet et la clé <em>anon public</em>. Cette clé est
           faite pour être publique&nbsp;; ce qui protège les données, ce sont les
-          règles d’accès définies sur le serveur. Le script de préparation de la
-          base est fourni dans <em>docs/supabase.sql</em>.
+          règles d’accès définies sur le serveur. La base doit être préparée une
+          fois&nbsp;: copiez le <strong>contenu</strong> du fichier
+          <em> docs/supabase.sql</em> du dépôt dans l’éditeur SQL du projet, et
+          exécutez-le.
         </Info>
       </h2>
 
