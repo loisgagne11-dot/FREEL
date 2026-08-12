@@ -188,3 +188,99 @@ export function faitsVides(): Faits {
     periodesDeclarees: [], configImpotBrute: {}
   };
 }
+
+/**
+ * Motif de refus d'un bloc de faits, ou `null` s'il est exploitable.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI VALIDER CE QU'ON A SOI-MÊME ÉCRIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Tant que les faits ne venaient que de `localStorage`, un `JSON.parse(...) as
+ * Faits` passait : l'application relisait ce qu'elle avait écrit. Dès qu'ils
+ * arrivent d'un compte distant, ce n'est plus vrai. Le bloc peut avoir été
+ * écrit par une AUTRE version de l'application, sur un autre appareil.
+ *
+ * Un transtypage laisserait alors entrer un `recettes` qui n'est pas un
+ * tableau, et l'erreur n'apparaîtrait qu'à l'affichage, loin de sa cause,
+ * après avoir écrasé l'état local. On refuse à l'entrée.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE VERSION PLUS RÉCENTE EST REFUSÉE, PAS RABOTÉE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Si le compte porte un schéma postérieur à celui que ce code connaît, le
+ * charger reviendrait à ignorer les champs inconnus — puis à les EFFACER au
+ * premier renvoi. Une version ancienne de l'application détruirait ainsi le
+ * travail fait sur une plus récente. Elle s'arrête donc.
+ *
+ * Ce qui est vérifié : la FORME de premier niveau. Pas le contenu de chaque
+ * enregistrement — le prétendre serait mentir sur la portée du contrôle.
+ */
+export function motifRefusFaits(brut: unknown): string | null {
+  if (typeof brut !== 'object' || brut === null || Array.isArray(brut)) {
+    return 'Le bloc de faits n’est pas un objet.';
+  }
+  const o = brut as Record<string, unknown>;
+
+  const version = o['version'];
+  if (typeof version !== 'number' || !Number.isInteger(version)) {
+    return 'Le bloc de faits ne porte pas de numéro de schéma.';
+  }
+  if (version > VERSION_SCHEMA) {
+    return `Ce compte a été enregistré par une version plus récente de `
+      + `l’application (schéma ${version}, connu ici : ${VERSION_SCHEMA}). `
+      + `Le charger effacerait ce que cette version-ci ne sait pas lire. `
+      + `Mettez à jour l’application avant de continuer.`;
+  }
+
+  const listes = [
+    'clients', 'missions', 'recettes', 'depenses', 'conges',
+    'mouvementsBancaires', 'periodesUrssafAjoutees', 'periodesDeclarees'
+  ] as const;
+  for (const cle of listes) {
+    if (cle in o && !Array.isArray(o[cle])) return `Le champ « ${cle} » devrait être une liste.`;
+  }
+
+  const nombres = ['soldeInitial', 'reserve', 'besoinMensuel'] as const;
+  for (const cle of nombres) {
+    const v = o[cle];
+    if (cle in o && (typeof v !== 'number' || !Number.isFinite(v))) {
+      return `Le champ « ${cle} » devrait être un montant.`;
+    }
+  }
+
+  const entreprise = o['entreprise'];
+  if ('entreprise' in o
+    && (typeof entreprise !== 'object' || entreprise === null || Array.isArray(entreprise))) {
+    return 'Le champ « entreprise » devrait être un objet.';
+  }
+
+  return null;
+}
+
+/**
+ * Complète un bloc validé avec les valeurs par défaut des champs absents.
+ *
+ * Un schéma ANTÉRIEUR est légitime : il lui manque les champs ajoutés depuis.
+ * Les combler ici évite que chaque écran ait à se demander si la liste qu'il
+ * lit existe — question à laquelle un jour l'un d'eux répondrait mal.
+ *
+ * À n'appeler qu'après `motifRefusFaits`, qui seul autorise l'entrée.
+ */
+export function completerFaits(brut: unknown): Faits {
+  const o = brut as Record<string, unknown>;
+  const defauts = faitsVides();
+  const entreprise = (typeof o['entreprise'] === 'object' && o['entreprise'] !== null)
+    ? o['entreprise'] as Partial<Entreprise>
+    : {};
+
+  return {
+    ...defauts,
+    ...o,
+    // Le numéro de schéma devient celui de CE code : les champs manquants
+    // viennent d'être comblés, le bloc n'est plus à l'ancien format.
+    version: VERSION_SCHEMA,
+    entreprise: { ...entrepriseVide(), ...entreprise }
+  } as Faits;
+}

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type ConfigSupabase, type Session, type StockageLocal,
-  bundleDepuisLegacy, chargerDonneesLegacy, configEffective, ecrireConfig,
-  ecrireSession, lireConfig, lireSession, rafraichir, seConnecter,
-  sessionValide
+  TABLE_FAITS, bundleDepuisLegacy, chargerDonneesLegacy, configEffective,
+  ecrireConfig, ecrireSession, lireConfig, lireSession, pousserFaits,
+  rafraichir, seConnecter, sessionValide, tirerFaits
 } from './supabase';
 
 const CONFIG: ConfigSupabase = { url: 'https://exemple.test', cleAnon: 'cle-anon' };
@@ -160,6 +160,185 @@ describe('chargement des données du compte', () => {
     expect(bundle).toEqual({
       c: { nom: 'Démo' }, m: [1], cl: [2], t: { soldeInitial: 5 }, ir: { '2026': {} }
     });
+  });
+});
+
+/**
+ * Une réponse par appel, dans l'ordre. Nécessaire dès qu'une opération en
+ * enchaîne plusieurs : une écriture refusée relit l'état distant derrière.
+ */
+function repondreEnSuite(...reponses: readonly (readonly [unknown, number])[]) {
+  let n = 0;
+  return vi.fn().mockImplementation(() => {
+    const r = reponses[Math.min(n++, reponses.length - 1)] as readonly [unknown, number];
+    const [corps, statut] = r;
+    return Promise.resolve({
+      ok: statut >= 200 && statut < 300,
+      status: statut,
+      text: async () => (corps === null ? '' : JSON.stringify(corps))
+    });
+  });
+}
+
+const LIGNE = {
+  version: 4, schema: 1, faits: { version: 1, clients: [] },
+  maj_le: '2026-08-12T09:00:00Z'
+};
+
+describe('lecture des faits du compte', () => {
+  it('lit la table de la nouvelle application, pas celle de l’ancienne', async () => {
+    const appel = repondre([LIGNE]);
+    vi.stubGlobal('fetch', appel);
+    await tirerFaits(CONFIG, SESSION);
+
+    const [url] = appel.mock.calls[0] as [string];
+    expect(url).toContain(TABLE_FAITS);
+    // La table de l'ancienne application reste lue ailleurs, jamais ici — et
+    // surtout jamais écrite : c'est ce qui la garde utilisable.
+    expect(url).not.toContain('user_data');
+    expect(url).toContain('user_id=eq.user-1');
+  });
+
+  it('rend la version et l’horodatage avec les faits', async () => {
+    vi.stubGlobal('fetch', repondre([LIGNE]));
+    const r = await tirerFaits(CONFIG, SESSION);
+    expect(r.statut).toBe('ok');
+    if (r.statut !== 'ok') return;
+    expect(r.valeur).toMatchObject({ version: 4, schema: 1, majLe: '2026-08-12T09:00:00Z' });
+  });
+
+  it('rend null sur un compte encore vide', async () => {
+    vi.stubGlobal('fetch', repondre([]));
+    const r = await tirerFaits(CONFIG, SESSION);
+    expect(r.statut === 'ok' && r.valeur).toBeNull();
+  });
+
+  // Une version illisible ne doit pas devenir une version plausible : elle ne
+  // correspondra à aucune ligne, et la prochaine écriture sera refusée.
+  it('ne fabrique pas une version quand elle est absente', async () => {
+    vi.stubGlobal('fetch', repondre([{ ...LIGNE, version: null }]));
+    const r = await tirerFaits(CONFIG, SESSION);
+    expect(r.statut === 'ok' && r.valeur?.version).toBe(0);
+  });
+
+  it('indique quoi faire quand la table n’existe pas encore', async () => {
+    vi.stubGlobal('fetch', repondre({ message: 'relation does not exist' }, 404));
+    const r = await tirerFaits(CONFIG, SESSION);
+    expect(r.statut).toBe('erreur');
+    if (r.statut === 'erreur') expect(r.motif).toContain('docs/supabase.sql');
+  });
+});
+
+describe('écriture des faits sur le compte', () => {
+  it('crée la ligne à la première écriture', async () => {
+    const appel = repondreEnSuite([[{ ...LIGNE, version: 1 }], 201]);
+    vi.stubGlobal('fetch', appel);
+
+    const r = await pousserFaits(CONFIG, SESSION, { version: 1 }, 1, null);
+    expect(r.statut).toBe('ok');
+
+    const [url, options] = appel.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(TABLE_FAITS);
+    expect(options.method).toBe('POST');
+    const corps = JSON.parse(String(options.body)) as Record<string, unknown>;
+    expect(corps['version']).toBe(1);
+    expect(corps['user_id']).toBe('user-1');
+  });
+
+  /**
+   * LE POINT DUR.
+   *
+   * Le filtre `version=eq.<attendue>` doit voyager dans la requête : c'est le
+   * serveur qui vérifie, en une opération atomique. Une vérification faite
+   * dans l'application — lire, comparer, écrire — laisserait entre la lecture
+   * et l'écriture une fenêtre où l'autre appareil se glisse.
+   */
+  it('conditionne la mise à jour à la version lue', async () => {
+    const appel = repondreEnSuite([[{ ...LIGNE, version: 5 }], 200]);
+    vi.stubGlobal('fetch', appel);
+
+    await pousserFaits(CONFIG, SESSION, { version: 1 }, 1, 4);
+
+    const [url, options] = appel.mock.calls[0] as [string, RequestInit];
+    expect(options.method).toBe('PATCH');
+    expect(url).toContain('version=eq.4');
+    expect(url).toContain('user_id=eq.user-1');
+    // Le compteur avance, sinon deux écritures successives se croiseraient
+    // sans que la seconde s'en aperçoive.
+    expect(JSON.parse(String(options.body))['version']).toBe(5);
+  });
+
+  /**
+   * Zéro ligne modifiée signifie que la version distante n'est plus celle
+   * qu'on a lue : quelqu'un a écrit entre-temps. Traiter ce cas comme un
+   * succès effacerait son travail en silence — c'est exactement la perte que
+   * le compteur existe pour empêcher.
+   */
+  it('refuse l’écriture quand le compte a bougé', async () => {
+    const appel = repondreEnSuite(
+      [[], 200],                        // le PATCH ne touche aucune ligne
+      [[{ ...LIGNE, version: 9 }], 200] // relecture de l'état distant
+    );
+    vi.stubGlobal('fetch', appel);
+
+    const r = await pousserFaits(CONFIG, SESSION, { version: 1 }, 1, 4);
+    expect(r.statut).toBe('conflit');
+    if (r.statut !== 'conflit') return;
+    // Le refus dit AUSSI ce qu'il y a en face : sans cela, l'utilisateur
+    // choisirait entre deux états dont il n'en connaît qu'un.
+    expect(r.distant?.version).toBe(9);
+  });
+
+  it('traite une ligne préexistante comme un conflit, pas comme une panne', async () => {
+    const appel = repondreEnSuite(
+      [{ code: '23505', message: 'duplicate key value' }, 409],
+      [[LIGNE], 200]
+    );
+    vi.stubGlobal('fetch', appel);
+
+    const r = await pousserFaits(CONFIG, SESSION, { version: 1 }, 1, null);
+    expect(r.statut).toBe('conflit');
+    if (r.statut === 'conflit') expect(r.distant?.version).toBe(4);
+  });
+
+  // Un conflit dont on ne peut pas relire l'autre côté reste un conflit :
+  // le dégrader en erreur inviterait à réessayer, donc à écraser.
+  it('reste un conflit même quand la relecture échoue', async () => {
+    const appel = repondreEnSuite([[], 200], [{ message: 'JWT expired' }, 401]);
+    vi.stubGlobal('fetch', appel);
+
+    const r = await pousserFaits(CONFIG, SESSION, { version: 1 }, 1, 4);
+    expect(r.statut).toBe('conflit');
+    if (r.statut === 'conflit') expect(r.distant).toBeNull();
+  });
+
+  it('distingue une panne réseau d’un conflit', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    const r = await pousserFaits(CONFIG, SESSION, { version: 1 }, 1, 4);
+    expect(r.statut).toBe('erreur');
+  });
+
+  // La condition de cohabitation : l'ancienne application doit rester
+  // utilisable, donc sa table ne doit jamais recevoir d'écriture.
+  it('n’écrit jamais dans la table de l’ancienne application', async () => {
+    const appel = repondreEnSuite([[LIGNE], 200]);
+    vi.stubGlobal('fetch', appel);
+    await pousserFaits(CONFIG, SESSION, { version: 1 }, 1, 4);
+
+    for (const [url, options] of appel.mock.calls as [string, RequestInit][]) {
+      if (options.method !== undefined && options.method !== 'GET') {
+        expect(url).not.toContain('user_data');
+      }
+    }
+  });
+
+  it('envoie le jeton de session, pas la clé anonyme', async () => {
+    const appel = repondreEnSuite([[LIGNE], 200]);
+    vi.stubGlobal('fetch', appel);
+    await pousserFaits(CONFIG, SESSION, { version: 1 }, 1, 4);
+
+    const [, options] = appel.mock.calls[0] as [string, RequestInit];
+    expect((options.headers as Record<string, string>).Authorization).toBe('Bearer jeton-abc');
   });
 });
 
