@@ -141,6 +141,24 @@ function lireLegacy(stockage: Stockage): Inconnu | null {
  * Dans l'ancien modèle, les factures étaient imbriquées dans les missions.
  * Le nouveau schéma les remonte au premier plan : le livre des recettes est
  * une obligation à part entière, pas un sous-produit d'une mission.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LES NOMS DE CHAMPS SONT RELEVÉS DU CODE LEGACY, PAS SUPPOSÉS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une première version cherchait `montant`, `date`, `datePaiement` et
+ * `payee` — des noms plausibles, et tous faux. L'ancienne application emploie
+ * `ht`, `dateEnvoi`, `datePaiementReel` et `status`. Conséquence : les
+ * recettes arrivaient à zéro euro, sans date et jamais encaissées, ce qui
+ * vidait le chiffre d'affaires, les provisions et le livre des recettes.
+ *
+ * Le jeu d'essai reproduisait la supposition au lieu de la structure réelle :
+ * il passait donc, et ne prouvait rien. Il est désormais copié sur les noms
+ * effectivement lus dans `index.html`.
+ *
+ * Le montant retenu est le HT : c'est l'assiette du chiffre d'affaires en
+ * micro, et c'est lui que l'URSSAF réclame. En franchise en base, HT et TTC
+ * se confondent de toute façon.
  */
 function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[] {
   const recettes: Recette[] = [];
@@ -149,8 +167,16 @@ function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[]
     const factures = tableau(m['factures']);
     factures.forEach((fBrut, iFacture) => {
       const f = objet(fBrut);
-      const encaisseeLe = dateOuNull(f['datePaiement'] ?? f['paidAt'] ?? f['dateEncaissement']);
-      const estEncaissee = booleen(f['payee'] ?? f['paid']) || encaisseeLe !== null;
+      const encaisseeLe = dateOuNull(
+        f['datePaiementReel'] ?? f['datePaiement'] ?? f['paidAt'] ?? f['dateEncaissement']
+      );
+      // Le statut legacy s'écrit « payée » ou « payé » selon l'endroit du code
+      // qui l'a posé. Les deux comptent, et une date de paiement vaut preuve
+      // d'encaissement même si le statut n'a pas suivi.
+      const statut = texte(f['status']).toLowerCase();
+      const estEncaissee = statut === 'payée' || statut === 'payee' || statut === 'payé'
+        || booleen(f['payee'] ?? f['paid'])
+        || encaisseeLe !== null;
 
       // Mention obligatoire du livre des recettes. L'ancienne structure ne la
       // portait pas : on ne peut pas l'inventer, on la signale.
@@ -173,8 +199,12 @@ function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[]
         id: texte(f['id']) || `rec-${iMission}-${iFacture}`,
         clientNom: texte(m['client']),
         libelle: texte(f['libelle'] ?? f['description'] ?? m['description']),
-        montant: euros(nombre(f['montant'] ?? f['montantHT'] ?? f['total'])),
-        emiseLe: dateOuNull(f['date'] ?? f['dateEmission']),
+        montant: euros(nombre(f['ht'] ?? f['montantHT'] ?? f['montant'] ?? f['total'])),
+        // `dateEnvoi` est la date d'émission réelle. À défaut, le mois de la
+        // facture donne au moins la période : la perdre empêcherait la
+        // déclaration européenne de services de voir la prestation.
+        emiseLe: dateOuNull(f['dateEnvoi'] ?? f['date'] ?? f['dateEmission'])
+          ?? premierJourDuMois(texte(f['mois'])),
         encaisseeLe,
         modeReglement: modeReglement(f['modeReglement']),
         numero: texte(f['numero'] ?? f['num'])
@@ -182,6 +212,31 @@ function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[]
     });
   });
   return recettes;
+}
+
+/**
+ * Statut de mission, tel que l'ancienne application l'écrivait.
+ *
+ * Elle employait `en_cours`, `perdue`, `prospect` et `active` selon l'endroit
+ * du code. Une première version rabattait tout ce qui n'était ni `terminee`
+ * ni `prospect` sur `active` : une mission perdue s'affichait donc comme en
+ * cours, et son chiffre d'affaires prévisionnel comptait encore.
+ */
+function statutMission(brut: string): Mission['statut'] {
+  switch (brut.toLowerCase()) {
+    case 'terminee':
+    case 'terminée':
+    case 'done':
+    case 'finie':
+      return 'terminee';
+    case 'prospect':
+      return 'prospect';
+    case 'perdue':
+    case 'perdu':
+      return 'perdue';
+    default:
+      return 'active';
+  }
 }
 
 /**
@@ -335,7 +390,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       tjm: euros(nombre(m['tjm'])),
       debut: dateOuNull(m['debut']),
       fin: dateOuNull(m['fin']),
-      statut: statutBrut === 'terminee' || statutBrut === 'prospect' ? statutBrut : 'active'
+      statut: statutMission(statutBrut)
     };
   });
 
@@ -594,7 +649,13 @@ export function verifierAbsenceDePerte(legacy: Inconnu, faits: Faits): readonly 
 
   const totalEntree = missionsBrutes.reduce<number>(
     (somme, m) => somme + tableau(objet(m)['factures']).reduce<number>(
-      (s, f) => s + nombre(objet(f)['montant'] ?? objet(f)['montantHT'] ?? objet(f)['total']), 0
+      // Même champ que la conversion — `ht`. Lire ici un nom différent
+      // ferait comparer zéro à zéro, et ce contrôle conclurait « aucune
+      // perte » sur une migration qui n'a rien repris. C'est exactement ce
+      // qui s'est produit.
+      (s, f) => s + nombre(
+        objet(f)['ht'] ?? objet(f)['montantHT'] ?? objet(f)['montant'] ?? objet(f)['total']
+      ), 0
     ), 0
   );
   const totalSortie = faits.recettes.reduce<number>((s, r) => s + r.montant, 0);

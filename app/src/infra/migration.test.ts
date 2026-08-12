@@ -5,7 +5,18 @@ import {
   analyser, migrer, prendreInstantane, stockageMemoire, verifierAbsenceDePerte
 } from './migration';
 
-/** Un jeu de données de l'ancienne application, structurellement fidèle. */
+/**
+ * Un jeu de données de l'ancienne application, structurellement fidèle.
+ *
+ * ⚠️ Les noms de champs sont RELEVÉS de `index.html`, jamais supposés. Une
+ * version antérieure de ce fichier employait `montant`, `date`, `datePaiement`
+ * et `payee` — des noms plausibles, tous absents du legacy, qui emploie `ht`,
+ * `dateEnvoi`, `datePaiementReel` et `status`. Le jeu d'essai reproduisait donc
+ * la supposition du code de migration : il passait, et ne prouvait rien.
+ *
+ * Toute modification ici doit être vérifiée contre le legacy, par exemple
+ * `grep -ohE "f\.[a-zA-Z]+" index.html | sort | uniq -c | sort -rn`.
+ */
 function bundleLegacy() {
   return {
     c: {
@@ -21,13 +32,28 @@ function bundleLegacy() {
         id: 'MIS1', client: 'ClientA', description: 'Mission A', tjm: 380,
         debut: '2025-05-12', fin: '2026-03-31', statut: 'active',
         factures: [
-          { id: 'F1', numero: '2026-001', montant: 4000, date: '2026-06-30', datePaiement: '2026-07-15', modeReglement: 'virement' },
-          { id: 'F2', numero: '2026-002', montant: 3800, date: '2026-07-31', payee: false }
+          // Facture encaissée : `status` à « payée » et `datePaiementReel`.
+          {
+            id: 'F1', numero: '2026-001', ht: 4000, ttc: 4000, jours: 10,
+            mois: '2026-06', dateEnvoi: '2026-06-30', status: 'payée',
+            datePaiementReel: '2026-07-15', modeReglement: 'virement'
+          },
+          // Facture émise, non réglée.
+          {
+            id: 'F2', numero: '2026-002', ht: 3800, ttc: 3800, jours: 10,
+            mois: '2026-07', dateEnvoi: '2026-07-31', status: 'envoyée'
+          },
+          // Variante « payé » sans accent, écrite ailleurs dans le legacy, et
+          // datée seulement au mois : les deux cas doivent être repris.
+          {
+            id: 'F3', numero: '2026-003', ht: 1200, mois: '2026-05',
+            status: 'payé', datePaiementReel: '2026-05-28'
+          }
         ]
       },
       {
         id: 'MIS2', client: 'ClientInconnu', description: 'Mission B', tjm: 400,
-        debut: '2026-01-05', fin: null, statut: 'terminee', factures: []
+        debut: '2026-01-05', fin: null, statut: 'en_cours', factures: []
       }
     ],
     cl: [
@@ -87,7 +113,7 @@ describe('rapport à blanc', () => {
     expect(r.aDesDonneesLegacy).toBe(true);
     expect(r.comptes.clients).toBe(1);
     expect(r.comptes.missions).toBe(2);
-    expect(r.comptes.recettes).toBe(2);
+    expect(r.comptes.recettes).toBe(3);
   });
 
   it('signale un stockage vierge sans crier à l\'erreur', () => {
@@ -138,10 +164,46 @@ describe('conversion des données', () => {
   it('remonte les factures imbriquées en recettes de premier niveau', () => {
     const r = migrer(avecLegacy());
     if (r.statut !== 'migre') throw new Error('migration attendue');
-    expect(r.faits.recettes).toHaveLength(2);
-    expect(r.faits.recettes[0]?.numero).toBe('2026-001');
-    expect(r.faits.recettes[0]?.encaisseeLe).toBe('2026-07-15');
-    expect(r.faits.recettes[0]?.modeReglement).toBe('virement');
+    expect(r.faits.recettes).toHaveLength(3);
+    expect(r.faits.recettes[0]).toMatchObject({
+      numero: '2026-001',
+      // Le montant vient de `ht` : c'est l'assiette du chiffre d'affaires en
+      // micro. Une version antérieure cherchait `montant`, absent du legacy,
+      // et chargeait donc toutes les recettes à zéro.
+      montant: 4000,
+      emiseLe: '2026-06-30',
+      encaisseeLe: '2026-07-15',
+      modeReglement: 'virement'
+    });
+  });
+
+  // Sans cette reprise, le chiffre d'affaires encaissé, les provisions et le
+  // livre des recettes restaient vides malgré une migration en apparence
+  // réussie.
+  it('reconnaît un encaissement quel que soit l\'accent du statut legacy', () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    const parNumero = new Map(r.faits.recettes.map((x) => [x.numero, x]));
+    expect(parNumero.get('2026-001')?.encaisseeLe).toBe('2026-07-15'); // « payée »
+    expect(parNumero.get('2026-003')?.encaisseeLe).toBe('2026-05-28'); // « payé »
+    expect(parNumero.get('2026-002')?.encaisseeLe).toBeNull();         // « envoyée »
+  });
+
+  // Perdre la date d'émission empêcherait la déclaration européenne de
+  // services de voir la prestation.
+  it('retombe sur le mois de la facture quand la date d\'envoi manque', () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    const f3 = r.faits.recettes.find((x) => x.numero === '2026-003');
+    expect(f3?.emiseLe).toBe('2026-05-01');
+  });
+
+  // « en_cours » et « perdue » existent dans le legacy. Tout rabattre sur
+  // « active » faisait compter le prévisionnel d'une mission perdue.
+  it('traduit les statuts de mission du legacy', () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    expect(r.faits.missions[1]?.statut).toBe('active'); // « en_cours »
   });
 
   it('rattache les missions à leur client par nom quand c\'est possible', () => {
@@ -356,7 +418,7 @@ describe('idempotence', () => {
     migrer(s);
     const seconde = migrer(s);
     if (seconde.statut !== 'deja-migre') throw new Error('deja-migre attendu');
-    expect(seconde.faits.recettes).toHaveLength(2);
+    expect(seconde.faits.recettes).toHaveLength(3);
   });
 
   it('refuse d\'écraser un stockage nouveau devenu illisible', () => {

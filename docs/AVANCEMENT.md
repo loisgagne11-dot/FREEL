@@ -374,6 +374,37 @@ tests verts.
 
 ---
 
+## 4 bis. Leçon du 12/08 — les jeux d'essai reproduisaient la supposition
+
+Le mappage des factures legacy était faux sur **presque tous les champs** :
+le code cherchait `montant`, `date`, `datePaiement` et `payee` ; l'ancienne
+application emploie `ht`, `dateEnvoi`, `datePaiementReel` et `status`. Les
+recettes arrivaient donc à **zéro euro, sans date et jamais encaissées** —
+chiffre d'affaires vide, provisions nulles, livre des recettes vide.
+
+Trois contrôles auraient dû l'attraper, et aucun ne l'a fait :
+
+| Contrôle | Pourquoi il a laissé passer |
+|---|---|
+| Tests de migration | Le jeu d'essai portait les noms **supposés**, pas les vrais |
+| `verifierAbsenceDePerte` | Il lisait le même mauvais champ : il comparait zéro à zéro et concluait « aucune perte » |
+| Migration de bout en bout | Son jeu d'essai aussi ; et il ne vérifiait que le **nombre** de recettes, jamais leur contenu |
+
+**Règle qui en découle.** Les noms de champs d'un jeu d'essai legacy se
+**relèvent** du code d'origine, jamais ne se supposent :
+
+```
+grep -ohE "f\.[a-zA-Z]+" index.html | sort | uniq -c | sort -rn
+```
+
+Et un contrôle de reprise doit porter sur le **contenu**, pas sur le compte :
+deux recettes vides passent un test qui compte deux recettes.
+
+C'est l'utilisateur qui l'a détecté, en constatant que « les données
+n'apparaissent pas partout » après connexion à Supabase.
+
+---
+
 ## 5. Points ouverts
 
 | Sujet | État |

@@ -50,12 +50,28 @@ const BUNDLE_LEGACY = {
   m: [{
     id: 'MIS1', client: 'ClientTest', description: 'Mission de test', tjm: 400,
     debut: '2026-01-05', fin: null, statut: 'active',
+    // ⚠️ Noms de champs RELEVÉS de `index.html`, jamais supposés. Ce jeu
+    // employait `montant`, `date`, `datePaiement` et `payee` : des noms
+    // plausibles, tous absents du legacy, et identiques à ceux que le code de
+    // migration cherchait alors. Le contrôle validait donc sa propre
+    // supposition — il passait sur des données que l'application n'aurait
+    // jamais rencontrées.
     factures: [
-      { id: 'F1', numero: '2026-001', montant: 10000, date: '2026-06-30', datePaiement: '2026-07-10', modeReglement: 'virement' },
-      { id: 'F2', numero: '2026-002', montant: 4000, date: '2026-07-31', payee: false }
+      {
+        id: 'F1', numero: '2026-001', ht: 10000, ttc: 10000, jours: 25,
+        mois: '2026-06', dateEnvoi: '2026-06-30', status: 'payée',
+        datePaiementReel: '2026-07-10', modeReglement: 'virement'
+      },
+      {
+        id: 'F2', numero: '2026-002', ht: 4000, ttc: 4000, jours: 10,
+        mois: '2026-07', dateEnvoi: '2026-07-31', status: 'envoyée'
+      }
     ]
   }],
-  cl: [{ id: 'CLI1', nom: 'ClientTest', adresse: '', siret: '', email: '', delaiPaiement: 30 }],
+  cl: [{
+    id: 'CLI1', nom: 'ClientTest', adresse: '', siret: '', contact: '', notes: '',
+    email: '', delaiPaiement: 30, jourPaiement: 15
+  }],
   t: { soldeInitial: 20000, salaireEstime: 2500, reserveCompte: 1500, mouvements: [], paidCharges: {}, conges: {} },
   ir: {},
   _ts: Date.now()
@@ -126,6 +142,15 @@ if (apres.faits) {
   constate(apres.faits.reserve === 1500, 'la réserve est reprise (D4 : source unique)', `${apres.faits.reserve}`);
   constate(apres.faits.besoinMensuel === 2500, 'le besoin mensuel est repris', `${apres.faits.besoinMensuel}`);
   constate(apres.faits.recettes.length === 2, 'les deux factures deviennent des recettes', `${apres.faits.recettes.length}`);
+  // Le contrôle qui manquait. Compter les recettes ne dit rien de leur
+  // contenu : elles arrivaient à zéro euro et jamais encaissées, et ce script
+  // passait quand même parce qu'il n'en vérifiait que le nombre.
+  const encaissee = apres.faits.recettes.find((r) => r.numero === '2026-001');
+  constate(encaissee?.montant === 10000, 'la recette porte son montant HT', `${encaissee?.montant}`);
+  constate(encaissee?.encaisseeLe === '2026-07-10', 'l\'encaissement est reconnu', `${encaissee?.encaisseeLe}`);
+  constate(encaissee?.emiseLe === '2026-06-30', 'la date d\'émission est reprise', `${encaissee?.emiseLe}`);
+  const impayee = apres.faits.recettes.find((r) => r.numero === '2026-002');
+  constate(impayee?.encaisseeLe === null, 'une facture envoyée n\'est pas réputée encaissée');
   constate(apres.faits.clients.length === 1, 'le client est repris');
   constate(apres.faits.missions[0]?.clientId === 'CLI1', 'la mission est rattachée à son client');
 }
@@ -139,6 +164,9 @@ const affichage = await page.evaluate(() => {
   return { texte, nombres };
 });
 
+if (process.env.DIAGNOSTIC === '1') {
+  console.log('  ↳ nombres affichés :', affichage.nombres.join(', '));
+}
 constate(affichage.nombres.includes(20000), 'le solde migré est affiché', '20 000 €');
 constate(affichage.nombres.includes(1500), 'la réserve migrée est affichée', '1 500 €');
 

@@ -86,7 +86,12 @@ export interface Mission {
   readonly tjm: Euros;
   readonly debut: DateISO | null;
   readonly fin: DateISO | null;
-  readonly statut: 'active' | 'terminee' | 'prospect';
+  /**
+   * `perdue` existe parce que l'ancienne application l'employait : une
+   * mission perdue n'est ni active — son chiffre d'affaires prévisionnel ne
+   * compte plus — ni terminée, puisqu'elle n'a rien produit.
+   */
+  readonly statut: 'active' | 'terminee' | 'prospect' | 'perdue';
 }
 
 /**

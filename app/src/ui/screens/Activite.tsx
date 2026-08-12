@@ -3,6 +3,7 @@ import { useFaits } from '../../state/store';
 import { type LigneMission, etatActivite, moisCourant } from '../../state/selecteurs';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import type { DateISO, Mois } from '../../domain/types';
+import type { Mission } from '../../state/schema';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte, eur } from '../format';
@@ -348,11 +349,12 @@ function LigneMissionAffichee({ ligne }: { ligne: LigneMission }) {
   );
 }
 
-function libelleStatut(statut: 'active' | 'terminee' | 'prospect'): string {
+function libelleStatut(statut: Mission['statut']): string {
   switch (statut) {
     case 'active': return 'En cours';
     case 'terminee': return 'Terminée';
     case 'prospect': return 'Prospect';
+    case 'perdue': return 'Perdue';
   }
 }
 
