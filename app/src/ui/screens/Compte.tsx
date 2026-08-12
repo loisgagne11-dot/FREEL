@@ -92,6 +92,11 @@ type Etat =
     readonly phase: 'conflit';
     readonly session: Session;
     readonly distant: InstantaneDistant | null;
+  }
+  | {
+    readonly phase: 'confirmer-envoi';
+    readonly session: Session;
+    readonly distant: InstantaneDistant;
   };
 
 interface Resume {
@@ -108,6 +113,29 @@ function resumer(faits: Faits): Resume {
     recettes: faits.recettes.length,
     depenses: faits.depenses.length
   };
+}
+
+/** Rien du tout : ni client, ni mission, ni recette, ni dépense. */
+function estVide(r: Resume): boolean {
+  return r.clients === 0 && r.missions === 0 && r.recettes === 0 && r.depenses === 0;
+}
+
+function resumeCourt(r: Resume): string {
+  return estVide(r)
+    ? 'rien pour l’instant'
+    : `${r.recettes} recette(s), ${r.depenses} dépense(s), ${r.clients} client(s)`;
+}
+
+/**
+ * Le résumé du bloc distant, quand il est lisible.
+ *
+ * `null` couvre deux cas qu'il ne faut surtout pas afficher comme « vide » :
+ * le bloc est illisible, ou il vient d'une version qu'on ne sait pas lire.
+ */
+function resumeDistant(instantane: InstantaneDistant): Resume | null {
+  return motifRefusFaits(instantane.faits) === null
+    ? resumer(completerFaits(instantane.faits))
+    : null;
 }
 
 export interface ProprietesCompte {
@@ -193,6 +221,35 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
   }
 
   /* ── Envoyer ─────────────────────────────────────────────────────────── */
+
+  /**
+   * Le cas qu'il ne faut pas laisser passer d'un clic : envoyer le VIDE
+   * par-dessus des données.
+   *
+   * Il survient naturellement. On installe la nouvelle application sur un
+   * appareil, elle n'a encore rien, et « enregistrer sur le compte » est le
+   * bouton qui semble le plus utile — il effacerait tout. Le compteur de
+   * version ne protège pas de cela : la version distante est bien celle qu'on
+   * a lue, l'écriture est donc parfaitement légitime pour le serveur.
+   *
+   * Le contrôle est délibérément étroit : rien d'un côté, quelque chose de
+   * l'autre. Une règle plus large — « refuser si le compte a plus de lignes »
+   * — se déclencherait à chaque suppression volontaire, et une confirmation
+   * qu'on voit tout le temps ne se lit plus.
+   */
+  async function demanderEnvoi(session: Session): Promise<void> {
+    if (distant === 'inconnu') return;
+    const cote = distant === null ? null : resumeDistant(distant);
+    const ecraserait = distant !== null && (cote === null || !estVide(cote));
+
+    if (estVide(resumer(faitsLocaux)) && ecraserait) {
+      setErreur(null);
+      setMessage(null);
+      setEtat({ phase: 'confirmer-envoi', session, distant });
+      return;
+    }
+    await envoyer(session, distant === null ? null : distant.version);
+  }
 
   async function envoyer(session: Session, versionAttendue: number | null): Promise<void> {
     if (config === null) return;
@@ -313,42 +370,73 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
           {etat.phase === 'connecte' && (
             <>
               <EtatDuCompte distant={distant} local={resumer(faitsLocaux)} />
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={styles.actionPrincipale}
-                  disabled={enCours || distant === 'inconnu'}
-                  onClick={() => void envoyer(
-                    etat.session, distant === 'inconnu' ? null : distant?.version ?? null
-                  )}
-                >
-                  {enCours ? 'Envoi…' : 'Envoyer sur le compte'}
-                </button>
-                <button
-                  type="button"
-                  className={styles.action}
-                  disabled={enCours}
-                  onClick={() => void recuperer(etat.session)}
-                >
-                  Récupérer depuis le compte
-                </button>
-                <button
-                  type="button"
-                  className={styles.action}
-                  disabled={enCours}
-                  onClick={() => void apercevoirLegacy(etat.session)}
-                >
-                  Reprendre l’ancienne application
-                </button>
-                <button
-                  type="button"
-                  className={styles.action}
-                  onClick={() => void deconnecter(etat.session)}
-                >
-                  Se déconnecter
-                </button>
-              </div>
+              <ul className={styles.operations}>
+                <li className={styles.operation}>
+                  <button
+                    type="button"
+                    className={styles.actionPrincipale}
+                    disabled={enCours || distant === 'inconnu'}
+                    onClick={() => void demanderEnvoi(etat.session)}
+                  >
+                    {enCours ? 'Envoi…' : 'Enregistrer cet appareil sur le compte'}
+                  </button>
+                  <p className={styles.consequence}>
+                    Envoie ce que contient <strong>cet appareil</strong>
+                    {' '}({resumeCourt(resumer(faitsLocaux))}) vers le compte, en
+                    remplacement de ce qui s’y trouve.
+                  </p>
+                </li>
+
+                <li className={styles.operation}>
+                  <button
+                    type="button"
+                    className={styles.action}
+                    disabled={enCours}
+                    onClick={() => void recuperer(etat.session)}
+                  >
+                    Charger le compte sur cet appareil
+                  </button>
+                  <p className={styles.consequence}>
+                    Sens inverse&nbsp;: ce qui est sur <strong>le compte</strong>
+                    {' '}remplacera ce que contient cet appareil.
+                  </p>
+                </li>
+
+                <li className={styles.operation}>
+                  <button
+                    type="button"
+                    className={styles.action}
+                    disabled={enCours}
+                    onClick={() => void apercevoirLegacy(etat.session)}
+                  >
+                    Reprendre les données de l’ancienne application
+                  </button>
+                  <p className={styles.consequence}>
+                    Lit la table de <strong>l’ancienne version</strong> et la
+                    convertit. Elle n’est jamais modifiée&nbsp;: l’ancienne
+                    application continue de fonctionner.
+                  </p>
+                </li>
+
+                <li className={styles.secondaires}>
+                  <button
+                    type="button"
+                    className={styles.action}
+                    onClick={() => void deconnecter(etat.session)}
+                  >
+                    Se déconnecter
+                  </button>
+                </li>
+              </ul>
             </>
+          )}
+
+          {etat.phase === 'confirmer-envoi' && (
+            <EnvoiDuVide
+              distant={etat.distant}
+              onConfirmer={() => void envoyer(etat.session, etat.distant.version)}
+              onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
+            />
           )}
 
           {etat.phase === 'apercu-legacy' && (
@@ -429,6 +517,48 @@ function EtatDuCompte({ distant, local }: { distant: EtatDistant; local: Resume 
         <dd>{local.recettes} recette(s), {local.depenses} dépense(s)</dd>
       </div>
     </dl>
+  );
+}
+
+/**
+ * Envoyer un appareil vide sur un compte qui contient quelque chose.
+ *
+ * Rien d'anormal du point de vue du serveur : la version est la bonne,
+ * l'écriture passerait. C'est l'INTENTION qui est douteuse, et seule une
+ * personne peut la confirmer.
+ */
+function EnvoiDuVide(
+  { distant, onConfirmer, onAnnuler }: {
+    distant: InstantaneDistant;
+    onConfirmer: () => void;
+    onAnnuler: () => void;
+  }
+) {
+  const cote = resumeDistant(distant);
+  return (
+    <div className={styles.apercu}>
+      <p className={styles.avertissement}>
+        Cet appareil ne contient <strong>aucune donnée</strong>. L’envoyer
+        effacerait ce que le compte contient
+        {cote === null
+          ? '.'
+          : ` — ${cote.recettes} recette(s), ${cote.depenses} dépense(s), `
+            + `${cote.clients} client(s).`}
+      </p>
+      <p className={styles.consequence}>
+        Si vous vouliez au contraire récupérer ces données ici, revenez en
+        arrière et choisissez <em>Charger le compte sur cet appareil</em>, ou
+        <em> Reprendre les données de l’ancienne application</em>.
+      </p>
+      <div className={styles.actions}>
+        <button type="button" className={styles.action} onClick={onConfirmer}>
+          Effacer quand même le compte
+        </button>
+        <button type="button" className={styles.actionPrincipale} onClick={onAnnuler}>
+          Revenir en arrière
+        </button>
+      </div>
+    </div>
   );
 }
 

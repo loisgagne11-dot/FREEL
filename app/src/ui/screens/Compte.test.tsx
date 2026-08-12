@@ -157,7 +157,7 @@ describe('connexion', () => {
     // La reprise va aussi lire l'état du compte : on attend que ce second
     // rendu ait eu lieu, sinon il surviendrait hors du test et le rendrait
     // instable pour celui qui suit.
-    expect(await screen.findByRole('button', { name: 'Envoyer sur le compte' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })).toBeTruthy();
   });
 });
 
@@ -167,7 +167,7 @@ describe('envoi sur le compte', () => {
     render(<Compte stockage={CONFIGURE()} />);
     const utilisateur = await seConnecter();
 
-    await utilisateur.click(await screen.findByRole('button', { name: 'Envoyer sur le compte' }));
+    await utilisateur.click(await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' }));
 
     expect((await screen.findByRole('status')).textContent).toMatch(/enregistrées sur le compte/i);
     const envoi = ecritures(appel).at(-1);
@@ -181,7 +181,7 @@ describe('envoi sur le compte', () => {
     render(<Compte stockage={CONFIGURE()} />);
     const utilisateur = await seConnecter();
 
-    await utilisateur.click(await screen.findByRole('button', { name: 'Envoyer sur le compte' }));
+    await utilisateur.click(await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' }));
 
     const envoi = ecritures(appel).at(-1);
     expect(envoi?.methode).toBe('PATCH');
@@ -197,9 +197,108 @@ describe('envoi sur le compte', () => {
     render(<Compte stockage={CONFIGURE()} />);
     await seConnecter();
 
-    const bouton = await screen.findByRole('button', { name: 'Envoyer sur le compte' });
+    const bouton = await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' });
     expect((bouton as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/L’envoi reste indisponible/)).toBeTruthy();
+  });
+});
+
+/**
+ * Le piège le plus naturel de tout l'écran.
+ *
+ * On installe l'application sur un appareil neuf, elle ne contient rien, et
+ * « enregistrer sur le compte » est le bouton qui semble le plus utile — il
+ * effacerait tout. Le compteur de version ne protège pas de cela : la version
+ * distante est bien celle qu'on a lue, l'écriture est parfaitement légitime
+ * pour le serveur. Seule une personne peut trancher sur l'intention.
+ */
+describe('envoi d’un appareil vide', () => {
+  const COMPTE_PLEIN = ligneDistante(3, {
+    version: VERSION_SCHEMA,
+    recettes: [{ id: 'r1' }, { id: 'r2' }],
+    clients: [{ id: 'c1' }]
+  });
+
+  it('n’écrase pas un compte plein sans confirmation', async () => {
+    const appel = reponses(SESSION_OK, COMPTE_PLEIN);
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+
+    expect(await screen.findByText(/aucune donnée/i)).toBeTruthy();
+    // Rien n'est parti : la confirmation vient AVANT l'écriture, pas après.
+    expect(ecritures(appel)).toEqual([]);
+  });
+
+  // Dire ce qu'on efface, et pas seulement qu'on efface quelque chose.
+  it('chiffre ce que l’envoi ferait disparaître', async () => {
+    reponses(SESSION_OK, COMPTE_PLEIN);
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+
+    expect((await screen.findByText(/2 recette\(s\)/)).textContent).toMatch(/1 client\(s\)/);
+  });
+
+  it('laisse revenir en arrière sans rien envoyer', async () => {
+    const appel = reponses(SESSION_OK, COMPTE_PLEIN);
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+    await utilisateur.click(await screen.findByRole('button', { name: 'Revenir en arrière' }));
+
+    expect(ecritures(appel)).toEqual([]);
+    expect(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    ).toBeTruthy();
+  });
+
+  // L'effacement délibéré reste possible : le garde-fou informe, il n'interdit pas.
+  it('envoie quand même si l’utilisateur confirme', async () => {
+    const appel = reponses(SESSION_OK, COMPTE_PLEIN, ligneDistante(4));
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+    await utilisateur.click(
+      await screen.findByRole('button', { name: /Effacer quand même/ })
+    );
+
+    expect(ecritures(appel).at(-1)?.url).toContain('version=eq.3');
+  });
+
+  /**
+   * Le contrôle est étroit à dessein. Un appareil qui contient quelque chose
+   * envoie sans confirmation, même vers un compte plus fourni : une règle
+   * « refuser si le compte a plus de lignes » se déclencherait à chaque
+   * suppression volontaire, et une confirmation qu'on voit tout le temps ne
+   * se lit plus.
+   */
+  it('ne demande rien quand l’appareil contient des données', async () => {
+    const appel = reponses(SESSION_OK, COMPTE_PLEIN, ligneDistante(4));
+    useFaits.setState({
+      faits: { ...faitsVides(), clients: [{ id: 'c9', nom: 'Client de démo' }] as never }
+    });
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+
+    expect((await screen.findByRole('status')).textContent).toMatch(/enregistrées sur le compte/i);
+    expect(ecritures(appel).at(-1)?.methode).toBe('PATCH');
   });
 });
 
@@ -219,7 +318,7 @@ describe('conflit d’écriture', () => {
     render(<Compte stockage={CONFIGURE()} />);
     const utilisateur = await seConnecter();
 
-    await utilisateur.click(await screen.findByRole('button', { name: 'Envoyer sur le compte' }));
+    await utilisateur.click(await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' }));
 
     expect(await screen.findByText(/Rien n’a été enregistré/)).toBeTruthy();
     expect(screen.getByText('Le compte').nextSibling?.textContent).toMatch(/2 recette/);
@@ -231,7 +330,7 @@ describe('conflit d’écriture', () => {
     render(<Compte stockage={CONFIGURE()} />);
     const utilisateur = await seConnecter();
 
-    await utilisateur.click(await screen.findByRole('button', { name: 'Envoyer sur le compte' }));
+    await utilisateur.click(await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' }));
     const avant = ecritures(appel).length;
     await utilisateur.click(await screen.findByRole('button', { name: 'Abandonner l’envoi' }));
 
@@ -248,7 +347,7 @@ describe('conflit d’écriture', () => {
     render(<Compte stockage={CONFIGURE()} />);
     const utilisateur = await seConnecter();
 
-    await utilisateur.click(await screen.findByRole('button', { name: 'Envoyer sur le compte' }));
+    await utilisateur.click(await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' }));
     await utilisateur.click(await screen.findByRole('button', { name: /Écraser le compte/ }));
 
     expect(ecritures(appel).at(-1)?.url).toContain('version=eq.9');
@@ -267,7 +366,7 @@ describe('récupération depuis le compte', () => {
     const utilisateur = await seConnecter();
 
     await utilisateur.click(
-      await screen.findByRole('button', { name: 'Récupérer depuis le compte' })
+      await screen.findByRole('button', { name: 'Charger le compte sur cet appareil' })
     );
 
     expect(await screen.findByText(/remplaceront/)).toBeTruthy();
@@ -288,7 +387,7 @@ describe('récupération depuis le compte', () => {
     const utilisateur = await seConnecter();
 
     await utilisateur.click(
-      await screen.findByRole('button', { name: 'Récupérer depuis le compte' })
+      await screen.findByRole('button', { name: 'Charger le compte sur cet appareil' })
     );
     await utilisateur.click(
       await screen.findByRole('button', { name: /Remplacer les données de cet appareil/ })
@@ -313,7 +412,7 @@ describe('récupération depuis le compte', () => {
     const utilisateur = await seConnecter();
 
     await utilisateur.click(
-      await screen.findByRole('button', { name: 'Récupérer depuis le compte' })
+      await screen.findByRole('button', { name: 'Charger le compte sur cet appareil' })
     );
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/plus récente/i);
@@ -327,7 +426,7 @@ describe('récupération depuis le compte', () => {
     const utilisateur = await seConnecter();
 
     await utilisateur.click(
-      await screen.findByRole('button', { name: 'Récupérer depuis le compte' })
+      await screen.findByRole('button', { name: 'Charger le compte sur cet appareil' })
     );
     expect((await screen.findByRole('status')).textContent).toMatch(/aucune donnée/i);
     expect(screen.queryByRole('alert')).toBeNull();
@@ -341,7 +440,7 @@ describe('cohabitation avec l’ancienne application', () => {
     const utilisateur = await seConnecter();
 
     await utilisateur.click(
-      await screen.findByRole('button', { name: /Reprendre l’ancienne application/ })
+      await screen.findByRole('button', { name: /Reprendre les données de l’ancienne application/ })
     );
     await utilisateur.click(
       await screen.findByRole('button', { name: /Remplacer les données de cet appareil/ })
@@ -366,12 +465,12 @@ describe('cohabitation avec l’ancienne application', () => {
     const utilisateur = await seConnecter();
 
     await utilisateur.click(
-      await screen.findByRole('button', { name: /Reprendre l’ancienne application/ })
+      await screen.findByRole('button', { name: /Reprendre les données de l’ancienne application/ })
     );
     await utilisateur.click(
       await screen.findByRole('button', { name: /Remplacer les données de cet appareil/ })
     );
-    await utilisateur.click(await screen.findByRole('button', { name: 'Envoyer sur le compte' }));
+    await utilisateur.click(await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' }));
 
     const versLegacy = ecritures(appel).filter((e) => e.url.includes('user_data'));
     expect(versLegacy).toEqual([]);

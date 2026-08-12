@@ -259,9 +259,16 @@ export async function chargerDonneesLegacy(
   config: ConfigSupabase,
   session: Session
 ): Promise<Resultat<DonneesLegacy | null>> {
+  // `select=*` et non la liste des colonnes voulues. Le schéma de l'ancienne
+  // application a gagné des colonnes au fil du temps — `ir_config` est arrivée
+  // par une migration séparée. Nommer une colonne qu'une installation donnée
+  // n'a jamais ajoutée fait échouer la lecture ENTIÈRE en 400, alors que les
+  // autres colonnes sont là et suffisent. On prend la ligne telle qu'elle est ;
+  // les champs absents ressortent `undefined`, ce que la conversion sait déjà
+  // traiter.
   const chemin = `/rest/v1/${TABLE_LEGACY}`
     + `?user_id=eq.${encodeURIComponent(session.utilisateurId)}`
-    + '&select=updated_at,company,missions,clients,treasury,ir_config';
+    + '&select=*';
 
   const r = await appeler(config, chemin, { jeton: session.jeton });
   if (r.statut === 'erreur') return r;
