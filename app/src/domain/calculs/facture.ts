@@ -14,8 +14,9 @@
  * Ce module ne se contente donc pas d'assembler un document : il CONSTATE ce
  * qui manque, mention par mention, avant émission. L'ancienne application
  * produisait un PDF sans vérifier quoi que ce soit — et son pied de page
- * portait un « RCS TOULOUSE » codé en dur, mention qui ne concerne pas un
- * micro-BNC et qui était donc fausse pour tout le monde.
+ * annonçait une immatriculation au registre du commerce, codée en dur avec
+ * une ville : mention qui ne concerne pas un micro-BNC, donc fausse pour
+ * tout le monde, et qui exposait au passage le domicile de l'utilisateur.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * TROIS MENTIONS QUI DÉPENDENT DU RÉGIME ET DU CLIENT
