@@ -16,6 +16,7 @@ import type { DateISO, Euros, Mois, TypeActivite } from '../domain/types';
 import type { Depense } from '../domain/calculs/depenses';
 import type { PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
+import type { MouvementBancaire } from '../domain/calculs/banque';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -124,13 +125,15 @@ export interface Faits {
    */
   readonly conges: readonly DateISO[];
   /**
-   * `true` quand des opérations bancaires sont disponibles pour rapprocher.
+   * Les opérations du compte, importées depuis un relevé.
    *
-   * Fait, et non déduction : sans lui, une dépense marquée « rapprochée » sous
-   * une ancienne configuration continuerait de s'afficher comme telle après la
-   * déconnexion du compte, en affirmant un contrôle qui n'a plus lieu.
+   * `banqueReliee` a disparu du schéma quand ce champ est apparu : il était
+   * devenu DÉRIVABLE — un relevé est disponible si et seulement s'il y a des
+   * mouvements. Le conserver aurait enfreint l'invariant « aucune valeur
+   * dérivée n'est stockée », et ouvert la possibilité qu'un booléen à `true`
+   * coexiste avec une liste vide.
    */
-  readonly banqueReliee: boolean;
+  readonly mouvementsBancaires: readonly MouvementBancaire[];
   /**
    * Périodes de barème URSSAF saisies par l'utilisateur.
    *
@@ -165,7 +168,7 @@ export function faitsVides(): Faits {
     version: VERSION_SCHEMA,
     entreprise: entrepriseVide(),
     clients: [], missions: [], recettes: [], depenses: [], conges: [],
-    banqueReliee: false, periodesUrssafAjoutees: [],
+    mouvementsBancaires: [], periodesUrssafAjoutees: [],
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     periodesDeclarees: [], configImpotBrute: {}
   };

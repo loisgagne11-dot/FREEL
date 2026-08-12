@@ -249,7 +249,7 @@ describe('reprise des charges en dépenses', () => {
   it('ne prétend pas qu\'un compte bancaire est relié', () => {
     const r = migrer(avecLegacy());
     if (r.statut !== 'migre') throw new Error('migration attendue');
-    expect(r.faits.banqueReliee).toBe(false);
+    expect(r.faits.mouvementsBancaires).toEqual([]);
   });
 });
 

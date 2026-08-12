@@ -1,0 +1,202 @@
+/* Relevé bancaire. Mobile-first, aucune couleur en dur, aucune largeur en JS. */
+
+.grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.chiffre {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  min-width: 0;
+}
+
+.libelle {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.montant {
+  font-size: 19px;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.accent { color: var(--green); }
+.attention { color: var(--amber); }
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  min-width: 0;
+}
+
+.carte + .carte { margin-top: 12px; }
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.vide { color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+.champFichier {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.carte input[type='file'] { font-size: 12px; color: var(--muted); max-width: 100%; }
+
+.retour { margin-top: 12px; }
+.succes { font-size: 13px; line-height: 1.55; color: var(--green); }
+.echec { font-size: 13px; line-height: 1.55; color: var(--red); }
+
+/* ── Interprétation du fichier ─────────────────────────────────────────── */
+
+.detail { display: flex; flex-direction: column; margin-top: 10px; }
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted-2);
+  min-width: 0;
+}
+
+.ligne:last-child { border-bottom: none; }
+
+.ligne dd {
+  color: var(--text);
+  font-weight: 560;
+  text-align: right;
+  /* Un intitulé de colonne peut être long ; il s'enroule plutôt que
+     d'élargir le document. */
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.repli { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+
+.repli summary {
+  cursor: pointer;
+  /* 44 px de haut : la flèche seule serait une cible de quelques pixels. */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.ecartes {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted-2);
+  padding-bottom: 6px;
+}
+
+/* ── Opérations ────────────────────────────────────────────────────────── */
+
+.liste { list-style: none; display: flex; flex-direction: column; }
+
+.mouvement {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.mouvement:last-child { border-bottom: none; }
+
+.ligneTitre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.ligneLibelle {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ligneMontant {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.debit { color: var(--text); }
+.credit { color: var(--green); }
+
+.ligneMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-2);
+  min-width: 0;
+}
+
+.etat { font-size: 12px; line-height: 1.5; color: var(--muted-2); }
+.etatAccent { font-size: 12px; line-height: 1.5; color: var(--green); align-self: center; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.action {
+  min-height: 40px;
+  padding: 0 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  /* Le libellé d'une écriture peut être long : il se coupe plutôt que de
+     pousser la ligne au-delà de la largeur disponible. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action:hover { color: var(--text); border-color: var(--green); }
+.action:disabled { opacity: 0.55; cursor: default; }
