@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ECRANS, ID_ECRAN_PAR_DEFAUT, resoudreEcran } from './navigation';
 
 describe('navigation — définition des écrans', () => {
-  it('définit exactement les 6 écrans du produit', () => {
-    expect(ECRANS).toHaveLength(6);
+  it('définit exactement les 7 écrans du produit', () => {
+    expect(ECRANS).toHaveLength(7);
   });
 
   it('donne à chaque écran un identifiant unique', () => {
@@ -30,7 +30,7 @@ describe('navigation — définition des écrans', () => {
 
   it("expose les libellés exacts attendus par la spec d'écrans", () => {
     const libelles = ECRANS.map((e) => e.libelle);
-    expect(libelles).toEqual(['Pilote', 'Activité & congés', 'Argent', 'Achats', 'Outils', 'Config']);
+    expect(libelles).toEqual(['Pilote', 'Activité & congés', 'Argent', 'Facturer', 'Achats', 'Outils', 'Config']);
   });
 });
 

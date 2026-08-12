@@ -17,6 +17,10 @@
  * 4. On teste le COMPORTEMENT, pas le texte source. Une assertion sur
  *    `html.includes('standard: 0.246')` casse au premier changement de
  *    barème tout en ne prouvant rien sur le calcul.
+ * 5. Le balayage de données personnelles du §4 porte sur TOUT le dépôt,
+ *    donc aussi sur `app/`. Il est appelé par `npm run verifier` côté app
+ *    (script `verifier:fuites`) : sans ce lien, écrire un nouvel écran ne
+ *    déclenchait pas le garde-fou, et la fuite n'était vue qu'en CI.
  */
 
 const fs = require('fs');
@@ -160,6 +164,12 @@ function estManifestementFactice(valeur) {
   if (chiffres.length === 0) return false;
   if (/^0+$/.test(chiffres)) return true;
   if (/^(\d)\1+$/.test(chiffres)) return true;
+  // Presque que des zéros, suivis d'un petit compteur : « 00000000000001 »,
+  // « 00000000000002 »… C'est la forme que prennent des fixtures qui ont
+  // besoin de deux identifiants DISTINCTS au bon format. Ne reconnaître que
+  // la version tout-à-zéro était incohérent : deux valeurs qui ne diffèrent
+  // que d'un chiffre étaient jugées, l'une factice, l'autre réelle.
+  if (/^0{5,}[0-9]{1,4}$/.test(chiffres)) return true;
   // « 123456789 », « 12345678901237 » : les huit premiers chiffres se suivent.
   return /^0?123456789/.test(chiffres);
 }

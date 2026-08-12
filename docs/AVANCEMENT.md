@@ -42,6 +42,77 @@ masquerait.
 
 ---
 
+## 0. Réécriture d'historique du 12/08/2026
+
+**Tout clone antérieur au 12/08/2026 est incompatible.** L'historique a été
+réécrit pour retirer des données personnelles présentes dans 13 à 15 commits :
+nom d'entreprise, SIRET, numéro de TVA intracommunautaire et SIREN. Les 21
+branches ont été force-poussées.
+
+Pour reprendre un clone existant :
+
+```
+git fetch origin --prune
+git checkout -B <votre-branche> origin/main
+```
+
+Ne pas tenter de fusionner l'ancien historique dans le nouveau : les commits
+n'ont plus les mêmes empreintes, et la fusion réintroduirait les données
+retirées.
+
+**Ce que la réécriture n'a pas pu faire.** GitHub conserve 250 références
+`refs/pull/N/head`, une par pull request, qu'aucun envoi ne peut supprimer.
+Les anciens commits restent donc atteignables par l'interface web d'une
+ancienne PR, ou par `git fetch origin refs/pull/N/head`. Vérifié en revanche :
+un `git clone` ordinaire ne rapporte plus aucune de ces valeurs — 737 commits,
+zéro occurrence. Une purge complète suppose une demande au support GitHub, ou
+la recréation du dépôt.
+
+---
+
+## 0 bis. Pourquoi `index.html` est encore là
+
+**Ce n'est pas du code mort : c'est l'application en production**, celle qui
+est servie et qui fait tourner l'activité. La nouvelle version ne peut pas
+encore la remplacer, et le tableau ci-dessous dit précisément ce qui manque.
+
+| Fonction | `index.html` (legacy) | `app/` (nouvelle) |
+|---|---|---|
+| Consulter, calculer, provisionner | ✅ | ✅ |
+| Saisir une **dépense** avec justificatif | ❌ | ✅ |
+| Importer un relevé bancaire | ❌ | ✅ |
+| Livre des recettes conforme, DES | ❌ | ✅ |
+| **Créer un client** | ✅ | ✅ |
+| **Créer une mission** | ✅ | ✅ |
+| **Émettre une facture, et son PDF** | ✅ | ✅ |
+| **Écrire dans Supabase** (synchro) | ✅ | ❌ lecture seule |
+
+**Il ne reste que la dernière ligne** avant de pouvoir retirer le legacy. Tant qu'elles ne sont pas faites, retirer `index.html` priverait
+l'utilisateur de son outil de facturation — et une facture non émise est un
+revenu non encaissé.
+
+**Ordre respecté.** Clients et missions d'abord, car une facture s'y rattache
+— fait le 12/08 ; la facturation ensuite — faite le 12/08 ; l'écriture Supabase
+en dernier, parce qu'elle est la seule opération qui peut abîmer des données
+existantes et qu'elle demande donc que le reste soit sûr.
+
+**Pas de bibliothèque PDF.** La facture est du HTML mis en page pour
+l'impression : « Imprimer → Enregistrer en PDF » donne le fichier. jsPDF pesait
+627 Ko dans l'ancienne version, pour produire un document que le navigateur
+sait déjà fabriquer. Le renoncement assumé : aucun fichier n'est produit par
+programme, donc joindre une facture à un courriel passe par la boîte
+d'impression.
+
+**Un piège du modèle, traité.** Le rattachement d'une recette à son client se
+fait par **nom**, l'ancienne application n'ayant jamais posé d'identifiant.
+Renommer un client casserait donc silencieusement ses missions et ses recettes.
+Le magasin propage le nouveau nom dans la même écriture, et l'écran avertit
+avant d'enregistrer. Passer aux identifiants serait la bonne forme, mais
+supposerait de deviner à quel client rattacher chaque recette historique —
+c'est-à-dire d'inventer un lien.
+
+---
+
 ## 1. À lire, dans cet ordre
 
 | Ordre | Document | Ce qu'il apporte |
@@ -49,10 +120,13 @@ masquerait.
 | 1 | **ce fichier** | Où on en est, quoi faire ensuite |
 | 2 | [`PLAN-REFONTE.md`](./PLAN-REFONTE.md) | Les 6 décisions arbitrées (D1–D6), le barème par périodes, les 7 jalons |
 | 3 | [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) | Le diagnostic complet |
-| 4 | [`audit/05-spec-ecrans.md`](./audit/05-spec-ecrans.md) | La spec écran par écran, à consulter au moment d'implémenter chaque écran |
-| 5 | [`audit/03-design-system.md`](./audit/03-design-system.md) | Tokens, media queries, responsabilités du shell |
+| 4 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
 
-Les autres rapports d'`audit/` sont des références ponctuelles.
+Les neuf rapports d'audit détaillés ont été retirés du dépôt le 12/08/2026.
+Leur substance est dans le document 3, et les décisions qu'ils ont produites
+sont devenues du code commenté — c'est là qu'il faut les lire désormais. Ils
+restent dans l'historique git (`git show 9d97b6b:docs/audit/05-spec-ecrans.md`)
+si un point de spécification manque.
 
 ---
 
@@ -288,7 +362,22 @@ tests verts.
       le montant réellement déclaré à l'époque.
 - [x] ~~Retirer la section « Propositions Claude Code »~~ (D5) — **fait**, elle
       n'existe pas dans le nouvel écran.
-- [ ] Déclaration d'échanges de services (DES) proprement dite
+- [x] ~~Déclaration européenne de services (DES)~~ — **fait.** Un point avait
+      été mal compris dans les jalons précédents et il fallait le lever avant
+      d'écrire une ligne : **la DES est due par celui qui VEND** un service à
+      un assujetti d'un autre État membre, pas par celui qui en achète.
+      L'écran Achats détecte l'autoliquidation à l'achat, qui relève de la
+      déclaration de TVA ; la DES regarde les **recettes**.
+      · **La franchise en base n'en dispense pas**, et il n'y a aucun seuil :
+        une prestation de 50 € déclenche l'obligation.
+      · **750 € d'amende par déclaration** manquante ou inexacte. Forfaitaire :
+        le montant en jeu ne dépend pas du chiffre d'affaires mais du nombre de
+        mois oubliés. D'où le placement parmi les retards du Pilote.
+      · Le mois retenu est celui de l'**émission**, pas de l'encaissement — la
+        taxe est exigible chez le preneur à l'achèvement de la prestation. Le
+        livre des recettes et la DES ne coïncident donc pas, et l'écran le dit.
+      · Une ligne sans numéro de TVA du preneur est **bloquée** plutôt que
+        déposée : une déclaration inexacte est sanctionnée comme une absente.
 - [x] ~~Livre des recettes conforme~~ — **fait.** Le registre se tient en
       **ajout seul** : une recette encaissée ne se modifie pas et ne se
       supprime pas, elle s'annule par une écriture inverse datée du jour de la
@@ -328,6 +417,37 @@ tests verts.
 
 ### Hors séquence
 - [ ] Règles RLS Supabase durcies (vérifiées actives, à documenter) — 1 h
+
+---
+
+## 4 bis. Leçon du 12/08 — les jeux d'essai reproduisaient la supposition
+
+Le mappage des factures legacy était faux sur **presque tous les champs** :
+le code cherchait `montant`, `date`, `datePaiement` et `payee` ; l'ancienne
+application emploie `ht`, `dateEnvoi`, `datePaiementReel` et `status`. Les
+recettes arrivaient donc à **zéro euro, sans date et jamais encaissées** —
+chiffre d'affaires vide, provisions nulles, livre des recettes vide.
+
+Trois contrôles auraient dû l'attraper, et aucun ne l'a fait :
+
+| Contrôle | Pourquoi il a laissé passer |
+|---|---|
+| Tests de migration | Le jeu d'essai portait les noms **supposés**, pas les vrais |
+| `verifierAbsenceDePerte` | Il lisait le même mauvais champ : il comparait zéro à zéro et concluait « aucune perte » |
+| Migration de bout en bout | Son jeu d'essai aussi ; et il ne vérifiait que le **nombre** de recettes, jamais leur contenu |
+
+**Règle qui en découle.** Les noms de champs d'un jeu d'essai legacy se
+**relèvent** du code d'origine, jamais ne se supposent :
+
+```
+grep -ohE "f\.[a-zA-Z]+" index.html | sort | uniq -c | sort -rn
+```
+
+Et un contrôle de reprise doit porter sur le **contenu**, pas sur le compte :
+deux recettes vides passent un test qui compte deux recettes.
+
+C'est l'utilisateur qui l'a détecté, en constatant que « les données
+n'apparaissent pas partout » après connexion à Supabase.
 
 ---
 

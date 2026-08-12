@@ -72,6 +72,13 @@ export interface EntreeATraiter {
    * l'alerte allumée, et l'utilisateur cesserait de la croire.
    */
   readonly periodesUrssaf?: readonly PeriodeBareme[];
+  /**
+   * Déclarations européennes de services dont la date limite est passée.
+   *
+   * Calculées à part (`calculs/des`) et passées ici : cette requête assemble
+   * les sujets, elle ne refait pas les calculs des autres modules.
+   */
+  readonly desEnRetard?: readonly { readonly mois: Mois }[];
   /** Échéances réglementaires à date fixe, déjà filtrées sur leur préavis. */
   readonly echeancesReglementaires: readonly {
     readonly id: string;
@@ -224,6 +231,33 @@ export function sujetsATraiter(
       contexte: `${total} € impayés, dont ${pluriel(plusAncienne, 'jour', 'jours')} de retard `
         + `sur la plus ancienne.`,
       action: 'Relancer'
+    });
+  }
+
+  /* ---------- déclarations européennes de services ---------- */
+  //
+  // La sanction est forfaitaire et par déclaration : 750 € qu'on ait vendu
+  // 50 € ou 50 000 €. C'est ce qui justifie de la placer parmi les retards
+  // plutôt que dans les informations — le montant en jeu ne dépend pas du
+  // chiffre d'affaires, mais du nombre de mois oubliés.
+  if (e.desEnRetard !== undefined && e.desEnRetard.length > 0) {
+    const plusAncien = e.desEnRetard[0];
+    const amende = euros(e.desEnRetard.length * 750);
+    sujets.push({
+      id: 'des-en-retard',
+      ecran: 'argent',
+      gravite: 'retard',
+      nombre: e.desEnRetard.length,
+      intitule: pluriel(
+        e.desEnRetard.length,
+        'déclaration européenne de services en retard',
+        'déclarations européennes de services en retard'
+      ),
+      contexte: plusAncien === undefined
+        ? ''
+        : `Depuis ${moisLisible(plusAncien.mois)}. L'amende est forfaitaire : `
+          + `${amende} € encourus. La franchise en base n'en dispense pas.`,
+      action: 'Déposer'
     });
   }
 

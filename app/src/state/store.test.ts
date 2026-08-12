@@ -189,3 +189,138 @@ describe('congés', () => {
     expect(useFaits.getState().faits.conges).toEqual(['2026-07-27', '2026-07-28']);
   });
 });
+
+describe('carnet — clients', () => {
+  const saisieClient = (nom: string) => ({
+    nom, adresse: '', siret: '', email: '', delaiPaiementJours: 30,
+    pays: '', tvaIntracom: ''
+  });
+
+  const clients = () => useFaits.getState().faits.clients;
+
+  it('ajoute un client', () => {
+    expect(useFaits.getState().ajouterClient(saisieClient('Dupont'))).toBeNull();
+    expect(clients()).toHaveLength(1);
+    expect(clients()[0]?.nom).toBe('Dupont');
+  });
+
+  // Le nom EST la clé de rattachement : deux homonymes rendraient indécidable
+  // l'appartenance de chaque recette.
+  it('refuse un homonyme, sans rien enregistrer', () => {
+    useFaits.getState().ajouterClient(saisieClient('Dupont'));
+    const refus = useFaits.getState().ajouterClient(saisieClient('dupont'));
+    expect(refus).toMatch(/déjà/i);
+    expect(clients()).toHaveLength(1);
+  });
+
+  it('refuse un nom vide', () => {
+    expect(useFaits.getState().ajouterClient(saisieClient('  '))).toMatch(/obligatoire/i);
+  });
+
+  // Sans propagation, les recettes resteraient attachées à un nom que plus
+  // aucun client ne porte.
+  it('propage un renommage sur les missions et les recettes', () => {
+    useFaits.getState().ajouterClient(saisieClient('Dupont'));
+    const idClient = clients()[0]?.id as string;
+    useFaits.getState().ajouterMission({
+      clientId: null, clientNom: 'Dupont', description: 'Mission',
+      tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active'
+    });
+    ajouter({ clientNom: 'Dupont' });
+
+    expect(useFaits.getState().modifierClient(idClient, { nom: 'Dupont SARL' })).toBeNull();
+
+    const faits = useFaits.getState().faits;
+    expect(faits.clients[0]?.nom).toBe('Dupont SARL');
+    expect(faits.missions[0]?.clientNom).toBe('Dupont SARL');
+    expect(faits.recettes[0]?.clientNom).toBe('Dupont SARL');
+  });
+
+  // Corriger la casse est un renommage : sans propagation, l'ancienne casse
+  // subsisterait dans les recettes.
+  it('propage aussi une simple correction de casse', () => {
+    useFaits.getState().ajouterClient(saisieClient('dupont'));
+    const idClient = clients()[0]?.id as string;
+    ajouter({ clientNom: 'dupont' });
+    useFaits.getState().modifierClient(idClient, { nom: 'Dupont' });
+    expect(useFaits.getState().faits.recettes[0]?.clientNom).toBe('Dupont');
+  });
+
+  it('modifie un champ sans toucher aux rattachements', () => {
+    useFaits.getState().ajouterClient(saisieClient('Dupont'));
+    const idClient = clients()[0]?.id as string;
+    ajouter({ clientNom: 'Dupont' });
+    useFaits.getState().modifierClient(idClient, { pays: 'DE', tvaIntracom: 'DE123' });
+
+    expect(clients()[0]).toMatchObject({ nom: 'Dupont', pays: 'DE' });
+    expect(useFaits.getState().faits.recettes[0]?.clientNom).toBe('Dupont');
+  });
+
+  // Les recettes resteraient au livre mais sortiraient des délais de paiement
+  // et de la DES sans que rien ne le signale.
+  it('refuse de supprimer un client qui porte des recettes', () => {
+    useFaits.getState().ajouterClient(saisieClient('Dupont'));
+    const idClient = clients()[0]?.id as string;
+    ajouter({ clientNom: 'Dupont' });
+
+    expect(useFaits.getState().supprimerClient(idClient)).toMatch(/rattachées/i);
+    expect(clients()).toHaveLength(1);
+  });
+
+  it('supprime un client sans rattachement', () => {
+    useFaits.getState().ajouterClient(saisieClient('Seul'));
+    expect(useFaits.getState().supprimerClient(clients()[0]?.id as string)).toBeNull();
+    expect(clients()).toHaveLength(0);
+  });
+});
+
+describe('carnet — missions', () => {
+  const missions = () => useFaits.getState().faits.missions;
+
+  const saisieMission = (clientNom: string) => ({
+    clientId: null, clientNom, description: 'Mission',
+    tjm: euros(400), debut: dateISO('2026-01-01'), fin: dateISO('2026-12-31'),
+    statut: 'active' as const
+  });
+
+  // Perdre le nom couperait la mission de son chiffre d'affaires, que le nom
+  // seul rattache.
+  it('rattache la mission au client par identifiant, sans perdre le nom', () => {
+    useFaits.getState().ajouterClient({
+      nom: 'Dupont', adresse: '', siret: '', email: '',
+      delaiPaiementJours: 30, pays: '', tvaIntracom: ''
+    });
+    const idClient = useFaits.getState().faits.clients[0]?.id;
+    useFaits.getState().ajouterMission(saisieMission('Dupont'));
+
+    expect(missions()[0]).toMatchObject({ clientId: idClient, clientNom: 'Dupont' });
+  });
+
+  it('accepte une mission pour un client hors carnet, sans identifiant', () => {
+    useFaits.getState().ajouterMission(saisieMission('Inconnu'));
+    expect(missions()[0]).toMatchObject({ clientId: null, clientNom: 'Inconnu' });
+  });
+
+  // Une facture émise ne se retire pas du registre : supprimer la mission qui
+  // la justifie rendrait sa présence inexplicable.
+  it('refuse de supprimer une mission dont une recette relève de la période', () => {
+    useFaits.getState().ajouterMission(saisieMission('Dupont'));
+    ajouter({ clientNom: 'Dupont', emiseLe: dateISO('2026-06-30') });
+
+    expect(useFaits.getState().supprimerMission(missions()[0]?.id as string))
+      .toMatch(/registre|inexplicable/i);
+    expect(missions()).toHaveLength(1);
+  });
+
+  it('supprime une mission dont aucune recette ne relève', () => {
+    useFaits.getState().ajouterMission(saisieMission('Dupont'));
+    expect(useFaits.getState().supprimerMission(missions()[0]?.id as string)).toBeNull();
+    expect(missions()).toHaveLength(0);
+  });
+
+  it('modifie une mission', () => {
+    useFaits.getState().ajouterMission(saisieMission('Dupont'));
+    useFaits.getState().modifierMission(missions()[0]?.id as string, { statut: 'terminee' });
+    expect(missions()[0]?.statut).toBe('terminee');
+  });
+});

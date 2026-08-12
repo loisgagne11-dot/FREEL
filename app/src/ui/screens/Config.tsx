@@ -157,6 +157,15 @@ function Profil() {
         </Champ>
 
         <Champ
+          id={`${idChamp}-intracom`}
+          libelle="Numéro de TVA intracommunautaire"
+          aide="Nécessaire pour déposer une déclaration européenne de services, y compris en franchise en base."
+        >
+          <input id={`${idChamp}-intracom`} value={entreprise.tvaIntracom}
+            onChange={(e) => modifier({ tvaIntracom: e.target.value })} />
+        </Champ>
+
+        <Champ
           id={`${idChamp}-tva`}
           libelle="Assujetti à la TVA depuis"
           aide="Laisser vide en franchise en base. Le régime est résolu à la date de chaque opération."

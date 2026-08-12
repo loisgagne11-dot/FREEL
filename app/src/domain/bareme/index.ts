@@ -68,6 +68,8 @@ import { verifierIntegritePlafonds } from './plafonds';
 import { verifierIntegriteTva } from './tva';
 import { verifierIntegrite as verifierIntegriteUrssafInterne } from './urssaf';
 import { verifierIntegriteRecettes as verifierIntegriteRecettesInterne } from './recettes';
+import { verifierIntegriteDes as verifierIntegriteDesInterne } from '../calculs/des';
+import { verifierIntegriteFacture as verifierIntegriteFactureInterne } from '../calculs/facture';
 
 /**
  * Contrôle d'intégrité de l'ensemble du barème, préfixé par table.
@@ -83,6 +85,8 @@ export function verifierIntegriteBareme(): readonly string[] {
     ...verifierIntegritePlafonds().map((a) => `[plafonds] ${a}`),
     ...verifierIntegriteTva().map((a) => `[tva] ${a}`),
     ...verifierIntegriteImpot().map((a) => `[impôt] ${a}`),
-    ...verifierIntegriteRecettesInterne().map((a) => `[recettes] ${a}`)
+    ...verifierIntegriteRecettesInterne().map((a) => `[recettes] ${a}`),
+    ...verifierIntegriteDesInterne().map((a) => `[des] ${a}`),
+    ...verifierIntegriteFactureInterne().map((a) => `[facture] ${a}`)
   ];
 }

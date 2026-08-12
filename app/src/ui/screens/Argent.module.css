@@ -197,3 +197,47 @@
 }
 
 .actionLigne:hover { color: var(--text); border-color: var(--line-2); }
+
+/* ── Déclaration européenne de services ────────────────────────────────── */
+
+.navigationMois {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.pas {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pas:hover { color: var(--text); border-color: var(--green); }
+
+.moisCourant {
+  min-width: 9.5ch;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text);
+  /* La première lettre du mois vient en minuscule de l'API d'internationalisation. */
+  text-transform: capitalize;
+}
+
+.noteBasse {
+  margin-top: 14px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted-2);
+}
+
+.noteBasse strong { color: var(--muted); }

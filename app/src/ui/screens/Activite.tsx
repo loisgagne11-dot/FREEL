@@ -3,8 +3,11 @@ import { useFaits } from '../../state/store';
 import { type LigneMission, etatActivite, moisCourant } from '../../state/selecteurs';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import type { DateISO, Mois } from '../../domain/types';
+import type { Client, Mission } from '../../state/schema';
+import { euros, dateISO } from '../../domain/types';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
+import { Sheet } from '../components/Sheet';
 import { dateCourte, eur } from '../format';
 import styles from './Activite.module.css';
 
@@ -41,6 +44,7 @@ export function Activite() {
   const basculerConge = useFaits((e) => e.basculerConge);
 
   const [section, setSection] = useState<Section>('charge');
+  const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
   const [mois, setMois] = useState<Mois>(() => moisCourant());
   const idGroupe = useId();
 
@@ -50,6 +54,18 @@ export function Activite() {
     <>
       <header className={styles.entete}>
         <h1 className={styles.titre}>Activité</h1>
+        {section === 'missions' && (
+          <button type="button" className={styles.actionPrincipale}
+            onClick={() => setPanneau({ type: 'mission', id: null })}>
+            Ajouter une mission
+          </button>
+        )}
+        {section === 'clients' && (
+          <button type="button" className={styles.actionPrincipale}
+            onClick={() => setPanneau({ type: 'client', id: null })}>
+            Ajouter un client
+          </button>
+        )}
         <div className={styles.navigationMois}>
           <button
             type="button"
@@ -164,7 +180,8 @@ export function Activite() {
               : (
                 <ul className={styles.liste}>
                   {etat.missions.map((ligne) => (
-                    <LigneMissionAffichee key={ligne.mission.id} ligne={ligne} />
+                    <LigneMissionAffichee key={ligne.mission.id} ligne={ligne}
+                      onOuvrir={() => setPanneau({ type: 'mission', id: ligne.mission.id })} />
                   ))}
                 </ul>
               )}
@@ -172,6 +189,48 @@ export function Activite() {
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="clients" actif={section === 'clients'}>
+          <section className={styles.carte} aria-labelledby={`${idGroupe}-carnet`}>
+            <h2 id={`${idGroupe}-carnet`} className={styles.titreCarte}>
+              Carnet
+              <Info libelle="Pourquoi le pays du client compte">
+                Une prestation vendue à un professionnel d’un autre État membre
+                doit figurer dans la déclaration européenne de services, dès le
+                premier euro et même en franchise en base. Sans le pays et le
+                numéro de TVA du client, cette obligation reste invisible.
+              </Info>
+            </h2>
+            {faits.clients.length === 0
+              ? <p className={styles.vide}>Aucun client enregistré.</p>
+              : (
+                <ul className={styles.liste}>
+                  {faits.clients.map((c) => (
+                    <li key={c.id} className={styles.ligneListe}>
+                      <button type="button" className={styles.ouvrir}
+                        onClick={() => setPanneau({ type: 'client', id: c.id })}>
+                        <span className={styles.ligneTitre}>
+                          <span className={styles.ligneLibelle}>{c.nom}</span>
+                          <span className={styles.ligneMontant}>
+                            {c.delaiPaiementJours} j
+                          </span>
+                        </span>
+                        <span className={styles.ligneMeta}>
+                          <span>{libellePays(c.pays)}</span>
+                          {c.pays !== '' && c.pays.toUpperCase() !== 'FR' && (
+                            <>
+                              <span aria-hidden="true">·</span>
+                              <span className={c.tvaIntracom === '' ? styles.attention : undefined}>
+                                {c.tvaIntracom === '' ? 'n° de TVA manquant' : c.tvaIntracom}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+          </section>
+
           <section className={styles.carte} aria-labelledby={`${idGroupe}-delais`}>
             <h2 id={`${idGroupe}-delais`} className={styles.titreCarte}>
               Délai de paiement observé
@@ -224,9 +283,35 @@ export function Activite() {
           </section>
         </PanneauOnglet>
       </div>
+
+      <Sheet
+        ouvert={panneau.type === 'client'}
+        titre={panneau.type === 'client' && panneau.id !== null ? 'Modifier le client' : 'Nouveau client'}
+        onFermer={() => setPanneau({ type: 'ferme' })}
+      >
+        {panneau.type === 'client' && (
+          <FormulaireClient id={panneau.id} onFini={() => setPanneau({ type: 'ferme' })} />
+        )}
+      </Sheet>
+
+      <Sheet
+        ouvert={panneau.type === 'mission'}
+        titre={panneau.type === 'mission' && panneau.id !== null ? 'Modifier la mission' : 'Nouvelle mission'}
+        onFermer={() => setPanneau({ type: 'ferme' })}
+      >
+        {panneau.type === 'mission' && (
+          <FormulaireMission id={panneau.id} onFini={() => setPanneau({ type: 'ferme' })} />
+        )}
+      </Sheet>
     </>
   );
 }
+
+/** Ce qu'un panneau latéral affiche. `id` à `null` pour une création. */
+type Panneau =
+  | { readonly type: 'ferme' }
+  | { readonly type: 'client'; readonly id: string | null }
+  | { readonly type: 'mission'; readonly id: string | null };
 
 /* ─────────────────────────────────────────────────────────────────────────
    Calendrier
@@ -318,10 +403,13 @@ function classeNature(nature: NatureJour): string {
    Missions
    ───────────────────────────────────────────────────────────────────────── */
 
-function LigneMissionAffichee({ ligne }: { ligne: LigneMission }) {
+function LigneMissionAffichee(
+  { ligne, onOuvrir }: { ligne: LigneMission; onOuvrir: () => void }
+) {
   const { mission } = ligne;
   return (
     <li className={styles.ligneListe}>
+      <button type="button" className={styles.ouvrir} onClick={onOuvrir}>
       <span className={styles.ligneTitre}>
         <span className={styles.ligneLibelle}>
           {mission.description || 'Mission sans description'}
@@ -344,15 +432,259 @@ function LigneMissionAffichee({ ligne }: { ligne: LigneMission }) {
           </>
         )}
       </span>
+      </button>
     </li>
   );
 }
 
-function libelleStatut(statut: 'active' | 'terminee' | 'prospect'): string {
+/* ─────────────────────────────────────────────────────────────────────────
+   Saisie du carnet
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Saisie d'un client.
+ *
+ * Le pays et le numéro de TVA sont ici parce qu'ils commandent une obligation
+ * déclarative : sans eux, une prestation vendue dans l'Union reste invisible à
+ * la déclaration européenne de services. L'écran le dit, plutôt que de les
+ * présenter comme des champs d'agrément.
+ *
+ * Renommer un client propage le nouveau nom sur ses missions et ses recettes.
+ * Le magasin s'en charge en une seule écriture ; l'écran n'a pas à le savoir,
+ * mais l'utilisateur si — d'où l'avertissement.
+ */
+function FormulaireClient(
+  { id, onFini }: { id: string | null; onFini: () => void }
+) {
+  const clients = useFaits((e) => e.faits.clients);
+  const ajouter = useFaits((e) => e.ajouterClient);
+  const modifier = useFaits((e) => e.modifierClient);
+  const supprimer = useFaits((e) => e.supprimerClient);
+  const idChamp = useId();
+
+  const existant = id === null ? undefined : clients.find((c) => c.id === id);
+  const [saisie, setSaisie] = useState<Omit<Client, 'id'>>(() => ({
+    nom: existant?.nom ?? '',
+    adresse: existant?.adresse ?? '',
+    siret: existant?.siret ?? '',
+    email: existant?.email ?? '',
+    delaiPaiementJours: existant?.delaiPaiementJours ?? 30,
+    pays: existant?.pays ?? '',
+    tvaIntracom: existant?.tvaIntracom ?? ''
+  }));
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  const horsFrance = saisie.pays.trim() !== '' && saisie.pays.trim().toUpperCase() !== 'FR';
+
+  function soumettre(evenement: React.FormEvent): void {
+    evenement.preventDefault();
+    const refus = id === null ? ajouter(saisie) : modifier(id, saisie);
+    if (refus !== null) { setErreur(refus); return; }
+    onFini();
+  }
+
+  return (
+    <form className={styles.formulaire} onSubmit={soumettre}>
+      <Champ id={`${idChamp}-nom`} libelle="Nom">
+        <input id={`${idChamp}-nom`} value={saisie.nom} required
+          onChange={(e) => setSaisie({ ...saisie, nom: e.target.value })} />
+      </Champ>
+
+      {existant !== undefined && saisie.nom.trim() !== existant.nom && (
+        <p className={styles.avertissement}>
+          Le nom rattache les missions et les recettes&nbsp;: le renommer les
+          mettra à jour en même temps.
+        </p>
+      )}
+
+      <Champ id={`${idChamp}-pays`} libelle="Pays (code à deux lettres)"
+        aide="Vide ou FR pour un client français. Un autre État membre déclenche la DES.">
+        <input id={`${idChamp}-pays`} value={saisie.pays} maxLength={2}
+          onChange={(e) => setSaisie({ ...saisie, pays: e.target.value.toUpperCase() })} />
+      </Champ>
+
+      {horsFrance && (
+        <Champ id={`${idChamp}-intracom`} libelle="N° de TVA intracommunautaire"
+          aide="Obligatoire sur la déclaration européenne de services : sans lui, la ligne ne peut pas être déposée.">
+          <input id={`${idChamp}-intracom`} value={saisie.tvaIntracom}
+            onChange={(e) => setSaisie({ ...saisie, tvaIntracom: e.target.value })} />
+        </Champ>
+      )}
+
+      <Champ id={`${idChamp}-delai`} libelle="Délai de paiement (jours)">
+        <input id={`${idChamp}-delai`} inputMode="numeric"
+          value={String(saisie.delaiPaiementJours)}
+          onChange={(e) => setSaisie({
+            ...saisie,
+            delaiPaiementJours: Math.max(0, Number.parseInt(e.target.value, 10) || 0)
+          })} />
+      </Champ>
+
+      <Champ id={`${idChamp}-email`} libelle="Courriel">
+        <input id={`${idChamp}-email`} type="email" value={saisie.email}
+          onChange={(e) => setSaisie({ ...saisie, email: e.target.value })} />
+      </Champ>
+
+      <Champ id={`${idChamp}-adresse`} libelle="Adresse">
+        <input id={`${idChamp}-adresse`} value={saisie.adresse}
+          onChange={(e) => setSaisie({ ...saisie, adresse: e.target.value })} />
+      </Champ>
+
+      <Champ id={`${idChamp}-siret`} libelle="SIRET ou identifiant">
+        <input id={`${idChamp}-siret`} value={saisie.siret}
+          onChange={(e) => setSaisie({ ...saisie, siret: e.target.value })} />
+      </Champ>
+
+      {erreur !== null && <p role="alert" className={styles.echec}>{erreur}</p>}
+
+      <button type="submit" className={styles.actionPrincipale}>
+        {id === null ? 'Ajouter le client' : 'Enregistrer'}
+      </button>
+
+      {existant !== undefined && (
+        <button type="button" className={styles.supprimer}
+          onClick={() => {
+            const refus = supprimer(existant.id);
+            if (refus !== null) setErreur(refus); else onFini();
+          }}>
+          Supprimer ce client
+        </button>
+      )}
+    </form>
+  );
+}
+
+/** Saisie d'une mission. Le TJM sert à convertir le facturé en jours. */
+function FormulaireMission(
+  { id, onFini }: { id: string | null; onFini: () => void }
+) {
+  const faits = useFaits((e) => e.faits);
+  const ajouter = useFaits((e) => e.ajouterMission);
+  const modifier = useFaits((e) => e.modifierMission);
+  const supprimer = useFaits((e) => e.supprimerMission);
+  const idChamp = useId();
+
+  const existante = id === null ? undefined : faits.missions.find((m) => m.id === id);
+  const [saisie, setSaisie] = useState<Omit<Mission, 'id'>>(() => ({
+    clientId: existante?.clientId ?? null,
+    clientNom: existante?.clientNom ?? '',
+    description: existante?.description ?? '',
+    tjm: existante?.tjm ?? euros(0),
+    debut: existante?.debut ?? null,
+    fin: existante?.fin ?? null,
+    statut: existante?.statut ?? 'active'
+  }));
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  function soumettre(evenement: React.FormEvent): void {
+    evenement.preventDefault();
+    if (id === null) ajouter(saisie); else modifier(id, saisie);
+    onFini();
+  }
+
+  const dateOuVide = (v: string) =>
+    (/^\d{4}-\d{2}-\d{2}$/.test(v) ? dateISO(v) : null);
+
+  return (
+    <form className={styles.formulaire} onSubmit={soumettre}>
+      <Champ id={`${idChamp}-client`} libelle="Client"
+        aide={faits.clients.length === 0 ? 'Aucun client au carnet : le nom sera conservé tel quel.' : undefined}>
+        <input id={`${idChamp}-client`} value={saisie.clientNom} required
+          list={`${idChamp}-liste-clients`}
+          onChange={(e) => setSaisie({ ...saisie, clientNom: e.target.value })} />
+      </Champ>
+      {/* Une liste de suggestions plutôt qu'un menu fermé : une mission peut
+          concerner un client pas encore au carnet, et forcer sa création
+          d'abord ferait perdre la saisie en cours. */}
+      <datalist id={`${idChamp}-liste-clients`}>
+        {faits.clients.map((c) => <option key={c.id} value={c.nom} />)}
+      </datalist>
+
+      <Champ id={`${idChamp}-description`} libelle="Description">
+        <input id={`${idChamp}-description`} value={saisie.description}
+          onChange={(e) => setSaisie({ ...saisie, description: e.target.value })} />
+      </Champ>
+
+      <Champ id={`${idChamp}-tjm`} libelle="Tarif journalier (€)"
+        aide="Sert à convertir le facturé en équivalent-jours, donc à calculer l’occupation.">
+        <input id={`${idChamp}-tjm`} inputMode="decimal" value={String(saisie.tjm)}
+          onChange={(e) => setSaisie({
+            ...saisie,
+            tjm: euros(Number.parseFloat(e.target.value.replace(',', '.')) || 0)
+          })} />
+      </Champ>
+
+      <Champ id={`${idChamp}-debut`} libelle="Début">
+        <input id={`${idChamp}-debut`} type="date" value={saisie.debut ?? ''}
+          onChange={(e) => setSaisie({ ...saisie, debut: dateOuVide(e.target.value) })} />
+      </Champ>
+
+      <Champ id={`${idChamp}-fin`} libelle="Fin">
+        <input id={`${idChamp}-fin`} type="date" value={saisie.fin ?? ''}
+          onChange={(e) => setSaisie({ ...saisie, fin: dateOuVide(e.target.value) })} />
+      </Champ>
+
+      <Champ id={`${idChamp}-statut`} libelle="Statut">
+        <select id={`${idChamp}-statut`} value={saisie.statut}
+          onChange={(e) => setSaisie({ ...saisie, statut: e.target.value as Mission['statut'] })}>
+          <option value="active">En cours</option>
+          <option value="prospect">Prospect</option>
+          <option value="terminee">Terminée</option>
+          <option value="perdue">Perdue</option>
+        </select>
+      </Champ>
+
+      {erreur !== null && <p role="alert" className={styles.echec}>{erreur}</p>}
+
+      <button type="submit" className={styles.actionPrincipale}>
+        {id === null ? 'Ajouter la mission' : 'Enregistrer'}
+      </button>
+
+      {existante !== undefined && (
+        <button type="button" className={styles.supprimer}
+          onClick={() => {
+            const refus = supprimer(existante.id);
+            if (refus !== null) setErreur(refus); else onFini();
+          }}>
+          Supprimer cette mission
+        </button>
+      )}
+    </form>
+  );
+}
+
+function Champ(
+  { id, libelle, aide, children }: {
+    id: string; libelle: string; aide?: string | undefined; children: React.ReactNode;
+  }
+) {
+  return (
+    <p className={styles.champ}>
+      <label htmlFor={id}>{libelle}</label>
+      {children}
+      {aide !== undefined && <span className={styles.aide}>{aide}</span>}
+    </p>
+  );
+}
+
+/** Le pays en clair. Un code à deux lettres ne se lit pas d'un coup d'œil. */
+function libellePays(code: string): string {
+  const propre = code.trim().toUpperCase();
+  if (propre === '' || propre === 'FR') return 'France';
+  try {
+    const nom = new Intl.DisplayNames(['fr'], { type: 'region' }).of(propre);
+    return nom ?? propre;
+  } catch {
+    return propre;
+  }
+}
+
+function libelleStatut(statut: Mission['statut']): string {
   switch (statut) {
     case 'active': return 'En cours';
     case 'terminee': return 'Terminée';
     case 'prospect': return 'Prospect';
+    case 'perdue': return 'Perdue';
   }
 }
 

@@ -4,7 +4,15 @@
 **Objet** : recréer les 6 écrans du handoff design `design_handoff_freel_v1.11` dans une stack cible responsive PC + mobile, à partir de la base de code existante.
 **Méthode** : orchestration de 6 agents spécialisés. Aucun code produit à ce stade.
 
-Rapports détaillés dans [`docs/audit/`](./audit/) :
+Les neuf rapports détaillés qui ont produit cette synthèse ont été retirés du
+dépôt le 12/08/2026 : leur substance est ici, et 400 Ko d'analyses figées
+n'aidaient plus à travailler. Ils restent consultables dans l'historique git :
+
+```
+git show 9d97b6b:docs/audit/07-critique-technique.md
+```
+
+Ils portaient :
 
 | # | Rapport | Périmètre |
 |---|---|---|
