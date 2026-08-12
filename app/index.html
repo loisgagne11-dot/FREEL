@@ -21,6 +21,47 @@
         document.documentElement.setAttribute('data-theme', 'sombre');
       }
     </script>
+    <!--
+      Rattrapage d'un index.html périmé.
+
+      Les fichiers construits portent une empreinte dans leur nom. À chaque
+      déploiement, les anciens disparaissent du serveur. Un navigateur qui a
+      gardé en cache l'index.html précédent réclame alors un script qui
+      n'existe plus : la requête échoue, React ne monte jamais, et
+      l'utilisateur voit une PAGE NOIRE — sans message, sans rien à faire
+      d'autre que deviner qu'il faut vider son cache.
+
+      Le cas s'est produit en vrai le 12/08. On le rattrape ici : si le module
+      d'entrée échoue à charger, on redemande la page avec un paramètre neuf,
+      ce qui force le serveur à renvoyer un index.html frais — un simple
+      reload se contenterait de revalider, et peut resservir le même cache.
+
+      Ce paramètre sert AUSSI de garde-fou contre la boucle : il survit au
+      rechargement, donc une deuxième panne ne déclenche pas de troisième
+      tentative. Une panne réseau durable doit finir en page vide visible,
+      pas en rechargements sans fin.
+    -->
+    <script>
+      var FREEL_RECHARGE = 'freel-recharge';
+
+      window.addEventListener('error', function (evenement) {
+        var cible = evenement.target;
+        if (!cible || cible.tagName !== 'SCRIPT' || !cible.src) return;
+        if (location.search.indexOf(FREEL_RECHARGE) !== -1) return;
+        location.replace(
+          location.pathname + '?' + FREEL_RECHARGE + '=' + Date.now() + location.hash
+        );
+      }, true); // en capture : les erreurs de chargement ne remontent pas.
+
+      // La page repartie, le paramètre n'a plus d'utilité : on le retire de la
+      // barre d'adresse pour qu'il ne soit pas mis en favori ni partagé.
+      window.addEventListener('load', function () {
+        if (location.search.indexOf(FREEL_RECHARGE) === -1) return;
+        try {
+          history.replaceState(null, '', location.pathname + location.hash);
+        } catch (e) { /* sans effet sur le fonctionnement */ }
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
