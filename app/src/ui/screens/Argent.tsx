@@ -5,6 +5,7 @@ import type { Mois } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Info } from '../components/Info';
+import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
@@ -207,7 +208,12 @@ function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
         </h2>
 
         {etat.ecritures.length === 0
-          ? <p className={styles.vide}>Aucun encaissement enregistré.</p>
+          ? (
+            <Vide
+              message="Aucun encaissement enregistré. Le livre des recettes se remplit quand une facture émise est marquée encaissée."
+              action={<a className={styles.actionPrincipale} href="#/facture">Émettre une facture</a>}
+            />
+          )
           : (
             <ul className={styles.liste}>
               {etat.ecritures.map((e) => (

@@ -6,6 +6,7 @@ import type { DateISO, Mois } from '../../domain/types';
 import type { Client, Mission } from '../../state/schema';
 import { euros, dateISO } from '../../domain/types';
 import { Info } from '../components/Info';
+import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
 import { dateCourte, eur } from '../format';
@@ -54,13 +55,16 @@ export function Activite() {
     <>
       <header className={styles.entete}>
         <h1 className={styles.titre}>Activité</h1>
-        {section === 'missions' && (
+        {/* Liste vide : l'action vit dans l'état vide, là où le regard se
+            pose. La répéter ici donnerait deux commandes identiques à
+            quelques centimètres. */}
+        {section === 'missions' && etat.missions.length > 0 && (
           <button type="button" className={styles.actionPrincipale}
             onClick={() => setPanneau({ type: 'mission', id: null })}>
             Ajouter une mission
           </button>
         )}
-        {section === 'clients' && (
+        {section === 'clients' && faits.clients.length > 0 && (
           <button type="button" className={styles.actionPrincipale}
             onClick={() => setPanneau({ type: 'client', id: null })}>
             Ajouter un client
@@ -176,7 +180,17 @@ export function Activite() {
               </Info>
             </h2>
             {etat.missions.length === 0
-              ? <p className={styles.vide}>Aucune mission enregistrée.</p>
+              ? (
+                <Vide
+                  message="Aucune mission enregistrée. Une mission porte le tarif journalier et les dates qui alimentent le plan de charge."
+                  action={(
+                    <button type="button" className={styles.actionPrincipale}
+                      onClick={() => setPanneau({ type: 'mission', id: null })}>
+                      Ajouter une mission
+                    </button>
+                  )}
+                />
+              )
               : (
                 <ul className={styles.liste}>
                   {etat.missions.map((ligne) => (
@@ -200,7 +214,17 @@ export function Activite() {
               </Info>
             </h2>
             {faits.clients.length === 0
-              ? <p className={styles.vide}>Aucun client enregistré.</p>
+              ? (
+                <Vide
+                  message="Aucun client enregistré. Le carnet porte le pays et le numéro de TVA, sans lesquels l’obligation de déclaration européenne reste invisible."
+                  action={(
+                    <button type="button" className={styles.actionPrincipale}
+                      onClick={() => setPanneau({ type: 'client', id: null })}>
+                      Ajouter un client
+                    </button>
+                  )}
+                />
+              )
               : (
                 <ul className={styles.liste}>
                   {faits.clients.map((c) => (
