@@ -316,7 +316,22 @@ tests verts.
       le montant réellement déclaré à l'époque.
 - [x] ~~Retirer la section « Propositions Claude Code »~~ (D5) — **fait**, elle
       n'existe pas dans le nouvel écran.
-- [ ] Déclaration d'échanges de services (DES) proprement dite
+- [x] ~~Déclaration européenne de services (DES)~~ — **fait.** Un point avait
+      été mal compris dans les jalons précédents et il fallait le lever avant
+      d'écrire une ligne : **la DES est due par celui qui VEND** un service à
+      un assujetti d'un autre État membre, pas par celui qui en achète.
+      L'écran Achats détecte l'autoliquidation à l'achat, qui relève de la
+      déclaration de TVA ; la DES regarde les **recettes**.
+      · **La franchise en base n'en dispense pas**, et il n'y a aucun seuil :
+        une prestation de 50 € déclenche l'obligation.
+      · **750 € d'amende par déclaration** manquante ou inexacte. Forfaitaire :
+        le montant en jeu ne dépend pas du chiffre d'affaires mais du nombre de
+        mois oubliés. D'où le placement parmi les retards du Pilote.
+      · Le mois retenu est celui de l'**émission**, pas de l'encaissement — la
+        taxe est exigible chez le preneur à l'achèvement de la prestation. Le
+        livre des recettes et la DES ne coïncident donc pas, et l'écran le dit.
+      · Une ligne sans numéro de TVA du preneur est **bloquée** plutôt que
+        déposée : une déclaration inexacte est sanctionnée comme une absente.
 - [x] ~~Livre des recettes conforme~~ — **fait.** Le registre se tient en
       **ajout seul** : une recette encaissée ne se modifie pas et ne se
       supprime pas, elle s'annule par une écriture inverse datée du jour de la

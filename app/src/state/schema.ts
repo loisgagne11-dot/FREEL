@@ -65,6 +65,16 @@ export interface Client {
   readonly siret: string;
   readonly email: string;
   readonly delaiPaiementJours: number;
+  /**
+   * Code pays ISO à deux lettres. Vide ou `FR` pour un client français.
+   *
+   * Commande l'obligation de déclaration européenne de services : une
+   * prestation vendue à un assujetti d'un autre État membre est déclarable
+   * dès le premier euro, franchise en base comprise.
+   */
+  readonly pays: string;
+  /** Numéro de TVA intracommunautaire du client. Obligatoire sur la DES. */
+  readonly tvaIntracom: string;
 }
 
 export interface Mission {

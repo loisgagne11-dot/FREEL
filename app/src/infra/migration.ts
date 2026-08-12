@@ -300,7 +300,13 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       adresse: texte(cli['adresse']),
       siret: texte(cli['siret']),
       email: texte(cli['email']),
-      delaiPaiementJours: nombre(cli['delaiPaiement'])
+      delaiPaiementJours: nombre(cli['delaiPaiement']),
+      // L'ancien modèle ne connaissait ni pays ni numéro de TVA du client :
+      // il ne pouvait donc pas voir qu'une déclaration européenne de services
+      // était due. Les champs sont créés vides, et tout client est réputé
+      // français jusqu'à ce que l'utilisateur en décide autrement.
+      pays: texte(cli['pays']),
+      tvaIntracom: texte(cli['tvaIntracom'])
     };
   });
 
