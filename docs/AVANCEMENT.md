@@ -42,6 +42,34 @@ masquerait.
 
 ---
 
+## 0. Réécriture d'historique du 12/08/2026
+
+**Tout clone antérieur au 12/08/2026 est incompatible.** L'historique a été
+réécrit pour retirer des données personnelles présentes dans 13 à 15 commits :
+nom d'entreprise, SIRET, numéro de TVA intracommunautaire et SIREN. Les 21
+branches ont été force-poussées.
+
+Pour reprendre un clone existant :
+
+```
+git fetch origin --prune
+git checkout -B <votre-branche> origin/main
+```
+
+Ne pas tenter de fusionner l'ancien historique dans le nouveau : les commits
+n'ont plus les mêmes empreintes, et la fusion réintroduirait les données
+retirées.
+
+**Ce que la réécriture n'a pas pu faire.** GitHub conserve 250 références
+`refs/pull/N/head`, une par pull request, qu'aucun envoi ne peut supprimer.
+Les anciens commits restent donc atteignables par l'interface web d'une
+ancienne PR, ou par `git fetch origin refs/pull/N/head`. Vérifié en revanche :
+un `git clone` ordinaire ne rapporte plus aucune de ces valeurs — 737 commits,
+zéro occurrence. Une purge complète suppose une demande au support GitHub, ou
+la recréation du dépôt.
+
+---
+
 ## 1. À lire, dans cet ordre
 
 | Ordre | Document | Ce qu'il apporte |
