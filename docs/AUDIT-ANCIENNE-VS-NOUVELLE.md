@@ -18,23 +18,24 @@ recouvre : le barème est daté et versionné, le livre des recettes est
 conforme, les justificatifs ont valeur probante, l'occupation se calcule sur
 un dénominateur réel. Ce n'est pas le sujet de cet audit.
 
-Le sujet, c'est ce qu'elle **ne fait pas encore**. Sept manques, dont trois
-bloquants pour un usage quotidien :
+Le sujet, c'est ce qu'elle **ne fait pas encore**. Sept manques recensés, dont
+trois bloquants pour un usage quotidien — **le premier est corrigé depuis** :
 
 | # | Manque | Pourquoi c'est bloquant |
 |---|---|---|
-| 1 | **Aucune échéance ne peut être saisie** | Le volet « échéances émises » est câblé sur une liste vide (`etatPilote(faits)`, `echeances = []`). Impossible d'enregistrer un appel URSSAF, un avis d'impôt, une CFE. Le flux du mois n'a donc **aucune sortie** — et le « disponible » est faux dans le sens dangereux : trop haut |
+| 1 | ~~**Aucune échéance ne peut être saisie**~~ | ✅ **Corrigé le 13/08.** `echeances` est devenu un fait du schéma (v3), avec sa carte dans Argent, et `etatPilote` / `etatArgent` / `fluxDuMois` lisent désormais le compte au lieu d'une liste vide. La migration trie en prime les charges legacy : les fiscales et sociales deviennent des **échéances payées**, plus des dépenses — une cotisation n'est pas un achat |
 | 2 | **Pas de clients opérationnels par mission** | L'ancienne application porte `mission.entites[]` — plusieurs clients finaux derrière un même donneur d'ordre, chacun avec sa couleur, son contact et **son rythme hebdomadaire**, et une affectation jour par jour (`entiteByDay`). C'est exactement le cas «&nbsp;Mission via Scalian&nbsp;». La nouvelle n'a qu'un client par mission : le CRA ne peut pas être ventilé |
 | 3 | **Pas de versement de rémunération** | `versable` se calcule, mais rien ne permet d'enregistrer qu'on s'est versé la somme. Le solde ne bouge donc jamais du fait d'un versement |
 
 Les quatre autres — objectif de CA, projection de franchissement des seuils,
 import OFX, restauration d'une sauvegarde — sont réels mais pas quotidiens.
 
-Une remarque de méthode : trois de ces manques ne se voient pas en lisant le
-code, parce que le code existe. `Echeance` est un type complet, `provisions()`
-sait l'utiliser, et les tests passent. Ce qui manque, c'est le **chemin entre
-l'écran et lui** — la même famille de défaut que les quatre actions câblées ce
-matin.
+Une remarque de méthode : le manque n°1 ne se voyait pas en lisant le code,
+parce que le code existait. `Echeance` était un type complet, `provisions()`
+savait l'utiliser, et les tests passaient. Ce qui manquait, c'était le **chemin
+entre l'écran et lui** — la même famille de défaut que les quatre actions
+câblées le matin même. Un paramètre `= []` qu'aucun appelant ne renseigne est
+un trou qui ne fait échouer aucun test.
 
 ---
 
@@ -71,13 +72,14 @@ matin.
 
 | Fonction de l'ancienne | Verdict | Détail |
 |---|---|---|
-| **`getChargesData`, `showChargeModal`, `showChargePonctuelle`, `showChargeRecurrente`, `getChargeTypesList`, `updateEcheance`, `togglePaid`** | ❌ | **Manque n°1.** L'ancienne gère sept natures (URSSAF, TVA, IR, CFP, CFE, Impôt PL, Autres), ponctuelles ou récurrentes, avec un état payé. La nouvelle porte le type `Echeance` et sait le calculer — mais aucun écran ne peut en créer une, et `etatPilote(faits)` reçoit une liste vide |
+| **`getChargesData`, `showChargeModal`, `getChargeTypesList`, `updateEcheance`, `togglePaid`** | ✅ | **Corrigé le 13/08.** Carte « Échéances reçues » dans Argent : saisir, corriger, supprimer, marquer payée. Cinq natures — URSSAF, TVA, impôt, CFE, CFP. « Impôt PL » n'en est pas une : en versement libératoire les 2,2 % sont prélevés **avec** les cotisations (D2), donc c'est une échéance URSSAF. « Autres » non plus : une dépense professionnelle est une dépense, elle vit dans Achats |
+| `showChargeRecurrente` — échéance récurrente | ❌ | Chaque appel se saisit à l'unité. Un échéancier trimestriel demande donc quatre saisies par an |
 | `getAbsoluteBalance`, `showEditSoldeInitial`, `showTresoSettings` | ✅ | Solde initial et besoin mensuel saisissables (ajoutés le 13/08 — ils n'avaient **aucune interface** jusque-là) |
 | `showSalaireModal`, `computeSalaireProjections` | ❌ | **Manque n°3.** Le versable se calcule, mais rien n'enregistre le versement |
 | `setGoalCA`, `showGoalModal`, `renderGoalWidget` | ❌ | Aucun objectif de chiffre d'affaires |
 | `computeProjections`, `showProjectionAutonomieModal` | ⚠️ | L'autonomie en mois existe (`autonomieMois`) ; la projection détaillée et son écran, non |
 | `calculerRendementMensuel`, `showRendementConfig` | ❌ | Suivi de rendement / placements : absent |
-| Provisions à deux volets | 🟢 | Décision D3. Le volet 2 fonctionne ; le volet 1 est vide faute d'échéances (manque n°1) |
+| Provisions à deux volets | 🟢 | Décision D3. Les deux volets fonctionnent depuis le 13/08 |
 | Périodes déclarées | 🟢 | Ajouté le 13/08, par mois ou par trimestre selon la périodicité |
 | `showWaterfallDetail`, `showAbsoluteWaterfallDetail` | ✅ | Carte de répartition du solde |
 
@@ -148,9 +150,9 @@ matin.
 
 ## Ordre de traitement proposé
 
-1. **Les échéances** — le type existe, `provisions()` sait s'en servir, il
-   manque l'écriture et un écran. C'est le meilleur rapport valeur/effort, et
-   ça débloque le volet 1 des provisions **et** les sorties du flux du mois.
+1. ~~**Les échéances**~~ — ✅ **fait le 13/08.** Schéma v3, quatre actions de
+   magasin, carte dans Argent, tri des charges legacy à la migration. Le volet 1
+   des provisions et les sorties du flux du mois sont débloqués.
 2. **Les clients opérationnels par mission** — touche le schéma, le planning
    et le CRA. C'est le plus structurant, et c'est votre cas réel.
 3. **Le versement de rémunération** — une action, un mouvement, une ligne au

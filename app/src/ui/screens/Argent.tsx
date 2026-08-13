@@ -15,6 +15,7 @@ import { Repartition } from '../components/Repartition';
 import { Statut, statutRecette } from '../components/Statut';
 import { Vide } from '../components/Vide';
 import { useToast } from '../components/Toasts';
+import { Echeances } from '../components/Echeances';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
@@ -147,6 +148,8 @@ export function Argent() {
               </div>
             </dl>
           </section>
+
+          <Echeances />
 
           <CarteDeclarations idGroupe={idGroupe} />
         </PanneauOnglet>

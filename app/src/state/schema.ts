@@ -18,6 +18,7 @@ import type { PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import type { MouvementBancaire } from '../domain/calculs/banque';
 import type { Ajustements, Rythme } from '../domain/calculs/planning';
+import type { Echeance } from '../domain/calculs/provisions';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -31,7 +32,7 @@ import type { Ajustements, Rythme } from '../domain/calculs/planning';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 2 as const;
+export const VERSION_SCHEMA = 3 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -206,6 +207,27 @@ export interface Faits {
   readonly besoinMensuel: Euros;
   /** Mois dont la déclaration a été faite. Opère la bascule entre volets de provisions. */
   readonly periodesDeclarees: readonly Mois[];
+  /**
+   * Les échéances émises : appels de cotisations, avis d'impôt, CFE.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * CE FAIT MANQUAIT, ET SON ABSENCE FAUSSAIT TOUT VERS LE HAUT
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Les provisions se tiennent en deux volets (D3). Le premier — ce que
+   * l'URSSAF ou le fisc ont DÉJÀ appelé — se calculait sur une liste vide,
+   * parce qu'aucun écran ne pouvait en créer une. Il valait donc zéro en
+   * permanence, et le flux du mois n'avait aucune sortie.
+   *
+   * L'erreur allait dans le sens dangereux : moins de provisions, donc plus
+   * de disponible, donc plus de versable. L'application invitait à se verser
+   * de l'argent qui était déjà dû.
+   *
+   * Une échéance est un FAIT, pas une projection : elle existe parce qu'un
+   * appel est arrivé. C'est ce qui la distingue du volet 2, qui estime une
+   * dette pas encore appelée.
+   */
+  readonly echeances: readonly Echeance[];
   /** Conservé brut : la structure de l'ancienne configuration d'IR est reprise sans interprétation. */
   readonly configImpotBrute: Readonly<Record<string, unknown>>;
 }
@@ -226,7 +248,7 @@ export function faitsVides(): Faits {
     clients: [], missions: [], recettes: [], depenses: [], conges: [],
     mouvementsBancaires: [], periodesUrssafAjoutees: [],
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
-    periodesDeclarees: [], configImpotBrute: {}
+    periodesDeclarees: [], echeances: [], configImpotBrute: {}
   };
 }
 

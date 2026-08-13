@@ -96,6 +96,16 @@ function bundleLegacy() {
         },
         // Ni date ni mois exploitables.
         { id: 'CH4', type: 'Charge', categorie: '', description: 'Sans date', montant: 40 },
+        // Charges FISCALES ET SOCIALES : elles ne sont pas des achats et ne
+        // doivent pas atterrir dans les dépenses.
+        {
+          id: 'CH5', type: 'Charge', categorie: 'URSSAF', description: 'Cotisations T2',
+          montant: 2400, date: '2026-07-05'
+        },
+        {
+          id: 'CH6', type: 'Charge', categorie: 'CFE', description: 'Cotisation foncière',
+          montant: 510, date: '2026-12-15'
+        },
         // Pas une dépense : ne doit pas être repris comme telle.
         { id: 'SAL1', type: 'Salaire', montant: 1500, mois: '2026-06', date: '2026-06-28' }
       ],
@@ -603,5 +613,55 @@ describe('rythme et ajustements', () => {
     const sansRythme = r.faits.missions.find((x) => x.id === 'MIS1');
     expect(sansRythme?.rythmes).toEqual([]);
     expect(sansRythme?.ajustements).toEqual({});
+  });
+});
+
+/**
+ * LE TRI QUI MANQUAIT.
+ *
+ * L'ancienne application rangeait tout sous « Charge » : cotisations URSSAF,
+ * TVA reversée, avis d'impôt, CFE — et abonnements logiciels. La migration les
+ * reprenait TOUS en dépenses.
+ *
+ * Or une cotisation sociale n'est pas un achat : en micro elle n'est pas
+ * déductible, et elle ne porte aucune TVA. Les importer en dépenses gonflait
+ * l'écran Achats de lignes qui n'y ont pas leur place, et leur faisait réclamer
+ * un justificatif de TVA qu'elles n'auront jamais.
+ */
+describe('charges fiscales et sociales', () => {
+  function faits() {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    return r.faits;
+  }
+
+  it('les reprend en échéances, pas en dépenses', () => {
+    expect(faits().echeances.map((e) => e.id)).toEqual(['CH5', 'CH6']);
+    expect(faits().depenses.map((d) => d.id)).not.toContain('CH5');
+  });
+
+  it('leur donne la bonne nature', () => {
+    const [urssaf, cfe] = faits().echeances;
+    expect(urssaf?.nature).toBe('urssaf');
+    expect(cfe?.nature).toBe('cfe');
+  });
+
+  /**
+   * Elles arrivent PAYÉES : le mouvement existait parce que l'argent était
+   * sorti. Les importer « à payer » ferait provisionner une seconde fois une
+   * somme déjà retranchée du solde bancaire.
+   */
+  it('les marque payées', () => {
+    expect(faits().echeances.every((e) => e.payee)).toBe(true);
+  });
+
+  it('reprend le montant tel quel, sans TVA à isoler', () => {
+    expect(faits().echeances[0]?.montant).toBe(2400);
+  });
+
+  // Une dépense professionnelle reste une dépense : le tri porte sur la
+  // catégorie, pas sur le type de mouvement.
+  it('laisse les vraies dépenses où elles sont', () => {
+    expect(faits().depenses.map((d) => d.id)).toEqual(['CH1', 'CH2', 'CH3', 'CH4']);
   });
 });

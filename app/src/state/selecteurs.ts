@@ -257,9 +257,21 @@ export interface EtatPilote {
  * L'état de l'écran Pilote : « combien je peux me verser, et qu'est-ce qui
  * coince ». Aucun nombre n'est écrit ici : tout vient des faits et du domaine.
  */
+/**
+ * Les échéances par défaut viennent des FAITS, plus d'une liste vide.
+ *
+ * Le paramètre existait avec `= []` pour défaut, et aucun appelant ne le
+ * renseignait : le volet « échéances émises » valait donc zéro en permanence,
+ * et le flux du mois n'avait aucune sortie. L'erreur allait dans le sens
+ * dangereux — moins de provisions, donc plus de disponible, donc plus de
+ * versable. L'application invitait à se verser de l'argent déjà dû.
+ *
+ * Le paramètre reste, pour les tests qui veulent poser un jeu précis ; mais
+ * son défaut est désormais ce que porte le compte.
+ */
 export function etatPilote(
   faits: Faits,
-  echeances: readonly Echeance[] = [],
+  echeances: readonly Echeance[] = faits.echeances,
   maintenant: Date = new Date()
 ): EtatPilote {
   const m = moisCourant(maintenant);
@@ -391,9 +403,9 @@ const LIBELLE_NATURE: Readonly<Record<NatureDette, string>> = {
  */
 export function fluxDuMois(
   faits: Faits,
-  echeances: readonly Echeance[],
   m: Mois,
-  etat: EtatPilote
+  etat: EtatPilote,
+  echeances: readonly Echeance[] = faits.echeances
 ): FluxDuMois {
   const encaisseesDuMois = faits.recettes.filter(
     (r) => r.encaisseeLe !== null && r.encaisseeLe.startsWith(m)
@@ -773,7 +785,7 @@ export interface EtatSeuils {
 
 export function etatArgent(
   faits: Faits,
-  echeances: readonly Echeance[] = [],
+  echeances: readonly Echeance[] = faits.echeances,
   maintenant: Date = new Date()
 ): EtatArgent {
   const annee = maintenant.getFullYear();

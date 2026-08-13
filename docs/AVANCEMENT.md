@@ -724,6 +724,50 @@ cause.
 
 ---
 
+### Les échéances émises deviennent un fait (13/08, schéma v3)
+
+Le manque n°1 de l'audit. Le volet 1 des provisions — ce que l'URSSAF ou le
+fisc ont **déjà appelé** — se calculait sur une liste vide : le paramètre
+`echeances` de `etatPilote` avait `= []` pour défaut, et **aucun appelant ne le
+renseignait**. Il valait donc zéro en permanence, et le flux du mois n'avait
+aucune sortie.
+
+L'erreur allait dans le sens dangereux : moins de provisions ⇒ plus de
+disponible ⇒ plus de versable. **L'application invitait à se verser de l'argent
+déjà dû** — le mécanisme exact du rappel qu'on ne peut plus payer, celui
+qu'elle existe pour empêcher.
+
+- `echeances` entre au schéma (**v3**), avec `ajouterEcheance`,
+  `modifierEcheance`, `supprimerEcheance` et `marquerEcheancePayee`.
+- Carte **« Échéances reçues »** dans Argent, entre les enveloppes et les
+  périodes URSSAF — l'ordre de lecture est celui du raisonnement : le total, ce
+  qui a été appelé, puis ce qui fait basculer l'un dans l'autre.
+- Le défaut du paramètre devient `faits.echeances`. Il reste paramétrable, pour
+  les tests qui posent un jeu précis.
+- **Une échéance est un fait, pas une prévision.** Elle existe parce qu'un
+  appel est arrivé. Le volet 2 estime, lui, une dette pas encore appelée : les
+  saisir tous les deux compterait deux fois la même somme, et c'est « marquer
+  la période déclarée » qui fait passer l'une dans l'autre.
+- **Payée ne veut pas dire effacée.** Elle sort des provisions — l'argent a
+  quitté le compte, le solde le reflète déjà — mais reste dans la liste, comme
+  historique de ce qui a été appelé.
+- **La date est exigée** : sans elle, la somme pèserait sur les provisions sans
+  apparaître dans aucun mois. Invisible au flux, mais bien retranchée.
+
+**Correction de migration au passage.** L'ancienne application rangeait tout
+sous « Charge » : cotisations URSSAF, TVA reversée, avis d'impôt, CFE — et
+abonnements logiciels. La migration les reprenait **tous en dépenses**. Or une
+cotisation sociale n'est pas un achat : en micro elle n'est pas déductible, et
+elle ne porte aucune TVA. L'écran Achats se retrouvait gonflé de lignes qui
+n'y ont pas leur place, et leur réclamait un justificatif de TVA qu'elles
+n'auront jamais.
+
+Elles deviennent des **échéances payées**, ce qu'elles sont. `natureDeLaCategorie`
+fait le tri ; `verifierAbsenceDePerte` compte désormais les deux destinations,
+sans quoi chaque cotisation correctement triée aurait été signalée comme perdue.
+
+---
+
 ## 4 quinquies. Leçon du 13/08 — un test vert sur du code mort ne prouve rien
 
 `encaisserRecette` était écrite, commentée, couverte par des tests de magasin

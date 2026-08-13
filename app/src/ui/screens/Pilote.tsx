@@ -31,7 +31,7 @@ export function Pilote() {
   // Recalculé à chaque changement de faits, jamais stocké.
   const etat = useMemo(() => etatPilote(faits), [faits]);
   const sujets = useMemo(() => aTraiter(faits), [faits]);
-  const flux = useMemo(() => fluxDuMois(faits, [], mois, etat), [faits, mois, etat]);
+  const flux = useMemo(() => fluxDuMois(faits, mois, etat), [faits, mois, etat]);
 
   /**
    * Les constats de santé viennent des MÊMES sources que le reste de l'écran.
