@@ -176,6 +176,36 @@
   font-weight: 620;
 }
 
+/* ── Bascule de vue ────────────────────────────────────────────────────── */
+
+.bascule {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  margin-bottom: 12px;
+  width: fit-content;
+}
+
+.vue {
+  min-height: 38px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 100px;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.vue:hover { color: var(--text); }
+.vue:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.vueActive { background: var(--panel); color: var(--text); box-shadow: var(--sh-1); }
+
 /* ── Dépendance client ─────────────────────────────────────────────────── */
 
 .barreClients {

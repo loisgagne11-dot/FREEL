@@ -15,11 +15,14 @@
  * les emploie, et ne pèsent plus sur l'ouverture de l'application.
  */
 
-import type { Jour } from '../domain/calculs/activite';
+import type { Jour, ZoneFeries } from '../domain/calculs/activite';
+import { joursFeries } from '../domain/calculs/activite';
+import type { JourPlanifie } from '../domain/calculs/planning';
+import { planifier } from '../domain/calculs/planning';
 import { calendrierDuMois, chargeDuMois, planDeCharge } from '../domain/calculs/activite';
 import type { PlanDeCharge } from '../domain/calculs/activite';
 import { delaisParClient, type DelaiClient } from '../domain/calculs/activite';
-import type { Euros, Mois } from '../domain/types';
+import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Faits, Mission } from './schema';
 import { dateDuJour } from './selecteurs';
@@ -177,4 +180,129 @@ function lignesDeMission(faits: Faits): readonly LigneMission[] {
       resteARentrer: euros(facture - encaisse)
     };
   });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Planning de la semaine
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface JourDeLaSemaine {
+  readonly date: DateISO;
+  readonly ferie: boolean;
+  readonly weekEnd: boolean;
+  readonly conge: number;
+  /** Ce que le rythme prévoit, toutes missions confondues. */
+  readonly prevu: number;
+  /** Ce qui compte : ajustements pris en compte. */
+  readonly retenu: number;
+  /** Le détail par mission, pour savoir laquelle occupe la journée. */
+  readonly parMission: readonly {
+    readonly missionId: string;
+    readonly libelle: string;
+    readonly prevu: number;
+    readonly retenu: number;
+    readonly ajuste: boolean;
+  }[];
+}
+
+export interface PlanningSemaine {
+  /** Lundi de la semaine observée. */
+  readonly lundi: DateISO;
+  readonly jours: readonly JourDeLaSemaine[];
+  readonly totalPrevu: number;
+  readonly totalRetenu: number;
+}
+
+/** Le lundi de la semaine qui contient cette date. */
+export function lundiDeLaSemaine(date: DateISO): DateISO {
+  const d = new Date(`${date}T00:00:00Z`);
+  // `getUTCDay()` rend 0 le dimanche : on recule de 6 jours dans ce cas, pas
+  // d'un seul, sinon la semaine du dimanche commencerait le lendemain.
+  const recul = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - recul);
+  return d.toISOString().slice(0, 10) as DateISO;
+}
+
+/**
+ * Le planning d'une semaine, mission par mission.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA SEMAINE EST LA MAILLE DE LA CORRECTION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le rythme remplit le mois d'un coup ; ce qu'on corrige, on le corrige à la
+ * semaine, parce que c'est l'horizon dont on se souvient. Un écran mensuel
+ * oblige à retrouver le bon jour dans une grille de trente-et-un — et une
+ * correction qu'on renonce à faire est un CRA faux.
+ *
+ * Les congés sont personnels, pas propres à une mission : ils s'appliquent à
+ * toutes. Un jour de congé posé pendant deux missions ne se travaille pas
+ * deux fois.
+ */
+export function planningDeLaSemaine(
+  faits: Faits,
+  dansLaSemaine: DateISO,
+  zone: ZoneFeries = 'general'
+): PlanningSemaine {
+  const lundi = lundiDeLaSemaine(dansLaSemaine);
+  const dates: DateISO[] = [];
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(`${lundi}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + i);
+    dates.push(d.toISOString().slice(0, 10) as DateISO);
+  }
+
+  // Les fériés peuvent tomber sur deux années quand la semaine est à cheval
+  // sur le 31 décembre.
+  const annees = new Set(dates.map((d) => Number(d.slice(0, 4))));
+  const feries = new Set<string>();
+  for (const a of annees) for (const f of joursFeries(a, zone)) feries.add(f);
+
+  const conges: Record<string, number> = {};
+  for (const c of faits.conges) conges[c.date] = c.quotite;
+
+  const actives = faits.missions.filter((m) => m.statut === 'active' || m.statut === 'terminee');
+
+  const parMissionEtDate = actives.map((m) => ({
+    mission: m,
+    planning: planifier(dates, {
+      rythmes: m.rythmes, ajustements: m.ajustements, feries, conges
+    })
+  }));
+
+  const jours = dates.map((date, i) => {
+    const detail = parMissionEtDate
+      .map(({ mission, planning }) => {
+        const j = planning[i] as JourPlanifie;
+        return {
+          missionId: mission.id,
+          libelle: mission.description !== '' ? mission.description : mission.clientNom,
+          prevu: j.prevu,
+          retenu: j.retenu,
+          ajuste: j.ajuste
+        };
+      })
+      // Une mission qui ne prévoit rien ce jour-là n'a pas à encombrer la
+      // case : le vide se lit mieux qu'une ligne à zéro.
+      .filter((d) => d.prevu > 0 || d.retenu > 0 || d.ajuste);
+
+    const modele = (parMissionEtDate[0]?.planning[i]) as JourPlanifie | undefined;
+
+    return {
+      date,
+      ferie: feries.has(date),
+      weekEnd: modele?.weekEnd ?? false,
+      conge: conges[date] ?? 0,
+      prevu: detail.reduce((s, d) => s + d.prevu, 0),
+      retenu: detail.reduce((s, d) => s + d.retenu, 0),
+      parMission: detail
+    };
+  });
+
+  return {
+    lundi,
+    jours,
+    totalPrevu: jours.reduce((s, j) => s + j.prevu, 0),
+    totalRetenu: jours.reduce((s, j) => s + j.retenu, 0)
+  };
 }
