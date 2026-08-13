@@ -32,8 +32,9 @@ import { type DateISO, type Mois, type TypeActivite, euros, ratio } from '../dom
 import {
   CLE_INSTANTANE_AVANT_MIGRATION, CLE_STOCKAGE, VERSION_SCHEMA,
   type Client, type Conge, type Depense, type Faits, type Mission, type Recette,
-  completerFaits, entrepriseVide, faitsVides, motifRefusFaits
+  type Rythme, completerFaits, entrepriseVide, faitsVides, motifRefusFaits
 } from '../state/schema';
+import { JOURS_SEMAINE } from '../domain/calculs/planning';
 
 /** Préfixe de l'ancienne application. Ne jamais écrire dessus. */
 export const PREFIXE_LEGACY = 'freel_v50_';
@@ -331,6 +332,78 @@ function congesDesMissions(missions: readonly unknown[]): Conge[] {
 }
 
 /**
+ * Le rythme de travail, tel que l'ancienne application le décrit.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * C'EST LE FAIT QUI REMPLIT LE PLANNING
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `mission.periodes[]` porte `joursMap` — `{ lun: 1, …, ven: 0.5 }` — et un
+ * TJM propre à la plage. Sans lui, le planning de la nouvelle application
+ * resterait vide et il faudrait tout ressaisir, alors que la donnée existe.
+ *
+ * `joursSemaine` est un format plus ancien : un simple nombre de jours par
+ * semaine, sans dire lesquels. On le convertit en semaine ouvrée pleine
+ * plutôt que de le perdre — c'est faux pour un quatre-cinquièmes du mercredi,
+ * mais les ajustements sont là pour corriger, et rien ne vaut mieux que rien.
+ */
+function rythmesDeLaMission(m: Inconnu): Rythme[] {
+  const rythmes: Rythme[] = [];
+
+  for (const pBrut of tableau(m['periodes'])) {
+    const p = objet(pBrut);
+    const du = dateOuNull(p['debut']);
+    const au = dateOuNull(p['fin']);
+    if (du === null || au === null) continue;
+
+    const brut = objet(p['joursMap']);
+    const parJour: Record<string, number> = {};
+    for (const j of JOURS_SEMAINE) {
+      const q = nombre(brut[j]);
+      if (q > 0) parJour[j] = q;
+    }
+
+    // Repli sur `joursSemaine` quand `joursMap` manque.
+    if (Object.keys(parJour).length === 0 && nombre(p['joursSemaine']) > 0) {
+      for (const j of ['lun', 'mar', 'mer', 'jeu', 'ven']) parJour[j] = 1;
+    }
+
+    const tjm = nombre(p['tjm']);
+    rythmes.push({ du, au, parJour, tjm: tjm > 0 ? euros(tjm) : null });
+  }
+
+  return rythmes;
+}
+
+/**
+ * Les ajustements : ce qui a réellement été travaillé.
+ *
+ * L'ancienne application les range par mois, dans `mission.lignes[].
+ * ajustements`. Le nouveau schéma les met à plat par date : un ajustement
+ * n'appartient pas à un mois, il appartient à un jour, et les regrouper
+ * obligeait à retrouver la ligne avant de lire la valeur.
+ *
+ * Une quotité à zéro est CONSERVÉE. C'est même le cas le plus important :
+ * elle dit « ce jour-là, prévu par le rythme, je n'ai pas travaillé ». La
+ * filtrer laisserait le rythme le remettre, et le CRA facturerait un jour qui
+ * n'a pas eu lieu.
+ */
+function ajustementsDeLaMission(m: Inconnu): Record<string, number> {
+  const parDate: Record<string, number> = {};
+
+  for (const ligneBrute of tableau(m['lignes'])) {
+    const ajustements = objet(objet(ligneBrute)['ajustements']);
+    for (const [date, valeur] of Object.entries(ajustements)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      if (typeof valeur !== 'number' || !Number.isFinite(valeur)) continue;
+      parDate[date] = valeur;
+    }
+  }
+
+  return parDate;
+}
+
+/**
  * Réunit deux sources de congés sans jamais compter un jour deux fois.
  *
  * La quotité la plus forte l'emporte : si une source dit demi-journée et
@@ -486,6 +559,8 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       clientNom: nom,
       description: texte(m['description']),
       tjm: euros(nombre(m['tjm'])),
+      rythmes: rythmesDeLaMission(m),
+      ajustements: ajustementsDeLaMission(m),
       debut: dateOuNull(m['debut']),
       fin: dateOuNull(m['fin']),
       statut: statutMission(statutBrut)

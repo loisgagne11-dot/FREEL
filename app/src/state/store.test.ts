@@ -248,7 +248,7 @@ describe('carnet — clients', () => {
     const idClient = clients()[0]?.id as string;
     useFaits.getState().ajouterMission({
       clientId: null, clientNom: 'Dupont', description: 'Mission',
-      tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active'
+      tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active', rythmes: [], ajustements: {}
     });
     ajouter({ clientNom: 'Dupont' });
 
@@ -304,7 +304,7 @@ describe('carnet — missions', () => {
   const saisieMission = (clientNom: string) => ({
     clientId: null, clientNom, description: 'Mission',
     tjm: euros(400), debut: dateISO('2026-01-01'), fin: dateISO('2026-12-31'),
-    statut: 'active' as const
+    statut: 'active' as const, rythmes: [], ajustements: {}
   });
 
   // Perdre le nom couperait la mission de son chiffre d'affaires, que le nom
@@ -344,7 +344,7 @@ describe('carnet — missions', () => {
 
   it('modifie une mission', () => {
     useFaits.getState().ajouterMission(saisieMission('Dupont'));
-    useFaits.getState().modifierMission(missions()[0]?.id as string, { statut: 'terminee' });
+    useFaits.getState().modifierMission(missions()[0]?.id as string, { statut: 'terminee', rythmes: [], ajustements: {} });
     expect(missions()[0]?.statut).toBe('terminee');
   });
 });

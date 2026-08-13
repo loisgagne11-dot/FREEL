@@ -32,7 +32,7 @@ beforeEach(() => { figerHorloge(); semer(); });
 const mission = (m: Partial<Faits['missions'][number]> = {}) => ({
   id: 'mis-1', clientId: null, clientNom: 'ClientA', description: 'Mission A',
   tjm: euros(400), debut: dateISO('2026-01-05'), fin: null,
-  statut: 'active' as const, ...m
+  statut: 'active' as const, rythmes: [], ajustements: {}, ...m
 });
 
 const recette = (m: Partial<Faits['recettes'][number]> = {}) => ({

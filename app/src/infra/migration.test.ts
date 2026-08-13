@@ -54,6 +54,18 @@ function bundleLegacy() {
       {
         id: 'MIS2', client: 'ClientInconnu', description: 'Mission B', tjm: 400,
         debut: '2026-01-05', fin: null, statut: 'en_cours', factures: [],
+        // Le rythme : lundi à jeudi pleins, vendredi à mi-temps.
+        periodes: [{
+          debut: '2026-01-05', fin: '2026-12-31',
+          joursMap: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 },
+          joursSemaine: 4.5, tjm: 450
+        }],
+        // Les ajustements, rangés par mois côté legacy. Le zéro est le cas le
+        // plus important : « ce jour prévu, je n'ai pas travaillé ».
+        lignes: [
+          { ym: '2026-09', ajustements: { '2026-09-14': 0, '2026-09-15': 0.5 } },
+          { ym: '2026-10', ajustements: { '2026-10-05': 1 } }
+        ],
         // Là où l'application écrit RÉELLEMENT les congés — avec le suffixe
         // `_half` des demi-journées.
         congesDates: ['2026-09-07', '2026-09-08_half', '2026-08-10']
@@ -544,5 +556,52 @@ describe('congés des missions', () => {
     const aout = conges().filter((c) => c.date === '2026-08-10');
     expect(aout).toHaveLength(1);
     expect(aout[0]?.quotite).toBe(1);
+  });
+});
+
+/**
+ * Le rythme et les ajustements — les deux faits qui remplissent le planning.
+ *
+ * Sans eux, le planning de la nouvelle application resterait vide et il
+ * faudrait tout ressaisir, alors que la donnée existe depuis toujours dans
+ * `mission.periodes[].joursMap` et `mission.lignes[].ajustements`.
+ */
+describe('rythme et ajustements', () => {
+  const mission = () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    const m = r.faits.missions.find((x) => x.id === 'MIS2');
+    if (m === undefined) throw new Error('mission attendue');
+    return m;
+  };
+
+  it('reprend le rythme, jour de semaine par jour de semaine', () => {
+    const [rythme] = mission().rythmes;
+    expect(rythme).toMatchObject({ du: '2026-01-05', au: '2026-12-31', tjm: 450 });
+    expect(rythme?.parJour).toEqual({ lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 });
+  });
+
+  it('met les ajustements à plat, par date', () => {
+    expect(mission().ajustements).toEqual({
+      '2026-09-14': 0, '2026-09-15': 0.5, '2026-10-05': 1
+    });
+  });
+
+  /**
+   * Le zéro est le cas le plus important : il dit « ce jour-là, prévu par le
+   * rythme, je n'ai pas travaillé ». Le filtrer laisserait le rythme le
+   * remettre, et le CRA facturerait un jour qui n'a pas eu lieu.
+   */
+  it('conserve un ajustement à zéro', () => {
+    expect(mission().ajustements['2026-09-14']).toBe(0);
+  });
+
+  // Une mission sans période n'a pas de rythme : rien à inventer.
+  it('n’invente pas de rythme quand la mission n’en a pas', () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    const sansRythme = r.faits.missions.find((x) => x.id === 'MIS1');
+    expect(sansRythme?.rythmes).toEqual([]);
+    expect(sansRythme?.ajustements).toEqual({});
   });
 });
