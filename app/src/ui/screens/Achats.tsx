@@ -11,6 +11,7 @@ import {
   deposerJustificatif, stockageIndexedDB, verifierIntegrite
 } from '../../infra/justificatifs';
 import { Info } from '../components/Info';
+import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
 import { Releve } from './Releve';
@@ -83,7 +84,11 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
     <>
       <header className={styles.entete}>
         <h1 className={styles.titre}>Achats</h1>
-        {section === 'depenses' && (
+        {/* Liste vide : l'action vit dans l'état vide, au milieu de l'écran,
+            là où le regard se pose. La répéter ici donnerait deux commandes
+            identiques à quelques centimètres — une hésitation gratuite, et
+            deux cibles pour un lecteur d'écran là où il n'y a qu'une action. */}
+        {section === 'depenses' && etat.lignes.length > 0 && (
           <button
             type="button"
             className={styles.actionPrincipale}
@@ -185,11 +190,24 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
 
         {etat.lignes.length === 0
           ? (
-            <p className={styles.vide}>
-              Aucune dépense enregistrée. Les charges de l’ancienne version sont
-              reprises à la migration, toutes sans justificatif&nbsp;: l’ancien
-              modèle n’en conservait aucun.
-            </p>
+            <Vide
+              message={(
+                <>
+                  Aucune dépense enregistrée. Les charges de l’ancienne version
+                  sont reprises à la migration, toutes sans
+                  justificatif&nbsp;: l’ancien modèle n’en conservait aucun.
+                </>
+              )}
+              action={(
+                <button
+                  type="button"
+                  className={styles.actionPrincipale}
+                  onClick={() => setPanneau({ type: 'ajout' })}
+                >
+                  Ajouter une dépense
+                </button>
+              )}
+            />
           )
           : (
             <ul className={styles.liste}>

@@ -119,6 +119,9 @@ describe('factures non encaissées', () => {
 describe('livre vide', () => {
   it('le dit au lieu d’afficher une liste vide', async () => {
     await ouvrirLivre();
-    expect(screen.getByText('Aucun encaissement enregistré.')).toBeTruthy();
+    expect(screen.getByText(/Aucun encaissement enregistré/)).toBeTruthy();
+    // L'état vide donne aussi la sortie : sans elle, il constate sans dire
+    // par où commencer — et c'est le premier écran que voit un débutant.
+    expect(screen.getByRole('link', { name: 'Émettre une facture' })).toBeTruthy();
   });
 });

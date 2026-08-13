@@ -1,0 +1,22 @@
+/* État vide. Aucune couleur en dur : tout passe par les tokens, pour que les
+   4 palettes s'y appliquent comme au reste. */
+
+.vide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 0 4px;
+  min-width: 0;
+}
+
+.message {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* L'action ne se déguise pas en texte : c'est la sortie, elle doit se voir
+   sans être plus lourde que le contenu qu'elle remplace. */
+.action { display: flex; flex-wrap: wrap; gap: 8px; }
