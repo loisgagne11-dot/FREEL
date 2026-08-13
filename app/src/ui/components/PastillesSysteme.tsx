@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import {
   type Theme, appliquerTheme, lireTheme, themesDisponibles
 } from '../theme';
+import { appliquerConfidentialite, lireConfidentialite } from '../confidentialite';
 import styles from './PastillesSysteme.module.css';
 
 /**
@@ -32,6 +33,7 @@ import styles from './PastillesSysteme.module.css';
  */
 export function PastillesSysteme() {
   const [theme, setTheme] = useState<Theme>(() => lireTheme());
+  const [confidentiel, setConfidentiel] = useState<boolean>(() => lireConfidentialite());
   const idChamp = useId();
 
   function choisir(valeur: Theme): void {
@@ -39,8 +41,30 @@ export function PastillesSysteme() {
     setTheme(valeur);
   }
 
+  function basculerConfidentialite(): void {
+    const actif = !confidentiel;
+    appliquerConfidentialite(actif);
+    setConfidentiel(actif);
+  }
+
   return (
     <div className={styles.pastilles}>
+      {/* Le libellé du bouton dit l'ACTION, pas l'état : « masquer les
+          montants » indique ce qui va se passer, là où « confidentialité »
+          laisse deviner dans quel sens on bascule. `aria-pressed` porte
+          l'état, qui est le rôle de l'attribut. */}
+      <button
+        type="button"
+        className={`${styles.bouton} ${confidentiel ? styles.actif : ''}`}
+        aria-pressed={confidentiel}
+        onClick={basculerConfidentialite}
+      >
+        <span aria-hidden="true">{confidentiel ? '🙈' : '👁'}</span>
+        <span className={styles.libelleBouton}>
+          {confidentiel ? 'Montants masqués' : 'Masquer les montants'}
+        </span>
+      </button>
+
       <div className={styles.pastille}>
         {/* Le libellé disparaît sous 1320 px (exigence de la cible), mais
             reste dans l'arbre d'accessibilité : un `display: none` priverait

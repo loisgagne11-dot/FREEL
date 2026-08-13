@@ -2,6 +2,7 @@ import type { FluxDuMois, LigneFlux } from '../../state/selecteurs';
 import { Info } from './Info';
 import { dateCourte, eur } from '../format';
 import styles from './FluxCard.module.css';
+import { Montant } from './Montant';
 
 /**
  * « Le flux du mois » — la carte centrale du Pilote dans la spec de design.
@@ -60,11 +61,11 @@ export function FluxCard(
         <div className={styles.colonne}>
           <span className={styles.libelle}>Entrées</span>
           <span className={`${styles.montant} ${styles.entree}`}>
-            {eur(flux.entrees.encaisse)}
+            <Montant>{eur(flux.entrees.encaisse)}</Montant>
           </span>
           <p className={styles.note}>
             {flux.entrees.enAttente > 0
-              ? <>{eur(flux.entrees.enAttente)} encore en attente</>
+              ? <><Montant>{eur(flux.entrees.enAttente)}</Montant> encore en attente</>
               : 'Rien en attente de règlement.'}
           </p>
           <Detail titre="Voir les encaissements" lignes={flux.entrees.lignes} />
@@ -73,14 +74,14 @@ export function FluxCard(
         <div className={styles.colonne}>
           <span className={styles.libelle}>Sorties</span>
           <span className={`${styles.montant} ${styles.sortie}`}>
-            {eur(flux.sorties.total)}
+            <Montant>{eur(flux.sorties.total)}</Montant>
           </span>
           <p className={styles.note}>
             {flux.sorties.total > 0
               ? (
                 <>
-                  {eur(flux.sorties.aProvisionner)} à provisionner sur les
-                  recettes encaissées, {eur(flux.sorties.constate)} déjà
+                  <Montant>{eur(flux.sorties.aProvisionner)}</Montant> à provisionner sur les
+                  recettes encaissées, <Montant>{eur(flux.sorties.constate)}</Montant> déjà
                   constaté.
                 </>
               )
@@ -91,9 +92,9 @@ export function FluxCard(
 
         <div className={styles.colonne}>
           <span className={styles.libelle}>Rémunération</span>
-          <span className={styles.montant}>{eur(flux.remuneration.versable)}</span>
+          <span className={styles.montant}><Montant>{eur(flux.remuneration.versable)}</Montant></span>
           <p className={styles.note}>
-            Hors provision&nbsp;: {eur(flux.remuneration.provisions)} restent de
+            Hors provision&nbsp;: <Montant>{eur(flux.remuneration.provisions)}</Montant> restent de
             côté pour les échéances à venir.
           </p>
           {versementPossible
@@ -129,7 +130,7 @@ function Detail({ titre, lignes }: { titre: string; lignes: readonly LigneFlux[]
               {l.date !== null && <> · {dateCourte(l.date)}</>}
               {!l.regle && <> · en attente</>}
             </span>
-            <span className={styles.ligneMontant}>{eur(l.montant)}</span>
+            <span className={styles.ligneMontant}><Montant>{eur(l.montant)}</Montant></span>
           </li>
         ))}
       </ul>

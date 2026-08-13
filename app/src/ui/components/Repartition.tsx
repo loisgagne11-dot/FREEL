@@ -1,3 +1,4 @@
+import { Montant } from './Montant';
 import styles from './Repartition.module.css';
 
 export interface PartSolde {
@@ -71,14 +72,14 @@ export function Repartition(
           <li key={p.libelle} className={styles.entree}>
             <span className={`${styles.pastille} ${styles[p.ton]}`} aria-hidden="true" />
             <span className={styles.libelle}>{p.libelle}</span>
-            <span className={styles.montant}>{montant(p.montant)}</span>
+            <span className={styles.montant}><Montant>{montant(p.montant)}</Montant></span>
           </li>
         ))}
       </ul>
 
       {deficit > 0 && (
         <p className={styles.deficit}>
-          Il manque <strong>{montant(deficit)}</strong> pour couvrir les
+          Il manque <strong><Montant>{montant(deficit)}</Montant></strong> pour couvrir les
           provisions&nbsp;: une partie de l’argent dû a déjà été dépensée.
         </p>
       )}

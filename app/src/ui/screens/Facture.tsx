@@ -8,6 +8,7 @@ import { dateISO, euros, ratio } from '../../domain/types';
 import { Info } from '../components/Info';
 import { dateCourte, eurExact } from '../format';
 import styles from './Facture.module.css';
+import { Montant } from '../components/Montant';
 
 /**
  * Émission d'une facture.
@@ -170,7 +171,7 @@ export function Facture() {
             {etat.manques.length > 1 ? 's' : ''} obligatoire
             {etat.manques.length > 1 ? 's' : ''} manque
             {etat.manques.length > 1 ? 'nt' : ''}
-            {etat.amendeEncourue > 0 && <> — jusqu’à {eurExact(etat.amendeEncourue)} d’amende</>}.
+            {etat.amendeEncourue > 0 && <> — jusqu’à <Montant>{eurExact(etat.amendeEncourue)}</Montant> d’amende</>}.
             <Info libelle="Pourquoi l’émission est bloquée">
               Une mention absente expose à 15 € d’amende par mention et par
               facture, mais surtout donne à un client de mauvaise foi un motif
@@ -299,17 +300,17 @@ function Totaux({ etat }: { etat: ReturnType<typeof etatFacture> }) {
     <dl className={styles.detail}>
       <div className={styles.ligne}>
         <dt>Total HT</dt>
-        <dd>{eurExact(t.totalHt)}</dd>
+        <dd><Montant>{eurExact(t.totalHt)}</Montant></dd>
       </div>
       {t.parTaux.map((g) => (
         <div key={g.taux} className={styles.ligne}>
-          <dt>TVA {(g.taux * 100).toFixed(1).replace('.', ',')} % sur {eurExact(g.base)}</dt>
-          <dd>{eurExact(g.tva)}</dd>
+          <dt>TVA {(g.taux * 100).toFixed(1).replace('.', ',')} % sur <Montant>{eurExact(g.base)}</Montant></dt>
+          <dd><Montant>{eurExact(g.tva)}</Montant></dd>
         </div>
       ))}
       <div className={`${styles.ligne} ${styles.total}`}>
         <dt>Total {t.totalTva > 0 ? 'TTC' : 'à payer'}</dt>
-        <dd>{eurExact(t.totalTtc)}</dd>
+        <dd><Montant>{eurExact(t.totalTtc)}</Montant></dd>
       </div>
       <div className={styles.ligne}>
         <dt>Échéance</dt>
@@ -380,11 +381,11 @@ function DocumentFacture({ etat }: { etat: ReturnType<typeof etatFacture> }) {
             <tr key={i}>
               <td>{l.designation}</td>
               <td>{l.quantite}</td>
-              <td>{eurExact(l.prixUnitaireHt)}</td>
+              <td><Montant>{eurExact(l.prixUnitaireHt)}</Montant></td>
               {t.totalTva > 0 && (
                 <td>{(l.tauxTva * 100).toFixed(1).replace('.', ',')} %</td>
               )}
-              <td>{eurExact(euros(l.quantite * l.prixUnitaireHt))}</td>
+              <td><Montant>{eurExact(euros(l.quantite * l.prixUnitaireHt))}</Montant></td>
             </tr>
           ))}
         </tbody>

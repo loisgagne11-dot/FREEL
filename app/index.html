@@ -17,6 +17,13 @@
     <script>
       try {
         document.documentElement.setAttribute('data-theme', localStorage.getItem('freel-v111-theme') || 'sombre');
+        // Le mode confidentialité DOIT être posé ici aussi. Attendre le
+        // montage de React laisserait les montants s'afficher en clair le
+        // temps d'un rendu — ce qui suffit à trahir la promesse quand on
+        // partage son écran.
+        if (localStorage.getItem('freel.confidentialite.v1') === 'oui') {
+          document.documentElement.setAttribute('data-confidentiel', 'oui');
+        }
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'sombre');
       }

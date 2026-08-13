@@ -22,6 +22,7 @@ import { Sheet } from '../components/Sheet';
 import { Releve } from './Releve';
 import { dateCourte, eur, eurExact } from '../format';
 import styles from './Achats.module.css';
+import { Montant } from '../components/Montant';
 
 /**
  * Écran Achats — dépenses, justificatifs et TVA déductible.
@@ -163,7 +164,7 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
         <p className={`${styles.bandeau} ${styles.bandeauDanger}`} role="status">
           <strong>{etat.resume.sansJustificatif}</strong>{' '}
           {etat.resume.sansJustificatif > 1 ? 'dépenses sont' : 'dépense est'} sans
-          justificatif, soit <strong>{eur(etat.resume.tvaPerdueFauteDePiece)}</strong> de
+          justificatif, soit <strong><Montant>{eur(etat.resume.tvaPerdueFauteDePiece)}</Montant></strong> de
           TVA non récupérable.
           <Info libelle="Pourquoi une pièce est indispensable">
             Une TVA déduite sans facture est un rappel assuré en contrôle. Une
@@ -176,7 +177,7 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
 
       {etat.resume.tvaAAutoliquider > 0 && (
         <p className={`${styles.bandeau} ${styles.bandeauAttention}`} role="status">
-          <strong>{eur(etat.resume.tvaAAutoliquider)}</strong> de TVA à autoliquider
+          <strong><Montant>{eur(etat.resume.tvaAAutoliquider)}</Montant></strong> de TVA à autoliquider
           sur des achats hors de France.
           <Info libelle="Explication de l’autoliquidation">
             Sur un service acheté à un prestataire étranger, c’est l’acheteur
@@ -290,7 +291,7 @@ function LigneListe({ ligne, onOuvrir }: { ligne: LigneDepense; onOuvrir: () => 
       <button type="button" className={styles.ouvrir} onClick={onOuvrir}>
         <span className={styles.ligneTitre}>
           <span className={styles.ligneLibelle}>{depense.libelle || 'Sans libellé'}</span>
-          <span className={styles.ligneMontant}>{eur(depense.montantTtc)}</span>
+          <span className={styles.ligneMontant}><Montant>{eur(depense.montantTtc)}</Montant></span>
         </span>
         <span className={styles.ligneMeta}>
           <span>{depense.fournisseur || 'Fournisseur non renseigné'}</span>
@@ -417,7 +418,7 @@ function DetailDepense(
         {tva.motifNonRecuperable === null
           ? (
             <p className={styles.verdictAccent}>
-              {eurExact(tva.recuperable)} récupérables.
+              <Montant>{eurExact(tva.recuperable)}</Montant> récupérables.
             </p>
           )
           : (
@@ -425,7 +426,7 @@ function DetailDepense(
               <p className={styles.verdict}>{libelleMotif(tva.motifNonRecuperable)}</p>
               {tva.aAutoliquider > 0 && (
                 <p className={styles.verdictAttention}>
-                  {eurExact(tva.aAutoliquider)} à autoliquider et à déclarer.
+                  <Montant>{eurExact(tva.aAutoliquider)}</Montant> à autoliquider et à déclarer.
                 </p>
               )}
             </>
@@ -642,7 +643,7 @@ function Fait({ terme, valeur }: { terme: string; valeur: string }) {
   return (
     <div className={styles.fait}>
       <dt>{terme}</dt>
-      <dd>{valeur}</dd>
+      <dd><Montant>{valeur}</Montant></dd>
     </div>
   );
 }
@@ -660,7 +661,7 @@ function Chiffre(
   return (
     <div className={styles.chiffre}>
       <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classe}`}>{valeur}</span>
+      <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
     </div>
   );
 }

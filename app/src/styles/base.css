@@ -92,3 +92,44 @@ a:hover {
   color: var(--muted-2);
   font-weight: 600;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Mode confidentialité
+   ─────────────────────────────────────────────────────────────────────────
+
+   Flouter les montants pour partager son écran, travailler dans un train, ou
+   montrer l'application sans exposer son chiffre d'affaires.
+
+   Le flou est posé ici, dans la feuille GLOBALE, et non dans un module CSS :
+   l'attribut vit sur <html>, et un nom de classe haché à la compilation ne
+   pourrait pas être atteint depuis la racine.
+
+   Le survol démasque localement. C'est délibéré : celui qui tient la souris
+   est celui qui regarde son propre écran, et il doit pouvoir vérifier un
+   chiffre sans tout révéler. Au clavier, le focus fait le même travail. */
+
+[data-confidentiel='oui'] [data-montant] {
+  filter: blur(6px);
+  /* Le texte flouté reste sélectionnable, donc copiable en clair. On le
+     neutralise : un montant qu'on croit masqué et qui part dans un
+     copier-coller trahit la promesse. */
+  user-select: none;
+  transition: filter 120ms ease-out;
+}
+
+[data-confidentiel='oui'] [data-montant]:hover,
+[data-confidentiel='oui'] [data-montant]:focus-within {
+  filter: none;
+  user-select: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-confidentiel='oui'] [data-montant] { transition: none; }
+}
+
+/* À l'impression, le flou n'a plus de sens : on imprime pour archiver ou pour
+   transmettre à son comptable, et un document dont les montants sont floutés
+   ne sert à rien. */
+@media print {
+  [data-confidentiel='oui'] [data-montant] { filter: none; user-select: auto; }
+}

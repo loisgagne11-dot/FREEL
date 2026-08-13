@@ -13,11 +13,12 @@
     "test:watch": "vitest",
     "verifier:responsive": "node scripts/verifier-responsive.mjs",
     "verifier:responsive:captures": "node scripts/verifier-responsive.mjs --captures",
-    "verifier": "npm run typecheck && npm test && npm run build && npm run verifier:budget && npm run verifier:responsive && npm run verifier:index && npm run verifier:migration && npm run verifier:fuites",
+    "verifier": "npm run typecheck && npm test && npm run build && npm run verifier:budget && npm run verifier:responsive && npm run verifier:index && npm run verifier:confidentialite && npm run verifier:migration && npm run verifier:fuites",
     "verifier:index": "node scripts/verifier-index-perime.mjs",
     "verifier:fuites": "node ../tests/smoke-test.js",
     "verifier:budget": "node scripts/verifier-budget.mjs",
-    "verifier:migration": "node scripts/verifier-migration-bout-en-bout.mjs"
+    "verifier:migration": "node scripts/verifier-migration-bout-en-bout.mjs",
+    "verifier:confidentialite": "node scripts/verifier-confidentialite.mjs"
   },
   "dependencies": {
     "react": "^19.2.0",

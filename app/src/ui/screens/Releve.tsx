@@ -6,6 +6,7 @@ import { decoderFichier, lireReleve, type RapportLecture } from '../../infra/rel
 import { Info } from '../components/Info';
 import { dateCourte, eur } from '../format';
 import styles from './Releve.module.css';
+import { Montant } from '../components/Montant';
 
 /**
  * Relevé bancaire — import et rapprochement.
@@ -214,7 +215,7 @@ function LigneMouvement(
       <span className={styles.ligneTitre}>
         <span className={styles.ligneLibelle}>{mouvement.libelle || 'Sans libellé'}</span>
         <span className={`${styles.ligneMontant} ${debit ? styles.debit : styles.credit}`}>
-          {eur(mouvement.montant)}
+          <Montant>{eur(mouvement.montant)}</Montant>
         </span>
       </span>
       <span className={styles.ligneMeta}>
@@ -302,7 +303,7 @@ function Chiffre(
   return (
     <div className={styles.chiffre}>
       <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classe}`}>{valeur}</span>
+      <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
     </div>
   );
 }
