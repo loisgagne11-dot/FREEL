@@ -8,6 +8,7 @@ import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
+import { Repartition } from '../components/Repartition';
 import { Statut, statutRecette } from '../components/Statut';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -76,6 +77,42 @@ export function Argent() {
             />
             <Chiffre libelle="Versable" valeur={eur(etat.tresorerie.versable)} ton="accent" />
           </div>
+
+          <section className={styles.carte} aria-labelledby={`${idGroupe}-repartition`}>
+            <h2 id={`${idGroupe}-repartition`} className={styles.titreCarte}>
+              Votre solde n’est pas tout à vous
+              <Info libelle="Pourquoi le solde trompe">
+                Le solde bancaire contient les cotisations d’un trimestre que
+                vous n’avez pas encore déclaré. Le regarder et se sentir riche,
+                c’est le mécanisme exact du rappel qu’on ne peut plus payer. La
+                barre montre d’abord ce qui n’est <em>pas</em> à vous.
+              </Info>
+            </h2>
+            <Repartition
+              total={etat.tresorerie.solde}
+              deficit={Math.max(0, -etat.tresorerie.dispo)}
+              parts={[
+                {
+                  libelle: 'Provisions — dû, pas encore payé',
+                  montant: Math.min(etat.tresorerie.provisions, Math.max(0, etat.tresorerie.solde)),
+                  ton: 'provisions'
+                },
+                {
+                  // La réserve n'est constituée qu'à hauteur de ce qui reste
+                  // après provisions : l'afficher pleine sur un disponible
+                  // insuffisant ferait croire à un matelas qui n'existe pas.
+                  libelle: 'Réserve de sécurité',
+                  montant: Math.min(etat.tresorerie.reserve, Math.max(0, etat.tresorerie.dispo)),
+                  ton: 'reserve'
+                },
+                {
+                  libelle: 'Versable — à vous',
+                  montant: etat.tresorerie.versable,
+                  ton: 'versable'
+                }
+              ]}
+            />
+          </section>
 
           <CarteSeuils idGroupe={idGroupe} seuils={etat.seuils} />
 
