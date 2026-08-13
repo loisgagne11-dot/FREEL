@@ -98,6 +98,7 @@ un trou qui ne fait échouer aucun test.
 | `calculateIR`, `getIRForYear`, `getTranche`, `showIRDetail` | ✅ | Simulateur dans Outils, détail par tranche |
 | `addIRMonthlyProvisions` | ⚠️ | En versement libératoire, les 2,2 % sont intégrés ; au barème, l'acompte PAS est **saisi** et non calculé (décision D2 — le montant est notifié par la DGFiP). Pas de provision mensuelle automatique |
 | `computeCFEEstimate`, `showCFESimulator`, `renderCFEResult` | ❌ | La CFE existe comme nature de dette, mais sans grille ni estimateur |
+| Comparateur versement libératoire / barème | 🟢 | **Ajouté le 13/08. N'existait pas dans l'ancienne.** Le seul arbitrage du projet qui porte une date : l'option s'exerce avant le 30/09 pour l'année suivante. Il mesure ce que l'activité AJOUTE à l'impôt du foyer, et compare ce surcroît aux 2,2 %. L'éligibilité — plafond de revenu fiscal de référence — n'est **pas** vérifiée, faute d'un nombre officiel daté, et l'écran le dit |
 | `getAcreInfo` | ⚠️ | L'ACRE s'applique au calcul ; pas de grille par période (noté au journal comme non traité) |
 | `renderTVAModule`, seuils, franchise | ✅ | Jauges de seuils dans Argent |
 | `projectTVADate` — date de franchissement projetée | ❌ | Le pourcentage s'affiche, la date probable non |
