@@ -36,10 +36,6 @@ import {
   rapprochementEffectif, resumerDepenses, tvaDeDepense
 } from '../domain/calculs/depenses';
 import {
-  type DelaiClient, type Jour, type PlanDeCharge,
-  calendrierDuMois, chargeDuMois, delaisParClient, planDeCharge
-} from '../domain/calculs/activite';
-import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
 import {
@@ -59,7 +55,7 @@ import {
   type DeclarationDes, type DeclarationEnRetard, type PreneurService,
   amendeEncourue, declarationDuMois, declarationsEnRetard
 } from '../domain/calculs/des';
-import type { Client, Depense, Faits, Mission, Recette } from './schema';
+import type { Client, Depense, Faits, Recette } from './schema';
 
 /**
  * Le barème URSSAF effectivement appliqué.
@@ -627,106 +623,6 @@ export function etatLivre(faits: Faits): EtatLivre {
    Écran Activité
    ───────────────────────────────────────────────────────────────────────── */
 
-/**
- * Tarif journalier par nom de client.
- *
- * Une mission active l'emporte sur une mission terminée : c'est le tarif en
- * vigueur qui convertit une recette récente en jours, pas celui d'un contrat
- * clos il y a deux ans.
- */
-export function tarifsParClient(faits: Faits): ReadonlyMap<string, Euros> {
-  const tarifs = new Map<string, Euros>();
-  for (const m of [...faits.missions].sort(prioriteMission)) {
-    const nom = m.clientNom;
-    if (nom === '' || m.tjm <= 0) continue;
-    if (!tarifs.has(nom)) tarifs.set(nom, m.tjm);
-  }
-  return tarifs;
-}
-
-/** Les missions actives d'abord, puis les terminées, puis les prospects. */
-function prioriteMission(a: Mission, b: Mission): number {
-  const rang = (m: Mission) => (m.statut === 'active' ? 0 : m.statut === 'terminee' ? 1 : 2);
-  return rang(a) - rang(b);
-}
-
-/** Une mission accompagnée de ce qu'elle a produit. */
-export interface LigneMission {
-  readonly mission: Mission;
-  readonly facture: Euros;
-  readonly encaisse: Euros;
-  readonly resteARentrer: Euros;
-}
-
-export interface EtatActivite {
-  readonly mois: Mois;
-  readonly calendrier: readonly Jour[];
-  readonly plan: PlanDeCharge;
-  /** Recettes du mois dont le tarif est inconnu : la mesure est partielle. */
-  readonly recettesSansTarif: number;
-  readonly missions: readonly LigneMission[];
-  readonly delais: readonly DelaiClient[];
-  /** Jours de congé posés sur l'année du mois affiché. */
-  readonly congesDeLAnnee: number;
-}
-
-/**
- * L'état de l'écran Activité, pour un mois donné.
- *
- * Le mois est un paramètre et non une constante : l'ancienne application
- * recalculait tout sur « le mois courant » lu à l'affichage, si bien que
- * consulter un mois passé était impossible sans changer l'horloge du poste.
- */
-export function etatActivite(
-  faits: Faits,
-  m: Mois,
-  maintenant: Date = new Date()
-): EtatActivite {
-  const tarifs = tarifsParClient(faits);
-  const charge = chargeDuMois(faits.recettes, tarifs, m);
-  const annee = m.slice(0, 4);
-
-  return {
-    mois: m,
-    calendrier: calendrierDuMois(m, faits.conges),
-    plan: planDeCharge(m, faits.conges, charge.jours),
-    recettesSansTarif: charge.recettesSansTarif,
-    missions: lignesDeMission(faits),
-    delais: delaisParClient(faits.recettes, dateDuJour(maintenant)),
-    congesDeLAnnee: faits.conges.filter((d) => d.startsWith(annee)).length
-  };
-}
-
-/**
- * Ce que chaque mission a produit.
- *
- * Le rattachement se fait par nom de client, l'ancien modèle ne portant pas de
- * lien entre une facture et la mission qui l'a produite. Un client à plusieurs
- * missions voit donc son chiffre d'affaires porté par la première d'entre
- * elles : c'est une approximation, et l'écran ne la présente pas autrement.
- */
-function lignesDeMission(faits: Faits): readonly LigneMission[] {
-  const dejaCompte = new Set<string>();
-  return [...faits.missions].sort(prioriteMission).map((mission) => {
-    const premiere = !dejaCompte.has(mission.clientNom);
-    dejaCompte.add(mission.clientNom);
-    const recettes = premiere
-      ? faits.recettes.filter((r) => r.clientNom === mission.clientNom)
-      : [];
-
-    const facture = recettes.reduce<number>((s, r) => s + r.montant, 0);
-    const encaisse = recettes
-      .filter((r) => r.encaisseeLe !== null)
-      .reduce<number>((s, r) => s + r.montant, 0);
-
-    return {
-      mission,
-      facture: euros(facture),
-      encaisse: euros(encaisse),
-      resteARentrer: euros(facture - encaisse)
-    };
-  });
-}
 
 /** La date du jour, au format ISO, sans passer par le fuseau local. */
 export function dateDuJour(maintenant: Date = new Date()): DateISO {

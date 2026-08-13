@@ -217,3 +217,50 @@ describe('délais de paiement', () => {
     expect(screen.queryByText(/au-delà de son délai habituel/)).toBeNull();
   });
 });
+
+/**
+ * La dépendance client.
+ *
+ * Perdre un client qui pèse 60 % du chiffre d'affaires ne se rattrape pas en
+ * un trimestre. C'est une des rares choses qu'une application de comptabilité
+ * peut voir venir — à condition de la mesurer et de la montrer.
+ */
+describe('le mois en chiffres', () => {
+  it('mesure le poids de chaque client dans l’année', () => {
+    semer({
+      recettes: [
+        recette({ id: 'r1', clientNom: 'Client A', montant: euros(7500), encaisseeLe: dateISO('2026-03-10') }),
+        recette({ id: 'r2', clientNom: 'Client B', montant: euros(2500), encaisseeLe: dateISO('2026-04-10') })
+      ]
+    });
+    render(<Activite />);
+
+    expect(screen.getByText('Client A')).toBeTruthy();
+    expect(screen.getByText('75 %')).toBeTruthy();
+    expect(screen.getByText('25 %')).toBeTruthy();
+  });
+
+  /**
+   * Sur l'année, pas sur le mois. Un client peut ne rien régler en août sans
+   * que la dépendance ait bougé — mesurée sur un seul mois, la concentration
+   * sauterait d'un client à l'autre au gré des règlements.
+   */
+  it('compte les encaissements de toute l’année, pas du seul mois affiché', () => {
+    semer({
+      recettes: [
+        recette({ id: 'r1', clientNom: 'Client A', montant: euros(5000), encaisseeLe: dateISO('2026-01-15') })
+      ]
+    });
+    render(<Activite />);
+    expect(screen.getByText('Client A')).toBeTruthy();
+    expect(screen.getByText('100 %')).toBeTruthy();
+  });
+
+  // Sans encaissement, la mesure n'existe pas : afficher « 0 % » pour un
+  // client suggérerait qu'il en a un.
+  it('dit que la dépendance ne se mesure pas encore', () => {
+    semer({ recettes: [] });
+    render(<Activite />);
+    expect(screen.getByText(/ne se mesure pas encore/)).toBeTruthy();
+  });
+});

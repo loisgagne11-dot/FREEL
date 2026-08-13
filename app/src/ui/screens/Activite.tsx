@@ -1,6 +1,9 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { type LigneMission, etatActivite, moisCourant } from '../../state/selecteurs';
+import { moisCourant } from '../../state/selecteurs';
+import {
+  type LigneMission, type PoidsClient, etatActivite
+} from '../../state/selecteurs.activite';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import type { DateISO, Mois } from '../../domain/types';
 import type { Client, Mission } from '../../state/schema';
@@ -137,6 +140,39 @@ export function Activite() {
               </Info>
             </p>
           )}
+
+          <section className={styles.carte} aria-labelledby={`${idGroupe}-chiffres`}>
+            <h2 id={`${idGroupe}-chiffres`} className={styles.titreCarte}>
+              Le mois en chiffres
+              <Info libelle="Pourquoi la dépendance client se mesure sur l’année">
+                Un client peut ne rien régler en août sans que la dépendance
+                ait bougé. Mesurée sur un seul mois, la concentration sauterait
+                d’un client à l’autre au gré des règlements et n’apprendrait
+                rien. Elle porte donc sur le chiffre d’affaires encaissé de
+                l’année.
+              </Info>
+            </h2>
+
+            {/* Les équivalent-jours et l'occupation sont déjà dans les tuiles
+                ci-dessus : les répéter ici ferait deux affichages du même
+                chiffre, qui finiraient par diverger. On n'ajoute que ce qui
+                n'est nulle part ailleurs. */}
+            <dl className={styles.detail}>
+              <div className={styles.ligne}>
+                <dt>Encaissé ce mois</dt>
+                <dd><Montant>{eur(etat.caDuMois)}</Montant></dd>
+              </div>
+            </dl>
+
+            {etat.poidsClients.length === 0
+              ? (
+                <p className={styles.vide}>
+                  Aucun encaissement cette année&nbsp;: la dépendance client ne
+                  se mesure pas encore.
+                </p>
+              )
+              : <DependanceClients poids={etat.poidsClients} />}
+          </section>
 
           <section className={styles.carte} aria-labelledby={`${idGroupe}-calendrier`}>
             <h2 id={`${idGroupe}-calendrier`} className={styles.titreCarte}>
@@ -444,6 +480,53 @@ function Legende() {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * La dépendance client.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE STATISTIQUE QUI EST UN RISQUE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Perdre un client qui pèse 60 % du chiffre d'affaires ne se rattrape pas en
+ * un trimestre. C'est une des rares choses qu'une application de comptabilité
+ * peut voir venir — à condition de la mesurer et de la montrer avant que
+ * l'événement arrive.
+ *
+ * Aucun seuil n'est posé : dire « au-delà de 50 %, c'est dangereux » serait
+ * une opinion déguisée en règle, et elle dépend du métier, du carnet, de la
+ * durée des missions. Les parts sont affichées, le lecteur juge.
+ */
+function DependanceClients({ poids }: { poids: readonly PoidsClient[] }) {
+  return (
+    <>
+      <div className={styles.barreClients} role="img"
+        aria-label={poids
+          .map((p) => `${p.nom} ${Math.round(p.part * 100)} %`)
+          .join(', ')}>
+        {poids.map((p, i) => (
+          <div
+            key={p.nom}
+            className={styles.partClient}
+            style={{ width: `${p.part * 100}%`, opacity: 1 - i * 0.16 }}
+          />
+        ))}
+      </div>
+
+      <ul className={styles.legendeClients}>
+        {poids.map((p, i) => (
+          <li key={p.nom} className={styles.entreeClient}>
+            <span className={styles.pastilleClient} style={{ opacity: 1 - i * 0.16 }}
+              aria-hidden="true" />
+            <span className={styles.nomClient}>{p.nom}</span>
+            <span className={styles.partTexte}>{Math.round(p.part * 100)} %</span>
+            <span className={styles.montantClient}><Montant>{eur(p.montant)}</Montant></span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

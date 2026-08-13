@@ -176,7 +176,70 @@
   font-weight: 620;
 }
 
-/* ── Légende ───────────────────────────────────────────────────────────── */
+/* ── Dépendance client ─────────────────────────────────────────────────── */
+
+.barreClients {
+  display: flex;
+  height: 12px;
+  border-radius: 100px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  margin: 10px 0;
+}
+
+/* Une seule teinte, dégradée par opacité : des couleurs distinctes
+   suggéreraient une nature différente entre clients, alors qu'ils ne
+   diffèrent que par leur poids. */
+.partClient { height: 100%; min-width: 2px; background: var(--green); }
+
+.legendeClients { list-style: none; display: flex; flex-direction: column; margin: 0; padding: 0; }
+
+.entreeClient {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.entreeClient:last-child { border-bottom: none; }
+
+.pastilleClient {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--green);
+  align-self: center;
+}
+
+.nomClient {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.partTexte {
+  margin-left: auto;
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+}
+
+.montantClient {
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 7ch;
+  text-align: right;
+}
+
+/* ── Légende �──────────────────────────────────────────────────────────── */
 
 .legende {
   list-style: none;
