@@ -27,7 +27,7 @@ import type { PlanDeCharge } from '../domain/calculs/activite';
 import { delaisParClient, type DelaiClient } from '../domain/calculs/activite';
 import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros } from '../domain/types';
-import type { Faits, Mission } from './schema';
+import type { ClientOperationnel, Faits, Mission } from './schema';
 import { dateDuJour } from './selecteurs';
 
 /**
@@ -198,10 +198,20 @@ export interface JourDeLaSemaine {
   readonly prevu: number;
   /** Ce qui compte : ajustements pris en compte. */
   readonly retenu: number;
-  /** Le détail par mission, pour savoir laquelle occupe la journée. */
+  /**
+   * Le détail par client opérationnel : qui occupe la journée.
+   *
+   * Une mission ordinaire n'en a qu'un, et le libellé rendu est alors celui de
+   * la mission — on ne fait pas apparaître un vocabulaire que le cas simple
+   * n'exige pas. Dès qu'il y en a deux, le nom de chacun s'affiche : c'est la
+   * question qu'on se pose en regardant la semaine.
+   */
   readonly parMission: readonly {
     readonly missionId: string;
+    readonly entiteId: string;
     readonly libelle: string;
+    /** Teinte du client opérationnel, vide si aucune n'a été choisie. */
+    readonly couleur: string;
     readonly prevu: number;
     readonly retenu: number;
     readonly ajuste: boolean;
@@ -266,20 +276,26 @@ export function planningDeLaSemaine(
 
   const actives = faits.missions.filter((m) => m.statut === 'active' || m.statut === 'terminee');
 
-  const parMissionEtDate = actives.map((m) => ({
+  // Une ligne PAR CLIENT OPÉRATIONNEL, pas par mission : chacun a son rythme,
+  // et c'est ce qui permet « lundi-mardi chez l'un, mercredi-jeudi chez
+  // l'autre » sans avoir à trancher, jour par jour, à qui revient la journée.
+  const parEntiteEtDate = actives.flatMap((m) => m.entites.map((e) => ({
     mission: m,
+    entite: e,
     planning: planifier(dates, {
-      rythmes: m.rythmes, ajustements: m.ajustements, feries, conges
+      rythmes: e.rythmes, ajustements: e.ajustements, feries, conges
     })
-  }));
+  })));
 
   const jours = dates.map((date, i) => {
-    const detail = parMissionEtDate
-      .map(({ mission, planning }) => {
+    const detail = parEntiteEtDate
+      .map(({ mission, entite, planning }) => {
         const j = planning[i] as JourPlanifie;
         return {
           missionId: mission.id,
-          libelle: mission.description !== '' ? mission.description : mission.clientNom,
+          entiteId: entite.id,
+          libelle: libelleDeLaLigne(mission, entite),
+          couleur: entite.couleur,
           prevu: j.prevu,
           retenu: j.retenu,
           ajuste: j.ajuste
@@ -289,7 +305,7 @@ export function planningDeLaSemaine(
       // case : le vide se lit mieux qu'une ligne à zéro.
       .filter((d) => d.prevu > 0 || d.retenu > 0 || d.ajuste);
 
-    const modele = (parMissionEtDate[0]?.planning[i]) as JourPlanifie | undefined;
+    const modele = (parEntiteEtDate[0]?.planning[i]) as JourPlanifie | undefined;
 
     return {
       date,
@@ -316,25 +332,32 @@ export function planningDeLaSemaine(
 
 export interface CraDeMission {
   readonly missionId: string;
+  readonly entiteId: string;
   readonly libelle: string;
+  /** Le client qui SIGNE le compte rendu : le client opérationnel. */
   readonly clientNom: string;
   readonly cra: Cra;
 }
 
 /**
- * Les CRA du mois, une par mission.
+ * Les CRA du mois, un par CLIENT OPÉRATIONNEL.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * UN CRA PAR MISSION, JAMAIS UN SEUL POUR TOUT
+ * UN CRA PAR CLIENT QUI SIGNE, JAMAIS UN SEUL POUR TOUT
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Le compte rendu d'activité se remet AU CLIENT, qui le signe. Fusionner
- * deux missions dans un document unique exposerait à l'un ce que l'autre
+ * deux clients dans un document unique exposerait à l'un ce que l'autre
  * achète — et un client qui découvre le volume qu'on consacre à son
  * concurrent ne le prend jamais bien.
  *
- * Les missions sans aucun jour travaillé sont écartées : un CRA vide n'est
- * pas un livrable, c'est un document qu'on envoie par erreur.
+ * La maille est donc le client opérationnel et non la mission : deux donneurs
+ * d'ordre derrière une même agence signent chacun le leur. Une mission
+ * ordinaire n'a qu'un client opérationnel, et rend donc exactement un CRA —
+ * le comportement d'avant, sans que rien n'ait à changer à l'écran.
+ *
+ * Les clients sans aucun jour travaillé sont écartés : un CRA vide n'est pas
+ * un livrable, c'est un document qu'on envoie par erreur.
  */
 export function craDuMoisParMission(
   faits: Faits,
@@ -350,18 +373,35 @@ export function craDuMoisParMission(
 
   return faits.missions
     .filter((mission) => mission.statut === 'active' || mission.statut === 'terminee')
-    .map((mission) => ({
+    .flatMap((mission) => mission.entites.map((entite) => ({
       missionId: mission.id,
-      libelle: mission.description !== '' ? mission.description : mission.clientNom,
-      clientNom: mission.clientNom,
+      entiteId: entite.id,
+      libelle: libelleDeLaLigne(mission, entite),
+      // Le nom porté sur le document est celui du client opérationnel quand il
+      // est renseigné : c'est lui qui signe. À défaut, celui qui facture.
+      clientNom: entite.nom !== '' ? entite.nom : mission.clientNom,
       cra: craDuMois(
         m,
         planifier(dates, {
-          rythmes: mission.rythmes, ajustements: mission.ajustements, feries, conges
+          rythmes: entite.rythmes, ajustements: entite.ajustements, feries, conges
         }),
-        mission.rythmes,
+        entite.rythmes,
         mission.tjm
       )
-    }))
+    })))
     .filter((x) => x.cra.totalJours > 0);
+}
+
+/**
+ * Comment nommer une ligne de planning ou un CRA.
+ *
+ * Un seul client opérationnel : le nom de la mission suffit, et introduire le
+ * nom de l'entité ferait apparaître un vocabulaire dont le cas simple n'a pas
+ * besoin. Plusieurs : c'est justement la distinction qu'on cherche, et le nom
+ * de la mission seul rendrait deux lignes indiscernables.
+ */
+function libelleDeLaLigne(mission: Mission, entite: ClientOperationnel): string {
+  const nomMission = mission.description !== '' ? mission.description : mission.clientNom;
+  if (mission.entites.length <= 1) return nomMission;
+  return entite.nom !== '' ? `${nomMission} — ${entite.nom}` : nomMission;
 }

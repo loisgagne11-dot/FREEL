@@ -188,7 +188,7 @@ describe('rapprochement bancaire', () => {
       depenses: [depense()],
       mouvementsBancaires: [{
         id: 'mvt-1', date: dateISO('2026-09-10'), libelle: 'PRLV',
-        montant: euros(-999), rapprocheAvec: null, sansContrepartie: false
+        montant: euros(-999), rapprocheAvec: null, sansContrepartie: null
       }]
     });
     rendre();

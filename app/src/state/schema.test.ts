@@ -152,8 +152,8 @@ describe('missions d’un bloc au schéma 1', () => {
 
   it('donne un rythme et des ajustements vides plutôt qu’absents', () => {
     const faits = completerFaits({ version: 1, missions: [missionV1] });
-    expect(faits.missions[0]?.rythmes).toEqual([]);
-    expect(faits.missions[0]?.ajustements).toEqual({});
+    expect(faits.missions[0]?.entites[0]?.rythmes).toEqual([]);
+    expect(faits.missions[0]?.entites[0]?.ajustements).toEqual({});
   });
 
   it('n’écrase pas un rythme déjà déclaré', () => {
@@ -165,9 +165,9 @@ describe('missions d’un bloc au schéma 1', () => {
         ajustements: { '2026-03-04': 0 }
       }]
     });
-    expect(faits.missions[0]?.rythmes).toHaveLength(1);
+    expect(faits.missions[0]?.entites[0]?.rythmes).toHaveLength(1);
     // Zéro est un ajustement légitime — c'est ainsi qu'on retire une journée.
-    expect(faits.missions[0]?.ajustements).toEqual({ '2026-03-04': 0 });
+    expect(faits.missions[0]?.entites[0]?.ajustements).toEqual({ '2026-03-04': 0 });
   });
 
   it('écarte une entrée qui n’est pas un objet', () => {
@@ -178,5 +178,48 @@ describe('missions d’un bloc au schéma 1', () => {
   // Le champ absent de bout en bout : `missions` lui-même peut manquer.
   it('accepte un bloc sans missions du tout', () => {
     expect(completerFaits({ version: 1 }).missions).toEqual([]);
+  });
+});
+
+/**
+ * `sansContrepartie` passe du booléen au motif (schéma 4 → 5).
+ *
+ * LE PIÈGE : le champ valait `true` ou `false`. Sans conversion, un `false`
+ * enregistré hier serait lu comme « différent de null », donc comme un
+ * mouvement DÉJÀ classé — tous les mouvements à traiter disparaîtraient de la
+ * file, sans que rien ne le signale.
+ *
+ * Troisième champ imbriqué à migrer, après les congés et les rythmes. La règle
+ * est acquise : une migration descend jusqu'où les champs ont bougé.
+ */
+describe('mouvements bancaires d’un bloc au schéma 4', () => {
+  const mv = (sansContrepartie: unknown) => ({
+    id: 'mv1', date: '2026-08-05', libelle: 'PRLV', montant: -120,
+    rapprocheAvec: null, sansContrepartie
+  });
+
+  it('rend un mouvement non classé à la file « à traiter »', () => {
+    const faits = completerFaits({ version: 4, mouvementsBancaires: [mv(false)] });
+    expect(faits.mouvementsBancaires[0]?.sansContrepartie).toBeNull();
+  });
+
+  /**
+   * Un `true` d'hier ne disait pas POURQUOI. Il devient « autre » : le
+   * requalifier en rémunération inventerait une information que l'ancien
+   * format n'a jamais portée.
+   */
+  it('convertit un ancien « vrai » en motif « autre »', () => {
+    const faits = completerFaits({ version: 4, mouvementsBancaires: [mv(true)] });
+    expect(faits.mouvementsBancaires[0]?.sansContrepartie).toBe('autre');
+  });
+
+  it('conserve un motif déjà au schéma 5', () => {
+    const faits = completerFaits({ version: 5, mouvementsBancaires: [mv('remuneration')] });
+    expect(faits.mouvementsBancaires[0]?.sansContrepartie).toBe('remuneration');
+  });
+
+  it('écarte une valeur illisible plutôt que de la garder', () => {
+    const faits = completerFaits({ version: 5, mouvementsBancaires: [mv('salaire')] });
+    expect(faits.mouvementsBancaires[0]?.sansContrepartie).toBeNull();
   });
 });

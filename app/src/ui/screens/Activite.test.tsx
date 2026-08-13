@@ -32,7 +32,16 @@ beforeEach(() => { figerHorloge(); semer(); });
 const mission = (m: Partial<Faits['missions'][number]> = {}) => ({
   id: 'mis-1', clientId: null, clientNom: 'ClientA', description: 'Mission A',
   tjm: euros(400), debut: dateISO('2026-01-05'), fin: null,
-  statut: 'active' as const, rythmes: [], ajustements: {}, ...m
+  statut: 'active' as const, entites: [entite()], ...m
+});
+
+/**
+ * Un client opérationnel. Depuis le schéma 4, c'est LUI qui porte le rythme et
+ * les ajustements : une mission peut en avoir plusieurs, chacun avec le sien.
+ */
+const entite = (e: Partial<Faits['missions'][number]['entites'][number]> = {}) => ({
+  id: 'mis-1-co1', nom: 'ClientA', couleur: '', adresse: '', contact: '',
+  email: '', telephone: '', rythmes: [], ajustements: {}, ...e
 });
 
 const recette = (m: Partial<Faits['recettes'][number]> = {}) => ({
@@ -281,11 +290,13 @@ describe('le mois en chiffres', () => {
  */
 describe('vue semaine', () => {
   const avecRythme = () => mission({
-    rythmes: [{
-      du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
-      parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 },
-      tjm: euros(400)
-    }]
+    entites: [entite({
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+        parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 },
+        tjm: euros(400)
+      }]
+    })]
   });
 
   const ouvrirSemaine = async () => {
@@ -323,7 +334,8 @@ describe('vue semaine', () => {
     const utilisateur = await ouvrirSemaine();
 
     const creneau = () => screen.getAllByRole('button', { name: /13 juil\. 2026/ })[0] as HTMLElement;
-    const ajustements = () => useFaits.getState().faits.missions[0]?.ajustements ?? {};
+    const ajustements = () =>
+      useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
 
     await utilisateur.click(creneau());          // journée → demi
     expect(ajustements()['2026-07-13']).toBe(0.5);
@@ -352,11 +364,13 @@ describe('vue semaine', () => {
 describe('compte rendu d’activité', () => {
   const avecRythmeCra = () => mission({
     tjm: euros(400),
-    rythmes: [{
-      du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
-      parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 },
-      tjm: euros(400)
-    }]
+    entites: [entite({
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+        parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 },
+        tjm: euros(400)
+      }]
+    })]
   });
 
   it('se remplit tout seul depuis le rythme', () => {
@@ -390,14 +404,83 @@ describe('compte rendu d’activité', () => {
   it('suit les ajustements posés au planning', () => {
     const sansRien = mission({
       tjm: euros(400),
-      rythmes: [{
-        du: dateISO('2026-07-01'), au: dateISO('2026-07-31'),
-        parJour: { lun: 1 }, tjm: euros(400)
-      }],
-      ajustements: { '2026-07-06': 0, '2026-07-13': 0, '2026-07-20': 0, '2026-07-27': 0 }
+      entites: [entite({
+        rythmes: [{
+          du: dateISO('2026-07-01'), au: dateISO('2026-07-31'),
+          parJour: { lun: 1 }, tjm: euros(400)
+        }],
+        ajustements: { '2026-07-06': 0, '2026-07-13': 0, '2026-07-20': 0, '2026-07-27': 0 }
+      })]
     });
     semer({ missions: [sansRien] });
     render(<Activite />);
     expect(screen.getByText(/Aucun jour travaillé/)).toBeTruthy();
+  });
+});
+
+/**
+ * UN CRÉNEAU VIDE NE DIT PAS À QUI LA JOURNÉE APPARTIENT.
+ *
+ * La première version en choisissait une en silence — la première mission
+ * active. C'est ce que cette application refuse partout ailleurs : l'écran
+ * propose, l'utilisateur tranche. Une journée rattachée au mauvais client
+ * fausse DEUX comptes rendus d'un coup — celui qui la reçoit à tort, et celui
+ * à qui elle manque — et rien ne le signale.
+ */
+describe('journée déclarée sur un créneau vide', () => {
+  const ouvrirSemaine = async () => {
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Semaine' }));
+    return utilisateur;
+  };
+
+  const deuxMissions = () => [
+    mission({ id: 'mis-1', description: 'Mission A', entites: [entite({ id: 'a1' })] }),
+    mission({ id: 'mis-2', description: 'Mission B', entites: [entite({ id: 'b1' })] })
+  ];
+
+  it('demande à qui la rattacher quand plusieurs missions sont en cours', async () => {
+    semer({ missions: deuxMissions() });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+
+    expect(screen.getByRole('button', { name: 'Mission A' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Mission B' })).toBeTruthy();
+    // Rien n'a été posé tant que le choix n'est pas fait.
+    expect(useFaits.getState().faits.missions.flatMap((m) => m.entites)
+      .every((e) => Object.keys(e.ajustements).length === 0)).toBe(true);
+  });
+
+  it('pose la journée sur la mission choisie, et sur elle seule', async () => {
+    semer({ missions: deuxMissions() });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+    await utilisateur.click(screen.getByRole('button', { name: 'Mission B' }));
+
+    const missions = useFaits.getState().faits.missions;
+    expect(Object.keys(missions[0]?.entites[0]?.ajustements ?? {})).toHaveLength(0);
+    expect(Object.keys(missions[1]?.entites[0]?.ajustements ?? {})).toHaveLength(1);
+  });
+
+  /**
+   * Une seule affectation possible : il n'y a pas de question, et la poser
+   * serait un clic de plus pour rien. Le geste doit rester immédiat dans le
+   * cas ordinaire.
+   */
+  it('ne demande rien quand une seule mission est en cours', async () => {
+    semer({ missions: [mission()] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+
+    expect(screen.queryByRole('button', { name: /rattacher/i })).toBeNull();
+    expect(Object.keys(
+      useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {}
+    )).toHaveLength(1);
   });
 });

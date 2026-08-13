@@ -12,7 +12,7 @@ const ligne = (date: string, libelle: string, montant: number) =>
 function mouvement(m: Partial<MouvementBancaire> = {}): MouvementBancaire {
   return {
     id: 'mvt-1', date: dateISO('2026-07-16'), libelle: 'PRLV ABONNEMENT',
-    montant: euros(-120), rapprocheAvec: null, sansContrepartie: false, ...m
+    montant: euros(-120), rapprocheAvec: null, sansContrepartie: null, ...m
   };
 }
 
@@ -143,7 +143,7 @@ describe('candidats de rapprochement', () => {
 
   it('n’en propose aucune pour un mouvement déjà tranché', () => {
     expect(candidatsPour(mouvement({ rapprocheAvec: 'dep-1' }), [ecriture()])).toEqual([]);
-    expect(candidatsPour(mouvement({ sansContrepartie: true }), [ecriture()])).toEqual([]);
+    expect(candidatsPour(mouvement({ sansContrepartie: 'autre' }), [ecriture()])).toEqual([]);
   });
 
   it('met la date la plus proche en tête', () => {
@@ -179,7 +179,7 @@ describe('résumé du rapprochement', () => {
   // éternellement « à traiter », et l'écran finirait par ne plus être regardé.
   it('compte à part ce que l’utilisateur a déclaré sans contrepartie', () => {
     const resume = resumerRapprochement([
-      mouvement({ id: 'frais', sansContrepartie: true }),
+      mouvement({ id: 'frais', sansContrepartie: 'autre' }),
       mouvement({ id: 'fait', rapprocheAvec: 'dep-1' })
     ], []);
     expect(resume).toMatchObject({ sansContrepartie: 1, rapproches: 1, sansCandidat: 0 });

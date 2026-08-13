@@ -69,6 +69,22 @@ function bundleLegacy() {
         // Là où l'application écrit RÉELLEMENT les congés — avec le suffixe
         // `_half` des demi-journées.
         congesDates: ['2026-09-07', '2026-09-08_half', '2026-08-10']
+      },
+      {
+        // Le cas de l'agence : deux clients FINAUX derrière un même donneur
+        // d'ordre, chacun avec son rythme hebdomadaire.
+        id: 'MIS3', client: 'ClientA', description: 'Mission via agence', tjm: 500,
+        debut: '2026-01-01', fin: '2026-12-31', statut: 'en_cours', factures: [],
+        periodes: [{
+          debut: '2026-01-01', fin: '2026-12-31',
+          joursMap: { lun: 1, mar: 1, mer: 1, jeu: 1 }, joursSemaine: 4, tjm: 500
+        }],
+        entites: [
+          { id: 'e1', nom: 'Client final A', couleur: '#22c55e',
+            joursParSemaine: { lun: 1, mar: 1 }, email: 'a@exemple.fr' },
+          { id: 'e2', nom: 'Client final B', couleur: '#38bdf8',
+            joursParSemaine: { mer: 1, jeu: 0.5 } }
+        ]
       }
     ],
     cl: [
@@ -137,7 +153,7 @@ describe('rapport à blanc', () => {
     const r = analyser(avecLegacy());
     expect(r.aDesDonneesLegacy).toBe(true);
     expect(r.comptes.clients).toBe(1);
-    expect(r.comptes.missions).toBe(2);
+    expect(r.comptes.missions).toBe(3);
     expect(r.comptes.recettes).toBe(3);
   });
 
@@ -321,7 +337,7 @@ describe('conversion des données', () => {
     });
     const r = analyser(s);
     expect(r.aDesDonneesLegacy).toBe(true);
-    expect(r.comptes.missions).toBe(2);
+    expect(r.comptes.missions).toBe(3);
   });
 });
 
@@ -586,13 +602,13 @@ describe('rythme et ajustements', () => {
   };
 
   it('reprend le rythme, jour de semaine par jour de semaine', () => {
-    const [rythme] = mission().rythmes;
+    const [rythme] = mission().entites[0]?.rythmes ?? [];
     expect(rythme).toMatchObject({ du: '2026-01-05', au: '2026-12-31', tjm: 450 });
     expect(rythme?.parJour).toEqual({ lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 });
   });
 
   it('met les ajustements à plat, par date', () => {
-    expect(mission().ajustements).toEqual({
+    expect(mission().entites[0]?.ajustements).toEqual({
       '2026-09-14': 0, '2026-09-15': 0.5, '2026-10-05': 1
     });
   });
@@ -603,7 +619,7 @@ describe('rythme et ajustements', () => {
    * remettre, et le CRA facturerait un jour qui n'a pas eu lieu.
    */
   it('conserve un ajustement à zéro', () => {
-    expect(mission().ajustements['2026-09-14']).toBe(0);
+    expect(mission().entites[0]?.ajustements['2026-09-14']).toBe(0);
   });
 
   // Une mission sans période n'a pas de rythme : rien à inventer.
@@ -611,8 +627,8 @@ describe('rythme et ajustements', () => {
     const r = migrer(avecLegacy());
     if (r.statut !== 'migre') throw new Error('migration attendue');
     const sansRythme = r.faits.missions.find((x) => x.id === 'MIS1');
-    expect(sansRythme?.rythmes).toEqual([]);
-    expect(sansRythme?.ajustements).toEqual({});
+    expect(sansRythme?.entites[0]?.rythmes).toEqual([]);
+    expect(sansRythme?.entites[0]?.ajustements).toEqual({});
   });
 });
 
@@ -663,5 +679,64 @@ describe('charges fiscales et sociales', () => {
   // catégorie, pas sur le type de mouvement.
   it('laisse les vraies dépenses où elles sont', () => {
     expect(faits().depenses.map((d) => d.id)).toEqual(['CH1', 'CH2', 'CH3', 'CH4']);
+  });
+});
+
+/**
+ * LE CAS DE L'AGENCE.
+ *
+ * L'ancienne application portait TROIS sources pour une même journée : le
+ * rythme de la mission, le rythme de chaque entité, et une table `entiteByDay`
+ * pour arbitrer. Rien n'indiquait laquelle faisait foi. Le nouveau schéma n'en
+ * garde qu'une — le rythme appartient au client opérationnel.
+ */
+describe('clients opérationnels repris du legacy', () => {
+  function mission3() {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    const m = r.faits.missions.find((x) => x.id === 'MIS3');
+    if (m === undefined) throw new Error('MIS3 attendue');
+    return m;
+  }
+
+  it('reprend un client opérationnel par entité', () => {
+    expect(mission3().entites.map((e) => e.nom))
+      .toEqual(['Client final A', 'Client final B']);
+  });
+
+  it('conserve leurs coordonnées et leur teinte', () => {
+    const [a] = mission3().entites;
+    expect(a?.couleur).toBe('#22c55e');
+    expect(a?.email).toBe('a@exemple.fr');
+  });
+
+  /**
+   * Chacun garde SON rythme. Reprendre en plus celui de la mission — qui était
+   * la somme approximative des deux — compterait les journées deux fois.
+   */
+  it('donne à chacun son propre rythme', () => {
+    const [a, b] = mission3().entites;
+    expect(a?.rythmes[0]?.parJour).toEqual({ lun: 1, mar: 1 });
+    expect(b?.rythmes[0]?.parJour).toEqual({ mer: 1, jeu: 0.5 });
+  });
+
+  it('étend leur semaine type à la durée de la mission', () => {
+    const [a] = mission3().entites;
+    expect(a?.rythmes[0]?.du).toBe('2026-01-01');
+    expect(a?.rythmes[0]?.au).toBe('2026-12-31');
+  });
+
+  /**
+   * Une mission sans entité devient une mission à UN client opérationnel, qui
+   * reprend le rythme de la mission tel quel. Le planning d'hier redonne
+   * exactement les mêmes journées.
+   */
+  it('donne un client opérationnel unique aux missions qui n’en avaient pas', () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    const m2 = r.faits.missions.find((x) => x.id === 'MIS2');
+    expect(m2?.entites).toHaveLength(1);
+    expect(m2?.entites[0]?.rythmes[0]?.parJour)
+      .toEqual({ lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 });
   });
 });

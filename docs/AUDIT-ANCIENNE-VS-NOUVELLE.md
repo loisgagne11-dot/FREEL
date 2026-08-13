@@ -19,16 +19,20 @@ conforme, les justificatifs ont valeur probante, l'occupation se calcule sur
 un dénominateur réel. Ce n'est pas le sujet de cet audit.
 
 Le sujet, c'est ce qu'elle **ne fait pas encore**. Sept manques recensés, dont
-trois bloquants pour un usage quotidien — **le premier est corrigé depuis** :
+trois bloquants pour un usage quotidien — **les deux premiers sont corrigés
+depuis**, et le second a fait apparaître un huitième manque que l'audit avait
+laissé passer : le rythme de travail n'était saisissable nulle part.
 
 | # | Manque | Pourquoi c'est bloquant |
 |---|---|---|
 | 1 | ~~**Aucune échéance ne peut être saisie**~~ | ✅ **Corrigé le 13/08.** `echeances` est devenu un fait du schéma (v3), avec sa carte dans Argent, et `etatPilote` / `etatArgent` / `fluxDuMois` lisent désormais le compte au lieu d'une liste vide. La migration trie en prime les charges legacy : les fiscales et sociales deviennent des **échéances payées**, plus des dépenses — une cotisation n'est pas un achat |
-| 2 | **Pas de clients opérationnels par mission** | L'ancienne application porte `mission.entites[]` — plusieurs clients finaux derrière un même donneur d'ordre, chacun avec sa couleur, son contact et **son rythme hebdomadaire**, et une affectation jour par jour (`entiteByDay`). C'est exactement le cas «&nbsp;Mission via Scalian&nbsp;». La nouvelle n'a qu'un client par mission : le CRA ne peut pas être ventilé |
-| 3 | **Pas de versement de rémunération** | `versable` se calcule, mais rien ne permet d'enregistrer qu'on s'est versé la somme. Le solde ne bouge donc jamais du fait d'un versement |
+| 2 | ~~**Pas de clients opérationnels par mission**~~ | ✅ **Corrigé le 13/08.** Schéma v4 : le rythme et les ajustements appartiennent au **client opérationnel**, pas à la mission. Une ligne de planning et un CRA par client qui signe. Découvert au passage : **le rythme n'était saisissable nulle part** — une mission créée dans l'application avait un planning vide à jamais |
+| 3 | ~~**Pas de versement de rémunération**~~ | ✅ **Corrigé le 13/08, autrement que demandé.** Le versement ne devient PAS un fait : ce serait le compter deux fois, puisque le virement figure déjà au relevé. C'est un mouvement bancaire à **nommer** — `sansContrepartie` passe du booléen au motif, et le Pilote affiche « déjà versé ce mois » face au besoin mensuel |
 
 Les quatre autres — objectif de CA, projection de franchissement des seuils,
 import OFX, restauration d'une sauvegarde — sont réels mais pas quotidiens.
+**La restauration est faite depuis** : un export qu'on ne sait pas réinjecter
+n'est pas une sauvegarde, c'est un fichier qui rassure.
 
 Une remarque de méthode : le manque n°1 ne se voyait pas en lisant le code,
 parce que le code existait. `Echeance` était un type complet, `provisions()`
@@ -58,7 +62,8 @@ un trou qui ne fait échouer aucun test.
 | Fonction de l'ancienne | Verdict | Détail |
 |---|---|---|
 | `buildMission`, `showMissionModal`, statuts | ✅ | Carnet complet, statuts `active` / `terminee` / `prospect` / `perdue` |
-| **`mission.entites[]` — clients opérationnels** | ❌ | **Manque n°2.** Plusieurs clients finaux par mission, chacun avec couleur, adresse, contact, courriel, téléphone et **rythme hebdomadaire propre** ; le planning affecte chaque journée à une entité (`entiteByDay`). Rien de tout cela n'existe |
+| **`mission.entites[]` — clients opérationnels** | ✅ | **Corrigé le 13/08** (schéma v4). Chaque client opérationnel porte son nom, sa teinte, ses coordonnées et **son rythme**. `entiteByDay` n'a pas été repris et n'a pas à l'être : chacun ayant ses propres journées, il n'y a plus rien à arbitrer — l'ancienne application avait trois sources pour une même journée, et rien n'indiquait laquelle faisait foi |
+| Déclarer le rythme d'une mission | ✅ | **Ajouté le 13/08.** Il n'existait AUCUN écran pour le saisir : `rythmes` ne pouvait venir que de la migration, donc toute mission créée dans l'application avait un planning vide, définitivement. Semaine type à sept boutons, tour journée → demi-journée → rien, le même geste qu'au planning |
 | `getScheduledDaysForMonth`, `joursParSemaine` | ✅ | `rythmes[]` par plages de dates, demi-journées comprises |
 | `showDaysEditor`, `saveDaysFromEditor`, `recalcDaysTable` | ✅ | Vue semaine avec ajustement à la journée ; l'ajustement l'emporte sur le rythme, **y compris à zéro** |
 | `fillAllDays` — remplir le mois d'un geste | ❌ | Il faut ajuster jour par jour |
@@ -75,7 +80,7 @@ un trou qui ne fait échouer aucun test.
 | **`getChargesData`, `showChargeModal`, `getChargeTypesList`, `updateEcheance`, `togglePaid`** | ✅ | **Corrigé le 13/08.** Carte « Échéances reçues » dans Argent : saisir, corriger, supprimer, marquer payée. Cinq natures — URSSAF, TVA, impôt, CFE, CFP. « Impôt PL » n'en est pas une : en versement libératoire les 2,2 % sont prélevés **avec** les cotisations (D2), donc c'est une échéance URSSAF. « Autres » non plus : une dépense professionnelle est une dépense, elle vit dans Achats |
 | `showChargeRecurrente` — échéance récurrente | ❌ | Chaque appel se saisit à l'unité. Un échéancier trimestriel demande donc quatre saisies par an |
 | `getAbsoluteBalance`, `showEditSoldeInitial`, `showTresoSettings` | ✅ | Solde initial et besoin mensuel saisissables (ajoutés le 13/08 — ils n'avaient **aucune interface** jusque-là) |
-| `showSalaireModal`, `computeSalaireProjections` | ❌ | **Manque n°3.** Le versable se calcule, mais rien n'enregistre le versement |
+| `showSalaireModal`, `computeSalaireProjections` | 🟢 | **Corrigé le 13/08, en refusant la forme demandée.** L'ancienne application SIMULAIT son solde (encaissements moins charges), elle devait donc enregistrer le salaire pour le retrancher. Ici le solde est réel : le virement est déjà au relevé, et le saisir une seconde fois le compterait deux fois. Il se **nomme** — « rémunération que je me suis versée » dans Achats › Relevé — et le Pilote affiche « déjà versé ce mois » face au besoin mensuel. Se verser de l'argent n'est pas une opération comptable en micro : la personne et l'entreprise sont la même |
 | `setGoalCA`, `showGoalModal`, `renderGoalWidget` | ❌ | Aucun objectif de chiffre d'affaires |
 | `computeProjections`, `showProjectionAutonomieModal` | ⚠️ | L'autonomie en mois existe (`autonomieMois`) ; la projection détaillée et son écran, non |
 | `calculerRendementMensuel`, `showRendementConfig` | ❌ | Suivi de rendement / placements : absent |
@@ -137,7 +142,7 @@ un trou qui ne fait échouer aucun test.
 | Auth Supabase, synchro | 🟢 | Verrou optimiste **atomique côté serveur** ; l'ancienne écrasait |
 | `_subscribeRealtime` — synchro temps réel | ❌ | Il faut recharger pour voir les changements d'un autre appareil |
 | `exportData` / `exportJSON` | ✅ | Export JSON complet |
-| `importData` / `importJSON` — **restauration** | ❌ | On peut exporter une sauvegarde, pas la réinjecter. Une sauvegarde qu'on ne sait pas restaurer n'est pas une sauvegarde |
+| `importData` / `importJSON` — **restauration** | ✅ | **Ajouté le 13/08.** Le fichier est lu, son contenu **annoncé** — tant de recettes, de dépenses, de missions —, et rien n'est écrasé avant confirmation. Le refus de fond (schéma plus récent que ce code) est relayé à l'écran plutôt qu'avalé |
 | `showOnboarding` et sa séquence | ❌ | Aucun parcours de première ouverture ; on arrive sur un Pilote vide |
 | `createSearchOverlay`, `performSearch` | ❌ | Pas de recherche globale |
 | `initKeyboardShortcuts`, `createKeyboardHelp` | ❌ | Pas de raccourcis clavier |
@@ -153,15 +158,65 @@ un trou qui ne fait échouer aucun test.
 1. ~~**Les échéances**~~ — ✅ **fait le 13/08.** Schéma v3, quatre actions de
    magasin, carte dans Argent, tri des charges legacy à la migration. Le volet 1
    des provisions et les sorties du flux du mois sont débloqués.
-2. **Les clients opérationnels par mission** — touche le schéma, le planning
-   et le CRA. C'est le plus structurant, et c'est votre cas réel.
-3. **Le versement de rémunération** — une action, un mouvement, une ligne au
-   flux.
-4. **La restauration d'une sauvegarde** — le pendant de l'export, quelques
-   heures, et ça ferme un risque de perte de données.
+2. ~~**Les clients opérationnels par mission**~~ — ✅ **fait le 13/08.**
+   Schéma v4, migration des entités legacy, planning et CRA ventilés, et
+   l'éditeur de rythme qui manquait.
+3. ~~**Le versement de rémunération**~~ — ✅ **fait le 13/08**, sous une autre
+   forme que celle demandée : un nom sur un mouvement, pas un fait de plus.
+4. ~~**La restauration d'une sauvegarde**~~ — ✅ **faite le 13/08.**
 5. Le reste — objectif de CA, projection de seuil, OFX, onboarding, recherche,
    raccourcis — au fil de l'usage.
 
 Trois choses ne reviendront pas, et c'est délibéré : l'export FEC (D6), le
 score de santé sur 100 (il ne mesurait rien), et le recalcul des grilles en
 JavaScript (invariant n°7).
+
+---
+
+## Annexe — l'écart de 2 060 € sur le CA encaissé
+
+**Question posée :** l'ancienne application annonce 43 030 € encaissés sur
+2026, la nouvelle 40 970 €. Est-ce un défaut de la nouvelle, ou une différence
+de définition&nbsp;?
+
+**Réponse : une différence de définition, et la nouvelle a la bonne.**
+Vérifié en lisant les deux calculs côte à côte.
+
+### Ce que chacune compte
+
+L'ancienne (`getIRForYear`, ligne 4391 de `index.html`) parcourt les factures
+des missions et applique **trois filtres** que la nouvelle n'a pas :
+
+| Filtre de l'ancienne | Effet | Pourquoi c'est discutable |
+|---|---|---|
+| `if (mis.statut === 'prospect' \|\| mis.statut === 'perdue') return` | Écarte **toutes** les factures d'une mission marquée perdue | Une mission perdue a pu être payée en partie avant de l'être. Cet argent est bien entré sur le compte, et l'URSSAF le réclamera |
+| `if (f.jours <= 0) return` | Écarte les factures sans jours saisis | Une facture porte un montant. Qu'on ait ou non renseigné son nombre de jours ne change pas ce qui est arrivé sur le compte |
+| `if (f.status === 'payée' && paymentMonth > nowYm) paymentMonth = nowYm` | **Ramène au mois courant** une date de paiement future | C'est le plus lourd : une facture payée avec une date en 2027 est comptée dans l'année en cours. Le chiffre de l'année en est gonflé, et celui de l'année suivante vidé |
+
+La nouvelle (`caEncaisseAnnee`) ne retient qu'une chose : les recettes dont la
+**date d'encaissement** tombe dans l'année. Sans filtre de statut de mission,
+sans filtre de jours, sans repli de date.
+
+C'est la définition du chiffre d'affaires encaissé en micro — ce qui est
+réellement arrivé sur le compte cette année-là — et c'est celle que l'URSSAF
+et le livre des recettes emploient.
+
+### Le sens de l'écart concorde
+
+Les trois filtres poussent dans le même sens : le troisième **gonfle** l'année
+en cours en y attirant des paiements futurs, les deux premiers en **retirent**
+des montants réels. L'ancienne annonçant *plus* que la nouvelle, le troisième
+domine — ce qui est cohérent avec les données observées le 12/08, où des
+écritures étaient datées de **janvier 2027**.
+
+### Ce qui reste à faire, et pourquoi ce n'est pas urgent
+
+Dire **laquelle** des trois lignes explique les 2 060 € demande les données
+réelles, que ce dépôt ne contient pas et ne doit pas contenir. C'est un
+rapprochement à faire dans l'application, écran Facturer&nbsp;: filtrer sur
+« Encaissées », période « Année », et comparer la liste au détail de l'ancienne
+version.
+
+**Ce n'est pas un correctif à écrire.** Aligner la nouvelle sur l'ancienne
+reviendrait à réintroduire trois erreurs de définition pour retrouver un
+chiffre faux.

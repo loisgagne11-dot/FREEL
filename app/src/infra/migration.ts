@@ -35,6 +35,7 @@ import {
   type Rythme, completerFaits, entrepriseVide, faitsVides, motifRefusFaits
 } from '../state/schema';
 import { JOURS_SEMAINE } from '../domain/calculs/planning';
+import type { ClientOperationnel } from '../state/schema';
 import type { Echeance, NatureDette } from '../domain/calculs/provisions';
 
 /** Préfixe de l'ancienne application. Ne jamais écrire dessus. */
@@ -348,6 +349,99 @@ function congesDesMissions(missions: readonly unknown[]): Conge[] {
  * plutôt que de le perdre — c'est faux pour un quatre-cinquièmes du mercredi,
  * mais les ajustements sont là pour corriger, et rien ne vaut mieux que rien.
  */
+/**
+ * Les clients opérationnels d'une mission legacy.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'ANCIENNE APPLICATION AVAIT TROIS SOURCES POUR UNE MÊME JOURNÉE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Elle portait un rythme sur la mission (`periodes[].joursMap`), un rythme
+ * par entité (`entites[].joursParSemaine`), et une table `entiteByDay` pour
+ * arbitrer entre les deux. Trois sources pour une même journée finissent
+ * toujours par se contredire, et rien n'indiquait laquelle faisait foi.
+ *
+ * Le nouveau schéma n'en garde qu'une : le rythme appartient au client
+ * opérationnel. La reprise applique donc une règle simple et vérifiable —
+ *
+ *   · pas d'entité, ou une seule : un client opérationnel qui reprend le
+ *     rythme de la mission tel quel. Le planning d'hier redonne exactement
+ *     les mêmes journées.
+ *   · plusieurs entités : chacune garde SON rythme (`joursParSemaine`), et
+ *     celui de la mission est ignoré — il était la somme approximative des
+ *     autres, et le conserver compterait les journées deux fois.
+ *
+ * Les ajustements restent au niveau de la mission dans l'ancien format
+ * (`lignes[].ajustements`, sans entité) : ils sont donnés au PREMIER client
+ * opérationnel. Les répartir au jugé serait inventer une information que
+ * l'ancienne application n'a jamais eue.
+ */
+function entitesDeLaMission(m: Inconnu, prefixe: string): ClientOperationnel[] {
+  const brutes = tableau(m['entites'])
+    .map((e) => objet(e))
+    .filter((e) => texte(e['nom']) !== '');
+
+  const ajustements = ajustementsDeLaMission(m);
+  const rythmeMission = rythmesDeLaMission(m);
+
+  if (brutes.length <= 1) {
+    const seule = brutes[0];
+    return [{
+      id: `${prefixe}-co1`,
+      nom: seule ? texte(seule['nom']) : texte(m['client']),
+      couleur: seule ? texte(seule['couleur']) : '',
+      adresse: seule ? texte(seule['adresse']) : '',
+      contact: seule ? texte(seule['contact']) : '',
+      email: seule ? texte(seule['email']) : '',
+      telephone: seule ? texte(seule['telephone']) : '',
+      rythmes: rythmeMission,
+      ajustements
+    }];
+  }
+
+  const debut = dateOuNull(m['debut']);
+  const fin = dateOuNull(m['fin']);
+
+  return brutes.map((e, i) => ({
+    id: `${prefixe}-co${i + 1}`,
+    nom: texte(e['nom']),
+    couleur: texte(e['couleur']),
+    adresse: texte(e['adresse']),
+    contact: texte(e['contact']),
+    email: texte(e['email']),
+    telephone: texte(e['telephone']),
+    rythmes: rythmeDeLEntite(e, debut, fin, rythmeMission),
+    // Seul le premier reçoit les ajustements : l'ancien format ne disait pas
+    // à quelle entité chacun appartenait.
+    ajustements: i === 0 ? ajustements : {}
+  }));
+}
+
+/**
+ * Le rythme propre d'une entité, sur toute la durée de la mission.
+ *
+ * `joursParSemaine` est une semaine type sans bornes de dates : on l'étend à
+ * la durée de la mission. Sans dates de mission, on retombe sur le rythme
+ * de la mission — mieux vaut une plage approchée qu'un planning vide.
+ */
+function rythmeDeLEntite(
+  e: Inconnu, debut: DateISO | null, fin: DateISO | null, repli: Rythme[]
+): Rythme[] {
+  const brut = objet(e['joursParSemaine']);
+  const parJour: Record<string, number> = {};
+  for (const j of JOURS_SEMAINE) {
+    const q = nombre(brut[j]);
+    if (q > 0) parJour[j] = q;
+  }
+  if (Object.keys(parJour).length === 0) return repli;
+
+  const du = debut ?? repli[0]?.du;
+  const au = fin ?? repli[repli.length - 1]?.au;
+  if (du === undefined || au === undefined) return repli;
+
+  return [{ du, au, parJour, tjm: null }];
+}
+
 function rythmesDeLaMission(m: Inconnu): Rythme[] {
   const rythmes: Rythme[] = [];
 
@@ -641,8 +735,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       clientNom: nom,
       description: texte(m['description']),
       tjm: euros(nombre(m['tjm'])),
-      rythmes: rythmesDeLaMission(m),
-      ajustements: ajustementsDeLaMission(m),
+      entites: entitesDeLaMission(m, `mission-${i}`),
       debut: dateOuNull(m['debut']),
       fin: dateOuNull(m['fin']),
       statut: statutMission(statutBrut)

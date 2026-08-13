@@ -5,29 +5,34 @@ premier, avant tout autre document. Il est mis à jour à chaque fin de lot de
 travail. Si son contenu contredit un autre document, c'est lui qui fait foi
 sur l'état d'avancement — les autres font foi sur les décisions.
 
-**Dernière mise à jour** : 28 juillet 2026
+**Dernière mise à jour** : 13 août 2026
 **Branche de travail** : `claude/orchestration-redesign-screens-0ee3sz`, repartie de `main`
-**PR #245** : **MERGÉE.** Elle est close, elle ne peut plus porter de travail —
-toute suite donne lieu à une **nouvelle** PR. Ne pas y ajouter de commits, ne
-pas la rouvrir.
+**Schéma des faits** : **v5**
 
-Tout ce qui est décrit ci-dessous est donc **sur `main`** et déployé : l'audit,
-le plan, les corrections J0 de l'app existante, et le socle de la nouvelle
-application sous `app/`.
+Les PR #245 à #264 sont **mergées et closes** : elles ne peuvent plus porter de
+travail, toute suite donne lieu à une nouvelle PR. Tout ce qu'elles contiennent
+est sur `main` et déployé.
 
 **Sanité au moment de la reprise** — `cd app && npm run verifier` enchaîne
-typage, tests, build, contrôle responsive et migration de bout en bout. Repères
-au dernier passage :
+typage, tests, build, budget, responsive, index périmé, confidentialité,
+migration de bout en bout et absence de données personnelles. Repères au
+dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **565** (+ 91 côté legacy) |
-| Build | **58 Ko** de code applicatif, 188 Ko de bibliothèques, 260 Ko au premier rendu |
+| Tests | **964** sur 56 fichiers (+ 91 côté legacy) |
+| Build | **78,2 Ko** de code applicatif, 188 Ko de bibliothèques, 289 Ko au premier rendu |
 | Budget | conforme sur les **4 postes** vérifiés |
-| Responsive | **120 combinaisons** (5 tailles × 4 palettes × **6 écrans**) |
+| Responsive | **140 combinaisons** (5 tailles × 4 palettes × **7 écrans**) |
+| Confidentialité | aucun montant lisible sur les 7 écrans |
 | Migration | conforme |
 
 Un nombre de tests en baisse, ou un budget dépassé, signale une régression.
+
+**Ce fichier avait quinze jours de retard au 13/08** — il annonçait 565 tests et
+58 Ko quand il y en avait 961 et 78. Le document qui « fait foi sur l'état
+d'avancement » ne peut pas être celui qu'on oublie de tenir : ses chiffres se
+relèvent de la sortie de `npm run verifier`, jamais de mémoire.
 
 **Le budget a changé de forme le 12/08.** Il était un plafond unique de 250 Ko
 sur le paquet d'entrée ; la mesure a montré ce que ce chiffre recouvrait :
@@ -768,6 +773,123 @@ sans quoi chaque cotisation correctement triée aurait été signalée comme per
 
 ---
 
+### Les clients opérationnels, et le rythme enfin saisissable (13/08, schéma v4)
+
+Le manque n°2 de l'audit. Une mission passée par une agence a **deux clients
+de nature différente** : celui qui paie — qui reçoit la facture — et ceux chez
+qui on travaille. Le CRA se remet au second, qui le signe.
+
+**Le rythme appartient désormais au client opérationnel**, pas à la mission.
+C'est ce qui permet « lundi-mardi chez l'un, mercredi-jeudi chez l'autre » sans
+avoir à trancher, jour par jour, à qui revient la journée : chacun a les
+siennes. L'ancienne application portait un rythme sur la mission **et** un
+rythme par entité, **plus** une table `entiteByDay` pour arbitrer entre les
+deux — trois sources pour une même journée, sans que rien n'indique laquelle
+faisait foi. Le nouveau schéma n'en garde qu'une, et `entiteByDay` devient sans
+objet.
+
+- Le planning rend **une ligne par client**, avec sa teinte ; la vue semaine a
+  une paire de créneaux par ligne, donc un clic sait toujours ce qu'il corrige.
+- Le CRA se ventile **par client qui signe**. Les fusionner exposerait à l'un
+  le volume consacré à l'autre.
+- **Le cas ordinaire ne montre pas le concept** : une mission à un seul client
+  affiche le rythme sans nom ni couleur à saisir, et son libellé reste celui de
+  la mission. Le vocabulaire n'apparaît qu'au moment où il veut dire quelque
+  chose.
+
+**Le huitième manque, que l'audit avait laissé passer.** En construisant le
+formulaire, découverte qu'il n'existait **aucun écran pour déclarer un
+rythme**. Le domaine savait le calculer, le planning savait le lire, la
+migration savait le reprendre — mais une mission créée dans l'application
+n'avait aucun moyen d'en recevoir un. Son planning restait vide,
+définitivement. Seules les missions reprises de l'ancienne version en avaient.
+
+C'est encore la même famille de défaut que les cinq précédentes : du code juste
+et inatteignable. Elle a échappé à l'audit parce que celui-ci comparait des
+FONCTIONS, et que l'ancienne application avait bien la sienne — c'est le
+chemin vers elle qui manquait, pas la fonction.
+
+L'éditeur ajouté est une semaine type à sept boutons, avec le même tour que le
+planning : journée → demi-journée → rien. Ce qu'on apprend d'un côté sert de
+l'autre, et une case à cocher ne saurait pas dire la demi-journée.
+
+**Budget.** L'entrée est repassée à 80,19 Ko pour un plafond de 80. Troisième
+application de la même règle : `selecteurs.achats.ts` sort du module
+monolithique → **76,59 Ko**. Le plafond n'a toujours pas bougé.
+
+---
+
+### La rémunération se nomme, elle ne se saisit pas (13/08, schéma v5)
+
+Le manque n°3 de l'audit, corrigé **autrement que demandé** — et le refus
+mérite d'être écrit, parce qu'il tient à la différence entre les deux
+applications.
+
+L'audit demandait « un versement de rémunération à enregistrer ». Ç'aurait été
+un fait de trop. Se verser de l'argent n'est pas une opération comptable en
+micro : la personne et l'entreprise sont la même, un virement du compte pro
+vers le compte perso ne crée ni charge ni recette. Et surtout, **le virement
+figure déjà au relevé** — le saisir une seconde fois le compterait deux fois.
+
+L'ancienne application n'avait pas ce choix : elle *simulait* son solde à
+partir des encaissements moins les charges, et devait donc enregistrer le
+salaire pour le retrancher. Ici le solde est réel. Reprendre sa solution aurait
+été reprendre la contrainte sans la cause.
+
+Ce qui manquait n'était pas un fait mais un **nom** : savoir lequel des
+mouvements sortants est une rémunération.
+
+- `sansContrepartie` passe du **booléen au motif** — `'remuneration'`,
+  `'autre'`, ou `null`. Un seul état ne pouvait pas distinguer un virement
+  qu'on s'est versé de frais bancaires.
+- Le motif ne change **aucun total** : il permet seulement de répondre à
+  « combien me suis-je versé ce mois-ci », que rien ne savait dire.
+- Le Pilote affiche **« déjà versé ce mois »** sous le versable, et l'écart au
+  besoin mensuel. Sans cette ligne, « je peux me verser 3 000 » se lit comme
+  « en plus », alors qu'on s'est peut-être déjà versé 2 500 le 5.
+- La rémunération n'est proposée que sur les **débits** : un crédit ne peut pas
+  être un virement qu'on s'est versé, et l'offrir inviterait à classer une
+  recette hors du chiffre d'affaires.
+
+**Le piège de migration, troisième du nom.** Le champ valait `true`/`false`.
+Sans conversion, un `false` enregistré hier serait lu comme « différent de
+`null` », donc comme un mouvement **déjà classé** : toute la file « à traiter »
+aurait disparu, sans que rien ne le signale. Après les congés et les rythmes,
+la règle est acquise — une migration descend jusqu'où les champs ont bougé, et
+un champ imbriqué se convertit explicitement.
+
+### Un filet contre l'omission (13/08)
+
+Ajouté sans que l'audit le demande, parce que les échéances viennent de faire
+apparaître le risque : **une omission ne se voit pas.** Elle produit un chiffre
+plausible, juste trop élevé.
+
+Quelqu'un qui encaisse depuis trois mois sans avoir jamais enregistré un appel
+de cotisations n'a pas « zéro cotisation » — il a oublié de les saisir. Son
+disponible et son versable sont surestimés, et l'application l'invite alors à
+se verser de l'argent déjà dû. Exactement ce qu'elle existe pour empêcher.
+
+`aTraiter` porte donc un sujet « aucune échéance enregistrée », qui **dit le
+sens de l'erreur** : « surestimé » n'est pas « incomplet », et c'est ce mot-là
+qui fait agir. Il se tait sur un ou deux mois — ça peut être un début
+d'activité — et disparaît dès la première échéance saisie, **même payée** :
+elle prouve que le geste est connu, et continuer à alerter dresserait à ignorer
+l'alerte.
+
+### Restaurer une sauvegarde (13/08)
+
+L'export existait depuis le début, la restauration non. Une sauvegarde qu'on ne
+sait pas relire n'est pas une sauvegarde : c'est un fichier qui rassure.
+
+Le fichier est lu, son contenu **annoncé** — tant de recettes, de dépenses, de
+missions, de clients — et rien n'est écrasé avant confirmation ; même posture
+que sur l'écran Compte, et pour la même raison. Un fichier illisible se dit
+tout de suite, pas après la confirmation. Le refus de fond — un bloc écrit par
+une version plus récente — vient de `adopterFaitsDistants` et est **relayé à
+l'écran** plutôt qu'avalé.
+
+---
+
 ## 4 quinquies. Leçon du 13/08 — un test vert sur du code mort ne prouve rien
 
 `encaisserRecette` était écrite, commentée, couverte par des tests de magasin
@@ -811,7 +933,7 @@ son travail : « je ne peux pas changer leur statut ».
 | **Marge de build** | Réglé. React est sorti dans un chunk `vendor` : il ne change pas d'un déploiement à l'autre, donc le cache du navigateur le conserve. Modifier une ligne de code invalidait 248 Ko ; désormais 55 |
 | **Relevé bancaire** | **Réglé.** L'import CSV existe, `selecteurs.solde()` compte les mouvements, et `banqueReliee` a été retiré du schéma : il était devenu dérivable (un relevé est disponible si et seulement s'il y a des mouvements), et le garder aurait permis qu'un booléen à `true` coexiste avec une liste vide |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
-| **Écart de 2 060 € sur le CA encaissé** | **Ouvert.** L'ancienne application annonce 43 030 €, la nouvelle 40 970 € sur 2026 après correction des brouillons. L'hypothèse est une définition de période différente (année civile contre glissante), **non vérifiée**. À reprendre facture par facture : un écart expliqué vaut mieux qu'un écart qui se réduit |
+| **Écart de 2 060 € sur le CA encaissé** | **Expliqué le 13/08 : différence de DÉFINITION, pas défaut de la nouvelle.** L'ancienne écarte les factures des missions « perdue », celles sans jours saisis, et surtout **ramène au mois courant** toute date de paiement future — ce qui gonfle l'année en cours de paiements 2027. La nouvelle ne retient que la date d'encaissement réelle, qui est la définition du CA encaissé en micro. Voir l'annexe de `AUDIT-ANCIENNE-VS-NOUVELLE.md`. Reste à faire, sans urgence : dire **laquelle** des trois lignes vaut 2 060 €, ce qui demande les données réelles — donc un rapprochement dans l'application, pas un correctif |
 | **Reprise à refaire** | Les congés, les rythmes et les ajustements ne migraient pas avant le 13/08. Une reprise effectuée avant cette date a un planning vide. Il faut relancer « Reprendre les données de l'ancienne application », puis contrôler le planning et le CRA contre ce qu'on sait — c'est le dernier endroit où une erreur de correspondance peut rester cachée |
 | **Schéma v1 → v2** | **Réglé, en deux temps.** Les congés étaient des chaînes de dates, ils sont désormais des objets `{ date, quotité }` pour porter la demi-journée — sans conversion, un calendrier existant se serait vidé en silence. Puis, le même jour, le cas manqué : `completerFaits` ne comblait que le **premier niveau**, donc les missions déjà enregistrées arrivaient sans `rythmes`, et l'écran Activité tombait entièrement pour tout compte antérieur au schéma 2. Corrigé et verrouillé par quatre tests |
 

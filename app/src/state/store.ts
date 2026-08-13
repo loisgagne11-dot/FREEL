@@ -29,6 +29,7 @@ import {
   type ModeReglement, ecritureDAnnulation, prochainNumero
 } from '../domain/calculs/livreRecettes';
 import { importerMouvements } from '../domain/calculs/banque';
+import type { MotifSansContrepartie } from '../domain/calculs/banque';
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
 } from '../domain/bareme/urssaf';
@@ -147,8 +148,20 @@ interface MagasinFaits {
    */
   readonly rapprocherMouvement: (mouvementId: string, ecritureId: string | null) => void;
 
-  /** Déclare qu'aucune écriture ne correspond : frais bancaires, apport… */
-  readonly marquerSansContrepartie: (mouvementId: string, sans: boolean) => void;
+  /**
+   * Déclare qu'aucune écriture ne correspond, et POURQUOI.
+   *
+   * `remuneration` pour un virement qu'on s'est versé, `autre` pour des frais
+   * bancaires ou un remboursement, `null` pour remettre le mouvement dans la
+   * file « à traiter ».
+   *
+   * Le motif ne change aucun total : le virement figure déjà au relevé et le
+   * solde le reflète déjà. Il permet seulement de répondre à « combien me
+   * suis-je versé ce mois-ci » — que rien ne savait dire.
+   */
+  readonly marquerSansContrepartie: (
+    mouvementId: string, motif: MotifSansContrepartie | null
+  ) => void;
 
   /** Efface tous les mouvements importés. Ne touche à aucune écriture. */
   readonly viderReleve: () => void;
@@ -206,7 +219,9 @@ interface MagasinFaits {
    * contraire « ce jour prévu, je n'ai pas travaillé ». Les confondre
    * rendrait impossible de revenir au rythme après une correction.
    */
-  readonly ajusterJour: (missionId: string, date: DateISO, quotite: number | null) => void;
+  readonly ajusterJour: (
+    missionId: string, entiteId: string, date: DateISO, quotite: number | null
+  ) => void;
 
   /* ── Profil et barème ─────────────────────────────────────────────────── */
 
@@ -488,19 +503,19 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
         (m.id === mouvementId
           // Rapprocher lève l'état « sans contrepartie » : les deux se
           // contrediraient, et l'écran devrait alors arbitrer.
-          ? { ...m, rapprocheAvec: ecritureId, sansContrepartie: false }
+          ? { ...m, rapprocheAvec: ecritureId, sansContrepartie: null }
           : m))
     };
     set({ faits });
     persister(stockageActif, faits);
   },
 
-  marquerSansContrepartie: (mouvementId, sans) => {
+  marquerSansContrepartie: (mouvementId, motif) => {
     const actuel = get().faits;
     const faits: Faits = {
       ...actuel,
       mouvementsBancaires: actuel.mouvementsBancaires.map((m) =>
-        (m.id === mouvementId ? { ...m, sansContrepartie: sans, rapprocheAvec: null } : m))
+        (m.id === mouvementId ? { ...m, sansContrepartie: motif, rapprocheAvec: null } : m))
     };
     set({ faits });
     persister(stockageActif, faits);
@@ -754,14 +769,23 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     return null;
   },
 
-  ajusterJour: (missionId, date, quotite) => {
+  ajusterJour: (missionId, entiteId, date, quotite) => {
     const actuel = get().faits;
     const missions = actuel.missions.map((m) => {
       if (m.id !== missionId) return m;
-      const ajustements = { ...m.ajustements };
-      if (quotite === null) delete ajustements[date];
-      else ajustements[date] = quotite;
-      return { ...m, ajustements };
+      // L'ajustement vise UN client opérationnel : deux d'entre eux peuvent
+      // travailler le même jour, et corriger l'un ne doit rien changer à
+      // l'autre.
+      return {
+        ...m,
+        entites: m.entites.map((e) => {
+          if (e.id !== entiteId) return e;
+          const ajustements = { ...e.ajustements };
+          if (quotite === null) delete ajustements[date];
+          else ajustements[date] = quotite;
+          return { ...e, ajustements };
+        })
+      };
     });
     const faits: Faits = { ...actuel, missions };
     set({ faits });

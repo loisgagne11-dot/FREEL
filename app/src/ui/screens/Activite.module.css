@@ -485,3 +485,119 @@
   font-size: 12.5px;
   cursor: pointer;
 }
+
+/* ── Rythme et clients opérationnels ────────────────────────────────────── */
+
+.groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 12px;
+  margin: 0;
+  min-width: 0;
+}
+
+.legendeGroupe {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.entite {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.entite + .entite { border-top: 1px solid var(--line); padding-top: 10px; }
+
+.entiteEntete { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.teinte {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: transparent;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.entiteNom {
+  flex: 1 1 140px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+}
+
+.retirer,
+.ajouterEntite {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.retirer:hover { border-color: var(--red-line); color: var(--text); }
+.ajouterEntite:hover { border-color: var(--green); color: var(--text); }
+
+/* La semaine type déborde plutôt que de s'écraser : sept boutons de 44 px ne
+   tiennent pas dans 340 px, et un bouton rétréci n'est plus une cible. */
+.semaineType {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.jourType {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1 0 44px;
+  min-height: 48px;
+  padding: 5px 4px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.jourType:hover { border-color: var(--line-2); }
+
+.jourPlein { background: var(--green-soft); border-color: var(--green); color: var(--text); }
+.jourDemi { background: var(--amber-soft); border-color: var(--amber); color: var(--text); }
+
+.quotiteJour { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* Choix du rattachement d'une journée déclarée. Une pile de boutons pleine
+   largeur : chaque ligne est une décision, pas une option dans une liste. */
+.choixAffectation { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.choixAffectation .actionPrincipale { width: 100%; text-align: left; }

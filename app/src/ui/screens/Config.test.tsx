@@ -1,13 +1,14 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois } from '../../domain/types';
 import { PERIODES_URSSAF } from '../../domain/bareme/urssaf';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { periodesUrssafEffectives } from '../../state/selecteurs';
+import { FournisseurToasts } from '../components/Toasts';
 import { Config } from './Config';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -282,12 +283,118 @@ describe('trésorerie', () => {
       ...faitsVides(),
       mouvementsBancaires: [{
         id: 'mv1', date: dateISO('2026-08-01'), libelle: 'Virement',
-        montant: euros(1000), rapprocheAvec: null, sansContrepartie: false
+        montant: euros(1000), rapprocheAvec: null, sansContrepartie: null
       }]
     };
     useFaits.setState({ faits });
     render(<Config />);
 
     expect(screen.getByRole('spinbutton', { name: /avant le premier mouvement/ })).toBeTruthy();
+  });
+});
+
+/**
+ * UNE SAUVEGARDE QU'ON NE SAIT PAS RELIRE N'EST PAS UNE SAUVEGARDE.
+ *
+ * L'export existait depuis le début, la restauration non : on pouvait produire
+ * un fichier, pas le réinjecter. C'est un fichier qui rassure, pas un filet.
+ */
+describe('restauration d’une sauvegarde', () => {
+  const sauvegarde = (contenu: unknown, nom = 'freel.json') =>
+    new File([JSON.stringify(contenu)], nom, { type: 'application/json' });
+
+  async function ouvrirDonnees() {
+    render(<FournisseurToasts><Config /></FournisseurToasts>);
+    const utilisateur = utilisateurTest();
+    await utilisateur.click(screen.getByRole('tab', { name: 'Données' }));
+    return utilisateur;
+  }
+
+  const bloc = {
+    ...faitsVides(),
+    clients: [{
+      id: 'c1', nom: 'Client repris', adresse: '', siret: '', email: '',
+      delaiPaiementJours: 30, pays: '', tvaIntracom: ''
+    }]
+  };
+
+  /**
+   * Restaurer écrase tout. Le faire au choix du fichier ferait perdre une
+   * saisie du jour sans que personne l'ait vue passer.
+   */
+  it('montre ce que contient le fichier avant d’écraser quoi que ce soit', async () => {
+    const utilisateur = await ouvrirDonnees();
+    await utilisateur.upload(
+      screen.getByLabelText('Restaurer une sauvegarde'), sauvegarde(bloc)
+    );
+
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(screen.getByRole('alert').textContent).toMatch(/1 .*client/);
+    // Rien n'a encore bougé.
+    expect(useFaits.getState().faits.clients).toEqual([]);
+  });
+
+  it('remplace les faits une fois confirmé', async () => {
+    const utilisateur = await ouvrirDonnees();
+    await utilisateur.upload(
+      screen.getByLabelText('Restaurer une sauvegarde'), sauvegarde(bloc)
+    );
+    await waitFor(() => screen.getByRole('alert'));
+    await utilisateur.click(
+      screen.getByRole('button', { name: 'Remplacer mes données par cette sauvegarde' })
+    );
+
+    expect(useFaits.getState().faits.clients[0]?.nom).toBe('Client repris');
+  });
+
+  it('laisse annuler sans rien toucher', async () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        clients: [{
+          id: 'existant', nom: 'Déjà là', adresse: '', siret: '', email: '',
+          delaiPaiementJours: 30, pays: '', tvaIntracom: ''
+        }]
+      }
+    });
+    const utilisateur = await ouvrirDonnees();
+    await utilisateur.upload(
+      screen.getByLabelText('Restaurer une sauvegarde'), sauvegarde(bloc)
+    );
+    await waitFor(() => screen.getByRole('alert'));
+    await utilisateur.click(screen.getByRole('button', { name: 'Annuler' }));
+
+    expect(useFaits.getState().faits.clients[0]?.nom).toBe('Déjà là');
+  });
+
+  // Un fichier illisible doit se dire tout de suite, pas après confirmation.
+  it('refuse un fichier qui n’est pas du JSON, et dit pourquoi', async () => {
+    const utilisateur = await ouvrirDonnees();
+    await utilisateur.upload(
+      screen.getByLabelText('Restaurer une sauvegarde'),
+      new File(['ceci n’est pas du JSON'], 'notes.json', { type: 'application/json' })
+    );
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/pas du JSON/));
+    expect(screen.queryByRole('button', { name: /Remplacer mes données/ })).toBeNull();
+  });
+
+  /**
+   * Le refus de fond — schéma plus récent que ce code — appartient à
+   * `adopterFaitsDistants`, et il est RENDU à l'utilisateur plutôt qu'avalé.
+   */
+  it('relaie le refus d’un bloc écrit par une version plus récente', async () => {
+    const utilisateur = await ouvrirDonnees();
+    await utilisateur.upload(
+      screen.getByLabelText('Restaurer une sauvegarde'),
+      sauvegarde({ ...bloc, version: 999 })
+    );
+    await waitFor(() => screen.getByRole('alert'));
+    await utilisateur.click(
+      screen.getByRole('button', { name: 'Remplacer mes données par cette sauvegarde' })
+    );
+
+    expect(useFaits.getState().faits.clients).toEqual([]);
+    await waitFor(() => expect(screen.getByText(/plus récente/i)).toBeTruthy());
   });
 });

@@ -3,9 +3,10 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  caEncaisseAnnee, etatAchats, etatLivre, etatPilote, moisCourant,
-  recettesEncaissees, regimeDe, regimeTvaAu, sousAcreLe
+  caEncaisseAnnee, etatLivre, etatPilote, moisCourant,
+  recettesEncaissees, regimeDe, remunerationDuMois, sousAcreLe
 } from './selecteurs';
+import { etatAchats, regimeTvaAu } from './selecteurs.achats';
 
 function faits(modifications: Partial<Faits> = {}): Faits {
   const base = faitsVides();
@@ -206,7 +207,7 @@ describe('écran Achats', () => {
     // rapprochement possible.
     mouvementsBancaires: [{
       id: 'mvt-1', date: dateISO('2026-09-10'), libelle: 'PRLV',
-      montant: euros(-120), rapprocheAvec: null, sansContrepartie: false
+      montant: euros(-120), rapprocheAvec: null, sansContrepartie: null
     }]
   });
 
@@ -344,5 +345,70 @@ describe('livre des recettes', () => {
     expect(etat.ecritures).toEqual([]);
     expect(etat.ecarts).toEqual([]);
     expect(etat.total.total).toBe(0);
+  });
+});
+
+/**
+ * LA RÉMUNÉRATION EST DÉRIVÉE DU RELEVÉ, JAMAIS SAISIE.
+ *
+ * L'audit demandait « un versement de rémunération à enregistrer ». Ç'aurait
+ * été un fait de trop : se verser de l'argent n'est pas une opération
+ * comptable en micro — la personne et l'entreprise sont la même —, le virement
+ * figure déjà au relevé, et le saisir une seconde fois le compterait deux fois.
+ *
+ * Ce qui manquait n'était pas un fait mais un NOM : savoir lequel des
+ * mouvements sortants est une rémunération.
+ */
+describe('rémunération versée', () => {
+  const mouvement = (m: Partial<Faits['mouvementsBancaires'][number]> = {}) => ({
+    id: 'mv1', date: dateISO('2026-08-05'), libelle: 'VIR COMPTE PERSO',
+    montant: euros(-2500), rapprocheAvec: null,
+    sansContrepartie: 'remuneration' as const, ...m
+  });
+
+  it('totalise les virements nommés « rémunération » du mois', () => {
+    const f = faits({
+      mouvementsBancaires: [
+        mouvement(),
+        mouvement({ id: 'mv2', date: dateISO('2026-08-20'), montant: euros(-500) })
+      ]
+    });
+    expect(remunerationDuMois(f, mois('2026-08'))).toBe(3000);
+  });
+
+  // Un débit est négatif au relevé : on rend le montant VERSÉ, pas son opposé.
+  it('rend un montant positif', () => {
+    const f = faits({ mouvementsBancaires: [mouvement()] });
+    expect(remunerationDuMois(f, mois('2026-08'))).toBeGreaterThan(0);
+  });
+
+  it('ignore les mouvements d’un autre mois', () => {
+    const f = faits({ mouvementsBancaires: [mouvement({ date: dateISO('2026-07-05') })] });
+    expect(remunerationDuMois(f, mois('2026-08'))).toBe(0);
+  });
+
+  /**
+   * Les frais bancaires sont eux aussi « sans contrepartie », et ce ne sont
+   * pas des rémunérations. C'est précisément pourquoi le booléen est devenu un
+   * motif : un seul état ne pouvait pas distinguer les deux.
+   */
+  it('ne compte pas les autres mouvements sans contrepartie', () => {
+    const f = faits({
+      mouvementsBancaires: [mouvement({ sansContrepartie: 'autre', montant: euros(-12) })]
+    });
+    expect(remunerationDuMois(f, mois('2026-08'))).toBe(0);
+  });
+
+  it('ne compte pas un mouvement rapproché d’une dépense', () => {
+    const f = faits({
+      mouvementsBancaires: [mouvement({ sansContrepartie: null, rapprocheAvec: 'd1' })]
+    });
+    expect(remunerationDuMois(f, mois('2026-08'))).toBe(0);
+  });
+
+  // Sans relevé, rien n'est su : zéro est alors une absence de mesure, et
+  // l'écran ne l'affiche pas (voir `soldeEstSuivi`).
+  it('rend zéro sans aucun relevé', () => {
+    expect(remunerationDuMois(faits(), mois('2026-08'))).toBe(0);
   });
 });
