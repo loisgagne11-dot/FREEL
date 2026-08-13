@@ -140,7 +140,11 @@ export function etatActivite(
         .reduce<number>((s, r) => s + r.montant, 0)
     ),
     poidsClients: poidsParClient(faits, Number(m.slice(0, 4))),
-    congesDeLAnnee: faits.conges.filter((d) => d.startsWith(annee)).length
+    // Somme des QUOTITÉS : deux demi-journées valent un jour, et compter les
+    // entrées en donnerait deux.
+    congesDeLAnnee: faits.conges
+      .filter((c) => c.date.startsWith(annee))
+      .reduce((s, c) => s + c.quotite, 0)
   };
 }
 

@@ -130,13 +130,21 @@ export interface Jour {
  * l'utilisateur, une fois sur son solde de congés et une fois sur son
  * occupation.
  */
+/** Un congé posé, tel que le calendrier a besoin de le connaître. */
+export interface CongePose {
+  readonly date: DateISO;
+  readonly quotite: number;
+}
+
 export function calendrierDuMois(
   m: Mois,
-  conges: readonly DateISO[],
+  conges: readonly CongePose[],
   zone: ZoneFeries = 'general'
 ): readonly Jour[] {
   const feries = new Set(joursFeries(Number(m.slice(0, 4)), zone));
-  const posesEnConge = new Set(conges);
+  // Une demi-journée posée reste un jour « en congé » au calendrier : la case
+  // doit se voir. C'est le DÉCOMPTE qui distingue la moitié de l'entier.
+  const posesEnConge = new Set(conges.filter((c) => c.quotite > 0).map((c) => c.date));
   return joursDuMois(m).map((date) => ({
     date,
     nature: estWeekEnd(date) ? 'week_end'
@@ -218,7 +226,7 @@ export function chargeDuMois(
 
 export function planDeCharge(
   m: Mois,
-  conges: readonly DateISO[],
+  conges: readonly CongePose[],
   joursFactures: number,
   zone: ZoneFeries = 'general'
 ): PlanDeCharge {
@@ -226,11 +234,20 @@ export function planDeCharge(
   const compter = (n: NatureJour) => calendrier.filter((j) => j.nature === n).length;
   const joursOuvrables = compter('ouvrable');
 
+  // Le décompte suit les QUOTITÉS : deux demi-journées valent un jour, et
+  // compter les cases en donnerait deux. C'est le solde de congés de
+  // l'utilisateur qui s'en trouverait faux.
+  const joursDeConge = conges
+    .filter((c) => c.date.startsWith(m) && calendrier.some(
+      (j) => j.date === c.date && j.nature === 'conge'
+    ))
+    .reduce((s, c) => s + c.quotite, 0);
+
   return {
     mois: m,
     joursOuvrables,
     joursFeries: compter('ferie'),
-    joursDeConge: compter('conge'),
+    joursDeConge,
     joursFactures,
     // Diviser par une constante donnerait des taux supérieurs à 100 % les mois
     // longs, et inférieurs à la réalité les mois courts.

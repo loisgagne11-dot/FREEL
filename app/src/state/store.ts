@@ -161,7 +161,16 @@ interface MagasinFaits {
    */
   readonly basculerConge: (jour: DateISO) => void;
   /** Pose ou retire une plage entière, sans jamais dupliquer une date déjà posée. */
-  readonly poserPlageDeConges: (jours: readonly DateISO[], pose: boolean) => void;
+  /**
+   * Pose ou retire une plage de congés.
+   *
+   * `quotite` vaut 1 par défaut — la journée entière est le cas courant. La
+   * demi-journée existe parce que l'ancienne application la gère depuis
+   * longtemps, et qu'un solde de congés qui compte 0,5 pour 1 est faux.
+   */
+  readonly poserPlageDeConges: (
+    jours: readonly DateISO[], pose: boolean, quotite?: number
+  ) => void;
 
   /* ── Profil et barème ─────────────────────────────────────────────────── */
 
@@ -560,7 +569,8 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
 
   basculerConge: (jour) => {
     const actuel = get().faits;
-    get().poserPlageDeConges([jour], !actuel.conges.includes(jour));
+    const pose = actuel.conges.some((c) => c.date === jour);
+    get().poserPlageDeConges([jour], !pose);
   },
 
   modifierEntreprise: (modification) => {
@@ -676,15 +686,19 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     return null;
   },
 
-  poserPlageDeConges: (jours, pose) => {
+  poserPlageDeConges: (jours, pose, quotite = 1) => {
     const actuel = get().faits;
-    // Un ensemble, puis un tri : poser deux fois la même date ne doit pas
-    // créer deux congés, et l'ordre stable rend les comparaisons lisibles.
-    const dates = new Set(actuel.conges);
+    // Une table par date, puis un tri : poser deux fois la même date ne doit
+    // pas créer deux congés, et l'ordre stable rend les comparaisons lisibles.
+    const parDate = new Map(actuel.conges.map((c) => [c.date, c]));
     for (const j of jours) {
-      if (pose) dates.add(j); else dates.delete(j);
+      if (pose) parDate.set(j, { date: j, quotite });
+      else parDate.delete(j);
     }
-    const faits: Faits = { ...actuel, conges: [...dates].sort() };
+    const faits: Faits = {
+      ...actuel,
+      conges: [...parDate.values()].sort((a, b) => a.date.localeCompare(b.date))
+    };
     set({ faits });
     persister(stockageActif, faits);
   }

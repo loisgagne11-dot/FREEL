@@ -29,7 +29,7 @@ import type { MouvementBancaire } from '../domain/calculs/banque';
  */
 export type { Depense };
 
-export const VERSION_SCHEMA = 1 as const;
+export const VERSION_SCHEMA = 2 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -123,6 +123,25 @@ export interface Recette {
   readonly globalisee?: boolean;
 }
 
+/**
+ * Un jour de congé, avec sa quotité.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA DEMI-JOURNÉE N'EST PAS UN RAFFINEMENT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne application la gère depuis longtemps — un congé y est écrit
+ * `'2026-08-14'` ou `'2026-08-14_half'`. La première version de ce schéma ne
+ * portait qu'une liste de dates : elle comptait donc une demi-journée comme
+ * une journée entière, gonflant le solde de congés et faussant l'occupation
+ * du mois dans le même mouvement.
+ */
+export interface Conge {
+  readonly date: DateISO;
+  /** 1 pour une journée, 0,5 pour une demi-journée. */
+  readonly quotite: number;
+}
+
 export interface Faits {
   readonly version: typeof VERSION_SCHEMA;
   readonly entreprise: Entreprise;
@@ -138,7 +157,7 @@ export interface Faits {
    * impossible une plage à cheval sur deux mois. Une liste de dates se trie,
    * se compare et se déduplique sans conversion.
    */
-  readonly conges: readonly DateISO[];
+  readonly conges: readonly Conge[];
   /**
    * Les opérations du compte, importées depuis un relevé.
    *
@@ -268,6 +287,38 @@ export function motifRefusFaits(brut: unknown): string | null {
  *
  * À n'appeler qu'après `motifRefusFaits`, qui seul autorise l'entrée.
  */
+/**
+ * Convertit les congés du schéma 1 vers le schéma 2.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE CAS QUI CASSE TOUT SI ON L'OUBLIE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le schéma 1 portait `conges: ['2026-08-10', …]` — de simples chaînes. Le
+ * schéma 2 porte `{ date, quotite }`, pour tenir la demi-journée que
+ * l'ancienne application gère depuis toujours.
+ *
+ * Tout bloc déjà enregistré — sur le poste comme sur le compte distant — est
+ * au format 1. Le laisser passer tel quel donnerait des congés dont `date`
+ * vaut `undefined` : le calendrier n'afficherait plus rien, le décompte
+ * tomberait à zéro, et rien ne le signalerait. Une migration de schéma qu'on
+ * oublie ne lève pas d'erreur, elle vide les données en silence.
+ */
+function congesDuSchema1(brut: unknown): readonly Conge[] {
+  if (!Array.isArray(brut)) return [];
+  return brut.flatMap((c): Conge[] => {
+    if (typeof c === 'string') return [{ date: c as DateISO, quotite: 1 }];
+    if (typeof c === 'object' && c !== null) {
+      const o = c as Record<string, unknown>;
+      if (typeof o['date'] !== 'string') return [];
+      const q = typeof o['quotite'] === 'number' && Number.isFinite(o['quotite'])
+        ? o['quotite'] : 1;
+      return [{ date: o['date'] as DateISO, quotite: q }];
+    }
+    return [];
+  });
+}
+
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
   const defauts = faitsVides();
@@ -281,6 +332,7 @@ export function completerFaits(brut: unknown): Faits {
     // Le numéro de schéma devient celui de CE code : les champs manquants
     // viennent d'être comblés, le bloc n'est plus à l'ancien format.
     version: VERSION_SCHEMA,
-    entreprise: { ...entrepriseVide(), ...entreprise }
+    entreprise: { ...entrepriseVide(), ...entreprise },
+    conges: congesDuSchema1(o['conges'])
   } as Faits;
 }

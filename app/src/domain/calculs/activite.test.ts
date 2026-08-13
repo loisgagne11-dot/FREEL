@@ -89,23 +89,28 @@ describe('jours du mois', () => {
   });
 });
 
+/** Un congé d'une journée entière — le cas courant. */
+const jour = (d: string) => ({ date: dateISO(d), quotite: 1 });
+/** Une demi-journée, telle que l'ancienne application les pose. */
+const demi = (d: string) => ({ date: dateISO(d), quotite: 0.5 });
+
 describe('calendrier du mois', () => {
   // Compter un congé posé un jour férié le ferait payer deux fois : une fois
   // sur le solde de congés, une fois sur l'occupation.
   it('ne compte pas comme congé un jour déjà férié', () => {
-    const calendrier = calendrierDuMois(mois('2026-05'), [dateISO('2026-05-01')]);
+    const calendrier = calendrierDuMois(mois('2026-05'), [jour('2026-05-01')]);
     const premier = calendrier.find((j) => j.date === '2026-05-01');
     expect(premier?.nature).toBe('ferie');
     expect(calendrier.filter((j) => j.nature === 'conge')).toHaveLength(0);
   });
 
   it('ne compte pas comme congé un samedi', () => {
-    const calendrier = calendrierDuMois(mois('2026-07'), [dateISO('2026-07-25')]);
+    const calendrier = calendrierDuMois(mois('2026-07'), [jour('2026-07-25')]);
     expect(calendrier.find((j) => j.date === '2026-07-25')?.nature).toBe('week_end');
   });
 
   it('marque un congé posé un jour ouvrable', () => {
-    const calendrier = calendrierDuMois(mois('2026-07'), [dateISO('2026-07-27')]);
+    const calendrier = calendrierDuMois(mois('2026-07'), [jour('2026-07-27')]);
     expect(calendrier.find((j) => j.date === '2026-07-27')?.nature).toBe('conge');
   });
 
@@ -128,7 +133,7 @@ describe('plan de charge', () => {
   });
 
   it('retire les congés du dénominateur', () => {
-    const conges = [dateISO('2026-07-27'), dateISO('2026-07-28')];
+    const conges = [jour('2026-07-27'), jour('2026-07-28')];
     const sans = planDeCharge(mois('2026-07'), [], 10);
     const avec = planDeCharge(mois('2026-07'), conges, 10);
     expect(avec.joursOuvrables).toBe(sans.joursOuvrables - 2);
@@ -141,7 +146,7 @@ describe('plan de charge', () => {
   // Un mois entièrement pris en congé n'a pas une occupation de 0 % : il n'en
   // a pas. Afficher 0 % laisserait croire à un mois creux.
   it('n\'a pas d\'occupation quand aucun jour n\'est ouvrable', () => {
-    const toutLeMois = joursDuMois(mois('2026-07'));
+    const toutLeMois = joursDuMois(mois('2026-07')).map((d) => ({ date: d, quotite: 1 }));
     expect(planDeCharge(mois('2026-07'), toutLeMois, 0).occupation).toBeNull();
   });
 
@@ -274,5 +279,42 @@ describe('délai de paiement par client', () => {
 
   it('sur une liste vide, ne produit aucun client', () => {
     expect(delaisParClient([], AUJOURDHUI)).toEqual([]);
+  });
+});
+
+/**
+ * La demi-journée.
+ *
+ * L'ancienne application la gère depuis longtemps — un congé y est écrit
+ * `'2026-08-14'` ou `'2026-08-14_half'`. La première version de ce schéma ne
+ * portait qu'une liste de dates : elle comptait donc une demi-journée comme
+ * une journée entière, gonflant le solde de congés de l'utilisateur.
+ */
+describe('demi-journées de congé', () => {
+  // La case doit se voir au calendrier : c'est le DÉCOMPTE qui distingue la
+  // moitié de l'entier, pas l'affichage.
+  it('marque la case comme congé, même à mi-temps', () => {
+    const calendrier = calendrierDuMois(mois('2026-07'), [demi('2026-07-27')]);
+    expect(calendrier.find((j) => j.date === '2026-07-27')?.nature).toBe('conge');
+  });
+
+  it('ne compte qu’un demi-jour au décompte', () => {
+    const plan = planDeCharge(mois('2026-07'), [demi('2026-07-27')], 10);
+    expect(plan.joursDeConge).toBe(0.5);
+  });
+
+  it('additionne deux demi-journées en un jour', () => {
+    const plan = planDeCharge(
+      mois('2026-07'), [demi('2026-07-27'), demi('2026-07-28')], 10
+    );
+    expect(plan.joursDeConge).toBe(1);
+  });
+
+  // Un congé posé hors du mois observé ne doit pas s'y ajouter.
+  it('ne compte que les congés du mois', () => {
+    const plan = planDeCharge(
+      mois('2026-07'), [jour('2026-07-27'), jour('2026-08-03')], 10
+    );
+    expect(plan.joursDeConge).toBe(1);
   });
 });

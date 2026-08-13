@@ -31,8 +31,8 @@
 import { type DateISO, type Mois, type TypeActivite, euros, ratio } from '../domain/types';
 import {
   CLE_INSTANTANE_AVANT_MIGRATION, CLE_STOCKAGE, VERSION_SCHEMA,
-  type Client, type Depense, type Faits, type Mission, type Recette,
-  entrepriseVide, faitsVides
+  type Client, type Conge, type Depense, type Faits, type Mission, type Recette,
+  completerFaits, entrepriseVide, faitsVides, motifRefusFaits
 } from '../state/schema';
 
 /** Préfixe de l'ancienne application. Ne jamais écrire dessus. */
@@ -287,7 +287,66 @@ function statutMission(brut: string): Mission['statut'] {
  * du mois (un 31 février, par exemple) est écarté : reporter silencieusement
  * sur le mois suivant poserait un congé un jour où l'utilisateur travaillait.
  */
-function extraireConges(parMois: Inconnu): DateISO[] {
+/**
+ * Les congés, là où l'ancienne application les écrit VRAIMENT.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * JE LISAIS UN CHAMP VIDE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `treasury.conges` existe dans les valeurs par défaut du legacy — un `{}`
+ * commenté « { '2025-08': [1,2,3] } » — mais rien ne l'alimente. L'écriture
+ * réelle se fait dans `mission.congesDates`, une liste de dates ISO avec le
+ * suffixe `_half` pour les demi-journées.
+ *
+ * La conversion lisait donc un objet vide pendant que les congés de
+ * l'utilisateur étaient ailleurs, et son calendrier arrivait vierge. Même
+ * famille d'erreur que `ht` contre `montant` sur les factures : un champ
+ * plausible, au mauvais endroit.
+ *
+ * L'ancien format est conservé en repli : rien ne dit qu'aucune installation
+ * ne l'a jamais rempli, et le perdre pour rien serait dommage.
+ */
+function congesDesMissions(missions: readonly unknown[]): Conge[] {
+  const parDate = new Map<string, Conge>();
+
+  for (const mBrut of missions) {
+    for (const cd of tableau(objet(mBrut)['congesDates'])) {
+      const brut = texte(cd);
+      const demi = brut.endsWith('_half');
+      const date = demi ? brut.slice(0, -5) : brut;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      // Une même date posée sur deux missions reste UN jour de congé : la
+      // personne ne peut pas être deux fois en vacances. La quotité la plus
+      // forte l'emporte.
+      const existant = parDate.get(date);
+      const quotite = demi ? 0.5 : 1;
+      if (existant === undefined || quotite > existant.quotite) {
+        parDate.set(date, { date: date as DateISO, quotite });
+      }
+    }
+  }
+
+  return [...parDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Réunit deux sources de congés sans jamais compter un jour deux fois.
+ *
+ * La quotité la plus forte l'emporte : si une source dit demi-journée et
+ * l'autre journée entière, retenir la moitié amputerait le solde de congés
+ * de l'utilisateur.
+ */
+function fusionnerConges(a: readonly Conge[], b: readonly Conge[]): Conge[] {
+  const parDate = new Map<string, Conge>();
+  for (const c of [...a, ...b]) {
+    const existant = parDate.get(c.date);
+    if (existant === undefined || c.quotite > existant.quotite) parDate.set(c.date, c);
+  }
+  return [...parDate.values()].sort((x, y) => x.date.localeCompare(y.date));
+}
+
+function extraireConges(parMois: Inconnu): Conge[] {
   const dates = new Set<string>();
   for (const [m, jours] of Object.entries(parMois)) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m)) continue;
@@ -298,7 +357,7 @@ function extraireConges(parMois: Inconnu): DateISO[] {
       dates.add(`${m}-${String(jour).padStart(2, '0')}`);
     }
   }
-  return [...dates].sort() as DateISO[];
+  return [...dates].sort().map((d) => ({ date: d as DateISO, quotite: 1 }));
 }
 
 /**
@@ -474,7 +533,12 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     missions,
     recettes: extraireRecettes(missionsBrutes, anomalies),
     depenses,
-    conges: extraireConges(objet(t['conges'])),
+    // Les deux sources sont réunies : `mission.congesDates` est celle que
+    // l'application alimente, `treasury.conges` un format plus ancien qu'on
+    // ne perd pas pour rien.
+    conges: fusionnerConges(
+      congesDesMissions(missionsBrutes), extraireConges(objet(t['conges']))
+    ),
     // L'ancienne application rapprochait contre un relevé importé à la main,
     // jamais contre un compte relié. Aucun fait ne permet de dire qu'un compte
     // l'est : on part de `false`, l'utilisateur le renseignera.
@@ -603,7 +667,13 @@ export function migrer(stockage: Stockage): ResultatMigration {
   const existant = stockage.getItem(CLE_STOCKAGE);
   if (existant !== null) {
     try {
-      return { statut: 'deja-migre', faits: JSON.parse(existant) as Faits };
+      // Passe par la MÊME validation que le compte distant. Un transtypage
+      // laisserait entrer un bloc au schéma 1 — congés en simples chaînes —
+      // qui viderait le calendrier sans lever d'erreur.
+      const brut: unknown = JSON.parse(existant);
+      const motif = motifRefusFaits(brut);
+      if (motif !== null) return { statut: 'echec', motif };
+      return { statut: 'deja-migre', faits: completerFaits(brut) };
     } catch {
       return {
         statut: 'echec',

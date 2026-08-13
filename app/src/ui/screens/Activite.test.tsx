@@ -77,7 +77,7 @@ describe('plan de charge', () => {
   it('n’affiche aucune occupation quand aucun jour n’est ouvrable', () => {
     const toutJuillet = Array.from(
       { length: 31 },
-      (_, i) => dateISO(`2026-07-${String(i + 1).padStart(2, '0')}`)
+      (_, i) => ({ date: dateISO(`2026-07-${String(i + 1).padStart(2, '0')}`), quotite: 1 })
     );
     semer({ conges: toutJuillet });
     render(<Activite />);
@@ -100,7 +100,9 @@ describe('calendrier des congés', () => {
     const lundi = screen.getByRole('button', { name: /27 juil\. 2026, jour travaillé/ });
 
     await utilisateur.click(lundi);
-    expect(useFaits.getState().faits.conges).toEqual(['2026-07-27']);
+    expect(useFaits.getState().faits.conges).toEqual([
+      { date: '2026-07-27', quotite: 1 }
+    ]);
 
     await utilisateur.click(screen.getByRole('button', { name: /27 juil\. 2026, congé posé/ }));
     expect(useFaits.getState().faits.conges).toEqual([]);
@@ -126,7 +128,11 @@ describe('calendrier des congés', () => {
   });
 
   it('compte les congés de l’année entière, pas seulement du mois affiché', () => {
-    semer({ conges: [dateISO('2026-02-16'), dateISO('2026-08-10'), dateISO('2025-12-24')] });
+    semer({ conges: [
+      { date: dateISO('2026-02-16'), quotite: 1 },
+      { date: dateISO('2026-08-10'), quotite: 1 },
+      { date: dateISO('2025-12-24'), quotite: 1 }
+    ] });
     render(<Activite />);
     expect(screen.getByText('Congés posés dans l’année').nextSibling?.textContent).toBe('2');
   });

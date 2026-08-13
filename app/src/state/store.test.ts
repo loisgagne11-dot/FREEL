@@ -177,7 +177,9 @@ describe('congés', () => {
   it('pose et retire une date d’un même geste', () => {
     const magasin = useFaits.getState();
     magasin.basculerConge(dateISO('2026-07-27'));
-    expect(useFaits.getState().faits.conges).toEqual(['2026-07-27']);
+    expect(useFaits.getState().faits.conges).toEqual([
+      { date: '2026-07-27', quotite: 1 }
+    ]);
     useFaits.getState().basculerConge(dateISO('2026-07-27'));
     expect(useFaits.getState().faits.conges).toEqual([]);
   });
@@ -186,7 +188,29 @@ describe('congés', () => {
     const magasin = useFaits.getState();
     magasin.poserPlageDeConges([dateISO('2026-07-28'), dateISO('2026-07-27')], true);
     magasin.poserPlageDeConges([dateISO('2026-07-27')], true);
-    expect(useFaits.getState().faits.conges).toEqual(['2026-07-27', '2026-07-28']);
+    expect(useFaits.getState().faits.conges.map((c) => c.date))
+      .toEqual(['2026-07-27', '2026-07-28']);
+  });
+
+  /**
+   * La demi-journée existe parce que l'ancienne application la gère depuis
+   * longtemps, et qu'un solde de congés qui compte 0,5 pour 1 est faux.
+   */
+  it('pose une demi-journée quand on le demande', () => {
+    useFaits.getState().poserPlageDeConges([dateISO('2026-07-27')], true, 0.5);
+    expect(useFaits.getState().faits.conges).toEqual([
+      { date: '2026-07-27', quotite: 0.5 }
+    ]);
+  });
+
+  // Reposer la même date avec une autre quotité corrige, sans dupliquer.
+  it('remplace la quotité d’une date déjà posée', () => {
+    const magasin = useFaits.getState();
+    magasin.poserPlageDeConges([dateISO('2026-07-27')], true, 1);
+    magasin.poserPlageDeConges([dateISO('2026-07-27')], true, 0.5);
+    expect(useFaits.getState().faits.conges).toEqual([
+      { date: '2026-07-27', quotite: 0.5 }
+    ]);
   });
 });
 

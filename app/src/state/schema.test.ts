@@ -93,3 +93,44 @@ describe('complétion d’un bloc accepté', () => {
     expect(faits.entreprise.onboardingFait).toBe(false);
   });
 });
+
+/**
+ * Migration du schéma 1 vers le schéma 2.
+ *
+ * Le schéma 1 portait `conges: ['2026-08-10', …]` — de simples chaînes. Tout
+ * bloc déjà enregistré, sur le poste comme sur le compte distant, est à ce
+ * format. Le laisser passer donnerait des congés dont `date` vaut `undefined`
+ * : le calendrier n'afficherait plus rien, le décompte tomberait à zéro, et
+ * rien ne le signalerait. Une migration de schéma qu'on oublie ne lève pas
+ * d'erreur — elle vide les données en silence.
+ */
+describe('congés d’un bloc au schéma 1', () => {
+  it('convertit les dates nues en journées entières', () => {
+    const faits = completerFaits({ version: 1, conges: ['2026-08-10', '2026-08-11'] });
+    expect(faits.conges).toEqual([
+      { date: '2026-08-10', quotite: 1 },
+      { date: '2026-08-11', quotite: 1 }
+    ]);
+  });
+
+  it('conserve les quotités d’un bloc déjà au schéma 2', () => {
+    const faits = completerFaits({
+      version: 2, conges: [{ date: '2026-08-10', quotite: 0.5 }]
+    });
+    expect(faits.conges).toEqual([{ date: '2026-08-10', quotite: 0.5 }]);
+  });
+
+  // Une entrée sans date n'est pas un congé : la garder produirait une case
+  // de calendrier qui ne correspond à aucun jour.
+  it('écarte une entrée sans date exploitable', () => {
+    const faits = completerFaits({ version: 2, conges: [{ quotite: 1 }, 42, null] });
+    expect(faits.conges).toEqual([]);
+  });
+
+  it('retombe sur la journée entière quand la quotité est illisible', () => {
+    const faits = completerFaits({
+      version: 2, conges: [{ date: '2026-08-10', quotite: 'moitié' }]
+    });
+    expect(faits.conges).toEqual([{ date: '2026-08-10', quotite: 1 }]);
+  });
+});
