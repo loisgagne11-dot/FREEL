@@ -241,3 +241,8 @@
 }
 
 .noteBasse strong { color: var(--muted); }
+
+/* Les jauges de seuil : empilées, jamais côte à côte. Deux barres alignées
+   invitent à les comparer entre elles, alors que chacune se lit seule et que
+   leurs échelles n'ont rien à voir. */
+.jauges { display: flex; flex-direction: column; gap: 16px; }
