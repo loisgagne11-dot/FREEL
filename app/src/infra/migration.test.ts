@@ -668,7 +668,7 @@ describe('charges fiscales et sociales', () => {
    * somme déjà retranchée du solde bancaire.
    */
   it('les marque payées', () => {
-    expect(faits().echeances.every((e) => e.payee)).toBe(true);
+    expect(faits().echeances.every((e) => e.payeeLe !== null)).toBe(true);
   });
 
   it('reprend le montant tel quel, sans TVA à isoler', () => {

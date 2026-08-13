@@ -484,3 +484,89 @@ describe('journée déclarée sur un créneau vide', () => {
     )).toHaveLength(1);
   });
 });
+
+/**
+ * DÉFAIRE UNE SEMAINE DE CORRECTIONS.
+ *
+ * `resetReelsToTheorique` de l'ancienne application. Son pendant
+ * `fillAllDays` n'a PAS été repris et n'a pas à l'être : ici le planning se
+ * remplit déjà tout seul depuis le rythme, c'est le modèle même. Remplir à la
+ * main n'aurait de sens que sur un planning vide — et un planning vide se
+ * remplit en déclarant un rythme, pas en cliquant trente et une fois.
+ *
+ * Retirer les corrections, en revanche, reste nécessaire : un rythme changé
+ * après coup laisse derrière lui des ajustements devenus faux.
+ */
+describe('revenir au rythme sur une semaine', () => {
+  const avecRythmeSemaine = () => mission({
+    entites: [entite({
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+        parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 },
+        tjm: euros(400)
+      }]
+    })]
+  });
+
+  const ouvrirSemaine = async () => {
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Semaine' }));
+    return utilisateur;
+  };
+
+  // Un bouton toujours là qui ne fait rien apprend à ne plus le regarder.
+  it('ne s’affiche que si la semaine porte une correction', async () => {
+    semer({ missions: [avecRythmeSemaine()] });
+    render(<Activite />);
+    await ouvrirSemaine();
+
+    expect(screen.queryByRole('button', { name: /Revenir au rythme/ })).toBeNull();
+  });
+
+  it('efface les corrections de la semaine, et d’elle seule', async () => {
+    semer({
+      missions: [mission({
+        entites: [entite({
+          rythmes: [{
+            du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+            parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: euros(400)
+          }],
+          // Deux corrections dans la semaine du 13/07, une hors de cette semaine.
+          ajustements: { '2026-07-13': 0, '2026-07-14': 0.5, '2026-06-01': 0 }
+        })]
+      })]
+    });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
+
+    const ajustements = useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
+    expect(ajustements).toEqual({ '2026-06-01': 0 });
+  });
+
+  /**
+   * « Revenir au rythme » n'est pas « mettre à zéro » : la journée redevient
+   * ce que le rythme prévoit. Les confondre rendrait le geste destructeur.
+   */
+  it('rend les journées au rythme, pas à zéro', async () => {
+    semer({
+      missions: [mission({
+        entites: [entite({
+          rythmes: [{
+            du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+            parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: euros(400)
+          }],
+          ajustements: { '2026-07-13': 0 }
+        })]
+      })]
+    });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+    await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
+
+    // Le lundi 13 juillet redevient une journée entière, comme le rythme le dit.
+    expect(screen.getAllByRole('button', { name: /13 juil.*journée entière/ }).length)
+      .toBeGreaterThan(0);
+  });
+});

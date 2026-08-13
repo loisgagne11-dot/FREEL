@@ -48,13 +48,18 @@ const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
  * paire, sans rien qui trahisse l'existence du concept.
  */
 export function VueSemaine(
-  { planning, aujourdhui, onBasculer }: {
+  { planning, aujourdhui, onBasculer, onRevenirAuRythme }: {
     readonly planning: PlanningSemaine;
     readonly aujourdhui: DateISO;
     /** Fait tourner la quotité d'une ligne du jour. */
     readonly onBasculer: (date: DateISO, missionId: string, entiteId: string) => void;
+    /** Efface les corrections de la semaine : les journées redeviennent le rythme. */
+    readonly onRevenirAuRythme: () => void;
   }
 ) {
+  // Le bouton n'apparaît que s'il y a quelque chose à défaire. Un bouton
+  // toujours là qui ne fait rien apprend à ne plus le regarder.
+  const corrigee = planning.jours.some((j) => j.parMission.some((l) => l.ajuste));
   return (
     <>
       <div className={styles.semaine}>
@@ -135,6 +140,12 @@ export function VueSemaine(
         <span>Travaillé cette semaine</span>
         <strong>{formater(planning.totalRetenu)} j</strong>
       </p>
+
+      {corrigee && (
+        <button type="button" className={styles.revenir} onClick={onRevenirAuRythme}>
+          Revenir au rythme sur cette semaine
+        </button>
+      )}
     </>
   );
 }

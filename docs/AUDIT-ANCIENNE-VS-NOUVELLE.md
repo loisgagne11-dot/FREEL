@@ -66,8 +66,8 @@ un trou qui ne fait échouer aucun test.
 | Déclarer le rythme d'une mission | ✅ | **Ajouté le 13/08.** Il n'existait AUCUN écran pour le saisir : `rythmes` ne pouvait venir que de la migration, donc toute mission créée dans l'application avait un planning vide, définitivement. Semaine type à sept boutons, tour journée → demi-journée → rien, le même geste qu'au planning |
 | `getScheduledDaysForMonth`, `joursParSemaine` | ✅ | `rythmes[]` par plages de dates, demi-journées comprises |
 | `showDaysEditor`, `saveDaysFromEditor`, `recalcDaysTable` | ✅ | Vue semaine avec ajustement à la journée ; l'ajustement l'emporte sur le rythme, **y compris à zéro** |
-| `fillAllDays` — remplir le mois d'un geste | ❌ | Il faut ajuster jour par jour |
-| `resetReelsToTheorique` — revenir au rythme | ❌ | Un ajustement posé ne se retire pas en bloc |
+| `fillAllDays` — remplir le mois d'un geste | 🚫 | **Sans objet ici.** Le planning se remplit déjà seul depuis le rythme, c'est le modèle même. Remplir à la main n'aurait de sens que sur un planning vide — et un planning vide se remplit en déclarant un rythme, pas en cliquant trente et une fois |
+| `resetReelsToTheorique` — revenir au rythme | ✅ | **Ajouté le 13/08**, à la maille de la semaine. Le bouton n'apparaît que si elle porte une correction |
 | `buildCRAData`, `generateCRAHTMLContent`, `generateCRAPDF` | 🟢 | Le CRA est **produit**, jamais saisi ; une mission par page à l'impression |
 | `showCRAPreviewWithSend` — envoi au client | ❌ | Impression seulement |
 | Congés, demi-journées, jours fériés | 🟢 | Fériés **calculés** (comput de Pâques compris) ; l'ancienne divisait par 20, une constante |
@@ -78,7 +78,8 @@ un trou qui ne fait échouer aucun test.
 | Fonction de l'ancienne | Verdict | Détail |
 |---|---|---|
 | **`getChargesData`, `showChargeModal`, `getChargeTypesList`, `updateEcheance`, `togglePaid`** | ✅ | **Corrigé le 13/08.** Carte « Échéances reçues » dans Argent : saisir, corriger, supprimer, marquer payée. Cinq natures — URSSAF, TVA, impôt, CFE, CFP. « Impôt PL » n'en est pas une : en versement libératoire les 2,2 % sont prélevés **avec** les cotisations (D2), donc c'est une échéance URSSAF. « Autres » non plus : une dépense professionnelle est une dépense, elle vit dans Achats |
-| `showChargeRecurrente` — échéance récurrente | ❌ | Chaque appel se saisit à l'unité. Un échéancier trimestriel demande donc quatre saisies par an |
+| `showChargeRecurrente` — échéance récurrente | 🟢 | **Ajouté le 13/08**, mais comme une commodité de SAISIE : la répétition crée N échéances ordinaires et s'efface. L'ancienne stockait une règle à côté de ses instances, sans dire laquelle fait foi quand un appel réel diffère — et il diffère |
+| Suivi du paiement d'une échéance | 🟢 | **Ajouté le 13/08.** La date du débit ET le montant réellement parti, pas une case « payée ». L'écart au montant appelé est conservé : c'est lui qui explique un solde qui ne tombe pas juste |
 | `getAbsoluteBalance`, `showEditSoldeInitial`, `showTresoSettings` | ✅ | Solde initial et besoin mensuel saisissables (ajoutés le 13/08 — ils n'avaient **aucune interface** jusque-là) |
 | `showSalaireModal`, `computeSalaireProjections` | 🟢 | **Corrigé le 13/08, en refusant la forme demandée.** L'ancienne application SIMULAIT son solde (encaissements moins charges), elle devait donc enregistrer le salaire pour le retrancher. Ici le solde est réel : le virement est déjà au relevé, et le saisir une seconde fois le compterait deux fois. Il se **nomme** — « rémunération que je me suis versée » dans Achats › Relevé — et le Pilote affiche « déjà versé ce mois » face au besoin mensuel. Se verser de l'argent n'est pas une opération comptable en micro : la personne et l'entreprise sont la même |
 | `setGoalCA`, `showGoalModal`, `renderGoalWidget` | ❌ | Aucun objectif de chiffre d'affaires |
