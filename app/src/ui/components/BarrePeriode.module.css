@@ -1,0 +1,74 @@
+/* Barre de période. Mobile-first, aucune couleur en dur. */
+
+.barre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+/* Les segments passent en défilement horizontal plutôt qu'à la ligne : quatre
+   mailles qui s'empilent feraient sauter tout le contenu vers le bas sur un
+   téléphone. */
+.segments {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+
+.segments::-webkit-scrollbar { display: none; }
+
+.segment {
+  flex: none;
+  min-height: 38px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 100px;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segment:hover { color: var(--text); }
+.segment:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+
+.actif { background: var(--panel); color: var(--text); box-shadow: var(--sh-1); }
+
+.navigation { display: flex; align-items: center; gap: 4px; }
+
+.pas {
+  /* 44 px : la cible minimale au doigt. */
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pas:hover { color: var(--text); border-color: var(--green); }
+
+.courante {
+  min-width: 9.5ch;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

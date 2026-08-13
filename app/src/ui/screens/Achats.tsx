@@ -11,6 +11,10 @@ import {
   deposerJustificatif, stockageIndexedDB, verifierIntegrite
 } from '../../infra/justificatifs';
 import { Greet } from '../components/Greet';
+import { BarrePeriode } from '../components/BarrePeriode';
+import {
+  type Granularite, periodeCourante
+} from '../../domain/calculs/periode';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -73,8 +77,19 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
   const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
   const [section, setSection] = useState<Section>('depenses');
   const idGroupe = useId();
+  /**
+   * La granularité et le décalage sont deux faits d'écran distincts : changer
+   * de maille doit repartir de la période courante, pas conserver un décalage
+   * de « trois mois en arrière » devenu « trois ans en arrière ».
+   */
+  const [granularite, setGranularite] = useState<Granularite>('tout');
+  const [decalage, setDecalage] = useState(0);
+  const periode = useMemo(
+    () => periodeCourante(granularite, new Date(), decalage),
+    [granularite, decalage]
+  );
 
-  const etat = useMemo(() => etatAchats(faits), [faits]);
+  const etat = useMemo(() => etatAchats(faits, new Date(), periode), [faits, periode]);
   const selection = panneau.type === 'detail'
     ? etat.lignes.find((l) => l.depense.id === panneau.id) ?? null
     : null;
@@ -116,6 +131,12 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="depenses" actif={section === 'depenses'}>
+
+      <BarrePeriode
+        periode={periode}
+        onGranularite={(g) => { setGranularite(g); setDecalage(0); }}
+        onDecaler={(pas) => setDecalage((d) => d + pas)}
+      />
 
       <div className={styles.grille}>
         <Chiffre libelle="Total TTC" valeur={eur(etat.resume.totalTtc)} />

@@ -15,6 +15,9 @@ import {
   euros, moisDe
 } from '../domain/types';
 import { plafondMicro, seuilsTva, tauxImpotEtContributions } from '../domain/bareme';
+import {
+  type Periode, dansLaPeriode, periodeCourante
+} from '../domain/calculs/periode';
 import type { RegimeImposition, SeuilsTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
 import {
@@ -783,6 +786,8 @@ export interface EtatAchats {
   readonly candidats: ReadonlyMap<string, readonly EcritureRapprochable[]>;
   /** Dépenses dont la date de paiement manque : ni exercice, ni régime. */
   readonly sansDate: number;
+  /** La période observée — l'écran l'affiche, il ne la redécoupe pas. */
+  readonly periode: Periode;
 }
 
 /**
@@ -792,11 +797,20 @@ export interface EtatAchats {
  * date en tête : une dépense non datée est le premier problème à traiter, pas
  * une ligne à reléguer en bas de liste.
  */
-export function etatAchats(faits: Faits, maintenant: Date = new Date()): EtatAchats {
+export function etatAchats(
+  faits: Faits,
+  maintenant: Date = new Date(),
+  periode: Periode = periodeCourante('tout', maintenant)
+): EtatAchats {
   const contexte = contexteDepense(faits, maintenant);
   const ecritures = ecrituresRapprochables(faits);
 
-  const lignes = [...faits.depenses]
+  // Le filtre s'applique AVANT le résumé : des totaux calculés sur toutes les
+  // dépenses sous un en-tête « T3 2026 » diraient autre chose que la liste
+  // affichée juste en dessous.
+  const retenues = faits.depenses.filter((d) => dansLaPeriode(d.payeeLe, periode));
+
+  const lignes = [...retenues]
     .sort(comparerParDate)
     .map((depense) => {
       const c = contexte(depense);
@@ -809,8 +823,9 @@ export function etatAchats(faits: Faits, maintenant: Date = new Date()): EtatAch
     });
 
   return {
+    periode,
     lignes,
-    resume: resumerDepenses(faits.depenses, contexte),
+    resume: resumerDepenses(retenues, contexte),
     banqueReliee: soldeEstSuivi(faits),
     resumeBanque: resumerRapprochement(faits.mouvementsBancaires, ecritures),
     mouvements: faits.mouvementsBancaires,
