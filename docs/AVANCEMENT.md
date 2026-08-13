@@ -853,6 +853,24 @@ aurait disparu, sans que rien ne le signale. Après les congés et les rythmes,
 la règle est acquise — une migration descend jusqu'où les champs ont bougé, et
 un champ imbriqué se convertit explicitement.
 
+### Un filet contre l'omission (13/08)
+
+Ajouté sans que l'audit le demande, parce que les échéances viennent de faire
+apparaître le risque : **une omission ne se voit pas.** Elle produit un chiffre
+plausible, juste trop élevé.
+
+Quelqu'un qui encaisse depuis trois mois sans avoir jamais enregistré un appel
+de cotisations n'a pas « zéro cotisation » — il a oublié de les saisir. Son
+disponible et son versable sont surestimés, et l'application l'invite alors à
+se verser de l'argent déjà dû. Exactement ce qu'elle existe pour empêcher.
+
+`aTraiter` porte donc un sujet « aucune échéance enregistrée », qui **dit le
+sens de l'erreur** : « surestimé » n'est pas « incomplet », et c'est ce mot-là
+qui fait agir. Il se tait sur un ou deux mois — ça peut être un début
+d'activité — et disparaît dès la première échéance saisie, **même payée** :
+elle prouve que le geste est connu, et continuer à alerter dresserait à ignorer
+l'alerte.
+
 ### Restaurer une sauvegarde (13/08)
 
 L'export existait depuis le début, la restauration non. Une sauvegarde qu'on ne

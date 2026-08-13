@@ -79,6 +79,16 @@ export interface EntreeATraiter {
    * les sujets, elle ne refait pas les calculs des autres modules.
    */
   readonly desEnRetard?: readonly { readonly mois: Mois }[];
+  /**
+   * Nombre d'échéances saisies, toutes natures et tous états confondus.
+   *
+   * Sert à détecter l'omission : quelqu'un qui encaisse depuis des mois sans
+   * avoir jamais enregistré un appel URSSAF n'a pas « zéro cotisation », il a
+   * oublié de les saisir — et son disponible est surestimé d'autant. C'est
+   * l'erreur qui va dans le sens dangereux, celle qui invite à se verser de
+   * l'argent déjà dû.
+   */
+  readonly echeancesSaisies?: number;
   /** Échéances réglementaires à date fixe, déjà filtrées sur leur préavis. */
   readonly echeancesReglementaires: readonly {
     readonly id: string;
@@ -282,6 +292,31 @@ export function sujetsATraiter(
       contexte: `Depuis ${moisLisible(premiere)}. Tant qu'une période n'est pas déclarée, sa charge `
         + `reste provisionnée et le versable est minoré d'autant.`,
       action: 'Déclarer'
+    });
+  }
+
+  /* ---------- aucune échéance jamais saisie ---------- */
+  //
+  // Une omission ne se voit pas : elle produit un chiffre plausible, juste
+  // trop élevé. Le seuil est volontairement bas — trois mois d'encaissements
+  // sans le moindre appel enregistré n'arrive pas par hasard — et le sujet
+  // disparaît dès la première échéance saisie, même payée.
+  const moisAvecEncaissement = new Set(
+    e.recettes
+      .filter((r) => r.encaisseeLe !== null)
+      .map((r) => (r.encaisseeLe as DateISO).slice(0, 7))
+  );
+  if ((e.echeancesSaisies ?? 0) === 0 && moisAvecEncaissement.size >= 3) {
+    sujets.push({
+      id: 'aucune-echeance',
+      ecran: 'argent',
+      gravite: 'retard',
+      nombre: 1,
+      intitule: 'Aucune échéance enregistrée',
+      contexte: 'Vous encaissez depuis plusieurs mois sans qu\'aucun appel de '
+        + 'cotisations, avis d\'impôt ou CFE ne soit saisi. Tant qu\'ils manquent, '
+        + 'le disponible et le versable sont SURESTIMÉS — c\'est le sens qui coûte cher.',
+      action: 'Saisir mes échéances'
     });
   }
 

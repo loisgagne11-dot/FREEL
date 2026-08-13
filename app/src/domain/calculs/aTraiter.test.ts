@@ -279,3 +279,65 @@ describe('ordre, compteurs et filtrage', () => {
     }
   });
 });
+
+/**
+ * L'OMISSION QUI VA DANS LE SENS DANGEREUX.
+ *
+ * Quelqu'un qui encaisse depuis des mois sans avoir jamais enregistré un appel
+ * URSSAF n'a pas « zéro cotisation » : il a oublié de les saisir. Le disponible
+ * et le versable sont alors surestimés — l'application invite à se verser de
+ * l'argent déjà dû, ce qu'elle existe pour empêcher.
+ *
+ * Une omission ne se voit pas toute seule : elle produit un chiffre plausible,
+ * juste trop élevé. Il faut donc aller la chercher.
+ */
+describe('aucune échéance jamais saisie', () => {
+  const encaissee = (mois: string) => recette({
+    id: `r-${mois}`, encaisseeLe: dateISO(`${mois}-10`)
+  });
+
+  it('alerte après plusieurs mois d’encaissements sans la moindre échéance', () => {
+    const sujets = sujetsATraiter(entree({
+      recettes: [encaissee('2026-04'), encaissee('2026-05'), encaissee('2026-06')],
+      echeancesSaisies: 0
+    }));
+    expect(sujets.some((s) => s.id === 'aucune-echeance')).toBe(true);
+  });
+
+  // Le doute doit rester possible : deux mois peuvent être un début d'activité.
+  it('se tait sur un ou deux mois seulement', () => {
+    const sujets = sujetsATraiter(entree({
+      recettes: [encaissee('2026-05'), encaissee('2026-06')],
+      echeancesSaisies: 0
+    }));
+    expect(sujets.some((s) => s.id === 'aucune-echeance')).toBe(false);
+  });
+
+  /**
+   * Une échéance PAYÉE compte : elle prouve que l'utilisateur connaît le
+   * geste. Continuer à l'alerter serait le dresser à ignorer l'alerte.
+   */
+  it('se tait dès qu’une échéance existe, même payée', () => {
+    const sujets = sujetsATraiter(entree({
+      recettes: [encaissee('2026-04'), encaissee('2026-05'), encaissee('2026-06')],
+      echeancesSaisies: 1
+    }));
+    expect(sujets.some((s) => s.id === 'aucune-echeance')).toBe(false);
+  });
+
+  it('se tait quand rien n’a été encaissé', () => {
+    const sujets = sujetsATraiter(entree({ echeancesSaisies: 0 }));
+    expect(sujets.some((s) => s.id === 'aucune-echeance')).toBe(false);
+  });
+
+  // Le sens de l'erreur doit être DIT : « surestimé » n'est pas la même chose
+  // qu'« incomplet », et c'est ce mot qui fait agir.
+  it('dit dans quel sens le chiffre est faux', () => {
+    const sujets = sujetsATraiter(entree({
+      recettes: [encaissee('2026-04'), encaissee('2026-05'), encaissee('2026-06')],
+      echeancesSaisies: 0
+    }));
+    const sujet = sujets.find((s) => s.id === 'aucune-echeance');
+    expect(sujet?.contexte).toMatch(/SURESTIM/i);
+  });
+});

@@ -199,6 +199,7 @@ export function entreeATraiter(
       delaiPaiementJours: delaiParClient.get(r.clientNom) ?? DELAI_PAIEMENT_DEFAUT
     })),
     periodesDeclarees: faits.periodesDeclarees,
+    echeancesSaisies: faits.echeances.length,
     periodicite: faits.entreprise.urssafPeriodicite,
     periodesUrssaf: periodesUrssafEffectives(faits),
     desEnRetard: declarationsEnRetard(
