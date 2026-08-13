@@ -341,3 +341,63 @@ describe('vue semaine', () => {
     expect(screen.getByRole('button', { name: 'Mois suivant' })).toBeTruthy();
   });
 });
+
+/**
+ * Le compte rendu d'activité — le livrable de fin de mois.
+ *
+ * Rien ne s'y saisit : il découle du rythme et des ajustements. Le saisir une
+ * seconde fois serait l'occasion de le saisir autrement, et un CRA qui
+ * contredit le planning ne prouve rien.
+ */
+describe('compte rendu d’activité', () => {
+  const avecRythmeCra = () => mission({
+    tjm: euros(400),
+    rythmes: [{
+      du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+      parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 },
+      tjm: euros(400)
+    }]
+  });
+
+  it('se remplit tout seul depuis le rythme', () => {
+    semer({ missions: [avecRythmeCra()] });
+    render(<Activite />);
+    // Juillet 2026 : lundis à jeudis pleins, vendredis à mi-temps, moins le
+    // 14 juillet férié. Le décompte se lit sur la carte, sans rien saisir.
+    const carte = screen.getByRole('region', { name: /Compte rendu d’activité/ });
+    expect(carte.textContent).toMatch(/jours? travaillés?/);
+    expect(carte.textContent).toMatch(/19,5/u);
+  });
+
+  it('propose l’impression sans bibliothèque PDF', () => {
+    semer({ missions: [avecRythmeCra()] });
+    render(<Activite />);
+    expect(screen.getByRole('button', { name: /Imprimer ou enregistrer en PDF/ })).toBeTruthy();
+  });
+
+  /**
+   * Un CRA vide n'est pas un livrable, c'est un document qu'on envoie par
+   * erreur. Sans jour travaillé, l'écran le dit et n'offre pas d'imprimer.
+   */
+  it('n’offre pas d’imprimer un mois sans activité', () => {
+    semer({ missions: [mission()] }); // sans rythme
+    render(<Activite />);
+    expect(screen.queryByRole('button', { name: /Imprimer ou enregistrer/ })).toBeNull();
+    expect(screen.getByText(/Aucun jour travaillé/)).toBeTruthy();
+  });
+
+  // Le CRA découle du planning : une journée effacée là-bas disparaît ici.
+  it('suit les ajustements posés au planning', () => {
+    const sansRien = mission({
+      tjm: euros(400),
+      rythmes: [{
+        du: dateISO('2026-07-01'), au: dateISO('2026-07-31'),
+        parJour: { lun: 1 }, tjm: euros(400)
+      }],
+      ajustements: { '2026-07-06': 0, '2026-07-13': 0, '2026-07-20': 0, '2026-07-27': 0 }
+    });
+    semer({ missions: [sansRien] });
+    render(<Activite />);
+    expect(screen.getByText(/Aucun jour travaillé/)).toBeTruthy();
+  });
+});

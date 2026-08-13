@@ -2,9 +2,11 @@ import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import {
-  type LigneMission, type PoidsClient, etatActivite, planningDeLaSemaine
+  type LigneMission, type PoidsClient,
+  craDuMoisParMission, etatActivite, planningDeLaSemaine
 } from '../../state/selecteurs.activite';
 import { VueSemaine } from '../components/VueSemaine';
+import { CraCard } from '../components/CraCard';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import type { DateISO, Mois } from '../../domain/types';
 import type { Client, Mission } from '../../state/schema';
@@ -63,6 +65,7 @@ export function Activite() {
   const semaine = useMemo(
     () => planningDeLaSemaine(faits, ancreSemaine), [faits, ancreSemaine]
   );
+  const cras = useMemo(() => craDuMoisParMission(faits, mois), [faits, mois]);
 
   /**
    * Le tour d'un créneau : journée → demi-journée → rien → retour au rythme.
@@ -297,6 +300,8 @@ export function Activite() {
               </div>
             </dl>
           </section>
+
+          <CraCard cras={cras} periode={moisLong(mois)} />
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="missions" actif={section === 'missions'}>

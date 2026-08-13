@@ -18,8 +18,11 @@
 import type { Jour, ZoneFeries } from '../domain/calculs/activite';
 import { joursFeries } from '../domain/calculs/activite';
 import type { JourPlanifie } from '../domain/calculs/planning';
-import { planifier } from '../domain/calculs/planning';
-import { calendrierDuMois, chargeDuMois, planDeCharge } from '../domain/calculs/activite';
+import { craDuMois, planifier } from '../domain/calculs/planning';
+import type { Cra } from '../domain/calculs/planning';
+import {
+  calendrierDuMois, chargeDuMois, joursDuMois, planDeCharge
+} from '../domain/calculs/activite';
 import type { PlanDeCharge } from '../domain/calculs/activite';
 import { delaisParClient, type DelaiClient } from '../domain/calculs/activite';
 import type { DateISO, Euros, Mois } from '../domain/types';
@@ -305,4 +308,60 @@ export function planningDeLaSemaine(
     totalPrevu: jours.reduce((s, j) => s + j.prevu, 0),
     totalRetenu: jours.reduce((s, j) => s + j.retenu, 0)
   };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Compte rendu d'activité
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface CraDeMission {
+  readonly missionId: string;
+  readonly libelle: string;
+  readonly clientNom: string;
+  readonly cra: Cra;
+}
+
+/**
+ * Les CRA du mois, une par mission.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN CRA PAR MISSION, JAMAIS UN SEUL POUR TOUT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le compte rendu d'activité se remet AU CLIENT, qui le signe. Fusionner
+ * deux missions dans un document unique exposerait à l'un ce que l'autre
+ * achète — et un client qui découvre le volume qu'on consacre à son
+ * concurrent ne le prend jamais bien.
+ *
+ * Les missions sans aucun jour travaillé sont écartées : un CRA vide n'est
+ * pas un livrable, c'est un document qu'on envoie par erreur.
+ */
+export function craDuMoisParMission(
+  faits: Faits,
+  m: Mois,
+  zone: ZoneFeries = 'general'
+): readonly CraDeMission[] {
+  const dates = joursDuMois(m);
+  const annee = Number(m.slice(0, 4));
+  const feries = new Set<string>(joursFeries(annee, zone));
+
+  const conges: Record<string, number> = {};
+  for (const c of faits.conges) conges[c.date] = c.quotite;
+
+  return faits.missions
+    .filter((mission) => mission.statut === 'active' || mission.statut === 'terminee')
+    .map((mission) => ({
+      missionId: mission.id,
+      libelle: mission.description !== '' ? mission.description : mission.clientNom,
+      clientNom: mission.clientNom,
+      cra: craDuMois(
+        m,
+        planifier(dates, {
+          rythmes: mission.rythmes, ajustements: mission.ajustements, feries, conges
+        }),
+        mission.rythmes,
+        mission.tjm
+      )
+    }))
+    .filter((x) => x.cra.totalJours > 0);
 }
