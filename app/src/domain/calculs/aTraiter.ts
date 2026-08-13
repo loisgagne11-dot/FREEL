@@ -116,7 +116,15 @@ export const SEUILS_PAR_DEFAUT: SeuilsAlerte = {
 const joursEntre = (a: DateISO, b: DateISO): number =>
   Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 
-function ajouterJours(d: DateISO, n: number): DateISO {
+/**
+ * Décale une date d'un nombre de jours.
+ *
+ * Exportée parce que l'échéance d'une facture se calcule aussi hors de cette
+ * requête — au livre des recettes, pour marquer les retards. Deux copies de
+ * cette arithmétique finiraient par diverger d'un jour, et un jour décide si
+ * une facture est en retard ou non.
+ */
+export function ajouterJours(d: DateISO, n: number): DateISO {
   const date = new Date(d);
   date.setDate(date.getDate() + n);
   return date.toISOString().slice(0, 10) as DateISO;

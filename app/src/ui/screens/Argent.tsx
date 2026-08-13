@@ -6,6 +6,7 @@ import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
+import { Statut, statutRecette } from '../components/Statut';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte, eur } from '../format';
@@ -270,7 +271,14 @@ function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
                   <span className={styles.ligneMontant}>{eur(r.montant)}</span>
                 </span>
                 <span className={styles.ligneMeta}>
+                  <Statut {...statutRecette({ encaissee: false, echeanceDepassee: r.enRetard })} />
                   <span>Émise le {dateCourte(r.emiseLe)}</span>
+                  {r.echeanceLe !== null && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>échéance {dateCourte(r.echeanceLe)}</span>
+                    </>
+                  )}
                   <span aria-hidden="true">·</span>
                   <span>{r.numero || 'Sans numéro'}</span>
                 </span>

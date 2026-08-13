@@ -22,6 +22,7 @@ import {
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
 import {
+  ajouterJours,
   type EntreeATraiter, type SujetATraiter,
   sujetsATraiter
 } from '../domain/calculs/aTraiter';
@@ -298,6 +299,31 @@ export function etatPilote(
 }
 
 
+/**
+ * Les factures émises et non réglées, avec leur échéance.
+ *
+ * Le délai vient du carnet ; à défaut de client rattaché, on retient le délai
+ * légal supplétif plutôt que zéro — une facture ne devient pas exigible le
+ * jour de son émission, et l'afficher « en retard » dès le premier jour
+ * apprendrait à ignorer l'étiquette.
+ */
+function recettesEnAttente(
+  faits: Faits,
+  maintenant: Date = new Date()
+): readonly RecetteEnAttente[] {
+  const delais = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
+  const aujourdhui = dateDuJour(maintenant);
+
+  return faits.recettes
+    .filter((r) => r.encaisseeLe === null && r.emiseLe !== null)
+    .map((r) => {
+      const jours = delais.get(r.clientNom) ?? DELAI_PAIEMENT_DEFAUT;
+      const echeanceLe = ajouterJours(r.emiseLe as DateISO, jours);
+      return { ...r, echeanceLe, enRetard: echeanceLe < aujourdhui };
+    })
+    .sort((a, b) => (b.emiseLe as DateISO).localeCompare(a.emiseLe as DateISO));
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Le flux du mois
    ───────────────────────────────────────────────────────────────────────── */
@@ -552,7 +578,19 @@ export interface EtatLivre {
   /** Écarts rattachés à une écriture, pour les afficher sur la ligne. */
   readonly ecartsParEcriture: ReadonlyMap<string, readonly EcartConformite[]>;
   /** Factures émises et non encaissées : elles n'entrent pas encore au livre. */
-  readonly enAttente: readonly Recette[];
+  readonly enAttente: readonly RecetteEnAttente[];
+}
+
+/**
+ * Une facture émise, en attente de règlement.
+ *
+ * `enRetard` est calculé ICI, pas dans l'écran : c'est une règle — l'échéance
+ * dépend du délai convenu avec le client, qui se lit dans le carnet. Un écran
+ * qui la recalculerait à sa façon finirait par en donner une autre lecture.
+ */
+export interface RecetteEnAttente extends Recette {
+  readonly echeanceLe: DateISO | null;
+  readonly enRetard: boolean;
 }
 
 /**
@@ -577,9 +615,7 @@ export function etatLivre(faits: Faits): EtatLivre {
     total: totaliser(faits.recettes),
     ecarts,
     ecartsParEcriture: parEcriture,
-    enAttente: faits.recettes
-      .filter((r) => r.encaisseeLe === null && r.emiseLe !== null)
-      .sort((a, b) => (b.emiseLe as DateISO).localeCompare(a.emiseLe as DateISO))
+    enAttente: recettesEnAttente(faits)
   };
 }
 
