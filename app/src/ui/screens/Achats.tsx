@@ -1,6 +1,6 @@
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { type LigneDepense, etatAchats } from '../../state/selecteurs';
+import { type LigneDepense, etatAchats } from '../../state/selecteurs.achats';
 import type { Depense } from '../../state/schema';
 import {
   type EtatRapprochement, type ProvenanceFournisseur,

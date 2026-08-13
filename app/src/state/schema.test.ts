@@ -152,8 +152,8 @@ describe('missions d’un bloc au schéma 1', () => {
 
   it('donne un rythme et des ajustements vides plutôt qu’absents', () => {
     const faits = completerFaits({ version: 1, missions: [missionV1] });
-    expect(faits.missions[0]?.rythmes).toEqual([]);
-    expect(faits.missions[0]?.ajustements).toEqual({});
+    expect(faits.missions[0]?.entites[0]?.rythmes).toEqual([]);
+    expect(faits.missions[0]?.entites[0]?.ajustements).toEqual({});
   });
 
   it('n’écrase pas un rythme déjà déclaré', () => {
@@ -165,9 +165,9 @@ describe('missions d’un bloc au schéma 1', () => {
         ajustements: { '2026-03-04': 0 }
       }]
     });
-    expect(faits.missions[0]?.rythmes).toHaveLength(1);
+    expect(faits.missions[0]?.entites[0]?.rythmes).toHaveLength(1);
     // Zéro est un ajustement légitime — c'est ainsi qu'on retire une journée.
-    expect(faits.missions[0]?.ajustements).toEqual({ '2026-03-04': 0 });
+    expect(faits.missions[0]?.entites[0]?.ajustements).toEqual({ '2026-03-04': 0 });
   });
 
   it('écarte une entrée qui n’est pas un objet', () => {

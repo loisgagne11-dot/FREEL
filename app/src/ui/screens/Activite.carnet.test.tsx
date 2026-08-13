@@ -82,7 +82,7 @@ describe('renommage d’un client', () => {
       clients: [client()],
       missions: [{
         id: 'm1', clientId: 'c1', clientNom: 'Dupont', description: 'Mission',
-        tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active', rythmes: [], ajustements: {}
+        tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active', entites: []
       }],
       recettes: [recette()]
     });
@@ -190,7 +190,7 @@ describe('missions', () => {
       missions: [{
         id: 'm1', clientId: null, clientNom: 'Dupont', description: 'Mission',
         tjm: euros(400), debut: dateISO('2026-01-01'), fin: dateISO('2026-12-31'),
-        statut: 'active', rythmes: [], ajustements: {}
+        statut: 'active', entites: []
       }],
       recettes: [recette()]
     });
@@ -207,7 +207,7 @@ describe('missions', () => {
     semer({
       missions: [{
         id: 'm1', clientId: null, clientNom: 'Dupont', description: 'Mission',
-        tjm: euros(400), debut: null, fin: null, statut: 'active', rythmes: [], ajustements: {}
+        tjm: euros(400), debut: null, fin: null, statut: 'active', entites: []
       }]
     });
     const utilisateur = await ouvrir('Missions');
@@ -216,5 +216,114 @@ describe('missions', () => {
     await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     expect(useFaits.getState().faits.missions[0]?.statut).toBe('perdue');
+  });
+});
+
+/**
+ * LE FAIT QUI REMPLIT LE PLANNING N'ÉTAIT SAISISSABLE NULLE PART.
+ *
+ * L'enchaînement du métier est : rythme → planning rempli d'office →
+ * ajustements → CRA. Le domaine le savait, le planning savait le lire, et
+ * aucun écran ne permettait de déclarer le rythme. Une mission créée dans
+ * l'application avait donc un planning vide, définitivement — seules les
+ * missions reprises de l'ancienne version en avaient un.
+ */
+describe('rythme de travail', () => {
+  async function nouvelleMission(utilisateur: ReturnType<typeof userEvent.setup>) {
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    await utilisateur.type(screen.getByLabelText('Client'), 'ClientA');
+    await utilisateur.type(screen.getByLabelText('Début'), '2026-01-01');
+    await utilisateur.type(screen.getByLabelText('Fin'), '2026-12-31');
+  }
+
+  it('se déclare à la création, et se retrouve sur le client opérationnel', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur);
+
+    const semaine = screen.getByRole('group', { name: 'Jours travaillés dans la semaine' });
+    await utilisateur.click(within(semaine).getByRole('button', { name: /^Lun/ }));
+    await utilisateur.click(within(semaine).getByRole('button', { name: /^Mar/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    const entite = useFaits.getState().faits.missions[0]?.entites[0];
+    expect(entite?.rythmes[0]?.parJour).toEqual({ lun: 1, mar: 1 });
+  });
+
+  // Un clic de plus donne la demi-journée, que l'ancienne application gère
+  // depuis toujours et qu'une case à cocher ne saurait pas dire.
+  it('fait le tour journée → demi-journée → rien', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur);
+    const semaine = screen.getByRole('group', { name: 'Jours travaillés dans la semaine' });
+    const vendredi = within(semaine).getByRole('button', { name: /^Ven/ });
+
+    await utilisateur.click(vendredi);
+    await utilisateur.click(vendredi);
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    expect(useFaits.getState().faits.missions[0]?.entites[0]?.rythmes[0]?.parJour)
+      .toEqual({ ven: 0.5 });
+  });
+
+  /**
+   * Le rythme se saisit avant que les dates soient forcément connues. Plutôt
+   * qu'inventer une plage, on pose une borne remplacée à l'enregistrement par
+   * les dates réelles — une plage inventée produirait des journées à des dates
+   * que personne n'a choisies.
+   */
+  it('pose le rythme sur la plage réelle de la mission', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur);
+    const semaine = screen.getByRole('group', { name: 'Jours travaillés dans la semaine' });
+    await utilisateur.click(within(semaine).getByRole('button', { name: /^Lun/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    const rythme = useFaits.getState().faits.missions[0]?.entites[0]?.rythmes[0];
+    expect(rythme?.du).toBe('2026-01-01');
+    expect(rythme?.au).toBe('2026-12-31');
+  });
+
+  it('dit qu’il faut des dates pour que le rythme serve', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    expect(screen.getByText(/sans plage de dates/)).toBeTruthy();
+  });
+
+  /**
+   * Le cas ordinaire ne montre pas le concept : un seul client opérationnel,
+   * donc pas de nom ni de couleur à saisir. Le vocabulaire n'apparaît qu'au
+   * moment où il veut dire quelque chose.
+   */
+  it('ne montre le vocabulaire qu’à partir du second client', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    expect(screen.queryByLabelText(/Nom du client opérationnel/)).toBeNull();
+
+    await utilisateur.click(
+      screen.getByRole('button', { name: 'Ajouter un client opérationnel' })
+    );
+    expect(screen.getAllByLabelText(/Nom du client opérationnel/)).toHaveLength(2);
+  });
+
+  it('enregistre deux clients opérationnels avec des rythmes distincts', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur);
+    await utilisateur.click(
+      screen.getByRole('button', { name: 'Ajouter un client opérationnel' })
+    );
+
+    const groupes = screen.getAllByRole('group', { name: 'Jours travaillés dans la semaine' });
+    await utilisateur.click(within(groupes[0] as HTMLElement).getByRole('button', { name: /^Lun/ }));
+    await utilisateur.click(within(groupes[1] as HTMLElement).getByRole('button', { name: /^Mer/ }));
+    await utilisateur.type(
+      screen.getAllByLabelText(/Nom du client opérationnel/)[1] as HTMLElement, 'Client final B'
+    );
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    const entites = useFaits.getState().faits.missions[0]?.entites ?? [];
+    expect(entites).toHaveLength(2);
+    expect(entites[0]?.rythmes[0]?.parJour).toEqual({ lun: 1 });
+    expect(entites[1]?.rythmes[0]?.parJour).toEqual({ mer: 1 });
+    expect(entites[1]?.nom).toBe('Client final B');
   });
 });

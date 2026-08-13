@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { etatAchats } from '../../state/selecteurs';
+import { etatAchats } from '../../state/selecteurs.achats';
 import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calculs/banque';
 import { decoderFichier, lireReleve, type RapportLecture } from '../../infra/releveCsv';
 import { Info } from '../components/Info';

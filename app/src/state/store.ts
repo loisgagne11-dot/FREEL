@@ -206,7 +206,9 @@ interface MagasinFaits {
    * contraire « ce jour prévu, je n'ai pas travaillé ». Les confondre
    * rendrait impossible de revenir au rythme après une correction.
    */
-  readonly ajusterJour: (missionId: string, date: DateISO, quotite: number | null) => void;
+  readonly ajusterJour: (
+    missionId: string, entiteId: string, date: DateISO, quotite: number | null
+  ) => void;
 
   /* ── Profil et barème ─────────────────────────────────────────────────── */
 
@@ -754,14 +756,23 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     return null;
   },
 
-  ajusterJour: (missionId, date, quotite) => {
+  ajusterJour: (missionId, entiteId, date, quotite) => {
     const actuel = get().faits;
     const missions = actuel.missions.map((m) => {
       if (m.id !== missionId) return m;
-      const ajustements = { ...m.ajustements };
-      if (quotite === null) delete ajustements[date];
-      else ajustements[date] = quotite;
-      return { ...m, ajustements };
+      // L'ajustement vise UN client opérationnel : deux d'entre eux peuvent
+      // travailler le même jour, et corriger l'un ne doit rien changer à
+      // l'autre.
+      return {
+        ...m,
+        entites: m.entites.map((e) => {
+          if (e.id !== entiteId) return e;
+          const ajustements = { ...e.ajustements };
+          if (quotite === null) delete ajustements[date];
+          else ajustements[date] = quotite;
+          return { ...e, ajustements };
+        })
+      };
     });
     const faits: Faits = { ...actuel, missions };
     set({ faits });

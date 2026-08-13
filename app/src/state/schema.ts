@@ -32,7 +32,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 3 as const;
+export const VERSION_SCHEMA = 4 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -95,6 +95,62 @@ export interface Mission {
    * compte plus — ni terminée, puisqu'elle n'a rien produit.
    */
   readonly statut: 'active' | 'terminee' | 'prospect' | 'perdue';
+  /**
+   * Les clients opérationnels de la mission.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * QUI FACTURE N'EST PAS QUI OCCUPE LES JOURNÉES
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Une mission passée par une agence a DEUX clients de nature différente :
+   * celui qui paie — `clientId`, l'agence, qui reçoit la facture — et ceux
+   * chez qui on travaille réellement. « Mission via Scalian » peut couvrir
+   * deux donneurs d'ordre finaux, chacun avec son rythme et son contact.
+   *
+   * Les confondre a une conséquence concrète : le CRA se remet au client
+   * opérationnel, qui le signe. Un CRA qui mélange deux d'entre eux expose à
+   * l'un le volume consacré à l'autre, et ne se fait signer par personne.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * IL Y EN A TOUJOURS AU MOINS UN
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Le cas courant — un seul client, qui paie et qui occupe — n'est pas une
+   * exception mais le cas à une entrée. La liste ne peut donc pas être vide,
+   * et l'interface ne montre le concept que lorsqu'il y en a plusieurs :
+   * personne n'a à apprendre le mot « client opérationnel » pour saisir une
+   * mission ordinaire.
+   *
+   * C'est ce qui évite la duplication de l'ancienne application, qui portait
+   * un rythme sur la mission ET un rythme par entité, plus une table
+   * `entiteByDay` pour arbitrer entre les deux. Trois sources pour une même
+   * journée finissent toujours par se contredire.
+   */
+  readonly entites: readonly ClientOperationnel[];
+}
+
+/**
+ * Un client opérationnel : là où les journées se passent.
+ *
+ * Il porte son propre RYTHME, et ses propres AJUSTEMENTS. C'est ce qui permet
+ * « lundi-mardi chez l'un, mercredi-jeudi chez l'autre » sans avoir à décider,
+ * jour par jour, à qui appartient la journée : chacun a les siens.
+ */
+export interface ClientOperationnel {
+  readonly id: string;
+  readonly nom: string;
+  /**
+   * Teinte du planning, en hexadécimal.
+   *
+   * Elle ne sert qu'à distinguer deux entités d'un coup d'œil dans la grille.
+   * Vide, l'interface en attribue une par rang — une couleur oubliée à la
+   * saisie ne doit pas produire deux blocs identiques.
+   */
+  readonly couleur: string;
+  readonly adresse: string;
+  readonly contact: string;
+  readonly email: string;
+  readonly telephone: string;
   /**
    * Le rythme de travail, par plages de dates.
    *
@@ -386,14 +442,57 @@ function missionsDuSchema1(brut: unknown): readonly Mission[] {
   return brut.flatMap((m): Mission[] => {
     if (typeof m !== 'object' || m === null) return [];
     const o = m as Record<string, unknown>;
+    const { rythmes: _r, ajustements: _a, ...reste } = o;
     return [{
-      ...(o as unknown as Mission),
-      rythmes: Array.isArray(o['rythmes']) ? o['rythmes'] as readonly Rythme[] : [],
-      ajustements: (typeof o['ajustements'] === 'object' && o['ajustements'] !== null)
-        ? o['ajustements'] as Ajustements
-        : {}
+      ...(reste as unknown as Mission),
+      entites: entitesDuSchema3(o)
     }];
   });
+}
+
+/**
+ * Le rythme quitte la mission pour son client opérationnel (schéma 3 → 4).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE CAS À UNE ENTRÉE N'EST PAS UNE EXCEPTION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Jusqu'au schéma 3, `rythmes` et `ajustements` étaient portés par la mission
+ * elle-même. Une mission d'alors devient donc une mission à UN client
+ * opérationnel, qui reprend son nom de client et son rythme tel quel. Rien
+ * n'est perdu, rien n'est inventé, et le planning d'hier redonne exactement
+ * les mêmes journées.
+ *
+ * Sans cette conversion, `entites` serait absent, le planning n'aurait plus
+ * aucun rythme à lire et les calendriers se videraient — en silence, comme
+ * les congés du schéma 1 avant eux.
+ */
+function entitesDuSchema3(o: Record<string, unknown>): readonly ClientOperationnel[] {
+  const dejaConverti = Array.isArray(o['entites']) && o['entites'].length > 0;
+  if (dejaConverti) {
+    return (o['entites'] as unknown[]).flatMap((e): ClientOperationnel[] => {
+      if (typeof e !== 'object' || e === null) return [];
+      const c = e as Record<string, unknown>;
+      return [{ ...entiteVide(), ...(c as unknown as ClientOperationnel) }];
+    });
+  }
+
+  return [{
+    ...entiteVide(),
+    id: `${typeof o['id'] === 'string' ? o['id'] : 'mission'}-co1`,
+    nom: typeof o['clientNom'] === 'string' ? o['clientNom'] : '',
+    rythmes: Array.isArray(o['rythmes']) ? o['rythmes'] as readonly Rythme[] : [],
+    ajustements: (typeof o['ajustements'] === 'object' && o['ajustements'] !== null)
+      ? o['ajustements'] as Ajustements
+      : {}
+  }];
+}
+
+export function entiteVide(): ClientOperationnel {
+  return {
+    id: '', nom: '', couleur: '', adresse: '', contact: '', email: '',
+    telephone: '', rythmes: [], ajustements: {}
+  };
 }
 
 export function completerFaits(brut: unknown): Faits {

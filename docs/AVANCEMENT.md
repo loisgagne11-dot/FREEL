@@ -768,6 +768,52 @@ sans quoi chaque cotisation correctement triée aurait été signalée comme per
 
 ---
 
+### Les clients opérationnels, et le rythme enfin saisissable (13/08, schéma v4)
+
+Le manque n°2 de l'audit. Une mission passée par une agence a **deux clients
+de nature différente** : celui qui paie — qui reçoit la facture — et ceux chez
+qui on travaille. Le CRA se remet au second, qui le signe.
+
+**Le rythme appartient désormais au client opérationnel**, pas à la mission.
+C'est ce qui permet « lundi-mardi chez l'un, mercredi-jeudi chez l'autre » sans
+avoir à trancher, jour par jour, à qui revient la journée : chacun a les
+siennes. L'ancienne application portait un rythme sur la mission **et** un
+rythme par entité, **plus** une table `entiteByDay` pour arbitrer entre les
+deux — trois sources pour une même journée, sans que rien n'indique laquelle
+faisait foi. Le nouveau schéma n'en garde qu'une, et `entiteByDay` devient sans
+objet.
+
+- Le planning rend **une ligne par client**, avec sa teinte ; la vue semaine a
+  une paire de créneaux par ligne, donc un clic sait toujours ce qu'il corrige.
+- Le CRA se ventile **par client qui signe**. Les fusionner exposerait à l'un
+  le volume consacré à l'autre.
+- **Le cas ordinaire ne montre pas le concept** : une mission à un seul client
+  affiche le rythme sans nom ni couleur à saisir, et son libellé reste celui de
+  la mission. Le vocabulaire n'apparaît qu'au moment où il veut dire quelque
+  chose.
+
+**Le huitième manque, que l'audit avait laissé passer.** En construisant le
+formulaire, découverte qu'il n'existait **aucun écran pour déclarer un
+rythme**. Le domaine savait le calculer, le planning savait le lire, la
+migration savait le reprendre — mais une mission créée dans l'application
+n'avait aucun moyen d'en recevoir un. Son planning restait vide,
+définitivement. Seules les missions reprises de l'ancienne version en avaient.
+
+C'est encore la même famille de défaut que les cinq précédentes : du code juste
+et inatteignable. Elle a échappé à l'audit parce que celui-ci comparait des
+FONCTIONS, et que l'ancienne application avait bien la sienne — c'est le
+chemin vers elle qui manquait, pas la fonction.
+
+L'éditeur ajouté est une semaine type à sept boutons, avec le même tour que le
+planning : journée → demi-journée → rien. Ce qu'on apprend d'un côté sert de
+l'autre, et une case à cocher ne saurait pas dire la demi-journée.
+
+**Budget.** L'entrée est repassée à 80,19 Ko pour un plafond de 80. Troisième
+application de la même règle : `selecteurs.achats.ts` sort du module
+monolithique → **76,59 Ko**. Le plafond n'a toujours pas bougé.
+
+---
+
 ## 4 quinquies. Leçon du 13/08 — un test vert sur du code mort ne prouve rien
 
 `encaisserRecette` était écrite, commentée, couverte par des tests de magasin

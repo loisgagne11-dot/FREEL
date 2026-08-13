@@ -114,3 +114,8 @@
   .creneau { min-height: 34px; font-size: 11px; }
   .libelleCreneau { display: block; }
 }
+
+/* Une pile de créneaux par client opérationnel. En colonne, comme les
+   créneaux qu'elle contient : deux lignes se lisent l'une sous l'autre, et
+   le cas à une seule ligne rend exactement la grille d'avant. */
+.pile { display: flex; flex-direction: column; gap: 3px; min-width: 0; }

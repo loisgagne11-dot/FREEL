@@ -19,12 +19,14 @@ conforme, les justificatifs ont valeur probante, l'occupation se calcule sur
 un dénominateur réel. Ce n'est pas le sujet de cet audit.
 
 Le sujet, c'est ce qu'elle **ne fait pas encore**. Sept manques recensés, dont
-trois bloquants pour un usage quotidien — **le premier est corrigé depuis** :
+trois bloquants pour un usage quotidien — **les deux premiers sont corrigés
+depuis**, et le second a fait apparaître un huitième manque que l'audit avait
+laissé passer : le rythme de travail n'était saisissable nulle part.
 
 | # | Manque | Pourquoi c'est bloquant |
 |---|---|---|
 | 1 | ~~**Aucune échéance ne peut être saisie**~~ | ✅ **Corrigé le 13/08.** `echeances` est devenu un fait du schéma (v3), avec sa carte dans Argent, et `etatPilote` / `etatArgent` / `fluxDuMois` lisent désormais le compte au lieu d'une liste vide. La migration trie en prime les charges legacy : les fiscales et sociales deviennent des **échéances payées**, plus des dépenses — une cotisation n'est pas un achat |
-| 2 | **Pas de clients opérationnels par mission** | L'ancienne application porte `mission.entites[]` — plusieurs clients finaux derrière un même donneur d'ordre, chacun avec sa couleur, son contact et **son rythme hebdomadaire**, et une affectation jour par jour (`entiteByDay`). C'est exactement le cas «&nbsp;Mission via Scalian&nbsp;». La nouvelle n'a qu'un client par mission : le CRA ne peut pas être ventilé |
+| 2 | ~~**Pas de clients opérationnels par mission**~~ | ✅ **Corrigé le 13/08.** Schéma v4 : le rythme et les ajustements appartiennent au **client opérationnel**, pas à la mission. Une ligne de planning et un CRA par client qui signe. Découvert au passage : **le rythme n'était saisissable nulle part** — une mission créée dans l'application avait un planning vide à jamais |
 | 3 | **Pas de versement de rémunération** | `versable` se calcule, mais rien ne permet d'enregistrer qu'on s'est versé la somme. Le solde ne bouge donc jamais du fait d'un versement |
 
 Les quatre autres — objectif de CA, projection de franchissement des seuils,
@@ -58,7 +60,8 @@ un trou qui ne fait échouer aucun test.
 | Fonction de l'ancienne | Verdict | Détail |
 |---|---|---|
 | `buildMission`, `showMissionModal`, statuts | ✅ | Carnet complet, statuts `active` / `terminee` / `prospect` / `perdue` |
-| **`mission.entites[]` — clients opérationnels** | ❌ | **Manque n°2.** Plusieurs clients finaux par mission, chacun avec couleur, adresse, contact, courriel, téléphone et **rythme hebdomadaire propre** ; le planning affecte chaque journée à une entité (`entiteByDay`). Rien de tout cela n'existe |
+| **`mission.entites[]` — clients opérationnels** | ✅ | **Corrigé le 13/08** (schéma v4). Chaque client opérationnel porte son nom, sa teinte, ses coordonnées et **son rythme**. `entiteByDay` n'a pas été repris et n'a pas à l'être : chacun ayant ses propres journées, il n'y a plus rien à arbitrer — l'ancienne application avait trois sources pour une même journée, et rien n'indiquait laquelle faisait foi |
+| Déclarer le rythme d'une mission | ✅ | **Ajouté le 13/08.** Il n'existait AUCUN écran pour le saisir : `rythmes` ne pouvait venir que de la migration, donc toute mission créée dans l'application avait un planning vide, définitivement. Semaine type à sept boutons, tour journée → demi-journée → rien, le même geste qu'au planning |
 | `getScheduledDaysForMonth`, `joursParSemaine` | ✅ | `rythmes[]` par plages de dates, demi-journées comprises |
 | `showDaysEditor`, `saveDaysFromEditor`, `recalcDaysTable` | ✅ | Vue semaine avec ajustement à la journée ; l'ajustement l'emporte sur le rythme, **y compris à zéro** |
 | `fillAllDays` — remplir le mois d'un geste | ❌ | Il faut ajuster jour par jour |
@@ -153,8 +156,9 @@ un trou qui ne fait échouer aucun test.
 1. ~~**Les échéances**~~ — ✅ **fait le 13/08.** Schéma v3, quatre actions de
    magasin, carte dans Argent, tri des charges legacy à la migration. Le volet 1
    des provisions et les sorties du flux du mois sont débloqués.
-2. **Les clients opérationnels par mission** — touche le schéma, le planning
-   et le CRA. C'est le plus structurant, et c'est votre cas réel.
+2. ~~**Les clients opérationnels par mission**~~ — ✅ **fait le 13/08.**
+   Schéma v4, migration des entités legacy, planning et CRA ventilés, et
+   l'éditeur de rythme qui manquait.
 3. **Le versement de rémunération** — une action, un mouvement, une ligne au
    flux.
 4. **La restauration d'une sauvegarde** — le pendant de l'export, quelques
