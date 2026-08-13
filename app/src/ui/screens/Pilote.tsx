@@ -7,6 +7,7 @@ import {
 import type { SujetATraiter } from '../../domain/calculs/aTraiter';
 import { Greet } from '../components/Greet';
 import { FluxCard } from '../components/FluxCard';
+import { SanteCard, indicateursDeSante } from '../components/SanteCard';
 import { eur, moisLong, moisTexte } from '../format';
 import styles from './Pilote.module.css';
 
@@ -30,6 +31,25 @@ export function Pilote() {
   const etat = useMemo(() => etatPilote(faits), [faits]);
   const sujets = useMemo(() => aTraiter(faits), [faits]);
   const flux = useMemo(() => fluxDuMois(faits, [], mois, etat), [faits, mois, etat]);
+
+  /**
+   * Les constats de santé viennent des MÊMES sources que le reste de l'écran.
+   *
+   * Les recompter séparément les ferait diverger du flux et du panneau
+   * « à traiter » — l'écran dirait alors deux choses différentes sur la même
+   * réalité, ce qui est exactement le défaut relevé sur l'ancienne version.
+   */
+  const sante = useMemo(() => {
+    const impayees = flux.entrees.lignes.filter((l) => !l.regle);
+    const periodes = sujets.find((x) => x.id === 'periodes-a-declarer');
+    return indicateursDeSante({
+      dispo: etat.tresorerie.dispo,
+      provisions: etat.tresorerie.provisions,
+      impayes: impayees.length,
+      montantImpaye: flux.entrees.enAttente,
+      periodesEnRetard: periodes?.nombre ?? 0
+    });
+  }, [flux, etat, sujets]);
 
   return (
     <>
@@ -86,6 +106,8 @@ export function Pilote() {
         periode={moisLong(mois)}
         versementPossible={etat.tresorerie.versable > 0}
       />
+
+      <SanteCard indicateurs={sante} autonomie={etat.autonomie} />
 
       <div className={styles.grille}>
         <Chiffre
