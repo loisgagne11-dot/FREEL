@@ -1,9 +1,12 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { etatArgent, etatDes, etatLivre, moisCourant } from '../../state/selecteurs';
+import {
+  etatArgent, etatDes, etatLivre, moisCourant, recettesEncaissees
+} from '../../state/selecteurs';
 import type { EtatSeuils } from '../../state/selecteurs';
 import type { Mois } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
+import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
@@ -11,6 +14,7 @@ import { Jauge } from '../components/Jauge';
 import { Repartition } from '../components/Repartition';
 import { Statut, statutRecette } from '../components/Statut';
 import { Vide } from '../components/Vide';
+import { useToast } from '../components/Toasts';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
@@ -143,6 +147,8 @@ export function Argent() {
               </div>
             </dl>
           </section>
+
+          <CarteDeclarations idGroupe={idGroupe} />
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="performance" actif={section === 'performance'}>
@@ -348,6 +354,113 @@ function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
  * Chaque jauge n'est donc rendue que si sa résolution est utilisable ; sinon,
  * l'écran dit pourquoi il ne peut pas répondre.
  */
+/**
+ * Les périodes URSSAF, et le geste qui les fait basculer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CE QUE SON ABSENCE COÛTAIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les provisions se tiennent en deux volets (D3) : ce que l'URSSAF a appelé,
+ * et ce qui est dû sur des recettes encaissées mais pas encore déclaré. Le
+ * second bascule dans le premier au moment de la déclaration.
+ *
+ * `marquerPeriodeDeclaree` existait dans le magasin. Aucun écran ne l'appelait.
+ * Une période déclarée restait donc à jamais dans le volet « à provisionner » :
+ * les provisions montaient sans jamais redescendre, et le versable baissait
+ * d'autant. On mettait de côté deux fois la même dette.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DÉCLARÉ N'EST PAS PAYÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Cocher ici ne dit pas que la somme est réglée : elle passe de « à
+ * provisionner » à « appelé, à payer ». Elle reste donc dans le total à garder
+ * de côté — c'est justement pour la payer qu'on la garde.
+ */
+function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
+  const faits = useFaits((e) => e.faits);
+  const marquer = useFaits((e) => e.marquerPeriodeDeclaree);
+  const annuler = useFaits((e) => e.annulerPeriodeDeclaree);
+  const signaler = useToast();
+
+  const periodes = useMemo(() => periodesADeclarer(
+    recettesEncaissees(faits),
+    faits.entreprise.urssafPeriodicite,
+    faits.periodesDeclarees,
+    new Date().toISOString().slice(0, 10)
+  ), [faits]);
+
+  if (periodes.length === 0) return null;
+
+  return (
+    <section className={styles.carte} aria-labelledby={`${idGroupe}-declarations`}>
+      <h2 id={`${idGroupe}-declarations`} className={styles.titreCarte}>
+        Périodes URSSAF
+        <Info libelle="À quoi sert de cocher une période">
+          Tant qu’une période n’est pas déclarée, les cotisations dues dessus
+          restent dans le volet «&nbsp;à provisionner&nbsp;». La déclarer les
+          fait basculer dans «&nbsp;échéances émises&nbsp;»&nbsp;: la somme
+          reste à garder de côté, mais elle cesse d’être comptée deux fois.
+          Cocher ne veut pas dire payé.
+        </Info>
+      </h2>
+
+      <ul className={styles.listeDeclarations}>
+        {periodes.map((p) => (
+          <li key={p.id} className={styles.ligneDeclaration}>
+            <span className={styles.declarationTitre}>
+              <span>{p.libelle}</span>
+              <span className={styles.declarationMontant}>
+                <Montant>{eur(p.encaisse)}</Montant> encaissés
+              </span>
+            </span>
+
+            {p.declaree
+              ? (
+                <span className={styles.declarationActions}>
+                  <Statut libelle="Déclarée" ton="ok" />
+                  <button
+                    type="button"
+                    className={styles.actionLigne}
+                    onClick={() => {
+                      for (const m of p.mois) annuler(m);
+                      signaler(`${p.libelle} n’est plus marquée déclarée.`);
+                    }}
+                  >
+                    Annuler
+                  </button>
+                </span>
+              )
+              : p.close
+                ? (
+                  <button
+                    type="button"
+                    className={styles.actionLigne}
+                    onClick={() => {
+                      for (const m of p.mois) marquer(m);
+                      signaler(`${p.libelle} marquée déclarée.`);
+                    }}
+                  >
+                    Marquer déclarée
+                  </button>
+                )
+                : (
+                  /* Une période en cours ne se déclare pas : l'URSSAF ouvre la
+                     déclaration après sa clôture, et la cocher d'avance
+                     sortirait du volet « à provisionner » des recettes qu'on
+                     va encore encaisser dessus. */
+                  <span className={styles.declarationAttente}>
+                    Période en cours, pas encore déclarable
+                  </span>
+                )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function CarteSeuils(
   { idGroupe, seuils }: { idGroupe: string; seuils: EtatSeuils }
 ) {

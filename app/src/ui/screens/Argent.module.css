@@ -246,3 +246,52 @@
    invitent à les comparer entre elles, alors que chacune se lit seule et que
    leurs échelles n'ont rien à voir. */
 .jauges { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Périodes URSSAF ────────────────────────────────────────────────────── */
+
+.listeDeclarations { list-style: none; margin: 0; padding: 0; }
+
+.ligneDeclaration {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.ligneDeclaration:last-child { border-bottom: none; }
+
+.declarationTitre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--text);
+}
+
+.declarationMontant {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.declarationActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.declarationAttente { font-size: 11.5px; color: var(--muted-2); }
+
+/* En paysage, le geste et son libellé tiennent sur un rang : la liste est
+   une suite de décisions courtes, pas un tableau à parcourir. */
+@media (min-width: 761px) {
+  .ligneDeclaration {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .declarationTitre { flex: 1 1 auto; }
+}

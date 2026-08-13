@@ -26,7 +26,6 @@ import {
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
 import {
-  ajouterJours,
   type EntreeATraiter, type SujetATraiter,
   sujetsATraiter
 } from '../domain/calculs/aTraiter';
@@ -50,6 +49,7 @@ import {
   type DeclarationDes, type DeclarationEnRetard, type PreneurService,
   amendeEncourue, declarationDuMois, declarationsEnRetard
 } from '../domain/calculs/des';
+import { DELAI_PAIEMENT_DEFAUT, echeanceDe } from '../domain/calculs/facturier';
 import type { Depense, Faits, Recette } from './schema';
 
 /**
@@ -151,8 +151,11 @@ function ajouterMois(m: Mois, n: number): Mois {
  * Le délai de paiement vient du client quand il est connu, sinon d'un défaut :
  * une facture sans délai renseigné ne doit pas être réputée jamais échue, sinon
  * les retards les plus anciens seraient précisément ceux qu'on ne verrait pas.
+ *
+ * Le défaut et le calcul d'échéance viennent de `calculs/facturier` : le suivi
+ * des factures applique la MÊME règle, et deux lectures de l'exigibilité
+ * finiraient par diverger d'un jour — celui qui décide d'une relance.
  */
-const DELAI_PAIEMENT_DEFAUT = 30;
 
 export function entreeATraiter(
   faits: Faits,
@@ -313,7 +316,7 @@ function recettesEnAttente(
     .filter((r) => r.encaisseeLe === null && r.emiseLe !== null)
     .map((r) => {
       const jours = delais.get(r.clientNom) ?? DELAI_PAIEMENT_DEFAUT;
-      const echeanceLe = ajouterJours(r.emiseLe as DateISO, jours);
+      const echeanceLe = echeanceDe(r.emiseLe as DateISO, jours);
       return { ...r, echeanceLe, enRetard: echeanceLe < aujourdhui };
     })
     .sort((a, b) => (b.emiseLe as DateISO).localeCompare(a.emiseLe as DateISO));

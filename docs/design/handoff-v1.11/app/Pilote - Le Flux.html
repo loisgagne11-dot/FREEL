@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Freel V1.11 — Pilote · Le Flux</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="freel.css?v=9">
+<link rel="stylesheet" href="v1.11.css?v=5">
+<script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('freel-v111-theme')||'sombre')}catch(e){document.documentElement.setAttribute('data-theme','sombre')}</script>
+<style>
+  /* ============ Le Flux — pilotage compact ============ */
+  .flux-card{border:1px solid var(--line);border-radius:20px;background:radial-gradient(130% 150% at 0% 0%,rgba(84,207,145,.05),var(--panel) 52%);padding:20px 24px 16px;position:relative;}
+  .flux-h{display:flex;align-items:baseline;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
+  .flux-h .fhint{margin-left:auto;font-size:11px;color:var(--muted-2);}
+  .flux-h .ftag{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);}
+  .flux-h .ftag svg{width:12px;height:12px;}
+  .flux-h h2{font-size:20px;letter-spacing:-.02em;margin:9px 0 0;font-weight:700;line-height:1.15;}
+  .flux-h .fgoal{font-size:12.5px;color:var(--muted);margin:6px 0 0;max-width:58ch;line-height:1.5;}
+  .flux-h .fgoal b{color:var(--text);font-weight:600;}
+  .flux-h .fsub{font-size:12px;color:var(--muted);}
+  .etsi{margin-left:auto;display:inline-flex;align-items:center;gap:8px;}
+  .etsi .btn.sm.on{background:var(--blue-soft);border-color:rgba(111,182,224,.45);color:var(--blue);}
+  .flux-card.simul{border-color:rgba(111,182,224,.35);background:radial-gradient(120% 140% at 0% 0%,rgba(111,182,224,.07),var(--panel) 55%);}
+
+  .fluxscroll{overflow-x:auto;scrollbar-width:none;}
+  .fluxscroll::-webkit-scrollbar{display:none;}
+  .fluxviz{position:relative;width:100%;min-width:640px;aspect-ratio:1040/560;margin:6px 0 2px;}
+  .fluxviz .river{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible;}
+  .riv-flow{stroke-dasharray:2 13;animation:rivflow 1.35s linear infinite;}
+  @keyframes rivflow{to{stroke-dashoffset:-15;}}
+  @media (prefers-reduced-motion: reduce){.riv-flow{animation:none;}}
+
+  /* stations sur le fleuve */
+  .rnode{position:absolute;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:var(--panel);border:2px solid var(--sc,var(--muted-2));display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:3;padding:0;box-shadow:0 8px 22px rgba(0,0,0,.42);transition:box-shadow .15s;color:var(--text);}
+  .rnode:hover{box-shadow:0 8px 22px rgba(0,0,0,.42),0 0 0 5px var(--scg,rgba(94,101,93,.16));}
+  .rnode:focus-visible{outline:2px solid var(--green);outline-offset:3px;}
+  .rnode .core{width:15px;height:15px;border-radius:50%;background:var(--sc,var(--muted-2));box-shadow:0 0 12px var(--sc,transparent);}
+  .rnode .cap{position:absolute;white-space:nowrap;text-align:left;}
+  .rnode .cap .rk{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.11em;color:var(--muted);font-weight:500;}
+  .rnode .cap .rv{display:block;font-family:var(--mono);font-size:23px;font-weight:700;letter-spacing:-.035em;line-height:1;margin-top:6px;color:var(--sv,var(--text));transition:filter .15s;}
+  .rnode:hover .cap .rv{filter:brightness(1.12);}
+  .rnode .cap .rmeta{display:block;font-size:10px;color:var(--muted);margin-top:6px;}
+  .rnode .cap .rdate{display:inline-block;margin-top:8px;font-family:var(--mono);font-size:9px;letter-spacing:.04em;padding:3px 9px;border-radius:20px;border:1px solid var(--line-2);background:var(--panel-2);color:var(--muted);}
+  .rnode .cap .fxd{display:none;font-family:var(--mono);font-size:10px;font-weight:700;margin-top:5px;}
+  .flux-card.simul .rnode .cap .fxd{display:block;}
+  .fxd.up{color:var(--green);}
+  .fxd.dn{color:var(--red);}
+  .fxd.eq{color:var(--muted-2);}
+  .rnode.cap-r .cap{left:64px;top:50%;transform:translateY(-50%);}
+  .rnode.cap-l .cap{right:64px;top:50%;transform:translateY(-50%);text-align:right;}
+  .rnode.cap-b .cap{top:64px;left:50%;transform:translateX(-50%);text-align:center;}
+  .rnode.cap-t .cap{bottom:64px;left:50%;transform:translateX(-50%);text-align:center;}
+  .rnode.time{--sc:var(--muted-2);--scg:rgba(94,101,93,.2);--sv:var(--text);}
+  .rnode.real{--sc:var(--blue);--scg:rgba(111,182,224,.2);--sv:var(--blue);}
+  .rnode.cash{--sc:var(--green);--scg:var(--green-glow);--sv:var(--green);}
+  .rnode.dispo{--sc:var(--green);--scg:var(--green-glow);--sv:var(--green);}
+  .rnode.pay{width:60px;height:60px;border-color:var(--green);background:linear-gradient(150deg,rgba(84,207,145,.3),var(--panel) 78%);box-shadow:0 12px 32px rgba(84,207,145,.24);--sc:var(--green);--scg:var(--green-glow);--sv:var(--green);}
+  .rnode.pay .core{width:22px;height:22px;}
+  .rnode.pay .cap .rk{color:var(--green);}
+  .rnode.pay .cap .rv{font-size:27px;}
+
+  /* réservoirs (affluents qui se détachent) */
+  .rjar{position:absolute;transform:translate(-50%,0);width:158px;text-align:left;font-family:inherit;color:var(--text);cursor:pointer;z-index:3;border:1px dashed rgba(227,179,95,.42);border-radius:13px;background:linear-gradient(160deg,var(--amber-soft),transparent 84%);padding:10px 13px;transition:border-color .15s,transform .15s;}
+  .rjar:hover{border-color:var(--amber);transform:translate(-50%,-2px);}
+  .rjar .jk{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--amber);font-weight:600;display:flex;align-items:center;gap:6px;}
+  .rjar .jk svg{width:11px;height:11px;}
+  .rjar .jv{display:block;font-family:var(--mono);font-size:17px;font-weight:700;color:var(--amber);margin-top:5px;letter-spacing:-.02em;}
+  .rjar .js{display:block;font-size:9.5px;color:var(--muted);margin-top:3px;line-height:1.35;}
+  .rjar.wait{border-color:rgba(111,182,224,.4);background:linear-gradient(160deg,var(--blue-soft),transparent 84%);}
+  .rjar.wait .jk,.rjar.wait .jv{color:var(--blue);}
+
+  /* pastilles d'intelligence sur les stations */
+  .rnode .pin{position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:4;cursor:pointer;}
+  .rnode .pin svg{width:11px;height:11px;}
+  .rnode .pin.urgent{background:var(--red);color:#1a0b08;box-shadow:0 0 0 3px var(--panel);}
+  .rnode .pin.warn{background:var(--amber);color:#1a1305;box-shadow:0 0 0 3px var(--panel);}
+  .rnode .pin.off{display:none;}
+
+  /* simulateur Et si ? */
+  .simpanel{display:none;margin-top:18px;border-top:1px dashed rgba(111,182,224,.35);padding-top:16px;}
+  .flux-card.simul .simpanel{display:block;}
+  .simgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .simctl{background:var(--panel-2);border:1px solid var(--line-2);border-radius:12px;padding:11px 13px;}
+  .simctl .sl{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;}
+  .simctl .sl b{font-family:var(--mono);font-size:14px;color:var(--blue);letter-spacing:-.01em;}
+  .simctl input[type=range]{width:100%;margin:10px 0 2px;accent-color:var(--blue);cursor:pointer;}
+  .simout{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:13px;color:var(--muted);flex-wrap:wrap;}
+  .simout .so{display:inline-flex;align-items:center;gap:8px;padding:8px 13px;border-radius:11px;border:1px solid rgba(111,182,224,.3);background:var(--blue-soft);color:var(--text);}
+  .simout .so b{font-family:var(--mono);color:var(--blue);}
+  .simout .so.warn{border-color:rgba(227,179,95,.35);background:var(--amber-soft);}
+  .simout .so.warn b{color:var(--amber);}
+
+  .flux-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.5;}
+  .flux-foot svg{width:13px;height:13px;color:var(--green);flex-shrink:0;}
+  .flux-foot b{color:var(--text);font-weight:600;}
+
+  /* ============ flux 3 colonnes ============ */
+  .flux3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;}
+  .fcol{min-width:0;padding:0 18px;}
+  .fcol:first-child{padding-left:0;}
+  .fcol:last-child{padding-right:0;}
+  .fcol + .fcol{border-left:1px solid var(--line);}
+  .fcol-t{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;margin-bottom:10px;}
+  .fcol-t .zdot{width:7px;height:7px;border-radius:2px;}
+  .fcol.in .fcol-t{color:var(--green);} .fcol.in .fcol-t .zdot{background:var(--green);}
+  .fcol.out .fcol-t{color:var(--amber);} .fcol.out .fcol-t .zdot{background:var(--amber);}
+  .fcol.pay .fcol-t{color:var(--green);} .fcol.pay .fcol-t .zdot{background:var(--green);}
+  .find{font-family:var(--mono);font-size:25px;font-weight:700;letter-spacing:-.03em;line-height:1;color:var(--text);}
+  .find-sub{font-size:11px;color:var(--muted);margin-top:7px;}
+  .find-sub b{font-family:var(--mono);font-weight:600;color:var(--text);}
+  .find-sub .att{color:var(--blue);}
+  .fitems{display:flex;flex-direction:column;gap:2px;margin-top:12px;}
+  .fit{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:7px 6px;border-radius:9px;border:1px solid transparent;background:none;font-family:inherit;color:var(--text);cursor:pointer;text-align:left;transition:background .12s,border-color .12s;}
+  .fit:hover{background:var(--panel-2);border-color:var(--line-2);}
+  .fit .fit-n{font-size:12px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fit .fit-n .fit-s{color:var(--muted-2);font-size:10.5px;}
+  .fit .fit-r{display:flex;align-items:center;gap:9px;}
+  .fit .fit-a{font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:-.02em;white-space:nowrap;}
+  .st-pill{font-family:var(--mono);font-size:8px;letter-spacing:.02em;font-weight:600;padding:3px 7px;border-radius:20px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;border:1px solid transparent;}
+  .st-pill::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;}
+  .st-pill.paid{color:var(--green);background:var(--green-glow);border-color:rgba(84,207,145,.3);}
+  .st-pill.wait{color:var(--blue);background:var(--blue-soft);border-color:rgba(111,182,224,.3);}
+  .fcol.out .st-pill.wait{color:var(--amber);background:var(--amber-soft);border-color:rgba(227,179,95,.3);}
+  .fcol.pay{display:flex;flex-direction:column;}
+  .fcol.pay .find{font-size:33px;color:var(--green);}
+  .pay-note{font-size:11px;color:var(--muted);line-height:1.5;margin:12px 0 14px;}
+  .pay-note b{color:var(--text);font-weight:600;}
+  .btn-verse{margin-top:auto;border:1px solid rgba(84,207,145,.4);background:var(--green);color:#08130d;border-radius:11px;padding:11px 16px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:filter .14s,transform .14s;}
+  .btn-verse:hover{filter:brightness(1.06);transform:translateY(-1px);}
+  .btn-verse svg{width:15px;height:15px;}
+  .sante-bar .sante-row{display:flex;align-items:center;gap:28px;flex-wrap:wrap;}
+  .sante-score{display:flex;align-items:baseline;gap:11px;}
+  .sante-score .sscore{font-family:var(--mono);font-size:25px;font-weight:700;color:var(--green);letter-spacing:-.02em;}
+  .sante-score .sscore small{color:var(--muted-2);font-weight:400;font-size:12px;}
+  .sante-items{display:flex;gap:20px;flex-wrap:wrap;flex:1;min-width:0;}
+  .sante-bar .runchip{margin:0;}
+  @media(max-width:900px){
+    .flux3{grid-template-columns:1fr;}
+    .fcol{padding:16px 0;}
+    .fcol + .fcol{border-left:none;border-top:1px solid var(--line);}
+  }
+
+  /* colonnes du flux : en-tête cliquable vers le détail */
+  .fcol-t.as-detail{width:100%;background:none;border:none;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;cursor:pointer;padding:0;text-align:left;}
+  .fcol-t.as-detail .fdet{margin-left:auto;display:inline-flex;align-items:center;gap:3px;letter-spacing:.04em;color:var(--muted-2);opacity:0;transition:opacity .14s;}
+  .fcol-t.as-detail .fdet svg{width:11px;height:11px;}
+  .fcol:hover .fcol-t.as-detail .fdet{opacity:1;}
+  .fcol-t.as-detail:hover{color:var(--text);}
+
+  /* réglages maquette : hors du chemin de lecture */
+  .tweakbar[hidden]{display:none;}
+  #twToggle.on{color:var(--green);border-color:rgba(84,207,145,.4);}
+
+  /* ============ grille sous le flux ============ */
+  .secgap{margin-top:18px;}
+  .versable .big{font-size:40px;color:var(--green);}
+  .resrange{display:flex;align-items:center;gap:12px;margin-top:14px;}
+  .resrange input[type=range]{flex:1;accent-color:var(--green);cursor:pointer;}
+  .resrange .rp{font-family:var(--mono);font-size:13px;color:var(--text);width:74px;text-align:right;}
+  .vnote{font-size:12px;color:var(--muted);margin-top:10px;}
+
+  .hzlist .tl .amt{font-size:12px;}
+  .runchip{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:12px;background:var(--green-glow);border:1px solid rgba(84,207,145,.25);margin-bottom:12px;}
+  .runchip .rv2{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green);line-height:1;}
+  .runchip .rl2{font-size:12px;color:var(--muted);line-height:1.35;}
+
+  .dec.done{opacity:.45;}
+  .dec.done .act{pointer-events:none;}
+  .dec .lever{font-size:11.5px;color:var(--muted-2);font-family:var(--mono);margin-top:5px;}
+
+  /* ============ propositions Claude Code ============ */
+  body.hide-props #props{display:none;}
+  .props-head{display:flex;align-items:flex-end;gap:14px;margin:46px 0 16px;flex-wrap:wrap;}
+  .props-head .ph-l h2{font-size:21px;letter-spacing:-.02em;margin:0;}
+  .props-head .ph-l .kick{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--blue);display:block;margin-bottom:7px;}
+  .props-head .ph-l p{margin:6px 0 0;font-size:13px;color:var(--muted);max-width:66ch;}
+  .props-head .ph-r{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .props-head .selcnt{font-family:var(--mono);font-size:12px;color:var(--muted);}
+  .propgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .prop{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:18px;display:flex;flex-direction:column;gap:0;position:relative;transition:border-color .14s;}
+  .prop:hover{border-color:rgba(111,182,224,.35);}
+  .prop.sel{border-color:var(--blue);background:linear-gradient(165deg,rgba(111,182,224,.07),var(--panel) 60%);}
+  .prop .ptop{display:flex;align-items:center;gap:10px;}
+  .prop .pic{width:32px;height:32px;border-radius:9px;background:var(--blue-soft);color:var(--blue);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .prop .pic svg{width:15px;height:15px;}
+  .prop .eff{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--muted-2);border:1px solid var(--line-2);border-radius:6px;padding:2px 7px;}
+  .prop h3{font-size:15px;letter-spacing:-.01em;margin:12px 0 5px;}
+  .prop .pp{font-size:12.5px;color:var(--muted);line-height:1.55;margin:0;flex:1;}
+  .prop .hooks{font-family:var(--mono);font-size:10px;color:var(--muted-2);margin-top:12px;line-height:1.6;}
+  .prop .hooks b{color:var(--green);font-weight:500;}
+  .prop .psel{display:flex;align-items:center;gap:8px;margin-top:13px;padding-top:12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);cursor:pointer;user-select:none;}
+  .prop .psel input{accent-color:var(--blue);width:14px;height:14px;cursor:pointer;}
+  .prop.sel .psel{color:var(--blue);font-weight:600;}
+
+  .sheet-b .brk .bv{width:auto;}
+  .mailprev{border:1px solid var(--line-2);border-radius:12px;background:var(--panel-2);padding:16px;font-size:13px;line-height:1.6;color:var(--muted);margin:14px 0;}
+  .mailprev b{color:var(--text);}
+  .mailprev .mh{font-family:var(--mono);font-size:11px;color:var(--muted-2);border-bottom:1px solid var(--line);padding-bottom:9px;margin-bottom:11px;}
+
+  @media(max-width:1080px){.simgrid{grid-template-columns:repeat(2,1fr);}.propgrid{grid-template-columns:1fr 1fr;}}
+  @media(max-width:720px){.propgrid{grid-template-columns:1fr;}}
+
+  /* actions rapides */
+  .quickacts{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 18px;}
+  .qa-cap{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-2);font-weight:600;margin-right:3px;}
+  .qa{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;font-size:12.5px;font-weight:500;color:var(--text);background:var(--panel);border:1px solid var(--line-2);border-radius:20px;padding:7px 13px;cursor:pointer;text-decoration:none;font-family:inherit;transition:border-color .14s,background .14s;}
+  .qa:hover{border-color:var(--green);background:var(--panel-2);}
+  .qa svg{width:14px;height:14px;color:var(--green);}
+  .qa .qa-x{margin-left:2px;margin-right:-4px;width:15px;height:15px;border-radius:50%;display:none;align-items:center;justify-content:center;font-size:13px;line-height:1;color:var(--muted-2);}
+  .qa:hover .qa-x{display:inline-flex;}
+  .qa .qa-x:hover{background:var(--panel-3);color:var(--red);}
+  .qa.add{padding:7px 10px;color:var(--muted);}
+  .qa.add svg{width:15px;height:15px;}
+  .qa-wrap{position:relative;display:inline-flex;}
+  .qa-menu{top:calc(100% + 7px);right:0;left:auto;min-width:232px;}
+
+  /* topbar : pas de débordement horizontal sur écrans étroits */
+  .topbar{flex-wrap:wrap;row-gap:10px;}
+  .search{min-width:0;flex-shrink:1;}
+  @media(max-width:1180px){.search,.synced{display:none;}}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ============ RAIL — nouvelle IA : 3 questions ============ -->
+  <aside class="rail">
+    <div class="brand">fre<b>e</b>l</div>
+    <a class="nav on" href="Pilote - Le Flux.html"><span class="ic">$ICO_grid$</span> Pilote</a>
+    <a class="nav" href="Activité - Plan de charge.html"><span class="ic">$ICO_layers$</span> Activité &amp; congés</a>
+    <a class="nav" href="Argent - Trésorerie & Performance.html"><span class="ic">$ICO_wallet$</span> Argent</a>
+    <a class="nav" href="Achats - Justificatifs & Banque.html"><span class="ic">$ICO_cart$</span> Achats</a>
+    <a class="nav" href="Outils - Simulateurs.html"><span class="ic">$ICO_calc$</span> Outils</a>
+    <a class="nav" href="Config.html"><span class="ic">$ICO_cog$</span> Config</a>
+    <div class="rail-foot">
+      <a class="nav" href="Config.html#livre"><span class="ic">$ICO_book$</span> Livre des recettes</a>
+      <div class="who">
+        <div class="ava">AL</div>
+        <div style="min-width:0;">
+          <div style="font-weight:600;font-size:13px;">Atelier L.</div>
+          <div class="muted" style="font-size:11.5px;">Micro-BNC · ACRE</div>
+        </div>
+      </div>
+      <div class="buildtag"><span class="pulse"></span> build <b>5</b> · 11 juil.</div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main" data-screen-label="Pilote — Le Flux">
+    <div class="topbar">
+      <div class="month">
+        <button class="ico-btn" id="prevM">$ICO_left$</button>
+        <b id="curM">Juin 2026</b>
+        <button class="ico-btn" id="nextM">$ICO_right$</button>
+      </div>
+      <div class="grow"></div>
+      <span class="synced on" title="Synchronisé · multi-appareils">$ICO_cloud$ <span class="pulse"></span></span>
+      <button class="yearsel" id="yearBtn"><span class="yv" data-year>2026</span> $ICO_chevdown$</button>
+      <button class="ico-btn" id="twToggle" title="Réglages de la maquette">$ICO_cog$</button>
+      <button class="ico-btn" id="privacyBtn" title="Masquer les montants">$ICO_eye$</button>
+      <div class="search">$ICO_search$ <span>Rechercher…</span><span class="kbd">⌘K</span></div>
+      <div class="fab-wrap">
+        <button class="btn" id="expBtn">$ICO_download$ Exporter</button>
+        <div class="menu" id="expMenu">
+          <div class="cap">Documents</div>
+          <div class="mi" data-export="cra">$ICO_doc$ Compte-rendu d'activité</div>
+          <div class="mi" data-export="factures-pdf">$ICO_doc$ Factures (PDF)</div>
+          <div class="sep"></div>
+          <div class="cap">Comptable</div>
+          <div class="mi" data-export="livre-csv">$ICO_doc$ Livre des recettes (CSV)</div>
+          <div class="mi" data-export="fec">$ICO_doc$ Export FEC</div>
+          <div class="mi" data-export="json">$ICO_doc$ Sauvegarde JSON</div>
+        </div>
+      </div>
+      <div class="fab-wrap">
+        <button class="btn primary" id="fabBtn">$ICO_plus$ Nouveau</button>
+        <div class="menu" id="fabMenu">
+          <div class="cap">Saisir</div>
+          <div class="mi" data-new="mission">$ICO_layers$ Mission</div>
+          <div class="mi" data-new="facture">$ICO_doc$ Facture</div>
+          <div class="mi" data-new="encaissement">$ICO_up$ Encaissement</div>
+          <div class="mi" data-new="charge">$ICO_minus$ Charge</div>
+          <div class="mi" data-new="salaire">$ICO_wallet$ Salaire</div>
+          <div class="mi" data-new="conge">$ICO_sun$ Congés</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tweakbar" id="tweakbar" hidden>
+      <span class="tt">Réglages maquette</span>
+      <label><input type="checkbox" id="twFn"> Annoter les fonctions du code</label>
+      <label><input type="checkbox" id="twProps" checked> Propositions Claude Code</label>
+      <span class="hue">Accent
+        <span class="sw sel" data-h="#54cf91" style="background:#54cf91;"></span>
+        <span class="sw" data-h="#5fc9c0" style="background:#5fc9c0;"></span>
+        <span class="sw" data-h="#8fcf54" style="background:#8fcf54;"></span>
+      </span>
+    </div>
+
+    <div class="content">
+      <div class="greet">
+        <div>
+          <h1>Bonjour Loïs — quatre décisions t'attendent.</h1>
+          <p>Ton mois en un coup d'œil : ce qui entre, ce qui sort, ce que tu peux te verser.</p>
+        </div>
+        <span class="tag">Solde compte · <b class="num blurnum" data-fx="solde">8 120 €</b></span>
+      </div>
+
+      <div class="quickacts" id="quickActs"></div>
+
+      <!-- ============ LE FLUX ============ -->
+      <div class="flux-card" id="fluxCard" data-comment-anchor="flux-spine">
+        <span class="fn">computeFlux() · setStatus()</span>
+        <div class="flux-h">
+          <span class="ftag">$ICO_arrow$ le flux du mois · juin 2026</span>
+          <span class="fhint">clique un statut pour le mettre à jour</span>
+        </div>
+
+        <div class="flux3">
+          <!-- ENTRÉES -->
+          <div class="fcol in" data-col="in">
+            <button class="fcol-t as-detail" data-sheet="tpl-cash" data-sheet-title="Entrées du mois — encaissé & en attente"><span class="zdot"></span>Entrées<span class="fdet">détail $ICO_right$</span></button>
+            <div class="find" id="inMain" data-fx="encaisse">6 010 €</div>
+            <div class="find-sub">encaissé · <span class="att" id="inSub" data-fx="attente">3 610 €</span> en attente</div>
+            <div class="fitems">
+              <button class="fit" data-amt="3200" data-state="paid">
+                <span class="fit-n">Atelier Novak</span>
+                <span class="fit-r"><span class="st-pill paid">encaissé</span></span>
+              </button>
+              <button class="fit" data-amt="2810" data-state="paid">
+                <span class="fit-n">Café Bianca</span>
+                <span class="fit-r"><span class="st-pill paid">encaissé</span></span>
+              </button>
+              <button class="fit" data-amt="2410" data-state="wait">
+                <span class="fit-n">Maison Vala</span>
+                <span class="fit-r"><span class="st-pill wait">en attente</span></span>
+              </button>
+              <button class="fit" data-amt="1200" data-state="wait">
+                <span class="fit-n">Studio Lumen</span>
+                <span class="fit-r"><span class="st-pill wait">en attente</span></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- SORTIES -->
+          <div class="fcol out" data-col="out">
+            <button class="fcol-t as-detail" data-sheet="tpl-dispo" data-sheet-title="Sorties & provisions — ce qui n'est pas à toi"><span class="zdot"></span>Sorties<span class="fdet">détail $ICO_right$</span></button>
+            <div class="find" id="outMain" data-fx="sortiesTotal">3 010 €</div>
+            <div class="find-sub"><b id="outPaid" data-fx="sortiesPayees">620 €</b> payé · <b id="outWait" data-fx="sortiesAVenir">2 390 €</b> à venir</div>
+            <div class="fitems">
+              <button class="fit" data-amt="1980" data-state="wait">
+                <span class="fit-n">URSSAF T2</span>
+                <span class="fit-r"><span class="st-pill wait">à venir</span></span>
+              </button>
+              <button class="fit" data-amt="620" data-state="paid">
+                <span class="fit-n">Acompte IR</span>
+                <span class="fit-r"><span class="st-pill paid">payé</span></span>
+              </button>
+              <button class="fit" data-amt="410" data-state="wait">
+                <span class="fit-n">CFE</span>
+                <span class="fit-r"><span class="st-pill wait">à venir</span></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- RÉMUNÉRATION -->
+          <div class="fcol pay" data-col="pay">
+            <button class="fcol-t as-detail" data-sheet="tpl-pay" data-sheet-title="Rémunération — ce que tu peux te verser"><span class="zdot"></span>Rémunération<span class="fdet">détail $ICO_right$</span></button>
+            <div class="find" id="payMain" data-fx="remuMois">3 000 €</div>
+            <p class="pay-note">Ce que tu peux te verser ce mois, <b>hors provision</b>. Réserve &amp; provisions dans <a href="Argent - Trésorerie & Performance.html">Argent</a>.</p>
+            <button class="btn-verse" data-new="salaire">$ICO_wallet$ Verser sur mon compte</button>
+          </div>
+        </div>
+        <button class="fluxfold" type="button" onclick="this.closest('.flux-card').classList.toggle('fluxopen');this.firstElementChild.textContent=this.closest('.flux-card').classList.contains('fluxopen')?'Masquer le détail':'Voir le détail'"><span>Voir le détail</span></button>
+      </div>
+
+      <!-- ============ GRILLE ============ -->
+      <div class="grid secgap">
+
+        <div class="card span12 sante-bar clickable" data-sheet="tpl-sante" data-sheet-title="Santé société — le calcul">
+          <span class="fn">calculateHealthScore() · runway()</span>
+          <div class="sante-row">
+            <div class="sante-score"><span class="lbl">Santé</span><span class="sscore">78<small>/100</small></span></div>
+            <div class="sante-items">
+              <div class="hi-row"><span class="st ok"></span> Provisions couvertes</div>
+              <div class="hi-row"><span class="st warn"></span> Factures · 1 retard</div>
+              <div class="hi-row"><span class="st ok"></span> Déclarations à jour</div>
+            </div>
+            <div class="runchip"><span class="rv2">4,2 mois</span><span class="rl2">d'autonomie au rythme actuel</span></div>
+          </div>
+        </div>
+
+        <div class="card span12" data-screen-label="Décisions du jour">
+          <span class="fn">getActionsList() · computeAlerts() · getNextDeclaration()</span>
+          <div class="card-h"><span class="lbl">Décisions du jour</span><span class="chip2 warn" id="decCount">4 à traiter</span></div>
+          <div class="feed">
+            <div class="dec warn" id="decDecl">
+              <span class="ic">$ICO_doc$</span>
+              <div class="body">
+                <div class="t">Déclarer l'URSSAF T2 — guichet ouvert du 1ᵉʳ au 5 juillet</div>
+                <div class="d">base encaissée avril → juin : <span class="amt blurnum" data-fx="baseUrssaf">7 970 €</span> · prélèvement <span class="amt blurnum" data-fx="urssaf">1 980 €</span> · chaque échéance (URSSAF, TVA, CFE…) arrive ici avec ses chiffres prêts</div>
+                <div class="lever">levier → les montants à recopier case par case sont préparés</div>
+              </div>
+              <button class="act" data-sheet="tpl-decl" data-sheet-title="Déclaration URSSAF T2 — chiffres prêts">Voir les chiffres</button>
+            </div>
+            <div class="dec urgent" id="decRelance">
+              <span class="ic">$ICO_alert$</span>
+              <div class="body">
+                <div class="t">Relancer Studio Lumen — facture #024</div>
+                <div class="d"><span class="amt blurnum">1 200 €</span> · en retard de 18 j · sans elle, ton solde passe sous 5 000 € le 22 juin</div>
+                <div class="lever">levier → email de relance prêt, envoi en 1 clic</div>
+              </div>
+              <button class="act" data-sheet="tpl-relance" data-sheet-title="Relancer la facture #024">Relancer</button>
+            </div>
+            <div class="dec warn" id="decProv">
+              <span class="ic">$ICO_shield$</span>
+              <div class="body">
+                <div class="t">Provisionner l'URSSAF T2 — échéance 5 juillet</div>
+                <div class="d"><span class="amt blurnum" data-fx="urssaf">1 980 €</span> à mettre de côté · ta trésorerie le permet dès maintenant</div>
+                <div class="lever">levier → virement vers le bocal préparé automatiquement</div>
+              </div>
+              <button class="act" data-action="prov">Provisionner</button>
+            </div>
+            <div class="dec warn" id="decDep">
+              <span class="ic">$ICO_users$</span>
+              <div class="body">
+                <div class="t">Dépendance client élevée — Studio Lumen pèse 58 %</div>
+                <div class="d">du CA encaissé · le retard de la #024 en est le symptôme direct · cible &lt; 40 %</div>
+                <div class="lever">levier → une mission hors Lumen au pipe suffit à redescendre</div>
+              </div>
+              <button class="act" data-sheet="tpl-dep" data-sheet-title="Dépendance client">Voir</button>
+            </div>
+            <div class="dec" id="decTva">
+              <span class="ic">$ICO_flag$</span>
+              <div class="body">
+                <div class="t">TVA : rien à collecter aujourd'hui — seuil à <span data-fx="seuilTVApct">86 %</span>, bascule estimée septembre</div>
+                <div class="d">franchise en base · <span data-fx="caEncaisse">32 400 €</span> / <span data-fx="seuilTVA">37 500 €</span> encaissés · au franchissement, Freel ajoute la TVA à tes factures et t'alerte ici</div>
+              </div>
+              <button class="act" data-sheet="tpl-tva" data-sheet-title="Seuil de TVA — leviers">Voir</button>
+            </div>
+            <div class="dec good" id="decCra">
+              <span class="ic">$ICO_doc$</span>
+              <div class="body">
+                <div class="t">CRA de mai prêt pour Atelier Novak</div>
+                <div class="d">9 jours · généré depuis le calendrier, sans ressaisie · n'attend que ton envoi</div>
+              </div>
+              <button class="act" data-action="cra">Envoyer</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ============ PROPOSITIONS CLAUDE CODE ============ -->
+      <section id="props" data-screen-label="Propositions Claude Code">
+        <div class="props-head">
+          <div class="ph-l">
+            <span class="kick">au-delà de l'app actuelle · à construire avec Claude Code</span>
+            <h2>Six modules d'intelligence en plus</h2>
+            <p>Chacun s'appuie sur des fonctions qui existent déjà dans ton code. Coche ceux qui te parlent, puis copie le brief — il est prêt à coller dans Claude Code.</p>
+          </div>
+          <div class="ph-r">
+            <span class="selcnt" id="selCount">0 retenu</span>
+            <button class="btn primary" id="briefBtn">$ICO_doc$ Copier le brief Claude Code</button>
+          </div>
+        </div>
+        <div class="propgrid">
+          <div class="prop" data-prop="Relances en pilote automatique" data-spec="Séquence graduée J+3 (rappel doux) / J+10 (ferme) / J+15 (mise en demeure) avec modèles d'email par ton, arrêt automatique dès encaissement rapproché. S'appuyer sur la table factures + getClientsStats() pour le DSO. UI : timeline de relance sur chaque facture en retard.">
+            <div class="ptop"><span class="pic">$ICO_mail$</span><span class="eff">effort M</span></div>
+            <h3>Relances en pilote automatique</h3>
+            <p class="pp">Séquence graduée J+3 → J+10 → J+15, ton qui durcit, arrêt automatique dès que l'encaissement est rapproché. Tu valides, Freel insiste.</p>
+            <div class="hooks">hooks : <b>getClientsStats()</b> · table factures · import bancaire</div>
+            <label class="psel"><input type="checkbox"> Retenir ce module</label>
+          </div>
+          <div class="prop" data-prop="Score de risque client" data-spec="Score par client combinant DSO réel vs contractuel, dérive sur 6 mois, part du CA, retards cumulés. Badge risque (vert/ambre/rouge) sur la fiche client et alerte au moment de créer une mission pour un client à risque. Hook : getClientsStats().">
+            <div class="ptop"><span class="pic">$ICO_users$</span><span class="eff">effort S</span></div>
+            <h3>Score de risque client</h3>
+            <p class="pp">DSO qui dérive, retards répétés, part du CA trop lourde : un badge par client, et une alerte avant de signer une nouvelle mission risquée.</p>
+            <div class="hooks">hooks : <b>getClientsStats()</b> · missions · factures</div>
+            <label class="psel"><input type="checkbox"> Retenir ce module</label>
+          </div>
+          <div class="prop" data-prop="Copilote fiscal" data-spec="Comparer en continu versement libératoire vs barème IR à partir du CA encaissé réel, des autres revenus du foyer et du PER (réutiliser calculateIR). Notifier la fenêtre de bascule optimale avant l'échéance du 30/09. UI : carte « tu économiserais X € en basculant » sur le Pilote.">
+            <div class="ptop"><span class="pic">$ICO_scale$</span><span class="eff">effort M</span></div>
+            <h3>Copilote fiscal</h3>
+            <p class="pp">Libératoire ou barème ? Recalculé en continu avec ton CA réel, ton foyer et ton PER — et Freel te prévient quand la bascule devient gagnante.</p>
+            <div class="hooks">hooks : <b>calculateIR()</b> · getFiscalParams() · foyer</div>
+            <label class="psel"><input type="checkbox"> Retenir ce module</label>
+          </div>
+          <div class="prop" data-prop="Provisions en auto-pilot" data-spec="À chaque encaissement rapproché (import bancaire), ventiler automatiquement vers les bocaux URSSAF / IR / CFP selon les taux de getCotisationsBreakdown(), et préparer l'ordre de virement. UI : toggle « auto-provision » par bocal + journal des ventilations.">
+            <div class="ptop"><span class="pic">$ICO_shield$</span><span class="eff">effort M</span></div>
+            <h3>Provisions en auto-pilot</h3>
+            <p class="pp">Chaque encaissement rapproché remplit les bocaux tout seul, au bon taux, et prépare l'ordre de virement. La provision cesse d'être une corvée.</p>
+            <div class="hooks">hooks : <b>getProvisionEnvelopes()</b> · getCotisationsBreakdown() · import</div>
+            <label class="psel"><input type="checkbox" checked> Retenir ce module</label>
+          </div>
+          <div class="prop" data-prop="Prévision probabiliste" data-spec="Remplacer la courbe de trésorerie unique par un éventail (fan chart) : délais de paiement réels par client + saisonnalité des 24 derniers mois. Afficher P10/P50/P90 et la date de passage sous le seuil de sécurité au pire cas. Hook : computeProjections().">
+            <div class="ptop"><span class="pic">$ICO_chart$</span><span class="eff">effort L</span></div>
+            <h3>Prévision probabiliste</h3>
+            <p class="pp">Pas une ligne, un éventail : la trésorerie projetée avec les vrais délais de chaque client. Tu vois le pire cas, pas juste la moyenne.</p>
+            <div class="hooks">hooks : <b>computeProjections()</b> · historique encaissements</div>
+            <label class="psel"><input type="checkbox"> Retenir ce module</label>
+          </div>
+          <div class="prop" data-prop="Le brief du lundi" data-spec="Digest hebdomadaire (notification ou email, lundi 8h) : le Flux résumé en une ligne, les 3 décisions de la semaine, 1 chiffre à retenir. Réutiliser computeAlerts() + getActionsList() ; rendu HTML email simple.">
+            <div class="ptop"><span class="pic">$ICO_zap$</span><span class="eff">effort S</span></div>
+            <h3>Le brief du lundi</h3>
+            <p class="pp">Lundi 8 h : le Flux en une ligne, trois décisions, un chiffre. Tu pilotes la semaine sans même ouvrir l'app.</p>
+            <div class="hooks">hooks : <b>computeAlerts()</b> · getActionsList()</div>
+            <label class="psel"><input type="checkbox" checked> Retenir ce module</label>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ TEMPLATES (drill-downs) ============ -->
+<template id="tpl-time">
+  <p class="lbl">Juin 2026 · source : calendrier</p>
+  <div class="brk"><div class="bt"><b>Refonte du site — Studio Lumen</b><span>TJM 520 €</span></div><div class="bbar"><i style="width:65%;background:var(--green);"></i></div><div class="bv num">12 j</div></div>
+  <div class="brk"><div class="bt"><b>Identité — Atelier Novak</b><span>TJM 520 €</span></div><div class="bbar"><i style="width:35%;background:var(--blue);"></i></div><div class="bv num">6,5 j</div></div>
+  <div class="brk"><div class="bt"><b>Congés posés</b><span>retirés de l'occupation</span></div><div class="bbar"><i style="width:11%;background:var(--panel-3);"></i></div><div class="bv num">2 j</div></div>
+  <div class="resultbox"><div><div class="lbl" style="margin:0 0 6px;">Occupation du mois</div><span class="muted" style="font-size:12.5px;">18,5 j facturés / 22 ouvrés</span></div><span class="rv">84 %</span></div>
+  <p class="help muted" style="font-size:12.5px;margin-top:16px;">Chaque journée saisie porte <b>mission · durée (¼ → 1 j) · tâche</b> : le CRA sort sans ressaisie. Le détail vit dans <b>Activité → Calendrier</b>.</p>
+  <a class="btn" href="Activité - Plan de charge.html" style="margin-top:8px;">$ICO_cal$ Ouvrir le calendrier</a>
+</template>
+
+<template id="tpl-real">
+  <p class="lbl">CA réalisé = jours × TJM, par mission</p>
+  <div class="brk"><div class="bt"><b>Refonte du site</b><span>12 j × 520 €</span></div><div class="bv num blurnum">6 240 €</div></div>
+  <div class="brk"><div class="bt"><b>Identité de marque</b><span>6,5 j × 520 €</span></div><div class="bv num blurnum">3 380 €</div></div>
+  <div class="resultbox"><div class="lbl" style="margin:0;">Réalisé juin</div><span class="rv blurnum">9 620 €</span></div>
+  <p class="help muted" style="font-size:12.5px;margin-top:16px;">Réalisé ≠ encaissé : l'URSSAF ne compte que l'encaissé. Le graphe annuel réalisé vs encaissé vit dans <b>Argent → Performance</b>.</p>
+  <a class="btn" href="Argent - Trésorerie & Performance.html" style="margin-top:8px;">$ICO_chart$ Ouvrir Performance</a>
+</template>
+
+<template id="tpl-cash">
+  <p class="lbl">Encaissé <span data-fx="encaisse">6 010 €</span> · en attente <span data-fx="attente">3 610 €</span></p>
+  <div class="brk"><div class="bt"><b>#021 · <span data-fx="facCli021">Atelier Novak</span></b><span>payée le 03/06</span></div><div class="bv"><span class="chip2 ok">encaissée · <span data-fx="fac021">3 200 €</span></span></div></div>
+  <div class="brk"><div class="bt"><b>#024 · <span data-fx="facCli024">Studio Lumen</span></b><span>échue depuis 18 j</span></div><div class="bv"><span class="chip2 bad">retard · <span data-fx="fac024">1 200 €</span></span></div></div>
+  <div class="brk"><div class="bt"><b>#023 · <span data-fx="facCli023">Maison Vala</span></b><span>échéance 28/06</span></div><div class="bv"><span class="chip2 blue">envoyée · <span data-fx="fac023">2 410 €</span></span></div></div>
+  <div class="resultbox" style="background:linear-gradient(165deg,var(--amber-soft),var(--panel-2) 70%);border-color:rgba(227,179,95,.3);"><div><div class="lbl" style="margin:0 0 6px;">DSO réel</div><span class="muted" style="font-size:12.5px;">vs 30 j contractuels</span></div><span class="rv" style="color:var(--amber);">42 j</span></div>
+  <button class="btn primary" data-sheet="tpl-relance" data-sheet-title="Relancer la facture #024" style="margin-top:16px;width:100%;justify-content:center;">$ICO_mail$ Relancer la #024</button>
+</template>
+
+<template id="tpl-dispo">
+  <p class="lbl">Ce qui est vraiment à toi, aujourd'hui</p>
+  <div class="brk"><div class="bt"><b>Solde du compte</b><span>au 10 juin</span></div><div class="bv num blurnum">+ <span data-fx="solde">8 120 €</span></div></div>
+  <div class="brk"><div class="bt"><b>Provisions dues</b><span>URSSAF T2 <span data-fx="urssaf">1 980</span> · IR <span data-fx="ir">620</span> · CFE <span data-fx="cfe">410</span> · CFP <span data-fx="cfp">170</span></span></div><div class="bv num" style="color:var(--amber);">− <span data-fx="provisions">3 180 €</span></div></div>
+  <div class="resultbox"><div class="lbl" style="margin:0;">Disponible</div><span class="rv blurnum" data-fx="dispo">4 940 €</span></div>
+  <p class="help muted" style="font-size:12.5px;margin-top:16px;">Les bocaux de provision et la trésorerie projetée vivent dans <b>Argent → Trésorerie</b>.</p>
+  <a class="btn" href="Argent - Trésorerie & Performance.html" style="margin-top:8px;">$ICO_wallet$ Ouvrir Trésorerie</a>
+</template>
+
+<template id="tpl-pay">
+  <p class="lbl">Disponible <span data-fx="dispo">4 940 €</span> − réserve matelas <span data-fx="reserve">2 470 €</span></p>
+  <div class="brk"><div class="bt"><b>Disponible</b></div><div class="bv num blurnum" data-fx="dispo">4 940 €</div></div>
+  <div class="brk"><div class="bt"><b>Réserve matelas gardée</b><span>curseur réglable sur le Pilote</span></div><div class="bv num" style="color:var(--amber);">− <span data-fx="reserve">2 470 €</span></div></div>
+  <div class="resultbox"><div><div class="lbl" style="margin:0 0 6px;">Tu peux te verser</div><span class="muted" style="font-size:12.5px;">conseillé le 1er juillet, après la provision URSSAF du 5</span></div><span class="rv blurnum" data-fx="versable">2 470 €</span></div>
+  <button class="btn primary" data-new="salaire" style="margin-top:16px;width:100%;justify-content:center;">$ICO_wallet$ Verser maintenant</button>
+</template>
+
+<template id="tpl-sante">
+  <p class="lbl">Score 78/100 — trois composantes</p>
+  <div class="brk"><div class="bt"><b>Provisions</b><span>couvertes — <span data-fx="provisions">3 180 €</span> fléchés vers les bocaux</span></div><div class="bbar"><i style="width:93%;background:var(--green);"></i></div><div class="bv num">28/30</div></div>
+  <div class="brk"><div class="bt"><b>Factures</b><span>1 en retard (#024) · DSO 42 j vs 30 contractuels</span></div><div class="bbar"><i style="width:57%;background:var(--amber);"></i></div><div class="bv num">20/35</div></div>
+  <div class="brk"><div class="bt"><b>Déclarations</b><span>T1 déclaré · T2 prêt pour le 5 juillet</span></div><div class="bbar"><i style="width:86%;background:var(--green);"></i></div><div class="bv num">30/35</div></div>
+  <p class="help muted" style="font-size:12.5px;margin-top:16px;">Le score remonte mécaniquement si tu relances la #024 (factures) — et ton autonomie reste à <span data-fx="autonomie">4,2</span> mois.</p>
+</template>
+
+<template id="tpl-relance">
+  <p class="lbl">Facture #024 · <span data-fx="facCli024">Studio Lumen</span> · <span data-fx="fac024">1 200 €</span> · échue J+18</p>
+  <div class="mailprev">
+    <div class="mh">À : compta@studiolumen.fr · Objet : Facture 2026-024 — relance aimable</div>
+    Bonjour Claire,<br><br>
+    Sauf erreur de ma part, la facture <b>2026-024 (<span data-fx="fac024">1 200 €</span>)</b>, émise le 23 avril et échue le 23 mai, ne m'est pas encore parvenue.<br><br>
+    Je vous renvoie le PDF en pièce jointe — un règlement sous quelques jours m'arrangerait pour clôturer le trimestre.<br><br>
+    Bien à vous,<br><b>Alex · Atelier L.</b>
+  </div>
+  <p class="help muted" style="font-size:12px;">2ᵉ retard de ce client cette année · sans ce règlement, ton solde passe sous 5 000 € le 22 juin · si silence : relance ferme à J+25 (voir module « Relances en pilote automatique »).</p>
+  <div style="display:flex;gap:9px;margin-top:14px;">
+    <button class="btn primary" data-action="relance" style="flex:1;justify-content:center;">$ICO_mail$ Envoyer la relance</button>
+    <button class="btn" data-action-close>Plus tard</button>
+  </div>
+</template>
+
+<template id="tpl-prov">
+  <p class="lbl">Paiement URSSAF du 5 juillet · base encaissée T2</p>
+  <div class="brk"><div class="bt"><b>Cotisations sociales</b><span>21,2 % avec ACRE</span></div><div class="bv num blurnum" data-fx="cotisUrssaf">1 690 €</div></div>
+  <div class="brk"><div class="bt"><b>CFP</b><span>0,2 %</span></div><div class="bv num blurnum" data-fx="cotisCFP">16 €</div></div>
+  <div class="brk"><div class="bt"><b>IR libératoire</b><span>2,2 %</span></div><div class="bv num blurnum" data-fx="cotisIR">274 €</div></div>
+  <div class="resultbox" style="background:linear-gradient(165deg,var(--amber-soft),var(--panel-2) 70%);border-color:rgba(227,179,95,.3);"><div><div class="lbl" style="margin:0 0 6px;">À provisionner</div><span class="muted" style="font-size:12.5px;">échéance le 5 juillet</span></div><span class="rv blurnum" style="color:var(--amber);" data-fx="urssaf">1 980 €</span></div>
+  <button class="btn primary" data-action="prov" style="margin-top:16px;width:100%;justify-content:center;">$ICO_shield$ Provisionner <span data-fx="urssaf">1 980 €</span></button>
+</template>
+
+<template id="tpl-tva">
+  <p class="lbl">Franchise de TVA · <span data-fx="caEncaisse">32 400 €</span> encaissés / <span data-fx="seuilTVA">37 500 €</span></p>
+  <p style="font-size:13.5px;color:var(--muted);line-height:1.6;margin:0 0 16px;">Il reste <b data-fx="margeTVA">5 100 €</b> de marge. Au rythme actuel des encaissements, le seuil tombe <b style="color:var(--amber);">vers début septembre</b>. Deux leviers, chiffrés :</p>
+  <div class="brk"><div class="bt"><b>Rester sous le seuil</b><span>≈ 10 j au TJM 520 € à décaler vers 2027</span></div><div class="bv"><span class="chip2 warn">− <span data-fx="margeTVA">5 100 €</span> de CA</span></div></div>
+  <div class="brk"><div class="bt"><b>Basculer en TVA</b><span>facturer +20 %, déclarer chaque mois</span></div><div class="bv"><span class="chip2 blue">prépa ~2 sem.</span></div></div>
+  <p class="help muted" style="font-size:12px;margin-top:14px;">Les simulateurs (onglet <b>Outils</b>) te montrent l'effet exact d'un changement de rythme sur la date de franchissement.</p>
+  <a class="btn primary" href="Outils - Simulateurs.html" style="margin-top:10px;width:100%;justify-content:center;">$ICO_zap$ Ouvrir les simulateurs</a>
+</template>
+
+<template id="tpl-dep">
+  <p class="lbl">Répartition du CA encaissé · 2026</p>
+  <div class="brk"><div class="bt"><b>Studio Lumen</b></div><div class="bbar"><i style="width:58%;background:var(--amber);"></i></div><div class="bv num">58 %</div></div>
+  <div class="brk"><div class="bt"><b>Atelier Novak</b></div><div class="bbar"><i style="width:31%;background:var(--green);"></i></div><div class="bv num">31 %</div></div>
+  <div class="brk"><div class="bt"><b>Brasserie Vent d'Ouest</b></div><div class="bbar"><i style="width:11%;background:var(--blue);"></i></div><div class="bv num">11 %</div></div>
+  <p class="help muted" style="font-size:12.5px;margin-top:16px;">Au-delà de 40 % sur un seul client, un retard de paiement devient un risque de trésorerie (c'est exactement le cas de la #024). Le module « Score de risque client » suit cette dérive automatiquement.</p>
+  <button class="btn primary" data-action="dep" style="margin-top:14px;width:100%;justify-content:center;">C'est noté — objectif &lt; 40 %</button>
+</template>
+
+<template id="tpl-decl">
+  <p class="lbl">URSSAF · autoentrepreneur.urssaf.fr · guichet du 1ᵉʳ au 5 juillet</p>
+  <div class="brk"><div class="bt"><b>Avril — encaissé</b><span>#021 · <span data-fx="facCli021">Atelier Novak</span></span></div><div class="bv num blurnum" data-fx="encAvril">2 680 €</div></div>
+  <div class="brk"><div class="bt"><b>Mai — encaissé</b><span>#022 · #023</span></div><div class="bv num blurnum" data-fx="encMai">2 880 €</div></div>
+  <div class="brk"><div class="bt"><b>Juin — encaissé</b><span>à date · hors #024 en retard</span></div><div class="bv num blurnum" data-fx="encJuin">2 410 €</div></div>
+  <div class="resultbox"><div><div class="lbl" style="margin:0 0 6px;">Case « recettes BNC »</div><span class="muted" style="font-size:12.5px;">CA encaissé du trimestre — à recopier tel quel</span></div><span class="rv blurnum" data-fx="baseUrssaf">7 970 €</span></div>
+  <div class="brk" style="margin-top:16px;"><div class="bt"><b>Cotisations sociales</b><span>21,2 % avec ACRE</span></div><div class="bv num blurnum" data-fx="cotisUrssaf">1 690 €</div></div>
+  <div class="brk"><div class="bt"><b>CFP</b><span>0,2 %</span></div><div class="bv num blurnum" data-fx="cotisCFP">16 €</div></div>
+  <div class="brk"><div class="bt"><b>IR libératoire</b><span>2,2 %</span></div><div class="bv num blurnum" data-fx="cotisIR">274 €</div></div>
+  <div class="resultbox" style="background:linear-gradient(165deg,var(--amber-soft),var(--panel-2) 70%);border-color:rgba(227,179,95,.3);"><div><div class="lbl" style="margin:0 0 6px;">Prélevé le 5 juillet ≈</div><span class="muted" style="font-size:12.5px;">le bocal URSSAF couvre ce montant</span></div><span class="rv blurnum" style="color:var(--amber);" data-fx="urssaf">1 980 €</span></div>
+  <p class="help muted" style="font-size:12px;margin-top:14px;line-height:1.6;">En rythme <b>mensuel</b> (Config → Paramètres fiscaux), cette ligne arrive chaque mois avec les mêmes chiffres prêts. Idem pour la TVA (dès la bascule) et la CFE en décembre.</p>
+  <button class="btn primary" data-action="decl" style="margin-top:12px;width:100%;justify-content:center;">$ICO_check$ Marquer comme déclaré</button>
+</template>
+
+<script src="freel-depenses.js?v=1"></script>
+<script src="freel-etat.js?v=4"></script>
+<script src="freel.js?v=6"></script>
+<script src="pilote-flux.js?v=7"></script>
+<script src="pilote-quickacts.js?v=3"></script>
+<script src="freel-docs.js?v=5"></script>
+<script src="freel-fold.js"></script>
+<script src="v1.11-shell.js?v=5"></script>
+</body>
+</html>

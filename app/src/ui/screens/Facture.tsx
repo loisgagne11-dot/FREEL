@@ -9,6 +9,7 @@ import { Info } from '../components/Info';
 import { dateCourte, eurExact } from '../format';
 import styles from './Facture.module.css';
 import { Montant } from '../components/Montant';
+import { Facturier } from '../components/Facturier';
 
 /**
  * Émission d'une facture.
@@ -53,7 +54,33 @@ const ligneVide = (): LigneFacture => ({
   designation: '', quantite: 1, prixUnitaireHt: euros(0), tauxTva: ratio(0.20)
 });
 
+/**
+ * L'écran a deux temps : le facturier, et la rédaction.
+ *
+ * Le facturier d'abord, parce que c'est ce qu'on vient faire le plus souvent —
+ * regarder qui n'a pas payé, enregistrer un règlement qui vient d'arriver.
+ * Émettre est plus rare, et c'est un geste qu'on décide : il mérite un clic.
+ *
+ * L'inverse — ouvrir sur un formulaire vierge — obligeait à chercher ses
+ * factures ailleurs, et l'ailleurs en question (Argent, sous-onglet livre des
+ * recettes) n'était pas trouvable.
+ */
 export function Facture() {
+  const [vue, setVue] = useState<'facturier' | 'saisie'>('facturier');
+
+  if (vue === 'saisie') return <NouvelleFacture onListe={() => setVue('facturier')} />;
+
+  return (
+    <>
+      <header className={styles.entete}>
+        <h1 className={styles.titre}>Facturer</h1>
+      </header>
+      <Facturier onNouvelle={() => setVue('saisie')} />
+    </>
+  );
+}
+
+function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
   const faits = useFaits((e) => e.faits);
   const ajouterRecette = useFaits((e) => e.ajouterRecette);
   const idChamp = useId();
@@ -139,6 +166,9 @@ export function Facture() {
             }}>
               Nouvelle facture
             </button>
+            <button type="button" className={styles.action} onClick={onListe}>
+              Retour au facturier
+            </button>
           </div>
         </header>
 
@@ -162,6 +192,9 @@ export function Facture() {
       <header className={styles.entete}>
         <h1 className={styles.titre}>Nouvelle facture</h1>
         <span className={styles.numero}>{numero}</span>
+        <button type="button" className={styles.action} onClick={onListe}>
+          Retour au facturier
+        </button>
       </header>
 
       {aCommence && etat.manques.length > 0 && (

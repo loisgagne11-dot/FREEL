@@ -342,3 +342,13 @@
   .bandeau { grid-column: 1 / -1; }
   .carte { grid-column: 1 / -1; }
 }
+
+/* Corriger et supprimer se rangent ensemble, en fin de panneau — deux issues
+   d'une même dépense. Elles ne se ressemblent pas : l'une garde la pièce,
+   l'autre emporte tout. */
+.actionsDetail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}

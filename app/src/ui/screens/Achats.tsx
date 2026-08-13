@@ -1,6 +1,7 @@
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { type LigneDepense, etatAchats } from '../../state/selecteurs';
+import type { Depense } from '../../state/schema';
 import {
   type EtatRapprochement, type ProvenanceFournisseur,
   libelleMotif
@@ -64,7 +65,8 @@ const SECTIONS = [
 type Panneau =
   | { readonly type: 'ferme' }
   | { readonly type: 'detail'; readonly id: string }
-  | { readonly type: 'ajout' };
+  | { readonly type: 'ajout' }
+  | { readonly type: 'edition'; readonly id: string };
 
 const stockageParDefaut = stockageIndexedDB();
 
@@ -74,6 +76,7 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
   const definirRapprochement = useFaits((e) => e.definirRapprochement);
   const ajouterDepense = useFaits((e) => e.ajouterDepense);
   const supprimerDepense = useFaits((e) => e.supprimerDepense);
+  const modifierDepense = useFaits((e) => e.modifierDepense);
 
   const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
   const [section, setSection] = useState<Section>('depenses');
@@ -93,6 +96,9 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
   const etat = useMemo(() => etatAchats(faits, new Date(), periode), [faits, periode]);
   const selection = panneau.type === 'detail'
     ? etat.lignes.find((l) => l.depense.id === panneau.id) ?? null
+    : null;
+  const enEdition = panneau.type === 'edition'
+    ? etat.lignes.find((l) => l.depense.id === panneau.id)?.depense ?? null
     : null;
 
   const fermer = useCallback(() => setPanneau({ type: 'ferme' }), []);
@@ -261,6 +267,7 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
             onAttacher={(idJustificatif) =>
               attacherJustificatif(selection.depense.id, idJustificatif)}
             onRapprocher={(e) => definirRapprochement(selection.depense.id, e)}
+            onCorriger={() => setPanneau({ type: 'edition', id: selection.depense.id })}
             onSupprimer={() => { supprimerDepense(selection.depense.id); fermer(); }}
           />
         )}
@@ -268,13 +275,40 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
 
       <Sheet ouvert={panneau.type === 'ajout'} titre="Ajouter une dépense" onFermer={fermer}>
         <FormulaireDepense
-          onValider={(saisie) => {
-            const id = ajouterDepense(saisie);
+          onValider={(champs) => {
+            const id = ajouterDepense({
+              ...champs,
+              // Une dépense naît sans pièce, et l'écran le dit immédiatement.
+              // Créer avec une pièce supposée serait revenir au `piece: true`
+              // de l'ancienne version.
+              justificatifId: null,
+              rapprochement: 'en_attente'
+            });
             // On enchaîne sur le détail : c'est là que la pièce se dépose, et
             // une dépense créée sans pièce est précisément le problème.
             setPanneau({ type: 'detail', id });
           }}
         />
+      </Sheet>
+
+      <Sheet
+        ouvert={enEdition !== null}
+        titre="Corriger la dépense"
+        onFermer={fermer}
+      >
+        {enEdition !== null && (
+          <FormulaireDepense
+            initiale={enEdition}
+            onValider={(champs) => {
+              // SEULEMENT les champs du formulaire. La pièce déposée et l'état
+              // de rapprochement ne sont pas des saisies : les renvoyer aux
+              // valeurs d'une dépense neuve détacherait le justificatif au
+              // premier changement de libellé.
+              modifierDepense(enEdition.id, champs);
+              setPanneau({ type: 'detail', id: enEdition.id });
+            }}
+          />
+        )}
       </Sheet>
     </>
   );
@@ -342,12 +376,13 @@ function etiquetteRapprochement(etat: EtatRapprochement): string {
 type Retour = { readonly ton: 'succes' | 'echec'; readonly texte: string } | null;
 
 function DetailDepense(
-  { ligne, stockage, banqueReliee, onAttacher, onRapprocher, onSupprimer }: {
+  { ligne, stockage, banqueReliee, onAttacher, onRapprocher, onCorriger, onSupprimer }: {
     ligne: LigneDepense;
     stockage: StockageJustificatifs;
     banqueReliee: boolean;
     onAttacher: (idJustificatif: string | null) => void;
     onRapprocher: (etat: EtatRapprochement) => void;
+    onCorriger: () => void;
     onSupprimer: () => void;
   }
 ) {
@@ -513,9 +548,17 @@ function DetailDepense(
           )}
       </section>
 
-      <button type="button" className={styles.supprimer} onClick={onSupprimer}>
-        Supprimer cette dépense
-      </button>
+      <div className={styles.actionsDetail}>
+        {/* Corriger AVANT supprimer, et à distance : jusqu'ici la seule façon
+            de rattraper une faute de saisie était de supprimer puis ressaisir
+            — ce qui détachait la pièce et perdait l'état de rapprochement. */}
+        <button type="button" className={styles.actionPrincipale} onClick={onCorriger}>
+          Corriger cette dépense
+        </button>
+        <button type="button" className={styles.supprimer} onClick={onSupprimer}>
+          Supprimer cette dépense
+        </button>
+      </div>
     </div>
   );
 }
@@ -543,16 +586,41 @@ function libelleProvenance(p: ProvenanceFournisseur): string {
  * Le taux de TVA est saisi, jamais supposé : l'ancienne version appliquait
  * 20 % par défaut, y compris sur des dépenses qui n'en portaient pas.
  */
+/**
+ * Les champs qu'un humain saisit sur une dépense.
+ *
+ * Volontairement SANS `justificatifId` ni `rapprochement` : ce ne sont pas des
+ * saisies mais des états acquis — une pièce déposée, un mouvement rapproché.
+ * Les faire passer par le formulaire ferait détacher le justificatif au
+ * premier changement de libellé, ce qui est exactement la raison pour laquelle
+ * corriger une dépense était impossible jusqu'ici : il fallait la supprimer et
+ * la ressaisir, et tout ce travail-là était perdu.
+ */
+type ChampsDepense = Pick<
+  Depense, 'libelle' | 'fournisseur' | 'provenance' | 'montantTtc' | 'tauxTva' | 'payeeLe'
+>;
+
 function FormulaireDepense(
-  { onValider }: { onValider: (saisie: Parameters<ReturnType<typeof useFaits.getState>['ajouterDepense']>[0]) => void }
+  { onValider, initiale }: {
+    readonly onValider: (champs: ChampsDepense) => void;
+    /** La dépense à corriger. Absente, le formulaire en crée une. */
+    readonly initiale?: Depense;
+  }
 ) {
   const idChamp = useId();
-  const [libelle, setLibelle] = useState('');
-  const [fournisseur, setFournisseur] = useState('');
-  const [montant, setMontant] = useState('');
-  const [taux, setTaux] = useState('20');
-  const [date, setDate] = useState('');
-  const [provenance, setProvenance] = useState<ProvenanceFournisseur>('france');
+  const correction = initiale !== undefined;
+  const [libelle, setLibelle] = useState(initiale?.libelle ?? '');
+  const [fournisseur, setFournisseur] = useState(initiale?.fournisseur ?? '');
+  const [montant, setMontant] = useState(
+    initiale === undefined ? '' : String(initiale.montantTtc)
+  );
+  const [taux, setTaux] = useState(
+    initiale === undefined ? '20' : String(Math.round(initiale.tauxTva * 1000) / 10)
+  );
+  const [date, setDate] = useState(initiale?.payeeLe ?? '');
+  const [provenance, setProvenance] = useState<ProvenanceFournisseur>(
+    initiale?.provenance ?? 'france'
+  );
   const [erreur, setErreur] = useState<string | null>(null);
 
   function soumettre(evenement: React.FormEvent): void {
@@ -574,12 +642,7 @@ function FormulaireDepense(
       provenance,
       montantTtc: euros(valeur),
       tauxTva: ratio(points / 100),
-      payeeLe: /^\d{4}-\d{2}-\d{2}$/.test(date) ? dateISO(date) : null,
-      // Une dépense naît sans pièce, et l'écran le dit immédiatement. Créer
-      // avec une pièce supposée serait revenir au `piece: true` de l'ancienne
-      // version.
-      justificatifId: null,
-      rapprochement: 'en_attente'
+      payeeLe: /^\d{4}-\d{2}-\d{2}$/.test(date) ? dateISO(date) : null
     });
   }
 
@@ -622,7 +685,7 @@ function FormulaireDepense(
       {erreur !== null && <p role="alert" className={styles.verdictDanger}>{erreur}</p>}
 
       <button type="submit" className={styles.actionPrincipale}>
-        Ajouter, puis déposer la pièce
+        {correction ? 'Enregistrer la correction' : 'Ajouter, puis déposer la pièce'}
       </button>
     </form>
   );

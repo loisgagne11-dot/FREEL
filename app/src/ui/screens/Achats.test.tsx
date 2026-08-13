@@ -311,3 +311,64 @@ describe('période d’observation', () => {
     expect(screen.getByRole('status').textContent).toBe(courante);
   });
 });
+
+/**
+ * CORRIGER SANS TOUT PERDRE.
+ *
+ * `modifierDepense` existait dans le magasin, aucun écran ne l'appelait : la
+ * seule façon de rattraper une faute de saisie était de supprimer puis
+ * ressaisir — ce qui détachait le justificatif déposé et remettait le
+ * rapprochement à zéro. Autrement dit, corriger un libellé coûtait la pièce
+ * justificative, qui est la seule chose ayant valeur probante.
+ */
+describe('corriger une dépense', () => {
+  it('modifie la ligne sans en créer une seconde', async () => {
+    semer({ depenses: [depense({ libelle: 'Abonnment' })] });
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnment/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Corriger cette dépense' }));
+
+    const champ = screen.getByLabelText('Libellé');
+    await utilisateur.clear(champ);
+    await utilisateur.type(champ, 'Abonnement');
+    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer la correction' }));
+
+    const depenses = useFaits.getState().faits.depenses;
+    expect(depenses).toHaveLength(1);
+    expect(depenses[0]?.libelle).toBe('Abonnement');
+  });
+
+  it('garde le justificatif attaché et l’état de rapprochement', async () => {
+    semer({
+      depenses: [depense({ justificatifId: 'j1', rapprochement: 'rapproche' })]
+    });
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Corriger cette dépense' }));
+    const champ = screen.getByLabelText('Libellé');
+    await utilisateur.clear(champ);
+    await utilisateur.type(champ, 'Autre libellé');
+    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer la correction' }));
+
+    const d = useFaits.getState().faits.depenses[0];
+    expect(d?.justificatifId).toBe('j1');
+    expect(d?.rapprochement).toBe('rapproche');
+  });
+
+  it('ouvre le formulaire déjà rempli, plutôt que vierge', async () => {
+    semer({ depenses: [depense({ libelle: 'Abonnement', montantTtc: euros(120) })] });
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Corriger cette dépense' }));
+
+    expect(screen.getByLabelText<HTMLInputElement>('Libellé').value).toBe('Abonnement');
+    expect(screen.getByLabelText<HTMLInputElement>('Montant TTC (€)').value).toBe('120');
+    expect(screen.getByLabelText<HTMLInputElement>('Taux de TVA (%)').value).toBe('20');
+  });
+});

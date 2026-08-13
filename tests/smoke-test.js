@@ -123,7 +123,10 @@ const fsMod = require('fs');
 const pathMod = require('path');
 const RACINE = pathMod.join(__dirname, '..');
 const IGNORES = new Set(['node_modules', '.git', 'dist', 'captures', 'coverage']);
-const EXTENSIONS = ['.html', '.js', '.ts', '.tsx', '.json', '.md', '.css'];
+// `.jsx` a été ajouté le 13/08 : le handoff de design en contenait, et deux
+// IBAN y sont passés inaperçus faute d'être lus. Une extension oubliée n'est
+// pas une lacune de règle, c'est un angle mort complet.
+const EXTENSIONS = ['.html', '.js', '.jsx', '.ts', '.tsx', '.json', '.md', '.css'];
 
 function fichiersDuDepot(dossier) {
   const trouves = [];
@@ -147,7 +150,13 @@ const MOTIFS_INTERDITS = [
   [/\bsiret:\s*['"]([0-9]{9,})/gi, 'SIRET en dur dans une valeur par défaut'],
   [/\biban:\s*['"](FR[0-9]{2}[0-9A-Z]{10,})/gi, 'IBAN français en dur'],
   [/tvaIntracom:\s*['"](FR[0-9]{2,})/gi, 'n° de TVA intracommunautaire en dur'],
-  [/\b(RCS\s+[A-ZÉÈÀÂÎÔÛ]{4,})/g, 'ville de RCS en dur dans une mention légale']
+  [/\b(RCS\s+[A-ZÉÈÀÂÎÔÛ]{4,})/g, 'ville de RCS en dur dans une mention légale'],
+  // Un IBAN NU, quelle que soit sa forme syntaxique. La règle précédente ne
+  // reconnaissait qu'une affectation `iban: 'FR…'` ; le handoff de design le
+  // portait en attribut JSX (`value="FR76 …"`) et dans une chaîne d'option,
+  // et il est passé. Une donnée bancaire ne devient pas inoffensive parce
+  // qu'elle change de place dans la syntaxe.
+  [/\b(FR[0-9]{2}(?:[ ]?[0-9A-Z]{4}){5,})/g, 'IBAN français en clair']
 ];
 
 /**

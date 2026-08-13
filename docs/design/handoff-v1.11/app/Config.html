@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Freel V1.11 — Config</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="freel.css?v=9">
+<link rel="stylesheet" href="v1.11.css?v=5">
+<script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('freel-v111-theme')||'sombre')}catch(e){document.documentElement.setAttribute('data-theme','sombre')}</script>
+<style>
+  #root{min-height:100vh;}
+  .a-reveal{animation:aRise .5s cubic-bezier(.2,.7,.2,1) both;}
+  @keyframes aRise{from{transform:translateY(9px);}to{transform:none;}}
+  @media (prefers-reduced-motion: reduce){.a-reveal{animation:none;transform:none;}}
+
+  .cfg-shell{display:grid;grid-template-columns:282px 1fr;gap:22px;align-items:start;}
+  @media(max-width:880px){.cfg-shell{grid-template-columns:1fr;}}
+  .cfg-list{display:flex;flex-direction:column;gap:6px;}
+  .cfg-item{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid var(--line);border-radius:13px;background:var(--panel);cursor:pointer;transition:border-color .14s,background .14s;text-align:left;width:100%;font-family:inherit;color:var(--text);}
+  .cfg-item:hover{border-color:var(--line-2);}
+  .cfg-item.on{border-color:rgba(84,207,145,.4);background:linear-gradient(120deg,var(--green-glow),var(--panel) 72%);}
+  .cfg-item .ci{width:34px;height:34px;border-radius:9px;background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .cfg-item.on .ci{background:var(--green-glow);color:var(--green);}
+  .cfg-item .ci svg{width:16px;height:16px;}
+  .cfg-item .ct{font-size:13.5px;font-weight:600;}
+  .cfg-item .cs{font-size:11.5px;color:var(--muted);margin-top:1px;}
+  .cfg-item .chev{margin-left:auto;color:var(--muted-2);display:flex;}
+  .cfg-item .chev svg{width:15px;height:15px;}
+
+  .sect-h{font-size:18px;font-weight:700;margin:0 0 3px;letter-spacing:-.2px;}
+  .sect-sub{color:var(--muted);font-size:13px;margin:0 0 20px;max-width:62ch;line-height:1.55;}
+  .help{font-size:11.5px;color:var(--muted-2);margin:5px 0 0;line-height:1.5;}
+  .frow{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:600px){.frow{grid-template-columns:1fr;}}
+  .field{margin-bottom:15px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500;}
+  .field input,.field select{width:100%;background:var(--panel-2);border:1px solid var(--line-2);border-radius:9px;padding:10px 12px;color:var(--text);font-family:inherit;font-size:13.5px;}
+  .field input.num{font-family:var(--mono);}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--green);}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line);}
+  .toggle-row:last-child{border-bottom:none;}
+  .toggle-row .tx b{font-weight:600;font-size:13.5px;display:block;}
+  .toggle-row .tx span{font-size:12px;color:var(--muted);}
+  .sw-toggle{appearance:none;width:38px;height:21px;border-radius:20px;background:var(--panel-3);border:1px solid var(--line-2);position:relative;cursor:pointer;transition:.15s;flex-shrink:0;}
+  .sw-toggle:checked{background:var(--green-deep);border-color:var(--green);}
+  .sw-toggle::after{content:"";position:absolute;top:1.5px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--muted);transition:.15s;}
+  .sw-toggle:checked::after{transform:translateX(16px);background:var(--green);}
+  .seg{display:inline-flex;padding:3px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:10px;gap:3px;}
+  .seg button{font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted);background:none;border:none;padding:7px 13px;border-radius:8px;cursor:pointer;}
+  .seg button.on{background:var(--panel-3);color:var(--text);box-shadow:inset 0 0 0 1px var(--line-2);}
+  .save-bar{display:flex;align-items:center;gap:12px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line);}
+  .save-bar .muted{font-size:12px;}
+  .rng{width:100%;accent-color:var(--green);cursor:pointer;}
+  .tbl{width:100%;border-collapse:collapse;}
+  .tbl th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2);font-weight:600;padding:0 12px 10px;border-bottom:1px solid var(--line);}
+  .tbl th.n,.tbl td.n{text-align:right;}
+  .tbl td{padding:11px 12px;border-bottom:1px solid var(--line);font-size:13px;}
+  .tbl .num{font-family:var(--mono);}
+  .tbl tr.tot td{border-bottom:none;font-weight:700;padding-top:13px;}
+  .acctcard{display:flex;align-items:center;gap:14px;padding:15px;border:1px solid rgba(84,207,145,.25);border-radius:13px;background:linear-gradient(165deg,rgba(84,207,145,.07),var(--panel-2) 70%);margin-bottom:18px;}
+  .stor-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-2);font-weight:600;margin:20px 0 2px;}
+  .cloud{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--line);}
+  .cloud:last-child{border-bottom:none;}
+  .cloud .cl-lo{width:36px;height:36px;border-radius:10px;background:var(--panel-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted);}
+  .cloud .cl-lo svg{width:18px;height:18px;}
+  .cloud .cl-b{flex:1;min-width:0;}
+  .cloud .cl-b b{font-size:13.5px;font-weight:600;display:block;}
+  .cloud .cl-b span{font-size:11.5px;color:var(--muted);}
+  .cloud .cl-b span.on{color:var(--green);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+window.FREEL_ICONS={check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>',layers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 3 8l9 5 9-5-9-5Z"/></svg>'};
+window.FreelToast=function(msg,kind){var t=document.createElement('div');t.className='freel-toast'+(kind?(' '+kind):'');t.innerHTML=(kind==='ok'?FREEL_ICONS.check:FREEL_ICONS.layers)+'<span>'+msg+'</span>';document.body.appendChild(t);requestAnimationFrame(function(){t.classList.add('show');});setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},250);},2600);};
+</script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="config-app.jsx?v=6"></script>
+<script src="freel-fold.js"></script>
+<script src="v1.11-shell.js?v=5"></script>
+</body>
+</html>

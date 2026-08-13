@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="design_doc_mode" content="canvas">
+<title>Freel — Le Flux · 5 pistes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="freel.css?v=5">
+<style>
+  body{font-family:"Hanken Grotesk",system-ui,sans-serif;background:#c9cdc7;}
+  .doc-head{position:absolute;left:120px;top:44px;width:1700px;}
+  .doc-head h1{font-size:23px;font-weight:700;letter-spacing:-.02em;margin:0;color:#1a1f18;}
+  .doc-head p{font-size:13.5px;color:#4a5147;margin:8px 0 0;max-width:80ch;line-height:1.5;}
+  .doc-head p b{color:#1a1f18;font-weight:600;}
+  .doc-head code{font-family:var(--mono);font-size:12px;background:rgba(20,30,20,.06);padding:2px 6px;border-radius:5px;}
+
+  .frame{position:absolute;}
+  .flabel{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;}
+  .flabel .fx{font-family:var(--mono);font-size:13px;font-weight:700;color:#1a1f18;letter-spacing:.02em;}
+  .flabel .fn{font-size:15px;font-weight:700;color:#1a1f18;}
+  .flabel .fd{font-size:12px;color:#5a6156;margin-left:auto;text-align:right;max-width:44ch;line-height:1.4;}
+
+  /* ---- carte (reprend .flux-card) ---- */
+  .card{border:1px solid var(--line);border-radius:22px;background:radial-gradient(130% 150% at 0% 0%,rgba(84,207,145,.05),var(--panel) 52%);padding:24px 26px 22px;color:var(--text);}
+  .chead{margin-bottom:20px;}
+  .chead .ftag{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);}
+  .chead .ftag svg{width:12px;height:12px;}
+  .chead h2{font-size:19px;letter-spacing:-.02em;margin:8px 0 0;font-weight:700;line-height:1.15;}
+  .chead .sub{font-size:12px;color:var(--muted);margin:5px 0 0;}
+  .pin{position:absolute;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:5;box-shadow:0 0 0 3px var(--panel);}
+  .pin svg{width:11px;height:11px;}
+  .pin.u{background:var(--red);color:#1a0b08;}
+  .pin.w{background:var(--amber);color:#1a1305;}
+
+  /* ============ A · Cascade ============ */
+  .wf{display:flex;align-items:flex-end;gap:14px;padding:26px 4px 0;}
+  .wf-col{flex:1;display:flex;flex-direction:column;align-items:stretch;min-width:0;}
+  .wf-track{position:relative;height:210px;display:flex;align-items:flex-start;}
+  .wf-bar{width:100%;border-radius:7px 7px 4px 4px;position:relative;cursor:pointer;transition:filter .15s,transform .15s;}
+  .wf-bar:hover{filter:brightness(1.12);transform:translateY(-2px);}
+  .wf-bar .wf-val{position:absolute;top:-19px;left:0;right:0;text-align:center;font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;}
+  .wf-real{background:linear-gradient(180deg,#2c7d56,#1c5e40);box-shadow:inset 0 1px 0 rgba(126,224,175,.4);}
+  .wf-real .wf-val{color:var(--text);}
+  .wf-ded{border-radius:5px;}
+  .wf-attente{background:repeating-linear-gradient(135deg,rgba(111,182,224,.32) 0 7px,rgba(111,182,224,.14) 7px 14px);border:1px solid rgba(111,182,224,.5);}
+  .wf-attente .wf-val{color:var(--blue);}
+  .wf-prov{background:linear-gradient(180deg,rgba(227,179,95,.5),rgba(227,179,95,.28));border:1px solid rgba(227,179,95,.5);}
+  .wf-prov .wf-val{color:var(--amber);}
+  .wf-res{background:linear-gradient(180deg,rgba(120,200,170,.5),rgba(120,200,170,.3));border:1px solid rgba(120,200,170,.5);}
+  .wf-res .wf-val{color:#7fe0c0;}
+  .wf-verses{background:linear-gradient(180deg,#54cf91,#3bb87b);box-shadow:0 10px 26px rgba(84,207,145,.28),inset 0 1px 0 rgba(190,255,225,.6);}
+  .wf-verses .wf-val{color:#eafff4;font-size:15px;}
+  .wf-floor{height:1px;background:var(--line-2);margin:0 0 10px;}
+  .wf-name{font-size:11px;color:var(--muted);text-align:center;line-height:1.3;padding-top:2px;}
+  .wf-name b{display:block;color:var(--text);font-weight:600;font-size:11.5px;}
+  .wf-conn{position:absolute;height:0;border-top:1px dashed var(--muted-2);opacity:.5;z-index:0;}
+
+  /* ============ B · Barre décomposée ============ */
+  .db-take{font-size:13px;color:var(--muted);margin:0 0 16px;}
+  .db-take b{font-family:var(--mono);color:var(--green);font-size:22px;font-weight:700;letter-spacing:-.02em;}
+  .db-bar{display:flex;height:68px;border-radius:12px;overflow:hidden;border:1px solid var(--line-2);position:relative;}
+  .db-seg{position:relative;display:flex;flex-direction:column;justify-content:center;padding:0 14px;cursor:pointer;transition:filter .15s;overflow:hidden;min-width:0;}
+  .db-seg:hover{filter:brightness(1.1);}
+  .db-seg + .db-seg{border-left:1px solid rgba(11,14,12,.35);}
+  .db-seg .db-k{font-size:10.5px;font-weight:600;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .db-seg .db-v{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:-.02em;margin-top:2px;}
+  .db-seg .db-p{font-family:var(--mono);font-size:10px;opacity:.7;}
+  .db-toi{background:linear-gradient(180deg,#3bb87b,#2c7d56);color:#eafff4;}
+  .db-prov{background:linear-gradient(180deg,rgba(227,179,95,.42),rgba(227,179,95,.24));color:var(--amber);}
+  .db-res{background:rgba(120,200,170,.28);color:#7fe0c0;}
+  .db-attente{background:repeating-linear-gradient(135deg,rgba(111,182,224,.26) 0 8px,rgba(111,182,224,.1) 8px 16px);color:var(--blue);}
+  .db-legend{display:flex;flex-wrap:wrap;gap:10px 22px;margin-top:18px;}
+  .db-li{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);cursor:pointer;}
+  .db-li .dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+  .db-li b{color:var(--text);font-weight:600;}
+  .db-li .amt{font-family:var(--mono);color:var(--text);font-weight:600;}
+
+  /* ============ C · Comptes / bocaux ============ */
+  .ac-src{display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--line-2);border-radius:12px;background:var(--panel-2);margin-bottom:8px;}
+  .ac-src .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:var(--muted);}
+  .ac-src .v{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green);margin-left:auto;letter-spacing:-.02em;white-space:nowrap;}
+  .ac-src .vt{font-size:11.5px;color:var(--muted);}
+  .ac-split{display:flex;justify-content:center;gap:60px;height:26px;position:relative;}
+  .ac-split::before{content:"";position:absolute;top:0;left:22%;right:22%;height:13px;border:1px solid var(--line-2);border-bottom:none;border-radius:8px 8px 0 0;}
+  .ac-split span{position:absolute;top:12px;width:1px;height:14px;background:var(--line-2);}
+  .ac-jars{display:flex;gap:12px;}
+  .ac-jar{flex:1;border:1px solid var(--line-2);border-radius:14px;background:var(--panel-2);padding:14px 14px 0;cursor:pointer;transition:border-color .15s,transform .15s;position:relative;overflow:hidden;display:flex;flex-direction:column;}
+  .ac-jar:hover{transform:translateY(-2px);}
+  .ac-jar .jk{font-size:11px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:7px;}
+  .ac-jar .jk svg{width:13px;height:13px;}
+  .ac-jar .jv{font-family:var(--mono);font-size:20px;font-weight:700;letter-spacing:-.02em;margin-top:6px;}
+  .ac-jar .js{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.35;min-height:26px;}
+  .ac-fill{height:9px;border-radius:20px;background:var(--panel-3);margin:10px -14px 0;position:relative;overflow:hidden;}
+  .ac-fill i{position:absolute;left:0;top:0;bottom:0;border-radius:20px;}
+  .ac-toi{border-color:rgba(84,207,145,.4);} .ac-toi .jv{color:var(--green);} .ac-toi .ac-fill i{background:var(--green);}
+  .ac-imp{border-color:rgba(227,179,95,.4);} .ac-imp .jv{color:var(--amber);} .ac-imp .ac-fill i{background:var(--amber);}
+  .ac-mat{border-color:rgba(120,200,170,.35);} .ac-mat .jv{color:#7fe0c0;} .ac-mat .ac-fill i{background:#7fe0c0;}
+  .ac-att{border-style:dashed;border-color:rgba(111,182,224,.42);} .ac-att .jv{color:var(--blue);} .ac-att .ac-fill i{background:var(--blue);}
+
+  /* ============ D · Relevé ============ */
+  .lg{font-family:var(--mono);}
+  .lg-row{display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:12px;padding:9px 6px;border-radius:7px;position:relative;cursor:pointer;}
+  .lg-row:hover{background:var(--panel-2);}
+  .lg-op{font-size:14px;font-weight:700;text-align:center;}
+  .lg-op.minus{color:var(--red);} .lg-op.plus{color:var(--green);} .lg-op.eq{color:var(--muted-2);}
+  .lg-name{font-family:"Hanken Grotesk",sans-serif;font-size:13.5px;color:var(--muted);display:flex;align-items:center;gap:9px;}
+  .lg-name .tag{font-family:var(--mono);font-size:9.5px;padding:2px 7px;border-radius:20px;font-weight:600;}
+  .lg-name .tag.u{color:var(--red);background:var(--red-soft);border:1px solid rgba(226,113,95,.35);}
+  .lg-name .tag.w{color:var(--amber);background:var(--amber-soft);border:1px solid rgba(227,179,95,.32);}
+  .lg-val{font-size:15px;font-weight:700;letter-spacing:-.02em;text-align:right;}
+  .lg-val.neg{color:var(--red);} .lg-val.pos{color:var(--text);}
+  .lg-sub{background:var(--panel-2);}
+  .lg-sub .lg-name{color:var(--text);font-weight:600;}
+  .lg-sub .lg-val{color:var(--text);}
+  .lg-hr{height:1px;background:var(--line);margin:4px 6px;}
+  .lg-final{margin-top:10px;display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:12px;padding:14px 6px 14px 0;border-radius:10px;background:linear-gradient(90deg,rgba(84,207,145,.14),transparent 70%);border:1px solid rgba(84,207,145,.3);position:relative;}
+  .lg-final::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:4px;border-radius:0 4px 4px 0;background:var(--green);}
+  .lg-final .lg-name{font-family:"Hanken Grotesk",sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--green);font-weight:700;padding-left:14px;}
+  .lg-final .lg-val{font-size:26px;color:var(--green);font-weight:700;}
+
+  /* ============ E · Hybride ============ */
+  .hy{display:grid;grid-template-columns:1.15fr 1fr;gap:34px;align-items:center;}
+  .hy-div{border-left:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<div class="doc-head">
+  <h1>Le flux du mois — 5 pistes de présentation</h1>
+  <p>Même information à chaque fois : <b>ce que tu factures n'est pas ce que tu touches</b>. Chiffres normalisés pour qu'ils s'additionnent (<code>réalisé 9 620 − attente 3 610 = encaissé 6 010 − provisions 3 180 = dispo 2 830 − réserve 360 = tu te verses 2 470</code>). La piste retenue sera recâblée sur les données live + le simulateur « Et si ? ». Fais défiler / zoome, puis dis-moi laquelle.</p>
+</div>
+
+<!-- ============ A · CASCADE ============ -->
+<section class="frame" style="left:120px;top:180px;width:820px;">
+  <div class="flabel"><span class="fx">A</span><span class="fn">La cascade</span><span class="fd">Le classique du « brut → net ». Chaque fuite fait chuter la marche jusqu'au versement posé au sol.</span></div>
+  <div class="card">
+    <div class="chead">
+      <span class="ftag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 12l4-4M4 12l4 4"/></svg> le flux du mois · juin 2026</span>
+      <h2>Ce que tu gagnes n'est pas ce que tu touches</h2>
+    </div>
+    <div class="wf">
+      <div class="wf-col">
+        <div class="wf-track">
+          <div class="wf-bar wf-real" style="height:200px;margin-top:0;"><span class="wf-val">9 620 €</span></div>
+        </div>
+        <div class="wf-floor"></div>
+        <div class="wf-name"><b>CA réalisé</b>facturé</div>
+      </div>
+      <div class="wf-col">
+        <div class="wf-track">
+          <div class="wf-bar wf-ded wf-attente" style="height:75px;margin-top:0;"><span class="wf-val">−3 610 €</span>
+            <span class="pin u" style="top:-9px;right:-9px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+          </div>
+        </div>
+        <div class="wf-floor"></div>
+        <div class="wf-name"><b>En attente</b>pas encaissé</div>
+      </div>
+      <div class="wf-col">
+        <div class="wf-track">
+          <div class="wf-bar wf-ded wf-prov" style="height:66px;margin-top:75px;"><span class="wf-val">−3 180 €</span>
+            <span class="pin w" style="top:-9px;right:-9px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+          </div>
+        </div>
+        <div class="wf-floor"></div>
+        <div class="wf-name"><b>Provisions</b>URSSAF·IR·CFE</div>
+      </div>
+      <div class="wf-col">
+        <div class="wf-track">
+          <div class="wf-bar wf-ded wf-res" style="height:8px;margin-top:141px;"><span class="wf-val">−360 €</span></div>
+        </div>
+        <div class="wf-floor"></div>
+        <div class="wf-name"><b>Réserve</b>matelas</div>
+      </div>
+      <div class="wf-col">
+        <div class="wf-track">
+          <div class="wf-bar wf-verses" style="height:51px;margin-top:149px;"><span class="wf-val">2 470 €</span></div>
+        </div>
+        <div class="wf-floor"></div>
+        <div class="wf-name"><b>Tu te verses</b>net perso</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ B · BARRE DÉCOMPOSÉE ============ -->
+<section class="frame" style="left:1020px;top:180px;width:820px;">
+  <div class="flabel"><span class="fx">B</span><span class="fn">Où va ton euro</span><span class="fd">Une seule barre = 100 % du réalisé. On saisit la proportion en une seconde.</span></div>
+  <div class="card">
+    <div class="chead">
+      <span class="ftag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 12l4-4M4 12l4 4"/></svg> le flux du mois · juin 2026</span>
+      <h2>Où part chaque euro facturé</h2>
+    </div>
+    <p class="db-take">Sur 9 620 € facturés, tu gardes vraiment <b>2 470 €</b> — soit <b style="font-size:15px;">26 %</b>.</p>
+    <div class="db-bar">
+      <div class="db-seg db-toi" style="flex-grow:2470;">
+        <span class="db-k">Tu te verses</span><span class="db-v">2 470 €</span>
+      </div>
+      <div class="db-seg db-prov" style="flex-grow:3180;">
+        <span class="pin w" style="top:8px;right:8px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+        <span class="db-k">Provisions</span><span class="db-v">3 180 €</span>
+      </div>
+      <div class="db-seg db-res" style="flex-grow:360;" title="Réserve · 360 €"></div>
+      <div class="db-seg db-attente" style="flex-grow:3610;">
+        <span class="pin u" style="top:8px;right:8px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+        <span class="db-k">En attente</span><span class="db-v">3 610 €</span>
+      </div>
+    </div>
+    <div class="db-legend">
+      <div class="db-li"><span class="dot" style="background:#3bb87b;"></span><b>Tu te verses</b> <span class="amt">2 470 €</span> · 26 %</div>
+      <div class="db-li"><span class="dot" style="background:var(--amber);"></span><b>Provisions</b> <span class="amt">3 180 €</span> · 33 %</div>
+      <div class="db-li"><span class="dot" style="background:#7fe0c0;"></span><b>Réserve</b> <span class="amt">360 €</span> · 4 %</div>
+      <div class="db-li"><span class="dot" style="background:var(--blue);"></span><b>En attente</b> <span class="amt">3 610 €</span> · 37 %</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ C · COMPTES / BOCAUX ============ -->
+<section class="frame" style="left:120px;top:740px;width:820px;">
+  <div class="flabel"><span class="fx">C</span><span class="fn">Les bocaux</span><span class="fd">L'encaissé tombe et remplit tes comptes. Colle à ton vocabulaire « bocaux ».</span></div>
+  <div class="card">
+    <div class="chead">
+      <span class="ftag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 12l4-4M4 12l4 4"/></svg> le flux du mois · juin 2026</span>
+      <h2>Où atterrit l'argent encaissé</h2>
+    </div>
+    <div class="ac-src">
+      <span class="k">Encaissé ce mois</span>
+      <span class="vt">à répartir →</span>
+      <span class="v">6 010 €</span>
+    </div>
+    <div class="ac-split"><span style="left:22%;"></span><span style="left:50%;"></span><span style="left:78%;"></span></div>
+    <div class="ac-jars">
+      <div class="ac-jar ac-toi">
+        <span class="jk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5"/><path d="M16 12h.01"/></svg> Toi</span>
+        <span class="jv">2 470 €</span>
+        <span class="js">viré sur ton compte perso</span>
+        <div class="ac-fill"><i style="width:68%;"></i></div>
+      </div>
+      <div class="ac-jar ac-imp">
+        <span class="pin w" style="top:-9px;right:-9px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+        <span class="jk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Impôts & cotis.</span>
+        <span class="jv">3 180 €</span>
+        <span class="js">URSSAF T2 · IR · CFE · CFP</span>
+        <div class="ac-fill"><i style="width:88%;"></i></div>
+      </div>
+      <div class="ac-jar ac-mat">
+        <span class="jk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 12a9 9 0 0 1 18 0M3 12a9 9 0 0 0 18 0"/></svg> Matelas</span>
+        <span class="jv">360 €</span>
+        <span class="js">coussin gardé</span>
+        <div class="ac-fill"><i style="width:10%;"></i></div>
+      </div>
+      <div class="ac-jar ac-att">
+        <span class="pin u" style="top:-9px;right:-9px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span>
+        <span class="jk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> En attente</span>
+        <span class="jv">3 610 €</span>
+        <span class="js">factures pas encore arrivées</span>
+        <div class="ac-fill"><i style="width:100%;"></i></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ D · RELEVÉ ============ -->
+<section class="frame" style="left:1020px;top:740px;width:820px;">
+  <div class="flabel"><span class="fx">D</span><span class="fn">Le relevé</span><span class="fd">Un mini-relevé typographique. Sobre, ultra-lisible, très « fintech ».</span></div>
+  <div class="card">
+    <div class="chead">
+      <span class="ftag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 12l4-4M4 12l4 4"/></svg> le flux du mois · juin 2026</span>
+      <h2>Ce que tu gagnes n'est pas ce que tu touches</h2>
+    </div>
+    <div class="lg">
+      <div class="lg-row"><span class="lg-op plus">+</span><span class="lg-name">CA réalisé <span class="muted">· facturé</span></span><span class="lg-val pos">9 620 €</span></div>
+      <div class="lg-row"><span class="lg-op minus">−</span><span class="lg-name">En attente d'encaissement <span class="tag u">relance #024</span></span><span class="lg-val neg">3 610 €</span></div>
+      <div class="lg-row lg-sub"><span class="lg-op eq">=</span><span class="lg-name">Encaissé</span><span class="lg-val">6 010 €</span></div>
+      <div class="lg-row"><span class="lg-op minus">−</span><span class="lg-name">Provisions <span class="tag w">URSSAF T2</span></span><span class="lg-val neg">3 180 €</span></div>
+      <div class="lg-row lg-sub"><span class="lg-op eq">=</span><span class="lg-name">Disponible</span><span class="lg-val">2 830 €</span></div>
+      <div class="lg-row"><span class="lg-op minus">−</span><span class="lg-name">Réserve matelas</span><span class="lg-val neg">360 €</span></div>
+      <div class="lg-final"><span></span><span class="lg-name">Tu te verses</span><span class="lg-val">2 470 €</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ E · HYBRIDE ============ -->
+<section class="frame" style="left:120px;top:1300px;width:1720px;">
+  <div class="flabel"><span class="fx">E</span><span class="fn">Cascade + relevé</span><span class="fd">Façon slide : la cascade pour l'œil, le relevé pour les chiffres exacts.</span></div>
+  <div class="card">
+    <div class="chead">
+      <span class="ftag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M4 12l4-4M4 12l4 4"/></svg> le flux du mois · juin 2026</span>
+      <h2>Ce que tu gagnes n'est pas ce que tu touches</h2>
+    </div>
+    <div class="hy">
+      <div class="wf">
+        <div class="wf-col"><div class="wf-track"><div class="wf-bar wf-real" style="height:200px;margin-top:0;"><span class="wf-val">9 620 €</span></div></div><div class="wf-floor"></div><div class="wf-name"><b>Réalisé</b></div></div>
+        <div class="wf-col"><div class="wf-track"><div class="wf-bar wf-ded wf-attente" style="height:75px;margin-top:0;"><span class="wf-val">−3 610</span></div></div><div class="wf-floor"></div><div class="wf-name"><b>Attente</b></div></div>
+        <div class="wf-col"><div class="wf-track"><div class="wf-bar wf-ded wf-prov" style="height:66px;margin-top:75px;"><span class="wf-val">−3 180</span></div></div><div class="wf-floor"></div><div class="wf-name"><b>Provisions</b></div></div>
+        <div class="wf-col"><div class="wf-track"><div class="wf-bar wf-ded wf-res" style="height:8px;margin-top:141px;"><span class="wf-val">−360</span></div></div><div class="wf-floor"></div><div class="wf-name"><b>Réserve</b></div></div>
+        <div class="wf-col"><div class="wf-track"><div class="wf-bar wf-verses" style="height:51px;margin-top:149px;"><span class="wf-val">2 470</span></div></div><div class="wf-floor"></div><div class="wf-name"><b>Tu te verses</b></div></div>
+      </div>
+      <div class="hy-div" style="padding-left:34px;">
+        <div class="lg">
+          <div class="lg-row"><span class="lg-op plus">+</span><span class="lg-name">CA réalisé</span><span class="lg-val pos">9 620 €</span></div>
+          <div class="lg-row"><span class="lg-op minus">−</span><span class="lg-name">En attente <span class="tag u">relance</span></span><span class="lg-val neg">3 610 €</span></div>
+          <div class="lg-row lg-sub"><span class="lg-op eq">=</span><span class="lg-name">Encaissé</span><span class="lg-val">6 010 €</span></div>
+          <div class="lg-row"><span class="lg-op minus">−</span><span class="lg-name">Provisions <span class="tag w">URSSAF</span></span><span class="lg-val neg">3 180 €</span></div>
+          <div class="lg-row lg-sub"><span class="lg-op eq">=</span><span class="lg-name">Disponible</span><span class="lg-val">2 830 €</span></div>
+          <div class="lg-row"><span class="lg-op minus">−</span><span class="lg-name">Réserve matelas</span><span class="lg-val neg">360 €</span></div>
+          <div class="lg-final"><span></span><span class="lg-name">Tu te verses</span><span class="lg-val">2 470 €</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
