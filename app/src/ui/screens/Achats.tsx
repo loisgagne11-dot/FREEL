@@ -10,6 +10,7 @@ import {
   type MetaJustificatif, type StockageJustificatifs,
   deposerJustificatif, stockageIndexedDB, verifierIntegrite
 } from '../../infra/justificatifs';
+import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -82,13 +83,10 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
 
   return (
     <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Achats</h1>
-        {/* Liste vide : l'action vit dans l'état vide, au milieu de l'écran,
-            là où le regard se pose. La répéter ici donnerait deux commandes
-            identiques à quelques centimètres — une hésitation gratuite, et
-            deux cibles pour un lecteur d'écran là où il n'y a qu'une action. */}
-        {section === 'depenses' && etat.lignes.length > 0 && (
+      <Greet
+        titre="Achats"
+        sousTitre="Une dépense sans pièce ne récupère pas sa TVA : c’est la règle, et elle n’est pas contournable."
+        actions={section === 'depenses' && etat.lignes.length > 0 ? (
           <button
             type="button"
             className={styles.actionPrincipale}
@@ -96,8 +94,8 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
           >
             Ajouter une dépense
           </button>
-        )}
-      </header>
+        ) : undefined}
+      />
 
       <div className={styles.sections}>
         <Onglets

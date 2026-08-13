@@ -3,6 +3,7 @@ import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
 import { aTraiter, etatPilote, moisCourant, soldeEstSuivi } from '../../state/selecteurs';
 import type { SujetATraiter } from '../../domain/calculs/aTraiter';
+import { Greet } from '../components/Greet';
 import { eur, moisLong, moisTexte } from '../format';
 import styles from './Pilote.module.css';
 
@@ -28,10 +29,11 @@ export function Pilote() {
 
   return (
     <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Pilote</h1>
-        <p className={styles.periode}>{moisLong(mois)}</p>
-      </header>
+      <Greet
+        titre={salutation(faits.entreprise.nom)}
+        sousTitre={phraseDAccueil(sujets.length, moisLong(mois))}
+        repere={`Solde compte · ${eur(etat.tresorerie.solde)}`}
+      />
 
       {chargement.phase === 'sans-persistance' && (
         <Bandeau ton="alerte" titre="Vos saisies ne sont pas conservées">
@@ -278,4 +280,31 @@ function CurseurReserve(
       </div>
     </section>
   );
+}
+
+/**
+ * « Bonjour » suivi du nom, quand on le connaît.
+ *
+ * Le nom vient de la configuration de l'utilisateur, jamais du code : rien
+ * d'identifiant n'est écrit dans le dépôt. Tant qu'il n'est pas renseigné,
+ * on salue sans nommer plutôt que d'afficher un « Bonjour  » amputé.
+ */
+function salutation(nom: string): string {
+  const propre = nom.trim();
+  return propre === '' ? 'Bonjour' : `Bonjour ${propre}`;
+}
+
+/**
+ * Ce qui attend, en une phrase.
+ *
+ * La spec ouvre le Pilote sur « quatre décisions t'attendent » — un état
+ * qu'on lit en une seconde, là où quatre tuiles demandent d'être comparées.
+ * Le cas « rien à traiter » n'est pas un vide à masquer : c'est la bonne
+ * nouvelle de la journée, et elle mérite d'être dite.
+ */
+function phraseDAccueil(nbSujets: number, mois: string): string {
+  if (nbSujets === 0) return `Rien ne demande votre attention en ${mois.toLowerCase()}.`;
+  return nbSujets === 1
+    ? `Une décision vous attend en ${mois.toLowerCase()}.`
+    : `${nbSujets} décisions vous attendent en ${mois.toLowerCase()}.`;
 }

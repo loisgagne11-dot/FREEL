@@ -1,0 +1,60 @@
+/* En-tête d'écran. Mobile-first, aucune couleur en dur, aucune largeur en JS. */
+
+.greet {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.texte { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.titre {
+  font-size: 21px;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+  color: var(--text);
+  margin: 0;
+}
+
+.sousTitre {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0;
+  /* `text-wrap: pretty` évite le mot orphelin en fin de phrase, sans qu'aucune
+     largeur soit calculée en JS. Ignoré par les moteurs qui ne le connaissent
+     pas — la phrase reste lisible. */
+  text-wrap: pretty;
+}
+
+/* Le repère chiffré : discret, mais lisible d'un coup d'œil. */
+.repere {
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  padding: 6px 12px;
+  margin: 0;
+}
+
+.cote {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+
+@media (min-width: 761px) {
+  .titre { font-size: 24px; }
+}

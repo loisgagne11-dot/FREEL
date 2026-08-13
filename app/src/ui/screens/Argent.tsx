@@ -4,6 +4,7 @@ import { etatArgent, etatDes, etatLivre, moisCourant } from '../../state/selecte
 import type { Mois } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
+import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -42,10 +43,11 @@ export function Argent() {
 
   return (
     <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Argent</h1>
-        <p className={styles.periode}>Année {etat.annee}</p>
-      </header>
+      <Greet
+        titre="Argent"
+        sousTitre="Ce qui est rentré, ce qui reste à rentrer, et ce que la période doit."
+        repere={`Année ${etat.annee}`}
+      />
 
       <div className={styles.sections}>
         <Onglets
