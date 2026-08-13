@@ -716,7 +716,12 @@ function FormulaireMission(
     tjm: existante?.tjm ?? euros(0),
     debut: existante?.debut ?? null,
     fin: existante?.fin ?? null,
-    statut: existante?.statut ?? 'active'
+    statut: existante?.statut ?? 'active',
+    // Le formulaire ne touche ni au rythme ni aux ajustements : ils se règlent
+    // depuis le planning, pas depuis la fiche. Les reprendre tels quels évite
+    // qu'une modification de description efface l'activité d'un trimestre.
+    rythmes: existante?.rythmes ?? [],
+    ajustements: existante?.ajustements ?? {}
   }));
   const [erreur, setErreur] = useState<string | null>(null);
 

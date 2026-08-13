@@ -17,6 +17,7 @@ import type { Depense } from '../domain/calculs/depenses';
 import type { PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import type { MouvementBancaire } from '../domain/calculs/banque';
+import type { Ajustements, Rythme } from '../domain/calculs/planning';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -28,6 +29,7 @@ import type { MouvementBancaire } from '../domain/calculs/banque';
  * ensuite s'accommoder.
  */
 export type { Depense };
+export type { Ajustements, Rythme };
 
 export const VERSION_SCHEMA = 2 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
@@ -92,6 +94,26 @@ export interface Mission {
    * compte plus — ni terminée, puisqu'elle n'a rien produit.
    */
   readonly statut: 'active' | 'terminee' | 'prospect' | 'perdue';
+  /**
+   * Le rythme de travail, par plages de dates.
+   *
+   * C'est LE fait qui remplit le planning : « lundi à jeudi pleins, vendredi
+   * à mi-temps ». On le déclare une fois, le planning se remplit tout seul,
+   * et on ne corrige ensuite que ce qui s'est passé autrement.
+   *
+   * Plusieurs plages parce qu'un rythme change en cours de mission — passer
+   * à quatre jours en septembre ne doit pas réécrire l'été.
+   */
+  readonly rythmes: readonly Rythme[];
+  /**
+   * Ce qui a réellement été travaillé, quand cela diffère du rythme.
+   *
+   * Une table date → quotité. Un ajustement l'emporte TOUJOURS sur le rythme,
+   * y compris à zéro : sans cela, effacer une journée serait impossible, le
+   * rythme la remettrait à chaque calcul, et le CRA facturerait un jour qui
+   * n'a pas eu lieu.
+   */
+  readonly ajustements: Ajustements;
 }
 
 /**

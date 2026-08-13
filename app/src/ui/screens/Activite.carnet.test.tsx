@@ -82,7 +82,7 @@ describe('renommage d’un client', () => {
       clients: [client()],
       missions: [{
         id: 'm1', clientId: 'c1', clientNom: 'Dupont', description: 'Mission',
-        tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active'
+        tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active', rythmes: [], ajustements: {}
       }],
       recettes: [recette()]
     });
@@ -190,7 +190,7 @@ describe('missions', () => {
       missions: [{
         id: 'm1', clientId: null, clientNom: 'Dupont', description: 'Mission',
         tjm: euros(400), debut: dateISO('2026-01-01'), fin: dateISO('2026-12-31'),
-        statut: 'active'
+        statut: 'active', rythmes: [], ajustements: {}
       }],
       recettes: [recette()]
     });
@@ -207,7 +207,7 @@ describe('missions', () => {
     semer({
       missions: [{
         id: 'm1', clientId: null, clientNom: 'Dupont', description: 'Mission',
-        tjm: euros(400), debut: null, fin: null, statut: 'active'
+        tjm: euros(400), debut: null, fin: null, statut: 'active', rythmes: [], ajustements: {}
       }]
     });
     const utilisateur = await ouvrir('Missions');
