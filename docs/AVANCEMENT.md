@@ -158,6 +158,7 @@ c'est-à-dire d'inventer un lien.
 | 1 | **ce fichier** | Où on en est, quoi faire ensuite |
 | 2 | [`PLAN-REFONTE.md`](./PLAN-REFONTE.md) | Les 6 décisions arbitrées (D1–D6), le barème par périodes, les 7 jalons |
 | 3 | [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) | Le diagnostic complet |
+| 3 bis | [`AUDIT-ANCIENNE-VS-NOUVELLE.md`](./AUDIT-ANCIENNE-VS-NOUVELLE.md) | **Ce qui manque encore**, fonction par fonction, avec l'ordre de traitement proposé |
 | 4 | [`design/03-design-system.md`](./design/03-design-system.md) et [`design/05-spec-ecrans.md`](./design/05-spec-ecrans.md) | **Les deux spécifications qui font foi sur le visuel** : tokens, composants, et écran par écran ce qui doit s'y trouver |
 | 5 | [`design/handoff-v1.11/`](./design/handoff-v1.11/) | **La source** : les prototypes eux-mêmes, plus `annexe-architecture-build5.md` (les deux stores, les règles de calcul, le vocabulaire). Lire d'abord son [`PROVENANCE.md`](./design/handoff-v1.11/PROVENANCE.md) |
 | 6 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
