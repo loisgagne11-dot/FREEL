@@ -154,6 +154,8 @@ export function Activite() {
               onBasculer={basculerConge}
             />
 
+            <Legende />
+
             <dl className={styles.detail}>
               <div className={styles.ligne}>
                 <dt>Jours fériés du mois</dt>
@@ -414,6 +416,33 @@ function CaseJour({ jour, onBasculer }: { jour: Jour; onBasculer: (d: DateISO) =
         {dateCourte(jour.date)}, {pose ? 'congé posé' : 'jour travaillé'}
       </span>
     </button>
+  );
+}
+
+/**
+ * La légende du calendrier.
+ *
+ * Les cases se distinguent par leur couleur et leur opacité. Sans légende, il
+ * faut cliquer pour découvrir laquelle est un congé — et un clic sur le
+ * calendrier POSE un congé : on apprend la convention en modifiant ses
+ * données. La spec de design prévoit cette légende ; elle manquait.
+ */
+function Legende() {
+  const entrees = [
+    { classe: styles.legendeOuvrable, libelle: 'Travaillable' },
+    { classe: styles.conge, libelle: 'Congé posé' },
+    { classe: styles.ferie, libelle: 'Jour férié' },
+    { classe: styles.weekEnd, libelle: 'Week-end' }
+  ];
+  return (
+    <ul className={styles.legende}>
+      {entrees.map((e) => (
+        <li key={e.libelle} className={styles.legendeEntree}>
+          <span className={`${styles.legendeCase} ${e.classe}`} aria-hidden="true" />
+          {e.libelle}
+        </li>
+      ))}
+    </ul>
   );
 }
 
