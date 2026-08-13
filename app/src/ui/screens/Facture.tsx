@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
   destinataireDe, emetteurDe, etatFacture, numeroSuivant
-} from '../../state/selecteurs';
+} from '../../state/selecteurs.facture';
 import type { Facture as FactureDomaine, LigneFacture } from '../../domain/calculs/facture';
 import { dateISO, euros, ratio } from '../../domain/types';
 import { Info } from '../components/Info';

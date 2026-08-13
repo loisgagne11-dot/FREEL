@@ -134,3 +134,49 @@ describe('congés d’un bloc au schéma 1', () => {
     expect(faits.conges).toEqual([{ date: '2026-08-10', quotite: 1 }]);
   });
 });
+
+/**
+ * Les champs ajoutés À L'INTÉRIEUR des missions au schéma 2.
+ *
+ * Bug constaté dans un vrai navigateur : `completerFaits` fusionnait les
+ * défauts au premier niveau seulement. Une liste `missions` présente écrasait
+ * le défaut en bloc, donc `rythmes` restait `undefined`, le planning lisait sa
+ * longueur, et l'écran Activité tombait entièrement — pour tout compte
+ * enregistré avant le schéma 2, c'est-à-dire tous.
+ */
+describe('missions d’un bloc au schéma 1', () => {
+  const missionV1 = {
+    id: 'm1', clientId: null, clientNom: 'Client', description: 'Mission',
+    tjm: 500, debut: '2026-01-01', fin: '2026-12-31', statut: 'active'
+  };
+
+  it('donne un rythme et des ajustements vides plutôt qu’absents', () => {
+    const faits = completerFaits({ version: 1, missions: [missionV1] });
+    expect(faits.missions[0]?.rythmes).toEqual([]);
+    expect(faits.missions[0]?.ajustements).toEqual({});
+  });
+
+  it('n’écrase pas un rythme déjà déclaré', () => {
+    const faits = completerFaits({
+      version: 2,
+      missions: [{
+        ...missionV1,
+        rythmes: [{ debut: '2026-01-01', fin: null, jours: { 1: 1, 2: 1 } }],
+        ajustements: { '2026-03-04': 0 }
+      }]
+    });
+    expect(faits.missions[0]?.rythmes).toHaveLength(1);
+    // Zéro est un ajustement légitime — c'est ainsi qu'on retire une journée.
+    expect(faits.missions[0]?.ajustements).toEqual({ '2026-03-04': 0 });
+  });
+
+  it('écarte une entrée qui n’est pas un objet', () => {
+    const faits = completerFaits({ version: 1, missions: [null, 42, missionV1] });
+    expect(faits.missions).toHaveLength(1);
+  });
+
+  // Le champ absent de bout en bout : `missions` lui-même peut manquer.
+  it('accepte un bloc sans missions du tout', () => {
+    expect(completerFaits({ version: 1 }).missions).toEqual([]);
+  });
+});
