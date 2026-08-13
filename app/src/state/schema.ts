@@ -341,6 +341,39 @@ function congesDuSchema1(brut: unknown): readonly Conge[] {
   });
 }
 
+/**
+ * Complète les missions du schéma 1.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * COMBLER LA RACINE NE SUFFIT PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `completerFaits` fusionnait les défauts au premier niveau seulement : une
+ * liste `missions` présente écrasait le défaut en bloc, y compris pour les
+ * champs ajoutés au schéma 2 À L'INTÉRIEUR de chaque mission.
+ *
+ * Résultat constaté dans un vrai navigateur : `rythmes` valait `undefined`,
+ * le planning lisait sa longueur, et l'écran Activité tombait entièrement —
+ * pour tout compte enregistré avant le schéma 2, c'est-à-dire tous.
+ *
+ * La leçon est la même que pour les congés, un niveau plus bas : une
+ * migration de schéma doit descendre jusqu'où les champs ont bougé.
+ */
+function missionsDuSchema1(brut: unknown): readonly Mission[] {
+  if (!Array.isArray(brut)) return [];
+  return brut.flatMap((m): Mission[] => {
+    if (typeof m !== 'object' || m === null) return [];
+    const o = m as Record<string, unknown>;
+    return [{
+      ...(o as unknown as Mission),
+      rythmes: Array.isArray(o['rythmes']) ? o['rythmes'] as readonly Rythme[] : [],
+      ajustements: (typeof o['ajustements'] === 'object' && o['ajustements'] !== null)
+        ? o['ajustements'] as Ajustements
+        : {}
+    }];
+  });
+}
+
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
   const defauts = faitsVides();
@@ -355,6 +388,7 @@ export function completerFaits(brut: unknown): Faits {
     // viennent d'être comblés, le bloc n'est plus à l'ancien format.
     version: VERSION_SCHEMA,
     entreprise: { ...entrepriseVide(), ...entreprise },
-    conges: congesDuSchema1(o['conges'])
+    conges: congesDuSchema1(o['conges']),
+    missions: missionsDuSchema1(o['missions'])
   } as Faits;
 }

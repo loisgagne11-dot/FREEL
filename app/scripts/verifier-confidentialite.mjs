@@ -128,6 +128,17 @@ await contexte.addInitScript(([faits, cle]) => {
 const page = await contexte.newPage();
 
 /**
+ * Les exceptions non rattrapées de l'application.
+ *
+ * Sans ce relevé, un écran qui tombe se manifeste par une attente de titre qui
+ * expire — un message qui décrit le symptôme et jamais la cause. Le coût a été
+ * payé une fois : l'écran Activité tombait sur des missions au schéma 1, et le
+ * script ne disait rien de plus que « timeout ».
+ */
+const plantages = [];
+page.on('pageerror', (erreur) => { plantages.push(erreur.message); });
+
+/**
  * Cherche les montants LISIBLES.
  *
  * On descend jusqu'aux éléments qui portent eux-mêmes le texte, puis on
@@ -169,9 +180,27 @@ async function montantsLisibles() {
 
 console.log('\n🔒 mode confidentialité actif — aucun montant ne doit rester lisible');
 for (const ecran of ECRANS) {
+  plantages.length = 0;
   await page.goto(`${base}#/${ecran}`, { waitUntil: 'networkidle' });
-  await page.waitForSelector('h1', { timeout: 10000 });
+  // `h1:visible` : un changement de hash ne recharge pas le document, et
+  // pendant la suspension du chunk suivant React garde l'écran précédent monté
+  // en `display: none`. Attendre un `h1` quelconque, c'est attendre ce titre-là.
+  let monte = true;
+  try {
+    await page.waitForSelector('h1:visible', { timeout: 10000 });
+  } catch {
+    monte = false;
+  }
   await page.waitForTimeout(150);
+
+  // Un écran qui ne se monte pas n'affiche aucun montant : il passerait le
+  // contrôle en ne prouvant rien. On le compte donc comme un échec, en citant
+  // l'exception plutôt que l'attente qui a expiré.
+  if (!monte) {
+    constate(false, `#/${ecran} — l’écran ne s’est pas monté`
+      + (plantages.length > 0 ? ` : ${plantages[0]}` : ''));
+    continue;
+  }
 
   const exposes = await montantsLisibles();
   constate(

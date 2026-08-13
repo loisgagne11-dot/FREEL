@@ -158,13 +158,15 @@ c'est-à-dire d'inventer un lien.
 | 1 | **ce fichier** | Où on en est, quoi faire ensuite |
 | 2 | [`PLAN-REFONTE.md`](./PLAN-REFONTE.md) | Les 6 décisions arbitrées (D1–D6), le barème par périodes, les 7 jalons |
 | 3 | [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) | Le diagnostic complet |
-| 4 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
+| 4 | [`design/03-design-system.md`](./design/03-design-system.md) et [`design/05-spec-ecrans.md`](./design/05-spec-ecrans.md) | **Les deux spécifications qui font foi sur le visuel** : tokens, composants, et écran par écran ce qui doit s'y trouver |
+| 5 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
 
-Les neuf rapports d'audit détaillés ont été retirés du dépôt le 12/08/2026.
-Leur substance est dans le document 3, et les décisions qu'ils ont produites
-sont devenues du code commenté — c'est là qu'il faut les lire désormais. Ils
-restent dans l'historique git (`git show 9d97b6b:docs/audit/05-spec-ecrans.md`)
-si un point de spécification manque.
+Les neuf documents de `docs/design/` avaient été retirés du dépôt le
+12/08/2026 comme « rapports d'audit ». C'était une erreur de nature : deux
+d'entre eux ne sont pas des constats mais des **spécifications** — ce qu'on
+doit construire, pas ce qu'on a trouvé. Ils ont été restaurés le 13/08
+(`fdc0fc2^`) et ne doivent plus être supprimés : un écart de conformité
+visuelle ne se juge que contre eux (voir §4 ter).
 
 ---
 
@@ -294,6 +296,79 @@ tests verts.
 - `app/src/domain/bareme/urssaf.test.ts` — **23 tests** : les 10 bascules mois
   par mois, l'asymétrie du temps, la contiguïté de la table, la provenance.
 
+### Conformité visuelle et chaîne planning → CRA (13/08)
+
+Le propriétaire a signalé que le visuel ne correspondait pas à ce qu'il avait
+conçu. Il avait raison, et la première comparaison que j'ai produite était
+elle aussi fausse : je l'avais faite contre `AUDIT-REDESIGN-V1.11.md`, un
+diagnostic, alors que la référence est `design/05-spec-ecrans.md`, une
+spécification — que mon propre rangement avait supprimée du dépôt (§4 ter).
+
+**Ce qui a été construit.** Chaque composant a sa feuille CSS Modules, ses
+tests, et un en-tête qui porte le motif du choix.
+
+| Composant | Ce qu'il apporte, et pourquoi |
+|---|---|
+| `Greet` | L'en-tête personnalisé de la spec. Le repère chiffré à côté du bonjour : la première question du matin n'est pas « qui suis-je » |
+| `BarrePeriode` | Mois / trimestre / année / tout, **une seule** barre partagée. Deux sélecteurs de période sur un même écran finissent par se contredire |
+| `Montant` | Le porteur de `data-montant`. Un euro affiché sans passer par lui échappe au mode confidentiel — c'est le seul point d'entrée |
+| `Statut`, `Jauge`, `Repartition` | Les primitives de la spec : pastille d'état, barre de remplissage, répartition à légende |
+| `FluxCard`, `SanteCard` | Les cartes d'en-tête d'Argent et de Pilote |
+| `Vide` | L'état vide **nommé** : « aucune mission » avec le geste qui suit, au lieu d'un tableau à zéro ligne qui ressemble à une panne |
+| `PastillesSysteme` | L'état de la synchronisation. Les pastilles Cloud/Documents/Qonto de la maquette sont restées dehors : aucune intégration ne les alimente, une pastille verte qui ne mesure rien est pire qu'absente |
+| `VueSemaine` | Le planning à la semaine, avec ajustement d'une journée |
+| `CraCard` | Le compte rendu d'activité, **produit** et non saisi. Une mission par page à l'impression : un CRA se remet au client, deux missions sur la même feuille exposeraient à l'un ce que l'autre achète |
+| `Toasts` | `role="status"` et non `alert` : la confirmation est lue sans voler le focus. Seulement pour les actions dont l'effet est invisible — poser un congé colore la case, ça n'a pas besoin d'être confirmé |
+
+**La chaîne mission → planning → CRA** (`domain/calculs/planning.ts`). Le
+sens de lecture avait été pris à l'envers dans mon premier jet : le CRA
+n'alimente pas le planning, il en sort. On déclare un **rythme** sur la
+mission (les jours de la semaine travaillés), le planning se remplit seul,
+on **ajuste** à la journée, et le CRA est la sortie. D'où la règle centrale :
+un ajustement l'emporte toujours sur le rythme, **y compris à zéro** —
+sans quoi une journée retirée à la main reviendrait au rechargement suivant.
+
+**Mode confidentiel** (`ui/confidentialite.ts`). Un attribut
+`data-confidentiel` sur `<html>`, appliqué **avant React** par le script
+inline, et une règle CSS unique qui floute tout `[data-montant]`. `user-select:
+none` avec : un montant masqué ne doit pas non plus partir en copier-coller.
+Levé à l'impression, où le masquage n'aurait aucun sens.
+Le vérificateur `verifier:confidentialite` charge les 7 écrans dans un vrai
+navigateur, cherche tout texte qui ressemble à un montant et contrôle le
+**style calculé**. Il a trouvé **25 fuites en trois passes** — des tuiles qui
+recevaient des chaînes déjà formatées, la légende de `Repartition`, les
+nombres de `Jauge`, les valeurs de `SanteCard`. Sans ce contrôle en
+navigateur, le mode confidentiel serait parti à moitié fonctionnel.
+
+**Solde initial et besoin mensuel** avaient un champ dans le schéma et
+**aucune interface** : impossible de les saisir. Découvert en cherchant
+pourquoi le solde de trésorerie affiché ne ressemblait pas à celui de
+l'ancienne application. Ce n'était pas un bug de calcul — l'ancienne
+*simule* un solde à partir des encaissements moins les charges payées, la
+nouvelle part d'un solde bancaire réel. Il fallait pouvoir le renseigner.
+
+**Ce qui a été refusé, et pourquoi.** Trois cartes de la maquette Argent
+(`FluxChart`, `CapaciteBarChart`, `VersementCard`) et le score de santé
+sur 100 ne sont pas construits : ils demanderaient soit d'inventer des
+données, soit de contredire la décision D4 (réserve unifiée, source unique).
+La spec elle-même note que ces valeurs sont codées en dur dans le prototype,
+sans fonction qui les calcule. Une jauge qui affiche 72/100 sans rien mesurer
+ressemble à une information — c'est exactement le défaut reproché à
+l'ancienne version.
+
+**Budget d'entrée.** L'ajout de ces écrans a fait passer le chunk d'entrée à
+80,5 Ko pour un plafond de 80. Le plafond avait déjà été relevé une fois ;
+plutôt qu'une seconde fois, `selecteurs.activite.ts` a été sorti du fichier
+de sélecteurs monolithique — 76,6 Ko. Le même dépassement est revenu à
+50 octets près en corrigeant la migration des missions ; même réponse,
+`selecteurs.facture.ts` cette fois — **76,4 Ko**. Un budget qu'on relève à
+chaque dépassement ne mesure plus rien.
+
+La règle qui s'en dégage : **un sélecteur qui ne sert qu'à un écran différé
+vit dans le module de cet écran.** `selecteurs.ts` est lu par le Pilote, qui
+est au premier rendu ; tout ce qu'on y ajoute est téléchargé avant le premier
+pixel, même si personne n'ouvre l'écran concerné.
+
 ---
 
 ## 4. Ce qui reste — par jalon
@@ -354,8 +429,9 @@ tests verts.
       focus dans les deux sens, Échap, voile, restitution du focus, verrou de
       défilement) et **Info** (motif « i », cible 44 px au lieu de 18,
       `aria-describedby`, clic garanti au clavier). 22 tests en jsdom, éprouvés
-      par mutation. Restent à faire : sémantique d'onglets ARIA et région live
-      pour les toasts.
+      par mutation. **Complété le 13/08** : les onglets ARIA existent
+      (`Onglets`, utilisés par Argent) et la région live aussi (`Toasts`,
+      `role="status"` — voir §3).
 - [x] ~~`allTodos()` réel~~ — **fait**, `domain/calculs/aTraiter.ts`, 26 tests.
 - [x] ~~Écran Outils~~ — **fait.** Simulateur d'IR câblé sur le barème
       (abattement, tranches, calcul progressif), détail par tranche dans le
@@ -520,6 +596,81 @@ deux recettes vides passent un test qui compte deux recettes.
 C'est l'utilisateur qui l'a détecté, en constatant que « les données
 n'apparaissent pas partout » après connexion à Supabase.
 
+**Suite du 13/08 — les noms étaient bons, le filtre manquait.** Une fois les
+champs corrigés, les montants restaient faux : chiffre d'affaires annuel
+doublé, écritures datées de janvier 2027, neuf factures en retard qui
+n'existent pas, dix-sept périodes à déclarer. Cause : `buildMission` de
+l'ancienne application crée une facture **`brouillon` par mois à venir** pour
+tenir sa projection. Je les importais comme des recettes. Un brouillon n'est
+pas une facture — il n'a pas été émis, il ne doit rien entrer au registre. La
+migration les écarte désormais et **dit combien** elle en a écarté, plutôt que
+de les faire disparaître en silence.
+
+Deux constats de la même journée qui se ressemblent : le premier venait d'un
+mauvais nom de champ, le second d'un champ correct sur des lignes qu'il ne
+fallait pas prendre. Lire les bonnes clés ne suffit pas — il faut savoir
+**quelles lignes** l'application d'origine considérait comme réelles.
+
+Là encore, c'est l'utilisateur qui l'a vu, en comparant les deux applications
+écran par écran.
+
+---
+
+## 4 ter. Leçon du 13/08 — supprimer une spécification n'est pas ranger
+
+Le 12/08, j'ai retiré `docs/design/` du dépôt en le décrivant comme « les neuf
+rapports d'audit », substance conservée ailleurs. C'était faux pour deux
+d'entre eux : `03-design-system.md` (316 lignes) et `05-spec-ecrans.md`
+(537 lignes) ne constatent rien, ils **prescrivent**. Ce sont les seuls
+documents qui disent ce que chaque écran doit contenir.
+
+Conséquence directe : quand le propriétaire a signalé que le visuel ne
+correspondait pas, j'ai produit un comparatif contre le document
+d'**audit** — et conclu à la conformité. La comparaison était structurellement
+incapable de trouver l'écart, puisqu'elle ne regardait pas la référence.
+
+**Règle qui en découle.** Avant de supprimer un document, se demander s'il
+décrit ce qui **est** ou ce qui **doit être**. Un constat périme ; une
+spécification, non — elle reste la seule chose contre quoi « conforme » a un
+sens. Les neuf fichiers sont restaurés dans `docs/design/` et référencés au
+§1 ; ils ne doivent plus quitter le dépôt.
+
+Il y a aussi une leçon de méthode : *« je considère avoir fini »* n'est pas un
+constat de conformité. Le propriétaire a dû me le dire deux fois.
+
+---
+
+## 4 quater. Leçon du 13/08 — une migration doit descendre jusqu'où les champs ont bougé
+
+`completerFaits` comble les champs absents d'un bloc écrit par une version
+antérieure. Il le faisait par fusion **au premier niveau** : une liste
+`missions` présente écrasait le défaut en bloc, y compris pour `rythmes` et
+`ajustements`, ajoutés au schéma 2 *à l'intérieur* de chaque mission.
+
+Conséquence : `rythmes` valait `undefined`, le planning lisait sa longueur, et
+l'écran Activité tombait **entièrement** — pour tout compte enregistré avant
+le schéma 2, c'est-à-dire tous. Y compris celui du propriétaire.
+
+Ce qui est instructif, c'est **où** cela a été trouvé. Les 867 tests unitaires
+passaient : ils construisent leurs missions avec le type courant, donc avec
+les champs. Le typage aussi : `completerFaits` retourne `Faits` par assertion,
+et une assertion ne vérifie rien. Le défaut n'est apparu que dans le
+vérificateur de confidentialité, parce qu'il est le seul à charger l'application
+**dans un vrai navigateur avec un bloc au format d'hier**.
+
+Deux règles :
+
+1. Une migration de schéma se descend jusqu'au niveau où les champs ont
+   changé. Combler la racine ne protège pas les listes qu'elle contient.
+2. Un jeu d'essai écrit avec les types d'**aujourd'hui** ne teste pas une
+   migration. Il faut un bloc littéral au format d'hier — c'est ce que font
+   désormais les tests `missions d'un bloc au schéma 1`.
+
+Le script a aussi été corrigé pour **nommer** ce genre de panne : il relève
+les exceptions de la page et signale « l'écran ne s'est pas monté » au lieu de
+laisser expirer une attente de titre, qui décrivait le symptôme et jamais la
+cause.
+
 ---
 
 ## 5. Points ouverts
@@ -532,6 +683,9 @@ n'apparaissent pas partout » après connexion à Supabase.
 | **Marge de build** | Réglé. React est sorti dans un chunk `vendor` : il ne change pas d'un déploiement à l'autre, donc le cache du navigateur le conserve. Modifier une ligne de code invalidait 248 Ko ; désormais 55 |
 | **Relevé bancaire** | **Réglé.** L'import CSV existe, `selecteurs.solde()` compte les mouvements, et `banqueReliee` a été retiré du schéma : il était devenu dérivable (un relevé est disponible si et seulement s'il y a des mouvements), et le garder aurait permis qu'un booléen à `true` coexiste avec une liste vide |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
+| **Écart de 2 060 € sur le CA encaissé** | **Ouvert.** L'ancienne application annonce 43 030 €, la nouvelle 40 970 € sur 2026 après correction des brouillons. L'hypothèse est une définition de période différente (année civile contre glissante), **non vérifiée**. À reprendre facture par facture : un écart expliqué vaut mieux qu'un écart qui se réduit |
+| **Reprise à refaire** | Les congés, les rythmes et les ajustements ne migraient pas avant le 13/08. Une reprise effectuée avant cette date a un planning vide. Il faut relancer « Reprendre les données de l'ancienne application », puis contrôler le planning et le CRA contre ce qu'on sait — c'est le dernier endroit où une erreur de correspondance peut rester cachée |
+| **Schéma v1 → v2** | **Réglé, en deux temps.** Les congés étaient des chaînes de dates, ils sont désormais des objets `{ date, quotité }` pour porter la demi-journée — sans conversion, un calendrier existant se serait vidé en silence. Puis, le même jour, le cas manqué : `completerFaits` ne comblait que le **premier niveau**, donc les missions déjà enregistrées arrivaient sans `rythmes`, et l'écran Activité tombait entièrement pour tout compte antérieur au schéma 2. Corrigé et verrouillé par quatre tests |
 
 ---
 
@@ -560,6 +714,20 @@ npm test            # tests du domaine
 npm run typecheck   # TypeScript strict
 npm run build       # build de production
 
+npm run verifier    # la chaîne complète, dans cet ordre :
+```
+
+| Étape | Ce qu'elle prouve |
+|---|---|
+| `typecheck` + `test` + `build` | Le compilateur, les tests, le build |
+| `verifier:budget` | Aucun chunk ne dépasse son plafond. **Un plafond se tient, il ne se relève pas** |
+| `verifier:responsive` | 140 combinaisons (5 tailles × 4 palettes × 7 écrans) : zéro débordement horizontal, forme de la navigation, cibles ≥ 44 px, thème appliqué avant rendu |
+| `verifier:index` | Un `index.html` périmé se récupère tout seul, **une seule fois** (pas de boucle de rechargement) |
+| `verifier:confidentialite` | Dans un vrai navigateur : aucun montant lisible quand le mode confidentiel est actif — contrôle du **style calculé**, pas de la présence d'une classe |
+| `verifier:migration` | La reprise de bout en bout, sur le contenu et non sur le nombre de lignes |
+| `verifier:fuites` | Aucune donnée personnelle dans le dépôt (invariant n°6) — c'est `tests/smoke-test.js`, qui couvre aussi le legacy |
+
+```
 # à la racine : tests de l'app existante (legacy)
 node tests/smoke-test.js
 ```

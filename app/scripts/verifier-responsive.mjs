@@ -112,7 +112,12 @@ for (const taille of TAILLES) {
     await page.goto(base + ecran.hash, { waitUntil: 'networkidle' });
     // Les écrans autres que l'accueil sont chargés à la demande : on attend que
     // leur titre soit rendu, sinon on mesurerait l'écran d'attente.
-    await page.waitForSelector('h1', { timeout: 10000 });
+    //
+    // `h1:visible` et non `h1` : un changement de hash ne recharge pas le
+    // document, et pendant la suspension du chunk suivant React laisse l'écran
+    // précédent monté en `display: none`. Un `h1` tout court se satisfait de ce
+    // titre fantôme, puis expire en l'attendant visible.
+    await page.waitForSelector('h1:visible', { timeout: 10000 });
 
     const mesures = await page.evaluate(() => {
       const nav = document.querySelector('nav');
