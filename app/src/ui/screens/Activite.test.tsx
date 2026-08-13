@@ -172,8 +172,11 @@ describe('missions', () => {
 
     const liste = screen.getByRole('list');
     expect(within(liste).getByText('Mission A')).toBeTruthy();
-    expect(within(liste).getByText(/Encaissé 4 000/)).toBeTruthy();
-    expect(within(liste).getByText(/Reste 2 000/)).toBeTruthy();
+    // Les montants sont marqués pour le mode confidentialité, donc portés par
+    // leur propre élément : on interroge le texte de la ligne entière plutôt
+    // qu'un nœud unique.
+    expect(liste.textContent).toMatch(/Encaissé\s*4\s000/u);
+    expect(liste.textContent).toMatch(/Reste\s*2\s000/u);
   });
 
   it('signale un TJM absent au lieu d’en supposer un', async () => {

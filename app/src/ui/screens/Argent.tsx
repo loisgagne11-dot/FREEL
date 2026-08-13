@@ -14,6 +14,7 @@ import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
+import { Montant } from '../components/Montant';
 
 /**
  * Écran Argent — trésorerie et performance.
@@ -130,15 +131,15 @@ export function Argent() {
             <dl className={styles.detail}>
               <div className={styles.ligne}>
                 <dt>Échéances émises, à payer</dt>
-                <dd>{eur(etat.voletConstate)}</dd>
+                <dd><Montant>{eur(etat.voletConstate)}</Montant></dd>
               </div>
               <div className={styles.ligne}>
                 <dt>Charges sur recettes encaissées non déclarées</dt>
-                <dd>{eur(etat.voletAProvisionner)}</dd>
+                <dd><Montant>{eur(etat.voletAProvisionner)}</Montant></dd>
               </div>
               <div className={`${styles.ligne} ${styles.total}`}>
                 <dt>Total à garder de côté</dt>
-                <dd>{eur(etat.tresorerie.provisions)}</dd>
+                <dd><Montant>{eur(etat.tresorerie.provisions)}</Montant></dd>
               </div>
             </dl>
           </section>
@@ -264,7 +265,7 @@ function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
                 <li key={e.id} className={styles.ligneEcriture}>
                   <span className={styles.ligneTitre}>
                     <span className={styles.ligneLibelle}>{e.libelle}</span>
-                    <span className={styles.ligneMontant}>{eur(e.montant)}</span>
+                    <span className={styles.ligneMontant}><Montant>{eur(e.montant)}</Montant></span>
                   </span>
                   <span className={styles.ligneMeta}>
                     <span>{dateCourte(e.encaisseeLe)}</span>
@@ -309,7 +310,7 @@ function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
               <li key={r.id} className={styles.ligneEcriture}>
                 <span className={styles.ligneTitre}>
                   <span className={styles.ligneLibelle}>{r.libelle}</span>
-                  <span className={styles.ligneMontant}>{eur(r.montant)}</span>
+                  <span className={styles.ligneMontant}><Montant>{eur(r.montant)}</Montant></span>
                 </span>
                 <span className={styles.ligneMeta}>
                   <Statut {...statutRecette({ encaissee: false, echeanceDepassee: r.enRetard })} />
@@ -430,7 +431,7 @@ function DeclarationServices({ idGroupe }: { idGroupe: string }) {
         <p className={`${styles.bandeau} ${styles.bandeauDanger}`} role="status">
           <strong>{etat.retards.length}</strong> déclaration
           {etat.retards.length > 1 ? 's' : ''} en retard, soit{' '}
-          <strong>{eur(etat.amendeEncourue)}</strong> d’amende encourue.
+          <strong><Montant>{eur(etat.amendeEncourue)}</Montant></strong> d’amende encourue.
           <Info libelle="Pourquoi l’amende ne dépend pas des montants">
             Elle est forfaitaire&nbsp;: 750 € par déclaration manquante ou
             inexacte, qu’on ait facturé 50 € ou 50 000 €. Une omission répétée
@@ -489,7 +490,7 @@ function DeclarationServices({ idGroupe }: { idGroupe: string }) {
                 </div>
                 <div className={`${styles.ligne} ${styles.total}`}>
                   <dt>Total à déclarer</dt>
-                  <dd>{eur(declaration.total)}</dd>
+                  <dd><Montant>{eur(declaration.total)}</Montant></dd>
                 </div>
               </dl>
 
@@ -499,7 +500,7 @@ function DeclarationServices({ idGroupe }: { idGroupe: string }) {
                     <li key={l.recetteId} className={styles.ligneEcriture}>
                       <span className={styles.ligneTitre}>
                         <span className={styles.ligneLibelle}>{l.clientNom}</span>
-                        <span className={styles.ligneMontant}>{eur(l.montant)}</span>
+                        <span className={styles.ligneMontant}><Montant>{eur(l.montant)}</Montant></span>
                       </span>
                       <span className={styles.ligneMeta}>
                         <span>{l.tvaIntracom}</span>
@@ -593,7 +594,7 @@ function Chiffre(
   return (
     <div className={styles.chiffre}>
       <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classe}`}>{valeur}</span>
+      <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
     </div>
   );
 }

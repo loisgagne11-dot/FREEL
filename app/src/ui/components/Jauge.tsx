@@ -1,3 +1,4 @@
+import { Montant } from './Montant';
 import styles from './Jauge.module.css';
 
 /**
@@ -60,11 +61,11 @@ export function Jauge(
 
       <p className={styles.detail}>
         {depasse
-          ? <>Seuil dépassé de <strong>{nombre(atteint - seuil)}&nbsp;{unite}</strong>.</>
+          ? <>Seuil dépassé de <strong><Montant>{nombre(atteint - seuil)}&nbsp;{unite}</Montant></strong>.</>
           : (
             <>
-              Il reste <strong>{nombre(reste)}&nbsp;{unite}</strong> avant le
-              seuil de {nombre(seuil)}&nbsp;{unite}.
+              Il reste <strong><Montant>{nombre(reste)}&nbsp;{unite}</Montant></strong> avant le
+              seuil de <Montant>{nombre(seuil)}&nbsp;{unite}</Montant>.
             </>
           )}
       </p>

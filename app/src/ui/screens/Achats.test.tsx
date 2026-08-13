@@ -259,3 +259,55 @@ describe('liste vide', () => {
     expect(screen.getByText(/Aucune dépense enregistrée/)).toBeTruthy();
   });
 });
+
+/**
+ * La barre de période.
+ *
+ * Le mois, le trimestre et l'année ne sont pas des commodités de tri : ce sont
+ * les mailles dans lesquelles on déclare. « Tout » a une fonction précise —
+ * une dépense sans date de paiement n'appartient à aucune période bornée, et
+ * c'est là qu'on la retrouve pour la corriger.
+ */
+describe('période d’observation', () => {
+  it('propose les quatre mailles', () => {
+    semer();
+    render(<Achats />);
+    ['Mois', 'Trimestre', 'Année', 'Tout'].forEach((m) => {
+      expect(screen.getByRole('button', { name: m })).toBeTruthy();
+    });
+  });
+
+  // Naviguer dans un ensemble qui contient déjà tout ne mène nulle part : une
+  // flèche inerte apprendrait que les flèches ne servent parfois à rien.
+  it('n’offre pas de navigation sur « Tout »', () => {
+    semer();
+    render(<Achats />);
+    expect(screen.queryByRole('button', { name: 'Période précédente' })).toBeNull();
+  });
+
+  it('offre la navigation dès qu’une maille est bornée', async () => {
+    semer();
+    render(<Achats />);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Mois' }));
+    expect(screen.getByRole('button', { name: 'Période précédente' })).toBeTruthy();
+  });
+
+  /**
+   * Changer de maille repart de la période courante. Conserver un décalage de
+   * « trois mois en arrière » en passant à l'année donnerait « trois ans en
+   * arrière » — un saut que personne n'a demandé.
+   */
+  it('repart de la période courante quand on change de maille', async () => {
+    semer();
+    render(<Achats />);
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Année' }));
+    const courante = screen.getByRole('status').textContent;
+    await utilisateur.click(screen.getByRole('button', { name: 'Période précédente' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Mois' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Année' }));
+
+    expect(screen.getByRole('status').textContent).toBe(courante);
+  });
+});

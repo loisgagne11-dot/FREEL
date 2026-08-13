@@ -1,5 +1,6 @@
 import { Info } from './Info';
 import { eur, moisTexte } from '../format';
+import { Montant } from './Montant';
 import styles from './SanteCard.module.css';
 
 export type EtatIndicateur = 'bon' | 'attention' | 'alerte';
@@ -64,7 +65,7 @@ export function SanteCard(
           <li key={i.libelle} className={styles.indicateur}>
             <span className={`${styles.pastille} ${styles[i.etat]}`} aria-hidden="true" />
             <span className={styles.libelle}>{i.libelle}</span>
-            <span className={styles.valeur}>{i.valeur}</span>
+            <span className={styles.valeur}><Montant>{i.valeur}</Montant></span>
           </li>
         ))}
       </ul>

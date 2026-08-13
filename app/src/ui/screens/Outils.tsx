@@ -10,6 +10,7 @@ import { Info } from '../components/Info';
 import { Sheet } from '../components/Sheet';
 import { eur, eurExact, moisLong, pct } from '../format';
 import styles from './Outils.module.css';
+import { Montant } from '../components/Montant';
 
 /**
  * Écran Outils — simulateurs.
@@ -111,11 +112,11 @@ export function Outils() {
               </div>
               <div className={styles.ligne}>
                 <dt>Revenu imposable</dt>
-                <dd>{eur(simulation.revenu)}</dd>
+                <dd><Montant>{eur(simulation.revenu)}</Montant></dd>
               </div>
               <div className={`${styles.ligne} ${styles.total}`}>
                 <dt>Impôt estimé</dt>
-                <dd>{eur(simulation.impot)}</dd>
+                <dd><Montant>{eur(simulation.impot)}</Montant></dd>
               </div>
             </dl>
 
@@ -153,7 +154,7 @@ export function Outils() {
             </p>
             <table className={styles.table}>
               <caption className={styles.legende}>
-                Revenu imposable de {eur(simulation.revenu)}
+                Revenu imposable de <Montant>{eur(simulation.revenu)}</Montant>
               </caption>
               <thead>
                 <tr>
@@ -172,10 +173,10 @@ export function Outils() {
                   const part = Math.max(0, Math.min(simulation.revenu, plafond) - tranche.seuil);
                   return (
                     <tr key={tranche.seuil} className={part === 0 ? styles.ligneInactive : ''}>
-                      <td>{eur(tranche.seuil)}</td>
+                      <td><Montant>{eur(tranche.seuil)}</Montant></td>
                       <td>{pct(tranche.taux)}</td>
-                      <td>{eur(part)}</td>
-                      <td>{eurExact(part * tranche.taux)}</td>
+                      <td><Montant>{eur(part)}</Montant></td>
+                      <td><Montant>{eurExact(part * tranche.taux)}</Montant></td>
                     </tr>
                   );
                 })}

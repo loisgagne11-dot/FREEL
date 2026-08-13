@@ -11,6 +11,7 @@ afterEach(cleanup);
 beforeEach(() => {
   localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
+  document.documentElement.removeAttribute('data-confidentiel');
 });
 
 /**
@@ -59,5 +60,42 @@ describe('sélecteur de palette', () => {
   it('garde un nom accessible même quand le libellé est masqué', () => {
     render(<PastillesSysteme />);
     expect(screen.getByRole('combobox', { name: 'Palette' })).toBeTruthy();
+  });
+});
+
+/**
+ * Le mode confidentialité.
+ *
+ * Il floute les montants pour qu'on puisse partager son écran. Un flou
+ * partiel serait pire qu'aucun : l'utilisateur se croirait couvert sans
+ * l'être. La complétude est constatée par `verifier-confidentialite`, qui
+ * charge les sept écrans dans un navigateur ; ici on vérifie la bascule.
+ */
+describe('bascule de confidentialité', () => {
+  it('dit l’action, et porte l’état dans aria-pressed', () => {
+    render(<PastillesSysteme />);
+    const bouton = screen.getByRole('button', { name: /Masquer les montants/ });
+    expect(bouton.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('marque le document quand on l’active', async () => {
+    render(<PastillesSysteme />);
+    await userEvent.click(screen.getByRole('button', { name: /Masquer les montants/ }));
+    expect(document.documentElement.getAttribute('data-confidentiel')).toBe('oui');
+    expect(screen.getByRole('button', { name: /Montants masqués/ }).getAttribute('aria-pressed'))
+      .toBe('true');
+  });
+
+  it('revient en arrière au second clic', async () => {
+    render(<PastillesSysteme />);
+    await userEvent.click(screen.getByRole('button', { name: /Masquer les montants/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Montants masqués/ }));
+    expect(document.documentElement.hasAttribute('data-confidentiel')).toBe(false);
+  });
+
+  it('part de l’état déjà persisté', () => {
+    localStorage.setItem('freel.confidentialite.v1', 'oui');
+    render(<PastillesSysteme />);
+    expect(screen.getByRole('button', { name: /Montants masqués/ })).toBeTruthy();
   });
 });

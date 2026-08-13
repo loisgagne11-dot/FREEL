@@ -10,6 +10,7 @@ import { FluxCard } from '../components/FluxCard';
 import { SanteCard, indicateursDeSante } from '../components/SanteCard';
 import { eur, moisLong, moisTexte } from '../format';
 import styles from './Pilote.module.css';
+import { Montant } from '../components/Montant';
 
 /**
  * Écran Pilote — « combien je peux me verser, et qu'est-ce qui coince ».
@@ -56,7 +57,7 @@ export function Pilote() {
       <Greet
         titre={salutation(faits.entreprise.nom)}
         sousTitre={phraseDAccueil(sujets.length, moisLong(mois))}
-        repere={`Solde compte · ${eur(etat.tresorerie.solde)}`}
+        repere={<>Solde compte · <Montant>{eur(etat.tresorerie.solde)}</Montant></>}
       />
 
       {chargement.phase === 'sans-persistance' && (
@@ -92,7 +93,7 @@ export function Pilote() {
 
       <section className={styles.versable} aria-labelledby="titre-versable">
         <h2 id="titre-versable" className={styles.libelle}>Je peux me verser</h2>
-        <p className={styles.montantPrincipal}>{eur(etat.tresorerie.versable)}</p>
+        <p className={styles.montantPrincipal}><Montant>{eur(etat.tresorerie.versable)}</Montant></p>
         <p className={styles.sousLigne}>
           Autonomie&nbsp;: {moisTexte(etat.autonomie)}
           {faits.besoinMensuel <= 0 && (
@@ -135,7 +136,7 @@ export function Pilote() {
         <dl className={styles.detail}>
           <div className={styles.ligne}>
             <dt>Échéances à payer</dt>
-            <dd>{eur(etat.voletConstate)}</dd>
+            <dd><Montant>{eur(etat.voletConstate)}</Montant></dd>
           </div>
           <div className={styles.ligne}>
             <dt>
@@ -144,11 +145,11 @@ export function Pilote() {
                 non encore déclarées — la dette naît à l’encaissement
               </span>
             </dt>
-            <dd>{eur(etat.voletAProvisionner)}</dd>
+            <dd><Montant>{eur(etat.voletAProvisionner)}</Montant></dd>
           </div>
           <div className={`${styles.ligne} ${styles.total}`}>
             <dt>Total</dt>
-            <dd>{eur(etat.tresorerie.provisions)}</dd>
+            <dd><Montant>{eur(etat.tresorerie.provisions)}</Montant></dd>
           </div>
         </dl>
       </section>
@@ -207,7 +208,14 @@ function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] }) {
                       : s.gravite === 'a_faire' ? 'À faire' : 'Information'}
                   </span>
                 </span>
-                <span className={styles.sujetContexte}>{s.contexte}</span>
+                {/* Le contexte d'un sujet porte des montants dans sa phrase
+                    (« 5 250 € impayés, dont 43 jours de retard »). La phrase
+                    entière est donc masquée : y découper le montant
+                    demanderait au domaine de séparer prose et chiffres, ce
+                    qui n'est pas son rôle. Le survol la révèle. */}
+                <span className={styles.sujetContexte}>
+                  <Montant>{s.contexte}</Montant>
+                </span>
               </div>
               <a className={styles.sujetAction} href={`#/${s.ecran}`}>{s.action}</a>
             </li>
@@ -257,7 +265,7 @@ function Chiffre(
   return (
     <div className={styles.chiffre}>
       <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classeTon}`}>{valeur}</span>
+      <span className={`${styles.montant} ${classeTon}`}><Montant>{valeur}</Montant></span>
       {precision !== undefined && <span className={styles.precision}>{precision}</span>}
     </div>
   );
@@ -308,7 +316,7 @@ function CurseurReserve(
           }}
           onBlur={() => setSaisie(null)}
         />
-        <output className={styles.curseurValeur}>{eur(affiche)}</output>
+        <output className={styles.curseurValeur}><Montant>{eur(affiche)}</Montant></output>
       </div>
     </section>
   );

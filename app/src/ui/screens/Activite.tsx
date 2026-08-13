@@ -12,6 +12,7 @@ import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
 import { dateCourte, eur } from '../format';
 import styles from './Activite.module.css';
+import { Montant } from '../components/Montant';
 
 /**
  * Écran Activité — plan de charge, missions et délais de paiement.
@@ -278,7 +279,7 @@ export function Activite() {
                     <li key={client.clientNom} className={styles.ligneListe}>
                       <span className={styles.ligneTitre}>
                         <span className={styles.ligneLibelle}>{client.clientNom}</span>
-                        <span className={styles.ligneMontant}>{eur(client.enAttente)}</span>
+                        <span className={styles.ligneMontant}><Montant>{eur(client.enAttente)}</Montant></span>
                       </span>
                       <span className={styles.ligneMeta}>
                         <span>
@@ -474,7 +475,7 @@ function LigneMissionAffichee(
               une liste. */}
           {mission.description || mission.clientNom || 'Mission sans description'}
         </span>
-        <span className={styles.ligneMontant}>{eur(ligne.facture)}</span>
+        <span className={styles.ligneMontant}><Montant>{eur(ligne.facture)}</Montant></span>
       </span>
       <span className={styles.ligneMeta}>
         <span>{mission.clientNom || 'Client non renseigné'}</span>
@@ -484,11 +485,11 @@ function LigneMissionAffichee(
         <span>{libelleStatut(mission.statut)}</span>
       </span>
       <span className={styles.ligneMeta}>
-        <span>Encaissé {eur(ligne.encaisse)}</span>
+        <span>Encaissé <Montant>{eur(ligne.encaisse)}</Montant></span>
         {ligne.resteARentrer > 0 && (
           <>
             <span aria-hidden="true">·</span>
-            <span className={styles.attention}>Reste {eur(ligne.resteARentrer)}</span>
+            <span className={styles.attention}>Reste <Montant>{eur(ligne.resteARentrer)}</Montant></span>
           </>
         )}
       </span>
@@ -807,7 +808,7 @@ function Chiffre(
   return (
     <div className={styles.chiffre}>
       <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classe}`}>{valeur}</span>
+      <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
     </div>
   );
 }
