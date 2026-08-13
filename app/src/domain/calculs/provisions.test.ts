@@ -15,7 +15,8 @@ const ctx = (
 });
 
 const ech = (id: string, montant: number, payee: boolean): Echeance => ({
-  id, nature: 'urssaf', montant: euros(montant), echeanceLe: dateISO('2026-07-31'), payee
+  id, nature: 'urssaf', montant: euros(montant), echeanceLe: dateISO('2026-07-31'),
+  payeeLe: payee ? dateISO('2026-07-31') : null, montantPaye: null
 });
 
 const rec = (id: string, montant: number, le: string): RecetteEncaissee => ({

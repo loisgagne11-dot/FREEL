@@ -7,7 +7,7 @@ sur l'état d'avancement — les autres font foi sur les décisions.
 
 **Dernière mise à jour** : 13 août 2026
 **Branche de travail** : `claude/orchestration-redesign-screens-0ee3sz`, repartie de `main`
-**Schéma des faits** : **v5**
+**Schéma des faits** : **v6**
 
 Les PR #245 à #264 sont **mergées et closes** : elles ne peuvent plus porter de
 travail, toute suite donne lieu à une nouvelle PR. Tout ce qu'elles contiennent
@@ -20,7 +20,7 @@ dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **964** sur 56 fichiers (+ 91 côté legacy) |
+| Tests | **990** sur 57 fichiers (+ 91 côté legacy) |
 | Build | **78,2 Ko** de code applicatif, 188 Ko de bibliothèques, 289 Ko au premier rendu |
 | Budget | conforme sur les **4 postes** vérifiés |
 | Responsive | **140 combinaisons** (5 tailles × 4 palettes × **7 écrans**) |
@@ -887,6 +887,60 @@ que sur l'écran Compte, et pour la même raison. Un fichier illisible se dit
 tout de suite, pas après la confirmation. Le refus de fond — un bloc écrit par
 une version plus récente — vient de `adopterFaitsDistants` et est **relayé à
 l'écran** plutôt qu'avalé.
+
+---
+
+### Les échéances : un échéancier, une frise, une preuve de paiement (13/08, schéma v6)
+
+Trois corrections d'un coup, dont deux venues d'une remarque du propriétaire —
+« je suis censé avoir une sorte de timeline qui m'indique les échéances ; à
+partir de ça je dois indiquer si je l'ai payé, quand, et quel montant réel ».
+
+**Un échéancier se saisit en une fois.** Répétition mensuelle ou trimestrielle,
+jusqu'à douze occurrences. Mais elle ne produit RIEN de nouveau : elle crée N
+échéances ordinaires et s'efface. L'ancienne application stockait une « charge
+récurrente » — une règle d'un côté, des instances de l'autre, et rien pour dire
+laquelle fait foi quand un appel réel diffère. Or il diffère.
+Un piège au passage : ajouter un mois au 31 janvier donne le 3 mars, et
+l'échéance sauterait un mois en silence. Le quantième est ramené au dernier
+jour du mois visé, sans raboter la série entière.
+
+**Une frise, pas une liste.** Ce qu'on vient chercher est une question de
+calendrier : « qu'est-ce qui tombe, et quand ». Les échéances sont donc
+groupées par mois, avec le total de chacun — c'est lui qui dit si le mois passe.
+
+**Payer se prouve par une date et un montant.** La première version portait
+`payee: boolean`. C'était exactement le défaut reproché à l'ancienne
+application sur les factures : **un statut qu'aucune écriture ne prouve.**
+Exiger une date et un mode de règlement pour encaisser une recette, puis
+accepter une case à cocher pour une échéance, était incohérent — et c'est le
+propriétaire qui l'a vu, pas moi.
+
+On enregistre donc la **date du débit** et le **montant réellement parti**. Ce
+dernier diffère plus souvent qu'on ne croit — régularisation de fin de
+trimestre, changement de taux, majoration de retard. L'écart est conservé et
+affiché : ce n'est pas une erreur à corriger, c'est lui qui explique un solde
+qui ne tombe pas juste.
+
+**Migration v5 → v6**, quatrième champ imbriqué après les congés, les rythmes et
+le motif des mouvements. Un `payee: true` devient la date d'échéance — ce n'est
+pas une invention pour les seules données qui existent : elles viennent toutes
+de la reprise des mouvements « Charge », où la date d'échéance a été posée à
+partir de la date du mouvement, c'est-à-dire du paiement.
+
+### Revenir au rythme sur une semaine (13/08)
+
+`resetReelsToTheorique` de l'ancienne application. Son pendant `fillAllDays`
+n'a **pas** été repris et n'a pas à l'être : ici le planning se remplit déjà
+tout seul depuis le rythme, c'est le modèle même. Remplir à la main n'aurait de
+sens que sur un planning vide — et un planning vide se remplit en déclarant un
+rythme, pas en cliquant trente et une fois.
+
+Retirer les corrections, en revanche, reste nécessaire : un rythme changé après
+coup laisse derrière lui des ajustements devenus faux. Le bouton n'apparaît que
+si la semaine en porte — un bouton toujours là qui ne fait rien apprend à ne
+plus le regarder — et « revenir au rythme » n'est pas « mettre à zéro » : la
+journée redevient ce que le rythme prévoit.
 
 ---
 

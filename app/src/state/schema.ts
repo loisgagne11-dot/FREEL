@@ -32,7 +32,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 5 as const;
+export const VERSION_SCHEMA = 6 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -527,6 +527,48 @@ function mouvementsDuSchema4(brut: unknown): readonly MouvementBancaire[] {
   });
 }
 
+/**
+ * `payee` devient une DATE de paiement (schéma 5 → 6).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CONVERTIR SANS INVENTER
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un `payee: true` d'hier dit qu'une échéance a été réglée, sans dire quand.
+ * On retient sa date d'échéance : ce n'est pas une invention pour les seules
+ * données qui existent aujourd'hui. Elles viennent toutes de la reprise des
+ * mouvements « Charge » du legacy, où la date d'échéance A ÉTÉ POSÉE À PARTIR
+ * de la date du mouvement — c'est-à-dire du paiement. La conversion redonne
+ * donc exactement la bonne date.
+ *
+ * `payee: false` devient `null` : pas de paiement, pas de date.
+ *
+ * Quatrième champ imbriqué à migrer, après les congés, les rythmes et le motif
+ * des mouvements. La règle est acquise et se vérifie à chaque fois : une
+ * migration descend jusqu'où les champs ont bougé.
+ */
+function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
+  if (!Array.isArray(brut)) return [];
+  return brut.flatMap((e): Echeance[] => {
+    if (typeof e !== 'object' || e === null) return [];
+    const o = e as Record<string, unknown>;
+    const dejaConverti = 'payeeLe' in o;
+    const echeanceLe = typeof o['echeanceLe'] === 'string' ? o['echeanceLe'] as DateISO : null;
+
+    const payeeLe = dejaConverti
+      ? (typeof o['payeeLe'] === 'string' ? o['payeeLe'] as DateISO : null)
+      : (o['payee'] === true ? echeanceLe : null);
+
+    return [{
+      ...(o as unknown as Echeance),
+      payeeLe,
+      montantPaye: typeof o['montantPaye'] === 'number' && Number.isFinite(o['montantPaye'])
+        ? o['montantPaye'] as Euros
+        : null
+    }];
+  });
+}
+
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
   const defauts = faitsVides();
@@ -543,6 +585,7 @@ export function completerFaits(brut: unknown): Faits {
     entreprise: { ...entrepriseVide(), ...entreprise },
     conges: congesDuSchema1(o['conges']),
     missions: missionsDuSchema1(o['missions']),
-    mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires'])
+    mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires']),
+    echeances: echeancesDuSchema5(o['echeances'])
   } as Faits;
 }

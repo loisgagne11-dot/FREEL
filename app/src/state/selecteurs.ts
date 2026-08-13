@@ -19,7 +19,7 @@ import type { RegimeImposition, SeuilsTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
-  provisions as calculerProvisions
+  estPayee, provisions as calculerProvisions
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
 import {
@@ -480,7 +480,7 @@ export function fluxDuMois(
         libelle: LIBELLE_NATURE[e.nature],
         montant: e.montant,
         date: e.echeanceLe,
-        regle: e.payee
+        regle: estPayee(e)
       }))
     },
     remuneration: {

@@ -223,3 +223,55 @@ describe('mouvements bancaires d’un bloc au schéma 4', () => {
     expect(faits.mouvementsBancaires[0]?.sansContrepartie).toBeNull();
   });
 });
+
+/**
+ * `payee` devient une DATE de paiement (schéma 5 → 6).
+ *
+ * Quatrième champ imbriqué à migrer, après les congés, les rythmes et le motif
+ * des mouvements. La règle est acquise et se vérifie à chaque fois : une
+ * migration descend jusqu'où les champs ont bougé.
+ */
+describe('échéances d’un bloc au schéma 5', () => {
+  const ech = (p: Record<string, unknown>) => ({
+    id: 'e1', nature: 'urssaf', montant: 2400, echeanceLe: '2026-07-31', ...p
+  });
+
+  /**
+   * Retenir la date d'échéance n'est pas une invention pour les seules données
+   * qui existent : elles viennent toutes de la reprise des mouvements
+   * « Charge », où la date d'échéance a été posée à partir de la date du
+   * mouvement — c'est-à-dire du paiement.
+   */
+  it('convertit un « payée » en date, celle de l’échéance', () => {
+    const faits = completerFaits({ version: 5, echeances: [ech({ payee: true })] });
+    expect(faits.echeances[0]?.payeeLe).toBe('2026-07-31');
+  });
+
+  it('laisse une échéance non payée sans date', () => {
+    const faits = completerFaits({ version: 5, echeances: [ech({ payee: false })] });
+    expect(faits.echeances[0]?.payeeLe).toBeNull();
+  });
+
+  it('comble le montant payé absent', () => {
+    const faits = completerFaits({ version: 5, echeances: [ech({ payee: false })] });
+    expect(faits.echeances[0]?.montantPaye).toBeNull();
+  });
+
+  it('conserve une échéance déjà au schéma 6', () => {
+    const faits = completerFaits({
+      version: 6,
+      echeances: [ech({ payeeLe: '2026-08-05', montantPaye: 2512.4 })]
+    });
+    expect(faits.echeances[0]?.payeeLe).toBe('2026-08-05');
+    expect(faits.echeances[0]?.montantPaye).toBe(2512.4);
+  });
+
+  // Une échéance payée dont la date d'échéance est illisible ne peut pas
+  // recevoir de date de paiement : mieux vaut « à payer » qu'une date fausse.
+  it('n’invente pas de date quand l’échéance n’en a pas', () => {
+    const faits = completerFaits({
+      version: 5, echeances: [{ id: 'e1', nature: 'urssaf', montant: 2400, payee: true }]
+    });
+    expect(faits.echeances[0]?.payeeLe).toBeNull();
+  });
+});

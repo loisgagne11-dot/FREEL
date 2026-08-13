@@ -56,6 +56,8 @@ export function Activite() {
   const faits = useFaits((e) => e.faits);
   const basculerConge = useFaits((e) => e.basculerConge);
   const ajusterJour = useFaits((e) => e.ajusterJour);
+  const retirerAjustements = useFaits((e) => e.retirerAjustements);
+  const signaler = useToast();
 
   const [section, setSection] = useState<Section>('charge');
   const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
@@ -321,6 +323,15 @@ export function Activite() {
                   planning={semaine}
                   aujourdhui={dateDuJour()}
                   onBasculer={ajusterAuClic}
+                  onRevenirAuRythme={() => {
+                    const n = retirerAjustements(semaine.jours.map((j) => j.date));
+                    // L'effet se voit — la grille change sous les yeux — mais
+                    // pas son ampleur : sept cases redevenues identiques ne
+                    // disent pas combien de corrections ont été retirées.
+                    signaler(n === 1
+                      ? 'Correction retirée : la journée reprend le rythme.'
+                      : `${n} corrections retirées : les journées reprennent le rythme.`);
+                  }}
                 />
               )}
 

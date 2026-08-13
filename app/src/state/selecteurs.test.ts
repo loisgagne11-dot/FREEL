@@ -24,7 +24,8 @@ function recette(id: string, montant: number, encaisseeLe: string | null) {
 
 const ech = (montant: number, payee: boolean): Echeance => ({
   id: 'e', nature: 'urssaf', montant: euros(montant),
-  echeanceLe: dateISO('2026-07-31'), payee
+  echeanceLe: dateISO('2026-07-31'),
+  payeeLe: payee ? dateISO('2026-07-31') : null, montantPaye: null
 });
 
 describe('mois courant', () => {

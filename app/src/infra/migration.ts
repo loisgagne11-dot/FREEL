@@ -606,8 +606,14 @@ function extraireEcheances(mouvements: unknown[], anomalies: Anomalie[]): Echean
       nature,
       // Une charge sociale ou fiscale n'a pas de TVA : le TTC EST le montant.
       montant: euros(nombre(mv['montantTTC']) || nombre(mv['montant'])),
+      // La date du mouvement est celle du PAIEMENT. La date d'appel, elle,
+      // n'existait nulle part dans l'ancien modèle : on retient la même, et
+      // c'est la seule chose honnête à faire.
       echeanceLe: date ?? (new Date().toISOString().slice(0, 10) as DateISO),
-      payee: true
+      payeeLe: date ?? (new Date().toISOString().slice(0, 10) as DateISO),
+      // Le montant appelé et le montant payé coïncident : l'ancien modèle
+      // n'en portait qu'un seul.
+      montantPaye: null
     });
   });
 

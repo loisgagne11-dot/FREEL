@@ -56,11 +56,42 @@ export interface Echeance {
   /** Date à laquelle le paiement est attendu. */
   readonly echeanceLe: DateISO;
   /**
-   * `true` dès que l'argent a quitté le compte. Une échéance payée n'est plus
-   * une provision : elle est déjà reflétée dans le solde bancaire.
+   * Date à laquelle l'argent a QUITTÉ le compte, ou `null` tant qu'il ne l'a
+   * pas fait.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * UNE DATE, PAS UN BOOLÉEN
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * La première version portait `payee: boolean`. C'était exactement le défaut
+   * reproché à l'ancienne application sur les factures : un statut qu'aucune
+   * écriture ne prouve. On exige une date et un mode de règlement pour
+   * encaisser une recette ; accepter une case à cocher pour une échéance était
+   * incohérent.
+   *
+   * La date sert à trois choses qu'un booléen ne peut pas rendre : rapprocher
+   * le paiement du relevé bancaire, savoir de quel mois la sortie relève, et
+   * constater un règlement en retard après coup.
+   *
+   * Une échéance payée n'est plus une provision : le solde bancaire la reflète
+   * déjà.
    */
-  readonly payee: boolean;
+  readonly payeeLe: DateISO | null;
+  /**
+   * Montant réellement débité, quand il diffère de celui appelé.
+   *
+   * Un échéancier annonce un montant ; ce qui part du compte peut différer —
+   * régularisation de fin de trimestre, changement de taux, majoration de
+   * retard. `null` quand les deux coïncident, ce qui est le cas ordinaire.
+   *
+   * L'écart n'est pas une erreur à corriger mais une information à garder :
+   * c'est lui qui explique un solde qui ne tombe pas juste.
+   */
+  readonly montantPaye: Euros | null;
 }
+
+/** Une échéance est payée dès qu'une date de paiement existe. */
+export const estPayee = (e: Echeance): boolean => e.payeeLe !== null;
 
 /** Une recette encaissée. Le fait générateur de la dette sociale. */
 export interface RecetteEncaissee {
@@ -127,7 +158,7 @@ export interface DetailProvisions {
 /** Volet 1 — les dettes déjà constatées. */
 export function voletConstate(echeances: readonly Echeance[]): Euros {
   return euros(
-    echeances.reduce((somme, e) => (e.payee ? somme : somme + e.montant), 0)
+    echeances.reduce((somme, e) => (estPayee(e) ? somme : somme + e.montant), 0)
   );
 }
 

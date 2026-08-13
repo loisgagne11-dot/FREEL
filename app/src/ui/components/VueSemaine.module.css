@@ -119,3 +119,22 @@
    créneaux qu'elle contient : deux lignes se lisent l'une sous l'autre, et
    le cas à une seule ligne rend exactement la grille d'avant. */
 .pile { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+/* Défaire les corrections d'une semaine. En retrait : c'est un retour en
+   arrière, pas le geste ordinaire — et il n'apparaît que s'il y a quelque
+   chose à défaire. */
+.revenir {
+  min-height: 44px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.revenir:hover { border-color: var(--line-2); color: var(--text); }

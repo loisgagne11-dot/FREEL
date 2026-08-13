@@ -98,18 +98,41 @@ interface MagasinFaits {
    * appelée, ce volet-ci porte ce qui l'a été.
    */
   readonly ajouterEcheance: (saisie: Omit<Echeance, 'id'>) => string;
+  /**
+   * Enregistre une série d'échéances d'un seul geste.
+   *
+   * Une commodité de SAISIE, pas un nouveau fait : elle crée N échéances
+   * ordinaires et s'efface. Chacune reste ensuite corrigeable, supprimable et
+   * marquable payée indépendamment — parce que c'est ce qui va arriver : un
+   * trimestre régularisé, un taux qui change, un mois reporté.
+   *
+   * Une seule écriture pour toute la série : N appels à `ajouterEcheance`
+   * persisteraient N fois, et une interruption au milieu laisserait un
+   * échéancier à moitié saisi.
+   */
+  readonly ajouterEcheances: (saisies: readonly Omit<Echeance, 'id'>[]) => number;
   readonly modifierEcheance: (
     id: string, modification: Partial<Omit<Echeance, 'id'>>
   ) => void;
   readonly supprimerEcheance: (id: string) => void;
   /**
-   * Marque une échéance payée, ou dépayée.
+   * Enregistre le paiement d'une échéance — ou l'annule avec `null`.
    *
-   * Payée, elle sort des provisions : l'argent a quitté le compte, donc le
-   * solde bancaire le reflète déjà. L'y laisser reviendrait à retrancher deux
-   * fois la même somme du disponible.
+   * La DATE est exigée, pas un booléen : c'est elle qui permet de rapprocher
+   * le paiement du relevé, de savoir de quel mois la sortie relève, et de
+   * constater après coup un règlement en retard. Exiger une date pour
+   * encaisser une recette et se contenter d'une case pour une échéance serait
+   * incohérent.
+   *
+   * `montantPaye` recueille l'écart quand ce qui est parti diffère de ce qui
+   * était appelé — régularisation, changement de taux, majoration. `null`
+   * quand les deux coïncident.
+   *
+   * Payée, l'échéance sort des provisions : le solde bancaire la reflète déjà.
    */
-  readonly marquerEcheancePayee: (id: string, payee: boolean) => void;
+  readonly enregistrerPaiement: (
+    id: string, payeeLe: DateISO | null, montantPaye: Euros | null
+  ) => void;
 
   readonly ajouterDepense: (saisie: Omit<Depense, 'id'>) => string;
   readonly modifierDepense: (id: string, modification: Partial<Omit<Depense, 'id'>>) => void;
@@ -222,6 +245,19 @@ interface MagasinFaits {
   readonly ajusterJour: (
     missionId: string, entiteId: string, date: DateISO, quotite: number | null
   ) => void;
+
+  /**
+   * Efface les ajustements posés sur une plage de dates, toutes missions et
+   * tous clients opérationnels confondus.
+   *
+   * Les journées y redeviennent ce que le RYTHME prévoit — ce n'est pas les
+   * mettre à zéro, c'est retirer la correction. Une semaine corrigée par
+   * erreur, ou un rythme changé après coup, se rattrape en un geste au lieu de
+   * sept.
+   *
+   * Rend le nombre d'ajustements retirés, pour que l'écran puisse le dire.
+   */
+  readonly retirerAjustements: (dates: readonly DateISO[]) => number;
 
   /* ── Profil et barème ─────────────────────────────────────────────────── */
 
@@ -427,6 +463,19 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     return id;
   },
 
+  ajouterEcheances: (saisies) => {
+    if (saisies.length === 0) return 0;
+    const actuel = get().faits;
+    const base = Date.now();
+    const nouvelles = saisies.map((saisie, i) => ({
+      ...saisie, id: `ech-${base}-${actuel.echeances.length + i}`
+    }));
+    const faits: Faits = { ...actuel, echeances: [...actuel.echeances, ...nouvelles] };
+    set({ faits });
+    persister(stockageActif, faits);
+    return nouvelles.length;
+  },
+
   modifierEcheance: (id, modification) => {
     const actuel = get().faits;
     const faits: Faits = {
@@ -446,8 +495,8 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     persister(stockageActif, faits);
   },
 
-  marquerEcheancePayee: (id, payee) => {
-    get().modifierEcheance(id, { payee });
+  enregistrerPaiement: (id, payeeLe, montantPaye) => {
+    get().modifierEcheance(id, { payeeLe, montantPaye });
   },
 
   ajouterDepense: (saisie) => {
@@ -790,6 +839,34 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     const faits: Faits = { ...actuel, missions };
     set({ faits });
     persister(stockageActif, faits);
+  },
+
+  retirerAjustements: (dates) => {
+    const actuel = get().faits;
+    const cibles = new Set<string>(dates);
+    let retires = 0;
+
+    const missions = actuel.missions.map((m) => ({
+      ...m,
+      entites: m.entites.map((e) => {
+        const ajustements: Record<string, number> = {};
+        for (const [date, quotite] of Object.entries(e.ajustements)) {
+          if (cibles.has(date)) { retires += 1; continue; }
+          ajustements[date] = quotite;
+        }
+        return { ...e, ajustements };
+      })
+    }));
+
+    // Rien à retirer : on n'écrit pas. Persister pour rien ferait remonter une
+    // version sur le compte distant, et un autre appareil croirait à une
+    // modification.
+    if (retires === 0) return 0;
+
+    const faits: Faits = { ...actuel, missions };
+    set({ faits });
+    persister(stockageActif, faits);
+    return retires;
   },
 
   poserPlageDeConges: (jours, pose, quotite = 1) => {
