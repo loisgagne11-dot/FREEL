@@ -88,8 +88,14 @@ const FAITS = {
  * Volontairement large : le symbole « € », ou un nombre à séparateur de
  * milliers. Un motif trop étroit laisserait passer précisément ce qu'on
  * cherche à trouver.
+ *
+ * Le `(?!\d)` final n'est pas un assouplissement mais une correction : un
+ * groupe de milliers fait EXACTEMENT trois chiffres. Sans cette borne, « T3
+ * 2026 » se lisait comme « 3 202 » suivi d'un 6 égaré, et le vérificateur
+ * réclamait le floutage d'un libellé de trimestre. Un contrôle qui signale ce
+ * qui n'est pas une fuite finit par être contourné plutôt que corrigé.
  */
-const MOTIF_MONTANT = /(\d[\d  \s]*[,.]?\d*\s*€)|(\d{1,3}(?:[  \s]\d{3})+)/u;
+const MOTIF_MONTANT = /(\d[\d  \s]*[,.]?\d*\s*€)|(\d{1,3}(?:[  \s]\d{3})+(?!\d))/u;
 
 function servir() {
   const serveur = createServer(async (requete, reponse) => {

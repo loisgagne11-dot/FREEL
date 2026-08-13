@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { euros, mois } from '../../domain/types';
 import { type Client, type Faits, faitsVides } from '../../state/schema';
@@ -35,6 +35,18 @@ function semer(modifications: Partial<Faits> = {}): void {
   });
 }
 
+/**
+ * Monte l'écran et ouvre la saisie.
+ *
+ * L'écran ouvre désormais sur le facturier — la liste des factures — et la
+ * rédaction est derrière un bouton. `fireEvent` plutôt que `userEvent` : ce
+ * helper sert aussi dans des tests synchrones.
+ */
+function rendreSaisie(): void {
+  render(<Facture />);
+  fireEvent.click(screen.getByRole('button', { name: 'Nouvelle facture' }));
+}
+
 /** Remplit une facture minimale et complète. */
 async function remplir(utilisateur: ReturnType<typeof userEvent.setup>) {
   await utilisateur.type(screen.getByLabelText('Client'), 'Client France');
@@ -55,7 +67,7 @@ describe('mentions obligatoires', () => {
    */
   it('ne reproche rien sur une facture encore vierge', () => {
     semer();
-    render(<Facture />);
+    rendreSaisie();
     expect(screen.queryByText(/mentions? obligatoires? manque/)).toBeNull();
     // Le contrôle n'a pas disparu pour autant.
     expect(screen.getByRole('button', { name: /Compléter les mentions/ }))
@@ -66,7 +78,7 @@ describe('mentions obligatoires', () => {
   // perdre la saisie : le constat vient pendant, pas à l'émission.
   it('constate les manques dès que la saisie commence', async () => {
     semer();
-    render(<Facture />);
+    rendreSaisie();
     await userEvent.setup().type(screen.getByLabelText('Client'), 'Client France');
     expect(screen.getByText(/mentions? obligatoires? manque/)).toBeTruthy();
   });
@@ -75,14 +87,14 @@ describe('mentions obligatoires', () => {
   // se réémet sous un nouveau numéro.
   it('bloque l’émission tant qu’une mention manque', () => {
     semer();
-    render(<Facture />);
+    rendreSaisie();
     const bouton = screen.getByRole('button', { name: /Compléter les mentions/ });
     expect(bouton).toHaveProperty('disabled', true);
   });
 
   it('débloque l’émission dès que tout est là', async () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     await remplir(userEvent.setup());
     expect(screen.getByRole('button', { name: 'Émettre la facture' }))
       .toHaveProperty('disabled', false);
@@ -90,14 +102,14 @@ describe('mentions obligatoires', () => {
 
   it('chiffre l’amende encourue', async () => {
     semer();
-    render(<Facture />);
+    rendreSaisie();
     await userEvent.setup().type(screen.getByLabelText('Client'), 'Client France');
     expect(screen.getByText(/d’amende/)).toBeTruthy();
   });
 
   it('signale un client absent du carnet', async () => {
     semer();
-    render(<Facture />);
+    rendreSaisie();
     await userEvent.setup().type(screen.getByLabelText('Client'), 'Inconnu');
     expect(screen.getByText(/pas au carnet/)).toBeTruthy();
   });
@@ -107,13 +119,13 @@ describe('régime de TVA', () => {
   // L'omettre en facturant sans TVA laisse croire à un oubli de taxe.
   it('annonce la franchise en base', () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     expect(screen.getByText(/franchise en base/)).toBeTruthy();
   });
 
   it('annonce l’autoliquidation et la DES pour un client assujetti de l’Union', async () => {
     semer({ clients: [client({ nom: 'Kunde', pays: 'DE', tvaIntracom: 'DE123' })] });
-    render(<Facture />);
+    rendreSaisie();
     await userEvent.setup().type(screen.getByLabelText('Client'), 'Kunde');
 
     expect(screen.getByText(/autoliquidation/i)).toBeTruthy();
@@ -123,7 +135,7 @@ describe('régime de TVA', () => {
   // Choisir un taux n'aurait aucun effet et laisserait croire le contraire.
   it('ne propose pas de taux de TVA quand la facture n’en porte pas', () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     expect(screen.queryByLabelText('TVA')).toBeNull();
   });
 
@@ -132,7 +144,7 @@ describe('régime de TVA', () => {
       entreprise: { ...ENTREPRISE, tvaDepuis: mois('2026-01') },
       clients: [client()]
     });
-    render(<Facture />);
+    rendreSaisie();
     expect(screen.getByLabelText('TVA')).toBeTruthy();
   });
 });
@@ -140,14 +152,14 @@ describe('régime de TVA', () => {
 describe('totaux', () => {
   it('calcule le total depuis quantité et prix unitaire', async () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     await remplir(userEvent.setup());
     expect(screen.getByText('Total HT').nextSibling?.textContent).toMatch(/4\s000/u);
   });
 
   it('affiche l’échéance déduite du délai du client', async () => {
     semer({ clients: [client({ delaiPaiementJours: 45 })] });
-    render(<Facture />);
+    rendreSaisie();
     await remplir(userEvent.setup());
     expect(screen.getByText('Échéance').nextSibling?.textContent).toMatch(/29 août 2026/);
   });
@@ -156,7 +168,7 @@ describe('totaux', () => {
 describe('lignes', () => {
   it('permet d’ajouter et de retirer une ligne', async () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une ligne' }));
@@ -169,7 +181,7 @@ describe('lignes', () => {
   // Retirer la dernière ligne laisserait une facture sans prestation.
   it('ne permet pas de retirer la seule ligne', () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     expect(screen.queryByRole('button', { name: /Retirer la ligne/ })).toBeNull();
   });
 });
@@ -177,7 +189,7 @@ describe('lignes', () => {
 describe('émission', () => {
   it('porte la facture au livre des recettes, non encaissée', async () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     const utilisateur = userEvent.setup();
     await remplir(utilisateur);
     await utilisateur.click(screen.getByRole('button', { name: 'Émettre la facture' }));
@@ -199,13 +211,13 @@ describe('émission', () => {
         emiseLe: null, encaisseeLe: null, modeReglement: null, numero: '2026-007'
       }]
     });
-    render(<Facture />);
+    rendreSaisie();
     expect(screen.getByText('2026-008')).toBeTruthy();
   });
 
   it('affiche le document imprimable après émission', async () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     const utilisateur = userEvent.setup();
     await remplir(utilisateur);
     await utilisateur.click(screen.getByRole('button', { name: 'Émettre la facture' }));
@@ -220,7 +232,7 @@ describe('émission', () => {
 
   it('rappelle que l’émission ne vaut pas encaissement', async () => {
     semer({ clients: [client()] });
-    render(<Facture />);
+    rendreSaisie();
     const utilisateur = userEvent.setup();
     await remplir(utilisateur);
     await utilisateur.click(screen.getByRole('button', { name: 'Émettre la facture' }));

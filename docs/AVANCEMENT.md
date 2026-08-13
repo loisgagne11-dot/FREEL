@@ -158,8 +158,10 @@ c'est-à-dire d'inventer un lien.
 | 1 | **ce fichier** | Où on en est, quoi faire ensuite |
 | 2 | [`PLAN-REFONTE.md`](./PLAN-REFONTE.md) | Les 6 décisions arbitrées (D1–D6), le barème par périodes, les 7 jalons |
 | 3 | [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) | Le diagnostic complet |
+| 3 bis | [`AUDIT-ANCIENNE-VS-NOUVELLE.md`](./AUDIT-ANCIENNE-VS-NOUVELLE.md) | **Ce qui manque encore**, fonction par fonction, avec l'ordre de traitement proposé |
 | 4 | [`design/03-design-system.md`](./design/03-design-system.md) et [`design/05-spec-ecrans.md`](./design/05-spec-ecrans.md) | **Les deux spécifications qui font foi sur le visuel** : tokens, composants, et écran par écran ce qui doit s'y trouver |
-| 5 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
+| 5 | [`design/handoff-v1.11/`](./design/handoff-v1.11/) | **La source** : les prototypes eux-mêmes, plus `annexe-architecture-build5.md` (les deux stores, les règles de calcul, le vocabulaire). Lire d'abord son [`PROVENANCE.md`](./design/handoff-v1.11/PROVENANCE.md) |
+| 6 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
 
 Les neuf documents de `docs/design/` avaient été retirés du dépôt le
 12/08/2026 comme « rapports d'audit ». C'était une erreur de nature : deux
@@ -368,6 +370,55 @@ La règle qui s'en dégage : **un sélecteur qui ne sert qu'à un écran différ
 vit dans le module de cet écran.** `selecteurs.ts` est lu par le Pilote, qui
 est au premier rendu ; tout ce qu'on y ajoute est téléchargé avant le premier
 pixel, même si personne n'ouvre l'écran concerné.
+
+### Quatre actions du magasin n'atteignaient aucun écran (13/08)
+
+Le propriétaire a signalé qu'il ne pouvait ni retrouver ses factures, ni
+changer leur statut, et que les valeurs restaient fausses. Un contrôle
+systématique — pour chaque action du magasin, quel écran l'appelle — a donné
+la réponse : **quatre n'étaient appelées par personne.**
+
+| Action | Ce que son absence produisait |
+|---|---|
+| `encaisserRecette` | **Une facture émise ne pouvait JAMAIS passer en encaissée.** Le chiffre d'affaires encaissé restait figé, les provisions calculées dessus étaient fausses, et la trésorerie disponible avec elles |
+| `marquerPeriodeDeclaree` | Une période déclarée restait à jamais dans le volet «&nbsp;à provisionner&nbsp;» (D3)&nbsp;: les provisions montaient sans redescendre, on mettait de côté deux fois la même dette |
+| `modifierDepense` | Corriger une faute de saisie obligeait à supprimer puis ressaisir — ce qui **détachait le justificatif** et remettait le rapprochement à zéro |
+| `supprimerBrouillon` | Un brouillon retenait son numéro sans qu'on puisse le jeter |
+
+Le code du domaine était écrit, testé, correct. Il ne servait à rien. **Un test
+unitaire vert sur une fonction que personne n'appelle ne prouve que la
+fonction** — c'est le contrôle qui manquait, et il tient en une ligne :
+
+```
+for a in <actions>; do grep -rl "\b$a\b" src/ui --include=*.tsx; done
+```
+
+**Ce qui a été construit.**
+
+- **Le facturier** (`components/Facturier.tsx`) — toutes les factures dans un
+  seul endroit, avec leur état (brouillon / émise / en retard / encaissée /
+  annulée / avoir), filtrées par période et par état, et les gestes qui vont
+  avec. L'écran Facturer ouvre dessus ; la rédaction passe derrière un bouton,
+  parce qu'on vient dix fois voir qui n'a pas payé pour une fois qu'on émet.
+- **Le statut est DÉRIVÉ** (`domain/calculs/facturier.ts`), jamais stocké —
+  invariant n°5. L'ancienne application portait un champ `status` qu'on pouvait
+  passer à « payée » sans date d'encaissement : le registre affichait alors une
+  facture réglée qu'aucune écriture ne prouvait.
+- **Encaisser passe par un panneau**, pas par une case à cocher : la date ET le
+  mode de règlement sont deux mentions obligatoires du livre des recettes. Il
+  n'existe pas de geste en un clic qui produise une écriture conforme.
+- **Le retard se compte en jours** et pas seulement en étiquette : « en
+  retard » se relativise, « 43 jours » se relance.
+- **Les périodes URSSAF** (`domain/calculs/declarations.ts`) suivent la
+  périodicité déclarée en Config — un trimestriel déclare un trimestre, et le
+  marquer déclaré marque ses **trois** mois, mois creux compris. Une période en
+  cours n'est pas déclarable : l'URSSAF ouvre la déclaration après la clôture,
+  et la cocher d'avance sortirait du volet « à provisionner » des recettes
+  qu'on va encore encaisser dessus.
+- **Corriger une dépense** ne passe que les champs du formulaire : la pièce
+  déposée et l'état de rapprochement ne sont pas des saisies, et les renvoyer
+  aux valeurs d'une dépense neuve détacherait le justificatif au premier
+  changement de libellé.
 
 ---
 
@@ -670,6 +721,83 @@ Le script a aussi été corrigé pour **nommer** ce genre de panne : il relève
 les exceptions de la page et signale « l'écran ne s'est pas monté » au lieu de
 laisser expirer une attente de titre, qui décrivait le symptôme et jamais la
 cause.
+
+---
+
+### Les échéances émises deviennent un fait (13/08, schéma v3)
+
+Le manque n°1 de l'audit. Le volet 1 des provisions — ce que l'URSSAF ou le
+fisc ont **déjà appelé** — se calculait sur une liste vide : le paramètre
+`echeances` de `etatPilote` avait `= []` pour défaut, et **aucun appelant ne le
+renseignait**. Il valait donc zéro en permanence, et le flux du mois n'avait
+aucune sortie.
+
+L'erreur allait dans le sens dangereux : moins de provisions ⇒ plus de
+disponible ⇒ plus de versable. **L'application invitait à se verser de l'argent
+déjà dû** — le mécanisme exact du rappel qu'on ne peut plus payer, celui
+qu'elle existe pour empêcher.
+
+- `echeances` entre au schéma (**v3**), avec `ajouterEcheance`,
+  `modifierEcheance`, `supprimerEcheance` et `marquerEcheancePayee`.
+- Carte **« Échéances reçues »** dans Argent, entre les enveloppes et les
+  périodes URSSAF — l'ordre de lecture est celui du raisonnement : le total, ce
+  qui a été appelé, puis ce qui fait basculer l'un dans l'autre.
+- Le défaut du paramètre devient `faits.echeances`. Il reste paramétrable, pour
+  les tests qui posent un jeu précis.
+- **Une échéance est un fait, pas une prévision.** Elle existe parce qu'un
+  appel est arrivé. Le volet 2 estime, lui, une dette pas encore appelée : les
+  saisir tous les deux compterait deux fois la même somme, et c'est « marquer
+  la période déclarée » qui fait passer l'une dans l'autre.
+- **Payée ne veut pas dire effacée.** Elle sort des provisions — l'argent a
+  quitté le compte, le solde le reflète déjà — mais reste dans la liste, comme
+  historique de ce qui a été appelé.
+- **La date est exigée** : sans elle, la somme pèserait sur les provisions sans
+  apparaître dans aucun mois. Invisible au flux, mais bien retranchée.
+
+**Correction de migration au passage.** L'ancienne application rangeait tout
+sous « Charge » : cotisations URSSAF, TVA reversée, avis d'impôt, CFE — et
+abonnements logiciels. La migration les reprenait **tous en dépenses**. Or une
+cotisation sociale n'est pas un achat : en micro elle n'est pas déductible, et
+elle ne porte aucune TVA. L'écran Achats se retrouvait gonflé de lignes qui
+n'y ont pas leur place, et leur réclamait un justificatif de TVA qu'elles
+n'auront jamais.
+
+Elles deviennent des **échéances payées**, ce qu'elles sont. `natureDeLaCategorie`
+fait le tri ; `verifierAbsenceDePerte` compte désormais les deux destinations,
+sans quoi chaque cotisation correctement triée aurait été signalée comme perdue.
+
+---
+
+## 4 quinquies. Leçon du 13/08 — un test vert sur du code mort ne prouve rien
+
+`encaisserRecette` était écrite, commentée, couverte par des tests de magasin
+qui passaient. Aucun écran ne l'appelait. Idem pour `marquerPeriodeDeclaree`,
+`modifierDepense` et `supprimerBrouillon` : quatre fonctions justes, et
+inatteignables.
+
+Aucun contrôle du projet ne pouvait le voir. Les tests unitaires appellent la
+fonction directement — c'est leur travail. Le typage est satisfait : une action
+non appelée est du code valide. Le vérificateur responsive charge les écrans
+mais ne clique nulle part. Et la couverture, si elle avait existé, aurait
+compté ces lignes comme couvertes.
+
+**Ce que ça coûtait**, en une phrase : on pouvait émettre une facture et jamais
+enregistrer son règlement. Toute la chaîne en aval — chiffre d'affaires
+encaissé, provisions, disponible, versable — était donc fausse par
+construction, et le restait quoi qu'on fasse dans l'application.
+
+**Règle qui en découle.** Une action du magasin est une promesse d'interface.
+Quand on en ajoute une, on câble l'écran dans le même mouvement, ou on ne
+l'ajoute pas. Et le contrôle se fait par l'inventaire, pas par la mémoire :
+
+```
+for a in $(grep -oE '^  readonly [a-zA-Z]+:' src/state/store.ts | ...); do
+  grep -rl "\b$a\b" src/ui --include=*.tsx | grep -v test || echo "❌ $a"
+done
+```
+
+C'est encore le propriétaire qui l'a détecté, en essayant simplement de faire
+son travail : « je ne peux pas changer leur statut ».
 
 ---
 

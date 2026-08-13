@@ -35,6 +35,7 @@ import {
   type Rythme, completerFaits, entrepriseVide, faitsVides, motifRefusFaits
 } from '../state/schema';
 import { JOURS_SEMAINE } from '../domain/calculs/planning';
+import type { Echeance, NatureDette } from '../domain/calculs/provisions';
 
 /** Préfixe de l'ancienne application. Ne jamais écrire dessus. */
 export const PREFIXE_LEGACY = 'freel_v50_';
@@ -449,11 +450,92 @@ function extraireConges(parMois: Inconnu): Conge[] {
  * récupérable tant que la pièce n'est pas déposée. L'écran Achats chiffre
  * alors ce que l'absence de pièces coûte, au lieu de la passer sous silence.
  */
+/**
+ * La catégorie d'un mouvement `Charge` de l'ancienne trésorerie, traduite en
+ * nature de dette — ou `null` si c'est une vraie dépense professionnelle.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI CE TRI N'EST PAS UN DÉTAIL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne application rangeait tout sous « Charge » : cotisations URSSAF,
+ * TVA reversée, avis d'impôt, CFE — et abonnements logiciels. La migration
+ * les reprenait TOUS en dépenses.
+ *
+ * Or une cotisation sociale n'est pas un achat. En micro, elle n'est pas
+ * déductible — l'abattement forfaitaire en tient lieu — et elle ne porte
+ * aucune TVA. Les importer en dépenses gonflait l'écran Achats de lignes qui
+ * n'y ont pas leur place, et leur faisait réclamer un justificatif de TVA
+ * qu'elles n'auront jamais.
+ *
+ * Elles deviennent donc des ÉCHÉANCES payées, ce qu'elles sont : un appel
+ * reçu, et honoré.
+ */
+function natureDeLaCategorie(categorie: string): NatureDette | null {
+  const c = categorie.trim().toLowerCase();
+  if (c.startsWith('urssaf')) return 'urssaf';
+  if (c.startsWith('tva')) return 'tva';
+  if (c === 'cfe') return 'cfe';
+  if (c === 'cfp') return 'cfp';
+  // « IR », « Impôt PL », « Impôt sur le revenu », « IR Estimé »… L'ancienne
+  // application employait plusieurs libellés pour la même dette.
+  if (c.startsWith('ir') || c.includes('impôt') || c.includes('impot')) return 'impot';
+  return null;
+}
+
+/**
+ * Les échéances reprises des mouvements `Charge` de nature fiscale ou sociale.
+ *
+ * Elles arrivent PAYÉES : le mouvement existait parce que l'argent était
+ * sorti. Une échéance payée ne pèse plus sur les provisions — le solde
+ * bancaire la reflète déjà.
+ */
+function extraireEcheances(mouvements: unknown[], anomalies: Anomalie[]): Echeance[] {
+  const echeances: Echeance[] = [];
+  mouvements.forEach((mvBrut, i) => {
+    const mv = objet(mvBrut);
+    if (texte(mv['type']) !== 'Charge') return;
+    const nature = natureDeLaCategorie(texte(mv['categorie']));
+    if (nature === null) return;
+
+    const date = dateOuNull(mv['date']) ?? premierJourDuMois(texte(mv['mois']));
+    if (date === null) {
+      anomalies.push({
+        gravite: 'avertissement',
+        message: `Échéance « ${texte(mv['description']) || i + 1} » sans date exploitable : `
+          + 'elle est datée d\'aujourd\'hui et reste à corriger.'
+      });
+    }
+
+    echeances.push({
+      id: texte(mv['id']) || `ech-${i}`,
+      nature,
+      // Une charge sociale ou fiscale n'a pas de TVA : le TTC EST le montant.
+      montant: euros(nombre(mv['montantTTC']) || nombre(mv['montant'])),
+      echeanceLe: date ?? (new Date().toISOString().slice(0, 10) as DateISO),
+      payee: true
+    });
+  });
+
+  if (echeances.length > 0) {
+    anomalies.push({
+      gravite: 'avertissement',
+      message: `${echeances.length} charge(s) fiscale(s) ou sociale(s) reprise(s) en `
+        + 'échéances PAYÉES, et non en dépenses : une cotisation n\'est pas un achat, '
+        + 'elle n\'est pas déductible en micro et ne porte aucune TVA. Les échéances '
+        + 'encore à payer sont à saisir depuis l\'écran Argent.'
+    });
+  }
+  return echeances;
+}
+
 function extraireDepenses(mouvements: unknown[], anomalies: Anomalie[]): Depense[] {
   const depenses: Depense[] = [];
   mouvements.forEach((mvBrut, i) => {
     const mv = objet(mvBrut);
     if (texte(mv['type']) !== 'Charge') return;
+    // Les charges fiscales et sociales partent en échéances, pas ici.
+    if (natureDeLaCategorie(texte(mv['categorie'])) !== null) return;
 
     // L'ancien modèle stockait le HT dans `montant` et le TTC à part, ce
     // dernier n'étant renseigné que si la saisie s'était faite en TTC.
@@ -577,7 +659,8 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
   // le taire les ferait disparaître sans trace.
   const mouvements = tableau(t['mouvements']);
   const depenses = extraireDepenses(mouvements, anomalies);
-  if (mouvements.length > depenses.length) {
+  const echeances = extraireEcheances(mouvements, anomalies);
+  if (mouvements.length > depenses.length + echeances.length) {
     champsNonRepris.push('treasury.mouvements (hors charges)');
   }
 
@@ -632,6 +715,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // ce fait n'y existait pas. Il devra être renseigné par l'utilisateur,
     // sinon le volet 2 des provisions surestimera la dette.
     periodesDeclarees: [],
+    echeances,
     configImpotBrute: objet(legacy['ir'])
   };
 }
@@ -847,15 +931,21 @@ export function verifierAbsenceDePerte(legacy: Inconnu, faits: Faits): readonly 
     pertes.push(`Montant total des recettes : ${totalEntree} en entrée, ${totalSortie} en sortie.`);
   }
 
-  // Les charges de l'ancienne trésorerie deviennent des dépenses. Le contrôle
-  // porte sur le nombre, pas sur le montant : le TTC reconstitué diffère
-  // légitimement du HT stocké côté legacy, et comparer les deux ferait crier à
-  // la perte alors que rien n'est perdu.
+  // Les charges de l'ancienne trésorerie se répartissent entre DEUX
+  // destinations : les fiscales et sociales deviennent des échéances payées,
+  // les autres des dépenses. Le contrôle porte donc sur la somme des deux —
+  // ne compter que les dépenses ferait crier à la perte à chaque cotisation
+  // correctement triée.
+  //
+  // Il porte sur le NOMBRE et pas sur le montant : le TTC reconstitué diffère
+  // légitimement du HT stocké côté legacy.
   const chargesBrutes = tableau(objet(legacy['t'])['mouvements'])
     .filter((mv) => texte(objet(mv)['type']) === 'Charge');
-  if (faits.depenses.length !== chargesBrutes.length) {
+  const reprises = faits.depenses.length + faits.echeances.length;
+  if (reprises !== chargesBrutes.length) {
     pertes.push(
-      `Dépenses : ${chargesBrutes.length} charges en entrée, ${faits.depenses.length} en sortie.`
+      `Charges : ${chargesBrutes.length} en entrée, ${reprises} en sortie `
+      + `(${faits.depenses.length} dépense(s), ${faits.echeances.length} échéance(s)).`
     );
   }
 

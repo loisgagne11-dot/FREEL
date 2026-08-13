@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Freel — Index du projet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app/freel.css">
+<style>
+  body{background:var(--bg);}
+  a{color:var(--green);text-decoration:none;}
+  a:hover{color:var(--text);}
+  .doc{max-width:980px;margin:0 auto;padding:0 40px 110px;}
+  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:500;}
+  .hero{padding:96px 0 44px;border-bottom:1px solid var(--line);}
+  .hero h1{font-size:50px;line-height:1.05;letter-spacing:-.03em;font-weight:800;margin:20px 0 0;}
+  .hero h1 em{font-style:normal;color:var(--green);}
+  .hero p{font-size:17px;color:var(--muted);margin:20px 0 0;max-width:62ch;line-height:1.6;}
+  .hero p b{color:var(--text);font-weight:600;}
+  section{padding:64px 0 0;}
+  h2{font-size:26px;letter-spacing:-.02em;font-weight:700;margin:0 0 8px;}
+  .lead{font-size:15px;color:var(--muted);max-width:66ch;line-height:1.6;margin:0 0 26px;}
+  .lead b{color:var(--text);font-weight:600;}
+
+  .badge{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:20px;white-space:nowrap;}
+  .badge.cur{color:#06140d;background:var(--green);}
+  .badge.doc{color:var(--blue);background:var(--blue-soft);border:1px solid rgba(111,182,224,.3);}
+  .badge.arc{color:var(--muted-2);background:var(--panel-3);border:1px solid var(--line-2);}
+
+  .vrow{display:grid;grid-template-columns:64px 1fr auto;gap:16px;align-items:center;padding:16px 20px;border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-bottom:10px;}
+  .vrow.cur{border-color:rgba(84,207,145,.4);background:linear-gradient(120deg,rgba(84,207,145,.07),var(--panel) 60%);}
+  .vrow .vn{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--muted-2);}
+  .vrow.cur .vn{color:var(--green);}
+  .vrow .vt{font-size:14.5px;font-weight:600;}
+  .vrow .vt a{color:var(--text);}
+  .vrow .vt a:hover{color:var(--green);}
+  .vrow .vs{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.5;}
+  .vrow .vs b{color:var(--text);font-weight:600;}
+
+  .apps{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:14px;}
+  .apps a{display:block;border:1px solid var(--line-2);border-radius:12px;background:var(--panel-2);padding:13px 15px;font-size:13.5px;font-weight:600;color:var(--text);}
+  .apps a:hover{border-color:rgba(84,207,145,.4);color:var(--green);}
+  .apps a span{display:block;font-size:11.5px;color:var(--muted);font-weight:400;margin-top:3px;}
+
+  .verdict{border:1px solid rgba(84,207,145,.35);border-radius:16px;background:linear-gradient(140deg,rgba(84,207,145,.08),var(--panel) 55%);padding:22px 24px;margin-bottom:14px;}
+  .verdict .vh{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;}
+  .verdict .vh svg{width:20px;height:20px;color:var(--green);flex-shrink:0;}
+  .verdict p{margin:10px 0 0;font-size:13.5px;color:var(--muted);line-height:1.6;}
+  .verdict p b{color:var(--text);font-weight:600;}
+  .caveat{border:1px solid rgba(227,179,95,.32);border-radius:16px;background:linear-gradient(140deg,var(--amber-soft),var(--panel) 60%);padding:22px 24px;}
+  .caveat .vh{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;}
+  .caveat .vh svg{width:19px;height:19px;color:var(--amber);flex-shrink:0;}
+  .caveat p{margin:10px 0 0;font-size:13.5px;color:var(--muted);line-height:1.6;}
+  .caveat p b{color:var(--text);font-weight:600;}
+  .caveat ul{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--muted);line-height:1.7;}
+  .caveat li b{color:var(--text);font-weight:600;}
+
+  @media(max-width:760px){.hero h1{font-size:36px;}.doc{padding:0 22px 80px;}.vrow{grid-template-columns:1fr auto;}.vrow .vn{grid-column:1/-1;}}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <header class="hero">
+    <div class="kicker">Freel · sommaire du projet</div>
+    <h1>Un seul point d'entrée. <em>Zéro doute</em> sur la version.</h1>
+    <p>Le projet est rangé en trois dossiers : <b>app/</b> (le prototype actuel, la seule chose à ouvrir au quotidien), <b>docs/</b> (les audits de couverture qui prouvent ce qui a été gardé) et <b>archive/</b> (les explorations dépassées, conservées pour mémoire).</p>
+  </header>
+
+  <!-- ===== L'APP ACTUELLE ===== -->
+  <section>
+    <h2>L'app actuelle — <span style="font-family:var(--mono);font-size:20px;color:var(--green);">build 5</span></h2>
+    <p class="lead">C'est <b>la version la plus récente</b> (retours du 11 juillet intégrés). Les 5 écrans partagent le même style et les mêmes données, et naviguent entre eux.</p>
+    <div class="apps">
+      <a href="app/Pilote - Le Flux.html">Pilote · Le Flux<span>la décision du jour</span></a>
+      <a href="app/Activité - Plan de charge.html">Activité<span>missions, calendrier, factures</span></a>
+      <a href="app/Argent - Trésorerie & Performance.html">Argent<span>trésorerie réelle + performance</span></a>
+      <a href="app/Outils - Simulateurs.html">Outils<span>IR, CFE, banque, CRA</span></a>
+      <a href="app/Config.html">Config<span>règles, livre, exports</span></a>
+    </div>
+  </section>
+
+  <!-- ===== COUVERTURE ===== -->
+  <section>
+    <h2>A-t-on perdu des fonctions de ton app de base ?</h2>
+    <div class="verdict" style="margin-top:22px;">
+      <div class="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>Non — les 52 éléments inventoriés ont tous une place, et les 5 écrans du prototype les portent.</div>
+      <p>La preuve détaillée, élément par élément, est dans <a href="docs/Refonte - Inventaire & Organisation.html">l'inventaire exhaustif</a> (52 éléments, statut « conservé / fusionné / approfondi », aucun supprimé) et dans <a href="docs/Refonte - Couverture fonctionnelle.html">la matrice de couverture</a> (33 fonctions de ton code, toutes recasées). Dans le prototype : salaire versable + réserve, santé, décisions suggérées, seuils micro &amp; TVA avec leviers, calendrier mensuel fusionné avec congés, missions + occupation, factures + cycle URSSAF, clients + dépendance, charges, CA réalisé vs encaissé, trésorerie projetée + runway, provisions, IR barème vs libératoire (foyer + PER), CFE, rendement, rapprochement bancaire, CRA imprimable, et les 7 sections de Config avec exports CSV / FEC / JSON réels.</p>
+    </div>
+    <div class="caveat">
+      <div class="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v5M12 18h.01"/></svg>Les limites honnêtes du prototype</div>
+      <p>Tout est <b>présent à l'écran et manipulable</b>, mais c'est une maquette : les données sont fictives et certaines actions sont simulées (un toast confirme le geste sans le faire vraiment) :</p>
+      <ul>
+        <li><b>Import bancaire</b> — la zone de dépôt CSV/OFX est là, le parsing réel n'est pas branché.</li>
+        <li><b>Cloud sync</b> — l'interface compte / appareils est là, sans vrai backend.</li>
+        <li><b>Envoi d'e-mails</b> (relances, CRA) — le flux est montré, l'envoi est simulé.</li>
+      </ul>
+      <p>Rien n'a été retiré : ces trois points sont des branchements techniques, pas des fonctions manquantes dans le design.</p>
+    </div>
+  </section>
+
+  <!-- ===== HISTORIQUE DES VERSIONS ===== -->
+  <section>
+    <h2>Historique des versions</h2>
+    <p class="lead">Du plus ancien au plus récent. Seule la dernière ligne fait foi.</p>
+
+    <div class="vrow">
+      <span class="vn">v1</span>
+      <div><div class="vt"><a href="archive/Wireframes - Poste de pilotage.html">Wireframes — Poste de pilotage</a></div><div class="vs">Premières explorations de structure, basse fidélité.</div></div>
+      <span class="badge arc">archivé</span>
+    </div>
+    <div class="vrow">
+      <span class="vn">v2</span>
+      <div><div class="vt"><a href="archive/Refonte - Architecture & Ergonomie.html">Refonte — Architecture &amp; Ergonomie</a></div><div class="vs">Proposition d'organisation en 5 écrans. Remplacée par le prototype construit.</div></div>
+      <span class="badge arc">archivé</span>
+    </div>
+    <div class="vrow">
+      <span class="vn">v3</span>
+      <div><div class="vt"><a href="docs/Refonte - Couverture fonctionnelle.html">Refonte — Couverture fonctionnelle</a></div><div class="vs">Matrice : <b>33 fonctions</b> de ton code, chacune recasée. Premier audit, par carte.</div></div>
+      <span class="badge doc">référence</span>
+    </div>
+    <div class="vrow">
+      <span class="vn">v3.1</span>
+      <div><div class="vt"><a href="docs/Refonte - Inventaire & Organisation.html">Refonte — Inventaire exhaustif &amp; Organisation</a></div><div class="vs">Passe fine : <b>52 éléments</b>, corrige les oublis du premier audit (runway, occupation par mission…).</div></div>
+      <span class="badge doc">référence</span>
+    </div>
+    <div class="vrow">
+      <span class="vn">v4</span>
+      <div><div class="vt"><a href="archive/app-build4/Pilote - Le Flux.html">Prototype interactif — build 4</a></div><div class="vs">Premier prototype complet 5 écrans. Figé dans <b>archive/app-build4/</b>.</div></div>
+      <span class="badge arc">archivé</span>
+    </div>
+    <div class="vrow">
+      <span class="vn">v1.1</span>
+      <div><div class="vt"><a href="archive/app-v1.1/Pilote - Le Flux.html">Prototype interactif — V1.1</a></div><div class="vs">Dossier <b>archive/app-v1.1/</b> · <b>version figée</b>, la référence fonctionnelle. Deux stores partagés (état financier + dépenses), Achats/conformité, responsive mobile. Retours du 11 juil. : Pilote allégé (doublons supprimés, échéancier « À déclarer »), CRA en synthèse hebdo, compte perso de virement, TVA intracom + adresse (CFE), fraîcheur des barèmes, congés → plan de charge.</div></div>
+      <span class="badge doc">figée</span>
+    </div>
+    <div class="vrow">
+      <span class="vn">v1.2</span>
+      <div><div class="vt"><a href="archive/app-v1.2/V1.2 Calme - Pilote.html">V1.2 « Calme » — première passe</a></div><div class="vs">Dossier <b>archive/app-v1.2/</b> · refonte visuelle seule, logique et données de la V1.1. Figée avant la passe fonctionnelle.</div></div>
+      <span class="badge arc">archivé</span>
+    </div>
+    <div class="vrow cur">
+      <span class="vn">v1.21</span>
+      <div><div class="vt"><a href="app/V1.21 Calme - Pilote.html">V1.21 « Calme » — passe fonctionnelle</a></div><div class="vs">Même direction visuelle, outil complet : dépôt réel des <b>justificatifs</b> (par ligne, à la saisie comme après coup), <b>registre des factures</b> sur tout l'historique avec états brouillon / envoyée / en retard / encaissée, <b>indicateurs système</b> (cloud, compte pro, sauvegarde, barème) sur tous les onglets, vocabulaire <b>provision ≠ réserve</b> avec allocation de rémunération et autonomie, option <b>sans versement libératoire</b>, <b>fraîcheur des barèmes</b> datée et actualisable (millésime 2026), réglages de facturation universels — le délai de paiement passe sur la mission.</div></div>
+      <span class="badge cur">en cours</span>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

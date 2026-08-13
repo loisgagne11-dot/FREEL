@@ -33,6 +33,7 @@ import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
 } from '../domain/bareme/urssaf';
 import type { EtatRapprochement } from '../domain/calculs/depenses';
+import type { Echeance } from '../domain/calculs/provisions';
 import { type Stockage, convertirBundle, migrer } from '../infra/migration';
 
 /** Le stockage du navigateur, ou `null` quand il est indisponible. */
@@ -86,6 +87,29 @@ interface MagasinFaits {
    * deux écrans qui les fabriqueraient chacun de leur côté finiraient par en
    * produire deux identiques.
    */
+  /* ── Échéances émises ─────────────────────────────────────────────────── */
+
+  /**
+   * Enregistre une échéance reçue : appel de cotisations, avis d'impôt, CFE.
+   *
+   * C'est un FAIT — elle existe parce qu'un appel est arrivé. Elle ne se
+   * calcule pas : le volet 2 des provisions estime la dette pas encore
+   * appelée, ce volet-ci porte ce qui l'a été.
+   */
+  readonly ajouterEcheance: (saisie: Omit<Echeance, 'id'>) => string;
+  readonly modifierEcheance: (
+    id: string, modification: Partial<Omit<Echeance, 'id'>>
+  ) => void;
+  readonly supprimerEcheance: (id: string) => void;
+  /**
+   * Marque une échéance payée, ou dépayée.
+   *
+   * Payée, elle sort des provisions : l'argent a quitté le compte, donc le
+   * solde bancaire le reflète déjà. L'y laisser reviendrait à retrancher deux
+   * fois la même somme du disponible.
+   */
+  readonly marquerEcheancePayee: (id: string, payee: boolean) => void;
+
   readonly ajouterDepense: (saisie: Omit<Depense, 'id'>) => string;
   readonly modifierDepense: (id: string, modification: Partial<Omit<Depense, 'id'>>) => void;
   readonly supprimerDepense: (id: string) => void;
@@ -377,6 +401,38 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     };
     set({ faits });
     persister(stockageActif, faits);
+  },
+
+  ajouterEcheance: (saisie) => {
+    const actuel = get().faits;
+    const id = `ech-${Date.now()}-${actuel.echeances.length}`;
+    const faits: Faits = { ...actuel, echeances: [...actuel.echeances, { ...saisie, id }] };
+    set({ faits });
+    persister(stockageActif, faits);
+    return id;
+  },
+
+  modifierEcheance: (id, modification) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      echeances: actuel.echeances.map((e) => (e.id === id ? { ...e, ...modification } : e))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  supprimerEcheance: (id) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel, echeances: actuel.echeances.filter((e) => e.id !== id)
+    };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  marquerEcheancePayee: (id, payee) => {
+    get().modifierEcheance(id, { payee });
   },
 
   ajouterDepense: (saisie) => {

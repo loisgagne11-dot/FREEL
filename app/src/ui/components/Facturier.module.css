@@ -1,0 +1,262 @@
+/* Le facturier. Mobile-first, aucune couleur en dur, aucune largeur en JS —
+   l'invariant n°7 veut que la mise en page reste entièrement CSS. */
+
+.grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tuile {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  min-width: 0;
+}
+
+.accent { border-color: var(--green-line); }
+.alerte { border-color: var(--red-line); }
+
+.tuileLibelle {
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.tuileValeur {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.alerte .tuileValeur { color: var(--red); }
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.entete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.actionPrincipale {
+  /* 44 px : la cible minimale au doigt. */
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.actionPrincipale:hover { border-color: var(--green); }
+
+/* Les filtres défilent plutôt que de s'écraser : six pastilles dans 340 px
+   deviendraient illisibles, et un libellé tronqué ne se clique pas. */
+.filtres {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+  scrollbar-width: thin;
+}
+
+.filtre {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 13px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.filtre:hover { border-color: var(--line-2); color: var(--text); }
+
+.filtreActif {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.compteur {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.liste { list-style: none; margin: 0; padding: 0; }
+
+.ligne {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.ligne:last-child { border-bottom: none; }
+
+.ligneTitre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ligneLibelle {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ligneMontant {
+  font-size: 13.5px;
+  font-weight: 620;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ligneMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+
+.retard { color: var(--red); font-weight: 560; }
+
+.ligneActions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.actionLigne,
+.actionSecondaire {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.actionLigne:hover { border-color: var(--green); }
+
+/* L'avoir et la suppression sont en retrait : ce sont des corrections, pas
+   le geste ordinaire. Les mettre au même niveau que « enregistrer le
+   règlement » inviterait à les confondre d'un doigt distrait. */
+.actionSecondaire { color: var(--muted); border-color: var(--line); }
+.actionSecondaire:hover { border-color: var(--red-line); color: var(--text); }
+
+/* ── Panneau d'encaissement ─────────────────────────────────────────────── */
+
+.panneau { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.rappel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.rappelMontant {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+
+.champ { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.libelle {
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.saisie {
+  min-height: 44px;
+  padding: 0 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+  width: 100%;
+}
+
+.saisie:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+.aide { font-size: 11.5px; color: var(--muted-2); line-height: 1.45; }
+
+.refus {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--red-line);
+  background: var(--red-soft);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+/* Un facturier n'a rien à faire sur une facture imprimée. */
+@media print {
+  .grille, .carte, .filtres, .panneau { display: none !important; }
+}

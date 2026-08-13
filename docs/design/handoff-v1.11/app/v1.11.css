@@ -1,0 +1,404 @@
+/* ============================================================
+   FREEL V1.11 — matière & palettes
+   Chargé APRÈS freel.css : ne change ni le balisage ni la logique.
+   Trois palettes complètes, commutées par [data-theme] sur <html> :
+     sombre (défaut) · clair · calme
+   Tout le reste du fichier ne parle qu'en variables.
+   ============================================================ */
+
+/* ---------- palette SOMBRE (défaut) ---------- */
+:root,[data-theme="sombre"]{
+  --bg:#090c0a; --bg-tint:#121a14;
+  --panel:#111511; --panel-2:#171c16; --panel-3:#1d231b;
+  --line:rgba(196,214,196,.07); --line-2:rgba(196,214,196,.13);
+  --tint-1:rgba(196,214,196,.025); --tint-2:rgba(196,214,196,.045); --tint-3:rgba(196,214,196,.07);
+  --text:#eef2ec; --muted:#8b9489; --muted-2:#646b62;
+  --green:#5fd39a; --green-lite:#6fdca6; --green-deep:#1d6644;
+  --green-glow:rgba(95,211,154,.12); --green-line:rgba(95,211,154,.28);
+  --amber:#e0b672; --amber-soft:rgba(224,182,114,.13); --amber-line:rgba(224,182,114,.28);
+  --red:#e2715f; --red-soft:rgba(226,113,95,.14); --red-line:rgba(226,113,95,.3);
+  --blue:#6fb6e0; --sable:#cba86f; --on-accent:#04140c;
+  --rail-a:#121712; --rail-b:#090c0a;
+  --top-a:rgba(9,12,10,.97); --top-b:rgba(9,12,10,.82);
+  --scrim:rgba(4,6,4,.68);
+  --dock:rgba(23,28,22,.9);
+  --card-a:var(--panel-2); --card-b:var(--panel);
+  --r:20px; --r-sm:13px;
+  --sh-1:0 1px 2px rgba(0,0,0,.4);
+  --sh-2:0 2px 6px rgba(0,0,0,.32),0 22px 44px -24px rgba(0,0,0,.9);
+  --sh-3:0 4px 12px rgba(0,0,0,.38),0 34px 60px -26px rgba(0,0,0,.95);
+  --sh-sheet:-30px 0 90px rgba(0,0,0,.7);
+  color-scheme:dark;
+}
+
+/* ---------- palette CLAIR ---------- */
+[data-theme="clair"]{
+  --bg:#f6f8f6; --bg-tint:#e7efe9;
+  --panel:#ffffff; --panel-2:#ffffff; --panel-3:#eef1ed;
+  --line:rgba(28,40,33,.10); --line-2:rgba(28,40,33,.18);
+  --tint-1:rgba(28,40,33,.028); --tint-2:rgba(28,40,33,.045); --tint-3:rgba(28,40,33,.08);
+  --text:#18201c; --muted:#5c6862; --muted-2:#69736c;
+  --green:#17845a; --green-lite:#1d9668; --green-deep:#d6ebe0;
+  --green-glow:rgba(23,132,90,.09); --green-line:rgba(23,132,90,.3);
+  --amber:#8d6413; --amber-soft:rgba(196,152,44,.14); --amber-line:rgba(196,152,44,.4);
+  --red:#b13c28; --red-soft:rgba(177,60,40,.10); --red-line:rgba(177,60,40,.32);
+  --blue:#2b6ba6; --sable:#a07c3a; --on-accent:#ffffff;
+  --rail-a:#ffffff; --rail-b:#f0f3f0;
+  --top-a:rgba(255,255,255,.97); --top-b:rgba(255,255,255,.85);
+  --scrim:rgba(20,30,25,.34);
+  --dock:rgba(255,255,255,.9);
+  --card-a:#ffffff; --card-b:#ffffff;
+  --sh-1:0 1px 2px rgba(24,34,28,.06);
+  --sh-2:0 1px 2px rgba(24,34,28,.05),0 10px 26px -18px rgba(24,34,28,.28);
+  --sh-3:0 2px 5px rgba(24,34,28,.07),0 20px 40px -20px rgba(24,34,28,.34);
+  --sh-sheet:-24px 0 70px rgba(24,34,28,.20);
+  color-scheme:light;
+}
+
+/* ---------- palette CALME (sauge / argile, dérivée de la V1.21) ---------- */
+[data-theme="calme"]{
+  --bg:#f1efe6; --bg-tint:#e4e6d4;
+  --panel:#fffdf7; --panel-2:#fffdf7; --panel-3:#ebe8d9;
+  --line:rgba(38,40,31,.11); --line-2:rgba(38,40,31,.19);
+  --tint-1:rgba(38,40,31,.03); --tint-2:rgba(38,40,31,.05); --tint-3:rgba(38,40,31,.09);
+  --text:#26281f; --muted:#5f6153; --muted-2:#75776a;
+  --green:#6f8f61; --green-lite:#7d9b6f; --green-deep:#e2eddb;
+  --green-glow:rgba(125,155,111,.15); --green-line:rgba(125,155,111,.42);
+  --amber:#8a6224; --amber-soft:#f3e4cd; --amber-line:rgba(196,160,106,.55);
+  --red:#96432f; --red-soft:#f2ded8; --red-line:rgba(192,112,92,.5);
+  --blue:#5f7f96; --sable:#c4a06a; --on-accent:#ffffff;
+  --rail-a:#eae7db; --rail-b:#e3e0d2;
+  --top-a:rgba(241,239,230,.97); --top-b:rgba(241,239,230,.84);
+  --scrim:rgba(38,40,31,.38);
+  --dock:rgba(255,253,247,.9);
+  --card-a:#fffdf7; --card-b:#fdfbf3;
+  --r:22px; --r-sm:14px;
+  --sh-1:0 1px 2px rgba(38,40,31,.07);
+  --sh-2:0 1px 3px rgba(38,40,31,.06),0 12px 28px -20px rgba(38,40,31,.34);
+  --sh-3:0 3px 6px rgba(38,40,31,.08),0 22px 44px -22px rgba(38,40,31,.4);
+  --sh-sheet:-24px 0 70px rgba(38,40,31,.22);
+  color-scheme:light;
+}
+
+/* ---------- palette NUIT — le calme, en version sombre ---------- */
+[data-theme="nuit"]{
+  --bg:#15170f; --bg-tint:#1f2318;
+  --panel:#212418; --panel-2:#262a1d; --panel-3:#2f3325;
+  --line:rgba(226,231,201,.10); --line-2:rgba(226,231,201,.19);
+  --tint-1:rgba(226,231,201,.035); --tint-2:rgba(226,231,201,.06); --tint-3:rgba(226,231,201,.10);
+  --text:#eeeade; --muted:#a9ab95; --muted-2:#8b8d78;
+  --green:#a3c489; --green-lite:#b4d49b; --green-deep:#3b4a2c;
+  --green-glow:rgba(163,196,137,.15); --green-line:rgba(163,196,137,.38);
+  --amber:#dcb578; --amber-soft:rgba(220,181,120,.15); --amber-line:rgba(220,181,120,.34);
+  --red:#d18a72; --red-soft:rgba(209,138,114,.16); --red-line:rgba(209,138,114,.36);
+  --blue:#8fb2c6; --sable:#cba87a; --on-accent:#191c10;
+  --rail-a:#1a1d13; --rail-b:#15170f;
+  --top-a:rgba(21,23,15,.97); --top-b:rgba(21,23,15,.82);
+  --scrim:rgba(10,12,6,.66);
+  --dock:rgba(40,44,30,.9);
+  --card-a:#282c1e; --card-b:#232619;
+  --r:22px; --r-sm:14px;
+  --sh-1:0 1px 2px rgba(0,0,0,.35);
+  --sh-2:0 1px 3px rgba(0,0,0,.3),0 18px 38px -22px rgba(0,0,0,.85);
+  --sh-3:0 3px 8px rgba(0,0,0,.36),0 30px 56px -24px rgba(0,0,0,.9);
+  --sh-sheet:-26px 0 80px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+
+body{background:radial-gradient(1200px 700px at 18% -8%,var(--bg-tint) 0%,transparent 60%),var(--bg);color:var(--text);font-size:14.5px;letter-spacing:-.005em}
+a{color:var(--green)}a:hover{color:var(--text)}
+.big{letter-spacing:-.035em}
+.lbl{font-size:10.5px;letter-spacing:.11em;color:var(--muted-2)}
+
+/* ---------- rail ---------- */
+.rail{background:linear-gradient(180deg,var(--rail-a),var(--rail-b) 70%);border-right:1px solid var(--line);padding:24px 14px}
+.brand{font-size:23px;letter-spacing:-.045em;padding:4px 12px 22px}
+.nav{border-radius:14px;padding:11px 13px;transition:background .16s,color .16s}
+.nav.on{background:linear-gradient(180deg,var(--panel-3),var(--panel-2));box-shadow:inset 0 0 0 1px var(--line-2),0 6px 18px -10px rgba(0,0,0,.18)}
+.ava{border-radius:12px}
+
+/* ---------- topbar ---------- */
+.topbar{padding:16px 30px;background:linear-gradient(180deg,var(--top-a),var(--top-b));border-bottom:1px solid var(--line);backdrop-filter:blur(12px);flex-wrap:wrap;row-gap:9px}
+.month b{font-size:16.5px;letter-spacing:-.02em}
+.ico-btn,.yearsel,.search,.btn{border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+.ico-btn:hover,.btn:hover{background:var(--panel-3);border-color:var(--line-2)}
+.btn{font-size:13.5px;padding:10px 15px;box-shadow:var(--sh-1)}
+.btn.primary{background:linear-gradient(180deg,var(--green-lite),var(--green));color:var(--on-accent);border-color:transparent;box-shadow:0 8px 22px -12px var(--green-line)}
+.pagetitle{font-size:17px;font-weight:600;letter-spacing:-.02em}
+
+/* ---------- indicateurs système ---------- */
+.sysbar{display:inline-flex;align-items:center;gap:3px}
+.sysbar button{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:20px;border:1px solid var(--line);background:var(--panel);color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.sysbar button:hover{color:var(--text);background:var(--panel-3);border-color:var(--line-2)}
+.sysbar button i{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.sysbar button svg{width:15px;height:15px}
+.sysbar button.w{color:var(--amber)}
+.sysbar button.w i{background:var(--amber)}
+.sysbar button.l{color:var(--red)}
+.sysbar button.l i{background:var(--red)}
+.sysbar button.thm i{background:none;width:auto;height:auto;display:inline-flex;gap:2px}
+.sysbar button.thm i b{width:7px;height:7px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px var(--line-2)}
+@media(max-width:1320px){.sysbar em{display:none}.sysbar button{padding:7px 9px}.sysbar{display:inline-flex!important}}
+@media(max-width:760px){.sysbar button svg{width:14px;height:14px}.sysbar button{padding:6px 8px}}
+
+/* ---------- contenu ---------- */
+.content{padding:26px 30px 70px}
+.greet h1{font-size:26px;letter-spacing:-.03em;font-weight:600}
+.greet p{font-size:13.5px;margin-top:5px}
+.greet .tag{border-radius:20px;font-size:11.5px;letter-spacing:.02em;white-space:nowrap}
+.grid{gap:18px}
+
+/* ---------- cartes ---------- */
+.card{background:linear-gradient(178deg,var(--card-a) 0%,var(--card-b) 62%);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;box-shadow:var(--sh-2)}
+.card.glow{background:linear-gradient(168deg,var(--green-glow),var(--card-b) 58%);border-color:var(--green-line)}
+.card-h{margin-bottom:16px}
+.card.clickable:hover{border-color:var(--green-line);box-shadow:var(--sh-3);transform:translateY(-1px)}
+.card,.clickable{transition:box-shadow .18s,transform .18s,border-color .18s}
+.kpi{background:linear-gradient(178deg,var(--card-a),var(--card-b) 70%);border:1px solid var(--line);border-radius:var(--r);padding:17px 18px;box-shadow:var(--sh-2);overflow:hidden}
+.kpi:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--green),transparent)}
+.kpi .big{font-size:27px;margin:9px 0 5px}
+.kpis{gap:16px}
+.versable .big{font-size:46px;letter-spacing:-.04em}
+
+/* ---------- lignes de liste ---------- */
+.lrow{padding:16px 0;border-bottom:1px solid var(--line)}
+.lrow:hover .ttl{color:var(--green)}
+.lrow .av{border-radius:12px;background:linear-gradient(180deg,var(--panel-3),var(--panel-2));box-shadow:inset 0 0 0 1px var(--line)}
+.lrow .ttl{font-size:14.5px;letter-spacing:-.015em;transition:color .15s}
+.iconbtn{border-radius:10px;background:var(--panel-2);border-color:var(--line)}
+.iconbtn:hover{background:var(--panel-3);border-color:var(--line-2)}
+
+/* ---------- tableaux ---------- */
+.tbl th{font-size:10px;letter-spacing:.1em;padding-bottom:12px;color:var(--muted-2)}
+.tbl td{padding:14px}
+.tbl tbody tr:hover td{background:var(--tint-1)}
+.tbl tr.tot td{border-top:1px solid var(--line-2);background:var(--tint-2)}
+
+/* ---------- sous-onglets ---------- */
+.subtabs{padding:5px;border-radius:100px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--sh-1);margin-bottom:22px}
+.subtab{border-radius:100px;padding:9px 18px}
+.subtab.on{background:linear-gradient(180deg,var(--panel-3),var(--panel-2));box-shadow:inset 0 0 0 1px var(--line-2)}
+
+/* ---------- jauges & barres ---------- */
+.track,.minibar,.stackbar{background:var(--tint-3)}
+.track i,.minibar i{box-shadow:0 0 14px -4px currentColor}
+.stackbar{height:12px;border-radius:100px;gap:3px;margin:16px 0 14px;background:none}
+.stackbar i{border-radius:100px}
+.legend .li{font-size:13.5px}
+.bars .b .col{border-radius:7px 7px 0 0}
+
+/* ---------- décisions / feed ---------- */
+.dec{border-radius:16px;background:linear-gradient(178deg,var(--panel-3),var(--panel-2) 70%);border-color:var(--line);padding:14px;box-shadow:var(--sh-1)}
+.dec:hover{border-color:var(--line-2)}
+.dec .ic{border-radius:12px}
+.dec .t{font-size:14.5px;letter-spacing:-.015em}
+.dec .act{border-radius:100px;padding:8px 14px;background:var(--panel);border-color:var(--line-2)}
+.dec .act:hover{background:var(--green);color:var(--on-accent);border-color:transparent}
+
+/* ---------- chips & badges ---------- */
+.chip2{border-radius:100px;font-size:11px;letter-spacing:.03em;padding:4px 10px}
+.bdg{display:inline-block;font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--panel-3);color:var(--muted);border:1px solid var(--line)}
+.bdg.paid{color:var(--green);background:var(--green-glow);border-color:var(--green-line)}
+.bdg.sent{color:var(--amber);background:var(--amber-soft);border-color:var(--amber-line)}
+.bdg.late{color:var(--red);background:var(--red-soft);border-color:var(--red-line)}
+.bdg.draft{color:var(--muted);background:var(--panel-3)}
+
+/* ---------- bandeau de fraîcheur ---------- */
+.freshbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border-radius:16px;padding:14px 18px;background:var(--amber-soft);border:1px solid var(--amber-line);color:var(--amber);font-size:13px;font-weight:600;margin-bottom:18px}
+.freshbar.ok{background:var(--green-glow);border-color:var(--green-line);color:var(--green)}
+.freshbar span{display:block;font-weight:500;color:var(--muted);font-size:12.5px;margin-top:3px}
+.freshbar button{border-radius:100px;padding:8px 15px;font-size:12.5px;font-weight:700;background:var(--panel);border:1px solid var(--line-2);color:var(--text);cursor:pointer;font-family:inherit;white-space:nowrap}
+.freshbar button:hover{background:var(--panel-3)}
+
+/* ---------- titre de section ---------- */
+.sect{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);padding:22px 2px 2px;grid-column:span 12}
+
+/* ---------- champs & dépôt ---------- */
+.field input,.field select{border-radius:12px;padding:12px 14px;background:var(--panel-2);border-color:var(--line);color:var(--text)}
+.field input:focus,.field select:focus{border-color:var(--green);box-shadow:0 0 0 3px var(--green-glow)}
+.bigfield{border-radius:16px;background:linear-gradient(178deg,var(--panel-3),var(--panel-2));border-color:var(--line)}
+.dropzone{border-radius:18px;border:1.5px dashed var(--line-2);background:linear-gradient(178deg,var(--panel-3),var(--panel-2));padding:28px;transition:border-color .15s,color .15s}
+.dropzone:hover{border-color:var(--green);color:var(--text)}
+.dropzone.has{border-style:solid;border-color:var(--green-line);color:var(--green)}
+.resultbox{border-radius:18px;padding:20px 22px}
+
+/* ---------- panneau latéral ---------- */
+.sheet{width:min(580px,94vw);background:linear-gradient(178deg,var(--panel-2),var(--panel) 40%);border-left:1px solid var(--line-2);box-shadow:var(--sh-sheet)}
+.sheet-h{padding:22px 26px}
+.sheet-h .st{font-size:18px;letter-spacing:-.03em}
+.sheet-b{padding:24px 26px 44px}
+.scrim{background:var(--scrim)}
+.freel-toast{border-radius:100px;padding:13px 20px;background:var(--panel-2);border-color:var(--line-2);box-shadow:var(--sh-3);color:var(--text)}
+.sheet-b .brk{display:flex;align-items:baseline;gap:14px}
+.sheet-b .brk .bt{flex:1;min-width:0}
+.sheet-b .brk .bv{width:auto;min-width:74px;white-space:nowrap;text-align:right}
+
+/* ---------- sélecteurs de panneau (drive, palette) ---------- */
+.pick{display:grid;grid-template-columns:auto 1fr auto;gap:13px;align-items:center;width:100%;text-align:left;background:var(--panel-3);border:1px solid var(--line);border-radius:15px;padding:13px 15px;color:inherit;font:inherit;cursor:pointer;margin-bottom:8px;transition:background .15s,border-color .15s,box-shadow .15s}
+.pick:hover{border-color:var(--line-2)}
+.pick.on{background:var(--green-glow);border-color:var(--green-line);box-shadow:inset 0 0 0 1px var(--green-line)}
+.pick b{display:block;font-size:14px;font-weight:650;letter-spacing:-.01em}
+.pick span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.pick .pic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--panel);color:var(--muted);box-shadow:inset 0 0 0 1px var(--line)}
+.pick.on .pic{color:var(--green)}
+.pick .ck{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--line-2)}
+.pick.on .ck{background:var(--green);box-shadow:none}
+.pick .swatches,.swatches{display:flex;gap:4px;align-items:center}
+.swatches i{width:16px;height:16px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px rgba(128,128,128,.25)}
+
+/* ---------- pastille d'info : le texte long se replie ---------- */
+.info{display:inline-grid;place-items:center;width:18px;height:18px;flex-shrink:0;border-radius:50%;border:1px solid var(--line-2);background:var(--panel-3);color:var(--muted);font:inherit;font-size:11px;font-weight:700;font-style:italic;line-height:1;cursor:pointer;vertical-align:1px;padding:0;transition:color .15s,border-color .15s,background .15s}
+.info:hover,.info[aria-expanded="true"]{color:var(--green);border-color:var(--green-line);background:var(--green-glow)}
+.explain{display:none;margin:9px 0 0;padding:11px 13px;border-radius:12px;background:var(--panel-3);border:1px solid var(--line);font-size:12.5px;line-height:1.55;color:var(--muted)}
+.explain.pin{border-color:var(--line-2)}
+.fluxfold{display:none}
+.explain.open{display:block}
+.explain b{color:var(--text)}
+
+/* ---------- badge d'onglet + indicateur « à traiter » ---------- */
+.rail .nav{position:relative}
+.rail .nav{white-space:nowrap;overflow:hidden}
+.rail .nav .nl{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navbadge{margin-left:auto;flex-shrink:0;min-width:19px;height:19px;padding:0 6px;border-radius:20px;display:inline-grid;place-items:center;font-size:10.5px;font-weight:700;font-family:inherit;background:var(--amber-soft);color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber-line)}
+.todofab{position:fixed;right:20px;bottom:20px;white-space:nowrap;z-index:45;display:inline-flex;align-items:center;gap:9px;padding:11px 16px 11px 13px;border-radius:100px;border:1px solid var(--amber-line);background:var(--amber-soft);backdrop-filter:blur(14px);color:var(--amber);font:inherit;font-size:13px;font-weight:650;cursor:pointer;box-shadow:var(--sh-2);transition:transform .16s,box-shadow .16s}
+.todofab:hover{transform:translateY(-1px);box-shadow:var(--sh-3)}
+/* en desktop il vit dans la barre du haut : jamais au-dessus d'un contrôle */
+.todofab.inbar{position:static;padding:6px 11px 6px 7px;font-size:12px;font-weight:600;box-shadow:none;margin-right:5px}
+.todofab.inbar b{min-width:19px;height:19px;font-size:11.5px}
+.todofab.inbar em{display:inline}
+@media(max-width:1320px){.todofab.inbar em{display:none}}
+/* sous 1150 px, « Exporter » se réduit à son icône : la hiérarchie tient sur un rang */
+@media(max-width:1150px){
+  .topbar .btn:not(.primary) .lbl-t{display:none}
+  .topbar .btn:not(.primary){padding:10px 12px}
+  .topbar{gap:10px;padding:13px 20px}
+  .sysbar{gap:2px}
+  .sysbar button{padding:6px 8px}
+  .topbar .month .ico-btn{padding:6px}
+  .todofab.inbar{padding:6px 9px 6px 6px;margin-right:3px}
+}
+.todofab.inbar:hover{transform:none;box-shadow:var(--sh-1)}
+.todofab b{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:100px;background:var(--amber);color:var(--on-accent);font-size:12.5px;font-weight:800}
+.todofab em{font-style:normal;white-space:nowrap}
+.todofab.ok{border-color:var(--green-line);background:var(--green-glow);color:var(--green)}
+.todofab.ok svg{width:15px;height:15px}
+.todo{display:grid;grid-template-columns:auto 1fr auto;gap:13px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)}
+.todo:last-child{border-bottom:none}
+.todo .tn{display:grid;place-items:center;min-width:28px;height:28px;padding:0 7px;border-radius:9px;background:var(--amber-soft);color:var(--amber);font-size:13px;font-weight:700;box-shadow:inset 0 0 0 1px var(--amber-line)}
+.todo .tt b{display:block;font-size:14px;font-weight:650;letter-spacing:-.01em}
+.todo .tt span{display:block;font-size:12.5px;color:var(--muted);margin-top:2px}
+.todo .btn{white-space:nowrap}
+
+/* ---------- Argent : les deux piliers lus comme des sections ---------- */
+.pillars{gap:0!important;border-bottom:1px solid var(--line);margin:6px 0 24px!important}
+.pillars .pillar{border:none;background:none;border-radius:0;padding:13px 18px 15px;box-shadow:none;opacity:.62;position:relative}
+.pillars .pillar:hover{opacity:.9;background:var(--tint-1)}
+.pillars .pillar.on{opacity:1;background:none}
+.pillars .pillar.on:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--green)}
+.pillars .pillar .pic{background:var(--panel-3);box-shadow:inset 0 0 0 1px var(--line)}
+.pillars .pillar.on .pic{background:var(--green-glow);color:var(--green);box-shadow:inset 0 0 0 1px var(--green-line)}
+.pillars .pillar .pt b{font-size:15.5px;letter-spacing:-.02em}
+.pillars .pillar.on .pt b{color:var(--text)}
+
+/* ---------- Outils : lignes de tranche insécables ---------- */
+.card .brk{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;row-gap:7px;align-items:center}
+.card .brk .bt{grid-area:1/1;display:flex;align-items:baseline;gap:9px;min-width:0;white-space:nowrap}
+.card .brk .bt span{display:inline;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .brk .bv{grid-area:1/2;white-space:nowrap;width:auto;min-width:72px;text-align:right}
+.card .brk .bbar{grid-area:2/1/2/3;width:auto;height:6px}
+
+/* ---------- tableaux larges : défilement propre plutôt que colonnes écrasées ---------- */
+.tblscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.tblscroll .atbl{min-width:660px}
+.atbl .four b{white-space:nowrap}
+@media(max-width:900px){.card:has(>table),.card:has(>.tbl2){overflow-x:auto;-webkit-overflow-scrolling:touch}.tbl2,.tbl{min-width:540px}.grid>*,.grid12>*,.kpis>*,.kpis2>*,.card{min-width:0}}
+.greet h1 .info{vertical-align:3px;margin-left:4px}
+
+/* ---------- graphe CA : valeurs au-dessus des barres, tout en k€ ---------- */
+.cabars .cav{flex-direction:row!important;gap:6px;align-items:baseline;order:-1;margin-bottom:2px}
+.cabars .cav b,.cabars .cav span{font-size:10px;letter-spacing:-.02em}
+.cabars .m{padding-top:0}
+
+/* ---------- anneau de santé & donuts ---------- */
+.ring::before,.donut::before{background:var(--panel)}
+.ring .rv b{font-size:25px}
+
+/* ---------- portrait ---------- */
+@media(max-width:760px){
+  .content{padding:12px 12px 20px;max-width:none}
+  .card{padding:15px 14px;border-radius:17px}
+  .greet{gap:6px!important;margin-bottom:14px}
+  .greet h1{font-size:20px}
+  .greet p{font-size:12.5px;margin-top:2px}
+  /* barre du haut : une seule ligne, compacte */
+  .topbar{padding:7px 12px;gap:8px;row-gap:0}
+  .topbar .month b{font-size:15px}
+  .topbar .btn{padding:8px 11px;font-size:12.5px}
+  .topbar .pagetitle{font-size:14.5px}
+  .sysbar{gap:2px;margin-left:auto}
+  /* barre du bas : dock flottant, comme la V1.2 */
+  .rail{left:50%;right:auto;transform:translateX(-50%);bottom:calc(13px + env(safe-area-inset-bottom));width:auto;max-width:calc(100vw - 20px);flex-direction:row;justify-content:flex-start;gap:2px;padding:6px;border:1px solid var(--line);border-top:1px solid var(--line);border-radius:100px;background:var(--dock);backdrop-filter:blur(16px);box-shadow:var(--sh-3);overflow-x:auto;scrollbar-width:none}
+  .rail::-webkit-scrollbar{display:none}
+  .rail .nav{flex:0 0 auto;flex-direction:row;align-items:center;gap:8px;padding:10px 13px;border-radius:100px;font-size:13px;background:none}
+  .rail .nav .ic{width:20px;height:20px}
+  .rail .nav{font-size:0}
+  .rail .nav .nl{display:none}
+  .rail .nav.on{background:var(--text);color:var(--bg)}
+  .rail .nav.on .ic{color:var(--bg)}
+  .rail .nav.on{font-size:13px}
+  .rail .nav.on .nl{display:inline;white-space:nowrap}
+  .navbadge{position:absolute;top:2px;left:26px;margin:0;min-width:15px;height:15px;padding:0 4px;font-size:9px}
+  .main{padding-bottom:84px}
+  .todofab{right:14px;bottom:calc(78px + env(safe-area-inset-bottom));padding:9px 14px 9px 11px;font-size:12.5px}
+  /* Config : la liste des sections en pastilles compactes */
+  .cfg-list{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important}
+  .cfg-item{padding:11px 12px!important;border-radius:14px!important;gap:9px!important}
+  .cfg-item .ci{width:28px!important;height:28px!important;border-radius:9px!important}
+  .cfg-item .cs,.cfg-item .chev{display:none!important}
+  .cfg-item .ct{font-size:12.5px!important;line-height:1.25}
+  /* Pilote : la barre du haut ne garde que l'essentiel */
+  .topbar #yearBtn,.topbar #twToggle,.topbar #blurToggle,.topbar .ico-btn{display:none}
+  .sante-row{flex-direction:column;align-items:flex-start;gap:12px}
+  .sante-items{flex-direction:column;gap:8px!important;width:100%}
+  .simgrid,.propgrid,.flux3{grid-template-columns:1fr!important}
+  /* la section « modules à construire » est un brief de conception : hors téléphone */
+  #props{display:none}
+  /* flux du mois : les 3 colonnes côte à côte, détail replié */
+  .flux3{grid-template-columns:repeat(3,1fr)!important;gap:10px}
+  .fcol{padding:0!important}
+  .fcol+.fcol{border-left:1px solid var(--line)!important;border-top:none!important;padding-left:10px!important}
+  .fcol-t,.fcol-t.as-detail{font-size:9px!important;letter-spacing:.06em;margin-bottom:6px;gap:5px}
+  .fcol-t .fdet{display:none}
+  .find{font-size:19px!important}
+  .find-sub{font-size:10px;margin-top:4px}
+  .fcol .fitems{display:none}
+  .fluxopen .fcol .fitems{display:flex}
+  .fit{padding:6px 0}
+  .fit .fit-n{font-size:11px}
+  .fit .fit-a{display:none}
+  .st-pill{width:9px;height:9px;min-width:9px;padding:0!important;border-radius:50%;overflow:hidden;text-indent:-99em;border:0!important;display:inline-block}
+  .st-pill.paid{background:var(--green)}
+  .st-pill.wait{background:var(--amber)}
+  .st-pill.late{background:var(--red)}
+  .pay-note{font-size:11px}
+  .fluxfold{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:8px 13px;border-radius:100px;border:1px solid var(--line-2);background:var(--panel);color:var(--muted);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  .fluxfold:hover{color:var(--text)}
+  .quickacts{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+  .quickacts::-webkit-scrollbar{display:none}
+  /* un seul rang de filtres, qui défile */
+  .perbar{flex-wrap:nowrap!important;overflow-x:auto;gap:7px!important;margin-bottom:12px!important;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .perbar::-webkit-scrollbar{display:none}
+  .perbar .grow{display:none}
+  .perbar .perseg,.perbar .acctseg,.perbar .pernav{flex-shrink:0}
+  .pillars{margin:2px 0 16px!important;overflow-x:auto;scrollbar-width:none}
+  .pillars::-webkit-scrollbar{display:none}
+  .pillars .pillar{padding:10px 12px 12px;gap:9px}
+  .pillars .pillar .pv{display:none}
+  .freshbar{padding:11px 13px;margin-bottom:12px}
+  .subtabs{width:100%;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}
+  .subtabs2{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .subtabs2::-webkit-scrollbar{display:none}
+  .subtabs2 .stab{white-space:nowrap;flex-shrink:0;padding:10px 12px;font-size:13px}
+  .subtabs::-webkit-scrollbar{display:none}
+  .sheet{width:100vw;border-left:none;border-radius:0}
+}
