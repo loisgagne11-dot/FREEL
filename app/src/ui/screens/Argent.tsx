@@ -1,11 +1,14 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { etatArgent, etatDes, etatLivre, moisCourant } from '../../state/selecteurs';
+import type { EtatSeuils } from '../../state/selecteurs';
 import type { Mois } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
+import { Jauge } from '../components/Jauge';
+import { Repartition } from '../components/Repartition';
 import { Statut, statutRecette } from '../components/Statut';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -74,6 +77,44 @@ export function Argent() {
             />
             <Chiffre libelle="Versable" valeur={eur(etat.tresorerie.versable)} ton="accent" />
           </div>
+
+          <section className={styles.carte} aria-labelledby={`${idGroupe}-repartition`}>
+            <h2 id={`${idGroupe}-repartition`} className={styles.titreCarte}>
+              Votre solde n’est pas tout à vous
+              <Info libelle="Pourquoi le solde trompe">
+                Le solde bancaire contient les cotisations d’un trimestre que
+                vous n’avez pas encore déclaré. Le regarder et se sentir riche,
+                c’est le mécanisme exact du rappel qu’on ne peut plus payer. La
+                barre montre d’abord ce qui n’est <em>pas</em> à vous.
+              </Info>
+            </h2>
+            <Repartition
+              total={etat.tresorerie.solde}
+              deficit={Math.max(0, -etat.tresorerie.dispo)}
+              parts={[
+                {
+                  libelle: 'Provisions — dû, pas encore payé',
+                  montant: Math.min(etat.tresorerie.provisions, Math.max(0, etat.tresorerie.solde)),
+                  ton: 'provisions'
+                },
+                {
+                  // La réserve n'est constituée qu'à hauteur de ce qui reste
+                  // après provisions : l'afficher pleine sur un disponible
+                  // insuffisant ferait croire à un matelas qui n'existe pas.
+                  libelle: 'Réserve de sécurité',
+                  montant: Math.min(etat.tresorerie.reserve, Math.max(0, etat.tresorerie.dispo)),
+                  ton: 'reserve'
+                },
+                {
+                  libelle: 'Versable — à vous',
+                  montant: etat.tresorerie.versable,
+                  ton: 'versable'
+                }
+              ]}
+            />
+          </section>
+
+          <CarteSeuils idGroupe={idGroupe} seuils={etat.seuils} />
 
           <section className={styles.carte} aria-labelledby={`${idGroupe}-enveloppes`}>
             <h2 id={`${idGroupe}-enveloppes`} className={styles.titreCarte}>
@@ -288,6 +329,76 @@ function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
         </section>
       )}
     </>
+  );
+}
+
+/**
+ * « Seuils — où j'en suis », la carte prévue par la spec de design.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE JAUGE SUR UN SEUIL INCONNU EST UN MENSONGE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les deux seuils viennent de tables datées, qui peuvent ne pas couvrir la
+ * période demandée. Dessiner une barre à « 62 % » d'un plafond qu'on ne
+ * connaît pas produirait un pourcentage inventé — et c'est précisément sur ce
+ * pourcentage qu'on décide de facturer ou non avant la fin de l'année.
+ *
+ * Chaque jauge n'est donc rendue que si sa résolution est utilisable ; sinon,
+ * l'écran dit pourquoi il ne peut pas répondre.
+ */
+function CarteSeuils(
+  { idGroupe, seuils }: { idGroupe: string; seuils: EtatSeuils }
+) {
+  const plafond = seuils.plafondMicro;
+  const tva = seuils.franchiseTva;
+
+  return (
+    <section className={styles.carte} aria-labelledby={`${idGroupe}-seuils`}>
+      <h2 id={`${idGroupe}-seuils`} className={styles.titreCarte}>
+        Seuils — où j’en suis
+        <Info libelle="Ce que ces deux seuils déclenchent">
+          Le <strong>plafond micro</strong> conditionne le régime lui-même&nbsp;:
+          le dépasser deux années de suite fait basculer en réel. La
+          <strong> franchise de TVA</strong> est plus immédiate&nbsp;: passé le
+          seuil majoré, la TVA devient exigible <em>dès le mois du
+          dépassement</em>, y compris sur les factures déjà émises sans TVA.
+          Les deux se mesurent sur le chiffre d’affaires <em>encaissé</em>.
+        </Info>
+      </h2>
+
+      <div className={styles.jauges}>
+        {plafond.statut === 'refuse'
+          ? <p className={styles.vide}>Plafond micro&nbsp;: {plafond.motif}</p>
+          : (
+            <Jauge
+              libelle="Plafond micro-entreprise"
+              atteint={seuils.caEncaisse}
+              seuil={plafond.valeur}
+              unite="€"
+            />
+          )}
+
+        {tva.statut === 'refuse'
+          ? <p className={styles.vide}>Franchise de TVA&nbsp;: {tva.motif}</p>
+          : (
+            <>
+              <Jauge
+                libelle="Franchise de TVA"
+                atteint={seuils.caEncaisse}
+                seuil={tva.valeur.franchise}
+                unite="€"
+              />
+              <Jauge
+                libelle="Seuil majoré de TVA"
+                atteint={seuils.caEncaisse}
+                seuil={tva.valeur.majore}
+                unite="€"
+              />
+            </>
+          )}
+      </div>
+    </section>
   );
 }
 

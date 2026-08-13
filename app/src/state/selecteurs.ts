@@ -14,8 +14,9 @@ import {
   type DateISO, type Euros, type Mois, type TypeActivite,
   euros, moisDe
 } from '../domain/types';
-import { tauxImpotEtContributions } from '../domain/bareme';
-import type { RegimeImposition } from '../domain/bareme';
+import { plafondMicro, seuilsTva, tauxImpotEtContributions } from '../domain/bareme';
+import type { RegimeImposition, SeuilsTva } from '../domain/bareme';
+import type { Resolution } from '../domain/types';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
   provisions as calculerProvisions
@@ -910,6 +911,22 @@ export interface EtatArgent {
   readonly tresorerie: ResultatTresorerie;
   readonly voletConstate: Euros;
   readonly voletAProvisionner: Euros;
+  readonly seuils: EtatSeuils;
+}
+
+/**
+ * Où en est-on des seuils.
+ *
+ * Chaque seuil est une `Resolution` : il vient d'une table datée qui peut ne
+ * pas couvrir la période demandée. Une jauge dessinée sur un seuil inconnu
+ * afficherait un pourcentage inventé — et c'est sur ce pourcentage qu'on
+ * décide de facturer ou non avant la fin de l'année.
+ */
+export interface EtatSeuils {
+  readonly plafondMicro: Resolution<Euros>;
+  readonly franchiseTva: Resolution<SeuilsTva>;
+  /** Chiffre d'affaires encaissé de l'année, l'assiette des deux seuils. */
+  readonly caEncaisse: Euros;
 }
 
 export function etatArgent(
@@ -923,7 +940,15 @@ export function etatArgent(
   const caEncaisse = euros(parMois.reduce<number>((s, m) => s + m.encaisse, 0));
   const pilote = etatPilote(faits, echeances, maintenant);
 
+  const m = moisCourant(maintenant);
+  const type = faits.entreprise.typeActivite;
+
   return {
+    seuils: {
+      plafondMicro: plafondMicro(m, type),
+      franchiseTva: seuilsTva(m, type),
+      caEncaisse
+    },
     annee,
     parMois,
     caEncaisse,

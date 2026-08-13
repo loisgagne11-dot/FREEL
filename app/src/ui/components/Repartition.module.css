@@ -1,0 +1,64 @@
+/* Répartition du solde. Aucune couleur en dur : les 4 palettes s'appliquent.
+   Seule la largeur des segments vient du JS — elle EST la donnée, le CSS ne
+   peut pas la connaître. */
+
+.repartition { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.barre {
+  display: flex;
+  height: 14px;
+  border-radius: 100px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.segment { height: 100%; min-width: 2px; }
+
+/* L'ordre visuel dit la priorité : ce qui n'est pas à vous d'abord. */
+.provisions { background: var(--amber); }
+.reserve { background: var(--slate, var(--muted-2)); }
+.versable { background: var(--green); }
+
+.legende { list-style: none; display: flex; flex-direction: column; margin: 0; padding: 0; }
+
+.entree {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  min-width: 0;
+}
+
+.entree:last-child { border-bottom: none; }
+
+.pastille {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  align-self: center;
+}
+
+.libelle { color: var(--muted); }
+
+.montant {
+  margin-left: auto;
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.deficit {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  border-left: 3px solid var(--red);
+  padding-left: 11px;
+  margin: 0;
+}
+
+.deficit strong { color: var(--red); font-weight: 600; }
