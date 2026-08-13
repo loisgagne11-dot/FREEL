@@ -5,29 +5,34 @@ premier, avant tout autre document. Il est mis à jour à chaque fin de lot de
 travail. Si son contenu contredit un autre document, c'est lui qui fait foi
 sur l'état d'avancement — les autres font foi sur les décisions.
 
-**Dernière mise à jour** : 28 juillet 2026
+**Dernière mise à jour** : 13 août 2026
 **Branche de travail** : `claude/orchestration-redesign-screens-0ee3sz`, repartie de `main`
-**PR #245** : **MERGÉE.** Elle est close, elle ne peut plus porter de travail —
-toute suite donne lieu à une **nouvelle** PR. Ne pas y ajouter de commits, ne
-pas la rouvrir.
+**Schéma des faits** : **v5**
 
-Tout ce qui est décrit ci-dessous est donc **sur `main`** et déployé : l'audit,
-le plan, les corrections J0 de l'app existante, et le socle de la nouvelle
-application sous `app/`.
+Les PR #245 à #264 sont **mergées et closes** : elles ne peuvent plus porter de
+travail, toute suite donne lieu à une nouvelle PR. Tout ce qu'elles contiennent
+est sur `main` et déployé.
 
 **Sanité au moment de la reprise** — `cd app && npm run verifier` enchaîne
-typage, tests, build, contrôle responsive et migration de bout en bout. Repères
-au dernier passage :
+typage, tests, build, budget, responsive, index périmé, confidentialité,
+migration de bout en bout et absence de données personnelles. Repères au
+dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **565** (+ 91 côté legacy) |
-| Build | **58 Ko** de code applicatif, 188 Ko de bibliothèques, 260 Ko au premier rendu |
+| Tests | **961** sur 56 fichiers (+ 91 côté legacy) |
+| Build | **78,2 Ko** de code applicatif, 188 Ko de bibliothèques, 289 Ko au premier rendu |
 | Budget | conforme sur les **4 postes** vérifiés |
-| Responsive | **120 combinaisons** (5 tailles × 4 palettes × **6 écrans**) |
+| Responsive | **140 combinaisons** (5 tailles × 4 palettes × **7 écrans**) |
+| Confidentialité | aucun montant lisible sur les 7 écrans |
 | Migration | conforme |
 
 Un nombre de tests en baisse, ou un budget dépassé, signale une régression.
+
+**Ce fichier avait quinze jours de retard au 13/08** — il annonçait 565 tests et
+58 Ko quand il y en avait 961 et 78. Le document qui « fait foi sur l'état
+d'avancement » ne peut pas être celui qu'on oublie de tenir : ses chiffres se
+relèvent de la sortie de `npm run verifier`, jamais de mémoire.
 
 **Le budget a changé de forme le 12/08.** Il était un plafond unique de 250 Ko
 sur le paquet d'entrée ; la mesure a montré ce que ce chiffre recouvrait :
