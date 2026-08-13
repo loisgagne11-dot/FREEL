@@ -270,3 +270,134 @@ describe('le mois en chiffres', () => {
     expect(screen.getByText(/ne se mesure pas encore/)).toBeTruthy();
   });
 });
+
+/**
+ * La vue semaine.
+ *
+ * Le rythme remplit le mois d'un coup ; ce qu'on corrige, on le corrige à la
+ * semaine, parce que c'est l'horizon dont on se souvient. Une grille de
+ * trente-et-un jours oblige à retrouver le bon — et une correction qu'on
+ * renonce à faire est un CRA faux.
+ */
+describe('vue semaine', () => {
+  const avecRythme = () => mission({
+    rythmes: [{
+      du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+      parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 },
+      tjm: euros(400)
+    }]
+  });
+
+  const ouvrirSemaine = async () => {
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Semaine' }));
+    return utilisateur;
+  };
+
+  it('remplit la semaine depuis le rythme, sans rien saisir', async () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    await ouvrirSemaine();
+    // Semaine du 13 juillet 2026 : lundi, mercredi et jeudi pleins, vendredi
+    // à mi-temps — le mardi 14 est férié et ne se travaille pas.
+    expect(screen.getByText(/3,5/u)).toBeTruthy();
+  });
+
+  // En vue semaine, avancer d'un mois ferait sauter quatre semaines : la
+  // flèche cesserait de vouloir dire « la suivante ».
+  it('fait avancer les flèches d’une semaine, pas d’un mois', async () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    await ouvrirSemaine();
+    expect(screen.getByRole('button', { name: 'Semaine suivante' })).toBeTruthy();
+  });
+
+  /**
+   * Le tour d'un créneau : journée → demi-journée → rien → retour au rythme.
+   * Le dernier état efface l'ajustement au lieu d'en poser un à zéro — sans
+   * lui, une correction serait définitive.
+   */
+  it('fait le tour des quotités au clic, puis revient au rythme', async () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    const creneau = () => screen.getAllByRole('button', { name: /13 juil\. 2026/ })[0] as HTMLElement;
+    const ajustements = () => useFaits.getState().faits.missions[0]?.ajustements ?? {};
+
+    await utilisateur.click(creneau());          // journée → demi
+    expect(ajustements()['2026-07-13']).toBe(0.5);
+    await utilisateur.click(creneau());          // demi → rien
+    expect(ajustements()['2026-07-13']).toBe(0);
+    await utilisateur.click(creneau());          // rien → retour au rythme
+    expect(ajustements()).not.toHaveProperty('2026-07-13');
+  });
+
+  it('revient au calendrier mensuel', async () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+    await utilisateur.click(screen.getByRole('button', { name: 'Mois' }));
+    expect(screen.getByRole('button', { name: 'Mois suivant' })).toBeTruthy();
+  });
+});
+
+/**
+ * Le compte rendu d'activité — le livrable de fin de mois.
+ *
+ * Rien ne s'y saisit : il découle du rythme et des ajustements. Le saisir une
+ * seconde fois serait l'occasion de le saisir autrement, et un CRA qui
+ * contredit le planning ne prouve rien.
+ */
+describe('compte rendu d’activité', () => {
+  const avecRythmeCra = () => mission({
+    tjm: euros(400),
+    rythmes: [{
+      du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+      parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 },
+      tjm: euros(400)
+    }]
+  });
+
+  it('se remplit tout seul depuis le rythme', () => {
+    semer({ missions: [avecRythmeCra()] });
+    render(<Activite />);
+    // Juillet 2026 : lundis à jeudis pleins, vendredis à mi-temps, moins le
+    // 14 juillet férié. Le décompte se lit sur la carte, sans rien saisir.
+    const carte = screen.getByRole('region', { name: /Compte rendu d’activité/ });
+    expect(carte.textContent).toMatch(/jours? travaillés?/);
+    expect(carte.textContent).toMatch(/19,5/u);
+  });
+
+  it('propose l’impression sans bibliothèque PDF', () => {
+    semer({ missions: [avecRythmeCra()] });
+    render(<Activite />);
+    expect(screen.getByRole('button', { name: /Imprimer ou enregistrer en PDF/ })).toBeTruthy();
+  });
+
+  /**
+   * Un CRA vide n'est pas un livrable, c'est un document qu'on envoie par
+   * erreur. Sans jour travaillé, l'écran le dit et n'offre pas d'imprimer.
+   */
+  it('n’offre pas d’imprimer un mois sans activité', () => {
+    semer({ missions: [mission()] }); // sans rythme
+    render(<Activite />);
+    expect(screen.queryByRole('button', { name: /Imprimer ou enregistrer/ })).toBeNull();
+    expect(screen.getByText(/Aucun jour travaillé/)).toBeTruthy();
+  });
+
+  // Le CRA découle du planning : une journée effacée là-bas disparaît ici.
+  it('suit les ajustements posés au planning', () => {
+    const sansRien = mission({
+      tjm: euros(400),
+      rythmes: [{
+        du: dateISO('2026-07-01'), au: dateISO('2026-07-31'),
+        parJour: { lun: 1 }, tjm: euros(400)
+      }],
+      ajustements: { '2026-07-06': 0, '2026-07-13': 0, '2026-07-20': 0, '2026-07-27': 0 }
+    });
+    semer({ missions: [sansRien] });
+    render(<Activite />);
+    expect(screen.getByText(/Aucun jour travaillé/)).toBeTruthy();
+  });
+});

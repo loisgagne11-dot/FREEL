@@ -1,0 +1,123 @@
+/* Compte rendu d'activité. Mobile-first, aucune couleur en dur à l'écran ;
+   du noir sur blanc à l'impression, où le thème n'a plus de sens. */
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.entete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.action {
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.action:hover { border-color: var(--green); }
+
+.document { min-width: 0; }
+
+.mission {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.mission:last-child { border-bottom: none; }
+
+.titreMission {
+  font-size: 13.5px;
+  font-weight: 620;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+
+.client { font-size: 12px; color: var(--muted-2); margin: 0 0 8px; }
+
+/* Les jours, en pastilles : un tableau de vingt lignes pour un CRA d'un mois
+   se relit mal, et se signe encore moins volontiers. */
+.jours { list-style: none; display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; }
+
+.jour {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 3px 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.demi { color: var(--amber); border-color: var(--amber); }
+
+.totaux {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.totaux strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.vide { color: var(--muted); font-size: 13px; margin: 0; }
+
+@media print {
+  .entete, .action { display: none !important; }
+
+  /* Le thème disparaît : un CRA s'imprime pour être signé, et l'encre de
+     couleur d'un fond sombre est illisible autant que coûteuse. */
+  .carte {
+    background: #fff;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    color: #000;
+  }
+
+  .titreMission, .totaux strong { color: #000; }
+  .client, .jour, .totaux { color: #333; }
+  .jour { border-color: #999; background: transparent; }
+  .demi { color: #000; border-color: #000; }
+
+  /* Une mission par page : le CRA se remet AU client, et deux missions sur
+     la même feuille exposeraient à l'un ce que l'autre achète. */
+  .mission { break-after: page; border-bottom: none; }
+  .mission:last-child { break-after: auto; }
+}

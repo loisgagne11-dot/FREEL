@@ -1,9 +1,12 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { moisCourant } from '../../state/selecteurs';
+import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import {
-  type LigneMission, type PoidsClient, etatActivite
+  type LigneMission, type PoidsClient,
+  craDuMoisParMission, etatActivite, planningDeLaSemaine
 } from '../../state/selecteurs.activite';
+import { VueSemaine } from '../components/VueSemaine';
+import { CraCard } from '../components/CraCard';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import type { DateISO, Mois } from '../../domain/types';
 import type { Client, Mission } from '../../state/schema';
@@ -48,6 +51,7 @@ const JOURS_SEMAINE = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 export function Activite() {
   const faits = useFaits((e) => e.faits);
   const basculerConge = useFaits((e) => e.basculerConge);
+  const ajusterJour = useFaits((e) => e.ajusterJour);
 
   const [section, setSection] = useState<Section>('charge');
   const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
@@ -55,6 +59,56 @@ export function Activite() {
   const idGroupe = useId();
 
   const etat = useMemo(() => etatActivite(faits, mois), [faits, mois]);
+
+  const [vue, setVue] = useState<'mois' | 'semaine'>('mois');
+  const [ancreSemaine, setAncreSemaine] = useState<DateISO>(() => dateDuJour());
+  const semaine = useMemo(
+    () => planningDeLaSemaine(faits, ancreSemaine), [faits, ancreSemaine]
+  );
+  const cras = useMemo(() => craDuMoisParMission(faits, mois), [faits, mois]);
+
+  /**
+   * Le tour d'un créneau : journée → demi-journée → rien → retour au rythme.
+   *
+   * « Retour au rythme » efface l'ajustement au lieu d'en poser un à zéro.
+   * Sans cet état, une correction serait définitive : le jour resterait à
+   * zéro même après un changement de rythme, et rien ne permettrait de
+   * revenir en arrière.
+   */
+  /**
+   * Les flèches suivent la vue.
+   *
+   * En vue semaine, avancer d'un mois ferait sauter quatre semaines : la
+   * flèche cesserait de vouloir dire « la suivante », et on ne saurait plus
+   * où l'on est. Le mois suit tout de même la semaine, pour que le retour à
+   * la vue mensuelle tombe au bon endroit.
+   */
+  function decalerSemaine(pas: number): void {
+    const d = new Date(`${ancreSemaine}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + pas * 7);
+    const nouvelle = d.toISOString().slice(0, 10) as DateISO;
+    setAncreSemaine(nouvelle);
+    setMois(nouvelle.slice(0, 7) as Mois);
+  }
+
+  const enSemaine = vue === 'semaine' && section === 'charge';
+  const reculer = () => (enSemaine ? decalerSemaine(-1) : setMois(decalerMois(mois, -1)));
+  const avancer = () => (enSemaine ? decalerSemaine(1) : setMois(decalerMois(mois, 1)));
+
+  function ajusterAuClic(date: DateISO): void {
+    const jour = semaine.jours.find((j) => j.date === date);
+    const missionId = jour?.parMission[0]?.missionId
+      ?? faits.missions.find((m) => m.statut === 'active')?.id;
+    if (missionId === undefined) return;
+
+    const ajuste = jour?.parMission.some((m) => m.ajuste) ?? false;
+    const retenu = jour?.retenu ?? 0;
+
+    if (!ajuste) ajusterJour(missionId, date, retenu >= 1 ? 0.5 : 1);
+    else if (retenu >= 1) ajusterJour(missionId, date, 0.5);
+    else if (retenu > 0) ajusterJour(missionId, date, 0);
+    else ajusterJour(missionId, date, null);
+  }
 
   return (
     <>
@@ -79,20 +133,26 @@ export function Activite() {
               <button
                 type="button"
                 className={styles.pas}
-                onClick={() => setMois(decalerMois(mois, -1))}
-                aria-label="Mois précédent"
+                onClick={() => reculer()}
+                aria-label={vue === 'semaine' && section === 'charge'
+                  ? 'Semaine précédente' : 'Mois précédent'}
               >
                 <span aria-hidden="true">‹</span>
               </button>
               {/* Le mois affiché est annoncé aux lecteurs d'écran à chaque
                   changement : sans cela, les flèches déplacent une vue dont on
                   n'entend jamais l'état. */}
-              <span className={styles.moisCourant} role="status">{moisLong(mois)}</span>
+              <span className={styles.moisCourant} role="status">
+                {vue === 'semaine' && section === 'charge'
+                  ? `Sem. du ${dateCourte(semaine.lundi)}`
+                  : moisLong(mois)}
+              </span>
               <button
                 type="button"
                 className={styles.pas}
-                onClick={() => setMois(decalerMois(mois, 1))}
-                aria-label="Mois suivant"
+                onClick={() => avancer()}
+                aria-label={vue === 'semaine' && section === 'charge'
+                  ? 'Semaine suivante' : 'Mois suivant'}
               >
                 <span aria-hidden="true">›</span>
               </button>
@@ -185,11 +245,43 @@ export function Activite() {
               </Info>
             </h2>
 
-            <Calendrier
-              mois={mois}
-              jours={etat.calendrier}
-              onBasculer={basculerConge}
-            />
+            {/* Semaine ou mois : la spec prévoit les deux. Le mois donne la
+                vue d'ensemble, la semaine est la maille où l'on corrige —
+                une grille de trente-et-un jours oblige à retrouver le bon. */}
+            <div className={styles.bascule} role="group" aria-label="Vue du planning">
+              <button
+                type="button"
+                className={`${styles.vue} ${vue === 'mois' ? styles.vueActive : ''}`}
+                aria-pressed={vue === 'mois'}
+                onClick={() => setVue('mois')}
+              >
+                Mois
+              </button>
+              <button
+                type="button"
+                className={`${styles.vue} ${vue === 'semaine' ? styles.vueActive : ''}`}
+                aria-pressed={vue === 'semaine'}
+                onClick={() => setVue('semaine')}
+              >
+                Semaine
+              </button>
+            </div>
+
+            {vue === 'mois'
+              ? (
+                <Calendrier
+                  mois={mois}
+                  jours={etat.calendrier}
+                  onBasculer={basculerConge}
+                />
+              )
+              : (
+                <VueSemaine
+                  planning={semaine}
+                  aujourdhui={dateDuJour()}
+                  onBasculer={ajusterAuClic}
+                />
+              )}
 
             <Legende />
 
@@ -208,6 +300,8 @@ export function Activite() {
               </div>
             </dl>
           </section>
+
+          <CraCard cras={cras} periode={moisLong(mois)} />
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="missions" actif={section === 'missions'}>

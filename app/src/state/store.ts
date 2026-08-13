@@ -172,6 +172,18 @@ interface MagasinFaits {
     jours: readonly DateISO[], pose: boolean, quotite?: number
   ) => void;
 
+  /* ── Planning ─────────────────────────────────────────────────────────── */
+
+  /**
+   * Ajuste ce qui a été travaillé un jour donné, pour une mission.
+   *
+   * `quotite` à `null` EFFACE l'ajustement : le jour redevient ce que le
+   * rythme prévoit. C'est un état distinct de « zéro », qui déclare au
+   * contraire « ce jour prévu, je n'ai pas travaillé ». Les confondre
+   * rendrait impossible de revenir au rythme après une correction.
+   */
+  readonly ajusterJour: (missionId: string, date: DateISO, quotite: number | null) => void;
+
   /* ── Profil et barème ─────────────────────────────────────────────────── */
 
   readonly modifierEntreprise: (modification: Partial<Entreprise>) => void;
@@ -684,6 +696,20 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     set({ faits });
     persister(stockageActif, faits);
     return null;
+  },
+
+  ajusterJour: (missionId, date, quotite) => {
+    const actuel = get().faits;
+    const missions = actuel.missions.map((m) => {
+      if (m.id !== missionId) return m;
+      const ajustements = { ...m.ajustements };
+      if (quotite === null) delete ajustements[date];
+      else ajustements[date] = quotite;
+      return { ...m, ajustements };
+    });
+    const faits: Faits = { ...actuel, missions };
+    set({ faits });
+    persister(stockageActif, faits);
   },
 
   poserPlageDeConges: (jours, pose, quotite = 1) => {
