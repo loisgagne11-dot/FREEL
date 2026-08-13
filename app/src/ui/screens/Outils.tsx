@@ -11,6 +11,7 @@ import { Sheet } from '../components/Sheet';
 import { eur, eurExact, moisLong, pct } from '../format';
 import styles from './Outils.module.css';
 import { Montant } from '../components/Montant';
+import { ComparateurVl } from '../components/ComparateurVl';
 
 /**
  * Écran Outils — simulateurs.
@@ -63,6 +64,10 @@ export function Outils() {
         sousTitre="Des simulations, jamais des déclarations : rien de ce qui est calculé ici n’est enregistré."
         repere={`Barème de ${moisLong(m)}`}
       />
+
+      {/* Le comparateur AVANT le simulateur : il porte une date limite, le
+          simulateur non. Ce qui périme se met devant. */}
+      <ComparateurVl />
 
       <section className={styles.carte} aria-labelledby="titre-ir">
         <h2 id="titre-ir" className={styles.titreCarte}>

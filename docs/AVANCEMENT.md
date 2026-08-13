@@ -20,7 +20,7 @@ dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **990** sur 57 fichiers (+ 91 côté legacy) |
+| Tests | **1 011** sur 59 fichiers (+ 91 côté legacy) |
 | Build | **78,2 Ko** de code applicatif, 188 Ko de bibliothèques, 289 Ko au premier rendu |
 | Budget | conforme sur les **4 postes** vérifiés |
 | Responsive | **140 combinaisons** (5 tailles × 4 palettes × **7 écrans**) |
@@ -164,6 +164,7 @@ c'est-à-dire d'inventer un lien.
 | 2 | [`PLAN-REFONTE.md`](./PLAN-REFONTE.md) | Les 6 décisions arbitrées (D1–D6), le barème par périodes, les 7 jalons |
 | 3 | [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) | Le diagnostic complet |
 | 3 bis | [`AUDIT-ANCIENNE-VS-NOUVELLE.md`](./AUDIT-ANCIENNE-VS-NOUVELLE.md) | **Ce qui manque encore**, fonction par fonction, avec l'ordre de traitement proposé |
+| 3 ter | [`PLAN-PERFORMANCE-ET-DESIGN.md`](./PLAN-PERFORMANCE-ET-DESIGN.md) | Où en sont la **vitesse** et la **conformité au handoff**, ce qui est mesuré, ce qui ne l'est pas, et dans quel ordre s'y prendre |
 | 4 | [`design/03-design-system.md`](./design/03-design-system.md) et [`design/05-spec-ecrans.md`](./design/05-spec-ecrans.md) | **Les deux spécifications qui font foi sur le visuel** : tokens, composants, et écran par écran ce qui doit s'y trouver |
 | 5 | [`design/handoff-v1.11/`](./design/handoff-v1.11/) | **La source** : les prototypes eux-mêmes, plus `annexe-architecture-build5.md` (les deux stores, les règles de calcul, le vocabulaire). Lire d'abord son [`PROVENANCE.md`](./design/handoff-v1.11/PROVENANCE.md) |
 | 6 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
@@ -497,11 +498,40 @@ for a in <actions>; do grep -rl "\b$a\b" src/ui --include=*.tsx; done
       les mouvements importés. L'isolement volontaire a tenu : un seul endroit
       à changer le jour où le relevé a existé.
 - [x] ~~Outils remonté ici~~ — l'écran le moins cher a prouvé le noyau tôt.
-- [ ] **Comparateur micro-BNC vs déclaration contrôlée — échéance 30/09.**
-      Seul élément du plan qui porte une date de valeur : passé le 30/09,
-      l'option ne peut plus être exercée pour l'année, et le comparateur ne
-      servirait qu'à constater ce qu'on n'a plus le droit de choisir.
-      **Non commencé.**
+- [x] ~~**Comparateur — échéance 30/09**~~ — **fait le 13/08.**
+
+      **Correction d'une erreur de ce journal au passage.** Cette ligne
+      annonçait un « comparateur micro-BNC vs déclaration contrôlée » en lui
+      attachant la date du 30/09. Les deux ne vont pas ensemble : le 30
+      septembre est la date limite de l'option pour le **versement
+      libératoire** (`PLAN-REFONTE.md`, tableau des dates, le dit
+      correctement), pas de l'option pour la déclaration contrôlée, qui a son
+      propre calendrier. Le journal avait dérivé, et il aurait fait travailler
+      sur le mauvais sujet — ou pire, agir sur le mauvais.
+
+      C'est donc le comparateur **versement libératoire / barème** qui est
+      construit, et c'est bien lui qui périme au 30/09.
+
+      Il mesure ce que l'activité AJOUTE à l'impôt du foyer — l'impôt avec
+      elle, moins l'impôt sans elle — et compare ce surcroît aux 2,2 %. Le
+      comparer autrement, sans les autres revenus ni les parts, reviendrait à
+      calculer comme si l'activité était le seul revenu du ménage, et à
+      conclure presque toujours en faveur du barème.
+
+      **Refus assumé** : l'éligibilité n'est pas vérifiée. L'option n'est
+      ouverte que sous un plafond de revenu fiscal de référence, qui est un
+      nombre officiel daté que l'application ne porte pas — l'invariant n°1
+      interdit de l'écrire au jugé. L'écran rend l'arithmétique, jamais le
+      droit d'opter, et il le dit.
+
+      Trois simplifications sont énoncées avec le **sens** de leur écart :
+      pas de décote (barème surestimé en bas), pas de plafonnement du quotient
+      familial (barème sous-estimé en haut), aucune réduction d'impôt. Les deux
+      premières jouent en sens contraire — un résultat serré ne se tranche pas
+      sur ces chiffres seuls.
+- [ ] **Comparateur micro-BNC vs déclaration contrôlée** — sujet distinct, sans
+      rapport avec le 30/09. Non commencé, et non urgent : il supposerait les
+      taux de cotisations du régime réel, que l'application ne porte pas.
 
 ### J4 · Argent
 - [x] ~~Écran Argent~~ — **fait.** Deux sections en onglets ARIA, enveloppes de
