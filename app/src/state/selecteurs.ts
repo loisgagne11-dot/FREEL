@@ -17,7 +17,7 @@ import {
 import { tauxImpotEtContributions } from '../domain/bareme';
 import type { RegimeImposition } from '../domain/bareme';
 import {
-  type Echeance, type RecetteEncaissee,
+  type Echeance, type NatureDette, type RecetteEncaissee,
   provisions as calculerProvisions
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
@@ -294,6 +294,139 @@ export function etatPilote(
     autonomie: autonomieMois(tresorerie.versable, faits.besoinMensuel),
     tauxImpotIndisponible: tauxImpotR.statut === 'refuse',
     motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null
+  };
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Le flux du mois
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Une ligne du flux : une facture attendue, ou une échéance à payer. */
+export interface LigneFlux {
+  readonly id: string;
+  readonly libelle: string;
+  readonly montant: Euros;
+  readonly date: DateISO | null;
+  /** Ce qui est fait, et ce qui ne l'est pas encore. */
+  readonly regle: boolean;
+}
+
+export interface FluxDuMois {
+  readonly entrees: {
+    /** Encaissé sur le mois observé. */
+    readonly encaisse: Euros;
+    /** Émis et non encore encaissé, tous mois confondus : l'argent qui manque. */
+    readonly enAttente: Euros;
+    readonly lignes: readonly LigneFlux[];
+  };
+  readonly sorties: {
+    readonly total: Euros;
+    /** Échéances déjà émises et non payées : la dette est chiffrée par l'appelant. */
+    readonly constate: Euros;
+    /** Charges nées d'encaissements non encore déclarés : la dette existe déjà. */
+    readonly aProvisionner: Euros;
+    readonly lignes: readonly LigneFlux[];
+  };
+  readonly remuneration: {
+    readonly versable: Euros;
+    /** Ce qui reste de côté, et qui explique l'écart avec le solde. */
+    readonly provisions: Euros;
+  };
+}
+
+const LIBELLE_NATURE: Readonly<Record<NatureDette, string>> = {
+  urssaf: 'Cotisations URSSAF',
+  tva: 'TVA',
+  impot: 'Impôt sur le revenu',
+  cfe: 'CFE',
+  cfp: 'Contribution à la formation'
+};
+
+/**
+ * Le flux du mois : ce qui rentre, ce qui sort, ce qui reste.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * TROIS COLONNES PARCE QUE CE SONT TROIS QUESTIONS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « Combien est rentré ce mois-ci », « combien doit sortir », « combien
+ * reste-t-il pour moi » ne se répondent pas avec le même chiffre, et les
+ * empiler dans une seule liste oblige à faire la soustraction de tête. La
+ * spec de design les met côte à côte ; ce sélecteur les produit d'un seul
+ * calcul, pour qu'aucune colonne ne puisse diverger d'une autre.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * « EN ATTENTE » N'EST PAS BORNÉ AU MOIS, ET C'EST VOULU
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'encaissement est daté : le limiter au mois observé a un sens. Une facture
+ * impayée, elle, n'appartient à aucun mois — elle traîne. La borner au mois
+ * ferait disparaître de l'écran la facture de mars toujours pas réglée en
+ * août, c'est-à-dire précisément celle qu'il faut relancer.
+ */
+export function fluxDuMois(
+  faits: Faits,
+  echeances: readonly Echeance[],
+  m: Mois,
+  etat: EtatPilote
+): FluxDuMois {
+  const encaisseesDuMois = faits.recettes.filter(
+    (r) => r.encaisseeLe !== null && r.encaisseeLe.startsWith(m)
+  );
+  // Une écriture d'annulation porte un montant négatif : elle doit diminuer
+  // l'encaissé, pas s'y ajouter comme une recette de plus.
+  const enAttente = faits.recettes.filter((r) => r.emiseLe !== null && r.encaisseeLe === null);
+
+  const echeancesDuMois = echeances.filter((e) => e.echeanceLe.startsWith(m));
+
+  const total = (liste: readonly { readonly montant: Euros }[]): Euros =>
+    euros(liste.reduce((s, x) => s + x.montant, 0));
+
+  return {
+    entrees: {
+      encaisse: total(encaisseesDuMois),
+      enAttente: total(enAttente),
+      lignes: [
+        ...encaisseesDuMois.map((r) => ({
+          id: r.id,
+          libelle: r.clientNom !== '' ? r.clientNom : r.libelle,
+          montant: r.montant,
+          date: r.encaisseeLe,
+          regle: true
+        })),
+        ...enAttente.map((r) => ({
+          id: r.id,
+          libelle: r.clientNom !== '' ? r.clientNom : r.libelle,
+          montant: r.montant,
+          date: r.emiseLe,
+          regle: false
+        }))
+      ]
+    },
+    sorties: {
+      // Le total vient des PROVISIONS, pas de la liste d'échéances.
+      //
+      // Tant qu'aucune échéance n'est saisie, la liste est vide — mais la
+      // dette, elle, existe : elle naît de l'encaissement. Additionner la
+      // liste afficherait « 0 € de sorties » à quelqu'un qui doit plusieurs
+      // milliers d'euros de cotisations, ce qui est le pire chiffre possible
+      // sur cet écran.
+      total: etat.tresorerie.provisions,
+      constate: etat.voletConstate,
+      aProvisionner: etat.voletAProvisionner,
+      lignes: echeancesDuMois.map((e) => ({
+        id: e.id,
+        libelle: LIBELLE_NATURE[e.nature],
+        montant: e.montant,
+        date: e.echeanceLe,
+        regle: e.payee
+      }))
+    },
+    remuneration: {
+      versable: etat.tresorerie.versable,
+      provisions: etat.tresorerie.provisions
+    }
   };
 }
 

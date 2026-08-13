@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
 import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
-import { aTraiter, etatPilote, moisCourant, soldeEstSuivi } from '../../state/selecteurs';
+import {
+  aTraiter, etatPilote, fluxDuMois, moisCourant, soldeEstSuivi
+} from '../../state/selecteurs';
 import type { SujetATraiter } from '../../domain/calculs/aTraiter';
 import { Greet } from '../components/Greet';
+import { FluxCard } from '../components/FluxCard';
 import { eur, moisLong, moisTexte } from '../format';
 import styles from './Pilote.module.css';
 
@@ -26,6 +29,7 @@ export function Pilote() {
   // Recalculé à chaque changement de faits, jamais stocké.
   const etat = useMemo(() => etatPilote(faits), [faits]);
   const sujets = useMemo(() => aTraiter(faits), [faits]);
+  const flux = useMemo(() => fluxDuMois(faits, [], mois, etat), [faits, mois, etat]);
 
   return (
     <>
@@ -76,6 +80,12 @@ export function Pilote() {
           )}
         </p>
       </section>
+
+      <FluxCard
+        flux={flux}
+        periode={moisLong(mois)}
+        versementPossible={etat.tresorerie.versable > 0}
+      />
 
       <div className={styles.grille}>
         <Chiffre
