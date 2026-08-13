@@ -86,6 +86,9 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
       <Greet
         titre="Achats"
         sousTitre="Une dépense sans pièce ne récupère pas sa TVA : c’est la règle, et elle n’est pas contournable."
+        repere={etat.resume.sansJustificatif === 0
+          ? 'Tout est justifié'
+          : `${etat.resume.sansJustificatif} justificatif${etat.resume.sansJustificatif > 1 ? 's' : ''} manquant${etat.resume.sansJustificatif > 1 ? 's' : ''}`}
         actions={section === 'depenses' && etat.lignes.length > 0 ? (
           <button
             type="button"
