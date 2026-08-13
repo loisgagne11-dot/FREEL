@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo } from 'react';
 import { Shell } from './ui/Shell';
+import { FournisseurToasts } from './ui/components/Toasts';
 import { useRoute } from './ui/useRoute';
 import { useFaits } from './state/store';
 
@@ -77,10 +78,12 @@ export function App() {
   useEffect(() => { initialiser(); }, [initialiser]);
 
   return (
-    <Shell compteurs={compteurs}>
-      <Suspense fallback={<EnChargement />}>
-        <Ecran />
-      </Suspense>
-    </Shell>
+    <FournisseurToasts>
+      <Shell compteurs={compteurs}>
+        <Suspense fallback={<EnChargement />}>
+          <Ecran />
+        </Suspense>
+      </Shell>
+    </FournisseurToasts>
   );
 }

@@ -7,6 +7,7 @@ import {
 } from '../../state/selecteurs.activite';
 import { VueSemaine } from '../components/VueSemaine';
 import { CraCard } from '../components/CraCard';
+import { useToast } from '../components/Toasts';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import type { DateISO, Mois } from '../../domain/types';
 import type { Client, Mission } from '../../state/schema';
@@ -698,6 +699,7 @@ function FormulaireClient(
   const ajouter = useFaits((e) => e.ajouterClient);
   const modifier = useFaits((e) => e.modifierClient);
   const supprimer = useFaits((e) => e.supprimerClient);
+  const signaler = useToast();
   const idChamp = useId();
 
   const existant = id === null ? undefined : clients.find((c) => c.id === id);
@@ -718,6 +720,10 @@ function FormulaireClient(
     evenement.preventDefault();
     const refus = id === null ? ajouter(saisie) : modifier(id, saisie);
     if (refus !== null) { setErreur(refus); return; }
+    // Le panneau se referme sur la liste : sans confirmation, on ne sait pas
+    // si l'enregistrement a eu lieu, et on recommence — ce qui crée un
+    // doublon.
+    signaler(id === null ? 'Client ajouté.' : 'Client enregistré.');
     onFini();
   }
 
@@ -783,7 +789,9 @@ function FormulaireClient(
         <button type="button" className={styles.supprimer}
           onClick={() => {
             const refus = supprimer(existant.id);
-            if (refus !== null) setErreur(refus); else onFini();
+            if (refus !== null) { setErreur(refus); return; }
+            signaler('Client supprimé.');
+            onFini();
           }}>
           Supprimer ce client
         </button>
@@ -800,6 +808,7 @@ function FormulaireMission(
   const ajouter = useFaits((e) => e.ajouterMission);
   const modifier = useFaits((e) => e.modifierMission);
   const supprimer = useFaits((e) => e.supprimerMission);
+  const signaler = useToast();
   const idChamp = useId();
 
   const existante = id === null ? undefined : faits.missions.find((m) => m.id === id);
@@ -822,6 +831,7 @@ function FormulaireMission(
   function soumettre(evenement: React.FormEvent): void {
     evenement.preventDefault();
     if (id === null) ajouter(saisie); else modifier(id, saisie);
+    signaler(id === null ? 'Mission ajoutée.' : 'Mission enregistrée.');
     onFini();
   }
 
@@ -887,7 +897,9 @@ function FormulaireMission(
         <button type="button" className={styles.supprimer}
           onClick={() => {
             const refus = supprimer(existante.id);
-            if (refus !== null) setErreur(refus); else onFini();
+            if (refus !== null) { setErreur(refus); return; }
+            signaler('Mission supprimée.');
+            onFini();
           }}>
           Supprimer cette mission
         </button>
