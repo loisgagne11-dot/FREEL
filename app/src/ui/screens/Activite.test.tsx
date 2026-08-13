@@ -77,7 +77,7 @@ describe('plan de charge', () => {
   it('n’affiche aucune occupation quand aucun jour n’est ouvrable', () => {
     const toutJuillet = Array.from(
       { length: 31 },
-      (_, i) => dateISO(`2026-07-${String(i + 1).padStart(2, '0')}`)
+      (_, i) => ({ date: dateISO(`2026-07-${String(i + 1).padStart(2, '0')}`), quotite: 1 })
     );
     semer({ conges: toutJuillet });
     render(<Activite />);
@@ -100,7 +100,9 @@ describe('calendrier des congés', () => {
     const lundi = screen.getByRole('button', { name: /27 juil\. 2026, jour travaillé/ });
 
     await utilisateur.click(lundi);
-    expect(useFaits.getState().faits.conges).toEqual(['2026-07-27']);
+    expect(useFaits.getState().faits.conges).toEqual([
+      { date: '2026-07-27', quotite: 1 }
+    ]);
 
     await utilisateur.click(screen.getByRole('button', { name: /27 juil\. 2026, congé posé/ }));
     expect(useFaits.getState().faits.conges).toEqual([]);
@@ -126,7 +128,11 @@ describe('calendrier des congés', () => {
   });
 
   it('compte les congés de l’année entière, pas seulement du mois affiché', () => {
-    semer({ conges: [dateISO('2026-02-16'), dateISO('2026-08-10'), dateISO('2025-12-24')] });
+    semer({ conges: [
+      { date: dateISO('2026-02-16'), quotite: 1 },
+      { date: dateISO('2026-08-10'), quotite: 1 },
+      { date: dateISO('2025-12-24'), quotite: 1 }
+    ] });
     render(<Activite />);
     expect(screen.getByText('Congés posés dans l’année').nextSibling?.textContent).toBe('2');
   });
@@ -215,5 +221,52 @@ describe('délais de paiement', () => {
 
     expect(screen.getByText('Délai non mesurable')).toBeTruthy();
     expect(screen.queryByText(/au-delà de son délai habituel/)).toBeNull();
+  });
+});
+
+/**
+ * La dépendance client.
+ *
+ * Perdre un client qui pèse 60 % du chiffre d'affaires ne se rattrape pas en
+ * un trimestre. C'est une des rares choses qu'une application de comptabilité
+ * peut voir venir — à condition de la mesurer et de la montrer.
+ */
+describe('le mois en chiffres', () => {
+  it('mesure le poids de chaque client dans l’année', () => {
+    semer({
+      recettes: [
+        recette({ id: 'r1', clientNom: 'Client A', montant: euros(7500), encaisseeLe: dateISO('2026-03-10') }),
+        recette({ id: 'r2', clientNom: 'Client B', montant: euros(2500), encaisseeLe: dateISO('2026-04-10') })
+      ]
+    });
+    render(<Activite />);
+
+    expect(screen.getByText('Client A')).toBeTruthy();
+    expect(screen.getByText('75 %')).toBeTruthy();
+    expect(screen.getByText('25 %')).toBeTruthy();
+  });
+
+  /**
+   * Sur l'année, pas sur le mois. Un client peut ne rien régler en août sans
+   * que la dépendance ait bougé — mesurée sur un seul mois, la concentration
+   * sauterait d'un client à l'autre au gré des règlements.
+   */
+  it('compte les encaissements de toute l’année, pas du seul mois affiché', () => {
+    semer({
+      recettes: [
+        recette({ id: 'r1', clientNom: 'Client A', montant: euros(5000), encaisseeLe: dateISO('2026-01-15') })
+      ]
+    });
+    render(<Activite />);
+    expect(screen.getByText('Client A')).toBeTruthy();
+    expect(screen.getByText('100 %')).toBeTruthy();
+  });
+
+  // Sans encaissement, la mesure n'existe pas : afficher « 0 % » pour un
+  // client suggérerait qu'il en a un.
+  it('dit que la dépendance ne se mesure pas encore', () => {
+    semer({ recettes: [] });
+    render(<Activite />);
+    expect(screen.getByText(/ne se mesure pas encore/)).toBeTruthy();
   });
 });

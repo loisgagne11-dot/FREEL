@@ -53,7 +53,10 @@ function bundleLegacy() {
       },
       {
         id: 'MIS2', client: 'ClientInconnu', description: 'Mission B', tjm: 400,
-        debut: '2026-01-05', fin: null, statut: 'en_cours', factures: []
+        debut: '2026-01-05', fin: null, statut: 'en_cours', factures: [],
+        // Là où l'application écrit RÉELLEMENT les congés — avec le suffixe
+        // `_half` des demi-journées.
+        congesDates: ['2026-09-07', '2026-09-08_half', '2026-08-10']
       }
     ],
     cl: [
@@ -377,15 +380,19 @@ describe('reprise des congés', () => {
   // Le format par mois obligeait à reconstruire une date à chaque lecture et
   // rendait impossible une plage à cheval sur deux mois.
   it('convertit les numéros de jour en dates pleines, triées', () => {
-    expect(conges()).toEqual([
-      '2026-08-10', '2026-08-11', '2026-08-12', '2026-12-24', '2026-12-31'
-    ]);
+    // Le jeu d'essai porte aussi des congés sur les missions : on isole ici
+    // ceux qui viennent de l'ancien format par mois.
+    const dates = conges().map((c) => c.date);
+    expect(dates).toEqual([...dates].sort());
+    ['2026-08-11', '2026-08-12', '2026-12-24', '2026-12-31'].forEach((d) => {
+      expect(dates).toContain(d);
+    });
   });
 
   // Reporter silencieusement un 30 février sur le 2 mars poserait un congé un
   // jour où l'utilisateur travaillait.
   it('écarte un jour qui n\'existe pas dans son mois', () => {
-    expect(conges().some((d) => d.startsWith('2026-02'))).toBe(false);
+    expect(conges().some((c) => c.date.startsWith('2026-02'))).toBe(false);
   });
 });
 
@@ -486,5 +493,56 @@ describe('idempotence', () => {
     const r = migrer(s);
     expect(r.statut).toBe('rien-a-migrer');
     expect(s.contenu[CLE_STOCKAGE]).toBeUndefined();
+  });
+});
+
+/**
+ * Les congés, là où l'ancienne application les écrit vraiment.
+ *
+ * `treasury.conges` existe dans ses valeurs par défaut — un `{}` commenté —
+ * mais rien ne l'alimente : l'écriture réelle se fait dans
+ * `mission.congesDates`. La conversion lisait donc un objet vide pendant que
+ * les congés de l'utilisateur étaient ailleurs, et son calendrier arrivait
+ * vierge. Même famille d'erreur que `ht` contre `montant` sur les factures.
+ */
+describe('congés des missions', () => {
+  const conges = () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    return r.faits.conges;
+  };
+
+  it('reprend les congés posés sur les missions', () => {
+    const parDate = new Map<string, number>(conges().map((c) => [c.date, c.quotite]));
+    expect(parDate.get('2026-09-07')).toBe(1);
+  });
+
+  /**
+   * La demi-journée n'est pas un raffinement : la compter pour une journée
+   * entière gonfle le solde de congés ET fausse l'occupation du mois, dans le
+   * même mouvement.
+   */
+  it('reconnaît le suffixe des demi-journées', () => {
+    const parDate = new Map<string, number>(conges().map((c) => [c.date, c.quotite]));
+    expect(parDate.get('2026-09-08')).toBe(0.5);
+  });
+
+  // L'ancien format par mois est conservé en repli : rien ne dit qu'aucune
+  // installation ne l'a jamais rempli.
+  it('réunit les deux sources sans rien perdre', () => {
+    const dates = conges().map((c) => c.date);
+    expect(dates).toContain('2026-09-07');   // mission.congesDates
+    expect(dates).toContain('2026-12-24');   // treasury.conges
+  });
+
+  /**
+   * Une même date posée sur deux missions reste UN jour : la personne ne peut
+   * pas être deux fois en vacances. Et la quotité la plus forte l'emporte —
+   * retenir la moitié amputerait le solde de l'utilisateur.
+   */
+  it('ne compte jamais deux fois le même jour', () => {
+    const aout = conges().filter((c) => c.date === '2026-08-10');
+    expect(aout).toHaveLength(1);
+    expect(aout[0]?.quotite).toBe(1);
   });
 });
