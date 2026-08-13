@@ -115,6 +115,40 @@ export function soldeEstSuivi(faits: Faits): boolean {
   return faits.mouvementsBancaires.length > 0;
 }
 
+/**
+ * Ce qu'on s'est effectivement versé sur un mois.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DÉRIVÉ DU RELEVÉ, JAMAIS SAISI
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Se verser de l'argent n'est pas une opération comptable en micro : la
+ * personne et l'entreprise sont la même, et un virement du compte pro vers le
+ * compte perso ne crée ni charge ni recette.
+ *
+ * L'audit demandait « un versement de rémunération à enregistrer ». Ç'aurait
+ * été un fait de trop : le virement figure déjà au relevé, le solde le reflète
+ * déjà, et le saisir une seconde fois le compterait deux fois. Ce qui manquait
+ * n'était pas un fait mais un NOM — savoir lequel des mouvements sortants est
+ * une rémunération.
+ *
+ * L'ancienne application n'avait pas ce choix : elle simulait un solde à
+ * partir des encaissements moins les charges, et devait donc enregistrer le
+ * salaire pour le retrancher. Ici le solde est réel.
+ *
+ * Rend zéro tant qu'aucun relevé n'est importé — et l'écran doit alors dire
+ * qu'il ne sait pas, pas afficher zéro comme un constat.
+ */
+export function remunerationDuMois(faits: Faits, m: Mois): Euros {
+  return euros(
+    faits.mouvementsBancaires
+      .filter((mv) => mv.sansContrepartie === 'remuneration' && mv.date.startsWith(m))
+      // Les versements sont des débits, donc négatifs : on rend le montant
+      // versé, pas son opposé.
+      .reduce<number>((somme, mv) => somme + Math.abs(mv.montant), 0)
+  );
+}
+
 /** Sous ACRE à ce mois, d'après la date de début d'activité et la durée d'ACRE. */
 export function sousAcreLe(faits: Faits, dureeTrimestres = 4): (m: Mois) => boolean {
   const debut = faits.entreprise.debutActivite;

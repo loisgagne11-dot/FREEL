@@ -237,14 +237,18 @@ function LigneMouvement(
             </button>
           </span>
         )
-        : mouvement.sansContrepartie
+        : mouvement.sansContrepartie !== null
           ? (
             <span className={styles.actions}>
-              <span className={styles.etat}>Sans contrepartie</span>
+              <span className={styles.etat}>
+                {mouvement.sansContrepartie === 'remuneration'
+                  ? 'Rémunération versée'
+                  : 'Sans contrepartie'}
+              </span>
               <button
                 type="button"
                 className={styles.action}
-                onClick={() => marquerSans(mouvement.id, false)}
+                onClick={() => marquerSans(mouvement.id, null)}
               >
                 Reprendre
               </button>
@@ -277,10 +281,22 @@ function LigneMouvement(
                     {c.libelle || 'Sans libellé'} — {dateCourte(c.date)}
                   </button>
                 ))}
+                {/* La rémunération est proposée sur les DÉBITS seulement :
+                    un crédit ne peut pas être un virement qu'on s'est versé,
+                    et l'offrir inviterait à mal classer une recette. */}
+                {debit && (
+                  <button
+                    type="button"
+                    className={styles.action}
+                    onClick={() => marquerSans(mouvement.id, 'remuneration')}
+                  >
+                    Rémunération que je me suis versée
+                  </button>
+                )}
                 <button
                   type="button"
                   className={styles.action}
-                  onClick={() => marquerSans(mouvement.id, true)}
+                  onClick={() => marquerSans(mouvement.id, 'autre')}
                 >
                   Sans contrepartie
                 </button>

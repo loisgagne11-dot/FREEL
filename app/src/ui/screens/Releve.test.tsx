@@ -144,7 +144,7 @@ describe('rapprochement', () => {
 
     await utilisateur.click(screen.getAllByRole('button', { name: 'Sans contrepartie' })[0]!);
     expect(useFaits.getState().faits.mouvementsBancaires
-      .some((m) => m.sansContrepartie)).toBe(true);
+      .some((m) => m.sansContrepartie !== null)).toBe(true);
     expect(screen.getAllByText('Sans contrepartie').length).toBeGreaterThan(0);
   });
 
@@ -172,5 +172,62 @@ describe('sans relevé', () => {
   it('dit que le solde n’est pas suivi', () => {
     render(<Releve />);
     expect(screen.getByText(/le solde affiché\s+reste le solde initial/)).toBeTruthy();
+  });
+});
+
+/**
+ * NOMMER UN VIREMENT, PAS EN SAISIR UN.
+ *
+ * Se verser de l'argent n'est pas une opération comptable en micro : la
+ * personne et l'entreprise sont la même. Le virement figure déjà au relevé et
+ * le solde le reflète déjà — l'enregistrer comme un fait distinct le
+ * compterait deux fois. Il n'y a donc rien à saisir, seulement à nommer.
+ */
+describe('rémunération versée', () => {
+  it('se déclare sur un débit, et se lit sur la ligne', async () => {
+    render(<Releve />);
+    const utilisateur = await importer();
+
+    await utilisateur.click(
+      screen.getAllByRole('button', { name: 'Rémunération que je me suis versée' })[0]!
+    );
+
+    expect(useFaits.getState().faits.mouvementsBancaires
+      .some((m) => m.sansContrepartie === 'remuneration')).toBe(true);
+    expect(screen.getAllByText('Rémunération versée').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Un crédit ne peut pas être un virement qu'on s'est versé. L'offrir
+   * inviterait à mal classer une recette — et une recette mal classée sort du
+   * chiffre d'affaires.
+   */
+  it('n’est pas proposée sur un crédit', async () => {
+    render(<Releve />);
+    await importer([
+      'Date;Libellé;Montant',
+      '15/07/2026;VIR RECU CLIENT;+4200,00'
+    ].join('\n'));
+
+    // « Sans contrepartie » reste offert — un crédit peut être un apport ou un
+    // remboursement. « Rémunération », non : ce serait inviter à classer une
+    // recette hors du chiffre d'affaires.
+    expect(screen.getAllByRole('button', { name: 'Sans contrepartie' }).length).toBe(1);
+    expect(
+      screen.queryByRole('button', { name: 'Rémunération que je me suis versée' })
+    ).toBeNull();
+  });
+
+  it('se reprend, comme tout classement', async () => {
+    render(<Releve />);
+    const utilisateur = await importer();
+
+    await utilisateur.click(
+      screen.getAllByRole('button', { name: 'Rémunération que je me suis versée' })[0]!
+    );
+    await utilisateur.click(screen.getAllByRole('button', { name: 'Reprendre' })[0]!);
+
+    expect(useFaits.getState().faits.mouvementsBancaires
+      .every((m) => m.sansContrepartie === null)).toBe(true);
   });
 });

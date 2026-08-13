@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
 import {
-  aTraiter, etatPilote, fluxDuMois, moisCourant, soldeEstSuivi
+  aTraiter, etatPilote, fluxDuMois, moisCourant, remunerationDuMois, soldeEstSuivi
 } from '../../state/selecteurs';
 import type { SujetATraiter } from '../../domain/calculs/aTraiter';
 import { Greet } from '../components/Greet';
@@ -11,6 +11,7 @@ import { SanteCard, indicateursDeSante } from '../components/SanteCard';
 import { eur, moisLong, moisTexte } from '../format';
 import styles from './Pilote.module.css';
 import { Montant } from '../components/Montant';
+import { Info } from '../components/Info';
 
 /**
  * Écran Pilote — « combien je peux me verser, et qu'est-ce qui coince ».
@@ -32,6 +33,7 @@ export function Pilote() {
   const etat = useMemo(() => etatPilote(faits), [faits]);
   const sujets = useMemo(() => aTraiter(faits), [faits]);
   const flux = useMemo(() => fluxDuMois(faits, mois, etat), [faits, mois, etat]);
+  const verseCeMois = useMemo(() => remunerationDuMois(faits, mois), [faits, mois]);
 
   /**
    * Les constats de santé viennent des MÊMES sources que le reste de l'écran.
@@ -100,6 +102,27 @@ export function Pilote() {
             <span className={styles.note}> — renseignez votre besoin mensuel pour la calculer</span>
           )}
         </p>
+        {/* Ce qui est DÉJÀ sorti ce mois-ci. Sans cette ligne, « je peux me
+            verser 3 000 » se lit comme « en plus », alors qu'on s'est
+            peut-être déjà versé 2 500 le 5. */}
+        {soldeEstSuivi(faits) && (
+          <p className={styles.sousLigne}>
+            Déjà versé ce mois&nbsp;: <Montant>{eur(verseCeMois)}</Montant>
+            {faits.besoinMensuel > 0 && verseCeMois < faits.besoinMensuel && (
+              <span className={styles.note}>
+                {' '}— il manque <Montant>{eur(euros(faits.besoinMensuel - verseCeMois))}</Montant>
+                {' '}pour couvrir votre besoin
+              </span>
+            )}
+            <Info libelle="D’où vient ce chiffre">
+              Des virements du relevé que vous avez marqués «&nbsp;rémunération
+              que je me suis versée&nbsp;», dans Achats&nbsp;› Relevé bancaire.
+              Se verser de l’argent n’est pas une opération comptable en
+              micro&nbsp;: la personne et l’entreprise sont la même. Le virement
+              est déjà au relevé — il n’y a rien à saisir, seulement à nommer.
+            </Info>
+          </p>
+        )}
       </section>
 
       <FluxCard

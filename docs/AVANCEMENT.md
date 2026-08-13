@@ -814,6 +814,59 @@ monolithique → **76,59 Ko**. Le plafond n'a toujours pas bougé.
 
 ---
 
+### La rémunération se nomme, elle ne se saisit pas (13/08, schéma v5)
+
+Le manque n°3 de l'audit, corrigé **autrement que demandé** — et le refus
+mérite d'être écrit, parce qu'il tient à la différence entre les deux
+applications.
+
+L'audit demandait « un versement de rémunération à enregistrer ». Ç'aurait été
+un fait de trop. Se verser de l'argent n'est pas une opération comptable en
+micro : la personne et l'entreprise sont la même, un virement du compte pro
+vers le compte perso ne crée ni charge ni recette. Et surtout, **le virement
+figure déjà au relevé** — le saisir une seconde fois le compterait deux fois.
+
+L'ancienne application n'avait pas ce choix : elle *simulait* son solde à
+partir des encaissements moins les charges, et devait donc enregistrer le
+salaire pour le retrancher. Ici le solde est réel. Reprendre sa solution aurait
+été reprendre la contrainte sans la cause.
+
+Ce qui manquait n'était pas un fait mais un **nom** : savoir lequel des
+mouvements sortants est une rémunération.
+
+- `sansContrepartie` passe du **booléen au motif** — `'remuneration'`,
+  `'autre'`, ou `null`. Un seul état ne pouvait pas distinguer un virement
+  qu'on s'est versé de frais bancaires.
+- Le motif ne change **aucun total** : il permet seulement de répondre à
+  « combien me suis-je versé ce mois-ci », que rien ne savait dire.
+- Le Pilote affiche **« déjà versé ce mois »** sous le versable, et l'écart au
+  besoin mensuel. Sans cette ligne, « je peux me verser 3 000 » se lit comme
+  « en plus », alors qu'on s'est peut-être déjà versé 2 500 le 5.
+- La rémunération n'est proposée que sur les **débits** : un crédit ne peut pas
+  être un virement qu'on s'est versé, et l'offrir inviterait à classer une
+  recette hors du chiffre d'affaires.
+
+**Le piège de migration, troisième du nom.** Le champ valait `true`/`false`.
+Sans conversion, un `false` enregistré hier serait lu comme « différent de
+`null` », donc comme un mouvement **déjà classé** : toute la file « à traiter »
+aurait disparu, sans que rien ne le signale. Après les congés et les rythmes,
+la règle est acquise — une migration descend jusqu'où les champs ont bougé, et
+un champ imbriqué se convertit explicitement.
+
+### Restaurer une sauvegarde (13/08)
+
+L'export existait depuis le début, la restauration non. Une sauvegarde qu'on ne
+sait pas relire n'est pas une sauvegarde : c'est un fichier qui rassure.
+
+Le fichier est lu, son contenu **annoncé** — tant de recettes, de dépenses, de
+missions, de clients — et rien n'est écrasé avant confirmation ; même posture
+que sur l'écran Compte, et pour la même raison. Un fichier illisible se dit
+tout de suite, pas après la confirmation. Le refus de fond — un bloc écrit par
+une version plus récente — vient de `adopterFaitsDistants` et est **relayé à
+l'écran** plutôt qu'avalé.
+
+---
+
 ## 4 quinquies. Leçon du 13/08 — un test vert sur du code mort ne prouve rien
 
 `encaisserRecette` était écrite, commentée, couverte par des tests de magasin

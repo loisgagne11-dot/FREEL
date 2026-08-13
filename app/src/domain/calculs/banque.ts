@@ -30,6 +30,16 @@
 
 import { type DateISO, type Euros, euros } from '../types';
 
+/**
+ * Pourquoi un mouvement n'a aucune écriture en face.
+ *
+ * `remuneration` est distingué parce que c'est le seul dont on veut le total :
+ * il se compare au besoin mensuel, et c'est la question qu'on se pose en fin
+ * de mois. Les autres — frais, remboursements — n'ont besoin que d'être
+ * écartés de la file « à traiter ».
+ */
+export type MotifSansContrepartie = 'remuneration' | 'autre';
+
 export interface MouvementBancaire {
   /** Empreinte stable : le même mouvement réimporté garde le même identifiant. */
   readonly id: string;
@@ -43,12 +53,26 @@ export interface MouvementBancaire {
    */
   readonly rapprocheAvec: string | null;
   /**
-   * `true` quand l'utilisateur a déclaré qu'aucune écriture ne correspond :
-   * frais bancaires, virement personnel, remboursement. Sans cet état, ces
-   * mouvements resteraient éternellement « à traiter » et l'écran finirait
-   * par ne plus être regardé.
+   * Ce que l'utilisateur a déclaré d'un mouvement qu'aucune écriture ne
+   * justifie : frais bancaires, remboursement — ou une RÉMUNÉRATION qu'il
+   * s'est versée. Sans cet état, ces mouvements resteraient éternellement
+   * « à traiter » et l'écran finirait par ne plus être regardé.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POURQUOI UN MOTIF ET PLUS UN BOOLÉEN
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Se verser de l'argent n'est PAS une opération comptable en micro : la
+   * personne et l'entreprise sont la même, un virement du compte pro vers le
+   * compte perso ne crée ni charge ni recette. Ce n'est donc pas une écriture
+   * de plus à saisir — c'est un mouvement bancaire à NOMMER.
+   *
+   * L'enregistrer comme un fait distinct le compterait deux fois : le virement
+   * figure déjà au relevé, et le solde le reflète déjà. Le motif, lui, ne
+   * change aucun total — il permet seulement de répondre à « combien me
+   * suis-je versé ce mois-ci », que rien ne savait dire.
    */
-  readonly sansContrepartie: boolean;
+  readonly sansContrepartie: MotifSansContrepartie | null;
 }
 
 /**
@@ -106,7 +130,7 @@ export function importerMouvements(
       libelle: ligne.libelle,
       montant: ligne.montant,
       rapprocheAvec: null,
-      sansContrepartie: false
+      sansContrepartie: null
     });
     ajoutes += 1;
   }
@@ -182,7 +206,7 @@ export function candidatsPour(
   ecritures: readonly EcritureRapprochable[],
   fenetreJours: number = FENETRE_JOURS
 ): readonly EcritureRapprochable[] {
-  if (mouvement.rapprocheAvec !== null || mouvement.sansContrepartie) return [];
+  if (mouvement.rapprocheAvec !== null || mouvement.sansContrepartie !== null) return [];
 
   const natureAttendue = mouvement.montant < 0 ? 'depense' : 'recette';
   const cible = Math.abs(mouvement.montant);
@@ -234,7 +258,7 @@ export function resumerRapprochement(
 
   for (const m of mouvements) {
     if (m.rapprocheAvec !== null) { rapproches += 1; continue; }
-    if (m.sansContrepartie) { sansContrepartie += 1; continue; }
+    if (m.sansContrepartie !== null) { sansContrepartie += 1; continue; }
     const n = candidatsPour(m, ecritures, fenetreJours).length;
     if (n === 0) sansCandidat += 1;
     else if (n === 1) evidentes += 1;

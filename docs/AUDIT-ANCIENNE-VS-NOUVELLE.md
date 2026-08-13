@@ -27,10 +27,12 @@ laissé passer : le rythme de travail n'était saisissable nulle part.
 |---|---|---|
 | 1 | ~~**Aucune échéance ne peut être saisie**~~ | ✅ **Corrigé le 13/08.** `echeances` est devenu un fait du schéma (v3), avec sa carte dans Argent, et `etatPilote` / `etatArgent` / `fluxDuMois` lisent désormais le compte au lieu d'une liste vide. La migration trie en prime les charges legacy : les fiscales et sociales deviennent des **échéances payées**, plus des dépenses — une cotisation n'est pas un achat |
 | 2 | ~~**Pas de clients opérationnels par mission**~~ | ✅ **Corrigé le 13/08.** Schéma v4 : le rythme et les ajustements appartiennent au **client opérationnel**, pas à la mission. Une ligne de planning et un CRA par client qui signe. Découvert au passage : **le rythme n'était saisissable nulle part** — une mission créée dans l'application avait un planning vide à jamais |
-| 3 | **Pas de versement de rémunération** | `versable` se calcule, mais rien ne permet d'enregistrer qu'on s'est versé la somme. Le solde ne bouge donc jamais du fait d'un versement |
+| 3 | ~~**Pas de versement de rémunération**~~ | ✅ **Corrigé le 13/08, autrement que demandé.** Le versement ne devient PAS un fait : ce serait le compter deux fois, puisque le virement figure déjà au relevé. C'est un mouvement bancaire à **nommer** — `sansContrepartie` passe du booléen au motif, et le Pilote affiche « déjà versé ce mois » face au besoin mensuel |
 
 Les quatre autres — objectif de CA, projection de franchissement des seuils,
 import OFX, restauration d'une sauvegarde — sont réels mais pas quotidiens.
+**La restauration est faite depuis** : un export qu'on ne sait pas réinjecter
+n'est pas une sauvegarde, c'est un fichier qui rassure.
 
 Une remarque de méthode : le manque n°1 ne se voyait pas en lisant le code,
 parce que le code existait. `Echeance` était un type complet, `provisions()`
@@ -78,7 +80,7 @@ un trou qui ne fait échouer aucun test.
 | **`getChargesData`, `showChargeModal`, `getChargeTypesList`, `updateEcheance`, `togglePaid`** | ✅ | **Corrigé le 13/08.** Carte « Échéances reçues » dans Argent : saisir, corriger, supprimer, marquer payée. Cinq natures — URSSAF, TVA, impôt, CFE, CFP. « Impôt PL » n'en est pas une : en versement libératoire les 2,2 % sont prélevés **avec** les cotisations (D2), donc c'est une échéance URSSAF. « Autres » non plus : une dépense professionnelle est une dépense, elle vit dans Achats |
 | `showChargeRecurrente` — échéance récurrente | ❌ | Chaque appel se saisit à l'unité. Un échéancier trimestriel demande donc quatre saisies par an |
 | `getAbsoluteBalance`, `showEditSoldeInitial`, `showTresoSettings` | ✅ | Solde initial et besoin mensuel saisissables (ajoutés le 13/08 — ils n'avaient **aucune interface** jusque-là) |
-| `showSalaireModal`, `computeSalaireProjections` | ❌ | **Manque n°3.** Le versable se calcule, mais rien n'enregistre le versement |
+| `showSalaireModal`, `computeSalaireProjections` | 🟢 | **Corrigé le 13/08, en refusant la forme demandée.** L'ancienne application SIMULAIT son solde (encaissements moins charges), elle devait donc enregistrer le salaire pour le retrancher. Ici le solde est réel : le virement est déjà au relevé, et le saisir une seconde fois le compterait deux fois. Il se **nomme** — « rémunération que je me suis versée » dans Achats › Relevé — et le Pilote affiche « déjà versé ce mois » face au besoin mensuel. Se verser de l'argent n'est pas une opération comptable en micro : la personne et l'entreprise sont la même |
 | `setGoalCA`, `showGoalModal`, `renderGoalWidget` | ❌ | Aucun objectif de chiffre d'affaires |
 | `computeProjections`, `showProjectionAutonomieModal` | ⚠️ | L'autonomie en mois existe (`autonomieMois`) ; la projection détaillée et son écran, non |
 | `calculerRendementMensuel`, `showRendementConfig` | ❌ | Suivi de rendement / placements : absent |
@@ -140,7 +142,7 @@ un trou qui ne fait échouer aucun test.
 | Auth Supabase, synchro | 🟢 | Verrou optimiste **atomique côté serveur** ; l'ancienne écrasait |
 | `_subscribeRealtime` — synchro temps réel | ❌ | Il faut recharger pour voir les changements d'un autre appareil |
 | `exportData` / `exportJSON` | ✅ | Export JSON complet |
-| `importData` / `importJSON` — **restauration** | ❌ | On peut exporter une sauvegarde, pas la réinjecter. Une sauvegarde qu'on ne sait pas restaurer n'est pas une sauvegarde |
+| `importData` / `importJSON` — **restauration** | ✅ | **Ajouté le 13/08.** Le fichier est lu, son contenu **annoncé** — tant de recettes, de dépenses, de missions —, et rien n'est écrasé avant confirmation. Le refus de fond (schéma plus récent que ce code) est relayé à l'écran plutôt qu'avalé |
 | `showOnboarding` et sa séquence | ❌ | Aucun parcours de première ouverture ; on arrive sur un Pilote vide |
 | `createSearchOverlay`, `performSearch` | ❌ | Pas de recherche globale |
 | `initKeyboardShortcuts`, `createKeyboardHelp` | ❌ | Pas de raccourcis clavier |
@@ -159,10 +161,9 @@ un trou qui ne fait échouer aucun test.
 2. ~~**Les clients opérationnels par mission**~~ — ✅ **fait le 13/08.**
    Schéma v4, migration des entités legacy, planning et CRA ventilés, et
    l'éditeur de rythme qui manquait.
-3. **Le versement de rémunération** — une action, un mouvement, une ligne au
-   flux.
-4. **La restauration d'une sauvegarde** — le pendant de l'export, quelques
-   heures, et ça ferme un risque de perte de données.
+3. ~~**Le versement de rémunération**~~ — ✅ **fait le 13/08**, sous une autre
+   forme que celle demandée : un nom sur un mouvement, pas un fait de plus.
+4. ~~**La restauration d'une sauvegarde**~~ — ✅ **faite le 13/08.**
 5. Le reste — objectif de CA, projection de seuil, OFX, onboarding, recherche,
    raccourcis — au fil de l'usage.
 

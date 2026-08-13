@@ -269,3 +269,36 @@
   .entete { grid-column: 1 / -1; }
   .sections { grid-column: 1 / -1; }
 }
+
+/* Confirmation avant restauration. Encadrée et distincte du reste : ce qui
+   suit écrase tout, et doit se lire comme un arrêt, pas comme une étape. */
+.confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--amber);
+  border-radius: var(--r-sm);
+  background: var(--amber-soft);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.confirmation p { margin: 0; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.action {
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.action:hover { border-color: var(--line-2); color: var(--text); }

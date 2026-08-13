@@ -16,7 +16,7 @@ import type { DateISO, Euros, Mois, TypeActivite } from '../domain/types';
 import type { Depense } from '../domain/calculs/depenses';
 import type { PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
-import type { MouvementBancaire } from '../domain/calculs/banque';
+import type { MotifSansContrepartie, MouvementBancaire } from '../domain/calculs/banque';
 import type { Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
 
@@ -32,7 +32,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 4 as const;
+export const VERSION_SCHEMA = 5 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -495,6 +495,38 @@ export function entiteVide(): ClientOperationnel {
   };
 }
 
+/**
+ * `sansContrepartie` passe du booléen au motif (schéma 4 → 5).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE PIÈGE DU FAUX QUI DEVIENT VRAI
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le champ valait `true` ou `false` ; il vaut désormais `'remuneration'`,
+ * `'autre'` ou `null`. Sans conversion, un `false` enregistré hier serait lu
+ * comme « différent de null », donc comme un mouvement DÉJÀ classé : tous les
+ * mouvements à traiter disparaîtraient de la file, sans que rien ne le
+ * signale.
+ *
+ * C'est le troisième champ imbriqué à migrer, après les congés et les rythmes.
+ * La règle est acquise : une migration descend jusqu'où les champs ont bougé.
+ */
+function mouvementsDuSchema4(brut: unknown): readonly MouvementBancaire[] {
+  if (!Array.isArray(brut)) return [];
+  return brut.flatMap((mv): MouvementBancaire[] => {
+    if (typeof mv !== 'object' || mv === null) return [];
+    const o = mv as Record<string, unknown>;
+    const ancien = o['sansContrepartie'];
+    const motif: MotifSansContrepartie | null =
+      ancien === 'remuneration' || ancien === 'autre' ? ancien
+        // Un `true` d'hier ne disait pas pourquoi : il devient « autre ».
+        // Le requalifier en rémunération inventerait une information.
+        : ancien === true ? 'autre'
+          : null;
+    return [{ ...(o as unknown as MouvementBancaire), sansContrepartie: motif }];
+  });
+}
+
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
   const defauts = faitsVides();
@@ -510,6 +542,7 @@ export function completerFaits(brut: unknown): Faits {
     version: VERSION_SCHEMA,
     entreprise: { ...entrepriseVide(), ...entreprise },
     conges: congesDuSchema1(o['conges']),
-    missions: missionsDuSchema1(o['missions'])
+    missions: missionsDuSchema1(o['missions']),
+    mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires'])
   } as Faits;
 }
