@@ -66,6 +66,10 @@ export function Activite() {
 
   const [vue, setVue] = useState<'mois' | 'semaine'>('mois');
   const [ancreSemaine, setAncreSemaine] = useState<DateISO>(() => dateDuJour());
+  /** Journée déclarée sur un créneau vide, en attente de savoir à qui elle est. */
+  const [aRattacher, setARattacher] = useState<
+    { readonly date: DateISO; readonly possibles: readonly Affectation[] } | null
+  >(null);
   const semaine = useMemo(
     () => planningDeLaSemaine(faits, ancreSemaine), [faits, ancreSemaine]
   );
@@ -99,25 +103,52 @@ export function Activite() {
   const reculer = () => (enSemaine ? decalerSemaine(-1) : setMois(decalerMois(mois, -1)));
   const avancer = () => (enSemaine ? decalerSemaine(1) : setMois(decalerMois(mois, 1)));
 
+  /**
+   * Fait tourner la quotité d'une ligne : journée → demi-journée → rien →
+   * retour au rythme.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * UN CRÉNEAU VIDE NE DIT PAS À QUI LA JOURNÉE APPARTIENT
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Cliquer un créneau vide déclare une journée que le rythme ne prévoyait
+   * pas. Encore faut-il savoir à quelle mission la rattacher : avec une seule
+   * affectation possible il n'y a pas de question, avec deux le choix devient
+   * arbitraire.
+   *
+   * La première version en choisissait une en silence — la première mission
+   * active. C'est précisément ce que cette application refuse partout
+   * ailleurs : l'écran propose, l'utilisateur tranche. Une journée rattachée
+   * au mauvais client fausse deux CRA d'un coup, celui qui la reçoit à tort
+   * et celui à qui elle manque, et rien ne le signale.
+   */
   function ajusterAuClic(date: DateISO, _missionId: string, entiteId: string): void {
     const jour = semaine.jours.find((j) => j.date === date);
     const ligne = jour?.parMission.find((l) => l.entiteId === entiteId);
 
-    // Créneau vide : aucune ligne ne prévoyait ce jour-là. On rattache la
-    // journée déclarée au premier client opérationnel d'une mission active —
-    // il n'y a rien d'autre à quoi la rattacher, et refuser le clic ferait
-    // perdre une journée réellement travaillée.
-    const cible = ligne ?? premiereAffectation(faits);
-    if (cible === null) return;
+    if (ligne !== undefined) {
+      faireTourner(date, ligne.missionId, ligne.entiteId, ligne.retenu, ligne.ajuste);
+      return;
+    }
 
-    const ajuste = ligne?.ajuste ?? false;
-    const retenu = ligne?.retenu ?? 0;
-    const { missionId: mid, entiteId: eid } = cible;
+    const possibles = affectationsPossibles(faits);
+    if (possibles.length === 0) return;
+    if (possibles.length === 1) {
+      const seule = possibles[0] as Affectation;
+      faireTourner(date, seule.missionId, seule.entiteId, 0, false);
+      return;
+    }
+    // Plusieurs candidats : on demande, on ne devine pas.
+    setARattacher({ date, possibles });
+  }
 
-    if (!ajuste) ajusterJour(mid, eid, date, retenu >= 1 ? 0.5 : 1);
-    else if (retenu >= 1) ajusterJour(mid, eid, date, 0.5);
-    else if (retenu > 0) ajusterJour(mid, eid, date, 0);
-    else ajusterJour(mid, eid, date, null);
+  function faireTourner(
+    date: DateISO, missionId: string, entiteId: string, retenu: number, ajuste: boolean
+  ): void {
+    if (!ajuste) ajusterJour(missionId, entiteId, date, retenu >= 1 ? 0.5 : 1);
+    else if (retenu >= 1) ajusterJour(missionId, entiteId, date, 0.5);
+    else if (retenu > 0) ajusterJour(missionId, entiteId, date, 0);
+    else ajusterJour(missionId, entiteId, date, null);
   }
 
   return (
@@ -471,6 +502,36 @@ export function Activite() {
       >
         {panneau.type === 'mission' && (
           <FormulaireMission id={panneau.id} onFini={() => setPanneau({ type: 'ferme' })} />
+        )}
+      </Sheet>
+
+      <Sheet
+        ouvert={aRattacher !== null}
+        titre="À quelle mission rattacher cette journée&nbsp;?"
+        onFermer={() => setARattacher(null)}
+      >
+        {aRattacher !== null && (
+          <div className={styles.choixAffectation}>
+            <p className={styles.aide}>
+              Le {dateCourte(aRattacher.date)} n’était prévu par aucun
+              rythme. Plusieurs missions sont en cours&nbsp;: choisir pour vous
+              fausserait deux comptes rendus d’un coup — celui qui recevrait la
+              journée à tort, et celui à qui elle manquerait.
+            </p>
+            {aRattacher.possibles.map((a) => (
+              <button
+                key={`${a.missionId}-${a.entiteId}`}
+                type="button"
+                className={styles.actionPrincipale}
+                onClick={() => {
+                  faireTourner(aRattacher.date, a.missionId, a.entiteId, 0, false);
+                  setARattacher(null);
+                }}
+              >
+                {a.libelle}
+              </button>
+            ))}
+          </div>
         )}
       </Sheet>
     </>
@@ -1031,22 +1092,33 @@ function Chiffre(
   );
 }
 
+/** Une mission et l'un de ses clients opérationnels. */
+interface Affectation {
+  readonly missionId: string;
+  readonly entiteId: string;
+  readonly libelle: string;
+}
+
 /**
- * Où rattacher une journée déclarée sur un créneau vide.
+ * Où une journée déclarée sur un créneau vide PEUT être rattachée.
  *
- * Le premier client opérationnel d'une mission active. Il n'y a rien d'autre à
- * quoi la rattacher — et refuser le clic ferait perdre une journée réellement
- * travaillée, ce qui est bien pire qu'un rattachement à corriger.
+ * Toutes les affectations des missions en cours, pas la première : le choix
+ * appartient à l'utilisateur dès qu'il y en a plus d'une. Une journée
+ * rattachée au mauvais client fausse deux CRA d'un coup — celui qui la reçoit
+ * à tort, et celui à qui elle manque.
  */
-function premiereAffectation(
+function affectationsPossibles(
   faits: { readonly missions: readonly Mission[] }
-): { readonly missionId: string; readonly entiteId: string } | null {
-  for (const m of faits.missions) {
-    if (m.statut !== 'active') continue;
-    const e = m.entites[0];
-    if (e !== undefined) return { missionId: m.id, entiteId: e.id };
-  }
-  return null;
+): readonly Affectation[] {
+  return faits.missions
+    .filter((m) => m.statut === 'active')
+    .flatMap((m) => m.entites.map((e) => ({
+      missionId: m.id,
+      entiteId: e.id,
+      libelle: m.entites.length > 1 && e.nom !== ''
+        ? `${m.description !== '' ? m.description : m.clientNom} — ${e.nom}`
+        : (m.description !== '' ? m.description : m.clientNom)
+    })));
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

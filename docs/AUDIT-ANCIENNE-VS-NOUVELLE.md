@@ -170,3 +170,53 @@ un trou qui ne fait échouer aucun test.
 Trois choses ne reviendront pas, et c'est délibéré : l'export FEC (D6), le
 score de santé sur 100 (il ne mesurait rien), et le recalcul des grilles en
 JavaScript (invariant n°7).
+
+---
+
+## Annexe — l'écart de 2 060 € sur le CA encaissé
+
+**Question posée :** l'ancienne application annonce 43 030 € encaissés sur
+2026, la nouvelle 40 970 €. Est-ce un défaut de la nouvelle, ou une différence
+de définition&nbsp;?
+
+**Réponse : une différence de définition, et la nouvelle a la bonne.**
+Vérifié en lisant les deux calculs côte à côte.
+
+### Ce que chacune compte
+
+L'ancienne (`getIRForYear`, ligne 4391 de `index.html`) parcourt les factures
+des missions et applique **trois filtres** que la nouvelle n'a pas :
+
+| Filtre de l'ancienne | Effet | Pourquoi c'est discutable |
+|---|---|---|
+| `if (mis.statut === 'prospect' \|\| mis.statut === 'perdue') return` | Écarte **toutes** les factures d'une mission marquée perdue | Une mission perdue a pu être payée en partie avant de l'être. Cet argent est bien entré sur le compte, et l'URSSAF le réclamera |
+| `if (f.jours <= 0) return` | Écarte les factures sans jours saisis | Une facture porte un montant. Qu'on ait ou non renseigné son nombre de jours ne change pas ce qui est arrivé sur le compte |
+| `if (f.status === 'payée' && paymentMonth > nowYm) paymentMonth = nowYm` | **Ramène au mois courant** une date de paiement future | C'est le plus lourd : une facture payée avec une date en 2027 est comptée dans l'année en cours. Le chiffre de l'année en est gonflé, et celui de l'année suivante vidé |
+
+La nouvelle (`caEncaisseAnnee`) ne retient qu'une chose : les recettes dont la
+**date d'encaissement** tombe dans l'année. Sans filtre de statut de mission,
+sans filtre de jours, sans repli de date.
+
+C'est la définition du chiffre d'affaires encaissé en micro — ce qui est
+réellement arrivé sur le compte cette année-là — et c'est celle que l'URSSAF
+et le livre des recettes emploient.
+
+### Le sens de l'écart concorde
+
+Les trois filtres poussent dans le même sens : le troisième **gonfle** l'année
+en cours en y attirant des paiements futurs, les deux premiers en **retirent**
+des montants réels. L'ancienne annonçant *plus* que la nouvelle, le troisième
+domine — ce qui est cohérent avec les données observées le 12/08, où des
+écritures étaient datées de **janvier 2027**.
+
+### Ce qui reste à faire, et pourquoi ce n'est pas urgent
+
+Dire **laquelle** des trois lignes explique les 2 060 € demande les données
+réelles, que ce dépôt ne contient pas et ne doit pas contenir. C'est un
+rapprochement à faire dans l'application, écran Facturer&nbsp;: filtrer sur
+« Encaissées », période « Année », et comparer la liste au détail de l'ancienne
+version.
+
+**Ce n'est pas un correctif à écrire.** Aligner la nouvelle sur l'ancienne
+reviendrait à réintroduire trois erreurs de définition pour retrouver un
+chiffre faux.

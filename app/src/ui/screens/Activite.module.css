@@ -596,3 +596,8 @@
 .jourDemi { background: var(--amber-soft); border-color: var(--amber); color: var(--text); }
 
 .quotiteJour { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* Choix du rattachement d'une journée déclarée. Une pile de boutons pleine
+   largeur : chaque ligne est une décision, pas une option dans une liste. */
+.choixAffectation { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.choixAffectation .actionPrincipale { width: 100%; text-align: left; }

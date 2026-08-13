@@ -417,3 +417,70 @@ describe('compte rendu d’activité', () => {
     expect(screen.getByText(/Aucun jour travaillé/)).toBeTruthy();
   });
 });
+
+/**
+ * UN CRÉNEAU VIDE NE DIT PAS À QUI LA JOURNÉE APPARTIENT.
+ *
+ * La première version en choisissait une en silence — la première mission
+ * active. C'est ce que cette application refuse partout ailleurs : l'écran
+ * propose, l'utilisateur tranche. Une journée rattachée au mauvais client
+ * fausse DEUX comptes rendus d'un coup — celui qui la reçoit à tort, et celui
+ * à qui elle manque — et rien ne le signale.
+ */
+describe('journée déclarée sur un créneau vide', () => {
+  const ouvrirSemaine = async () => {
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Semaine' }));
+    return utilisateur;
+  };
+
+  const deuxMissions = () => [
+    mission({ id: 'mis-1', description: 'Mission A', entites: [entite({ id: 'a1' })] }),
+    mission({ id: 'mis-2', description: 'Mission B', entites: [entite({ id: 'b1' })] })
+  ];
+
+  it('demande à qui la rattacher quand plusieurs missions sont en cours', async () => {
+    semer({ missions: deuxMissions() });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+
+    expect(screen.getByRole('button', { name: 'Mission A' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Mission B' })).toBeTruthy();
+    // Rien n'a été posé tant que le choix n'est pas fait.
+    expect(useFaits.getState().faits.missions.flatMap((m) => m.entites)
+      .every((e) => Object.keys(e.ajustements).length === 0)).toBe(true);
+  });
+
+  it('pose la journée sur la mission choisie, et sur elle seule', async () => {
+    semer({ missions: deuxMissions() });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+    await utilisateur.click(screen.getByRole('button', { name: 'Mission B' }));
+
+    const missions = useFaits.getState().faits.missions;
+    expect(Object.keys(missions[0]?.entites[0]?.ajustements ?? {})).toHaveLength(0);
+    expect(Object.keys(missions[1]?.entites[0]?.ajustements ?? {})).toHaveLength(1);
+  });
+
+  /**
+   * Une seule affectation possible : il n'y a pas de question, et la poser
+   * serait un clic de plus pour rien. Le geste doit rester immédiat dans le
+   * cas ordinaire.
+   */
+  it('ne demande rien quand une seule mission est en cours', async () => {
+    semer({ missions: [mission()] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+
+    expect(screen.queryByRole('button', { name: /rattacher/i })).toBeNull();
+    expect(Object.keys(
+      useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {}
+    )).toHaveLength(1);
+  });
+});

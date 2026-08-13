@@ -20,7 +20,7 @@ dernier passage :
 
 | Repère | Valeur |
 |---|---|
-| Tests | **961** sur 56 fichiers (+ 91 côté legacy) |
+| Tests | **964** sur 56 fichiers (+ 91 côté legacy) |
 | Build | **78,2 Ko** de code applicatif, 188 Ko de bibliothèques, 289 Ko au premier rendu |
 | Budget | conforme sur les **4 postes** vérifiés |
 | Responsive | **140 combinaisons** (5 tailles × 4 palettes × **7 écrans**) |
@@ -933,7 +933,7 @@ son travail : « je ne peux pas changer leur statut ».
 | **Marge de build** | Réglé. React est sorti dans un chunk `vendor` : il ne change pas d'un déploiement à l'autre, donc le cache du navigateur le conserve. Modifier une ligne de code invalidait 248 Ko ; désormais 55 |
 | **Relevé bancaire** | **Réglé.** L'import CSV existe, `selecteurs.solde()` compte les mouvements, et `banqueReliee` a été retiré du schéma : il était devenu dérivable (un relevé est disponible si et seulement s'il y a des mouvements), et le garder aurait permis qu'un booléen à `true` coexiste avec une liste vide |
 | **Coquille lisible en J2** | Optimisation retenue : afficher un écran réel sur l'**ancien** schéma en lecture seule, pour valider le mappage de migration à l'œil avant qu'il soit terminal |
-| **Écart de 2 060 € sur le CA encaissé** | **Ouvert.** L'ancienne application annonce 43 030 €, la nouvelle 40 970 € sur 2026 après correction des brouillons. L'hypothèse est une définition de période différente (année civile contre glissante), **non vérifiée**. À reprendre facture par facture : un écart expliqué vaut mieux qu'un écart qui se réduit |
+| **Écart de 2 060 € sur le CA encaissé** | **Expliqué le 13/08 : différence de DÉFINITION, pas défaut de la nouvelle.** L'ancienne écarte les factures des missions « perdue », celles sans jours saisis, et surtout **ramène au mois courant** toute date de paiement future — ce qui gonfle l'année en cours de paiements 2027. La nouvelle ne retient que la date d'encaissement réelle, qui est la définition du CA encaissé en micro. Voir l'annexe de `AUDIT-ANCIENNE-VS-NOUVELLE.md`. Reste à faire, sans urgence : dire **laquelle** des trois lignes vaut 2 060 €, ce qui demande les données réelles — donc un rapprochement dans l'application, pas un correctif |
 | **Reprise à refaire** | Les congés, les rythmes et les ajustements ne migraient pas avant le 13/08. Une reprise effectuée avant cette date a un planning vide. Il faut relancer « Reprendre les données de l'ancienne application », puis contrôler le planning et le CRA contre ce qu'on sait — c'est le dernier endroit où une erreur de correspondance peut rester cachée |
 | **Schéma v1 → v2** | **Réglé, en deux temps.** Les congés étaient des chaînes de dates, ils sont désormais des objets `{ date, quotité }` pour porter la demi-journée — sans conversion, un calendrier existant se serait vidé en silence. Puis, le même jour, le cas manqué : `completerFaits` ne comblait que le **premier niveau**, donc les missions déjà enregistrées arrivaient sans `rythmes`, et l'écran Activité tombait entièrement pour tout compte antérieur au schéma 2. Corrigé et verrouillé par quatre tests |
 
