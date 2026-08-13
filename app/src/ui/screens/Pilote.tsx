@@ -1,8 +1,13 @@
 import { useMemo, useState } from 'react';
 import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
-import { aTraiter, etatPilote, moisCourant, soldeEstSuivi } from '../../state/selecteurs';
+import {
+  aTraiter, etatPilote, fluxDuMois, moisCourant, soldeEstSuivi
+} from '../../state/selecteurs';
 import type { SujetATraiter } from '../../domain/calculs/aTraiter';
+import { Greet } from '../components/Greet';
+import { FluxCard } from '../components/FluxCard';
+import { SanteCard, indicateursDeSante } from '../components/SanteCard';
 import { eur, moisLong, moisTexte } from '../format';
 import styles from './Pilote.module.css';
 
@@ -25,13 +30,34 @@ export function Pilote() {
   // Recalculé à chaque changement de faits, jamais stocké.
   const etat = useMemo(() => etatPilote(faits), [faits]);
   const sujets = useMemo(() => aTraiter(faits), [faits]);
+  const flux = useMemo(() => fluxDuMois(faits, [], mois, etat), [faits, mois, etat]);
+
+  /**
+   * Les constats de santé viennent des MÊMES sources que le reste de l'écran.
+   *
+   * Les recompter séparément les ferait diverger du flux et du panneau
+   * « à traiter » — l'écran dirait alors deux choses différentes sur la même
+   * réalité, ce qui est exactement le défaut relevé sur l'ancienne version.
+   */
+  const sante = useMemo(() => {
+    const impayees = flux.entrees.lignes.filter((l) => !l.regle);
+    const periodes = sujets.find((x) => x.id === 'periodes-a-declarer');
+    return indicateursDeSante({
+      dispo: etat.tresorerie.dispo,
+      provisions: etat.tresorerie.provisions,
+      impayes: impayees.length,
+      montantImpaye: flux.entrees.enAttente,
+      periodesEnRetard: periodes?.nombre ?? 0
+    });
+  }, [flux, etat, sujets]);
 
   return (
     <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Pilote</h1>
-        <p className={styles.periode}>{moisLong(mois)}</p>
-      </header>
+      <Greet
+        titre={salutation(faits.entreprise.nom)}
+        sousTitre={phraseDAccueil(sujets.length, moisLong(mois))}
+        repere={`Solde compte · ${eur(etat.tresorerie.solde)}`}
+      />
 
       {chargement.phase === 'sans-persistance' && (
         <Bandeau ton="alerte" titre="Vos saisies ne sont pas conservées">
@@ -74,6 +100,14 @@ export function Pilote() {
           )}
         </p>
       </section>
+
+      <FluxCard
+        flux={flux}
+        periode={moisLong(mois)}
+        versementPossible={etat.tresorerie.versable > 0}
+      />
+
+      <SanteCard indicateurs={sante} autonomie={etat.autonomie} />
 
       <div className={styles.grille}>
         <Chiffre
@@ -278,4 +312,31 @@ function CurseurReserve(
       </div>
     </section>
   );
+}
+
+/**
+ * « Bonjour » suivi du nom, quand on le connaît.
+ *
+ * Le nom vient de la configuration de l'utilisateur, jamais du code : rien
+ * d'identifiant n'est écrit dans le dépôt. Tant qu'il n'est pas renseigné,
+ * on salue sans nommer plutôt que d'afficher un « Bonjour  » amputé.
+ */
+function salutation(nom: string): string {
+  const propre = nom.trim();
+  return propre === '' ? 'Bonjour' : `Bonjour ${propre}`;
+}
+
+/**
+ * Ce qui attend, en une phrase.
+ *
+ * La spec ouvre le Pilote sur « quatre décisions t'attendent » — un état
+ * qu'on lit en une seconde, là où quatre tuiles demandent d'être comparées.
+ * Le cas « rien à traiter » n'est pas un vide à masquer : c'est la bonne
+ * nouvelle de la journée, et elle mérite d'être dite.
+ */
+function phraseDAccueil(nbSujets: number, mois: string): string {
+  if (nbSujets === 0) return `Rien ne demande votre attention en ${mois.toLowerCase()}.`;
+  return nbSujets === 1
+    ? `Une décision vous attend en ${mois.toLowerCase()}.`
+    : `${nbSujets} décisions vous attendent en ${mois.toLowerCase()}.`;
 }

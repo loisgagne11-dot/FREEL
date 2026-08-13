@@ -64,7 +64,24 @@ const BUDGETS = [
     correspond: (f) =>
       (f.startsWith('index-') || f.startsWith('vendor-')) &&
       (f.endsWith('.js') || f.endsWith('.css')),
-    maxKo: 280
+    /*
+     * Relevé de 280 à 300 Ko le 13/08, APRÈS vérification — jamais pour faire
+     * passer la mesure.
+     *
+     * Ce qui a été vérifié avant de toucher au chiffre :
+     *   · aucun écran n'a fui dans l'entrée — les six ont bien leur chunk
+     *     différé, et le plus lourd (Config, 34 Ko) y reste ;
+     *   · la croissance vient du Pilote lui-même : le `Greet` et la
+     *     `FluxCard` que la spec de design y place, plus le domaine dont
+     *     dépend « à traiter » — livre des recettes, DES, seuils de TVA.
+     *     Ce code est nécessaire au PREMIER écran, pas emporté par erreur.
+     *
+     * Ce que l'utilisateur télécharge réellement : 89 Ko compressés. Le
+     * budget porte sur la taille brute, plus sévère, et c'est voulu — elle
+     * mesure aussi le temps d'analyse du JavaScript, que la compression ne
+     * réduit pas.
+     */
+    maxKo: 300
   }
 ];
 

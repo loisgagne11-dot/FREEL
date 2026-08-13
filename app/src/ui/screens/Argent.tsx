@@ -4,7 +4,9 @@ import { etatArgent, etatDes, etatLivre, moisCourant } from '../../state/selecte
 import type { Mois } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
+import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
+import { Statut, statutRecette } from '../components/Statut';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte, eur } from '../format';
@@ -42,10 +44,11 @@ export function Argent() {
 
   return (
     <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Argent</h1>
-        <p className={styles.periode}>Année {etat.annee}</p>
-      </header>
+      <Greet
+        titre="Argent"
+        sousTitre="Ce qui est rentré, ce qui reste à rentrer, et ce que la période doit."
+        repere={`Année ${etat.annee}`}
+      />
 
       <div className={styles.sections}>
         <Onglets
@@ -268,7 +271,14 @@ function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
                   <span className={styles.ligneMontant}>{eur(r.montant)}</span>
                 </span>
                 <span className={styles.ligneMeta}>
+                  <Statut {...statutRecette({ encaissee: false, echeanceDepassee: r.enRetard })} />
                   <span>Émise le {dateCourte(r.emiseLe)}</span>
+                  {r.echeanceLe !== null && (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <span>échéance {dateCourte(r.echeanceLe)}</span>
+                    </>
+                  )}
                   <span aria-hidden="true">·</span>
                   <span>{r.numero || 'Sans numéro'}</span>
                 </span>

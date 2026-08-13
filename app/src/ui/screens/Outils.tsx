@@ -5,6 +5,7 @@ import {
 } from '../../domain/bareme';
 import { useFaits } from '../../state/store';
 import { moisCourant } from '../../state/selecteurs';
+import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Sheet } from '../components/Sheet';
 import { eur, eurExact, moisLong, pct } from '../format';
@@ -56,10 +57,11 @@ export function Outils() {
 
   return (
     <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Outils</h1>
-        <p className={styles.periode}>Barème de {moisLong(m)}</p>
-      </header>
+      <Greet
+        titre="Outils"
+        sousTitre="Des simulations, jamais des déclarations : rien de ce qui est calculé ici n’est enregistré."
+        repere={`Barème de ${moisLong(m)}`}
+      />
 
       <section className={styles.carte} aria-labelledby="titre-ir">
         <h2 id="titre-ir" className={styles.titreCarte}>

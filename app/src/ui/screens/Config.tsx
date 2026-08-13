@@ -6,6 +6,7 @@ import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/typ
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE } from '../../state/schema';
 import { Compte } from './Compte';
+import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte } from '../format';
@@ -56,9 +57,10 @@ export function Config() {
 
   return (
     <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Config</h1>
-      </header>
+      <Greet
+        titre="Config"
+        sousTitre="Votre régime, vos barèmes, vos données. Chaque champ s’enregistre à la frappe."
+      />
 
       <div className={styles.sections}>
         <Onglets

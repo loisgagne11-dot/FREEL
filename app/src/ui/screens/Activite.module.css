@@ -176,6 +176,31 @@
   font-weight: 620;
 }
 
+/* ── Légende ───────────────────────────────────────────────────────────── */
+
+.legende {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+
+.legendeEntree { display: flex; align-items: center; gap: 6px; }
+
+.legendeCase {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  flex: none;
+}
+
+.legendeOuvrable { background: var(--panel-2); border-color: var(--line); }
+
 /* Nom accessible sans encombrement visuel. Pas de `display: none`, qui le
    retirerait aussi de l'arbre d'accessibilité. */
 .invisible {

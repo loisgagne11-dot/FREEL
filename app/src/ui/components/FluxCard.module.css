@@ -1,0 +1,157 @@
+/* Le flux du mois. Mobile-first, aucune couleur en dur, aucune largeur en JS. */
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.entete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 14px;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.periode { font-size: 12px; color: var(--muted-2); }
+
+/* Trois colonnes côte à côte dès que la place existe ; empilées en dessous.
+   La spec bascule à 900 px — au-delà, trois colonnes de chiffres deviennent
+   illisibles avant même de déborder. */
+.colonnes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  min-width: 0;
+}
+
+.colonne {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.colonne:first-child { border-top: none; padding-top: 0; }
+
+.libelle {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.montant {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  font-weight: 620;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.entree { color: var(--green); }
+.sortie { color: var(--amber); }
+
+.note { font-size: 12px; line-height: 1.5; color: var(--muted); }
+
+/* ── Lignes de détail ───────────────────────────────────────────────────── */
+
+.repli { margin-top: 4px; }
+
+.repli summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted-2);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.repli summary:hover { color: var(--text); }
+
+.lignes {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.ligne:last-child { border-bottom: none; }
+
+.ligneLibelle {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ligneMontant {
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.action {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+  margin-top: 4px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.action:hover { border-color: var(--green); }
+
+@media (min-width: 901px) {
+  .colonnes { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+
+  /* La séparation redevient verticale : en colonnes, une bordure horizontale
+     ne sépare plus rien. */
+  .colonne {
+    border-top: none;
+    border-left: 1px solid var(--line);
+    padding: 0 0 0 18px;
+  }
+
+  .colonne:first-child { border-left: none; padding-left: 0; }
+}

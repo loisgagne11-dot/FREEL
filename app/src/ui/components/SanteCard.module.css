@@ -1,0 +1,81 @@
+/* Carte « Santé ». Mobile-first, aucune couleur en dur. */
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.entete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.autonomie {
+  font-size: 12px;
+  font-weight: 560;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  padding: 4px 11px;
+  white-space: nowrap;
+}
+
+.indicateurs { list-style: none; display: flex; flex-direction: column; margin: 0; padding: 0; }
+
+.indicateur {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  min-width: 0;
+}
+
+.indicateur:last-child { border-bottom: none; }
+
+/* L'état est porté par la couleur ET par le texte de la valeur : une pastille
+   seule laisserait un daltonien sans information. */
+.pastille {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  align-self: center;
+}
+
+.bon { background: var(--green); }
+.attention { background: var(--amber); }
+.alerte { background: var(--red); }
+
+.libelle { color: var(--muted); flex: none; }
+
+.valeur {
+  margin-left: auto;
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 0;
+}

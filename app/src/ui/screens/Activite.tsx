@@ -5,6 +5,7 @@ import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import type { DateISO, Mois } from '../../domain/types';
 import type { Client, Mission } from '../../state/schema';
 import { euros, dateISO } from '../../domain/types';
+import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -53,46 +54,48 @@ export function Activite() {
 
   return (
     <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Activité</h1>
-        {/* Liste vide : l'action vit dans l'état vide, là où le regard se
-            pose. La répéter ici donnerait deux commandes identiques à
-            quelques centimètres. */}
-        {section === 'missions' && etat.missions.length > 0 && (
-          <button type="button" className={styles.actionPrincipale}
-            onClick={() => setPanneau({ type: 'mission', id: null })}>
-            Ajouter une mission
-          </button>
+      <Greet
+        titre="Activité"
+        sousTitre="Les congés posés sortent du dénominateur : le même travail sur moins de jours fait monter l’occupation."
+        actions={(
+          <>
+            {section === 'missions' && etat.missions.length > 0 && (
+              <button type="button" className={styles.actionPrincipale}
+                onClick={() => setPanneau({ type: 'mission', id: null })}>
+                Ajouter une mission
+              </button>
+            )}
+            {section === 'clients' && faits.clients.length > 0 && (
+              <button type="button" className={styles.actionPrincipale}
+                onClick={() => setPanneau({ type: 'client', id: null })}>
+                Ajouter un client
+              </button>
+            )}
+            <div className={styles.navigationMois}>
+              <button
+                type="button"
+                className={styles.pas}
+                onClick={() => setMois(decalerMois(mois, -1))}
+                aria-label="Mois précédent"
+              >
+                <span aria-hidden="true">‹</span>
+              </button>
+              {/* Le mois affiché est annoncé aux lecteurs d'écran à chaque
+                  changement : sans cela, les flèches déplacent une vue dont on
+                  n'entend jamais l'état. */}
+              <span className={styles.moisCourant} role="status">{moisLong(mois)}</span>
+              <button
+                type="button"
+                className={styles.pas}
+                onClick={() => setMois(decalerMois(mois, 1))}
+                aria-label="Mois suivant"
+              >
+                <span aria-hidden="true">›</span>
+              </button>
+            </div>
+          </>
         )}
-        {section === 'clients' && faits.clients.length > 0 && (
-          <button type="button" className={styles.actionPrincipale}
-            onClick={() => setPanneau({ type: 'client', id: null })}>
-            Ajouter un client
-          </button>
-        )}
-        <div className={styles.navigationMois}>
-          <button
-            type="button"
-            className={styles.pas}
-            onClick={() => setMois(decalerMois(mois, -1))}
-            aria-label="Mois précédent"
-          >
-            <span aria-hidden="true">‹</span>
-          </button>
-          {/* Le mois affiché est annoncé aux lecteurs d'écran à chaque
-              changement : sans cela, les flèches déplacent une vue dont on
-              n'entend jamais l'état. */}
-          <span className={styles.moisCourant} role="status">{moisLong(mois)}</span>
-          <button
-            type="button"
-            className={styles.pas}
-            onClick={() => setMois(decalerMois(mois, 1))}
-            aria-label="Mois suivant"
-          >
-            <span aria-hidden="true">›</span>
-          </button>
-        </div>
-      </header>
+      />
 
       <div className={styles.sections}>
         <Onglets
@@ -150,6 +153,8 @@ export function Activite() {
               jours={etat.calendrier}
               onBasculer={basculerConge}
             />
+
+            <Legende />
 
             <dl className={styles.detail}>
               <div className={styles.ligne}>
@@ -411,6 +416,33 @@ function CaseJour({ jour, onBasculer }: { jour: Jour; onBasculer: (d: DateISO) =
         {dateCourte(jour.date)}, {pose ? 'congé posé' : 'jour travaillé'}
       </span>
     </button>
+  );
+}
+
+/**
+ * La légende du calendrier.
+ *
+ * Les cases se distinguent par leur couleur et leur opacité. Sans légende, il
+ * faut cliquer pour découvrir laquelle est un congé — et un clic sur le
+ * calendrier POSE un congé : on apprend la convention en modifiant ses
+ * données. La spec de design prévoit cette légende ; elle manquait.
+ */
+function Legende() {
+  const entrees = [
+    { classe: styles.legendeOuvrable, libelle: 'Travaillable' },
+    { classe: styles.conge, libelle: 'Congé posé' },
+    { classe: styles.ferie, libelle: 'Jour férié' },
+    { classe: styles.weekEnd, libelle: 'Week-end' }
+  ];
+  return (
+    <ul className={styles.legende}>
+      {entrees.map((e) => (
+        <li key={e.libelle} className={styles.legendeEntree}>
+          <span className={`${styles.legendeCase} ${e.classe}`} aria-hidden="true" />
+          {e.libelle}
+        </li>
+      ))}
+    </ul>
   );
 }
 
