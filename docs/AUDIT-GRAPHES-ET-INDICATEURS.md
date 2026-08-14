@@ -215,7 +215,7 @@ doivent être des `<button>` HTML au-dessus, ou les lignes du tableau.
 
 ## 5. Jugement sur les renoncements
 
-### 5.1 Le score /100 — le renoncement est juste, le besoin n'est qu'à moitié couvert
+### 5.1 Le score /100 — le renoncement est juste, et le besoin est couvert autrement
 
 Le motif écrit est **vérifiable** : dans la maquette, le « 78/100 » et ses
 sous-scores sont littéralement écrits dans le HTML, aucune fonction ne les
@@ -275,15 +275,24 @@ ne peut pas le représenter. Le niveau de détail manquant (§4.1) est comblé.
 
 ## 6. Reste à faire, par valeur
 
-1. **Phrase de synthèse de santé** (§5.1)
-2. **Composition d'un mois au clic** (§4.6)
-3. **Graphe de solde constaté**, sans extrapolation (§4.5)
-4. **Dire ce que compte l'autonomie** — versable ou disponible ?
-5. **Retirer `preserveAspectRatio="none"`** de `GrapheBarres` (§5.2)
+1. **Composition d'un mois au clic** (§4.6)
+2. **Graphe de solde constaté**, sans extrapolation (§4.5)
+3. **Objectif de CA avec allure attendue** (V17) — dépend d'un objectif que
+   rien ne porte encore dans les faits
+4. **Comparaison N−1** en filigrane du graphe existant — utile la troisième
+   année, pas la première
 
-Livrés : le tableau « rapport vs charge » par mission (§4.3), le TJM effectif
-et le TJM net (§4.4), la ventilation des provisions (§4.1), le repère de date
-et la projection de franchissement (§4.2).
+Livrés : la ventilation des provisions (§4.1), le repère de date et la
+projection de franchissement (§4.2), le tableau « rapport vs charge » par
+mission (§4.3), le TJM effectif et le TJM net (§4.4), la phrase de synthèse
+de santé (§5.1), l'assiette nommée de l'autonomie.
+
+**Tranché contre la recommandation** : `preserveAspectRatio="none"` reste
+(§5.2). L'attribut est délibéré — il tient la hauteur fixe qui empêche le
+graphe de pousser la page en portrait, et retrouver la proportion demanderait
+de mesurer le conteneur en JavaScript, ce que cet écran s'interdit. Seul
+l'artefact visible est corrigé : l'arrondi des barres, qui devenait un ovale
+différent d'une largeur d'écran à l'autre, est supprimé.
 
 **À ne pas faire** : réintroduire la cascade, le donut de destination, les
 scénarios, les sparklines ou le score /100 (§5.5, §5.1). Ne pas retransformer
