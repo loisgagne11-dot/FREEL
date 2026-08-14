@@ -23,9 +23,12 @@ import {
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
 import {
-  type EntreeATraiter, type SujetATraiter,
+  type EcranCible, type EntreeATraiter, type SujetATraiter,
   sujetsATraiter
 } from '../domain/calculs/aTraiter';
+import {
+  acompteCfe, cfeDue, declaration1447C, paiementCfe, regimeCfe
+} from '../domain/bareme/cfe';
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
@@ -233,17 +236,149 @@ export const ECHEANCES_REGLEMENTAIRES: readonly {
 ];
 
 export function echeancesReglementairesActives(
+  faits: Faits,
   maintenant: Date = new Date()
 ): EntreeATraiter['echeancesReglementaires'] {
   const aujourdhui = dateISOde(maintenant);
-  return ECHEANCES_REGLEMENTAIRES
-    .filter((e) => {
-      const jours = Math.round(
-        (new Date(e.date).getTime() - new Date(aujourdhui).getTime()) / 86400000
-      );
-      return jours <= e.preavisJours;
-    })
+  const dansLePreavis = (date: DateISO, preavisJours: number): boolean => {
+    const jours = Math.round(
+      (new Date(date).getTime() - new Date(aujourdhui).getTime()) / 86400000
+    );
+    return jours <= preavisJours;
+  };
+
+  const fixes = ECHEANCES_REGLEMENTAIRES
+    .filter((e) => dansLePreavis(e.date, e.preavisJours))
     .map((e) => ({ id: e.id, intitule: e.intitule, date: e.date }));
+
+  const cfe = echeancesCfe(faits, maintenant)
+    .filter((e) => dansLePreavis(e.date, e.preavisJours))
+    // `preavisJours` a servi au filtrage : il n'a plus rien à dire au sujet.
+    .map(({ preavisJours: _, ...reste }) => reste);
+
+  return [...fixes, ...cfe];
+}
+
+/**
+ * Les obligations de CFE, déduites de la situation.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA CHARGE QUE L'APPLICATION IGNORAIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La CFE est annuelle, payable au 15 décembre, et n'apparaît nulle part avant
+ * la parution de l'avis en novembre. Rien ne la signalait : quelqu'un qui se
+ * verse tout son disponible en octobre se verse la CFE de décembre. C'est
+ * l'erreur qui va dans le sens dangereux — celle qui invite à se verser de
+ * l'argent déjà dû.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE SUJET DISPARAÎT QUAND IL EST RÉGLÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le rappel de paiement n'apparaît que si AUCUNE échéance de nature `cfe` n'est
+ * enregistrée pour l'année. Dès qu'elle l'est, la dette entre dans les
+ * provisions par le chemin normal et le sujet s'efface. Un rappel qui reste
+ * affiché après avoir été traité apprend à ignorer les rappels.
+ *
+ * Aucun MONTANT n'est avancé ici : la base minimum est fixée par la commune, le
+ * taux voté par elle, et seul l'avis les porte. Voir `bareme/cfe.ts`.
+ */
+interface EcheanceCfeDatee {
+  readonly id: string;
+  readonly intitule: string;
+  readonly date: DateISO;
+  readonly preavisJours: number;
+  readonly ecran?: EcranCible;
+  readonly action?: string;
+  readonly contexte?: string;
+}
+
+function echeancesCfe(faits: Faits, maintenant: Date): readonly EcheanceCfeDatee[] {
+  const annee = maintenant.getFullYear();
+  const debut = faits.entreprise.debutActivite;
+
+  const sujets: EcheanceCfeDatee[] = [];
+
+  // La déclaration initiale, l'année de la création. Ne pas la déposer ne
+  // supprime pas la CFE : cela fait perdre l'exonération de première année.
+  const declaration = declaration1447C(debut, annee);
+  if (declaration !== null) {
+    sujets.push({
+      ...declaration,
+      ecran: 'config',
+      action: 'Se préparer',
+      contexte: 'C’est elle qui établit votre base d’imposition ; l’omettre fait perdre '
+        + 'l’exonération de première année.'
+    });
+  }
+
+  const regime = regimeCfe(debut, annee, caDeReferenceCfe(faits, annee));
+  if (!cfeDue(regime)) return sujets;
+
+  // « Provisionnée » veut dire : une échéance de nature `cfe` existe pour cette
+  // année. Son montant, lui, vient de l'avis — jamais d'un calcul d'ici.
+  const provisionnee = faits.echeances.some(
+    (e) => e.nature === 'cfe' && e.echeanceLe.startsWith(String(annee))
+  );
+  if (!provisionnee) {
+    const paiement = paiementCfe(annee);
+    sujets.push({
+      ...paiement,
+      ecran: 'argent',
+      action: 'Saisir l’échéance',
+      contexte: regime.type === 'base-reduite-moitie'
+        ? 'Première année d’imposition : la base est réduite de moitié, mais la CFE est '
+          + 'due. Sans montant saisi, votre disponible est surestimé.'
+        : 'L’avis paraît en novembre sur votre espace professionnel. Sans montant saisi, '
+          + 'votre disponible est surestimé.'
+    });
+  }
+
+  // L'acompte de juin découle de la CFE de l'an passé, telle qu'elle a été
+  // saisie — pas d'une estimation.
+  const cfePrecedente = euros(faits.echeances
+    .filter((e) => e.nature === 'cfe' && e.echeanceLe.startsWith(String(annee - 1)))
+    .reduce((t, e) => t + e.montant, 0));
+  const acompte = acompteCfe(annee, cfePrecedente);
+  if (acompte !== null) {
+    sujets.push({ ...acompte, ecran: 'argent', action: 'Voir les échéances' });
+  }
+
+  return sujets;
+}
+
+/**
+ * Le chiffre d'affaires de référence pour situer la base minimum : celui de
+ * l'année N−2.
+ *
+ * Rend `null` quand l'entreprise est trop jeune pour en avoir un : une
+ * entreprise sans N−2 n'a pas « 0 € de recettes en N−2 », elle n'a pas de N−2.
+ * La traiter comme un zéro la dispenserait à tort de cotisation minimum, en
+ * surestimant son disponible.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CE GARDE-FOU EST AUJOURD'HUI INATTEIGNABLE, ET C'EST ASSUMÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Vérifié par mutation : le supprimer ne casse aucun test, et ce n'est pas une
+ * lacune des tests. Quand le N−2 manque, l'entreprise a été créée l'année
+ * courante ou la précédente — donc `regimeCfe` a déjà conclu à l'exonération de
+ * création ou à la base réduite de moitié, sans jamais regarder le chiffre de
+ * référence. Les deux conditions ne peuvent pas être vraies en même temps.
+ *
+ * Il est gardé quand même : il rend cette fonction juste PRISE SEULE, sans
+ * rien supposer des branches de `regimeCfe`. Le jour où l'une d'elles change,
+ * un zéro passerait ici pour une absence — et la dispense de cotisation
+ * minimum s'appliquerait à tort, dans le sens dangereux. La règle elle-même est
+ * couverte, côté domaine, par `regimeCfe(…, null)`.
+ */
+function caDeReferenceCfe(faits: Faits, annee: number): Euros | null {
+  const debut = faits.entreprise.debutActivite;
+  if (debut === null) return null;
+  const reference = annee - 2;
+  if (Number(debut.slice(0, 4)) > reference) return null;
+  return caEncaisseAnnee(faits, reference);
 }
 
 /** Les sujets à traiter, calculés depuis les faits. Jamais stockés. */
@@ -252,7 +387,7 @@ export function aTraiter(
   maintenant: Date = new Date()
 ): readonly SujetATraiter[] {
   return sujetsATraiter(
-    entreeATraiter(faits, echeancesReglementairesActives(maintenant), maintenant)
+    entreeATraiter(faits, echeancesReglementairesActives(faits, maintenant), maintenant)
   );
 }
 

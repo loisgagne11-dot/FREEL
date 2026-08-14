@@ -1,0 +1,111 @@
+/* Carte CFE. Aucune couleur en dur : tout par les tokens. */
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+/* Le régime porte le fond, pas le montant : c'est lui qui décide s'il y a
+   quelque chose à payer, et c'est la première chose à lire. */
+.regime {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--tint-2);
+}
+
+/* Rien à payer se dit en vert, quelque chose à provisionner en ambre. Ce n'est
+   pas une alerte : c'est une charge annoncée, et l'ambre dit « à mettre de
+   côté » sans crier. */
+.regime[data-du='false'] { border-color: var(--green-line); background: var(--green-glow); }
+.regime[data-du='true'] { border-color: var(--amber-line); background: var(--amber-soft); }
+
+.champs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (min-width: 561px) {
+  .champs { grid-template-columns: 1fr 1fr; gap: 14px; }
+}
+
+.champ { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+.libelleChamp { font-size: 12.5px; color: var(--text); font-weight: 540; }
+
+.saisie {
+  box-sizing: border-box;
+  /* 44 px : la cible tactile minimale s'applique aussi aux champs. */
+  min-height: 44px;
+  width: 100%;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.saisie:focus-visible { border-color: var(--green); outline: none; }
+
+.attente { margin-top: 12px; font-size: 12.5px; color: var(--muted-2); line-height: 1.55; }
+
+.resultat {
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 620;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.precision { font-size: 12px; font-weight: 400; color: var(--muted-2); }
+
+.suite { margin-top: 12px; font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+
+.lien {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 13px;
+  margin-left: 2px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 560;
+  text-decoration: none;
+}
+
+.lien:hover { border-color: var(--green); }
+
+.calendrier {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--muted-2);
+  line-height: 1.6;
+}

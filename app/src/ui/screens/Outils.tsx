@@ -12,6 +12,7 @@ import { eur, eurExact, moisLong, pct } from '../format';
 import styles from './Outils.module.css';
 import { Montant } from '../components/Montant';
 import { ComparateurVl } from '../components/ComparateurVl';
+import { CarteCfe } from '../components/CarteCfe';
 
 /**
  * Écran Outils — simulateurs.
@@ -66,8 +67,11 @@ export function Outils() {
       />
 
       {/* Le comparateur AVANT le simulateur : il porte une date limite, le
-          simulateur non. Ce qui périme se met devant. */}
+          simulateur non. Ce qui périme se met devant. Et la CFE juste après :
+          elle aussi porte une date — le 15 décembre — mais chaque année. */}
       <ComparateurVl />
+
+      <CarteCfe />
 
       <section className={styles.carte} aria-labelledby="titre-ir">
         <h2 id="titre-ir" className={styles.titreCarte}>

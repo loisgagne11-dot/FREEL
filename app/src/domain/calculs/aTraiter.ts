@@ -89,11 +89,31 @@ export interface EntreeATraiter {
    * l'argent déjà dû.
    */
   readonly echeancesSaisies?: number;
-  /** Échéances réglementaires à date fixe, déjà filtrées sur leur préavis. */
+  /**
+   * Échéances réglementaires, déjà filtrées sur leur préavis.
+   *
+   * Deux familles y cohabitent : celles à date fixe, qui tombent le même jour
+   * pour tout le monde, et celles qui découlent de la situation — la CFE, dont
+   * l'année de création décale les obligations. Le sujet ne fait pas la
+   * différence : dans les deux cas, une date approche et il y a quelque chose à
+   * faire.
+   */
   readonly echeancesReglementaires: readonly {
     readonly id: string;
     readonly intitule: string;
     readonly date: DateISO;
+    /**
+     * L'écran qui règle le sujet, et l'action qui l'y attend.
+     *
+     * Optionnels, parce que la plupart de ces obligations ne demandent que de
+     * se préparer. Mais une CFE non provisionnée se règle en saisissant une
+     * échéance dans Argent, et l'envoyer sur Config serait l'envoyer nulle
+     * part.
+     */
+    readonly ecran?: EcranCible;
+    readonly action?: string;
+    /** Ce qui rend la date urgente, quand elle ne parle pas d'elle-même. */
+    readonly contexte?: string;
   }[];
 }
 
@@ -400,16 +420,17 @@ export function sujetsATraiter(
   /* ---------- échéances réglementaires ---------- */
   for (const ech of e.echeancesReglementaires) {
     const jours = joursEntre(e.aujourdhui, ech.date);
+    const delai = jours < 0
+      ? `Échéance dépassée depuis ${pluriel(-jours, 'jour', 'jours')}.`
+      : `Dans ${pluriel(jours, 'jour', 'jours')}.`;
     sujets.push({
       id: `echeance-${ech.id}`,
-      ecran: 'config',
+      ecran: ech.ecran ?? 'config',
       gravite: jours < 0 ? 'retard' : jours <= 30 ? 'a_faire' : 'information',
       nombre: 1,
       intitule: ech.intitule,
-      contexte: jours < 0
-        ? `Échéance dépassée depuis ${pluriel(-jours, 'jour', 'jours')}.`
-        : `Dans ${pluriel(jours, 'jour', 'jours')}.`,
-      action: 'Se préparer'
+      contexte: ech.contexte === undefined ? delai : `${delai} ${ech.contexte}`,
+      action: ech.action ?? 'Se préparer'
     });
   }
 

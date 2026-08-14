@@ -3,7 +3,8 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe, remunerationDuMois, sousAcreLe
+  aTraiter, caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe,
+  remunerationDuMois, sousAcreLe
 } from './selecteurs';
 import { etatLivre } from './selecteurs.livre';
 import { etatAchats, regimeTvaAu } from './selecteurs.achats';
@@ -411,5 +412,142 @@ describe('rémunération versée', () => {
   // l'écran ne l'affiche pas (voir `soldeEstSuivi`).
   it('rend zéro sans aucun relevé', () => {
     expect(remunerationDuMois(faits(), mois('2026-08'))).toBe(0);
+  });
+});
+
+/**
+ * LA CFE — LA CHARGE QUE L'APPLICATION IGNORAIT.
+ *
+ * Annuelle, payable au 15 décembre, invisible avant la parution de l'avis en
+ * novembre. Rien ne la signalait : quelqu'un qui se verse tout son disponible
+ * en octobre se verse la CFE de décembre.
+ *
+ * Ces tests portent sur le CÂBLAGE — quand le sujet apparaît, quand il
+ * disparaît, où il mène. Les règles elles-mêmes sont éprouvées dans
+ * `bareme/cfe.test.ts`.
+ */
+describe('obligations de CFE', () => {
+  const entreprise = (debutActivite: string) => ({
+    ...faitsVides().entreprise, debutActivite: dateISO(debutActivite)
+  });
+
+  const echeanceCfe = (annee: number): Echeance => ({
+    id: `cfe-${annee}`, nature: 'cfe', montant: euros(410),
+    echeanceLe: dateISO(`${annee}-12-15`), payeeLe: null, montantPaye: null
+  });
+
+  /** Le 5 octobre : dans le préavis de 75 jours du paiement du 15 décembre. */
+  const enOctobre = new Date('2026-10-05T09:00:00Z');
+
+  it('rappelle la CFE avant qu’il soit trop tard pour la provisionner', () => {
+    const sujets = aTraiter(
+      faits({ entreprise: entreprise('2020-01-01'), recettes: [recette('r', 40000, '2024-05-01')] }),
+      enOctobre
+    );
+    const cfe = sujets.find((s) => s.id.includes('cfe-paiement'));
+    expect(cfe).toBeTruthy();
+    expect(cfe?.contexte).toMatch(/disponible est surestimé/);
+  });
+
+  /**
+   * LE POINT QUI REND L'ALERTE CRÉDIBLE. Dès que l'échéance est saisie, la
+   * dette entre dans les provisions par le chemin normal et le sujet s'efface.
+   * Un rappel qui survit à son traitement apprend à ignorer les rappels.
+   */
+  it('se taît dès que l’échéance est saisie', () => {
+    const sujets = aTraiter(
+      faits({
+        entreprise: entreprise('2020-01-01'),
+        recettes: [recette('r', 40000, '2024-05-01')],
+        echeances: [echeanceCfe(2026)]
+      }),
+      enOctobre
+    );
+    expect(sujets.find((s) => s.id.includes('cfe-paiement'))).toBeUndefined();
+  });
+
+  // Une échéance de l'an dernier ne couvre pas cette année-ci.
+  it('ne tient pas la CFE de l’an passé pour celle de cette année', () => {
+    const sujets = aTraiter(
+      faits({
+        entreprise: entreprise('2020-01-01'),
+        recettes: [recette('r', 40000, '2024-05-01')],
+        echeances: [echeanceCfe(2025)]
+      }),
+      enOctobre
+    );
+    expect(sujets.find((s) => s.id.includes('cfe-paiement'))).toBeTruthy();
+  });
+
+  it('ne réclame rien l’année de la création, qui est exonérée', () => {
+    const sujets = aTraiter(faits({ entreprise: entreprise('2026-02-01') }), enOctobre);
+    expect(sujets.find((s) => s.id.includes('cfe-paiement'))).toBeUndefined();
+  });
+
+  /**
+   * L'année de création, c'est la 1447-C qui est due — et elle, elle mérite
+   * d'être rappelée : l'omettre fait perdre l'exonération de première année.
+   */
+  it('rappelle la déclaration initiale l’année de la création', () => {
+    const sujets = aTraiter(faits({ entreprise: entreprise('2026-02-01') }), enOctobre);
+    const d = sujets.find((s) => s.id.includes('1447c'));
+    expect(d?.intitule).toMatch(/1447-C/);
+    expect(d?.ecran).toBe('config');
+  });
+
+  it('ne rappelle plus la déclaration initiale les années suivantes', () => {
+    const sujets = aTraiter(faits({ entreprise: entreprise('2024-02-01') }), enOctobre);
+    expect(sujets.find((s) => s.id.includes('1447c'))).toBeUndefined();
+  });
+
+  // Le sujet se règle en saisissant une échéance : il doit mener là où on la
+  // saisit, pas sur Config.
+  it('mène là où l’échéance se saisit', () => {
+    const sujets = aTraiter(
+      faits({ entreprise: entreprise('2020-01-01'), recettes: [recette('r', 40000, '2024-05-01')] }),
+      enOctobre
+    );
+    expect(sujets.find((s) => s.id.includes('cfe-paiement'))?.ecran).toBe('argent');
+  });
+
+  /**
+   * En juin, le paiement de décembre est encore loin : l'annoncer alors
+   * n'ajoute rien et occupe une ligne pour six mois.
+   */
+  it('ne parle pas du paiement de décembre au mois de juin', () => {
+    const sujets = aTraiter(
+      faits({ entreprise: entreprise('2020-01-01'), recettes: [recette('r', 40000, '2024-05-01')] }),
+      new Date('2026-06-20T09:00:00Z')
+    );
+    expect(sujets.find((s) => s.id.includes('cfe-paiement'))).toBeUndefined();
+  });
+
+  /**
+   * LA PREMIÈRE ANNÉE D'IMPOSITION EST DUE, MÊME SANS UN EURO DE RECETTES.
+   *
+   * Entreprise créée en 2025, aucune recette enregistrée : le chiffre de
+   * référence est nul ou inconnu selon la lecture, et il serait tentant d'en
+   * conclure « rien à payer ». C'est faux — la base est réduite de moitié, pas
+   * supprimée. Le sujet doit donc apparaître, et dire pourquoi.
+   *
+   * (Le cas « N−2 inexistant » lui-même se teste côté domaine, sur
+   * `regimeCfe(…, null)` : ici les régimes de création l'absorbent avant que le
+   * chiffre de référence soit consulté.)
+   */
+  it('réclame la CFE de la première année d’imposition, même sans recettes', () => {
+    const sujets = aTraiter(faits({ entreprise: entreprise('2025-01-01') }), enOctobre);
+    const cfe = sujets.find((s) => s.id.includes('cfe-paiement'));
+    expect(cfe).toBeTruthy();
+    expect(cfe?.contexte).toMatch(/réduite de moitié/);
+  });
+
+  // Au plus 5 000 € de recettes en N−2 : pas de cotisation minimum, donc rien
+  // à provisionner et rien à dire.
+  it('ne réclame rien sous le seuil de cotisation minimum', () => {
+    const sujets = aTraiter(
+      faits({ entreprise: entreprise('2020-01-01'), recettes: [recette('r', 4000, '2024-05-01')] }),
+      enOctobre
+    );
+    expect(sujets.find((s) => s.id.includes('cfe-paiement'))).toBeUndefined();
   });
 });
