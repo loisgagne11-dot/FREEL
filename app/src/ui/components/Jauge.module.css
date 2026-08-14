@@ -20,6 +20,8 @@
 }
 
 .piste {
+  /* Le repère de date se positionne dans cette piste. */
+  position: relative;
   height: 8px;
   border-radius: 100px;
   background: var(--panel-2);
@@ -44,4 +46,28 @@
 
 @media (prefers-reduced-motion: reduce) {
   .remplissage { transition: none; }
+}
+
+/* Le repère de date : un trait fin en travers de la piste, à la part de
+   l'année écoulée. Il ne remplit rien — il marque une position — donc il
+   traverse aussi bien le vide que le rempli. */
+.repere {
+  position: absolute;
+  /* Dans la piste et non débordant : elle masque ce qui dépasse, pour garder
+     les coins arrondis du remplissage. */
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  opacity: 0.55;
+  border-radius: 1px;
+}
+
+/* Une extrapolation ne se lit pas comme un constat : plus discrète que le
+   détail chiffré qui la précède. */
+.note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
 }

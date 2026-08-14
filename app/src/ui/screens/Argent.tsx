@@ -1,14 +1,15 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
-  etatArgent, moisCourant, recettesEncaissees
+  dateDuJour, etatArgent, moisCourant, recettesEncaissees
 } from '../../state/selecteurs';
 import { etatDes, etatLivre } from '../../state/selecteurs.livre';
 import type { EtatSeuils } from '../../state/selecteurs';
-import type { Mois } from '../../domain/types';
+import type { DateISO, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
+import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
 import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
@@ -522,6 +523,20 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
   const tva = seuils.franchiseTva;
 
   /**
+   * Le repère de date, posé sur chaque jauge.
+   *
+   * C'est un fait de calendrier, pas une extrapolation : au 15 novembre, 87 %
+   * de l'année est passée quoi qu'on fasse. Sans lui, « 69 % du plafond » se
+   * lit pareil en mars et en novembre, alors que c'est une bonne nouvelle dans
+   * un cas et un problème dans l'autre.
+   */
+  const aujourdhui = dateDuJour();
+  const repere = {
+    part: partDeLAnneeEcoulee(aujourdhui),
+    libelle: `${Math.round(partDeLAnneeEcoulee(aujourdhui) * 100)} % de l’année écoulée`
+  };
+
+  /**
    * Ce que la carte dit une fois repliée.
    *
    * La spec de design notait que le résumé plié de cette carte était **écrit en
@@ -578,6 +593,12 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
               atteint={seuils.caEncaisse}
               seuil={plafond.valeur}
               unite="€"
+              repere={repere}
+              note={<NoteDeFranchissement
+                encaisse={seuils.caEncaisse}
+                seuil={plafond.valeur}
+                aujourdhui={aujourdhui}
+              />}
             />
           )}
 
@@ -590,18 +611,85 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
                 atteint={seuils.caEncaisse}
                 seuil={tva.valeur.franchise}
                 unite="€"
+                repere={repere}
+                note={<NoteDeFranchissement
+                  encaisse={seuils.caEncaisse}
+                  seuil={tva.valeur.franchise}
+                  aujourdhui={aujourdhui}
+                />}
               />
+              {/* Le seuil MAJORÉ est celui où prévenir tard coûte le plus
+                  cher : le franchir rend la TVA exigible dès le 1er du mois,
+                  sur des factures déjà émises sans TVA. */}
               <Jauge
                 libelle="Seuil majoré de TVA"
                 atteint={seuils.caEncaisse}
                 seuil={tva.valeur.majore}
                 unite="€"
+                repere={repere}
+                note={<NoteDeFranchissement
+                  encaisse={seuils.caEncaisse}
+                  seuil={tva.valeur.majore}
+                  aujourdhui={aujourdhui}
+                />}
               />
             </>
           )}
       </div>
     </CartePliable>
   );
+}
+
+/**
+ * Ce que le rythme constaté annonce, avec son hypothèse visible.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE EXTRAPOLATION QUI DIT QU'ELLE EN EST UNE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Prolonger le rythme est légitime pour annoncer l'avenir — c'est même la
+ * seule façon de prévenir avant le franchissement. Mais le chiffre ne vaut que
+ * son hypothèse, qui est écrite : « au rythme de l'encaissé depuis janvier ».
+ *
+ * Et l'abstention est dite, jamais déguisée : sous un trimestre d'activité, un
+ * seul règlement important suffit à tripler le rythme apparent. La phrase dit
+ * alors pourquoi elle ne dit rien, au lieu d'afficher une date qui sauterait
+ * d'un mois à l'autre chaque semaine.
+ */
+function NoteDeFranchissement(
+  { encaisse, seuil, aujourdhui }: {
+    readonly encaisse: number;
+    readonly seuil: number;
+    readonly aujourdhui: DateISO;
+  }
+) {
+  const f = franchissementPrevu(euros(encaisse), euros(seuil), aujourdhui);
+
+  // Un seuil déjà franchi n'a plus de date à prévoir, et la jauge le dit déjà
+  // en clair au-dessus. Le répéter n'ajouterait rien.
+  if (f.statut === 'depasse') return null;
+
+  if (f.statut === 'indeterminable') {
+    return <>Pas de projection&nbsp;: {f.motif}.</>;
+  }
+
+  if (f.statut === 'hors_annee') {
+    return <>Au rythme de l’encaissé depuis janvier, seuil non atteint d’ici le 31 décembre.</>;
+  }
+
+  return (
+    <>
+      Au rythme de l’encaissé depuis janvier, seuil atteint vers{' '}
+      <strong>{moisLong(f.mois)}</strong>.
+    </>
+  );
+}
+
+/** « 2026-09 » → « septembre 2026 ». */
+function moisLong(m: Mois): string {
+  return new Date(`${m}-01T00:00:00Z`).toLocaleDateString('fr-FR', {
+    month: 'long', year: 'numeric', timeZone: 'UTC'
+  });
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
