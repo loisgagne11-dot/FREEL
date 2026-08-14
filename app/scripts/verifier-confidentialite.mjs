@@ -130,29 +130,37 @@ await contexte.addInitScript(([faits, cle, ecrans]) => {
   window.localStorage.setItem('freel.faits.v1', JSON.stringify(faits));
   window.localStorage.setItem(cle, 'oui');
 
-  /*
-   * LES CARTES SONT REPLIÉES AVANT LA PASSE, ET C'EST INDISPENSABLE.
-   *
-   * Une carte repliée affiche sa SYNTHÈSE — « n achats · X € TTC · TVA
-   * déductible Y € ». Des montants, donc, qui doivent être masqués comme les
-   * autres.
-   *
-   * Mais les cartes s'ouvrent dépliées : la synthèse n'est pas dans le DOM, et
-   * le contrôle passait au vert sans jamais l'avoir regardée. C'est arrivé — la
-   * première version de `CartePliable` rendait ses montants en clair, et ces
-   * 140 combinaisons n'y voyaient rien.
-   *
-   * On replie donc tout ce qui peut l'être. Un contrôle qui n'inspecte que
-   * l'état par défaut ne contrôle que la moitié de l'écran.
-   */
-  for (const ecran of ecrans) {
-    window.localStorage.setItem(
-      `freel.pli.${ecran}`,
-      JSON.stringify({ registre: true })
-    );
+}, [FAITS, 'freel.confidentialite.v1']);
+
+/**
+ * Replie toutes les cartes pliables de l'écran courant.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI C'EST INDISPENSABLE, ET POURQUOI ON CLIQUE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une carte repliée affiche sa SYNTHÈSE — « n achats · X € TTC · TVA
+ * déductible Y € ». Des montants, donc, qui doivent être masqués comme les
+ * autres. Mais les cartes s'ouvrent DÉPLIÉES : la synthèse n'est pas dans le
+ * DOM, et le contrôle passait au vert sans jamais l'avoir regardée. C'est
+ * arrivé — la première version de `CartePliable` rendait ses montants en clair.
+ *
+ * On CLIQUE plutôt que de poser des clés de stockage. Une liste d'identifiants
+ * de cartes écrite ici vieillirait en silence : chaque carte pliable ajoutée
+ * échapperait au contrôle sans que rien ne le signale, ce qui est exactement le
+ * défaut qu'on répare. Cliquer sur ce qui est déplié n'a rien à savoir des
+ * identifiants.
+ */
+async function replierLesCartes(page) {
+  const boutons = page.locator('button[aria-expanded="true"][aria-controls]');
+  for (let i = await boutons.count(); i > 0; i--) {
+    // Toujours le premier : replier réordonne le DOM, et un index figé
+    // désignerait un bouton déjà traité.
+    const bouton = page.locator('button[aria-expanded="true"][aria-controls]').first();
+    if (await bouton.count() === 0) break;
+    await bouton.click({ timeout: 2000 }).catch(() => {});
   }
-}, [FAITS, 'freel.confidentialite.v1',
-  ['pilote', 'activite', 'argent', 'facture', 'achats', 'outils', 'config']]);
+}
 
 const page = await contexte.newPage();
 
@@ -221,6 +229,8 @@ for (const ecran of ECRANS) {
     monte = false;
   }
   await page.waitForTimeout(150);
+  await replierLesCartes(page);
+  await page.waitForTimeout(80);
 
   // Un écran qui ne se monte pas n'affiche aucun montant : il passerait le
   // contrôle en ne prouvant rien. On le compte donc comme un échec, en citant
