@@ -100,7 +100,7 @@ plus que de repli, et l'écran annonce qu'il estime au lieu de mesurer.
 | V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis** |
 | V6 | Frise de l'échéancier | ✅ | ✅ | ⚠️ liste groupée ; la lecture « à date » de la frise est perdue |
 | V7 | Courbe de solde / trésorerie | ✅ | ✅ | ❌ rien au-delà du mois courant |
-| V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ⚠️ dépendance en CA, pas en jours |
+| V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
 | V9 | Capacité de versement par mois | ✅ | ✅ | ❌ |
 | V10 | Cascade CA → charges → net | ✅ (deux fois) | ❌ | 🚫 §5.5 |
 | V11 | Donut de destination du CA | ✅ | ❌ | 🚫 §5.5 |
@@ -128,7 +128,7 @@ Ne sont listés que les verdicts qui appellent une décision.
 | **Déjà versé ce mois** | 🟢 **n'existe nulle part ailleurs** |
 | **Autonomie (mois)** | 🟢 `null` si non renseigné, là où l'ancienne codait `2200 \|\| 500` en dur — mais elle divise le **versable**, donc exclut la réserve, et l'écran ne dit pas ce qu'il compte |
 | **Reste à rentrer** | ✅ corrigé, §1.1 |
-| **TJM effectif** et **TJM net** | ❌ disparus sans motif écrit. Le TJM net importe le plus en micro-BNC : l'écart entre le tarif affiché et ce qui reste est ce que tout indépendant sous-estime |
+| **TJM effectif** et **TJM net** | ✅ **ajoutés depuis** — avec l'écart entre le tarif des contrats et le facturé, qui mesure ce qui se perd en remises et jours non facturés. Le net s'abstient quand le barème ne couvre pas la période |
 | **Bénéfice net / marge %** | 🚫 légitime : le « bénéfice » de l'ancienne n'avait pas de définition comptable stable en micro |
 | **DSO / délai de paiement** | 🟢 **médiane** et non moyenne |
 | **Dépendance client** | 🟢 sur le CA encaissé de l'année, bien motivé |
@@ -171,7 +171,7 @@ Le seuil majoré de TVA est le cas où cela compte le plus : le franchir rend la
 TVA exigible **rétroactivement au 1er du mois**, sur des factures déjà émises
 sans TVA.
 
-### 4.3 « Quelle mission me rapporte quoi et me prend combien de temps »
+### 4.3 « Quelle mission me rapporte quoi et me prend combien de temps » — ✅ livré
 
 Personne n'a jamais mis les deux face à face. L'ancienne avait le rapport et la
 charge dans **deux écrans différents, jamais croisés**. La maquette a les jours
@@ -185,7 +185,7 @@ date.
 tableau trié par € par jour effectif** — on compare des ratios, pas des
 proportions.
 
-### 4.4 TJM effectif et TJM net
+### 4.4 TJM effectif et TJM net — ✅ livré
 
 Disparus sans motif écrit. Le TJM effectif dit si les jours non facturés, les
 remises et les forfaits rognent le tarif affiché. Le TJM **net** — après
@@ -275,13 +275,15 @@ ne peut pas le représenter. Le niveau de détail manquant (§4.1) est comblé.
 
 ## 6. Reste à faire, par valeur
 
-1. **Tableau « rapport vs charge » par mission** (§4.3)
-2. **TJM effectif et TJM net** (§4.4)
-3. **Phrase de synthèse de santé** (§5.1)
-4. **Composition d'un mois au clic** (§4.6)
-5. **Graphe de solde constaté**, sans extrapolation (§4.5)
-6. **Dire ce que compte l'autonomie** — versable ou disponible ?
-7. **Retirer `preserveAspectRatio="none"`** de `GrapheBarres` (§5.2)
+1. **Phrase de synthèse de santé** (§5.1)
+2. **Composition d'un mois au clic** (§4.6)
+3. **Graphe de solde constaté**, sans extrapolation (§4.5)
+4. **Dire ce que compte l'autonomie** — versable ou disponible ?
+5. **Retirer `preserveAspectRatio="none"`** de `GrapheBarres` (§5.2)
+
+Livrés : le tableau « rapport vs charge » par mission (§4.3), le TJM effectif
+et le TJM net (§4.4), la ventilation des provisions (§4.1), le repère de date
+et la projection de franchissement (§4.2).
 
 **À ne pas faire** : réintroduire la cascade, le donut de destination, les
 scénarios, les sparklines ou le score /100 (§5.5, §5.1). Ne pas retransformer

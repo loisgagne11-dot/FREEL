@@ -184,6 +184,7 @@ describe('missions', () => {
     render(<Activite />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: 'Missions' }));
+    await screen.findByRole('heading', { name: /^Missions/ });
 
     const liste = screen.getByRole('list');
     expect(within(liste).getByText('Mission A')).toBeTruthy();
@@ -808,5 +809,68 @@ describe('rapport et charge par mission', () => {
 
     const table = screen.getByRole('table');
     expect(within(table).getByText('800 €').closest('[data-montant]')).toBeTruthy();
+  });
+});
+
+/**
+ * LES DEUX ERREURS QU'ON FAIT SUR SON PROPRE TARIF.
+ *
+ * Tous les jours travaillés ne se facturent pas, et ce qui rentre n'est pas ce
+ * qui reste. Les deux indicateurs existaient dans l'ancienne application et
+ * avaient disparu — l'inventaire fonctionnel les donnait même pour « présents »
+ * alors qu'ils n'étaient nulle part.
+ */
+describe('ce qu’une journée rapporte', () => {
+  const missionTarifee = mission({
+    id: 't', description: 'Mission tarifée', clientNom: 'ClientA',
+    tjm: euros(500), debut: dateISO('2026-01-01'), fin: dateISO('2026-01-31'),
+    entites: [entite({
+      id: 't-co', nom: 'ClientA',
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-01-31'),
+        parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 },
+        tjm: euros(500)
+      }]
+    })]
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Le tarif des contrats et le tarif facturé se divisent
+   * par les MÊMES journées : leur écart mesure ce qui se perd en remises,
+   * forfaits et jours non facturés, et non une différence de décompte.
+   */
+  it('met l’écart entre le tarif des contrats et le facturé', () => {
+    semer({
+      missions: [missionTarifee],
+      // Janvier 2026 : 22 jours ouvrés, soit 11 000 € au tarif du contrat.
+      recettes: [recette({ montant: euros(8800), emiseLe: dateISO('2026-01-31') })]
+    });
+    render(<Activite />);
+
+    expect(screen.getByText(/Tarif des contrats/)).toBeTruthy();
+    expect(screen.getByText('Tarif effectif, facturé')).toBeTruthy();
+    expect(screen.getByText('Perdu par journée')).toBeTruthy();
+  });
+
+  /** Le net retire cotisations et impôt : c'est ce qu'on sous-estime le plus. */
+  it('montre ce qu’il reste, charges déduites', () => {
+    semer({
+      missions: [missionTarifee],
+      recettes: [recette({ montant: euros(11_000), emiseLe: dateISO('2026-01-31') })]
+    });
+    render(<Activite />);
+
+    const reste = screen.getByText(/Ce qu’il vous reste, charges déduites/);
+    const montant = reste.parentElement?.querySelector('dd')?.textContent ?? '';
+    expect(montant).toMatch(/€/);
+    // Net strictement inférieur au brut : les charges ne sont pas nulles.
+    expect(montant).not.toBe('500 €');
+  });
+
+  /** Sans journée travaillée, il n'y a pas de moyenne à montrer. */
+  it('ne montre rien sans journée travaillée', () => {
+    semer({ missions: [] });
+    render(<Activite />);
+    expect(screen.queryByText(/Tarif des contrats/)).toBeNull();
   });
 });

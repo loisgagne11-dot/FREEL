@@ -26,10 +26,15 @@ import {
 } from '../domain/calculs/activite';
 import type { ChargeDuMois, PlanDeCharge, SourceCharge } from '../domain/calculs/activite';
 import { delaisParClient, type DelaiClient } from '../domain/calculs/activite';
-import type { DateISO, Euros, Mois } from '../domain/types';
+import type { DateISO, Euros, Mois, Resolution } from '../domain/types';
 import { euros } from '../domain/types';
 import type { ClientOperationnel, Faits, Mission } from './schema';
-import { dateDuJour } from './selecteurs';
+import {
+  dateDuJour, periodesUrssafEffectives, regimeDe, sousAcreLe
+} from './selecteurs';
+import { tauxCotisations } from '../domain/bareme/urssaf';
+import { tauxImpotEtContributions } from '../domain/bareme';
+import { type TjmEffectif, tjmEffectif, tjmNet } from '../domain/calculs/tjm';
 
 /**
  * Tarif journalier par nom de client.
@@ -632,4 +637,97 @@ export function rapportParMission(
     // Du meilleur euro-jour au moins bon : c'est la décision commerciale que
     // l'outil peut éclairer, et elle doit être en première ligne.
     .sort((a, b) => (b.parJour ?? 0) - (a.parJour ?? 0));
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Ce qu'une journée rapporte, et ce qu'il en reste
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Le tarif de la journée, brut puis net de charges. */
+export interface TarifDeLaJournee {
+  readonly effectif: TjmEffectif;
+  /**
+   * Ce qu'il reste d'une journée facturée, cotisations et impôt déduits.
+   *
+   * Une `Resolution` : le barème peut ne pas couvrir la période, et un « ce qui
+   * vous reste par jour » calculé sur un taux supposé serait précisément le
+   * chiffre sur lequel on décide d'accepter une mission.
+   */
+  readonly net: Resolution<Euros>;
+}
+
+/**
+ * Le taux total de charges d'un mois : cotisations sociales, plus impôt et
+ * contributions.
+ *
+ * Les deux sont des `Resolution` et se combinent en une seule : si l'une des
+ * deux refuse, le total refuse. Additionner un taux connu à un taux inconnu
+ * traité comme zéro donnerait un net trop élevé — l'erreur qui rassure.
+ */
+function tauxDeChargesAu(faits: Faits, m: Mois): Resolution<number> {
+  const type = faits.entreprise.typeActivite;
+  const cotis = tauxCotisations(m, type, sousAcreLe(faits)(m), periodesUrssafEffectives(faits));
+  if (cotis.statut === 'refuse') return cotis;
+
+  const impot = tauxImpotEtContributions(regimeDe(faits), m, type);
+  if (impot.statut === 'refuse') return impot;
+
+  const somme = cotis.valeur + impot.valeur;
+
+  // Le total est une hypothèse dès que l'un des deux en est une : c'est le
+  // moins engageant des deux qui gouverne.
+  return cotis.statut === 'hypothese'
+    ? { ...cotis, valeur: somme }
+    : impot.statut === 'hypothese'
+      ? { ...impot, valeur: somme }
+      : { statut: 'publie', valeur: somme, source: cotis.source, verifieLe: cotis.verifieLe };
+}
+
+/**
+ * Ce qu'une journée rapporte réellement sur l'année, et ce qu'il en reste.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX INDICATEURS QUI AVAIENT DISPARU SANS MOTIF
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne application portait `tjmEffectif` et `tjmNet` ; ils ont disparu
+ * dans la reprise, et l'inventaire fonctionnel les donnait pour « présents »
+ * alors qu'ils n'existaient nulle part.
+ *
+ * Ils méritent d'exister tous les deux. Le premier dit si les jours non
+ * facturés, les remises et les forfaits rognent le tarif affiché. Le second
+ * dit ce qu'il reste après cotisations et impôt — l'écart que tout indépendant
+ * sous-estime, et celui qu'il faut avoir en tête pour dire oui à une mission.
+ *
+ * Le tarif affiché est valorisé depuis le PLANNING, le tarif effectif depuis
+ * les factures ÉMISES, et les deux se divisent par les mêmes journées : c'est
+ * la seule façon que l'écart soit lisible.
+ */
+export function tarifDeLaJournee(
+  faits: Faits,
+  annee: number,
+  zone: ZoneFeries = 'general'
+): TarifDeLaJournee {
+  const lignes = rapportParMission(faits, annee, zone);
+  const jours = lignes.reduce((s, l) => s + l.jours, 0);
+  const produit = euros(lignes.reduce((s, l) => s + l.produit, 0));
+
+  const prefixe = String(annee);
+  const facture = euros(faits.recettes
+    .filter((r) => r.emiseLe !== null && r.emiseLe.startsWith(prefixe))
+    .reduce<number>((s, r) => s + r.montant, 0));
+
+  const effectif = tjmEffectif({ jours, produit, facture });
+
+  // Le taux se résout au DERNIER mois de l'année considérée qui soit couvert
+  // par le barème : c'est celui en vigueur pour ce qu'on facturera ensuite, et
+  // c'est la question que pose « ce qui me reste par jour ».
+  const taux = tauxDeChargesAu(faits, `${annee}-12` as Mois);
+
+  return {
+    effectif,
+    net: effectif.effectif === null
+      ? { statut: 'refuse', motif: 'aucune journée travaillée cette année' }
+      : tjmNet(effectif.effectif, taux)
+  };
 }

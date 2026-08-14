@@ -42,9 +42,10 @@ async function ouvrir(onglet: 'Clients' | 'Missions') {
   render(<Activite />);
   const utilisateur = userEvent.setup();
   await utilisateur.click(screen.getByRole('tab', { name: onglet }));
-  if (onglet === 'Clients') {
-    await screen.findByRole('heading', { name: /Carnet/ });
-  }
+  // Les deux onglets sont chargés à la demande : attendre leur arrivée.
+  await screen.findByRole('heading', {
+    name: onglet === 'Clients' ? /Carnet/ : /^Missions/
+  });
   return utilisateur;
 }
 
