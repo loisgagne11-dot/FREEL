@@ -62,6 +62,9 @@ import styles from './Facturier.module.css';
 const TONS: Readonly<Record<StatutFacture, TonStatut>> = {
   brouillon: 'neutre',
   emise: 'attente',
+  // « Envoyée » n'est pas « en attente » d'un geste de notre part : la balle
+  // est chez le client. Le ton le dit.
+  envoyee: 'attente',
   en_retard: 'retard',
   encaissee: 'ok',
   annulee: 'neutre',
@@ -110,6 +113,7 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
   const annulerRecette = useFaits((e) => e.annulerRecette);
   const supprimerBrouillon = useFaits((e) => e.supprimerBrouillon);
   const consignerRelance = useFaits((e) => e.consignerRelance);
+  const marquerEnvoyee = useFaits((e) => e.marquerEnvoyee);
   const signaler = useToast();
 
   const [granularite, setGranularite] = useState<Granularite>('tout');
@@ -140,6 +144,20 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
     // L'effet est invisible : la ligne quitte « à encaisser » pour rejoindre
     // le livre, dans un écran qu'on ne regarde pas.
     signaler('Règlement enregistré au livre des recettes.');
+  }
+
+  /**
+   * Marque la facture envoyée, à la date du jour.
+   *
+   * La date du jour et non un formulaire : on clique en sortant du courriel,
+   * et demander une date à ce moment-là ferait abandonner le geste — après
+   * quoi plus rien ne distinguerait une facture partie d'une facture oubliée.
+   * Le fait qui compte est qu'elle soit partie ; l'antidatage a ses limites,
+   * mais l'absence d'information n'en a aucune.
+   */
+  function envoyer(f: FactureSuivie<Recette>): void {
+    const motif = marquerEnvoyee(f.recette.id, dateDuJour());
+    signaler(motif ?? `Facture ${f.recette.numero || 'sans numéro'} marquée envoyée.`);
   }
 
   function annuler(f: FactureSuivie<Recette>): void {
@@ -230,6 +248,7 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
                   onAnnuler={() => annuler(f)}
                   onJeter={() => jeter(f)}
                   onRelancer={() => setARelancer(f)}
+                  onEnvoyer={() => envoyer(f)}
                 />
               ))}
             </ul>
@@ -283,12 +302,13 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
 }
 
 function Ligne(
-  { facture, onEncaisser, onAnnuler, onJeter, onRelancer }: {
+  { facture, onEncaisser, onAnnuler, onJeter, onRelancer, onEnvoyer }: {
     readonly facture: FactureSuivie<Recette>;
     readonly onEncaisser: () => void;
     readonly onAnnuler: () => void;
     readonly onJeter: () => void;
     readonly onRelancer: () => void;
+    readonly onEnvoyer: () => void;
   }
 ) {
   const { recette: r, statut, echeanceLe, joursDeRetard } = facture;
@@ -313,6 +333,14 @@ function Ligne(
             <span>émise le {dateCourte(r.emiseLe)}</span>
           </>
         )}
+        {/* La date d'envoi se lit à côté de celle d'émission : c'est l'écart
+            entre les deux qui explique un client qui n'a rien reçu. */}
+        {r.envoyeeLe != null && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>envoyée le {dateCourte(r.envoyeeLe)}</span>
+          </>
+        )}
         {r.encaisseeLe !== null && (
           <>
             <span aria-hidden="true">·</span>
@@ -329,7 +357,7 @@ function Ligne(
             </span>
           </>
         )}
-        {statut === 'emise' && echeanceLe !== null && (
+        {(statut === 'emise' || statut === 'envoyee') && echeanceLe !== null && (
           <>
             <span aria-hidden="true">·</span>
             <span>échéance {dateCourte(echeanceLe)}</span>
@@ -338,7 +366,15 @@ function Ligne(
       </span>
 
       <span className={styles.ligneActions}>
-        {(statut === 'emise' || statut === 'en_retard') && (
+        {/* Le geste manquant : une facture pouvait être émise et réglée, mais
+            jamais « partie ». On relançait donc des clients qui n'avaient rien
+            reçu, et on ne savait pas répondre à « je ne l'ai jamais reçue ». */}
+        {(statut === 'emise' || (statut === 'en_retard' && r.envoyeeLe == null)) && (
+          <button type="button" className={styles.actionLigne} onClick={onEnvoyer}>
+            Marquer envoyée
+          </button>
+        )}
+        {(statut === 'emise' || statut === 'envoyee' || statut === 'en_retard') && (
           <button type="button" className={styles.actionLigne} onClick={onEncaisser}>
             Enregistrer le règlement
           </button>

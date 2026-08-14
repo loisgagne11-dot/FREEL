@@ -118,7 +118,7 @@ Relevé dans le code au 14/08, pas supposé.
 | Mission → **CRA du mois** | ✅ | Un CRA par client qui signe |
 | Mission → **prévision de revenu** | ✅ | Prévu et retenu côte à côte, chaque journée au tarif de sa date |
 | Mission → **facture du mois en brouillon** | ✅ | Dérivé du planning, donc il suit par construction. Émettre est le geste qui engage |
-| Facture : **statut d'avancement, date d'envoi** | ❌ | Deux états seulement — émise, encaissée. Pas de date d'envoi |
+| Facture : **statut d'avancement, date d'envoi** | ✅ | Brouillon, à envoyer, envoyée, en retard, encaissée — chacun dérivé d'une date, jamais d'un statut saisi |
 | Provisions **automatiques et justes** | ✅ | Deux volets : échéances émises, et charges sur recettes encaissées non déclarées |
 | Provision **soldée par un paiement réel** | ✅ | Une échéance payée sort du volet 1 ; la date et le montant réellement débité sont exigés |
 | Provisions **par catégorie** | ✅ | Ventilé URSSAF / TVA / impôt / CFE / CFP, volet 1 par échéance et volet 2 par règle de calcul |
@@ -141,8 +141,8 @@ l'ordre :
 
 1. ~~**La chaîne de la mission**~~ — prévision de revenu ✅, brouillon de
    facture qui suit l'Activité ✅.
-2. **Le cycle de vie d'une facture** — envoyée, avec sa date ; payée, avec la
-   sienne. *Reste à faire.*
+2. ~~**Le cycle de vie d'une facture**~~ — envoyée avec sa date ✅ ; payée
+   avec la sienne ✅ (elle l'était déjà).
 3. ~~**Les provisions par catégorie**~~ ✅.
 4. **Le dossier de déclaration de TVA**, atteint depuis son jalon, avec les
    factures et la TVA déductible qui le composent. *Reste à faire.*

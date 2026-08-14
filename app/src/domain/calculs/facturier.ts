@@ -56,6 +56,7 @@ export function echeanceDe(emiseLe: DateISO, delaiJours: number): DateISO {
 export type StatutFacture =
   | 'brouillon'
   | 'emise'
+  | 'envoyee'
   | 'en_retard'
   | 'encaissee'
   | 'annulee'
@@ -68,6 +69,8 @@ export interface RecetteSuivie {
   readonly libelle: string;
   readonly montant: Euros;
   readonly emiseLe: DateISO | null;
+  /** Date d'envoi au client. `undefined` sur les recettes d'avant le schéma 8. */
+  readonly envoyeeLe?: DateISO | null;
   readonly encaisseeLe: DateISO | null;
   readonly numero: string;
   readonly annuleEcriture?: string | null;
@@ -129,7 +132,16 @@ function statutDe(
   // Strictement supérieur : une facture n'est pas en retard LE jour de son
   // échéance, elle l'est le lendemain.
   if (echeanceLe !== null && aujourdhui > echeanceLe) return 'en_retard';
-  return 'emise';
+
+  // ÉMISE N'EST PAS ENVOYÉE. Le document peut exister, porter son numéro, et
+  // dormir dans un dossier — c'est même le cas courant en fin de mois, où l'on
+  // établit les factures d'un coup avant de les envoyer. Les confondre fait
+  // relancer un client qui n'a jamais rien reçu.
+  //
+  // Le retard l'emporte sur les deux : une facture échue est en retard qu'on
+  // l'ait envoyée ou non, et si on ne l'a pas envoyée, c'est le premier
+  // problème à régler.
+  return recette.envoyeeLe == null ? 'emise' : 'envoyee';
 }
 
 /**
@@ -178,8 +190,13 @@ export function encoursDe(factures: readonly FactureSuivie[]): Encours {
   const somme = (garde: (f: FactureSuivie) => boolean): Euros =>
     euros(factures.filter(garde).reduce((t, f) => t + f.recette.montant, 0));
 
+  // Une facture non encore envoyée est due autant qu'une envoyée : le client
+  // n'a simplement pas encore été mis au courant. L'exclure ferait disparaître
+  // du « reste à rentrer » les factures de fin de mois, c'est-à-dire les plus
+  // récentes.
   return {
-    resteARentrer: somme((f) => f.statut === 'emise' || f.statut === 'en_retard'),
+    resteARentrer: somme((f) =>
+      f.statut === 'emise' || f.statut === 'envoyee' || f.statut === 'en_retard'),
     enRetard: somme((f) => f.statut === 'en_retard')
   };
 }
@@ -187,7 +204,10 @@ export function encoursDe(factures: readonly FactureSuivie[]): Encours {
 /** Les libellés d'état, au singulier de ce que la facture EST. */
 export const LIBELLE_STATUT: Readonly<Record<StatutFacture, string>> = {
   brouillon: 'Brouillon',
-  emise: 'Émise',
+  // « À envoyer » plutôt que « Émise » : le libellé dit ce qu'il reste à
+  // faire, là où l'état seul laissait croire que la facture était partie.
+  emise: 'À envoyer',
+  envoyee: 'Envoyée',
   en_retard: 'En retard',
   encaissee: 'Encaissée',
   annulee: 'Annulée',

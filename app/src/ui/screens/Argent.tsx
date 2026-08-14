@@ -1,10 +1,8 @@
 import { Suspense, lazy, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import {
-  dateDuJour, etatArgent, recettesEncaissees
-} from '../../state/selecteurs';
+import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
+import { type EtatSeuils, etatArgent } from '../../state/selecteurs.argent';
 import { etatLivre } from '../../state/selecteurs.livre';
-import type { EtatSeuils } from '../../state/selecteurs';
 import type { DateISO, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';

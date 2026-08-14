@@ -156,7 +156,8 @@ export function etatFacturier(
     .sort(parDateDecroissante);
 
   const parStatut: Record<StatutFacture, number> = {
-    brouillon: 0, emise: 0, en_retard: 0, encaissee: 0, annulee: 0, annulation: 0
+    brouillon: 0, emise: 0, envoyee: 0, en_retard: 0, encaissee: 0,
+    annulee: 0, annulation: 0
   };
   for (const f of factures) parStatut[f.statut] += 1;
 

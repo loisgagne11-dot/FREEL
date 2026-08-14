@@ -439,3 +439,76 @@ describe('la facture du mois, avant qu’elle existe', () => {
     expect(screen.queryByRole('heading', { name: /La facture de/ })).toBeNull();
   });
 });
+
+/**
+ * ÉMISE N'EST PAS ENVOYÉE.
+ *
+ * Le document peut exister, porter son numéro et sa date, et dormir dans un
+ * dossier — c'est le cas courant en fin de mois, où l'on établit les factures
+ * d'un coup avant de les envoyer. Les confondre coûte deux choses : on relance
+ * un client qui n'a jamais rien reçu, et on ne sait pas répondre à « je ne
+ * l'ai jamais reçue », qui est la réponse la plus courante à une relance.
+ */
+describe('cycle de vie : envoyée, avec sa date', () => {
+  it('distingue une facture émise d’une facture partie', () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+
+    expect(screen.getByText('À envoyer')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Marquer envoyée' })).toBeTruthy();
+  });
+
+  it('consigne la date d’envoi et change l’état', async () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Marquer envoyée' }));
+
+    expect(useFaits.getState().faits.recettes[0]?.envoyeeLe).toBe('2026-08-13');
+    expect(screen.getByText('Envoyée')).toBeTruthy();
+    expect(screen.getByText(/envoyée le/)).toBeTruthy();
+  });
+
+  /** Le geste ne se propose qu'une fois : elle est partie, elle reste partie. */
+  it('ne propose plus l’envoi d’une facture déjà partie', () => {
+    semer([recette({ id: 'r1', envoyeeLe: dateISO('2026-08-05') })]);
+    rendre();
+    expect(screen.queryByRole('button', { name: 'Marquer envoyée' })).toBeNull();
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Une facture échue est en retard qu'on l'ait envoyée
+   * ou non — mais si elle n'est pas partie, c'est le premier problème à
+   * régler, et le bouton doit rester là.
+   */
+  it('propose encore l’envoi sur une facture en retard jamais partie', () => {
+    semer([recette({ id: 'r1', emiseLe: dateISO('2026-05-01') })]);
+    rendre();
+
+    expect(screen.getAllByText('En retard').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Marquer envoyée' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Relancer' })).toBeTruthy();
+  });
+
+  /** Un brouillon n'a pas de document à envoyer : il n'a ni numéro ni date. */
+  it('refuse d’envoyer un brouillon', () => {
+    semer([recette({ id: 'r1', emiseLe: null, numero: '2026-009' })]);
+    rendre();
+    expect(screen.queryByRole('button', { name: 'Marquer envoyée' })).toBeNull();
+  });
+
+  /**
+   * Une facture non encore envoyée est due autant qu'une envoyée : le client
+   * n'a simplement pas été mis au courant. L'exclure du reste à rentrer ferait
+   * disparaître les factures de fin de mois, c'est-à-dire les plus récentes.
+   */
+  it('compte l’envoyée comme la non-envoyée dans le reste à rentrer', () => {
+    semer([
+      recette({ id: 'r1', montant: euros(1000) }),
+      recette({ id: 'r2', montant: euros(2000), numero: '2026-002', envoyeeLe: dateISO('2026-08-05') })
+    ]);
+    rendre();
+    expect(screen.getByText('3 000 €')).toBeTruthy();
+  });
+});
