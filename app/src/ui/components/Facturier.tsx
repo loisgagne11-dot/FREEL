@@ -70,6 +70,25 @@ const MODES: readonly { readonly id: ModeReglement; readonly libelle: string }[]
   { id: 'autre', libelle: 'Autre' }
 ];
 
+/**
+ * Combien de lignes on rend d'un coup.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE LISTE QU'ON NE PEUT PAS LIRE N'EST PAS UNE LISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Trois ans d'activité font plus de quatre cents factures. Les rendre toutes
+ * produit sept mille nœuds et près de neuf cents millisecondes avant
+ * l'affichage — mesuré, pas supposé (`verifier:vitesse`). Et personne ne lit
+ * quatre cents lignes : on cherche celles qui ne sont pas payées, ou celle
+ * d'un mois précis, et les filtres sont là pour ça.
+ *
+ * Les TOTAUX, eux, restent calculés sur l'ensemble. Un « reste à rentrer » qui
+ * ne compterait que les lignes affichées serait faux — et faux dans le sens
+ * rassurant, le pire.
+ */
+const LIGNES_PAR_PAGE = 50;
+
 /** Les filtres proposés. « Tout » d'abord : c'est la vue par défaut. */
 const FILTRES: readonly { readonly id: StatutFacture | 'tout'; readonly libelle: string }[] = [
   { id: 'tout', libelle: 'Tout' },
@@ -90,6 +109,7 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
   const [decalage, setDecalage] = useState(0);
   const [filtre, setFiltre] = useState<StatutFacture | 'tout'>('tout');
   const [aEncaisser, setAEncaisser] = useState<FactureSuivie<Recette> | null>(null);
+  const [limite, setLimite] = useState(LIGNES_PAR_PAGE);
   const [refus, setRefus] = useState<string | null>(null);
 
   const periode: Periode = useMemo(
@@ -98,9 +118,11 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
   );
   const etat = useMemo(() => etatFacturier(faits, periode), [faits, periode]);
 
-  const visibles = filtre === 'tout'
+  const retenues = filtre === 'tout'
     ? etat.factures
     : etat.factures.filter((f) => f.statut === filtre);
+  const visibles = retenues.slice(0, limite);
+  const restantes = retenues.length - visibles.length;
 
   function encaisser(id: string, date: string, mode: ModeReglement): void {
     const motif = encaisserRecette(id, dateISO(date), mode);
@@ -126,8 +148,8 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
     <>
       <BarrePeriode
         periode={periode}
-        onGranularite={(g) => { setGranularite(g); setDecalage(0); }}
-        onDecaler={(pas) => setDecalage((d) => d + pas)}
+        onGranularite={(g) => { setGranularite(g); setDecalage(0); setLimite(LIGNES_PAR_PAGE); }}
+        onDecaler={(pas) => { setDecalage((d) => d + pas); setLimite(LIGNES_PAR_PAGE); }}
       />
 
       <div className={styles.grille}>
@@ -168,7 +190,7 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
                 type="button"
                 className={`${styles.filtre} ${filtre === f.id ? styles.filtreActif : ''}`}
                 aria-pressed={filtre === f.id}
-                onClick={() => setFiltre(f.id)}
+                onClick={() => { setFiltre(f.id); setLimite(LIGNES_PAR_PAGE); }}
               >
                 {f.libelle}
                 <span className={styles.compteur}>{n}</span>
@@ -201,6 +223,18 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
               ))}
             </ul>
           )}
+
+        {restantes > 0 && (
+          <button
+            type="button"
+            className={styles.actionSecondaire}
+            onClick={() => setLimite((n) => n + LIGNES_PAR_PAGE)}
+          >
+            Voir {Math.min(restantes, LIGNES_PAR_PAGE)} facture
+            {Math.min(restantes, LIGNES_PAR_PAGE) > 1 ? 's' : ''} de plus
+            {' '}({restantes} restante{restantes > 1 ? 's' : ''})
+          </button>
+        )}
       </section>
 
       <Sheet

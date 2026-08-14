@@ -35,7 +35,7 @@ import {
 } from '../domain/bareme/urssaf';
 import type { EtatRapprochement } from '../domain/calculs/depenses';
 import type { Echeance } from '../domain/calculs/provisions';
-import { type Stockage, convertirBundle, migrer } from '../infra/migration';
+import { type ResultatMigration, type Stockage, migrer } from '../infra/migration';
 
 /** Le stockage du navigateur, ou `null` quand il est indisponible. */
 function stockageNavigateur(): Stockage | null {
@@ -198,7 +198,7 @@ interface MagasinFaits {
    * d'abord ce qui serait chargé et demande confirmation. Charger en silence
    * ferait disparaître une saisie faite hors ligne sans que personne le voie.
    */
-  readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => void;
+  readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => Promise<void>;
 
   /**
    * Remplace les faits par un bloc venu du compte distant.
@@ -374,6 +374,36 @@ function persister(stockage: Stockage | null, faits: Faits): void {
 
 let stockageActif: Stockage | null = null;
 
+/** Porte le résultat d'une migration dans le magasin. Partagée par les deux chemins. */
+function appliquerMigration(
+  set: (partiel: Partial<MagasinFaits>) => void,
+  resultat: ResultatMigration
+): void {
+  switch (resultat.statut) {
+    case 'migre':
+      set({ faits: resultat.faits, chargement: { phase: 'pret', migrationEffectuee: true } });
+      break;
+    case 'deja-migre':
+    case 'rien-a-migrer':
+      set({ faits: resultat.faits, chargement: { phase: 'pret', migrationEffectuee: false } });
+      break;
+    case 'reprise-requise':
+      // Ne peut pas arriver : l'appelant l'intercepte avant. Le compilateur
+      // exige néanmoins que le cas soit couvert, et c'est tant mieux.
+      break;
+    case 'echec':
+      // On ne repart PAS de zéro : écraser des données qu'on n'a pas su lire
+      // serait la pire issue possible. On fonctionne sans persistance et on
+      // le dit.
+      stockageActif = null;
+      set({
+        faits: faitsVides(),
+        chargement: { phase: 'sans-persistance', motif: resultat.motif }
+      });
+      break;
+  }
+}
+
 export const useFaits = create<MagasinFaits>((set, get) => ({
   faits: faitsVides(),
   chargement: { phase: 'initial' },
@@ -394,25 +424,38 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     }
 
     const resultat = migrer(s);
-    switch (resultat.statut) {
-      case 'migre':
-        set({ faits: resultat.faits, chargement: { phase: 'pret', migrationEffectuee: true } });
-        break;
-      case 'deja-migre':
-      case 'rien-a-migrer':
-        set({ faits: resultat.faits, chargement: { phase: 'pret', migrationEffectuee: false } });
-        break;
-      case 'echec':
-        // On ne repart PAS de zéro : écraser des données qu'on n'a pas su lire
-        // serait la pire issue possible. On fonctionne sans persistance et on
-        // le dit.
-        stockageActif = null;
-        set({
-          faits: faitsVides(),
-          chargement: { phase: 'sans-persistance', motif: resultat.motif }
+
+    /**
+     * Le cas de la reprise, et pourquoi il est asynchrone.
+     *
+     * Le convertisseur de l'ancienne application ne sert qu'une fois, et
+     * jamais à qui n'a pas connu la version précédente. Il vit donc dans un
+     * module chargé à la demande (`migration.legacy`), et seulement ici.
+     *
+     * L'attente n'est pas invisible et c'est très bien ainsi : l'écran reste
+     * en phase « initial » le temps du chargement, plutôt que d'afficher un
+     * état vide qu'on remplacerait une seconde plus tard — ce qui aurait donné
+     * à voir « 0 € » à quelqu'un qui a trois ans d'activité.
+     */
+    if (resultat.statut === 'reprise-requise') {
+      void import('../infra/migration.legacy')
+        .then(({ reprendreLegacy }) => { appliquerMigration(set, reprendreLegacy(s)); })
+        .catch(() => {
+          stockageActif = null;
+          set({
+            faits: faitsVides(),
+            chargement: {
+              phase: 'sans-persistance',
+              motif: 'La reprise des données de l\'ancienne version n\'a pas pu être '
+                + 'chargée. Vos anciennes données sont intactes ; réessayez en '
+                + 'rechargeant la page.'
+            }
+          });
         });
-        break;
+      return;
     }
+
+    appliquerMigration(set, resultat);
   },
 
   definirReserve: (montant) => {
@@ -678,7 +721,11 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     return null;
   },
 
-  remplacerParBundle: (bundle) => {
+  remplacerParBundle: async (bundle) => {
+    // Le convertisseur est chargé à la demande : restaurer une sauvegarde de
+    // l'ancienne application est un geste rare, et son code n'a rien à faire
+    // dans le paquet d'entrée.
+    const { convertirBundle } = await import('../infra/migration.legacy');
     const faits = convertirBundle(bundle).faits;
     set({ faits });
     persister(stockageActif, faits);

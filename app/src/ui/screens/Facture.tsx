@@ -10,6 +10,7 @@ import { dateCourte, eurExact } from '../format';
 import styles from './Facture.module.css';
 import { Montant } from '../components/Montant';
 import { Facturier } from '../components/Facturier';
+import { useRoute } from '../useRoute';
 
 /**
  * Émission d'une facture.
@@ -66,16 +67,27 @@ const ligneVide = (): LigneFacture => ({
  * recettes) n'était pas trouvable.
  */
 export function Facture() {
-  const [vue, setVue] = useState<'facturier' | 'saisie'>('facturier');
+  /**
+   * La vue vient de l'URL, pas d'un état local.
+   *
+   * `#/facture/nouvelle` ouvre la rédaction. Sans cela, l'action rapide
+   * « Nouvelle facture » du Pilote déposerait sur la liste, et il faudrait
+   * chercher le bouton une seconde fois — le reproche exact fait à l'ancienne
+   * version. Corollaire gratuit : le bouton « retour » du navigateur ramène
+   * au facturier, ce qu'un état local ne savait pas faire.
+   */
+  const { sousRoute, naviguerVers } = useRoute();
 
-  if (vue === 'saisie') return <NouvelleFacture onListe={() => setVue('facturier')} />;
+  if (sousRoute === 'nouvelle') {
+    return <NouvelleFacture onListe={() => naviguerVers('facture')} />;
+  }
 
   return (
     <>
       <header className={styles.entete}>
         <h1 className={styles.titre}>Facturer</h1>
       </header>
-      <Facturier onNouvelle={() => setVue('saisie')} />
+      <Facturier onNouvelle={() => naviguerVers('facture', 'nouvelle')} />
     </>
   );
 }

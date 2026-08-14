@@ -1007,6 +1007,49 @@ son travail : « je ne peux pas changer leur statut ».
 
 ---
 
+## 4 sexies. Leçon du 14/08 — un garde-fou qu'on n'a pas vu échouer n'en est pas un
+
+Deux vérificateurs mesuraient autre chose que ce qu'ils annonçaient. Ils
+passaient tous les deux.
+
+**`verifier-responsive.mjs` comptait « le premier `<nav>` de la page ».** Il
+faisait `document.querySelector('nav')` et affirmait mesurer le rail de
+navigation. Le jour où le Pilote a reçu une rangée d'actions rapides — un
+second `<nav>`, légitime et nommé — le compte d'onglets est passé à douze et le
+contrôle a échoué sur les quatre palettes. Il n'avait jamais mesuré le rail : il
+mesurait ce qui venait en premier, et le hasard du DOM avait fait le reste. Il
+désigne maintenant la navigation principale par son **nom accessible**.
+
+**Une assertion conditionnelle qui ne s'exécutait jamais.** L'assertion posée
+pour vérifier que la pastille « à traiter » reste dans la fenêtre est
+conditionnelle, à raison : sans sujet à traiter, la pastille disparaît, et c'est
+le comportement voulu. Mais le vérificateur part d'un stockage vierge — il n'y
+avait donc **jamais** de sujet, la condition était toujours fausse, et
+l'assertion silencieuse sur 140 combinaisons.
+
+Ce qui est passé au travers pendant ce temps : `backdrop-filter: blur(12px)` sur
+la barre du haut. Un `backdrop-filter` fait de l'élément le **bloc conteneur**
+de ses descendants en `position: fixed` — la pastille, censée flotter au-dessus
+du dock, atterrissait à **−72 px**, hors écran, sans erreur en console. Et le
+flou était invisible : les tokens de la barre sont opaques à 97 %.
+
+**Deux règles qui en découlent.**
+
+1. **Un contrôle conditionnel doit être amorcé.** Le vérificateur sème
+   désormais une facture en retard, émise en 2020 — en retard quelle que soit la
+   date de relance, sans horloge à figer.
+2. **On vérifie le garde-fou par mutation.** `backdrop-filter` réintroduit :
+   48 échecs. Retiré : zéro. Sans cette manipulation, on aurait ajouté une
+   assertion verte qui ne protégeait de rien — exactement le défaut qu'elle
+   était censée corriger.
+
+Le rapprochement avec la leçon précédente est direct : là c'était du code mort
+que les tests validaient, ici une assertion morte que la chaîne validait. Dans
+les deux cas, **le vert venait de ce qu'on ne s'était pas mis en situation
+d'échouer**.
+
+---
+
 ## 5. Points ouverts
 
 | Sujet | État |
@@ -1059,6 +1102,7 @@ npm run verifier    # la chaîne complète, dans cet ordre :
 | `verifier:index` | Un `index.html` périmé se récupère tout seul, **une seule fois** (pas de boucle de rechargement) |
 | `verifier:confidentialite` | Dans un vrai navigateur : aucun montant lisible quand le mode confidentiel est actif — contrôle du **style calculé**, pas de la présence d'une classe |
 | `verifier:migration` | La reprise de bout en bout, sur le contenu et non sur le nombre de lignes |
+| `verifier:vitesse` | Dans un vrai navigateur, sur **trois ans d'activité** (432 recettes, 360 dépenses, 720 mouvements) : chaque écran s'affiche sous 600 ms. Médiane de cinq passages — une mesure unique attrape un ramasse-miettes et accuse le mauvais écran |
 | `verifier:fuites` | Aucune donnée personnelle dans le dépôt (invariant n°6) — c'est `tests/smoke-test.js`, qui couvre aussi le legacy |
 
 ```

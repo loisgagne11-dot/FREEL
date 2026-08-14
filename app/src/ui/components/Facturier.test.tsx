@@ -171,3 +171,71 @@ it('totalise ce qui reste à rentrer, hors factures réglées', () => {
   expect(tuile.textContent).toContain('1');
   expect(tuile.textContent).not.toContain('6');
 });
+
+/**
+ * UNE LISTE QU'ON NE PEUT PAS LIRE N'EST PAS UNE LISTE.
+ *
+ * Trois ans d'activité font plus de quatre cents factures. Les rendre toutes
+ * produit sept mille nœuds et près de neuf cents millisecondes avant
+ * l'affichage — mesuré par `verifier:vitesse`, pas supposé.
+ *
+ * Le point de vigilance est ailleurs : les TOTAUX doivent rester calculés sur
+ * l'ensemble. Un « reste à rentrer » qui ne compterait que les lignes
+ * affichées serait faux, et faux dans le sens rassurant — le pire.
+ */
+describe('grand nombre de factures', () => {
+  const beaucoup = Array.from({ length: 120 }, (_, i) => recette({
+    id: `r${i}`,
+    numero: `2026-${String(i).padStart(3, '0')}`,
+    montant: euros(100)
+  }));
+
+  it('n’affiche pas les quatre cents lignes d’un coup', () => {
+    semer(beaucoup);
+    rendre();
+    expect(screen.getAllByRole('listitem').length).toBeLessThan(beaucoup.length);
+  });
+
+  /** LE POINT QUI COMPTE : tronquer la liste ne tronque pas les totaux. */
+  it('totalise sur TOUTES les factures, pas sur celles affichées', () => {
+    semer(beaucoup);
+    rendre();
+    const tuile = screen.getByText('Reste à rentrer').closest('div') as HTMLElement;
+    // 120 × 100 € = 12 000 €, quel que soit le nombre de lignes rendues.
+    expect(tuile.textContent).toMatch(/12\s*000/u);
+  });
+
+  it('compte l’ensemble sur les pastilles de filtre', () => {
+    semer(beaucoup);
+    rendre();
+    const groupe = screen.getByRole('group', { name: 'Filtrer par état' });
+    expect(within(groupe).getByRole('button', { name: /^Tout/ }).textContent).toContain('120');
+  });
+
+  // Rien n'est perdu : le reste est à un clic.
+  it('permet de dérouler la suite', async () => {
+    semer(beaucoup);
+    rendre();
+    const avant = screen.getAllByRole('listitem').length;
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /Voir .* de plus/ }));
+
+    expect(screen.getAllByRole('listitem').length).toBeGreaterThan(avant);
+  });
+
+  // Garder 200 lignes révélées en passant à « brouillons » n'aurait aucun sens.
+  it('repart du début quand on change de filtre', async () => {
+    semer(beaucoup);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    // La barre de période porte elle aussi un « Tout » : on vise le groupe
+    // de filtres, pas l'écran entier.
+    const filtres = screen.getByRole('group', { name: 'Filtrer par état' });
+    await utilisateur.click(screen.getByRole('button', { name: /Voir .* de plus/ }));
+    await utilisateur.click(within(filtres).getByRole('button', { name: /^Encaissées/ }));
+    await utilisateur.click(within(filtres).getByRole('button', { name: /^Tout/ }));
+
+    expect(screen.getAllByRole('listitem').length).toBeLessThanOrEqual(50);
+  });
+});

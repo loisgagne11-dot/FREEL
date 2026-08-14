@@ -28,19 +28,22 @@
  * expirent.
  */
 
+/*
+ * La session — forme, clé, lecture, validité — vit dans `session.ts`, pour que
+ * la barre du haut puisse dire si le compte est relié sans embarquer tout ce
+ * client dans le paquet d'entrée. Réexportée ici : rien ne change pour les
+ * appelants.
+ */
+export {
+  CLE_SESSION, type Session, type StockageLocal,
+  ecrireSession, lireSession, sessionValide
+} from './session';
+import type { Session, StockageLocal } from './session';
+
 /** Où se connecter. Ni l'un ni l'autre n'est écrit dans le code. */
 export interface ConfigSupabase {
   readonly url: string;
   readonly cleAnon: string;
-}
-
-export interface Session {
-  readonly jeton: string;
-  readonly jetonRafraichissement: string;
-  /** Horodatage d'expiration, en millisecondes. */
-  readonly expireLe: number;
-  readonly utilisateurId: string;
-  readonly email: string;
 }
 
 export type Resultat<T> =
@@ -58,8 +61,6 @@ export type Resultat<T> =
     readonly code?: number;
   };
 
-/** Clé de conservation de la session. Distincte de celle des faits. */
-export const CLE_SESSION = 'freel.session.supabase.v1' as const;
 /** Clé de conservation de la configuration de connexion. */
 export const CLE_CONFIG = 'freel.config.supabase.v1' as const;
 
@@ -214,11 +215,6 @@ export async function rafraichir(
 }
 
 /** Une session encore valable, avec une marge pour l'appel en cours. */
-export function sessionValide(session: Session, maintenant: number = Date.now()): boolean {
-  const MARGE_MS = 60_000;
-  return session.expireLe - MARGE_MS > maintenant;
-}
-
 export async function seDeconnecter(
   config: ConfigSupabase,
   session: Session
@@ -476,33 +472,6 @@ export async function pousserFaits(
 }
 
 /* ── Conservation locale ───────────────────────────────────────────────── */
-
-export interface StockageLocal {
-  getItem(cle: string): string | null;
-  setItem(cle: string, valeur: string): void;
-  removeItem(cle: string): void;
-}
-
-export function lireSession(stockage: StockageLocal): Session | null {
-  try {
-    const brut = stockage.getItem(CLE_SESSION);
-    if (brut === null) return null;
-    const o = JSON.parse(brut) as Record<string, unknown>;
-    if (typeof o['jeton'] !== 'string' || typeof o['utilisateurId'] !== 'string') return null;
-    return o as unknown as Session;
-  } catch {
-    return null;
-  }
-}
-
-export function ecrireSession(stockage: StockageLocal, session: Session | null): void {
-  try {
-    if (session === null) stockage.removeItem(CLE_SESSION);
-    else stockage.setItem(CLE_SESSION, JSON.stringify(session));
-  } catch {
-    // Stockage indisponible : la session vaudra pour l'onglet courant.
-  }
-}
 
 export function lireConfig(stockage: StockageLocal): ConfigSupabase | null {
   try {

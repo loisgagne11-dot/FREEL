@@ -104,6 +104,38 @@ for (const taille of TAILLES) {
     // inline de `index.html` l'applique sans flash.
     await contexte.addInitScript((p) => {
       window.localStorage.setItem('freel-v111-theme', p);
+
+      /*
+       * Une facture en retard, et rien d'autre.
+       *
+       * Elle ne sert qu'à faire EXISTER la pastille « à traiter » : sur un
+       * stockage vierge il n'y a aucun sujet, la pastille disparaît — ce qui
+       * est le comportement voulu — et l'assertion qui vérifie sa position ne
+       * s'exécutait jamais. Un contrôle qui ne s'exécute pas ne protège de
+       * rien : c'est ainsi qu'un `backdrop-filter` a pu l'expédier à −72 px
+       * sans que ces 140 combinaisons s'en aperçoivent.
+       *
+       * Émise en 2020 : en retard quelle que soit la date à laquelle ce script
+       * est relancé, sans horloge à figer.
+       */
+      window.localStorage.setItem('freel.faits.v1', JSON.stringify({
+        version: 6,
+        entreprise: {
+          nom: 'Atelier de démonstration', siret: '', adresse: '', codePostal: '',
+          ville: '', typeActivite: 'BNC', debutActivite: '2020-01-01',
+          urssafPeriodicite: 'trimestriel', tvaDepuis: null, tvaIntracom: '',
+          acre: false, versementLiberatoire: false
+        },
+        clients: [], missions: [], depenses: [], echeances: [],
+        periodesDeclarees: [], mouvementsBancaires: [], conges: [],
+        periodesUrssafSaisies: [], baremesImpot: [],
+        soldeInitial: 0, reserve: 0, besoinMensuel: 0,
+        recettes: [{
+          id: 'r1', clientNom: 'Client de démonstration', libelle: 'Prestation',
+          montant: 1000, emiseLe: '2020-01-15', encaisseeLe: null,
+          modeReglement: null, numero: '2020-001'
+        }]
+      }));
     }, palette);
 
     const page = await contexte.newPage();
@@ -120,9 +152,16 @@ for (const taille of TAILLES) {
     await page.waitForSelector('h1:visible', { timeout: 10000 });
 
     const mesures = await page.evaluate(() => {
-      const nav = document.querySelector('nav');
+      // La navigation PRINCIPALE, désignée par son nom accessible.
+      //
+      // `document.querySelector('nav')` prenait le premier <nav> venu. Le
+      // jour où le Pilote a reçu sa rangée d'actions rapides — un second
+      // <nav>, légitime et nommé — le compte d'onglets est passé à douze et
+      // le contrôle a échoué sur les quatre palettes. Il mesurait « le
+      // premier nav de la page », pas « le rail de navigation ».
+      const nav = document.querySelector('nav[aria-label="Navigation principale"]');
       const style = nav ? getComputedStyle(nav) : null;
-      const liens = [...document.querySelectorAll('nav a')];
+      const liens = nav ? [...nav.querySelectorAll('a')] : [];
       const hauteurs = liens.map((a) => a.getBoundingClientRect().height);
       return {
         theme: document.documentElement.getAttribute('data-theme'),
@@ -143,6 +182,27 @@ for (const taille of TAILLES) {
           .every((a) => a.getAttribute('aria-current') === 'page'),
         hauteurMiniLien: hauteurs.length > 0 ? Math.min(...hauteurs) : 0,
         contenuPresent: document.getElementById('contenu-principal') !== null,
+        /*
+         * La pastille « à traiter », si elle est là, est-elle DANS la fenêtre ?
+         *
+         * Elle flotte en `position: fixed`. Un ancêtre portant un `filter`,
+         * un `transform` ou un `backdrop-filter` devient son bloc conteneur —
+         * et elle part alors hors écran sans qu'aucune erreur ne soit levée.
+         * C'est arrivé : douze pixels de flou invisibles sur la barre du haut
+         * l'expédiaient à −72 px. On mesure, plutôt que de faire confiance.
+         *
+         * Rendu conditionnel : l'absence de sujet à traiter est un état
+         * normal, et la pastille disparaît alors — ce que ce contrôle ne doit
+         * pas confondre avec un échec.
+         */
+        pastilleDansLaFenetre: (() => {
+          const b = [...document.querySelectorAll('button')]
+            .find((x) => /à traiter/.test(x.textContent || ''));
+          if (!b) return null;
+          const r = b.getBoundingClientRect();
+          return r.top >= 0 && r.left >= 0
+            && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+        })(),
         couleurFond: getComputedStyle(document.body).backgroundColor
       };
     });
@@ -157,6 +217,12 @@ for (const taille of TAILLES) {
     );
     constate(mesures.navPresente && mesures.nbLiens === 7, `${prefixe} 7 onglets de navigation`);
     constate(mesures.contenuPresent, `${prefixe} contenu principal présent et ciblable`);
+    if (mesures.pastilleDansLaFenetre !== null) {
+      constate(
+        mesures.pastilleDansLaFenetre,
+        `${prefixe} la pastille « à traiter » reste dans la fenêtre`
+      );
+    }
 
     if (taille.portrait) {
       constate(mesures.navPosition === 'fixed', `${prefixe} dock flottant en portrait`);

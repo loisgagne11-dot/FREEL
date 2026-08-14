@@ -3,9 +3,9 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  caEncaisseAnnee, etatLivre, etatPilote, moisCourant,
-  recettesEncaissees, regimeDe, remunerationDuMois, sousAcreLe
+  caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe, remunerationDuMois, sousAcreLe
 } from './selecteurs';
+import { etatLivre } from './selecteurs.livre';
 import { etatAchats, regimeTvaAu } from './selecteurs.achats';
 
 function faits(modifications: Partial<Faits> = {}): Faits {
