@@ -34,7 +34,7 @@ import {
 } from '../domain/bareme/urssaf';
 import { soldeBancaire } from '../domain/calculs/banque';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
-import { DELAI_PAIEMENT_DEFAUT } from '../domain/calculs/facturier';
+import { DELAI_PAIEMENT_DEFAUT, encoursDe, suivre } from '../domain/calculs/facturier';
 import type { Faits } from './schema';
 
 /**
@@ -611,6 +611,21 @@ export function dateDuJour(maintenant: Date = new Date()): DateISO {
   return maintenant.toISOString().slice(0, 10) as DateISO;
 }
 
+/**
+ * Toutes les factures, avec leur statut dérivé à la date du jour.
+ *
+ * Le délai de paiement vient du carnet ; à défaut de client rattaché, le délai
+ * légal supplétif. Retenir zéro afficherait « en retard » dès l'émission.
+ */
+export function facturesSuivies(faits: Faits, maintenant: Date = new Date()) {
+  const delais = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
+  return suivre(
+    faits.recettes,
+    (nom) => delais.get(nom) ?? DELAI_PAIEMENT_DEFAUT,
+    dateDuJour(maintenant)
+  );
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Écran Argent
    ───────────────────────────────────────────────────────────────────────── */
@@ -699,10 +714,11 @@ export function etatArgent(
     parMois,
     caEncaisse,
     caRealise,
-    // Jamais négatif : un encaissé supérieur au réalisé de l'année signifie
-    // qu'on a encaissé des factures d'une année antérieure, pas qu'il reste
-    // un montant négatif à rentrer.
-    resteARentrer: euros(Math.max(0, caRealise - caEncaisse)),
+    // Compté facture par facture, et sur TOUTES les années : une facture de
+    // l'an dernier qui n'est pas réglée reste due au 1er janvier. La borner à
+    // l'année en cours ferait disparaître de l'écran exactement celle qu'il
+    // faut aller chercher.
+    resteARentrer: encoursDe(facturesSuivies(faits, maintenant)).resteARentrer,
     tresorerie: pilote.tresorerie,
     voletConstate: pilote.voletConstate,
     voletAProvisionner: pilote.voletAProvisionner

@@ -215,7 +215,11 @@ export function Activite() {
               {/* Le mois affiché est annoncé aux lecteurs d'écran à chaque
                   changement : sans cela, les flèches déplacent une vue dont on
                   n'entend jamais l'état. */}
-              <span className={styles.moisCourant} role="status">
+              <span
+                className={styles.moisCourant}
+                role="status"
+                aria-label="Période affichée"
+              >
                 {vue === 'semaine' && section === 'charge'
                   ? `Sem. du ${dateCourte(semaine.lundi)}`
                   : moisLong(mois)}
@@ -246,8 +250,15 @@ export function Activite() {
         <PanneauOnglet idGroupe={idGroupe} id="charge" actif={section === 'charge'}>
           <div className={styles.grille}>
             <Chiffre libelle="Jours ouvrables" valeur={String(etat.plan.joursOuvrables)} />
+            {/* Le libellé suit la SOURCE. Des journées lues sur le planning
+                sont des jours travaillés — un fait. Les mêmes déduites d'un
+                montant divisé par un tarif sont des équivalent-jours — une
+                estimation. Le même titre pour les deux ferait passer l'une
+                pour l'autre. */}
             <Chiffre
-              libelle="Équivalent-jours facturés"
+              libelle={etat.sourceCharge === 'planning'
+                ? 'Jours travaillés'
+                : 'Équivalent-jours facturés'}
               valeur={formaterJours(etat.plan.joursFactures)}
               ton="accent"
             />
@@ -258,6 +269,25 @@ export function Activite() {
             />
             <Chiffre libelle="Congés posés dans l’année" valeur={String(etat.congesDeLAnnee)} />
           </div>
+
+          {/* Sans planning, l'occupation se déduit encore d'une division — et
+              elle se trompe dès que la facturation ne suit pas le travail : un
+              mois facturé au trimestre s'affiche à 0 %. Le dire vaut mieux que
+              de laisser croire à un mois creux. */}
+          {etat.sourceCharge === 'facturation' && etat.missions.length > 0 && (
+            <p className={styles.bandeau} role="status">
+              Occupation estimée depuis les montants facturés, faute de rythme
+              saisi sur les missions du mois.
+              <Info libelle="Pourquoi cette estimation est fragile">
+                Sans planning, les jours travaillés se déduisent du montant
+                facturé divisé par le tarif journalier. Un mois facturé au
+                trimestre affiche alors 0 % d’occupation alors qu’il a été
+                travaillé, et un forfait au résultat ne se convertit pas en
+                jours. Saisir le rythme de la mission remplace cette estimation
+                par les journées réellement retenues.
+              </Info>
+            </p>
+          )}
 
           {etat.recettesSansTarif > 0 && (
             <p className={styles.bandeau} role="status">
@@ -795,6 +825,18 @@ function LigneMissionAffichee(
         <span aria-hidden="true">·</span>
         <span>{libelleStatut(mission.statut)}</span>
       </span>
+      {/* Une facture ne porte pas le nom de la mission qui l'a produite. Quand
+          deux missions d'un même client courent en même temps, aucune date ne
+          peut les départager : le montant est celui du client, et le taire
+          reviendrait à l'attribuer à l'une d'elles sans le dire. */}
+      {ligne.missionsQuiPartagent > 1 && (
+        <span className={styles.ligneMeta}>
+          <span className={styles.approximation}>
+            Chiffre du client, partagé avec {ligne.missionsQuiPartagent - 1} autre
+            {ligne.missionsQuiPartagent > 2 ? 's missions' : ' mission'}
+          </span>
+        </span>
+      )}
       <span className={styles.ligneMeta}>
         <span>Encaissé <Montant>{eur(ligne.encaisse)}</Montant></span>
         {ligne.resteARentrer > 0 && (

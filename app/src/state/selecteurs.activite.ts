@@ -24,7 +24,7 @@ import type { Cra } from '../domain/calculs/planning';
 import {
   calendrierDuMois, chargeDuMois, joursDuMois, planDeCharge
 } from '../domain/calculs/activite';
-import type { PlanDeCharge } from '../domain/calculs/activite';
+import type { ChargeDuMois, PlanDeCharge, SourceCharge } from '../domain/calculs/activite';
 import { delaisParClient, type DelaiClient } from '../domain/calculs/activite';
 import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros } from '../domain/types';
@@ -60,12 +60,29 @@ export interface LigneMission {
   readonly facture: Euros;
   readonly encaisse: Euros;
   readonly resteARentrer: Euros;
+  /**
+   * Combien de missions se partagent ces montants.
+   *
+   * `1` quand ils sont bien ceux de cette mission seule. Au-delà, ce sont ceux
+   * du CLIENT, et l'écran doit le dire : une facture ne porte pas le nom de la
+   * mission qui l'a produite, et deux missions d'un même client actives en même
+   * temps ne peuvent pas être départagées.
+   */
+  readonly missionsQuiPartagent: number;
 }
 
 export interface EtatActivite {
   readonly mois: Mois;
   readonly calendrier: readonly Jour[];
   readonly plan: PlanDeCharge;
+  /**
+   * D'où viennent les jours travaillés du plan de charge.
+   *
+   * L'écran doit pouvoir dire s'il montre une mesure ou une estimation : une
+   * occupation lue sur le planning est un fait, la même déduite d'un montant
+   * divisé par un tarif n'en est pas un.
+   */
+  readonly sourceCharge: SourceCharge;
   /** Recettes du mois dont le tarif est inconnu : la mesure est partielle. */
   readonly recettesSansTarif: number;
   readonly missions: readonly LigneMission[];
@@ -130,14 +147,15 @@ export function etatActivite(
   m: Mois,
   maintenant: Date = new Date()
 ): EtatActivite {
-  const tarifs = tarifsParClient(faits);
-  const charge = chargeDuMois(faits.recettes, tarifs, m);
+  const charge = chargeDuMoisPlanifiee(faits, m)
+    ?? chargeDuMois(faits.recettes, tarifsParClient(faits), m);
   const annee = m.slice(0, 4);
 
   return {
     mois: m,
     calendrier: calendrierDuMois(m, faits.conges),
     plan: planDeCharge(m, faits.conges, charge.jours),
+    sourceCharge: charge.source,
     recettesSansTarif: charge.recettesSansTarif,
     missions: lignesDeMission(faits),
     delais: delaisParClient(faits.recettes, dateDuJour(maintenant)),
@@ -156,24 +174,80 @@ export function etatActivite(
 }
 
 /**
+ * Les journées travaillées du mois, prises sur le planning.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN FAIT PLUTÔT QU'UNE DIVISION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'occupation divisait jusqu'ici le montant facturé par le tarif journalier.
+ * Le dénominateur était juste — jours ouvrés réels, fériés calculés, congés
+ * déduits — mais le numérateur était une estimation, et elle se trompait dès
+ * que la facturation ne suivait pas le travail : un mois facturé au trimestre
+ * affichait 0 % d'occupation alors qu'on l'avait travaillé entièrement.
+ *
+ * Le planning donne les journées directement, ajustements compris. On les
+ * prend là. `null` quand aucun rythme n'a été saisi — c'est le seul cas où la
+ * division par le tarif garde un sens, et l'écran dit alors d'où vient son
+ * chiffre.
+ */
+function chargeDuMoisPlanifiee(faits: Faits, m: Mois): ChargeDuMois | null {
+  const jours = previsionDuMoisParMission(faits, m)
+    .reduce((s, p) => s + p.prevision.joursRetenus, 0);
+
+  return jours > 0 ? { jours, source: 'planning', recettesSansTarif: 0 } : null;
+}
+
+/** La facture tombe-t-elle dans la fenêtre de la mission ? */
+function dansLaFenetre(mission: Mission, date: DateISO): boolean {
+  if (mission.debut !== null && date < mission.debut) return false;
+  if (mission.fin !== null && date > mission.fin) return false;
+  return true;
+}
+
+/**
  * Ce que chaque mission a produit.
  *
- * Le rattachement se fait par nom de client, l'ancien modèle ne portant pas de
- * lien entre une facture et la mission qui l'a produite. Un client à plusieurs
- * missions voit donc son chiffre d'affaires porté par la première d'entre
- * elles : c'est une approximation, et l'écran ne la présente pas autrement.
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX FAÇONS DE SE TROMPER, ET CELLE QU'ON ÉVITE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une facture ne porte pas le nom de la mission qui l'a produite : le modèle
+ * ne relie que le CLIENT. Le rattachement précédent donnait donc l'intégralité
+ * du chiffre d'affaires du client à la PREMIÈRE de ses missions, et zéro aux
+ * suivantes — un écran qui affichait « 0 € » en face d'une mission qui
+ * facturait, sans rien dire de l'approximation.
+ *
+ * Le rattachement se fait maintenant par client ET par FENÊTRE DE DATES.
+ * Deux missions successives chez le même client — le cas courant — se
+ * séparent alors correctement, chacune prenant les factures émises pendant
+ * qu'elle courait. Il ne reste d'ambiguïté que pour deux missions d'un même
+ * client actives EN MÊME TEMPS : là, aucune date ne peut trancher, et
+ * `missionsQuiPartagent` le dit plutôt que de choisir au hasard.
+ *
+ * Les brouillons sont exclus : sans date d'émission, une facture n'a pas été
+ * envoyée, et un devis en attente n'est pas du chiffre d'affaires.
  */
 function lignesDeMission(faits: Faits): readonly LigneMission[] {
-  const dejaCompte = new Set<string>();
-  return [...faits.missions].sort(prioriteMission).map((mission) => {
-    const premiere = !dejaCompte.has(mission.clientNom);
-    dejaCompte.add(mission.clientNom);
-    const recettes = premiere
-      ? faits.recettes.filter((r) => r.clientNom === mission.clientNom)
-      : [];
+  const missions = [...faits.missions].sort(prioriteMission);
 
-    const facture = recettes.reduce<number>((s, r) => s + r.montant, 0);
-    const encaisse = recettes
+  return missions.map((mission) => {
+    const siennes = faits.recettes.filter((r) =>
+      r.clientNom === mission.clientNom
+      && r.emiseLe !== null
+      && dansLaFenetre(mission, r.emiseLe)
+    );
+
+    // Les missions du même client dont la fenêtre couvre au moins une de ces
+    // factures — celle-ci comprise. Au-delà de une, le montant est celui du
+    // client et l'écran l'annonce.
+    const missionsQuiPartagent = missions.filter((autre) =>
+      autre.clientNom === mission.clientNom
+      && siennes.some((r) => r.emiseLe !== null && dansLaFenetre(autre, r.emiseLe))
+    ).length;
+
+    const facture = siennes.reduce<number>((s, r) => s + r.montant, 0);
+    const encaisse = siennes
       .filter((r) => r.encaisseeLe !== null)
       .reduce<number>((s, r) => s + r.montant, 0);
 
@@ -181,7 +255,8 @@ function lignesDeMission(faits: Faits): readonly LigneMission[] {
       mission,
       facture: euros(facture),
       encaisse: euros(encaisse),
-      resteARentrer: euros(facture - encaisse)
+      resteARentrer: euros(facture - encaisse),
+      missionsQuiPartagent: Math.max(1, missionsQuiPartagent)
     };
   });
 }

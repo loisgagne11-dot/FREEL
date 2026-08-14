@@ -88,6 +88,13 @@
 .accent { color: var(--green); }
 .attention { color: var(--amber); }
 
+/* Ce que le chiffre ne dit pas de lui-même. En retrait : c'est une réserve
+   sur la mesure, pas une alerte sur l'activité. */
+.approximation {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .bandeau {
   display: block;
   background: var(--panel-2);

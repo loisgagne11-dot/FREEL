@@ -155,11 +155,11 @@ describe('navigation entre les mois', () => {
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Mois précédent' }));
-    expect(screen.getByRole('status').textContent).toBe('juin 2026');
+    expect(screen.getByRole('status', { name: 'Période affichée' }).textContent).toBe('juin 2026');
 
     await utilisateur.click(screen.getByRole('button', { name: 'Mois suivant' }));
     await utilisateur.click(screen.getByRole('button', { name: 'Mois suivant' }));
-    expect(screen.getByRole('status').textContent).toBe('août 2026');
+    expect(screen.getByRole('status', { name: 'Période affichée' }).textContent).toBe('août 2026');
   });
 
   it('franchit correctement le passage à l’année', async () => {
@@ -168,7 +168,7 @@ describe('navigation entre les mois', () => {
     for (let i = 0; i < 6; i++) {
       await utilisateur.click(screen.getByRole('button', { name: 'Mois suivant' }));
     }
-    expect(screen.getByRole('status').textContent).toBe('janvier 2027');
+    expect(screen.getByRole('status', { name: 'Période affichée' }).textContent).toBe('janvier 2027');
   });
 });
 

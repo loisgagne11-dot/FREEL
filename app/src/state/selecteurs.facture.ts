@@ -24,7 +24,8 @@ import {
 } from '../domain/calculs/facture';
 import { prochainNumero } from '../domain/calculs/livreRecettes';
 import {
-  DELAI_PAIEMENT_DEFAUT, type FactureSuivie, type StatutFacture, suivre
+  DELAI_PAIEMENT_DEFAUT, type FactureSuivie, type StatutFacture,
+  encoursDe, suivre
 } from '../domain/calculs/facturier';
 import { dansLaPeriode, type Periode } from '../domain/calculs/periode';
 import type { DateISO, Euros } from '../domain/types';
@@ -157,11 +158,13 @@ export function etatFacturier(
   const somme = (garde: (f: FactureSuivie<Recette>) => boolean): Euros =>
     euros(factures.filter(garde).reduce((t, f) => t + f.recette.montant, 0));
 
+  // L'encours vient du domaine, et non d'un calcul local : l'écran Argent pose
+  // la même question sur une autre assiette, et deux soustractions écrites
+  // séparément finissent par répondre différemment.
   return {
     factures,
     parStatut,
-    resteARentrer: somme((f) => f.statut === 'emise' || f.statut === 'en_retard'),
-    enRetard: somme((f) => f.statut === 'en_retard'),
+    ...encoursDe(factures),
     encaisse: somme((f) => f.statut === 'encaissee')
   };
 }

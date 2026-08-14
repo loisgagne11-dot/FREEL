@@ -3,9 +3,11 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  aTraiter, caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe,
+  aTraiter, caEncaisseAnnee, etatArgent, etatPilote, moisCourant, recettesEncaissees, regimeDe,
   remunerationDuMois, sousAcreLe
 } from './selecteurs';
+import { periodeCourante } from '../domain/calculs/periode';
+import { etatFacturier } from './selecteurs.facture';
 import { etatLivre } from './selecteurs.livre';
 import { etatAchats, regimeTvaAu } from './selecteurs.achats';
 
@@ -549,5 +551,94 @@ describe('obligations de CFE', () => {
       enOctobre
     );
     expect(sujets.find((s) => s.id.includes('cfe-paiement'))).toBeUndefined();
+  });
+});
+
+/**
+ * L'INDICATEUR QUI ÉTAIT FAUX FAUTE D'ÊTRE TESTÉ.
+ *
+ * `etatArgent` n'avait aucun test, et son « reste à rentrer » était la
+ * différence entre deux agrégats annuels, bornée à zéro. Une facture émise en
+ * décembre et encaissée en janvier gonfle l'encaissé d'une année sans
+ * contrepartie dans le réalisé de la même : la soustraction devient négative,
+ * la borne l'écrase à zéro, et l'écran annonce que tout est rentré alors qu'il
+ * manque des milliers d'euros.
+ *
+ * Le reste à rentrer ne se déduit pas d'agrégats. Il se compte facture par
+ * facture.
+ */
+describe('reste à rentrer de l’écran Argent', () => {
+  const enJuillet = new Date('2026-07-15T12:00:00Z');
+
+  const f = (
+    id: string, montant: number, emiseLe: string | null, encaisseeLe: string | null
+  ) => ({
+    id, clientNom: 'C', libelle: 'l', montant: euros(montant),
+    emiseLe: emiseLe === null ? null : dateISO(emiseLe),
+    encaisseeLe: encaisseeLe === null ? null : dateISO(encaisseeLe),
+    modeReglement: 'virement' as const, numero: id
+  });
+
+  it('compte ce qui est émis et non réglé', () => {
+    const etat = etatArgent(
+      faits({ recettes: [f('a', 3000, '2026-05-01', null), f('b', 2000, '2026-05-01', '2026-06-01')] }),
+      [], enJuillet
+    );
+    expect(etat.resteARentrer).toBe(3000);
+  });
+
+  /**
+   * LE CAS QUI CASSAIT L'ANCIENNE FORMULE. 40 000 € réalisés en 2026, 44 000 €
+   * encaissés dont 12 000 € émis en 2025 : la différence annuelle vaut −4 000,
+   * bornée à 0. Or 8 000 € émis en 2026 ne sont pas rentrés.
+   */
+  it('ne s’écrase pas à zéro quand l’encaissé de l’année dépasse le réalisé', () => {
+    const etat = etatArgent(faits({
+      recettes: [
+        f('n1a', 12_000, '2025-12-01', '2026-01-15'),
+        f('a', 32_000, '2026-02-01', '2026-03-01'),
+        f('b', 8_000, '2026-06-01', null)
+      ]
+    }), [], enJuillet);
+
+    expect(etat.caRealise).toBe(40_000);
+    expect(etat.caEncaisse).toBe(44_000);
+    expect(etat.resteARentrer).toBe(8_000);
+    expect(etat.resteARentrer).not.toBe(0);
+  });
+
+  /**
+   * Une facture de l'an dernier qui n'est pas réglée reste due au 1er janvier.
+   * La borner à l'année en cours ferait disparaître de l'écran exactement
+   * celle qu'il faut aller chercher.
+   */
+  it('n’oublie pas un impayé des années précédentes', () => {
+    const etat = etatArgent(
+      faits({ recettes: [f('vieux', 5000, '2025-03-01', null)] }), [], enJuillet
+    );
+    expect(etat.caRealise).toBe(0);
+    expect(etat.resteARentrer).toBe(5000);
+  });
+
+  /** Un brouillon n'a pas été envoyé : personne ne doit rien. */
+  it('ne compte pas les brouillons', () => {
+    const etat = etatArgent(
+      faits({ recettes: [f('br', 9000, null, null)] }), [], enJuillet
+    );
+    expect(etat.resteARentrer).toBe(0);
+  });
+
+  /** Une seule définition : celle du facturier, sur toutes les factures. */
+  it('donne le même chiffre que le facturier sur la même assiette', () => {
+    const jeu = faits({
+      recettes: [
+        f('a', 3000, '2026-05-01', null),
+        f('b', 2000, '2026-05-01', '2026-06-01'),
+        f('c', 1500, '2026-06-20', null)
+      ]
+    });
+    const argent = etatArgent(jeu, [], enJuillet);
+    const facturier = etatFacturier(jeu, periodeCourante('annee', enJuillet), enJuillet);
+    expect(argent.resteARentrer).toBe(facturier.resteARentrer);
   });
 });

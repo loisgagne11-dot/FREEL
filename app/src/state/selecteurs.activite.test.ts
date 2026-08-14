@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
 import { type Faits, faitsVides } from './schema';
 import {
-  craDuMoisParMission, lundiDeLaSemaine, planningDeLaSemaine
+  craDuMoisParMission, etatActivite, lundiDeLaSemaine, planningDeLaSemaine
 } from './selecteurs.activite';
 
 const D = (s: string) => dateISO(s);
@@ -191,5 +191,181 @@ describe('clients opérationnels', () => {
     // Août 2026 : 5 lundis, 4 mardis pour A ; 4 mercredis, 4 jeudis pour B.
     expect(cras[0]?.cra.totalJours).toBe(9);
     expect(cras[1]?.cra.totalJours).toBe(8);
+  });
+});
+
+/**
+ * CE QUE CHAQUE MISSION A PRODUIT — L'INDICATEUR QUI ATTRIBUAIT TOUT À LA
+ * PREMIÈRE.
+ *
+ * Une facture ne porte pas le nom de la mission qui l'a produite : le modèle
+ * ne relie que le client. Le rattachement précédent donnait l'intégralité du
+ * chiffre d'affaires du client à la première de ses missions et ZÉRO aux
+ * suivantes, sans le dire. On lisait « Charte éditoriale — 0 € » et on en
+ * concluait que la mission ne rapportait rien.
+ */
+describe('ce que chaque mission a produit', () => {
+  const M = (id: string, debut: string | null, fin: string | null, client = 'Client de démo') => ({
+    ...MISSION, id, clientNom: client, description: id,
+    debut: debut === null ? null : D(debut),
+    fin: fin === null ? null : D(fin)
+  });
+
+  const R = (id: string, montant: number, emiseLe: string | null, encaisseeLe: string | null) => ({
+    id, clientNom: 'Client de démo', libelle: id, montant: euros(montant),
+    emiseLe: emiseLe === null ? null : D(emiseLe),
+    encaisseeLe: encaisseeLe === null ? null : D(encaisseeLe),
+    modeReglement: 'virement' as const, numero: id
+  });
+
+  const lignes = (f: Faits) => etatActivite(f, mois('2026-07'), new Date('2026-07-15T12:00:00Z')).missions;
+
+  /**
+   * LE CAS QUI COMPTE. Deux missions successives chez le même client : chacune
+   * prend les factures émises pendant qu'elle courait. C'est la situation
+   * courante, et c'est celle qui affichait 0 €.
+   */
+  it('sépare deux missions successives d’un même client par leurs dates', () => {
+    const f = avec({
+      missions: [M('printemps', '2026-01-01', '2026-04-30'), M('été', '2026-05-01', '2026-08-31')],
+      recettes: [R('a', 3000, '2026-03-10', null), R('b', 5000, '2026-06-10', null)]
+    });
+    const [printemps, ete] = [
+      lignes(f).find((l) => l.mission.id === 'printemps'),
+      lignes(f).find((l) => l.mission.id === 'été')
+    ];
+
+    expect(printemps?.facture).toBe(3000);
+    expect(ete?.facture).toBe(5000);
+    expect(printemps?.missionsQuiPartagent).toBe(1);
+  });
+
+  /**
+   * Deux missions d'un même client actives EN MÊME TEMPS : aucune date ne peut
+   * trancher. Le montant est celui du client, et il faut le DIRE plutôt que de
+   * choisir au hasard — ou d'afficher zéro.
+   */
+  it('signale le partage quand deux missions se recouvrent', () => {
+    const f = avec({
+      missions: [M('a', '2026-01-01', '2026-12-31'), M('b', '2026-01-01', '2026-12-31')],
+      recettes: [R('r', 4000, '2026-06-10', null)]
+    });
+    for (const l of lignes(f)) {
+      expect(l.facture).toBe(4000);
+      expect(l.missionsQuiPartagent).toBe(2);
+    }
+  });
+
+  /** Un brouillon n'a pas été envoyé : un devis en attente n'est pas du CA. */
+  it('ne compte pas les brouillons dans le chiffre d’affaires', () => {
+    const f = avec({
+      missions: [M('m', null, null)],
+      recettes: [R('brouillon', 9000, null, null), R('émise', 1000, '2026-06-01', null)]
+    });
+    expect(lignes(f)[0]?.facture).toBe(1000);
+  });
+
+  it('distingue l’encaissé du facturé, et ce qui reste à rentrer', () => {
+    const f = avec({
+      missions: [M('m', null, null)],
+      recettes: [R('payée', 2000, '2026-05-01', '2026-06-01'), R('due', 3000, '2026-06-01', null)]
+    });
+    const l = lignes(f)[0];
+    expect(l?.facture).toBe(5000);
+    expect(l?.encaisse).toBe(2000);
+    expect(l?.resteARentrer).toBe(3000);
+  });
+
+  /** Une mission sans dates prend tout ce que le client a facturé. */
+  it('retient tout quand la mission n’a pas de fenêtre', () => {
+    const f = avec({
+      missions: [M('m', null, null)],
+      recettes: [R('vieille', 1000, '2024-01-01', null), R('récente', 2000, '2026-06-01', null)]
+    });
+    expect(lignes(f)[0]?.facture).toBe(3000);
+  });
+
+  /** Deux clients ne se mélangent jamais, quelles que soient les dates. */
+  it('ne mélange pas deux clients', () => {
+    const f = avec({
+      missions: [M('a', null, null), M('b', null, null, 'Autre client')],
+      recettes: [R('r', 4000, '2026-06-10', null)]
+    });
+    expect(lignes(f).find((l) => l.mission.id === 'b')?.facture).toBe(0);
+  });
+});
+
+/**
+ * L'OCCUPATION AVAIT UN DÉNOMINATEUR JUSTE ET UN NUMÉRATEUR INVENTÉ.
+ *
+ * Les jours ouvrables sont comptés pour de vrai — fériés calculés, congés
+ * déduits. Mais les jours travaillés se déduisaient du montant FACTURÉ divisé
+ * par le tarif journalier. Or le planning donne les journées directement :
+ * déduire des jours d'un montant quand on a les jours fabrique une
+ * approximation là où le fait existe.
+ */
+describe('d’où viennent les jours travaillés', () => {
+  const juillet = mois('2026-07');
+  const enJuillet = new Date('2026-07-15T12:00:00Z');
+
+  /**
+   * LE CAS QUI CASSAIT. Un mois entièrement travaillé, rien de facturé — une
+   * mission réglée au trimestre, un forfait, une facture pas encore émise.
+   * L'ancienne mesure annonçait 0 % d'occupation sur un mois plein.
+   */
+  it('compte les journées du planning même sans aucune facture', () => {
+    const etat = etatActivite(avec({ recettes: [] }), juillet, enJuillet);
+
+    expect(etat.sourceCharge).toBe('planning');
+    expect(etat.plan.joursFactures).toBeGreaterThan(0);
+    expect(etat.plan.occupation).toBeGreaterThan(0);
+  });
+
+  /** Le planning l'emporte : c'est un fait, la division n'est qu'une estimation. */
+  it('préfère le planning aux montants facturés', () => {
+    const avecFactures = avec({
+      recettes: [{
+        id: 'r', clientNom: 'Client de démo', libelle: 'r', montant: euros(500),
+        emiseLe: D('2026-07-10'), encaisseeLe: null,
+        modeReglement: 'virement' as const, numero: 'r'
+      }]
+    });
+    const etat = etatActivite(avecFactures, juillet, enJuillet);
+
+    expect(etat.sourceCharge).toBe('planning');
+    // Un seul jour serait déduit de la facture ; le planning en retient
+    // beaucoup plus.
+    expect(etat.plan.joursFactures).toBeGreaterThan(1);
+  });
+
+  /**
+   * Sans rythme saisi, la division reste le seul recours — mais elle
+   * s'annonce comme telle, pour que l'écran ne présente pas une estimation
+   * comme une mesure.
+   */
+  it('retombe sur les montants facturés quand aucun rythme n’est saisi', () => {
+    const sansRythme = avec({
+      missions: [{ ...MISSION, entites: [] }],
+      recettes: [{
+        id: 'r', clientNom: 'Client de démo', libelle: 'r', montant: euros(1500),
+        emiseLe: D('2026-07-10'), encaisseeLe: null,
+        modeReglement: 'virement' as const, numero: 'r'
+      }]
+    });
+    const etat = etatActivite(sansRythme, juillet, enJuillet);
+
+    expect(etat.sourceCharge).toBe('facturation');
+    expect(etat.plan.joursFactures).toBe(3);
+  });
+
+  /** Les ajustements comptent : une journée retirée retire de l'occupation. */
+  it('suit les ajustements du planning', () => {
+    const plein = etatActivite(avec({ recettes: [] }), juillet, enJuillet);
+    const ampute = etatActivite(
+      avec({ recettes: [], missions: [avecAjustement({ '2026-07-06': 0, '2026-07-07': 0 })] }),
+      juillet, enJuillet
+    );
+
+    expect(ampute.plan.joursFactures).toBe(plein.plan.joursFactures - 2);
   });
 });

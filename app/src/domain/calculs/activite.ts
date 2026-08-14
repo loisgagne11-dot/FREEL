@@ -283,8 +283,24 @@ export function joursEquivalents(montant: Euros, tjm: Euros): number {
   return montant / tjm;
 }
 
+/**
+ * D'où viennent les jours travaillés d'un mois.
+ *
+ * `planning` : comptés sur les journées réellement retenues, ajustements
+ * compris. C'est un FAIT.
+ *
+ * `facturation` : déduits du montant facturé divisé par le tarif journalier.
+ * C'est une ESTIMATION, et elle se trompe dans trois cas au moins — un mois
+ * sans facture émise (facturation trimestrielle) affiche zéro alors qu'on a
+ * travaillé plein temps ; un forfait au résultat divise n'importe quoi ; un
+ * client à deux tarifs prend celui de sa première mission.
+ */
+export type SourceCharge = 'planning' | 'facturation';
+
 export interface ChargeDuMois {
   readonly jours: number;
+  /** Ce qui a produit ce nombre — l'écran doit pouvoir le dire. */
+  readonly source: SourceCharge;
   /**
    * Recettes du mois dont le tarif journalier est inconnu.
    *
@@ -299,10 +315,24 @@ export interface ChargeDuMois {
 /**
  * Jours facturés d'un mois, à partir des recettes émises et des tarifs connus.
  *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE REPLI, PAS LA MESURE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Depuis que le planning existe, les journées travaillées sont un FAIT : le
+ * rythme et ses ajustements les donnent directement. Les déduire d'un montant
+ * quand on dispose des jours, c'est fabriquer une approximation là où l'on a
+ * la chose même.
+ *
+ * Cette fonction ne sert donc plus que lorsque AUCUN planning n'a été saisi —
+ * une mission sans rythme, un mois entièrement hors contrat. Et le résultat
+ * porte alors `source: 'facturation'`, pour que l'écran ne présente pas une
+ * estimation comme une mesure.
+ *
  * Le rattachement se fait par nom de client, faute de lien entre une recette et
- * la mission qui l'a produite dans l'ancien modèle. Un client qui a plusieurs
- * missions à des tarifs différents fausse donc la conversion — raison de plus
- * pour parler d'équivalent-jours.
+ * la mission qui l'a produite. Un client qui a plusieurs missions à des tarifs
+ * différents fausse la conversion — raison de plus pour parler
+ * d'équivalent-jours.
  */
 export function chargeDuMois(
   recettes: readonly { readonly clientNom: string; readonly montant: Euros; readonly emiseLe: DateISO | null }[],
@@ -320,7 +350,7 @@ export function chargeDuMois(
     }
     jours += joursEquivalents(r.montant, tjm);
   }
-  return { jours, recettesSansTarif };
+  return { jours, source: 'facturation', recettesSansTarif };
 }
 
 export function planDeCharge(

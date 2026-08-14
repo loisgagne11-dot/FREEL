@@ -1,4 +1,5 @@
 import type { DateISO, Euros } from '../types';
+import { euros } from '../types';
 import { ajouterJours } from './aTraiter';
 
 /**
@@ -143,6 +144,44 @@ function joursEntre(depuis: DateISO, jusqua: DateISO): number {
   const b = Date.parse(`${jusqua}T00:00:00Z`);
   if (Number.isNaN(a) || Number.isNaN(b)) return 0;
   return Math.max(0, Math.round((b - a) / 86_400_000));
+}
+
+/** Ce qui a été facturé et qui n'est pas rentré. */
+export interface Encours {
+  /** Émis et non réglé, annulations déduites. */
+  readonly resteARentrer: Euros;
+  /** La part de ce reste dont l'échéance est passée. */
+  readonly enRetard: Euros;
+}
+
+/**
+ * L'encours d'une liste de factures suivies.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE SEULE DÉFINITION DE « RESTE À RENTRER »
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'écran Argent en portait une seconde, et elle était fausse : la différence
+ * entre le CA réalisé et le CA encaissé de l'année, bornée à zéro. Deux
+ * agrégats annuels ne se soustraient pas — une facture émise en décembre et
+ * encaissée en janvier gonfle l'encaissé d'une année sans contrepartie dans le
+ * réalisé de la même. Sur 50 000 € réalisés et 52 000 € encaissés dont 8 000 €
+ * venus de l'an dernier, le vrai reste à rentrer est de 6 000 € et l'écran
+ * affichait 0 €. La borne à zéro n'était pas une protection : elle effaçait le
+ * signal au lieu de le corriger.
+ *
+ * Le reste à rentrer ne se déduit pas d'agrégats. Il se COMPTE, facture par
+ * facture : celles qui sont émises et que rien n'a réglées. C'est ce que fait
+ * cette fonction, et c'est désormais la seule à le faire.
+ */
+export function encoursDe(factures: readonly FactureSuivie[]): Encours {
+  const somme = (garde: (f: FactureSuivie) => boolean): Euros =>
+    euros(factures.filter(garde).reduce((t, f) => t + f.recette.montant, 0));
+
+  return {
+    resteARentrer: somme((f) => f.statut === 'emise' || f.statut === 'en_retard'),
+    enRetard: somme((f) => f.statut === 'en_retard')
+  };
 }
 
 /** Les libellés d'état, au singulier de ce que la facture EST. */
