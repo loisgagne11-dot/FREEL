@@ -11,6 +11,36 @@ volontairement, avec la décision qui le justifie
 
 ---
 
+## Le défaut de cet inventaire, corrigé le 14/08
+
+> « Je me questionne sur pourquoi tu ne l'avais pas pris en compte de base, vu
+> qu'on vise non pas juste à refaire un visuel conforme mais à y ajouter toute
+> l'intelligence de l'ancienne appli — et ça comprend les formules, les
+> indicateurs et les graphes. »
+
+La remarque porte, et voici la cause exacte.
+
+L'unité de cet inventaire était **la fonction** : un écran, une action de
+magasin, un module de calcul. Les trois vérificateurs automatiques mesurent les
+mêmes objets. Cette unité attrape bien une fonction entière qui manque — c'est
+ainsi qu'ont été trouvés la relance, la CFE, le contrôle des identifiants.
+
+Mais **un indicateur n'est ni un écran, ni une action, ni un module** : c'est
+une ligne dans un écran. Un graphe aussi. Quand l'ancienne application affichait
+un ratio quelque part et que le nouvel écran ne le reprend pas, rien ne
+s'allume : l'écran existe, le magasin est câblé, les tests sont verts. Le trou
+est **invisible par construction**. Une formule portée mais jamais affichée est
+du code mort qui passe tous les contrôles.
+
+Ce n'était donc pas une erreur de périmètre — le périmètre était juste — mais
+un **trou d'instrumentation** : il manquait un recensement dont l'unité soit
+« un nombre que l'utilisateur lit à l'écran ». Ce recensement existe désormais
+et vit dans `AUDIT-GRAPHES-ET-INDICATEURS.md`. Il a trouvé du premier coup
+**trois indicateurs faux**, dont deux affichaient des euros — et deux
+affirmations fausses de ce document-ci, corrigées ci-dessous.
+
+---
+
 ## Ce qu'il faut retenir
 
 La nouvelle application est **plus juste** que l'ancienne partout où elle la
@@ -127,12 +157,14 @@ un trou qui ne fait échouer aucun test.
 | `getClientsStats`, dépendance client | 🟢 | Concentration sur le CA **encaissé de l'année**, pas du mois : mesurée sur un mois, elle sauterait d'un client à l'autre au gré des règlements |
 | `compositionDSO`, délai de paiement | 🟢 | **Médiane** et non moyenne : un client qui paie à 30 jours neuf fois et à 300 une fois n'est pas un client à 57 jours |
 | `compositionTxOccupation` | 🟢 | Dénominateur réel : jours ouvrables, fériés calculés, congés déduits |
-| `compositionTJMEffectif`, `compositionMargeNette` | ✅ | Présents |
+| `compositionTJMEffectif`, `compositionMargeNette` | ❌ | **Absents.** Cette ligne annonçait « Présents » — c'était faux, aucune occurrence dans `app/src/`. Un inventaire qui se trompe dans ce sens coûte plus cher qu'un manque : il ferme le sujet |
 | `showKPIComposition` — d'où vient un chiffre | ⚠️ | Les motifs « i » expliquent les règles, mais on ne peut pas déplier le calcul ligne à ligne |
 | `calculateHealthScore` — score /100 | 🚫 | Refusé : la spécification elle-même note que les valeurs sont **codées en dur** dans le prototype, sans fonction qui les calcule. Une jauge à 72/100 qui ne mesure rien ressemble à une information |
 | `getInsights`, `renderInsightsCritiques` | ❌ | Pas de conseils automatiques |
 | `getCompareData`, `compDelta`, `computeTrend`, `createSparkline` | ❌ | Aucune comparaison à la période précédente, aucune tendance |
-| `drawMainChart`, `drawPerfDonut`, `drawSoldeChart` | ✅ | `GrapheBarres` en SVG, avec la donnée **doublée en tableau accessible**. 627 Ko de Chart.js en moins |
+| `drawMainChart` | ✅ | `GrapheBarres` en SVG, avec la donnée **doublée en tableau accessible**. 627 Ko de Chart.js en moins |
+| `drawPerfDonut` — destination du CA | 🚫 | Refusé : il redisait, en moins précis, ce que `Repartition` dit du solde |
+| `drawSoldeChart` — courbe de solde | ❌ | **Absent**, et sans motif écrit jusqu'ici. Rien ne montre le solde au-delà du mois courant |
 | `getActionsList`, `markActionDone` | ✅ | `aTraiter` — la liste des sujets, réelle |
 
 ## 7. Système
