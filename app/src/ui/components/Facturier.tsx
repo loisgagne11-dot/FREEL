@@ -18,6 +18,8 @@ import { Statut, type TonStatut } from './Statut';
 import { useToast } from './Toasts';
 import { Vide } from './Vide';
 import { dateCourte, eur } from '../format';
+import { dateDuJour } from '../../state/selecteurs';
+import { detteDeRetard, redigerRelance } from '../../domain/calculs/relance';
 import styles from './Facturier.module.css';
 
 /**
@@ -103,12 +105,14 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
   const encaisserRecette = useFaits((e) => e.encaisserRecette);
   const annulerRecette = useFaits((e) => e.annulerRecette);
   const supprimerBrouillon = useFaits((e) => e.supprimerBrouillon);
+  const consignerRelance = useFaits((e) => e.consignerRelance);
   const signaler = useToast();
 
   const [granularite, setGranularite] = useState<Granularite>('tout');
   const [decalage, setDecalage] = useState(0);
   const [filtre, setFiltre] = useState<StatutFacture | 'tout'>('tout');
   const [aEncaisser, setAEncaisser] = useState<FactureSuivie<Recette> | null>(null);
+  const [aRelancer, setARelancer] = useState<FactureSuivie<Recette> | null>(null);
   const [limite, setLimite] = useState(LIGNES_PAR_PAGE);
   const [refus, setRefus] = useState<string | null>(null);
 
@@ -219,6 +223,7 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
                   onEncaisser={() => { setRefus(null); setAEncaisser(f); }}
                   onAnnuler={() => annuler(f)}
                   onJeter={() => jeter(f)}
+                  onRelancer={() => setARelancer(f)}
                 />
               ))}
             </ul>
@@ -250,16 +255,34 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
           />
         )}
       </Sheet>
+
+      <Sheet
+        ouvert={aRelancer !== null}
+        titre="Relancer"
+        onFermer={() => setARelancer(null)}
+      >
+        {aRelancer !== null && (
+          <PanneauRelance
+            facture={aRelancer}
+            onConsigner={() => {
+              consignerRelance(aRelancer.recette.id, dateISO(dateDuJour()));
+              signaler('Relance consignée.');
+              setARelancer(null);
+            }}
+          />
+        )}
+      </Sheet>
     </>
   );
 }
 
 function Ligne(
-  { facture, onEncaisser, onAnnuler, onJeter }: {
+  { facture, onEncaisser, onAnnuler, onJeter, onRelancer }: {
     readonly facture: FactureSuivie<Recette>;
     readonly onEncaisser: () => void;
     readonly onAnnuler: () => void;
     readonly onJeter: () => void;
+    readonly onRelancer: () => void;
   }
 ) {
   const { recette: r, statut, echeanceLe, joursDeRetard } = facture;
@@ -312,6 +335,15 @@ function Ligne(
         {(statut === 'emise' || statut === 'en_retard') && (
           <button type="button" className={styles.actionLigne} onClick={onEncaisser}>
             Enregistrer le règlement
+          </button>
+        )}
+        {/* L'application désignait déjà « précisément celle qu'il faut
+            relancer » et ne proposait rien au bout. Relancer ne demande pas
+            d'envoyer : cela demande de savoir quoi écrire, ce qu'on peut
+            réclamer, et quand on l'a déjà fait. */}
+        {statut === 'en_retard' && (
+          <button type="button" className={styles.actionSecondaire} onClick={onRelancer}>
+            Relancer
           </button>
         )}
         {/* Une facture émise ne se supprime pas : elle a circulé, et retirer
@@ -412,6 +444,141 @@ function Chiffre(
     <div className={`${styles.tuile} ${styles[ton]}`}>
       <span className={styles.tuileLibelle}>{libelle}</span>
       <strong className={styles.tuileValeur}><Montant>{valeur}</Montant></strong>
+    </div>
+  );
+}
+
+/**
+ * Le panneau de relance.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'APPLICATION RÉDIGE, ELLE N'ENVOIE PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Elle n'a aucun service d'expédition, et un envoi qu'elle ne saurait ni tracer
+ * ni prouver ne vaudrait rien le jour où il faudrait démontrer qu'on a relancé.
+ * Le texte se copie, part de la messagerie de l'utilisateur, et c'est LUI qui
+ * consigne l'avoir envoyé.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE TAUX SE SAISIT, IL NE SE DEVINE PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le taux de pénalité est celui des conditions de vente. À défaut, le code
+ * retient le taux BCE majoré de dix points, avec un plancher à trois fois
+ * l'intérêt légal — deux valeurs semestrielles qu'aucune source automatisable
+ * ne fournit. Sans lui, la relance RÉSERVE les pénalités au lieu de les
+ * chiffrer : réclamer un montant calculé sur un taux supposé fragiliserait
+ * précisément le document qu'on cherche à rendre solide.
+ *
+ * L'indemnité forfaitaire de 40 €, elle, est certaine, datée et sourcée : elle
+ * s'affiche toujours.
+ */
+function PanneauRelance(
+  { facture, onConsigner }: {
+    readonly facture: FactureSuivie<Recette>;
+    readonly onConsigner: () => void;
+  }
+) {
+  const [tauxSaisi, setTauxSaisi] = useState('');
+  const [copie, setCopie] = useState(false);
+  const id = useId();
+
+  const taux = tauxSaisi.trim() === '' ? null : Number(tauxSaisi.replace(',', '.'));
+  const tauxValide = taux !== null && Number.isFinite(taux) && taux >= 0 ? taux / 100 : null;
+
+  const relancesFaites = facture.recette.relancesLe?.length ?? 0;
+  const echeance = facture.echeanceLe;
+
+  // Sans échéance, il n'y a pas de retard à calculer — et le bouton « Relancer »
+  // n'apparaît que sur une facture en retard, qui en a donc une.
+  if (echeance === null) return <p>Cette facture n’a pas d’échéance.</p>;
+
+  const dette = detteDeRetard(
+    facture.recette.montant, echeance, dateISO(dateDuJour()), tauxValide
+  );
+  const brouillon = redigerRelance({
+    numero: facture.recette.numero,
+    montant: facture.recette.montant,
+    echeanceLe: echeance,
+    dette,
+    relancesFaites
+  });
+
+  return (
+    <div className={styles.relance}>
+      <p className={styles.relanceEtat}>
+        {relancesFaites === 0
+          ? 'Jamais relancée.'
+          : `${relancesFaites} relance${relancesFaites > 1 ? 's' : ''} — la dernière le `
+            + `${dateCourte(facture.recette.relancesLe?.[relancesFaites - 1] as never)}.`}
+        {' '}{dette.joursDeRetard} jour{dette.joursDeRetard > 1 ? 's' : ''} de retard.
+      </p>
+
+      <dl className={styles.relanceDus}>
+        <div className={styles.ligne}>
+          <dt>
+            Indemnité forfaitaire
+            <Info libelle="Ce qu’est l’indemnité forfaitaire">
+              Due de plein droit entre professionnels, par facture en retard, quels
+              que soient la durée du retard et le montant (article L441-10 du code
+              de commerce). Elle n’a pas à être réclamée en justice, mais elle
+              n’est exigible que si la facture l’annonce&nbsp;— ce que fait le
+              document émis ici.
+            </Info>
+          </dt>
+          <dd><Montant>{eur(dette.indemniteForfaitaire)}</Montant></dd>
+        </div>
+        <div className={styles.ligne}>
+          <dt>Pénalités de retard</dt>
+          <dd>
+            {dette.penalites === null
+              ? <span className={styles.relanceInconnu}>taux non renseigné</span>
+              : <Montant>{eur(dette.penalites)}</Montant>}
+          </dd>
+        </div>
+      </dl>
+
+      <label className={styles.champ} htmlFor={`${id}-taux`}>
+        <span className={styles.libelle}>Taux de pénalité de vos conditions de vente (%)</span>
+        <input
+          id={`${id}-taux`}
+          type="text"
+          inputMode="decimal"
+          className={styles.saisie}
+          value={tauxSaisi}
+          onChange={(e) => setTauxSaisi(e.target.value)}
+          placeholder="Laisser vide si vous ne le connaissez pas"
+        />
+      </label>
+
+      <p className={styles.libelle}>Objet</p>
+      <p className={styles.relanceObjet}>{brouillon.objet}</p>
+
+      <p className={styles.libelle}>Message</p>
+      <textarea className={styles.relanceCorps} readOnly value={brouillon.corps} rows={12} />
+
+      <div className={styles.relanceActions}>
+        <button
+          type="button"
+          className={styles.actionSecondaire}
+          onClick={() => {
+            // `clipboard` peut être absent ou refusé : la sélection manuelle
+            // reste toujours possible, le texte est à l'écran.
+            void navigator.clipboard?.writeText(brouillon.corps)
+              .then(() => setCopie(true))
+              .catch(() => setCopie(false));
+          }}
+        >
+          {copie ? 'Copié' : 'Copier le message'}
+        </button>
+        {/* Consigner est un geste SÉPARÉ de la copie : on copie souvent pour
+            relire, on ne relance qu'une fois. Les confondre ferait passer au
+            ton suivant sans qu'un message soit parti. */}
+        <button type="button" className={styles.actionLigne} onClick={onConsigner}>
+          J’ai envoyé cette relance
+        </button>
+      </div>
     </div>
   );
 }

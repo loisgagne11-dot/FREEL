@@ -239,3 +239,102 @@ describe('grand nombre de factures', () => {
     expect(screen.getAllByRole('listitem').length).toBeLessThanOrEqual(50);
   });
 });
+
+/**
+ * RELANCER — LE BESOIN QUI N'AVAIT AUCUN REMPLAÇANT.
+ *
+ * L'application désignait déjà « précisément celle qu'il faut relancer » — c'est
+ * écrit tel quel dans les sélecteurs — et ne proposait rien au bout. La fonction
+ * de l'ancienne version avait été écartée au motif qu'un envoi de courriel
+ * suppose un service d'expédition : le motif répondait à la FORME et pas au
+ * besoin. Relancer ne demande pas d'envoyer, mais de savoir quoi écrire, ce
+ * qu'on peut réclamer, et quand on l'a déjà fait.
+ */
+describe('relancer une facture en retard', () => {
+  const enRetard = () => recette({ id: 'r1', emiseLe: dateISO('2026-06-01') });
+
+  async function ouvrirRelance() {
+    semer([enRetard()]);
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Relancer' }));
+    return utilisateur;
+  }
+
+  // Le bouton n'a de sens que sur une facture échue : le proposer avant, c'est
+  // inviter à menacer un client qui n'a rien à se reprocher.
+  it('ne propose de relancer qu’une facture en retard', () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    expect(screen.queryByRole('button', { name: 'Relancer' })).toBeNull();
+  });
+
+  it('rédige un message qui nomme la facture', async () => {
+    await ouvrirRelance();
+    const message = screen.getByRole('textbox', { name: '' }) as HTMLTextAreaElement
+      ?? document.querySelector('textarea');
+    expect((message as HTMLTextAreaElement).value).toContain('2026-001');
+  });
+
+  /**
+   * L'indemnité forfaitaire de 40 € est due de plein droit, par facture, quels
+   * que soient la durée du retard et le montant. Presque personne ne la
+   * réclame — l'afficher est la moitié du travail.
+   */
+  it('chiffre l’indemnité forfaitaire, due de plein droit', async () => {
+    await ouvrirRelance();
+    expect(screen.getByText('Indemnité forfaitaire')).toBeTruthy();
+    expect(screen.getByText(/40/)).toBeTruthy();
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Sans taux, on ne chiffre pas : afficher zéro ferait
+   * croire qu'il n'y a rien à réclamer, et réclamer un montant calculé sur un
+   * taux supposé fragiliserait le document qu'on cherche à rendre solide.
+   */
+  it('dit que le taux manque, plutôt que d’annoncer zéro', async () => {
+    await ouvrirRelance();
+    expect(screen.getByText('taux non renseigné')).toBeTruthy();
+  });
+
+  it('chiffre les pénalités dès que le taux est donné', async () => {
+    const utilisateur = await ouvrirRelance();
+    await utilisateur.type(
+      screen.getByLabelText(/Taux de pénalité/), '12'
+    );
+    expect(screen.queryByText('taux non renseigné')).toBeNull();
+  });
+
+  /**
+   * Consigner est un geste SÉPARÉ de la copie : on copie souvent pour relire,
+   * on ne relance qu'une fois. Les confondre ferait passer au ton suivant sans
+   * qu'un message soit parti.
+   */
+  it('consigne la relance sur un geste explicite', async () => {
+    const utilisateur = await ouvrirRelance();
+    await utilisateur.click(screen.getByRole('button', { name: 'J’ai envoyé cette relance' }));
+
+    expect(useFaits.getState().faits.recettes[0]?.relancesLe).toHaveLength(1);
+  });
+
+  // Le ton suit le nombre de relances : rappel, puis ferme, puis mise en
+  // demeure. Sans la trace, on réécrit indéfiniment le même rappel courtois.
+  it('durcit le ton quand une relance a déjà été faite', async () => {
+    semer([{ ...enRetard(), relancesLe: [dateISO('2026-07-15')] }]);
+    rendre();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Relancer' }));
+
+    expect(screen.getByText(/^Relance —/)).toBeTruthy();
+  });
+
+  it('met en demeure à partir de la troisième', async () => {
+    semer([{
+      ...enRetard(),
+      relancesLe: [dateISO('2026-07-01'), dateISO('2026-07-20')]
+    }]);
+    rendre();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Relancer' }));
+
+    expect(screen.getByText(/^Mise en demeure/)).toBeTruthy();
+  });
+});

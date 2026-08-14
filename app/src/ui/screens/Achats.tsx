@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import { type LigneDepense, etatAchats } from '../../state/selecteurs.achats';
 import type { Depense } from '../../state/schema';
@@ -19,6 +20,7 @@ import {
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
 import { useRoute } from '../useRoute';
+import { CartePliable } from '../components/CartePliable';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
 import { Releve } from './Releve';
@@ -227,15 +229,22 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
         </p>
       )}
 
-      <section className={styles.carte} aria-labelledby={`${idGroupe}-liste`}>
-        <h2 id={`${idGroupe}-liste`} className={styles.titreCarte}>
-          Dépenses
-          {etat.sansDate > 0 && (
-            <span className={styles.compteur}>
-              {etat.sansDate} sans date
-            </span>
-          )}
-        </h2>
+      {/*
+        * Le registre est pliable, et sa synthèse est celle que la spec écrit
+        * mot pour mot : « n achats · X € TTC · TVA déductible Y € · Z pièce(s)
+        * manquante(s) ». Replié, il continue donc de dire s'il y a quelque
+        * chose à faire — c'est ce qui distingue ce pli d'un accordéon, où il
+        * faudrait déplier pour savoir s'il faut déplier.
+        */}
+      <CartePliable
+        id="registre"
+        ecran="achats"
+        titre="Dépenses"
+        resume={synthese(etat)}
+        {...(etat.sansDate > 0
+          ? { actions: <span className={styles.compteur}>{etat.sansDate} sans date</span> }
+          : {})}
+      >
 
         {etat.lignes.length === 0
           ? (
@@ -269,7 +278,7 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
               ))}
             </ul>
           )}
-      </section>
+      </CartePliable>
 
         </PanneauOnglet>
       </div>
@@ -754,4 +763,38 @@ function Pastille({ ton, texte }: { ton: 'neutre' | 'accent' | 'danger'; texte: 
   const classe = ton === 'danger' ? styles.pastilleDanger
     : ton === 'accent' ? styles.pastilleAccent : '';
   return <span className={`${styles.pastille} ${classe}`}>{texte}</span>;
+}
+
+/**
+ * Ce que le registre dit une fois replié.
+ *
+ * La formule est celle de la spec de design, mot pour mot : « n achats · X €
+ * TTC · TVA déductible Y € · Z pièce(s) manquante(s) ». Chacun de ces quatre
+ * chiffres répond à une question qu'on se pose sans ouvrir la carte — et le
+ * dernier est le seul qui appelle une action.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DES NŒUDS, PAS UNE CHAÎNE, ET CE N'EST PAS UN DÉTAIL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La première version rendait une chaîne, montants compris. Le masquage du mode
+ * confidentiel ne cible que `[data-montant]` : une carte repliée affichait donc
+ * le total TTC et la TVA déductible EN CLAIR, écran partagé.
+ *
+ * Et `verifier:confidentialite` ne pouvait pas le voir : les cartes s'ouvrent
+ * dépliées, la synthèse n'était pas dans le DOM au moment du contrôle. Un vert
+ * qui ne prouve rien — exactement ce contre quoi ce contrôle existe. Le
+ * vérificateur replie désormais les cartes avant sa passe.
+ */
+function synthese(etat: ReturnType<typeof etatAchats>): ReactNode {
+  const n = etat.lignes.length;
+  const p = etat.resume.sansJustificatif;
+  return (
+    <>
+      {n} achat{n > 1 ? 's' : ''}
+      {' · '}<Montant>{eur(etat.resume.totalTtc)}</Montant> TTC
+      {' · '}TVA déductible <Montant>{eur(etat.resume.tvaRecuperable)}</Montant>
+      {p > 0 && <>{' · '}{p} pièce{p > 1 ? 's' : ''} manquante{p > 1 ? 's' : ''}</>}
+    </>
+  );
 }

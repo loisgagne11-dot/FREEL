@@ -6,6 +6,7 @@ import {
 import { etatDes, etatLivre } from '../../state/selecteurs.livre';
 import type { EtatSeuils } from '../../state/selecteurs';
 import type { Mois } from '../../domain/types';
+import { euros } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
@@ -17,6 +18,7 @@ import { Statut, statutRecette } from '../components/Statut';
 import { Vide } from '../components/Vide';
 import { useToast } from '../components/Toasts';
 import { Echeances } from '../components/Echeances';
+import { CartePliable } from '../components/CartePliable';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
@@ -85,16 +87,28 @@ export function Argent() {
             <Chiffre libelle="Versable" valeur={eur(etat.tresorerie.versable)} ton="accent" />
           </div>
 
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-repartition`}>
-            <h2 id={`${idGroupe}-repartition`} className={styles.titreCarte}>
-              Votre solde n’est pas tout à vous
-              <Info libelle="Pourquoi le solde trompe">
-                Le solde bancaire contient les cotisations d’un trimestre que
-                vous n’avez pas encore déclaré. Le regarder et se sentir riche,
-                c’est le mécanisme exact du rappel qu’on ne peut plus payer. La
-                barre montre d’abord ce qui n’est <em>pas</em> à vous.
-              </Info>
-            </h2>
+          <CartePliable
+            id="repartition"
+            ecran="argent"
+            titre={(
+              <>
+                Votre solde n’est pas tout à vous
+                <Info libelle="Pourquoi le solde trompe">
+                  Le solde bancaire contient les cotisations d’un trimestre que
+                  vous n’avez pas encore déclaré. Le regarder et se sentir riche,
+                  c’est le mécanisme exact du rappel qu’on ne peut plus payer. La
+                  barre montre d’abord ce qui n’est <em>pas</em> à vous.
+                </Info>
+              </>
+            )}
+            resume={(
+              <>
+                <Montant>{eur(etat.tresorerie.versable)}</Montant> à vous
+                {' · '}<Montant>{eur(etat.tresorerie.provisions)}</Montant> de côté
+                {' · '}<Montant>{eur(etat.tresorerie.reserve)}</Montant> en réserve
+              </>
+            )}
+          >
             <Repartition
               total={etat.tresorerie.solde}
               deficit={Math.max(0, -etat.tresorerie.dispo)}
@@ -119,21 +133,32 @@ export function Argent() {
                 }
               ]}
             />
-          </section>
+          </CartePliable>
 
-          <CarteSeuils idGroupe={idGroupe} seuils={etat.seuils} />
+          <CarteSeuils seuils={etat.seuils} />
 
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-enveloppes`}>
-            <h2 id={`${idGroupe}-enveloppes`} className={styles.titreCarte}>
-              Enveloppes de provision
-              <Info libelle="Explication des deux volets de provision">
-                Les échéances émises sont ce que l’URSSAF ou le fisc ont déjà
-                appelé. Les charges sur recettes encaissées sont dues mais pas
-                encore appelées : la dette naît à l’encaissement, pas à
-                l’émission de l’échéance. Une fois la période déclarée, la
-                seconde ligne bascule dans la première.
-              </Info>
-            </h2>
+          <CartePliable
+            id="enveloppes"
+            ecran="argent"
+            titre={(
+              <>
+                Enveloppes de provision
+                <Info libelle="Explication des deux volets de provision">
+                  Les échéances émises sont ce que l’URSSAF ou le fisc ont déjà
+                  appelé. Les charges sur recettes encaissées sont dues mais pas
+                  encore appelées&nbsp;: la dette naît à l’encaissement, pas à
+                  l’émission de l’échéance. Une fois la période déclarée, la
+                  seconde ligne bascule dans la première.
+                </Info>
+              </>
+            )}
+            resume={(
+              <>
+                <Montant>{eur(etat.tresorerie.provisions)}</Montant> à garder de côté
+                {' · dont '}<Montant>{eur(etat.voletConstate)}</Montant> déjà appelés
+              </>
+            )}
+          >
             <dl className={styles.detail}>
               <div className={styles.ligne}>
                 <dt>Échéances émises, à payer</dt>
@@ -148,7 +173,7 @@ export function Argent() {
                 <dd><Montant>{eur(etat.tresorerie.provisions)}</Montant></dd>
               </div>
             </dl>
-          </section>
+          </CartePliable>
 
           <Echeances />
 
@@ -465,26 +490,58 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
   );
 }
 
-function CarteSeuils(
-  { idGroupe, seuils }: { idGroupe: string; seuils: EtatSeuils }
-) {
+function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
   const plafond = seuils.plafondMicro;
   const tva = seuils.franchiseTva;
 
-  return (
-    <section className={styles.carte} aria-labelledby={`${idGroupe}-seuils`}>
-      <h2 id={`${idGroupe}-seuils`} className={styles.titreCarte}>
-        Seuils — où j’en suis
-        <Info libelle="Ce que ces deux seuils déclenchent">
-          Le <strong>plafond micro</strong> conditionne le régime lui-même&nbsp;:
-          le dépasser deux années de suite fait basculer en réel. La
-          <strong> franchise de TVA</strong> est plus immédiate&nbsp;: passé le
-          seuil majoré, la TVA devient exigible <em>dès le mois du
-          dépassement</em>, y compris sur les factures déjà émises sans TVA.
-          Les deux se mesurent sur le chiffre d’affaires <em>encaissé</em>.
-        </Info>
-      </h2>
+  /**
+   * Ce que la carte dit une fois repliée.
+   *
+   * La spec de design notait que le résumé plié de cette carte était **écrit en
+   * dur** dans le prototype (« voir Écarts »). Il est ici dérivé des seuils
+   * réels, et il refuse de se prononcer quand le barème refuse : un résumé qui
+   * annoncerait une marge sur un plafond inconnu serait précisément le genre de
+   * chiffre rassurant et faux que le projet s'interdit.
+   *
+   * C'est le seuil MAJORÉ qui est mis en avant, et non la franchise : c'est lui
+   * qui assujettit dès le mois du dépassement, sur des factures déjà émises
+   * sans TVA.
+   */
+  const resume = tva.statut === 'refuse'
+    ? 'Seuils de TVA indisponibles pour cette période.'
+    : (
+      <>
+        <Montant>{eur(euros(Math.max(0, tva.valeur.majore - seuils.caEncaisse)))}</Montant>
+        {' avant le seuil majoré de TVA'}
+        {plafond.statut !== 'refuse' && (
+          <>
+            {' · '}
+            <Montant>{eur(euros(Math.max(0, plafond.valeur - seuils.caEncaisse)))}</Montant>
+            {' avant le plafond micro'}
+          </>
+        )}
+      </>
+    );
 
+  return (
+    <CartePliable
+      id="seuils"
+      ecran="argent"
+      titre={(
+        <>
+          Seuils — où j’en suis
+          <Info libelle="Ce que ces deux seuils déclenchent">
+            Le <strong>plafond micro</strong> conditionne le régime lui-même&nbsp;:
+            le dépasser deux années de suite fait basculer en réel. La
+            <strong> franchise de TVA</strong> est plus immédiate&nbsp;: passé le
+            seuil majoré, la TVA devient exigible <em>dès le mois du
+            dépassement</em>, y compris sur les factures déjà émises sans TVA.
+            Les deux se mesurent sur le chiffre d’affaires <em>encaissé</em>.
+          </Info>
+        </>
+      )}
+      resume={resume}
+    >
       <div className={styles.jauges}>
         {plafond.statut === 'refuse'
           ? <p className={styles.vide}>Plafond micro&nbsp;: {plafond.motif}</p>
@@ -516,7 +573,7 @@ function CarteSeuils(
             </>
           )}
       </div>
-    </section>
+    </CartePliable>
   );
 }
 
@@ -572,7 +629,8 @@ function DeclarationServices({ idGroupe }: { idGroupe: string }) {
           <Info libelle="Qui doit déposer une DES, et quand">
             Elle est due par celui qui <strong>vend</strong> un service à un
             professionnel établi dans un autre État membre — pas par celui qui
-            en achète. Aucun seuil&nbsp;: une prestation de 50 € suffit. Dépôt
+            en achète. Aucun seuil&nbsp;: une prestation de{' '}
+            <Montant>50&nbsp;€</Montant> suffit. Dépôt
             au plus tard le 10 du mois suivant, sur le portail de la douane.
           </Info>
         </h2>

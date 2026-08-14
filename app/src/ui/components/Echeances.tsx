@@ -10,6 +10,7 @@ import { Sheet } from './Sheet';
 import { Statut, type TonStatut } from './Statut';
 import { useToast } from './Toasts';
 import { Vide } from './Vide';
+import { CartePliable } from './CartePliable';
 import { dateCourte, eur, moisLong } from '../format';
 import styles from './Echeances.module.css';
 
@@ -110,10 +111,41 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
     ? faits.echeances.find((e) => e.id === panneau.id) ?? null
     : null;
 
+  /**
+   * Ce que l'échéancier dit une fois replié.
+   *
+   * Le montant restant à payer, et la prochaine date. Ce sont les deux seules
+   * questions qu'on se pose sans ouvrir la carte — et la date importe autant
+   * que la somme : une échéance à trois jours et une à trois mois n'appellent
+   * pas la même décision.
+   */
+  const prochaine = [...aPayer].sort((a, b) => a.echeanceLe.localeCompare(b.echeanceLe))[0];
+  const resume = aPayer.length === 0
+    ? 'Aucune échéance en attente de paiement.'
+    : (
+      <>
+        <Montant>{eur(total)}</Montant> à payer
+        {' sur '}{aPayer.length} échéance{aPayer.length > 1 ? 's' : ''}
+        {prochaine !== undefined && <>{' · prochaine le '}{dateCourte(prochaine.echeanceLe)}</>}
+      </>
+    );
+
   return (
-    <section className={styles.carte} aria-labelledby="titre-echeances">
-      <header className={styles.entete}>
-        <h2 id="titre-echeances" className={styles.titreCarte}>
+    <CartePliable
+      id="echeancier"
+      ecran="argent"
+      resume={resume}
+      actions={(
+        <button
+          type="button"
+          className={styles.actionPrincipale}
+          onClick={() => setPanneau({ type: 'saisie', id: null })}
+        >
+          Saisir une échéance
+        </button>
+      )}
+      titre={(
+        <>
           Échéances reçues
           <Info libelle="Ce qu’il faut saisir ici">
             Les appels que vous avez réellement reçus&nbsp;: échéancier URSSAF,
@@ -124,15 +156,9 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
             somme&nbsp;; c’est «&nbsp;marquer la période déclarée&nbsp;» qui
             fait passer l’une dans l’autre.
           </Info>
-        </h2>
-        <button
-          type="button"
-          className={styles.actionPrincipale}
-          onClick={() => setPanneau({ type: 'saisie', id: null })}
-        >
-          Saisir une échéance
-        </button>
-      </header>
+        </>
+      )}
+    >
 
       {mois.length === 0
         ? (
@@ -232,7 +258,7 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
           />
         )}
       </Sheet>
-    </section>
+    </CartePliable>
   );
 }
 
@@ -254,7 +280,28 @@ function Ligne(
   return (
     <li className={styles.ligne}>
       <span className={styles.ligneTitre}>
-        <span className={styles.ligneLibelle}>{LIBELLE[echeance.nature]}</span>
+        {/*
+          * LA COULEUR FIXE PAR TYPE DE CHARGE.
+          *
+          * L'annexe du handoff nomme DEUX mécanismes structurants à conserver :
+          * le pli à synthèse, et celui-ci — « une charge garde sa couleur
+          * partout ». Les jetons existaient dans les quatre palettes et
+          * n'étaient câblés nulle part : la nature d'une dette ne se lisait
+          * qu'en toutes lettres.
+          *
+          * Un filet de 3 px, pas une pastille pleine : la couleur doit
+          * identifier la charge sans entrer en concurrence avec le vert, l'ambre
+          * et le rouge, qui codent l'ÉTAT. Deux systèmes de couleur sur la même
+          * ligne, et aucun des deux ne se lit plus.
+          *
+          * Le libellé reste écrit : la couleur est un repère, jamais la seule
+          * porteuse de l'information — c'est la règle pour qui ne la distingue
+          * pas.
+          */}
+        <span className={styles.nature}>
+          <span className={styles.teinte} data-charge={echeance.nature} aria-hidden="true" />
+          <span className={styles.ligneLibelle}>{LIBELLE[echeance.nature]}</span>
+        </span>
         <span className={styles.ligneMontant}>
           <Montant>{eur(echeance.montantPaye ?? echeance.montant)}</Montant>
         </span>

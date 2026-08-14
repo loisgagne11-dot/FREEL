@@ -260,3 +260,53 @@
 @media print {
   .grille, .carte, .filtres, .panneau { display: none !important; }
 }
+
+/* ── Panneau de relance ──────────────────────────────────────────────────
+   L'application rédige, elle n'envoie pas : le texte est fait pour être relu
+   puis copié, pas pour être expédié d'ici. */
+
+.relance { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.relanceEtat {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--tint-2);
+}
+
+.relanceDus { display: flex; flex-direction: column; }
+
+/* Le taux n'est pas connu : on le dit, on n'affiche pas zéro. Zéro laisserait
+   croire qu'il n'y a rien à réclamer. */
+.relanceInconnu { color: var(--muted-2); font-style: italic; font-weight: 400; }
+
+.relanceObjet {
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  user-select: all;
+}
+
+/* Le message est en lecture seule mais entièrement sélectionnable : le
+   copier-coller manuel doit rester possible si le presse-papiers est refusé. */
+.relanceCorps {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.relanceActions { display: flex; flex-wrap: wrap; gap: 8px; }

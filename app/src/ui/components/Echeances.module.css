@@ -252,3 +252,32 @@
 }
 
 .rappel strong { color: var(--text); font-variant-numeric: tabular-nums; font-size: 15px; }
+
+/* ── La couleur fixe par type de charge ──────────────────────────────────
+   Second des deux mécanismes structurants que l'annexe du handoff demande de
+   conserver : « une charge garde sa couleur partout ». Les jetons vivaient
+   dans les quatre palettes sans être câblés nulle part.
+
+   Un filet, pas un aplat : la couleur identifie la CHARGE, tandis que vert /
+   ambre / rouge codent l'ÉTAT. Deux systèmes de couleur qui se disputent la
+   même ligne, et aucun des deux ne se lit plus. */
+/* Le filet et le libellé forment un bloc : sans lui, le filet participerait à
+   la répartition qui pousse le montant à droite. */
+.nature { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.teinte {
+  width: 3px;
+  align-self: stretch;
+  min-height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: var(--slate);
+}
+
+.teinte[data-charge='urssaf'] { background: var(--c-urssaf); }
+.teinte[data-charge='tva'] { background: var(--c-tva); }
+.teinte[data-charge='impot'] { background: var(--c-ir); }
+.teinte[data-charge='cfe'] { background: var(--c-cfe); }
+/* La CFP est due avec les cotisations : elle partage leur teinte plutôt que
+   d'introduire une cinquième couleur pour une ligne qui suit la même échéance. */
+.teinte[data-charge='cfp'] { background: var(--c-urssaf); }

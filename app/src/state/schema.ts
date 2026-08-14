@@ -32,7 +32,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 6 as const;
+export const VERSION_SCHEMA = 7 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -200,6 +200,23 @@ export interface Recette {
   readonly annuleEcriture?: string | null;
   /** Recette globalisée en fin de journée, sans identité de client. */
   readonly globalisee?: boolean;
+  /**
+   * Les dates auxquelles cette facture a été relancée.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * UNE LISTE, PAS UN COMPTEUR NI UN BOOLÉEN
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * « Je l'ai relancé quand ? » et « combien de fois ? » sont deux questions,
+   * et la première est celle qu'on se pose au téléphone. Un compteur répond à
+   * la seconde et perd la première ; un booléen perd les deux.
+   *
+   * Les dates commandent aussi le TON : le premier message est un rappel, le
+   * deuxième est ferme, le troisième une mise en demeure. Sans la trace, on
+   * réécrit indéfiniment le même rappel courtois — ou on met en demeure
+   * quelqu'un qu'on n'a jamais prévenu.
+   */
+  readonly relancesLe?: readonly DateISO[];
 }
 
 /**
@@ -586,6 +603,32 @@ export function completerFaits(brut: unknown): Faits {
     conges: congesDuSchema1(o['conges']),
     missions: missionsDuSchema1(o['missions']),
     mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires']),
-    echeances: echeancesDuSchema5(o['echeances'])
+    echeances: echeancesDuSchema5(o['echeances']),
+    recettes: recettesDuSchema6(o['recettes'])
   } as Faits;
+}
+
+/**
+ * v6 → v7 : les recettes portent leurs dates de relance.
+ *
+ * Le champ est nouveau et facultatif ; une recette d'avant le schéma 7 n'a
+ * simplement jamais été relancée dans l'application. On pose donc une liste
+ * vide plutôt que de laisser `undefined` circuler : le reste du code compte des
+ * relances, et `undefined.length` n'est pas une absence, c'est une panne.
+ *
+ * La règle du projet s'applique une fois de plus : une migration descend
+ * jusqu'où les champs ont bougé. Ici ils n'ont pas bougé, ils sont apparus —
+ * mais le comblement doit quand même descendre au niveau de chaque recette,
+ * ce que la fusion de surface de `completerFaits` ne fait pas.
+ */
+function recettesDuSchema6(brut: unknown): readonly Recette[] {
+  if (!Array.isArray(brut)) return [];
+  return brut.flatMap((r): Recette[] => {
+    if (typeof r !== 'object' || r === null) return [];
+    const o = r as Record<string, unknown>;
+    const relances = Array.isArray(o['relancesLe'])
+      ? o['relancesLe'].filter((d): d is DateISO => typeof d === 'string')
+      : [];
+    return [{ ...(o as unknown as Recette), relancesLe: relances }];
+  });
 }
