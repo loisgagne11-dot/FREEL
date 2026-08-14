@@ -10,6 +10,9 @@ import { Compte } from './Compte';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
+import {
+  type ControleIdentifiant, controlerIban, controlerSiret
+} from '../../domain/calculs/identifiants';
 import { useRoute } from '../useRoute';
 import { dateCourte } from '../format';
 import styles from './Config.module.css';
@@ -231,9 +234,46 @@ function Profil() {
             onChange={(e) => modifier({ nom: e.target.value })} />
         </Champ>
 
-        <Champ id={`${idChamp}-siret`} libelle="SIRET">
+        {/*
+          * LE SIRET EST CONTRÔLÉ, PAS SEULEMENT DEMANDÉ.
+          *
+          * C'est une mention obligatoire de la facture : un numéro erroné vaut
+          * mention absente, à 15 € par mention et par facture. Il porte une clé
+          * de Luhn — la faute de frappe se voit hors ligne, à la saisie.
+          *
+          * L'avertissement ne bloque rien : une clé qui ne tombe pas juste dit
+          * « improbable », jamais « faux ».
+          */}
+        <Champ id={`${idChamp}-siret`} libelle="SIRET" controle={controlerSiret(entreprise.siret)}>
           <input id={`${idChamp}-siret`} inputMode="numeric" value={entreprise.siret}
             onChange={(e) => modifier({ siret: e.target.value })} />
+        </Champ>
+
+        {/*
+          * L'ADRESSE, QUI N'ÉTAIT SAISISSABLE NULLE PART.
+          *
+          * Elle est une mention obligatoire, `etatFacture` bloque l'émission
+          * sans elle, et le message de blocage renvoyait « à renseigner dans
+          * Config → Profil » — où le champ n'existait pas. Une entreprise créée
+          * dans la nouvelle version ne pouvait donc émettre aucune facture ;
+          * seules celles reprises de l'ancienne avaient une adresse.
+          */}
+        <Champ id={`${idChamp}-adresse`} libelle="Adresse">
+          <input id={`${idChamp}-adresse`} autoComplete="street-address"
+            value={entreprise.adresse}
+            onChange={(e) => modifier({ adresse: e.target.value })} />
+        </Champ>
+
+        <Champ id={`${idChamp}-cp`} libelle="Code postal">
+          <input id={`${idChamp}-cp`} inputMode="numeric" autoComplete="postal-code"
+            value={entreprise.codePostal}
+            onChange={(e) => modifier({ codePostal: e.target.value })} />
+        </Champ>
+
+        <Champ id={`${idChamp}-ville`} libelle="Ville">
+          <input id={`${idChamp}-ville`} autoComplete="address-level2"
+            value={entreprise.ville}
+            onChange={(e) => modifier({ ville: e.target.value })} />
         </Champ>
 
         <Champ id={`${idChamp}-debut`} libelle="Début d’activité">
@@ -275,6 +315,35 @@ function Profil() {
         >
           <input id={`${idChamp}-intracom`} value={entreprise.tvaIntracom}
             onChange={(e) => modifier({ tvaIntracom: e.target.value })} />
+        </Champ>
+
+        {/*
+          * OÙ VOUS PAYER.
+          *
+          * `iban` existait au schéma et était même repris de l'ancienne
+          * application à la migration — mais aucun écran ne le montrait et le
+          * document imprimé ne le portait pas. Le client recevait une facture
+          * régulière sur laquelle rien n'indiquait où envoyer l'argent.
+          *
+          * L'IBAN porte une clé mod-97 : une inversion de caractères se voit
+          * ici, et non trois semaines plus tard en relançant un virement qui
+          * n'est jamais parti.
+          */}
+        <Champ
+          id={`${idChamp}-iban`}
+          libelle="IBAN"
+          aide="Figure sur vos factures, pour que le client sache où virer. Rien n’est envoyé nulle part."
+          controle={controlerIban(entreprise.iban)}
+        >
+          <input id={`${idChamp}-iban`} autoComplete="off" spellCheck={false}
+            value={entreprise.iban}
+            onChange={(e) => modifier({ iban: e.target.value })} />
+        </Champ>
+
+        <Champ id={`${idChamp}-bic`} libelle="BIC" aide="Facultatif pour un virement SEPA.">
+          <input id={`${idChamp}-bic`} autoComplete="off" spellCheck={false}
+            value={entreprise.bic}
+            onChange={(e) => modifier({ bic: e.target.value })} />
         </Champ>
 
         <Champ
@@ -718,8 +787,17 @@ function pourcent(r: number): string {
 }
 
 function Champ(
-  { id, libelle, aide, children }: {
-    id: string; libelle: string; aide?: string; children: React.ReactNode;
+  { id, libelle, aide, controle, children }: {
+    id: string; libelle: string; aide?: string;
+    /**
+     * Le résultat d'une clé de contrôle, quand le champ en porte une.
+     *
+     * `role="status"` et non `alert` : l'avertissement apparaît pendant qu'on
+     * tape, et une alerte à chaque caractère interromprait la saisie qu'elle
+     * prétend aider.
+     */
+    controle?: ControleIdentifiant;
+    children: React.ReactNode;
   }
 ) {
   const idAide = `${id}-aide`;
@@ -728,6 +806,9 @@ function Champ(
       <label htmlFor={id}>{libelle}</label>
       {children}
       {aide !== undefined && <span id={idAide} className={styles.aide}>{aide}</span>}
+      {controle !== undefined && controle.statut === 'suspect' && (
+        <span className={styles.suspect} role="status">{controle.motif}</span>
+      )}
     </p>
   );
 }

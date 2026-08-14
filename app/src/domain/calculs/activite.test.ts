@@ -3,7 +3,7 @@ import { dateISO, euros, mois } from '../types';
 import {
   type RecettePayee,
   calendrierDuMois, chargeDuMois, delaisParClient, estWeekEnd, joursDuMois,
-  joursEntre, joursEquivalents, joursFeries, paques, planDeCharge
+  joursCongeables, joursEntre, joursEquivalents, joursFeries, paques, planDeCharge
 } from './activite';
 
 describe('date de Pâques', () => {
@@ -316,5 +316,68 @@ describe('demi-journées de congé', () => {
       mois('2026-07'), [jour('2026-07-27'), jour('2026-08-03')], 10
     );
     expect(plan.joursDeConge).toBe(1);
+  });
+});
+
+/**
+ * POSER UNE PLAGE DE CONGÉS.
+ *
+ * `poserPlageDeConges` existait dans le magasin depuis le début, testée, et
+ * AUCUN écran ne l'appelait : le calendrier ne posait qu'un jour à la fois.
+ * Trois semaines de vacances demandaient vingt et un clics, et la demi-journée
+ * — que le schéma porte depuis la v2 — était inatteignable.
+ *
+ * La réduction de la plage aux jours ouvrés est une règle, pas une commodité
+ * d'affichage : « du 1er au 21 août » vaut quinze jours ouvrés, pas vingt et un.
+ */
+describe('jours congeables d’une plage', () => {
+  it('écarte les week-ends', () => {
+    // Du lundi 3 au dimanche 9 août 2026 : cinq jours ouvrés.
+    const jours = joursCongeables(dateISO('2026-08-03'), dateISO('2026-08-09'));
+    expect(jours).toHaveLength(5);
+    expect(jours).not.toContain('2026-08-08');
+    expect(jours).not.toContain('2026-08-09');
+  });
+
+  /**
+   * Le 15 août 2026 tombe un samedi ; prenons plutôt le 14 juillet 2026, un
+   * mardi. L'inclure gonflerait le solde de congés d'un jour non dû.
+   */
+  it('écarte les jours fériés', () => {
+    const jours = joursCongeables(dateISO('2026-07-13'), dateISO('2026-07-15'));
+    expect(jours).not.toContain('2026-07-14');
+    expect(jours).toEqual(['2026-07-13', '2026-07-15']);
+  });
+
+  // Sélectionner de la fin vers le début est un geste courant, pas une faute.
+  it('accepte les bornes dans les deux sens', () => {
+    const endroit = joursCongeables(dateISO('2026-08-03'), dateISO('2026-08-07'));
+    const envers = joursCongeables(dateISO('2026-08-07'), dateISO('2026-08-03'));
+    expect(envers).toEqual(endroit);
+  });
+
+  it('inclut les deux bornes', () => {
+    const jours = joursCongeables(dateISO('2026-08-03'), dateISO('2026-08-04'));
+    expect(jours).toEqual(['2026-08-03', '2026-08-04']);
+  });
+
+  /**
+   * Une plage qui enjambe le 31 décembre traverse deux années de fériés. Ne
+   * charger que celle du départ laisserait passer le 1er janvier.
+   */
+  it('connaît les fériés des deux années quand la plage enjambe le nouvel an', () => {
+    const jours = joursCongeables(dateISO('2026-12-30'), dateISO('2027-01-04'));
+    expect(jours).not.toContain('2027-01-01');
+    expect(jours).toContain('2026-12-30');
+  });
+
+  it('rend une plage d’un seul jour ouvré', () => {
+    expect(joursCongeables(dateISO('2026-08-03'), dateISO('2026-08-03')))
+      .toEqual(['2026-08-03']);
+  });
+
+  // Un dimanche seul ne donne rien : il n'y a rien à poser.
+  it('rend une liste vide quand la plage ne contient aucun jour ouvré', () => {
+    expect(joursCongeables(dateISO('2026-08-08'), dateISO('2026-08-09'))).toEqual([]);
   });
 });

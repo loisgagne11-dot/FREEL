@@ -97,16 +97,24 @@ interface MagasinFaits {
    * calcule pas : le volet 2 des provisions estime la dette pas encore
    * appelée, ce volet-ci porte ce qui l'a été.
    */
-  readonly ajouterEcheance: (saisie: Omit<Echeance, 'id'>) => string;
   /**
-   * Enregistre une série d'échéances d'un seul geste.
+   * Enregistre une ou plusieurs échéances d'un seul geste.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * IL N'Y A PLUS DE VERSION AU SINGULIER, ET C'EST DÉLIBÉRÉ
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `ajouterEcheance` a existé. `verifier:cablage` l'a trouvée morte : l'écran
+   * des échéances passe toujours par ici, y compris pour une seule. Deux
+   * chemins pour le même fait finissent par diverger — l'un persiste, l'autre
+   * oublie — et le second n'est jamais testé puisque personne ne l'emprunte.
    *
    * Une commodité de SAISIE, pas un nouveau fait : elle crée N échéances
    * ordinaires et s'efface. Chacune reste ensuite corrigeable, supprimable et
    * marquable payée indépendamment — parce que c'est ce qui va arriver : un
    * trimestre régularisé, un taux qui change, un mois reporté.
    *
-   * Une seule écriture pour toute la série : N appels à `ajouterEcheance`
+   * Une seule écriture pour toute la série : N écritures séparées
    * persisteraient N fois, et une interruption au milieu laisserait un
    * échéancier à moitié saisi.
    */
@@ -495,15 +503,6 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     };
     set({ faits });
     persister(stockageActif, faits);
-  },
-
-  ajouterEcheance: (saisie) => {
-    const actuel = get().faits;
-    const id = `ech-${Date.now()}-${actuel.echeances.length}`;
-    const faits: Faits = { ...actuel, echeances: [...actuel.echeances, { ...saisie, id }] };
-    set({ faits });
-    persister(stockageActif, faits);
-    return id;
   },
 
   ajouterEcheances: (saisies) => {

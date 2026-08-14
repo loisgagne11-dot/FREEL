@@ -287,6 +287,27 @@
 
 .docTotaux { margin-top: 16px; margin-left: auto; max-width: 340px; }
 
+/* Le bloc de règlement, entre les totaux et les mentions légales. Il n'est pas
+   une mention obligatoire : il est ce qui fait la différence entre une facture
+   et une facture payable. */
+.docReglement {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--tint-2);
+}
+
+/* L'IBAN est fait pour être recopié : chiffres à chasse fixe, jamais coupé au
+   milieu d'un groupe, et sélectionnable d'un seul geste. */
+.docIban {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  font-weight: 560;
+  white-space: nowrap;
+  user-select: all;
+}
+
 .docPied {
   margin-top: 20px;
   padding-top: 14px;
@@ -329,6 +350,9 @@
 
   .docTable { display: table; overflow: visible; }
   .docEntete, .docPied, .docTable thead th, .docTable td { border-color: #999 !important; }
+  /* Sur papier, le fond teinté du bloc de règlement disparaît : il coûterait de
+     l'encre pour un contraste que le filet donne déjà. */
+  .docReglement { background: none !important; border-color: #999 !important; }
   .ligne { border-color: #ddd !important; }
   .total { border-color: #999 !important; }
 

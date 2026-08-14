@@ -280,3 +280,63 @@ describe('l’adresse de la rédaction', () => {
     expect(await screen.findByLabelText('Client')).toBeTruthy();
   });
 });
+
+/**
+ * OÙ PAYER — CE QUI MANQUAIT SUR CHAQUE FACTURE ÉMISE.
+ *
+ * `entreprise.iban` existait au schéma, était repris de l'ancienne application
+ * à la migration, et n'atteignait AUCUN écran : ni Config, où il n'était pas
+ * saisissable, ni le document imprimé, qui ne le portait pas.
+ *
+ * Le client recevait donc une facture parfaitement régulière sur laquelle rien
+ * n'indiquait où envoyer l'argent. Ce n'est pas une mention obligatoire ; c'est
+ * ce qui fait la différence entre une facture et une facture payable.
+ */
+describe('coordonnées de règlement', () => {
+  /**
+   * Un IBAN manifestement factice, et un BIC de démonstration.
+   *
+   * Ces tests vérifient l'AFFICHAGE et l'enregistrement, pas la validité de la
+   * clé — celle-ci est éprouvée dans `calculs/identifiants.test.ts`. Aucune
+   * donnée bancaire réelle n'a donc à figurer ici, et `verifier:fuites` s'en
+   * assure : un fichier de test est exactement l'endroit où une vraie valeur se
+   * glisse sans être vue.
+   */
+  const AVEC_IBAN = {
+    ...ENTREPRISE,
+    iban: 'FR0000000000000000000000000',
+    bic: 'XXXXFRPPXXX'
+  };
+
+  async function emettre(): Promise<void> {
+    rendreSaisie();
+    const utilisateur = userEvent.setup();
+    await remplir(utilisateur);
+    await utilisateur.click(screen.getByRole('button', { name: 'Émettre la facture' }));
+  }
+
+  it('porte l’IBAN sur le document', async () => {
+    semer({ entreprise: AVEC_IBAN, clients: [client()] });
+    await emettre();
+    const document_ = screen.getByRole('article', { name: /Facture 2026-001/ });
+    expect(within(document_).getByText(/Règlement/)).toBeTruthy();
+    // Groupé par quatre, comme sur un relevé : c'est ainsi qu'il se recopie.
+    expect(within(document_).getByText('FR00 0000 0000 0000 0000 0000 000')).toBeTruthy();
+  });
+
+  it('porte le BIC quand il est renseigné', async () => {
+    semer({ entreprise: AVEC_IBAN, clients: [client()] });
+    await emettre();
+    expect(screen.getByText(/XXXXFRPPXXX/)).toBeTruthy();
+  });
+
+  /**
+   * Sans IBAN, pas de bloc vide : une rubrique « Règlement » sans coordonnées
+   * fait croire à une omission d'impression plutôt qu'à un champ non rempli.
+   */
+  it('n’imprime pas un bloc de règlement vide', async () => {
+    semer({ entreprise: { ...ENTREPRISE, iban: '', bic: '' }, clients: [client()] });
+    await emettre();
+    expect(screen.queryByText(/Règlement/)).toBeNull();
+  });
+});

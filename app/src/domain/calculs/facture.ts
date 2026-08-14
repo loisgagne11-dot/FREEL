@@ -67,6 +67,24 @@ export interface Emetteur {
   readonly tvaIntracom: string;
   /** `true` si l'entreprise est en franchise en base de TVA. */
   readonly enFranchise: boolean;
+  /**
+   * Les coordonnées bancaires, telles qu'elles doivent figurer sur la facture.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * ELLES MANQUAIENT, ET LA FACTURE ÉTAIT IMPAYABLE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `entreprise.iban` existait dans le schéma et était même repris de
+   * l'ancienne application à la migration — mais aucun écran ne le montrait, et
+   * le document imprimé ne le portait pas. Le client recevait une facture
+   * régulière sur laquelle rien n'indiquait où payer.
+   *
+   * Ce n'est pas une mention obligatoire au sens de l'article L441-9 : une
+   * facture sans IBAN reste valide. Elle est seulement impayable sans un
+   * échange de courriels de plus, à chaque fois.
+   */
+  readonly iban: string;
+  readonly bic: string;
 }
 
 /** Le destinataire. */

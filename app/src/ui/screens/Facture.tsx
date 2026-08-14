@@ -10,6 +10,7 @@ import { dateCourte, eurExact } from '../format';
 import styles from './Facture.module.css';
 import { Montant } from '../components/Montant';
 import { Facturier } from '../components/Facturier';
+import { formaterIban } from '../../domain/calculs/identifiants';
 import { useRoute } from '../useRoute';
 
 /**
@@ -439,6 +440,23 @@ function DocumentFacture({ etat }: { etat: ReturnType<typeof etatFacture> }) {
       <div className={styles.docTotaux}>
         <Totaux etat={etat} />
       </div>
+
+      {/* OÙ PAYER.
+          `entreprise.iban` existait au schéma, était repris de l'ancienne
+          application à la migration — et n'atteignait aucun écran. Le client
+          recevait une facture régulière sur laquelle rien n'indiquait où
+          envoyer l'argent. Ce n'est pas une mention obligatoire ; c'est
+          seulement ce qui fait la différence entre une facture et une facture
+          payable. */}
+      {em.iban !== '' && (
+        <section className={styles.docReglement}>
+          <p className={styles.docLabel}>Règlement</p>
+          <p className={styles.docLigne}>
+            Par virement — IBAN <span className={styles.docIban}>{formaterIban(em.iban)}</span>
+          </p>
+          {em.bic !== '' && <p className={styles.docLigne}>BIC {em.bic}</p>}
+        </section>
+      )}
 
       <footer className={styles.docPied}>
         {etat.mentions.map((m) => <p key={m} className={styles.docMention}>{m}</p>)}

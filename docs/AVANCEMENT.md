@@ -1065,6 +1065,43 @@ d'échouer**.
 
 ---
 
+## 4 septies. Leçon du 14/08 — l'audit regardait dans un seul sens
+
+L'audit ancienne/nouvelle listait ce que l'ancienne application faisait et la
+nouvelle non. La question inverse n'avait jamais été posée : **ce que la
+nouvelle prétend faire et n'atteint pas.**
+
+Trois trous s'y cachaient, tous identiques de structure — un fait présent au
+schéma, repris de l'ancienne version à la migration, et **aucun chemin pour
+l'atteindre** :
+
+| Fait | Ce que ça coûtait |
+|---|---|
+| `entreprise.adresse`, `codePostal`, `ville` | Mention obligatoire. `etatFacture` bloquait l'émission sans elle, avec un message renvoyant « à renseigner dans Config → Profil » — **où le champ n'existait pas**. Une entreprise créée dans la nouvelle version ne pouvait émettre AUCUNE facture |
+| `entreprise.iban`, `bic` | Le client recevait une facture régulière sur laquelle **rien n'indiquait où payer** |
+| `poserPlageDeConges` | Trois semaines de vacances = vingt et un clics, et la demi-journée était inatteignable |
+
+Le premier est le plus instructif : le code **disait lui-même** où aller le
+corriger, et l'endroit désigné n'existait pas. Aucun test ne pouvait l'attraper,
+parce que tous les jeux d'essai construisent une entreprise complète — c'est
+justement ce qu'un utilisateur n'a pas le premier jour.
+
+**Deux règles qui en découlent.**
+
+1. **Un message qui désigne un endroit doit désigner un endroit qui existe.**
+   « À renseigner dans X » est une promesse au même titre qu'un bouton.
+2. **Le jeu d'essai le plus révélateur est le plus pauvre.** Une entreprise
+   vierge — pas une entreprise de démonstration bien remplie — est ce qui fait
+   apparaître les chemins manquants.
+
+Et un garde-fou, parce que la famille de défaut est connue depuis le 13/08 : le
+journal en avait tiré une règle et **une commande à lancer à la main**. Une
+règle qu'on doit penser à appliquer n'est pas une règle. `verifier:cablage` la
+lance à chaque passage de la chaîne, et une action fictive ajoutée au contrat le
+fait échouer.
+
+---
+
 ## 5. Points ouverts
 
 | Sujet | État |
@@ -1112,6 +1149,7 @@ npm run verifier    # la chaîne complète, dans cet ordre :
 | Étape | Ce qu'elle prouve |
 |---|---|
 | `typecheck` + `test` + `build` | Le compilateur, les tests, le build |
+| `verifier:cablage` | **Chaque action du magasin est appelée depuis un écran.** Les tests ne suffisent pas à le prouver : ils appellent la fonction directement, c'est leur travail. Vérifié par mutation |
 | `verifier:budget` | Aucun chunk ne dépasse son plafond. **Un plafond se tient, il ne se relève pas** |
 | `verifier:responsive` | 140 combinaisons (5 tailles × 4 palettes × 7 écrans) : zéro débordement horizontal, forme de la navigation, cibles ≥ 44 px, thème appliqué avant rendu |
 | `verifier:index` | Un `index.html` périmé se récupère tout seul, **une seule fois** (pas de boucle de rechargement) |
