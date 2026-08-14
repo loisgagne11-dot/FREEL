@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ECRANS, ID_ECRAN_PAR_DEFAUT, resoudreEcran } from './navigation';
+import { ECRANS, ID_ECRAN_PAR_DEFAUT, resoudreEcran, resoudreRoute } from './navigation';
 
 describe('navigation — définition des écrans', () => {
   it('définit exactement les 7 écrans du produit', () => {
@@ -52,5 +52,39 @@ describe('navigation — résolution du hash', () => {
     // "#/pi" est un préfixe de "#/pilote" : une correspondance par préfixe le
     // résoudrait à tort vers Pilote. La comparaison doit être stricte.
     expect(resoudreEcran('#/pi').id).toBe(ID_ECRAN_PAR_DEFAUT);
+  });
+});
+
+/**
+ * LES SOUS-ROUTES EXISTENT POUR QUE LES ACTIONS RAPIDES SOIENT HONNÊTES.
+ *
+ * Une action « Nouvelle facture » qui dépose sur la liste des factures oblige à
+ * chercher le bouton une deuxième fois. Elle doit ouvrir la rédaction.
+ */
+describe('navigation — sous-routes', () => {
+  it('sépare l’écran de ce qui le suit', () => {
+    const route = resoudreRoute('#/facture/nouvelle');
+    expect(route.ecran.id).toBe('facture');
+    expect(route.sousRoute).toBe('nouvelle');
+  });
+
+  it('rend une sous-route vide quand il n’y en a pas', () => {
+    expect(resoudreRoute('#/facture').sousRoute).toBe('');
+    expect(resoudreRoute('').sousRoute).toBe('');
+  });
+
+  // La barre oblique finale est une variante d'écriture, pas une sous-route.
+  it('ne prend pas une barre oblique finale pour un segment', () => {
+    expect(resoudreRoute('#/facture/').sousRoute).toBe('');
+  });
+
+  /**
+   * Le découpage par segments ne doit pas rouvrir la porte au préfixe : un
+   * écran inconnu reste inconnu, quelle que soit sa suite.
+   */
+  it('ignore la sous-route d’un écran inconnu', () => {
+    const route = resoudreRoute('#/pi/nouvelle');
+    expect(route.ecran.id).toBe(ID_ECRAN_PAR_DEFAUT);
+    expect(route.sousRoute).toBe('');
   });
 });

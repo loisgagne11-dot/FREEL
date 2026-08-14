@@ -11,6 +11,9 @@ import { Facture } from './Facture';
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 beforeEach(() => {
+  // L'écran lit son adresse : sans remise à zéro, un test ouvert sur la saisie
+  // laisserait le suivant démarrer sur la saisie lui aussi.
+  window.location.hash = '';
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-07-15T09:00:00Z'));
   useFaits.setState({ faits: faitsVides() });
@@ -36,15 +39,16 @@ function semer(modifications: Partial<Faits> = {}): void {
 }
 
 /**
- * Monte l'écran et ouvre la saisie.
+ * Monte l'écran directement sur la saisie.
  *
- * L'écran ouvre désormais sur le facturier — la liste des factures — et la
- * rédaction est derrière un bouton. `fireEvent` plutôt que `userEvent` : ce
- * helper sert aussi dans des tests synchrones.
+ * L'écran ouvre sur le facturier — la liste des factures — et la rédaction est
+ * derrière `#/facture/nouvelle`. On pose l'adresse plutôt que de cliquer : le
+ * clic passe par un `hashchange`, que jsdom délivre de façon asynchrone, et ces
+ * tests-ci sont synchrones. Le clic lui-même est vérifié à part, plus bas.
  */
 function rendreSaisie(): void {
+  window.location.hash = '#/facture/nouvelle';
   render(<Facture />);
-  fireEvent.click(screen.getByRole('button', { name: 'Nouvelle facture' }));
 }
 
 /** Remplit une facture minimale et complète. */
@@ -238,5 +242,41 @@ describe('émission', () => {
     await utilisateur.click(screen.getByRole('button', { name: 'Émettre la facture' }));
 
     expect(screen.getByRole('status').textContent).toMatch(/non encaissée/);
+  });
+});
+
+/**
+ * LA RÉDACTION A UNE ADRESSE.
+ *
+ * Elle était un état local : le Pilote ne pouvait pas y mener, et le bouton
+ * « retour » du navigateur sortait de l'écran au lieu de revenir au facturier.
+ * L'action rapide « Nouvelle facture » repose entièrement sur cette adresse.
+ */
+describe('l’adresse de la rédaction', () => {
+  it('ouvre la saisie quand l’URL la désigne', () => {
+    semer({ clients: [client()] });
+    window.location.hash = '#/facture/nouvelle';
+    render(<Facture />);
+    expect(screen.getByLabelText('Client')).toBeTruthy();
+  });
+
+  it('ouvre le facturier sans sous-route', () => {
+    semer({ clients: [client()] });
+    window.location.hash = '#/facture';
+    render(<Facture />);
+    expect(screen.getByRole('heading', { name: 'Facturer' })).toBeTruthy();
+  });
+
+  // Le bouton du facturier écrit l'adresse : c'est ce qui rend l'état partageable
+  // et le retour navigateur cohérent.
+  it('porte l’adresse dans l’URL quand on clique « Nouvelle facture »', async () => {
+    semer({ clients: [client()] });
+    window.location.hash = '#/facture';
+    render(<Facture />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nouvelle facture' }));
+
+    expect(window.location.hash).toBe('#/facture/nouvelle');
+    expect(await screen.findByLabelText('Client')).toBeTruthy();
   });
 });

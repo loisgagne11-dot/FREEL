@@ -1,9 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { CLE_INSTANTANE_AVANT_MIGRATION, CLE_STOCKAGE } from '../state/schema';
 import {
-  CLE_BUNDLE_LEGACY, PREFIXE_LEGACY,
-  analyser, migrer, prendreInstantane, stockageMemoire, verifierAbsenceDePerte
+  CLE_BUNDLE_LEGACY, PREFIXE_LEGACY, type ResultatMigration, type Stockage,
+  migrer as detecter, prendreInstantane, presenceLegacy, stockageMemoire
 } from './migration';
+import { analyser, reprendreLegacy, verifierAbsenceDePerte } from './migration.legacy';
+
+/**
+ * La migration complète : détection, puis reprise.
+ *
+ * C'est exactement ce que fait `initialiser` — la détection est synchrone et
+ * vit dans le paquet d'entrée, la reprise est chargée à la demande. Les tests
+ * exercent la COMPOSITION des deux, pas l'une ou l'autre isolément, parce que
+ * c'est la composition qui doit tenir ses promesses.
+ */
+function migrer(stockage: Stockage): ResultatMigration {
+  const detection = detecter(stockage);
+  return detection.statut === 'reprise-requise' ? reprendreLegacy(stockage) : detection;
+}
 
 /**
  * Un jeu de données de l'ancienne application, structurellement fidèle.
@@ -738,5 +752,52 @@ describe('clients opérationnels repris du legacy', () => {
     expect(m2?.entites).toHaveLength(1);
     expect(m2?.entites[0]?.rythmes[0]?.parJour)
       .toEqual({ lun: 1, mar: 1, mer: 1, jeu: 1, ven: 0.5 });
+  });
+});
+
+/**
+ * LA COUTURE ENTRE LE NOYAU ET LA REPRISE.
+ *
+ * Le convertisseur de l'ancienne application ne sert qu'une fois, et jamais à
+ * qui n'a pas connu la version précédente : il est chargé à la demande. Le
+ * noyau ne fait plus que le CONSTATER — et ce constat doit être exact, sinon
+ * on charge un module pour rien, ou pire, on conclut « rien à migrer » sur
+ * des données bien présentes.
+ */
+describe('détection sans conversion', () => {
+  it('constate l’ancien sans le convertir', () => {
+    const detection = detecter(avecLegacy());
+    expect(detection.statut).toBe('reprise-requise');
+  });
+
+  it('ne demande aucune reprise sur un stockage vierge', () => {
+    const detection = detecter(stockageMemoire());
+    expect(detection.statut).toBe('rien-a-migrer');
+  });
+
+  // Idempotence : déjà migré, donc rien à reprendre, donc rien à charger.
+  it('ne demande aucune reprise quand la migration a déjà eu lieu', () => {
+    const s = avecLegacy();
+    migrer(s);
+    expect(detecter(s).statut).toBe('deja-migre');
+  });
+
+  it('reconnaît le format antérieur, une clé par entité', () => {
+    const s = stockageMemoire({ [`${PREFIXE_LEGACY}missions`]: '[]' });
+    expect(presenceLegacy(s)).toBe(true);
+  });
+
+  /**
+   * Une clé présente mais illisible reste « présente ».
+   *
+   * Conclure ici « rien à migrer » effacerait le problème : l'utilisateur
+   * verrait une application vide sans qu'on lui dise que ses données n'ont pas
+   * pu être lues. La reprise, une fois chargée, le dira.
+   */
+  it('tient une donnée illisible pour présente, pas pour absente', () => {
+    const s = stockageMemoire({ [CLE_BUNDLE_LEGACY]: '{{{' });
+    expect(presenceLegacy(s)).toBe(true);
+    expect(detecter(s).statut).toBe('reprise-requise');
+    expect(migrer(s).statut).toBe('echec');
   });
 });

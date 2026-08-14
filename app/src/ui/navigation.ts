@@ -87,11 +87,39 @@ function ecranParDefaut(): Ecran {
   return defaut;
 }
 
+/** Un écran, et ce qui suit son nom dans l'URL. */
+export interface Route {
+  readonly ecran: Ecran;
+  /**
+   * Le segment qui suit l'écran, ou `''`.
+   *
+   * `#/facture/nouvelle` donne `'nouvelle'`. C'est ce qui permet à une action
+   * rapide du Pilote d'ouvrir directement la rédaction d'une facture, plutôt
+   * que de déposer l'utilisateur sur la liste en le laissant chercher le
+   * bouton — le reproche exact fait à l'ancienne version.
+   */
+  readonly sousRoute: string;
+}
+
 /**
- * Résout un hash d'URL (ex. `"#/argent"`) vers l'écran correspondant.
+ * Résout un hash d'URL (ex. `"#/argent"`, `"#/facture/nouvelle"`).
+ *
+ * La découpe se fait sur les SEGMENTS, jamais sur les caractères : `"#/pi"`
+ * n'est pas un début de `"#/pilote"`, c'est un segment inconnu. C'est ce qui
+ * évite de réintroduire l'appariement par préfixe de texte de l'ancienne
+ * version, où « Achat » sélectionnait « Achats » et « Arg » « Argent ».
+ *
  * Retombe sur l'écran par défaut si le hash est vide ou inconnu — jamais
  * d'écran blanc, jamais d'exception pour un hash mal formé.
  */
+export function resoudreRoute(hash: string): Route {
+  const segments = hash.replace(/^#\/?/, '').split('/').filter((s) => s.length > 0);
+  const ecran = ECRANS.find((e) => e.chemin === `#/${segments[0] ?? ''}`);
+  if (ecran === undefined) return { ecran: ecranParDefaut(), sousRoute: '' };
+  return { ecran, sousRoute: segments[1] ?? '' };
+}
+
+/** L'écran seul, quand la sous-route n'intéresse pas l'appelant. */
 export function resoudreEcran(hash: string): Ecran {
-  return ECRANS.find((e) => e.chemin === hash) ?? ecranParDefaut();
+  return resoudreRoute(hash).ecran;
 }

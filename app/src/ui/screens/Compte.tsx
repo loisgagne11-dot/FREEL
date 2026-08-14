@@ -9,7 +9,8 @@ import {
 import {
   VERSION_SCHEMA, type Faits, completerFaits, motifRefusFaits
 } from '../../state/schema';
-import { convertirBundle, type RapportMigration } from '../../infra/migration';
+import type { RapportMigration } from '../../infra/migration';
+import { convertirBundle } from '../../infra/migration.legacy';
 import { Info } from '../components/Info';
 import { dateCourte } from '../format';
 import styles from './Compte.module.css';

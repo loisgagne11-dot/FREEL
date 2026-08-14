@@ -32,7 +32,22 @@
   padding: 10px 14px;
   /* Le dégradé de la barre est un token, comme tout le reste de la matière. */
   background: linear-gradient(180deg, var(--top-a), var(--top-b));
-  backdrop-filter: blur(12px);
+  /*
+   * PAS de `backdrop-filter` ici, et ce n'est pas un oubli.
+   *
+   * Il y en avait un — `blur(12px)`. Invisible : les tokens `--top-a` et
+   * `--top-b` sont opaques à 97 %, il n'y a donc rien à voir au travers. Mais
+   * un `backdrop-filter` fait de l'élément le BLOC CONTENEUR de tous ses
+   * descendants en `position: fixed`, qui cessent alors d'être positionnés par
+   * rapport à la fenêtre.
+   *
+   * Conséquence constatée : la pastille « à traiter », censée flotter
+   * au-dessus du dock en portrait, se calculait depuis le bas de la barre du
+   * haut et atterrissait à −72 px — hors de l'écran, sans la moindre erreur.
+   * Douze pixels de flou qu'on ne voit pas ne valent pas un contrôle qu'on ne
+   * voit plus. `scripts/verifier-responsive.mjs` vérifie désormais que la
+   * pastille reste dans la fenêtre.
+   */
   border-bottom: 1px solid var(--line);
   min-height: 52px;
 }

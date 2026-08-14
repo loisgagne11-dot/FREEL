@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { type LigneDepense, etatAchats } from '../../state/selecteurs.achats';
 import type { Depense } from '../../state/schema';
@@ -18,6 +18,7 @@ import {
 } from '../../domain/calculs/periode';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
+import { useRoute } from '../useRoute';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
 import { Releve } from './Releve';
@@ -78,8 +79,27 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
   const supprimerDepense = useFaits((e) => e.supprimerDepense);
   const modifierDepense = useFaits((e) => e.modifierDepense);
 
-  const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
-  const [section, setSection] = useState<Section>('depenses');
+  /**
+   * L'URL peut désigner une section et ouvrir la saisie.
+   *
+   * `#/achats/depense` ouvre le panneau d'ajout, `#/achats/releve` la section
+   * relevé. C'est ce qui permet aux actions rapides du Pilote de faire ce
+   * qu'elles annoncent : « ajouter une dépense » doit ouvrir le formulaire, pas
+   * déposer sur un écran où il faut encore trouver le bouton.
+   *
+   * L'état d'écran reste local et modifiable à la main : la sous-route ne fait
+   * que l'AMORCER. Sans cela, cliquer sur l'onglet « Dépenses » depuis
+   * `#/achats/releve` serait aussitôt annulé par l'URL.
+   */
+  const { sousRoute } = useRoute();
+  const [panneau, setPanneau] = useState<Panneau>(
+    sousRoute === 'depense' ? { type: 'ajout' } : { type: 'ferme' }
+  );
+  const [section, setSection] = useState<Section>(sousRoute === 'releve' ? 'releve' : 'depenses');
+  useEffect(() => {
+    if (sousRoute === 'releve') setSection('releve');
+    if (sousRoute === 'depense') { setSection('depenses'); setPanneau({ type: 'ajout' }); }
+  }, [sousRoute]);
   const idGroupe = useId();
   /**
    * La granularité et le décalage sont deux faits d'écran distincts : changer

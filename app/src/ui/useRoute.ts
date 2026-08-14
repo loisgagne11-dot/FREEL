@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Ecran, IdEcran } from './navigation';
-import { ECRANS, resoudreEcran } from './navigation';
+import type { Ecran, IdEcran, Route } from './navigation';
+import { ECRANS, resoudreRoute } from './navigation';
 
 function lireHashCourant(): string {
   // `window` est absent en environnement de test sans DOM ; on ne blinde
@@ -15,23 +15,28 @@ function lireHashCourant(): string {
  * renverrait une 404 sans configuration serveur dédiée (réécriture
  * d'URL), qu'on ne maîtrise pas sur ce type d'hébergement.
  */
-export function useRoute(): { readonly ecran: Ecran; readonly naviguerVers: (id: IdEcran) => void } {
-  const [ecran, setEcran] = useState<Ecran>(() => resoudreEcran(lireHashCourant()));
+export function useRoute(): {
+  readonly ecran: Ecran;
+  /** Le segment qui suit l'écran (`#/facture/nouvelle` → `'nouvelle'`), ou `''`. */
+  readonly sousRoute: string;
+  readonly naviguerVers: (id: IdEcran, sousRoute?: string) => void;
+} {
+  const [route, setRoute] = useState<Route>(() => resoudreRoute(lireHashCourant()));
 
   useEffect(() => {
     const surChangementHash = (): void => {
-      setEcran(resoudreEcran(lireHashCourant()));
+      setRoute(resoudreRoute(lireHashCourant()));
     };
     window.addEventListener('hashchange', surChangementHash);
     return () => window.removeEventListener('hashchange', surChangementHash);
   }, []);
 
-  const naviguerVers = useCallback((id: IdEcran): void => {
+  const naviguerVers = useCallback((id: IdEcran, sousRoute = ''): void => {
     const cible = ECRANS.find((e) => e.id === id);
     if (cible) {
-      window.location.hash = cible.chemin;
+      window.location.hash = sousRoute === '' ? cible.chemin : `${cible.chemin}/${sousRoute}`;
     }
   }, []);
 
-  return { ecran, naviguerVers };
+  return { ecran: route.ecran, sousRoute: route.sousRoute, naviguerVers };
 }

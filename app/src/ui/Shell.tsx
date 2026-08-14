@@ -1,6 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { RailNav } from './components/RailNav';
 import { PastillesSysteme } from './components/PastillesSysteme';
+import { IndicateurATraiter } from './components/IndicateurATraiter';
 import { useRoute } from './useRoute';
 import type { IdEcran } from './navigation';
 import styles from './Shell.module.css';
@@ -59,6 +60,9 @@ export function Shell({ children, compteurs }: ProprietesShell) {
               encore construits (actions Exporter/Nouveau). On ne les invente
               pas ici. */}
           <div data-emplacement="selecteur-periode" />
+          {/* En tête des pastilles, jamais au-dessus d'un contrôle : en
+              portrait il flotte au-dessus du dock, en paysage il vit ici. */}
+          <IndicateurATraiter ecranActif={ecran.id} />
           <PastillesSysteme />
           <div data-emplacement="actions" />
         </header>

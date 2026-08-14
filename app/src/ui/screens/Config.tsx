@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { useFaits } from '../../state/store';
 import { periodesUrssafEffectives, soldeEstSuivi } from '../../state/selecteurs';
@@ -10,6 +10,7 @@ import { Compte } from './Compte';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
+import { useRoute } from '../useRoute';
 import { dateCourte } from '../format';
 import styles from './Config.module.css';
 
@@ -53,7 +54,23 @@ const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: st
 
 export function Config() {
   const faits = useFaits((e) => e.faits);
-  const [section, setSection] = useState<Section>('profil');
+  /**
+   * L'URL peut désigner une section.
+   *
+   * `#/config/compte` ouvre le compte : c'est la destination de la pastille
+   * Cloud de la barre du haut, qui annonce une session expirée. L'y envoyer
+   * sur l'onglet « Profil » lui ferait chercher où se reconnecter.
+   *
+   * La sous-route AMORCE l'état, elle ne le contraint pas : sans quoi cliquer
+   * sur un autre onglet serait aussitôt annulé par l'adresse.
+   */
+  const { sousRoute } = useRoute();
+  const [section, setSection] = useState<Section>(
+    (SECTIONS.some((x) => x.id === sousRoute) ? sousRoute : 'profil') as Section
+  );
+  useEffect(() => {
+    if (SECTIONS.some((x) => x.id === sousRoute)) setSection(sousRoute as Section);
+  }, [sousRoute]);
   const idGroupe = useId();
 
   return (

@@ -1,8 +1,9 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
-  etatArgent, etatDes, etatLivre, moisCourant, recettesEncaissees
+  etatArgent, moisCourant, recettesEncaissees
 } from '../../state/selecteurs';
+import { etatDes, etatLivre } from '../../state/selecteurs.livre';
 import type { EtatSeuils } from '../../state/selecteurs';
 import type { Mois } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';

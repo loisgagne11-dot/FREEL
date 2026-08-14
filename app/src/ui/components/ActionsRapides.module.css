@@ -1,0 +1,66 @@
+/* La rangée d'actions rapides du Pilote. */
+
+.rangee {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 14px;
+  min-width: 0;
+}
+
+.intitule {
+  flex-shrink: 0;
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/* Défilement horizontal plutôt que retour à la ligne : trois rangs d'actions
+   repousseraient le flux du mois sous la ligne de flottaison. La barre de
+   défilement est masquée — elle n'apporte rien sur tactile — mais le
+   défilement reste possible au clavier, car les liens prennent le focus. */
+.liste {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 0;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.liste::-webkit-scrollbar { display: none; }
+
+.action {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 100px;
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 560;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.action:hover { border-color: var(--green); }
+
+.icone { width: 15px; height: 15px; flex-shrink: 0; color: var(--muted-2); }
+
+.action:hover .icone { color: var(--green); }
+
+/* L'intitulé passe au-dessus quand la place manque vraiment : à 360 px il
+   mangeait un tiers de la rangée. */
+@media (max-width: 480px) {
+  .rangee { flex-direction: column; align-items: stretch; gap: 6px; }
+}
+
+@media print { .rangee { display: none; } }

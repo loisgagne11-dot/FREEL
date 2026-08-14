@@ -6,6 +6,7 @@ import {
 } from '../../state/selecteurs';
 import type { SujetATraiter } from '../../domain/calculs/aTraiter';
 import { Greet } from '../components/Greet';
+import { ActionsRapides } from '../components/ActionsRapides';
 import { FluxCard } from '../components/FluxCard';
 import { SanteCard, indicateursDeSante } from '../components/SanteCard';
 import { eur, moisLong, moisTexte } from '../format';
@@ -61,6 +62,11 @@ export function Pilote() {
         sousTitre={phraseDAccueil(sujets.length, moisLong(mois))}
         repere={<>Solde compte · <Montant>{eur(etat.tresorerie.solde)}</Montant></>}
       />
+
+      {/* Juste sous l'accueil, avant tout chiffre : c'est l'ordre de la spec, et
+          c'est celui de l'usage — on ouvre l'application pour faire quelque
+          chose au moins aussi souvent que pour regarder où l'on en est. */}
+      <ActionsRapides />
 
       {chargement.phase === 'sans-persistance' && (
         <Bandeau ton="alerte" titre="Vos saisies ne sont pas conservées">

@@ -31,36 +31,41 @@
 
 .periode { font-size: 12px; color: var(--muted-2); }
 
-/* Trois colonnes côte à côte dès que la place existe ; empilées en dessous.
-   La spec bascule à 900 px — au-delà, trois colonnes de chiffres deviennent
-   illisibles avant même de déborder. */
+/* Trois colonnes côte à côte À TOUTE LARGEUR, y compris sur téléphone.
+   C'est le choix de la spec (`v1.11.css` : `.flux3{repeat(3,1fr);gap:10px}`) et
+   c'est ce qui fait de la carte une comparaison plutôt qu'une liste. */
 .colonnes {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   min-width: 0;
 }
 
 .colonne {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 13px 0;
-  border-top: 1px solid var(--line);
+  gap: 5px;
   min-width: 0;
 }
 
-.colonne:first-child { border-top: none; padding-top: 0; }
+/* Le filet vertical sépare les colonnes sans ajouter de trait au dernier bord. */
+.colonne + .colonne {
+  border-left: 1px solid var(--line);
+  padding-left: 10px;
+}
 
 .libelle {
-  font-size: 10.5px;
-  letter-spacing: 0.11em;
+  font-size: 9px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted-2);
 }
 
+/* Le montant se réduit avec la fenêtre : à 390 px une colonne fait ~105 px, et
+   un montant à six chiffres déborderait à taille fixe. `clamp` évite d'avoir à
+   choisir entre « illisible » et « tronqué ». */
 .montant {
-  font-size: 22px;
+  font-size: clamp(15px, 4.6vw, 19px);
   letter-spacing: -0.03em;
   font-weight: 620;
   color: var(--text);
@@ -70,22 +75,79 @@
 .entree { color: var(--green); }
 .sortie { color: var(--amber); }
 
-.note { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.note {
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--muted);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
-/* ── Lignes de détail ───────────────────────────────────────────────────── */
+/* Deux renseignements de même rang : chacun sa ligne, pour que le rapport
+   entre les deux montants se lise d'un coup d'œil. */
+.fragment { display: block; }
 
-.repli { margin-top: 4px; }
+/* ── Pied : les actions ─────────────────────────────────────────────────── */
 
-.repli summary {
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--muted-2);
-  min-height: 44px;
+.pied {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.action {
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
   align-items: center;
 }
 
-.repli summary:hover { color: var(--text); }
+.action:hover { border-color: var(--green); }
+
+.principale {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--bg);
+}
+
+.principale:hover { filter: brightness(1.06); }
+
+/* ── Lignes de détail ───────────────────────────────────────────────────── */
+
+/* Hors des colonnes : une liste dans 105 px n'est plus une liste. En portrait
+   les blocs s'empilent sur toute la largeur ; au-delà ils se répartissent. */
+.details {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.details[hidden] { display: none; }
+
+.bloc { min-width: 0; }
+
+.titreBloc {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  font-weight: 620;
+  margin-bottom: 4px;
+}
 
 .lignes {
   list-style: none;
@@ -123,35 +185,18 @@
   white-space: nowrap;
 }
 
-.action {
-  align-self: flex-start;
-  min-height: 44px;
-  padding: 0 15px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--line-2);
-  background: var(--panel-2);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 560;
-  cursor: pointer;
-  margin-top: 4px;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
+@media (min-width: 761px) {
+  .colonnes { gap: 18px; }
+  .colonne + .colonne { padding-left: 18px; }
+  .libelle { font-size: 10.5px; letter-spacing: 0.11em; }
+  .montant { font-size: 22px; }
+  .note { font-size: 12px; line-height: 1.5; }
+  .details { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
 }
 
-.action:hover { border-color: var(--green); }
-
-@media (min-width: 901px) {
-  .colonnes { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-
-  /* La séparation redevient verticale : en colonnes, une bordure horizontale
-     ne sépare plus rien. */
-  .colonne {
-    border-top: none;
-    border-left: 1px solid var(--line);
-    padding: 0 0 0 18px;
-  }
-
-  .colonne:first-child { border-left: none; padding-left: 0; }
+/* À l'impression, le détail vaut mieux que le dépliant : le papier n'a pas de
+   bouton. */
+@media print {
+  .details { display: grid !important; }
+  .pied { display: none; }
 }

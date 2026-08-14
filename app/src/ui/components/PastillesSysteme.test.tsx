@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CLE_STOCKAGE_THEME, themesDisponibles } from '../theme';
+import { CLE_SESSION } from '../../infra/session';
 import { PastillesSysteme } from './PastillesSysteme';
 
 afterEach(cleanup);
@@ -97,5 +98,59 @@ describe('bascule de confidentialité', () => {
     localStorage.setItem('freel.confidentialite.v1', 'oui');
     render(<PastillesSysteme />);
     expect(screen.getByRole('button', { name: /Montants masqués/ })).toBeTruthy();
+  });
+});
+
+/**
+ * LA PASTILLE CLOUD, ET LE CAS QU'ELLE EXISTE POUR SIGNALER.
+ *
+ * Trois états, pas deux. Entre « relié » et « local » se trouve la session
+ * EXPIRÉE : on croit être synchronisé, on saisit une semaine de travail, et
+ * rien ne remonte. C'est le seul des trois qui coûte quelque chose, et c'est
+ * celui qu'un indicateur binaire escamote.
+ */
+describe('état du compte', () => {
+  const session = (expireLe: number) => JSON.stringify({
+    jeton: 'j', jetonRafraichissement: 'r', expireLe,
+    utilisateurId: 'u1', email: 'contact@atelier-demo.fr'
+  });
+
+  it('dit « local » quand aucun compte n’est relié', () => {
+    render(<PastillesSysteme />);
+    expect(screen.getByRole('link', { name: /Vos données restent sur cet appareil/ }))
+      .toBeTruthy();
+  });
+
+  it('dit que le compte est relié quand la session est valable', () => {
+    localStorage.setItem(CLE_SESSION, session(Date.now() + 3_600_000));
+    render(<PastillesSysteme />);
+    expect(screen.getByRole('link', { name: /Compte relié/ })).toBeTruthy();
+  });
+
+  /** LE TEST QUI COMPTE : une session morte ne doit jamais se lire « relié ». */
+  it('signale une session expirée plutôt que de la dire reliée', () => {
+    localStorage.setItem(CLE_SESSION, session(Date.now() - 1000));
+    render(<PastillesSysteme />);
+    expect(screen.getByRole('link', { name: /Session expirée/ })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /^Compte relié/ })).toBeNull();
+  });
+
+  // Signaler sans offrir le chemin serait un reproche, pas un outil.
+  it('mène à l’écran où l’on s’y reconnecte', () => {
+    localStorage.setItem(CLE_SESSION, session(Date.now() - 1000));
+    render(<PastillesSysteme />);
+    const lien = screen.getByRole('link', { name: /Session expirée/ });
+    expect(lien.getAttribute('href')).toBe('#/config/compte');
+  });
+
+  /**
+   * Une session sur le point d'expirer est traitée comme expirée : partir sur
+   * une requête avec un jeton qui meurt en chemin ne synchronise rien, et
+   * l'aurait annoncé comme réussi.
+   */
+  it('compte la marge d’une minute du côté prudent', () => {
+    localStorage.setItem(CLE_SESSION, session(Date.now() + 30_000));
+    render(<PastillesSysteme />);
+    expect(screen.getByRole('link', { name: /Session expirée/ })).toBeTruthy();
   });
 });
