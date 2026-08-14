@@ -82,7 +82,7 @@ Statut relevé dans le code, pas supposé. `✅` conforme · `⚠️` partiel ·
 |---|---|---|
 | Feuilles latérales (piège de focus, Échap, voile) | ✅ | `Sheet` |
 | Toasts | ✅ | `Toasts` |
-| **Cartes pliables avec synthèse `data-fold`** | ✅ | `CartePliable` appliqué aux **6 cartes** que `05-spec-ecrans.md` nomme : registre des achats, rapprochement bancaire, répartition du solde, enveloppes de provision, seuils, échéancier. Le compte de « huit » avancé plus tôt était faux — six instances, plus deux mentions du composant lui-même |
+| **Cartes pliables avec synthèse `data-fold`** | ✅ | `CartePliable` sur **6 cartes** : registre des achats, rapprochement bancaire, répartition du solde, enveloppes de provision, seuils, échéancier. **Sur la source, deux comptes coexistent et j'ai cité le mauvais deux fois.** `05-spec-ecrans.md` §517 écrit « Pilote (Santé), Argent (5 cartes), Achats (2 cartes) » = 8 ; le code de la maquette porte 6 attributs `data-fold` (Argent 4, Achats 2). Les six livrées suivent le code. Les deux sites en écart : la carte Santé du Pilote porte `data-sheet` et non `data-fold`, et son score sur 100 est un renoncement assumé ; la cinquième carte Argent est un surcompte de la spec |
 | Sous-onglets `[data-tab]` | ✅ | `Onglets`, sémantique ARIA |
 | Rail 212 px, grille 12 colonnes, panneau 580 px | ✅ | |
 
@@ -255,3 +255,44 @@ Son objection est fondée et change le lot :
   qui est un fait exact, pas la date, qui est un confort.
 
 Le lot 3 est donc **suspendu** en l'état et à réécrire selon ces conditions.
+
+
+---
+
+## Contrôle d'adhérence du 14/08 — axe A
+
+Soumis à l'agent `controleur-adherence`. Verdict : **CONFORME AVEC RÉSERVES**.
+Les cinq livraisons existent et fonctionnent, mesurées sur l'application
+construite. Mais la couche de PREUVE était plus mince que ce document ne le
+laissait croire.
+
+### Ce qu'il a trouvé, et qui était vrai
+
+| Réserve | Suite donnée |
+|---|---|
+| **Le vérificateur de confidentialité n'atteignait que 4 cartes porteuses de montants sur 6.** Le jeu de faits n'avait ni `echeances` ni `mouvementsBancaires` : l'échéancier retombait sur « aucune échéance », et la carte de rapprochement n'était pas rendue | Jeu de faits complété **et** parcours des onglets ajouté. Les deux cartes mordent désormais sous mutation |
+| **Parcourir les onglets sans mesurer à chaque pas ne mesure que le dernier.** `PanneauOnglet` démonte l'onglet quitté : ma première correction parcourait bien, puis mesurait une fois — donc sur le dernier onglet visité | Mesure après **chaque** onglet. C'est ce qui a fait apparaître deux fuites réelles de plus |
+| **Un échec de repli était avalé** par un `catch` vide : une carte impossible à replier n'était jamais inspectée, sans un mot | Échec bruyant, compté comme une non-conformité |
+| **Le câblage `data-charge` → jetons n'avait aucun garde-fou** : supprimer les quatre règles CSS laissait 21 tests verts | Assertion sur la feuille de style. Vérifiée par mutation |
+| **L'affichage des jours ouvrés en vue semaine n'en avait aucun** : supprimer le paragraphe laissait 1 150 tests verts | `VueSemaine.test.tsx`, cinq cas. Vérifié par mutation |
+| **Le « 6 » de A5 était un compte de `grep` attribué à la spec**, qui en écrit 8 | Ligne rectifiée : les deux comptes sont dits, avec ce qui les sépare |
+
+### Deux fuites réelles, découvertes par le vérificateur devenu plus profond
+
+- **« une prestation de 50 € suffit »** — seuil statutaire dans une explication
+  de DES, lisible écran partagé. Même règle que pour les seuils de CFE : la
+  garde ne négocie pas.
+- **Le tarif journalier d'une mission** (`500 € / jour`) — celui-là n'a rien de
+  statutaire : il en dit autant sur les revenus que le chiffre d'affaires.
+
+Aucune des deux n'était visible tant que le contrôle ne savait pas parcourir les
+onglets.
+
+### Réserve restante, non levée
+
+**Le tableau des tranches d'Outils vit derrière une feuille latérale que le
+vérificateur responsive n'ouvre jamais** : il fait `goto` puis mesure, sans clic
+ni saisie. Le correctif est réel — mesuré à 390 px, `overflow-x: auto` sur le
+conteneur — mais **les 140 combinaisons ne sont pas sa preuve**, elles n'ont
+jamais rencontré l'élément. La ligne du tableau A4 est donc juste sur le fond et
+sa justification reste à établir.

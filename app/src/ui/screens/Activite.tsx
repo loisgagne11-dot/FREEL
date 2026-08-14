@@ -766,7 +766,15 @@ function LigneMissionAffichee(
       <span className={styles.ligneMeta}>
         <span>{mission.clientNom || 'Client non renseigné'}</span>
         <span aria-hidden="true">·</span>
-        <span>{mission.tjm > 0 ? `${eur(mission.tjm)} / jour` : 'TJM non renseigné'}</span>
+        {/* Le tarif journalier est un montant comme un autre : il en dit
+            autant sur les revenus que le chiffre d'affaires, et il restait
+            lisible écran partagé. Trouvé par le vérificateur une fois qu'il a
+            su parcourir les onglets. */}
+        <span>
+          {mission.tjm > 0
+            ? <><Montant>{eur(mission.tjm)}</Montant> / jour</>
+            : 'TJM non renseigné'}
+        </span>
         <span aria-hidden="true">·</span>
         <span>{libelleStatut(mission.statut)}</span>
       </span>

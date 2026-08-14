@@ -629,7 +629,8 @@ function DeclarationServices({ idGroupe }: { idGroupe: string }) {
           <Info libelle="Qui doit déposer une DES, et quand">
             Elle est due par celui qui <strong>vend</strong> un service à un
             professionnel établi dans un autre État membre — pas par celui qui
-            en achète. Aucun seuil&nbsp;: une prestation de 50 € suffit. Dépôt
+            en achète. Aucun seuil&nbsp;: une prestation de{' '}
+            <Montant>50&nbsp;€</Montant> suffit. Dépôt
             au plus tard le 10 du mois suivant, sur le portail de la douane.
           </Info>
         </h2>

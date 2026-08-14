@@ -77,7 +77,34 @@ const FAITS = {
     justificatifId: null, rapprochement: 'a_rapprocher', categorie: 'logiciel',
     provenance: 'france'
   }],
-  conges: [], mouvementsBancaires: [], periodesUrssafAjoutees: [],
+  /*
+   * ÉCHÉANCES ET MOUVEMENTS : SANS EUX, DEUX CARTES NE MONTRENT RIEN.
+   *
+   * Le contrôle replie les cartes pour inspecter leur synthèse. Encore faut-il
+   * que cette synthèse porte des montants. Sans échéance, l'échéancier retombe
+   * sur « aucune échéance en attente » ; sans mouvement, la carte de
+   * rapprochement n'est pas rendue du tout.
+   *
+   * Le contrôle passait donc au vert sur ces deux cartes sans les avoir
+   * regardées — le même défaut, d'un cran plus loin, que celui qu'il venait de
+   * réparer. Un jeu de faits trop pauvre est une façon silencieuse de ne rien
+   * vérifier.
+   */
+  echeances: [{
+    id: 'e1', nature: 'urssaf', montant: 2480, echeanceLe: '2026-10-31',
+    payeeLe: null, montantPaye: null
+  }],
+  mouvementsBancaires: [
+    {
+      id: 'm1', date: '2026-08-04', libelle: 'Virement client', montant: 4300,
+      compte: 'pro', rapprocheAvec: null, sansContrepartie: null
+    },
+    {
+      id: 'm2', date: '2026-08-06', libelle: 'Achat fourniture', montant: -260,
+      compte: 'pro', rapprocheAvec: null, sansContrepartie: null
+    }
+  ],
+  conges: [], periodesUrssafAjoutees: [],
   soldeInitial: 24500, reserve: 3000, besoinMensuel: 2200,
   periodesDeclarees: [], configImpotBrute: {}
 };
@@ -126,10 +153,9 @@ const BIN = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const navigateur = await chromium.launch(existsSync(BIN) ? { executablePath: BIN } : {});
 
 const contexte = await navigateur.newContext({ viewport: { width: 1440, height: 900 } });
-await contexte.addInitScript(([faits, cle, ecrans]) => {
+await contexte.addInitScript(([faits, cle]) => {
   window.localStorage.setItem('freel.faits.v1', JSON.stringify(faits));
   window.localStorage.setItem(cle, 'oui');
-
 }, [FAITS, 'freel.confidentialite.v1']);
 
 /**
@@ -152,14 +178,67 @@ await contexte.addInitScript(([faits, cle, ecrans]) => {
  * identifiants.
  */
 async function replierLesCartes(page) {
+  let replies = 0;
+  const echecs = [];
   const boutons = page.locator('button[aria-expanded="true"][aria-controls]');
   for (let i = await boutons.count(); i > 0; i--) {
     // Toujours le premier : replier réordonne le DOM, et un index figé
     // désignerait un bouton déjà traité.
     const bouton = page.locator('button[aria-expanded="true"][aria-controls]').first();
     if (await bouton.count() === 0) break;
-    await bouton.click({ timeout: 2000 }).catch(() => {});
+    const nom = (await bouton.textContent().catch(() => '')) ?? '';
+    try {
+      await bouton.click({ timeout: 2000 });
+      replies++;
+    } catch (e) {
+      // Un échec de repli était avalé en silence : une carte impossible à
+      // replier n'était jamais inspectée, et rien ne le disait.
+      echecs.push(`${nom.trim().slice(0, 40)} — ${String(e).slice(0, 60)}`);
+    }
   }
+  return { replies, echecs };
+}
+
+/**
+ * Parcourt les onglets de l'écran, replie les cartes de chacun, ET MESURE À
+ * CHAQUE ÉTAPE.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * MESURER À LA FIN NE MESURE QUE LE DERNIER ONGLET
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `PanneauOnglet` rend `null` quand son onglet est inactif : les cartes d'un
+ * onglet qu'on a quitté ne sont plus dans le DOM. Une première version
+ * parcourait bien les onglets, puis mesurait une seule fois — c'est-à-dire sur
+ * le dernier onglet visité, les précédents ayant été démontés en chemin.
+ *
+ * Vérifié par mutation : l'échéancier d'Argent, démarqué exprès, ne produisait
+ * aucune fuite. Parcourir sans mesurer à chaque pas donne l'illusion d'une
+ * couverture qu'on n'a pas.
+ */
+async function parcourirEtMesurer(page, mesurer) {
+  const echecs = [];
+  const exposes = [];
+  let replies = 0;
+
+  async function passe() {
+    const r = await replierLesCartes(page);
+    replies += r.replies;
+    echecs.push(...r.echecs);
+    await page.waitForTimeout(60);
+    exposes.push(...await mesurer());
+  }
+
+  await passe();
+
+  const onglets = page.locator('[role="tab"]');
+  for (let i = 0; i < await onglets.count(); i++) {
+    const onglet = page.locator('[role="tab"]').nth(i);
+    await onglet.click({ timeout: 2000 }).catch(() => {});
+    await page.waitForTimeout(120);
+    await passe();
+  }
+  return { replies, echecs, exposes };
 }
 
 const page = await contexte.newPage();
@@ -229,8 +308,6 @@ for (const ecran of ECRANS) {
     monte = false;
   }
   await page.waitForTimeout(150);
-  await replierLesCartes(page);
-  await page.waitForTimeout(80);
 
   // Un écran qui ne se monte pas n'affiche aucun montant : il passerait le
   // contrôle en ne prouvant rien. On le compte donc comme un échec, en citant
@@ -241,7 +318,11 @@ for (const ecran of ECRANS) {
     continue;
   }
 
-  const exposes = await montantsLisibles();
+  const passe = await parcourirEtMesurer(page, montantsLisibles);
+  if (passe.echecs.length > 0) {
+    constate(false, `#/${ecran} — carte impossible à replier : ${passe.echecs[0]}`);
+  }
+  const exposes = passe.exposes;
   constate(
     exposes.length === 0,
     `#/${ecran} — aucun montant lisible`

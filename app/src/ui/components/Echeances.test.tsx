@@ -353,3 +353,45 @@ describe('couleur par type de charge', () => {
     expect(document.querySelector('[data-charge]')?.getAttribute('aria-hidden')).toBe('true');
   });
 });
+
+/**
+ * LE GARDE-FOU DU CÂBLAGE, ET POURQUOI IL PORTE SUR LA FEUILLE DE STYLE.
+ *
+ * Le test ci-dessus mesure la présence de l'attribut `data-charge`. Il resterait
+ * vert si les quatre règles CSS qui lient cet attribut aux jetons de couleur
+ * disparaissaient — c'est-à-dire sur la régression exacte que ce mécanisme
+ * vient de réparer : les jetons existaient dans les quatre palettes et
+ * n'étaient câblés nulle part.
+ *
+ * jsdom n'applique pas les modules CSS : on ne peut pas mesurer une couleur
+ * calculée ici. On lit donc la feuille, ce qui est un plancher — mais un
+ * plancher qui échoue si quelqu'un décâble, alors que l'assertion sur
+ * l'attribut, elle, ne bronche pas.
+ */
+describe('câblage des jetons de couleur', () => {
+  it('lie chaque nature de charge à son jeton', async () => {
+    // Chemin résolu depuis la racine du projet : sous jsdom, `import.meta.url`
+    // porte une URL que `readFile` refuse.
+    const { readFile } = await import('node:fs/promises');
+    const feuille = await readFile(
+      'src/ui/components/Echeances.module.css', 'utf8'
+    );
+
+    const attendus: readonly [string, string][] = [
+      ['urssaf', '--c-urssaf'],
+      ['tva', '--c-tva'],
+      ['impot', '--c-ir'],
+      ['cfe', '--c-cfe'],
+      // La CFP est due avec les cotisations : elle partage leur teinte plutôt
+      // que d'introduire une cinquième couleur pour la même échéance.
+      ['cfp', '--c-urssaf']
+    ];
+
+    for (const [nature, jeton] of attendus) {
+      const regle = new RegExp(
+        `\\.teinte\\[data-charge='${nature}'\\][^}]*var\\(${jeton}\\)`, 'u'
+      );
+      expect(regle.test(feuille), `${nature} → ${jeton}`).toBe(true);
+    }
+  });
+});
