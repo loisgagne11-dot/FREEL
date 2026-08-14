@@ -307,6 +307,20 @@ interface MagasinFaits {
   ) => string | null;
 
   /**
+   * Consigne qu'une facture a été relancée, à cette date.
+   *
+   * C'est un FAIT, au même titre qu'un encaissement : on l'a fait ou on ne l'a
+   * pas fait. Il commande le ton de la relance suivante — rappel, puis ferme,
+   * puis mise en demeure — et répond à « je l'ai relancé quand ? », qui est la
+   * question qu'on se pose au téléphone.
+   *
+   * L'application n'envoie rien : elle rédige, et consigne que vous avez
+   * envoyé. Prétendre expédier sans savoir ni tracer ni prouver l'envoi ne
+   * vaudrait rien le jour où il faudrait démontrer qu'on a relancé.
+   */
+  readonly consignerRelance: (id: string, le: DateISO) => void;
+
+  /**
    * Annule une recette ÉMISE par une écriture inverse.
    *
    * Rien n'est supprimé : les deux écritures restent visibles et leur somme
@@ -464,6 +478,24 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     }
 
     appliquerMigration(set, resultat);
+  },
+
+  consignerRelance: (id, le) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      recettes: actuel.recettes.map((r) => {
+        if (r.id !== id) return r;
+        const faites = r.relancesLe ?? [];
+        // Deux relances le même jour sont une double frappe, pas deux
+        // démarches : les compter ferait passer au ton suivant sans qu'un
+        // second message soit parti.
+        if (faites.includes(le)) return r;
+        return { ...r, relancesLe: [...faites, le] };
+      })
+    };
+    set({ faits });
+    persister(stockageActif, faits);
   },
 
   definirReserve: (montant) => {
