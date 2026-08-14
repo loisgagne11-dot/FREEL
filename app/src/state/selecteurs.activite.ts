@@ -19,6 +19,7 @@ import type { Jour, ZoneFeries } from '../domain/calculs/activite';
 import { joursFeries } from '../domain/calculs/activite';
 import type { JourPlanifie } from '../domain/calculs/planning';
 import { craDuMois, planifier } from '../domain/calculs/planning';
+import { type PrevisionDuMois, previsionDuMois } from '../domain/calculs/prevision';
 import type { Cra } from '../domain/calculs/planning';
 import {
   calendrierDuMois, chargeDuMois, joursDuMois, planDeCharge
@@ -390,6 +391,60 @@ export function craDuMoisParMission(
       )
     })))
     .filter((x) => x.cra.totalJours > 0);
+}
+
+/** La prévision d'une mission sur un mois, prête à afficher. */
+export interface PrevisionDeMission {
+  readonly missionId: string;
+  readonly entiteId: string;
+  readonly libelle: string;
+  readonly prevision: PrevisionDuMois;
+}
+
+/**
+ * Ce que chaque mission devrait rapporter ce mois-ci, et ce qu'elle rapporte.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * MÊME SOURCE QUE LE CRA, DÉLIBÉRÉMENT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le planning est calculé ici comme il l'est pour le CRA — mêmes rythmes,
+ * mêmes ajustements, mêmes fériés, mêmes congés. En produire une seconde
+ * version garantirait que les deux finissent par diverger, et le projet a déjà
+ * payé ce prix : l'ancienne application avait trois sources pour une même
+ * journée, et rien n'indiquait laquelle faisait foi.
+ *
+ * Contrairement au CRA, les missions SANS journée retenue sont conservées : une
+ * mission qui devait rapporter et n'a rien rapporté est précisément
+ * l'information qu'on cherche. Le CRA, lui, ne liste que ce qui se facture.
+ */
+export function previsionDuMoisParMission(
+  faits: Faits,
+  m: Mois,
+  zone: ZoneFeries = 'general'
+): readonly PrevisionDeMission[] {
+  const dates = joursDuMois(m);
+  const feries = new Set<string>(joursFeries(Number(m.slice(0, 4)), zone));
+
+  const conges: Record<string, number> = {};
+  for (const c of faits.conges) conges[c.date] = c.quotite;
+
+  return faits.missions
+    .filter((mission) => mission.statut === 'active' || mission.statut === 'terminee')
+    .flatMap((mission) => mission.entites.map((entite) => ({
+      missionId: mission.id,
+      entiteId: entite.id,
+      libelle: libelleDeLaLigne(mission, entite),
+      prevision: previsionDuMois(
+        m,
+        planifier(dates, {
+          rythmes: entite.rythmes, ajustements: entite.ajustements, feries, conges
+        }),
+        entite.rythmes,
+        mission.tjm
+      )
+    })))
+    .filter((x) => x.prevision.joursPrevus > 0 || x.prevision.joursRetenus > 0);
 }
 
 /**

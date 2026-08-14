@@ -692,3 +692,40 @@
 .plageAction:disabled { opacity: 0.45; cursor: not-allowed; }
 
 @media print { .plage { display: none; } }
+
+/* ---------- prévision de revenu par mission ---------- */
+
+.lignePrevision {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.lignePrevision:last-child { border-bottom: none; }
+
+.lignePrevisionNom {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.lignePrevisionChiffres {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Retenu / prévu : les deux nombres côte à côte, parce que c'est leur ÉCART
+   qui répond à « est-ce que je tiens ce que j'avais prévu ? ». */
+.lignePrevisionJours { font-size: 12px; color: var(--muted-2); }
+
+.lignePrevisionMontant { font-size: 13px; font-weight: 560; color: var(--text); }

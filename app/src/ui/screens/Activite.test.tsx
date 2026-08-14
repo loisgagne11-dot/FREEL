@@ -662,3 +662,68 @@ describe('poser une plage de congés', () => {
       .toHaveProperty('disabled', true);
   });
 });
+
+/**
+ * LA PRÉVISION DE REVENU — LE PREMIER MAILLON DE LA CHAÎNE.
+ *
+ * Une mission doit se décliner en prévision de revenu, planning, facture du
+ * mois et CRA. Le planning et le CRA existaient ; la prévision non : le tarif
+ * journalier et le rythme étaient là, et rien n'en tirait ce qu'ils annoncent.
+ */
+describe('prévision de revenu du mois', () => {
+  const avecRythme = () => mission({
+    tjm: euros(400),
+    entites: [entite({
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-12-31'), tjm: euros(400),
+        parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }
+      }]
+    })]
+  });
+
+  it('chiffre ce que le mois devrait rapporter', () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    // Juillet 2026 : 22 jours ouvrables à 400 € = 8 800 €. Le montant paraît
+    // deux fois — prévu et retenu — puisqu'aucun ajustement n'a été posé.
+    expect(screen.getAllByText(/8\s*800/u).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /devrait rapporter/ })).toBeTruthy();
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Prévu et retenu côte à côte : sans les deux, la
+   * question « est-ce que je tiens ce que j'avais prévu ? » disparaît.
+   *
+   * On lit la ligne de mission, pas la synthèse : celle-ci ne s'affiche que
+   * carte repliée, et les cartes s'ouvrent dépliées.
+   */
+  it('montre le retenu en face du prévu, mission par mission', () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    // 22 jours retenus sur 22 prévus : aucun ajustement n'a été posé.
+    expect(screen.getByText('22 / 22 j')).toBeTruthy();
+  });
+
+  /**
+   * Repliée, la carte dit encore l'essentiel — c'est la règle du pli. Les deux
+   * totaux y sont, et l'écart n'apparaît que s'il y en a un.
+   */
+  it('résume les deux totaux une fois repliée', async () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    await userEvent.setup().click(
+      screen.getByRole('button', { name: /devrait rapporter/ })
+    );
+
+    const resume = screen.getByText(/prévus/);
+    expect(resume.textContent).toMatch(/retenus/);
+  });
+
+  // Sans rythme, aucune journée n'est prévue : la carte n'a rien à dire et ne
+  // s'affiche pas plutôt que d'annoncer zéro.
+  it('ne s’affiche pas sans rythme saisi', () => {
+    semer({ missions: [mission()] });
+    render(<Activite />);
+    expect(screen.queryByText(/devrait rapporter/)).toBeNull();
+  });
+});

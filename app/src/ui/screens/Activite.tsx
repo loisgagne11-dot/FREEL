@@ -10,10 +10,15 @@ import { CraCard } from '../components/CraCard';
 import { useToast } from '../components/Toasts';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import { joursCongeables } from '../../domain/calculs/activite';
+import { CartePliable } from '../components/CartePliable';
+import { ecartDePrevision, totaliserPrevisions } from '../../domain/calculs/prevision';
+import {
+  type PrevisionDeMission, previsionDuMoisParMission
+} from '../../state/selecteurs.activite';
 
 import type { DateISO, Mois } from '../../domain/types';
 import type { Mission } from '../../state/schema';
-import { dateISO } from '../../domain/types';
+import { dateISO, euros } from '../../domain/types';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
@@ -85,6 +90,11 @@ export function Activite() {
   const idGroupe = useId();
 
   const etat = useMemo(() => etatActivite(faits, mois), [faits, mois]);
+  // Même source que le CRA : rythmes, ajustements, fériés et congés. En
+  // produire une seconde version garantirait qu'elles divergent.
+  const previsions = useMemo(
+    () => previsionDuMoisParMission(faits, mois), [faits, mois]
+  );
 
   const [vue, setVue] = useState<'mois' | 'semaine'>('mois');
   const [ancreSemaine, setAncreSemaine] = useState<DateISO>(() => dateDuJour());
@@ -264,6 +274,12 @@ export function Activite() {
             </p>
           )}
 
+          {/* Avec les chiffres du mois, et non dans l'onglet Missions : c'est
+              une question de MOIS — « ce que ce mois-ci devrait rapporter » —
+              même si sa source est la mission. Rangée sous Missions, elle
+              n'était visible qu'en changeant d'onglet. */}
+          <CartePrevision previsions={previsions} mois={mois} />
+
           <section className={styles.carte} aria-labelledby={`${idGroupe}-chiffres`}>
             <h2 id={`${idGroupe}-chiffres`} className={styles.titreCarte}>
               Le mois en chiffres
@@ -411,6 +427,7 @@ export function Activite() {
                 </ul>
               )}
           </section>
+
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="clients" actif={section === 'clients'}>
@@ -1031,5 +1048,87 @@ function PlageDeConges() {
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Ce que les missions devaient rapporter ce mois-ci, et ce qu'elles rapportent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE PREMIER MAILLON DE LA CHAÎNE QUI PART DE LA MISSION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une mission doit se décliner en prévision de revenu, planning, facture du
+ * mois et CRA. Le planning et le CRA existaient ; la prévision non — le tarif
+ * journalier et le rythme étaient là, et rien n'en tirait ce qu'ils annoncent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX COLONNES, PARCE QUE L'ÉCART EST L'INFORMATION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le prévu vient du rythme, le retenu de ce qui a été ajusté journée par
+ * journée. N'afficher que l'un des deux ferait disparaître la question qui
+ * compte : « est-ce que je tiens ce que j'avais prévu ? ». Un mois travaillé
+ * trois jours de moins que le rythme doit se voir, et il ne se voit qu'en
+ * gardant les deux nombres côte à côte.
+ *
+ * Les missions sans aucune journée retenue restent affichées — contrairement au
+ * CRA, qui ne liste que ce qui se facture. Une mission qui devait rapporter et
+ * n'a rien rapporté est précisément ce qu'on cherche à voir.
+ */
+function CartePrevision(
+  { previsions, mois: m }: {
+    readonly previsions: readonly PrevisionDeMission[];
+    readonly mois: Mois;
+  }
+) {
+  if (previsions.length === 0) return null;
+
+  const total = totaliserPrevisions(previsions.map((p) => p.prevision), m);
+  const ecart = ecartDePrevision(total);
+
+  return (
+    <CartePliable
+      id="prevision"
+      ecran="activite"
+      titre={(
+        <>
+          Ce que le mois devrait rapporter
+          <Info libelle="D’où vient cette prévision">
+            Du <strong>rythme</strong> de chaque mission et de son tarif
+            journalier, congés et jours fériés déduits. Chaque journée est
+            valorisée au tarif <em>en vigueur à sa date</em>&nbsp;: appliquer
+            celui d’aujourd’hui réécrirait le passé à chaque renégociation.
+            Le « retenu » est ce que vos ajustements journaliers ont retenu —
+            c’est lui qui se facturera.
+          </Info>
+        </>
+      )}
+      resume={(
+        <>
+          <Montant>{eur(total.montantPrevu)}</Montant> prévus
+          {' · '}<Montant>{eur(total.montantRetenu)}</Montant> retenus
+          {ecart !== 0 && (
+            <>{' · écart '}<Montant>{eur(euros(ecart))}</Montant></>
+          )}
+        </>
+      )}
+    >
+      <ul className={styles.liste}>
+        {previsions.map((p) => (
+          <li key={`${p.missionId}-${p.entiteId}`} className={styles.lignePrevision}>
+            <span className={styles.lignePrevisionNom}>{p.libelle}</span>
+            <span className={styles.lignePrevisionChiffres}>
+              <span className={styles.lignePrevisionJours}>
+                {formaterJours(p.prevision.joursRetenus)} / {formaterJours(p.prevision.joursPrevus)} j
+              </span>
+              <span className={styles.lignePrevisionMontant}>
+                <Montant>{eur(p.prevision.montantRetenu)}</Montant>
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </CartePliable>
   );
 }
