@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../types';
 import {
   type RecettePayee,
-  calendrierDuMois, chargeDuMois, delaisParClient, estWeekEnd, joursDuMois,
-  joursCongeables, joursEntre, joursEquivalents, joursFeries, paques, planDeCharge
+  calendrierDuMois, chargeDuMois, decompterJours, delaisParClient, estWeekEnd,
+  joursCongeables, joursDuMois, joursEntre, joursEquivalents, joursFeries,
+  paques, planDeCharge
 } from './activite';
 
 describe('date de Pâques', () => {
@@ -379,5 +380,83 @@ describe('jours congeables d’une plage', () => {
   // Un dimanche seul ne donne rien : il n'y a rien à poser.
   it('rend une liste vide quand la plage ne contient aucun jour ouvré', () => {
     expect(joursCongeables(dateISO('2026-08-08'), dateISO('2026-08-09'))).toEqual([]);
+  });
+});
+
+/**
+ * UN MOT NE PEUT PAS DÉSIGNER DEUX NOMBRES.
+ *
+ * Le plan de charge du mois compte comme « jours ouvrables » les jours ni
+ * week-end, ni fériés, ni posés en congé — c'est le dénominateur du taux
+ * d'occupation. La vue semaine avait d'abord compté les jours ouvrés congés
+ * COMPRIS, dans son propre composant.
+ *
+ * Les deux nombres portaient le même nom, sur le même écran : une semaine avec
+ * deux jours de congé annonçait « 5 jours ouvrés » pendant que le mois n'en
+ * comptait que 3 pour cette semaine-là. Deux vérités pour la même réalité —
+ * exactement ce que la refonte existe pour supprimer.
+ *
+ * Les deux sont pourtant justes, pour deux questions différentes. D'où deux
+ * noms, et une seule fonction qui les rend tous les deux.
+ */
+describe('décompte des jours d’une période', () => {
+  const jour = (o: Partial<{ ferie: boolean; weekEnd: boolean; conge: number }> = {}) =>
+    ({ ferie: false, weekEnd: false, conge: 0, ...o });
+
+  it('compte les jours ouvrés congés compris', () => {
+    const d = decompterJours([jour(), jour(), jour({ conge: 1 })]);
+    expect(d.ouvres).toBe(3);
+  });
+
+  it('compte à part ceux qui sont posés en congé', () => {
+    const d = decompterJours([jour(), jour({ conge: 1 }), jour({ conge: 0.5 })]);
+    expect(d.enConge).toBe(2);
+  });
+
+  /**
+   * LE NOMBRE QUI SERT DE DÉNOMINATEUR. Retirer les congés est juste ici :
+   * sinon partir en vacances ferait chuter un taux d'occupation qui ne
+   * mesurerait plus rien.
+   */
+  it('rend les travaillables, congés retirés', () => {
+    const d = decompterJours([jour(), jour(), jour({ conge: 1 })]);
+    expect(d.travaillables).toBe(2);
+  });
+
+  it('écarte week-ends et fériés des trois comptes', () => {
+    const d = decompterJours([
+      jour(), jour({ weekEnd: true }), jour({ ferie: true }), jour({ conge: 1 })
+    ]);
+    expect(d).toEqual({ ouvres: 2, enConge: 1, travaillables: 1 });
+  });
+
+  /**
+   * Une demi-journée de congé occupe le jour : il n'est plus travaillable en
+   * entier. Le compter comme travaillable gonflerait le dénominateur.
+   */
+  it('tient une demi-journée pour un jour en congé', () => {
+    const d = decompterJours([jour({ conge: 0.5 })]);
+    expect(d).toEqual({ ouvres: 1, enConge: 1, travaillables: 0 });
+  });
+
+  /**
+   * LA COHÉRENCE AVEC LE MOIS, qui est la raison d'être de cette fonction.
+   * `travaillables` doit valoir ce que `planDeCharge` appelle `joursOuvrables`
+   * — sans quoi on aurait recréé la divergence qu'on vient de supprimer.
+   */
+  it('donne le même nombre que le plan de charge du mois', () => {
+    const m = mois('2026-07');
+    const conges = [
+      { date: dateISO('2026-07-06'), quotite: 1 },
+      { date: dateISO('2026-07-07'), quotite: 1 }
+    ];
+    const plan = planDeCharge(m, conges, 0);
+    const jours = calendrierDuMois(m, conges).map((j) => ({
+      ferie: j.nature === 'ferie',
+      weekEnd: j.nature === 'week_end',
+      conge: j.nature === 'conge' ? 1 : 0
+    }));
+
+    expect(decompterJours(jours).travaillables).toBe(plan.joursOuvrables);
   });
 });

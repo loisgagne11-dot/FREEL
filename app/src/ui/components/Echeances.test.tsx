@@ -318,3 +318,38 @@ describe('répéter une échéance', () => {
     expect(screen.queryByLabelText('Répéter')).toBeNull();
   });
 });
+
+/**
+ * LE SECOND MÉCANISME STRUCTURANT DU HANDOFF.
+ *
+ * L'annexe en nomme deux à conserver : le pli à synthèse, et « la couleur fixe
+ * par type de charge — une charge garde sa couleur partout ». Les jetons
+ * `--c-urssaf`, `--c-tva`, `--c-ir`, `--c-cfe` existaient dans les quatre
+ * palettes et n'étaient câblés nulle part.
+ */
+describe('couleur par type de charge', () => {
+  it('marque chaque échéance de la teinte de sa charge', () => {
+    semer([
+      echeance({ id: 'e1', nature: 'urssaf' }),
+      echeance({ id: 'e2', nature: 'tva' }),
+      echeance({ id: 'e3', nature: 'cfe' })
+    ]);
+    rendre();
+
+    const teintes = [...document.querySelectorAll('[data-charge]')]
+      .map((n) => n.getAttribute('data-charge'));
+    expect(teintes).toEqual(expect.arrayContaining(['urssaf', 'tva', 'cfe']));
+  });
+
+  /**
+   * LA COULEUR EST UN REPÈRE, JAMAIS LA SEULE PORTEUSE DE L'INFORMATION.
+   * Le libellé reste écrit — c'est la règle pour qui ne distingue pas les
+   * teintes, et le filet porte donc `aria-hidden`.
+   */
+  it('garde le libellé en toutes lettres', () => {
+    semer([echeance({ id: 'e1', nature: 'tva' })]);
+    rendre();
+    expect(screen.getByText('TVA')).toBeTruthy();
+    expect(document.querySelector('[data-charge]')?.getAttribute('aria-hidden')).toBe('true');
+  });
+});

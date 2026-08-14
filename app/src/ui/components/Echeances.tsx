@@ -254,7 +254,28 @@ function Ligne(
   return (
     <li className={styles.ligne}>
       <span className={styles.ligneTitre}>
-        <span className={styles.ligneLibelle}>{LIBELLE[echeance.nature]}</span>
+        {/*
+          * LA COULEUR FIXE PAR TYPE DE CHARGE.
+          *
+          * L'annexe du handoff nomme DEUX mécanismes structurants à conserver :
+          * le pli à synthèse, et celui-ci — « une charge garde sa couleur
+          * partout ». Les jetons existaient dans les quatre palettes et
+          * n'étaient câblés nulle part : la nature d'une dette ne se lisait
+          * qu'en toutes lettres.
+          *
+          * Un filet de 3 px, pas une pastille pleine : la couleur doit
+          * identifier la charge sans entrer en concurrence avec le vert, l'ambre
+          * et le rouge, qui codent l'ÉTAT. Deux systèmes de couleur sur la même
+          * ligne, et aucun des deux ne se lit plus.
+          *
+          * Le libellé reste écrit : la couleur est un repère, jamais la seule
+          * porteuse de l'information — c'est la règle pour qui ne la distingue
+          * pas.
+          */}
+        <span className={styles.nature}>
+          <span className={styles.teinte} data-charge={echeance.nature} aria-hidden="true" />
+          <span className={styles.ligneLibelle}>{LIBELLE[echeance.nature]}</span>
+        </span>
         <span className={styles.ligneMontant}>
           <Montant>{eur(echeance.montantPaye ?? echeance.montant)}</Montant>
         </span>

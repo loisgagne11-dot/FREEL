@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import { type LigneDepense, etatAchats } from '../../state/selecteurs.achats';
 import type { Depense } from '../../state/schema';
@@ -771,17 +772,29 @@ function Pastille({ ton, texte }: { ton: 'neutre' | 'accent' | 'danger'; texte: 
  * TTC · TVA déductible Y € · Z pièce(s) manquante(s) ». Chacun de ces quatre
  * chiffres répond à une question qu'on se pose sans ouvrir la carte — et le
  * dernier est le seul qui appelle une action.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DES NŒUDS, PAS UNE CHAÎNE, ET CE N'EST PAS UN DÉTAIL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La première version rendait une chaîne, montants compris. Le masquage du mode
+ * confidentiel ne cible que `[data-montant]` : une carte repliée affichait donc
+ * le total TTC et la TVA déductible EN CLAIR, écran partagé.
+ *
+ * Et `verifier:confidentialite` ne pouvait pas le voir : les cartes s'ouvrent
+ * dépliées, la synthèse n'était pas dans le DOM au moment du contrôle. Un vert
+ * qui ne prouve rien — exactement ce contre quoi ce contrôle existe. Le
+ * vérificateur replie désormais les cartes avant sa passe.
  */
-function synthese(etat: ReturnType<typeof etatAchats>): string {
+function synthese(etat: ReturnType<typeof etatAchats>): ReactNode {
   const n = etat.lignes.length;
-  const morceaux = [
-    `${n} achat${n > 1 ? 's' : ''}`,
-    `${eur(etat.resume.totalTtc)} TTC`,
-    `TVA déductible ${eur(etat.resume.tvaRecuperable)}`
-  ];
-  if (etat.resume.sansJustificatif > 0) {
-    const p = etat.resume.sansJustificatif;
-    morceaux.push(`${p} pièce${p > 1 ? 's' : ''} manquante${p > 1 ? 's' : ''}`);
-  }
-  return morceaux.join(' · ');
+  const p = etat.resume.sansJustificatif;
+  return (
+    <>
+      {n} achat{n > 1 ? 's' : ''}
+      {' · '}<Montant>{eur(etat.resume.totalTtc)}</Montant> TTC
+      {' · '}TVA déductible <Montant>{eur(etat.resume.tvaRecuperable)}</Montant>
+      {p > 0 && <>{' · '}{p} pièce{p > 1 ? 's' : ''} manquante{p > 1 ? 's' : ''}</>}
+    </>
+  );
 }

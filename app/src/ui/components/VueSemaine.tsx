@@ -1,6 +1,7 @@
 import type { PlanningSemaine } from '../../state/selecteurs.activite';
 import type { DateISO } from '../../domain/types';
 import { dateCourte } from '../format';
+import { decompterJours } from '../../domain/calculs/activite';
 import styles from './VueSemaine.module.css';
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -62,27 +63,28 @@ export function VueSemaine(
   const corrigee = planning.jours.some((j) => j.parMission.some((l) => l.ajuste));
 
   /**
-   * Les jours ouvrés de la semaine affichée.
+   * Le décompte de la semaine affichée, calculé par le DOMAINE.
    *
-   * La spec de design demande ce compte « sur la période visible (semaine ou
-   * mois) ». Le mois l'avait, la semaine non — et c'est là qu'il manque le
-   * plus : cinq jours ouvrés n'est pas toujours la réponse. Une semaine avec un
-   * férié en compte quatre, et un taux d'occupation lu sans le savoir est faux
-   * d'un cinquième.
+   * La spec demande ce compte « sur la période visible (semaine ou mois) ». Le
+   * mois l'avait, la semaine non — et c'est là qu'il manque le plus : cinq
+   * jours ouvrés n'est pas toujours la réponse, une semaine avec un férié en
+   * compte quatre.
    *
-   * Les congés posés ne sont pas retirés ici : ils restent des jours OUVRÉS
-   * qu'on a choisi de ne pas travailler. Les soustraire du dénominateur ferait
-   * afficher 100 % d'occupation à quelqu'un en vacances.
+   * Le calcul ne vit PAS ici. Une première version le faisait dans ce
+   * composant, et comptait les congés parmi les ouvrés là où le plan de charge
+   * du mois les en retire : même mot, deux nombres, même écran. Les deux
+   * réponses étaient justes pour deux questions différentes — d'où deux noms,
+   * et une seule fonction qui les rend tous les deux.
    */
-  const joursOuvres = planning.jours.filter((j) => !j.ferie && !j.weekEnd).length;
+  const decompte = decompterJours(planning.jours);
 
   return (
     <>
-      {/* Le compte, et rien d'autre : le total retenu est déjà lisible sous la
-          grille, et le répéter ici n'ajouterait qu'une occasion de diverger. */}
+      {/* Les deux nombres ensemble : « 5 jours ouvrés, dont 2 de congé ».
+          Personne n'a plus à deviner lequel il regarde. */}
       <p className={styles.resumeSemaine}>
-        {joursOuvres} jour{joursOuvres > 1 ? 's' : ''} ouvré{joursOuvres > 1 ? 's' : ''}
-        {' cette semaine'}
+        {decompte.ouvres} jour{decompte.ouvres > 1 ? 's' : ''} ouvré{decompte.ouvres > 1 ? 's' : ''}
+        {decompte.enConge > 0 && `, dont ${decompte.enConge} de congé`}
       </p>
 
       <div className={styles.semaine}>

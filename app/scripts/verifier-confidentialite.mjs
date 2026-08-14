@@ -126,10 +126,33 @@ const BIN = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const navigateur = await chromium.launch(existsSync(BIN) ? { executablePath: BIN } : {});
 
 const contexte = await navigateur.newContext({ viewport: { width: 1440, height: 900 } });
-await contexte.addInitScript(([faits, cle]) => {
+await contexte.addInitScript(([faits, cle, ecrans]) => {
   window.localStorage.setItem('freel.faits.v1', JSON.stringify(faits));
   window.localStorage.setItem(cle, 'oui');
-}, [FAITS, 'freel.confidentialite.v1']);
+
+  /*
+   * LES CARTES SONT REPLIÉES AVANT LA PASSE, ET C'EST INDISPENSABLE.
+   *
+   * Une carte repliée affiche sa SYNTHÈSE — « n achats · X € TTC · TVA
+   * déductible Y € ». Des montants, donc, qui doivent être masqués comme les
+   * autres.
+   *
+   * Mais les cartes s'ouvrent dépliées : la synthèse n'est pas dans le DOM, et
+   * le contrôle passait au vert sans jamais l'avoir regardée. C'est arrivé — la
+   * première version de `CartePliable` rendait ses montants en clair, et ces
+   * 140 combinaisons n'y voyaient rien.
+   *
+   * On replie donc tout ce qui peut l'être. Un contrôle qui n'inspecte que
+   * l'état par défaut ne contrôle que la moitié de l'écran.
+   */
+  for (const ecran of ecrans) {
+    window.localStorage.setItem(
+      `freel.pli.${ecran}`,
+      JSON.stringify({ registre: true })
+    );
+  }
+}, [FAITS, 'freel.confidentialite.v1',
+  ['pilote', 'activite', 'argent', 'facture', 'achats', 'outils', 'config']]);
 
 const page = await contexte.newPage();
 

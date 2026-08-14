@@ -161,6 +161,11 @@ export function Outils() {
               dépasse. C’est pourquoi le taux réellement payé reste inférieur au
               taux de la tranche la plus haute atteinte.
             </p>
+            {/* Le tableau défile DANS SON CONTENEUR plutôt que d'élargir la
+                feuille : quatre colonnes de chiffres ne tiennent pas dans 390 px,
+                et les écraser casse les libellés caractère par caractère — le
+                défaut que la V1.11 corrigeait précisément sur cet écran. */}
+            <div className={styles.tableDefilante}>
             <table className={styles.table}>
               <caption className={styles.legende}>
                 Revenu imposable de <Montant>{eur(simulation.revenu)}</Montant>
@@ -191,6 +196,7 @@ export function Outils() {
                 })}
               </tbody>
             </table>
+            </div>
             <p className={styles.source}>
               Source du barème&nbsp;: {simulation.tranches.source}, vérifié le{' '}
               {simulation.tranches.verifieLe}.

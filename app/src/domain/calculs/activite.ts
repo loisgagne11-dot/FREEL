@@ -202,6 +202,57 @@ export function joursCongeables(
   return jours;
 }
 
+/**
+ * Le décompte des jours d'une période : ouvrés, et parmi eux ceux en congé.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN MOT NE PEUT PAS DÉSIGNER DEUX NOMBRES
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le plan de charge du mois compte comme « jours ouvrables » les jours ni
+ * week-end, ni fériés, **ni posés en congé** : c'est le dénominateur du taux
+ * d'occupation, et retirer les congés est juste — sinon partir en vacances
+ * ferait chuter un taux qui ne mesure plus rien.
+ *
+ * La vue semaine, elle, a d'abord compté les jours ouvrés **congés compris**.
+ * Les deux nombres portaient le même nom, sur le même écran, à quinze
+ * centimètres l'un de l'autre : une semaine avec deux jours de congé annonçait
+ * « 5 jours ouvrés » pendant que le mois n'en comptait que 3 pour cette
+ * semaine-là. C'est la famille de défaut que la refonte existe pour supprimer —
+ * deux vérités pour la même réalité.
+ *
+ * La sortie de crise n'est pas de trancher pour l'un des deux : les DEUX sont
+ * justes, pour deux questions différentes. « Combien de jours cette semaine
+ * n'étaient ni week-end ni fériés » et « sur combien de jours mon occupation se
+ * calcule » ne sont pas la même question.
+ *
+ * Ils reçoivent donc deux noms, et l'écran les dit ensemble : « 5 jours ouvrés,
+ * dont 2 de congé ». Personne n'a plus à deviner lequel il regarde.
+ */
+export interface DecompteJours {
+  /** Ni week-end, ni férié. Les congés y sont COMPRIS. */
+  readonly ouvres: number;
+  /** Parmi les ouvrés, ceux posés en congé. */
+  readonly enConge: number;
+  /** Les ouvrés moins les congés : le dénominateur du taux d'occupation. */
+  readonly travaillables: number;
+}
+
+/**
+ * Décompte une suite de jours déjà qualifiés.
+ *
+ * Prend le strict nécessaire — férié, week-end, congé — plutôt qu'un type
+ * d'écran : la vue semaine et le calendrier du mois ne portent pas la même
+ * structure, et c'est la règle qui doit être partagée, pas la forme.
+ */
+export function decompterJours(
+  jours: readonly { readonly ferie: boolean; readonly weekEnd: boolean; readonly conge: number }[]
+): DecompteJours {
+  const ouvrables = jours.filter((j) => !j.ferie && !j.weekEnd);
+  const enConge = ouvrables.filter((j) => j.conge > 0).length;
+  return { ouvres: ouvrables.length, enConge, travaillables: ouvrables.length - enConge };
+}
+
 export interface PlanDeCharge {
   readonly mois: Mois;
   /** Jours ni week-end, ni fériés, ni posés en congé. Le dénominateur. */

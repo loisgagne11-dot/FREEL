@@ -41,7 +41,8 @@ Statut relevé dans le code, pas supposé. `✅` conforme · `⚠️` partiel ·
 | 4 palettes commutables, valeurs de `v1.11.css` | ✅ | `styles/tokens.css`, vérifié sur 140 combinaisons |
 | Palette appliquée **avant le premier rendu**, sans flash | ✅ | Script inline, assertion sur chaque combinaison |
 | Tokens : surfaces, traits, texte, statuts, formes | ✅ | Aucune couleur en dur dans les modules CSS |
-| « La couleur ne code qu'une donnée » | ✅ | vert = sain, ambre = à faire, rouge = retard, bleu = info |
+| « La couleur ne code qu'une donnée » (état) | ✅ | vert = sain, ambre = à faire, rouge = retard, bleu = info |
+| **Couleur fixe par type de charge** — « une charge garde sa couleur partout » | ✅ | **Corrigé le 14/08.** Les jetons `--c-urssaf`, `--c-tva`, `--c-ir`, `--c-cfe` existaient dans les quatre palettes et n'étaient câblés **nulle part**. Un filet de 3 px sur chaque échéance, pas un aplat : la couleur identifie la **charge**, tandis que vert/ambre/rouge codent l'**état** — deux systèmes sur la même ligne et aucun ne se lit plus |
 
 ### A2. Couche « indicateurs système »
 
@@ -71,8 +72,8 @@ Statut relevé dans le code, pas supposé. `✅` conforme · `⚠️` partiel ·
 | Seul l'onglet actif porte son libellé | ✅ | Assertion dédiée |
 | **Flux du mois : 3 colonnes côte à côte** | ✅ | Fait le 14/08. Le détail sort des colonnes plutôt que de perdre ses montants |
 | Un seul rang de filtres, défilant (Achats) | ✅ | `BarrePeriode` |
-| Tableaux larges à défilement dans leur carte | ⚠️ | Activité, Config et Facturer l'ont. Argent et Achats n'ont pas de `<table>` — le besoin ne se pose pas |
-| Config : liste des sections en grille 2 colonnes compacte | 🚫 | Résolu autrement : les sections sont des **onglets** défilants, pas une liste. Plus compact encore, et cohérent avec Achats et Argent |
+| Tableaux larges à défilement dans leur carte | ✅ | Activité, Config, Facturer — et **Outils depuis le 14/08**, dont le tableau des tranches à quatre colonnes avait été oublié. Argent et Achats n'ont pas de `<table>` |
+| Config : liste des sections en grille 2 colonnes compacte | ✅ | **Résolu autrement, pas abandonné** : les sections sont des **onglets** défilants, plus compacts qu'une grille et cohérents avec Achats et Argent. Le classer en renoncement gonflait artificiellement la colonne des abandons |
 | Aucun débordement horizontal | ✅ | 140 combinaisons |
 
 ### A5. Comportements transversaux
@@ -81,7 +82,7 @@ Statut relevé dans le code, pas supposé. `✅` conforme · `⚠️` partiel ·
 |---|---|---|
 | Feuilles latérales (piège de focus, Échap, voile) | ✅ | `Sheet` |
 | Toasts | ✅ | `Toasts` |
-| **Cartes pliables avec synthèse `data-fold`** | ❌ | **Absent.** Le handoff le qualifie de « mécanisme transversal, **à conserver** » |
+| **Cartes pliables avec synthèse `data-fold`** | ⚠️ | Composant `CartePliable` fait le 14/08 et appliqué au registre des achats. Mais `05-spec-ecrans.md` le nomme sur **huit** cartes — Pilote (Santé), Argent (5), Achats (2). **Une sur huit** : le point ne se ferme pas |
 | Sous-onglets `[data-tab]` | ✅ | `Onglets`, sémantique ARIA |
 | Rail 212 px, grille 12 colonnes, panneau 580 px | ✅ | |
 
@@ -91,8 +92,8 @@ Statut relevé dans le code, pas supposé. `✅` conforme · `⚠️` partiel ·
 |---|---|---|
 | Argent : Trésorerie / Performance en **onglets de section** | ✅ | |
 | Graphe CA : valeurs **au-dessus** des barres, en k€ | ✅ | `GrapheBarres` |
-| **Activité : jours ouvrés de la période visible (semaine ou mois)** | ⚠️ | Le mois l'a. **La semaine ne l'a pas** |
-| Outils : lignes de tranche insécables | ✅ | `white-space: nowrap` sur les valeurs |
+| **Activité : jours ouvrés de la période visible (semaine ou mois)** | ✅ | Fait le 14/08, puis **corrigé** : la première version comptait les congés parmi les ouvrés là où le mois les en retire — même mot, deux nombres, même écran. `decompterJours` rend désormais les deux (`ouvres`, `enConge`, `travaillables`) et un test vérifie l'accord avec le plan de charge |
+| Outils : lignes de tranche insécables | ✅ | Corrigé le 14/08 : le `nowrap` invoqué portait sur la **liste de résultat**, pas sur le tableau des tranches. Celui-ci défile maintenant dans son conteneur |
 | Achats : pastilles d'état en double supprimées | ✅ | |
 | Sauvegarde : pastille dédiée supprimée | ✅ | |
 
@@ -120,7 +121,8 @@ adresse et coordonnées bancaires · plage de congés et demi-journées.
 | `showOnboarding` | On arrive sur un Pilote vide | Plus tard |
 | `createSearchOverlay`, `initKeyboardShortcuts` | Pas de recherche ni de raccourcis | Plus tard |
 | `_subscribeRealtime` | Recharger pour voir un autre appareil | Plus tard |
-| `showSendInvoiceModal`, `showCRAPreviewWithSend` | Pas d'envoi par courriel — impression seulement | 🚫 Suppose un service d'envoi ; hors périmètre d'une application sans backend |
+| **Relancer une facture en retard** (`showSendInvoiceModal`) | ❌ **Reclassé le 14/08.** Le motif « pas d'envoi de courriel » répondait à la FORME, pas au besoin : cette fonction servait à relancer un impayé. Le besoin n'a aucun remplaçant — `selecteurs.ts` identifie même « précisément celle qu'il faut relancer », sans aucune action au bout | **À faire** |
+| Envoi du document par courriel | La facture s'imprime ou s'enregistre en PDF, puis se joint à un courriel | 🚫 Un envoi depuis l'application supposerait un service d'expédition et l'archivage de ce qui a été envoyé. La relance, elle, n'en a pas besoin |
 | `calculerRendementMensuel` | Suivi de placements | 🚫 Hors du métier micro-BNC |
 | `repairInvoiceNumbers`, `swapInvoiceNumbers` | Réparer une numérotation | 🚫 Réécrire un numéro émis est ce qu'un contrôle cherche. Les trous sont **signalés**, pas réparés |
 | Export FEC | | 🚫 Décision D6 : le FEC ne concerne pas la micro |
@@ -188,3 +190,68 @@ Le contrôleur existe contre une famille de défaut que ce projet connaît : des
 actions écrites, testées et injoignables ; une assertion conditionnelle qui ne
 s'exécutait jamais ; un vérificateur qui mesurait « le premier `<nav>` de la
 page ». Tous passaient au vert.
+
+
+---
+
+## Revue experte du 14/08 — verdict et suites
+
+Ce plan a été soumis à l'agent `expert-plan` **avant** d'être poursuivi. Verdict :
+**INSUFFISANT**. Il avait raison sur l'essentiel, et sur des points que la chaîne
+de vérification ne pouvait pas voir.
+
+### Ce qu'il a trouvé, et qui était vrai
+
+| Constat | Vérifié | Suite |
+|---|---|---|
+| **Le second mécanisme structurant manquait.** L'annexe en nomme deux à conserver : le pli à synthèse **et** la couleur fixe par charge. Le plan n'avait vu que le premier | ✅ Les jetons existaient dans les 4 palettes, câblés dans **une seule** règle CSS | Câblé sur les échéances |
+| **Trou de confidentialité dans le pli.** La synthèse rendait ses montants en chaîne, sans `data-montant` : carte repliée, le total TTC et la TVA s'affichaient **en clair** en mode confidentiel | ✅ Reproduit puis corrigé | Synthèse en nœuds `<Montant>`, **et** le vérificateur replie désormais les cartes avant sa passe — sans quoi il restait vert sur le trou |
+| **Deux définitions de « jour ouvré » sur le même écran.** Le mois retire les congés, ma vue semaine les comptait | ✅ Reproduit | `decompterJours` dans le domaine rend les deux nombres sous deux noms, avec un test d'accord avec le plan de charge |
+| **La preuve de « tranches insécables » ne portait pas** : le `nowrap` cité était sur la liste de résultat, pas sur le tableau à quatre colonnes | ✅ | Tableau mis en conteneur défilant |
+| **Le pli est demandé sur huit cartes, une seule est faite** | ✅ | A5 repassé en ⚠️ — le point ne se ferme pas |
+| **Config n'est pas un renoncement mais une résolution autrement** | ✅ | Reclassé ✅ |
+| **Le motif de l'envoi par courriel répondait à la forme, pas au besoin** : la fonction servait à **relancer un impayé**, et ce besoin n'a aucun remplaçant | ✅ | Scindé : la relance passe en ❌ à faire, l'envoi reste écarté |
+
+### Ce qu'il a ajouté et que le plan ignorait
+
+Trois manques de l'annexe (« Ordres de marche » §4), qui n'appartenaient ni à
+l'axe A — bâti sur le README — ni à l'axe B, bâti sur l'audit :
+
+1. **Génération des dépenses récurrentes** — aucun modèle d'abonnement. C'est la
+   saisie la plus répétitive de l'outil, et celle qu'on abandonne en premier.
+   L'expert la classe devant tout le « plus tard » de B2.
+2. **Conservation 10 ans visible.** La durée est au barème, aucun écran ne
+   l'affiche. En renonçant à la pastille Documents — à raison — on a supprimé le
+   seul endroit du handoff où cette obligation était posée.
+3. **État « ignorée » au rapprochement**, et **création d'une dépense depuis une
+   opération orpheline** : le relevé arrive avant la saisie, c'est le sens le
+   plus fréquent et il n'est pas câblé.
+
+Plus deux comportements : **clic sur un mois = composition** dans les graphes, et
+**les sous-onglets qui remontent en haut** au changement.
+
+### Sur le lot 3, qu'il a refusé en l'état
+
+Son objection est fondée et change le lot :
+
+- **« La » date de franchissement n'existe pas au singulier.** Franchise et seuil
+  majoré ont des effets **opposés** : la franchise se perd au 1er janvier suivant
+  (sous une règle N-1/N-2 que le barème ne calcule pas et documente comme non
+  calculée) ; le seuil majoré assujettit **immédiatement**. Le coût décrit dans le
+  plan — devoir la TVA sur des factures déjà émises — est celui du **seuil
+  majoré seul**. `projectTVADate` visait 37 500 €, et `tva.ts` qualifie cette
+  présentation de « juridiquement FAUX ». Écrire le lot sans nommer le seuil,
+  c'est réintroduire l'erreur que le barème existe pour éviter.
+- **Projeter par tendance sur l'encaissé est le plus mauvais estimateur
+  disponible** : l'encaissement dépend de la date à laquelle le client paie. Il
+  faut bâtir sur ce qui est **déjà facturé et non encaissé**, plus le délai
+  **médian** constaté.
+- **`Resolution<T>` ne convient pas** : ses variantes exigent `source` et
+  `verifieLe`, la traçabilité d'une valeur de barème. Une projection statistique
+  n'a pas de `verifieLe`, et lui donner ces insignes la ferait passer pour un
+  fait publié.
+- **L'année civile est une borne dure** — le CA de référence se remet à zéro au
+  1er janvier —, et le chiffre qui doit rester dominant est le **reste en euros**,
+  qui est un fait exact, pas la date, qui est un confort.
+
+Le lot 3 est donc **suspendu** en l'état et à réécrire selon ces conditions.

@@ -215,3 +215,16 @@
   .entete { grid-column: 1 / -1; }
   .carte { grid-column: 1 / span 7; }
 }
+
+/* Le tableau des tranches défile dans son conteneur.
+   Quatre colonnes de chiffres ne tiennent pas dans 390 px ; les écraser casse
+   les libellés caractère par caractère, ce que la V1.11 corrigeait sur cet
+   écran. L'invariant de non-débordement porte sur la PAGE : c'est donc au
+   conteneur de défiler, pas à la page de s'élargir. */
+.tableDefilante {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
+}
+
+.tableDefilante .table { min-width: 340px; }
