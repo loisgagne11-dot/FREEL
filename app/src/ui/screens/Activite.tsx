@@ -13,7 +13,8 @@ import { joursCongeables } from '../../domain/calculs/activite';
 import { CartePliable } from '../components/CartePliable';
 import { ecartDePrevision, totaliserPrevisions } from '../../domain/calculs/prevision';
 import {
-  type PrevisionDeMission, previsionDuMoisParMission
+  type PrevisionDeMission, type RapportDeMission,
+  previsionDuMoisParMission, rapportParMission
 } from '../../state/selecteurs.activite';
 
 import type { DateISO, Mois } from '../../domain/types';
@@ -39,6 +40,16 @@ const FormulaireClient = lazy(() => import('./Activite.formulaires')
   .then((m) => ({ default: m.FormulaireClient })));
 const FormulaireMission = lazy(() => import('./Activite.formulaires')
   .then((m) => ({ default: m.FormulaireMission })));
+
+/**
+ * L'onglet Clients arrive à l'ouverture de son onglet.
+ *
+ * Même motif que les formulaires : le carnet se consulte à la création d'un
+ * client puis rarement, et le plan de charge — ce qu'on ouvre dix fois par
+ * semaine — n'a aucune raison d'en payer le téléchargement.
+ */
+const OngletClients = lazy(() => import('./Activite.clients')
+  .then((m) => ({ default: m.OngletClients })));
 
 /** L'attente d'un formulaire, dans son panneau. Sobre : elle dure un instant. */
 function EnAttenteDeFormulaire() {
@@ -94,6 +105,12 @@ export function Activite() {
   // produire une seconde version garantirait qu'elles divergent.
   const previsions = useMemo(
     () => previsionDuMoisParMission(faits, mois), [faits, mois]
+  );
+  // Sur l'ANNÉE et non sur le mois : « quelle mission me rapporte quoi » est
+  // une question commerciale, et un mois de congés ou un mois creux ferait
+  // passer une bonne mission pour une mauvaise.
+  const rapports = useMemo(
+    () => rapportParMission(faits, Number(mois.slice(0, 4))), [faits, mois]
   );
 
   const [vue, setVue] = useState<'mois' | 'semaine'>('mois');
@@ -310,6 +327,8 @@ export function Activite() {
               n'était visible qu'en changeant d'onglet. */}
           <CartePrevision previsions={previsions} mois={mois} />
 
+          <CarteRapportParMission rapports={rapports} annee={Number(mois.slice(0, 4))} />
+
           <section className={styles.carte} aria-labelledby={`${idGroupe}-chiffres`}>
             <h2 id={`${idGroupe}-chiffres`} className={styles.titreCarte}>
               Le mois en chiffres
@@ -461,108 +480,9 @@ export function Activite() {
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="clients" actif={section === 'clients'}>
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-carnet`}>
-            <h2 id={`${idGroupe}-carnet`} className={styles.titreCarte}>
-              Carnet
-              <Info libelle="Pourquoi le pays du client compte">
-                Une prestation vendue à un professionnel d’un autre État membre
-                doit figurer dans la déclaration européenne de services, dès le
-                premier euro et même en franchise en base. Sans le pays et le
-                numéro de TVA du client, cette obligation reste invisible.
-              </Info>
-            </h2>
-            {faits.clients.length === 0
-              ? (
-                <Vide
-                  message="Aucun client enregistré. Le carnet porte le pays et le numéro de TVA, sans lesquels l’obligation de déclaration européenne reste invisible."
-                  action={(
-                    <button type="button" className={styles.actionPrincipale}
-                      onClick={() => setPanneau({ type: 'client', id: null })}>
-                      Ajouter un client
-                    </button>
-                  )}
-                />
-              )
-              : (
-                <ul className={styles.liste}>
-                  {faits.clients.map((c) => (
-                    <li key={c.id} className={styles.ligneListe}>
-                      <button type="button" className={styles.ouvrir}
-                        onClick={() => setPanneau({ type: 'client', id: c.id })}>
-                        <span className={styles.ligneTitre}>
-                          <span className={styles.ligneLibelle}>{c.nom}</span>
-                          <span className={styles.ligneMontant}>
-                            {c.delaiPaiementJours} j
-                          </span>
-                        </span>
-                        <span className={styles.ligneMeta}>
-                          <span>{libellePays(c.pays)}</span>
-                          {c.pays !== '' && c.pays.toUpperCase() !== 'FR' && (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span className={c.tvaIntracom === '' ? styles.attention : undefined}>
-                                {c.tvaIntracom === '' ? 'n° de TVA manquant' : c.tvaIntracom}
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-          </section>
-
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-delais`}>
-            <h2 id={`${idGroupe}-delais`} className={styles.titreCarte}>
-              Délai de paiement observé
-              <Info libelle="Pourquoi la médiane plutôt que la moyenne">
-                Un client qui paie à 30 jours neuf fois et à 300 jours une fois
-                n’est pas un client à 57 jours. La moyenne décrit un client qui
-                n’existe pas&nbsp;; la médiane décrit le comportement habituel.
-                Le délai contractuel est une intention, celui-ci est un constat.
-              </Info>
-            </h2>
-            {etat.delais.length === 0
-              ? <p className={styles.vide}>Aucune recette enregistrée.</p>
-              : (
-                <ul className={styles.liste}>
-                  {etat.delais.map((client) => (
-                    <li key={client.clientNom} className={styles.ligneListe}>
-                      <span className={styles.ligneTitre}>
-                        <span className={styles.ligneLibelle}>{client.clientNom}</span>
-                        <span className={styles.ligneMontant}><Montant>{eur(client.enAttente)}</Montant></span>
-                      </span>
-                      <span className={styles.ligneMeta}>
-                        <span>
-                          {client.delaiMedian === null
-                            ? 'Délai non mesurable'
-                            : `${client.delaiMedian} j en médiane`}
-                        </span>
-                        {client.delaiMaximum !== null && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span>{client.delaiMaximum} j au pire</span>
-                          </>
-                        )}
-                        <span aria-hidden="true">·</span>
-                        <span>
-                          {client.facturesMesurees === 0
-                            ? 'aucune facture réglée'
-                            : `${client.facturesMesurees} facture${client.facturesMesurees > 1 ? 's' : ''} mesurée${client.facturesMesurees > 1 ? 's' : ''}`}
-                        </span>
-                      </span>
-                      {client.enRetard > 0 && (
-                        <span className={styles.alerte}>
-                          {client.enRetard} facture{client.enRetard > 1 ? 's' : ''} en attente
-                          au-delà de son délai habituel
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-          </section>
+          <Suspense fallback={<EnAttenteDeFormulaire />}>
+            <OngletClients idGroupe={idGroupe} onOuvrirClient={(id) => setPanneau({ type: 'client', id })} delais={etat.delais} />
+          </Suspense>
         </PanneauOnglet>
       </div>
 
@@ -859,16 +779,6 @@ function LigneMissionAffichee(
 
 
 /** Le pays en clair. Un code à deux lettres ne se lit pas d'un coup d'œil. */
-function libellePays(code: string): string {
-  const propre = code.trim().toUpperCase();
-  if (propre === '' || propre === 'FR') return 'France';
-  try {
-    const nom = new Intl.DisplayNames(['fr'], { type: 'region' }).of(propre);
-    return nom ?? propre;
-  } catch {
-    return propre;
-  }
-}
 
 function libelleStatut(statut: Mission['statut']): string {
   switch (statut) {
@@ -1171,6 +1081,96 @@ function CartePrevision(
           </li>
         ))}
       </ul>
+    </CartePliable>
+  );
+}
+
+/**
+ * Ce que chaque mission rapporte, face à ce qu'elle prend de temps.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN TABLEAU, ET PAS UN GRAPHE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « Quelle mission me rapporte quoi et me prend combien de charge de temps » :
+ * la question était posée telle quelle, et personne ne l'avait jamais mise en
+ * face d'elle-même. L'ancienne application avait le rapport et la charge dans
+ * deux écrans différents, jamais croisés.
+ *
+ * Ce qui se compare ici, ce sont des RATIOS — des euros par jour — et non des
+ * proportions. Un camembert répond à « quelle part du gâteau », ce qui n'est
+ * pas la question : une mission qui pèse 15 % du chiffre d'affaires en
+ * consommant 40 % du temps est un problème que sa part ne montre pas. Un
+ * tableau trié par euro-jour met la réponse en première ligne.
+ *
+ * Un vrai `<table>` plutôt qu'une liste de `<div>` : trois colonnes qui se
+ * comparent d'une ligne à l'autre sont un tableau, et un lecteur d'écran doit
+ * pouvoir annoncer « Studio Lumen, 620 euros par jour » plutôt que quatre
+ * fragments sans en-tête.
+ */
+function CarteRapportParMission(
+  { rapports, annee }: {
+    readonly rapports: readonly RapportDeMission[];
+    readonly annee: number;
+  }
+) {
+  if (rapports.length === 0) return null;
+
+  const meilleur = rapports[0] as RapportDeMission;
+
+  return (
+    <CartePliable
+      id="rapport-mission"
+      ecran="activite"
+      titre={(
+        <>
+          Ce que chaque mission rapporte, et ce qu’elle coûte en temps
+          <Info libelle="Pourquoi l’euro-jour, et d’où vient le montant">
+            La colonne qui décide est l’<strong>euro par jour</strong>&nbsp;:
+            une mission qui pèse peu dans le chiffre d’affaires en consommant
+            beaucoup de temps est un problème que sa part ne montre pas.
+            Le montant est celui du travail <em>produit</em>, tiré du planning
+            et valorisé au tarif en vigueur à chaque date — et non de
+            l’encaissé, qui ne se rattache qu’au client et que deux missions
+            simultanées ne pourraient pas se partager.
+          </Info>
+        </>
+      )}
+      resume={(
+        <>
+          {meilleur.libelle} rapporte{' '}
+          <Montant>{eur(meilleur.parJour ?? euros(0))}</Montant> par jour
+          {rapports.length > 1 && ` · ${rapports.length} missions sur ${annee}`}
+        </>
+      )}
+    >
+      <table className={styles.tableau}>
+        <caption className={styles.tableauLegende}>
+          Missions de {annee}, de la mieux à la moins bien rémunérée par journée
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Mission</th>
+            <th scope="col">Jours</th>
+            <th scope="col">Produit</th>
+            <th scope="col">€ / jour</th>
+            <th scope="col">Part du temps</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rapports.map((r) => (
+            <tr key={`${r.missionId}-${r.entiteId}`}>
+              <th scope="row" className={styles.tableauNom}>{r.libelle}</th>
+              <td>{formaterJours(r.jours)}</td>
+              <td><Montant>{eur(r.produit)}</Montant></td>
+              <td className={styles.tableauFort}>
+                {r.parJour === null ? '—' : <Montant>{eur(r.parJour)}</Montant>}
+              </td>
+              <td>{Math.round(r.partDuTemps * 100)}&nbsp;%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </CartePliable>
   );
 }

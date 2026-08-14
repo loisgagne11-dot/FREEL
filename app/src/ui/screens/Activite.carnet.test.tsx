@@ -33,10 +33,18 @@ function semer(modifications: Partial<Faits> = {}): void {
   useFaits.setState({ faits: { ...faitsVides(), ...modifications } });
 }
 
+/**
+ * L'onglet Clients est chargé à la demande : on attend son arrivée avant
+ * d'interroger le contenu, sinon la première assertion tombe sur le
+ * « Chargement… » du Suspense.
+ */
 async function ouvrir(onglet: 'Clients' | 'Missions') {
   render(<Activite />);
   const utilisateur = userEvent.setup();
   await utilisateur.click(screen.getByRole('tab', { name: onglet }));
+  if (onglet === 'Clients') {
+    await screen.findByRole('heading', { name: /Carnet/ });
+  }
   return utilisateur;
 }
 

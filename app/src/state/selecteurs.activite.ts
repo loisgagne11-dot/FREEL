@@ -535,3 +535,101 @@ function libelleDeLaLigne(mission: Mission, entite: ClientOperationnel): string 
   if (mission.entites.length <= 1) return nomMission;
   return entite.nom !== '' ? `${nomMission} — ${entite.nom}` : nomMission;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Ce qu'une mission rapporte, face à ce qu'elle coûte en temps
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Une mission, avec son rapport ET sa charge — les deux, côte à côte. */
+export interface RapportDeMission {
+  readonly missionId: string;
+  readonly entiteId: string;
+  readonly libelle: string;
+  /** Journées retenues sur l'année, ajustements compris. */
+  readonly jours: number;
+  /** Ce que ces journées valent, au tarif en vigueur à chaque date. */
+  readonly produit: Euros;
+  /**
+   * Ce que la mission rapporte par journée effectivement passée dessus.
+   *
+   * `null` sans journée : diviser par zéro donnerait l'infini, et afficher
+   * zéro laisserait croire à une mission qui ne rapporte rien alors qu'elle
+   * n'a simplement pas encore commencé.
+   */
+  readonly parJour: Euros | null;
+  /** Part de l'année de travail que cette mission consomme, entre 0 et 1. */
+  readonly partDuTemps: number;
+}
+
+/**
+ * Ce que chaque mission rapporte, face à ce qu'elle prend de temps.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * PERSONNE N'A JAMAIS MIS LES DEUX FACE À FACE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « Quelle mission me rapporte quoi et me prend combien de charge de temps » :
+ * la question était posée telle quelle, et aucune des deux sources ne pouvait
+ * y répondre. L'ancienne application avait le rapport (chiffre d'affaires par
+ * client) ET la charge (jours par mission) — dans deux écrans différents,
+ * jamais croisés. La maquette montre les jours par client sans le chiffre
+ * d'affaires en face.
+ *
+ * La matière n'existait pas non plus : il a fallu que la prévision valorise
+ * chaque journée du planning au tarif de sa date pour que « ce que cette
+ * mission rapporte » cesse d'être une approximation par client.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN TABLEAU TRIÉ, PAS UN GRAPHE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * On compare ici des RATIOS — des euros par jour — et non des proportions. Un
+ * camembert répond à « quelle part du gâteau », ce qui n'est pas la question :
+ * une mission qui pèse 15 % du chiffre d'affaires en consommant 40 % du temps
+ * est un problème que sa part ne montre pas. Le tri par euro-jour met la
+ * réponse en première ligne.
+ *
+ * Le montant est celui du travail PRODUIT, et non de l'encaissé : l'encaissé
+ * ne se rattache qu'au client, jamais à la mission, et deux missions
+ * simultanées d'un même client ne peuvent pas se le partager. Produire le
+ * chiffre depuis le planning est la seule façon d'en avoir un qui soit
+ * vraiment celui de la mission.
+ */
+export function rapportParMission(
+  faits: Faits,
+  annee: number,
+  zone: ZoneFeries = 'general'
+): readonly RapportDeMission[] {
+  const cumul = new Map<string, { ligne: Omit<RapportDeMission, 'parJour' | 'partDuTemps'> }>();
+
+  for (let m = 1; m <= 12; m++) {
+    const mois = `${annee}-${String(m).padStart(2, '0')}` as Mois;
+    for (const p of previsionDuMoisParMission(faits, mois, zone)) {
+      const cle = `${p.missionId}/${p.entiteId}`;
+      const acc = cumul.get(cle)?.ligne ?? {
+        missionId: p.missionId, entiteId: p.entiteId, libelle: p.libelle,
+        jours: 0, produit: euros(0)
+      };
+      cumul.set(cle, {
+        ligne: {
+          ...acc,
+          jours: acc.jours + p.prevision.joursRetenus,
+          produit: euros(acc.produit + p.prevision.montantRetenu)
+        }
+      });
+    }
+  }
+
+  const lignes = [...cumul.values()].map((c) => c.ligne).filter((l) => l.jours > 0);
+  const joursTotaux = lignes.reduce((s, l) => s + l.jours, 0);
+
+  return lignes
+    .map((l) => ({
+      ...l,
+      parJour: l.jours > 0 ? euros(Math.round(l.produit / l.jours)) : null,
+      partDuTemps: joursTotaux > 0 ? l.jours / joursTotaux : 0
+    }))
+    // Du meilleur euro-jour au moins bon : c'est la décision commerciale que
+    // l'outil peut éclairer, et elle doit être en première ligne.
+    .sort((a, b) => (b.parJour ?? 0) - (a.parJour ?? 0));
+}

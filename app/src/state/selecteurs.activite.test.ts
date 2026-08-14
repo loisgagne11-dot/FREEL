@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
 import { type Faits, faitsVides } from './schema';
 import {
-  craDuMoisParMission, etatActivite, lundiDeLaSemaine, planningDeLaSemaine
+  craDuMoisParMission, etatActivite, lundiDeLaSemaine, planningDeLaSemaine,
+  rapportParMission
 } from './selecteurs.activite';
 
 const D = (s: string) => dateISO(s);
@@ -367,5 +368,118 @@ describe('d’où viennent les jours travaillés', () => {
     );
 
     expect(ampute.plan.joursFactures).toBe(plein.plan.joursFactures - 2);
+  });
+});
+
+/**
+ * « QUELLE MISSION ME RAPPORTE QUOI ET ME PREND COMBIEN DE CHARGE DE TEMPS »
+ *
+ * La question était posée telle quelle, et aucune des deux sources ne pouvait
+ * y répondre : l'ancienne application avait le rapport et la charge dans deux
+ * écrans jamais croisés, la maquette les jours sans le chiffre d'affaires en
+ * face.
+ */
+describe('rapport et charge par mission', () => {
+  const rythme = (tjm: number) => ({
+    du: D('2026-01-01'), au: D('2026-12-31'),
+    parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 },
+    tjm: euros(tjm)
+  });
+
+  const M = (id: string, tjm: number, du: string, au: string) => ({
+    ...MISSION, id, description: id, clientNom: id, tjm: euros(tjm),
+    debut: D(du), fin: D(au),
+    entites: [{
+      id: `${id}-co`, nom: id, couleur: '', adresse: '', contact: '',
+      email: '', telephone: '',
+      rythmes: [{ ...rythme(tjm), du: D(du), au: D(au) }],
+      ajustements: {}
+    }]
+  });
+
+  /**
+   * LE POINT QUI COMPTE. On compare des RATIOS, pas des proportions : une
+   * mission qui pèse peu dans le chiffre d'affaires en consommant beaucoup de
+   * temps est un problème que sa part ne montre pas.
+   */
+  it('met l’euro-jour en première ligne, du meilleur au moins bon', () => {
+    const r = rapportParMission(avec({
+      missions: [M('petite', 800, '2026-01-01', '2026-01-31'),
+                 M('grosse', 400, '2026-01-01', '2026-06-30')]
+    }), 2026);
+
+    expect(r[0]?.libelle).toBe('petite');
+    expect(r[0]?.parJour).toBe(800);
+    expect(r[1]?.parJour).toBe(400);
+  });
+
+  /** La charge en face du rapport : c'est la moitié de la question. */
+  it('donne la part du temps que chaque mission consomme', () => {
+    const r = rapportParMission(avec({
+      missions: [M('a', 500, '2026-01-01', '2026-01-31'),
+                 M('b', 500, '2026-02-01', '2026-02-28')]
+    }), 2026);
+
+    const total = r.reduce((s, l) => s + l.partDuTemps, 0);
+    expect(total).toBeCloseTo(1, 6);
+    expect(r.every((l) => l.jours > 0)).toBe(true);
+  });
+
+  /**
+   * Le montant est celui du travail PRODUIT et non de l'encaissé : l'encaissé
+   * ne se rattache qu'au client, jamais à la mission. Une recette n'a donc
+   * aucun effet sur ce tableau.
+   */
+  it('ne dépend pas des recettes encaissées', () => {
+    const missions = [M('a', 500, '2026-01-01', '2026-03-31')];
+    const sans = rapportParMission(avec({ missions, recettes: [] }), 2026);
+    const avecRecette = rapportParMission(avec({
+      missions,
+      recettes: [{
+        id: 'r', clientNom: 'a', libelle: 'r', montant: euros(99_000),
+        emiseLe: D('2026-02-01'), encaisseeLe: D('2026-02-15'),
+        modeReglement: 'virement' as const, numero: 'r'
+      }]
+    }), 2026);
+
+    expect(avecRecette[0]?.produit).toBe(sans[0]?.produit);
+  });
+
+  /** Une mission sans journée retenue n'a pas d'euro-jour à montrer. */
+  it('écarte les missions sans aucune journée', () => {
+    const r = rapportParMission(avec({
+      missions: [M('a', 500, '2026-01-01', '2026-01-31'),
+                 M('future', 500, '2027-01-01', '2027-12-31')]
+    }), 2026);
+
+    expect(r).toHaveLength(1);
+    expect(r[0]?.libelle).toBe('a');
+  });
+
+  /** Les journées valent le tarif en vigueur À LEUR DATE, comme le CRA. */
+  it('valorise chaque journée au tarif de sa date', () => {
+    const mission = {
+      ...MISSION, id: 'm', description: 'm', clientNom: 'm', tjm: euros(999),
+      debut: D('2026-01-01'), fin: D('2026-02-28'),
+      entites: [{
+        id: 'm-co', nom: 'm', couleur: '', adresse: '', contact: '',
+        email: '', telephone: '',
+        rythmes: [
+          { ...rythme(400), du: D('2026-01-01'), au: D('2026-01-31') },
+          { ...rythme(600), du: D('2026-02-01'), au: D('2026-02-28') }
+        ],
+        ajustements: {}
+      }]
+    };
+    const r = rapportParMission(avec({ missions: [mission] }), 2026);
+
+    // Entre les deux tarifs, jamais au-dessus ni en dessous.
+    expect(r[0]?.parJour).toBeGreaterThan(400);
+    expect(r[0]?.parJour).toBeLessThan(600);
+  });
+
+  /** Une année sans mission ne fait pas échouer le calcul. */
+  it('rend une liste vide sans mission', () => {
+    expect(rapportParMission(avec({ missions: [] }), 2026)).toHaveLength(0);
   });
 });

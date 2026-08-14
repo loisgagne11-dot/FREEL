@@ -215,6 +215,8 @@ describe('délais de paiement', () => {
     render(<Activite />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: 'Clients' }));
+    // L'onglet est chargé à la demande : attendre son arrivée.
+    await screen.findByRole('heading', { name: /Carnet/ });
 
     expect(screen.getByText('31 j en médiane')).toBeTruthy();
     expect(screen.getByText('5 000 €')).toBeTruthy();
@@ -227,6 +229,7 @@ describe('délais de paiement', () => {
     render(<Activite />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: 'Clients' }));
+    await screen.findByRole('heading', { name: /Carnet/ });
 
     expect(screen.getByText('Délai non mesurable')).toBeTruthy();
     expect(screen.queryByText(/au-delà de son délai habituel/)).toBeNull();
@@ -725,5 +728,85 @@ describe('prévision de revenu du mois', () => {
     semer({ missions: [mission()] });
     render(<Activite />);
     expect(screen.queryByText(/devrait rapporter/)).toBeNull();
+  });
+});
+
+/**
+ * « QUELLE MISSION ME RAPPORTE QUOI ET ME PREND COMBIEN DE CHARGE DE TEMPS »
+ *
+ * Personne ne l'avait jamais mise en face d'elle-même : l'ancienne
+ * application avait le rapport et la charge dans deux écrans jamais croisés,
+ * la maquette les jours par client sans le chiffre d'affaires en face.
+ */
+describe('rapport et charge par mission', () => {
+  const rythme = (du: string, au: string, tjm: number) => ({
+    du: dateISO(du), au: dateISO(au),
+    parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 },
+    tjm: euros(tjm)
+  });
+
+  const missionA = mission({
+    id: 'a', description: 'Studio Lumen', clientNom: 'Studio Lumen',
+    tjm: euros(800), debut: dateISO('2026-01-01'), fin: dateISO('2026-01-31'),
+    entites: [entite({
+      id: 'a-co', nom: 'Studio Lumen',
+      rythmes: [rythme('2026-01-01', '2026-01-31', 800)]
+    })]
+  });
+
+  const missionB = mission({
+    id: 'b', description: 'Atelier Novak', clientNom: 'Atelier Novak',
+    tjm: euros(400), debut: dateISO('2026-02-01'), fin: dateISO('2026-06-30'),
+    entites: [entite({
+      id: 'b-co', nom: 'Atelier Novak',
+      rythmes: [rythme('2026-02-01', '2026-06-30', 400)]
+    })]
+  });
+
+  /**
+   * LE POINT QUI COMPTE. On compare des RATIOS et non des proportions : une
+   * mission qui pèse peu dans le chiffre d'affaires en consommant beaucoup de
+   * temps est un problème que sa part ne montre pas. Le tri met la réponse en
+   * première ligne.
+   */
+  it('trie les missions du meilleur euro-jour au moins bon', () => {
+    semer({ missions: [missionB, missionA] });
+    render(<Activite />);
+
+    const lignes = screen.getAllByRole('row').filter(
+      (l) => l.textContent?.includes('Studio Lumen') || l.textContent?.includes('Atelier Novak')
+    );
+    expect(lignes[0]?.textContent).toContain('Studio Lumen');
+    expect(lignes[1]?.textContent).toContain('Atelier Novak');
+  });
+
+  /** Les deux moitiés de la question, côte à côte : le rapport et la charge. */
+  it('met la part du temps en face de l’euro-jour', () => {
+    semer({ missions: [missionA, missionB] });
+    render(<Activite />);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('columnheader', { name: '€ / jour' })).toBeTruthy();
+    expect(within(table).getByRole('columnheader', { name: 'Part du temps' })).toBeTruthy();
+    expect(within(table).getByText('800 €')).toBeTruthy();
+  });
+
+  /** Sans mission planifiée, la carte ne s'invente pas un tableau vide. */
+  it('ne montre rien sans mission planifiée', () => {
+    semer({ missions: [] });
+    render(<Activite />);
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  /**
+   * Les montants du tableau portent `data-montant` : un euro-jour dit le tarif
+   * réel, et il restait lisible sur un écran partagé.
+   */
+  it('rend les montants masquables', () => {
+    semer({ missions: [missionA] });
+    render(<Activite />);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('800 €').closest('[data-montant]')).toBeTruthy();
   });
 });
