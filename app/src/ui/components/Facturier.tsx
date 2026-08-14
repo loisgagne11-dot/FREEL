@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { etatFacturier } from '../../state/selecteurs.facture';
+import { brouillonsDeFacture, etatFacturier } from '../../state/selecteurs.facture';
 import {
   LIBELLE_STATUT, type FactureSuivie, type StatutFacture
 } from '../../domain/calculs/facturier';
@@ -8,6 +8,7 @@ import type { ModeReglement } from '../../domain/calculs/livreRecettes';
 import {
   type Granularite, type Periode, periodeCourante
 } from '../../domain/calculs/periode';
+import type { Mois } from '../../domain/types';
 import { dateISO } from '../../domain/types';
 import type { Recette } from '../../state/schema';
 import { BarrePeriode } from './BarrePeriode';
@@ -18,8 +19,11 @@ import { Statut, type TonStatut } from './Statut';
 import { useToast } from './Toasts';
 import { Vide } from './Vide';
 import { dateCourte, eur } from '../format';
-import { dateDuJour } from '../../state/selecteurs';
+import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import { detteDeRetard, redigerRelance } from '../../domain/calculs/relance';
+import {
+  type BrouillonDeFacture, libelleDeLaFacture
+} from '../../domain/calculs/brouillon';
 import styles from './Facturier.module.css';
 
 /**
@@ -155,6 +159,8 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
         onGranularite={(g) => { setGranularite(g); setDecalage(0); setLimite(LIGNES_PAR_PAGE); }}
         onDecaler={(pas) => { setDecalage((d) => d + pas); setLimite(LIGNES_PAR_PAGE); }}
       />
+
+      <BrouillonDuMois />
 
       <div className={styles.grille}>
         <Chiffre libelle="Reste à rentrer" valeur={eur(etat.resteARentrer)} />
@@ -581,4 +587,133 @@ function PanneauRelance(
       </div>
     </div>
   );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   La facture du mois, avant qu'elle existe
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Le brouillon de la facture du mois, qui n'a pas été demandé.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * IL SUIT L'ACTIVITÉ PARCE QU'IL N'EN EST PAS SÉPARÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Rien n'est stocké : le brouillon se recalcule à chaque lecture depuis le
+ * planning, celui-là même qui produit le compte rendu et la prévision. Une
+ * journée corrigée à l'Activité change la facture dans le même mouvement, non
+ * par un mécanisme de mise à jour mais parce qu'il n'y a rien à mettre à jour.
+ *
+ * Émettre est le geste qui ENGAGE : à partir de là, la facture porte un
+ * numéro, entre au registre, et ne bouge plus qu'à l'annulation. C'est
+ * pourquoi c'est un bouton, et le seul de cette carte.
+ */
+function BrouillonDuMois() {
+  const faits = useFaits((e) => e.faits);
+  const ajouterRecette = useFaits((e) => e.ajouterRecette);
+  const signaler = useToast();
+
+  const [mois, setMois] = useState<Mois>(() => moisCourant());
+  const brouillons = useMemo(() => brouillonsDeFacture(faits, mois), [faits, mois]);
+
+  if (brouillons.length === 0) return null;
+
+  function emettre(b: BrouillonDeFacture): void {
+    ajouterRecette({
+      clientNom: b.clientNom,
+      libelle: libelleDeLaFacture(b),
+      montant: b.total,
+      emiseLe: dateDuJour(),
+      encaisseeLe: null,
+      modeReglement: null
+    });
+    signaler(`Facture émise pour ${b.clientNom}. Elle porte un numéro et entre au registre.`);
+  }
+
+  return (
+    <section className={styles.carte} aria-labelledby="titre-brouillon">
+      <header className={styles.entete}>
+        <h2 id="titre-brouillon" className={styles.titreCarte}>
+          La facture de {moisLisible(mois)}
+          <Info libelle="D’où vient ce brouillon et pourquoi il bouge">
+            Il n’est enregistré nulle part&nbsp;: il se recalcule depuis le
+            <strong> planning</strong>, celui-là même qui produit le compte
+            rendu d’activité. Corriger une journée à l’Activité corrige la
+            facture dans le même mouvement — et garantit que le document et le
+            compte rendu signé disent le même nombre de jours. Les journées
+            valorisées sont celles <em>retenues</em>, ajustements compris&nbsp;:
+            on facture ce qui a été fait.
+          </Info>
+        </h2>
+        <div className={styles.navigationMois}>
+          <button type="button" className={styles.pas}
+            onClick={() => setMois(decalerMois(mois, -1))} aria-label="Mois précédent">
+            ‹
+          </button>
+          <span className={styles.moisCourant} role="status" aria-label="Mois facturé">
+            {moisLisible(mois)}
+          </span>
+          <button type="button" className={styles.pas}
+            onClick={() => setMois(decalerMois(mois, 1))} aria-label="Mois suivant">
+            ›
+          </button>
+        </div>
+      </header>
+
+      <ul className={styles.liste}>
+        {brouillons.map((b) => (
+          <li key={b.clientNom} className={styles.ligneBrouillon}>
+            <div className={styles.brouillonTitre}>
+              <span className={styles.brouillonClient}>{b.clientNom}</span>
+              <span className={styles.brouillonTotal}>
+                <Montant>{eur(b.total)}</Montant>
+              </span>
+            </div>
+
+            <ul className={styles.brouillonLignes}>
+              {b.lignes.map((l) => (
+                <li key={`${l.missionId}-${l.entiteId}`}>
+                  <span>{l.libelle}</span>
+                  <span className={styles.brouillonDetail}>
+                    {l.jours} j · <Montant>{eur(l.montant)}</Montant>
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            {/* Le brouillon d'un client déjà facturé reste affiché, marqué.
+                Le faire disparaître empêcherait de voir qu'on a facturé douze
+                jours là où le planning en compte quatorze — l'écart qu'on veut
+                constater avant que le client le constate. */}
+            {b.dejaEmise === null
+              ? (
+                <button type="button" className={styles.actionPrincipale}
+                  onClick={() => emettre(b)}>
+                  Émettre cette facture
+                </button>
+              )
+              : (
+                <p className={styles.dejaEmise}>
+                  Facture {b.dejaEmise} déjà émise pour {moisLisible(mois)}.
+                  Ce brouillon reste affiché pour que l’écart se voie.
+                </p>
+              )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** « 2026-07 » → « juillet 2026 ». */
+function moisLisible(m: Mois): string {
+  return new Date(`${m}-01T00:00:00Z`).toLocaleDateString('fr-FR', {
+    month: 'long', year: 'numeric', timeZone: 'UTC'
+  });
+}
+
+function decalerMois(m: Mois, pas: number): Mois {
+  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + pas;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
 }

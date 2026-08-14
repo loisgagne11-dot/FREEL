@@ -116,18 +116,18 @@ Relevé dans le code au 14/08, pas supposé.
 |---|---|---|
 | Mission → **planning Activité** | ✅ | Rythme par client opérationnel, ajustements par journée |
 | Mission → **CRA du mois** | ✅ | Un CRA par client qui signe |
-| Mission → **prévision de revenu** | ❌ | **Absent.** Le TJM et le rythme sont là, rien n'en tire un revenu attendu |
-| Mission → **facture du mois en brouillon** | ❌ | **Absent.** Aucun brouillon ne se crée, rien ne suit l'Activité |
+| Mission → **prévision de revenu** | ✅ | Prévu et retenu côte à côte, chaque journée au tarif de sa date |
+| Mission → **facture du mois en brouillon** | ✅ | Dérivé du planning, donc il suit par construction. Émettre est le geste qui engage |
 | Facture : **statut d'avancement, date d'envoi** | ❌ | Deux états seulement — émise, encaissée. Pas de date d'envoi |
 | Provisions **automatiques et justes** | ✅ | Deux volets : échéances émises, et charges sur recettes encaissées non déclarées |
 | Provision **soldée par un paiement réel** | ✅ | Une échéance payée sort du volet 1 ; la date et le montant réellement débité sont exigés |
-| Provisions **par catégorie** | ❌ | **Absent.** Le total est affiché, jamais sa ventilation URSSAF / TVA / impôt / CFE |
+| Provisions **par catégorie** | ✅ | Ventilé URSSAF / TVA / impôt / CFE / CFP, volet 1 par échéance et volet 2 par règle de calcul |
 | **Jalons datés et visibles** | ⚠️ | Les échéances ont leurs dates et une frise mensuelle ; les jalons réglementaires alertent |
 | Jalon → **dossier complet pour déclarer** | ⚠️ | La DES a son état ; les périodes URSSAF sont chiffrées. **La TVA n'a pas son dossier**, et aucun jalon ne mène aux factures précises concernées |
-| Trésorerie : **cumulé / provisionné / disponible** | ⚠️ | Le solde, les provisions et le versable sont là ; la ventilation par catégorie manque |
+| Trésorerie : **cumulé / provisionné / disponible** | ✅ | Solde, provisions ventilées et versable |
 | CA **réalisé vs encaissé**, graphes | ✅ | Par mois, avec les valeurs au-dessus des barres |
-| **Où j'en suis à aujourd'hui** | ⚠️ | Les seuils se lisent en pourcentage ; pas de repère « à cette date de l'an dernier » |
-| **Rapport et charge par mission** | ⚠️ | L'occupation par mission existe ; le rapport par mission n'est pas mis en face |
+| **Où j'en suis à aujourd'hui** | ✅ | Repère de date sur chaque jauge, et date probable de franchissement — qui s'abstient sous un trimestre |
+| **Rapport et charge par mission** | ✅ | Tableau trié par euro-jour, plus le TJM effectif et le TJM net |
 | Achats : **photo, historisation, preuve** | ✅ | Fichier réellement conservé, empreinte vérifiée — pas un booléen |
 | Achats → **TVA déductible de la déclaration** | ⚠️ | La TVA récupérable est chiffrée ; elle n'est reliée à aucun dossier de déclaration |
 | **Simulateurs d'impôts** | ✅ | IR par tranches, comparateur versement libératoire, CFE |
@@ -139,15 +139,14 @@ Les deux inventaires de conformité (`PLAN-CONFORMITE-100.md`) mesuraient l'éca
 ne classaient pas par valeur d'usage**. Cet énoncé le fait, et il déplace
 l'ordre :
 
-1. **La chaîne de la mission** — prévision de revenu, puis brouillon de facture
-   qui suit l'Activité. C'est nommé « le plus important », et c'est aussi ce qui
-   alimente tout le reste.
+1. ~~**La chaîne de la mission**~~ — prévision de revenu ✅, brouillon de
+   facture qui suit l'Activité ✅.
 2. **Le cycle de vie d'une facture** — envoyée, avec sa date ; payée, avec la
-   sienne.
-3. **Les provisions par catégorie**, dans la trésorerie.
+   sienne. *Reste à faire.*
+3. ~~**Les provisions par catégorie**~~ ✅.
 4. **Le dossier de déclaration de TVA**, atteint depuis son jalon, avec les
-   factures et la TVA déductible qui le composent.
-5. **Le rapport par mission** en face de sa charge.
+   factures et la TVA déductible qui le composent. *Reste à faire.*
+5. ~~**Le rapport par mission** en face de sa charge~~ ✅.
 
 Ce qui était en tête des plans précédents et que cet énoncé **déclasse
 explicitement** : la relance d'impayés (« pas super important »). Elle vient
