@@ -82,7 +82,7 @@ Statut relevé dans le code, pas supposé. `✅` conforme · `⚠️` partiel ·
 |---|---|---|
 | Feuilles latérales (piège de focus, Échap, voile) | ✅ | `Sheet` |
 | Toasts | ✅ | `Toasts` |
-| **Cartes pliables avec synthèse `data-fold`** | ⚠️ | `CartePliable` appliqué à **4 des 6 cartes** que `05-spec-ecrans.md` nomme : registre des achats, répartition du solde, enveloppes de provision, seuils, échéancier. Reste le **rapprochement bancaire** (`ReconCard`). Le compte de « huit » avancé plus tôt était faux — la spec en nomme six, plus une mention du composant lui-même |
+| **Cartes pliables avec synthèse `data-fold`** | ✅ | `CartePliable` appliqué aux **6 cartes** que `05-spec-ecrans.md` nomme : registre des achats, rapprochement bancaire, répartition du solde, enveloppes de provision, seuils, échéancier. Le compte de « huit » avancé plus tôt était faux — six instances, plus deux mentions du composant lui-même |
 | Sous-onglets `[data-tab]` | ✅ | `Onglets`, sémantique ARIA |
 | Rail 212 px, grille 12 colonnes, panneau 580 px | ✅ | |
 

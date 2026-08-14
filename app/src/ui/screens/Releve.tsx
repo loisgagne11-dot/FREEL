@@ -4,6 +4,7 @@ import { etatAchats } from '../../state/selecteurs.achats';
 import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calculs/banque';
 import { decoderFichier, lireReleve, type RapportLecture } from '../../infra/releveCsv';
 import { Info } from '../components/Info';
+import { CartePliable } from '../components/CartePliable';
 import { dateCourte, eur } from '../format';
 import styles from './Releve.module.css';
 import { Montant } from '../components/Montant';
@@ -143,16 +144,29 @@ export function Releve() {
           </section>
         )
         : (
-          <section className={styles.carte} aria-labelledby={`${idChamp}-operations`}>
-            <h2 id={`${idChamp}-operations`} className={styles.titreCarte}>
-              Opérations
-              <Info libelle="Pourquoi rien n’est rapproché automatiquement">
-                Une seule correspondance ne fait pas une certitude. L’ancienne
-                application appariait seule et n’en laissait aucune
-                trace&nbsp;: un appariement faux devenait invisible, et
-                « tout est rapproché » ne renvoyait à aucun fait vérifiable.
-              </Info>
-            </h2>
+          /*
+           * La sixième et dernière carte que `05-spec-ecrans.md` nomme comme
+           * pliable (`ReconCard`). Sa synthèse porte ce qui RESTE à traiter,
+           * pas ce qui est fait : un rapprochement terminé n'appelle aucune
+           * décision, et une carte repliée qui annoncerait « 42 opérations »
+           * ne dirait pas s'il faut l'ouvrir.
+           */
+          <CartePliable
+            id="rapprochement"
+            ecran="achats"
+            titre={(
+              <>
+                Opérations
+                <Info libelle="Pourquoi rien n’est rapproché automatiquement">
+                  Une seule correspondance ne fait pas une certitude. L’ancienne
+                  application appariait seule et n’en laissait aucune
+                  trace&nbsp;: un appariement faux devenait invisible, et
+                  « tout est rapproché » ne renvoyait à aucun fait vérifiable.
+                </Info>
+              </>
+            )}
+            resume={syntheseRapprochement(etat.mouvements)}
+          >
             <ul className={styles.liste}>
               {etat.mouvements.map((m) => (
                 <LigneMouvement
@@ -162,7 +176,7 @@ export function Releve() {
                 />
               ))}
             </ul>
-          </section>
+          </CartePliable>
         )}
     </>
   );
@@ -322,4 +336,27 @@ function Chiffre(
       <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
     </div>
   );
+}
+
+/**
+ * Ce que la carte de rapprochement dit une fois repliée.
+ *
+ * Elle porte ce qui RESTE à traiter, jamais ce qui est fait. Un rapprochement
+ * terminé n'appelle aucune décision ; une carte repliée qui annoncerait
+ * « 42 opérations » ne dirait pas s'il faut l'ouvrir, ce qui est précisément la
+ * question à laquelle une synthèse doit répondre.
+ *
+ * Aucun montant ici, et ce n'est pas un oubli : le nombre d'opérations en
+ * attente suffit à décider, et il se lit sans démasquer l'écran.
+ */
+function syntheseRapprochement(mouvements: readonly MouvementBancaire[]): string {
+  const enAttente = mouvements.filter(
+    (m) => m.rapprocheAvec === null && m.sansContrepartie === null
+  ).length;
+  if (mouvements.length === 0) return 'Aucune opération importée.';
+  if (enAttente === 0) {
+    return `${mouvements.length} opération${mouvements.length > 1 ? 's' : ''}, toutes traitées.`;
+  }
+  return `${enAttente} opération${enAttente > 1 ? 's' : ''} à rapprocher `
+    + `sur ${mouvements.length}.`;
 }
