@@ -88,6 +88,11 @@
 
 .aide { font-size: 11.5px; line-height: 1.5; color: var(--muted-2); }
 
+/* Une clé de contrôle qui ne tombe pas juste : ambre, pas rouge. Elle dit
+   « improbable », jamais « faux » — et rien n'est bloqué. Le rouge est réservé
+   à ce qui empêche d'avancer. */
+.suspect { font-size: 11.5px; line-height: 1.5; color: var(--amber); }
+
 .interrupteurs {
   display: flex;
   flex-direction: column;

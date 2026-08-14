@@ -44,7 +44,7 @@ describe('création d’un client', () => {
   it('enregistre un client depuis l’écran', async () => {
     const utilisateur = await ouvrir('Clients');
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter un client' }));
-    await utilisateur.type(screen.getByLabelText('Nom'), 'Nouveau Client');
+    await utilisateur.type(await screen.findByLabelText('Nom'), 'Nouveau Client');
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter le client' }));
 
     expect(useFaits.getState().faits.clients[0]?.nom).toBe('Nouveau Client');
@@ -56,7 +56,7 @@ describe('création d’un client', () => {
     semer({ clients: [client()] });
     const utilisateur = await ouvrir('Clients');
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter un client' }));
-    await utilisateur.type(screen.getByLabelText('Nom'), 'Dupont');
+    await utilisateur.type(await screen.findByLabelText('Nom'), 'Dupont');
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter le client' }));
 
     expect(screen.getByRole('alert').textContent).toMatch(/déjà/i);
@@ -89,7 +89,7 @@ describe('renommage d’un client', () => {
     const utilisateur = await ouvrir('Clients');
     await utilisateur.click(screen.getByRole('button', { name: /Dupont/ }));
 
-    const champ = screen.getByLabelText('Nom');
+    const champ = await screen.findByLabelText('Nom');
     await utilisateur.clear(champ);
     await utilisateur.type(champ, 'Dupont SARL');
     await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
@@ -105,7 +105,7 @@ describe('renommage d’un client', () => {
     const utilisateur = await ouvrir('Clients');
     await utilisateur.click(screen.getByRole('button', { name: /Dupont/ }));
 
-    const champ = screen.getByLabelText('Nom');
+    const champ = await screen.findByLabelText('Nom');
     await utilisateur.clear(champ);
     await utilisateur.type(champ, 'Autre nom');
     expect(screen.getByText(/rattache les missions et les recettes/)).toBeTruthy();
@@ -160,7 +160,7 @@ describe('missions', () => {
   it('enregistre une mission avec son tarif journalier', async () => {
     const utilisateur = await ouvrir('Missions');
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
-    await utilisateur.type(screen.getByLabelText('Client'), 'ClientA');
+    await utilisateur.type(await screen.findByLabelText('Client'), 'ClientA');
     await utilisateur.type(screen.getByLabelText('Description'), 'Mission A');
     await utilisateur.clear(screen.getByLabelText(/Tarif journalier/));
     await utilisateur.type(screen.getByLabelText(/Tarif journalier/), '450');
@@ -176,7 +176,7 @@ describe('missions', () => {
     semer({ clients: [client()] });
     const utilisateur = await ouvrir('Missions');
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
-    await utilisateur.type(screen.getByLabelText('Client'), 'Dupont');
+    await utilisateur.type(await screen.findByLabelText('Client'), 'Dupont');
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
 
     expect(useFaits.getState().faits.missions[0]).toMatchObject({
@@ -231,7 +231,7 @@ describe('missions', () => {
 describe('rythme de travail', () => {
   async function nouvelleMission(utilisateur: ReturnType<typeof userEvent.setup>) {
     await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
-    await utilisateur.type(screen.getByLabelText('Client'), 'ClientA');
+    await utilisateur.type(await screen.findByLabelText('Client'), 'ClientA');
     await utilisateur.type(screen.getByLabelText('Début'), '2026-01-01');
     await utilisateur.type(screen.getByLabelText('Fin'), '2026-12-31');
   }

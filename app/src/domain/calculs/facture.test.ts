@@ -9,7 +9,7 @@ import {
 
 const EMETTEUR: Emetteur = {
   nom: 'Mon Entreprise', siret: '00000000000000', adresse: '1 rue Exemple',
-  codePostal: '75001', ville: 'Paris', tvaIntracom: '', enFranchise: true
+  codePostal: '75001', ville: 'Paris', tvaIntracom: '', enFranchise: true, iban: '', bic: ''
 };
 
 const CLIENT_FR: Destinataire = {

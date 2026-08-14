@@ -398,3 +398,90 @@ describe('restauration d’une sauvegarde', () => {
     await waitFor(() => expect(screen.getByText(/plus récente/i)).toBeTruthy());
   });
 });
+
+/**
+ * L'IDENTITÉ DE L'ENTREPRISE — CE QUI EMPÊCHAIT D'ÉMETTRE LA MOINDRE FACTURE.
+ *
+ * `adresse`, `codePostal`, `ville`, `iban` et `bic` existaient au schéma et
+ * étaient repris de l'ancienne application à la migration. Aucun n'était
+ * saisissable.
+ *
+ * Conséquence, mesurable : l'adresse est une mention obligatoire, `etatFacture`
+ * bloque l'émission sans elle, et le message de blocage renvoyait « à
+ * renseigner dans Config → Profil » — où le champ n'existait pas. Une
+ * entreprise créée dans la nouvelle version ne pouvait donc émettre AUCUNE
+ * facture ; seules celles migrées de l'ancienne avaient une adresse.
+ */
+describe('identité de l’entreprise', () => {
+  it('permet de saisir l’adresse, sans laquelle aucune facture ne peut sortir', async () => {
+    render(<Config />);
+    const utilisateur = utilisateurTest();
+
+    await utilisateur.type(screen.getByLabelText('Adresse'), '1 rue Exemple');
+    await utilisateur.type(screen.getByLabelText('Code postal'), '75001');
+    await utilisateur.type(screen.getByLabelText('Ville'), 'Paris');
+
+    const e = useFaits.getState().faits.entreprise;
+    expect(e.adresse).toBe('1 rue Exemple');
+    expect(e.codePostal).toBe('75001');
+    expect(e.ville).toBe('Paris');
+  });
+
+  it('permet de saisir l’IBAN, sans lequel la facture est impayable', async () => {
+    render(<Config />);
+    await utilisateurTest().type(
+      screen.getByLabelText('IBAN'), 'FR0000000000000000000000000'
+    );
+    expect(useFaits.getState().faits.entreprise.iban).toBe('FR0000000000000000000000000');
+  });
+});
+
+/**
+ * LES CLÉS DE CONTRÔLE, QUI SE CALCULENT HORS LIGNE.
+ *
+ * Un IBAN faux : le virement n'arrive jamais, et on l'apprend en relançant des
+ * semaines plus tard. Un SIRET faux : c'est une mention obligatoire, et un
+ * numéro erroné vaut mention absente — 15 € par mention et par facture.
+ */
+describe('contrôle des identifiants', () => {
+  it('signale un SIRET dont la clé ne tombe pas juste', async () => {
+    render(<Config />);
+    await utilisateurTest().type(screen.getByLabelText('SIRET'), '12000101100001');
+    expect(await screen.findByText(/clé de contrôle/)).toBeTruthy();
+  });
+
+  it('ne dit rien d’un SIRET valide', async () => {
+    render(<Config />);
+    await utilisateurTest().type(screen.getByLabelText('SIRET'), '12000101100010');
+    expect(screen.queryByText(/clé de contrôle/)).toBeNull();
+  });
+
+  it('signale un IBAN dont la clé ne tombe pas juste', async () => {
+    render(<Config />);
+    await utilisateurTest().type(
+      screen.getByLabelText('IBAN'), 'FR1111111111111111111111111'
+    );
+    expect(await screen.findByText(/clé de contrôle/)).toBeTruthy();
+  });
+
+  /**
+   * L'avertissement ne BLOQUE rien. Une clé qui ne tombe pas juste dit
+   * « improbable », jamais « faux » — et empêcher de saisir sur un test qui
+   * n'est pas une preuve serait pire que le laisser passer.
+   */
+  it('n’empêche jamais la saisie', async () => {
+    render(<Config />);
+    const champ = screen.getByLabelText('SIRET') as HTMLInputElement;
+    await utilisateurTest().type(champ, '12000101100001');
+    expect(champ.value).toBe('12000101100001');
+    expect(champ.disabled).toBe(false);
+  });
+
+  // Un formulaire vierge n'est pas un formulaire fautif : un avertissement
+  // permanent cesse d'être lu.
+  it('ne reproche rien sur un champ vide', () => {
+    render(<Config />);
+    expect(screen.queryByText(/clé de contrôle/)).toBeNull();
+    expect(screen.queryByText(/que des chiffres/)).toBeNull();
+  });
+});

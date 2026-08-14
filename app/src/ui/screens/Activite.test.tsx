@@ -570,3 +570,95 @@ describe('revenir au rythme sur une semaine', () => {
       .toBeGreaterThan(0);
   });
 });
+
+/**
+ * POSER UNE PLAGE DE CONGÉS — L'ACTION QUI EXISTAIT SANS PORTE D'ENTRÉE.
+ *
+ * `poserPlageDeConges` vivait dans le magasin depuis le début, testée, et aucun
+ * écran ne l'appelait : le calendrier ne posait qu'un jour à la fois. Trois
+ * semaines de vacances coûtaient vingt et un clics, et la demi-journée — que le
+ * schéma porte depuis la v2 et que le solde compte correctement — était
+ * inatteignable.
+ *
+ * Même famille de défaut que les quatre actions non câblées du 13/08 : une
+ * action du magasin est une promesse d'interface.
+ */
+describe('poser une plage de congés', () => {
+  async function saisirPlage(du: string, au: string) {
+    const utilisateur = userEvent.setup();
+    await utilisateur.type(screen.getByLabelText('Du'), du);
+    await utilisateur.type(screen.getByLabelText('Au'), au);
+    return utilisateur;
+  }
+
+  it('pose une semaine entière d’un seul geste', async () => {
+    render(<Activite />);
+    // Lundi 6 au vendredi 10 juillet 2026.
+    const utilisateur = await saisirPlage('2026-07-06', '2026-07-10');
+    await utilisateur.click(screen.getByRole('button', { name: 'Poser ces congés' }));
+
+    expect(useFaits.getState().faits.conges).toHaveLength(5);
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Un congé posé un dimanche gonflerait le solde et le
+   * dénominateur d'occupation sans correspondre à rien.
+   */
+  it('n’enregistre ni les week-ends ni les fériés', async () => {
+    render(<Activite />);
+    // Du lundi 13 au vendredi 17 juillet : le 14 est férié, les 18-19 hors plage.
+    const utilisateur = await saisirPlage('2026-07-13', '2026-07-17');
+    await utilisateur.click(screen.getByRole('button', { name: 'Poser ces congés' }));
+
+    const dates = useFaits.getState().faits.conges.map((c) => c.date);
+    expect(dates).not.toContain('2026-07-14');
+    expect(dates).toHaveLength(4);
+  });
+
+  /**
+   * Le compte est annoncé AVANT le geste : découvrir après coup qu'on a posé
+   * six jours de plus que voulu oblige à défaire à la main ce qu'on croyait
+   * avoir fait d'un coup.
+   */
+  it('annonce le nombre de jours retenus avant de les poser', async () => {
+    render(<Activite />);
+    await saisirPlage('2026-07-06', '2026-07-19');
+    // Deux semaines calendaires : dix jours de semaine, moins le 14 juillet
+    // qui tombe un mardi. Neuf, pas dix — c'est exactement la soustraction
+    // qu'on ne fait pas de tête en posant ses vacances.
+    expect(screen.getByText(/9 jours ouvrés/)).toBeTruthy();
+  });
+
+  // La demi-journée existe au schéma et dans le solde ; elle n'avait aucune
+  // commande.
+  it('sait poser des demi-journées', async () => {
+    render(<Activite />);
+    const utilisateur = await saisirPlage('2026-07-06', '2026-07-07');
+    await utilisateur.click(screen.getByLabelText('Demi-journées'));
+    await utilisateur.click(screen.getByRole('button', { name: 'Poser ces congés' }));
+
+    expect(useFaits.getState().faits.conges.every((c) => c.quotite === 0.5)).toBe(true);
+  });
+
+  // Corriger une erreur de saisie doit coûter le même geste que la faire.
+  it('retire une plage aussi facilement qu’elle la pose', async () => {
+    semer({ conges: [
+      { date: dateISO('2026-07-06'), quotite: 1 },
+      { date: dateISO('2026-07-07'), quotite: 1 }
+    ] });
+    render(<Activite />);
+    const utilisateur = await saisirPlage('2026-07-06', '2026-07-07');
+    await utilisateur.click(screen.getByRole('button', { name: 'Les retirer' }));
+
+    expect(useFaits.getState().faits.conges).toHaveLength(0);
+  });
+
+  // Un bouton actif sur une plage vide invite à un geste sans effet.
+  it('n’offre rien à poser sur un week-end seul', async () => {
+    render(<Activite />);
+    await saisirPlage('2026-07-11', '2026-07-12');
+    expect(screen.getByText(/Aucun jour ouvré/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Poser ces congés' }))
+      .toHaveProperty('disabled', true);
+  });
+});

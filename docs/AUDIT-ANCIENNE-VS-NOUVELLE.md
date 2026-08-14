@@ -97,7 +97,7 @@ un trou qui ne fait échouer aucun test.
 | Ajouter une période de barème | 🟢 | Depuis l'application, avec sa source. L'ancienne exigeait un redéploiement |
 | `calculateIR`, `getIRForYear`, `getTranche`, `showIRDetail` | ✅ | Simulateur dans Outils, détail par tranche |
 | `addIRMonthlyProvisions` | ⚠️ | En versement libératoire, les 2,2 % sont intégrés ; au barème, l'acompte PAS est **saisi** et non calculé (décision D2 — le montant est notifié par la DGFiP). Pas de provision mensuelle automatique |
-| `computeCFEEstimate`, `showCFESimulator`, `renderCFEResult` | ❌ | La CFE existe comme nature de dette, mais sans grille ni estimateur |
+| `computeCFEEstimate`, `showCFESimulator`, `renderCFEResult` | ✅ | **Fait le 14/08, en refusant la grille.** `bareme/cfe.ts` porte les RÈGLES — exonération de création, base réduite de moitié la 1ʳᵉ année d'imposition, dispense sous 5 000 € de recettes N−2, calendrier, déclaration 1447-C. Aucune fourchette de base minimum n'est écrite : elle est fixée par la commune, et la grille en dur de l'ancienne était jugée non conforme par l'audit comptable. La carte demande l'avis et calcule base × taux, ou ne dit rien |
 | Comparateur versement libératoire / barème | 🟢 | **Ajouté le 13/08. N'existait pas dans l'ancienne.** Le seul arbitrage du projet qui porte une date : l'option s'exerce avant le 30/09 pour l'année suivante. Il mesure ce que l'activité AJOUTE à l'impôt du foyer, et compare ce surcroît aux 2,2 %. L'éligibilité — plafond de revenu fiscal de référence — n'est **pas** vérifiée, faute d'un nombre officiel daté, et l'écran le dit |
 | `getAcreInfo` | ⚠️ | L'ACRE s'applique au calcul ; pas de grille par période (noté au journal comme non traité) |
 | `renderTVAModule`, seuils, franchise | ✅ | Jauges de seuils dans Argent |
@@ -150,7 +150,7 @@ un trou qui ne fait échouer aucun test.
 | `initKeyboardShortcuts`, `createKeyboardHelp` | ❌ | Pas de raccourcis clavier |
 | `createNotifCenter`, `updateNotifBadge` | ⚠️ | Les badges par onglet existent ; pas de centre de notifications avec historique |
 | `adaptMobileGrids` | 🟢 | **Supprimé volontairement** : l'ancienne recalculait les grilles en JS, avec un bug vérifié — élargir au-delà de 600 px ne les restaurait jamais. Tout est en CSS (invariant n°7) |
-| `luhnCheck`, `ibanMod97Check` | ⚠️ | La validation SIRET/IBAN de saisie n'a pas été reprise |
+| `luhnCheck`, `ibanMod97Check` | ✅ | **Repris le 14/08**, dans `calculs/identifiants.ts`. Clé de Luhn sur le SIRET (avec l'exception La Poste), clé mod-97 sur l'IBAN, calculée par réduction au fil de la lecture — un `Number` sur la chaîne entière donnerait un modulo faux **sans lever d'erreur**. On signale, on ne bloque jamais : une clé dit « improbable », pas « faux » |
 | Pastilles Cloud / Documents / Qonto | 🚫 | Refusées : aucune intégration ne les alimente. Une pastille verte qui ne mesure rien est pire qu'absente |
 
 ---
@@ -172,6 +172,41 @@ un trou qui ne fait échouer aucun test.
 Trois choses ne reviendront pas, et c'est délibéré : l'export FEC (D6), le
 score de santé sur 100 (il ne mesurait rien), et le recalcul des grilles en
 JavaScript (invariant n°7).
+
+---
+
+## Revue du 14/08 — ce que la relecture a trouvé
+
+L'audit listait ce que l'ancienne application faisait et la nouvelle non. Il ne
+regardait pas la question inverse : **ce que la nouvelle prétend faire et
+n'atteint pas.** Trois trous s'y cachaient, tous du même genre — un fait au
+schéma, migré depuis l'ancienne version, et aucun chemin pour l'atteindre.
+
+| Trou | Conséquence | État |
+|---|---|---|
+| **`entreprise.adresse`, `codePostal`, `ville` saisissables nulle part** | L'adresse est une mention obligatoire ; `etatFacture` bloque l'émission sans elle, et le message renvoyait « à renseigner dans Config → Profil » **où le champ n'existait pas**. Une entreprise créée dans la nouvelle version ne pouvait émettre **aucune** facture | ✅ corrigé |
+| **`entreprise.iban` / `bic` invisibles** | Repris à la migration, jamais affichés, absents du document imprimé. Le client recevait une facture régulière sur laquelle **rien n'indiquait où payer** | ✅ corrigé — bloc « Règlement » sur la facture, champs dans Config, clé mod-97 |
+| **`poserPlageDeConges` jamais appelée** | Le calendrier posait un jour à la fois : trois semaines de vacances = vingt et un clics, et la demi-journée — portée par le schéma depuis la v2, comptée correctement par le solde — était **inatteignable** | ✅ corrigé — panneau de plage, réduite aux jours ouvrés |
+
+Une quatrième, sans conséquence pour l'utilisateur : `ajouterEcheance` au
+singulier était morte, doublée par sa version au pluriel. Retirée — deux chemins
+pour le même fait finissent par diverger, et celui que personne n'emprunte n'est
+jamais testé.
+
+### Le garde-fou qui manquait
+
+Les quatre se ressemblent, et ressemblent aux quatre actions non câblées du
+13/08. Le journal en avait tiré une règle et **une commande à lancer à la
+main**. Une règle qu'on doit penser à appliquer n'est pas une règle.
+
+`verifier:cablage` la lance désormais à chaque passage de la chaîne : il lit les
+actions déclarées par le magasin et vérifie que chacune est appelée depuis
+ailleurs que ses propres tests. Vérifié par mutation — une action fictive
+ajoutée au contrat fait échouer le script.
+
+Ce qu'il ne peut pas voir : un bouton derrière une condition toujours fausse le
+satisferait. C'est un **plancher**, pas une preuve — mais un plancher qui aurait
+attrapé les cinq occurrences connues.
 
 ---
 

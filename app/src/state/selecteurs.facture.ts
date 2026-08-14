@@ -44,7 +44,11 @@ export function emetteurDe(faits: Faits): Emetteur {
     // La franchise se déduit de l'absence de mois d'assujettissement : c'est
     // le même fait qui commande la TVA déductible des dépenses, et deux
     // sources se contrediraient.
-    enFranchise: e.tvaDepuis === null
+    enFranchise: e.tvaDepuis === null,
+    // Ils existaient au schéma et n'atteignaient jamais le document : la
+    // facture partait sans dire où payer.
+    iban: e.iban,
+    bic: e.bic
   };
 }
 

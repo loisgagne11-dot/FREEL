@@ -154,6 +154,54 @@ export function calendrierDuMois(
   }));
 }
 
+/**
+ * Les jours d'une plage sur lesquels un congé a un sens.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POSER UN CONGÉ UN DIMANCHE N'EST PAS UNE ERREUR DE SAISIE, C'EST UN FAUX
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « Du 1er au 21 août » veut dire quinze jours ouvrés, pas vingt et un. Enregistrer
+ * les week-ends et les fériés gonflerait le solde de congés de moitié, et
+ * gonflerait aussi le dénominateur d'occupation — deux chiffres faux tirés d'un
+ * geste juste.
+ *
+ * La plage est donc réduite ici, dans le domaine, et non dans l'écran : c'est
+ * une règle, pas une commodité d'affichage, et un second écran qui poserait des
+ * congés autrement finirait par compter autrement.
+ *
+ * Les bornes sont inclusives et acceptées dans les deux sens : sélectionner du
+ * 21 au 1er est un geste courant, pas une faute à sanctionner.
+ */
+export function joursCongeables(
+  debut: DateISO,
+  fin: DateISO,
+  zone: ZoneFeries = 'general'
+): readonly DateISO[] {
+  const [du, au] = debut <= fin ? [debut, fin] : [fin, debut];
+
+  // Les fériés de toutes les années traversées : une plage peut enjamber le
+  // 31 décembre, et ne prendre que l'année de départ laisserait passer le
+  // 1er janvier.
+  const feries = new Set<string>();
+  for (let a = Number(du.slice(0, 4)); a <= Number(au.slice(0, 4)); a++) {
+    for (const f of joursFeries(a, zone)) feries.add(f);
+  }
+
+  const jours: DateISO[] = [];
+  const curseur = new Date(`${du}T00:00:00Z`);
+  const borne = new Date(`${au}T00:00:00Z`);
+  // Garde-fou : une plage démesurée viendrait d'une saisie aberrante, pas d'un
+  // congé. On s'arrête plutôt que de bloquer l'onglet.
+  const MAXIMUM = 400;
+  while (curseur <= borne && jours.length < MAXIMUM) {
+    const date = curseur.toISOString().slice(0, 10) as DateISO;
+    if (!estWeekEnd(date) && !feries.has(date)) jours.push(date);
+    curseur.setUTCDate(curseur.getUTCDate() + 1);
+  }
+  return jours;
+}
+
 export interface PlanDeCharge {
   readonly mois: Mois;
   /** Jours ni week-end, ni fériés, ni posés en congé. Le dénominateur. */
