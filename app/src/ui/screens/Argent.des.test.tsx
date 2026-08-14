@@ -32,9 +32,15 @@ function semer(modifications: Partial<Faits> = {}): void {
   useFaits.setState({ faits: { ...faitsVides(), ...modifications } });
 }
 
+/**
+ * L'onglet DES est chargé à la demande : on attend que son module soit arrivé
+ * avant d'interroger le contenu. Sans cette attente, la première assertion
+ * tomberait sur le « Chargement… » du Suspense.
+ */
 async function ouvrirDes() {
   render(<Argent />);
   await userEvent.setup().click(screen.getByRole('tab', { name: 'DES' }));
+  await screen.findByRole('heading', { name: /Prestations à déclarer/ });
 }
 
 describe('prestations à déclarer', () => {
