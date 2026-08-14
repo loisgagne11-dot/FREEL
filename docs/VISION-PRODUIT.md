@@ -123,13 +123,13 @@ Relevé dans le code au 14/08, pas supposé.
 | Provision **soldée par un paiement réel** | ✅ | Une échéance payée sort du volet 1 ; la date et le montant réellement débité sont exigés |
 | Provisions **par catégorie** | ✅ | Ventilé URSSAF / TVA / impôt / CFE / CFP, volet 1 par échéance et volet 2 par règle de calcul |
 | **Jalons datés et visibles** | ⚠️ | Les échéances ont leurs dates et une frise mensuelle ; les jalons réglementaires alertent |
-| Jalon → **dossier complet pour déclarer** | ⚠️ | La DES a son état ; les périodes URSSAF sont chiffrées. **La TVA n'a pas son dossier**, et aucun jalon ne mène aux factures précises concernées |
+| Jalon → **dossier complet pour déclarer** | ✅ | La TVA a son dossier, ouvert depuis la trésorerie, avec le détail des factures et des achats concernés |
 | Trésorerie : **cumulé / provisionné / disponible** | ✅ | Solde, provisions ventilées et versable |
 | CA **réalisé vs encaissé**, graphes | ✅ | Par mois, avec les valeurs au-dessus des barres |
 | **Où j'en suis à aujourd'hui** | ✅ | Repère de date sur chaque jauge, et date probable de franchissement — qui s'abstient sous un trimestre |
 | **Rapport et charge par mission** | ✅ | Tableau trié par euro-jour, plus le TJM effectif et le TJM net |
 | Achats : **photo, historisation, preuve** | ✅ | Fichier réellement conservé, empreinte vérifiée — pas un booléen |
-| Achats → **TVA déductible de la déclaration** | ⚠️ | La TVA récupérable est chiffrée ; elle n'est reliée à aucun dossier de déclaration |
+| Achats → **TVA déductible de la déclaration** | ✅ | Les achats payés du trimestre composent la ligne déductible, listés un par un |
 | **Simulateurs d'impôts** | ✅ | IR par tranches, comparateur versement libératoire, CFE |
 
 ## Ce que cela change dans l'ordre de travail
@@ -144,8 +144,8 @@ l'ordre :
 2. ~~**Le cycle de vie d'une facture**~~ — envoyée avec sa date ✅ ; payée
    avec la sienne ✅ (elle l'était déjà).
 3. ~~**Les provisions par catégorie**~~ ✅.
-4. **Le dossier de déclaration de TVA**, atteint depuis son jalon, avec les
-   factures et la TVA déductible qui le composent. *Reste à faire.*
+4. ~~**Le dossier de déclaration de TVA**~~, atteint depuis son jalon, avec
+   les factures et la TVA déductible qui le composent ✅.
 5. ~~**Le rapport par mission** en face de sa charge~~ ✅.
 
 Ce qui était en tête des plans précédents et que cet énoncé **déclasse

@@ -20,6 +20,7 @@ import { useToast } from '../components/Toasts';
 import { Echeances } from '../components/Echeances';
 import { CartePliable } from '../components/CartePliable';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
+import { Sheet } from '../components/Sheet';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
 import { Montant } from '../components/Montant';
@@ -35,6 +36,17 @@ import { Montant } from '../components/Montant';
  */
 const DeclarationServices = lazy(() => import('./Argent.des')
   .then((m) => ({ default: m.DeclarationServices })));
+
+/**
+ * Le dossier de déclaration de TVA, ouvert depuis son jalon.
+ *
+ * On déclare quatre fois par an. Une carte permanente ferait porter à chaque
+ * consultation de la trésorerie le poids d'un écran qu'on ouvre un jour par
+ * trimestre — et c'est aussi ce que demande l'énoncé : le dossier s'atteint
+ * DEPUIS son échéance, pas en permanence.
+ */
+const DossierTvaPanneau = lazy(() => import('./Argent.tva')
+  .then((m) => ({ default: m.DossierTvaPanneau })));
 
 /**
  * Écran Argent — trésorerie et performance.
@@ -62,6 +74,7 @@ const MOIS_COURTS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
 export function Argent() {
   const faits = useFaits((e) => e.faits);
   const [section, setSection] = useState<Section>('tresorerie');
+  const [dossierOuvert, setDossierOuvert] = useState(false);
   const idGroupe = useId();
 
   const etat = useMemo(() => etatArgent(faits), [faits]);
@@ -215,6 +228,14 @@ export function Argent() {
 
           <Echeances />
 
+          <button
+            type="button"
+            className={styles.actionPrincipale}
+            onClick={() => setDossierOuvert(true)}
+          >
+            Préparer ma déclaration de TVA
+          </button>
+
           <CarteDeclarations idGroupe={idGroupe} />
         </PanneauOnglet>
 
@@ -258,6 +279,22 @@ export function Argent() {
           </Suspense>
         </PanneauOnglet>
       </div>
+
+      {/* « Au clic, j'ai toutes les informations pour remplir ma
+          déclaration. » Un panneau plutôt qu'une carte : le dossier ne se
+          consulte qu'au moment de déclarer, et il tient alors tout l'écran —
+          ce qu'une carte au milieu d'une pile ne peut pas faire. */}
+      <Sheet
+        ouvert={dossierOuvert}
+        titre="Déclaration de TVA"
+        onFermer={() => setDossierOuvert(false)}
+      >
+        {dossierOuvert && (
+          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+            <DossierTvaPanneau />
+          </Suspense>
+        )}
+      </Sheet>
     </>
   );
 }

@@ -154,6 +154,11 @@ function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
       // Le montant porté au livre est le HT : c'est l'assiette du chiffre
       // d'affaires en micro, et celle que l'URSSAF réclame.
       montant: etat.totaux.totalHt,
+      // La TVA du document est conservée telle quelle : elle ne se recalcule
+      // pas — les lignes ne sont pas gardées, et une facture peut porter
+      // plusieurs taux. La jeter obligeait à la supposer au moment de
+      // déclarer, sur un formulaire officiel.
+      tvaCollectee: etat.totaux.totalTva,
       emiseLe: facture.emiseLe,
       // L'encaissement viendra plus tard : porter une recette comme encaissée
       // à l'émission ferait déclarer un revenu qui n'est pas rentré.

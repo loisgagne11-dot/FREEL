@@ -330,4 +330,28 @@ describe('recettes d’un bloc au schéma 7', () => {
   it('porte la version courante après complétion', () => {
     expect(completerFaits({ version: 7, recettes: [recette()] }).version).toBe(VERSION_SCHEMA);
   });
+
+  /**
+   * v8 → v9 : LA TVA DU DOCUMENT.
+   *
+   * `null` reste `null` et ne devient PAS zéro. Une facture d'avant le schéma 9
+   * portait peut-être de la TVA ; la compter pour zéro sous-évaluerait une
+   * déclaration — le sens dangereux de l'erreur, celui qui produit un rappel.
+   */
+  it('laisse la TVA inconnue à null, jamais à zéro', () => {
+    const f = completerFaits({ version: 8, recettes: [recette()] });
+    expect(f.recettes[0]).toHaveProperty('tvaCollectee');
+    expect(f.recettes[0]?.tvaCollectee).toBeNull();
+    expect(f.recettes[0]?.tvaCollectee).not.toBe(0);
+  });
+
+  it('conserve une TVA déjà enregistrée, y compris à zéro', () => {
+    const avec = completerFaits({ version: 9, recettes: [recette({ tvaCollectee: 1000 })] });
+    expect(avec.recettes[0]?.tvaCollectee).toBe(1000);
+
+    // Zéro est une valeur JUSTE : une facture émise en franchise ne porte pas
+    // de TVA, et ce n'est pas la même chose qu'une TVA inconnue.
+    const franchise = completerFaits({ version: 9, recettes: [recette({ tvaCollectee: 0 })] });
+    expect(franchise.recettes[0]?.tvaCollectee).toBe(0);
+  });
 });

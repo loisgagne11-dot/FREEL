@@ -16,7 +16,7 @@
  * Relever le seuil aurait masqué la cause.
  */
 
-import type { Euros, Mois } from '../domain/types';
+import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros } from '../domain/types';
 import { plafondMicro, seuilsTva } from '../domain/bareme';
 import type { SeuilsTva } from '../domain/bareme';
@@ -26,6 +26,11 @@ import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
 import { DELAI_PAIEMENT_DEFAUT, encoursDe, suivre } from '../domain/calculs/facturier';
 import type { Faits } from './schema';
 import { dateDuJour, etatPilote, moisCourant } from './selecteurs';
+import { contexteDepense } from './selecteurs.achats';
+import { tvaDeDepense } from '../domain/calculs/depenses';
+import {
+  type DossierTva, type PieceCollectee, type PieceDeduite, dossierTva
+} from '../domain/calculs/dossierTva';
 
 /**
  * Toutes les factures, avec leur statut dérivé à la date du jour.
@@ -147,4 +152,58 @@ export function etatArgent(
     voletAProvisionner: pilote.voletAProvisionner,
     provisionsParNature: pilote.provisionsParNature
   };
+}
+/* ─────────────────────────────────────────────────────────────────────────
+   Le dossier de déclaration de TVA
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Tout ce qu'il faut pour remplir la déclaration d'un trimestre.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX DATES DIFFÉRENTES, ET C'EST LE PIÈGE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La TVA collectée sur les prestations de services est exigible à
+ * l'ENCAISSEMENT, la TVA déductible à la date de PAIEMENT de la dépense.
+ * Aucune des deux n'est la date d'émission — qui est pourtant celle qui range
+ * les factures partout ailleurs dans cette application. Les confondre décale
+ * une déclaration entière d'un trimestre.
+ *
+ * Les avoirs sont écartés : une écriture d'annulation neutralise déjà le
+ * montant de la facture qu'elle vise, et compter les deux ferait entrer un
+ * montant négatif sans sa contrepartie.
+ */
+export function dossierTvaDuTrimestre(
+  faits: Faits,
+  du: DateISO,
+  au: DateISO,
+  maintenant: Date = new Date()
+): DossierTva {
+  const encaissements: PieceCollectee[] = faits.recettes
+    .filter((r): r is typeof r & { encaisseeLe: DateISO } =>
+      r.encaisseeLe !== null && typeof r.annuleEcriture !== 'string')
+    .map((r) => ({
+      id: r.id,
+      numero: r.numero,
+      clientNom: r.clientNom,
+      encaisseeLe: r.encaisseeLe,
+      montantHt: r.montant,
+      // `undefined` et `null` disent la même chose ici — la TVA n'a pas été
+      // conservée — et le dossier les compte à part plutôt que pour zéro.
+      tva: r.tvaCollectee ?? null
+    }));
+
+  const contexte = contexteDepense(faits, maintenant);
+  const achats: PieceDeduite[] = faits.depenses
+    .filter((d): d is typeof d & { payeeLe: DateISO } => d.payeeLe !== null)
+    .map((d) => ({
+      id: d.id,
+      libelle: d.libelle,
+      payeeLe: d.payeeLe,
+      montantTtc: d.montantTtc,
+      tvaRecuperable: tvaDeDepense(d, contexte(d)).recuperable
+    }));
+
+  return dossierTva({ du, au, encaissements, achats });
 }

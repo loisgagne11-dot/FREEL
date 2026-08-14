@@ -32,7 +32,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 8 as const;
+export const VERSION_SCHEMA = 9 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -218,6 +218,28 @@ export interface Recette {
    * ne prouve rien.
    */
   readonly envoyeeLe?: DateISO | null;
+  /**
+   * TVA portée par le document, en euros.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * UN FAIT DU DOCUMENT, PAS UNE DÉRIVATION
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `montant` est le HT — l'assiette du chiffre d'affaires en micro, celle que
+   * l'URSSAF réclame. La TVA était calculée à l'émission puis JETÉE, et elle
+   * ne se recalcule pas : les lignes de la facture ne sont pas conservées, et
+   * une facture peut porter plusieurs taux — 20 %, 10 %, 5,5 %.
+   *
+   * La supposer à 20 % pour remplir une déclaration serait exactement le
+   * chiffre faux qu'on ne veut pas voir partir sur un formulaire officiel.
+   *
+   * `null` a deux sens qui ne se confondent pas et que le dossier de
+   * déclaration distingue : une facture émise EN FRANCHISE ne porte pas de TVA
+   * — c'est zéro, et c'est juste ; une facture d'avant le schéma 9 en portait
+   * peut-être une, et on ne la connaît pas. La seconde doit être signalée, pas
+   * comptée pour zéro.
+   */
+  readonly tvaCollectee?: Euros | null;
   /** Recette globalisée en fin de journée, sans identité de client. */
   readonly globalisee?: boolean;
   /**
@@ -631,6 +653,7 @@ export function completerFaits(brut: unknown): Faits {
 /**
  * v6 → v7 : les recettes portent leurs dates de relance.
  * v7 → v8 : elles portent aussi leur date d'envoi.
+ * v8 → v9 : et la TVA que le document porte.
  *
  * Le champ est nouveau et facultatif ; une recette d'avant le schéma 7 n'a
  * simplement jamais été relancée dans l'application. On pose donc une liste
@@ -655,6 +678,12 @@ function recettesDuSchema6(brut: unknown): readonly Recette[] {
     // le dit — et une facture d'avant le schéma 8 n'a effectivement aucune
     // date d'envoi enregistrée, quoi qu'il se soit passé dans la vraie vie.
     const envoyeeLe = typeof o['envoyeeLe'] === 'string' ? o['envoyeeLe'] as DateISO : null;
-    return [{ ...(o as unknown as Recette), relancesLe: relances, envoyeeLe }];
+    // v9 : `null` reste `null` et ne devient PAS zéro. Une facture d'avant le
+    // schéma 9 portait peut-être de la TVA ; la compter pour zéro sous-évaluerait
+    // une déclaration, ce qui est le sens dangereux de l'erreur.
+    const tvaCollectee = typeof o['tvaCollectee'] === 'number' && Number.isFinite(o['tvaCollectee'])
+      ? o['tvaCollectee'] as Euros
+      : null;
+    return [{ ...(o as unknown as Recette), relancesLe: relances, envoyeeLe, tvaCollectee }];
   });
 }
