@@ -138,3 +138,14 @@
 }
 
 .revenir:hover { border-color: var(--line-2); color: var(--text); }
+
+/* Le compte de la semaine affichée, au-dessus de la grille.
+   Cinq jours ouvrés n'est pas toujours la réponse : une semaine avec un férié
+   en compte quatre, et un taux d'occupation lu sans le savoir est faux d'un
+   cinquième. */
+.resumeSemaine {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

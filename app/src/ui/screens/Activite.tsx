@@ -19,7 +19,7 @@ import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
-import { dateCourte, eur } from '../format';
+import { dateCourte, eur, formaterJours } from '../format';
 import styles from './Activite.module.css';
 import { Montant } from '../components/Montant';
 
@@ -826,17 +826,6 @@ function decalerMois(m: Mois, pas: number): Mois {
 function moisLong(m: Mois): string {
   const date = new Date(`${m}-01T00:00:00`);
   return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(date);
-}
-
-/**
- * Les équivalent-jours se présentent avec une décimale.
- *
- * Un montant divisé par un tarif tombe rarement juste, et arrondir à l'entier
- * ferait disparaître les demi-journées — qui sont précisément ce dont on
- * discute quand on regarde un plan de charge.
- */
-function formaterJours(jours: number): string {
-  return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(jours);
 }
 
 function formaterPourcent(part: number): string {

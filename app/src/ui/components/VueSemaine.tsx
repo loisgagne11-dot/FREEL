@@ -60,8 +60,31 @@ export function VueSemaine(
   // Le bouton n'apparaît que s'il y a quelque chose à défaire. Un bouton
   // toujours là qui ne fait rien apprend à ne plus le regarder.
   const corrigee = planning.jours.some((j) => j.parMission.some((l) => l.ajuste));
+
+  /**
+   * Les jours ouvrés de la semaine affichée.
+   *
+   * La spec de design demande ce compte « sur la période visible (semaine ou
+   * mois) ». Le mois l'avait, la semaine non — et c'est là qu'il manque le
+   * plus : cinq jours ouvrés n'est pas toujours la réponse. Une semaine avec un
+   * férié en compte quatre, et un taux d'occupation lu sans le savoir est faux
+   * d'un cinquième.
+   *
+   * Les congés posés ne sont pas retirés ici : ils restent des jours OUVRÉS
+   * qu'on a choisi de ne pas travailler. Les soustraire du dénominateur ferait
+   * afficher 100 % d'occupation à quelqu'un en vacances.
+   */
+  const joursOuvres = planning.jours.filter((j) => !j.ferie && !j.weekEnd).length;
+
   return (
     <>
+      {/* Le compte, et rien d'autre : le total retenu est déjà lisible sous la
+          grille, et le répéter ici n'ajouterait qu'une occasion de diverger. */}
+      <p className={styles.resumeSemaine}>
+        {joursOuvres} jour{joursOuvres > 1 ? 's' : ''} ouvré{joursOuvres > 1 ? 's' : ''}
+        {' cette semaine'}
+      </p>
+
       <div className={styles.semaine}>
         {JOURS.map((j) => (
           <div key={j} className={styles.enteteJour} aria-hidden="true">{j}</div>

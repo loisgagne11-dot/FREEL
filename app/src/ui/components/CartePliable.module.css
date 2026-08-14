@@ -1,0 +1,101 @@
+/* Carte pliable. Aucune couleur en dur : tout par les tokens. */
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  margin-bottom: 12px;
+  min-width: 0;
+}
+
+/* Repliée, la carte se resserre : c'est le gain de place qu'on est venu
+   chercher. Elle garde son fond, pour rester une carte et pas une ligne. */
+.pliee { padding-bottom: 13px; }
+
+.entete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Le bouton ne contient que le titre : une zone cliquable qui en contiendrait
+   d'autres serait un piège à la souris comme au lecteur d'écran. */
+.bascule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  /* 44 px de haut : la cible tactile s'applique aussi à un en-tête. */
+  min-height: 44px;
+  margin: -15px -8px -8px -8px;
+  padding: 0 8px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bascule:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.titre {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Le chevron pointe vers le bas quand la carte est ouverte : il montre le sens
+   du contenu, pas le sens du geste. */
+.chevron {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--muted-2);
+  transform: rotate(90deg);
+  transition: transform 140ms ease-out;
+}
+
+.pliee .chevron { transform: rotate(0deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron { transition: none; }
+}
+
+.actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* LA SYNTHÈSE — ce qui distingue ce pli d'un accordéon ordinaire.
+   Repliée, la carte continue de dire l'essentiel : on replie ce qu'on a lu
+   sans avoir à déplier pour savoir s'il fallait déplier. */
+.resume {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.contenu { margin-top: 14px; min-width: 0; }
+
+.contenu[hidden] { display: none; }
+
+/* Sur papier, rien n'est replié : on imprime pour archiver ou pour transmettre
+   à son comptable, et un document amputé de ses cartes repliées ne sert à rien. */
+@media print {
+  .contenu { display: block !important; }
+  .resume { display: none; }
+  .bascule { pointer-events: none; }
+  .chevron { display: none; }
+}

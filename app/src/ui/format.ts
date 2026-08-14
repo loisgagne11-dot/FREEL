@@ -60,3 +60,15 @@ export function moisTexte(nombre: number | null): string {
   const valeur = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(arrondi);
   return `${valeur} mois`;
 }
+
+/**
+ * Un nombre de jours travaillés.
+ *
+ * Une décimale au plus, et jamais d'arrondi à l'entier : un montant divisé par
+ * un tarif tombe rarement juste, et arrondir ferait disparaître les
+ * demi-journées — qui sont précisément ce dont on discute quand on regarde un
+ * plan de charge.
+ */
+export function formaterJours(jours: number): string {
+  return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(jours);
+}
