@@ -19,6 +19,7 @@ import type { RegimeImposition, SeuilsTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
+  type VentilationProvisions,
   estPayee, provisions as calculerProvisions
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
@@ -395,6 +396,15 @@ export interface EtatPilote {
   readonly tresorerie: ResultatTresorerie;
   readonly voletConstate: Euros;
   readonly voletAProvisionner: Euros;
+  /**
+   * Le total de provision, ventilé par nature.
+   *
+   * « Sur cette somme totale, combien j'ai de provision et sur quelle
+   * catégorie » : un total ne dit pas ce qu'il faut en faire, et ne permet ni
+   * de vérifier une provision contre l'avis reçu, ni de savoir ce qui se
+   * libère après une déclaration.
+   */
+  readonly provisionsParNature: VentilationProvisions;
   readonly autonomie: number | null;
   /**
    * `true` quand le taux d'impôt n'a pas pu être résolu : le calcul est alors
@@ -454,6 +464,7 @@ export function etatPilote(
     tresorerie,
     voletConstate: detail.voletConstate,
     voletAProvisionner: detail.voletAProvisionner,
+    provisionsParNature: detail.parNature,
     autonomie: autonomieMois(tresorerie.versable, faits.besoinMensuel),
     tauxImpotIndisponible: tauxImpotR.statut === 'refuse',
     motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null
@@ -667,8 +678,15 @@ export interface EtatArgent {
   readonly parMois: readonly MoisChiffre[];
   readonly caEncaisse: Euros;
   readonly caRealise: Euros;
-  /** Écart entre facturé et encaissé : ce qui reste à rentrer. */
+  /**
+   * Ce qui est émis et non réglé, compté facture par facture, toutes années.
+   *
+   * Ce n'est PAS l'écart entre le facturé et l'encaissé de l'année : deux
+   * agrégats annuels ne se soustraient pas. Voir `encoursDe`.
+   */
   readonly resteARentrer: Euros;
+  /** Le total de provision, ventilé par nature — voir `EtatPilote`. */
+  readonly provisionsParNature: VentilationProvisions;
   readonly tresorerie: ResultatTresorerie;
   readonly voletConstate: Euros;
   readonly voletAProvisionner: Euros;
@@ -721,6 +739,7 @@ export function etatArgent(
     resteARentrer: encoursDe(facturesSuivies(faits, maintenant)).resteARentrer,
     tresorerie: pilote.tresorerie,
     voletConstate: pilote.voletConstate,
-    voletAProvisionner: pilote.voletAProvisionner
+    voletAProvisionner: pilote.voletAProvisionner,
+    provisionsParNature: pilote.provisionsParNature
   };
 }

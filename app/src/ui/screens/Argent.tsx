@@ -9,6 +9,7 @@ import type { Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
+import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
@@ -173,6 +174,32 @@ export function Argent() {
                 <dd><Montant>{eur(etat.tresorerie.provisions)}</Montant></dd>
               </div>
             </dl>
+
+            {/* « Sur cette somme totale, combien j'ai de provision et sur
+                quelle catégorie ». Un total ne dit pas ce qu'il faut en
+                faire : il ne permet ni de rapprocher une provision de l'avis
+                reçu, ni de savoir ce qui se libère après une déclaration. */}
+            <h3 className={styles.sousTitre}>
+              Sur quelle catégorie
+              <Info libelle="D’où vient la ventilation">
+                Les échéances déjà émises portent chacune leur nature. Les
+                charges sur recettes encaissées n’ont pas encore d’échéance à
+                qui la demander&nbsp;: elles se répartissent selon la règle qui
+                les calcule — cotisations d’un côté, impôt et contributions de
+                l’autre. La TVA n’y figure pas tant qu’aucun appel n’est émis,
+                parce qu’elle se relève sur les factures et ne se déduit
+                d’aucun taux.
+              </Info>
+            </h3>
+            <Repartition
+              total={etat.tresorerie.provisions}
+              deficit={0}
+              parts={NATURES_DETTE.map((n) => ({
+                libelle: LIBELLE_NATURE[n],
+                montant: etat.provisionsParNature[n],
+                ton: n
+              }))}
+            />
           </CartePliable>
 
           <Echeances />

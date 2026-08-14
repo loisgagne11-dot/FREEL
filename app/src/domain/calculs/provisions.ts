@@ -140,12 +140,72 @@ export interface ContexteProvisions {
   readonly tauxImpotEtContributions: number;
 }
 
+/**
+ * Ce que le total de provision recouvre, nature par nature.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * « SUR CETTE SOMME, QUELLE CATÉGORIE »
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un total de provision ne dit pas ce qu'il faut en faire. « 6 200 € de côté »
+ * et « 4 100 € d'URSSAF, 1 800 € de TVA, 300 € de CFE » ne se pilotent pas
+ * pareil : la première formulation ne permet ni de vérifier une provision
+ * contre un avis reçu, ni de savoir ce qui se libère après une déclaration.
+ *
+ * Les deux volets se ventilent différemment, et c'est normal :
+ *
+ *  - le VOLET 1 se ventile par échéance — chacune porte déjà sa nature ;
+ *  - le VOLET 2 se ventile par RÈGLE DE CALCUL, puisqu'aucune échéance
+ *    n'existe encore : la part cotisations va en `urssaf`, la part impôt et
+ *    contributions en `impot`.
+ *
+ * La TVA collectée n'apparaît en volet 2 sous aucune forme : elle ne se déduit
+ * pas d'un taux appliqué aux recettes, elle se relève sur les factures. Elle
+ * n'entre donc dans la ventilation qu'une fois l'échéance émise.
+ */
+export type VentilationProvisions = Readonly<Record<NatureDette, Euros>>;
+
+/** Les natures, dans l'ordre où on les lit. */
+export const NATURES_DETTE: readonly NatureDette[] = ['urssaf', 'tva', 'impot', 'cfe', 'cfp'];
+
+/**
+ * Le nom de chaque nature, dit une seule fois.
+ *
+ * Comme `LIBELLE_STATUT` pour les factures : trois écrans nommaient les mêmes
+ * dettes, et rien ne garantissait qu'ils les nomment pareil. Le libellé porte
+ * l'interlocuteur autant que la dette — « URSSAF » et « cotisations sociales »
+ * sont la même ligne, mais on ne les cherche pas sous le même mot.
+ */
+export const LIBELLE_NATURE: Readonly<Record<NatureDette, string>> = {
+  urssaf: 'URSSAF — cotisations sociales',
+  tva: 'TVA à reverser',
+  impot: 'Impôt sur le revenu',
+  cfe: 'CFE — cotisation foncière',
+  cfp: 'CFP — formation professionnelle'
+};
+
+const ventilationVide = (): Record<NatureDette, number> =>
+  ({ urssaf: 0, tva: 0, impot: 0, cfe: 0, cfp: 0 });
+
+const figer = (v: Record<NatureDette, number>): VentilationProvisions => ({
+  urssaf: euros(v.urssaf), tva: euros(v.tva), impot: euros(v.impot),
+  cfe: euros(v.cfe), cfp: euros(v.cfp)
+});
+
 export interface DetailProvisions {
   /** Échéances émises et non payées. */
   readonly voletConstate: Euros;
   /** Charges dues sur recettes encaissées non encore déclarées. */
   readonly voletAProvisionner: Euros;
   readonly total: Euros;
+  /**
+   * Le total, ventilé par nature. La somme des parts vaut `total`.
+   *
+   * Les natures sans montant valent zéro plutôt que d'être absentes : une
+   * catégorie qui disparaît de l'écran quand elle tombe à zéro donne à croire
+   * qu'elle n'existe pas, alors qu'elle vient d'être soldée.
+   */
+  readonly parNature: VentilationProvisions;
   /**
    * Recettes encaissées dont le barème ne permet pas de calculer la charge.
    * Non silencieux : le total ci-dessus les EXCLUT, donc il est sous-évalué,
@@ -163,6 +223,23 @@ export function voletConstate(echeances: readonly Echeance[]): Euros {
 }
 
 /**
+ * Volet 1, ventilé — chaque échéance porte déjà sa nature.
+ *
+ * Une échéance payée sort de la ventilation comme elle sort du total : le
+ * solde bancaire la reflète déjà, et la laisser ferait provisionner deux fois.
+ */
+export function voletConstateParNature(
+  echeances: readonly Echeance[]
+): VentilationProvisions {
+  const v = ventilationVide();
+  for (const e of echeances) {
+    if (estPayee(e)) continue;
+    v[e.nature] += e.montant;
+  }
+  return figer(v);
+}
+
+/**
  * Volet 2 — les charges à provisionner sur les recettes encaissées dont la
  * période n'est pas encore déclarée.
  *
@@ -175,8 +252,19 @@ export function voletAProvisionner(
   recettes: readonly RecetteEncaissee[],
   declarees: PeriodesDeclarees,
   ctx: ContexteProvisions
-): { readonly montant: Euros; readonly nonCalculables: readonly { readonly id: string; readonly motif: string }[] } {
+): {
+  readonly montant: Euros;
+  /**
+   * La ventilation par RÈGLE DE CALCUL, faute d'échéance à qui la demander :
+   * la part cotisations en `urssaf`, la part impôt et contributions en
+   * `impot`. Les autres natures restent à zéro — elles n'existent qu'une fois
+   * l'appel émis.
+   */
+  readonly parNature: VentilationProvisions;
+  readonly nonCalculables: readonly { readonly id: string; readonly motif: string }[];
+} {
   let somme = 0;
+  const parNature = ventilationVide();
   const nonCalculables: { id: string; motif: string }[] = [];
 
   for (const r of recettes) {
@@ -193,9 +281,11 @@ export function voletAProvisionner(
       continue;
     }
     somme += r.montant * (taux.valeur + ctx.tauxImpotEtContributions);
+    parNature.urssaf += r.montant * taux.valeur;
+    parNature.impot += r.montant * ctx.tauxImpotEtContributions;
   }
 
-  return { montant: euros(somme), nonCalculables };
+  return { montant: euros(somme), parNature: figer(parNature), nonCalculables };
 }
 
 /** Les deux volets, et leur total. */
@@ -207,10 +297,21 @@ export function provisions(
 ): DetailProvisions {
   const constate = voletConstate(echeances);
   const aProvisionner = voletAProvisionner(recettes, declarees, ctx);
+  const ventileConstate = voletConstateParNature(echeances);
+
+  // Les deux ventilations s'additionnent nature par nature. Elles ne peuvent
+  // pas se recouvrir : une période déclarée quitte le volet 2 au moment même
+  // où son échéance entre au volet 1.
+  const parNature = ventilationVide();
+  for (const n of NATURES_DETTE) {
+    parNature[n] = ventileConstate[n] + aProvisionner.parNature[n];
+  }
+
   return {
     voletConstate: constate,
     voletAProvisionner: aProvisionner.montant,
     total: euros(constate + aProvisionner.montant),
+    parNature: figer(parNature),
     recettesNonCalculables: aProvisionner.nonCalculables
   };
 }

@@ -1,10 +1,23 @@
 import { Montant } from './Montant';
 import styles from './Repartition.module.css';
 
+/**
+ * Les teintes disponibles.
+ *
+ * Les trois premières découpent le SOLDE — ce qui n'est pas à vous, le
+ * matelas, le reste. Les cinq suivantes découpent la PROVISION par nature de
+ * dette, et reprennent les couleurs déjà employées par l'échéancier : une même
+ * dette doit avoir la même couleur d'un écran à l'autre, sinon la couleur
+ * cesse d'être une information.
+ */
+export type TonPart =
+  | 'provisions' | 'reserve' | 'versable'
+  | 'urssaf' | 'tva' | 'impot' | 'cfe' | 'cfp';
+
 export interface PartSolde {
   readonly libelle: string;
   readonly montant: number;
-  readonly ton: 'provisions' | 'reserve' | 'versable';
+  readonly ton: TonPart;
 }
 
 /**

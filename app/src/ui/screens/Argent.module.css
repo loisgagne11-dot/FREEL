@@ -295,3 +295,18 @@
 
   .declarationTitre { flex: 1 1 auto; }
 }
+
+/* Un second niveau à l'intérieur d'une carte : la ventilation détaille le
+   total qui la précède, elle n'ouvre pas un autre sujet. Plus discret que le
+   titre de carte, pour que la hiérarchie se lise. */
+.sousTitre {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 16px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
