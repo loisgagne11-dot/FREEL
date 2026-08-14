@@ -435,7 +435,22 @@ for a in <actions>; do grep -rl "\b$a\b" src/ui --include=*.tsx; done
       ajoutés, `bareme/index.ts` en place avec `verifierIntegriteBareme()`.
       Tests éprouvés par mutation : réintroduire le facteur `× 1,56` déclenche
       2 échecs, inverser la borne du seuil majoré 1 échec.
-- [ ] Grille CFE et ACRE par période (non traités)
+- [x] ~~**CFE**~~ — **faite le 14/08, en refusant la grille.** `bareme/cfe.ts`
+      porte les **règles** — exonération de l'année de création, base réduite de
+      moitié la première année d'imposition, dispense de cotisation minimum au
+      plus 5 000 € de recettes N−2, calendrier (avis en novembre, paiement au
+      15/12, acompte au 15/06 au-delà de 3 000 €), déclaration initiale 1447-C
+      avant le 31/12 de l'année de création.
+      **Aucune fourchette de base minimum n'est écrite.** La base est fixée par
+      la commune et le taux voté par elle : seul l'avis les porte. L'ancienne
+      application affichait pourtant un montant, tiré d'une grille en dur que
+      l'audit a jugée non conforme, plus un montant plat de 410 € dans
+      l'échéancier — deux vérités pour la même dette. La carte demande donc
+      l'avis et calcule base × taux, ou ne dit rien.
+      Le sujet « CFE non provisionnée » apparaît à partir du 1er octobre et
+      **disparaît dès qu'une échéance de nature `cfe` existe pour l'année** :
+      un rappel qui survit à son traitement apprend à ignorer les rappels.
+- [ ] Grille ACRE par période (non traitée)
 - [x] ~~`provisions()` **à deux volets** (D3)~~ — `domain/calculs/provisions.ts`.
       Le fait « période déclarée » qui manquait existe : `periodesDeclarees`
       dans le schéma. C'est lui qui fait basculer la dette du volet
