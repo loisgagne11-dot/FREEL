@@ -99,3 +99,12 @@
   .bascule { pointer-events: none; }
   .chevron { display: none; }
 }
+
+/* L'explication, à côté du bouton de pliage et jamais dedans : un bouton dans
+   un bouton est du HTML invalide, et le navigateur sort l'intérieur de son
+   conteneur — après quoi plus rien ne le retient dans la largeur de l'écran. */
+.aide {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}

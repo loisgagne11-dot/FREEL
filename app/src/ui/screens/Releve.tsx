@@ -154,17 +154,13 @@ export function Releve() {
           <CartePliable
             id="rapprochement"
             ecran="achats"
-            titre={(
-              <>
-                Opérations
-                <Info libelle="Pourquoi rien n’est rapproché automatiquement">
+            titre="Opérations"
+            aide={<Info libelle="Pourquoi rien n’est rapproché automatiquement">
                   Une seule correspondance ne fait pas une certitude. L’ancienne
                   application appariait seule et n’en laissait aucune
                   trace&nbsp;: un appariement faux devenait invisible, et
                   « tout est rapproché » ne renvoyait à aucun fait vérifiable.
-                </Info>
-              </>
-            )}
+                </Info>}
             resume={syntheseRapprochement(etat.mouvements)}
           >
             <ul className={styles.liste}>

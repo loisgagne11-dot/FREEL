@@ -25,7 +25,13 @@ import type { Echeance, VentilationProvisions } from '../domain/calculs/provisio
 import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
 import { DELAI_PAIEMENT_DEFAUT, encoursDe, suivre } from '../domain/calculs/facturier';
 import type { Faits } from './schema';
-import { dateDuJour, etatPilote, moisCourant } from './selecteurs';
+import {
+  dateDuJour, etatPilote, moisCourant, remunerationDuMois
+} from './selecteurs';
+import { previsionDuMoisParMission, tauxDeChargesAu } from './selecteurs.activite';
+import {
+  type ProjectionSolde, depensesMensuellesMoyennes, projeterDisponible
+} from '../domain/calculs/projectionSolde';
 import { contexteDepense } from './selecteurs.achats';
 import { tvaDeDepense } from '../domain/calculs/depenses';
 import {
@@ -206,4 +212,137 @@ export function dossierTvaDuTrimestre(
     }));
 
   return dossierTva({ du, au, encaissements, achats });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Où va l'argent disponible, mois après mois
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Combien de mois la projection couvre. Un an : au-delà, tout est fiction. */
+const MOIS_PROJETES = 12;
+
+/** Sur combien de mois passés on moyenne les dépenses courantes. */
+const MOIS_D_HISTORIQUE = 6;
+
+/** Le mois décalé de `pas`. */
+function decalerMois(m: Mois, pas: number): Mois {
+  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + pas;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
+}
+
+export interface EtatProjection {
+  readonly projection: ProjectionSolde;
+  /**
+   * L'hypothèse de dépenses courantes retenue, ou `null` si l'historique est
+   * trop court pour en tirer une.
+   *
+   * L'écran doit le dire : une projection sans dépenses est optimiste, et
+   * l'optimisme est le sens dangereux de l'erreur sur une trésorerie.
+   */
+  readonly depensesMensuelles: Euros | null;
+  /**
+   * Le taux de charges appliqué aux encaissements à venir.
+   *
+   * `null` quand le barème ne couvre pas la période : la projection retient
+   * alors zéro et surestime le disponible d'un quart. Elle doit le dire au
+   * lieu de présenter le résultat comme un chiffre.
+   */
+  readonly tauxDeCharges: number | null;
+  /** Ce qu'on s'est réellement versé, mois par mois, sur l'année écoulée. */
+  readonly versementsPasses: readonly { readonly mois: Mois; readonly montant: Euros }[];
+}
+
+/**
+ * Ce que le compte devient sur douze mois, avec et sans se verser.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * D'OÙ VIENNENT LES ENCAISSEMENTS ATTENDUS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * De deux sources, et d'aucune autre — surtout pas d'une extrapolation du
+ * passé :
+ *
+ *  1. les factures **déjà émises et non réglées**, portées au mois de leur
+ *     échéance. C'est un fait : le document est parti, la somme est due ;
+ *  2. le **revenu prévu au planning** des mois à venir, décalé du délai de
+ *     paiement du client. C'est le rythme que l'utilisateur a lui-même saisi,
+ *     pas une tendance devinée.
+ *
+ * Une facture échue depuis longtemps et toujours impayée est portée au mois
+ * COURANT plutôt qu'à sa date passée : l'argent n'est pas rentré, mais il
+ * n'est pas perdu non plus, et le faire disparaître de la projection
+ * reviendrait à l'abandonner sans le dire.
+ */
+export function etatProjection(
+  faits: Faits,
+  maintenant: Date = new Date()
+): EtatProjection {
+  const m0 = moisCourant(maintenant);
+  const moisProjetes = Array.from({ length: MOIS_PROJETES }, (_, i) => decalerMois(m0, i));
+
+  const delais = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
+  const delaiDe = (nom: string) => delais.get(nom) ?? DELAI_PAIEMENT_DEFAUT;
+
+  const attendu = new Map<Mois, number>(moisProjetes.map((m) => [m, 0]));
+  const ajouter = (m: Mois, montant: number): void => {
+    // Hors fenêtre : ni avant le mois courant — l'argent d'hier est déjà au
+    // solde — ni au-delà de l'horizon.
+    if (attendu.has(m)) attendu.set(m, (attendu.get(m) ?? 0) + montant);
+  };
+
+  // 1. Les factures émises et non réglées, à l'échéance. Une échéance déjà
+  //    passée retombe sur le mois courant : la somme est toujours due.
+  for (const f of facturesSuivies(faits, maintenant)) {
+    if (f.statut !== 'emise' && f.statut !== 'envoyee' && f.statut !== 'en_retard') continue;
+    const echeance = (f.echeanceLe ?? m0).slice(0, 7) as Mois;
+    ajouter(echeance < m0 ? m0 : echeance, f.recette.montant);
+  }
+
+  // 2. Le revenu prévu au planning, décalé du délai de paiement. Le mois M se
+  //    facture à sa fin et s'encaisse `delai` jours plus tard.
+  const parMission = new Map(faits.missions.map((mi) => [mi.id, mi]));
+  for (const m of moisProjetes) {
+    for (const p of previsionDuMoisParMission(faits, m)) {
+      const client = parMission.get(p.missionId)?.clientNom ?? '';
+      const decalage = Math.ceil(delaiDe(client) / 30);
+      ajouter(decalerMois(m, decalage), p.prevision.montantRetenu);
+    }
+  }
+
+  const pilote = etatPilote(faits, faits.echeances, maintenant);
+  const taux = tauxDeChargesAu(faits, m0);
+  // Six mois à zéro ne sont pas six mois d'historique : sans AUCUNE dépense
+  // enregistrée, on ne sait pas ce que coûte le mois — on ne sait pas non plus
+  // qu'il ne coûte rien. Moyenner des zéros répondrait « zéro » à une question
+  // qui n'a pas de réponse.
+  const depenses = faits.depenses.length === 0 ? null : depensesMensuellesMoyennes(
+    Array.from({ length: MOIS_D_HISTORIQUE }, (_, i) => {
+      const m = decalerMois(m0, -(i + 1));
+      return euros(faits.depenses
+        .filter((d) => d.payeeLe !== null && d.payeeLe.startsWith(m))
+        .reduce<number>((s, d) => s + d.montantTtc, 0));
+    })
+  );
+
+  return {
+    depensesMensuelles: depenses,
+    tauxDeCharges: taux.statut === 'refuse' ? null : taux.valeur,
+    projection: projeterDisponible({
+      depart: pilote.tresorerie.dispo,
+      reserve: pilote.tresorerie.reserve,
+      entrees: moisProjetes.map((m) => ({
+        mois: m, encaissements: euros(attendu.get(m) ?? 0)
+      })),
+      // Faute de barème, zéro : la projection est alors trop haute d'un quart,
+      // et `tauxDeCharges` à `null` oblige l'écran à le dire.
+      tauxDeCharges: taux.statut === 'refuse' ? 0 : taux.valeur,
+      depensesMensuelles: depenses ?? euros(0)
+    }),
+    // Sur l'année écoulée, mois courant inclus : c'est la question « est-ce
+    // que je me verse plus ou moins que ce que je peux ? ».
+    versementsPasses: Array.from({ length: 12 }, (_, i) => {
+      const m = decalerMois(m0, i - 11);
+      return { mois: m, montant: remunerationDuMois(faits, m) };
+    })
+  };
 }

@@ -165,8 +165,16 @@ export function GrapheBarres(
         )}
       </svg>
 
-      {/* La même donnée, en tableau. Masquée visuellement, jamais du DOM. */}
-      <table className={styles.tableauMasque}>
+      {/* La même donnée, en tableau. Masquée visuellement, jamais du DOM.
+
+          Le masque est porté par un CONTENEUR et non par le tableau lui-même :
+          un tableau ne se laisse pas rétrécir sous la largeur de son contenu,
+          et son `<caption>` échappe même à `table-layout: fixed`. Le poser sur
+          le tableau revenait donc à demander une contrainte qu'il n'applique
+          pas. Un conteneur d'un pixel à `overflow: hidden` découpe pour de
+          bon, et le tableau reste entier pour les lecteurs d'écran. */}
+      <div className={styles.masque}>
+      <table className={styles.tableau}>
         <caption>{titre}</caption>
         <thead>
           <tr>
@@ -185,6 +193,7 @@ export function GrapheBarres(
           ))}
         </tbody>
       </table>
+      </div>
     </figure>
   );
 }

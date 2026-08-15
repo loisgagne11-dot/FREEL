@@ -64,16 +64,31 @@
 /* Masqué visuellement, présent dans le DOM et l'arbre d'accessibilité.
    `display: none` ou `visibility: hidden` le retireraient des lecteurs
    d'écran, ce qui annulerait tout l'intérêt de ce tableau. */
-.tableauMasque {
+/* Le masque : un conteneur d'un pixel qui DÉCOUPE ce qui dépasse.
+
+   Porté par le conteneur et non par le tableau, parce qu'un tableau ne se
+   laisse pas rétrécir sous la largeur de son contenu — et que son `<caption>`
+   échappe même à `table-layout: fixed`. Le masque posé sur le tableau lui-même
+   demandait donc une contrainte qu'il n'applique pas, et le laissait s'étendre
+   à sa largeur naturelle.
+
+   Ni `display: none` ni `visibility: hidden` : les deux retireraient le
+   tableau de l'arbre d'accessibilité, or c'est la seule version de la donnée
+   que certains utilisateurs pourront consulter. */
+.masque {
   position: absolute;
   width: 1px;
   height: 1px;
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+  clip-path: inset(50%);
   border-width: 0;
+}
+
+.tableau {
+  width: max-content;
+  white-space: nowrap;
 }
 
 /* Repère d'échelle affiché quand les étiquettes par barre ne tiennent pas. */

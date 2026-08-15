@@ -40,12 +40,30 @@ import styles from './CartePliable.module.css';
  * doit pas rouvrir toutes les cartes de quelqu'un.
  */
 export function CartePliable(
-  { id, ecran, titre, resume, actions, children, deplieeParDefaut = true }: {
+  { id, ecran, titre, aide, resume, actions, children, deplieeParDefaut = true }: {
     /** Identité stable de la carte. Ne change pas quand le titre change. */
     readonly id: string;
     /** L'écran auquel elle appartient — l'état est conservé par écran. */
     readonly ecran: string;
     readonly titre: ReactNode;
+    /**
+     * L'explication « i », posée À CÔTÉ du bouton de pliage.
+     *
+     * ───────────────────────────────────────────────────────────────────────
+     * ELLE NE PEUT PAS VIVRE DANS LE TITRE
+     * ───────────────────────────────────────────────────────────────────────
+     *
+     * `Info` est un bouton, et un bouton dans un bouton est du HTML invalide.
+     * Le navigateur ne se contente pas de le tolérer : à l'analyse, il FERME
+     * le bouton extérieur et sort l'intérieur de son conteneur. L'explication
+     * échappait donc au découpage du titre, se plaçait où sa largeur naturelle
+     * la menait, et poussait la page hors de l'écran en portrait — trouvé par
+     * le vérificateur responsive sur un titre un peu long.
+     *
+     * La règle était déjà écrite ici — « les commandes vivent hors du
+     * bouton » — mais rien ne l'imposait. Ce paramètre l'impose.
+     */
+    readonly aide?: ReactNode;
     /**
      * Ce que la carte dit une fois repliée.
      *
@@ -91,6 +109,8 @@ export function CartePliable(
           </svg>
           <span className={styles.titre}>{titre}</span>
         </button>
+
+        {aide !== undefined && <span className={styles.aide}>{aide}</span>}
 
         {actions !== undefined && <div className={styles.actions}>{actions}</div>}
       </header>

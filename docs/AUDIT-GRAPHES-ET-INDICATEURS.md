@@ -99,9 +99,9 @@ plus que de repli, et l'écran annonce qu'il estime au lieu de mesurer.
 | V4 | Provisions **par catégorie** | ✅ | ✅ | ✅ **ajouté depuis** |
 | V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis** |
 | V6 | Frise de l'échéancier | ✅ | ✅ | ⚠️ liste groupée ; la lecture « à date » de la frise est perdue |
-| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ❌ rien au-delà du mois courant |
+| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **ajoutée depuis** — sur le DISPONIBLE et non le solde, deux scénarios, hypothèses écrites |
 | V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
-| V9 | Capacité de versement par mois | ✅ | ✅ | ❌ |
+| V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **ajoutée depuis** — versé (relevé) face au soutenable |
 | V10 | Cascade CA → charges → net | ✅ (deux fois) | ❌ | 🚫 §5.5 |
 | V11 | Donut de destination du CA | ✅ | ❌ | 🚫 §5.5 |
 | V12 | Sparklines dans les tuiles | ✅ | ❌ | 🚫 §5.5 |
@@ -193,7 +193,7 @@ cotisations et impôt — est ce que tout indépendant sous-estime. Le noyau fis
 sait le calculer, et la seconde tuile doit s'abstenir quand le barème ne couvre
 pas la période.
 
-### 4.5 Courbe de solde
+### 4.5 Courbe de solde — ✅ livrée, autrement
 
 Absente, sans motif écrit, alors que la spécification la place en tête de
 l'onglet Trésorerie. Mais **la recopier serait une erreur** : projeter le solde
@@ -276,10 +276,9 @@ ne peut pas le représenter. Le niveau de détail manquant (§4.1) est comblé.
 ## 6. Reste à faire, par valeur
 
 1. **Composition d'un mois au clic** (§4.6)
-2. **Graphe de solde constaté**, sans extrapolation (§4.5)
-3. **Objectif de CA avec allure attendue** (V17) — dépend d'un objectif que
+2. **Objectif de CA avec allure attendue** (V17) — dépend d'un objectif que
    rien ne porte encore dans les faits
-4. **Comparaison N−1** en filigrane du graphe existant — utile la troisième
+3. **Comparaison N−1** en filigrane du graphe existant — utile la troisième
    année, pas la première
 
 Livrés : la ventilation des provisions (§4.1), le repère de date et la

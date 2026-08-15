@@ -378,4 +378,57 @@
 /* Ce qui manque au dossier, dit sans détour : c'est du total sous-évalué. */
 .manquant { color: var(--amber); font-style: italic; }
 
-.dossier { display: flex; flex-direction: column; gap: 4px; }
+/* `min-width: 0` : un enfant de conteneur flexible ne rétrécit pas sous sa
+   largeur de contenu par défaut, et un graphe large pousserait la page. */
+.dossier {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* ── Projection ──────────────────────────────────────────────────────── */
+
+/* La réponse en toutes lettres, avant les barres : un graphe se lit d'un coup
+   d'œil mais ne dit pas de combien il s'agit. */
+.reponse {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  margin-bottom: 12px;
+}
+
+/* Une projection n'est vraie que de ses hypothèses : elles sont écrites, et
+   celles qui manquent sont nommées. */
+.hypotheses {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.hypotheses li {
+  padding: 4px 0 4px 14px;
+  position: relative;
+}
+
+.hypotheses li::before {
+  content: '·';
+  position: absolute;
+  left: 2px;
+  color: var(--muted-2);
+}
+
+.aide {
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}

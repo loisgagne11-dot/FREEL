@@ -142,10 +142,8 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
           Saisir une échéance
         </button>
       )}
-      titre={(
-        <>
-          Échéances reçues
-          <Info libelle="Ce qu’il faut saisir ici">
+      titre="Échéances reçues"
+            aide={<Info libelle="Ce qu’il faut saisir ici">
             Les appels que vous avez réellement reçus&nbsp;: échéancier URSSAF,
             avis d’impôt, CFE. Ce n’est pas une prévision — les cotisations dues
             sur des recettes encaissées mais pas encore déclarées sont déjà
@@ -153,9 +151,7 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
             encaissées&nbsp;». Saisir les deux compterait deux fois la même
             somme&nbsp;; c’est «&nbsp;marquer la période déclarée&nbsp;» qui
             fait passer l’une dans l’autre.
-          </Info>
-        </>
-      )}
+          </Info>}
     >
 
       {mois.length === 0
