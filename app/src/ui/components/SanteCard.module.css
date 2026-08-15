@@ -79,3 +79,20 @@
   text-align: right;
   min-width: 0;
 }
+
+/* La phrase de synthèse : le coup d'œil. Elle porte le ton du plus grave des
+   constats, et rien d'autre — un fond coloré ferait de chaque consultation une
+   alerte, y compris quand tout va bien. */
+.synthese {
+  margin: 10px 0 12px;
+  font-size: 13.5px;
+  font-weight: 560;
+  line-height: 1.5;
+  color: var(--text);
+  padding-left: 10px;
+  border-left: 3px solid var(--line-2);
+}
+
+.synthese.bon { border-left-color: var(--green); }
+.synthese.attention { border-left-color: var(--amber); }
+.synthese.alerte { border-left-color: var(--red, var(--amber)); }

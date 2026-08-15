@@ -2,7 +2,7 @@ import { Suspense, lazy, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import {
-  type LigneMission, type PoidsClient,
+  type PoidsClient,
   craDuMoisParMission, etatActivite, planningDeLaSemaine
 } from '../../state/selecteurs.activite';
 import { VueSemaine } from '../components/VueSemaine';
@@ -10,13 +10,18 @@ import { CraCard } from '../components/CraCard';
 import { useToast } from '../components/Toasts';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import { joursCongeables } from '../../domain/calculs/activite';
+import { CartePliable } from '../components/CartePliable';
+import { ecartDePrevision, totaliserPrevisions } from '../../domain/calculs/prevision';
+import {
+  type PrevisionDeMission, type RapportDeMission, type TarifDeLaJournee,
+  previsionDuMoisParMission, rapportParMission, tarifDeLaJournee
+} from '../../state/selecteurs.activite';
 
 import type { DateISO, Mois } from '../../domain/types';
 import type { Mission } from '../../state/schema';
-import { dateISO } from '../../domain/types';
+import { dateISO, euros } from '../../domain/types';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
-import { Vide } from '../components/Vide';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
 import { dateCourte, eur, formaterJours } from '../format';
@@ -34,6 +39,20 @@ const FormulaireClient = lazy(() => import('./Activite.formulaires')
   .then((m) => ({ default: m.FormulaireClient })));
 const FormulaireMission = lazy(() => import('./Activite.formulaires')
   .then((m) => ({ default: m.FormulaireMission })));
+
+/**
+ * L'onglet Clients arrive à l'ouverture de son onglet.
+ *
+ * Même motif que les formulaires : le carnet se consulte à la création d'un
+ * client puis rarement, et le plan de charge — ce qu'on ouvre dix fois par
+ * semaine — n'a aucune raison d'en payer le téléchargement.
+ */
+const OngletClients = lazy(() => import('./Activite.clients')
+  .then((m) => ({ default: m.OngletClients })));
+
+/** L'onglet Missions, même motif : une liste qu'on ouvre pour modifier. */
+const OngletMissions = lazy(() => import('./Activite.missions')
+  .then((m) => ({ default: m.OngletMissions })));
 
 /** L'attente d'un formulaire, dans son panneau. Sobre : elle dure un instant. */
 function EnAttenteDeFormulaire() {
@@ -85,6 +104,20 @@ export function Activite() {
   const idGroupe = useId();
 
   const etat = useMemo(() => etatActivite(faits, mois), [faits, mois]);
+  // Même source que le CRA : rythmes, ajustements, fériés et congés. En
+  // produire une seconde version garantirait qu'elles divergent.
+  const previsions = useMemo(
+    () => previsionDuMoisParMission(faits, mois), [faits, mois]
+  );
+  // Sur l'ANNÉE et non sur le mois : « quelle mission me rapporte quoi » est
+  // une question commerciale, et un mois de congés ou un mois creux ferait
+  // passer une bonne mission pour une mauvaise.
+  const rapports = useMemo(
+    () => rapportParMission(faits, Number(mois.slice(0, 4))), [faits, mois]
+  );
+  const tarif = useMemo(
+    () => tarifDeLaJournee(faits, Number(mois.slice(0, 4))), [faits, mois]
+  );
 
   const [vue, setVue] = useState<'mois' | 'semaine'>('mois');
   const [ancreSemaine, setAncreSemaine] = useState<DateISO>(() => dateDuJour());
@@ -205,7 +238,11 @@ export function Activite() {
               {/* Le mois affiché est annoncé aux lecteurs d'écran à chaque
                   changement : sans cela, les flèches déplacent une vue dont on
                   n'entend jamais l'état. */}
-              <span className={styles.moisCourant} role="status">
+              <span
+                className={styles.moisCourant}
+                role="status"
+                aria-label="Période affichée"
+              >
                 {vue === 'semaine' && section === 'charge'
                   ? `Sem. du ${dateCourte(semaine.lundi)}`
                   : moisLong(mois)}
@@ -236,8 +273,15 @@ export function Activite() {
         <PanneauOnglet idGroupe={idGroupe} id="charge" actif={section === 'charge'}>
           <div className={styles.grille}>
             <Chiffre libelle="Jours ouvrables" valeur={String(etat.plan.joursOuvrables)} />
+            {/* Le libellé suit la SOURCE. Des journées lues sur le planning
+                sont des jours travaillés — un fait. Les mêmes déduites d'un
+                montant divisé par un tarif sont des équivalent-jours — une
+                estimation. Le même titre pour les deux ferait passer l'une
+                pour l'autre. */}
             <Chiffre
-              libelle="Équivalent-jours facturés"
+              libelle={etat.sourceCharge === 'planning'
+                ? 'Jours travaillés'
+                : 'Équivalent-jours facturés'}
               valeur={formaterJours(etat.plan.joursFactures)}
               ton="accent"
             />
@@ -248,6 +292,25 @@ export function Activite() {
             />
             <Chiffre libelle="Congés posés dans l’année" valeur={String(etat.congesDeLAnnee)} />
           </div>
+
+          {/* Sans planning, l'occupation se déduit encore d'une division — et
+              elle se trompe dès que la facturation ne suit pas le travail : un
+              mois facturé au trimestre s'affiche à 0 %. Le dire vaut mieux que
+              de laisser croire à un mois creux. */}
+          {etat.sourceCharge === 'facturation' && etat.missions.length > 0 && (
+            <p className={styles.bandeau} role="status">
+              Occupation estimée depuis les montants facturés, faute de rythme
+              saisi sur les missions du mois.
+              <Info libelle="Pourquoi cette estimation est fragile">
+                Sans planning, les jours travaillés se déduisent du montant
+                facturé divisé par le tarif journalier. Un mois facturé au
+                trimestre affiche alors 0 % d’occupation alors qu’il a été
+                travaillé, et un forfait au résultat ne se convertit pas en
+                jours. Saisir le rythme de la mission remplace cette estimation
+                par les journées réellement retenues.
+              </Info>
+            </p>
+          )}
 
           {etat.recettesSansTarif > 0 && (
             <p className={styles.bandeau} role="status">
@@ -263,6 +326,16 @@ export function Activite() {
               </Info>
             </p>
           )}
+
+          {/* Avec les chiffres du mois, et non dans l'onglet Missions : c'est
+              une question de MOIS — « ce que ce mois-ci devrait rapporter » —
+              même si sa source est la mission. Rangée sous Missions, elle
+              n'était visible qu'en changeant d'onglet. */}
+          <CartePrevision previsions={previsions} mois={mois} />
+
+          <CarteRapportParMission rapports={rapports} annee={Number(mois.slice(0, 4))} />
+
+          <CarteTarifJournalier tarif={tarif} annee={Number(mois.slice(0, 4))} />
 
           <section className={styles.carte} aria-labelledby={`${idGroupe}-chiffres`}>
             <h2 id={`${idGroupe}-chiffres`} className={styles.titreCarte}>
@@ -380,142 +453,19 @@ export function Activite() {
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="missions" actif={section === 'missions'}>
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-missions`}>
-            <h2 id={`${idGroupe}-missions`} className={styles.titreCarte}>
-              Missions
-              <Info libelle="Comment les montants sont rattachés">
-                Le rattachement se fait par nom de client&nbsp;: l’ancien modèle
-                ne liait pas une facture à la mission qui l’a produite. Un
-                client suivi sur plusieurs missions voit donc son chiffre
-                d’affaires porté par la première d’entre elles.
-              </Info>
-            </h2>
-            {etat.missions.length === 0
-              ? (
-                <Vide
-                  message="Aucune mission enregistrée. Une mission porte le tarif journalier et les dates qui alimentent le plan de charge."
-                  action={(
-                    <button type="button" className={styles.actionPrincipale}
-                      onClick={() => setPanneau({ type: 'mission', id: null })}>
-                      Ajouter une mission
-                    </button>
-                  )}
-                />
-              )
-              : (
-                <ul className={styles.liste}>
-                  {etat.missions.map((ligne) => (
-                    <LigneMissionAffichee key={ligne.mission.id} ligne={ligne}
-                      onOuvrir={() => setPanneau({ type: 'mission', id: ligne.mission.id })} />
-                  ))}
-                </ul>
-              )}
-          </section>
+          <Suspense fallback={<EnAttenteDeFormulaire />}>
+            <OngletMissions
+              idGroupe={idGroupe}
+              missions={etat.missions}
+              onOuvrirMission={(id) => setPanneau({ type: 'mission', id })}
+            />
+          </Suspense>
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="clients" actif={section === 'clients'}>
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-carnet`}>
-            <h2 id={`${idGroupe}-carnet`} className={styles.titreCarte}>
-              Carnet
-              <Info libelle="Pourquoi le pays du client compte">
-                Une prestation vendue à un professionnel d’un autre État membre
-                doit figurer dans la déclaration européenne de services, dès le
-                premier euro et même en franchise en base. Sans le pays et le
-                numéro de TVA du client, cette obligation reste invisible.
-              </Info>
-            </h2>
-            {faits.clients.length === 0
-              ? (
-                <Vide
-                  message="Aucun client enregistré. Le carnet porte le pays et le numéro de TVA, sans lesquels l’obligation de déclaration européenne reste invisible."
-                  action={(
-                    <button type="button" className={styles.actionPrincipale}
-                      onClick={() => setPanneau({ type: 'client', id: null })}>
-                      Ajouter un client
-                    </button>
-                  )}
-                />
-              )
-              : (
-                <ul className={styles.liste}>
-                  {faits.clients.map((c) => (
-                    <li key={c.id} className={styles.ligneListe}>
-                      <button type="button" className={styles.ouvrir}
-                        onClick={() => setPanneau({ type: 'client', id: c.id })}>
-                        <span className={styles.ligneTitre}>
-                          <span className={styles.ligneLibelle}>{c.nom}</span>
-                          <span className={styles.ligneMontant}>
-                            {c.delaiPaiementJours} j
-                          </span>
-                        </span>
-                        <span className={styles.ligneMeta}>
-                          <span>{libellePays(c.pays)}</span>
-                          {c.pays !== '' && c.pays.toUpperCase() !== 'FR' && (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span className={c.tvaIntracom === '' ? styles.attention : undefined}>
-                                {c.tvaIntracom === '' ? 'n° de TVA manquant' : c.tvaIntracom}
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-          </section>
-
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-delais`}>
-            <h2 id={`${idGroupe}-delais`} className={styles.titreCarte}>
-              Délai de paiement observé
-              <Info libelle="Pourquoi la médiane plutôt que la moyenne">
-                Un client qui paie à 30 jours neuf fois et à 300 jours une fois
-                n’est pas un client à 57 jours. La moyenne décrit un client qui
-                n’existe pas&nbsp;; la médiane décrit le comportement habituel.
-                Le délai contractuel est une intention, celui-ci est un constat.
-              </Info>
-            </h2>
-            {etat.delais.length === 0
-              ? <p className={styles.vide}>Aucune recette enregistrée.</p>
-              : (
-                <ul className={styles.liste}>
-                  {etat.delais.map((client) => (
-                    <li key={client.clientNom} className={styles.ligneListe}>
-                      <span className={styles.ligneTitre}>
-                        <span className={styles.ligneLibelle}>{client.clientNom}</span>
-                        <span className={styles.ligneMontant}><Montant>{eur(client.enAttente)}</Montant></span>
-                      </span>
-                      <span className={styles.ligneMeta}>
-                        <span>
-                          {client.delaiMedian === null
-                            ? 'Délai non mesurable'
-                            : `${client.delaiMedian} j en médiane`}
-                        </span>
-                        {client.delaiMaximum !== null && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span>{client.delaiMaximum} j au pire</span>
-                          </>
-                        )}
-                        <span aria-hidden="true">·</span>
-                        <span>
-                          {client.facturesMesurees === 0
-                            ? 'aucune facture réglée'
-                            : `${client.facturesMesurees} facture${client.facturesMesurees > 1 ? 's' : ''} mesurée${client.facturesMesurees > 1 ? 's' : ''}`}
-                        </span>
-                      </span>
-                      {client.enRetard > 0 && (
-                        <span className={styles.alerte}>
-                          {client.enRetard} facture{client.enRetard > 1 ? 's' : ''} en attente
-                          au-delà de son délai habituel
-                        </span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-          </section>
+          <Suspense fallback={<EnAttenteDeFormulaire />}>
+            <OngletClients idGroupe={idGroupe} onOuvrirClient={(id) => setPanneau({ type: 'client', id })} delais={etat.delais} />
+          </Suspense>
         </PanneauOnglet>
       </div>
 
@@ -742,55 +692,6 @@ function classeNature(nature: NatureJour): string {
   }
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Missions
-   ───────────────────────────────────────────────────────────────────────── */
-
-function LigneMissionAffichee(
-  { ligne, onOuvrir }: { ligne: LigneMission; onOuvrir: () => void }
-) {
-  const { mission } = ligne;
-  return (
-    <li className={styles.ligneListe}>
-      <button type="button" className={styles.ouvrir} onClick={onOuvrir}>
-      <span className={styles.ligneTitre}>
-        <span className={styles.ligneLibelle}>
-          {/* Le nom du client vaut mieux qu'un « sans description » : dans
-              l'ancienne application, c'est lui qui identifiait la mission, et
-              une mission désignée par son absence de nom est illisible dans
-              une liste. */}
-          {mission.description || mission.clientNom || 'Mission sans description'}
-        </span>
-        <span className={styles.ligneMontant}><Montant>{eur(ligne.facture)}</Montant></span>
-      </span>
-      <span className={styles.ligneMeta}>
-        <span>{mission.clientNom || 'Client non renseigné'}</span>
-        <span aria-hidden="true">·</span>
-        {/* Le tarif journalier est un montant comme un autre : il en dit
-            autant sur les revenus que le chiffre d'affaires, et il restait
-            lisible écran partagé. Trouvé par le vérificateur une fois qu'il a
-            su parcourir les onglets. */}
-        <span>
-          {mission.tjm > 0
-            ? <><Montant>{eur(mission.tjm)}</Montant> / jour</>
-            : 'TJM non renseigné'}
-        </span>
-        <span aria-hidden="true">·</span>
-        <span>{libelleStatut(mission.statut)}</span>
-      </span>
-      <span className={styles.ligneMeta}>
-        <span>Encaissé <Montant>{eur(ligne.encaisse)}</Montant></span>
-        {ligne.resteARentrer > 0 && (
-          <>
-            <span aria-hidden="true">·</span>
-            <span className={styles.attention}>Reste <Montant>{eur(ligne.resteARentrer)}</Montant></span>
-          </>
-        )}
-      </span>
-      </button>
-    </li>
-  );
-}
 
 /* ─────────────────────────────────────────────────────────────────────────
    Saisie du carnet
@@ -800,25 +701,7 @@ function LigneMissionAffichee(
 
 
 /** Le pays en clair. Un code à deux lettres ne se lit pas d'un coup d'œil. */
-function libellePays(code: string): string {
-  const propre = code.trim().toUpperCase();
-  if (propre === '' || propre === 'FR') return 'France';
-  try {
-    const nom = new Intl.DisplayNames(['fr'], { type: 'region' }).of(propre);
-    return nom ?? propre;
-  } catch {
-    return propre;
-  }
-}
 
-function libelleStatut(statut: Mission['statut']): string {
-  switch (statut) {
-    case 'active': return 'En cours';
-    case 'terminee': return 'Terminée';
-    case 'prospect': return 'Prospect';
-    case 'perdue': return 'Perdue';
-  }
-}
 
 /* ─────────────────────────────────────────────────────────────────────────
    Présentation
@@ -1031,5 +914,272 @@ function PlageDeConges() {
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Ce que les missions devaient rapporter ce mois-ci, et ce qu'elles rapportent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE PREMIER MAILLON DE LA CHAÎNE QUI PART DE LA MISSION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une mission doit se décliner en prévision de revenu, planning, facture du
+ * mois et CRA. Le planning et le CRA existaient ; la prévision non — le tarif
+ * journalier et le rythme étaient là, et rien n'en tirait ce qu'ils annoncent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX COLONNES, PARCE QUE L'ÉCART EST L'INFORMATION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le prévu vient du rythme, le retenu de ce qui a été ajusté journée par
+ * journée. N'afficher que l'un des deux ferait disparaître la question qui
+ * compte : « est-ce que je tiens ce que j'avais prévu ? ». Un mois travaillé
+ * trois jours de moins que le rythme doit se voir, et il ne se voit qu'en
+ * gardant les deux nombres côte à côte.
+ *
+ * Les missions sans aucune journée retenue restent affichées — contrairement au
+ * CRA, qui ne liste que ce qui se facture. Une mission qui devait rapporter et
+ * n'a rien rapporté est précisément ce qu'on cherche à voir.
+ */
+function CartePrevision(
+  { previsions, mois: m }: {
+    readonly previsions: readonly PrevisionDeMission[];
+    readonly mois: Mois;
+  }
+) {
+  if (previsions.length === 0) return null;
+
+  const total = totaliserPrevisions(previsions.map((p) => p.prevision), m);
+  const ecart = ecartDePrevision(total);
+
+  return (
+    <CartePliable
+      id="prevision"
+      ecran="activite"
+      titre={(
+        <>
+          Ce que le mois devrait rapporter
+          <Info libelle="D’où vient cette prévision">
+            Du <strong>rythme</strong> de chaque mission et de son tarif
+            journalier, congés et jours fériés déduits. Chaque journée est
+            valorisée au tarif <em>en vigueur à sa date</em>&nbsp;: appliquer
+            celui d’aujourd’hui réécrirait le passé à chaque renégociation.
+            Le « retenu » est ce que vos ajustements journaliers ont retenu —
+            c’est lui qui se facturera.
+          </Info>
+        </>
+      )}
+      resume={(
+        <>
+          <Montant>{eur(total.montantPrevu)}</Montant> prévus
+          {' · '}<Montant>{eur(total.montantRetenu)}</Montant> retenus
+          {ecart !== 0 && (
+            <>{' · écart '}<Montant>{eur(euros(ecart))}</Montant></>
+          )}
+        </>
+      )}
+    >
+      <ul className={styles.liste}>
+        {previsions.map((p) => (
+          <li key={`${p.missionId}-${p.entiteId}`} className={styles.lignePrevision}>
+            <span className={styles.lignePrevisionNom}>{p.libelle}</span>
+            <span className={styles.lignePrevisionChiffres}>
+              <span className={styles.lignePrevisionJours}>
+                {formaterJours(p.prevision.joursRetenus)} / {formaterJours(p.prevision.joursPrevus)} j
+              </span>
+              <span className={styles.lignePrevisionMontant}>
+                <Montant>{eur(p.prevision.montantRetenu)}</Montant>
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </CartePliable>
+  );
+}
+
+/**
+ * Ce que chaque mission rapporte, face à ce qu'elle prend de temps.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN TABLEAU, ET PAS UN GRAPHE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « Quelle mission me rapporte quoi et me prend combien de charge de temps » :
+ * la question était posée telle quelle, et personne ne l'avait jamais mise en
+ * face d'elle-même. L'ancienne application avait le rapport et la charge dans
+ * deux écrans différents, jamais croisés.
+ *
+ * Ce qui se compare ici, ce sont des RATIOS — des euros par jour — et non des
+ * proportions. Un camembert répond à « quelle part du gâteau », ce qui n'est
+ * pas la question : une mission qui pèse 15 % du chiffre d'affaires en
+ * consommant 40 % du temps est un problème que sa part ne montre pas. Un
+ * tableau trié par euro-jour met la réponse en première ligne.
+ *
+ * Un vrai `<table>` plutôt qu'une liste de `<div>` : trois colonnes qui se
+ * comparent d'une ligne à l'autre sont un tableau, et un lecteur d'écran doit
+ * pouvoir annoncer « Studio Lumen, 620 euros par jour » plutôt que quatre
+ * fragments sans en-tête.
+ */
+function CarteRapportParMission(
+  { rapports, annee }: {
+    readonly rapports: readonly RapportDeMission[];
+    readonly annee: number;
+  }
+) {
+  if (rapports.length === 0) return null;
+
+  const meilleur = rapports[0] as RapportDeMission;
+
+  return (
+    <CartePliable
+      id="rapport-mission"
+      ecran="activite"
+      titre={(
+        <>
+          Ce que chaque mission rapporte, et ce qu’elle coûte en temps
+          <Info libelle="Pourquoi l’euro-jour, et d’où vient le montant">
+            La colonne qui décide est l’<strong>euro par jour</strong>&nbsp;:
+            une mission qui pèse peu dans le chiffre d’affaires en consommant
+            beaucoup de temps est un problème que sa part ne montre pas.
+            Le montant est celui du travail <em>produit</em>, tiré du planning
+            et valorisé au tarif en vigueur à chaque date — et non de
+            l’encaissé, qui ne se rattache qu’au client et que deux missions
+            simultanées ne pourraient pas se partager.
+          </Info>
+        </>
+      )}
+      resume={(
+        <>
+          {meilleur.libelle} rapporte{' '}
+          <Montant>{eur(meilleur.parJour ?? euros(0))}</Montant> par jour
+          {rapports.length > 1 && ` · ${rapports.length} missions sur ${annee}`}
+        </>
+      )}
+    >
+      <table className={styles.tableau}>
+        <caption className={styles.tableauLegende}>
+          Missions de {annee}, de la mieux à la moins bien rémunérée par journée
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Mission</th>
+            <th scope="col">Jours</th>
+            <th scope="col">Produit</th>
+            <th scope="col">€ / jour</th>
+            <th scope="col">Part du temps</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rapports.map((r) => (
+            <tr key={`${r.missionId}-${r.entiteId}`}>
+              <th scope="row" className={styles.tableauNom}>{r.libelle}</th>
+              <td>{formaterJours(r.jours)}</td>
+              <td><Montant>{eur(r.produit)}</Montant></td>
+              <td className={styles.tableauFort}>
+                {r.parJour === null ? '—' : <Montant>{eur(r.parJour)}</Montant>}
+              </td>
+              <td>{Math.round(r.partDuTemps * 100)}&nbsp;%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </CartePliable>
+  );
+}
+
+/**
+ * Ce qu'une journée rapporte vraiment, et ce qu'il en reste.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LES DEUX ERREURS QU'ON FAIT SUR SON PROPRE TARIF
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un indépendant connaît son tarif journalier par cœur et se trompe deux fois
+ * dessus. D'abord parce que tous les jours travaillés ne se facturent pas —
+ * une remise, un forfait qui déborde, une demi-journée offerte. Ensuite parce
+ * que ce qui rentre n'est pas ce qui reste : cotisations et impôt prélèvent
+ * près d'un quart avant qu'on ait rien décidé.
+ *
+ * Les deux indicateurs existaient dans l'ancienne application et avaient
+ * disparu sans motif — l'inventaire fonctionnel les donnait même pour
+ * « présents » alors qu'ils n'étaient nulle part.
+ *
+ * Le net s'ABSTIENT quand le barème ne couvre pas la période, et dit pourquoi.
+ * C'est le chiffre sur lequel on décide d'accepter une mission : le poser sur
+ * un taux supposé serait la pire des approximations.
+ */
+function CarteTarifJournalier(
+  { tarif, annee }: { readonly tarif: TarifDeLaJournee; readonly annee: number }
+) {
+  const { effectif, net } = tarif;
+  if (effectif.effectif === null || effectif.affiche === null) return null;
+
+  const ecart = effectif.ecart ?? euros(0);
+
+  return (
+    <CartePliable
+      id="tarif-journalier"
+      ecran="activite"
+      titre={(
+        <>
+          Ce qu’une journée vous rapporte
+          <Info libelle="Pourquoi trois tarifs et non un seul">
+            Le <strong>tarif des contrats</strong> vient du planning valorisé au
+            tarif de chaque mission. Le <strong>tarif effectif</strong> divise
+            ce qui a réellement été facturé par les mêmes journées&nbsp;: leur
+            écart mesure ce qui se perd en remises, forfaits et jours non
+            facturés. Le <strong>net</strong> retire cotisations et impôt — près
+            d’un quart du chiffre d’affaires en micro-BNC, et l’écart que l’on
+            sous-estime le plus au moment de dire oui à une mission.
+          </Info>
+        </>
+      )}
+      resume={(
+        <>
+          <Montant>{eur(effectif.effectif)}</Montant> facturés par jour
+          {net.statut !== 'refuse' && (
+            <>{' · '}<Montant>{eur(net.valeur)}</Montant> nets</>
+          )}
+        </>
+      )}
+    >
+      <dl className={styles.detail}>
+        <div className={styles.ligne}>
+          <dt>Tarif des contrats, sur {formaterJours(effectif.jours)} jours</dt>
+          <dd><Montant>{eur(effectif.affiche)}</Montant></dd>
+        </div>
+        <div className={styles.ligne}>
+          <dt>Tarif effectif, facturé</dt>
+          <dd><Montant>{eur(effectif.effectif)}</Montant></dd>
+        </div>
+        {ecart !== 0 && (
+          <div className={styles.ligne}>
+            <dt className={ecart < 0 ? styles.attention : undefined}>
+              {ecart < 0 ? 'Perdu par journée' : 'Gagné par journée'}
+            </dt>
+            <dd className={ecart < 0 ? styles.attention : styles.accent}>
+              <Montant>{eur(euros(Math.abs(ecart)))}</Montant>
+            </dd>
+          </div>
+        )}
+        <div className={`${styles.ligne} ${styles.total}`}>
+          <dt>Ce qu’il vous reste, charges déduites</dt>
+          <dd>
+            {net.statut === 'refuse'
+              ? <span className={styles.vide}>{net.motif}</span>
+              : <Montant>{eur(net.valeur)}</Montant>}
+          </dd>
+        </div>
+      </dl>
+
+      {net.statut === 'hypothese' && (
+        <p className={styles.approximation}>
+          Taux de {annee} non encore publié&nbsp;: le net est calculé sur la
+          dernière période connue, et n’engage pas.
+        </p>
+      )}
+    </CartePliable>
   );
 }

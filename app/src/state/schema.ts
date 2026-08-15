@@ -32,7 +32,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 7 as const;
+export const VERSION_SCHEMA = 9 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -198,6 +198,48 @@ export interface Recette {
    * prouve rien — et c'est précisément ce qu'un contrôle vérifie.
    */
   readonly annuleEcriture?: string | null;
+  /**
+   * Date à laquelle la facture a été ENVOYÉE au client.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * ÉMISE N'EST PAS ENVOYÉE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Le document peut exister, porter son numéro et sa date, et dormir dans un
+   * dossier. C'est même le cas le plus fréquent en fin de mois : on établit
+   * les factures d'un coup, on les envoie ensuite.
+   *
+   * Les confondre coûte deux choses. On relance un client qui n'a jamais reçu
+   * la facture — la pire des relances. Et on ne sait pas répondre à « je ne
+   * l'ai jamais reçue », qui est la réponse la plus courante à une relance.
+   *
+   * `null` tant qu'elle n'est pas partie. Une DATE et non un booléen, pour la
+   * même raison que partout ailleurs ici : un statut qu'aucune date ne prouve
+   * ne prouve rien.
+   */
+  readonly envoyeeLe?: DateISO | null;
+  /**
+   * TVA portée par le document, en euros.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * UN FAIT DU DOCUMENT, PAS UNE DÉRIVATION
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `montant` est le HT — l'assiette du chiffre d'affaires en micro, celle que
+   * l'URSSAF réclame. La TVA était calculée à l'émission puis JETÉE, et elle
+   * ne se recalcule pas : les lignes de la facture ne sont pas conservées, et
+   * une facture peut porter plusieurs taux — 20 %, 10 %, 5,5 %.
+   *
+   * La supposer à 20 % pour remplir une déclaration serait exactement le
+   * chiffre faux qu'on ne veut pas voir partir sur un formulaire officiel.
+   *
+   * `null` a deux sens qui ne se confondent pas et que le dossier de
+   * déclaration distingue : une facture émise EN FRANCHISE ne porte pas de TVA
+   * — c'est zéro, et c'est juste ; une facture d'avant le schéma 9 en portait
+   * peut-être une, et on ne la connaît pas. La seconde doit être signalée, pas
+   * comptée pour zéro.
+   */
+  readonly tvaCollectee?: Euros | null;
   /** Recette globalisée en fin de journée, sans identité de client. */
   readonly globalisee?: boolean;
   /**
@@ -610,6 +652,8 @@ export function completerFaits(brut: unknown): Faits {
 
 /**
  * v6 → v7 : les recettes portent leurs dates de relance.
+ * v7 → v8 : elles portent aussi leur date d'envoi.
+ * v8 → v9 : et la TVA que le document porte.
  *
  * Le champ est nouveau et facultatif ; une recette d'avant le schéma 7 n'a
  * simplement jamais été relancée dans l'application. On pose donc une liste
@@ -629,6 +673,17 @@ function recettesDuSchema6(brut: unknown): readonly Recette[] {
     const relances = Array.isArray(o['relancesLe'])
       ? o['relancesLe'].filter((d): d is DateISO => typeof d === 'string')
       : [];
-    return [{ ...(o as unknown as Recette), relancesLe: relances }];
+    // v8 : la date d'envoi. `undefined` deviendrait « pas encore envoyée »
+    // par accident ; on pose `null` explicitement, qui dit la même chose mais
+    // le dit — et une facture d'avant le schéma 8 n'a effectivement aucune
+    // date d'envoi enregistrée, quoi qu'il se soit passé dans la vraie vie.
+    const envoyeeLe = typeof o['envoyeeLe'] === 'string' ? o['envoyeeLe'] as DateISO : null;
+    // v9 : `null` reste `null` et ne devient PAS zéro. Une facture d'avant le
+    // schéma 9 portait peut-être de la TVA ; la compter pour zéro sous-évaluerait
+    // une déclaration, ce qui est le sens dangereux de l'erreur.
+    const tvaCollectee = typeof o['tvaCollectee'] === 'number' && Number.isFinite(o['tvaCollectee'])
+      ? o['tvaCollectee'] as Euros
+      : null;
+    return [{ ...(o as unknown as Recette), relancesLe: relances, envoyeeLe, tvaCollectee }];
   });
 }

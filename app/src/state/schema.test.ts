@@ -275,3 +275,83 @@ describe('échéances d’un bloc au schéma 5', () => {
     expect(faits.echeances[0]?.payeeLe).toBeNull();
   });
 });
+
+/**
+ * v7 → v8 : LES RECETTES PORTENT LEUR DATE D'ENVOI.
+ *
+ * Émise n'est pas envoyée : le document peut exister, porter son numéro, et
+ * dormir dans un dossier. Le champ est nouveau, donc absent partout — et la
+ * règle du projet s'applique une fois de plus : une migration descend jusqu'où
+ * les champs ont bougé, ce que la fusion de surface de `completerFaits` ne fait
+ * pas.
+ */
+describe('recettes d’un bloc au schéma 7', () => {
+  const recette = (o: Record<string, unknown> = {}) => ({
+    id: 'r1', clientNom: 'C', libelle: 'l', montant: 1000,
+    emiseLe: '2026-06-01', encaisseeLe: null, modeReglement: null,
+    numero: '2026-001', ...o
+  });
+
+  /**
+   * LE POINT QUI COMPTE. `undefined` deviendrait « pas encore envoyée » par
+   * accident. On pose `null` explicitement : cela dit la même chose, mais le
+   * dit — et une facture d'avant le schéma 8 n'a effectivement aucune date
+   * d'envoi enregistrée, quoi qu'il se soit passé dans la vraie vie.
+   */
+  it('pose null plutôt que de laisser le champ absent', () => {
+    const f = completerFaits({ version: 7, recettes: [recette()] });
+    expect(f.recettes[0]).toHaveProperty('envoyeeLe');
+    expect(f.recettes[0]?.envoyeeLe).toBeNull();
+  });
+
+  it('conserve une date d’envoi déjà présente', () => {
+    const f = completerFaits({
+      version: 8, recettes: [recette({ envoyeeLe: '2026-06-03' })]
+    });
+    expect(f.recettes[0]?.envoyeeLe).toBe('2026-06-03');
+  });
+
+  /** Une valeur d'un autre type ne doit pas circuler comme une date. */
+  it('refuse une date d’envoi qui n’en est pas une', () => {
+    const f = completerFaits({ version: 8, recettes: [recette({ envoyeeLe: 42 })] });
+    expect(f.recettes[0]?.envoyeeLe).toBeNull();
+  });
+
+  /** Le champ des relances, arrivé au schéma 7, ne doit pas régresser. */
+  it('comble aussi les relances, sans les perdre', () => {
+    const f = completerFaits({
+      version: 7, recettes: [recette({ relancesLe: ['2026-07-01'] }), recette({ id: 'r2' })]
+    });
+    expect(f.recettes[0]?.relancesLe).toEqual(['2026-07-01']);
+    expect(f.recettes[1]?.relancesLe).toEqual([]);
+  });
+
+  /** Le bloc ressort au numéro de schéma de CE code. */
+  it('porte la version courante après complétion', () => {
+    expect(completerFaits({ version: 7, recettes: [recette()] }).version).toBe(VERSION_SCHEMA);
+  });
+
+  /**
+   * v8 → v9 : LA TVA DU DOCUMENT.
+   *
+   * `null` reste `null` et ne devient PAS zéro. Une facture d'avant le schéma 9
+   * portait peut-être de la TVA ; la compter pour zéro sous-évaluerait une
+   * déclaration — le sens dangereux de l'erreur, celui qui produit un rappel.
+   */
+  it('laisse la TVA inconnue à null, jamais à zéro', () => {
+    const f = completerFaits({ version: 8, recettes: [recette()] });
+    expect(f.recettes[0]).toHaveProperty('tvaCollectee');
+    expect(f.recettes[0]?.tvaCollectee).toBeNull();
+    expect(f.recettes[0]?.tvaCollectee).not.toBe(0);
+  });
+
+  it('conserve une TVA déjà enregistrée, y compris à zéro', () => {
+    const avec = completerFaits({ version: 9, recettes: [recette({ tvaCollectee: 1000 })] });
+    expect(avec.recettes[0]?.tvaCollectee).toBe(1000);
+
+    // Zéro est une valeur JUSTE : une facture émise en franchise ne porte pas
+    // de TVA, et ce n'est pas la même chose qu'une TVA inconnue.
+    const franchise = completerFaits({ version: 9, recettes: [recette({ tvaCollectee: 0 })] });
+    expect(franchise.recettes[0]?.tvaCollectee).toBe(0);
+  });
+});

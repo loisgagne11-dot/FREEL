@@ -1,14 +1,14 @@
-import { useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import {
-  etatArgent, moisCourant, recettesEncaissees
-} from '../../state/selecteurs';
-import { etatDes, etatLivre } from '../../state/selecteurs.livre';
-import type { EtatSeuils } from '../../state/selecteurs';
-import type { Mois } from '../../domain/types';
+import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
+import { type EtatSeuils, etatArgent } from '../../state/selecteurs.argent';
+import { etatLivre } from '../../state/selecteurs.livre';
+import type { DateISO, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
+import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
+import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
@@ -20,9 +20,33 @@ import { useToast } from '../components/Toasts';
 import { Echeances } from '../components/Echeances';
 import { CartePliable } from '../components/CartePliable';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
+import { Sheet } from '../components/Sheet';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
 import { Montant } from '../components/Montant';
+
+/**
+ * L'onglet DES arrive à l'ouverture de son onglet.
+ *
+ * `PanneauOnglet` ne rend rien quand son onglet est inactif : le module n'est
+ * donc demandé qu'au moment où l'on va vraiment le lire. La déclaration
+ * européenne de services se consulte une fois par mois au plus, et le reste de
+ * l'écran n'en dépend pas — consulter sa trésorerie n'a aucune raison d'en
+ * payer le téléchargement.
+ */
+const DeclarationServices = lazy(() => import('./Argent.des')
+  .then((m) => ({ default: m.DeclarationServices })));
+
+/**
+ * Le dossier de déclaration de TVA, ouvert depuis son jalon.
+ *
+ * On déclare quatre fois par an. Une carte permanente ferait porter à chaque
+ * consultation de la trésorerie le poids d'un écran qu'on ouvre un jour par
+ * trimestre — et c'est aussi ce que demande l'énoncé : le dossier s'atteint
+ * DEPUIS son échéance, pas en permanence.
+ */
+const DossierTvaPanneau = lazy(() => import('./Argent.tva')
+  .then((m) => ({ default: m.DossierTvaPanneau })));
 
 /**
  * Écran Argent — trésorerie et performance.
@@ -50,6 +74,7 @@ const MOIS_COURTS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D']
 export function Argent() {
   const faits = useFaits((e) => e.faits);
   const [section, setSection] = useState<Section>('tresorerie');
+  const [dossierOuvert, setDossierOuvert] = useState(false);
   const idGroupe = useId();
 
   const etat = useMemo(() => etatArgent(faits), [faits]);
@@ -173,9 +198,43 @@ export function Argent() {
                 <dd><Montant>{eur(etat.tresorerie.provisions)}</Montant></dd>
               </div>
             </dl>
+
+            {/* « Sur cette somme totale, combien j'ai de provision et sur
+                quelle catégorie ». Un total ne dit pas ce qu'il faut en
+                faire : il ne permet ni de rapprocher une provision de l'avis
+                reçu, ni de savoir ce qui se libère après une déclaration. */}
+            <h3 className={styles.sousTitre}>
+              Sur quelle catégorie
+              <Info libelle="D’où vient la ventilation">
+                Les échéances déjà émises portent chacune leur nature. Les
+                charges sur recettes encaissées n’ont pas encore d’échéance à
+                qui la demander&nbsp;: elles se répartissent selon la règle qui
+                les calcule — cotisations d’un côté, impôt et contributions de
+                l’autre. La TVA n’y figure pas tant qu’aucun appel n’est émis,
+                parce qu’elle se relève sur les factures et ne se déduit
+                d’aucun taux.
+              </Info>
+            </h3>
+            <Repartition
+              total={etat.tresorerie.provisions}
+              deficit={0}
+              parts={NATURES_DETTE.map((n) => ({
+                libelle: LIBELLE_NATURE[n],
+                montant: etat.provisionsParNature[n],
+                ton: n
+              }))}
+            />
           </CartePliable>
 
           <Echeances />
+
+          <button
+            type="button"
+            className={styles.actionPrincipale}
+            onClick={() => setDossierOuvert(true)}
+          >
+            Préparer ma déclaration de TVA
+          </button>
 
           <CarteDeclarations idGroupe={idGroupe} />
         </PanneauOnglet>
@@ -215,9 +274,27 @@ export function Argent() {
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="des" actif={section === 'des'}>
-          <DeclarationServices idGroupe={idGroupe} />
+          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+            <DeclarationServices idGroupe={idGroupe} />
+          </Suspense>
         </PanneauOnglet>
       </div>
+
+      {/* « Au clic, j'ai toutes les informations pour remplir ma
+          déclaration. » Un panneau plutôt qu'une carte : le dossier ne se
+          consulte qu'au moment de déclarer, et il tient alors tout l'écran —
+          ce qu'une carte au milieu d'une pile ne peut pas faire. */}
+      <Sheet
+        ouvert={dossierOuvert}
+        titre="Déclaration de TVA"
+        onFermer={() => setDossierOuvert(false)}
+      >
+        {dossierOuvert && (
+          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+            <DossierTvaPanneau />
+          </Suspense>
+        )}
+      </Sheet>
     </>
   );
 }
@@ -495,6 +572,20 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
   const tva = seuils.franchiseTva;
 
   /**
+   * Le repère de date, posé sur chaque jauge.
+   *
+   * C'est un fait de calendrier, pas une extrapolation : au 15 novembre, 87 %
+   * de l'année est passée quoi qu'on fasse. Sans lui, « 69 % du plafond » se
+   * lit pareil en mars et en novembre, alors que c'est une bonne nouvelle dans
+   * un cas et un problème dans l'autre.
+   */
+  const aujourdhui = dateDuJour();
+  const repere = {
+    part: partDeLAnneeEcoulee(aujourdhui),
+    libelle: `${Math.round(partDeLAnneeEcoulee(aujourdhui) * 100)} % de l’année écoulée`
+  };
+
+  /**
    * Ce que la carte dit une fois repliée.
    *
    * La spec de design notait que le résumé plié de cette carte était **écrit en
@@ -551,6 +642,12 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
               atteint={seuils.caEncaisse}
               seuil={plafond.valeur}
               unite="€"
+              repere={repere}
+              note={<NoteDeFranchissement
+                encaisse={seuils.caEncaisse}
+                seuil={plafond.valeur}
+                aujourdhui={aujourdhui}
+              />}
             />
           )}
 
@@ -563,12 +660,27 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
                 atteint={seuils.caEncaisse}
                 seuil={tva.valeur.franchise}
                 unite="€"
+                repere={repere}
+                note={<NoteDeFranchissement
+                  encaisse={seuils.caEncaisse}
+                  seuil={tva.valeur.franchise}
+                  aujourdhui={aujourdhui}
+                />}
               />
+              {/* Le seuil MAJORÉ est celui où prévenir tard coûte le plus
+                  cher : le franchir rend la TVA exigible dès le 1er du mois,
+                  sur des factures déjà émises sans TVA. */}
               <Jauge
                 libelle="Seuil majoré de TVA"
                 atteint={seuils.caEncaisse}
                 seuil={tva.valeur.majore}
                 unite="€"
+                repere={repere}
+                note={<NoteDeFranchissement
+                  encaisse={seuils.caEncaisse}
+                  seuil={tva.valeur.majore}
+                  aujourdhui={aujourdhui}
+                />}
               />
             </>
           )}
@@ -577,152 +689,61 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Déclaration européenne de services
-   ───────────────────────────────────────────────────────────────────────── */
-
 /**
- * La DES.
+ * Ce que le rythme constaté annonce, avec son hypothèse visible.
  *
- * Elle est due par le PRESTATAIRE qui rend un service à un assujetti d'un
- * autre État membre — pas par celui qui en achète. C'est la confusion la plus
- * fréquente, et elle a commandé toute la conception : l'écran Achats détecte
- * l'autoliquidation à l'achat, celui-ci regarde les recettes.
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE EXTRAPOLATION QUI DIT QU'ELLE EN EST UNE
+ * ─────────────────────────────────────────────────────────────────────────
  *
- * Trois faits qui surprennent, et que l'écran énonce plutôt que de les
- * supposer connus : la franchise en base n'en dispense pas, il n'y a aucun
- * seuil, et l'amende est de 750 € par déclaration manquante.
+ * Prolonger le rythme est légitime pour annoncer l'avenir — c'est même la
+ * seule façon de prévenir avant le franchissement. Mais le chiffre ne vaut que
+ * son hypothèse, qui est écrite : « au rythme de l'encaissé depuis janvier ».
+ *
+ * Et l'abstention est dite, jamais déguisée : sous un trimestre d'activité, un
+ * seul règlement important suffit à tripler le rythme apparent. La phrase dit
+ * alors pourquoi elle ne dit rien, au lieu d'afficher une date qui sauterait
+ * d'un mois à l'autre chaque semaine.
  */
-function DeclarationServices({ idGroupe }: { idGroupe: string }) {
-  const faits = useFaits((e) => e.faits);
-  const [moisAffiche, setMoisAffiche] = useState<Mois>(() => moisPrecedentDe(moisCourant()));
-  const etat = useMemo(() => etatDes(faits, moisAffiche), [faits, moisAffiche]);
-  const { declaration } = etat;
+function NoteDeFranchissement(
+  { encaisse, seuil, aujourdhui }: {
+    readonly encaisse: number;
+    readonly seuil: number;
+    readonly aujourdhui: DateISO;
+  }
+) {
+  const f = franchissementPrevu(euros(encaisse), euros(seuil), aujourdhui);
+
+  // Un seuil déjà franchi n'a plus de date à prévoir, et la jauge le dit déjà
+  // en clair au-dessus. Le répéter n'ajouterait rien.
+  if (f.statut === 'depasse') return null;
+
+  if (f.statut === 'indeterminable') {
+    return <>Pas de projection&nbsp;: {f.motif}.</>;
+  }
+
+  if (f.statut === 'hors_annee') {
+    return <>Au rythme de l’encaissé depuis janvier, seuil non atteint d’ici le 31 décembre.</>;
+  }
 
   return (
     <>
-      {etat.retards.length > 0 && (
-        <p className={`${styles.bandeau} ${styles.bandeauDanger}`} role="status">
-          <strong>{etat.retards.length}</strong> déclaration
-          {etat.retards.length > 1 ? 's' : ''} en retard, soit{' '}
-          <strong><Montant>{eur(etat.amendeEncourue)}</Montant></strong> d’amende encourue.
-          <Info libelle="Pourquoi l’amende ne dépend pas des montants">
-            Elle est forfaitaire&nbsp;: 750 € par déclaration manquante ou
-            inexacte, qu’on ait facturé 50 € ou 50 000 €. Une omission répétée
-            sur une année coûte donc davantage que la plupart des
-            redressements que cette application cherche par ailleurs à éviter.
-          </Info>
-        </p>
-      )}
-
-      {etat.sansNumeroIntracom && !declaration.sansObjet && (
-        <p className={`${styles.bandeau} ${styles.bandeauAttention}`} role="status">
-          Vous n’avez pas de numéro de TVA intracommunautaire. Il en faut un
-          pour déposer une DES, <em>y compris en franchise en base</em>&nbsp;:
-          il se demande au service des impôts des entreprises.
-        </p>
-      )}
-
-      <section className={styles.carte} aria-labelledby={`${idGroupe}-des`}>
-        <h2 id={`${idGroupe}-des`} className={styles.titreCarte}>
-          Prestations à déclarer
-          <Info libelle="Qui doit déposer une DES, et quand">
-            Elle est due par celui qui <strong>vend</strong> un service à un
-            professionnel établi dans un autre État membre — pas par celui qui
-            en achète. Aucun seuil&nbsp;: une prestation de{' '}
-            <Montant>50&nbsp;€</Montant> suffit. Dépôt
-            au plus tard le 10 du mois suivant, sur le portail de la douane.
-          </Info>
-        </h2>
-
-        <div className={styles.navigationMois}>
-          <button type="button" className={styles.pas}
-            onClick={() => setMoisAffiche(moisPrecedentDe(moisAffiche))}
-            aria-label="Mois précédent">
-            <span aria-hidden="true">‹</span>
-          </button>
-          <span className={styles.moisCourant} role="status">{moisLisible(moisAffiche)}</span>
-          <button type="button" className={styles.pas}
-            onClick={() => setMoisAffiche(moisSuivantDe(moisAffiche))}
-            aria-label="Mois suivant">
-            <span aria-hidden="true">›</span>
-          </button>
-        </div>
-
-        {declaration.sansObjet
-          ? (
-            <p className={styles.vide}>
-              Aucune prestation intracommunautaire ce mois-là&nbsp;: aucune
-              déclaration n’est due. Un mois sans prestation ne se déclare pas.
-            </p>
-          )
-          : (
-            <>
-              <dl className={styles.detail}>
-                <div className={styles.ligne}>
-                  <dt>À déposer avant le</dt>
-                  <dd>{dateCourte(declaration.limiteLe)}</dd>
-                </div>
-                <div className={`${styles.ligne} ${styles.total}`}>
-                  <dt>Total à déclarer</dt>
-                  <dd><Montant>{eur(declaration.total)}</Montant></dd>
-                </div>
-              </dl>
-
-              {declaration.lignes.length > 0 && (
-                <ul className={styles.liste}>
-                  {declaration.lignes.map((l) => (
-                    <li key={l.recetteId} className={styles.ligneEcriture}>
-                      <span className={styles.ligneTitre}>
-                        <span className={styles.ligneLibelle}>{l.clientNom}</span>
-                        <span className={styles.ligneMontant}><Montant>{eur(l.montant)}</Montant></span>
-                      </span>
-                      <span className={styles.ligneMeta}>
-                        <span>{l.tvaIntracom}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{dateCourte(l.emiseLe)}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {declaration.anomalies.length > 0 && (
-                <ul className={styles.ecarts}>
-                  {declaration.anomalies.map((a) => (
-                    <li key={a.recetteId} className={styles.ecart}>{a.message}</li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-
-        <p className={styles.noteBasse}>
-          Le mois retenu est celui de l’<strong>émission</strong> de la facture,
-          non celui de l’encaissement&nbsp;: la taxe devient exigible chez le
-          preneur à l’achèvement de la prestation. Le livre des recettes, lui,
-          s’écrit à l’encaissement — les deux registres ne coïncident donc pas,
-          et c’est normal.
-        </p>
-      </section>
+      Au rythme de l’encaissé depuis janvier, seuil atteint vers{' '}
+      <strong>{moisLong(f.mois)}</strong>.
     </>
   );
 }
 
-function moisPrecedentDe(m: Mois): Mois {
-  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) - 1;
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
+/** « 2026-09 » → « septembre 2026 ». */
+function moisLong(m: Mois): string {
+  return new Date(`${m}-01T00:00:00Z`).toLocaleDateString('fr-FR', {
+    month: 'long', year: 'numeric', timeZone: 'UTC'
+  });
 }
 
-function moisSuivantDe(m: Mois): Mois {
-  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + 1;
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
-}
 
-function moisLisible(m: Mois): string {
-  return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' })
-    .format(new Date(`${m}-01T00:00:00`));
-}
+
+
 
 function libelleMode(mode: string | null): string {
   switch (mode) {

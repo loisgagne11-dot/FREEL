@@ -14,11 +14,11 @@ import {
   type DateISO, type Euros, type Mois, type TypeActivite,
   euros, moisDe
 } from '../domain/types';
-import { plafondMicro, seuilsTva, tauxImpotEtContributions } from '../domain/bareme';
-import type { RegimeImposition, SeuilsTva } from '../domain/bareme';
-import type { Resolution } from '../domain/types';
+import { tauxImpotEtContributions } from '../domain/bareme';
+import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
+  type VentilationProvisions,
   estPayee, provisions as calculerProvisions
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
@@ -395,6 +395,15 @@ export interface EtatPilote {
   readonly tresorerie: ResultatTresorerie;
   readonly voletConstate: Euros;
   readonly voletAProvisionner: Euros;
+  /**
+   * Le total de provision, ventilé par nature.
+   *
+   * « Sur cette somme totale, combien j'ai de provision et sur quelle
+   * catégorie » : un total ne dit pas ce qu'il faut en faire, et ne permet ni
+   * de vérifier une provision contre l'avis reçu, ni de savoir ce qui se
+   * libère après une déclaration.
+   */
+  readonly provisionsParNature: VentilationProvisions;
   readonly autonomie: number | null;
   /**
    * `true` quand le taux d'impôt n'a pas pu être résolu : le calcul est alors
@@ -454,6 +463,7 @@ export function etatPilote(
     tresorerie,
     voletConstate: detail.voletConstate,
     voletAProvisionner: detail.voletAProvisionner,
+    provisionsParNature: detail.parNature,
     autonomie: autonomieMois(tresorerie.versable, faits.besoinMensuel),
     tauxImpotIndisponible: tauxImpotR.statut === 'refuse',
     motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null
@@ -609,102 +619,4 @@ export function preneursDeServices(faits: Faits): ReadonlyMap<string, PreneurSer
 /** La date du jour, au format ISO, sans passer par le fuseau local. */
 export function dateDuJour(maintenant: Date = new Date()): DateISO {
   return maintenant.toISOString().slice(0, 10) as DateISO;
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Écran Argent
-   ───────────────────────────────────────────────────────────────────────── */
-
-export interface MoisChiffre {
-  readonly mois: Mois;
-  /** Recettes émises sur le mois, encaissées ou non. */
-  readonly realise: Euros;
-  /** Recettes encaissées sur le mois. */
-  readonly encaisse: Euros;
-}
-
-/**
- * Chiffre d'affaires mois par mois, réalisé et encaissé.
- *
- * Les deux courbes ne mesurent pas la même chose et l'écart entre elles EST
- * l'information : le réalisé dit ce qui a été facturé, l'encaissé ce qui est
- * arrivé sur le compte. C'est cet écart qui se transforme en trou de
- * trésorerie, et la raison pour laquelle les seuils fiscaux se calculent sur
- * l'encaissé, jamais sur le facturé.
- */
-export function chiffreParMois(faits: Faits, annee: number): readonly MoisChiffre[] {
-  const mois: MoisChiffre[] = [];
-  for (let m = 1; m <= 12; m++) {
-    const cle = `${annee}-${String(m).padStart(2, '0')}` as Mois;
-    const realise = faits.recettes
-      .filter((r) => r.emiseLe !== null && r.emiseLe.startsWith(cle))
-      .reduce<number>((s, r) => s + r.montant, 0);
-    const encaisse = faits.recettes
-      .filter((r) => r.encaisseeLe !== null && r.encaisseeLe.startsWith(cle))
-      .reduce<number>((s, r) => s + r.montant, 0);
-    mois.push({ mois: cle, realise: euros(realise), encaisse: euros(encaisse) });
-  }
-  return mois;
-}
-
-export interface EtatArgent {
-  readonly annee: number;
-  readonly parMois: readonly MoisChiffre[];
-  readonly caEncaisse: Euros;
-  readonly caRealise: Euros;
-  /** Écart entre facturé et encaissé : ce qui reste à rentrer. */
-  readonly resteARentrer: Euros;
-  readonly tresorerie: ResultatTresorerie;
-  readonly voletConstate: Euros;
-  readonly voletAProvisionner: Euros;
-  readonly seuils: EtatSeuils;
-}
-
-/**
- * Où en est-on des seuils.
- *
- * Chaque seuil est une `Resolution` : il vient d'une table datée qui peut ne
- * pas couvrir la période demandée. Une jauge dessinée sur un seuil inconnu
- * afficherait un pourcentage inventé — et c'est sur ce pourcentage qu'on
- * décide de facturer ou non avant la fin de l'année.
- */
-export interface EtatSeuils {
-  readonly plafondMicro: Resolution<Euros>;
-  readonly franchiseTva: Resolution<SeuilsTva>;
-  /** Chiffre d'affaires encaissé de l'année, l'assiette des deux seuils. */
-  readonly caEncaisse: Euros;
-}
-
-export function etatArgent(
-  faits: Faits,
-  echeances: readonly Echeance[] = faits.echeances,
-  maintenant: Date = new Date()
-): EtatArgent {
-  const annee = maintenant.getFullYear();
-  const parMois = chiffreParMois(faits, annee);
-  const caRealise = euros(parMois.reduce<number>((s, m) => s + m.realise, 0));
-  const caEncaisse = euros(parMois.reduce<number>((s, m) => s + m.encaisse, 0));
-  const pilote = etatPilote(faits, echeances, maintenant);
-
-  const m = moisCourant(maintenant);
-  const type = faits.entreprise.typeActivite;
-
-  return {
-    seuils: {
-      plafondMicro: plafondMicro(m, type),
-      franchiseTva: seuilsTva(m, type),
-      caEncaisse
-    },
-    annee,
-    parMois,
-    caEncaisse,
-    caRealise,
-    // Jamais négatif : un encaissé supérieur au réalisé de l'année signifie
-    // qu'on a encaissé des factures d'une année antérieure, pas qu'il reste
-    // un montant négatif à rentrer.
-    resteARentrer: euros(Math.max(0, caRealise - caEncaisse)),
-    tresorerie: pilote.tresorerie,
-    voletConstate: pilote.voletConstate,
-    voletAProvisionner: pilote.voletAProvisionner
-  };
 }

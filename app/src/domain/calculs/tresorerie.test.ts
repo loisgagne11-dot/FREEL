@@ -9,6 +9,10 @@ const detail = (
   voletConstate: euros(total),
   voletAProvisionner: euros(0),
   total: euros(total),
+  parNature: {
+    urssaf: euros(total), tva: euros(0), impot: euros(0),
+    cfe: euros(0), cfp: euros(0)
+  },
   recettesNonCalculables: nonCalculables
 });
 

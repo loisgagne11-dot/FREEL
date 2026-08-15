@@ -295,3 +295,87 @@
 
   .declarationTitre { flex: 1 1 auto; }
 }
+
+/* Un second niveau à l'intérieur d'une carte : la ventilation détaille le
+   total qui la précède, elle n'ouvre pas un autre sujet. Plus discret que le
+   titre de carte, pour que la hiérarchie se lise. */
+.sousTitre {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 16px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Dossier de déclaration ──────────────────────────────────────────── */
+
+.navigationMois { display: flex; align-items: center; gap: 4px; margin-bottom: 12px; }
+
+.pas {
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pas:hover { color: var(--text); border-color: var(--green); }
+
+.moisCourant {
+  min-width: 8ch;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--text);
+}
+
+/* Les pièces qui composent la déclaration. Elles défilent dans leur propre
+   conteneur : la page, elle, ne défile jamais horizontalement. */
+.listePieces {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+  font-size: 12.5px;
+}
+
+.listePieces li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.listePieces li:last-child { border-bottom: none; }
+
+.pieceNom {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.pieceDate { color: var(--muted-2); white-space: nowrap; }
+
+.pieceMontant {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+  min-width: 6ch;
+}
+
+/* Ce qui manque au dossier, dit sans détour : c'est du total sous-évalué. */
+.manquant { color: var(--amber); font-style: italic; }
+
+.dossier { display: flex; flex-direction: column; gap: 4px; }

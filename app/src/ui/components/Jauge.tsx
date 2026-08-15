@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Montant } from './Montant';
 import styles from './Jauge.module.css';
 
@@ -25,15 +26,43 @@ const nombre = (n: number): string =>
  *
  * `role="img"` avec un nom accessible : sans lui, un lecteur d'écran ne
  * rencontre que deux `<div>` vides.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE REPÈRE DE DATE, ET POURQUOI IL CHANGE TOUT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Sans lui, la jauge répond à « combien du seuil ai-je consommé » et pas à
+ * « est-ce que je vais le dépasser ». Or 69 % est une excellente nouvelle au
+ * 15 mars et un problème au 15 novembre : le même chiffre veut dire deux
+ * choses opposées, et rien ne les distinguait.
+ *
+ * Le repère est un FAIT de calendrier, pas une extrapolation : au 15 novembre,
+ * 87 % de l'année est passée quoi qu'on fasse. Remplissage à gauche du
+ * repère, on est sous le rythme d'une année linéaire ; à droite, au-dessus.
  */
 export function Jauge(
-  { libelle, atteint, seuil, unite, alerteA = 0.85 }: {
+  { libelle, atteint, seuil, unite, alerteA = 0.85, repere = null, note = null }: {
     readonly libelle: string;
     readonly atteint: number;
     readonly seuil: number;
     readonly unite: string;
     /** Part du seuil à partir de laquelle la jauge passe en alerte. */
     readonly alerteA?: number;
+    /**
+     * Un repère posé sur la piste, entre 0 et 1, avec ce qu'il signifie.
+     *
+     * Employé pour la part de l'année écoulée. Le libellé entre dans le nom
+     * accessible : un trait vertical ne se décrit pas de lui-même.
+     */
+    readonly repere?: { readonly part: number; readonly libelle: string } | null;
+    /**
+     * Ce que la jauge ne peut pas montrer — une projection, une abstention.
+     *
+     * Séparé du détail chiffré parce que ce n'en est pas de même nature : le
+     * détail constate, la note extrapole, et les mêler ferait lire la seconde
+     * avec l'autorité du premier.
+     */
+    readonly note?: ReactNode;
   }
 ) {
   const part = seuil > 0 ? atteint / seuil : 0;
@@ -54,9 +83,19 @@ export function Jauge(
       <div
         className={styles.piste}
         role="img"
-        aria-label={`${libelle} : ${Math.round(part * 100)} % du seuil de ${nombre(seuil)} ${unite}`}
+        aria-label={
+          `${libelle} : ${Math.round(part * 100)} % du seuil de ${nombre(seuil)} ${unite}`
+          + (repere === null ? '' : `, ${repere.libelle}`)
+        }
       >
         <div className={`${styles.remplissage} ${ton}`} style={{ width: `${largeur}%` }} />
+        {repere !== null && (
+          <span
+            className={styles.repere}
+            style={{ left: `${Math.min(100, Math.max(0, repere.part * 100))}%` }}
+            aria-hidden="true"
+          />
+        )}
       </div>
 
       <p className={styles.detail}>
@@ -69,6 +108,8 @@ export function Jauge(
             </>
           )}
       </p>
+
+      {note !== null && <p className={styles.note}>{note}</p>}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import type { Echeance, NatureDette } from '../../domain/calculs/provisions';
+import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
 import { dateISO, euros } from '../../domain/types';
 import type { DateISO, Euros } from '../../domain/types';
 import { type Cadence, REPETITIONS_MAX, datesRepetees } from '../../domain/calculs/echeancier';
@@ -72,13 +73,10 @@ import styles from './Echeances.module.css';
  * de ce qui a été appelé, et il sert à vérifier le prochain appel.
  */
 
-const NATURES: readonly { readonly id: NatureDette; readonly libelle: string }[] = [
-  { id: 'urssaf', libelle: 'URSSAF — cotisations sociales' },
-  { id: 'tva', libelle: 'TVA à reverser' },
-  { id: 'impot', libelle: 'Impôt sur le revenu' },
-  { id: 'cfe', libelle: 'CFE — cotisation foncière' },
-  { id: 'cfp', libelle: 'CFP — formation professionnelle' }
-];
+// Les libellés viennent du domaine : trois écrans nomment les mêmes dettes, et
+// rien ne garantissait qu'ils les nomment pareil.
+const NATURES: readonly { readonly id: NatureDette; readonly libelle: string }[] =
+  NATURES_DETTE.map((id) => ({ id, libelle: LIBELLE_NATURE[id] }));
 
 const LIBELLE: Readonly<Record<NatureDette, string>> = {
   urssaf: 'URSSAF', tva: 'TVA', impot: 'Impôt', cfe: 'CFE', cfp: 'CFP'

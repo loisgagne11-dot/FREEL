@@ -88,6 +88,13 @@
 .accent { color: var(--green); }
 .attention { color: var(--amber); }
 
+/* Ce que le chiffre ne dit pas de lui-même. En retrait : c'est une réserve
+   sur la mesure, pas une alerte sur l'activité. */
+.approximation {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .bandeau {
   display: block;
   background: var(--panel-2);
@@ -692,3 +699,86 @@
 .plageAction:disabled { opacity: 0.45; cursor: not-allowed; }
 
 @media print { .plage { display: none; } }
+
+/* ---------- prévision de revenu par mission ---------- */
+
+.lignePrevision {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.lignePrevision:last-child { border-bottom: none; }
+
+.lignePrevisionNom {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.lignePrevisionChiffres {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Retenu / prévu : les deux nombres côte à côte, parce que c'est leur ÉCART
+   qui répond à « est-ce que je tiens ce que j'avais prévu ? ». */
+.lignePrevisionJours { font-size: 12px; color: var(--muted-2); }
+
+.lignePrevisionMontant { font-size: 13px; font-weight: 560; color: var(--text); }
+
+/* Un vrai tableau : trois colonnes qui se comparent d'une ligne à l'autre en
+   sont un, et un lecteur d'écran doit pouvoir annoncer la cellule avec son
+   en-tête. Il défile dans son propre conteneur — la page, elle, ne défile
+   jamais horizontalement. */
+.tableau {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tableauLegende {
+  text-align: left;
+  color: var(--muted);
+  font-size: 12px;
+  padding-bottom: 8px;
+}
+
+.tableau th,
+.tableau td {
+  padding: 7px 8px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+
+.tableau thead th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.tableau th:first-child,
+.tableauNom {
+  text-align: left;
+  font-weight: 550;
+  color: var(--text);
+}
+
+/* La colonne qui décide. */
+.tableauFort {
+  font-weight: 640;
+  color: var(--green);
+}

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois, type TypeActivite } from '../types';
 import {
   type ContexteProvisions, type Echeance, type PeriodesDeclarees,
-  type RecetteEncaissee,
-  provisions, voletAProvisionner, voletConstate
+  type NatureDette, type RecetteEncaissee,
+  NATURES_DETTE, provisions, voletAProvisionner, voletConstate
 } from './provisions';
 
 const ctx = (
@@ -127,5 +127,119 @@ describe('les deux volets réunis', () => {
 
     // Le total ne bouge pas : c'est la même dette, vue à deux stades.
     expect(apres.total).toBe(avant.total);
+  });
+});
+
+/**
+ * « SUR CETTE SOMME TOTALE, COMBIEN J'AI DE PROVISION ET SUR QUELLE
+ * CATÉGORIE » — la question posée telle quelle.
+ *
+ * Le total ne suffit pas : « 6 200 € de côté » et « 4 100 € d'URSSAF, 1 800 €
+ * de TVA, 300 € de CFE » ne se pilotent pas pareil. Sans la ventilation, on ne
+ * peut ni vérifier une provision contre l'avis reçu, ni savoir ce qui se
+ * libère après une déclaration.
+ */
+describe('ventilation des provisions par nature', () => {
+  const ech = (
+    id: string, nature: NatureDette, montant: number, payeeLe: string | null = null
+  ): Echeance => ({
+    id, nature, montant: euros(montant), echeanceLe: dateISO('2026-07-31'),
+    payeeLe: payeeLe === null ? null : dateISO(payeeLe), montantPaye: null
+  });
+
+  const ctx: ContexteProvisions = {
+    typeActivite: 'BNC',
+    sousAcreLe: () => false,
+    tauxImpotEtContributions: 0.022
+  };
+
+  it('répartit les échéances émises selon leur nature', () => {
+    const d = provisions(
+      [ech('a', 'urssaf', 4100), ech('b', 'tva', 1800), ech('c', 'cfe', 300)],
+      [], { mois: [] }, ctx
+    );
+
+    expect(d.parNature.urssaf).toBe(4100);
+    expect(d.parNature.tva).toBe(1800);
+    expect(d.parNature.cfe).toBe(300);
+    expect(d.total).toBe(6200);
+  });
+
+  /**
+   * Une nature à zéro reste présente. Une catégorie qui disparaît de l'écran
+   * en tombant à zéro donne à croire qu'elle n'existe pas, alors qu'elle vient
+   * d'être soldée — c'est l'information inverse.
+   */
+  it('garde à zéro les natures sans montant', () => {
+    const d = provisions([ech('a', 'urssaf', 1000)], [], { mois: [] }, ctx);
+    expect(d.parNature.tva).toBe(0);
+    expect(d.parNature.cfe).toBe(0);
+    expect(d.parNature.cfp).toBe(0);
+  });
+
+  /** Une échéance payée sort de la ventilation comme elle sort du total. */
+  it('exclut les échéances payées', () => {
+    const d = provisions(
+      [ech('a', 'urssaf', 4100), ech('b', 'tva', 1800, '2026-07-20')],
+      [], { mois: [] }, ctx
+    );
+    expect(d.parNature.tva).toBe(0);
+    expect(d.parNature.urssaf).toBe(4100);
+  });
+
+  /**
+   * LE POINT DÉLICAT. Le volet 2 n'a aucune échéance à qui demander sa nature :
+   * il se ventile par RÈGLE DE CALCUL — la part cotisations en `urssaf`, la
+   * part impôt et contributions en `impot`.
+   */
+  it('ventile le volet 2 par règle de calcul, faute d’échéance', () => {
+    const d = provisions([], [
+      { id: 'r', montant: euros(10_000), encaisseeLe: dateISO('2026-03-15') }
+    ], { mois: [] }, ctx);
+
+    expect(d.parNature.impot).toBe(220); // 10 000 × 2,2 %
+    expect(d.parNature.urssaf).toBeGreaterThan(0);
+    expect(d.parNature.tva).toBe(0);
+  });
+
+  /**
+   * La TVA collectée ne se déduit d'aucun taux appliqué aux recettes : elle se
+   * relève sur les factures. Elle n'entre donc dans la ventilation qu'une fois
+   * l'échéance émise — l'y faire figurer avant serait un montant inventé.
+   */
+  it('n’invente pas de TVA sur les recettes encaissées', () => {
+    const d = provisions([], [
+      { id: 'r', montant: euros(10_000), encaisseeLe: dateISO('2026-03-15') }
+    ], { mois: [] }, ctx);
+    expect(d.parNature.tva).toBe(0);
+  });
+
+  /** L'invariant qui rend la ventilation lisible : les parts font le total. */
+  it('les parts somment exactement le total', () => {
+    const d = provisions(
+      [ech('a', 'urssaf', 4100), ech('b', 'tva', 1800), ech('c', 'cfp', 90)],
+      [{ id: 'r', montant: euros(8000), encaisseeLe: dateISO('2026-05-02') }],
+      { mois: [] }, ctx
+    );
+
+    const somme = NATURES_DETTE.reduce((s, n) => s + d.parNature[n], 0);
+    expect(Math.round(somme)).toBe(Math.round(d.total));
+  });
+
+  /**
+   * Les deux volets ne peuvent pas se recouvrir : une période déclarée quitte
+   * le volet 2 au moment où son échéance entre au volet 1. La ventilation doit
+   * le refléter, sans compter deux fois.
+   */
+  it('ne compte pas deux fois une période déclarée', () => {
+    const recettes = [{ id: 'r', montant: euros(10_000), encaisseeLe: dateISO('2026-03-15') }];
+    const avant = provisions([], recettes, { mois: [] }, ctx);
+    const apres = provisions(
+      [ech('appel', 'urssaf', 2560)], recettes, { mois: [mois('2026-03')] }, ctx
+    );
+
+    expect(avant.parNature.impot).toBe(220);
+    expect(apres.parNature.impot).toBe(0);
+    expect(apres.parNature.urssaf).toBe(2560);
   });
 });

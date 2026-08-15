@@ -321,6 +321,27 @@ interface MagasinFaits {
   readonly consignerRelance: (id: string, le: DateISO) => void;
 
   /**
+   * Consigne qu'une facture a été ENVOYÉE au client, à cette date.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * ÉMISE N'EST PAS ENVOYÉE
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Le document peut exister, porter son numéro et sa date, et dormir dans un
+   * dossier — c'est le cas courant en fin de mois, où l'on établit les
+   * factures d'un coup avant de les envoyer.
+   *
+   * Les confondre coûte deux choses. On relance un client qui n'a jamais reçu
+   * la facture, ce qui est la pire des relances. Et on ne sait pas répondre à
+   * « je ne l'ai jamais reçue », qui est la réponse la plus courante à une
+   * relance.
+   *
+   * Une DATE et non un booléen, comme partout ailleurs ici : un statut
+   * qu'aucune date ne prouve ne prouve rien. Rend le motif du refus, ou `null`.
+   */
+  readonly marquerEnvoyee: (id: string, le: DateISO) => string | null;
+
+  /**
    * Annule une recette ÉMISE par une écriture inverse.
    *
    * Rien n'est supprimé : les deux écritures restent visibles et leur somme
@@ -478,6 +499,32 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     }
 
     appliquerMigration(set, resultat);
+  },
+
+  marquerEnvoyee: (id, le) => {
+    const actuel = get().faits;
+    const recette = actuel.recettes.find((r) => r.id === id);
+    if (recette === undefined) return 'Recette introuvable.';
+
+    // Un brouillon n'a pas de document à envoyer : il n'a ni numéro définitif
+    // ni date. L'envoyer d'abord et l'émettre ensuite mettrait la date d'envoi
+    // avant la date de la facture.
+    if (recette.emiseLe === null) {
+      return 'Ce brouillon n’a pas encore été émis : émettez-le d’abord, '
+        + 'il prendra son numéro et sa date.';
+    }
+    if (le < recette.emiseLe) {
+      return 'Une facture ne peut pas partir avant d’exister : la date d’envoi '
+        + 'est antérieure à sa date d’émission.';
+    }
+
+    const faits: Faits = {
+      ...actuel,
+      recettes: actuel.recettes.map((r) => (r.id === id ? { ...r, envoyeeLe: le } : r))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
+    return null;
   },
 
   consignerRelance: (id, le) => {

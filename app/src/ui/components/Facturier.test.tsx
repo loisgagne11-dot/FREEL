@@ -338,3 +338,177 @@ describe('relancer une facture en retard', () => {
     expect(screen.getByText(/^Mise en demeure/)).toBeTruthy();
   });
 });
+
+/**
+ * LA FACTURE DU MOIS QU'ON N'A PAS DEMANDÉE.
+ *
+ * « Créée en brouillon et mise à jour en fonction de mes modifications
+ * d'Activité. » Un brouillon enregistré serait juste à l'instant de sa
+ * création et faux dès la première journée corrigée. Celui-ci est dérivé du
+ * planning : il suit par construction, parce qu'il n'a pas d'existence
+ * séparée à faire diverger.
+ */
+describe('la facture du mois, avant qu’elle existe', () => {
+  const rythme = {
+    du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+    parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 },
+    tjm: euros(500)
+  };
+
+  const missionPlanifiee = {
+    id: 'm1', clientId: null, clientNom: 'Client France', description: 'Mission A',
+    tjm: euros(500), debut: dateISO('2026-01-01'), fin: dateISO('2026-12-31'),
+    statut: 'active' as const,
+    entites: [{
+      id: 'm1-co', nom: 'Client France', couleur: '', adresse: '', contact: '',
+      email: '', telephone: '', rythmes: [rythme], ajustements: {}
+    }]
+  };
+
+  it('propose la facture du mois sans qu’on la demande', () => {
+    semer([], { missions: [missionPlanifiee] });
+    rendre();
+
+    expect(screen.getByRole('heading', { name: /La facture de août 2026/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Émettre cette facture' })).toBeTruthy();
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Le brouillon vient du MÊME planning que le compte
+   * rendu : une journée retirée à l'Activité retire son montant de la facture,
+   * sans qu'aucune resynchronisation ait lieu.
+   */
+  it('suit les ajustements du planning', () => {
+    semer([], { missions: [missionPlanifiee] });
+    rendre();
+    const avant = screen.getByLabelText('Mois facturé').closest('section');
+    const montantAvant = within(avant as HTMLElement).getAllByText(/€/)[0]?.textContent;
+
+    cleanup();
+    semer([], {
+      missions: [{
+        ...missionPlanifiee,
+        entites: [{
+          ...(missionPlanifiee.entites[0] as (typeof missionPlanifiee)['entites'][number]),
+          ajustements: { '2026-08-03': 0, '2026-08-04': 0 }
+        }]
+      }]
+    });
+    rendre();
+    const apres = screen.getByLabelText('Mois facturé').closest('section');
+    const montantApres = within(apres as HTMLElement).getAllByText(/€/)[0]?.textContent;
+
+    expect(montantApres).not.toBe(montantAvant);
+  });
+
+  /** Émettre est le geste qui engage : la facture prend un numéro et entre au registre. */
+  it('matérialise la facture à l’émission', async () => {
+    semer([], { missions: [missionPlanifiee] });
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Émettre cette facture' }));
+
+    const recettes = useFaits.getState().faits.recettes;
+    expect(recettes).toHaveLength(1);
+    expect(recettes[0]?.numero).not.toBe('');
+    expect(recettes[0]?.emiseLe).not.toBeNull();
+    expect(recettes[0]?.clientNom).toBe('Client France');
+  });
+
+  /**
+   * Le brouillon d'un client déjà facturé reste affiché, marqué. Le faire
+   * disparaître empêcherait de voir qu'on a facturé douze jours là où le
+   * planning en compte quatorze.
+   */
+  it('marque le mois déjà facturé sans effacer le brouillon', () => {
+    semer(
+      [recette({ id: 'r1', emiseLe: dateISO('2026-08-05'), numero: '2026-014' })],
+      { missions: [missionPlanifiee] }
+    );
+    rendre();
+
+    expect(screen.getByText(/Facture 2026-014 déjà émise/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Émettre cette facture' })).toBeNull();
+  });
+
+  /** Sans planning, il n'y a rien à facturer : la carte ne s'invente pas. */
+  it('ne montre rien sans mission planifiée', () => {
+    semer([]);
+    rendre();
+    expect(screen.queryByRole('heading', { name: /La facture de/ })).toBeNull();
+  });
+});
+
+/**
+ * ÉMISE N'EST PAS ENVOYÉE.
+ *
+ * Le document peut exister, porter son numéro et sa date, et dormir dans un
+ * dossier — c'est le cas courant en fin de mois, où l'on établit les factures
+ * d'un coup avant de les envoyer. Les confondre coûte deux choses : on relance
+ * un client qui n'a jamais rien reçu, et on ne sait pas répondre à « je ne
+ * l'ai jamais reçue », qui est la réponse la plus courante à une relance.
+ */
+describe('cycle de vie : envoyée, avec sa date', () => {
+  it('distingue une facture émise d’une facture partie', () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+
+    expect(screen.getByText('À envoyer')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Marquer envoyée' })).toBeTruthy();
+  });
+
+  it('consigne la date d’envoi et change l’état', async () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Marquer envoyée' }));
+
+    expect(useFaits.getState().faits.recettes[0]?.envoyeeLe).toBe('2026-08-13');
+    expect(screen.getByText('Envoyée')).toBeTruthy();
+    expect(screen.getByText(/envoyée le/)).toBeTruthy();
+  });
+
+  /** Le geste ne se propose qu'une fois : elle est partie, elle reste partie. */
+  it('ne propose plus l’envoi d’une facture déjà partie', () => {
+    semer([recette({ id: 'r1', envoyeeLe: dateISO('2026-08-05') })]);
+    rendre();
+    expect(screen.queryByRole('button', { name: 'Marquer envoyée' })).toBeNull();
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Une facture échue est en retard qu'on l'ait envoyée
+   * ou non — mais si elle n'est pas partie, c'est le premier problème à
+   * régler, et le bouton doit rester là.
+   */
+  it('propose encore l’envoi sur une facture en retard jamais partie', () => {
+    semer([recette({ id: 'r1', emiseLe: dateISO('2026-05-01') })]);
+    rendre();
+
+    expect(screen.getAllByText('En retard').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Marquer envoyée' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Relancer' })).toBeTruthy();
+  });
+
+  /** Un brouillon n'a pas de document à envoyer : il n'a ni numéro ni date. */
+  it('refuse d’envoyer un brouillon', () => {
+    semer([recette({ id: 'r1', emiseLe: null, numero: '2026-009' })]);
+    rendre();
+    expect(screen.queryByRole('button', { name: 'Marquer envoyée' })).toBeNull();
+  });
+
+  /**
+   * Une facture non encore envoyée est due autant qu'une envoyée : le client
+   * n'a simplement pas été mis au courant. L'exclure du reste à rentrer ferait
+   * disparaître les factures de fin de mois, c'est-à-dire les plus récentes.
+   */
+  it('compte l’envoyée comme la non-envoyée dans le reste à rentrer', () => {
+    semer([
+      recette({ id: 'r1', montant: euros(1000) }),
+      recette({ id: 'r2', montant: euros(2000), numero: '2026-002', envoyeeLe: dateISO('2026-08-05') })
+    ]);
+    rendre();
+    expect(screen.getByText('3 000 €')).toBeTruthy();
+  });
+});

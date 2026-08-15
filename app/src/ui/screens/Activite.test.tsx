@@ -155,11 +155,11 @@ describe('navigation entre les mois', () => {
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Mois précédent' }));
-    expect(screen.getByRole('status').textContent).toBe('juin 2026');
+    expect(screen.getByRole('status', { name: 'Période affichée' }).textContent).toBe('juin 2026');
 
     await utilisateur.click(screen.getByRole('button', { name: 'Mois suivant' }));
     await utilisateur.click(screen.getByRole('button', { name: 'Mois suivant' }));
-    expect(screen.getByRole('status').textContent).toBe('août 2026');
+    expect(screen.getByRole('status', { name: 'Période affichée' }).textContent).toBe('août 2026');
   });
 
   it('franchit correctement le passage à l’année', async () => {
@@ -168,7 +168,7 @@ describe('navigation entre les mois', () => {
     for (let i = 0; i < 6; i++) {
       await utilisateur.click(screen.getByRole('button', { name: 'Mois suivant' }));
     }
-    expect(screen.getByRole('status').textContent).toBe('janvier 2027');
+    expect(screen.getByRole('status', { name: 'Période affichée' }).textContent).toBe('janvier 2027');
   });
 });
 
@@ -184,6 +184,7 @@ describe('missions', () => {
     render(<Activite />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: 'Missions' }));
+    await screen.findByRole('heading', { name: /^Missions/ });
 
     const liste = screen.getByRole('list');
     expect(within(liste).getByText('Mission A')).toBeTruthy();
@@ -215,6 +216,8 @@ describe('délais de paiement', () => {
     render(<Activite />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: 'Clients' }));
+    // L'onglet est chargé à la demande : attendre son arrivée.
+    await screen.findByRole('heading', { name: /Carnet/ });
 
     expect(screen.getByText('31 j en médiane')).toBeTruthy();
     expect(screen.getByText('5 000 €')).toBeTruthy();
@@ -227,6 +230,7 @@ describe('délais de paiement', () => {
     render(<Activite />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: 'Clients' }));
+    await screen.findByRole('heading', { name: /Carnet/ });
 
     expect(screen.getByText('Délai non mesurable')).toBeTruthy();
     expect(screen.queryByText(/au-delà de son délai habituel/)).toBeNull();
@@ -660,5 +664,213 @@ describe('poser une plage de congés', () => {
     expect(screen.getByText(/Aucun jour ouvré/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Poser ces congés' }))
       .toHaveProperty('disabled', true);
+  });
+});
+
+/**
+ * LA PRÉVISION DE REVENU — LE PREMIER MAILLON DE LA CHAÎNE.
+ *
+ * Une mission doit se décliner en prévision de revenu, planning, facture du
+ * mois et CRA. Le planning et le CRA existaient ; la prévision non : le tarif
+ * journalier et le rythme étaient là, et rien n'en tirait ce qu'ils annoncent.
+ */
+describe('prévision de revenu du mois', () => {
+  const avecRythme = () => mission({
+    tjm: euros(400),
+    entites: [entite({
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-12-31'), tjm: euros(400),
+        parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }
+      }]
+    })]
+  });
+
+  it('chiffre ce que le mois devrait rapporter', () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    // Juillet 2026 : 22 jours ouvrables à 400 € = 8 800 €. Le montant paraît
+    // deux fois — prévu et retenu — puisqu'aucun ajustement n'a été posé.
+    expect(screen.getAllByText(/8\s*800/u).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /devrait rapporter/ })).toBeTruthy();
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Prévu et retenu côte à côte : sans les deux, la
+   * question « est-ce que je tiens ce que j'avais prévu ? » disparaît.
+   *
+   * On lit la ligne de mission, pas la synthèse : celle-ci ne s'affiche que
+   * carte repliée, et les cartes s'ouvrent dépliées.
+   */
+  it('montre le retenu en face du prévu, mission par mission', () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    // 22 jours retenus sur 22 prévus : aucun ajustement n'a été posé.
+    expect(screen.getByText('22 / 22 j')).toBeTruthy();
+  });
+
+  /**
+   * Repliée, la carte dit encore l'essentiel — c'est la règle du pli. Les deux
+   * totaux y sont, et l'écart n'apparaît que s'il y en a un.
+   */
+  it('résume les deux totaux une fois repliée', async () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    await userEvent.setup().click(
+      screen.getByRole('button', { name: /devrait rapporter/ })
+    );
+
+    const resume = screen.getByText(/prévus/);
+    expect(resume.textContent).toMatch(/retenus/);
+  });
+
+  // Sans rythme, aucune journée n'est prévue : la carte n'a rien à dire et ne
+  // s'affiche pas plutôt que d'annoncer zéro.
+  it('ne s’affiche pas sans rythme saisi', () => {
+    semer({ missions: [mission()] });
+    render(<Activite />);
+    expect(screen.queryByText(/devrait rapporter/)).toBeNull();
+  });
+});
+
+/**
+ * « QUELLE MISSION ME RAPPORTE QUOI ET ME PREND COMBIEN DE CHARGE DE TEMPS »
+ *
+ * Personne ne l'avait jamais mise en face d'elle-même : l'ancienne
+ * application avait le rapport et la charge dans deux écrans jamais croisés,
+ * la maquette les jours par client sans le chiffre d'affaires en face.
+ */
+describe('rapport et charge par mission', () => {
+  const rythme = (du: string, au: string, tjm: number) => ({
+    du: dateISO(du), au: dateISO(au),
+    parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 },
+    tjm: euros(tjm)
+  });
+
+  const missionA = mission({
+    id: 'a', description: 'Studio Lumen', clientNom: 'Studio Lumen',
+    tjm: euros(800), debut: dateISO('2026-01-01'), fin: dateISO('2026-01-31'),
+    entites: [entite({
+      id: 'a-co', nom: 'Studio Lumen',
+      rythmes: [rythme('2026-01-01', '2026-01-31', 800)]
+    })]
+  });
+
+  const missionB = mission({
+    id: 'b', description: 'Atelier Novak', clientNom: 'Atelier Novak',
+    tjm: euros(400), debut: dateISO('2026-02-01'), fin: dateISO('2026-06-30'),
+    entites: [entite({
+      id: 'b-co', nom: 'Atelier Novak',
+      rythmes: [rythme('2026-02-01', '2026-06-30', 400)]
+    })]
+  });
+
+  /**
+   * LE POINT QUI COMPTE. On compare des RATIOS et non des proportions : une
+   * mission qui pèse peu dans le chiffre d'affaires en consommant beaucoup de
+   * temps est un problème que sa part ne montre pas. Le tri met la réponse en
+   * première ligne.
+   */
+  it('trie les missions du meilleur euro-jour au moins bon', () => {
+    semer({ missions: [missionB, missionA] });
+    render(<Activite />);
+
+    const lignes = screen.getAllByRole('row').filter(
+      (l) => l.textContent?.includes('Studio Lumen') || l.textContent?.includes('Atelier Novak')
+    );
+    expect(lignes[0]?.textContent).toContain('Studio Lumen');
+    expect(lignes[1]?.textContent).toContain('Atelier Novak');
+  });
+
+  /** Les deux moitiés de la question, côte à côte : le rapport et la charge. */
+  it('met la part du temps en face de l’euro-jour', () => {
+    semer({ missions: [missionA, missionB] });
+    render(<Activite />);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('columnheader', { name: '€ / jour' })).toBeTruthy();
+    expect(within(table).getByRole('columnheader', { name: 'Part du temps' })).toBeTruthy();
+    expect(within(table).getByText('800 €')).toBeTruthy();
+  });
+
+  /** Sans mission planifiée, la carte ne s'invente pas un tableau vide. */
+  it('ne montre rien sans mission planifiée', () => {
+    semer({ missions: [] });
+    render(<Activite />);
+    expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  /**
+   * Les montants du tableau portent `data-montant` : un euro-jour dit le tarif
+   * réel, et il restait lisible sur un écran partagé.
+   */
+  it('rend les montants masquables', () => {
+    semer({ missions: [missionA] });
+    render(<Activite />);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('800 €').closest('[data-montant]')).toBeTruthy();
+  });
+});
+
+/**
+ * LES DEUX ERREURS QU'ON FAIT SUR SON PROPRE TARIF.
+ *
+ * Tous les jours travaillés ne se facturent pas, et ce qui rentre n'est pas ce
+ * qui reste. Les deux indicateurs existaient dans l'ancienne application et
+ * avaient disparu — l'inventaire fonctionnel les donnait même pour « présents »
+ * alors qu'ils n'étaient nulle part.
+ */
+describe('ce qu’une journée rapporte', () => {
+  const missionTarifee = mission({
+    id: 't', description: 'Mission tarifée', clientNom: 'ClientA',
+    tjm: euros(500), debut: dateISO('2026-01-01'), fin: dateISO('2026-01-31'),
+    entites: [entite({
+      id: 't-co', nom: 'ClientA',
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-01-31'),
+        parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 },
+        tjm: euros(500)
+      }]
+    })]
+  });
+
+  /**
+   * LE POINT QUI COMPTE. Le tarif des contrats et le tarif facturé se divisent
+   * par les MÊMES journées : leur écart mesure ce qui se perd en remises,
+   * forfaits et jours non facturés, et non une différence de décompte.
+   */
+  it('met l’écart entre le tarif des contrats et le facturé', () => {
+    semer({
+      missions: [missionTarifee],
+      // Janvier 2026 : 22 jours ouvrés, soit 11 000 € au tarif du contrat.
+      recettes: [recette({ montant: euros(8800), emiseLe: dateISO('2026-01-31') })]
+    });
+    render(<Activite />);
+
+    expect(screen.getByText(/Tarif des contrats/)).toBeTruthy();
+    expect(screen.getByText('Tarif effectif, facturé')).toBeTruthy();
+    expect(screen.getByText('Perdu par journée')).toBeTruthy();
+  });
+
+  /** Le net retire cotisations et impôt : c'est ce qu'on sous-estime le plus. */
+  it('montre ce qu’il reste, charges déduites', () => {
+    semer({
+      missions: [missionTarifee],
+      recettes: [recette({ montant: euros(11_000), emiseLe: dateISO('2026-01-31') })]
+    });
+    render(<Activite />);
+
+    const reste = screen.getByText(/Ce qu’il vous reste, charges déduites/);
+    const montant = reste.parentElement?.querySelector('dd')?.textContent ?? '';
+    expect(montant).toMatch(/€/);
+    // Net strictement inférieur au brut : les charges ne sont pas nulles.
+    expect(montant).not.toBe('500 €');
+  });
+
+  /** Sans journée travaillée, il n'y a pas de moyenne à montrer. */
+  it('ne montre rien sans journée travaillée', () => {
+    semer({ missions: [] });
+    render(<Activite />);
+    expect(screen.queryByText(/Tarif des contrats/)).toBeNull();
   });
 });

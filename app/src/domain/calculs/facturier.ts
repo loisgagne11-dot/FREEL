@@ -1,4 +1,5 @@
 import type { DateISO, Euros } from '../types';
+import { euros } from '../types';
 import { ajouterJours } from './aTraiter';
 
 /**
@@ -55,6 +56,7 @@ export function echeanceDe(emiseLe: DateISO, delaiJours: number): DateISO {
 export type StatutFacture =
   | 'brouillon'
   | 'emise'
+  | 'envoyee'
   | 'en_retard'
   | 'encaissee'
   | 'annulee'
@@ -67,6 +69,8 @@ export interface RecetteSuivie {
   readonly libelle: string;
   readonly montant: Euros;
   readonly emiseLe: DateISO | null;
+  /** Date d'envoi au client. `undefined` sur les recettes d'avant le schéma 8. */
+  readonly envoyeeLe?: DateISO | null;
   readonly encaisseeLe: DateISO | null;
   readonly numero: string;
   readonly annuleEcriture?: string | null;
@@ -128,7 +132,16 @@ function statutDe(
   // Strictement supérieur : une facture n'est pas en retard LE jour de son
   // échéance, elle l'est le lendemain.
   if (echeanceLe !== null && aujourdhui > echeanceLe) return 'en_retard';
-  return 'emise';
+
+  // ÉMISE N'EST PAS ENVOYÉE. Le document peut exister, porter son numéro, et
+  // dormir dans un dossier — c'est même le cas courant en fin de mois, où l'on
+  // établit les factures d'un coup avant de les envoyer. Les confondre fait
+  // relancer un client qui n'a jamais rien reçu.
+  //
+  // Le retard l'emporte sur les deux : une facture échue est en retard qu'on
+  // l'ait envoyée ou non, et si on ne l'a pas envoyée, c'est le premier
+  // problème à régler.
+  return recette.envoyeeLe == null ? 'emise' : 'envoyee';
 }
 
 /**
@@ -145,10 +158,56 @@ function joursEntre(depuis: DateISO, jusqua: DateISO): number {
   return Math.max(0, Math.round((b - a) / 86_400_000));
 }
 
+/** Ce qui a été facturé et qui n'est pas rentré. */
+export interface Encours {
+  /** Émis et non réglé, annulations déduites. */
+  readonly resteARentrer: Euros;
+  /** La part de ce reste dont l'échéance est passée. */
+  readonly enRetard: Euros;
+}
+
+/**
+ * L'encours d'une liste de factures suivies.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE SEULE DÉFINITION DE « RESTE À RENTRER »
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'écran Argent en portait une seconde, et elle était fausse : la différence
+ * entre le CA réalisé et le CA encaissé de l'année, bornée à zéro. Deux
+ * agrégats annuels ne se soustraient pas — une facture émise en décembre et
+ * encaissée en janvier gonfle l'encaissé d'une année sans contrepartie dans le
+ * réalisé de la même. Sur 50 000 € réalisés et 52 000 € encaissés dont 8 000 €
+ * venus de l'an dernier, le vrai reste à rentrer est de 6 000 € et l'écran
+ * affichait 0 €. La borne à zéro n'était pas une protection : elle effaçait le
+ * signal au lieu de le corriger.
+ *
+ * Le reste à rentrer ne se déduit pas d'agrégats. Il se COMPTE, facture par
+ * facture : celles qui sont émises et que rien n'a réglées. C'est ce que fait
+ * cette fonction, et c'est désormais la seule à le faire.
+ */
+export function encoursDe(factures: readonly FactureSuivie[]): Encours {
+  const somme = (garde: (f: FactureSuivie) => boolean): Euros =>
+    euros(factures.filter(garde).reduce((t, f) => t + f.recette.montant, 0));
+
+  // Une facture non encore envoyée est due autant qu'une envoyée : le client
+  // n'a simplement pas encore été mis au courant. L'exclure ferait disparaître
+  // du « reste à rentrer » les factures de fin de mois, c'est-à-dire les plus
+  // récentes.
+  return {
+    resteARentrer: somme((f) =>
+      f.statut === 'emise' || f.statut === 'envoyee' || f.statut === 'en_retard'),
+    enRetard: somme((f) => f.statut === 'en_retard')
+  };
+}
+
 /** Les libellés d'état, au singulier de ce que la facture EST. */
 export const LIBELLE_STATUT: Readonly<Record<StatutFacture, string>> = {
   brouillon: 'Brouillon',
-  emise: 'Émise',
+  // « À envoyer » plutôt que « Émise » : le libellé dit ce qu'il reste à
+  // faire, là où l'état seul laissait croire que la facture était partie.
+  emise: 'À envoyer',
+  envoyee: 'Envoyée',
   en_retard: 'En retard',
   encaissee: 'Encaissée',
   annulee: 'Annulée',

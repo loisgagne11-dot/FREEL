@@ -19,16 +19,22 @@ import type { Jour, ZoneFeries } from '../domain/calculs/activite';
 import { joursFeries } from '../domain/calculs/activite';
 import type { JourPlanifie } from '../domain/calculs/planning';
 import { craDuMois, planifier } from '../domain/calculs/planning';
+import { type PrevisionDuMois, previsionDuMois } from '../domain/calculs/prevision';
 import type { Cra } from '../domain/calculs/planning';
 import {
   calendrierDuMois, chargeDuMois, joursDuMois, planDeCharge
 } from '../domain/calculs/activite';
-import type { PlanDeCharge } from '../domain/calculs/activite';
+import type { ChargeDuMois, PlanDeCharge, SourceCharge } from '../domain/calculs/activite';
 import { delaisParClient, type DelaiClient } from '../domain/calculs/activite';
-import type { DateISO, Euros, Mois } from '../domain/types';
+import type { DateISO, Euros, Mois, Resolution } from '../domain/types';
 import { euros } from '../domain/types';
 import type { ClientOperationnel, Faits, Mission } from './schema';
-import { dateDuJour } from './selecteurs';
+import {
+  dateDuJour, periodesUrssafEffectives, regimeDe, sousAcreLe
+} from './selecteurs';
+import { tauxCotisations } from '../domain/bareme/urssaf';
+import { tauxImpotEtContributions } from '../domain/bareme';
+import { type TjmEffectif, tjmEffectif, tjmNet } from '../domain/calculs/tjm';
 
 /**
  * Tarif journalier par nom de client.
@@ -59,12 +65,29 @@ export interface LigneMission {
   readonly facture: Euros;
   readonly encaisse: Euros;
   readonly resteARentrer: Euros;
+  /**
+   * Combien de missions se partagent ces montants.
+   *
+   * `1` quand ils sont bien ceux de cette mission seule. Au-delà, ce sont ceux
+   * du CLIENT, et l'écran doit le dire : une facture ne porte pas le nom de la
+   * mission qui l'a produite, et deux missions d'un même client actives en même
+   * temps ne peuvent pas être départagées.
+   */
+  readonly missionsQuiPartagent: number;
 }
 
 export interface EtatActivite {
   readonly mois: Mois;
   readonly calendrier: readonly Jour[];
   readonly plan: PlanDeCharge;
+  /**
+   * D'où viennent les jours travaillés du plan de charge.
+   *
+   * L'écran doit pouvoir dire s'il montre une mesure ou une estimation : une
+   * occupation lue sur le planning est un fait, la même déduite d'un montant
+   * divisé par un tarif n'en est pas un.
+   */
+  readonly sourceCharge: SourceCharge;
   /** Recettes du mois dont le tarif est inconnu : la mesure est partielle. */
   readonly recettesSansTarif: number;
   readonly missions: readonly LigneMission[];
@@ -129,14 +152,15 @@ export function etatActivite(
   m: Mois,
   maintenant: Date = new Date()
 ): EtatActivite {
-  const tarifs = tarifsParClient(faits);
-  const charge = chargeDuMois(faits.recettes, tarifs, m);
+  const charge = chargeDuMoisPlanifiee(faits, m)
+    ?? chargeDuMois(faits.recettes, tarifsParClient(faits), m);
   const annee = m.slice(0, 4);
 
   return {
     mois: m,
     calendrier: calendrierDuMois(m, faits.conges),
     plan: planDeCharge(m, faits.conges, charge.jours),
+    sourceCharge: charge.source,
     recettesSansTarif: charge.recettesSansTarif,
     missions: lignesDeMission(faits),
     delais: delaisParClient(faits.recettes, dateDuJour(maintenant)),
@@ -155,24 +179,80 @@ export function etatActivite(
 }
 
 /**
+ * Les journées travaillées du mois, prises sur le planning.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN FAIT PLUTÔT QU'UNE DIVISION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'occupation divisait jusqu'ici le montant facturé par le tarif journalier.
+ * Le dénominateur était juste — jours ouvrés réels, fériés calculés, congés
+ * déduits — mais le numérateur était une estimation, et elle se trompait dès
+ * que la facturation ne suivait pas le travail : un mois facturé au trimestre
+ * affichait 0 % d'occupation alors qu'on l'avait travaillé entièrement.
+ *
+ * Le planning donne les journées directement, ajustements compris. On les
+ * prend là. `null` quand aucun rythme n'a été saisi — c'est le seul cas où la
+ * division par le tarif garde un sens, et l'écran dit alors d'où vient son
+ * chiffre.
+ */
+function chargeDuMoisPlanifiee(faits: Faits, m: Mois): ChargeDuMois | null {
+  const jours = previsionDuMoisParMission(faits, m)
+    .reduce((s, p) => s + p.prevision.joursRetenus, 0);
+
+  return jours > 0 ? { jours, source: 'planning', recettesSansTarif: 0 } : null;
+}
+
+/** La facture tombe-t-elle dans la fenêtre de la mission ? */
+function dansLaFenetre(mission: Mission, date: DateISO): boolean {
+  if (mission.debut !== null && date < mission.debut) return false;
+  if (mission.fin !== null && date > mission.fin) return false;
+  return true;
+}
+
+/**
  * Ce que chaque mission a produit.
  *
- * Le rattachement se fait par nom de client, l'ancien modèle ne portant pas de
- * lien entre une facture et la mission qui l'a produite. Un client à plusieurs
- * missions voit donc son chiffre d'affaires porté par la première d'entre
- * elles : c'est une approximation, et l'écran ne la présente pas autrement.
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX FAÇONS DE SE TROMPER, ET CELLE QU'ON ÉVITE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une facture ne porte pas le nom de la mission qui l'a produite : le modèle
+ * ne relie que le CLIENT. Le rattachement précédent donnait donc l'intégralité
+ * du chiffre d'affaires du client à la PREMIÈRE de ses missions, et zéro aux
+ * suivantes — un écran qui affichait « 0 € » en face d'une mission qui
+ * facturait, sans rien dire de l'approximation.
+ *
+ * Le rattachement se fait maintenant par client ET par FENÊTRE DE DATES.
+ * Deux missions successives chez le même client — le cas courant — se
+ * séparent alors correctement, chacune prenant les factures émises pendant
+ * qu'elle courait. Il ne reste d'ambiguïté que pour deux missions d'un même
+ * client actives EN MÊME TEMPS : là, aucune date ne peut trancher, et
+ * `missionsQuiPartagent` le dit plutôt que de choisir au hasard.
+ *
+ * Les brouillons sont exclus : sans date d'émission, une facture n'a pas été
+ * envoyée, et un devis en attente n'est pas du chiffre d'affaires.
  */
 function lignesDeMission(faits: Faits): readonly LigneMission[] {
-  const dejaCompte = new Set<string>();
-  return [...faits.missions].sort(prioriteMission).map((mission) => {
-    const premiere = !dejaCompte.has(mission.clientNom);
-    dejaCompte.add(mission.clientNom);
-    const recettes = premiere
-      ? faits.recettes.filter((r) => r.clientNom === mission.clientNom)
-      : [];
+  const missions = [...faits.missions].sort(prioriteMission);
 
-    const facture = recettes.reduce<number>((s, r) => s + r.montant, 0);
-    const encaisse = recettes
+  return missions.map((mission) => {
+    const siennes = faits.recettes.filter((r) =>
+      r.clientNom === mission.clientNom
+      && r.emiseLe !== null
+      && dansLaFenetre(mission, r.emiseLe)
+    );
+
+    // Les missions du même client dont la fenêtre couvre au moins une de ces
+    // factures — celle-ci comprise. Au-delà de une, le montant est celui du
+    // client et l'écran l'annonce.
+    const missionsQuiPartagent = missions.filter((autre) =>
+      autre.clientNom === mission.clientNom
+      && siennes.some((r) => r.emiseLe !== null && dansLaFenetre(autre, r.emiseLe))
+    ).length;
+
+    const facture = siennes.reduce<number>((s, r) => s + r.montant, 0);
+    const encaisse = siennes
       .filter((r) => r.encaisseeLe !== null)
       .reduce<number>((s, r) => s + r.montant, 0);
 
@@ -180,7 +260,8 @@ function lignesDeMission(faits: Faits): readonly LigneMission[] {
       mission,
       facture: euros(facture),
       encaisse: euros(encaisse),
-      resteARentrer: euros(facture - encaisse)
+      resteARentrer: euros(facture - encaisse),
+      missionsQuiPartagent: Math.max(1, missionsQuiPartagent)
     };
   });
 }
@@ -392,6 +473,60 @@ export function craDuMoisParMission(
     .filter((x) => x.cra.totalJours > 0);
 }
 
+/** La prévision d'une mission sur un mois, prête à afficher. */
+export interface PrevisionDeMission {
+  readonly missionId: string;
+  readonly entiteId: string;
+  readonly libelle: string;
+  readonly prevision: PrevisionDuMois;
+}
+
+/**
+ * Ce que chaque mission devrait rapporter ce mois-ci, et ce qu'elle rapporte.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * MÊME SOURCE QUE LE CRA, DÉLIBÉRÉMENT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le planning est calculé ici comme il l'est pour le CRA — mêmes rythmes,
+ * mêmes ajustements, mêmes fériés, mêmes congés. En produire une seconde
+ * version garantirait que les deux finissent par diverger, et le projet a déjà
+ * payé ce prix : l'ancienne application avait trois sources pour une même
+ * journée, et rien n'indiquait laquelle faisait foi.
+ *
+ * Contrairement au CRA, les missions SANS journée retenue sont conservées : une
+ * mission qui devait rapporter et n'a rien rapporté est précisément
+ * l'information qu'on cherche. Le CRA, lui, ne liste que ce qui se facture.
+ */
+export function previsionDuMoisParMission(
+  faits: Faits,
+  m: Mois,
+  zone: ZoneFeries = 'general'
+): readonly PrevisionDeMission[] {
+  const dates = joursDuMois(m);
+  const feries = new Set<string>(joursFeries(Number(m.slice(0, 4)), zone));
+
+  const conges: Record<string, number> = {};
+  for (const c of faits.conges) conges[c.date] = c.quotite;
+
+  return faits.missions
+    .filter((mission) => mission.statut === 'active' || mission.statut === 'terminee')
+    .flatMap((mission) => mission.entites.map((entite) => ({
+      missionId: mission.id,
+      entiteId: entite.id,
+      libelle: libelleDeLaLigne(mission, entite),
+      prevision: previsionDuMois(
+        m,
+        planifier(dates, {
+          rythmes: entite.rythmes, ajustements: entite.ajustements, feries, conges
+        }),
+        entite.rythmes,
+        mission.tjm
+      )
+    })))
+    .filter((x) => x.prevision.joursPrevus > 0 || x.prevision.joursRetenus > 0);
+}
+
 /**
  * Comment nommer une ligne de planning ou un CRA.
  *
@@ -404,4 +539,195 @@ function libelleDeLaLigne(mission: Mission, entite: ClientOperationnel): string 
   const nomMission = mission.description !== '' ? mission.description : mission.clientNom;
   if (mission.entites.length <= 1) return nomMission;
   return entite.nom !== '' ? `${nomMission} — ${entite.nom}` : nomMission;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Ce qu'une mission rapporte, face à ce qu'elle coûte en temps
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Une mission, avec son rapport ET sa charge — les deux, côte à côte. */
+export interface RapportDeMission {
+  readonly missionId: string;
+  readonly entiteId: string;
+  readonly libelle: string;
+  /** Journées retenues sur l'année, ajustements compris. */
+  readonly jours: number;
+  /** Ce que ces journées valent, au tarif en vigueur à chaque date. */
+  readonly produit: Euros;
+  /**
+   * Ce que la mission rapporte par journée effectivement passée dessus.
+   *
+   * `null` sans journée : diviser par zéro donnerait l'infini, et afficher
+   * zéro laisserait croire à une mission qui ne rapporte rien alors qu'elle
+   * n'a simplement pas encore commencé.
+   */
+  readonly parJour: Euros | null;
+  /** Part de l'année de travail que cette mission consomme, entre 0 et 1. */
+  readonly partDuTemps: number;
+}
+
+/**
+ * Ce que chaque mission rapporte, face à ce qu'elle prend de temps.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * PERSONNE N'A JAMAIS MIS LES DEUX FACE À FACE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « Quelle mission me rapporte quoi et me prend combien de charge de temps » :
+ * la question était posée telle quelle, et aucune des deux sources ne pouvait
+ * y répondre. L'ancienne application avait le rapport (chiffre d'affaires par
+ * client) ET la charge (jours par mission) — dans deux écrans différents,
+ * jamais croisés. La maquette montre les jours par client sans le chiffre
+ * d'affaires en face.
+ *
+ * La matière n'existait pas non plus : il a fallu que la prévision valorise
+ * chaque journée du planning au tarif de sa date pour que « ce que cette
+ * mission rapporte » cesse d'être une approximation par client.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN TABLEAU TRIÉ, PAS UN GRAPHE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * On compare ici des RATIOS — des euros par jour — et non des proportions. Un
+ * camembert répond à « quelle part du gâteau », ce qui n'est pas la question :
+ * une mission qui pèse 15 % du chiffre d'affaires en consommant 40 % du temps
+ * est un problème que sa part ne montre pas. Le tri par euro-jour met la
+ * réponse en première ligne.
+ *
+ * Le montant est celui du travail PRODUIT, et non de l'encaissé : l'encaissé
+ * ne se rattache qu'au client, jamais à la mission, et deux missions
+ * simultanées d'un même client ne peuvent pas se le partager. Produire le
+ * chiffre depuis le planning est la seule façon d'en avoir un qui soit
+ * vraiment celui de la mission.
+ */
+export function rapportParMission(
+  faits: Faits,
+  annee: number,
+  zone: ZoneFeries = 'general'
+): readonly RapportDeMission[] {
+  const cumul = new Map<string, { ligne: Omit<RapportDeMission, 'parJour' | 'partDuTemps'> }>();
+
+  for (let m = 1; m <= 12; m++) {
+    const mois = `${annee}-${String(m).padStart(2, '0')}` as Mois;
+    for (const p of previsionDuMoisParMission(faits, mois, zone)) {
+      const cle = `${p.missionId}/${p.entiteId}`;
+      const acc = cumul.get(cle)?.ligne ?? {
+        missionId: p.missionId, entiteId: p.entiteId, libelle: p.libelle,
+        jours: 0, produit: euros(0)
+      };
+      cumul.set(cle, {
+        ligne: {
+          ...acc,
+          jours: acc.jours + p.prevision.joursRetenus,
+          produit: euros(acc.produit + p.prevision.montantRetenu)
+        }
+      });
+    }
+  }
+
+  const lignes = [...cumul.values()].map((c) => c.ligne).filter((l) => l.jours > 0);
+  const joursTotaux = lignes.reduce((s, l) => s + l.jours, 0);
+
+  return lignes
+    .map((l) => ({
+      ...l,
+      parJour: l.jours > 0 ? euros(Math.round(l.produit / l.jours)) : null,
+      partDuTemps: joursTotaux > 0 ? l.jours / joursTotaux : 0
+    }))
+    // Du meilleur euro-jour au moins bon : c'est la décision commerciale que
+    // l'outil peut éclairer, et elle doit être en première ligne.
+    .sort((a, b) => (b.parJour ?? 0) - (a.parJour ?? 0));
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Ce qu'une journée rapporte, et ce qu'il en reste
+   ───────────────────────────────────────────────────────────────────────── */
+
+/** Le tarif de la journée, brut puis net de charges. */
+export interface TarifDeLaJournee {
+  readonly effectif: TjmEffectif;
+  /**
+   * Ce qu'il reste d'une journée facturée, cotisations et impôt déduits.
+   *
+   * Une `Resolution` : le barème peut ne pas couvrir la période, et un « ce qui
+   * vous reste par jour » calculé sur un taux supposé serait précisément le
+   * chiffre sur lequel on décide d'accepter une mission.
+   */
+  readonly net: Resolution<Euros>;
+}
+
+/**
+ * Le taux total de charges d'un mois : cotisations sociales, plus impôt et
+ * contributions.
+ *
+ * Les deux sont des `Resolution` et se combinent en une seule : si l'une des
+ * deux refuse, le total refuse. Additionner un taux connu à un taux inconnu
+ * traité comme zéro donnerait un net trop élevé — l'erreur qui rassure.
+ */
+function tauxDeChargesAu(faits: Faits, m: Mois): Resolution<number> {
+  const type = faits.entreprise.typeActivite;
+  const cotis = tauxCotisations(m, type, sousAcreLe(faits)(m), periodesUrssafEffectives(faits));
+  if (cotis.statut === 'refuse') return cotis;
+
+  const impot = tauxImpotEtContributions(regimeDe(faits), m, type);
+  if (impot.statut === 'refuse') return impot;
+
+  const somme = cotis.valeur + impot.valeur;
+
+  // Le total est une hypothèse dès que l'un des deux en est une : c'est le
+  // moins engageant des deux qui gouverne.
+  return cotis.statut === 'hypothese'
+    ? { ...cotis, valeur: somme }
+    : impot.statut === 'hypothese'
+      ? { ...impot, valeur: somme }
+      : { statut: 'publie', valeur: somme, source: cotis.source, verifieLe: cotis.verifieLe };
+}
+
+/**
+ * Ce qu'une journée rapporte réellement sur l'année, et ce qu'il en reste.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX INDICATEURS QUI AVAIENT DISPARU SANS MOTIF
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne application portait `tjmEffectif` et `tjmNet` ; ils ont disparu
+ * dans la reprise, et l'inventaire fonctionnel les donnait pour « présents »
+ * alors qu'ils n'existaient nulle part.
+ *
+ * Ils méritent d'exister tous les deux. Le premier dit si les jours non
+ * facturés, les remises et les forfaits rognent le tarif affiché. Le second
+ * dit ce qu'il reste après cotisations et impôt — l'écart que tout indépendant
+ * sous-estime, et celui qu'il faut avoir en tête pour dire oui à une mission.
+ *
+ * Le tarif affiché est valorisé depuis le PLANNING, le tarif effectif depuis
+ * les factures ÉMISES, et les deux se divisent par les mêmes journées : c'est
+ * la seule façon que l'écart soit lisible.
+ */
+export function tarifDeLaJournee(
+  faits: Faits,
+  annee: number,
+  zone: ZoneFeries = 'general'
+): TarifDeLaJournee {
+  const lignes = rapportParMission(faits, annee, zone);
+  const jours = lignes.reduce((s, l) => s + l.jours, 0);
+  const produit = euros(lignes.reduce((s, l) => s + l.produit, 0));
+
+  const prefixe = String(annee);
+  const facture = euros(faits.recettes
+    .filter((r) => r.emiseLe !== null && r.emiseLe.startsWith(prefixe))
+    .reduce<number>((s, r) => s + r.montant, 0));
+
+  const effectif = tjmEffectif({ jours, produit, facture });
+
+  // Le taux se résout au DERNIER mois de l'année considérée qui soit couvert
+  // par le barème : c'est celui en vigueur pour ce qu'on facturera ensuite, et
+  // c'est la question que pose « ce qui me reste par jour ».
+  const taux = tauxDeChargesAu(faits, `${annee}-12` as Mois);
+
+  return {
+    effectif,
+    net: effectif.effectif === null
+      ? { statut: 'refuse', motif: 'aucune journée travaillée cette année' }
+      : tjmNet(effectif.effectif, taux)
+  };
 }

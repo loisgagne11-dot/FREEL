@@ -5,7 +5,16 @@ import styles from './SanteCard.module.css';
 
 export type EtatIndicateur = 'bon' | 'attention' | 'alerte';
 
+/**
+ * L'identité du constat, distincte de son libellé.
+ *
+ * La règle de priorité s'appuie dessus : trier sur le texte affiché ferait
+ * dépendre l'ordre de gravité d'une reformulation.
+ */
+export type SujetDeSante = 'provisions' | 'factures' | 'declarations';
+
 export interface Indicateur {
+  readonly id: SujetDeSante;
   readonly libelle: string;
   readonly valeur: string;
   readonly etat: EtatIndicateur;
@@ -40,6 +49,8 @@ export function SanteCard(
     readonly autonomie: number | null;
   }
 ) {
+  const synthese = syntheseDeSante(indicateurs);
+
   return (
     <section className={styles.carte} aria-labelledby="titre-sante">
       <header className={styles.entete}>
@@ -50,15 +61,31 @@ export function SanteCard(
             la formule&nbsp;: quel poids donner aux provisions, aux impayés, aux
             déclarations&nbsp;? Chaque réponse est défendable, aucune n’est
             vérifiable — et une note se retient, se compare, puis commande des
-            décisions. Les trois constats ci-dessous, eux, se démontrent.
+            décisions. La phrase de synthèse, elle, ne pondère rien&nbsp;: elle
+            nomme le plus grave des trois constats, selon un ordre de gravité
+            écrit — une provision déjà dépensée passe avant une déclaration en
+            retard, qui passe avant un impayé.
           </Info>
         </h2>
         <p className={styles.autonomie}>
+          {/* L'assiette est NOMMÉE. « 4,2 mois d'autonomie » ne dit pas sur
+              quoi l'on tient : ici sur le versable, réserve exclue — donc le
+              chiffre est volontairement prudent, et il y a du matelas derrière
+              lui. Le taire ferait lire un chiffre de survie là où c'est un
+              chiffre de confort. */}
           {autonomie === null
             ? 'Autonomie inconnue'
-            : `${moisTexte(autonomie)} d’autonomie`}
+            : `${moisTexte(autonomie)} d’autonomie, sans toucher à la réserve`}
         </p>
       </header>
+
+      {/* Le coup d'œil, que trois pastilles ne donnaient pas : elles sont
+          vraies mais elles font trois informations, quand la question — « est-ce
+          que ça va ? » — en attend une. La phrase nomme le plus grave, sans
+          pondérer quoi que ce soit. */}
+      <p className={`${styles.synthese} ${styles[synthese.ton]}`} role="status">
+        {synthese.phrase}
+      </p>
 
       <ul className={styles.indicateurs}>
         {indicateurs.map((i) => (
@@ -91,6 +118,7 @@ export function indicateursDeSante(
 ): readonly Indicateur[] {
   return [
     {
+      id: 'provisions',
       libelle: 'Provisions couvertes',
       valeur: provisions === 0
         ? 'rien à provisionner'
@@ -98,6 +126,7 @@ export function indicateursDeSante(
       etat: provisions === 0 ? 'bon' : dispo >= 0 ? 'bon' : 'alerte'
     },
     {
+      id: 'factures',
       libelle: 'Factures',
       valeur: impayes === 0
         ? 'aucun impayé'
@@ -105,6 +134,7 @@ export function indicateursDeSante(
       etat: impayes === 0 ? 'bon' : 'attention'
     },
     {
+      id: 'declarations',
       libelle: 'Déclarations',
       valeur: periodesEnRetard === 0
         ? 'à jour'
@@ -112,4 +142,66 @@ export function indicateursDeSante(
       etat: periodesEnRetard === 0 ? 'bon' : 'alerte'
     }
   ];
+}
+
+/**
+ * Le coup d'œil, sans inventer de note.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CE QUE LE SCORE FAISAIT BIEN, ET QU'ON AVAIT PERDU
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Refuser le « 78/100 » était juste : sa formule aurait été inventée. Mais le
+ * score répondait à une vraie question — « est-ce que ça va ? » — en UNE
+ * information, et trois pastilles en font trois. On avait raison sur le fond
+ * et on avait perdu l'usage.
+ *
+ * Une phrase répond à la même question sans rien pondérer. Elle ne mélange
+ * pas les constats : elle nomme LE PLUS GRAVE, et le nomme en toutes lettres.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'ORDRE EST UNE GRAVITÉ, PAS UNE PONDÉRATION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * C'est ce qui distingue cette phrase d'un score. On n'attribue aucun poids ;
+ * on classe des conséquences, et le classement se justifie :
+ *
+ *  1. PROVISIONS non couvertes — l'argent dû a déjà été dépensé. C'est le seul
+ *     des trois qui soit déjà consommé : il ne se rattrape qu'en trouvant la
+ *     somme ailleurs, et les majorations courent pendant ce temps.
+ *  2. DÉCLARATIONS en retard — la pénalité est automatique et croît seule,
+ *     mais la somme, elle, est encore là.
+ *  3. IMPAYÉS — c'est un tiers qui doit. Désagréable, réversible, et la
+ *     trésorerie n'est pas encore atteinte.
+ *
+ * Le pire des trois gouverne le ton. À égalité de gravité, l'ordre ci-dessus
+ * tranche — parce qu'un ordre arbitraire mais ÉCRIT vaut mieux qu'un ordre
+ * d'exécution qu'on découvrirait à l'usage.
+ */
+const GRAVITE: readonly SujetDeSante[] = ['provisions', 'declarations', 'factures'];
+
+export interface SyntheseDeSante {
+  readonly ton: EtatIndicateur;
+  readonly phrase: string;
+}
+
+export function syntheseDeSante(
+  indicateurs: readonly Indicateur[]
+): SyntheseDeSante {
+  const rang = (i: Indicateur) => GRAVITE.indexOf(i.id);
+  const gravite = (e: EtatIndicateur) => (e === 'alerte' ? 0 : e === 'attention' ? 1 : 2);
+
+  const pire = [...indicateurs]
+    .sort((a, b) => gravite(a.etat) - gravite(b.etat) || rang(a) - rang(b))[0];
+
+  if (pire === undefined || pire.etat === 'bon') {
+    return { ton: 'bon', phrase: 'Rien ne réclame votre attention.' };
+  }
+
+  // Le sujet est nommé ET chiffré : « attention » sans dire à quoi oblige à
+  // aller chercher, ce qui est exactement ce que le coup d'œil doit éviter.
+  return {
+    ton: pire.etat,
+    phrase: `${pire.libelle} — ${pire.valeur}.`
+  };
 }

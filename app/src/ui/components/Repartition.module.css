@@ -62,3 +62,14 @@
 }
 
 .deficit strong { color: var(--red); font-weight: 600; }
+
+/* Les natures de dette reprennent les couleurs de l'échéancier : une même
+   dette doit avoir la même couleur d'un écran à l'autre, sinon la couleur
+   cesse d'être une information et devient une décoration. */
+.urssaf { background: var(--c-urssaf); }
+.tva { background: var(--c-tva); }
+.impot { background: var(--c-ir); }
+.cfe { background: var(--c-cfe); }
+/* La CFP est collectée par l'URSSAF avec les cotisations : lui donner une
+   couleur propre suggérerait un interlocuteur de plus. */
+.cfp { background: var(--c-urssaf); }

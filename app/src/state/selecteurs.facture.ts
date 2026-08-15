@@ -24,12 +24,18 @@ import {
 } from '../domain/calculs/facture';
 import { prochainNumero } from '../domain/calculs/livreRecettes';
 import {
-  DELAI_PAIEMENT_DEFAUT, type FactureSuivie, type StatutFacture, suivre
+  DELAI_PAIEMENT_DEFAUT, type FactureSuivie, type StatutFacture,
+  encoursDe, suivre
 } from '../domain/calculs/facturier';
 import { dansLaPeriode, type Periode } from '../domain/calculs/periode';
 import type { DateISO, Euros } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Client, Faits, Recette } from './schema';
+import type { Mois } from '../domain/types';
+import {
+  type BrouillonDeFacture, type LigneDeBrouillon, brouillonsDuMois
+} from '../domain/calculs/brouillon';
+import { previsionDuMoisParMission } from './selecteurs.activite';
 
 /** L'émetteur, tel qu'il doit figurer sur une facture. */
 export function emetteurDe(faits: Faits): Emetteur {
@@ -150,18 +156,21 @@ export function etatFacturier(
     .sort(parDateDecroissante);
 
   const parStatut: Record<StatutFacture, number> = {
-    brouillon: 0, emise: 0, en_retard: 0, encaissee: 0, annulee: 0, annulation: 0
+    brouillon: 0, emise: 0, envoyee: 0, en_retard: 0, encaissee: 0,
+    annulee: 0, annulation: 0
   };
   for (const f of factures) parStatut[f.statut] += 1;
 
   const somme = (garde: (f: FactureSuivie<Recette>) => boolean): Euros =>
     euros(factures.filter(garde).reduce((t, f) => t + f.recette.montant, 0));
 
+  // L'encours vient du domaine, et non d'un calcul local : l'écran Argent pose
+  // la même question sur une autre assiette, et deux soustractions écrites
+  // séparément finissent par répondre différemment.
   return {
     factures,
     parStatut,
-    resteARentrer: somme((f) => f.statut === 'emise' || f.statut === 'en_retard'),
-    enRetard: somme((f) => f.statut === 'en_retard'),
+    ...encoursDe(factures),
     encaisse: somme((f) => f.statut === 'encaissee')
   };
 }
@@ -179,4 +188,71 @@ function parDateDecroissante(
   if (a.statut === 'brouillon' && b.statut !== 'brouillon') return -1;
   if (b.statut === 'brouillon' && a.statut !== 'brouillon') return 1;
   return (b.recette.emiseLe ?? '').localeCompare(a.recette.emiseLe ?? '');
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   La facture du mois, avant qu'elle existe
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Les brouillons de facture du mois, dérivés du planning.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * IL SUIT L'ACTIVITÉ PARCE QU'IL N'EN EST PAS SÉPARÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « La facture du mois en cours est créée en brouillon et se met à jour en
+ * fonction de mes modifications d'Activité. » Un brouillon enregistré serait
+ * juste à l'instant de sa création puis faux dès la première journée corrigée,
+ * et il faudrait le resynchroniser — c'est-à-dire réécrire un fait à partir
+ * d'un calcul, ce que cette application s'interdit partout ailleurs.
+ *
+ * Celui-ci n'est stocké nulle part. Il vient du même planning que le CRA et
+ * que la prévision, ce qui garantit que les trois disent le même nombre de
+ * journées : une facture qui ne collerait pas au compte rendu signé est
+ * exactement le document qu'on ne veut pas envoyer.
+ *
+ * Les journées valorisées sont les journées RETENUES — ajustements compris —
+ * et non les journées prévues : on facture ce qui a été fait.
+ */
+export function brouillonsDeFacture(
+  faits: Faits,
+  m: Mois
+): readonly BrouillonDeFacture[] {
+  const parMission = new Map(faits.missions.map((mi) => [mi.id, mi]));
+
+  const lignes: LigneDeBrouillon[] = previsionDuMoisParMission(faits, m)
+    .map((p) => ({
+      missionId: p.missionId,
+      entiteId: p.entiteId,
+      libelle: p.libelle,
+      // Le client qui REÇOIT la facture, et non celui chez qui l'on travaille :
+      // une mission passée par une agence a les deux, et c'est l'agence qui paie.
+      clientNom: parMission.get(p.missionId)?.clientNom ?? '',
+      jours: p.prevision.joursRetenus,
+      montant: p.prevision.montantRetenu
+    }))
+    .filter((l) => l.clientNom !== '');
+
+  return brouillonsDuMois(m, lignes, facturesEmisesDuMois(faits, m));
+}
+
+/**
+ * Les factures déjà émises ce mois-là, par client.
+ *
+ * Sert à marquer un brouillon plutôt qu'à le supprimer : voir côte à côte ce
+ * qui a été facturé et ce que le planning compte est la seule façon de
+ * remarquer un écart avant que le client le remarque.
+ *
+ * La date retenue est celle d'ÉMISSION : c'est celle que porte le document, et
+ * celle qu'on a en tête en cherchant « la facture de juin ».
+ */
+function facturesEmisesDuMois(faits: Faits, m: Mois): ReadonlyMap<string, string> {
+  const parClient = new Map<string, string>();
+  for (const r of faits.recettes) {
+    if (r.emiseLe === null || !r.emiseLe.startsWith(m)) continue;
+    if (typeof r.annuleEcriture === 'string') continue;
+    if (!parClient.has(r.clientNom)) parClient.set(r.clientNom, r.numero);
+  }
+  return parClient;
 }

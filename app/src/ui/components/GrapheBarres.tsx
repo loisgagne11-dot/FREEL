@@ -89,7 +89,14 @@ export function GrapheBarres(
         ))}
       </div>
 
-      {/* Le tracé est décoratif : la donnée est dans le tableau ci-dessous. */}
+      {/* Le tracé est décoratif : la donnée est dans le tableau ci-dessous.
+
+          `preserveAspectRatio="none"` est délibéré, et c'est un arbitrage
+          assumé : le repère s'étire en largeur sans grandir en hauteur, donc
+          le graphe ne pousse jamais la page en portrait. Le laisser à sa
+          valeur par défaut le ferait soit déborder, soit rétrécir jusqu'à
+          l'illisible sur un téléphone — et retrouver la proportion demanderait
+          de mesurer le conteneur en JavaScript, ce que cet écran s'interdit. */}
       <svg
         className={styles.trace}
         viewBox={`0 0 ${LARGEUR_VUE} ${HAUTEUR}`}
@@ -116,9 +123,14 @@ export function GrapheBarres(
                 const y = HAUTEUR - MARGE_BAS - hauteur;
                 return (
                   <g key={serie.id}>
+                    {/* Pas d'arrondi : le repère est étiré en largeur pour
+                        tenir la hauteur fixe (voir `preserveAspectRatio`), et
+                        un rayon uniforme y deviendrait un ovale, différent
+                        d'une largeur d'écran à l'autre. Un angle droit est
+                        franc à toutes les tailles. */}
                     <rect
                       x={x} y={y} width={largeurBarre} height={Math.max(0, hauteur)}
-                      rx={3} fill={`var(--${serie.token})`}
+                      fill={`var(--${serie.token})`}
                     />
                     {/* Valeur au-dessus de la barre. Masquée quand les barres
                         sont trop serrées (voir `etiquettesParBarre`) ou la barre
