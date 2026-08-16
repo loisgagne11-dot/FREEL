@@ -101,6 +101,7 @@ le propriétaire le 16/08, vérifié sur le code, confirmé.
 | P3 | `provisionImpotRevenu` : l'IR estimé de l'année, réparti sur les mois | Assiette = encaissé constaté + encaissements attendus des missions ; abattement forfaitaire ; barème avec parts ; **les acomptes de PAS déjà saisis sont retranchés** | ⚠️ Le module prend l'assiette complète, mais l'appelant du volet 2 ne peut pas lui fournir les encaissements attendus — voir journal |
 | P4 | La provision d'IR entre au volet 2 des provisions | Le versable cesse d'être surévalué de tout l'impôt pour qui n'a pas coché le versement libératoire | ✅ |
 | P5 | L'écran dit l'hypothèse | Sans parts ni autres revenus, la provision s'affiche comme incomplète — jamais comme un résultat | ✅ |
+| P6 | **L'assiette prend les encaissements attendus des missions** | Aujourd'hui la provision ne compte que l'encaissé constaté : un plancher juste, mais qui monte au fil de l'année au lieu d'être lissé. Le module accepte déjà l'assiette complète ; il manque un accès au pipeline de projection depuis le paquet d'entrée — cycle `etatProjection` → `etatPilote`, et dix-huit kilo-octets à trouver | ⬜ |
 
 #### §3 ter — Pourquoi ce lot existe, et ce qu'il ne refait pas
 
@@ -404,6 +405,7 @@ faits plutôt qu'avec trois écrans finis.
 | Date | Lot | Ce qui a été fait |
 |---|---|---|
 | 16/08 | — | Plan établi et périmètre arbitré. |
+| 16/08 | Lot P | Livré, P6 excepté. Le versable baisse de 5 045 € sur 60 000 € encaissés en BNC à une part : c'est l'impôt qui n'était provisionné nulle part. L'ACRE s'arrêtait un mois trop tard. Deux extractions imposées par le budget, aucun plafond relevé. |
 | 16/08 | Lot Q | Ouvert : l'échéance d'une facture se déduisait du client à la lecture, sans savoir dire « fin de mois » et en réécrivant le passé à chaque changement de conditions. |
 | 16/08 | Lot P | Ouvert : l'impôt sur le revenu n'était provisionné nulle part sous le régime du barème, et la fenêtre d'ACRE est probablement trop longue de un à trois mois. |
 | 16/08 | Lot P | Livré. L'ACRE est une règle **trimestrielle** datée (`bareme/acre.ts`), confirmée par constat sur un compte réel — un début au 01/02/2025 s'arrête au 31/12/2025, et non au 31/01/2026 comme le calculait le `4` en dur. Les trois faits du foyer fiscal sont saisissables et repris de `configImpotBrute` (schéma 12). `provisionImpotRevenu` entre au volet 2, acomptes de PAS retranchés. **Réserve sur P3** : l'assiette du volet 2 se limite à l'encaissé CONSTATÉ. Le pipeline de `etatProjection` ne peut pas être lu depuis `etatPilote` — `etatProjection` appelle lui-même `etatPilote`, et l'y importer ferait franchir de 18 Ko le budget d'entrée. Le montant est donc un plancher, et il le dit. |
