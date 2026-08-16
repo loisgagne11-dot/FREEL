@@ -80,3 +80,51 @@ describe('ventilation des provisions à l’écran', () => {
     }
   });
 });
+
+/**
+ * LA PROVISION D'IMPÔT NE S'AFFICHE JAMAIS NUE.
+ *
+ * Elle repose sur des faits que l'utilisateur seul connaît — ses parts, les
+ * autres revenus de son foyer — et sur un barème qui n'est pas toujours
+ * publié. Présentée sans ses réserves, elle se lit comme « voilà ce que je
+ * dois », et on se verse le reste.
+ */
+describe('provision d’impôt sur le revenu à l’écran', () => {
+  const recette = (montant: number) => ({
+    id: 'r1', clientNom: 'C', libelle: 'Mission', montant: euros(montant),
+    emiseLe: dateISO('2026-06-30'), encaisseeLe: dateISO('2026-07-10'),
+    modeReglement: 'virement' as const, numero: '2026-001'
+  });
+
+  it('dit pourquoi elle n’est pas provisionnée quand les parts manquent', () => {
+    semer({ recettes: [recette(60000)] });
+    render(<Argent />);
+    // `getAllBy` : le titre en gras et la ligne qui le contient répondent tous
+    // deux au motif. C'est un détail de rendu, pas deux endroits.
+    expect(screen.getAllByText(/non provisionné/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/parts fiscales/).length).toBeGreaterThan(0);
+  });
+
+  it('affiche le reste à mettre de côté et nomme ce qu’il ignore', () => {
+    semer({ recettes: [recette(60000)], partsFiscales: 1 });
+    render(<Argent />);
+    expect(screen.getAllByText(/restant à\s+mettre de côté/).length).toBeGreaterThan(0);
+    // Autres revenus et PER non renseignés : deux réserves qui vont dans des
+    // sens opposés, et qui doivent être dites toutes les deux.
+    expect(screen.getByText(/Autres revenus du foyer non renseignés/)).toBeTruthy();
+    expect(screen.getByText(/Versement PER non renseigné/)).toBeTruthy();
+  });
+
+  // Sous versement libératoire, l'impôt est déjà payé avec les cotisations :
+  // une seconde ligne le compterait deux fois, et l'expliquer laisserait croire
+  // qu'il manque une provision.
+  it('ne dit rien sous le versement libératoire', () => {
+    semer({
+      recettes: [recette(60000)],
+      entreprise: { ...faitsVides().entreprise, versementLiberatoire: true }
+    });
+    render(<Argent />);
+    expect(screen.queryAllByText(/non provisionné/)).toHaveLength(0);
+    expect(screen.queryAllByText(/restant à\s+mettre de côté/)).toHaveLength(0);
+  });
+});

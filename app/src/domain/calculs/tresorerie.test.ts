@@ -13,7 +13,8 @@ const detail = (
     urssaf: euros(total), tva: euros(0), impot: euros(0),
     cfe: euros(0), cfp: euros(0)
   },
-  recettesNonCalculables: nonCalculables
+  recettesNonCalculables: nonCalculables,
+  impotRevenuNonProvisionne: null
 });
 
 describe('dispo et versable', () => {

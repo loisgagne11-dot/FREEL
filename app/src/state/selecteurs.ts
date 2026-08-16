@@ -23,6 +23,9 @@ import {
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
 import {
+  type ProvisionImpotRevenu, provisionImpotRevenu
+} from '../domain/calculs/provisionImpotRevenu';
+import {
   type EcranCible, type EntreeATraiter, type SujetATraiter,
   sujetsATraiter
 } from '../domain/calculs/aTraiter';
@@ -402,6 +405,77 @@ export function aTraiter(
   );
 }
 
+/**
+ * Les acomptes de prélèvement à la source déjà saisis pour l'année.
+ *
+ * Payés ou non, et c'est ce qui rend les deux volets étanches : le volet 1
+ * reprend déjà les acomptes appelés et non payés, donc la provision d'impôt
+ * doit tous les retrancher. N'en retrancher que les payés compterait deux fois
+ * ceux qui sont appelés et pas encore réglés.
+ *
+ * Le montant réellement débité l'emporte quand il diffère de celui appelé :
+ * c'est lui qui est sorti du compte.
+ */
+function acomptesPasDeLAnnee(faits: Faits, annee: number): Euros {
+  const prefixe = String(annee);
+  return euros(faits.echeances
+    .filter((e) => e.nature === 'impot' && e.echeanceLe.startsWith(prefixe))
+    .reduce<number>((somme, e) => somme + (e.montantPaye ?? e.montant), 0));
+}
+
+/**
+ * La provision d'impôt sur le revenu de l'année en cours.
+ *
+ * `null` sous le versement libératoire : l'impôt y est acquitté avec les
+ * cotisations, et une seconde ligne le compterait deux fois. Les deux régimes
+ * sont exclusifs par construction (`bareme/impot.ts`).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * `caAttendu` EST EXPLICITE, ET N'A PAS DE DÉFAUT CACHÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les encaissements attendus du reste de l'année viennent du pipeline
+ * construit par `etatProjection` — factures émises non réglées et revenu prévu
+ * au planning. Ce pipeline ne peut pas être appelé d'ici : `etatProjection`
+ * appelle lui-même `etatPilote`, et le lire ici formerait un cycle. L'appelant
+ * qui l'a sous la main le passe ; les autres passent `null`, et le module
+ * calcule alors un PLANCHER en le disant.
+ */
+export function provisionIrDe(
+  faits: Faits,
+  maintenant: Date = new Date(),
+  caAttendu: Euros | null = null
+): Resolution<ProvisionImpotRevenu> | null {
+  if (faits.entreprise.versementLiberatoire) return null;
+
+  const m = moisCourant(maintenant);
+  const annee = Number(m.slice(0, 4));
+  return provisionImpotRevenu({
+    annee,
+    moisCourant: m,
+    typeActivite: faits.entreprise.typeActivite,
+    caEncaisseConstate: caEncaisseAnnee(faits, annee),
+    caAttendu,
+    foyer: {
+      partsFiscales: faits.partsFiscales,
+      autresRevenusFoyer: faits.autresRevenusFoyer,
+      versementPerDeductible: faits.versementPerDeductible
+    },
+    acomptesPasSaisis: acomptesPasDeLAnnee(faits, annee)
+  });
+}
+
+/** Le reste à provisionner, dans la résolution qu'attend le volet 2. */
+function resteAProvisionnerDe(
+  r: Resolution<ProvisionImpotRevenu> | null
+): Resolution<Euros> | undefined {
+  if (r === null) return undefined;
+  if (r.statut === 'refuse') return r;
+  return r.statut === 'publie'
+    ? { statut: 'publie', valeur: r.valeur.resteAProvisionner, source: r.source, verifieLe: r.verifieLe }
+    : { statut: 'hypothese', valeur: r.valeur.resteAProvisionner, source: r.source, verifieLe: r.verifieLe, depuis: r.depuis };
+}
+
 export interface EtatPilote {
   readonly tresorerie: ResultatTresorerie;
   readonly voletConstate: Euros;
@@ -423,6 +497,14 @@ export interface EtatPilote {
    */
   readonly tauxImpotIndisponible: boolean;
   readonly motifTauxImpot: string | null;
+  /**
+   * La provision d'impôt sur le revenu, avec ce qu'elle ignore.
+   *
+   * `null` sous le versement libératoire, où l'impôt est déjà dans le taux.
+   * L'écran s'en sert pour ne jamais présenter le montant comme un résultat
+   * quand les parts, les autres revenus ou le barème manquent.
+   */
+  readonly provisionImpotRevenu: Resolution<ProvisionImpotRevenu> | null;
 }
 
 /**
@@ -453,6 +535,12 @@ export function etatPilote(
   const tauxImpotR = tauxImpotEtContributions(regime, m, type);
   const tauxImpot = tauxImpotR.statut === 'refuse' ? 0 : tauxImpotR.valeur;
 
+  // Sous le barème, `tauxImpot` ne vaut que la CFP : l'impôt sur le revenu
+  // entre séparément, en montant annuel. Sans lui, le versable était surévalué
+  // de tout l'impôt de l'année pour qui n'a pas opté pour le versement
+  // libératoire.
+  const provisionIr = provisionIrDe(faits, maintenant);
+
   const detail = calculerProvisions(
     echeances,
     recettesEncaissees(faits),
@@ -461,6 +549,7 @@ export function etatPilote(
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
       tauxImpotEtContributions: tauxImpot,
+      impotRevenu: resteAProvisionnerDe(provisionIr),
       periodesUrssaf: periodesUrssafEffectives(faits)
     }
   );
@@ -477,7 +566,8 @@ export function etatPilote(
     provisionsParNature: detail.parNature,
     autonomie: autonomieMois(tresorerie.versable, faits.besoinMensuel),
     tauxImpotIndisponible: tauxImpotR.statut === 'refuse',
-    motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null
+    motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null,
+    provisionImpotRevenu: provisionIr
   };
 }
 

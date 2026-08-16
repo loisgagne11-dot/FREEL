@@ -61,10 +61,10 @@ export const PERIODES_ACRE: readonly PeriodeAcre[] = [
     du: mois('2024-01'),
     au: null,
     trimestresApresAffiliation: 3,
-    source: 'Micro-social — exonération jusqu\'à la fin du 3ᵉ trimestre civil suivant celui '
-      + 'de l\'affiliation ; confirmée par CONSTAT SUR UN COMPTE RÉEL (début d\'activité au '
-      + '01/02/2025, exonération observée jusqu\'au 31/12/2025, taux plein depuis 01/2026). '
-      + 'Constat plus faible qu\'un texte officiel, plus fort qu\'une supposition.',
+    // La justification longue est dans l'en-tête : elle est gratuite en
+    // commentaire, et coûterait au premier rendu dans cette chaîne-ci.
+    source: 'Micro-social, fin du 3ᵉ trimestre civil suivant l\'affiliation — '
+      + 'confirmé par constat sur un compte réel',
     verifieLe: dateISO('2026-08-16')
   }
 ];
@@ -113,9 +113,8 @@ export function dernierMoisAcre(debut: Mois): Resolution<Mois> {
   if (debutTable !== undefined && debut < debutTable.du) {
     return {
       statut: 'refuse',
-      motif: `Aucune règle d'ACRE connue pour un début d'activité en ${debut} : antérieur à la `
-        + `plus ancienne règle saisie (${debutTable.du}). Une durée d'exonération passée est `
-        + 'un fait, elle ne peut pas être extrapolée.'
+      motif: `Aucune règle d'ACRE connue pour un début d'activité en ${debut} : antérieur `
+        + `à la plus ancienne règle saisie (${debutTable.du}).`
     };
   }
 

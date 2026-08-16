@@ -69,7 +69,10 @@ describe('indicateur à traiter', () => {
     expect(pastille.textContent).toContain('2');
 
     await userEvent.setup().click(pastille);
-    expect(screen.getByRole('dialog')).toBeTruthy();
+    // `findBy` et non `getBy` : le panneau est chargé à la demande, comme les
+    // écrans. Le test attend donc le fragment, au lieu de supposer qu'il est
+    // déjà là — ce qu'il ne serait plus au premier clic d'une vraie session.
+    expect(await screen.findByRole('dialog')).toBeTruthy();
   });
 
   /**
@@ -101,6 +104,7 @@ describe('indicateur à traiter', () => {
     semer({ recettes: [enRetard('r1')] });
     render(<IndicateurATraiter ecranActif="pilote" />);
     await userEvent.setup().click(screen.getByRole('button', { name: /à traiter/ }));
+    await screen.findByRole('dialog');
 
     const lien = screen.getAllByRole('link')[0] as HTMLAnchorElement;
     expect(lien.getAttribute('href')).toMatch(/^#\//);

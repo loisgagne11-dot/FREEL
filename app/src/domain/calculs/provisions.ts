@@ -136,8 +136,40 @@ export interface ContexteProvisions {
    * du régime d'imposition (versement libératoire ou barème), qui est un
    * discriminant exclusif traité par le module `bareme/impot`. Ce module-ci
    * ne doit pas avoir d'opinion sur le régime.
+   *
+   * ATTENTION : sous le régime du BARÈME, ce taux ne vaut que la CFP — 0,2 %.
+   * L'impôt sur le revenu, lui, n'est pas un taux sur les recettes ; il entre
+   * par `impotRevenu` ci-dessous.
    */
   readonly tauxImpotEtContributions: number;
+  /**
+   * L'impôt sur le revenu restant à mettre de côté pour l'année, en euros.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * UN MONTANT ANNUEL, PAS UN TAUX SUR LES RECETTES
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Sous le régime du barème, `tauxImpotEtContributions` rend la CFP seule :
+   * la ligne « impôt » du volet 2 valait donc 0,2 % du chiffre d'affaires, et
+   * le versable était surévalué de TOUT l'impôt sur le revenu. Quelqu'un qui
+   * n'a pas opté pour le versement libératoire se voyait proposer de se
+   * verser l'argent de son impôt.
+   *
+   * L'impôt sur le revenu ne se déduit pas d'un taux appliqué recette par
+   * recette : il dépend du foyer, des autres revenus et d'un barème
+   * progressif. Il se calcule une fois pour l'année — `provisionImpotRevenu`
+   * — et entre ici comme un montant, ACOMPTES DE PAS DÉJÀ RETRANCHÉS. Sans
+   * cette soustraction faite en amont, le volet 1 (les acomptes appelés non
+   * payés) et ce montant compteraient deux fois la même dette.
+   *
+   * Omis sous le versement libératoire : l'impôt y est déjà dans le taux, et
+   * l'ajouter le compterait deux fois.
+   *
+   * Passé en `Resolution` et non en nombre : un refus ne doit pas se traduire
+   * par un zéro silencieux, qui est indistinguable d'un impôt nul. Le motif
+   * remonte jusqu'à l'écran par `DetailProvisions`.
+   */
+  readonly impotRevenu?: Resolution<Euros> | undefined;
 }
 
 /**
@@ -213,6 +245,16 @@ export interface DetailProvisions {
    * qui a l'air complet.
    */
   readonly recettesNonCalculables: readonly { readonly id: string; readonly motif: string }[];
+  /**
+   * Motif pour lequel l'impôt sur le revenu n'a PAS pu être provisionné, ou
+   * `null` quand il l'a été (ou qu'il n'a pas lieu de l'être, sous versement
+   * libératoire).
+   *
+   * Comme ci-dessus, le total est alors SOUS-ÉVALUÉ — de tout l'impôt de
+   * l'année, ce qui est la plus grosse des sous-évaluations possibles. Le
+   * taire ferait proposer de se verser l'argent de l'impôt.
+   */
+  readonly impotRevenuNonProvisionne: string | null;
 }
 
 /** Volet 1 — les dettes déjà constatées. */
@@ -262,6 +304,8 @@ export function voletAProvisionner(
    */
   readonly parNature: VentilationProvisions;
   readonly nonCalculables: readonly { readonly id: string; readonly motif: string }[];
+  /** Motif du refus de la provision d'impôt sur le revenu, ou `null`. */
+  readonly impotRevenuNonProvisionne: string | null;
 } {
   let somme = 0;
   const parNature = ventilationVide();
@@ -285,7 +329,27 @@ export function voletAProvisionner(
     parNature.impot += r.montant * ctx.tauxImpotEtContributions;
   }
 
-  return { montant: euros(somme), parNature: figer(parNature), nonCalculables };
+  // L'impôt sur le revenu s'ajoute UNE FOIS, pas recette par recette : c'est
+  // une dette annuelle du foyer, pas une charge proportionnelle à chaque
+  // encaissement. Il rejoint la nature `impot`, où il côtoie la CFP sans la
+  // recouvrir — celle-ci est bien un taux, et reste comptée ci-dessus.
+  //
+  // Il ne dépend pas non plus des périodes déclarées : la déclaration URSSAF
+  // ne solde rien de l'impôt. Ce qui l'empêche de doubler le volet 1, ce sont
+  // les acomptes de PAS déjà retranchés en amont.
+  const impotR = ctx.impotRevenu;
+  const impotRevenu = impotR !== undefined && impotR.statut !== 'refuse' ? impotR.valeur : 0;
+  somme += impotRevenu;
+  parNature.impot += impotRevenu;
+
+  return {
+    montant: euros(somme),
+    parNature: figer(parNature),
+    nonCalculables,
+    impotRevenuNonProvisionne: impotR !== undefined && impotR.statut === 'refuse'
+      ? impotR.motif
+      : null
+  };
 }
 
 /** Les deux volets, et leur total. */
@@ -312,6 +376,7 @@ export function provisions(
     voletAProvisionner: aProvisionner.montant,
     total: euros(constate + aProvisionner.montant),
     parNature: figer(parNature),
-    recettesNonCalculables: aProvisionner.nonCalculables
+    recettesNonCalculables: aProvisionner.nonCalculables,
+    impotRevenuNonProvisionne: aProvisionner.impotRevenuNonProvisionne
   };
 }

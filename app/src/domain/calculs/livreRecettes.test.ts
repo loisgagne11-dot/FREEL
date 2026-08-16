@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros } from '../types';
 import {
   type EcritureRecette, type NatureEcart,
-  ecritureDAnnulation, ecrituresDuLivre, estAnnulation, prochainNumero,
+  ecrituresDuLivre, estAnnulation,
   totaliser, verifierConformite
 } from './livreRecettes';
+import { ecritureDAnnulation, prochainNumero } from './ecritureRecette';
 
 function ecriture(m: Partial<EcritureRecette> = {}): EcritureRecette {
   return {

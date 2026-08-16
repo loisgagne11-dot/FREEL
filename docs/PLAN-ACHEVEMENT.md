@@ -96,11 +96,11 @@ le propriétaire le 16/08, vérifié sur le code, confirmé.
 
 | # | Livrable | Critère d'acceptation | État |
 |---|---|---|---|
-| P1 | La durée d'ACRE devient une **règle datée avec sa source**, comme les taux URSSAF | Le `4` en dur de `sousAcreLe` disparaît ; la règle porte sa source et sa date de vérification ; l'invariant n°3 est tenu | ⬜ |
-| P2 | Les faits du foyer fiscal : parts, autres revenus imposables, versement PER | Ils dorment aujourd'hui dans `configImpotBrute`, non interprétés ; une provision d'IR sans eux serait un chiffre inventé | ⬜ |
-| P3 | `provisionImpotRevenu` : l'IR estimé de l'année, réparti sur les mois | Assiette = encaissé constaté + encaissements attendus des missions ; abattement forfaitaire ; barème avec parts ; **les acomptes de PAS déjà saisis sont retranchés** | ⬜ |
-| P4 | La provision d'IR entre au volet 2 des provisions | Le versable cesse d'être surévalué de tout l'impôt pour qui n'a pas coché le versement libératoire | ⬜ |
-| P5 | L'écran dit l'hypothèse | Sans parts ni autres revenus, la provision s'affiche comme incomplète — jamais comme un résultat | ⬜ |
+| P1 | La durée d'ACRE devient une **règle datée avec sa source**, comme les taux URSSAF | Le `4` en dur de `sousAcreLe` disparaît ; la règle porte sa source et sa date de vérification ; l'invariant n°3 est tenu | ✅ |
+| P2 | Les faits du foyer fiscal : parts, autres revenus imposables, versement PER | Ils dorment aujourd'hui dans `configImpotBrute`, non interprétés ; une provision d'IR sans eux serait un chiffre inventé | ✅ |
+| P3 | `provisionImpotRevenu` : l'IR estimé de l'année, réparti sur les mois | Assiette = encaissé constaté + encaissements attendus des missions ; abattement forfaitaire ; barème avec parts ; **les acomptes de PAS déjà saisis sont retranchés** | ⚠️ Le module prend l'assiette complète, mais l'appelant du volet 2 ne peut pas lui fournir les encaissements attendus — voir journal |
+| P4 | La provision d'IR entre au volet 2 des provisions | Le versable cesse d'être surévalué de tout l'impôt pour qui n'a pas coché le versement libératoire | ✅ |
+| P5 | L'écran dit l'hypothèse | Sans parts ni autres revenus, la provision s'affiche comme incomplète — jamais comme un résultat | ✅ |
 
 #### §3 ter — Pourquoi ce lot existe, et ce qu'il ne refait pas
 
@@ -406,4 +406,5 @@ faits plutôt qu'avec trois écrans finis.
 | 16/08 | — | Plan établi et périmètre arbitré. |
 | 16/08 | Lot Q | Ouvert : l'échéance d'une facture se déduisait du client à la lecture, sans savoir dire « fin de mois » et en réécrivant le passé à chaque changement de conditions. |
 | 16/08 | Lot P | Ouvert : l'impôt sur le revenu n'était provisionné nulle part sous le régime du barème, et la fenêtre d'ACRE est probablement trop longue de un à trois mois. |
+| 16/08 | Lot P | Livré. L'ACRE est une règle **trimestrielle** datée (`bareme/acre.ts`), confirmée par constat sur un compte réel — un début au 01/02/2025 s'arrête au 31/12/2025, et non au 31/01/2026 comme le calculait le `4` en dur. Les trois faits du foyer fiscal sont saisissables et repris de `configImpotBrute` (schéma 12). `provisionImpotRevenu` entre au volet 2, acomptes de PAS retranchés. **Réserve sur P3** : l'assiette du volet 2 se limite à l'encaissé CONSTATÉ. Le pipeline de `etatProjection` ne peut pas être lu depuis `etatPilote` — `etatProjection` appelle lui-même `etatPilote`, et l'y importer ferait franchir de 18 Ko le budget d'entrée. Le montant est donc un plancher, et il le dit. |
 | 16/08 | Socle O | Outillage de contrôle en place. La première comparaison montre l'onglet Performance à trois tuiles sur quatre, sans composition au clic, sans capacité de versement et sans curseur de réserve. |

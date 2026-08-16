@@ -22,7 +22,7 @@ import {
   type RegimeFacture, type TotauxFacture,
   amendeMentions, mentionsAPorter, mentionsManquantes, regimeDeLaFacture, totaux
 } from '../domain/calculs/facture';
-import { prochainNumero } from '../domain/calculs/livreRecettes';
+import { prochainNumero } from '../domain/calculs/ecritureRecette';
 import {
   DELAI_PAIEMENT_DEFAUT, type FactureSuivie, type StatutFacture,
   encoursDe, suivre

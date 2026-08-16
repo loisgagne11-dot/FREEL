@@ -244,53 +244,6 @@ function ecartsDeChronologie(
     }));
 }
 
-/**
- * Le prochain numéro de facture d'une année.
- *
- * Reprend le rang le plus élevé et l'incrémente, plutôt que de compter les
- * factures : après une suppression, compter redonnerait un numéro déjà
- * utilisé, ce qui casserait l'unicité que le contrôle ci-dessus exige.
- */
-export function prochainNumero(
-  recettes: readonly EcritureRecette[],
-  annee: number
-): string {
-  const prefixe = String(annee);
-  let maximum = 0;
-  for (const r of recettes) {
-    const correspond = new RegExp(`^${prefixe}-(\\d+)$`).exec(r.numero.trim());
-    if (correspond === null) continue;
-    maximum = Math.max(maximum, Number(correspond[1]));
-  }
-  return `${prefixe}-${String(maximum + 1).padStart(3, '0')}`;
-}
-
-/**
- * L'écriture qui annule une recette.
- *
- * Le montant est l'opposé, la référence renvoie à l'originale, et la date
- * d'encaissement est celle de la correction — pas celle de l'écriture annulée.
- * Antidater l'annulation ferait disparaître la recette de la période où elle
- * avait été déclarée.
- */
-export function ecritureDAnnulation(
-  origine: EcritureRecette,
-  aujourdhui: DateISO,
-  identifiant: string
-): EcritureRecette {
-  return {
-    id: identifiant,
-    clientNom: origine.clientNom,
-    libelle: `Annulation — ${origine.libelle}`,
-    montant: euros(-origine.montant),
-    emiseLe: origine.emiseLe,
-    encaisseeLe: aujourdhui,
-    modeReglement: origine.modeReglement,
-    numero: origine.numero,
-    annuleEcriture: origine.id
-  };
-}
-
 export interface TotalLivre {
   readonly ecritures: number;
   /** Somme des montants encaissés, annulations déduites. */

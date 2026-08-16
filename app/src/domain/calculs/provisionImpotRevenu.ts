@@ -93,27 +93,6 @@ export type IgnoreParLaProvisionIr =
   | 'decote_et_reductions_d_impot'
   | 'bareme_de_l_annee_non_publie';
 
-/** Le nom de chaque réserve, dit une seule fois pour tous les écrans. */
-export const LIBELLE_IGNORE_IR: Readonly<Record<IgnoreParLaProvisionIr, string>> = {
-  encaissements_a_venir_non_fournis:
-    'Calculé sur le chiffre d’affaires déjà encaissé seulement : les encaissements '
-    + 'attendus d’ici la fin de l’année ne sont pas dans l’assiette. Le montant est un '
-    + 'plancher, il montera.',
-  autres_revenus_foyer_non_renseignes:
-    'Les autres revenus imposables du foyer ne sont pas renseignés : ils sont comptés '
-    + 'pour zéro, donc la tranche retenue est trop basse et l’impôt sous-estimé.',
-  versement_per_non_renseigne:
-    'Aucun versement PER renseigné : il n’est pas déduit. L’impôt est donc au plus haut.',
-  plafonnement_quotient_familial:
-    'Le plafonnement de l’avantage du quotient familial n’est pas appliqué : au-delà '
-    + 'd’un certain revenu, l’impôt réel est plus élevé.',
-  decote_et_reductions_d_impot:
-    'Ni décote, ni réductions ou crédits d’impôt : l’impôt réel peut être plus faible.',
-  bareme_de_l_annee_non_publie:
-    'Le barème de l’impôt n’est pas publié pour cette année : celui de la dernière '
-    + 'année connue est repris, à titre de prévision.'
-};
-
 export interface ProvisionImpotRevenu {
   readonly annee: number;
   /** Le chiffre d'affaires retenu : constaté, plus l'attendu s'il est fourni. */
@@ -162,9 +141,9 @@ export function provisionImpotRevenu(
   if (partsFiscales === null || partsFiscales <= 0) {
     return {
       statut: 'refuse',
-      motif: 'Nombre de parts fiscales non renseigné : l’impôt sur le revenu ne peut pas être '
-        + 'estimé sans quotient familial. Renseignez-le dans Config — une part supposée '
-        + 'surestimerait l’impôt d’un foyer qui en compte plusieurs.'
+      motif: 'Impôt sur le revenu non provisionné : le nombre de parts fiscales n’est pas '
+        + 'renseigné (Config). Une part supposée surestimerait l’impôt d’un foyer qui en '
+        + 'compte plusieurs.'
     };
   }
 

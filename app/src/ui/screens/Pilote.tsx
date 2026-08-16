@@ -96,9 +96,12 @@ export function Pilote() {
           versable trop élevé conduirait à se verser de l'argent déjà dû. */}
       {etat.tresorerie.incomplet && (
         <Bandeau ton="alerte" titre="Montants sous-évalués">
-          Certaines recettes ne peuvent pas être provisionnées faute de barème
-          pour leur période. Les montants ci-dessous sont donc <strong>plus élevés
-          que la réalité</strong>.
+          {/* Le motif n'est plus seulement « recette hors barème » : l'impôt sur
+              le revenu non provisionnable entre par la même porte, et le texte
+              nommait une cause qui n'était pas toujours la bonne. Chaque motif
+              se dit maintenant lui-même, ci-dessous. */}
+          Une partie de ce qui est dû n’a pas pu être provisionnée. Les montants
+          ci-dessous sont donc <strong>plus élevés que la réalité</strong>.
           <ul className={styles.motifs}>
             {etat.tresorerie.motifsIncomplets.map((m) => <li key={m}>{m}</li>)}
           </ul>

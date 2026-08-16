@@ -23,6 +23,7 @@ import type { SeuilsTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
 import type { Echeance, VentilationProvisions } from '../domain/calculs/provisions';
 import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
+import type { ProvisionImpotRevenu } from '../domain/calculs/provisionImpotRevenu';
 import { DELAI_PAIEMENT_DEFAUT, encoursDe, suivre } from '../domain/calculs/facturier';
 import {
   type CapaciteDuMois, capaciteDuMois
@@ -112,6 +113,15 @@ export interface EtatArgent {
   readonly voletConstate: Euros;
   readonly voletAProvisionner: Euros;
   readonly seuils: EtatSeuils;
+  /**
+   * La provision d'impôt sur le revenu, avec ce qu'elle ignore — reprise telle
+   * quelle de `EtatPilote`, jamais recalculée : la ligne « impôt » de la
+   * ventilation et l'explication qui l'accompagne doivent venir du même
+   * calcul, faute de quoi l'écran commenterait un chiffre qu'il n'affiche pas.
+   *
+   * `null` sous le versement libératoire.
+   */
+  readonly provisionImpotRevenu: Resolution<ProvisionImpotRevenu> | null;
 }
 
 /**
@@ -161,7 +171,8 @@ export function etatArgent(
     tresorerie: pilote.tresorerie,
     voletConstate: pilote.voletConstate,
     voletAProvisionner: pilote.voletAProvisionner,
-    provisionsParNature: pilote.provisionsParNature
+    provisionsParNature: pilote.provisionsParNature,
+    provisionImpotRevenu: pilote.provisionImpotRevenu
   };
 }
 /* ─────────────────────────────────────────────────────────────────────────
