@@ -664,9 +664,24 @@ export interface TarifDeLaJournee {
  * deux refuse, le total refuse. Additionner un taux connu à un taux inconnu
  * traité comme zéro donnerait un net trop élevé — l'erreur qui rassure.
  */
+/**
+ * Le taux de cotisations SOCIALES d'un mois, ACRE comprise.
+ *
+ * Extrait de `tauxDeChargesAu` parce que deux questions différentes s'y
+ * posaient : « ce qui me reste par jour » veut le total, « combien de
+ * cotisations sur l'année » veut la part sociale SEULE, pour la nommer à part
+ * de l'impôt. Refaire l'appel au barème ailleurs aurait donné deux lectures de
+ * l'ACRE, dont l'une aurait fini par oublier la date de fin.
+ */
+export function tauxCotisationsAu(faits: Faits, m: Mois): Resolution<number> {
+  return tauxCotisations(
+    m, faits.entreprise.typeActivite, sousAcreLe(faits)(m), periodesUrssafEffectives(faits)
+  );
+}
+
 export function tauxDeChargesAu(faits: Faits, m: Mois): Resolution<number> {
   const type = faits.entreprise.typeActivite;
-  const cotis = tauxCotisations(m, type, sousAcreLe(faits)(m), periodesUrssafEffectives(faits));
+  const cotis = tauxCotisationsAu(faits, m);
   if (cotis.statut === 'refuse') return cotis;
 
   const impot = tauxImpotEtContributions(regimeDe(faits), m, type);

@@ -12,7 +12,8 @@
  * `freel_app_version` qui déclenche un `location.reload()` dans le legacy.
  */
 
-import type { DateISO, Euros, Mois, TypeActivite } from '../domain/types';
+import type { DateISO, Euros, Mois, Ratio, TypeActivite } from '../domain/types';
+import { ratio } from '../domain/types';
 import type { Depense } from '../domain/calculs/depenses';
 import type { PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
@@ -32,7 +33,18 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 10 as const;
+export const VERSION_SCHEMA = 11 as const;
+
+/**
+ * Part maximale du versable qu'on peut choisir de garder.
+ *
+ * Au-delà de 80 %, le curseur ne dit plus « je garde une marge », il dit « je
+ * ne me verse rien » — et cette décision-là se prend en ne se versant rien, pas
+ * en réglant un curseur qu'on oubliera d'avoir mis là. La borne existe aussi
+ * pour que `versable × (1 − part)` reste une somme qu'on peut afficher : à 100 %
+ * l'écran proposerait toujours zéro, sans dire pourquoi.
+ */
+export const PART_GARDEE_MAX = 0.8;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -317,9 +329,45 @@ export interface Faits {
    */
   readonly periodesUrssafAjoutees: readonly PeriodeBareme[];
   readonly soldeInitial: Euros;
-  /** Matelas de sécurité, montant absolu. Source unique (D4). */
+  /**
+   * Matelas de sécurité, montant absolu. Source unique (D4).
+   *
+   * Le fait garde son nom ; l'écran, lui, l'appelle « seuil de sécurité »,
+   * comme le dessin. Renommer le champ aurait obligé à une migration pour un
+   * gain nul — et aurait fait passer le vocabulaire de l'interface dans le
+   * stockage, où il n'a rien à faire.
+   */
   readonly reserve: Euros;
   readonly besoinMensuel: Euros;
+  /**
+   * Part du versable qu'on choisit de laisser sur le compte, entre 0 et 0,8.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * DEUX NOTIONS, PAS DEUX FAÇONS DE DIRE LA MÊME CHOSE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `reserve` est un PLANCHER en euros — le seuil de sécurité, la ligne sous
+   * laquelle les courbes ne doivent pas descendre. Celui-ci est une PART du
+   * versable, une prudence qu'on renouvelle à chaque versement.
+   *
+   * Les confondre — c'est-à-dire exprimer le plancher en pourcentage du
+   * disponible — fabriquerait une boucle : le plancher descendrait à mesure
+   * qu'on vide le compte, et le versement soutenable finirait par tout
+   * autoriser. Ce n'est pas une préférence d'affichage, c'est une erreur de
+   * modèle.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * LE DÉFAUT EST ZÉRO, ET CE N'EST PAS UN OUBLI
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Le prototype propose 50 %. Repris tel quel, il couperait en deux, sans
+   * qu'un geste ait été fait, le versable de tout compte existant. Un réglage
+   * par défaut qui change un montant affiché est un chiffre faux : zéro ne
+   * change rien tant que personne n'a bougé le curseur.
+   *
+   * Le montant gardé, lui, ne se stocke jamais — il se dérive (invariant 1).
+   */
+  readonly partGardeeAuVersement: Ratio;
   /**
    * L'objectif de chiffre d'affaires encaissé sur l'année civile, ou `null`.
    *
@@ -386,6 +434,7 @@ export function faitsVides(): Faits {
     clients: [], missions: [], recettes: [], depenses: [], conges: [],
     mouvementsBancaires: [], periodesUrssafAjoutees: [],
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
+    partGardeeAuVersement: ratio(0),
     objectifCaAnnuel: null,
     periodesDeclarees: [], echeances: [], configImpotBrute: {}
   };
@@ -459,6 +508,24 @@ export function motifRefusFaits(brut: unknown): string | null {
   if ('objectifCaAnnuel' in o && objectif !== null
     && (typeof objectif !== 'number' || !Number.isFinite(objectif))) {
     return 'Le champ « objectifCaAnnuel » devrait être un montant ou être absent.';
+  }
+
+  // La part gardée est un RATIO, pas un montant : elle ne peut donc pas voyager
+  // avec `soldeInitial` et consorts. Son absence est légitime — aucun compte
+  // d'avant le schéma 11 ne la porte — et la refuser rejetterait tous les
+  // comptes existants.
+  //
+  // Le contrôle borne à [0 ; 1] et non à [0 ; PART_GARDEE_MAX] : au-delà de 1,
+  // `versable × (1 − part)` devient NÉGATIF et l'écran proposerait de se verser
+  // une dette ; en dessous de 0, il proposerait plus que le versable. Ce sont
+  // les deux erreurs qui engagent. Entre 0,8 et 1, le chiffre reste juste et
+  // seulement trop prudent : le magasin le ramène dans la plage utile plutôt
+  // que de refuser le compte entier pour un curseur mal réglé.
+  const part = o['partGardeeAuVersement'];
+  if ('partGardeeAuVersement' in o
+    && (typeof part !== 'number' || !Number.isFinite(part) || part < 0 || part > 1)) {
+    return 'Le champ « partGardeeAuVersement » devrait être une part entre 0 et 1, '
+      + 'ou être absent.';
   }
 
   const entreprise = o['entreprise'];
@@ -672,6 +739,19 @@ function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
  * sont là parce que leurs champs, eux, vivaient dans des éléments de liste.
  *
  * La valeur comblée est `null` et non zéro : voir `objectifCaAnnuel`.
+ *
+ * v10 → v11 : la part gardée au versement.
+ *
+ * Même conclusion, et vérifiée de la même façon plutôt que supposée : le champ
+ * est de PREMIER NIVEAU, donc `{ ...defauts, ...o }` le comble depuis
+ * `faitsVides()` dès lors qu'un bloc de schéma 10 ne porte pas la clé. La
+ * vérification n'est pas une lecture du code mais un test nommé —
+ * « un compte de schéma 10 reçoit une part gardée nulle, et non `undefined` » —
+ * qui échoue si la fusion cesse de suffire. C'est ce qui distingue ce cas des
+ * cinq migrations imbriquées ci-dessus : leurs champs, eux, vivaient dans des
+ * éléments de liste, que la fusion de surface n'atteint pas.
+ *
+ * La valeur comblée est zéro, et jamais 0,5 : voir `partGardeeAuVersement`.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;

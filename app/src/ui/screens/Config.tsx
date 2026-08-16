@@ -1,20 +1,19 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { useFaits } from '../../state/store';
-import { periodesUrssafEffectives, soldeEstSuivi } from '../../state/selecteurs';
-import { PERIODES_URSSAF, type PeriodeBareme } from '../../domain/bareme/urssaf';
+import { soldeEstSuivi } from '../../state/selecteurs';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
-import { CLE_STOCKAGE } from '../../state/schema';
+import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
+import { Montant } from '../components/Montant';
+import { eur } from '../format';
 import { Compte } from './Compte';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
-import {
-  type ControleIdentifiant, controlerIban, controlerSiret
-} from '../../domain/calculs/identifiants';
+import { controlerIban, controlerSiret } from '../../domain/calculs/identifiants';
 import { useRoute } from '../useRoute';
-import { dateCourte } from '../format';
+import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
 
 /**
@@ -48,6 +47,8 @@ const SECTIONS = [
   { id: 'donnees' as Section, libelle: 'Données' },
   { id: 'compte' as Section, libelle: 'Compte' }
 ];
+
+const Bareme = lazy(() => import('./Config.bareme').then((m) => ({ default: m.Bareme })));
 
 const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: string }[] = [
   { id: 'BNC', libelle: 'BNC — prestations libérales' },
@@ -98,7 +99,12 @@ export function Config() {
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="bareme" actif={section === 'bareme'}>
-          <Bareme />
+          {/* Chargé à la demande : c'est la plus grosse section de l'écran, et
+              on ne l'ouvre que quand un taux officiel change — une fois ou
+              deux par an. */}
+          <Suspense fallback={<p role="status" className={styles.aide}>Chargement…</p>}>
+            {section === 'bareme' && <Bareme />}
+          </Suspense>
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="donnees" actif={section === 'donnees'}>
@@ -229,7 +235,120 @@ function Tresorerie() {
           />
         </Champ>
       </div>
+
+      <ReservesEtVersements />
     </section>
+  );
+}
+
+/**
+ * Les deux réglages de prudence — sources uniques, et deux notions distinctes.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN PLANCHER EN EUROS N'EST PAS UNE PART EN POURCENTAGE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le SEUIL DE SÉCURITÉ est un montant absolu : la ligne sous laquelle le compte
+ * ne descend pas (D4, fait `reserve`). La PART GARDÉE est une fraction du
+ * versable qu'on choisit de ne pas prendre ce mois-ci.
+ *
+ * Les confondre — c'est-à-dire exprimer le plancher en pourcentage du
+ * disponible, comme le fait le prototype du handoff — fabrique une boucle : le
+ * plancher descend à mesure qu'on vide le compte, et le versement soutenable
+ * finit par tout autoriser. Ce n'est pas une préférence de conception, c'est
+ * une rétroaction.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI ILS SONT ICI ET PLUS SUR LE PILOTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le handoff les range dans « Réserve & versements », et le Pilote n'y montre
+ * que le montant qui en résulte. Le second motif a tranché : le Pilote est le
+ * seul écran du paquet d'entrée, et le second curseur lui a fait franchir son
+ * plafond. La règle du projet est d'extraire ce qui n'a rien à faire là.
+ *
+ * L'état local ne sert qu'à la fluidité du glissement ; la valeur part dans le
+ * magasin à chaque changement, de sorte qu'il n'existe jamais deux vérités.
+ */
+function ReservesEtVersements() {
+  const reserve = useFaits((e) => e.faits.reserve);
+  const partGardee = useFaits((e) => e.faits.partGardeeAuVersement);
+  const soldeInitial = useFaits((e) => e.faits.soldeInitial);
+  const definirReserve = useFaits((e) => e.definirReserve);
+  const definirPartGardee = useFaits((e) => e.definirPartGardee);
+  const idChamp = useId();
+
+  const [saisiePart, setSaisiePart] = useState<number | null>(null);
+  const pourcent = Math.round((saisiePart ?? partGardee) * 100);
+  // Le versable qui résulte des deux réglages, pour que la phrase dise le
+  // calcul plutôt que de le laisser deviner. Dérivé, jamais stocké.
+  const versable = Math.max(0, soldeInitial - reserve);
+
+  return (
+    <div className={styles.formulaire}>
+      {/* Un CHAMP et non un curseur, contrairement à la part : c'est ce que
+          montre la capture, et c'est juste. Une plage a besoin d'une borne
+          haute, et la seule disponible ici est le solde — quelqu'un qui a
+          8 000 € en banque mais n'a pas encore saisi son solde de départ ne
+          pourrait pas se fixer un plancher à 5 000 €. */}
+      <Champ
+        id={`${idChamp}-seuil`}
+        libelle="Seuil de sécurité"
+        aide="Le montant que vous gardez sur le compte quoi qu’il arrive. Il est
+              retiré du disponible pour obtenir ce que vous pouvez vous verser,
+              et c’est le plancher tracé sur vos courbes."
+      >
+        <input
+          id={`${idChamp}-seuil`}
+          type="number"
+          inputMode="decimal"
+          step="50"
+          min="0"
+          value={reserve}
+          onChange={(e) => definirReserve(euros(Math.max(0, Number(e.target.value) || 0)))}
+        />
+      </Champ>
+
+      <p className={styles.champ}>
+        <label htmlFor={`${idChamp}-part`}>Part gardée à chaque versement</label>
+        <span className={styles.curseurRangee}>
+          <input
+            id={`${idChamp}-part`}
+            type="range"
+            className={styles.curseur}
+            min={0}
+            max={PART_GARDEE_MAX * 100}
+            step={5}
+            value={pourcent}
+            aria-valuetext={`${pourcent} %`}
+            onChange={(e) => {
+              const v = Number(e.target.value) / 100;
+              setSaisiePart(v);
+              definirPartGardee(ratio(v));
+            }}
+            onBlur={() => setSaisiePart(null)}
+          />
+          <output className={styles.curseurValeur}>{pourcent}&nbsp;%</output>
+        </span>
+        <span className={styles.aide}>
+          Ce que vous laissez sur le compte <strong>au-dessus du seuil</strong>,
+          à chaque versement. À 0&nbsp;% rien ne change&nbsp;: c’est le réglage
+          par défaut, et il ne décide rien à votre place.
+        </span>
+      </p>
+
+      {/* La phrase dit le calcul, seuil compris. Le prototype du handoff écrit
+          « sur ta part disponible, tu gardes N % » — sans le seuil, ce qui à
+          0 % proposerait de verser le matelas avec. */}
+      <p className={styles.explication}>
+        Sur un solde de <Montant>{eur(soldeInitial)}</Montant>, le seuil en garde{' '}
+        <Montant>{eur(reserve)}</Montant>&nbsp;; des{' '}
+        <Montant>{eur(versable)}</Montant> restants vous en laissez{' '}
+        {pourcent}&nbsp;%, soit{' '}
+        <Montant>{eur(Math.round(versable * (1 - pourcent / 100)))}</Montant> à
+        vous verser.
+      </p>
+    </div>
   );
 }
 
@@ -413,233 +532,6 @@ function Profil() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Barème
-   ───────────────────────────────────────────────────────────────────────── */
-
-function Bareme() {
-  const faits = useFaits((e) => e.faits);
-  const ajouter = useFaits((e) => e.ajouterPeriodeUrssaf);
-  const retirer = useFaits((e) => e.retirerPeriodeUrssaf);
-  const idChamp = useId();
-
-  const effectives = useMemo(() => periodesUrssafEffectives(faits), [faits]);
-  const ajouteesParDebut = useMemo(
-    () => new Set(faits.periodesUrssafAjoutees.map((p) => p.du)),
-    [faits.periodesUrssafAjoutees]
-  );
-
-  return (
-    <>
-      <section className={styles.carte} aria-labelledby={`${idChamp}-table`}>
-        <h2 id={`${idChamp}-table`} className={styles.titreCarte}>
-          Cotisations sociales, par période
-          <Info libelle="Pourquoi par période et non par année">
-            Le taux applicable aux BNC a augmenté au 1<sup>er</sup> juillet
-            2024, puis de nouveau au 1<sup>er</sup> juillet 2026. Une table par
-            année civile appliquerait un taux unique à des mois relevant de deux
-            barèmes&nbsp;: c’est le défaut qui faisait calculer juillet 2026 à
-            25,6 % au lieu de 26,1 %.
-          </Info>
-        </h2>
-
-        <p className={styles.explication}>
-          Cette table est celle que les calculs appliquent réellement. Un taux
-          d’un mois écoulé est un fait&nbsp;: il ne s’extrapole pas, et une
-          période close ne se réécrit pas.
-        </p>
-
-        <div className={styles.tableDefilante}>
-          <table className={styles.table}>
-            <caption className={styles.legende}>
-              Taux de cotisations en vigueur, par période et par type d’activité
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Période</th>
-                <th scope="col">BNC</th>
-                <th scope="col">BIC service</th>
-                <th scope="col">BIC vente</th>
-                <th scope="col">Source</th>
-                <th scope="col">Vérifié le</th>
-                <th scope="col"><span className={styles.invisible}>Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {effectives.map((p) => (
-                <tr key={p.du}>
-                  <th scope="row">
-                    {p.du} → {p.au ?? 'en cours'}
-                    {ajouteesParDebut.has(p.du) && (
-                      <span className={styles.marque}>saisie</span>
-                    )}
-                  </th>
-                  <td>{pourcent(p.taux.BNC)}</td>
-                  <td>{pourcent(p.taux.BIC_service)}</td>
-                  <td>{pourcent(p.taux.BIC_vente)}</td>
-                  <td className={styles.source}>{p.source}</td>
-                  <td>{dateCourte(p.verifieLe)}</td>
-                  <td>
-                    {ajouteesParDebut.has(p.du) && (
-                      <button
-                        type="button"
-                        className={styles.action}
-                        onClick={() => retirer(p.du)}
-                      >
-                        Retirer
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {faits.periodesUrssafAjoutees.length > 0 && (
-          <p className={styles.explication}>
-            Retirer une période saisie rend la main au barème livré avec
-            l’application pour les mois qu’elle couvrait.
-          </p>
-        )}
-      </section>
-
-      <FormulairePeriode
-        onAjouter={ajouter}
-        derniere={effectives[effectives.length - 1] ?? PERIODES_URSSAF[0]}
-      />
-    </>
-  );
-}
-
-/**
- * Saisie d'une nouvelle période.
- *
- * Le formulaire ne décide de rien : il assemble une période et la soumet au
- * magasin, qui la fait valider par le domaine. Le motif du refus est affiché
- * tel quel — il dit ce qui ne va pas, ce qu'un « saisie invalide » ne fait pas.
- */
-function FormulairePeriode(
-  { onAjouter, derniere }: {
-    onAjouter: (p: PeriodeBareme) => string | null;
-    derniere: PeriodeBareme | undefined;
-  }
-) {
-  const idChamp = useId();
-  const [du, setDu] = useState('');
-  const [bnc, setBnc] = useState('');
-  const [bicService, setBicService] = useState('');
-  const [bicVente, setBicVente] = useState('');
-  const [source, setSource] = useState('');
-  const [retour, setRetour] = useState<{ ton: 'succes' | 'echec'; texte: string } | null>(null);
-
-  function soumettre(evenement: React.FormEvent): void {
-    evenement.preventDefault();
-
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(du)) {
-      setRetour({ ton: 'echec', texte: 'Indiquez le mois où la période commence.' });
-      return;
-    }
-    const taux = [bnc, bicService, bicVente].map(enRatio);
-    if (taux.some((t) => t === null)) {
-      setRetour({
-        ton: 'echec',
-        texte: 'Les trois taux sont attendus en pourcentage, par exemple 27,2.'
-      });
-      return;
-    }
-
-    const refus = onAjouter({
-      du: mois(du),
-      // La période nouvelle reste ouverte ; la fusion ferme la précédente.
-      au: null,
-      taux: {
-        BNC: ratio(taux[0] as number),
-        BIC_service: ratio(taux[1] as number),
-        BIC_vente: ratio(taux[2] as number)
-      },
-      source: source.trim(),
-      // La date de vérification est celle de la saisie : c'est le jour où un
-      // humain a lu la valeur à sa source.
-      verifieLe: dateISO(new Date().toISOString().slice(0, 10))
-    });
-
-    if (refus !== null) {
-      setRetour({ ton: 'echec', texte: refus });
-      return;
-    }
-    setRetour({ ton: 'succes', texte: `Période ajoutée à partir de ${du}.` });
-    setDu(''); setBnc(''); setBicService(''); setBicVente(''); setSource('');
-  }
-
-  return (
-    <section className={styles.carte} aria-labelledby={`${idChamp}-ajout`}>
-      <h2 id={`${idChamp}-ajout`} className={styles.titreCarte}>
-        Ajouter une période
-        <Info libelle="Quand ajouter une période">
-          Quand un nouvel avis d’appel ou une publication officielle annonce un
-          taux différent. La période ajoutée prend effet au mois indiqué et
-          ferme la précédente&nbsp;; rien avant ce mois n’est modifié, pour que
-          le recalcul d’un trimestre passé redonne le montant réellement déclaré
-          à l’époque.
-        </Info>
-      </h2>
-
-      {derniere !== undefined && (
-        <p className={styles.explication}>
-          Dernière période connue&nbsp;: à partir de {derniere.du},{' '}
-          {pourcent(derniere.taux.BNC)} en BNC, d’après {derniere.source},
-          vérifié le {dateCourte(derniere.verifieLe)}.
-        </p>
-      )}
-
-      <form className={styles.formulaire} onSubmit={soumettre}>
-        <Champ id={`${idChamp}-du`} libelle="À partir du mois">
-          <input id={`${idChamp}-du`} type="month" value={du}
-            onChange={(e) => setDu(e.target.value)} required />
-        </Champ>
-
-        <Champ id={`${idChamp}-bnc`} libelle="Taux BNC (%)">
-          <input id={`${idChamp}-bnc`} inputMode="decimal" value={bnc}
-            onChange={(e) => setBnc(e.target.value)} required />
-        </Champ>
-
-        <Champ id={`${idChamp}-bic-service`} libelle="Taux BIC service (%)">
-          <input id={`${idChamp}-bic-service`} inputMode="decimal" value={bicService}
-            onChange={(e) => setBicService(e.target.value)} required />
-        </Champ>
-
-        <Champ id={`${idChamp}-bic-vente`} libelle="Taux BIC vente (%)">
-          <input id={`${idChamp}-bic-vente`} inputMode="decimal" value={bicVente}
-            onChange={(e) => setBicVente(e.target.value)} required />
-        </Champ>
-
-        <Champ
-          id={`${idChamp}-source`}
-          libelle="Source"
-          aide="D’où vient ce taux ? Par exemple : avis d’appel du 12/01/2027."
-        >
-          <input id={`${idChamp}-source`} value={source}
-            onChange={(e) => setSource(e.target.value)} required />
-        </Champ>
-
-        {retour !== null && (
-          <p
-            role={retour.ton === 'echec' ? 'alert' : 'status'}
-            className={retour.ton === 'echec' ? styles.echec : styles.succes}
-          >
-            {retour.texte}
-          </p>
-        )}
-
-        <button type="submit" className={styles.actionPrincipale}>
-          Ajouter la période
-        </button>
-      </form>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
    Données
    ───────────────────────────────────────────────────────────────────────── */
 
@@ -816,46 +708,8 @@ function nomExport(entreprise: Entreprise): string {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Présentation
+   Petits composants
    ───────────────────────────────────────────────────────────────────────── */
-
-/** Un pourcentage lu en saisie, converti en ratio. `null` si illisible. */
-function enRatio(saisie: string): number | null {
-  const points = Number.parseFloat(saisie.replace(',', '.'));
-  if (!Number.isFinite(points) || points < 0 || points > 100) return null;
-  return points / 100;
-}
-
-function pourcent(r: number): string {
-  return `${(r * 100).toFixed(1).replace('.', ',')} %`;
-}
-
-function Champ(
-  { id, libelle, aide, controle, children }: {
-    id: string; libelle: string; aide?: string;
-    /**
-     * Le résultat d'une clé de contrôle, quand le champ en porte une.
-     *
-     * `role="status"` et non `alert` : l'avertissement apparaît pendant qu'on
-     * tape, et une alerte à chaque caractère interromprait la saisie qu'elle
-     * prétend aider.
-     */
-    controle?: ControleIdentifiant;
-    children: React.ReactNode;
-  }
-) {
-  const idAide = `${id}-aide`;
-  return (
-    <p className={styles.champ}>
-      <label htmlFor={id}>{libelle}</label>
-      {children}
-      {aide !== undefined && <span id={idAide} className={styles.aide}>{aide}</span>}
-      {controle !== undefined && controle.statut === 'suspect' && (
-        <span className={styles.suspect} role="status">{controle.motif}</span>
-      )}
-    </p>
-  );
-}
 
 function Interrupteur(
   { id, libelle, coche, onChange, aide }: {

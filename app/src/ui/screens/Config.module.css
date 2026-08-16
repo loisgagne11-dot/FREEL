@@ -307,3 +307,39 @@
 }
 
 .action:hover { border-color: var(--line-2); color: var(--text); }
+
+/* ---------- curseurs de prudence ----------
+   Repris du Pilote, d'où ils sont partis : le handoff range les deux réglages
+   ici, et le Pilote est le seul écran du paquet d'entrée — un réglage qu'on
+   touche trois fois par an n'a pas à être téléchargé à chaque ouverture. */
+
+.curseurRangee {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.curseur {
+  flex: 1;
+  min-width: 0;
+  /* Hauteur de la zone cliquable portée à 44 px : la piste reste fine
+     visuellement, mais la cible tactile respecte le minimum. */
+  height: 44px;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+.curseur:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+
+.curseurValeur {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  min-width: 5.5ch;
+  text-align: right;
+}

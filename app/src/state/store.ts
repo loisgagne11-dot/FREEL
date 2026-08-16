@@ -17,10 +17,10 @@
  */
 
 import { create } from 'zustand';
-import { type DateISO, type Euros, type Mois, euros } from '../domain/types';
+import { type DateISO, type Euros, type Mois, type Ratio, euros, ratio } from '../domain/types';
 import {
-  CLE_STOCKAGE, type Client, type Depense, type Entreprise, type Faits,
-  type Mission, type Recette, completerFaits, faitsVides, motifRefusFaits
+  CLE_STOCKAGE, PART_GARDEE_MAX, type Client, type Depense, type Entreprise,
+  type Faits, type Mission, type Recette, completerFaits, faitsVides, motifRefusFaits
 } from './schema';
 import {
   nomAPropager, peutSupprimerClient, peutSupprimerMission, validerNomClient
@@ -68,8 +68,18 @@ interface MagasinFaits {
   /** Charge depuis le stockage, en migrant l'ancien format si nécessaire. */
   readonly initialiser: (stockage?: Stockage | null) => void;
 
-  /** Seul écrivain de la réserve (D4). */
+  /** Seul écrivain du seuil de sécurité — le fait s'appelle `reserve` (D4). */
   readonly definirReserve: (montant: Euros) => void;
+  /**
+   * Seul écrivain de la part gardée au versement.
+   *
+   * Le bornage est ICI et non dans l'écran : un curseur borné côté interface
+   * laisse passer tout ce qui n'est pas saisi au curseur — un import, un compte
+   * distant, un jeu de démonstration. Une part supérieure à 1 rendrait
+   * `versable × (1 − part)` négatif, c'est-à-dire un versement proposé à
+   * l'envers.
+   */
+  readonly definirPartGardee: (part: Ratio) => void;
   readonly definirBesoinMensuel: (montant: Euros) => void;
   readonly definirSoldeInitial: (montant: Euros) => void;
   /** `null` efface l'objectif ; c'est autre chose que de le mettre à zéro. */
@@ -549,6 +559,17 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
 
   definirReserve: (montant) => {
     const faits: Faits = { ...get().faits, reserve: euros(Math.max(0, montant)) };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  definirPartGardee: (part) => {
+    // `NaN` retombe à zéro plutôt qu'à la borne haute : une saisie illisible
+    // ne doit pas se traduire par « je garde tout », qui est une décision.
+    const borne = Number.isFinite(part)
+      ? Math.min(PART_GARDEE_MAX, Math.max(0, part))
+      : 0;
+    const faits: Faits = { ...get().faits, partGardeeAuVersement: ratio(borne) };
     set({ faits });
     persister(stockageActif, faits);
   },

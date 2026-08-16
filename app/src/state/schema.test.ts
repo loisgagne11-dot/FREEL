@@ -355,3 +355,63 @@ describe('recettes d’un bloc au schéma 7', () => {
     expect(franchise.recettes[0]?.tvaCollectee).toBe(0);
   });
 });
+
+/**
+ * v10 → v11 : LA PART GARDÉE AU VERSEMENT.
+ *
+ * Le champ est de PREMIER NIVEAU. La fusion de surface de `completerFaits`
+ * suffit donc à le combler — mais c'est ce que ces tests VÉRIFIENT, plutôt que
+ * ce que le code suppose : le jour où le champ descendrait dans un élément de
+ * liste, la fusion cesserait de suffire en silence, exactement comme pour les
+ * congés du schéma 1 et les rythmes du schéma 2.
+ */
+describe('schéma 10 → 11 : la part gardée au versement', () => {
+  it('comble un compte de schéma 10 à zéro, jamais à undefined', () => {
+    const f = completerFaits({ version: 10, reserve: 3000 });
+    expect(f).toHaveProperty('partGardeeAuVersement');
+    expect(f.partGardeeAuVersement).toBe(0);
+    expect(f.partGardeeAuVersement).not.toBeUndefined();
+  });
+
+  /**
+   * LE DÉFAUT EST ZÉRO, ET SÛREMENT PAS 0,5.
+   *
+   * Si ce test sautait et que le défaut passait à 50 %, le versable de TOUT
+   * compte existant serait coupé en deux au premier chargement, sans qu'un
+   * geste ait été fait. Un réglage par défaut qui change un montant affiché est
+   * un chiffre faux.
+   */
+  it('ne propose aucune part gardée tant que personne n’a réglé le curseur', () => {
+    expect(faitsVides().partGardeeAuVersement).toBe(0);
+    expect(completerFaits({ version: 0 }).partGardeeAuVersement).toBe(0);
+  });
+
+  it('conserve une part déjà réglée', () => {
+    expect(completerFaits({ version: 11, partGardeeAuVersement: 0.3 }).partGardeeAuVersement)
+      .toBe(0.3);
+  });
+
+  /**
+   * LE CONTRÔLE PORTE SUR CE QUI ENGAGE.
+   *
+   * Au-delà de 1, `versable × (1 − part)` devient négatif : l'écran proposerait
+   * de se verser une dette. En dessous de 0, il proposerait plus que le
+   * versable. Ce sont les deux erreurs qu'un bloc venu d'ailleurs peut porter.
+   */
+  it('refuse une part qui n’est pas un ratio', () => {
+    expect(motifRefusFaits({ ...faitsVides(), partGardeeAuVersement: '0,3' }))
+      .toMatch(/partGardeeAuVersement/);
+    expect(motifRefusFaits({ ...faitsVides(), partGardeeAuVersement: 1.5 }))
+      .toMatch(/partGardeeAuVersement/);
+    expect(motifRefusFaits({ ...faitsVides(), partGardeeAuVersement: -0.1 }))
+      .toMatch(/partGardeeAuVersement/);
+    expect(motifRefusFaits({ ...faitsVides(), partGardeeAuVersement: Number.NaN }))
+      .toMatch(/partGardeeAuVersement/);
+  });
+
+  // Aucun compte d'avant le schéma 11 ne la porte : la refuser pour absence les
+  // rejetterait tous.
+  it('accepte son absence', () => {
+    expect(motifRefusFaits({ version: 10, reserve: 3000 })).toBeNull();
+  });
+});

@@ -1,11 +1,11 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois } from '../../domain/types';
 import { PERIODES_URSSAF } from '../../domain/bareme/urssaf';
-import { type Faits, faitsVides } from '../../state/schema';
+import { PART_GARDEE_MAX, type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { periodesUrssafEffectives } from '../../state/selecteurs';
 import { FournisseurToasts } from '../components/Toasts';
@@ -24,6 +24,9 @@ const utilisateurTest = () => userEvent.setup();
 async function ouvrirBareme() {
   render(<Config />);
   await utilisateurTest().click(screen.getByRole('tab', { name: 'Barème' }));
+  // La section est chargée à la demande : sans cette attente, on interrogerait
+  // l'écran de chargement et non le barème.
+  await screen.findByRole('table');
 }
 
 async function saisirPeriode(
@@ -557,5 +560,94 @@ describe('jeu de démonstration', () => {
     await utilisateur.click(screen.getByRole('button', { name: 'Charger un jeu de démonstration' }));
 
     expect(await screen.findByText(/n’a pas pu être chargé/)).toBeTruthy();
+  });
+});
+
+/**
+ * LES DEUX RÉGLAGES DE PRUDENCE SONT DEUX NOTIONS, PAS DEUX ÉCRITURES DU MÊME.
+ *
+ * Le seuil de sécurité est un PLANCHER en euros ; la part gardée est une
+ * FRACTION du versable. Les exprimer tous deux en pourcentage du disponible —
+ * ce que fait le prototype du handoff — fabrique une boucle : le plancher
+ * descend à mesure qu'on vide le compte, et le versement soutenable finit par
+ * tout autoriser.
+ *
+ * Ils vivaient sur le Pilote. Ils sont ici parce que le handoff les y range, et
+ * parce que le Pilote est le seul écran du paquet d'entrée : le second curseur
+ * lui a fait franchir son plafond.
+ */
+describe('seuil de sécurité et part gardée', () => {
+  const champSeuil = () =>
+    screen.getByRole('spinbutton', { name: /Seuil de sécurité/ }) as HTMLInputElement;
+  const curseurPart = () =>
+    screen.getByRole('slider', { name: /Part gardée/ }) as HTMLInputElement;
+
+  it('écrit le seuil de sécurité dans les faits', () => {
+    render(<Config />);
+    fireEvent.change(champSeuil(), { target: { value: '3500' } });
+    expect(useFaits.getState().faits.reserve).toBe(3500);
+  });
+
+  /**
+   * Le seuil est un CHAMP et non un curseur, contrairement à la part. Une
+   * plage aurait eu besoin d'une borne haute, et la seule disponible est le
+   * solde : quelqu'un qui a 8 000 € en banque mais n'a pas encore saisi son
+   * solde de départ n'aurait pas pu se fixer un plancher à 5 000 €.
+   */
+  it('n’enferme pas le seuil dans la borne d’un curseur', () => {
+    render(<Config />);
+    fireEvent.change(champSeuil(), { target: { value: '5000' } });
+    expect(useFaits.getState().faits.reserve).toBe(5000);
+  });
+
+  /**
+   * Le prototype du handoff écrit « sur ta part disponible, tu gardes N % » —
+   * sans le seuil. À 0 % il propose donc de verser le matelas avec. La phrase
+   * doit dire les DEUX réglages, sinon elle décrit un autre calcul que celui
+   * qui s'applique.
+   */
+  it('dit le calcul complet, seuil compris', () => {
+    useFaits.setState({
+      faits: { ...faitsVides(), soldeInitial: euros(8000), reserve: euros(5000) }
+    });
+    render(<Config />);
+    fireEvent.change(curseurPart(), { target: { value: '50' } });
+
+    const phrase = screen.getByText(/Sur un solde de/).textContent ?? '';
+    expect(phrase).toMatch(/8\s?000/u);   // le solde
+    expect(phrase).toMatch(/5\s?000/u);   // ce que le seuil garde
+    expect(phrase).toMatch(/3\s?000/u);   // le versable
+    expect(phrase).toMatch(/1\s?500/u);   // ce qu'il reste à se verser
+  });
+
+  it('écrit la part gardée en ratio, pas en pourcentage', () => {
+    render(<Config />);
+    fireEvent.change(curseurPart(), { target: { value: '25' } });
+    expect(useFaits.getState().faits.partGardeeAuVersement).toBeCloseTo(0.25, 10);
+  });
+
+  /**
+   * Un défaut à 50 %, comme dans le prototype, couperait en deux le versable de
+   * tout compte existant sans qu'un geste ait été fait.
+   */
+  it('part de zéro pour cent, qui ne décide rien', () => {
+    render(<Config />);
+    expect(curseurPart().value).toBe('0');
+    expect(useFaits.getState().faits.partGardeeAuVersement).toBe(0);
+  });
+
+  it('ne laisse pas régler une part au-delà du maximum du schéma', () => {
+    render(<Config />);
+    expect(Number(curseurPart().max)).toBe(PART_GARDEE_MAX * 100);
+  });
+
+  /**
+   * Un plancher négatif n'existe pas : il autoriserait un versement supérieur
+   * au disponible.
+   */
+  it('refuse un seuil négatif plutôt que de l’enregistrer', () => {
+    render(<Config />);
+    fireEvent.change(champSeuil(), { target: { value: '-400' } });
+    expect(useFaits.getState().faits.reserve).toBe(0);
   });
 });
