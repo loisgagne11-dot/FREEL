@@ -91,16 +91,63 @@ Prérequis de tout le reste : sans lui, « conforme au visuel » reste une opini
 ### Lot A — Argent · Performance
 
 C'est là que le plus grand nombre d'indicateurs de l'ancienne application ont
-disparu.
+disparu. Le plan initial a été **révisé après expertise** : trois de ses six
+points auraient publié un chiffre faux ou recréé un défaut déjà fermé. Les
+arbitrages sont écrits au §3 bis, sous le tableau.
 
 | # | Livrable | Capture | Critère d'acceptation | État |
 |---|---|---|---|---|
-| A1 | Quatre tuiles : CA réalisé, CA encaissé, À encaisser, Résultat projeté | `*-argent-performance` | Le résultat projeté annonce « après cotisations » et s'abstient si le taux est inconnu | ⬜ |
-| A2 | Graphe CA réalisé vs encaissé, valeurs en k€ au-dessus, cumulé en pied | `*-argent-performance` | Les deux séries, les douze mois, le cumul en pied de carte | ⬜ |
-| A3 | **Clic sur un mois → panneau Composition** | `*-argent-performance` | Réalisé ventilé par mission, encaissé par facture, reste à encaisser ; cible cliquable au clavier | ⬜ |
-| A4 | « Tu peux te verser » + curseur de réserve en % | `*-argent-performance` | Le curseur écrit un fait ; la phrase dit le calcul en toutes lettres | ⬜ |
-| A5 | Capacité de versement par mois, **versé à l'intérieur de la barre**, futur hachuré | `*-argent-performance` | Le futur se distingue du passé sans couleur seule | ⬜ |
-| A6 | Objectif de CA sur le graphe : ligne de référence et allure attendue | `*-argent-performance` | Aucune ligne quand aucun objectif n'est fixé | ⬜ |
+| A0 | Le cadre : titre « Ton argent », sous-titre, étiquette « Provisions · N % couvertes », et les **deux piliers** (Trésorerie / Performance) portant chacun sa question et son chiffre | `*-argent-tresorerie`, `*-argent-performance` | Le vocabulaire du handoff est repris tel quel ; le sort des onglets « Livre des recettes » et « DES » est tranché par écrit | ⬜ |
+| A1 | Quatre tuiles : CA réalisé, CA encaissé, À encaisser, **Résultat projeté** | `*-argent-performance` | Assiette = le pipeline de `etatProjection`, jamais une extrapolation du passé. Cotisations sommées **mois par mois** (l'ACRE s'éteint en cours d'année). Sous barème : acomptes de PAS **saisis** seulement, jamais un IR déduit d'un taux — sinon le libellé dit « avant impôt sur le revenu ». Si l'un des trois ne tient pas : **trois tuiles**, pas quatre dont une fausse | ⬜ |
+| A2 | Graphe CA réalisé vs encaissé, **mois écoulés seulement**, valeurs en k€ au-dessus, repère du mois courant, cumul en pied | `*-argent-performance` | Douze mois rendraient les étiquettes illisibles et contrediraient la référence, qui s'arrête au mois courant | ⬜ |
+| A3 | **Panneau Composition, permanent**, ouvert sur le mois courant | `*-argent-performance` | Réalisé ventilé par mission avec `jours × TJM` ; encaissé par facture ; **reste à encaisser calculé facture par facture**, jamais par soustraction de deux agrégats ; cas « encaissé d'avance » traité ; ce qui ne se départage pas entre missions simultanées d'un même client est **dit** | ⬜ |
+| A4 | « Tu peux te verser » + curseur de part gardée | `*-argent-performance` | Deux faits distincts (§3 bis) ; `versable × (1 − part)` ; défaut 0 % ; le bouton **nomme un mouvement bancaire**, il ne crée pas un fait de versement | ⬜ |
+| A5 | Capacité de versement par mois, **versé à l'intérieur de la barre**, futur hachuré | `*-argent-performance` | Un module de domaine `capaciteVersement.ts` écrit et testé **avant** de dessiner ; un mois futur n'a **aucun** versé — le hachuré ne remplit rien | ⬜ |
+| A6 | Objectif de CA : ligne de référence rattachée à l'**encaissé**, et jours d'écart en pied | `*-argent-performance` | Aucune ligne sans objectif fixé ; l'écart au dessin (le handoff n'a pas d'objectif) est écrit | ⬜ |
+| A7 | Les trois inventaires remis d'équerre | — | V9 cesse d'être vrai, `drawMainChart` et `computeTrend` reçoivent leur motif. Un inventaire qui se trompe dans le sens « présent » coûte plus cher qu'un manque | ⬜ |
+
+#### §3 bis — Arbitrages du lot A
+
+**Le résultat projeté ne peut pas être « CA − cotisations ».** Sous le régime du
+barème, le calcul de charges ne rend que la CFP à 0,2 % et ne refuse jamais : la
+tuile aurait affiché « après cotisations » en ignorant tout l'impôt sur le
+revenu, sans qu'aucun garde-fou ne se déclenche. Et le corriger en recalculant
+l'IR rouvrirait l'anomalie déjà fermée : l'acompte de prélèvement à la source
+est un **fait saisi**, jamais une sortie de calcul — le reconstituer produit une
+double imposition. La tuile dit donc ce qu'elle sait, et nomme ce qu'elle ignore.
+
+**La réserve est deux notions, pas une.** Le handoff porte les deux dans le même
+écran de réglages : un **seuil de sécurité** en euros (« plancher affiché sur tes
+courbes ») et une **part gardée** en pourcentage. Ce ne sont pas deux façons de
+dire la même chose — un plancher exprimé en pourcentage du disponible descend à
+mesure qu'on vide le compte, et le versement soutenable finit par tout
+autoriser. C'est une boucle, pas une préférence.
+
+- `reserve: Euros` **reste le fait**, et prend son nom du dessin : **seuil de
+  sécurité**. Les deux endroits qui l'appellent encore « réserve » se réalignent.
+- **Nouveau fait** `partGardeeAuVersement` (ratio) : ce que le curseur écrit, ici
+  comme dans Config. Source unique.
+- Le montant gardé ne se stocke jamais : il se dérive.
+- Formule : `versable × (1 − part)`, et non `disponible × (1 − part)` comme le
+  fait le prototype — à 0 % celui-ci propose de verser le matelas avec.
+- **Défaut 0 %, pas 50 %** : un défaut à 50 % couperait en deux, sans un geste,
+  le versable de tout compte existant.
+
+**« Enregistrer le versement » n'écrit pas un fait de plus.** L'arbitrage est
+déjà pris : un versement est **un nom sur un mouvement bancaire**, pas une
+saisie. Deux sources pour « déjà versé » finiraient par ne pas tomber d'accord.
+
+**Écartés, avec motif.** La bascule mensuel / cumulé — le cumul est en pied de
+carte, une bascule ajouterait un état d'écran pour dire le même total. Les
+congés en second axe — un axe en jours sur un graphe en euros ; la donnée vit au
+lot C4. La tendance ↑/↓ % — elle comparait trois mois à trois mois sur une
+facturation irrégulière. La moyenne de capacité — elle moyennerait des mois
+projetés, donc une fiction ; la moyenne du **versé**, elle, est reprise.
+
+**Reporté, mais écrit** : le sélecteur de période. L'année est aujourd'hui
+verrouillée sur l'horloge ; au 1er janvier l'écran Performance devient vide et
+l'année précédente est inatteignable. Traité au lot A si le budget le permet,
+sinon en lot propre — pas oublié.
 
 ### Lot B — Argent · Trésorerie
 
