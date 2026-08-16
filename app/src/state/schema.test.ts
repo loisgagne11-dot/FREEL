@@ -415,3 +415,85 @@ describe('schéma 10 → 11 : la part gardée au versement', () => {
     expect(motifRefusFaits({ version: 10, reserve: 3000 })).toBeNull();
   });
 });
+
+/**
+ * v11 → v12 : LES TROIS FAITS DU FOYER FISCAL.
+ *
+ * Le cas est différent des deux précédents, et c'est ce qui rend ces tests
+ * nécessaires : les champs sont bien de premier niveau, mais leur VALEUR dort
+ * ailleurs — dans `configImpotBrute`, l'objet indexé par année que la reprise
+ * du legacy avait conservé sans jamais l'interpréter. La fusion de surface
+ * comblerait donc `null` alors que la donnée existe, et l'utilisateur devrait
+ * retaper ce qu'il avait déjà saisi.
+ */
+describe('schéma 11 → 12 : le foyer fiscal', () => {
+  it('reprend parts, autres revenus et PER de l’ancienne configuration d’impôt', () => {
+    const f = completerFaits({
+      version: 11,
+      configImpotBrute: { '2025': { parts: 2.5, autresRevenus: 12000, perAnnuel: 3000 } }
+    });
+    expect(f.partsFiscales).toBe(2.5);
+    expect(f.autresRevenusFoyer).toBe(12000);
+    expect(f.versementPerDeductible).toBe(3000);
+  });
+
+  // L'ancienne structure était indexée PAR ANNÉE. Prendre la première venue
+  // ressusciterait une situation de foyer périmée — un divorce, une naissance,
+  // et le quotient familial change de valeur.
+  it('retient l’année la plus récente quand l’ancienne configuration en porte plusieurs', () => {
+    const f = completerFaits({
+      version: 11,
+      configImpotBrute: {
+        '2024': { parts: 1, autresRevenus: 0, perAnnuel: 0 },
+        '2026': { parts: 3, autresRevenus: 500, perAnnuel: 0 }
+      }
+    });
+    expect(f.partsFiscales).toBe(3);
+    expect(f.autresRevenusFoyer).toBe(500);
+  });
+
+  /**
+   * `null` N'EST PAS 1.
+   *
+   * Si ce test sautait et qu'un défaut à une part s'installait, la provision
+   * d'impôt s'afficherait comme un résultat complet à quelqu'un qui n'a jamais
+   * dit combien il a de parts — et le barème progressif appliqué à un quotient
+   * trop petit surestime l'impôt du simple au double.
+   */
+  it('laisse les trois faits vides quand rien n’est repris', () => {
+    const f = completerFaits({ version: 11 });
+    expect(f.partsFiscales).toBeNull();
+    expect(f.autresRevenusFoyer).toBeNull();
+    expect(f.versementPerDeductible).toBeNull();
+    expect(faitsVides().partsFiscales).toBeNull();
+  });
+
+  // Un zéro de l'ancienne application a été SAISI : le transformer en « non
+  // renseigné » ferait refuser un calcul que la donnée permettait.
+  it('conserve un zéro repris, qui n’est pas une absence', () => {
+    const f = completerFaits({
+      version: 11,
+      configImpotBrute: { '2025': { parts: 1, autresRevenus: 0, perAnnuel: 0 } }
+    });
+    expect(f.autresRevenusFoyer).toBe(0);
+    expect(f.versementPerDeductible).toBe(0);
+  });
+
+  it('ne réécrit pas une valeur déjà corrigée depuis l’écran Config', () => {
+    const f = completerFaits({
+      version: 12,
+      partsFiscales: 2,
+      configImpotBrute: { '2025': { parts: 1 } }
+    });
+    expect(f.partsFiscales).toBe(2);
+  });
+
+  it('accepte l’absence des trois champs et refuse une valeur qui n’est pas un nombre', () => {
+    expect(motifRefusFaits({ version: 11, reserve: 3000 })).toBeNull();
+    expect(motifRefusFaits({ ...faitsVides(), partsFiscales: '2' }))
+      .toMatch(/partsFiscales/);
+    expect(motifRefusFaits({ ...faitsVides(), autresRevenusFoyer: Number.NaN }))
+      .toMatch(/autresRevenusFoyer/);
+    expect(motifRefusFaits({ ...faitsVides(), versementPerDeductible: null })).toBeNull();
+  });
+});
