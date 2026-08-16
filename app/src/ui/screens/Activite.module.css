@@ -569,6 +569,71 @@
 .retirer:hover { border-color: var(--red-line); color: var(--text); }
 .ajouterEntite:hover { border-color: var(--green); color: var(--text); }
 
+/* ---------- périodes de rythme ---------- */
+
+.rythmes { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.periode { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+/* Un liseré à gauche plutôt qu'un cadre : les périodes sont déjà dans le cadre
+   du client opérationnel, et deux bordures imbriquées font une boîte dans une
+   boîte sans rien séparer de plus. */
+.periode + .periode {
+  border-left: 2px solid var(--line-2);
+  padding-left: 8px;
+  margin-left: 2px;
+}
+
+.periodeEntete { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.periodeDate {
+  flex: 1 1 130px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.periodeSepare { color: var(--muted-2); font-size: 13px; flex: 0 0 auto; }
+
+.periodeMois {
+  flex: 0 0 auto;
+  min-width: 56px;
+  font-size: 12px;
+  font-weight: 620;
+  color: var(--text);
+  text-transform: capitalize;
+  font-variant-numeric: tabular-nums;
+}
+
+.tjmPeriode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.tjmPeriode input {
+  flex: 0 1 110px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
 /* La semaine type déborde plutôt que de s'écraser : sept boutons de 44 px ne
    tiennent pas dans 340 px, et un bouton rétréci n'est plus une cible. */
 .semaineType {

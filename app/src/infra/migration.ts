@@ -55,9 +55,19 @@ import {
 /** Préfixe de l'ancienne application. Ne jamais écrire dessus. */
 export const PREFIXE_LEGACY = 'freel_v50_';
 export const CLE_BUNDLE_LEGACY = `${PREFIXE_LEGACY}bundle`;
+/**
+ * L'objectif de chiffre d'affaires de l'ancienne application.
+ *
+ * Sans le préfixe : cette clé-là n'a jamais été versionnée dans l'ancien code,
+ * elle s'appelle `freel_goal_ca` tout court. La déduire du préfixe l'aurait
+ * cherchée au mauvais endroit, et l'objectif aurait été perdu en silence — ce
+ * qui est précisément le genre de perte que cette reprise existe pour éviter.
+ */
+export const CLE_OBJECTIF_LEGACY = 'freel_goal_ca';
+
 /** Clés annexes de l'ancienne application, sauvegardées dans l'instantané. */
 export const CLES_ANNEXES_LEGACY = [
-  'freel_ts', 'freel_theme', 'freel_goal_ca', 'freel_notif_read',
+  'freel_ts', 'freel_theme', CLE_OBJECTIF_LEGACY, 'freel_notif_read',
   'freel_supabase', 'freel_app_version'
 ] as const;
 

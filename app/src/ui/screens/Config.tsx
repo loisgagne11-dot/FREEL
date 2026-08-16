@@ -150,6 +150,7 @@ function Tresorerie() {
   const faits = useFaits((e) => e.faits);
   const definirSoldeInitial = useFaits((e) => e.definirSoldeInitial);
   const definirBesoinMensuel = useFaits((e) => e.definirBesoinMensuel);
+  const definirObjectif = useFaits((e) => e.definirObjectifCaAnnuel);
   const idChamp = useId();
   const suivi = soldeEstSuivi(faits);
 
@@ -200,6 +201,31 @@ function Tresorerie() {
             step="1"
             value={faits.besoinMensuel}
             onChange={(e) => definirBesoinMensuel(euros(Number(e.target.value) || 0))}
+          />
+        </Champ>
+
+        {/* Le champ est vide quand aucun objectif n'est fixé, et non à « 0 ».
+            Un zéro affiché se lirait comme un objectif de zéro euro, alors que
+            l'état réel est « je ne m'en suis pas fixé » — et c'est cet état-là
+            qui fait que le graphe n'affiche aucune ligne d'objectif. */}
+        <Champ
+          id={`${idChamp}-objectif`}
+          libelle="Objectif de chiffre d’affaires sur l’année"
+          aide="Facultatif. Sur l’encaissé, comme les plafonds et l’impôt — un
+                objectif sur le facturé serait atteint sans que le compte l’ait
+                vu passer. Laissez vide pour ne pas en fixer."
+        >
+          <input
+            id={`${idChamp}-objectif`}
+            type="number"
+            inputMode="decimal"
+            step="1000"
+            min="0"
+            placeholder="Aucun objectif"
+            value={faits.objectifCaAnnuel ?? ''}
+            onChange={(e) => definirObjectif(
+              e.target.value === '' ? null : euros(Number(e.target.value) || 0)
+            )}
           />
         </Champ>
       </div>

@@ -12,7 +12,7 @@ window.FreelDocs = (function(){
 
   /* ---------- identité émettrice + clients ---------- */
   var ME = {
-    nom:'Atelier L. — Loïs Mercier', activite:'Designer graphique · micro-entrepreneur',
+    nom:'Atelier L. — Camille Demo', activite:'Designer graphique · micro-entrepreneur',
     adr:'14 rue des Récollets, 75010 Paris', siret:'SIRET 912 457 881 00027',
     iban:'FR00 0000 0000 0000 0000 0000 000', email:'contact@atelier-demo.fr', tjm:520
   };

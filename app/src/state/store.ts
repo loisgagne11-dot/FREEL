@@ -72,6 +72,8 @@ interface MagasinFaits {
   readonly definirReserve: (montant: Euros) => void;
   readonly definirBesoinMensuel: (montant: Euros) => void;
   readonly definirSoldeInitial: (montant: Euros) => void;
+  /** `null` efface l'objectif ; c'est autre chose que de le mettre à zéro. */
+  readonly definirObjectifCaAnnuel: (montant: Euros | null) => void;
 
   /**
    * Marque une période comme déclarée. C'est ce fait qui fait basculer la
@@ -559,6 +561,18 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
 
   definirSoldeInitial: (montant) => {
     const faits: Faits = { ...get().faits, soldeInitial: euros(montant) };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  /**
+   * Un objectif négatif n'existe pas, mais on ne le remonte pas à zéro pour
+   * autant : zéro serait un objectif fixé, et l'écran l'afficherait. Une
+   * saisie absurde efface donc l'objectif au lieu d'en inventer un.
+   */
+  definirObjectifCaAnnuel: (montant) => {
+    const objectif = montant === null || montant <= 0 ? null : euros(montant);
+    const faits: Faits = { ...get().faits, objectifCaAnnuel: objectif };
     set({ faits });
     persister(stockageActif, faits);
   },

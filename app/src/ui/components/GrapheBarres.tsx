@@ -114,8 +114,12 @@ export function GrapheBarres(
           const largeurTotale = series.length * largeurBarre + (series.length - 1) * ecart;
           const depart = centre - largeurTotale / 2;
 
+          /* La clé est le RANG, pas le libellé : sur douze mois, l'axe porte
+             « J F M A M J J A S O N D » — deux « J », deux « M », deux « A ».
+             React fusionnait alors des groupes distincts, et une barre pouvait
+             en garder l'état d'une autre. Un axe se répète ; un rang, non. */
           return (
-            <g key={categorie}>
+            <g key={iCat}>
               {series.map((serie, iSerie) => {
                 const valeur = serie.valeurs[iCat] ?? 0;
                 const hauteur = (valeur / maximum) * hauteurTracee;
@@ -184,7 +188,7 @@ export function GrapheBarres(
         </thead>
         <tbody>
           {categories.map((categorie, iCat) => (
-            <tr key={categorie}>
+            <tr key={iCat}>
               <th scope="row">{categorie}</th>
               {series.map((s) => (
                 <td key={s.id}>{formater(s.valeurs[iCat] ?? 0)}</td>
