@@ -801,3 +801,53 @@ describe('détection sans conversion', () => {
     expect(migrer(s).statut).toBe('echec');
   });
 });
+
+/**
+ * L'OBJECTIF DE CA VIVAIT DANS SA PROPRE CLÉ, HORS DU BUNDLE.
+ *
+ * L'ancienne application l'écrivait dans `freel_goal_ca`, sans le préfixe de
+ * version. Le chercher dans le bundle l'aurait perdu en silence — et un
+ * objectif perdu ne se remarque pas : l'écran n'affiche simplement plus de
+ * ligne, comme si l'on n'en avait jamais fixé.
+ */
+describe('reprise de l’objectif de chiffre d’affaires', () => {
+  it('reprend l’objectif écrit dans sa clé séparée', () => {
+    const s = stockageMemoire({
+      [CLE_BUNDLE_LEGACY]: JSON.stringify(bundleLegacy()),
+      freel_goal_ca: '65000'
+    });
+    const r = migrer(s);
+    expect(r.statut).toBe('migre');
+    expect(r.statut === 'migre' ? r.faits.objectifCaAnnuel : undefined).toBe(65_000);
+  });
+
+  /**
+   * L'ancienne application écrivait `0` pour « pas d'objectif », et son graphe
+   * testait `GOAL_CA > 0` avant de tracer la ligne. Reprendre le zéro tel quel
+   * fabriquerait un objectif de zéro euro, atteint par construction.
+   */
+  it('traduit le zéro de l’ancienne application par une absence d’objectif', () => {
+    const s = stockageMemoire({
+      [CLE_BUNDLE_LEGACY]: JSON.stringify(bundleLegacy()),
+      freel_goal_ca: '0'
+    });
+    const r = migrer(s);
+    expect(r.statut === 'migre' ? r.faits.objectifCaAnnuel : undefined).toBeNull();
+  });
+
+  it('rend un objectif nul quand la clé n’existe pas', () => {
+    const r = migrer(avecLegacy());
+    expect(r.statut === 'migre' ? r.faits.objectifCaAnnuel : undefined).toBeNull();
+  });
+
+  /**
+   * Un objectif seul ne déclenche pas de reprise : sans mission ni recette, il
+   * n'y a rien à migrer, et prétendre le contraire afficherait un écran de
+   * reprise à quelqu'un qui n'a jamais utilisé l'ancienne application.
+   */
+  it('ne déclenche aucune reprise à lui seul', () => {
+    const s = stockageMemoire({ freel_goal_ca: '65000' });
+    expect(presenceLegacy(s)).toBe(false);
+    expect(detecter(s).statut).toBe('rien-a-migrer');
+  });
+});

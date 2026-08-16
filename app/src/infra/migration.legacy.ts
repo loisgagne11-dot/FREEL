@@ -36,7 +36,7 @@ import { JOURS_SEMAINE } from '../domain/calculs/planning';
 import type { ClientOperationnel } from '../state/schema';
 import type { Echeance, NatureDette } from '../domain/calculs/provisions';
 import {
-  CLE_BUNDLE_LEGACY, PREFIXE_LEGACY,
+  CLE_BUNDLE_LEGACY, CLE_OBJECTIF_LEGACY, PREFIXE_LEGACY,
   type Anomalie, type RapportMigration, type ResultatMigration, type Stockage,
   archiverAvantReprise
 } from './migration';
@@ -75,6 +75,22 @@ function modeReglement(v: unknown): Recette['modeReglement'] {
 
 /** Lit le bundle de l'ancienne application, en gérant le format par clé plus ancien. */
 function lireLegacy(stockage: Stockage): Inconnu | null {
+  const donnees = lireDonneesLegacy(stockage);
+  if (donnees === null) return null;
+
+  /* L'objectif de CA vit dans SA PROPRE clé, hors du bundle : l'ancienne
+     application l'écrivait à part, sans préfixe de version. Il est rapatrié
+     ici, sous le nom que `convertir` attend, de sorte que les deux formats
+     d'entrée — bundle et clé par entité — le retrouvent pareillement.
+
+     Il n'entre pas dans la décision « y a-t-il du legacy ? » : un objectif
+     seul, sans mission ni recette, ne justifie pas de déclencher une reprise. */
+  const objectif = stockage.getItem(CLE_OBJECTIF_LEGACY);
+  if (objectif !== null && !('goalCA' in donnees)) donnees['goalCA'] = objectif;
+  return donnees;
+}
+
+function lireDonneesLegacy(stockage: Stockage): Inconnu | null {
   const brut = stockage.getItem(CLE_BUNDLE_LEGACY);
   if (brut !== null) {
     try {
@@ -776,6 +792,13 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // version, seule des trois implémentations concurrentes à être un montant.
     reserve: euros(nombre(t['reserveCompte'])),
     besoinMensuel: euros(nombre(t['salaireEstime'])),
+    // L'ancienne application écrivait `0` pour « pas d'objectif », et son
+    // graphe testait `GOAL_CA > 0` pour décider de tracer la ligne. Le nouveau
+    // schéma dit la même chose avec `null` — reprendre le zéro tel quel aurait
+    // fabriqué un objectif de zéro euro, atteint par construction.
+    objectifCaAnnuel: nombre(legacy['goalCA']) > 0
+      ? euros(nombre(legacy['goalCA']))
+      : null,
     // Aucune période n'était marquée comme déclarée dans l'ancien modèle :
     // ce fait n'y existait pas. Il devra être renseigné par l'utilisateur,
     // sinon le volet 2 des provisions surestimera la dette.

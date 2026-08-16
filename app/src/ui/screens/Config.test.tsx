@@ -291,6 +291,41 @@ describe('trésorerie', () => {
 
     expect(screen.getByRole('spinbutton', { name: /avant le premier mouvement/ })).toBeTruthy();
   });
+
+  /**
+   * L'OBJECTIF EST FACULTATIF, ET SON ABSENCE N'EST PAS UN ZÉRO.
+   *
+   * Le champ part vide, et non à « 0 » : un zéro affiché se lirait comme un
+   * objectif de zéro euro, alors que l'état réel est « je ne m'en suis pas
+   * fixé ». C'est cet état-là qui fait que le graphe ne trace aucune ligne
+   * d'objectif — et un zéro stocké l'aurait fait tracer, à zéro.
+   */
+  it('part sans objectif de chiffre d’affaires', () => {
+    render(<Config />);
+    const champ = screen.getByRole('spinbutton', { name: /Objectif de chiffre d’affaires/ });
+    expect((champ as HTMLInputElement).value).toBe('');
+    expect(useFaits.getState().faits.objectifCaAnnuel).toBeNull();
+  });
+
+  it('écrit l’objectif de chiffre d’affaires dans les faits', async () => {
+    render(<Config />);
+    const utilisateur = utilisateurTest();
+
+    const champ = screen.getByRole('spinbutton', { name: /Objectif de chiffre d’affaires/ });
+    await utilisateur.type(champ, '60000');
+
+    expect(useFaits.getState().faits.objectifCaAnnuel).toBe(60_000);
+  });
+
+  it('efface l’objectif quand on vide le champ, au lieu de le mettre à zéro', async () => {
+    useFaits.setState({ faits: { ...faitsVides(), objectifCaAnnuel: euros(60_000) } });
+    render(<Config />);
+    const utilisateur = utilisateurTest();
+
+    await utilisateur.clear(screen.getByRole('spinbutton', { name: /Objectif de chiffre d’affaires/ }));
+
+    expect(useFaits.getState().faits.objectifCaAnnuel).toBeNull();
+  });
 });
 
 /**

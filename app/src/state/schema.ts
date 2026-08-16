@@ -32,7 +32,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 9 as const;
+export const VERSION_SCHEMA = 10 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -320,6 +320,29 @@ export interface Faits {
   /** Matelas de sécurité, montant absolu. Source unique (D4). */
   readonly reserve: Euros;
   readonly besoinMensuel: Euros;
+  /**
+   * L'objectif de chiffre d'affaires encaissé sur l'année civile, ou `null`.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * POURQUOI `null` ET NON ZÉRO
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * « Je ne me suis pas fixé d'objectif » et « mon objectif est de zéro euro »
+   * sont deux états différents, et l'écran ne doit pas les confondre : le
+   * premier n'affiche rien, le second afficherait un objectif atteint à
+   * l'infini dès le premier euro. Zéro comme valeur par défaut aurait aussi
+   * fait diviser par zéro tout ce qui rapporte le réalisé à l'objectif.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * SUR L'ENCAISSÉ
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Le reste de l'application compte en encaissé — plafonds, TVA, impôt,
+   * cotisations. Poser l'objectif sur le facturé aurait fabriqué un troisième
+   * référentiel, et un objectif « atteint » que le compte n'aurait jamais vu
+   * passer.
+   */
+  readonly objectifCaAnnuel: Euros | null;
   /** Mois dont la déclaration a été faite. Opère la bascule entre volets de provisions. */
   readonly periodesDeclarees: readonly Mois[];
   /**
@@ -363,6 +386,7 @@ export function faitsVides(): Faits {
     clients: [], missions: [], recettes: [], depenses: [], conges: [],
     mouvementsBancaires: [], periodesUrssafAjoutees: [],
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
+    objectifCaAnnuel: null,
     periodesDeclarees: [], echeances: [], configImpotBrute: {}
   };
 }
@@ -426,6 +450,15 @@ export function motifRefusFaits(brut: unknown): string | null {
     if (cle in o && (typeof v !== 'number' || !Number.isFinite(v))) {
       return `Le champ « ${cle} » devrait être un montant.`;
     }
+  }
+
+  // L'objectif est le premier montant qui a le droit d'être absent. Le ranger
+  // avec les autres l'aurait rendu obligatoire, et un compte d'avant le schéma
+  // 10 aurait été refusé pour n'avoir pas fixé d'objectif.
+  const objectif = o['objectifCaAnnuel'];
+  if ('objectifCaAnnuel' in o && objectif !== null
+    && (typeof objectif !== 'number' || !Number.isFinite(objectif))) {
+    return 'Le champ « objectifCaAnnuel » devrait être un montant ou être absent.';
   }
 
   const entreprise = o['entreprise'];
@@ -628,6 +661,18 @@ function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
   });
 }
 
+/**
+ * v9 → v10 : l'objectif de chiffre d'affaires annuel.
+ *
+ * Aucune fonction de migration dédiée, et c'est vérifié plutôt que supposé :
+ * le champ est de PREMIER NIVEAU, donc la fusion de surface ci-dessous le
+ * comble depuis `faitsVides()`. La règle du projet — « une migration descend
+ * jusqu'où les champs ont bougé » — est respectée précisément parce qu'ici
+ * rien n'a bougé sous la surface. Les quatre migrations imbriquées existantes
+ * sont là parce que leurs champs, eux, vivaient dans des éléments de liste.
+ *
+ * La valeur comblée est `null` et non zéro : voir `objectifCaAnnuel`.
+ */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
   const defauts = faitsVides();
