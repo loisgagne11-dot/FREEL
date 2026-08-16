@@ -88,6 +88,61 @@ Prérequis de tout le reste : sans lui, « conforme au visuel » reste une opini
 | O3 | Agent `controleur-visuel` | — | Rend une liste d'écarts localisés, pas un avis global | ✅ |
 | O4 | Bouton « charger un jeu de démonstration » dans Config | `*-config-donnees` | Remplit une application vierge, et le dit avant d'écraser | ✅ |
 
+### Lot P — Ce que l'impôt et l'ACRE coûtent vraiment
+
+**Placé avant la suite du dessin** : la tuile « Résultat projeté » (A1) et les
+provisions de l'écran Trésorerie (B4) en dépendent toutes les deux. Soulevé par
+le propriétaire le 16/08, vérifié sur le code, confirmé.
+
+| # | Livrable | Critère d'acceptation | État |
+|---|---|---|---|
+| P1 | La durée d'ACRE devient une **règle datée avec sa source**, comme les taux URSSAF | Le `4` en dur de `sousAcreLe` disparaît ; la règle porte sa source et sa date de vérification ; l'invariant n°3 est tenu | ⬜ |
+| P2 | Les faits du foyer fiscal : parts, autres revenus imposables, versement PER | Ils dorment aujourd'hui dans `configImpotBrute`, non interprétés ; une provision d'IR sans eux serait un chiffre inventé | ⬜ |
+| P3 | `provisionImpotRevenu` : l'IR estimé de l'année, réparti sur les mois | Assiette = encaissé constaté + encaissements attendus des missions ; abattement forfaitaire ; barème avec parts ; **les acomptes de PAS déjà saisis sont retranchés** | ⬜ |
+| P4 | La provision d'IR entre au volet 2 des provisions | Le versable cesse d'être surévalué de tout l'impôt pour qui n'a pas coché le versement libératoire | ⬜ |
+| P5 | L'écran dit l'hypothèse | Sans parts ni autres revenus, la provision s'affiche comme incomplète — jamais comme un résultat | ⬜ |
+
+#### §3 ter — Pourquoi ce lot existe, et ce qu'il ne refait pas
+
+**L'impôt n'était pas provisionné du tout sous le régime du barème.**
+`tauxImpotEtContributions` rend la CFP seule — 0,2 % — et `provisions.ts` en
+fait la ligne « impôt » du volet 2. Quelqu'un qui n'a pas coché le versement
+libératoire voit donc un versable surévalué de tout son impôt sur le revenu.
+
+**Ce n'est pas l'anomalie E qui rouvre.** Ce qui avait été interdit, c'est de
+RECONSTITUER l'acompte de prélèvement à la source : la DGFiP le notifie,
+l'utilisateur le saisit, et le recalculer produisait une double imposition.
+Une PROVISION est autre chose :
+
+| | Acompte de PAS | Provision d'IR |
+|---|---|---|
+| Nature | un **fait** — un avis reçu, une date, un montant | une **estimation** de ce que l'année va coûter |
+| Volet | 1, déjà appelé | 2, dû mais pas encore appelé |
+| Source | l'avis d'imposition | le CA projeté et le foyer |
+
+Les deux cohabitent **à une condition** : la provision estimée retranche les
+acomptes déjà saisis. Sans cette soustraction, l'anomalie E revient sous un
+autre nom.
+
+**L'ACRE court probablement moins longtemps que ce que nous calculons.**
+`sousAcreLe` applique douze mois pleins à compter du mois de début d'activité.
+La règle du micro-social est, sauf erreur, « jusqu'à la fin du 3ᵉ trimestre
+civil suivant celui de l'affiliation » — soit onze mois pour un début en
+février, dix pour un début en décembre. L'écart va dans le sens dangereux :
+moins de charges, donc plus de disponible, donc plus de versable.
+
+Une règle légale ne se réécrit pas sur la seule conviction de qui code. Elle
+remonte donc dans le barème **avec sa source et sa date de vérification**, comme
+les taux URSSAF — le `4` actuel n'en a aucune, ce que l'invariant n°3 interdit.
+La formulation exacte est à confirmer sur l'attestation URSSAF du propriétaire.
+
+**L'assiette de la projection est celle que le propriétaire décrit** : les
+missions donnent le chiffre d'affaires de l'année, remis à jour à chaque
+évolution de mission et de planning ; le RÉEL prend le relais mois par mois dès
+que la facture est émise. Le module distingue les deux sans les mélanger — c'est
+la même règle que partout ailleurs dans le projet, le constaté ne se confond pas
+avec l'attendu.
+
 ### Lot A — Argent · Performance
 
 C'est là que le plus grand nombre d'indicateurs de l'ancienne application ont
@@ -273,4 +328,5 @@ faits plutôt qu'avec trois écrans finis.
 | Date | Lot | Ce qui a été fait |
 |---|---|---|
 | 16/08 | — | Plan établi et périmètre arbitré. |
+| 16/08 | Lot P | Ouvert : l'impôt sur le revenu n'était provisionné nulle part sous le régime du barème, et la fenêtre d'ACRE est probablement trop longue de un à trois mois. |
 | 16/08 | Socle O | Outillage de contrôle en place. La première comparaison montre l'onglet Performance à trois tuiles sur quatre, sans composition au clic, sans capacité de versement et sans curseur de réserve. |
