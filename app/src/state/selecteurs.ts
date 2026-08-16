@@ -11,10 +11,10 @@
  */
 
 import {
-  type DateISO, type Euros, type Mois, type TypeActivite,
+  type DateISO, type Euros, type Mois, type Resolution, type TypeActivite,
   euros, moisDe
 } from '../domain/types';
-import { tauxImpotEtContributions } from '../domain/bareme';
+import { dernierMoisAcre, moisSousAcre, tauxImpotEtContributions } from '../domain/bareme';
 import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
@@ -145,23 +145,34 @@ export function remunerationDuMois(faits: Faits, m: Mois): Euros {
   );
 }
 
-/** Sous ACRE à ce mois, d'après la date de début d'activité et la durée d'ACRE. */
-export function sousAcreLe(faits: Faits, dureeTrimestres = 4): (m: Mois) => boolean {
+/**
+ * Sous ACRE à ce mois, d'après la date de début d'activité.
+ *
+ * La durée ne se calcule plus ici : elle était écrite en dur — quatre
+ * trimestres pleins à compter du mois de début — sans source ni date de
+ * vérification, ce que l'invariant n°3 interdit. Elle vit maintenant dans
+ * `bareme/acre.ts`, avec sa provenance, et elle est TRIMESTRIELLE : un début
+ * en février 2025 s'arrête au 31/12/2025, non au 31/01/2026.
+ */
+export function sousAcreLe(faits: Faits): (m: Mois) => boolean {
   const debut = faits.entreprise.debutActivite;
   if (!faits.entreprise.acre || debut === null) return () => false;
 
   const moisDebut = moisDe(debut);
-  // L'ACRE court sur un nombre de trimestres à compter du début d'activité.
-  const finExclusive = ajouterMois(moisDebut, dureeTrimestres * 3);
-  return (m) => m >= moisDebut && m < finExclusive;
+  return (m) => moisSousAcre(moisDebut, m);
 }
 
-function ajouterMois(m: Mois, n: number): Mois {
-  const [a, mm] = m.split('-');
-  const total = Number(a) * 12 + (Number(mm) - 1) + n;
-  const annee = Math.floor(total / 12);
-  const mois = String((total % 12) + 1).padStart(2, '0');
-  return `${annee}-${mois}` as Mois;
+/**
+ * Le dernier mois d'ACRE, pour que l'écran Config puisse l'écrire en clair.
+ *
+ * `null` quand l'ACRE n'est pas déclarée ou que le début d'activité manque :
+ * il n'y a alors rien à afficher, et une date inventée serait recoupée contre
+ * l'attestation URSSAF puis crue.
+ */
+export function finAcreDe(faits: Faits): Resolution<Mois> | null {
+  const debut = faits.entreprise.debutActivite;
+  if (!faits.entreprise.acre || debut === null) return null;
+  return dernierMoisAcre(moisDe(debut));
 }
 
 /**

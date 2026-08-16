@@ -153,8 +153,9 @@ d'impôt reposent toutes sur la date à laquelle l'argent arrive.
 
 | # | Livrable | Critère d'acceptation | État |
 |---|---|---|---|
-| Q1 | Un délai de paiement qui sait dire « 30 jours **fin de mois** » | Aujourd'hui `delaiPaiementJours: number` ne sait qu'ajouter des jours. « Fin de mois » est une autre arithmétique, et c'est la plus répandue en France | ⬜ |
-| Q2 | Le délai se déclare **sur la mission**, pas seulement sur le client | Une mission passée par une agence n'a pas les mêmes conditions qu'une vente directe au même nom | ⬜ |
+| Q1 | Un délai de paiement qui sait dire « 30 jours **fin de mois** » | Aujourd'hui `delaiPaiementJours: number` ne sait qu'ajouter des jours. « Fin de mois » est une autre arithmétique, et c'est celle que le propriétaire subit sur ses deux missions en cours | ⬜ |
+| Q2 | Le délai se déclare **sur la mission**, dans une liste déroulante | Une mission passée par une agence n'a pas les mêmes conditions qu'une vente directe au même nom. Liste, pas saisie libre : les conditions réelles sont un petit ensemble de formules nommées | ⬜ |
+| Q2 bis | L'application signale un délai **hors des bornes légales** | 60 jours nets ou 45 jours fin de mois au maximum (art. L441-10 du code de commerce). Un délai plus long se signale sans se refuser : il arrive qu'on en signe | ⬜ |
 | Q3 | La facture **porte son échéance** comme un fait | Elle est imprimée sur le document envoyé au client : changer les conditions d'un client ne doit pas réécrire la date d'échéance des factures déjà parties | ⬜ |
 | Q4 | Les prévisions s'alignent sur ces échéances | `etatProjection`, `capaciteVersement` et la provision d'impôt datent l'encaissement attendu à l'échéance réelle, plus à une approximation | ⬜ |
 | Q5 | Migration des factures existantes | L'échéance se calcule une fois depuis les conditions du client, puis se fige. Le dire, ne pas le supposer | ⬜ |
@@ -183,6 +184,40 @@ Trois défauts, du plus léger au plus grave :
 
 C'est la même distinction que partout ailleurs dans le projet : le constaté ne
 se recalcule pas depuis un réglage qui a bougé depuis.
+
+#### §3 quinquies — Les formules proposées, et pourquoi une liste
+
+Les conditions de paiement ne sont pas un nombre libre : ce sont quelques
+formules nommées, que les deux parties reconnaissent et écrivent telles quelles
+sur le contrat. Une saisie libre en jours ne peut d'ailleurs pas exprimer
+« fin de mois », qui est le cas courant.
+
+La liste proposée à la création d'une mission :
+
+| Formule | Ce qu'elle calcule, pour une facture du 12 juin |
+|---|---|
+| Paiement à réception | 12 juin |
+| 30 jours nets | 12 juillet |
+| 45 jours nets | 27 juillet |
+| 60 jours nets | 11 août |
+| **30 jours fin de mois** | + 30 jours, puis fin du mois atteint → **31 juillet** |
+| **45 jours fin de mois** | + 45 jours, puis fin du mois atteint → **31 juillet** |
+| Fin de mois + 30 jours | fin du mois d'émission, puis + 30 jours → 30 juillet |
+| Fin de mois + 45 jours | fin du mois d'émission, puis + 45 jours → 14 août |
+
+Les deux dernières existent parce que « 30 jours fin de mois » et « fin de mois
++ 30 jours » sont deux conventions distinctes, souvent confondues, qui ne
+tombent pas le même jour. Les nommer sans ambiguïté vaut mieux que de deviner
+laquelle l'utilisateur voulait dire.
+
+**Défaut : 30 jours fin de mois.** C'est ce que le propriétaire subit sur ses
+missions en cours, et le supplétif légal — 30 jours — n'en est pas loin.
+
+**Hors bornes légales.** L'article L441-10 plafonne à 60 jours nets ou 45 jours
+fin de mois. « Fin de mois + 45 jours » et « 60 jours fin de mois » dépassent.
+L'application ne les refuse pas — on signe parfois ce qu'on n'a pas choisi —
+mais elle le dit, parce que c'est une information que le freelance a intérêt à
+connaître au moment de facturer.
 
 ### Lot A — Argent · Performance
 

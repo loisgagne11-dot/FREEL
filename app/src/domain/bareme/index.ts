@@ -29,6 +29,12 @@ export {
 export type { PeriodeBareme } from './urssaf';
 
 export {
+  PERIODES_ACRE,
+  dernierMoisAcre, moisSousAcre, periodeAcrePour, verifierIntegriteAcre
+} from './acre';
+export type { PeriodeAcre } from './acre';
+
+export {
   MINIMUM_ABATTEMENT, PERIODES_ABATTEMENT,
   periodeAbattementPour, revenuApresAbattement, tauxAbattement, verifierIntegriteAbattement
 } from './abattement';
@@ -63,6 +69,7 @@ export {
 } from './recettes';
 
 import { verifierIntegriteAbattement } from './abattement';
+import { verifierIntegriteAcre } from './acre';
 import { verifierIntegriteImpot } from './impot';
 import { verifierIntegritePlafonds } from './plafonds';
 import { verifierIntegriteTva } from './tva';
@@ -82,6 +89,7 @@ export function verifierIntegriteBareme(): readonly string[] {
   return [
     ...verifierIntegriteUrssafInterne().map((a) => `[cotisations] ${a}`),
     ...verifierIntegriteAbattement().map((a) => `[abattement] ${a}`),
+    ...verifierIntegriteAcre().map((a) => `[acre] ${a}`),
     ...verifierIntegritePlafonds().map((a) => `[plafonds] ${a}`),
     ...verifierIntegriteTva().map((a) => `[tva] ${a}`),
     ...verifierIntegriteImpot().map((a) => `[impôt] ${a}`),

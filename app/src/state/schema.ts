@@ -33,7 +33,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 11 as const;
+export const VERSION_SCHEMA = 12 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -416,6 +416,32 @@ export interface Faits {
   readonly echeances: readonly Echeance[];
   /** Conservé brut : la structure de l'ancienne configuration d'IR est reprise sans interprétation. */
   readonly configImpotBrute: Readonly<Record<string, unknown>>;
+  /**
+   * Nombre de parts du quotient familial, ou `null` tant que rien n'est saisi.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * `null` N'EST PAS 1, ET NE LE DEVIENDRA PAS
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * « Je n'ai pas renseigné mes parts » et « je suis seul, donc une part »
+   * sont deux états différents. Poser 1 par défaut ferait afficher une
+   * provision d'impôt d'apparence complète à quelqu'un qui a trois parts —
+   * et le barème progressif appliqué à un quotient trois fois trop petit
+   * surestime l'impôt du simple au double. Le second état se DÉCLARE ; le
+   * premier fait refuser le calcul, ce qui est visible.
+   */
+  readonly partsFiscales: number | null;
+  /**
+   * Revenus imposables du foyer HORS micro-entreprise, pour l'année.
+   *
+   * Ils déterminent la tranche marginale dans laquelle le résultat du micro
+   * vient s'empiler. Les ignorer sous-estime l'impôt — le sens dangereux.
+   * `null` quand rien n'est saisi : le calcul retient alors zéro, mais le
+   * DIT, au lieu de présenter le résultat comme complet.
+   */
+  readonly autresRevenusFoyer: Euros | null;
+  /** Versements sur un plan d'épargne retraite, déductibles du revenu global. */
+  readonly versementPerDeductible: Euros | null;
 }
 
 export function entrepriseVide(): Entreprise {
@@ -436,7 +462,8 @@ export function faitsVides(): Faits {
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     partGardeeAuVersement: ratio(0),
     objectifCaAnnuel: null,
-    periodesDeclarees: [], echeances: [], configImpotBrute: {}
+    periodesDeclarees: [], echeances: [], configImpotBrute: {},
+    partsFiscales: null, autresRevenusFoyer: null, versementPerDeductible: null
   };
 }
 
@@ -526,6 +553,18 @@ export function motifRefusFaits(brut: unknown): string | null {
     && (typeof part !== 'number' || !Number.isFinite(part) || part < 0 || part > 1)) {
     return 'Le champ « partGardeeAuVersement » devrait être une part entre 0 et 1, '
       + 'ou être absent.';
+  }
+
+  // Les trois faits du foyer fiscal ont le droit d'être absents — aucun compte
+  // d'avant le schéma 12 ne les porte — et le droit d'être `null`, qui veut
+  // dire « pas renseigné » et non « zéro ». Seule une valeur présente mais qui
+  // n'est pas un nombre fini est refusée : elle ferait entrer un `NaN` dans le
+  // barème progressif, dont le résultat est un montant d'impôt sans forme.
+  for (const cle of ['partsFiscales', 'autresRevenusFoyer', 'versementPerDeductible'] as const) {
+    const v = o[cle];
+    if (cle in o && v !== null && (typeof v !== 'number' || !Number.isFinite(v))) {
+      return `Le champ « ${cle} » devrait être un nombre, être nul, ou être absent.`;
+    }
   }
 
   const entreprise = o['entreprise'];
@@ -752,6 +791,11 @@ function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
  * éléments de liste, que la fusion de surface n'atteint pas.
  *
  * La valeur comblée est zéro, et jamais 0,5 : voir `partGardeeAuVersement`.
+ *
+ * v11 → v12 : les trois faits du foyer fiscal. Ceux-là, la fusion de surface
+ * ne suffit PAS à combler — non parce qu'ils vivent dans une liste, mais parce
+ * que leur valeur dort ailleurs, dans `configImpotBrute`. Voir
+ * `foyerFiscalDuSchema11`.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
@@ -763,6 +807,7 @@ export function completerFaits(brut: unknown): Faits {
   return {
     ...defauts,
     ...o,
+    ...foyerFiscalDuSchema11(o),
     // Le numéro de schéma devient celui de CE code : les champs manquants
     // viennent d'être comblés, le bloc n'est plus à l'ancien format.
     version: VERSION_SCHEMA,
@@ -773,6 +818,79 @@ export function completerFaits(brut: unknown): Faits {
     echeances: echeancesDuSchema5(o['echeances']),
     recettes: recettesDuSchema6(o['recettes'])
   } as Faits;
+}
+
+/**
+ * v11 → v12 : le foyer fiscal sort de `configImpotBrute`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * REPRENDRE PLUTÔT QUE REDEMANDER
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne application tenait ces trois valeurs dans un objet indexé PAR
+ * ANNÉE : `{ '2025': { parts, autresRevenus, perAnnuel }, '2026': {…} }`. La
+ * reprise l'a conservé tel quel, sans jamais l'interpréter — d'où
+ * `configImpotBrute`. Les redemander à la saisie alors qu'ils sont là
+ * ferait retaper une information déjà donnée, et la provision d'impôt
+ * refuserait de se calculer jusqu'à ce que ce soit fait.
+ *
+ * L'ANNÉE LA PLUS RÉCENTE l'emporte : c'est la seule qui décrit la situation
+ * actuelle du foyer. La dimension annuelle est perdue, et c'est assumé — un
+ * historique des parts ne sert à rien tant qu'aucun écran ne recalcule une
+ * année passée, et le porter demanderait une table que personne ne tiendrait
+ * à jour. Le jour où un tel écran existe, la donnée brute est toujours là.
+ *
+ * Un zéro de l'ancienne application reste un zéro : il a été saisi. Seule une
+ * clé absente devient `null`, qui veut dire « pas renseigné ».
+ */
+export interface FoyerFiscal {
+  readonly partsFiscales: number | null;
+  readonly autresRevenusFoyer: Euros | null;
+  readonly versementPerDeductible: Euros | null;
+}
+
+const nombreOuNull = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null;
+
+/**
+ * Extrait le foyer fiscal de l'ancienne configuration d'IR.
+ *
+ * Exporté pour que la reprise du legacy et la migration de schéma lisent la
+ * MÊME règle : deux lectures de la même structure finiraient par diverger, et
+ * l'application dirait alors deux nombres de parts selon l'origine du compte.
+ */
+export function foyerFiscalDepuisConfigImpot(brute: unknown): FoyerFiscal {
+  const parAnnee = (typeof brute === 'object' && brute !== null && !Array.isArray(brute))
+    ? brute as Record<string, unknown>
+    : {};
+  const derniereAnnee = Object.keys(parAnnee)
+    .filter((cle) => /^\d{4}$/.test(cle))
+    .sort()
+    .pop();
+  const ancien = derniereAnnee !== undefined
+    && typeof parAnnee[derniereAnnee] === 'object' && parAnnee[derniereAnnee] !== null
+    ? parAnnee[derniereAnnee] as Record<string, unknown>
+    : {};
+
+  return {
+    partsFiscales: nombreOuNull(ancien['parts']),
+    autresRevenusFoyer: nombreOuNull(ancien['autresRevenus']) as Euros | null,
+    versementPerDeductible: nombreOuNull(ancien['perAnnuel']) as Euros | null
+  };
+}
+
+function foyerFiscalDuSchema11(o: Record<string, unknown>): FoyerFiscal {
+  // Ce qui est déjà saisi dans le nouveau schéma l'emporte : la reprise ne
+  // sert qu'à combler une absence, jamais à écraser une valeur corrigée
+  // depuis l'écran Config.
+  const repris = foyerFiscalDepuisConfigImpot(o['configImpotBrute']);
+  return {
+    partsFiscales: nombreOuNull(o['partsFiscales']) ?? repris.partsFiscales,
+    autresRevenusFoyer:
+      (nombreOuNull(o['autresRevenusFoyer']) as Euros | null) ?? repris.autresRevenusFoyer,
+    versementPerDeductible:
+      (nombreOuNull(o['versementPerDeductible']) as Euros | null) ?? repris.versementPerDeductible
+  };
 }
 
 /**

@@ -3,7 +3,7 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  aTraiter, caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe,
+  aTraiter, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant, recettesEncaissees, regimeDe,
   remunerationDuMois, sousAcreLe
 } from './selecteurs';
 import { periodeCourante } from '../domain/calculs/periode';
@@ -90,11 +90,26 @@ describe('période d\'ACRE', () => {
     }
   });
 
-  it('couvre les quatre trimestres suivant le début d\'activité', () => {
+  // L'attente précédente était « douze mois pleins », donc janvier 2026
+  // exonéré pour un début en février 2025. Elle était fausse : la règle court
+  // jusqu'à la fin du 3ᵉ trimestre civil suivant celui de l'affiliation, et le
+  // compte du propriétaire l'a confirmé — taux plein constaté dès janvier
+  // 2026. Un mois d'ACRE de trop, c'est la moitié des cotisations de ce mois
+  // qui n'est pas provisionnée.
+  it('couvre jusqu\'à la fin du 3e trimestre civil suivant celui de l\'affiliation', () => {
     const sous = sousAcreLe(avecAcre('2025-02-01'));
     expect(sous(mois('2025-02'))).toBe(true);
     expect(sous(mois('2025-12'))).toBe(true);
-    expect(sous(mois('2026-01'))).toBe(true);
+    expect(sous(mois('2026-01'))).toBe(false);
+  });
+
+  // La fenêtre est observable, et pas seulement calculée : l'écran Config
+  // l'écrit pour qu'elle se recoupe avec l'attestation URSSAF.
+  it('rend la fin d\'ACRE en clair, et rien quand l\'ACRE n\'est pas déclarée', () => {
+    const r = finAcreDe(avecAcre('2025-02-01'));
+    expect(r?.statut).not.toBe('refuse');
+    expect(r !== null && r.statut !== 'refuse' ? r.valeur : null).toBe('2025-12');
+    expect(finAcreDe(faitsVides())).toBeNull();
   });
 
   // Le cas de la persona de l'audit : ACRE éteinte, donc trimestre à taux

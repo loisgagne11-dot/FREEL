@@ -30,7 +30,7 @@ import { type DateISO, type Mois, type TypeActivite, euros, ratio } from '../dom
 import {
   CLE_STOCKAGE, VERSION_SCHEMA,
   type Client, type Conge, type Depense, type Faits, type Mission, type Recette,
-  type Rythme, entrepriseVide
+  type Rythme, entrepriseVide, foyerFiscalDepuisConfigImpot
 } from '../state/schema';
 import { JOURS_SEMAINE } from '../domain/calculs/planning';
 import type { ClientOperationnel } from '../state/schema';
@@ -810,7 +810,12 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // sinon le volet 2 des provisions surestimera la dette.
     periodesDeclarees: [],
     echeances,
-    configImpotBrute: objet(legacy['ir'])
+    configImpotBrute: objet(legacy['ir']),
+    // Les trois faits du foyer fiscal sortent de cette même structure, par la
+    // règle du schéma — jamais par une seconde lecture écrite ici. La donnée
+    // brute reste conservée à côté : elle porte l'historique par année que les
+    // trois faits, eux, ne gardent pas.
+    ...foyerFiscalDepuisConfigImpot(objet(legacy['ir']))
   };
 }
 
