@@ -738,6 +738,24 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
         </span>
       </p>
 
+      {/* Une application vide ne montre rien de ce qu'elle sait faire : les
+          graphes sont plats, les indicateurs à zéro, et on ne peut pas juger.
+          Le jeu de démonstration passe par la MÊME confirmation qu'une
+          restauration — il écrase autant qu'elle, et l'appeler « démonstration »
+          ne le rend pas moins destructeur. */}
+      <button
+        type="button"
+        className={styles.action}
+        onClick={() => { void lireJeuDeDemonstration().then(setARestaurer); }}
+      >
+        Charger un jeu de démonstration
+      </button>
+      <p className={styles.explication}>
+        Des clients, des missions, des factures et des échéances manifestement
+        fictifs, pour voir l’application remplie. Ils remplacent vos données&nbsp;:
+        exportez-les d’abord si elles comptent.
+      </p>
+
       {aRestaurer !== null && (
         <div className={styles.confirmation} role="alert">
           {aRestaurer.statut === 'illisible'
@@ -889,6 +907,26 @@ type Restauration =
  * que ce qu'il faut pour ANNONCER le contenu : un fichier illisible doit se
  * dire tout de suite, pas après une confirmation.
  */
+/**
+ * Le jeu de démonstration, servi comme fichier statique.
+ *
+ * Il n'est PAS importé dans le paquet : ce sont douze kilo-octets que quelqu'un
+ * qui saisit ses vraies données ne téléchargera jamais. Il est aussi la source
+ * dont `scripts/capturer-app.mjs` se sert pour rendre nos écrans dans les mêmes
+ * conditions que le handoff — un seul fichier, pas une copie qui dérive.
+ */
+async function lireJeuDeDemonstration(): Promise<Restauration> {
+  try {
+    const reponse = await fetch(`${import.meta.env.BASE_URL}jeu-de-demonstration.json`);
+    if (!reponse.ok) {
+      return { statut: 'illisible', motif: 'Le jeu de démonstration n’a pas pu être chargé.' };
+    }
+    return resumerBloc(await reponse.json());
+  } catch {
+    return { statut: 'illisible', motif: 'Le jeu de démonstration n’a pas pu être chargé.' };
+  }
+}
+
 async function lireSauvegarde(fichier: File): Promise<Restauration> {
   let texte: string;
   try {
@@ -907,6 +945,11 @@ async function lireSauvegarde(fichier: File): Promise<Restauration> {
     };
   }
 
+  return resumerBloc(brut);
+}
+
+/** Annonce ce qu'un bloc contient, sans rien adopter. */
+function resumerBloc(brut: unknown): Restauration {
   if (typeof brut !== 'object' || brut === null || Array.isArray(brut)) {
     return {
       statut: 'illisible',

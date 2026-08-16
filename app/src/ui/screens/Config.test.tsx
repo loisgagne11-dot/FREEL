@@ -520,3 +520,42 @@ describe('contrôle des identifiants', () => {
     expect(screen.queryByText(/que des chiffres/)).toBeNull();
   });
 });
+
+/**
+ * UNE APPLICATION VIDE NE MONTRE RIEN DE CE QU'ELLE SAIT FAIRE.
+ *
+ * Les graphes sont plats, les indicateurs à zéro. Le jeu de démonstration
+ * existe pour qu'on puisse juger — et il passe par la MÊME confirmation qu'une
+ * restauration, parce qu'il écrase autant qu'elle. L'appeler « démonstration »
+ * ne le rend pas moins destructeur.
+ */
+describe('jeu de démonstration', () => {
+  it('demande confirmation avant d’écraser, et n’écrit rien avant', async () => {
+    const avant = { ...faitsVides(), soldeInitial: euros(4242) };
+    useFaits.setState({ faits: avant });
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ version: 10, recettes: [{}, {}], depenses: [], missions: [{}], clients: [{}] }),
+      { status: 200 }
+    )) as typeof fetch;
+
+    render(<Config />);
+    const utilisateur = utilisateurTest();
+    await utilisateur.click(screen.getByRole('tab', { name: /Données/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Charger un jeu de démonstration' }));
+
+    // La confirmation annonce le contenu, et rien n'est encore écrit.
+    expect(await screen.findByText(/recette\(s\)/)).toBeTruthy();
+    expect(useFaits.getState().faits.soldeInitial).toBe(4242);
+  });
+
+  it('dit que le jeu n’a pas pu être chargé plutôt que d’échouer en silence', async () => {
+    globalThis.fetch = (async () => new Response('', { status: 404 })) as typeof fetch;
+
+    render(<Config />);
+    const utilisateur = utilisateurTest();
+    await utilisateur.click(screen.getByRole('tab', { name: /Données/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Charger un jeu de démonstration' }));
+
+    expect(await screen.findByText(/n’a pas pu être chargé/)).toBeTruthy();
+  });
+});

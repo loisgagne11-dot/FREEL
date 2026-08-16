@@ -1,0 +1,353 @@
+{
+  "_lisezMoi": [
+    "Jeu de démonstration partagé. Il sert à DEUX choses, et c'est pour cela",
+    "qu'il vit ici plutôt que dans du code de test :",
+    "",
+    "1. `app/scripts/capturer-app.mjs` le charge pour rendre nos écrans dans les",
+    "   mêmes conditions que le handoff, de sorte que les deux captures se",
+    "   comparent chiffre à chiffre ;",
+    "2. l'écran Config le propose pour remplir une application vierge.",
+    "",
+    "Les noms, les montants et les identifiants sont ceux du handoff de design,",
+    "et sont manifestement fictifs. Le SIRET et l'IBAN sont neutralisés par",
+    "construction (clé de contrôle invalide) — invariant n°6 : le dépôt est",
+    "public, aucune donnée personnelle n'y entre.",
+    "",
+    "Les dates sont ancrées en 2026 pour reproduire l'état du handoff, daté de",
+    "juin 2026."
+  ],
+  "version": 10,
+  "entreprise": {
+    "nom": "Atelier de démonstration",
+    "siret": "000 000 000 00000",
+    "debutActivite": "2025-02-01",
+    "typeActivite": "BNC",
+    "acre": true,
+    "versementLiberatoire": true,
+    "tvaDepuis": null,
+    "tvaIntracom": "",
+    "iban": "FR00 0000 0000 0000 0000 0000 000",
+    "bic": "",
+    "adresse": "1 rue de la Démonstration",
+    "codePostal": "75010",
+    "ville": "Paris",
+    "codeApe": "74.10Z",
+    "email": "contact@atelier-demo.fr",
+    "telephone": "",
+    "urssafPeriodicite": "trimestriel",
+    "onboardingFait": true
+  },
+  "clients": [
+    {
+      "id": "cl-lumen",
+      "nom": "Studio Lumen",
+      "adresse": "8 quai de Seine, 75019 Paris",
+      "siret": "000 000 000 00001",
+      "email": "compta@studio-lumen.demo",
+      "delaiPaiementJours": 30,
+      "pays": "FR",
+      "tvaIntracom": ""
+    },
+    {
+      "id": "cl-novak",
+      "nom": "Atelier Novak",
+      "adresse": "12 rue des Arts, 69002 Lyon",
+      "siret": "000 000 000 00002",
+      "email": "facturation@atelier-novak.demo",
+      "delaiPaiementJours": 60,
+      "pays": "FR",
+      "tvaIntracom": ""
+    },
+    {
+      "id": "cl-kessler",
+      "nom": "Maison Kessler",
+      "adresse": "3 place du Marché, 33000 Bordeaux",
+      "siret": "000 000 000 00003",
+      "email": "contact@maison-kessler.demo",
+      "delaiPaiementJours": 30,
+      "pays": "FR",
+      "tvaIntracom": ""
+    },
+    {
+      "id": "cl-brasserie",
+      "nom": "Brasserie Vent d’Ouest",
+      "adresse": "5 rue du Port, 44000 Nantes",
+      "siret": "000 000 000 00004",
+      "email": "gerance@vent-ouest.demo",
+      "delaiPaiementJours": 30,
+      "pays": "FR",
+      "tvaIntracom": ""
+    }
+  ],
+  "missions": [
+    {
+      "id": "mis-refonte",
+      "clientId": "cl-lumen",
+      "clientNom": "Studio Lumen",
+      "description": "Refonte du site",
+      "tjm": 520,
+      "debut": "2026-05-01",
+      "fin": "2026-07-31",
+      "statut": "active",
+      "entites": [
+        {
+          "id": "mis-refonte-co1",
+          "nom": "Studio Lumen",
+          "couleur": "#22c55e",
+          "adresse": "8 quai de Seine, 75019 Paris",
+          "contact": "",
+          "email": "",
+          "telephone": "",
+          "rythmes": [
+            { "du": "2026-05-01", "au": "2026-05-31", "parJour": { "lun": 1, "mar": 1, "mer": 1 }, "tjm": null },
+            { "du": "2026-06-01", "au": "2026-06-30", "parJour": { "lun": 1, "mar": 1, "mer": 0.5 }, "tjm": null },
+            { "du": "2026-07-01", "au": "2026-07-31", "parJour": { "lun": 1, "mar": 1 }, "tjm": null }
+          ],
+          "ajustements": {}
+        }
+      ]
+    },
+    {
+      "id": "mis-identite",
+      "clientId": "cl-novak",
+      "clientNom": "Atelier Novak",
+      "description": "Identité de marque",
+      "tjm": 480,
+      "debut": "2026-03-02",
+      "fin": "2026-06-30",
+      "statut": "active",
+      "entites": [
+        {
+          "id": "mis-identite-co1",
+          "nom": "Atelier Novak",
+          "couleur": "#38bdf8",
+          "adresse": "12 rue des Arts, 69002 Lyon",
+          "contact": "",
+          "email": "",
+          "telephone": "",
+          "rythmes": [
+            { "du": "2026-03-02", "au": "2026-06-30", "parJour": { "jeu": 1, "ven": 0.5 }, "tjm": null }
+          ],
+          "ajustements": {}
+        }
+      ]
+    },
+    {
+      "id": "mis-carte",
+      "clientId": "cl-brasserie",
+      "clientNom": "Brasserie Vent d’Ouest",
+      "description": "Carte & menus",
+      "tjm": 460,
+      "debut": "2026-06-01",
+      "fin": "2026-06-30",
+      "statut": "active",
+      "entites": [
+        {
+          "id": "mis-carte-co1",
+          "nom": "Brasserie Vent d’Ouest",
+          "couleur": "#a78bfa",
+          "adresse": "5 rue du Port, 44000 Nantes",
+          "contact": "",
+          "email": "",
+          "telephone": "",
+          "rythmes": [
+            { "du": "2026-06-01", "au": "2026-06-30", "parJour": { "ven": 1 }, "tjm": null }
+          ],
+          "ajustements": {}
+        }
+      ]
+    },
+    {
+      "id": "mis-catalogue",
+      "clientId": "cl-kessler",
+      "clientNom": "Maison Kessler",
+      "description": "Catalogue produits",
+      "tjm": 520,
+      "debut": "2026-09-01",
+      "fin": "2026-10-31",
+      "statut": "prospect",
+      "entites": [
+        {
+          "id": "mis-catalogue-co1",
+          "nom": "Maison Kessler",
+          "couleur": "#f59e0b",
+          "adresse": "3 place du Marché, 33000 Bordeaux",
+          "contact": "",
+          "email": "",
+          "telephone": "",
+          "rythmes": [],
+          "ajustements": {}
+        }
+      ]
+    },
+    {
+      "id": "mis-charte",
+      "clientId": "cl-novak",
+      "clientNom": "Atelier Novak",
+      "description": "Charte éditoriale",
+      "tjm": 400,
+      "debut": "2026-02-01",
+      "fin": "2026-02-28",
+      "statut": "perdue",
+      "entites": [
+        {
+          "id": "mis-charte-co1",
+          "nom": "Atelier Novak",
+          "couleur": "#94a3b8",
+          "adresse": "",
+          "contact": "",
+          "email": "",
+          "telephone": "",
+          "rythmes": [],
+          "ajustements": {}
+        }
+      ]
+    }
+  ],
+  "recettes": [
+    {
+      "id": "rec-021", "clientNom": "Maison Kessler", "libelle": "Catalogue — cadrage",
+      "montant": 5200, "emiseLe": "2026-03-10", "envoyeeLe": "2026-03-10",
+      "encaisseeLe": "2026-04-14", "modeReglement": "virement", "numero": "2026-021",
+      "tvaCollectee": null, "relancesLe": []
+    },
+    {
+      "id": "rec-022", "clientNom": "Atelier Novak", "libelle": "Identité — avril",
+      "montant": 3600, "emiseLe": "2026-04-30", "envoyeeLe": "2026-04-30",
+      "encaisseeLe": "2026-05-28", "modeReglement": "virement", "numero": "2026-022",
+      "tvaCollectee": null, "relancesLe": []
+    },
+    {
+      "id": "rec-023", "clientNom": "Studio Lumen", "libelle": "Refonte — avril",
+      "montant": 4160, "emiseLe": "2026-04-30", "envoyeeLe": "2026-04-30",
+      "encaisseeLe": "2026-06-04", "modeReglement": "virement", "numero": "2026-023",
+      "tvaCollectee": null, "relancesLe": []
+    },
+    {
+      "id": "rec-024", "clientNom": "Studio Lumen", "libelle": "Refonte — mai",
+      "montant": 1200, "emiseLe": "2026-05-12", "envoyeeLe": "2026-05-12",
+      "encaisseeLe": null, "modeReglement": null, "numero": "2026-024",
+      "tvaCollectee": null, "relancesLe": ["2026-06-08"]
+    },
+    {
+      "id": "rec-025", "clientNom": "Atelier Novak", "libelle": "Identité — mai",
+      "montant": 2400, "emiseLe": "2026-05-28", "envoyeeLe": "2026-05-28",
+      "encaisseeLe": null, "modeReglement": null, "numero": "2026-025",
+      "tvaCollectee": null, "relancesLe": []
+    },
+    {
+      "id": "rec-026", "clientNom": "Studio Lumen", "libelle": "Refonte — mai (2)",
+      "montant": 2410, "emiseLe": "2026-06-04", "envoyeeLe": "2026-06-04",
+      "encaisseeLe": null, "modeReglement": null, "numero": "2026-026",
+      "tvaCollectee": null, "relancesLe": []
+    },
+    {
+      "id": "rec-027", "clientNom": "Brasserie Vent d’Ouest", "libelle": "Carte & menus — juin",
+      "montant": 2880, "emiseLe": null, "envoyeeLe": null,
+      "encaisseeLe": null, "modeReglement": null, "numero": "2026-027",
+      "tvaCollectee": null, "relancesLe": []
+    }
+  ],
+  "depenses": [
+    {
+      "id": "dep-adobe", "libelle": "Abonnement Adobe", "fournisseur": "Adobe Systems",
+      "provenance": "ue", "montantTtc": 71.98, "tauxTva": 0.2,
+      "payeeLe": "2026-06-12", "justificatifId": "just-adobe", "rapprochement": "rapproche"
+    },
+    {
+      "id": "dep-ovh", "libelle": "Hébergement", "fournisseur": "OVHcloud",
+      "provenance": "france", "montantTtc": 35.98, "tauxTva": 0.2,
+      "payeeLe": "2026-06-12", "justificatifId": "just-ovh", "rapprochement": "rapproche"
+    },
+    {
+      "id": "dep-sncf", "libelle": "Déplacement client", "fournisseur": "SNCF",
+      "provenance": "france", "montantTtc": 89, "tauxTva": 0,
+      "payeeLe": "2026-06-12", "justificatifId": "just-sncf", "rapprochement": "rapproche"
+    },
+    {
+      "id": "dep-clavier", "libelle": "Nouveau clavier", "fournisseur": "Fnac Pro",
+      "provenance": "france", "montantTtc": 62, "tauxTva": 0.2,
+      "payeeLe": "2026-06-07", "justificatifId": null, "rapprochement": "en_attente"
+    },
+    {
+      "id": "dep-wework", "libelle": "Coworking", "fournisseur": "WeWork",
+      "provenance": "france", "montantTtc": 264, "tauxTva": 0.2,
+      "payeeLe": "2026-06-02", "justificatifId": "just-wework", "rapprochement": "rapproche"
+    },
+    {
+      "id": "dep-axa", "libelle": "Assurance RC Pro", "fournisseur": "AXA",
+      "provenance": "france", "montantTtc": 38, "tauxTva": 0,
+      "payeeLe": "2026-06-01", "justificatifId": "just-axa", "rapprochement": "rapproche"
+    },
+    {
+      "id": "dep-adobe-mai", "libelle": "Abonnement Adobe", "fournisseur": "Adobe Systems",
+      "provenance": "ue", "montantTtc": 71.98, "tauxTva": 0.2,
+      "payeeLe": "2026-05-12", "justificatifId": "just-adobe-mai", "rapprochement": "rapproche"
+    },
+    {
+      "id": "dep-wework-mai", "libelle": "Coworking", "fournisseur": "WeWork",
+      "provenance": "france", "montantTtc": 264, "tauxTva": 0.2,
+      "payeeLe": "2026-05-02", "justificatifId": "just-wework-mai", "rapprochement": "rapproche"
+    },
+    {
+      "id": "dep-wework-avr", "libelle": "Coworking", "fournisseur": "WeWork",
+      "provenance": "france", "montantTtc": 264, "tauxTva": 0.2,
+      "payeeLe": "2026-04-02", "justificatifId": "just-wework-avr", "rapprochement": "rapproche"
+    }
+  ],
+  "conges": [
+    { "date": "2026-06-10", "quotite": 1 },
+    { "date": "2026-06-11", "quotite": 1 }
+  ],
+  "mouvementsBancaires": [
+    {
+      "id": "mv-lumen-023", "date": "2026-06-04", "libelle": "VIR SEPA STUDIO LUMEN SARL",
+      "montant": 4160, "rapprocheAvec": "rec-023", "sansContrepartie": null
+    },
+    {
+      "id": "mv-adobe-ovh", "date": "2026-06-03", "libelle": "PRLV ADOBE + OVH",
+      "montant": -142, "rapprocheAvec": null, "sansContrepartie": "autre"
+    },
+    {
+      "id": "mv-remu-mai", "date": "2026-05-31", "libelle": "VIR COMPTE PERSO",
+      "montant": -2400, "rapprocheAvec": null, "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remu-avr", "date": "2026-04-30", "libelle": "VIR COMPTE PERSO",
+      "montant": -2200, "rapprocheAvec": null, "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remu-mar", "date": "2026-03-31", "libelle": "VIR COMPTE PERSO",
+      "montant": -2600, "rapprocheAvec": null, "sansContrepartie": "remuneration"
+    }
+  ],
+  "periodesUrssafAjoutees": [],
+  "soldeInitial": 8120,
+  "reserve": 2470,
+  "besoinMensuel": 2300,
+  "objectifCaAnnuel": 72000,
+  "periodesDeclarees": ["2026-01", "2026-02", "2026-03"],
+  "echeances": [
+    {
+      "id": "ech-urssaf-t1", "nature": "urssaf", "montant": 1740,
+      "echeanceLe": "2026-04-05", "payeeLe": "2026-04-05", "montantPaye": 1740
+    },
+    {
+      "id": "ech-ir-acompte", "nature": "impot", "montant": 620,
+      "echeanceLe": "2026-05-15", "payeeLe": "2026-05-15", "montantPaye": 620
+    },
+    {
+      "id": "ech-urssaf-t2", "nature": "urssaf", "montant": 1980,
+      "echeanceLe": "2026-07-05", "payeeLe": null, "montantPaye": null
+    },
+    {
+      "id": "ech-urssaf-t3", "nature": "urssaf", "montant": 1850,
+      "echeanceLe": "2026-10-05", "payeeLe": null, "montantPaye": null
+    },
+    {
+      "id": "ech-cfe", "nature": "cfe", "montant": 148,
+      "echeanceLe": "2026-12-15", "payeeLe": null, "montantPaye": null
+    }
+  ],
+  "configImpotBrute": {}
+}
