@@ -792,6 +792,12 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // version, seule des trois implémentations concurrentes à être un montant.
     reserve: euros(nombre(t['reserveCompte'])),
     besoinMensuel: euros(nombre(t['salaireEstime'])),
+    // Rien à reprendre : l'ancienne application n'avait AUCUNE notion de part
+    // gardée. Son seul réglage de prudence était `reserveCompte`, un plancher
+    // en euros — repris juste au-dessus. Fabriquer une part à partir de lui
+    // (par exemple `reserveCompte / dispo`) transformerait un plancher fixe en
+    // pourcentage glissant, exactement la confusion que le schéma 11 sépare.
+    partGardeeAuVersement: ratio(0),
     // L'ancienne application écrivait `0` pour « pas d'objectif », et son
     // graphe testait `GOAL_CA > 0` pour décider de tracer la ligne. Le nouveau
     // schéma dit la même chose avec `null` — reprendre le zéro tel quel aurait

@@ -9,3 +9,8 @@ coverage
 FREEL-v52.zip
 FREEL-v52-standalone.tar.gz
 _site/
+
+# Les captures de NOTRE application se regénèrent à chaque lot et pèsent
+# plusieurs mégaoctets. Seules celles du handoff sont versionnées : elles sont
+# la référence, elles ne bougent que quand le design bouge.
+docs/design/captures-app/

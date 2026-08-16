@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
 import {
@@ -21,13 +21,25 @@ import { Info } from '../components/Info';
  * du domaine, via `etatPilote`. C'est ce qui empêche la dérive qui produisait
  * cinq valeurs concurrentes du taux de cotisations dans l'ancienne version.
  *
- * Le curseur de réserve est le SEUL endroit de l'application qui écrit la
- * réserve (décision D4).
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE PILOTE AFFICHE, IL NE RÈGLE PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le curseur de seuil de sécurité vivait ici. Il est parti dans Config, où le
+ * handoff le place — avec la part gardée, qui est arrivée en même temps. Deux
+ * raisons, et la seconde a tranché :
+ *
+ *  1. Le handoff range les deux réglages dans « Réserve & versements », et le
+ *     Pilote n'y montre que le montant qui en résulte.
+ *  2. Le Pilote est le seul écran du paquet d'entrée. Le second curseur l'a
+ *     fait franchir son plafond, et l'invariant du projet est d'EXTRAIRE ce qui
+ *     n'a rien à faire là plutôt que de relever le plafond. Un réglage qu'on
+ *     touche trois fois par an n'a pas à être téléchargé par tout le monde à
+ *     chaque ouverture.
  */
 export function Pilote() {
   const faits = useFaits((e) => e.faits);
   const chargement = useFaits((e) => e.chargement);
-  const definirReserve = useFaits((e) => e.definirReserve);
 
   const mois = moisCourant();
   // Recalculé à chaque changement de faits, jamais stocké.
@@ -157,7 +169,7 @@ export function Pilote() {
           valeur={eur(etat.tresorerie.dispo)}
           ton={etat.tresorerie.dispo < 0 ? 'danger' : 'neutre'}
         />
-        <Chiffre libelle="Réserve" valeur={eur(etat.tresorerie.reserve)} />
+        <Chiffre libelle="Seuil de sécurité" valeur={eur(etat.tresorerie.reserve)} />
       </div>
 
       <section className={styles.carte} aria-labelledby="titre-provisions">
@@ -185,11 +197,6 @@ export function Pilote() {
 
       <ATraiter sujets={sujets} />
 
-      <CurseurReserve
-        reserve={etat.tresorerie.reserve}
-        maximum={Math.max(etat.tresorerie.solde, etat.tresorerie.reserve)}
-        onChange={(v) => definirReserve(euros(v))}
-      />
     </>
   );
 }
@@ -297,57 +304,6 @@ function Chiffre(
       <span className={`${styles.montant} ${classeTon}`}><Montant>{valeur}</Montant></span>
       {precision !== undefined && <span className={styles.precision}>{precision}</span>}
     </div>
-  );
-}
-
-/**
- * Curseur de réserve — source unique du matelas de sécurité (D4).
- *
- * L'état local ne sert qu'à la fluidité du glissement ; la valeur est écrite
- * dans le magasin à chaque changement, de sorte qu'il n'existe jamais deux
- * vérités sur la réserve.
- */
-function CurseurReserve(
-  { reserve, maximum, onChange }: {
-    reserve: number;
-    maximum: number;
-    onChange: (valeur: number) => void;
-  }
-) {
-  const [saisie, setSaisie] = useState<number | null>(null);
-  const affiche = saisie ?? reserve;
-  // Un maximum nul rendrait le curseur inutilisable : on garde une plage
-  // minimale plutôt qu'un contrôle mort.
-  const borne = Math.max(maximum, 1000);
-  const pas = 50;
-
-  return (
-    <section className={styles.carte} aria-labelledby="titre-reserve">
-      <h2 id="titre-reserve" className={styles.titreCarte}>Réserve de sécurité</h2>
-      <p className={styles.aideCarte}>
-        Montant que vous gardez sur le compte quoi qu’il arrive. Il est retiré du
-        disponible pour obtenir ce que vous pouvez vous verser.
-      </p>
-      <div className={styles.curseurRangee}>
-        <input
-          type="range"
-          className={styles.curseur}
-          min={0}
-          max={borne}
-          step={pas}
-          value={affiche}
-          aria-label="Réserve de sécurité en euros"
-          aria-valuetext={eur(affiche)}
-          onChange={(e) => {
-            const v = Number(e.target.value);
-            setSaisie(v);
-            onChange(v);
-          }}
-          onBlur={() => setSaisie(null)}
-        />
-        <output className={styles.curseurValeur}><Montant>{eur(affiche)}</Montant></output>
-      </div>
-    </section>
   );
 }
 

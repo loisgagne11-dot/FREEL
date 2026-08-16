@@ -138,7 +138,7 @@ export function Argent() {
               <>
                 <Montant>{eur(etat.tresorerie.versable)}</Montant> à vous
                 {' · '}<Montant>{eur(etat.tresorerie.provisions)}</Montant> de côté
-                {' · '}<Montant>{eur(etat.tresorerie.reserve)}</Montant> en réserve
+                {' · '}<Montant>{eur(etat.tresorerie.reserve)}</Montant> de seuil de sécurité
               </>
             )}
           >
@@ -152,10 +152,16 @@ export function Argent() {
                   ton: 'provisions'
                 },
                 {
-                  // La réserve n'est constituée qu'à hauteur de ce qui reste
-                  // après provisions : l'afficher pleine sur un disponible
-                  // insuffisant ferait croire à un matelas qui n'existe pas.
-                  libelle: 'Réserve de sécurité',
+                  // Le seuil n'est constitué qu'à hauteur de ce qui reste après
+                  // provisions : l'afficher plein sur un disponible insuffisant
+                  // ferait croire à un matelas qui n'existe pas.
+                  //
+                  // « Seuil de sécurité » et non « réserve » : le mot vient du
+                  // dessin, et il libère « réserve » pour l'autre notion — la
+                  // part gardée au versement, qui est un pourcentage. Un seul
+                  // mot couvrait deux idées, et c'est ainsi qu'un plancher fixe
+                  // finit par être exprimé en pourcentage du disponible.
+                  libelle: 'Seuil de sécurité',
                   montant: Math.min(etat.tresorerie.reserve, Math.max(0, etat.tresorerie.dispo)),
                   ton: 'reserve'
                 },

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { dateISO, euros } from '../domain/types';
+import { dateISO, euros, ratio } from '../domain/types';
 import { totaliser } from '../domain/calculs/livreRecettes';
-import { faitsVides, type Recette } from './schema';
+import { PART_GARDEE_MAX, faitsVides, type Recette } from './schema';
 import { useFaits } from './store';
 
 /**
@@ -346,5 +346,43 @@ describe('carnet — missions', () => {
     useFaits.getState().ajouterMission(saisieMission('Dupont'));
     useFaits.getState().modifierMission(missions()[0]?.id as string, { statut: 'terminee', entites: [] });
     expect(missions()[0]?.statut).toBe('terminee');
+  });
+});
+
+/**
+ * LA PART GARDÉE EST BORNÉE DANS LE MAGASIN, PAS DANS L'ÉCRAN.
+ *
+ * Un curseur borné côté interface laisse passer tout ce qui n'est pas saisi au
+ * curseur : un import, un compte distant, un jeu de démonstration. Si ce
+ * bornage sautait, une part supérieure à 1 rendrait `versable × (1 − part)`
+ * négatif — l'application proposerait un versement à l'envers.
+ */
+describe('part gardée au versement', () => {
+  const part = () => useFaits.getState().faits.partGardeeAuVersement;
+
+  it('vaut zéro tant que personne n’a réglé le curseur', () => {
+    expect(part()).toBe(0);
+  });
+
+  it('enregistre une part réglée', () => {
+    useFaits.getState().definirPartGardee(ratio(0.3));
+    expect(part()).toBe(0.3);
+  });
+
+  it('borne à 80 % : au-delà, le curseur ne dit plus « je garde »', () => {
+    useFaits.getState().definirPartGardee(ratio(0.95));
+    expect(part()).toBe(PART_GARDEE_MAX);
+  });
+
+  it('refuse une part négative, qui ferait verser plus que le versable', () => {
+    useFaits.getState().definirPartGardee(ratio(-0.2));
+    expect(part()).toBe(0);
+  });
+
+  // Une saisie illisible ne doit pas se traduire par « je garde tout », qui est
+  // une décision que personne n'a prise.
+  it('retombe à zéro sur une valeur illisible, pas sur la borne haute', () => {
+    useFaits.getState().definirPartGardee(ratio(Number.NaN));
+    expect(part()).toBe(0);
   });
 });
