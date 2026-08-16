@@ -138,7 +138,7 @@ function Profil(){
   return <>
     <h2 className="sect-h">Profil &amp; statut</h2>
     <p className="sect-sub">Identité de l'entreprise. Le régime et l'ACRE déterminent tes plafonds et tes taux.</p>
-    <div className="frow"><Field label="Nom commercial" value="Atelier L."/><Field label="Nom & prénom" value="Loïs Mercier"/></div>
+    <div className="frow"><Field label="Nom commercial" value="Atelier L."/><Field label="Nom & prénom" value="Camille Demo"/></div>
     <div className="frow"><Field label="SIRET" value="912 457 881 00027"/><Field label="Activité (code APE)" value="74.10Z · Design"/></div>
     <div className="frow"><Field label="N° TVA intracommunautaire" value="FR 32 912457881" help="Affiché sur les factures — obligatoire dès l'assujettissement TVA."/><Field label="Adresse du siège" value="14 rue des Récollets, 75010 Paris" help="Figure sur les factures et détermine la commune — donc la base et le taux — de ta CFE."/></div>
     <div className="frow"><Field label="Régime" type="select" value={['Micro-BNC (libéral)','Micro-BIC (vente)','Micro-BIC (services)']}/><Field label="Début d'activité" value="01/02/2025"/></div>

@@ -336,3 +336,156 @@ describe('rythme de travail', () => {
     expect(entites[1]?.nom).toBe('Client final B');
   });
 });
+
+/**
+ * UN RYTHME CHANGE EN COURS DE MISSION, ET CE N'EST PAS UNE AUTRE MISSION.
+ *
+ * Passer de cinq jours par semaine à trois chez le même client opérationnel
+ * arrive tout le temps : la mission se prolonge à temps partiel. Le contrat, le
+ * CRA et la facturation ne changent pas — forcer à créer une seconde mission
+ * couperait en deux l'historique d'un même engagement.
+ *
+ * Le modèle portait `rythmes[]` depuis le schéma 4, et `rythmePour` savait déjà
+ * arbitrer entre deux plages. Seul le formulaire ne savait pas en écrire une
+ * seconde : il réécrivait toujours la dernière.
+ *
+ * Le découpage est MENSUEL, comme le handoff de design : une ligne par mois de
+ * la mission. Il n'y a alors aucune jonction à deviner, puisque les bornes sont
+ * celles du calendrier.
+ */
+describe('changement de rythme en cours de mission', () => {
+  async function nouvelleMission(
+    utilisateur: ReturnType<typeof userEvent.setup>,
+    fin = '2026-03-31'
+  ) {
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    await utilisateur.type(await screen.findByLabelText('Client'), 'ClientA');
+    await utilisateur.type(screen.getByLabelText('Début'), '2026-01-01');
+    await utilisateur.type(screen.getByLabelText('Fin'), fin);
+  }
+
+  const decouper = (utilisateur: ReturnType<typeof userEvent.setup>) =>
+    utilisateur.click(
+      screen.getByRole('button', { name: 'Changer de rythme en cours de mission' })
+    );
+
+  /** Le cas à une période ne montre pas le concept : ni dates ni TJM. */
+  it('ne montre les dates de période qu’à partir de la seconde', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur);
+    expect(screen.queryByLabelText(/Début de la période/)).toBeNull();
+
+    await decouper(utilisateur);
+    expect(screen.getAllByLabelText(/Début de la période/)).toHaveLength(3);
+  });
+
+  /**
+   * Sans dates de mission, il n'y a pas de mois à découper. Proposer le
+   * découpage quand même produirait des lignes sans bornes, c'est-à-dire le
+   * défaut qu'il existe pour éviter.
+   */
+  it('ne propose pas le découpage tant que la mission n’est pas datée', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    await screen.findByLabelText('Client');
+    expect(
+      screen.queryByRole('button', { name: 'Changer de rythme en cours de mission' })
+    ).toBeNull();
+  });
+
+  /**
+   * Les bornes sont celles du calendrier, ramenées à celles de la mission aux
+   * deux extrémités : un rythme qui déborderait remplirait le planning de
+   * journées hors contrat.
+   */
+  it('découpe en un mois par ligne, sans déborder de la mission', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur, '2026-03-15');
+    await decouper(utilisateur);
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    const rythmes = useFaits.getState().faits.missions[0]?.entites[0]?.rythmes ?? [];
+    expect(rythmes.map((r) => [r.du, r.au])).toEqual([
+      ['2026-01-01', '2026-01-31'],
+      ['2026-02-01', '2026-02-28'],
+      ['2026-03-01', '2026-03-15']
+    ]);
+  });
+
+  /**
+   * Chaque mois hérite du rythme en cours : un changement part d'un rythme
+   * connu qu'on amende. On ne touche ensuite que les lignes qui changent.
+   */
+  it('reporte la semaine type sur chaque mois, puis n’en modifie qu’un', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur, '2026-02-28');
+
+    const premiere = screen.getByRole('group', { name: 'Jours travaillés dans la semaine' });
+    for (const jour of [/^Lun/, /^Mar/, /^Mer/]) {
+      await utilisateur.click(within(premiere).getByRole('button', { name: jour }));
+    }
+    await decouper(utilisateur);
+
+    const groupes = screen.getAllByRole('group', { name: 'Jours travaillés dans la semaine' });
+    expect(groupes).toHaveLength(2);
+    // Février passe à mi-temps le mercredi. Le tour est 0 → 1 → ½ → rien :
+    // partant du plein hérité, un seul clic donne la demi-journée.
+    const fevrier = groupes[1] as HTMLElement;
+    await utilisateur.click(within(fevrier).getByRole('button', { name: /^Mer/ }));
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    const rythmes = useFaits.getState().faits.missions[0]?.entites[0]?.rythmes ?? [];
+    expect(rythmes[0]?.parJour).toEqual({ lun: 1, mar: 1, mer: 1 });
+    expect(rythmes[1]?.parJour).toEqual({ lun: 1, mar: 1, mer: 0.5 });
+  });
+
+  /** Le TJM peut changer avec le rythme — l'ancienne application ne le savait pas. */
+  it('accepte un TJM propre à un mois', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur, '2026-02-28');
+    await decouper(utilisateur);
+
+    const tjms = screen.getAllByLabelText(/TJM sur cette période/);
+    await utilisateur.type(tjms[1] as HTMLElement, '520');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    const rythmes = useFaits.getState().faits.missions[0]?.entites[0]?.rythmes ?? [];
+    expect(rythmes[0]?.tjm).toBeNull();
+    expect(rythmes[1]?.tjm).toBe(520);
+  });
+
+  /**
+   * Un changement qui tombe le 15 reste exprimable : le découpage mensuel est
+   * ce qu'on PROPOSE, pas ce qu'on impose.
+   */
+  it('laisse déplacer une borne en cours de mois', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur, '2026-02-28');
+    await decouper(utilisateur);
+
+    const debuts = screen.getAllByLabelText(/Début de la période/);
+    await utilisateur.clear(debuts[1] as HTMLElement);
+    await utilisateur.type(debuts[1] as HTMLElement, '2026-01-16');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    const rythmes = useFaits.getState().faits.missions[0]?.entites[0]?.rythmes ?? [];
+    expect(rythmes[1]?.du).toBe('2026-01-16');
+  });
+
+  it('retire un mois sans toucher aux autres', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await nouvelleMission(utilisateur, '2026-02-28');
+    const premiere = screen.getByRole('group', { name: 'Jours travaillés dans la semaine' });
+    await utilisateur.click(within(premiere).getByRole('button', { name: /^Lun/ }));
+    await decouper(utilisateur);
+
+    const retirer = screen.getAllByRole('button', { name: 'Retirer' });
+    await utilisateur.click(retirer[retirer.length - 1] as HTMLElement);
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    const rythmes = useFaits.getState().faits.missions[0]?.entites[0]?.rythmes ?? [];
+    expect(rythmes).toHaveLength(1);
+    expect(rythmes[0]?.au).toBe('2026-01-31');
+  });
+});

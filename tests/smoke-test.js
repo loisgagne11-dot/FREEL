@@ -156,8 +156,27 @@ const MOTIFS_INTERDITS = [
   // portait en attribut JSX (`value="FR76 …"`) et dans une chaîne d'option,
   // et il est passé. Une donnée bancaire ne devient pas inoffensive parce
   // qu'elle change de place dans la syntaxe.
-  [/\b(FR[0-9]{2}(?:[ ]?[0-9A-Z]{4}){5,})/g, 'IBAN français en clair']
+  [/\b(FR[0-9]{2}(?:[ ]?[0-9A-Z]{4}){5,})/g, 'IBAN français en clair'],
+  // Une adresse de courriel posée comme valeur par défaut. Le handoff en
+  // portait une au prénom du propriétaire ; elle avait été remplacée à la
+  // main, sans que rien n'empêche la suivante d'entrer. Les domaines
+  // manifestement fictifs sont laissés passer — c'est avec eux qu'on écrit
+  // des données de démonstration.
+  [
+    /(?:email|mail|courriel)\s*[:=]\s*['"]([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi,
+    'adresse de courriel en dur dans une valeur par défaut'
+  ]
 ];
+
+/**
+ * Les domaines conventionnellement fictifs, dans les deux langues.
+ *
+ * Une adresse de démonstration doit bien s'écrire quelque part : la reconnaître
+ * à son domaine évite d'exclure des fichiers entiers du balayage, ce qui
+ * laisserait de vraies adresses s'y loger sans que rien ne les voie.
+ */
+const DOMAINES_FICTIFS =
+  /@(?:[a-z0-9.-]*[.-])?(?:example|exemple|demo|test|invalid|localhost)(?:[.-][a-z0-9.-]*)?$/i;
 
 /**
  * Une valeur manifestement inventée.
@@ -169,6 +188,7 @@ const MOTIFS_INTERDITS = [
  * séquence croissante, ou un seul chiffre répété.
  */
 function estManifestementFactice(valeur) {
+  if (String(valeur).includes('@')) return DOMAINES_FICTIFS.test(String(valeur));
   const chiffres = String(valeur).replace(/[^0-9]/g, '');
   if (chiffres.length === 0) return false;
   if (/^0+$/.test(chiffres)) return true;

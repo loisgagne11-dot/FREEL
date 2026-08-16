@@ -19,6 +19,21 @@ const JOURS_LIBELLES: Readonly<Record<JourDeSemaine, string>> = {
 };
 
 /**
+ * Borne provisoire d'un rythme tout juste déclaré.
+ *
+ * Le rythme se saisit avant que les dates de mission soient forcément
+ * connues. Plutôt qu'inventer une plage, on pose une borne reconnaissable que
+ * `poserLesBornes` remplace par les dates réelles à l'enregistrement. Une plage
+ * inventée produirait des journées à des dates que personne n'a choisies.
+ *
+ * Déclarée ici, en tête : `PERIODE_VIDE` la lit au moment où le module
+ * s'évalue, et non depuis une fonction. La ranger plus bas, à côté de ses
+ * usages, la laisserait dans sa zone morte temporelle — le module lèverait au
+ * chargement, et l'écran entier tomberait.
+ */
+const BORNE_A_POSER = '0000-00-00' as DateISO;
+
+/**
  * Les formulaires de l'écran Activité — client, mission, clients opérationnels.
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -253,7 +268,9 @@ export function FormulaireMission(
       <EditeurEntites
         entites={saisie.entites}
         clientNom={saisie.clientNom}
-        datees={saisie.debut !== null && saisie.fin !== null}
+        debut={saisie.debut}
+        fin={saisie.fin}
+        tjmMission={saisie.tjm}
         onChange={(entites) => setSaisie({ ...saisie, entites })}
       />
 
@@ -315,15 +332,19 @@ function Champ(
  * commence à vouloir dire quelque chose.
  */
 function EditeurEntites(
-  { entites, clientNom, datees, onChange }: {
+  { entites, clientNom, debut, fin, tjmMission, onChange }: {
     readonly entites: readonly ClientOperationnel[];
     readonly clientNom: string;
-    /** La mission a-t-elle un début ET une fin ? Sans quoi le rythme n'a pas de plage. */
-    readonly datees: boolean;
+    /** Les bornes de la mission. Sans elles, le rythme n'a aucune plage où se poser. */
+    readonly debut: DateISO | null;
+    readonly fin: DateISO | null;
+    /** Le TJM de la mission, affiché comme valeur par défaut d'une période. */
+    readonly tjmMission: number;
     readonly onChange: (entites: readonly ClientOperationnel[]) => void;
   }
 ) {
   const plusieurs = entites.length > 1;
+  const datees = debut !== null && fin !== null;
 
   function modifier(i: number, champs: Partial<ClientOperationnel>): void {
     onChange(entites.map((e, j) => (j === i ? { ...e, ...champs } : e)));
@@ -381,9 +402,12 @@ function EditeurEntites(
             </div>
           )}
 
-          <SemaineType
-            parJour={parJourDe(entite)}
-            onChange={(parJour) => modifier(i, { rythmes: rythmeDe(entite, parJour) })}
+          <EditeurRythmes
+            rythmes={entite.rythmes}
+            tjmMission={tjmMission}
+            debut={debut}
+            fin={fin}
+            onChange={(rythmes) => modifier(i, { rythmes })}
           />
         </div>
       ))}
@@ -451,51 +475,264 @@ function SemaineType(
   );
 }
 
-/** La semaine type d'une entité : celle du dernier rythme déclaré. */
-function parJourDe(e: ClientOperationnel): Readonly<Partial<Record<JourDeSemaine, number>>> {
-  return e.rythmes[e.rythmes.length - 1]?.parJour ?? {};
-}
-
 /**
- * Repose la semaine type sur les rythmes existants.
+ * Les périodes de rythme d'un client opérationnel.
  *
- * On modifie le DERNIER rythme, pas tous : une renégociation de septembre ne
- * doit pas réécrire l'été, et c'est exactement ce que ferait un remplacement
- * en bloc. Sans rythme préexistant, la plage est celle de la mission — posée
- * par `FormulaireMission`, qui seul connaît ses dates.
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE MODÈLE SAVAIT LE DIRE, LE FORMULAIRE NE SAVAIT PAS L'ÉCRIRE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `ClientOperationnel.rythmes` est une LISTE de plages datées depuis le
+ * schéma 4, et `rythmePour` sait déjà arbitrer entre deux plages qui se
+ * chevauchent — la plus récemment déclarée l'emporte. Le formulaire, lui,
+ * n'éditait que la dernière : on ne pouvait donc pas déclarer « cinq jours par
+ * semaine jusqu'en août, trois ensuite », alors que c'est le cas courant d'une
+ * mission qui se prolonge à temps partiel.
+ *
+ * Le passage à mi-temps chez le même client n'est pas une nouvelle mission : le
+ * contrat, le CRA et la facturation restent les mêmes. Forcer à en créer une
+ * seconde aurait coupé en deux l'historique d'un même engagement, et cassé le
+ * rattachement du chiffre d'affaires que la mission porte.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE DÉCOUPAGE EST MENSUEL, ET CE N'EST PAS UN RACCOURCI
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La première version de cet éditeur ajoutait une plage libre, à dater soi-même.
+ * Elle butait sur une jonction indéterminée : deux plages sans dates saisies
+ * couvraient toutes deux la mission entière, et comme `rythmePour` retient la
+ * dernière déclarée, la première devenait morte — en silence, en laissant croire
+ * à un changement enregistré.
+ *
+ * Le handoff de design tranche autrement, et mieux : une ligne PAR MOIS de la
+ * mission, avec son rythme et son TJM. Il n'y a alors plus aucune jonction à
+ * deviner, puisque les bornes sont celles du calendrier. Les champs de date
+ * restent modifiables : un changement au 15 reste exprimable, il n'est
+ * simplement pas ce qu'on propose par défaut.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE CAS À UNE PÉRIODE NE MONTRE PAS LE CONCEPT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Même règle que pour les clients opérationnels : tant qu'il n'y a qu'une
+ * plage, on ne voit que la semaine type — ni dates ni TJM, puisqu'ils valent
+ * ceux de la mission. Les dates n'apparaissent qu'au moment où il y en a deux,
+ * c'est-à-dire quand elles commencent à départager quelque chose.
  */
-function rythmeDe(
-  e: ClientOperationnel,
-  parJour: Readonly<Partial<Record<JourDeSemaine, number>>>
-): readonly Rythme[] {
-  if (e.rythmes.length === 0) {
-    return [{ du: BORNE_A_POSER, au: BORNE_A_POSER, parJour, tjm: null }];
+function EditeurRythmes(
+  { rythmes, tjmMission, debut, fin, onChange }: {
+    readonly rythmes: readonly Rythme[];
+    readonly tjmMission: number;
+    /** Les bornes de la mission, qui commandent le découpage mensuel. */
+    readonly debut: DateISO | null;
+    readonly fin: DateISO | null;
+    readonly onChange: (rythmes: readonly Rythme[]) => void;
   }
-  return e.rythmes.map((r, i) => (i === e.rythmes.length - 1 ? { ...r, parJour } : r));
+) {
+  // Une entité sans rythme se présente comme une entité à une période vide :
+  // sinon la première semaine type n'aurait nulle part où s'écrire.
+  const periodes = rythmes.length === 0 ? [PERIODE_VIDE] : rythmes;
+  const plusieurs = periodes.length > 1;
+  // Sans bornes de mission, il n'y a pas de mois à découper. Le message qui
+  // réclame les dates est déjà affiché par `EditeurEntites` juste au-dessus.
+  const decoupable = debut !== null && fin !== null && periodes.length === 1;
+
+  function modifier(i: number, champs: Partial<Rythme>): void {
+    onChange(periodes.map((r, j) => (j === i ? { ...r, ...champs } : r)));
+  }
+
+  return (
+    <div className={styles.rythmes}>
+      {periodes.map((periode, i) => (
+        <div key={i} className={styles.periode}>
+          {plusieurs && (
+            <div className={styles.periodeEntete}>
+              {/* Le mois en toutes lettres avant les dates : c'est lui qu'on
+                  cherche des yeux pour trouver la ligne à changer. Deux champs
+                  de date se lisent, un intitulé se repère. */}
+              <span className={styles.periodeMois}>{libelleDuMois(periode.du)}</span>
+              <input
+                type="date"
+                className={styles.periodeDate}
+                aria-label={`Début de la période ${i + 1}`}
+                value={periode.du === BORNE_A_POSER ? '' : periode.du}
+                onChange={(e) => modifier(i, { du: dateOuBorne(e.target.value) })}
+              />
+              <span className={styles.periodeSepare} aria-hidden="true">→</span>
+              <input
+                type="date"
+                className={styles.periodeDate}
+                aria-label={`Fin de la période ${i + 1}`}
+                value={periode.au === BORNE_A_POSER ? '' : periode.au}
+                onChange={(e) => modifier(i, { au: dateOuBorne(e.target.value) })}
+              />
+              {/* Retirer la dernière période est permis : une mission peut
+                  légitimement n'avoir aucun rythme déclaré — son planning
+                  reste alors vide, ce qui est un état, pas une panne. */}
+              <button
+                type="button"
+                className={styles.retirer}
+                onClick={() => onChange(periodes.filter((_, j) => j !== i))}
+              >
+                Retirer
+              </button>
+            </div>
+          )}
+
+          <SemaineType
+            parJour={periode.parJour}
+            onChange={(parJour) => modifier(i, { parJour })}
+          />
+
+          {plusieurs && (
+            <label className={styles.tjmPeriode}>
+              TJM sur cette période
+              <input
+                type="number"
+                inputMode="decimal"
+                step="10"
+                min="0"
+                placeholder={tjmMission > 0 ? String(tjmMission) : 'TJM de la mission'}
+                value={periode.tjm ?? ''}
+                onChange={(e) => modifier(i, {
+                  tjm: e.target.value === '' ? null : euros(Number(e.target.value) || 0)
+                })}
+              />
+            </label>
+          )}
+        </div>
+      ))}
+
+      {decoupable && (
+        <button
+          type="button"
+          className={styles.ajouterEntite}
+          onClick={() => onChange(
+            parMois(periodes[0] as Rythme, debut as DateISO, fin as DateISO)
+          )}
+        >
+          Changer de rythme en cours de mission
+        </button>
+      )}
+      {plusieurs && (
+        <p className={styles.aide}>
+          Un mois par ligne&nbsp;: modifiez ceux qui changent, laissez les autres.
+          Les dates restent modifiables si le changement tombe en cours de mois.
+        </p>
+      )}
+    </div>
+  );
 }
 
-/**
- * Borne provisoire d'un rythme tout juste déclaré.
- *
- * Le rythme se saisit avant que les dates de mission soient forcément
- * connues. Plutôt qu'inventer une plage, on pose une borne reconnaissable que
- * `FormulaireMission` remplace par les dates réelles à l'enregistrement. Une
- * plage inventée produirait des journées à des dates que personne n'a
- * choisies.
- */
-const BORNE_A_POSER = '0000-00-00' as DateISO;
+const PERIODE_VIDE: Rythme = {
+  du: BORNE_A_POSER, au: BORNE_A_POSER, parJour: {}, tjm: null
+};
 
-/** Remplace les bornes provisoires par la plage réelle de la mission. */
+/**
+ * Découpe une période unique en un rythme par mois de la mission.
+ *
+ * Chaque mois hérite du rythme et du TJM en cours : un changement part presque
+ * toujours d'un rythme connu qu'on amende — passer de cinq jours à trois, ce
+ * n'est pas repartir de zéro. Seules les lignes qui changent sont ensuite
+ * touchées.
+ *
+ * Les bornes sont celles du calendrier, ramenées à celles de la mission au
+ * premier et au dernier mois : le rythme ne doit pas déborder de la mission, ce
+ * qui remplirait le planning de journées hors contrat.
+ *
+ * Au-delà de trente-six mois, on s'arrête : une mission de trois ans se pilote
+ * autrement qu'en modifiant trente-six lignes, et un formulaire qui en génère
+ * cent cinquante n'est plus utilisable.
+ */
+const MOIS_MAXIMUM_DECOUPES = 36;
+
+function parMois(modele: Rythme, debut: DateISO, fin: DateISO): readonly Rythme[] {
+  const mois: Rythme[] = [];
+  let curseur = premierDuMois(debut);
+
+  while (curseur <= fin && mois.length < MOIS_MAXIMUM_DECOUPES) {
+    const finDuMois = dernierDuMois(curseur);
+    mois.push({
+      du: curseur < debut ? debut : curseur,
+      au: finDuMois > fin ? fin : finDuMois,
+      parJour: modele.parJour,
+      tjm: modele.tjm
+    });
+    curseur = lendemainDe(finDuMois);
+  }
+  return mois.length === 0 ? [modele] : mois;
+}
+
+/** « 2026-05-01 » → « mai 26 ». Vide tant que la borne n'est pas posée. */
+function libelleDuMois(d: DateISO): string {
+  if (d === BORNE_A_POSER) return '';
+  return new Date(`${d.slice(0, 7)}-01T00:00:00Z`)
+    .toLocaleDateString('fr-FR', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+}
+
+const premierDuMois = (d: DateISO): DateISO => `${d.slice(0, 7)}-01` as DateISO;
+
+function dernierDuMois(d: DateISO): DateISO {
+  const date = new Date(`${d.slice(0, 7)}-01T00:00:00Z`);
+  date.setUTCMonth(date.getUTCMonth() + 1);
+  date.setUTCDate(0);
+  return date.toISOString().slice(0, 10) as DateISO;
+}
+
+/** Le jour suivant une date ISO, en UTC pour ne pas dépendre du fuseau. */
+function lendemainDe(date: DateISO): DateISO {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10) as DateISO;
+}
+
+/** Un champ de date vidé redevient une borne à poser, jamais une date vide. */
+const dateOuBorne = (v: string): DateISO =>
+  (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v as DateISO : BORNE_A_POSER);
+
+/**
+ * Remplace les bornes provisoires par des dates réelles.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LES BORNES SE POSENT DE PROCHE EN PROCHE, PAS TOUTES SUR LA MISSION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Tant qu'il n'y avait qu'un rythme, « début manquant = début de mission, fin
+ * manquante = fin de mission » suffisait. Avec plusieurs périodes, cette règle
+ * les ferait toutes courir sur la mission entière : elles se recouvriraient
+ * intégralement, et comme `rythmePour` retient la dernière déclarée, toutes les
+ * précédentes deviendraient mortes — silencieusement, en laissant croire à un
+ * changement de rythme enregistré.
+ *
+ * La règle est donc la chaîne : une période commence au lendemain de celle qui
+ * la précède, et finit la veille de celle qui la suit. Seules les deux bornes
+ * extrêmes retombent sur la mission.
+ */
 function poserLesBornes(
   entites: readonly ClientOperationnel[], debut: DateISO | null, fin: DateISO | null
 ): readonly ClientOperationnel[] {
   if (debut === null || fin === null) return entites;
   return entites.map((e) => ({
     ...e,
-    rythmes: e.rythmes.map((r) => ({
-      ...r,
-      du: r.du === BORNE_A_POSER ? debut : r.du,
-      au: r.au === BORNE_A_POSER ? fin : r.au
-    }))
+    rythmes: e.rythmes.map((r, i, tous) => {
+      const precedente = i === 0 ? undefined : tous[i - 1];
+      const suivante = tous[i + 1];
+      const du = r.du !== BORNE_A_POSER ? r.du
+        : precedente === undefined || precedente.au === BORNE_A_POSER
+          ? debut
+          : lendemainDe(precedente.au);
+      const au = r.au !== BORNE_A_POSER ? r.au
+        : suivante === undefined || suivante.du === BORNE_A_POSER
+          ? fin
+          : veilleDe(suivante.du);
+      return { ...r, du, au };
+    })
   }));
+}
+
+/** Le jour précédant une date ISO, en UTC comme `lendemainDe`. */
+function veilleDe(date: DateISO): DateISO {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10) as DateISO;
 }
