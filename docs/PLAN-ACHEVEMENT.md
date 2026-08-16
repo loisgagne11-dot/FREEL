@@ -124,17 +124,19 @@ Les deux cohabitent **à une condition** : la provision estimée retranche les
 acomptes déjà saisis. Sans cette soustraction, l'anomalie E revient sous un
 autre nom.
 
-**L'ACRE court probablement moins longtemps que ce que nous calculons.**
+**L'ACRE court moins longtemps que ce que nous calculions — confirmé.**
 `sousAcreLe` applique douze mois pleins à compter du mois de début d'activité.
-La règle du micro-social est, sauf erreur, « jusqu'à la fin du 3ᵉ trimestre
-civil suivant celui de l'affiliation » — soit onze mois pour un début en
-février, dix pour un début en décembre. L'écart va dans le sens dangereux :
-moins de charges, donc plus de disponible, donc plus de versable.
+La règle du micro-social court « jusqu'à la fin du 3ᵉ trimestre civil suivant
+celui de l'affiliation » — soit onze mois pour un début en février, dix pour un
+début en décembre. L'écart allait dans le sens dangereux : moins de charges,
+donc plus de disponible, donc plus de versable.
 
-Une règle légale ne se réécrit pas sur la seule conviction de qui code. Elle
-remonte donc dans le barème **avec sa source et sa date de vérification**, comme
-les taux URSSAF — le `4` actuel n'en a aucune, ce que l'invariant n°3 interdit.
-La formulation exacte est à confirmer sur l'attestation URSSAF du propriétaire.
+**Confirmé par constat le 16/08** : début d'activité au 01/02/2025, exonération
+appliquée jusqu'au 31/12/2025, taux plein à partir de janvier 2026. La règle
+trimestrielle tombe juste ; les douze mois pleins donnaient janvier 2026 en
+trop. La règle remonte dans le barème **avec sa source et sa date de
+vérification**, comme les taux URSSAF — le `4` d'origine n'en avait aucune, ce
+que l'invariant n°3 interdit.
 
 **L'assiette de la projection est celle que le propriétaire décrit** : les
 missions donnent le chiffre d'affaires de l'année, remis à jour à chaque
@@ -142,6 +144,45 @@ missions donnent le chiffre d'affaires de l'année, remis à jour à chaque
 que la facture est émise. Le module distingue les deux sans les mélanger — c'est
 la même règle que partout ailleurs dans le projet, le constaté ne se confond pas
 avec l'attendu.
+
+### Lot Q — Une facture n'est pas payée le jour où elle part
+
+Soulevé par le propriétaire le 16/08. **Bloque la justesse de toute prévision** :
+la projection de trésorerie, la capacité de versement mensuelle et la provision
+d'impôt reposent toutes sur la date à laquelle l'argent arrive.
+
+| # | Livrable | Critère d'acceptation | État |
+|---|---|---|---|
+| Q1 | Un délai de paiement qui sait dire « 30 jours **fin de mois** » | Aujourd'hui `delaiPaiementJours: number` ne sait qu'ajouter des jours. « Fin de mois » est une autre arithmétique, et c'est la plus répandue en France | ⬜ |
+| Q2 | Le délai se déclare **sur la mission**, pas seulement sur le client | Une mission passée par une agence n'a pas les mêmes conditions qu'une vente directe au même nom | ⬜ |
+| Q3 | La facture **porte son échéance** comme un fait | Elle est imprimée sur le document envoyé au client : changer les conditions d'un client ne doit pas réécrire la date d'échéance des factures déjà parties | ⬜ |
+| Q4 | Les prévisions s'alignent sur ces échéances | `etatProjection`, `capaciteVersement` et la provision d'impôt datent l'encaissement attendu à l'échéance réelle, plus à une approximation | ⬜ |
+| Q5 | Migration des factures existantes | L'échéance se calcule une fois depuis les conditions du client, puis se fige. Le dire, ne pas le supposer | ⬜ |
+
+#### §3 quater — Pourquoi l'échéance devient un fait
+
+Le code actuel dérive l'échéance à la lecture :
+`ajouterJours(r.emiseLe, delaiParClient.get(r.clientNom))`.
+
+Trois défauts, du plus léger au plus grave :
+
+1. **Il ne sait pas dire « fin de mois ».** Une facture émise le 12 juin à
+   « 30 jours fin de mois » n'est pas due le 12 juillet mais le 31 juillet.
+   Dix-neuf jours d'écart sur chaque facture, et la prévision de trésorerie
+   annonce l'argent avant qu'il n'arrive.
+
+2. **Le délai ne vit que sur le client.** Une mission passée par une agence et
+   une vente directe au même client n'ont pas les mêmes conditions.
+
+3. **Changer les conditions d'un client réécrit le passé.** « Cette facture
+   était-elle en retard ? » change de réponse rétroactivement, et le compteur
+   de retards avec. Or l'échéance est **imprimée sur le document envoyé** :
+   c'est un fait, pas une dérivée. Le délai de la mission et celui du client
+   ne sont plus que la valeur **proposée à la création** — ce qui est
+   exactement leur rôle.
+
+C'est la même distinction que partout ailleurs dans le projet : le constaté ne
+se recalcule pas depuis un réglage qui a bougé depuis.
 
 ### Lot A — Argent · Performance
 
@@ -328,5 +369,6 @@ faits plutôt qu'avec trois écrans finis.
 | Date | Lot | Ce qui a été fait |
 |---|---|---|
 | 16/08 | — | Plan établi et périmètre arbitré. |
+| 16/08 | Lot Q | Ouvert : l'échéance d'une facture se déduisait du client à la lecture, sans savoir dire « fin de mois » et en réécrivant le passé à chaque changement de conditions. |
 | 16/08 | Lot P | Ouvert : l'impôt sur le revenu n'était provisionné nulle part sous le régime du barème, et la fenêtre d'ACRE est probablement trop longue de un à trois mois. |
 | 16/08 | Socle O | Outillage de contrôle en place. La première comparaison montre l'onglet Performance à trois tuiles sur quatre, sans composition au clic, sans capacité de versement et sans curseur de réserve. |
