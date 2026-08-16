@@ -220,6 +220,29 @@ L'application ne les refuse pas — on signe parfois ce qu'on n'a pas choisi —
 mais elle le dit, parce que c'est une information que le freelance a intérêt à
 connaître au moment de facturer.
 
+### Lot R — Dégager le paquet d'entrée
+
+**Bloque la clôture du lot Q**, et bloquera tous les suivants : le paquet
+d'entrée n'a plus de marge. Il était à 79,89 / 80 Ko avant le lot Q, soit un
+dixième de pour cent — n'importe quel ajout le fait déborder, et l'invariant
+n°7 interdit de relever le plafond.
+
+| # | Livrable | Critère d'acceptation | État |
+|---|---|---|---|
+| R1 | La FORMULATION des sujets « à traiter » quitte le paquet d'entrée | Dix mille huit cent cinquante-sept octets de phrases françaises y voyagent aujourd'hui, pour un panneau qui ne s'ouvre qu'au clic. La détection — combien, quelle gravité, quel écran — reste ; la mise en mots part avec le panneau | ⬜ |
+| R2 | Le budget retrouve une marge exploitable | Au moins cinq kilo-octets, sans quoi le lot suivant rouvre le même sujet | ⬜ |
+
+#### §3 sexies — La coupure : détecter n'est pas formuler
+
+C'est la même coupure que celle déjà faite deux fois dans ce projet — les
+libellés de délai de paiement d'un côté, le calcul d'échéance de l'autre ; le
+barème de Config sorti dans son propre paquet. Ce qui CALCULE reste, ce qui
+NOMME part avec l'écran qui l'affiche.
+
+Ici, la pastille du haut n'a besoin que d'un nombre et d'une gravité. Les
+intitulés, les contextes et les libellés d'action ne servent qu'au panneau, et
+ce panneau charge déjà sa coquille à la demande.
+
 ### Lot A — Argent · Performance
 
 C'est là que le plus grand nombre d'indicateurs de l'ancienne application ont
@@ -405,6 +428,8 @@ faits plutôt qu'avec trois écrans finis.
 | Date | Lot | Ce qui a été fait |
 |---|---|---|
 | 16/08 | — | Plan établi et périmètre arbitré. |
+| 16/08 | Lot R | Ouvert : le paquet d'entrée n'a plus de marge, et l'invariant n°7 interdit de relever le plafond. |
+| 16/08 | Lot Q | Code livré et testé, **non clos** : le budget d'entrée dépasse de cent-dix octets. Trois extractions faites (libellés séparés du calcul, table de règles remplacée par la lecture de l'identifiant, deux fonctions de date fusionnées) — il en manque une, et c'est le lot R. |
 | 16/08 | Lot P | Livré, P6 excepté. Le versable baisse de 5 045 € sur 60 000 € encaissés en BNC à une part : c'est l'impôt qui n'était provisionné nulle part. L'ACRE s'arrêtait un mois trop tard. Deux extractions imposées par le budget, aucun plafond relevé. |
 | 16/08 | Lot Q | Ouvert : l'échéance d'une facture se déduisait du client à la lecture, sans savoir dire « fin de mois » et en réécrivant le passé à chaque changement de conditions. |
 | 16/08 | Lot P | Ouvert : l'impôt sur le revenu n'était provisionné nulle part sous le régime du barème, et la fenêtre d'ACRE est probablement trop longue de un à trois mois. |

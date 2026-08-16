@@ -24,7 +24,7 @@ import type { Resolution } from '../domain/types';
 import type { Echeance, VentilationProvisions } from '../domain/calculs/provisions';
 import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
 import type { ProvisionImpotRevenu } from '../domain/calculs/provisionImpotRevenu';
-import { DELAI_PAIEMENT_DEFAUT, encoursDe, suivre } from '../domain/calculs/facturier';
+import { encoursDe, suivre } from '../domain/calculs/facturier';
 import {
   type CapaciteDuMois, capaciteDuMois
 } from '../domain/calculs/capaciteVersement';
@@ -43,6 +43,9 @@ import { tvaDeDepense } from '../domain/calculs/depenses';
 import {
   type DossierTva, type PieceCollectee, type PieceDeduite, dossierTva
 } from '../domain/calculs/dossierTva';
+import {
+  FORMULE_PAR_DEFAUT, echeanceDe, formuleOuNull
+} from '../domain/calculs/delaiPaiement';
 
 /**
  * Toutes les factures, avec leur statut dérivé à la date du jour.
@@ -51,10 +54,15 @@ import {
  * légal supplétif. Retenir zéro afficherait « en retard » dès l'émission.
  */
 export function facturesSuivies(faits: Faits, maintenant: Date = new Date()) {
-  const delais = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
+  /* Secours : l'échéance manque sur la recette (bloc écrit à la main, jeu
+     d'essai). On la reconstruit depuis les conditions actuelles du client —
+     faute de mieux, et sans l'écrire nulle part. */
+  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+  const secours = (nom: string, emiseLe: DateISO) =>
+    echeanceDe(emiseLe, formules.get(nom) ?? FORMULE_PAR_DEFAUT);
   return suivre(
     faits.recettes,
-    (nom) => delais.get(nom) ?? DELAI_PAIEMENT_DEFAUT,
+    secours,
     dateDuJour(maintenant)
   );
 }
@@ -296,8 +304,12 @@ export function etatProjection(
   const m0 = moisCourant(maintenant);
   const moisProjetes = Array.from({ length: MOIS_PROJETES }, (_, i) => decalerMois(m0, i));
 
-  const delais = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
-  const delaiDe = (nom: string) => delais.get(nom) ?? DELAI_PAIEMENT_DEFAUT;
+  /* Le décalage de l'encaissement attendu suit la FORMULE, pas un nombre de
+     jours : « 30 jours fin de mois » repousse une facture du 12 juin au
+     31 juillet, dix-neuf jours plus loin qu'une simple addition. Sur une
+     prévision de trésorerie, dix-neuf jours changent le mois. */
+  const formulesClient = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+
 
   const attendu = new Map<Mois, number>(moisProjetes.map((m) => [m, 0]));
   const ajouter = (m: Mois, montant: number): void => {
@@ -314,14 +326,22 @@ export function etatProjection(
     ajouter(echeance < m0 ? m0 : echeance, f.recette.montant);
   }
 
-  // 2. Le revenu prévu au planning, décalé du délai de paiement. Le mois M se
-  //    facture à sa fin et s'encaisse `delai` jours plus tard.
+  /* 2. Le revenu prévu au planning, daté à son ÉCHÉANCE réelle.
+        Le mois M se facture le dernier jour du mois, et l'échéance suit la
+        formule convenue. Le calcul précédent divisait un nombre de jours par
+        trente et arrondissait au mois supérieur : « 30 jours fin de mois »
+        s'y traduisait par un mois de décalage, alors qu'une facture du
+        31 juillet à cette formule n'est due que le 30 septembre. Un mois
+        d'écart sur chaque mission, sur toute la prévision. */
   const parMission = new Map(faits.missions.map((mi) => [mi.id, mi]));
   for (const m of moisProjetes) {
     for (const p of previsionDuMoisParMission(faits, m)) {
-      const client = parMission.get(p.missionId)?.clientNom ?? '';
-      const decalage = Math.ceil(delaiDe(client) / 30);
-      ajouter(decalerMois(m, decalage), p.prevision.montantRetenu);
+      const mission = parMission.get(p.missionId);
+      const nom = mission?.clientNom ?? '';
+      const emiseLe = finDuMoisISO(m);
+      const formule = formuleOuNull(mission?.delaiPaiement)
+        ?? formulesClient.get(nom) ?? FORMULE_PAR_DEFAUT;
+      ajouter(echeanceDe(emiseLe, formule).slice(0, 7) as Mois, p.prevision.montantRetenu);
     }
   }
 
@@ -912,4 +932,13 @@ function ligneDeRealise(
     facture,
     indetermine: ids.length > 1
   };
+}
+
+
+/** Le dernier jour d'un mois, au format ISO. */
+function finDuMoisISO(m: Mois): DateISO {
+  const d = new Date(`${m}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  d.setUTCDate(0);
+  return d.toISOString().slice(0, 10) as DateISO;
 }

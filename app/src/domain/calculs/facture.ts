@@ -33,6 +33,7 @@
 
 import { type DateISO, type Euros, type Ratio, euros, ratio } from '../types';
 import { estDansLUe } from './des';
+import { type FormuleDelai, echeanceDe } from './delaiPaiement';
 
 /**
  * Indemnité forfaitaire pour frais de recouvrement.
@@ -95,7 +96,14 @@ export interface Destinataire {
   /** Code pays ISO. Vide ou `FR` pour la France. */
   readonly pays: string;
   readonly tvaIntracom: string;
-  readonly delaiPaiementJours: number;
+  /**
+   * Les conditions de paiement retenues pour CETTE facture.
+   *
+   * Celles de la mission si elle en a, sinon celles du client. Elles servent à
+   * calculer l'échéance une fois, à l'émission — c'est ensuite la date figée
+   * dans la recette qui fait foi, parce que c'est elle qui est imprimée.
+   */
+  readonly delaiPaiement: FormuleDelai;
 }
 
 export interface LigneFacture {
@@ -149,13 +157,6 @@ export function regimeDeLaFacture(
   return emetteur.enFranchise ? 'franchise' : 'tva_francaise';
 }
 
-function ajouterJours(d: DateISO, n: number): DateISO {
-  const t = Date.UTC(
-    Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10))
-  ) + n * 86_400_000;
-  return new Date(t).toISOString().slice(0, 10) as DateISO;
-}
-
 /**
  * Les totaux d'une facture.
  *
@@ -194,10 +195,7 @@ export function totaux(facture: Facture): TotauxFacture {
     totalTva: euros(totalTva),
     totalTtc: euros(totalHt + totalTva),
     parTaux,
-    echeanceLe: ajouterJours(
-      facture.emiseLe,
-      Math.max(0, facture.destinataire.delaiPaiementJours)
-    )
+    echeanceLe: echeanceDe(facture.emiseLe, facture.destinataire.delaiPaiement)
   };
 }
 

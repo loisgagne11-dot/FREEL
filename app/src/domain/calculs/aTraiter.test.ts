@@ -24,7 +24,9 @@ function recette(m: Partial<RecetteVue> = {}): RecetteVue {
   return {
     id: 'r', montant: euros(1000), emiseLe: dateISO('2026-07-01'),
     encaisseeLe: null, modeReglement: 'virement', clientNom: 'C',
-    delaiPaiementJours: 30,
+    /* L'échéance est la date IMPRIMÉE sur la facture, plus une dérivée du
+       délai du client : c'est elle que `sujetsATraiter` lit. */
+    echeanceLe: dateISO('2026-07-31'),
     ...m
   };
 }
@@ -51,7 +53,7 @@ describe('rien n\'est inventé', () => {
 describe('factures en retard', () => {
   it('signale une facture dont le délai de paiement est dépassé', () => {
     const e = entree({
-      recettes: [recette({ emiseLe: dateISO('2026-05-01'), delaiPaiementJours: 30 })]
+      recettes: [recette({ emiseLe: dateISO('2026-05-01'), echeanceLe: dateISO('2026-05-31') })]
     });
     const s = sujetsATraiter(e).find((x) => x.id === 'factures-en-retard');
     expect(s).toBeDefined();
@@ -62,7 +64,7 @@ describe('factures en retard', () => {
   // La borne : une facture dont l'échéance est aujourd'hui n'est pas en retard.
   it('ne signale pas une facture encore dans son délai', () => {
     const e = entree({
-      recettes: [recette({ emiseLe: dateISO('2026-07-20'), delaiPaiementJours: 30 })]
+      recettes: [recette({ emiseLe: dateISO('2026-07-20'), echeanceLe: dateISO('2026-08-31') })]
     });
     expect(idsDe(e)).not.toContain('factures-en-retard');
   });
@@ -70,7 +72,7 @@ describe('factures en retard', () => {
   it('ne signale jamais une facture déjà encaissée', () => {
     const e = entree({
       recettes: [recette({
-        emiseLe: dateISO('2026-01-01'), delaiPaiementJours: 30,
+        emiseLe: dateISO('2026-01-01'), echeanceLe: dateISO('2026-07-31'),
         encaisseeLe: dateISO('2026-02-01')
       })]
     });
@@ -80,8 +82,14 @@ describe('factures en retard', () => {
   it('compte les factures et cumule leur montant', () => {
     const e = entree({
       recettes: [
-        recette({ id: 'a', montant: euros(1000), emiseLe: dateISO('2026-05-01') }),
-        recette({ id: 'b', montant: euros(2000), emiseLe: dateISO('2026-05-01') })
+        recette({
+          id: 'a', montant: euros(1000),
+          emiseLe: dateISO('2026-05-01'), echeanceLe: dateISO('2026-05-31')
+        }),
+        recette({
+          id: 'b', montant: euros(2000),
+          emiseLe: dateISO('2026-05-01'), echeanceLe: dateISO('2026-05-31')
+        })
       ]
     });
     const s = sujetsATraiter(e).find((x) => x.id === 'factures-en-retard');

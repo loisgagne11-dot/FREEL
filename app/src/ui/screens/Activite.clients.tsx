@@ -5,6 +5,7 @@ import { Vide } from '../components/Vide';
 import { Montant } from '../components/Montant';
 import { eur } from '../format';
 import styles from './Activite.module.css';
+import { libelleDelai } from '../../domain/calculs/delaiPaiement.libelles';
 
 /**
  * L'onglet Clients, chargé à la demande.
@@ -65,7 +66,7 @@ export function OngletClients(
                         <span className={styles.ligneTitre}>
                           <span className={styles.ligneLibelle}>{c.nom}</span>
                           <span className={styles.ligneMontant}>
-                            {c.delaiPaiementJours} j
+                            {libelleDelai(c.delaiPaiement)}
                           </span>
                         </span>
                         <span className={styles.ligneMeta}>

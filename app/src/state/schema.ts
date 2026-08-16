@@ -20,6 +20,10 @@ import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import type { MotifSansContrepartie, MouvementBancaire } from '../domain/calculs/banque';
 import type { Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
+import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
+import {
+  FORMULE_PAR_DEFAUT, echeanceDe, formuleDepuisJours, formuleOuNull
+} from '../domain/calculs/delaiPaiement';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -33,7 +37,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 12 as const;
+export const VERSION_SCHEMA = 13 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -79,7 +83,18 @@ export interface Client {
   readonly adresse: string;
   readonly siret: string;
   readonly email: string;
-  readonly delaiPaiementJours: number;
+  /**
+   * Les conditions de paiement habituelles de ce client.
+   *
+   * Une FORMULE et non un nombre de jours : « 30 jours fin de mois » ne
+   * s'exprime pas en jours, et c'est pourtant la formule la plus répandue.
+   * Voir `calculs/delaiPaiement`.
+   *
+   * Ce n'est qu'une valeur PROPOSÉE au moment de créer une facture. L'échéance
+   * réelle se fige dans la recette, parce qu'elle est imprimée sur le document
+   * envoyé — changer ceci ne réécrit pas le passé.
+   */
+  readonly delaiPaiement: FormuleDelai;
   /**
    * Code pays ISO à deux lettres. Vide ou `FR` pour un client français.
    *
@@ -139,6 +154,19 @@ export interface Mission {
    * journée finissent toujours par se contredire.
    */
   readonly entites: readonly ClientOperationnel[];
+  /**
+   * Les conditions de paiement de CETTE mission, ou `null` pour celles du
+   * client.
+   *
+   * Une mission passée par une agence et une vente directe au même nom n'ont
+   * pas les mêmes conditions. Le délai du client reste le défaut ; celui-ci le
+   * remplace quand il est renseigné.
+   *
+   * Facultatif comme les autres champs arrivés par migration : une mission
+   * d'avant le schéma 13 n'en porte pas, et le comblement se fait à la lecture
+   * plutôt qu'en réécrivant quarante jeux d'essai.
+   */
+  readonly delaiPaiement?: FormuleDelai | null;
 }
 
 /**
@@ -271,6 +299,25 @@ export interface Recette {
    * quelqu'un qu'on n'a jamais prévenu.
    */
   readonly relancesLe?: readonly DateISO[];
+  /**
+   * La date à laquelle la facture est due — celle IMPRIMÉE sur le document.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * UN FAIT, PAS UNE DÉRIVÉE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Elle se calculait à la lecture, en ajoutant le délai du client à la date
+   * d'émission. Changer les conditions d'un client réécrivait donc
+   * rétroactivement l'échéance de toutes ses factures déjà parties : « cette
+   * facture était-elle en retard ? » changeait de réponse, et le compteur de
+   * retards avec.
+   *
+   * Or le client, lui, a un papier avec une date dessus. C'est cette date-là
+   * qui fait foi, et elle ne bouge plus une fois la facture émise.
+   *
+   * `null` sur une facture sans date d'émission : rien n'est encore dû.
+   */
+  readonly echeanceLe?: DateISO | null;
 }
 
 /**
@@ -813,10 +860,16 @@ export function completerFaits(brut: unknown): Faits {
     version: VERSION_SCHEMA,
     entreprise: { ...entrepriseVide(), ...entreprise },
     conges: congesDuSchema1(o['conges']),
+    clients: clientsDuSchema12(o['clients']),
+    /* Pas de normalisation du délai de mission ici : le champ est FACULTATIF,
+       une mission d'avant le schéma 13 n'en porte pas, et le seul lecteur —
+       la projection — le lit déjà par `formuleOuNull`. Le faire aussi au
+       chargement aurait coûté un parcours de la liste à tous les utilisateurs
+       pour une valeur qu'aucun d'eux n'a encore saisie. */
     missions: missionsDuSchema1(o['missions']),
     mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires']),
     echeances: echeancesDuSchema5(o['echeances']),
-    recettes: recettesDuSchema6(o['recettes'])
+    recettes: recettesDuSchema12(recettesDuSchema6(o['recettes']), o['clients'])
   } as Faits;
 }
 
@@ -928,5 +981,67 @@ function recettesDuSchema6(brut: unknown): readonly Recette[] {
       ? o['tvaCollectee'] as Euros
       : null;
     return [{ ...(o as unknown as Recette), relancesLe: relances, envoyeeLe, tvaCollectee }];
+  });
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   v12 → v13 : les conditions de paiement, et l'échéance qui devient un fait
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Le client porte une FORMULE, plus un nombre de jours.
+ *
+ * L'ancien `delaiPaiementJours` se traduit vers une formule « nets », jamais
+ * vers « fin de mois ». C'est exactement ce que le code calculait — `emiseLe +
+ * N jours` —, et traduire un ancien `30` par « 30 jours fin de mois » aurait
+ * décalé de plusieurs semaines l'échéance de factures déjà émises, sous
+ * couvert de les corriger.
+ */
+function clientsDuSchema12(brut: unknown): readonly Client[] {
+  if (!Array.isArray(brut)) return [];
+  return brut.flatMap((c): Client[] => {
+    if (typeof c !== 'object' || c === null) return [];
+    const o = c as Record<string, unknown>;
+    const deja = formuleOuNull(o['delaiPaiement']);
+    const jours = typeof o['delaiPaiementJours'] === 'number' ? o['delaiPaiementJours'] : null;
+    return [{
+      ...(o as unknown as Client),
+      delaiPaiement: deja ?? (jours === null ? FORMULE_PAR_DEFAUT : formuleDepuisJours(jours))
+    }];
+  });
+}
+
+/**
+ * L'échéance se fige sur chaque facture déjà émise.
+ *
+ * Elle se calcule UNE FOIS depuis les conditions du client telles qu'elles
+ * sont aujourd'hui — c'est la seule information disponible — puis ne bouge
+ * plus. C'est moins juste qu'une échéance relevée sur le document d'origine,
+ * et strictement plus juste que le comportement précédent, où elle changeait à
+ * chaque modification des conditions du client.
+ *
+ * Une recette sans date d'émission n'a pas d'échéance : `null`, et non une
+ * date inventée. Rien n'est encore dû sur un brouillon.
+ */
+function recettesDuSchema12(
+  recettes: readonly Recette[], clientsBruts: unknown
+): readonly Recette[] {
+  const parClient = new Map(
+    clientsDuSchema12(clientsBruts).map((c) => [c.nom, c.delaiPaiement])
+  );
+  return recettes.map((r) => {
+    if (r.echeanceLe != null) return r;
+    /* La FORME de la date est vérifiée avant de calculer. Un bloc venu d'un
+       compte distant peut porter n'importe quoi : `new Date('n importe
+       quoi')` donne une date invalide, dont `toISOString()` LÈVE. La migration
+       s'exécute au chargement, donc l'exception ne tombait pas dans un coin —
+       elle emportait l'écran entier, et la seule trace était un « Invalid time
+       value » sans rapport apparent avec une facture. */
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.emiseLe ?? ''))) {
+      return { ...r, echeanceLe: null };
+    }
+    const formule = parClient.get(r.clientNom) ?? FORMULE_PAR_DEFAUT;
+    return { ...r, echeanceLe: echeanceDe(r.emiseLe as DateISO, formule) };
   });
 }

@@ -497,3 +497,102 @@ describe('schéma 11 → 12 : le foyer fiscal', () => {
     expect(motifRefusFaits({ ...faitsVides(), versementPerDeductible: null })).toBeNull();
   });
 });
+
+/**
+ * L'ÉCHÉANCE CESSE DE SE RECALCULER, ET C'EST TOUT L'OBJET DU SCHÉMA 13.
+ *
+ * Elle se dérivait à la lecture, en ajoutant le délai du client à la date
+ * d'émission. Changer les conditions d'un client réécrivait donc
+ * rétroactivement l'échéance de toutes ses factures déjà parties : « cette
+ * facture était-elle en retard ? » changeait de réponse, et le compteur de
+ * retards avec.
+ */
+describe('schéma 12 → 13 : conditions de paiement et échéance', () => {
+  const bloc = (modifications: Record<string, unknown> = {}) => completerFaits({
+    version: 12,
+    clients: [{ id: 'c1', nom: 'Client A', delaiPaiementJours: 45 }],
+    recettes: [{
+      id: 'r1', clientNom: 'Client A', libelle: 'Prestation', montant: 1000,
+      emiseLe: '2026-06-12', encaisseeLe: null, modeReglement: null, numero: '2026-001'
+    }],
+    missions: [{ id: 'm1', clientNom: 'Client A', entites: [] }],
+    ...modifications
+  });
+
+  /**
+   * L'ancien nombre de jours devient une formule « nets », jamais « fin de
+   * mois » : c'est exactement ce que le code calculait. Le traduire autrement
+   * aurait décalé de plusieurs semaines l'échéance de factures déjà émises,
+   * sous couvert de les corriger.
+   */
+  it('traduit le délai en jours vers une formule « nets »', () => {
+    expect(bloc().clients[0]?.delaiPaiement).toBe('net_45');
+  });
+
+  it('fige l’échéance de chaque facture déjà émise', () => {
+    // 12 juin + 45 jours nets = 27 juillet.
+    expect(bloc().recettes[0]?.echeanceLe).toBe('2026-07-27');
+  });
+
+  /**
+   * Le fait figé l'emporte : une facture qui porte déjà son échéance ne la
+   * voit pas recalculée, même si les conditions du client ont changé depuis.
+   */
+  it('ne touche pas à une échéance déjà portée par la recette', () => {
+    const avec = completerFaits({
+      version: 13,
+      clients: [{ id: 'c1', nom: 'Client A', delaiPaiement: 'reception' }],
+      recettes: [{
+        id: 'r1', clientNom: 'Client A', libelle: 'P', montant: 1000,
+        emiseLe: '2026-06-12', encaisseeLe: null, modeReglement: null,
+        numero: '2026-001', echeanceLe: '2026-07-31'
+      }]
+    });
+    expect(avec.recettes[0]?.echeanceLe).toBe('2026-07-31');
+  });
+
+  /** Rien n'est encore dû sur un brouillon : pas de date inventée. */
+  it('laisse sans échéance une recette non émise', () => {
+    const sansEmission = bloc({
+      recettes: [{
+        id: 'r1', clientNom: 'Client A', libelle: 'P', montant: 1000,
+        emiseLe: null, encaisseeLe: null, modeReglement: null, numero: ''
+      }]
+    });
+    expect(sansEmission.recettes[0]?.echeanceLe).toBeNull();
+  });
+
+  /**
+   * Un bloc venu d'un compte distant peut porter n'importe quoi. `new
+   * Date('n importe quoi').toISOString()` LÈVE, et la migration s'exécute au
+   * chargement : l'exception emportait l'écran entier, avec pour seule trace
+   * un « Invalid time value » sans rapport apparent avec une facture.
+   */
+  it('ne lève pas sur une date d’émission mal formée', () => {
+    const abime = bloc({
+      recettes: [{
+        id: 'r1', clientNom: 'Client A', libelle: 'P', montant: 1000,
+        emiseLe: 'pas une date', encaisseeLe: null, modeReglement: null, numero: ''
+      }]
+    });
+    expect(abime.recettes[0]?.echeanceLe).toBeNull();
+  });
+
+  /**
+   * Une mission d'avant le schéma 13 n'a pas ses propres conditions : elle
+   * hérite de son client, ce qui est le comportement d'alors.
+   *
+   * Le champ reste ABSENT plutôt que posé à `null` : il est facultatif, et le
+   * seul lecteur — la projection — le normalise déjà. Le parcourir au
+   * chargement aurait coûté un balayage de la liste à tous les utilisateurs
+   * pour une valeur qu'aucun n'a encore saisie.
+   */
+  it('laisse la mission hériter du client', () => {
+    expect(bloc().missions[0]?.delaiPaiement ?? null).toBeNull();
+  });
+
+  it('propose « 30 jours fin de mois » à un client sans délai connu', () => {
+    const sansDelai = bloc({ clients: [{ id: 'c1', nom: 'Client A' }] });
+    expect(sansDelai.clients[0]?.delaiPaiement).toBe('fdm_30');
+  });
+});

@@ -24,7 +24,7 @@ import {
 } from '../domain/calculs/facture';
 import { prochainNumero } from '../domain/calculs/ecritureRecette';
 import {
-  DELAI_PAIEMENT_DEFAUT, type FactureSuivie, type StatutFacture,
+ type FactureSuivie, type StatutFacture,
   encoursDe, suivre
 } from '../domain/calculs/facturier';
 import { dansLaPeriode, type Periode } from '../domain/calculs/periode';
@@ -36,6 +36,9 @@ import {
   type BrouillonDeFacture, type LigneDeBrouillon, brouillonsDuMois
 } from '../domain/calculs/brouillon';
 import { previsionDuMoisParMission } from './selecteurs.activite';
+import {
+  FORMULE_PAR_DEFAUT, echeanceDe
+} from '../domain/calculs/delaiPaiement';
 
 /** L'émetteur, tel qu'il doit figurer sur une facture. */
 export function emetteurDe(faits: Faits): Emetteur {
@@ -66,7 +69,7 @@ export function destinataireDe(client: Client): Destinataire {
     siret: client.siret,
     pays: client.pays,
     tvaIntracom: client.tvaIntracom,
-    delaiPaiementJours: client.delaiPaiementJours
+    delaiPaiement: client.delaiPaiement
   };
 }
 
@@ -142,14 +145,15 @@ export function etatFacturier(
   periode: Periode,
   maintenant: Date = new Date()
 ): EtatFacturier {
-  const delais = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
+  /* Secours : l'échéance manque sur la recette (bloc écrit à la main, jeu
+     d'essai). On la reconstruit depuis les conditions actuelles du client —
+     faute de mieux, et sans l'écrire nulle part. */
+  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+  const secours = (nom: string, emiseLe: DateISO) =>
+    echeanceDe(emiseLe, formules.get(nom) ?? FORMULE_PAR_DEFAUT);
   const aujourdhui = maintenant.toISOString().slice(0, 10) as DateISO;
 
-  const toutes = suivre(
-    faits.recettes,
-    (nom) => delais.get(nom) ?? DELAI_PAIEMENT_DEFAUT,
-    aujourdhui
-  );
+  const toutes = suivre(faits.recettes, secours, aujourdhui);
 
   const factures = toutes
     .filter((f) => f.statut === 'brouillon' || dansLaPeriode(f.recette.emiseLe, periode))

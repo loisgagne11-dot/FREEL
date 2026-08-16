@@ -37,8 +37,10 @@ import {
 } from '../domain/bareme/urssaf';
 import { soldeBancaire } from '../domain/calculs/banque';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
-import { DELAI_PAIEMENT_DEFAUT } from '../domain/calculs/facturier';
 import type { Faits } from './schema';
+import {
+  FORMULE_PAR_DEFAUT, echeanceDe
+} from '../domain/calculs/delaiPaiement';
 
 /**
  * Le barème URSSAF effectivement appliqué.
@@ -195,7 +197,11 @@ export function entreeATraiter(
   echeancesReglementaires: EntreeATraiter['echeancesReglementaires'] = [],
   maintenant: Date = new Date()
 ): EntreeATraiter {
-  const delaiParClient = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
+  /* L'échéance vient de la recette : elle est imprimée sur le document. Le
+     secours ne sert qu'à une facture qu'aucune migration n'aurait comblée —
+     une facture émise sans échéance serait réputée jamais échue, et les
+     retards les plus anciens seraient précisément ceux qu'on ne verrait pas. */
+  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
   return {
     aujourdhui: dateISOde(maintenant),
     typeActivite: faits.entreprise.typeActivite,
@@ -206,7 +212,10 @@ export function entreeATraiter(
       encaisseeLe: r.encaisseeLe,
       modeReglement: r.modeReglement,
       clientNom: r.clientNom,
-      delaiPaiementJours: delaiParClient.get(r.clientNom) ?? DELAI_PAIEMENT_DEFAUT
+      echeanceLe: r.emiseLe === null
+        ? null
+        : r.echeanceLe
+          ?? echeanceDe(r.emiseLe, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT)
     })),
     periodesDeclarees: faits.periodesDeclarees,
     echeancesSaisies: faits.echeances.length,

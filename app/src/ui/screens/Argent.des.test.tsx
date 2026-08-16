@@ -19,7 +19,7 @@ beforeEach(() => {
 
 const client = (m: Partial<Client> = {}): Client => ({
   id: 'c1', nom: 'ClientDE', adresse: '', siret: '', email: '',
-  delaiPaiementJours: 30, pays: 'DE', tvaIntracom: 'DE123456789', ...m
+  delaiPaiement: 'net_30', pays: 'DE', tvaIntracom: 'DE123456789', ...m
 });
 
 const recette = (m: Partial<Recette> = {}): Recette => ({

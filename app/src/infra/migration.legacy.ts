@@ -33,6 +33,7 @@ import {
   type Rythme, entrepriseVide, foyerFiscalDepuisConfigImpot
 } from '../state/schema';
 import { JOURS_SEMAINE } from '../domain/calculs/planning';
+import { formuleDepuisJours } from '../domain/calculs/delaiPaiement';
 import type { ClientOperationnel } from '../state/schema';
 import type { Echeance, NatureDette } from '../domain/calculs/provisions';
 import {
@@ -690,7 +691,12 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       adresse: texte(cli['adresse']),
       siret: texte(cli['siret']),
       email: texte(cli['email']),
-      delaiPaiementJours: nombre(cli['delaiPaiement']),
+      /* L'ancienne application ne connaissait qu'un nombre de jours, appliqué
+         par simple addition. On traduit donc vers une formule « nets » et non
+         « fin de mois » : traduire un ancien 30 par « 30 jours fin de mois »
+         aurait décalé de plusieurs semaines l'échéance de factures déjà
+         émises, sous couvert de les corriger. */
+      delaiPaiement: formuleDepuisJours(nombre(cli['delaiPaiement'])),
       // L'ancien modèle ne connaissait ni pays ni numéro de TVA du client :
       // il ne pouvait donc pas voir qu'une déclaration européenne de services
       // était due. Les champs sont créés vides, et tout client est réputé

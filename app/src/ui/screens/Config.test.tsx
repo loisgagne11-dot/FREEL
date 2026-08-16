@@ -352,7 +352,7 @@ describe('restauration d’une sauvegarde', () => {
     ...faitsVides(),
     clients: [{
       id: 'c1', nom: 'Client repris', adresse: '', siret: '', email: '',
-      delaiPaiementJours: 30, pays: '', tvaIntracom: ''
+      delaiPaiement: 'net_30', pays: '', tvaIntracom: ''
     }]
   };
 
@@ -391,7 +391,7 @@ describe('restauration d’une sauvegarde', () => {
         ...faitsVides(),
         clients: [{
           id: 'existant', nom: 'Déjà là', adresse: '', siret: '', email: '',
-          delaiPaiementJours: 30, pays: '', tvaIntracom: ''
+          delaiPaiement: 'net_30', pays: '', tvaIntracom: ''
         }]
       }
     });

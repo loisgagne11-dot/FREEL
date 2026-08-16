@@ -52,8 +52,15 @@ export interface RecetteVue {
   readonly encaisseeLe: DateISO | null;
   readonly modeReglement: string | null;
   readonly clientNom: string;
-  /** Délai de paiement convenu, en jours. */
-  readonly delaiPaiementJours: number;
+  /**
+   * L'échéance imprimée sur la facture, ou `null` si elle n'est pas émise.
+   *
+   * Une DATE et non un délai : la recalculer ici depuis le délai du client
+   * ferait changer de réponse à « cette facture était-elle en retard ? » dès
+   * qu'on modifie les conditions du client. Le compteur de retards changerait
+   * avec, rétroactivement.
+   */
+  readonly echeanceLe: DateISO | null;
 }
 
 export interface EntreeATraiter {
@@ -251,14 +258,13 @@ export function sujetsATraiter(
 
   /* ---------- factures en retard de paiement ---------- */
   const enRetard = e.recettes.filter((r) => {
-    if (r.encaisseeLe !== null || r.emiseLe === null) return false;
-    const echeance = ajouterJours(r.emiseLe, r.delaiPaiementJours);
-    return echeance < e.aujourdhui;
+    if (r.encaisseeLe !== null || r.emiseLe === null || r.echeanceLe === null) return false;
+    return r.echeanceLe < e.aujourdhui;
   });
   if (enRetard.length > 0) {
     const total = euros(enRetard.reduce<number>((s, r) => s + r.montant, 0));
     const plusAncienne = enRetard
-      .map((r) => joursEntre(ajouterJours(r.emiseLe as DateISO, r.delaiPaiementJours), e.aujourdhui))
+      .map((r) => joursEntre(r.echeanceLe as DateISO, e.aujourdhui))
       .reduce((a, b) => Math.max(a, b), 0);
     sujets.push({
       id: 'factures-en-retard',

@@ -29,9 +29,11 @@ import {
   type DeclarationDes, type DeclarationEnRetard,
   amendeEncourue, declarationDuMois, declarationsEnRetard
 } from '../domain/calculs/des';
-import { DELAI_PAIEMENT_DEFAUT, echeanceDe } from '../domain/calculs/facturier';
 import { dateDuJour, preneursDeServices } from './selecteurs';
 import type { Faits, Recette } from './schema';
+import {
+  FORMULE_PAR_DEFAUT, echeanceDe
+} from '../domain/calculs/delaiPaiement';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Déclaration européenne de services
@@ -133,14 +135,17 @@ function recettesEnAttente(
   faits: Faits,
   maintenant: Date = new Date()
 ): readonly RecetteEnAttente[] {
-  const delais = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiementJours]));
+  /* L'échéance est LUE sur la recette : elle est imprimée sur le document
+     envoyé. Le secours ne sert qu'à une recette qu'aucune migration n'aurait
+     comblée. */
+  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
   const aujourdhui = dateDuJour(maintenant);
 
   return faits.recettes
     .filter((r) => r.encaisseeLe === null && r.emiseLe !== null)
     .map((r) => {
-      const jours = delais.get(r.clientNom) ?? DELAI_PAIEMENT_DEFAUT;
-      const echeanceLe = echeanceDe(r.emiseLe as DateISO, jours);
+      const echeanceLe = r.echeanceLe
+        ?? echeanceDe(r.emiseLe as DateISO, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT);
       return { ...r, echeanceLe, enRetard: echeanceLe < aujourdhui };
     })
     .sort((a, b) => (b.emiseLe as DateISO).localeCompare(a.emiseLe as DateISO));

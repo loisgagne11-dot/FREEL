@@ -20,7 +20,7 @@ beforeEach(() => {
 
 const client = (m: Partial<Client> = {}): Client => ({
   id: 'c1', nom: 'Dupont', adresse: '', siret: '', email: '',
-  delaiPaiementJours: 30, pays: '', tvaIntracom: '', ...m
+  delaiPaiement: 'net_30', pays: '', tvaIntracom: '', ...m
 });
 
 const recette = (m: Partial<Recette> = {}): Recette => ({
@@ -487,5 +487,75 @@ describe('changement de rythme en cours de mission', () => {
     const rythmes = useFaits.getState().faits.missions[0]?.entites[0]?.rythmes ?? [];
     expect(rythmes).toHaveLength(1);
     expect(rythmes[0]?.au).toBe('2026-01-31');
+  });
+});
+
+/**
+ * LES CONDITIONS DE PAIEMENT SE CHOISISSENT DANS UNE LISTE.
+ *
+ * Pas une saisie libre en jours : les conditions réelles sont un petit
+ * ensemble de formules nommées, que les deux parties écrivent telles quelles
+ * sur le contrat. Et surtout, un nombre de jours NE PEUT PAS exprimer « fin de
+ * mois » — une facture du 12 juin à « 30 jours fin de mois » n'est pas due le
+ * 12 juillet mais le 31.
+ */
+describe('conditions de paiement', () => {
+  it('propose la liste sur une mission, avec « comme le client » par défaut', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    const liste = await screen.findByLabelText('Conditions de paiement');
+
+    expect((liste as HTMLSelectElement).value).toBe('');
+    expect(within(liste).getByRole('option', { name: 'Comme le client' })).toBeTruthy();
+    expect(within(liste).getByRole('option', { name: '30 jours fin de mois' })).toBeTruthy();
+    expect(within(liste).getByRole('option', { name: 'Fin de mois + 30 jours' })).toBeTruthy();
+  });
+
+  it('enregistre la formule choisie sur la mission', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    await utilisateur.type(await screen.findByLabelText('Client'), 'ClientA');
+    await utilisateur.selectOptions(
+      screen.getByLabelText('Conditions de paiement'), 'fdm_45'
+    );
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+
+    expect(useFaits.getState().faits.missions[0]?.delaiPaiement).toBe('fdm_45');
+  });
+
+  /**
+   * On CONSTATE le dépassement, on ne le refuse pas : il arrive de signer ce
+   * qu'on n'a pas choisi, et interdire de saisir ses conditions réelles
+   * obligerait à mentir sur ses propres factures.
+   */
+  it('signale un délai hors des bornes légales, sans bloquer', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    await utilisateur.type(await screen.findByLabelText('Client'), 'ClientA');
+    await utilisateur.selectOptions(
+      screen.getByLabelText('Conditions de paiement'), 'fdm_60'
+    );
+
+    expect(screen.getByText(/L441-10/)).toBeTruthy();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter la mission' }));
+    expect(useFaits.getState().faits.missions[0]?.delaiPaiement).toBe('fdm_60');
+  });
+
+  it('ne signale rien sur une formule qui tient dans la loi', async () => {
+    const utilisateur = await ouvrir('Missions');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter une mission' }));
+    await screen.findByLabelText('Conditions de paiement');
+    await utilisateur.selectOptions(
+      screen.getByLabelText('Conditions de paiement'), 'fdm_45'
+    );
+    expect(screen.queryByText(/L441-10/)).toBeNull();
+  });
+
+  it('propose « 30 jours fin de mois » à un nouveau client', async () => {
+    const utilisateur = await ouvrir('Clients');
+    await utilisateur.click(screen.getByRole('button', { name: 'Ajouter un client' }));
+    const liste = await screen.findByLabelText('Conditions de paiement habituelles');
+    expect((liste as HTMLSelectElement).value).toBe('fdm_30');
   });
 });

@@ -9,6 +9,12 @@ import type { Client, ClientOperationnel, Mission } from '../../state/schema';
 import {
   JOURS_SEMAINE as JOURS_DE_LA_SEMAINE, type JourDeSemaine, type Rythme
 } from '../../domain/calculs/planning';
+import {
+  FORMULE_PAR_DEFAUT, type FormuleDelai
+} from '../../domain/calculs/delaiPaiement';
+import {
+  FORMULES_DELAI, depassementLegal, libelleDelai
+} from '../../domain/calculs/delaiPaiement.libelles';
 import styles from './Activite.module.css';
 
 /** Les teintes proposées pour distinguer les clients opérationnels au planning. */
@@ -78,7 +84,7 @@ export function FormulaireClient(
     adresse: existant?.adresse ?? '',
     siret: existant?.siret ?? '',
     email: existant?.email ?? '',
-    delaiPaiementJours: existant?.delaiPaiementJours ?? 30,
+    delaiPaiement: existant?.delaiPaiement ?? FORMULE_PAR_DEFAUT,
     pays: existant?.pays ?? '',
     tvaIntracom: existant?.tvaIntracom ?? ''
   }));
@@ -125,14 +131,12 @@ export function FormulaireClient(
         </Champ>
       )}
 
-      <Champ id={`${idChamp}-delai`} libelle="Délai de paiement (jours)">
-        <input id={`${idChamp}-delai`} inputMode="numeric"
-          value={String(saisie.delaiPaiementJours)}
-          onChange={(e) => setSaisie({
-            ...saisie,
-            delaiPaiementJours: Math.max(0, Number.parseInt(e.target.value, 10) || 0)
-          })} />
-      </Champ>
+      <ChoixDelai
+        id={`${idChamp}-delai`}
+        libelle="Conditions de paiement habituelles"
+        valeur={saisie.delaiPaiement}
+        onChange={(delaiPaiement) => setSaisie({ ...saisie, delaiPaiement })}
+      />
 
       <Champ id={`${idChamp}-email`} libelle="Courriel">
         <input id={`${idChamp}-email`} type="email" value={saisie.email}
@@ -187,6 +191,7 @@ export function FormulaireMission(
     clientNom: existante?.clientNom ?? '',
     description: existante?.description ?? '',
     tjm: existante?.tjm ?? euros(0),
+    delaiPaiement: existante?.delaiPaiement ?? null,
     debut: existante?.debut ?? null,
     fin: existante?.fin ?? null,
     statut: existante?.statut ?? 'active',
@@ -264,6 +269,17 @@ export function FormulaireMission(
           <option value="perdue">Perdue</option>
         </select>
       </Champ>
+
+      {/* Les conditions de la MISSION l'emportent sur celles du client : une
+          mission passée par une agence et une vente directe au même nom n'ont
+          pas les mêmes. « Comme le client » reste le défaut. */}
+      <ChoixDelai
+        id={`${idChamp}-delai`}
+        libelle="Conditions de paiement"
+        valeur={saisie.delaiPaiement ?? null}
+        avecHeritage
+        onChange={(delaiPaiement) => setSaisie({ ...saisie, delaiPaiement })}
+      />
 
       <EditeurEntites
         entites={saisie.entites}
@@ -735,4 +751,46 @@ function veilleDe(date: DateISO): DateISO {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10) as DateISO;
+}
+
+
+/**
+ * La liste des conditions de paiement.
+ *
+ * Une liste et non une saisie libre en jours : les conditions réelles sont un
+ * petit ensemble de formules nommées, que les deux parties écrivent telles
+ * quelles sur le contrat. Et surtout, un nombre de jours **ne peut pas**
+ * exprimer « fin de mois », qui est le cas courant — une facture du 12 juin à
+ * « 30 jours fin de mois » n'est pas due le 12 juillet mais le 31.
+ *
+ * Le dépassement des bornes légales est DIT, jamais bloqué : il arrive de
+ * signer ce qu'on n'a pas choisi, et interdire de saisir ses conditions
+ * réelles obligerait à mentir sur ses propres factures.
+ */
+function ChoixDelai<T extends FormuleDelai | null>(
+  { id, libelle, valeur, avecHeritage, onChange }: {
+    readonly id: string;
+    readonly libelle: string;
+    readonly valeur: T;
+    /** Ajoute « comme le client », qui vaut `null`. Pour une mission. */
+    readonly avecHeritage?: boolean;
+    readonly onChange: (v: T) => void;
+  }
+) {
+  const alerte = valeur === null ? null : depassementLegal(valeur);
+  return (
+    <Champ id={id} libelle={libelle}>
+      <select
+        id={id}
+        value={valeur ?? ''}
+        onChange={(e) => onChange((e.target.value === '' ? null : e.target.value) as T)}
+      >
+        {avecHeritage === true && <option value="">Comme le client</option>}
+        {FORMULES_DELAI.map((f) => (
+          <option key={f} value={f}>{libelleDelai(f)}</option>
+        ))}
+      </select>
+      {alerte !== null && <span className={styles.aide} role="status">{alerte}</span>}
+    </Champ>
+  );
 }
