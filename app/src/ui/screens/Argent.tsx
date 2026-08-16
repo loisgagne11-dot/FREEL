@@ -2,10 +2,8 @@ import { Suspense, lazy, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
 import { type EtatSeuils, etatArgent } from '../../state/selecteurs.argent';
-import { etatLivre } from '../../state/selecteurs.livre';
 import type { DateISO, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
-import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
 import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
@@ -14,14 +12,14 @@ import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
 import { Repartition } from '../components/Repartition';
-import { Statut, statutRecette } from '../components/Statut';
-import { Vide } from '../components/Vide';
+import { Statut } from '../components/Statut';
 import { useToast } from '../components/Toasts';
 import { Echeances } from '../components/Echeances';
 import { CartePliable } from '../components/CartePliable';
+import { Chiffre } from '../components/Chiffre';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
-import { dateCourte, eur } from '../format';
+import { eur } from '../format';
 import styles from './Argent.module.css';
 import { Montant } from '../components/Montant';
 
@@ -47,6 +45,20 @@ const DeclarationServices = lazy(() => import('./Argent.des')
  */
 const DossierTvaPanneau = lazy(() => import('./Argent.tva')
   .then((m) => ({ default: m.DossierTvaPanneau })));
+
+/**
+ * La projection du disponible et les versements.
+ *
+ * Deux graphes qui ne servent qu'à une question de pilotage — « combien puis-je
+ * me verser ? » — et qu'on ne consulte pas en vérifiant son solde. Ils vivent
+ * donc dans leur propre module, chargé à l'ouverture de leur carte.
+ */
+const ProjectionPanneau = lazy(() => import('./Argent.projection')
+  .then((m) => ({ default: m.ProjectionPanneau })));
+
+/** Le registre : on l'ouvre pour vérifier ou justifier, pas tous les jours. */
+const LivreDesRecettes = lazy(() => import('./Argent.livre')
+  .then((m) => ({ default: m.LivreDesRecettes })));
 
 /**
  * Écran Argent — trésorerie et performance.
@@ -115,17 +127,13 @@ export function Argent() {
           <CartePliable
             id="repartition"
             ecran="argent"
-            titre={(
-              <>
-                Votre solde n’est pas tout à vous
-                <Info libelle="Pourquoi le solde trompe">
+            titre="Votre solde n’est pas tout à vous"
+            aide={<Info libelle="Pourquoi le solde trompe">
                   Le solde bancaire contient les cotisations d’un trimestre que
                   vous n’avez pas encore déclaré. Le regarder et se sentir riche,
                   c’est le mécanisme exact du rappel qu’on ne peut plus payer. La
                   barre montre d’abord ce qui n’est <em>pas</em> à vous.
-                </Info>
-              </>
-            )}
+                </Info>}
             resume={(
               <>
                 <Montant>{eur(etat.tresorerie.versable)}</Montant> à vous
@@ -163,20 +171,35 @@ export function Argent() {
           <CarteSeuils seuils={etat.seuils} />
 
           <CartePliable
+            id="projection"
+            ecran="argent"
+            titre="Où va votre disponible, et combien vous pouvez vous verser"
+            aide={<Info libelle="Ce que cette projection montre">
+                  Douze mois à venir, dans deux scénarios&nbsp;: sans rien vous
+                  verser, et en vous versant chaque mois le maximum qui ne fasse
+                  jamais passer le disponible sous votre réserve. Les
+                  encaissements attendus viennent des factures émises non
+                  réglées et du revenu prévu au planning — aucune tendance n’est
+                  devinée.
+                </Info>}
+            resume="Projection sur douze mois, et versement mensuel soutenable"
+          >
+            <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+              <ProjectionPanneau />
+            </Suspense>
+          </CartePliable>
+
+          <CartePliable
             id="enveloppes"
             ecran="argent"
-            titre={(
-              <>
-                Enveloppes de provision
-                <Info libelle="Explication des deux volets de provision">
+            titre="Enveloppes de provision"
+            aide={<Info libelle="Explication des deux volets de provision">
                   Les échéances émises sont ce que l’URSSAF ou le fisc ont déjà
                   appelé. Les charges sur recettes encaissées sont dues mais pas
                   encore appelées&nbsp;: la dette naît à l’encaissement, pas à
                   l’émission de l’échéance. Une fois la période déclarée, la
                   seconde ligne bascule dans la première.
-                </Info>
-              </>
-            )}
+                </Info>}
             resume={(
               <>
                 <Montant>{eur(etat.tresorerie.provisions)}</Montant> à garder de côté
@@ -270,7 +293,9 @@ export function Argent() {
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="livre" actif={section === 'livre'}>
-          <LivreDesRecettes idGroupe={idGroupe} />
+          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+            <LivreDesRecettes idGroupe={idGroupe} />
+          </Suspense>
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="des" actif={section === 'des'}>
@@ -299,151 +324,6 @@ export function Argent() {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Livre des recettes
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * Le registre obligatoire.
- *
- * L'ancienne application ne portait ni date d'encaissement ni mode de
- * règlement : son registre n'était pas conforme, et rien ne le disait. Ici,
- * les écarts sont constatés et nommés — « registre non conforme » sans plus de
- * précision n'aide personne à le rendre conforme.
- *
- * Le livre ne contient QUE des encaissements. Une facture émise et non réglée
- * n'y figure pas : l'y faire figurer serait déclarer une recette qui n'a pas
- * eu lieu.
- */
-function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
-  const faits = useFaits((e) => e.faits);
-  const annulerRecette = useFaits((e) => e.annulerRecette);
-  const etat = useMemo(() => etatLivre(faits), [faits]);
-
-  return (
-    <>
-      <div className={styles.grille}>
-        <Chiffre libelle="Écritures au livre" valeur={String(etat.total.ecritures)} />
-        <Chiffre libelle="Total encaissé" valeur={eur(etat.total.total)} ton="accent" />
-        <Chiffre
-          libelle="Écarts de conformité"
-          valeur={String(etat.ecarts.length)}
-          ton={etat.ecarts.length > 0 ? 'danger' : 'neutre'}
-        />
-      </div>
-
-      {etat.ecarts.length > 0 && (
-        <section className={styles.carte} aria-labelledby={`${idGroupe}-ecarts`}>
-          <h2 id={`${idGroupe}-ecarts`} className={styles.titreCarte}>
-            À corriger
-            <Info libelle="Ce qui rend un registre opposable">
-              Le livre des recettes doit présenter, pour chaque encaissement, sa
-              date, son montant, l’identité du client, le mode de règlement et
-              la référence de la pièce. Une numérotation trouée se lit, en
-              contrôle, comme une facture retirée du registre.
-            </Info>
-          </h2>
-          <ul className={styles.ecarts}>
-            {etat.ecarts.map((ecart, i) => (
-              <li key={`${ecart.nature}-${ecart.ecritureId ?? i}`} className={styles.ecart}>
-                {ecart.message}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className={styles.carte} aria-labelledby={`${idGroupe}-ecritures`}>
-        <h2 id={`${idGroupe}-ecritures`} className={styles.titreCarte}>
-          Écritures
-          <Info libelle="Pourquoi rien ne s’efface ici">
-            Le registre se tient en ajout seul&nbsp;: une recette encaissée
-            s’annule par une écriture inverse, datée du jour de la correction,
-            et les deux restent visibles. Un registre qu’on peut réécrire ne
-            prouve rien — c’est précisément ce qu’un contrôle vérifie.
-          </Info>
-        </h2>
-
-        {etat.ecritures.length === 0
-          ? (
-            <Vide
-              message="Aucun encaissement enregistré. Le livre des recettes se remplit quand une facture émise est marquée encaissée."
-              action={<a className={styles.actionPrincipale} href="#/facture">Émettre une facture</a>}
-            />
-          )
-          : (
-            <ul className={styles.liste}>
-              {etat.ecritures.map((e) => (
-                <li key={e.id} className={styles.ligneEcriture}>
-                  <span className={styles.ligneTitre}>
-                    <span className={styles.ligneLibelle}>{e.libelle}</span>
-                    <span className={styles.ligneMontant}><Montant>{eur(e.montant)}</Montant></span>
-                  </span>
-                  <span className={styles.ligneMeta}>
-                    <span>{dateCourte(e.encaisseeLe)}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{e.clientNom || 'Client non renseigné'}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{e.numero || 'Sans numéro'}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{libelleMode(e.modeReglement)}</span>
-                  </span>
-                  {etat.ecartsParEcriture.get(e.id)?.map((ecart) => (
-                    <span key={ecart.nature} className={styles.alerteLigne}>{ecart.message}</span>
-                  ))}
-                  {!estAnnulation(e) && (
-                    <button
-                      type="button"
-                      className={styles.actionLigne}
-                      onClick={() => annulerRecette(e.id)}
-                    >
-                      Annuler par écriture inverse
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-      </section>
-
-      {etat.enAttente.length > 0 && (
-        <section className={styles.carte} aria-labelledby={`${idGroupe}-attente`}>
-          <h2 id={`${idGroupe}-attente`} className={styles.titreCarte}>
-            Émises, pas encore encaissées
-            <Info libelle="Pourquoi elles ne sont pas au livre">
-              Le livre des recettes enregistre des encaissements. Une facture
-              émise et non réglée n’y a pas sa place&nbsp;: l’y inscrire
-              reviendrait à déclarer une recette qui n’a pas eu lieu, et à payer
-              des cotisations dessus.
-            </Info>
-          </h2>
-          <ul className={styles.liste}>
-            {etat.enAttente.map((r) => (
-              <li key={r.id} className={styles.ligneEcriture}>
-                <span className={styles.ligneTitre}>
-                  <span className={styles.ligneLibelle}>{r.libelle}</span>
-                  <span className={styles.ligneMontant}><Montant>{eur(r.montant)}</Montant></span>
-                </span>
-                <span className={styles.ligneMeta}>
-                  <Statut {...statutRecette({ encaissee: false, echeanceDepassee: r.enRetard })} />
-                  <span>Émise le {dateCourte(r.emiseLe)}</span>
-                  {r.echeanceLe !== null && (
-                    <>
-                      <span aria-hidden="true">·</span>
-                      <span>échéance {dateCourte(r.echeanceLe)}</span>
-                    </>
-                  )}
-                  <span aria-hidden="true">·</span>
-                  <span>{r.numero || 'Sans numéro'}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </>
-  );
-}
 
 /**
  * « Seuils — où j'en suis », la carte prévue par la spec de design.
@@ -618,19 +498,15 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
     <CartePliable
       id="seuils"
       ecran="argent"
-      titre={(
-        <>
-          Seuils — où j’en suis
-          <Info libelle="Ce que ces deux seuils déclenchent">
+      titre="Seuils — où j’en suis"
+            aide={<Info libelle="Ce que ces deux seuils déclenchent">
             Le <strong>plafond micro</strong> conditionne le régime lui-même&nbsp;:
             le dépasser deux années de suite fait basculer en réel. La
             <strong> franchise de TVA</strong> est plus immédiate&nbsp;: passé le
             seuil majoré, la TVA devient exigible <em>dès le mois du
             dépassement</em>, y compris sur les factures déjà émises sans TVA.
             Les deux se mesurent sur le chiffre d’affaires <em>encaissé</em>.
-          </Info>
-        </>
-      )}
+          </Info>}
       resume={resume}
     >
       <div className={styles.jauges}>
@@ -745,16 +621,6 @@ function moisLong(m: Mois): string {
 
 
 
-function libelleMode(mode: string | null): string {
-  switch (mode) {
-    case 'virement': return 'Virement';
-    case 'cheque': return 'Chèque';
-    case 'especes': return 'Espèces';
-    case 'carte': return 'Carte';
-    case 'autre': return 'Autre';
-    default: return 'Mode non renseigné';
-  }
-}
 
 /**
  * Le design veut les montants du graphe libellés en k€ : au-dessus des barres,
@@ -777,20 +643,3 @@ function seriesDe(
   ];
 }
 
-function Chiffre(
-  { libelle, valeur, ton = 'neutre' }: {
-    libelle: string;
-    valeur: string;
-    ton?: 'neutre' | 'accent' | 'attention' | 'danger';
-  }
-) {
-  const classe = ton === 'danger' ? styles.danger
-    : ton === 'attention' ? styles.attention
-    : ton === 'accent' ? styles.accent : '';
-  return (
-    <div className={styles.chiffre}>
-      <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
-    </div>
-  );
-}

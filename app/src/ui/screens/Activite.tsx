@@ -957,19 +957,15 @@ function CartePrevision(
     <CartePliable
       id="prevision"
       ecran="activite"
-      titre={(
-        <>
-          Ce que le mois devrait rapporter
-          <Info libelle="D’où vient cette prévision">
+      titre="Ce que le mois devrait rapporter"
+            aide={<Info libelle="D’où vient cette prévision">
             Du <strong>rythme</strong> de chaque mission et de son tarif
             journalier, congés et jours fériés déduits. Chaque journée est
             valorisée au tarif <em>en vigueur à sa date</em>&nbsp;: appliquer
             celui d’aujourd’hui réécrirait le passé à chaque renégociation.
             Le « retenu » est ce que vos ajustements journaliers ont retenu —
             c’est lui qui se facturera.
-          </Info>
-        </>
-      )}
+          </Info>}
       resume={(
         <>
           <Montant>{eur(total.montantPrevu)}</Montant> prévus
@@ -1036,10 +1032,8 @@ function CarteRapportParMission(
     <CartePliable
       id="rapport-mission"
       ecran="activite"
-      titre={(
-        <>
-          Ce que chaque mission rapporte, et ce qu’elle coûte en temps
-          <Info libelle="Pourquoi l’euro-jour, et d’où vient le montant">
+      titre="Ce que chaque mission rapporte, et ce qu’elle coûte en temps"
+            aide={<Info libelle="Pourquoi l’euro-jour, et d’où vient le montant">
             La colonne qui décide est l’<strong>euro par jour</strong>&nbsp;:
             une mission qui pèse peu dans le chiffre d’affaires en consommant
             beaucoup de temps est un problème que sa part ne montre pas.
@@ -1047,9 +1041,7 @@ function CarteRapportParMission(
             et valorisé au tarif en vigueur à chaque date — et non de
             l’encaissé, qui ne se rattache qu’au client et que deux missions
             simultanées ne pourraient pas se partager.
-          </Info>
-        </>
-      )}
+          </Info>}
       resume={(
         <>
           {meilleur.libelle} rapporte{' '}
@@ -1122,10 +1114,8 @@ function CarteTarifJournalier(
     <CartePliable
       id="tarif-journalier"
       ecran="activite"
-      titre={(
-        <>
-          Ce qu’une journée vous rapporte
-          <Info libelle="Pourquoi trois tarifs et non un seul">
+      titre="Ce qu’une journée vous rapporte"
+            aide={<Info libelle="Pourquoi trois tarifs et non un seul">
             Le <strong>tarif des contrats</strong> vient du planning valorisé au
             tarif de chaque mission. Le <strong>tarif effectif</strong> divise
             ce qui a réellement été facturé par les mêmes journées&nbsp;: leur
@@ -1133,9 +1123,7 @@ function CarteTarifJournalier(
             facturés. Le <strong>net</strong> retire cotisations et impôt — près
             d’un quart du chiffre d’affaires en micro-BNC, et l’écart que l’on
             sous-estime le plus au moment de dire oui à une mission.
-          </Info>
-        </>
-      )}
+          </Info>}
       resume={(
         <>
           <Montant>{eur(effectif.effectif)}</Montant> facturés par jour

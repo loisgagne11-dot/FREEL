@@ -30,9 +30,15 @@ function semer(modifications: Partial<Faits> = {}): void {
   useFaits.setState({ faits: { ...faitsVides(), ...modifications } });
 }
 
+/**
+ * L'onglet est chargé à la demande : on attend son arrivée avant d'interroger
+ * le contenu, sinon la première assertion tombe sur le « Chargement… » du
+ * Suspense.
+ */
 async function ouvrirLivre() {
   render(<Argent />);
   await userEvent.setup().click(screen.getByRole('tab', { name: 'Livre des recettes' }));
+  await screen.findByRole('heading', { name: /^Écritures/ });
 }
 
 describe('conformité du registre', () => {

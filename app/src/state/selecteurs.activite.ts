@@ -664,7 +664,7 @@ export interface TarifDeLaJournee {
  * deux refuse, le total refuse. Additionner un taux connu à un taux inconnu
  * traité comme zéro donnerait un net trop élevé — l'erreur qui rassure.
  */
-function tauxDeChargesAu(faits: Faits, m: Mois): Resolution<number> {
+export function tauxDeChargesAu(faits: Faits, m: Mois): Resolution<number> {
   const type = faits.entreprise.typeActivite;
   const cotis = tauxCotisations(m, type, sousAcreLe(faits)(m), periodesUrssafEffectives(faits));
   if (cotis.statut === 'refuse') return cotis;

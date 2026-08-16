@@ -155,3 +155,61 @@ describe('commandes de l’en-tête', () => {
       .toBe('true');
   });
 });
+
+/**
+ * UN BOUTON DANS UN BOUTON EST DU HTML INVALIDE — ET LE NAVIGATEUR NE SE
+ * CONTENTE PAS DE LE TOLÉRER.
+ *
+ * À l'analyse, il FERME le bouton extérieur et sort l'intérieur de son
+ * conteneur. L'explication « i » échappait ainsi au découpage du titre, se
+ * plaçait où sa largeur naturelle la menait, et poussait la page hors de
+ * l'écran en portrait — trouvé par le vérificateur responsive sur un titre un
+ * peu long, et invisible partout ailleurs.
+ *
+ * La règle était déjà écrite dans le composant — « les commandes vivent hors
+ * du bouton » — mais rien ne l'imposait. Ces tests l'imposent.
+ */
+describe('l’explication vit hors du bouton de pliage', () => {
+  it('rend l’aide à côté du titre, jamais dedans', () => {
+    render(
+      <CartePliable
+        id="t" ecran="test"
+        titre="Un titre"
+        aide={<button type="button">Pourquoi</button>}
+        resume="résumé"
+      >
+        <p>contenu</p>
+      </CartePliable>
+    );
+
+    const bascule = screen.getByRole('button', { name: /Un titre/ });
+    const aide = screen.getByRole('button', { name: 'Pourquoi' });
+    expect(bascule.contains(aide)).toBe(false);
+  });
+
+  /** Aucun bouton imbriqué dans l'en-tête, quelle qu'en soit la profondeur. */
+  it('ne produit aucun bouton imbriqué', () => {
+    const { container } = render(
+      <CartePliable
+        id="t" ecran="test"
+        titre="Un titre très long qui pourrait pousser la page hors de l’écran"
+        aide={<button type="button">Pourquoi</button>}
+        resume="résumé"
+      >
+        <p>contenu</p>
+      </CartePliable>
+    );
+
+    expect(container.querySelectorAll('button button')).toHaveLength(0);
+  });
+
+  /** L'aide reste facultative : une carte peut n'avoir rien à expliquer. */
+  it('n’exige pas d’aide', () => {
+    render(
+      <CartePliable id="t" ecran="test" titre="Un titre" resume="résumé">
+        <p>contenu</p>
+      </CartePliable>
+    );
+    expect(screen.getByRole('button', { name: /Un titre/ })).toBeTruthy();
+  });
+});

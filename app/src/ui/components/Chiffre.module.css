@@ -1,0 +1,31 @@
+/* La tuile de chiffre. Aucune couleur en dur : que des tokens. */
+
+.chiffre {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  min-width: 0;
+}
+
+.libelle {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.montant {
+  font-size: 19px;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.accent { color: var(--green); }
+.attention { color: var(--amber); }
+.danger { color: var(--red); }
