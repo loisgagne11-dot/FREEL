@@ -101,7 +101,37 @@ le propriétaire le 16/08, vérifié sur le code, confirmé.
 | P3 | `provisionImpotRevenu` : l'IR estimé de l'année, réparti sur les mois | Assiette = encaissé constaté + encaissements attendus des missions ; abattement forfaitaire ; barème avec parts ; **les acomptes de PAS déjà saisis sont retranchés** | ⚠️ Le module prend l'assiette complète, mais l'appelant du volet 2 ne peut pas lui fournir les encaissements attendus — voir journal |
 | P4 | La provision d'IR entre au volet 2 des provisions | Le versable cesse d'être surévalué de tout l'impôt pour qui n'a pas coché le versement libératoire | ✅ |
 | P5 | L'écran dit l'hypothèse | Sans parts ni autres revenus, la provision s'affiche comme incomplète — jamais comme un résultat | ✅ |
-| P6 | **L'assiette prend les encaissements attendus des missions** | Aujourd'hui la provision ne compte que l'encaissé constaté : un plancher juste, mais qui monte au fil de l'année au lieu d'être lissé. Le module accepte déjà l'assiette complète ; il manque un accès au pipeline de projection depuis le paquet d'entrée — cycle `etatProjection` → `etatPilote`, et dix-huit kilo-octets à trouver | ⬜ |
+| P6 | **L'assiette prend les encaissements attendus des missions** | Aujourd'hui la provision ne compte que l'encaissé constaté : un plancher juste, mais qui monte au fil de l'année au lieu d'être lissé. **Bloqué par le poids, plus par le cycle** — voir §3 septies | ⛔ |
+
+#### §3 septies — P6 : le cycle se résout, le poids non
+
+**Mesuré le 19/08, pas estimé.** L'extraction a été faite pour de bon, puis
+défaite.
+
+Le cycle n'est pas le problème : `etatProjection` appelle `etatPilote` pour son
+point de départ, mais le pipeline d'encaissements attendus, lui, ne dépend de
+personne en amont. Sorti dans son propre module, il compile et les deux
+consommateurs le lisent sans s'attendre.
+
+Le problème est le **poids**. Brancher la provision d'impôt sur ce pipeline fait
+passer le paquet d'entrée de **78,97 Ko à 100,06 Ko**. Vingt-et-un kilo-octets :
+c'est la machinerie qui transforme des rythmes en jours travaillés — planning,
+jours fériés, congés, prévision. Il n'y a pas vingt-et-un kilo-octets à extraire
+ailleurs.
+
+Trois issues, et aucune ne se prend sans arbitrage :
+
+1. **Sortir le Pilote du paquet d'entrée**, comme les cinq autres écrans. Le
+   total téléchargé ne change pas ; il se répartit autrement, au prix d'un
+   aller-retour de plus sur un chargement à froid. L'architecture devient
+   uniforme.
+2. **Affiner après le premier rendu** : montrer le plancher, puis le corriger
+   quand le module lourd arrive. Un chiffre d'argent qui bouge tout seul sous
+   les yeux est pire qu'un chiffre stable et modeste.
+3. **Laisser le plancher**, et l'écrire dans l'écran. C'est l'état actuel : le
+   montant est juste, il provisionne simplement trop tard dans l'année.
+
+En attendant, l'état 3 tient et se dit. Ce n'est pas un oubli.
 
 #### §3 ter — Pourquoi ce lot existe, et ce qu'il ne refait pas
 
