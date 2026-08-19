@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formuler } from './aTraiter.libelles';
 import { dateISO, euros, mois } from '../types';
 import {
   type EntreeATraiter, type RecetteVue,
@@ -94,7 +95,7 @@ describe('factures en retard', () => {
     });
     const s = sujetsATraiter(e).find((x) => x.id === 'factures-en-retard');
     expect(s?.nombre).toBe(2);
-    expect(s?.contexte).toContain('3000');
+    expect(s === undefined ? '' : formuler(s).contexte).toContain('3000');
   });
 });
 
@@ -107,7 +108,7 @@ describe('périodes à déclarer', () => {
     expect(s).toBeDefined();
     expect(s?.ecran).toBe('argent');
     // La prose est destinée à l'utilisateur : « juin 2026 », pas « 2026-06 ».
-    expect(s?.contexte).toContain('juin 2026');
+    expect(s === undefined ? '' : formuler(s).contexte).toContain('juin 2026');
   });
 
   // Réclamer la déclaration du mois courant serait un faux positif quotidien.
@@ -163,15 +164,15 @@ describe('seuil majoré de TVA', () => {
     const s = sujetsATraiter(gros(35000)).find((x) => x.id === 'seuil-tva');
     expect(s).toBeDefined();
     expect(s?.gravite).toBe('a_faire');
-    expect(s?.intitule).toMatch(/proche/i);
-    expect(s?.contexte).toContain('6250');
+    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/proche/i);
+    expect(s === undefined ? '' : formuler(s).contexte).toContain('6250');
   });
 
   it('passe en retard une fois le seuil franchi, et explique le coût', () => {
     const s = sujetsATraiter(gros(45000)).find((x) => x.id === 'seuil-tva');
     expect(s?.gravite).toBe('retard');
-    expect(s?.intitule).toMatch(/franchi/i);
-    expect(s?.contexte).toMatch(/TTC/);
+    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/franchi/i);
+    expect(s === undefined ? '' : formuler(s).contexte).toMatch(/TTC/);
   });
 });
 
@@ -206,7 +207,7 @@ describe('livre des recettes', () => {
     });
     const s = sujetsATraiter(e).find((x) => x.id === 'livre-recettes-incomplet');
     expect(s).toBeDefined();
-    expect(s?.contexte).toMatch(/obligatoire/);
+    expect(s === undefined ? '' : formuler(s).contexte).toMatch(/obligatoire/);
   });
 
   it('ne signale rien pour une recette non encore encaissée', () => {
@@ -233,7 +234,7 @@ describe('échéances réglementaires', () => {
   it('passe en retard une fois dépassée, sans disparaître', () => {
     const s = sujetsATraiter(avecEcheance('2026-06-01')).find((x) => x.id === 'echeance-fe');
     expect(s?.gravite).toBe('retard');
-    expect(s?.contexte).toMatch(/dépassée/);
+    expect(s === undefined ? '' : formuler(s).contexte).toMatch(/dépassée/);
   });
 });
 
@@ -280,9 +281,9 @@ describe('ordre, compteurs et filtrage', () => {
     const sujets = sujetsATraiter(chargee);
     expect(new Set(sujets.map((s) => s.id)).size).toBe(sujets.length);
     for (const s of sujets) {
-      expect(s.intitule).toBeTruthy();
-      expect(s.contexte).toBeTruthy();
-      expect(s.action).toBeTruthy();
+      expect(formuler(s).intitule).toBeTruthy();
+      expect(formuler(s).contexte).toBeTruthy();
+      expect(formuler(s).action).toBeTruthy();
       expect(s.nombre).toBeGreaterThanOrEqual(1);
     }
   });
@@ -346,6 +347,6 @@ describe('aucune échéance jamais saisie', () => {
       echeancesSaisies: 0
     }));
     const sujet = sujets.find((s) => s.id === 'aucune-echeance');
-    expect(sujet?.contexte).toMatch(/SURESTIM/i);
+    expect(sujet === undefined ? '' : formuler(sujet).contexte).toMatch(/SURESTIM/i);
   });
 });

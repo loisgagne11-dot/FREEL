@@ -154,7 +154,7 @@ d'impôt reposent toutes sur la date à laquelle l'argent arrive.
 
 | # | Livrable | Critère d'acceptation | État |
 |---|---|---|---|
-| Q1 | Un délai de paiement qui sait dire « 30 jours **fin de mois** » | Aujourd'hui `delaiPaiementJours: number` ne sait qu'ajouter des jours. « Fin de mois » est une autre arithmétique, et c'est celle que le propriétaire subit sur ses deux missions en cours | ⬜ |
+| Q1 | ✅ Un délai de paiement qui sait dire « 30 jours **fin de mois** » | Aujourd'hui `delaiPaiementJours: number` ne sait qu'ajouter des jours. « Fin de mois » est une autre arithmétique, et c'est celle que le propriétaire subit sur ses deux missions en cours | ⬜ |
 | Q2 | Le délai se déclare **sur la mission**, dans une liste déroulante | Une mission passée par une agence n'a pas les mêmes conditions qu'une vente directe au même nom. Liste, pas saisie libre : les conditions réelles sont un petit ensemble de formules nommées | ⬜ |
 | Q2 bis | L'application signale un délai **hors des bornes légales** | 60 jours nets ou 45 jours fin de mois au maximum (art. L441-10 du code de commerce). Un délai plus long se signale sans se refuser : il arrive qu'on en signe | ⬜ |
 | Q3 | La facture **porte son échéance** comme un fait | Elle est imprimée sur le document envoyé au client : changer les conditions d'un client ne doit pas réécrire la date d'échéance des factures déjà parties | ⬜ |
@@ -229,8 +229,8 @@ n°7 interdit de relever le plafond.
 
 | # | Livrable | Critère d'acceptation | État |
 |---|---|---|---|
-| R1 | La FORMULATION des sujets « à traiter » quitte le paquet d'entrée | Dix mille huit cent cinquante-sept octets de phrases françaises y voyagent aujourd'hui, pour un panneau qui ne s'ouvre qu'au clic. La détection — combien, quelle gravité, quel écran — reste ; la mise en mots part avec le panneau | ⬜ |
-| R2 | Le budget retrouve une marge exploitable | Au moins cinq kilo-octets, sans quoi le lot suivant rouvre le même sujet | ⬜ |
+| R1 | La FORMULATION des sujets « à traiter » quitte le paquet d'entrée | Dix mille huit cent cinquante-sept octets de phrases françaises y voyageaient, pour un panneau qui ne s'ouvre qu'au clic et une carte sous la ligne de flottaison. La détection reste ; la mise en mots part avec ce qui l'affiche | ✅ |
+| R2 | Le budget retrouve une marge exploitable | **77,11 / 80 Ko** — près de trois kilo-octets, contre cent-dix octets avant. L'écran différé le plus lourd reste à 39,83 / 40 : c'est lui qui bloquera le prochain lot d'écran | ✅ |
 
 #### §3 sexies — La coupure : détecter n'est pas formuler
 
@@ -428,7 +428,9 @@ faits plutôt qu'avec trois écrans finis.
 | Date | Lot | Ce qui a été fait |
 |---|---|---|
 | 16/08 | — | Plan établi et périmètre arbitré. |
-| 16/08 | Lot R | Ouvert : le paquet d'entrée n'a plus de marge, et l'invariant n°7 interdit de relever le plafond. |
+| 16/08 | Lot R | Livré. La coupure « détecter n'est pas formuler » rend 3 Ko au paquet d'entrée : 77,11 / 80. Deux consommateurs des phrases ont été extraits — le panneau de la pastille, et la carte « À traiter » du Pilote, qui est sous la ligne de flottaison. |
+| 16/08 | Lot Q | **Clos.** Le budget passe, la chaîne entière est verte. |
+| 16/08 | Lot R (ouverture) | le paquet d'entrée n'a plus de marge, et l'invariant n°7 interdit de relever le plafond. |
 | 16/08 | Lot Q | Code livré et testé, **non clos** : le budget d'entrée dépasse de cent-dix octets. Trois extractions faites (libellés séparés du calcul, table de règles remplacée par la lecture de l'identifiant, deux fonctions de date fusionnées) — il en manque une, et c'est le lot R. |
 | 16/08 | Lot P | Livré, P6 excepté. Le versable baisse de 5 045 € sur 60 000 € encaissés en BNC à une part : c'est l'impôt qui n'était provisionné nulle part. L'ACRE s'arrêtait un mois trop tard. Deux extractions imposées par le budget, aucun plafond relevé. |
 | 16/08 | Lot Q | Ouvert : l'échéance d'une facture se déduisait du client à la lecture, sans savoir dire « fin de mois » et en réécrivant le passé à chaque changement de conditions. |

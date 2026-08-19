@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { formuler } from '../domain/calculs/aTraiter.libelles';
 import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
@@ -560,7 +561,7 @@ describe('obligations de CFE', () => {
     );
     const cfe = sujets.find((s) => s.id.includes('cfe-paiement'));
     expect(cfe).toBeTruthy();
-    expect(cfe?.contexte).toMatch(/disponible est surestimé/);
+    expect(cfe === undefined ? '' : formuler(cfe).contexte).toMatch(/disponible est surestimé/);
   });
 
   /**
@@ -605,7 +606,7 @@ describe('obligations de CFE', () => {
   it('rappelle la déclaration initiale l’année de la création', () => {
     const sujets = aTraiter(faits({ entreprise: entreprise('2026-02-01') }), enOctobre);
     const d = sujets.find((s) => s.id.includes('1447c'));
-    expect(d?.intitule).toMatch(/1447-C/);
+    expect(d === undefined ? '' : formuler(d).intitule).toMatch(/1447-C/);
     expect(d?.ecran).toBe('config');
   });
 
@@ -652,7 +653,7 @@ describe('obligations de CFE', () => {
     const sujets = aTraiter(faits({ entreprise: entreprise('2025-01-01') }), enOctobre);
     const cfe = sujets.find((s) => s.id.includes('cfe-paiement'));
     expect(cfe).toBeTruthy();
-    expect(cfe?.contexte).toMatch(/réduite de moitié/);
+    expect(cfe === undefined ? '' : formuler(cfe).contexte).toMatch(/réduite de moitié/);
   });
 
   // Au plus 5 000 € de recettes en N−2 : pas de cotisation minimum, donc rien
