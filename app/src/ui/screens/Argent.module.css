@@ -459,3 +459,99 @@
 }
 
 .lienRegistre:hover { color: var(--text); border-color: var(--green); }
+
+/* ── Enveloppes de provision ───────────────────────────────────────────── */
+
+/* Des vignettes plutôt qu'une barre segmentée : la barre disait la proportion
+   de chaque nature dans le total, qui est la mauvaise question. On ne se
+   demande pas quel pourcentage de ses provisions est de l'URSSAF, on se
+   demande si le 5 juillet va passer. */
+.enveloppes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 10px;
+}
+
+.enveloppe {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  min-width: 0;
+}
+
+.enveloppeTitre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 620;
+  color: var(--text);
+  margin-bottom: 3px;
+  min-width: 0;
+}
+
+.puce { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; }
+
+.enveloppeCouvert,
+.enveloppeManque {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+
+.enveloppeCouvert { color: var(--green); }
+
+/* Couverture incomplète : la couleur dit qu'il manque quelque chose. C'est le
+   seul endroit de la carte où l'information « ça ne passera pas » existe. */
+.enveloppeManque { color: var(--amber); }
+
+.enveloppeDu {
+  font-size: 11.5px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.jaugeEnveloppe {
+  display: block;
+  height: 4px;
+  margin: 7px 0 5px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.jaugeRemplie { display: block; height: 100%; border-radius: 2px; }
+
+.enveloppeEcheance { font-size: 11px; color: var(--muted-2); }
+
+/* Les teintes de nature, reprises de la répartition : une même dette garde sa
+   couleur d'un écran à l'autre, sinon la couleur cesse d'être une information. */
+.urssaf { background: var(--c-urssaf); }
+.tva { background: var(--c-tva); }
+.impot { background: var(--c-ir); }
+.cfe { background: var(--c-cfe); }
+.cfp { background: var(--c-urssaf); }
+
+/* ── Seuils ─────────────────────────────────────────────────────────────── */
+
+/* Côte à côte en paysage, comme le dessin : trois jauges pleine largeur
+   empilées prenaient trois cent cinquante pixels pour trois barres de quatre.
+   Empilées en portrait — sur 360 px, deux jauges côte à côte réduisent chacune
+   à une trentaine de pixels, où la position du repère ne se lit plus.
+
+   Elles restent des blocs INDÉPENDANTS et non un tableau : chacune se lit
+   seule, et leurs échelles n'ont rien à voir entre elles. */
+.seuils {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px 24px;
+}

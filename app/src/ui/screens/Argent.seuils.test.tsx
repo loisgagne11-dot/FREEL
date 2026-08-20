@@ -79,7 +79,7 @@ describe('repère de date et projection sur les seuils', () => {
     render(<Argent />);
     await attendreTresorerie();
 
-    const jauge = screen.getAllByRole('img', { name: /Plafond micro-entreprise/ })[0];
+    const jauge = screen.getAllByRole('img', { name: /Plafond micro-BNC/ })[0];
     expect(jauge?.getAttribute('aria-label')).toMatch(/87 % de l’année écoulée/);
   });
 

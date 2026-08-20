@@ -7,7 +7,8 @@ import { euros } from '../../domain/types';
 import { autonomieMois } from '../../domain/calculs/tresorerie';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
-import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
+import { enveloppesDeProvision } from '../../domain/calculs/enveloppes';
+import { LIBELLE_NATURE } from '../../domain/calculs/provisions';
 import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.libelles';
 import { CartePliable } from '../components/CartePliable';
 import { Chiffre } from '../components/Chiffre';
@@ -16,7 +17,6 @@ import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
 import { Montant } from '../components/Montant';
 import { Donut, PhraseRepartition } from '../components/Donut';
-import { Repartition } from '../components/Repartition';
 import { Statut } from '../components/Statut';
 import { useToast } from '../components/Toasts';
 import { dateCourte, eur, moisTexte } from '../format';
@@ -138,8 +138,8 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             faire : il ne permet ni de rapprocher une provision de l'avis
             reçu, ni de savoir ce qui se libère après une déclaration. */}
         <h3 className={styles.sousTitre}>
-          Sur quelle catégorie
-          <Info libelle="D’où vient la ventilation">
+          Combien est mis de côté, enveloppe par enveloppe
+          <Info libelle="D’où vient la ventilation, et ce que « mis de côté » veut dire">
             Les échéances déjà émises portent chacune leur nature. Les
             charges sur recettes encaissées n’ont pas encore d’échéance à
             qui la demander&nbsp;: elles se répartissent selon la règle qui
@@ -147,17 +147,16 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             l’autre. La TVA n’y figure pas tant qu’aucun appel n’est émis,
             parce qu’elle se relève sur les factures et ne se déduit
             d’aucun taux.
+            <br /><br />
+            Aucun euro du compte n’est <em>affecté</em> à une enveloppe&nbsp;:
+            l’argent est fongible. Le solde est donc réparti dans l’ordre des
+            échéances, <strong>la plus proche servie d’abord</strong> — c’est ce
+            qui se passera réellement le jour du prélèvement. Sur un compte
+            insuffisant, les premières enveloppes sont pleines et les dernières
+            vides&nbsp;: on voit <em>laquelle</em> ne passera pas.
           </Info>
         </h3>
-        <Repartition
-          total={etat.tresorerie.provisions}
-          deficit={0}
-          parts={NATURES_DETTE.map((n) => ({
-            libelle: LIBELLE_NATURE[n],
-            montant: etat.provisionsParNature[n],
-            ton: n
-          }))}
-        />
+        <Enveloppes etat={etat} />
         <NoteImpotRevenu provision={etat.provisionImpotRevenu} />
       </CartePliable>
 
@@ -165,6 +164,85 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
 
       <CarteDeclarations idGroupe={idGroupe} />
     </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   B4 — les enveloppes de provision
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Une vignette par nature de dette : mis de côté, dû, et la date qui vient.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI DES VIGNETTES PLUTÔT QU'UNE BARRE SEGMENTÉE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La barre disait la PROPORTION de chaque nature dans le total. C'est la
+ * mauvaise question : personne ne se demande quel pourcentage de ses
+ * provisions est de l'URSSAF. On se demande « est-ce que le 5 juillet va
+ * passer ». Une barre ne peut pas répondre — elle n'a ni date ni jauge de
+ * remplissage par poste.
+ *
+ * Chaque vignette porte donc les trois choses que la barre ne pouvait pas
+ * porter : la couverture, le dû, et l'échéance. La règle d'affectation du solde
+ * est dans `enveloppes.ts`, et elle est écrite sous le titre de la carte.
+ *
+ * Les natures à zéro sont MASQUÉES ici, alors que le calcul les rend toutes.
+ * Ce n'est pas une contradiction : le calcul ne doit pas décaler ses lignes,
+ * l'écran ne doit pas afficher quatre vignettes vides sur un compte neuf. La
+ * décision est à l'écran parce que c'est une question de place, pas de vérité.
+ */
+function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
+  const echeances = useFaits((e) => e.faits.echeances);
+  const enveloppes = enveloppesDeProvision(
+    etat.tresorerie.solde, etat.provisionsParNature, echeances
+  ).filter((e) => e.du > 0);
+
+  if (enveloppes.length === 0) {
+    return <p className={styles.vide}>Rien n’est dû pour l’instant.</p>;
+  }
+
+  return (
+    <ul className={styles.enveloppes}>
+      {enveloppes.map((e) => {
+        const part = e.du <= 0 ? 1 : Math.min(1, e.couvert / e.du);
+        const complet = e.couvert >= e.du;
+        return (
+          <li key={e.nature} className={styles.enveloppe}>
+            <span className={styles.enveloppeTitre}>
+              <span className={`${styles.puce} ${styles[e.nature]}`} aria-hidden="true" />
+              {LIBELLE_NATURE[e.nature]}
+            </span>
+
+            <span className={complet ? styles.enveloppeCouvert : styles.enveloppeManque}>
+              <Montant>{eur(e.couvert)}</Montant>
+            </span>
+            <span className={styles.enveloppeDu}>
+              {'sur '}<Montant>{eur(e.du)}</Montant>
+            </span>
+
+            {/* La jauge est une image ; les deux montants au-dessus sont la
+                donnée. Sous quelques pourcents, un remplissage fait deux
+                pixels sur un téléphone. */}
+            <span className={styles.jaugeEnveloppe} aria-hidden="true">
+              <span
+                className={`${styles.jaugeRemplie} ${styles[e.nature]}`}
+                style={{ width: `${part * 100}%` }}
+              />
+            </span>
+
+            <span className={styles.enveloppeEcheance}>
+              {e.prochaineEcheance === null
+                /* Pas d'échéance : la dette existe, mais rien ne l'a encore
+                   appelée. Le dire évite de lire « rien à payer ». */
+                ? 'pas encore appelée'
+                : `éch. ${dateCourte(e.prochaineEcheance)}`}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -465,6 +543,18 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
 }
 
 function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
+  /*
+   * Le plafond porte le nom du régime RÉELLEMENT configuré.
+   *
+   * Le handoff écrit « Plafond micro-BNC », et il a raison de nommer le régime
+   * exact : « micro-entreprise » recouvre deux plafonds qui vont du simple au
+   * quadruple — 77 700 € en BNC, 188 700 € en vente. Mais l'écrire en dur
+   * afficherait « BNC » à un artisan dont le plafond n'est pas celui-là, et le
+   * chiffre à côté serait alors juste tandis que son nom serait faux. Le nom
+   * suit donc le fait, comme le seuil qu'il désigne.
+   */
+  const typeActivite = useFaits((e) => e.faits.entreprise.typeActivite);
+
   const plafond = seuils.plafondMicro;
   const tva = seuils.franchiseTva;
 
@@ -526,12 +616,12 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
           </Info>}
       resume={resume}
     >
-      <div className={styles.jauges}>
+      <div className={styles.seuils}>
         {plafond.statut === 'refuse'
           ? <p className={styles.vide}>Plafond micro&nbsp;: {plafond.motif}</p>
           : (
             <Jauge
-              libelle="Plafond micro-entreprise"
+              libelle={`Plafond micro-${typeActivite === 'BNC' ? 'BNC' : 'BIC'}`}
               atteint={seuils.caEncaisse}
               seuil={plafond.valeur}
               unite="€"

@@ -6,6 +6,7 @@ import { dateISO, euros } from '../../domain/types';
 import type { Echeance } from '../../domain/calculs/provisions';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
+import { eur } from '../format';
 import { Argent } from './Argent';
 
 /**
@@ -63,19 +64,53 @@ describe('ventilation des provisions à l’écran', () => {
   });
 
   /**
-   * Une nature à zéro reste affichée. Une catégorie qui disparaît en tombant à
-   * zéro donne à croire qu'elle n'existe pas, alors qu'elle vient d'être
-   * soldée — c'est l'information inverse.
+   * UNE ENVELOPPE VIDE NE PREND PAS DE PLACE — MAIS LE CALCUL LA GARDE.
+   *
+   * Ce test protégeait l'inverse : avec la barre segmentée, une nature à zéro
+   * restait affichée, parce qu'une catégorie qui disparaît donne à croire
+   * qu'elle n'existe pas. La règle a changé AVEC la forme, et pour une raison.
+   *
+   * La barre montrait des proportions : y garder les zéros coûtait une ligne de
+   * légende. Les vignettes montrent une couverture et une échéance : quatre
+   * vignettes vides sur un compte neuf n'apprennent rien et poussent hors de
+   * l'écran celles qui portent une date.
+   *
+   * Ce que l'ancien test tenait vraiment — « ne pas décaler les vignettes d'un
+   * mois à l'autre » — est tenu ailleurs, et mieux : `enveloppesDeProvision`
+   * rend TOUJOURS les cinq natures dans leur ordre canonique, et son test le
+   * vérifie. Le filtrage est à l'écran parce que c'est une question de place,
+   * pas de vérité.
    */
-  it('garde les natures sans montant, à zéro', async () => {
+  it('n’affiche pas d’enveloppe pour une nature qui ne doit rien', async () => {
     semer({ echeances: [ech('a', 'urssaf', 4100)] });
     render(<Argent />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
     const dans = within(enveloppes as HTMLElement);
-    expect(dans.getByText('CFP — formation professionnelle')).toBeTruthy();
-    expect(dans.getAllByText('0 €').length).toBeGreaterThan(0);
+    expect(dans.getByText('URSSAF — cotisations sociales')).toBeTruthy();
+    expect(dans.queryByText('CFP — formation professionnelle')).toBeNull();
+  });
+
+  /**
+   * L'ENVELOPPE DIT SI ELLE PASSERA, ET QUAND.
+   *
+   * C'est la seule question qu'on se pose devant elle. La barre segmentée
+   * répondait à « quel pourcentage de mes provisions est de l'URSSAF », que
+   * personne ne se demande.
+   */
+  it('met la couverture en face du dû, avec la date qui vient', async () => {
+    semer({ soldeInitial: euros(1_000), echeances: [ech('a', 'urssaf', 4100)] });
+    render(<Argent />);
+    await attendreTresorerie();
+
+    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const dans = within(enveloppes as HTMLElement);
+    // 1 000 € sur le compte, 4 100 € dus : l'enveloppe n'est pas couverte.
+    const vignette = dans.getByText('URSSAF — cotisations sociales').parentElement?.parentElement;
+    expect(vignette?.textContent).toContain(eur(1_000));
+    expect(vignette?.textContent).toContain(`sur ${eur(4_100)}`);
+    expect(vignette?.textContent).toContain('éch.');
   });
 
   /**
