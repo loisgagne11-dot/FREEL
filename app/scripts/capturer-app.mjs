@@ -41,7 +41,15 @@ import { join, resolve } from 'node:path';
 
 const RACINE = resolve(import.meta.dirname, '../..');
 const SORTIE = join(RACINE, 'docs/design/captures-app');
-const JEU = JSON.parse(readFileSync(join(RACINE, 'docs/design/jeu-de-demonstration.json'), 'utf8'));
+/* Le jeu vient de `app/public/`, d'où l'application elle-même le charge — et
+   non d'une copie dans `docs/`. Le script pointait vers `docs/design/`, où
+   rien ne se trouve : il levait avant d'ouvrir un navigateur, et personne ne
+   l'a vu parce qu'aucune capture manquante ne fait échouer `npm run verifier`.
+   Une seconde copie du jeu aurait de toute façon fini par diverger de celle
+   que l'application sert. */
+const JEU = JSON.parse(
+  readFileSync(join(RACINE, 'app/public/jeu-de-demonstration.json'), 'utf8')
+);
 const PORT = 4174;
 
 /** Le 10 juin 2026, comme le handoff. Voir l'en-tête. */

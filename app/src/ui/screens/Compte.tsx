@@ -547,7 +547,7 @@ function EnvoiDuVide(
             + `${cote.clients} client(s).`}
       </p>
       <p className={styles.consequence}>
-        Si vous vouliez au contraire récupérer ces données ici, revenez en
+        Si tu voulais au contraire récupérer ces données ici, reviens en
         arrière et choisissez <em>Charger le compte sur cet appareil</em>, ou
         <em> Reprendre les données de l’ancienne application</em>.
       </p>
@@ -797,7 +797,7 @@ function SaisieConfig(
 
       <p className={styles.explication}>
         {configDeBuild() === null
-          ? 'Aucun compte n’est relié à cette installation. Renseignez l’adresse du projet pour vous connecter.'
+          ? 'Aucun compte n’est relié à cette installation. Renseigne l’adresse du projet pour te connecter.'
           : 'Un compte est configuré à la compilation.'}
       </p>
 

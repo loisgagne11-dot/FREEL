@@ -502,7 +502,7 @@ export function Activite() {
           <div className={styles.choixAffectation}>
             <p className={styles.aide}>
               Le {dateCourte(aRattacher.date)} n’était prévu par aucun
-              rythme. Plusieurs missions sont en cours&nbsp;: choisir pour vous
+              rythme. Plusieurs missions sont en cours&nbsp;: choisir à ta place
               fausserait deux comptes rendus d’un coup — celui qui recevrait la
               journée à tort, et celui à qui elle manquerait.
             </p>
@@ -859,7 +859,7 @@ function PlageDeConges() {
         <Info libelle="Ce que la plage enregistre">
           Seuls les jours ouvrés sont retenus&nbsp;: les week-ends et les jours
           fériés sont écartés, parce qu’un congé posé un dimanche gonflerait
-          votre solde et votre taux d’occupation sans correspondre à rien.
+          ton solde et ton taux d’occupation sans correspondre à rien.
         </Info>
       </h3>
 
@@ -963,7 +963,7 @@ function CartePrevision(
             journalier, congés et jours fériés déduits. Chaque journée est
             valorisée au tarif <em>en vigueur à sa date</em>&nbsp;: appliquer
             celui d’aujourd’hui réécrirait le passé à chaque renégociation.
-            Le « retenu » est ce que vos ajustements journaliers ont retenu —
+            Le « retenu » est ce que tes ajustements journaliers ont retenu —
             c’est lui qui se facturera.
           </Info>}
       resume={(
@@ -1114,7 +1114,7 @@ function CarteTarifJournalier(
     <CartePliable
       id="tarif-journalier"
       ecran="activite"
-      titre="Ce qu’une journée vous rapporte"
+      titre="Ce qu’une journée te rapporte"
             aide={<Info libelle="Pourquoi trois tarifs et non un seul">
             Le <strong>tarif des contrats</strong> vient du planning valorisé au
             tarif de chaque mission. Le <strong>tarif effectif</strong> divise
@@ -1153,7 +1153,7 @@ function CarteTarifJournalier(
           </div>
         )}
         <div className={`${styles.ligne} ${styles.total}`}>
-          <dt>Ce qu’il vous reste, charges déduites</dt>
+          <dt>Ce qu’il te reste, charges déduites</dt>
           <dd>
             {net.statut === 'refuse'
               ? <span className={styles.vide}>{net.motif}</span>

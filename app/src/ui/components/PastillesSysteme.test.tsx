@@ -117,7 +117,7 @@ describe('état du compte', () => {
 
   it('dit « local » quand aucun compte n’est relié', () => {
     render(<PastillesSysteme />);
-    expect(screen.getByRole('link', { name: /Vos données restent sur cet appareil/ }))
+    expect(screen.getByRole('link', { name: /Tes données restent sur cet appareil/ }))
       .toBeTruthy();
   });
 

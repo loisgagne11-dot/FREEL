@@ -147,7 +147,7 @@ describe('chargement des données du compte', () => {
     vi.stubGlobal('fetch', repondre({ message: 'JWT expired' }, 401));
     const r = await chargerDonneesLegacy(CONFIG, SESSION);
     expect(r.statut).toBe('erreur');
-    if (r.statut === 'erreur') expect(r.motif).toMatch(/reconnectez-vous/i);
+    if (r.statut === 'erreur') expect(r.motif).toMatch(/reconnecte-toi/i);
   });
 
   // Sans quoi l'application dirait deux choses différentes selon que la

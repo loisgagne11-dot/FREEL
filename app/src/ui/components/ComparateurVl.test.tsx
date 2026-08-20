@@ -74,13 +74,13 @@ describe('comparaison', () => {
   it('désigne le barème sur un petit chiffre d’affaires', async () => {
     semer({ recettes: [encaissee(15000)] });
     render(<ComparateurVl />);
-    expect(screen.getByText(/Le barème vous coûterait/)).toBeTruthy();
+    expect(screen.getByText(/Le barème te coûterait/)).toBeTruthy();
   });
 
   it('désigne le versement libératoire sur un chiffre d’affaires moyen', () => {
     semer({ recettes: [encaissee(40000)] });
     render(<ComparateurVl />);
-    expect(screen.getByText(/Le versement libératoire vous coûterait/)).toBeTruthy();
+    expect(screen.getByText(/Le versement libératoire te coûterait/)).toBeTruthy();
   });
 
   /**
@@ -91,14 +91,14 @@ describe('comparaison', () => {
   it('change de verdict quand le foyer a d’autres revenus', async () => {
     semer({ recettes: [encaissee(20000)] });
     render(<ComparateurVl />);
-    expect(screen.getByText(/Le barème vous coûterait/)).toBeTruthy();
+    expect(screen.getByText(/Le barème te coûterait/)).toBeTruthy();
 
     const autres = screen.getByLabelText(/Autres revenus imposables/);
     const utilisateur = userEvent.setup();
     await utilisateur.clear(autres);
     await utilisateur.type(autres, '60000');
 
-    expect(screen.getByText(/Le versement libératoire vous coûterait/)).toBeTruthy();
+    expect(screen.getByText(/Le versement libératoire te coûterait/)).toBeTruthy();
   });
 });
 

@@ -1,0 +1,462 @@
+/* Le pilier Performance. Aucune couleur en dur, mobile-first. */
+
+.tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* Deux cartes par rang en paysage, empilées en portrait. La colonne étroite
+   est la seconde (composition, capacité) : le graphe a besoin de la largeur,
+   une liste de montants non. */
+.deuxColonnes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+  /*
+   * Chaque carte à sa hauteur propre.
+   *
+   * `stretch` a été essayé, mesuré, et repoussé : le rang partage bien sa
+   * hauteur, mais le vide passe alors À L'INTÉRIEUR de la carte, au-dessus des
+   * barres — deux cent trente pixels de carte creuse, qui se lisent comme un
+   * graphe qui n'a pas fini de charger. Dehors, le même vide est du fond de
+   * page, et ne prétend rien.
+   *
+   * L'étirer en agrandissant les barres à la hauteur reçue serait la vraie
+   * réponse ; elle demande que la bande cesse d'avoir une hauteur fixe, donc
+   * que la ligne d'objectif cesse de pouvoir se poser sur la même échelle sans
+   * mesurer le conteneur en JavaScript. Un repère faux coûte plus qu'un vide.
+   */
+  align-items: start;
+}
+
+@media (min-width: 981px) {
+  .deuxColonnes { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  /* Le second rang inverse les proportions : « Tu peux te verser » est un
+     chiffre unique, la capacité est un graphe de douze mois. */
+  .deuxColonnes + .deuxColonnes { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+}
+
+.carte {
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 15px 16px;
+  box-shadow: var(--sh-1);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.enteteCarte {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 620;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Le mois lu garde sa casse : « juin 2026 » en capitales se lit moins vite
+   qu'en minuscules, et c'est la seule variable du titre. */
+.moisTitre { text-transform: none; letter-spacing: 0; color: var(--text); }
+
+.noteCarte { font-size: 11.5px; color: var(--muted-2); }
+
+.badge {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  font-size: 10.5px;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+/* ── Le tracé, commun aux deux graphes ─────────────────────────────────── */
+
+/* `position: relative` porte la ligne d'objectif ; `align-items: flex-end`
+   pose toutes les colonnes sur la même ligne de base, quelle que soit la
+   hauteur de leurs étiquettes. */
+.trace {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 2px;
+  /* `flex: 1` : le tracé prend toute la hauteur que la carte reçoit du rang, et
+     les colonnes restent collées en bas. La bande des barres, elle, garde sa
+     hauteur fixe — voir `.barres`. */
+  flex: 1 1 auto;
+  min-height: 210px;
+  min-width: 0;
+}
+
+.colonne,
+.colonneStatique {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: none;
+}
+
+.colonne { cursor: pointer; }
+
+.colonne:hover { background: var(--panel-2); }
+
+/* Le mois courant est encadré, pas coloré : la couleur est déjà prise par les
+   séries, et un mois « en vert » se lirait comme une bonne nouvelle. */
+.colonneCourante { border-color: var(--line-2); background: var(--panel-2); }
+
+/* Un liséré bas, et non un cadre vert plein pourtour. Le dessin distingue le
+   mois courant par un panneau à peine plus clair que le fond ; un cadre saturé
+   sur la colonne de droite tirait l'œil vers le mois qu'on regarde déjà, et se
+   superposait au cadre du mois courant quand c'est le même. */
+.colonneLue { background: var(--panel-2); box-shadow: inset 0 -2px 0 var(--green); }
+
+.colonne:focus-visible,
+.colonneStatique:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+/* Les étiquettes de valeur sont des chiffres : même police que les montants,
+   sinon la colonne du graphe et la colonne de la composition ne se lisent pas
+   comme la même famille d'information. */
+.valeurs {
+  font-family: var(--mono);
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  min-height: 1.3em;
+}
+
+.valeurRealise { color: var(--blue); font-weight: 600; }
+.valeurEncaisse { color: var(--muted-2); }
+.valeurCapacite { color: var(--muted); font-weight: 560; }
+.valeurNegative { color: var(--red); font-weight: 600; }
+.valeurRefus { color: var(--muted-2); }
+
+/* Les barres occupent une bande de hauteur FIXE ; leur propre hauteur est un
+   pourcentage de CE conteneur, ce qui rend l'échelle indépendante du nombre
+   de lignes d'étiquettes au-dessus.
+   ⚠️ `height` doit rester d'accord avec `HAUTEUR_BARRES` dans le module TSX,
+   qui s'en sert pour poser la ligne d'objectif sur la même échelle. */
+.barres {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  height: 175px;
+  min-width: 0;
+}
+
+.barreRealise,
+.barreEncaisse,
+.barreCapacite {
+  display: block;
+  width: 11px;
+  max-width: 40%;
+  border-radius: 2px 2px 0 0;
+  min-height: 1px;
+}
+
+.barreRealise { background: var(--blue); }
+.barreEncaisse { background: var(--green); }
+
+/* La capacité est un contour : c'est le plein à l'intérieur qui porte la
+   couleur, et une barre pleine ne pourrait pas en contenir un second. */
+.barreCapacite {
+  position: relative;
+  width: 22px;
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  display: flex;
+  align-items: flex-end;
+}
+
+.barreVerse {
+  display: block;
+  width: 100%;
+  background: var(--green);
+  border-radius: 1px;
+}
+
+/* Le futur est hachuré : il ne se remplit jamais. Les rayures viennent d'un
+   dégradé répété plutôt que d'une image, pour suivre le thème. */
+.hachure {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 4px,
+      var(--line-2) 4px 5px
+    ),
+    var(--panel-2);
+}
+
+.moisAxe {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.colonneCourante .moisAxe,
+.moisCourantAxe { color: var(--text); font-weight: 700; }
+
+/* Sur la capacité, le mois courant est seulement mis en gras : le dessin n'y
+   met aucun cadre, et il en faudrait un troisième niveau — encadré, hachuré,
+   plein — sur un graphe qui en porte déjà deux. */
+.colonneSimple { border-color: transparent; background: none; }
+
+/* ── La ligne d'objectif ───────────────────────────────────────────────── */
+
+/* Le `bottom` vient du JavaScript : il additionne la hauteur de la bande des
+   barres au décalage qui la sépare du bas du tracé (`HAUTEUR_BARRES` et
+   `BAS_DES_BARRES`). Les tenir ici en CSS aurait obligé à redire l'échelle des
+   barres en pourcentage d'un conteneur différent du leur — et une ligne de
+   repère sur une autre échelle que ce qu'elle repère ne repère rien. */
+.ligneObjectif {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--amber);
+  pointer-events: none;
+}
+
+/* À GAUCHE, et non à droite : le mois courant est encadré à droite du tracé,
+   et l'étiquette venait se poser dessus. Le repère est à hauteur constante,
+   alors que la colonne de droite est celle qu'on regarde. */
+.libelleObjectif {
+  position: absolute;
+  left: 0;
+  top: -13px;
+  font-size: 10px;
+  color: var(--amber);
+  background: var(--panel);
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* ── Pied de graphe ────────────────────────────────────────────────────── */
+
+.piedCarte {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+
+.legende { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.pastilleRealise,
+.pastilleEncaisse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.pastilleRealise { background: var(--blue); }
+.pastilleEncaisse { background: var(--green); margin-left: 8px; }
+
+.cumul {
+  font-family: var(--mono);
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Composition ───────────────────────────────────────────────────────── */
+
+.bloc { margin-bottom: 14px; }
+
+.enteteBloc {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.libelleBloc {
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.encaisse, .totalEncaisse { color: var(--green); }
+
+/* Le total prend la couleur de son intitulé : bleu pour le réalisé, vert pour
+   l'encaissé. Deux totaux blancs sous deux intitulés colorés laissaient
+   chercher lequel appartient à quelle section. */
+.totalBloc {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lignes { list-style: none; margin: 0; padding: 0; }
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.ligne:last-child { border-bottom: none; }
+
+.ligneTexte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.ligneLibelle {
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ligneMeta { font-size: 11.5px; line-height: 1.4; color: var(--muted-2); }
+
+.ligneMontant {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.piedBloc {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 11px;
+  border-top: 1px solid var(--line-2);
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.attente { color: var(--amber); font-weight: 620; }
+
+.noteBloc { margin-top: 8px; font-size: 11.5px; line-height: 1.55; color: var(--muted-2); }
+
+.alerte { margin-top: 6px; font-size: 11.5px; line-height: 1.5; color: var(--red); }
+
+.vide { font-size: 12.5px; color: var(--muted-2); padding: 8px 0; }
+
+/* ── Tu peux te verser ─────────────────────────────────────────────────── */
+
+.grandChiffre {
+  font-family: var(--mono);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 14px;
+}
+
+.curseurRangee {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.curseurLibelle { min-width: 0; }
+
+.curseurValeur {
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.curseur { width: 100%; margin: 8px 0 4px; accent-color: var(--green); }
+
+.explication {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.explication strong { color: var(--text); }
+
+.action {
+  min-height: 44px;
+  width: 100%;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: var(--on-accent, #0b1a13);
+  font-size: 13px;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.action:hover { filter: brightness(1.06); }
+
+.aide { margin-top: 10px; font-size: 11.5px; line-height: 1.55; color: var(--muted-2); }
+
+.aide strong { color: var(--muted); }
+
+/* Lisible par les technologies d'assistance, invisible à l'écran : le détail
+   chiffré de chaque colonne, que l'étiquette abrège en k€. */
+.horsEcran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

@@ -117,7 +117,7 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
     case 'aucune-echeance':
       return {
         intitule: 'Aucune échéance enregistrée',
-        contexte: 'Vous encaissez depuis plusieurs mois sans qu’aucun appel de '
+        contexte: 'Tu encaisses depuis plusieurs mois sans qu’aucun appel de '
           + 'cotisations, avis d’impôt ou CFE ne soit saisi. Tant qu’ils manquent, '
           + 'le disponible et le versable sont SURESTIMÉS — c’est le sens qui coûte cher.',
         action: 'Saisir mes échéances'

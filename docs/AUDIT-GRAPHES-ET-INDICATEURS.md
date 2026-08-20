@@ -93,15 +93,15 @@ plus que de repli, et l'écran annonce qu'il estime au lieu de mesurer.
 
 | # | La question à laquelle elle répond | Ancienne | Maquette | Actuelle |
 |---|---|---|---|---|
-| V1 | CA réalisé vs encaissé, mois par mois | ✅ | ✅ | ✅ `GrapheBarres`, doublé en tableau accessible |
-| V2 | Composition d'un mois de CA, au clic | ✅ | ✅ | ❌ le graphe n'est pas cliquable |
+| V1 | CA réalisé vs encaissé, mois par mois | ✅ | ✅ | ✅ graphe propre au pilier Performance&nbsp;: **mois écoulés seulement**, valeurs en k€, mois courant encadré, cumul en pied |
+| V2 | Composition d'un mois de CA, au clic | ✅ | ✅ | ✅ **livrée** — chaque mois est un `<button>`, le panneau Composition suit ; réalisé par mission avec `j × TJM`, encaissé par facture |
 | V3 | Répartition du solde | ✅ donut | ✅ donut | ⚠️ barre segmentée — **meilleure**, montants en clair |
 | V4 | Provisions **par catégorie** | ✅ | ✅ | ✅ **ajouté depuis** |
 | V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis** |
 | V6 | Frise de l'échéancier | ✅ | ✅ | ⚠️ liste groupée ; la lecture « à date » de la frise est perdue |
 | V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **ajoutée depuis** — sur le DISPONIBLE et non le solde, deux scénarios, hypothèses écrites |
 | V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
-| V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **ajoutée depuis** — versé (relevé) face au soutenable |
+| V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau |
 | V10 | Cascade CA → charges → net | ✅ (deux fois) | ❌ | 🚫 §5.5 |
 | V11 | Donut de destination du CA | ✅ | ❌ | 🚫 §5.5 |
 | V12 | Sparklines dans les tuiles | ✅ | ❌ | 🚫 §5.5 |
@@ -109,10 +109,20 @@ plus que de repli, et l'écran annonce qu'il estime au lieu de mesurer.
 | V14 | Occupation avec repère 100 % | ⚠️ | ✅ | ❌ chiffre nu |
 | V15 | Impôt par tranche | ✅ barres | ✅ barres | ⚠️ **tableau exact** — progrès, la barre était décorative |
 | V16 | Projection par scénarios | ✅ | ❌ | 🚫 §5.5 |
-| V17 | Objectif de CA avec allure attendue | ✅ | ❌ | ❌ |
+| V17 | Objectif de CA avec allure attendue | ✅ | ❌ | ✅ **livrée**, absente du handoff&nbsp;: repère mensuel sur le graphe et écart en JOURS en pied |
 | V18 | Autonomie à zones 3/6/12 mois | ✅ | ⚠️ | 🚫 §5.5 |
 | V19 | Score de santé /100 | ✅ | ✅ (en dur) | 🚫 §5.1 |
 | V20 | Calendrier / plan de charge | ✅ | ✅ | ✅ |
+
+> **V9 disait « ✅ » alors que rien ne s'affichait.** Le calcul existait —
+> `capaciteVersement.ts` et son sélecteur, testés, verts — et aucun écran ne
+> l'appelait. L'inventaire lisait le code du domaine et concluait « présent ».
+>
+> C'est l'erreur la plus coûteuse que puisse commettre un inventaire, parce
+> qu'elle est la seule qui ferme le sujet : un manque signalé finit par être
+> comblé, un manque déclaré présent ne l'est jamais. La colonne « Actuelle » ne
+> se lit donc plus dans `domain/` ni dans `state/` — **elle se lit dans un
+> écran**, et le contrôle qui la vérifie est la capture, pas la lecture.
 
 ---
 
@@ -204,12 +214,24 @@ futures (existe) *et* le versement qu'on se fera (n'existe pas).
 relevé — donc entièrement factuel — avec les échéances datées portées en aval
 comme repères, **sans courbe extrapolée**.
 
-### 4.6 Composition d'un mois au clic
+### 4.6 Composition d'un mois au clic — ✅ livrée
 
 Le titre de la carte de la maquette dit littéralement « clic sur un mois =
 composition ». Le libellé est réfléchi, il est perdu. Faible coût, forte
 valeur — avec une précaution : le `<svg>` est `aria-hidden`, donc les cibles
 doivent être des `<button>` HTML au-dessus, ou les lignes du tableau.
+
+**Livrée, et la précaution a été suivie plus loin que prévu** : il n'y a plus
+de `<svg>` du tout sur ce graphe. Chaque mois est un `<button>` contenant ses
+deux valeurs en TEXTE, avec un `aria-label` qui les donne en euros — sans lui,
+le bouton s'annonçait « 9,4 k€ 8,0 », deux nombres abrégés sans unité ni mois.
+Le tableau de rechange devient alors inutile : la donnée n'a jamais été des
+pixels.
+
+Le reste à encaisser du panneau se compte **facture par facture**. Le prototype
+faisait « réalisé du mois − encaissé du mois » : sur un juin qui émet 8 000 € et
+encaisse 12 000 € venus d'avril, cette soustraction rend zéro, et les 8 000 €
+dus disparaissent de l'écran.
 
 ---
 
@@ -275,13 +297,15 @@ ne peut pas le représenter. Le niveau de détail manquant (§4.1) est comblé.
 
 ## 6. Reste à faire, par valeur
 
-1. **Composition d'un mois au clic** (§4.6)
-2. **Objectif de CA avec allure attendue** (V17) — dépend d'un objectif que
-   rien ne porte encore dans les faits
-3. **Comparaison N−1** en filigrane du graphe existant — utile la troisième
+1. **Comparaison N−1** en filigrane du graphe existant — utile la troisième
    année, pas la première
+2. **Sélecteur de période** — l'année est verrouillée sur l'horloge ; au
+   1ᵉʳ janvier le pilier Performance devient vide et l'année précédente est
+   inatteignable
 
-Livrés : la ventilation des provisions (§4.1), le repère de date et la
+Livrés : la composition d'un mois au clic (§4.6, V2), l'objectif de CA et son
+écart en jours (V17), la capacité de versement enfin affichée (V9), la
+ventilation des provisions (§4.1), le repère de date et la
 projection de franchissement (§4.2), le tableau « rapport vs charge » par
 mission (§4.3), le TJM effectif et le TJM net (§4.4), la phrase de synthèse
 de santé (§5.1), l'assiette nommée de l'autonomie.

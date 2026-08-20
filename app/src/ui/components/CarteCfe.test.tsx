@@ -59,7 +59,7 @@ describe('carte CFE', () => {
   it('ne propose aucun montant tant que l’avis n’est pas recopié', () => {
     semer('2020-01-01', { recettes: [recette(40000, '2024-05-01')] });
     rendre();
-    expect(screen.getByText(/Recopiez les deux valeurs de votre avis/)).toBeTruthy();
+    expect(screen.getByText(/Recopie les deux valeurs de ton avis/)).toBeTruthy();
     expect(screen.queryByText(/Cotisation\s*:/)).toBeNull();
   });
 
@@ -68,7 +68,7 @@ describe('carte CFE', () => {
     rendre();
     const utilisateur = userEvent.setup();
 
-    await utilisateur.type(screen.getByLabelText('Base minimum de votre avis'), '600');
+    await utilisateur.type(screen.getByLabelText('Base minimum de ton avis'), '600');
     await utilisateur.type(screen.getByLabelText('Taux communal (%)'), '26,5');
 
     // 600 × 26,5 % = 159 €.
@@ -88,7 +88,7 @@ describe('régime annoncé', () => {
   it('ne demande rien quand rien n’est dû', () => {
     semer('2026-03-01');
     rendre();
-    expect(screen.queryByLabelText('Base minimum de votre avis')).toBeNull();
+    expect(screen.queryByLabelText('Base minimum de ton avis')).toBeNull();
   });
 
   /**
@@ -99,7 +99,7 @@ describe('régime annoncé', () => {
     semer('2025-06-01');
     rendre();
     expect(screen.getByText(/réduite de moitié/)).toBeTruthy();
-    expect(screen.getByLabelText('Base minimum de votre avis')).toBeTruthy();
+    expect(screen.getByLabelText('Base minimum de ton avis')).toBeTruthy();
   });
 
   it('applique la réduction de moitié au calcul', async () => {
@@ -107,7 +107,7 @@ describe('régime annoncé', () => {
     rendre();
     const utilisateur = userEvent.setup();
 
-    await utilisateur.type(screen.getByLabelText('Base minimum de votre avis'), '600');
+    await utilisateur.type(screen.getByLabelText('Base minimum de ton avis'), '600');
     await utilisateur.type(screen.getByLabelText('Taux communal (%)'), '26,5');
 
     // 300 × 26,5 % = 80 €, et non 159.
@@ -140,7 +140,7 @@ describe('le lien avec les provisions', () => {
       recettes: [recette(40000, '2024-05-01')], echeances: [echeanceCfe]
     });
     rendre();
-    expect(screen.getByText(/déjà comptée dans vos provisions/)).toBeTruthy();
+    expect(screen.getByText(/déjà comptée dans tes provisions/)).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Saisir l’échéance' })).toBeNull();
   });
 });

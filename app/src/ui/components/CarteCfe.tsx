@@ -78,10 +78,10 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
       <h2 id="titre-cfe" className={styles.titreCarte}>
         Cotisation foncière des entreprises {annee}
         <Info libelle="Pourquoi aucun montant n’est proposé">
-          La CFE est une <strong>base minimum fixée par votre commune</strong>,
+          La CFE est une <strong>base minimum fixée par ta commune</strong>,
           multipliée par un <strong>taux voté par elle</strong>. Aucune règle
           nationale ne permet de la calculer&nbsp;: les deux valeurs se lisent
-          sur votre avis, disponible en novembre sur votre espace professionnel.
+          sur ton avis, disponible en novembre sur ton espace professionnel.
           Une estimation tirée d’une grille moyenne serait un chiffre qui
           engage sans rien mesurer.
         </Info>
@@ -116,7 +116,7 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
         <>
           <div className={styles.champs}>
             <label className={styles.champ} htmlFor={`${idChamp}-base`}>
-              <span className={styles.libelleChamp}>Base minimum de votre avis</span>
+              <span className={styles.libelleChamp}>Base minimum de ton avis</span>
               <input
                 id={`${idChamp}-base`}
                 type="text"
@@ -145,7 +145,7 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
           {montant === null
             ? (
               <p className={styles.attente}>
-                Recopiez les deux valeurs de votre avis pour obtenir le montant.
+                Recopie les deux valeurs de ton avis pour obtenir le montant.
                 Tant qu’il n’est pas connu, il n’est pas provisionné.
               </p>
             )
@@ -164,10 +164,10 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
               CFE ne pèse sur le disponible que portée en échéance. */}
           <p className={styles.suite}>
             {dejaSaisie
-              ? 'Une échéance de CFE est enregistrée pour cette année : elle est déjà comptée dans vos provisions.'
+              ? 'Une échéance de CFE est enregistrée pour cette année : elle est déjà comptée dans tes provisions.'
               : (
                 <>
-                  Rien n’est enregistré tant que vous ne portez pas ce montant en
+                  Rien n’est enregistré tant que tu ne portes pas ce montant en
                   échéance. <a className={styles.lien} href="#/argent">Saisir l’échéance</a>
                 </>
               )}
@@ -194,18 +194,18 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
 function phrase(regime: RegimeCfe, annee: number): string {
   switch (regime.type) {
     case 'exonere-creation':
-      return `Année de création : vous êtes exonéré de CFE pour ${annee}. Pensez en revanche `
+      return `Année de création : tu es exonéré de CFE pour ${annee}. Pensez en revanche `
         + 'à déposer la déclaration initiale 1447-C avant le 31 décembre — c’est elle qui '
-        + 'établit votre base, et l’omettre fait perdre l’exonération de première année.';
+        + 'établit ta base, et l’omettre fait perdre l’exonération de première année.';
     case 'base-reduite-moitie':
-      return 'Première année d’imposition : votre base est réduite de moitié. La CFE est '
+      return 'Première année d’imposition : ta base est réduite de moitié. La CFE est '
         + 'due, pour un montant deux fois moindre.';
     case 'sous-le-seuil-de-cotisation-minimum':
-      return `Vos recettes de ${annee - 2} ne dépassent pas ${eur(CA_SANS_COTISATION_MINIMUM)} : `
+      return `Tes recettes de ${annee - 2} ne dépassent pas ${eur(CA_SANS_COTISATION_MINIMUM)} : `
         + 'la cotisation minimum n’est pas due. C’est un seuil, pas un abattement — un euro '
         + 'au-dessus et elle le redevient en entier.';
     case 'droit-commun':
-      return 'Régime de droit commun : base minimum fixée par votre commune, multipliée par '
+      return 'Régime de droit commun : base minimum fixée par ta commune, multipliée par '
         + 'son taux.';
   }
 }

@@ -582,7 +582,7 @@ function PanneauRelance(
       </dl>
 
       <label className={styles.champ} htmlFor={`${id}-taux`}>
-        <span className={styles.libelle}>Taux de pénalité de vos conditions de vente (%)</span>
+        <span className={styles.libelle}>Taux de pénalité de tes conditions de vente (%)</span>
         <input
           id={`${id}-taux`}
           type="text"
@@ -590,7 +590,7 @@ function PanneauRelance(
           className={styles.saisie}
           value={tauxSaisi}
           onChange={(e) => setTauxSaisi(e.target.value)}
-          placeholder="Laisser vide si vous ne le connaissez pas"
+          placeholder="Laisser vide si tu ne le connais pas"
         />
       </label>
 

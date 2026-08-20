@@ -180,6 +180,15 @@ export interface Encours {
   readonly resteARentrer: Euros;
   /** La part de ce reste dont l'échéance est passée. */
   readonly enRetard: Euros;
+  /**
+   * Combien de factures composent ce reste.
+   *
+   * L'écran écrit « 3 610 € · 2 factures en attente ». Ce nombre se compte ICI
+   * et non à l'écran : recompter à côté avec un filtre écrit une seconde fois,
+   * c'est se donner deux définitions de « en attente » qui finiront par ne pas
+   * s'accorder — un montant sur trois factures et un compte de deux.
+   */
+  readonly nombre: number;
 }
 
 /**
@@ -210,10 +219,13 @@ export function encoursDe(factures: readonly FactureSuivie[]): Encours {
   // n'a simplement pas encore été mis au courant. L'exclure ferait disparaître
   // du « reste à rentrer » les factures de fin de mois, c'est-à-dire les plus
   // récentes.
+  const dues = (f: FactureSuivie): boolean =>
+    f.statut === 'emise' || f.statut === 'envoyee' || f.statut === 'en_retard';
+
   return {
-    resteARentrer: somme((f) =>
-      f.statut === 'emise' || f.statut === 'envoyee' || f.statut === 'en_retard'),
-    enRetard: somme((f) => f.statut === 'en_retard')
+    resteARentrer: somme(dues),
+    enRetard: somme((f) => f.statut === 'en_retard'),
+    nombre: factures.filter(dues).length
   };
 }
 

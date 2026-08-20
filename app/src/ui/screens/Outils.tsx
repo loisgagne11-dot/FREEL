@@ -79,7 +79,7 @@ export function Outils() {
           <Info libelle="Explication du calcul de l’impôt">
             Le calcul part du chiffre d’affaires encaissé, applique l’abattement
             forfaitaire du régime micro, puis le barème progressif tranche par
-            tranche. Il ne tient pas compte de vos autres revenus ni de votre
+            tranche. Il ne tient pas compte de tes autres revenus ni de ton
             nombre de parts : c’est un ordre de grandeur, pas une déclaration.
           </Info>
         </h2>

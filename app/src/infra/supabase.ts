@@ -109,7 +109,7 @@ async function appeler(
     // réaction : l'un se réessaie, l'autre demande une correction.
     return {
       statut: 'erreur',
-      motif: 'Le serveur est injoignable. Vérifiez votre connexion, puis réessayez.'
+      motif: 'Le serveur est injoignable. Vérifie ta connexion, puis réessaie.'
     };
   }
 }
@@ -140,7 +140,7 @@ function messageDErreur(code: number, corps: unknown): string {
     return 'Adresse non confirmée : ouvrez le courriel de confirmation reçu à l’inscription.';
   }
   if (code === 401 || code === 403) {
-    return 'Accès refusé. La session a peut-être expiré : reconnectez-vous.';
+    return 'Accès refusé. La session a peut-être expiré : reconnecte-toi.';
   }
   if (code === 404) {
     // Le message a d'abord dit « exécutez docs/supabase.sql », et la première

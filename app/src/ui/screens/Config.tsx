@@ -81,7 +81,7 @@ export function Config() {
     <>
       <Greet
         titre="Config"
-        sousTitre="Votre régime, vos barèmes, vos données. Chaque champ s’enregistre à la frappe."
+        sousTitre="Ton régime, tes barèmes, tes données. Chaque champ s’enregistre à la frappe."
       />
 
       <div className={styles.sections}>
@@ -165,8 +165,8 @@ function Tresorerie() {
       <h2 id={`${idChamp}-titre`} className={styles.titreCarte}>
         Trésorerie
         <Info libelle="D’où vient le solde">
-          Le solde de cette application vient de votre <strong>banque</strong>,
-          pas d’un calcul. Vous indiquez ici le point de départ&nbsp;; les
+          Le solde de cette application vient de ta <strong>banque</strong>,
+          pas d’un calcul. Tu indiques ici le point de départ&nbsp;; les
           mouvements d’un relevé importé s’y ajoutent ensuite. L’ancienne
           version, elle, simulait le solde à partir des encaissements et des
           charges cochées payées — un chiffre qui dérive dès qu’une case est
@@ -182,7 +182,7 @@ function Tresorerie() {
             ? 'Un relevé est importé : ce montant est le point de départ auquel '
               + 'ses mouvements s’ajoutent. Le modifier décale tout le solde.'
             : 'Aucun relevé n’est importé : c’est ce montant qui s’affiche comme '
-              + 'solde. Reportez celui de votre compte bancaire.'}
+              + 'solde. Reporte celui de ton compte bancaire.'}
         >
           <input
             id={`${idChamp}-solde`}
@@ -197,7 +197,7 @@ function Tresorerie() {
         <Champ
           id={`${idChamp}-besoin`}
           libelle="Besoin mensuel"
-          aide="Ce qu’il vous faut pour vivre chaque mois. Sert à calculer votre
+          aide="Ce qu’il te faut pour vivre chaque mois. Sert à calculer ton
                 autonomie ; à zéro, l’autonomie affichée reste à zéro mois."
         >
           <input
@@ -282,7 +282,7 @@ function FoyerFiscal() {
       <Champ
         id={`${idChamp}-parts`}
         libelle="Parts fiscales du foyer"
-        aide="Le quotient familial de votre avis d’imposition. Tant qu’il est vide,
+        aide="Le quotient familial de ton avis d’imposition. Tant qu’il est vide,
               l’impôt sur le revenu n’est pas provisionné — et l’application le dit
               plutôt que d’en supposer une."
       >
@@ -302,7 +302,7 @@ function FoyerFiscal() {
         id={`${idChamp}-autres`}
         libelle="Autres revenus imposables du foyer, sur l’année"
         aide="Salaires du conjoint, revenus fonciers… hors micro-entreprise. Ils
-              déterminent la tranche où votre résultat vient s’empiler : les ignorer
+              déterminent la tranche où ton résultat vient s’empiler : les ignorer
               sous-estime l’impôt."
       >
         <input
@@ -323,7 +323,7 @@ function FoyerFiscal() {
       <Champ
         id={`${idChamp}-per`}
         libelle="Versement PER déductible, sur l’année"
-        aide="Ce que vous versez sur un plan d’épargne retraite, déductible du revenu
+        aide="Ce que tu verses sur un plan d’épargne retraite, déductible du revenu
               global. Non renseigné, il n’est pas déduit : l’impôt estimé est alors au
               plus haut."
       >
@@ -398,9 +398,9 @@ function ReservesEtVersements() {
       <Champ
         id={`${idChamp}-seuil`}
         libelle="Seuil de sécurité"
-        aide="Le montant que vous gardez sur le compte quoi qu’il arrive. Il est
-              retiré du disponible pour obtenir ce que vous pouvez vous verser,
-              et c’est le plancher tracé sur vos courbes."
+        aide="Le montant que tu gardes sur le compte quoi qu’il arrive. Il est
+              retiré du disponible pour obtenir ce que tu peux te verser,
+              et c’est le plancher tracé sur tes courbes."
       >
         <input
           id={`${idChamp}-seuil`}
@@ -435,9 +435,9 @@ function ReservesEtVersements() {
           <output className={styles.curseurValeur}>{pourcent}&nbsp;%</output>
         </span>
         <span className={styles.aide}>
-          Ce que vous laissez sur le compte <strong>au-dessus du seuil</strong>,
+          Ce que tu laisses sur le compte <strong>au-dessus du seuil</strong>,
           à chaque versement. À 0&nbsp;% rien ne change&nbsp;: c’est le réglage
-          par défaut, et il ne décide rien à votre place.
+          par défaut, et il ne décide rien à ta place.
         </span>
       </p>
 
@@ -447,10 +447,10 @@ function ReservesEtVersements() {
       <p className={styles.explication}>
         Sur un solde de <Montant>{eur(soldeInitial)}</Montant>, le seuil en garde{' '}
         <Montant>{eur(reserve)}</Montant>&nbsp;; des{' '}
-        <Montant>{eur(versable)}</Montant> restants vous en laissez{' '}
+        <Montant>{eur(versable)}</Montant> restants tu en laisses{' '}
         {pourcent}&nbsp;%, soit{' '}
         <Montant>{eur(Math.round(versable * (1 - pourcent / 100)))}</Montant> à
-        vous verser.
+        te verser.
       </p>
     </div>
   );
@@ -581,7 +581,7 @@ function Profil() {
         <Champ
           id={`${idChamp}-iban`}
           libelle="IBAN"
-          aide="Figure sur vos factures, pour que le client sache où virer. Rien n’est envoyé nulle part."
+          aide="Figure sur tes factures, pour que le client sache où virer. Rien n’est envoyé nulle part."
           controle={controlerIban(entreprise.iban)}
         >
           <input id={`${idChamp}-iban`} autoComplete="off" spellCheck={false}
@@ -661,7 +661,7 @@ function FenetreAcre() {
     <>
       Exonération jusqu’au <strong>31/{fin.valeur.slice(5, 7)}/{fin.valeur.slice(0, 4)}</strong>{' '}
       inclus, puis taux plein — jusqu’à la fin du 3<sup>e</sup> trimestre civil suivant
-      celui de l’affiliation. À recouper avec votre attestation URSSAF.
+      celui de l’affiliation. À recouper avec ton attestation URSSAF.
       {fin.statut === 'hypothese' && ' Règle extrapolée, non publiée pour cette période.'}
     </>
   );
@@ -707,7 +707,7 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
 
   return (
     <section className={styles.carte} aria-labelledby={`${idChamp}-donnees`}>
-      <h2 id={`${idChamp}-donnees`} className={styles.titreCarte}>Vos données</h2>
+      <h2 id={`${idChamp}-donnees`} className={styles.titreCarte}>Tes données</h2>
 
       {chargement.phase === 'sans-persistance' && (
         <p className={styles.echec} role="alert">{chargement.motif}</p>
@@ -762,7 +762,7 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
         />
         <span className={styles.aide}>
           Un fichier produit par «&nbsp;Exporter mes données&nbsp;». Son contenu
-          vous sera montré avant d’écraser quoi que ce soit.
+          te sera montré avant d’écraser quoi que ce soit.
         </span>
       </p>
 
@@ -780,7 +780,7 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
       </button>
       <p className={styles.explication}>
         Des clients, des missions, des factures et des échéances manifestement
-        fictifs, pour voir l’application remplie. Ils remplacent vos données&nbsp;:
+        fictifs, pour voir l’application remplie. Ils remplacent tes données&nbsp;:
         exportez-les d’abord si elles comptent.
       </p>
 

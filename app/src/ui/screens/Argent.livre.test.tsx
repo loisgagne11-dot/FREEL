@@ -31,13 +31,15 @@ function semer(modifications: Partial<Faits> = {}): void {
 }
 
 /**
- * L'onglet est chargé à la demande : on attend son arrivée avant d'interroger
- * le contenu, sinon la première assertion tombe sur le « Chargement… » du
- * Suspense.
+ * Le livre n'est plus un onglet mais un registre ouvert en panneau — la
+ * référence ne lui donne pas le même rang qu'à la trésorerie (voir l'en-tête
+ * de `Section` dans `Argent.tsx`). Il reste chargé à la demande : on attend son
+ * arrivée avant d'interroger le contenu, sinon la première assertion tombe sur
+ * le « Chargement… » du Suspense.
  */
 async function ouvrirLivre() {
   render(<Argent />);
-  await userEvent.setup().click(screen.getByRole('tab', { name: 'Livre des recettes' }));
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Livre des recettes' }));
   await screen.findByRole('heading', { name: /^Écritures/ });
 }
 

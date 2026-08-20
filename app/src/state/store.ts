@@ -485,7 +485,7 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
         chargement: {
           phase: 'sans-persistance',
           motif: 'Le stockage du navigateur est indisponible (navigation privée '
-            + 'ou stockage bloqué). Vos saisies ne seront pas conservées.'
+            + 'ou stockage bloqué). Tes saisies ne seront pas conservées.'
         }
       });
       return;
@@ -515,7 +515,7 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
             chargement: {
               phase: 'sans-persistance',
               motif: 'La reprise des données de l\'ancienne version n\'a pas pu être '
-                + 'chargée. Vos anciennes données sont intactes ; réessayez en '
+                + 'chargée. Tes anciennes données sont intactes ; réessaie en '
                 + 'rechargeant la page.'
             }
           });
