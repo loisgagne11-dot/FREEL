@@ -8,6 +8,18 @@ import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Argent } from './Argent';
 
+/**
+ * Le pilier Trésorerie est chargé à la demande depuis le lot B : on attend son
+ * arrivée avant d'interroger le contenu, sinon la première assertion tombe sur
+ * le « Chargement… » du Suspense.
+ *
+ * L'ancre est le titre de la carte de répartition, que le handoff garde tel
+ * quel — les libellés des tuiles, eux, changent d'un lot à l'autre.
+ */
+async function attendreTresorerie(): Promise<void> {
+  await screen.findByText(/n’est pas tout à toi/);
+}
+
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 function semer(modifications: Partial<Faits> = {}): void {
@@ -34,9 +46,10 @@ const ech = (id: string, nature: Echeance['nature'], montant: number): Echeance 
  * libère après une déclaration.
  */
 describe('ventilation des provisions à l’écran', () => {
-  it('affiche chaque nature avec son montant', () => {
+  it('affiche chaque nature avec son montant', async () => {
     semer({ echeances: [ech('a', 'urssaf', 4100), ech('b', 'tva', 1800), ech('c', 'cfe', 300)] });
     render(<Argent />);
+    await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
     expect(enveloppes).toBeTruthy();
@@ -54,9 +67,10 @@ describe('ventilation des provisions à l’écran', () => {
    * zéro donne à croire qu'elle n'existe pas, alors qu'elle vient d'être
    * soldée — c'est l'information inverse.
    */
-  it('garde les natures sans montant, à zéro', () => {
+  it('garde les natures sans montant, à zéro', async () => {
     semer({ echeances: [ech('a', 'urssaf', 4100)] });
     render(<Argent />);
+    await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
     const dans = within(enveloppes as HTMLElement);
@@ -69,9 +83,10 @@ describe('ventilation des provisions à l’écran', () => {
    * confidentiel laisserait lire l'URSSAF et la TVA en clair sur un écran
    * partagé — et une provision dit à elle seule le chiffre d'affaires.
    */
-  it('rend chaque montant masquable', () => {
+  it('rend chaque montant masquable', async () => {
     semer({ echeances: [ech('a', 'urssaf', 4100), ech('b', 'tva', 1800)] });
     render(<Argent />);
+    await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
     for (const texte of ['4 100 €', '1 800 €']) {
@@ -96,18 +111,20 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     modeReglement: 'virement' as const, numero: '2026-001'
   });
 
-  it('dit pourquoi elle n’est pas provisionnée quand les parts manquent', () => {
+  it('dit pourquoi elle n’est pas provisionnée quand les parts manquent', async () => {
     semer({ recettes: [recette(60000)] });
     render(<Argent />);
+    await attendreTresorerie();
     // `getAllBy` : le titre en gras et la ligne qui le contient répondent tous
     // deux au motif. C'est un détail de rendu, pas deux endroits.
     expect(screen.getAllByText(/non provisionné/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/parts fiscales/).length).toBeGreaterThan(0);
   });
 
-  it('affiche le reste à mettre de côté et nomme ce qu’il ignore', () => {
+  it('affiche le reste à mettre de côté et nomme ce qu’il ignore', async () => {
     semer({ recettes: [recette(60000)], partsFiscales: 1 });
     render(<Argent />);
+    await attendreTresorerie();
     expect(screen.getAllByText(/restant à\s+mettre de côté/).length).toBeGreaterThan(0);
     // Autres revenus et PER non renseignés : deux réserves qui vont dans des
     // sens opposés, et qui doivent être dites toutes les deux.
@@ -118,12 +135,13 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
   // Sous versement libératoire, l'impôt est déjà payé avec les cotisations :
   // une seconde ligne le compterait deux fois, et l'expliquer laisserait croire
   // qu'il manque une provision.
-  it('ne dit rien sous le versement libératoire', () => {
+  it('ne dit rien sous le versement libératoire', async () => {
     semer({
       recettes: [recette(60000)],
       entreprise: { ...faitsVides().entreprise, versementLiberatoire: true }
     });
     render(<Argent />);
+    await attendreTresorerie();
     expect(screen.queryAllByText(/non provisionné/)).toHaveLength(0);
     expect(screen.queryAllByText(/restant à\s+mettre de côté/)).toHaveLength(0);
   });
