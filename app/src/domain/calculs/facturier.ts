@@ -1,6 +1,5 @@
 import type { DateISO, Euros } from '../types';
 import { euros } from '../types';
-import { ajouterJours } from './aTraiter';
 
 /**
  * Le suivi des factures — de l'émission au règlement.
@@ -39,12 +38,10 @@ import { ajouterJours } from './aTraiter';
  * code de commerce). Retenir zéro afficherait « en retard » dès le jour de
  * l'émission, et une étiquette qu'on voit toujours cesse d'être lue.
  */
-export const DELAI_PAIEMENT_DEFAUT = 30;
-
-/** La date à laquelle le règlement devient exigible. */
-export function echeanceDe(emiseLe: DateISO, delaiJours: number): DateISO {
-  return ajouterJours(emiseLe, delaiJours);
-}
+/* `DELAI_PAIEMENT_DEFAUT` et `echeanceDe` vivaient ici, en nombre de jours.
+   Ils sont partis dans `delaiPaiement.ts`, qui sait dire « fin de mois » — ce
+   qu'une addition de jours ne peut pas. Deux représentations d'une même notion
+   finissent par ne pas tomber d'accord ; il n'en reste qu'une. */
 
 /**
  * Les états d'une facture.
@@ -74,6 +71,12 @@ export interface RecetteSuivie {
   readonly encaisseeLe: DateISO | null;
   readonly numero: string;
   readonly annuleEcriture?: string | null;
+  /**
+   * L'échéance imprimée sur la facture. `undefined` avant le schéma 13.
+   *
+   * C'est elle qui fait foi. Voir `suivre`.
+   */
+  readonly echeanceLe?: DateISO | null;
 }
 
 export interface FactureSuivie<R extends RecetteSuivie = RecetteSuivie> {
@@ -93,9 +96,22 @@ export interface FactureSuivie<R extends RecetteSuivie = RecetteSuivie> {
  * d'encaissement donnerait à croire que l'argent est acquis. L'annulation
  * l'emporte donc sur l'encaissement.
  */
+/**
+ * L'échéance est LUE sur la recette, plus recalculée.
+ *
+ * Elle est imprimée sur le document envoyé au client : c'est un fait, et le
+ * papier ne change pas parce qu'on a renégocié depuis. La recalculer depuis
+ * les conditions du client faisait changer de réponse à « cette facture
+ * était-elle en retard ? », rétroactivement, et le compteur de retards avec.
+ *
+ * `secours` ne sert qu'aux recettes qu'aucune migration n'aurait comblées —
+ * un bloc écrit à la main, un jeu d'essai. Une facture émise sans échéance
+ * serait autrement réputée jamais échue, et les retards les plus anciens
+ * seraient précisément ceux qu'on ne verrait pas.
+ */
 export function suivre<R extends RecetteSuivie>(
   recettes: readonly R[],
-  delaiPour: (clientNom: string) => number,
+  secours: (clientNom: string, emiseLe: DateISO) => DateISO,
   aujourdhui: DateISO
 ): readonly FactureSuivie<R>[] {
   const annulees = new Set(
@@ -105,7 +121,7 @@ export function suivre<R extends RecetteSuivie>(
   return recettes.map((recette) => {
     const echeanceLe = recette.emiseLe === null
       ? null
-      : echeanceDe(recette.emiseLe, delaiPour(recette.clientNom));
+      : recette.echeanceLe ?? secours(recette.clientNom, recette.emiseLe);
 
     const statut = statutDe(recette, annulees, echeanceLe, aujourdhui);
     const enRetard = statut === 'en_retard' && echeanceLe !== null;

@@ -29,7 +29,7 @@ const ENTREPRISE = {
 
 const client = (m: Partial<Client> = {}): Client => ({
   id: 'c1', nom: 'Client France', adresse: '2 rue Exemple', siret: '',
-  email: '', delaiPaiementJours: 30, pays: 'FR', tvaIntracom: '', ...m
+  email: '', delaiPaiement: 'net_30', pays: 'FR', tvaIntracom: '', ...m
 });
 
 function semer(modifications: Partial<Faits> = {}): void {
@@ -162,7 +162,7 @@ describe('totaux', () => {
   });
 
   it('affiche l’échéance déduite du délai du client', async () => {
-    semer({ clients: [client({ delaiPaiementJours: 45 })] });
+    semer({ clients: [client({ delaiPaiement: 'net_45' })] });
     rendreSaisie();
     await remplir(userEvent.setup());
     expect(screen.getByText('Échéance').nextSibling?.textContent).toMatch(/29 août 2026/);

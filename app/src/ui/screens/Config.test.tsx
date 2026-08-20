@@ -352,7 +352,7 @@ describe('restauration d’une sauvegarde', () => {
     ...faitsVides(),
     clients: [{
       id: 'c1', nom: 'Client repris', adresse: '', siret: '', email: '',
-      delaiPaiementJours: 30, pays: '', tvaIntracom: ''
+      delaiPaiement: 'net_30', pays: '', tvaIntracom: ''
     }]
   };
 
@@ -391,7 +391,7 @@ describe('restauration d’une sauvegarde', () => {
         ...faitsVides(),
         clients: [{
           id: 'existant', nom: 'Déjà là', adresse: '', siret: '', email: '',
-          delaiPaiementJours: 30, pays: '', tvaIntracom: ''
+          delaiPaiement: 'net_30', pays: '', tvaIntracom: ''
         }]
       }
     });
@@ -649,5 +649,73 @@ describe('seuil de sécurité et part gardée', () => {
     render(<Config />);
     fireEvent.change(champSeuil(), { target: { value: '-400' } });
     expect(useFaits.getState().faits.reserve).toBe(0);
+  });
+});
+
+describe('foyer fiscal', () => {
+  /**
+   * LES CHAMPS RESTENT VIDES, ET C'EST LE POINT.
+   *
+   * Si ce test sautait et qu'un « 1 » s'affichait par défaut dans les parts,
+   * la provision d'impôt se calculerait sur un foyer inventé et s'afficherait
+   * comme un résultat. Entre une part et trois, l'impôt va du simple au
+   * double, et c'est le versable qui en dépend.
+   */
+  it('n’affiche aucune valeur tant que rien n’est renseigné', () => {
+    render(<Config />);
+    const parts = screen.getByLabelText(/Parts fiscales/) as HTMLInputElement;
+    const autres = screen.getByLabelText(/Autres revenus imposables/) as HTMLInputElement;
+    const per = screen.getByLabelText(/Versement PER/) as HTMLInputElement;
+    expect(parts.value).toBe('');
+    expect(autres.value).toBe('');
+    expect(per.value).toBe('');
+  });
+
+  it('enregistre les trois faits du foyer à la frappe', () => {
+    render(<Config />);
+    fireEvent.change(screen.getByLabelText(/Parts fiscales/), { target: { value: '2.5' } });
+    fireEvent.change(screen.getByLabelText(/Autres revenus imposables/), { target: { value: '12000' } });
+    fireEvent.change(screen.getByLabelText(/Versement PER/), { target: { value: '3000' } });
+
+    const f = useFaits.getState().faits;
+    expect(f.partsFiscales).toBe(2.5);
+    expect(f.autresRevenusFoyer).toBe(12000);
+    expect(f.versementPerDeductible).toBe(3000);
+  });
+
+  // Effacer un champ n'est pas saisir zéro : c'est revenir à « non renseigné »,
+  // ce qui fait de nouveau refuser la provision d'impôt au lieu de la calculer
+  // sur un foyer sans autres revenus.
+  it('un champ vidé redevient « non renseigné », pas zéro', () => {
+    useFaits.setState({ faits: { ...faitsVides(), partsFiscales: 2 } });
+    render(<Config />);
+    fireEvent.change(screen.getByLabelText(/Parts fiscales/), { target: { value: '' } });
+    expect(useFaits.getState().faits.partsFiscales).toBeNull();
+  });
+});
+
+describe('fenêtre d’ACRE', () => {
+  /**
+   * UNE DATE SE RECOUPE, UN BOOLÉEN NE SE RECOUPE PAS.
+   *
+   * La durée était calculée sans jamais être montrée, et elle courait un
+   * trimestre de trop. Affichée, elle se compare à l'attestation URSSAF. Le
+   * cas est celui constaté sur un compte réel : début au 01/02/2025,
+   * exonération jusqu'au 31/12/2025.
+   */
+  it('écrit la date de fin quand l’ACRE est déclarée', () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        entreprise: { ...faitsVides().entreprise, acre: true, debutActivite: dateISO('2025-02-01') }
+      }
+    });
+    render(<Config />);
+    expect(screen.getByText(/31\/12\/2025/)).toBeTruthy();
+  });
+
+  it('n’écrit aucune date quand l’ACRE n’est pas déclarée', () => {
+    render(<Config />);
+    expect(screen.queryByText(/Exonération jusqu’au/)).toBeNull();
   });
 });

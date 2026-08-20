@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { formuler } from '../domain/calculs/aTraiter.libelles';
 import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  aTraiter, caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe,
+  aTraiter, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant, recettesEncaissees, regimeDe,
   remunerationDuMois, sousAcreLe
 } from './selecteurs';
 import { periodeCourante } from '../domain/calculs/periode';
@@ -90,11 +91,26 @@ describe('période d\'ACRE', () => {
     }
   });
 
-  it('couvre les quatre trimestres suivant le début d\'activité', () => {
+  // L'attente précédente était « douze mois pleins », donc janvier 2026
+  // exonéré pour un début en février 2025. Elle était fausse : la règle court
+  // jusqu'à la fin du 3ᵉ trimestre civil suivant celui de l'affiliation, et le
+  // compte du propriétaire l'a confirmé — taux plein constaté dès janvier
+  // 2026. Un mois d'ACRE de trop, c'est la moitié des cotisations de ce mois
+  // qui n'est pas provisionnée.
+  it('couvre jusqu\'à la fin du 3e trimestre civil suivant celui de l\'affiliation', () => {
     const sous = sousAcreLe(avecAcre('2025-02-01'));
     expect(sous(mois('2025-02'))).toBe(true);
     expect(sous(mois('2025-12'))).toBe(true);
-    expect(sous(mois('2026-01'))).toBe(true);
+    expect(sous(mois('2026-01'))).toBe(false);
+  });
+
+  // La fenêtre est observable, et pas seulement calculée : l'écran Config
+  // l'écrit pour qu'elle se recoupe avec l'attestation URSSAF.
+  it('rend la fin d\'ACRE en clair, et rien quand l\'ACRE n\'est pas déclarée', () => {
+    const r = finAcreDe(avecAcre('2025-02-01'));
+    expect(r?.statut).not.toBe('refuse');
+    expect(r !== null && r.statut !== 'refuse' ? r.valeur : null).toBe('2025-12');
+    expect(finAcreDe(faitsVides())).toBeNull();
   });
 
   // Le cas de la persona de l'audit : ACRE éteinte, donc trimestre à taux
@@ -194,6 +210,102 @@ describe('état de l\'écran Pilote', () => {
   it('ne stocke aucun dérivé : deux appels sur les mêmes faits donnent le même résultat', () => {
     const f = faits({ soldeInitial: euros(10000), reserve: euros(500) });
     expect(etatPilote(f, [], maintenant)).toEqual(etatPilote(f, [], maintenant));
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────
+     La provision d'impôt sur le revenu au volet 2
+     ─────────────────────────────────────────────────────────────────────── */
+
+  const auBareme = (modifications: Partial<Faits> = {}) => faits({
+    soldeInitial: euros(60000),
+    recettes: [recette('a', 60000, '2026-07-10')],
+    partsFiscales: 1,
+    autresRevenusFoyer: euros(0),
+    versementPerDeductible: euros(0),
+    ...modifications
+  });
+
+  // Cotisations 25,6 % + CFP 0,2 % : tout ce que le volet 2 retenait avant.
+  const provisionsSansImpot = 60000 * (0.256 + 0.002);
+
+  /**
+   * LE VERSABLE CESSAIT D'ÊTRE SURÉVALUÉ.
+   *
+   * Sous le régime du barème, `tauxImpotEtContributions` ne rend que la CFP —
+   * 0,2 %. La ligne « impôt » du volet 2 valait donc 120 € sur 60 000 € de
+   * chiffre d'affaires, et le versable proposait de se verser les 5 045 €
+   * d'impôt sur le revenu de l'année. Si ce test sautait, l'application
+   * inviterait de nouveau à dépenser l'argent du fisc.
+   */
+  it('retranche l’impôt sur le revenu du versable, sous le régime du barème', () => {
+    const e = etatPilote(auBareme(), [], maintenant);
+    const versableAvant = 60000 - provisionsSansImpot;
+    expect(e.tresorerie.versable).toBeLessThan(versableAvant);
+    // 60 000 × 66 % = 39 600 imposables ; barème : 5 045,48 €.
+    expect(e.tresorerie.versable).toBeCloseTo(versableAvant - 5045.48, 2);
+  });
+
+  // La ventilation doit rester lisible : la CFP est un taux, l'impôt sur le
+  // revenu un montant annuel, et les deux se lisent sur la même ligne sans se
+  // recouvrir.
+  it('range l’impôt sur le revenu dans la nature « impot », à côté de la CFP', () => {
+    const e = etatPilote(auBareme(), [], maintenant);
+    expect(e.provisionsParNature.impot).toBeCloseTo(60000 * 0.002 + 5045.48, 2);
+    expect(e.provisionsParNature.urssaf).toBeCloseTo(60000 * 0.256, 2);
+  });
+
+  /**
+   * LA CONDITION SANS LAQUELLE L'ANOMALIE E ROUVRE.
+   *
+   * L'acompte de prélèvement à la source est un fait saisi, déjà porté par le
+   * volet 1 quand il n'est pas payé. La provision ne couvre que le reste :
+   * sans cette soustraction, la même dette serait provisionnée deux fois.
+   */
+  it('ne provisionne que ce que les acomptes de prélèvement à la source ne couvrent pas', () => {
+    const acompte: Echeance = {
+      id: 'pas', nature: 'impot', montant: euros(2000),
+      echeanceLe: dateISO('2026-06-15'), payeeLe: null, montantPaye: null
+    };
+    const e = etatPilote(auBareme({ echeances: [acompte] }), [acompte], maintenant);
+    // Volet 1 : l'acompte appelé et non payé. Volet 2 : l'impôt de l'année
+    // moins ce même acompte. La somme vaut l'impôt de l'année, pas le double.
+    expect(e.voletConstate).toBe(2000);
+    expect(e.provisionsParNature.impot).toBeCloseTo(60000 * 0.002 + 5045.48, 2);
+  });
+
+  // Les deux régimes sont exclusifs : sous versement libératoire, l'impôt est
+  // déjà dans le taux de 2,2 %, et une seconde ligne le compterait deux fois.
+  it('n’ajoute aucune provision d’impôt sous le versement libératoire', () => {
+    const e = etatPilote(
+      auBareme({ entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } }),
+      [], maintenant
+    );
+    expect(e.provisionImpotRevenu).toBeNull();
+    expect(e.provisionsParNature.impot).toBeCloseTo(60000 * (0.002 + 0.022), 2);
+  });
+
+  /**
+   * SANS PARTS, ON NE MONTRE PAS UN CHIFFRE.
+   *
+   * Le total est alors sous-évalué de tout l'impôt de l'année — la plus grosse
+   * sous-évaluation possible. L'écran doit le dire au lieu de présenter le
+   * versable comme un résultat.
+   */
+  it('signale un calcul incomplet tant que les parts fiscales ne sont pas renseignées', () => {
+    const e = etatPilote(auBareme({ partsFiscales: null }), [], maintenant);
+    expect(e.provisionImpotRevenu?.statut).toBe('refuse');
+    expect(e.tresorerie.incomplet).toBe(true);
+    expect(e.tresorerie.motifsIncomplets.join(' ')).toMatch(/parts/i);
+  });
+
+  // Le pipeline des encaissements à venir n'est pas accessible depuis ici
+  // (`etatProjection` appelle `etatPilote`) : le montant est un plancher, et
+  // il le dit plutôt que de passer pour l'impôt complet de l'année.
+  it('dit que les encaissements à venir ne sont pas dans l’assiette', () => {
+    const e = etatPilote(auBareme(), [], maintenant);
+    const r = e.provisionImpotRevenu;
+    expect(r !== null && r.statut !== 'refuse' && r.valeur.ignore)
+      .toContain('encaissements_a_venir_non_fournis');
   });
 });
 
@@ -449,7 +561,7 @@ describe('obligations de CFE', () => {
     );
     const cfe = sujets.find((s) => s.id.includes('cfe-paiement'));
     expect(cfe).toBeTruthy();
-    expect(cfe?.contexte).toMatch(/disponible est surestimé/);
+    expect(cfe === undefined ? '' : formuler(cfe).contexte).toMatch(/disponible est surestimé/);
   });
 
   /**
@@ -494,7 +606,7 @@ describe('obligations de CFE', () => {
   it('rappelle la déclaration initiale l’année de la création', () => {
     const sujets = aTraiter(faits({ entreprise: entreprise('2026-02-01') }), enOctobre);
     const d = sujets.find((s) => s.id.includes('1447c'));
-    expect(d?.intitule).toMatch(/1447-C/);
+    expect(d === undefined ? '' : formuler(d).intitule).toMatch(/1447-C/);
     expect(d?.ecran).toBe('config');
   });
 
@@ -541,7 +653,7 @@ describe('obligations de CFE', () => {
     const sujets = aTraiter(faits({ entreprise: entreprise('2025-01-01') }), enOctobre);
     const cfe = sujets.find((s) => s.id.includes('cfe-paiement'));
     expect(cfe).toBeTruthy();
-    expect(cfe?.contexte).toMatch(/réduite de moitié/);
+    expect(cfe === undefined ? '' : formuler(cfe).contexte).toMatch(/réduite de moitié/);
   });
 
   // Au plus 5 000 € de recettes en N−2 : pas de cotisation minimum, donc rien

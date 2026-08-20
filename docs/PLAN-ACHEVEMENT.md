@@ -88,6 +88,191 @@ Prérequis de tout le reste : sans lui, « conforme au visuel » reste une opini
 | O3 | Agent `controleur-visuel` | — | Rend une liste d'écarts localisés, pas un avis global | ✅ |
 | O4 | Bouton « charger un jeu de démonstration » dans Config | `*-config-donnees` | Remplit une application vierge, et le dit avant d'écraser | ✅ |
 
+### Lot P — Ce que l'impôt et l'ACRE coûtent vraiment
+
+**Placé avant la suite du dessin** : la tuile « Résultat projeté » (A1) et les
+provisions de l'écran Trésorerie (B4) en dépendent toutes les deux. Soulevé par
+le propriétaire le 16/08, vérifié sur le code, confirmé.
+
+| # | Livrable | Critère d'acceptation | État |
+|---|---|---|---|
+| P1 | La durée d'ACRE devient une **règle datée avec sa source**, comme les taux URSSAF | Le `4` en dur de `sousAcreLe` disparaît ; la règle porte sa source et sa date de vérification ; l'invariant n°3 est tenu | ✅ |
+| P2 | Les faits du foyer fiscal : parts, autres revenus imposables, versement PER | Ils dorment aujourd'hui dans `configImpotBrute`, non interprétés ; une provision d'IR sans eux serait un chiffre inventé | ✅ |
+| P3 | `provisionImpotRevenu` : l'IR estimé de l'année, réparti sur les mois | Assiette = encaissé constaté + encaissements attendus des missions ; abattement forfaitaire ; barème avec parts ; **les acomptes de PAS déjà saisis sont retranchés** | ⚠️ Le module prend l'assiette complète, mais l'appelant du volet 2 ne peut pas lui fournir les encaissements attendus — voir journal |
+| P4 | La provision d'IR entre au volet 2 des provisions | Le versable cesse d'être surévalué de tout l'impôt pour qui n'a pas coché le versement libératoire | ✅ |
+| P5 | L'écran dit l'hypothèse | Sans parts ni autres revenus, la provision s'affiche comme incomplète — jamais comme un résultat | ✅ |
+| P6 | **L'assiette prend les encaissements attendus des missions** | Aujourd'hui la provision ne compte que l'encaissé constaté : un plancher juste, mais qui monte au fil de l'année au lieu d'être lissé. **Bloqué par le poids, plus par le cycle** — voir §3 septies | ⛔ |
+
+#### §3 septies — P6 : le cycle se résout, le poids non
+
+**Mesuré le 19/08, pas estimé.** L'extraction a été faite pour de bon, puis
+défaite.
+
+Le cycle n'est pas le problème : `etatProjection` appelle `etatPilote` pour son
+point de départ, mais le pipeline d'encaissements attendus, lui, ne dépend de
+personne en amont. Sorti dans son propre module, il compile et les deux
+consommateurs le lisent sans s'attendre.
+
+Le problème est le **poids**. Brancher la provision d'impôt sur ce pipeline fait
+passer le paquet d'entrée de **78,97 Ko à 100,06 Ko**. Vingt-et-un kilo-octets :
+c'est la machinerie qui transforme des rythmes en jours travaillés — planning,
+jours fériés, congés, prévision. Il n'y a pas vingt-et-un kilo-octets à extraire
+ailleurs.
+
+Trois issues, et aucune ne se prend sans arbitrage :
+
+1. **Sortir le Pilote du paquet d'entrée**, comme les cinq autres écrans. Le
+   total téléchargé ne change pas ; il se répartit autrement, au prix d'un
+   aller-retour de plus sur un chargement à froid. L'architecture devient
+   uniforme.
+2. **Affiner après le premier rendu** : montrer le plancher, puis le corriger
+   quand le module lourd arrive. Un chiffre d'argent qui bouge tout seul sous
+   les yeux est pire qu'un chiffre stable et modeste.
+3. **Laisser le plancher**, et l'écrire dans l'écran. C'est l'état actuel : le
+   montant est juste, il provisionne simplement trop tard dans l'année.
+
+En attendant, l'état 3 tient et se dit. Ce n'est pas un oubli.
+
+#### §3 ter — Pourquoi ce lot existe, et ce qu'il ne refait pas
+
+**L'impôt n'était pas provisionné du tout sous le régime du barème.**
+`tauxImpotEtContributions` rend la CFP seule — 0,2 % — et `provisions.ts` en
+fait la ligne « impôt » du volet 2. Quelqu'un qui n'a pas coché le versement
+libératoire voit donc un versable surévalué de tout son impôt sur le revenu.
+
+**Ce n'est pas l'anomalie E qui rouvre.** Ce qui avait été interdit, c'est de
+RECONSTITUER l'acompte de prélèvement à la source : la DGFiP le notifie,
+l'utilisateur le saisit, et le recalculer produisait une double imposition.
+Une PROVISION est autre chose :
+
+| | Acompte de PAS | Provision d'IR |
+|---|---|---|
+| Nature | un **fait** — un avis reçu, une date, un montant | une **estimation** de ce que l'année va coûter |
+| Volet | 1, déjà appelé | 2, dû mais pas encore appelé |
+| Source | l'avis d'imposition | le CA projeté et le foyer |
+
+Les deux cohabitent **à une condition** : la provision estimée retranche les
+acomptes déjà saisis. Sans cette soustraction, l'anomalie E revient sous un
+autre nom.
+
+**L'ACRE court moins longtemps que ce que nous calculions — confirmé.**
+`sousAcreLe` applique douze mois pleins à compter du mois de début d'activité.
+La règle du micro-social court « jusqu'à la fin du 3ᵉ trimestre civil suivant
+celui de l'affiliation » — soit onze mois pour un début en février, dix pour un
+début en décembre. L'écart allait dans le sens dangereux : moins de charges,
+donc plus de disponible, donc plus de versable.
+
+**Confirmé par constat le 16/08** : début d'activité au 01/02/2025, exonération
+appliquée jusqu'au 31/12/2025, taux plein à partir de janvier 2026. La règle
+trimestrielle tombe juste ; les douze mois pleins donnaient janvier 2026 en
+trop. La règle remonte dans le barème **avec sa source et sa date de
+vérification**, comme les taux URSSAF — le `4` d'origine n'en avait aucune, ce
+que l'invariant n°3 interdit.
+
+**L'assiette de la projection est celle que le propriétaire décrit** : les
+missions donnent le chiffre d'affaires de l'année, remis à jour à chaque
+évolution de mission et de planning ; le RÉEL prend le relais mois par mois dès
+que la facture est émise. Le module distingue les deux sans les mélanger — c'est
+la même règle que partout ailleurs dans le projet, le constaté ne se confond pas
+avec l'attendu.
+
+### Lot Q — Une facture n'est pas payée le jour où elle part
+
+Soulevé par le propriétaire le 16/08. **Bloque la justesse de toute prévision** :
+la projection de trésorerie, la capacité de versement mensuelle et la provision
+d'impôt reposent toutes sur la date à laquelle l'argent arrive.
+
+| # | Livrable | Critère d'acceptation | État |
+|---|---|---|---|
+| Q1 | ✅ Un délai de paiement qui sait dire « 30 jours **fin de mois** » | Aujourd'hui `delaiPaiementJours: number` ne sait qu'ajouter des jours. « Fin de mois » est une autre arithmétique, et c'est celle que le propriétaire subit sur ses deux missions en cours | ⬜ |
+| Q2 | Le délai se déclare **sur la mission**, dans une liste déroulante | Une mission passée par une agence n'a pas les mêmes conditions qu'une vente directe au même nom. Liste, pas saisie libre : les conditions réelles sont un petit ensemble de formules nommées | ⬜ |
+| Q2 bis | L'application signale un délai **hors des bornes légales** | 60 jours nets ou 45 jours fin de mois au maximum (art. L441-10 du code de commerce). Un délai plus long se signale sans se refuser : il arrive qu'on en signe | ⬜ |
+| Q3 | La facture **porte son échéance** comme un fait | Elle est imprimée sur le document envoyé au client : changer les conditions d'un client ne doit pas réécrire la date d'échéance des factures déjà parties | ⬜ |
+| Q4 | Les prévisions s'alignent sur ces échéances | `etatProjection`, `capaciteVersement` et la provision d'impôt datent l'encaissement attendu à l'échéance réelle, plus à une approximation | ⬜ |
+| Q5 | Migration des factures existantes | L'échéance se calcule une fois depuis les conditions du client, puis se fige. Le dire, ne pas le supposer | ⬜ |
+
+#### §3 quater — Pourquoi l'échéance devient un fait
+
+Le code actuel dérive l'échéance à la lecture :
+`ajouterJours(r.emiseLe, delaiParClient.get(r.clientNom))`.
+
+Trois défauts, du plus léger au plus grave :
+
+1. **Il ne sait pas dire « fin de mois ».** Une facture émise le 12 juin à
+   « 30 jours fin de mois » n'est pas due le 12 juillet mais le 31 juillet.
+   Dix-neuf jours d'écart sur chaque facture, et la prévision de trésorerie
+   annonce l'argent avant qu'il n'arrive.
+
+2. **Le délai ne vit que sur le client.** Une mission passée par une agence et
+   une vente directe au même client n'ont pas les mêmes conditions.
+
+3. **Changer les conditions d'un client réécrit le passé.** « Cette facture
+   était-elle en retard ? » change de réponse rétroactivement, et le compteur
+   de retards avec. Or l'échéance est **imprimée sur le document envoyé** :
+   c'est un fait, pas une dérivée. Le délai de la mission et celui du client
+   ne sont plus que la valeur **proposée à la création** — ce qui est
+   exactement leur rôle.
+
+C'est la même distinction que partout ailleurs dans le projet : le constaté ne
+se recalcule pas depuis un réglage qui a bougé depuis.
+
+#### §3 quinquies — Les formules proposées, et pourquoi une liste
+
+Les conditions de paiement ne sont pas un nombre libre : ce sont quelques
+formules nommées, que les deux parties reconnaissent et écrivent telles quelles
+sur le contrat. Une saisie libre en jours ne peut d'ailleurs pas exprimer
+« fin de mois », qui est le cas courant.
+
+La liste proposée à la création d'une mission :
+
+| Formule | Ce qu'elle calcule, pour une facture du 12 juin |
+|---|---|
+| Paiement à réception | 12 juin |
+| 30 jours nets | 12 juillet |
+| 45 jours nets | 27 juillet |
+| 60 jours nets | 11 août |
+| **30 jours fin de mois** | + 30 jours, puis fin du mois atteint → **31 juillet** |
+| **45 jours fin de mois** | + 45 jours, puis fin du mois atteint → **31 juillet** |
+| Fin de mois + 30 jours | fin du mois d'émission, puis + 30 jours → 30 juillet |
+| Fin de mois + 45 jours | fin du mois d'émission, puis + 45 jours → 14 août |
+
+Les deux dernières existent parce que « 30 jours fin de mois » et « fin de mois
++ 30 jours » sont deux conventions distinctes, souvent confondues, qui ne
+tombent pas le même jour. Les nommer sans ambiguïté vaut mieux que de deviner
+laquelle l'utilisateur voulait dire.
+
+**Défaut : 30 jours fin de mois.** C'est ce que le propriétaire subit sur ses
+missions en cours, et le supplétif légal — 30 jours — n'en est pas loin.
+
+**Hors bornes légales.** L'article L441-10 plafonne à 60 jours nets ou 45 jours
+fin de mois. « Fin de mois + 45 jours » et « 60 jours fin de mois » dépassent.
+L'application ne les refuse pas — on signe parfois ce qu'on n'a pas choisi —
+mais elle le dit, parce que c'est une information que le freelance a intérêt à
+connaître au moment de facturer.
+
+### Lot R — Dégager le paquet d'entrée
+
+**Bloque la clôture du lot Q**, et bloquera tous les suivants : le paquet
+d'entrée n'a plus de marge. Il était à 79,89 / 80 Ko avant le lot Q, soit un
+dixième de pour cent — n'importe quel ajout le fait déborder, et l'invariant
+n°7 interdit de relever le plafond.
+
+| # | Livrable | Critère d'acceptation | État |
+|---|---|---|---|
+| R1 | La FORMULATION des sujets « à traiter » quitte le paquet d'entrée | Dix mille huit cent cinquante-sept octets de phrases françaises y voyageaient, pour un panneau qui ne s'ouvre qu'au clic et une carte sous la ligne de flottaison. La détection reste ; la mise en mots part avec ce qui l'affiche | ✅ |
+| R2 | Le budget retrouve une marge exploitable | **77,11 / 80 Ko** — près de trois kilo-octets, contre cent-dix octets avant. L'écran différé le plus lourd reste à 39,83 / 40 : c'est lui qui bloquera le prochain lot d'écran | ✅ |
+
+#### §3 sexies — La coupure : détecter n'est pas formuler
+
+C'est la même coupure que celle déjà faite deux fois dans ce projet — les
+libellés de délai de paiement d'un côté, le calcul d'échéance de l'autre ; le
+barème de Config sorti dans son propre paquet. Ce qui CALCULE reste, ce qui
+NOMME part avec l'écran qui l'affiche.
+
+Ici, la pastille du haut n'a besoin que d'un nombre et d'une gravité. Les
+intitulés, les contextes et les libellés d'action ne servent qu'au panneau, et
+ce panneau charge déjà sa coquille à la demande.
+
 ### Lot A — Argent · Performance
 
 C'est là que le plus grand nombre d'indicateurs de l'ancienne application ont
@@ -273,4 +458,12 @@ faits plutôt qu'avec trois écrans finis.
 | Date | Lot | Ce qui a été fait |
 |---|---|---|
 | 16/08 | — | Plan établi et périmètre arbitré. |
+| 16/08 | Lot R | Livré. La coupure « détecter n'est pas formuler » rend 3 Ko au paquet d'entrée : 77,11 / 80. Deux consommateurs des phrases ont été extraits — le panneau de la pastille, et la carte « À traiter » du Pilote, qui est sous la ligne de flottaison. |
+| 16/08 | Lot Q | **Clos.** Le budget passe, la chaîne entière est verte. |
+| 16/08 | Lot R (ouverture) | le paquet d'entrée n'a plus de marge, et l'invariant n°7 interdit de relever le plafond. |
+| 16/08 | Lot Q | Code livré et testé, **non clos** : le budget d'entrée dépasse de cent-dix octets. Trois extractions faites (libellés séparés du calcul, table de règles remplacée par la lecture de l'identifiant, deux fonctions de date fusionnées) — il en manque une, et c'est le lot R. |
+| 16/08 | Lot P | Livré, P6 excepté. Le versable baisse de 5 045 € sur 60 000 € encaissés en BNC à une part : c'est l'impôt qui n'était provisionné nulle part. L'ACRE s'arrêtait un mois trop tard. Deux extractions imposées par le budget, aucun plafond relevé. |
+| 16/08 | Lot Q | Ouvert : l'échéance d'une facture se déduisait du client à la lecture, sans savoir dire « fin de mois » et en réécrivant le passé à chaque changement de conditions. |
+| 16/08 | Lot P | Ouvert : l'impôt sur le revenu n'était provisionné nulle part sous le régime du barème, et la fenêtre d'ACRE est probablement trop longue de un à trois mois. |
+| 16/08 | Lot P | Livré. L'ACRE est une règle **trimestrielle** datée (`bareme/acre.ts`), confirmée par constat sur un compte réel — un début au 01/02/2025 s'arrête au 31/12/2025, et non au 31/01/2026 comme le calculait le `4` en dur. Les trois faits du foyer fiscal sont saisissables et repris de `configImpotBrute` (schéma 12). `provisionImpotRevenu` entre au volet 2, acomptes de PAS retranchés. **Réserve sur P3** : l'assiette du volet 2 se limite à l'encaissé CONSTATÉ. Le pipeline de `etatProjection` ne peut pas être lu depuis `etatPilote` — `etatProjection` appelle lui-même `etatPilote`, et l'y importer ferait franchir de 18 Ko le budget d'entrée. Le montant est donc un plancher, et il le dit. |
 | 16/08 | Socle O | Outillage de contrôle en place. La première comparaison montre l'onglet Performance à trois tuiles sur quatre, sans composition au clic, sans capacité de versement et sans curseur de réserve. |

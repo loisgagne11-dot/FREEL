@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { useFaits } from '../../state/store';
-import { soldeEstSuivi } from '../../state/selecteurs';
+import { finAcreDe, soldeEstSuivi } from '../../state/selecteurs';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
@@ -237,7 +237,111 @@ function Tresorerie() {
       </div>
 
       <ReservesEtVersements />
+      <FoyerFiscal />
     </section>
+  );
+}
+
+/**
+ * Le foyer fiscal : parts, autres revenus, versement PER.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * TROIS FAITS QUI DORMAIENT SANS PORTE D'ENTRÉE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Ils étaient repris de l'ancienne application dans `configImpotBrute` —
+ * conservés bruts, jamais interprétés, jamais saisissables. Sans eux, la
+ * provision d'impôt sur le revenu ne peut pas se calculer : sous le régime du
+ * barème, la ligne « impôt » du volet 2 ne valait donc que la CFP, 0,2 %, et
+ * le versable était surévalué de tout l'impôt de l'année.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LES CHAMPS RESTENT VIDES, ET C'EST LE POINT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Ni « 1 » de parts, ni « 0 » d'autres revenus par défaut : « je n'ai pas
+ * renseigné » et « je suis seul » sont deux états différents, et le second se
+ * déclare. Un défaut affiché ferait passer pour un résultat un impôt calculé
+ * sur un foyer inventé — et l'écart entre une et trois parts va du simple au
+ * double.
+ *
+ * Ils sont rangés en Trésorerie et non en Profil parce que c'est là qu'on
+ * regarde ce qu'il faut garder de côté : c'est la seule chose que ces trois
+ * faits servent à calculer.
+ */
+function FoyerFiscal() {
+  const faits = useFaits((e) => e.faits);
+  const definir = useFaits((e) => e.definirFoyerFiscal);
+  const idChamp = useId();
+
+  const nombreOuNull = (valeur: string): number | null =>
+    valeur === '' ? null : (Number(valeur) || 0);
+
+  return (
+    <div className={styles.formulaire}>
+      <Champ
+        id={`${idChamp}-parts`}
+        libelle="Parts fiscales du foyer"
+        aide="Le quotient familial de votre avis d’imposition. Tant qu’il est vide,
+              l’impôt sur le revenu n’est pas provisionné — et l’application le dit
+              plutôt que d’en supposer une."
+      >
+        <input
+          id={`${idChamp}-parts`}
+          type="number"
+          inputMode="decimal"
+          step="0.25"
+          min="0.5"
+          placeholder="Non renseigné"
+          value={faits.partsFiscales ?? ''}
+          onChange={(e) => definir({ partsFiscales: nombreOuNull(e.target.value) })}
+        />
+      </Champ>
+
+      <Champ
+        id={`${idChamp}-autres`}
+        libelle="Autres revenus imposables du foyer, sur l’année"
+        aide="Salaires du conjoint, revenus fonciers… hors micro-entreprise. Ils
+              déterminent la tranche où votre résultat vient s’empiler : les ignorer
+              sous-estime l’impôt."
+      >
+        <input
+          id={`${idChamp}-autres`}
+          type="number"
+          inputMode="decimal"
+          step="100"
+          min="0"
+          placeholder="Non renseignés"
+          value={faits.autresRevenusFoyer ?? ''}
+          onChange={(e) => {
+            const v = nombreOuNull(e.target.value);
+            definir({ autresRevenusFoyer: v === null ? null : euros(v) });
+          }}
+        />
+      </Champ>
+
+      <Champ
+        id={`${idChamp}-per`}
+        libelle="Versement PER déductible, sur l’année"
+        aide="Ce que vous versez sur un plan d’épargne retraite, déductible du revenu
+              global. Non renseigné, il n’est pas déduit : l’impôt estimé est alors au
+              plus haut."
+      >
+        <input
+          id={`${idChamp}-per`}
+          type="number"
+          inputMode="decimal"
+          step="100"
+          min="0"
+          placeholder="Non renseigné"
+          value={faits.versementPerDeductible ?? ''}
+          onChange={(e) => {
+            const v = nombreOuNull(e.target.value);
+            definir({ versementPerDeductible: v === null ? null : euros(v) });
+          }}
+        />
+      </Champ>
+    </div>
   );
 }
 
@@ -511,6 +615,7 @@ function Profil() {
           libelle="Bénéficiaire de l’ACRE"
           coche={entreprise.acre}
           onChange={(v) => modifier({ acre: v })}
+          aide={<FenetreAcre />}
         />
         <Interrupteur
           id={`${idChamp}-vl`}
@@ -528,6 +633,37 @@ function Profil() {
         />
       </div>
     </section>
+  );
+}
+
+/**
+ * La fenêtre d'ACRE, écrite en clair.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE DATE SE RECOUPE, UN BOOLÉEN NE SE RECOUPE PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La durée d'exonération était calculée sans jamais être montrée : personne
+ * ne pouvait voir qu'elle courait un trimestre de trop, et un mois d'ACRE en
+ * trop, c'est la moitié des cotisations de ce mois-là qui n'est pas
+ * provisionnée. Affichée, elle se compare à l'attestation URSSAF en un coup
+ * d'œil.
+ *
+ * Rien n'est écrit quand la règle refuse : une date inventée serait recoupée
+ * puis crue.
+ */
+function FenetreAcre() {
+  const faits = useFaits((e) => e.faits);
+  const fin = finAcreDe(faits);
+  if (fin === null || fin.statut === 'refuse') return null;
+
+  return (
+    <>
+      Exonération jusqu’au <strong>31/{fin.valeur.slice(5, 7)}/{fin.valeur.slice(0, 4)}</strong>{' '}
+      inclus, puis taux plein — jusqu’à la fin du 3<sup>e</sup> trimestre civil suivant
+      celui de l’affiliation. À recouper avec votre attestation URSSAF.
+      {fin.statut === 'hypothese' && ' Règle extrapolée, non publiée pour cette période.'}
+    </>
   );
 }
 

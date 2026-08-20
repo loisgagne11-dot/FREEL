@@ -216,7 +216,7 @@ describe('congés', () => {
 
 describe('carnet — clients', () => {
   const saisieClient = (nom: string) => ({
-    nom, adresse: '', siret: '', email: '', delaiPaiementJours: 30,
+    nom, adresse: '', siret: '', email: '', delaiPaiement: 'net_30' as const,
     pays: '', tvaIntracom: ''
   });
 
@@ -312,7 +312,7 @@ describe('carnet — missions', () => {
   it('rattache la mission au client par identifiant, sans perdre le nom', () => {
     useFaits.getState().ajouterClient({
       nom: 'Dupont', adresse: '', siret: '', email: '',
-      delaiPaiementJours: 30, pays: '', tvaIntracom: ''
+      delaiPaiement: 'net_30' as const, pays: '', tvaIntracom: ''
     });
     const idClient = useFaits.getState().faits.clients[0]?.id;
     useFaits.getState().ajouterMission(saisieMission('Dupont'));

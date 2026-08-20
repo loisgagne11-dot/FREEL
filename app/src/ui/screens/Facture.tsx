@@ -121,7 +121,7 @@ function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
     destinataire: client === undefined
       ? {
         nom: clientNom, adresse: '', siret: '', pays: '', tvaIntracom: '',
-        delaiPaiementJours: 30
+        delaiPaiement: 'net_30'
       }
       : destinataireDe(client),
     lignes

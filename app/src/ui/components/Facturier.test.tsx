@@ -21,7 +21,7 @@ beforeEach(() => {
 
 const CLIENT: Client = {
   id: 'c1', nom: 'Client France', adresse: '2 rue Exemple', siret: '',
-  email: '', delaiPaiementJours: 30, pays: 'FR', tvaIntracom: ''
+  email: '', delaiPaiement: 'net_30', pays: 'FR', tvaIntracom: ''
 };
 
 const recette = (p: Partial<Recette> & { readonly id: string }): Recette => ({

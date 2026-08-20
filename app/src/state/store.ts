@@ -25,9 +25,8 @@ import {
 import {
   nomAPropager, peutSupprimerClient, peutSupprimerMission, validerNomClient
 } from '../domain/calculs/carnet';
-import {
-  type ModeReglement, ecritureDAnnulation, prochainNumero
-} from '../domain/calculs/livreRecettes';
+import type { ModeReglement } from '../domain/calculs/livreRecettes';
+import { ecritureDAnnulation, prochainNumero } from '../domain/calculs/ecritureRecette';
 import { importerMouvements } from '../domain/calculs/banque';
 import type { MotifSansContrepartie } from '../domain/calculs/banque';
 import {
@@ -84,6 +83,20 @@ interface MagasinFaits {
   readonly definirSoldeInitial: (montant: Euros) => void;
   /** `null` efface l'objectif ; c'est autre chose que de le mettre à zéro. */
   readonly definirObjectifCaAnnuel: (montant: Euros | null) => void;
+  /**
+   * Les faits du foyer fiscal, un à la fois.
+   *
+   * `null` est une valeur légitime et distincte de zéro : « je n'ai pas
+   * renseigné mes parts » n'est pas « j'en ai zéro ». L'action l'accepte donc
+   * telle quelle, et n'a pas le droit de la remplacer par un défaut — c'est
+   * cette absence qui fait REFUSER la provision d'impôt, donc qui la rend
+   * visible.
+   */
+  readonly definirFoyerFiscal: (modification: {
+    readonly partsFiscales?: number | null;
+    readonly autresRevenusFoyer?: Euros | null;
+    readonly versementPerDeductible?: Euros | null;
+  }) => void;
 
   /**
    * Marque une période comme déclarée. C'est ce fait qui fait basculer la
@@ -594,6 +607,12 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
   definirObjectifCaAnnuel: (montant) => {
     const objectif = montant === null || montant <= 0 ? null : euros(montant);
     const faits: Faits = { ...get().faits, objectifCaAnnuel: objectif };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  definirFoyerFiscal: (modification) => {
+    const faits: Faits = { ...get().faits, ...modification };
     set({ faits });
     persister(stockageActif, faits);
   },

@@ -14,12 +14,12 @@ const EMETTEUR: Emetteur = {
 
 const CLIENT_FR: Destinataire = {
   nom: 'Client France', adresse: '2 rue Exemple', siret: '00000000000001',
-  pays: 'FR', tvaIntracom: '', delaiPaiementJours: 30
+  pays: 'FR', tvaIntracom: '', delaiPaiement: 'net_30'
 };
 
 const CLIENT_DE: Destinataire = {
   nom: 'Kunde', adresse: 'Hauptstraße 1', siret: '', pays: 'DE',
-  tvaIntracom: 'DE123456789', delaiPaiementJours: 30
+  tvaIntracom: 'DE123456789', delaiPaiement: 'net_30'
 };
 
 function facture(m: Partial<Facture> = {}): Facture {
@@ -121,9 +121,9 @@ describe('totaux', () => {
     expect(totaux(facture()).echeanceLe).toBe('2026-08-14');
   });
 
-  it('traite un délai négatif comme un paiement comptant', () => {
+  it('traite un paiement à réception comme une échéance le jour même', () => {
     const t = totaux(facture({
-      destinataire: { ...CLIENT_FR, delaiPaiementJours: -5 }
+      destinataire: { ...CLIENT_FR, delaiPaiement: 'reception' }
     }));
     expect(t.echeanceLe).toBe('2026-07-15');
   });

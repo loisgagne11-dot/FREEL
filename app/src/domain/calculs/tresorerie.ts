@@ -58,8 +58,16 @@ export function calculerTresorerie(
     dispo,
     reserve: etat.reserve,
     versable,
-    incomplet: detail.recettesNonCalculables.length > 0,
-    motifsIncomplets: detail.recettesNonCalculables.map((r) => r.motif)
+    // L'impôt sur le revenu non provisionné entre par la même porte que les
+    // recettes non calculables : ce sont deux façons de rendre le total
+    // sous-évalué, et l'écran doit les dire de la même manière. Le distinguer
+    // aurait laissé un écran ne traiter que l'une des deux.
+    incomplet: detail.recettesNonCalculables.length > 0
+      || detail.impotRevenuNonProvisionne !== null,
+    motifsIncomplets: [
+      ...detail.recettesNonCalculables.map((r) => r.motif),
+      ...(detail.impotRevenuNonProvisionne !== null ? [detail.impotRevenuNonProvisionne] : [])
+    ]
   };
 }
 

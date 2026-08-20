@@ -1,9 +1,31 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { aTraiter } from '../../state/selecteurs';
-import type { EcranCible, SujetATraiter } from '../../domain/calculs/aTraiter';
-import { Sheet } from './Sheet';
+import type { EcranCible } from '../../domain/calculs/aTraiter';
 import styles from './IndicateurATraiter.module.css';
+
+/**
+ * Le panneau n'est téléchargé qu'à l'ouverture.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * MÊME RÈGLE QUE POUR LES ÉCRANS, APPLIQUÉE AU MÊME ENDROIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `Sheet` porte la sémantique de dialogue, le piège de focus et le
+ * verrouillage du défilement : deux kilo-octets que le premier rendu ne peut
+ * pas exécuter, puisque rien n'est ouvert. Il était pourtant emporté dans le
+ * lot d'entrée, parce que cette pastille — présente sur tous les écrans — s'y
+ * trouve. Le budget d'entrée l'a signalé en dépassant ; relever le seuil
+ * aurait masqué la cause.
+ *
+ * Le panneau n'est monté qu'une fois ouvert, et non rendu en permanence avec
+ * `ouvert={false}` : c'est ce montage conditionnel qui permet de ne charger le
+ * fragment qu'au clic. La restitution du focus continue de fonctionner — elle
+ * est faite par le nettoyage d'effet du panneau, qui s'exécute au démontage.
+ */
+const Sheet = lazy(() => import('./Sheet').then((m) => ({ default: m.Sheet })));
+const ListeSujets = lazy(() => import('./IndicateurATraiter.liste')
+  .then((m) => ({ default: m.ListeSujets })));
 
 /**
  * L'indicateur « à traiter » — `.todofab` de la spec de design.
@@ -63,15 +85,21 @@ export function IndicateurATraiter({ ecranActif }: { readonly ecranActif: string
         <span className={styles.libelle}>à traiter</span>
       </button>
 
-      <Sheet
-        ouvert={ouvert}
-        titre={ecranActif === 'pilote' ? 'À traiter' : `À traiter · ${LIBELLES[ecranActif] ?? ecranActif}`}
-        onFermer={() => setOuvert(false)}
-      >
-        <ul className={styles.liste}>
-          {sujets.map((s) => <Ligne key={s.id} sujet={s} onSuivi={() => setOuvert(false)} />)}
-        </ul>
-      </Sheet>
+      {ouvert && (
+        <Suspense fallback={null}>
+          <Sheet
+            ouvert
+            titre={ecranActif === 'pilote' ? 'À traiter' : `À traiter · ${LIBELLES[ecranActif] ?? ecranActif}`}
+            onFermer={() => setOuvert(false)}
+          >
+            {/* La LISTE est chargée avec le panneau, pas avec la pastille.
+                Elle tire la mise en mots des sujets — dix kilo-octets de
+                français — qui n'ont rien à faire dans le paquet d'entrée : la
+                pastille n'affiche qu'un nombre. */}
+            <ListeSujets sujets={sujets} onSuivi={() => setOuvert(false)} />
+          </Sheet>
+        </Suspense>
+      )}
     </>
   );
 }
@@ -81,19 +109,3 @@ const LIBELLES: Readonly<Record<string, string>> = {
   achats: 'Achats', outils: 'Outils', config: 'Config'
 };
 
-function Ligne({ sujet, onSuivi }: { readonly sujet: SujetATraiter; readonly onSuivi: () => void }) {
-  return (
-    <li className={`${styles.ligne} ${styles[sujet.gravite] ?? ''}`}>
-      <span className={styles.ligneTitre}>
-        <span className={styles.ligneNombre}>{sujet.nombre}</span>
-        <span className={styles.ligneIntitule}>{sujet.intitule}</span>
-      </span>
-      <span className={styles.ligneContexte}>{sujet.contexte}</span>
-      {/* Un lien, pas un bouton : c'est une navigation, et elle doit s'ouvrir
-          dans un nouvel onglet comme n'importe quel lien si on le demande. */}
-      <a className={styles.ligneAction} href={`#/${sujet.ecran}`} onClick={onSuivi}>
-        {sujet.action}
-      </a>
-    </li>
-  );
-}

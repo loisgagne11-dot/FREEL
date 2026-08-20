@@ -36,13 +36,29 @@ export interface SujetATraiter {
   readonly gravite: Gravite;
   /** Quantité concernée : 3 factures, 2 périodes… Toujours ≥ 1. */
   readonly nombre: number;
-  /** Intitulé court, affiché en liste. */
-  readonly intitule: string;
-  /** Pourquoi ce sujet est là maintenant. Une phrase. */
-  readonly contexte: string;
-  /** Libellé de l'action à mener. */
-  readonly action: string;
+  /**
+   * Les chiffres dont la mise en mots a besoin — rien de plus.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * DÉTECTER N'EST PAS FORMULER
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Ce module portait ses phrases : dix mille huit cent cinquante-sept octets
+   * de français, tirés dans le paquet d'entrée par la pastille de la barre du
+   * haut. Or la pastille n'a besoin que d'un NOMBRE et d'une GRAVITÉ ; les
+   * intitulés, les contextes et les libellés d'action ne servent qu'au panneau
+   * — et ce panneau s'ouvre au clic, sa coquille étant déjà chargée à la
+   * demande.
+   *
+   * La coupure est celle déjà faite deux fois dans ce projet : ce qui CALCULE
+   * reste, ce qui NOMME part avec l'écran qui l'affiche. Voir
+   * `aTraiter.libelles`.
+   */
+  readonly donnees: DonneesSujet;
 }
+
+/** Ce qu'un sujet transporte pour être mis en mots. */
+export type DonneesSujet = Readonly<Record<string, string | number | boolean | null>>;
 
 /** Une recette, vue par cette requête. */
 export interface RecetteVue {
@@ -52,8 +68,15 @@ export interface RecetteVue {
   readonly encaisseeLe: DateISO | null;
   readonly modeReglement: string | null;
   readonly clientNom: string;
-  /** Délai de paiement convenu, en jours. */
-  readonly delaiPaiementJours: number;
+  /**
+   * L'échéance imprimée sur la facture, ou `null` si elle n'est pas émise.
+   *
+   * Une DATE et non un délai : la recalculer ici depuis le délai du client
+   * ferait changer de réponse à « cette facture était-elle en retard ? » dès
+   * qu'on modifie les conditions du client. Le compteur de retards changerait
+   * avec, rétroactivement.
+   */
+  readonly echeanceLe: DateISO | null;
 }
 
 export interface EntreeATraiter {
@@ -166,19 +189,9 @@ function ajouterMois(m: Mois, n: number): Mois {
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
 }
 
-const pluriel = (n: number, singulier: string, plurielMot: string): string =>
-  `${n} ${n > 1 ? plurielMot : singulier}`;
-
-/**
- * Un mois en français lisible. Ce module écrit de la prose destinée à
- * l'utilisateur : « depuis avril 2026 » se lit, « depuis 2026-04 » se décode.
- */
-function moisLisible(m: Mois): string {
-  const [a, mm] = m.split('-');
-  if (a === undefined || mm === undefined) return m;
-  return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' })
-    .format(new Date(Number(a), Number(mm) - 1, 1));
-}
+/* `pluriel` et `moisLisible` vivaient ici. Ils sont partis dans
+   `aTraiter.libelles` avec les phrases qu'ils servaient : ce module ne produit
+   plus de prose, seulement des chiffres et des gravités. */
 
 /**
  * Les périodes déclaratives échues et non déclarées, alors que des recettes y
@@ -251,24 +264,20 @@ export function sujetsATraiter(
 
   /* ---------- factures en retard de paiement ---------- */
   const enRetard = e.recettes.filter((r) => {
-    if (r.encaisseeLe !== null || r.emiseLe === null) return false;
-    const echeance = ajouterJours(r.emiseLe, r.delaiPaiementJours);
-    return echeance < e.aujourdhui;
+    if (r.encaisseeLe !== null || r.emiseLe === null || r.echeanceLe === null) return false;
+    return r.echeanceLe < e.aujourdhui;
   });
   if (enRetard.length > 0) {
     const total = euros(enRetard.reduce<number>((s, r) => s + r.montant, 0));
     const plusAncienne = enRetard
-      .map((r) => joursEntre(ajouterJours(r.emiseLe as DateISO, r.delaiPaiementJours), e.aujourdhui))
+      .map((r) => joursEntre(r.echeanceLe as DateISO, e.aujourdhui))
       .reduce((a, b) => Math.max(a, b), 0);
     sujets.push({
       id: 'factures-en-retard',
       ecran: 'activite',
       gravite: 'retard',
       nombre: enRetard.length,
-      intitule: `${pluriel(enRetard.length, 'facture en retard', 'factures en retard')}`,
-      contexte: `${total} € impayés, dont ${pluriel(plusAncienne, 'jour', 'jours')} de retard `
-        + `sur la plus ancienne.`,
-      action: 'Relancer'
+      donnees: { total, plusAncienne }
     });
   }
 
@@ -286,16 +295,7 @@ export function sujetsATraiter(
       ecran: 'argent',
       gravite: 'retard',
       nombre: e.desEnRetard.length,
-      intitule: pluriel(
-        e.desEnRetard.length,
-        'déclaration européenne de services en retard',
-        'déclarations européennes de services en retard'
-      ),
-      contexte: plusAncien === undefined
-        ? ''
-        : `Depuis ${moisLisible(plusAncien.mois)}. L'amende est forfaitaire : `
-          + `${amende} € encourus. La franchise en base n'en dispense pas.`,
-      action: 'Déposer'
+      donnees: { depuis: plusAncien?.mois ?? null, amende }
     });
   }
 
@@ -308,10 +308,7 @@ export function sujetsATraiter(
       ecran: 'argent',
       gravite: 'retard',
       nombre: aDeclarer.length,
-      intitule: `${pluriel(aDeclarer.length, 'période à déclarer', 'périodes à déclarer')}`,
-      contexte: `Depuis ${moisLisible(premiere)}. Tant qu'une période n'est pas déclarée, sa charge `
-        + `reste provisionnée et le versable est minoré d'autant.`,
-      action: 'Déclarer'
+      donnees: { depuis: premiere }
     });
   }
 
@@ -332,11 +329,7 @@ export function sujetsATraiter(
       ecran: 'argent',
       gravite: 'retard',
       nombre: 1,
-      intitule: 'Aucune échéance enregistrée',
-      contexte: 'Vous encaissez depuis plusieurs mois sans qu\'aucun appel de '
-        + 'cotisations, avis d\'impôt ou CFE ne soit saisi. Tant qu\'ils manquent, '
-        + 'le disponible et le versable sont SURESTIMÉS — c\'est le sens qui coûte cher.',
-      action: 'Saisir mes échéances'
+      donnees: {}
     });
   }
 
@@ -357,15 +350,7 @@ export function sujetsATraiter(
         ecran: 'argent',
         gravite: franchi ? 'retard' : 'a_faire',
         nombre: 1,
-        intitule: franchi
-          ? 'Seuil majoré de TVA franchi'
-          : 'Seuil majoré de TVA proche',
-        contexte: franchi
-          ? 'La TVA est due immédiatement. Une facture émise sans TVA après le '
-            + 'franchissement est réputée TTC : la part de TVA est à reverser sans '
-            + 'avoir pu être répercutée au client.'
-          : `Il reste ${resteTva.valeur} € facturables avant assujettissement immédiat.`,
-        action: franchi ? 'Régulariser' : 'Voir le détail'
+        donnees: { franchi, reste: resteTva.valeur }
       });
     }
   }
@@ -379,9 +364,7 @@ export function sujetsATraiter(
       ecran: 'argent',
       gravite: caAnnee > plafond.valeur ? 'retard' : 'a_faire',
       nombre: 1,
-      intitule: caAnnee > plafond.valeur ? 'Plafond du régime micro dépassé' : 'Plafond du régime micro proche',
-      contexte: `${caAnnee} € encaissés sur ${plafond.valeur} € de plafond.`,
-      action: 'Voir le détail'
+      donnees: { depasse: caAnnee > plafond.valeur, ca: caAnnee, plafond: plafond.valeur }
     });
   }
 
@@ -396,9 +379,7 @@ export function sujetsATraiter(
       ecran: 'argent',
       gravite: 'a_faire',
       nombre: sansMention.length,
-      intitule: `${pluriel(sansMention.length, 'recette sans mode de règlement', 'recettes sans mode de règlement')}`,
-      contexte: 'Le mode de règlement est une mention obligatoire du livre des recettes.',
-      action: 'Compléter'
+      donnees: {}
     });
   }
 
@@ -410,27 +391,26 @@ export function sujetsATraiter(
       ecran: 'config',
       gravite: 'a_faire',
       nombre: 1,
-      intitule: 'Barème à revérifier',
-      contexte: `Dernière vérification en ${moisLisible(verifieLe)}. Les taux changent au 1er janvier `
-        + `et, depuis 2024, en cours d'année.`,
-      action: 'Vérifier'
+      donnees: { verifieLe }
     });
   }
 
   /* ---------- échéances réglementaires ---------- */
   for (const ech of e.echeancesReglementaires) {
     const jours = joursEntre(e.aujourdhui, ech.date);
-    const delai = jours < 0
-      ? `Échéance dépassée depuis ${pluriel(-jours, 'jour', 'jours')}.`
-      : `Dans ${pluriel(jours, 'jour', 'jours')}.`;
     sujets.push({
       id: `echeance-${ech.id}`,
       ecran: ech.ecran ?? 'config',
       gravite: jours < 0 ? 'retard' : jours <= 30 ? 'a_faire' : 'information',
       nombre: 1,
-      intitule: ech.intitule,
-      contexte: ech.contexte === undefined ? delai : `${delai} ${ech.contexte}`,
-      action: ech.action ?? 'Se préparer'
+      /* Ces trois textes viennent de l'APPELANT, pas d'ici : les recopier
+         tels quels n'ajoute aucune phrase au paquet d'entrée. */
+      donnees: {
+        jours,
+        intitule: ech.intitule,
+        contexte: ech.contexte ?? null,
+        action: ech.action ?? null
+      }
     });
   }
 

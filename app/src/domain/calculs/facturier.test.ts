@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros } from '../types';
 import type { DateISO } from '../types';
-import { DELAI_PAIEMENT_DEFAUT, echeanceDe, suivre } from './facturier';
+import { suivre } from './facturier';
+import { FORMULE_PAR_DEFAUT, echeanceDe } from './delaiPaiement';
 import type { RecetteSuivie } from './facturier';
 
 const recette = (p: Partial<RecetteSuivie> & { readonly id: string }): RecetteSuivie => ({
@@ -15,7 +16,10 @@ const recette = (p: Partial<RecetteSuivie> & { readonly id: string }): RecetteSu
 });
 
 const AUJOURDHUI = dateISO('2026-08-13');
-const trente = () => DELAI_PAIEMENT_DEFAUT;
+/* Le secours de `suivre` : une échéance à trente jours nets. Il ne sert
+   qu'aux recettes sans échéance figée — ici, toutes, puisque les jeux d'essai
+   n'en portent pas. */
+const trente = (_n: string, e: DateISO) => echeanceDe(e, 'net_30');
 
 const statuts = (rs: readonly RecetteSuivie[], jour: DateISO = AUJOURDHUI) =>
   suivre(rs, trente, jour).map((f) => f.statut);
@@ -87,7 +91,7 @@ describe('annulation', () => {
 describe('échéance', () => {
   it('suit le délai du client, pas une constante', () => {
     const r = [recette({ id: 'r1', clientNom: 'Lent', emiseLe: dateISO('2026-06-01') })];
-    const suivi = suivre(r, () => 60, AUJOURDHUI);
+    const suivi = suivre(r, (_n: string, e: DateISO) => echeanceDe(e, 'net_60'), AUJOURDHUI);
     expect(suivi[0]?.echeanceLe).toBe('2026-07-31');
   });
 
@@ -96,7 +100,14 @@ describe('échéance', () => {
     expect(suivi[0]?.echeanceLe).toBeNull();
   });
 
-  it('trente jours à défaut de convention', () => {
-    expect(echeanceDe(dateISO('2026-01-01'), DELAI_PAIEMENT_DEFAUT)).toBe('2026-01-31');
+  /**
+   * Le défaut est « 30 jours FIN DE MOIS », pas « 30 jours nets ». Une facture
+   * du 1er janvier tombe donc au 31 janvier — trente jours mènent au 31, et la
+   * fin de ce mois-là est le 31. Le 12 juin, en revanche, mène au 31 juillet et
+   * non au 12 : c'est là que l'écart avec une addition de jours se voit.
+   */
+  it('applique la formule par défaut : trente jours fin de mois', () => {
+    expect(echeanceDe(dateISO('2026-01-01'), FORMULE_PAR_DEFAUT)).toBe('2026-01-31');
+    expect(echeanceDe(dateISO('2026-06-12'), FORMULE_PAR_DEFAUT)).toBe('2026-07-31');
   });
 });

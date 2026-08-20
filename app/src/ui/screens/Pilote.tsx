@@ -1,15 +1,17 @@
-import { useMemo } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
 import {
   aTraiter, etatPilote, fluxDuMois, moisCourant, remunerationDuMois, soldeEstSuivi
 } from '../../state/selecteurs';
-import type { SujetATraiter } from '../../domain/calculs/aTraiter';
 import { Greet } from '../components/Greet';
 import { ActionsRapides } from '../components/ActionsRapides';
 import { FluxCard } from '../components/FluxCard';
 import { SanteCard, indicateursDeSante } from '../components/SanteCard';
 import { eur, moisLong, moisTexte } from '../format';
+const ATraiter = lazy(() => import('./Pilote.decisions')
+  .then((m) => ({ default: m.ATraiter })));
+
 import styles from './Pilote.module.css';
 import { Montant } from '../components/Montant';
 import { Info } from '../components/Info';
@@ -96,9 +98,12 @@ export function Pilote() {
           versable trop élevé conduirait à se verser de l'argent déjà dû. */}
       {etat.tresorerie.incomplet && (
         <Bandeau ton="alerte" titre="Montants sous-évalués">
-          Certaines recettes ne peuvent pas être provisionnées faute de barème
-          pour leur période. Les montants ci-dessous sont donc <strong>plus élevés
-          que la réalité</strong>.
+          {/* Le motif n'est plus seulement « recette hors barème » : l'impôt sur
+              le revenu non provisionnable entre par la même porte, et le texte
+              nommait une cause qui n'était pas toujours la bonne. Chaque motif
+              se dit maintenant lui-même, ci-dessous. */}
+          Une partie de ce qui est dû n’a pas pu être provisionnée. Les montants
+          ci-dessous sont donc <strong>plus élevés que la réalité</strong>.
           <ul className={styles.motifs}>
             {etat.tresorerie.motifsIncomplets.map((m) => <li key={m}>{m}</li>)}
           </ul>
@@ -195,7 +200,12 @@ export function Pilote() {
         </dl>
       </section>
 
-      <ATraiter sujets={sujets} />
+      {/* Sous la ligne de flottaison, donc chargée après le premier rendu :
+          elle tire la mise en mots des sujets, dix kilo-octets de français que
+          le paquet d'entrée n'a pas à porter pour tout le monde. */}
+      <Suspense fallback={null}>
+        <ATraiter sujets={sujets} />
+      </Suspense>
 
     </>
   );
@@ -212,55 +222,6 @@ export function Pilote() {
  * Une liste vide n'est pas un vide à masquer : c'est une information, et la
  * meilleure qu'on puisse donner.
  */
-function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] }) {
-  return (
-    <section className={styles.carte} aria-labelledby="titre-a-traiter">
-      <h2 id="titre-a-traiter" className={styles.titreCarte}>
-        À traiter
-        {sujets.length > 0 && <span className={styles.compteur}>{sujets.length}</span>}
-      </h2>
-
-      {sujets.length === 0 ? (
-        <p className={styles.aideCarte}>Rien ne réclame votre attention aujourd’hui.</p>
-      ) : (
-        <ul className={styles.sujets}>
-          {sujets.map((s) => (
-            <li key={s.id} className={styles.sujet}>
-              <span
-                className={`${styles.puce} ${
-                  s.gravite === 'retard' ? styles.puceRetard
-                  : s.gravite === 'a_faire' ? styles.puceAFaire
-                  : styles.puceInfo
-                }`}
-                aria-hidden="true"
-              />
-              <div className={styles.sujetCorps}>
-                <span className={styles.sujetIntitule}>
-                  {s.intitule}
-                  {/* Le libellé porte déjà la quantité quand elle compte ; on
-                      n'affiche pas « 1 » qui n'apprendrait rien. */}
-                  <span className={styles.sujetGravite}>
-                    {s.gravite === 'retard' ? 'En retard'
-                      : s.gravite === 'a_faire' ? 'À faire' : 'Information'}
-                  </span>
-                </span>
-                {/* Le contexte d'un sujet porte des montants dans sa phrase
-                    (« 5 250 € impayés, dont 43 jours de retard »). La phrase
-                    entière est donc masquée : y découper le montant
-                    demanderait au domaine de séparer prose et chiffres, ce
-                    qui n'est pas son rôle. Le survol la révèle. */}
-                <span className={styles.sujetContexte}>
-                  <Montant>{s.contexte}</Montant>
-                </span>
-              </div>
-              <a className={styles.sujetAction} href={`#/${s.ecran}`}>{s.action}</a>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
 
 /* ---------- éléments locaux ---------- */
 

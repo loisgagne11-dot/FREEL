@@ -415,3 +415,184 @@ describe('schéma 10 → 11 : la part gardée au versement', () => {
     expect(motifRefusFaits({ version: 10, reserve: 3000 })).toBeNull();
   });
 });
+
+/**
+ * v11 → v12 : LES TROIS FAITS DU FOYER FISCAL.
+ *
+ * Le cas est différent des deux précédents, et c'est ce qui rend ces tests
+ * nécessaires : les champs sont bien de premier niveau, mais leur VALEUR dort
+ * ailleurs — dans `configImpotBrute`, l'objet indexé par année que la reprise
+ * du legacy avait conservé sans jamais l'interpréter. La fusion de surface
+ * comblerait donc `null` alors que la donnée existe, et l'utilisateur devrait
+ * retaper ce qu'il avait déjà saisi.
+ */
+describe('schéma 11 → 12 : le foyer fiscal', () => {
+  it('reprend parts, autres revenus et PER de l’ancienne configuration d’impôt', () => {
+    const f = completerFaits({
+      version: 11,
+      configImpotBrute: { '2025': { parts: 2.5, autresRevenus: 12000, perAnnuel: 3000 } }
+    });
+    expect(f.partsFiscales).toBe(2.5);
+    expect(f.autresRevenusFoyer).toBe(12000);
+    expect(f.versementPerDeductible).toBe(3000);
+  });
+
+  // L'ancienne structure était indexée PAR ANNÉE. Prendre la première venue
+  // ressusciterait une situation de foyer périmée — un divorce, une naissance,
+  // et le quotient familial change de valeur.
+  it('retient l’année la plus récente quand l’ancienne configuration en porte plusieurs', () => {
+    const f = completerFaits({
+      version: 11,
+      configImpotBrute: {
+        '2024': { parts: 1, autresRevenus: 0, perAnnuel: 0 },
+        '2026': { parts: 3, autresRevenus: 500, perAnnuel: 0 }
+      }
+    });
+    expect(f.partsFiscales).toBe(3);
+    expect(f.autresRevenusFoyer).toBe(500);
+  });
+
+  /**
+   * `null` N'EST PAS 1.
+   *
+   * Si ce test sautait et qu'un défaut à une part s'installait, la provision
+   * d'impôt s'afficherait comme un résultat complet à quelqu'un qui n'a jamais
+   * dit combien il a de parts — et le barème progressif appliqué à un quotient
+   * trop petit surestime l'impôt du simple au double.
+   */
+  it('laisse les trois faits vides quand rien n’est repris', () => {
+    const f = completerFaits({ version: 11 });
+    expect(f.partsFiscales).toBeNull();
+    expect(f.autresRevenusFoyer).toBeNull();
+    expect(f.versementPerDeductible).toBeNull();
+    expect(faitsVides().partsFiscales).toBeNull();
+  });
+
+  // Un zéro de l'ancienne application a été SAISI : le transformer en « non
+  // renseigné » ferait refuser un calcul que la donnée permettait.
+  it('conserve un zéro repris, qui n’est pas une absence', () => {
+    const f = completerFaits({
+      version: 11,
+      configImpotBrute: { '2025': { parts: 1, autresRevenus: 0, perAnnuel: 0 } }
+    });
+    expect(f.autresRevenusFoyer).toBe(0);
+    expect(f.versementPerDeductible).toBe(0);
+  });
+
+  it('ne réécrit pas une valeur déjà corrigée depuis l’écran Config', () => {
+    const f = completerFaits({
+      version: 12,
+      partsFiscales: 2,
+      configImpotBrute: { '2025': { parts: 1 } }
+    });
+    expect(f.partsFiscales).toBe(2);
+  });
+
+  it('accepte l’absence des trois champs et refuse une valeur qui n’est pas un nombre', () => {
+    expect(motifRefusFaits({ version: 11, reserve: 3000 })).toBeNull();
+    expect(motifRefusFaits({ ...faitsVides(), partsFiscales: '2' }))
+      .toMatch(/partsFiscales/);
+    expect(motifRefusFaits({ ...faitsVides(), autresRevenusFoyer: Number.NaN }))
+      .toMatch(/autresRevenusFoyer/);
+    expect(motifRefusFaits({ ...faitsVides(), versementPerDeductible: null })).toBeNull();
+  });
+});
+
+/**
+ * L'ÉCHÉANCE CESSE DE SE RECALCULER, ET C'EST TOUT L'OBJET DU SCHÉMA 13.
+ *
+ * Elle se dérivait à la lecture, en ajoutant le délai du client à la date
+ * d'émission. Changer les conditions d'un client réécrivait donc
+ * rétroactivement l'échéance de toutes ses factures déjà parties : « cette
+ * facture était-elle en retard ? » changeait de réponse, et le compteur de
+ * retards avec.
+ */
+describe('schéma 12 → 13 : conditions de paiement et échéance', () => {
+  const bloc = (modifications: Record<string, unknown> = {}) => completerFaits({
+    version: 12,
+    clients: [{ id: 'c1', nom: 'Client A', delaiPaiementJours: 45 }],
+    recettes: [{
+      id: 'r1', clientNom: 'Client A', libelle: 'Prestation', montant: 1000,
+      emiseLe: '2026-06-12', encaisseeLe: null, modeReglement: null, numero: '2026-001'
+    }],
+    missions: [{ id: 'm1', clientNom: 'Client A', entites: [] }],
+    ...modifications
+  });
+
+  /**
+   * L'ancien nombre de jours devient une formule « nets », jamais « fin de
+   * mois » : c'est exactement ce que le code calculait. Le traduire autrement
+   * aurait décalé de plusieurs semaines l'échéance de factures déjà émises,
+   * sous couvert de les corriger.
+   */
+  it('traduit le délai en jours vers une formule « nets »', () => {
+    expect(bloc().clients[0]?.delaiPaiement).toBe('net_45');
+  });
+
+  it('fige l’échéance de chaque facture déjà émise', () => {
+    // 12 juin + 45 jours nets = 27 juillet.
+    expect(bloc().recettes[0]?.echeanceLe).toBe('2026-07-27');
+  });
+
+  /**
+   * Le fait figé l'emporte : une facture qui porte déjà son échéance ne la
+   * voit pas recalculée, même si les conditions du client ont changé depuis.
+   */
+  it('ne touche pas à une échéance déjà portée par la recette', () => {
+    const avec = completerFaits({
+      version: 13,
+      clients: [{ id: 'c1', nom: 'Client A', delaiPaiement: 'reception' }],
+      recettes: [{
+        id: 'r1', clientNom: 'Client A', libelle: 'P', montant: 1000,
+        emiseLe: '2026-06-12', encaisseeLe: null, modeReglement: null,
+        numero: '2026-001', echeanceLe: '2026-07-31'
+      }]
+    });
+    expect(avec.recettes[0]?.echeanceLe).toBe('2026-07-31');
+  });
+
+  /** Rien n'est encore dû sur un brouillon : pas de date inventée. */
+  it('laisse sans échéance une recette non émise', () => {
+    const sansEmission = bloc({
+      recettes: [{
+        id: 'r1', clientNom: 'Client A', libelle: 'P', montant: 1000,
+        emiseLe: null, encaisseeLe: null, modeReglement: null, numero: ''
+      }]
+    });
+    expect(sansEmission.recettes[0]?.echeanceLe).toBeNull();
+  });
+
+  /**
+   * Un bloc venu d'un compte distant peut porter n'importe quoi. `new
+   * Date('n importe quoi').toISOString()` LÈVE, et la migration s'exécute au
+   * chargement : l'exception emportait l'écran entier, avec pour seule trace
+   * un « Invalid time value » sans rapport apparent avec une facture.
+   */
+  it('ne lève pas sur une date d’émission mal formée', () => {
+    const abime = bloc({
+      recettes: [{
+        id: 'r1', clientNom: 'Client A', libelle: 'P', montant: 1000,
+        emiseLe: 'pas une date', encaisseeLe: null, modeReglement: null, numero: ''
+      }]
+    });
+    expect(abime.recettes[0]?.echeanceLe).toBeNull();
+  });
+
+  /**
+   * Une mission d'avant le schéma 13 n'a pas ses propres conditions : elle
+   * hérite de son client, ce qui est le comportement d'alors.
+   *
+   * Le champ reste ABSENT plutôt que posé à `null` : il est facultatif, et le
+   * seul lecteur — la projection — le normalise déjà. Le parcourir au
+   * chargement aurait coûté un balayage de la liste à tous les utilisateurs
+   * pour une valeur qu'aucun n'a encore saisie.
+   */
+  it('laisse la mission hériter du client', () => {
+    expect(bloc().missions[0]?.delaiPaiement ?? null).toBeNull();
+  });
+
+  it('propose « 30 jours fin de mois » à un client sans délai connu', () => {
+    const sansDelai = bloc({ clients: [{ id: 'c1', nom: 'Client A' }] });
+    expect(sansDelai.clients[0]?.delaiPaiement).toBe('fdm_30');
+  });
+});

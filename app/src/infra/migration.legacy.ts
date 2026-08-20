@@ -30,9 +30,10 @@ import { type DateISO, type Mois, type TypeActivite, euros, ratio } from '../dom
 import {
   CLE_STOCKAGE, VERSION_SCHEMA,
   type Client, type Conge, type Depense, type Faits, type Mission, type Recette,
-  type Rythme, entrepriseVide
+  type Rythme, entrepriseVide, foyerFiscalDepuisConfigImpot
 } from '../state/schema';
 import { JOURS_SEMAINE } from '../domain/calculs/planning';
+import { formuleDepuisJours } from '../domain/calculs/delaiPaiement';
 import type { ClientOperationnel } from '../state/schema';
 import type { Echeance, NatureDette } from '../domain/calculs/provisions';
 import {
@@ -690,7 +691,12 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       adresse: texte(cli['adresse']),
       siret: texte(cli['siret']),
       email: texte(cli['email']),
-      delaiPaiementJours: nombre(cli['delaiPaiement']),
+      /* L'ancienne application ne connaissait qu'un nombre de jours, appliqué
+         par simple addition. On traduit donc vers une formule « nets » et non
+         « fin de mois » : traduire un ancien 30 par « 30 jours fin de mois »
+         aurait décalé de plusieurs semaines l'échéance de factures déjà
+         émises, sous couvert de les corriger. */
+      delaiPaiement: formuleDepuisJours(nombre(cli['delaiPaiement'])),
       // L'ancien modèle ne connaissait ni pays ni numéro de TVA du client :
       // il ne pouvait donc pas voir qu'une déclaration européenne de services
       // était due. Les champs sont créés vides, et tout client est réputé
@@ -810,7 +816,12 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // sinon le volet 2 des provisions surestimera la dette.
     periodesDeclarees: [],
     echeances,
-    configImpotBrute: objet(legacy['ir'])
+    configImpotBrute: objet(legacy['ir']),
+    // Les trois faits du foyer fiscal sortent de cette même structure, par la
+    // règle du schéma — jamais par une seconde lecture écrite ici. La donnée
+    // brute reste conservée à côté : elle porte l'historique par année que les
+    // trois faits, eux, ne gardent pas.
+    ...foyerFiscalDepuisConfigImpot(objet(legacy['ir']))
   };
 }
 

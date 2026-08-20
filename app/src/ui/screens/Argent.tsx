@@ -1,12 +1,13 @@
 import { Suspense, lazy, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
-import { type EtatSeuils, etatArgent } from '../../state/selecteurs.argent';
+import { type EtatArgent, type EtatSeuils, etatArgent } from '../../state/selecteurs.argent';
 import type { DateISO, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
 import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
+import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.libelles';
 import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
@@ -253,6 +254,7 @@ export function Argent() {
                 ton: n
               }))}
             />
+            <NoteImpotRevenu provision={etat.provisionImpotRevenu} />
           </CartePliable>
 
           <Echeances />
@@ -613,6 +615,54 @@ function NoteDeFranchissement(
       Au rythme de l’encaissé depuis janvier, seuil atteint vers{' '}
       <strong>{moisLong(f.mois)}</strong>.
     </>
+  );
+}
+
+/**
+ * Ce que recouvre la ligne « impôt sur le revenu », et ce qu'elle ignore.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN MONTANT D'IMPÔT NE S'AFFICHE PAS SEUL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Il repose sur des faits que l'utilisateur seul connaît — ses parts, les
+ * autres revenus de son foyer — et sur un barème qui n'est pas toujours
+ * publié. Présenté sans ses réserves, il se lit comme « voilà ce que je
+ * dois », et on décide dessus. Refusé, il laisse la ligne à zéro : il faut
+ * alors dire POURQUOI, sans quoi l'écran affiche un versable trop élevé sans
+ * rien signaler.
+ *
+ * `null` sous le versement libératoire : l'impôt y est déjà payé avec les
+ * cotisations, il n'y a pas de seconde ligne à expliquer.
+ */
+function NoteImpotRevenu(
+  { provision }: { readonly provision: EtatArgent['provisionImpotRevenu'] }
+) {
+  if (provision === null) return null;
+
+  if (provision.statut === 'refuse') {
+    return (
+      /* Le motif se suffit à lui-même : il commence par nommer la ligne
+         concernée, parce qu'il sert aussi de bandeau sur le Pilote. Le
+         préfixer ici répéterait « impôt sur le revenu » deux fois de suite. */
+      <ul className={styles.hypotheses}>
+        <li><strong>{provision.motif}</strong></li>
+      </ul>
+    );
+  }
+
+  const p = provision.valeur;
+  return (
+    <ul className={styles.hypotheses}>
+      <li>
+        <strong>Impôt sur le revenu&nbsp;: {eur(p.resteAProvisionner)}</strong> restant à
+        mettre de côté pour {p.annee} — {eur(p.impotMicro)} estimés sur la part micro,
+        moins {eur(p.acomptesPasSaisis)} d’acomptes déjà appelés.
+        {p.parMoisRestant !== null
+          && ` Soit ${eur(p.parMoisRestant)} par mois sur ${p.moisRestants} mois.`}
+      </li>
+      {p.ignore.map((r) => <li key={r}>{LIBELLE_IGNORE_IR[r]}</li>)}
+    </ul>
   );
 }
 

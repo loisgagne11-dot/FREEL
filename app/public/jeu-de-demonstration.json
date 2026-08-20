@@ -16,7 +16,7 @@
     "Les dates sont ancrées en 2026 pour reproduire l'état du handoff, daté de",
     "juin 2026."
   ],
-  "version": 10,
+  "version": 13,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "siret": "000 000 000 00000",
@@ -44,7 +44,7 @@
       "adresse": "8 quai de Seine, 75019 Paris",
       "siret": "000 000 000 00001",
       "email": "compta@studio-lumen.demo",
-      "delaiPaiementJours": 30,
+      "delaiPaiement": "fdm_30",
       "pays": "FR",
       "tvaIntracom": ""
     },
@@ -54,7 +54,7 @@
       "adresse": "12 rue des Arts, 69002 Lyon",
       "siret": "000 000 000 00002",
       "email": "facturation@atelier-novak.demo",
-      "delaiPaiementJours": 60,
+      "delaiPaiement": "fdm_45",
       "pays": "FR",
       "tvaIntracom": ""
     },
@@ -64,7 +64,7 @@
       "adresse": "3 place du Marché, 33000 Bordeaux",
       "siret": "000 000 000 00003",
       "email": "contact@maison-kessler.demo",
-      "delaiPaiementJours": 30,
+      "delaiPaiement": "fdm_30",
       "pays": "FR",
       "tvaIntracom": ""
     },
@@ -74,7 +74,7 @@
       "adresse": "5 rue du Port, 44000 Nantes",
       "siret": "000 000 000 00004",
       "email": "gerance@vent-ouest.demo",
-      "delaiPaiementJours": 30,
+      "delaiPaiement": "fdm_30",
       "pays": "FR",
       "tvaIntracom": ""
     }

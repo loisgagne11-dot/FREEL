@@ -20,6 +20,10 @@ import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import type { MotifSansContrepartie, MouvementBancaire } from '../domain/calculs/banque';
 import type { Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
+import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
+import {
+  FORMULE_PAR_DEFAUT, echeanceDe, formuleDepuisJours, formuleOuNull
+} from '../domain/calculs/delaiPaiement';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -33,7 +37,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 export type { Depense };
 export type { Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 11 as const;
+export const VERSION_SCHEMA = 13 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -79,7 +83,18 @@ export interface Client {
   readonly adresse: string;
   readonly siret: string;
   readonly email: string;
-  readonly delaiPaiementJours: number;
+  /**
+   * Les conditions de paiement habituelles de ce client.
+   *
+   * Une FORMULE et non un nombre de jours : « 30 jours fin de mois » ne
+   * s'exprime pas en jours, et c'est pourtant la formule la plus répandue.
+   * Voir `calculs/delaiPaiement`.
+   *
+   * Ce n'est qu'une valeur PROPOSÉE au moment de créer une facture. L'échéance
+   * réelle se fige dans la recette, parce qu'elle est imprimée sur le document
+   * envoyé — changer ceci ne réécrit pas le passé.
+   */
+  readonly delaiPaiement: FormuleDelai;
   /**
    * Code pays ISO à deux lettres. Vide ou `FR` pour un client français.
    *
@@ -139,6 +154,19 @@ export interface Mission {
    * journée finissent toujours par se contredire.
    */
   readonly entites: readonly ClientOperationnel[];
+  /**
+   * Les conditions de paiement de CETTE mission, ou `null` pour celles du
+   * client.
+   *
+   * Une mission passée par une agence et une vente directe au même nom n'ont
+   * pas les mêmes conditions. Le délai du client reste le défaut ; celui-ci le
+   * remplace quand il est renseigné.
+   *
+   * Facultatif comme les autres champs arrivés par migration : une mission
+   * d'avant le schéma 13 n'en porte pas, et le comblement se fait à la lecture
+   * plutôt qu'en réécrivant quarante jeux d'essai.
+   */
+  readonly delaiPaiement?: FormuleDelai | null;
 }
 
 /**
@@ -271,6 +299,25 @@ export interface Recette {
    * quelqu'un qu'on n'a jamais prévenu.
    */
   readonly relancesLe?: readonly DateISO[];
+  /**
+   * La date à laquelle la facture est due — celle IMPRIMÉE sur le document.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * UN FAIT, PAS UNE DÉRIVÉE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Elle se calculait à la lecture, en ajoutant le délai du client à la date
+   * d'émission. Changer les conditions d'un client réécrivait donc
+   * rétroactivement l'échéance de toutes ses factures déjà parties : « cette
+   * facture était-elle en retard ? » changeait de réponse, et le compteur de
+   * retards avec.
+   *
+   * Or le client, lui, a un papier avec une date dessus. C'est cette date-là
+   * qui fait foi, et elle ne bouge plus une fois la facture émise.
+   *
+   * `null` sur une facture sans date d'émission : rien n'est encore dû.
+   */
+  readonly echeanceLe?: DateISO | null;
 }
 
 /**
@@ -416,6 +463,32 @@ export interface Faits {
   readonly echeances: readonly Echeance[];
   /** Conservé brut : la structure de l'ancienne configuration d'IR est reprise sans interprétation. */
   readonly configImpotBrute: Readonly<Record<string, unknown>>;
+  /**
+   * Nombre de parts du quotient familial, ou `null` tant que rien n'est saisi.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * `null` N'EST PAS 1, ET NE LE DEVIENDRA PAS
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * « Je n'ai pas renseigné mes parts » et « je suis seul, donc une part »
+   * sont deux états différents. Poser 1 par défaut ferait afficher une
+   * provision d'impôt d'apparence complète à quelqu'un qui a trois parts —
+   * et le barème progressif appliqué à un quotient trois fois trop petit
+   * surestime l'impôt du simple au double. Le second état se DÉCLARE ; le
+   * premier fait refuser le calcul, ce qui est visible.
+   */
+  readonly partsFiscales: number | null;
+  /**
+   * Revenus imposables du foyer HORS micro-entreprise, pour l'année.
+   *
+   * Ils déterminent la tranche marginale dans laquelle le résultat du micro
+   * vient s'empiler. Les ignorer sous-estime l'impôt — le sens dangereux.
+   * `null` quand rien n'est saisi : le calcul retient alors zéro, mais le
+   * DIT, au lieu de présenter le résultat comme complet.
+   */
+  readonly autresRevenusFoyer: Euros | null;
+  /** Versements sur un plan d'épargne retraite, déductibles du revenu global. */
+  readonly versementPerDeductible: Euros | null;
 }
 
 export function entrepriseVide(): Entreprise {
@@ -436,7 +509,8 @@ export function faitsVides(): Faits {
     soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     partGardeeAuVersement: ratio(0),
     objectifCaAnnuel: null,
-    periodesDeclarees: [], echeances: [], configImpotBrute: {}
+    periodesDeclarees: [], echeances: [], configImpotBrute: {},
+    partsFiscales: null, autresRevenusFoyer: null, versementPerDeductible: null
   };
 }
 
@@ -526,6 +600,18 @@ export function motifRefusFaits(brut: unknown): string | null {
     && (typeof part !== 'number' || !Number.isFinite(part) || part < 0 || part > 1)) {
     return 'Le champ « partGardeeAuVersement » devrait être une part entre 0 et 1, '
       + 'ou être absent.';
+  }
+
+  // Les trois faits du foyer fiscal ont le droit d'être absents — aucun compte
+  // d'avant le schéma 12 ne les porte — et le droit d'être `null`, qui veut
+  // dire « pas renseigné » et non « zéro ». Seule une valeur présente mais qui
+  // n'est pas un nombre fini est refusée : elle ferait entrer un `NaN` dans le
+  // barème progressif, dont le résultat est un montant d'impôt sans forme.
+  for (const cle of ['partsFiscales', 'autresRevenusFoyer', 'versementPerDeductible'] as const) {
+    const v = o[cle];
+    if (cle in o && v !== null && (typeof v !== 'number' || !Number.isFinite(v))) {
+      return `Le champ « ${cle} » devrait être un nombre, être nul, ou être absent.`;
+    }
   }
 
   const entreprise = o['entreprise'];
@@ -752,6 +838,11 @@ function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
  * éléments de liste, que la fusion de surface n'atteint pas.
  *
  * La valeur comblée est zéro, et jamais 0,5 : voir `partGardeeAuVersement`.
+ *
+ * v11 → v12 : les trois faits du foyer fiscal. Ceux-là, la fusion de surface
+ * ne suffit PAS à combler — non parce qu'ils vivent dans une liste, mais parce
+ * que leur valeur dort ailleurs, dans `configImpotBrute`. Voir
+ * `foyerFiscalDuSchema11`.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
@@ -763,16 +854,96 @@ export function completerFaits(brut: unknown): Faits {
   return {
     ...defauts,
     ...o,
+    ...foyerFiscalDuSchema11(o),
     // Le numéro de schéma devient celui de CE code : les champs manquants
     // viennent d'être comblés, le bloc n'est plus à l'ancien format.
     version: VERSION_SCHEMA,
     entreprise: { ...entrepriseVide(), ...entreprise },
     conges: congesDuSchema1(o['conges']),
+    clients: clientsDuSchema12(o['clients']),
+    /* Pas de normalisation du délai de mission ici : le champ est FACULTATIF,
+       une mission d'avant le schéma 13 n'en porte pas, et le seul lecteur —
+       la projection — le lit déjà par `formuleOuNull`. Le faire aussi au
+       chargement aurait coûté un parcours de la liste à tous les utilisateurs
+       pour une valeur qu'aucun d'eux n'a encore saisie. */
     missions: missionsDuSchema1(o['missions']),
     mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires']),
     echeances: echeancesDuSchema5(o['echeances']),
-    recettes: recettesDuSchema6(o['recettes'])
+    recettes: recettesDuSchema12(recettesDuSchema6(o['recettes']), o['clients'])
   } as Faits;
+}
+
+/**
+ * v11 → v12 : le foyer fiscal sort de `configImpotBrute`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * REPRENDRE PLUTÔT QUE REDEMANDER
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne application tenait ces trois valeurs dans un objet indexé PAR
+ * ANNÉE : `{ '2025': { parts, autresRevenus, perAnnuel }, '2026': {…} }`. La
+ * reprise l'a conservé tel quel, sans jamais l'interpréter — d'où
+ * `configImpotBrute`. Les redemander à la saisie alors qu'ils sont là
+ * ferait retaper une information déjà donnée, et la provision d'impôt
+ * refuserait de se calculer jusqu'à ce que ce soit fait.
+ *
+ * L'ANNÉE LA PLUS RÉCENTE l'emporte : c'est la seule qui décrit la situation
+ * actuelle du foyer. La dimension annuelle est perdue, et c'est assumé — un
+ * historique des parts ne sert à rien tant qu'aucun écran ne recalcule une
+ * année passée, et le porter demanderait une table que personne ne tiendrait
+ * à jour. Le jour où un tel écran existe, la donnée brute est toujours là.
+ *
+ * Un zéro de l'ancienne application reste un zéro : il a été saisi. Seule une
+ * clé absente devient `null`, qui veut dire « pas renseigné ».
+ */
+export interface FoyerFiscal {
+  readonly partsFiscales: number | null;
+  readonly autresRevenusFoyer: Euros | null;
+  readonly versementPerDeductible: Euros | null;
+}
+
+const nombreOuNull = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null;
+
+/**
+ * Extrait le foyer fiscal de l'ancienne configuration d'IR.
+ *
+ * Exporté pour que la reprise du legacy et la migration de schéma lisent la
+ * MÊME règle : deux lectures de la même structure finiraient par diverger, et
+ * l'application dirait alors deux nombres de parts selon l'origine du compte.
+ */
+export function foyerFiscalDepuisConfigImpot(brute: unknown): FoyerFiscal {
+  const parAnnee = (typeof brute === 'object' && brute !== null && !Array.isArray(brute))
+    ? brute as Record<string, unknown>
+    : {};
+  const derniereAnnee = Object.keys(parAnnee)
+    .filter((cle) => /^\d{4}$/.test(cle))
+    .sort()
+    .pop();
+  const ancien = derniereAnnee !== undefined
+    && typeof parAnnee[derniereAnnee] === 'object' && parAnnee[derniereAnnee] !== null
+    ? parAnnee[derniereAnnee] as Record<string, unknown>
+    : {};
+
+  return {
+    partsFiscales: nombreOuNull(ancien['parts']),
+    autresRevenusFoyer: nombreOuNull(ancien['autresRevenus']) as Euros | null,
+    versementPerDeductible: nombreOuNull(ancien['perAnnuel']) as Euros | null
+  };
+}
+
+function foyerFiscalDuSchema11(o: Record<string, unknown>): FoyerFiscal {
+  // Ce qui est déjà saisi dans le nouveau schéma l'emporte : la reprise ne
+  // sert qu'à combler une absence, jamais à écraser une valeur corrigée
+  // depuis l'écran Config.
+  const repris = foyerFiscalDepuisConfigImpot(o['configImpotBrute']);
+  return {
+    partsFiscales: nombreOuNull(o['partsFiscales']) ?? repris.partsFiscales,
+    autresRevenusFoyer:
+      (nombreOuNull(o['autresRevenusFoyer']) as Euros | null) ?? repris.autresRevenusFoyer,
+    versementPerDeductible:
+      (nombreOuNull(o['versementPerDeductible']) as Euros | null) ?? repris.versementPerDeductible
+  };
 }
 
 /**
@@ -810,5 +981,67 @@ function recettesDuSchema6(brut: unknown): readonly Recette[] {
       ? o['tvaCollectee'] as Euros
       : null;
     return [{ ...(o as unknown as Recette), relancesLe: relances, envoyeeLe, tvaCollectee }];
+  });
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   v12 → v13 : les conditions de paiement, et l'échéance qui devient un fait
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Le client porte une FORMULE, plus un nombre de jours.
+ *
+ * L'ancien `delaiPaiementJours` se traduit vers une formule « nets », jamais
+ * vers « fin de mois ». C'est exactement ce que le code calculait — `emiseLe +
+ * N jours` —, et traduire un ancien `30` par « 30 jours fin de mois » aurait
+ * décalé de plusieurs semaines l'échéance de factures déjà émises, sous
+ * couvert de les corriger.
+ */
+function clientsDuSchema12(brut: unknown): readonly Client[] {
+  if (!Array.isArray(brut)) return [];
+  return brut.flatMap((c): Client[] => {
+    if (typeof c !== 'object' || c === null) return [];
+    const o = c as Record<string, unknown>;
+    const deja = formuleOuNull(o['delaiPaiement']);
+    const jours = typeof o['delaiPaiementJours'] === 'number' ? o['delaiPaiementJours'] : null;
+    return [{
+      ...(o as unknown as Client),
+      delaiPaiement: deja ?? (jours === null ? FORMULE_PAR_DEFAUT : formuleDepuisJours(jours))
+    }];
+  });
+}
+
+/**
+ * L'échéance se fige sur chaque facture déjà émise.
+ *
+ * Elle se calcule UNE FOIS depuis les conditions du client telles qu'elles
+ * sont aujourd'hui — c'est la seule information disponible — puis ne bouge
+ * plus. C'est moins juste qu'une échéance relevée sur le document d'origine,
+ * et strictement plus juste que le comportement précédent, où elle changeait à
+ * chaque modification des conditions du client.
+ *
+ * Une recette sans date d'émission n'a pas d'échéance : `null`, et non une
+ * date inventée. Rien n'est encore dû sur un brouillon.
+ */
+function recettesDuSchema12(
+  recettes: readonly Recette[], clientsBruts: unknown
+): readonly Recette[] {
+  const parClient = new Map(
+    clientsDuSchema12(clientsBruts).map((c) => [c.nom, c.delaiPaiement])
+  );
+  return recettes.map((r) => {
+    if (r.echeanceLe != null) return r;
+    /* La FORME de la date est vérifiée avant de calculer. Un bloc venu d'un
+       compte distant peut porter n'importe quoi : `new Date('n importe
+       quoi')` donne une date invalide, dont `toISOString()` LÈVE. La migration
+       s'exécute au chargement, donc l'exception ne tombait pas dans un coin —
+       elle emportait l'écran entier, et la seule trace était un « Invalid time
+       value » sans rapport apparent avec une facture. */
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(r.emiseLe ?? ''))) {
+      return { ...r, echeanceLe: null };
+    }
+    const formule = parClient.get(r.clientNom) ?? FORMULE_PAR_DEFAUT;
+    return { ...r, echeanceLe: echeanceDe(r.emiseLe as DateISO, formule) };
   });
 }
