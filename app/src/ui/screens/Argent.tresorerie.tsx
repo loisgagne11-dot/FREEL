@@ -1,9 +1,10 @@
 import { Suspense, lazy, useId, useMemo } from 'react';
 import { useFaits } from '../../state/store';
-import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
+import { dateDuJour, recettesEncaissees, soldeEstSuivi } from '../../state/selecteurs';
 import type { EtatArgent, EtatSeuils } from '../../state/selecteurs.argent';
 import type { DateISO, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
+import { autonomieMois } from '../../domain/calculs/tresorerie';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
 import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
@@ -14,10 +15,11 @@ import { Echeances } from '../components/Echeances';
 import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
 import { Montant } from '../components/Montant';
+import { Donut, PhraseRepartition } from '../components/Donut';
 import { Repartition } from '../components/Repartition';
 import { Statut } from '../components/Statut';
 import { useToast } from '../components/Toasts';
-import { eur } from '../format';
+import { dateCourte, eur, moisTexte } from '../format';
 import styles from './Argent.module.css';
 
 /**
@@ -54,20 +56,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
 
   return (
     <>
-      <div className={styles.grille}>
-        <Chiffre libelle="Solde" valeur={eur(etat.tresorerie.solde)} />
-        <Chiffre
-          libelle="À garder de côté"
-          valeur={eur(etat.tresorerie.provisions)}
-          ton={etat.tresorerie.provisions > 0 ? 'attention' : 'neutre'}
-        />
-        <Chiffre
-          libelle="Disponible"
-          valeur={eur(etat.tresorerie.dispo)}
-          ton={etat.tresorerie.dispo < 0 ? 'danger' : 'neutre'}
-        />
-        <Chiffre libelle="Versable" valeur={eur(etat.tresorerie.versable)} ton="accent" />
-      </div>
+      <TuilesTresorerie etat={etat} />
 
       <CartePliable
         id="repartition"
@@ -87,36 +76,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
           </>
         )}
       >
-        <Repartition
-          total={etat.tresorerie.solde}
-          deficit={Math.max(0, -etat.tresorerie.dispo)}
-          parts={[
-            {
-              libelle: 'Provisions — dû, pas encore payé',
-              montant: Math.min(etat.tresorerie.provisions, Math.max(0, etat.tresorerie.solde)),
-              ton: 'provisions'
-            },
-            {
-              // Le seuil n'est constitué qu'à hauteur de ce qui reste après
-              // provisions : l'afficher plein sur un disponible insuffisant
-              // ferait croire à un matelas qui n'existe pas.
-              //
-              // « Seuil de sécurité » et non « réserve » : le mot vient du
-              // dessin, et il libère « réserve » pour l'autre notion — la
-              // part gardée au versement, qui est un pourcentage. Un seul
-              // mot couvrait deux idées, et c'est ainsi qu'un plancher fixe
-              // finit par être exprimé en pourcentage du disponible.
-              libelle: 'Seuil de sécurité',
-              montant: Math.min(etat.tresorerie.reserve, Math.max(0, etat.tresorerie.dispo)),
-              ton: 'reserve'
-            },
-            {
-              libelle: 'Versable — à toi',
-              montant: etat.tresorerie.versable,
-              ton: 'versable'
-            }
-          ]}
-        />
+        <RepartitionDuSolde etat={etat} />
       </CartePliable>
 
       <CarteSeuils seuils={etat.seuils} />
@@ -204,6 +164,180 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
       <Echeances />
 
       <CarteDeclarations idGroupe={idGroupe} />
+    </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   B1 — les quatre tuiles
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Les quatre chiffres du haut, tels que le handoff les choisit.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CE QUI CHANGE, ET POURQUOI CE N'EST PAS UNE PERTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La rangée portait Solde / À garder de côté / Disponible / Versable — deux
+ * découpes du même solde sur quatre cases. La référence met Solde / Disponible
+ * / À encaisser / Autonomie : deux constats, puis deux réponses à des questions
+ * différentes — « qu'est-ce qui va rentrer » et « combien de temps je tiens ».
+ *
+ * Ni « à garder de côté » ni « versable » ne disparaissent : le premier est le
+ * total des enveloppes de provision, juste dessous, et le second est au centre
+ * de l'anneau et sur l'autre pilier. Les répéter dans la rangée du haut
+ * coûtait les deux seules cases où l'écran pouvait dire autre chose.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CHAQUE TUILE DIT SON ASSIETTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « 8 120 € » ne dit pas à quelle date, « 4 940 € » ne dit pas ce qui en a été
+ * retiré. Le dessin met une ligne sous chacun, et c'est elle qui rend le
+ * chiffre opposable.
+ *
+ * L'autonomie s'abstient plutôt que d'afficher zéro : sans besoin mensuel
+ * saisi, la division n'a pas de sens. L'ancienne application affichait dans ce
+ * cas une autonomie qui bondissait sans cause — au 1ᵉʳ janvier, les dépenses de
+ * l'année tombant à zéro, elle passait de 5,3 à 9,3 mois.
+ */
+function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
+  const besoinMensuel = useFaits((e) => e.faits.besoinMensuel);
+  const soldeSuivi = useFaits((e) => soldeEstSuivi(e.faits));
+  const autonomie = autonomieMois(etat.tresorerie.versable, besoinMensuel);
+
+  return (
+    <div className={styles.grille}>
+      <Chiffre
+        libelle="Solde du compte"
+        valeur={eur(etat.tresorerie.solde)}
+        note={soldeSuivi
+          ? `au ${dateCourte(dateDuJour())}`
+          : 'saisi, aucun relevé importé'}
+      />
+      <Chiffre
+        libelle="Disponible"
+        valeur={eur(etat.tresorerie.dispo)}
+        ton={etat.tresorerie.dispo < 0 ? 'danger' : 'accent'}
+        note="à toi, hors provisions"
+      />
+      <Chiffre
+        libelle="À encaisser"
+        valeur={eur(etat.resteARentrer)}
+        ton={etat.resteARentrer > 0 ? 'attention' : 'neutre'}
+        note={etat.resteARentrerNombre === 0
+          ? 'rien en attente'
+          : `${etat.resteARentrerNombre} facture${etat.resteARentrerNombre > 1 ? 's' : ''} en attente`}
+      />
+      <Chiffre
+        libelle="Autonomie"
+        valeur={moisTexte(autonomie)}
+        note={autonomie === null
+          ? 'besoin mensuel non renseigné'
+          : 'ton versable, à ton train de vie'}
+      />
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   B3 — la répartition du solde
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Les trois parts du solde, en anneau, avec la phrase qui les explique.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LES PARTS SONT BORNÉES, ET C'EST TOUT LE SUJET
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le seuil de sécurité n'est constitué qu'à hauteur de ce qui reste APRÈS les
+ * provisions : l'afficher plein sur un disponible insuffisant ferait croire à
+ * un matelas qui n'existe pas. Même chose pour les provisions elles-mêmes,
+ * bornées au solde — au-delà, ce n'est plus une part, c'est un manque, et il se
+ * dit en toutes lettres sous la légende.
+ *
+ * « Seuil de sécurité » et non « réserve » : le mot vient du dessin, et il
+ * libère « réserve » pour l'autre notion — la part gardée au versement, qui est
+ * un pourcentage. Un seul mot couvrait deux idées, et c'est ainsi qu'un
+ * plancher fixe finit par être exprimé en pourcentage du disponible.
+ */
+function RepartitionDuSolde({ etat }: { readonly etat: EtatArgent }) {
+  const t = etat.tresorerie;
+  const provisionsCouvertes = Math.min(t.provisions, Math.max(0, t.solde));
+  const seuilConstitue = Math.min(t.reserve, Math.max(0, t.dispo));
+  const manque = Math.max(0, -t.dispo);
+
+  return (
+    <>
+      <Donut
+        total={t.solde}
+        deficit={manque}
+        centre={eur(t.dispo)}
+        legendeCentre="à toi, hors provisions"
+        parts={[
+          {
+            /*
+             * Le libellé change quand le montant est BORNÉ.
+             *
+             * L'anneau découpe le solde : la part de provisions y est plafonnée
+             * à ce que le compte contient. Sur un compte qui doit 7 607 € et
+             * n'en porte que 4 938, la légende affichait « Provisions dues :
+             * 4 938 € » — trois lignes au-dessus d'une carte qui en annonce
+             * 7 607. Deux montants pour la même notion sur le même écran, sans
+             * que rien ne dise lequel fait foi.
+             *
+             * Le montant reste borné, parce que c'est ce que l'anneau
+             * représente ; c'est le NOM qui dit ce qu'on regarde. Le reste dû
+             * est sur la ligne de manque, juste dessous.
+             */
+            libelle: manque > 0 ? 'Provisions couvertes par le solde' : 'Provisions dues',
+            montant: provisionsCouvertes,
+            ton: 'provisions'
+          },
+          { libelle: 'Seuil de sécurité', montant: seuilConstitue, ton: 'reserve' },
+          { libelle: 'À te verser', montant: t.versable, ton: 'versable' }
+        ]}
+      />
+
+      {/* La phrase du dessin, dérivée et non écrite en dur. C'est elle qui
+          fait le lien entre l'anneau et les enveloppes juste dessous : sans
+          elle, on voit trois parts sans savoir laquelle il faut aller
+          regarder. */}
+      {/*
+        * La phrase et le centre de l'anneau doivent dire LE MÊME nombre.
+        *
+        * Le centre porte le disponible tel qu'il est, négatif compris — c'est
+        * le signal le plus fort de l'écran et il ne se borne pas. La phrase
+        * écrivait de son côté « 0 € sont à toi », parce qu'elle bornait. Sur la
+        * même carte, à trois centimètres l'une de l'autre, deux réponses à la
+        * même question.
+        *
+        * Le cas négatif a donc sa phrase, qui dit ce qui se passe réellement :
+        * ce n'est pas que rien n'est à toi, c'est que l'argent des cotisations
+        * a déjà été dépensé.
+        */}
+      {t.dispo < 0 ? (
+        <PhraseRepartition>
+          Sur les <strong><Montant>{eur(t.solde)}</Montant></strong> du compte,{' '}
+          <strong>rien n’est à toi</strong>&nbsp;: les{' '}
+          <strong><Montant>{eur(t.provisions)}</Montant></strong> dus (URSSAF, impôt, TVA)
+          dépassent le solde de <strong><Montant>{eur(euros(manque))}</Montant></strong>.
+          Une partie de l’argent des cotisations a déjà été dépensée — le détail
+          est dans les enveloppes ci-dessous.
+        </PhraseRepartition>
+      ) : (
+        <PhraseRepartition>
+          Sur les <strong><Montant>{eur(t.solde)}</Montant></strong> du compte,{' '}
+          <strong><Montant>{eur(t.dispo)}</Montant></strong> sont à toi —{' '}
+          <Montant>{eur(euros(seuilConstitue))}</Montant> de seuil gardé
+          {' + '}<Montant>{eur(t.versable)}</Montant> que tu peux te verser. Les{' '}
+          <strong><Montant>{eur(euros(provisionsCouvertes))}</Montant></strong> restants
+          sont <strong>dus</strong> (URSSAF, impôt, TVA) — détaillés dans les
+          enveloppes ci-dessous.
+        </PhraseRepartition>
+      )}
     </>
   );
 }
