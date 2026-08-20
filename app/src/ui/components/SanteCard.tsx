@@ -195,7 +195,7 @@ export function syntheseDeSante(
     .sort((a, b) => gravite(a.etat) - gravite(b.etat) || rang(a) - rang(b))[0];
 
   if (pire === undefined || pire.etat === 'bon') {
-    return { ton: 'bon', phrase: 'Rien ne réclame votre attention.' };
+    return { ton: 'bon', phrase: 'Rien ne réclame ton attention.' };
   }
 
   // Le sujet est nommé ET chiffré : « attention » sans dire à quoi oblige à

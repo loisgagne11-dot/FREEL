@@ -38,7 +38,7 @@ describe('projection du disponible', () => {
     semer({ soldeInitial: euros(24_000) });
     render(<ProjectionPanneau />);
 
-    expect(screen.getByText(/Vous pouvez vous verser/)).toBeTruthy();
+    expect(screen.getByText(/Tu peux te verser/)).toBeTruthy();
   });
 
   /** Deux scénarios, parce que la question en a deux. */
@@ -128,7 +128,7 @@ describe('projection du disponible', () => {
     semer({ soldeInitial: euros(24_000) });
     render(<ProjectionPanneau />);
 
-    const carte = screen.getByText(/Ce que vous vous êtes versé/).closest('section');
+    const carte = screen.getByText(/Ce que tu t’es versé/).closest('section');
     const dans = within(carte as HTMLElement);
     expect(dans.getAllByText('Versé').length).toBeGreaterThan(0);
     expect(dans.getAllByText('Soutenable').length).toBeGreaterThan(0);
@@ -139,7 +139,7 @@ describe('projection du disponible', () => {
     semer({ soldeInitial: euros(24_000) });
     render(<ProjectionPanneau />);
 
-    const phrase = screen.getByText(/Vous pouvez vous verser/);
+    const phrase = screen.getByText(/Tu peux te verser/);
     expect(phrase.querySelector('[data-montant]')).toBeTruthy();
   });
 });

@@ -40,7 +40,7 @@ export function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] }) {
       </h2>
 
       {sujets.length === 0 ? (
-        <p className={styles.aideCarte}>Rien ne réclame votre attention aujourd’hui.</p>
+        <p className={styles.aideCarte}>Rien ne réclame ton attention aujourd’hui.</p>
       ) : (
         <ul className={styles.sujets}>
           {sujets.map((s) => <Sujet key={s.id} sujet={s} />)}

@@ -77,7 +77,7 @@ export function FluxCard(
           Le flux du mois
           <Info libelle="Ce que montrent les trois colonnes">
             Ce qui est <strong>entré</strong> sur le mois, ce qui doit en
-            <strong> sortir</strong>, et ce qu’il reste pour vous. L’argent en
+            <strong> sortir</strong>, et ce qu’il reste pour toi. L’argent en
             attente n’est pas borné au mois&nbsp;: une facture impayée
             n’appartient à aucun mois, et la masquer ferait disparaître de
             l’écran celle qu’il faut relancer.

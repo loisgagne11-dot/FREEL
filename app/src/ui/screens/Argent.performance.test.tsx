@@ -288,7 +288,7 @@ describe('tu peux te verser', () => {
   it('propose le versable entier à 0 %, jamais le seuil de sécurité avec', () => {
     poser({ soldeInitial: euros(10_000), reserve: euros(4_000) });
 
-    const grand = screen.getByText(/Montant que vous pouvez vous verser/).parentElement;
+    const grand = screen.getByText(/Montant que tu peux te verser/).parentElement;
     expect(grand?.textContent).toContain(eur(6_000));
     expect(grand?.textContent).not.toContain(eur(10_000));
   });
@@ -298,7 +298,7 @@ describe('tu peux te verser', () => {
       soldeInitial: euros(10_000), reserve: euros(4_000), partGardeeAuVersement: ratio(0.5)
     });
 
-    const grand = screen.getByText(/Montant que vous pouvez vous verser/).parentElement;
+    const grand = screen.getByText(/Montant que tu peux te verser/).parentElement;
     expect(grand?.textContent).toContain(eur(3_000));
   });
 

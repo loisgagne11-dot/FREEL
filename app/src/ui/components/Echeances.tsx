@@ -144,7 +144,7 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
       )}
       titre="Échéances reçues"
             aide={<Info libelle="Ce qu’il faut saisir ici">
-            Les appels que vous avez réellement reçus&nbsp;: échéancier URSSAF,
+            Les appels que tu as réellement reçus&nbsp;: échéancier URSSAF,
             avis d’impôt, CFE. Ce n’est pas une prévision — les cotisations dues
             sur des recettes encaissées mais pas encore déclarées sont déjà
             estimées juste au-dessus, dans «&nbsp;charges sur recettes

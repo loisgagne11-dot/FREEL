@@ -105,11 +105,11 @@ export function ProjectionPanneau() {
       {/* La réponse, en toutes lettres, avant les barres. Un graphe se lit
           d'un coup d'œil mais ne dit pas de combien il s'agit. */}
       <p className={styles.reponse}>
-        Vous pouvez vous verser <strong><Montant>{eur(projection.versementMensuel)}</Montant></strong> par
+        Tu peux te verser <strong><Montant>{eur(projection.versementMensuel)}</Montant></strong> par
         mois pendant un an.
         {projection.moisContraignant !== null && (
           <> C’est <strong>{moisLong(projection.moisContraignant)}</strong> qui
-          limite&nbsp;: au-delà, ce mois-là passerait sous votre réserve.</>
+          limite&nbsp;: au-delà, ce mois-là passerait sous ta réserve.</>
         )}
         {projection.versementMensuel === 0 && (
           <> Rien pour l’instant&nbsp;: le disponible ne dépasse pas la réserve
@@ -169,18 +169,18 @@ export function ProjectionPanneau() {
         {dernier !== undefined && (
           <p className={styles.aide}>
             Dans un an&nbsp;: <Montant>{eur(dernier.sansVersement)}</Montant> sans
-            rien vous verser, <Montant>{eur(dernier.avecVersement)}</Montant> en
-            vous étant versé <Montant>{eur(dernier.verseCumule)}</Montant> au total.
+            rien te verser, <Montant>{eur(dernier.avecVersement)}</Montant> en
+            t’étant versé <Montant>{eur(dernier.verseCumule)}</Montant> au total.
           </p>
         )}
       </section>
 
       <section className={styles.carte} aria-labelledby="titre-versements">
         <h3 id="titre-versements" className={styles.titreCarte}>
-          Ce que vous vous êtes versé
+          Ce que tu t’es versé
           <Info libelle="D’où viennent ces montants">
             Du <strong>relevé bancaire</strong>&nbsp;: ce sont les mouvements
-            que vous avez marqués comme rémunération. Rien n’est saisi deux
+            que tu as marqués comme rémunération. Rien n’est saisi deux
             fois — en micro, un virement du compte professionnel vers le
             compte personnel ne crée ni charge ni recette, il change seulement
             de poche. La barre de référence est le versement soutenable

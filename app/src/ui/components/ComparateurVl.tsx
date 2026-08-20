@@ -80,7 +80,7 @@ export function ComparateurVl() {
         Versement libératoire ou barème&nbsp;?
         <Info libelle="Ce que compare cet outil">
           Le versement libératoire est un pourcentage du chiffre
-          d’affaires&nbsp;: il se paie même sans bénéfice, et ignore votre
+          d’affaires&nbsp;: il se paie même sans bénéfice, et ignore ton
           foyer. Le barème s’applique au revenu après abattement, dans un foyer
           qui a ses propres revenus et ses propres parts. On ne peut donc pas
           les comparer directement — on mesure ce que l’activité AJOUTE à
@@ -109,9 +109,9 @@ export function ComparateurVl() {
           />
           <span id={`${id}-ca-aide`} className={styles.aide}>
             {caReel > 0
-              ? <>Prérempli avec vos <Montant>{eur(caReel)}</Montant> encaissés
+              ? <>Prérempli avec tes <Montant>{eur(caReel)}</Montant> encaissés
                   en {annee}. La décision porte sur l’année prochaine&nbsp;:
-                  ajustez si vous l’attendez différente.</>
+                  ajuste si tu l’attends différente.</>
               : <>Le montant encaissé, pas facturé.</>}
           </span>
         </p>
@@ -199,7 +199,7 @@ export function ComparateurVl() {
                   {resultat.valeur.avantage === 'versement_liberatoire'
                     ? 'Le versement libératoire'
                     : 'Le barème'}
-                  {' '}vous coûterait{' '}
+                  {' '}te coûterait{' '}
                   <strong>
                     <Montant>{eur(euros(Math.abs(resultat.valeur.ecart)))}</Montant>
                   </strong>

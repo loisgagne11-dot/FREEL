@@ -83,7 +83,7 @@ export function Pilote() {
       <ActionsRapides />
 
       {chargement.phase === 'sans-persistance' && (
-        <Bandeau ton="alerte" titre="Vos saisies ne sont pas conservées">
+        <Bandeau ton="alerte" titre="Tes saisies ne sont pas conservées">
           {chargement.motif}
         </Bandeau>
       )}
@@ -122,7 +122,7 @@ export function Pilote() {
         <p className={styles.sousLigne}>
           Autonomie&nbsp;: {moisTexte(etat.autonomie)}
           {faits.besoinMensuel <= 0 && (
-            <span className={styles.note}> — renseignez votre besoin mensuel pour la calculer</span>
+            <span className={styles.note}> — renseigne ton besoin mensuel pour la calculer</span>
           )}
         </p>
         {/* Ce qui est DÉJÀ sorti ce mois-ci. Sans cette ligne, « je peux me
@@ -134,11 +134,11 @@ export function Pilote() {
             {faits.besoinMensuel > 0 && verseCeMois < faits.besoinMensuel && (
               <span className={styles.note}>
                 {' '}— il manque <Montant>{eur(euros(faits.besoinMensuel - verseCeMois))}</Montant>
-                {' '}pour couvrir votre besoin
+                {' '}pour couvrir ton besoin
               </span>
             )}
             <Info libelle="D’où vient ce chiffre">
-              Des virements du relevé que vous avez marqués «&nbsp;rémunération
+              Des virements du relevé que tu as marqués «&nbsp;rémunération
               que je me suis versée&nbsp;», dans Achats&nbsp;› Relevé bancaire.
               Se verser de l’argent n’est pas une opération comptable en
               micro&nbsp;: la personne et l’entreprise sont la même. Le virement
@@ -289,8 +289,8 @@ function salutation(nom: string): string {
  * nouvelle de la journée, et elle mérite d'être dite.
  */
 function phraseDAccueil(nbSujets: number, mois: string): string {
-  if (nbSujets === 0) return `Rien ne demande votre attention en ${mois.toLowerCase()}.`;
+  if (nbSujets === 0) return `Rien ne demande ton attention en ${mois.toLowerCase()}.`;
   return nbSujets === 1
-    ? `Une décision vous attend en ${mois.toLowerCase()}.`
-    : `${nbSujets} décisions vous attendent en ${mois.toLowerCase()}.`;
+    ? `Une décision t’attend en ${mois.toLowerCase()}.`
+    : `${nbSujets} décisions t’attendent en ${mois.toLowerCase()}.`;
 }

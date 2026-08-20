@@ -93,7 +93,7 @@ export function Releve() {
             Un fichier CSV exporté depuis la banque. Il n’existe pas de format
             commun&nbsp;: séparateur, format de date, montant signé ou réparti
             sur deux colonnes Débit et Crédit varient d’un établissement à
-            l’autre. L’import dit ce qu’il a compris, pour que vous puissiez le
+            l’autre. L’import dit ce qu’il a compris, pour que tu puisses le
             vérifier. Réimporter un relevé qui recouvre le précédent n’ajoute
             que ce qui manque&nbsp;: le solde ne double pas.
           </Info>

@@ -331,7 +331,7 @@ function echeancesCfe(faits: Faits, maintenant: Date): readonly EcheanceCfeDatee
       ...declaration,
       ecran: 'config',
       action: 'Se préparer',
-      contexte: 'C’est elle qui établit votre base d’imposition ; l’omettre fait perdre '
+      contexte: 'C’est elle qui établit ta base d’imposition ; l’omettre fait perdre '
         + 'l’exonération de première année.'
     });
   }
@@ -352,9 +352,9 @@ function echeancesCfe(faits: Faits, maintenant: Date): readonly EcheanceCfeDatee
       action: 'Saisir l’échéance',
       contexte: regime.type === 'base-reduite-moitie'
         ? 'Première année d’imposition : la base est réduite de moitié, mais la CFE est '
-          + 'due. Sans montant saisi, votre disponible est surestimé.'
-        : 'L’avis paraît en novembre sur votre espace professionnel. Sans montant saisi, '
-          + 'votre disponible est surestimé.'
+          + 'due. Sans montant saisi, ton disponible est surestimé.'
+        : 'L’avis paraît en novembre sur ton espace professionnel. Sans montant saisi, '
+          + 'ton disponible est surestimé.'
     });
   }
 

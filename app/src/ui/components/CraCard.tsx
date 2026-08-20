@@ -64,7 +64,7 @@ export function CraCard(
         ? (
           <Vide
             message={`Aucun jour travaillé en ${periode.toLowerCase()}. Le compte rendu se
-                      remplit depuis le planning, à partir du rythme de vos missions.`}
+                      remplit depuis le planning, à partir du rythme de tes missions.`}
           />
         )
         : (

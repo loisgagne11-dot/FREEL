@@ -243,13 +243,13 @@ export function mentionsManquantes(facture: Facture): readonly Manque[] {
     'Date d’émission absente ou invalide.');
 
   exiger(emetteur.nom.trim() !== '', 'identite_emetteur',
-    'Votre nom ou dénomination est absent. À renseigner dans Config → Profil.');
+    'Ton nom ou ta dénomination est absent. À renseigner dans Config → Profil.');
   exiger(emetteur.siret.trim() !== '', 'siret_emetteur',
-    'Votre SIRET est absent. À renseigner dans Config → Profil.');
+    'Ton SIRET est absent. À renseigner dans Config → Profil.');
   exiger(
     emetteur.adresse.trim() !== '' || emetteur.ville.trim() !== '',
     'adresse_emetteur',
-    'Votre adresse est absente. À renseigner dans Config → Profil.'
+    'Ton adresse est absente. À renseigner dans Config → Profil.'
   );
 
   exiger(destinataire.nom.trim() !== '', 'identite_destinataire',
@@ -271,7 +271,7 @@ export function mentionsManquantes(facture: Facture): readonly Manque[] {
   // être invoquée ; sans celui du client, elle ne peut pas être justifiée.
   if (regime === 'autoliquidation_ue') {
     exiger(emetteur.tvaIntracom.trim() !== '', 'tva_intracom_emetteur',
-      'Votre numéro de TVA intracommunautaire est absent : il est obligatoire pour '
+      'Ton numéro de TVA intracommunautaire est absent : il est obligatoire pour '
       + 'facturer un client assujetti d’un autre État membre, y compris en '
       + 'franchise en base.');
     exiger(destinataire.tvaIntracom.trim() !== '', 'tva_intracom_destinataire',

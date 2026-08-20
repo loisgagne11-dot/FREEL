@@ -146,7 +146,7 @@ function etatDuCompte(): EtatCompte {
     return {
       ton: 'local',
       libelle: 'Local',
-      detail: 'Vos données restent sur cet appareil. Ouvrir Config › Compte pour les '
+      detail: 'Tes données restent sur cet appareil. Ouvrir Config › Compte pour les '
         + 'synchroniser.'
     };
   }
@@ -154,7 +154,7 @@ function etatDuCompte(): EtatCompte {
     return {
       ton: 'expire',
       libelle: 'Session expirée',
-      detail: `Session expirée pour ${session.email}. Vos saisies ne remontent plus : `
+      detail: `Session expirée pour ${session.email}. Tes saisies ne remontent plus : `
         + 'ouvrir Config › Compte pour se reconnecter.'
     };
   }

@@ -860,7 +860,7 @@ describe('ce qu’une journée rapporte', () => {
     });
     render(<Activite />);
 
-    const reste = screen.getByText(/Ce qu’il vous reste, charges déduites/);
+    const reste = screen.getByText(/Ce qu’il te reste, charges déduites/);
     const montant = reste.parentElement?.querySelector('dd')?.textContent ?? '';
     expect(montant).toMatch(/€/);
     // Net strictement inférieur au brut : les charges ne sont pas nulles.

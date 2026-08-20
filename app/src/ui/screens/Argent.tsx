@@ -178,16 +178,16 @@ export function Argent() {
           <CartePliable
             id="repartition"
             ecran="argent"
-            titre="Votre solde n’est pas tout à vous"
+            titre="Ton solde n’est pas tout à toi"
             aide={<Info libelle="Pourquoi le solde trompe">
                   Le solde bancaire contient les cotisations d’un trimestre que
-                  vous n’avez pas encore déclaré. Le regarder et se sentir riche,
+                  tu n’as pas encore déclaré. Le regarder et se sentir riche,
                   c’est le mécanisme exact du rappel qu’on ne peut plus payer. La
-                  barre montre d’abord ce qui n’est <em>pas</em> à vous.
+                  barre montre d’abord ce qui n’est <em>pas</em> à toi.
                 </Info>}
             resume={(
               <>
-                <Montant>{eur(etat.tresorerie.versable)}</Montant> à vous
+                <Montant>{eur(etat.tresorerie.versable)}</Montant> à toi
                 {' · '}<Montant>{eur(etat.tresorerie.provisions)}</Montant> de côté
                 {' · '}<Montant>{eur(etat.tresorerie.reserve)}</Montant> de seuil de sécurité
               </>
@@ -217,7 +217,7 @@ export function Argent() {
                   ton: 'reserve'
                 },
                 {
-                  libelle: 'Versable — à vous',
+                  libelle: 'Versable — à toi',
                   montant: etat.tresorerie.versable,
                   ton: 'versable'
                 }
@@ -230,11 +230,11 @@ export function Argent() {
           <CartePliable
             id="projection"
             ecran="argent"
-            titre="Où va votre disponible, et combien vous pouvez vous verser"
+            titre="Où va ton disponible, et combien tu peux te verser"
             aide={<Info libelle="Ce que cette projection montre">
-                  Douze mois à venir, dans deux scénarios&nbsp;: sans rien vous
-                  verser, et en vous versant chaque mois le maximum qui ne fasse
-                  jamais passer le disponible sous votre réserve. Les
+                  Douze mois à venir, dans deux scénarios&nbsp;: sans rien te
+                  verser, et en te versant chaque mois le maximum qui ne fasse
+                  jamais passer le disponible sous ta réserve. Les
                   encaissements attendus viennent des factures émises non
                   réglées et du revenu prévu au planning — aucune tendance n’est
                   devinée.

@@ -61,7 +61,7 @@ export function DeclarationServices({ idGroupe }: { idGroupe: string }) {
 
       {etat.sansNumeroIntracom && !declaration.sansObjet && (
         <p className={`${styles.bandeau} ${styles.bandeauAttention}`} role="status">
-          Vous n’avez pas de numéro de TVA intracommunautaire. Il en faut un
+          Tu n’as pas de numéro de TVA intracommunautaire. Il en faut un
           pour déposer une DES, <em>y compris en franchise en base</em>&nbsp;:
           il se demande au service des impôts des entreprises.
         </p>

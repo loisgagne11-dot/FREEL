@@ -87,3 +87,17 @@ correction doit faire échouer un test nommé. Sinon le test ne tient rien.
 Le code, les commentaires, les commits et les libellés sont **en français**.
 Les commentaires disent *pourquoi*, avec le contre-exemple qui a motivé la
 décision — pas *ce que* fait la ligne suivante.
+
+**L'application tutoie.** C'est la voix du handoff — « Ton argent », « Tu peux
+te verser », « Rien ne réclame ton attention » — et celle d'un outil personnel
+qu'on ouvre tous les matins. Arbitré le 20/08 ; l'application vouvoyait jusque-là
+et la passe a été faite d'un coup, sur les 31 fichiers concernés.
+
+**Une exception, et une seule : ce qui part chez le client.** `relance.ts` écrit
+des lettres de relance et des mises en demeure adressées au client, pas à
+l'utilisateur. Elles vouvoient, et c'est le contraire d'une incohérence — une
+mise en demeure tutoyée ne vaut rien.
+
+Le piège de cette passe : un `vous` de politesse et un `vous` pluriel ne se
+distinguent par aucune expression régulière, et `votre` s'accorde en genre avec
+ce qui suit. Elle se relit à l'œil, jamais au `sed`.

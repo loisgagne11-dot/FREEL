@@ -202,7 +202,7 @@ function TuileResultat(
             {avantIr && (
               <>
                 Aucun impôt sur le revenu n’est déduit&nbsp;: il dépend de faits
-                que vous seul connaissez et il se saisit depuis votre avis, il ne
+                que toi seul connais et il se saisit depuis ton avis, il ne
                 se reconstitue pas depuis un taux.{' '}
               </>
             )}
@@ -366,9 +366,9 @@ function GrapheCa(
           Le repère mensuel est l’objectif annuel divisé par douze&nbsp;— une
           hypothèse d’étalement, pas une prévision.{' '}
           {joursDEcart === null ? null : joursDEcart >= 0
-            ? <>Sur l’année écoulée, vous avez <strong>{joursDEcart} jour
+            ? <>Sur l’année écoulée, tu as <strong>{joursDEcart} jour
               {joursDEcart > 1 ? 's' : ''} d’avance</strong> sur l’objectif.</>
-            : <>Sur l’année écoulée, vous avez <strong>{-joursDEcart} jour
+            : <>Sur l’année écoulée, tu as <strong>{-joursDEcart} jour
               {-joursDEcart > 1 ? 's' : ''} de retard</strong> sur l’objectif.</>}
         </p>
       )}
@@ -584,7 +584,7 @@ function CarteVersement(
           d'assistance : annoncé seul, « 2 470 € » ne dit pas de quoi il s'agit,
           et c'est le chiffre le plus engageant de l'écran. */}
       <p className={styles.grandChiffre}>
-        <span className={styles.horsEcran}>Montant que vous pouvez vous verser&nbsp;: </span>
+        <span className={styles.horsEcran}>Montant que tu peux te verser&nbsp;: </span>
         <Montant>{eur(aVerser)}</Montant>
       </p>
 
@@ -624,17 +624,17 @@ function CarteVersement(
           sache si c'est le réglage ou le compte qui l'impose. */}
       {dispo < 0 ? (
         <p className={styles.explication}>
-          Votre disponible est <strong>négatif</strong> (<Montant>{eur(dispo)}</Montant>)&nbsp;:
+          Ton disponible est <strong>négatif</strong> (<Montant>{eur(dispo)}</Montant>)&nbsp;:
           les provisions dépassent ce qu’il y a sur le compte. Il n’y a rien à
-          vous verser, et le seuil de sécurité n’est pas constitué non plus.
+          te verser, et le seuil de sécurité n’est pas constitué non plus.
         </p>
       ) : (
         <p className={styles.explication}>
           Sur <Montant>{eur(dispo)}</Montant> de disponible, le seuil de sécurité
           en retient <Montant>{eur(euros(Math.min(reserve, dispo)))}</Montant>&nbsp;: reste{' '}
-          <Montant>{eur(base)}</Montant> de versable. Vous en gardez{' '}
+          <Montant>{eur(base)}</Montant> de versable. Tu en gardes{' '}
           <strong>{pourcent}&nbsp;%</strong> (<Montant>{eur(gardee)}</Montant>) et
-          vous versez le reste.
+          tu verses le reste.
         </p>
       )}
 
@@ -646,7 +646,7 @@ function CarteVersement(
         Pointer le versement au relevé
       </button>
       <p className={styles.aide}>
-        Le virement figure déjà sur votre relevé&nbsp;: il n’y a rien à saisir, il
+        Le virement figure déjà sur ton relevé&nbsp;: il n’y a rien à saisir, il
         n’y a qu’à le nommer. Le saisir ici le compterait deux fois.
       </p>
     </section>
@@ -699,7 +699,7 @@ function CarteCapacite(
           <Info libelle="Comment lire ces barres">
             La barre dit ce que le mois <em>autorisait</em>&nbsp;: encaissé, moins
             les charges au taux de <em>ce</em> mois-là, moins les dépenses. Le
-            plein dit ce que vous avez pris. Les mois à venir sont hachurés et
+            plein dit ce que tu as pris. Les mois à venir sont hachurés et
             n’ont aucun plein&nbsp;— rien n’en est encore sorti.
           </Info>
         </h2>
