@@ -56,19 +56,26 @@
   .actif { border-bottom-color: var(--green); }
 }
 
+/* Carré arrondi et PLEIN, comme le dessin — pas un cercle en contour. Un
+   contour seul se confond avec les puces d'état de la barre du haut, qui sont
+   rondes et creuses ; la pastille de pilier est un repère, pas un état. */
 .icone {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   flex: 0 0 auto;
-  border-radius: var(--r-sm);
+  border-radius: 10px;
   border: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--panel-2);
   color: var(--muted-2);
 }
 
-.actif .icone { color: var(--green); border-color: var(--green); }
+.actif .icone {
+  color: var(--green);
+  border-color: var(--green);
+  background: var(--green-soft, var(--panel-2));
+}
 
 .texte {
   display: flex;
@@ -104,14 +111,20 @@
   min-width: 0;
 }
 
+/* Le pilier INACTIF porte un chiffre atténué. Aux deux mêmes poids, la
+   hiérarchie ne tenait plus qu'au trait de soulignement, qui est à l'autre
+   bout de la bande — on ne sait plus lequel des deux chiffres on regarde. */
 .chiffre {
+  font-family: var(--mono);
   font-size: 17px;
-  font-weight: 620;
-  letter-spacing: -0.03em;
-  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+.actif .chiffre { color: var(--text); }
 
 .precision {
   font-size: 9.5px;

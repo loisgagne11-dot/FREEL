@@ -60,7 +60,7 @@ import styles from './Argent.performance.module.css';
  * Ils doivent rester d'accord avec `.barres { height }` et le bas de `.colonne`
  * dans la feuille de style, qui portent le commentaire réciproque.
  */
-const HAUTEUR_BARRES = 140;
+const HAUTEUR_BARRES = 175;
 const BAS_DES_BARRES = 22;
 
 /** Les mois de l'axe, dans la langue du dessin. */
@@ -169,10 +169,26 @@ function TuileResultat(
   if (resultat === null) return null;
 
   const avantIr = resultat.reserves.includes('avant_impot_sur_le_revenu');
+
+  /*
+   * « ~21 900 € » et non « 21 877 € ».
+   *
+   * Le dessin écrit « ~46 k€ », et le tilde n'est pas un ornement : ce chiffre
+   * repose sur un pipeline de factures qui ne sont pas encore parties et sur
+   * des dépenses futures inconnues. Trois chiffres significatifs affichés à
+   * l'euro près donnent à une projection l'apparence d'un relevé, et c'est ce
+   * qui fait qu'on la reporte sur un formulaire.
+   *
+   * Arrondi à la centaine plutôt qu'au millier : le registre en euros pleins
+   * des trois autres tuiles est conservé — deux unités sur la même rangée
+   * demanderaient de comparer 18 970 € à 21,9 k€ de tête.
+   */
+  const arrondi = euros(Math.round(resultat.resultat / 100) * 100);
+
   return (
     <Chiffre
       libelle="Résultat projeté"
-      valeur={eur(resultat.resultat)}
+      valeur={`~${eur(arrondi)}`}
       note={
         <>
           {avantIr ? 'avant impôt sur le revenu' : 'après cotisations'}
@@ -453,7 +469,9 @@ function PanneauComposition({ composition }: { readonly composition: Composition
       <div className={styles.bloc}>
         <p className={styles.enteteBloc}>
           <span className={`${styles.libelleBloc} ${styles.encaisse}`}>Encaissé · reçu</span>
-          <span className={styles.totalBloc}><Montant>{eur(c.encaisse)}</Montant></span>
+          <span className={`${styles.totalBloc} ${styles.totalEncaisse}`}>
+            <Montant>{eur(c.encaisse)}</Montant>
+          </span>
         </p>
         {c.encaisseParFacture.length === 0
           ? <p className={styles.vide}>Rien n’est entré sur le compte ce mois-ci.</p>
@@ -483,8 +501,11 @@ function PanneauComposition({ composition }: { readonly composition: Composition
 
       <p className={styles.piedBloc}>
         <span>Reste à encaisser sur les factures de ce mois</span>
+        {/* Le signe « + » dit le SENS : c'est de l'argent qui va rentrer, pas
+            une dette. Sans lui, le montant se range à côté des provisions et
+            des échéances, qui sortent du compte. */}
         <span className={a.resteAEncaisser > 0 ? styles.attente : ''}>
-          <Montant>{eur(a.resteAEncaisser)}</Montant>
+          {a.resteAEncaisser > 0 && '+'}<Montant>{eur(a.resteAEncaisser)}</Montant>
         </span>
       </p>
       {a.enRetard > 0 && (
@@ -701,10 +722,7 @@ function CarteCapacite(
           const v = c.valeur;
           const futur = v.nature === 'projete';
           return (
-            <div
-              key={mois}
-              className={`${styles.colonneStatique} ${i === indexCourant ? styles.colonneCourante : ''}`}
-            >
+            <div key={mois} className={styles.colonneStatique}>
               <span className={styles.valeurs}>
                 <span className={v.capacite < 0 ? styles.valeurNegative : styles.valeurCapacite}>
                   <Montant>{enKiloEuros(v.capacite)}</Montant>
@@ -727,7 +745,9 @@ function CarteCapacite(
                   )}
                 </span>
               </span>
-              <span className={styles.moisAxe}>
+              <span
+                className={`${styles.moisAxe} ${i === indexCourant ? styles.moisCourantAxe : ''}`}
+              >
                 {mois}
                 <span className={styles.horsEcran}>
                   {' '}: {eur(v.capacite)} de capacité

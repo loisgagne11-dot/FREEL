@@ -15,10 +15,20 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   margin-bottom: 12px;
-  /* Chaque carte à sa hauteur propre. Étirées à la plus haute du rang — le
-     défaut de la grille — le graphe et la capacité gagnaient deux cents pixels
-     de vide sous leurs barres, et la carte se lisait comme s'il manquait
-     quelque chose dessous. */
+  /*
+   * Chaque carte à sa hauteur propre.
+   *
+   * `stretch` a été essayé, mesuré, et repoussé : le rang partage bien sa
+   * hauteur, mais le vide passe alors À L'INTÉRIEUR de la carte, au-dessus des
+   * barres — deux cent trente pixels de carte creuse, qui se lisent comme un
+   * graphe qui n'a pas fini de charger. Dehors, le même vide est du fond de
+   * page, et ne prétend rien.
+   *
+   * L'étirer en agrandissant les barres à la hauteur reçue serait la vraie
+   * réponse ; elle demande que la bande cesse d'avoir une hauteur fixe, donc
+   * que la ligne d'objectif cesse de pouvoir se poser sur la même échelle sans
+   * mesurer le conteneur en JavaScript. Un repère faux coûte plus qu'un vide.
+   */
   align-items: start;
 }
 
@@ -87,7 +97,11 @@
   align-items: flex-end;
   justify-content: space-around;
   gap: 2px;
-  min-height: 190px;
+  /* `flex: 1` : le tracé prend toute la hauteur que la carte reçoit du rang, et
+     les colonnes restent collées en bas. La bande des barres, elle, garde sa
+     hauteur fixe — voir `.barres`. */
+  flex: 1 1 auto;
+  min-height: 210px;
   min-width: 0;
 }
 
@@ -114,12 +128,20 @@
    séries, et un mois « en vert » se lirait comme une bonne nouvelle. */
 .colonneCourante { border-color: var(--line-2); background: var(--panel-2); }
 
-.colonneLue { border-color: var(--green); }
+/* Un liséré bas, et non un cadre vert plein pourtour. Le dessin distingue le
+   mois courant par un panneau à peine plus clair que le fond ; un cadre saturé
+   sur la colonne de droite tirait l'œil vers le mois qu'on regarde déjà, et se
+   superposait au cadre du mois courant quand c'est le même. */
+.colonneLue { background: var(--panel-2); box-shadow: inset 0 -2px 0 var(--green); }
 
 .colonne:focus-visible,
 .colonneStatique:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 
+/* Les étiquettes de valeur sont des chiffres : même police que les montants,
+   sinon la colonne du graphe et la colonne de la composition ne se lisent pas
+   comme la même famille d'information. */
 .valeurs {
+  font-family: var(--mono);
   display: flex;
   align-items: baseline;
   gap: 3px;
@@ -148,7 +170,7 @@
   justify-content: center;
   gap: 3px;
   width: 100%;
-  height: 140px;
+  height: 175px;
   min-width: 0;
 }
 
@@ -202,7 +224,13 @@
   white-space: nowrap;
 }
 
-.colonneCourante .moisAxe { color: var(--text); font-weight: 620; }
+.colonneCourante .moisAxe,
+.moisCourantAxe { color: var(--text); font-weight: 700; }
+
+/* Sur la capacité, le mois courant est seulement mis en gras : le dessin n'y
+   met aucun cadre, et il en faudrait un troisième niveau — encadré, hachuré,
+   plein — sur un graphe qui en porte déjà deux. */
+.colonneSimple { border-color: transparent; background: none; }
 
 /* ── La ligne d'objectif ───────────────────────────────────────────────── */
 
@@ -261,7 +289,13 @@
 .pastilleRealise { background: var(--blue); }
 .pastilleEncaisse { background: var(--green); margin-left: 8px; }
 
-.cumul { color: var(--text); font-weight: 560; font-variant-numeric: tabular-nums; }
+.cumul {
+  font-family: var(--mono);
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Composition ───────────────────────────────────────────────────────── */
 
@@ -284,12 +318,16 @@
   color: var(--blue);
 }
 
-.encaisse { color: var(--green); }
+.encaisse, .totalEncaisse { color: var(--green); }
 
+/* Le total prend la couleur de son intitulé : bleu pour le réalisé, vert pour
+   l'encaissé. Deux totaux blancs sous deux intitulés colorés laissaient
+   chercher lequel appartient à quelle section. */
 .totalBloc {
+  font-family: var(--mono);
   font-size: 12.5px;
-  font-weight: 620;
-  color: var(--text);
+  font-weight: 700;
+  color: var(--blue);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -322,6 +360,7 @@
 .ligneMeta { font-size: 11.5px; line-height: 1.4; color: var(--muted-2); }
 
 .ligneMontant {
+  font-family: var(--mono);
   font-size: 12.5px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -352,8 +391,9 @@
 /* ── Tu peux te verser ─────────────────────────────────────────────────── */
 
 .grandChiffre {
+  font-family: var(--mono);
   font-size: 34px;
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.045em;
   color: var(--green);
   font-variant-numeric: tabular-nums;
@@ -372,7 +412,8 @@
 .curseurLibelle { min-width: 0; }
 
 .curseurValeur {
-  font-weight: 620;
+  font-family: var(--mono);
+  font-weight: 700;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }

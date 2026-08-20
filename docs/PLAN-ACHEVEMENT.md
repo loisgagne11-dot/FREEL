@@ -324,6 +324,48 @@ qui la vérifie est la capture.
 engageante de l'écran. Le cas est maintenant dit pour ce qu'il est : les
 provisions dépassent le compte, le seuil n'est pas constitué non plus.
 
+**Ce que le contrôle visuel a rattrapé, et ce qu'il a ouvert.** La comparaison
+image contre image a trouvé ce que ni les tests ni la lecture du code ne
+pouvaient voir :
+
+- **`--mono` n'était utilisé par aucun écran.** Le token de police chiffrée du
+  design existait depuis le lot des tokens, et l'utilitaire `.big` de `base.css`
+  s'en servait — mais aucun composant React ne l'appelait. Tous les montants de
+  l'application étaient rendus dans la police de texte, avec `tabular-nums` pour
+  rattraper l'alignement. Ce n'est pas la même chose : la chasse fixe est ce qui
+  fait qu'une colonne de montants se lit comme une colonne.
+- **Les libellés de tuile étaient en petites capitales**, que le handoff réserve
+  aux titres de carte. Les deux niveaux portaient la même casse.
+- **Le résultat projeté s'annonçait à l'euro près.** Le dessin écrit « ~46 k€»,
+  et le tilde n'est pas un ornement : trois chiffres significatifs donnent à une
+  projection l'apparence d'un relevé.
+
+Ces trois-là valent pour **tout** l'application, pas seulement pour ce lot : les
+deux premiers sont corrigés dans les composants partagés.
+
+**Ouvert, et daté d'ici** — le contrôle visuel a relevé sur le pilier
+Trésorerie, donc au lot B :
+
+- la légende du graphe « Ce que vous vous êtes versé » annonce une série
+  « Soutenable » dont **aucune barre n'est tracée** sur les douze mois. La
+  valeur n'est pas fausse — elle vaut zéro — mais une légende sans barre se lit
+  comme une donnée manquante, et non comme un zéro constaté ;
+- l'axe des mois y est sur **une lettre** (`J A S O N D J F M A M`) là où tout
+  le reste de l'écran en met trois ;
+- l'échelle s'y réduit à un « max 11 k€ » posé en gris, sans axe ni graduation.
+
+**Chevrons de repli** : le handoff en met un sur chacune des quatre cartes de ce
+pilier. Non fait, et c'est un choix de périmètre — `CartePliable` existe et sait
+persister son état, mais A3 demandait un panneau **permanent**, et quatre cartes
+repliables changent la structure des tests d'écran. À reprendre avec le lot G,
+où le même motif se pose sur tous les écrans à la fois.
+
+**Registre d'unité** : le handoff met ses tuiles en k€ et porte une liste
+déroulante « montants en k€ » qui l'assume. Les tuiles restent ici en euros
+pleins — le mode confidentiel les masque de toute façon, et deux unités sur la
+même rangée obligeraient à comparer 18 970 € à 21,9 k€ de tête. Seul le résultat
+projeté est arrondi, parce que lui seul est une projection.
+
 **Reporté, et toujours écrit** : le sélecteur de période. L'année reste
 verrouillée sur l'horloge ; au 1ᵉʳ janvier le pilier Performance devient vide et
 l'année précédente est inatteignable. Le budget du lot ne le permettait pas.

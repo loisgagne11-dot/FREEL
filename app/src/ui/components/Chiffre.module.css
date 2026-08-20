@@ -11,17 +11,27 @@
   min-width: 0;
 }
 
+/* Casse normale, et non petites capitales. Les captures du handoff mettent
+   « CA réalisé · 2026 » et « Solde du compte » en casse ordinaire, et
+   réservent les capitales espacées aux TITRES DE CARTE — « COMPOSITION »,
+   « CAPACITÉ DE VERSEMENT PAR MOIS ». Les deux niveaux portaient ici la même
+   casse, et la hiérarchie ne se lisait plus. */
 .libelle {
-  font-size: 10.5px;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
+  font-size: 11.5px;
   color: var(--muted-2);
 }
 
+/* `--mono` est le token du design pour tout ce qui est chiffré, et aucun écran
+   ne s'en servait : les montants étaient rendus dans la police de texte, avec
+   `tabular-nums` pour rattraper l'alignement. Ce n'est pas la même chose — la
+   chasse fixe et l'interlettrage resserré sont la signature du dessin, et
+   c'est ce qui fait qu'une colonne de montants se lit comme une colonne. */
 .montant {
+  font-family: var(--mono);
   font-size: 19px;
-  letter-spacing: -0.03em;
-  font-weight: 600;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+  line-height: 1.1;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
