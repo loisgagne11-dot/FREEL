@@ -161,8 +161,8 @@ un trou qui ne fait échouer aucun test.
 | `showKPIComposition` — d'où vient un chiffre | ⚠️ | Les motifs « i » expliquent les règles, mais on ne peut pas déplier le calcul ligne à ligne |
 | `calculateHealthScore` — score /100 | 🚫 | Refusé : la spécification elle-même note que les valeurs sont **codées en dur** dans le prototype, sans fonction qui les calcule. Une jauge à 72/100 qui ne mesure rien ressemble à une information |
 | `getInsights`, `renderInsightsCritiques` | ❌ | Pas de conseils automatiques |
-| `getCompareData`, `compDelta`, `computeTrend`, `createSparkline` | ❌ | Aucune comparaison à la période précédente, aucune tendance |
-| `drawMainChart` | ✅ | `GrapheBarres` en SVG, avec la donnée **doublée en tableau accessible**. 627 Ko de Chart.js en moins |
+| `getCompareData`, `compDelta`, `computeTrend`, `createSparkline` | 🚫 | **Refusés, motif écrit.** `computeTrend` comparait trois mois à trois mois sur une facturation irrégulière : un client qui règle deux factures le même mois produisait « +180 % » sans qu'aucune activité n'ait changé. Une flèche qui s'affole se cesse d'être lue, puis se met à rassurer quand elle est verte. La comparaison N−1 reste utile — la troisième année, pas la première |
+| `drawMainChart` | ✅ | Deux graphes, pas un. `GrapheBarres` en SVG là où l'on lit ; sur le pilier Performance, des colonnes en HTML **cliquables** — le handoff veut « clic sur un mois = composition », et un `<rect>` SVG n'est ni tabulable ni annoncé. 627 Ko de Chart.js en moins dans les deux cas |
 | `drawPerfDonut` — destination du CA | 🚫 | Refusé : il redisait, en moins précis, ce que `Repartition` dit du solde |
 | `drawSoldeChart` — courbe de solde | ❌ | **Absent**, et sans motif écrit jusqu'ici. Rien ne montre le solde au-delà du mois courant |
 | `getActionsList`, `markActionDone` | ✅ | `aTraiter` — la liste des sujets, réelle |

@@ -39,7 +39,7 @@ function semer(modifications: Partial<Faits> = {}): void {
  */
 async function ouvrirDes() {
   render(<Argent />);
-  await userEvent.setup().click(screen.getByRole('tab', { name: 'DES' }));
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Déclaration européenne de services' }));
   await screen.findByRole('heading', { name: /Prestations à déclarer/ });
 }
 
@@ -105,7 +105,7 @@ describe('prestations à déclarer', () => {
     });
     render(<Argent />);
     const utilisateur = userEvent.setup();
-    await utilisateur.click(screen.getByRole('tab', { name: 'DES' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Déclaration européenne de services' }));
 
     expect(screen.getByText(/Aucune prestation intracommunautaire/)).toBeTruthy();
     await utilisateur.click(screen.getByRole('button', { name: 'Mois précédent' }));

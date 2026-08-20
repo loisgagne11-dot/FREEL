@@ -1,0 +1,139 @@
+/* Les deux piliers d'un écran. Aucune couleur en dur : que des tokens. */
+
+.rangee {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+/* En portrait les deux piliers s'empilent : côte à côte sur 360 px, le
+   chiffre passerait sous la question et le pilier ferait trois lignes de
+   haut pour rien. */
+@media (min-width: 761px) {
+  .rangee {
+    flex-direction: row;
+    gap: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .pilier { flex: 1 1 0; }
+}
+
+.pilier {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 11px 13px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  text-align: left;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+@media (min-width: 761px) {
+  .pilier {
+    background: none;
+    border: none;
+    /* La barre d'activité vit dans la bordure basse : un fond plein sur le
+       pilier actif aurait fait un second niveau de carte au-dessus des
+       tuiles, qui en sont déjà. */
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    margin-bottom: -1px;
+  }
+}
+
+.pilier:hover { color: var(--text); }
+
+.actif { color: var(--text); border-color: var(--green); }
+
+@media (min-width: 761px) {
+  .actif { border-bottom-color: var(--green); }
+}
+
+.icone {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted-2);
+}
+
+.actif .icone { color: var(--green); border-color: var(--green); }
+
+.texte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.nom {
+  font-size: 13.5px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+/* La question se coupe plutôt que d'imposer sa largeur : c'est le chiffre à
+   droite qui doit rester entier, pas elle. */
+.question {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reponse {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.chiffre {
+  font-size: 17px;
+  font-weight: 620;
+  letter-spacing: -0.03em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.precision {
+  font-size: 9.5px;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+/* ── Étiquette d'état ──────────────────────────────────────────────────── */
+
+.etiquette {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  font-size: 11.5px;
+  font-weight: 560;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ok { color: var(--green); border-color: var(--green); }
+.attentionEtiquette { color: var(--amber); border-color: var(--amber); }

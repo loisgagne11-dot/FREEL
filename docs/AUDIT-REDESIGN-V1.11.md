@@ -321,7 +321,7 @@ Six décisions, dont quatre portent sur des nombres opposables. Aucune n'est tec
 1. **Le taux de cotisations URSSAF canonique** — et la vérification à la source. Un seul taux, servi par le store, appliqué par période déclarative.
 2. **Le sort du `× 1,56`** — et le choix du régime d'imposition comme **discriminant de calcul** : versement libératoire ⇒ ligne 2,2 % et **aucun** acompte PAS ; barème ⇒ acomptes PAS et **aucune** ligne VL.
 3. **La sémantique de `provisions()`** — toutes les échéances, ou seulement celles à venir. Le commentaire du code dit aujourd'hui l'inverse de ce que fait le code.
-4. **Où vit la réserve** — trois implémentations concurrentes existent (montant absolu sur Pilote, curseur % dans Argent > Performance, pourcentage dans Config).
+4. **Où vit la réserve** — trois implémentations concurrentes existaient (montant absolu sur Pilote, curseur % dans Argent > Performance, pourcentage dans Config). **Tranché** : ce sont *deux notions*, et les confondre fabrique une rétroaction — un plancher exprimé en pourcentage du disponible descend à mesure qu'on vide le compte, et le versement soutenable finit par tout autoriser. Le fait `reserve` est un **seuil de sécurité en euros**, réglé dans Config ; `partGardeeAuVersement` est une **part**, réglée au curseur d'Argent > Performance comme dans Config — même action de magasin, source unique. Le montant gardé se dérive, il ne se stocke jamais.
 5. **Le sort de la section « Propositions Claude Code »** de Pilote — roadmap interne laissée dans le prototype, ou fonctionnalité produit ?
 6. **Le maintien ou l'abandon de l'export FEC** — hors obligation en micro-BNC, mais peut-être utilisé.
 

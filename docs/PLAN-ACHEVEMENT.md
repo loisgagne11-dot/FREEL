@@ -282,14 +282,54 @@ arbitrages sont écrits au §3 bis, sous le tableau.
 
 | # | Livrable | Capture | Critère d'acceptation | État |
 |---|---|---|---|---|
-| A0 | Le cadre : titre « Ton argent », sous-titre, étiquette « Provisions · N % couvertes », et les **deux piliers** (Trésorerie / Performance) portant chacun sa question et son chiffre | `*-argent-tresorerie`, `*-argent-performance` | Le vocabulaire du handoff est repris tel quel ; le sort des onglets « Livre des recettes » et « DES » est tranché par écrit | ⬜ |
-| A1 | Quatre tuiles : CA réalisé, CA encaissé, À encaisser, **Résultat projeté** | `*-argent-performance` | Assiette = le pipeline de `etatProjection`, jamais une extrapolation du passé. Cotisations sommées **mois par mois** (l'ACRE s'éteint en cours d'année). Sous barème : acomptes de PAS **saisis** seulement, jamais un IR déduit d'un taux — sinon le libellé dit « avant impôt sur le revenu ». Si l'un des trois ne tient pas : **trois tuiles**, pas quatre dont une fausse | ⬜ |
-| A2 | Graphe CA réalisé vs encaissé, **mois écoulés seulement**, valeurs en k€ au-dessus, repère du mois courant, cumul en pied | `*-argent-performance` | Douze mois rendraient les étiquettes illisibles et contrediraient la référence, qui s'arrête au mois courant | ⬜ |
-| A3 | **Panneau Composition, permanent**, ouvert sur le mois courant | `*-argent-performance` | Réalisé ventilé par mission avec `jours × TJM` ; encaissé par facture ; **reste à encaisser calculé facture par facture**, jamais par soustraction de deux agrégats ; cas « encaissé d'avance » traité ; ce qui ne se départage pas entre missions simultanées d'un même client est **dit** | ⬜ |
-| A4 | « Tu peux te verser » + curseur de part gardée | `*-argent-performance` | Deux faits distincts (§3 bis) ; `versable × (1 − part)` ; défaut 0 % ; le bouton **nomme un mouvement bancaire**, il ne crée pas un fait de versement | ⬜ |
-| A5 | Capacité de versement par mois, **versé à l'intérieur de la barre**, futur hachuré | `*-argent-performance` | Un module de domaine `capaciteVersement.ts` écrit et testé **avant** de dessiner ; un mois futur n'a **aucun** versé — le hachuré ne remplit rien | ⬜ |
-| A6 | Objectif de CA : ligne de référence rattachée à l'**encaissé**, et jours d'écart en pied | `*-argent-performance` | Aucune ligne sans objectif fixé ; l'écart au dessin (le handoff n'a pas d'objectif) est écrit | ⬜ |
-| A7 | Les trois inventaires remis d'équerre | — | V9 cesse d'être vrai, `drawMainChart` et `computeTrend` reçoivent leur motif. Un inventaire qui se trompe dans le sens « présent » coûte plus cher qu'un manque | ⬜ |
+| A0 | Le cadre : titre « Ton argent », sous-titre, étiquette « Provisions · N % couvertes », et les **deux piliers** (Trésorerie / Performance) portant chacun sa question et son chiffre | `*-argent-tresorerie`, `*-argent-performance` | Le vocabulaire du handoff est repris tel quel ; le sort des onglets « Livre des recettes » et « DES » est tranché par écrit | ✅ |
+| A1 | Quatre tuiles : CA réalisé, CA encaissé, À encaisser, **Résultat projeté** | `*-argent-performance` | Assiette = le pipeline de `etatProjection`, jamais une extrapolation du passé. Cotisations sommées **mois par mois** (l'ACRE s'éteint en cours d'année). Sous barème : acomptes de PAS **saisis** seulement, jamais un IR déduit d'un taux — sinon le libellé dit « avant impôt sur le revenu ». Si l'un des trois ne tient pas : **trois tuiles**, pas quatre dont une fausse | ✅ |
+| A2 | Graphe CA réalisé vs encaissé, **mois écoulés seulement**, valeurs en k€ au-dessus, repère du mois courant, cumul en pied | `*-argent-performance` | Douze mois rendraient les étiquettes illisibles et contrediraient la référence, qui s'arrête au mois courant | ✅ |
+| A3 | **Panneau Composition, permanent**, ouvert sur le mois courant | `*-argent-performance` | Réalisé ventilé par mission avec `jours × TJM` ; encaissé par facture ; **reste à encaisser calculé facture par facture**, jamais par soustraction de deux agrégats ; cas « encaissé d'avance » traité ; ce qui ne se départage pas entre missions simultanées d'un même client est **dit** | ✅ |
+| A4 | « Tu peux te verser » + curseur de part gardée | `*-argent-performance` | Deux faits distincts (§3 bis) ; `versable × (1 − part)` ; défaut 0 % ; le bouton **nomme un mouvement bancaire**, il ne crée pas un fait de versement | ✅ |
+| A5 | Capacité de versement par mois, **versé à l'intérieur de la barre**, futur hachuré | `*-argent-performance` | Un module de domaine `capaciteVersement.ts` écrit et testé **avant** de dessiner ; un mois futur n'a **aucun** versé — le hachuré ne remplit rien | ✅ |
+| A6 | Objectif de CA : ligne de référence rattachée à l'**encaissé**, et jours d'écart en pied | `*-argent-performance` | Aucune ligne sans objectif fixé ; l'écart au dessin (le handoff n'a pas d'objectif) est écrit | ✅ |
+| A7 | Les trois inventaires remis d'équerre | — | V9 cesse d'être vrai, `drawMainChart` et `computeTrend` reçoivent leur motif. Un inventaire qui se trompe dans le sens « présent » coûte plus cher qu'un manque | ✅ |
+
+#### §3 octies — Ce que le lot A a coûté et ce qu'il a trouvé
+
+**Deux extractions, pas une.** Le plan annonçait qu'Argent était à 39,83 / 40 Ko
+et que le lot commencerait par une extraction. Sortir toute l'interface du pilier
+Performance dans `Argent.performance.tsx` n'a pas suffi : l'écran est **monté** à
+44 Ko. Le motif est instructif — `capaciteParMois`, `resultatProjete`,
+`compositionDuMois` et `resteAEncaisserDuMois` étaient écrits, testés, verts, et
+**qu'aucun écran n'appelait**. L'empaqueteur les élaguait ; les câbler les a fait
+entrer dans le lot. Ils vivent désormais dans `selecteurs.performance.ts`, qui
+voyage avec le module qui les lit. Écran différé le plus lourd : **39,42 / 40 Ko**.
+
+C'est la même règle appliquée un cran plus bas que d'habitude : ce qui ne sert
+qu'à un module chargé à la demande voyage avec lui, sélecteurs compris.
+
+**Le script de capture n'avait jamais tourné.** `capturer-app.mjs` lisait le jeu
+de démonstration dans `docs/design/`, où il n'est pas — il est dans
+`app/public/`, d'où l'application le sert. Le script levait avant d'ouvrir un
+navigateur. Personne ne l'a vu parce qu'**une capture manquante ne fait échouer
+aucun contrôle** : `npm run verifier` ne connaît pas ce script. Le troisième axe
+n'existait donc que sur le papier depuis qu'il a été écrit.
+
+**V9 était marquée « ✅ » et rien ne s'affichait.** L'inventaire des indicateurs
+lisait le code du domaine et concluait « présent ». C'est l'erreur qui ferme le
+sujet : un manque signalé finit par être comblé, un manque déclaré présent
+jamais. La colonne « Actuelle » se lit maintenant dans un écran, et le contrôle
+qui la vérifie est la capture.
+
+**Trouvé en dessinant, pas en calculant.** Un disponible négatif faisait écrire
+« Sur −2 669 € de disponible, le seuil de sécurité en retient 2 470 € : reste
+0 € de versable » — une soustraction qui ne tombe pas juste, sur la carte la plus
+engageante de l'écran. Le cas est maintenant dit pour ce qu'il est : les
+provisions dépassent le compte, le seuil n'est pas constitué non plus.
+
+**Reporté, et toujours écrit** : le sélecteur de période. L'année reste
+verrouillée sur l'horloge ; au 1ᵉʳ janvier le pilier Performance devient vide et
+l'année précédente est inatteignable. Le budget du lot ne le permettait pas.
+
+**Pour le lot B** : le pilier Trésorerie porte à lui seul les 39,42 Ko restants.
+Il commencera donc, lui aussi, par une extraction.
 
 #### §3 bis — Arbitrages du lot A
 

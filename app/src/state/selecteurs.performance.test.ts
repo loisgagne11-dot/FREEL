@@ -3,7 +3,7 @@ import { type DateISO, type Mois, dateISO, euros, mois } from '../domain/types';
 import { type Faits, type Mission, type Recette, entiteVide, faitsVides } from './schema';
 import {
   capaciteParMois, compositionDuMois, resteAEncaisserDuMois, resultatProjete
-} from './selecteurs.argent';
+} from './selecteurs.performance';
 
 function faits(modifications: Partial<Faits> = {}): Faits {
   return { ...faitsVides(), ...modifications };

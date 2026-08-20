@@ -26,6 +26,18 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* La note tient sur une ligne et se coupe plutôt que d'élargir la tuile :
+   quatre tuiles côte à côte doivent garder la même largeur, sinon la
+   comparaison des montants — leur seule raison d'être alignés — se perd. */
+.note {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .accent { color: var(--green); }
 .attention { color: var(--amber); }
 .danger { color: var(--red); }

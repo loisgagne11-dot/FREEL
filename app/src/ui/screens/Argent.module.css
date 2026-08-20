@@ -432,3 +432,30 @@
   line-height: 1.55;
   color: var(--muted);
 }
+
+/* ── Les registres, sous les piliers ───────────────────────────────────── */
+
+/* Une rangée discrète, et non des onglets : ce sont des obligations qu'on
+   ouvre pour justifier ou déclarer, pas des questions qu'on se pose tous les
+   jours. Voir l'en-tête de `Section` dans Argent.tsx. */
+.registres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.lienRegistre {
+  min-height: 38px;
+  padding: 0 13px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.lienRegistre:hover { color: var(--text); border-color: var(--green); }

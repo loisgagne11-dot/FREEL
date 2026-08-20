@@ -8,7 +8,6 @@ import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
 import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
 import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.libelles';
-import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
@@ -18,7 +17,8 @@ import { useToast } from '../components/Toasts';
 import { Echeances } from '../components/Echeances';
 import { CartePliable } from '../components/CartePliable';
 import { Chiffre } from '../components/Chiffre';
-import { Onglets, PanneauOnglet } from '../components/Onglets';
+import { PanneauOnglet } from '../components/Onglets';
+import { Etiquette, Piliers } from '../components/Piliers';
 import { Sheet } from '../components/Sheet';
 import { eur } from '../format';
 import styles from './Argent.module.css';
@@ -62,6 +62,16 @@ const LivreDesRecettes = lazy(() => import('./Argent.livre')
   .then((m) => ({ default: m.LivreDesRecettes })));
 
 /**
+ * Le pilier Performance, avec tout ce qu'il porte.
+ *
+ * Il est différé pour deux raisons qui vont dans le même sens : l'écran était
+ * à 39,83 Ko sur un budget de 40, et on ouvre Argent pour regarder son solde
+ * bien plus souvent que pour lire son année. Voir l'en-tête du module.
+ */
+const Performance = lazy(() => import('./Argent.performance')
+  .then((m) => ({ default: m.Performance })));
+
+/**
  * Écran Argent — trésorerie et performance.
  *
  * L'écran le plus dense de l'application. Deux sections en onglets, comme le
@@ -72,38 +82,78 @@ const LivreDesRecettes = lazy(() => import('./Argent.livre')
  * (voir `GrapheBarres`) : 627 Ko de bibliothèques bloquantes en moins.
  */
 
-type Section = 'tresorerie' | 'performance' | 'livre' | 'des';
+/**
+ * Les deux piliers du dessin, et ce qu'on a fait des deux autres onglets.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE SORT DU LIVRE DES RECETTES ET DE LA DES
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'écran portait quatre onglets de même rang. La référence n'en a que deux —
+ * « Trésorerie » et « Performance » — et range le livre des recettes ailleurs,
+ * dans le rail ; la DES n'y figure pas du tout.
+ *
+ * Les supprimer était exclu : ce sont deux obligations, et la DES est passible
+ * de 750 € par déclaration manquante. Les laisser en onglets l'était aussi —
+ * quatre onglets de même rang font croire à quatre questions équivalentes,
+ * alors que deux se posent tous les jours et deux une fois par mois au plus.
+ *
+ * Ils deviennent donc deux registres, atteints depuis une rangée discrète sous
+ * les piliers et ouverts en panneau plein — comme le dossier de TVA, et pour la
+ * même raison : on ne les consulte qu'au moment de justifier ou de déclarer, et
+ * ils tiennent alors tout l'écran.
+ */
+type Section = 'tresorerie' | 'performance';
 
-const SECTIONS = [
-  { id: 'tresorerie' as Section, libelle: 'Trésorerie' },
-  { id: 'performance' as Section, libelle: 'Performance' },
-  { id: 'livre' as Section, libelle: 'Livre des recettes' },
-  { id: 'des' as Section, libelle: 'DES' }
-];
-
-/** Abréviations de mois, pour l'axe du graphe. */
-const MOIS_COURTS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+/** Le registre ouvert par-dessus l'écran, ou aucun. */
+type Registre = 'livre' | 'des' | 'tva' | null;
 
 export function Argent() {
   const faits = useFaits((e) => e.faits);
   const [section, setSection] = useState<Section>('tresorerie');
-  const [dossierOuvert, setDossierOuvert] = useState(false);
+  const [registre, setRegistre] = useState<Registre>(null);
   const idGroupe = useId();
 
   const etat = useMemo(() => etatArgent(faits), [faits]);
+  const couverture = Math.round(etat.couvertureProvisions * 100);
 
   return (
     <>
       <Greet
-        titre="Argent"
+        titre="Ton argent"
         sousTitre="Ce qui est rentré, ce qui reste à rentrer, et ce que la période doit."
-        repere={`Année ${etat.annee}`}
+        repere={(
+          /* La couverture des provisions, et non le solde : le solde est déjà
+             sur le pilier Trésorerie juste dessous, et le répéter n'apprend
+             rien. Ce que l'en-tête ajoute, c'est la réponse à « si tout tombait
+             demain, le compte suivrait-il ? ». */
+          <Etiquette ton={couverture >= 100 ? 'ok' : 'attention'}>
+            Provisions · {couverture}&nbsp;% couvertes
+          </Etiquette>
+        )}
       />
 
       <div className={styles.sections}>
-        <Onglets
+        <Piliers
           idGroupe={idGroupe}
-          onglets={SECTIONS}
+          piliers={[
+            {
+              id: 'tresorerie' as Section,
+              libelle: 'Trésorerie',
+              question: 'combien j’ai là, pour de vrai ?',
+              chiffre: eur(etat.tresorerie.dispo),
+              precision: 'disponible',
+              icone: 'M3 7 H18 V18 H3 Z M3 7 L6 4 H15 L18 7 M14 12 H17'
+            },
+            {
+              id: 'performance' as Section,
+              libelle: 'Performance',
+              question: 'combien je gagne, je me verse ?',
+              chiffre: eur(etat.caRealise),
+              precision: `CA réalisé ${etat.annee}`,
+              icone: 'M3 17 L9 11 L13 15 L21 7'
+            }
+          ]}
           actif={section}
           onChange={setSection}
           libelle="Sections de l’écran Argent"
@@ -259,58 +309,28 @@ export function Argent() {
 
           <Echeances />
 
-          <button
-            type="button"
-            className={styles.actionPrincipale}
-            onClick={() => setDossierOuvert(true)}
-          >
-            Préparer ma déclaration de TVA
-          </button>
-
           <CarteDeclarations idGroupe={idGroupe} />
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="performance" actif={section === 'performance'}>
-          <div className={styles.grille}>
-            <Chiffre libelle="Facturé sur l’année" valeur={eur(etat.caRealise)} />
-            <Chiffre libelle="Encaissé sur l’année" valeur={eur(etat.caEncaisse)} ton="accent" />
-            <Chiffre
-              libelle="Reste à rentrer"
-              valeur={eur(etat.resteARentrer)}
-              ton={etat.resteARentrer > 0 ? 'attention' : 'neutre'}
-            />
-          </div>
-
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-graphe`}>
-            <h2 id={`${idGroupe}-graphe`} className={styles.titreCarte}>
-              Chiffre d’affaires mois par mois
-              <Info libelle="Explication de l’écart entre facturé et encaissé">
-                Le facturé dit ce qui a été émis, l’encaissé ce qui est arrivé
-                sur le compte. L’écart entre les deux est ce qui se transforme
-                en trou de trésorerie — et c’est pourquoi les seuils fiscaux se
-                calculent sur l’encaissé, jamais sur le facturé.
-              </Info>
-            </h2>
-            <GrapheBarres
-              titre={`Facturé et encaissé, ${etat.annee}`}
-              categories={etat.parMois.map((m, i) => MOIS_COURTS[i] ?? m.mois)}
-              series={seriesDe(etat.parMois)}
-              formater={enKiloEuros}
-            />
-          </section>
-        </PanneauOnglet>
-
-        <PanneauOnglet idGroupe={idGroupe} id="livre" actif={section === 'livre'}>
           <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-            <LivreDesRecettes idGroupe={idGroupe} />
+            <Performance etat={etat} />
           </Suspense>
         </PanneauOnglet>
+      </div>
 
-        <PanneauOnglet idGroupe={idGroupe} id="des" actif={section === 'des'}>
-          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-            <DeclarationServices idGroupe={idGroupe} />
-          </Suspense>
-        </PanneauOnglet>
+      {/* Les registres et le dossier de déclaration : atteints d'ici, ouverts
+          par-dessus. Voir l'en-tête de `Section` pour le motif. */}
+      <div className={styles.registres}>
+        <button type="button" className={styles.lienRegistre} onClick={() => setRegistre('tva')}>
+          Préparer ma déclaration de TVA
+        </button>
+        <button type="button" className={styles.lienRegistre} onClick={() => setRegistre('livre')}>
+          Livre des recettes
+        </button>
+        <button type="button" className={styles.lienRegistre} onClick={() => setRegistre('des')}>
+          Déclaration européenne de services
+        </button>
       </div>
 
       {/* « Au clic, j'ai toutes les informations pour remplir ma
@@ -318,13 +338,17 @@ export function Argent() {
           consulte qu'au moment de déclarer, et il tient alors tout l'écran —
           ce qu'une carte au milieu d'une pile ne peut pas faire. */}
       <Sheet
-        ouvert={dossierOuvert}
-        titre="Déclaration de TVA"
-        onFermer={() => setDossierOuvert(false)}
+        ouvert={registre !== null}
+        titre={registre === 'livre' ? 'Livre des recettes'
+          : registre === 'des' ? 'Déclaration européenne de services'
+            : 'Déclaration de TVA'}
+        onFermer={() => setRegistre(null)}
       >
-        {dossierOuvert && (
+        {registre !== null && (
           <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-            <DossierTvaPanneau />
+            {registre === 'livre' && <LivreDesRecettes idGroupe={idGroupe} />}
+            {registre === 'des' && <DeclarationServices idGroupe={idGroupe} />}
+            {registre === 'tva' && <DossierTvaPanneau />}
           </Suspense>
         )}
       </Sheet>
@@ -678,24 +702,5 @@ function moisLong(m: Mois): string {
 
 
 
-/**
- * Le design veut les montants du graphe libellés en k€ : au-dessus des barres,
- * un montant complet en euros serait trop long et se chevaucherait d'une barre
- * à l'autre.
- */
-function enKiloEuros(valeur: number): string {
-  if (valeur === 0) return '0';
-  const k = valeur / 1000;
-  const arrondi = k >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
-  return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(arrondi)} k€`;
-}
 
-function seriesDe(
-  parMois: ReturnType<typeof etatArgent>['parMois']
-): readonly SerieBarres[] {
-  return [
-    { id: 'realise', libelle: 'Facturé', valeurs: parMois.map((m) => m.realise), token: 'sable' },
-    { id: 'encaisse', libelle: 'Encaissé', valeurs: parMois.map((m) => m.encaisse), token: 'green' }
-  ];
-}
 
