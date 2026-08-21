@@ -37,10 +37,31 @@ function semer(modifications: Partial<Faits> = {}): void {
 
 const rendre = async (): Promise<void> => {
   render(<FournisseurToasts><Argent /></FournisseurToasts>);
-  // Le pilier Trésorerie est différé depuis le lot B : sans cette attente, la
-  // première assertion tombe sur le « Chargement… » du Suspense. L'ancre est le
-  // titre de la carte de répartition, que le handoff garde tel quel.
+  /*
+   * DEUX MODULES DIFFÉRÉS, DONC DEUX ATTENTES.
+   *
+   * Le pilier Trésorerie est différé depuis le lot B, et l'échéancier — qui
+   * porte cette carte — l'est À SON TOUR depuis le lot B aussi. N'attendre que
+   * le premier laissait le second arriver « en général assez vite », ce qui est
+   * une autre façon de dire que le test passait par chance : sous charge, les
+   * cinq assertions tombaient sur un `Chargement…`.
+   *
+   * L'échec ne ressemblait à rien de connu — « avril 2026 introuvable » — et il
+   * a coûté un aller-retour complet à travers trois lots avant qu'on remonte à
+   * la vraie cause. On attend donc explicitement la carte qu'on interroge.
+   */
   await screen.findByText(/n’est pas tout à toi/);
+};
+
+/**
+ * Le même rendu, mais qui attend la carte qu'on va interroger.
+ *
+ * Séparé de `rendre` parce qu'un des tests vérifie au contraire son ABSENCE :
+ * l'attendre là serait attendre ce qu'on veut ne pas trouver.
+ */
+const rendreAvecUrssaf = async (): Promise<void> => {
+  await rendre();
+  await screen.findByText('Périodes URSSAF');
 };
 
 /**
@@ -54,7 +75,7 @@ const rendre = async (): Promise<void> => {
 describe('périodes URSSAF', () => {
   it('marque les trois mois d’un trimestre d’un seul geste', async () => {
     semer({ recettes: [encaissee('r1', '2026-04-10')] });
-    await rendre();
+    await rendreAvecUrssaf();
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Marquer déclarée' }));
 
@@ -64,7 +85,7 @@ describe('périodes URSSAF', () => {
 
   it('fait basculer la dette d’un volet à l’autre', async () => {
     semer({ recettes: [encaissee('r1', '2026-04-10')] });
-    await rendre();
+    await rendreAvecUrssaf();
 
     const avant = screen.getByText('Charges sur recettes encaissées non déclarées')
       .nextElementSibling?.textContent;
@@ -77,7 +98,7 @@ describe('périodes URSSAF', () => {
 
   it('permet de revenir sur une déclaration marquée par erreur', async () => {
     semer({ recettes: [encaissee('r1', '2026-04-10')] });
-    await rendre();
+    await rendreAvecUrssaf();
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Marquer déclarée' }));
@@ -94,7 +115,7 @@ describe('périodes URSSAF', () => {
   it('ne propose pas de déclarer une période en cours', async () => {
     // Août 2026 est dans le T3, qui court jusqu'en septembre.
     semer({ recettes: [encaissee('r1', '2026-08-05')] });
-    await rendre();
+    await rendreAvecUrssaf();
 
     expect(screen.queryByRole('button', { name: 'Marquer déclarée' })).toBeNull();
     expect(screen.getByText(/Période en cours/)).toBeTruthy();
@@ -112,7 +133,7 @@ describe('périodes URSSAF', () => {
       entreprise: { ...faitsVides().entreprise, urssafPeriodicite: 'mensuel' },
       recettes: [encaissee('r1', '2026-04-10')]
     });
-    await rendre();
+    await rendreAvecUrssaf();
     expect(screen.getByText('avril 2026')).toBeTruthy();
   });
 });

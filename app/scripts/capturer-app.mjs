@@ -65,12 +65,11 @@ const AUJOURDHUI = '2026-06-10T09:00:00Z';
  */
 const VUES = [
   { hash: '#/pilote', nom: 'pilote' },
-  /* Le handoff nomme « plan de charge » sa VUE SEMAINE : c'est sur elle que
-     l'écran s'ouvre là-bas. Chez nous l'écran s'ouvre encore sur le mois, parce
-     que c'est le mois qui porte la pose des congés — la fusion des deux cartes
-     est le lot C3. En attendant, on clique pour aller chercher la vue que la
-     référence montre, plutôt que de comparer deux écrans différents. */
-  { hash: '#/activite', nom: 'activite-plan-de-charge', ouvrir: ['Semaine'] },
+  /* Rien à ouvrir : l'écran s'ouvre sur la vue SEMAINE, comme le handoff.
+     Il a porté `ouvrir: ['Semaine']` le temps que le mois reste la vue par
+     défaut — et ce clic est devenu nuisible le jour où il ne l'a plus été :
+     voir la note sur l'ancrage exact des libellés, plus bas. */
+  { hash: '#/activite', nom: 'activite-plan-de-charge' },
   { hash: '#/activite', nom: 'activite-mois', ouvrir: ['Mois'] },
   { hash: '#/activite', nom: 'activite-missions', ouvrir: ['Missions'] },
   { hash: '#/activite', nom: 'activite-factures', ouvrir: ['Factures'] },
@@ -164,9 +163,28 @@ for (const theme of THEMES) {
 
     let ouverte = true;
     for (const libelle of vue.ouvrir ?? []) {
+      /*
+       * LES ONGLETS PAR PRÉFIXE, LES BOUTONS PAR NOM EXACT D'ABORD.
+       *
+       * Le préfixe seul sur les boutons a fait capturer un écran FAUX sans que
+       * rien ne le signale : `^Semaine` désigne aussi bien le segment
+       * « Semaine » de la bascule que le bouton « Semaine précédente » de
+       * l'en-tête — et celui-ci vient avant dans le document. Le script
+       * reculait donc d'une semaine, et la capture montrait le 1ᵉʳ juin là où
+       * l'horloge était au 10. Le contrôle visuel comparait deux semaines
+       * différentes, sans que la capture ait l'air anormale.
+       *
+       * Les ONGLETS gardent le préfixe : leur libellé peut porter un compte à
+       * la suite — « Missions 5 » dans le handoff — et l'égalité stricte ne les
+       * trouverait plus le jour où on l'ajoutera.
+       */
       const cible = page.getByRole('tab', { name: new RegExp(`^${libelle}`) }).first();
+      const exact = page.getByRole('button', { name: new RegExp(`^${libelle}$`) }).first();
       const secours = page.getByRole('button', { name: new RegExp(`^${libelle}`) }).first();
-      const choisie = await cible.count() > 0 ? cible : secours;
+      const choisie = await cible.count() > 0 ? cible
+        : await exact.count() > 0 ? exact
+          : secours;
+
       if (await choisie.count() === 0) { ouverte = false; break; }
       await choisie.click({ timeout: 5000 }).catch(() => { ouverte = false; });
       await page.waitForTimeout(500);

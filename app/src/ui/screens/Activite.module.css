@@ -42,9 +42,13 @@
   font-size: 13px;
   font-weight: 560;
   color: var(--text);
-  /* La première lettre du mois vient en minuscule de l'API d'internationalisation. */
-  text-transform: capitalize;
 }
+
+/* `capitalize` frappait CHAQUE mot : « Sem. Du 8 Juin 2026 », avec des
+   majuscules en plein milieu d'une phrase. L'API d'internationalisation ne rend
+   en minuscule que la PREMIÈRE lettre — « juin 2026 » — et c'est elle seule
+   qu'il faut relever. */
+.moisCourant::first-letter { text-transform: uppercase; }
 
 .sections {
   display: flex;
