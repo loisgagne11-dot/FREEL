@@ -59,6 +59,38 @@
   margin-bottom: 12px;
 }
 
+/* ── La charpente à deux colonnes ──────────────────────────────────────── */
+
+/* Une seule colonne par défaut, et deux à partir du grand écran. C'est le sens
+   mobile-first du projet : la disposition étroite n'est pas une dégradation de
+   la large, c'est la base. */
+.deuxColonnes { display: grid; gap: 12px; min-width: 0; }
+
+.principale,
+.laterale {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 1100 px : en dessous, la colonne latérale n'aurait plus la largeur d'écrire
+   « 18,5 / 22 j ouvrés · 2 j congé » sur une ligne, et le dénominateur passerait
+   à la ligne au milieu d'un nombre. C'est la mesure qui commande le seuil, pas
+   une taille d'appareil. */
+@media (min-width: 1100px) {
+  .deuxColonnes {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+  }
+
+  /* `start` et non `stretch` : sans lui, une colonne plus courte que l'autre
+     étire ses cartes pour combler la différence, et le vide se retrouve DANS
+     la carte — une carte de chiffres de 400 px de haut dont la moitié basse est
+     nue. Le défaut a déjà été payé sur le pilier Performance. */
+  .laterale { position: sticky; top: 12px; }
+}
+
 .chiffre {
   display: flex;
   flex-direction: column;
@@ -208,6 +240,10 @@
   margin-bottom: 12px;
   width: fit-content;
 }
+
+/* Décorative : le mot porte le sens. Elle ne rétrécit pas et ne se coupe pas —
+   une icône tronquée à mi-hauteur se lit comme un défaut d'affichage. */
+.iconeVue { margin-right: 6px; font-size: 11px; line-height: 1; }
 
 .vue {
   min-height: 38px;
