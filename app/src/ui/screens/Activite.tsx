@@ -3,9 +3,10 @@ import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import {
   type PoidsClient,
-  craDuMoisParMission, etatActivite, planningDeLaSemaine
+  craDuMoisParMission, etatActivite, planningDeLaSemaine, planningDuMois
 } from '../../state/selecteurs.activite';
 import { VueSemaine } from '../components/VueSemaine';
+import { VueMois } from '../components/VueMois';
 import { CraCard } from '../components/CraCard';
 import { useToast } from '../components/Toasts';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
@@ -135,6 +136,7 @@ export function Activite() {
   const semaine = useMemo(
     () => planningDeLaSemaine(faits, ancreSemaine), [faits, ancreSemaine]
   );
+  const planningMois = useMemo(() => planningDuMois(faits, mois), [faits, mois]);
   const cras = useMemo(() => craDuMoisParMission(faits, mois), [faits, mois]);
 
   /**
@@ -404,11 +406,13 @@ export function Activite() {
             <div className={styles.enteteCarte}>
               <h2 id={`${idGroupe}-calendrier`} className={styles.titreCarte}>
                 {vue === 'mois' ? 'Vue mois' : 'Vue semaine'}
-                <Info libelle="Effet des congés sur l’occupation">
-                  Un jour posé sort du dénominateur&nbsp;: le même travail sur
-                  moins de jours disponibles fait monter l’occupation, ce qui est
-                  le sens de la mesure. Un congé posé un jour férié ou un week-end
-                  n’est pas consommé, et n’est donc pas compté.
+                <Info libelle="Ce que la grille montre">
+                  Chaque journée porte deux créneaux. Ceux dont la position a été
+                  saisie disent le matin ou l’après-midi&nbsp;; les autres — toute
+                  journée d’avant cette version — sont RÉPARTIS pour pouvoir être
+                  dessinés, et n’affichent donc pas de lieu. Un clic bascule la
+                  moitié visée&nbsp;; la ramener à ce que le rythme prévoit efface
+                  la correction au lieu d’en poser une.
                 </Info>
               </h2>
 
@@ -437,14 +441,12 @@ export function Activite() {
 
             {vue === 'mois'
               ? (
-                <>
-                  <PlageDeConges />
-                  <Calendrier
-                    mois={mois}
-                    jours={etat.calendrier}
-                    onBasculer={basculerConge}
-                  />
-                </>
+                <VueMois
+                  planning={planningMois}
+                  libellePeriode={moisLong(mois)}
+                  aujourdhui={dateDuJour()}
+                  onBasculer={ajusterAuClic}
+                />
               )
               : (
                 <VueSemaine
@@ -462,13 +464,42 @@ export function Activite() {
                   }}
                 />
               )}
+          </section>
 
-            {/* La légende des NATURES DE JOUR ne coiffe que le calendrier des
-                congés : « Travaillable », « Congé posé », « Jour férié ». La
-                semaine a la sienne, qui nomme les clients — les deux côte à
-                côte donnaient six pastilles pour deux grilles dont une seule
-                était affichée. */}
-            {vue === 'mois' && <Legende />}
+          {/*
+            * LES CONGÉS ONT LEUR PROPRE CARTE, ET C'EST LA CORRECTION D'UNE
+            * CONFUSION.
+            *
+            * Une seule carte portait les deux grilles : le plan de charge en
+            * vue semaine, le calendrier des congés en vue mois. Deux questions
+            * différentes derrière la même bascule — « qu'ai-je travaillé » et
+            * « quand suis-je absent » — et il fallait quitter l'une pour poser
+            * un congé sur l'autre.
+            *
+            * Le dessin range le TRAVAIL dans les deux vues du plan de charge, et
+            * y montre les congés en hachures. Fondre les deux grilles en une
+            * seule aurait supprimé le geste qui pose un congé d'un clic — celui
+            * de l'ancienne application, et le seul qui reste pour une journée
+            * isolée. Elles vivent donc côte à côte, chacune sous son titre.
+            */}
+          <section className={styles.carte} aria-labelledby={`${idGroupe}-conges`}>
+            <h2 id={`${idGroupe}-conges`} className={styles.titreCarte}>
+              Congés de {moisLong(mois)}
+              <Info libelle="Effet des congés sur l’occupation">
+                Un jour posé sort du dénominateur&nbsp;: le même travail sur
+                moins de jours disponibles fait monter l’occupation, ce qui est
+                le sens de la mesure. Un congé posé un jour férié ou un week-end
+                n’est pas consommé, et n’est donc pas compté.
+              </Info>
+            </h2>
+
+            <PlageDeConges />
+            <Calendrier
+              mois={mois}
+              jours={etat.calendrier}
+              onBasculer={basculerConge}
+            />
+            <Legende />
 
             <dl className={styles.detail}>
               <div className={styles.ligne}>

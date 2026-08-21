@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
 import { type Faits, faitsVides } from './schema';
 import {
-  craDuMoisParMission, etatActivite, lundiDeLaSemaine, planningDeLaSemaine,
+  craDuMoisParMission, etatActivite, lundiDeLaSemaine, planningDeLaSemaine, planningDuMois,
   rapportParMission
 } from './selecteurs.activite';
 
@@ -492,5 +492,64 @@ describe('rapport et charge par mission', () => {
   /** Une année sans mission ne fait pas échouer le calcul. */
   it('rend une liste vide sans mission', () => {
     expect(rapportParMission(avec({ missions: [] }), 2026)).toHaveLength(0);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Le planning du mois
+   ───────────────────────────────────────────────────────────────────────── */
+
+describe('planning du mois', () => {
+  it('rend un jour par jour du mois, bissextiles comprises', () => {
+    expect(planningDuMois(avec(), mois('2026-06')).jours).toHaveLength(30);
+    expect(planningDuMois(avec(), mois('2026-02')).jours).toHaveLength(28);
+    expect(planningDuMois(avec(), mois('2028-02')).jours).toHaveLength(29);
+  });
+
+  /**
+   * LE SAMEDI EST UN SAMEDI, MISSION OU PAS.
+   *
+   * `weekEnd` se lisait sur le planning de la PREMIÈRE entité, et retombait sur
+   * `false` quand il n'y en avait aucune. Un compte sans mission active — un
+   * début d'activité, un mois entre deux contrats — comptait les trente jours du
+   * mois comme ouvrés : l'occupation tombait d'un tiers, et le seul écran qui
+   * aurait pu le signaler était précisément celui qui se trompait.
+   *
+   * Rien ne LEVAIT : la grille s'affichait, les totaux tombaient, et le chiffre
+   * était faux.
+   */
+  it('reconnaît les week-ends même sans aucune mission', () => {
+    const juin = planningDuMois(avec({ missions: [] }), mois('2026-06'));
+    // Samedi 6 et dimanche 7 juin 2026.
+    expect(juin.jours.find((j) => j.date === '2026-06-06')?.weekEnd).toBe(true);
+    expect(juin.jours.find((j) => j.date === '2026-06-07')?.weekEnd).toBe(true);
+    expect(juin.jours.find((j) => j.date === '2026-06-08')?.weekEnd).toBe(false);
+    // Juin 2026 : 30 jours, 8 de week-end, donc 22 ouvrés.
+    expect(juin.jours.filter((j) => !j.weekEnd && !j.ferie)).toHaveLength(22);
+  });
+
+  it('reconnaît les week-ends de la semaine sans mission, de la même façon', () => {
+    const p = planningDeLaSemaine(avec({ missions: [] }), D('2026-06-10'));
+    expect(p.jours.filter((j) => j.weekEnd)).toHaveLength(2);
+  });
+
+  /**
+   * LES DEUX VUES SORTENT DU MÊME CALCUL.
+   *
+   * Elles sont à un clic l'une de l'autre : un écart se lirait sur deux dessins
+   * du même jour, et rien ne dirait lequel a raison. Le mois est la même
+   * fonction appliquée à d'autres dates — ce test le CONSTATE au lieu de le
+   * supposer, jour par jour sur la semaine commune.
+   */
+  it('dit du mois ce que la semaine dit des mêmes jours', () => {
+    const faits = avec();
+    const duMois = planningDuMois(faits, mois('2026-06'));
+    const deLaSemaine = planningDeLaSemaine(faits, D('2026-06-10'));
+
+    for (const jour of deLaSemaine.jours) {
+      const meme = duMois.jours.find((j) => j.date === jour.date);
+      if (meme === undefined) continue; // la semaine déborde du mois
+      expect(meme).toEqual(jour);
+    }
   });
 });

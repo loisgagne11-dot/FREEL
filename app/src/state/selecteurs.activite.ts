@@ -18,7 +18,12 @@
 import type { Jour, ZoneFeries } from '../domain/calculs/activite';
 import { joursFeries } from '../domain/calculs/activite';
 import type { Creneau, JourPlanifie, Lieu } from '../domain/calculs/planning';
-import { CRENEAUX, craDuMois, creneauxOccupes, planifier } from '../domain/calculs/planning';
+import {
+  CRENEAUX, craDuMois, creneauxOccupes, jourDeSemaine, planifier
+} from '../domain/calculs/planning';
+
+/** Les deux jours que le rythme ne remplit jamais de lui-même. */
+const JOURS_DE_REPOS = new Set(['sam', 'dim']);
 import { type PrevisionDuMois, previsionDuMois } from '../domain/calculs/prevision';
 import type { Cra } from '../domain/calculs/planning';
 import {
@@ -340,12 +345,16 @@ export interface OccupantDeCreneau extends LigneDuJour {
   readonly sur: 'saisi' | 'reparti';
 }
 
-export interface PlanningSemaine {
-  /** Lundi de la semaine observée. */
-  readonly lundi: DateISO;
+/** Le planning d'une période quelconque : une semaine, un mois. */
+export interface PlanningPeriode {
   readonly jours: readonly JourDeLaSemaine[];
   readonly totalPrevu: number;
   readonly totalRetenu: number;
+}
+
+export interface PlanningSemaine extends PlanningPeriode {
+  /** Lundi de la semaine observée. */
+  readonly lundi: DateISO;
 }
 
 /** Le lundi de la semaine qui contient cette date. */
@@ -386,7 +395,43 @@ export function planningDeLaSemaine(
     d.setUTCDate(d.getUTCDate() + i);
     dates.push(d.toISOString().slice(0, 10) as DateISO);
   }
+  return { lundi, ...planningDesDates(faits, dates, zone) };
+}
 
+/**
+ * Le planning d'un MOIS, exactement comme celui d'une semaine.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX VUES, UN SEUL CALCUL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La vue mois et la vue semaine sont deux onglets du MÊME écran, et l'on passe
+ * de l'une à l'autre d'un clic. Deux calculs concurrents ne se contrediraient
+ * pas en théorie — ils se contrediraient dans six mois, sur un cas que l'un
+ * traiterait et l'autre pas, et l'écart se lirait sur deux dessins du même jour
+ * à un clic d'intervalle. C'est l'invariant n°4, et c'est exactement la
+ * situation où il coûte le plus cher.
+ *
+ * Le mois est donc la même fonction, appliquée à un autre lot de dates.
+ */
+export function planningDuMois(
+  faits: Faits, m: Mois, zone: ZoneFeries = 'general'
+): PlanningPeriode {
+  const annee = Number(m.slice(0, 4));
+  const numero = Number(m.slice(5, 7));
+  // Le 0 du mois SUIVANT est le dernier jour de celui-ci : la seule façon de
+  // compter 28, 29, 30 ou 31 sans table ni règle bissextile écrite à la main.
+  const dernier = new Date(Date.UTC(annee, numero, 0)).getUTCDate();
+  const dates: DateISO[] = [];
+  for (let j = 1; j <= dernier; j += 1) {
+    dates.push(`${m}-${String(j).padStart(2, '0')}` as DateISO);
+  }
+  return planningDesDates(faits, dates, zone);
+}
+
+function planningDesDates(
+  faits: Faits, dates: readonly DateISO[], zone: ZoneFeries
+): PlanningPeriode {
   // Les fériés peuvent tomber sur deux années quand la semaine est à cheval
   // sur le 31 décembre.
   const annees = new Set(dates.map((d) => Number(d.slice(0, 4))));
@@ -435,8 +480,6 @@ export function planningDeLaSemaine(
       // case : le vide se lit mieux qu'une ligne à zéro.
       .filter((d) => d.prevu > 0 || d.retenu > 0 || d.ajuste);
 
-    const modele = (parEntiteEtDate[0]?.planning[i]) as JourPlanifie | undefined;
-
     /*
      * La journée retournée par créneau.
      *
@@ -459,7 +502,19 @@ export function planningDeLaSemaine(
     return {
       date,
       ferie: feries.has(date),
-      weekEnd: modele?.weekEnd ?? false,
+      /*
+       * LE SAMEDI EST UN SAMEDI, MISSION OU PAS.
+       *
+       * Cette ligne lisait le `weekEnd` du planning de la PREMIÈRE entité, et
+       * retombait sur `false` quand il n'y en avait aucune. Un compte sans
+       * mission active — un début d'activité, un mois entre deux contrats —
+       * comptait donc les trente jours du mois comme ouvrés : l'occupation
+       * tombait d'un tiers, et le seul écran qui aurait pu le signaler était
+       * précisément celui qui se trompait.
+       *
+       * Le jour de la semaine ne dépend d'aucune mission. Il se lit sur la date.
+       */
+      weekEnd: JOURS_DE_REPOS.has(jourDeSemaine(date)),
       conge: conges[date] ?? 0,
       prevu: detail.reduce((s, d) => s + d.prevu, 0),
       retenu: detail.reduce((s, d) => s + d.retenu, 0),
@@ -469,7 +524,6 @@ export function planningDeLaSemaine(
   });
 
   return {
-    lundi,
     jours,
     totalPrevu: jours.reduce((s, j) => s + j.prevu, 0),
     totalRetenu: jours.reduce((s, j) => s + j.retenu, 0)

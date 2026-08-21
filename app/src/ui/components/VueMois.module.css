@@ -1,0 +1,193 @@
+/* La grille du mois. Mobile-first, aucune largeur calculée en JS. */
+
+.grille {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+  min-width: 0;
+}
+
+.entete {
+  text-align: center;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--muted-2);
+  padding-bottom: 3px;
+}
+
+/* Les cases d'avant le 1ᵉʳ. Elles gardent leur place — la grille doit rester
+   alignée sur les jours de semaine — sans rien porter. */
+.horsMois { min-height: 0; }
+
+.jour {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+}
+
+/* Le jour courant est ENCADRÉ, pas coloré : la couleur est déjà prise par les
+   clients, et une teinte de plus se lirait comme un client de plus. */
+.jourCourant { border-color: var(--green); }
+
+/* Un week-end ou un férié ne se travaille pas d'ordinaire, mais reste cliquable
+   — les astreintes et les rendus de nuit existent. Le fond s'efface, la case
+   demeure. */
+.weekEnd { background: transparent; }
+.ferie { background: transparent; border-style: dashed; }
+
+.numero {
+  font-size: 9.5px;
+  line-height: 1;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+  padding-left: 1px;
+}
+
+.jourCourant .numero { color: var(--green); font-weight: 700; }
+
+/* ── Les deux moitiés ──────────────────────────────────────────────────── */
+
+.demi {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Deux moitiés de 22 px font 44 px : la cible reste atteignable au doigt sans
+     que cinq rangs de grille poussent la page en portrait. */
+  min-height: 22px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background: var(--panel);
+  color: var(--muted-2);
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.demi:hover { border-color: var(--line-2); }
+.demi:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+
+.occupee { font-weight: 700; }
+
+/* Le congé est HACHURÉ, comme dans la vue semaine : une même journée doit se
+   reconnaître d'un onglet à l'autre. Deux traitements pour le même état
+   feraient chercher une différence qui n'existe pas. */
+.conge {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--amber) 16%, transparent) 0 4px,
+      transparent 4px 8px
+    ),
+    var(--panel);
+  border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+  color: var(--amber);
+}
+
+.initiales {
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* Posé en coin plutôt qu'à côté des initiales : sur 60 px de large, deux
+   éléments côte à côte se touchent, et c'est l'initiale — l'information
+   principale — qui perdrait sa place. */
+.lieu {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 8px;
+  line-height: 1;
+  color: var(--muted-2);
+  opacity: 0.85;
+}
+
+/* ── Légende ───────────────────────────────────────────────────────────── */
+
+.legende {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.legendeEntree { display: inline-flex; align-items: center; gap: 5px; }
+
+.pastille {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--green);
+}
+
+.pastilleConge { background: var(--amber); }
+
+/* Les initiales dans la légende : sans elles, « BV » sur la grille n'est qu'un
+   code. C'est la légende qui fait d'une abréviation une information. */
+.initialesLegende {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.legende .lieu { position: static; font-size: 10px; opacity: 1; }
+
+.invisible {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line-2);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.total strong { color: var(--green); font-size: 16px; font-variant-numeric: tabular-nums; }
+
+.resume {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.resume strong { color: var(--muted); font-weight: 650; }
+
+/* Sur écran large, la case respire : les initiales grandissent et le mois se
+   lit d'un coup d'œil au lieu de se déchiffrer. */
+@media (min-width: 761px) {
+  .demi { min-height: 28px; }
+  .initiales { font-size: 11px; }
+  .numero { font-size: 10.5px; }
+  .lieu { font-size: 9px; }
+}
