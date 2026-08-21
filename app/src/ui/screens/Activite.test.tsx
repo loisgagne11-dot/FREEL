@@ -44,6 +44,16 @@ const entite = (e: Partial<Faits['missions'][number]['entites'][number]> = {}) =
   email: '', telephone: '', rythmes: [], ajustements: {}, ...e
 });
 
+/**
+ * Des ajustements écrits par leur seule quotité.
+ *
+ * Depuis le schéma 14, un ajustement porte aussi un créneau et un lieu. Aucun
+ * des tests d'ici ne les regarde : les écrire à chaque ligne laisserait croire
+ * qu'ils pèsent sur ce qu'on mesure.
+ */
+const poses = (quotites: Record<string, number>) =>
+  Object.fromEntries(Object.entries(quotites).map(([d, quotite]) => [d, { quotite }]));
+
 const recette = (m: Partial<Faits['recettes'][number]> = {}) => ({
   id: 'rec-1', clientNom: 'ClientA', libelle: 'Facture', montant: euros(4000),
   emiseLe: dateISO('2026-07-10'), encaisseeLe: null,
@@ -342,9 +352,9 @@ describe('vue semaine', () => {
       useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
 
     await utilisateur.click(creneau());          // journée → demi
-    expect(ajustements()['2026-07-13']).toBe(0.5);
+    expect(ajustements()['2026-07-13']?.quotite).toBe(0.5);
     await utilisateur.click(creneau());          // demi → rien
-    expect(ajustements()['2026-07-13']).toBe(0);
+    expect(ajustements()['2026-07-13']?.quotite).toBe(0);
     await utilisateur.click(creneau());          // rien → retour au rythme
     expect(ajustements()).not.toHaveProperty('2026-07-13');
   });
@@ -413,7 +423,9 @@ describe('compte rendu d’activité', () => {
           du: dateISO('2026-07-01'), au: dateISO('2026-07-31'),
           parJour: { lun: 1 }, tjm: euros(400)
         }],
-        ajustements: { '2026-07-06': 0, '2026-07-13': 0, '2026-07-20': 0, '2026-07-27': 0 }
+        ajustements: poses({
+          '2026-07-06': 0, '2026-07-13': 0, '2026-07-20': 0, '2026-07-27': 0
+        })
       })]
     });
     semer({ missions: [sansRien] });
@@ -536,7 +548,7 @@ describe('revenir au rythme sur une semaine', () => {
             parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: euros(400)
           }],
           // Deux corrections dans la semaine du 13/07, une hors de cette semaine.
-          ajustements: { '2026-07-13': 0, '2026-07-14': 0.5, '2026-06-01': 0 }
+          ajustements: poses({ '2026-07-13': 0, '2026-07-14': 0.5, '2026-06-01': 0 })
         })]
       })]
     });
@@ -546,7 +558,7 @@ describe('revenir au rythme sur une semaine', () => {
     await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
 
     const ajustements = useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
-    expect(ajustements).toEqual({ '2026-06-01': 0 });
+    expect(ajustements).toEqual({ '2026-06-01': { quotite: 0 } });
   });
 
   /**
@@ -561,7 +573,7 @@ describe('revenir au rythme sur une semaine', () => {
             du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
             parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: euros(400)
           }],
-          ajustements: { '2026-07-13': 0 }
+          ajustements: poses({ '2026-07-13': 0 })
         })]
       })]
     });

@@ -83,7 +83,9 @@ describe('planning', () => {
    * facturerait un jour qui n'a pas eu lieu.
    */
   it('laisse l’ajustement l’emporter, y compris à zéro', () => {
-    const [j] = planifier([D('2026-08-10')], { ...SANS, ajustements: { '2026-08-10': 0 } });
+    const [j] = planifier(
+      [D('2026-08-10')], { ...SANS, ajustements: { '2026-08-10': { quotite: 0 } } }
+    );
     expect(j?.prevu).toBe(1);
     expect(j?.retenu).toBe(0);
     expect(j?.ajuste).toBe(true);
@@ -97,7 +99,7 @@ describe('planning', () => {
     const [samedi, ferie] = planifier(['2026-08-15', '2026-07-14'].map(D), {
       ...SANS,
       feries: new Set(['2026-07-14']),
-      ajustements: { '2026-08-15': 1, '2026-07-14': 0.5 }
+      ajustements: { '2026-08-15': { quotite: 1 }, '2026-07-14': { quotite: 0.5 } }
     });
     expect(samedi?.retenu).toBe(1);
     expect(ferie?.retenu).toBe(0.5);

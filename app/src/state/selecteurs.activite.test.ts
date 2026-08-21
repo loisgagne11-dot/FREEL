@@ -27,10 +27,21 @@ const MISSION = {
   }]
 };
 
-/** La même mission, avec un ajustement posé sur son client opérationnel. */
-const avecAjustement = (ajustements: Record<string, number>) => ({
+/**
+ * La même mission, avec un ajustement posé sur son client opérationnel.
+ *
+ * Les appels donnent la seule quotité : c'est tout ce que l'occupation regarde.
+ * Le créneau et le lieu, arrivés au schéma 14, ne changent aucun de ces calculs
+ * — les écrire ici ferait croire le contraire.
+ */
+const avecAjustement = (quotites: Record<string, number>) => ({
   ...MISSION,
-  entites: [{ ...(MISSION.entites[0] as (typeof MISSION)['entites'][number]), ajustements }]
+  entites: [{
+    ...(MISSION.entites[0] as (typeof MISSION)['entites'][number]),
+    ajustements: Object.fromEntries(
+      Object.entries(quotites).map(([date, quotite]) => [date, { quotite }])
+    )
+  }]
 });
 
 const avec = (m: Partial<Faits> = {}): Faits => ({ ...faitsVides(), missions: [MISSION], ...m });

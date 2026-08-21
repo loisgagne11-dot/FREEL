@@ -56,8 +56,63 @@ export interface Rythme {
   readonly tjm: Euros | null;
 }
 
-/** Ce qui a réellement été travaillé un jour donné, quand ça diffère du rythme. */
-export type Ajustements = Readonly<Record<string, Quotite>>;
+/** Les deux moitiés d'une journée. Le dessin ne connaît qu'elles. */
+export const CRENEAUX = ['matin', 'apresMidi'] as const;
+export type Creneau = typeof CRENEAUX[number];
+
+/**
+ * Où la demi-journée s'est passée.
+ *
+ * Ce n'est pas une commodité d'affichage : le télétravail se compte. Il entre
+ * dans « 78 % de télétravail » du plan de charge, et surtout il se justifie —
+ * une mission facturée « sur site » qui ne l'a pas été se conteste.
+ */
+export const LIEUX = ['teletravail', 'sur_site'] as const;
+export type Lieu = typeof LIEUX[number];
+
+/**
+ * Ce qui a réellement été travaillé un jour donné, quand ça diffère du rythme.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI CE N'EST PLUS UN NOMBRE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * C'était `Record<date, Quotite>` : une quantité par jour, 0, 0,5 ou 1. Cela
+ * suffit à totaliser un CRA, et c'est tout ce que le modèle savait dire.
+ *
+ * Le dessin en demande deux de plus, et aucun des deux ne se déduit d'une
+ * quotité. « 0,5 » ne dit pas SI c'était le matin ou l'après-midi — or deux
+ * clients le même jour, c'est exactement un matin chez l'un et un après-midi
+ * chez l'autre, et sans le créneau on ne peut ni le saisir ni le rendre. Et
+ * « 0,5 » ne dit rien du LIEU, qui se compte (« 78 % de télétravail ») et se
+ * justifie.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA QUOTITÉ RESTE, ET RESTE LA SOURCE DU TOTAL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * On aurait pu la déduire des créneaux — deux créneaux valent un jour. Ce
+ * serait une seconde définition du même nombre, et l'invariant l'interdit :
+ * une journée dont les créneaux ne sont pas renseignés vaudrait alors zéro,
+ * alors qu'elle a été travaillée. Les créneaux PRÉCISENT la quotité, ils ne la
+ * remplacent pas — et une journée d'avant ce schéma n'en a aucun.
+ */
+export interface AjustementJour {
+  /** Ce qui compte pour le total. Un fait, saisi ou migré. */
+  readonly quotite: Quotite;
+  /**
+   * Les créneaux effectivement occupés, quand on les connaît.
+   *
+   * Absent sur toute journée saisie avant ce schéma : la migration ne les
+   * invente pas. Une demi-journée dont on ignore la moitié se lit « 0,5 j »
+   * sans position, ce qui est la vérité.
+   */
+  readonly creneaux?: readonly Creneau[];
+  /** Le lieu de la journée, quand il est renseigné. */
+  readonly lieu?: Lieu;
+}
+
+export type Ajustements = Readonly<Record<string, AjustementJour>>;
 
 export interface JourPlanifie {
   readonly date: DateISO;
@@ -70,6 +125,16 @@ export interface JourPlanifie {
   readonly weekEnd: boolean;
   /** Quotité de congé posée ce jour-là : 0, 0,5 ou 1. */
   readonly conge: Quotite;
+  /**
+   * Les créneaux occupés, ou `null` quand on ne les connaît pas.
+   *
+   * `null` et non un tableau vide : le vide dirait « aucun créneau travaillé »,
+   * alors qu'il s'agit d'une journée dont on ignore la répartition. La vue
+   * semaine doit pouvoir distinguer les deux — elle affiche une journée pleine
+   * sans position dans un cas, et rien dans l'autre.
+   */
+  readonly creneaux: readonly Creneau[] | null;
+  readonly lieu: Lieu | null;
 }
 
 /** Le jour de la semaine d'une date ISO, sans dépendre du fuseau local. */
@@ -131,9 +196,14 @@ export function planifier(
     // L'ajustement l'emporte TOUJOURS, y compris à zéro et y compris un jour
     // férié : c'est la seule façon de dire « j'ai travaillé ce jour-là », ou
     // « finalement non ».
-    const retenu = ajuste ? (ajustements[date] as Quotite) : prevu;
+    const pose = ajustements[date];
+    const retenu = ajuste && pose !== undefined ? pose.quotite : prevu;
 
-    return { date, prevu, retenu, ajuste, ferie, weekEnd, conge };
+    return {
+      date, prevu, retenu, ajuste, ferie, weekEnd, conge,
+      creneaux: pose?.creneaux ?? null,
+      lieu: pose?.lieu ?? null
+    };
   });
 }
 

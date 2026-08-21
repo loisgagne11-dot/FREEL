@@ -34,6 +34,7 @@ import {
 } from '../domain/bareme/urssaf';
 import type { EtatRapprochement } from '../domain/calculs/depenses';
 import type { Echeance } from '../domain/calculs/provisions';
+import type { AjustementJour } from '../domain/calculs/planning';
 import { type ResultatMigration, type Stockage, migrer } from '../infra/migration';
 
 /** Le stockage du navigateur, ou `null` quand il est indisponible. */
@@ -1010,7 +1011,13 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
           if (e.id !== entiteId) return e;
           const ajustements = { ...e.ajustements };
           if (quotite === null) delete ajustements[date];
-          else ajustements[date] = quotite;
+          else {
+            /* Les créneaux et le lieu déjà posés SURVIVENT à un changement de
+               quotité : corriger « 1 j » en « 0,5 j » ne dit pas qu'on ne sait
+               plus si c'était le matin. Les effacer obligerait à les ressaisir
+               à chaque correction, et c'est ainsi qu'on cesse de les saisir. */
+            ajustements[date] = { ...ajustements[date], quotite };
+          }
           return { ...e, ajustements };
         })
       };
@@ -1028,10 +1035,10 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     const missions = actuel.missions.map((m) => ({
       ...m,
       entites: m.entites.map((e) => {
-        const ajustements: Record<string, number> = {};
-        for (const [date, quotite] of Object.entries(e.ajustements)) {
+        const ajustements: Record<string, AjustementJour> = {};
+        for (const [date, pose] of Object.entries(e.ajustements)) {
           if (cibles.has(date)) { retires += 1; continue; }
-          ajustements[date] = quotite;
+          ajustements[date] = pose;
         }
         return { ...e, ajustements };
       })
