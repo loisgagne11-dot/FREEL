@@ -39,10 +39,20 @@ import styles from './Argent.module.css';
  * la question qu'on se pose, qui est « combien puis-je me verser ? ».
  */
 
-const MOIS_COURTS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+/*
+ * TROIS LETTRES, ET NON UNE.
+ *
+ * L'axe portait des initiales : « J A S O N D J F M A M ». Trois des douze
+ * lettres y apparaissent deux fois, et une année qui traverse janvier se lit
+ * comme si elle revenait en arrière. Le reste de l'écran — et la référence —
+ * abrège sur trois lettres, où chaque mois est reconnaissable seul.
+ */
+const MOIS_COURTS = [
+  'JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEP', 'OCT', 'NOV', 'DÉC'
+];
 
-/** L'initiale du mois, pour l'axe. */
-const initiale = (m: Mois): string => MOIS_COURTS[Number(m.slice(5, 7)) - 1] ?? m;
+/** L'abrégé du mois, pour l'axe. */
+const moisCourt = (m: Mois): string => MOIS_COURTS[Number(m.slice(5, 7)) - 1] ?? m;
 
 /** « 2026-09 » → « septembre 2026 ». */
 function moisLong(m: Mois): string {
@@ -64,25 +74,19 @@ export function ProjectionPanneau() {
   const etat = useMemo(() => etatProjection(faits), [faits]);
   const { projection, depensesMensuelles, tauxDeCharges, versementsPasses } = etat;
 
-  const series: readonly SerieBarres[] = [
-    {
-      id: 'sans',
-      libelle: 'Sans versement',
-      valeurs: projection.mois.map((m) => m.sansVersement),
-      token: 'sable'
-    },
-    {
-      id: 'avec',
-      // Pas de montant dans le libellé : une légende de graphe est du texte
-      // brut, hors de `Montant`, donc illisible au vérificateur de
-      // confidentialité et lisible sur un écran partagé. Le montant est dit
-      // au-dessus, dans la phrase, où il est masquable.
-      libelle: 'En me versant chaque mois',
-      valeurs: projection.mois.map((m) => m.avecVersement),
-      token: 'green'
-    }
-  ];
-
+  /*
+   * UNE LÉGENDE SANS BARRE SE LIT COMME UNE DONNÉE MANQUANTE.
+   *
+   * La série « Soutenable » vaut `versementMensuel` répété sur douze mois.
+   * Quand ce montant est nul — le cas dès que le disponible ne dépasse pas la
+   * réserve — elle ne trace aucune barre, et la légende continuait pourtant à
+   * l'annoncer. On cherche alors la barre absente au lieu de lire le zéro.
+   *
+   * Le zéro n'est pas faux, il est simplement invisible : il se dit en toutes
+   * lettres sous le graphe, et la série disparaît de la légende.
+   */
+  const dernier = projection.mois[projection.mois.length - 1];
+  const soutenableTracable = projection.versementMensuel > 0;
   const versements: readonly SerieBarres[] = [
     {
       id: 'verse',
@@ -90,15 +94,13 @@ export function ProjectionPanneau() {
       valeurs: versementsPasses.map((v) => v.montant),
       token: 'green'
     },
-    {
+    ...(soutenableTracable ? [{
       id: 'soutenable',
       libelle: 'Soutenable',
       valeurs: versementsPasses.map(() => projection.versementMensuel),
       token: 'sable'
-    }
+    }] : [])
   ];
-
-  const dernier = projection.mois[projection.mois.length - 1];
 
   return (
     <div className={styles.dossier}>
@@ -147,33 +149,26 @@ export function ProjectionPanneau() {
         </li>
       </ul>
 
-      <section className={styles.carte} aria-labelledby="titre-projection">
-        <h3 id="titre-projection" className={styles.titreCarte}>
-          Disponible sur douze mois
-          <Info libelle="Pourquoi le disponible et non le solde">
-            Projeter le <em>solde</em> obligerait à deviner quand chaque dette
-            sortira du compte — et la moitié d’entre elles n’a pas encore de
-            date, puisque l’URSSAF n’a pas appelé les charges des recettes
-            déjà encaissées. Une courbe de solde monte donc joliment jusqu’au
-            trimestre où elle s’effondre. Le <strong>disponible</strong>, lui,
-            a déjà tout retiré&nbsp;: un encaissement ne lui ajoute que sa part
-            nette, et payer une échéance ne le fait pas bouger.
-          </Info>
-        </h3>
-        <GrapheBarres
-          titre="Disponible projeté, avec et sans versement mensuel"
-          categories={projection.mois.map((m) => initiale(m.mois))}
-          series={series}
-          formater={enKiloEuros}
-        />
-        {dernier !== undefined && (
-          <p className={styles.aide}>
-            Dans un an&nbsp;: <Montant>{eur(dernier.sansVersement)}</Montant> sans
-            rien te verser, <Montant>{eur(dernier.avecVersement)}</Montant> en
-            t’étant versé <Montant>{eur(dernier.verseCumule)}</Montant> au total.
-          </p>
-        )}
-      </section>
+      {/* La carte « Disponible sur douze mois » a été RETIRÉE d'ici.
+          Elle traçait la même projection que le graphe combiné du haut de
+          l'écran — même série, même source — dans une autre forme et sur un
+          axe d'une seule lettre. Deux dessins du même nombre sur un écran
+          finissent par ne pas dire la même chose ; celui du haut porte en
+          plus les entrées, les sorties et le seuil, donc c'est lui qui reste.
+
+          Ce qui n'était QUE dans cette carte est conservé : la phrase du
+          versement soutenable et les trois hypothèses sont juste au-dessus, et
+          la ligne « dans un an » ci-dessous. Elle porte le seul chiffre que le
+          graphe combiné ne donne pas — le versé CUMULÉ sur douze mois — et
+          c'est du texte, pas un second dessin du même nombre. */}
+
+      {dernier !== undefined && (
+        <p className={styles.aide}>
+          Dans un an&nbsp;: <Montant>{eur(dernier.sansVersement)}</Montant> sans
+          rien te verser, <Montant>{eur(dernier.avecVersement)}</Montant> en
+          t’étant versé <Montant>{eur(dernier.verseCumule)}</Montant> au total.
+        </p>
+      )}
 
       <section className={styles.carte} aria-labelledby="titre-versements">
         <h3 id="titre-versements" className={styles.titreCarte}>
@@ -190,11 +185,20 @@ export function ProjectionPanneau() {
           </Info>
         </h3>
         <GrapheBarres
-          titre="Versements des douze derniers mois, face au soutenable"
-          categories={versementsPasses.map((v) => initiale(v.mois))}
+          titre={soutenableTracable
+            ? 'Versements des douze derniers mois, face au soutenable'
+            : 'Versements des douze derniers mois'}
+          categories={versementsPasses.map((v) => moisCourt(v.mois))}
           series={versements}
           formater={enKiloEuros}
         />
+        {!soutenableTracable && (
+          <p className={styles.aide}>
+            Aucune référence tracée&nbsp;: le versement soutenable est de{' '}
+            <Montant>{eur(projection.versementMensuel)}</Montant> aujourd’hui —
+            c’est un zéro constaté, pas une donnée manquante.
+          </p>
+        )}
       </section>
     </div>
   );

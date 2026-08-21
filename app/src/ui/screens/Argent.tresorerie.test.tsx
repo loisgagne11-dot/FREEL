@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { dateISO, euros } from '../../domain/types';
 import { type Faits, faitsVides } from '../../state/schema';
 import { etatArgent } from '../../state/selecteurs.argent';
@@ -200,5 +200,80 @@ describe('la répartition du solde', () => {
 
     const ligne = screen.getByText('À te verser').parentElement;
     expect(ligne?.textContent).toContain(eur(7_000));
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   B2 — l'évolution du compte
+   ───────────────────────────────────────────────────────────────────────── */
+
+describe('l’évolution du compte', () => {
+  /**
+   * LA COURBE EST LE DISPONIBLE, ET LE TITRE DOIT LE DIRE.
+   *
+   * Le dessin trace un solde. Projeter le solde obligerait à deviner quand
+   * chaque dette sortira du compte, et la moitié n'a pas de date. Un titre qui
+   * dirait « solde » sur une courbe de disponible serait conforme au dessin et
+   * faux — le pire des deux mondes.
+   */
+  it('annonce une courbe de disponible, pas de solde', () => {
+    poser({ soldeInitial: euros(10_000) });
+
+    // Le titre VISIBLE, et non son info : celle-ci explique justement pourquoi
+    // ce n'est pas le solde, donc elle contient le mot.
+    expect(screen.getByText(/Évolution du compte — entrées, sorties/).textContent)
+      .toContain('disponible');
+  });
+
+  /**
+   * DOUZE MOIS GLISSANTS, PAS « JUSQU'À DÉCEMBRE ».
+   *
+   * La référence s'arrête à décembre parce qu'elle est dessinée en juin. La
+   * même règle en novembre laisserait deux colonnes.
+   */
+  it('projette douze mois à partir du mois courant', () => {
+    poser({ soldeInitial: euros(10_000) });
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    const dans = within(carte as HTMLElement);
+    // Juin 2026 → mai 2027 : le mois courant en tête, et le même douze mois plus tard.
+    expect(dans.getAllByText('JUIN').length).toBeGreaterThan(0);
+    expect(dans.getAllByText('MAI').length).toBeGreaterThan(0);
+    expect(dans.getByText(/projeté dans douze mois/)).toBeTruthy();
+  });
+
+  /**
+   * LE SEUIL NE SE TRACE QUE S'IL EXISTE.
+   *
+   * Une ligne de plancher à zéro serait un repère qu'on n'a jamais posé, et
+   * elle se confondrait avec l'axe.
+   */
+  it('ne trace aucun seuil tant qu’aucun n’est réglé', () => {
+    poser({ soldeInitial: euros(10_000) });
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    expect(within(carte as HTMLElement).queryByText(/^seuil/)).toBeNull();
+  });
+
+  it('trace le seuil de sécurité dès qu’il est réglé', () => {
+    poser({ soldeInitial: euros(10_000), reserve: euros(4_000) });
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    const dans = within(carte as HTMLElement);
+    expect(dans.getByText(/^seuil/).textContent).toContain(eur(4_000));
+  });
+
+  /**
+   * LE NET SOUS CHAQUE MOIS.
+   *
+   * C'est lui qui explique la pente du segment au-dessus. Sans lui, deux barres
+   * imposent la soustraction de tête, douze fois de suite.
+   */
+  it('écrit le net de chaque mois sous son libellé', () => {
+    poser({ soldeInitial: euros(10_000), besoinMensuel: euros(1_000) });
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    // Le signe est porté par le net, jamais par les barres seules.
+    expect(within(carte as HTMLElement).getAllByText(/^[+−]/).length).toBeGreaterThan(0);
   });
 });
