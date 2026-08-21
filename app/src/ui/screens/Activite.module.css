@@ -185,6 +185,19 @@
 
 /* ── Bascule de vue ────────────────────────────────────────────────────── */
 
+/* Le titre et la bascule sur une même ligne, comme le dessin. `wrap` plutôt
+   qu'un rétrécissement : sur un téléphone, la bascule passe dessous entière
+   au lieu de comprimer « Vue semaine » jusqu'à l'ellipse. */
+.enteteCarte {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.enteteCarte .bascule { margin-bottom: 12px; }
+
 .bascule {
   display: flex;
   gap: 3px;

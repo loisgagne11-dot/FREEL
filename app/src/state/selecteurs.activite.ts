@@ -17,9 +17,16 @@
 
 import type { Jour, ZoneFeries } from '../domain/calculs/activite';
 import { joursFeries } from '../domain/calculs/activite';
-import type { JourPlanifie } from '../domain/calculs/planning';
-import { craDuMois, planifier } from '../domain/calculs/planning';
-import { type PrevisionDuMois, previsionDuMois } from '../domain/calculs/prevision';
+import type { Creneau, JourPlanifie, Lieu } from '../domain/calculs/planning';
+import {
+  CRENEAUX, craDuMois, creneauxOccupes, jourDeSemaine, planifier
+} from '../domain/calculs/planning';
+
+/** Les deux jours que le rythme ne remplit jamais de lui-même. */
+const JOURS_DE_REPOS = new Set(['sam', 'dim']);
+import {
+  type PrevisionDuMois, previsionDuMois, totaliserPrevisions
+} from '../domain/calculs/prevision';
 import type { Cra } from '../domain/calculs/planning';
 import {
   calendrierDuMois, chargeDuMois, joursDuMois, planDeCharge
@@ -287,24 +294,69 @@ export interface JourDeLaSemaine {
    * n'exige pas. Dès qu'il y en a deux, le nom de chacun s'affiche : c'est la
    * question qu'on se pose en regardant la semaine.
    */
-  readonly parMission: readonly {
-    readonly missionId: string;
-    readonly entiteId: string;
-    readonly libelle: string;
-    /** Teinte du client opérationnel, vide si aucune n'a été choisie. */
-    readonly couleur: string;
-    readonly prevu: number;
-    readonly retenu: number;
-    readonly ajuste: boolean;
-  }[];
+  readonly parMission: readonly LigneDuJour[];
+  /**
+   * Les deux moitiés de la journée, et qui les occupe.
+   *
+   * Le dessin organise la journée par CRÉNEAU — une ligne « matin », une ligne
+   * « après-midi » — là où `parMission` l'organise par client. Les deux vues
+   * du même jour sont utiles : `parMission` répond à « combien chez qui »,
+   * `creneaux` à « où j'étais mercredi matin ». Les dériver ici, d'une seule
+   * source, évite que deux composants les recalculent différemment.
+   */
+  readonly creneaux: readonly CreneauDuJour[];
 }
 
-export interface PlanningSemaine {
-  /** Lundi de la semaine observée. */
-  readonly lundi: DateISO;
+export interface LigneDuJour {
+  readonly missionId: string;
+  readonly entiteId: string;
+  readonly libelle: string;
+  /** Le nom du client opérationnel seul, tel que le dessin l'affiche en gras. */
+  readonly nom: string;
+  /** Ce qu'on fait pour lui — la description de la mission, sous le nom. */
+  readonly description: string;
+  /** Teinte du client opérationnel, vide si aucune n'a été choisie. */
+  readonly couleur: string;
+  readonly prevu: number;
+  readonly retenu: number;
+  readonly ajuste: boolean;
+  readonly lieu: Lieu | null;
+}
+
+export interface CreneauDuJour {
+  readonly creneau: Creneau;
+  /**
+   * Qui occupe ce créneau. Vide : personne.
+   *
+   * Une LISTE et non un occupant unique. Deux donneurs d'ordre peuvent
+   * revendiquer la même matinée — deux rythmes qui prévoient tous deux le
+   * lundi. Le dessin n'en montre qu'un parce que son jeu d'exemple n'a jamais
+   * le cas ; n'en garder qu'un ici ferait DISPARAÎTRE du travail déclaré, en
+   * silence, et le CRA ne s'en apercevrait pas.
+   */
+  readonly occupants: readonly OccupantDeCreneau[];
+}
+
+export interface OccupantDeCreneau extends LigneDuJour {
+  /**
+   * `saisi` : la position vient d'un ajustement. `reparti` : de la convention.
+   *
+   * Le lieu ne s'affiche que sur un créneau `saisi` : sur une journée d'avant
+   * le schéma 14, il n'y en a pas, et en dessiner un serait l'inventer.
+   */
+  readonly sur: 'saisi' | 'reparti';
+}
+
+/** Le planning d'une période quelconque : une semaine, un mois. */
+export interface PlanningPeriode {
   readonly jours: readonly JourDeLaSemaine[];
   readonly totalPrevu: number;
   readonly totalRetenu: number;
+}
+
+export interface PlanningSemaine extends PlanningPeriode {
+  /** Lundi de la semaine observée. */
+  readonly lundi: DateISO;
 }
 
 /** Le lundi de la semaine qui contient cette date. */
@@ -345,7 +397,43 @@ export function planningDeLaSemaine(
     d.setUTCDate(d.getUTCDate() + i);
     dates.push(d.toISOString().slice(0, 10) as DateISO);
   }
+  return { lundi, ...planningDesDates(faits, dates, zone) };
+}
 
+/**
+ * Le planning d'un MOIS, exactement comme celui d'une semaine.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX VUES, UN SEUL CALCUL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La vue mois et la vue semaine sont deux onglets du MÊME écran, et l'on passe
+ * de l'une à l'autre d'un clic. Deux calculs concurrents ne se contrediraient
+ * pas en théorie — ils se contrediraient dans six mois, sur un cas que l'un
+ * traiterait et l'autre pas, et l'écart se lirait sur deux dessins du même jour
+ * à un clic d'intervalle. C'est l'invariant n°4, et c'est exactement la
+ * situation où il coûte le plus cher.
+ *
+ * Le mois est donc la même fonction, appliquée à un autre lot de dates.
+ */
+export function planningDuMois(
+  faits: Faits, m: Mois, zone: ZoneFeries = 'general'
+): PlanningPeriode {
+  const annee = Number(m.slice(0, 4));
+  const numero = Number(m.slice(5, 7));
+  // Le 0 du mois SUIVANT est le dernier jour de celui-ci : la seule façon de
+  // compter 28, 29, 30 ou 31 sans table ni règle bissextile écrite à la main.
+  const dernier = new Date(Date.UTC(annee, numero, 0)).getUTCDate();
+  const dates: DateISO[] = [];
+  for (let j = 1; j <= dernier; j += 1) {
+    dates.push(`${m}-${String(j).padStart(2, '0')}` as DateISO);
+  }
+  return planningDesDates(faits, dates, zone);
+}
+
+function planningDesDates(
+  faits: Faits, dates: readonly DateISO[], zone: ZoneFeries
+): PlanningPeriode {
   // Les fériés peuvent tomber sur deux années quand la semaine est à cheval
   // sur le 31 décembre.
   const annees = new Set(dates.map((d) => Number(d.slice(0, 4))));
@@ -376,31 +464,68 @@ export function planningDeLaSemaine(
           missionId: mission.id,
           entiteId: entite.id,
           libelle: libelleDeLaLigne(mission, entite),
+          // Le nom du client opérationnel s'il en porte un, celui du client de
+          // la mission sinon. Une entité sans nom n'est pas une anomalie : le
+          // cas ordinaire — une mission, un donneur d'ordre — n'a jamais eu à
+          // le saisir.
+          nom: entite.nom !== '' ? entite.nom : mission.clientNom,
+          description: mission.description,
           couleur: entite.couleur,
           prevu: j.prevu,
           retenu: j.retenu,
-          ajuste: j.ajuste
+          ajuste: j.ajuste,
+          lieu: j.lieu,
+          creneaux: j.creneaux
         };
       })
       // Une mission qui ne prévoit rien ce jour-là n'a pas à encombrer la
       // case : le vide se lit mieux qu'une ligne à zéro.
       .filter((d) => d.prevu > 0 || d.retenu > 0 || d.ajuste);
 
-    const modele = (parEntiteEtDate[0]?.planning[i]) as JourPlanifie | undefined;
+    /*
+     * La journée retournée par créneau.
+     *
+     * Chaque ligne dit quels créneaux elle occupe — les siens s'ils ont été
+     * saisis, ceux de la convention sinon — et on range le résultat par
+     * créneau. Une ligne à zéro n'occupe rien : `creneauxOccupes` le dit, et
+     * c'est ce qui laisse la case vide au lieu d'y poser un client absent.
+     */
+    const creneaux: CreneauDuJour[] = CRENEAUX.map((creneau) => ({
+      creneau,
+      occupants: detail.flatMap((d) => {
+        const occupe = creneauxOccupes(d.retenu, d.creneaux)
+          .find((o) => o.creneau === creneau);
+        if (occupe === undefined) return [];
+        const { creneaux: _positions, ...ligne } = d;
+        return [{ ...ligne, sur: occupe.sur }];
+      })
+    }));
 
     return {
       date,
       ferie: feries.has(date),
-      weekEnd: modele?.weekEnd ?? false,
+      /*
+       * LE SAMEDI EST UN SAMEDI, MISSION OU PAS.
+       *
+       * Cette ligne lisait le `weekEnd` du planning de la PREMIÈRE entité, et
+       * retombait sur `false` quand il n'y en avait aucune. Un compte sans
+       * mission active — un début d'activité, un mois entre deux contrats —
+       * comptait donc les trente jours du mois comme ouvrés : l'occupation
+       * tombait d'un tiers, et le seul écran qui aurait pu le signaler était
+       * précisément celui qui se trompait.
+       *
+       * Le jour de la semaine ne dépend d'aucune mission. Il se lit sur la date.
+       */
+      weekEnd: JOURS_DE_REPOS.has(jourDeSemaine(date)),
       conge: conges[date] ?? 0,
       prevu: detail.reduce((s, d) => s + d.prevu, 0),
       retenu: detail.reduce((s, d) => s + d.retenu, 0),
-      parMission: detail
+      parMission: detail.map(({ creneaux: _positions, ...ligne }) => ligne),
+      creneaux
     };
   });
 
   return {
-    lundi,
     jours,
     totalPrevu: jours.reduce((s, j) => s + j.prevu, 0),
     totalRetenu: jours.reduce((s, j) => s + j.retenu, 0)
@@ -744,5 +869,174 @@ export function tarifDeLaJournee(
     net: effectif.effectif === null
       ? { statut: 'refuse', motif: 'aucune journée travaillée cette année' }
       : tjmNet(effectif.effectif, taux)
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Le mois en chiffres
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * La part de télétravail, ET SUR QUOI ELLE EST CALCULÉE.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI LE DÉNOMINATEUR EST DANS LA STRUCTURE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le lieu n'est connu que sur les demi-journées dont la position a été SAISIE.
+ * Un mois de vingt jours dont deux seulement portent un lieu, tous deux à
+ * domicile, donnerait « 100 % de télétravail » — un chiffre parfaitement faux,
+ * et d'autant plus crédible qu'il est rond.
+ *
+ * La part porte donc sur les demi-journées DOCUMENTÉES, et la structure dit
+ * combien elles sont sur combien. À l'écran, « 100 % » devient « 100 %, sur 2
+ * demi-journées renseignées sur 37 » — et personne ne le lit comme une mesure
+ * du mois.
+ */
+export interface PartTeletravail {
+  /** Entre 0 et 1, sur les seules demi-journées documentées. */
+  readonly part: number;
+  readonly documentees: number;
+  readonly travaillees: number;
+}
+
+export interface PartClient {
+  readonly entiteId: string;
+  readonly nom: string;
+  readonly couleur: string;
+  /** Journées retenues sur le mois, ajustements compris. */
+  readonly jours: number;
+  /** Part du temps travaillé du mois, entre 0 et 1. */
+  readonly part: number;
+}
+
+export interface MoisEnChiffres {
+  readonly joursTravailles: number;
+  /** Ce que ces journées valent, au tarif en vigueur à chaque date. */
+  readonly caGenere: Euros;
+  readonly joursOuvrables: number;
+  readonly joursDeConge: number;
+  /**
+   * Jours travaillés rapportés aux jours ouvrables, ou `null`.
+   *
+   * `null` et non zéro quand aucun jour n'est ouvrable : un mois entièrement
+   * pris en congé n'a pas une occupation de 0 %, il n'en a pas. Afficher zéro
+   * ferait lire un mois catastrophique là où il n'y a rien à lire.
+   */
+  readonly occupation: number | null;
+  readonly parClient: readonly PartClient[];
+  /** `null` quand aucune demi-journée du mois ne porte de lieu. */
+  readonly teletravail: PartTeletravail | null;
+  /**
+   * D'où viennent les jours travaillés : du planning, ou déduits des factures.
+   *
+   * L'écran doit pouvoir dire s'il montre une MESURE ou une ESTIMATION. Une
+   * occupation lue sur le planning est un fait ; la même déduite d'un montant
+   * divisé par un tarif n'en est pas un, et un client qui a plusieurs missions
+   * à des tarifs différents la fausse.
+   */
+  readonly source: SourceCharge;
+}
+
+/**
+ * Le mois vu du TEMPS, et non de l'argent encaissé.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX RÉPARTITIONS CLIENT, ET CE N'EST PAS UN DOUBLON
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'écran porte déjà une répartition par client, en EUROS et sur l'ANNÉE :
+ * c'est la dépendance commerciale, le risque de perdre celui qui pèse 60 % du
+ * chiffre d'affaires. Celle-ci est en JOURS et sur le MOIS : c'est où passe le
+ * temps, maintenant.
+ *
+ * Les deux ne coïncident pas, et c'est précisément ce qui les rend utiles
+ * ensemble. Un client qui prend 40 % des journées pour 15 % du chiffre est mal
+ * tarifé — aucune des deux vues ne le dit seule.
+ *
+ * Le CA est celui que le TRAVAIL du mois produit, pas celui qui est rentré sur
+ * le compte : les deux diffèrent de tout le délai de paiement, et les
+ * confondre ferait lire un mois creux comme un mois faible.
+ */
+export function moisEnChiffres(
+  faits: Faits, m: Mois, zone: ZoneFeries = 'general'
+): MoisEnChiffres {
+  const planning = planningDuMois(faits, m, zone);
+  /* LE MÊME REPLI QUE LES TUILES DE L'ÉCRAN, ET PAR LA MÊME FONCTION.
+     Sans rythme déclaré — une mission sans planning, un mois hors contrat — le
+     planning rend zéro journée. Compter zéro donnerait une occupation nulle à
+     qui a facturé tout le mois. `chargeDuMoisPlanifiee` cède alors la place aux
+     jours déduits des factures, et `source` dit lequel des deux on lit. */
+  const charge = chargeDuMoisPlanifiee(faits, m)
+    ?? chargeDuMois(faits.recettes, tarifsParClient(faits), m);
+  /* `joursFactures` à zéro : ce plan ne sert qu'à son DÉNOMINATEUR — jours
+     ouvrables et congés posés. L'occupation est recalculée plus bas sur les
+     journées du PLANNING, qui sont un fait, là où celle du plan de charge est
+     déduite d'un montant divisé par un tarif. Passer les jours facturés ici
+     ferait exister un second taux d'occupation dans la même structure. */
+  const plan = planDeCharge(m, faits.conges, 0, zone);
+  const total = totaliserPrevisions(
+    previsionDuMoisParMission(faits, m).map((p) => p.prevision), m
+  );
+
+
+  const parEntite = new Map<string, { nom: string; couleur: string; jours: number }>();
+  let demiesDocumentees = 0;
+  let demiesTeletravail = 0;
+  let demiesTravaillees = 0;
+
+  for (const jour of planning.jours) {
+    for (const ligne of jour.parMission) {
+      if (ligne.retenu <= 0) continue;
+      const dejaLa = parEntite.get(ligne.entiteId);
+      if (dejaLa === undefined) {
+        parEntite.set(ligne.entiteId, {
+          nom: ligne.nom, couleur: ligne.couleur, jours: ligne.retenu
+        });
+      } else {
+        dejaLa.jours += ligne.retenu;
+      }
+    }
+
+    /* Le lieu se compte par DEMI-JOURNÉE, pas par journée.
+       Une journée à domicile le matin et sur site l'après-midi n'est ni l'un ni
+       l'autre : la compter comme une journée entière obligerait à choisir, et le
+       choix serait faux la moitié du temps. */
+    for (const creneau of jour.creneaux) {
+      for (const occupant of creneau.occupants) {
+        demiesTravaillees += 1;
+        if (occupant.sur !== 'saisi' || occupant.lieu === null) continue;
+        demiesDocumentees += 1;
+        if (occupant.lieu === 'teletravail') demiesTeletravail += 1;
+      }
+    }
+  }
+
+  const joursTravailles = charge.jours;
+  const parClient = [...parEntite.entries()]
+    .map(([entiteId, c]) => ({
+      entiteId,
+      nom: c.nom,
+      couleur: c.couleur,
+      jours: c.jours,
+      part: joursTravailles > 0 ? c.jours / joursTravailles : 0
+    }))
+    .sort((a, b) => b.jours - a.jours);
+
+  return {
+    joursTravailles,
+    caGenere: total.montantRetenu,
+    joursOuvrables: plan.joursOuvrables,
+    joursDeConge: plan.joursDeConge,
+    occupation: plan.joursOuvrables > 0 ? joursTravailles / plan.joursOuvrables : null,
+    parClient,
+    source: charge.source,
+    teletravail: demiesDocumentees === 0
+      ? null
+      : {
+        part: demiesTeletravail / demiesDocumentees,
+        documentees: demiesDocumentees,
+        travaillees: demiesTravaillees
+      }
   };
 }

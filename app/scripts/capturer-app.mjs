@@ -65,7 +65,12 @@ const AUJOURDHUI = '2026-06-10T09:00:00Z';
  */
 const VUES = [
   { hash: '#/pilote', nom: 'pilote' },
-  { hash: '#/activite', nom: 'activite-plan-de-charge' },
+  /* Le handoff nomme « plan de charge » sa VUE SEMAINE : c'est sur elle que
+     l'écran s'ouvre là-bas. Chez nous l'écran s'ouvre encore sur le mois, parce
+     que c'est le mois qui porte la pose des congés — la fusion des deux cartes
+     est le lot C3. En attendant, on clique pour aller chercher la vue que la
+     référence montre, plutôt que de comparer deux écrans différents. */
+  { hash: '#/activite', nom: 'activite-plan-de-charge', ouvrir: ['Semaine'] },
   { hash: '#/activite', nom: 'activite-mois', ouvrir: ['Mois'] },
   { hash: '#/activite', nom: 'activite-missions', ouvrir: ['Missions'] },
   { hash: '#/activite', nom: 'activite-factures', ouvrir: ['Factures'] },

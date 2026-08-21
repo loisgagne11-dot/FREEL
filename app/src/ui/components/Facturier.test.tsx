@@ -390,7 +390,9 @@ describe('la facture du mois, avant qu’elle existe', () => {
         ...missionPlanifiee,
         entites: [{
           ...(missionPlanifiee.entites[0] as (typeof missionPlanifiee)['entites'][number]),
-          ajustements: { '2026-08-03': 0, '2026-08-04': 0 }
+          // Depuis le schéma 14 un ajustement porte aussi créneau et lieu ; le
+          // CRA ne lit que la quotité, et c'est elle seule qu'on pose ici.
+          ajustements: { '2026-08-03': { quotite: 0 }, '2026-08-04': { quotite: 0 } }
         }]
       }]
     });

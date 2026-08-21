@@ -44,6 +44,16 @@ const entite = (e: Partial<Faits['missions'][number]['entites'][number]> = {}) =
   email: '', telephone: '', rythmes: [], ajustements: {}, ...e
 });
 
+/**
+ * Des ajustements écrits par leur seule quotité.
+ *
+ * Depuis le schéma 14, un ajustement porte aussi un créneau et un lieu. Aucun
+ * des tests d'ici ne les regarde : les écrire à chaque ligne laisserait croire
+ * qu'ils pèsent sur ce qu'on mesure.
+ */
+const poses = (quotites: Record<string, number>) =>
+  Object.fromEntries(Object.entries(quotites).map(([d, quotite]) => [d, { quotite }]));
+
 const recette = (m: Partial<Faits['recettes'][number]> = {}) => ({
   id: 'rec-1', clientNom: 'ClientA', libelle: 'Facture', montant: euros(4000),
   emiseLe: dateISO('2026-07-10'), encaisseeLe: null,
@@ -66,13 +76,20 @@ describe('plan de charge', () => {
     expect(screen.getByText('Équivalent-jours facturés').nextSibling?.textContent).toBe('10');
   });
 
+  /**
+   * L'OCCUPATION A QUITTÉ LES TUILES POUR « LE MOIS EN CHIFFRES ».
+   *
+   * Elle s'affichait aux deux endroits, et les deux ne calculaient pas la même
+   * chose. Le panneau la garde parce qu'il a la place d'écrire son
+   * dénominateur — sans lui, « 45 % » ne se compare pas d'un mois à l'autre.
+   * Le RAPPORT lui-même, lui, ne change pas : c'est ce que ce test tient.
+   */
   it('rapporte les jours facturés aux jours ouvrables', () => {
     semer({ missions: [mission()], recettes: [recette()] });
     render(<Activite />);
-    // 10 / 22 ≈ 45 %. L'espace avant le signe est une insécable étroite,
-    // posée par l'API d'internationalisation : la comparer à une espace
-    // ordinaire ferait échouer un affichage pourtant correct.
-    expect(screen.getByText('Occupation').nextSibling?.textContent).toMatch(/^45\s%$/u);
+    // 10 / 22 ≈ 45 %.
+    expect(screen.getByText('Occupation').parentElement?.textContent).toMatch(/45\s?%/u);
+    expect(screen.getByText(/j ouvrés/).textContent).toMatch(/10 \/ 22\s?j ouvrés/u);
   });
 
   // Les compter à un tarif supposé fabriquerait de l'occupation.
@@ -90,7 +107,9 @@ describe('plan de charge', () => {
     );
     semer({ conges: toutJuillet });
     render(<Activite />);
-    expect(screen.getByText('Occupation').nextSibling?.textContent).toBe('—');
+    const ligne = screen.getByText('Occupation').parentElement;
+    expect(ligne?.textContent).toContain('—');
+    expect(ligne?.textContent).not.toMatch(/0\s?%/u);
   });
 });
 
@@ -124,8 +143,10 @@ describe('calendrier des congés', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: /27 juil\. 2026, jour travaillé/ }));
     expect(screen.getByText('Jours ouvrables').nextSibling?.textContent).toBe('21');
-    // 10 / 21 ≈ 48 %.
-    expect(screen.getByText('Occupation').nextSibling?.textContent).toMatch(/^48\s%$/u);
+    // 10 / 21 ≈ 48 %. Le congé sort du DÉNOMINATEUR : le même travail sur
+    // moins de jours disponibles fait monter l'occupation, ce qui est le sens
+    // de la mesure.
+    expect(screen.getByText('Occupation').parentElement?.textContent).toMatch(/48\s?%/u);
   });
 
   // Un congé posé ce jour-là ne consomme rien et ne changerait aucun chiffre.
@@ -328,24 +349,48 @@ describe('vue semaine', () => {
   });
 
   /**
-   * Le tour d'un créneau : journée → demi-journée → rien → retour au rythme.
-   * Le dernier état efface l'ajustement au lieu d'en poser un à zéro — sans
-   * lui, une correction serait définitive.
+   * LE CLIC VISE UNE MOITIÉ, ET LA MOITIÉ VISÉE EST CELLE QUI BOUGE.
+   *
+   * L'écran faisait tourner la JOURNÉE — entière, demie, rien, retour au
+   * rythme — et « demie » remplissait toujours le matin : retirer une matinée
+   * en gardant l'après-midi était impossible. Le schéma 14 donne la position,
+   * et le geste la suit.
    */
-  it('fait le tour des quotités au clic, puis revient au rythme', async () => {
+  it('retire la moitié cliquée et laisse l’autre', async () => {
     semer({ missions: [avecRythme()] });
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    const creneau = () => screen.getAllByRole('button', { name: /13 juil\. 2026/ })[0] as HTMLElement;
     const ajustements = () =>
       useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
 
-    await utilisateur.click(creneau());          // journée → demi
-    expect(ajustements()['2026-07-13']).toBe(0.5);
-    await utilisateur.click(creneau());          // demi → rien
-    expect(ajustements()['2026-07-13']).toBe(0);
-    await utilisateur.click(creneau());          // rien → retour au rythme
+    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
+    expect(ajustements()['2026-07-13']?.quotite).toBe(0.5);
+    expect(ajustements()['2026-07-13']?.creneaux).toEqual(['apresMidi']);
+
+    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, après-midi/ }));
+    expect(ajustements()['2026-07-13']?.quotite).toBe(0);
+    expect(ajustements()['2026-07-13']?.creneaux).toEqual([]);
+  });
+
+  /**
+   * Revenir exactement à ce que le rythme prévoit EFFACE l'ajustement, au lieu
+   * d'en poser un qui dit la même chose. C'est ce que le troisième état du
+   * cycle tenait vraiment : sans lui, une correction annulée à la main
+   * laisserait derrière elle un ajustement invisible — jusqu'au jour où le
+   * rythme change et où cette journée-là ne suit pas.
+   */
+  it('efface l’ajustement quand la journée retombe sur le rythme', async () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    const ajustements = () =>
+      useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
+
+    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
+    expect(ajustements()).toHaveProperty('2026-07-13');
+    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
     expect(ajustements()).not.toHaveProperty('2026-07-13');
   });
 
@@ -413,7 +458,9 @@ describe('compte rendu d’activité', () => {
           du: dateISO('2026-07-01'), au: dateISO('2026-07-31'),
           parJour: { lun: 1 }, tjm: euros(400)
         }],
-        ajustements: { '2026-07-06': 0, '2026-07-13': 0, '2026-07-20': 0, '2026-07-27': 0 }
+        ajustements: poses({
+          '2026-07-06': 0, '2026-07-13': 0, '2026-07-20': 0, '2026-07-27': 0
+        })
       })]
     });
     semer({ missions: [sansRien] });
@@ -448,7 +495,7 @@ describe('journée déclarée sur un créneau vide', () => {
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+    await utilisateur.click(screen.getAllByRole('button', { name: /, libre$/ })[0]!);
 
     expect(screen.getByRole('button', { name: 'Mission A' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Mission B' })).toBeTruthy();
@@ -462,7 +509,7 @@ describe('journée déclarée sur un créneau vide', () => {
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+    await utilisateur.click(screen.getAllByRole('button', { name: /, libre$/ })[0]!);
     await utilisateur.click(screen.getByRole('button', { name: 'Mission B' }));
 
     const missions = useFaits.getState().faits.missions;
@@ -480,7 +527,7 @@ describe('journée déclarée sur un créneau vide', () => {
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+    await utilisateur.click(screen.getAllByRole('button', { name: /, libre$/ })[0]!);
 
     expect(screen.queryByRole('button', { name: /rattacher/i })).toBeNull();
     expect(Object.keys(
@@ -536,7 +583,7 @@ describe('revenir au rythme sur une semaine', () => {
             parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: euros(400)
           }],
           // Deux corrections dans la semaine du 13/07, une hors de cette semaine.
-          ajustements: { '2026-07-13': 0, '2026-07-14': 0.5, '2026-06-01': 0 }
+          ajustements: poses({ '2026-07-13': 0, '2026-07-14': 0.5, '2026-06-01': 0 })
         })]
       })]
     });
@@ -546,7 +593,7 @@ describe('revenir au rythme sur une semaine', () => {
     await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
 
     const ajustements = useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
-    expect(ajustements).toEqual({ '2026-06-01': 0 });
+    expect(ajustements).toEqual({ '2026-06-01': { quotite: 0 } });
   });
 
   /**
@@ -561,7 +608,7 @@ describe('revenir au rythme sur une semaine', () => {
             du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
             parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: euros(400)
           }],
-          ajustements: { '2026-07-13': 0 }
+          ajustements: poses({ '2026-07-13': 0 })
         })]
       })]
     });
@@ -569,9 +616,11 @@ describe('revenir au rythme sur une semaine', () => {
     const utilisateur = await ouvrirSemaine();
     await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
 
-    // Le lundi 13 juillet redevient une journée entière, comme le rythme le dit.
-    expect(screen.getAllByRole('button', { name: /13 juil.*journée entière/ }).length)
-      .toBeGreaterThan(0);
+    // Le lundi 13 juillet redevient travaillé sur ses DEUX moitiés, comme le
+    // rythme le dit. Le remettre à zéro laisserait les deux à « libre ».
+    expect(screen.getByRole('button', { name: /13 juil\. 2026, matin, ClientA/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /13 juil\. 2026, après-midi, ClientA/ }))
+      .toBeTruthy();
   });
 });
 

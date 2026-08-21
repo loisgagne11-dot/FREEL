@@ -1,4 +1,5 @@
-import type { PlanningSemaine } from '../../state/selecteurs.activite';
+import type { CreneauDuJour, JourDeLaSemaine, PlanningSemaine } from '../../state/selecteurs.activite';
+import type { Creneau, Lieu } from '../../domain/calculs/planning';
 import type { DateISO } from '../../domain/types';
 import { dateCourte } from '../format';
 import { decompterJours } from '../../domain/calculs/activite';
@@ -6,8 +7,20 @@ import styles from './VueSemaine.module.css';
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
+/** Les deux moitiés, telles que le dessin les nomme au-dessus de chaque case. */
+const NOM_CRENEAU: Readonly<Record<Creneau, string>> = {
+  matin: 'MATIN',
+  apresMidi: 'APRÈS-M.'
+};
+
+/** Le lieu, en toutes lettres. Le pictogramme seul ne se lit pas. */
+const NOM_LIEU: Readonly<Record<Lieu, string>> = {
+  teletravail: 'télétravail',
+  sur_site: 'sur site'
+};
+
 /**
- * La vue semaine du planning — `WeekView` de la spec de design.
+ * La vue semaine du planning.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LA SEMAINE EST LA MAILLE DE LA CORRECTION
@@ -19,41 +32,41 @@ const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
  * renonce à faire est un CRA faux.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * DEUX CRÉNEAUX PARCE QUE LA DEMI-JOURNÉE EXISTE
+ * LA JOURNÉE SE LIT PAR CRÉNEAU, ET NON PAR CLIENT
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Chaque jour porte deux créneaux : c'est la seule façon de rendre visible
- * une demi-journée, que l'ancienne application gère depuis toujours. Une
- * quotité de 1 les remplit tous les deux, 0,5 le premier. Le partage
- * matin/après-midi n'est pas un fait — l'application ne sait pas QUELLE
- * moitié a été travaillée — c'est une convention d'affichage, et l'infobulle
- * de l'écran le dit.
+ * La version précédente empilait une paire de cases par client opérationnel.
+ * C'était la seule forme possible tant que la position d'une demi-journée
+ * n'existait pas : deux clients le même jour donnaient deux paires, sans qu'on
+ * puisse dire lequel occupait la matinée.
  *
- * Un clic fait le tour : journée → demi-journée → rien → retour au rythme.
- * « Retour au rythme » est un état distinct de « rien » : il efface
- * l'ajustement au lieu d'en poser un à zéro, et le jour redevient ce que le
- * rythme prévoit.
- */
-/**
+ * Le dessin range dans l'autre sens — une ligne MATIN, une ligne APRÈS-MIDI,
+ * et le client À L'INTÉRIEUR — et c'est la question qu'on se pose vraiment en
+ * regardant sa semaine : « où j'étais mercredi matin ». Depuis le schéma 14, la
+ * donnée permet d'y répondre.
+ *
+ * Un créneau peut porter DEUX occupants : deux rythmes qui prévoient tous deux
+ * le lundi matin. Le dessin ne montre jamais le cas parce que son jeu d'exemple
+ * ne l'a pas ; n'en afficher qu'un ferait disparaître du travail déclaré, en
+ * silence, pendant que le CRA continuerait de le compter.
+ *
  * ─────────────────────────────────────────────────────────────────────────
- * UNE PAIRE DE CRÉNEAUX PAR CLIENT OPÉRATIONNEL
+ * LE LIEU NE S'AFFICHE QUE S'IL EST SU
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Deux donneurs d'ordre peuvent occuper la même journée — lundi chez l'un,
- * lundi après-midi chez l'autre. Une seule paire de créneaux par jour
- * obligerait à décider laquelle des deux lignes un clic corrige, et le choix
- * serait forcément arbitraire.
- *
- * Chaque ligne a donc ses propres créneaux, dans sa propre teinte. Le cas
- * ordinaire — un seul client — donne exactement l'affichage d'avant : une
- * paire, sans rien qui trahisse l'existence du concept.
+ * Un créneau `reparti` — déduit de la seule quotité, sans position saisie —
+ * n'a pas de lieu, et on n'en dessine pas. Poser « télétravail » par défaut
+ * remplirait le plan de charge de journées à domicile que personne n'a
+ * déclarées, indiscernables des vraies.
  */
 export function VueSemaine(
   { planning, aujourdhui, onBasculer, onRevenirAuRythme }: {
     readonly planning: PlanningSemaine;
     readonly aujourdhui: DateISO;
-    /** Fait tourner la quotité d'une ligne du jour. */
-    readonly onBasculer: (date: DateISO, missionId: string, entiteId: string) => void;
+    /** Bascule UN créneau d'une ligne. Ligne vide : on demande à qui l'affecter. */
+    readonly onBasculer: (
+      date: DateISO, missionId: string, entiteId: string, creneau: Creneau
+    ) => void;
     /** Efface les corrections de la semaine : les journées redeviennent le rythme. */
     readonly onRevenirAuRythme: () => void;
   }
@@ -65,11 +78,6 @@ export function VueSemaine(
   /**
    * Le décompte de la semaine affichée, calculé par le DOMAINE.
    *
-   * La spec demande ce compte « sur la période visible (semaine ou mois) ». Le
-   * mois l'avait, la semaine non — et c'est là qu'il manque le plus : cinq
-   * jours ouvrés n'est pas toujours la réponse, une semaine avec un férié en
-   * compte quatre.
-   *
    * Le calcul ne vit PAS ici. Une première version le faisait dans ce
    * composant, et comptait les congés parmi les ouvrés là où le plan de charge
    * du mois les en retire : même mot, deux nombres, même écran. Les deux
@@ -78,88 +86,86 @@ export function VueSemaine(
    */
   const decompte = decompterJours(planning.jours);
 
+  /** Les clients présents cette semaine, pour la légende. Un seul par teinte. */
+  const presents = new Map<string, { readonly nom: string; readonly couleur: string }>();
+  for (const jour of planning.jours) {
+    for (const ligne of jour.parMission) {
+      if (ligne.retenu > 0 && !presents.has(ligne.entiteId)) {
+        presents.set(ligne.entiteId, { nom: ligne.nom, couleur: ligne.couleur });
+      }
+    }
+  }
+
   return (
     <>
-      {/* Les deux nombres ensemble : « 5 jours ouvrés, dont 2 de congé ».
-          Personne n'a plus à deviner lequel il regarde. */}
+      {/*
+        * La ligne de lecture du dessin : ce que la grille montre, puis le
+        * compte. « matin / après-midi » y est une CONVENTION d'affichage pour
+        * toute journée dont la position n'a pas été saisie — l'écrire ici est
+        * la seule façon de ne pas laisser croire à un fait.
+        */}
       <p className={styles.resumeSemaine}>
-        {decompte.ouvres} jour{decompte.ouvres > 1 ? 's' : ''} ouvré{decompte.ouvres > 1 ? 's' : ''}
-        {decompte.enConge > 0 && `, dont ${decompte.enConge} de congé`}
+        <span className={styles.conventions}>matin&nbsp;/&nbsp;après-midi · client · lieu</span>
+        {' · '}
+        <strong>
+          {decompte.ouvres} jour{decompte.ouvres > 1 ? 's' : ''} ouvré{decompte.ouvres > 1 ? 's' : ''}
+          {decompte.enConge > 0 && `, dont ${decompte.enConge} de congé`}
+        </strong>
       </p>
 
       <div className={styles.semaine}>
-        {JOURS.map((j) => (
-          <div key={j} className={styles.enteteJour} aria-hidden="true">{j}</div>
-        ))}
-
-        {planning.jours.map((jour) => {
+        {planning.jours.map((jour, index) => {
           const numero = Number(jour.date.slice(8, 10));
-          // Un jour sans aucune ligne garde une paire de créneaux vides : la
-          // grille doit rester une grille, et c'est là qu'on clique pour
-          // déclarer une journée que le rythme ne prévoyait pas.
-          const lignes = jour.parMission.length > 0 ? jour.parMission : [null];
+          const estAujourdhui = jour.date === aujourdhui;
 
           return (
-            <div key={jour.date} className={styles.colonne}>
-              <span
-                className={`${styles.numero} ${jour.date === aujourdhui ? styles.aujourdhui : ''}`}
-              >
-                {numero}
-              </span>
+            <div
+              key={jour.date}
+              className={`${styles.colonne} ${estAujourdhui ? styles.colonneDuJour : ''}`}
+            >
+              <div className={styles.enteteJour}>
+                <span aria-hidden="true">{JOURS[index]} {numero}</span>
+                <span className={styles.invisible}>{dateCourte(jour.date)}</span>
+              </div>
 
-              {lignes.map((ligne, rang) => (
-                <div key={ligne?.entiteId ?? rang} className={styles.pile}>
-                  {[0, 1].map((creneau) => {
-                    const retenu = ligne?.retenu ?? 0;
-                    // Une quotité de 1 remplit les deux créneaux, 0,5 le premier.
-                    const rempli = retenu >= (creneau === 0 ? 0.5 : 1);
-                    const ajuste = ligne?.ajuste ?? false;
-                    const classes = [
-                      styles.creneau,
-                      rempli ? styles.travaille : '',
-                      ajuste && rempli ? styles.ajuste : '',
-                      jour.conge > 0 && !rempli ? styles.conge : '',
-                      jour.ferie ? styles.ferie : '',
-                      jour.weekEnd ? styles.weekEnd : ''
-                    ].filter((c) => c !== '').join(' ');
-
-                    return (
-                      <button
-                        key={creneau}
-                        type="button"
-                        className={classes}
-                        // La teinte du client opérationnel prime sur celle du
-                        // thème quand elle est choisie : c'est ce qui distingue
-                        // deux lignes d'un coup d'œil. Absente, le thème reprend
-                        // la main — une couleur oubliée ne casse rien.
-                        {...(rempli && ligne !== null && ligne.couleur !== ''
-                          ? { style: { background: ligne.couleur, borderColor: ligne.couleur } }
-                          : {})}
-                        onClick={() => onBasculer(
-                          jour.date,
-                          ligne?.missionId ?? '',
-                          ligne?.entiteId ?? ''
-                        )}
-                      >
-                        <span className={styles.invisible}>
-                          {dateCourte(jour.date)}
-                          {ligne !== null && ligne.libelle !== '' ? `, ${ligne.libelle}` : ''}
-                          , {etatDeLaLigne(jour, ligne)}
-                        </span>
-                        {rempli && ligne !== null && (
-                          <span className={styles.libelleCreneau} aria-hidden="true">
-                            {ligne.libelle}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+              {jour.creneaux.map((creneau) => (
+                <CaseDeCreneau
+                  key={creneau.creneau}
+                  jour={jour}
+                  creneau={creneau}
+                  onBasculer={onBasculer}
+                />
               ))}
             </div>
           );
         })}
       </div>
+
+      <ul className={styles.legende}>
+        {[...presents.values()].map((c) => (
+          <li key={c.nom} className={styles.legendeEntree}>
+            <span
+              className={styles.pastille}
+              {...(c.couleur !== '' ? { style: { background: c.couleur } } : {})}
+              aria-hidden="true"
+            />
+            {c.nom}
+          </li>
+        ))}
+        <li className={styles.legendeEntree}>
+          <span className={`${styles.pastille} ${styles.pastilleConge}`} aria-hidden="true" />
+          Congé
+        </li>
+        {/* Ici le pictogramme est MUET : son nom est écrit juste à côté, et
+            `MarqueLieu` le répéterait hors écran — un lecteur d'écran
+            entendrait « télétravail télétravail ». */}
+        <li className={styles.legendeEntree}>
+          <span className={styles.lieu} aria-hidden="true">⌂</span>télétravail
+        </li>
+        <li className={styles.legendeEntree}>
+          <span className={styles.lieu} aria-hidden="true">▤</span>sur site
+        </li>
+      </ul>
 
       <p className={styles.total}>
         <span>Travaillé cette semaine</span>
@@ -176,23 +182,120 @@ export function VueSemaine(
 }
 
 /**
- * L'état d'une ligne, en toutes lettres, pour les lecteurs d'écran.
+ * Une case : une moitié de journée.
  *
- * La quotité annoncée est celle de la LIGNE, pas du jour : un lecteur d'écran
- * qui entendrait « journée entière » sur un créneau à moitié rempli n'aurait
- * aucun moyen de savoir laquelle des deux lignes il écoute.
+ * Elle reste un BOUTON même vide. C'est là qu'on déclare une demi-journée que
+ * le rythme ne prévoyait pas — un rendu un samedi, une astreinte un férié — et
+ * l'ancienne application le permettait déjà.
  */
-function etatDeLaLigne(
-  jour: PlanningSemaine['jours'][number],
-  ligne: PlanningSemaine['jours'][number]['parMission'][number] | null
-): string {
-  const retenu = ligne?.retenu ?? 0;
+function CaseDeCreneau(
+  { jour, creneau, onBasculer }: {
+    readonly jour: JourDeLaSemaine;
+    readonly creneau: CreneauDuJour;
+    readonly onBasculer: (
+      date: DateISO, missionId: string, entiteId: string, creneau: Creneau
+    ) => void;
+  }
+) {
+  const [premier] = creneau.occupants;
+  const occupe = premier !== undefined;
+  // Le congé ne se dessine que sur une moitié LIBRE : une demi-journée de congé
+  // le matin laisse l'après-midi travaillé, et hachurer les deux dirait le
+  // contraire de ce que le CRA compte.
+  const enConge = !occupe && jour.conge > 0;
+  const libre = !occupe && !enConge;
+
+  const classes = [
+    styles.creneau,
+    occupe ? styles.travaille : '',
+    occupe && premier.ajuste ? styles.ajuste : '',
+    enConge ? styles.conge : '',
+    jour.ferie ? styles.ferie : '',
+    jour.weekEnd ? styles.weekEnd : ''
+  ].filter((c) => c !== '').join(' ');
+
+  return (
+    <button
+      type="button"
+      className={classes}
+      // La teinte du client prime sur celle du thème quand elle est choisie :
+      // c'est elle qui distingue deux clients d'un coup d'œil. Absente, le
+      // thème reprend la main — une couleur oubliée ne casse rien.
+      {...(occupe && premier.couleur !== ''
+        ? { style: { borderColor: premier.couleur } }
+        : {})}
+      onClick={() => onBasculer(
+        jour.date,
+        premier?.missionId ?? '',
+        premier?.entiteId ?? '',
+        creneau.creneau
+      )}
+    >
+      <span className={styles.invisible}>
+        {dateCourte(jour.date)}, {creneau.creneau === 'matin' ? 'matin' : 'après-midi'},{' '}
+        {etatDuCreneau(jour, creneau)}
+      </span>
+
+      <span className={styles.enteteCreneau} aria-hidden="true">
+        <span className={styles.etiquetteCreneau}>{NOM_CRENEAU[creneau.creneau]}</span>
+        {/* Le lieu vient du créneau SAISI. Sur un créneau réparti, il n'y en a
+            pas : le sélecteur rend `null`, et rien ne se dessine. */}
+        {premier?.sur === 'saisi' && premier.lieu !== null && <MarqueLieu lieu={premier.lieu} />}
+      </span>
+
+      {occupe && (
+        <span aria-hidden="true">
+          {creneau.occupants.map((o) => (
+            <span key={o.entiteId} className={styles.occupant}>
+              <span
+                className={styles.nomClient}
+                {...(o.couleur !== '' ? { style: { color: o.couleur } } : {})}
+              >
+                {o.nom}
+              </span>
+              {o.description !== '' && (
+                <span className={styles.descriptionMission}>{o.description}</span>
+              )}
+            </span>
+          ))}
+        </span>
+      )}
+
+      {enConge && <span className={styles.motCase} aria-hidden="true">Congé</span>}
+      {libre && <span className={styles.motLibre} aria-hidden="true">libre</span>}
+    </button>
+  );
+}
+
+/** Le pictogramme du lieu, avec son nom pour qui ne le voit pas. */
+function MarqueLieu({ lieu }: { readonly lieu: Lieu }) {
+  return (
+    <span className={styles.lieu} title={NOM_LIEU[lieu]}>
+      <span aria-hidden="true">{lieu === 'teletravail' ? '⌂' : '▤'}</span>
+      <span className={styles.invisible}>{NOM_LIEU[lieu]}</span>
+    </span>
+  );
+}
+
+/**
+ * L'état d'un créneau, en toutes lettres, pour les lecteurs d'écran.
+ *
+ * Il nomme le client : un lecteur d'écran qui entendrait « travaillé » sur
+ * quatorze cases n'aurait aucun moyen de reconstituer la semaine que l'œil lit
+ * d'un coup.
+ */
+function etatDuCreneau(jour: JourDeLaSemaine, creneau: CreneauDuJour): string {
+  const noms = creneau.occupants
+    .map((o) => (o.description !== '' ? `${o.nom}, ${o.description}` : o.nom))
+    .join(' et ');
+  if (noms !== '') {
+    const ajuste = creneau.occupants.some((o) => o.ajuste) ? ', ajusté' : '';
+    return `${noms}${ajuste}`;
+  }
   if (jour.ferie) return 'jour férié';
-  if (jour.weekEnd && retenu === 0) return 'week-end';
-  if (jour.conge > 0 && retenu === 0) return 'congé';
-  if (retenu === 0) return 'non travaillé';
-  const quantite = retenu === 1 ? 'journée entière' : `${formater(retenu)} jour`;
-  return ligne?.ajuste === true ? `${quantite}, ajusté` : quantite;
+  if (jour.conge > 0) return 'congé';
+  if (jour.weekEnd) return 'week-end';
+  return 'libre';
 }
 
 /** Une quotité lisible : « 4,5 » plutôt que « 4.5 ». */

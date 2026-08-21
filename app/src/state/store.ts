@@ -34,6 +34,7 @@ import {
 } from '../domain/bareme/urssaf';
 import type { EtatRapprochement } from '../domain/calculs/depenses';
 import type { Echeance } from '../domain/calculs/provisions';
+import type { AjustementJour } from '../domain/calculs/planning';
 import { type ResultatMigration, type Stockage, migrer } from '../infra/migration';
 
 /** Le stockage du navigateur, ou `null` quand il est indisponible. */
@@ -268,15 +269,31 @@ interface MagasinFaits {
   /* ── Planning ─────────────────────────────────────────────────────────── */
 
   /**
-   * Ajuste ce qui a été travaillé un jour donné, pour une mission.
+   * Pose l'ajustement d'une journée, pour un client opérationnel.
    *
-   * `quotite` à `null` EFFACE l'ajustement : le jour redevient ce que le
-   * rythme prévoit. C'est un état distinct de « zéro », qui déclare au
-   * contraire « ce jour prévu, je n'ai pas travaillé ». Les confondre
-   * rendrait impossible de revenir au rythme après une correction.
+   * ─────────────────────────────────────────────────────────────────────────
+   * UN SEUL ÉCRIVAIN POUR UN SEUL CHAMP
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * `ajusterJour` l'a précédée : elle n'écrivait qu'une quotité et FUSIONNAIT
+   * avec les créneaux déjà posés. C'était le bon comportement pour corriger
+   * « 1 j » en « 0,5 j », et le mauvais pour un clic qui DÉPLACE la
+   * demi-journée du matin vers l'après-midi — les créneaux d'avant survivaient
+   * au geste qui visait justement à les changer.
+   *
+   * Les deux ont coexisté le temps d'un lot, et c'est exactement la
+   * configuration que l'invariant n°4 interdit : deux façons d'écrire le même
+   * champ finissent par ne pas tomber d'accord. `poserAjustement` REMPLACE, et
+   * l'appelant lui donne la journée entière — c'est au domaine de dire ce
+   * qu'elle devient, pas au magasin de le deviner.
+   *
+   * `null` EFFACE l'ajustement : la journée redevient ce que le rythme prévoit.
+   * C'est un état distinct de « zéro », qui déclare au contraire « ce jour
+   * prévu, je n'ai pas travaillé ». Les confondre rendrait impossible de
+   * revenir au rythme après une correction.
    */
-  readonly ajusterJour: (
-    missionId: string, entiteId: string, date: DateISO, quotite: number | null
+  readonly poserAjustement: (
+    missionId: string, entiteId: string, date: DateISO, pose: AjustementJour | null
   ) => void;
 
   /**
@@ -997,7 +1014,7 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     return null;
   },
 
-  ajusterJour: (missionId, entiteId, date, quotite) => {
+  poserAjustement: (missionId, entiteId, date, pose) => {
     const actuel = get().faits;
     const missions = actuel.missions.map((m) => {
       if (m.id !== missionId) return m;
@@ -1009,8 +1026,9 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
         entites: m.entites.map((e) => {
           if (e.id !== entiteId) return e;
           const ajustements = { ...e.ajustements };
-          if (quotite === null) delete ajustements[date];
-          else ajustements[date] = quotite;
+          // Remplacement, et non fusion : le geste vise les créneaux eux-mêmes.
+          if (pose === null) delete ajustements[date];
+          else ajustements[date] = pose;
           return { ...e, ajustements };
         })
       };
@@ -1028,10 +1046,10 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     const missions = actuel.missions.map((m) => ({
       ...m,
       entites: m.entites.map((e) => {
-        const ajustements: Record<string, number> = {};
-        for (const [date, quotite] of Object.entries(e.ajustements)) {
+        const ajustements: Record<string, AjustementJour> = {};
+        for (const [date, pose] of Object.entries(e.ajustements)) {
           if (cibles.has(date)) { retires += 1; continue; }
-          ajustements[date] = quotite;
+          ajustements[date] = pose;
         }
         return { ...e, ajustements };
       })

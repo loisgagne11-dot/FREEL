@@ -18,7 +18,7 @@ import type { Depense } from '../domain/calculs/depenses';
 import type { PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import type { MotifSansContrepartie, MouvementBancaire } from '../domain/calculs/banque';
-import type { Ajustements, Rythme } from '../domain/calculs/planning';
+import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
 import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 import {
@@ -35,9 +35,9 @@ import {
  * ensuite s'accommoder.
  */
 export type { Depense };
-export type { Ajustements, Rythme };
+export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 13 as const;
+export const VERSION_SCHEMA = 14 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -718,7 +718,17 @@ function entitesDuSchema3(o: Record<string, unknown>): readonly ClientOperationn
     return (o['entites'] as unknown[]).flatMap((e): ClientOperationnel[] => {
       if (typeof e !== 'object' || e === null) return [];
       const c = e as Record<string, unknown>;
-      return [{ ...entiteVide(), ...(c as unknown as ClientOperationnel) }];
+      return [{
+        ...entiteVide(),
+        ...(c as unknown as ClientOperationnel),
+        /* APRÈS l'étalement, et jamais avant.
+           `...c` recopie `ajustements` tel quel : sur un bloc d'avant le
+           schéma 14, ce sont des NOMBRES. La fusion de surface ne les
+           convertit pas — c'est exactement le piège de l'invariant n°5, déjà
+           rencontré sur `partsFiscales` : le champ existe, donc il passe, et
+           il passe faux. */
+        ajustements: ajustementsDuSchema13(c['ajustements'])
+      }];
     });
   }
 
@@ -727,10 +737,54 @@ function entitesDuSchema3(o: Record<string, unknown>): readonly ClientOperationn
     id: `${typeof o['id'] === 'string' ? o['id'] : 'mission'}-co1`,
     nom: typeof o['clientNom'] === 'string' ? o['clientNom'] : '',
     rythmes: Array.isArray(o['rythmes']) ? o['rythmes'] as readonly Rythme[] : [],
-    ajustements: (typeof o['ajustements'] === 'object' && o['ajustements'] !== null)
-      ? o['ajustements'] as Ajustements
-      : {}
+    ajustements: ajustementsDuSchema13(o['ajustements'])
   }];
+}
+
+/**
+ * L'ajustement passe du nombre nu au fait de journée (schéma 13 → 14).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CE QUI SE PERDRAIT SANS ELLE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `ajustements` valait `Record<date, number>`. Il vaut désormais
+ * `Record<date, { quotite, creneaux?, lieu? }>`. Sans conversion, `planifier`
+ * lirait `pose.quotite` sur un nombre — `undefined` — et TOUTES les journées
+ * ajustées retomberaient sur le prévu du rythme. Le CRA d'un mois entier
+ * changerait sans que rien ne le signale : ni erreur, ni écran vide, juste des
+ * journées qui redeviennent celles du rythme théorique.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * NI CRÉNEAU NI LIEU : ON NE LES INVENTE PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une journée d'avant ce schéma ne dit pas si elle a été travaillée le matin,
+ * et rien ne permet de le déduire — pas même une quotité de 0,5. Les deux
+ * champs restent donc absents, et l'écran affiche « 0,5 j » sans position.
+ * Poser « matin » par défaut remplirait le plan de charge de demi-journées que
+ * personne n'a saisies, et elles seraient indiscernables des vraies.
+ */
+function ajustementsDuSchema13(brut: unknown): Ajustements {
+  if (typeof brut !== 'object' || brut === null) return {};
+  const converti: Record<string, AjustementJour> = {};
+
+  for (const [date, valeur] of Object.entries(brut as Record<string, unknown>)) {
+    if (typeof valeur === 'number' && Number.isFinite(valeur)) {
+      converti[date] = { quotite: valeur };
+      continue;
+    }
+    // Déjà au schéma 14 : on garde, en vérifiant tout de même la quotité. Un
+    // bloc distant mal formé ne doit pas faire tomber le planning.
+    if (typeof valeur === 'object' && valeur !== null) {
+      const o = valeur as Record<string, unknown>;
+      const q = o['quotite'];
+      if (typeof q === 'number' && Number.isFinite(q)) {
+        converti[date] = valeur as AjustementJour;
+      }
+    }
+  }
+  return converti;
 }
 
 export function entiteVide(): ClientOperationnel {

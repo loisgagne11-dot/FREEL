@@ -9,78 +9,168 @@
   min-width: 0;
 }
 
+/* En GRILLE, et non en pile : les deux créneaux se partagent également la
+   hauteur restante, donc la ligne « après-midi » tombe au même niveau sur les
+   sept jours. En pile, un créneau qui porte deux clients — deux rythmes qui
+   prévoient tous deux le lundi matin — poussait l'après-midi de sa colonne
+   seule, et la semaine se lisait en escalier. */
+.colonne {
+  display: grid;
+  grid-template-rows: auto 1fr 1fr;
+  gap: 3px;
+  min-width: 0;
+  padding: 5px 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+}
+
+/* Le jour courant est ENCADRÉ, pas coloré : les couleurs sont déjà prises par
+   les clients, et une huitième teinte se lirait comme un client de plus. */
+.colonneDuJour { border-color: var(--green); }
+
 .enteteJour {
   text-align: center;
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 10.5px;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
   color: var(--muted-2);
-  padding-bottom: 4px;
-}
-
-.colonne { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-
-.numero {
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--muted);
+  padding-bottom: 3px;
   font-variant-numeric: tabular-nums;
-  padding-bottom: 2px;
 }
 
-.aujourdhui { color: var(--green); font-weight: 650; }
+.colonneDuJour .enteteJour { color: var(--green); font-weight: 700; }
 
 /* ── Créneaux ──────────────────────────────────────────────────────────── */
 
 .creneau {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  /* 44 px de haut cumulés sur deux créneaux : chacun reste atteignable au
-     doigt sans que la grille déborde à 360 px. */
-  min-height: 30px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 2px;
+  /* Chaque moitié reste atteignable au doigt sans que la grille déborde à
+     360 px. Deux d'entre elles font la hauteur d'une cible confortable. */
+  min-height: 34px;
   border-radius: var(--r-sm);
-  border: 1px solid var(--line);
-  background: var(--panel-2);
+  border: 1px solid transparent;
+  background: var(--panel);
   color: var(--muted-2);
   font-size: 10px;
+  font-family: inherit;
+  text-align: left;
   cursor: pointer;
-  padding: 0 2px;
+  padding: 4px 5px;
   overflow: hidden;
   min-width: 0;
 }
 
-.creneau:hover { border-color: var(--green); }
+.creneau:hover { border-color: var(--line-2); }
 .creneau:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 
-/* Travaillé : plein. Le libellé de mission n'apparaît qu'à partir de la
-   tablette — sur 50 px de large, il ne serait qu'une bouillie. */
+/* Travaillé : la case s'éclaire de la teinte du client, posée en ligne par le
+   composant sur la bordure. Le fond reste sobre — sept couleurs pleines côte à
+   côte rendraient les noms illisibles. */
 .travaille {
-  background: color-mix(in srgb, var(--green) 18%, var(--panel-2));
-  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 10%, var(--panel));
+  border-color: var(--line-2);
   color: var(--text);
 }
 
-/* Ajusté : une bordure plus marquée. L'utilisateur doit distinguer ce que le
-   rythme a rempli de ce qu'il a corrigé lui-même — sans quoi il ne sait plus
-   ce qu'il a vérifié. */
-.ajuste { border-width: 2px; }
+/* Ajusté : une bordure plus marquée. Distinguer ce que le rythme a rempli de
+   ce qu'on a corrigé soi-même — sans quoi on ne sait plus ce qu'on a vérifié. */
+.ajuste { border-width: 2px; padding: 3px 4px; }
 
+/* Le congé est HACHURÉ, et non simplement coloré : c'est un jour qui n'est ni
+   travaillé ni libre, et la trame le dit sans consommer une teinte de client. */
 .conge {
-  background: color-mix(in srgb, var(--amber) 14%, var(--panel-2));
-  border-color: var(--amber);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--amber) 16%, transparent) 0 4px,
+      transparent 4px 8px
+    ),
+    var(--panel);
+  border-color: color-mix(in srgb, var(--amber) 45%, transparent);
   color: var(--amber);
 }
 
-.ferie { background: transparent; color: var(--amber); opacity: 0.7; cursor: default; }
-.weekEnd { background: transparent; opacity: 0.45; }
+.ferie { color: var(--amber); opacity: 0.75; }
+.weekEnd { background: transparent; opacity: 0.5; }
 
-.libelleCreneau {
+.enteteCreneau {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+}
+
+.etiquetteCreneau {
+  font-size: 8.5px;
+  letter-spacing: 0.09em;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.occupant { display: block; min-width: 0; }
+
+.nomClient {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Le nom se coupe sur deux lignes plutôt que de disparaître : « Brasserie
+     Vent d'Ouest » sur une colonne de téléphone ne tient pas en une, et un nom
+     tronqué à « Brass… » ne distingue plus deux clients. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.descriptionMission {
   display: none;
+  font-size: 9px;
+  color: var(--muted-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.motCase { font-size: 10.5px; font-weight: 650; }
+.motLibre { font-size: 10px; color: var(--muted-2); }
+
+.lieu { font-size: 10px; color: var(--muted-2); line-height: 1; }
+
+/* ── Légende ───────────────────────────────────────────────────────────── */
+
+.legende {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.legendeEntree { display: inline-flex; align-items: center; gap: 6px; }
+
+.pastille {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--green);
+}
+
+.pastilleConge { background: var(--amber); }
 
 /* Nom accessible sans encombrement visuel. Pas de `display: none`, qui le
    retirerait de l'arbre d'accessibilité. */
@@ -110,15 +200,15 @@
 
 .total strong { color: var(--green); font-size: 16px; font-variant-numeric: tabular-nums; }
 
+/* La description de mission n'apparaît qu'à partir de la tablette : sur 50 px
+   de large, « Design system » n'est qu'une bouillie, et c'est le NOM du client
+   qui répond à la question qu'on se pose. */
 @media (min-width: 761px) {
-  .creneau { min-height: 34px; font-size: 11px; }
-  .libelleCreneau { display: block; }
+  .creneau { min-height: 44px; font-size: 11px; }
+  .descriptionMission { display: block; }
+  .nomClient { font-size: 11px; }
+  .etiquetteCreneau { font-size: 9px; }
 }
-
-/* Une pile de créneaux par client opérationnel. En colonne, comme les
-   créneaux qu'elle contient : deux lignes se lisent l'une sous l'autre, et
-   le cas à une seule ligne rend exactement la grille d'avant. */
-.pile { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 
 /* Défaire les corrections d'une semaine. En retrait : c'est un retour en
    arrière, pas le geste ordinaire — et il n'apparaît que s'il y a quelque
@@ -139,13 +229,17 @@
 
 .revenir:hover { border-color: var(--line-2); color: var(--text); }
 
-/* Le compte de la semaine affichée, au-dessus de la grille.
-   Cinq jours ouvrés n'est pas toujours la réponse : une semaine avec un férié
-   en compte quatre, et un taux d'occupation lu sans le savoir est faux d'un
-   cinquième. */
+/* La ligne de lecture, au-dessus de la grille : ce que la grille montre, puis
+   le compte. Cinq jours ouvrés n'est pas toujours la réponse — une semaine
+   avec un férié en compte quatre, et un taux d'occupation lu sans le savoir
+   est faux d'un cinquième. */
 .resumeSemaine {
   margin-bottom: 10px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-2);
   font-variant-numeric: tabular-nums;
 }
+
+.resumeSemaine strong { color: var(--muted); font-weight: 650; }
+
+.conventions { color: var(--muted-2); }

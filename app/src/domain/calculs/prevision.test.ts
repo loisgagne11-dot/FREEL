@@ -9,6 +9,10 @@ const jour = (
 ): JourPlanifie => ({
   date: dateISO(date),
   prevu: 1, retenu: 1, ajuste: false, ferie: false, weekEnd: false, conge: 0,
+  // La prévision ne connaît que la quotité : le créneau et le lieu ne pèsent
+  // ni sur les jours ni sur le CA. Ils sont là parce que `JourPlanifie` les
+  // porte, à `null` parce que rien ne les a posés.
+  creneaux: null, lieu: null,
   ...o
 });
 

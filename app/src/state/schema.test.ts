@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { dateISO } from '../domain/types';
+import { planifier } from '../domain/calculs/planning';
 import {
   VERSION_SCHEMA, completerFaits, entrepriseVide, faitsVides, motifRefusFaits
 } from './schema';
@@ -167,7 +169,8 @@ describe('missions d’un bloc au schéma 1', () => {
     });
     expect(faits.missions[0]?.entites[0]?.rythmes).toHaveLength(1);
     // Zéro est un ajustement légitime — c'est ainsi qu'on retire une journée.
-    expect(faits.missions[0]?.entites[0]?.ajustements).toEqual({ '2026-03-04': 0 });
+    expect(faits.missions[0]?.entites[0]?.ajustements)
+      .toEqual({ '2026-03-04': { quotite: 0 } });
   });
 
   it('écarte une entrée qui n’est pas un objet', () => {
@@ -594,5 +597,129 @@ describe('schéma 12 → 13 : conditions de paiement et échéance', () => {
   it('propose « 30 jours fin de mois » à un client sans délai connu', () => {
     const sansDelai = bloc({ clients: [{ id: 'c1', nom: 'Client A' }] });
     expect(sansDelai.clients[0]?.delaiPaiement).toBe('fdm_30');
+  });
+});
+
+/**
+ * L'AJUSTEMENT PASSE DU NOMBRE AU FAIT DE JOURNÉE (SCHÉMA 13 → 14).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI CE BLOC EXISTE, ET PAS SEULEMENT UNE ASSERTION DE FORME
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `ajustements` valait `Record<date, number>` ; il vaut désormais
+ * `Record<date, { quotite, creneaux?, lieu? }>`. Un bloc non converti ne
+ * PLANTE PAS : `planifier` lit `pose.quotite` sur un nombre, trouve
+ * `undefined`, et la journée retombe sur le prévu du rythme. Le CRA d'un mois
+ * entier change en silence — ni erreur, ni écran vide, juste des journées qui
+ * redeviennent théoriques. C'est pourquoi le dernier test d'ici ne regarde pas
+ * la forme du champ mais ce que le PLANNING en fait : c'est là que le dégât se
+ * produirait.
+ */
+describe('ajustements du schéma 13 au schéma 14', () => {
+  /** Un bloc d'avant le schéma 14, avec ses ajustements en nombres nus. */
+  const brut = (ajustements: unknown) => ({
+    version: 13,
+    missions: [{
+      id: 'm1', clientId: null, clientNom: 'Client', description: 'Mission',
+      tjm: 500, debut: '2026-01-01', fin: null, statut: 'active',
+      entites: [{
+        id: 'm1-co1', nom: 'Client', couleur: '', adresse: '', contact: '',
+        email: '', telephone: '',
+        rythmes: [{
+          du: '2026-01-01', au: '2026-12-31',
+          parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: 500
+        }],
+        ajustements
+      }]
+    }]
+  });
+
+  const pose = (ajustements: unknown) =>
+    completerFaits(brut(ajustements)).missions[0]?.entites[0]?.ajustements ?? {};
+
+  /**
+   * LE PIÈGE DE L'INVARIANT N°5, ET IL EST ICI.
+   *
+   * `entitesDuSchema3` étale le client opérationnel tel quel avant de le
+   * compléter. L'étalement recopie `ajustements` — donc des NOMBRES — et une
+   * fusion de surface ne les convertit pas : le champ EXISTE, donc il passe, et
+   * il passe faux. La conversion doit descendre APRÈS l'étalement, jusque dans
+   * l'élément de liste où le champ a bougé.
+   */
+  it('convertit les ajustements portés par un client opérationnel', () => {
+    expect(pose({ '2026-09-14': 0, '2026-09-15': 0.5 })).toEqual({
+      '2026-09-14': { quotite: 0 },
+      '2026-09-15': { quotite: 0.5 }
+    });
+  });
+
+  /**
+   * L'autre branche : jusqu'au schéma 3, c'est la MISSION qui portait ses
+   * ajustements. Les deux chemins mènent au même champ, et corriger l'un sans
+   * l'autre laisse la moitié des comptes non convertis.
+   */
+  it('convertit aussi les ajustements portés par la mission elle-même', () => {
+    const faits = completerFaits({
+      version: 2,
+      missions: [{
+        id: 'm1', clientId: null, clientNom: 'Client', description: 'Mission',
+        tjm: 500, debut: '2026-01-01', fin: null, statut: 'active',
+        ajustements: { '2026-09-14': 0.5 }
+      }]
+    });
+    expect(faits.missions[0]?.entites[0]?.ajustements)
+      .toEqual({ '2026-09-14': { quotite: 0.5 } });
+  });
+
+  /**
+   * NI CRÉNEAU NI LIEU : ON NE LES INVENTE PAS.
+   *
+   * Une journée d'avant ce schéma ne dit pas si elle a été travaillée le matin,
+   * et une quotité de 0,5 ne permet pas de le déduire. Poser « matin » par
+   * défaut remplirait le plan de charge de demi-journées que personne n'a
+   * saisies — et elles seraient indiscernables des vraies.
+   */
+  it('n’invente ni créneau ni lieu sur une journée qui n’en dit rien', () => {
+    const converti = pose({ '2026-09-15': 0.5 })['2026-09-15'];
+    expect(converti?.creneaux).toBeUndefined();
+    expect(converti?.lieu).toBeUndefined();
+  });
+
+  /** Un bloc déjà au schéma 14 traverse sans être reconverti. */
+  it('laisse passer un ajustement déjà au nouveau format', () => {
+    expect(pose({ '2026-09-15': { quotite: 0.5, creneaux: ['matin'], lieu: 'sur_site' } }))
+      .toEqual({ '2026-09-15': { quotite: 0.5, creneaux: ['matin'], lieu: 'sur_site' } });
+  });
+
+  /**
+   * Un bloc distant mal formé ne doit pas faire tomber le planning : une entrée
+   * sans quotité lisible est ÉCARTÉE plutôt que gardée à `undefined`, ce qui
+   * ferait exactement le dégât décrit en tête de bloc.
+   */
+  it('écarte une entrée dont la quotité n’est pas lisible', () => {
+    expect(pose({ '2026-09-14': { lieu: 'sur_site' }, '2026-09-15': 'oui' })).toEqual({});
+  });
+
+  /**
+   * LA PREUVE PAR LE PLANNING.
+   *
+   * Le seul test qui échouerait vraiment si la conversion était retirée : la
+   * journée du 14 est ajustée à zéro, et sans conversion `planifier` lirait
+   * `quotite` sur le nombre `0`, trouverait `undefined`, et rendrait le 1 du
+   * rythme. Une assertion de forme, elle, resterait verte tant que le champ
+   * existe.
+   */
+  it('rend une journée effacée, et non le jour du rythme', () => {
+    const entite = completerFaits(brut({ '2026-09-14': 0 })).missions[0]?.entites[0];
+    const [jour] = planifier([dateISO('2026-09-14')], {
+      rythmes: entite?.rythmes ?? [],
+      ajustements: entite?.ajustements ?? {},
+      feries: new Set<string>(),
+      conges: {}
+    });
+    expect(jour?.prevu).toBe(1);
+    expect(jour?.retenu).toBe(0);
+    expect(jour?.ajuste).toBe(true);
   });
 });

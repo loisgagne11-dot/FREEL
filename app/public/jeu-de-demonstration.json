@@ -99,11 +99,68 @@
           "email": "",
           "telephone": "",
           "rythmes": [
-            { "du": "2026-05-01", "au": "2026-05-31", "parJour": { "lun": 1, "mar": 1, "mer": 1 }, "tjm": null },
-            { "du": "2026-06-01", "au": "2026-06-30", "parJour": { "lun": 1, "mar": 1, "mer": 0.5 }, "tjm": null },
-            { "du": "2026-07-01", "au": "2026-07-31", "parJour": { "lun": 1, "mar": 1 }, "tjm": null }
+            {
+              "du": "2026-05-01",
+              "au": "2026-05-31",
+              "parJour": {
+                "lun": 1,
+                "mar": 1,
+                "mer": 1
+              },
+              "tjm": null
+            },
+            {
+              "du": "2026-06-01",
+              "au": "2026-06-30",
+              "parJour": {
+                "lun": 1,
+                "mar": 1,
+                "mer": 0.5
+              },
+              "tjm": null
+            },
+            {
+              "du": "2026-07-01",
+              "au": "2026-07-31",
+              "parJour": {
+                "lun": 1,
+                "mar": 1
+              },
+              "tjm": null
+            }
           ],
-          "ajustements": {}
+          "ajustements": {
+            "2026-06-08": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            },
+            "2026-06-09": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
+            },
+            "2026-06-15": {
+              "quotite": 0.5,
+              "creneaux": [
+                "matin"
+              ],
+              "lieu": "teletravail"
+            },
+            "2026-06-16": {
+              "quotite": 0.5,
+              "creneaux": [
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            }
+          }
         }
       ]
     },
@@ -126,9 +183,33 @@
           "email": "",
           "telephone": "",
           "rythmes": [
-            { "du": "2026-03-02", "au": "2026-06-30", "parJour": { "jeu": 1, "ven": 0.5 }, "tjm": null }
+            {
+              "du": "2026-03-02",
+              "au": "2026-06-30",
+              "parJour": {
+                "jeu": 1,
+                "ven": 0.5
+              },
+              "tjm": null
+            }
           ],
-          "ajustements": {}
+          "ajustements": {
+            "2026-06-11": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
+            },
+            "2026-06-12": {
+              "quotite": 0.5,
+              "creneaux": [
+                "matin"
+              ],
+              "lieu": "teletravail"
+            }
+          }
         }
       ]
     },
@@ -151,9 +232,33 @@
           "email": "",
           "telephone": "",
           "rythmes": [
-            { "du": "2026-06-01", "au": "2026-06-30", "parJour": { "ven": 1 }, "tjm": null }
+            {
+              "du": "2026-06-01",
+              "au": "2026-06-30",
+              "parJour": {
+                "ven": 1
+              },
+              "tjm": null
+            }
           ],
-          "ajustements": {}
+          "ajustements": {
+            "2026-06-12": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            },
+            "2026-06-19": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            }
+          }
         }
       ]
     },
@@ -206,119 +311,250 @@
   ],
   "recettes": [
     {
-      "id": "rec-021", "clientNom": "Maison Kessler", "libelle": "Catalogue — cadrage",
-      "montant": 5200, "emiseLe": "2026-03-10", "envoyeeLe": "2026-03-10",
-      "encaisseeLe": "2026-04-14", "modeReglement": "virement", "numero": "2026-021",
-      "tvaCollectee": null, "relancesLe": []
+      "id": "rec-021",
+      "clientNom": "Maison Kessler",
+      "libelle": "Catalogue — cadrage",
+      "montant": 5200,
+      "emiseLe": "2026-03-10",
+      "envoyeeLe": "2026-03-10",
+      "encaisseeLe": "2026-04-14",
+      "modeReglement": "virement",
+      "numero": "2026-021",
+      "tvaCollectee": null,
+      "relancesLe": []
     },
     {
-      "id": "rec-022", "clientNom": "Atelier Novak", "libelle": "Identité — avril",
-      "montant": 3600, "emiseLe": "2026-04-30", "envoyeeLe": "2026-04-30",
-      "encaisseeLe": "2026-05-28", "modeReglement": "virement", "numero": "2026-022",
-      "tvaCollectee": null, "relancesLe": []
+      "id": "rec-022",
+      "clientNom": "Atelier Novak",
+      "libelle": "Identité — avril",
+      "montant": 3600,
+      "emiseLe": "2026-04-30",
+      "envoyeeLe": "2026-04-30",
+      "encaisseeLe": "2026-05-28",
+      "modeReglement": "virement",
+      "numero": "2026-022",
+      "tvaCollectee": null,
+      "relancesLe": []
     },
     {
-      "id": "rec-023", "clientNom": "Studio Lumen", "libelle": "Refonte — avril",
-      "montant": 4160, "emiseLe": "2026-04-30", "envoyeeLe": "2026-04-30",
-      "encaisseeLe": "2026-06-04", "modeReglement": "virement", "numero": "2026-023",
-      "tvaCollectee": null, "relancesLe": []
+      "id": "rec-023",
+      "clientNom": "Studio Lumen",
+      "libelle": "Refonte — avril",
+      "montant": 4160,
+      "emiseLe": "2026-04-30",
+      "envoyeeLe": "2026-04-30",
+      "encaisseeLe": "2026-06-04",
+      "modeReglement": "virement",
+      "numero": "2026-023",
+      "tvaCollectee": null,
+      "relancesLe": []
     },
     {
-      "id": "rec-024", "clientNom": "Studio Lumen", "libelle": "Refonte — mai",
-      "montant": 1200, "emiseLe": "2026-05-12", "envoyeeLe": "2026-05-12",
-      "encaisseeLe": null, "modeReglement": null, "numero": "2026-024",
-      "tvaCollectee": null, "relancesLe": ["2026-06-08"]
+      "id": "rec-024",
+      "clientNom": "Studio Lumen",
+      "libelle": "Refonte — mai",
+      "montant": 1200,
+      "emiseLe": "2026-05-12",
+      "envoyeeLe": "2026-05-12",
+      "encaisseeLe": null,
+      "modeReglement": null,
+      "numero": "2026-024",
+      "tvaCollectee": null,
+      "relancesLe": [
+        "2026-06-08"
+      ]
     },
     {
-      "id": "rec-025", "clientNom": "Atelier Novak", "libelle": "Identité — mai",
-      "montant": 2400, "emiseLe": "2026-05-28", "envoyeeLe": "2026-05-28",
-      "encaisseeLe": null, "modeReglement": null, "numero": "2026-025",
-      "tvaCollectee": null, "relancesLe": []
+      "id": "rec-025",
+      "clientNom": "Atelier Novak",
+      "libelle": "Identité — mai",
+      "montant": 2400,
+      "emiseLe": "2026-05-28",
+      "envoyeeLe": "2026-05-28",
+      "encaisseeLe": null,
+      "modeReglement": null,
+      "numero": "2026-025",
+      "tvaCollectee": null,
+      "relancesLe": []
     },
     {
-      "id": "rec-026", "clientNom": "Studio Lumen", "libelle": "Refonte — mai (2)",
-      "montant": 2410, "emiseLe": "2026-06-04", "envoyeeLe": "2026-06-04",
-      "encaisseeLe": null, "modeReglement": null, "numero": "2026-026",
-      "tvaCollectee": null, "relancesLe": []
+      "id": "rec-026",
+      "clientNom": "Studio Lumen",
+      "libelle": "Refonte — mai (2)",
+      "montant": 2410,
+      "emiseLe": "2026-06-04",
+      "envoyeeLe": "2026-06-04",
+      "encaisseeLe": null,
+      "modeReglement": null,
+      "numero": "2026-026",
+      "tvaCollectee": null,
+      "relancesLe": []
     },
     {
-      "id": "rec-027", "clientNom": "Brasserie Vent d’Ouest", "libelle": "Carte & menus — juin",
-      "montant": 2880, "emiseLe": null, "envoyeeLe": null,
-      "encaisseeLe": null, "modeReglement": null, "numero": "2026-027",
-      "tvaCollectee": null, "relancesLe": []
+      "id": "rec-027",
+      "clientNom": "Brasserie Vent d’Ouest",
+      "libelle": "Carte & menus — juin",
+      "montant": 2880,
+      "emiseLe": null,
+      "envoyeeLe": null,
+      "encaisseeLe": null,
+      "modeReglement": null,
+      "numero": "2026-027",
+      "tvaCollectee": null,
+      "relancesLe": []
     }
   ],
   "depenses": [
     {
-      "id": "dep-adobe", "libelle": "Abonnement Adobe", "fournisseur": "Adobe Systems",
-      "provenance": "ue", "montantTtc": 71.98, "tauxTva": 0.2,
-      "payeeLe": "2026-06-12", "justificatifId": "just-adobe", "rapprochement": "rapproche"
+      "id": "dep-adobe",
+      "libelle": "Abonnement Adobe",
+      "fournisseur": "Adobe Systems",
+      "provenance": "ue",
+      "montantTtc": 71.98,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-06-12",
+      "justificatifId": "just-adobe",
+      "rapprochement": "rapproche"
     },
     {
-      "id": "dep-ovh", "libelle": "Hébergement", "fournisseur": "OVHcloud",
-      "provenance": "france", "montantTtc": 35.98, "tauxTva": 0.2,
-      "payeeLe": "2026-06-12", "justificatifId": "just-ovh", "rapprochement": "rapproche"
+      "id": "dep-ovh",
+      "libelle": "Hébergement",
+      "fournisseur": "OVHcloud",
+      "provenance": "france",
+      "montantTtc": 35.98,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-06-12",
+      "justificatifId": "just-ovh",
+      "rapprochement": "rapproche"
     },
     {
-      "id": "dep-sncf", "libelle": "Déplacement client", "fournisseur": "SNCF",
-      "provenance": "france", "montantTtc": 89, "tauxTva": 0,
-      "payeeLe": "2026-06-12", "justificatifId": "just-sncf", "rapprochement": "rapproche"
+      "id": "dep-sncf",
+      "libelle": "Déplacement client",
+      "fournisseur": "SNCF",
+      "provenance": "france",
+      "montantTtc": 89,
+      "tauxTva": 0,
+      "payeeLe": "2026-06-12",
+      "justificatifId": "just-sncf",
+      "rapprochement": "rapproche"
     },
     {
-      "id": "dep-clavier", "libelle": "Nouveau clavier", "fournisseur": "Fnac Pro",
-      "provenance": "france", "montantTtc": 62, "tauxTva": 0.2,
-      "payeeLe": "2026-06-07", "justificatifId": null, "rapprochement": "en_attente"
+      "id": "dep-clavier",
+      "libelle": "Nouveau clavier",
+      "fournisseur": "Fnac Pro",
+      "provenance": "france",
+      "montantTtc": 62,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-06-07",
+      "justificatifId": null,
+      "rapprochement": "en_attente"
     },
     {
-      "id": "dep-wework", "libelle": "Coworking", "fournisseur": "WeWork",
-      "provenance": "france", "montantTtc": 264, "tauxTva": 0.2,
-      "payeeLe": "2026-06-02", "justificatifId": "just-wework", "rapprochement": "rapproche"
+      "id": "dep-wework",
+      "libelle": "Coworking",
+      "fournisseur": "WeWork",
+      "provenance": "france",
+      "montantTtc": 264,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-06-02",
+      "justificatifId": "just-wework",
+      "rapprochement": "rapproche"
     },
     {
-      "id": "dep-axa", "libelle": "Assurance RC Pro", "fournisseur": "AXA",
-      "provenance": "france", "montantTtc": 38, "tauxTva": 0,
-      "payeeLe": "2026-06-01", "justificatifId": "just-axa", "rapprochement": "rapproche"
+      "id": "dep-axa",
+      "libelle": "Assurance RC Pro",
+      "fournisseur": "AXA",
+      "provenance": "france",
+      "montantTtc": 38,
+      "tauxTva": 0,
+      "payeeLe": "2026-06-01",
+      "justificatifId": "just-axa",
+      "rapprochement": "rapproche"
     },
     {
-      "id": "dep-adobe-mai", "libelle": "Abonnement Adobe", "fournisseur": "Adobe Systems",
-      "provenance": "ue", "montantTtc": 71.98, "tauxTva": 0.2,
-      "payeeLe": "2026-05-12", "justificatifId": "just-adobe-mai", "rapprochement": "rapproche"
+      "id": "dep-adobe-mai",
+      "libelle": "Abonnement Adobe",
+      "fournisseur": "Adobe Systems",
+      "provenance": "ue",
+      "montantTtc": 71.98,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-05-12",
+      "justificatifId": "just-adobe-mai",
+      "rapprochement": "rapproche"
     },
     {
-      "id": "dep-wework-mai", "libelle": "Coworking", "fournisseur": "WeWork",
-      "provenance": "france", "montantTtc": 264, "tauxTva": 0.2,
-      "payeeLe": "2026-05-02", "justificatifId": "just-wework-mai", "rapprochement": "rapproche"
+      "id": "dep-wework-mai",
+      "libelle": "Coworking",
+      "fournisseur": "WeWork",
+      "provenance": "france",
+      "montantTtc": 264,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-05-02",
+      "justificatifId": "just-wework-mai",
+      "rapprochement": "rapproche"
     },
     {
-      "id": "dep-wework-avr", "libelle": "Coworking", "fournisseur": "WeWork",
-      "provenance": "france", "montantTtc": 264, "tauxTva": 0.2,
-      "payeeLe": "2026-04-02", "justificatifId": "just-wework-avr", "rapprochement": "rapproche"
+      "id": "dep-wework-avr",
+      "libelle": "Coworking",
+      "fournisseur": "WeWork",
+      "provenance": "france",
+      "montantTtc": 264,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-04-02",
+      "justificatifId": "just-wework-avr",
+      "rapprochement": "rapproche"
     }
   ],
   "conges": [
-    { "date": "2026-06-10", "quotite": 1 },
-    { "date": "2026-06-11", "quotite": 1 }
+    {
+      "date": "2026-06-10",
+      "quotite": 1
+    },
+    {
+      "date": "2026-06-11",
+      "quotite": 1
+    }
   ],
   "mouvementsBancaires": [
     {
-      "id": "mv-lumen-023", "date": "2026-06-04", "libelle": "VIR SEPA STUDIO LUMEN SARL",
-      "montant": 4160, "rapprocheAvec": "rec-023", "sansContrepartie": null
+      "id": "mv-lumen-023",
+      "date": "2026-06-04",
+      "libelle": "VIR SEPA STUDIO LUMEN SARL",
+      "montant": 4160,
+      "rapprocheAvec": "rec-023",
+      "sansContrepartie": null
     },
     {
-      "id": "mv-adobe-ovh", "date": "2026-06-03", "libelle": "PRLV ADOBE + OVH",
-      "montant": -142, "rapprocheAvec": null, "sansContrepartie": "autre"
+      "id": "mv-adobe-ovh",
+      "date": "2026-06-03",
+      "libelle": "PRLV ADOBE + OVH",
+      "montant": -142,
+      "rapprocheAvec": null,
+      "sansContrepartie": "autre"
     },
     {
-      "id": "mv-remu-mai", "date": "2026-05-31", "libelle": "VIR COMPTE PERSO",
-      "montant": -2400, "rapprocheAvec": null, "sansContrepartie": "remuneration"
+      "id": "mv-remu-mai",
+      "date": "2026-05-31",
+      "libelle": "VIR COMPTE PERSO",
+      "montant": -2400,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
     },
     {
-      "id": "mv-remu-avr", "date": "2026-04-30", "libelle": "VIR COMPTE PERSO",
-      "montant": -2200, "rapprocheAvec": null, "sansContrepartie": "remuneration"
+      "id": "mv-remu-avr",
+      "date": "2026-04-30",
+      "libelle": "VIR COMPTE PERSO",
+      "montant": -2200,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
     },
     {
-      "id": "mv-remu-mar", "date": "2026-03-31", "libelle": "VIR COMPTE PERSO",
-      "montant": -2600, "rapprocheAvec": null, "sansContrepartie": "remuneration"
+      "id": "mv-remu-mar",
+      "date": "2026-03-31",
+      "libelle": "VIR COMPTE PERSO",
+      "montant": -2600,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
     }
   ],
   "periodesUrssafAjoutees": [],
@@ -326,27 +562,51 @@
   "reserve": 2470,
   "besoinMensuel": 2300,
   "objectifCaAnnuel": 72000,
-  "periodesDeclarees": ["2026-01", "2026-02", "2026-03"],
+  "periodesDeclarees": [
+    "2026-01",
+    "2026-02",
+    "2026-03"
+  ],
   "echeances": [
     {
-      "id": "ech-urssaf-t1", "nature": "urssaf", "montant": 1740,
-      "echeanceLe": "2026-04-05", "payeeLe": "2026-04-05", "montantPaye": 1740
+      "id": "ech-urssaf-t1",
+      "nature": "urssaf",
+      "montant": 1740,
+      "echeanceLe": "2026-04-05",
+      "payeeLe": "2026-04-05",
+      "montantPaye": 1740
     },
     {
-      "id": "ech-ir-acompte", "nature": "impot", "montant": 620,
-      "echeanceLe": "2026-05-15", "payeeLe": "2026-05-15", "montantPaye": 620
+      "id": "ech-ir-acompte",
+      "nature": "impot",
+      "montant": 620,
+      "echeanceLe": "2026-05-15",
+      "payeeLe": "2026-05-15",
+      "montantPaye": 620
     },
     {
-      "id": "ech-urssaf-t2", "nature": "urssaf", "montant": 1980,
-      "echeanceLe": "2026-07-05", "payeeLe": null, "montantPaye": null
+      "id": "ech-urssaf-t2",
+      "nature": "urssaf",
+      "montant": 1980,
+      "echeanceLe": "2026-07-05",
+      "payeeLe": null,
+      "montantPaye": null
     },
     {
-      "id": "ech-urssaf-t3", "nature": "urssaf", "montant": 1850,
-      "echeanceLe": "2026-10-05", "payeeLe": null, "montantPaye": null
+      "id": "ech-urssaf-t3",
+      "nature": "urssaf",
+      "montant": 1850,
+      "echeanceLe": "2026-10-05",
+      "payeeLe": null,
+      "montantPaye": null
     },
     {
-      "id": "ech-cfe", "nature": "cfe", "montant": 148,
-      "echeanceLe": "2026-12-15", "payeeLe": null, "montantPaye": null
+      "id": "ech-cfe",
+      "nature": "cfe",
+      "montant": 148,
+      "echeanceLe": "2026-12-15",
+      "payeeLe": null,
+      "montantPaye": null
     }
   ],
   "configImpotBrute": {}

@@ -623,7 +623,9 @@ describe('rythme et ajustements', () => {
 
   it('met les ajustements à plat, par date', () => {
     expect(mission().entites[0]?.ajustements).toEqual({
-      '2026-09-14': 0, '2026-09-15': 0.5, '2026-10-05': 1
+      '2026-09-14': { quotite: 0 },
+      '2026-09-15': { quotite: 0.5 },
+      '2026-10-05': { quotite: 1 }
     });
   });
 
@@ -633,7 +635,7 @@ describe('rythme et ajustements', () => {
    * remettre, et le CRA facturerait un jour qui n'a pas eu lieu.
    */
   it('conserve un ajustement à zéro', () => {
-    expect(mission().entites[0]?.ajustements['2026-09-14']).toBe(0);
+    expect(mission().entites[0]?.ajustements['2026-09-14']?.quotite).toBe(0);
   });
 
   // Une mission sans période n'a pas de rythme : rien à inventer.

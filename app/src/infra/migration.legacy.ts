@@ -32,7 +32,7 @@ import {
   type Client, type Conge, type Depense, type Faits, type Mission, type Recette,
   type Rythme, entrepriseVide, foyerFiscalDepuisConfigImpot
 } from '../state/schema';
-import { JOURS_SEMAINE } from '../domain/calculs/planning';
+import { JOURS_SEMAINE, type AjustementJour } from '../domain/calculs/planning';
 import { formuleDepuisJours } from '../domain/calculs/delaiPaiement';
 import type { ClientOperationnel } from '../state/schema';
 import type { Echeance, NatureDette } from '../domain/calculs/provisions';
@@ -466,15 +466,18 @@ function rythmesDeLaMission(m: Inconnu): Rythme[] {
  * filtrer laisserait le rythme le remettre, et le CRA facturerait un jour qui
  * n'a pas eu lieu.
  */
-function ajustementsDeLaMission(m: Inconnu): Record<string, number> {
-  const parDate: Record<string, number> = {};
+function ajustementsDeLaMission(m: Inconnu): Record<string, AjustementJour> {
+  const parDate: Record<string, AjustementJour> = {};
 
   for (const ligneBrute of tableau(m['lignes'])) {
     const ajustements = objet(objet(ligneBrute)['ajustements']);
     for (const [date, valeur] of Object.entries(ajustements)) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
       if (typeof valeur !== 'number' || !Number.isFinite(valeur)) continue;
-      parDate[date] = valeur;
+      /* Ni créneau ni lieu : l'ancienne application ne les connaissait pas, et
+         les inventer poserait des matinées que personne n'a saisies. Une
+         journée sans créneau se lit « 1 j » sans position — c'est la vérité. */
+      parDate[date] = { quotite: valeur };
     }
   }
 
