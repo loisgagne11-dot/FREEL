@@ -76,13 +76,20 @@ describe('plan de charge', () => {
     expect(screen.getByText('Équivalent-jours facturés').nextSibling?.textContent).toBe('10');
   });
 
+  /**
+   * L'OCCUPATION A QUITTÉ LES TUILES POUR « LE MOIS EN CHIFFRES ».
+   *
+   * Elle s'affichait aux deux endroits, et les deux ne calculaient pas la même
+   * chose. Le panneau la garde parce qu'il a la place d'écrire son
+   * dénominateur — sans lui, « 45 % » ne se compare pas d'un mois à l'autre.
+   * Le RAPPORT lui-même, lui, ne change pas : c'est ce que ce test tient.
+   */
   it('rapporte les jours facturés aux jours ouvrables', () => {
     semer({ missions: [mission()], recettes: [recette()] });
     render(<Activite />);
-    // 10 / 22 ≈ 45 %. L'espace avant le signe est une insécable étroite,
-    // posée par l'API d'internationalisation : la comparer à une espace
-    // ordinaire ferait échouer un affichage pourtant correct.
-    expect(screen.getByText('Occupation').nextSibling?.textContent).toMatch(/^45\s%$/u);
+    // 10 / 22 ≈ 45 %.
+    expect(screen.getByText('Occupation').parentElement?.textContent).toMatch(/45\s?%/u);
+    expect(screen.getByText(/j ouvrés/).textContent).toMatch(/10 \/ 22\s?j ouvrés/u);
   });
 
   // Les compter à un tarif supposé fabriquerait de l'occupation.
@@ -100,7 +107,9 @@ describe('plan de charge', () => {
     );
     semer({ conges: toutJuillet });
     render(<Activite />);
-    expect(screen.getByText('Occupation').nextSibling?.textContent).toBe('—');
+    const ligne = screen.getByText('Occupation').parentElement;
+    expect(ligne?.textContent).toContain('—');
+    expect(ligne?.textContent).not.toMatch(/0\s?%/u);
   });
 });
 
@@ -134,8 +143,10 @@ describe('calendrier des congés', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: /27 juil\. 2026, jour travaillé/ }));
     expect(screen.getByText('Jours ouvrables').nextSibling?.textContent).toBe('21');
-    // 10 / 21 ≈ 48 %.
-    expect(screen.getByText('Occupation').nextSibling?.textContent).toMatch(/^48\s%$/u);
+    // 10 / 21 ≈ 48 %. Le congé sort du DÉNOMINATEUR : le même travail sur
+    // moins de jours disponibles fait monter l'occupation, ce qui est le sens
+    // de la mesure.
+    expect(screen.getByText('Occupation').parentElement?.textContent).toMatch(/48\s?%/u);
   });
 
   // Un congé posé ce jour-là ne consomme rien et ne changerait aucun chiffre.

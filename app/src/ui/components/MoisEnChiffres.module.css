@@ -1,0 +1,180 @@
+/* Le mois vu du temps. Aucune couleur en dur : que des tokens. */
+
+.tuiles { margin: 0 0 14px; }
+
+.ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ligne dt { min-width: 0; }
+.ligne dd { margin: 0; }
+
+.valeur {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Occupation ────────────────────────────────────────────────────────── */
+
+.occupation { margin-bottom: 16px; }
+
+.enteteOccupation {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.taux {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+/* L'abstention n'est pas une valeur : elle ne prend ni la couleur ni le poids
+   d'un chiffre, sans quoi le tiret se lirait comme un résultat. */
+.sansValeur { font-size: 17px; font-weight: 400; color: var(--muted-2); }
+
+.jauge {
+  display: block;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.remplissage {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+}
+
+/* Au-delà de cent pour cent, la barre est pleine et ne peut plus rien dire :
+   c'est la TEINTE qui porte le dépassement, et le compte écrit dessous qui le
+   chiffre. Une barre qui déborderait de sa gouttière ne se lirait pas. */
+.depassement { background: var(--amber); }
+
+.detail {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Répartition du temps ──────────────────────────────────────────────── */
+
+.sousTitre {
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.barre {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--panel-2);
+  gap: 2px;
+}
+
+.segment { display: block; height: 100%; min-width: 2px; background: var(--green); }
+
+.clients { list-style: none; margin: 10px 0 0; padding: 0; }
+
+.client {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.pastille {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--green);
+  align-self: center;
+}
+
+/* Le nom pousse le compte à droite, et se coupe avant lui : c'est la journée
+   qu'on cherche du regard, pas la fin du nom. */
+.nomClient {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.joursClient {
+  flex: none;
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Télétravail ───────────────────────────────────────────────────────── */
+
+.teletravail { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+.abstention {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.motifAbstention { font-size: 11.5px; color: var(--muted-2); text-align: right; }
+
+.vide { margin: 0; font-size: 12.5px; color: var(--muted-2); }
+
+/* Au-delà de cent pour cent, on a travaillé plus de jours qu'il n'y en avait de
+   disponibles : soit un forfait fausse la conversion, soit les congés posés ne
+   correspondent pas à la réalité. Dans les deux cas il y a quelque chose à
+   regarder — d'où l'alerte plutôt qu'un chiffre flatteur. */
+.tauxAttention {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+
+.estimation {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--amber);
+}

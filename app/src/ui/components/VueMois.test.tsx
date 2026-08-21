@@ -167,6 +167,27 @@ describe('ce que chaque moitié porte', () => {
     expect(reparti.textContent).not.toContain('▤');
   });
 
+  /**
+   * LE CAS QUE LE PRÉCÉDENT NE COUVRE PAS : un lieu POSÉ, mais sans créneau.
+   *
+   * La journée porte bien un lieu ; sa position, elle, reste inconnue, et les
+   * deux moitiés sont réparties par convention. Dessiner le pictogramme sur la
+   * matinée affirmerait qu'elle s'est passée à domicile — ce que personne n'a
+   * saisi. Sans ce test, retirer la garde ne faisait rien échouer.
+   */
+  it('ne montre pas le lieu d’une journée dont la position est inconnue', () => {
+    rendre({
+      missions: [missionDe({
+        nom: 'Sans Position',
+        parJour: { lun: 1 },
+        ajustements: { '2026-06-01': { quotite: 1, lieu: 'sur_site' } }
+      })]
+    });
+
+    expect(screen.getByRole('button', { name: /^1 juin 2026, matin, Sans Position/ }).textContent)
+      .not.toContain('▤');
+  });
+
   /** Le congé porte sa lettre, et la légende la donne — sans elle, « C » n'est
       qu'un caractère de plus dans une case. */
   it('marque les congés d’un C', () => {

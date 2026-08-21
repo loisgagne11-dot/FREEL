@@ -24,7 +24,9 @@ import {
 
 /** Les deux jours que le rythme ne remplit jamais de lui-même. */
 const JOURS_DE_REPOS = new Set(['sam', 'dim']);
-import { type PrevisionDuMois, previsionDuMois } from '../domain/calculs/prevision';
+import {
+  type PrevisionDuMois, previsionDuMois, totaliserPrevisions
+} from '../domain/calculs/prevision';
 import type { Cra } from '../domain/calculs/planning';
 import {
   calendrierDuMois, chargeDuMois, joursDuMois, planDeCharge
@@ -867,5 +869,174 @@ export function tarifDeLaJournee(
     net: effectif.effectif === null
       ? { statut: 'refuse', motif: 'aucune journée travaillée cette année' }
       : tjmNet(effectif.effectif, taux)
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Le mois en chiffres
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * La part de télétravail, ET SUR QUOI ELLE EST CALCULÉE.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI LE DÉNOMINATEUR EST DANS LA STRUCTURE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le lieu n'est connu que sur les demi-journées dont la position a été SAISIE.
+ * Un mois de vingt jours dont deux seulement portent un lieu, tous deux à
+ * domicile, donnerait « 100 % de télétravail » — un chiffre parfaitement faux,
+ * et d'autant plus crédible qu'il est rond.
+ *
+ * La part porte donc sur les demi-journées DOCUMENTÉES, et la structure dit
+ * combien elles sont sur combien. À l'écran, « 100 % » devient « 100 %, sur 2
+ * demi-journées renseignées sur 37 » — et personne ne le lit comme une mesure
+ * du mois.
+ */
+export interface PartTeletravail {
+  /** Entre 0 et 1, sur les seules demi-journées documentées. */
+  readonly part: number;
+  readonly documentees: number;
+  readonly travaillees: number;
+}
+
+export interface PartClient {
+  readonly entiteId: string;
+  readonly nom: string;
+  readonly couleur: string;
+  /** Journées retenues sur le mois, ajustements compris. */
+  readonly jours: number;
+  /** Part du temps travaillé du mois, entre 0 et 1. */
+  readonly part: number;
+}
+
+export interface MoisEnChiffres {
+  readonly joursTravailles: number;
+  /** Ce que ces journées valent, au tarif en vigueur à chaque date. */
+  readonly caGenere: Euros;
+  readonly joursOuvrables: number;
+  readonly joursDeConge: number;
+  /**
+   * Jours travaillés rapportés aux jours ouvrables, ou `null`.
+   *
+   * `null` et non zéro quand aucun jour n'est ouvrable : un mois entièrement
+   * pris en congé n'a pas une occupation de 0 %, il n'en a pas. Afficher zéro
+   * ferait lire un mois catastrophique là où il n'y a rien à lire.
+   */
+  readonly occupation: number | null;
+  readonly parClient: readonly PartClient[];
+  /** `null` quand aucune demi-journée du mois ne porte de lieu. */
+  readonly teletravail: PartTeletravail | null;
+  /**
+   * D'où viennent les jours travaillés : du planning, ou déduits des factures.
+   *
+   * L'écran doit pouvoir dire s'il montre une MESURE ou une ESTIMATION. Une
+   * occupation lue sur le planning est un fait ; la même déduite d'un montant
+   * divisé par un tarif n'en est pas un, et un client qui a plusieurs missions
+   * à des tarifs différents la fausse.
+   */
+  readonly source: SourceCharge;
+}
+
+/**
+ * Le mois vu du TEMPS, et non de l'argent encaissé.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX RÉPARTITIONS CLIENT, ET CE N'EST PAS UN DOUBLON
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'écran porte déjà une répartition par client, en EUROS et sur l'ANNÉE :
+ * c'est la dépendance commerciale, le risque de perdre celui qui pèse 60 % du
+ * chiffre d'affaires. Celle-ci est en JOURS et sur le MOIS : c'est où passe le
+ * temps, maintenant.
+ *
+ * Les deux ne coïncident pas, et c'est précisément ce qui les rend utiles
+ * ensemble. Un client qui prend 40 % des journées pour 15 % du chiffre est mal
+ * tarifé — aucune des deux vues ne le dit seule.
+ *
+ * Le CA est celui que le TRAVAIL du mois produit, pas celui qui est rentré sur
+ * le compte : les deux diffèrent de tout le délai de paiement, et les
+ * confondre ferait lire un mois creux comme un mois faible.
+ */
+export function moisEnChiffres(
+  faits: Faits, m: Mois, zone: ZoneFeries = 'general'
+): MoisEnChiffres {
+  const planning = planningDuMois(faits, m, zone);
+  /* LE MÊME REPLI QUE LES TUILES DE L'ÉCRAN, ET PAR LA MÊME FONCTION.
+     Sans rythme déclaré — une mission sans planning, un mois hors contrat — le
+     planning rend zéro journée. Compter zéro donnerait une occupation nulle à
+     qui a facturé tout le mois. `chargeDuMoisPlanifiee` cède alors la place aux
+     jours déduits des factures, et `source` dit lequel des deux on lit. */
+  const charge = chargeDuMoisPlanifiee(faits, m)
+    ?? chargeDuMois(faits.recettes, tarifsParClient(faits), m);
+  /* `joursFactures` à zéro : ce plan ne sert qu'à son DÉNOMINATEUR — jours
+     ouvrables et congés posés. L'occupation est recalculée plus bas sur les
+     journées du PLANNING, qui sont un fait, là où celle du plan de charge est
+     déduite d'un montant divisé par un tarif. Passer les jours facturés ici
+     ferait exister un second taux d'occupation dans la même structure. */
+  const plan = planDeCharge(m, faits.conges, 0, zone);
+  const total = totaliserPrevisions(
+    previsionDuMoisParMission(faits, m).map((p) => p.prevision), m
+  );
+
+
+  const parEntite = new Map<string, { nom: string; couleur: string; jours: number }>();
+  let demiesDocumentees = 0;
+  let demiesTeletravail = 0;
+  let demiesTravaillees = 0;
+
+  for (const jour of planning.jours) {
+    for (const ligne of jour.parMission) {
+      if (ligne.retenu <= 0) continue;
+      const dejaLa = parEntite.get(ligne.entiteId);
+      if (dejaLa === undefined) {
+        parEntite.set(ligne.entiteId, {
+          nom: ligne.nom, couleur: ligne.couleur, jours: ligne.retenu
+        });
+      } else {
+        dejaLa.jours += ligne.retenu;
+      }
+    }
+
+    /* Le lieu se compte par DEMI-JOURNÉE, pas par journée.
+       Une journée à domicile le matin et sur site l'après-midi n'est ni l'un ni
+       l'autre : la compter comme une journée entière obligerait à choisir, et le
+       choix serait faux la moitié du temps. */
+    for (const creneau of jour.creneaux) {
+      for (const occupant of creneau.occupants) {
+        demiesTravaillees += 1;
+        if (occupant.sur !== 'saisi' || occupant.lieu === null) continue;
+        demiesDocumentees += 1;
+        if (occupant.lieu === 'teletravail') demiesTeletravail += 1;
+      }
+    }
+  }
+
+  const joursTravailles = charge.jours;
+  const parClient = [...parEntite.entries()]
+    .map(([entiteId, c]) => ({
+      entiteId,
+      nom: c.nom,
+      couleur: c.couleur,
+      jours: c.jours,
+      part: joursTravailles > 0 ? c.jours / joursTravailles : 0
+    }))
+    .sort((a, b) => b.jours - a.jours);
+
+  return {
+    joursTravailles,
+    caGenere: total.montantRetenu,
+    joursOuvrables: plan.joursOuvrables,
+    joursDeConge: plan.joursDeConge,
+    occupation: plan.joursOuvrables > 0 ? joursTravailles / plan.joursOuvrables : null,
+    parClient,
+    source: charge.source,
+    teletravail: demiesDocumentees === 0
+      ? null
+      : {
+        part: demiesTeletravail / demiesDocumentees,
+        documentees: demiesDocumentees,
+        travaillees: demiesTravaillees
+      }
   };
 }
