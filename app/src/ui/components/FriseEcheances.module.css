@@ -1,0 +1,143 @@
+/* La frise de l'échéancier. Aucune couleur en dur : que des tokens. */
+
+.figure { margin: 0; min-width: 0; }
+
+.legende {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+
+.entreeLegende { display: inline-flex; align-items: center; gap: 6px; }
+
+.pastille { display: inline-block; width: 8px; height: 8px; border-radius: 999px; }
+
+/* ── La bande ──────────────────────────────────────────────────────────── */
+
+/* Hauteur fixe : les jalons sont positionnés en absolu, donc rien ne la
+   pousse. Deux rangs d'étiquettes doivent y tenir — voir `.jalonHaut`. */
+.frise {
+  position: relative;
+  height: 118px;
+  min-width: 0;
+  /* Les étiquettes des jalons de janvier et de décembre débordent de la bande.
+     La marge intérieure leur laisse la place au lieu de les couper. */
+  margin: 0 30px;
+}
+
+.axe {
+  position: absolute;
+  left: -30px;
+  right: -30px;
+  bottom: 0;
+  border-top: 1px solid var(--line-2);
+}
+
+.jalon {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Le second rang, pour deux échéances trop proches. Il monte plutôt qu'il ne
+   rétrécit : une étiquette tronquée ne se lit plus, et c'est justement quand
+   deux échéances sont proches qu'on a besoin de lire les deux. */
+.jalonHaut { padding-bottom: 46px; }
+
+.jalonNom { font-size: 11.5px; font-weight: 620; color: var(--text); }
+
+.reglee { font-weight: 400; color: var(--muted-2); }
+
+.jalonMontant {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.jalonDate { font-size: 10px; color: var(--muted-2); margin-bottom: 5px; }
+
+/* Le point est posé SUR l'axe, à cheval : c'est ce qui le rattache à sa date
+   plutôt qu'à son étiquette. */
+.point {
+  display: block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  margin-bottom: -5px;
+  border: 2px solid var(--panel);
+}
+
+/* Réglée : le point se creuse. La couleur de nature reste — c'est elle qui dit
+   de quoi il s'agit — mais le plein est ce qui signale une charge à venir. */
+.pointRegle { background: var(--panel) !important; border-width: 2px; }
+
+/* ── Le repère du jour ─────────────────────────────────────────────────── */
+
+.repere {
+  position: absolute;
+  top: 6px;
+  bottom: 0;
+  border-left: 2px solid var(--text);
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+.repereLibelle {
+  position: absolute;
+  top: -6px;
+  left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--panel);
+  padding: 0 3px;
+}
+
+/* ── L'axe des mois ────────────────────────────────────────────────────── */
+
+.axeMois {
+  display: flex;
+  margin-top: 7px;
+  font-size: 10px;
+  color: var(--muted-2);
+}
+
+.moisAxe { flex: 1 1 0; text-align: center; min-width: 0; }
+
+.vide { font-size: 13px; line-height: 1.6; color: var(--muted); }
+
+.vide strong { color: var(--amber); }
+
+/* Les teintes de nature, reprises de la répartition et des enveloppes : une
+   même dette garde sa couleur d'un écran à l'autre. */
+.urssaf { background: var(--c-urssaf); border-color: var(--c-urssaf); }
+.tva { background: var(--c-tva); border-color: var(--c-tva); }
+.impot { background: var(--c-ir); border-color: var(--c-ir); }
+.cfe { background: var(--c-cfe); border-color: var(--c-cfe); }
+.cfp { background: var(--c-urssaf); border-color: var(--c-urssaf); }
+
+.horsEcran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

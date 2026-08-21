@@ -1,11 +1,10 @@
-import { Suspense, lazy, useId, useMemo } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import { useFaits } from '../../state/store';
-import { dateDuJour, recettesEncaissees, soldeEstSuivi } from '../../state/selecteurs';
+import { dateDuJour, soldeEstSuivi } from '../../state/selecteurs';
 import { etatProjection, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
 import type { DateISO, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import { autonomieMois } from '../../domain/calculs/tresorerie';
-import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
 import { enveloppesDeProvision } from '../../domain/calculs/enveloppes';
 import { LIBELLE_NATURE } from '../../domain/calculs/provisions';
@@ -13,13 +12,10 @@ import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.lib
 import { CartePliable } from '../components/CartePliable';
 import { GrapheEvolution } from '../components/GrapheEvolution';
 import { Chiffre } from '../components/Chiffre';
-import { Echeances } from '../components/Echeances';
 import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
 import { Montant } from '../components/Montant';
 import { Donut, PhraseRepartition } from '../components/Donut';
-import { Statut } from '../components/Statut';
-import { useToast } from '../components/Toasts';
 import { dateCourte, eur, moisTexte } from '../format';
 import styles from './Argent.module.css';
 
@@ -53,6 +49,15 @@ const ProjectionPanneau = lazy(() => import('./Argent.projection')
   .then((m) => ({ default: m.ProjectionPanneau })));
 
 /**
+ * L'échéancier : frise de l'année, liste des appels, périodes URSSAF.
+ *
+ * Différé, et seul bloc du pilier à l'être. Il est sous la ligne de flottaison
+ * et ne s'ouvre que pour payer ou déclarer. Voir l'en-tête de son module.
+ */
+const Echeancier = lazy(() => import('./Argent.echeancier')
+  .then((m) => ({ default: m.Echeancier })));
+
+/**
  * Les montants abrégés des étiquettes de graphe.
  *
  * Sous mille euros, l'abréviation en k€ perdrait le seul chiffre significatif :
@@ -73,7 +78,6 @@ const MOIS_COURTS = [
 ];
 
 export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
-  const idGroupe = useId();
 
   return (
     <>
@@ -183,9 +187,15 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
         <NoteImpotRevenu provision={etat.provisionImpotRevenu} />
       </CartePliable>
 
-      <Echeances />
-
-      <CarteDeclarations idGroupe={idGroupe} />
+      {/* L'échéancier est DIFFÉRÉ, et c'est le seul bloc du pilier à l'être.
+          Il est en bas de l'écran, sous la ligne de flottaison : son
+          chargement se lit comme un bas de page qui se remplit, pas comme un
+          écran vide qu'on attend. Même arbitrage que la carte « À traiter » du
+          Pilote, et pour la même raison — le pilier venait de dépasser son
+          budget de cent quatre-vingts octets, et un budget ne se relève pas. */}
+      <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+        <Echeancier annee={etat.annee} />
+      </Suspense>
     </>
   );
 }
@@ -555,113 +565,6 @@ function RepartitionDuSolde({ etat }: { readonly etat: EtatArgent }) {
  * Chaque jauge n'est donc rendue que si sa résolution est utilisable ; sinon,
  * l'écran dit pourquoi il ne peut pas répondre.
  */
-/**
- * Les périodes URSSAF, et le geste qui les fait basculer.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * CE QUE SON ABSENCE COÛTAIT
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Les provisions se tiennent en deux volets (D3) : ce que l'URSSAF a appelé,
- * et ce qui est dû sur des recettes encaissées mais pas encore déclaré. Le
- * second bascule dans le premier au moment de la déclaration.
- *
- * `marquerPeriodeDeclaree` existait dans le magasin. Aucun écran ne l'appelait.
- * Une période déclarée restait donc à jamais dans le volet « à provisionner » :
- * les provisions montaient sans jamais redescendre, et le versable baissait
- * d'autant. On mettait de côté deux fois la même dette.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * DÉCLARÉ N'EST PAS PAYÉ
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Cocher ici ne dit pas que la somme est réglée : elle passe de « à
- * provisionner » à « appelé, à payer ». Elle reste donc dans le total à garder
- * de côté — c'est justement pour la payer qu'on la garde.
- */
-function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
-  const faits = useFaits((e) => e.faits);
-  const marquer = useFaits((e) => e.marquerPeriodeDeclaree);
-  const annuler = useFaits((e) => e.annulerPeriodeDeclaree);
-  const signaler = useToast();
-
-  const periodes = useMemo(() => periodesADeclarer(
-    recettesEncaissees(faits),
-    faits.entreprise.urssafPeriodicite,
-    faits.periodesDeclarees,
-    new Date().toISOString().slice(0, 10)
-  ), [faits]);
-
-  if (periodes.length === 0) return null;
-
-  return (
-    <section className={styles.carte} aria-labelledby={`${idGroupe}-declarations`}>
-      <h2 id={`${idGroupe}-declarations`} className={styles.titreCarte}>
-        Périodes URSSAF
-        <Info libelle="À quoi sert de cocher une période">
-          Tant qu’une période n’est pas déclarée, les cotisations dues dessus
-          restent dans le volet «&nbsp;à provisionner&nbsp;». La déclarer les
-          fait basculer dans «&nbsp;échéances émises&nbsp;»&nbsp;: la somme
-          reste à garder de côté, mais elle cesse d’être comptée deux fois.
-          Cocher ne veut pas dire payé.
-        </Info>
-      </h2>
-
-      <ul className={styles.listeDeclarations}>
-        {periodes.map((p) => (
-          <li key={p.id} className={styles.ligneDeclaration}>
-            <span className={styles.declarationTitre}>
-              <span>{p.libelle}</span>
-              <span className={styles.declarationMontant}>
-                <Montant>{eur(p.encaisse)}</Montant> encaissés
-              </span>
-            </span>
-
-            {p.declaree
-              ? (
-                <span className={styles.declarationActions}>
-                  <Statut libelle="Déclarée" ton="ok" />
-                  <button
-                    type="button"
-                    className={styles.actionLigne}
-                    onClick={() => {
-                      for (const m of p.mois) annuler(m);
-                      signaler(`${p.libelle} n’est plus marquée déclarée.`);
-                    }}
-                  >
-                    Annuler
-                  </button>
-                </span>
-              )
-              : p.close
-                ? (
-                  <button
-                    type="button"
-                    className={styles.actionLigne}
-                    onClick={() => {
-                      for (const m of p.mois) marquer(m);
-                      signaler(`${p.libelle} marquée déclarée.`);
-                    }}
-                  >
-                    Marquer déclarée
-                  </button>
-                )
-                : (
-                  /* Une période en cours ne se déclare pas : l'URSSAF ouvre la
-                     déclaration après sa clôture, et la cocher d'avance
-                     sortirait du volet « à provisionner » des recettes qu'on
-                     va encore encaisser dessus. */
-                  <span className={styles.declarationAttente}>
-                    Période en cours, pas encore déclarable
-                  </span>
-                )}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
   /*
    * Le plafond porte le nom du régime RÉELLEMENT configuré.
