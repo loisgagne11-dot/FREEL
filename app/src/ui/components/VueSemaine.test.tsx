@@ -233,6 +233,30 @@ describe('les deux moitiés de la journée', () => {
   });
 
   /**
+   * LA BANDE NE MENT PAS SUR QUI L'OCCUPE.
+   *
+   * La case prenait sa couleur sur le PREMIER occupant : un créneau à deux
+   * clients affichait un fond d'une seule teinte alors que deux noms y
+   * figuraient — la couleur affirmait un fait faux. Ici les deux teintes
+   * doivent apparaître, pas seulement celle de « Client Un ».
+   */
+  it('ne teinte pas un créneau à deux occupants de la seule couleur du premier', () => {
+    rendre(semaine({
+      '2026-07-06': jour('2026-07-06', {
+        lignes: [
+          ligne({ nom: 'Client Un', couleur: '#3b82f6' }),
+          ligne({ nom: 'Client Deux', couleur: '#a855f7' })
+        ]
+      })
+    }));
+
+    const matin = screen.getByRole('button', { name: /6 juil\. 2026, matin/ });
+    const fond = matin.style.background;
+    expect(fond).toContain('#3b82f6');
+    expect(fond).toContain('#a855f7');
+  });
+
+  /**
    * LE LIEU EST UN FAIT, PAS UNE DÉDUCTION.
    *
    * Sur un créneau seulement RÉPARTI — la position n'a pas été saisie — il n'y a

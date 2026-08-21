@@ -195,6 +195,30 @@ describe('ce que chaque moitié porte', () => {
     expect(screen.getByRole('button', { name: /^2 juin 2026, matin, congé/ }).textContent)
       .toContain('C');
   });
+
+  /**
+   * LA CASE MENTAIT DEUX FOIS SUR UN CRÉNEAU PARTAGÉ.
+   *
+   * Elle prenait le fond ET les initiales du seul PREMIER occupant : un
+   * créneau à deux clients se lisait — couleur et lettres — comme n'en
+   * portant qu'un seul, alors que le CRA du mois compte les deux. Sans ce
+   * test, retirer la correction ne faisait rien échouer alors qu'un client
+   * disparaissait de la grille.
+   */
+  it('ne réduit pas un créneau à deux occupants à la couleur et aux initiales du premier', () => {
+    rendre({
+      missions: [
+        missionDe({ nom: 'Studio Lumen', couleur: '#22c55e', parJour: { lun: 1 } }),
+        missionDe({ nom: 'Atelier Novak', couleur: '#3b82f6', parJour: { lun: 1 } })
+      ]
+    });
+
+    const matin = screen.getByRole('button', { name: /^1 juin 2026, matin, Studio Lumen et/ });
+    expect(matin.textContent).toContain('SL');
+    expect(matin.textContent).toContain('AN');
+    expect(matin.style.background).toContain('#22c55e');
+    expect(matin.style.background).toContain('#3b82f6');
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -278,6 +302,23 @@ describe('le compte du mois', () => {
   it('annonce les jours ouvrés du mois', () => {
     rendre();
     expect(screen.getByText(/22 jours ouvrés/)).toBeTruthy();
+  });
+
+  /**
+   * LE MOIS AVAIT DISPARU DU SOUS-TITRE.
+   *
+   * La référence dit « Juin 2026 · couleur = client · 22 j ouvrés » ; le
+   * libellé était déjà reçu par le composant, mais ne servait qu'au nom
+   * accessible du groupe — invisible à l'écran. Sans le mois en tête, savoir
+   * de quand parlent ces « 22 jours ouvrés » oblige à remonter à l'en-tête,
+   * deux niveaux plus haut.
+   */
+  it('annonce le mois affiché en tête du sous-titre', () => {
+    rendre();
+    // Le libellé et le compte sont dans des éléments distincts du même
+    // paragraphe : c'est le paragraphe entier qui doit commencer par le mois.
+    const sousTitre = screen.getByText(/jours ouvrés/).closest('p');
+    expect(sousTitre?.textContent?.startsWith('juin 2026')).toBe(true);
   });
 
   it('nomme les congés à part, sans les retirer des ouvrés', () => {

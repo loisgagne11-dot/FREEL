@@ -19,15 +19,22 @@
    alignée sur les jours de semaine — sans rien porter. */
 .horsMois { min-height: 0; }
 
+/* Les deux bandes sont CONTIGUËS, pleine largeur, collées aux bords de la
+   cellule : c'est la correction que le contrôle visuel a demandée, contre la
+   pastille détourée avec gouttière d'avant, qui faisait lire la grille comme
+   une liste de puces plutôt que comme une trame d'occupation. `position:
+   relative` porte le numéro du jour, posé en overlay sur la première bande.
+   `overflow: hidden` laisse les bandes remplir le cadre jusqu'à son coin
+   arrondi sans le déborder. */
 .jour {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-width: 0;
-  padding: 3px;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--panel-2);
+  overflow: hidden;
 }
 
 /* Le jour courant est ENCADRÉ, pas coloré : la couleur est déjà prise par les
@@ -40,12 +47,20 @@
 .weekEnd { background: transparent; }
 .ferie { background: transparent; border-style: dashed; }
 
+/* Posé en OVERLAY sur la première bande, et non plus sur sa propre ligne : une
+   ligne séparée rouvrirait, en haut de la cellule, l'espace que la bande
+   contiguë vient de refermer. `pointer-events: none` laisse le clic
+   traverser jusqu'au bouton MATIN qu'il recouvre. */
 .numero {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  z-index: 1;
   font-size: 9.5px;
   line-height: 1;
   color: var(--muted-2);
   font-variant-numeric: tabular-nums;
-  padding-left: 1px;
+  pointer-events: none;
 }
 
 .jourCourant .numero { color: var(--green); font-weight: 700; }
@@ -57,11 +72,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 1 1 0;
   /* Deux moitiés de 22 px font 44 px : la cible reste atteignable au doigt sans
-     que cinq rangs de grille poussent la page en portrait. */
+     que cinq rangs de grille poussent la page en portrait. Le filet d'un
+     pixel entre les deux (ci-dessous) ne l'entame pas. */
   min-height: 22px;
-  border-radius: 3px;
-  border: 1px solid transparent;
+  border: none;
   background: var(--panel);
   color: var(--muted-2);
   font-family: inherit;
@@ -71,7 +87,18 @@
   overflow: hidden;
 }
 
-.demi:hover { border-color: var(--line-2); }
+/* Le FILET entre matin et après-midi : une bordure fine plutôt qu'une
+   gouttière, pour qu'une même journée se lise comme UNE carte à deux temps —
+   sur les deux vues, semaine et mois. `:first-of-type`, et non `:first-child` :
+   le numéro du jour (un `<span>`) précède les deux bandes dans le DOM, donc la
+   première bande n'est le premier enfant QUE parmi les éléments de son propre
+   type. */
+.demi:first-of-type { border-bottom: 1px solid var(--line); }
+
+/* La bordure n'existe plus qu'en filet horizontal : le survol et le focus
+   passent par `box-shadow`/`outline`, qui ne consomment pas de place et ne
+   rouvrent pas la continuité des deux bandes. */
+.demi:hover { box-shadow: inset 0 0 0 1px var(--line-2); }
 .demi:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 
 .occupee { font-weight: 700; }
@@ -87,7 +114,6 @@
       transparent 4px 8px
     ),
     var(--panel);
-  border-color: color-mix(in srgb, var(--amber) 40%, transparent);
   color: var(--amber);
 }
 
@@ -182,6 +208,11 @@
 }
 
 .resume strong { color: var(--muted); font-weight: 650; }
+
+/* Le domaine rend « juin 2026 » en minuscule, comme on l'écrit en français au
+   milieu d'une phrase. En tête de ligne, la capitale est un choix de mise en
+   forme — elle ne devient jamais une valeur stockée. */
+.periode { text-transform: capitalize; }
 
 /* Sur écran large, la case respire : les initiales grandissent et le mois se
    lit d'un coup d'œil au lieu de se déchiffrer. */

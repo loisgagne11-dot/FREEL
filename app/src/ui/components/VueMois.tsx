@@ -50,7 +50,11 @@ const NOM_CRENEAU: Readonly<Record<Creneau, string>> = {
 export function VueMois(
   { planning, libellePeriode, aujourdhui, onBasculer }: {
     readonly planning: PlanningPeriode;
-    /** « juin 2026 ». Un LIBELLÉ, pas un `Mois` : il ne sert qu'au nom du groupe. */
+    /**
+     * « juin 2026 ». Un LIBELLÉ, pas un `Mois` : sert au sous-titre affiché
+     * et au nom accessible du groupe — jamais à un calcul, qui reste sur
+     * `Mois` côté appelant.
+     */
     readonly libellePeriode: string;
     readonly aujourdhui: DateISO;
     readonly onBasculer: (
@@ -86,6 +90,12 @@ export function VueMois(
   return (
     <>
       <p className={styles.resume}>
+        {/* Le mois en tête du sous-titre, comme le dessin : sans lui, savoir de
+            quel mois parlent « 22 jours ouvrés » oblige à remonter à l'en-tête
+            de l'écran, deux niveaux plus haut — et le sélecteur mois/semaine
+            juste au-dessus donne d'autant moins envie d'y regarder. */}
+        <span className={styles.periode}>{libellePeriode}</span>
+        {' · '}
         <span>couleur&nbsp;=&nbsp;client · deux créneaux par jour</span>
         {' · '}
         <strong>
@@ -166,6 +176,10 @@ function CaseDeJour(
 
   return (
     <div className={classes}>
+      {/* Posé en overlay sur la première bande plutôt qu'en ligne à part :
+          c'est la correction d'ergonomie ci-dessous — les deux bandes sont
+          désormais CONTIGUËS, pleine hauteur, et une ligne de numéro séparée
+          rouvrirait l'espace qu'on vient de refermer. */}
       <span className={styles.numero} aria-hidden="true">{Number(jour.date.slice(8, 10))}</span>
       {jour.creneaux.map((creneau) => (
         <Demi key={creneau.creneau} jour={jour} creneau={creneau} onBasculer={onBasculer} />
@@ -186,6 +200,13 @@ function Demi(
   const [premier] = creneau.occupants;
   const occupe = premier !== undefined;
   const enConge = !occupe && jour.conge > 0;
+  // Deux rythmes peuvent revendiquer la même demi-journée. Se limiter au
+  // premier occupant mentirait deux fois sur la même case : la couleur
+  // affirmerait un seul client, les initiales n'en nommeraient qu'un — alors
+  // que le CRA compte les deux.
+  const partage = creneau.occupants.length > 1;
+
+  const fond = occupe ? fondBande(creneau.occupants) : undefined;
 
   return (
     <button
@@ -194,12 +215,17 @@ function Demi(
       // La teinte du client TEINTE la case : c'est le « couleur = client » du
       // dessin, et sur une case de 60 px c'est le seul repère qui se lit de
       // loin. `color-mix` en ligne parce que la teinte vient de la donnée.
-      {...(occupe && premier.couleur !== ''
+      {...(fond !== undefined
         ? {
           style: {
-            background: `color-mix(in srgb, ${premier.couleur} 22%, transparent)`,
-            borderColor: `color-mix(in srgb, ${premier.couleur} 55%, transparent)`,
-            color: premier.couleur
+            background: fond,
+            // Le texte ne peut porter qu'une seule couleur : sur une bande
+            // partagée, aucune des deux ne représente l'autre client, et le
+            // neutre est le seul choix honnête — colorer d'après le premier
+            // reviendrait à l'erreur qu'on corrige ici.
+            ...(!partage && premier !== undefined && premier.couleur !== ''
+              ? { color: premier.couleur }
+              : {})
           }
         }
         : {})}
@@ -211,7 +237,7 @@ function Demi(
         {dateCourte(jour.date)}, {NOM_CRENEAU[creneau.creneau]}, {etat(jour, creneau)}
       </span>
       <span className={styles.initiales} aria-hidden="true">
-        {occupe ? initiales(premier.nom) : enConge ? 'C' : ''}
+        {occupe ? creneau.occupants.map((o) => initiales(o.nom)).join('/') : enConge ? 'C' : ''}
       </span>
       {/* Le lieu vient du créneau SAISI. Sur un créneau réparti, il n'y en a
           pas : en dessiner un serait l'inventer. */}
@@ -222,6 +248,28 @@ function Demi(
       )}
     </button>
   );
+}
+
+/**
+ * Le fond d'une bande : la teinte du ou des clients qui l'occupent.
+ *
+ * Une bande à deux occupants n'a pas une seule couleur qui les représente
+ * tous les deux. La version d'avant ne peignait que celle du premier — et
+ * effaçait le second aussi bien de la couleur que des initiales. On partage
+ * la bande en autant de tranches que d'occupants plutôt que d'en retenir un
+ * au hasard.
+ */
+function fondBande(occupants: readonly { readonly couleur: string }[]): string | undefined {
+  const couleurs = occupants.map((o) => o.couleur).filter((c) => c !== '');
+  if (couleurs.length === 0) return undefined;
+  const part = 100 / couleurs.length;
+  const tranches = couleurs
+    .map((c, i) => `color-mix(in srgb, ${c} 30%, var(--panel)) ${i * part}% ${(i + 1) * part}%`)
+    .join(', ');
+  // À l'horizontale : les initiales se lisent aussi de gauche à droite dans
+  // cet ordre (« SL/AN »), et la tranche de couleur tombe derrière celle
+  // qu'elle désigne.
+  return `linear-gradient(90deg, ${tranches})`;
 }
 
 /**
