@@ -41,15 +41,27 @@ describe('projection du disponible', () => {
     expect(screen.getByText(/Tu peux te verser/)).toBeTruthy();
   });
 
-  /** Deux scénarios, parce que la question en a deux. */
-  it('montre les deux scénarios, avec et sans versement', () => {
+  /**
+   * DEUX SCÉNARIOS, PARCE QUE LA QUESTION EN A DEUX — MAIS PLUS DEUX GRAPHES.
+   *
+   * Ce test cherchait les deux séries dans la légende d'un graphe de barres
+   * « avec / sans versement ». Ce graphe a été retiré au lot B : il traçait la
+   * même projection que le graphe combiné en tête de l'écran, même série et
+   * même source, dans une autre forme. Deux dessins du même nombre finissent
+   * par ne pas dire la même chose.
+   *
+   * Ce que le graphe portait SEUL est resté, et c'est ce qu'on vérifie ici : le
+   * versé cumulé sur douze mois, que le graphe combiné ne donne pas. Les deux
+   * scénarios sont désormais une phrase — ce qui suffit, puisqu'il s'agit de
+   * deux nombres et non d'une forme.
+   */
+  it('chiffre les deux scénarios à un an, versé cumulé compris', () => {
     semer({ soldeInitial: euros(24_000) });
     render(<ProjectionPanneau />);
 
-    // Deux fois chacun : la légende du graphe, et l'en-tête du tableau
-    // accessible qui double la donnée.
-    expect(screen.getAllByText('Sans versement').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/En me versant/).length).toBeGreaterThan(0);
+    const phrase = screen.getByText(/Dans un an/);
+    expect(phrase.textContent).toContain('sans rien te verser');
+    expect(phrase.textContent).toContain('au total');
   });
 
   /**

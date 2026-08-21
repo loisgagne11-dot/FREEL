@@ -1,22 +1,23 @@
 import { Suspense, lazy, useId, useMemo } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, recettesEncaissees, soldeEstSuivi } from '../../state/selecteurs';
-import type { EtatArgent, EtatSeuils } from '../../state/selecteurs.argent';
+import { etatProjection, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
 import type { DateISO, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import { autonomieMois } from '../../domain/calculs/tresorerie';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
-import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
+import { enveloppesDeProvision } from '../../domain/calculs/enveloppes';
+import { LIBELLE_NATURE } from '../../domain/calculs/provisions';
 import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.libelles';
 import { CartePliable } from '../components/CartePliable';
+import { GrapheEvolution } from '../components/GrapheEvolution';
 import { Chiffre } from '../components/Chiffre';
 import { Echeances } from '../components/Echeances';
 import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
 import { Montant } from '../components/Montant';
 import { Donut, PhraseRepartition } from '../components/Donut';
-import { Repartition } from '../components/Repartition';
 import { Statut } from '../components/Statut';
 import { useToast } from '../components/Toasts';
 import { dateCourte, eur, moisTexte } from '../format';
@@ -51,12 +52,34 @@ import styles from './Argent.module.css';
 const ProjectionPanneau = lazy(() => import('./Argent.projection')
   .then((m) => ({ default: m.ProjectionPanneau })));
 
+/**
+ * Les montants abrégés des étiquettes de graphe.
+ *
+ * Sous mille euros, l'abréviation en k€ perdrait le seul chiffre significatif :
+ * « 0,3 k€ » se lit moins bien que « 340 € », et sur un net mensuel c'est
+ * précisément l'ordre de grandeur courant.
+ */
+function enKiloEuros(valeur: number): string {
+  const abs = Math.abs(valeur);
+  if (abs < 1000) return eur(euros(Math.round(valeur)));
+  const k = valeur / 1000;
+  const arrondi = Math.abs(k) >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
+  return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(arrondi)} k€`;
+}
+
+/** Les mois de l'axe, sur trois lettres comme partout ailleurs dans l'écran. */
+const MOIS_COURTS = [
+  'JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEP', 'OCT', 'NOV', 'DÉC'
+];
+
 export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
   const idGroupe = useId();
 
   return (
     <>
       <TuilesTresorerie etat={etat} />
+
+      <EvolutionDuCompte />
 
       <CartePliable
         id="repartition"
@@ -138,8 +161,8 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             faire : il ne permet ni de rapprocher une provision de l'avis
             reçu, ni de savoir ce qui se libère après une déclaration. */}
         <h3 className={styles.sousTitre}>
-          Sur quelle catégorie
-          <Info libelle="D’où vient la ventilation">
+          Combien est mis de côté, enveloppe par enveloppe
+          <Info libelle="D’où vient la ventilation, et ce que « mis de côté » veut dire">
             Les échéances déjà émises portent chacune leur nature. Les
             charges sur recettes encaissées n’ont pas encore d’échéance à
             qui la demander&nbsp;: elles se répartissent selon la règle qui
@@ -147,17 +170,16 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             l’autre. La TVA n’y figure pas tant qu’aucun appel n’est émis,
             parce qu’elle se relève sur les factures et ne se déduit
             d’aucun taux.
+            <br /><br />
+            Aucun euro du compte n’est <em>affecté</em> à une enveloppe&nbsp;:
+            l’argent est fongible. Le solde est donc réparti dans l’ordre des
+            échéances, <strong>la plus proche servie d’abord</strong> — c’est ce
+            qui se passera réellement le jour du prélèvement. Sur un compte
+            insuffisant, les premières enveloppes sont pleines et les dernières
+            vides&nbsp;: on voit <em>laquelle</em> ne passera pas.
           </Info>
         </h3>
-        <Repartition
-          total={etat.tresorerie.provisions}
-          deficit={0}
-          parts={NATURES_DETTE.map((n) => ({
-            libelle: LIBELLE_NATURE[n],
-            montant: etat.provisionsParNature[n],
-            ton: n
-          }))}
-        />
+        <Enveloppes etat={etat} />
         <NoteImpotRevenu provision={etat.provisionImpotRevenu} />
       </CartePliable>
 
@@ -165,6 +187,182 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
 
       <CarteDeclarations idGroupe={idGroupe} />
     </>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   B2 — l'évolution du compte
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Entrées, sorties et niveau projeté sur un même repère.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA CARTE QUI MANQUAIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La référence ouvre le pilier là-dessus, et l'écran n'en avait rien : il
+ * portait deux graphes de barres dans une carte repliée plus bas, qui
+ * répondaient à « combien puis-je me verser » et non à « est-ce que ça tient ».
+ *
+ * La différence n'est pas cosmétique. Un mois qui encaisse 8 000 € et en sort
+ * 9 000 € est un mauvais mois ; deux graphes séparés laissent faire la
+ * soustraction de tête, douze fois de suite. Ici la courbe donne le niveau, les
+ * barres donnent le mouvement autour d'un zéro, et le net est écrit sous chaque
+ * mois — on lit la pente, puis on descend voir quel mois l'explique.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA COURBE EST LE DISPONIBLE, ET LE TITRE LE DIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le dessin trace un solde ; l'application s'y refuse, et c'est un arbitrage
+ * ancien qu'on ne rouvre pas. Projeter le solde obligerait à deviner QUAND
+ * chaque dette sortira du compte, et la moitié n'a pas de date — l'URSSAF n'a
+ * pas encore appelé les charges des recettes déjà encaissées. Une courbe de
+ * solde monte joliment jusqu'au trimestre où elle s'effondre, et c'est
+ * exactement la courbe qui fait se verser de l'argent qu'on doit.
+ *
+ * Le titre de la carte porte donc « disponible » et non « solde », et l'info le
+ * détaille. Un graphe conforme au dessin et faux sur le fond serait le pire des
+ * deux mondes.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DOUZE MOIS GLISSANTS, PAS « JUSQU'À DÉCEMBRE »
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La référence s'arrête à décembre parce qu'elle est dessinée en juin. La même
+ * règle appliquée en novembre laisserait deux colonnes. La projection court sur
+ * douze mois à partir du mois courant, et la phrase dit « dans douze mois »
+ * plutôt qu'une fin d'année qui ne veut dire quelque chose qu'en juin.
+ */
+function EvolutionDuCompte() {
+  const faits = useFaits((e) => e.faits);
+  const projection = useMemo(() => etatProjection(faits), [faits]);
+  const p = projection.projection;
+
+  const mois = p.mois.map((m) => ({
+    mois: m.mois,
+    libelle: MOIS_COURTS[Number(m.mois.slice(5, 7)) - 1] ?? m.mois,
+    entrees: m.encaissements,
+    // Charges ET dépenses : ce sont les deux sorties que la projection connaît.
+    // Les séparer ferait trois séries pour une question qui en a deux.
+    sorties: m.charges + m.depenses,
+    niveau: m.sansVersement
+  }));
+  const dernier = p.mois[p.mois.length - 1];
+
+  return (
+    <section className={styles.carte} aria-labelledby="evolution">
+      <h2 id="evolution" className={styles.titreCarte}>
+        Évolution du compte — entrées, sorties &amp; disponible
+        <Info libelle="Pourquoi le disponible et non le solde">
+          Projeter le <em>solde</em> obligerait à deviner quand chaque dette
+          sortira du compte — et la moitié d’entre elles n’a pas encore de date,
+          puisque l’URSSAF n’a pas appelé les charges des recettes déjà
+          encaissées. Une courbe de solde monte donc joliment jusqu’au trimestre
+          où elle s’effondre. Le <strong>disponible</strong>, lui, a déjà tout
+          retiré&nbsp;: un encaissement ne lui ajoute que sa part nette, et payer
+          une échéance ne le fait pas bouger.
+        </Info>
+      </h2>
+
+      {dernier !== undefined && (
+        <p className={styles.reponse}>
+          Disponible aujourd’hui <strong><Montant>{eur(p.depart)}</Montant></strong>
+          {' → '}projeté dans douze mois{' '}
+          <strong><Montant>{eur(dernier.sansVersement)}</Montant></strong>, sans
+          rien te verser.
+        </p>
+      )}
+
+      <GrapheEvolution
+        mois={mois}
+        seuil={faits.reserve > 0 ? faits.reserve : null}
+        libelleNiveau="disponible"
+        formater={(v) => eur(euros(Math.round(v)))}
+        formaterCourt={enKiloEuros}
+        indexCourant={0}
+      />
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   B4 — les enveloppes de provision
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Une vignette par nature de dette : mis de côté, dû, et la date qui vient.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI DES VIGNETTES PLUTÔT QU'UNE BARRE SEGMENTÉE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La barre disait la PROPORTION de chaque nature dans le total. C'est la
+ * mauvaise question : personne ne se demande quel pourcentage de ses
+ * provisions est de l'URSSAF. On se demande « est-ce que le 5 juillet va
+ * passer ». Une barre ne peut pas répondre — elle n'a ni date ni jauge de
+ * remplissage par poste.
+ *
+ * Chaque vignette porte donc les trois choses que la barre ne pouvait pas
+ * porter : la couverture, le dû, et l'échéance. La règle d'affectation du solde
+ * est dans `enveloppes.ts`, et elle est écrite sous le titre de la carte.
+ *
+ * Les natures à zéro sont MASQUÉES ici, alors que le calcul les rend toutes.
+ * Ce n'est pas une contradiction : le calcul ne doit pas décaler ses lignes,
+ * l'écran ne doit pas afficher quatre vignettes vides sur un compte neuf. La
+ * décision est à l'écran parce que c'est une question de place, pas de vérité.
+ */
+function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
+  const echeances = useFaits((e) => e.faits.echeances);
+  const enveloppes = enveloppesDeProvision(
+    etat.tresorerie.solde, etat.provisionsParNature, echeances
+  ).filter((e) => e.du > 0);
+
+  if (enveloppes.length === 0) {
+    return <p className={styles.vide}>Rien n’est dû pour l’instant.</p>;
+  }
+
+  return (
+    <ul className={styles.enveloppes}>
+      {enveloppes.map((e) => {
+        const part = e.du <= 0 ? 1 : Math.min(1, e.couvert / e.du);
+        const complet = e.couvert >= e.du;
+        return (
+          <li key={e.nature} className={styles.enveloppe}>
+            <span className={styles.enveloppeTitre}>
+              <span className={`${styles.puce} ${styles[e.nature]}`} aria-hidden="true" />
+              {LIBELLE_NATURE[e.nature]}
+            </span>
+
+            <span className={complet ? styles.enveloppeCouvert : styles.enveloppeManque}>
+              <Montant>{eur(e.couvert)}</Montant>
+            </span>
+            <span className={styles.enveloppeDu}>
+              {'sur '}<Montant>{eur(e.du)}</Montant>
+            </span>
+
+            {/* La jauge est une image ; les deux montants au-dessus sont la
+                donnée. Sous quelques pourcents, un remplissage fait deux
+                pixels sur un téléphone. */}
+            <span className={styles.jaugeEnveloppe} aria-hidden="true">
+              <span
+                className={`${styles.jaugeRemplie} ${styles[e.nature]}`}
+                style={{ width: `${part * 100}%` }}
+              />
+            </span>
+
+            <span className={styles.enveloppeEcheance}>
+              {e.prochaineEcheance === null
+                /* Pas d'échéance : la dette existe, mais rien ne l'a encore
+                   appelée. Le dire évite de lire « rien à payer ». */
+                ? 'pas encore appelée'
+                : `éch. ${dateCourte(e.prochaineEcheance)}`}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -465,6 +663,18 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
 }
 
 function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
+  /*
+   * Le plafond porte le nom du régime RÉELLEMENT configuré.
+   *
+   * Le handoff écrit « Plafond micro-BNC », et il a raison de nommer le régime
+   * exact : « micro-entreprise » recouvre deux plafonds qui vont du simple au
+   * quadruple — 77 700 € en BNC, 188 700 € en vente. Mais l'écrire en dur
+   * afficherait « BNC » à un artisan dont le plafond n'est pas celui-là, et le
+   * chiffre à côté serait alors juste tandis que son nom serait faux. Le nom
+   * suit donc le fait, comme le seuil qu'il désigne.
+   */
+  const typeActivite = useFaits((e) => e.faits.entreprise.typeActivite);
+
   const plafond = seuils.plafondMicro;
   const tva = seuils.franchiseTva;
 
@@ -526,12 +736,12 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
           </Info>}
       resume={resume}
     >
-      <div className={styles.jauges}>
+      <div className={styles.seuils}>
         {plafond.statut === 'refuse'
           ? <p className={styles.vide}>Plafond micro&nbsp;: {plafond.motif}</p>
           : (
             <Jauge
-              libelle="Plafond micro-entreprise"
+              libelle={`Plafond micro-${typeActivite === 'BNC' ? 'BNC' : 'BIC'}`}
               atteint={seuils.caEncaisse}
               seuil={plafond.valeur}
               unite="€"
