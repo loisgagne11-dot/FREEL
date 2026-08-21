@@ -50,6 +50,28 @@ Le troisième existe parce que les deux premiers ne pouvaient structurellement
 pas voir un indicateur perdu à l'intérieur d'un écran existant : l'écran est là,
 le magasin est câblé, les tests sont verts, et le chiffre a disparu.
 
+**Les tenir fait partie du lot, pas de l'après.** Les lots B et C ont été livrés
+et fusionnés pendant que les trois documents restaient datés du lot A : sept
+visualisations et six indicateurs y manquaient, et une ligne se contredisait avec
+sa propre section « reste à faire ». Un inventaire qu'on ne met pas à jour au
+moment de la livraison ne signale plus rien — il devient la photographie d'un état
+passé, et la seule chose qu'il garantit est qu'on cessera de le consulter.
+
+## Livrer
+
+Un lot n'est fini que quand les quatre sont vrais :
+
+1. `cd app && npm run verifier` est vert ;
+2. les captures sont regénérées et **relues** ;
+3. les trois inventaires portent ce que le lot a changé ;
+4. le contrôle visuel est passé sur les écrans touchés.
+
+**Une PR par lot, ouverte au premier commit.** Quatre lots empilés sur une
+branche dont la PR fusionne en cours de route se retrouvent sans PR ouverte :
+plus rien ne les porte en revue, et c'est arrivé au lot C. Ne rien proposer à la
+fusion qui ne soit fini au sens ci-dessus — et le dire explicitement quand ça
+l'est.
+
 `docs/VISION-PRODUIT.md` dit à quoi sert le produit ; s'y référer avant
 d'arbitrer entre deux conceptions.
 
