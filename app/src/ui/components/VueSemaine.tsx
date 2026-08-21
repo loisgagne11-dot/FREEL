@@ -214,16 +214,17 @@ function CaseDeCreneau(
     jour.weekEnd ? styles.weekEnd : ''
   ].filter((c) => c !== '').join(' ');
 
+  // Le fond de la bande, pas seulement sa bordure. Depuis que la bande est
+  // pleine largeur (correction d'ergonomie ci-dessous), c'est elle qui porte
+  // « couleur = client » — `fondBande` répond `undefined` si personne n'a de
+  // teinte choisie, et le vert par défaut de `.travaille` reprend la main.
+  const fond = occupe ? fondBande(creneau.occupants) : undefined;
+
   return (
     <button
       type="button"
       className={classes}
-      // La teinte du client prime sur celle du thème quand elle est choisie :
-      // c'est elle qui distingue deux clients d'un coup d'œil. Absente, le
-      // thème reprend la main — une couleur oubliée ne casse rien.
-      {...(occupe && premier.couleur !== ''
-        ? { style: { borderColor: premier.couleur } }
-        : {})}
+      {...(fond !== undefined ? { style: { background: fond } } : {})}
       onClick={() => onBasculer(
         jour.date,
         premier?.missionId ?? '',
@@ -265,6 +266,29 @@ function CaseDeCreneau(
       {libre && <span className={styles.motLibre} aria-hidden="true">libre</span>}
     </button>
   );
+}
+
+/**
+ * Le fond d'une bande : la teinte du ou des clients qui l'occupent.
+ *
+ * Une bande à DEUX occupants — deux rythmes qui prévoient tous deux le lundi
+ * matin — n'a pas une seule couleur qui les représente. La version d'avant ne
+ * peignait que celle du premier, en bordure : la bordure désignait un client,
+ * le contenu en désignait deux. On partage la bande en autant de tranches que
+ * d'occupants plutôt que d'en retenir un au hasard — c'est un choix parmi
+ * d'autres (une bordure neutre en aurait été un autre), mais celui-ci garde le
+ * repère de couleur que le reste de l'écran promet.
+ */
+function fondBande(occupants: readonly { readonly couleur: string }[]): string | undefined {
+  const couleurs = occupants.map((o) => o.couleur).filter((c) => c !== '');
+  if (couleurs.length === 0) return undefined;
+  const part = 100 / couleurs.length;
+  const tranches = couleurs
+    .map((c, i) => `color-mix(in srgb, ${c} 22%, var(--panel)) ${i * part}% ${(i + 1) * part}%`)
+    .join(', ');
+  // À la verticale : les occupants s'empilent dans la bande dans le même
+  // ordre, et chaque tranche de couleur tombe derrière celui qu'elle désigne.
+  return `linear-gradient(180deg, ${tranches})`;
 }
 
 /** Le pictogramme du lieu, avec son nom pour qui ne le voit pas. */

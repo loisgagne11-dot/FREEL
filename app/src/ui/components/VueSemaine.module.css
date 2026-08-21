@@ -13,16 +13,24 @@
    hauteur restante, donc la ligne « après-midi » tombe au même niveau sur les
    sept jours. En pile, un créneau qui porte deux clients — deux rythmes qui
    prévoient tous deux le lundi matin — poussait l'après-midi de sa colonne
-   seule, et la semaine se lisait en escalier. */
+   seule, et la semaine se lisait en escalier.
+
+   PAS DE GOUTTIÈRE entre les deux créneaux : ce sont deux bandes CONTIGUËS
+   d'une même carte-jour, comme le dessin les montre — un espace donnerait à
+   croire que la matinée et l'après-midi sont deux cases indépendantes, et une
+   demi-journée libre se lirait comme un trou plutôt que comme une bande. Le
+   `overflow: hidden` laisse les bandes remplir le cadre jusqu'à son coin
+   arrondi sans le déborder. */
 .colonne {
   display: grid;
   grid-template-rows: auto 1fr 1fr;
-  gap: 3px;
+  gap: 0;
   min-width: 0;
-  padding: 5px 4px 6px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--panel-2);
+  overflow: hidden;
 }
 
 /* Le jour courant est ENCADRÉ, pas coloré : les couleurs sont déjà prises par
@@ -35,7 +43,10 @@
   font-family: var(--mono);
   letter-spacing: 0.04em;
   color: var(--muted-2);
-  padding-bottom: 3px;
+  /* La carte n'a plus de padding propre (les bandes doivent aller jusqu'à ses
+     bords) : c'est l'entête qui porte le sien, pour respirer sans en donner
+     aux bandes. */
+  padding: 5px 4px 4px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -50,10 +61,10 @@
   justify-content: flex-start;
   gap: 2px;
   /* Chaque moitié reste atteignable au doigt sans que la grille déborde à
-     360 px. Deux d'entre elles font la hauteur d'une cible confortable. */
+     360 px. Deux d'entre elles font la hauteur d'une cible confortable — le
+     filet d'un pixel entre les deux (ci-dessous) ne l'entame pas. */
   min-height: 34px;
-  border-radius: var(--r-sm);
-  border: 1px solid transparent;
+  border: none;
   background: var(--panel);
   color: var(--muted-2);
   font-size: 10px;
@@ -65,21 +76,32 @@
   min-width: 0;
 }
 
-.creneau:hover { border-color: var(--line-2); }
+/* Le FILET entre les deux bandes : une bordure fine plutôt qu'une gouttière,
+   pour que matin et après-midi restent une seule carte-jour à deux temps —
+   c'est la correction que le contrôle visuel a demandée, contre la pastille
+   détourée d'avant. */
+.creneau:first-of-type { border-bottom: 1px solid var(--line); }
+
+/* Le survol et le focus ne peuvent plus jouer sur la bordure — elle n'existe
+   plus qu'en filet horizontal. `box-shadow` en incrustation donne le même
+   repère sans consommer de place ni casser la continuité des deux bandes. */
+.creneau:hover { box-shadow: inset 0 0 0 1px var(--line-2); }
 .creneau:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 
-/* Travaillé : la case s'éclaire de la teinte du client, posée en ligne par le
-   composant sur la bordure. Le fond reste sobre — sept couleurs pleines côte à
-   côte rendraient les noms illisibles. */
+/* Travaillé, sans teinte de client connue : un vert neutre, faute de mieux.
+   Dès qu'une couleur est choisie, le composant pose son propre fond en ligne
+   (`fondBande`), et cette règle ne s'applique plus — l'inline l'emporte
+   toujours sur la classe. */
 .travaille {
   background: color-mix(in srgb, var(--green) 10%, var(--panel));
-  border-color: var(--line-2);
   color: var(--text);
 }
 
-/* Ajusté : une bordure plus marquée. Distinguer ce que le rythme a rempli de
-   ce qu'on a corrigé soi-même — sans quoi on ne sait plus ce qu'on a vérifié. */
-.ajuste { border-width: 2px; padding: 3px 4px; }
+/* Ajusté : un LISERÉ à gauche, et non plus une bordure pleine — celle-ci
+   aurait rouvert la gouttière entre les deux bandes que la correction
+   d'ergonomie vient de refermer. Distinguer ce que le rythme a rempli de ce
+   qu'on a corrigé soi-même — sans quoi on ne sait plus ce qu'on a vérifié. */
+.ajuste { border-left: 3px solid var(--line-2); padding-left: 3px; }
 
 /* Le congé est HACHURÉ, et non simplement coloré : c'est un jour qui n'est ni
    travaillé ni libre, et la trame le dit sans consommer une teinte de client. */
@@ -91,7 +113,6 @@
       transparent 4px 8px
     ),
     var(--panel);
-  border-color: color-mix(in srgb, var(--amber) 45%, transparent);
   color: var(--amber);
 }
 

@@ -277,3 +277,52 @@ describe('l’évolution du compte', () => {
     expect(within(carte as HTMLElement).getAllByText(/^[+−]/).length).toBeGreaterThan(0);
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────
+   B6 — l'ordre des cartes
+   ───────────────────────────────────────────────────────────────────────── */
+
+describe('l’ordre des cartes', () => {
+  /**
+   * UN RENVOI QUI DÉSIGNE QUELQUE CHOSE QU'ON NE VOIT PAS.
+   *
+   * La phrase de répartition renvoie à « les enveloppes ci-dessous ». Elles se
+   * trouvaient deux cartes plus bas, derrière les seuils et la projection de
+   * versement : il fallait deviner qu'il fallait défiler, et le renvoi
+   * désignait le vide.
+   *
+   * Un renvoi cassé coûte plus qu'une carte mal rangée — il apprend à ne plus
+   * suivre les renvois, et c'est celui-ci qui porte la seule explication de ce
+   * que « provisions » recouvre.
+   *
+   * Le test lit l'ORDRE DU DOCUMENT et non des pixels : c'est lui que suivent
+   * le défilement, la tabulation et un lecteur d'écran.
+   */
+  it('met les enveloppes juste après la répartition qui y renvoie', () => {
+    poser({ soldeInitial: euros(10_000), echeances: [echeance(2_000)] });
+
+    /* Les titres de carte sont des `<span>` dans un bouton de repli, pas des
+       `heading` : on lit donc la position dans le DOCUMENT, ce qui est de
+       toute façon ce qu'on veut vérifier — c'est cet ordre-là que suivent le
+       défilement, la tabulation et un lecteur d'écran. */
+    const avant = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    const repartition = screen.getByText('Ton solde n’est pas tout à toi');
+    const enveloppes = screen.getByText('Enveloppes de provision');
+    const seuils = screen.getByText(/^Seuils/);
+
+    expect(avant(repartition, enveloppes)).toBe(true);
+    expect(avant(enveloppes, seuils)).toBe(true);
+  });
+
+  /**
+   * Et la phrase dit bien « ci-dessous ». Si elle changeait de mot sans que la
+   * carte bouge — ou l'inverse — ce test et le précédent se contrediraient,
+   * ce qui est exactement le signal qu'on veut.
+   */
+  it('renvoie aux enveloppes par un mot qui suppose qu’elles suivent', () => {
+    poser({ soldeInitial: euros(10_000), echeances: [echeance(2_000)] });
+    expect(phraseDeRepartition().textContent).toMatch(/enveloppes ci-dessous/);
+  });
+});

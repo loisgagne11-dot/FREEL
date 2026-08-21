@@ -106,27 +106,18 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
         <RepartitionDuSolde etat={etat} />
       </CartePliable>
 
-      <CarteSeuils seuils={etat.seuils} />
-
-      <CartePliable
-        id="projection"
-        ecran="argent"
-        titre="Où va ton disponible, et combien tu peux te verser"
-        aide={<Info libelle="Ce que cette projection montre">
-              Douze mois à venir, dans deux scénarios&nbsp;: sans rien te
-              verser, et en te versant chaque mois le maximum qui ne fasse
-              jamais passer le disponible sous ta réserve. Les
-              encaissements attendus viennent des factures émises non
-              réglées et du revenu prévu au planning — aucune tendance n’est
-              devinée.
-            </Info>}
-        resume="Projection sur douze mois, et versement mensuel soutenable"
-      >
-        <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-          <ProjectionPanneau />
-        </Suspense>
-      </CartePliable>
-
+      {/*
+        * LES ENVELOPPES SUIVENT IMMÉDIATEMENT LA RÉPARTITION DU SOLDE.
+        *
+        * La phrase du donut renvoie à « les enveloppes ci-dessous ». Elles
+        * étaient deux cartes plus bas, derrière les seuils et la projection de
+        * versement : le renvoi désignait quelque chose qu'on ne voyait pas, et
+        * il fallait deviner qu'il fallait défiler.
+        *
+        * Un renvoi cassé coûte plus qu'une carte mal rangée. Il apprend à ne
+        * plus suivre les renvois, et c'est celui-ci qui porte la seule
+        * explication de ce que « provisions » recouvre.
+        */}
       <CartePliable
         id="enveloppes"
         ecran="argent"
@@ -186,6 +177,32 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
         <Enveloppes etat={etat} />
         <NoteImpotRevenu provision={etat.provisionImpotRevenu} />
       </CartePliable>
+
+      {/* Les seuils viennent APRÈS : ils répondent à « où j'en suis dans
+          l'année » — une question de plafond, pas de trésorerie du jour. Les
+          intercaler entre le solde et son détail coupait une explication en
+          deux. */}
+      <CarteSeuils seuils={etat.seuils} />
+
+      <CartePliable
+        id="projection"
+        ecran="argent"
+        titre="Où va ton disponible, et combien tu peux te verser"
+        aide={<Info libelle="Ce que cette projection montre">
+              Douze mois à venir, dans deux scénarios&nbsp;: sans rien te
+              verser, et en te versant chaque mois le maximum qui ne fasse
+              jamais passer le disponible sous ta réserve. Les
+              encaissements attendus viennent des factures émises non
+              réglées et du revenu prévu au planning — aucune tendance n’est
+              devinée.
+            </Info>}
+        resume="Projection sur douze mois, et versement mensuel soutenable"
+      >
+        <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+          <ProjectionPanneau />
+        </Suspense>
+      </CartePliable>
+
 
       {/* L'échéancier est DIFFÉRÉ, et c'est le seul bloc du pilier à l'être.
           Il est en bas de l'écran, sous la ligne de flottaison : son

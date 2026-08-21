@@ -38,6 +38,21 @@
   border-top: 1px solid var(--line-2);
 }
 
+/*
+ * Le segment écoulé, en vert, superposé à `.axe`.
+ *
+ * Il ne déborde PAS dans les marges de -30px/+30px : ce débord n'existe que
+ * pour que le trait gris atteigne visuellement les bords de la carte, il ne
+ * représente aucune date. Le vert, lui, doit s'arrêter exactement là où le
+ * repère « auj. » s'arrête — sinon les deux ne raccordent plus.
+ */
+.axeEcoule {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  border-top: 1px solid var(--green);
+}
+
 .jalon {
   position: absolute;
   bottom: 0;
@@ -58,6 +73,10 @@
 .jalonNom { font-size: 11.5px; font-weight: 620; color: var(--text); }
 
 .reglee { font-weight: 400; color: var(--muted-2); }
+
+/* Rouge et en gras : c'est la seule information de la frise qui appelle une
+   action, elle ne doit pas se fondre dans le reste de l'étiquette. */
+.enRetard { font-weight: 700; color: var(--red); }
 
 .jalonMontant {
   font-family: var(--mono);
@@ -81,9 +100,26 @@
   border: 2px solid var(--panel);
 }
 
-/* Réglée : le point se creuse. La couleur de nature reste — c'est elle qui dit
-   de quoi il s'agit — mais le plein est ce qui signale une charge à venir. */
-.pointRegle { background: var(--panel) !important; border-width: 2px; }
+/*
+ * Par défaut — sans classe d'état — le point est PLEIN : c'est l'apparence
+ * d'une échéance réglée, et c'est le cas ordinaire une fois l'année écoulée.
+ * Les deux classes ci-dessous couvrent les deux autres états, et un point ne
+ * porte jamais les deux à la fois.
+ */
+
+/* À venir : le point se creuse. La couleur de nature reste — c'est elle qui
+   dit de quoi il s'agit — mais le vide est ce qui signale que rien n'est
+   encore réglé. */
+.pointAVenir { background: var(--panel) !important; border-width: 2px; }
+
+/*
+ * En retard : ni plein ni creux au sens des deux autres états, une troisième
+ * couleur — le rouge, réservé aux alertes dans toute l'application, jamais
+ * utilisé pour une nature de charge. Un point rouge PLEIN se distingue d'une
+ * pastille réglée (couleur de nature, jamais rouge) et d'un anneau à venir
+ * (vide) sans ambiguïté possible, même sans lire l'étiquette « en retard ».
+ */
+.pointRetard { background: var(--red) !important; border-color: var(--red) !important; }
 
 /* ── Le repère du jour ─────────────────────────────────────────────────── */
 

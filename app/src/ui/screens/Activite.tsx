@@ -3,6 +3,7 @@ import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import {
   type PoidsClient,
+  type MoisEnChiffres as ChiffresDuMois,
   craDuMoisParMission, etatActivite, moisEnChiffres, planningDeLaSemaine, planningDuMois
 } from '../../state/selecteurs.activite';
 import { VueSemaine } from '../components/VueSemaine';
@@ -134,7 +135,20 @@ export function Activite() {
     () => tarifDeLaJournee(faits, Number(mois.slice(0, 4))), [faits, mois]
   );
 
-  const [vue, setVue] = useState<'mois' | 'semaine'>('mois');
+  /*
+   * L'écran s'ouvre sur la SEMAINE.
+   *
+   * C'est la maille où l'on corrige — le rythme remplit le mois d'un coup, et
+   * ce qu'on redresse, on le redresse à la semaine parce que c'est l'horizon
+   * dont on se souvient. Le dessin ouvre là, et notre propre commentaire de
+   * `VueSemaine` le disait déjà depuis le début.
+   *
+   * Il ouvrait sur le mois pour une raison qui a disparu : la pose des congés
+   * ne vivait que dans le calendrier mensuel, et ouvrir sur la semaine l'aurait
+   * rendue introuvable. Les congés ont désormais leur propre carte, toujours
+   * affichée — le verrou est levé.
+   */
+  const [vue, setVue] = useState<'mois' | 'semaine'>('semaine');
   const [ancreSemaine, setAncreSemaine] = useState<DateISO>(() => dateDuJour());
   /** Journée déclarée sur un créneau vide, en attente de savoir à qui elle est. */
   const [aRattacher, setARattacher] = useState<{
@@ -245,8 +259,9 @@ export function Activite() {
   return (
     <>
       <Greet
-        titre="Activité"
+        titre="Ton plan de charge"
         sousTitre="Les congés posés sortent du dénominateur : le même travail sur moins de jours fait monter l’occupation."
+        {...(section === 'charge' ? { repere: <ResumeDuMois chiffres={chiffres} /> } : {})}
         actions={(
           <>
             {section === 'missions' && etat.missions.length > 0 && (
@@ -307,274 +322,306 @@ export function Activite() {
         />
 
         <PanneauOnglet idGroupe={idGroupe} id="charge" actif={section === 'charge'}>
-          <div className={styles.grille}>
-            <Chiffre libelle="Jours ouvrables" valeur={String(etat.plan.joursOuvrables)} />
-            {/* Le libellé suit la SOURCE. Des journées lues sur le planning
-                sont des jours travaillés — un fait. Les mêmes déduites d'un
-                montant divisé par un tarif sont des équivalent-jours — une
-                estimation. Le même titre pour les deux ferait passer l'une
-                pour l'autre. */}
-            <Chiffre
-              libelle={etat.sourceCharge === 'planning'
-                ? 'Jours travaillés'
-                : 'Équivalent-jours facturés'}
-              valeur={formaterJours(etat.plan.joursFactures)}
-              ton="accent"
-            />
-            {/* L'OCCUPATION N'EST PLUS ICI, ET C'EST UNE CORRECTION.
-                Elle s'affichait en tuile ET dans « Le mois en chiffres » : deux
-                fois le même mot pour deux calculs qui n'étaient pas les mêmes,
-                sur le même écran. Le panneau la garde — il a la place d'écrire
-                son dénominateur, sans lequel « 84 % » ne se compare pas d'un
-                mois à l'autre. */}
-            <Chiffre libelle="Congés posés dans l’année" valeur={String(etat.congesDeLAnnee)} />
-          </div>
+          {/*
+            * DEUX COLONNES, COMME LE DESSIN.
+            *
+            * ─────────────────────────────────────────────────────────────
+            * CE QU'UNE COLONNE UNIQUE FORÇAIT
+            * ─────────────────────────────────────────────────────────────
+            *
+            * Tout s'empilait sur près de quatre mille pixels, et « Le mois en
+            * chiffres » n'arrivait qu'en quatrième position — après la grille,
+            * après le calendrier des congés. Ce qui répond en une seconde à
+            * « comment va ce mois » était sous la ligne de flottaison, et la
+            * seule façon de le remonter aurait été de repousser la grille
+            * qu'on vient précisément consulter.
+            *
+            * Une colonne unique FORCE un arbitrage que deux colonnes n'ont pas
+            * à rendre : ici la grille tient la largeur, et les chiffres se
+            * lisent en regard sans que rien ne cède sa place.
+            *
+            * ─────────────────────────────────────────────────────────────
+            * L'ORDRE DU DOCUMENT RESTE CELUI DE LA LECTURE
+            * ─────────────────────────────────────────────────────────────
+            *
+            * La colonne latérale vient APRÈS la principale dans le document, et
+            * la grille ne s'en sert pas pour les réordonner. Un lecteur d'écran
+            * et un parcours au clavier suivent donc l'ordre du texte —
+            * plan de charge, congés, analyse, puis chiffres et compte rendu.
+            * Repositionner en CSS ce que le document ordonne autrement fabrique
+            * une page qui se lit dans un sens et se tabule dans un autre.
+            *
+            * Sous 1100 px la grille retombe à une colonne, et l'empilement
+            * reprend cet ordre-là — pas un autre.
+            */}
+          <div className={styles.deuxColonnes}>
+            <div className={styles.principale}>
+              {/* Sans planning, l'occupation se déduit encore d'une division — et
+                  elle se trompe dès que la facturation ne suit pas le travail : un
+                  mois facturé au trimestre s'affiche à 0 %. Le dire vaut mieux que
+                  de laisser croire à un mois creux. */}
+              {etat.sourceCharge === 'facturation' && etat.missions.length > 0 && (
+                <p className={styles.bandeau} role="status">
+                  Occupation estimée depuis les montants facturés, faute de rythme
+                  saisi sur les missions du mois.
+                  <Info libelle="Pourquoi cette estimation est fragile">
+                    Sans planning, les jours travaillés se déduisent du montant
+                    facturé divisé par le tarif journalier. Un mois facturé au
+                    trimestre affiche alors 0 % d’occupation alors qu’il a été
+                    travaillé, et un forfait au résultat ne se convertit pas en
+                    jours. Saisir le rythme de la mission remplace cette estimation
+                    par les journées réellement retenues.
+                  </Info>
+                </p>
+              )}
 
-          {/* Sans planning, l'occupation se déduit encore d'une division — et
-              elle se trompe dès que la facturation ne suit pas le travail : un
-              mois facturé au trimestre s'affiche à 0 %. Le dire vaut mieux que
-              de laisser croire à un mois creux. */}
-          {etat.sourceCharge === 'facturation' && etat.missions.length > 0 && (
-            <p className={styles.bandeau} role="status">
-              Occupation estimée depuis les montants facturés, faute de rythme
-              saisi sur les missions du mois.
-              <Info libelle="Pourquoi cette estimation est fragile">
-                Sans planning, les jours travaillés se déduisent du montant
-                facturé divisé par le tarif journalier. Un mois facturé au
-                trimestre affiche alors 0 % d’occupation alors qu’il a été
-                travaillé, et un forfait au résultat ne se convertit pas en
-                jours. Saisir le rythme de la mission remplace cette estimation
-                par les journées réellement retenues.
-              </Info>
-            </p>
-          )}
+              {etat.recettesSansTarif > 0 && (
+                <p className={styles.bandeau} role="status">
+                  {etat.recettesSansTarif}{' '}
+                  {etat.recettesSansTarif > 1 ? 'recettes du mois n’ont' : 'recette du mois n’a'} pas de
+                  tarif journalier connu&nbsp;: {etat.recettesSansTarif > 1 ? 'elles ne sont' : 'elle n’est'} pas
+                  {' '}comptée{etat.recettesSansTarif > 1 ? 's' : ''} dans l’occupation.
+                  <Info libelle="Pourquoi ces recettes ne sont pas comptées">
+                    Les jours facturés se déduisent du montant divisé par le tarif
+                    journalier de la mission. Sans tarif, les compter à un montant
+                    supposé fabriquerait de l’occupation. Renseigner le TJM de la
+                    mission du client suffit à les faire entrer dans la mesure.
+                  </Info>
+                </p>
+              )}
 
-          {etat.recettesSansTarif > 0 && (
-            <p className={styles.bandeau} role="status">
-              {etat.recettesSansTarif}{' '}
-              {etat.recettesSansTarif > 1 ? 'recettes du mois n’ont' : 'recette du mois n’a'} pas de
-              tarif journalier connu&nbsp;: {etat.recettesSansTarif > 1 ? 'elles ne sont' : 'elle n’est'} pas
-              {' '}comptée{etat.recettesSansTarif > 1 ? 's' : ''} dans l’occupation.
-              <Info libelle="Pourquoi ces recettes ne sont pas comptées">
-                Les jours facturés se déduisent du montant divisé par le tarif
-                journalier de la mission. Sans tarif, les compter à un montant
-                supposé fabriquerait de l’occupation. Renseigner le TJM de la
-                mission du client suffit à les faire entrer dans la mesure.
-              </Info>
-            </p>
-          )}
+              <section className={styles.carte} aria-labelledby={`${idGroupe}-calendrier`}>
+                {/*
+                  * L'en-tête dit CE QU'ON REGARDE, et la bascule est à sa droite.
+                  *
+                  * La carte s'annonçait « Congés de juin 2026 » dans les deux vues.
+                  * C'était vrai du calendrier mensuel — on y pose ses congés — et
+                  * faux de la semaine, qui montre le plan de charge et où les congés
+                  * ne sont qu'une des choses affichées. Un titre qui ne décrit que la
+                  * moitié de ce qu'il coiffe apprend à ne plus le lire.
+                  */}
+                <div className={styles.enteteCarte}>
+                  <h2 id={`${idGroupe}-calendrier`} className={styles.titreCarte}>
+                    {vue === 'mois' ? 'Vue mois' : 'Vue semaine'}
+                    <Info libelle="Ce que la grille montre">
+                      Chaque journée porte deux créneaux. Ceux dont la position a été
+                      saisie disent le matin ou l’après-midi&nbsp;; les autres — toute
+                      journée d’avant cette version — sont RÉPARTIS pour pouvoir être
+                      dessinés, et n’affichent donc pas de lieu. Un clic bascule la
+                      moitié visée&nbsp;; la ramener à ce que le rythme prévoit efface
+                      la correction au lieu d’en poser une.
+                    </Info>
+                  </h2>
 
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-calendrier`}>
-            {/*
-              * L'en-tête dit CE QU'ON REGARDE, et la bascule est à sa droite.
-              *
-              * La carte s'annonçait « Congés de juin 2026 » dans les deux vues.
-              * C'était vrai du calendrier mensuel — on y pose ses congés — et
-              * faux de la semaine, qui montre le plan de charge et où les congés
-              * ne sont qu'une des choses affichées. Un titre qui ne décrit que la
-              * moitié de ce qu'il coiffe apprend à ne plus le lire.
-              */}
-            <div className={styles.enteteCarte}>
-              <h2 id={`${idGroupe}-calendrier`} className={styles.titreCarte}>
-                {vue === 'mois' ? 'Vue mois' : 'Vue semaine'}
-                <Info libelle="Ce que la grille montre">
-                  Chaque journée porte deux créneaux. Ceux dont la position a été
-                  saisie disent le matin ou l’après-midi&nbsp;; les autres — toute
-                  journée d’avant cette version — sont RÉPARTIS pour pouvoir être
-                  dessinés, et n’affichent donc pas de lieu. Un clic bascule la
-                  moitié visée&nbsp;; la ramener à ce que le rythme prévoit efface
-                  la correction au lieu d’en poser une.
-                </Info>
-              </h2>
+                  {/* Semaine ou mois : la spec prévoit les deux. Le mois donne la
+                      vue d'ensemble, la semaine est la maille où l'on corrige —
+                      une grille de trente-et-un jours oblige à retrouver le bon. */}
+                  {/* La SEMAINE en premier, comme le dessin : c'est la vue par
+                      défaut, et une bascule dont l'état actif n'est pas le premier
+                      segment se lit à l'envers. Les pictogrammes sont décoratifs —
+                      le mot porte seul le sens, et le bouton reste compréhensible
+                      si la police d'icônes ne rend rien. */}
+                  <div className={styles.bascule} role="group" aria-label="Vue du planning">
+                    <button
+                      type="button"
+                      className={`${styles.vue} ${vue === 'semaine' ? styles.vueActive : ''}`}
+                      aria-pressed={vue === 'semaine'}
+                      onClick={() => setVue('semaine')}
+                    >
+                      <span className={styles.iconeVue} aria-hidden="true">▤</span>
+                      Semaine
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.vue} ${vue === 'mois' ? styles.vueActive : ''}`}
+                      aria-pressed={vue === 'mois'}
+                      onClick={() => setVue('mois')}
+                    >
+                      <span className={styles.iconeVue} aria-hidden="true">▦</span>
+                      Mois
+                    </button>
+                  </div>
+                </div>
 
-              {/* Semaine ou mois : la spec prévoit les deux. Le mois donne la
-                  vue d'ensemble, la semaine est la maille où l'on corrige —
-                  une grille de trente-et-un jours oblige à retrouver le bon. */}
-              <div className={styles.bascule} role="group" aria-label="Vue du planning">
-                <button
-                  type="button"
-                  className={`${styles.vue} ${vue === 'mois' ? styles.vueActive : ''}`}
-                  aria-pressed={vue === 'mois'}
-                  onClick={() => setVue('mois')}
-                >
-                  Mois
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.vue} ${vue === 'semaine' ? styles.vueActive : ''}`}
-                  aria-pressed={vue === 'semaine'}
-                  onClick={() => setVue('semaine')}
-                >
-                  Semaine
-                </button>
-              </div>
+                {vue === 'mois'
+                  ? (
+                    <VueMois
+                      planning={planningMois}
+                      libellePeriode={moisLong(mois)}
+                      aujourdhui={dateDuJour()}
+                      onBasculer={ajusterAuClic}
+                    />
+                  )
+                  : (
+                    <VueSemaine
+                      planning={semaine}
+                      aujourdhui={dateDuJour()}
+                      onBasculer={ajusterAuClic}
+                      onRevenirAuRythme={() => {
+                        const n = retirerAjustements(semaine.jours.map((j) => j.date));
+                        // L'effet se voit — la grille change sous les yeux — mais
+                        // pas son ampleur : sept cases redevenues identiques ne
+                        // disent pas combien de corrections ont été retirées.
+                        signaler(n === 1
+                          ? 'Correction retirée : la journée reprend le rythme.'
+                          : `${n} corrections retirées : les journées reprennent le rythme.`);
+                      }}
+                    />
+                  )}
+              </section>
+
+
+              {/*
+                * LES CONGÉS ONT LEUR PROPRE CARTE, ET C'EST LA CORRECTION D'UNE
+                * CONFUSION.
+                *
+                * Une seule carte portait les deux grilles : le plan de charge en
+                * vue semaine, le calendrier des congés en vue mois. Deux questions
+                * différentes derrière la même bascule — « qu'ai-je travaillé » et
+                * « quand suis-je absent » — et il fallait quitter l'une pour poser
+                * un congé sur l'autre.
+                *
+                * Le dessin range le TRAVAIL dans les deux vues du plan de charge, et
+                * y montre les congés en hachures. Fondre les deux grilles en une
+                * seule aurait supprimé le geste qui pose un congé d'un clic — celui
+                * de l'ancienne application, et le seul qui reste pour une journée
+                * isolée. Elles vivent donc côte à côte, chacune sous son titre.
+                */}
+              <section className={styles.carte} aria-labelledby={`${idGroupe}-conges`}>
+                <h2 id={`${idGroupe}-conges`} className={styles.titreCarte}>
+                  Congés de {moisLong(mois)}
+                  <Info libelle="Effet des congés sur l’occupation">
+                    Un jour posé sort du dénominateur&nbsp;: le même travail sur
+                    moins de jours disponibles fait monter l’occupation, ce qui est
+                    le sens de la mesure. Un congé posé un jour férié ou un week-end
+                    n’est pas consommé, et n’est donc pas compté.
+                  </Info>
+                </h2>
+
+                <PlageDeConges />
+                <Calendrier
+                  mois={mois}
+                  jours={etat.calendrier}
+                  onBasculer={basculerConge}
+                />
+                <Legende />
+
+                <dl className={styles.detail}>
+                  <div className={styles.ligne}>
+                    <dt>Jours fériés du mois</dt>
+                    <dd>{etat.plan.joursFeries}</dd>
+                  </div>
+                  <div className={styles.ligne}>
+                    <dt>Congés posés ce mois</dt>
+                    <dd>{etat.plan.joursDeConge}</dd>
+                  </div>
+                  {/* Le compte de l'ANNÉE, et non du mois : il vivait dans une
+                      tuile d'en-tête que le repère du titre a remplacée. Le retirer
+                      sans le replacer aurait fait disparaître le seul endroit où
+                      l'on voit ses congés cumulés. */}
+                  <div className={styles.ligne}>
+                    <dt>Congés posés dans l’année</dt>
+                    <dd>{etat.congesDeLAnnee}</dd>
+                  </div>
+                  <div className={`${styles.ligne} ${styles.total}`}>
+                    <dt>Jours réellement travaillables</dt>
+                    <dd>{etat.plan.joursOuvrables}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              {/*
+                * L'ANALYSE VIENT APRÈS LE PLAN DE CHARGE, ET À LA DEMANDE.
+                *
+                * Ces trois cartes répondent à « combien ça rapporte », une question
+                * commerciale qu'on se pose en fin de mois. Elles étaient AU-DESSUS
+                * de la grille : il fallait les dépasser pour arriver à ce qu'on
+                * venait consulter. Le dessin met le plan de charge en tête.
+                *
+                * Elles restent dans l'onglet du plan de charge et non sous Missions :
+                * « ce que ce mois-ci devrait rapporter » est une question de MOIS,
+                * même si sa source est la mission. Rangée sous Missions, la première
+                * n'était visible qu'en changeant d'onglet.
+                */}
+              <Suspense fallback={<EnAttenteDeFormulaire />}>
+                <CartePrevision previsions={previsions} mois={mois} />
+                <CarteRapportParMission rapports={rapports} annee={Number(mois.slice(0, 4))} />
+                <CarteTarifJournalier tarif={tarif} annee={Number(mois.slice(0, 4))} />
+              </Suspense>
             </div>
 
-            {vue === 'mois'
-              ? (
-                <VueMois
-                  planning={planningMois}
-                  libellePeriode={moisLong(mois)}
-                  aujourdhui={dateDuJour()}
-                  onBasculer={ajusterAuClic}
-                />
-              )
-              : (
-                <VueSemaine
-                  planning={semaine}
-                  aujourdhui={dateDuJour()}
-                  onBasculer={ajusterAuClic}
-                  onRevenirAuRythme={() => {
-                    const n = retirerAjustements(semaine.jours.map((j) => j.date));
-                    // L'effet se voit — la grille change sous les yeux — mais
-                    // pas son ampleur : sept cases redevenues identiques ne
-                    // disent pas combien de corrections ont été retirées.
-                    signaler(n === 1
-                      ? 'Correction retirée : la journée reprend le rythme.'
-                      : `${n} corrections retirées : les journées reprennent le rythme.`);
-                  }}
-                />
-              )}
-          </section>
+            <aside className={styles.laterale} aria-label="Chiffres du mois">
+              {/*
+                * LES CHIFFRES VIENNENT APRÈS LA GRILLE, COMME DANS LE DESSIN.
+                *
+                * On ouvre cet onglet pour voir ce qu'on a travaillé, pas pour lire
+                * un taux : il fallait dépasser trois cartes de nombres avant
+                * d'atteindre la grille qu'on venait consulter. Le dessin range le
+                * plan de charge en tête de la colonne, et les chiffres du mois dans
+                * le rail — c'est-à-dire, sur une seule colonne, dessous.
+                */}
+              <section className={styles.carte} aria-labelledby={`${idGroupe}-chiffres`}>
+                <h2 id={`${idGroupe}-chiffres`} className={styles.titreCarte}>
+                  Le mois en chiffres
+                  <Info libelle="Ce que ce panneau mesure">
+                    Du TEMPS, et sur le mois affiché. Le CA est celui que le travail
+                    du mois produit, pas celui qui est rentré sur le compte&nbsp;: les
+                    deux diffèrent de tout le délai de paiement. La part de
+                    télétravail ne porte que sur les demi-journées dont le lieu a été
+                    renseigné, et le panneau dit combien elles sont — une part
+                    calculée sur deux demi-journées ne mesure pas le mois.
+                  </Info>
+                </h2>
 
-          {/*
-            * LES CONGÉS ONT LEUR PROPRE CARTE, ET C'EST LA CORRECTION D'UNE
-            * CONFUSION.
-            *
-            * Une seule carte portait les deux grilles : le plan de charge en
-            * vue semaine, le calendrier des congés en vue mois. Deux questions
-            * différentes derrière la même bascule — « qu'ai-je travaillé » et
-            * « quand suis-je absent » — et il fallait quitter l'une pour poser
-            * un congé sur l'autre.
-            *
-            * Le dessin range le TRAVAIL dans les deux vues du plan de charge, et
-            * y montre les congés en hachures. Fondre les deux grilles en une
-            * seule aurait supprimé le geste qui pose un congé d'un clic — celui
-            * de l'ancienne application, et le seul qui reste pour une journée
-            * isolée. Elles vivent donc côte à côte, chacune sous son titre.
-            */}
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-conges`}>
-            <h2 id={`${idGroupe}-conges`} className={styles.titreCarte}>
-              Congés de {moisLong(mois)}
-              <Info libelle="Effet des congés sur l’occupation">
-                Un jour posé sort du dénominateur&nbsp;: le même travail sur
-                moins de jours disponibles fait monter l’occupation, ce qui est
-                le sens de la mesure. Un congé posé un jour férié ou un week-end
-                n’est pas consommé, et n’est donc pas compté.
-              </Info>
-            </h2>
+                <MoisEnChiffres chiffres={chiffres} />
+              </section>
 
-            <PlageDeConges />
-            <Calendrier
-              mois={mois}
-              jours={etat.calendrier}
-              onBasculer={basculerConge}
-            />
-            <Legende />
+              <CraCard cras={cras} periode={moisLong(mois)} />
 
-            <dl className={styles.detail}>
-              <div className={styles.ligne}>
-                <dt>Jours fériés du mois</dt>
-                <dd>{etat.plan.joursFeries}</dd>
-              </div>
-              <div className={styles.ligne}>
-                <dt>Congés posés ce mois</dt>
-                <dd>{etat.plan.joursDeConge}</dd>
-              </div>
-              <div className={`${styles.ligne} ${styles.total}`}>
-                <dt>Jours réellement travaillables</dt>
-                <dd>{etat.plan.joursOuvrables}</dd>
-              </div>
-            </dl>
-          </section>
+              {/*
+                * DEUX RÉPARTITIONS CLIENT, ET CE N'EST PAS UN DOUBLON.
+                *
+                * Celle du dessus est en JOURS et sur le MOIS : où passe le temps,
+                * maintenant. Celle-ci est en EUROS et sur l'ANNÉE : le risque de
+                * perdre celui qui pèse 60 % du chiffre d'affaires.
+                *
+                * Elles ne coïncident pas, et c'est ce qui les rend utiles ensemble —
+                * un client qui prend 40 % des journées pour 15 % du chiffre est mal
+                * tarifé, et aucune des deux ne le dit seule. Cette carte portait le
+                * titre « Le mois en chiffres » tout en mesurant l'année : le titre
+                * dit maintenant ce qu'elle mesure.
+                */}
+              <section className={styles.carte} aria-labelledby={`${idGroupe}-dependance`}>
+                <h2 id={`${idGroupe}-dependance`} className={styles.titreCarte}>
+                  Ta dépendance client, sur l’année
+                  <Info libelle="Pourquoi elle se mesure sur l’année">
+                    Un client peut ne rien régler en août sans que la dépendance
+                    ait bougé. Mesurée sur un seul mois, la concentration sauterait
+                    d’un client à l’autre au gré des règlements et n’apprendrait
+                    rien. Elle porte donc sur le chiffre d’affaires encaissé de
+                    l’année.
+                  </Info>
+                </h2>
 
-          {/*
-            * LES CHIFFRES VIENNENT APRÈS LA GRILLE, COMME DANS LE DESSIN.
-            *
-            * On ouvre cet onglet pour voir ce qu'on a travaillé, pas pour lire
-            * un taux : il fallait dépasser trois cartes de nombres avant
-            * d'atteindre la grille qu'on venait consulter. Le dessin range le
-            * plan de charge en tête de la colonne, et les chiffres du mois dans
-            * le rail — c'est-à-dire, sur une seule colonne, dessous.
-            */}
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-chiffres`}>
-            <h2 id={`${idGroupe}-chiffres`} className={styles.titreCarte}>
-              Le mois en chiffres
-              <Info libelle="Ce que ce panneau mesure">
-                Du TEMPS, et sur le mois affiché. Le CA est celui que le travail
-                du mois produit, pas celui qui est rentré sur le compte&nbsp;: les
-                deux diffèrent de tout le délai de paiement. La part de
-                télétravail ne porte que sur les demi-journées dont le lieu a été
-                renseigné, et le panneau dit combien elles sont — une part
-                calculée sur deux demi-journées ne mesure pas le mois.
-              </Info>
-            </h2>
+                <dl className={styles.detail}>
+                  <div className={styles.ligne}>
+                    <dt>Encaissé ce mois</dt>
+                    <dd><Montant>{eur(etat.caDuMois)}</Montant></dd>
+                  </div>
+                </dl>
 
-            <MoisEnChiffres chiffres={chiffres} />
-          </section>
+                {etat.poidsClients.length === 0
+                  ? (
+                    <p className={styles.vide}>
+                      Aucun encaissement cette année&nbsp;: la dépendance client ne
+                      se mesure pas encore.
+                    </p>
+                  )
+                  : <DependanceClients poids={etat.poidsClients} />}
+              </section>
+            </aside>
+          </div>
 
-          {/*
-            * DEUX RÉPARTITIONS CLIENT, ET CE N'EST PAS UN DOUBLON.
-            *
-            * Celle du dessus est en JOURS et sur le MOIS : où passe le temps,
-            * maintenant. Celle-ci est en EUROS et sur l'ANNÉE : le risque de
-            * perdre celui qui pèse 60 % du chiffre d'affaires.
-            *
-            * Elles ne coïncident pas, et c'est ce qui les rend utiles ensemble —
-            * un client qui prend 40 % des journées pour 15 % du chiffre est mal
-            * tarifé, et aucune des deux ne le dit seule. Cette carte portait le
-            * titre « Le mois en chiffres » tout en mesurant l'année : le titre
-            * dit maintenant ce qu'elle mesure.
-            */}
-          <section className={styles.carte} aria-labelledby={`${idGroupe}-dependance`}>
-            <h2 id={`${idGroupe}-dependance`} className={styles.titreCarte}>
-              Ta dépendance client, sur l’année
-              <Info libelle="Pourquoi elle se mesure sur l’année">
-                Un client peut ne rien régler en août sans que la dépendance
-                ait bougé. Mesurée sur un seul mois, la concentration sauterait
-                d’un client à l’autre au gré des règlements et n’apprendrait
-                rien. Elle porte donc sur le chiffre d’affaires encaissé de
-                l’année.
-              </Info>
-            </h2>
-
-            <dl className={styles.detail}>
-              <div className={styles.ligne}>
-                <dt>Encaissé ce mois</dt>
-                <dd><Montant>{eur(etat.caDuMois)}</Montant></dd>
-              </div>
-            </dl>
-
-            {etat.poidsClients.length === 0
-              ? (
-                <p className={styles.vide}>
-                  Aucun encaissement cette année&nbsp;: la dépendance client ne
-                  se mesure pas encore.
-                </p>
-              )
-              : <DependanceClients poids={etat.poidsClients} />}
-          </section>
-
-          {/*
-            * L'ANALYSE VIENT APRÈS LE PLAN DE CHARGE, ET À LA DEMANDE.
-            *
-            * Ces trois cartes répondent à « combien ça rapporte », une question
-            * commerciale qu'on se pose en fin de mois. Elles étaient AU-DESSUS
-            * de la grille : il fallait les dépasser pour arriver à ce qu'on
-            * venait consulter. Le dessin met le plan de charge en tête.
-            *
-            * Elles restent dans l'onglet du plan de charge et non sous Missions :
-            * « ce que ce mois-ci devrait rapporter » est une question de MOIS,
-            * même si sa source est la mission. Rangée sous Missions, la première
-            * n'était visible qu'en changeant d'onglet.
-            */}
-          <Suspense fallback={<EnAttenteDeFormulaire />}>
-            <CartePrevision previsions={previsions} mois={mois} />
-            <CarteRapportParMission rapports={rapports} annee={Number(mois.slice(0, 4))} />
-            <CarteTarifJournalier tarif={tarif} annee={Number(mois.slice(0, 4))} />
-          </Suspense>
-
-          <CraCard cras={cras} periode={moisLong(mois)} />
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="missions" actif={section === 'missions'}>
@@ -742,6 +789,46 @@ function CaseJour({ jour, onBasculer }: { jour: Jour; onBasculer: (d: DateISO) =
  * calendrier POSE un congé : on apprend la convention en modifiant ses
  * données. La spec de design prévoit cette légende ; elle manquait.
  */
+/**
+ * Le repère chiffré de l'en-tête : jours travaillés et occupation.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * IL REMPLACE TROIS TUILES, IL NE S'Y AJOUTE PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'écran ouvrait sur une rangée de trois cartes — jours ouvrables, jours
+ * travaillés, congés de l'année — qu'il fallait dépasser pour atteindre la
+ * grille qu'on venait consulter. Le dessin met la réponse sur la ligne du
+ * titre, en une phrase, et garde le détail pour le panneau.
+ *
+ * Ajouter ce repère SANS retirer les tuiles aurait ramené le défaut qu'on
+ * venait de corriger : l'occupation affichée deux fois sur le même écran, avec
+ * deux calculs qui n'étaient pas les mêmes. D'où la même source que le
+ * panneau — `moisEnChiffres` — et une seule.
+ *
+ * Le libellé suit la SOURCE. Des journées lues sur le planning sont des jours
+ * travaillés, un fait ; les mêmes déduites d'un montant divisé par un tarif
+ * sont des équivalent-jours, une estimation. Le même mot pour les deux ferait
+ * passer l'une pour l'autre.
+ */
+function ResumeDuMois({ chiffres }: { readonly chiffres: ChiffresDuMois }) {
+  const nom = chiffres.source === 'planning' ? 'travaillés' : 'équivalent-jours';
+  return (
+    <>
+      <strong>{formaterJours(chiffres.joursTravailles)} j</strong> {nom}
+      {/* L'occupation s'abstient quand aucun jour n'est ouvrable : un mois
+          entièrement pris en congé n'a pas une occupation de 0 %, il n'en a
+          pas. Afficher zéro ferait lire un mois catastrophique. */}
+      {chiffres.occupation !== null && (
+        <>
+          {' · '}
+          <strong>{Math.round(chiffres.occupation * 100)} %</strong> occupé
+        </>
+      )}
+    </>
+  );
+}
+
 function Legende() {
   const entrees = [
     { classe: styles.legendeOuvrable, libelle: 'Travaillable' },
@@ -842,23 +929,6 @@ function decalerMois(m: Mois, pas: number): Mois {
 function moisLong(m: Mois): string {
   const date = new Date(`${m}-01T00:00:00`);
   return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(date);
-}
-
-function Chiffre(
-  { libelle, valeur, ton = 'neutre' }: {
-    libelle: string;
-    valeur: string;
-    ton?: 'neutre' | 'accent' | 'attention';
-  }
-) {
-  const classe = ton === 'attention' ? styles.attention
-    : ton === 'accent' ? styles.accent : '';
-  return (
-    <div className={styles.chiffre}>
-      <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
-    </div>
-  );
 }
 
 /** Une mission et l'un de ses clients opérationnels. */

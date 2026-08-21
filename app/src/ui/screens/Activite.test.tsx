@@ -61,19 +61,37 @@ const recette = (m: Partial<Faits['recettes'][number]> = {}) => ({
 });
 
 describe('plan de charge', () => {
-  // L'ancienne application divisait par 20, une constante : un mois de mai à
-  // 19 jours ouvrés donnait 95 % à qui avait travaillé tous les jours.
+  /**
+   * L'ancienne application divisait par 20, une constante : un mois de mai à
+   * 19 jours ouvrés donnait 95 % à qui avait travaillé tous les jours.
+   *
+   * Le nombre a quitté sa tuile d'en-tête pour la carte des congés — c'est là
+   * qu'il se lit, à côté des fériés et des congés qui le composent. Ce que ce
+   * test tient n'a pas changé : le dénominateur est celui du mois RÉEL.
+   */
   it('affiche les jours ouvrables réels du mois', () => {
     render(<Activite />);
     // Juillet 2026 : 23 jours de semaine, moins le 14 juillet (mardi).
-    expect(screen.getByText('Jours ouvrables').nextSibling?.textContent).toBe('22');
+    expect(screen.getByText('Jours réellement travaillables').nextSibling?.textContent)
+      .toBe('22');
   });
 
+  /**
+   * LE LIBELLÉ SUIT LA SOURCE, ET C'EST TOUT L'OBJET DE CE TEST.
+   *
+   * Sans rythme saisi, les journées se déduisent d'un montant divisé par un
+   * tarif : ce sont des ÉQUIVALENT-JOURS, une estimation. Les annoncer comme
+   * des jours travaillés ferait passer une déduction pour une mesure.
+   *
+   * Le chiffre a quitté sa tuile pour le repère de l'en-tête — un seul endroit
+   * au lieu de trois cartes qu'il fallait dépasser pour atteindre la grille.
+   */
   it('convertit les recettes du mois en équivalent-jours', () => {
     semer({ missions: [mission()], recettes: [recette()] });
     render(<Activite />);
-    // 4 000 € à 400 € par jour → 10 jours.
-    expect(screen.getByText('Équivalent-jours facturés').nextSibling?.textContent).toBe('10');
+    // 4 000 € à 400 € par jour → 10 jours, annoncés comme une estimation.
+    const repere = screen.getByText(/équivalent-jours/);
+    expect(repere.textContent).toMatch(/10\s?j/u);
   });
 
   /**
@@ -97,7 +115,7 @@ describe('plan de charge', () => {
     semer({ recettes: [recette()] });
     render(<Activite />);
     expect(screen.getByText(/pas de tarif journalier connu/)).toBeTruthy();
-    expect(screen.getByText('Équivalent-jours facturés').nextSibling?.textContent).toBe('0');
+    expect(screen.getByText(/équivalent-jours/).textContent).toMatch(/0\s?j/u);
   });
 
   it('n’affiche aucune occupation quand aucun jour n’est ouvrable', () => {
@@ -142,7 +160,8 @@ describe('calendrier des congés', () => {
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: /27 juil\. 2026, jour travaillé/ }));
-    expect(screen.getByText('Jours ouvrables').nextSibling?.textContent).toBe('21');
+    expect(screen.getByText('Jours réellement travaillables').nextSibling?.textContent)
+      .toBe('21');
     // 10 / 21 ≈ 48 %. Le congé sort du DÉNOMINATEUR : le même travail sur
     // moins de jours disponibles fait monter l'occupation, ce qui est le sens
     // de la mesure.
@@ -164,16 +183,30 @@ describe('calendrier des congés', () => {
       { date: dateISO('2025-12-24'), quotite: 1 }
     ] });
     render(<Activite />);
+    // Le compte vit désormais dans la carte des congés, avec les fériés et les
+    // congés du mois — et non plus dans une tuile d'en-tête isolée.
     expect(screen.getByText('Congés posés dans l’année').nextSibling?.textContent).toBe('2');
   });
 });
 
 describe('navigation entre les mois', () => {
+  /**
+   * L'écran s'ouvre sur la SEMAINE, la maille où l'on corrige — donc les
+   * flèches déplacent une semaine. On bascule sur le mois pour les tests qui
+   * portent sur la navigation mensuelle : c'est le geste que fait
+   * l'utilisateur, et le tester par ce chemin-là le vérifie vraiment.
+   */
+  const enVueMois = async () => {
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Mois/ }));
+    return utilisateur;
+  };
+
   // L'ancienne application recalculait tout sur « le mois courant » lu à
   // l'affichage : consulter un mois passé supposait de changer l'horloge.
   it('permet de reculer et d’avancer', async () => {
     render(<Activite />);
-    const utilisateur = userEvent.setup();
+    const utilisateur = await enVueMois();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Mois précédent' }));
     expect(screen.getByRole('status', { name: 'Période affichée' }).textContent).toBe('juin 2026');
@@ -185,7 +218,7 @@ describe('navigation entre les mois', () => {
 
   it('franchit correctement le passage à l’année', async () => {
     render(<Activite />);
-    const utilisateur = userEvent.setup();
+    const utilisateur = await enVueMois();
     for (let i = 0; i < 6; i++) {
       await utilisateur.click(screen.getByRole('button', { name: 'Mois suivant' }));
     }
