@@ -420,12 +420,54 @@ sinon en lot propre — pas oublié.
 
 | # | Livrable | Capture | Critère d'acceptation | État |
 |---|---|---|---|---|
-| B1 | Quatre tuiles : solde, disponible, à encaisser, autonomie | `*-argent-tresorerie` | L'autonomie dit son hypothèse ; zéro besoin mensuel ⇒ abstention, pas zéro mois | ⬜ |
-| B2 | **Graphe combiné entrées / sorties / solde** projeté, avec ligne de seuil | `*-argent-tresorerie` | Une courbe de solde, des barres autour d'un zéro, le net sous chaque mois | ⬜ |
-| B3 | **Donut** « Ton solde n'est pas tout à toi » + phrase + montants à droite | `*-argent-tresorerie` | Les trois parts, la phrase qui les explique, les montants masquables | ⬜ |
-| B4 | Enveloppes de provision en quatre cartes, clic = détail | `*-argent-tresorerie` | Chaque carte : montant mis de côté / montant dû, et son échéance | ⬜ |
-| B5 | Seuils : deux jauges avec projection et date de franchissement | `*-argent-tresorerie` | Déjà présent — à conformer au dessin | ⬜ |
-| B6 | **Frise de l'échéancier** avec repère « auj. » | `*-argent-tresorerie` | Les échéances posées sur douze mois, pas groupées en liste | ⬜ |
+| B1 | Quatre tuiles : solde, disponible, à encaisser, autonomie | `*-argent-tresorerie` | L'autonomie dit son hypothèse ; zéro besoin mensuel ⇒ abstention, pas zéro mois | ✅ |
+| B2 | **Graphe combiné entrées / sorties / solde** projeté, avec ligne de seuil | `*-argent-tresorerie` | Une courbe de solde, des barres autour d'un zéro, le net sous chaque mois | ✅ |
+| B3 | **Donut** « Ton solde n'est pas tout à toi » + phrase + montants à droite | `*-argent-tresorerie` | Les trois parts, la phrase qui les explique, les montants masquables | ✅ |
+| B4 | Enveloppes de provision en quatre cartes, clic = détail | `*-argent-tresorerie` | Chaque carte : montant mis de côté / montant dû, et son échéance | ✅ |
+| B5 | Seuils : deux jauges avec projection et date de franchissement | `*-argent-tresorerie` | Déjà présent — à conformer au dessin | ✅ |
+| B6 | **Frise de l'échéancier** avec repère « auj. » | `*-argent-tresorerie` | Les échéances posées sur douze mois, pas groupées en liste | ✅ |
+
+#### §3 nonies — Ce que le lot B a coûté et ce qu'il a trouvé
+
+**Le pilier a dépassé, deux fois, et deux extractions l'ont ramené.** D'abord la
+Trésorerie entière hors d'`Argent.tsx`, qui n'est plus qu'une coquille de
+13,6 Ko ; puis, quand la frise a fait franchir le plafond de cent quatre-vingts
+octets, l'**échéancier** dans son propre module différé. Il était le bon
+candidat pour deux raisons qui vont dans le même sens : il est sous la ligne de
+flottaison, et on l'ouvre pour payer ou déclarer, pas pour lire son solde.
+
+Écran différé le plus lourd : **37,92 / 40 Ko** — et ce n'est plus Argent.
+
+**Une règle qu'il a fallu poser, faute de fait.** Le dessin met sur chaque
+enveloppe « mis de côté / dû ». Aucun fait ne dit qu'un euro du compte est
+affecté à l'URSSAF plutôt qu'à la TVA. Trois issues, dont deux mauvaises :
+inventer un prorata — quatre enveloppes à 60 %, et aucune ne dit laquelle ne
+passera pas ; ne rien afficher — et perdre la seule question qu'on se pose
+devant une enveloppe. La règle retenue est **l'échéance la plus proche servie
+d'abord**, parce que c'est ce qui se passera le jour du prélèvement. Elle est
+écrite dans `enveloppes.ts` et sous le titre de la carte.
+
+**Deux incohérences que l'anneau a fait apparaître.** Le centre annonçait
+« −2 669 € » pendant que la phrase, trois centimètres plus bas, écrivait « 0 €
+sont à toi ». Et la légende disait « Provisions dues : 4 938 € » au-dessus d'une
+carte qui en compte 7 607 — le montant était borné à ce que le solde couvre,
+c'est le NOM qui manquait.
+
+**Une fuite attrapée par le harnais.** La description hors écran des colonnes du
+graphe combiné mettait des montants NUS dans le document, hors de `Montant` :
+ils restaient lisibles quand tout le reste était masqué. C'est exactement ce
+pour quoi `verifier-confidentialite` existe.
+
+**Les trois défauts relevés au §3 octies sont fermés** : la légende
+« Soutenable » sans barre, l'axe des mois sur une lettre, et la carte
+« Disponible sur douze mois » qui doublait le graphe combiné.
+
+**Écart au dessin, assumé et écrit** : la courbe trace le **disponible** et non
+le solde. Projeter le solde obligerait à deviner quand chaque dette sortira du
+compte, et la moitié n'a pas de date. Un graphe conforme au dessin et faux sur
+le fond serait le pire des deux mondes ; le titre porte donc « disponible », et
+l'info dit pourquoi. Même arbitrage sur « Plafond micro-BNC », dont le nom suit
+le régime configuré plutôt que d'être écrit en dur.
 
 ### Lot C — Activité & congés
 
