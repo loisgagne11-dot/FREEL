@@ -36,9 +36,18 @@ import styles from './GrapheEvolution.module.css';
  * LE TRACÉ EST UNE IMAGE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `aria-hidden` sur le SVG, et chaque mois porte ses trois montants en texte
- * sous les barres. Un graphe dont l'information n'existe qu'en pixels est
- * inaccessible ; ici la donnée est lisible sans lui.
+ * `aria-hidden` sur le SVG et sur les barres, et chaque mois porte ses trois
+ * montants en texte : l'entrée au-dessus de la barre, la sortie en dessous, le
+ * niveau tout en haut de la colonne. Un graphe dont l'information n'existe
+ * qu'en pixels est inaccessible ; ici la donnée est lisible sans lui.
+ *
+ * Ça n'a pas toujours été le cas : entrées et sorties ont d'abord vécu dans un
+ * `<span>` hors écran, que le vérificateur de confidentialité a signalé comme
+ * un montant nu échappant au floutage — puis, pour le faire taire, dans un
+ * `aria-label` sur les barres, qui rend le montant inaccessible à l'ŒIL plutôt
+ * qu'inaccessible AU FLOUTAGE. Le bon correctif était le troisième : un texte
+ * visible, passé par `<Montant>` comme les deux autres séries, qui satisfait
+ * l'œil et le floutage à la fois.
  */
 
 export interface MoisEvolution {
@@ -161,20 +170,16 @@ export function GrapheEvolution(
               <span className={styles.valeurNiveau}>
                 <Montant>{formaterCourt(m.niveau)}</Montant>
               </span>
-              {/*
-                * `role="img"` et un nom : les deux barres sont des pixels, et
-                * elles portent les seuls chiffres que la colonne ne dit pas en
-                * clair. Un `aria-label` plutôt qu'un texte hors écran — celui-ci
-                * mettait des montants NUS dans le document, hors de `Montant`,
-                * et le vérificateur de confidentialité l'a signalé : ils
-                * restaient lisibles quand tout le reste était masqué.
-                */}
-              <span
-                className={styles.barres}
-                role="img"
-                aria-label={`${m.libelle} : ${formater(m.entrees)} d’entrées, `
-                  + `${formater(m.sorties)} de sorties`}
-              >
+              {/* L'entrée colle au sommet de sa barre, la sortie au pied de la
+                  sienne : chaque chiffre reste soudé au trait qu'il légende, au
+                  lieu de forcer un aller-retour de l'œil entre un nombre et une
+                  barre parmi douze. */}
+              <span className={styles.valeurEntree}>
+                +<Montant>{formaterCourt(m.entrees)}</Montant>
+              </span>
+              {/* Les barres elles-mêmes restent décoratives : le pixel n'ajoute
+                  rien que les deux montants qui l'encadrent ne disent déjà. */}
+              <span className={styles.barres} aria-hidden="true">
                 <span
                   className={styles.barreEntrees}
                   style={{ height: `${(m.entrees / mouvementMax) * HAUTEUR_BARRES}px` }}
@@ -183,6 +188,9 @@ export function GrapheEvolution(
                   className={styles.barreSorties}
                   style={{ height: `${(m.sorties / mouvementMax) * HAUTEUR_BARRES}px` }}
                 />
+              </span>
+              <span className={styles.valeurSortie}>
+                −<Montant>{formaterCourt(m.sorties)}</Montant>
               </span>
               <span className={styles.axeMois}>{m.libelle}</span>
               {/* Le net sous le mois : c'est lui qui explique la pente du

@@ -83,6 +83,12 @@ export function FriseEcheances(
       montant: e.montant,
       date: e.echeanceLe,
       payee: e.payeeLe !== null,
+      // Une échéance passée et non payée est un RETARD, pas une échéance « à
+      // venir » comme les autres : c'est l'information la plus importante de
+      // la frise, et elle se perdrait si on la confondait avec l'une des deux
+      // autres. Le jour même reste « à payer » — comparaison stricte, comme
+      // `statutDe` dans `Echeances.tsx` : on a la journée pour régler.
+      enRetard: e.payeeLe === null && e.echeanceLe < aujourdhui,
       part: partDeLAnnee(e.echeanceLe)
     }))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -114,6 +120,22 @@ export function FriseEcheances(
   const partDuJour = partDeLAnnee(aujourdhui);
   const dansLAnnee = aujourdhui.startsWith(String(annee));
 
+  /*
+   * La part de l'axe déjà écoulée — pas la part déjà PAYÉE.
+   *
+   * Le vert dit « ce temps est passé », un fait indépendant de ce qui a été
+   * réglé ou non : une année où tout traîne encore impayé a quand même des
+   * mois qui se sont écoulés, et l'axe doit le montrer. Confondre les deux
+   * ferait dire au trait vert « tout va bien jusque-là », ce qu'il ne sait pas.
+   *
+   * Hors de l'année affichée, il n'y a pas de repère « auj. » à qui raccorder
+   * le trait : soit l'année entière est déjà passée (tout est vert), soit elle
+   * n'a pas commencé (rien ne l'est).
+   */
+  const partEcoulee = dansLAnnee
+    ? partDuJour
+    : Number(aujourdhui.slice(0, 4)) > annee ? 1 : 0;
+
   return (
     <figure className={styles.figure} aria-labelledby={idTitre}>
       <figcaption className={styles.horsEcran} id={idTitre}>
@@ -141,13 +163,33 @@ export function FriseEcheances(
                   Mais elle ne doit pas se lire comme une charge à venir, d'où
                   la marque plutôt que la suppression. */}
               {j.payee && <span className={styles.reglee}> réglée</span>}
+              {/* Le retard se dit en toutes lettres : la couleur du point ne
+                  suffit pas à qui ne la distingue pas, et c'est justement
+                  l'information qui ne doit pas se perdre. */}
+              {j.enRetard && <span className={styles.enRetard}> en retard</span>}
             </span>
             <span className={styles.jalonMontant}>
               <Montant>{formater(j.montant)}</Montant>
             </span>
             <span className={styles.jalonDate}>{jourEtMois(j.date)}</span>
+            {/*
+             * PASSÉ ≠ RÉGLÉ, et le point ne doit confondre ni l'un ni l'autre.
+             *
+             * Pleine pour ce qui est réglé, creuse pour ce qui vient — dans cet
+             * ordre, et pas l'inverse : une pastille pleine se lit comme
+             * « acquis », un anneau comme « en attente », et c'est bien ce que
+             * sont une échéance payée et une échéance qui ne l'est pas encore.
+             *
+             * Le retard n'est ni l'un ni l'autre : la date est passée mais rien
+             * n'a été réglé. Le confondre avec un anneau « à venir » masquerait
+             * le seul cas où le disponible est réellement en danger ; le
+             * confondre avec une pastille pleine ferait croire l'argent déjà
+             * sorti. D'où une troisième marque — rouge, pleine — qui ne peut
+             * être prise pour aucune des deux autres.
+             */}
             <span
-              className={`${styles.point} ${styles[j.nature]} ${j.payee ? styles.pointRegle : ''}`}
+              className={`${styles.point} ${styles[j.nature]} `
+                + (j.enRetard ? styles.pointRetard : j.payee ? '' : styles.pointAVenir)}
               aria-hidden="true"
             />
           </span>
@@ -162,6 +204,16 @@ export function FriseEcheances(
         )}
 
         <span className={styles.axe} aria-hidden="true" />
+        {/* Superposé au segment écoulé : même position verticale que `.axe`,
+            mais large seulement de la part du temps déjà passée. Après lui, le
+            gris de `.axe` reste visible tel quel. */}
+        {partEcoulee > 0 && (
+          <span
+            className={styles.axeEcoule}
+            aria-hidden="true"
+            style={{ width: `${partEcoulee * 100}%` }}
+          />
+        )}
       </div>
 
       <div className={styles.axeMois} aria-hidden="true">

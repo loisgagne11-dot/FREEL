@@ -104,6 +104,20 @@
   white-space: nowrap;
 }
 
+/* L'entrée et la sortie prennent la couleur de la barre qu'elles légendent :
+   c'est la même association que la légende du graphe, et elle évite d'avoir à
+   relire une clé de couleurs pour savoir laquelle des deux on regarde. */
+.valeurEntree,
+.valeurSortie {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.valeurEntree { color: var(--green); }
+.valeurSortie { color: var(--amber); }
+
 /* Les deux barres partent d'une ligne médiane : les entrées montent, les
    sorties descendent. C'est le zéro qui rend la comparaison immédiate — deux
    barres posées sur la même base demanderaient de les soustraire de l'œil. */
