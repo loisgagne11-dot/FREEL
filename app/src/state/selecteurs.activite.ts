@@ -17,8 +17,8 @@
 
 import type { Jour, ZoneFeries } from '../domain/calculs/activite';
 import { joursFeries } from '../domain/calculs/activite';
-import type { JourPlanifie } from '../domain/calculs/planning';
-import { craDuMois, planifier } from '../domain/calculs/planning';
+import type { Creneau, JourPlanifie, Lieu } from '../domain/calculs/planning';
+import { CRENEAUX, craDuMois, creneauxOccupes, planifier } from '../domain/calculs/planning';
 import { type PrevisionDuMois, previsionDuMois } from '../domain/calculs/prevision';
 import type { Cra } from '../domain/calculs/planning';
 import {
@@ -287,16 +287,57 @@ export interface JourDeLaSemaine {
    * n'exige pas. Dès qu'il y en a deux, le nom de chacun s'affiche : c'est la
    * question qu'on se pose en regardant la semaine.
    */
-  readonly parMission: readonly {
-    readonly missionId: string;
-    readonly entiteId: string;
-    readonly libelle: string;
-    /** Teinte du client opérationnel, vide si aucune n'a été choisie. */
-    readonly couleur: string;
-    readonly prevu: number;
-    readonly retenu: number;
-    readonly ajuste: boolean;
-  }[];
+  readonly parMission: readonly LigneDuJour[];
+  /**
+   * Les deux moitiés de la journée, et qui les occupe.
+   *
+   * Le dessin organise la journée par CRÉNEAU — une ligne « matin », une ligne
+   * « après-midi » — là où `parMission` l'organise par client. Les deux vues
+   * du même jour sont utiles : `parMission` répond à « combien chez qui »,
+   * `creneaux` à « où j'étais mercredi matin ». Les dériver ici, d'une seule
+   * source, évite que deux composants les recalculent différemment.
+   */
+  readonly creneaux: readonly CreneauDuJour[];
+}
+
+export interface LigneDuJour {
+  readonly missionId: string;
+  readonly entiteId: string;
+  readonly libelle: string;
+  /** Le nom du client opérationnel seul, tel que le dessin l'affiche en gras. */
+  readonly nom: string;
+  /** Ce qu'on fait pour lui — la description de la mission, sous le nom. */
+  readonly description: string;
+  /** Teinte du client opérationnel, vide si aucune n'a été choisie. */
+  readonly couleur: string;
+  readonly prevu: number;
+  readonly retenu: number;
+  readonly ajuste: boolean;
+  readonly lieu: Lieu | null;
+}
+
+export interface CreneauDuJour {
+  readonly creneau: Creneau;
+  /**
+   * Qui occupe ce créneau. Vide : personne.
+   *
+   * Une LISTE et non un occupant unique. Deux donneurs d'ordre peuvent
+   * revendiquer la même matinée — deux rythmes qui prévoient tous deux le
+   * lundi. Le dessin n'en montre qu'un parce que son jeu d'exemple n'a jamais
+   * le cas ; n'en garder qu'un ici ferait DISPARAÎTRE du travail déclaré, en
+   * silence, et le CRA ne s'en apercevrait pas.
+   */
+  readonly occupants: readonly OccupantDeCreneau[];
+}
+
+export interface OccupantDeCreneau extends LigneDuJour {
+  /**
+   * `saisi` : la position vient d'un ajustement. `reparti` : de la convention.
+   *
+   * Le lieu ne s'affiche que sur un créneau `saisi` : sur une journée d'avant
+   * le schéma 14, il n'y en a pas, et en dessiner un serait l'inventer.
+   */
+  readonly sur: 'saisi' | 'reparti';
 }
 
 export interface PlanningSemaine {
@@ -376,10 +417,18 @@ export function planningDeLaSemaine(
           missionId: mission.id,
           entiteId: entite.id,
           libelle: libelleDeLaLigne(mission, entite),
+          // Le nom du client opérationnel s'il en porte un, celui du client de
+          // la mission sinon. Une entité sans nom n'est pas une anomalie : le
+          // cas ordinaire — une mission, un donneur d'ordre — n'a jamais eu à
+          // le saisir.
+          nom: entite.nom !== '' ? entite.nom : mission.clientNom,
+          description: mission.description,
           couleur: entite.couleur,
           prevu: j.prevu,
           retenu: j.retenu,
-          ajuste: j.ajuste
+          ajuste: j.ajuste,
+          lieu: j.lieu,
+          creneaux: j.creneaux
         };
       })
       // Une mission qui ne prévoit rien ce jour-là n'a pas à encombrer la
@@ -388,6 +437,25 @@ export function planningDeLaSemaine(
 
     const modele = (parEntiteEtDate[0]?.planning[i]) as JourPlanifie | undefined;
 
+    /*
+     * La journée retournée par créneau.
+     *
+     * Chaque ligne dit quels créneaux elle occupe — les siens s'ils ont été
+     * saisis, ceux de la convention sinon — et on range le résultat par
+     * créneau. Une ligne à zéro n'occupe rien : `creneauxOccupes` le dit, et
+     * c'est ce qui laisse la case vide au lieu d'y poser un client absent.
+     */
+    const creneaux: CreneauDuJour[] = CRENEAUX.map((creneau) => ({
+      creneau,
+      occupants: detail.flatMap((d) => {
+        const occupe = creneauxOccupes(d.retenu, d.creneaux)
+          .find((o) => o.creneau === creneau);
+        if (occupe === undefined) return [];
+        const { creneaux: _positions, ...ligne } = d;
+        return [{ ...ligne, sur: occupe.sur }];
+      })
+    }));
+
     return {
       date,
       ferie: feries.has(date),
@@ -395,7 +463,8 @@ export function planningDeLaSemaine(
       conge: conges[date] ?? 0,
       prevu: detail.reduce((s, d) => s + d.prevu, 0),
       retenu: detail.reduce((s, d) => s + d.retenu, 0),
-      parMission: detail
+      parMission: detail.map(({ creneaux: _positions, ...ligne }) => ligne),
+      creneaux
     };
   });
 

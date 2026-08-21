@@ -207,6 +207,114 @@ export function planifier(
   });
 }
 
+/**
+ * Ce qu'un créneau porte : le travail lui-même, et d'où on le sait.
+ *
+ * `sur` distingue le fait de la convention. Une journée dont les créneaux ont
+ * été SAISIS dit « j'étais chez ce client le matin » ; une journée qui n'a
+ * qu'une quotité ne le dit pas — l'application la répartit pour pouvoir la
+ * dessiner, et c'est tout. Confondre les deux ferait lire une position que
+ * personne n'a renseignée, et le lieu affiché à côté serait celui d'une
+ * demi-journée dont on ignore la moitié.
+ */
+export interface OccupationCreneau {
+  readonly creneau: Creneau;
+  /** `saisi` : les créneaux sont un fait. `reparti` : c'est la convention. */
+  readonly sur: 'saisi' | 'reparti';
+}
+
+/**
+ * Quels créneaux une journée occupe.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA CONVENTION N'EST QUE LE RECOURS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Avant le schéma 14, la position d'une demi-journée n'existait pas : le seul
+ * moyen de dessiner « 0,5 j » était de remplir le premier créneau et de le dire
+ * ailleurs. C'était une convention d'affichage, pas une donnée — et elle reste
+ * le recours pour toutes les journées d'avant, qu'aucune migration ne peut
+ * renseigner.
+ *
+ * Dès que les créneaux sont saisis, ce sont EUX qui font foi, y compris quand
+ * ils contredisent la convention : une demi-journée d'après-midi remplit le
+ * second créneau et laisse le premier vide, ce que la convention seule ne
+ * saurait jamais rendre.
+ *
+ * La fonction vit dans le domaine parce que la vue semaine ET la vue mois en
+ * ont besoin. Deux implémentations finiraient par ne pas tomber d'accord, et
+ * l'écart se verrait exactement là où on ne le cherche pas : deux dessins du
+ * même jour, sur deux onglets du même écran.
+ */
+export function creneauxOccupes(
+  retenu: Quotite, creneaux: readonly Creneau[] | null
+): readonly OccupationCreneau[] {
+  if (creneaux !== null) {
+    // Un tableau VIDE est une réponse : « aucun créneau », et non « on ne sait
+    // pas ». Le distinguer de `null` est tout l'objet du champ.
+    return CRENEAUX
+      .filter((c) => creneaux.includes(c))
+      .map((creneau) => ({ creneau, sur: 'saisi' as const }));
+  }
+  if (retenu <= 0) return [];
+  // La convention : une journée entière remplit les deux, une demi-journée le
+  // premier. Toute quotité intermédiaire — 0,25 d'une astreinte — occupe au
+  // moins la matinée : l'arrondir à rien effacerait du travail réel.
+  return retenu >= 1
+    ? CRENEAUX.map((creneau) => ({ creneau, sur: 'reparti' as const }))
+    : [{ creneau: 'matin', sur: 'reparti' as const }];
+}
+
+/**
+ * Un clic sur un créneau : l'ajustement à écrire, ou `null` pour l'effacer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI UNE BASCULE, ET NON UN CYCLE DE TROIS ÉTATS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'écran faisait tourner la JOURNÉE : entière → demie → rien → retour au
+ * rythme. C'était la seule manœuvre possible tant que la position d'une
+ * demi-journée n'existait pas — « 0,5 » ne disait pas laquelle des deux
+ * moitiés, donc cliquer une moitié précise n'avait pas de sens.
+ *
+ * Depuis le schéma 14, elle existe. Un clic sur l'après-midi retire
+ * l'après-midi, et le matin reste — ce qu'aucun cycle sur la journée entière
+ * ne pouvait exprimer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * REVENIR EXACTEMENT AU RYTHME EFFACE L'AJUSTEMENT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * C'est ce que le troisième état du cycle tenait vraiment, et il faut le
+ * garder : sans lui, une correction annulée à la main laisserait derrière elle
+ * un ajustement qui dit la même chose que le rythme. Il ne se verrait pas —
+ * jusqu'au jour où le rythme change et où cette journée-là ne suit pas.
+ *
+ * Une quotité intermédiaire — 0,25 d'astreinte, qu'aucun écran ne sait poser —
+ * est arrondie au créneau par ce geste. C'est le prix d'un clic qui dit « cette
+ * moitié, oui ou non » : la demander autrement voudrait un autre geste.
+ */
+export function basculerCreneau(jour: JourPlanifie, creneau: Creneau): AjustementJour | null {
+  const occupes = creneauxOccupes(jour.retenu, jour.creneaux).map((o) => o.creneau);
+  const apres = occupes.includes(creneau)
+    ? occupes.filter((c) => c !== creneau)
+    : CRENEAUX.filter((c) => c === creneau || occupes.includes(c));
+
+  const duRythme = creneauxOccupes(jour.prevu, null).map((o) => o.creneau);
+  const memeQueLeRythme = apres.length === duRythme.length
+    && apres.every((c) => duRythme.includes(c));
+  if (memeQueLeRythme) return null;
+
+  return {
+    quotite: apres.length * 0.5,
+    creneaux: apres,
+    // Le lieu SURVIT : retirer une matinée ne dit pas qu'on ne sait plus d'où
+    // l'après-midi a été travaillé. `exactOptionalPropertyTypes` interdit de le
+    // poser à `undefined`, d'où l'étalement conditionnel.
+    ...(jour.lieu !== null ? { lieu: jour.lieu } : {})
+  };
+}
+
 export interface LigneCra {
   readonly date: DateISO;
   readonly quotite: Quotite;

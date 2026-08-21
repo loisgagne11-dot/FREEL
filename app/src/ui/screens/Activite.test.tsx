@@ -338,24 +338,48 @@ describe('vue semaine', () => {
   });
 
   /**
-   * Le tour d'un créneau : journée → demi-journée → rien → retour au rythme.
-   * Le dernier état efface l'ajustement au lieu d'en poser un à zéro — sans
-   * lui, une correction serait définitive.
+   * LE CLIC VISE UNE MOITIÉ, ET LA MOITIÉ VISÉE EST CELLE QUI BOUGE.
+   *
+   * L'écran faisait tourner la JOURNÉE — entière, demie, rien, retour au
+   * rythme — et « demie » remplissait toujours le matin : retirer une matinée
+   * en gardant l'après-midi était impossible. Le schéma 14 donne la position,
+   * et le geste la suit.
    */
-  it('fait le tour des quotités au clic, puis revient au rythme', async () => {
+  it('retire la moitié cliquée et laisse l’autre', async () => {
     semer({ missions: [avecRythme()] });
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    const creneau = () => screen.getAllByRole('button', { name: /13 juil\. 2026/ })[0] as HTMLElement;
     const ajustements = () =>
       useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
 
-    await utilisateur.click(creneau());          // journée → demi
+    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
     expect(ajustements()['2026-07-13']?.quotite).toBe(0.5);
-    await utilisateur.click(creneau());          // demi → rien
+    expect(ajustements()['2026-07-13']?.creneaux).toEqual(['apresMidi']);
+
+    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, après-midi/ }));
     expect(ajustements()['2026-07-13']?.quotite).toBe(0);
-    await utilisateur.click(creneau());          // rien → retour au rythme
+    expect(ajustements()['2026-07-13']?.creneaux).toEqual([]);
+  });
+
+  /**
+   * Revenir exactement à ce que le rythme prévoit EFFACE l'ajustement, au lieu
+   * d'en poser un qui dit la même chose. C'est ce que le troisième état du
+   * cycle tenait vraiment : sans lui, une correction annulée à la main
+   * laisserait derrière elle un ajustement invisible — jusqu'au jour où le
+   * rythme change et où cette journée-là ne suit pas.
+   */
+  it('efface l’ajustement quand la journée retombe sur le rythme', async () => {
+    semer({ missions: [avecRythme()] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    const ajustements = () =>
+      useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
+
+    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
+    expect(ajustements()).toHaveProperty('2026-07-13');
+    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
     expect(ajustements()).not.toHaveProperty('2026-07-13');
   });
 
@@ -460,7 +484,7 @@ describe('journée déclarée sur un créneau vide', () => {
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+    await utilisateur.click(screen.getAllByRole('button', { name: /, libre$/ })[0]!);
 
     expect(screen.getByRole('button', { name: 'Mission A' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Mission B' })).toBeTruthy();
@@ -474,7 +498,7 @@ describe('journée déclarée sur un créneau vide', () => {
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+    await utilisateur.click(screen.getAllByRole('button', { name: /, libre$/ })[0]!);
     await utilisateur.click(screen.getByRole('button', { name: 'Mission B' }));
 
     const missions = useFaits.getState().faits.missions;
@@ -492,7 +516,7 @@ describe('journée déclarée sur un créneau vide', () => {
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(screen.getAllByRole('button', { name: /non travaillé/ })[0]!);
+    await utilisateur.click(screen.getAllByRole('button', { name: /, libre$/ })[0]!);
 
     expect(screen.queryByRole('button', { name: /rattacher/i })).toBeNull();
     expect(Object.keys(
@@ -581,9 +605,11 @@ describe('revenir au rythme sur une semaine', () => {
     const utilisateur = await ouvrirSemaine();
     await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
 
-    // Le lundi 13 juillet redevient une journée entière, comme le rythme le dit.
-    expect(screen.getAllByRole('button', { name: /13 juil.*journée entière/ }).length)
-      .toBeGreaterThan(0);
+    // Le lundi 13 juillet redevient travaillé sur ses DEUX moitiés, comme le
+    // rythme le dit. Le remettre à zéro laisserait les deux à « libre ».
+    expect(screen.getByRole('button', { name: /13 juil\. 2026, matin, ClientA/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /13 juil\. 2026, après-midi, ClientA/ }))
+      .toBeTruthy();
   });
 });
 

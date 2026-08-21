@@ -9,7 +9,9 @@ import { VueSemaine } from '../components/VueSemaine';
 import { CraCard } from '../components/CraCard';
 import { useToast } from '../components/Toasts';
 import type { Jour, NatureJour } from '../../domain/calculs/activite';
-import { joursCongeables } from '../../domain/calculs/activite';
+import { joursCongeables, joursFeries } from '../../domain/calculs/activite';
+import type { Creneau } from '../../domain/calculs/planning';
+import { basculerCreneau, planifier } from '../../domain/calculs/planning';
 import { CartePliable } from '../components/CartePliable';
 import { ecartDePrevision, totaliserPrevisions } from '../../domain/calculs/prevision';
 import {
@@ -94,7 +96,7 @@ const JOURS_SEMAINE = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 export function Activite() {
   const faits = useFaits((e) => e.faits);
   const basculerConge = useFaits((e) => e.basculerConge);
-  const ajusterJour = useFaits((e) => e.ajusterJour);
+  const poserAjustement = useFaits((e) => e.poserAjustement);
   const retirerAjustements = useFaits((e) => e.retirerAjustements);
   const signaler = useToast();
 
@@ -122,22 +124,19 @@ export function Activite() {
   const [vue, setVue] = useState<'mois' | 'semaine'>('mois');
   const [ancreSemaine, setAncreSemaine] = useState<DateISO>(() => dateDuJour());
   /** Journée déclarée sur un créneau vide, en attente de savoir à qui elle est. */
-  const [aRattacher, setARattacher] = useState<
-    { readonly date: DateISO; readonly possibles: readonly Affectation[] } | null
-  >(null);
+  const [aRattacher, setARattacher] = useState<{
+    readonly date: DateISO;
+    readonly possibles: readonly Affectation[];
+    /* Le créneau cliqué voyage avec la question : le rattachement peut prendre
+       plusieurs secondes, et rouvrir la feuille ne doit pas reposer la journée
+       entière quand c'est l'après-midi qu'on visait. */
+    readonly creneau: Creneau;
+  } | null>(null);
   const semaine = useMemo(
     () => planningDeLaSemaine(faits, ancreSemaine), [faits, ancreSemaine]
   );
   const cras = useMemo(() => craDuMoisParMission(faits, mois), [faits, mois]);
 
-  /**
-   * Le tour d'un créneau : journée → demi-journée → rien → retour au rythme.
-   *
-   * « Retour au rythme » efface l'ajustement au lieu d'en poser un à zéro.
-   * Sans cet état, une correction serait définitive : le jour resterait à
-   * zéro même après un changement de rythme, et rien ne permettrait de
-   * revenir en arrière.
-   */
   /**
    * Les flèches suivent la vue.
    *
@@ -159,17 +158,16 @@ export function Activite() {
   const avancer = () => (enSemaine ? decalerSemaine(1) : setMois(decalerMois(mois, 1)));
 
   /**
-   * Fait tourner la quotité d'une ligne : journée → demi-journée → rien →
-   * retour au rythme.
+   * Bascule LE CRÉNEAU cliqué.
    *
    * ─────────────────────────────────────────────────────────────────────────
    * UN CRÉNEAU VIDE NE DIT PAS À QUI LA JOURNÉE APPARTIENT
    * ─────────────────────────────────────────────────────────────────────────
    *
-   * Cliquer un créneau vide déclare une journée que le rythme ne prévoyait
-   * pas. Encore faut-il savoir à quelle mission la rattacher : avec une seule
-   * affectation possible il n'y a pas de question, avec deux le choix devient
-   * arbitraire.
+   * Cliquer un créneau vide déclare une demi-journée que le rythme ne
+   * prévoyait pas. Encore faut-il savoir à quelle mission la rattacher : avec
+   * une seule affectation possible il n'y a pas de question, avec deux le choix
+   * devient arbitraire.
    *
    * La première version en choisissait une en silence — la première mission
    * active. C'est précisément ce que cette application refuse partout
@@ -177,12 +175,14 @@ export function Activite() {
    * au mauvais client fausse deux CRA d'un coup, celui qui la reçoit à tort
    * et celui à qui elle manque, et rien ne le signale.
    */
-  function ajusterAuClic(date: DateISO, _missionId: string, entiteId: string): void {
+  function ajusterAuClic(
+    date: DateISO, _missionId: string, entiteId: string, creneau: Creneau
+  ): void {
     const jour = semaine.jours.find((j) => j.date === date);
     const ligne = jour?.parMission.find((l) => l.entiteId === entiteId);
 
-    if (ligne !== undefined) {
-      faireTourner(date, ligne.missionId, ligne.entiteId, ligne.retenu, ligne.ajuste);
+    if (ligne !== undefined && jour !== undefined) {
+      basculer(date, ligne.missionId, ligne.entiteId, creneau);
       return;
     }
 
@@ -190,20 +190,41 @@ export function Activite() {
     if (possibles.length === 0) return;
     if (possibles.length === 1) {
       const seule = possibles[0] as Affectation;
-      faireTourner(date, seule.missionId, seule.entiteId, 0, false);
+      basculer(date, seule.missionId, seule.entiteId, creneau);
       return;
     }
     // Plusieurs candidats : on demande, on ne devine pas.
-    setARattacher({ date, possibles });
+    setARattacher({ date, possibles, creneau });
   }
 
-  function faireTourner(
-    date: DateISO, missionId: string, entiteId: string, retenu: number, ajuste: boolean
+  /**
+   * L'état de la journée AVANT le clic, pour la ligne visée, puis la bascule.
+   *
+   * La journée est replanifiée pour ce seul client opérationnel : `semaine`
+   * agrège toutes les lignes, et `basculerCreneau` a besoin du `prevu` de
+   * CELLE-CI — c'est lui qui dit si le résultat retombe sur le rythme, donc si
+   * l'ajustement doit disparaître au lieu d'être écrit.
+   */
+  function basculer(
+    date: DateISO, missionId: string, entiteId: string, creneau: Creneau
   ): void {
-    if (!ajuste) ajusterJour(missionId, entiteId, date, retenu >= 1 ? 0.5 : 1);
-    else if (retenu >= 1) ajusterJour(missionId, entiteId, date, 0.5);
-    else if (retenu > 0) ajusterJour(missionId, entiteId, date, 0);
-    else ajusterJour(missionId, entiteId, date, null);
+    const entite = faits.missions
+      .find((m) => m.id === missionId)?.entites.find((e) => e.id === entiteId);
+    if (entite === undefined) return;
+
+    const conges: Record<string, number> = {};
+    for (const c of faits.conges) conges[c.date] = c.quotite;
+    const annee = Number(date.slice(0, 4));
+
+    const [jour] = planifier([date], {
+      rythmes: entite.rythmes,
+      ajustements: entite.ajustements,
+      feries: new Set(joursFeries(annee)),
+      conges
+    });
+    if (jour === undefined) return;
+
+    poserAjustement(missionId, entiteId, date, basculerCreneau(jour, creneau));
   }
 
   return (
@@ -371,36 +392,47 @@ export function Activite() {
           </section>
 
           <section className={styles.carte} aria-labelledby={`${idGroupe}-calendrier`}>
-            <h2 id={`${idGroupe}-calendrier`} className={styles.titreCarte}>
-              Congés de {moisLong(mois)}
-              <Info libelle="Effet des congés sur l’occupation">
-                Un jour posé sort du dénominateur&nbsp;: le même travail sur
-                moins de jours disponibles fait monter l’occupation, ce qui est
-                le sens de la mesure. Un congé posé un jour férié ou un week-end
-                n’est pas consommé, et n’est donc pas compté.
-              </Info>
-            </h2>
+            {/*
+              * L'en-tête dit CE QU'ON REGARDE, et la bascule est à sa droite.
+              *
+              * La carte s'annonçait « Congés de juin 2026 » dans les deux vues.
+              * C'était vrai du calendrier mensuel — on y pose ses congés — et
+              * faux de la semaine, qui montre le plan de charge et où les congés
+              * ne sont qu'une des choses affichées. Un titre qui ne décrit que la
+              * moitié de ce qu'il coiffe apprend à ne plus le lire.
+              */}
+            <div className={styles.enteteCarte}>
+              <h2 id={`${idGroupe}-calendrier`} className={styles.titreCarte}>
+                {vue === 'mois' ? 'Vue mois' : 'Vue semaine'}
+                <Info libelle="Effet des congés sur l’occupation">
+                  Un jour posé sort du dénominateur&nbsp;: le même travail sur
+                  moins de jours disponibles fait monter l’occupation, ce qui est
+                  le sens de la mesure. Un congé posé un jour férié ou un week-end
+                  n’est pas consommé, et n’est donc pas compté.
+                </Info>
+              </h2>
 
-            {/* Semaine ou mois : la spec prévoit les deux. Le mois donne la
-                vue d'ensemble, la semaine est la maille où l'on corrige —
-                une grille de trente-et-un jours oblige à retrouver le bon. */}
-            <div className={styles.bascule} role="group" aria-label="Vue du planning">
-              <button
-                type="button"
-                className={`${styles.vue} ${vue === 'mois' ? styles.vueActive : ''}`}
-                aria-pressed={vue === 'mois'}
-                onClick={() => setVue('mois')}
-              >
-                Mois
-              </button>
-              <button
-                type="button"
-                className={`${styles.vue} ${vue === 'semaine' ? styles.vueActive : ''}`}
-                aria-pressed={vue === 'semaine'}
-                onClick={() => setVue('semaine')}
-              >
-                Semaine
-              </button>
+              {/* Semaine ou mois : la spec prévoit les deux. Le mois donne la
+                  vue d'ensemble, la semaine est la maille où l'on corrige —
+                  une grille de trente-et-un jours oblige à retrouver le bon. */}
+              <div className={styles.bascule} role="group" aria-label="Vue du planning">
+                <button
+                  type="button"
+                  className={`${styles.vue} ${vue === 'mois' ? styles.vueActive : ''}`}
+                  aria-pressed={vue === 'mois'}
+                  onClick={() => setVue('mois')}
+                >
+                  Mois
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.vue} ${vue === 'semaine' ? styles.vueActive : ''}`}
+                  aria-pressed={vue === 'semaine'}
+                  onClick={() => setVue('semaine')}
+                >
+                  Semaine
+                </button>
+              </div>
             </div>
 
             {vue === 'mois'
@@ -431,7 +463,12 @@ export function Activite() {
                 />
               )}
 
-            <Legende />
+            {/* La légende des NATURES DE JOUR ne coiffe que le calendrier des
+                congés : « Travaillable », « Congé posé », « Jour férié ». La
+                semaine a la sienne, qui nomme les clients — les deux côte à
+                côte donnaient six pastilles pour deux grilles dont une seule
+                était affichée. */}
+            {vue === 'mois' && <Legende />}
 
             <dl className={styles.detail}>
               <div className={styles.ligne}>
@@ -512,7 +549,7 @@ export function Activite() {
                 type="button"
                 className={styles.actionPrincipale}
                 onClick={() => {
-                  faireTourner(aRattacher.date, a.missionId, a.entiteId, 0, false);
+                  basculer(aRattacher.date, a.missionId, a.entiteId, aRattacher.creneau);
                   setARattacher(null);
                 }}
               >

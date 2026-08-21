@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../types';
+import type { JourPlanifie, Rythme } from './planning';
 import {
-  type Rythme, craDuMois, jourDeSemaine, planifier, quotitePrevue, rythmePour
+  basculerCreneau, craDuMois, creneauxOccupes, jourDeSemaine, planifier,
+  quotitePrevue, rythmePour
 } from './planning';
 
 const D = (s: string) => dateISO(s);
@@ -163,5 +165,132 @@ describe('compte rendu d’activité', () => {
       [sansTjm], euros(700)
     );
     expect(cra.montant).toBe(700);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Les deux moitiés de la journée
+   ───────────────────────────────────────────────────────────────────────── */
+
+describe('créneaux occupés', () => {
+  /**
+   * LA CONVENTION N'EST QUE LE RECOURS.
+   *
+   * Avant le schéma 14, la position d'une demi-journée n'existait pas : la
+   * dessiner supposait de remplir le premier créneau et de le dire ailleurs.
+   * C'est une convention d'affichage, pas une donnée — et elle reste le recours
+   * pour toutes les journées d'avant, qu'aucune migration ne peut renseigner.
+   */
+  it('répartit une journée sans position saisie', () => {
+    expect(creneauxOccupes(1, null).map((o) => o.creneau)).toEqual(['matin', 'apresMidi']);
+    expect(creneauxOccupes(0.5, null).map((o) => o.creneau)).toEqual(['matin']);
+    expect(creneauxOccupes(0, null)).toEqual([]);
+  });
+
+  /** Et elle le DIT : une position répartie n'est pas une position su. */
+  it('marque « reparti » ce qui vient de la convention', () => {
+    expect(creneauxOccupes(1, null).every((o) => o.sur === 'reparti')).toBe(true);
+    expect(creneauxOccupes(1, ['matin']).every((o) => o.sur === 'saisi')).toBe(true);
+  });
+
+  /**
+   * LE POINT DUR. Une demi-journée d'APRÈS-MIDI occupe la seconde moitié et
+   * laisse la première vide. La convention seule remplissait le matin, toujours
+   * — et se trompait une fois sur deux.
+   */
+  it('laisse les créneaux saisis l’emporter sur la convention', () => {
+    expect(creneauxOccupes(0.5, ['apresMidi']).map((o) => o.creneau)).toEqual(['apresMidi']);
+  });
+
+  /**
+   * Un tableau VIDE est une réponse — « aucune moitié travaillée » — là où
+   * `null` dit « on ne sait pas ». Les confondre ferait réapparaître, par la
+   * convention, une journée que l'utilisateur venait d'effacer.
+   */
+  it('distingue « aucun créneau » de « position inconnue »', () => {
+    expect(creneauxOccupes(1, [])).toEqual([]);
+    expect(creneauxOccupes(1, null)).toHaveLength(2);
+  });
+
+  /** Les créneaux sortent toujours dans l'ordre de la journée, quel que soit
+      celui dans lequel ils ont été saisis. */
+  it('rend les créneaux dans l’ordre de la journée', () => {
+    expect(creneauxOccupes(1, ['apresMidi', 'matin']).map((o) => o.creneau))
+      .toEqual(['matin', 'apresMidi']);
+  });
+
+  /**
+   * Une quotité intermédiaire — 0,25 d'astreinte — occupe au moins la matinée.
+   * L'arrondir à rien effacerait du travail réel de la grille, pendant que le
+   * CRA continuerait de le compter.
+   */
+  it('occupe au moins une moitié dès qu’il y a du travail', () => {
+    expect(creneauxOccupes(0.25, null).map((o) => o.creneau)).toEqual(['matin']);
+  });
+});
+
+describe('bascule d’un créneau', () => {
+  const journee = (o: Partial<JourPlanifie> = {}): JourPlanifie => ({
+    date: D('2026-08-10'),
+    prevu: 1, retenu: 1, ajuste: false, ferie: false, weekEnd: false, conge: 0,
+    creneaux: null, lieu: null,
+    ...o
+  });
+
+  /**
+   * CE QU'AUCUN CYCLE SUR LA JOURNÉE ENTIÈRE NE POUVAIT EXPRIMER.
+   *
+   * Retirer l'après-midi laisse le matin. L'écran d'avant faisait tourner la
+   * JOURNÉE — entière, demie, rien — et « demie » remplissait toujours le
+   * matin : retirer la matinée était impossible.
+   */
+  it('retire la moitié cliquée et garde l’autre', () => {
+    expect(basculerCreneau(journee(), 'apresMidi'))
+      .toEqual({ quotite: 0.5, creneaux: ['matin'] });
+    expect(basculerCreneau(journee(), 'matin'))
+      .toEqual({ quotite: 0.5, creneaux: ['apresMidi'] });
+  });
+
+  /** Une moitié vide se remplit : c'est ainsi qu'on déclare un rendu de nuit. */
+  it('ajoute la moitié cliquée quand elle est libre', () => {
+    const libre = journee({ prevu: 0, retenu: 0, weekEnd: true });
+    expect(basculerCreneau(libre, 'matin')).toEqual({ quotite: 0.5, creneaux: ['matin'] });
+  });
+
+  it('vide la journée quand on retire la seconde moitié', () => {
+    const demi = journee({ retenu: 0.5, creneaux: ['matin'], ajuste: true });
+    expect(basculerCreneau(demi, 'matin')).toEqual({ quotite: 0, creneaux: [] });
+  });
+
+  /**
+   * LE POINT DUR, ET C'EST CE QUE LE TROISIÈME ÉTAT DU CYCLE TENAIT VRAIMENT.
+   *
+   * Revenir exactement à ce que le rythme prévoit EFFACE l'ajustement. Sans
+   * cela, une correction annulée à la main laisserait derrière elle un
+   * ajustement qui dit la même chose que le rythme — invisible, jusqu'au jour
+   * où le rythme change et où cette journée-là ne suit pas.
+   */
+  it('efface l’ajustement quand la journée retombe sur le rythme', () => {
+    const corrigee = journee({ prevu: 1, retenu: 0.5, creneaux: ['matin'], ajuste: true });
+    expect(basculerCreneau(corrigee, 'apresMidi')).toBeNull();
+  });
+
+  // Le rythme ne prévoit rien : vider la journée, c'est y revenir.
+  it('efface l’ajustement quand une journée déclarée est vidée', () => {
+    const declaree = journee({
+      prevu: 0, retenu: 0.5, creneaux: ['matin'], ajuste: true, weekEnd: true
+    });
+    expect(basculerCreneau(declaree, 'matin')).toBeNull();
+  });
+
+  /**
+   * Le lieu SURVIT au geste : retirer une matinée ne dit pas qu'on ne sait
+   * plus d'où l'après-midi a été travaillé. L'effacer obligerait à le ressaisir
+   * à chaque correction — et c'est ainsi qu'on cesse de le saisir.
+   */
+  it('conserve le lieu déjà posé', () => {
+    const surSite = journee({ lieu: 'sur_site' });
+    expect(basculerCreneau(surSite, 'matin'))
+      .toEqual({ quotite: 0.5, creneaux: ['apresMidi'], lieu: 'sur_site' });
   });
 });
