@@ -156,7 +156,8 @@ un trou qui ne fait échouer aucun test.
 |---|---|---|
 | `getClientsStats`, dépendance client | 🟢 | Concentration sur le CA **encaissé de l'année**, pas du mois : mesurée sur un mois, elle sauterait d'un client à l'autre au gré des règlements |
 | `compositionDSO`, délai de paiement | 🟢 | **Médiane** et non moyenne : un client qui paie à 30 jours neuf fois et à 300 une fois n'est pas un client à 57 jours |
-| `compositionTxOccupation` | 🟢 | Dénominateur réel : jours ouvrables, fériés calculés, congés déduits |
+| `compositionTxOccupation` | 🟢 | Dénominateur réel : jours ouvrables, fériés calculés, congés déduits. **Lot C4** : le dénominateur est désormais ÉCRIT à l'écran sous la jauge, et l'occupation ne s'affiche plus qu'une fois par écran — elle était en tuile ET dans le panneau, avec deux calculs différents |
+| Plan de charge — le créneau et le lieu | 🆕 | **N'existe dans aucune des deux.** L'ancienne stockait une quotité par jour : « 0,5 » ne disait ni quelle moitié ni où. Le schéma 14 pose les deux, et les vues semaine et mois les montrent — sans jamais les inventer sur une journée d'avant |
 | `compositionTJMEffectif`, `compositionMargeNette` | ❌ | **Absents.** Cette ligne annonçait « Présents » — c'était faux, aucune occurrence dans `app/src/`. Un inventaire qui se trompe dans ce sens coûte plus cher qu'un manque : il ferme le sujet |
 | `showKPIComposition` — d'où vient un chiffre | ⚠️ | Les motifs « i » expliquent les règles, mais on ne peut pas déplier le calcul ligne à ligne |
 | `calculateHealthScore` — score /100 | 🚫 | Refusé : la spécification elle-même note que les valeurs sont **codées en dur** dans le prototype, sans fonction qui les calcule. Une jauge à 72/100 qui ne mesure rien ressemble à une information |
@@ -164,7 +165,7 @@ un trou qui ne fait échouer aucun test.
 | `getCompareData`, `compDelta`, `computeTrend`, `createSparkline` | 🚫 | **Refusés, motif écrit.** `computeTrend` comparait trois mois à trois mois sur une facturation irrégulière : un client qui règle deux factures le même mois produisait « +180 % » sans qu'aucune activité n'ait changé. Une flèche qui s'affole se cesse d'être lue, puis se met à rassurer quand elle est verte. La comparaison N−1 reste utile — la troisième année, pas la première |
 | `drawMainChart` | ✅ | Deux graphes, pas un. `GrapheBarres` en SVG là où l'on lit ; sur le pilier Performance, des colonnes en HTML **cliquables** — le handoff veut « clic sur un mois = composition », et un `<rect>` SVG n'est ni tabulable ni annoncé. 627 Ko de Chart.js en moins dans les deux cas |
 | `drawPerfDonut` — destination du CA | 🚫 | Refusé : il redisait, en moins précis, ce que `Repartition` dit du solde |
-| `drawSoldeChart` — courbe de solde | ❌ | **Absent**, et sans motif écrit jusqu'ici. Rien ne montre le solde au-delà du mois courant |
+| `drawSoldeChart` — courbe de solde | ✅ | **Livré au lot B**, autrement : un graphe combiné entrées / sorties / niveau sur douze mois glissants, tracé sur le DISPONIBLE et non le solde. Projeter le solde obligerait à deviner quand chaque dette sortira du compte, et la moitié d'entre elles n'a pas de date — la courbe monterait joliment jusqu'au trimestre où elle s'effondre. Le titre de la carte dit ce qu'elle trace |
 | `getActionsList`, `markActionDone` | ✅ | `aTraiter` — la liste des sujets, réelle |
 
 ## 7. Système

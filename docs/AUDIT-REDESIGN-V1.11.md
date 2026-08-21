@@ -326,3 +326,85 @@ Six décisions, dont quatre portent sur des nombres opposables. Aucune n'est tec
 6. **Le maintien ou l'abandon de l'export FEC** — hors obligation en micro-BNC, mais peut-être utilisé.
 
 Ces décisions sont peu coûteuses à prendre et très coûteuses à différer : chacune est un endroit où l'app affirme aujourd'hui deux choses à la fois.
+
+---
+
+## 7. Contrôle visuel du 21/08 — Activité et Trésorerie
+
+Premier passage image contre image sur ces deux écrans depuis leur livraison :
+notre rendu (`docs/design/captures-app/`) contre le handoff
+(`docs/design/captures/`), dans les deux thèmes.
+
+**Verdict : NON CONFORME sur les deux.** Aucun écart n'est propre à un thème.
+
+Ce contrôle aurait dû précéder la fusion des lots B et C. Il ne l'a pas fait, et
+c'est la raison pour laquelle il figure ici comme une section datée plutôt que
+comme une case cochée : ce qui suit n'est pas un reste à faire découvert par le
+plan, c'est un écart découvert après coup.
+
+### 7.1 L'écart structurant, commun aux deux écrans
+
+**La référence est une page à deux colonnes ; nous rendons une colonne unique.**
+
+Sur Activité, la référence pose la grille de charge à gauche sur environ trois
+quarts de la largeur, et une colonne latérale droite qui porte « Le mois en
+chiffres », le compte rendu d'activité et « Ce que Freel remarque ». Toute la
+page tient dans un écran. Chez nous tout s'empile sur près de 4 000 pixels de
+haut, et « Le mois en chiffres » n'arrive qu'en quatrième position.
+
+Ce n'est pas un défaut de carte : c'est la charpente de l'écran. Il coûte plus
+cher que la somme des autres écarts, et il les explique en partie — une colonne
+unique force un ordre de lecture que la référence n'a pas à choisir.
+
+### 7.2 Ce qui est bien là
+
+Les formes livrées aux lots B et C sont présentes et correctement dessinées : le
+graphe combiné entrées / sorties / niveau, le donut de répartition, la frise avec
+son repère « auj. », les deux grilles à créneaux, et les cinq indicateurs du
+panneau « Le mois en chiffres ». Le contrôle ne conteste aucune de ces formes.
+
+### 7.3 Défauts réels, à corriger
+
+Ceux-ci ne sont pas des choix de conception : ils sont faux ou incohérents.
+
+| # | Écran | Constat |
+|---|---|---|
+| D1 | Activité | Un créneau occupé par DEUX clients garde le contour du premier : contour vert, contenus bleu et violet. La convention « couleur = client », annoncée dans le sous-titre, ne tient plus sur cette cellule |
+| D2 | Trésorerie | La phrase du donut renvoie aux enveloppes « ci-dessous » ; elles sont deux cartes plus bas, derrière les seuils et un graphe de versement. Le renvoi est cassé |
+| D3 | Trésorerie | La frise inverse la convention de la référence : chez nous le point se creuse quand l'échéance est réglée, chez elle le plein marque le passé et l'anneau ce qui vient. L'axe de la référence est vert jusqu'au repère puis gris ; le nôtre est gris uniforme, donc le repère ne sépare plus rien |
+| D4 | Trésorerie | Les entrées et les sorties de chaque mois ne sont lisibles NULLE PART sur le graphe qui les dessine. Elles étaient en texte hors écran ; le vérificateur de confidentialité les a signalées, elles sont passées en `aria-label` — et personne ne les voit plus. La correction a déplacé le problème |
+| D5 | Trésorerie | Le mois a disparu du sous-titre de la vue mois ; la référence l'y met (« Juin 2026 · couleur = client · 22 j ouvrés ») |
+
+**D4 mérite d'être noté pour ce qu'il enseigne.** Un vérificateur automatique a
+signalé un vrai problème, la correction l'a fait taire, et l'information a disparu
+de l'écran sans qu'aucun contrôle ne s'en aperçoive — ni les tests, ni le
+vérificateur, ni les deux premiers inventaires. Seul un œil posé sur l'image l'a
+vu. C'est le même mécanisme que le V9 de l'inventaire des indicateurs.
+
+### 7.4 Écarts de conception, à arbitrer
+
+Ni fautes ni conformités : des choix qui demandent une décision.
+
+- **Activité** : titre « Activité » contre « Ton plan de charge » ; trois cartes
+  KPI d'en-tête contre une pastille « 18,5 j travaillés · 84 % occupé » ; bascule
+  `[Mois | Semaine]` contre `[Semaine | Mois]` ; navigation de période remontée
+  dans l'en-tête de page au lieu de l'en-tête de carte ; créneaux en pastilles
+  détourées contre bandes contiguës pleine largeur ; congé hachuré en vue mois là
+  où la référence pose un aplat ; compteurs absents sur les onglets.
+- **Trésorerie** : ordre des cartes (seuils et enveloppes permutés) ; enveloppes
+  « TVA à venir » et « Réserve matelas » sans tuile, « CFE » en tuile alors
+  qu'elle n'est qu'une pastille de frise dans la référence ; trois jauges de seuil
+  au lieu de deux ; chiffres des seuils remplacés par des phrases ; « Réserve
+  matelas » renommée « Seuil de sécurité » ; capacité de versement posée sur
+  Trésorerie alors que la référence la met sur Performance ; indications d'en-tête
+  (`solde 8 120 €`, `clic = détail`, `plafonds annuels`) remplacées par une
+  pastille « i » — dont la perte de « clic = détail », seule indication que les
+  enveloppes s'ouvrent.
+
+### 7.5 Chez nous et pas dans la référence — assumé
+
+Le handoff ne dessine pas tout ce que l'ancienne application faisait. Ces cartes
+restent, et leur absence du dessin n'est pas un argument pour les retirer :
+« Échéances reçues » et ses actions, « Périodes URSSAF », la barre TVA / livre des
+recettes / DES, la carte des congés et sa pose à un clic, « Revenir au rythme »,
+les quatre cartes d'analyse, les lignes d'alerte contextuelles.

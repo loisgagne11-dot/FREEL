@@ -25,6 +25,19 @@ Ce document tient l'inventaire dont l'unité est **un nombre que l'utilisateur
 lit à l'écran**. C'est le troisième axe de contrôle, à côté du design et des
 fonctions.
 
+> **Il a passé deux lots sans être tenu.** Le lot B et le lot C ont été livrés,
+> relus et fusionnés pendant que ce document restait daté du lot A. Sept
+> visualisations et six indicateurs y manquaient, et une ligne se contredisait
+> avec le §6 depuis autant de temps.
+>
+> Un inventaire qui n'est pas mis à jour au moment de la livraison ne signale
+> plus rien : il devient une photographie d'un état passé, et la seule chose
+> qu'il garantit est qu'on ne le consultera plus. C'est le même mécanisme que
+> le V9 déclaré présent alors que rien ne s'affichait — sauf qu'ici c'est
+> l'inventaire entier qui décroche, pas une ligne.
+>
+> **La mise à jour des trois inventaires fait partie du lot, pas de l'après.**
+
 ---
 
 ## Verdict d'ensemble
@@ -85,6 +98,18 @@ mois plein**.
 **Corrigé** — jours pris du planning, ajustements compris. La division ne sert
 plus que de repli, et l'écran annonce qu'il estime au lieu de mesurer.
 
+**Suite, lot C4 : il y en avait DEUX sur le même écran.** Une tuile « Occupation »
+en haut, et une autre ligne « Occupation » dans le panneau latéral — deux fois le
+même mot pour deux calculs qui n'étaient pas les mêmes. La tuile est retirée. Le
+panneau la garde parce qu'il a la place d'écrire son **dénominateur**
+(« 18,5 / 22 j ouvrés · 2 j congé »), sans lequel « 84 % » ne se compare pas d'un
+mois à l'autre, et de dire si le chiffre est une mesure lue sur le planning ou une
+estimation déduite d'un montant divisé par un tarif.
+
+Le doublon n'apparaît dans aucun des deux autres inventaires : l'écran existe,
+l'action est câblée, les tests sont verts. C'est exactement la classe de défaut
+pour laquelle ce document a été ouvert.
+
 ---
 
 ## 2. Inventaire des visualisations
@@ -95,24 +120,38 @@ plus que de repli, et l'écran annonce qu'il estime au lieu de mesurer.
 |---|---|---|---|---|
 | V1 | CA réalisé vs encaissé, mois par mois | ✅ | ✅ | ✅ graphe propre au pilier Performance&nbsp;: **mois écoulés seulement**, valeurs en k€, mois courant encadré, cumul en pied |
 | V2 | Composition d'un mois de CA, au clic | ✅ | ✅ | ✅ **livrée** — chaque mois est un `<button>`, le panneau Composition suit ; réalisé par mission avec `j × TJM`, encaissé par facture |
-| V3 | Répartition du solde | ✅ donut | ✅ donut | ⚠️ barre segmentée — **meilleure**, montants en clair |
+| V3 | Répartition du solde | ✅ donut | ✅ donut | ✅ **donut livré** (lot B) — la barre segmentée disait le partage, pas la part&nbsp;; le donut porte le disponible en son centre, la phrase explicative à côté, et chaque part son montant en clair |
 | V4 | Provisions **par catégorie** | ✅ | ✅ | ✅ **ajouté depuis** |
 | V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis** |
-| V6 | Frise de l'échéancier | ✅ | ✅ | ⚠️ liste groupée ; la lecture « à date » de la frise est perdue |
-| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **ajoutée depuis** — sur le DISPONIBLE et non le solde, deux scénarios, hypothèses écrites |
+| V6 | Frise de l'échéancier | ✅ | ✅ | ✅ **frise livrée** (lot B) — chaque obligation à sa date réelle sur l'année, repère « auj. ». Elle ne remplace pas la liste, elle la précède&nbsp;: la frise répond à « qu'est-ce qui vient », la liste à « qu'est-ce que j'en fais » |
+| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **graphe combiné** (lot B) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Sur le DISPONIBLE et non le solde, et le titre le dit&nbsp;: projeter le solde obligerait à deviner quand chaque dette sortira du compte |
 | V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
 | V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau |
 | V10 | Cascade CA → charges → net | ✅ (deux fois) | ❌ | 🚫 §5.5 |
 | V11 | Donut de destination du CA | ✅ | ❌ | 🚫 §5.5 |
 | V12 | Sparklines dans les tuiles | ✅ | ❌ | 🚫 §5.5 |
 | V13 | Dépendance client | ✅ | ✅ | ⚠️ barre segmentée + légende chiffrée |
-| V14 | Occupation avec repère 100 % | ⚠️ | ✅ | ❌ chiffre nu |
+| V14 | Occupation avec repère 100 % | ⚠️ | ✅ | ✅ **jauge livrée** (lot C4) dans « Le mois en chiffres », avec son dénominateur écrit dessous. La tuile qui donnait un SECOND chiffre d'occupation sur le même écran est retirée&nbsp;: §1.3 |
 | V15 | Impôt par tranche | ✅ barres | ✅ barres | ⚠️ **tableau exact** — progrès, la barre était décorative |
 | V16 | Projection par scénarios | ✅ | ❌ | 🚫 §5.5 |
 | V17 | Objectif de CA avec allure attendue | ✅ | ❌ | ✅ **livrée**, absente du handoff&nbsp;: repère mensuel sur le graphe et écart en JOURS en pied |
 | V18 | Autonomie à zones 3/6/12 mois | ✅ | ⚠️ | 🚫 §5.5 |
 | V19 | Score de santé /100 | ✅ | ✅ (en dur) | 🚫 §5.1 |
-| V20 | Calendrier / plan de charge | ✅ | ✅ | ✅ |
+| V20 | Calendrier / plan de charge | ✅ | ✅ | ✅ **refait** (lot C) — deux créneaux par jour au lieu d'une case, client et lieu dans chacun |
+| V21 | Vue semaine par créneau | ❌ | ✅ | ✅ **livrée** (lot C2) — MATIN / APRÈS-M. nommés, client dans sa teinte, description de mission, lieu, congés hachurés |
+| V22 | Vue mois par créneau | ❌ | ✅ | ✅ **livrée** (lot C3) — initiales du client, légende qui en donne la clé, lieu en coin de case |
+| V23 | Répartition du TEMPS par client | ❌ | ✅ | ✅ **livrée** (lot C4) — en jours et sur le mois. Distincte de V13, qui est en euros et sur l'année&nbsp;: voir la note sous le tableau |
+
+> **V13 et V23 mesurent deux choses, et c'est ce qui les rend utiles ensemble.**
+> V23 est en JOURS et sur le MOIS — où passe le temps, maintenant. V13 est en
+> EUROS et sur l'ANNÉE — le risque de perdre le client qui pèse 60 % du chiffre
+> d'affaires. Elles ne coïncident pas : un client qui prend 40 % des journées
+> pour 15 % du chiffre est mal tarifé, et aucune des deux ne le dit seule.
+>
+> Elles ont pourtant porté le MÊME TITRE pendant un temps — la carte de
+> dépendance client s'appelait « Le mois en chiffres » tout en mesurant l'année.
+> Deux mesures sous un titre qui n'en décrit qu'une se lisent comme une seule,
+> et la contradiction apparente fait douter des deux.
 
 > **V9 disait « ✅ » alors que rien ne s'affichait.** Le calcul existait —
 > `capaciteVersement.ts` et son sélecteur, testés, verts — et aucun écran ne
@@ -144,11 +183,16 @@ Ne sont listés que les verdicts qui appellent une décision.
 | **Dépendance client** | 🟢 sur le CA encaissé de l'année, bien motivé |
 | **Seuils en %** | 🟢 avec le reste en euros, ce que le % seul ne dit pas |
 | **Date probable de franchissement TVA** | ✅ **ajoutée depuis** |
-| **Objectif de CA + allure** | ❌ |
+| **Objectif de CA + allure** | ✅ **livré** (V17) — la ligne disait ❌ alors que §6 le comptait parmi les livrés&nbsp;: deux verdicts opposés dans le même document, corrigé ici |
 | **Comparaison N−1 / tendance** | ❌ — utile la troisième année, pas la première |
 | **TVA perdue faute de pièce** | 🟢 **n'existe nulle part ailleurs** — chiffre le coût de la négligence |
 | **Écarts de conformité du livre** | 🟢 **n'existe nulle part ailleurs** |
 | **Prévision de revenu du mois** | 🟢 **n'existe nulle part ailleurs** — le maillon que la vision nomme « le plus important » |
+| **Jours travaillés du mois** | 🟢 **ajouté** (lot C4) — le libellé suit la SOURCE&nbsp;: « jours travaillés » quand ils sont lus sur le planning, « équivalent-jours facturés » quand ils sont déduits d'un montant. Le même titre pour les deux ferait passer une estimation pour un fait |
+| **CA généré par le mois** | 🟢 **ajouté** (lot C4) — ce que le TRAVAIL du mois produit, et non ce qui est rentré sur le compte. Les deux diffèrent de tout le délai de paiement, et l'infobulle le dit |
+| **Occupation du mois** | ✅ corrigé deux fois, §1.3 — désormais en jauge, avec son dénominateur écrit, et une seule fois par écran |
+| **Répartition du temps par client** | 🟢 **ajouté** (lot C4) — en jours et sur le mois, distinct de la dépendance client. Voir la note du §2 |
+| **Part de télétravail** | 🟢 **n'existe nulle part ailleurs** (lot C4) — et **son dénominateur est l'information**. Deux demi-journées à domicile sur un mois de vingt jours donneraient « 100 % », faux et d'autant plus crédible que le chiffre est rond. La part ne porte que sur les demi-journées dont le lieu est renseigné, et la ligne écrit combien elles sont sur combien. Aucune : on s'abstient et on dit pourquoi |
 
 ---
 
@@ -309,6 +353,14 @@ ventilation des provisions (§4.1), le repère de date et la
 projection de franchissement (§4.2), le tableau « rapport vs charge » par
 mission (§4.3), le TJM effectif et le TJM net (§4.4), la phrase de synthèse
 de santé (§5.1), l'assiette nommée de l'autonomie.
+
+**Livrés au lot B** : le donut de répartition du solde (V3), la frise de
+l'échéancier (V6), le graphe combiné entrées / sorties / disponible (V7).
+
+**Livrés au lot C** : le plan de charge à deux créneaux par jour (V20), la vue
+semaine (V21), la vue mois (V22), la répartition du temps par client (V23),
+l'occupation en jauge avec son dénominateur (V14), les jours travaillés et le CA
+généré du mois, la part de télétravail.
 
 **Tranché contre la recommandation** : `preserveAspectRatio="none"` reste
 (§5.2). L'attribut est délibéré — il tient la hauteur fixe qui empêche le
