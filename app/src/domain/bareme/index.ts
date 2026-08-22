@@ -18,7 +18,9 @@
  *     valeur publiée, une hypothèse de prévision et un refus — plutôt que de
  *     recevoir un nombre dont il ignore la fiabilité.
  *
- * Contrôle d'intégrité global : `verifierIntegriteBareme()`.
+ * Contrôle d'intégrité global : `verifierIntegriteBareme()`, dans
+ * `./integrite` — il ne s'exécute qu'en test, et le garder ici alourdissait
+ * le paquet de premier rendu.
  */
 
 export {
@@ -71,33 +73,12 @@ export {
   ANNEES_CONSERVATION, SEUIL_GLOBALISATION_DETAIL, verifierIntegriteRecettes
 } from './recettes';
 
-import { verifierIntegriteAbattement } from './abattement';
-import { verifierIntegriteAcre } from './acre';
-import { verifierIntegriteImpot } from './impot';
-import { verifierIntegritePlafonds } from './plafonds';
-import { verifierIntegriteTva } from './tva';
-import { verifierIntegrite as verifierIntegriteUrssafInterne } from './urssaf';
-import { verifierIntegriteRecettes as verifierIntegriteRecettesInterne } from './recettes';
-import { verifierIntegriteDes as verifierIntegriteDesInterne } from '../calculs/des';
-import { verifierIntegriteFacture as verifierIntegriteFactureInterne } from '../calculs/facture';
-
-/**
- * Contrôle d'intégrité de l'ensemble du barème, préfixé par table.
- * Renvoie la liste des anomalies ; vide si tout est sain.
+/*
+ * LE CONTRÔLE D'INTÉGRITÉ GLOBAL A DÉMÉNAGÉ dans `./integrite`.
  *
- * À exécuter en test, et utile au moment d'ajouter une période : une table
- * trouée ou qui se chevauche produit des résolutions silencieusement fausses.
+ * Il n'a aucun appelant applicatif — il s'exécute en test. Tant qu'il vivait
+ * ici, ses `import` traînaient `calculs/facture` et `calculs/des` dans le
+ * paquet de PREMIER RENDU, parce qu'un contrôle de test les nommait. Le budget
+ * d'entrée l'a signalé en dépassant, et on n'y touche pas : on extrait le
+ * module qui n'a rien à faire là.
  */
-export function verifierIntegriteBareme(): readonly string[] {
-  return [
-    ...verifierIntegriteUrssafInterne().map((a) => `[cotisations] ${a}`),
-    ...verifierIntegriteAbattement().map((a) => `[abattement] ${a}`),
-    ...verifierIntegriteAcre().map((a) => `[acre] ${a}`),
-    ...verifierIntegritePlafonds().map((a) => `[plafonds] ${a}`),
-    ...verifierIntegriteTva().map((a) => `[tva] ${a}`),
-    ...verifierIntegriteImpot().map((a) => `[impôt] ${a}`),
-    ...verifierIntegriteRecettesInterne().map((a) => `[recettes] ${a}`),
-    ...verifierIntegriteDesInterne().map((a) => `[des] ${a}`),
-    ...verifierIntegriteFactureInterne().map((a) => `[facture] ${a}`)
-  ];
-}
