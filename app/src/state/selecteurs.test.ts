@@ -4,11 +4,11 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  aTraiter, anneesDisponibles, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant,
+  aTraiter, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant,
   provenanceSoldeDe, recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe
 } from './selecteurs';
 import { periodeCourante } from '../domain/calculs/periode';
-import { etatArgent } from './selecteurs.argent';
+import { anneesDisponibles, etatArgent } from './selecteurs.argent';
 import { etatFacturier } from './selecteurs.facture';
 import { etatLivre } from './selecteurs.livre';
 import { etatAchats, regimeTvaAu } from './selecteurs.achats';

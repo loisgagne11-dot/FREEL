@@ -64,6 +64,55 @@ export function facturesSuivies(faits: Faits, maintenant: Date = new Date()) {
   );
 }
 
+/**
+ * Les années que le sélecteur de la barre du haut peut proposer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE BORNE SE LIT DANS LES FAITS, ELLE NE S'INVENTE PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un intervalle fixe — « les dix dernières années », disons — ferait
+ * proposer neuf années vides à un dossier ouvert cette année, et en
+ * cacherait une à un dossier repris avec dix ans d'historique. La borne
+ * basse est donc celle du plus ancien fait daté du dossier ; la borne haute
+ * est l'année courante, sauf si un fait existe déjà l'année suivante — une
+ * mission planifiée en janvier prochain, typiquement, ou une échéance saisie
+ * d'avance.
+ *
+ * L'intervalle est CONTINU entre les deux bornes, même si certaines années
+ * intermédiaires n'ont aucun fait : un dossier de 2023 qui n'a rien saisi en
+ * 2024 doit quand même pouvoir afficher 2024 — à zéro, ce qui est une
+ * réponse, pas une année absente du menu.
+ *
+ * Un dossier vide ne propose que l'année courante : il n'y a rien à
+ * comparer, et un menu à une seule entrée n'en est pas un — voir
+ * `SelecteurAnnee`, qui se masque dans ce cas.
+ *
+ * Vit ici, et non dans `selecteurs.ts` : cette fonction ne sert qu'au
+ * sélecteur de l'écran Argent, chargé à la demande (voir l'en-tête du
+ * fichier). L'ajouter au module toujours chargé aurait fait franchir son
+ * budget pour un contrôle que cinq écrans sur six n'affichent jamais —
+ * constaté en pratique en écrivant ce lot.
+ */
+export function anneesDisponibles(faits: Faits, maintenant: Date = new Date()): readonly number[] {
+  const courante = maintenant.getFullYear();
+  const datees: readonly (DateISO | null)[] = [
+    ...faits.recettes.flatMap((r) => [r.emiseLe, r.encaisseeLe]),
+    ...faits.depenses.map((d) => d.payeeLe),
+    ...faits.echeances.map((e): DateISO => e.echeanceLe),
+    ...faits.missions.flatMap((m) => [m.debut, m.fin])
+  ];
+  const annees = new Set(
+    datees.flatMap((d) => (d === null ? [] : [Number(d.slice(0, 4))]))
+  );
+
+  const plusAncienne = annees.size === 0 ? courante : Math.min(courante, ...annees);
+  const resultat: number[] = [];
+  for (let a = plusAncienne; a <= courante; a++) resultat.push(a);
+  if (annees.has(courante + 1)) resultat.push(courante + 1);
+  return resultat;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Écran Argent
    ───────────────────────────────────────────────────────────────────────── */

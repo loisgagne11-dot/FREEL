@@ -12,7 +12,7 @@ import { Argent } from './Argent';
  *
  * `selecteurs.test.ts` prouve la règle sur `etatArgent`, à l'écart de React.
  * Ce fichier vérifie le seul fil qui manque : que l'écran câble bien la prop
- * `anneeChoisie` jusque-là, et que rien d'autre ne bouge sur l'écran quand
+ * `annee` jusque-là, et que rien d'autre ne bouge sur l'écran quand
  * elle change — en particulier le pilier Trésorerie, qui n'a pas d'année.
  */
 
@@ -51,7 +51,7 @@ describe('bascule d’année, câblée depuis l’écran Argent', () => {
       ]
     });
 
-    render(<Argent anneeChoisie={2025} />);
+    render(<Argent annee={2025} />);
     expect(screen.getByText('CA réalisé 2025')).toBeTruthy();
     expect(screen.queryByText('CA réalisé 2026')).toBeNull();
   });
@@ -73,11 +73,11 @@ describe('bascule d’année, câblée depuis l’écran Argent', () => {
       ]
     });
 
-    const { unmount } = render(<Argent anneeChoisie={2025} />);
+    const { unmount } = render(<Argent annee={2025} />);
     const disponible2025 = screen.getByText(/disponible/).parentElement?.textContent;
     unmount();
 
-    render(<Argent anneeChoisie={2026} />);
+    render(<Argent annee={2026} />);
     const disponible2026 = screen.getByText(/disponible/).parentElement?.textContent;
 
     expect(disponible2025).toBe(disponible2026);

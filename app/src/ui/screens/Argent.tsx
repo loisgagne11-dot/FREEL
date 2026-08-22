@@ -101,10 +101,10 @@ export interface ProprietesArgent {
    * l'année de l'horloge — le cas des tests qui montent cet écran seul, sans
    * la coquille qui porte le sélecteur.
    */
-  readonly anneeChoisie?: number;
+  readonly annee?: number;
 }
 
-export function Argent({ anneeChoisie }: ProprietesArgent = {}) {
+export function Argent({ annee }: ProprietesArgent = {}) {
   const faits = useFaits((e) => e.faits);
   const [section, setSection] = useState<Section>('tresorerie');
   const [registre, setRegistre] = useState<Registre>(null);
@@ -114,8 +114,8 @@ export function Argent({ anneeChoisie }: ProprietesArgent = {}) {
   // par défaut (l'année de `maintenant`), au lieu qu'on la recalcule ici une
   // seconde fois avec le risque qu'elle diverge de celle du domaine.
   const etat = useMemo(
-    () => etatArgent(faits, faits.echeances, new Date(), anneeChoisie),
-    [faits, anneeChoisie]
+    () => etatArgent(faits, faits.echeances, new Date(), annee),
+    [faits, annee]
   );
   const couverture = Math.round(etat.couvertureProvisions * 100);
 

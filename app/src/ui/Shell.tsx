@@ -22,7 +22,7 @@ export interface ProprietesShell {
    * route active, peut en décider. Elle se contente de lui réserver la place
    * prévue par le dessin, en tête de barre.
    */
-  readonly selecteurPeriode?: ReactNode;
+  readonly periode?: ReactNode;
 }
 
 const ID_CONTENU = 'contenu-principal';
@@ -49,7 +49,7 @@ function surClicEvitement(evenement: MouseEvent<HTMLAnchorElement>): void {
  * uniquement de `useRoute`, qui lit la même source (`navigation.ts`) que
  * RailNav, donc les deux ne peuvent jamais diverger sur « quel écran ».
  */
-export function Shell({ children, compteurs, selecteurPeriode }: ProprietesShell) {
+export function Shell({ children, compteurs, periode }: ProprietesShell) {
   const { ecran } = useRoute();
 
   return (
@@ -67,7 +67,7 @@ export function Shell({ children, compteurs, selecteurPeriode }: ProprietesShell
           {/* Emplacement réservé — son contenu est propre à chaque écran
               (sélecteur de période) et fourni par l'appelant, qui seul sait
               quelle route est active. */}
-          <div data-emplacement="selecteur-periode">{selecteurPeriode}</div>
+          <div data-emplacement="selecteur-periode">{periode}</div>
           {/* Emplacement réservé pour des services transverses pas encore
               construits (actions Exporter/Nouveau). On ne les invente pas ici. */}
           {/* En tête des pastilles, jamais au-dessus d'un contrôle : en

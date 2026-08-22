@@ -1,10 +1,17 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Shell } from './ui/Shell';
 import { FournisseurToasts } from './ui/components/Toasts';
-import { SelecteurAnnee } from './ui/components/SelecteurAnnee';
 import { useRoute } from './ui/useRoute';
 import { useFaits } from './state/store';
-import { anneesDisponibles } from './state/selecteurs';
+
+/**
+ * Chargé à la demande, comme les six écrans plus bas : il ne sert qu'à
+ * l'écran Argent — bornes comprises, voir son en-tête — et le charger
+ * d'emblée avait fait franchir le budget du code d'entrée pour un contrôle
+ * que cinq écrans sur six n'affichent jamais.
+ */
+const SelecteurPeriodeArgent = lazy(() => import('./ui/components/SelecteurPeriodeArgent')
+  .then((m) => ({ default: m.SelecteurPeriodeArgent })));
 
 /**
  * Les écrans sont chargés à la demande.
@@ -50,16 +57,23 @@ function EnChargement() {
  * `never`, donc ajouter un écran à la navigation sans le router ici ne
  * compile pas. Un `return null` final aurait laissé passer un écran blanc.
  *
- * `anneeChoisie` ne va qu'à Argent, seul écran qui la lit aujourd'hui : la
+ * `annee` ne va qu'à Argent, seul écran qui la lit aujourd'hui : la
  * distribuer aux six autres les ferait tous se re-rendre à chaque bascule
  * d'année pour rien.
+ *
+ * Appelée comme une fonction ordinaire depuis `App` (`Ecran(annee)`), pas
+ * comme un élément JSX (`<Ecran annee={annee} />`) : les deux sont
+ * équivalents pour React tant que l'appel reste inconditionnel au même
+ * endroit à chaque rendu — ce qui est le cas ici —, mais la forme fonction
+ * n'a pas besoin d'un objet de props, donc pas d'un nom de propriété qui
+ * survivrait à la minification.
  */
-function Ecran({ anneeChoisie }: { readonly anneeChoisie: number }) {
+function Ecran(annee: number) {
   const { ecran } = useRoute();
   switch (ecran.id) {
     case 'pilote': return <Pilote />;
     case 'activite': return <Activite />;
-    case 'argent': return <Argent anneeChoisie={anneeChoisie} />;
+    case 'argent': return <Argent annee={annee} />;
     case 'facture': return <Facture />;
     case 'achats': return <Achats />;
     case 'outils': return <Outils />;
@@ -74,7 +88,6 @@ function Ecran({ anneeChoisie }: { readonly anneeChoisie: number }) {
 export function App() {
   const initialiser = useFaits((e) => e.initialiser);
   const faits = useFaits((e) => e.faits);
-  const { ecran } = useRoute();
 
   // Les badges viennent de la même requête que la liste de l'écran Pilote :
   // une seule source, donc jamais de badge qui contredit la liste.
@@ -93,19 +106,13 @@ export function App() {
    * passer de Pilote à Argent et y revenir ne doit pas la remettre à l'année
    * courante. Un état local à l'écran Argent serait remonté à zéro à chaque
    * démontage — exactement le défaut relevé par l'audit des indicateurs.
+   *
+   * Ce que ce composant ignore volontairement : les BORNES de ce nombre.
+   * `anneesDisponibles` et le repli quand le choix sort des bornes vivent
+   * dans `SelecteurPeriodeArgent`, chargé à la demande — voir son en-tête.
    */
-  const [anneeChoisie, setAnneeChoisie] = useState<number>(() => new Date().getFullYear());
-  const annees = useMemo(() => anneesDisponibles(faits), [faits]);
-
-  // Si les faits changent sous le pied du choix courant — le dossier vient
-  // d'être rechargé, ou la dernière recette d'une année future vient d'être
-  // supprimée — et que l'année choisie n'a plus rien à montrer, on retombe
-  // sur l'année courante plutôt que de garder un sélecteur qui pointe sur une
-  // option qui n'existe plus. L'année courante est TOUJOURS dans les bornes
-  // (voir `anneesDisponibles`), ce retour est donc toujours valide.
-  useEffect(() => {
-    if (!annees.includes(anneeChoisie)) setAnneeChoisie(new Date().getFullYear());
-  }, [annees, anneeChoisie]);
+  const etatAnnee = useState<number>(() => new Date().getFullYear());
+  const [anneeChoisie] = etatAnnee;
 
   // Chargement et migration au démarrage, une seule fois. `initialiser` est
   // idempotent côté migration : un second appel ne réécrit rien.
@@ -115,12 +122,23 @@ export function App() {
     <FournisseurToasts>
       <Shell
         compteurs={compteurs}
-        selecteurPeriode={ecran.id === 'argent' ? (
-          <SelecteurAnnee annees={annees} valeur={anneeChoisie} onChange={setAnneeChoisie} />
-        ) : undefined}
+        // Monté sur les sept écrans : c'est `SelecteurPeriodeArgent` lui-même
+        // qui décide de se taire hors d'Argent (voir son en-tête) — Shell ne
+        // doit pas apprendre le nom d'un écran pour rester ignorante du
+        // métier (voir la doc de sa prop `periode`), et `App` n'a donc pas
+        // besoin de connaître la route pour ce seul contrôle.
+        periode={(
+          // Suspense sans texte : c'est un contrôle de la barre du haut, pas
+          // un écran — un « Chargement… » y clignoterait pour quelques
+          // dizaines de millisecondes sur une connexion correcte, plus
+          // dérangeant que l'absence du contrôle le temps qu'il arrive.
+          <Suspense fallback={null}>
+            <SelecteurPeriodeArgent etat={etatAnnee} />
+          </Suspense>
+        )}
       >
         <Suspense fallback={<EnChargement />}>
-          <Ecran anneeChoisie={anneeChoisie} />
+          {Ecran(anneeChoisie)}
         </Suspense>
       </Shell>
     </FournisseurToasts>
