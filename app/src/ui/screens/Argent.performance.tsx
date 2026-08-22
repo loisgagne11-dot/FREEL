@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant, soldeEstSuivi } from '../../state/selecteurs';
 import { etatProjection, type EtatArgent } from '../../state/selecteurs.argent';
@@ -73,6 +73,15 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
   const m0 = moisCourant();
   const indexCourant = Number(m0.slice(5, 7)) - 1;
 
+  /**
+   * `etat.annee` est un CHOIX ; l'année réelle ne l'est pas. Elles ne
+   * coïncident QUE quand personne n'a touché au sélecteur — c'est le cas le
+   * plus courant, mais deux calculs de cet écran doivent savoir le
+   * distinguer : voir juste en dessous.
+   */
+  const anneeReelle = Number(m0.slice(0, 4));
+  const estAnneeCourante = etat.annee === anneeReelle;
+
   const projection = useMemo(() => etatProjection(faits), [faits]);
   const resultat = useMemo(
     () => resultatProjete(faits, new Date(), projection), [faits, projection]
@@ -89,14 +98,34 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
    * regarder mars pendant que le graphe met juin en évidence.
    */
   const [moisLu, setMoisLu] = useState<Mois>(m0);
+
+  // La bascule d'année déplace le graphe hors du mois lu : sans ce recalage,
+  // le panneau de composition continuerait d'afficher le mois réel courant
+  // (ex. « août 2026 ») pendant qu'on regarde le graphe de 2024, un mois qui
+  // n'y figure même pas. Une année passée n'a pas de « mois courant » : on
+  // retombe sur son dernier mois, décembre.
+  useEffect(() => {
+    setMoisLu(estAnneeCourante ? m0 : `${etat.annee}-12` as Mois);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- volontaire :
+    // seule une bascule d'ANNÉE doit recaler la lecture, pas chaque rendu.
+  }, [etat.annee]);
+
   const composition = useMemo(() => compositionDuMois(faits, moisLu), [faits, moisLu]);
 
-  // L'objectif se compare à l'ENCAISSÉ : c'est lui qui fait les seuils, les
-  // cotisations et le compte en banque. Le comparer au facturé récompenserait
-  // d'avoir émis une facture que personne n'a réglée.
+  /*
+   * L'ALLURE NE SE LIT QUE SUR L'ANNÉE EN COURS.
+   *
+   * `allureObjectif` compare un réalisé À CE JOUR à un rythme attendu À CE
+   * JOUR — une question qui n'a de sens que pour une année encore en train de
+   * se dérouler. Sur 2024 consultée en 2026, « jours d'avance » comparerait
+   * le total (définitif) d'une année finie à la part de 2026 déjà écoulée :
+   * un nombre qui aurait l'air d'un calcul et qui n'en serait pas un.
+   */
   const allure = useMemo(
-    () => allureObjectif(faits.objectifCaAnnuel, etat.caEncaisse, dateDuJour()),
-    [faits.objectifCaAnnuel, etat.caEncaisse]
+    () => (estAnneeCourante
+      ? allureObjectif(faits.objectifCaAnnuel, etat.caEncaisse, dateDuJour())
+      : null),
+    [estAnneeCourante, faits.objectifCaAnnuel, etat.caEncaisse]
   );
 
   return (
@@ -121,13 +150,14 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
             ? 'rien en attente'
             : `${etat.resteARentrerNombre} facture${etat.resteARentrerNombre > 1 ? 's' : ''} en attente`}
         />
-        <TuileResultat resultat={resultat} annee={etat.annee} />
+        <TuileResultat resultat={resultat} />
       </div>
 
       <div className={styles.deuxColonnes}>
         <GrapheCa
           etat={etat}
           indexCourant={indexCourant}
+          estAnneeCourante={estAnneeCourante}
           moisLu={moisLu}
           onLire={setMoisLu}
           objectifMensuel={faits.objectifCaAnnuel === null ? null : faits.objectifCaAnnuel / 12}
@@ -162,11 +192,16 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
  *
  * `null` rend **trois** tuiles et non quatre : le plan l'a tranché — mieux vaut
  * une tuile manquante, qui se voit, qu'une quatrième qui engage à faux.
+ *
+ * L'année de la tuile vient de `resultat.annee` — celle de `maintenant`,
+ * TOUJOURS — et non de l'année choisie au sélecteur : ce résultat projette
+ * douze mois à partir d'aujourd'hui, pas depuis la fin de l'année qu'on
+ * regarde. Lui donner l'année du sélecteur écrirait « fin 2024 » sur un
+ * chiffre qui reste, lui, une projection à douze mois de la date du jour.
  */
-function TuileResultat(
-  { resultat, annee }: { readonly resultat: ResultatProjete | null; readonly annee: number }
-) {
+function TuileResultat({ resultat }: { readonly resultat: ResultatProjete | null }) {
   if (resultat === null) return null;
+  const annee = resultat.annee;
 
   const avantIr = resultat.reserves.includes('avant_impot_sur_le_revenu');
 
@@ -238,6 +273,12 @@ function TuileResultat(
  * Et surtout, six colonnes vides à droite se lisent comme un effondrement de
  * l'activité, alors qu'elles ne disent que « on n'y est pas encore ».
  *
+ * Cette troncature ne vaut que pour l'année RÉELLEMENT en cours — `mois
+ * courant` n'a de sens que sur elle. En consultant une année passée par le
+ * sélecteur, `estAnneeCourante` vaut `false` et les douze mois s'affichent :
+ * une année révolue n'a pas de mois « pas encore atteint », et la tronquer à
+ * l'index du mois réel ferait disparaître son second semestre.
+ *
  * ─────────────────────────────────────────────────────────────────────────
  * DES BOUTONS, PAS UN SVG CLIQUABLE
  * ─────────────────────────────────────────────────────────────────────────
@@ -262,16 +303,18 @@ function TuileResultat(
  * JOURS par `allureObjectif`, qui lui tient compte du calendrier écoulé.
  */
 function GrapheCa(
-  { etat, indexCourant, moisLu, onLire, objectifMensuel, joursDEcart }: {
+  { etat, indexCourant, estAnneeCourante, moisLu, onLire, objectifMensuel, joursDEcart }: {
     readonly etat: EtatArgent;
     readonly indexCourant: number;
+    /** `false` sur une année passée ou future choisie au sélecteur — voir la doc ci-dessus. */
+    readonly estAnneeCourante: boolean;
     readonly moisLu: Mois;
     readonly onLire: (m: Mois) => void;
     readonly objectifMensuel: number | null;
     readonly joursDEcart: number | null;
   }
 ) {
-  const ecoules = etat.parMois.slice(0, indexCourant + 1);
+  const ecoules = estAnneeCourante ? etat.parMois.slice(0, indexCourant + 1) : etat.parMois;
   const maximum = Math.max(
     1,
     ...ecoules.flatMap((m) => [m.realise, m.encaisse]),
@@ -313,7 +356,7 @@ function GrapheCa(
         )}
 
         {ecoules.map((m, i) => {
-          const estCourant = i === indexCourant;
+          const estCourant = estAnneeCourante && i === indexCourant;
           const estLu = m.mois === moisLu;
           return (
             <button

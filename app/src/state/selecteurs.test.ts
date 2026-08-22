@@ -4,8 +4,8 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  aTraiter, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant, provenanceSoldeDe,
-  recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe
+  aTraiter, anneesDisponibles, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant,
+  provenanceSoldeDe, recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe
 } from './selecteurs';
 import { periodeCourante } from '../domain/calculs/periode';
 import { etatArgent } from './selecteurs.argent';
@@ -878,5 +878,128 @@ describe('reste à rentrer de l’écran Argent', () => {
     const argent = etatArgent(jeu, [], enJuillet);
     const facturier = etatFacturier(jeu, periodeCourante('annee', enJuillet), enJuillet);
     expect(argent.resteARentrer).toBe(facturier.resteARentrer);
+  });
+});
+
+/**
+ * LA BASCULE D'ANNÉE DE LA BARRE DU HAUT.
+ *
+ * L'année était verrouillée sur `maintenant.getFullYear()` : au 1ᵉʳ janvier,
+ * le pilier Performance perdait toute recette de l'année qui venait de se
+ * terminer, et rien ne permettait de la revoir. `etatArgent` reçoit
+ * maintenant l'année comme un paramètre distinct de l'horloge — voir sa
+ * documentation pour la raison des DEUX paramètres de temps.
+ */
+describe('bascule d’année de l’écran Argent', () => {
+  const le15juillet2026 = new Date('2026-07-15T12:00:00Z');
+
+  const f = (id: string, montant: number, emiseLe: string, encaisseeLe: string) => ({
+    id, clientNom: 'C', libelle: 'l', montant: euros(montant),
+    emiseLe: dateISO(emiseLe), encaisseeLe: dateISO(encaisseeLe),
+    modeReglement: 'virement' as const, numero: id
+  });
+
+  const deuxAnnees = faits({
+    recettes: [
+      f('r2025', 12_000, '2025-03-01', '2025-03-15'),
+      f('r2026', 40_000, '2026-02-01', '2026-02-20')
+    ]
+  });
+
+  /*
+   * LE CŒUR DU LOT : LA BASCULE CHANGE LE CHIFFRE D'AFFAIRES DE L'ANNÉE.
+   *
+   * Si ce test tombait, l'écran Argent redeviendrait ce que l'audit
+   * signalait : une année verrouillée sur l'horloge, la précédente
+   * inatteignable.
+   */
+  it('affiche le chiffre d’affaires de l’année demandée, pas celle de l’horloge', () => {
+    const en2026 = etatArgent(deuxAnnees, [], le15juillet2026, 2026);
+    const en2025 = etatArgent(deuxAnnees, [], le15juillet2026, 2025);
+
+    expect(en2026.annee).toBe(2026);
+    expect(en2026.caRealise).toBe(40_000);
+    expect(en2025.annee).toBe(2025);
+    expect(en2025.caRealise).toBe(12_000);
+  });
+
+  /**
+   * LE POINT DUR DU LOT.
+   *
+   * Le solde est un état INSTANTANÉ — combien il y a sur le compte
+   * maintenant — et non une période. Il vient de `pilote.tresorerie`, calculé
+   * sur `maintenant` et jamais sur `annee`. Si ce test tombait, regarder 2024
+   * changerait ce que l'écran affiche pour le compte en banque d'aujourd'hui
+   * — l'écart exact que l'utilisateur a signalé : « la trésorerie ne doit pas
+   * être impactée par les périodes ».
+   */
+  it('ne change pas le solde du compte quand on change l’année regardée', () => {
+    const en2026 = etatArgent(deuxAnnees, [], le15juillet2026, 2026);
+    const en2025 = etatArgent(deuxAnnees, [], le15juillet2026, 2025);
+    const en2019 = etatArgent(deuxAnnees, [], le15juillet2026, 2019);
+
+    expect(en2026.tresorerie.solde).toBe(en2025.tresorerie.solde);
+    expect(en2026.tresorerie.solde).toBe(en2019.tresorerie.solde);
+    expect(en2026.tresorerie.dispo).toBe(en2025.tresorerie.dispo);
+  });
+
+  /** Sans le paramètre, on retombe sur l'année de l'horloge — le comportement
+   *  de tous les appelants d'avant ce lot, tests compris. */
+  it('retombe sur l’année de l’horloge quand aucune n’est choisie', () => {
+    const etat = etatArgent(deuxAnnees, [], le15juillet2026);
+    expect(etat.annee).toBe(2026);
+  });
+});
+
+describe('années proposables au sélecteur de période', () => {
+  const mission = (debut: string | null, fin: string | null) => ({
+    id: 'm', clientId: null, clientNom: 'C', description: '', tjm: euros(0),
+    debut: debut === null ? null : dateISO(debut), fin: fin === null ? null : dateISO(fin),
+    statut: 'active' as const, entites: []
+  });
+
+  /** Sans le moindre fait daté, il n'y a rien à comparer : proposer une plage
+   *  imaginaire ferait choisir entre des années toutes vides. */
+  it('ne propose que l’année courante à un dossier vide', () => {
+    expect(anneesDisponibles(faitsVides(), new Date('2026-07-15'))).toEqual([2026]);
+  });
+
+  /** La borne basse vient du fait le plus ancien du dossier, quel qu'il soit —
+   *  ici une dépense, pas une recette. */
+  it('descend jusqu’à l’année du plus ancien fait, quelle que soit sa nature', () => {
+    const jeu = faits({
+      depenses: [{
+        id: 'd', libelle: 'l', fournisseur: 'f', provenance: 'france',
+        montantTtc: euros(100), tauxTva: ratio(0.2), payeeLe: dateISO('2022-03-01'),
+        justificatifId: null, rapprochement: 'sans_banque'
+      } as Depense]
+    });
+    expect(anneesDisponibles(jeu, new Date('2026-07-15'))).toEqual(
+      [2022, 2023, 2024, 2025, 2026]
+    );
+  });
+
+  /** Une année intermédiaire sans le moindre fait reste proposable : la plage
+   *  est continue, elle ne saute pas les trous. */
+  it('comble les années intermédiaires qui n’ont elles-mêmes aucun fait', () => {
+    const jeu = faits({
+      recettes: [
+        { id: 'a', clientNom: 'C', libelle: 'l', montant: euros(1000), emiseLe: dateISO('2023-01-10'),
+          encaisseeLe: dateISO('2023-01-10'), modeReglement: 'virement', numero: '1' }
+      ]
+    });
+    // 2024 et 2025 n'ont aucun fait, et figurent quand même : c'est le
+    // dossier repris que l'audit citait — deux ans d'historique qui
+    // n'en montraient qu'un.
+    expect(anneesDisponibles(jeu, new Date('2026-02-01'))).toEqual(
+      [2023, 2024, 2025, 2026]
+    );
+  });
+
+  /** Une mission déjà planifiée l'an prochain rend cette année-là proposable
+   *  — mais seulement elle, pas un intervalle ouvert vers l'avenir. */
+  it('ajoute l’année suivante seulement si un fait y figure déjà', () => {
+    const jeu = faits({ missions: [mission('2027-01-05', '2027-03-01')] });
+    expect(anneesDisponibles(jeu, new Date('2026-07-15'))).toEqual([2026, 2027]);
   });
 });

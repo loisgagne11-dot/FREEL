@@ -14,6 +14,15 @@ export interface ProprietesShell {
    * métier.
    */
   readonly compteurs?: Partial<Record<IdEcran, number>>;
+  /**
+   * Le sélecteur de période de l'écran courant, ou rien.
+   *
+   * La coquille ne sait pas ce qu'une période représente — année, mois,
+   * trimestre — ni quel écran en a besoin : seul l'appelant, qui connaît la
+   * route active, peut en décider. Elle se contente de lui réserver la place
+   * prévue par le dessin, en tête de barre.
+   */
+  readonly selecteurPeriode?: ReactNode;
 }
 
 const ID_CONTENU = 'contenu-principal';
@@ -40,7 +49,7 @@ function surClicEvitement(evenement: MouseEvent<HTMLAnchorElement>): void {
  * uniquement de `useRoute`, qui lit la même source (`navigation.ts`) que
  * RailNav, donc les deux ne peuvent jamais diverger sur « quel écran ».
  */
-export function Shell({ children, compteurs }: ProprietesShell) {
+export function Shell({ children, compteurs, selecteurPeriode }: ProprietesShell) {
   const { ecran } = useRoute();
 
   return (
@@ -55,11 +64,12 @@ export function Shell({ children, compteurs }: ProprietesShell) {
         <header className={styles.topbar}>
           <span className={styles.titre}>{ecran.libelle}</span>
           <div className={styles.grow} />
-          {/* Emplacements réservés — leur contenu est propre à chaque écran
-              (sélecteur de période) ou vient de services transverses pas
-              encore construits (actions Exporter/Nouveau). On ne les invente
-              pas ici. */}
-          <div data-emplacement="selecteur-periode" />
+          {/* Emplacement réservé — son contenu est propre à chaque écran
+              (sélecteur de période) et fourni par l'appelant, qui seul sait
+              quelle route est active. */}
+          <div data-emplacement="selecteur-periode">{selecteurPeriode}</div>
+          {/* Emplacement réservé pour des services transverses pas encore
+              construits (actions Exporter/Nouveau). On ne les invente pas ici. */}
           {/* En tête des pastilles, jamais au-dessus d'un contrôle : en
               portrait il flotte au-dessus du dock, en paysage il vit ici. */}
           <IndicateurATraiter ecranActif={ecran.id} />

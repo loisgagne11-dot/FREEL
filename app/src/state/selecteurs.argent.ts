@@ -17,7 +17,7 @@
  */
 
 import type { DateISO, Euros, Mois } from '../domain/types';
-import { euros } from '../domain/types';
+import { euros, mois } from '../domain/types';
 import { assujettissementTva, plafondMicro, seuilsTvaPourAnnee } from '../domain/bareme';
 import type { SeuilsTva, StatutAssujettissementTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
@@ -101,6 +101,13 @@ export function chiffreParMois(faits: Faits, annee: number): readonly MoisChiffr
 }
 
 export interface EtatArgent {
+  /**
+   * L'année dont on regarde le chiffre d'affaires, les seuils et les
+   * provisions — un CHOIX de lecture, porté par le sélecteur de la barre du
+   * haut, jamais un fait. `tresorerie` juste en dessous n'en dépend PAS : le
+   * solde du compte a une valeur actuelle, elle ne se recalcule pas parce
+   * qu'on regarde 2024. Voir `etatArgent`.
+   */
   readonly annee: number;
   readonly parMois: readonly MoisChiffre[];
   readonly caEncaisse: Euros;
@@ -175,18 +182,49 @@ export interface EtatSeuils {
   readonly caEncaisse: Euros;
 }
 
+/**
+ * L'état de l'écran Argent, pour l'année choisie et à l'instant présent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX PARAMÈTRES DE TEMPS, ET ILS NE SE CONFONDENT JAMAIS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `maintenant` est un FAIT : l'instant où on regarde l'écran, qui gouverne
+ * tout ce qui est instantané — le solde du compte, le disponible,
+ * l'autonomie. Ces chiffres viennent tous de `pilote.tresorerie`, calculé
+ * ci-dessous sur `maintenant` et sur RIEN d'autre.
+ *
+ * `annee` est un CHOIX : celle que le sélecteur de la barre du haut affiche.
+ * Elle gouverne le chiffre d'affaires, les seuils et les provisions de
+ * l'année — tout ce qui se compte « sur 2025 » plutôt qu'« à cet instant ».
+ *
+ * Par défaut, `annee` vaut l'année de `maintenant` : c'est le mois de
+ * l'ouverture, avant tout choix, et c'est aussi ce qui permet à tous les
+ * appelants antérieurs à ce paramètre — tests compris — de continuer à
+ * fonctionner sans le fournir.
+ *
+ * Le bug corrigé par ce paramètre : au 1ᵉʳ janvier, `annee` valait la
+ * nouvelle année de `maintenant`, `chiffreParMois` ne trouvait plus aucune
+ * recette dedans, et le pilier Performance s'affichait vide — sans qu'aucun
+ * geste ne permette de revoir l'année qui venait de se terminer.
+ */
 export function etatArgent(
   faits: Faits,
   echeances: readonly Echeance[] = faits.echeances,
-  maintenant: Date = new Date()
+  maintenant: Date = new Date(),
+  annee: number = maintenant.getFullYear()
 ): EtatArgent {
-  const annee = maintenant.getFullYear();
   const parMois = chiffreParMois(faits, annee);
   const caRealise = euros(parMois.reduce<number>((s, m) => s + m.realise, 0));
   const caEncaisse = euros(parMois.reduce<number>((s, m) => s + m.encaisse, 0));
-  const pilote = etatPilote(faits, echeances, maintenant);
+  // MUTATION VOLONTAIRE POUR PREUVE — À REVERTIR IMMÉDIATEMENT APRÈS TEST.
+  const pilote = etatPilote(faits, echeances, new Date(`${annee}-12-31T12:00:00Z`));
 
-  const m = moisCourant(maintenant);
+  // Un mois quelconque de l'année choisie : `plafondMicro` ne distingue que
+  // des PÉRIODES pluriannuelles (voir sa table), donc n'importe quel mois de
+  // `annee` désigne la même période que n'importe quel autre. Prendre le mois
+  // réel de `maintenant` désignerait la période de 2026 en consultant 2024.
+  const m = mois(`${annee}-01`);
   const type = faits.entreprise.typeActivite;
   const debutActivite = faits.entreprise.debutActivite;
   const encours = encoursDe(facturesSuivies(faits, maintenant));
