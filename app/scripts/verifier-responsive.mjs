@@ -242,7 +242,23 @@ for (const taille of TAILLES) {
         `${prefixe} cibles tactiles ≥ 44 px (${Math.round(mesures.hauteurMiniLien)} px)`
       );
     } else {
-      constate(mesures.navPosition === 'static', `${prefixe} rail latéral en desktop`);
+      /*
+       * CE QUE CETTE ASSERTION VEUT DIRE : un RAIL, pas un dock.
+       *
+       * Elle exigeait `static`, ce qui n'était qu'un proxy — en portrait le
+       * dock est `fixed`, et `static` suffisait à l'en distinguer. Le rail est
+       * passé en `sticky` pour qu'il garde son fond sur une page longue : en
+       * `static` avec `height: 100dvh`, sa colonne perdait fond et bordure aux
+       * deux tiers d'une page de trois mille six cents pixels.
+       *
+       * `sticky` reste dans le flux, occupe sa colonne et ne recouvre rien —
+       * c'est bien un rail. Seul `fixed` en ferait un dock, et c'est cela que
+       * l'assertion doit refuser.
+       */
+      constate(
+        mesures.navPosition === 'static' || mesures.navPosition === 'sticky',
+        `${prefixe} rail latéral en desktop (${mesures.navPosition})`
+      );
       // En desktop la place existe : tous les onglets sont nommés. Un rail
       // d'icônes muettes obligerait à deviner.
       constate(

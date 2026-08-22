@@ -108,11 +108,26 @@
 
 /* ---------- desktop : rail latéral fixe, 212px, tous les libellés visibles ---------- */
 @media (min-width: 761px) {
+  /*
+   * LE RAIL COLLE AU HAUT DE LA FENÊTRE, IL NE DÉFILE PAS AVEC LA PAGE.
+   *
+   * En `static` avec `height: 100dvh`, il s'arrêtait à la hauteur d'ÉCRAN : sur
+   * une page de trois mille six cents pixels — la Trésorerie déployée — sa
+   * colonne perdait son fond et sa bordure aux deux tiers, et le gris de page
+   * apparaissait dessous. Le défaut sautait aux yeux en thème clair, où le fond
+   * du rail est blanc, et passait presque inaperçu en sombre.
+   *
+   * `sticky` corrige les deux d'un coup : la colonne reste peinte sur toute la
+   * hauteur puisqu'elle ne quitte jamais l'écran, et la navigation demeure
+   * atteignable sans remonter — ce qu'un rail latéral doit faire de toute façon.
+   */
   .rail {
-    position: static;
+    position: sticky;
+    top: 0;
     left: auto;
     bottom: auto;
     transform: none;
+    align-self: start;
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
