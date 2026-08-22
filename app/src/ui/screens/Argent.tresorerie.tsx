@@ -731,6 +731,7 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
 
   const plafond = seuils.plafondMicro;
   const tva = seuils.franchiseTva;
+  const assujettissement = seuils.assujettissementTva;
 
   /**
    * Le repère de date, posé sur chaque jauge.
@@ -759,21 +760,40 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
    * qui assujettit dès le mois du dépassement, sur des factures déjà émises
    * sans TVA.
    */
+  const complementPlafond = plafond.statut !== 'refuse' && (
+    <>
+      {' · '}
+      <Montant>{eur(euros(Math.max(0, plafond.valeur - seuils.caEncaisse)))}</Montant>
+      {' avant le plafond micro'}
+    </>
+  );
+
+  /**
+   * Redevable l'EMPORTE sur « il reste X € » — pas les deux à la fois.
+   *
+   * « Il reste 2 300 € avant le seuil majoré » à quelqu'un déjà redevable
+   * depuis le 1er janvier (à cause du CA de l'année précédente, voir
+   * `assujettissementTva`) ferait croire à une marge qui n'existe plus : le
+   * CA de l'année en cours n'a jamais été sous franchise, il n'y a rien à
+   * attendre avant un seuil qui ne s'applique déjà plus.
+   */
   const resume = tva.statut === 'refuse'
     ? 'Seuils de TVA indisponibles pour cette période.'
-    : (
-      <>
-        <Montant>{eur(euros(Math.max(0, tva.valeur.majore - seuils.caEncaisse)))}</Montant>
-        {' avant le seuil majoré de TVA'}
-        {plafond.statut !== 'refuse' && (
-          <>
-            {' · '}
-            <Montant>{eur(euros(Math.max(0, plafond.valeur - seuils.caEncaisse)))}</Montant>
-            {' avant le plafond micro'}
-          </>
-        )}
-      </>
-    );
+    : assujettissement.statut !== 'refuse' && assujettissement.valeur.cas === 'redevable'
+      ? (
+        <>
+          {'Redevable de la TVA depuis le 1ᵉʳ '}
+          <strong>{moisLong(assujettissement.valeur.depuis)}</strong>
+          {complementPlafond}
+        </>
+      )
+      : (
+        <>
+          <Montant>{eur(euros(Math.max(0, tva.valeur.majore - seuils.caEncaisse)))}</Montant>
+          {' avant le seuil majoré de TVA'}
+          {complementPlafond}
+        </>
+      );
 
   return (
     <CartePliable
@@ -844,10 +864,65 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
                   aujourdhui={aujourdhui}
                 />}
               />
+              <NoteRedevabiliteTva assujettissement={assujettissement} />
             </>
           )}
       </div>
     </CartePliable>
+  );
+}
+
+/**
+ * DEPUIS QUAND COLLECTER, ET SUR QUELLE BASE.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA QUESTION QUE LES DEUX JAUGES DU DESSUS NE PEUVENT PAS RÉPONDRE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les jauges au-dessus ne regardent que le CA encaissé de l'année en cours :
+ * c'est le bug remonté — un CA encaissé en décembre dernier, avec TVA déjà
+ * collectée dessus, restait invisible dès que l'année changeait, parce que
+ * rien ne relisait l'année précédente. `assujettissementTva` (le sélecteur
+ * qui alimente cette note) répare ce point précis en tenant compte du CA de
+ * N-1 ; cette note en est le seul endroit où l'écran le montre.
+ *
+ * Rien n'est affiché sous la franchise : les jauges au-dessus suffisent déjà
+ * à dire « rien à collecter », et une note vide serait un bruit de plus.
+ */
+function NoteRedevabiliteTva(
+  { assujettissement }: { readonly assujettissement: EtatSeuils['assujettissementTva'] }
+) {
+  if (assujettissement.statut === 'refuse') return null;
+  const etat = assujettissement.valeur;
+  if (etat.cas === 'sous_franchise') return null;
+
+  if (etat.cas === 'perte_franchise') {
+    return (
+      <p className={styles.vide}>
+        <span className={styles.attention}>
+          Franchise perdue à compter du {moisLong(etat.depuis)}
+        </span>
+        {' '}— le chiffre d’affaires encaissé cette année a déjà dépassé la
+        franchise simple, sans atteindre le seuil majoré.
+      </p>
+    );
+  }
+
+  // `motif` distingue ce que l'utilisateur doit comprendre : soit il n'a
+  // JAMAIS eu de franchise cette année (le CA de l'an dernier l'avait déjà
+  // fait sortir), soit il l'a perdue en cours d'année — deux histoires
+  // différentes, qui ne se racontent pas avec la même phrase.
+  const base = etat.motif === 'annee_precedente'
+    ? 'le chiffre d’affaires encaissé l’an dernier avait déjà dépassé la franchise : cette année n’en a jamais eu'
+    : 'le seuil majoré a été franchi ce mois-là';
+
+  return (
+    <p className={styles.vide}>
+      <span className={styles.alerteLigne}>
+        Redevable de la TVA depuis le 1ᵉʳ {moisLong(etat.depuis)}
+      </span>
+      {' '}— {base}.
+    </p>
   );
 }
 

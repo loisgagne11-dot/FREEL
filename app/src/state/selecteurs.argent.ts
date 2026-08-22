@@ -18,8 +18,8 @@
 
 import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros } from '../domain/types';
-import { plafondMicro, seuilsTva } from '../domain/bareme';
-import type { SeuilsTva } from '../domain/bareme';
+import { assujettissementTva, plafondMicro, seuilsTvaPourAnnee } from '../domain/bareme';
+import type { SeuilsTva, StatutAssujettissementTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
 import type { Echeance, VentilationProvisions } from '../domain/calculs/provisions';
 import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
@@ -158,7 +158,19 @@ export interface EtatArgent {
  */
 export interface EtatSeuils {
   readonly plafondMicro: Resolution<Euros>;
+  /**
+   * Les deux seuils de TVA de l'année en cours, prorata temporis compris la
+   * première année d'activité (voir `seuilsTvaPourAnnee`) — ce n'est PLUS le
+   * seuil plein de la table pour une entreprise créée en cours d'année.
+   */
   readonly franchiseTva: Resolution<SeuilsTva>;
+  /**
+   * Depuis quand collecter, en tenant compte du CA encaissé l'année
+   * PRÉCÉDENTE — c'est la question que `franchiseTva` seul ne peut pas
+   * répondre : il ne regarde que l'année en cours, donc jamais un
+   * encaissement de décembre dernier. Voir `assujettissementTva`.
+   */
+  readonly assujettissementTva: Resolution<StatutAssujettissementTva>;
   /** Chiffre d'affaires encaissé de l'année, l'assiette des deux seuils. */
   readonly caEncaisse: Euros;
 }
@@ -176,12 +188,27 @@ export function etatArgent(
 
   const m = moisCourant(maintenant);
   const type = faits.entreprise.typeActivite;
+  const debutActivite = faits.entreprise.debutActivite;
   const encours = encoursDe(facturesSuivies(faits, maintenant));
+
+  // Le CA de l'année PRÉCÉDENTE : c'est lui que l'ancien calcul ignorait
+  // entièrement, et c'est le bug remonté — un encaissement de décembre
+  // dernier, avec TVA déjà collectée dessus, restait invisible une fois
+  // l'application ouverte l'année suivante.
+  const parMoisPrecedent = chiffreParMois(faits, annee - 1);
+  const caEncaissePrecedent = euros(
+    parMoisPrecedent.reduce<number>((s, mc) => s + mc.encaisse, 0)
+  );
 
   return {
     seuils: {
       plafondMicro: plafondMicro(m, type),
-      franchiseTva: seuilsTva(m, type),
+      franchiseTva: seuilsTvaPourAnnee(annee, type, debutActivite),
+      assujettissementTva: assujettissementTva({
+        annee, type, debutActivite,
+        caAnneePrecedente: caEncaissePrecedent,
+        parMoisAnneeEnCours: parMois.map((mc) => ({ mois: mc.mois, encaisse: mc.encaisse }))
+      }),
       caEncaisse
     },
     annee,
