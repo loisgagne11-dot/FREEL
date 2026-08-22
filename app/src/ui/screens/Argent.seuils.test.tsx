@@ -1,8 +1,9 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
-import { dateISO, euros } from '../../domain/types';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import { dateISO, euros, mois } from '../../domain/types';
+import { plafondMicro } from '../../domain/bareme';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Argent } from './Argent';
@@ -93,5 +94,97 @@ describe('repère de date et projection sur les seuils', () => {
 
     expect(screen.queryByText(/seuil atteint vers/)).toBeNull();
     expect(screen.getAllByText(/Seuil dépassé de/).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * « 32 400 € / 77 700 € » puis « proj. 74 200 € » ou « dépass. ~ sept. » — le
+ * dessin écrit trois nombres sous chaque barre. La jauge, elle, ne dit qu'un
+ * ÉCART (« il reste X € avant le seuil de Y € ») : retrouver le réalisé
+ * demandait de le soustraire de tête, ce qu'une jauge existe pour éviter.
+ */
+describe('les trois chiffres sous chaque jauge de seuil', () => {
+  /** Récupère le conteneur d'une jauge à partir de son nom accessible. */
+  function jaugeParLibelle(nomAccessible: RegExp): HTMLElement {
+    const piste = screen.getAllByRole('img', { name: nomAccessible })[0];
+    return piste?.parentElement as HTMLElement;
+  }
+
+  /**
+   * La ligne compacte est un `<span>` dont le texte contient un « / » : c'est
+   * le seul endroit de la jauge où ce caractère apparaît, ce qui la distingue
+   * des `<span>` de `Montant` qu'elle contient (eux ne portent qu'un montant
+   * seul, jamais la paire).
+   */
+  function ligneChiffree(jauge: HTMLElement): HTMLElement {
+    return within(jauge).getByText(
+      (_, el) => el?.tagName === 'SPAN' && (el.textContent ?? '').includes('/')
+    );
+  }
+
+  it('affiche le réalisé et le plafond, pas seulement l’écart', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-30T09:00:00Z'));
+    semer([{ montant: 30_000, le: '2026-03-15' }]);
+    render(<Argent />);
+    await attendreTresorerie();
+
+    // Le plafond vient du barème daté, jamais recopié en dur ici : la table
+    // 2026 de `plafonds.ts` est étiquetée confiance MOYENNE-BASSE et peut
+    // changer avant confirmation à la source — un chiffre codé en dur dans ce
+    // test se serait tu le jour où elle change.
+    const plafond = plafondMicro(mois('2026-06'), 'BNC');
+    expect(plafond.statut).not.toBe('refuse');
+    const chiffrePlafond = plafond.statut === 'refuse' ? '' : String(plafond.valeur);
+
+    const ligne = ligneChiffree(jaugeParLibelle(/^Plafond micro-BNC/));
+    expect(ligne.textContent).toContain('30');
+    expect(ligne.textContent).toContain('000');
+    expect(ligne.textContent).toContain(chiffrePlafond.slice(0, 2));
+    expect(ligne.textContent).toContain(chiffrePlafond.slice(2));
+  });
+
+  /**
+   * Sous un trimestre, aucune base : ni réalisé chiffré à part le montant
+   * brut, ni projection — la règle d'abstention du projet s'applique aussi à
+   * ce nouveau chiffre, pas seulement à la phrase qui l'accompagnait déjà.
+   */
+  it('ne chiffre aucune projection quand la base est trop mince', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-02-10T09:00:00Z'));
+    semer([{ montant: 30_000, le: '2026-01-15' }]);
+    render(<Argent />);
+    await attendreTresorerie();
+
+    const ligne = ligneChiffree(jaugeParLibelle(/^Plafond micro-BNC/));
+    expect(ligne.textContent).not.toContain('proj.');
+    expect(ligne.textContent).not.toContain('dépass.');
+  });
+
+  it('chiffre la projection annuelle quand le seuil ne tombe pas cette année', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-30T09:00:00Z'));
+    semer([{ montant: 30_000, le: '2026-03-15' }]);
+    render(<Argent />);
+    await attendreTresorerie();
+
+    // Le plafond micro n'est pas franchi cette année au rythme constaté :
+    // c'est la jauge « hors année » de ce jeu de données.
+    const ligne = ligneChiffree(jaugeParLibelle(/^Plafond micro-BNC/));
+    expect(ligne.textContent).toContain('proj.');
+    expect(ligne.textContent).not.toContain('dépass.');
+  });
+
+  it('chiffre le mois de dépassement au lieu de le laisser seulement en prose', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-30T09:00:00Z'));
+    semer([{ montant: 30_000, le: '2026-03-15' }]);
+    render(<Argent />);
+    await attendreTresorerie();
+
+    // La franchise de TVA (37 500 €), elle, tombe cette année au même rythme.
+    const ligne = ligneChiffree(jaugeParLibelle(/^Franchise de TVA/));
+    expect(ligne.textContent).toContain('dépass.');
+    expect(ligne.textContent).not.toContain('proj.');
   });
 });

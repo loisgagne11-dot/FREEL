@@ -129,6 +129,76 @@ describe('ventilation des provisions à l’écran', () => {
       expect(noeud.closest('[data-montant]')).toBeTruthy();
     }
   });
+
+  /**
+   * LA TVA NE DISPARAÎT JAMAIS, MÊME SANS APPEL — ELLE DIT POURQUOI.
+   *
+   * Les autres natures se masquent à zéro parce que zéro y veut dire « rien
+   * n'est dû ». Pour la TVA, zéro veut dire autre chose : aucun appel n'est
+   * encore émis, ce qui n'est pas la même chose. La masquer comme les autres
+   * ferait disparaître la seule tuile qui prévient qu'une TVA existe peut-être
+   * déjà sur des factures, sans qu'on sache encore combien.
+   *
+   * Si la tuile redevenait masquée à zéro (l'ancien comportement), ce test
+   * échouerait sur la première assertion — vérifié par mutation ci-dessous.
+   */
+  it('garde une vignette TVA même sans appel émis, en disant pourquoi', async () => {
+    semer({ echeances: [ech('a', 'urssaf', 4100)] }); // aucune échéance de nature TVA
+    render(<Argent />);
+    await attendreTresorerie();
+
+    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const dans = within(enveloppes as HTMLElement);
+    const vignette = dans.getByText('TVA à reverser').closest('li');
+    expect(vignette).toBeTruthy();
+    const dansVignette = within(vignette as HTMLElement);
+    expect(dansVignette.getByText(/Pas d’appel émis/)).toBeTruthy();
+    // Et surtout : jamais un montant inventé à la place de l'appel absent.
+    expect(dansVignette.queryByText('0 €')).toBeNull();
+  });
+
+  it('affiche le montant réel dès qu’un appel de TVA existe', async () => {
+    semer({ echeances: [ech('a', 'tva', 950)] });
+    render(<Argent />);
+    await attendreTresorerie();
+
+    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const dans = within(enveloppes as HTMLElement);
+    const vignette = dans.getByText('TVA à reverser').closest('li');
+    expect(vignette).toBeTruthy();
+    const dansVignette = within(vignette as HTMLElement);
+    expect(dansVignette.getByText('950 €')).toBeTruthy();
+    expect(dansVignette.queryByText(/Pas d’appel émis/)).toBeNull();
+  });
+
+  /**
+   * LE SEUIL DE SÉCURITÉ EST LA QUATRIÈME VIGNETTE DU DESSIN.
+   *
+   * Il n'est pas une dette — il n'a ni échéance ni « nature » au sens du
+   * domaine — mais le dessin le pose à côté des trois autres, et le fait
+   * porte déjà un nom dans l'application : « seuil de sécurité », jamais
+   * « réserve matelas ». Masqué à zéro comme les enveloppes de dette, pour la
+   * même raison : personne n'a réglé de cible, il n'y a rien à montrer.
+   */
+  it('ajoute une vignette « Seuil de sécurité » quand une réserve est réglée', async () => {
+    semer({ soldeInitial: euros(10_000), reserve: euros(2_500) });
+    render(<Argent />);
+    await attendreTresorerie();
+
+    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const dans = within(enveloppes as HTMLElement);
+    const vignette = dans.getByText('Seuil de sécurité').parentElement?.parentElement;
+    expect(vignette?.textContent).toContain(`sur ${eur(2_500)}`);
+  });
+
+  it('ne montre pas de vignette « Seuil de sécurité » quand aucune réserve n’est réglée', async () => {
+    semer({ soldeInitial: euros(10_000) }); // `reserve` reste à zéro, comme `faitsVides()`
+    render(<Argent />);
+    await attendreTresorerie();
+
+    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    expect(within(enveloppes as HTMLElement).queryByText('Seuil de sécurité')).toBeNull();
+  });
 });
 
 /**

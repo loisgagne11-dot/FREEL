@@ -5,6 +5,7 @@
 .legende {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 14px;
   flex-wrap: wrap;
   margin-bottom: 10px;
@@ -33,6 +34,11 @@
 .pastilleEntrees { background: var(--green); }
 .pastilleSorties { background: var(--amber); }
 
+/* Réserve de la place au-dessus du point le plus haut : sans cette marge, son
+   étiquette de niveau — posée par-dessus, en `position: absolute` — se
+   couperait contre le haut de la carte au lieu de flotter au-dessus du trait. */
+.courbeConteneur { position: relative; margin-top: 16px; }
+
 /* La courbe s'étire en largeur et garde sa hauteur : voir `preserveAspectRatio`
    dans le composant. Le trait, lui, garde son épaisseur grâce à
    `vector-effect`, sinon l'étirement l'amincirait jusqu'à l'invisible. */
@@ -43,6 +49,31 @@
 .ligne { fill: none; stroke: var(--green); stroke-width: 2; }
 
 .point { fill: var(--green); }
+
+/* Les étiquettes de niveau, en HTML par-dessus le SVG — jamais dans son
+   `viewBox` : ce repère est étiré en largeur (`preserveAspectRatio="none"`),
+   et un `<text>` SVG en aurait hérité l'étirement, aplatissant les glyphes. Le
+   conteneur reprend exactement les dimensions du SVG (100 % × 96px) pour que
+   les pourcentages `left`/`top` posés sur chaque étiquette retombent au même
+   endroit que `x()`/`y()` dans le composant. */
+.etiquettesNiveau {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.etiquetteNiveau {
+  position: absolute;
+  /* Centrée sur son point, posée juste au-dessus : `translate` déplace de sa
+     propre taille, pas de celle — étirée — du repère SVG, donc ce décalage ne
+     subit jamais la déformation en largeur. */
+  transform: translate(-50%, calc(-100% - 3px));
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--muted-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
 /* Le seuil est en pointillés et en ambre : c'est un plancher qu'on ne veut pas
    franchir, pas une série de données. Le confondre avec la courbe ferait lire
@@ -95,14 +126,6 @@
 /* Le mois courant est encadré, pas coloré : les couleurs sont déjà prises par
    les entrées et les sorties. */
 .colonneCourante { border-color: var(--line-2); background: var(--panel-2); }
-
-.valeurNiveau {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  color: var(--muted-2);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 
 /* L'entrée et la sortie prennent la couleur de la barre qu'elles légendent :
    c'est la même association que la légende du graphe, et elle évite d'avoir à

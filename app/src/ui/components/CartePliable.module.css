@@ -50,7 +50,12 @@
   border-radius: var(--r-sm);
 }
 
+/* `flex: 1` : le titre occupe tout ce que le bouton laisse de large, ce qui
+   pousse le chevron — dernier enfant — jusqu'au bord droit du bouton. Sans
+   ça, le chevron collerait au texte du titre au lieu du bord de la carte, et
+   ce serait le même défaut qu'avant, juste déplacé d'un côté. */
 .titre {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -38,8 +38,8 @@ import styles from './GrapheEvolution.module.css';
  *
  * `aria-hidden` sur le SVG et sur les barres, et chaque mois porte ses trois
  * montants en texte : l'entrée au-dessus de la barre, la sortie en dessous, le
- * niveau tout en haut de la colonne. Un graphe dont l'information n'existe
- * qu'en pixels est inaccessible ; ici la donnée est lisible sans lui.
+ * niveau au-dessus de son point sur la courbe. Un graphe dont l'information
+ * n'existe qu'en pixels est inaccessible ; ici la donnée est lisible sans lui.
  *
  * Ça n'a pas toujours été le cas : entrées et sorties ont d'abord vécu dans un
  * `<span>` hors écran, que le vérificateur de confidentialité a signalé comme
@@ -48,6 +48,24 @@ import styles from './GrapheEvolution.module.css';
  * qu'inaccessible AU FLOUTAGE. Le bon correctif était le troisième : un texte
  * visible, passé par `<Montant>` comme les deux autres séries, qui satisfait
  * l'œil et le floutage à la fois.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE NIVEAU NE VIT QU'À UN SEUL ENDROIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La référence pose le niveau sur la courbe, là où l'œil suit la pente. Il a
+ * vécu un temps sous la colonne, avec l'entrée et la sortie — mais l'y garder
+ * EN PLUS de la courbe aurait recréé, sur cette carte, le défaut que le projet
+ * vient de corriger deux fois ailleurs : l'occupation en double sur Activité,
+ * le « Reste à rentrer » à deux sources sur Argent. Un même nombre à deux
+ * endroits d'une carte n'informe pas deux fois, il fait douter lequel des deux
+ * est à jour le jour où quelqu'un n'en touche qu'un.
+ *
+ * Le texte est posé en HTML, PAS dans le SVG : le repère est étiré en largeur
+ * par `preserveAspectRatio="none"`, et un `<text>` SVG en hériterait — les
+ * glyphes s'aplatiraient avec la courbe. Un `<span>` positionné en
+ * pourcentage, par-dessus, garde sa police intacte quelle que soit la largeur
+ * de la carte.
  */
 
 export interface MoisEvolution {
@@ -117,6 +135,12 @@ export function GrapheEvolution(
         {libelleNiveau}, entrées et sorties, mois par mois
       </figcaption>
 
+      {/* Alignée à droite : la référence la pose sur la ligne du titre de la
+          carte, à droite. Ce composant ne connaît pas ce titre — c'est
+          `Argent.tresorerie.tsx` qui l'affiche, dans un `<h2>` hors de ce
+          fichier — donc il ne peut pas la mettre sur SA ligne. L'aligner à
+          droite ici est le pas qu'on peut faire sans y toucher ; la poser
+          effectivement à côté du titre reste à faire côté appelant. */}
       <div className={styles.legende} aria-hidden="true">
         <span className={styles.entreeLegende}>
           <span className={styles.traitNiveau} />{libelleNiveau}
@@ -132,25 +156,44 @@ export function GrapheEvolution(
       {/* `preserveAspectRatio="none"` : le repère s'étire en largeur sans
           grandir en hauteur, donc le graphe ne pousse jamais la page en
           portrait. Même arbitrage que `GrapheBarres`, et pour la même raison. */}
-      <svg
-        className={styles.courbe}
-        viewBox={`0 0 100 ${HAUTEUR_COURBE}`}
-        preserveAspectRatio="none"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <polygon points={aire} className={styles.aire} />
-        <polyline points={points} className={styles.ligne} vectorEffect="non-scaling-stroke" />
-        {seuil !== null && (
-          <line
-            x1="0" x2="100" y1={y(seuil)} y2={y(seuil)}
-            className={styles.seuil} vectorEffect="non-scaling-stroke"
-          />
-        )}
-        {mois.map((m, i) => (
-          <circle key={m.mois} cx={x(i)} cy={y(m.niveau)} r="1.6" className={styles.point} />
-        ))}
-      </svg>
+      <div className={styles.courbeConteneur}>
+        <svg
+          className={styles.courbe}
+          viewBox={`0 0 100 ${HAUTEUR_COURBE}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <polygon points={aire} className={styles.aire} />
+          <polyline points={points} className={styles.ligne} vectorEffect="non-scaling-stroke" />
+          {seuil !== null && (
+            <line
+              x1="0" x2="100" y1={y(seuil)} y2={y(seuil)}
+              className={styles.seuil} vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {mois.map((m, i) => (
+            <circle key={m.mois} cx={x(i)} cy={y(m.niveau)} r="1.6" className={styles.point} />
+          ))}
+        </svg>
+
+        {/* Le niveau, en HTML par-dessus le SVG — voir « LE NIVEAU NE VIT
+            QU'À UN SEUL ENDROIT » en tête de fichier. `left`/`top` en
+            pourcentage reprennent exactement `x()`/`y()` : la même échelle que
+            le point qu'ils légendent, sans jamais entrer dans son repère
+            étiré. */}
+        <div className={styles.etiquettesNiveau}>
+          {mois.map((m, i) => (
+            <span
+              key={m.mois}
+              className={styles.etiquetteNiveau}
+              style={{ left: `${x(i)}%`, top: `${(y(m.niveau) / HAUTEUR_COURBE) * 100}%` }}
+            >
+              <Montant>{formaterCourt(m.niveau)}</Montant>
+            </span>
+          ))}
+        </div>
+      </div>
 
       {seuil !== null && (
         <p className={styles.libelleSeuil}>
@@ -167,9 +210,9 @@ export function GrapheEvolution(
               key={m.mois}
               className={`${styles.colonne} ${i === indexCourant ? styles.colonneCourante : ''}`}
             >
-              <span className={styles.valeurNiveau}>
-                <Montant>{formaterCourt(m.niveau)}</Montant>
-              </span>
+              {/* Pas de niveau ici : il est déjà sur la courbe, au-dessus de
+                  ce même mois. Voir « LE NIVEAU NE VIT QU'À UN SEUL ENDROIT »
+                  en tête de fichier. */}
               {/* L'entrée colle au sommet de sa barre, la sortie au pied de la
                   sienne : chaque chiffre reste soudé au trait qu'il légende, au
                   lieu de forcer un aller-retour de l'œil entre un nombre et une

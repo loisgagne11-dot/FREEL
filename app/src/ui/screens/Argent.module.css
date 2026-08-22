@@ -433,6 +433,18 @@
   color: var(--muted);
 }
 
+/* L'indication d'en-tête du dessin — « solde 8 120 € », « clic = détail »,
+   « plafonds annuels ». Elle vit dans `actions`, à côté de l'« i » et pas à
+   sa place : l'infobulle explique un chiffre, cette ligne dit ce qu'on peut
+   faire ou ce qu'on regarde, et les deux questions ne se répondent pas de la
+   même phrase. */
+.indication {
+  font-size: 12px;
+  color: var(--muted-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Les registres, sous les piliers ───────────────────────────────────── */
 
 /* Une rangée discrète, et non des onglets : ce sont des obligations qu'on
@@ -514,6 +526,15 @@
    seul endroit de la carte où l'information « ça ne passera pas » existe. */
 .enveloppeManque { color: var(--amber); }
 
+/* La vignette TVA sans appel émis : ni un montant couvert, ni un manque — une
+   abstention. Un chiffre à cet endroit se lirait comme un fait, alors que
+   c'est justement ce que l'application ne sait pas encore dire. */
+.enveloppeAbstention {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--muted);
+}
+
 .enveloppeDu {
   font-size: 11.5px;
   color: var(--muted-2);
@@ -541,6 +562,12 @@
 .cfe { background: var(--c-cfe); }
 .cfp { background: var(--c-urssaf); }
 
+/* Le seuil de sécurité n'est pas une dette : il reprend la teinte de la
+   répartition du solde (`Repartition.module.css`, `Donut.module.css`), où il
+   porte déjà cette couleur — la même notion garde la même teinte d'un endroit
+   à l'autre de l'écran. */
+.reserve { background: var(--slate, var(--muted-2)); }
+
 /* ── Seuils ─────────────────────────────────────────────────────────────── */
 
 /* Côte à côte en paysage, comme le dessin : trois jauges pleine largeur
@@ -554,4 +581,16 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px 24px;
+}
+
+/* Le réalisé, le plafond et — quand elle a une base — la projection : les
+   trois chiffres que la jauge seule ne peut pas porter (voir `Jauge.tsx`,
+   « la barre n'est pas l'information »). En gras : c'est la ligne qu'on lit
+   avant la phrase, pas après. */
+.seuilChiffres {
+  display: block;
+  margin-top: 2px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
