@@ -2,11 +2,15 @@ import { Suspense, lazy, useMemo } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, soldeEstSuivi } from '../../state/selecteurs';
 import { etatProjection, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
-import type { DateISO, Mois } from '../../domain/types';
+import type { DateISO, Euros, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import { autonomieMois } from '../../domain/calculs/tresorerie';
-import { franchissementPrevu, partDeLAnneeEcoulee } from '../../domain/calculs/allure';
-import { enveloppesDeProvision } from '../../domain/calculs/enveloppes';
+import {
+  type Franchissement, franchissementPrevu, partDeLAnneeEcoulee, projectionAnnuelle
+} from '../../domain/calculs/allure';
+import {
+  type EnveloppeProvision, enveloppesDeProvision
+} from '../../domain/calculs/enveloppes';
 import { LIBELLE_NATURE } from '../../domain/calculs/provisions';
 import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.libelles';
 import { CartePliable } from '../components/CartePliable';
@@ -95,6 +99,13 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
               c’est le mécanisme exact du rappel qu’on ne peut plus payer. La
               barre montre d’abord ce qui n’est <em>pas</em> à toi.
             </Info>}
+        /* L'indication d'en-tête du dessin, à côté de l'« i » et non à sa
+           place : l'infobulle explique POURQUOI le solde trompe, cette ligne
+           dit COMBIEN il vaut — la question qu'on se pose en ouvrant la
+           carte, avant même de la déplier. */
+        actions={<span className={styles.indication}>
+              solde <Montant>{eur(etat.tresorerie.solde)}</Montant>
+            </span>}
         resume={(
           <>
             <Montant>{eur(etat.tresorerie.versable)}</Montant> à toi
@@ -129,6 +140,11 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
               l’émission de l’échéance. Une fois la période déclarée, la
               seconde ligne bascule dans la première.
             </Info>}
+        /* La seule indication, sur tout l'écran, qui dit que la carte
+           s'ouvre sur autre chose qu'un résumé plus long. Sans elle, rien ne
+           distingue cette carte pliable d'une autre — c'est la perte que
+           l'audit du redesign chiffrait comme la plus coûteuse des trois. */
+        actions={<span className={styles.indication}>clic = détail</span>}
         resume={(
           <>
             <Montant>{eur(etat.tresorerie.provisions)}</Montant> à garder de côté
@@ -339,57 +355,161 @@ function EvolutionDuCompte() {
  * Ce n'est pas une contradiction : le calcul ne doit pas décaler ses lignes,
  * l'écran ne doit pas afficher quatre vignettes vides sur un compte neuf. La
  * décision est à l'écran parce que c'est une question de place, pas de vérité.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA CFE GARDE SA VIGNETTE, CONTRE LE DESSIN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le dessin ne lui donne qu'une pastille sur la frise de l'échéancier, pas de
+ * vignette de provision. Elle garde la sienne ici : elle vient d'une échéance
+ * réelle comme l'URSSAF ou l'impôt — voir `NATURES_DETTE` — et la lui retirer
+ * ferait disparaître une dette qui, pour un artisan ou un commerçant, peut
+ * dépasser mille euros. Suivre le dessin sur ce point aurait été conforme et
+ * faux : la vignette manquante n'aurait rien annoncé de moins qu'une dette
+ * qu'on continue pourtant à devoir.
  */
 function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
   const echeances = useFaits((e) => e.faits.echeances);
-  const enveloppes = enveloppesDeProvision(
+  const toutes = enveloppesDeProvision(
     etat.tresorerie.solde, etat.provisionsParNature, echeances
-  ).filter((e) => e.du > 0);
+  );
 
-  if (enveloppes.length === 0) {
-    return <p className={styles.vide}>Rien n’est dû pour l’instant.</p>;
-  }
+  /*
+   * LA TVA SORT DU FILTRE COMMUN.
+   *
+   * Pour les quatre autres natures, `du === 0` veut dire « rien n'est dû » et
+   * la vignette se masque — c'est la règle documentée plus haut. Pour la TVA,
+   * `du === 0` veut dire autre chose : aucun appel n'est encore émis, ce qui
+   * n'est PAS la même chose que « rien n'est dû ». La dette existe peut-être
+   * déjà sur des factures ; elle ne se déduit simplement d'aucun taux tant
+   * qu'aucun appel ne l'a matérialisée. La masquer comme les autres ferait
+   * disparaître la question au lieu d'y répondre — voir `VignetteTva`.
+   *
+   * `enveloppesDeProvision` rend TOUJOURS les cinq natures (voir sa
+   * documentation) : la vignette TVA existe forcément dans `toutes`.
+   */
+  const tva = toutes.find((e) => e.nature === 'tva');
+  if (tva === undefined) return null; // structurellement impossible — voir ci-dessus.
+  const dettes = toutes.filter((e) => e.nature !== 'tva' && e.du > 0);
+
+  /*
+   * LE SEUIL DE SÉCURITÉ, EN QUATRIÈME VIGNETTE.
+   *
+   * Ce n'est pas une nature de dette — `enveloppesDeProvision` ne le connaît
+   * pas — mais le dessin en fait la quatrième enveloppe, à côté de l'URSSAF,
+   * de l'impôt et de la TVA. Le fait s'appelle `reserve` dans le schéma et
+   * l'application l'appelle partout ailleurs « seuil de sécurité » (Config
+   * comprise) : la vignette garde ce nom plutôt que « réserve matelas » du
+   * dessin — deux noms pour une même notion coûteraient plus qu'un écart de
+   * libellé. Masquée à zéro, comme les autres natures sans montant : un seuil
+   * qu'on n'a pas réglé n'a rien à montrer, ce n'est pas une TVA en attente
+   * d'appel.
+   */
+  const seuilDu = etat.tresorerie.reserve;
+  const seuilCouvert = euros(Math.min(etat.tresorerie.reserve, Math.max(0, etat.tresorerie.dispo)));
 
   return (
     <ul className={styles.enveloppes}>
-      {enveloppes.map((e) => {
-        const part = e.du <= 0 ? 1 : Math.min(1, e.couvert / e.du);
-        const complet = e.couvert >= e.du;
-        return (
-          <li key={e.nature} className={styles.enveloppe}>
-            <span className={styles.enveloppeTitre}>
-              <span className={`${styles.puce} ${styles[e.nature]}`} aria-hidden="true" />
-              {LIBELLE_NATURE[e.nature]}
-            </span>
-
-            <span className={complet ? styles.enveloppeCouvert : styles.enveloppeManque}>
-              <Montant>{eur(e.couvert)}</Montant>
-            </span>
-            <span className={styles.enveloppeDu}>
-              {'sur '}<Montant>{eur(e.du)}</Montant>
-            </span>
-
-            {/* La jauge est une image ; les deux montants au-dessus sont la
-                donnée. Sous quelques pourcents, un remplissage fait deux
-                pixels sur un téléphone. */}
-            <span className={styles.jaugeEnveloppe} aria-hidden="true">
-              <span
-                className={`${styles.jaugeRemplie} ${styles[e.nature]}`}
-                style={{ width: `${part * 100}%` }}
-              />
-            </span>
-
-            <span className={styles.enveloppeEcheance}>
-              {e.prochaineEcheance === null
-                /* Pas d'échéance : la dette existe, mais rien ne l'a encore
-                   appelée. Le dire évite de lire « rien à payer ». */
-                ? 'pas encore appelée'
-                : `éch. ${dateCourte(e.prochaineEcheance)}`}
-            </span>
-          </li>
-        );
-      })}
+      {dettes.map((e) => <VignetteDette key={e.nature} e={e} />)}
+      <VignetteTva e={tva} />
+      {seuilDu > 0 && <VignetteReserve du={seuilDu} couvert={seuilCouvert} />}
     </ul>
+  );
+}
+
+/** Une nature de dette : ce qui est mis de côté, face à ce qui est dû. */
+function VignetteDette({ e }: { readonly e: EnveloppeProvision }) {
+  const part = e.du <= 0 ? 1 : Math.min(1, e.couvert / e.du);
+  const complet = e.couvert >= e.du;
+  return (
+    <li className={styles.enveloppe}>
+      <span className={styles.enveloppeTitre}>
+        <span className={`${styles.puce} ${styles[e.nature]}`} aria-hidden="true" />
+        {LIBELLE_NATURE[e.nature]}
+      </span>
+
+      <span className={complet ? styles.enveloppeCouvert : styles.enveloppeManque}>
+        <Montant>{eur(e.couvert)}</Montant>
+      </span>
+      <span className={styles.enveloppeDu}>
+        {'sur '}<Montant>{eur(e.du)}</Montant>
+      </span>
+
+      {/* La jauge est une image ; les deux montants au-dessus sont la
+          donnée. Sous quelques pourcents, un remplissage fait deux
+          pixels sur un téléphone. */}
+      <span className={styles.jaugeEnveloppe} aria-hidden="true">
+        <span
+          className={`${styles.jaugeRemplie} ${styles[e.nature]}`}
+          style={{ width: `${part * 100}%` }}
+        />
+      </span>
+
+      <span className={styles.enveloppeEcheance}>
+        {e.prochaineEcheance === null
+          /* Pas d'échéance : la dette existe, mais rien ne l'a encore
+             appelée. Le dire évite de lire « rien à payer ». */
+          ? 'pas encore appelée'
+          : `éch. ${dateCourte(e.prochaineEcheance)}`}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * La vignette TVA — la seule qui ne se masque jamais à zéro.
+ *
+ * Avec un appel émis, elle se lit comme n'importe quelle autre enveloppe.
+ * Sans appel, un montant à zéro mentirait : ce n'est pas que rien n'est dû,
+ * c'est qu'on ne sait pas encore combien. La tuile le DIT plutôt que
+ * d'afficher un chiffre inventé — une tuile qui s'abstient reste conforme à
+ * ce que l'application sait ; une tuile qui invente un montant ne l'est pas.
+ */
+function VignetteTva({ e }: { readonly e: EnveloppeProvision }) {
+  if (e.du > 0) return <VignetteDette e={e} />;
+
+  return (
+    <li className={styles.enveloppe}>
+      <span className={styles.enveloppeTitre}>
+        <span className={`${styles.puce} ${styles.tva}`} aria-hidden="true" />
+        {LIBELLE_NATURE.tva}
+      </span>
+      <span className={styles.enveloppeAbstention}>Pas d’appel émis</span>
+      <span className={styles.enveloppeEcheance}>
+        se relève sur les factures, pas sur un taux
+      </span>
+    </li>
+  );
+}
+
+/**
+ * Le seuil de sécurité, en enveloppe — voir l'explication dans `Enveloppes`.
+ */
+function VignetteReserve({ du, couvert }: { readonly du: Euros; readonly couvert: Euros }) {
+  const part = du <= 0 ? 1 : Math.min(1, couvert / du);
+  const complet = couvert >= du;
+  return (
+    <li className={styles.enveloppe}>
+      <span className={styles.enveloppeTitre}>
+        <span className={`${styles.puce} ${styles.reserve}`} aria-hidden="true" />
+        Seuil de sécurité
+      </span>
+      <span className={complet ? styles.enveloppeCouvert : styles.enveloppeManque}>
+        <Montant>{eur(couvert)}</Montant>
+      </span>
+      <span className={styles.enveloppeDu}>
+        {'sur '}<Montant>{eur(du)}</Montant>
+      </span>
+      <span className={styles.jaugeEnveloppe} aria-hidden="true">
+        <span
+          className={`${styles.jaugeRemplie} ${styles.reserve}`}
+          style={{ width: `${part * 100}%` }}
+        />
+      </span>
+      {/* Pas d'échéance : ce n'est pas une dette qui tombe un jour donné,
+          c'est un matelas qu'on constitue au fil des versements. */}
+      <span className={styles.enveloppeEcheance}>matelas, pas une échéance</span>
+    </li>
   );
 }
 
@@ -426,6 +546,20 @@ function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
  * saisi, la division n'a pas de sens. L'ancienne application affichait dans ce
  * cas une autonomie qui bondissait sans cause — au 1ᵉʳ janvier, les dépenses de
  * l'année tombant à zéro, elle passait de 5,3 à 9,3 mois.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE SOUS-LIBELLÉ NE REPREND PAS CELUI DU DESSIN, ET C'EST VOULU
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La référence écrit « charges + provisions lissées » sous cette tuile : elle
+ * divise le versable par une charge d'entreprise moyennée. Ici, `autonomieMois`
+ * (voir `domain/calculs/tresorerie.ts`) divise par `besoinMensuel`, un fait que
+ * l'utilisateur saisit lui-même en Config sous le libellé « Ce qu'il te faut
+ * pour vivre chaque mois » — le train de vie personnel, pas une charge
+ * professionnelle lissée. Écrire le libellé du dessin décrirait un calcul
+ * qu'on ne fait pas : ce serait conforme et faux, exactement le défaut que ce
+ * projet s'interdit sur un chiffre. Le libellé suit donc ce que la ligne
+ * calcule réellement, pas le dessin.
  */
 function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
   const besoinMensuel = useFaits((e) => e.faits.besoinMensuel);
@@ -654,6 +788,11 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
             dépassement</em>, y compris sur les factures déjà émises sans TVA.
             Les deux se mesurent sur le chiffre d’affaires <em>encaissé</em>.
           </Info>}
+      /* « Plafonds annuels » et non « plafonds » tout court : les deux jauges
+         de dessous ne se remettent PAS à zéro le 1er du mois comme une
+         échéance URSSAF, elles courent sur l'année civile entière. Le dire
+         évite de lire « 42 % » comme un rythme mensuel. */
+      actions={<span className={styles.indication}>plafonds annuels</span>}
       resume={resume}
     >
       <div className={styles.seuils}>
@@ -736,9 +875,52 @@ function NoteDeFranchissement(
   }
 ) {
   const f = franchissementPrevu(euros(encaisse), euros(seuil), aujourdhui);
+  const projection = projectionAnnuelle(euros(encaisse), aujourdhui);
 
-  // Un seuil déjà franchi n'a plus de date à prévoir, et la jauge le dit déjà
-  // en clair au-dessus. Le répéter n'ajouterait rien.
+  return (
+    <>
+      {/*
+       * RÉALISÉ, PLAFOND ET PROJECTION — LES TROIS CHIFFRES DU DESSIN.
+       *
+       * La phrase juste en dessous disait « il reste X € avant le seuil de
+       * Y € » : c'est un ÉCART, pas le réalisé. Pour connaître le réalisé,
+       * il fallait le soustraire de tête — exactement ce qu'une jauge existe
+       * pour éviter. La paire « réalisé / plafond » est donc écrite en clair,
+       * comme sous chaque barre du dessin ; la projection et le mois de
+       * dépassement suivent quand ils ont une base pour être calculés.
+       */}
+      <span className={styles.seuilChiffres}>
+        <Montant>{eur(euros(Math.round(encaisse)))}</Montant>
+        {' / '}
+        <Montant>{eur(euros(Math.round(seuil)))}</Montant>
+        {f.statut === 'prevu' && (
+          <>{' · dépass. '}<strong>{moisLong(f.mois)}</strong></>
+        )}
+        {/* La projection annuelle n'a de sens QUE si le seuil ne tombe pas
+            cette année : sur un seuil déjà franchi ou sur le point de l'être,
+            « ce que donnerait le rythme sur l'année entière » n'apprend plus
+            rien que le mois de dépassement n'ait déjà dit. */}
+        {f.statut === 'hors_annee' && projection !== null && (
+          <>{' · proj. '}<Montant>{eur(projection)}</Montant></>
+        )}
+      </span>
+
+      <PhraseDeFranchissement statut={f} />
+    </>
+  );
+}
+
+/**
+ * L'hypothèse en toutes lettres, ou l'abstention quand elle n'a pas de base.
+ *
+ * Séparée du chiffre ci-dessus parce que ce n'est pas la même promesse : le
+ * chiffre CONSTATE un réalisé, la phrase EXTRAPOLE un rythme. Un seuil déjà
+ * franchi n'a plus de date à prévoir — la jauge le dit déjà en clair au-dessus
+ * — et une base trop mince ne doit pas se déguiser en date : elle dit pourquoi
+ * elle se tait plutôt que d'afficher un mois qui sauterait d'une semaine à
+ * l'autre.
+ */
+function PhraseDeFranchissement({ statut: f }: { readonly statut: Franchissement }) {
   if (f.statut === 'depasse') return null;
 
   if (f.statut === 'indeterminable') {

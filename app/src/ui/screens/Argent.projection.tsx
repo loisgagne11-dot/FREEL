@@ -2,8 +2,6 @@ import { useMemo } from 'react';
 import { useFaits } from '../../state/store';
 import { etatProjection } from '../../state/selecteurs.argent';
 import type { Mois } from '../../domain/types';
-import { GrapheBarres, type SerieBarres } from '../components/GrapheBarres';
-import { Info } from '../components/Info';
 import { Montant } from '../components/Montant';
 import { eur } from '../format';
 import styles from './Argent.module.css';
@@ -47,13 +45,6 @@ import styles from './Argent.module.css';
  * comme si elle revenait en arrière. Le reste de l'écran — et la référence —
  * abrège sur trois lettres, où chaque mois est reconnaissable seul.
  */
-const MOIS_COURTS = [
-  'JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEP', 'OCT', 'NOV', 'DÉC'
-];
-
-/** L'abrégé du mois, pour l'axe. */
-const moisCourt = (m: Mois): string => MOIS_COURTS[Number(m.slice(5, 7)) - 1] ?? m;
-
 /** « 2026-09 » → « septembre 2026 ». */
 function moisLong(m: Mois): string {
   return new Date(`${m}-01T00:00:00Z`).toLocaleDateString('fr-FR', {
@@ -61,46 +52,12 @@ function moisLong(m: Mois): string {
   });
 }
 
-/** En k€ : un montant complet au-dessus d'une barre se chevaucherait. */
-function enKiloEuros(valeur: number): string {
-  if (valeur === 0) return '0';
-  const k = valeur / 1000;
-  const arrondi = Math.abs(k) >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
-  return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(arrondi)} k€`;
-}
-
 export function ProjectionPanneau() {
   const faits = useFaits((e) => e.faits);
   const etat = useMemo(() => etatProjection(faits), [faits]);
-  const { projection, depensesMensuelles, tauxDeCharges, versementsPasses } = etat;
+  const { projection, depensesMensuelles, tauxDeCharges } = etat;
 
-  /*
-   * UNE LÉGENDE SANS BARRE SE LIT COMME UNE DONNÉE MANQUANTE.
-   *
-   * La série « Soutenable » vaut `versementMensuel` répété sur douze mois.
-   * Quand ce montant est nul — le cas dès que le disponible ne dépasse pas la
-   * réserve — elle ne trace aucune barre, et la légende continuait pourtant à
-   * l'annoncer. On cherche alors la barre absente au lieu de lire le zéro.
-   *
-   * Le zéro n'est pas faux, il est simplement invisible : il se dit en toutes
-   * lettres sous le graphe, et la série disparaît de la légende.
-   */
   const dernier = projection.mois[projection.mois.length - 1];
-  const soutenableTracable = projection.versementMensuel > 0;
-  const versements: readonly SerieBarres[] = [
-    {
-      id: 'verse',
-      libelle: 'Versé',
-      valeurs: versementsPasses.map((v) => v.montant),
-      token: 'green'
-    },
-    ...(soutenableTracable ? [{
-      id: 'soutenable',
-      libelle: 'Soutenable',
-      valeurs: versementsPasses.map(() => projection.versementMensuel),
-      token: 'sable'
-    }] : [])
-  ];
 
   return (
     <div className={styles.dossier}>
@@ -170,36 +127,31 @@ export function ProjectionPanneau() {
         </p>
       )}
 
-      <section className={styles.carte} aria-labelledby="titre-versements">
-        <h3 id="titre-versements" className={styles.titreCarte}>
-          Ce que tu t’es versé
-          <Info libelle="D’où viennent ces montants">
-            Du <strong>relevé bancaire</strong>&nbsp;: ce sont les mouvements
-            que tu as marqués comme rémunération. Rien n’est saisi deux
-            fois — en micro, un virement du compte professionnel vers le
-            compte personnel ne crée ni charge ni recette, il change seulement
-            de poche. La barre de référence est le versement soutenable
-            calculé <em>aujourd’hui</em>&nbsp;: elle répond à « est-ce que je
-            me verse plus ou moins que ce que je peux&nbsp;? », pas à « qu’aurais-je
-            pu me verser en mars ».
-          </Info>
-        </h3>
-        <GrapheBarres
-          titre={soutenableTracable
-            ? 'Versements des douze derniers mois, face au soutenable'
-            : 'Versements des douze derniers mois'}
-          categories={versementsPasses.map((v) => moisCourt(v.mois))}
-          series={versements}
-          formater={enKiloEuros}
-        />
-        {!soutenableTracable && (
-          <p className={styles.aide}>
-            Aucune référence tracée&nbsp;: le versement soutenable est de{' '}
-            <Montant>{eur(projection.versementMensuel)}</Montant> aujourd’hui —
-            c’est un zéro constaté, pas une donnée manquante.
-          </p>
-        )}
-      </section>
+      {/*
+        * LE GRAPHE DES VERSEMENTS PASSÉS A ÉTÉ RETIRÉ D'ICI.
+        *
+        * Il confrontait les douze derniers versements au soutenable calculé
+        * AUJOURD'HUI — et son infobulle l'admettait : « elle répond à “est-ce
+        * que je me verse plus ou moins que ce que je peux ?”, pas à “qu'aurais-je
+        * pu me verser en mars” ». Le dénominateur était le mauvais, et le dire
+        * ne le rendait pas juste.
+        *
+        * « Capacité de versement par mois », sur le pilier Performance, répond
+        * à la même question avec la capacité de CHAQUE mois — encaissé du mois,
+        * charges au taux de ce mois-là, dépenses de ce mois-là — et le versé
+        * dessiné À L'INTÉRIEUR de la barre. C'est aussi la forme que le handoff
+        * dessine, et il n'en dessine qu'une.
+        *
+        * Deux réponses à une même question sur un même écran finissent par ne
+        * pas tomber d'accord ; ici l'une était déjà connue pour être la moins
+        * bonne. C'est le troisième retrait de ce type sur cet écran — après le
+        * donut de destination et la carte « Disponible sur douze mois » — et
+        * toujours pour le même motif.
+        *
+        * Ce qui n'était QUE dans cette carte est conservé : la phrase du
+        * versement soutenable, les trois hypothèses, et la ligne « dans un an »
+        * qui porte le versé CUMULÉ — un chiffre qu'aucun graphe ne donne.
+        */}
     </div>
   );
 }

@@ -107,13 +107,27 @@ describe('les quatre tuiles de trésorerie', () => {
    B3 — la répartition du solde
    ───────────────────────────────────────────────────────────────────────── */
 
+/**
+ * La carte de répartition, prise par son titre.
+ *
+ * « Seuil de sécurité » est un nom PARTAGÉ : il nomme la part de l'anneau ici,
+ * et depuis le lot F-A il nomme aussi la quatrième vignette de la carte
+ * « Enveloppes de provision », juste en dessous — voir `Argent.provisions.test.tsx`.
+ * Un `getByText` sans portée trouverait les deux et échouerait pour la
+ * mauvaise raison ; il faut se limiter à CETTE carte.
+ */
+function carteRepartition(): HTMLElement {
+  return screen.getByText('Ton solde n’est pas tout à toi').closest('section') as HTMLElement;
+}
+
 describe('la répartition du solde', () => {
   it('nomme les trois parts du dessin', () => {
     poser({ soldeInitial: euros(10_000), reserve: euros(3_000) });
 
-    expect(screen.getByText('Provisions dues')).toBeTruthy();
-    expect(screen.getByText('Seuil de sécurité')).toBeTruthy();
-    expect(screen.getByText('À te verser')).toBeTruthy();
+    const dans = within(carteRepartition());
+    expect(dans.getByText('Provisions dues')).toBeTruthy();
+    expect(dans.getByText('Seuil de sécurité')).toBeTruthy();
+    expect(dans.getByText('À te verser')).toBeTruthy();
   });
 
   /**
@@ -129,7 +143,7 @@ describe('la répartition du solde', () => {
       soldeInitial: euros(5_000), reserve: euros(3_000), echeances: [echeance(4_000)]
     });
 
-    const ligne = screen.getByText('Seuil de sécurité').parentElement;
+    const ligne = within(carteRepartition()).getByText('Seuil de sécurité').parentElement;
     expect(ligne?.textContent).toContain(eur(1_000));
     expect(ligne?.textContent).not.toContain(eur(3_000));
   });
@@ -324,5 +338,47 @@ describe('l’ordre des cartes', () => {
   it('renvoie aux enveloppes par un mot qui suppose qu’elles suivent', () => {
     poser({ soldeInitial: euros(10_000), echeances: [echeance(2_000)] });
     expect(phraseDeRepartition().textContent).toMatch(/enveloppes ci-dessous/);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Les trois indications d'en-tête du dessin
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * « solde 8 120 € », « clic = détail », « plafonds annuels » — trois
+ * indications que l'écran ne portait plus qu'à travers une pastille « i »
+ * identique sur les trois cartes.
+ *
+ * La plus coûteuse est « clic = détail » : c'est la seule indication que la
+ * carte « Enveloppes de provision » a un contenu de plus que son résumé plié.
+ * `CartePliable` le fait déjà (voir son en-tête) — l'indication ne fait que
+ * le dire, elle n'invente pas un geste que l'écran ne sait pas faire.
+ */
+describe('les indications d’en-tête du dessin', () => {
+  it('affiche le solde à côté du titre de la répartition, avant même de déplier', () => {
+    poser({ soldeInitial: euros(8_120) });
+
+    const carte = screen.getByText('Ton solde n’est pas tout à toi').closest('section');
+    // Le titre contient déjà le mot « solde » : c'est l'indication qui
+    // COMMENCE par lui qu'on cherche, pas n'importe quelle occurrence.
+    const indication = within(carte as HTMLElement).getByText(
+      (_, el) => el?.tagName === 'SPAN' && /^solde/.test(el.textContent ?? '')
+    );
+    expect(indication.textContent).toContain(eur(8_120));
+  });
+
+  it('annonce que la carte des enveloppes s’ouvre sur un détail', () => {
+    poser({ soldeInitial: euros(10_000) });
+
+    const carte = screen.getByText('Enveloppes de provision').closest('section');
+    expect(within(carte as HTMLElement).getByText('clic = détail')).toBeTruthy();
+  });
+
+  it('dit que les jauges de seuil se lisent à l’année, pas au mois', () => {
+    poser({ soldeInitial: euros(10_000) });
+
+    const carte = screen.getByText(/^Seuils/).closest('section');
+    expect(within(carte as HTMLElement).getByText('plafonds annuels')).toBeTruthy();
   });
 });

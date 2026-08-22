@@ -78,13 +78,30 @@ describe('lisibilité des entrées et des sorties', () => {
     expect(barres?.hasAttribute('role')).toBe(false);
   });
 
-  // Le niveau restait déjà visible avant ce lot : la correction ajoute sans
-  // retirer.
-  it('garde le niveau visible au-dessus de la colonne', () => {
-    rendre();
-    // `getAllByText` : le span de `<Montant>` porte le même texte que son
-    // parent, faute de préfixe de signe sur un niveau — à la différence de
-    // l'entrée et de la sortie, ce n'est pas un flux.
-    expect(screen.getAllByText(parExactTexte('8,9k')).length).toBeGreaterThan(0);
+  it('affiche le niveau au-dessus de son point sur la courbe', () => {
+    const { container } = rendre();
+    const etiquette = [...container.querySelectorAll('span')]
+      .find((el) => el.className.includes('etiquetteNiveau') && el.textContent === '8,9k');
+    expect(etiquette).toBeTruthy();
+    expect(etiquette?.querySelector('[data-montant]')).toBeTruthy();
+  });
+
+  /**
+   * LA RÈGLE QUE CE LOT IMPOSE : UN MÊME NOMBRE, UN SEUL ENDROIT.
+   *
+   * Le niveau vivait sous la colonne ; il vit maintenant sur la courbe. Sans
+   * ce test, rien n'empêche de le remettre aux deux endroits à la prochaine
+   * modification — exactement le défaut que le projet a déjà corrigé deux
+   * fois ailleurs (occupation en double, « Reste à rentrer » à deux sources).
+   */
+  it('n’écrit plus le niveau dans la colonne, seulement sur la courbe', () => {
+    const { container } = rendre();
+    const colonnes = container.querySelector('[class*="colonnes"]');
+    expect(colonnes).toBeTruthy();
+    // Aucun texte de colonne ne doit valoir exactement « 8,9k » : ce serait le
+    // niveau, redit une seconde fois là où seuls l'entrée, la sortie et le net
+    // doivent figurer.
+    expect([...colonnes!.querySelectorAll('span')].some((el) => el.textContent === '8,9k'))
+      .toBe(false);
   });
 });

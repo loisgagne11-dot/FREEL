@@ -18,6 +18,18 @@ import styles from './Onglets.module.css';
 export interface Onglet<T extends string> {
   readonly id: T;
   readonly libelle: string;
+  /**
+   * Combien l'onglet contient, affiché en pastille à côté de son nom.
+   *
+   * `undefined` — et non zéro — quand le compte n'a pas de sens : « Plan de
+   * charge » ne se compte pas. Zéro EST une réponse et s'affiche, parce que
+   * « Clients 0 » dit qu'il n'y en a pas encore, là qu'une pastille absente
+   * laisserait croire qu'on ne sait pas.
+   *
+   * Le compte entre aussi dans le nom accessible de l'onglet : une pastille
+   * qui n'existe qu'en pixels ne dit rien à qui écoute la page.
+   */
+  readonly compte?: number;
 }
 
 export interface ProprietesOnglets<T extends string> {
@@ -89,6 +101,19 @@ export function Onglets<T extends string>(
             onKeyDown={(e) => auClavier(e, index)}
           >
             {onglet.libelle}
+            {/* La pastille n'est PAS `aria-hidden` : son nombre rejoint
+                naturellement le nom accessible de l'onglet — « Missions 5 ». Le
+                masquer aurait obligé à le redire hors écran, donc à maintenir
+                deux fois la même valeur, et un lecteur d'écran aurait fini par
+                entendre « Missions 5, 5 » le jour où l'une des deux aurait été
+                oubliée. */}
+            {/* L'espace est EXPLICITE : deux `<span>` adjacents se concatènent
+                sans séparateur dans le nom accessible, et l'onglet s'annonçait
+                « Missions5 ». La marge CSS ne produit aucun espace de texte —
+                elle ne se voit qu'à l'œil. */}
+            {onglet.compte !== undefined && (
+              <>{' '}<span className={styles.compte}>{onglet.compte}</span></>
+            )}
           </button>
         );
       })}

@@ -237,7 +237,7 @@ describe('missions', () => {
     });
     render(<Activite />);
     const utilisateur = userEvent.setup();
-    await utilisateur.click(screen.getByRole('tab', { name: 'Missions' }));
+    await utilisateur.click(screen.getByRole('tab', { name: /^Missions/ }));
     await screen.findByRole('heading', { name: /^Missions/ });
 
     const liste = screen.getByRole('list');
@@ -253,7 +253,7 @@ describe('missions', () => {
     semer({ missions: [mission({ tjm: euros(0) })] });
     render(<Activite />);
     const utilisateur = userEvent.setup();
-    await utilisateur.click(screen.getByRole('tab', { name: 'Missions' }));
+    await utilisateur.click(screen.getByRole('tab', { name: /^Missions/ }));
     expect(screen.getByText('TJM non renseigné')).toBeTruthy();
   });
 });
@@ -269,7 +269,7 @@ describe('délais de paiement', () => {
     });
     render(<Activite />);
     const utilisateur = userEvent.setup();
-    await utilisateur.click(screen.getByRole('tab', { name: 'Clients' }));
+    await utilisateur.click(screen.getByRole('tab', { name: /^Clients/ }));
     // L'onglet est chargé à la demande : attendre son arrivée.
     await screen.findByRole('heading', { name: /Carnet/ });
 
@@ -283,7 +283,7 @@ describe('délais de paiement', () => {
     semer({ recettes: [recette({ encaisseeLe: null })] });
     render(<Activite />);
     const utilisateur = userEvent.setup();
-    await utilisateur.click(screen.getByRole('tab', { name: 'Clients' }));
+    await utilisateur.click(screen.getByRole('tab', { name: /^Clients/ }));
     await screen.findByRole('heading', { name: /Carnet/ });
 
     expect(screen.getByText('Délai non mesurable')).toBeTruthy();
@@ -460,7 +460,7 @@ describe('compte rendu d’activité', () => {
     render(<Activite />);
     // Juillet 2026 : lundis à jeudis pleins, vendredis à mi-temps, moins le
     // 14 juillet férié. Le décompte se lit sur la carte, sans rien saisir.
-    const carte = screen.getByRole('region', { name: /Compte rendu d’activité/ });
+    const carte = screen.getByRole('region', { name: /Compte-rendu d’activité/ });
     expect(carte.textContent).toMatch(/jours? travaillés?/);
     expect(carte.textContent).toMatch(/19,5/u);
   });

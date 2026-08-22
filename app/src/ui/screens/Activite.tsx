@@ -98,10 +98,20 @@ function EnAttenteDeFormulaire() {
 
 type Section = 'charge' | 'missions' | 'clients';
 
-const SECTIONS = [
+/**
+ * Les onglets, et ce que chacun contient.
+ *
+ * Le compte est calculé À L'AFFICHAGE (`sections()` ci-dessous) : le mettre ici
+ * en dur donnerait un nombre figé, et le mettre dans l'état en ferait une
+ * valeur dérivée persistée — ce que l'invariant n°1 interdit.
+ *
+ * « Plan de charge » n'a pas de compte : ce n'est pas une liste. Une pastille
+ * y afficherait un nombre dont on chercherait ce qu'il dénombre.
+ */
+const sections = (nbMissions: number, nbClients: number) => [
   { id: 'charge' as Section, libelle: 'Plan de charge' },
-  { id: 'missions' as Section, libelle: 'Missions' },
-  { id: 'clients' as Section, libelle: 'Clients' }
+  { id: 'missions' as Section, libelle: 'Missions', compte: nbMissions },
+  { id: 'clients' as Section, libelle: 'Clients', compte: nbClients }
 ];
 
 /** Lundi en tête : la semaine française commence le lundi, pas le dimanche. */
@@ -182,9 +192,8 @@ export function Activite() {
     setMois(nouvelle.slice(0, 7) as Mois);
   }
 
-  const enSemaine = vue === 'semaine' && section === 'charge';
-  const reculer = () => (enSemaine ? decalerSemaine(-1) : setMois(decalerMois(mois, -1)));
-  const avancer = () => (enSemaine ? decalerSemaine(1) : setMois(decalerMois(mois, 1)));
+  const reculer = () => (vue === 'semaine' ? decalerSemaine(-1) : setMois(decalerMois(mois, -1)));
+  const avancer = () => (vue === 'semaine' ? decalerSemaine(1) : setMois(decalerMois(mois, 1)));
 
   /**
    * Bascule LE CRÉNEAU cliqué.
@@ -276,38 +285,6 @@ export function Activite() {
                 Ajouter un client
               </button>
             )}
-            <div className={styles.navigationMois}>
-              <button
-                type="button"
-                className={styles.pas}
-                onClick={() => reculer()}
-                aria-label={vue === 'semaine' && section === 'charge'
-                  ? 'Semaine précédente' : 'Mois précédent'}
-              >
-                <span aria-hidden="true">‹</span>
-              </button>
-              {/* Le mois affiché est annoncé aux lecteurs d'écran à chaque
-                  changement : sans cela, les flèches déplacent une vue dont on
-                  n'entend jamais l'état. */}
-              <span
-                className={styles.moisCourant}
-                role="status"
-                aria-label="Période affichée"
-              >
-                {vue === 'semaine' && section === 'charge'
-                  ? `Sem. du ${dateCourte(semaine.lundi)}`
-                  : moisLong(mois)}
-              </span>
-              <button
-                type="button"
-                className={styles.pas}
-                onClick={() => avancer()}
-                aria-label={vue === 'semaine' && section === 'charge'
-                  ? 'Semaine suivante' : 'Mois suivant'}
-              >
-                <span aria-hidden="true">›</span>
-              </button>
-            </div>
           </>
         )}
       />
@@ -315,7 +292,7 @@ export function Activite() {
       <div className={styles.sections}>
         <Onglets
           idGroupe={idGroupe}
-          onglets={SECTIONS}
+          onglets={sections(etat.missions.length, faits.clients.length)}
           actif={section}
           onChange={setSection}
           libelle="Sections de l’écran Activité"
@@ -412,6 +389,48 @@ export function Activite() {
                       la correction au lieu d’en poser une.
                     </Info>
                   </h2>
+
+                  {/*
+                    * LA NAVIGATION DE PÉRIODE EST DANS L'EN-TÊTE DE LA CARTE.
+                    *
+                    * Elle vivait dans l'en-tête de la PAGE, où elle s'affichait
+                    * sur les trois onglets — alors que ni Missions ni Clients ne
+                    * dépend du mois affiché : `lignesDeMission` et
+                    * `delaisParClient` ne le reçoivent même pas. Des flèches qui
+                    * ne changent rien à ce qu'on regarde apprennent à ne plus
+                    * s'en servir.
+                    *
+                    * Elle est donc rendue avec la grille qu'elle déplace, comme
+                    * le dessin, et disparaît des onglets qu'elle ne concerne pas.
+                    */}
+                  <div className={styles.navigationMois}>
+                    <button
+                      type="button"
+                      className={styles.pas}
+                      onClick={() => reculer()}
+                      aria-label={vue === 'semaine' ? 'Semaine précédente' : 'Mois précédent'}
+                    >
+                      <span aria-hidden="true">‹</span>
+                    </button>
+                    {/* La période est annoncée aux lecteurs d'écran à chaque
+                        changement : sans cela, les flèches déplacent une vue
+                        dont on n'entend jamais l'état. */}
+                    <span
+                      className={styles.moisCourant}
+                      role="status"
+                      aria-label="Période affichée"
+                    >
+                      {vue === 'semaine' ? `Sem. du ${dateCourte(semaine.lundi)}` : moisLong(mois)}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.pas}
+                      onClick={() => avancer()}
+                      aria-label={vue === 'semaine' ? 'Semaine suivante' : 'Mois suivant'}
+                    >
+                      <span aria-hidden="true">›</span>
+                    </button>
+                  </div>
 
                   {/* Semaine ou mois : la spec prévoit les deux. Le mois donne la
                       vue d'ensemble, la semaine est la maille où l'on corrige —

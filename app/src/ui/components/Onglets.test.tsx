@@ -149,3 +149,60 @@ describe('navigation aux flèches', () => {
     expect(screen.getByRole('tab', { name: 'Trésorerie' }).getAttribute('aria-selected')).toBe('true');
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Le compte de chaque onglet
+   ───────────────────────────────────────────────────────────────────────── */
+
+describe('compte affiché sur un onglet', () => {
+  const avecComptes = [
+    { id: 'charge' as const, libelle: 'Plan de charge' },
+    { id: 'missions' as const, libelle: 'Missions', compte: 5 },
+    { id: 'clients' as const, libelle: 'Clients', compte: 0 }
+  ];
+
+  const rendre = () => render(
+    <Onglets
+      idGroupe="t"
+      onglets={avecComptes}
+      actif="charge"
+      onChange={() => { /* testé ailleurs */ }}
+      libelle="Sections"
+    />
+  );
+
+  /**
+   * LE COMPTE ENTRE DANS LE NOM ACCESSIBLE, ET C'EST VOULU.
+   *
+   * La pastille n'est pas `aria-hidden` : son nombre rejoint naturellement le
+   * nom de l'onglet. La masquer aurait obligé à le redire hors écran, donc à
+   * maintenir deux fois la même valeur — et un lecteur d'écran aurait fini par
+   * entendre « Missions 5, 5 » le jour où l'une des deux aurait été oubliée.
+   */
+  it('joint le compte au nom de l’onglet', () => {
+    rendre();
+    expect(screen.getByRole('tab', { name: 'Missions 5' })).toBeTruthy();
+  });
+
+  /**
+   * ZÉRO EST UNE RÉPONSE, ET IL S'AFFICHE.
+   *
+   * « Clients 0 » dit qu'il n'y en a pas encore. Une pastille absente laisserait
+   * croire que le compte n'est pas su — deux situations que rien ne
+   * distinguerait ensuite.
+   */
+  it('affiche zéro plutôt que de taire le compte', () => {
+    rendre();
+    expect(screen.getByRole('tab', { name: 'Clients 0' })).toBeTruthy();
+  });
+
+  /**
+   * Un onglet qui n'est pas une liste n'a pas de compte. Une pastille sur
+   * « Plan de charge » afficherait un nombre dont on chercherait ce qu'il
+   * dénombre.
+   */
+  it('ne pose aucune pastille sur un onglet qui ne se compte pas', () => {
+    rendre();
+    expect(screen.getByRole('tab', { name: 'Plan de charge' })).toBeTruthy();
+  });
+});

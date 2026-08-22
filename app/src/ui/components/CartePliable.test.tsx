@@ -213,3 +213,27 @@ describe('l’explication vit hors du bouton de pliage', () => {
     expect(screen.getByRole('button', { name: /Un titre/ })).toBeTruthy();
   });
 });
+
+/**
+ * LE CHEVRON EST AU BORD DROIT DE LA CARTE, PAS À GAUCHE DU TITRE.
+ *
+ * Écart systématique relevé sur les six cartes de l'écran Argent face à la
+ * référence. Sans ce test, rien n'empêche de le remettre en tête du bouton à
+ * la prochaine retouche — retour silencieux au défaut que ce lot corrige.
+ */
+describe('le chevron est posé au bord droit du bouton', () => {
+  it('place le titre avant le chevron dans le bouton de pliage', () => {
+    render(
+      <CartePliable id="t" ecran="test" titre="Un titre" resume="résumé">
+        <p>contenu</p>
+      </CartePliable>
+    );
+
+    const bascule = screen.getByRole('button', { name: /Un titre/ });
+    const enfants = [...bascule.children];
+    const indexTitre = enfants.findIndex((e) => e.textContent === 'Un titre');
+    const indexChevron = enfants.findIndex((e) => e.tagName.toLowerCase() === 'svg');
+    expect(indexTitre).toBeGreaterThanOrEqual(0);
+    expect(indexChevron).toBeGreaterThan(indexTitre);
+  });
+});

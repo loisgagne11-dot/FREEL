@@ -44,7 +44,7 @@ export function CraCard(
     <section className={styles.carte} aria-labelledby="titre-cra">
       <header className={styles.entete}>
         <h2 id="titre-cra" className={styles.titreCarte}>
-          Compte rendu d’activité
+          Compte-rendu d’activité
           <Info libelle="D’où vient ce document">
             Il n’est pas saisi&nbsp;: il découle du rythme de la mission et des
             ajustements posés au planning. Corriger une journée là-bas le met à

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { dateISO, euros } from '../../domain/types';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
@@ -135,15 +135,40 @@ describe('projection du disponible', () => {
     expect(screen.getByText(/Rien pour l’instant/)).toBeTruthy();
   });
 
-  /** Les versements passés viennent du relevé, jamais d'une saisie. */
-  it('confronte ce qui a été versé au soutenable', () => {
+  /**
+   * LE GRAPHE DES VERSEMENTS PASSÉS N'EST PLUS ICI, ET NE DOIT PAS Y REVENIR.
+   *
+   * Il confrontait les douze derniers versements au soutenable calculé
+   * AUJOURD'HUI, et son infobulle l'admettait : le dénominateur n'était pas
+   * celui de chaque mois. « Capacité de versement par mois », sur le pilier
+   * Performance, répond à la même question avec la capacité de CHAQUE mois et
+   * le versé dessiné à l'intérieur de la barre — la forme que le handoff
+   * dessine, et il n'en dessine qu'une.
+   *
+   * Ce test remplace celui qui vérifiait la présence des deux séries. Il tient
+   * ce que l'ancien tenait VRAIMENT — que la confrontation versé / soutenable
+   * existe quelque part — en vérifiant qu'elle n'est plus DEUX fois : sans lui,
+   * la carte peut revenir sans que rien ne le signale, et l'écran redirait deux
+   * choses différentes de la même question.
+   */
+  it('ne redit pas ici la confrontation que Performance porte mieux', () => {
     semer({ soldeInitial: euros(24_000) });
     render(<ProjectionPanneau />);
 
-    const carte = screen.getByText(/Ce que tu t’es versé/).closest('section');
-    const dans = within(carte as HTMLElement);
-    expect(dans.getAllByText('Versé').length).toBeGreaterThan(0);
-    expect(dans.getAllByText('Soutenable').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Ce que tu t’es versé/)).toBeNull();
+    expect(screen.queryByText('Soutenable')).toBeNull();
+  });
+
+  /**
+   * Ce que le retrait ne devait PAS emporter : le versé cumulé sur douze mois
+   * ne se lit nulle part ailleurs — ni sur le graphe combiné, ni sur la carte
+   * de capacité, qui donnent des montants mensuels.
+   */
+  it('garde le versé cumulé, que nul autre écran ne donne', () => {
+    semer({ soldeInitial: euros(24_000) });
+    render(<ProjectionPanneau />);
+
+    expect(screen.getByText(/Dans un an/).textContent).toMatch(/au total/);
   });
 
   /** Chaque montant reste masquable : une projection dit tout du chiffre d'affaires. */

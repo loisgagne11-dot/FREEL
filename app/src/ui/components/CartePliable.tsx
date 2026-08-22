@@ -95,6 +95,12 @@ export function CartePliable(
           * invisible au clavier —, les commandes vivent hors du bouton. Une
           * zone cliquable qui contient d'autres zones cliquables est un piège
           * pour la souris comme pour les lecteurs d'écran.
+          *
+          * Le chevron est APRÈS le titre, pas avant : la référence le pose au
+          * bord droit de la carte, et le titre garde `flex: 1` pour pousser le
+          * chevron jusque-là. Il reste DANS ce même bouton — un chevron sorti
+          * dans un élément à part aurait doublé la commande de pliage pour une
+          * seule action, un piège au clavier comme au lecteur d'écran.
           */}
         <button
           type="button"
@@ -103,11 +109,11 @@ export function CartePliable(
           aria-controls={idContenu}
           onClick={basculer}
         >
+          <span className={styles.titre}>{titre}</span>
           <svg className={styles.chevron} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M8 5 L16 12 L8 19" fill="none" stroke="currentColor" strokeWidth="1.8"
               strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span className={styles.titre}>{titre}</span>
         </button>
 
         {aide !== undefined && <span className={styles.aide}>{aide}</span>}
