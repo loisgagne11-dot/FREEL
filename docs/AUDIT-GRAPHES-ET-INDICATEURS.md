@@ -348,9 +348,6 @@ ne peut pas le représenter. Le niveau de détail manquant (§4.1) est comblé.
 
 1. **Comparaison N−1** en filigrane du graphe existant — utile la troisième
    année, pas la première
-2. **Sélecteur de période** — l'année est verrouillée sur l'horloge ; au
-   1ᵉʳ janvier le pilier Performance devient vide et l'année précédente est
-   inatteignable
 
 Livrés : la composition d'un mois au clic (§4.6, V2), l'objectif de CA et son
 écart en jours (V17), la capacité de versement enfin affichée (V9), la
@@ -361,6 +358,17 @@ de santé (§5.1), l'assiette nommée de l'autonomie.
 
 **Livrés au lot B** : le donut de répartition du solde (V3), la frise de
 l'échéancier (V6), le graphe combiné entrées / sorties / disponible (V7).
+
+**Livré au lot J2** : le **sélecteur de période** — l'année n'est plus
+verrouillée sur l'horloge. `etatArgent` reçoit désormais l'année comme un
+paramètre distinct de `maintenant` (`app/src/state/selecteurs.argent.ts`),
+choisie par une bascule dans la barre du haut (`SelecteurAnnee`,
+`SelecteurPeriodeArgent`), bornée aux années où le dossier a un fait
+(`anneesDisponibles`) — jamais à un intervalle inventé. Le 1ᵉʳ janvier ne vide
+plus le pilier Performance : l'année précédente reste à un clic. Le solde du
+compte, lui, n'en dépend PAS — c'est un état instantané, pas une période — et
+un test nommé (`selecteurs.test.ts`, « ne change pas le solde du compte quand
+on change l'année regardée ») tient explicitement cette frontière.
 
 **Livrés au lot C** : le plan de charge à deux créneaux par jour (V20), la vue
 semaine (V21), la vue mois (V22), la répartition du temps par client (V23),

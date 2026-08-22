@@ -37,7 +37,7 @@ import {
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 15 as const;
+export const VERSION_SCHEMA = 16 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -318,6 +318,25 @@ export interface Recette {
    * `null` sur une facture sans date d'émission : rien n'est encore dû.
    */
   readonly echeanceLe?: DateISO | null;
+  /**
+   * Identifiant du justificatif conservé pour cette recette, ou `null` s'il
+   * manque. `undefined` sur une recette d'avant le schéma 16 — voir
+   * `recettesDuSchema15` plus bas, qui le comble à `null`.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * UNE FACTURE ÉMISE ICI N'EN A PAS BESOIN — UNE FACTURE VENUE D'AILLEURS, SI
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Une facture établie PAR l'application se reconstruit entièrement depuis
+   * les faits — mission, client, montant, numéro — et n'a besoin d'aucun
+   * fichier pour exister. Ce champ sert aux factures établies AILLEURS (devis
+   * réglé de la main à la main, export d'un autre outil) et à celles reprises
+   * de l'ancienne version, qui n'existaient dans son registre que par un
+   * booléen `piece: true` sans aucune valeur probante. Comme
+   * `Depense.justificatifId` : un identifiant de fichier réellement conservé,
+   * jamais un booléen qui ne permettrait pas de retrouver la pièce.
+   */
+  readonly justificatifId?: string | null;
 }
 
 /**
@@ -943,6 +962,11 @@ function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
  * exactement le cas que ce champ existe pour distinguer : un compte migré
  * reste dans l'état d'ABSTENTION (`ProvenanceSolde['sansDate']`) jusqu'à ce
  * que quelqu'un date son solde depuis Config.
+ *
+ * v15 → v16 : `Recette.justificatifId`. Champ apparu dans un élément de
+ * liste comme les cinq migrations imbriquées ci-dessus, et lu par égalité
+ * STRICTE à `null` — la fusion de surface ne suffit donc pas. Voir
+ * `recettesDuSchema15`.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
@@ -969,7 +993,9 @@ export function completerFaits(brut: unknown): Faits {
     missions: missionsDuSchema1(o['missions']),
     mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires']),
     echeances: echeancesDuSchema5(o['echeances']),
-    recettes: recettesDuSchema12(recettesDuSchema6(o['recettes']), o['clients'])
+    recettes: recettesDuSchema15(
+      recettesDuSchema12(recettesDuSchema6(o['recettes']), o['clients'])
+    )
   } as Faits;
 }
 
@@ -1144,4 +1170,27 @@ function recettesDuSchema12(
     const formule = parClient.get(r.clientNom) ?? FORMULE_PAR_DEFAUT;
     return { ...r, echeanceLe: echeanceDe(r.emiseLe as DateISO, formule) };
   });
+}
+
+/**
+ * v15 → v16 : la recette porte l'identifiant de sa pièce jointe.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * `undefined` N'EST PAS `null`, ET C'EST TOUT L'ENJEU ICI
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le champ est nouveau, donc absent de toute recette enregistrée avant ce
+ * schéma. Mais contrairement à `relancesLe` ou `envoyeeLe`, il se lit par
+ * comparaison STRICTE à `null` — exactement comme `Depense.justificatifId` —
+ * pour décider si une pièce est conservée. Laisser `undefined` circuler
+ * romprait ce test : `undefined === null` vaut `false`, et l'écran
+ * afficherait « pièce conservée » pour un document qui n'en a strictement
+ * aucune. La règle du projet s'applique une fois de plus : une migration
+ * descend jusqu'où les champs ont bougé, ce que la fusion de surface de
+ * `completerFaits` ne fait pas pour un champ apparu dans un élément de liste.
+ */
+function recettesDuSchema15(recettes: readonly Recette[]): readonly Recette[] {
+  return recettes.map((r) => (
+    r.justificatifId === undefined ? { ...r, justificatifId: null } : r
+  ));
 }

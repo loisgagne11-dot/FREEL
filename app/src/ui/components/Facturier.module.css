@@ -447,3 +447,22 @@
 /* La ligne cesse d'être une seule ligne : elle porte maintenant deux niveaux,
    et `white-space: nowrap` sur le conteneur les collerait l'un à l'autre. */
 .ligneMontant { text-align: right; }
+
+/* ── Panneau de pièce jointe ─────────────────────────────────────────────
+   Mêmes classes que le bloc justificatif d'Achats (Achats.module.css) : même
+   pièce, même sens probant, seul le fait rattaché change. */
+
+.verdict { font-size: 13px; line-height: 1.55; color: var(--muted); }
+.verdictAccent { font-size: 13px; line-height: 1.55; color: var(--green); }
+.verdictDanger { font-size: 13px; line-height: 1.55; color: var(--red); }
+
+.champFichier {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.panneau input[type='file'] {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 100%;
+}

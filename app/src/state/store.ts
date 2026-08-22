@@ -419,6 +419,19 @@ interface MagasinFaits {
    */
   readonly supprimerBrouillon: (id: string) => string | null;
 
+  /**
+   * Rattache une pièce à une recette — ou la détache avec `null`.
+   *
+   * Miroir de `attacherJustificatif`, côté recettes : une facture établie
+   * AILLEURS que dans l'application, ou reprise de l'ancienne version, n'a
+   * aucun autre moyen d'être jointe à son document d'origine. Contrairement à
+   * la dépense, aucune règle fiscale n'en dépend ici — une facture émise par
+   * l'application se reconstruit déjà depuis les faits — mais l'audit
+   * comptable ne reconnaît une pièce que si elle est effectivement conservée,
+   * et cette porte n'existait tout simplement pas avant ce lot.
+   */
+  readonly attacherJustificatifRecette: (id: string, justificatifId: string | null) => void;
+
   /* ── Carnet : clients et missions ─────────────────────────────────────── */
 
   /**
@@ -1024,6 +1037,16 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     set({ faits });
     persister(stockageActif, faits);
     return null;
+  },
+
+  attacherJustificatifRecette: (id, justificatifId) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      recettes: actuel.recettes.map((r) => (r.id === id ? { ...r, justificatifId } : r))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
   },
 
   poserAjustement: (missionId, entiteId, date, pose) => {

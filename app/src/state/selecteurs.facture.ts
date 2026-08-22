@@ -19,8 +19,9 @@
 
 import {
   type Destinataire, type Emetteur, type Facture, type Manque,
-  type RegimeFacture, type TotauxFacture,
-  amendeMentions, mentionsAPorter, mentionsManquantes, regimeDeLaFacture, totaux
+  type ReeditionFacture, type RegimeFacture, type TotauxFacture,
+  amendeMentions, factureDepuisRecette, mentionsAPorter, mentionsManquantes,
+  regimeDeLaFacture, totaux
 } from '../domain/calculs/facture';
 import { prochainNumero } from '../domain/calculs/ecritureRecette';
 import {
@@ -71,6 +72,47 @@ export function destinataireDe(client: Client): Destinataire {
     tvaIntracom: client.tvaIntracom,
     delaiPaiement: client.delaiPaiement
   };
+}
+
+/**
+ * Le document d'une facture DÉJÀ ÉMISE, retrouvé depuis les faits.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE FACTURE ÉMISE N'AVAIT AUCUN CHEMIN DE RETOUR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le document n'existait qu'à l'instant de l'émission, dans l'écran de
+ * rédaction. Passé cet instant : plus moyen de le revoir, ni de le renvoyer à
+ * un client qui dit ne pas l'avoir reçu — la réponse la plus courante à une
+ * relance — ni même d'en garder une copie.
+ *
+ * Rien n'est stocké de plus pour autant : le document se RECONSTRUIT depuis la
+ * recette, l'entreprise et le carnet. C'est la même règle que le brouillon du
+ * mois — ce qui se dérive ne se persiste pas, sous peine de diverger de sa
+ * source à la première correction.
+ *
+ * Le client vient du CARNET, par son nom. Une facture émise à un client
+ * absent du carnet ne peut pas être rééditée : son adresse est une mention
+ * obligatoire, et l'inventer produirait un document irrégulier sous un numéro
+ * déjà utilisé.
+ */
+export function reediterFacture(faits: Faits, numero: string): ReeditionFacture {
+  const recette = faits.recettes.find((r) => r.numero === numero);
+  if (recette === undefined) {
+    return { cas: 'impossible', motif: 'Aucune facture ne porte ce numéro.' };
+  }
+
+  const client = faits.clients.find((c) => c.nom === recette.clientNom);
+  if (client === undefined) {
+    return {
+      cas: 'impossible',
+      motif: `« ${recette.clientNom || 'Client non renseigné'} » n’est pas dans `
+        + 'ton carnet. Son adresse est une mention obligatoire de la facture, '
+        + 'et elle ne s’invente pas. Ajoute-le pour pouvoir rééditer.'
+    };
+  }
+
+  return factureDepuisRecette(recette, emetteurDe(faits), destinataireDe(client));
 }
 
 export interface EtatFacture {

@@ -16,10 +16,36 @@
  * copie numérique n'a de valeur en contrôle que si l'on peut montrer qu'elle
  * n'a pas été modifiée depuis son dépôt — c'est ce que l'empreinte établit.
  *
- * Le module ne SUPPRIME jamais une pièce liée à une dépense encore existante.
- * Les durées de conservation se comptent en années, et une suppression
- * accidentelle détruit un document que la loi oblige à conserver.
+ * Le module ne SUPPRIME jamais une pièce liée à un fait encore existant (voir
+ * `motifRefusSuppression` plus bas). Les durées de conservation se comptent en
+ * années, et une suppression accidentelle détruit un document que la loi
+ * oblige à conserver.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI UNE PIÈCE SE RATTACHE À UN « FAIT », PAS À UNE DÉPENSE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Ce module a longtemps posé `depenseId` sans alternative : une facture de
+ * vente établie hors de l'application — ou reprise de l'ancienne version —
+ * n'avait donc aucun moyen d'être jointe à sa recette. Le manque n'était pas
+ * un oubli d'écran, il était dans la FORME des métadonnées elles-mêmes.
+ *
+ * `fait` remplace `depenseId` par une **nature et un identifiant**, plutôt que
+ * par deux champs optionnels (`depenseId?`, `recetteId?`). Deux champs
+ * optionnels permettraient les deux à la fois, ou aucun des deux — un état
+ * qu'aucune pièce ne doit pouvoir atteindre, puisqu'elle rattache exactement
+ * un document. Une union discriminée rend cet état IMPOSSIBLE à représenter,
+ * plutôt que simplement improbable et laissé à la discipline de qui écrit.
  */
+
+/** La nature du fait auquel une pièce peut se rattacher. */
+export type NatureFait = 'depense' | 'recette';
+
+/** Le fait précis auquel une pièce se rattache. */
+export interface RattachementFait {
+  readonly nature: NatureFait;
+  readonly id: string;
+}
 
 /** Métadonnées d'une pièce conservée. Sans le binaire, pour être listables. */
 export interface MetaJustificatif {
@@ -31,8 +57,8 @@ export interface MetaJustificatif {
   readonly empreinte: string;
   /** Horodatage du dépôt, en ISO. */
   readonly deposeLe: string;
-  /** Dépense à laquelle la pièce se rattache. */
-  readonly depenseId: string;
+  /** Le fait — dépense ou recette — que cette pièce justifie. */
+  readonly fait: RattachementFait;
 }
 
 export interface Justificatif extends MetaJustificatif {
@@ -92,12 +118,14 @@ export function typeAccepte(typeMime: string): boolean {
  * Dépose une pièce, après contrôles.
  *
  * Le contrôle précède l'écriture, et l'empreinte est calculée sur le contenu
- * effectivement stocké — pas sur ce qu'on croit avoir reçu.
+ * effectivement stocké — pas sur ce qu'on croit avoir reçu. Le calcul est le
+ * même pour une pièce de dépense et une pièce de recette : l'empreinte ne
+ * connaît pas la nature du fait, elle ne connaît que des octets.
  */
 export async function deposerJustificatif(
   stockage: StockageJustificatifs,
   fichier: { nom: string; typeMime: string; contenu: Blob },
-  depenseId: string,
+  fait: RattachementFait,
   maintenant: Date = new Date()
 ): Promise<ResultatDepot> {
   if (fichier.contenu.size === 0) {
@@ -121,14 +149,18 @@ export async function deposerJustificatif(
   const empreinte = await empreinteDe(fichier.contenu);
   const meta: MetaJustificatif = {
     // L'empreinte fait partie de l'identifiant : déposer deux fois le même
-    // fichier sur la même dépense ne crée pas deux pièces.
-    id: `${depenseId}-${empreinte.slice(0, 16)}`,
+    // fichier sur le même fait ne crée pas deux pièces. La nature entre dans
+    // l'identifiant pour la même raison qui a motivé l'union discriminée
+    // ci-dessus : une dépense et une recette créées côte à côte pourraient en
+    // théorie porter le même identifiant applicatif, et fusionner leurs
+    // pièces serait alors une collision silencieuse.
+    id: `${fait.nature}-${fait.id}-${empreinte.slice(0, 16)}`,
     nomFichier: fichier.nom,
     typeMime: fichier.typeMime,
     taille: fichier.contenu.size,
     empreinte,
     deposeLe: maintenant.toISOString(),
-    depenseId
+    fait
   };
 
   await stockage.deposer({ ...meta, contenu: fichier.contenu });
@@ -153,24 +185,159 @@ export async function verifierIntegrite(
     : { intacte: false, motif: 'L’empreinte ne correspond plus : la pièce a été modifiée.' };
 }
 
+/**
+ * Un minimum des faits courants : de quoi savoir si le document qu'une pièce
+ * justifie existe encore.
+ *
+ * Volontairement réduit à des identifiants, et pas un import de `state/schema`
+ * : ce module reste utilisable sans le magasin, comme `empreinteDe` l'est déjà
+ * sans navigateur.
+ */
+export interface FaitsConnus {
+  readonly depenses: readonly { readonly id: string }[];
+  readonly recettes: readonly { readonly id: string }[];
+}
+
+/**
+ * Pourquoi cette pièce ne peut PAS être supprimée, ou `null` si elle le peut.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE REFUS PORTE SUR LE FAIT, PAS SUR LA NATURE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Refusé si et seulement si le fait rattaché — dépense OU recette — existe
+ * ENCORE dans les faits courants. Ce n'est pas la présence d'un rattachement
+ * en soi qui bloque : une pièce dont le fait a depuis disparu redevient
+ * orpheline, et rien n'oblige à la garder indéfiniment. C'est cette
+ * distinction qui a longtemps manqué : avant ce lot, la seule dépense pouvait
+ * bloquer une suppression — une facture de vente échappait totalement au
+ * contrôle, alors qu'elle est soumise au même délai de conservation légal
+ * (voir `ANNEES_CONSERVATION`, `domain/bareme/recettes.ts`).
+ */
+export function motifRefusSuppression(
+  meta: MetaJustificatif,
+  faits: FaitsConnus
+): string | null {
+  const existeEncore = meta.fait.nature === 'depense'
+    ? faits.depenses.some((d) => d.id === meta.fait.id)
+    : faits.recettes.some((r) => r.id === meta.fait.id);
+  if (!existeEncore) return null;
+
+  const nature = meta.fait.nature === 'depense' ? 'dépense' : 'recette';
+  return `Cette pièce est rattachée à une ${nature} qui existe encore : elle ne `
+    + 'peut pas être supprimée tant que ce document existe. Détache-la d’abord '
+    + 'si tu veux t’en défaire.';
+}
+
+/**
+ * Supprime une pièce, si rien ne l'en empêche.
+ *
+ * Rend le motif du refus, ou `null` si la suppression a eu lieu — le même
+ * contrat que les actions de refus du magasin (`supprimerDepense`,
+ * `supprimerBrouillon`…). Une pièce déjà absente n'est pas un échec : il n'y a
+ * simplement plus rien à protéger.
+ */
+export async function supprimerJustificatif(
+  stockage: StockageJustificatifs,
+  id: string,
+  faits: FaitsConnus
+): Promise<string | null> {
+  const meta = await stockage.lire(id);
+  if (meta === null) return null;
+  const motif = motifRefusSuppression(meta, faits);
+  if (motif !== null) return motif;
+  await stockage.supprimer(id);
+  return null;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Implémentation IndexedDB
    ───────────────────────────────────────────────────────────────────────── */
 
 const NOM_BASE = 'freel-justificatifs';
 const NOM_MAGASIN = 'pieces';
-const VERSION_BASE = 1;
+/**
+ * Version du magasin IndexedDB.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CE VERSIONNAGE N'EST PAS CELUI DE `Faits`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les métadonnées des pièces ne vivent PAS dans `Faits` : elles ont leur
+ * propre base, et IndexedDB porte son propre mécanisme de version — un nombre
+ * qui déclenche `onupgradeneeded` à l'ouverture, plutôt qu'un champ `version`
+ * relu et validé comme `motifRefusFaits` le fait pour les faits. On ne peut
+ * donc pas réutiliser `completerFaits` ici : la migration se place dans
+ * `onupgradeneeded`, au moment précis où le navigateur constate que la base
+ * ouverte est d'une version antérieure à celle-ci.
+ *
+ * v1 → v2 : une pièce ne portait que `depenseId`. Elle rattachait forcément
+ * une dépense, puisque les recettes n'avaient pas cette porte — migrer, c'est
+ * donc nommer ce qui était implicite, pas inventer une information. La
+ * conversion elle-même est `migrerMeta` ci-dessous : une fonction PURE,
+ * testable sans IndexedDB, appliquée à chaque enregistrement par le curseur
+ * de migration. La descendre au niveau de l'enregistrement et non du magasin
+ * dans son ensemble est la même règle que pour `Faits` (invariant n°5) : une
+ * migration descend jusqu'où les champs ont bougé.
+ */
+const VERSION_BASE = 2;
+
+/** Une pièce telle qu'enregistrée avant que le rattachement se généralise. */
+interface MetaJustificatifV1 {
+  readonly id: string;
+  readonly nomFichier: string;
+  readonly typeMime: string;
+  readonly taille: number;
+  readonly empreinte: string;
+  readonly deposeLe: string;
+  readonly depenseId: string;
+}
+
+/**
+ * Met une métadonnée de pièce au format courant.
+ *
+ * Exportée pour être testée directement : c'est elle qui porte toute la
+ * logique de conversion, `onupgradeneeded` ne fait que l'appliquer à chaque
+ * enregistrement via un curseur — voir le commentaire de `VERSION_BASE`.
+ *
+ * Idempotente : appliquée à une pièce déjà au format courant, elle la rend
+ * telle quelle. C'est ce qui permet de la rappeler sans condition depuis le
+ * curseur de migration.
+ */
+export function migrerMeta(
+  brut: MetaJustificatifV1 | MetaJustificatif
+): MetaJustificatif {
+  if ('fait' in brut) return brut;
+  const { depenseId, ...reste } = brut;
+  return { ...reste, fait: { nature: 'depense', id: depenseId } };
+}
 
 function ouvrir(): Promise<IDBDatabase> {
   return new Promise((resoudre, rejeter) => {
     const requete = indexedDB.open(NOM_BASE, VERSION_BASE);
-    requete.onupgradeneeded = () => {
+    requete.onupgradeneeded = (evenement) => {
       const base = requete.result;
-      if (!base.objectStoreNames.contains(NOM_MAGASIN)) {
-        const magasin = base.createObjectStore(NOM_MAGASIN, { keyPath: 'id' });
-        // Index sur la dépense : retrouver les pièces d'une dépense sans
-        // parcourir tout le magasin.
-        magasin.createIndex('depenseId', 'depenseId', { unique: false });
+      const magasin = base.objectStoreNames.contains(NOM_MAGASIN)
+        ? requete.transaction!.objectStore(NOM_MAGASIN)
+        : base.createObjectStore(NOM_MAGASIN, { keyPath: 'id' });
+
+      // L'index portait sur `depenseId`, qui n'existe plus dans le format
+      // courant : le remplacer par un index sur `fait.id`, qui sert les deux
+      // natures. IndexedDB sait indexer un chemin imbriqué directement.
+      if (magasin.indexNames.contains('depenseId')) magasin.deleteIndex('depenseId');
+      if (!magasin.indexNames.contains('fait.id')) {
+        magasin.createIndex('fait.id', 'fait.id', { unique: false });
+      }
+
+      // Ancienne version détectée : convertit chaque enregistrement en place.
+      if (evenement.oldVersion > 0 && evenement.oldVersion < 2) {
+        magasin.openCursor().onsuccess = (ev) => {
+          const curseur = (ev.target as IDBRequest<IDBCursorWithValue | null>).result;
+          if (curseur === null) return;
+          const valeur = curseur.value as MetaJustificatifV1 | Justificatif;
+          if (!('fait' in valeur)) curseur.update(migrerMeta(valeur));
+          curseur.continue();
+        };
       }
     };
     requete.onsuccess = () => resoudre(requete.result);

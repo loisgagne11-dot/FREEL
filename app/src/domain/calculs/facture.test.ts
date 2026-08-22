@@ -3,8 +3,8 @@ import { dateISO, euros, ratio } from '../types';
 import {
   type Destinataire, type Emetteur, type Facture,
   AMENDE_PAR_MENTION, INDEMNITE_RECOUVREMENT,
-  amendeMentions, mentionsAPorter, mentionsManquantes, regimeDeLaFacture,
-  totaux, verifierIntegriteFacture
+  amendeMentions, factureDepuisRecette, mentionsAPorter, mentionsManquantes,
+  regimeDeLaFacture, totaux, verifierIntegriteFacture
 } from './facture';
 
 const EMETTEUR: Emetteur = {
@@ -228,5 +228,93 @@ describe('mentions à porter', () => {
 describe('intégrité des données chiffrées', () => {
   it('passe son contrôle', () => {
     expect(verifierIntegriteFacture()).toEqual([]);
+  });
+});
+
+/**
+ * RÉÉDITER UNE FACTURE DÉJÀ ÉMISE.
+ *
+ * Le document n'existait qu'à l'instant de l'émission, dans l'écran de
+ * rédaction. Passé cet instant, plus moyen de le revoir, ni de le renvoyer à
+ * un client qui dit ne pas l'avoir reçu, ni d'en garder une copie.
+ */
+describe('réédition d’une facture émise', () => {
+  /** Un émetteur assujetti : le jeu d'essai ordinaire est en franchise, et
+      une facture avec TVA n'y serait pas rééditable — voir le test dédié. */
+  const ASSUJETTI: Emetteur = { ...EMETTEUR, enFranchise: false, tvaIntracom: 'FR00000000000' };
+
+  const recette = (m: Record<string, unknown> = {}) => ({
+    numero: '2026-001',
+    libelle: 'Prestation de juin 2026, 18 j',
+    montant: euros(1000),
+    emiseLe: dateISO('2026-06-30'),
+    tvaCollectee: euros(200),
+    ...m
+  });
+
+  it('reconstruit le document depuis ce que la recette conserve', () => {
+    const r = factureDepuisRecette(recette(), ASSUJETTI, CLIENT_FR);
+    if (r.cas !== 'reeditee') throw new Error('réédition attendue');
+
+    expect(r.facture.numero).toBe('2026-001');
+    expect(r.facture.emiseLe).toBe('2026-06-30');
+    expect(r.facture.lignes).toHaveLength(1);
+    expect(r.facture.lignes[0]?.designation).toBe('Prestation de juin 2026, 18 j');
+    // Le taux se déduit du rapport entre le HT et la TVA enregistrée.
+    expect(r.facture.lignes[0]?.tauxTva).toBeCloseTo(0.2, 5);
+    // Les totaux du document rééditÉ retombent sur ceux de la recette.
+    expect(totaux(r.facture).totalHt).toBe(1000);
+    expect(totaux(r.facture).totalTva).toBe(200);
+  });
+
+  /** Une facture en franchise : taux zéro, et c'est un taux reconnu. */
+  it('rééditе une facture sans TVA', () => {
+    const r = factureDepuisRecette(recette({ tvaCollectee: euros(0) }), EMETTEUR, CLIENT_FR);
+    if (r.cas !== 'reeditee') throw new Error('réédition attendue');
+    expect(r.facture.lignes[0]?.tauxTva).toBe(0);
+  });
+
+  /**
+   * LE POINT DUR, ET LE MOTIF DU REFUS.
+   *
+   * Une facture qui mêlait 20 % et 10 % donne un rapport intermédiaire qui ne
+   * correspond à aucun taux légal. L'imprimer comme s'il était un taux
+   * mettrait sur un document comptable un chiffre qui n'a jamais existé — sous
+   * le même numéro que l'original, donc indiscernable de lui.
+   */
+  it('refuse quand le rapport ne tombe sur aucun taux légal', () => {
+    // 1 000 € de HT pour 150 € de TVA : ni 20 %, ni 10 %.
+    const r = factureDepuisRecette(recette({ tvaCollectee: euros(150) }), ASSUJETTI, CLIENT_FR);
+    expect(r.cas).toBe('impossible');
+    if (r.cas === 'impossible') expect(r.motif).toMatch(/plusieurs taux/);
+  });
+
+  /** Une TVA jamais conservée ne se suppose pas : le document porterait le
+      même numéro que l'original en disant autre chose. */
+  it('refuse quand la TVA n’a pas été conservée', () => {
+    const r = factureDepuisRecette(recette({ tvaCollectee: null }), EMETTEUR, CLIENT_FR);
+    expect(r.cas).toBe('impossible');
+    if (r.cas === 'impossible') expect(r.motif).toMatch(/n’a pas été conservée/);
+  });
+
+  /** Sans date d'émission, ce n'est pas une facture — c'est un brouillon ou
+      une écriture d'annulation. */
+  it('refuse une écriture sans date d’émission', () => {
+    const r = factureDepuisRecette(recette({ emiseLe: null }), ASSUJETTI, CLIENT_FR);
+    expect(r.cas).toBe('impossible');
+  });
+
+  /**
+   * LE RÉGIME D'AUJOURD'HUI N'EST PAS CELUI DU JOUR DE L'ÉMISSION.
+   *
+   * `totaux` met la TVA à zéro quand l'émetteur est en franchise — juste pour
+   * une facture qu'on établit maintenant, faux pour une facture émise AVANT le
+   * passage en franchise. La rééditer sous le régime du jour l'effacerait :
+   * le document contredirait l'original tout en portant son numéro.
+   */
+  it('refuse de rééditer une facture avec TVA sous un régime devenu la franchise', () => {
+    const r = factureDepuisRecette(recette(), EMETTEUR, CLIENT_FR);
+    expect(r.cas).toBe('impossible');
+    if (r.cas === 'impossible') expect(r.motif).toMatch(/franchise/);
   });
 });

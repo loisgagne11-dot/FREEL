@@ -121,6 +121,143 @@ export interface Facture {
   readonly lignes: readonly LigneFacture[];
 }
 
+/**
+ * Les taux de TVA en vigueur en France, du plus courant au plus rare.
+ *
+ * Ils servent à RECONNAÎTRE un taux, pas à en proposer un : voir
+ * `factureDepuisRecette`. Une liste qui sert à reconnaître peut être fermée,
+ * là où une liste qui sert à proposer devrait suivre les évolutions du barème.
+ */
+const TAUX_TVA_CONNUS: readonly number[] = [0.2, 0.1, 0.055, 0.021, 0];
+
+/**
+ * Ce qu'on peut rééditer d'une facture déjà émise.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI UNE RÉÉDITION PEUT ÉCHOUER, ET POURQUOI C'EST VOULU
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une facture émise n'était plus atteignable : le document n'existait qu'à
+ * l'instant de l'émission, dans l'écran de rédaction. Passé cet instant, plus
+ * moyen de le revoir, de le renvoyer à un client qui dit ne pas l'avoir reçu,
+ * ni d'en garder une copie.
+ *
+ * Le rééditer demande de retrouver ses LIGNES, et la recette ne les conserve
+ * pas — elle porte le total HT et la TVA du document, pas leur détail. On les
+ * reconstruit donc à partir de ce qui est su : une désignation, le total HT,
+ * et le taux qui relie le HT à la TVA enregistrée.
+ *
+ * Ce taux ne se devine que s'il est UNIQUE. Une facture qui mêlait 20 % et
+ * 10 % donne un rapport intermédiaire qui ne correspond à aucun taux légal :
+ * imprimer ce rapport comme s'il était un taux mettrait sur un document
+ * comptable un chiffre qui n'a jamais existé — sous le même numéro que
+ * l'original, donc indiscernable de lui. On refuse, et on dit pourquoi.
+ */
+export type ReeditionFacture =
+  | { readonly cas: 'reeditee'; readonly facture: Facture }
+  | { readonly cas: 'impossible'; readonly motif: string };
+
+/**
+ * Reconstruit le document d'une facture déjà émise.
+ *
+ * La désignation vient du libellé enregistré, en UNE ligne. C'est la forme
+ * réelle de ces factures — « Prestation de juin 2026, 18 j » — et non un
+ * appauvrissement : le libellé est écrit à l'émission précisément pour que le
+ * client sache six mois plus tard à quoi correspondait le virement.
+ */
+export function factureDepuisRecette(
+  recette: {
+    readonly numero: string;
+    readonly libelle: string;
+    readonly montant: Euros;
+    readonly emiseLe: DateISO | null;
+    readonly tvaCollectee?: Euros | null;
+  },
+  emetteur: Emetteur,
+  destinataire: Destinataire
+): ReeditionFacture {
+  if (recette.emiseLe === null) {
+    return {
+      cas: 'impossible',
+      motif: 'Cette écriture ne porte pas de date d’émission : ce n’est pas une facture.'
+    };
+  }
+
+  const tva = recette.tvaCollectee ?? null;
+  if (tva === null) {
+    return {
+      cas: 'impossible',
+      motif: 'La TVA de cette facture n’a pas été conservée. La rééditer '
+        + 'obligerait à en supposer une, sur un document qui porte le même '
+        + 'numéro que l’original.'
+    };
+  }
+
+  /*
+   * LE RÉGIME D'AUJOURD'HUI N'EST PAS CELUI DU JOUR DE L'ÉMISSION.
+   *
+   * `totaux` met la TVA à zéro quand l'émetteur est en franchise — c'est
+   * juste pour une facture qu'on établit maintenant. Mais une facture émise
+   * AVANT le passage en franchise en portait une, et la rééditer sous le
+   * régime du jour l'effacerait : le document contredirait l'original tout en
+   * portant son numéro.
+   *
+   * Le régime historique n'est pas conservé, et il ne se devine pas. On
+   * refuse plutôt que de choisir entre deux documents dont l'un est faux.
+   */
+  if (tva > 0 && emetteur.enFranchise) {
+    return {
+      cas: 'impossible',
+      motif: 'Cette facture porte de la TVA alors que ton entreprise est '
+        + 'aujourd’hui en franchise. La rééditer sous le régime actuel '
+        + 'effacerait cette TVA, sur un document qui porte le même numéro que '
+        + 'l’original.'
+    };
+  }
+
+  const taux = tauxReconnu(recette.montant, tva);
+  if (taux === null) {
+    return {
+      cas: 'impossible',
+      motif: 'Cette facture mêlait plusieurs taux de TVA, et leur détail n’a '
+        + 'pas été conservé. Le rapport entre son total et sa TVA ne '
+        + 'correspond à aucun taux légal.'
+    };
+  }
+
+  return {
+    cas: 'reeditee',
+    facture: {
+      numero: recette.numero,
+      emiseLe: recette.emiseLe,
+      emetteur,
+      destinataire,
+      lignes: [{
+        designation: recette.libelle,
+        // Une quantité de 1 au prix du total : le détail « 18 j × 430 € »
+        // n'est pas conservé, et le fabriquer par division donnerait un prix
+        // unitaire arrondi dont le produit ne retomberait pas sur le total.
+        quantite: 1,
+        prixUnitaireHt: recette.montant,
+        tauxTva: taux as Ratio
+      }]
+    }
+  };
+}
+
+/**
+ * Le taux de TVA d'une facture, s'il est reconnaissable.
+ *
+ * `null` quand le rapport ne tombe sur aucun taux légal — ce qui arrive dès
+ * que la facture en mêlait deux. La tolérance d'un demi-centime absorbe les
+ * arrondis d'affichage sans jamais accepter un taux voisin : le plus serré des
+ * écarts entre deux taux légaux est de 3,4 points, très loin devant.
+ */
+function tauxReconnu(ht: Euros, tva: Euros): number | null {
+  if (ht <= 0) return tva === 0 ? 0 : null;
+  return TAUX_TVA_CONNUS.find((t) => Math.abs(ht * t - tva) < 0.005) ?? null;
+}
+
 /* ── Totaux ────────────────────────────────────────────────────────────── */
 
 export interface TotauxFacture {

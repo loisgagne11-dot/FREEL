@@ -42,7 +42,9 @@ export const SEUIL_GLOBALISATION_DETAIL: SeuilDate = {
  *
  * Six ans à compter de la dernière opération, au titre du droit de reprise de
  * l'administration fiscale. C'est cette durée qui interdit au module de
- * justificatifs de supprimer une pièce rattachée à une dépense existante.
+ * justificatifs de supprimer une pièce rattachée à un fait existant — dépense
+ * comme recette : une facture de vente est soumise au même délai qu'une
+ * facture d'achat.
  */
 export const ANNEES_CONSERVATION = {
   valeur: 6,

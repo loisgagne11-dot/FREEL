@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
-  destinataireDe, emetteurDe, etatFacture, numeroSuivant
+  destinataireDe, emetteurDe, etatFacture, numeroSuivant, reediterFacture
 } from '../../state/selecteurs.facture';
 import type { Facture as FactureDomaine, LigneFacture } from '../../domain/calculs/facture';
 import { dateISO, euros, ratio } from '../../domain/types';
@@ -83,12 +83,106 @@ export function Facture() {
     return <NouvelleFacture onListe={() => naviguerVers('facture')} />;
   }
 
+  /*
+   * `#/facture/2026-001` ROUVRE une facture déjà émise.
+   *
+   * Le numéro dans l'URL plutôt qu'un état local, pour la même raison que
+   * `nouvelle` juste au-dessus : le bouton « retour » du navigateur ramène au
+   * facturier, et le lien se partage — c'est celui qu'on recolle dans un
+   * courriel quand un client redemande sa facture.
+   */
+  if (sousRoute !== null && sousRoute !== '') {
+    return (
+      <FactureEmise
+        numero={decodeURIComponent(sousRoute)}
+        onListe={() => naviguerVers('facture')}
+      />
+    );
+  }
+
   return (
     <>
       <header className={styles.entete}>
         <h1 className={styles.titre}>Facturer</h1>
       </header>
-      <Facturier onNouvelle={() => naviguerVers('facture', 'nouvelle')} />
+      <Facturier
+        onNouvelle={() => naviguerVers('facture', 'nouvelle')}
+        onRevoir={(numero) => naviguerVers('facture', encodeURIComponent(numero))}
+      />
+    </>
+  );
+}
+
+/**
+ * Une facture DÉJÀ ÉMISE, rouverte.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ELLE N'AVAIT AUCUN CHEMIN DE RETOUR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le document n'existait qu'à l'instant de l'émission, dans l'écran de
+ * rédaction juste en dessous. Passé cet instant : plus moyen de le revoir, ni
+ * de le renvoyer à un client qui dit ne pas l'avoir reçu — la réponse la plus
+ * courante à une relance — ni même d'en garder une copie.
+ *
+ * Rien n'est stocké de plus pour autant : le document se reconstruit depuis
+ * la recette, l'entreprise et le carnet. Et quand il ne peut pas l'être
+ * fidèlement, on le DIT plutôt que d'en produire un approchant : il porterait
+ * le numéro de l'original, donc serait indiscernable de lui pour qui le
+ * reçoit.
+ */
+function FactureEmise(
+  { numero, onListe }: { readonly numero: string; readonly onListe: () => void }
+) {
+  const faits = useFaits((e) => e.faits);
+  const reedition = useMemo(() => reediterFacture(faits, numero), [faits, numero]);
+
+  if (reedition.cas === 'impossible') {
+    return (
+      <>
+        <header className={styles.entete}>
+          <h1 className={styles.titre}>Facture {numero}</h1>
+          <div className={styles.actions}>
+            <button type="button" className={styles.action} onClick={onListe}>
+              Retour au facturier
+            </button>
+          </div>
+        </header>
+        <p className={styles.bandeau} role="status">
+          Cette facture ne peut pas être rééditée. {reedition.motif}
+        </p>
+      </>
+    );
+  }
+
+  const etat = etatFacture(reedition.facture);
+
+  return (
+    <>
+      <header className={styles.entete}>
+        <h1 className={styles.titre}>Facture {numero}</h1>
+        <div className={styles.actions}>
+          <button type="button" className={styles.actionPrincipale}
+            onClick={() => window.print()}>
+            Imprimer ou enregistrer en PDF
+          </button>
+          <button type="button" className={styles.action} onClick={onListe}>
+            Retour au facturier
+          </button>
+        </div>
+      </header>
+
+      {/* Le détail des lignes n'est pas conservé : le document se rétablit en
+          UNE désignation, celle qui a été enregistrée à l'émission. On le dit,
+          parce qu'une facture d'origine à plusieurs lignes ne se présentera
+          pas ici comme elle est partie. */}
+      <p className={styles.bandeau} role="status">
+        Document rétabli depuis ton livre des recettes. Les montants sont ceux
+        qui ont été enregistrés à l’émission&nbsp;; le détail des lignes, lui,
+        n’est pas conservé et tient en une désignation.
+      </p>
+
+      <DocumentFacture etat={etat} />
     </>
   );
 }

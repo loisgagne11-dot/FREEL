@@ -154,6 +154,24 @@ describe('le graphe du chiffre d’affaires', () => {
   });
 
   /**
+   * UNE ANNÉE PASSÉE N'A PAS DE « MOIS PAS ENCORE ATTEINT ».
+   *
+   * La troncature au mois courant n'a de sens que pour l'année réellement en
+   * cours (2026 dans ces tests, l'horloge est figée au 10 juin). En
+   * choisissant 2025 au sélecteur, un dossier repris avec deux ans
+   * d'historique doit voir SES douze mois — sans ça, décembre 2025 resterait
+   * invisible pour la seule raison qu'on est en juin d'une AUTRE année.
+   */
+  it('trace les douze mois d’une année passée choisie au sélecteur', () => {
+    const faits = { ...faitsVides(), recettes: [recette({ emiseLe: dateISO('2025-11-05') })] };
+    useFaits.setState({ faits });
+    render(<Performance etat={etatArgent(faits, undefined, undefined, 2025)} />);
+
+    expect(screen.getByRole('button', { name: /^JUIN/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^DÉC/ })).toBeTruthy();
+  });
+
+  /**
    * LE CUMUL EST EN PIED, ET IL EST CELUI DE L'ANNÉE ENTIÈRE.
    *
    * L'axe est tronqué au mois courant ; le cumul, lui, ne l'est pas — il n'a
