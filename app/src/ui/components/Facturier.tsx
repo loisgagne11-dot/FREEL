@@ -3,8 +3,10 @@ import { useFaits } from '../../state/store';
 import { brouillonsDeFacture, etatFacturier } from '../../state/selecteurs.facture';
 import type { EcartDeFacturation } from '../../domain/calculs/brouillon';
 import { euros } from '../../domain/types';
+import type { Euros } from '../../domain/types';
 import {
-  LIBELLE_STATUT, type FactureSuivie, type StatutFacture
+  LIBELLE_STATUT, montantsDeLaFacture,
+  type FactureSuivie, type RecetteSuivie, type StatutFacture
 } from '../../domain/calculs/facturier';
 import type { ModeReglement } from '../../domain/calculs/livreRecettes';
 import {
@@ -321,7 +323,7 @@ function Ligne(
         <span className={styles.ligneLibelle}>
           {r.libelle || 'Sans désignation'}
         </span>
-        <span className={styles.ligneMontant}><Montant>{eur(r.montant)}</Montant></span>
+        <MontantsDeLigne recette={r} />
       </span>
 
       <span className={styles.ligneMeta}>
@@ -424,7 +426,7 @@ function PanneauEncaissement(
       <p className={styles.rappel}>
         {facture.recette.numero || 'Sans numéro'} — {facture.recette.clientNom || 'client non renseigné'}
         <strong className={styles.rappelMontant}>
-          <Montant>{eur(facture.recette.montant)}</Montant>
+          <MontantsEnClair recette={facture.recette} />
         </strong>
       </p>
 
@@ -744,6 +746,85 @@ function BrouillonDuMois() {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Le montant d'une ligne de facture : le TTC en tête, le HT dessous.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LEQUEL DES DEUX EN GROS, ET POURQUOI CELUI-LÀ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La liste n'affichait qu'un chiffre, sans dire lequel : le HT. C'est le bon
+ * pour les déclarations — l'assiette du chiffre d'affaires en micro. Ce n'est
+ * pas celui que le client vire, ni celui qu'on retrouve sur le relevé.
+ *
+ * Sur CETTE liste, on suit des règlements : on y cherche « est-ce que les
+ * 12 000 € du relevé correspondent à cette facture-là ». Le TTC prend donc la
+ * place principale, et le HT reste juste dessous, nommé — la déclaration se
+ * fait ailleurs, où le HT reprend la tête.
+ *
+ * Sans TVA, un seul chiffre : afficher deux fois le même montant sur deux
+ * lignes ferait chercher la différence entre eux.
+ */
+function MontantsDeLigne({ recette }: { readonly recette: RecetteSuivie }) {
+  const m = montantsDeLaFacture(recette);
+
+  if (m.ttc === null) {
+    return (
+      <span className={styles.ligneMontant}>
+        <Montant>{eur(m.ht)}</Montant>
+        {/* La TVA de cette facture n'est pas connue : on ne peut pas en
+            déduire un TTC, et en afficher un serait l'inventer. */}
+        <span className={styles.montantNote}> HT · TTC inconnu</span>
+      </span>
+    );
+  }
+
+  if (m.sansTva) {
+    return (
+      <span className={styles.ligneMontant}>
+        <Montant>{eur(m.ht)}</Montant>
+        <span className={styles.montantNote}> sans TVA</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className={styles.ligneMontant}>
+      <Montant>{eur(m.ttc)}</Montant>
+      <span className={styles.montantNote}> TTC</span>
+      <span className={styles.montantSecondaire}>
+        <Montant>{eur(m.ht)}</Montant> HT
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Les trois montants en une phrase, pour un rappel de facture.
+ *
+ * Au moment d'encaisser, c'est le TTC qu'on lit sur le relevé et qu'on vient
+ * comparer. Le HT l'accompagne parce que c'est lui qui entrera au livre des
+ * recettes : voir les deux ensemble évite de se demander lequel a été
+ * enregistré.
+ */
+function MontantsEnClair({ recette }: { readonly recette: RecetteSuivie }) {
+  const m = montantsDeLaFacture(recette);
+  if (m.ttc === null) {
+    return <><Montant>{eur(m.ht)}</Montant> HT</>;
+  }
+  if (m.sansTva) {
+    return <><Montant>{eur(m.ht)}</Montant> (sans TVA)</>;
+  }
+  return (
+    <>
+      <Montant>{eur(m.ttc)}</Montant> TTC
+      <span className={styles.montantSecondaire}>
+        dont <Montant>{eur(m.tva as Euros)}</Montant> de TVA
+      </span>
+    </>
   );
 }
 

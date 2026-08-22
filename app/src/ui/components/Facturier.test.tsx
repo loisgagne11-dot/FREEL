@@ -340,6 +340,56 @@ describe('relancer une facture en retard', () => {
 });
 
 /**
+ * LE HT N'EST PAS CE QUE LE CLIENT VIRE.
+ *
+ * La liste n'affichait qu'un montant, sans dire lequel : le HT, l'assiette du
+ * chiffre d'affaires que l'URSSAF réclame. Rapprocher un virement d'une
+ * facture demandait donc de refaire le calcul de tête, à un taux qu'aucun
+ * écran ne rappelait.
+ */
+describe('les montants d’une facture', () => {
+  it('montre le TTC et le HT, chacun nommé', () => {
+    semer([recette({
+      id: 'r1', montant: euros(1000), tvaCollectee: euros(200),
+      encaisseeLe: dateISO('2026-08-05')
+    })]);
+    rendre();
+
+    const ligne = screen.getByText('Prestation').closest('li') as HTMLElement;
+    expect(ligne.textContent).toMatch(/1\s?200\s?€\s?TTC/u);
+    expect(ligne.textContent).toMatch(/1\s?000\s?€\s?HT/u);
+  });
+
+  /**
+   * ZÉRO EST UNE RÉPONSE — franchise en base, ou autoliquidation chez un
+   * client étranger. Afficher deux fois le même montant sur deux lignes ferait
+   * chercher la différence entre eux ; « TVA 0 € » laisserait croire qu'un
+   * taux a été appliqué et qu'il tombe à rien.
+   */
+  it('n’affiche qu’un montant sur une facture sans TVA', () => {
+    semer([recette({ id: 'r1', montant: euros(1000), tvaCollectee: euros(0) })]);
+    rendre();
+
+    const ligne = screen.getByText('Prestation').closest('li') as HTMLElement;
+    expect(ligne.textContent).toMatch(/sans TVA/);
+    expect(ligne.textContent).not.toMatch(/TTC/);
+  });
+
+  /**
+   * LE POINT DUR. Une facture d'avant le schéma 9 portait peut-être une TVA,
+   * et on ne la connaît pas. En déduire un TTC serait inventer un chiffre,
+   * d'autant plus crédible qu'il est rond.
+   */
+  it('s’abstient sur le TTC quand la TVA n’est pas connue', () => {
+    semer([recette({ id: 'r1', montant: euros(1000) })]);
+    rendre();
+
+    const ligne = screen.getByText('Prestation').closest('li') as HTMLElement;
+    expect(ligne.textContent).toMatch(/TTC inconnu/);
+  });
+});
+
+/**
  * LA FACTURE DU MOIS QU'ON N'A PAS DEMANDÉE.
  *
  * « Créée en brouillon et mise à jour en fonction de mes modifications

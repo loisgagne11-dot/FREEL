@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros } from '../types';
 import type { DateISO } from '../types';
-import { suivre } from './facturier';
+import { montantsDeLaFacture, suivre } from './facturier';
 import { FORMULE_PAR_DEFAUT, echeanceDe } from './delaiPaiement';
 import type { RecetteSuivie } from './facturier';
 
@@ -109,5 +109,52 @@ describe('échéance', () => {
   it('applique la formule par défaut : trente jours fin de mois', () => {
     expect(echeanceDe(dateISO('2026-01-01'), FORMULE_PAR_DEFAUT)).toBe('2026-01-31');
     expect(echeanceDe(dateISO('2026-06-12'), FORMULE_PAR_DEFAUT)).toBe('2026-07-31');
+  });
+});
+
+describe('les trois montants d’une facture', () => {
+  const recette = (montant: number, tva?: number | null) => ({
+    montant: euros(montant),
+    ...(tva === undefined ? {} : { tvaCollectee: tva === null ? null : euros(tva) })
+  });
+
+  /**
+   * LE HT N'EST PAS CE QUE LE CLIENT VIRE.
+   *
+   * Les écrans n'affichaient qu'un montant, sans dire lequel : le HT,
+   * l'assiette que l'URSSAF réclame. Rapprocher un virement d'une facture
+   * demandait donc de refaire le calcul de tête, à un taux qu'aucun écran ne
+   * rappelait.
+   */
+  it('rend le HT, la TVA et le TTC quand la TVA est connue', () => {
+    expect(montantsDeLaFacture(recette(1000, 200)))
+      .toEqual({ ht: 1000, tva: 200, ttc: 1200, sansTva: false });
+  });
+
+  /**
+   * ZÉRO EST UNE RÉPONSE — franchise en base, ou autoliquidation chez un
+   * client étranger. Le TTC vaut alors le HT, et `sansTva` permet à l'écran
+   * d'écrire « sans TVA » plutôt que « TVA 0 € », qui laisserait croire qu'un
+   * taux a été appliqué et qu'il tombe à rien.
+   */
+  it('distingue une facture sans TVA d’une facture taxée', () => {
+    const m = montantsDeLaFacture(recette(1000, 0));
+    expect(m.ttc).toBe(1000);
+    expect(m.sansTva).toBe(true);
+  });
+
+  /**
+   * LE POINT DUR. Une facture d'avant le schéma 9 portait peut-être une TVA,
+   * et on ne la connaît pas. Afficher « TTC = HT » serait un chiffre inventé,
+   * d'autant plus crédible qu'il est rond. On s'abstient.
+   */
+  it('s’abstient sur le TTC quand la TVA n’est pas connue', () => {
+    expect(montantsDeLaFacture(recette(1000, null)))
+      .toEqual({ ht: 1000, tva: null, ttc: null, sansTva: false });
+  });
+
+  /** `undefined` — le champ n'existait pas — vaut la même inconnue que `null`. */
+  it('traite un champ absent comme une TVA inconnue', () => {
+    expect(montantsDeLaFacture(recette(1000)).ttc).toBeNull();
   });
 });
