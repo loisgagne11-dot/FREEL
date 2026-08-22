@@ -33,7 +33,7 @@ import { euros } from '../domain/types';
 import type { Client, Faits, Recette } from './schema';
 import type { Mois } from '../domain/types';
 import {
-  type BrouillonDeFacture, type LigneDeBrouillon, brouillonsDuMois
+  type BrouillonDeFacture, type FactureEmise, type LigneDeBrouillon, brouillonsDuMois
 } from '../domain/calculs/brouillon';
 import { previsionDuMoisParMission } from './selecteurs.activite';
 import {
@@ -251,12 +251,19 @@ export function brouillonsDeFacture(
  * La date retenue est celle d'ÉMISSION : c'est celle que porte le document, et
  * celle qu'on a en tête en cherchant « la facture de juin ».
  */
-function facturesEmisesDuMois(faits: Faits, m: Mois): ReadonlyMap<string, string> {
-  const parClient = new Map<string, string>();
+function facturesEmisesDuMois(faits: Faits, m: Mois): ReadonlyMap<string, FactureEmise> {
+  const parClient = new Map<string, FactureEmise>();
   for (const r of faits.recettes) {
     if (r.emiseLe === null || !r.emiseLe.startsWith(m)) continue;
     if (typeof r.annuleEcriture === 'string') continue;
-    if (!parClient.has(r.clientNom)) parClient.set(r.clientNom, r.numero);
+    // Le montant CUMULÉ du mois, et non celui de la première facture : deux
+    // factures au même client le même mois se comparent au planning
+    // ensemble. N'en retenir qu'une afficherait un écart qui n'existe pas.
+    const acc = parClient.get(r.clientNom);
+    parClient.set(r.clientNom, {
+      numero: acc === undefined ? r.numero : `${acc.numero} +`,
+      montant: euros((acc?.montant ?? 0) + r.montant)
+    });
   }
   return parClient;
 }

@@ -70,14 +70,49 @@ export interface BrouillonDeFacture {
    * justement pouvoir constater avant que le client le constate.
    */
   readonly dejaEmise: string | null;
+  /**
+   * L'écart entre ce qui a été facturé et ce que le planning compte
+   * MAINTENANT. `null` quand rien n'a été émis : il n'y a alors rien à
+   * comparer.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * MONTRER LES DEUX NOMBRES NE SUFFISAIT PAS
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Le brouillon restait affiché à côté de la facture émise « pour que
+   * l'écart se voie ». Il se voyait au sens où les deux montants étaient à
+   * l'écran — mais il fallait les soustraire de tête, sur une carte qui en
+   * porte déjà plusieurs. Un écart qu'on doit calculer soi-même est un écart
+   * qu'on ne remarque pas.
+   *
+   * Il est donc CALCULÉ. Positif : le planning compte plus que ce qui a été
+   * facturé — du travail fait et non facturé, qui se perd si personne ne le
+   * voit avant la clôture. Négatif : on a facturé plus que le planning ne
+   * porte, et c'est le client qui le remarquera.
+   */
+  readonly ecart: EcartDeFacturation | null;
+}
+
+/** De combien la facture émise et le planning divergent. */
+export interface EcartDeFacturation {
+  /** Ce que porte la facture déjà émise. */
+  readonly facture: Euros;
+  /** Planning moins facturé. Signé : le sens de l'écart est l'information. */
+  readonly montant: Euros;
+}
+
+/** Ce qu'une facture émise porte, pour la comparer au planning. */
+export interface FactureEmise {
+  readonly numero: string;
+  readonly montant: Euros;
 }
 
 /**
  * Rassemble les journées du mois en brouillons de facture, un par client.
  *
- * `emisesParClient` associe un nom de client au numéro de la facture déjà
- * émise pour ce mois. Un brouillon dont le client y figure est marqué, pas
- * supprimé.
+ * `emisesParClient` associe un nom de client à la facture déjà émise pour ce
+ * mois — son numéro ET son montant. Un brouillon dont le client y figure est
+ * marqué, pas supprimé, et l'écart entre les deux montants est calculé.
  *
  * Les lignes sans journée ne produisent rien : facturer zéro jour n'est pas
  * une facture à zéro euro, c'est une facture qui n'a pas lieu d'être.
@@ -85,7 +120,7 @@ export interface BrouillonDeFacture {
 export function brouillonsDuMois(
   mois: Mois,
   lignes: readonly LigneDeBrouillon[],
-  emisesParClient: ReadonlyMap<string, string> = new Map()
+  emisesParClient: ReadonlyMap<string, FactureEmise> = new Map()
 ): readonly BrouillonDeFacture[] {
   const parClient = new Map<string, LigneDeBrouillon[]>();
 
@@ -97,14 +132,21 @@ export function brouillonsDuMois(
   }
 
   return [...parClient.entries()]
-    .map(([clientNom, sesLignes]) => ({
-      mois,
-      clientNom,
-      lignes: sesLignes,
-      jours: sesLignes.reduce((s, l) => s + l.jours, 0),
-      total: euros(sesLignes.reduce((s, l) => s + l.montant, 0)),
-      dejaEmise: emisesParClient.get(clientNom) ?? null
-    }))
+    .map(([clientNom, sesLignes]) => {
+      const total = euros(sesLignes.reduce((s, l) => s + l.montant, 0));
+      const emise = emisesParClient.get(clientNom);
+      return {
+        mois,
+        clientNom,
+        lignes: sesLignes,
+        jours: sesLignes.reduce((s, l) => s + l.jours, 0),
+        total,
+        dejaEmise: emise?.numero ?? null,
+        ecart: emise === undefined
+          ? null
+          : { facture: emise.montant, montant: euros(total - emise.montant) }
+      };
+    })
     // Le plus gros montant d'abord : c'est celui qu'on veut envoyer en premier,
     // et celui dont un écart coûte le plus cher.
     .sort((a, b) => b.total - a.total);

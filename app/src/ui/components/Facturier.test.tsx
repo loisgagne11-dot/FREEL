@@ -374,6 +374,40 @@ describe('la facture du mois, avant qu’elle existe', () => {
   });
 
   /**
+   * L'ÉCART SE CHIFFRE, IL NE SE DEVINE PAS.
+   *
+   * Le brouillon restait affiché à côté de la facture émise « pour que
+   * l'écart se voie ». Il se voyait au sens où les deux montants étaient à
+   * l'écran — mais il fallait les soustraire de tête. Un écart qu'on doit
+   * calculer soi-même est un écart qu'on ne remarque pas, et celui-ci se
+   * remarque d'ordinaire quand le client le remarque.
+   */
+  it('chiffre ce qui a été travaillé et pas facturé', () => {
+    // Une facture émise pour le mois, volontairement trop basse : le planning
+    // d'août compte vingt et un jours ouvrés à 500 €.
+    semer(
+      [recette({ id: 'r1', numero: '2026-014', montant: euros(1000) })],
+      { missions: [missionPlanifiee] }
+    );
+    rendre();
+
+    expect(screen.getByText(/n’ont pas été facturés/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Émettre cette facture' })).toBeNull();
+  });
+
+  /** Le SIGNE porte le conseil : les deux sens n'appellent pas le même geste,
+      une facture complémentaire d'un côté, un avoir de l'autre. */
+  it('dit l’autre sens quand on a facturé plus que le planning', () => {
+    semer(
+      [recette({ id: 'r1', numero: '2026-014', montant: euros(999_000) })],
+      { missions: [missionPlanifiee] }
+    );
+    rendre();
+
+    expect(screen.getByText(/en plus de ce que le planning porte/)).toBeTruthy();
+  });
+
+  /**
    * LE POINT QUI COMPTE. Le brouillon vient du MÊME planning que le compte
    * rendu : une journée retirée à l'Activité retire son montant de la facture,
    * sans qu'aucune resynchronisation ait lieu.

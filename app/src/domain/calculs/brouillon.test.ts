@@ -80,7 +80,8 @@ describe('brouillon de facture du mois', () => {
    */
   it('marque le client déjà facturé sans supprimer son brouillon', () => {
     const b = brouillonsDuMois(
-      M, [ligne({ clientNom: 'Alpha' })], new Map([['Alpha', '2026-014']])
+      M, [ligne({ clientNom: 'Alpha' })],
+      new Map([['Alpha', { numero: '2026-014', montant: euros(5000) }]])
     );
 
     expect(b).toHaveLength(1);
@@ -89,8 +90,47 @@ describe('brouillon de facture du mois', () => {
   });
 
   it('laisse à null les clients pas encore facturés', () => {
-    const b = brouillonsDuMois(M, [ligne({ clientNom: 'Beta' })], new Map([['Alpha', '1']]));
+    const b = brouillonsDuMois(
+      M, [ligne({ clientNom: 'Beta' })],
+      new Map([['Alpha', { numero: '1', montant: euros(1) }]])
+    );
     expect(b[0]?.dejaEmise).toBeNull();
+    expect(b[0]?.ecart).toBeNull();
+  });
+
+  /**
+   * L'ÉCART SE CALCULE, IL NE SE DEVINE PAS.
+   *
+   * Le brouillon restait affiché à côté de la facture émise « pour que
+   * l'écart se voie ». Il se voyait au sens où les deux montants étaient à
+   * l'écran — mais il fallait les soustraire de tête, sur une carte qui en
+   * porte déjà plusieurs. Un écart qu'on doit calculer soi-même est un écart
+   * qu'on ne remarque pas.
+   */
+  it('chiffre ce que le planning compte en plus de ce qui a été facturé', () => {
+    const b = brouillonsDuMois(
+      M, [ligne({ clientNom: 'Alpha' })],
+      new Map([['Alpha', { numero: '2026-014', montant: euros(4000) }]])
+    );
+    expect(b[0]?.ecart).toEqual({ facture: 4000, montant: 1000 });
+  });
+
+  /** Le SIGNE est l'information : facturé en trop, c'est le client qui le
+      remarquera ; facturé en moins, c'est du travail qui se perd. */
+  it('rend un écart négatif quand on a facturé plus que le planning', () => {
+    const b = brouillonsDuMois(
+      M, [ligne({ clientNom: 'Alpha' })],
+      new Map([['Alpha', { numero: '2026-014', montant: euros(6000) }]])
+    );
+    expect(b[0]?.ecart?.montant).toBe(-1000);
+  });
+
+  it('ne signale aucun écart quand les deux tombent juste', () => {
+    const b = brouillonsDuMois(
+      M, [ligne({ clientNom: 'Alpha' })],
+      new Map([['Alpha', { numero: '2026-014', montant: euros(5000) }]])
+    );
+    expect(b[0]?.ecart?.montant).toBe(0);
   });
 });
 
