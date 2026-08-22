@@ -167,7 +167,25 @@ const affichage = await page.evaluate(() => {
 if (process.env.DIAGNOSTIC === '1') {
   console.log('  ↳ nombres affichés :', affichage.nombres.join(', '));
 }
-constate(affichage.nombres.includes(20000), 'le solde migré est affiché', '20 000 €');
+// LE SOLDE N'EST PLUS LE SOLDE INITIAL, ET C'EST LA CORRECTION.
+//
+// Ce contrôle attendait 20 000 € — le solde initial de l'ancienne
+// application, affiché tel quel. Un dossier réel a montré ce que cela
+// donnait : après reprise, le solde restait au montant de départ et n'en
+// bougeait plus, quoi que le dossier contienne. Disponible négatif,
+// provisions annoncées à découvert, versable à zéro.
+//
+// Le solde se DÉRIVE désormais des faits postérieurs à sa date, et la
+// migration date ce point de départ de la veille du premier mouvement. Le
+// solde affiché vaut donc le solde initial PLUS l'encaissement de juillet.
+// On le calcule ici plutôt que de le figer : écrire 30 000 en dur rendrait ce
+// contrôle muet le jour où le jeu d'essai change.
+const soldeAttendu = 20000 + 10000;
+constate(
+  affichage.nombres.includes(soldeAttendu),
+  'le solde dérivé des faits est affiché',
+  `${soldeAttendu} €`
+);
 constate(affichage.nombres.includes(1500), 'la réserve migrée est affichée', '1 500 €');
 
 // Volet 2 : la recette de 10 000 € encaissée en juillet 2026, période non
@@ -184,10 +202,10 @@ constate(
   'la charge sur recette encaissée est provisionnée (volet 2 de D3)',
   `${provisionAttendue} €`
 );
-// Et le versable en découle, sans être écrit en dur : 20 000 − provision
-// − 1 500. Le calculer à partir de la provision plutôt que de le figer évite
-// qu'une correction de barème en laisse un des deux à jour et pas l'autre.
-const versableAttendu = 20000 - provisionAttendue - 1500;
+// Et le versable en découle, sans être écrit en dur : solde dérivé
+// − provision − 1 500. Le calculer à partir des deux autres plutôt que de le
+// figer évite qu'une correction en laisse un à jour et pas l'autre.
+const versableAttendu = soldeAttendu - provisionAttendue - 1500;
 constate(
   affichage.nombres.includes(versableAttendu),
   'le versable découle du solde, des provisions et de la réserve',
