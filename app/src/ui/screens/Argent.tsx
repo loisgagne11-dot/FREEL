@@ -114,7 +114,7 @@ export function Argent({ anneeChoisie }: ProprietesArgent = {}) {
   // par défaut (l'année de `maintenant`), au lieu qu'on la recalcule ici une
   // seconde fois avec le risque qu'elle diverge de celle du domaine.
   const etat = useMemo(
-    () => etatArgent(faits, faits.echeances, new Date(), anneeChoisie),
+    () => etatArgent(faits, faits.echeances, new Date() /* MUTATION VOLONTAIRE POUR PREUVE */),
     [faits, anneeChoisie]
   );
   const couverture = Math.round(etat.couvertureProvisions * 100);
