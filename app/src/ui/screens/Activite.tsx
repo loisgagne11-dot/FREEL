@@ -12,6 +12,7 @@ import { MoisEnChiffres } from '../components/MoisEnChiffres';
 import { CraCard } from '../components/CraCard';
 import { useToast } from '../components/Toasts';
 import { joursCongeables, joursFeries } from '../../domain/calculs/activite';
+import type { JourDeLaSemaine } from '../../state/selecteurs.activite';
 import type { Creneau, Portee } from '../../domain/calculs/planning';
 import {
   congeApresSaisie, creneauxDeLaPortee, creneauxOccupes, planifier, saisirSurPortee
@@ -175,7 +176,6 @@ export function Activite() {
   const planningMois = useMemo(() => planningDuMois(faits, mois), [faits, mois]);
   const chiffres = useMemo(() => moisEnChiffres(faits, mois), [faits, mois]);
   const cras = useMemo(() => craDuMoisParMission(faits, mois), [faits, mois]);
-  const affectations = useMemo(() => affectationsPossibles(faits), [faits]);
 
   /*
    * La journée éditée se cherche dans la vue AFFICHÉE.
@@ -188,6 +188,26 @@ export function Activite() {
     ? null
     : (vue === 'mois' ? planningMois : semaine).jours
       .find((j) => j.date === aEditer.date) ?? null;
+
+  /*
+   * LA MISSION TERMINÉE QUI TIENT DÉJÀ LA JOURNÉE RESTE PROPOSABLE.
+   *
+   * La liste n'offrait que les missions ACTIVES. C'est juste pour DÉCLARER une
+   * journée neuve — on n'affecte pas du travail à une mission close. Mais
+   * l'éditeur s'ouvre pré-rempli sur l'occupant de la moitié cliquée, et une
+   * mission terminée n'y figurant pas, le pré-remplissage retombait sur la
+   * PREMIÈRE mission active : cliquer une journée d'une mission finie puis
+   * enregistrer sans rien toucher la transférait en silence à une autre
+   * mission. Deux CRA faussés d'un coup, et le geste avait l'air d'être resté
+   * sans effet.
+   *
+   * Une mission terminée entre donc dans la liste dès qu'elle occupe DÉJÀ la
+   * journée éditée — jamais autrement.
+   */
+  const affectations = useMemo(
+    () => affectationsPossibles(faits, occupantsDuJour(jourEdite)),
+    [faits, jourEdite]
+  );
 
   /**
    * Les flèches suivent la vue.
@@ -845,10 +865,11 @@ function moisLong(m: Mois): string {
  * liste de l'éditeur et la bande colorée qu'on vient de cliquer sur la grille.
  */
 function affectationsPossibles(
-  faits: { readonly missions: readonly Mission[] }
+  faits: { readonly missions: readonly Mission[] },
+  dejaLa: ReadonlySet<string>
 ): readonly Affectation[] {
   return faits.missions
-    .filter((m) => m.statut === 'active')
+    .filter((m) => m.statut === 'active' || m.entites.some((e) => dejaLa.has(cleAffectation(m.id, e.id))))
     .flatMap((m) => m.entites.map((e) => ({
       missionId: m.id,
       entiteId: e.id,
@@ -858,6 +879,23 @@ function affectationsPossibles(
         : (m.description !== '' ? m.description : m.clientNom)
     })));
 }
+
+/**
+ * Qui occupe déjà la journée éditée, toutes moitiés confondues.
+ *
+ * Une seule des deux peut porter la mission terminée qu'on vient de cliquer,
+ * et c'est celle qu'il faut pouvoir garder.
+ */
+function occupantsDuJour(jour: JourDeLaSemaine | null): ReadonlySet<string> {
+  if (jour === null) return new Set();
+  return new Set(jour.creneaux.flatMap(
+    (c) => c.occupants.map((o) => cleAffectation(o.missionId, o.entiteId))
+  ));
+}
+
+/** L'identité d'une affectation, la même que celle de l'éditeur. */
+const cleAffectation = (missionId: string, entiteId: string): string =>
+  `${missionId}\u00b7${entiteId}`;
 
 /**
  * Cette affectation occupe-t-elle une partie de la portée visée&nbsp;?
