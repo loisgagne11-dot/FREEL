@@ -1,9 +1,10 @@
 import { Suspense, lazy, useMemo } from 'react';
 import { useFaits } from '../../state/store';
-import { dateDuJour, soldeEstSuivi } from '../../state/selecteurs';
+import { dateDuJour, provenanceSoldeDe } from '../../state/selecteurs';
 import { etatProjection, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
 import type { DateISO, Euros, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
+import type { ProvenanceSolde } from '../../domain/calculs/solde';
 import { autonomieMois } from '../../domain/calculs/tresorerie';
 import {
   type Franchissement, franchissementPrevu, partDeLAnneeEcoulee, projectionAnnuelle
@@ -560,10 +561,25 @@ function VignetteReserve({ du, couvert }: { readonly du: Euros; readonly couvert
  * qu'on ne fait pas : ce serait conforme et faux, exactement le défaut que ce
  * projet s'interdit sur un chiffre. Le libellé suit donc ce que la ligne
  * calcule réellement, pas le dessin.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA NOTE DU SOLDE DIT SA PROVENANCE, PAS SEULEMENT SA DATE (LOT H-C)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `soldeEstSuivi` disait seulement « un relevé est importé, ou non » — ce qui
+ * s'est révélé être la mauvaise question dès que le solde s'est mis à se
+ * dériver des faits (lot H-B) : un compte sans relevé peut parfaitement se
+ * dériver de recettes et de dépenses, et un compte AVEC relevé peut rester
+ * `saisi` tant que rien n'y a encore été rapproché. `provenanceSoldeDe`
+ * distingue les quatre cas réels ; voir `ProvenanceSolde` pour ce que chacun
+ * garantit. `sansDate` est le plus important à montrer : c'est l'invitation à
+ * dater le solde qui évite exactement le bug que H-C corrige — sans elle,
+ * rien à l'écran ne dit qu'une date manque.
  */
 function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
   const besoinMensuel = useFaits((e) => e.faits.besoinMensuel);
-  const soldeSuivi = useFaits((e) => soldeEstSuivi(e.faits));
+  const provenanceSolde = useFaits((e) => provenanceSoldeDe(e.faits));
+  const soldeInitialAu = useFaits((e) => e.faits.soldeInitialAu);
   const autonomie = autonomieMois(etat.tresorerie.versable, besoinMensuel);
 
   return (
@@ -571,9 +587,7 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
       <Chiffre
         libelle="Solde du compte"
         valeur={eur(etat.tresorerie.solde)}
-        note={soldeSuivi
-          ? `au ${dateCourte(dateDuJour())}`
-          : 'saisi, aucun relevé importé'}
+        note={noteProvenanceSolde(provenanceSolde, soldeInitialAu)}
       />
       <Chiffre
         libelle="Disponible"
@@ -598,6 +612,40 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
       />
     </div>
   );
+}
+
+/**
+ * Ce que la note sous le solde doit dire, selon sa provenance.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * « sansDate » PASSE EN PREMIER, ET C'EST UNE INVITATION, PAS UN CONSTAT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * C'est l'état de tout compte migré : personne n'a encore eu l'occasion de
+ * dater son solde depuis Config. La note doit le dire en clair plutôt que de
+ * se rabattre sur un « saisi » silencieux qui laisserait croire que le
+ * chiffre est déjà à jour de tout ce qui a été enregistré depuis — exactement
+ * la confusion qui a produit le double comptage que ce lot corrige.
+ *
+ * `derive` et `saisi` ne peuvent survenir qu'avec une date posée (voir
+ * `provenanceSolde` : `sansDate` est rendu AVANT tout autre calcul dès que
+ * `soldeInitialAu` vaut `null`) — `soldeInitialAu` y est donc toujours non
+ * nul, ce que le `as DateISO` documente plutôt que de cacher derrière un
+ * `??` qui masquerait un bug de câblage.
+ */
+function noteProvenanceSolde(
+  provenance: ProvenanceSolde, soldeInitialAu: DateISO | null
+): string {
+  switch (provenance) {
+    case 'rapproche':
+      return 'lu sur le relevé';
+    case 'derive':
+      return `dérivé des faits depuis le ${dateCourte(soldeInitialAu as DateISO)}`;
+    case 'saisi':
+      return `saisi le ${dateCourte(soldeInitialAu as DateISO)}, rien à dériver`;
+    case 'sansDate':
+      return 'date-le en Config pour qu’il suive tes entrées et tes sorties';
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
