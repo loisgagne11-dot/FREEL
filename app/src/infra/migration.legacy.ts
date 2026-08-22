@@ -750,6 +750,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
   const mouvements = tableau(t['mouvements']);
   const depenses = extraireDepenses(mouvements, anomalies);
   const echeances = extraireEcheances(mouvements, anomalies);
+  const recettes = extraireRecettes(missionsBrutes, anomalies);
   if (mouvements.length > depenses.length + echeances.length) {
     champsNonRepris.push('treasury.mouvements (hors charges)');
   }
@@ -779,7 +780,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     },
     clients,
     missions,
-    recettes: extraireRecettes(missionsBrutes, anomalies),
+    recettes,
     depenses,
     // Les deux sources sont réunies : `mission.congesDates` est celle que
     // l'application alimente, `treasury.conges` un format plus ancien qu'on
@@ -797,11 +798,46 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // dur dans le code. Rien à reprendre.
     periodesUrssafAjoutees: [],
     soldeInitial: euros(nombre(t['soldeInitial'])),
-    // L'ancienne application ne datait jamais son solde : `null`, jamais la
-    // date de la reprise elle-même, qui ne dit rien de quand le montant était
-    // vrai. Voir `Faits.soldeInitialAu` — la dérivation par les faits reste
-    // en abstention tant que personne ne pose cette date depuis Config.
-    soldeInitialAu: null,
+    /*
+     * LE SOLDE REPRIS EST DATÉ, ET C'EST CE QUI LE REND UTILISABLE.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * CE QUE `null` PRODUISAIT
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * Cette date valait `null`, au motif que l'ancienne application « ne
+     * datait jamais son solde ». C'était vrai de la LETTRE du champ et faux
+     * de son sens, et un dossier réel l'a montré : après reprise, le solde
+     * affichait le solde initial de l'ancienne version — quelques dizaines
+     * d'euros — et n'en bougeait plus. Sans date, `soldeDerive` s'abstient ;
+     * l'abstention est le bon réflexe face à l'inconnu, mais ici la date
+     * n'était pas inconnue.
+     *
+     * Tout en découlait, et rien ne désignait la cause : disponible
+     * lourdement négatif, « il manque tant » sur des provisions en réalité
+     * couvertes, versable à zéro, autonomie à zéro mois. L'utilisateur a
+     * résumé cela par « je ne comprends pas les données », et il avait
+     * raison — l'écran était cohérent avec lui-même et faux.
+     *
+     * ─────────────────────────────────────────────────────────────────────
+     * L'ANCIEN SOLDE INITIAL EST UN POINT DE DÉPART, PAS UN INSTANTANÉ
+     * ─────────────────────────────────────────────────────────────────────
+     *
+     * L'ancienne application affichait côte à côte « solde initial »,
+     * « encaissé », « charges payées » : c'est une ACCUMULATION, et son
+     * premier terme est le solde d'avant la première opération connue. Sa
+     * date n'était pas écrite parce qu'elle était implicite, pas parce
+     * qu'elle n'existait pas.
+     *
+     * On la retrouve donc plutôt que de l'inventer : la VEILLE du plus ancien
+     * fait repris. La veille, et non le jour même — la dérivation ne compte
+     * que ce qui suit strictement la date, et un encaissement tombant
+     * exactement ce jour-là serait perdu.
+     *
+     * Un dossier sans aucun fait daté ne donne rien à ancrer : la date reste
+     * `null` et l'abstention reprend ses droits, comme il se doit.
+     */
+    soldeInitialAu: veilleDuPremierFait(recettes, depenses, echeances),
     // La réserve unifiée (D4) reprend le plancher de compte de l'ancienne
     // version, seule des trois implémentations concurrentes à être un montant.
     reserve: euros(nombre(t['reserveCompte'])),
@@ -831,6 +867,44 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // trois faits, eux, ne gardent pas.
     ...foyerFiscalDepuisConfigImpot(objet(legacy['ir']))
   };
+}
+
+/**
+ * La veille du plus ancien fait daté du dossier.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * TOUTES LES DATES QUI COMPTENT, ET SEULEMENT CELLES-LÀ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * On retient exactement les dates que `soldeDerive` regarde : un
+ * ENCAISSEMENT de recette, un PAIEMENT de dépense, un PAIEMENT d'échéance.
+ * Pas la date d'émission d'une facture ni celle d'exigibilité d'une
+ * échéance : elles ne déplacent pas d'argent, et ancrer le solde sur elles
+ * le ferait démarrer avant le premier mouvement réel — sans conséquence sur
+ * le total, mais en affichant une date que rien ne justifie.
+ *
+ * `null` quand rien n'est daté : il n'y a alors aucune accumulation à
+ * ancrer, et l'abstention de `soldeDerive` est la bonne réponse.
+ */
+function veilleDuPremierFait(
+  recettes: readonly Recette[],
+  depenses: readonly Depense[],
+  echeances: readonly Echeance[]
+): DateISO | null {
+  const dates = [
+    ...recettes.map((r) => r.encaisseeLe),
+    ...depenses.map((d) => d.payeeLe),
+    ...echeances.map((e) => e.payeeLe)
+  ].filter((d): d is DateISO => d !== null);
+
+  if (dates.length === 0) return null;
+
+  // Comparaison de chaînes : le format ISO se trie dans l'ordre du temps,
+  // et passer par des `Date` rouvrirait la question du fuseau pour rien.
+  const premiere = dates.reduce((a, b) => (a < b ? a : b));
+  const veille = new Date(`${premiere}T00:00:00Z`);
+  veille.setUTCDate(veille.getUTCDate() - 1);
+  return veille.toISOString().slice(0, 10) as DateISO;
 }
 
 /**

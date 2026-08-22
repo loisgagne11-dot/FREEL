@@ -149,8 +149,10 @@ function bundleLegacy() {
   };
 }
 
-const avecLegacy = () => stockageMemoire({
-  [CLE_BUNDLE_LEGACY]: JSON.stringify(bundleLegacy()),
+/** Le stockage de l'ancienne application. Le bundle se remplace pour les cas
+    qui veulent un jeu d'essai différent du cas ordinaire. */
+const avecLegacy = (bundle: unknown = bundleLegacy()) => stockageMemoire({
+  [CLE_BUNDLE_LEGACY]: JSON.stringify(bundle),
   freel_ts: '1750000000000',
   freel_theme: 'sombre'
 });
@@ -339,6 +341,68 @@ describe('conversion des données', () => {
     expect(r.faits.soldeInitial).toBe(5000);
     expect(r.faits.reserve).toBe(150);
     expect(r.faits.besoinMensuel).toBe(2200);
+  });
+
+  /**
+   * LE SOLDE REPRIS EST DATÉ, ET C'EST CE QUI LE REND UTILISABLE.
+   *
+   * Cette date valait `null` : « l'ancienne application ne datait jamais son
+   * solde ». Vrai de la lettre du champ, faux de son sens, et un dossier réel
+   * l'a montré — après reprise, le solde restait au solde initial de
+   * l'ancienne version et n'en bougeait plus, parce que `soldeDerive`
+   * s'abstient sans date. Disponible lourdement négatif, provisions annoncées
+   * à découvert alors qu'elles étaient couvertes, versable à zéro, autonomie
+   * à zéro mois : tout en découlait, et rien à l'écran ne désignait la cause.
+   *
+   * Dans ce jeu d'essai, le plus ancien mouvement d'argent est la dépense de
+   * train, datée au seul mois de mai 2026 donc ramenée au 1ᵉʳ. Le solde de
+   * départ est daté de la VEILLE — la dérivation ne compte que ce qui suit
+   * STRICTEMENT, et le jour même perdrait ce mouvement-là.
+   */
+  it('date le solde repris de la veille du premier mouvement', () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    expect(r.faits.soldeInitialAu).toBe('2026-04-30');
+  });
+
+  /**
+   * Une date d'ÉMISSION ne déplace pas d'argent, et l'ancrage ne la regarde
+   * donc pas : s'y ancrer ferait démarrer le solde avant le premier mouvement
+   * réel, à une date que rien ne justifie.
+   *
+   * Le jeu d'essai est réduit à une seule facture ENVOYÉE et non réglée :
+   * aucun euro n'a bougé, il n'y a rien à ancrer.
+   */
+  it('ignore les dates qui ne déplacent pas d’argent', () => {
+    const r = migrer(avecLegacy({
+      c: { nom: 'Exemple' },
+      m: [{
+        id: 'M1', client: 'C', description: 'M', tjm: 400, statut: 'active',
+        factures: [{
+          id: 'F9', numero: '2026-009', ht: 1000, mois: '2026-01',
+          dateEnvoi: '2026-01-15', status: 'envoyée'
+        }]
+      }],
+      t: { soldeInitial: 5000, mouvements: [] }
+    }));
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    expect(r.faits.recettes).toHaveLength(1);
+    expect(r.faits.soldeInitialAu).toBeNull();
+  });
+
+  /**
+   * Rien de daté du tout : il n'y a aucune accumulation à ancrer, et
+   * l'abstention de `soldeDerive` redevient la bonne réponse. Dater quand
+   * même reviendrait à inventer le point de départ qu'on prétend retrouver.
+   */
+  it('s’abstient de dater quand aucun fait ne l’est', () => {
+    const r = migrer(avecLegacy({
+      c: { nom: 'Exemple' },
+      m: [],
+      t: { soldeInitial: 5000, mouvements: [] }
+    }));
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    expect(r.faits.soldeInitialAu).toBeNull();
   });
 
   it('lit aussi le format antérieur, une clé par entité', () => {
