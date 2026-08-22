@@ -82,11 +82,18 @@ describe('les tuiles de performance', () => {
    * « 10 000 € » et « 4 000 € » côte à côte ne disent pas lequel est facturé et
    * lequel est encaissé. Sans les notes, la tuile la plus flatteuse est celle
    * qu'on retient — et c'est le facturé, celui sur lequel rien ne se décide.
+   *
+   * Le TITRE aussi doit le dire, et pas seulement la note : il annonçait
+   * « CA réalisé », un mot qui désigne ailleurs ce que le travail du planning
+   * produit. Deux nombres très différents sous le même nom, et l'utilisateur
+   * concluait — à raison — qu'il ne comprenait pas les données.
    */
   it('dit sous chaque montant de quel chiffre d’affaires il s’agit', () => {
     poser({ recettes: [recette({ montant: euros(10_000) })] });
 
-    expect(screen.getByText('facturé, cumulé')).toBeTruthy();
+    // Le titre de la tuile porte l'année ; celui du graphe ne l'a pas.
+    expect(screen.getByText('CA facturé · 2026')).toBeTruthy();
+    expect(screen.getByText('émis, encaissé ou non')).toBeTruthy();
     expect(screen.getByText('reçu sur le compte')).toBeTruthy();
   });
 

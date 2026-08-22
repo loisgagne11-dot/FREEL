@@ -131,10 +131,28 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
   return (
     <>
       <div className={styles.tuiles}>
+        {/*
+          * « FACTURÉ » ET NON « RÉALISÉ », ET C'EST UNE CORRECTION DE NOM.
+          *
+          * Le titre disait « CA réalisé » et la note « facturé, cumulé » : la
+          * note disait juste, le titre non. Or « réalisé » désigne ailleurs
+          * une TOUTE AUTRE mesure — ce que le travail du planning produit,
+          * jours retenus multipliés par le tarif, que l'écran Activité nomme
+          * « CA généré ».
+          *
+          * Les deux sont légitimes et ne coïncident jamais : on facture après
+          * coup, et une journée travaillée le 30 du mois n'est facturée que le
+          * mois suivant. Un utilisateur venu de l'ancienne application, qui
+          * appelait « CA réalisé » la seconde, lisait donc deux nombres très
+          * différents sous le même nom et concluait — à raison — qu'il ne
+          * comprenait pas les données.
+          *
+          * Une source unique par notion suppose d'abord un nom par notion.
+          */}
         <Chiffre
-          libelle={`CA réalisé · ${etat.annee}`}
+          libelle={`CA facturé · ${etat.annee}`}
           valeur={eur(etat.caRealise)}
-          note="facturé, cumulé"
+          note="émis, encaissé ou non"
         />
         <Chiffre
           libelle="CA encaissé"
@@ -261,7 +279,12 @@ function TuileResultat({ resultat }: { readonly resultat: ResultatProjete | null
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * CA réalisé contre CA encaissé, **mois écoulés seulement**.
+ * CA FACTURÉ contre CA encaissé, **mois écoulés seulement**.
+ *
+ * « Facturé » et non « réalisé » : voir la tuile plus haut. « Réalisé »
+ * désigne ailleurs ce que le travail du planning produit, une tout autre
+ * mesure, et le même mot pour les deux faisait lire deux nombres très
+ * différents comme s'ils devaient coïncider.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI L'AXE S'ARRÊTE AU MOIS COURANT
@@ -326,7 +349,7 @@ function GrapheCa(
     <section className={styles.carte} aria-labelledby="graphe-ca">
       <header className={styles.enteteCarte}>
         <h2 id="graphe-ca" className={styles.titreCarte}>
-          CA réalisé vs encaissé
+          CA facturé vs encaissé
           <Info libelle="Explication de l’écart entre facturé et encaissé">
             Le facturé dit ce qui a été émis, l’encaissé ce qui est arrivé sur le
             compte. L’écart entre les deux est ce qui se transforme en trou de
@@ -369,7 +392,7 @@ function GrapheCa(
                  contenu, qui commence par « 9,4 k€ 8,0 » — deux nombres
                  abrégés sans unité ni mois. On ne saurait ni sur quoi on
                  clique, ni ce que ça vaut. */
-              aria-label={`${MOIS_COURTS[i] ?? m.mois} : ${eur(m.realise)} réalisé, `
+              aria-label={`${MOIS_COURTS[i] ?? m.mois} : ${eur(m.realise)} facturé, `
                 + `${eur(m.encaisse)} encaissé`}
               onClick={() => onLire(m.mois)}
             >
@@ -395,11 +418,11 @@ function GrapheCa(
 
       <footer className={styles.piedCarte}>
         <span className={styles.legende}>
-          <span className={styles.pastilleRealise} aria-hidden="true" />CA réalisé (facturé)
+          <span className={styles.pastilleRealise} aria-hidden="true" />CA facturé
           <span className={styles.pastilleEncaisse} aria-hidden="true" />CA encaissé
         </span>
         <span className={styles.cumul}>
-          Cumulé&nbsp;: <Montant>{eur(etat.caRealise)}</Montant> réalisé ·{' '}
+          Cumulé&nbsp;: <Montant>{eur(etat.caRealise)}</Montant> facturé ·{' '}
           <Montant>{eur(etat.caEncaisse)}</Montant> encaissé
         </span>
       </footer>
