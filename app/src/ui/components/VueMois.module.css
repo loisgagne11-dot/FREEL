@@ -42,9 +42,15 @@
 .jourCourant { border-color: var(--green); }
 
 /* Un week-end ou un férié ne se travaille pas d'ordinaire, mais reste cliquable
-   — les astreintes et les rendus de nuit existent. Le fond s'efface, la case
-   demeure. */
-.weekEnd { background: transparent; }
+   — les astreintes et les rendus de nuit existent. Le fond s'efface, le cadre
+   passe en POINTILLÉS comme dans le dessin, et la case demeure.
+
+   Le pointillé plutôt qu'un simple gris : la grille compte trente cases, dont
+   huit ou neuf de week-end, et un gris de plus se serait confondu avec une case
+   ouvrée mais vide. Le trait discontinu dit « hors du cadre ordinaire » sans
+   consommer une nuance de gris. */
+.weekEnd { background: transparent; border-style: dashed; }
+.weekEnd .numero { opacity: 0.6; }
 .ferie { background: transparent; border-style: dashed; }
 
 /* Posé en OVERLAY sur la première bande, et non plus sur sa propre ligne : une
@@ -103,9 +109,11 @@
 
 .occupee { font-weight: 700; }
 
-/* Le congé est HACHURÉ, comme dans la vue semaine : une même journée doit se
-   reconnaître d'un onglet à l'autre. Deux traitements pour le même état
-   feraient chercher une différence qui n'existe pas. */
+/* Le congé est HACHURÉ, comme dans la vue semaine.
+   ÉCART ASSUMÉ AU DESSIN : la référence hachure en vue semaine et pose un aplat
+   en vue mois. Suivre les deux importerait SON incohérence — une même journée
+   changerait d'aspect selon l'onglet, et on chercherait la différence qu'elle
+   signale. Elle n'en signale aucune : c'est le même congé. */
 .conge {
   background:
     repeating-linear-gradient(

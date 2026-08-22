@@ -224,6 +224,10 @@
 /* Le titre et la bascule sur une même ligne, comme le dessin. `wrap` plutôt
    qu'un rétrécissement : sur un téléphone, la bascule passe dessous entière
    au lieu de comprimer « Vue semaine » jusqu'à l'ellipse. */
+/* Titre à gauche, navigation de période au CENTRE, bascule à droite — l'ordre
+   du dessin. `wrap` plutôt qu'un rétrécissement : sur un téléphone les trois
+   blocs passent l'un sous l'autre entiers, au lieu de comprimer « Vue semaine »
+   jusqu'à l'ellipse. */
 .enteteCarte {
   display: flex;
   align-items: center;
@@ -232,6 +236,12 @@
   gap: 8px 12px;
 }
 
+/* La navigation prend la place restante et centre son contenu : c'est ce qui la
+   met au milieu quand la ligne tient, et la laisse cadrée à gauche quand elle
+   passe seule sur sa ligne. */
+.enteteCarte .navigationMois { flex: 1 1 auto; justify-content: center; }
+
+.enteteCarte .navigationMois,
 .enteteCarte .bascule { margin-bottom: 12px; }
 
 .bascule {
