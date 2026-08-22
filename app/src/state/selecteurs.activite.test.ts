@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
 import { type Faits, faitsVides } from './schema';
 import {
-  craDuMoisParMission, etatActivite, lundiDeLaSemaine, planningDeLaSemaine, planningDuMois,
+  craDuMoisParMission, etatActivite, lundiDeLaSemaine, moisEnChiffres, planningDeLaSemaine,
+  planningDuMois,
   rapportParMission
 } from './selecteurs.activite';
 
@@ -551,5 +552,81 @@ describe('planning du mois', () => {
       if (meme === undefined) continue; // la semaine déborde du mois
       expect(meme).toEqual(jour);
     }
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Les journées engagées au-delà d'une journée
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * POURQUOI L'OCCUPATION DÉPASSAIT 100 % SANS QUE RIEN NE LE DISE.
+ *
+ * Le numérateur additionne les journées PAR CLIENT ; le dénominateur compte les
+ * jours du CALENDRIER. Deux rythmes qui prévoient tous deux le vendredi — l'un
+ * à 0,5, l'autre à 1 — donnent 1,5 journée sur un seul vendredi.
+ *
+ * Le taux n'était pas faux : il rapportait fidèlement une donnée qui, elle,
+ * était impossible. Le jeu de démonstration lui-même portait ce défaut, et
+ * l'écran affichait 102 % sans qu'aucun test ne s'en émeuve.
+ */
+describe('journées surengagées', () => {
+  /** Deux clients opérationnels qui se disputent le même jour de semaine. */
+  const surDeuxRythmes = (venA: number, venB: number): Faits['missions'][number] => ({
+    ...MISSION,
+    entites: [
+      {
+        ...(MISSION.entites[0] as (typeof MISSION)['entites'][number]),
+        id: 'co-a', nom: 'Client A',
+        rythmes: [{
+          du: D('2026-01-01'), au: D('2026-12-31'), parJour: { ven: venA }, tjm: euros(500)
+        }]
+      },
+      {
+        ...(MISSION.entites[0] as (typeof MISSION)['entites'][number]),
+        id: 'co-b', nom: 'Client B',
+        rythmes: [{
+          du: D('2026-01-01'), au: D('2026-12-31'), parJour: { ven: venB }, tjm: euros(500)
+        }]
+      }
+    ]
+  });
+
+  /**
+   * LE CAS QUI PRODUISAIT 102 %. Un vendredi à 0,5 + 1 vaut 1,5 journée sur une
+   * seule journée réelle — et juin 2026 compte quatre vendredis.
+   */
+  it('compte les jours qui portent plus d’une journée de travail', () => {
+    const c = moisEnChiffres(avec({ missions: [surDeuxRythmes(0.5, 1)] }), mois('2026-06'));
+    expect(c.joursSurengages).toBe(4);
+  });
+
+  /**
+   * DEUX DEMI-JOURNÉES FONT UNE JOURNÉE PLEINE, ET C'EST LÉGITIME.
+   *
+   * Le seuil est UN, et non le nombre de créneaux : deux clients à mi-temps le
+   * même vendredi remplissent la journée sans la dépasser. Signaler ce cas
+   * apprendrait à ignorer le signal.
+   */
+  it('ne signale pas deux demi-journées qui se complètent', () => {
+    const c = moisEnChiffres(avec({ missions: [surDeuxRythmes(0.5, 0.5)] }), mois('2026-06'));
+    expect(c.joursSurengages).toBe(0);
+  });
+
+  /**
+   * L'ARITHMÉTIQUE FLOTTANTE, ET POURQUOI LE SEUIL N'EST PAS EXACTEMENT UN.
+   *
+   * `0.5 + 0.5` peut valoir `1.0000000000000002` selon l'ordre de la somme. Sans
+   * tolérance, une journée parfaitement remplie se signalerait une fois sur
+   * deux — et un signal qui se déclenche au hasard cesse d'être lu.
+   */
+  it('ne se déclenche pas sur une journée pleine au centième près', () => {
+    const c = moisEnChiffres(avec({ missions: [surDeuxRythmes(0.1, 0.9)] }), mois('2026-06'));
+    expect(c.joursSurengages).toBe(0);
+  });
+
+  // Le cas ordinaire — un seul client — ne signale jamais rien.
+  it('ne signale rien sur une mission à un seul client', () => {
+    expect(moisEnChiffres(avec(), mois('2026-06')).joursSurengages).toBe(0);
   });
 });

@@ -91,15 +91,20 @@ export function VueMois(
     <>
       <p className={styles.resume}>
         {/* Le mois en tête du sous-titre, comme le dessin : sans lui, savoir de
-            quel mois parlent « 22 jours ouvrés » oblige à remonter à l'en-tête
-            de l'écran, deux niveaux plus haut — et le sélecteur mois/semaine
-            juste au-dessus donne d'autant moins envie d'y regarder. */}
+            quel mois parlent « 22 j ouvrés » oblige à remonter à l'en-tête de
+            l'écran, deux niveaux plus haut — et le sélecteur mois/semaine juste
+            au-dessus donne d'autant moins envie d'y regarder. */}
         <span className={styles.periode}>{libellePeriode}</span>
         {' · '}
         <span>couleur&nbsp;=&nbsp;client · deux créneaux par jour</span>
         {' · '}
         <strong>
-          {decompte.ouvres} jour{decompte.ouvres > 1 ? 's' : ''} ouvré{decompte.ouvres > 1 ? 's' : ''}
+          {/* « j », comme le dessin, et non « jour(s) » : la ligne de résumé se lit
+              d'un regard, la précision du compte ne se perd pas — c'est un nombre,
+              pas une abréviation ambiguë. « dont N de congé » reste en toutes
+              lettres : c'est une nuance que le dessin ne porte pas et qui change
+              la lecture du chiffre. */}
+          {decompte.ouvres} j ouvré{decompte.ouvres > 1 ? 's' : ''}
           {decompte.enConge > 0 && `, dont ${decompte.enConge} de congé`}
         </strong>
       </p>
@@ -223,8 +228,19 @@ function Demi(
             // partagée, aucune des deux ne représente l'autre client, et le
             // neutre est le seul choix honnête — colorer d'après le premier
             // reviendrait à l'erreur qu'on corrige ici.
+            //
+            // La teinte BRUTE du client, posée telle quelle, se lit bien sur
+            // le fond sombre du thème nuit mais devient illisible sur le fond
+            // PASTEL du thème clair — un vert saisi par l'utilisateur peut
+            // tomber presque à la même clarté que le fond vert pâle sur
+            // lequel `fondBande` le pose, et « SL » disparaît. Le mélanger
+            // avec `--text` — le foncé du thème clair, le clair du thème
+            // sombre — pousse la teinte dans le sens inverse de celui de la
+            // bande (qui se mélange, elle, vers `--panel`) : elle en ressort
+            // foncée sur fond clair et claire sur fond sombre, sans qu'aucune
+            // couleur de client ne soit jamais écrite en dur.
             ...(!partage && premier !== undefined && premier.couleur !== ''
-              ? { color: premier.couleur }
+              ? { color: `color-mix(in srgb, ${premier.couleur} 45%, var(--text))` }
               : {})
           }
         }
@@ -258,13 +274,23 @@ function Demi(
  * effaçait le second aussi bien de la couleur que des initiales. On partage
  * la bande en autant de tranches que d'occupants plutôt que d'en retenir un
  * au hasard.
+ *
+ * DOSAGE À 20 % : le dessin teinte ses cases avec un calque à 20 %
+ * d'opacité (`rgba(couleur,.2)`) sur le fond du panneau — un dosage qui reste
+ * discret quelle que soit la teinte posée dessous. Une couleur saisie par
+ * l'utilisateur peut être bien plus vive que celles du dessin ; le même
+ * dosage, appliqué en mélange plutôt qu'en calque, donne un résultat du même
+ * ordre pour n'importe quelle teinte — vif ou pastel au départ, il redevient
+ * discret à l'arrivée. Un dosage plus fort (30 % avant cette correction)
+ * fait ressortir la saturation d'origine au lieu de l'atténuer, et c'est ce
+ * que le contrôle visuel a relevé en thème sombre.
  */
 function fondBande(occupants: readonly { readonly couleur: string }[]): string | undefined {
   const couleurs = occupants.map((o) => o.couleur).filter((c) => c !== '');
   if (couleurs.length === 0) return undefined;
   const part = 100 / couleurs.length;
   const tranches = couleurs
-    .map((c, i) => `color-mix(in srgb, ${c} 30%, var(--panel)) ${i * part}% ${(i + 1) * part}%`)
+    .map((c, i) => `color-mix(in srgb, ${c} 20%, var(--panel)) ${i * part}% ${(i + 1) * part}%`)
     .join(', ');
   // À l'horizontale : les initiales se lisent aussi de gauche à droite dans
   // cet ordre (« SL/AN »), et la tranche de couleur tombe derrière celle

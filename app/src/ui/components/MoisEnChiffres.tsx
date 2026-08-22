@@ -91,6 +91,32 @@ export function MoisEnChiffres({ chiffres }: { readonly chiffres: Chiffres }) {
         </p>
 
         {/*
+          * LA CAUSE D'UN TAUX AU-DESSUS DE 100 %, DITE PLUTÔT QUE DEVINÉE.
+          *
+          * Le numérateur additionne les journées PAR CLIENT, le dénominateur
+          * compte les jours du CALENDRIER. Deux rythmes qui prévoient tous deux
+          * le vendredi — l'un à 0,5, l'autre à 1 — donnent 1,5 journée sur un
+          * seul vendredi, et l'occupation dépasse 100 %.
+          *
+          * Le taux n'est pas faux : il rapporte fidèlement une donnée qui, elle,
+          * est impossible. On ne le borne donc PAS — le borner masquerait le
+          * signal. On nomme la cause, et on renvoie au geste qui la corrige : un
+          * jour ne contient pas une journée et demie, et le CRA qui en sortirait
+          * facturerait du temps qui n'a pas existé.
+          */}
+        {chiffres.joursSurengages > 0 && (
+          <p className={styles.surengagement} role="status">
+            <strong>
+              {chiffres.joursSurengages}&nbsp;jour{chiffres.joursSurengages > 1 ? 's' : ''}
+            </strong>
+            {chiffres.joursSurengages > 1 ? ' portent ' : ' porte '}
+            plus d’une journée de travail&nbsp;: deux rythmes s’y superposent.
+            Corrige-les au planning, sans quoi le compte rendu facturera du temps
+            qui n’a pas existé.
+          </p>
+        )}
+
+        {/*
           * UNE MESURE OU UNE ESTIMATION, ET L'ÉCRAN DOIT LE DIRE.
           *
           * Sans rythme saisi, les journées se déduisent du montant facturé

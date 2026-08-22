@@ -112,7 +112,9 @@ const rendre = (
 describe('compte des jours ouvrés de la semaine', () => {
   it('affiche les jours ouvrés de la semaine visible', () => {
     rendre(semaine());
-    expect(screen.getByText(/5 jours ouvrés/)).toBeTruthy();
+    // « j ouvrés », comme le dessin — voir la correction d'ergonomie sur
+    // l'abréviation, dans VueSemaine.tsx.
+    expect(screen.getByText(/5 j ouvrés/)).toBeTruthy();
   });
 
   /**
@@ -121,7 +123,7 @@ describe('compte des jours ouvrés de la semaine', () => {
    */
   it('retire les jours fériés du compte', () => {
     rendre(semaine({ '2026-07-08': jour('2026-07-08', { ferie: true }) }));
-    expect(screen.getByText(/4 jours ouvrés/)).toBeTruthy();
+    expect(screen.getByText(/4 j ouvrés/)).toBeTruthy();
   });
 
   /**
@@ -134,21 +136,21 @@ describe('compte des jours ouvrés de la semaine', () => {
       '2026-07-06': jour('2026-07-06', { conge: 1 }),
       '2026-07-07': jour('2026-07-07', { conge: 1 })
     }));
-    const resume = screen.getByText(/jours ouvrés/);
-    expect(resume.textContent).toMatch(/5 jours ouvrés/);
+    const resume = screen.getByText(/j ouvrés/);
+    expect(resume.textContent).toMatch(/5 j ouvrés/);
     expect(resume.textContent).toMatch(/dont 2 de congé/);
   });
 
   // Sans congé, la précision n'a rien à dire et n'encombre pas la ligne.
   it('ne mentionne les congés que s’il y en a', () => {
     rendre(semaine());
-    expect(screen.getByText(/jours ouvrés/).textContent).not.toMatch(/congé/);
+    expect(screen.getByText(/j ouvrés/).textContent).not.toMatch(/congé/);
   });
 
   // Une demi-journée occupe le jour : il compte comme jour en congé.
   it('tient une demi-journée pour un jour en congé', () => {
     rendre(semaine({ '2026-07-06': jour('2026-07-06', { conge: 0.5 }) }));
-    expect(screen.getByText(/jours ouvrés/).textContent).toMatch(/dont 1 de congé/);
+    expect(screen.getByText(/j ouvrés/).textContent).toMatch(/dont 1 de congé/);
   });
 
   /**
@@ -254,6 +256,24 @@ describe('les deux moitiés de la journée', () => {
     const fond = matin.style.background;
     expect(fond).toContain('#3b82f6');
     expect(fond).toContain('#a855f7');
+  });
+
+  /**
+   * LE DOSAGE DU FOND SUIT CELUI DU DESSIN, PAS CELUI DE LA TEINTE SAISIE.
+   *
+   * Même règle que VueMois, pour la même raison : un dosage trop généreux
+   * laisse ressortir la vivacité d'une teinte saisie par l'utilisateur au
+   * lieu de l'atténuer comme le fait le dessin (`rgba(couleur,.2)`). Sans ce
+   * test, remonter le dosage à 22 % (l'ancien réglage) ne ferait rien
+   * échouer.
+   */
+  it('assourdit la teinte du client au même dosage que le dessin', () => {
+    rendre(semaine({
+      '2026-07-06': jour('2026-07-06', { lignes: [ligne({ nom: 'Client', couleur: '#3b82f6' })] })
+    }));
+
+    const matin = screen.getByRole('button', { name: /6 juil\. 2026, matin/ });
+    expect(matin.style.background).toContain('color-mix(in srgb, #3b82f6 20%, var(--panel))');
   });
 
   /**

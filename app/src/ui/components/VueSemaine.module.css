@@ -183,11 +183,14 @@
 
 .legendeEntree { display: inline-flex; align-items: center; gap: 6px; }
 
+/* Ronde, comme le dessin. Une puce de légende n'est pas un carré de couleur
+   qu'on retrouverait ailleurs sur l'écran — le rond la distingue sans
+   ambiguïté des cases de la grille, qui elles sont carrées. */
 .pastille {
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: 50%;
   background: var(--green);
 }
 

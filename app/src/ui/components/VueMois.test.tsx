@@ -219,6 +219,41 @@ describe('ce que chaque moitié porte', () => {
     expect(matin.style.background).toContain('#22c55e');
     expect(matin.style.background).toContain('#3b82f6');
   });
+
+  /**
+   * LA TEINTE BRUTE DU CLIENT NE SUFFIT PAS COMME COULEUR DE TEXTE.
+   *
+   * Posée telle quelle, elle se lit bien sur le fond sombre du thème nuit
+   * mais devient quasi invisible sur le fond pastel du thème clair — un
+   * contrôle visuel l'a relevé : « SL » vert sur vert pâle. Le texte doit se
+   * mélanger vers `--text`, le jeton qui va dans le sens INVERSE de celui de
+   * la bande (mélangée vers `--panel`) : foncé sur fond clair, clair sur
+   * fond sombre, sans qu'aucune couleur de client ne soit écrite en dur. Sans
+   * ce test, remettre `color: premier.couleur` ne ferait rien échouer.
+   */
+  it('mélange les initiales colorées avec le texte du thème plutôt que de poser la teinte brute', () => {
+    rendre({ missions: [missionDe({ nom: 'Studio Lumen', couleur: '#22c55e', parJour: { lun: 1 } })] });
+
+    const matin = screen.getByRole('button', { name: /^1 juin 2026, matin, Studio Lumen/ });
+    expect(matin.style.color).toBe('color-mix(in srgb, #22c55e 45%, var(--text))');
+  });
+
+  /**
+   * LE DOSAGE DU FOND SUIT CELUI DU DESSIN, PAS CELUI DE LA TEINTE SAISIE.
+   *
+   * Le dessin teinte ses cases à 20 % d'opacité quelle que soit la couleur
+   * posée dessous. Une teinte saisie par l'utilisateur peut être bien plus
+   * vive que celles du dessin ; un dosage trop généreux (30 % avant cette
+   * correction) laisse alors ressortir toute cette vivacité au lieu de
+   * l'atténuer — c'est ce qu'un contrôle visuel a relevé en thème sombre :
+   * bleu et violet francs là où le dessin les montre assourdis.
+   */
+  it('assourdit la teinte du client au même dosage que le dessin', () => {
+    rendre({ missions: [missionDe({ nom: 'Studio Lumen', couleur: '#22c55e', parJour: { lun: 1 } })] });
+
+    const matin = screen.getByRole('button', { name: /^1 juin 2026, matin, Studio Lumen/ });
+    expect(matin.style.background).toContain('color-mix(in srgb, #22c55e 20%, var(--panel))');
+  });
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -301,7 +336,9 @@ describe('le compte du mois', () => {
    */
   it('annonce les jours ouvrés du mois', () => {
     rendre();
-    expect(screen.getByText(/22 jours ouvrés/)).toBeTruthy();
+    // « j ouvrés », comme le dessin — voir la correction d'ergonomie sur
+    // l'abréviation, dans VueMois.tsx.
+    expect(screen.getByText(/22 j ouvrés/)).toBeTruthy();
   });
 
   /**
@@ -310,21 +347,21 @@ describe('le compte du mois', () => {
    * La référence dit « Juin 2026 · couleur = client · 22 j ouvrés » ; le
    * libellé était déjà reçu par le composant, mais ne servait qu'au nom
    * accessible du groupe — invisible à l'écran. Sans le mois en tête, savoir
-   * de quand parlent ces « 22 jours ouvrés » oblige à remonter à l'en-tête,
+   * de quand parlent ces « 22 j ouvrés » oblige à remonter à l'en-tête,
    * deux niveaux plus haut.
    */
   it('annonce le mois affiché en tête du sous-titre', () => {
     rendre();
     // Le libellé et le compte sont dans des éléments distincts du même
     // paragraphe : c'est le paragraphe entier qui doit commencer par le mois.
-    const sousTitre = screen.getByText(/jours ouvrés/).closest('p');
+    const sousTitre = screen.getByText(/j ouvrés/).closest('p');
     expect(sousTitre?.textContent?.startsWith('juin 2026')).toBe(true);
   });
 
   it('nomme les congés à part, sans les retirer des ouvrés', () => {
     rendre({ conges: [{ date: D('2026-06-02'), quotite: 1 }] });
-    const resume = screen.getByText(/jours ouvrés/);
-    expect(resume.textContent).toMatch(/22 jours ouvrés/);
+    const resume = screen.getByText(/j ouvrés/);
+    expect(resume.textContent).toMatch(/22 j ouvrés/);
     expect(resume.textContent).toMatch(/dont 1 de congé/);
   });
 
