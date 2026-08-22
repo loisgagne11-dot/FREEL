@@ -924,6 +924,42 @@ export interface MoisEnChiffres {
    * ferait lire un mois catastrophique là où il n'y a rien à lire.
    */
   readonly occupation: number | null;
+  /**
+   * Combien de journées du mois portent PLUS d'une journée de travail.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * POURQUOI L'OCCUPATION DÉPASSAIT 100 % SANS QUE RIEN NE LE DISE
+   * ─────────────────────────────────────────────────────────────────────
+   *
+   * Le numérateur additionne les journées PAR CLIENT ; le dénominateur compte
+   * les jours du CALENDRIER. Deux rythmes qui prévoient tous deux le vendredi
+   * — l'un à 0,5, l'autre à 1 — donnent 1,5 journée sur un seul vendredi, et
+   * l'occupation passe au-dessus de 100 %.
+   *
+   * Le taux n'était pas faux : il rapportait fidèlement une donnée qui, elle,
+   * était impossible. C'est la DONNÉE qu'il faut signaler — un jour ne contient
+   * pas une journée et demie, et le CRA qui en sortirait facturerait du temps
+   * qui n'a pas existé. Le jeu de démonstration lui-même portait ce défaut.
+   *
+   * Le seuil est UN, et non le nombre de créneaux : deux demi-journées font une
+   * journée pleine, et c'est le maximum qu'un jour puisse porter.
+   */
+  readonly joursSurengages: number;
+  /**
+   * Les jours fériés du mois, et les congés posés depuis le 1ᵉʳ janvier.
+   *
+   * Ils vivaient dans la carte « Congés du mois », retirée avec sa seconde
+   * grille : le plan de charge répond désormais à tout ce qu'elle savait
+   * faire. Ces deux nombres-là, non — un férié ne se compte pas à l'œil sur
+   * une trame de trente cases, et le cumul de l'ANNÉE n'y figure pas du tout.
+   *
+   * Les laisser partir avec la carte aurait été exactement le défaut que le
+   * troisième inventaire existe pour attraper : l'écran est là, le magasin est
+   * câblé, les tests sont verts, et le chiffre a disparu.
+   */
+  readonly joursFeries: number;
+  /** Congés posés sur l'année du mois affiché, en quotités cumulées. */
+  readonly congesDeLAnnee: number;
   readonly parClient: readonly PartClient[];
   /** `null` quand aucune demi-journée du mois ne porte de lieu. */
   readonly teletravail: PartTeletravail | null;
@@ -1023,8 +1059,24 @@ export function moisEnChiffres(
     }))
     .sort((a, b) => b.jours - a.jours);
 
+  /* Une tolérance d'un centième : les quotités sont des flottants, et
+     0,5 + 0,5 peut valoir 1,0000000000000002 selon l'ordre de la somme. Sans
+     elle, une journée parfaitement remplie se signalerait une fois sur deux. */
+  const joursSurengages = planning.jours.filter((j) => j.retenu > 1.01).length;
+
+  // Somme des QUOTITÉS et non compte des entrées : deux demi-journées valent
+  // un jour, et les compter en donnerait deux. Même règle que `etatActivite`,
+  // dont c'est la seule autre lecture.
+  const annee = m.slice(0, 4);
+  const congesDeLAnnee = faits.conges
+    .filter((c) => c.date.startsWith(annee))
+    .reduce((s, c) => s + c.quotite, 0);
+
   return {
     joursTravailles,
+    joursSurengages,
+    joursFeries: plan.joursFeries,
+    congesDeLAnnee,
     caGenere: total.montantRetenu,
     joursOuvrables: plan.joursOuvrables,
     joursDeConge: plan.joursDeConge,

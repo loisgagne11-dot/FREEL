@@ -100,7 +100,8 @@ un trou qui ne fait échouer aucun test.
 | `resetReelsToTheorique` — revenir au rythme | ✅ | **Ajouté le 13/08**, à la maille de la semaine. Le bouton n'apparaît que si elle porte une correction |
 | `buildCRAData`, `generateCRAHTMLContent`, `generateCRAPDF` | 🟢 | Le CRA est **produit**, jamais saisi ; une mission par page à l'impression |
 | `showCRAPreviewWithSend` — envoi au client | ❌ | Impression seulement |
-| Congés, demi-journées, jours fériés | 🟢 | Fériés **calculés** (comput de Pâques compris) ; l'ancienne divisait par 20, une constante |
+| Congés, demi-journées, jours fériés | 🟢 | Fériés **calculés** (comput de Pâques compris) ; l'ancienne divisait par 20, une constante. **Lot G** : le congé se pose depuis le plan de charge lui-même, à la demi-journée. Le calendrier séparé qui le portait arrondissait au JOUR — une matinée de congé gonflait le solde de moitié, en silence |
+| `toggleConge` — poser un congé d'un clic | 🟢 | **Lot G** : le clic ouvre un éditeur au lieu de basculer. Un clic de plus sur le geste courant, et c'est le prix de trois choses que la bascule ne pouvait pas dire — le lieu, le client quand deux missions revendiquent la même moitié, et le congé à la demi-journée. Surtout, elle ne pouvait qu'AJOUTER une moitié, jamais la retirer à quelqu'un d'autre : une journée et demie posée sur un seul vendredi n'avait aucun geste pour la corriger |
 | `showWeeklyBreakdownModal` | ✅ | Vue semaine |
 
 ## 3. Argent, charges, trésorerie
@@ -219,7 +220,7 @@ schéma, migré depuis l'ancienne version, et aucun chemin pour l'atteindre.
 |---|---|---|
 | **`entreprise.adresse`, `codePostal`, `ville` saisissables nulle part** | L'adresse est une mention obligatoire ; `etatFacture` bloque l'émission sans elle, et le message renvoyait « à renseigner dans Config → Profil » **où le champ n'existait pas**. Une entreprise créée dans la nouvelle version ne pouvait émettre **aucune** facture | ✅ corrigé |
 | **`entreprise.iban` / `bic` invisibles** | Repris à la migration, jamais affichés, absents du document imprimé. Le client recevait une facture régulière sur laquelle **rien n'indiquait où payer** | ✅ corrigé — bloc « Règlement » sur la facture, champs dans Config, clé mod-97 |
-| **`poserPlageDeConges` jamais appelée** | Le calendrier posait un jour à la fois : trois semaines de vacances = vingt et un clics, et la demi-journée — portée par le schéma depuis la v2, comptée correctement par le solde — était **inatteignable** | ✅ corrigé — panneau de plage, réduite aux jours ouvrés |
+| **`poserPlageDeConges` jamais appelée** | Le calendrier posait un jour à la fois : trois semaines de vacances = vingt et un clics, et la demi-journée — portée par le schéma depuis la v2, comptée correctement par le solde — était **inatteignable** | ✅ corrigé — panneau de plage, réduite aux jours ouvrés. **Lot G** : `poserPlageDeConges` est devenue la source UNIQUE de l'écriture d'un congé, `basculerConge` ayant disparu avec la carte qui était son seul appelant |
 
 Une quatrième, sans conséquence pour l'utilisateur : `ajouterEcheance` au
 singulier était morte, doublée par sa version au pluriel. Retirée — deux chemins

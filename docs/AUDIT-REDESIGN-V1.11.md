@@ -385,12 +385,17 @@ vu. C'est le même mécanisme que le V9 de l'inventaire des indicateurs.
 
 Ni fautes ni conformités : des choix qui demandent une décision.
 
-- **Activité** : titre « Activité » contre « Ton plan de charge » ; trois cartes
-  KPI d'en-tête contre une pastille « 18,5 j travaillés · 84 % occupé » ; bascule
-  `[Mois | Semaine]` contre `[Semaine | Mois]` ; navigation de période remontée
-  dans l'en-tête de page au lieu de l'en-tête de carte ; créneaux en pastilles
-  détourées contre bandes contiguës pleine largeur ; congé hachuré en vue mois là
-  où la référence pose un aplat ; compteurs absents sur les onglets.
+- **Activité** : ~~titre « Activité » contre « Ton plan de charge »~~ ; ~~trois cartes
+  KPI d'en-tête contre une pastille « 18,5 j travaillés · 84 % occupé »~~ ; ~~bascule
+  `[Mois | Semaine]` contre `[Semaine | Mois]`~~ ; ~~navigation de période remontée
+  dans l'en-tête de page au lieu de l'en-tête de carte~~ ; ~~créneaux en pastilles
+  détourées contre bandes contiguës pleine largeur~~ ; congé hachuré en vue mois là
+  où la référence pose un aplat ; ~~compteurs absents sur les onglets~~.
+  **Tous arbitrés et alignés sur la référence, sauf le congé hachuré**, écart
+  assumé : la référence hachure en vue semaine et pose un aplat en vue mois, et
+  suivre les deux importerait SON incohérence — une même journée changerait
+  d'aspect selon l'onglet, et on chercherait la différence qu'elle signale. Elle
+  n'en signale aucune : c'est le même congé.
 - **Trésorerie** : ordre des cartes (seuils et enveloppes permutés) ; enveloppes
   « TVA à venir » et « Réserve matelas » sans tuile, « CFE » en tuile alors
   qu'elle n'est qu'une pastille de frise dans la référence ; trois jauges de seuil
@@ -406,5 +411,43 @@ Ni fautes ni conformités : des choix qui demandent une décision.
 Le handoff ne dessine pas tout ce que l'ancienne application faisait. Ces cartes
 restent, et leur absence du dessin n'est pas un argument pour les retirer :
 « Échéances reçues » et ses actions, « Périodes URSSAF », la barre TVA / livre des
-recettes / DES, la carte des congés et sa pose à un clic, « Revenir au rythme »,
+recettes / DES, la pose d'une PLAGE de congés, « Revenir au rythme »,
 les quatre cartes d'analyse, les lignes d'alerte contextuelles.
+
+## 8. Contrôle du 22/08 — le plan de charge revient à une seule grille
+
+La « carte des congés et sa pose à un clic » figurait ci-dessus parmi ce qui
+reste malgré son absence du dessin. Elle n'y figure plus, et le motif mérite
+d'être écrit : ce n'est pas la référence qui a tranché, c'est l'usage.
+
+L'écran portait DEUX trames de trente cases pour le même mois — le plan de
+charge, puis un calendrier des congés en dessous. Notre propre commentaire
+justifiait la séparation par le geste qu'une fusion aurait supprimé : poser un
+congé d'un clic. C'était vrai tant que le clic sur le plan de charge ne savait
+que basculer du travail.
+
+Le dessin, lui, n'a jamais eu qu'une grille, et une phrase le dit en toutes
+lettres : « clique n'importe quelle demi-journée pour l'attribuer, poser un
+congé ou la libérer ». Son éditeur de créneau — portée matin / après-midi /
+journée, type travail / congé / libre, puis client et lieu — est ce qui rendait
+la seconde grille inutile. Nous ne l'avions pas repris.
+
+Ce qui change en le reprenant :
+
+- le congé se pose à la DEMI-JOURNÉE. Le calendrier disparu basculait le jour
+  entier : une matinée de congé gonflait le solde de moitié, en silence ;
+- une moitié peut être RETIRÉE à un client. La bascule ne savait qu'ajouter, ce
+  qui laissait sans recours une journée et demie posée sur un seul vendredi —
+  deux rythmes qui prévoient tous deux ce jour-là ;
+- le lieu se saisit au moment où l'on déclare la demi-journée, plutôt que nulle
+  part.
+
+Ce qui se perd : le clic unique. Il faut désormais confirmer. L'éditeur s'ouvre
+pré-rempli sur ce que la moitié porte déjà, de sorte qu'ouvrir par erreur ne
+coûte qu'une fermeture.
+
+Écart restant à la référence : son quatrième type, « Indispo », n'est pas
+repris. Le schéma ne connaît que le congé, et rien ne distingue les deux dans
+un calcul. Inventer un statut stocké contredirait l'invariant qui veut que les
+statuts se dérivent ; le poser comme un congé sous un autre nom mentirait sur
+le solde de congés. On s'abstient, et on le note.

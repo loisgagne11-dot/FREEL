@@ -178,3 +178,34 @@
   line-height: 1.45;
   color: var(--amber);
 }
+
+/* Le surengagement : une journée qui en porte plus d'une. En ambre et non en
+   rouge — ce n'est pas une erreur de l'application, c'est une saisie à
+   reprendre, et le rouge est réservé à ce qui est déjà perdu. */
+.surengagement {
+  margin-top: 6px;
+  padding: 7px 9px;
+  border-radius: var(--r-sm);
+  border-left: 3px solid var(--amber);
+  background: var(--panel-2);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.surengagement strong { color: var(--amber); }
+
+/* La composition du dénominateur : plus discrète que les deux tuiles du haut.
+   Ce sont des nombres d'APPOINT — ils expliquent l'occupation, ils ne sont pas
+   ce qu'on vient lire. Les mettre au même poids que « jours travaillés » ferait
+   quatre chiffres égaux dont aucun ne ressortirait. */
+.composition { margin: 10px 0 0; }
+
+.composition .ligne {
+  padding: 5px 0;
+  font-size: 12px;
+  color: var(--muted-2);
+  border-bottom: none;
+}
+
+.composition dd { font-variant-numeric: tabular-nums; color: var(--muted); }

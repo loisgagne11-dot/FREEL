@@ -1,0 +1,190 @@
+/* L'éditeur vit dans un panneau latéral : il ne pose ni fond ni cadre, c'est
+   le panneau qui les porte. */
+
+.editeur { display: flex; flex-direction: column; gap: 16px; }
+
+.jour {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+.mention { color: var(--muted-2); font-weight: 400; text-transform: none; }
+
+.groupe { margin: 0; padding: 0; border: none; min-width: 0; }
+
+.legende {
+  padding: 0 0 7px;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/* ── Segments : portée et lieu ─────────────────────────────────────────── */
+
+/* `flex-wrap` plutôt qu'une grille à trois colonnes : « Non précisé » est plus
+   long que « Sur site », et trois colonnes égales couperaient le plus long au
+   lieu de laisser respirer les deux autres. */
+.segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.segment {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.segment:hover { border-color: var(--line-2); color: var(--text); }
+.segment:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.segmentActif {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 12%, var(--panel));
+  color: var(--text);
+  font-weight: 650;
+}
+
+/* ── Type ──────────────────────────────────────────────────────────────── */
+
+.types { display: flex; gap: 6px; }
+
+.type {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 11px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.type:hover { border-color: var(--line-2); color: var(--text); }
+.type:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* Chaque type porte SA teinte à l'état actif, celle qu'il a sur la grille : le
+   congé est ambre partout ailleurs, et un bouton « Congé » vert forcerait à
+   relire le libellé pour savoir ce qu'on vient de choisir. */
+.typeActif { font-weight: 650; color: var(--text); }
+
+.travail.typeActif {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 14%, var(--panel));
+}
+
+.conge.typeActif {
+  border-color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 14%, var(--panel));
+}
+
+.libre.typeActif { border-color: var(--line-2); background: var(--panel-2); }
+
+/* ── Clients ───────────────────────────────────────────────────────────── */
+
+/* En colonne, et non en puces : un libellé de mission porte le nom du client
+   ET celui du client opérationnel, et deux d'entre eux côte à côte sur une
+   largeur de panneau se coupent tous les deux. */
+.clients { display: flex; flex-direction: column; gap: 5px; }
+
+.client {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.client:hover { border-color: var(--line-2); color: var(--text); }
+.client:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.clientActif {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 10%, var(--panel));
+  color: var(--text);
+  font-weight: 650;
+}
+
+.pastille {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+/* ── Conséquence et pied ───────────────────────────────────────────────── */
+
+.consequence {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.aide {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-2);
+}
+
+.pied { display: flex; gap: 8px; }
+
+.annuler,
+.enregistrer {
+  flex: 1 1 0;
+  padding: 11px 14px;
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.annuler {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+}
+
+.annuler:hover { border-color: var(--line-2); color: var(--text); }
+
+/* Vert par le CADRE et par un fond très dilué, comme le reste de
+   l'application, et non un aplat vert plein : les quatre palettes n'ont pas
+   toutes un texte lisible sur `--green` saturé, et aucun jeton ne le donne. */
+.enregistrer {
+  border: 1px solid var(--green);
+  background: var(--green-glow);
+  color: var(--text);
+}
+
+.enregistrer:hover { background: color-mix(in srgb, var(--green) 22%, var(--panel)); }
+
+.annuler:focus-visible,
+.enregistrer:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }

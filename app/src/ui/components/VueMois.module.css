@@ -25,12 +25,25 @@
    une liste de puces plutôt que comme une trame d'occupation. `position:
    relative` porte le numéro du jour, posé en overlay sur la première bande.
    `overflow: hidden` laisse les bandes remplir le cadre jusqu'à son coin
-   arrondi sans le déborder. */
+   arrondi sans le déborder.
+ *
+   CARRÉE, COMME LE DESSIN : `aspect-ratio: 1` donne à la case la hauteur de sa
+   propre largeur plutôt qu'une hauteur fixée en pixels. Un contrôle visuel a
+   mesuré des cases deux fois moins hautes que la référence — le numéro du
+   jour minuscule et collé au bord, l'icône de lieu à la limite du
+   discernable — parce que la hauteur ne dépendait que d'un plancher tactile
+   pensé pour la LARGEUR du doigt, pas pour la lecture. `aspect-ratio` régle
+   les deux à la fois : sur mobile, sept colonnes étroites redonnent des
+   cases modestes SANS repasser sous ce plancher (voir `.demi` ci-dessous) ;
+   sur desktop, les colonnes s'élargissent et les cases grandissent avec
+   elles, jusqu'à la même hauteur que dans le dessin — sans media query ni
+   pixel fixé en dur. */
 .jour {
   position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  aspect-ratio: 1;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--panel-2);
@@ -161,11 +174,12 @@
 
 .legendeEntree { display: inline-flex; align-items: center; gap: 5px; }
 
+/* Ronde, comme le dessin — voir la même correction dans VueSemaine. */
 .pastille {
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 2px;
+  border-radius: 50%;
   background: var(--green);
 }
 

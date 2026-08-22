@@ -54,6 +54,34 @@ const entite = (e: Partial<Faits['missions'][number]['entites'][number]> = {}) =
 const poses = (quotites: Record<string, number>) =>
   Object.fromEntries(Object.entries(quotites).map(([d, quotite]) => [d, { quotite }]));
 
+/**
+ * Le geste courant du plan de charge, depuis que le clic ouvre un éditeur.
+ *
+ * Il en faut UN, partagé : ces trois étapes — cliquer la moitié, choisir le
+ * type, enregistrer — se répètent dans une douzaine de tests, et trois d'entre
+ * eux écrits à la main finiraient par ne plus décrire le même geste.
+ */
+async function editer(
+  utilisateur: ReturnType<typeof userEvent.setup>,
+  nomDeLaMoitie: RegExp,
+  { type, portee, qui }: {
+    readonly type?: 'Travail' | 'Congé' | 'Libre';
+    readonly portee?: 'Matin' | 'Après-midi' | 'Journée';
+    readonly qui?: string;
+  } = {}
+): Promise<void> {
+  // `getAllBy…[0]` : sur la semaine, quatorze moitiés portent « libre ». Les
+  // tests qui visent une journée précise passent une expression qui la nomme ;
+  // ceux à qui n'importe quelle moitié libre convient prennent la première.
+  await utilisateur.click(screen.getAllByRole('button', { name: nomDeLaMoitie })[0]!);
+  if (portee !== undefined) {
+    await utilisateur.click(screen.getByRole('button', { name: portee }));
+  }
+  if (type !== undefined) await utilisateur.click(screen.getByRole('button', { name: type }));
+  if (qui !== undefined) await utilisateur.click(screen.getByRole('button', { name: qui }));
+  await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
+}
+
 const recette = (m: Partial<Faits['recettes'][number]> = {}) => ({
   id: 'rec-1', clientNom: 'ClientA', libelle: 'Facture', montant: euros(4000),
   emiseLe: dateISO('2026-07-10'), encaisseeLe: null,
@@ -71,9 +99,11 @@ describe('plan de charge', () => {
    */
   it('affiche les jours ouvrables réels du mois', () => {
     render(<Activite />);
-    // Juillet 2026 : 23 jours de semaine, moins le 14 juillet (mardi).
-    expect(screen.getByText('Jours réellement travaillables').nextSibling?.textContent)
-      .toBe('22');
+    // Juillet 2026 : 23 jours de semaine, moins le 14 juillet (mardi). Le
+    // dénominateur se lit sous la jauge d'occupation, avec le férié qui
+    // l'explique — la carte des congés qui les portait a été retirée.
+    expect(screen.getByText(/\/ 22\s?j ouvrés/u)).toBeTruthy();
+    expect(screen.getByText('Jours fériés du mois').nextSibling?.textContent).toBe('1');
   });
 
   /**
@@ -107,7 +137,7 @@ describe('plan de charge', () => {
     render(<Activite />);
     // 10 / 22 ≈ 45 %.
     expect(screen.getByText('Occupation').parentElement?.textContent).toMatch(/45\s?%/u);
-    expect(screen.getByText(/j ouvrés/).textContent).toMatch(/10 \/ 22\s?j ouvrés/u);
+    expect(screen.getByText(/10 \/ 22\s?j ouvrés/u)).toBeTruthy();
   });
 
   // Les compter à un tarif supposé fabriquerait de l'occupation.
@@ -131,49 +161,92 @@ describe('plan de charge', () => {
   });
 });
 
-describe('calendrier des congés', () => {
+/**
+ * LE CONGÉ SE POSE SUR LE PLAN DE CHARGE, ET PLUS SUR UNE SECONDE GRILLE.
+ *
+ * Une carte « Congés du mois » portait son propre calendrier, sous celui du
+ * plan de charge : deux trames de trente cases pour le même mois. Elle
+ * existait parce que le clic sur le plan de charge ne savait que basculer du
+ * travail. Depuis que ce clic ouvre un éditeur à trois réponses — travail,
+ * congé, libre — elle ne répondait plus à aucune question que la première ne
+ * traitait déjà.
+ *
+ * Ces tests-là ne mesurent donc plus la grille disparue, mais le geste qui l'a
+ * remplacée : c'est le même effet sur les mêmes chiffres, par un autre chemin.
+ */
+describe('congé posé depuis le plan de charge', () => {
+  const ouvrirSemaine = async () => {
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Semaine' }));
+    return utilisateur;
+  };
+
   // La modale de l'ancienne version empêchait de voir en même temps les jours
-  // posés et leur effet sur l'occupation — la seule question qui se pose.
-  it('est dans la page, pas dans une fenêtre', () => {
+  // posés et leur effet sur l'occupation — la seule question qui se pose. La
+  // grille reste dans la page ; seul l'éditeur s'ouvre en panneau.
+  it('laisse la grille dans la page', () => {
     render(<Activite />);
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('group', { name: /Congés de juillet 2026/i })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Vue du planning' })).toBeTruthy();
   });
 
-  it('pose un congé au clic, et le retire au clic suivant', async () => {
+  it('pose un congé sur la journée entière, et le retire', async () => {
     render(<Activite />);
-    const utilisateur = userEvent.setup();
-    const lundi = screen.getByRole('button', { name: /27 juil\. 2026, jour travaillé/ });
+    const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(lundi);
+    await editer(utilisateur, /13 juil\. 2026, matin/, { portee: 'Journée', type: 'Congé' });
     expect(useFaits.getState().faits.conges).toEqual([
-      { date: '2026-07-27', quotite: 1 }
+      { date: '2026-07-13', quotite: 1 }
     ]);
 
-    await utilisateur.click(screen.getByRole('button', { name: /27 juil\. 2026, congé posé/ }));
+    await editer(utilisateur, /13 juil\. 2026, matin/, { portee: 'Journée', type: 'Libre' });
     expect(useFaits.getState().faits.conges).toEqual([]);
+  });
+
+  /**
+   * LA DEMI-JOURNÉE DE CONGÉ, QUE LA GRILLE DISPARUE NE SAVAIT PAS POSER.
+   *
+   * Son calendrier basculait la journée entière : une matinée de congé
+   * s'arrondissait à un jour, et le solde grossissait de moitié sans que rien
+   * ne le dise. C'est ce que l'éditeur rend enfin atteignable.
+   */
+  it('pose une demi-journée de congé', async () => {
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await editer(utilisateur, /13 juil\. 2026, matin/, { type: 'Congé' });
+    expect(useFaits.getState().faits.conges).toEqual([
+      { date: '2026-07-13', quotite: 0.5 }
+    ]);
   });
 
   it('fait baisser les jours ouvrables et monter l’occupation', async () => {
     semer({ missions: [mission()], recettes: [recette()] });
     render(<Activite />);
-    const utilisateur = userEvent.setup();
+    const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(screen.getByRole('button', { name: /27 juil\. 2026, jour travaillé/ }));
-    expect(screen.getByText('Jours réellement travaillables').nextSibling?.textContent)
-      .toBe('21');
+    await editer(utilisateur, /13 juil\. 2026, matin/, { portee: 'Journée', type: 'Congé' });
+
     // 10 / 21 ≈ 48 %. Le congé sort du DÉNOMINATEUR : le même travail sur
     // moins de jours disponibles fait monter l'occupation, ce qui est le sens
     // de la mesure.
+    expect(screen.getByText(/\/ 21\s?j ouvrés/u)).toBeTruthy();
     expect(screen.getByText('Occupation').parentElement?.textContent).toMatch(/48\s?%/u);
   });
 
-  // Un congé posé ce jour-là ne consomme rien et ne changerait aucun chiffre.
-  it('n’offre pas de poser un congé un jour férié ou un week-end', () => {
+  /**
+   * Un férié et un week-end restent CLIQUABLES — les astreintes et les rendus
+   * de nuit existent, et l'ancienne application les déclarait déjà. Ce qui ne
+   * doit pas arriver, c'est qu'un congé posé là consomme un jour : il n'en
+   * retire aucun du dénominateur, puisqu'il n'y était pas.
+   */
+  it('ne consomme rien quand le congé tombe un jour férié', async () => {
+    semer({ missions: [mission()], recettes: [recette()] });
     render(<Activite />);
-    expect(screen.queryByRole('button', { name: /14 juil\. 2026, jour travaillé/ })).toBeNull();
-    expect(screen.getByText(/14 juil\. 2026, jour férié/)).toBeTruthy();
-    expect(screen.getByText(/25 juil\. 2026, week-end/)).toBeTruthy();
+    const utilisateur = await ouvrirSemaine();
+
+    await editer(utilisateur, /14 juil\. 2026, matin/, { portee: 'Journée', type: 'Congé' });
+    expect(screen.getByText(/\/ 22\s?j ouvrés/u)).toBeTruthy();
   });
 
   it('compte les congés de l’année entière, pas seulement du mois affiché', () => {
@@ -183,8 +256,9 @@ describe('calendrier des congés', () => {
       { date: dateISO('2025-12-24'), quotite: 1 }
     ] });
     render(<Activite />);
-    // Le compte vit désormais dans la carte des congés, avec les fériés et les
-    // congés du mois — et non plus dans une tuile d'en-tête isolée.
+    // Le cumul de l'ANNÉE a suivi la carte disparue jusque dans « Le mois en
+    // chiffres » : c'est le seul endroit où il se lit, et le mois affiché n'y
+    // répond pas.
     expect(screen.getByText('Congés posés dans l’année').nextSibling?.textContent).toBe('2');
   });
 });
@@ -397,11 +471,11 @@ describe('vue semaine', () => {
     const ajustements = () =>
       useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
 
-    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
+    await editer(utilisateur, /13 juil\. 2026, matin/, { type: 'Libre' });
     expect(ajustements()['2026-07-13']?.quotite).toBe(0.5);
     expect(ajustements()['2026-07-13']?.creneaux).toEqual(['apresMidi']);
 
-    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, après-midi/ }));
+    await editer(utilisateur, /13 juil\. 2026, après-midi/, { type: 'Libre' });
     expect(ajustements()['2026-07-13']?.quotite).toBe(0);
     expect(ajustements()['2026-07-13']?.creneaux).toEqual([]);
   });
@@ -421,9 +495,11 @@ describe('vue semaine', () => {
     const ajustements = () =>
       useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
 
-    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
+    await editer(utilisateur, /13 juil\. 2026, matin/, { type: 'Libre' });
     expect(ajustements()).toHaveProperty('2026-07-13');
-    await utilisateur.click(screen.getByRole('button', { name: /13 juil\. 2026, matin/ }));
+    // Redonner la matinée au même client remet la journée sur le rythme :
+    // l'ajustement doit DISPARAÎTRE, pas dire la même chose que le rythme.
+    await editer(utilisateur, /13 juil\. 2026, matin/, { type: 'Travail' });
     expect(ajustements()).not.toHaveProperty('2026-07-13');
   });
 
@@ -523,7 +599,14 @@ describe('journée déclarée sur un créneau vide', () => {
     mission({ id: 'mis-2', description: 'Mission B', entites: [entite({ id: 'b1' })] })
   ];
 
-  it('demande à qui la rattacher quand plusieurs missions sont en cours', async () => {
+  /**
+   * LE CLIENT SE CHOISIT, IL NE SE DEVINE PAS.
+   *
+   * Une version en prenait un en silence — la première mission active. Une
+   * journée rattachée au mauvais client fausse DEUX comptes rendus d'un coup :
+   * celui qui la reçoit à tort et celui à qui elle manque, et rien ne le dit.
+   */
+  it('propose les missions en cours, et n’en pose aucune d’office', async () => {
     semer({ missions: deuxMissions() });
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
@@ -532,7 +615,8 @@ describe('journée déclarée sur un créneau vide', () => {
 
     expect(screen.getByRole('button', { name: 'Mission A' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Mission B' })).toBeTruthy();
-    // Rien n'a été posé tant que le choix n'est pas fait.
+    // Rien n'a été posé tant qu'on n'a pas enregistré : ouvrir l'éditeur par
+    // erreur ne doit coûter qu'une fermeture.
     expect(useFaits.getState().faits.missions.flatMap((m) => m.entites)
       .every((e) => Object.keys(e.ajustements).length === 0)).toBe(true);
   });
@@ -542,8 +626,7 @@ describe('journée déclarée sur un créneau vide', () => {
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
-    await utilisateur.click(screen.getAllByRole('button', { name: /, libre$/ })[0]!);
-    await utilisateur.click(screen.getByRole('button', { name: 'Mission B' }));
+    await editer(utilisateur, /, libre$/, { type: 'Travail', qui: 'Mission B' });
 
     const missions = useFaits.getState().faits.missions;
     expect(Object.keys(missions[0]?.entites[0]?.ajustements ?? {})).toHaveLength(0);
@@ -551,21 +634,69 @@ describe('journée déclarée sur un créneau vide', () => {
   });
 
   /**
-   * Une seule affectation possible : il n'y a pas de question, et la poser
-   * serait un clic de plus pour rien. Le geste doit rester immédiat dans le
-   * cas ordinaire.
+   * LE GESTE QUI CORRIGE UNE JOURNÉE ET DEMIE, ET C'EST LE POINT DUR DU LOT.
+   *
+   * Deux rythmes qui prévoient tous deux le lundi donnent 1,5 journée sur un
+   * seul lundi : l'occupation passe au-dessus de 100 % et le CRA facturerait
+   * du temps qui n'a pas existé. Le clic-bascule d'avant ne pouvait
+   * qu'AJOUTER une moitié, jamais la retirer à quelqu'un d'autre.
+   *
+   * Attribuer la matinée à B la retire donc à A. C'est la seule façon de
+   * défaire le doublon depuis l'écran.
    */
-  it('ne demande rien quand une seule mission est en cours', async () => {
+  it('retire la moitié à celui qui la tenait quand on l’attribue à un autre', async () => {
+    const rythmeLundi = (id: string) => entite({
+      id,
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+        parJour: { lun: 1 }, tjm: euros(400)
+      }]
+    });
+    semer({ missions: [
+      mission({ id: 'mis-1', description: 'Mission A', entites: [rythmeLundi('a1')] }),
+      mission({ id: 'mis-2', description: 'Mission B', entites: [rythmeLundi('b1')] })
+    ] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await editer(utilisateur, /13 juil\. 2026, matin/, { type: 'Travail', qui: 'Mission B' });
+
+    const missions = useFaits.getState().faits.missions;
+    // A rend la matinée et garde son après-midi ; B la prend et garde la
+    // sienne. Le lundi vaut de nouveau une journée, pas deux.
+    expect(missions[0]?.entites[0]?.ajustements['2026-07-13']?.creneaux)
+      .toEqual(['apresMidi']);
+    expect(missions[1]?.entites[0]?.ajustements['2026-07-13']).toBeUndefined();
+  });
+
+  /** Le lieu ne se pose pas d'office : « 78 % de télétravail » se calcule sur
+      les demi-journées DOCUMENTÉES, et un lieu inventé la fausserait. */
+  it('n’enregistre aucun lieu tant qu’on n’en choisit pas', async () => {
+    semer({ missions: [mission()] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    await editer(utilisateur, /, libre$/, { type: 'Travail' });
+    const pose = Object.values(
+      useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {}
+    )[0];
+    expect(pose?.lieu).toBeUndefined();
+  });
+
+  it('enregistre le lieu quand on le choisit', async () => {
     semer({ missions: [mission()] });
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
 
     await utilisateur.click(screen.getAllByRole('button', { name: /, libre$/ })[0]!);
+    await utilisateur.click(screen.getByRole('button', { name: 'Travail' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Sur site' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
-    expect(screen.queryByRole('button', { name: /rattacher/i })).toBeNull();
-    expect(Object.keys(
+    const pose = Object.values(
       useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {}
-    )).toHaveLength(1);
+    )[0];
+    expect(pose?.lieu).toBe('sur_site');
   });
 });
 

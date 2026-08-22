@@ -108,7 +108,9 @@ export function VueSemaine(
         <span className={styles.conventions}>matin&nbsp;/&nbsp;après-midi · client · lieu</span>
         {' · '}
         <strong>
-          {decompte.ouvres} jour{decompte.ouvres > 1 ? 's' : ''} ouvré{decompte.ouvres > 1 ? 's' : ''}
+          {/* « j », comme le dessin, et non « jour(s) » : voir la même
+              abréviation dans VueMois. */}
+          {decompte.ouvres} j ouvré{decompte.ouvres > 1 ? 's' : ''}
           {decompte.enConge > 0 && `, dont ${decompte.enConge} de congé`}
         </strong>
       </p>
@@ -278,13 +280,17 @@ function CaseDeCreneau(
  * d'occupants plutôt que d'en retenir un au hasard — c'est un choix parmi
  * d'autres (une bordure neutre en aurait été un autre), mais celui-ci garde le
  * repère de couleur que le reste de l'écran promet.
+ *
+ * DOSAGE À 20 % : le même que dans VueMois, pour la même raison — c'est celui
+ * du dessin (`rgba(couleur,.2)`), et il tient quelle que soit la vivacité de
+ * la teinte saisie. Voir le commentaire de `fondBande` dans VueMois.tsx.
  */
 function fondBande(occupants: readonly { readonly couleur: string }[]): string | undefined {
   const couleurs = occupants.map((o) => o.couleur).filter((c) => c !== '');
   if (couleurs.length === 0) return undefined;
   const part = 100 / couleurs.length;
   const tranches = couleurs
-    .map((c, i) => `color-mix(in srgb, ${c} 22%, var(--panel)) ${i * part}% ${(i + 1) * part}%`)
+    .map((c, i) => `color-mix(in srgb, ${c} 20%, var(--panel)) ${i * part}% ${(i + 1) * part}%`)
     .join(', ');
   // À la verticale : les occupants s'empilent dans la bande dans le même
   // ordre, et chaque tranche de couleur tombe derrière celui qu'elle désigne.

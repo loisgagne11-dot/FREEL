@@ -249,11 +249,15 @@ interface MagasinFaits {
 
   /* ── Congés ───────────────────────────────────────────────────────────── */
 
-  /**
-   * Pose ou retire un congé sur une date. Un seul geste dans les deux sens :
-   * corriger une erreur de saisie doit coûter le même clic que la faire.
+  /*
+   * `basculerConge` a été RETIRÉE, et c'est la règle d'une source unique.
+   *
+   * Elle posait ou retirait un jour entier, et n'avait qu'un appelant : le
+   * calendrier de la carte « Congés du mois ». Cette carte a disparu — le plan
+   * de charge pose désormais les congés lui-même, à la demi-journée, par
+   * `poserPlageDeConges`. Garder les deux aurait laissé deux écritures
+   * concurrentes sur la même notion, dont l'une arrondit à la journée.
    */
-  readonly basculerConge: (jour: DateISO) => void;
   /** Pose ou retire une plage entière, sans jamais dupliquer une date déjà posée. */
   /**
    * Pose ou retire une plage de congés.
@@ -893,12 +897,6 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     const faits: Faits = { ...get().faits, mouvementsBancaires: [] };
     set({ faits });
     persister(stockageActif, faits);
-  },
-
-  basculerConge: (jour) => {
-    const actuel = get().faits;
-    const pose = actuel.conges.some((c) => c.date === jour);
-    get().poserPlageDeConges([jour], !pose);
   },
 
   modifierEntreprise: (modification) => {
