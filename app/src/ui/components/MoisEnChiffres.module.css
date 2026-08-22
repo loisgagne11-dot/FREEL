@@ -194,3 +194,18 @@
 }
 
 .surengagement strong { color: var(--amber); }
+
+/* La composition du dénominateur : plus discrète que les deux tuiles du haut.
+   Ce sont des nombres d'APPOINT — ils expliquent l'occupation, ils ne sont pas
+   ce qu'on vient lire. Les mettre au même poids que « jours travaillés » ferait
+   quatre chiffres égaux dont aucun ne ressortirait. */
+.composition { margin: 10px 0 0; }
+
+.composition .ligne {
+  padding: 5px 0;
+  font-size: 12px;
+  color: var(--muted-2);
+  border-bottom: none;
+}
+
+.composition dd { font-variant-numeric: tabular-nums; color: var(--muted); }

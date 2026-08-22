@@ -945,6 +945,21 @@ export interface MoisEnChiffres {
    * journée pleine, et c'est le maximum qu'un jour puisse porter.
    */
   readonly joursSurengages: number;
+  /**
+   * Les jours fériés du mois, et les congés posés depuis le 1ᵉʳ janvier.
+   *
+   * Ils vivaient dans la carte « Congés du mois », retirée avec sa seconde
+   * grille : le plan de charge répond désormais à tout ce qu'elle savait
+   * faire. Ces deux nombres-là, non — un férié ne se compte pas à l'œil sur
+   * une trame de trente cases, et le cumul de l'ANNÉE n'y figure pas du tout.
+   *
+   * Les laisser partir avec la carte aurait été exactement le défaut que le
+   * troisième inventaire existe pour attraper : l'écran est là, le magasin est
+   * câblé, les tests sont verts, et le chiffre a disparu.
+   */
+  readonly joursFeries: number;
+  /** Congés posés sur l'année du mois affiché, en quotités cumulées. */
+  readonly congesDeLAnnee: number;
   readonly parClient: readonly PartClient[];
   /** `null` quand aucune demi-journée du mois ne porte de lieu. */
   readonly teletravail: PartTeletravail | null;
@@ -1049,9 +1064,19 @@ export function moisEnChiffres(
      elle, une journée parfaitement remplie se signalerait une fois sur deux. */
   const joursSurengages = planning.jours.filter((j) => j.retenu > 1.01).length;
 
+  // Somme des QUOTITÉS et non compte des entrées : deux demi-journées valent
+  // un jour, et les compter en donnerait deux. Même règle que `etatActivite`,
+  // dont c'est la seule autre lecture.
+  const annee = m.slice(0, 4);
+  const congesDeLAnnee = faits.conges
+    .filter((c) => c.date.startsWith(annee))
+    .reduce((s, c) => s + c.quotite, 0);
+
   return {
     joursTravailles,
     joursSurengages,
+    joursFeries: plan.joursFeries,
+    congesDeLAnnee,
     caGenere: total.montantRetenu,
     joursOuvrables: plan.joursOuvrables,
     joursDeConge: plan.joursDeConge,

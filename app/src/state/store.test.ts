@@ -174,13 +174,21 @@ describe('barème saisi', () => {
 });
 
 describe('congés', () => {
+  /**
+   * Poser puis retirer, d'un même geste dans les deux sens : corriger une
+   * erreur de saisie doit coûter le même clic que la faire.
+   *
+   * Le test passait par `basculerConge`, retirée avec la carte qui était son
+   * seul appelant. Ce qu'il tient n'a pas changé — seul le chemin a changé,
+   * et il n'en reste qu'un.
+   */
   it('pose et retire une date d’un même geste', () => {
     const magasin = useFaits.getState();
-    magasin.basculerConge(dateISO('2026-07-27'));
+    magasin.poserPlageDeConges([dateISO('2026-07-27')], true);
     expect(useFaits.getState().faits.conges).toEqual([
       { date: '2026-07-27', quotite: 1 }
     ]);
-    useFaits.getState().basculerConge(dateISO('2026-07-27'));
+    useFaits.getState().poserPlageDeConges([dateISO('2026-07-27')], false);
     expect(useFaits.getState().faits.conges).toEqual([]);
   });
 

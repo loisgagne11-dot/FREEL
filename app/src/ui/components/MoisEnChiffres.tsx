@@ -91,6 +91,27 @@ export function MoisEnChiffres({ chiffres }: { readonly chiffres: Chiffres }) {
         </p>
 
         {/*
+          * CE QUI COMPOSE LE DÉNOMINATEUR, ET LE CUMUL DE L'ANNÉE.
+          *
+          * Ces deux nombres vivaient sous la seconde grille du mois, retirée
+          * depuis que le plan de charge pose les congés lui-même. Le premier
+          * explique pourquoi juillet a 22 jours ouvrables et non 23 — un férié
+          * ne se compte pas à l'œil sur une trame de trente cases. Le second
+          * est le SEUL endroit où les congés se lisent sur l'année : c'est la
+          * question qu'on se pose en août, et le mois affiché n'y répond pas.
+          */}
+        <dl className={styles.composition}>
+          <div className={styles.ligne}>
+            <dt>Jours fériés du mois</dt>
+            <dd>{chiffres.joursFeries}</dd>
+          </div>
+          <div className={styles.ligne}>
+            <dt>Congés posés dans l’année</dt>
+            <dd>{jours(chiffres.congesDeLAnnee)}</dd>
+          </div>
+        </dl>
+
+        {/*
           * LA CAUSE D'UN TAUX AU-DESSUS DE 100 %, DITE PLUTÔT QUE DEVINÉE.
           *
           * Le numérateur additionne les journées PAR CLIENT, le dénominateur

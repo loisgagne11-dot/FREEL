@@ -11,10 +11,14 @@ import { VueMois } from '../components/VueMois';
 import { MoisEnChiffres } from '../components/MoisEnChiffres';
 import { CraCard } from '../components/CraCard';
 import { useToast } from '../components/Toasts';
-import type { Jour, NatureJour } from '../../domain/calculs/activite';
 import { joursCongeables, joursFeries } from '../../domain/calculs/activite';
-import type { Creneau } from '../../domain/calculs/planning';
-import { basculerCreneau, planifier } from '../../domain/calculs/planning';
+import type { Creneau, Portee } from '../../domain/calculs/planning';
+import {
+  congeApresSaisie, creneauxDeLaPortee, creneauxOccupes, planifier, saisirSurPortee
+} from '../../domain/calculs/planning';
+import type { JourPlanifie } from '../../domain/calculs/planning';
+import { EditeurDemiJournee } from '../components/EditeurDemiJournee';
+import type { Affectation, SaisieDemiJournee } from '../components/EditeurDemiJournee';
 import {
   previsionDuMoisParMission, rapportParMission, tarifDeLaJournee
 } from '../../state/selecteurs.activite';
@@ -114,13 +118,10 @@ const sections = (nbMissions: number, nbClients: number) => [
   { id: 'clients' as Section, libelle: 'Clients', compte: nbClients }
 ];
 
-/** Lundi en tête : la semaine française commence le lundi, pas le dimanche. */
-const JOURS_SEMAINE = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
 export function Activite() {
   const faits = useFaits((e) => e.faits);
-  const basculerConge = useFaits((e) => e.basculerConge);
   const poserAjustement = useFaits((e) => e.poserAjustement);
+  const poserPlageDeConges = useFaits((e) => e.poserPlageDeConges);
   const retirerAjustements = useFaits((e) => e.retirerAjustements);
   const signaler = useToast();
 
@@ -160,13 +161,12 @@ export function Activite() {
    */
   const [vue, setVue] = useState<'mois' | 'semaine'>('semaine');
   const [ancreSemaine, setAncreSemaine] = useState<DateISO>(() => dateDuJour());
-  /** Journée déclarée sur un créneau vide, en attente de savoir à qui elle est. */
-  const [aRattacher, setARattacher] = useState<{
+  /** La demi-journée qu'on est en train d'éditer, telle qu'on l'a cliquée. */
+  const [aEditer, setAEditer] = useState<{
     readonly date: DateISO;
-    readonly possibles: readonly Affectation[];
-    /* Le créneau cliqué voyage avec la question : le rattachement peut prendre
-       plusieurs secondes, et rouvrir la feuille ne doit pas reposer la journée
-       entière quand c'est l'après-midi qu'on visait. */
+    /* Le créneau cliqué voyage avec la question : l'éditeur s'ouvre sur cette
+       portée-là, et non sur la journée entière — c'est l'après-midi qu'on
+       visait, pas le jour. */
     readonly creneau: Creneau;
   } | null>(null);
   const semaine = useMemo(
@@ -175,6 +175,19 @@ export function Activite() {
   const planningMois = useMemo(() => planningDuMois(faits, mois), [faits, mois]);
   const chiffres = useMemo(() => moisEnChiffres(faits, mois), [faits, mois]);
   const cras = useMemo(() => craDuMoisParMission(faits, mois), [faits, mois]);
+  const affectations = useMemo(() => affectationsPossibles(faits), [faits]);
+
+  /*
+   * La journée éditée se cherche dans la vue AFFICHÉE.
+   *
+   * Une semaine peut chevaucher deux mois : chercher dans le planning mensuel
+   * ne trouverait pas le 31 août cliqué depuis la semaine du 1ᵉʳ septembre, et
+   * l'éditeur s'ouvrirait vide sur une journée qui existe.
+   */
+  const jourEdite = aEditer === null
+    ? null
+    : (vue === 'mois' ? planningMois : semaine).jours
+      .find((j) => j.date === aEditer.date) ?? null;
 
   /**
    * Les flèches suivent la vue.
@@ -196,73 +209,88 @@ export function Activite() {
   const avancer = () => (vue === 'semaine' ? decalerSemaine(1) : setMois(decalerMois(mois, 1)));
 
   /**
-   * Bascule LE CRÉNEAU cliqué.
+   * Ouvre l'éditeur sur la demi-journée cliquée.
    *
    * ─────────────────────────────────────────────────────────────────────────
-   * UN CRÉNEAU VIDE NE DIT PAS À QUI LA JOURNÉE APPARTIENT
+   * POURQUOI LE CLIC NE BASCULE PLUS
    * ─────────────────────────────────────────────────────────────────────────
    *
-   * Cliquer un créneau vide déclare une demi-journée que le rythme ne
-   * prévoyait pas. Encore faut-il savoir à quelle mission la rattacher : avec
-   * une seule affectation possible il n'y a pas de question, avec deux le choix
-   * devient arbitraire.
+   * Il basculait le travail, et rien d'autre : rempli ↔ vide. Trois choses en
+   * étaient inatteignables — le congé (qui vivait dans une SECONDE grille, en
+   * dessous), le lieu, et le choix du client quand deux missions revendiquent
+   * la même moitié.
    *
-   * La première version en choisissait une en silence — la première mission
-   * active. C'est précisément ce que cette application refuse partout
-   * ailleurs : l'écran propose, l'utilisateur tranche. Une journée rattachée
-   * au mauvais client fausse deux CRA d'un coup, celui qui la reçoit à tort
-   * et celui à qui elle manque, et rien ne le signale.
+   * Cette dernière est la plus coûteuse : sans elle, on ne pouvait pas RETIRER
+   * une matinée à un client, seulement l'ajouter. Deux rythmes qui prévoient
+   * tous deux le vendredi donnaient une journée et demie sur un seul vendredi,
+   * une occupation au-dessus de 100 %, et aucun geste pour la corriger.
+   *
+   * Le dessin ouvre un éditeur — « clique n'importe quelle demi-journée pour
+   * l'attribuer, poser un congé ou la libérer ». C'est un clic de plus sur le
+   * geste courant, et c'est le prix des trois autres. L'éditeur s'ouvre
+   * pré-rempli sur ce que la moitié porte déjà : ouvrir par erreur ne coûte
+   * qu'une fermeture.
    */
-  function ajusterAuClic(
-    date: DateISO, _missionId: string, entiteId: string, creneau: Creneau
+  function ouvrirEditeur(
+    date: DateISO, _missionId: string, _entiteId: string, creneau: Creneau
   ): void {
-    const jour = semaine.jours.find((j) => j.date === date);
-    const ligne = jour?.parMission.find((l) => l.entiteId === entiteId);
-
-    if (ligne !== undefined && jour !== undefined) {
-      basculer(date, ligne.missionId, ligne.entiteId, creneau);
-      return;
-    }
-
-    const possibles = affectationsPossibles(faits);
-    if (possibles.length === 0) return;
-    if (possibles.length === 1) {
-      const seule = possibles[0] as Affectation;
-      basculer(date, seule.missionId, seule.entiteId, creneau);
-      return;
-    }
-    // Plusieurs candidats : on demande, on ne devine pas.
-    setARattacher({ date, possibles, creneau });
+    setAEditer({ date, creneau });
   }
 
   /**
-   * L'état de la journée AVANT le clic, pour la ligne visée, puis la bascule.
+   * Écrit ce que l'éditeur a rendu.
    *
-   * La journée est replanifiée pour ce seul client opérationnel : `semaine`
-   * agrège toutes les lignes, et `basculerCreneau` a besoin du `prevu` de
-   * CELLE-CI — c'est lui qui dit si le résultat retombe sur le rythme, donc si
-   * l'ajustement doit disparaître au lieu d'être écrit.
+   * ─────────────────────────────────────────────────────────────────────────
+   * TOUTES LES AFFECTATIONS SONT TOUCHÉES, PAS SEULEMENT CELLE QU'ON DÉSIGNE
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Une moitié de journée n'a qu'un occupant. Celle qu'on désigne la prend,
+   * toutes les autres la RENDENT — c'est cette libération, et elle seule, qui
+   * corrige une journée et demie posée sur un seul vendredi.
+   *
+   * On ne parcourt donc pas les seules missions actives : un ajustement peut
+   * survivre sur une mission terminée, et l'ignorer laisserait sur place le
+   * doublon qu'on vient précisément de venir défaire.
    */
-  function basculer(
-    date: DateISO, missionId: string, entiteId: string, creneau: Creneau
-  ): void {
-    const entite = faits.missions
-      .find((m) => m.id === missionId)?.entites.find((e) => e.id === entiteId);
-    if (entite === undefined) return;
-
+  function appliquerSaisie(date: DateISO, saisie: SaisieDemiJournee): void {
     const conges: Record<string, number> = {};
     for (const c of faits.conges) conges[c.date] = c.quotite;
     const annee = Number(date.slice(0, 4));
+    const feries = new Set(joursFeries(annee));
 
-    const [jour] = planifier([date], {
-      rythmes: entite.rythmes,
-      ajustements: entite.ajustements,
-      feries: new Set(joursFeries(annee)),
-      conges
-    });
-    if (jour === undefined) return;
+    for (const m of faits.missions) {
+      for (const e of m.entites) {
+        const [jour] = planifier([date], {
+          rythmes: e.rythmes, ajustements: e.ajustements, feries, conges
+        });
+        if (jour === undefined) continue;
 
-    poserAjustement(missionId, entiteId, date, basculerCreneau(jour, creneau));
+        const occupe = saisie.type === 'travail'
+          && m.id === saisie.missionId && e.id === saisie.entiteId;
+        // Rien à changer : ni cette affectation ne prend la portée, ni elle ne
+        // la tenait. Écrire quand même poserait un ajustement identique au
+        // rythme sur toutes les missions du dossier, à chaque clic.
+        if (!occupe && !toucheLaPortee(jour, saisie.portee)) continue;
+
+        poserAjustement(m.id, e.id, date,
+          saisirSurPortee(jour, saisie.portee, occupe, saisie.lieu));
+      }
+    }
+
+    // Le congé APRÈS le travail : `congeApresSaisie` part de la quotité
+    // actuelle, et la lire après une écriture qui ne la touche pas donne le
+    // même résultat — mais l'ordre inverse ferait dépendre le calcul d'un état
+    // intermédiaire, ce qui est exactement ce qu'on ne veut pas relire dans six
+    // mois.
+    const actuel = faits.conges.find((c) => c.date === date)?.quotite ?? 0;
+    const apres = congeApresSaisie(actuel, saisie.portee, saisie.type);
+    if (apres !== actuel) {
+      if (apres === 0) poserPlageDeConges([date], false);
+      else poserPlageDeConges([date], true, apres);
+    }
+
+    setAEditer(null);
+    signaler(messageDeSaisie(saisie, affectations));
   }
 
   return (
@@ -468,14 +496,14 @@ export function Activite() {
                       planning={planningMois}
                       libellePeriode={moisLong(mois)}
                       aujourdhui={dateDuJour()}
-                      onBasculer={ajusterAuClic}
+                      onBasculer={ouvrirEditeur}
                     />
                   )
                   : (
                     <VueSemaine
                       planning={semaine}
                       aujourdhui={dateDuJour()}
-                      onBasculer={ajusterAuClic}
+                      onBasculer={ouvrirEditeur}
                       onRevenirAuRythme={() => {
                         const n = retirerAjustements(semaine.jours.map((j) => j.date));
                         // L'effet se voit — la grille change sous les yeux — mais
@@ -491,62 +519,41 @@ export function Activite() {
 
 
               {/*
-                * LES CONGÉS ONT LEUR PROPRE CARTE, ET C'EST LA CORRECTION D'UNE
-                * CONFUSION.
+                * LA SECONDE GRILLE A DISPARU, ET C'EST L'ÉDITEUR QUI L'A PERMIS.
                 *
-                * Une seule carte portait les deux grilles : le plan de charge en
-                * vue semaine, le calendrier des congés en vue mois. Deux questions
-                * différentes derrière la même bascule — « qu'ai-je travaillé » et
-                * « quand suis-je absent » — et il fallait quitter l'une pour poser
-                * un congé sur l'autre.
+                * Une carte « Congés du mois » vivait ici, avec son propre
+                * calendrier du même mois. Deux trames de trente cases l'une
+                * au-dessus de l'autre, la première pour « qu'ai-je travaillé »,
+                * la seconde pour « quand suis-je absent » — et il fallait
+                * quitter l'une pour agir sur l'autre.
                 *
-                * Le dessin range le TRAVAIL dans les deux vues du plan de charge, et
-                * y montre les congés en hachures. Fondre les deux grilles en une
-                * seule aurait supprimé le geste qui pose un congé d'un clic — celui
-                * de l'ancienne application, et le seul qui reste pour une journée
-                * isolée. Elles vivent donc côte à côte, chacune sous son titre.
+                * Elle existait pour UNE raison : le clic sur le plan de charge
+                * ne savait que basculer du travail, donc poser un congé d'un
+                * clic demandait une grille à part. Le commentaire qui les
+                * séparait le disait lui-même. Depuis que le clic ouvre un
+                * éditeur qui offre les trois réponses — travail, congé, libre —
+                * la seconde grille ne répond plus à aucune question que la
+                * première ne traite déjà. L'utilisateur l'a dit avant nous.
+                *
+                * Ce qu'elle portait et qui ne se déduit pas de la grille a été
+                * REPLACÉ, pas perdu : la pose d'une PLAGE ci-dessous — trois
+                * semaines de vacances ne se posent pas en trente clics, même
+                * bons — et les deux comptes du mois dans « Le mois en chiffres ».
                 */}
-              <section className={styles.carte} aria-labelledby={`${idGroupe}-conges`}>
-                <h2 id={`${idGroupe}-conges`} className={styles.titreCarte}>
-                  Congés de {moisLong(mois)}
+              <section className={styles.carte} aria-labelledby={`${idGroupe}-plage`}>
+                <h2 id={`${idGroupe}-plage`} className={styles.titreCarte}>
+                  Congés
                   <Info libelle="Effet des congés sur l’occupation">
                     Un jour posé sort du dénominateur&nbsp;: le même travail sur
                     moins de jours disponibles fait monter l’occupation, ce qui est
                     le sens de la mesure. Un congé posé un jour férié ou un week-end
                     n’est pas consommé, et n’est donc pas compté.
+                    {' '}Pour une journée isolée, clique-la directement sur le plan
+                    de charge&nbsp;: l’éditeur y propose «&nbsp;Congé&nbsp;».
                   </Info>
                 </h2>
 
                 <PlageDeConges />
-                <Calendrier
-                  mois={mois}
-                  jours={etat.calendrier}
-                  onBasculer={basculerConge}
-                />
-                <Legende />
-
-                <dl className={styles.detail}>
-                  <div className={styles.ligne}>
-                    <dt>Jours fériés du mois</dt>
-                    <dd>{etat.plan.joursFeries}</dd>
-                  </div>
-                  <div className={styles.ligne}>
-                    <dt>Congés posés ce mois</dt>
-                    <dd>{etat.plan.joursDeConge}</dd>
-                  </div>
-                  {/* Le compte de l'ANNÉE, et non du mois : il vivait dans une
-                      tuile d'en-tête que le repère du titre a remplacée. Le retirer
-                      sans le replacer aurait fait disparaître le seul endroit où
-                      l'on voit ses congés cumulés. */}
-                  <div className={styles.ligne}>
-                    <dt>Congés posés dans l’année</dt>
-                    <dd>{etat.congesDeLAnnee}</dd>
-                  </div>
-                  <div className={`${styles.ligne} ${styles.total}`}>
-                    <dt>Jours réellement travaillables</dt>
-                    <dd>{etat.plan.joursOuvrables}</dd>
-                  </div>
-                </dl>
               </section>
 
               {/*
@@ -684,35 +691,25 @@ export function Activite() {
         )}
       </Sheet>
 
+      {/* L'ÉDITEUR REMPLACE LA QUESTION « À QUELLE MISSION ? ».
+          C'était la même question, posée seulement quand plusieurs missions
+          étaient candidates, et sans pouvoir répondre « congé » ni « personne ».
+          Une feuille de plus n'aurait rien ajouté : celle-ci la contient. */}
       <Sheet
-        ouvert={aRattacher !== null}
-        titre="À quelle mission rattacher cette journée&nbsp;?"
-        onFermer={() => setARattacher(null)}
+        ouvert={aEditer !== null}
+        titre="Cette demi-journée"
+        onFermer={() => setAEditer(null)}
       >
-        {aRattacher !== null && (
-          <div className={styles.choixAffectation}>
-            <p className={styles.aide}>
-              Le {dateCourte(aRattacher.date)} n’était prévu par aucun
-              rythme. Plusieurs missions sont en cours&nbsp;: choisir à ta place
-              fausserait deux comptes rendus d’un coup — celui qui recevrait la
-              journée à tort, et celui à qui elle manquerait.
-            </p>
-            {aRattacher.possibles.map((a) => (
-              <button
-                key={`${a.missionId}-${a.entiteId}`}
-                type="button"
-                className={styles.actionPrincipale}
-                onClick={() => {
-                  basculer(aRattacher.date, a.missionId, a.entiteId, aRattacher.creneau);
-                  setARattacher(null);
-                }}
-              >
-                {a.libelle}
-              </button>
-            ))}
-          </div>
+        {jourEdite !== null && aEditer !== null && (
+          <EditeurDemiJournee
+            jour={jourEdite}
+            creneauInitial={aEditer.creneau}
+            affectations={affectations}
+            onEnregistrer={(saisie) => appliquerSaisie(aEditer.date, saisie)}
+            onAnnuler={() => setAEditer(null)}
+          />
         )}
-      </Sheet>
+            </Sheet>
     </>
   );
 }
@@ -723,91 +720,6 @@ type Panneau =
   | { readonly type: 'client'; readonly id: string | null }
   | { readonly type: 'mission'; readonly id: string | null };
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Calendrier
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * Le calendrier du mois.
- *
- * Une grille de boutons plutôt qu'un tableau : chaque case est une action —
- * poser ou retirer un congé — et non une donnée à lire. Les week-ends et les
- * jours fériés ne sont pas cliquables, parce qu'un congé posé ce jour-là ne
- * consomme rien et ne changerait aucun chiffre.
- */
-function Calendrier(
-  { mois, jours, onBasculer }: {
-    mois: Mois;
-    jours: readonly Jour[];
-    onBasculer: (jour: DateISO) => void;
-  }
-) {
-  // Décalage du premier jour : la semaine commence le lundi, `getUTCDay()`
-  // rend 0 pour dimanche.
-  const premier = jours[0];
-  const decalage = premier === undefined
-    ? 0
-    : (new Date(`${premier.date}T00:00:00Z`).getUTCDay() + 6) % 7;
-
-  return (
-    <div className={styles.calendrier}>
-      <div className={styles.enteteSemaine} aria-hidden="true">
-        {JOURS_SEMAINE.map((lettre, i) => (
-          <span key={`${lettre}-${i}`} className={styles.jourSemaine}>{lettre}</span>
-        ))}
-      </div>
-      <div className={styles.grilleJours} role="group" aria-label={`Congés de ${moisLong(mois)}`}>
-        {Array.from({ length: decalage }, (_, i) => (
-          <span key={`vide-${i}`} className={styles.caseVide} aria-hidden="true" />
-        ))}
-        {jours.map((jour) => (
-          <CaseJour key={jour.date} jour={jour} onBasculer={onBasculer} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CaseJour({ jour, onBasculer }: { jour: Jour; onBasculer: (d: DateISO) => void }) {
-  const numero = Number(jour.date.slice(8, 10));
-  const posable = jour.nature === 'ouvrable' || jour.nature === 'conge';
-
-  if (!posable) {
-    return (
-      <span className={`${styles.case} ${classeNature(jour.nature)}`}>
-        <span aria-hidden="true">{numero}</span>
-        {/* Le nom accessible dit pourquoi la case n'est pas actionnable. */}
-        <span className={styles.invisible}>
-          {dateCourte(jour.date)}, {jour.nature === 'ferie' ? 'jour férié' : 'week-end'}
-        </span>
-      </span>
-    );
-  }
-
-  const pose = jour.nature === 'conge';
-  return (
-    <button
-      type="button"
-      className={`${styles.case} ${styles.caseActionnable} ${classeNature(jour.nature)}`}
-      aria-pressed={pose}
-      onClick={() => onBasculer(jour.date)}
-    >
-      <span aria-hidden="true">{numero}</span>
-      <span className={styles.invisible}>
-        {dateCourte(jour.date)}, {pose ? 'congé posé' : 'jour travaillé'}
-      </span>
-    </button>
-  );
-}
-
-/**
- * La légende du calendrier.
- *
- * Les cases se distinguent par leur couleur et leur opacité. Sans légende, il
- * faut cliquer pour découvrir laquelle est un congé — et un clic sur le
- * calendrier POSE un congé : on apprend la convention en modifiant ses
- * données. La spec de design prévoit cette légende ; elle manquait.
- */
 /**
  * Le repère chiffré de l'en-tête : jours travaillés et occupation.
  *
@@ -845,25 +757,6 @@ function ResumeDuMois({ chiffres }: { readonly chiffres: ChiffresDuMois }) {
         </>
       )}
     </>
-  );
-}
-
-function Legende() {
-  const entrees = [
-    { classe: styles.legendeOuvrable, libelle: 'Travaillable' },
-    { classe: styles.conge, libelle: 'Congé posé' },
-    { classe: styles.ferie, libelle: 'Jour férié' },
-    { classe: styles.weekEnd, libelle: 'Week-end' }
-  ];
-  return (
-    <ul className={styles.legende}>
-      {entrees.map((e) => (
-        <li key={e.libelle} className={styles.legendeEntree}>
-          <span className={`${styles.legendeCase} ${e.classe}`} aria-hidden="true" />
-          {e.libelle}
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -914,16 +807,6 @@ function DependanceClients({ poids }: { poids: readonly PoidsClient[] }) {
   );
 }
 
-function classeNature(nature: NatureJour): string {
-  switch (nature) {
-    case 'ferie': return styles.ferie as string;
-    case 'week_end': return styles.weekEnd as string;
-    case 'conge': return styles.conge as string;
-    case 'ouvrable': return '';
-  }
-}
-
-
 /* ─────────────────────────────────────────────────────────────────────────
    Saisie du carnet
    ───────────────────────────────────────────────────────────────────────── */
@@ -950,20 +833,16 @@ function moisLong(m: Mois): string {
   return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(date);
 }
 
-/** Une mission et l'un de ses clients opérationnels. */
-interface Affectation {
-  readonly missionId: string;
-  readonly entiteId: string;
-  readonly libelle: string;
-}
-
 /**
- * Où une journée déclarée sur un créneau vide PEUT être rattachée.
+ * Où une demi-journée PEUT être rattachée.
  *
  * Toutes les affectations des missions en cours, pas la première : le choix
  * appartient à l'utilisateur dès qu'il y en a plus d'une. Une journée
  * rattachée au mauvais client fausse deux CRA d'un coup — celui qui la reçoit
  * à tort, et celui à qui elle manque.
+ *
+ * La teinte voyage avec le libellé : c'est elle qui fait le lien entre la
+ * liste de l'éditeur et la bande colorée qu'on vient de cliquer sur la grille.
  */
 function affectationsPossibles(
   faits: { readonly missions: readonly Mission[] }
@@ -973,10 +852,46 @@ function affectationsPossibles(
     .flatMap((m) => m.entites.map((e) => ({
       missionId: m.id,
       entiteId: e.id,
+      couleur: e.couleur,
       libelle: m.entites.length > 1 && e.nom !== ''
         ? `${m.description !== '' ? m.description : m.clientNom} — ${e.nom}`
         : (m.description !== '' ? m.description : m.clientNom)
     })));
+}
+
+/**
+ * Cette affectation occupe-t-elle une partie de la portée visée&nbsp;?
+ *
+ * Sans ce filtre, chaque enregistrement écrirait un ajustement sur TOUTES les
+ * missions du dossier — y compris celles qui n'ont jamais rien eu ce jour-là.
+ * Ils diraient la même chose que le rythme, donc rien ne se verrait à l'écran
+ * — jusqu'au jour où un rythme change et où ces journées-là ne suivent pas.
+ */
+function toucheLaPortee(jour: JourPlanifie, portee: Portee): boolean {
+  const vises = creneauxDeLaPortee(portee);
+  return creneauxOccupes(jour.retenu, jour.creneaux)
+    .some((o) => vises.includes(o.creneau));
+}
+
+/**
+ * Ce que la saisie vient de faire, dit après coup.
+ *
+ * Le panneau se referme sur une grille qui a changé en plusieurs endroits à la
+ * fois — la moitié saisie, et celle qu'une autre mission vient de rendre. Sans
+ * cette phrase, il faudrait comparer deux états de la grille de mémoire.
+ */
+function messageDeSaisie(
+  saisie: SaisieDemiJournee, affectations: readonly Affectation[]
+): string {
+  const quoi = saisie.portee === 'journee'
+    ? 'Journée'
+    : saisie.portee === 'matin' ? 'Matin' : 'Après-midi';
+  if (saisie.type === 'conge') return `${quoi} posé en congé.`;
+  if (saisie.type === 'libre') return `${quoi} libéré : ni travail, ni congé.`;
+  const nom = affectations
+    .find((a) => a.missionId === saisie.missionId && a.entiteId === saisie.entiteId)
+    ?.libelle ?? 'la mission';
+  return `${quoi} attribué à ${nom}.`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -315,6 +315,114 @@ export function basculerCreneau(jour: JourPlanifie, creneau: Creneau): Ajustemen
   };
 }
 
+/**
+ * Sur quoi porte une saisie : une moitié de journée, ou la journée entière.
+ *
+ * Le dessin propose les trois — « Matin / Après-midi / Journée » — et la
+ * troisième n'est pas un raccourci pour deux clics. Poser une journée de congé
+ * en deux gestes laisse un état intermédiaire d'une demi-journée qui n'a jamais
+ * été voulu, et c'est celui-là que l'utilisateur verra si le second clic
+ * échoue.
+ */
+export const PORTEES = ['matin', 'apresMidi', 'journee'] as const;
+export type Portee = typeof PORTEES[number];
+
+/** Les créneaux qu'une portée recouvre. */
+export function creneauxDeLaPortee(portee: Portee): readonly Creneau[] {
+  return portee === 'journee' ? CRENEAUX : [portee];
+}
+
+/**
+ * Ce qu'on déclare sur une portée.
+ *
+ * Le dessin en propose un quatrième — « Indispo » — et il n'est PAS repris :
+ * le schéma ne connaît que le congé, et rien ne distingue les deux dans un
+ * calcul. Inventer un statut stocké pour l'occasion contredirait l'invariant
+ * qui veut que les statuts se dérivent ; le poser comme un congé sous un autre
+ * nom mentirait sur le solde de congés. On s'abstient, et on le note.
+ */
+export type TypeDeSaisie = 'travail' | 'conge' | 'libre';
+
+/**
+ * L'ajustement à écrire pour UNE affectation, après une saisie sur une portée.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE MOITIÉ DE JOURNÉE N'A QU'UN OCCUPANT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `occupe` dit si CETTE affectation tient la portée après la saisie. Celle
+ * qu'on désigne la prend, toutes les autres la rendent — c'est l'appelant qui
+ * appelle cette fonction une fois par affectation, avec le bon `occupe`.
+ *
+ * Sans cette libération, déclarer « mercredi matin, client B » sur une matinée
+ * que le rythme du client A prévoyait déjà donnerait DEUX occupants pour une
+ * seule matinée : une journée et demie sur un mercredi, une occupation
+ * au-dessus de 100 %, et un CRA qui facture du temps qui n'a pas existé. C'est
+ * exactement l'anomalie que « Le mois en chiffres » signale — ce geste est
+ * celui qui la corrige.
+ */
+export function saisirSurPortee(
+  jour: JourPlanifie,
+  portee: Portee,
+  occupe: boolean,
+  lieu: Lieu | null
+): AjustementJour | null {
+  const vises = creneauxDeLaPortee(portee);
+  const actuels = creneauxOccupes(jour.retenu, jour.creneaux).map((o) => o.creneau);
+
+  const apres = occupe
+    ? CRENEAUX.filter((c) => vises.includes(c) || actuels.includes(c))
+    : actuels.filter((c) => !vises.includes(c));
+
+  const duRythme = creneauxOccupes(jour.prevu, null).map((o) => o.creneau);
+  const memeQueLeRythme = apres.length === duRythme.length
+    && apres.every((c) => duRythme.includes(c));
+  // Le lieu compte dans la comparaison : une journée que le rythme prévoyait
+  // déjà, mais dont on vient de préciser qu'elle s'est faite sur site, n'est
+  // plus « la même que le rythme ». Effacer l'ajustement perdrait le lieu que
+  // l'utilisateur vient de saisir, sans rien signaler.
+  if (memeQueLeRythme && lieu === null) return null;
+
+  return {
+    quotite: apres.length * 0.5,
+    creneaux: apres,
+    ...(lieu !== null ? { lieu } : jour.lieu !== null ? { lieu: jour.lieu } : {})
+  };
+}
+
+/**
+ * La quotité de congé du jour après une saisie.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE CONGÉ EST UNE QUOTITÉ, PAS DEUX CRÉNEAUX
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le schéma stocke « 0,5 j de congé ce jour-là », sans dire laquelle des deux
+ * moitiés. On ne peut donc pas savoir si poser un congé sur le matin, alors
+ * qu'une demi-journée est déjà posée, ajoute une moitié ou répète la même.
+ *
+ * D'où un maximum plutôt qu'une somme : poser un congé ne peut qu'amener la
+ * journée AU MOINS à ce que la portée demande. Une somme ferait qu'un second
+ * clic sur la même moitié compterait un jour de congé qui n'a pas été pris —
+ * et le solde de congés est justement ce que ce chiffre alimente.
+ *
+ * Le retrait, lui, soustrait : « libre » sur l'après-midi d'une journée
+ * entièrement en congé la ramène à une demi-journée, ce qui rend le geste
+ * réversible moitié par moitié.
+ */
+export function congeApresSaisie(
+  congeActuel: Quotite, portee: Portee, type: TypeDeSaisie
+): Quotite {
+  const part = creneauxDeLaPortee(portee).length * 0.5;
+  if (type === 'conge') return Math.max(congeActuel, part);
+  if (type === 'libre') return Math.max(0, congeActuel - part);
+  // Déclarer du travail sur une moitié en congé retire ce congé de la même
+  // moitié : les deux ne peuvent pas tenir sur le même créneau, et laisser les
+  // deux ferait sortir le jour du dénominateur pendant qu'il compte au
+  // numérateur.
+  return Math.max(0, congeActuel - part);
+}
+
 export interface LigneCra {
   readonly date: DateISO;
   readonly quotite: Quotite;

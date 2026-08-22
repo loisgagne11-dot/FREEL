@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../types';
 import type { JourPlanifie, Rythme } from './planning';
 import {
-  basculerCreneau, craDuMois, creneauxOccupes, jourDeSemaine, planifier,
-  quotitePrevue, rythmePour
+  basculerCreneau, congeApresSaisie, craDuMois, creneauxOccupes, jourDeSemaine,
+  planifier, quotitePrevue, rythmePour, saisirSurPortee
 } from './planning';
 
 const D = (s: string) => dateISO(s);
@@ -292,5 +292,119 @@ describe('bascule d’un créneau', () => {
     const surSite = journee({ lieu: 'sur_site' });
     expect(basculerCreneau(surSite, 'matin'))
       .toEqual({ quotite: 0.5, creneaux: ['apresMidi'], lieu: 'sur_site' });
+  });
+});
+
+describe('saisie sur une portée', () => {
+  const journee = (o: Partial<JourPlanifie> = {}): JourPlanifie => ({
+    date: D('2026-08-10'),
+    prevu: 1, retenu: 1, ajuste: false, ferie: false, weekEnd: false, conge: 0,
+    creneaux: null, lieu: null,
+    ...o
+  });
+
+  /**
+   * LE GESTE QUI CORRIGE LA JOURNÉE ET DEMIE.
+   *
+   * Deux rythmes prévoient tous deux le vendredi : l'occupation passe au-dessus
+   * de 100 % et le CRA facture du temps qui n'a pas existé. Attribuer la
+   * matinée à l'un la RETIRE à l'autre — c'est l'appelant qui passe `occupe`
+   * à faux pour toutes les autres affectations.
+   */
+  it('libère la portée de l’affectation qui ne la tient pas', () => {
+    expect(saisirSurPortee(journee(), 'matin', false, null))
+      .toEqual({ quotite: 0.5, creneaux: ['apresMidi'] });
+  });
+
+  it('donne la portée à l’affectation qui la tient', () => {
+    const vide = journee({ prevu: 0, retenu: 0, weekEnd: true });
+    expect(saisirSurPortee(vide, 'apresMidi', true, null))
+      .toEqual({ quotite: 0.5, creneaux: ['apresMidi'] });
+  });
+
+  /** La journée entière est un geste, pas deux : voir `PORTEES`. */
+  it('prend les deux moitiés d’un coup sur la portée journée', () => {
+    const vide = journee({ prevu: 0, retenu: 0, weekEnd: true });
+    expect(saisirSurPortee(vide, 'journee', true, null))
+      .toEqual({ quotite: 1, creneaux: ['matin', 'apresMidi'] });
+    expect(saisirSurPortee(journee(), 'journee', false, null))
+      .toEqual({ quotite: 0, creneaux: [] });
+  });
+
+  /** Une moitié déjà tenue ne se dédouble pas quand on redéclare l'autre. */
+  it('ajoute la portée à ce qui est déjà tenu', () => {
+    const matin = journee({ prevu: 0.5, retenu: 0.5, creneaux: ['matin'] });
+    expect(saisirSurPortee(matin, 'apresMidi', true, null))
+      .toEqual({ quotite: 1, creneaux: ['matin', 'apresMidi'] });
+  });
+
+  it('efface l’ajustement quand la saisie retombe sur le rythme', () => {
+    const corrigee = journee({ prevu: 1, retenu: 0.5, creneaux: ['matin'], ajuste: true });
+    expect(saisirSurPortee(corrigee, 'apresMidi', true, null)).toBeNull();
+  });
+
+  /**
+   * LE LIEU EMPÊCHE L'EFFACEMENT, ET C'EST LE POINT DUR.
+   *
+   * Préciser « sur site » sur une journée que le rythme prévoyait déjà ne la
+   * ramène pas au rythme : elle porte maintenant une information de plus.
+   * L'effacer comme identique perdrait le lieu que l'utilisateur vient de
+   * saisir, sans rien signaler — le pire des deux, puisque le geste a l'air
+   * d'avoir fonctionné.
+   */
+  it('garde l’ajustement quand la saisie ne fait qu’ajouter un lieu', () => {
+    expect(saisirSurPortee(journee(), 'journee', true, 'sur_site'))
+      .toEqual({ quotite: 1, creneaux: ['matin', 'apresMidi'], lieu: 'sur_site' });
+  });
+
+  /** Le lieu saisi l'emporte sur celui déjà posé : c'est une correction. */
+  it('remplace le lieu déjà posé par celui qu’on saisit', () => {
+    const domicile = journee({ lieu: 'teletravail' });
+    expect(saisirSurPortee(domicile, 'journee', true, 'sur_site'))
+      .toEqual({ quotite: 1, creneaux: ['matin', 'apresMidi'], lieu: 'sur_site' });
+  });
+
+  /** Sans lieu saisi, celui de la journée survit — comme à la bascule. */
+  it('conserve le lieu quand la saisie n’en donne pas', () => {
+    const surSite = journee({ lieu: 'sur_site' });
+    expect(saisirSurPortee(surSite, 'matin', false, null))
+      .toEqual({ quotite: 0.5, creneaux: ['apresMidi'], lieu: 'sur_site' });
+  });
+});
+
+describe('congé après une saisie', () => {
+  /**
+   * UN MAXIMUM, ET NON UNE SOMME.
+   *
+   * Le schéma stocke « 0,5 j de congé », sans dire quelle moitié. Un second
+   * clic sur la même matinée compterait donc un jour de congé qui n'a pas été
+   * pris — et c'est ce chiffre qui alimente le solde.
+   */
+  it('ne compte pas deux fois la même moitié', () => {
+    expect(congeApresSaisie(0.5, 'matin', 'conge')).toBe(0.5);
+  });
+
+  it('porte la journée entière au congé', () => {
+    expect(congeApresSaisie(0, 'journee', 'conge')).toBe(1);
+    expect(congeApresSaisie(0.5, 'journee', 'conge')).toBe(1);
+  });
+
+  /** Réversible moitié par moitié : c'est ce qui rend le geste rattrapable. */
+  it('retire une moitié à la fois', () => {
+    expect(congeApresSaisie(1, 'apresMidi', 'libre')).toBe(0.5);
+    expect(congeApresSaisie(0.5, 'matin', 'libre')).toBe(0);
+  });
+
+  it('ne descend jamais sous zéro', () => {
+    expect(congeApresSaisie(0, 'journee', 'libre')).toBe(0);
+  });
+
+  /**
+   * Travail et congé ne tiennent pas sur le même créneau : laisser les deux
+   * ferait sortir le jour du dénominateur d'occupation pendant qu'il compte au
+   * numérateur — un taux faux des deux côtés à la fois.
+   */
+  it('retire le congé de la moitié qu’on déclare travaillée', () => {
+    expect(congeApresSaisie(1, 'matin', 'travail')).toBe(0.5);
   });
 });
