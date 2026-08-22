@@ -41,7 +41,11 @@ function semer(modifications: Partial<Faits> = {}): void {
 async function ouvrir(onglet: 'Clients' | 'Missions') {
   render(<Activite />);
   const utilisateur = userEvent.setup();
-  await utilisateur.click(screen.getByRole('tab', { name: onglet }));
+  /* Le nom de l'onglet porte désormais son COMPTE — « Clients 4 » — parce que
+     la pastille n'est pas masquée aux lecteurs d'écran : elle rejoint
+     naturellement le nom, plutôt que d'être redite hors écran et maintenue
+     deux fois. Le sélecteur s'ancre donc au début du libellé. */
+  await utilisateur.click(screen.getByRole('tab', { name: new RegExp(`^${onglet}`) }));
   // Les deux onglets sont chargés à la demande : attendre leur arrivée.
   await screen.findByRole('heading', {
     name: onglet === 'Clients' ? /Carnet/ : /^Missions/
