@@ -48,10 +48,13 @@ export type { PeriodePlafond } from './plafonds';
 
 export {
   PERIODES_TVA,
-  etatAssujettissement, periodeTvaPour, resteAvantFranchise, resteAvantMajore,
-  seuilsTva, verifierIntegriteTva
+  assujettissementTva, etatAssujettissement, periodeTvaPour, resteAvantFranchise,
+  resteAvantMajore, seuilsTva, seuilsTvaPourAnnee, verifierIntegriteTva
 } from './tva';
-export type { EtatAssujettissementTva, PeriodeTva, SeuilsTva } from './tva';
+export type {
+  DonneesAssujettissementTva, EtatAssujettissementTva, PeriodeTva, SeuilsTva,
+  StatutAssujettissementTva
+} from './tva';
 
 export {
   PERIODES_CFP, PERIODES_IR, PERIODES_VERSEMENT_LIBERATOIRE,

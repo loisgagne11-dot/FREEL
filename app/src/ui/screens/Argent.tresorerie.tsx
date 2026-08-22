@@ -1,9 +1,10 @@
 import { Suspense, lazy, useMemo } from 'react';
 import { useFaits } from '../../state/store';
-import { dateDuJour, soldeEstSuivi } from '../../state/selecteurs';
+import { dateDuJour, provenanceSoldeDe } from '../../state/selecteurs';
 import { etatProjection, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
 import type { DateISO, Euros, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
+import type { ProvenanceSolde } from '../../domain/calculs/solde';
 import { autonomieMois } from '../../domain/calculs/tresorerie';
 import {
   type Franchissement, franchissementPrevu, partDeLAnneeEcoulee, projectionAnnuelle
@@ -560,10 +561,25 @@ function VignetteReserve({ du, couvert }: { readonly du: Euros; readonly couvert
  * qu'on ne fait pas : ce serait conforme et faux, exactement le défaut que ce
  * projet s'interdit sur un chiffre. Le libellé suit donc ce que la ligne
  * calcule réellement, pas le dessin.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA NOTE DU SOLDE DIT SA PROVENANCE, PAS SEULEMENT SA DATE (LOT H-C)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `soldeEstSuivi` disait seulement « un relevé est importé, ou non » — ce qui
+ * s'est révélé être la mauvaise question dès que le solde s'est mis à se
+ * dériver des faits (lot H-B) : un compte sans relevé peut parfaitement se
+ * dériver de recettes et de dépenses, et un compte AVEC relevé peut rester
+ * `saisi` tant que rien n'y a encore été rapproché. `provenanceSoldeDe`
+ * distingue les quatre cas réels ; voir `ProvenanceSolde` pour ce que chacun
+ * garantit. `sansDate` est le plus important à montrer : c'est l'invitation à
+ * dater le solde qui évite exactement le bug que H-C corrige — sans elle,
+ * rien à l'écran ne dit qu'une date manque.
  */
 function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
   const besoinMensuel = useFaits((e) => e.faits.besoinMensuel);
-  const soldeSuivi = useFaits((e) => soldeEstSuivi(e.faits));
+  const provenanceSolde = useFaits((e) => provenanceSoldeDe(e.faits));
+  const soldeInitialAu = useFaits((e) => e.faits.soldeInitialAu);
   const autonomie = autonomieMois(etat.tresorerie.versable, besoinMensuel);
 
   return (
@@ -571,9 +587,7 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
       <Chiffre
         libelle="Solde du compte"
         valeur={eur(etat.tresorerie.solde)}
-        note={soldeSuivi
-          ? `au ${dateCourte(dateDuJour())}`
-          : 'saisi, aucun relevé importé'}
+        note={noteProvenanceSolde(provenanceSolde, soldeInitialAu)}
       />
       <Chiffre
         libelle="Disponible"
@@ -598,6 +612,40 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
       />
     </div>
   );
+}
+
+/**
+ * Ce que la note sous le solde doit dire, selon sa provenance.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * « sansDate » PASSE EN PREMIER, ET C'EST UNE INVITATION, PAS UN CONSTAT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * C'est l'état de tout compte migré : personne n'a encore eu l'occasion de
+ * dater son solde depuis Config. La note doit le dire en clair plutôt que de
+ * se rabattre sur un « saisi » silencieux qui laisserait croire que le
+ * chiffre est déjà à jour de tout ce qui a été enregistré depuis — exactement
+ * la confusion qui a produit le double comptage que ce lot corrige.
+ *
+ * `derive` et `saisi` ne peuvent survenir qu'avec une date posée (voir
+ * `provenanceSolde` : `sansDate` est rendu AVANT tout autre calcul dès que
+ * `soldeInitialAu` vaut `null`) — `soldeInitialAu` y est donc toujours non
+ * nul, ce que le `as DateISO` documente plutôt que de cacher derrière un
+ * `??` qui masquerait un bug de câblage.
+ */
+function noteProvenanceSolde(
+  provenance: ProvenanceSolde, soldeInitialAu: DateISO | null
+): string {
+  switch (provenance) {
+    case 'rapproche':
+      return 'lu sur le relevé';
+    case 'derive':
+      return `dérivé des faits depuis le ${dateCourte(soldeInitialAu as DateISO)}`;
+    case 'saisi':
+      return `saisi le ${dateCourte(soldeInitialAu as DateISO)}, rien à dériver`;
+    case 'sansDate':
+      return 'date-le en Config pour qu’il suive tes entrées et tes sorties';
+  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -731,6 +779,7 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
 
   const plafond = seuils.plafondMicro;
   const tva = seuils.franchiseTva;
+  const assujettissement = seuils.assujettissementTva;
 
   /**
    * Le repère de date, posé sur chaque jauge.
@@ -759,21 +808,40 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
    * qui assujettit dès le mois du dépassement, sur des factures déjà émises
    * sans TVA.
    */
+  const complementPlafond = plafond.statut !== 'refuse' && (
+    <>
+      {' · '}
+      <Montant>{eur(euros(Math.max(0, plafond.valeur - seuils.caEncaisse)))}</Montant>
+      {' avant le plafond micro'}
+    </>
+  );
+
+  /**
+   * Redevable l'EMPORTE sur « il reste X € » — pas les deux à la fois.
+   *
+   * « Il reste 2 300 € avant le seuil majoré » à quelqu'un déjà redevable
+   * depuis le 1er janvier (à cause du CA de l'année précédente, voir
+   * `assujettissementTva`) ferait croire à une marge qui n'existe plus : le
+   * CA de l'année en cours n'a jamais été sous franchise, il n'y a rien à
+   * attendre avant un seuil qui ne s'applique déjà plus.
+   */
   const resume = tva.statut === 'refuse'
     ? 'Seuils de TVA indisponibles pour cette période.'
-    : (
-      <>
-        <Montant>{eur(euros(Math.max(0, tva.valeur.majore - seuils.caEncaisse)))}</Montant>
-        {' avant le seuil majoré de TVA'}
-        {plafond.statut !== 'refuse' && (
-          <>
-            {' · '}
-            <Montant>{eur(euros(Math.max(0, plafond.valeur - seuils.caEncaisse)))}</Montant>
-            {' avant le plafond micro'}
-          </>
-        )}
-      </>
-    );
+    : assujettissement.statut !== 'refuse' && assujettissement.valeur.cas === 'redevable'
+      ? (
+        <>
+          {'Redevable de la TVA depuis le 1ᵉʳ '}
+          <strong>{moisLong(assujettissement.valeur.depuis)}</strong>
+          {complementPlafond}
+        </>
+      )
+      : (
+        <>
+          <Montant>{eur(euros(Math.max(0, tva.valeur.majore - seuils.caEncaisse)))}</Montant>
+          {' avant le seuil majoré de TVA'}
+          {complementPlafond}
+        </>
+      );
 
   return (
     <CartePliable
@@ -844,10 +912,65 @@ function CarteSeuils({ seuils }: { seuils: EtatSeuils }) {
                   aujourdhui={aujourdhui}
                 />}
               />
+              <NoteRedevabiliteTva assujettissement={assujettissement} />
             </>
           )}
       </div>
     </CartePliable>
+  );
+}
+
+/**
+ * DEPUIS QUAND COLLECTER, ET SUR QUELLE BASE.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA QUESTION QUE LES DEUX JAUGES DU DESSUS NE PEUVENT PAS RÉPONDRE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les jauges au-dessus ne regardent que le CA encaissé de l'année en cours :
+ * c'est le bug remonté — un CA encaissé en décembre dernier, avec TVA déjà
+ * collectée dessus, restait invisible dès que l'année changeait, parce que
+ * rien ne relisait l'année précédente. `assujettissementTva` (le sélecteur
+ * qui alimente cette note) répare ce point précis en tenant compte du CA de
+ * N-1 ; cette note en est le seul endroit où l'écran le montre.
+ *
+ * Rien n'est affiché sous la franchise : les jauges au-dessus suffisent déjà
+ * à dire « rien à collecter », et une note vide serait un bruit de plus.
+ */
+function NoteRedevabiliteTva(
+  { assujettissement }: { readonly assujettissement: EtatSeuils['assujettissementTva'] }
+) {
+  if (assujettissement.statut === 'refuse') return null;
+  const etat = assujettissement.valeur;
+  if (etat.cas === 'sous_franchise') return null;
+
+  if (etat.cas === 'perte_franchise') {
+    return (
+      <p className={styles.vide}>
+        <span className={styles.attention}>
+          Franchise perdue à compter du {moisLong(etat.depuis)}
+        </span>
+        {' '}— le chiffre d’affaires encaissé cette année a déjà dépassé la
+        franchise simple, sans atteindre le seuil majoré.
+      </p>
+    );
+  }
+
+  // `motif` distingue ce que l'utilisateur doit comprendre : soit il n'a
+  // JAMAIS eu de franchise cette année (le CA de l'an dernier l'avait déjà
+  // fait sortir), soit il l'a perdue en cours d'année — deux histoires
+  // différentes, qui ne se racontent pas avec la même phrase.
+  const base = etat.motif === 'annee_precedente'
+    ? 'le chiffre d’affaires encaissé l’an dernier avait déjà dépassé la franchise : cette année n’en a jamais eu'
+    : 'le seuil majoré a été franchi ce mois-là';
+
+  return (
+    <p className={styles.vide}>
+      <span className={styles.alerteLigne}>
+        Redevable de la TVA depuis le 1ᵉʳ {moisLong(etat.depuis)}
+      </span>
+      {' '}— {base}.
+    </p>
   );
 }
 

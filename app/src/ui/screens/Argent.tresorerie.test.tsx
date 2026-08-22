@@ -6,7 +6,7 @@ import { dateISO, euros } from '../../domain/types';
 import { type Faits, faitsVides } from '../../state/schema';
 import { etatArgent } from '../../state/selecteurs.argent';
 import { useFaits } from '../../state/store';
-import { eur } from '../format';
+import { dateCourte, eur } from '../format';
 import { Tresorerie } from './Argent.tresorerie';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -66,17 +66,60 @@ describe('les quatre tuiles de trésorerie', () => {
   });
 
   /**
-   * LE SOLDE DIT S'IL EST SUIVI OU SEULEMENT SAISI.
+   * LE SOLDE DIT D'OÙ IL VIENT (lot H-C).
    *
-   * Sans relevé importé, le solde est un chiffre qu'on a tapé une fois et qui
-   * ne bouge plus. Le dater « au 10 juin » laisserait croire à un rapprochement
-   * bancaire qui n'a pas eu lieu.
+   * Quatre provenances possibles (voir `ProvenanceSolde`) et une note par cas,
+   * pour que l'écran ne dise jamais plus de confiance qu'il n'en tient.
    */
-  it('avoue qu’aucun relevé n’est importé au lieu de dater le solde', () => {
-    poser({ soldeInitial: euros(10_000) });
+  describe('provenance du solde', () => {
+    /**
+     * `sansDate` EST LE CAS PAR DÉFAUT DE TOUT COMPTE MIGRÉ, ET C'EST CELUI
+     * QUI DOIT LE PLUS SE FAIRE REMARQUER : sans lui, rien à l'écran ne dit
+     * que la date manque, et l'application recommence à deviner — exactement
+     * le défaut que ce lot corrige.
+     */
+    it('invite à dater le solde quand la date de départ est inconnue', () => {
+      poser({ soldeInitial: euros(10_000), soldeInitialAu: null });
 
-    const tuile = screen.getByText('Solde du compte').parentElement;
-    expect(tuile?.textContent).toContain('saisi, aucun relevé importé');
+      const tuile = screen.getByText('Solde du compte').parentElement;
+      expect(tuile?.textContent).toContain('date-le en Config');
+    });
+
+    it('dit « saisi » et la date, quand rien n’a encore contribué', () => {
+      poser({ soldeInitial: euros(10_000), soldeInitialAu: dateISO('2026-06-01') });
+
+      const tuile = screen.getByText('Solde du compte').parentElement;
+      expect(tuile?.textContent).toContain('saisi le');
+      expect(tuile?.textContent).toContain(dateCourte('2026-06-01'));
+    });
+
+    it('dit « dérivé » et depuis quand, dès qu’un fait postérieur contribue', () => {
+      poser({
+        soldeInitial: euros(10_000), soldeInitialAu: dateISO('2026-06-01'),
+        recettes: [{
+          id: 'r1', clientNom: 'Client test', libelle: 'Mission', montant: euros(2000),
+          emiseLe: dateISO('2026-06-05'), encaisseeLe: dateISO('2026-06-05'),
+          modeReglement: 'virement', numero: '1'
+        }]
+      });
+
+      const tuile = screen.getByText('Solde du compte').parentElement;
+      expect(tuile?.textContent).toContain('dérivé des faits depuis le');
+      expect(tuile?.textContent).toContain(dateCourte('2026-06-01'));
+    });
+
+    it('dit « lu sur le relevé » quand tout mouvement est classé', () => {
+      poser({
+        soldeInitial: euros(10_000), soldeInitialAu: dateISO('2026-06-01'),
+        mouvementsBancaires: [{
+          id: 'mv1', date: dateISO('2026-06-05'), libelle: 'VIR',
+          montant: euros(500), rapprocheAvec: null, sansContrepartie: 'autre'
+        }]
+      });
+
+      const tuile = screen.getByText('Solde du compte').parentElement;
+      expect(tuile?.textContent).toContain('lu sur le relevé');
+    });
   });
 
   /**

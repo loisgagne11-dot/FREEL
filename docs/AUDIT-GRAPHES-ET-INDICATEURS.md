@@ -192,6 +192,7 @@ Ne sont listés que les verdicts qui appellent une décision.
 | **CA généré par le mois** | 🟢 **ajouté** (lot C4) — ce que le TRAVAIL du mois produit, et non ce qui est rentré sur le compte. Les deux diffèrent de tout le délai de paiement, et l'infobulle le dit |
 | **Occupation du mois** | ✅ corrigé deux fois, §1.3 — désormais en jauge, avec son dénominateur écrit, et une seule fois par écran |
 | **Répartition du temps par client** | 🟢 **ajouté** (lot C4) — en jours et sur le mois, distinct de la dépendance client. Voir la note du §2 |
+| **Écart facturé / planning** | 🟢 **ajouté** (lot I) — le brouillon du mois restait affiché à côté de la facture émise «&nbsp;pour que l'écart se voie&nbsp;». Il se voyait au sens où les deux montants étaient à l'écran, mais il fallait les soustraire de tête&nbsp;: un écart qu'on doit calculer soi-même est un écart qu'on ne remarque pas — et celui-ci se remarque d'ordinaire quand le CLIENT le remarque. Il est désormais chiffré, et son SIGNE porte le conseil, parce que les deux sens n'appellent pas le même geste&nbsp;: facturé en moins, c'est du travail qui se perd à la clôture et il reste une facture complémentaire à émettre ; facturé en plus, c'est un avoir. L'égalité se dit aussi, plutôt que de laisser un blanc que rien ne distingue d'un calcul qui n'a pas tourné |
 | **Journées surengagées** | 🟢 **ajouté** (lot G) — la CAUSE d'une occupation au-dessus de 100 %, dite plutôt que devinée. Le numérateur additionne les journées par CLIENT, le dénominateur compte les jours du CALENDRIER&nbsp;: deux rythmes qui prévoient tous deux le vendredi donnent une journée et demie sur un seul vendredi. Le taux n'est pas faux — il rapporte fidèlement une donnée impossible. On ne le borne donc pas, on nomme la cause et on renvoie au geste qui la corrige |
 | **Jours fériés du mois** | 🟢 **déplacé** (lot G) — il vivait dans la carte « Congés du mois », retirée avec sa seconde grille. Il explique le dénominateur&nbsp;: un férié ne se compte pas à l'œil sur une trame de trente cases |
 | **Congés posés dans l'année** | 🟢 **déplacé** (lot G) — même origine. C'est le SEUL endroit où les congés se lisent sur l'année, et le mois affiché n'y répond pas. Le laisser partir avec la carte aurait été exactement le défaut que ce document existe pour attraper |
@@ -364,6 +365,11 @@ l'échéancier (V6), le graphe combiné entrées / sorties / disponible (V7).
 semaine (V21), la vue mois (V22), la répartition du temps par client (V23),
 l'occupation en jauge avec son dénominateur (V14), les jours travaillés et le CA
 généré du mois, la part de télétravail.
+
+**Livré au lot I** : l'écart chiffré entre ce qui a été facturé et ce que le
+planning compte maintenant. Le mécanisme existait — le brouillon dérivé du même
+planning que le compte rendu, laissé visible à côté de la facture émise — mais
+il s'arrêtait à mettre les deux nombres côte à côte.
 
 **Livrés au lot G** : les journées surengagées — la cause d'une occupation
 au-dessus de 100 %, que rien ne disait — et le rapatriement des deux comptes

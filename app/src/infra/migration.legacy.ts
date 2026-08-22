@@ -797,6 +797,11 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // dur dans le code. Rien à reprendre.
     periodesUrssafAjoutees: [],
     soldeInitial: euros(nombre(t['soldeInitial'])),
+    // L'ancienne application ne datait jamais son solde : `null`, jamais la
+    // date de la reprise elle-même, qui ne dit rien de quand le montant était
+    // vrai. Voir `Faits.soldeInitialAu` — la dérivation par les faits reste
+    // en abstention tant que personne ne pose cette date depuis Config.
+    soldeInitialAu: null,
     // La réserve unifiée (D4) reprend le plancher de compte de l'ancienne
     // version, seule des trois implémentations concurrentes à être un montant.
     reserve: euros(nombre(t['reserveCompte'])),

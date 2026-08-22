@@ -37,7 +37,7 @@ import {
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 14 as const;
+export const VERSION_SCHEMA = 15 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -377,6 +377,32 @@ export interface Faits {
   readonly periodesUrssafAjoutees: readonly PeriodeBareme[];
   readonly soldeInitial: Euros;
   /**
+   * La date à laquelle `soldeInitial` était vrai, ou `null` tant qu'elle n'est
+   * pas connue.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * UN SOLDE SANS DATE NE SE COMBINE PAS AUX FAITS
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * `soldeInitial` a longtemps été traité comme un point de départ auquel les
+   * faits enregistrés depuis (recettes encaissées, dépenses payées, échéances
+   * réglées) pouvaient s'ajouter sans risque. C'était faux dès que l'écran
+   * Config le décrivait comme « le solde du compte aujourd'hui » : ce montant
+   * contient DÉJÀ tous les encaissements et paiements passés. Y rajouter une
+   * recette encaissée hier compte le même euro deux fois — dans le sens le
+   * plus dangereux, un solde plus haut qu'il ne l'est réellement.
+   *
+   * Une date résout l'ambiguïté : seuls les faits postérieurs à elle sont
+   * ajoutés (voir `domain/calculs/solde.ts`). Sans date, l'application ne
+   * peut pas savoir ce qui est déjà dans le montant saisi et s'abstient donc
+   * de dériver quoi que ce soit — voir `ProvenanceSolde['sansDate']`.
+   *
+   * `null` par défaut, y compris pour tout compte migré depuis un schéma
+   * antérieur : personne n'a jamais dit à quelle date son solde était vrai,
+   * et l'inventer serait fabriquer une date qui n'a pas été vérifiée.
+   */
+  readonly soldeInitialAu: DateISO | null;
+  /**
    * Matelas de sécurité, montant absolu. Source unique (D4).
    *
    * Le fait garde son nom ; l'écran, lui, l'appelle « seuil de sécurité »,
@@ -506,7 +532,7 @@ export function faitsVides(): Faits {
     entreprise: entrepriseVide(),
     clients: [], missions: [], recettes: [], depenses: [], conges: [],
     mouvementsBancaires: [], periodesUrssafAjoutees: [],
-    soldeInitial: 0 as Euros, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
+    soldeInitial: 0 as Euros, soldeInitialAu: null, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     partGardeeAuVersement: ratio(0),
     objectifCaAnnuel: null,
     periodesDeclarees: [], echeances: [], configImpotBrute: {},
@@ -573,6 +599,17 @@ export function motifRefusFaits(brut: unknown): string | null {
     if (cle in o && (typeof v !== 'number' || !Number.isFinite(v))) {
       return `Le champ « ${cle} » devrait être un montant.`;
     }
+  }
+
+  // `soldeInitialAu` a le droit d'être absent (compte d'avant le schéma 15)
+  // ou `null` (jamais daté) — c'est le comportement d'ABSTENTION que le lot
+  // installe, pas une erreur à réparer. Seule une valeur présente qui n'est
+  // ni `null` ni une date `AAAA-MM-JJ` est refusée : elle ferait entrer une
+  // comparaison de dates fausse dans `soldeDerive`, silencieusement.
+  const soldeAu = o['soldeInitialAu'];
+  if ('soldeInitialAu' in o && soldeAu !== null
+    && (typeof soldeAu !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(soldeAu))) {
+    return 'Le champ « soldeInitialAu » devrait être une date, être nul, ou être absent.';
   }
 
   // L'objectif est le premier montant qui a le droit d'être absent. Le ranger
@@ -897,6 +934,15 @@ function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
  * ne suffit PAS à combler — non parce qu'ils vivent dans une liste, mais parce
  * que leur valeur dort ailleurs, dans `configImpotBrute`. Voir
  * `foyerFiscalDuSchema11`.
+ *
+ * v14 → v15 : la date du solde de départ, `soldeInitialAu`. Champ de PREMIER
+ * NIVEAU comme les deux premiers ci-dessus : la fusion de surface le comble
+ * depuis `faitsVides()`. La valeur comblée est `null`, JAMAIS une date
+ * devinée — ni celle du jour de la migration, ni `debutActivite`, aucune des
+ * deux ne serait la date à laquelle `soldeInitial` était vrai. C'est
+ * exactement le cas que ce champ existe pour distinguer : un compte migré
+ * reste dans l'état d'ABSTENTION (`ProvenanceSolde['sansDate']`) jusqu'à ce
+ * que quelqu'un date son solde depuis Config.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;

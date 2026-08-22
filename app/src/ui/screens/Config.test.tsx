@@ -251,7 +251,7 @@ describe('trésorerie', () => {
     render(<Config />);
     const utilisateur = utilisateurTest();
 
-    const champ = screen.getByRole('spinbutton', { name: /Solde du compte/ });
+    const champ = screen.getByRole('spinbutton', { name: /Solde de ton compte/ });
     await utilisateur.clear(champ);
     await utilisateur.type(champ, '53984');
 
@@ -274,11 +274,18 @@ describe('trésorerie', () => {
    * qu'un relevé est importé ou non : point de départ d'une suite de
    * mouvements, ou solde affiché tel quel. Un seul libellé pour les deux
    * situations en rendrait une des deux fausse.
+   *
+   * L'ANCIEN LIBELLÉ — « Solde du compte aujourd’hui » — ÉTAIT LE BUG (lot
+   * H-C) : il laissait croire que le montant se distinguait d'un solde
+   * « normal » alors que c'est exactement un solde bancaire, qui contient déjà
+   * tous les encaissements et paiements passés. L'application le dérivait
+   * pourtant en y rajoutant les recettes encaissées — comptant le même euro
+   * deux fois. Le nouveau libellé ne mentionne plus « aujourd’hui » : c'est
+   * la date, saisie à part, qui porte cette information.
    */
   it('dit que le montant vaut solde tant qu’aucun relevé n’est importé', () => {
     render(<Config />);
-    expect(screen.getByRole('spinbutton', { name: /Solde du compte aujourd/ })).toBeTruthy();
-    expect(screen.getByText(/Aucun relevé n’est importé/)).toBeTruthy();
+    expect(screen.getByRole('spinbutton', { name: 'Solde de ton compte' })).toBeTruthy();
   });
 
   it('change de libellé dès qu’un relevé est importé', () => {
@@ -293,6 +300,46 @@ describe('trésorerie', () => {
     render(<Config />);
 
     expect(screen.getByRole('spinbutton', { name: /avant le premier mouvement/ })).toBeTruthy();
+  });
+
+  /**
+   * LA DATE, SANS LAQUELLE LE SOLDE NE PEUT PAS SE COMBINER AUX FAITS.
+   *
+   * `soldeInitialAu` est `null` sur tout compte migré : personne n'a encore eu
+   * l'occasion de la saisir. L'aide doit le dire en clair — « je m'abstiens »,
+   * pas un silence qui laisserait croire que tout va bien.
+   */
+  describe('date du solde de départ', () => {
+    it('écrit la date dans les faits', async () => {
+      render(<Config />);
+      const utilisateur = utilisateurTest();
+
+      const champDate = screen.getByLabelText('Ce solde était vrai le');
+      await utilisateur.type(champDate, '2026-08-01');
+
+      expect(useFaits.getState().faits.soldeInitialAu).toBe('2026-08-01');
+    });
+
+    it('dit que l’application s’abstient de dériver tant qu’aucune date n’est posée', () => {
+      render(<Config />);
+      expect(screen.getByText(/elle s’abstient donc de l’ajouter/)).toBeTruthy();
+    });
+
+    it('dit ce que dater le solde change, une fois la date posée', () => {
+      useFaits.setState({ faits: { ...faitsVides(), soldeInitialAu: dateISO('2026-08-01') } });
+      render(<Config />);
+      expect(screen.getByText(/s’ajoute désormais au solde affiché/)).toBeTruthy();
+    });
+
+    it('efface la date quand le champ est vidé', async () => {
+      useFaits.setState({ faits: { ...faitsVides(), soldeInitialAu: dateISO('2026-08-01') } });
+      render(<Config />);
+      const utilisateur = utilisateurTest();
+
+      await utilisateur.clear(screen.getByLabelText('Ce solde était vrai le'));
+
+      expect(useFaits.getState().faits.soldeInitialAu).toBeNull();
+    });
   });
 
   /**

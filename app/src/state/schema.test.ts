@@ -420,6 +420,46 @@ describe('schéma 10 → 11 : la part gardée au versement', () => {
 });
 
 /**
+ * v14 → v15 : LA DATE DU SOLDE DE DÉPART.
+ *
+ * Champ de premier niveau comme la part gardée ci-dessus : la fusion de
+ * surface suffit à le combler. Le test qui compte est celui du défaut — s'il
+ * devenait une date devinée plutôt que `null`, l'application recommencerait à
+ * dériver sur un solde dont elle ignore ce qu'il contient déjà, exactement le
+ * bug que ce lot corrige.
+ */
+describe('schéma 14 → 15 : la date du solde de départ', () => {
+  it('comble un compte antérieur à `null`, jamais à une date devinée', () => {
+    const f = completerFaits({ version: 14, soldeInitial: 20000 });
+    expect(f).toHaveProperty('soldeInitialAu');
+    expect(f.soldeInitialAu).toBeNull();
+  });
+
+  it('conserve une date déjà posée', () => {
+    expect(completerFaits({ version: 15, soldeInitialAu: '2026-08-01' }).soldeInitialAu)
+      .toBe('2026-08-01');
+  });
+
+  it('refuse une valeur qui n’a pas la forme d’une date', () => {
+    expect(motifRefusFaits({ ...faitsVides(), soldeInitialAu: 'hier' }))
+      .toMatch(/soldeInitialAu/);
+    expect(motifRefusFaits({ ...faitsVides(), soldeInitialAu: 20260801 }))
+      .toMatch(/soldeInitialAu/);
+  });
+
+  // Aucun compte d'avant le schéma 15 ne la porte : la refuser pour absence
+  // rejetterait tous les comptes existants.
+  it('accepte son absence', () => {
+    expect(motifRefusFaits({ version: 14, soldeInitial: 20000 })).toBeNull();
+  });
+
+  // `null` est la valeur normale d'un solde jamais daté, pas une erreur.
+  it('accepte `null`', () => {
+    expect(motifRefusFaits({ ...faitsVides(), soldeInitialAu: null })).toBeNull();
+  });
+});
+
+/**
  * v11 → v12 : LES TROIS FAITS DU FOYER FISCAL.
  *
  * Le cas est différent des deux précédents, et c'est ce qui rend ces tests

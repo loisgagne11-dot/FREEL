@@ -669,6 +669,51 @@ describe('journée déclarée sur un créneau vide', () => {
     expect(missions[1]?.entites[0]?.ajustements['2026-07-13']).toBeUndefined();
   });
 
+  /**
+   * UNE MISSION TERMINÉE NE SE FAIT PAS VOLER SES JOURNÉES.
+   *
+   * La liste n'offrait que les missions ACTIVES. L'éditeur s'ouvrant
+   * pré-rempli sur l'occupant de la moitié cliquée, une mission terminée n'y
+   * figurant pas, le pré-remplissage retombait sur la première mission active :
+   * ouvrir une journée d'une mission finie et enregistrer sans rien toucher la
+   * transférait en silence. Deux comptes rendus faussés d'un coup, et le geste
+   * avait l'air d'être resté sans effet.
+   */
+  it('garde la journée sur la mission terminée qui la tient déjà', async () => {
+    // Deux jours DISTINCTS : la mission finie tient le lundi, l'active le
+    // mardi. Sans cela le lundi serait surengagé, et enregistrer le
+    // corrigerait — ce qui est le bon comportement, mais pas ce qu'on mesure
+    // ici.
+    const rythme = (id: string, jour: 'lun' | 'mar') => entite({
+      id,
+      rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-12-31'),
+        parJour: { [jour]: 1 }, tjm: euros(400)
+      }]
+    });
+    semer({ missions: [
+      mission({
+        id: 'mis-finie', description: 'Mission finie', statut: 'terminee',
+        entites: [rythme('f1', 'lun')]
+      }),
+      mission({ id: 'mis-2', description: 'Mission B', entites: [rythme('b1', 'mar')] })
+    ] });
+    render(<Activite />);
+    const utilisateur = await ouvrirSemaine();
+
+    // Ouvrir puis enregistrer sans rien changer ne doit RIEN changer.
+    await editer(utilisateur, /13 juil\. 2026, matin/);
+
+    const missions = useFaits.getState().faits.missions;
+    expect(Object.keys(missions[0]?.entites[0]?.ajustements ?? {})).toHaveLength(0);
+    expect(Object.keys(missions[1]?.entites[0]?.ajustements ?? {})).toHaveLength(0);
+    // Et elle reste proposable, puisqu'elle tient la journée.
+    await utilisateur.click(
+      screen.getAllByRole('button', { name: /13 juil\. 2026, matin/ })[0]!
+    );
+    expect(screen.getByRole('button', { name: 'Mission finie' })).toBeTruthy();
+  });
+
   /** Le lieu ne se pose pas d'office : « 78 % de télétravail » se calcule sur
       les demi-journées DOCUMENTÉES, et un lieu inventé la fausserait. */
   it('n’enregistre aucun lieu tant qu’on n’en choisit pas', async () => {

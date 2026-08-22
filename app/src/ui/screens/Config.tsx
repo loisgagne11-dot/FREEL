@@ -127,7 +127,7 @@ export function Config() {
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * Le point de départ du solde, et le besoin mensuel.
+ * Le point de départ du solde, sa date, et le besoin mensuel.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * DEUX FAITS QUI N'AVAIENT AUCUNE PORTE D'ENTRÉE
@@ -140,21 +140,28 @@ export function Config() {
  * Un fait qu'on ne peut pas saisir est un fait qui restera faux.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * CE QUE « SOLDE DU COMPTE » VEUT DIRE ICI
+ * UN SOLDE N'EST UN POINT DE DÉPART QUE S'IL EST DATÉ
  * ─────────────────────────────────────────────────────────────────────────
  *
- * L'ancienne application SIMULAIT un solde : solde initial, plus les
- * encaissements, moins les charges cochées payées. Un chiffre calculé, qui
- * dérive de la réalité dès qu'une case est mal cochée.
+ * Ce champ s'appelait « Solde du compte aujourd'hui », et c'était le bug : ce
+ * montant contient DÉJÀ tous les encaissements et paiements passés, exactement
+ * comme n'importe quel solde bancaire. L'application dérivait pourtant le
+ * solde affiché en y rajoutant les recettes encaissées et les dépenses payées
+ * — une seconde fois le même euro, dans le sens le plus dangereux : un solde
+ * plus haut qu'il ne l'est, qui invite à se verser de l'argent déjà sorti.
  *
- * Ici, le solde vient de la banque : ce montant est le point de départ, et
- * les mouvements d'un relevé importé s'y ajoutent. Tant qu'aucun relevé n'est
- * importé, le solde affiché est exactement ce montant — l'écran Pilote le dit
- * plutôt que de le présenter comme suivi.
+ * Le champ demande maintenant deux choses : le montant, ET la date à laquelle
+ * il était vrai. Sans elle, l'application ne peut pas savoir ce qu'il contient
+ * déjà et S'ABSTIENT de rien y ajouter (voir `domain/calculs/solde.ts`,
+ * `ProvenanceSolde['sansDate']`) — le comportement d'avant que le solde ne se
+ * dérive des faits. Avec elle, seuls les faits STRICTEMENT postérieurs
+ * s'ajoutent : une recette encaissée hier, saisie après coup, ne s'y rajoute
+ * pas ; une recette encaissée demain, si.
  */
 function Tresorerie() {
   const faits = useFaits((e) => e.faits);
   const definirSoldeInitial = useFaits((e) => e.definirSoldeInitial);
+  const definirSoldeInitialAu = useFaits((e) => e.definirSoldeInitialAu);
   const definirBesoinMensuel = useFaits((e) => e.definirBesoinMensuel);
   const definirObjectif = useFaits((e) => e.definirObjectifCaAnnuel);
   const idChamp = useId();
@@ -167,22 +174,22 @@ function Tresorerie() {
         <Info libelle="D’où vient le solde">
           Le solde de cette application vient de ta <strong>banque</strong>,
           pas d’un calcul. Tu indiques ici le point de départ&nbsp;; les
-          mouvements d’un relevé importé s’y ajoutent ensuite. L’ancienne
-          version, elle, simulait le solde à partir des encaissements et des
-          charges cochées payées — un chiffre qui dérive dès qu’une case est
-          mal cochée.
+          mouvements d’un relevé importé, et les faits enregistrés APRÈS la
+          date que tu poses, s’y ajoutent ensuite. L’ancienne version, elle,
+          simulait le solde à partir des encaissements et des charges cochées
+          payées — un chiffre qui dérive dès qu’une case est mal cochée.
         </Info>
       </h2>
 
       <div className={styles.formulaire}>
         <Champ
           id={`${idChamp}-solde`}
-          libelle={suivi ? 'Solde avant le premier mouvement importé' : 'Solde du compte aujourd’hui'}
+          libelle={suivi ? 'Solde avant le premier mouvement importé' : 'Solde de ton compte'}
           aide={suivi
             ? 'Un relevé est importé : ce montant est le point de départ auquel '
               + 'ses mouvements s’ajoutent. Le modifier décale tout le solde.'
-            : 'Aucun relevé n’est importé : c’est ce montant qui s’affiche comme '
-              + 'solde. Reporte celui de ton compte bancaire.'}
+            : 'Le montant que tu relèves sur ton compte, à la date que tu '
+              + 'indiques juste en dessous.'}
         >
           <input
             id={`${idChamp}-solde`}
@@ -191,6 +198,28 @@ function Tresorerie() {
             step="0.01"
             value={faits.soldeInitial}
             onChange={(e) => definirSoldeInitial(euros(Number(e.target.value) || 0))}
+          />
+        </Champ>
+
+        <Champ
+          id={`${idChamp}-solde-date`}
+          libelle="Ce solde était vrai le"
+          aide={faits.soldeInitialAu === null
+            ? 'Sans cette date, l’application ne peut pas savoir si une recette '
+              + 'ou une dépense que tu enregistres ensuite est déjà comptée '
+              + 'dans ce montant — elle s’abstient donc de l’ajouter, et le '
+              + 'solde affiché reste exactement celui du dessus.'
+            : 'Tout ce que tu encaisses ou paies APRÈS cette date s’ajoute '
+              + 'désormais au solde affiché ; ce qui est daté d’avant, ou de '
+              + 'ce jour-là, est déjà compté dans le montant ci-dessus.'}
+        >
+          <input
+            id={`${idChamp}-solde-date`}
+            type="date"
+            value={faits.soldeInitialAu ?? ''}
+            onChange={(e) => definirSoldeInitialAu(
+              /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) ? dateISO(e.target.value) : null
+            )}
           />
         </Champ>
 

@@ -1,6 +1,8 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { brouillonsDeFacture, etatFacturier } from '../../state/selecteurs.facture';
+import type { EcartDeFacturation } from '../../domain/calculs/brouillon';
+import { euros } from '../../domain/types';
 import {
   LIBELLE_STATUT, type FactureSuivie, type StatutFacture
 } from '../../domain/calculs/facturier';
@@ -730,15 +732,65 @@ function BrouillonDuMois() {
                 </button>
               )
               : (
-                <p className={styles.dejaEmise}>
-                  Facture {b.dejaEmise} déjà émise pour {moisLisible(mois)}.
-                  Ce brouillon reste affiché pour que l’écart se voie.
-                </p>
+                <>
+                  <p className={styles.dejaEmise}>
+                    Facture {b.dejaEmise} déjà émise pour {moisLisible(mois)},
+                    pour <Montant>{eur(b.ecart?.facture ?? euros(0))}</Montant>.
+                  </p>
+                  <EcartDeFacture ecart={b.ecart} />
+                </>
               )}
           </li>
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * De combien la facture émise et le planning divergent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * MONTRER LES DEUX NOMBRES NE SUFFISAIT PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le brouillon restait affiché à côté de la facture émise « pour que l'écart
+ * se voie ». Il se voyait au sens où les deux montants étaient à l'écran —
+ * mais il fallait les soustraire de tête, sur une carte qui en porte déjà
+ * plusieurs. Un écart qu'on doit calculer soi-même est un écart qu'on ne
+ * remarque pas, et celui-ci se remarque d'ordinaire quand le client le
+ * remarque.
+ *
+ * Le SIGNE porte le conseil, parce que les deux sens n'appellent pas le même
+ * geste : facturé en moins, c'est du travail fait qui se perd à la clôture et
+ * il reste une facture complémentaire à émettre ; facturé en plus, c'est le
+ * client qui contestera, et c'est un avoir.
+ *
+ * L'égalité se dit AUSSI, plutôt que de laisser un blanc : « rien à signaler »
+ * est une réponse, et l'absence de message ne se distingue pas d'un calcul qui
+ * n'a pas tourné.
+ */
+function EcartDeFacture({ ecart }: { readonly ecart: EcartDeFacturation | null }) {
+  if (ecart === null) return null;
+
+  if (ecart.montant === 0) {
+    return (
+      <p className={styles.ecartNul} role="status">
+        Le planning et la facture disent la même chose.
+      </p>
+    );
+  }
+
+  const enPlus = ecart.montant > 0;
+  return (
+    <p className={styles.ecartFacture} role="status">
+      <strong>
+        <Montant>{eur(euros(Math.abs(ecart.montant)))}</Montant>
+      </strong>
+      {enPlus
+        ? ' de travail au planning n’ont pas été facturés. Une facture complémentaire les rattrape ; sans elle, ils se perdent à la clôture.'
+        : ' ont été facturés en plus de ce que le planning porte. C’est le client qui le remarquera : un avoir corrige.'}
+    </p>
   );
 }
 

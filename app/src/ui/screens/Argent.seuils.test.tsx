@@ -188,3 +188,51 @@ describe('les trois chiffres sous chaque jauge de seuil', () => {
     expect(ligne.textContent).not.toContain('proj.');
   });
 });
+
+/**
+ * LE BUG REMONTÉ : les deux jauges ci-dessus ne regardent que le CA de
+ * l'année en cours. Un CA encaissé en décembre dernier — avec TVA déjà
+ * collectée dessus — rendait l'écran aveugle une fois janvier passé : les
+ * jauges affichaient « sous la franchise » à quelqu'un déjà redevable depuis
+ * le 1ᵉʳ janvier. Les montants ci-dessous sont fictifs.
+ */
+describe('redevabilité de TVA, le CA de l’année précédente compris', () => {
+  it('dit être redevable depuis le 1er janvier quand l’an dernier a déjà dépassé la franchise', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-03-10T09:00:00Z'));
+    // Encaissé en NOVEMBRE DE L'AN DERNIER : rien en 2026, et pourtant déjà
+    // redevable — c'est exactement ce que l'ancien calcul ne pouvait pas voir.
+    semer([{ montant: 39_000, le: '2025-11-20' }]);
+    render(<Argent />);
+    await attendreTresorerie();
+
+    expect(screen.getAllByText(/Redevable de la TVA depuis/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/janvier 2026/).length).toBeGreaterThan(0);
+  });
+
+  it('ne dit rien de particulier quand l’année précédente et l’année en cours sont sous la franchise', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-03-10T09:00:00Z'));
+    semer([{ montant: 5_000, le: '2025-11-20' }, { montant: 3_000, le: '2026-01-15' }]);
+    render(<Argent />);
+    await attendreTresorerie();
+
+    expect(screen.queryByText(/Redevable de la TVA depuis/)).toBeNull();
+  });
+
+  // La perte de la franchise EN COURS D'ANNÉE (sans dépassement du seuil
+  // majoré) n'est pas une redevabilité immédiate : elle prend effet au 1er
+  // janvier SUIVANT, et la note doit le dire avec cette date-là, pas celle
+  // de l'année en cours.
+  it('annonce la perte de franchise au 1er janvier suivant, pas une redevabilité immédiate', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-03-10T09:00:00Z'));
+    semer([{ montant: 39_000, le: '2026-02-01' }]); // > 37 500, ≤ 41 250, rien en 2025
+    render(<Argent />);
+    await attendreTresorerie();
+
+    expect(screen.getAllByText(/Franchise perdue à compter du/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/janvier 2027/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Redevable de la TVA depuis/)).toBeNull();
+  });
+});

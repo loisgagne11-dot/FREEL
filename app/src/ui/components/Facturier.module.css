@@ -390,3 +390,33 @@
   color: var(--muted);
   line-height: 1.5;
 }
+
+/* L'ÉCART EST LA LIGNE QU'ON DOIT VOIR EN PREMIER sur un brouillon déjà
+   facturé : c'est la seule qui appelle un geste. Elle est donc cadrée et
+   teintée, là où la ligne « facture déjà émise » au-dessus n'est qu'un
+   constat. Ambre et non rouge : un écart n'est pas une faute, c'est un
+   rattrapage à faire tant qu'il est temps. */
+.ecartFacture {
+  margin: 8px 0 0;
+  padding: 9px 11px;
+  border: 1px solid var(--amber);
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.ecartFacture strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* « Rien à signaler » se DIT, plutôt que de laisser un blanc : l'absence de
+   message ne se distingue pas d'un calcul qui n'a pas tourné. */
+.ecartNul {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--green);
+}
