@@ -35,7 +35,7 @@ import {
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
-import { soldeBancaire } from '../domain/calculs/banque';
+import { type ProvenanceSolde, soldeDerive } from '../domain/calculs/solde';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
 import type { Faits } from './schema';
 import {
@@ -91,23 +91,52 @@ export function caEncaisseAnnee(faits: Faits, annee: number): Euros {
 }
 
 /**
- * Le solde bancaire.
+ * Le solde du compte.
  *
- * Solde initial plus les mouvements importés. Cette fonction avait été isolée
- * dès le départ pour que l'arrivée des mouvements n'ait qu'un seul endroit à
- * changer : c'est ce qui vient de se produire, et aucun écran n'a eu à être
- * touché.
+ * ─────────────────────────────────────────────────────────────────────────
+ * IL NE VALAIT LE SOLDE INITIAL QUE PARCE QU'ON NE LUI DONNAIT RIEN D'AUTRE
+ * ─────────────────────────────────────────────────────────────────────────
  *
- * Sans relevé importé, elle rend le solde initial — et l'écran doit alors dire
- * que le solde n'est pas suivi, plutôt que d'afficher un chiffre figé comme
- * s'il était à jour. Voir `soldeEstSuivi`.
+ * Cette fonction ne sommait autrefois que le solde initial et les mouvements
+ * d'un relevé importé : tant qu'aucun relevé n'existait, elle ne bougeait
+ * jamais, quoi que l'utilisateur enregistre par ailleurs — des recettes
+ * encaissées, des dépenses payées, des échéances URSSAF ou de TVA réglées.
+ * Elle dérive maintenant de TOUS ces faits, pas seulement du relevé ; voir
+ * `soldeDerive` (`domain/calculs/solde.ts`) pour la règle qui évite de les
+ * compter deux fois quand un relevé existe.
+ *
+ * Isolée ici pour la même raison qu'avant : un seul endroit à changer.
  */
 export function solde(faits: Faits): Euros {
-  return soldeBancaire(faits.soldeInitial, faits.mouvementsBancaires);
+  return soldeDerive(
+    faits.soldeInitial, faits.soldeInitialAu,
+    recettesEncaissees(faits), faits.depenses, faits.echeances,
+    faits.mouvementsBancaires
+  ).montant;
+}
+
+/**
+ * D'où vient le solde affiché — dérivé des faits, rapproché d'un relevé,
+ * simplement saisi faute des deux, ou saisi SANS DATE (voir `ProvenanceSolde`
+ * pour ce que distingue chaque état — en particulier `'sansDate'`, l'état
+ * d'abstention tant que `soldeInitialAu` est `null`).
+ */
+export function provenanceSoldeDe(faits: Faits): ProvenanceSolde {
+  return soldeDerive(
+    faits.soldeInitial, faits.soldeInitialAu,
+    recettesEncaissees(faits), faits.depenses, faits.echeances,
+    faits.mouvementsBancaires
+  ).provenance;
 }
 
 /**
  * Un relevé est-il disponible ?
+ *
+ * NOTE : distinct de la provenance du solde (`provenanceSoldeDe`), qui peut
+ * valoir `'derive'` même quand cette fonction rend `false` — le solde se
+ * dérive désormais des faits seuls, sans qu'un relevé soit nécessaire.
+ * `soldeEstSuivi` répond à une question plus étroite : la banque est-elle
+ * synchronisée, au sens où l'écran Relevé et le rapprochement en ont besoin.
  *
  * Dérivé, jamais stocké : un booléen `banqueReliee` à `true` pourrait
  * coexister avec une liste de mouvements vide, et rien ne le signalerait.

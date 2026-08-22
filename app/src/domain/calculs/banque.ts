@@ -143,12 +143,18 @@ export function importerMouvements(
 }
 
 /**
- * Le solde bancaire.
+ * Solde initial plus la somme d'un ensemble de mouvements.
  *
- * Solde initial plus la somme des mouvements. Tant qu'aucun relevé n'est
- * importé, il vaut le solde initial — et l'écran doit alors dire que le solde
- * n'est pas suivi, plutôt que d'afficher un chiffre figé comme s'il était à
- * jour.
+ * Volontairement générique dans ce qu'elle reçoit : elle sert au solde
+ * purement bancaire (tous les mouvements d'un relevé), mais aussi de brique à
+ * `soldeDerive` (`./solde.ts`), qui ne lui passe que le sous-ensemble des
+ * mouvements « sans contrepartie » pour ne pas compter deux fois ce que les
+ * faits — recettes, dépenses, échéances — comptent déjà.
+ *
+ * Le SOLDE DE L'APPLICATION, celui qu'un écran doit afficher, n'est plus
+ * cette fonction seule : voir `soldeDerive`, qui ajoute aux mouvements les
+ * faits que le relevé ne reflète pas encore. Une source unique par notion
+ * (invariant n°4) — cette fonction-ci n'en est qu'un rouage.
  */
 export function soldeBancaire(
   soldeInitial: Euros,

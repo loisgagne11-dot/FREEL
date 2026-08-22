@@ -4,8 +4,8 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  aTraiter, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant, recettesEncaissees, regimeDe,
-  remunerationDuMois, sousAcreLe
+  aTraiter, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant, provenanceSoldeDe,
+  recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe
 } from './selecteurs';
 import { periodeCourante } from '../domain/calculs/periode';
 import { etatArgent } from './selecteurs.argent';
@@ -15,7 +15,17 @@ import { etatAchats, regimeTvaAu } from './selecteurs.achats';
 
 function faits(modifications: Partial<Faits> = {}): Faits {
   const base = faitsVides();
-  return { ...base, ...modifications };
+  return {
+    ...base,
+    // Antérieure à toute fixture de ce fichier : ces tests vérifient que le
+    // sélecteur CÂBLE `soldeDerive` (voir l'en-tête de « solde dérivé des
+    // faits »), pas la règle de date elle-même — éprouvée exhaustivement dans
+    // `domain/calculs/solde.test.ts`. Sans cette date, chaque fixture existante
+    // deviendrait « non datée » et cesserait de se dériver, masquant tout ce
+    // que ce bloc de tests vérifie.
+    soldeInitialAu: dateISO('2000-01-01'),
+    ...modifications
+  };
 }
 
 function recette(id: string, montant: number, encaisseeLe: string | null) {
@@ -81,6 +91,115 @@ describe('recettes encaissées', () => {
     expect(caEncaisseAnnee(f, 2026)).toBe(3000);
     expect(caEncaisseAnnee(f, 2025)).toBe(5000);
     expect(caEncaisseAnnee(f, 2024)).toBe(0);
+  });
+});
+
+/**
+ * LE SOLDE SE DÉRIVE DE TOUS LES FAITS, PAS SEULEMENT DU RELEVÉ.
+ *
+ * Bug remonté sur des données réelles : un utilisateur avait enregistré ses
+ * encaissements, ses versements, une dépense et le paiement de ses échéances
+ * URSSAF/TVA, sans jamais importer de relevé. Le solde ne bougeait pas — seul
+ * `soldeInitial` comptait. Les règles détaillées (mouvement rapproché, sans
+ * contrepartie, à traiter) sont éprouvées dans `domain/calculs/solde.test.ts` ;
+ * celles-ci vérifient seulement que le sélecteur les câble.
+ */
+describe('solde dérivé des faits', () => {
+  function depense(m: Partial<Depense> = {}): Depense {
+    return {
+      id: 'dep', libelle: 'Matériel', fournisseur: 'F', provenance: 'france',
+      montantTtc: euros(300), tauxTva: ratio(0.20), payeeLe: dateISO('2026-07-05'),
+      justificatifId: null, rapprochement: 'en_attente', ...m
+    };
+  }
+
+  // C'est très exactement le bug remonté : sans lui, cette suite entière
+  // retomberait au comportement précédent sans qu'aucun test ne le voie.
+  it('ne vaut plus seulement le solde initial dès qu’un fait existe', () => {
+    const f = faits({
+      soldeInitial: euros(1000),
+      recettes: [recette('r1', 4000, '2026-07-10')]
+    });
+    expect(solde(f)).toBe(5000);
+  });
+
+  it('retranche les dépenses payées et les échéances payées', () => {
+    const f = faits({
+      soldeInitial: euros(10000),
+      depenses: [depense()],
+      echeances: [ech(1500, true)]
+    });
+    expect(solde(f)).toBe(10000 - 300 - 1500);
+  });
+
+  // Le piège du lot : sans l'exclusion des mouvements rapprochés, ce même
+  // encaissement compterait deux fois — une fois côté recette, une fois côté
+  // relevé — et le solde afficherait 4000 € de trop.
+  it('ne compte pas deux fois une recette dont le mouvement est rapproché', () => {
+    const f = faits({
+      soldeInitial: euros(1000),
+      recettes: [recette('r1', 4000, '2026-07-10')],
+      mouvementsBancaires: [{
+        id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR CLIENT',
+        montant: euros(4000), rapprocheAvec: 'r1', sansContrepartie: null
+      }]
+    });
+    expect(solde(f)).toBe(5000);
+  });
+
+  it('n’ajoute pas un mouvement encore à traiter', () => {
+    const f = faits({
+      soldeInitial: euros(1000),
+      mouvementsBancaires: [{
+        id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR INCONNU',
+        montant: euros(4000), rapprocheAvec: null, sansContrepartie: null
+      }]
+    });
+    expect(solde(f)).toBe(1000);
+  });
+
+  it('ajoute un versement, mouvement sans contrepartie', () => {
+    const f = faits({
+      soldeInitial: euros(5000),
+      mouvementsBancaires: [{
+        id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR COMPTE PERSO',
+        montant: euros(-2000), rapprocheAvec: null, sansContrepartie: 'remuneration'
+      }]
+    });
+    expect(solde(f)).toBe(3000);
+  });
+
+  describe('provenance affichée', () => {
+    it('« saisi » quand ni fait ni relevé ne contribuent', () => {
+      expect(provenanceSoldeDe(faits({ soldeInitial: euros(1000) }))).toBe('saisi');
+    });
+
+    it('« derive » dès qu’un fait contribue, sans relevé', () => {
+      const f = faits({ recettes: [recette('r1', 4000, '2026-07-10')] });
+      expect(provenanceSoldeDe(f)).toBe('derive');
+    });
+
+    it('« rapproche » quand un relevé existe et que rien n’y attend de décision', () => {
+      const f = faits({
+        recettes: [recette('r1', 4000, '2026-07-10')],
+        mouvementsBancaires: [{
+          id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR CLIENT',
+          montant: euros(4000), rapprocheAvec: 'r1', sansContrepartie: null
+        }]
+      });
+      expect(provenanceSoldeDe(f)).toBe('rapproche');
+    });
+
+    it('reste « derive » tant qu’un mouvement du relevé est à traiter', () => {
+      const f = faits({
+        recettes: [recette('r1', 4000, '2026-07-10')],
+        mouvementsBancaires: [{
+          id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR INCONNU',
+          montant: euros(150), rapprocheAvec: null, sansContrepartie: null
+        }]
+      });
+      expect(provenanceSoldeDe(f)).toBe('derive');
+    });
   });
 });
 
@@ -239,7 +358,13 @@ describe('état de l\'écran Pilote', () => {
    */
   it('retranche l’impôt sur le revenu du versable, sous le régime du barème', () => {
     const e = etatPilote(auBareme(), [], maintenant);
-    const versableAvant = 60000 - provisionsSansImpot;
+    // Le solde compte le solde initial ET la recette encaissée : 60 000 €
+    // saisis en Config, 60 000 € de mission réellement entrés en banque.
+    // Avant que le solde se dérive des faits (lot H-B), cette recette
+    // encaissée ne comptait pour rien et `versableAvant` valait
+    // `60000 - provisionsSansImpot` : la moitié de l'argent réellement
+    // disponible aurait alors été invisible.
+    const versableAvant = (60000 + 60000) - provisionsSansImpot;
     expect(e.tresorerie.versable).toBeLessThan(versableAvant);
     // 60 000 × 66 % = 39 600 imposables ; barème : 5 045,48 €.
     expect(e.tresorerie.versable).toBeCloseTo(versableAvant - 5045.48, 2);

@@ -82,6 +82,14 @@ interface MagasinFaits {
   readonly definirPartGardee: (part: Ratio) => void;
   readonly definirBesoinMensuel: (montant: Euros) => void;
   readonly definirSoldeInitial: (montant: Euros) => void;
+  /**
+   * Seul écrivain de la date à laquelle `soldeInitial` était vrai.
+   *
+   * `null` efface la date — c'est un retour délibéré à l'abstention
+   * (`ProvenanceSolde['sansDate']`), pas une valeur à combler ailleurs : si le
+   * montant a changé sans qu'on sache depuis quand, redater serait mentir.
+   */
+  readonly definirSoldeInitialAu: (date: DateISO | null) => void;
   /** `null` efface l'objectif ; c'est autre chose que de le mettre à zéro. */
   readonly definirObjectifCaAnnuel: (montant: Euros | null) => void;
   /**
@@ -616,6 +624,12 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
 
   definirSoldeInitial: (montant) => {
     const faits: Faits = { ...get().faits, soldeInitial: euros(montant) };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  definirSoldeInitialAu: (date) => {
+    const faits: Faits = { ...get().faits, soldeInitialAu: date };
     set({ faits });
     persister(stockageActif, faits);
   },
