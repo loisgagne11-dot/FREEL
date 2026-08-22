@@ -244,6 +244,46 @@ describe('solde dérivé — le point dur : dater le solde de départ', () => {
   });
 });
 
+/**
+ * L'ABSTENTION SANS DATE DOIT ÊTRE TOTALE.
+ *
+ * Trouvée par le CONTRÔLE VISUEL, pas par les tests : sur le jeu de
+ * démonstration, le solde tombait de plusieurs milliers d'euros et les
+ * provisions passaient à découvert. Deux exclusions se cumulaient — le
+ * mouvement rapproché écarté parce que « son fait le compte déjà », pendant
+ * que le fait était écarté lui aussi, faute de date. L'argent disparaissait
+ * deux fois.
+ *
+ * Sans date, on ne dérive rien : le relevé redevient la seule source, et TOUS
+ * ses mouvements comptent, exactement comme avant que ce module existe.
+ */
+describe('solde dérivé — sans date, le relevé fait foi tout seul', () => {
+  it('compte les mouvements rapprochés quand aucune date n’est posée', () => {
+    const releve = [
+      mouvement({ id: 'm1', montant: euros(4000), rapprocheAvec: 'r1' }),
+      mouvement({ id: 'm2', montant: euros(-300), sansContrepartie: 'autre' }),
+      mouvement({ id: 'm3', montant: euros(-100) })
+    ];
+    // 1 000 + 4 000 − 300 − 100 : le relevé entier, sans rien retrancher.
+    expect(soldeDerive(euros(1000), null, [recette('r1', 4000, '2026-07-12')], [], [], releve)
+      .montant).toBe(4600);
+  });
+
+  /** Avec une date, le tri reprend son sens : le rapproché est porté par son
+      fait, le « à traiter » reste ambigu, seul le « sans contrepartie » entre
+      au brut. */
+  it('trie de nouveau les mouvements dès qu’une date est posée', () => {
+    const releve = [
+      mouvement({ id: 'm1', montant: euros(4000), rapprocheAvec: 'r1' }),
+      mouvement({ id: 'm2', montant: euros(-300), sansContrepartie: 'autre' }),
+      mouvement({ id: 'm3', montant: euros(-100) })
+    ];
+    // 1 000 − 300 (sans contrepartie) + 4 000 (le FAIT, une seule fois).
+    expect(soldeDerive(euros(1000), AVANT_TOUT, [recette('r1', 4000, '2026-07-12')], [], [], releve)
+      .montant).toBe(4700);
+  });
+});
+
 describe('provenance du solde', () => {
   it('« saisi » quand ni fait ni relevé ne contribuent', () => {
     expect(provenanceSolde(AVANT_TOUT, [], [], [], [])).toBe('saisi');

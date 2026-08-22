@@ -213,8 +213,30 @@ export function soldeDerive(
   // mouvements, qu'ils soient TOUS les mouvements d'un relevé complet ou,
   // comme ici, le seul sous-ensemble qui ne double aucun fait. Ce sous-ensemble
   // ne dépend pas de la date : voir l'en-tête de la fonction.
-  const mouvementsSansContrepartie = mouvements.filter((m) => m.sansContrepartie !== null);
-  const partBanque = soldeBancaire(soldeInitial, mouvementsSansContrepartie);
+  /*
+   * L'ABSTENTION EST TOTALE, OU ELLE FAIT DISPARAÎTRE DE L'ARGENT.
+   *
+   * Une première version ne retenait JAMAIS que les mouvements sans
+   * contrepartie, y compris sans date de solde de départ. Les deux exclusions
+   * se cumulaient alors : le mouvement rapproché était écarté parce que « son
+   * fait le compte déjà », pendant que le fait était écarté lui aussi, faute
+   * de date. Le contrôle visuel l'a vu sur le jeu de démonstration — le solde
+   * tombait de plusieurs milliers d'euros et les provisions passaient à
+   * découvert, sans qu'aucun test ne bronche.
+   *
+   * Sans date, on ne dérive donc RIEN : le relevé redevient la seule source et
+   * TOUS ses mouvements comptent, exactement comme avant que ce module
+   * existe. Aucun double compte n'est possible, puisqu'aucun fait n'est
+   * compté en face.
+   *
+   * Avec une date, le tri reprend son sens : les rapprochés sont portés par
+   * leur fait, les « à traiter » restent ambigus, seuls les « sans
+   * contrepartie » s'ajoutent au brut.
+   */
+  const mouvementsRetenus = soldeInitialAu === null
+    ? mouvements
+    : mouvements.filter((m) => m.sansContrepartie !== null);
+  const partBanque = soldeBancaire(soldeInitial, mouvementsRetenus);
 
   // Sans date, aucun fait n'est retenu : voir l'en-tête de la fonction. Avec
   // une date, seuls ceux STRICTEMENT postérieurs le sont — le solde d'un soir
