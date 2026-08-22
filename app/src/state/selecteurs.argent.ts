@@ -217,8 +217,10 @@ export function etatArgent(
   const parMois = chiffreParMois(faits, annee);
   const caRealise = euros(parMois.reduce<number>((s, m) => s + m.realise, 0));
   const caEncaisse = euros(parMois.reduce<number>((s, m) => s + m.encaisse, 0));
-  // MUTATION VOLONTAIRE POUR PREUVE — À REVERTIR IMMÉDIATEMENT APRÈS TEST.
-  const pilote = etatPilote(faits, echeances, new Date(`${annee}-12-31T12:00:00Z`));
+  // `maintenant`, jamais `annee` : c'est le compte en banque à l'instant où on
+  // regarde, quelle que soit l'année parcourue à l'écran. Voir la note
+  // ci-dessus et le test « changer l'année ne change pas le solde ».
+  const pilote = etatPilote(faits, echeances, maintenant);
 
   // Un mois quelconque de l'année choisie : `plafondMicro` ne distingue que
   // des PÉRIODES pluriannuelles (voir sa table), donc n'importe quel mois de
