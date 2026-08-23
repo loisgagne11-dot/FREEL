@@ -95,8 +95,15 @@ export interface MoisEvolution {
   readonly entrees: number;
   /** Positif : c'est un montant qui SORT, pas une valeur négative. */
   readonly sorties: number;
-  /** Le niveau à la fin de ce mois — ce que la courbe trace. */
-  readonly niveau: number;
+  /**
+   * Le niveau à la fin de ce mois — ce que la courbe trace.
+   *
+   * `null` quand il n'est pas CONNU : sur une année antérieure au solde de
+   * départ, la dérivation n'a rien à quoi s'accrocher. La courbe ne trace
+   * alors rien plutôt que de poser le montant de départ — ce qui affirmerait
+   * que le compte l'a porté toute l'année.
+   */
+  readonly niveau: number | null;
   /**
    * `false` : `niveau` est un fait, mois déjà clos. `true` : `niveau` est une
    * hypothèse de disponible — voir l'en-tête du fichier. Détermine le trait
@@ -150,7 +157,16 @@ export function GrapheEvolution(
    * paniquer sur un mois ordinaire, puis cesse d'être crue quand la falaise
    * est réelle. Le zéro est gardé, et le seuil est tracé à sa vraie hauteur.
    */
-  const niveaux = mois.map((m) => m.niveau);
+  /*
+   * LES MOIS SANS NIVEAU CONNU NE PÈSENT PAS SUR L'ÉCHELLE.
+   *
+   * Les compter pour zéro écraserait la courbe des mois qui, eux, sont
+   * connus : une année dont seuls les deux derniers mois ont un solde
+   * verrait ces deux points collés en haut d'un vide de dix colonnes.
+   */
+  const niveaux = mois
+    .map((m) => m.niveau)
+    .filter((n): n is number => n !== null);
   const hautNiveau = Math.max(1, ...niveaux, seuil ?? 0);
   const basNiveau = Math.min(0, ...niveaux);
   const amplitude = Math.max(1, hautNiveau - basNiveau);
@@ -158,7 +174,12 @@ export function GrapheEvolution(
     HAUTEUR_COURBE - ((v - basNiveau) / amplitude) * HAUTEUR_COURBE;
   const x = (i: number): number => ((i + 0.5) / mois.length) * 100;
 
-  const points = mois.map((m, i) => `${x(i)},${y(m.niveau)}`);
+  /*
+   * `null` là où le niveau n'est pas connu : le tracé s'interrompt plutôt que
+   * de relier deux points par-dessus un trou. Une ligne qui traverse
+   * l'inconnu affirme une continuité que rien n'établit.
+   */
+  const points = mois.map((m, i) => (m.niveau === null ? null : `${x(i)},${y(m.niveau)}`));
 
   /*
    * DEUX TRAITS, PAS UN : LE FAIT S'ARRÊTE OÙ L'HYPOTHÈSE COMMENCE.
@@ -172,17 +193,24 @@ export function GrapheEvolution(
    * s'arrêterait avant le pointillé laisserait un trou visible entre les
    * deux, comme si un mois manquait.
    */
-  const indexBascule = mois.reduce((acc, m, i) => (!m.estProjete ? i : acc), -1);
-  const pointsFaits = indexBascule >= 0 ? points.slice(0, indexBascule + 1).join(' ') : '';
-  const aPortionProjetee = indexBascule < mois.length - 1;
+  const indexBascule = mois.reduce(
+    (acc, m, i) => (!m.estProjete && m.niveau !== null ? i : acc), -1
+  );
+  const connus = (p: readonly (string | null)[]): string =>
+    p.filter((v): v is string => v !== null).join(' ');
+  const pointsFaits = indexBascule >= 0 ? connus(points.slice(0, indexBascule + 1)) : '';
+  const aPortionProjetee = mois.some((m) => m.estProjete);
   const pointsProjetes = aPortionProjetee
-    ? points.slice(Math.max(indexBascule, 0)).join(' ')
+    ? connus(points.slice(Math.max(indexBascule, 0)))
     : '';
 
   // L'aire ne se remplit que sous ce qui est CONNU : la remplir sous
   // l'hypothèse donnerait à une projection le même poids visuel qu'un fait.
-  const aire = indexBascule >= 0
-    ? `${x(0)},${HAUTEUR_COURBE} ${pointsFaits} ${x(indexBascule)},${HAUTEUR_COURBE}`
+  // L'aire part du PREMIER mois connu, pas de la première colonne : la faire
+  // démarrer à gauche d'un trou la remplirait sous l'inconnu.
+  const premierConnu = points.findIndex((p) => p !== null);
+  const aire = indexBascule >= 0 && premierConnu >= 0
+    ? `${x(premierConnu)},${HAUTEUR_COURBE} ${pointsFaits} ${x(indexBascule)},${HAUTEUR_COURBE}`
     : null;
 
   const mouvementMax = Math.max(1, ...mois.flatMap((m) => [m.entrees, m.sorties]));
@@ -247,12 +275,14 @@ export function GrapheEvolution(
               className={styles.seuil} vectorEffect="non-scaling-stroke"
             />
           )}
-          {mois.map((m, i) => (
+          {/* Pas de point là où le niveau n'est pas connu : un point posé à
+              zéro se lirait comme un solde vide, ce qui est une affirmation. */}
+          {mois.map((m, i) => (m.niveau === null ? null : (
             <circle
               key={m.mois} cx={x(i)} cy={y(m.niveau)} r="1.6"
               className={m.estProjete ? styles.pointProjete : styles.point}
             />
-          ))}
+          )))}
         </svg>
 
         {/* Le niveau, en HTML par-dessus le SVG — voir « LE NIVEAU NE VIT
@@ -261,7 +291,7 @@ export function GrapheEvolution(
             le point qu'ils légendent, sans jamais entrer dans son repère
             étiré. */}
         <div className={styles.etiquettesNiveau}>
-          {mois.map((m, i) => (
+          {mois.map((m, i) => (m.niveau === null ? null : (
             <span
               key={m.mois}
               className={styles.etiquetteNiveau}
@@ -269,7 +299,7 @@ export function GrapheEvolution(
             >
               <Montant>{formaterCourt(m.niveau)}</Montant>
             </span>
-          ))}
+          )))}
         </div>
       </div>
 

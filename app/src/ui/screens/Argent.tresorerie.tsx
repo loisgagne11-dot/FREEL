@@ -341,7 +341,31 @@ function EvolutionDuCompte({ annee }: { readonly annee: number }) {
         </Info>
       </h2>
 
-      {dernier !== undefined && (
+      {/*
+        * UNE ANNÉE ENTIÈREMENT ANTÉRIEURE AU SOLDE DE DÉPART NE SE TRACE PAS.
+        *
+        * La dérivation ne compte que les faits postérieurs à cette date : sur
+        * une année d'avant, le solde de chaque mois est INCONNU. Un dossier
+        * réel l'a montré — barres d'encaissement bien visibles de juillet à
+        * décembre, courbe immobile au montant de départ au-dessus. Aucune des
+        * deux ne mentait, et rien ne disait laquelle croire.
+        */}
+      {dernier?.niveau == null && (
+        <p className={styles.reponse} role="status">
+          Le solde de {annee} n’est pas connu&nbsp;: ton solde de départ est
+          daté du{' '}
+          <strong>
+            {faits.soldeInitialAu === null
+              ? 'jour où tu le renseigneras'
+              : dateCourte(faits.soldeInitialAu)}
+          </strong>
+          , et l’application ne sait pas ce que le compte portait avant. Les
+          entrées et sorties de l’année, elles, sont bien celles que tes
+          écritures disent.
+        </p>
+      )}
+
+      {dernier?.niveau != null && (
         <p className={styles.reponse}>
           {aUneProjection ? (
             /* `solde(faits)` et non `dernier.niveau` d'un mois clos : sur
