@@ -16,7 +16,7 @@
     "Les dates sont ancrées en 2026 pour reproduire l'état du handoff, daté de",
     "juin 2026."
   ],
-  "version": 13,
+  "version": 16,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "siret": "000 000 000 00000",
@@ -321,7 +321,9 @@
       "modeReglement": "virement",
       "numero": "2026-021",
       "tvaCollectee": null,
-      "relancesLe": []
+      "relancesLe": [],
+      "echeanceLe": "2026-04-30",
+      "justificatifId": null
     },
     {
       "id": "rec-022",
@@ -334,7 +336,9 @@
       "modeReglement": "virement",
       "numero": "2026-022",
       "tvaCollectee": null,
-      "relancesLe": []
+      "relancesLe": [],
+      "echeanceLe": "2026-06-30",
+      "justificatifId": null
     },
     {
       "id": "rec-023",
@@ -347,7 +351,9 @@
       "modeReglement": "virement",
       "numero": "2026-023",
       "tvaCollectee": null,
-      "relancesLe": []
+      "relancesLe": [],
+      "echeanceLe": "2026-05-31",
+      "justificatifId": null
     },
     {
       "id": "rec-024",
@@ -362,7 +368,9 @@
       "tvaCollectee": null,
       "relancesLe": [
         "2026-06-08"
-      ]
+      ],
+      "echeanceLe": "2026-06-30",
+      "justificatifId": null
     },
     {
       "id": "rec-025",
@@ -375,7 +383,9 @@
       "modeReglement": null,
       "numero": "2026-025",
       "tvaCollectee": null,
-      "relancesLe": []
+      "relancesLe": [],
+      "echeanceLe": "2026-07-31",
+      "justificatifId": null
     },
     {
       "id": "rec-026",
@@ -388,7 +398,9 @@
       "modeReglement": null,
       "numero": "2026-026",
       "tvaCollectee": null,
-      "relancesLe": []
+      "relancesLe": [],
+      "echeanceLe": "2026-07-31",
+      "justificatifId": null
     },
     {
       "id": "rec-027",
@@ -401,7 +413,9 @@
       "modeReglement": null,
       "numero": "2026-027",
       "tvaCollectee": null,
-      "relancesLe": []
+      "relancesLe": [],
+      "echeanceLe": null,
+      "justificatifId": null
     }
   ],
   "depenses": [
@@ -559,6 +573,7 @@
   ],
   "periodesUrssafAjoutees": [],
   "soldeInitial": 8120,
+  "soldeInitialAu": "2026-03-30",
   "reserve": 2470,
   "besoinMensuel": 2300,
   "objectifCaAnnuel": 72000,
@@ -609,5 +624,9 @@
       "montantPaye": null
     }
   ],
-  "configImpotBrute": {}
+  "configImpotBrute": {},
+  "partGardeeAuVersement": 0,
+  "partsFiscales": null,
+  "autresRevenusFoyer": null,
+  "versementPerDeductible": null
 }

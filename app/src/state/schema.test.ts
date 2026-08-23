@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { dateISO } from '../domain/types';
 import { planifier } from '../domain/calculs/planning';
@@ -760,5 +761,54 @@ describe('ajustements du schéma 13 au schéma 14', () => {
     expect(jour?.prevu).toBe(1);
     expect(jour?.retenu).toBe(0);
     expect(jour?.ajuste).toBe(true);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Le jeu de démonstration est un document du schéma COURANT
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * POURQUOI CE TEST EXISTE.
+ *
+ * Le jeu de démonstration se déclarait schéma 13 alors que le schéma courant
+ * était 16. Rien ne cassait : `completerFaits` comblait les champs manquants
+ * au chargement. Mais l'un d'eux — `soldeInitialAu` — ne PEUT PAS se combler,
+ * et c'est délibéré : aucune date n'est devinable pour un solde de départ (voir
+ * la migration v14 → v15). Il était donc comblé à `null`, l'application
+ * s'abstenait de dériver, et la démonstration ignorait en silence ses sept
+ * recettes et ses neuf dépenses. Toutes les captures montraient un solde faux,
+ * et il a fallu que le panneau de composition (lot J3) le dise en toutes
+ * lettres pour que quelqu'un le voie.
+ *
+ * Le test tient la propriété qui l'empêche de recommencer : le jeu doit être
+ * un document COMPLET du schéma courant, pas un document ancien qu'une
+ * migration rattrape. Toute migration future le fera donc échouer, ce qui est
+ * exactement le moment où il faut regarder ce qu'elle ne peut pas deviner.
+ */
+describe('le jeu de démonstration', () => {
+  const brutDemo = JSON.parse(
+    readFileSync(new URL('../../public/jeu-de-demonstration.json', import.meta.url), 'utf8')
+  ) as Record<string, unknown>;
+
+  it('se déclare au schéma courant', () => {
+    expect(brutDemo['version']).toBe(VERSION_SCHEMA);
+  });
+
+  /** Rien à combler : `completerFaits` doit le rendre à l'identique. */
+  it('ne laisse aucun champ à combler par une migration', () => {
+    expect(JSON.parse(JSON.stringify(completerFaits(brutDemo)))).toEqual(brutDemo);
+  });
+
+  /**
+   * LE CHAMP QUI NE SE DEVINE PAS, ET DONT TOUT LE RESTE DÉPEND.
+   *
+   * Sans date, `soldeDerive` s'abstient : le solde affiché n'est plus que le
+   * montant saisi et les mouvements du relevé, et quatre mois de faits
+   * n'atteignent jamais le compte. Une date la veille du premier fait est ce
+   * que la migration d'un vrai dossier pose elle-même (`veilleDuPremierFait`).
+   */
+  it('date son solde de départ avant son premier fait', () => {
+    expect(brutDemo['soldeInitialAu']).toBe('2026-03-30');
   });
 });

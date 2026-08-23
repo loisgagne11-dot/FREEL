@@ -544,3 +544,39 @@ passe de 78,13 à 79,34 Ko pour 80 — la marge est mince, et le prochain lot qu
 touche au Pilote devra extraire avant d'ajouter. L'écran différé le plus lourd
 reste inchangé à 39,89 Ko : c'est ce que le report du panneau hors du paquet de
 Trésorerie a préservé.
+
+## 11. Lot M1 — le jeu de démonstration était un document ancien
+
+Trouvé en relisant les captures du lot J3, et invisible jusque-là.
+
+`public/jeu-de-demonstration.json` se déclarait **schéma 13** quand le schéma
+courant était 16. Rien ne cassait : `completerFaits` comble les champs
+manquants au chargement. Mais l'un d'eux — `soldeInitialAu` — **ne peut pas se
+combler**, et c'est délibéré : aucune date n'est devinable pour un solde de
+départ, ni celle du jour de la migration ni `debutActivite` (voir la migration
+v14 → v15). Il était donc comblé à `null`, `soldeDerive` s'abstenait, et la
+démonstration ignorait en silence ses **sept recettes et ses neuf dépenses**.
+
+Le solde affiché n'était que le montant saisi diminué des mouvements du relevé.
+Toutes les captures montraient donc un compte en détresse — disponible négatif,
+provisions couvertes à 65 %, rien à se verser, zéro mois d'autonomie — qui
+n'était pas ce que les faits du jeu décrivent. Il a fallu que le panneau de
+composition du lot J3 écrive la colonne en toutes lettres pour que quelqu'un le
+voie ; aucun test ne pouvait l'attraper, puisque le calcul était juste et que
+c'est la DONNÉE qui mentait.
+
+Ce que le lot change :
+
+- le jeu devient un document **complet du schéma courant** : les vingt champs
+  que la migration comblait sont écrits, `version` passe à 16 ;
+- son solde de départ est daté au **30 mars 2026**, la veille de son premier
+  fait — exactement ce que `veilleDuPremierFait` pose à la migration d'un vrai
+  dossier ;
+- trois tests tiennent la propriété (`schema.test.ts`) : le jeu se déclare au
+  schéma courant, ne laisse aucun champ à combler, et date son solde. **Toute
+  migration future les fera échouer**, ce qui est précisément le moment où il
+  faut regarder ce qu'elle ne sait pas deviner.
+
+La démonstration devient cohérente : 8 120 + 12 960 − 1 161 − 2 360 − 7 342 =
+10 217 €, provisions couvertes à 100 %, et le donut de répartition somme au
+solde. Les vingt-deux captures sont regénérées.
