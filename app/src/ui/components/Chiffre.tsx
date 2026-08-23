@@ -18,7 +18,7 @@ import styles from './Chiffre.module.css';
  * confidentiel laisserait lire un solde en clair sur un écran partagé.
  */
 export function Chiffre(
-  { libelle, valeur, ton = 'neutre', note }: {
+  { libelle, valeur, ton = 'neutre', note, onOuvrir }: {
     readonly libelle: string;
     readonly valeur: string;
     readonly ton?: 'neutre' | 'accent' | 'attention' | 'danger';
@@ -36,17 +36,49 @@ export function Chiffre(
      * quand les montants ne le sont plus.
      */
     readonly note?: ReactNode;
+    /**
+     * Ce qui s'ouvre au clic : la composition du chiffre.
+     *
+     * Optionnel, et c'est délibéré. Toutes les tuiles ne se décomposent pas —
+     * « Opérations : 42 » n'a pas de formule — et poser un bouton là où rien
+     * ne s'ouvre apprend à ne plus cliquer sur les autres. Une tuile sans
+     * `onOuvrir` reste un simple bloc de texte, sans cible, sans focus.
+     */
+    readonly onOuvrir?: () => void;
   }
 ) {
   const classe = ton === 'danger' ? styles.danger
     : ton === 'attention' ? styles.attention
     : ton === 'accent' ? styles.accent : '';
 
-  return (
-    <div className={styles.chiffre}>
+  const contenu = (
+    <>
       <span className={styles.libelle}>{libelle}</span>
       <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
       {note !== undefined && <span className={styles.note}>{note}</span>}
-    </div>
+    </>
+  );
+
+  if (onOuvrir === undefined) return <div className={styles.chiffre}>{contenu}</div>;
+
+  return (
+    <button
+      type="button"
+      className={`${styles.chiffre} ${styles.cliquable}`}
+      onClick={onOuvrir}
+    >
+      {contenu}
+      {/*
+        * L'INTENTION SE DIT, ELLE NE SE DEVINE PAS.
+        *
+        * Le nom accessible du bouton est son contenu — « Solde du compte
+        * 41 570 € reçu sur le compte » — qui décrit le chiffre et non le geste.
+        * Entendu au clavier, ça ne dit pas ce que la touche Entrée va faire.
+        * La mention hors écran complète le nom sans encombrer la tuile ; le
+        * chevron, lui, fait le même travail à l'œil.
+        */}
+      <span className={styles.horsEcran}> — d’où vient ce chiffre</span>
+      <span className={styles.chevron} aria-hidden="true">›</span>
+    </button>
   );
 }

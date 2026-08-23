@@ -120,6 +120,7 @@ un trou qui ne fait échouer aucun test.
 | Provisions à deux volets | 🟢 | Décision D3. Les deux volets fonctionnent depuis le 13/08 |
 | Périodes déclarées | 🟢 | Ajouté le 13/08, par mois ou par trimestre selon la périodicité |
 | `showWaterfallDetail`, `showAbsoluteWaterfallDetail` | ✅ | Carte de répartition du solde |
+| **Composition d'un chiffre au clic** | 🟢 | **Ajouté au lot J3.** L'ancienne ouvrait la décomposition de « CA Encaissé HT » ou de « Marge Nette » ; la nouvelle n'affichait que quatre résultats de trésorerie, sans moyen de les recouper. Or ils s'enchaînent — le total de l'un est un terme du suivant — et c'est exactement ce que « je ne comprends pas les données » désignait après un import. Chaque tuile s'ouvre maintenant sur sa formule en toutes lettres, ses termes avec le nombre de faits qu'ils recouvrent, ce que le chiffre veut dire et ce qu'il tait. Deux écarts assumés avec l'ancienne : le panneau **mesure** l'écart entre sa colonne et le total au lieu de le supposer, et il **ne recalcule rien** — les parts du solde sortent de `soldeDerive` en même temps que le montant, jamais d'une copie des trois règles de tri qui ont déjà produit deux bugs |
 
 ## 4. Fiscal et social
 

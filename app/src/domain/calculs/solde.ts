@@ -124,9 +124,65 @@ export type ProvenanceSolde =
    */
   | 'sansDate';
 
+/**
+ * D'où vient chaque euro du solde, part par part.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI C'EST RENDU ICI ET NON RECALCULÉ AILLEURS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'écran doit pouvoir répondre à « d'où sort ce solde ». Le refaire dans un
+ * module de présentation supposerait de recopier les trois règles de tri de
+ * `soldeDerive` — la borne de date, le sort des mouvements rapprochés, et
+ * l'abstention totale quand aucune date n'est posée. Elles sont subtiles, et
+ * elles ont déjà produit deux bugs à elles seules. Une copie qui en oublierait
+ * une afficherait un détail qui ne retombe pas sur son propre total : le
+ * lecteur venu vérifier son chiffre repartirait avec une raison de plus de ne
+ * pas y croire.
+ *
+ * La somme signée `depart + recettes − depenses − echeances + releve` vaut
+ * `montant`, par construction et non par accord. Un test le vérifie quand
+ * même, parce que c'est cette identité que l'écran donne à lire.
+ *
+ * `depenses` et `echeances` sont POSITIVES : ce sont des montants sortis, et
+ * le signe est porté par la formule, pas par la valeur. Les rendre négatives
+ * ferait écrire « − −1 200 € » à l'écran le jour où quelqu'un les additionne
+ * dans le mauvais sens.
+ */
+export interface PartsSolde {
+  /** Le solde de départ, tel que saisi en Config. */
+  readonly depart: Euros;
+  /** Ce qui est entré depuis : recettes encaissées retenues. */
+  readonly recettes: Euros;
+  /** Ce qui est sorti depuis : dépenses payées retenues. Positif. */
+  readonly depenses: Euros;
+  /** Ce qui est sorti depuis : échéances réglées retenues. Positif. */
+  readonly echeances: Euros;
+  /**
+   * Le net des mouvements du relevé qui ne doublent aucun fait. Signé : un
+   * relevé peut aussi bien ajouter un remboursement que retrancher des frais
+   * bancaires, et les séparer en deux parts donnerait deux lignes qui ne
+   * correspondent à rien de nommable.
+   */
+  readonly releve: Euros;
+  /**
+   * Combien de faits chaque part recouvre.
+   *
+   * « 12 encaissements » sous un montant permet de reconnaître son propre
+   * dossier ; « 43 030 € » seul ne se vérifie contre rien.
+   */
+  readonly nombres: {
+    readonly recettes: number;
+    readonly depenses: number;
+    readonly echeances: number;
+    readonly mouvements: number;
+  };
+}
+
 export interface SoldeDetaille {
   readonly montant: Euros;
   readonly provenance: ProvenanceSolde;
+  readonly parts: PartsSolde;
 }
 
 /**
@@ -260,7 +316,23 @@ export function soldeDerive(
 
   return {
     montant: euros(partBanque + partRecettes - partDepenses - partEcheances),
-    provenance: provenanceSolde(soldeInitialAu, recettesEncaissees, depenses, echeances, mouvements)
+    provenance: provenanceSolde(soldeInitialAu, recettesEncaissees, depenses, echeances, mouvements),
+    parts: {
+      depart: soldeInitial,
+      recettes: euros(partRecettes),
+      depenses: euros(partDepenses),
+      echeances: euros(partEcheances),
+      // Le net du relevé se déduit du brut plutôt que de se resommer : c'est
+      // `soldeBancaire` qui fait l'addition, et la refaire ici en donnerait une
+      // seconde version qui finirait par ne plus tomber d'accord avec elle.
+      releve: euros(partBanque - soldeInitial),
+      nombres: {
+        recettes: recettesRetenues.length,
+        depenses: depensesRetenues.length,
+        echeances: echeancesRetenues.length,
+        mouvements: mouvementsRetenus.length
+      }
+    }
   };
 }
 

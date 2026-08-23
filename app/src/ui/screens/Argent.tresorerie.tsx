@@ -15,6 +15,7 @@ import {
 import { LIBELLE_NATURE } from '../../domain/calculs/provisions';
 import type { NatureDette } from '../../domain/calculs/provisions';
 import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.libelles';
+import type { CleComposition } from '../../domain/calculs/composition';
 import { CartePliable } from '../components/CartePliable';
 import { GrapheEvolution } from '../components/GrapheEvolution';
 import { Sheet } from '../components/Sheet';
@@ -65,6 +66,18 @@ const ProjectionPanneau = lazy(() => import('./Argent.projection')
  */
 const Echeancier = lazy(() => import('./Argent.echeancier')
   .then((m) => ({ default: m.Echeancier })));
+
+/**
+ * La composition d'un chiffre, au clic sur sa tuile.
+ *
+ * Différée, et pour une raison mesurée : le budget de l'écran différé le plus
+ * lourd était à une centaine d'octets de son plafond. L'invariant du projet
+ * interdit de relever un budget — on extrait ce qui n'a pas à être là. Un
+ * panneau qu'on n'ouvre qu'en venant vérifier un chiffre n'a rien à faire dans
+ * le paquet d'un écran qu'on ouvre tous les matins.
+ */
+const Composition = lazy(() => import('../components/Composition')
+  .then((m) => ({ default: m.Composition })));
 
 /**
  * Les montants abrégés des étiquettes de graphe.
@@ -706,6 +719,16 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
   const provenanceSolde = useFaits((e) => provenanceSoldeDe(e.faits));
   const soldeInitialAu = useFaits((e) => e.faits.soldeInitialAu);
   const autonomie = autonomieMois(etat.tresorerie.versable, besoinMensuel);
+  /*
+   * DEUX TUILES S'OUVRENT, DEUX NON, ET C'EST VOULU.
+   *
+   * Le solde et le disponible ont une formule ; « À encaisser » est une liste
+   * de factures, qui se lit au facturier, et l'autonomie est un rapport à un
+   * besoin mensuel qu'on lit dans son libellé même. Rendre les quatre
+   * cliquables pour l'uniformité ferait ouvrir deux panneaux qui n'auraient
+   * rien à montrer — et on cesserait de cliquer sur les deux autres.
+   */
+  const [compose, setCompose] = useState<CleComposition | null>(null);
 
   return (
     <div className={styles.grille}>
@@ -713,12 +736,14 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
         libelle="Solde du compte"
         valeur={eur(etat.tresorerie.solde)}
         note={noteProvenanceSolde(provenanceSolde, soldeInitialAu)}
+        onOuvrir={() => setCompose('solde')}
       />
       <Chiffre
         libelle="Disponible"
         valeur={eur(etat.tresorerie.dispo)}
         ton={etat.tresorerie.dispo < 0 ? 'danger' : 'accent'}
         note="à toi, hors provisions"
+        onOuvrir={() => setCompose('disponible')}
       />
       <Chiffre
         libelle="À encaisser"
@@ -735,6 +760,12 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
           ? 'besoin mensuel non renseigné'
           : 'ton versable, à ton train de vie'}
       />
+
+      {compose !== null && (
+        <Suspense fallback={null}>
+          <Composition cle={compose} onFermer={() => setCompose(null)} />
+        </Suspense>
+      )}
     </div>
   );
 }

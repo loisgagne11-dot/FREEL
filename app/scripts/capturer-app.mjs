@@ -74,6 +74,13 @@ const VUES = [
   { hash: '#/activite', nom: 'activite-missions', ouvrir: ['Missions'] },
   { hash: '#/activite', nom: 'activite-factures', ouvrir: ['Factures'] },
   { hash: '#/activite', nom: 'activite-clients', ouvrir: ['Clients'] },
+  /* La composition d'un chiffre, panneau ouvert.
+     Une vue à part, et non un détail de l'écran Pilote : le panneau ne s'ouvre
+     qu'au clic, donc la capture de l'écran ne le montre jamais. C'est
+     exactement le cas où « les tests sont verts et personne n'a regardé » — et
+     le premier passage a produit un chevron collé au montant comme une
+     virgule, que rien d'autre qu'un œil ne pouvait voir. */
+  { hash: '#/pilote', nom: 'pilote-composition', ouvrir: ['Solde'] },
   { hash: '#/argent', nom: 'argent-tresorerie' },
   { hash: '#/argent', nom: 'argent-performance', ouvrir: ['Performance'] },
   { hash: '#/achats', nom: 'achats' },
