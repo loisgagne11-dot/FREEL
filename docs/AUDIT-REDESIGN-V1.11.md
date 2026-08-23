@@ -580,3 +580,54 @@ Ce que le lot change :
 La démonstration devient cohérente : 8 120 + 12 960 − 1 161 − 2 360 − 7 342 =
 10 217 €, provisions couvertes à 100 %, et le donut de répartition somme au
 solde. Les vingt-deux captures sont regénérées.
+
+## 12. Lot N1 — le taux de recouvrement, et une capture qui pointait dans le vide
+
+### L'indicateur
+
+Le facturier disait « reste à rentrer », « dont en retard », « encaissé sur la
+période ». Trois montants, et aucun ne répond à la question qu'on se pose en
+les regardant : **est-ce que c'est beaucoup ?** 6 010 € en attente sur un
+trimestre à 8 000 € facturés est une alerte ; les mêmes 6 010 € sur un
+trimestre à 60 000 € sont la respiration normale d'un délai de paiement.
+
+Une quatrième tuile répond, sur la même assiette que les trois autres — les
+factures de la période, faute de quoi un taux calculé sur toute l'histoire
+répondrait à une autre question que celle que la barre de période pose, sans
+que rien à l'écran ne dise laquelle.
+
+### Écart assumé avec la référence
+
+**Le handoff ne dessine pas cette tuile.** Sa vue « Factures » porte
+« 6 factures · 3 610 € en attente d'encaissement » et s'arrête là. La tuile est
+donc une addition, au même titre que le panneau de composition du lot J3 — et
+pour la même raison : ce que l'ancienne application savait dire et que le
+dessin ne reprend pas ne disparaît pas pour autant du besoin.
+
+### Ce que le contrôle visuel a rattrapé
+
+Deux défauts, tous deux invisibles au test :
+
+- **la tuile virait au rouge à 68 % pendant que sa voisine annonçait « dont en
+  retard : 0 € »**. Deux tuiles côte à côte disant le contraire l'une de
+  l'autre. Elles ne se contredisaient pas vraiment : un taux bas SANS retard ne
+  dit pas que l'argent ne rentre pas, il dit qu'on vient de facturer — l'état
+  normal d'un trimestre qui se termine sur une grosse facture émise le 30.
+  Le rouge est désormais réservé à ce qui est réellement en retard ;
+- « 68,32 % ». `pct`, le formateur partagé, garde une à deux décimales — ce
+  qu'il faut pour un taux de cotisations où 2,2 % et 2 % diffèrent, ce qui est
+  du bruit sur un taux de recouvrement. La tuile emploie l'arrondi entier, celui
+  de l'occupation et des jauges.
+
+### La capture qui pointait dans le vide
+
+Le script cherchait la vue `activite-factures` en cliquant un onglet
+« Factures » sur l'écran Activité. Cet onglet n'existe plus : les factures sont
+devenues un écran à part, atteint par le rail. Le script le signalait **à
+chaque exécution depuis plusieurs lots**, et le message avait fini par se lire
+comme du décor — pendant ce temps, l'écran Facturer n'avait aucun contrôle
+visuel du tout.
+
+La vue pointe maintenant sur `#/facture`. Son NOM de fichier ne change pas :
+c'est lui qui apparie notre capture à celle du handoff, et les deux montrent
+bien le même écran. Seul l'endroit où on va le chercher a bougé.

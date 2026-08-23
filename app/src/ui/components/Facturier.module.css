@@ -39,6 +39,16 @@
 }
 
 .alerte .tuileValeur { color: var(--red); }
+.accent .tuileValeur { color: var(--green); }
+
+/* La note passe sur deux lignes plutôt que de s'élargir : quatre tuiles côte à
+   côte doivent garder la même largeur, sinon la comparaison des chiffres — leur
+   seule raison d'être alignés — se perd. */
+.tuileNote {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--muted-2);
+}
 
 .carte {
   background: linear-gradient(160deg, var(--card-a), var(--card-b));

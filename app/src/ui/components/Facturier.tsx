@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import { brouillonsDeFacture, etatFacturier } from '../../state/selecteurs.facture';
 import type { EcartDeFacturation } from '../../domain/calculs/brouillon';
@@ -19,6 +20,7 @@ import {
   type MetaJustificatif, type StockageJustificatifs,
   deposerJustificatif, stockageIndexedDB, verifierIntegrite
 } from '../../infra/justificatifs';
+import type { Recouvrement } from '../../domain/calculs/recouvrement';
 import { BarrePeriode } from './BarrePeriode';
 import { Info } from './Info';
 import { Montant } from './Montant';
@@ -226,6 +228,25 @@ export function Facturier(
           ton={etat.enRetard > 0 ? 'alerte' : 'neutre'}
         />
         <Chiffre libelle="Encaissé sur la période" valeur={eur(etat.encaisse)} ton="accent" />
+        {/*
+          * LE TAUX RÉPOND À LA QUESTION QUE LES TROIS AUTRES POSENT.
+          *
+          * « 6 010 € en attente » ne dit pas si c'est beaucoup. Sur un
+          * trimestre à 8 000 € facturés c'est une alerte ; sur un trimestre à
+          * 60 000 € c'est la respiration normale d'un délai de paiement.
+          *
+          * Absent tant que rien n'est facturé sur la période : « 0 % de
+          * recouvrement » décrirait un échec là où il n'y a eu aucune
+          * tentative, et c'est le cas de tout trimestre qui commence.
+          */}
+        {etat.recouvrement.taux !== null && (
+          <Chiffre
+            libelle="Recouvrement"
+            valeur={partEntiere(etat.recouvrement.taux)}
+            ton={tonRecouvrement(etat.recouvrement.taux, etat.enRetard)}
+            note={<NoteRecouvrement r={etat.recouvrement} />}
+          />
+        )}
       </div>
 
       <section className={styles.carte} aria-labelledby="titre-facturier">
@@ -702,17 +723,106 @@ function resumerPieceRecette(meta: MetaJustificatif): string {
 }
 
 function Chiffre(
-  { libelle, valeur, ton = 'neutre' }: {
+  { libelle, valeur, ton = 'neutre', note }: {
     readonly libelle: string;
     readonly valeur: string;
     readonly ton?: 'neutre' | 'accent' | 'alerte';
+    /**
+     * Ce que le chiffre recouvre, sous lui.
+     *
+     * Un pourcentage sans son assiette ne se vérifie contre rien : « 98 % »
+     * peut porter sur deux factures comme sur quarante, et ce n'est pas la
+     * même nouvelle.
+     *
+     * `ReactNode` et non `string` : la note porte des SOMMES, et une somme
+     * doit passer par `Montant` sous peine de rester lisible en mode
+     * confidentiel — la vérification automatisée l'a attrapée sur la première
+     * version. Le reste de la phrase, lui, n'est pas masqué : c'est justement
+     * ce qui permet de savoir ce qu'on lit quand les montants sont couverts.
+     */
+    readonly note?: ReactNode;
   }
 ) {
   return (
     <div className={`${styles.tuile} ${styles[ton]}`}>
       <span className={styles.tuileLibelle}>{libelle}</span>
       <strong className={styles.tuileValeur}><Montant>{valeur}</Montant></strong>
+      {note !== undefined && <span className={styles.tuileNote}>{note}</span>}
     </div>
+  );
+}
+
+/**
+ * Ce que la tuile de recouvrement écrit sous son pourcentage.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'ASSIETTE D'ABORD, LE DÉLAI ENSUITE, L'ANOMALIE SEULEMENT SI ELLE EXISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « 98 % » ne dit pas s'il porte sur deux factures ou sur quarante. La note
+ * donne donc les deux montants, puis le délai habituel — la MÉDIANE, parce que
+ * c'est ce qu'on attend la prochaine fois.
+ *
+ * La moyenne n'apparaît que lorsqu'elle s'écarte franchement de la médiane :
+ * c'est le seul moment où elle apprend quelque chose, et ce qu'elle apprend
+ * alors n'est pas un délai, c'est qu'UN dossier traîne. L'afficher toujours en
+ * ferait un second délai concurrent dont on ne saurait lequel croire.
+ */
+/**
+ * La teinte du taux, et ce qui la commande vraiment.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * C'EST LE RETARD QUI ALARME, PAS LE TAUX
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une première version passait au rouge sous 70 %. Le contrôle visuel l'a
+ * montrée rouge à 68 % sur un dossier où la tuile voisine annonçait « dont en
+ * retard : 0 € » — deux tuiles côte à côte disant le contraire l'une de
+ * l'autre.
+ *
+ * Elles ne se contredisaient pas vraiment : un taux bas SANS retard ne dit pas
+ * que l'argent ne rentre pas, il dit qu'on vient de facturer. C'est même l'état
+ * normal d'un trimestre qui se termine sur une grosse facture émise le 30, et
+ * l'alarmer reviendrait à crier au loup une fois par trimestre — après quoi
+ * personne ne regarde plus la tuile.
+ *
+ * Le rouge est donc réservé à ce qui est RÉELLEMENT en retard. Le vert reste
+ * au taux : au-dessus de 90 %, l'encaissement suit la facturation, et c'est
+ * une bonne nouvelle qui mérite d'être vue.
+ */
+function tonRecouvrement(taux: number, enRetard: Euros): 'neutre' | 'accent' | 'alerte' {
+  if (enRetard > 0) return 'alerte';
+  return taux >= 0.9 ? 'accent' : 'neutre';
+}
+
+/**
+ * Une part, en pourcentage entier.
+ *
+ * `pct` — le formateur partagé — garde une à deux décimales, ce qu'il faut
+ * pour un taux de cotisations où 2,2 % et 2 % ne sont pas la même chose. Sur
+ * un taux de recouvrement, la décimale est du bruit : le contrôle visuel a
+ * donné « 68,32 % », qui se lit moins vite que « 68 % » et ne dit rien de
+ * plus. C'est l'arrondi qu'emploient déjà l'occupation et les jauges.
+ */
+const partEntiere = (r: number): string => `${Math.round(r * 100)} %`;
+
+function NoteRecouvrement({ r }: { readonly r: Recouvrement }) {
+  // Un tiers d'écart : en deçà, la moyenne et la médiane racontent la même
+  // histoire et la répéter encombre. Au-delà, l'écart EST l'information.
+  const traine = r.delaiMoyen !== null
+    && r.delaiMedian !== null
+    && r.delaiMedian > 0
+    && r.delaiMoyen > r.delaiMedian * 1.3;
+
+  return (
+    <>
+      <Montant>{eur(r.encaisse)}</Montant> rentrés sur{' '}
+      <Montant>{eur(r.facture)}</Montant>
+      {r.delaiMedian === null
+        ? ' · aucun règlement daté'
+        : ` · règlement à ${r.delaiMedian} j en médiane`}
+      {traine && `, ${r.delaiMoyen} j de moyenne — un dossier traîne`}
+    </>
   );
 }
 

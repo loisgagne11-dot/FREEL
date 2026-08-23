@@ -72,7 +72,20 @@ const VUES = [
   { hash: '#/activite', nom: 'activite-plan-de-charge' },
   { hash: '#/activite', nom: 'activite-mois', ouvrir: ['Mois'] },
   { hash: '#/activite', nom: 'activite-missions', ouvrir: ['Missions'] },
-  { hash: '#/activite', nom: 'activite-factures', ouvrir: ['Factures'] },
+  /*
+   * LE MÊME NOM, UNE AUTRE ROUTE.
+   *
+   * Le handoff range les factures dans un ONGLET d'Activité ; notre
+   * application en a fait un écran à part, atteint par le rail. La vue
+   * cherchait donc un onglet « Factures » qui n'existe plus, et le script le
+   * signalait à chaque exécution depuis des lots — un message qu'on avait fini
+   * par lire comme du décor.
+   *
+   * Le nom de fichier ne change PAS : c'est lui qui apparie notre capture à
+   * celle du handoff, et les deux montrent bien le même écran. Seul l'endroit
+   * où on va le chercher a bougé.
+   */
+  { hash: '#/facture', nom: 'activite-factures' },
   { hash: '#/activite', nom: 'activite-clients', ouvrir: ['Clients'] },
   /* La composition d'un chiffre, panneau ouvert.
      Une vue à part, et non un détail de l'écran Pilote : le panneau ne s'ouvre
