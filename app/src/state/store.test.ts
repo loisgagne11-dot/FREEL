@@ -1,8 +1,21 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dateISO, euros, ratio } from '../domain/types';
 import { totaliser } from '../domain/calculs/livreRecettes';
-import { PART_GARDEE_MAX, faitsVides, type Recette } from './schema';
+import { CLE_STOCKAGE, PART_GARDEE_MAX, VERSION_SCHEMA, faitsVides, type Recette } from './schema';
+import { stockageMemoire } from '../infra/migration';
 import { useFaits } from './store';
+
+/**
+ * Espionne `completerFaits` (`schema.migrations.ts`) SANS changer son
+ * comportement : `importOriginal` garde la vraie fonction, `vi.fn` autour
+ * compte seulement les appels. Sans ce filet, la garantie de ce lot —
+ * « un dossier déjà à jour ne charge jamais le module de migrations » —
+ * ne serait vérifiée qu'à l'œil, dans le poids du paquet d'entrée.
+ */
+vi.mock('./schema.migrations', async (importOriginal) => {
+  const reel = await importOriginal<typeof import('./schema.migrations')>();
+  return { ...reel, completerFaits: vi.fn(reel.completerFaits) };
+});
 
 /**
  * Le magasin est un singleton : chaque test repart de faits vierges et d'un
@@ -392,5 +405,77 @@ describe('part gardée au versement', () => {
   it('retombe à zéro sur une valeur illisible, pas sur la borne haute', () => {
     useFaits.getState().definirPartGardee(ratio(Number.NaN));
     expect(part()).toBe(0);
+  });
+});
+
+/**
+ * LE CHARGEMENT NE SOLLICITE `schema.migrations.ts` QUE LORSQU'IL LE FAUT.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * CE QUE CE BLOC PROUVE, ET POURQUOI CE N'EST PAS UN DÉTAIL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les fonctions de migration (`congesDuSchema1`, `missionsDuSchema1`, etc.)
+ * ne servent qu'au passage d'un schéma à l'autre — jamais à un compte déjà à
+ * `VERSION_SCHEMA`, c'est-à-dire la quasi-totalité des ouvertures. Le budget
+ * du paquet d'entrée (`npm run verifier:budget`) constate qu'elles n'y sont
+ * plus, mais ne dit rien sur QUAND elles sont chargées à l'exécution : un
+ * code qui les importerait dynamiquement à CHAQUE ouverture, y compris pour
+ * un dossier courant, respecterait le budget tout en ratant l'objectif —
+ * chaque utilisateur télécharge quand même le module, juste un peu plus tard.
+ * Seul un test qui compte les appels réels de `completerFaits` le vérifie.
+ */
+describe('chargement : le module de migrations n’est sollicité qu’au besoin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('un dossier déjà à la version courante se charge sans que le module de migrations soit sollicité', async () => {
+    const { completerFaits } = await import('./schema.migrations');
+    const stockage = stockageMemoire({
+      [CLE_STOCKAGE]: JSON.stringify({ ...faitsVides(), version: VERSION_SCHEMA })
+    });
+
+    useFaits.getState().initialiser(stockage);
+
+    // Chemin SYNCHRONE : le résultat est déjà là, sans le moindre tour de
+    // boucle d'événements — la preuve la plus directe qu'aucun `import()`
+    // n'a été attendu pour en arriver là.
+    expect(useFaits.getState().chargement.phase).toBe('pret');
+    expect(completerFaits).not.toHaveBeenCalled();
+
+    // Un `import()` déjà déclenché ailleurs pourrait résoudre entre-temps :
+    // on laisse passer un tour de microtâches et on revérifie, pour ne pas
+    // se contenter d'une preuve qui ne regarderait qu'un instant t.
+    await Promise.resolve();
+    expect(completerFaits).not.toHaveBeenCalled();
+  });
+
+  it('un dossier à une version antérieure se migre toujours correctement', async () => {
+    const { completerFaits } = await import('./schema.migrations');
+    // Schéma 1 : les congés sont de simples chaînes. S'ils ressortent
+    // convertis en `{ date, quotite }`, c'est que la conversion réelle a
+    // tourné — pas seulement qu'un module a été chargé sans rien faire.
+    const stockage = stockageMemoire({
+      [CLE_STOCKAGE]: JSON.stringify({ version: 1, conges: ['2026-08-10'] })
+    });
+    // Le `beforeEach` global de ce fichier laisse `chargement` sur
+    // `sans-persistance` (stockage nul). On repart de l'état d'un VRAI
+    // démarrage à froid, sinon l'assertion qui suit ne prouverait rien.
+    useFaits.setState({ chargement: { phase: 'initial' } });
+
+    useFaits.getState().initialiser(stockage);
+
+    // Le module est chargé À LA DEMANDE : l'écran reste en phase « initial »
+    // le temps du chargement, plutôt que de montrer un état vide qu'on
+    // remplacerait une seconde plus tard.
+    expect(useFaits.getState().chargement.phase).toBe('initial');
+
+    await vi.waitFor(() => {
+      expect(useFaits.getState().chargement.phase).toBe('pret');
+    });
+
+    expect(completerFaits).toHaveBeenCalledTimes(1);
+    expect(useFaits.getState().faits.conges).toEqual([{ date: '2026-08-10', quotite: 1 }]);
   });
 });

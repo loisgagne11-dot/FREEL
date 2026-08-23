@@ -6,9 +6,16 @@ import {
   ecrireConfig, ecrireSession, lireSession, pousserFaits, rafraichir,
   seConnecter, seDeconnecter, sessionValide, tirerFaits
 } from '../../infra/supabase';
-import {
-  VERSION_SCHEMA, type Faits, completerFaits, motifRefusFaits
-} from '../../state/schema';
+import { VERSION_SCHEMA, type Faits, motifRefusFaits } from '../../state/schema';
+/**
+ * `completerFaits` est importé STATIQUEMENT ici, contrairement à
+ * `state/store.ts` : cet écran est déjà chargé à la demande (voir `App.tsx`,
+ * qui le charge via `Config`), donc le module de migrations n'alourdit aucun
+ * paquet de premier rendu en passant par lui. Le charger dynamiquement de
+ * surcroît n'aurait rien économisé, et aurait coûté un aller-retour réseau à
+ * chacun des trois usages ci-dessous.
+ */
+import { completerFaits } from '../../state/schema.migrations';
 import type { RapportMigration } from '../../infra/migration';
 import { convertirBundle } from '../../infra/migration.legacy';
 import { Info } from '../components/Info';
@@ -299,8 +306,8 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     });
   }
 
-  function confirmerRecuperation(session: Session, faits: Faits): void {
-    const motif = adopterFaitsDistants(faits);
+  async function confirmerRecuperation(session: Session, faits: Faits): Promise<void> {
+    const motif = await adopterFaitsDistants(faits);
     if (motif !== null) { setErreur(motif); return; }
     setEtat({ phase: 'connecte', session });
     setMessage('Données du compte chargées. Elles remplacent l’état de cet appareil.');
@@ -454,7 +461,7 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
             <ApercuDistant
               resume={resumer(etat.faits)}
               majLe={etat.instantane.majLe}
-              onConfirmer={() => confirmerRecuperation(etat.session, etat.faits)}
+              onConfirmer={() => void confirmerRecuperation(etat.session, etat.faits)}
               onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
             />
           )}

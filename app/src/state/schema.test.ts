@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO } from '../domain/types';
 import { planifier } from '../domain/calculs/planning';
-import {
-  VERSION_SCHEMA, completerFaits, entrepriseVide, faitsVides, motifRefusFaits
-} from './schema';
+import { VERSION_SCHEMA, entrepriseVide, faitsVides, motifRefusFaits } from './schema';
+import { completerFaits } from './schema.migrations';
 
 /**
  * Validation d'un bloc de faits.
