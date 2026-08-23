@@ -19,18 +19,23 @@ import styles from './GrapheEvolution.module.css';
  * chaque mois. On lit la pente, puis on descend voir quel mois l'explique.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * LA COURBE EST LE DISPONIBLE, PAS LE SOLDE — ET LA CARTE LE DIT
+ * LA COURBE PEUT CHANGER DE GRANDEUR EN COURS DE ROUTE, ET C'EST VOULU
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Le dessin trace un solde. L'application s'y refuse, et c'est un arbitrage
- * ancien : projeter le solde obligerait à deviner QUAND chaque dette sortira du
- * compte, et la moitié d'entre elles n'a pas encore de date — rien ne les a
- * appelées. Une courbe de solde monte joliment jusqu'au trimestre où elle
- * s'effondre, et c'est exactement la courbe qui fait se verser de l'argent
- * qu'on doit.
+ * Le composant ne tranche PAS ce que la courbe représente : il trace la série
+ * de `niveau` qu'on lui donne, et affiche les deux noms qu'on lui passe —
+ * `libelleNiveau` pour les mois clos, `libelleNiveauProjete` pour les mois à
+ * venir. C'est l'appelant (`Argent.tresorerie.tsx`) qui décide de la grandeur,
+ * et pour de bonnes raisons il n'en garde pas la même sur toute la largeur.
  *
- * Le composant ne tranche pas : il trace la série qu'on lui donne et affiche le
- * nom qu'on lui passe. C'est l'appelant qui doit dire ce qu'il trace.
+ * Un mois déjà clos a un solde exact, connu jusqu'au centime : rien n'y est
+ * deviné, la courbe peut donc le tracer directement, en plein. Un mois à venir
+ * n'a pas ce luxe — projeter un SOLDE obligerait à deviner QUAND chaque dette
+ * sortira du compte, et la moitié d'entre elles n'a pas encore de date. Une
+ * courbe de solde qui les ignorerait monterait joliment jusqu'au trimestre où
+ * elle s'effondre, et c'est exactement la courbe qui fait se verser de
+ * l'argent qu'on doit. Voir `estProjete` ci-dessous pour comment la frontière
+ * se marque à l'écran.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LE TRACÉ EST UNE IMAGE
@@ -66,6 +71,21 @@ import styles from './GrapheEvolution.module.css';
  * glyphes s'aplatiraient avec la courbe. Un `<span>` positionné en
  * pourcentage, par-dessus, garde sa police intacte quelle que soit la largeur
  * de la carte.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE FAIT ET L'HYPOTHÈSE NE SE DESSINENT PAS PAREIL (lot L1)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `estProjete` sépare les mois clos — un solde réel, connu exactement — des
+ * mois à venir — une hypothèse de disponible, qui suppose déjà tout retiré ce
+ * qui est dû. Confondre les deux dans un même trait plein referait la faute
+ * qu'une courbe de solde projeté commet : monter joliment jusqu'au trimestre
+ * où elle s'effondre, sans jamais dire qu'elle devinait.
+ *
+ * Le trait des mois clos reste plein ; celui des mois à venir est en
+ * pointillés, comme le seuil. Chaque colonne à venir porte en plus un mot en
+ * clair — « prévu » — parce qu'une différence de trait seule échappe à qui ne
+ * la voit pas ou ne la cherche pas.
  */
 
 export interface MoisEvolution {
@@ -77,18 +97,32 @@ export interface MoisEvolution {
   readonly sorties: number;
   /** Le niveau à la fin de ce mois — ce que la courbe trace. */
   readonly niveau: number;
+  /**
+   * `false` : `niveau` est un fait, mois déjà clos. `true` : `niveau` est une
+   * hypothèse de disponible — voir l'en-tête du fichier. Détermine le trait
+   * (plein ou pointillé) et le mot « prévu » sous la colonne.
+   */
+  readonly estProjete: boolean;
 }
 
 const HAUTEUR_COURBE = 96;
 const HAUTEUR_BARRES = 64;
 
 export function GrapheEvolution(
-  { mois, seuil, libelleNiveau, formater, formaterCourt, indexCourant = -1 }: {
+  {
+    mois, seuil, libelleNiveau, libelleNiveauProjete, formater, formaterCourt, indexCourant = -1
+  }: {
     readonly mois: readonly MoisEvolution[];
     /** Le plancher tracé en pointillés, ou `null` s'il n'y en a pas. */
     readonly seuil: number | null;
-    /** Ce que la courbe représente. Entre dans la légende et le nom accessible. */
+    /** Ce que la courbe représente sur les mois CLOS. Entre dans la légende. */
     readonly libelleNiveau: string;
+    /**
+     * Ce que la courbe représente sur les mois À VENIR — une hypothèse
+     * distincte, jamais la même grandeur que `libelleNiveau` (voir l'en-tête
+     * du fichier). N'entre dans la légende que si au moins un mois est projeté.
+     */
+    readonly libelleNiveauProjete: string;
     readonly formater: (valeur: number) => string;
     /**
      * Format abrégé, pour les douze étiquettes de colonne.
@@ -124,15 +158,43 @@ export function GrapheEvolution(
     HAUTEUR_COURBE - ((v - basNiveau) / amplitude) * HAUTEUR_COURBE;
   const x = (i: number): number => ((i + 0.5) / mois.length) * 100;
 
-  const points = mois.map((m, i) => `${x(i)},${y(m.niveau)}`).join(' ');
-  const aire = `${x(0)},${HAUTEUR_COURBE} ${points} ${x(mois.length - 1)},${HAUTEUR_COURBE}`;
+  const points = mois.map((m, i) => `${x(i)},${y(m.niveau)}`);
+
+  /*
+   * DEUX TRAITS, PAS UN : LE FAIT S'ARRÊTE OÙ L'HYPOTHÈSE COMMENCE.
+   *
+   * `indexBascule` est le dernier mois CLOS. `evolutionCompte` garantit que
+   * les mois clos sont toujours en tête, contigus (voir sa documentation) :
+   * chercher le dernier `!estProjete` suffit donc, pas besoin de scinder le
+   * tableau ailleurs.
+   *
+   * Les deux tracés partagent le point de bascule : un trait plein qui
+   * s'arrêterait avant le pointillé laisserait un trou visible entre les
+   * deux, comme si un mois manquait.
+   */
+  const indexBascule = mois.reduce((acc, m, i) => (!m.estProjete ? i : acc), -1);
+  const pointsFaits = indexBascule >= 0 ? points.slice(0, indexBascule + 1).join(' ') : '';
+  const aPortionProjetee = indexBascule < mois.length - 1;
+  const pointsProjetes = aPortionProjetee
+    ? points.slice(Math.max(indexBascule, 0)).join(' ')
+    : '';
+
+  // L'aire ne se remplit que sous ce qui est CONNU : la remplir sous
+  // l'hypothèse donnerait à une projection le même poids visuel qu'un fait.
+  const aire = indexBascule >= 0
+    ? `${x(0)},${HAUTEUR_COURBE} ${pointsFaits} ${x(indexBascule)},${HAUTEUR_COURBE}`
+    : null;
 
   const mouvementMax = Math.max(1, ...mois.flatMap((m) => [m.entrees, m.sorties]));
+  const titreAccessible = aPortionProjetee
+    ? `${libelleNiveau}, puis ${libelleNiveauProjete} à partir des mois à venir, `
+      + 'entrées et sorties, mois par mois'
+    : `${libelleNiveau}, entrées et sorties, mois par mois`;
 
   return (
     <figure className={styles.figure} aria-labelledby={idTitre}>
       <figcaption className={styles.horsEcran} id={idTitre}>
-        {libelleNiveau}, entrées et sorties, mois par mois
+        {titreAccessible}
       </figcaption>
 
       {/* Alignée à droite : la référence la pose sur la ligne du titre de la
@@ -145,6 +207,11 @@ export function GrapheEvolution(
         <span className={styles.entreeLegende}>
           <span className={styles.traitNiveau} />{libelleNiveau}
         </span>
+        {aPortionProjetee && (
+          <span className={styles.entreeLegende}>
+            <span className={styles.traitNiveauProjete} />{libelleNiveauProjete}
+          </span>
+        )}
         <span className={styles.entreeLegende}>
           <span className={styles.pastilleEntrees} />entrées
         </span>
@@ -164,8 +231,16 @@ export function GrapheEvolution(
           aria-hidden="true"
           focusable="false"
         >
-          <polygon points={aire} className={styles.aire} />
-          <polyline points={points} className={styles.ligne} vectorEffect="non-scaling-stroke" />
+          {aire !== null && <polygon points={aire} className={styles.aire} />}
+          {pointsFaits !== '' && (
+            <polyline points={pointsFaits} className={styles.ligne} vectorEffect="non-scaling-stroke" />
+          )}
+          {pointsProjetes !== '' && (
+            <polyline
+              points={pointsProjetes} className={styles.ligneProjetee}
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
           {seuil !== null && (
             <line
               x1="0" x2="100" y1={y(seuil)} y2={y(seuil)}
@@ -173,7 +248,10 @@ export function GrapheEvolution(
             />
           )}
           {mois.map((m, i) => (
-            <circle key={m.mois} cx={x(i)} cy={y(m.niveau)} r="1.6" className={styles.point} />
+            <circle
+              key={m.mois} cx={x(i)} cy={y(m.niveau)} r="1.6"
+              className={m.estProjete ? styles.pointProjete : styles.point}
+            />
           ))}
         </svg>
 
@@ -208,7 +286,11 @@ export function GrapheEvolution(
           return (
             <div
               key={m.mois}
-              className={`${styles.colonne} ${i === indexCourant ? styles.colonneCourante : ''}`}
+              className={[
+                styles.colonne,
+                i === indexCourant ? styles.colonneCourante : '',
+                m.estProjete ? styles.colonneProjetee : ''
+              ].filter(Boolean).join(' ')}
             >
               {/* Pas de niveau ici : il est déjà sur la courbe, au-dessus de
                   ce même mois. Voir « LE NIVEAU NE VIT QU'À UN SEUL ENDROIT »
@@ -217,9 +299,25 @@ export function GrapheEvolution(
                   sienne : chaque chiffre reste soudé au trait qu'il légende, au
                   lieu de forcer un aller-retour de l'œil entre un nombre et une
                   barre parmi douze. */}
-              <span className={styles.valeurEntree}>
-                +<Montant>{formaterCourt(m.entrees)}</Montant>
-              </span>
+              {/*
+                * UN MOIS SANS MOUVEMENT N'ÉCRIT RIEN.
+                *
+                * Le graphe imprimait « +0 € » et « −0 € » sur chaque mois vide,
+                * plus « +0 € » de net dessous : trois zéros par colonne, et sur
+                * une année qui démarre en avril, une vingtaine de zéros pour
+                * douze mois. L'œil les lit comme des données, cherche ce qu'ils
+                * distinguent, et ne trouve rien — le graphe passait pour cassé
+                * alors qu'il disait la vérité.
+                *
+                * Le vide se montre en ne montrant rien. La colonne garde sa
+                * place et son mois : c'est l'absence de chiffre qui dit
+                * l'absence de mouvement.
+                */}
+              {m.entrees > 0 && (
+                <span className={styles.valeurEntree}>
+                  +<Montant>{formaterCourt(m.entrees)}</Montant>
+                </span>
+              )}
               {/* Les barres elles-mêmes restent décoratives : le pixel n'ajoute
                   rien que les deux montants qui l'encadrent ne disent déjà. */}
               <span className={styles.barres} aria-hidden="true">
@@ -232,16 +330,36 @@ export function GrapheEvolution(
                   style={{ height: `${(m.sorties / mouvementMax) * HAUTEUR_BARRES}px` }}
                 />
               </span>
-              <span className={styles.valeurSortie}>
-                −<Montant>{formaterCourt(m.sorties)}</Montant>
-              </span>
+              {m.sorties > 0 && (
+                <span className={styles.valeurSortie}>
+                  −<Montant>{formaterCourt(m.sorties)}</Montant>
+                </span>
+              )}
               <span className={styles.axeMois}>{m.libelle}</span>
               {/* Le net sous le mois : c'est lui qui explique la pente du
                   segment juste au-dessus, et il évite la soustraction de tête
                   que deux barres imposeraient. */}
-              <span className={net < 0 ? styles.netNegatif : styles.netPositif}>
-                {net >= 0 ? '+' : '−'}<Montant>{formaterCourt(Math.abs(net))}</Montant>
-              </span>
+              {/*
+                * LE NET N'EXPLIQUE QUE CE QUE LES DEUX FLUX NE DISENT PAS.
+                *
+                * Il ne s'écrit que si les DEUX flux existent. Sur un mois vide
+                * il vaudrait zéro, et un zéro de plus n'explique aucune pente —
+                * le segment au-dessus est plat, ce qui se voit. Sur un mois qui
+                * n'a qu'une sortie, le net RÉPÈTE cette sortie : deux fois le
+                * même nombre l'un sous l'autre, et l'œil cherche la différence
+                * entre eux. Le net a sa raison d'être quand il évite une
+                * soustraction de tête, pas quand il recopie.
+                */}
+              {m.entrees > 0 && m.sorties > 0 && (
+                <span className={net < 0 ? styles.netNegatif : styles.netPositif}>
+                  {net >= 0 ? '+' : '−'}<Montant>{formaterCourt(Math.abs(net))}</Montant>
+                </span>
+              )}
+              {/* Un mot en clair, pas seulement un trait en pointillés : une
+                  différence de trait seule échappe à qui ne la voit pas, ou ne
+                  la cherche pas — voir « LE FAIT ET L'HYPOTHÈSE… » en tête de
+                  fichier. */}
+              {m.estProjete && <span className={styles.badgeProjete}>prévu</span>}
             </div>
           );
         })}

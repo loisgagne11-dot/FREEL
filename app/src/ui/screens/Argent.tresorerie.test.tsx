@@ -266,37 +266,77 @@ describe('la répartition du solde', () => {
 
 describe('l’évolution du compte', () => {
   /**
-   * LA COURBE EST LE DISPONIBLE, ET LE TITRE DOIT LE DIRE.
+   * LA COURBE EST LE SOLDE, PAS LE DISPONIBLE (lot L1).
    *
-   * Le dessin trace un solde. Projeter le solde obligerait à deviner quand
-   * chaque dette sortira du compte, et la moitié n'a pas de date. Un titre qui
-   * dirait « solde » sur une courbe de disponible serait conforme au dessin et
-   * faux — le pire des deux mondes.
+   * L'utilisateur l'a demandé explicitement : « qu'il me montre le solde
+   * réel ». Un titre qui dirait « disponible » sur une courbe de solde serait
+   * conforme à l'ancienne carte et faux sur ce qu'elle montre désormais.
    */
-  it('annonce une courbe de disponible, pas de solde', () => {
+  it('annonce une courbe de solde, pas de disponible', () => {
     poser({ soldeInitial: euros(10_000) });
 
-    // Le titre VISIBLE, et non son info : celle-ci explique justement pourquoi
-    // ce n'est pas le solde, donc elle contient le mot.
     expect(screen.getByText(/Évolution du compte — entrées, sorties/).textContent)
-      .toContain('disponible');
+      .toContain('solde');
   });
 
   /**
-   * DOUZE MOIS GLISSANTS, PAS « JUSQU'À DÉCEMBRE ».
+   * LA PHRASE « SANS RIEN TE VERSER » A DISPARU.
    *
-   * La référence s'arrête à décembre parce qu'elle est dessinée en juin. La
-   * même règle en novembre laisserait deux colonnes.
+   * L'utilisateur l'a jugée sans intérêt : elle qualifiait une projection de
+   * disponible, jamais un solde constaté. Le solde réel n'a pas d'hypothèse de
+   * versement à qualifier.
    */
-  it('projette douze mois à partir du mois courant', () => {
+  it('ne parle plus de « sans rien te verser »', () => {
+    poser({ soldeInitial: euros(10_000) });
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    expect(within(carte as HTMLElement).queryByText(/sans rien te verser/)).toBeNull();
+  });
+
+  /**
+   * L'ANNÉE CHOISIE, PAS DOUZE MOIS GLISSANTS.
+   *
+   * Avant ce lot, la carte ignorait la bascule d'année et courait toujours sur
+   * douze mois depuis aujourd'hui — le deuxième défaut remonté par
+   * l'utilisateur. Elle doit désormais suivre `etat.annee`, de janvier à
+   * décembre.
+   */
+  it('couvre janvier à décembre de l’année choisie', () => {
     poser({ soldeInitial: euros(10_000) });
 
     const carte = screen.getByText(/Évolution du compte/).closest('section');
     const dans = within(carte as HTMLElement);
-    // Juin 2026 → mai 2027 : le mois courant en tête, et le même douze mois plus tard.
+    expect(dans.getAllByText('JAN').length).toBeGreaterThan(0);
+    expect(dans.getAllByText('DÉC').length).toBeGreaterThan(0);
+    // Le mois d'horloge (juin) n'est ni le premier ni le dernier de l'année :
+    // seul « douze mois glissants » l'aurait mis en tête.
     expect(dans.getAllByText('JUIN').length).toBeGreaterThan(0);
-    expect(dans.getAllByText('MAI').length).toBeGreaterThan(0);
-    expect(dans.getByText(/projeté dans douze mois/)).toBeTruthy();
+  });
+
+  /**
+   * UN MOIS À VENIR EST ANNONCÉ COMME TEL, EN CLAIR.
+   *
+   * La distinction entre le fait et l'hypothèse doit être lisible sans
+   * dépendre d'une différence de trait — voir `GrapheEvolution.test.tsx` pour
+   * la preuve au niveau du composant ; ce test-ci vérifie le câblage réel
+   * depuis l'écran.
+   */
+  it('annonce les mois à venir comme « prévu »', () => {
+    poser({ soldeInitial: euros(10_000) });
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    expect(within(carte as HTMLElement).getAllByText('prévu').length).toBeGreaterThan(0);
+  });
+
+  // L'horloge du test est fixée au 10 juin 2026 (voir `beforeEach`) : une
+  // année déjà terminée ne doit plus rien annoncer comme « prévu ».
+  it('n’annonce rien comme « prévu » sur une année déjà terminée', () => {
+    const faits = { ...faitsVides(), soldeInitial: euros(10_000) } as Faits;
+    useFaits.setState({ faits });
+    render(<Tresorerie etat={etatArgent(faits, faits.echeances, undefined, 2025)} />);
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    expect(within(carte as HTMLElement).queryByText('prévu')).toBeNull();
   });
 
   /**
@@ -326,12 +366,39 @@ describe('l’évolution du compte', () => {
    * C'est lui qui explique la pente du segment au-dessus. Sans lui, deux barres
    * imposent la soustraction de tête, douze fois de suite.
    */
+  /**
+   * Le net porte le signe, jamais les barres seules. Le jeu d'essai doit donc
+   * comporter un MOUVEMENT : depuis qu'un mois vide n'écrit plus « +0 € », un
+   * dossier sans recette ni dépense n'a aucun net à montrer — et c'est voulu.
+   */
   it('écrit le net de chaque mois sous son libellé', () => {
+    poser({
+      soldeInitial: euros(10_000),
+      besoinMensuel: euros(1_000),
+      recettes: [{
+        id: 'r1', clientNom: 'C', libelle: 'F', montant: euros(5_000),
+        emiseLe: dateISO('2026-03-01'), encaisseeLe: dateISO('2026-03-20'),
+        modeReglement: null, numero: '2026-001'
+      }]
+    });
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    expect(within(carte as HTMLElement).getAllByText(/^[+−]/).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * UN MOIS SANS MOUVEMENT N'ÉCRIT RIEN.
+   *
+   * Le graphe imprimait « +0 € », « −0 € » et un net à zéro sur chaque mois
+   * vide : une vingtaine de zéros pour douze mois sur une année qui démarre
+   * tard. L'œil les lit comme des données, cherche ce qu'ils distinguent, et
+   * ne trouve rien — le graphe passait pour cassé alors qu'il disait vrai.
+   */
+  it('n’écrit aucun zéro sur un mois sans mouvement', () => {
     poser({ soldeInitial: euros(10_000), besoinMensuel: euros(1_000) });
 
     const carte = screen.getByText(/Évolution du compte/).closest('section');
-    // Le signe est porté par le net, jamais par les barres seules.
-    expect(within(carte as HTMLElement).getAllByText(/^[+−]/).length).toBeGreaterThan(0);
+    expect(within(carte as HTMLElement).queryAllByText(/^[+−]\s*0/)).toHaveLength(0);
   });
 });
 

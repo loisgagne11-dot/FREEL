@@ -263,3 +263,44 @@ export function soldeDerive(
     provenance: provenanceSolde(soldeInitialAu, recettesEncaissees, depenses, echeances, mouvements)
   };
 }
+
+/**
+ * Le solde tel qu'il était à la fin d'un mois donné — un FAIT, pas une
+ * hypothèse, dès lors que le mois est déjà passé ou en cours.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI UNE BORNE HAUTE, ET POURQUOI PAS UN SECOND CALCUL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `soldeDerive` ne connaît qu'une borne — `soldeInitialAu`, la borne BASSE —
+ * et somme tout ce qui la suit sans jamais s'arrêter. C'est le bon calcul
+ * pour AUJOURD'HUI : rien n'est jamais daté dans le futur, donc « tout ce qui
+ * suit » s'arrête naturellement à maintenant. Un mois déjà clos a besoin
+ * d'une borne HAUTE en plus, faute de quoi une recette encaissée le mois
+ * suivant se retrouverait comptée dans le solde du mois précédent.
+ *
+ * La fonction ne réimplémente pas l'addition : elle filtre les quatre
+ * collections à la borne haute puis délègue entièrement à `soldeDerive`, qui
+ * reste l'unique endroit où la somme se fait. Deux additions du même solde
+ * auraient fini par diverger le jour où l'une des deux change de règle sans
+ * l'autre — exactement l'écart que l'invariant « une source unique par
+ * notion » interdit.
+ */
+export function soldeAuDernierJourDe(
+  finDeMois: DateISO,
+  soldeInitial: Euros,
+  soldeInitialAu: DateISO | null,
+  recettesEncaissees: readonly RecetteEncaissee[],
+  depenses: readonly Depense[],
+  echeances: readonly Echeance[],
+  mouvements: readonly MouvementBancaire[]
+): Euros {
+  return soldeDerive(
+    soldeInitial,
+    soldeInitialAu,
+    recettesEncaissees.filter((r) => r.encaisseeLe <= finDeMois),
+    depenses.filter((d) => d.payeeLe !== null && d.payeeLe <= finDeMois),
+    echeances.filter((e) => estPayee(e) && (e.payeeLe as DateISO) <= finDeMois),
+    mouvements.filter((m) => m.date <= finDeMois)
+  ).montant;
+}

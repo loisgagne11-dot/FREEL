@@ -1,7 +1,7 @@
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { dateDuJour, provenanceSoldeDe } from '../../state/selecteurs';
-import { etatProjection, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
+import { dateDuJour, moisCourant, provenanceSoldeDe, solde } from '../../state/selecteurs';
+import { evolutionCompte, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
 import type { DateISO, Euros, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';
 import type { ProvenanceSolde } from '../../domain/calculs/solde';
@@ -13,9 +13,13 @@ import {
   type EnveloppeProvision, enveloppesDeProvision
 } from '../../domain/calculs/enveloppes';
 import { LIBELLE_NATURE } from '../../domain/calculs/provisions';
+import type { NatureDette } from '../../domain/calculs/provisions';
 import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.libelles';
 import { CartePliable } from '../components/CartePliable';
 import { GrapheEvolution } from '../components/GrapheEvolution';
+import { Sheet } from '../components/Sheet';
+import { detailDeLaDette } from '../../state/selecteurs.dette';
+import { PanneauDetailDette } from '../components/DetailDette';
 import { Chiffre } from '../components/Chiffre';
 import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
@@ -68,12 +72,21 @@ const Echeancier = lazy(() => import('./Argent.echeancier')
  * Sous mille euros, l'abréviation en k€ perdrait le seul chiffre significatif :
  * « 0,3 k€ » se lit moins bien que « 340 € », et sur un net mensuel c'est
  * précisément l'ordre de grandeur courant.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN SEUL CHIFFRE APRÈS LA VIRGULE, MÊME AU-DELÀ DE DIX MILLE EUROS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une première version arrondissait à l'entier dès 10 k€ — « 11 k€ », sans
+ * décimale. Un contrôle visuel l'a relevé : douze mois qui varient entre
+ * 10 500 € et 11 400 € affichaient tous « 11 k€ », neuf fois la même
+ * étiquette sur une courbe qui bouge réellement. Garder la décimale, quelle
+ * que soit l'ampleur du solde, rend les colonnes de nouveau distinguables.
  */
 function enKiloEuros(valeur: number): string {
   const abs = Math.abs(valeur);
   if (abs < 1000) return eur(euros(Math.round(valeur)));
-  const k = valeur / 1000;
-  const arrondi = Math.abs(k) >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
+  const arrondi = Math.round(valeur / 100) / 10;
   return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(arrondi)} k€`;
 }
 
@@ -88,7 +101,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
     <>
       <TuilesTresorerie etat={etat} />
 
-      <EvolutionDuCompte />
+      <EvolutionDuCompte annee={etat.annee} />
 
       <CartePliable
         id="repartition"
@@ -239,7 +252,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * Entrées, sorties et niveau projeté sur un même repère.
+ * Entrées, sorties et niveau, sur l'année choisie.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LA CARTE QUI MANQUAIT
@@ -256,76 +269,104 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
  * mois — on lit la pente, puis on descend voir quel mois l'explique.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * LA COURBE EST LE DISPONIBLE, ET LE TITRE LE DIT
+ * LE SOLDE RÉEL, ET NON PLUS LE DISPONIBLE « SANS RIEN TE VERSER » (lot L1)
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Le dessin trace un solde ; l'application s'y refuse, et c'est un arbitrage
- * ancien qu'on ne rouvre pas. Projeter le solde obligerait à deviner QUAND
- * chaque dette sortira du compte, et la moitié n'a pas de date — l'URSSAF n'a
- * pas encore appelé les charges des recettes déjà encaissées. Une courbe de
- * solde monte joliment jusqu'au trimestre où elle s'effondre, et c'est
- * exactement la courbe qui fait se verser de l'argent qu'on doit.
+ * Trois défauts remontés sur cette carte : un graphe peu lisible, une année
+ * ignorée, et une courbe de disponible assortie d'une phrase — « sans rien te
+ * verser » — jugée sans intérêt par l'utilisateur lui-même. Les trois se
+ * corrigent ensemble, parce que le second défaut explique pourquoi le
+ * troisième existait : le graphe tournait en douze mois glissants depuis
+ * aujourd'hui, jamais sur des mois CLOS, donc il n'avait jamais accès qu'à une
+ * projection — jamais à un fait.
  *
- * Le titre de la carte porte donc « disponible » et non « solde », et l'info le
- * détaille. Un graphe conforme au dessin et faux sur le fond serait le pire des
- * deux mondes.
+ * Or le solde PASSÉ est un fait, connu exactement, mois par mois (voir
+ * `evolutionCompte` et `domain/calculs/solde.ts`). L'argument qui interdit de
+ * PROJETER un solde — deviner quand chaque dette sortira du compte, une
+ * courbe qui monte joliment jusqu'au trimestre où elle s'effondre — ne vaut
+ * que pour l'AVENIR : il ne s'applique pas à un mois déjà clos, où il n'y a
+ * plus rien à deviner. Les mois clos tracent donc le solde réel, en trait
+ * plein. Les mois à venir restent une hypothèse de disponible, en pointillés
+ * — voir `GrapheEvolution` pour le rendu, et l'infobulle ci-dessous pour ce
+ * que ça change de l'un à l'autre.
+ *
+ * La phrase « sans rien te verser » disparaît avec eux : elle n'avait de sens
+ * que pour QUALIFIER une projection de disponible, jamais un solde constaté.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * DOUZE MOIS GLISSANTS, PAS « JUSQU'À DÉCEMBRE »
+ * L'ANNÉE CHOISIE, PAS DOUZE MOIS GLISSANTS
  * ─────────────────────────────────────────────────────────────────────────
  *
- * La référence s'arrête à décembre parce qu'elle est dessinée en juin. La même
- * règle appliquée en novembre laisserait deux colonnes. La projection court sur
- * douze mois à partir du mois courant, et la phrase dit « dans douze mois »
- * plutôt qu'une fin d'année qui ne veut dire quelque chose qu'en juin.
+ * Le graphe suit désormais la bascule d'année de la barre du haut — janvier à
+ * décembre de l'année regardée. Ce n'est PAS une contradiction avec le solde
+ * affiché en tuile, qui ne dépend jamais de l'année (voir `evolutionCompte`) :
+ * la tuile dit un état instantané, cette carte une évolution sur la période
+ * choisie.
  */
-function EvolutionDuCompte() {
+function EvolutionDuCompte({ annee }: { readonly annee: number }) {
   const faits = useFaits((e) => e.faits);
-  const projection = useMemo(() => etatProjection(faits), [faits]);
-  const p = projection.projection;
+  const evolution = useMemo(() => evolutionCompte(faits, annee), [faits, annee]);
 
-  const mois = p.mois.map((m) => ({
+  const mois = evolution.map((m) => ({
     mois: m.mois,
     libelle: MOIS_COURTS[Number(m.mois.slice(5, 7)) - 1] ?? m.mois,
-    entrees: m.encaissements,
-    // Charges ET dépenses : ce sont les deux sorties que la projection connaît.
-    // Les séparer ferait trois séries pour une question qui en a deux.
-    sorties: m.charges + m.depenses,
-    niveau: m.sansVersement
+    entrees: m.entrees,
+    sorties: m.sorties,
+    niveau: m.niveau,
+    estProjete: m.estProjete
   }));
-  const dernier = p.mois[p.mois.length - 1];
+
+  // −1 sur une année qui n'est pas l'année en cours : il n'y a alors aucun
+  // mois « courant » à distinguer des autres dans CETTE carte.
+  const moisCourantIndex = mois.findIndex((m) => m.mois === moisCourant());
+  const dernier = mois[mois.length - 1];
+  const aUneProjection = dernier?.estProjete === true;
 
   return (
     <section className={styles.carte} aria-labelledby="evolution">
       <h2 id="evolution" className={styles.titreCarte}>
-        Évolution du compte — entrées, sorties &amp; disponible
-        <Info libelle="Pourquoi le disponible et non le solde">
-          Projeter le <em>solde</em> obligerait à deviner quand chaque dette
-          sortira du compte — et la moitié d’entre elles n’a pas encore de date,
-          puisque l’URSSAF n’a pas appelé les charges des recettes déjà
-          encaissées. Une courbe de solde monte donc joliment jusqu’au trimestre
-          où elle s’effondre. Le <strong>disponible</strong>, lui, a déjà tout
-          retiré&nbsp;: un encaissement ne lui ajoute que sa part nette, et payer
-          une échéance ne le fait pas bouger.
+        Évolution du compte — entrées, sorties &amp; solde
+        <Info libelle="Le passé est un fait, l’avenir une hypothèse">
+          Un mois déjà clos a un solde exact&nbsp;: le dossier connaît tout ce
+          qui est entré ou sorti jusqu’à sa fin, rien n’y est deviné. La courbe
+          le trace donc en plein, sans détour par le disponible.
+          <br /><br />
+          Un mois à venir n’a pas ce luxe&nbsp;: la moitié de ce qui est dû —
+          les charges sur des recettes déjà encaissées mais pas encore
+          déclarées — n’a pas de date. Tracer un solde qui les ignorerait
+          monterait joliment jusqu’au trimestre où il s’effondrerait. Ces
+          mois-là tracent donc le <strong>disponible</strong>, qui a déjà tout
+          retiré ce qui est dû, daté ou non&nbsp;: une hypothèse plus basse,
+          mais sûre — en pointillés, pour ne jamais se confondre avec un fait.
         </Info>
       </h2>
 
       {dernier !== undefined && (
         <p className={styles.reponse}>
-          Disponible aujourd’hui <strong><Montant>{eur(p.depart)}</Montant></strong>
-          {' → '}projeté dans douze mois{' '}
-          <strong><Montant>{eur(dernier.sansVersement)}</Montant></strong>, sans
-          rien te verser.
+          {aUneProjection ? (
+            /* `solde(faits)` et non `dernier.niveau` d'un mois clos : sur
+               une année en cours, le point de départ de la phrase doit être
+               le fait d'AUJOURD'HUI, indépendant de l'année regardée — comme
+               la tuile (voir l'en-tête de fonction). */
+            <>
+              Solde aujourd’hui <strong><Montant>{eur(solde(faits))}</Montant></strong>
+              {' → '}projeté fin décembre {annee}{' '}
+              <strong><Montant>{eur(dernier.niveau)}</Montant></strong>
+            </>
+          ) : (
+            <>Solde à fin décembre {annee} <strong><Montant>{eur(dernier.niveau)}</Montant></strong></>
+          )}
         </p>
       )}
 
       <GrapheEvolution
         mois={mois}
         seuil={faits.reserve > 0 ? faits.reserve : null}
-        libelleNiveau="disponible"
+        libelleNiveau="solde"
+        libelleNiveauProjete="disponible (hypothèse)"
         formater={(v) => eur(euros(Math.round(v)))}
         formaterCourt={enKiloEuros}
-        indexCourant={0}
+        indexCourant={moisCourantIndex}
       />
     </section>
   );
@@ -370,7 +411,10 @@ function EvolutionDuCompte() {
  * qu'on continue pourtant à devoir.
  */
 function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
-  const echeances = useFaits((e) => e.faits.echeances);
+  const faits = useFaits((e) => e.faits);
+  const echeances = faits.echeances;
+  /** La nature dont on regarde le détail, ou `null` quand aucune. */
+  const [ouverte, setOuverte] = useState<NatureDette | null>(null);
   const toutes = enveloppesDeProvision(
     etat.tresorerie.solde, etat.provisionsParNature, echeances
   );
@@ -410,20 +454,55 @@ function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
   const seuilCouvert = euros(Math.min(etat.tresorerie.reserve, Math.max(0, etat.tresorerie.dispo)));
 
   return (
-    <ul className={styles.enveloppes}>
-      {dettes.map((e) => <VignetteDette key={e.nature} e={e} />)}
-      <VignetteTva e={tva} />
-      {seuilDu > 0 && <VignetteReserve du={seuilDu} couvert={seuilCouvert} />}
-    </ul>
+    <>
+      <ul className={styles.enveloppes}>
+        {dettes.map((e) => (
+          <VignetteDette key={e.nature} e={e} onOuvrir={() => setOuverte(e.nature)} />
+        ))}
+        <VignetteTva e={tva} onOuvrir={() => setOuverte('tva')} />
+        {/* Le seuil de sécurité n'est pas une dette : il n'a ni mois, ni
+            échéance, ni geste pour le régulariser. Il ne s'ouvre donc pas. */}
+        {seuilDu > 0 && <VignetteReserve du={seuilDu} couvert={seuilCouvert} />}
+      </ul>
+
+      <Sheet
+        ouvert={ouverte !== null}
+        titre={ouverte === null ? '' : `${LIBELLE_NATURE[ouverte]} — le détail`}
+        onFermer={() => setOuverte(null)}
+      >
+        {ouverte !== null && (
+          <PanneauDetailDette detail={detailDeLaDette(faits, ouverte)} />
+        )}
+      </Sheet>
+    </>
   );
 }
 
 /** Une nature de dette : ce qui est mis de côté, face à ce qui est dû. */
-function VignetteDette({ e }: { readonly e: EnveloppeProvision }) {
+function VignetteDette(
+  { e, onOuvrir }: {
+    readonly e: EnveloppeProvision;
+    readonly onOuvrir?: (() => void) | undefined;
+  }
+) {
   const part = e.du <= 0 ? 1 : Math.min(1, e.couvert / e.du);
   const complet = e.couvert >= e.du;
-  return (
-    <li className={styles.enveloppe}>
+
+  /*
+   * LA VIGNETTE DEVIENT UNE PORTE.
+   *
+   * Elle disait trois nombres — couvert, dû, échéance — et répondait à « est-ce
+   * que le 5 juillet va passer ». Elle ne répondait pas à « d'où sort ce
+   * montant » ni à « qu'est-ce que j'ai à faire », et un total ne se vérifie
+   * ni ne s'agit.
+   *
+   * Un BOUTON et non un `<li>` cliquable : c'est une action, elle doit
+   * s'atteindre au clavier et s'annoncer comme telle. Sans `onOuvrir` — dans
+   * un test monté sans panneau — elle redevient une simple donnée à lire
+   * plutôt qu'un bouton qui ne ferait rien.
+   */
+  const contenu = (
+    <>
       <span className={styles.enveloppeTitre}>
         <span className={`${styles.puce} ${styles[e.nature]}`} aria-hidden="true" />
         {LIBELLE_NATURE[e.nature]}
@@ -453,6 +532,23 @@ function VignetteDette({ e }: { readonly e: EnveloppeProvision }) {
           ? 'pas encore appelée'
           : `éch. ${dateCourte(e.prochaineEcheance)}`}
       </span>
+    </>
+  );
+
+  if (onOuvrir === undefined) {
+    return <li className={styles.enveloppe}>{contenu}</li>;
+  }
+
+  return (
+    <li>
+      <button
+        type="button"
+        className={`${styles.enveloppe} ${styles.enveloppeOuvrable}`}
+        onClick={onOuvrir}
+      >
+        {contenu}
+        <span className={styles.enveloppeIndice} aria-hidden="true">détail ›</span>
+      </button>
     </li>
   );
 }
@@ -466,8 +562,13 @@ function VignetteDette({ e }: { readonly e: EnveloppeProvision }) {
  * d'afficher un chiffre inventé — une tuile qui s'abstient reste conforme à
  * ce que l'application sait ; une tuile qui invente un montant ne l'est pas.
  */
-function VignetteTva({ e }: { readonly e: EnveloppeProvision }) {
-  if (e.du > 0) return <VignetteDette e={e} />;
+function VignetteTva(
+  { e, onOuvrir }: {
+    readonly e: EnveloppeProvision;
+    readonly onOuvrir?: (() => void) | undefined;
+  }
+) {
+  if (e.du > 0) return <VignetteDette e={e} onOuvrir={onOuvrir} />;
 
   return (
     <li className={styles.enveloppe}>

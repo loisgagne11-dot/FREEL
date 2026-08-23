@@ -594,3 +594,31 @@
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+
+/* LA VIGNETTE DEVIENT UNE PORTE, et doit se voir comme telle.
+
+   Un bouton qui ressemble en tout point à la donnée voisine ne s'essaie pas :
+   l'utilisateur a lu trois vignettes sans savoir que la quatrième s'ouvrait.
+   Le chevron l'annonce, la bordure réagit au survol, et le tout garde
+   l'apparence d'une vignette — c'en est toujours une, elle fait juste quelque
+   chose de plus. */
+.enveloppeOuvrable {
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  position: relative;
+}
+
+.enveloppeOuvrable:hover { border-color: var(--green); }
+.enveloppeOuvrable:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.enveloppeIndice {
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted-2);
+}
+
+.enveloppeOuvrable:hover .enveloppeIndice { color: var(--green); }

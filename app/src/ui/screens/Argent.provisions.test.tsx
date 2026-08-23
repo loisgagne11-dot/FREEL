@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import type { Echeance } from '../../domain/calculs/provisions';
 import { type Faits, faitsVides } from '../../state/schema';
@@ -249,5 +250,94 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     await attendreTresorerie();
     expect(screen.queryAllByText(/non provisionné/)).toHaveLength(0);
     expect(screen.queryAllByText(/restant à\s+mettre de côté/)).toHaveLength(0);
+  });
+});
+
+/**
+ * L'ENVELOPPE S'OUVRE SUR SON DÉTAIL, ET SUR LE GESTE QUI L'AVANCE.
+ *
+ * La vignette disait « 5 414 € d'URSSAF ». C'est le bon chiffre, et il ne
+ * permet ni de vérifier ni d'agir : on ne sait pas quel mois n'a pas été
+ * déclaré, ni quel appel attend son règlement, ni pourquoi le total est
+ * celui-là plutôt qu'un autre.
+ */
+describe('le détail d’une enveloppe', () => {
+  const utilisateur = () => userEvent.setup();
+
+  it('ouvre le détail au clic sur la vignette', async () => {
+    semer({ echeances: [ech('e1', 'urssaf', 2000)] });
+    render(<Argent />);
+    await attendreTresorerie();
+
+    await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
+
+    expect(await screen.findByText('Reste à sortir')).toBeTruthy();
+    expect(screen.getByText('Déjà payé')).toBeTruthy();
+  });
+
+  /**
+   * LE GESTE SUIT L'ORIGINE DE LA LIGNE. Une dette estimée avance en déclarant
+   * sa période ; une dette appelée se solde en enregistrant son paiement.
+   * Proposer « enregistrer le paiement » sur une dette que personne n'a
+   * appelée ferait inscrire un règlement sans appel en face.
+   */
+  it('propose de déclarer un mois estimé, et de payer un appel reçu', async () => {
+    semer({
+      echeances: [ech('e1', 'urssaf', 2000)],
+      recettes: [{
+        id: 'r1', clientNom: 'C', libelle: 'F', montant: euros(10_000),
+        emiseLe: dateISO('2026-05-01'), encaisseeLe: dateISO('2026-05-20'),
+        modeReglement: null, numero: '2026-001'
+      }]
+    });
+    render(<Argent />);
+    await attendreTresorerie();
+    await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
+
+    // Restreint au PANNEAU : « Enregistrer le paiement » existe aussi dans
+    // l'échéancier, sur le même écran. Une requête globale trouverait les deux
+    // et ne dirait rien de celui qu'on est venu vérifier.
+    const panneau = within(await screen.findByRole('dialog'));
+    expect(panneau.getByRole('button', { name: 'Marquer déclaré' })).toBeTruthy();
+    expect(panneau.getByRole('button', { name: 'Enregistrer le paiement' })).toBeTruthy();
+  });
+
+  /** Le geste ÉCRIT vraiment : sans cela le panneau ne serait qu'un affichage
+      de plus, et la dette resterait où elle était. */
+  it('déclare la période, et la dette quitte l’estimation', async () => {
+    semer({
+      recettes: [{
+        id: 'r1', clientNom: 'C', libelle: 'F', montant: euros(10_000),
+        emiseLe: dateISO('2026-05-01'), encaisseeLe: dateISO('2026-05-20'),
+        modeReglement: null, numero: '2026-001'
+      }]
+    });
+    render(<Argent />);
+    await attendreTresorerie();
+    await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
+    const panneau = within(await screen.findByRole('dialog'));
+    await utilisateur().click(panneau.getByRole('button', { name: 'Marquer déclaré' }));
+
+    expect(useFaits.getState().faits.periodesDeclarees).toEqual(['2026-05']);
+  });
+
+  /**
+   * ENREGISTRER UN PAIEMENT DEMANDE UNE CONFIRMATION. Déclarer une période se
+   * défait ; un paiement enregistré fait bouger le solde, donc ce qu'on croit
+   * pouvoir se verser. Un clic malencontreux sur une liste qu'on parcourt
+   * coûterait plus cher que le clic de confirmation.
+   */
+  it('ne règle rien avant confirmation', async () => {
+    semer({ echeances: [ech('e1', 'urssaf', 2000)] });
+    render(<Argent />);
+    await attendreTresorerie();
+    await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
+    const panneau = within(await screen.findByRole('dialog'));
+    await utilisateur().click(panneau.getByRole('button', { name: 'Enregistrer le paiement' }));
+
+    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBeNull();
+
+    await utilisateur().click(panneau.getByRole('button', { name: 'Payé aujourd’hui' }));
+    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-07-15');
   });
 });

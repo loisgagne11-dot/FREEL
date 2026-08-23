@@ -23,6 +23,15 @@
   background: var(--green);
 }
 
+/* Le trait de la portion projetée : pointillé, jamais plein — c'est le seul
+   indice visuel qui distingue un fait d'une hypothèse sur la légende. */
+.traitNiveauProjete {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed var(--green);
+}
+
 .pastilleEntrees,
 .pastilleSorties {
   display: inline-block;
@@ -48,7 +57,24 @@
 
 .ligne { fill: none; stroke: var(--green); stroke-width: 2; }
 
+/* La portion à venir : même couleur, mais en pointillés — une hypothèse, pas
+   un fait. `vector-effect="non-scaling-stroke"` (posé dans le composant)
+   garde le motif de pointillés lisible malgré l'étirement horizontal du
+   repère. */
+.ligneProjetee {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  opacity: 0.75;
+}
+
 .point { fill: var(--green); }
+
+/* Le point d'un mois à venir : plus discret que celui d'un fait, comme le
+   trait qui le porte. Une couleur à part ferait une troisième légende ; une
+   simple baisse d'opacité suffit à le distinguer sans en ajouter une. */
+.pointProjete { fill: var(--green); opacity: 0.5; }
 
 /* Les étiquettes de niveau, en HTML par-dessus le SVG — jamais dans son
    `viewBox` : ce repère est étiré en largeur (`preserveAspectRatio="none"`),
@@ -126,6 +152,17 @@
 /* Le mois courant est encadré, pas coloré : les couleurs sont déjà prises par
    les entrées et les sorties. */
 .colonneCourante { border-color: var(--line-2); background: var(--panel-2); }
+
+/* Une colonne à venir est un peu plus discrète que ses voisines closes — la
+   même règle que la courbe : l'hypothèse pèse moins à l'œil que le fait. */
+.colonneProjetee { opacity: 0.72; }
+
+.badgeProjete {
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
 
 /* L'entrée et la sortie prennent la couleur de la barre qu'elles légendent :
    c'est la même association que la légende du graphe, et elle évite d'avoir à

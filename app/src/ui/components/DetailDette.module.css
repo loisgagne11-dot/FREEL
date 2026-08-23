@@ -1,0 +1,204 @@
+/* Le panneau vit dans une feuille latérale : il ne pose ni fond ni cadre. */
+
+.detail { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Les deux totaux ───────────────────────────────────────────────────── */
+
+/* Côte à côte, comme l'ancienne application les montrait : « reste à sortir »
+   et « déjà payé » sont les deux moitiés d'une même question, et les empiler
+   ferait lire la seconde comme un détail de la première. */
+.totaux {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.totalBloc {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+}
+
+.totalBloc dt {
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.totalBloc dd {
+  margin: 4px 0 0;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.resteValeur { color: var(--amber); }
+.payeValeur { color: var(--green); }
+
+/* ── L'abstention ──────────────────────────────────────────────────────── */
+
+.abstention {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-2);
+}
+
+.vide {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted-2);
+}
+
+/* ── Une année ─────────────────────────────────────────────────────────── */
+
+.annee { display: flex; flex-direction: column; gap: 6px; }
+
+.anneeTitre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.anneeReste {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-2);
+}
+
+/* ── Une ligne ─────────────────────────────────────────────────────────── */
+
+.lignes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+
+/* En grille : le libellé prend la place, le montant s'aligne à droite en
+   colonne fixe, et l'action passe dessous sur mobile plutôt que d'écraser le
+   montant — c'est le montant qu'on vient lire. */
+.ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+}
+
+/* Une ligne réglée s'efface : elle est là pour la trace, pas pour l'action. */
+.payee { opacity: 0.62; }
+
+.ligneTexte { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.ligneLibelle {
+  font-size: 12.5px;
+  color: var(--text);
+  /* Le mois vient du domaine en minuscule, comme on l'écrit au milieu d'une
+     phrase. En tête de ligne, la capitale est une mise en forme — elle ne
+     devient jamais une valeur stockée. */
+  text-transform: capitalize;
+}
+
+.ligneMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--muted-2);
+}
+
+.ligneMontant {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Le statut porte SA teinte : trois états qui appellent trois gestes
+   différents se distinguent d'un coup d'œil, sans lire le mot. */
+.statut {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.statut_a_declarer {
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  color: var(--amber);
+}
+
+.statut_a_payer {
+  background: color-mix(in srgb, var(--red, var(--amber)) 16%, transparent);
+  color: var(--red, var(--amber));
+}
+
+.statut_payee {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green);
+}
+
+/* ── Les gestes ────────────────────────────────────────────────────────── */
+
+/* Sur toute la largeur, sous la ligne : une cible de 44 px au doigt sans
+   comprimer le libellé ni le montant. */
+.action,
+.actionPrincipale {
+  grid-column: 1 / -1;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-sm);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action {
+  border: 1px solid var(--line-2);
+  background: transparent;
+  color: var(--muted);
+}
+
+.action:hover { border-color: var(--green); color: var(--text); }
+
+.actionPrincipale {
+  border: 1px solid var(--green);
+  background: var(--green-glow);
+  color: var(--text);
+}
+
+.actionPrincipale:hover { background: color-mix(in srgb, var(--green) 22%, var(--panel)); }
+
+.action:focus-visible,
+.actionPrincipale:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* Les deux boutons de confirmation partagent la ligne : « payé aujourd'hui »
+   d'abord, parce que c'est celui qu'on est venu chercher. */
+.confirmation {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+}
+
+.confirmation > * { flex: 1 1 0; grid-column: auto; }

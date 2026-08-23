@@ -124,7 +124,7 @@ pour laquelle ce document a été ouvert.
 | V4 | Provisions **par catégorie** | ✅ | ✅ | ✅ **ajouté depuis** |
 | V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis** |
 | V6 | Frise de l'échéancier | ✅ | ✅ | ✅ **frise livrée** (lot B) — chaque obligation à sa date réelle sur l'année, repère « auj. ». Elle ne remplace pas la liste, elle la précède&nbsp;: la frise répond à « qu'est-ce qui vient », la liste à « qu'est-ce que j'en fais » |
-| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **graphe combiné** (lot B) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Sur le DISPONIBLE et non le solde, et le titre le dit&nbsp;: projeter le solde obligerait à deviner quand chaque dette sortira du compte |
+| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **graphe combiné, sur le SOLDE réel** (lot B, refait lot L1) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Couvre janvier à décembre de l'année CHOISIE (plus de « douze mois glissants »)&nbsp;: les mois clos tracent le solde réel en trait plein (un fait, dérivé des faits jusqu'à leur fin de mois), les mois à venir le disponible projeté en pointillés, annoncés « prévu » — jamais un solde deviné, pour la raison que l'infobulle détaille |
 | V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
 | V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau |
 | V10 | Cascade CA → charges → net | ✅ (deux fois) | ❌ | 🚫 §5.5 |
@@ -193,6 +193,7 @@ Ne sont listés que les verdicts qui appellent une décision.
 | **Occupation du mois** | ✅ corrigé deux fois, §1.3 — désormais en jauge, avec son dénominateur écrit, et une seule fois par écran |
 | **Répartition du temps par client** | 🟢 **ajouté** (lot C4) — en jours et sur le mois, distinct de la dépendance client. Voir la note du §2 |
 | **CA facturé de l'année** | 🟢 **renommé** (lot J4) — le titre annonçait «&nbsp;CA réalisé&nbsp;» et la note «&nbsp;facturé, cumulé&nbsp;»&nbsp;: la note disait juste, le titre non. Or «&nbsp;réalisé&nbsp;» désigne ailleurs une TOUTE AUTRE mesure — ce que le travail du planning produit, jours retenus × tarif, que l'écran Activité nomme «&nbsp;CA généré&nbsp;». Les deux sont légitimes et ne coïncident jamais, puisqu'on facture après coup. Un utilisateur venu de l'ancienne application, qui appelait «&nbsp;CA réalisé&nbsp;» la seconde, lisait deux nombres très différents sous le même nom — et concluait à raison qu'il ne comprenait pas les données. **Une source unique par notion suppose d'abord un nom par notion** |
+| **Détail d'une dette, mois par mois** | 🟢 **ajouté** (lot L) — la vignette de provision disait trois nombres&nbsp;: couvert, dû, échéance. Elle répondait à «&nbsp;est-ce que le 5 juillet va passer&nbsp;», pas à «&nbsp;d'où sort ce montant&nbsp;» ni à «&nbsp;qu'est-ce que j'ai à faire&nbsp;». Sur un dossier réel, une provision d'URSSAF est la somme de huit mois d'encaissements à des taux qui ont pu changer, plus deux appels dont un est payé — un total ne se vérifie ni ne s'agit. L'enveloppe s'ouvre désormais sur l'année, le mois, la ligne, avec son statut et le geste qui la fait avancer. **Le geste suit l'ORIGINE** : une dette estimée se déclare, une dette appelée se paie ; les confondre ferait inscrire un règlement sans appel en face. Le total du détail retombe sur celui des provisions, tenu par un test — une seconde définition de la même dette finirait par ne pas tomber d'accord avec la première |
 | **Montant d'une facture : HT, TVA, TTC** | 🟢 **corrigé** (lot K) — la liste n'affichait qu'un chiffre, sans dire lequel. C'était le HT, l'assiette du chiffre d'affaires que l'URSSAF réclame&nbsp;: le bon chiffre pour déclarer, pas celui que le client vire ni celui qu'on retrouve sur le relevé. Rapprocher un virement demandait de refaire le calcul de tête, à un taux qu'aucun écran ne rappelait. Le TTC prend la tête sur la liste de suivi des règlements, le HT reste nommé juste dessous. **Zéro et inconnu ne se confondent pas**&nbsp;: une facture en franchise porte «&nbsp;sans TVA&nbsp;» et un seul montant, une facture d'avant le schéma 9 dit «&nbsp;TTC inconnu&nbsp;» plutôt que d'afficher un total inventé |
 | **Écart facturé / planning** | 🟢 **ajouté** (lot I) — le brouillon du mois restait affiché à côté de la facture émise «&nbsp;pour que l'écart se voie&nbsp;». Il se voyait au sens où les deux montants étaient à l'écran, mais il fallait les soustraire de tête&nbsp;: un écart qu'on doit calculer soi-même est un écart qu'on ne remarque pas — et celui-ci se remarque d'ordinaire quand le CLIENT le remarque. Il est désormais chiffré, et son SIGNE porte le conseil, parce que les deux sens n'appellent pas le même geste&nbsp;: facturé en moins, c'est du travail qui se perd à la clôture et il reste une facture complémentaire à émettre ; facturé en plus, c'est un avoir. L'égalité se dit aussi, plutôt que de laisser un blanc que rien ne distingue d'un calcul qui n'a pas tourné |
 | **Journées surengagées** | 🟢 **ajouté** (lot G) — la CAUSE d'une occupation au-dessus de 100 %, dite plutôt que devinée. Le numérateur additionne les journées par CLIENT, le dénominateur compte les jours du CALENDRIER&nbsp;: deux rythmes qui prévoient tous deux le vendredi donnent une journée et demie sur un seul vendredi. Le taux n'est pas faux — il rapporte fidèlement une donnée impossible. On ne le borne donc pas, on nomme la cause et on renvoie au geste qui la corrige |
@@ -359,6 +360,21 @@ de santé (§5.1), l'assiette nommée de l'autonomie.
 
 **Livrés au lot B** : le donut de répartition du solde (V3), la frise de
 l'échéancier (V6), le graphe combiné entrées / sorties / disponible (V7).
+
+**Refait au lot L1** : le graphe combiné (V7) montrait un défaut à trois
+faces, remonté directement par l'utilisateur — peu lisible, indifférent à la
+bascule d'année (toujours douze mois glissants depuis aujourd'hui, même après
+le lot J2), et une courbe de DISPONIBLE assortie d'une phrase « sans rien te
+verser » jugée sans intérêt. Le solde PASSÉ se dérivant désormais des faits
+exactement (`domain/calculs/solde.ts`, `soldeAuDernierJourDe`), l'argument qui
+interdisait de tracer un solde — deviner quand chaque dette sort du compte —
+ne vaut plus que pour l'AVENIR : les mois clos tracent donc le solde réel, les
+mois à venir restent une hypothèse de disponible, visuellement distincte
+(pointillés, mot « prévu ») et non plus muette sur ce qu'elle suppose. Le
+graphe suit `etat.annee`, de janvier à décembre ; sur une année passée, tous
+les mois sont des faits. La tuile « Solde du compte », état instantané, n'en
+dépend toujours pas — voir le test « ne change pas le solde du compte quand on
+change l'année regardée ».
 
 **Livré au lot J2** : le **sélecteur de période** — l'année n'est plus
 verrouillée sur l'horloge. `etatArgent` reçoit désormais l'année comme un
