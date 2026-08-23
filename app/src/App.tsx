@@ -10,8 +10,8 @@ import { useFaits } from './state/store';
  * d'emblée avait fait franchir le budget du code d'entrée pour un contrôle
  * que cinq écrans sur six n'affichent jamais.
  */
-const SelecteurPeriodeArgent = lazy(() => import('./ui/components/SelecteurPeriodeArgent')
-  .then((m) => ({ default: m.SelecteurPeriodeArgent })));
+const SelecteurPeriode = lazy(() => import('./ui/components/SelecteurPeriode')
+  .then((m) => ({ default: m.SelecteurPeriode })));
 
 /**
  * Les écrans sont chargés à la demande.
@@ -57,9 +57,13 @@ function EnChargement() {
  * `never`, donc ajouter un écran à la navigation sans le router ici ne
  * compile pas. Un `return null` final aurait laissé passer un écran blanc.
  *
- * `annee` ne va qu'à Argent, seul écran qui la lit aujourd'hui : la
- * distribuer aux six autres les ferait tous se re-rendre à chaque bascule
- * d'année pour rien.
+ * `annee` va aux CINQ écrans qui ont une période à ancrer. Pilote et Config
+ * ne la reçoivent pas : le premier est le poste de pilotage d'aujourd'hui —
+ * « combien je peux me verser » n'a pas d'année —, le second ne porte que des
+ * réglages. C'est la même liste que `ECRANS_DATES` dans `SelecteurPeriode`,
+ * qui décide d'afficher le contrôle ou non ; les deux doivent rester
+ * d'accord, faute de quoi on afficherait un sélecteur sans effet ou un effet
+ * sans sélecteur.
  *
  * Appelée comme une fonction ordinaire depuis `App` (`Ecran(annee)`), pas
  * comme un élément JSX (`<Ecran annee={annee} />`) : les deux sont
@@ -72,11 +76,11 @@ function Ecran(annee: number) {
   const { ecran } = useRoute();
   switch (ecran.id) {
     case 'pilote': return <Pilote />;
-    case 'activite': return <Activite />;
+    case 'activite': return <Activite annee={annee} />;
     case 'argent': return <Argent annee={annee} />;
-    case 'facture': return <Facture />;
-    case 'achats': return <Achats />;
-    case 'outils': return <Outils />;
+    case 'facture': return <Facture annee={annee} />;
+    case 'achats': return <Achats annee={annee} />;
+    case 'outils': return <Outils annee={annee} />;
     case 'config': return <Config />;
     default: {
       const jamais: never = ecran.id;
@@ -109,7 +113,7 @@ export function App() {
    *
    * Ce que ce composant ignore volontairement : les BORNES de ce nombre.
    * `anneesDisponibles` et le repli quand le choix sort des bornes vivent
-   * dans `SelecteurPeriodeArgent`, chargé à la demande — voir son en-tête.
+   * dans `SelecteurPeriode`, chargé à la demande — voir son en-tête.
    */
   const etatAnnee = useState<number>(() => new Date().getFullYear());
   const [anneeChoisie] = etatAnnee;
@@ -122,8 +126,8 @@ export function App() {
     <FournisseurToasts>
       <Shell
         compteurs={compteurs}
-        // Monté sur les sept écrans : c'est `SelecteurPeriodeArgent` lui-même
-        // qui décide de se taire hors d'Argent (voir son en-tête) — Shell ne
+        // Monté sur les sept écrans : c'est `SelecteurPeriode` lui-même qui
+        // décide de se taire sur Pilote et Config (voir son en-tête) — Shell ne
         // doit pas apprendre le nom d'un écran pour rester ignorante du
         // métier (voir la doc de sa prop `periode`), et `App` n'a donc pas
         // besoin de connaître la route pour ce seul contrôle.
@@ -133,7 +137,7 @@ export function App() {
           // dizaines de millisecondes sur une connexion correcte, plus
           // dérangeant que l'absence du contrôle le temps qu'il arrive.
           <Suspense fallback={null}>
-            <SelecteurPeriodeArgent etat={etatAnnee} />
+            <SelecteurPeriode etat={etatAnnee} />
           </Suspense>
         )}
       >

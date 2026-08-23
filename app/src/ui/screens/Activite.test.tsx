@@ -1132,3 +1132,52 @@ describe('ce qu’une journée rapporte', () => {
     expect(screen.queryByText(/Tarif des contrats/)).toBeNull();
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────
+   O1 — l'année de la barre du haut déplace le mois parcouru
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * CHANGER D'ANNÉE DÉPLACE LE MOIS, IL NE REMONTE PAS LA NAVIGATION À ZÉRO.
+ *
+ * Le mois reste un état d'écran — on le fait défiler avec les flèches, et ce
+ * défilement doit survivre à un aller-retour vers Argent. Mais il doit SUIVRE
+ * l'année, sinon le sélecteur ne fait rien ici : c'est le défaut que ce lot
+ * corrige.
+ */
+describe('l’année choisie déplace le mois parcouru', () => {
+  const periode = () =>
+    screen.getByRole('status', { name: 'Période affichée' }).textContent;
+
+  /** L'écran s'ouvre sur la vue SEMAINE : le mois se lit après la bascule. */
+  const enVueMois = async () => {
+    const utilisateur = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await utilisateur.click(screen.getByRole('button', { name: /Mois/ }));
+    return utilisateur;
+  };
+
+  it('garde le mois et ne change que son millésime', async () => {
+    const rendu = render(<Activite annee={2026} />);
+    await enVueMois();
+    expect(periode()).toBe('juillet 2026');
+
+    // Le mois regardé reste juillet : c'est celui qu'on consultait, dans
+    // l'année qu'on vient de demander. Retomber sur décembre ferait perdre
+    // le point de comparaison qu'on cherchait justement.
+    rendu.rerender(<Activite annee={2025} />);
+    expect(periode()).toBe('juillet 2025');
+  });
+
+  it('n’écrase pas une navigation faite à l’intérieur de l’année', async () => {
+    const rendu = render(<Activite annee={2026} />);
+    const utilisateur = await enVueMois();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Mois précédent' }));
+    expect(periode()).toBe('juin 2026');
+
+    // Un nouveau rendu à la MÊME année ne doit rien réécrire : sans le garde
+    // sur le millésime, l'effet remettrait juillet à chaque passage.
+    rendu.rerender(<Activite annee={2026} />);
+    expect(periode()).toBe('juin 2026');
+  });
+});

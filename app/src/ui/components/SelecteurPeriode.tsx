@@ -2,9 +2,10 @@ import { useEffect, useMemo } from 'react';
 import { useFaits } from '../../state/store';
 import { anneesDisponibles } from '../../state/selecteurs.argent';
 import { useRoute } from '../useRoute';
+import type { IdEcran } from '../navigation';
 import { SelecteurAnnee } from './SelecteurAnnee';
 
-export interface ProprietesSelecteurPeriodeArgent {
+export interface ProprietesSelecteurPeriode {
   /**
    * Le couple `[valeur, setter]` renvoyé par le `useState` de `App.tsx`, tel
    * quel — plutôt que deux props `valeur`/`onChange` séparées, qui coûtaient
@@ -13,6 +14,29 @@ export interface ProprietesSelecteurPeriodeArgent {
    */
   readonly etat: readonly [number, (annee: number) => void];
 }
+
+/**
+ * Les écrans sur lesquels l'année a quelque chose à ancrer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX ÉCRANS N'Y SONT PAS, ET C'EST VOULU
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * **Pilote** est le poste de pilotage d'AUJOURD'HUI : « combien je peux me
+ * verser », « qu'est-ce qui coince ». Aucun de ces chiffres n'a d'année, et
+ * les faire suivre le sélecteur ferait lire « tu peux te verser 3 000 € » sur
+ * 2025 — un montant qu'on ne peut pas se verser, puisque l'année est passée.
+ *
+ * **Config** ne porte que des réglages. Un régime fiscal n'a pas de période
+ * d'affichage.
+ *
+ * Un sélecteur affiché mais sans effet serait pire que les deux : on le
+ * tournerait, rien ne bougerait, et on cesserait de s'en servir sur les cinq
+ * écrans où il marche.
+ */
+const ECRANS_DATES: ReadonlySet<IdEcran> = new Set<IdEcran>([
+  'activite', 'argent', 'facture', 'achats', 'outils'
+]);
 
 /**
  * Le sélecteur d'année de la barre du haut, avec ses bornes et sa condition
@@ -26,7 +50,7 @@ export interface ProprietesSelecteurPeriodeArgent {
  * comme ce module (voir son en-tête). L'appeler depuis `App.tsx` — qui, lui,
  * n'est jamais différé — a été essayé et mesuré : la fonction se serait alors
  * retrouvée dans le paquet que l'utilisateur attend avant de voir quoi que ce
- * soit, pour un contrôle que cinq écrans sur six n'affichent jamais, et a
+ * soit, pour un contrôle que deux écrans sur sept n'affichent jamais, et a
  * fait franchir son budget de 0,4 Ko.
  *
  * `App.tsx` ne garde donc que le NOMBRE choisi (`useState`), qui doit
@@ -39,14 +63,14 @@ export interface ProprietesSelecteurPeriodeArgent {
  * ─────────────────────────────────────────────────────────────────────────
  *
  * `Shell` documente explicitement qu'elle ignore tout du métier — pas même le
- * nom d'un écran. Faire porter la condition « seulement sur Argent » par
- * `App.tsx` aurait donc obligé `App` à lire la route une seconde fois (`Ecran`
- * la lit déjà) pour une question que ce module peut se poser lui-même. Il est
- * monté sur les sept écrans, mais ne rend rien hors d'Argent : le coût, un
- * chargement anticipé de son petit paquet dès l'ouverture — négligeable au
- * regard du budget qu'il évite de faire franchir à l'entrée.
+ * nom d'un écran. Faire porter la condition d'affichage par `App.tsx` aurait
+ * donc obligé `App` à lire la route une seconde fois (`Ecran` la lit déjà)
+ * pour une question que ce module peut se poser lui-même. Il est monté sur les
+ * sept écrans, mais ne rend rien sur Pilote ni Config : le coût, un chargement
+ * anticipé de son petit paquet dès l'ouverture — négligeable au regard du
+ * budget qu'il évite de faire franchir à l'entrée.
  */
-export function SelecteurPeriodeArgent({ etat: [valeur, onChange] }: ProprietesSelecteurPeriodeArgent) {
+export function SelecteurPeriode({ etat: [valeur, onChange] }: ProprietesSelecteurPeriode) {
   const { ecran } = useRoute();
   const faits = useFaits((e) => e.faits);
   const annees = useMemo(() => anneesDisponibles(faits), [faits]);
@@ -61,6 +85,6 @@ export function SelecteurPeriodeArgent({ etat: [valeur, onChange] }: ProprietesS
     if (!annees.includes(valeur)) onChange(new Date().getFullYear());
   }, [annees, valeur, onChange]);
 
-  if (ecran.id !== 'argent') return null;
+  if (!ECRANS_DATES.has(ecran.id)) return null;
   return <SelecteurAnnee annees={annees} valeur={valeur} onChange={onChange} />;
 }

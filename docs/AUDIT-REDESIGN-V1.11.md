@@ -631,3 +631,68 @@ visuel du tout.
 La vue pointe maintenant sur `#/facture`. Son NOM de fichier ne change pas :
 c'est lui qui apparie notre capture à celle du handoff, et les deux montrent
 bien le même écran. Seul l'endroit où on va le chercher a bougé.
+
+## 13. Lot O1 — le sélecteur d'année agit enfin sur tous les écrans
+
+Le sélecteur livré au lot J2 ne s'affichait que sur Argent (`if (ecran.id !==
+'argent') return null`) et n'était passé qu'à lui (`Ecran(annee)`). Remonté
+directement par l'utilisateur : **« faut que le filtre d'année soit actif sur
+tous les onglets, pas sur un seul ».**
+
+### L'année ANCRE la période, elle ne s'y ajoute pas
+
+C'est la décision du lot, et elle évite un défaut que l'empilement aurait créé.
+La barre du haut dit QUELLE ANNÉE, les barres de période des écrans (Mois /
+Trimestre / Année / Tout) disent QUELLE FINESSE. Deux filtres successifs
+donneraient « le mois d'août, dans l'année 2025 » alors que la barre pointe sur
+août 2026 : un ensemble vide présenté comme un résultat.
+
+L'année déplace donc l'ancre à partir de laquelle `periodeCourante` compte son
+décalage (`ancreDeLAnnee`). Une seule source pour l'année, une pour la
+granularité, et toute combinaison des deux désigne un intervalle réel.
+
+- année courante → ancre = aujourd'hui. Ancrer au 31 décembre y ferait ouvrir
+  Facturer sur un mois qui n'est pas encore arrivé, donc vide ;
+- autre année → ancre = **31 décembre**, le dernier mois qui peut porter des
+  faits. Le 1ᵉʳ janvier obligerait à avancer onze fois pour atteindre ce qu'on
+  vient chercher.
+
+Sur **Activité**, le mois reste un état d'écran — il doit survivre à un
+aller-retour vers Argent — mais suit l'année en ne changeant que son millésime :
+mars 2026 devient mars 2025, pas décembre. C'est le mois qu'on regardait, dans
+l'année qu'on vient de demander.
+
+Sur **Outils**, l'année commande le BARÈME : simuler son impôt 2025 au barème
+2026 donnerait un impôt que personne ne paiera.
+
+### Deux écrans ne le reçoivent pas, et c'est voulu
+
+**Pilote** est le poste de pilotage d'AUJOURD'HUI. « Combien je peux me verser »
+n'a pas d'année, et le rendre actif ferait lire « tu peux te verser 3 000 € »
+sur 2025 — un montant qu'on ne peut pas se verser, puisque l'année est passée.
+**Config** ne porte que des réglages.
+
+Le sélecteur y disparaît plutôt que d'y rester inerte : un contrôle affiché sans
+effet se tourne une fois, ne fait rien, et on cesse de s'en servir sur les cinq
+écrans où il marche. `ECRANS_DATES` (dans `SelecteurPeriode`) et le `switch` de
+`Ecran` portent la même liste et doivent rester d'accord — faute de quoi on
+afficherait un sélecteur sans effet, ou un effet sans sélecteur.
+
+### Ce que la capture ne peut pas montrer
+
+`SelecteurAnnee` se masque quand il n'a qu'une année à proposer — « un seul
+choix n'est pas un choix ». Le jeu de démonstration ne porte que 2026 : **aucune
+capture ne montre donc ce contrôle**, ni avant ce lot ni après. La conformité
+est tenue par un test de porte (`SelecteurPeriode.test.tsx`, sept écrans) plutôt
+que par l'image, et c'est un manque du jeu de démonstration à porter au bilan,
+pas une conformité ratée.
+
+### Budget
+
+L'écran Activité, déjà le plus lourd des écrans différés, a franchi son plafond
+de **0,02 Ko** en gagnant l'ancrage. C'est un dépassement ridicule, et c'est
+exactement le moment où la règle vaut : la relever une fois pour vingt octets,
+c'est la relever. Le formulaire « Poser une plage » de congés est parti dans
+`Activite.conges`, chargé à la demande — on pose ses vacances trois ou quatre
+fois par an, on ouvre le plan de charge tous les matins. L'écran retombe à
+**38,76 Ko** pour 40.

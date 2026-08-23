@@ -24,7 +24,7 @@ function EnAttente() {
   return <p className={styles.bandeau} role="status">Un instant…</p>;
 }
 
-export function Facture() {
+export function Facture({ annee }: { readonly annee?: number } = {}) {
   /**
    * La vue vient de l'URL, pas d'un état local.
    *
@@ -69,6 +69,7 @@ export function Facture() {
       <Facturier
         onNouvelle={() => naviguerVers('facture', 'nouvelle')}
         onRevoir={(numero) => naviguerVers('facture', encodeURIComponent(numero))}
+        {...(annee === undefined ? {} : { annee })}
       />
     </>
   );
