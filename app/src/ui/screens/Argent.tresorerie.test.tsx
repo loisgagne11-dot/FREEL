@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Faits, faitsVides } from '../../state/schema';
 import { etatArgent } from '../../state/selecteurs.argent';
@@ -47,6 +48,49 @@ const echeance = (montant: number) => ({
 /* ─────────────────────────────────────────────────────────────────────────
    B1 — les quatre tuiles
    ───────────────────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────────────────
+   J3 — la tuile s'ouvre sur sa composition
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * DEUX TUILES S'OUVRENT, DEUX NON, ET C'EST VOULU.
+ *
+ * Le solde et le disponible ont une formule. « À encaisser » est une liste de
+ * factures, qui se lit au facturier ; l'autonomie est un rapport à un besoin
+ * mensuel que son propre libellé énonce. Les rendre toutes cliquables pour
+ * l'uniformité ferait ouvrir deux panneaux sans rien à montrer — et on
+ * cesserait de cliquer sur les deux autres.
+ */
+describe('la composition d’un chiffre, au clic sur sa tuile', () => {
+  it('ouvre la formule du solde', async () => {
+    const utilisateur = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    poser({ soldeInitial: euros(10_000), soldeInitialAu: dateISO('2025-12-31') });
+
+    await utilisateur.click(screen.getByRole('button', { name: /Solde du compte/ }));
+
+    // Le panneau est différé : il n'existe qu'après résolution de son module.
+    const panneau = await screen.findByRole('dialog');
+    expect(within(panneau).getByText(/solde de départ \+ encaissements/i)).toBeTruthy();
+  });
+
+  it('ouvre la formule du disponible', async () => {
+    const utilisateur = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    poser({ soldeInitial: euros(10_000), soldeInitialAu: dateISO('2025-12-31') });
+
+    await utilisateur.click(screen.getByRole('button', { name: /^Disponible/ }));
+
+    const panneau = await screen.findByRole('dialog');
+    expect(within(panneau).getByText(/solde du compte − à garder de côté/i)).toBeTruthy();
+  });
+
+  it('laisse « À encaisser » et « Autonomie » sans bouton', () => {
+    poser({ soldeInitial: euros(10_000), soldeInitialAu: dateISO('2025-12-31') });
+
+    expect(screen.queryByRole('button', { name: /^À encaisser/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Autonomie/ })).toBeNull();
+  });
+});
 
 describe('les quatre tuiles de trésorerie', () => {
   /**

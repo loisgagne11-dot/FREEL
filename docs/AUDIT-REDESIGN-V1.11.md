@@ -479,3 +479,68 @@ elles-mêmes ne montrent qu'un solde continu sans distinction fait/hypothèse
 conformité ratée : la référence ne distingue pas le passé de l'avenir sur cette
 courbe, et l'écart est documenté dans le composant (`GrapheEvolution.tsx`) et
 dans `AUDIT-GRAPHES-ET-INDICATEURS.md` (V7).
+
+## 10. Lot J3 — la composition d'un chiffre, au clic sur sa tuile
+
+Quatre chiffres commandent toutes les décisions de l'application, et ils
+s'enchaînent : le solde donne le disponible, le disponible donne le versable.
+L'écran n'en montrait que les résultats. Après un import de données réelles,
+l'utilisateur trouvait quatre nombres qu'il ne pouvait recouper ni entre eux ni
+contre sa banque, et concluait qu'il ne comprenait pas les données.
+
+Ce que le lot ajoute, sur le Pilote et sur Argent › Trésorerie :
+
+- **la formule en toutes lettres**, avant tout montant. La colonne de chiffres
+  ne s'interprète pas sans la règle qui la produit ;
+- **les termes**, avec le nombre de faits que chacun recouvre — « 12
+  encaissements » permet de recouper son propre dossier, un montant seul ne se
+  vérifie contre rien ;
+- **ce que le chiffre veut dire**, distinct de la formule : savoir que
+  « disponible = solde − provisions » ne dit pas encore qu'on peut le dépenser ;
+- **ce qu'il tait** : un solde non daté qui ne suit pas les saisies, un impôt
+  sur le revenu non provisionné, un versable ramené à zéro par le seuil.
+
+### Écarts assumés avec la référence
+
+Le handoff ne dessine pas ce panneau. Trois décisions n'ont donc pas d'appui
+dans le dessin, et sont prises ici :
+
+1. **Deux tuiles s'ouvrent, deux non**, sur Trésorerie. « À encaisser » est une
+   liste de factures, qui se lit au facturier ; l'autonomie est un rapport à un
+   besoin mensuel que son propre libellé énonce. Rendre les quatre cliquables
+   pour l'uniformité ferait ouvrir deux panneaux sans rien à montrer — et on
+   cesserait de cliquer sur les deux autres. Même motif pour le seuil de
+   sécurité sur le Pilote : c'est un réglage, pas un résultat.
+2. **Le chiffre principal du Pilote s'ouvre aussi.** C'est celui sur lequel on
+   décide, donc celui qu'on a le plus de raisons de vouloir vérifier avant de
+   virer l'argent.
+3. **Le Pilote garde sa propre tuile**, distincte de `components/Chiffre`. Les
+   deux se ressemblent, mais le dessin met les libellés du Pilote en capitales
+   espacées et ceux d'Argent en casse ordinaire (§7 les y avait fait retirer).
+   Les fondre imposerait une casse aux deux écrans.
+
+### Ce que le contrôle visuel a rattrapé, et que les tests ne voyaient pas
+
+Deux défauts, tous deux invisibles au test et corrigés dans le lot :
+
+- le chevron du chiffre principal, aligné sur la ligne de base d'un nombre de
+  46 px, se posait au pied du montant et se lisait comme une virgule mal
+  placée — « 0 €› ». Centré sur la hauteur du nombre, il redevient une flèche à
+  côté ;
+- le net du relevé, seule part dont le sens n'est pas connu d'avance,
+  s'affichait « + Mouvements du relevé … −3 182 € ». Le lecteur venu vérifier
+  une colonne devait additionner un négatif de tête. C'est désormais
+  l'OPÉRATEUR qui bascule, jamais le montant.
+
+Le script de capture gagne pour cela une vue `pilote-composition` : le panneau
+ne s'ouvre qu'au clic, donc aucune capture d'écran ne le montrait — exactement
+le cas où les tests sont verts et personne n'a regardé.
+
+### Budget
+
+Le panneau et son sélecteur vivent dans leur propre morceau différé (7,2 Ko),
+et le `Sheet` qu'ils tirent reste dans son morceau partagé. Le paquet d'entrée
+passe de 78,13 à 79,34 Ko pour 80 — la marge est mince, et le prochain lot qui
+touche au Pilote devra extraire avant d'ajouter. L'écran différé le plus lourd
+reste inchangé à 39,89 Ko : c'est ce que le report du panneau hors du paquet de
+Trésorerie a préservé.

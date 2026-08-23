@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
 import {
@@ -12,9 +12,22 @@ import { eur, moisLong, moisTexte } from '../format';
 const ATraiter = lazy(() => import('./Pilote.decisions')
   .then((m) => ({ default: m.ATraiter })));
 
+/**
+ * La composition d'un chiffre, au clic sur sa tuile.
+ *
+ * Différée pour la même raison que tout ce qui l'est ici : le Pilote est le
+ * seul écran du paquet d'ENTRÉE, celui que tout le monde télécharge avant de
+ * voir quoi que ce soit. Un panneau qu'on n'ouvre qu'en venant vérifier un
+ * chiffre — et le `Sheet` qu'il emporte, dont le Pilote n'avait aucun usage
+ * jusqu'ici — n'ont rien à y faire.
+ */
+const Composition = lazy(() => import('../components/Composition')
+  .then((m) => ({ default: m.Composition })));
+
 import styles from './Pilote.module.css';
 import { Montant } from '../components/Montant';
 import { Info } from '../components/Info';
+import type { CleComposition } from '../../domain/calculs/composition';
 
 /**
  * Écran Pilote — « combien je peux me verser, et qu'est-ce qui coince ».
@@ -42,6 +55,7 @@ import { Info } from '../components/Info';
 export function Pilote() {
   const faits = useFaits((e) => e.faits);
   const chargement = useFaits((e) => e.chargement);
+  const [compose, setCompose] = useState<CleComposition | null>(null);
 
   const mois = moisCourant();
   // Recalculé à chaque changement de faits, jamais stocké.
@@ -118,7 +132,23 @@ export function Pilote() {
 
       <section className={styles.versable} aria-labelledby="titre-versable">
         <h2 id="titre-versable" className={styles.libelle}>Je peux me verser</h2>
-        <p className={styles.montantPrincipal}><Montant>{eur(etat.tresorerie.versable)}</Montant></p>
+        {/*
+          * LE CHIFFRE PRINCIPAL S'OUVRE COMME LES AUTRES.
+          *
+          * C'est celui sur lequel on décide — et donc celui qu'on a le plus de
+          * raisons de vouloir vérifier avant de virer l'argent. Le laisser seul
+          * non cliquable, alors que les quatre tuiles du dessous s'ouvrent,
+          * aurait fait exactement l'inverse de ce que ce lot cherche.
+          */}
+        <button
+          type="button"
+          className={styles.montantPrincipal}
+          onClick={() => setCompose('versable')}
+        >
+          <Montant>{eur(etat.tresorerie.versable)}</Montant>
+          <span className={styles.horsEcran}> — d’où vient ce chiffre</span>
+          <span className={styles.chevronPrincipal} aria-hidden="true">›</span>
+        </button>
         <p className={styles.sousLigne}>
           Autonomie&nbsp;: {moisTexte(etat.autonomie)}
           {faits.besoinMensuel <= 0 && (
@@ -160,6 +190,7 @@ export function Pilote() {
         <Chiffre
           libelle="Solde"
           valeur={eur(etat.tresorerie.solde)}
+          onOuvrir={() => setCompose('solde')}
           {...(soldeEstSuivi(faits)
             ? {}
             : { precision: 'saisi, aucun relevé importé' })}
@@ -168,12 +199,16 @@ export function Pilote() {
           libelle="À garder de côté"
           valeur={eur(etat.tresorerie.provisions)}
           ton={etat.tresorerie.provisions > 0 ? 'attention' : 'neutre'}
+          onOuvrir={() => setCompose('provisions')}
         />
         <Chiffre
           libelle="Disponible"
           valeur={eur(etat.tresorerie.dispo)}
           ton={etat.tresorerie.dispo < 0 ? 'danger' : 'neutre'}
+          onOuvrir={() => setCompose('disponible')}
         />
+        {/* Le seuil de sécurité ne s'ouvre pas : c'est un réglage, pas un
+            résultat. Il n'a pas de termes — il se change dans Config. */}
         <Chiffre libelle="Seuil de sécurité" valeur={eur(etat.tresorerie.reserve)} />
       </div>
 
@@ -206,6 +241,12 @@ export function Pilote() {
       <Suspense fallback={null}>
         <ATraiter sujets={sujets} />
       </Suspense>
+
+      {compose !== null && (
+        <Suspense fallback={null}>
+          <Composition cle={compose} onFermer={() => setCompose(null)} />
+        </Suspense>
+      )}
 
     </>
   );
@@ -242,8 +283,27 @@ function Bandeau(
   );
 }
 
+/**
+ * La tuile de chiffre du Pilote.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI ELLE N'EST PAS `components/Chiffre`
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les deux se ressemblent à s'y méprendre, et la tentation de les fondre est
+ * revenue à chaque lot. Elles diffèrent sur un point que le dessin tranche :
+ * le Pilote met ses libellés en CAPITALES ESPACÉES, l'écran Argent en casse
+ * ordinaire — et le commentaire de `Chiffre.module.css` dit pourquoi il a
+ * fallu les y retirer. Les fondre imposerait une casse aux deux écrans, ou
+ * ajouterait une variante à un composant partagé pour un seul appelant.
+ *
+ * L'invariant « une source unique par notion » vise les CALCULS : deux
+ * additions du même montant finissent par diverger. Deux mises en forme
+ * distinctes de deux dessins distincts ne divergent pas — elles sont déjà
+ * différentes, et à dessein.
+ */
 function Chiffre(
-  { libelle, valeur, ton = 'neutre', precision }: {
+  { libelle, valeur, ton = 'neutre', precision, onOuvrir }: {
     libelle: string;
     valeur: string;
     ton?: 'neutre' | 'attention' | 'danger';
@@ -256,15 +316,37 @@ function Chiffre(
      * décisions de trésorerie.
      */
     precision?: string;
+    /**
+     * Ce qui s'ouvre au clic : la composition du chiffre.
+     *
+     * Absent sur le seuil de sécurité, qui n'a pas de formule — c'est un
+     * réglage, pas un résultat. Une tuile qui s'ouvrirait sur « seuil de
+     * sécurité = seuil de sécurité » apprendrait à ne plus cliquer sur les
+     * trois autres.
+     */
+    onOuvrir?: () => void;
   }
 ) {
   const classeTon = ton === 'danger' ? styles.danger : ton === 'attention' ? styles.attention : '';
-  return (
-    <div className={styles.chiffre}>
+  const contenu = (
+    <>
       <span className={styles.libelle}>{libelle}</span>
       <span className={`${styles.montant} ${classeTon}`}><Montant>{valeur}</Montant></span>
       {precision !== undefined && <span className={styles.precision}>{precision}</span>}
-    </div>
+    </>
+  );
+
+  if (onOuvrir === undefined) return <div className={styles.chiffre}>{contenu}</div>;
+
+  return (
+    <button type="button" className={`${styles.chiffre} ${styles.cliquable}`} onClick={onOuvrir}>
+      {contenu}
+      {/* Le nom accessible du bouton est son contenu, qui décrit le chiffre et
+          non le geste : entendu au clavier, il ne dit pas ce que la touche
+          Entrée va faire. Le chevron fait le même travail à l'œil. */}
+      <span className={styles.horsEcran}> — d’où vient ce chiffre</span>
+      <span className={styles.chevron} aria-hidden="true">›</span>
+    </button>
   );
 }
 
