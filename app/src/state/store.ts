@@ -20,7 +20,7 @@ import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, type Ratio, euros, ratio } from '../domain/types';
 import {
   CLE_STOCKAGE, PART_GARDEE_MAX, type Client, type Depense, type Entreprise,
-  type Faits, type Mission, type Recette, completerFaits, faitsVides, motifRefusFaits
+  type Faits, type Mission, type Recette, faitsVides, motifRefusFaits
 } from './schema';
 import {
   nomAPropager, peutSupprimerClient, peutSupprimerMission, validerNomClient
@@ -252,8 +252,13 @@ interface MagasinFaits {
    * des champs que ce code ne connaît pas.
    *
    * Rend le motif du refus, ou `null` si l'adoption a eu lieu.
+   *
+   * ASYNCHRONE : la conversion (`completerFaits`) vit dans
+   * `schema.migrations.ts`, chargé à la demande. L'importer statiquement ici
+   * ramènerait tout le module de migrations dans le paquet d'entrée pour une
+   * action que seul l'écran Compte déclenche — voir son en-tête.
    */
-  readonly adopterFaitsDistants: (brut: unknown) => string | null;
+  readonly adopterFaitsDistants: (brut: unknown) => Promise<string | null>;
 
   /* ── Congés ───────────────────────────────────────────────────────────── */
 
@@ -419,6 +424,19 @@ interface MagasinFaits {
    */
   readonly supprimerBrouillon: (id: string) => string | null;
 
+  /**
+   * Rattache une pièce à une recette — ou la détache avec `null`.
+   *
+   * Miroir de `attacherJustificatif`, côté recettes : une facture établie
+   * AILLEURS que dans l'application, ou reprise de l'ancienne version, n'a
+   * aucun autre moyen d'être jointe à son document d'origine. Contrairement à
+   * la dépense, aucune règle fiscale n'en dépend ici — une facture émise par
+   * l'application se reconstruit déjà depuis les faits — mais l'audit
+   * comptable ne reconnaît une pièce que si elle est effectivement conservée,
+   * et cette porte n'existait tout simplement pas avant ce lot.
+   */
+  readonly attacherJustificatifRecette: (id: string, justificatifId: string | null) => void;
+
   /* ── Carnet : clients et missions ─────────────────────────────────────── */
 
   /**
@@ -485,8 +503,10 @@ function appliquerMigration(
       set({ faits: resultat.faits, chargement: { phase: 'pret', migrationEffectuee: false } });
       break;
     case 'reprise-requise':
-      // Ne peut pas arriver : l'appelant l'intercepte avant. Le compilateur
-      // exige néanmoins que le cas soit couvert, et c'est tant mieux.
+    case 'migration-requise':
+      // Ne peut pas arriver : l'appelant intercepte les deux avant. Le
+      // compilateur exige néanmoins que le cas soit couvert, et c'est tant
+      // mieux.
       break;
     case 'echec':
       // On ne repart PAS de zéro : écraser des données qu'on n'a pas su lire
@@ -546,6 +566,37 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
               motif: 'La reprise des données de l\'ancienne version n\'a pas pu être '
                 + 'chargée. Tes anciennes données sont intactes ; réessaie en '
                 + 'rechargeant la page.'
+            }
+          });
+        });
+      return;
+    }
+
+    /**
+     * Même motif que la reprise ci-dessus, pour un compte d'un schéma
+     * antérieur de CETTE application plutôt que de l'ancienne version : les
+     * fonctions de `schema.migrations.ts` ne servent qu'au passage d'un
+     * schéma à l'autre, jamais à un compte déjà courant — la quasi-totalité
+     * des ouvertures. Les embarquer dans le paquet d'entrée les ferait
+     * télécharger par tout le monde pour ne les exécuter presque jamais.
+     *
+     * `migrationEffectuee` reste à `false` : cette bannière-là ne dit
+     * « données reprises de l'ancienne version » que pour la reprise
+     * ci-dessus, jamais pour une simple mise à jour de schéma interne.
+     */
+    if (resultat.statut === 'migration-requise') {
+      void import('./schema.migrations')
+        .then(({ completerFaits }) => {
+          appliquerMigration(set, { statut: 'deja-migre', faits: completerFaits(resultat.brut) });
+        })
+        .catch(() => {
+          stockageActif = null;
+          set({
+            faits: faitsVides(),
+            chargement: {
+              phase: 'sans-persistance',
+              motif: 'Les migrations de schéma n\'ont pas pu être chargées. Tes données '
+                + 'sont intactes ; réessaie en rechargeant la page.'
             }
           });
         });
@@ -898,9 +949,11 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     persister(stockageActif, faits);
   },
 
-  adopterFaitsDistants: (brut) => {
+  adopterFaitsDistants: async (brut) => {
     const motif = motifRefusFaits(brut);
     if (motif !== null) return motif;
+    // Chargé à la demande : voir le commentaire de la déclaration ci-dessus.
+    const { completerFaits } = await import('./schema.migrations');
     const faits = completerFaits(brut);
     set({ faits });
     persister(stockageActif, faits);
@@ -1024,6 +1077,16 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     set({ faits });
     persister(stockageActif, faits);
     return null;
+  },
+
+  attacherJustificatifRecette: (id, justificatifId) => {
+    const actuel = get().faits;
+    const faits: Faits = {
+      ...actuel,
+      recettes: actuel.recettes.map((r) => (r.id === id ? { ...r, justificatifId } : r))
+    };
+    set({ faits });
+    persister(stockageActif, faits);
   },
 
   poserAjustement: (missionId, entiteId, date, pose) => {

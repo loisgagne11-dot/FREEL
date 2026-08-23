@@ -17,7 +17,7 @@
  */
 
 import type { DateISO, Euros, Mois } from '../domain/types';
-import { euros } from '../domain/types';
+import { euros, mois } from '../domain/types';
 import { assujettissementTva, plafondMicro, seuilsTvaPourAnnee } from '../domain/bareme';
 import type { SeuilsTva, StatutAssujettissementTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
@@ -64,6 +64,55 @@ export function facturesSuivies(faits: Faits, maintenant: Date = new Date()) {
   );
 }
 
+/**
+ * Les années que le sélecteur de la barre du haut peut proposer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE BORNE SE LIT DANS LES FAITS, ELLE NE S'INVENTE PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un intervalle fixe — « les dix dernières années », disons — ferait
+ * proposer neuf années vides à un dossier ouvert cette année, et en
+ * cacherait une à un dossier repris avec dix ans d'historique. La borne
+ * basse est donc celle du plus ancien fait daté du dossier ; la borne haute
+ * est l'année courante, sauf si un fait existe déjà l'année suivante — une
+ * mission planifiée en janvier prochain, typiquement, ou une échéance saisie
+ * d'avance.
+ *
+ * L'intervalle est CONTINU entre les deux bornes, même si certaines années
+ * intermédiaires n'ont aucun fait : un dossier de 2023 qui n'a rien saisi en
+ * 2024 doit quand même pouvoir afficher 2024 — à zéro, ce qui est une
+ * réponse, pas une année absente du menu.
+ *
+ * Un dossier vide ne propose que l'année courante : il n'y a rien à
+ * comparer, et un menu à une seule entrée n'en est pas un — voir
+ * `SelecteurAnnee`, qui se masque dans ce cas.
+ *
+ * Vit ici, et non dans `selecteurs.ts` : cette fonction ne sert qu'au
+ * sélecteur de l'écran Argent, chargé à la demande (voir l'en-tête du
+ * fichier). L'ajouter au module toujours chargé aurait fait franchir son
+ * budget pour un contrôle que cinq écrans sur six n'affichent jamais —
+ * constaté en pratique en écrivant ce lot.
+ */
+export function anneesDisponibles(faits: Faits, maintenant: Date = new Date()): readonly number[] {
+  const courante = maintenant.getFullYear();
+  const datees: readonly (DateISO | null)[] = [
+    ...faits.recettes.flatMap((r) => [r.emiseLe, r.encaisseeLe]),
+    ...faits.depenses.map((d) => d.payeeLe),
+    ...faits.echeances.map((e): DateISO => e.echeanceLe),
+    ...faits.missions.flatMap((m) => [m.debut, m.fin])
+  ];
+  const annees = new Set(
+    datees.flatMap((d) => (d === null ? [] : [Number(d.slice(0, 4))]))
+  );
+
+  const plusAncienne = annees.size === 0 ? courante : Math.min(courante, ...annees);
+  const resultat: number[] = [];
+  for (let a = plusAncienne; a <= courante; a++) resultat.push(a);
+  if (annees.has(courante + 1)) resultat.push(courante + 1);
+  return resultat;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────
    Écran Argent
    ───────────────────────────────────────────────────────────────────────── */
@@ -101,6 +150,13 @@ export function chiffreParMois(faits: Faits, annee: number): readonly MoisChiffr
 }
 
 export interface EtatArgent {
+  /**
+   * L'année dont on regarde le chiffre d'affaires, les seuils et les
+   * provisions — un CHOIX de lecture, porté par le sélecteur de la barre du
+   * haut, jamais un fait. `tresorerie` juste en dessous n'en dépend PAS : le
+   * solde du compte a une valeur actuelle, elle ne se recalcule pas parce
+   * qu'on regarde 2024. Voir `etatArgent`.
+   */
   readonly annee: number;
   readonly parMois: readonly MoisChiffre[];
   readonly caEncaisse: Euros;
@@ -175,18 +231,51 @@ export interface EtatSeuils {
   readonly caEncaisse: Euros;
 }
 
+/**
+ * L'état de l'écran Argent, pour l'année choisie et à l'instant présent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX PARAMÈTRES DE TEMPS, ET ILS NE SE CONFONDENT JAMAIS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `maintenant` est un FAIT : l'instant où on regarde l'écran, qui gouverne
+ * tout ce qui est instantané — le solde du compte, le disponible,
+ * l'autonomie. Ces chiffres viennent tous de `pilote.tresorerie`, calculé
+ * ci-dessous sur `maintenant` et sur RIEN d'autre.
+ *
+ * `annee` est un CHOIX : celle que le sélecteur de la barre du haut affiche.
+ * Elle gouverne le chiffre d'affaires, les seuils et les provisions de
+ * l'année — tout ce qui se compte « sur 2025 » plutôt qu'« à cet instant ».
+ *
+ * Par défaut, `annee` vaut l'année de `maintenant` : c'est le mois de
+ * l'ouverture, avant tout choix, et c'est aussi ce qui permet à tous les
+ * appelants antérieurs à ce paramètre — tests compris — de continuer à
+ * fonctionner sans le fournir.
+ *
+ * Le bug corrigé par ce paramètre : au 1ᵉʳ janvier, `annee` valait la
+ * nouvelle année de `maintenant`, `chiffreParMois` ne trouvait plus aucune
+ * recette dedans, et le pilier Performance s'affichait vide — sans qu'aucun
+ * geste ne permette de revoir l'année qui venait de se terminer.
+ */
 export function etatArgent(
   faits: Faits,
   echeances: readonly Echeance[] = faits.echeances,
-  maintenant: Date = new Date()
+  maintenant: Date = new Date(),
+  annee: number = maintenant.getFullYear()
 ): EtatArgent {
-  const annee = maintenant.getFullYear();
   const parMois = chiffreParMois(faits, annee);
   const caRealise = euros(parMois.reduce<number>((s, m) => s + m.realise, 0));
   const caEncaisse = euros(parMois.reduce<number>((s, m) => s + m.encaisse, 0));
+  // `maintenant`, jamais `annee` : c'est le compte en banque à l'instant où on
+  // regarde, quelle que soit l'année parcourue à l'écran. Voir la note
+  // ci-dessus et le test « changer l'année ne change pas le solde ».
   const pilote = etatPilote(faits, echeances, maintenant);
 
-  const m = moisCourant(maintenant);
+  // Un mois quelconque de l'année choisie : `plafondMicro` ne distingue que
+  // des PÉRIODES pluriannuelles (voir sa table), donc n'importe quel mois de
+  // `annee` désigne la même période que n'importe quel autre. Prendre le mois
+  // réel de `maintenant` désignerait la période de 2026 en consultant 2024.
+  const m = mois(`${annee}-01`);
   const type = faits.entreprise.typeActivite;
   const debutActivite = faits.entreprise.debutActivite;
   const encours = encoursDe(facturesSuivies(faits, maintenant));

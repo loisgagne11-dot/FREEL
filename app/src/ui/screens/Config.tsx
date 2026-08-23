@@ -835,9 +835,10 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
                     type="button"
                     className={styles.actionPrincipale}
                     onClick={() => {
-                      const refus = adopter(aRestaurer.brut);
-                      signaler(refus ?? 'Sauvegarde restaurée.');
-                      setARestaurer(null);
+                      void adopter(aRestaurer.brut).then((refus) => {
+                        signaler(refus ?? 'Sauvegarde restaurée.');
+                        setARestaurer(null);
+                      });
                     }}
                   >
                     Remplacer mes données par cette sauvegarde

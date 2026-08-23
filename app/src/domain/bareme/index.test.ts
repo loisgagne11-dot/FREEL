@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { verifierIntegriteBareme } from './integrite';
 import { mois } from '../types';
 import {
   tauxCotisations, tauxAbattement, plafondMicro, seuilsTva,
-  tauxImpotEtContributions, verifierIntegriteBareme
-} from './index';
+  tauxImpotEtContributions, } from './index';
 
 describe('point d\'entrée du barème', () => {
   // Le contrôle global est ce qu'on exécute après avoir ajouté une période :

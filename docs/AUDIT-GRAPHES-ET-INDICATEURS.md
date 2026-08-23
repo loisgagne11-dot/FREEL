@@ -192,6 +192,8 @@ Ne sont listés que les verdicts qui appellent une décision.
 | **CA généré par le mois** | 🟢 **ajouté** (lot C4) — ce que le TRAVAIL du mois produit, et non ce qui est rentré sur le compte. Les deux diffèrent de tout le délai de paiement, et l'infobulle le dit |
 | **Occupation du mois** | ✅ corrigé deux fois, §1.3 — désormais en jauge, avec son dénominateur écrit, et une seule fois par écran |
 | **Répartition du temps par client** | 🟢 **ajouté** (lot C4) — en jours et sur le mois, distinct de la dépendance client. Voir la note du §2 |
+| **CA facturé de l'année** | 🟢 **renommé** (lot J4) — le titre annonçait «&nbsp;CA réalisé&nbsp;» et la note «&nbsp;facturé, cumulé&nbsp;»&nbsp;: la note disait juste, le titre non. Or «&nbsp;réalisé&nbsp;» désigne ailleurs une TOUTE AUTRE mesure — ce que le travail du planning produit, jours retenus × tarif, que l'écran Activité nomme «&nbsp;CA généré&nbsp;». Les deux sont légitimes et ne coïncident jamais, puisqu'on facture après coup. Un utilisateur venu de l'ancienne application, qui appelait «&nbsp;CA réalisé&nbsp;» la seconde, lisait deux nombres très différents sous le même nom — et concluait à raison qu'il ne comprenait pas les données. **Une source unique par notion suppose d'abord un nom par notion** |
+| **Montant d'une facture : HT, TVA, TTC** | 🟢 **corrigé** (lot K) — la liste n'affichait qu'un chiffre, sans dire lequel. C'était le HT, l'assiette du chiffre d'affaires que l'URSSAF réclame&nbsp;: le bon chiffre pour déclarer, pas celui que le client vire ni celui qu'on retrouve sur le relevé. Rapprocher un virement demandait de refaire le calcul de tête, à un taux qu'aucun écran ne rappelait. Le TTC prend la tête sur la liste de suivi des règlements, le HT reste nommé juste dessous. **Zéro et inconnu ne se confondent pas**&nbsp;: une facture en franchise porte «&nbsp;sans TVA&nbsp;» et un seul montant, une facture d'avant le schéma 9 dit «&nbsp;TTC inconnu&nbsp;» plutôt que d'afficher un total inventé |
 | **Écart facturé / planning** | 🟢 **ajouté** (lot I) — le brouillon du mois restait affiché à côté de la facture émise «&nbsp;pour que l'écart se voie&nbsp;». Il se voyait au sens où les deux montants étaient à l'écran, mais il fallait les soustraire de tête&nbsp;: un écart qu'on doit calculer soi-même est un écart qu'on ne remarque pas — et celui-ci se remarque d'ordinaire quand le CLIENT le remarque. Il est désormais chiffré, et son SIGNE porte le conseil, parce que les deux sens n'appellent pas le même geste&nbsp;: facturé en moins, c'est du travail qui se perd à la clôture et il reste une facture complémentaire à émettre ; facturé en plus, c'est un avoir. L'égalité se dit aussi, plutôt que de laisser un blanc que rien ne distingue d'un calcul qui n'a pas tourné |
 | **Journées surengagées** | 🟢 **ajouté** (lot G) — la CAUSE d'une occupation au-dessus de 100 %, dite plutôt que devinée. Le numérateur additionne les journées par CLIENT, le dénominateur compte les jours du CALENDRIER&nbsp;: deux rythmes qui prévoient tous deux le vendredi donnent une journée et demie sur un seul vendredi. Le taux n'est pas faux — il rapporte fidèlement une donnée impossible. On ne le borne donc pas, on nomme la cause et on renvoie au geste qui la corrige |
 | **Jours fériés du mois** | 🟢 **déplacé** (lot G) — il vivait dans la carte « Congés du mois », retirée avec sa seconde grille. Il explique le dénominateur&nbsp;: un férié ne se compte pas à l'œil sur une trame de trente cases |
@@ -347,9 +349,6 @@ ne peut pas le représenter. Le niveau de détail manquant (§4.1) est comblé.
 
 1. **Comparaison N−1** en filigrane du graphe existant — utile la troisième
    année, pas la première
-2. **Sélecteur de période** — l'année est verrouillée sur l'horloge ; au
-   1ᵉʳ janvier le pilier Performance devient vide et l'année précédente est
-   inatteignable
 
 Livrés : la composition d'un mois au clic (§4.6, V2), l'objectif de CA et son
 écart en jours (V17), la capacité de versement enfin affichée (V9), la
@@ -360,6 +359,17 @@ de santé (§5.1), l'assiette nommée de l'autonomie.
 
 **Livrés au lot B** : le donut de répartition du solde (V3), la frise de
 l'échéancier (V6), le graphe combiné entrées / sorties / disponible (V7).
+
+**Livré au lot J2** : le **sélecteur de période** — l'année n'est plus
+verrouillée sur l'horloge. `etatArgent` reçoit désormais l'année comme un
+paramètre distinct de `maintenant` (`app/src/state/selecteurs.argent.ts`),
+choisie par une bascule dans la barre du haut (`SelecteurAnnee`,
+`SelecteurPeriodeArgent`), bornée aux années où le dossier a un fait
+(`anneesDisponibles`) — jamais à un intervalle inventé. Le 1ᵉʳ janvier ne vide
+plus le pilier Performance : l'année précédente reste à un clic. Le solde du
+compte, lui, n'en dépend PAS — c'est un état instantané, pas une période — et
+un test nommé (`selecteurs.test.ts`, « ne change pas le solde du compte quand
+on change l'année regardée ») tient explicitement cette frontière.
 
 **Livrés au lot C** : le plan de charge à deux créneaux par jour (V20), la vue
 semaine (V21), la vue mois (V22), la répartition du temps par client (V23),

@@ -86,6 +86,7 @@ un trou qui ne fait échouer aucun test.
 | `showSendInvoiceModal` — envoi par courriel | ❌ | Aucun envoi. Il faut passer par sa messagerie, avec le PDF imprimé |
 | `attachInvoiceDragHandlers` — réordonner par glisser | 🚫 | L'ordre d'une facture au registre est chronologique, il ne se choisit pas |
 | Avoir / annulation | 🟢 | Écriture inverse datée, les deux lignes restent visibles. L'ancienne supprimait |
+| Rattacher une pièce à une facture existante | 🆕 | **N'existe dans aucune des deux.** Signalé par un utilisateur : « je n'ai aucun moyen de relier une facture déjà existante ». `infra/justificatifs.ts` ne savait joindre un fichier qu'à une DÉPENSE ; une facture de vente établie hors de l'application, ou reprise de l'ancienne version, n'avait aucun moyen d'être jointe à sa recette. Le panneau « Pièce jointe » du Facturier fait le même geste que celui d'Achats — dépôt, remplacement, vérification d'intégrité, détachement — et dit explicitement qu'une facture émise ICI n'en a pas besoin : elle se reconstruit depuis les faits |
 
 ## 2. Missions, planning, CRA
 
@@ -144,7 +145,7 @@ un trou qui ne fait échouer aucun test.
 | Fonction de l'ancienne | Verdict | Détail |
 |---|---|---|
 | Dépenses : ajouter, corriger, supprimer | ✅ | La correction a été câblée le 13/08 — elle **conserve** le justificatif et l'état de rapprochement |
-| Justificatifs | 🟢 | Fichier conservé, empreinte SHA-256, horodatage. L'ancienne n'avait qu'un booléen `piece: true`, classé « sans valeur probante » par l'audit |
+| Justificatifs | 🟢 | Fichier conservé, empreinte SHA-256, horodatage. L'ancienne n'avait qu'un booléen `piece: true`, classé « sans valeur probante » par l'audit. Le rattachement, généralisé à une nature de fait (`dépense` ou `recette`, voir ligne « Rattacher une pièce à une facture existante » en section 1) — et une pièce liée à un fait encore existant, dépense ou recette, ne se supprime pas |
 | `parseCSV`, `parseBankFile` | ✅ | Import CSV qui **dit ce qu'il a compris** : séparateur, colonnes, format de date, lignes écartées et pourquoi |
 | `parseOFX` | ❌ | Le format OFX n'est pas lu. Certaines banques n'exportent que celui-là |
 | `reconcileTransactions`, `scoreCandidate` | 🟢 | L'écran **propose**, l'utilisateur tranche. Correspondance au centime — une tolérance masquerait un écart de règlement |

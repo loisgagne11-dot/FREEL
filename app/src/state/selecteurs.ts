@@ -61,6 +61,7 @@ export function moisCourant(maintenant: Date = new Date()): Mois {
   return `${maintenant.getFullYear()}-${mm}` as Mois;
 }
 
+
 /** Le régime d'imposition, tel qu'il découle des faits (discriminant D2). */
 export function regimeDe(faits: Faits, acomptePasSaisi: Euros = euros(0)): RegimeImposition {
   return faits.entreprise.versementLiberatoire

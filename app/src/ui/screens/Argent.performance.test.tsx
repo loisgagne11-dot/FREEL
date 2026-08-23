@@ -82,11 +82,18 @@ describe('les tuiles de performance', () => {
    * « 10 000 € » et « 4 000 € » côte à côte ne disent pas lequel est facturé et
    * lequel est encaissé. Sans les notes, la tuile la plus flatteuse est celle
    * qu'on retient — et c'est le facturé, celui sur lequel rien ne se décide.
+   *
+   * Le TITRE aussi doit le dire, et pas seulement la note : il annonçait
+   * « CA réalisé », un mot qui désigne ailleurs ce que le travail du planning
+   * produit. Deux nombres très différents sous le même nom, et l'utilisateur
+   * concluait — à raison — qu'il ne comprenait pas les données.
    */
   it('dit sous chaque montant de quel chiffre d’affaires il s’agit', () => {
     poser({ recettes: [recette({ montant: euros(10_000) })] });
 
-    expect(screen.getByText('facturé, cumulé')).toBeTruthy();
+    // Le titre de la tuile porte l'année ; celui du graphe ne l'a pas.
+    expect(screen.getByText('CA facturé · 2026')).toBeTruthy();
+    expect(screen.getByText('émis, encaissé ou non')).toBeTruthy();
     expect(screen.getByText('reçu sur le compte')).toBeTruthy();
   });
 
@@ -151,6 +158,24 @@ describe('le graphe du chiffre d’affaires', () => {
     expect(screen.getByRole('button', { name: /^JUIN/ })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^JUIL/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^DÉC/ })).toBeNull();
+  });
+
+  /**
+   * UNE ANNÉE PASSÉE N'A PAS DE « MOIS PAS ENCORE ATTEINT ».
+   *
+   * La troncature au mois courant n'a de sens que pour l'année réellement en
+   * cours (2026 dans ces tests, l'horloge est figée au 10 juin). En
+   * choisissant 2025 au sélecteur, un dossier repris avec deux ans
+   * d'historique doit voir SES douze mois — sans ça, décembre 2025 resterait
+   * invisible pour la seule raison qu'on est en juin d'une AUTRE année.
+   */
+  it('trace les douze mois d’une année passée choisie au sélecteur', () => {
+    const faits = { ...faitsVides(), recettes: [recette({ emiseLe: dateISO('2025-11-05') })] };
+    useFaits.setState({ faits });
+    render(<Performance etat={etatArgent(faits, undefined, undefined, 2025)} />);
+
+    expect(screen.getByRole('button', { name: /^JUIN/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^DÉC/ })).toBeTruthy();
   });
 
   /**

@@ -77,6 +77,75 @@ export interface RecetteSuivie {
    * C'est elle qui fait foi. Voir `suivre`.
    */
   readonly echeanceLe?: DateISO | null;
+  /**
+   * TVA portée par le document. `undefined` avant le schéma 9.
+   *
+   * Voir `montantsDeLaFacture` : `null` et `0` ne veulent pas dire la même
+   * chose, et les confondre est précisément ce qu'on ne veut pas faire.
+   */
+  readonly tvaCollectee?: Euros | null;
+}
+
+/**
+ * Les trois montants d'une facture, tels qu'ils se lisent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI LES TROIS, ET POURQUOI ENSEMBLE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Les écrans n'affichaient qu'un montant, sans dire lequel. C'était le HT —
+ * l'assiette du chiffre d'affaires en micro, celle que l'URSSAF réclame — et
+ * c'est le bon chiffre pour les déclarations. Mais ce n'est pas celui que le
+ * client vire, ni celui qu'on retrouve sur le relevé bancaire : ceux-là sont
+ * en TTC. Rapprocher un virement d'une facture demandait donc de refaire le
+ * calcul de tête, à un taux qu'aucun écran ne rappelait.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * « PAS DE TVA » ET « TVA INCONNUE » NE SE CONFONDENT PAS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `tvaCollectee` vaut `null` dans deux situations que le dossier de
+ * déclaration distingue déjà, et que l'affichage doit distinguer aussi :
+ *
+ *   - une facture émise EN FRANCHISE ne porte pas de TVA. C'est zéro, et
+ *     c'est juste : le TTC vaut le HT.
+ *   - une facture d'avant le schéma 9 en portait peut-être une, et on ne la
+ *     connaît pas. Là, le TTC est INCONNU.
+ *
+ * Afficher « TTC = HT » dans le second cas serait un chiffre inventé, et
+ * d'autant plus crédible qu'il est rond. On s'abstient et on le dit — c'est
+ * la même règle que partout ailleurs ici.
+ */
+export interface MontantsFacture {
+  /** L'assiette du chiffre d'affaires. Toujours connue. */
+  readonly ht: Euros;
+  /** `null` quand la TVA du document n'est pas connue. */
+  readonly tva: Euros | null;
+  /** `null` quand la TVA n'est pas connue, donc le total non plus. */
+  readonly ttc: Euros | null;
+  /** Vrai quand le document ne porte pas de TVA : le TTC vaut le HT. */
+  readonly sansTva: boolean;
+}
+
+export function montantsDeLaFacture(r: {
+  readonly montant: Euros;
+  readonly tvaCollectee?: Euros | null;
+}): MontantsFacture {
+  // `undefined` comme `null` : la recette est d'avant le schéma 9, ou la TVA
+  // n'a jamais été renseignée. Dans les deux cas on ne la connaît pas.
+  const tva = r.tvaCollectee ?? null;
+  if (tva === null) {
+    return { ht: r.montant, tva: null, ttc: null, sansTva: false };
+  }
+  return {
+    ht: r.montant,
+    tva,
+    ttc: euros(r.montant + tva),
+    // Zéro EST une réponse : franchise en base, ou autoliquidation chez un
+    // client étranger. L'écran dit « sans TVA » plutôt que « TVA 0 € », qui
+    // laisserait croire qu'un taux a été appliqué et qu'il tombe à rien.
+    sansTva: tva === 0
+  };
 }
 
 export interface FactureSuivie<R extends RecetteSuivie = RecetteSuivie> {

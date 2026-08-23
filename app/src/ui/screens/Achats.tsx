@@ -427,7 +427,7 @@ function DetailDepense(
       const resultat = await deposerJustificatif(
         stockage,
         { nom: fichier.name, typeMime: fichier.type, contenu: fichier },
-        depense.id
+        { nature: 'depense', id: depense.id }
       );
       if (resultat.statut === 'refuse') {
         setRetour({ ton: 'echec', texte: resultat.motif });

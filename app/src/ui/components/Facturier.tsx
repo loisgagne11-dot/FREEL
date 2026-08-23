@@ -3,8 +3,10 @@ import { useFaits } from '../../state/store';
 import { brouillonsDeFacture, etatFacturier } from '../../state/selecteurs.facture';
 import type { EcartDeFacturation } from '../../domain/calculs/brouillon';
 import { euros } from '../../domain/types';
+import type { Euros } from '../../domain/types';
 import {
-  LIBELLE_STATUT, type FactureSuivie, type StatutFacture
+  LIBELLE_STATUT, montantsDeLaFacture,
+  type FactureSuivie, type RecetteSuivie, type StatutFacture
 } from '../../domain/calculs/facturier';
 import type { ModeReglement } from '../../domain/calculs/livreRecettes';
 import {
@@ -13,6 +15,10 @@ import {
 import type { Mois } from '../../domain/types';
 import { dateISO } from '../../domain/types';
 import type { Recette } from '../../state/schema';
+import {
+  type MetaJustificatif, type StockageJustificatifs,
+  deposerJustificatif, stockageIndexedDB, verifierIntegrite
+} from '../../infra/justificatifs';
 import { BarrePeriode } from './BarrePeriode';
 import { Info } from './Info';
 import { Montant } from './Montant';
@@ -59,6 +65,17 @@ import styles from './Facturier.module.css';
  *
  * D'où le panneau plutôt qu'une case à cocher : il n'y a pas de geste en un
  * clic qui produise une écriture conforme.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE FACTURE PEUT AVOIR UNE PIÈCE, SANS QUE CE SOIT UNE OBLIGATION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `infra/justificatifs.ts` ne savait rattacher une pièce qu'à une DÉPENSE :
+ * une facture de vente établie hors de l'application, ou reprise de
+ * l'ancienne version, n'avait strictement aucun moyen d'être jointe à sa
+ * recette. Une facture émise ICI n'en a pas besoin — elle se reconstruit
+ * depuis les faits — d'où le panneau « Pièce jointe », séparé du reste et dit
+ * comme facultatif, plutôt qu'une mention qui laisserait croire au contraire.
  */
 
 const TONS: Readonly<Record<StatutFacture, TonStatut>> = {
@@ -109,13 +126,31 @@ const FILTRES: readonly { readonly id: StatutFacture | 'tout'; readonly libelle:
   { id: 'brouillon', libelle: 'Brouillons' }
 ];
 
-export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
+const stockageParDefaut = stockageIndexedDB();
+
+export function Facturier(
+  { onNouvelle, onRevoir, stockage = stockageParDefaut }: {
+    readonly onNouvelle: () => void;
+    /**
+     * Rouvre une facture déjà émise, par son numéro.
+     *
+     * Optionnel : le facturier se monte aussi dans des tests qui ne veulent
+     * pas de navigation. Sans lui, le bouton ne s'affiche pas — plutôt qu'un
+     * bouton présent qui ne ferait rien, ce qui apprend à ne plus le
+     * regarder.
+     */
+    readonly onRevoir?: (numero: string) => void;
+    /** Le stockage des pièces. Injectable pour les tests, comme dans Achats. */
+    readonly stockage?: StockageJustificatifs;
+  }
+) {
   const faits = useFaits((e) => e.faits);
   const encaisserRecette = useFaits((e) => e.encaisserRecette);
   const annulerRecette = useFaits((e) => e.annulerRecette);
   const supprimerBrouillon = useFaits((e) => e.supprimerBrouillon);
   const consignerRelance = useFaits((e) => e.consignerRelance);
   const marquerEnvoyee = useFaits((e) => e.marquerEnvoyee);
+  const attacherJustificatifRecette = useFaits((e) => e.attacherJustificatifRecette);
   const signaler = useToast();
 
   const [granularite, setGranularite] = useState<Granularite>('tout');
@@ -123,6 +158,7 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
   const [filtre, setFiltre] = useState<StatutFacture | 'tout'>('tout');
   const [aEncaisser, setAEncaisser] = useState<FactureSuivie<Recette> | null>(null);
   const [aRelancer, setARelancer] = useState<FactureSuivie<Recette> | null>(null);
+  const [aJustifier, setAJustifier] = useState<FactureSuivie<Recette> | null>(null);
   const [limite, setLimite] = useState(LIGNES_PAR_PAGE);
   const [refus, setRefus] = useState<string | null>(null);
 
@@ -251,6 +287,10 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
                   onJeter={() => jeter(f)}
                   onRelancer={() => setARelancer(f)}
                   onEnvoyer={() => envoyer(f)}
+                  onRevoir={onRevoir === undefined || f.recette.numero === ''
+                    ? undefined
+                    : () => onRevoir(f.recette.numero)}
+                  onJustifier={() => setAJustifier(f)}
                 />
               ))}
             </ul>
@@ -299,18 +339,36 @@ export function Facturier({ onNouvelle }: { readonly onNouvelle: () => void }) {
           />
         )}
       </Sheet>
+
+      <Sheet
+        ouvert={aJustifier !== null}
+        titre="Pièce jointe"
+        onFermer={() => setAJustifier(null)}
+      >
+        {aJustifier !== null && (
+          <PanneauJustificatif
+            facture={aJustifier}
+            stockage={stockage}
+            onAttacher={(idJustificatif) =>
+              attacherJustificatifRecette(aJustifier.recette.id, idJustificatif)}
+          />
+        )}
+      </Sheet>
     </>
   );
 }
 
 function Ligne(
-  { facture, onEncaisser, onAnnuler, onJeter, onRelancer, onEnvoyer }: {
+  { facture, onEncaisser, onAnnuler, onJeter, onRelancer, onEnvoyer, onJustifier, onRevoir }: {
     readonly facture: FactureSuivie<Recette>;
     readonly onEncaisser: () => void;
     readonly onAnnuler: () => void;
     readonly onJeter: () => void;
     readonly onRelancer: () => void;
     readonly onEnvoyer: () => void;
+    /** `undefined` quand le facturier est monté sans navigation. */
+    readonly onRevoir?: (() => void) | undefined;
+    readonly onJustifier: () => void;
   }
 ) {
   const { recette: r, statut, echeanceLe, joursDeRetard } = facture;
@@ -321,7 +379,7 @@ function Ligne(
         <span className={styles.ligneLibelle}>
           {r.libelle || 'Sans désignation'}
         </span>
-        <span className={styles.ligneMontant}><Montant>{eur(r.montant)}</Montant></span>
+        <MontantsDeLigne recette={r} />
       </span>
 
       <span className={styles.ligneMeta}>
@@ -368,6 +426,17 @@ function Ligne(
       </span>
 
       <span className={styles.ligneActions}>
+        {/* LE CHEMIN DE RETOUR, QUI N'EXISTAIT PAS.
+            Le document n'existait qu'à l'instant de l'émission : passé cet
+            instant, plus moyen de le revoir ni de le renvoyer à un client qui
+            dit ne pas l'avoir reçu — la réponse la plus courante à une
+            relance. Un brouillon n'a rien à rouvrir : il n'a pas encore de
+            document. */}
+        {onRevoir !== undefined && statut !== 'brouillon' && (
+          <button type="button" className={styles.actionLigne} onClick={onRevoir}>
+            Revoir la facture
+          </button>
+        )}
         {/* Le geste manquant : une facture pouvait être émise et réglée, mais
             jamais « partie ». On relançait donc des clients qui n'avaient rien
             reçu, et on ne savait pas répondre à « je ne l'ai jamais reçue ». */}
@@ -403,6 +472,12 @@ function Ligne(
             Supprimer le brouillon
           </button>
         )}
+        {/* Disponible quel que soit le statut : une facture reprise de
+            l'ancienne version ou établie hors de l'application peut arriver
+            dans n'importe quel état, brouillon compris. */}
+        <button type="button" className={styles.actionSecondaire} onClick={onJustifier}>
+          {r.justificatifId != null ? 'Pièce jointe' : 'Joindre une pièce'}
+        </button>
       </span>
     </li>
   );
@@ -424,7 +499,7 @@ function PanneauEncaissement(
       <p className={styles.rappel}>
         {facture.recette.numero || 'Sans numéro'} — {facture.recette.clientNom || 'client non renseigné'}
         <strong className={styles.rappelMontant}>
-          <Montant>{eur(facture.recette.montant)}</Montant>
+          <MontantsEnClair recette={facture.recette} />
         </strong>
       </p>
 
@@ -475,6 +550,155 @@ function PanneauEncaissement(
       </button>
     </div>
   );
+}
+
+/** Ce que le dépôt d'une pièce a donné. Affiché tel quel, succès comme refus. */
+type RetourJustificatif = { readonly ton: 'succes' | 'echec'; readonly texte: string } | null;
+
+/**
+ * Le panneau de pièce jointe d'une recette.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * FACULTATIF, ET DIT COMME TEL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Contrairement à Achats, où l'absence de pièce coûte une TVA non
+ * récupérable, aucun calcul de ce panneau ne dépend de la présence d'une
+ * pièce : une facture émise par l'application se reconstruit déjà entière
+ * depuis ses faits. Sans le dire, l'écran laisserait croire à une obligation
+ * qui n'existe pas ici — c'est le cas contraire de celui d'Achats, mais la
+ * même exigence de ne rien laisser deviner.
+ *
+ * Le geste — déposer, remplacer, vérifier l'intégrité, détacher — est
+ * délibérément le même qu'en Achats : c'est la même pièce, au même sens
+ * probant, seule la nature du fait change.
+ */
+function PanneauJustificatif(
+  { facture, stockage, onAttacher }: {
+    readonly facture: FactureSuivie<Recette>;
+    readonly stockage: StockageJustificatifs;
+    readonly onAttacher: (idJustificatif: string | null) => void;
+  }
+) {
+  const { recette } = facture;
+  // `?? null` et non `=== null` : une recette antérieure au schéma 16 ne
+  // porte pas le champ du tout (`undefined`), et le confondre avec « une
+  // pièce existe » afficherait un faux positif sur tout compte repris.
+  const justificatifId = recette.justificatifId ?? null;
+  const [retour, setRetour] = useState<RetourJustificatif>(null);
+  const [enCours, setEnCours] = useState(false);
+  const idChamp = useId();
+
+  async function deposer(fichier: File): Promise<void> {
+    setEnCours(true);
+    setRetour(null);
+    try {
+      const resultat = await deposerJustificatif(
+        stockage,
+        { nom: fichier.name, typeMime: fichier.type, contenu: fichier },
+        { nature: 'recette', id: recette.id }
+      );
+      if (resultat.statut === 'refuse') {
+        setRetour({ ton: 'echec', texte: resultat.motif });
+        return;
+      }
+      onAttacher(resultat.meta.id);
+      setRetour({ ton: 'succes', texte: resumerPieceRecette(resultat.meta) });
+    } catch {
+      // Un stockage indisponible ne doit pas laisser croire que la pièce est
+      // conservée : l'utilisateur doit pouvoir réessayer en connaissance de
+      // cause, pas découvrir l'absence de pièce au moment d'un contrôle.
+      setRetour({
+        ton: 'echec',
+        texte: 'La pièce n’a pas pu être conservée. Rien n’a été enregistré.'
+      });
+    } finally {
+      setEnCours(false);
+    }
+  }
+
+  async function verifier(): Promise<void> {
+    if (justificatifId === null) return;
+    setEnCours(true);
+    try {
+      const verdict = await verifierIntegrite(stockage, justificatifId);
+      setRetour(verdict.intacte
+        ? { ton: 'succes', texte: 'La pièce est intacte depuis son dépôt.' }
+        : { ton: 'echec', texte: verdict.motif ?? 'Vérification impossible.' });
+    } catch {
+      setRetour({ ton: 'echec', texte: 'La pièce n’a pas pu être relue.' });
+    } finally {
+      setEnCours(false);
+    }
+  }
+
+  return (
+    <div className={styles.panneau}>
+      <p className={styles.rappel}>
+        {recette.numero || 'Sans numéro'} — {recette.clientNom || 'client non renseigné'}
+      </p>
+
+      <p className={styles.aide}>
+        Une facture émise dans l’application n’a besoin d’aucune pièce
+        jointe&nbsp;: elle se reconstruit depuis les faits. Cette pièce sert
+        aux factures établies AILLEURS, ou reprises de l’ancienne version — la
+        joindre est ce qui leur donne une valeur probante en contrôle.
+      </p>
+
+      {justificatifId === null
+        ? <p className={styles.verdict}>Aucune pièce conservée.</p>
+        : <p className={styles.verdictAccent}>Une pièce est conservée.</p>}
+
+      <label className={styles.champFichier} htmlFor={`${idChamp}-fichier`}>
+        {justificatifId === null ? 'Déposer une pièce' : 'Remplacer la pièce'}
+      </label>
+      <input
+        id={`${idChamp}-fichier`}
+        type="file"
+        accept="application/pdf,image/jpeg,image/png,image/heic,image/webp"
+        disabled={enCours}
+        onChange={(e) => {
+          const fichier = e.target.files?.[0];
+          if (fichier) void deposer(fichier);
+        }}
+      />
+
+      {justificatifId !== null && (
+        <div className={styles.ligneActions}>
+          <button
+            type="button"
+            className={styles.actionLigne}
+            disabled={enCours}
+            onClick={() => void verifier()}
+          >
+            Vérifier l’intégrité
+          </button>
+          <button
+            type="button"
+            className={styles.actionSecondaire}
+            disabled={enCours}
+            onClick={() => { onAttacher(null); setRetour(null); }}
+          >
+            Détacher
+          </button>
+        </div>
+      )}
+
+      {retour !== null && (
+        <p
+          role="status"
+          className={retour.ton === 'succes' ? styles.verdictAccent : styles.verdictDanger}
+        >
+          {retour.texte}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function resumerPieceRecette(meta: MetaJustificatif): string {
+  const ko = Math.max(1, Math.round(meta.taille / 1024));
+  return `Pièce conservée : ${meta.nomFichier} (${ko} Ko), empreinte ${meta.empreinte.slice(0, 12)}…`;
 }
 
 function Chiffre(
@@ -744,6 +968,85 @@ function BrouillonDuMois() {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Le montant d'une ligne de facture : le TTC en tête, le HT dessous.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LEQUEL DES DEUX EN GROS, ET POURQUOI CELUI-LÀ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La liste n'affichait qu'un chiffre, sans dire lequel : le HT. C'est le bon
+ * pour les déclarations — l'assiette du chiffre d'affaires en micro. Ce n'est
+ * pas celui que le client vire, ni celui qu'on retrouve sur le relevé.
+ *
+ * Sur CETTE liste, on suit des règlements : on y cherche « est-ce que les
+ * 12 000 € du relevé correspondent à cette facture-là ». Le TTC prend donc la
+ * place principale, et le HT reste juste dessous, nommé — la déclaration se
+ * fait ailleurs, où le HT reprend la tête.
+ *
+ * Sans TVA, un seul chiffre : afficher deux fois le même montant sur deux
+ * lignes ferait chercher la différence entre eux.
+ */
+function MontantsDeLigne({ recette }: { readonly recette: RecetteSuivie }) {
+  const m = montantsDeLaFacture(recette);
+
+  if (m.ttc === null) {
+    return (
+      <span className={styles.ligneMontant}>
+        <Montant>{eur(m.ht)}</Montant>
+        {/* La TVA de cette facture n'est pas connue : on ne peut pas en
+            déduire un TTC, et en afficher un serait l'inventer. */}
+        <span className={styles.montantNote}> HT · TTC inconnu</span>
+      </span>
+    );
+  }
+
+  if (m.sansTva) {
+    return (
+      <span className={styles.ligneMontant}>
+        <Montant>{eur(m.ht)}</Montant>
+        <span className={styles.montantNote}> sans TVA</span>
+      </span>
+    );
+  }
+
+  return (
+    <span className={styles.ligneMontant}>
+      <Montant>{eur(m.ttc)}</Montant>
+      <span className={styles.montantNote}> TTC</span>
+      <span className={styles.montantSecondaire}>
+        <Montant>{eur(m.ht)}</Montant> HT
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Les trois montants en une phrase, pour un rappel de facture.
+ *
+ * Au moment d'encaisser, c'est le TTC qu'on lit sur le relevé et qu'on vient
+ * comparer. Le HT l'accompagne parce que c'est lui qui entrera au livre des
+ * recettes : voir les deux ensemble évite de se demander lequel a été
+ * enregistré.
+ */
+function MontantsEnClair({ recette }: { readonly recette: RecetteSuivie }) {
+  const m = montantsDeLaFacture(recette);
+  if (m.ttc === null) {
+    return <><Montant>{eur(m.ht)}</Montant> HT</>;
+  }
+  if (m.sansTva) {
+    return <><Montant>{eur(m.ht)}</Montant> (sans TVA)</>;
+  }
+  return (
+    <>
+      <Montant>{eur(m.ttc)}</Montant> TTC
+      <span className={styles.montantSecondaire}>
+        dont <Montant>{eur(m.tva as Euros)}</Montant> de TVA
+      </span>
+    </>
   );
 }
 

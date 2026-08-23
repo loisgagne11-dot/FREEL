@@ -48,8 +48,8 @@
  */
 
 import {
-  CLE_INSTANTANE_AVANT_MIGRATION, CLE_STOCKAGE,
-  type Faits, completerFaits, faitsVides, motifRefusFaits
+  CLE_INSTANTANE_AVANT_MIGRATION, CLE_STOCKAGE, VERSION_SCHEMA,
+  type Faits, completerFaitsCourants, faitsVides, motifRefusFaits
 } from '../state/schema';
 
 /** Préfixe de l'ancienne application. Ne jamais écrire dessus. */
@@ -125,6 +125,22 @@ export type ResultatMigration =
    * à chaque ouverture.
    */
   | { readonly statut: 'reprise-requise' }
+  /**
+   * Le compte existe déjà, dans CETTE application, mais à un schéma
+   * ANTÉRIEUR à `VERSION_SCHEMA`.
+   *
+   * La conversion — `completerFaits` et les fonctions `…DuSchemaN` qu'elle
+   * enchaîne — vit dans `state/schema.migrations.ts`, chargé à la demande, sur
+   * le même modèle que la reprise de l'ancienne application ci-dessus : ces
+   * fonctions ne servent qu'au passage d'un schéma à l'autre, jamais à un
+   * compte déjà courant, qui est le cas de la grande majorité des ouvertures.
+   * Les embarquer dans le paquet d'entrée les ferait télécharger par tout le
+   * monde pour ne les exécuter presque jamais.
+   *
+   * `brut` porte le bloc déjà validé par `motifRefusFaits` — à charge pour
+   * l'appelant de le convertir une fois le module chargé.
+   */
+  | { readonly statut: 'migration-requise'; readonly brut: unknown }
   | { readonly statut: 'echec'; readonly motif: string };
 
 /**
@@ -162,6 +178,24 @@ export function presenceLegacy(stockage: Stockage): boolean {
  * Ne CONVERTIT pas : quand de l'ancien est présent, cette fonction le constate
  * et rend `reprise-requise`. La conversion vit dans `migration.legacy.ts`, que
  * l'appelant charge alors à la demande.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX CHEMINS POUR UN COMPTE DÉJÀ DE CETTE APPLICATION, ET C'EST NOUVEAU
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un bloc `CLE_STOCKAGE` déjà présent peut porter n'importe quel schéma passé,
+ * pas seulement le courant. La version tranche :
+ *
+ *  - ÉGALE à `VERSION_SCHEMA` : chemin SYNCHRONE. `completerFaitsCourants`
+ *    (`schema.ts`) fusionne les défauts sans charger aucune fonction de
+ *    migration — c'est le cas de la quasi-totalité des ouvertures, et c'est
+ *    lui qui doit rester léger.
+ *  - ANTÉRIEURE : `migration-requise`, avec le bloc brut. La conversion réelle
+ *    (`schema.migrations.ts`) est chargée à la demande par l'appelant, sur le
+ *    modèle de la reprise de l'ancienne application.
+ *
+ * Une version POSTÉRIEURE est déjà écartée à ce stade : `motifRefusFaits` l'a
+ * refusée plus haut, avant même de distinguer les deux chemins.
  */
 export function migrer(stockage: Stockage): ResultatMigration {
   const existant = stockage.getItem(CLE_STOCKAGE);
@@ -173,7 +207,17 @@ export function migrer(stockage: Stockage): ResultatMigration {
       const brut: unknown = JSON.parse(existant);
       const motif = motifRefusFaits(brut);
       if (motif !== null) return { statut: 'echec', motif };
-      return { statut: 'deja-migre', faits: completerFaits(brut) };
+
+      const version = (brut as { readonly version: number }).version;
+      if (version === VERSION_SCHEMA) {
+        return {
+          statut: 'deja-migre',
+          faits: completerFaitsCourants(brut as Record<string, unknown>)
+        };
+      }
+      // `version < VERSION_SCHEMA` forcément : le cas supérieur a été refusé
+      // par `motifRefusFaits` ci-dessus.
+      return { statut: 'migration-requise', brut };
     } catch {
       return {
         statut: 'echec',

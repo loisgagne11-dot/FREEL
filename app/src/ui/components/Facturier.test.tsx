@@ -1,11 +1,12 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
+import { stockageMemoireJustificatifs } from '../../infra/justificatifs';
 import { FournisseurToasts } from './Toasts';
 import { Facturier } from './Facturier';
 
@@ -41,9 +42,14 @@ function semer(recettes: readonly Recette[], reste: Partial<Faits> = {}): void {
   });
 }
 
-const rendre = () => render(
-  <FournisseurToasts><Facturier onNouvelle={() => { /* testé ailleurs */ }} /></FournisseurToasts>
-);
+function rendre(stockage = stockageMemoireJustificatifs()) {
+  const rendu = render(
+    <FournisseurToasts>
+      <Facturier onNouvelle={() => { /* testé ailleurs */ }} stockage={stockage} />
+    </FournisseurToasts>
+  );
+  return { ...rendu, stockage };
+}
 
 /**
  * LE TROU QUE CET ÉCRAN BOUCHE.
@@ -340,6 +346,89 @@ describe('relancer une facture en retard', () => {
 });
 
 /**
+ * LE CHEMIN DE RETOUR VERS UNE FACTURE ÉMISE.
+ *
+ * Le document n'existait qu'à l'instant de l'émission : passé cet instant,
+ * plus moyen de le revoir ni de le renvoyer à un client qui dit ne pas l'avoir
+ * reçu — la réponse la plus courante à une relance.
+ */
+describe('rouvrir une facture émise', () => {
+  it('propose de revoir une facture qui a un numéro', async () => {
+    const revus: string[] = [];
+    semer([recette({ id: 'r1', numero: '2026-014', emiseLe: dateISO('2026-08-01') })]);
+    render(
+      <FournisseurToasts>
+        <Facturier onNouvelle={() => { /* testé ailleurs */ }}
+          onRevoir={(n) => revus.push(n)} />
+      </FournisseurToasts>
+    );
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Revoir la facture' }));
+    expect(revus).toEqual(['2026-014']);
+  });
+
+  /**
+   * Un bouton présent qui ne ferait rien apprend à ne plus le regarder. Sans
+   * navigation fournie, il ne s'affiche pas.
+   */
+  it('n’affiche rien quand le facturier est monté sans navigation', () => {
+    semer([recette({ id: 'r1', numero: '2026-014', emiseLe: dateISO('2026-08-01') })]);
+    rendre();
+    expect(screen.queryByRole('button', { name: 'Revoir la facture' })).toBeNull();
+  });
+});
+
+/**
+ * LE HT N'EST PAS CE QUE LE CLIENT VIRE.
+ *
+ * La liste n'affichait qu'un montant, sans dire lequel : le HT, l'assiette du
+ * chiffre d'affaires que l'URSSAF réclame. Rapprocher un virement d'une
+ * facture demandait donc de refaire le calcul de tête, à un taux qu'aucun
+ * écran ne rappelait.
+ */
+describe('les montants d’une facture', () => {
+  it('montre le TTC et le HT, chacun nommé', () => {
+    semer([recette({
+      id: 'r1', montant: euros(1000), tvaCollectee: euros(200),
+      encaisseeLe: dateISO('2026-08-05')
+    })]);
+    rendre();
+
+    const ligne = screen.getByText('Prestation').closest('li') as HTMLElement;
+    expect(ligne.textContent).toMatch(/1\s?200\s?€\s?TTC/u);
+    expect(ligne.textContent).toMatch(/1\s?000\s?€\s?HT/u);
+  });
+
+  /**
+   * ZÉRO EST UNE RÉPONSE — franchise en base, ou autoliquidation chez un
+   * client étranger. Afficher deux fois le même montant sur deux lignes ferait
+   * chercher la différence entre eux ; « TVA 0 € » laisserait croire qu'un
+   * taux a été appliqué et qu'il tombe à rien.
+   */
+  it('n’affiche qu’un montant sur une facture sans TVA', () => {
+    semer([recette({ id: 'r1', montant: euros(1000), tvaCollectee: euros(0) })]);
+    rendre();
+
+    const ligne = screen.getByText('Prestation').closest('li') as HTMLElement;
+    expect(ligne.textContent).toMatch(/sans TVA/);
+    expect(ligne.textContent).not.toMatch(/TTC/);
+  });
+
+  /**
+   * LE POINT DUR. Une facture d'avant le schéma 9 portait peut-être une TVA,
+   * et on ne la connaît pas. En déduire un TTC serait inventer un chiffre,
+   * d'autant plus crédible qu'il est rond.
+   */
+  it('s’abstient sur le TTC quand la TVA n’est pas connue', () => {
+    semer([recette({ id: 'r1', montant: euros(1000) })]);
+    rendre();
+
+    const ligne = screen.getByText('Prestation').closest('li') as HTMLElement;
+    expect(ligne.textContent).toMatch(/TTC inconnu/);
+  });
+});
+
+/**
  * LA FACTURE DU MOIS QU'ON N'A PAS DEMANDÉE.
  *
  * « Créée en brouillon et mise à jour en fonction de mes modifications
@@ -546,5 +635,58 @@ describe('cycle de vie : envoyée, avec sa date', () => {
     ]);
     rendre();
     expect(screen.getByText('3 000 €')).toBeTruthy();
+  });
+});
+
+/**
+ * LE MANQUE QUE CE LOT COMBLE.
+ *
+ * `infra/justificatifs.ts` ne savait rattacher une pièce qu'à une dépense :
+ * une facture de vente établie hors de l'application — ou reprise de
+ * l'ancienne version — n'avait aucun moyen d'être jointe à sa recette. Ces
+ * tests couvrent le même geste que ceux d'Achats (`Achats.test.tsx`), côté
+ * recettes.
+ */
+describe('pièce jointe d’une recette', () => {
+  it('rattache une pièce à une recette', async () => {
+    semer([recette({ id: 'r1' })]);
+    const { stockage } = rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Joindre une pièce' }));
+    const champ = await screen.findByLabelText(/Déposer une pièce/i);
+    await utilisateur.upload(
+      champ,
+      new File(['facture de vente'], 'facture-vente.pdf', { type: 'application/pdf' })
+    );
+
+    // La pièce est réellement conservée, pas seulement annoncée.
+    await waitFor(() => expect(stockage.contenu.size).toBe(1));
+    const recetteFinale = useFaits.getState().faits.recettes[0];
+    expect(recetteFinale?.justificatifId).not.toBeNull();
+    const [piece] = [...stockage.contenu.values()];
+    expect(piece?.fait).toEqual({ nature: 'recette', id: 'r1' });
+    await screen.findByText(/Pièce conservée : facture-vente\.pdf/);
+  });
+
+  // Une facture émise par l'application n'a besoin d'aucune pièce : le
+  // panneau doit le dire, sinon on croit que joindre est obligatoire.
+  it('dit qu’une pièce n’est pas obligatoire pour une facture émise ici', async () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Joindre une pièce' }));
+
+    expect(screen.getByText(/n’a besoin d’aucune pièce jointe/)).toBeTruthy();
+  });
+
+  it('détache une pièce déjà rattachée', async () => {
+    semer([recette({ id: 'r1', justificatifId: 'p1' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Pièce jointe' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Détacher' }));
+
+    expect(useFaits.getState().faits.recettes[0]?.justificatifId).toBeNull();
   });
 });

@@ -95,13 +95,28 @@ type Section = 'tresorerie' | 'performance';
 /** Le registre ouvert par-dessus l'écran, ou aucun. */
 type Registre = 'livre' | 'des' | 'tva' | null;
 
-export function Argent() {
+export interface ProprietesArgent {
+  /**
+   * L'année choisie au sélecteur de la barre du haut. `undefined` retombe sur
+   * l'année de l'horloge — le cas des tests qui montent cet écran seul, sans
+   * la coquille qui porte le sélecteur.
+   */
+  readonly annee?: number;
+}
+
+export function Argent({ annee }: ProprietesArgent = {}) {
   const faits = useFaits((e) => e.faits);
   const [section, setSection] = useState<Section>('tresorerie');
   const [registre, setRegistre] = useState<Registre>(null);
   const idGroupe = useId();
 
-  const etat = useMemo(() => etatArgent(faits), [faits]);
+  // `undefined` explicite : `etatArgent` retombe alors sur sa propre valeur
+  // par défaut (l'année de `maintenant`), au lieu qu'on la recalcule ici une
+  // seconde fois avec le risque qu'elle diverge de celle du domaine.
+  const etat = useMemo(
+    () => etatArgent(faits, faits.echeances, new Date(), annee),
+    [faits, annee]
+  );
   const couverture = Math.round(etat.couvertureProvisions * 100);
 
   return (
