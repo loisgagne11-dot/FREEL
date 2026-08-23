@@ -28,6 +28,7 @@ import {
  type FactureSuivie, type StatutFacture,
   encoursDe, suivre
 } from '../domain/calculs/facturier';
+import { type Recouvrement, recouvrementDe } from '../domain/calculs/recouvrement';
 import { dansLaPeriode, type Periode } from '../domain/calculs/periode';
 import type { DateISO, Euros } from '../domain/types';
 import { euros } from '../domain/types';
@@ -164,6 +165,15 @@ export interface EtatFacturier {
   readonly enRetard: Euros;
   /** Encaissé sur la période — le seul chiffre qui compte pour l'URSSAF. */
   readonly encaisse: Euros;
+  /**
+   * Ce qui rentre, et en combien de temps.
+   *
+   * Sur la MÊME assiette que les trois montants ci-dessus — les factures de la
+   * période. Un taux calculé sur toute l'histoire à côté de montants filtrés
+   * répondrait à une autre question que celle que la barre de période pose, et
+   * rien à l'écran ne dirait laquelle.
+   */
+  readonly recouvrement: Recouvrement;
 }
 
 /**
@@ -217,7 +227,8 @@ export function etatFacturier(
     factures,
     parStatut,
     ...encoursDe(factures),
-    encaisse: somme((f) => f.statut === 'encaissee')
+    encaisse: somme((f) => f.statut === 'encaissee'),
+    recouvrement: recouvrementDe(factures)
   };
 }
 

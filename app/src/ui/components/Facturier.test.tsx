@@ -634,7 +634,11 @@ describe('cycle de vie : envoyée, avec sa date', () => {
       recette({ id: 'r2', montant: euros(2000), numero: '2026-002', envoyeeLe: dateISO('2026-08-05') })
     ]);
     rendre();
-    expect(screen.getByText('3 000 €')).toBeTruthy();
+    /* Pris SUR SA TUILE, et non sur l'écran. Depuis que la tuile de
+       recouvrement écrit son assiette, « 3 000 € » apparaît deux fois — et
+       `getByText` échouait alors sur une ambiguïté qui n'apprend rien du reste
+       à rentrer. */
+    expect(valeurDeLaTuile('Reste à rentrer')).toBe('3 000 €');
   });
 });
 
@@ -688,5 +692,149 @@ describe('pièce jointe d’une recette', () => {
     await utilisateur.click(screen.getByRole('button', { name: 'Détacher' }));
 
     expect(useFaits.getState().faits.recettes[0]?.justificatifId).toBeNull();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   N1 — le taux de recouvrement
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * LE TAUX RÉPOND À LA QUESTION QUE LES TROIS AUTRES TUILES POSENT.
+ *
+ * « 6 010 € en attente » ne dit pas si c'est beaucoup. Sur un trimestre à
+ * 8 000 € facturés c'est une alerte ; sur un trimestre à 60 000 € c'est la
+ * respiration normale d'un délai de paiement.
+ */
+/**
+ * Les espaces d'`Intl`, ramenées à des espaces ordinaires.
+ *
+ * Le formateur sépare les milliers par une espace fine insécable (U+202F) et
+ * pose une insécable ordinaire (U+00A0) devant l'euro. Une attente écrite avec
+ * des espaces normales échoue alors sur « 3 000 € » attendu contre « 3 000 € »
+ * reçu — deux chaînes visuellement identiques, et un échec qui ne ressemble en
+ * rien à sa cause. Ce que ces tests vérifient est la PHRASE, pas le choix
+ * d'espace du formateur.
+ */
+const lisible = (t: string | null): string => (t ?? '').replace(/[\u202f\u00a0]/g, ' ');
+
+/** Le montant d'une tuile, pris sur SA tuile et non sur l'écran entier. */
+function valeurDeLaTuile(libelle: string): string {
+  const tuile = screen.getByText(libelle).closest('div') as HTMLElement;
+  return lisible(within(tuile).getAllByText(/€/)[0]?.textContent ?? '');
+}
+
+/**
+ * La note d'une tuile, reconstituée.
+ *
+ * Les montants passent par `Montant`, qui les isole dans leur propre élément :
+ * le texte de la note est coupé en morceaux, et `getByText` sur une expression
+ * régulière n'en retrouve aucun d'un seul tenant. C'est la tuile entière qu'on
+ * veut lire.
+ */
+function noteDeLaTuile(libelle: string): string {
+  const tuile = screen.getByText(libelle).closest('div') as HTMLElement;
+  return lisible(tuile.textContent);
+}
+
+describe('la tuile de recouvrement', () => {
+  it('donne le taux et l’assiette qui le fonde', () => {
+    semer([
+      recette({ id: 'r1', numero: '2026-001', montant: euros(3_000),
+        envoyeeLe: dateISO('2026-08-01'), encaisseeLe: dateISO('2026-08-11') }),
+      recette({ id: 'r2', numero: '2026-002', montant: euros(1_000) })
+    ]);
+    rendre();
+
+    expect(screen.getByText('Recouvrement')).toBeTruthy();
+    // En pourcentage ENTIER : « 68,32 % » se lit moins vite que « 68 % » et ne
+    // dit rien de plus. Voir `partEntiere`.
+    expect(screen.getByText('75 %')).toBeTruthy();
+    // L'assiette sous le pourcentage : « 75 % » seul peut porter sur deux
+    // factures comme sur quarante, et ce n'est pas la même nouvelle.
+    //
+    // Prise sur la tuile entière : les montants passent par `Montant`, qui les
+    // pose dans leur propre élément, et le texte de la note est donc coupé en
+    // morceaux qu'aucune expression régulière ne retrouve d'un seul tenant.
+    expect(noteDeLaTuile('Recouvrement')).toMatch(/3 000 € rentrés sur 4 000 €/);
+    expect(noteDeLaTuile('Recouvrement')).toMatch(/règlement à 10 j en médiane/);
+  });
+
+  /**
+   * ZÉRO FACTURÉ N'EST PAS ZÉRO POUR CENT — la tuile disparaît plutôt que
+   * d'annoncer un échec là où il n'y a eu aucune tentative.
+   */
+  it('ne s’affiche pas quand rien n’a été facturé sur la période', () => {
+    semer([]);
+    rendre();
+    expect(screen.queryByText('Recouvrement')).toBeNull();
+  });
+
+  /**
+   * LA MOYENNE N'APPARAÎT QUE LORSQU'ELLE APPREND QUELQUE CHOSE — et ce qu'elle
+   * apprend alors n'est pas un délai, c'est qu'UN dossier traîne.
+   */
+  it('signale un dossier qui traîne quand la moyenne s’écarte de la médiane', () => {
+    semer([
+      recette({ id: 'r1', numero: '2026-001', montant: euros(1_000),
+        emiseLe: dateISO('2026-08-01'), envoyeeLe: dateISO('2026-08-01'),
+        encaisseeLe: dateISO('2026-08-11') }),
+      recette({ id: 'r2', numero: '2026-002', montant: euros(1_000),
+        emiseLe: dateISO('2026-08-01'), envoyeeLe: dateISO('2026-08-01'),
+        encaisseeLe: dateISO('2026-08-11') }),
+      recette({ id: 'r3', numero: '2026-003', montant: euros(1_000),
+        emiseLe: dateISO('2026-08-01'), envoyeeLe: dateISO('2026-01-05'),
+        encaisseeLe: dateISO('2026-08-12') })
+    ]);
+    rendre();
+
+    expect(noteDeLaTuile('Recouvrement')).toMatch(/un dossier traîne/);
+  });
+
+  /**
+   * DEUX TUILES CÔTE À CÔTE NE DOIVENT PAS SE CONTREDIRE.
+   *
+   * Le rouge appartient à ce qui est RÉELLEMENT en retard. Un taux bas sans
+   * retard ne dit pas que l'argent ne rentre pas — il dit qu'on vient de
+   * facturer, et c'est l'état normal d'un trimestre qui se termine sur une
+   * grosse facture.
+   */
+  it('ne s’alarme pas d’un taux bas quand rien n’est en retard', () => {
+    semer([
+      recette({ id: 'r1', numero: '2026-001', montant: euros(1_000),
+        envoyeeLe: dateISO('2026-08-01'), encaisseeLe: dateISO('2026-08-11') }),
+      // Émise le 12, échéance à 30 jours : rien n'est encore dû le 13.
+      recette({ id: 'r2', numero: '2026-002', montant: euros(9_000),
+        emiseLe: dateISO('2026-08-12') })
+    ]);
+    rendre();
+
+    const tuile = screen.getByText('Recouvrement').closest('div') as HTMLElement;
+    expect(tuile.className).not.toMatch(/alerte/);
+  });
+
+  it('s’alarme dès qu’une facture est réellement en retard', () => {
+    semer([
+      recette({ id: 'r1', numero: '2026-001', montant: euros(1_000),
+        envoyeeLe: dateISO('2026-08-01'), encaisseeLe: dateISO('2026-08-11') }),
+      recette({ id: 'r2', numero: '2026-002', montant: euros(9_000),
+        emiseLe: dateISO('2026-05-01') })
+    ]);
+    rendre();
+
+    const tuile = screen.getByText('Recouvrement').closest('div') as HTMLElement;
+    expect(tuile.className).toMatch(/alerte/);
+  });
+
+  it('se tait sur la moyenne quand elle raconte la même histoire', () => {
+    semer([
+      recette({ id: 'r1', numero: '2026-001', montant: euros(1_000),
+        envoyeeLe: dateISO('2026-08-01'), encaisseeLe: dateISO('2026-08-11') }),
+      recette({ id: 'r2', numero: '2026-002', montant: euros(1_000),
+        envoyeeLe: dateISO('2026-08-01'), encaisseeLe: dateISO('2026-08-12') })
+    ]);
+    rendre();
+
+    expect(noteDeLaTuile('Recouvrement')).not.toMatch(/un dossier traîne/);
   });
 });

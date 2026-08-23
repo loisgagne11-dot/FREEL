@@ -544,3 +544,90 @@ passe de 78,13 à 79,34 Ko pour 80 — la marge est mince, et le prochain lot qu
 touche au Pilote devra extraire avant d'ajouter. L'écran différé le plus lourd
 reste inchangé à 39,89 Ko : c'est ce que le report du panneau hors du paquet de
 Trésorerie a préservé.
+
+## 11. Lot M1 — le jeu de démonstration était un document ancien
+
+Trouvé en relisant les captures du lot J3, et invisible jusque-là.
+
+`public/jeu-de-demonstration.json` se déclarait **schéma 13** quand le schéma
+courant était 16. Rien ne cassait : `completerFaits` comble les champs
+manquants au chargement. Mais l'un d'eux — `soldeInitialAu` — **ne peut pas se
+combler**, et c'est délibéré : aucune date n'est devinable pour un solde de
+départ, ni celle du jour de la migration ni `debutActivite` (voir la migration
+v14 → v15). Il était donc comblé à `null`, `soldeDerive` s'abstenait, et la
+démonstration ignorait en silence ses **sept recettes et ses neuf dépenses**.
+
+Le solde affiché n'était que le montant saisi diminué des mouvements du relevé.
+Toutes les captures montraient donc un compte en détresse — disponible négatif,
+provisions couvertes à 65 %, rien à se verser, zéro mois d'autonomie — qui
+n'était pas ce que les faits du jeu décrivent. Il a fallu que le panneau de
+composition du lot J3 écrive la colonne en toutes lettres pour que quelqu'un le
+voie ; aucun test ne pouvait l'attraper, puisque le calcul était juste et que
+c'est la DONNÉE qui mentait.
+
+Ce que le lot change :
+
+- le jeu devient un document **complet du schéma courant** : les vingt champs
+  que la migration comblait sont écrits, `version` passe à 16 ;
+- son solde de départ est daté au **30 mars 2026**, la veille de son premier
+  fait — exactement ce que `veilleDuPremierFait` pose à la migration d'un vrai
+  dossier ;
+- trois tests tiennent la propriété (`schema.test.ts`) : le jeu se déclare au
+  schéma courant, ne laisse aucun champ à combler, et date son solde. **Toute
+  migration future les fera échouer**, ce qui est précisément le moment où il
+  faut regarder ce qu'elle ne sait pas deviner.
+
+La démonstration devient cohérente : 8 120 + 12 960 − 1 161 − 2 360 − 7 342 =
+10 217 €, provisions couvertes à 100 %, et le donut de répartition somme au
+solde. Les vingt-deux captures sont regénérées.
+
+## 12. Lot N1 — le taux de recouvrement, et une capture qui pointait dans le vide
+
+### L'indicateur
+
+Le facturier disait « reste à rentrer », « dont en retard », « encaissé sur la
+période ». Trois montants, et aucun ne répond à la question qu'on se pose en
+les regardant : **est-ce que c'est beaucoup ?** 6 010 € en attente sur un
+trimestre à 8 000 € facturés est une alerte ; les mêmes 6 010 € sur un
+trimestre à 60 000 € sont la respiration normale d'un délai de paiement.
+
+Une quatrième tuile répond, sur la même assiette que les trois autres — les
+factures de la période, faute de quoi un taux calculé sur toute l'histoire
+répondrait à une autre question que celle que la barre de période pose, sans
+que rien à l'écran ne dise laquelle.
+
+### Écart assumé avec la référence
+
+**Le handoff ne dessine pas cette tuile.** Sa vue « Factures » porte
+« 6 factures · 3 610 € en attente d'encaissement » et s'arrête là. La tuile est
+donc une addition, au même titre que le panneau de composition du lot J3 — et
+pour la même raison : ce que l'ancienne application savait dire et que le
+dessin ne reprend pas ne disparaît pas pour autant du besoin.
+
+### Ce que le contrôle visuel a rattrapé
+
+Deux défauts, tous deux invisibles au test :
+
+- **la tuile virait au rouge à 68 % pendant que sa voisine annonçait « dont en
+  retard : 0 € »**. Deux tuiles côte à côte disant le contraire l'une de
+  l'autre. Elles ne se contredisaient pas vraiment : un taux bas SANS retard ne
+  dit pas que l'argent ne rentre pas, il dit qu'on vient de facturer — l'état
+  normal d'un trimestre qui se termine sur une grosse facture émise le 30.
+  Le rouge est désormais réservé à ce qui est réellement en retard ;
+- « 68,32 % ». `pct`, le formateur partagé, garde une à deux décimales — ce
+  qu'il faut pour un taux de cotisations où 2,2 % et 2 % diffèrent, ce qui est
+  du bruit sur un taux de recouvrement. La tuile emploie l'arrondi entier, celui
+  de l'occupation et des jauges.
+
+### La capture qui pointait dans le vide
+
+Le script cherchait la vue `activite-factures` en cliquant un onglet
+« Factures » sur l'écran Activité. Cet onglet n'existe plus : les factures sont
+devenues un écran à part, atteint par le rail. Le script le signalait **à
+chaque exécution depuis plusieurs lots**, et le message avait fini par se lire
+comme du décor — pendant ce temps, l'écran Facturer n'avait aucun contrôle
+visuel du tout.
+
+La vue pointe maintenant sur `#/facture`. Son NOM de fichier ne change pas :
+c'est lui qui apparie notre capture à celle du handoff, et les deux montrent
+bien le même écran. Seul l'endroit où on va le chercher a bougé.
