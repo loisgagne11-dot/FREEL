@@ -21,13 +21,14 @@ import { euros, mois } from '../domain/types';
 import { assujettissementTva, plafondMicro, seuilsTvaPourAnnee } from '../domain/bareme';
 import type { SeuilsTva, StatutAssujettissementTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
-import type { Echeance, VentilationProvisions } from '../domain/calculs/provisions';
+import { type Echeance, type VentilationProvisions, estPayee } from '../domain/calculs/provisions';
 import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
 import type { ProvisionImpotRevenu } from '../domain/calculs/provisionImpotRevenu';
 import { encoursDe, suivre } from '../domain/calculs/facturier';
+import { soldeAuDernierJourDe } from '../domain/calculs/solde';
 import type { Faits } from './schema';
 import {
-  dateDuJour, etatPilote, moisCourant, remunerationDuMois
+  dateDuJour, etatPilote, moisCourant, recettesEncaissees, remunerationDuMois
 } from './selecteurs';
 import {
   previsionDuMoisParMission, tauxDeChargesAu
@@ -434,12 +435,36 @@ export interface EtatProjection {
  * n'est pas perdu non plus, et le faire disparaître de la projection
  * reviendrait à l'abandonner sans le dire.
  */
-export function etatProjection(
+/**
+ * Les encaissements attendus, mois par mois, sur l'horizon fourni.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * EXTRAIT POUR SERVIR À DEUX HORIZONS DIFFÉRENTS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `etatProjection` l'appelle sur douze mois glissants — c'est la carte
+ * « Où va ton disponible ». Le graphe « Évolution du compte » (voir
+ * `evolutionCompte`) l'appelle sur un horizon variable, qui dépend de
+ * l'année regardée et peut être plus court (le reste de l'année en cours) ou
+ * plus long (une année future déjà annoncée par un fait). Un seul calcul
+ * d'attente, deux fenêtres — jamais une seconde implémentation qui aurait pu
+ * diverger de la première.
+ *
+ * Le premier mois d'`horizon` sert de PLANCHER : une facture déjà échue
+ * retombe dessus plutôt que sur sa date passée, qui n'a plus de sens une fois
+ * l'horizon commencé. Voir l'appelant pour ce que ce plancher vaut dans
+ * chaque cas — le mois courant pour `etatProjection`, le mois suivant pour
+ * `evolutionCompte`, qui traite le mois courant comme un fait et non comme
+ * une projection.
+ */
+function encaissementsAttendusParMois(
   faits: Faits,
-  maintenant: Date = new Date()
-): EtatProjection {
-  const m0 = moisCourant(maintenant);
-  const moisProjetes = Array.from({ length: MOIS_PROJETES }, (_, i) => decalerMois(m0, i));
+  horizon: readonly Mois[],
+  maintenant: Date
+): Map<Mois, number> {
+  const attendu = new Map<Mois, number>(horizon.map((m) => [m, 0]));
+  if (horizon.length === 0) return attendu;
+  const plancher = horizon[0] as Mois;
 
   /* Le décalage de l'encaissement attendu suit la FORMULE, pas un nombre de
      jours : « 30 jours fin de mois » repousse une facture du 12 juin au
@@ -447,20 +472,18 @@ export function etatProjection(
      prévision de trésorerie, dix-neuf jours changent le mois. */
   const formulesClient = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
 
-
-  const attendu = new Map<Mois, number>(moisProjetes.map((m) => [m, 0]));
   const ajouter = (m: Mois, montant: number): void => {
-    // Hors fenêtre : ni avant le mois courant — l'argent d'hier est déjà au
+    // Hors fenêtre : ni avant le plancher — l'argent d'hier est déjà au
     // solde — ni au-delà de l'horizon.
     if (attendu.has(m)) attendu.set(m, (attendu.get(m) ?? 0) + montant);
   };
 
   // 1. Les factures émises et non réglées, à l'échéance. Une échéance déjà
-  //    passée retombe sur le mois courant : la somme est toujours due.
+  //    passée retombe sur le plancher : la somme est toujours due.
   for (const f of facturesSuivies(faits, maintenant)) {
     if (f.statut !== 'emise' && f.statut !== 'envoyee' && f.statut !== 'en_retard') continue;
-    const echeance = (f.echeanceLe ?? m0).slice(0, 7) as Mois;
-    ajouter(echeance < m0 ? m0 : echeance, f.recette.montant);
+    const echeance = (f.echeanceLe ?? plancher).slice(0, 7) as Mois;
+    ajouter(echeance < plancher ? plancher : echeance, f.recette.montant);
   }
 
   /* 2. Le revenu prévu au planning, daté à son ÉCHÉANCE réelle.
@@ -471,7 +494,7 @@ export function etatProjection(
         31 juillet à cette formule n'est due que le 30 septembre. Un mois
         d'écart sur chaque mission, sur toute la prévision. */
   const parMission = new Map(faits.missions.map((mi) => [mi.id, mi]));
-  for (const m of moisProjetes) {
+  for (const m of horizon) {
     for (const p of previsionDuMoisParMission(faits, m)) {
       const mission = parMission.get(p.missionId);
       const nom = mission?.clientNom ?? '';
@@ -482,13 +505,22 @@ export function etatProjection(
     }
   }
 
-  const pilote = etatPilote(faits, faits.echeances, maintenant);
-  const taux = tauxDeChargesAu(faits, m0);
-  // Six mois à zéro ne sont pas six mois d'historique : sans AUCUNE dépense
-  // enregistrée, on ne sait pas ce que coûte le mois — on ne sait pas non plus
-  // qu'il ne coûte rien. Moyenner des zéros répondrait « zéro » à une question
-  // qui n'a pas de réponse.
-  const depenses = faits.depenses.length === 0 ? null : depensesMensuellesMoyennes(
+  return attendu;
+}
+
+/**
+ * Six mois d'historique de dépenses payées, ramenés à leur moyenne — ou
+ * `null` si l'historique est trop court.
+ *
+ * Six mois à zéro ne sont pas six mois d'historique : sans AUCUNE dépense
+ * enregistrée, on ne sait pas ce que coûte le mois — on ne sait pas non plus
+ * qu'il ne coûte rien. Moyenner des zéros répondrait « zéro » à une question
+ * qui n'a pas de réponse. Partagée par `etatProjection` et `evolutionCompte` :
+ * les deux projettent depuis le même mois courant, sur le même historique.
+ */
+function depensesMoyennesRecentes(faits: Faits, m0: Mois): Euros | null {
+  if (faits.depenses.length === 0) return null;
+  return depensesMensuellesMoyennes(
     Array.from({ length: MOIS_D_HISTORIQUE }, (_, i) => {
       const m = decalerMois(m0, -(i + 1));
       return euros(faits.depenses
@@ -496,6 +528,40 @@ export function etatProjection(
         .reduce<number>((s, d) => s + d.montantTtc, 0));
     })
   );
+}
+
+/**
+ * Ce que le compte devient sur douze mois, avec et sans se verser.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * D'OÙ VIENNENT LES ENCAISSEMENTS ATTENDUS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * De deux sources, et d'aucune autre — surtout pas d'une extrapolation du
+ * passé (voir `encaissementsAttendusParMois`) :
+ *
+ *  1. les factures **déjà émises et non réglées**, portées au mois de leur
+ *     échéance. C'est un fait : le document est parti, la somme est due ;
+ *  2. le **revenu prévu au planning** des mois à venir, décalé du délai de
+ *     paiement du client. C'est le rythme que l'utilisateur a lui-même saisi,
+ *     pas une tendance devinée.
+ *
+ * Une facture échue depuis longtemps et toujours impayée est portée au mois
+ * COURANT plutôt qu'à sa date passée : l'argent n'est pas rentré, mais il
+ * n'est pas perdu non plus, et le faire disparaître de la projection
+ * reviendrait à l'abandonner sans le dire.
+ */
+export function etatProjection(
+  faits: Faits,
+  maintenant: Date = new Date()
+): EtatProjection {
+  const m0 = moisCourant(maintenant);
+  const moisProjetes = Array.from({ length: MOIS_PROJETES }, (_, i) => decalerMois(m0, i));
+  const attendu = encaissementsAttendusParMois(faits, moisProjetes, maintenant);
+
+  const pilote = etatPilote(faits, faits.echeances, maintenant);
+  const taux = tauxDeChargesAu(faits, m0);
+  const depenses = depensesMoyennesRecentes(faits, m0);
 
   return {
     depensesMensuelles: depenses,
@@ -528,4 +594,172 @@ function finDuMoisISO(m: Mois): DateISO {
   d.setUTCMonth(d.getUTCMonth() + 1);
   d.setUTCDate(0);
   return d.toISOString().slice(0, 10) as DateISO;
+}
+
+/** Nombre de mois entre `a` et `b` — positif si `b` est postérieur à `a`. */
+function differenceMois(a: Mois, b: Mois): number {
+  const indice = (m: Mois) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)) - 1;
+  return indice(b) - indice(a);
+}
+
+/**
+ * Le solde de fin de mois, tel que les faits du dossier le disent — jamais
+ * recalculé autrement que par `soldeAuDernierJourDe` (voir `domain/calculs/solde.ts`).
+ */
+function soldeFinDeMois(faits: Faits, finDeMois: DateISO): Euros {
+  return soldeAuDernierJourDe(
+    finDeMois,
+    faits.soldeInitial, faits.soldeInitialAu,
+    recettesEncaissees(faits), faits.depenses, faits.echeances,
+    faits.mouvementsBancaires
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   L'évolution du compte, mois par mois, sur l'année choisie
+   ───────────────────────────────────────────────────────────────────────── */
+
+export interface MoisEvolutionCompte {
+  readonly mois: Mois;
+  readonly entrees: Euros;
+  readonly sorties: Euros;
+  /**
+   * Le niveau que la courbe trace pour ce mois. Ce n'est PAS toujours la même
+   * grandeur — voir `estProjete`, qui dit laquelle.
+   */
+  readonly niveau: Euros;
+  /**
+   * `false` : ce mois est clos (passé, ou le mois courant), et `niveau` est
+   * le SOLDE RÉEL de fin de mois — un fait, dérivé des écritures déjà
+   * enregistrées, qui ne bougera plus.
+   *
+   * `true` : aucune écriture n'existe encore pour ce mois. `niveau` est alors
+   * le DISPONIBLE projeté (voir `etatProjection` et son en-tête) — jamais un
+   * solde projeté, pour la raison que l'infobulle de la carte détaille : on ne
+   * peut pas deviner QUAND une dette déjà due mais pas encore appelée sortira
+   * du compte. Le disponible, lui, l'a déjà retirée, ce qui rend l'hypothèse
+   * sûre plutôt qu'optimiste.
+   */
+  readonly estProjete: boolean;
+}
+
+/**
+ * Ce que le compte a fait, mois par mois, sur l'ANNÉE CHOISIE — la carte
+ * « Évolution du compte » de l'écran Argent.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE PASSÉ EST UN FAIT, L'AVENIR UNE HYPOTHÈSE — ET LE CALCUL LE SUIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un mois clos a un solde EXACT : le solde initial daté, plus tout ce que les
+ * faits disent être entré ou sorti jusqu'à sa fin (voir `soldeFinDeMois`).
+ * Rien n'y est deviné, donc rien n'empêche de tracer le solde lui-même.
+ *
+ * Un mois à venir n'a pas ce luxe : la moitié de ce qu'on doit — les charges
+ * sur des recettes déjà encaissées mais pas encore déclarées — n'a pas de
+ * date. Tracer un solde qui les ignorerait monterait joliment jusqu'au
+ * trimestre où il s'effondrerait, exactement l'écueil que ce projet refuse.
+ * Ces mois-là tracent donc le DISPONIBLE projeté (voir `etatProjection`), qui
+ * a déjà retiré tout ce qui est dû, daté ou non — une hypothèse plus basse,
+ * mais sûre. `estProjete` porte cette distinction jusqu'à l'écran, qui doit
+ * la dessiner différemment plutôt que la taire.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DOUZE MOIS DE L'ANNÉE CHOISIE, PAS DOUZE MOIS GLISSANTS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le graphe suit la bascule d'année de la barre du haut — janvier à décembre
+ * de l'année regardée, jamais un rouleau de douze mois depuis aujourd'hui. Sur
+ * une année déjà terminée, tous les mois sont des faits ; sur l'année en
+ * cours, les mois après le mois courant sont projetés ; sur une année future
+ * déjà annoncée par un fait (une mission planifiée, par exemple), tout est
+ * projeté.
+ *
+ * Ceci NE CONTREDIT PAS le solde affiché en tuile, qui ne dépend jamais de
+ * l'année regardée (voir `etatArgent` et son test « ne change pas le solde du
+ * compte quand on change l'année regardée ») : la tuile dit un état instantané
+ * — combien il y a AUJOURD'HUI —, ce graphe dit une évolution SUR l'année
+ * choisie. Les deux se recalculent depuis les mêmes faits sans jamais devoir
+ * s'accorder, puisqu'ils ne répondent pas à la même question.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI LA PROJECTION NE S'ARRÊTE PAS FORCÉMENT À DOUZE MOIS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `etatProjection` (la carte « Où va ton disponible ») fixe son horizon à
+ * douze mois glissants — au-delà, elle l'assume, « tout est fiction ». Ce
+ * graphe-ci doit pouvoir couvrir une année ENTIÈRE, même future : le cumul du
+ * disponible doit alors être simulé mois par mois depuis AUJOURD'HUI jusqu'à
+ * la fin de cette année-là, sans quoi les mois sautés fausseraient le niveau
+ * de départ des mois affichés. `encaissementsAttendusParMois` est appelée sur
+ * cet horizon complet ; seuls les mois de l'année choisie sont ensuite gardés.
+ */
+export function evolutionCompte(
+  faits: Faits,
+  annee: number,
+  maintenant: Date = new Date()
+): readonly MoisEvolutionCompte[] {
+  const m0 = moisCourant(maintenant);
+  const moisAnnee = Array.from(
+    { length: 12 }, (_, i) => mois(`${annee}-${String(i + 1).padStart(2, '0')}`)
+  );
+  const parMoisAnnee = chiffreParMois(faits, annee);
+
+  const resultats: MoisEvolutionCompte[] = moisAnnee
+    .filter((m) => m <= m0)
+    .map((m) => {
+      const encaisse = parMoisAnnee.find((mc) => mc.mois === m)?.encaisse ?? euros(0);
+      const depensesPayees = faits.depenses
+        .filter((d) => d.payeeLe !== null && d.payeeLe.startsWith(m))
+        .reduce<number>((s, d) => s + d.montantTtc, 0);
+      const echeancesPayees = faits.echeances
+        .filter((e) => estPayee(e) && (e.payeeLe as DateISO).startsWith(m))
+        .reduce<number>((s, e) => s + (e.montantPaye ?? e.montant), 0);
+
+      return {
+        mois: m,
+        entrees: encaisse,
+        sorties: euros(depensesPayees + echeancesPayees),
+        niveau: soldeFinDeMois(faits, finDuMoisISO(m)),
+        estProjete: false
+      };
+    });
+
+  const moisAProjeter = moisAnnee.filter((m) => m > m0);
+  if (moisAProjeter.length > 0) {
+    const dernierMoisNecessaire = moisAProjeter[moisAProjeter.length - 1] as Mois;
+    const horizon = Array.from(
+      { length: differenceMois(m0, dernierMoisNecessaire) },
+      (_, i) => decalerMois(m0, i + 1)
+    );
+    const attendu = encaissementsAttendusParMois(faits, horizon, maintenant);
+    const pilote = etatPilote(faits, faits.echeances, maintenant);
+    const taux = tauxDeChargesAu(faits, m0);
+    const depenses = depensesMoyennesRecentes(faits, m0);
+
+    const projection = projeterDisponible({
+      depart: pilote.tresorerie.dispo,
+      reserve: pilote.tresorerie.reserve,
+      entrees: horizon.map((m) => ({ mois: m, encaissements: euros(attendu.get(m) ?? 0) })),
+      tauxDeCharges: taux.statut === 'refuse' ? 0 : taux.valeur,
+      depensesMensuelles: depenses ?? euros(0)
+    });
+    const parMoisProjection = new Map(projection.mois.map((mp) => [mp.mois, mp]));
+
+    for (const m of moisAProjeter) {
+      const mp = parMoisProjection.get(m);
+      // Ne devrait jamais manquer : `horizon` couvre par construction jusqu'à
+      // `dernierMoisNecessaire`, qui est le dernier élément de `moisAProjeter`.
+      if (mp === undefined) continue;
+      resultats.push({
+        mois: m,
+        entrees: mp.encaissements,
+        sorties: euros(mp.charges + mp.depenses),
+        niveau: mp.sansVersement,
+        estProjete: true
+      });
+    }
+  }
+
+  return resultats;
 }

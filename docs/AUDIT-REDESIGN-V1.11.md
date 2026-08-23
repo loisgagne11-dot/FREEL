@@ -451,3 +451,31 @@ repris. Le schéma ne connaît que le congé, et rien ne distingue les deux dans
 un calcul. Inventer un statut stocké contredirait l'invariant qui veut que les
 statuts se dérivent ; le poser comme un congé sous un autre nom mentirait sur
 le solde de congés. On s'abstient, et on le note.
+
+## 9. Lot L1 — le graphe « Évolution du compte », refait sur le solde réel
+
+Trois défauts remontés directement par l'utilisateur sur la carte « Évolution
+du compte » de Trésorerie, tous corrigés dans le même lot :
+
+- **lisibilité** : les étiquettes de niveau arrondissaient à l'entier dès
+  10 k€, ce qui répétait « 11 k€ » sur plusieurs colonnes consécutives dont les
+  valeurs réelles différaient de plusieurs centaines d'euros — corrigé en
+  gardant une décimale quelle que soit l'ampleur du solde ;
+- **année ignorée** : le graphe tournait toujours sur douze mois glissants
+  depuis aujourd'hui, indifférent au sélecteur d'année livré au lot J2. Il suit
+  désormais `etat.annee`, de janvier à décembre ;
+- **« sans rien te verser » retiré** : la courbe traçait le disponible projeté
+  sur les douze mois, avec cette phrase. Le solde PASSÉ se dérivant maintenant
+  des faits exactement, les mois clos tracent le solde réel (trait plein) ; les
+  mois à venir restent une hypothèse de disponible (pointillés, mot « prévu »
+  sous la colonne) — jamais un solde deviné.
+
+Ce changement n'a pas été confronté image contre image à la référence après
+coup (le contrôle du 21/08, §7, précède ce lot) : **un contrôle visuel sur la
+carte « Évolution du compte », dans les deux thèmes, reste à faire** avant de
+considérer ce lot conforme au sens de ce document. Les captures du handoff
+elles-mêmes ne montrent qu'un solde continu sans distinction fait/hypothèse
+(§ voir `sombre-argent-tresorerie.png`) — c'est un écart assumé, pas une
+conformité ratée : la référence ne distingue pas le passé de l'avenir sur cette
+courbe, et l'écart est documenté dans le composant (`GrapheEvolution.tsx`) et
+dans `AUDIT-GRAPHES-ET-INDICATEURS.md` (V7).

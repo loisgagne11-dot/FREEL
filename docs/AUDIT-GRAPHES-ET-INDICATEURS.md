@@ -124,7 +124,7 @@ pour laquelle ce document a été ouvert.
 | V4 | Provisions **par catégorie** | ✅ | ✅ | ✅ **ajouté depuis** |
 | V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis** |
 | V6 | Frise de l'échéancier | ✅ | ✅ | ✅ **frise livrée** (lot B) — chaque obligation à sa date réelle sur l'année, repère « auj. ». Elle ne remplace pas la liste, elle la précède&nbsp;: la frise répond à « qu'est-ce qui vient », la liste à « qu'est-ce que j'en fais » |
-| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **graphe combiné** (lot B) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Sur le DISPONIBLE et non le solde, et le titre le dit&nbsp;: projeter le solde obligerait à deviner quand chaque dette sortira du compte |
+| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **graphe combiné, sur le SOLDE réel** (lot B, refait lot L1) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Couvre janvier à décembre de l'année CHOISIE (plus de « douze mois glissants »)&nbsp;: les mois clos tracent le solde réel en trait plein (un fait, dérivé des faits jusqu'à leur fin de mois), les mois à venir le disponible projeté en pointillés, annoncés « prévu » — jamais un solde deviné, pour la raison que l'infobulle détaille |
 | V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
 | V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau |
 | V10 | Cascade CA → charges → net | ✅ (deux fois) | ❌ | 🚫 §5.5 |
@@ -360,6 +360,21 @@ de santé (§5.1), l'assiette nommée de l'autonomie.
 
 **Livrés au lot B** : le donut de répartition du solde (V3), la frise de
 l'échéancier (V6), le graphe combiné entrées / sorties / disponible (V7).
+
+**Refait au lot L1** : le graphe combiné (V7) montrait un défaut à trois
+faces, remonté directement par l'utilisateur — peu lisible, indifférent à la
+bascule d'année (toujours douze mois glissants depuis aujourd'hui, même après
+le lot J2), et une courbe de DISPONIBLE assortie d'une phrase « sans rien te
+verser » jugée sans intérêt. Le solde PASSÉ se dérivant désormais des faits
+exactement (`domain/calculs/solde.ts`, `soldeAuDernierJourDe`), l'argument qui
+interdisait de tracer un solde — deviner quand chaque dette sort du compte —
+ne vaut plus que pour l'AVENIR : les mois clos tracent donc le solde réel, les
+mois à venir restent une hypothèse de disponible, visuellement distincte
+(pointillés, mot « prévu ») et non plus muette sur ce qu'elle suppose. Le
+graphe suit `etat.annee`, de janvier à décembre ; sur une année passée, tous
+les mois sont des faits. La tuile « Solde du compte », état instantané, n'en
+dépend toujours pas — voir le test « ne change pas le solde du compte quand on
+change l'année regardée ».
 
 **Livré au lot J2** : le **sélecteur de période** — l'année n'est plus
 verrouillée sur l'horloge. `etatArgent` reçoit désormais l'année comme un

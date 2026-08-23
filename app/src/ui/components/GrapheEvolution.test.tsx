@@ -10,14 +10,14 @@ const formater = (v: number) => `${v} €`;
 const formaterCourt = (v: number) => `${(v / 1000).toFixed(1).replace('.', ',')}k`;
 
 const MOIS: readonly MoisEvolution[] = [
-  { mois: '2026-06', libelle: 'JUIN', entrees: 6000, sorties: 5200, niveau: 8900 },
-  { mois: '2026-07', libelle: 'JUIL', entrees: 7200, sorties: 5800, niveau: 10300 }
+  { mois: '2026-06', libelle: 'JUIN', entrees: 6000, sorties: 5200, niveau: 8900, estProjete: false },
+  { mois: '2026-07', libelle: 'JUIL', entrees: 7200, sorties: 5800, niveau: 10300, estProjete: false }
 ];
 
 function rendre(mois: readonly MoisEvolution[] = MOIS) {
   return render(
     <GrapheEvolution
-      mois={mois} seuil={null} libelleNiveau="disponible"
+      mois={mois} seuil={null} libelleNiveau="solde" libelleNiveauProjete="disponible (hypothèse)"
       formater={formater} formaterCourt={formaterCourt}
     />
   );
@@ -103,5 +103,59 @@ describe('lisibilité des entrées et des sorties', () => {
     // doivent figurer.
     expect([...colonnes!.querySelectorAll('span')].some((el) => el.textContent === '8,9k'))
       .toBe(false);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Le fait et l'hypothèse (lot L1)
+   ───────────────────────────────────────────────────────────────────────── */
+
+const MOIS_MIXTE: readonly MoisEvolution[] = [
+  { mois: '2026-06', libelle: 'JUIN', entrees: 6000, sorties: 5200, niveau: 8900, estProjete: false },
+  { mois: '2026-07', libelle: 'JUIL', entrees: 7200, sorties: 5800, niveau: 10300, estProjete: true }
+];
+
+describe('le fait et l’hypothèse ne se dessinent pas pareil', () => {
+  /**
+   * SANS CE TEST, LE TRAIT POINTILLÉ POURRAIT REDEVENIR UN SEUL TRAIT PLEIN
+   * sans qu'aucune assertion ne le remarque — exactement le risque qu'un mois
+   * deviné se lise comme un mois connu.
+   */
+  it('trace un trait à part pour la portion projetée', () => {
+    const { container } = render(
+      <GrapheEvolution
+        mois={MOIS_MIXTE} seuil={null} libelleNiveau="solde"
+        libelleNiveauProjete="disponible (hypothèse)"
+        formater={formater} formaterCourt={formaterCourt}
+      />
+    );
+    const traitProjete = [...container.querySelectorAll('polyline')]
+      .find((el) => el.className.baseVal.includes('ligneProjetee'));
+    expect(traitProjete).toBeTruthy();
+  });
+
+  it('ne trace aucun trait projeté quand tous les mois sont des faits', () => {
+    const { container } = rendre(); // MOIS : deux mois, tous deux `estProjete: false`.
+    const traitProjete = [...container.querySelectorAll('polyline')]
+      .find((el) => el.className.baseVal.includes('ligneProjetee'));
+    expect(traitProjete).toBeUndefined();
+  });
+
+  // Le trait seul ne suffit pas : un mot en clair, lisible même sans percevoir
+  // la différence de pointillés.
+  it('annonce en clair qu’un mois à venir est prévu, pas constaté', () => {
+    render(
+      <GrapheEvolution
+        mois={MOIS_MIXTE} seuil={null} libelleNiveau="solde"
+        libelleNiveauProjete="disponible (hypothèse)"
+        formater={formater} formaterCourt={formaterCourt}
+      />
+    );
+    expect(screen.getByText('prévu')).toBeTruthy();
+  });
+
+  it('n’annonce rien de « prévu » sous un mois déjà clos', () => {
+    rendre();
+    expect(screen.queryByText('prévu')).toBeNull();
   });
 });

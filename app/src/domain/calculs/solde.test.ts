@@ -3,7 +3,7 @@ import { dateISO, euros, ratio } from '../types';
 import type { Depense } from './depenses';
 import type { Echeance, RecetteEncaissee } from './provisions';
 import type { MouvementBancaire } from './banque';
-import { provenanceSolde, soldeDerive } from './solde';
+import { provenanceSolde, soldeAuDernierJourDe, soldeDerive } from './solde';
 
 const recette = (id: string, montant: number, encaisseeLe: string): RecetteEncaissee => ({
   id, montant: euros(montant), encaisseeLe: dateISO(encaisseeLe)
@@ -359,5 +359,71 @@ describe('provenance du solde', () => {
     expect(provenanceSolde(null, [], [], [], [])).toBe('sansDate');
     expect(provenanceSolde(null, [recette('r1', 4000, '2026-07-10')], [], [], []))
       .toBe('sansDate');
+  });
+});
+
+/**
+ * LE SOLDE DE FIN DE MOIS — CE QUE LE GRAPHE DE TRÉSORERIE TRACE POUR LE
+ * PASSÉ (lot L1).
+ *
+ * `soldeDerive` seule ne sait répondre qu'à « combien AUJOURD'HUI » : elle
+ * n'a pas de borne haute, elle somme tout ce qui suit `soldeInitialAu` sans
+ * jamais s'arrêter. `soldeAuDernierJourDe` ajoute cette borne, pour qu'un
+ * mois déjà clos reste un FAIT figé — et non un nombre qui continuerait de
+ * bouger si on le relisait le mois suivant.
+ */
+describe('solde de fin de mois — un fait figé, pas une photo qui bouge', () => {
+  it('vaut ce que les faits du mois disent, sans ceux du mois suivant', () => {
+    const soldeFinJuillet = soldeAuDernierJourDe(
+      dateISO('2026-07-31'),
+      euros(1000), AVANT_TOUT,
+      [recette('r1', 4000, '2026-07-10')],
+      [depense({ payeeLe: dateISO('2026-08-05') })], // payée en AOÛT : hors du mois regardé
+      [], []
+    );
+    // 1000 (initial) + 4000 (recette de juillet) — la dépense d'août est ignorée.
+    expect(soldeFinJuillet).toBe(5000);
+  });
+
+  /**
+   * PREUVE PAR MUTATION DE LA FRONTIÈRE (voir le compte rendu) : si le filtre
+   * de borne haute utilisait `<` au lieu de `<=`, ce test échouerait — le
+   * dernier jour du mois ferait alors partie du mois SUIVANT.
+   */
+  it('inclut un fait daté du dernier jour du mois lui-même', () => {
+    const soldeFinJuillet = soldeAuDernierJourDe(
+      dateISO('2026-07-31'),
+      euros(1000), AVANT_TOUT,
+      [recette('r1', 4000, '2026-07-31')],
+      [], [], []
+    );
+    expect(soldeFinJuillet).toBe(5000);
+  });
+
+  it('reprend tous les faits une fois la borne haute reculée d’un mois', () => {
+    const soldeFinAout = soldeAuDernierJourDe(
+      dateISO('2026-08-31'),
+      euros(1000), AVANT_TOUT,
+      [recette('r1', 4000, '2026-07-10')],
+      [depense({ payeeLe: dateISO('2026-08-05') })],
+      [], []
+    );
+    expect(soldeFinAout).toBe(1000 + 4000 - 300);
+  });
+
+  // Sans date de solde de départ, le relevé fait foi seul (voir plus haut) —
+  // la borne haute doit s'appliquer À LUI AUSSI, sans quoi un mouvement du
+  // mois suivant se glisserait dans le solde d'un mois déjà clos.
+  it('applique aussi la borne haute au relevé quand aucune date n’est posée', () => {
+    const soldeFinJuillet = soldeAuDernierJourDe(
+      dateISO('2026-07-31'),
+      euros(1000), null, [],
+      [], [],
+      [
+        mouvement({ id: 'm1', date: dateISO('2026-07-20'), montant: euros(500) }),
+        mouvement({ id: 'm2', date: dateISO('2026-08-01'), montant: euros(9000) })
+      ]
+    );
+    expect(soldeFinJuillet).toBe(1500);
   });
 });
