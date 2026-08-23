@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, provenanceSoldeDe } from '../../state/selecteurs';
 import { etatProjection, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
@@ -13,9 +13,13 @@ import {
   type EnveloppeProvision, enveloppesDeProvision
 } from '../../domain/calculs/enveloppes';
 import { LIBELLE_NATURE } from '../../domain/calculs/provisions';
+import type { NatureDette } from '../../domain/calculs/provisions';
 import { LIBELLE_IGNORE_IR } from '../../domain/calculs/provisionImpotRevenu.libelles';
 import { CartePliable } from '../components/CartePliable';
 import { GrapheEvolution } from '../components/GrapheEvolution';
+import { Sheet } from '../components/Sheet';
+import { detailDeLaDette } from '../../state/selecteurs.dette';
+import { PanneauDetailDette } from '../components/DetailDette';
 import { Chiffre } from '../components/Chiffre';
 import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
@@ -370,7 +374,10 @@ function EvolutionDuCompte() {
  * qu'on continue pourtant à devoir.
  */
 function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
-  const echeances = useFaits((e) => e.faits.echeances);
+  const faits = useFaits((e) => e.faits);
+  const echeances = faits.echeances;
+  /** La nature dont on regarde le détail, ou `null` quand aucune. */
+  const [ouverte, setOuverte] = useState<NatureDette | null>(null);
   const toutes = enveloppesDeProvision(
     etat.tresorerie.solde, etat.provisionsParNature, echeances
   );
@@ -410,20 +417,55 @@ function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
   const seuilCouvert = euros(Math.min(etat.tresorerie.reserve, Math.max(0, etat.tresorerie.dispo)));
 
   return (
-    <ul className={styles.enveloppes}>
-      {dettes.map((e) => <VignetteDette key={e.nature} e={e} />)}
-      <VignetteTva e={tva} />
-      {seuilDu > 0 && <VignetteReserve du={seuilDu} couvert={seuilCouvert} />}
-    </ul>
+    <>
+      <ul className={styles.enveloppes}>
+        {dettes.map((e) => (
+          <VignetteDette key={e.nature} e={e} onOuvrir={() => setOuverte(e.nature)} />
+        ))}
+        <VignetteTva e={tva} onOuvrir={() => setOuverte('tva')} />
+        {/* Le seuil de sécurité n'est pas une dette : il n'a ni mois, ni
+            échéance, ni geste pour le régulariser. Il ne s'ouvre donc pas. */}
+        {seuilDu > 0 && <VignetteReserve du={seuilDu} couvert={seuilCouvert} />}
+      </ul>
+
+      <Sheet
+        ouvert={ouverte !== null}
+        titre={ouverte === null ? '' : `${LIBELLE_NATURE[ouverte]} — le détail`}
+        onFermer={() => setOuverte(null)}
+      >
+        {ouverte !== null && (
+          <PanneauDetailDette detail={detailDeLaDette(faits, ouverte)} />
+        )}
+      </Sheet>
+    </>
   );
 }
 
 /** Une nature de dette : ce qui est mis de côté, face à ce qui est dû. */
-function VignetteDette({ e }: { readonly e: EnveloppeProvision }) {
+function VignetteDette(
+  { e, onOuvrir }: {
+    readonly e: EnveloppeProvision;
+    readonly onOuvrir?: (() => void) | undefined;
+  }
+) {
   const part = e.du <= 0 ? 1 : Math.min(1, e.couvert / e.du);
   const complet = e.couvert >= e.du;
-  return (
-    <li className={styles.enveloppe}>
+
+  /*
+   * LA VIGNETTE DEVIENT UNE PORTE.
+   *
+   * Elle disait trois nombres — couvert, dû, échéance — et répondait à « est-ce
+   * que le 5 juillet va passer ». Elle ne répondait pas à « d'où sort ce
+   * montant » ni à « qu'est-ce que j'ai à faire », et un total ne se vérifie
+   * ni ne s'agit.
+   *
+   * Un BOUTON et non un `<li>` cliquable : c'est une action, elle doit
+   * s'atteindre au clavier et s'annoncer comme telle. Sans `onOuvrir` — dans
+   * un test monté sans panneau — elle redevient une simple donnée à lire
+   * plutôt qu'un bouton qui ne ferait rien.
+   */
+  const contenu = (
+    <>
       <span className={styles.enveloppeTitre}>
         <span className={`${styles.puce} ${styles[e.nature]}`} aria-hidden="true" />
         {LIBELLE_NATURE[e.nature]}
@@ -453,6 +495,23 @@ function VignetteDette({ e }: { readonly e: EnveloppeProvision }) {
           ? 'pas encore appelée'
           : `éch. ${dateCourte(e.prochaineEcheance)}`}
       </span>
+    </>
+  );
+
+  if (onOuvrir === undefined) {
+    return <li className={styles.enveloppe}>{contenu}</li>;
+  }
+
+  return (
+    <li>
+      <button
+        type="button"
+        className={`${styles.enveloppe} ${styles.enveloppeOuvrable}`}
+        onClick={onOuvrir}
+      >
+        {contenu}
+        <span className={styles.enveloppeIndice} aria-hidden="true">détail ›</span>
+      </button>
     </li>
   );
 }
@@ -466,8 +525,13 @@ function VignetteDette({ e }: { readonly e: EnveloppeProvision }) {
  * d'afficher un chiffre inventé — une tuile qui s'abstient reste conforme à
  * ce que l'application sait ; une tuile qui invente un montant ne l'est pas.
  */
-function VignetteTva({ e }: { readonly e: EnveloppeProvision }) {
-  if (e.du > 0) return <VignetteDette e={e} />;
+function VignetteTva(
+  { e, onOuvrir }: {
+    readonly e: EnveloppeProvision;
+    readonly onOuvrir?: (() => void) | undefined;
+  }
+) {
+  if (e.du > 0) return <VignetteDette e={e} onOuvrir={onOuvrir} />;
 
   return (
     <li className={styles.enveloppe}>

@@ -505,7 +505,7 @@ export function provisionIrDe(
 }
 
 /** Le reste à provisionner, dans la résolution qu'attend le volet 2. */
-function resteAProvisionnerDe(
+export function resteAProvisionnerDe(
   r: Resolution<ProvisionImpotRevenu> | null
 ): Resolution<Euros> | undefined {
   if (r === null) return undefined;
