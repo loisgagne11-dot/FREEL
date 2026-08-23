@@ -366,12 +366,39 @@ describe('l’évolution du compte', () => {
    * C'est lui qui explique la pente du segment au-dessus. Sans lui, deux barres
    * imposent la soustraction de tête, douze fois de suite.
    */
+  /**
+   * Le net porte le signe, jamais les barres seules. Le jeu d'essai doit donc
+   * comporter un MOUVEMENT : depuis qu'un mois vide n'écrit plus « +0 € », un
+   * dossier sans recette ni dépense n'a aucun net à montrer — et c'est voulu.
+   */
   it('écrit le net de chaque mois sous son libellé', () => {
+    poser({
+      soldeInitial: euros(10_000),
+      besoinMensuel: euros(1_000),
+      recettes: [{
+        id: 'r1', clientNom: 'C', libelle: 'F', montant: euros(5_000),
+        emiseLe: dateISO('2026-03-01'), encaisseeLe: dateISO('2026-03-20'),
+        modeReglement: null, numero: '2026-001'
+      }]
+    });
+
+    const carte = screen.getByText(/Évolution du compte/).closest('section');
+    expect(within(carte as HTMLElement).getAllByText(/^[+−]/).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * UN MOIS SANS MOUVEMENT N'ÉCRIT RIEN.
+   *
+   * Le graphe imprimait « +0 € », « −0 € » et un net à zéro sur chaque mois
+   * vide : une vingtaine de zéros pour douze mois sur une année qui démarre
+   * tard. L'œil les lit comme des données, cherche ce qu'ils distinguent, et
+   * ne trouve rien — le graphe passait pour cassé alors qu'il disait vrai.
+   */
+  it('n’écrit aucun zéro sur un mois sans mouvement', () => {
     poser({ soldeInitial: euros(10_000), besoinMensuel: euros(1_000) });
 
     const carte = screen.getByText(/Évolution du compte/).closest('section');
-    // Le signe est porté par le net, jamais par les barres seules.
-    expect(within(carte as HTMLElement).getAllByText(/^[+−]/).length).toBeGreaterThan(0);
+    expect(within(carte as HTMLElement).queryAllByText(/^[+−]\s*0/)).toHaveLength(0);
   });
 });
 

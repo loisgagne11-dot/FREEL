@@ -299,9 +299,25 @@ export function GrapheEvolution(
                   sienne : chaque chiffre reste soudé au trait qu'il légende, au
                   lieu de forcer un aller-retour de l'œil entre un nombre et une
                   barre parmi douze. */}
-              <span className={styles.valeurEntree}>
-                +<Montant>{formaterCourt(m.entrees)}</Montant>
-              </span>
+              {/*
+                * UN MOIS SANS MOUVEMENT N'ÉCRIT RIEN.
+                *
+                * Le graphe imprimait « +0 € » et « −0 € » sur chaque mois vide,
+                * plus « +0 € » de net dessous : trois zéros par colonne, et sur
+                * une année qui démarre en avril, une vingtaine de zéros pour
+                * douze mois. L'œil les lit comme des données, cherche ce qu'ils
+                * distinguent, et ne trouve rien — le graphe passait pour cassé
+                * alors qu'il disait la vérité.
+                *
+                * Le vide se montre en ne montrant rien. La colonne garde sa
+                * place et son mois : c'est l'absence de chiffre qui dit
+                * l'absence de mouvement.
+                */}
+              {m.entrees > 0 && (
+                <span className={styles.valeurEntree}>
+                  +<Montant>{formaterCourt(m.entrees)}</Montant>
+                </span>
+              )}
               {/* Les barres elles-mêmes restent décoratives : le pixel n'ajoute
                   rien que les deux montants qui l'encadrent ne disent déjà. */}
               <span className={styles.barres} aria-hidden="true">
@@ -314,16 +330,31 @@ export function GrapheEvolution(
                   style={{ height: `${(m.sorties / mouvementMax) * HAUTEUR_BARRES}px` }}
                 />
               </span>
-              <span className={styles.valeurSortie}>
-                −<Montant>{formaterCourt(m.sorties)}</Montant>
-              </span>
+              {m.sorties > 0 && (
+                <span className={styles.valeurSortie}>
+                  −<Montant>{formaterCourt(m.sorties)}</Montant>
+                </span>
+              )}
               <span className={styles.axeMois}>{m.libelle}</span>
               {/* Le net sous le mois : c'est lui qui explique la pente du
                   segment juste au-dessus, et il évite la soustraction de tête
                   que deux barres imposeraient. */}
-              <span className={net < 0 ? styles.netNegatif : styles.netPositif}>
-                {net >= 0 ? '+' : '−'}<Montant>{formaterCourt(Math.abs(net))}</Montant>
-              </span>
+              {/*
+                * LE NET N'EXPLIQUE QUE CE QUE LES DEUX FLUX NE DISENT PAS.
+                *
+                * Il ne s'écrit que si les DEUX flux existent. Sur un mois vide
+                * il vaudrait zéro, et un zéro de plus n'explique aucune pente —
+                * le segment au-dessus est plat, ce qui se voit. Sur un mois qui
+                * n'a qu'une sortie, le net RÉPÈTE cette sortie : deux fois le
+                * même nombre l'un sous l'autre, et l'œil cherche la différence
+                * entre eux. Le net a sa raison d'être quand il évite une
+                * soustraction de tête, pas quand il recopie.
+                */}
+              {m.entrees > 0 && m.sorties > 0 && (
+                <span className={net < 0 ? styles.netNegatif : styles.netPositif}>
+                  {net >= 0 ? '+' : '−'}<Montant>{formaterCourt(Math.abs(net))}</Montant>
+                </span>
+              )}
               {/* Un mot en clair, pas seulement un trait en pointillés : une
                   différence de trait seule échappe à qui ne la voit pas, ou ne
                   la cherche pas — voir « LE FAIT ET L'HYPOTHÈSE… » en tête de
