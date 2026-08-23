@@ -141,3 +141,49 @@ describe('évolution du compte — la frontière entre le fait et l’hypothèse
     expect(fevrier?.sorties).toBe(1300);
   });
 });
+
+/**
+ * AVANT LE SOLDE DE DÉPART, IL N'Y A RIEN À SAVOIR.
+ *
+ * La dérivation ne compte que les faits POSTÉRIEURS à `soldeInitialAu` : ceux
+ * d'avant sont réputés déjà contenus dans le montant saisi. C'est juste pour
+ * le solde d'aujourd'hui, et faux pour un mois antérieur à cette date.
+ *
+ * Un dossier réel l'a montré : sur une année d'avant, des barres
+ * d'encaissement bien visibles de juillet à décembre, et une courbe immobile
+ * au montant de départ au-dessus. Aucune des deux ne mentait — les
+ * encaissements ont eu lieu, et le solde de ces mois-là est simplement
+ * inconnu — mais rien ne disait laquelle croire.
+ */
+describe('une année antérieure au solde de départ', () => {
+  const faits = poser({
+    soldeInitialAu: dateISO('2026-01-29'),
+    recettes: [
+      recette('r1', 5_000, '2025-07-15'),
+      recette('r2', 8_000, '2025-11-20')
+    ]
+  });
+
+  it('ne prétend connaître aucun solde de cette année-là', () => {
+    const mois = evolutionCompte(faits, 2025, MAINTENANT);
+    expect(mois.every((m) => m.niveau === null)).toBe(true);
+  });
+
+  /**
+   * Les FLUX, eux, sont connus : ce sont des écritures datées. Les taire
+   * aussi ferait disparaître une année entière d'activité de l'écran, alors
+   * que seule la position du compte manque.
+   */
+  it('montre quand même les encaissements de l’année', () => {
+    const mois = evolutionCompte(faits, 2025, MAINTENANT);
+    expect(mois.find((m) => m.mois === '2025-07')?.entrees).toBe(5_000);
+    expect(mois.find((m) => m.mois === '2025-11')?.entrees).toBe(8_000);
+  });
+
+  /** L'année qui contient la date d'ancrage reprend son solde à partir du mois
+      où il devient connu, et pas avant. */
+  it('reprend le solde au mois où il devient connu', () => {
+    const mois = evolutionCompte(faits, 2026, MAINTENANT);
+    expect(mois.find((m) => m.mois === '2026-01')?.niveau).not.toBeNull();
+  });
+});

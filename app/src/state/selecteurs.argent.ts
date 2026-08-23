@@ -606,7 +606,34 @@ function differenceMois(a: Mois, b: Mois): number {
  * Le solde de fin de mois, tel que les faits du dossier le disent — jamais
  * recalculé autrement que par `soldeAuDernierJourDe` (voir `domain/calculs/solde.ts`).
  */
-function soldeFinDeMois(faits: Faits, finDeMois: DateISO): Euros {
+/**
+ * Le solde à la fin d'un mois, ou `null` quand il n'est pas connu.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * AVANT LE SOLDE DE DÉPART, IL N'Y A RIEN À SAVOIR
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La dérivation ne compte que les faits POSTÉRIEURS à `soldeInitialAu` : ceux
+ * d'avant sont réputés déjà contenus dans le montant saisi. C'est juste pour
+ * le solde d'aujourd'hui, et faux pour un mois antérieur à cette date — la
+ * fonction rendait alors le solde de départ, tel quel.
+ *
+ * Sur un graphe annuel, cela traçait une ligne PLATE au montant de départ sur
+ * les douze mois d'une année d'avant. Un dossier réel l'a montré : des barres
+ * d'encaissement bien visibles de juillet à décembre, et une courbe immobile
+ * au-dessus — deux séries qui se contredisent sur le même dessin, sans que
+ * rien n'explique laquelle croire.
+ *
+ * Aucune ne mentait : les encaissements ont eu lieu, et le solde de ces
+ * mois-là est simplement INCONNU. C'est cela qu'il faut dire. Tracer le
+ * montant de départ à leur place affirme que le compte portait cette
+ * somme-là toute l'année, ce que personne n'a jamais saisi.
+ */
+function soldeFinDeMois(faits: Faits, finDeMois: DateISO): Euros | null {
+  // La borne est celle de `soldeDerive` : un fait du jour même de l'ancrage
+  // est déjà dedans, donc un mois qui s'achève ce jour-là n'apprend rien.
+  if (faits.soldeInitialAu !== null && finDeMois <= faits.soldeInitialAu) return null;
+
   return soldeAuDernierJourDe(
     finDeMois,
     faits.soldeInitial, faits.soldeInitialAu,
@@ -626,8 +653,12 @@ export interface MoisEvolutionCompte {
   /**
    * Le niveau que la courbe trace pour ce mois. Ce n'est PAS toujours la même
    * grandeur — voir `estProjete`, qui dit laquelle.
+   *
+   * `null` quand le mois s'achève avant la date du solde de départ : son
+   * solde n'est alors pas connu, et la courbe ne doit rien y tracer. Voir
+   * `soldeFinDeMois`.
    */
-  readonly niveau: Euros;
+  readonly niveau: Euros | null;
   /**
    * `false` : ce mois est clos (passé, ou le mois courant), et `niveau` est
    * le SOLDE RÉEL de fin de mois — un fait, dérivé des écritures déjà
