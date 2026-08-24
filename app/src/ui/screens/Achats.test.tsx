@@ -372,3 +372,55 @@ describe('corriger une dépense', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Taux de TVA (%)').value).toBe('20');
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────
+   O1 — l'année de la barre du haut ancre la période de l'écran
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * L'ANNÉE ANCRE, ELLE NE FILTRE PAS.
+ *
+ * Le sélecteur d'année ne s'affichait que sur Argent : on le tournait ailleurs
+ * et rien ne bougeait. Il commande désormais l'ancre à partir de laquelle la
+ * barre de période compte — une seule source pour « quelle année », une pour
+ * « quelle finesse », et toute combinaison des deux désigne un intervalle réel.
+ */
+describe('l’année choisie ancre la période', () => {
+  it('ouvre la maille « mois » sur le dernier mois d’une année passée', async () => {
+    const utilisateur = userEvent.setup();
+    semer({ depenses: [depense({ payeeLe: dateISO('2025-12-05') })] });
+    render(<Achats annee={2025} />);
+
+    await utilisateur.click(screen.getByRole('button', { name: /^Mois/ }));
+    expect(screen.getByText('Décembre 2025')).toBeTruthy();
+  });
+
+  /**
+   * SUR L'ANNÉE COURANTE, ON GARDE AUJOURD'HUI. Ancrer au 31 décembre y ferait
+   * ouvrir l'écran sur un mois qui n'est pas encore arrivé, donc vide.
+   */
+  it('garde le mois en cours sur l’année courante', async () => {
+    const utilisateur = userEvent.setup();
+    semer();
+    render(<Achats annee={new Date().getFullYear()} />);
+
+    await utilisateur.click(screen.getByRole('button', { name: /^Mois/ }));
+    const attendu = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' })
+      .format(new Date());
+    const [moisLu, anneeLue] = attendu.split(' ');
+    expect(screen.getByText(
+      `${(moisLu ?? '').charAt(0).toUpperCase()}${(moisLu ?? '').slice(1)} ${anneeLue ?? ''}`
+    )).toBeTruthy();
+  });
+
+  /** La barre de période continue de naviguer PAR-DESSUS l'ancre. */
+  it('laisse reculer d’un mois à l’intérieur de l’année ancrée', async () => {
+    const utilisateur = userEvent.setup();
+    semer();
+    render(<Achats annee={2025} />);
+
+    await utilisateur.click(screen.getByRole('button', { name: /^Mois/ }));
+    await utilisateur.click(screen.getByRole('button', { name: /précédent/i }));
+    expect(screen.getByText('Novembre 2025')).toBeTruthy();
+  });
+});

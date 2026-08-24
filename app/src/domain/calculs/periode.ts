@@ -118,3 +118,42 @@ export function moisDeLaPeriode(periode: Periode): Mois | null {
     ? periode.du.slice(0, 7) as Mois
     : null;
 }
+
+/**
+ * La date depuis laquelle une période se compte, pour une année choisie.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI UNE ANCRE ET NON UN FILTRE DE PLUS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le sélecteur d'année de la barre du haut et les barres de période des écrans
+ * (Mois / Trimestre / Année / Tout) répondent à deux questions différentes :
+ * l'un dit QUELLE ANNÉE, l'autre QUELLE FINESSE. Les empiler en deux filtres
+ * successifs donnerait des états qui ne veulent rien dire — « le mois d'août,
+ * dans l'année 2025 » alors que la barre pointe sur août 2026, donc un
+ * ensemble vide présenté comme un résultat.
+ *
+ * L'année déplace donc l'ANCRE à partir de laquelle `periodeCourante` compte
+ * son décalage. Une seule source pour l'année, une seule pour la granularité,
+ * et toute combinaison des deux désigne un intervalle réel.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'ANNÉE COURANTE GARDE AUJOURD'HUI, LES AUTRES PRENNENT LEUR FIN
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Sur l'année en cours, l'ancre reste `maintenant` : « Mois » désigne le mois
+ * où l'on est, ce qui est le comportement qu'on attend en ouvrant l'écran.
+ * Ancrer au 31 décembre y ferait ouvrir Facturer sur un mois qui n'est pas
+ * encore arrivé, donc vide.
+ *
+ * Sur une autre année, on ancre au 31 DÉCEMBRE et non au 1ᵉʳ janvier : c'est
+ * le dernier mois qui peut porter des faits, donc celui d'où l'on remonte. Une
+ * ancre au 1ᵉʳ janvier obligerait à avancer onze fois pour atteindre ce qu'on
+ * vient chercher.
+ */
+export function ancreDeLAnnee(annee: number, maintenant: Date = new Date()): Date {
+  if (annee === maintenant.getFullYear()) return maintenant;
+  // Midi UTC : à minuit, un fuseau à l'ouest ferait basculer la date au
+  // 30 décembre, et l'ancre changerait de mois selon le fuseau du lecteur.
+  return new Date(Date.UTC(annee, 11, 31, 12));
+}

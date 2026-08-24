@@ -1,4 +1,4 @@
-import { Suspense, lazy, useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import {
@@ -11,7 +11,7 @@ import { VueMois } from '../components/VueMois';
 import { MoisEnChiffres } from '../components/MoisEnChiffres';
 import { CraCard } from '../components/CraCard';
 import { useToast } from '../components/Toasts';
-import { joursCongeables, joursFeries } from '../../domain/calculs/activite';
+import { joursFeries } from '../../domain/calculs/activite';
 import type { JourDeLaSemaine } from '../../state/selecteurs.activite';
 import type { Creneau, Portee } from '../../domain/calculs/planning';
 import {
@@ -26,7 +26,6 @@ import {
 
 import type { DateISO, Mois } from '../../domain/types';
 import type { Mission } from '../../state/schema';
-import { dateISO } from '../../domain/types';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -72,6 +71,15 @@ const CartePrevision = lazy(() => import('./Activite.analyse')
   .then((m) => ({ default: m.CartePrevision })));
 const CarteRapportParMission = lazy(() => import('./Activite.analyse')
   .then((m) => ({ default: m.CarteRapportParMission })));
+/**
+ * Le formulaire de pose de congés, différé.
+ *
+ * On pose ses vacances trois ou quatre fois par an et on ouvre le plan de
+ * charge tous les matins : voir l'en-tête de son module.
+ */
+const PlageDeConges = lazy(() => import('./Activite.conges')
+  .then((m) => ({ default: m.PlageDeConges })));
+
 const CarteTarifJournalier = lazy(() => import('./Activite.analyse')
   .then((m) => ({ default: m.CarteTarifJournalier })));
 
@@ -119,7 +127,18 @@ const sections = (nbMissions: number, nbClients: number) => [
   { id: 'clients' as Section, libelle: 'Clients', compte: nbClients }
 ];
 
-export function Activite() {
+export interface ProprietesActivite {
+  /**
+   * L'année choisie dans la barre du haut.
+   *
+   * Elle ANCRE le mois parcouru, elle ne le filtre pas : voir `ancreDeLAnnee`.
+   * `undefined` retombe sur l'année de l'horloge — le cas des tests qui
+   * montent cet écran seul, sans la coquille qui porte le sélecteur.
+   */
+  readonly annee?: number;
+}
+
+export function Activite({ annee }: ProprietesActivite = {}) {
   const faits = useFaits((e) => e.faits);
   const poserAjustement = useFaits((e) => e.poserAjustement);
   const poserPlageDeConges = useFaits((e) => e.poserPlageDeConges);
@@ -129,6 +148,32 @@ export function Activite() {
   const [section, setSection] = useState<Section>('charge');
   const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
   const [mois, setMois] = useState<Mois>(() => moisCourant());
+
+  /*
+   * ─────────────────────────────────────────────────────────────────────────
+   * CHANGER D'ANNÉE DÉPLACE LE MOIS, ET NE REMONTE PAS LA NAVIGATION À ZÉRO
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Le mois reste un état d'écran : on le fait défiler avec les flèches, et
+   * ce défilement doit survivre à un aller-retour vers Argent. Le dériver de
+   * l'année le rendrait immobile.
+   *
+   * Mais il doit SUIVRE l'année quand elle change, sinon le sélecteur ne fait
+   * rien ici — le défaut que ce lot corrige. On garde donc le mois de la
+   * bascule et on ne change que son millésime : passer de mars 2026 à 2025
+   * donne mars 2025, et non décembre. C'est le mois qu'on regardait, dans
+   * l'année qu'on vient de demander.
+   *
+   * Le garde `mois.slice(0, 4)` est ce qui empêche la boucle : sans lui,
+   * l'effet réécrirait le mois à chaque rendu et annulerait toute navigation
+   * au sein de l'année choisie.
+   */
+  const anneeVoulue = annee ?? new Date().getFullYear();
+  useEffect(() => {
+    setMois((actuel) => (Number(actuel.slice(0, 4)) === anneeVoulue
+      ? actuel
+      : `${anneeVoulue}-${actuel.slice(5, 7)}` as Mois));
+  }, [anneeVoulue]);
   const idGroupe = useId();
 
   const etat = useMemo(() => etatActivite(faits, mois), [faits, mois]);
@@ -573,7 +618,7 @@ export function Activite() {
                   </Info>
                 </h2>
 
-                <PlageDeConges />
+                <Suspense fallback={null}><PlageDeConges /></Suspense>
               </section>
 
               {/*
@@ -942,124 +987,3 @@ function messageDeSaisie(
  * Une couleur oubliée à la saisie ne doit pas produire deux blocs identiques
  * au planning : c'est justement là qu'on distingue deux donneurs d'ordre.
  */
-
-
-
-
-
-
-/**
- * Poser ou retirer une plage de congés.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * VINGT ET UN CLICS POUR TROIS SEMAINES
- * ─────────────────────────────────────────────────────────────────────────
- *
- * `poserPlageDeConges` existait dans le magasin depuis le début, testée, et
- * aucun écran ne l'appelait : le calendrier ne posait qu'un jour à la fois.
- * Des vacances d'été se saisissaient case par case, et la demi-journée — que le
- * schéma porte depuis la v2 et que le solde de congés compte correctement —
- * était tout simplement inatteignable.
- *
- * C'est la même famille de défaut que les quatre actions non câblées du 13/08 :
- * une action du magasin est une promesse d'interface, et une promesse qu'aucun
- * écran ne tient n'existe pas pour celui qui s'en sert.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LA PLAGE EST RÉDUITE AUX JOURS OUVRÉS, ET ON LE DIT AVANT
- * ─────────────────────────────────────────────────────────────────────────
- *
- * « Du 1er au 21 août » vaut quinze jours ouvrés, pas vingt et un. Enregistrer
- * les week-ends et les fériés gonflerait le solde de congés de moitié — et le
- * dénominateur d'occupation avec. Le compte est donc annoncé AVANT le geste :
- * découvrir après coup qu'on a posé six jours de plus que voulu oblige à
- * défaire à la main ce qu'on croyait avoir fait d'un coup.
- */
-function PlageDeConges() {
-  const poserPlage = useFaits((e) => e.poserPlageDeConges);
-  const signaler = useToast();
-  const id = useId();
-
-  const [du, setDu] = useState('');
-  const [au, setAu] = useState('');
-  const [demiJournee, setDemiJournee] = useState(false);
-
-  const valide = /^\d{4}-\d{2}-\d{2}$/.test(du) && /^\d{4}-\d{2}-\d{2}$/.test(au);
-  const jours = valide ? joursCongeables(dateISO(du), dateISO(au)) : [];
-
-  function appliquer(pose: boolean): void {
-    if (jours.length === 0) return;
-    poserPlage(jours, pose, demiJournee ? 0.5 : 1);
-    const quoi = demiJournee ? 'demi-journée' : 'jour';
-    signaler(
-      pose
-        ? `${jours.length} ${quoi}${jours.length > 1 ? 's' : ''} de congé posée${jours.length > 1 ? 's' : ''}.`
-        : `${jours.length} jour${jours.length > 1 ? 's' : ''} retiré${jours.length > 1 ? 's' : ''} des congés.`
-    );
-    setDu(''); setAu('');
-  }
-
-  return (
-    <section className={styles.plage} aria-labelledby={`${id}-titre`}>
-      <h3 id={`${id}-titre`} className={styles.plageTitre}>
-        Poser une plage
-        <Info libelle="Ce que la plage enregistre">
-          Seuls les jours ouvrés sont retenus&nbsp;: les week-ends et les jours
-          fériés sont écartés, parce qu’un congé posé un dimanche gonflerait
-          ton solde et ton taux d’occupation sans correspondre à rien.
-        </Info>
-      </h3>
-
-      <div className={styles.plageChamps}>
-        <label className={styles.plageChamp} htmlFor={`${id}-du`}>
-          <span>Du</span>
-          <input id={`${id}-du`} type="date" value={du}
-            onChange={(e) => setDu(e.target.value)} />
-        </label>
-
-        <label className={styles.plageChamp} htmlFor={`${id}-au`}>
-          <span>Au</span>
-          <input id={`${id}-au`} type="date" value={au}
-            onChange={(e) => setAu(e.target.value)} />
-        </label>
-
-        <label className={styles.plageCase} htmlFor={`${id}-demi`}>
-          <input id={`${id}-demi`} type="checkbox" checked={demiJournee}
-            onChange={(e) => setDemiJournee(e.target.checked)} />
-          <span>Demi-journées</span>
-        </label>
-      </div>
-
-      {/*
-        * Le compte AVANT le geste : c'est lui qui fait la différence entre
-        * « je pose mes vacances » et « je découvre ce que j'ai posé ».
-        *
-        * Pas de région live, volontairement. Il se recalcule à chaque frappe
-        * dans un champ de date — l'annoncer à voix haute autant de fois serait
-        * du bruit, et il entrerait en concurrence avec le `role="status"` du
-        * navigateur de mois, qui lui a une vraie raison d'interrompre.
-        */}
-      <p className={styles.plageCompte}>
-        {!valide
-          ? 'Choisissez deux dates.'
-          : jours.length === 0
-            ? 'Aucun jour ouvré dans cette plage.'
-            : `${jours.length} jour${jours.length > 1 ? 's' : ''} ouvré${jours.length > 1 ? 's' : ''}`
-              + `${demiJournee ? ', comptés pour une demi-journée chacun' : ''}.`}
-      </p>
-
-      <div className={styles.plageActions}>
-        <button type="button" className={styles.plageAction}
-          disabled={jours.length === 0} onClick={() => appliquer(true)}>
-          Poser ces congés
-        </button>
-        {/* Retirer coûte le même geste que poser : corriger une erreur de
-            saisie ne doit pas être plus cher que la faire. */}
-        <button type="button" className={styles.plageAction}
-          disabled={jours.length === 0} onClick={() => appliquer(false)}>
-          Les retirer
-        </button>
-      </div>
-    </section>
-  );
-}

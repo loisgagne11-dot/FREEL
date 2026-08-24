@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO } from '../types';
-import { dansLaPeriode, moisDeLaPeriode, periodeCourante } from './periode';
+import { ancreDeLAnnee, dansLaPeriode, moisDeLaPeriode, periodeCourante } from './periode';
 
 const LE = (s: string) => new Date(`${s}T12:00:00Z`);
 
@@ -88,5 +88,66 @@ describe('mois d’une période', () => {
   it('ne rend rien pour un trimestre ou une année', () => {
     expect(moisDeLaPeriode(periodeCourante('trimestre', LE('2026-08-13')))).toBeNull();
     expect(moisDeLaPeriode(periodeCourante('annee', LE('2026-08-13')))).toBeNull();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   O1 — l'année choisie ancre la période
+   ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * L'ANNÉE EST UNE ANCRE, PAS UN SECOND FILTRE.
+ *
+ * La barre du haut dit QUELLE ANNÉE, la barre de période dit QUELLE FINESSE.
+ * Les empiler donnerait « le mois d'août, dans l'année 2025 » alors que la
+ * barre pointe sur août 2026 — un ensemble vide présenté comme un résultat.
+ */
+describe('l’ancre d’une année', () => {
+  const MAINTENANT = new Date('2026-06-10T09:00:00Z');
+
+  /**
+   * SUR L'ANNÉE COURANTE, ON GARDE AUJOURD'HUI. Ancrer au 31 décembre y
+   * ferait ouvrir Facturer sur un mois qui n'est pas encore arrivé, donc vide.
+   */
+  it('garde aujourd’hui sur l’année en cours', () => {
+    expect(ancreDeLAnnee(2026, MAINTENANT)).toBe(MAINTENANT);
+    expect(periodeCourante('mois', ancreDeLAnnee(2026, MAINTENANT)).libelle).toBe('Juin 2026');
+  });
+
+  /**
+   * SUR UNE AUTRE ANNÉE, ON ANCRE À SA FIN. C'est le dernier mois qui peut
+   * porter des faits, donc celui d'où l'on remonte ; le 1ᵉʳ janvier
+   * obligerait à avancer onze fois pour atteindre ce qu'on vient chercher.
+   */
+  it('ancre au dernier mois d’une année passée', () => {
+    expect(periodeCourante('mois', ancreDeLAnnee(2025, MAINTENANT)).libelle)
+      .toBe('Décembre 2025');
+  });
+
+  it('rend l’année entière quand la granularité est l’année', () => {
+    const p = periodeCourante('annee', ancreDeLAnnee(2024, MAINTENANT));
+    expect(p.du).toBe('2024-01-01');
+    expect(p.au).toBe('2024-12-31');
+    expect(p.libelle).toBe('2024');
+  });
+
+  /** Le décalage de la barre de période continue de fonctionner PAR-DESSUS. */
+  it('laisse la barre de période naviguer dans l’année ancrée', () => {
+    const ancre = ancreDeLAnnee(2025, MAINTENANT);
+    expect(periodeCourante('mois', ancre, -1).libelle).toBe('Novembre 2025');
+    expect(periodeCourante('trimestre', ancre).libelle).toBe('T4 2025');
+  });
+
+  /**
+   * MIDI ET NON MINUIT.
+   *
+   * À minuit UTC, un fuseau à l'ouest ferait basculer la date au 30 décembre
+   * — l'ancre changerait de mois selon le fuseau du lecteur, ce qui ferait
+   * ouvrir l'écran sur novembre pour les uns et décembre pour les autres.
+   */
+  it('ne bascule pas de mois selon le fuseau', () => {
+    const ancre = ancreDeLAnnee(2025, MAINTENANT);
+    expect(ancre.getUTCMonth()).toBe(11);
+    expect(ancre.getUTCHours()).toBe(12);
   });
 });

@@ -5,6 +5,7 @@ import {
 } from '../../domain/bareme';
 import { useFaits } from '../../state/store';
 import { moisCourant } from '../../state/selecteurs';
+import { ancreDeLAnnee } from '../../domain/calculs/periode';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Sheet } from '../components/Sheet';
@@ -27,12 +28,28 @@ import { CarteCfe } from '../components/CarteCfe';
  * domaine oblige à traiter ce cas, et l'écran le dit plutôt que d'avancer un
  * chiffre.
  */
-export function Outils() {
+export interface ProprietesOutils {
+  /**
+   * L'année choisie dans la barre du haut.
+   *
+   * Elle commande le BARÈME du simulateur : simuler son impôt 2025 se fait au
+   * barème 2025, pas à celui de l'année en cours. `undefined` retombe sur
+   * l'année de l'horloge — le cas des tests qui montent cet écran seul.
+   */
+  readonly annee?: number;
+}
+
+export function Outils({ annee }: ProprietesOutils = {}) {
   const faits = useFaits((e) => e.faits);
   const [caSaisi, setCaSaisi] = useState('');
   const [detailOuvert, setDetailOuvert] = useState(false);
 
-  const m = moisCourant();
+  /* Le barème suit l'année choisie : un abattement, des tranches et un
+     plafond changent d'une année à l'autre, et simuler 2025 au barème 2026
+     donnerait un impôt que personne ne paiera. Le mois de DÉCEMBRE de l'année
+     visée — voir `ancreDeLAnnee` : c'est le dernier mois qu'elle porte, donc
+     celui dont le barème vaut pour l'exercice entier. */
+  const m = moisCourant(ancreDeLAnnee(annee ?? new Date().getFullYear()));
   const type = faits.entreprise.typeActivite;
 
   // Une saisie vide n'est pas zéro : elle veut dire « je n'ai rien dit ».

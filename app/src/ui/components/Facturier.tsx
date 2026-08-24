@@ -11,7 +11,7 @@ import {
 } from '../../domain/calculs/facturier';
 import type { ModeReglement } from '../../domain/calculs/livreRecettes';
 import {
-  type Granularite, type Periode, periodeCourante
+  type Granularite, type Periode, ancreDeLAnnee, periodeCourante
 } from '../../domain/calculs/periode';
 import type { Mois } from '../../domain/types';
 import { dateISO } from '../../domain/types';
@@ -131,8 +131,15 @@ const FILTRES: readonly { readonly id: StatutFacture | 'tout'; readonly libelle:
 const stockageParDefaut = stockageIndexedDB();
 
 export function Facturier(
-  { onNouvelle, onRevoir, stockage = stockageParDefaut }: {
+  { onNouvelle, onRevoir, stockage = stockageParDefaut, annee }: {
     readonly onNouvelle: () => void;
+    /**
+     * L'année choisie dans la barre du haut.
+     *
+     * `undefined` retombe sur l'année de l'horloge — le cas des tests qui
+     * montent ce composant seul, sans la coquille qui porte le sélecteur.
+     */
+    readonly annee?: number;
     /**
      * Rouvre une facture déjà émise, par son numéro.
      *
@@ -164,9 +171,18 @@ export function Facturier(
   const [limite, setLimite] = useState(LIGNES_PAR_PAGE);
   const [refus, setRefus] = useState<string | null>(null);
 
+  /*
+   * L'ANNÉE CHOISIE EST L'ANCRE, PAS UN FILTRE DE PLUS.
+   *
+   * La barre du haut dit QUELLE ANNÉE, la barre de période dit QUELLE FINESSE.
+   * Les empiler en deux filtres successifs donnerait « le mois d'août, dans
+   * l'année 2025 » alors que la barre pointe sur août 2026 — un ensemble vide
+   * présenté comme un résultat. Voir `ancreDeLAnnee`.
+   */
+  const ancre = useMemo(() => ancreDeLAnnee(annee ?? new Date().getFullYear()), [annee]);
   const periode: Periode = useMemo(
-    () => periodeCourante(granularite, new Date(), decalage),
-    [granularite, decalage]
+    () => periodeCourante(granularite, ancre, decalage),
+    [granularite, ancre, decalage]
   );
   const etat = useMemo(() => etatFacturier(faits, periode), [faits, periode]);
 

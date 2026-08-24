@@ -15,7 +15,7 @@ import {
 import { Greet } from '../components/Greet';
 import { BarrePeriode } from '../components/BarrePeriode';
 import {
-  type Granularite, periodeCourante
+  type Granularite, ancreDeLAnnee, periodeCourante
 } from '../../domain/calculs/periode';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
@@ -55,6 +55,14 @@ export interface ProprietesAchats {
    * toucher à l'écran.
    */
   readonly stockage?: StockageJustificatifs;
+  /**
+   * L'année choisie dans la barre du haut : elle ANCRE la période de l'écran,
+   * elle ne s'y ajoute pas. Voir `ancreDeLAnnee`.
+   *
+   * `undefined` retombe sur l'année de l'horloge — le cas des tests qui
+   * montent cet écran seul, sans la coquille qui porte le sélecteur.
+   */
+  readonly annee?: number;
 }
 
 type Section = 'depenses' | 'releve';
@@ -73,7 +81,7 @@ type Panneau =
 
 const stockageParDefaut = stockageIndexedDB();
 
-export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) {
+export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats = {}) {
   const faits = useFaits((e) => e.faits);
   const attacherJustificatif = useFaits((e) => e.attacherJustificatif);
   const definirRapprochement = useFaits((e) => e.definirRapprochement);
@@ -110,9 +118,18 @@ export function Achats({ stockage = stockageParDefaut }: ProprietesAchats = {}) 
    */
   const [granularite, setGranularite] = useState<Granularite>('tout');
   const [decalage, setDecalage] = useState(0);
+  /*
+   * L'ANNÉE CHOISIE EST L'ANCRE, PAS UN FILTRE DE PLUS.
+   *
+   * La barre du haut dit QUELLE ANNÉE, la barre de période dit QUELLE FINESSE.
+   * Les empiler en deux filtres successifs donnerait « le mois d'août, dans
+   * l'année 2025 » alors que la barre pointe sur août 2026 — un ensemble vide
+   * présenté comme un résultat. Voir `ancreDeLAnnee`.
+   */
+  const ancre = useMemo(() => ancreDeLAnnee(annee ?? new Date().getFullYear()), [annee]);
   const periode = useMemo(
-    () => periodeCourante(granularite, new Date(), decalage),
-    [granularite, decalage]
+    () => periodeCourante(granularite, ancre, decalage),
+    [granularite, ancre, decalage]
   );
 
   const etat = useMemo(() => etatAchats(faits, new Date(), periode), [faits, periode]);
