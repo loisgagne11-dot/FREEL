@@ -18,6 +18,7 @@ import { VERSION_SCHEMA, type Faits, motifRefusFaits } from '../../state/schema'
 import { completerFaits } from '../../state/schema.migrations';
 import type { RapportMigration } from '../../infra/migration';
 import { convertirBundle } from '../../infra/migration.legacy';
+import { estLeJeuDeDemonstration } from '../../domain/calculs/demonstration';
 import { Info } from '../components/Info';
 import { dateCourte } from '../format';
 import styles from './Compte.module.css';
@@ -105,7 +106,18 @@ type Etat =
     readonly phase: 'confirmer-envoi';
     readonly session: Session;
     readonly distant: InstantaneDistant;
+    /**
+     * Pourquoi on demande confirmation.
+     *
+     * Les deux dangers écrasent le compte, et ils ne se racontent pas de la
+     * même façon : « cet appareil est vide » n'explique rien à qui vient de
+     * charger la démonstration et voit un écran plein de factures.
+     */
+    readonly motif: MotifDeConfirmation;
   };
+
+/** Ce qui, sur cet appareil, ne doit pas partir sur le compte sans un mot. */
+type MotifDeConfirmation = 'appareil-vide' | 'jeu-de-demonstration';
 
 interface Resume {
   readonly clients: number;
@@ -126,6 +138,31 @@ function resumer(faits: Faits): Resume {
 /** Rien du tout : ni client, ni mission, ni recette, ni dépense. */
 function estVide(r: Resume): boolean {
   return r.clients === 0 && r.missions === 0 && r.recettes === 0 && r.depenses === 0;
+}
+
+/**
+ * Ce qui, sur cet appareil, ne doit pas partir sur le compte sans un mot —
+ * ou `null` quand l'envoi est ordinaire.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX DANGERS, ET LE SECOND MANQUAIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le premier est l'appareil VIDE : on installe l'application quelque part, elle
+ * n'a rien, et « enregistrer sur le compte » est le bouton qui semble le plus
+ * utile — il effacerait tout.
+ *
+ * Le second est le jeu de DÉMONSTRATION, et il n'était pas couvert : un
+ * appareil rempli de factures fictives n'est pas vide, donc l'envoi partait
+ * sans rien demander. Charger la démonstration pour regarder puis enregistrer
+ * sur le compte écrasait des données réelles, en silence.
+ *
+ * L'ordre compte : le vide est vérifié d'abord parce qu'un dossier vide n'a
+ * pas d'entreprise à reconnaître.
+ */
+function motifDeConfirmation(faits: Faits): MotifDeConfirmation | null {
+  if (estVide(resumer(faits))) return 'appareil-vide';
+  return estLeJeuDeDemonstration(faits.entreprise) ? 'jeu-de-demonstration' : null;
 }
 
 function resumeCourt(r: Resume): string {
@@ -250,10 +287,11 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     const cote = distant === null ? null : resumeDistant(distant);
     const ecraserait = distant !== null && (cote === null || !estVide(cote));
 
-    if (estVide(resumer(faitsLocaux)) && ecraserait) {
+    const motif = motifDeConfirmation(faitsLocaux);
+    if (motif !== null && ecraserait && distant !== null) {
       setErreur(null);
       setMessage(null);
-      setEtat({ phase: 'confirmer-envoi', session, distant });
+      setEtat({ phase: 'confirmer-envoi', session, distant, motif });
       return;
     }
     await envoyer(session, distant === null ? null : distant.version);
@@ -440,7 +478,8 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
           )}
 
           {etat.phase === 'confirmer-envoi' && (
-            <EnvoiDuVide
+            <ConfirmerEnvoi
+              motif={etat.motif}
               distant={etat.distant}
               onConfirmer={() => void envoyer(etat.session, etat.distant.version)}
               onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
@@ -535,24 +574,43 @@ function EtatDuCompte({ distant, local }: { distant: EtatDistant; local: Resume 
  * l'écriture passerait. C'est l'INTENTION qui est douteuse, et seule une
  * personne peut la confirmer.
  */
-function EnvoiDuVide(
-  { distant, onConfirmer, onAnnuler }: {
+function ConfirmerEnvoi(
+  { motif, distant, onConfirmer, onAnnuler }: {
+    motif: MotifDeConfirmation;
     distant: InstantaneDistant;
     onConfirmer: () => void;
     onAnnuler: () => void;
   }
 ) {
   const cote = resumeDistant(distant);
+  const contenuDuCompte = cote === null
+    ? '.'
+    : ` — ${cote.recettes} recette(s), ${cote.depenses} dépense(s), `
+      + `${cote.clients} client(s).`;
+
   return (
     <div className={styles.apercu}>
-      <p className={styles.avertissement}>
-        Cet appareil ne contient <strong>aucune donnée</strong>. L’envoyer
-        effacerait ce que le compte contient
-        {cote === null
-          ? '.'
-          : ` — ${cote.recettes} recette(s), ${cote.depenses} dépense(s), `
-            + `${cote.clients} client(s).`}
-      </p>
+      {motif === 'appareil-vide'
+        ? (
+          <p className={styles.avertissement}>
+            Cet appareil ne contient <strong>aucune donnée</strong>. L’envoyer
+            effacerait ce que le compte contient{contenuDuCompte}
+          </p>
+        )
+        : (
+          /*
+           * LE DANGER SE NOMME, SINON IL NE SE VOIT PAS.
+           *
+           * L'écran est plein de factures : rien n'y ressemble à une perte de
+           * données. Il faut donc dire que ces factures sont FICTIVES, et ce
+           * que l'envoi ferait des vraies.
+           */
+          <p className={styles.avertissement}>
+            Cet appareil contient le <strong>jeu de démonstration</strong> —
+            des clients et des factures fictifs. L’envoyer remplacerait le
+            contenu du compte{contenuDuCompte}
+          </p>
+        )}
       <p className={styles.consequence}>
         Si tu voulais au contraire récupérer ces données ici, reviens en
         arrière et choisissez <em>Charger le compte sur cet appareil</em>, ou
@@ -560,7 +618,9 @@ function EnvoiDuVide(
       </p>
       <div className={styles.actions}>
         <button type="button" className={styles.action} onClick={onConfirmer}>
-          Effacer quand même le compte
+          {motif === 'appareil-vide'
+            ? 'Effacer quand même le compte'
+            : 'Remplacer quand même le compte'}
         </button>
         <button type="button" className={styles.actionPrincipale} onClick={onAnnuler}>
           Revenir en arrière

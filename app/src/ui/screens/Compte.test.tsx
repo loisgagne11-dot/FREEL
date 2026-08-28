@@ -302,6 +302,119 @@ describe('envoi d’un appareil vide', () => {
   });
 });
 
+/**
+ * LE SECOND DANGER, QUI N'ÉTAIT PAS COUVERT.
+ *
+ * Un appareil rempli du jeu de démonstration n'est PAS vide : le garde-fou
+ * précédent le laissait donc passer sans rien demander. Charger la
+ * démonstration pour regarder, puis « enregistrer sur le compte », écrasait des
+ * données réelles par des factures fictives — en silence, et sans que le
+ * compteur de version y voie quoi que ce soit d'anormal.
+ */
+describe('envoi d’un appareil rempli de la démonstration', () => {
+  const COMPTE_PLEIN = ligneDistante(3, {
+    version: VERSION_SCHEMA,
+    recettes: [{ id: 'r1' }, { id: 'r2' }],
+    clients: [{ id: 'c1' }]
+  });
+
+  /** L'identité que le jeu de démonstration porte, telle qu'il est livré. */
+  const poserLaDemonstration = (): void => {
+    const base = faitsVides();
+    useFaits.setState({
+      faits: {
+        ...base,
+        entreprise: {
+          ...base.entreprise,
+          nom: 'Atelier de démonstration',
+          siret: '000 000 000 00000'
+        },
+        clients: [{ id: 'c9', nom: 'Studio Lumen' }] as never
+      }
+    });
+  };
+
+  it('n’écrase pas un compte plein sans confirmation', async () => {
+    const appel = reponses(SESSION_OK, COMPTE_PLEIN);
+    poserLaDemonstration();
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+
+    expect(await screen.findByText(/jeu de démonstration/i)).toBeTruthy();
+    // Rien n'est parti : la confirmation vient AVANT l'écriture.
+    expect(ecritures(appel)).toEqual([]);
+  });
+
+  /**
+   * LE DANGER SE NOMME. L'écran est plein de factures — rien n'y ressemble à
+   * une perte de données, et « cet appareil est vide » n'expliquerait rien.
+   */
+  it('dit que ces factures sont fictives, et ce que l’envoi remplacerait', async () => {
+    reponses(SESSION_OK, COMPTE_PLEIN);
+    poserLaDemonstration();
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+
+    // Le libellé est dans un `<strong>` : c'est le PARAGRAPHE qu'on veut lire,
+    // pas le mot en gras qui n'en porte qu'une moitié.
+    const marqueur = await screen.findByText(/jeu de démonstration/i);
+    const avertissement = marqueur.closest('p') as HTMLElement;
+    expect(avertissement.textContent).toMatch(/fictifs/);
+    expect(avertissement.textContent).toMatch(/2 recette\(s\)/);
+  });
+
+  /** Le garde-fou informe, il n'interdit pas : le remplacement reste possible. */
+  it('envoie quand même si l’utilisateur confirme', async () => {
+    const appel = reponses(SESSION_OK, COMPTE_PLEIN, ligneDistante(4));
+    poserLaDemonstration();
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+    await utilisateur.click(
+      await screen.findByRole('button', { name: /Remplacer quand même/ })
+    );
+
+    expect(ecritures(appel).at(-1)?.url).toContain('version=eq.3');
+  });
+
+  /**
+   * QUI RENOMME SON ENTREPRISE SORT DE LA RECONNAISSANCE, et c'est voulu : à
+   * ce moment-là il s'est approprié le dossier. La confirmation qu'on voit
+   * pour rien est celle qu'on cesse de lire.
+   */
+  it('ne demande plus rien une fois l’entreprise renommée', async () => {
+    const appel = reponses(SESSION_OK, COMPTE_PLEIN, ligneDistante(4));
+    const base = faitsVides();
+    useFaits.setState({
+      faits: {
+        ...base,
+        entreprise: { ...base.entreprise, nom: 'Mon activité', siret: '000 000 000 00000' },
+        clients: [{ id: 'c9', nom: 'Studio Lumen' }] as never
+      }
+    });
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(
+      await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' })
+    );
+
+    expect((await screen.findByRole('status')).textContent).toMatch(/enregistrées sur le compte/i);
+    expect(ecritures(appel).at(-1)?.methode).toBe('PATCH');
+  });
+});
+
 describe('conflit d’écriture', () => {
   /**
    * Zéro ligne modifiée : le compte a bougé. L'écran doit s'arrêter et
