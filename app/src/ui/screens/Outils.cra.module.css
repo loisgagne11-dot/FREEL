@@ -163,30 +163,6 @@
   color: var(--green);
 }
 
-/* ---------- l'aperçu ---------- */
-
-.apercu {
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  /* Le papier est toujours clair : un fond neutre le détache du thème sombre
-     sans lui donner l'air d'un bug d'affichage. */
-  background: #2a2a28;
-  padding: 12px;
-  overflow: auto;
-}
-
-:root[data-theme="light"] .apercu,
-:root:not([data-theme="dark"]) .apercu {
-  background: #e9e9e4;
-}
-
-.papier {
-  background: #ffffff;
-  border-radius: 4px;
-  box-shadow: 0 2px 14px rgb(0 0 0 / 0.22);
-}
-
 /* ---------- pied ---------- */
 
 .piedNote {
@@ -238,11 +214,13 @@
     align-items: start;
   }
 
-  .apercu {
+  /* L'aperçu colle en haut et défile DANS son cadre : la saisie défile à
+     côté sans l'emporter. La sélection porte sur le second enfant de la
+     grille — le cadre vient de `documents/Apercu.module.css`, dont les
+     classes sont hachées ailleurs et inatteignables d'ici. */
+  .atelier > :last-child {
     position: sticky;
     top: 0;
-    /* La hauteur du corps du dialogue, moins ses marges : l'aperçu défile
-       DANS son cadre, et la saisie défile à côté sans l'emporter. */
     max-height: calc(100vh - 190px);
   }
 }

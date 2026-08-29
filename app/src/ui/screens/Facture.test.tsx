@@ -145,7 +145,10 @@ describe('régime de TVA', () => {
     await rendreSaisie();
     await userEvent.setup().type(screen.getByLabelText('Client'), 'Kunde');
 
-    expect(screen.getByText(/autoliquidation/i)).toBeTruthy();
+    // La note de régime est celle du FORMULAIRE : le document, à côté, porte
+    // aussi la mention légale, et une recherche non ancrée trouve les deux
+    // depuis que l'aperçu est vivant.
+    expect(screen.getAllByText(/autoliquidation/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/DES/)).toBeTruthy();
   });
 
@@ -171,7 +174,13 @@ describe('totaux', () => {
     semer({ clients: [client()] });
     await rendreSaisie();
     await remplir(userEvent.setup());
-    expect(screen.getByText('Total HT').nextSibling?.textContent).toMatch(/4\s000/u);
+    // Le total se lit sur le DOCUMENT, qui est ce qui part chez le client, et
+    // dans son bloc de totaux : « Total HT » est AUSSI l'en-tête de la
+    // dernière colonne du tableau des prestations.
+    const papier = screen.getByRole('article', { name: /Facture/ });
+    const totaux = papier.querySelector('.doc-totaux') as HTMLElement;
+    expect(within(totaux).getByText('Total HT').nextSibling?.textContent)
+      .toMatch(/4\s000/u);
   });
 
   it('affiche l’échéance déduite du délai du client', async () => {
@@ -229,7 +238,12 @@ describe('émission', () => {
       }]
     });
     await rendreSaisie();
-    expect(screen.getByText('2026-008')).toBeTruthy();
+    // Le numéro apparaît deux fois depuis que l'aperçu est vivant : en tête
+    // du formulaire, et sur le document. C'est voulu — on veut le voir sur le
+    // papier avant d'émettre.
+    expect(screen.getAllByText('2026-008').length).toBeGreaterThanOrEqual(1);
+    expect(within(screen.getByRole('article', { name: /Facture/ }))
+      .getByText('2026-008')).toBeTruthy();
   });
 
   it('affiche le document imprimable après émission', async () => {
@@ -351,5 +365,105 @@ describe('coordonnées de règlement', () => {
     semer({ entreprise: { ...ENTREPRISE, iban: '', bic: '' }, clients: [client()] });
     await emettre();
     expect(screen.queryByText(/Règlement/)).toBeNull();
+  });
+});
+
+/*
+ * L'APERÇU VIVANT — CE QUE CE LOT AJOUTE.
+ *
+ * Le document ne s'affichait qu'APRÈS l'émission, geste irréversible : une
+ * facture irrégulière ne se corrige pas, elle s'annule par un avoir et se
+ * réémet sous un nouveau numéro. On remplissait donc à l'aveugle, et on
+ * découvrait ensuite ce qu'on venait de produire.
+ */
+describe('l’aperçu pendant la saisie', () => {
+  it('montre le document avant même la première frappe', async () => {
+    semer({ clients: [client()] });
+    await rendreSaisie();
+    expect(screen.getByRole('article', { name: /Facture/ })).toBeTruthy();
+  });
+
+  it('suit la saisie ligne par ligne', async () => {
+    semer({ clients: [client()] });
+    await rendreSaisie();
+    await remplir(userEvent.setup());
+
+    const papier = screen.getByRole('article', { name: /Facture/ });
+    // La désignation tapée à gauche apparaît sur le papier à droite, sans
+    // qu'on ait émis quoi que ce soit.
+    expect(papier.textContent).toMatch(/Développement/);
+    expect(papier.textContent).toMatch(/Client France/);
+  });
+
+  /*
+   * LE BROUILLON NE SE CONFOND PAS AVEC UNE FACTURE ÉMISE.
+   *
+   * Son numéro n'est pas encore attribué : deux brouillons du même jour
+   * portent le même. Parti tel quel chez un client, l'un des deux devient un
+   * doublon au livre de quelqu'un. Le bandeau part AVEC le fichier.
+   */
+  it('marque le document « brouillon » tant que la facture n’est pas émise', async () => {
+    semer({ clients: [client()] });
+    await rendreSaisie();
+    const papier = screen.getByRole('article', { name: /Facture/ });
+    expect(papier.textContent).toMatch(/Brouillon/);
+    expect(papier.textContent).toMatch(/n’est pas encore attribué/);
+  });
+
+  it('retire le bandeau une fois la facture émise', async () => {
+    semer({ clients: [client()] });
+    await rendreSaisie();
+    await remplir(userEvent.setup());
+    await userEvent.setup().click(screen.getByRole('button', { name: /Émettre/ }));
+
+    const papier = screen.getByRole('article', { name: /Facture/ });
+    expect(papier.textContent).not.toMatch(/Brouillon/);
+  });
+
+  it('propose d’imprimer et de télécharger sans avoir émis', async () => {
+    semer({ clients: [client()] });
+    await rendreSaisie();
+    expect(screen.getByRole('button', { name: /Télécharger le brouillon/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Imprimer le brouillon/ })).toBeTruthy();
+  });
+
+  /* Les deux montants que l'utilisateur a réclamés : « pour les factures j'ai
+     besoin de voir les deux montants ». */
+  it('porte le HT, la TVA et le net à payer', async () => {
+    semer({ clients: [client()] });
+    await rendreSaisie();
+    const totaux = screen.getByRole('article', { name: /Facture/ })
+      .querySelector('.doc-totaux') as HTMLElement;
+    expect(within(totaux).getByText('Total HT')).toBeTruthy();
+    expect(within(totaux).getByText(/^TVA/)).toBeTruthy();
+    expect(within(totaux).getByText('Net à payer')).toBeTruthy();
+  });
+});
+
+describe('le fichier téléchargé', () => {
+  it('est autonome et emporte sa feuille de style', async () => {
+    semer({ clients: [client()] });
+    await rendreSaisie();
+    await remplir(userEvent.setup());
+
+    let ecrit = '';
+    const creerUrl = vi.fn((blob: Blob) => {
+      void blob.text().then((t) => { ecrit = t; });
+      return 'blob:x';
+    });
+    vi.stubGlobal('URL', { ...URL, createObjectURL: creerUrl, revokeObjectURL: vi.fn() });
+
+    await userEvent.setup().click(
+      screen.getByRole('button', { name: /Télécharger le brouillon/ })
+    );
+    await new Promise((r) => { setTimeout(r, 0); });
+
+    expect(creerUrl).toHaveBeenCalled();
+    // Autonome : il s'ouvrira chez le client, sans notre application autour.
+    expect(ecrit).toMatch(/<!doctype html>/);
+    expect(ecrit).toMatch(/\.doc-table/);
+    // Et le bandeau de brouillon PART avec le fichier : c'est tout son intérêt.
+    expect(ecrit).toMatch(/Brouillon/);
+    vi.unstubAllGlobals();
   });
 });
