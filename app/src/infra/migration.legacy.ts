@@ -788,6 +788,11 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     conges: fusionnerConges(
       congesDesMissions(missionsBrutes), extraireConges(objet(t['conges']))
     ),
+    // L'ancienne application produisait un CRA en liste de numéros de jours,
+    // sans phrase de tâches accomplies : il n'y a rien à reprendre, et une
+    // note inventée depuis la description de mission dirait la même chose pour
+    // les douze mois du contrat.
+    notesCra: [],
     // L'ancienne application rapprochait contre un relevé importé à la main,
     // jamais contre un compte relié. Aucun fait ne permet de dire qu'un compte
     // l'est : on part de `false`, l'utilisateur le renseignera.

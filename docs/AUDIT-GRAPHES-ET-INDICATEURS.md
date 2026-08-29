@@ -132,6 +132,7 @@ pour laquelle ce document a été ouvert.
 | V12 | Sparklines dans les tuiles | ✅ | ❌ | 🚫 §5.5 |
 | V13 | Dépendance client | ✅ | ✅ | ⚠️ barre segmentée + légende chiffrée |
 | V14 | Occupation avec repère 100 % | ⚠️ | ✅ | ✅ **jauge livrée** (lot C4) dans « Le mois en chiffres », avec son dénominateur écrit dessous. La tuile qui donnait un SECOND chiffre d'occupation sur le même écran est retirée&nbsp;: §1.3 |
+| V24 | **Le compte rendu d'activité, semaine par semaine** | ⚠️ liste de numéros de jours | ✅ | ✅ **livré au lot P** — Outils › CRA, atelier deux colonnes avec aperçu vivant. Par semaine&nbsp;: le rang dans le mois, la plage réellement travaillée, une ligne par client ventilée télétravail / sur site, la phrase de tâches. Puis les totaux par client et le grand total. L'ancienne rendait « 1 2 3 4 7 8 9½ 10 »&nbsp;: exact et illisible — un client qui signe veut le volume, pas un calendrier à recopier |
 | V15 | Impôt par tranche | ✅ barres | ✅ barres | ⚠️ **tableau exact** — progrès, la barre était décorative |
 | V16 | Projection par scénarios | ✅ | ❌ | 🚫 §5.5 |
 | V17 | Objectif de CA avec allure attendue | ✅ | ❌ | ✅ **livrée**, absente du handoff&nbsp;: repère mensuel sur le graphe et écart en JOURS en pied |
@@ -180,6 +181,10 @@ Ne sont listés que les verdicts qui appellent une décision.
 | **TJM effectif** et **TJM net** | ✅ **ajoutés depuis** — avec l'écart entre le tarif des contrats et le facturé, qui mesure ce qui se perd en remises et jours non facturés. Le net s'abstient quand le barème ne couvre pas la période |
 | **Bénéfice net / marge %** | 🚫 légitime : le « bénéfice » de l'ancienne n'avait pas de définition comptable stable en micro |
 | **DSO / délai de paiement** | 🟢 **médiane** et non moyenne |
+| **Jours travaillés du mois, par client qui signe** | 🟢 **lot P.** Sur le document ET sur l'écran Activité. La maille est le client OPÉRATIONNEL et non la mission&nbsp;: deux donneurs d'ordre derrière une même agence signent chacun le sien |
+| **Ventilation télétravail / sur site du mois** | 🟢 **lot P.** Lue sur le `lieu` des journées. Une journée sans lieu compte au total et va dans une colonne `sans lieu` — jamais rangée au hasard. Quand le mois n'en connaît aucun, les deux colonnes disparaissent au lieu d'afficher deux zéros trompeurs |
+| **Valorisation du mois au TJM** | 🟢 **déplacée au lot P**, pas perdue. Elle était sur le document remis au client&nbsp;; elle est maintenant sur l'écran Activité, où elle s'adresse à l'utilisateur. Un CRA qui porte un prix se renégocie au lieu de se signer |
+| **Statut d'un CRA — « envoyé le », « validé », « archivé »** | ❌ **volontairement absent.** Le handoff les dessine dans sa liste « CRA récents ». Aucun des trois n'est un fait enregistré&nbsp;: un CRA n'est pas un objet du modèle, c'est une VUE du planning. La colonne montre donc les mois à documenter, avec leur volume et le nombre de documents à produire. Le jour où l'envoi sera enregistré, la date viendra s'y poser |
 | **Dépendance client** | 🟢 sur le CA encaissé de l'année, bien motivé |
 | **Seuils en %** | 🟢 avec le reste en euros, ce que le % seul ne dit pas |
 | **Date probable de franchissement TVA** | ✅ **ajoutée depuis** |
@@ -422,3 +427,35 @@ différent d'une largeur d'écran à l'autre, est supprimé.
 scénarios, les sparklines ou le score /100 (§5.5, §5.1). Ne pas retransformer
 `Repartition` en donut au motif que la maquette en montrait un : c'est le
 *niveau de détail* qui manquait, pas la forme.
+
+---
+
+## 7. Ce que le lot P (29/08) laisse ouvert
+
+**Livré** : V24, le générateur de compte rendu d'activité — aperçu vivant,
+impression et téléchargement d'un fichier autonome, une ventilation par lieu
+qui s'abstient plutôt que de deviner, et la phrase de tâches enregistrée
+(schéma 17). Le montant a quitté le document client.
+
+**Reste ouvert, et nommé plutôt que tu.**
+
+1. **Un lieu par défaut sur le client opérationnel.** Aujourd'hui, le lieu se
+   pose journée par journée. Un compte importé de l'ancienne application n'en
+   a aucun, et son CRA rend donc une colonne `sans lieu` pour tout le mois —
+   honnête, mais peu utile. Une mission passée par une agence a pourtant une
+   convention stable, « chez ce client je suis à distance sauf mention
+   contraire ». Ce serait le même motif de priorité qu'ajustement contre
+   rythme&nbsp;: la journée l'emporte sur la convention. À faire avec
+   `partTeletravail` du plan de charge, qui lit la même notion et doit rester
+   d'accord (invariant n°4).
+
+2. **L'envoi du CRA, enregistré comme un fait.** Il débloquerait les statuts
+   du handoff, qui sont aujourd'hui hors de portée faute de donnée.
+
+3. **Le paquet d'entrée est à 79,94 Ko pour un plafond de 80.** Le budget
+   passe, mais il ne reste rien. La cause est structurelle et connue&nbsp;: le
+   magasin porte ses cinquante actions d'écriture dans le premier rendu, alors
+   que le Pilote n'en déclenche presque aucune. C'est le remède que
+   `selecteurs.activite` a déjà appliqué aux sélecteurs — et il n'a jamais été
+   appliqué au magasin. **À faire en ouverture du lot suivant**, avant tout
+   ajout&nbsp;: l'invariant n°7 dit d'extraire, pas de relever.

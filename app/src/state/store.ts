@@ -283,6 +283,18 @@ interface MagasinFaits {
     jours: readonly DateISO[], pose: boolean, quotite?: number
   ) => void;
 
+  /**
+   * Écrit la phrase de tâches accomplies d'une semaine, sur un CRA.
+   *
+   * Une phrase VIDE efface la note au lieu d'en enregistrer une sans contenu :
+   * une liste qui accumulerait des chaînes vides ferait grossir le compte
+   * distant à chaque frappe corrigée, et rendrait « y a-t-il une note ? »
+   * indécidable sans inspecter le texte.
+   */
+  readonly noterSemaineCra: (
+    semaine: DateISO, destinataire: string, texte: string
+  ) => void;
+
   /* ── Planning ─────────────────────────────────────────────────────────── */
 
   /**
@@ -1154,6 +1166,30 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
       ...actuel,
       conges: [...parDate.values()].sort((a, b) => a.date.localeCompare(b.date))
     };
+    set({ faits });
+    persister(stockageActif, faits);
+  },
+
+  noterSemaineCra: (semaine, destinataire, texte) => {
+    const actuel = get().faits;
+    const propre = texte.trim();
+    const autres = actuel.notesCra
+      .filter((n) => !(n.semaine === semaine && n.destinataire === destinataire));
+
+    // Rien n'a changé : on n'écrit pas. Persister à l'identique ferait monter
+    // une version sur le compte distant, et l'autre appareil croirait à une
+    // modification qui n'a pas eu lieu — le même motif que pour les congés.
+    const avant = actuel.notesCra
+      .find((n) => n.semaine === semaine && n.destinataire === destinataire);
+    if ((avant?.texte ?? '') === propre) return;
+
+    const notesCra = propre === ''
+      ? autres
+      : [...autres, { semaine, destinataire, texte: propre }]
+        .sort((a, b) => a.semaine.localeCompare(b.semaine)
+          || a.destinataire.localeCompare(b.destinataire, 'fr'));
+
+    const faits: Faits = { ...actuel, notesCra };
     set({ faits });
     persister(stockageActif, faits);
   }

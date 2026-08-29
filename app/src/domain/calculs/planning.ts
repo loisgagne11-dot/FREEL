@@ -144,6 +144,23 @@ export function jourDeSemaine(date: DateISO): JourDeSemaine {
   return JOURS_SEMAINE[(n + 6) % 7] as JourDeSemaine;
 }
 
+/**
+ * Le lundi de la semaine d'une date, en date ISO.
+ *
+ * Elle vit ici, dans le domaine, et non dans les sélecteurs d'un écran : la
+ * vue semaine du planning ET la synthèse hebdomadaire du CRA en ont besoin, et
+ * deux copies auraient fini par ne pas découper la semaine au même endroit —
+ * un CRA dont les semaines ne correspondent pas au planning ne se recoupe pas.
+ */
+export function lundiDeLaSemaine(date: DateISO): DateISO {
+  const d = new Date(`${date}T00:00:00Z`);
+  // `getUTCDay()` rend 0 le dimanche : on recule de 6 jours dans ce cas, pas
+  // d'un seul, sinon la semaine du dimanche commencerait le lendemain.
+  const recul = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - recul);
+  return d.toISOString().slice(0, 10) as DateISO;
+}
+
 /** Le rythme qui couvre une date, ou `undefined`. Le dernier déclaré l'emporte. */
 export function rythmePour(date: DateISO, rythmes: readonly Rythme[]): Rythme | undefined {
   // Parcours à l'envers : quand deux rythmes se chevauchent — ce que

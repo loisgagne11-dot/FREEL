@@ -119,7 +119,7 @@ Un seul écran cible (**Argent**) correspond à une fusion propre. Les cinq autr
 | **Activité & congés** | ~55 % | Missions, factures, occupation (`tauxOccupation:6510`), DSO par client | Calendrier **intégré en page** — la fonction candidate `renderCongesCalendar:15597` est du **code mort**, jamais appelée | À recâbler |
 | **Argent** | ~60 % | Solde, mouvements, provisions, échéancier `CHARGE_TYPES`, graphe CA Prévu/Réalisé/Encaissé avec toggle Mensuel/Cumulé | Enveloppes de provision au sens cible, modales de déclaration conformes, taux canonique unique | À recâbler *(le plus complet)* |
 | **Achats** | ~40 % | 14 catégories de dépense, saisie montant/TVA/récurrence, rapprochement automatique | **Justificatif**, champ fournisseur, état de rapprochement explicite stocké | À recâbler **+ compléter** |
-| **Outils** | ~45 % | Les 3 calculs (IR par tranches `:4134`, CFE `:8928`, CRA PDF) existent et fonctionnent | Regroupement en 3 sous-onglets, cohérence des taux | À recâbler |
+| **Outils** | ~80 % | IR par tranches, CFE, comparateur de versement libératoire, **et le générateur de CRA (lot P)** | Le troisième onglet du handoff, « Compte pro & banque » — chez nous, l'import de relevé est un onglet d'**Achats** et non d'Outils | Deux onglets sur trois |
 | **Config** | ~50 % *(65 % avec Compte)* | Régime fiscal, ACRE, livre des recettes (`:3603`), export FEC (`:3643`), sync Supabase | Section Réserve & versements, bandeau fraîcheur barème, fusion avec Compte | À recâbler |
 
 **Aucun écran n'est à créer de zéro.** Chacun a un socle de calcul ou d'UI réel. Le travail dominant est la redistribution et le complément.
@@ -696,3 +696,64 @@ c'est la relever. Le formulaire « Poser une plage » de congés est parti dans
 `Activite.conges`, chargé à la demande — on pose ses vacances trois ou quatre
 fois par an, on ouvre le plan de charge tous les matins. L'écran retombe à
 **38,76 Ko** pour 40.
+
+---
+
+## 11. Lot P (29/08) — le générateur de compte rendu d'activité
+
+### 11.1 Ce que le handoff demandait
+
+`pilote-cra` et `outils-cra` posent une modale large en deux colonnes : la
+saisie à gauche, l'aperçu du document à droite, et un pied
+`Envoyer · Imprimer · Télécharger le PDF`. Le texte de la carte est explicite
+sur la règle du document : « Pas de montants — c'est un suivi d'activité, la
+facture s'occupe des € ».
+
+### 11.2 Ce qui est livré, et qui correspond
+
+* L'**atelier** — une variante de `Sheet`, et non un second composant de
+  dialogue : le piège de focus, la fermeture par Échap, le verrou de
+  défilement et la restitution du focus sont ceux qui existaient. Deux
+  implémentations de dialogue auraient fini par n'en respecter qu'une sur deux.
+* Le **document**, par semaine, ventilé télétravail / sur site, avec la phrase
+  de tâches, les totaux par client et le grand total.
+* **Aucun montant** sur le document, conformément au texte du handoff. La
+  valorisation au TJM reste sur l'écran Activité, où elle s'adresse à
+  l'utilisateur.
+* L'onglet **CRA** dans Outils, et l'action rapide **« Télécharger le CRA »**
+  sur le Pilote — deuxième de la rangée, comme dans le handoff.
+* `Imprimer` et `Télécharger`, tous deux servis par **le nœud de l'aperçu**.
+  Reconstruire le document une seconde fois pour le fichier aurait laissé les
+  deux diverger, et l'utilisateur aurait envoyé au client un papier qu'il n'a
+  pas relu.
+
+### 11.3 Les trois écarts assumés, et leur motif
+
+| Écart au handoff | Motif |
+|---|---|
+| **Les jours ne se saisissent pas.** Le handoff pose des champs `Télétrav.` / `Sur site` par semaine et par client ; chez nous ils sont en lecture seule | « 2 jours de télétravail cette semaine » ne dit pas LESQUELS. Les répartir pour les enregistrer inventerait des faits ; ne pas les enregistrer donnerait un document qui contredit le planning. C'est l'invariant n°4 — une seule source par notion — et la question posée en toutes lettres : « quand je mets à jour l'activité, ça ajuste les factures et le CRA ? » |
+| **Pas de bouton « Envoyer ».** Le handoff en pose un | Il n'envoie rien dans le handoff non plus : il ferme la modale sur un message. Un bouton qui prétend envoyer sans envoyer est pire qu'un bouton absent |
+| **« CRA récents » devient « Mois à documenter ».** Le handoff liste des CRA avec un statut — « envoyé le 02/06 », « validé », « archivé » | Aucun des trois n'est un fait enregistré : un CRA n'est pas un objet du modèle, c'est une vue du planning. La colonne montre donc les mois qui ont produit des journées, leur volume et le nombre de documents à produire. La même liste, remplie de faits |
+
+### 11.4 Ce que la capture a trouvé et qu'aucun test ne cherchait
+
+Deux défauts, tous deux invisibles à la suite de tests :
+
+1. **Le générateur s'ouvrait sur juillet le 10 juin.** Le planning est rempli
+   d'office par le rythme, donc un mois à venir porte déjà des journées. Rien
+   n'était faux — seulement prématuré : le document attestait d'un travail qui
+   n'avait pas eu lieu. Corrigé, et tenu par un test nommé.
+2. **La ventilation sortait du cadre** — « 0,5 j sans lie », coupé net au bord
+   de la colonne de saisie.
+
+Un troisième défaut a été trouvé sur la capture *manquante* : le script
+photographiait l'écran pendant que le module différé arrivait encore, et
+rendait une image d'apparence normale où l'atelier était simplement absent.
+Le script accepte désormais un sélecteur `attendre`.
+
+### 11.5 Ce que ce lot laisse ouvert sur cet écran
+
+Le troisième onglet du handoff, **« Compte pro & banque »**, n'est pas dans
+Outils : l'import de relevé vit dans Achats. Le déplacer est un arbitrage
+d'architecture de l'information, pas un défaut de cet écran — et il touche
+deux écrans, donc il n'appartient pas à ce lot.

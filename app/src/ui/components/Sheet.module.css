@@ -90,3 +90,53 @@
     width: 580px;
   }
 }
+
+/* ---------- le sous-titre du dialogue ---------- */
+
+.sousTitre {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted-2);
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+/* ---------- la barre d'actions ---------- */
+
+.pied {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* ---------- variante « atelier » ----------
+   Un plan de travail centré, et non un tiroir collé au bord : ce qu'on
+   fabrique se regarde au milieu de l'écran. En portrait il occupe tout,
+   comme le panneau — deux colonnes n'y tiennent de toute façon pas. */
+
+.atelier {
+  border-left: none;
+}
+
+@media (min-width: 761px) {
+  .atelier {
+    top: 24px;
+    bottom: 24px;
+    right: 24px;
+    left: 24px;
+    /* Une largeur maximale : au-delà, la colonne de saisie s'étire sans
+       rien gagner, et l'aperçu du document flotte au milieu du vide. */
+    width: auto;
+    max-width: 1140px;
+    margin: 0 auto;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+}
