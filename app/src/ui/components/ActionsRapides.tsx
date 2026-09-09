@@ -43,6 +43,14 @@ export const ACTIONS_RAPIDES: readonly ActionRapide[] = [
     icone: 'M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M12 11 V17 M9 14 H15'
   },
   {
+    /* Le handoff met le CRA en deuxième position des actions rapides, avant la
+       dépense : c'est le livrable qu'on remet à un client, et le seul geste du
+       mois qui a une échéance. Une dépense se saisit quand on veut. */
+    libelle: 'Télécharger le CRA',
+    href: '#/outils/cra',
+    icone: 'M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M9 12 H15 M9 16 H13'
+  },
+  {
     libelle: 'Ajouter une dépense',
     href: '#/achats/depense',
     icone: 'M3 4 H6 L8.5 15 H18 L20 7 H7.5 M8 19 H10 V21 H8 Z M14 19 H16 V21 H14 Z'

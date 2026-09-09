@@ -478,6 +478,17 @@ function recettesDuSchema15(recettes: readonly Recette[]): readonly Recette[] {
  * liste comme les cinq migrations imbriquées ci-dessus, et lu par égalité
  * STRICTE à `null` — la fusion de surface ne suffit donc pas. Voir
  * `recettesDuSchema15`.
+ *
+ * v16 → v17 : `notesCra`, les phrases de tâches accomplies du CRA. Champ de
+ * PREMIER NIVEAU et LISTE : la fusion de surface le comble depuis
+ * `faitsVides()` dès qu'un bloc de schéma 16 ne porte pas la clé, et la valeur
+ * comblée est la liste vide — un compte migré n'a jamais eu de générateur de
+ * CRA, donc aucune note à retrouver. Ici encore, la vérification n'est pas une
+ * lecture du code mais un test nommé : « un compte de schéma 16 reçoit une
+ * liste de notes vide, et non `undefined` ». Sans lui, `faits.notesCra.filter`
+ * lèverait au premier chargement d'un compte existant — la migration de
+ * surface a l'air de suffire jusqu'au jour où quelqu'un déplace le champ dans
+ * un élément de liste.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;

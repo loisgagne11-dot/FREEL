@@ -62,6 +62,10 @@ const AUJOURDHUI = '2026-06-10T09:00:00Z';
  * dans notre application est normal tant que le lot correspondant n'est pas
  * fait : le script le signale au lieu d'échouer, et la capture manquante est
  * elle-même l'information.
+ *
+ * `attendre` est un sélecteur qui DOIT être là avant la photo. À réserver aux
+ * vues qui ouvrent un module différé : sans lui, le script capture l'écran
+ * pendant que le fragment arrive encore, et rend une image qui a l'air normale.
  */
 const VUES = [
   { hash: '#/pilote', nom: 'pilote' },
@@ -98,6 +102,13 @@ const VUES = [
   { hash: '#/argent', nom: 'argent-performance', ouvrir: ['Performance'] },
   { hash: '#/achats', nom: 'achats' },
   { hash: '#/outils', nom: 'outils-impot' },
+  /* L'onglet CRA, puis l'atelier lui-même.
+     Deux vues et non une : la carte s'apparie à `outils-cra` du handoff, et
+     l'atelier à `pilote-cra`. C'est le même appariement que pour la
+     composition — un panneau qui ne s'ouvre qu'au clic n'apparaît sur aucune
+     capture d'écran, et c'est justement là que les défauts se logent. */
+  { hash: '#/outils', nom: 'outils-cra', ouvrir: ['CRA'] },
+  { hash: '#/outils/cra', nom: 'pilote-cra', attendre: '[role="dialog"]' },
   { hash: '#/config', nom: 'config-profil' }
 ];
 
@@ -213,6 +224,25 @@ for (const theme of THEMES) {
     if (!ouverte) {
       manquees.push(`${theme}-${vue.nom} (libellé « ${(vue.ouvrir ?? []).join(' › ')} » introuvable)`);
       continue;
+    }
+
+    /*
+     * ATTENDRE CE QUE LA VUE PROMET.
+     *
+     * `networkidle` puis `h1:visible` ne suffisent pas quand la vue ouvre un
+     * module DIFFÉRÉ : le titre de l'écran est déjà là, le script photographie,
+     * et le fragment arrive après. La capture du générateur de CRA a été prise
+     * exactement comme ça — l'onglet bien ouvert, l'atelier absent, et rien
+     * dans le rapport pour le dire.
+     */
+    if (vue.attendre) {
+      const arrive = await page.waitForSelector(vue.attendre, { timeout: 15000 })
+        .then(() => true).catch(() => false);
+      if (!arrive) {
+        manquees.push(`${theme}-${vue.nom} (« ${vue.attendre} » n’est jamais apparu)`);
+        continue;
+      }
+      await page.waitForTimeout(400);
     }
 
     await page.screenshot({ path: join(SORTIE, `${theme}-${vue.nom}.png`), fullPage: true });

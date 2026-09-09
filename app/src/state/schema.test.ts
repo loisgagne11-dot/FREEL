@@ -786,6 +786,39 @@ describe('ajustements du schéma 13 au schéma 14', () => {
  * migration rattrape. Toute migration future le fera donc échouer, ce qui est
  * exactement le moment où il faut regarder ce qu'elle ne peut pas deviner.
  */
+/**
+ * v16 → v17 : LES PHRASES DE TÂCHES DU CRA.
+ *
+ * Champ de premier niveau et LISTE : la fusion de surface suffit — mais c'est
+ * une lecture du code, et la règle du projet veut une preuve. Sans ces tests,
+ * un compte de schéma 16 arriverait avec `notesCra` à `undefined`, et le
+ * premier `faits.notesCra.filter(...)` du générateur lèverait au chargement,
+ * loin de sa cause.
+ */
+describe('schéma 16 → 17 : les phrases de tâches du CRA', () => {
+  it('comble un compte de schéma 16 avec une liste vide, et non `undefined`', () => {
+    const f = completerFaits({ version: 16, soldeInitial: 0 });
+    expect(f.notesCra).toEqual([]);
+    expect(f.notesCra).not.toBeUndefined();
+  });
+
+  it('conserve les notes déjà enregistrées', () => {
+    const note = { semaine: '2026-06-01', destinataire: 'Client A', texte: 'Recette' };
+    expect(completerFaits({ version: 17, notesCra: [note] }).notesCra).toEqual([note]);
+  });
+
+  // Aucun compte d'avant le schéma 17 ne porte la clé : la refuser pour
+  // absence rejetterait tous les comptes existants.
+  it('accepte son absence', () => {
+    expect(motifRefusFaits({ version: 16, soldeInitial: 0 })).toBeNull();
+  });
+
+  it('refuse une valeur qui n’est pas une liste', () => {
+    expect(motifRefusFaits({ ...faitsVides(), notesCra: { '2026-06-01': 'Recette' } }))
+      .toMatch(/notesCra/);
+  });
+});
+
 describe('le jeu de démonstration', () => {
   const brutDemo = JSON.parse(
     readFileSync(new URL('../../public/jeu-de-demonstration.json', import.meta.url), 'utf8')

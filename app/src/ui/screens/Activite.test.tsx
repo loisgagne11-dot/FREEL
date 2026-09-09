@@ -536,25 +536,48 @@ describe('compte rendu d’activité', () => {
     render(<Activite />);
     // Juillet 2026 : lundis à jeudis pleins, vendredis à mi-temps, moins le
     // 14 juillet férié. Le décompte se lit sur la carte, sans rien saisir.
-    const carte = screen.getByRole('region', { name: /Compte-rendu d’activité/ });
-    expect(carte.textContent).toMatch(/jours? travaillés?/);
+    const carte = screen.getByRole('region', { name: /Ce que le mois a produit/ });
+    expect(carte.textContent).toMatch(/jours? sur juillet/);
     expect(carte.textContent).toMatch(/19,5/u);
   });
 
-  it('propose l’impression sans bibliothèque PDF', () => {
+  /*
+   * LE DOCUMENT NE SE DESSINE PLUS ICI.
+   *
+   * Cette carte imprimait son propre CRA, à côté de celui que le générateur
+   * d'Outils produit. Deux rendus du même papier finissent par ne plus dire la
+   * même chose, et l'utilisateur ne sait plus lequel il vient d'envoyer. La
+   * carte mène donc au générateur au lieu d'imprimer.
+   */
+  it('mène au générateur plutôt que d’imprimer un second document', () => {
     semer({ missions: [avecRythmeCra()] });
     render(<Activite />);
-    expect(screen.getByRole('button', { name: /Imprimer ou enregistrer en PDF/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Imprimer/ })).toBeNull();
+    const lien = screen.getByRole('link', { name: /Générer le compte-rendu/ });
+    expect(lien.getAttribute('href')).toBe('#/outils/cra');
+  });
+
+  /*
+   * La valorisation au tarif journalier reste — pour l'utilisateur, sur SON
+   * écran. Elle ne figure sur aucun document remis au client : un CRA qui
+   * porte un prix se renégocie au lieu de se signer.
+   */
+  it('garde la valorisation du mois, qui ne part pas chez le client', () => {
+    semer({ missions: [avecRythmeCra()] });
+    render(<Activite />);
+    const carte = screen.getByRole('region', { name: /Ce que le mois a produit/ });
+    expect(carte.textContent).toMatch(/€/);
+    expect(carte.textContent).toMatch(/le CRA ne porte aucun montant/);
   });
 
   /**
    * Un CRA vide n'est pas un livrable, c'est un document qu'on envoie par
-   * erreur. Sans jour travaillé, l'écran le dit et n'offre pas d'imprimer.
+   * erreur. Sans jour travaillé, l'écran le dit et n'offre pas d'en générer un.
    */
-  it('n’offre pas d’imprimer un mois sans activité', () => {
+  it('n’offre pas de générer un mois sans activité', () => {
     semer({ missions: [mission()] }); // sans rythme
     render(<Activite />);
-    expect(screen.queryByRole('button', { name: /Imprimer ou enregistrer/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Générer le compte-rendu/ })).toBeNull();
     expect(screen.getByText(/Aucun jour travaillé/)).toBeTruthy();
   });
 

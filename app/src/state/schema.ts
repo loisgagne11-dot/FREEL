@@ -34,7 +34,7 @@ import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 16 as const;
+export const VERSION_SCHEMA = 17 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -349,6 +349,44 @@ export interface Recette {
  * une journée entière, gonflant le solde de congés et faussant l'occupation
  * du mois dans le même mouvement.
  */
+/**
+ * La phrase de tâches accomplies d'une semaine, sur un compte rendu d'activité.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE SEUL FAIT DU CRA QUI SE SAISISSE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Tout le reste du document se DÉRIVE du planning : les jours, leur
+ * répartition entre télétravail et présence sur site, les totaux. « Ce que
+ * j'ai fait cette semaine-là » ne se déduit d'aucun fait enregistré — ni du
+ * rythme, ni de la description de la mission, qui vaut pour toute sa durée.
+ * Ne pas l'enregistrer obligerait à le retaper à chaque réédition, ce qui est
+ * exactement la ressaisie que ce générateur existe pour supprimer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA CLÉ EST LE LUNDI, PAS LE RANG DE LA SEMAINE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * « Semaine 2 » se déplace : elle dépend du mois, et du jour où celui-ci
+ * commence. Un lundi en date ISO ne bouge pas, et la note reste attachée à la
+ * semaine qu'elle décrit même si le découpage du document change.
+ */
+export interface NoteCra {
+  /** Le lundi de la semaine décrite, en date ISO. */
+  readonly semaine: DateISO;
+  /**
+   * Le client destinataire, ou la chaîne vide pour le document tous clients.
+   *
+   * Le NOM et non l'identifiant du client opérationnel : c'est le nom qui est
+   * imprimé sur le document, et deux entités homonymes rendent de toute façon
+   * une seule ligne dans la synthèse. Renommer un client détache ses notes —
+   * elles ne sont pas perdues, elles cessent d'être proposées, et c'est
+   * préférable à les voir réapparaître sous un nom qui n'est plus le leur.
+   */
+  readonly destinataire: string;
+  readonly texte: string;
+}
+
 export interface Conge {
   readonly date: DateISO;
   /** 1 pour une journée, 0,5 pour une demi-journée. */
@@ -371,6 +409,16 @@ export interface Faits {
    * se compare et se déduplique sans conversion.
    */
   readonly conges: readonly Conge[];
+  /**
+   * Les phrases de tâches accomplies des comptes rendus d'activité.
+   *
+   * Une liste plate plutôt qu'un dictionnaire imbriqué par mois puis par
+   * client : c'est ce qui permet de la filtrer, de la trier et de la
+   * dédupliquer sans conversion — le même arbitrage que pour `conges`, dont
+   * l'ancienne application faisait un `{ '2025-08': [1, 2, 3] }` qu'il fallait
+   * reconstruire à chaque lecture.
+   */
+  readonly notesCra: readonly NoteCra[];
   /**
    * Les opérations du compte, importées depuis un relevé.
    *
@@ -546,7 +594,7 @@ export function faitsVides(): Faits {
   return {
     version: VERSION_SCHEMA,
     entreprise: entrepriseVide(),
-    clients: [], missions: [], recettes: [], depenses: [], conges: [],
+    clients: [], missions: [], recettes: [], depenses: [], conges: [], notesCra: [],
     mouvementsBancaires: [], periodesUrssafAjoutees: [],
     soldeInitial: 0 as Euros, soldeInitialAu: null, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
     partGardeeAuVersement: ratio(0),
@@ -602,7 +650,7 @@ export function motifRefusFaits(brut: unknown): string | null {
   }
 
   const listes = [
-    'clients', 'missions', 'recettes', 'depenses', 'conges',
+    'clients', 'missions', 'recettes', 'depenses', 'conges', 'notesCra',
     'mouvementsBancaires', 'periodesUrssafAjoutees', 'periodesDeclarees'
   ] as const;
   for (const cle of listes) {

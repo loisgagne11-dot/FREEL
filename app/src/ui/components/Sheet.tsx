@@ -25,6 +25,33 @@ export interface ProprietesSheet {
   readonly titre: string;
   readonly onFermer: () => void;
   readonly children: React.ReactNode;
+  /**
+   * La forme du dialogue.
+   *
+   * `panneau` — le tiroir latéral de 580 px, qui montre le DÉTAIL de ce qu'on
+   * regardait : le contexte reste visible à côté, et c'est ce qui le rend
+   * lisible.
+   *
+   * `atelier` — un plan de travail centré et large, pour ce qu'on FABRIQUE :
+   * une saisie d'un côté, l'aperçu du document de l'autre. Le détail du
+   * contexte n'a plus d'intérêt — on ne regarde plus que ce qu'on construit —
+   * et 580 px ne suffisent pas à poser les deux côte à côte.
+   *
+   * La variante ne change QUE l'habillage : le piège de focus, la fermeture
+   * par Échap, le verrou de défilement et la restitution du focus sont les
+   * mêmes. Deux composants de dialogue auraient fini par n'en respecter qu'un
+   * sur deux.
+   */
+  readonly variante?: 'panneau' | 'atelier';
+  /** Une précision à côté du titre, sur la même ligne. */
+  readonly sousTitre?: string;
+  /**
+   * La barre d'actions du bas, HORS de la zone qui défile.
+   *
+   * Un bouton « Télécharger » posé à la fin d'un aperçu de trois pages ne se
+   * trouve qu'après avoir fait défiler l'aperçu entier.
+   */
+  readonly pied?: React.ReactNode;
 }
 
 /** Éléments focusables, dans l'ordre du document. */
@@ -34,7 +61,9 @@ const SELECTEUR_FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])'
 ].join(',');
 
-export function Sheet({ ouvert, titre, onFermer, children }: ProprietesSheet) {
+export function Sheet(
+  { ouvert, titre, onFermer, children, variante = 'panneau', sousTitre, pied }: ProprietesSheet
+) {
   const panneau = useRef<HTMLElement | null>(null);
   const declencheur = useRef<HTMLElement | null>(null);
   const idTitre = useId();
@@ -109,14 +138,19 @@ export function Sheet({ ouvert, titre, onFermer, children }: ProprietesSheet) {
       <div className={styles.voile} onClick={onFermer} aria-hidden="true" />
       <aside
         ref={panneau}
-        className={styles.panneau}
+        className={`${styles.panneau} ${variante === 'atelier' ? styles.atelier : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={idTitre}
         tabIndex={-1}
       >
         <header className={styles.entete}>
-          <h2 id={idTitre} className={styles.titre}>{titre}</h2>
+          <h2 id={idTitre} className={styles.titre}>
+            {titre}
+            {sousTitre !== undefined && (
+              <span className={styles.sousTitre}>{sousTitre}</span>
+            )}
+          </h2>
           <button
             type="button"
             className={styles.fermer}
@@ -128,6 +162,7 @@ export function Sheet({ ouvert, titre, onFermer, children }: ProprietesSheet) {
           </button>
         </header>
         <div className={styles.corps}>{children}</div>
+        {pied !== undefined && <footer className={styles.pied}>{pied}</footer>}
       </aside>
     </>
   );

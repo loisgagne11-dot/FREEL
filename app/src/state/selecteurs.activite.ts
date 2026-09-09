@@ -19,8 +19,13 @@ import type { Jour, ZoneFeries } from '../domain/calculs/activite';
 import { joursFeries } from '../domain/calculs/activite';
 import type { Creneau, JourPlanifie, Lieu } from '../domain/calculs/planning';
 import {
-  CRENEAUX, craDuMois, creneauxOccupes, jourDeSemaine, planifier
+  CRENEAUX, craDuMois, creneauxOccupes, jourDeSemaine, lundiDeLaSemaine, planifier
 } from '../domain/calculs/planning';
+
+/* Réexportée telle quelle : elle a migré dans le domaine, où le CRA en a aussi
+   besoin, mais l'écran Activité et ses tests continuent de la lire ici. Une
+   seconde définition les aurait laissés découper la semaine autrement. */
+export { lundiDeLaSemaine };
 
 /** Les deux jours que le rythme ne remplit jamais de lui-même. */
 const JOURS_DE_REPOS = new Set(['sam', 'dim']);
@@ -359,15 +364,6 @@ export interface PlanningSemaine extends PlanningPeriode {
   readonly lundi: DateISO;
 }
 
-/** Le lundi de la semaine qui contient cette date. */
-export function lundiDeLaSemaine(date: DateISO): DateISO {
-  const d = new Date(`${date}T00:00:00Z`);
-  // `getUTCDay()` rend 0 le dimanche : on recule de 6 jours dans ce cas, pas
-  // d'un seul, sinon la semaine du dimanche commencerait le lendemain.
-  const recul = (d.getUTCDay() + 6) % 7;
-  d.setUTCDate(d.getUTCDate() - recul);
-  return d.toISOString().slice(0, 10) as DateISO;
-}
 
 /**
  * Le planning d'une semaine, mission par mission.

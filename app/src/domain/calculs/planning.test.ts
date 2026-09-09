@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../types';
+import type { DateISO } from '../types';
 import type { JourPlanifie, Rythme } from './planning';
 import {
   basculerCreneau, congeApresSaisie, craDuMois, creneauxOccupes, jourDeSemaine,
-  planifier, quotitePrevue, rythmePour, saisirSurPortee
+  lundiDeLaSemaine, planifier, quotitePrevue, rythmePour, saisirSurPortee
 } from './planning';
 
 const D = (s: string) => dateISO(s);
@@ -406,5 +407,25 @@ describe('congé après une saisie', () => {
    */
   it('retire le congé de la moitié qu’on déclare travaillée', () => {
     expect(congeApresSaisie(1, 'matin', 'travail')).toBe(0.5);
+  });
+});
+
+describe('lundiDeLaSemaine', () => {
+  it('rend le lundi de la semaine, et lui-même pour un lundi', () => {
+    // 1er juin 2026 est un lundi ; le 7 est le dimanche de la même semaine.
+    expect(lundiDeLaSemaine('2026-06-01' as DateISO)).toBe('2026-06-01');
+    expect(lundiDeLaSemaine('2026-06-04' as DateISO)).toBe('2026-06-01');
+    expect(lundiDeLaSemaine('2026-06-07' as DateISO)).toBe('2026-06-01');
+  });
+
+  /*
+   * Le cas qui a motivé la descente de cette fonction dans le domaine : la
+   * synthèse hebdomadaire du CRA regroupe par lundi, et une semaine à cheval
+   * sur deux mois doit remonter au mois précédent — sinon le 1er juillet
+   * fonderait sa propre semaine et le rang de toutes les suivantes glisserait.
+   */
+  it('remonte au mois précédent quand la semaine est à cheval', () => {
+    // 1er juillet 2026 est un mercredi : son lundi est le 29 juin.
+    expect(lundiDeLaSemaine('2026-07-01' as DateISO)).toBe('2026-06-29');
   });
 });

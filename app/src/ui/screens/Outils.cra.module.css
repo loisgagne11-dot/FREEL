@@ -1,0 +1,248 @@
+/* Le générateur de CRA : saisie à gauche, document à droite.
+   Aucune couleur en dur — sauf dans `documents/feuille.ts`, qui habille le
+   papier lui-même et dont l'en-tête dit pourquoi. */
+
+.atelier {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.saisie {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ---------- champs ---------- */
+
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.libelle {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  font-weight: 560;
+}
+
+.selecteur,
+.zone {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.selecteur {
+  /* 44 px de cible tactile : un `select` natif descend à 30 px sur mobile. */
+  min-height: 44px;
+}
+
+.zone {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.selecteur:focus-visible,
+.zone:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+/* ---------- semaines ---------- */
+
+.semaine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.titreSemaine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.plage {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.totalSemaine {
+  margin-left: auto;
+  font-weight: 620;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.volumes {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.volume {
+  display: grid;
+  /* Le nom prend la ligne, le total se cale à droite, et la ventilation
+     descend en dessous sur toute la largeur : à 340 px, « 0,5 j télétrav. ·
+     0,5 j sur site · 0,5 j sans lieu » ne tient sur aucune ligne partagée. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.volume dt {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.jours {
+  color: var(--text);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.repartition {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted-2);
+}
+
+/* ---------- messages ---------- */
+
+.avertissement {
+  padding: 9px 11px;
+  border: 1px solid var(--amber-line);
+  border-radius: var(--r-sm);
+  background: var(--amber-soft);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.vide,
+.provenance {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted-2);
+}
+
+.provenance {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.provenance a {
+  color: var(--green);
+}
+
+/* ---------- l'aperçu ---------- */
+
+.apercu {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  /* Le papier est toujours clair : un fond neutre le détache du thème sombre
+     sans lui donner l'air d'un bug d'affichage. */
+  background: #2a2a28;
+  padding: 12px;
+  overflow: auto;
+}
+
+:root[data-theme="light"] .apercu,
+:root:not([data-theme="dark"]) .apercu {
+  background: #e9e9e4;
+}
+
+.papier {
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 2px 14px rgb(0 0 0 / 0.22);
+}
+
+/* ---------- pied ---------- */
+
+.piedNote {
+  flex: 1;
+  min-width: 160px;
+  font-size: 11.5px;
+  color: var(--muted-2);
+  line-height: 1.45;
+}
+
+.bouton {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--tint-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.bouton:hover {
+  background: var(--tint-3);
+}
+
+.bouton:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+.principal {
+  border-color: var(--green-line);
+  background: var(--green-glow);
+  color: var(--green);
+}
+
+/* ---------- desktop : les deux colonnes côte à côte ---------- */
+
+@media (min-width: 901px) {
+  .atelier {
+    display: grid;
+    /* La saisie garde une largeur fixe, l'aperçu prend le reste : c'est le
+       document qu'on vient regarder, et une colonne de saisie élastique le
+       rétrécirait à mesure qu'on nomme longuement un client. */
+    grid-template-columns: 340px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .apercu {
+    position: sticky;
+    top: 0;
+    /* La hauteur du corps du dialogue, moins ses marges : l'aperçu défile
+       DANS son cadre, et la saisie défile à côté sans l'emporter. */
+    max-height: calc(100vh - 190px);
+  }
+}

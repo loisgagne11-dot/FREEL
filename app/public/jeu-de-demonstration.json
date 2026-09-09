@@ -16,7 +16,7 @@
     "Les dates sont ancrées en 2026 pour reproduire l'état du handoff, daté de",
     "juin 2026."
   ],
-  "version": 16,
+  "version": 17,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "siret": "000 000 000 00000",
@@ -130,6 +130,22 @@
             }
           ],
           "ajustements": {
+            "2026-06-01": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
+            },
+            "2026-06-02": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            },
             "2026-06-08": {
               "quotite": 1,
               "creneaux": [
@@ -159,6 +175,38 @@
                 "apresMidi"
               ],
               "lieu": "sur_site"
+            },
+            "2026-06-22": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
+            },
+            "2026-06-23": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            },
+            "2026-06-29": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
+            },
+            "2026-06-30": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
             }
           }
         }
@@ -194,6 +242,21 @@
             }
           ],
           "ajustements": {
+            "2026-06-04": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            },
+            "2026-06-05": {
+              "quotite": 0.5,
+              "creneaux": [
+                "matin"
+              ],
+              "lieu": "teletravail"
+            },
             "2026-06-11": {
               "quotite": 1,
               "creneaux": [
@@ -208,6 +271,29 @@
                 "matin"
               ],
               "lieu": "teletravail"
+            },
+            "2026-06-18": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
+            },
+            "2026-06-19": {
+              "quotite": 0.5,
+              "creneaux": [
+                "matin"
+              ],
+              "lieu": "sur_site"
+            },
+            "2026-06-25": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
             }
           }
         }
@@ -527,6 +613,38 @@
     {
       "date": "2026-06-11",
       "quotite": 1
+    }
+  ],
+  "notesCra": [
+    {
+      "semaine": "2026-06-01",
+      "destinataire": "Studio Lumen",
+      "texte": "Intégration des maquettes d’accueil · cadrage de la refonte du catalogue"
+    },
+    {
+      "semaine": "2026-06-01",
+      "destinataire": "Atelier Novak",
+      "texte": "Atelier de lancement · reprise de la charte typographique"
+    },
+    {
+      "semaine": "2026-06-08",
+      "destinataire": "Studio Lumen",
+      "texte": "Responsive et recette · itérations sur les fiches produit"
+    },
+    {
+      "semaine": "2026-06-15",
+      "destinataire": "Studio Lumen",
+      "texte": "Direction artistique · atelier de recette chez le client"
+    },
+    {
+      "semaine": "2026-06-15",
+      "destinataire": "Atelier Novak",
+      "texte": "Déclinaisons print · relecture des gabarits"
+    },
+    {
+      "semaine": "2026-06-22",
+      "destinataire": "Studio Lumen",
+      "texte": "Préparation des livrables · corrections finales"
     }
   ],
   "mouvementsBancaires": [
