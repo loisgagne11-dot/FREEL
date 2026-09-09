@@ -2,6 +2,9 @@ import { useId, useState } from 'react';
 import { dateISO, euros } from '../../domain/types';
 import type { DateISO } from '../../domain/types';
 import { useFaits } from '../../state/store';
+import {
+  ajouterClient, modifierClient, supprimerClient, supprimerMission
+} from '../../state/ecritures.carnet';
 import { useToast } from '../components/Toasts';
 import { Info } from '../components/Info';
 import { entiteVide } from '../../state/schema';
@@ -72,9 +75,12 @@ export function FormulaireClient(
   { id, onFini }: { id: string | null; onFini: () => void }
 ) {
   const clients = useFaits((e) => e.faits.clients);
-  const ajouter = useFaits((e) => e.ajouterClient);
-  const modifier = useFaits((e) => e.modifierClient);
-  const supprimer = useFaits((e) => e.supprimerClient);
+  /* Ces écritures vivent hors du magasin : elles emportaient les gardes du
+     carnet dans le paquet d'entrée pour un écran chargé à la demande. Voir
+     `state/ecritures.carnet`. */
+  const ajouter = ajouterClient;
+  const modifier = modifierClient;
+  const supprimer = supprimerClient;
   const signaler = useToast();
   const idChamp = useId();
 
@@ -181,7 +187,7 @@ export function FormulaireMission(
   const faits = useFaits((e) => e.faits);
   const ajouter = useFaits((e) => e.ajouterMission);
   const modifier = useFaits((e) => e.modifierMission);
-  const supprimer = useFaits((e) => e.supprimerMission);
+  const supprimer = supprimerMission;
   const signaler = useToast();
   const idChamp = useId();
 

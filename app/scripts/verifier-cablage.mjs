@@ -44,6 +44,22 @@ const RACINE = new URL('../src/', import.meta.url).pathname;
 const MAGASIN = join(RACINE, 'state/store.ts');
 
 /**
+ * Les écritures SORTIES du magasin, et pourquoi elles restent surveillées ici.
+ *
+ * Cinq d'entre elles ont quitté `store.ts` pour ne plus peser sur le premier
+ * rendu — voir `state/ecritures.carnet`. Ce sont les mêmes écritures, avec les
+ * mêmes gardes ; seul leur fichier a changé. Si ce script ne lisait que le
+ * magasin, elles sortiraient DU MÊME COUP du contrôle, et une écriture
+ * orpheline redeviendrait invisible.
+ *
+ * C'est exactement le mécanisme que ce script existe pour empêcher : du code
+ * juste, testé, et que rien n'appelle. Un déplacement de fichier ne doit pas
+ * pouvoir désarmer un garde-fou.
+ */
+const ECRITURES = [join(RACINE, 'state/ecritures.carnet.ts')];
+const SOURCES = [MAGASIN, ...ECRITURES];
+
+/**
  * Les fichiers susceptibles d'appeler une action, tests exclus.
  *
  * Tout `src/` sauf le magasin lui-même : une porte d'entrée n'est pas
@@ -65,7 +81,7 @@ async function fichiersAppelants(dossier) {
     } else if (
       /\.(ts|tsx)$/u.test(entree.name)
       && !/\.test\.tsx?$/u.test(entree.name)
-      && chemin !== MAGASIN
+      && !SOURCES.includes(chemin)
     ) {
       trouves.push(chemin);
     }
@@ -87,8 +103,20 @@ function actionsDeclarees(source) {
   return actions;
 }
 
+/** Les écritures d'un module hors magasin : ses fonctions exportées. */
+function ecrituresExportees(source) {
+  const noms = [];
+  const motif = /^export function\s+([a-zA-Z][a-zA-Z0-9]*)\s*\(/gmu;
+  let trouve;
+  while ((trouve = motif.exec(source)) !== null) noms.push(trouve[1]);
+  return noms;
+}
+
 const source = await readFile(MAGASIN, 'utf8');
 const actions = actionsDeclarees(source);
+for (const chemin of ECRITURES) {
+  actions.push(...ecrituresExportees(await readFile(chemin, 'utf8')));
+}
 
 if (actions.length === 0) {
   console.error('❌ Aucune action trouvée dans le magasin : le motif de lecture a dû changer.');
@@ -104,7 +132,7 @@ for (const action of actions) {
   if (!contenus.some((c) => motif.test(c))) orphelines.push(action);
 }
 
-console.log('\n🔌 Câblage des actions du magasin\n');
+console.log('\n🔌 Câblage des écritures — magasin et modules d’écriture\n');
 console.log(`   ${actions.length} actions déclarées · ${fichiers.length} fichiers lus\n`);
 
 for (const action of actions) {
@@ -116,7 +144,7 @@ for (const action of orphelines) {
 
 console.log(`\n${'═'.repeat(52)}`);
 if (orphelines.length === 0) {
-  console.log('✅ câblage : chaque action du magasin a une porte d’entrée');
+  console.log('✅ câblage : chaque écriture a une porte d’entrée');
   console.log('═'.repeat(52));
   process.exit(0);
 }

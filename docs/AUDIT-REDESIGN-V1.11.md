@@ -757,3 +757,69 @@ Le troisième onglet du handoff, **« Compte pro & banque »**, n'est pas dans
 Outils : l'import de relevé vit dans Achats. Le déplacer est un arbitrage
 d'architecture de l'information, pas un défaut de cet écran — et il touche
 deux écrans, donc il n'appartient pas à ce lot.
+
+---
+
+## 12. Lot Q (29/08) — la facture se voit pendant qu'on l'écrit
+
+### 12.1 Ce que le handoff demandait
+
+`pilote-nouvelle-facture` pose le même atelier que le CRA : client, numéro et
+période en haut à gauche, les lignes de prestation éditables en dessous, le
+total HT en pied de colonne — et l'aperçu du document à droite, vivant. Le
+pied porte `Enregistrer brouillon · Imprimer · Télécharger le PDF`.
+
+### 12.2 Ce qui est livré
+
+* L'**aperçu vivant**. Le document ne s'affichait qu'APRÈS l'émission : on
+  remplissait à l'aveugle, on émettait — geste irréversible, une facture
+  irrégulière ne se corrige pas —, et on découvrait ensuite ce qu'on venait de
+  produire. C'est le seul écart de fond avec le handoff, et il est corrigé.
+* Le **document sur la feuille partagée** (`documents/DocumentFacture`), la
+  même que le compte rendu d'activité, et la même que le fichier téléchargé
+  emporte. Un module CSS ne voyage pas : ses noms de classes sont hachés.
+* **Imprimer** et **Télécharger** à trois endroits : sur le brouillon, sur la
+  facture émise, et sur une facture rééditée depuis le livre des recettes.
+* Le **bandeau « brouillon »**, qui part avec le fichier.
+* Les **deux montants** — HT, TVA, net à payer — réclamés en toutes lettres.
+* L'action rapide **« Télécharger une facture »** sur le Pilote, qui mène au
+  facturier : télécharger, c'est reprendre une facture déjà émise, et le
+  facturier est le seul écran qui les liste.
+
+### 12.3 Les écarts assumés
+
+| Écart au handoff | Motif |
+|---|---|
+| Ce n'est pas une **modale** mais un écran | Le facturier est un écran à part entière chez nous, là où le handoff en fait un onglet d'Activité. Changer cela relève du choix de rail (§ le bilan visuel), pas de ce lot. La disposition, elle, est celle du handoff |
+| Pas de bouton **« Enregistrer brouillon »** | Il n'enregistre rien dans le handoff. Chez nous un brouillon se télécharge et s'imprime ; le conserver dans les faits demanderait de stocker les lignes, ce que le schéma refuse aujourd'hui — voir 12.5 |
+
+### 12.4 L'extraction que le budget a imposée
+
+L'ajout d'**une seule** action rapide a fait dépasser le paquet d'entrée :
+80,12 Ko pour un plafond de 80. L'invariant n°7 dit d'extraire, pas de
+relever — cinq écritures ont donc quitté le magasin pour
+`state/ecritures.carnet` : celles du carnet (ajout, modification, suppression
+d'un client, suppression d'une mission) et l'import de relevé. Leurs gardes
+emportaient `calculs/carnet` et `calculs/banque` dans le premier rendu, pour
+des écrans chargés à la demande. **77,09 Ko** après extraction.
+
+Deux solutions plus rapides ont été écartées, et il faut dire pourquoi :
+
+* **déplacer les gardes dans les écrans** aurait rapporté les mêmes octets, et
+  échangé un invariant contre un budget : un second point d'entrée — un
+  import, une restauration de sauvegarde — serait passé à côté du contrôle, et
+  le carnet aurait accepté deux clients homonymes ;
+* **ouvrir un second magasin** aurait donné deux copies des faits, qui
+  divergent à la première écriture.
+
+`verifier-cablage` lit désormais aussi les modules d'écriture. Sans cela, un
+déplacement de fichier aurait suffi à faire sortir cinq écritures du contrôle
+— précisément le défaut que ce script existe pour rendre impossible.
+
+### 12.5 Ce que ce lot laisse ouvert
+
+**Les lignes d'une facture ne sont pas conservées.** Une facture rééditée
+depuis le livre des recettes se rétablit en UNE désignation, et l'écran le dit.
+C'est défendable — le livre porte ce qui compte fiscalement — mais une facture
+est un document que l'on doit pouvoir reproduire à l'identique pendant dix ans.
+Les conserver serait un schéma 18, et un lot à soi seul.

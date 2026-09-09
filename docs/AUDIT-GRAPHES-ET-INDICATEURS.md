@@ -133,6 +133,7 @@ pour laquelle ce document a été ouvert.
 | V13 | Dépendance client | ✅ | ✅ | ⚠️ barre segmentée + légende chiffrée |
 | V14 | Occupation avec repère 100 % | ⚠️ | ✅ | ✅ **jauge livrée** (lot C4) dans « Le mois en chiffres », avec son dénominateur écrit dessous. La tuile qui donnait un SECOND chiffre d'occupation sur le même écran est retirée&nbsp;: §1.3 |
 | V24 | **Le compte rendu d'activité, semaine par semaine** | ⚠️ liste de numéros de jours | ✅ | ✅ **livré au lot P** — Outils › CRA, atelier deux colonnes avec aperçu vivant. Par semaine&nbsp;: le rang dans le mois, la plage réellement travaillée, une ligne par client ventilée télétravail / sur site, la phrase de tâches. Puis les totaux par client et le grand total. L'ancienne rendait « 1 2 3 4 7 8 9½ 10 »&nbsp;: exact et illisible — un client qui signe veut le volume, pas un calendrier à recopier |
+| V25 | **La facture, pendant qu'on l'écrit** | ⚠️ après émission | ✅ | ✅ **livrée au lot Q** — atelier deux colonnes, aperçu qui suit la frappe, bandeau « brouillon » tant que le numéro n'est pas attribué. Elle porte le HT, la TVA et le net à payer |
 | V15 | Impôt par tranche | ✅ barres | ✅ barres | ⚠️ **tableau exact** — progrès, la barre était décorative |
 | V16 | Projection par scénarios | ✅ | ❌ | 🚫 §5.5 |
 | V17 | Objectif de CA avec allure attendue | ✅ | ❌ | ✅ **livrée**, absente du handoff&nbsp;: repère mensuel sur le graphe et écart en JOURS en pied |
@@ -184,6 +185,7 @@ Ne sont listés que les verdicts qui appellent une décision.
 | **Jours travaillés du mois, par client qui signe** | 🟢 **lot P.** Sur le document ET sur l'écran Activité. La maille est le client OPÉRATIONNEL et non la mission&nbsp;: deux donneurs d'ordre derrière une même agence signent chacun le sien |
 | **Ventilation télétravail / sur site du mois** | 🟢 **lot P.** Lue sur le `lieu` des journées. Une journée sans lieu compte au total et va dans une colonne `sans lieu` — jamais rangée au hasard. Quand le mois n'en connaît aucun, les deux colonnes disparaissent au lieu d'afficher deux zéros trompeurs |
 | **Valorisation du mois au TJM** | 🟢 **déplacée au lot P**, pas perdue. Elle était sur le document remis au client&nbsp;; elle est maintenant sur l'écran Activité, où elle s'adresse à l'utilisateur. Un CRA qui porte un prix se renégocie au lieu de se signer |
+| **Total HT, TVA, net à payer d'une facture** | 🟢 **lot Q**, sur le document ET pendant la saisie. Les deux montants réclamés — « pour les factures j'ai besoin de voir les deux montants » |
 | **Statut d'un CRA — « envoyé le », « validé », « archivé »** | ❌ **volontairement absent.** Le handoff les dessine dans sa liste « CRA récents ». Aucun des trois n'est un fait enregistré&nbsp;: un CRA n'est pas un objet du modèle, c'est une VUE du planning. La colonne montre donc les mois à documenter, avec leur volume et le nombre de documents à produire. Le jour où l'envoi sera enregistré, la date viendra s'y poser |
 | **Dépendance client** | 🟢 sur le CA encaissé de l'année, bien motivé |
 | **Seuils en %** | 🟢 avec le reste en euros, ce que le % seul ne dit pas |
@@ -452,10 +454,22 @@ qui s'abstient plutôt que de deviner, et la phrase de tâches enregistrée
 2. **L'envoi du CRA, enregistré comme un fait.** Il débloquerait les statuts
    du handoff, qui sont aujourd'hui hors de portée faute de donnée.
 
-3. **Le paquet d'entrée est à 79,94 Ko pour un plafond de 80.** Le budget
-   passe, mais il ne reste rien. La cause est structurelle et connue&nbsp;: le
-   magasin porte ses cinquante actions d'écriture dans le premier rendu, alors
-   que le Pilote n'en déclenche presque aucune. C'est le remède que
-   `selecteurs.activite` a déjà appliqué aux sélecteurs — et il n'a jamais été
-   appliqué au magasin. **À faire en ouverture du lot suivant**, avant tout
-   ajout&nbsp;: l'invariant n°7 dit d'extraire, pas de relever.
+3. ~~**Le paquet d'entrée est à 79,94 Ko pour un plafond de 80.**~~ ✅ **Traité
+   au lot Q**, et pas volontairement&nbsp;: le budget a DÉPASSÉ (80,12 Ko) sur
+   l'ajout d'une seule action rapide, ce qui a rendu l'extraction obligatoire.
+   Cinq écritures ont quitté le magasin pour `state/ecritures.carnet` — celles
+   du carnet et du relevé, dont les gardes emportaient `calculs/carnet` et
+   `calculs/banque` dans le premier rendu pour des écrans chargés à la demande.
+   **77,09 Ko**, soit près de 3 Ko de marge retrouvés.
+
+   Deux choses ont été refusées au passage. Déplacer les GARDES dans les
+   écrans aurait rapporté les mêmes octets&nbsp;: c'eût été échanger un
+   invariant contre un budget — un second point d'entrée aurait accepté deux
+   clients homonymes, dont le nom sert justement de clé de rattachement. Et
+   ouvrir un second magasin aurait donné deux copies des faits, qui divergent
+   à la première écriture. Les écritures déplacées lisent donc le même état et
+   passent par `ecrireFaits`, seule porte vers le disque.
+
+   `verifier-cablage` a été étendu aux modules d'écriture : sans cela, un
+   simple déplacement de fichier aurait fait sortir cinq écritures du contrôle
+   — exactement le mécanisme que ce script existe pour empêcher.

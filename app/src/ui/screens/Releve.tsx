@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
+import { importerReleve } from '../../state/ecritures.carnet';
 import { etatAchats } from '../../state/selecteurs.achats';
 import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calculs/banque';
 import { decoderFichier, lireReleve, type RapportLecture } from '../../infra/releveCsv';
@@ -38,7 +39,8 @@ type Retour =
 
 export function Releve() {
   const faits = useFaits((e) => e.faits);
-  const importerReleve = useFaits((e) => e.importerReleve);
+  /* Hors du magasin : elle emportait `calculs/banque` dans le paquet
+     d'entrée. Voir `state/ecritures.carnet`. */
   const viderReleve = useFaits((e) => e.viderReleve);
 
   const [retour, setRetour] = useState<Retour>(null);

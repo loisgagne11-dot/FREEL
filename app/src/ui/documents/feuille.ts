@@ -99,6 +99,71 @@ export const FEUILLE_DOCUMENT = `
 .doc-signature span { display: block; height: 52px; margin-top: 6px;
   border: 1px dashed #c8c8c0; border-radius: 6px; }
 
+/* ---------- ce qui n'appartient qu'à la facture ---------- */
+
+.doc-grosTitre {
+  font-size: 21px; font-weight: 800; letter-spacing: -0.01em;
+  text-transform: uppercase; margin: 0;
+}
+.doc-numero { font-size: 12.5px; color: #1f8b58; font-weight: 700; margin-top: 2px; }
+
+/* Le destinataire sur un fond teinté : sur une facture, « à qui » se repère
+   avant de se lire, et c'est la première chose qu'un service comptable
+   cherche pour la router. */
+.doc-bloc {
+  margin-top: 18px; padding: 11px 13px; border-radius: 6px; background: #f6f6f2;
+}
+.doc-bloc .doc-label {
+  font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #8a8a85; font-weight: 700; margin-bottom: 3px;
+}
+.doc-bloc strong { font-size: 13px; }
+
+.doc-iban {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.doc-totaux { margin-top: 14px; display: flex; justify-content: flex-end; }
+/* Une largeur plafonnée, et non la forme fonctionnelle min() : celle-ci fait
+   tomber getComputedStyle de jsdom en résolvant les tailles de police, et les
+   tests d'écran de la facture ne pouvaient plus interroger le document. Les
+   deux déclarations décrivent la même largeur.
+   (Aucune apostrophe inverse dans cette chaîne : elle terminerait le gabarit.) */
+.doc-totaux dl { width: 100%; max-width: 320px; }
+.doc-totaux div {
+  display: flex; justify-content: space-between; gap: 20px;
+  padding: 5px 0; font-size: 11.5px; color: #6a6a66;
+}
+.doc-totaux dd { font-variant-numeric: tabular-nums; color: #1d1d1b; }
+.doc-totaux .doc-net {
+  margin-top: 4px; padding-top: 9px; border-top: 1.5px solid #1d1d1b;
+  font-size: 14px; font-weight: 700; color: #1d1d1b;
+}
+.doc-totaux .doc-net dd { font-weight: 700; }
+
+.doc-mentions {
+  margin-top: 18px; padding-top: 12px; border-top: 1px solid #ececec;
+  font-size: 10px; line-height: 1.6; color: #6a6a66;
+}
+.doc-mentions p { margin: 0 0 2px; }
+
+/*
+ * LE BROUILLON SE VOIT, ET NE SE CONFOND PAS AVEC UNE FACTURE ÉMISE.
+ *
+ * Une facture non émise porte un numéro qui n'est pas encore attribué : deux
+ * brouillons téléchargés le même jour porteraient le même. Envoyé tel quel à
+ * un client, l'un des deux devient une facture en double au livre de
+ * quelqu'un. Le bandeau part avec le fichier — c'est tout l'intérêt.
+ */
+.doc-brouillon {
+  margin-bottom: 14px; padding: 8px 11px; border-radius: 6px;
+  border: 1px dashed #c08a2e; background: #fdf6e8;
+  font-size: 11px; font-weight: 600; color: #8a5d10;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
 @media print {
   .doc { padding: 0; max-width: none; }
 }

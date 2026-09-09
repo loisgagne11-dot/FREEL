@@ -1,0 +1,24 @@
+/* Le cadre d'aperçu d'un document.
+   Deux couleurs en dur seulement — le gris du plan de travail derrière la
+   feuille : le papier, lui, est toujours clair, et un fond de thème le ferait
+   flotter sans limite visible. Le reste passe par les jetons. */
+
+.cadre {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: #2a2a28;
+  padding: 12px;
+  overflow: auto;
+}
+
+:root[data-theme="light"] .cadre,
+:root:not([data-theme="dark"]) .cadre {
+  background: #e9e9e4;
+}
+
+.papier {
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 2px 14px rgb(0 0 0 / 0.22);
+}
