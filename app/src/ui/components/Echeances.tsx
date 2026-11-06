@@ -487,6 +487,10 @@ function Formulaire(
 ) {
   const id = useId();
   const [nature, setNature] = useState<NatureDette>(initiale?.nature ?? 'urssaf');
+  // Un prélèvement d'impôt d'automne peut régler l'année en cours (acompte) ou
+  // la précédente (solde de l'avis) : seule la personne qui tient l'avis le
+  // sait, et c'est ce qui fait sortir le solde estimé des provisions.
+  const [solde, setSolde] = useState(initiale?.exercice !== undefined);
   const [montant, setMontant] = useState(initiale === null ? '' : String(initiale.montant));
   const [date, setDate] = useState(initiale?.echeanceLe ?? '');
   // La répétition n'a de sens qu'à la création : corriger une échéance d'une
@@ -513,7 +517,10 @@ function Formulaire(
     // à payer. L'enregistrer déjà payée sans preuve serait le « statut sans
     // écriture » qu'on refuse par ailleurs — le paiement se saisit à part,
     // avec sa date et ce qui est réellement parti.
-    const modele = { nature, montant: euros(valeur), payeeLe: null, montantPaye: null };
+    const modele = {
+      nature, montant: euros(valeur), payeeLe: null, montantPaye: null,
+      exercice: nature === 'impot' && solde ? Number(date.slice(0, 4)) - 1 : undefined
+    };
 
     if (initiale !== null || cadence === 'aucune') {
       onValider([{ ...modele, echeanceLe: dateISO(date) }]);
@@ -544,6 +551,27 @@ function Formulaire(
           {NATURES.map((n) => <option key={n.id} value={n.id}>{n.libelle}</option>)}
         </select>
       </p>
+
+      {nature === 'impot' && (
+        <p className={styles.champ}>
+          <label className={styles.libelle} htmlFor={`${id}-regle`}>Ce qu’elle règle</label>
+          <select
+            id={`${id}-regle`}
+            className={styles.saisie}
+            value={solde ? 'solde' : 'acompte'}
+            onChange={(e) => setSolde(e.target.value === 'solde')}
+          >
+            <option value="acompte">Un acompte de l’année (prélèvement à la source)</option>
+            <option value="solde">
+              Le solde de l’impôt {/^\d{4}/.test(date) ? Number(date.slice(0, 4)) - 1 : 'de l’année précédente'} (avis d’imposition)
+            </option>
+          </select>
+          <span className={styles.aide}>
+            À l’automne, les deux se prélèvent. Saisir le solde comme tel le fait
+            sortir des provisions, où il était gardé estimé depuis le 1er janvier.
+          </span>
+        </p>
+      )}
 
       <p className={styles.champ}>
         <label className={styles.libelle} htmlFor={`${id}-montant`}>Montant appelé (€)</label>

@@ -88,7 +88,32 @@ export interface Echeance {
    * c'est lui qui explique un solde qui ne tombe pas juste.
    */
   readonly montantPaye: Euros | null;
+  /**
+   * L'année des REVENUS que cette échéance règle — pour l'impôt seulement, et
+   * seulement quand elle diffère de l'année de l'échéance.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * LA DATE NE SUFFIT PAS À DIRE CE QU'UN PRÉLÈVEMENT D'IMPÔT RÈGLE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * En septembre, deux prélèvements d'impôt cohabitent : l'acompte du mois,
+   * qui règle l'année en cours, et le solde de l'année précédente. Rangés à
+   * leur seule date, le second passait pour un acompte de l'année en cours —
+   * et rien ne permettait de savoir si le solde de l'an dernier avait été
+   * saisi, donc de le garder en provision jusque-là.
+   *
+   * Absente, l'échéance règle l'année de sa date : c'est le cas de tous les
+   * acomptes, et de toutes les échéances saisies avant ce champ. Aucune donnée
+   * existante ne change de sens ; une version antérieure de l'application qui
+   * relit le compte conserve le champ (les éléments de liste sont recopiés
+   * entiers) et retrouve son ancien comportement.
+   */
+  readonly exercice?: number | undefined;
 }
+
+/** L'année de revenus qu'une échéance règle : son exercice, sinon l'année de sa date. */
+export const exerciceDe = (e: Echeance): number =>
+  e.exercice ?? Number(e.echeanceLe.slice(0, 4));
 
 /** Une échéance est payée dès qu'une date de paiement existe. */
 export const estPayee = (e: Echeance): boolean => e.payeeLe !== null;
