@@ -1,6 +1,6 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Shell } from './ui/Shell';
-import { FournisseurToasts } from './ui/components/Toasts';
+import { FournisseurToasts, useToast } from './ui/components/Toasts';
 import { useRoute } from './ui/useRoute';
 import { useFaits } from './state/store';
 
@@ -26,7 +26,7 @@ const SelecteurPeriode = lazy(() => import('./ui/components/SelecteurPeriode')
  * Pilote n'est PAS découpé : c'est l'écran d'entrée, et le découper ajouterait
  * un aller-retour réseau juste avant le contenu qu'on vient chercher.
  */
-import { Pilote } from './ui/screens/Pilote';
+import { Bandeau, Pilote } from './ui/screens/Pilote';
 
 const Argent = lazy(() => import('./ui/screens/Argent').then((m) => ({ default: m.Argent })));
 const Outils = lazy(() => import('./ui/screens/Outils').then((m) => ({ default: m.Outils })));
@@ -97,6 +97,33 @@ function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], annee: num
   }
 }
 
+/**
+ * Ce qui menace la conservation des saisies, sur TOUS les écrans.
+ *
+ * L'alerte vivait sur le Pilote seul. Elle ne servait qu'au démarrage : un
+ * stockage qui sature en cours de session se découvre en pleine saisie d'une
+ * facture, et c'est là qu'il faut le lire. Une saisie écartée parce qu'un
+ * autre onglet avait écrit entre-temps se dit aussi — sinon elle aurait l'air
+ * d'avoir été enregistrée.
+ */
+function AlerteConservation() {
+  const chargement = useFaits((e) => e.chargement);
+  const ecartees = useFaits((e) => e.saisiesEcartees);
+  const toast = useToast();
+  const dejaSignalees = useRef(ecartees);
+  useEffect(() => {
+    if (ecartees > dejaSignalees.current) {
+      toast('Une autre fenêtre de l’application venait d’enregistrer : ta dernière '
+        + 'saisie n’a pas été appliquée. Les données ont été rechargées, refais-la.');
+    }
+    dejaSignalees.current = ecartees;
+  }, [ecartees, toast]);
+
+  return chargement.phase === 'sans-persistance' ? (
+    <Bandeau ton="alerte" titre="Tes saisies ne sont pas conservées">{chargement.motif}</Bandeau>
+  ) : null;
+}
+
 export function App() {
   const initialiser = useFaits((e) => e.initialiser);
   const faits = useFaits((e) => e.faits);
@@ -149,6 +176,7 @@ export function App() {
           </Suspense>
         )}
       >
+        <AlerteConservation />
         <Suspense fallback={<EnChargement />}>
           {Ecran(anneeChoisie)}
         </Suspense>

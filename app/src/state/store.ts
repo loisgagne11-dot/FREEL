@@ -20,7 +20,7 @@ import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, type Ratio, euros, ratio } from '../domain/types';
 import {
   CLE_STOCKAGE, PART_GARDEE_MAX, type Depense, type Entreprise,
-  type Faits, type Mission, faitsVides, motifRefusFaits
+  VERSION_SCHEMA, type Faits, type Mission, completerFaitsCourants, faitsVides, motifRefusFaits
 } from './schema';
 import type { MotifSansContrepartie } from '../domain/calculs/banque';
 import {
@@ -31,18 +31,37 @@ import type { Echeance } from '../domain/calculs/provisions';
 import type { AjustementJour } from '../domain/calculs/planning';
 import { type ResultatMigration, type Stockage, migrer } from '../infra/migration';
 
-/** Le stockage du navigateur, ou `null` quand il est indisponible. */
-function stockageNavigateur(): Stockage | null {
+/**
+ * Le stockage du navigateur, `null` quand il est indisponible — et s'il est
+ * PLEIN.
+ *
+ * On lit avant d'essayer d'écrire. L'ancienne détection ne faisait qu'une
+ * écriture d'essai : un stockage plein la faisait échouer, et l'application
+ * partait VIDE avec le message « navigation privée », alors que les données
+ * étaient intactes et lisibles. Plein se lit, et se dit autrement.
+ */
+function stockageNavigateur(): { readonly stockage: Stockage | null; readonly plein: boolean } {
+  let ls: Storage;
   try {
     // L'accès seul peut lever en navigation privée ou stockage bloqué.
-    const test = '__freel_test__';
-    window.localStorage.setItem(test, '1');
-    window.localStorage.removeItem(test);
-    return window.localStorage;
+    ls = window.localStorage;
+    ls.getItem(CLE_STOCKAGE);
   } catch {
-    return null;
+    return { stockage: null, plein: false };
+  }
+  try {
+    const test = '__freel_test__';
+    ls.setItem(test, '1');
+    ls.removeItem(test);
+    return { stockage: ls, plein: false };
+  } catch {
+    return { stockage: ls, plein: true };
   }
 }
+
+const MOTIF_PLEIN = 'Le stockage du navigateur est plein (ou bloqué en écriture) : '
+  + 'tes données s’affichent, mais tes dernières saisies ne sont plus enregistrées. '
+  + 'Télécharge une sauvegarde depuis Réglages → Données, puis libère de l’espace.';
 
 export type EtatChargement =
   | { readonly phase: 'initial' }
@@ -58,6 +77,12 @@ export type EtatChargement =
 interface MagasinFaits {
   readonly faits: Faits;
   readonly chargement: EtatChargement;
+  /**
+   * Saisies écartées parce qu'un autre onglet avait écrit entre-temps. Un
+   * compteur et non un booléen : chaque écart doit pouvoir se signaler, même
+   * deux de suite.
+   */
+  readonly saisiesEcartees: number;
 
   /** Charge depuis le stockage, en migrant l'ancien format si nécessaire. */
   readonly initialiser: (stockage?: Stockage | null) => void;
@@ -373,28 +398,103 @@ export function ecrireFaits(faits: Faits): void {
 }
 
 /**
- * Persistance. Volontairement silencieuse en cas d'échec côté écriture :
- * l'utilisateur a déjà été averti par `chargement`, et faire échouer chaque
- * saisie ne l'aiderait pas. L'absence de persistance est signalée une fois,
- * à l'endroit qui compte.
+ * Persistance — et les deux façons dont elle perdait des données sans le dire.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN ÉCHEC D'ÉCRITURE EN COURS DE SESSION ÉTAIT AVALÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le commentaire d'origine disait l'utilisateur « déjà averti par
+ * `chargement` » : vrai au démarrage seulement. Un quota atteint en cours de
+ * session laissait l'écran dire que tout allait bien, et tout ce qu'on
+ * saisissait ensuite disparaissait à la fermeture de l'onglet. L'échec passe
+ * désormais en « sans persistance » au premier coup, et une écriture qui
+ * réussit à nouveau — l'espace a été libéré — lève l'alerte.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX ONGLETS : LE DERNIER QUI ÉCRIVAIT EFFAÇAIT L'AUTRE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Chaque écriture réécrit l'état complet. L'onglet B ajoutait une recette,
+ * l'onglet A ajoutait ensuite une dépense sur son état d'avant : la recette
+ * disparaissait. Pire, la numérotation se calculait sur l'état en mémoire, et
+ * deux onglets pouvaient émettre deux factures du même numéro.
+ *
+ * Deux défenses. L'écoute de l'événement `storage` tient chaque onglet à jour
+ * de ce que l'autre écrit (voir `initialiser`). Et avant d'écrire, on vérifie
+ * que le disque porte encore ce que cet onglet y a lu ou écrit en dernier : si
+ * ce n'est plus le cas, l'autre onglet l'emporte, cet onglet se recharge, et
+ * la saisie écartée est SIGNALÉE (`saisiesEcartees`). Perdre une saisie qu'on
+ * voit est réparable ; effacer en silence celle d'un autre onglet ne l'est pas.
  */
 function persister(stockage: Stockage | null, faits: Faits): void {
   if (!stockage) return;
   try {
-    stockage.setItem(CLE_STOCKAGE, JSON.stringify(faits));
+    const surLeDisque = stockage.getItem(CLE_STOCKAGE);
+    if (surLeDisque !== null && dernierConnu !== undefined && surLeDisque !== dernierConnu) {
+      reprendreDuDisque(surLeDisque);
+      useFaits.setState((e) => ({ saisiesEcartees: e.saisiesEcartees + 1 }));
+      return;
+    }
+    const contenu = JSON.stringify(faits);
+    stockage.setItem(CLE_STOCKAGE, contenu);
+    dernierConnu = contenu;
+    if (ecritureEnEchec) {
+      ecritureEnEchec = false;
+      useFaits.setState({ chargement: { phase: 'pret', migrationEffectuee: false } });
+    }
   } catch {
-    // Quota dépassé : l'état en mémoire reste juste, seule la conservation
-    // échoue. Voir `chargement.phase === 'sans-persistance'`.
+    // L'état en mémoire reste juste ; seule la conservation échoue — et cela
+    // se dit, sur tous les écrans.
+    ecritureEnEchec = true;
+    useFaits.setState({ chargement: { phase: 'sans-persistance', motif: MOTIF_PLEIN } });
   }
 }
 
+/**
+ * Adopte ce qu'un autre onglet a écrit.
+ *
+ * Seulement s'il est lisible ET au schéma courant. Un bloc d'un schéma
+ * postérieur veut dire qu'une version plus récente de l'application tourne à
+ * côté : continuer à écrire depuis celle-ci raboterait ses champs. Cet onglet
+ * cesse donc d'écrire et demande à être rechargé.
+ */
+function reprendreDuDisque(brut: string): void {
+  let bloc: unknown;
+  try { bloc = JSON.parse(brut); } catch { bloc = null; }
+  const lisible = motifRefusFaits(bloc) === null
+    && (bloc as { version?: unknown }).version === VERSION_SCHEMA;
+  if (!lisible) {
+    stockageActif = null;
+    useFaits.setState({
+      chargement: {
+        phase: 'sans-persistance',
+        motif: 'Une autre fenêtre de l’application a enregistré des données que cette '
+          + 'page ne sait pas lire, sans doute une version plus récente. Recharge cette '
+          + 'page : rien de ce qui est enregistré n’a été touché.'
+      }
+    });
+    return;
+  }
+  dernierConnu = brut;
+  useFaits.setState({ faits: completerFaitsCourants(bloc as Record<string, unknown>) });
+}
+
 let stockageActif: Stockage | null = null;
+/**
+ * Ce que cet onglet sait être sur le disque : lu au démarrage, ou écrit par
+ * lui. `undefined` tant qu'aucune lecture n'a eu lieu — rien à comparer.
+ */
+let dernierConnu: string | null | undefined;
+let ecritureEnEchec = false;
+let ecouteOnglets = false;
 
 /** Porte le résultat d'une migration dans le magasin. Partagée par les deux chemins. */
 function appliquerMigration(
   set: (partiel: Partial<MagasinFaits>) => void,
   resultat: ResultatMigration
 ): void {
+  dernierConnu = stockageActif?.getItem(CLE_STOCKAGE) ?? null;
   switch (resultat.statut) {
     case 'migre':
       set({ faits: resultat.faits, chargement: { phase: 'pret', migrationEffectuee: true } });
@@ -418,17 +518,35 @@ function appliquerMigration(
         faits: faitsVides(),
         chargement: { phase: 'sans-persistance', motif: resultat.motif }
       });
-      break;
+      return;
   }
+  // Un stockage plein au démarrage : les données se lisent, l'alerte reste.
+  if (ecritureEnEchec) set({ chargement: { phase: 'sans-persistance', motif: MOTIF_PLEIN } });
 }
 
 export const useFaits = create<MagasinFaits>((set, get) => ({
   faits: faitsVides(),
   chargement: { phase: 'initial' },
+  saisiesEcartees: 0,
 
   initialiser: (stockage) => {
-    const s = stockage === undefined ? stockageNavigateur() : stockage;
+    const navigateur = stockage === undefined ? stockageNavigateur() : null;
+    const s = navigateur === null ? (stockage ?? null) : navigateur.stockage;
     stockageActif = s;
+    dernierConnu = undefined;
+    ecritureEnEchec = navigateur?.plein ?? false;
+
+    // Ce qu'un autre onglet écrit arrive ici ; jamais ce que celui-ci écrit
+    // lui-même (le navigateur ne renvoie pas l'événement à son auteur).
+    if (s !== null && !ecouteOnglets && typeof window !== 'undefined') {
+      ecouteOnglets = true;
+      window.addEventListener('storage', (e) => {
+        if (e.key === CLE_STOCKAGE && e.newValue !== null && stockageActif !== null
+          && e.storageArea === stockageActif) {
+          reprendreDuDisque(e.newValue);
+        }
+      });
+    }
 
     if (!s) {
       set({

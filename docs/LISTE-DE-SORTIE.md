@@ -48,8 +48,8 @@ ne se réutilisent jamais.
 |---|---|
 | S1 — validation de chaque élément de liste (dont `echeances` et `missions[].entites`) ; filet d'erreur par écran et pour l'application, avec téléchargement des données brutes | ✅ fait |
 | S2 — garde de schéma à l'envoi vers le compte : envoi et « écraser » désactivés si le schéma distant est postérieur (un compte seulement abîmé reste remplaçable, sinon irréparable) | ✅ fait |
-| S3 — deux onglets : écouter `storage`, refuser d'écrire si le stockage a changé depuis la dernière lecture ; protège aussi la numérotation continue des factures | ⬜ |
-| S4 — quota plein : passer en « sans persistance » au premier échec d'écriture, motif distinct de la navigation privée ; lire avant de tester l'écriture | ⬜ |
+| S3 — deux onglets : écoute de `storage`, contrôle de révision avant écriture ; l'autre onglet l'emporte et la saisie écartée est signalée ; une version plus récente ouverte à côté arrête l'écriture | ✅ fait |
+| S4 — quota plein : « sans persistance » au premier échec, levé quand l'espace revient ; au démarrage, un stockage plein se lit au lieu de passer pour une navigation privée ; l'alerte est visible sur tous les écrans | ✅ fait |
 | S5 — justificatifs : `navigator.storage.persist()`, résolution sur `oncomplete`, export des pièces | ⬜ |
 | S6 — instantané `freel.avant-remplacement.v1` avant toute restauration ou récupération de compte, avec « revenir à l'état d'avant » | ⬜ |
 | Q3 — appeler `verifierAbsenceDePerte` à l'import de l'ancienne application et afficher ce qui n'a pas trouvé de place | ⬜ |
@@ -107,7 +107,7 @@ Sert de filet aux lots 5 et 6.
 | Navigateur de mois qui pilote tous les écrans ; recherche (client, numéro, montant) ; « + Nouveau » (facture, dépense, mission, congé) ; « Exporter » | ⬜ |
 | Livre des recettes en accès direct dans le rail ; carte utilisateur | ⬜ |
 | Rail tranché (décision n° 2) | ⬜ |
-| Q5 — sortir d'abord « Données et sauvegarde » de `Config.tsx` vers un module différé : le budget Réglages est à 39,34 / 40 Ko et ne se relève pas | ⬜ |
+| Q5 — budget de Réglages : l'écran Compte est désormais chargé à la demande (Réglages 39,92 → sous 38 Ko ; le plus lourd est Activité, 38,34 / 40) | ✅ fait (lot 1) |
 
 ### Lot 7 — Finitions (priorité 3, parallélisable)
 

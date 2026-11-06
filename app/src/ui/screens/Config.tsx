@@ -7,7 +7,6 @@ import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
 import { Montant } from '../components/Montant';
 import { eur } from '../format';
-import { Compte } from './Compte';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -49,6 +48,10 @@ const SECTIONS = [
 ];
 
 const Bareme = lazy(() => import('./Config.bareme').then((m) => ({ default: m.Bareme })));
+// Le compte en ligne aussi : c'est l'écran le plus lourd après le barème, on
+// ne l'ouvre que pour synchroniser, et sa garde de schéma à l'envoi avait
+// amené Réglages à 39,92 / 40 Ko (invariant n°7 : on extrait).
+const Compte = lazy(() => import('./Compte').then((m) => ({ default: m.Compte })));
 
 const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: string }[] = [
   { id: 'BNC', libelle: 'BNC — prestations libérales' },
@@ -115,7 +118,9 @@ export function Config() {
           {/* Monté seulement à l'ouverture : reprendre une session et
               interroger le serveur n'a pas à se produire chaque fois qu'on
               vient régler son profil. */}
-          {section === 'compte' && <Compte />}
+          <Suspense fallback={<p role="status" className={styles.aide}>Chargement…</p>}>
+            {section === 'compte' && <Compte />}
+          </Suspense>
         </PanneauOnglet>
       </div>
     </>
