@@ -44,7 +44,7 @@ import {
   euros
 } from '../types';
 import { revenuApresAbattement } from '../bareme/abattement';
-import { irParTranches, tranchesIR } from '../bareme/impot';
+import { impotDuFoyer, surcroitDImpot, tranchesIR } from '../bareme/impot';
 
 /** Les faits du foyer fiscal. `null` veut dire « pas renseigné », jamais zéro. */
 export interface FoyerFiscalImpot {
@@ -103,7 +103,7 @@ export interface ProvisionImpotRevenu {
   readonly revenuImposableFoyer: Euros;
   /** Impôt du foyer entier, quotient familial appliqué. */
   readonly impotFoyer: Euros;
-  /** La part de cet impôt qui revient au micro : c'est elle qu'on provisionne. */
+  /** Ce que l'activité ajoute à cet impôt (avec − sans elle) : c'est lui qu'on provisionne. */
   readonly impotMicro: Euros;
   readonly acomptesPasSaisis: Euros;
   /** Ce qui reste dû après les acomptes déjà saisis. Jamais négatif. */
@@ -162,14 +162,11 @@ export function provisionImpotRevenu(
   // Quotient familial : le barème s'applique à une part, le résultat se
   // remultiplie. L'appliquer au revenu entier ferait payer la tranche haute
   // à un foyer qui la divise en plusieurs parts.
-  const impotFoyer = euros(irParTranches(euros(revenuFoyer / partsFiscales), tranches.valeur) * partsFiscales);
+  const impotFoyer = impotDuFoyer(revenuFoyer, partsFiscales, tranches.valeur);
 
-  // La quote-part du micro, au prorata des revenus qui composent l'assiette
-  // AVANT déduction PER : le PER profite au foyer entier, l'imputer au seul
-  // micro lui attribuerait un avantage qu'il ne porte pas seul.
-  const totalRevenus = revenuMicro + autres;
-  const quotePart = totalRevenus > 0 ? revenuMicro / totalRevenus : 0;
-  const impotMicro = euros(impotFoyer * quotePart);
+  // Ce que l'activité AJOUTE à l'impôt du foyer, pas sa quote-part au taux
+  // moyen : voir `surcroitDImpot`, la même fonction que le comparateur.
+  const impotMicro = surcroitDImpot(revenuMicro, autres, per, partsFiscales, tranches.valeur);
 
   const resteAProvisionner = euros(Math.max(0, impotMicro - entree.acomptesPasSaisis));
   const moisRestants = Math.max(0, 12 - Number(entree.moisCourant.slice(5, 7)) + 1);

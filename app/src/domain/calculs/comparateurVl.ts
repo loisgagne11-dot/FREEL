@@ -1,6 +1,6 @@
 import type { Euros, Mois, Ratio, Resolution, TypeActivite } from '../types';
 import { euros } from '../types';
-import { irParTranches, tauxVersementLiberatoire, tranchesIR } from '../bareme/impot';
+import { surcroitDImpot, tauxVersementLiberatoire, tranchesIR } from '../bareme/impot';
 import { revenuApresAbattement } from '../bareme/abattement';
 
 /**
@@ -115,10 +115,7 @@ export function comparerRegimes(
   const tranches = tranchesR.valeur;
 
   // Le surcroît : l'impôt du foyer AVEC l'activité, moins celui SANS elle.
-  const parts = Math.max(1, foyer.parts);
-  const sans = irDuFoyer(foyer.autresRevenus, parts, tranches);
-  const avec = irDuFoyer(euros(foyer.autresRevenus + revenuR.valeur), parts, tranches);
-  const bareme = euros(Math.max(0, avec - sans));
+  const bareme = surcroitDImpot(revenuR.valeur, foyer.autresRevenus, 0, Math.max(1, foyer.parts), tranches);
 
   const ecart = euros(vl - bareme);
   const valeur: Comparaison = {
@@ -146,16 +143,4 @@ export function comparerRegimes(
   return {
     statut: 'publie', valeur, source: tauxR.source, verifieLe: tauxR.verifieLe
   };
-}
-
-/**
- * L'impôt d'un foyer, par quotient familial.
- *
- * Le revenu est divisé par les parts, le barème s'applique au quotient, et le
- * résultat est remultiplié. Sans plafonnement du quotient ni décote — voir
- * l'en-tête : les deux écarts jouent en sens contraire, et l'écran les dit.
- */
-function irDuFoyer(revenu: Euros, parts: number, tranches: Parameters<typeof irParTranches>[1]): number {
-  if (revenu <= 0) return 0;
-  return irParTranches(euros(revenu / parts), tranches) * parts;
 }
