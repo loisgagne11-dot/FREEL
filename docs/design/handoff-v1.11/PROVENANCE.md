@@ -43,6 +43,13 @@ Remplacés par des valeurs manifestement factices :
 
 Rien d'autre n'a été touché : ni les écrans, ni les tokens, ni les libellés.
 
+**Le 6 novembre 2026**, le prénom du propriétaire — que le smoke-test ne peut
+pas reconnaître, un prénom n'ayant pas de forme — a été remplacé par celui de
+la persona déjà présente dans `config-app.jsx` (« Camille Demo ») : dans la
+salutation du Pilote (`Pilote - Le Flux.html`), l'en-tête de `pilote-flux.js`,
+et les deux documents de spécification qui le citaient. Les captures ont été
+regénérées depuis ces sources, pas retouchées.
+
 **Le garde-fou avait deux angles morts**, tous deux corrigés dans
 `tests/smoke-test.js` le même jour :
 

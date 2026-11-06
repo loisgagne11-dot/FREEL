@@ -23,9 +23,9 @@ Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 | 1 | Fusionner la PR #296 | ✅ faite, fusionnée le 6/11 | — |
 | 2 | Rail : six entrées comme le handoff, ou garder « Facturer » | ⬜ en attente | Suivre le handoff : la facture se crée depuis « + Nouveau » et depuis le Pilote. Conditionne le lot 6. |
 | 3 | Impôt de l'activité : taux marginal ou prorata | ⬜ en attente | Marginal : c'est le surcoût réel pour le foyer, et ce que calcule déjà le comparateur. Conditionne L5 (lot 2). |
-| 4 | Prénom du propriétaire dans les sources publiques du handoff et les captures | ⬜ en attente | Le remplacer par un prénom fictif dans les sources, regénérer les captures ; ne pas réécrire l'historique git. |
-| 5 | Adresse du projet Supabase en dur dans l'ancienne `index.html` | ⬜ en attente | Retirer la ligne (l'ancienne application a déjà un champ de saisie), garder le fichier. |
-| 6 | Contrôle du taux BNC 2026 (25,6 %) sur l'avis URSSAF réel, sans communiquer de chiffre | ⬜ en attente | Si le taux est confirmé, L10 se referme pour le taux et la source passe en premier ordre. |
+| 4 | Prénom du propriétaire dans les sources publiques du handoff et les captures | ✅ accepté le 6/11 — remplacé par la persona « Camille Demo » déjà présente dans le handoff, captures regénérées ; l'historique git n'est pas réécrit | — |
+| 5 | Adresse du projet Supabase en dur dans l'ancienne `index.html` | ✅ accepté le 6/11 — ligne retirée, fichier conservé ; l'adresse se saisit dans l'onglet « Cloud & Vie privée » de l'ancienne application | — |
+| 6 | Contrôle du taux BNC 2026 (25,6 %) sur l'avis URSSAF réel | ✅ confirmé le 6/11 par le propriétaire. Il signale aussi les 0,2 % de CFP payés avec la déclaration : voir L12 (lot 2) | — |
 
 ## Lots en cours et à venir
 
@@ -66,6 +66,7 @@ Chaque correctif porte son test de mutation.
 | L4 — garder la provision d'impôt de N-1 jusqu'au solde, avec un test qui traverse le 31 décembre | ⬜ |
 | L5 — une seule méthode d'impôt de l'activité (selon la décision n° 3) | ⬜ |
 | L9 — écrire « avant impôt » sur tout net ou toute capacité qui l'exclut | ⬜ |
+| L12 — CFP (0,2 % en BNC, payée à l'URSSAF avec la déclaration) : comptée dans le total à mettre de côté, mais rangée en « impôt » ; le montant URSSAF affiché est donc 0,2 % sous ce que l'URSSAF demande. La ranger en nature `cfp`, et montrer « cotisations 25,6 % + CFP 0,2 % » à la déclaration | ⬜ |
 | L11 — date locale pour les annulations (la date UTC bascule dans l'année précédente) ; CFP rangée dans la nature `cfp` ; arrondi des parts | ⬜ |
 | Q2 — les cinq tests qui ne tiennent rien (`if (statut === 'refuse') return;` sans assertion) : utilitaire `publie(r)` | ⬜ |
 | Q4 — `domain/dates.ts` et `ui/format.ts` comme seules sources (`joursEntre` en six copies, `enKiloEuros`, libellé « mois année ») | ⬜ |

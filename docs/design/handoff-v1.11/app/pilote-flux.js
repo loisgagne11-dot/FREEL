@@ -1,6 +1,6 @@
 /* ============================================================
    FREEL — Pilote · Le Flux (logique de page)
-   Données alignées sur le Cockpit « Le Fil » (Loïs · juin 2026) :
+   Données alignées sur le Cockpit « Le Fil » (Camille · juin 2026) :
    solde 8 120 € · provisions dues 3 180 € · réserve 2 600 €
    → versable 2 340 € · TVA 32 400/37 500 (franchi ≈ sept.)
    Chargé APRÈS freel.js (qui remplace les jetons $ICO_x$).

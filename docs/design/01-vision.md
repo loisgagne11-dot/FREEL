@@ -10,7 +10,7 @@ Sources consultées ponctuellement pour vérifier/compléter des formules citée
 
 **Problème métier** — un indépendant en micro-BNC (France) doit répondre en permanence à cinq questions vitales que ni sa banque ni un tableur ne relient entre elles : combien il peut se verser aujourd'hui sans se mettre en danger, ce qu'il doit à l'URSSAF/au fisc, où il se situe par rapport aux seuils légaux (plafond micro-BNC, franchise de TVA), si sa comptabilité est en règle (justificatifs, rapprochement bancaire, livre des recettes), et son autonomie de trésorerie (combien de mois il peut tenir au rythme actuel). (`annexe-architecture-build5.md:5-7`)
 
-**Pour qui** — un freelance/indépendant unique, en micro-BNC, avec option ACRE active, potentiellement en franchise de TVA (bascule possible vers assujetti). Persona démo : « Atelier L. » / Loïs Mercier, activité 74.10Z (Design), Paris. (`config-app.jsx:141-143`)
+**Pour qui** — un freelance/indépendant unique, en micro-BNC, avec option ACRE active, potentiellement en franchise de TVA (bascule possible vers assujetti). Persona démo : « Atelier L. » / Camille Demo, activité 74.10Z (Design), Paris. (`config-app.jsx:141-143`)
 
 **Questions auxquelles l'app répond** (reformulées depuis le vocabulaire du produit, non l'inverse) :
 - « Combien je peux me verser, et qu'est-ce qui coince » → écran Pilote (`annexe:153`)
