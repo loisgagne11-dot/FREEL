@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useFaits } from '../../state/store';
+import { annulerRecette } from '../../state/ecritures.recettes';
 import { etatLivre } from '../../state/selecteurs.livre';
 import { estAnnulation } from '../../domain/calculs/livreRecettes';
 import { Info } from '../components/Info';
@@ -33,7 +34,6 @@ import styles from './Argent.module.css';
  */
 export function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
   const faits = useFaits((e) => e.faits);
-  const annulerRecette = useFaits((e) => e.annulerRecette);
   const etat = useMemo(() => etatLivre(faits), [faits]);
 
   return (

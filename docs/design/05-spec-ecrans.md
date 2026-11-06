@@ -25,7 +25,7 @@ Fichiers : `Pilote - Le Flux.html` (structure + 11 `<template>` de détail) + `p
     - Recherche (⌘K, placeholder) — masquée `<1180px`
     - **FabMenu** `[réutilisable]` « Exporter » (CRA, factures PDF, livre CSV, FEC, JSON)
     - **FabMenu** `[réutilisable]` « Nouveau » (Mission, Facture, Encaissement, Charge, Salaire, Congés)
-  - **Greet** — titre « Bonjour Loïs — quatre décisions t'attendent. », sous-titre, tag « Solde compte · {solde} »
+  - **Greet** — titre « Bonjour Camille — quatre décisions t'attendent. », sous-titre, tag « Solde compte · {solde} »
   - **QuickActsBar** (`pilote-quickacts.js`, propre à cet écran) — chips d'actions personnalisables + bouton « + » ouvrant un menu catégorisé (Documents / Saisir / Aller à) ; ajout/retrait persistés dans `localStorage['freel-quickacts']`, **indépendant des deux stores métier**
   - **FluxCard** — carte « le flux du mois »
     - **FluxHeader** (tag « le flux du mois · juin 2026 », indice « clique un statut pour le mettre à jour »)

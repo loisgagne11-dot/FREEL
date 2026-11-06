@@ -477,7 +477,7 @@ export function compositionDuMois(
       .filter((mi) => mi.clientNom === r.clientNom && dansLaFenetre(mi, emiseLe))
       .map((mi) => mi.id)
       .sort();
-    const cle = `${r.clientNom} ${candidates.join('|')}`;
+    const cle = `${r.clientNom}\u0000${candidates.join('|')}`;
     const existant = groupes.get(cle);
     if (existant === undefined) {
       groupes.set(cle, {

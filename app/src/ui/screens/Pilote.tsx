@@ -96,11 +96,9 @@ export function Pilote() {
           chose au moins aussi souvent que pour regarder où l'on en est. */}
       <ActionsRapides />
 
-      {chargement.phase === 'sans-persistance' && (
-        <Bandeau ton="alerte" titre="Tes saisies ne sont pas conservées">
-          {chargement.motif}
-        </Bandeau>
-      )}
+      {/* « Tes saisies ne sont pas conservées » vit dans `App`, au-dessus de
+          TOUS les écrans : un quota atteint en cours de session doit se voir là
+          où l'on saisit, pas seulement en revenant ici. */}
 
       {chargement.phase === 'pret' && chargement.migrationEffectuee && (
         <Bandeau ton="info" titre="Données reprises de la version précédente">
@@ -266,7 +264,7 @@ export function Pilote() {
 
 /* ---------- éléments locaux ---------- */
 
-function Bandeau(
+export function Bandeau(
   { ton, titre, children }: {
     ton: 'info' | 'alerte';
     titre: string;

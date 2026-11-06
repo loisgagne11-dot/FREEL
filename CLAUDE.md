@@ -59,12 +59,13 @@ passé, et la seule chose qu'il garantit est qu'on cessera de le consulter.
 
 ## Livrer
 
-Un lot n'est fini que quand les quatre sont vrais :
+Un lot n'est fini que quand les cinq sont vrais :
 
 1. `cd app && npm run verifier` est vert ;
 2. les captures sont regénérées et **relues** ;
 3. les trois inventaires portent ce que le lot a changé ;
-4. le contrôle visuel est passé sur les écrans touchés.
+4. le contrôle visuel est passé sur les écrans touchés ;
+5. `docs/LISTE-DE-SORTIE.md` porte ce que le lot a changé.
 
 **Une PR par lot, ouverte au premier commit.** Quatre lots empilés sur une
 branche dont la PR fusionne en cours de route se retrouvent sans PR ouverte :
@@ -73,7 +74,8 @@ fusion qui ne soit fini au sens ci-dessus — et le dire explicitement quand ça
 l'est.
 
 `docs/VISION-PRODUIT.md` dit à quoi sert le produit ; s'y référer avant
-d'arbitrer entre deux conceptions.
+d'arbitrer entre deux conceptions. Ce qui reste à faire vit dans
+`docs/LISTE-DE-SORTIE.md`, et nulle part ailleurs.
 
 ## Invariants
 

@@ -352,13 +352,55 @@ function promesseDe<T>(requete: IDBRequest<T>): Promise<T> {
   });
 }
 
+/**
+ * Une écriture IndexedDB n'est acquise qu'à la VALIDATION de sa transaction.
+ *
+ * Le dépôt attendait le succès de la requête `put` — qui ne dit que « la
+ * demande est acceptée ». La transaction peut encore avorter au moment de
+ * valider, typiquement quand le quota est atteint. L'écran affichait alors
+ * « Pièce conservée » et rattachait au fait l'identifiant d'une pièce qui
+ * n'existait pas : la perte n'apparaissait qu'au contrôle, des mois plus tard.
+ */
+export function transactionTerminee(
+  transaction: Pick<IDBTransaction, 'oncomplete' | 'onabort' | 'onerror' | 'error'>
+): Promise<void> {
+  return new Promise((resoudre, rejeter) => {
+    transaction.oncomplete = () => resoudre();
+    const echec = () => rejeter(transaction.error ?? new Error('La pièce n’a pas pu être enregistrée.'));
+    transaction.onabort = echec;
+    transaction.onerror = echec;
+  });
+}
+
+/**
+ * Demande au navigateur de ne pas évincer les pièces pour faire de la place.
+ *
+ * Sans cette demande, IndexedDB est un stockage « au mieux » : sous pression
+ * d'espace, le navigateur peut tout supprimer sans prévenir. Or ces pièces
+ * sont à conservation légale et ne sont, pour l'instant, ni dans l'export ni
+ * dans la synchronisation. Demandée une fois, au premier dépôt — c'est là
+ * qu'il y a quelque chose à protéger ; un refus n'empêche pas de déposer.
+ */
+let persistanceDemandee = false;
+function demanderStockagePersistant(): void {
+  if (persistanceDemandee) return;
+  persistanceDemandee = true;
+  void globalThis.navigator?.storage?.persist?.().catch(() => false);
+}
+
 export function stockageIndexedDB(): StockageJustificatifs {
   return {
     async deposer(j) {
+      demanderStockagePersistant();
       const base = await ouvrir();
       const transaction = base.transaction(NOM_MAGASIN, 'readwrite');
-      await promesseDe(transaction.objectStore(NOM_MAGASIN).put(j));
-      base.close();
+      const terminee = transactionTerminee(transaction);
+      transaction.objectStore(NOM_MAGASIN).put(j);
+      try {
+        await terminee;
+      } finally {
+        base.close();
+      }
     },
     async lire(id) {
       const base = await ouvrir();
@@ -383,8 +425,13 @@ export function stockageIndexedDB(): StockageJustificatifs {
     async supprimer(id) {
       const base = await ouvrir();
       const transaction = base.transaction(NOM_MAGASIN, 'readwrite');
-      await promesseDe(transaction.objectStore(NOM_MAGASIN).delete(id));
-      base.close();
+      const terminee = transactionTerminee(transaction);
+      transaction.objectStore(NOM_MAGASIN).delete(id);
+      try {
+        await terminee;
+      } finally {
+        base.close();
+      }
     }
   };
 }

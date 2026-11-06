@@ -467,6 +467,45 @@ describe('conflit d’écriture', () => {
   });
 });
 
+/**
+ * UN APPAREIL EN RETARD N'ÉCRASE PAS UN COMPTE PLUS RÉCENT.
+ *
+ * Si la garde sautait, un appareil resté sur une ancienne version lirait un
+ * compte écrit par une plus récente, n'en comprendrait rien — et l'envoi
+ * partirait quand même, le serveur l'acceptant puisque le compteur de version
+ * est le bon. Le travail fait sur la version récente serait remplacé.
+ */
+describe('envoi vers un compte plus récent', () => {
+  const futur = { version: VERSION_SCHEMA + 1, recettes: [] };
+
+  it('désactive l’envoi et dit pourquoi', async () => {
+    const appel = reponses(SESSION_OK, ligneDistante(3, futur));
+    useFaits.setState({
+      faits: { ...faitsVides(), clients: [{ id: 'c9', nom: 'Client de démo' }] as never }
+    });
+    render(<Compte stockage={CONFIGURE()} />);
+    await seConnecter();
+
+    const bouton = await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' });
+    expect((bouton as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/version plus récente/).textContent).toMatch(/mets d’abord/);
+    expect(ecritures(appel)).toHaveLength(0);
+  });
+
+  // Le conflit relit le compte : s'il a été réécrit entre-temps par une
+  // version plus récente, « écraser » retomberait dans le même cas.
+  it('interdit d’écraser quand le conflit révèle un compte plus récent', async () => {
+    reponses(SESSION_OK, ligneDistante(3), { corps: [] }, ligneDistante(9, futur));
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(await screen.findByRole('button', { name: 'Enregistrer cet appareil sur le compte' }));
+
+    const ecraser = await screen.findByRole('button', { name: /Écraser le compte/ });
+    expect((ecraser as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
 describe('récupération depuis le compte', () => {
   it('montre ce qui serait chargé avant de remplacer quoi que ce soit', async () => {
     const faits = {

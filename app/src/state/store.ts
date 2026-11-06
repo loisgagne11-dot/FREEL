@@ -19,11 +19,9 @@
 import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, type Ratio, euros, ratio } from '../domain/types';
 import {
-  CLE_STOCKAGE, PART_GARDEE_MAX, type Depense, type Entreprise,
-  type Faits, type Mission, type Recette, faitsVides, motifRefusFaits
+  CLE_AVANT_REMPLACEMENT, CLE_STOCKAGE, PART_GARDEE_MAX, type Depense, type Entreprise,
+  VERSION_SCHEMA, type Faits, type Mission, completerFaitsCourants, faitsVides, motifRefusFaits
 } from './schema';
-import type { ModeReglement } from '../domain/calculs/livreRecettes';
-import { ecritureDAnnulation, prochainNumero } from '../domain/calculs/ecritureRecette';
 import type { MotifSansContrepartie } from '../domain/calculs/banque';
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
@@ -33,18 +31,37 @@ import type { Echeance } from '../domain/calculs/provisions';
 import type { AjustementJour } from '../domain/calculs/planning';
 import { type ResultatMigration, type Stockage, migrer } from '../infra/migration';
 
-/** Le stockage du navigateur, ou `null` quand il est indisponible. */
-function stockageNavigateur(): Stockage | null {
+/**
+ * Le stockage du navigateur, `null` quand il est indisponible — et s'il est
+ * PLEIN.
+ *
+ * On lit avant d'essayer d'écrire. L'ancienne détection ne faisait qu'une
+ * écriture d'essai : un stockage plein la faisait échouer, et l'application
+ * partait VIDE avec le message « navigation privée », alors que les données
+ * étaient intactes et lisibles. Plein se lit, et se dit autrement.
+ */
+function stockageNavigateur(): { readonly stockage: Stockage | null; readonly plein: boolean } {
+  let ls: Storage;
   try {
     // L'accès seul peut lever en navigation privée ou stockage bloqué.
-    const test = '__freel_test__';
-    window.localStorage.setItem(test, '1');
-    window.localStorage.removeItem(test);
-    return window.localStorage;
+    ls = window.localStorage;
+    ls.getItem(CLE_STOCKAGE);
   } catch {
-    return null;
+    return { stockage: null, plein: false };
+  }
+  try {
+    const test = '__freel_test__';
+    ls.setItem(test, '1');
+    ls.removeItem(test);
+    return { stockage: ls, plein: false };
+  } catch {
+    return { stockage: ls, plein: true };
   }
 }
+
+const MOTIF_PLEIN = 'Le stockage du navigateur est plein (ou bloqué en écriture) : '
+  + 'tes données s’affichent, mais tes dernières saisies ne sont plus enregistrées. '
+  + 'Télécharge une sauvegarde depuis Réglages → Données, puis libère de l’espace.';
 
 export type EtatChargement =
   | { readonly phase: 'initial' }
@@ -60,6 +77,12 @@ export type EtatChargement =
 interface MagasinFaits {
   readonly faits: Faits;
   readonly chargement: EtatChargement;
+  /**
+   * Saisies écartées parce qu'un autre onglet avait écrit entre-temps. Un
+   * compteur et non un booléen : chaque écart doit pouvoir se signaler, même
+   * deux de suite.
+   */
+  readonly saisiesEcartees: number;
 
   /** Charge depuis le stockage, en migrant l'ancien format si nécessaire. */
   readonly initialiser: (stockage?: Stockage | null) => void;
@@ -229,7 +252,7 @@ interface MagasinFaits {
    * d'abord ce qui serait chargé et demande confirmation. Charger en silence
    * ferait disparaître une saisie faite hors ligne sans que personne le voie.
    */
-  readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => Promise<void>;
+  readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => Promise<string | null>;
 
   /**
    * Remplace les faits par un bloc venu du compte distant.
@@ -342,101 +365,10 @@ interface MagasinFaits {
   readonly ajouterPeriodeUrssaf: (periode: PeriodeBareme) => string | null;
   readonly retirerPeriodeUrssaf: (du: Mois) => void;
 
-  /* ── Livre des recettes ───────────────────────────────────────────────── */
-
-  /**
-   * Ajoute une recette. Le numéro est attribué ici s'il n'est pas fourni :
-   * la continuité de la numérotation est une exigence du registre, pas une
-   * commodité d'affichage.
-   */
-  readonly ajouterRecette: (
-    saisie: Omit<Recette, 'id' | 'numero'> & { readonly numero?: string }
-  ) => string;
-
-  /**
-   * Passe une recette en encaissé.
-   *
-   * La date ET le mode de règlement sont exigés ensemble : ce sont deux
-   * mentions obligatoires du livre des recettes, et l'ancienne application
-   * n'en portait aucune. Rend le motif du refus, ou `null`.
-   */
-  readonly encaisserRecette: (
-    id: string,
-    encaisseeLe: DateISO,
-    modeReglement: ModeReglement
-  ) => string | null;
-
-  /**
-   * Consigne qu'une facture a été relancée, à cette date.
-   *
-   * C'est un FAIT, au même titre qu'un encaissement : on l'a fait ou on ne l'a
-   * pas fait. Il commande le ton de la relance suivante — rappel, puis ferme,
-   * puis mise en demeure — et répond à « je l'ai relancé quand ? », qui est la
-   * question qu'on se pose au téléphone.
-   *
-   * L'application n'envoie rien : elle rédige, et consigne que vous avez
-   * envoyé. Prétendre expédier sans savoir ni tracer ni prouver l'envoi ne
-   * vaudrait rien le jour où il faudrait démontrer qu'on a relancé.
-   */
-  readonly consignerRelance: (id: string, le: DateISO) => void;
-
-  /**
-   * Consigne qu'une facture a été ENVOYÉE au client, à cette date.
-   *
-   * ─────────────────────────────────────────────────────────────────────────
-   * ÉMISE N'EST PAS ENVOYÉE
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Le document peut exister, porter son numéro et sa date, et dormir dans un
-   * dossier — c'est le cas courant en fin de mois, où l'on établit les
-   * factures d'un coup avant de les envoyer.
-   *
-   * Les confondre coûte deux choses. On relance un client qui n'a jamais reçu
-   * la facture, ce qui est la pire des relances. Et on ne sait pas répondre à
-   * « je ne l'ai jamais reçue », qui est la réponse la plus courante à une
-   * relance.
-   *
-   * Une DATE et non un booléen, comme partout ailleurs ici : un statut
-   * qu'aucune date ne prouve ne prouve rien. Rend le motif du refus, ou `null`.
-   */
-  readonly marquerEnvoyee: (id: string, le: DateISO) => string | null;
-
-  /**
-   * Annule une recette ÉMISE par une écriture inverse.
-   *
-   * Rien n'est supprimé : les deux écritures restent visibles et leur somme
-   * est nulle. Un registre qu'on peut réécrire ne prouve rien.
-   *
-   * Une facture émise mais jamais encaissée s'annule elle aussi — c'est un
-   * avoir. L'écriture inverse reste alors hors du livre (`encaisseeLe` à
-   * `null`), le livre des recettes n'enregistrant que des encaissements, mais
-   * elle neutralise le montant resté à rentrer.
-   */
-  readonly annulerRecette: (id: string, aujourdhui?: DateISO) => string | null;
-
-  /**
-   * Supprime un BROUILLON — une recette jamais émise.
-   *
-   * Le critère est l'émission, pas l'encaissement : un numéro porté par une
-   * facture sortie de chez l'utilisateur ne peut plus disparaître, sous peine
-   * de laisser un trou dans la numérotation. Un brouillon, lui, n'a jamais
-   * circulé : le supprimer libère son numéro, et c'est ce qu'il faut — le
-   * réserver créerait précisément le trou qu'on cherche à éviter.
-   */
-  readonly supprimerBrouillon: (id: string) => string | null;
-
-  /**
-   * Rattache une pièce à une recette — ou la détache avec `null`.
-   *
-   * Miroir de `attacherJustificatif`, côté recettes : une facture établie
-   * AILLEURS que dans l'application, ou reprise de l'ancienne version, n'a
-   * aucun autre moyen d'être jointe à son document d'origine. Contrairement à
-   * la dépense, aucune règle fiscale n'en dépend ici — une facture émise par
-   * l'application se reconstruit déjà depuis les faits — mais l'audit
-   * comptable ne reconnaît une pièce que si elle est effectivement conservée,
-   * et cette porte n'existait tout simplement pas avant ce lot.
-   */
-  readonly attacherJustificatifRecette: (id: string, justificatifId: string | null) => void;
+  /* Les écritures du LIVRE DES RECETTES — émettre, envoyer, encaisser,
+     relancer, annuler, supprimer un brouillon, joindre une pièce — ont migré
+     dans `ecritures.recettes` : aucune n'est déclenchable depuis le Pilote, et
+     elles emportaient la numérotation dans le paquet d'entrée. */
 
   /* ── Carnet : clients et missions ─────────────────────────────────────── */
 
@@ -466,28 +398,145 @@ export function ecrireFaits(faits: Faits): void {
 }
 
 /**
- * Persistance. Volontairement silencieuse en cas d'échec côté écriture :
- * l'utilisateur a déjà été averti par `chargement`, et faire échouer chaque
- * saisie ne l'aiderait pas. L'absence de persistance est signalée une fois,
- * à l'endroit qui compte.
+ * Persistance — et les deux façons dont elle perdait des données sans le dire.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN ÉCHEC D'ÉCRITURE EN COURS DE SESSION ÉTAIT AVALÉ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le commentaire d'origine disait l'utilisateur « déjà averti par
+ * `chargement` » : vrai au démarrage seulement. Un quota atteint en cours de
+ * session laissait l'écran dire que tout allait bien, et tout ce qu'on
+ * saisissait ensuite disparaissait à la fermeture de l'onglet. L'échec passe
+ * désormais en « sans persistance » au premier coup, et une écriture qui
+ * réussit à nouveau — l'espace a été libéré — lève l'alerte.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX ONGLETS : LE DERNIER QUI ÉCRIVAIT EFFAÇAIT L'AUTRE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Chaque écriture réécrit l'état complet. L'onglet B ajoutait une recette,
+ * l'onglet A ajoutait ensuite une dépense sur son état d'avant : la recette
+ * disparaissait. Pire, la numérotation se calculait sur l'état en mémoire, et
+ * deux onglets pouvaient émettre deux factures du même numéro.
+ *
+ * Deux défenses. L'écoute de l'événement `storage` tient chaque onglet à jour
+ * de ce que l'autre écrit (voir `initialiser`). Et avant d'écrire, on vérifie
+ * que le disque porte encore ce que cet onglet y a lu ou écrit en dernier : si
+ * ce n'est plus le cas, l'autre onglet l'emporte, cet onglet se recharge, et
+ * la saisie écartée est SIGNALÉE (`saisiesEcartees`). Perdre une saisie qu'on
+ * voit est réparable ; effacer en silence celle d'un autre onglet ne l'est pas.
  */
 function persister(stockage: Stockage | null, faits: Faits): void {
   if (!stockage) return;
   try {
-    stockage.setItem(CLE_STOCKAGE, JSON.stringify(faits));
+    const surLeDisque = stockage.getItem(CLE_STOCKAGE);
+    if (surLeDisque !== null && dernierConnu !== undefined && surLeDisque !== dernierConnu) {
+      reprendreDuDisque(surLeDisque);
+      useFaits.setState((e) => ({ saisiesEcartees: e.saisiesEcartees + 1 }));
+      return;
+    }
+    const contenu = JSON.stringify(faits);
+    stockage.setItem(CLE_STOCKAGE, contenu);
+    dernierConnu = contenu;
+    if (ecritureEnEchec) {
+      ecritureEnEchec = false;
+      useFaits.setState({ chargement: { phase: 'pret', migrationEffectuee: false } });
+    }
   } catch {
-    // Quota dépassé : l'état en mémoire reste juste, seule la conservation
-    // échoue. Voir `chargement.phase === 'sans-persistance'`.
+    // L'état en mémoire reste juste ; seule la conservation échoue — et cela
+    // se dit, sur tous les écrans.
+    ecritureEnEchec = true;
+    useFaits.setState({ chargement: { phase: 'sans-persistance', motif: MOTIF_PLEIN } });
+  }
+}
+
+/**
+ * Adopte ce qu'un autre onglet a écrit.
+ *
+ * Seulement s'il est lisible ET au schéma courant. Un bloc d'un schéma
+ * postérieur veut dire qu'une version plus récente de l'application tourne à
+ * côté : continuer à écrire depuis celle-ci raboterait ses champs. Cet onglet
+ * cesse donc d'écrire et demande à être rechargé.
+ */
+function reprendreDuDisque(brut: string): void {
+  let bloc: unknown;
+  try { bloc = JSON.parse(brut); } catch { bloc = null; }
+  const lisible = motifRefusFaits(bloc) === null
+    && (bloc as { version?: unknown }).version === VERSION_SCHEMA;
+  if (!lisible) {
+    stockageActif = null;
+    useFaits.setState({
+      chargement: {
+        phase: 'sans-persistance',
+        motif: 'Une autre fenêtre de l’application a enregistré des données que cette '
+          + 'page ne sait pas lire, sans doute une version plus récente. Recharge cette '
+          + 'page : rien de ce qui est enregistré n’a été touché.'
+      }
+    });
+    return;
+  }
+  dernierConnu = brut;
+  useFaits.setState({ faits: completerFaitsCourants(bloc as Record<string, unknown>) });
+}
+
+/**
+ * Garde une copie de l'état local avant de le remplacer en entier.
+ *
+ * Restaurer une sauvegarde, charger le compte, reprendre l'ancienne
+ * application : trois gestes qui ÉCRASENT tout, précédés d'un aperçu de ce
+ * qui arrive mais d'aucune copie de ce qui part. Un mauvais fichier choisi, et
+ * la saisie du jour était irrécupérable.
+ *
+ * Une seule copie, la dernière : c'est un « annuler », pas un historique.
+ * Rien n'est copié quand l'état actuel est vide — sinon remplir un appareil
+ * neuf effacerait la copie utile d'avant. Et si la copie ne peut pas s'écrire
+ * (stockage plein), le remplacement est REFUSÉ : c'est le seul moment où l'on
+ * peut encore choisir de télécharger une sauvegarde d'abord.
+ */
+function garderInstantane(): string | null {
+  const s = stockageActif;
+  const brut = s?.getItem(CLE_STOCKAGE) ?? null;
+  const f = useFaits.getState().faits;
+  if (s === null || brut === null
+    || f.recettes.length + f.depenses.length + f.clients.length + f.missions.length === 0) {
+    return null;
+  }
+  try {
+    s.setItem(CLE_AVANT_REMPLACEMENT, JSON.stringify({ le: new Date().toISOString(), brut }));
+    return null;
+  } catch {
+    return 'Impossible de mettre de côté tes données actuelles avant de les remplacer '
+      + '(stockage plein). Télécharge d’abord une sauvegarde depuis Réglages → Données.';
+  }
+}
+
+/** La copie prise avant le dernier remplacement, si elle existe et se lit. */
+export function instantaneAvantRemplacement(): { readonly le: string; readonly brut: string } | null {
+  try {
+    const o = JSON.parse(stockageActif?.getItem(CLE_AVANT_REMPLACEMENT) ?? 'null') as
+      { le?: unknown; brut?: unknown } | null;
+    return typeof o?.le === 'string' && typeof o.brut === 'string' ? { le: o.le, brut: o.brut } : null;
+  } catch {
+    return null;
   }
 }
 
 let stockageActif: Stockage | null = null;
+/**
+ * Ce que cet onglet sait être sur le disque : lu au démarrage, ou écrit par
+ * lui. `undefined` tant qu'aucune lecture n'a eu lieu — rien à comparer.
+ */
+let dernierConnu: string | null | undefined;
+let ecritureEnEchec = false;
+let ecouteOnglets = false;
 
 /** Porte le résultat d'une migration dans le magasin. Partagée par les deux chemins. */
 function appliquerMigration(
   set: (partiel: Partial<MagasinFaits>) => void,
   resultat: ResultatMigration
 ): void {
+  dernierConnu = stockageActif?.getItem(CLE_STOCKAGE) ?? null;
   switch (resultat.statut) {
     case 'migre':
       set({ faits: resultat.faits, chargement: { phase: 'pret', migrationEffectuee: true } });
@@ -511,17 +560,35 @@ function appliquerMigration(
         faits: faitsVides(),
         chargement: { phase: 'sans-persistance', motif: resultat.motif }
       });
-      break;
+      return;
   }
+  // Un stockage plein au démarrage : les données se lisent, l'alerte reste.
+  if (ecritureEnEchec) set({ chargement: { phase: 'sans-persistance', motif: MOTIF_PLEIN } });
 }
 
 export const useFaits = create<MagasinFaits>((set, get) => ({
   faits: faitsVides(),
   chargement: { phase: 'initial' },
+  saisiesEcartees: 0,
 
   initialiser: (stockage) => {
-    const s = stockage === undefined ? stockageNavigateur() : stockage;
+    const navigateur = stockage === undefined ? stockageNavigateur() : null;
+    const s = navigateur === null ? (stockage ?? null) : navigateur.stockage;
     stockageActif = s;
+    dernierConnu = undefined;
+    ecritureEnEchec = navigateur?.plein ?? false;
+
+    // Ce qu'un autre onglet écrit arrive ici ; jamais ce que celui-ci écrit
+    // lui-même (le navigateur ne renvoie pas l'événement à son auteur).
+    if (s !== null && !ecouteOnglets && typeof window !== 'undefined') {
+      ecouteOnglets = true;
+      window.addEventListener('storage', (e) => {
+        if (e.key === CLE_STOCKAGE && e.newValue !== null && stockageActif !== null
+          && e.storageArea === stockageActif) {
+          reprendreDuDisque(e.newValue);
+        }
+      });
+    }
 
     if (!s) {
       set({
@@ -598,50 +665,6 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     }
 
     appliquerMigration(set, resultat);
-  },
-
-  marquerEnvoyee: (id, le) => {
-    const actuel = get().faits;
-    const recette = actuel.recettes.find((r) => r.id === id);
-    if (recette === undefined) return 'Recette introuvable.';
-
-    // Un brouillon n'a pas de document à envoyer : il n'a ni numéro définitif
-    // ni date. L'envoyer d'abord et l'émettre ensuite mettrait la date d'envoi
-    // avant la date de la facture.
-    if (recette.emiseLe === null) {
-      return 'Ce brouillon n’a pas encore été émis : émettez-le d’abord, '
-        + 'il prendra son numéro et sa date.';
-    }
-    if (le < recette.emiseLe) {
-      return 'Une facture ne peut pas partir avant d’exister : la date d’envoi '
-        + 'est antérieure à sa date d’émission.';
-    }
-
-    const faits: Faits = {
-      ...actuel,
-      recettes: actuel.recettes.map((r) => (r.id === id ? { ...r, envoyeeLe: le } : r))
-    };
-    set({ faits });
-    persister(stockageActif, faits);
-    return null;
-  },
-
-  consignerRelance: (id, le) => {
-    const actuel = get().faits;
-    const faits: Faits = {
-      ...actuel,
-      recettes: actuel.recettes.map((r) => {
-        if (r.id !== id) return r;
-        const faites = r.relancesLe ?? [];
-        // Deux relances le même jour sont une double frappe, pas deux
-        // démarches : les compter ferait passer au ton suivant sans qu'un
-        // second message soit parti.
-        if (faites.includes(le)) return r;
-        return { ...r, relancesLe: [...faites, le] };
-      })
-    };
-    set({ faits });
-    persister(stockageActif, faits);
   },
 
   definirReserve: (montant) => {
@@ -850,14 +873,19 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     // l'ancienne application est un geste rare, et son code n'a rien à faire
     // dans le paquet d'entrée.
     const { convertirBundle } = await import('../infra/migration.legacy');
+    const refus = garderInstantane();
+    if (refus !== null) return refus;
     const faits = convertirBundle(bundle).faits;
     set({ faits });
     persister(stockageActif, faits);
+    return null;
   },
 
   adopterFaitsDistants: async (brut) => {
     const motif = motifRefusFaits(brut);
     if (motif !== null) return motif;
+    const refus = garderInstantane();
+    if (refus !== null) return refus;
     // Chargé à la demande : voir le commentaire de la déclaration ci-dessus.
     const { completerFaits } = await import('./schema.migrations');
     const faits = completerFaits(brut);
@@ -903,93 +931,6 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     const faits: Faits = {
       ...actuel,
       periodesUrssafAjoutees: actuel.periodesUrssafAjoutees.filter((p) => p.du !== du)
-    };
-    set({ faits });
-    persister(stockageActif, faits);
-  },
-
-  ajouterRecette: (saisie) => {
-    const actuel = get().faits;
-    const id = `rec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    const annee = Number((saisie.emiseLe ?? saisie.encaisseeLe ?? '')
-      .slice(0, 4)) || new Date().getFullYear();
-    const recette: Recette = {
-      ...saisie,
-      id,
-      numero: saisie.numero?.trim() || prochainNumero(actuel.recettes, annee)
-    };
-    const faits: Faits = { ...actuel, recettes: [...actuel.recettes, recette] };
-    set({ faits });
-    persister(stockageActif, faits);
-    return id;
-  },
-
-  encaisserRecette: (id, encaisseeLe, modeReglement) => {
-    const actuel = get().faits;
-    const recette = actuel.recettes.find((r) => r.id === id);
-    if (recette === undefined) return 'Recette introuvable.';
-    if (recette.encaisseeLe !== null) {
-      // Réencaisser reviendrait à modifier une écriture déjà portée au
-      // registre. La correction passe par une annulation.
-      return 'Cette recette est déjà encaissée. Pour la corriger, annulez-la : '
-        + 'le livre des recettes se tient en ajout seul.';
-    }
-    const faits: Faits = {
-      ...actuel,
-      recettes: actuel.recettes.map((r) =>
-        (r.id === id ? { ...r, encaisseeLe, modeReglement } : r))
-    };
-    set({ faits });
-    persister(stockageActif, faits);
-    return null;
-  },
-
-  annulerRecette: (id, aujourdhui) => {
-    const actuel = get().faits;
-    const origine = actuel.recettes.find((r) => r.id === id);
-    if (origine === undefined) return 'Recette introuvable.';
-    if (origine.emiseLe === null) {
-      return 'Ce brouillon n’a jamais été émis : il se supprime, il n’y a rien '
-        + 'à annuler.';
-    }
-    const jour = aujourdhui ?? (new Date().toISOString().slice(0, 10) as DateISO);
-    const inverse = ecritureDAnnulation(origine, jour, `${origine.id}-annulation`);
-    if (actuel.recettes.some((r) => r.id === inverse.id)) {
-      return 'Cette recette a déjà été annulée.';
-    }
-
-    // Une facture jamais encaissée n'a pas d'écriture au livre : l'avoir n'en
-    // crée donc pas non plus. Il neutralise le reste à rentrer, sans inscrire
-    // au registre un encaissement qui n'a pas eu lieu.
-    const ecriture = origine.encaisseeLe === null
-      ? { ...inverse, encaisseeLe: null }
-      : inverse;
-
-    const faits: Faits = { ...actuel, recettes: [...actuel.recettes, ecriture] };
-    set({ faits });
-    persister(stockageActif, faits);
-    return null;
-  },
-
-  supprimerBrouillon: (id) => {
-    const actuel = get().faits;
-    const recette = actuel.recettes.find((r) => r.id === id);
-    if (recette === undefined) return 'Recette introuvable.';
-    if (recette.emiseLe !== null) {
-      return 'Cette facture a été émise : son numéro est sorti, et le supprimer '
-        + 'laisserait un trou dans la numérotation. Annulez-la par un avoir.';
-    }
-    const faits: Faits = { ...actuel, recettes: actuel.recettes.filter((r) => r.id !== id) };
-    set({ faits });
-    persister(stockageActif, faits);
-    return null;
-  },
-
-  attacherJustificatifRecette: (id, justificatifId) => {
-    const actuel = get().faits;
-    const faits: Faits = {
-      ...actuel,
-      recettes: actuel.recettes.map((r) => (r.id === id ? { ...r, justificatifId } : r))
     };
     set({ faits });
     persister(stockageActif, faits);

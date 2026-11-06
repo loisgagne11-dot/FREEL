@@ -1,6 +1,6 @@
 # Second avis comptable sur le plan de refonte — Freel V1.11
 
-Revue au **27 juillet 2026**. Document audité : [`PLAN-REFONTE.md`](../PLAN-REFONTE.md).
+Revue au **27 juillet 2026**. Document audité : [`PLAN-REFONTE.md`](../archives/PLAN-REFONTE.md).
 Références : mon rapport [`06-critique-comptable.md`](./06-critique-comptable.md) (non réécrit ici) et [`AUDIT-REDESIGN-V1.11.md`](../AUDIT-REDESIGN-V1.11.md).
 Persona : micro-BNC libéral, APE 74.10Z, début d'activité 01/02/2025, ACRE éteinte, franchise en base, CA encaissé 2026 à date **32 400 €**, projection **74 200 €**.
 

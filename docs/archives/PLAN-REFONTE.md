@@ -1,7 +1,10 @@
+> **Archivé le 6 novembre 2026** : ce plan n'est plus tenu à jour ; ce qui reste à faire est dans [`docs/LISTE-DE-SORTIE.md`](../LISTE-DE-SORTIE.md).
+> Il est conservé pour l'historique des décisions, pas comme état d'avancement.
+
 # Plan de refonte Freel V1.11 — vision du résultat et plan d'action
 
 **Date** : 27 juillet 2026 · **Révision 2** — corrigée après revue par les deux experts.
-Prérequis : [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) · Revues : [`08-revue-plan-comptable.md`](./audit/08-revue-plan-comptable.md) · [`09-revue-plan-technique.md`](./audit/09-revue-plan-technique.md)
+Prérequis : [`AUDIT-REDESIGN-V1.11.md`](../AUDIT-REDESIGN-V1.11.md) · Revues : [`08-revue-plan-comptable.md`](../design/08-revue-plan-comptable.md) · [`09-revue-plan-technique.md`](../design/09-revue-plan-technique.md)
 
 > **Ce que la révision 2 corrige.** La révision 1 annonçait 13–14 semaines et un gain de recyclage de 2–3 semaines : les deux étaient faux. Elle promettait aussi « +620 € de versable » sur la correction D3, alors que D3 était incomplète. Les chiffres ci-dessous sont ceux des revues, vérifiés dans le code.
 

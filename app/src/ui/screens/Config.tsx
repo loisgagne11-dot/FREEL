@@ -1,13 +1,12 @@
-import { lazy, Suspense, useEffect, useId, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
 import { useToast } from '../components/Toasts';
-import { useFaits } from '../../state/store';
+import { instantaneAvantRemplacement, useFaits } from '../../state/store';
 import { finAcreDe, soldeEstSuivi } from '../../state/selecteurs';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
 import { Montant } from '../components/Montant';
-import { eur } from '../format';
-import { Compte } from './Compte';
+import { dateCourte, eur } from '../format';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -49,6 +48,10 @@ const SECTIONS = [
 ];
 
 const Bareme = lazy(() => import('./Config.bareme').then((m) => ({ default: m.Bareme })));
+// Le compte en ligne aussi : c'est l'écran le plus lourd après le barème, on
+// ne l'ouvre que pour synchroniser, et sa garde de schéma à l'envoi avait
+// amené Réglages à 39,92 / 40 Ko (invariant n°7 : on extrait).
+const Compte = lazy(() => import('./Compte').then((m) => ({ default: m.Compte })));
 
 const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: string }[] = [
   { id: 'BNC', libelle: 'BNC — prestations libérales' },
@@ -115,7 +118,9 @@ export function Config() {
           {/* Monté seulement à l'ouverture : reprendre une session et
               interroger le serveur n'a pas à se produire chaque fois qu'on
               vient régler son profil. */}
-          {section === 'compte' && <Compte />}
+          <Suspense fallback={<p role="status" className={styles.aide}>Chargement…</p>}>
+            {section === 'compte' && <Compte />}
+          </Suspense>
         </PanneauOnglet>
       </div>
     </>
@@ -723,6 +728,8 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
    * précaution que sur l'écran Compte, et pour la même raison.
    */
   const [aRestaurer, setARestaurer] = useState<Restauration | null>(null);
+  // Relue à chaque changement des faits : un remplacement vient d'en écrire une.
+  const avant = useMemo(() => instantaneAvantRemplacement(), [faits]);
 
   function exporter(): void {
     const contenu = JSON.stringify(faits, null, 2);
@@ -853,6 +860,31 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
                 </div>
               </>
             )}
+        </div>
+      )}
+
+      {avant !== null && (
+        <div className={styles.confirmation}>
+          <p className={styles.explication}>
+            Tes données d’avant le dernier remplacement ({dateCourte(avant.le.slice(0, 10))})
+            ont été mises de côté. Y revenir met à son tour de côté ce que tu as
+            maintenant&nbsp;: rien ne se perd.
+          </p>
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.action}
+              onClick={() => {
+                let bloc: unknown = null;
+                try { bloc = JSON.parse(avant.brut); } catch { /* refusé plus bas */ }
+                void adopter(bloc).then((refus) => {
+                  signaler(refus ?? 'Données d’avant le remplacement rétablies.');
+                });
+              }}
+            >
+              Revenir à l’état d’avant
+            </button>
+          </div>
         </div>
       )}
 

@@ -5,7 +5,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois } from '../../domain/types';
 import { PERIODES_URSSAF } from '../../domain/bareme/urssaf';
-import { PART_GARDEE_MAX, type Faits, faitsVides } from '../../state/schema';
+import { CLE_STOCKAGE, PART_GARDEE_MAX, type Faits, faitsVides } from '../../state/schema';
+import { stockageMemoire } from '../../infra/migration';
 import { useFaits } from '../../state/store';
 import { periodesUrssafEffectives } from '../../state/selecteurs';
 import { FournisseurToasts } from '../components/Toasts';
@@ -450,6 +451,31 @@ describe('restauration d’une sauvegarde', () => {
     await utilisateur.click(screen.getByRole('button', { name: 'Annuler' }));
 
     expect(useFaits.getState().faits.clients[0]?.nom).toBe('Déjà là');
+  });
+
+  // La restauration écrase tout : la copie de ce qui partait permet d'en
+  // revenir, depuis le même écran.
+  it('permet de revenir à l’état d’avant la restauration', async () => {
+    const deja = {
+      ...faitsVides(),
+      clients: [{
+        id: 'existant', nom: 'Déjà là', adresse: '', siret: '', email: '',
+        delaiPaiement: 'net_30', pays: '', tvaIntracom: ''
+      }]
+    };
+    useFaits.getState().initialiser(stockageMemoire({ [CLE_STOCKAGE]: JSON.stringify(deja) }));
+    const utilisateur = await ouvrirDonnees();
+    await utilisateur.upload(
+      screen.getByLabelText('Restaurer une sauvegarde'), sauvegarde(bloc)
+    );
+    await waitFor(() => screen.getByRole('alert'));
+    await utilisateur.click(
+      screen.getByRole('button', { name: 'Remplacer mes données par cette sauvegarde' })
+    );
+    await waitFor(() => expect(useFaits.getState().faits.clients[0]?.nom).toBe('Client repris'));
+
+    await utilisateur.click(await screen.findByRole('button', { name: 'Revenir à l’état d’avant' }));
+    await waitFor(() => expect(useFaits.getState().faits.clients[0]?.nom).toBe('Déjà là'));
   });
 
   // Un fichier illisible doit se dire tout de suite, pas après confirmation.

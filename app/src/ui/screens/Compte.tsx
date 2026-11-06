@@ -183,6 +183,36 @@ function resumeDistant(instantane: InstantaneDistant): Resume | null {
     : null;
 }
 
+/**
+ * Motif qui interdit d'envoyer cet appareil sur le compte, ou `null`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA LECTURE REFUSAIT UN SCHÉMA PLUS RÉCENT, L'ÉCRITURE NON
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un appareil resté sur une ancienne version lisait un compte écrit par une
+ * plus récente : le résumé distant était illisible, la confirmation ne se
+ * déclenchait que pour un appareil vide ou en démonstration — et l'envoi
+ * partait. Le serveur l'acceptait, puisque le compteur de version était le
+ * bon, et le bloc récent était remplacé par ce qu'en voyait l'ancien.
+ * Exactement ce que l'invariant n°5 interdit en lecture.
+ *
+ * Seul le schéma POSTÉRIEUR bloque. Un compte illisible pour une autre raison
+ * — abîmé — reste remplaçable, avec la mention « contenu illisible » : le
+ * bloquer aussi laisserait l'utilisateur sans aucun moyen de le réparer.
+ */
+function motifRefusEnvoi(distant: InstantaneDistant | null): string | null {
+  if (distant === null) return null;
+  const brut = distant.faits as { version?: unknown } | null;
+  const versionFaits = typeof brut?.version === 'number' ? brut.version : 0;
+  const schema = Math.max(distant.schema, versionFaits);
+  if (schema <= VERSION_SCHEMA) return null;
+  return `Le compte a été enregistré par une version plus récente de l’application `
+    + `(schéma ${schema}, connu ici : ${VERSION_SCHEMA}). L’envoyer depuis cet appareil `
+    + `effacerait ce que cette version ne sait pas lire : mets d’abord l’application `
+    + `à jour ici, en rechargeant la page.`;
+}
+
 export interface ProprietesCompte {
   /** Injectable pour les tests, où `window` n'a pas de stockage utile. */
   readonly stockage?: ReturnType<typeof stockageNavigateur>;
@@ -283,7 +313,7 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
    * qu'on voit tout le temps ne se lit plus.
    */
   async function demanderEnvoi(session: Session): Promise<void> {
-    if (distant === 'inconnu') return;
+    if (distant === 'inconnu' || motifRefusEnvoi(distant) !== null) return;
     const cote = distant === null ? null : resumeDistant(distant);
     const ecraserait = distant !== null && (cote === null || !estVide(cote));
 
@@ -370,9 +400,10 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     setEtat({ phase: 'apercu-legacy', session, donnees: r.valeur, rapport });
   }
 
-  function confirmerLegacy(donnees: DonneesLegacy, session: Session): void {
-    remplacerParBundle(bundleDepuisLegacy(donnees));
+  async function confirmerLegacy(donnees: DonneesLegacy, session: Session): Promise<void> {
+    const refus = await remplacerParBundle(bundleDepuisLegacy(donnees));
     setEtat({ phase: 'connecte', session });
+    if (refus !== null) { setErreur(refus); return; }
     setMessage('Données de l’ancienne application chargées sur cet appareil.');
   }
 
@@ -421,7 +452,7 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
                   <button
                     type="button"
                     className={styles.actionPrincipale}
-                    disabled={enCours || distant === 'inconnu'}
+                    disabled={enCours || distant === 'inconnu' || motifRefusEnvoi(distant) !== null}
                     onClick={() => void demanderEnvoi(etat.session)}
                   >
                     {enCours ? 'Envoi…' : 'Enregistrer cet appareil sur le compte'}
@@ -491,7 +522,7 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
               titre="Données de l’ancienne application"
               rapport={etat.rapport}
               majLe={etat.donnees.updated_at}
-              onConfirmer={() => confirmerLegacy(etat.donnees, etat.session)}
+              onConfirmer={() => void confirmerLegacy(etat.donnees, etat.session)}
               onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
             />
           )}
@@ -542,6 +573,9 @@ function EtatDuCompte({ distant, local }: { distant: EtatDistant; local: Resume 
       </p>
     );
   }
+
+  const refus = motifRefusEnvoi(distant);
+  if (refus !== null) return <p className={styles.avertissement}>{refus}</p>;
 
   if (distant === null) {
     return (
@@ -649,6 +683,9 @@ function Conflit(
 ) {
   const lisible = distant !== null && motifRefusFaits(distant.faits) === null;
   const cote = lisible && distant !== null ? resumer(completerFaits(distant.faits)) : null;
+  // Le conflit peut révéler qu'un appareil plus récent a écrit entre-temps :
+  // « écraser » retomberait alors exactement dans le cas que l'envoi refuse.
+  const refus = motifRefusEnvoi(distant);
 
   return (
     <div className={styles.apercu}>
@@ -680,11 +717,13 @@ function Conflit(
         )}
       </dl>
 
+      {refus !== null && <p className={styles.avertissement}>{refus}</p>}
+
       <div className={styles.actions}>
         <button
           type="button"
           className={styles.action}
-          disabled={enCours}
+          disabled={enCours || refus !== null}
           onClick={onEcraser}
         >
           Écraser le compte avec cet appareil

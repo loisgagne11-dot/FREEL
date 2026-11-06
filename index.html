@@ -1990,8 +1990,11 @@ var COMPTE_TAB = 'profil'; // sous-onglet compte: profil, preferences, securite
     FOR ALL USING (auth.uid() = user_id);
 */
 
-var SUPABASE_URL = 'https://gorewyleblikjgvmenml.supabase.co';
-var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdvcmV3eWxlYmxpa2pndm1lbm1sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NzUyOTMsImV4cCI6MjA4NzQ1MTI5M30.l40BEOxT69IOf65UofDH-zu3ig_UKwzc5yP2bxv-tp8';
+// Aucune adresse de projet en dur : le dépôt est public, et l'adresse désigne un compte.
+// Elles se saisissent dans l'onglet « Cloud & Vie privée » (carte « Cloud Sync (Supabase) ») et sont
+// gardées dans ce navigateur ('freel_supabase') : une saisie faite une fois y reste.
+var SUPABASE_URL = '';
+var SUPABASE_ANON_KEY = '';
 var _supabaseLib = null; // Référence à la librairie CDN (createClient)
 var supabaseClient = null; // Instance du client Supabase
 var CURRENT_USER = null;

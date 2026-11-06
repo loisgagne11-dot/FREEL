@@ -1,6 +1,6 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Shell } from './ui/Shell';
-import { FournisseurToasts } from './ui/components/Toasts';
+import { FournisseurToasts, useToast } from './ui/components/Toasts';
 import { useRoute } from './ui/useRoute';
 import { useFaits } from './state/store';
 
@@ -26,7 +26,7 @@ const SelecteurPeriode = lazy(() => import('./ui/components/SelecteurPeriode')
  * Pilote n'est PAS découpé : c'est l'écran d'entrée, et le découper ajouterait
  * un aller-retour réseau juste avant le contenu qu'on vient chercher.
  */
-import { Pilote } from './ui/screens/Pilote';
+import { Bandeau, Pilote } from './ui/screens/Pilote';
 
 const Argent = lazy(() => import('./ui/screens/Argent').then((m) => ({ default: m.Argent })));
 const Outils = lazy(() => import('./ui/screens/Outils').then((m) => ({ default: m.Outils })));
@@ -36,6 +36,7 @@ const Config = lazy(() => import('./ui/screens/Config').then((m) => ({ default: 
 const Facture = lazy(() => import('./ui/screens/Facture').then((m) => ({ default: m.Facture })));
 import { aTraiter } from './state/selecteurs';
 import { compteursParEcran } from './domain/calculs/aTraiter';
+import { FiletErreur } from './ui/components/FiletErreur';
 
 /**
  * Attente de chargement d'un écran. Sobre et sans animation : sur une connexion
@@ -71,10 +72,17 @@ function EnChargement() {
  * endroit à chaque rendu — ce qui est le cas ici —, mais la forme fonction
  * n'a pas besoin d'un objet de props, donc pas d'un nom de propriété qui
  * survivrait à la minification.
+ *
+ * Le filet porte la route en clé : un écran tombé se relève quand on en
+ * change, sans recharger la page.
  */
 function Ecran(annee: number) {
   const { ecran } = useRoute();
-  switch (ecran.id) {
+  return <FiletErreur key={ecran.id} portee="ecran">{contenuEcran(ecran.id, annee)}</FiletErreur>;
+}
+
+function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], annee: number) {
+  switch (id) {
     case 'pilote': return <Pilote />;
     case 'activite': return <Activite annee={annee} />;
     case 'argent': return <Argent annee={annee} />;
@@ -83,10 +91,37 @@ function Ecran(annee: number) {
     case 'outils': return <Outils annee={annee} />;
     case 'config': return <Config />;
     default: {
-      const jamais: never = ecran.id;
+      const jamais: never = id;
       return jamais;
     }
   }
+}
+
+/**
+ * Ce qui menace la conservation des saisies, sur TOUS les écrans.
+ *
+ * L'alerte vivait sur le Pilote seul. Elle ne servait qu'au démarrage : un
+ * stockage qui sature en cours de session se découvre en pleine saisie d'une
+ * facture, et c'est là qu'il faut le lire. Une saisie écartée parce qu'un
+ * autre onglet avait écrit entre-temps se dit aussi — sinon elle aurait l'air
+ * d'avoir été enregistrée.
+ */
+function AlerteConservation() {
+  const chargement = useFaits((e) => e.chargement);
+  const ecartees = useFaits((e) => e.saisiesEcartees);
+  const toast = useToast();
+  const dejaSignalees = useRef(ecartees);
+  useEffect(() => {
+    if (ecartees > dejaSignalees.current) {
+      toast('Une autre fenêtre de l’application venait d’enregistrer : ta dernière '
+        + 'saisie n’a pas été appliquée. Les données ont été rechargées, refais-la.');
+    }
+    dejaSignalees.current = ecartees;
+  }, [ecartees, toast]);
+
+  return chargement.phase === 'sans-persistance' ? (
+    <Bandeau ton="alerte" titre="Tes saisies ne sont pas conservées">{chargement.motif}</Bandeau>
+  ) : null;
 }
 
 export function App() {
@@ -141,6 +176,7 @@ export function App() {
           </Suspense>
         )}
       >
+        <AlerteConservation />
         <Suspense fallback={<EnChargement />}>
           {Ecran(anneeChoisie)}
         </Suspense>

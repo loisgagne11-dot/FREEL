@@ -225,6 +225,25 @@ assert(
     (fuitesTrouvees.length ? ' — trouvé : ' + fuitesTrouvees.join(' ; ') : '')
 );
 
+/*
+ * Un octet nul dans une source fait passer le fichier pour binaire aux yeux de
+ * git : `git diff` rend « - - », et la revue de PR n'affiche plus rien de ses
+ * modifications. C'est arrivé à l'écran CRA, dont deux lots ont été relus sans
+ * qu'un seul de ses changements soit visible. La sentinelle voulue s'écrit
+ * échappée (barre oblique inverse, u0000) : même valeur à l'exécution, texte
+ * lisible dans le fichier.
+ */
+const sourcesBinaires = fichiersDuDepot(RACINE).filter(function(chemin) {
+  return fsMod.readFileSync(chemin, 'utf8').indexOf('\u0000') !== -1;
+});
+assert(
+  sourcesBinaires.length === 0,
+  'Aucun octet nul dans les sources (git les tiendrait pour binaires)' +
+    (sourcesBinaires.length
+      ? ' — trouvé : ' + sourcesBinaires.map(function(c) { return pathMod.relative(RACINE, c); }).join(' ; ')
+      : '')
+);
+
 // ===== 5. Vérifier la sécurité =====
 section('Sécurité');
 

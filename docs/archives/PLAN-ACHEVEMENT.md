@@ -1,3 +1,6 @@
+> **Archivé le 6 novembre 2026** : ce plan n'est plus tenu à jour ; ce qui reste à faire est dans [`docs/LISTE-DE-SORTIE.md`](../LISTE-DE-SORTIE.md).
+> Il est conservé pour l'historique des décisions, pas comme état d'avancement.
+
 # Plan d'achèvement — jusqu'à ce que l'application soit finie
 
 Ce document est **l'état du travail**, pas son résumé. Il vit sur disque parce

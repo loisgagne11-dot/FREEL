@@ -4,6 +4,7 @@ import { totaliser } from '../domain/calculs/livreRecettes';
 import { CLE_STOCKAGE, PART_GARDEE_MAX, VERSION_SCHEMA, faitsVides, type Recette } from './schema';
 import { stockageMemoire } from '../infra/migration';
 import { useFaits } from './store';
+import { ajouterRecette, annulerRecette, encaisserRecette, supprimerBrouillon } from './ecritures.recettes';
 /* Les écritures du carnet et du relevé ont quitté le magasin pour ne plus
    peser sur le premier rendu : elles s'importent, mais restent les mêmes
    écritures, avec les mêmes gardes et le même état. */
@@ -36,7 +37,7 @@ beforeEach(() => {
 const recettes = (): readonly Recette[] => useFaits.getState().faits.recettes;
 
 function ajouter(m: Partial<Omit<Recette, 'id'>> = {}): string {
-  return useFaits.getState().ajouterRecette({
+  return ajouterRecette({
     clientNom: 'ClientA', libelle: 'Mission', montant: euros(4000),
     emiseLe: dateISO('2026-06-30'), encaisseeLe: null, modeReglement: null, ...m
   });
@@ -62,7 +63,7 @@ describe('numérotation', () => {
   it('libère le numéro d’un brouillon supprimé', () => {
     ajouter({ emiseLe: null });
     const second = ajouter({ emiseLe: null });
-    useFaits.getState().supprimerBrouillon(second);
+    supprimerBrouillon(second);
     const troisieme = ajouter({ emiseLe: null });
     expect(recettes().find((r) => r.id === troisieme)?.numero)
       .toBe(recettes()[0]?.numero.replace(/\d+$/, '002'));
@@ -74,7 +75,7 @@ describe('encaissement', () => {
   // application ne portait ni l'une ni l'autre.
   it('exige ensemble la date et le mode de règlement', () => {
     const id = ajouter();
-    expect(useFaits.getState().encaisserRecette(id, dateISO('2026-07-15'), 'virement'))
+    expect(encaisserRecette(id, dateISO('2026-07-15'), 'virement'))
       .toBeNull();
     expect(recettes()[0]).toMatchObject({
       encaisseeLe: '2026-07-15', modeReglement: 'virement'
@@ -84,14 +85,14 @@ describe('encaissement', () => {
   // Réencaisser reviendrait à modifier une écriture déjà portée au registre.
   it('refuse de réencaisser, en renvoyant vers l’annulation', () => {
     const id = ajouter();
-    useFaits.getState().encaisserRecette(id, dateISO('2026-07-15'), 'virement');
-    const refus = useFaits.getState().encaisserRecette(id, dateISO('2026-08-01'), 'cheque');
-    expect(refus).toMatch(/annulez|ajout seul/i);
+    encaisserRecette(id, dateISO('2026-07-15'), 'virement');
+    const refus = encaisserRecette(id, dateISO('2026-08-01'), 'cheque');
+    expect(refus).toMatch(/annule-la|ajout seul/i);
     expect(recettes()[0]?.encaisseeLe).toBe('2026-07-15');
   });
 
   it('signale une recette introuvable', () => {
-    expect(useFaits.getState().encaisserRecette('fantome', dateISO('2026-07-15'), 'carte'))
+    expect(encaisserRecette('fantome', dateISO('2026-07-15'), 'carte'))
       .toMatch(/introuvable/i);
   });
 });
@@ -101,8 +102,8 @@ describe('ajout seul', () => {
   // qu'un contrôle cherche à vérifier.
   it('refuse de supprimer une recette encaissée', () => {
     const id = ajouter();
-    useFaits.getState().encaisserRecette(id, dateISO('2026-07-15'), 'virement');
-    const refus = useFaits.getState().supprimerBrouillon(id);
+    encaisserRecette(id, dateISO('2026-07-15'), 'virement');
+    const refus = supprimerBrouillon(id);
     expect(refus).toMatch(/numérotation|avoir/i);
     expect(recettes()).toHaveLength(1);
   });
@@ -111,13 +112,13 @@ describe('ajout seul', () => {
   // l'utilisateur ne peut plus disparaître.
   it('refuse de supprimer une facture émise, même impayée', () => {
     const id = ajouter({ emiseLe: dateISO('2026-06-30') });
-    expect(useFaits.getState().supprimerBrouillon(id)).toMatch(/émise/i);
+    expect(supprimerBrouillon(id)).toMatch(/émise/i);
     expect(recettes()).toHaveLength(1);
   });
 
   it('supprime un brouillon jamais émis', () => {
     const id = ajouter({ emiseLe: null });
-    expect(useFaits.getState().supprimerBrouillon(id)).toBeNull();
+    expect(supprimerBrouillon(id)).toBeNull();
     expect(recettes()).toHaveLength(0);
   });
 
@@ -125,7 +126,7 @@ describe('ajout seul', () => {
   // sans inscrire au registre un encaissement qui n'a pas eu lieu.
   it('annule une facture émise et impayée sans écriture au livre', () => {
     const id = ajouter({ emiseLe: dateISO('2026-06-30') });
-    expect(useFaits.getState().annulerRecette(id, dateISO('2026-09-30'))).toBeNull();
+    expect(annulerRecette(id, dateISO('2026-09-30'))).toBeNull();
     expect(recettes()).toHaveLength(2);
     expect(recettes()[1]?.encaisseeLe).toBeNull();
     expect(totaliser(recettes()).ecritures).toBe(0);
@@ -133,8 +134,8 @@ describe('ajout seul', () => {
 
   it('annule par une écriture inverse, sans rien effacer', () => {
     const id = ajouter();
-    useFaits.getState().encaisserRecette(id, dateISO('2026-07-15'), 'virement');
-    expect(useFaits.getState().annulerRecette(id, dateISO('2026-09-30'))).toBeNull();
+    encaisserRecette(id, dateISO('2026-07-15'), 'virement');
+    expect(annulerRecette(id, dateISO('2026-09-30'))).toBeNull();
 
     expect(recettes()).toHaveLength(2);
     const total = totaliser(recettes());
@@ -146,23 +147,23 @@ describe('ajout seul', () => {
   // elle avait été déclarée.
   it('date l’annulation du jour de la correction', () => {
     const id = ajouter();
-    useFaits.getState().encaisserRecette(id, dateISO('2026-07-15'), 'virement');
-    useFaits.getState().annulerRecette(id, dateISO('2026-09-30'));
+    encaisserRecette(id, dateISO('2026-07-15'), 'virement');
+    annulerRecette(id, dateISO('2026-09-30'));
     expect(recettes()[1]?.encaisseeLe).toBe('2026-09-30');
   });
 
   it('refuse d’annuler deux fois la même écriture', () => {
     const id = ajouter();
-    useFaits.getState().encaisserRecette(id, dateISO('2026-07-15'), 'virement');
-    useFaits.getState().annulerRecette(id, dateISO('2026-09-30'));
-    expect(useFaits.getState().annulerRecette(id, dateISO('2026-10-01')))
+    encaisserRecette(id, dateISO('2026-07-15'), 'virement');
+    annulerRecette(id, dateISO('2026-09-30'));
+    expect(annulerRecette(id, dateISO('2026-10-01')))
       .toMatch(/déjà été annulée/i);
     expect(recettes()).toHaveLength(2);
   });
 
   it('refuse d’annuler un brouillon jamais émis', () => {
     const id = ajouter({ emiseLe: null });
-    expect(useFaits.getState().annulerRecette(id)).toMatch(/brouillon|se supprime/i);
+    expect(annulerRecette(id)).toMatch(/brouillon|se supprime/i);
   });
 });
 

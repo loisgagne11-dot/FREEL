@@ -56,7 +56,10 @@ const MAGASIN = join(RACINE, 'state/store.ts');
  * juste, testé, et que rien n'appelle. Un déplacement de fichier ne doit pas
  * pouvoir désarmer un garde-fou.
  */
-const ECRITURES = [join(RACINE, 'state/ecritures.carnet.ts')];
+const ECRITURES = [
+  join(RACINE, 'state/ecritures.carnet.ts'),
+  join(RACINE, 'state/ecritures.recettes.ts')
+];
 const SOURCES = [MAGASIN, ...ECRITURES];
 
 /**
