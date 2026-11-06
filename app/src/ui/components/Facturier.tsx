@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
+import { ajouterRecette, annulerRecette, attacherJustificatifRecette, consignerRelance, encaisserRecette, marquerEnvoyee, supprimerBrouillon } from '../../state/ecritures.recettes';
 import { brouillonsDeFacture, etatFacturier } from '../../state/selecteurs.facture';
 import type { EcartDeFacturation } from '../../domain/calculs/brouillon';
 import { euros } from '../../domain/types';
@@ -154,12 +155,6 @@ export function Facturier(
   }
 ) {
   const faits = useFaits((e) => e.faits);
-  const encaisserRecette = useFaits((e) => e.encaisserRecette);
-  const annulerRecette = useFaits((e) => e.annulerRecette);
-  const supprimerBrouillon = useFaits((e) => e.supprimerBrouillon);
-  const consignerRelance = useFaits((e) => e.consignerRelance);
-  const marquerEnvoyee = useFaits((e) => e.marquerEnvoyee);
-  const attacherJustificatifRecette = useFaits((e) => e.attacherJustificatifRecette);
   const signaler = useToast();
 
   const [granularite, setGranularite] = useState<Granularite>('tout');
@@ -999,7 +994,6 @@ function PanneauRelance(
  */
 function BrouillonDuMois() {
   const faits = useFaits((e) => e.faits);
-  const ajouterRecette = useFaits((e) => e.ajouterRecette);
   const signaler = useToast();
 
   const [mois, setMois] = useState<Mois>(() => moisCourant());

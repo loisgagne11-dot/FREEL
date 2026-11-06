@@ -36,6 +36,7 @@ const Config = lazy(() => import('./ui/screens/Config').then((m) => ({ default: 
 const Facture = lazy(() => import('./ui/screens/Facture').then((m) => ({ default: m.Facture })));
 import { aTraiter } from './state/selecteurs';
 import { compteursParEcran } from './domain/calculs/aTraiter';
+import { FiletErreur } from './ui/components/FiletErreur';
 
 /**
  * Attente de chargement d'un écran. Sobre et sans animation : sur une connexion
@@ -71,10 +72,17 @@ function EnChargement() {
  * endroit à chaque rendu — ce qui est le cas ici —, mais la forme fonction
  * n'a pas besoin d'un objet de props, donc pas d'un nom de propriété qui
  * survivrait à la minification.
+ *
+ * Le filet porte la route en clé : un écran tombé se relève quand on en
+ * change, sans recharger la page.
  */
 function Ecran(annee: number) {
   const { ecran } = useRoute();
-  switch (ecran.id) {
+  return <FiletErreur key={ecran.id} portee="ecran">{contenuEcran(ecran.id, annee)}</FiletErreur>;
+}
+
+function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], annee: number) {
+  switch (id) {
     case 'pilote': return <Pilote />;
     case 'activite': return <Activite annee={annee} />;
     case 'argent': return <Argent annee={annee} />;
@@ -83,7 +91,7 @@ function Ecran(annee: number) {
     case 'outils': return <Outils annee={annee} />;
     case 'config': return <Config />;
     default: {
-      const jamais: never = ecran.id;
+      const jamais: never = id;
       return jamais;
     }
   }

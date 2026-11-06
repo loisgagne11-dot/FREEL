@@ -32,6 +32,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
+import { ajouterRecette } from '../../state/ecritures.recettes';
 import {
   destinataireDe, emetteurDe, etatFacture, numeroSuivant
 } from '../../state/selecteurs.facture';
@@ -68,7 +69,6 @@ const ligneVide = (): LigneFacture => ({
  */
 export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
   const faits = useFaits((e) => e.faits);
-  const ajouterRecette = useFaits((e) => e.ajouterRecette);
   const idChamp = useId();
 
   const [clientNom, setClientNom] = useState('');

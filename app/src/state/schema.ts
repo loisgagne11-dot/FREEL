@@ -629,8 +629,9 @@ export function faitsVides(): Faits {
  * premier renvoi. Une version ancienne de l'application détruirait ainsi le
  * travail fait sur une plus récente. Elle s'arrête donc.
  *
- * Ce qui est vérifié : la FORME de premier niveau. Pas le contenu de chaque
- * enregistrement — le prétendre serait mentir sur la portée du contrôle.
+ * Ce qui est vérifié : la FORME de premier niveau, et que chaque élément d'une
+ * liste est bien un enregistrement — voir `motifRefusElements`. Pas la valeur
+ * de chaque champ : le prétendre serait mentir sur la portée du contrôle.
  */
 export function motifRefusFaits(brut: unknown): string | null {
   if (typeof brut !== 'object' || brut === null || Array.isArray(brut)) {
@@ -646,16 +647,20 @@ export function motifRefusFaits(brut: unknown): string | null {
     return `Ce compte a été enregistré par une version plus récente de `
       + `l’application (schéma ${version}, connu ici : ${VERSION_SCHEMA}). `
       + `Le charger effacerait ce que cette version-ci ne sait pas lire. `
-      + `Mettez à jour l’application avant de continuer.`;
+      + `Mets à jour l’application avant de continuer.`;
   }
 
+  // `echeances` manquait à cette liste : un `echeances: {}` passait, puis
+  // faisait tomber l'échéancier au premier `filter`.
   const listes = [
     'clients', 'missions', 'recettes', 'depenses', 'conges', 'notesCra',
-    'mouvementsBancaires', 'periodesUrssafAjoutees', 'periodesDeclarees'
+    'mouvementsBancaires', 'periodesUrssafAjoutees', 'periodesDeclarees', 'echeances'
   ] as const;
   for (const cle of listes) {
     if (cle in o && !Array.isArray(o[cle])) return `Le champ « ${cle} » devrait être une liste.`;
   }
+  const motifElements = motifRefusElements(o, version);
+  if (motifElements !== null) return motifElements;
 
   const nombres = ['soldeInitial', 'reserve', 'besoinMensuel'] as const;
   for (const cle of nombres) {
@@ -721,6 +726,72 @@ export function motifRefusFaits(brut: unknown): string | null {
     return 'Le champ « entreprise » devrait être un objet.';
   }
 
+  return null;
+}
+
+const estEnregistrement = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Position lisible d'un élément fautif : on compte à partir de 1. */
+const illisible = (cle: string, i: number): string =>
+  `Le champ « ${cle} » contient un élément illisible (n° ${i + 1}). `
+  + `Ce fichier ou ce compte est abîmé : rien n’a été chargé.`;
+
+/**
+ * Chaque élément de liste est un enregistrement.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN BLOC ABÎMÉ NE DOIT PAS ENTRER, PARCE QU'IL NE RESSORT PLUS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le contrôle de premier niveau laissait passer `"depenses": [null]`. Le bloc
+ * était accepté, ENREGISTRÉ, puis Pilote, Argent, Activité et Achats levaient
+ * « Cannot read properties of null » : écran blanc, et le même écran blanc à
+ * chaque ouverture, puisque le bloc était déjà persisté. Seul un vidage
+ * manuel du stockage en sortait — en effaçant tout.
+ *
+ * Les listes d'enregistrements le sont à toutes les versions. Deux exceptions
+ * de forme : `periodesDeclarees` est une liste de mois (des chaînes), et
+ * `conges` a été une liste de dates nues jusqu'au schéma 1 — la migration les
+ * convertit, il ne faut donc pas les refuser avant elle.
+ *
+ * Les listes IMBRIQUÉES des missions ne sont contrôlées qu'au schéma courant :
+ * c'est le seul cas où rien ne les reconstruit (`completerFaitsCourants` ne
+ * descend pas), alors que la migration réécrit les entités des schémas
+ * antérieurs de toute façon.
+ */
+function motifRefusElements(o: Record<string, unknown>, version: number): string | null {
+  const enregistrements = [
+    'clients', 'missions', 'recettes', 'depenses', 'notesCra',
+    'mouvementsBancaires', 'periodesUrssafAjoutees', 'echeances'
+  ] as const;
+  for (const cle of enregistrements) {
+    const liste = o[cle];
+    if (!Array.isArray(liste)) continue;
+    const i = liste.findIndex((e) => !estEnregistrement(e));
+    if (i !== -1) return illisible(cle, i);
+  }
+
+  const conges = o['conges'];
+  if (Array.isArray(conges)) {
+    const i = conges.findIndex((c) => typeof c !== 'string' && !estEnregistrement(c));
+    if (i !== -1) return illisible('conges', i);
+  }
+  const declarees = o['periodesDeclarees'];
+  if (Array.isArray(declarees)) {
+    const i = declarees.findIndex((m) => typeof m !== 'string');
+    if (i !== -1) return illisible('periodesDeclarees', i);
+  }
+
+  if (version !== VERSION_SCHEMA || !Array.isArray(o['missions'])) return null;
+  for (const [i, m] of (o['missions'] as Record<string, unknown>[]).entries()) {
+    const entites = m['entites'];
+    const entitesLisibles = Array.isArray(entites) && entites.every((e) =>
+      estEnregistrement(e)
+      && Array.isArray(e['rythmes']) && e['rythmes'].every(estEnregistrement)
+      && estEnregistrement(e['ajustements']));
+    if (!entitesLisibles) return illisible('missions', i);
+  }
   return null;
 }
 

@@ -62,6 +62,55 @@ describe('acceptation d’un bloc de faits', () => {
   });
 });
 
+/**
+ * UN BLOC ABÎMÉ ACCEPTÉ NE RESSORT PLUS.
+ *
+ * Si ces règles sautaient, une sauvegarde portant `"depenses": [null]` serait
+ * acceptée, enregistrée, puis ferait tomber Pilote, Argent, Activité et Achats
+ * — à chaque ouverture, puisque le bloc est déjà persisté. On ne s'en sortait
+ * qu'en vidant le stockage, c'est-à-dire en perdant tout.
+ */
+describe('refus d’un élément de liste illisible', () => {
+  it('refuse un élément nul, nombre ou liste dans une liste d’enregistrements', () => {
+    expect(motifRefusFaits({ ...faitsVides(), depenses: [null] })).toMatch(/depenses.*n° 1/);
+    expect(motifRefusFaits({ ...faitsVides(), recettes: [{}, 42] })).toMatch(/recettes.*n° 2/);
+    expect(motifRefusFaits({ ...faitsVides(), clients: [[]] })).toMatch(/clients/);
+  });
+
+  // L'échéancier faisait `faits.echeances.filter` sur un objet : `echeances`
+  // n'était pas dans la liste des champs contrôlés.
+  it('refuse des échéances qui ne sont pas une liste', () => {
+    expect(motifRefusFaits({ ...faitsVides(), echeances: {} })).toMatch(/echeances/);
+    expect(motifRefusFaits({ ...faitsVides(), echeances: [null] })).toMatch(/echeances/);
+  });
+
+  it('refuse un mois déclaré qui n’est pas une chaîne', () => {
+    expect(motifRefusFaits({ ...faitsVides(), periodesDeclarees: [202601] }))
+      .toMatch(/periodesDeclarees/);
+  });
+
+  it('refuse, au schéma courant, une mission sans entités lisibles', () => {
+    const mission = { id: 'm1', clientNom: 'Client démo' };
+    expect(motifRefusFaits({ ...faitsVides(), missions: [mission] })).toMatch(/missions/);
+    const entiteSansRythmes = { id: 'e1', nom: 'Démo', ajustements: {} };
+    expect(motifRefusFaits({ ...faitsVides(), missions: [{ ...mission, entites: [entiteSansRythmes] }] }))
+      .toMatch(/missions/);
+  });
+
+  // La migration convertit ces formes : les refuser avant elle rejetterait
+  // des comptes parfaitement récupérables.
+  it('laisse passer les formes anciennes que la migration convertit', () => {
+    expect(motifRefusFaits({ version: 1, conges: ['2025-03-03'] })).toBeNull();
+    expect(motifRefusFaits({ version: 1, missions: [{ id: 'm1', clientNom: 'Client démo' }] }))
+      .toBeNull();
+  });
+
+  it('accepte le jeu de démonstration livré', () => {
+    const demo: unknown = JSON.parse(readFileSync('public/jeu-de-demonstration.json', 'utf8'));
+    expect(motifRefusFaits(demo)).toBeNull();
+  });
+});
+
 describe('complétion d’un bloc accepté', () => {
   it('comble les listes absentes plutôt que de les laisser indéfinies', () => {
     const faits = completerFaits({ version: 0 });
