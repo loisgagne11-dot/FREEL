@@ -190,14 +190,17 @@ describe('ventilation des provisions par nature', () => {
   /**
    * LE POINT DÉLICAT. Le volet 2 n'a aucune échéance à qui demander sa nature :
    * il se ventile par RÈGLE DE CALCUL — la part cotisations en `urssaf`, la
-   * part impôt et contributions en `impot`.
+   * CFP en `cfp` (elle se paie à l'URSSAF avec la déclaration), le reste du
+   * taux en `impot`.
    */
   it('ventile le volet 2 par règle de calcul, faute d’échéance', () => {
     const d = provisions([], [
       { id: 'r', montant: euros(10_000), encaisseeLe: dateISO('2026-03-15') }
     ], { mois: [] }, ctx);
 
-    expect(d.parNature.impot).toBe(220); // 10 000 × 2,2 %
+    // 10 000 × 2,2 % : 0,2 % de CFP, le reste en impôt.
+    expect(d.parNature.cfp).toBe(20);
+    expect(d.parNature.impot).toBe(200);
     expect(d.parNature.urssaf).toBeGreaterThan(0);
     expect(d.parNature.tva).toBe(0);
   });
@@ -238,8 +241,9 @@ describe('ventilation des provisions par nature', () => {
       [ech('appel', 'urssaf', 2560)], recettes, { mois: [mois('2026-03')] }, ctx
     );
 
-    expect(avant.parNature.impot).toBe(220);
+    expect(avant.parNature.impot + avant.parNature.cfp).toBe(220);
     expect(apres.parNature.impot).toBe(0);
+    expect(apres.parNature.cfp).toBe(0);
     expect(apres.parNature.urssaf).toBe(2560);
   });
 });

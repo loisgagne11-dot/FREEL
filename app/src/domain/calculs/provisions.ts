@@ -44,6 +44,7 @@ import {
   euros, moisDe
 } from '../types';
 import { type PeriodeBareme, tauxCotisations } from '../bareme/urssaf';
+import { tauxCfp } from '../bareme/impot';
 
 /** Nature d'une somme due. Sert à expliquer un montant, jamais à le calculer. */
 export type NatureDette = 'urssaf' | 'tva' | 'impot' | 'cfe' | 'cfp';
@@ -351,13 +352,22 @@ export function voletAProvisionner(
     }
     somme += r.montant * (taux.valeur + ctx.tauxImpotEtContributions);
     parNature.urssaf += r.montant * taux.valeur;
-    parNature.impot += r.montant * ctx.tauxImpotEtContributions;
+    // La CFP se paie à l'URSSAF avec la déclaration : rangée en « impôt », elle
+    // faisait afficher une ligne URSSAF 0,2 % sous ce que l'URSSAF demande, et
+    // une ligne impôt d'autant au-dessus — total juste, répartition fausse,
+    // relevée par le propriétaire en déclarant. Le reste du taux (le versement
+    // libératoire, s'il y a lieu) demeure de l'impôt. `min` : un taux refusé
+    // arrive ici à zéro, et rien ne doit alors être attribué à la CFP.
+    const cfp = tauxCfp(m, ctx.typeActivite);
+    const partCfp = Math.min(ctx.tauxImpotEtContributions, cfp.statut === 'refuse' ? 0 : cfp.valeur);
+    parNature.cfp += r.montant * partCfp;
+    parNature.impot += r.montant * (ctx.tauxImpotEtContributions - partCfp);
   }
 
   // L'impôt sur le revenu s'ajoute UNE FOIS, pas recette par recette : c'est
   // une dette annuelle du foyer, pas une charge proportionnelle à chaque
-  // encaissement. Il rejoint la nature `impot`, où il côtoie la CFP sans la
-  // recouvrir — celle-ci est bien un taux, et reste comptée ci-dessus.
+  // encaissement. Il rejoint la nature `impot` ; la CFP, elle, a sa propre
+  // nature, comptée recette par recette ci-dessus.
   //
   // Il ne dépend pas non plus des périodes déclarées : la déclaration URSSAF
   // ne solde rien de l'impôt. Ce qui l'empêche de doubler le volet 1, ce sont

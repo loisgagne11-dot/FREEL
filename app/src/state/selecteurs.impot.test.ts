@@ -90,9 +90,9 @@ describe('avis de solde saisi', () => {
     const f = foyer({ echeances: [avis] });
     expect(soldeImpotPrecedentDe(f, debutJanvier)).toBeNull();
     const e = etatPilote(f, [avis], debutJanvier);
-    // Volet 1 : l'avis appelé (3 000 €). Volet 2 : la seule CFP des recettes
-    // de 2026 non encore déclarées — plus d'estimation d'impôt.
-    expect(e.provisionsParNature.impot).toBeCloseTo(3000 + 60000 * 0.002, 2);
+    // Volet 1 : l'avis appelé (3 000 €). Plus d'estimation d'impôt au volet 2 ;
+    // la CFP des recettes non déclarées est rangée à part.
+    expect(e.provisionsParNature.impot).toBeCloseTo(3000, 2);
   });
 
   // À l'automne, le solde de l'an dernier et l'acompte du mois se prélèvent
