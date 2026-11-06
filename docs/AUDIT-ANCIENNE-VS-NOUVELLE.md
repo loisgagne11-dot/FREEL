@@ -188,10 +188,11 @@ un trou qui ne fait échouer aucun test.
 |---|---|---|
 | Thème, palettes | 🟢 | 4 palettes, appliquées **avant le premier rendu** (vérifié par assertion sur 140 combinaisons) |
 | `togglePrivacy` | 🟢 | Mode confidentiel vérifié dans un vrai navigateur : **zéro montant lisible** sur les 7 écrans |
-| Auth Supabase, synchro | 🟢 | Verrou optimiste **atomique côté serveur** ; l'ancienne écrasait |
+| Auth Supabase, synchro | 🟢 | Verrou optimiste **atomique côté serveur** ; l'ancienne écrasait. **Lot 1 (06/11)** : un appareil resté sur une version ancienne ne peut plus écraser un compte écrit par une plus récente |
 | `_subscribeRealtime` — synchro temps réel | ❌ | Il faut recharger pour voir les changements d'un autre appareil |
 | `exportData` / `exportJSON` | ✅ | Export JSON complet |
-| `importData` / `importJSON` — **restauration** | ✅ | **Ajouté le 13/08.** Le fichier est lu, son contenu **annoncé** — tant de recettes, de dépenses, de missions —, et rien n'est écrasé avant confirmation. Le refus de fond (schéma plus récent que ce code) est relayé à l'écran plutôt qu'avalé |
+| `importData` / `importJSON` — **restauration** | ✅ | **Ajouté le 13/08.** Le fichier est lu, son contenu **annoncé** — tant de recettes, de dépenses, de missions —, et rien n'est écrasé avant confirmation. Le refus de fond (schéma plus récent que ce code) est relayé à l'écran plutôt qu'avalé. **Lot 1 (06/11)** : chaque élément de liste est contrôlé (un `[null]` faisait planter l'application à chaque ouverture) ; l'état local est **mis de côté** avant tout remplacement, et « Revenir à l'état d'avant » le rétablit |
+| Sûreté de l'enregistrement local | 🟢 | **Lot 1 (06/11), absent de l'ancienne** : deux onglets ne s'effacent plus (écoute `storage`, contrôle de révision avant écriture) ; un stockage plein se signale sur tous les écrans au lieu d'avaler les saisies ; un écran qui plante affiche un filet avec téléchargement des données brutes au lieu d'une page blanche |
 | `showOnboarding` et sa séquence | ❌ | Aucun parcours de première ouverture ; on arrive sur un Pilote vide |
 | `createSearchOverlay`, `performSearch` | ❌ | Pas de recherche globale |
 | `initKeyboardShortcuts`, `createKeyboardHelp` | ❌ | Pas de raccourcis clavier |

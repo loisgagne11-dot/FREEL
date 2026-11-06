@@ -865,3 +865,18 @@ repoussé : le vide passe alors dans la carte, au-dessus des barres, et se lit
 comme un chargement inachevé. L'alternative — des barres qui s'étirent à la
 hauteur reçue — empêcherait la ligne d'objectif de se poser sur la même échelle
 sans mesurer le conteneur en JavaScript. Un repère faux coûte plus qu'un vide.
+
+## 14. Lot 1 (06/11) — rien ne se perd
+
+Lot de sûreté, sans changement de dessin. Trois effets visibles, à connaître
+au contrôle visuel :
+
+| Où | Ce qui change à l'écran | Pourquoi |
+|---|---|---|
+| Tous les écrans | « Tes saisies ne sont pas conservées » quitte le Pilote pour s'afficher au-dessus de l'écran courant | Un stockage plein se découvre en pleine saisie, pas en revenant au Pilote |
+| Tous les écrans | Un écran qui lève une exception affiche un cadre « Cet écran n'a pas pu s'afficher », avec téléchargement des données brutes et « Réessayer » | Remplace la page blanche, dont on ne sortait qu'en vidant le stockage |
+| Réglages → Données | « Revenir à l'état d'avant » apparaît après une restauration ou une récupération de compte | L'aperçu montrait ce qui arrivait, jamais ce qui partait |
+| Réglages → Compte | L'onglet se charge à la demande ; l'envoi est désactivé, avec son motif, face à un compte d'une version plus récente | Budget de Réglages (39,92 / 40 Ko) et invariant n°5 |
+
+Aucun de ces états n'apparaît sur les captures de référence : ils ne
+surviennent qu'en cas d'incident. Ils sont tenus par des tests nommés.
