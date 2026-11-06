@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { euros } from '../domain/types';
 import { CLE_STOCKAGE, VERSION_SCHEMA, type Recette, faitsVides } from './schema';
-import { useFaits } from './store';
+import { instantaneAvantRemplacement, useFaits } from './store';
 
 /** Un stockage en mémoire qu'on peut remplir — le quota, sans navigateur. */
 function stockageEssai(initial: Record<string, string> = {}) {
@@ -135,5 +135,42 @@ describe('deux onglets', () => {
 
     useFaits.getState().definirReserve(euros(700));
     expect(localStorage.getItem(CLE_STOCKAGE)).toBe(recent);
+  });
+});
+
+/**
+ * REMPLACER TOUT GARDE UNE COPIE DE CE QUI PART.
+ *
+ * Si la règle sautait, restaurer le mauvais fichier ou charger le compte par
+ * erreur écraserait la saisie du jour sans retour possible : l'aperçu montrait
+ * ce qui arrivait, jamais ce qui partait.
+ */
+describe('copie avant remplacement', () => {
+  const plein = bloc({ recettes: [recetteDeLAutreOnglet] });
+
+  it('met de côté l’état actuel avant de l’écraser', async () => {
+    const s = stockageEssai({ [CLE_STOCKAGE]: plein });
+    useFaits.getState().initialiser(s);
+    expect(await useFaits.getState().adopterFaitsDistants(JSON.parse(bloc()))).toBeNull();
+
+    expect(useFaits.getState().faits.recettes).toHaveLength(0);
+    expect(instantaneAvantRemplacement()?.brut).toBe(plein);
+  });
+
+  // Remplir un appareil neuf ne doit pas effacer la copie utile d'avant.
+  it('ne met rien de côté quand il n’y a rien à perdre', async () => {
+    const s = stockageEssai({ [CLE_STOCKAGE]: bloc() });
+    useFaits.getState().initialiser(s);
+    await useFaits.getState().adopterFaitsDistants(JSON.parse(plein));
+    expect(instantaneAvantRemplacement()).toBeNull();
+  });
+
+  it('refuse de remplacer quand la copie ne peut pas s’écrire', async () => {
+    const s = stockageEssai({ [CLE_STOCKAGE]: plein });
+    useFaits.getState().initialiser(s);
+    s.remplir();
+    const refus = await useFaits.getState().adopterFaitsDistants(JSON.parse(bloc()));
+    expect(refus).toMatch(/mettre de côté/);
+    expect(useFaits.getState().faits.recettes).toHaveLength(1);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   TAILLE_MAX_OCTETS, deposerJustificatif, empreinteDe, migrerMeta,
   motifRefusSuppression, stockageMemoireJustificatifs, supprimerJustificatif,
-  typeAccepte, verifierIntegrite
+  transactionTerminee, typeAccepte, verifierIntegrite
 } from './justificatifs';
 
 function pdf(contenu = 'facture', nom = 'facture.pdf') {
@@ -389,5 +389,38 @@ describe('migration d’une base à l’ancien format', () => {
       fait: { nature: 'depense' as const, id: 'dep-1' }
     };
     expect(migrerMeta(dejaMigree)).toEqual(dejaMigree);
+  });
+});
+
+/**
+ * UNE PIÈCE N'EST CONSERVÉE QU'À LA VALIDATION DE LA TRANSACTION.
+ *
+ * Si la règle sautait, le dépôt se croirait acquis au succès de la requête
+ * `put`. Une transaction qui avorte ensuite — quota atteint — laissait l'écran
+ * annoncer « Pièce conservée » et rattacher au fait une pièce inexistante.
+ */
+describe('validation de la transaction IndexedDB', () => {
+  type Fausse = Parameters<typeof transactionTerminee>[0] & {
+    oncomplete: (() => void) | null; onabort: (() => void) | null;
+  };
+  const fausse = (): Fausse =>
+    ({ oncomplete: null, onabort: null, onerror: null, error: null }) as unknown as Fausse;
+
+  it('n’aboutit qu’à la validation', async () => {
+    const t = fausse();
+    let terminee = false;
+    void transactionTerminee(t).then(() => { terminee = true; });
+    await Promise.resolve();
+    expect(terminee).toBe(false);
+    t.oncomplete?.();
+    await Promise.resolve();
+    expect(terminee).toBe(true);
+  });
+
+  it('échoue quand la transaction avorte', async () => {
+    const t = fausse();
+    const attente = transactionTerminee(t);
+    t.onabort?.();
+    await expect(attente).rejects.toThrow(/pas pu être enregistrée/);
   });
 });

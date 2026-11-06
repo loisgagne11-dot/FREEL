@@ -19,7 +19,7 @@
 import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, type Ratio, euros, ratio } from '../domain/types';
 import {
-  CLE_STOCKAGE, PART_GARDEE_MAX, type Depense, type Entreprise,
+  CLE_AVANT_REMPLACEMENT, CLE_STOCKAGE, PART_GARDEE_MAX, type Depense, type Entreprise,
   VERSION_SCHEMA, type Faits, type Mission, completerFaitsCourants, faitsVides, motifRefusFaits
 } from './schema';
 import type { MotifSansContrepartie } from '../domain/calculs/banque';
@@ -252,7 +252,7 @@ interface MagasinFaits {
    * d'abord ce qui serait chargé et demande confirmation. Charger en silence
    * ferait disparaître une saisie faite hors ligne sans que personne le voie.
    */
-  readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => Promise<void>;
+  readonly remplacerParBundle: (bundle: Readonly<Record<string, unknown>>) => Promise<string | null>;
 
   /**
    * Remplace les faits par un bloc venu du compte distant.
@@ -478,6 +478,48 @@ function reprendreDuDisque(brut: string): void {
   }
   dernierConnu = brut;
   useFaits.setState({ faits: completerFaitsCourants(bloc as Record<string, unknown>) });
+}
+
+/**
+ * Garde une copie de l'état local avant de le remplacer en entier.
+ *
+ * Restaurer une sauvegarde, charger le compte, reprendre l'ancienne
+ * application : trois gestes qui ÉCRASENT tout, précédés d'un aperçu de ce
+ * qui arrive mais d'aucune copie de ce qui part. Un mauvais fichier choisi, et
+ * la saisie du jour était irrécupérable.
+ *
+ * Une seule copie, la dernière : c'est un « annuler », pas un historique.
+ * Rien n'est copié quand l'état actuel est vide — sinon remplir un appareil
+ * neuf effacerait la copie utile d'avant. Et si la copie ne peut pas s'écrire
+ * (stockage plein), le remplacement est REFUSÉ : c'est le seul moment où l'on
+ * peut encore choisir de télécharger une sauvegarde d'abord.
+ */
+function garderInstantane(): string | null {
+  const s = stockageActif;
+  const brut = s?.getItem(CLE_STOCKAGE) ?? null;
+  const f = useFaits.getState().faits;
+  if (s === null || brut === null
+    || f.recettes.length + f.depenses.length + f.clients.length + f.missions.length === 0) {
+    return null;
+  }
+  try {
+    s.setItem(CLE_AVANT_REMPLACEMENT, JSON.stringify({ le: new Date().toISOString(), brut }));
+    return null;
+  } catch {
+    return 'Impossible de mettre de côté tes données actuelles avant de les remplacer '
+      + '(stockage plein). Télécharge d’abord une sauvegarde depuis Réglages → Données.';
+  }
+}
+
+/** La copie prise avant le dernier remplacement, si elle existe et se lit. */
+export function instantaneAvantRemplacement(): { readonly le: string; readonly brut: string } | null {
+  try {
+    const o = JSON.parse(stockageActif?.getItem(CLE_AVANT_REMPLACEMENT) ?? 'null') as
+      { le?: unknown; brut?: unknown } | null;
+    return typeof o?.le === 'string' && typeof o.brut === 'string' ? { le: o.le, brut: o.brut } : null;
+  } catch {
+    return null;
+  }
 }
 
 let stockageActif: Stockage | null = null;
@@ -831,14 +873,19 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     // l'ancienne application est un geste rare, et son code n'a rien à faire
     // dans le paquet d'entrée.
     const { convertirBundle } = await import('../infra/migration.legacy');
+    const refus = garderInstantane();
+    if (refus !== null) return refus;
     const faits = convertirBundle(bundle).faits;
     set({ faits });
     persister(stockageActif, faits);
+    return null;
   },
 
   adopterFaitsDistants: async (brut) => {
     const motif = motifRefusFaits(brut);
     if (motif !== null) return motif;
+    const refus = garderInstantane();
+    if (refus !== null) return refus;
     // Chargé à la demande : voir le commentaire de la déclaration ci-dessus.
     const { completerFaits } = await import('./schema.migrations');
     const faits = completerFaits(brut);

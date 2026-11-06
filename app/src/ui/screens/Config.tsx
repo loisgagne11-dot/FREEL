@@ -1,12 +1,12 @@
-import { lazy, Suspense, useEffect, useId, useState } from 'react';
+import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
 import { useToast } from '../components/Toasts';
-import { useFaits } from '../../state/store';
+import { instantaneAvantRemplacement, useFaits } from '../../state/store';
 import { finAcreDe, soldeEstSuivi } from '../../state/selecteurs';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
 import { Montant } from '../components/Montant';
-import { eur } from '../format';
+import { dateCourte, eur } from '../format';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -728,6 +728,8 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
    * précaution que sur l'écran Compte, et pour la même raison.
    */
   const [aRestaurer, setARestaurer] = useState<Restauration | null>(null);
+  // Relue à chaque changement des faits : un remplacement vient d'en écrire une.
+  const avant = useMemo(() => instantaneAvantRemplacement(), [faits]);
 
   function exporter(): void {
     const contenu = JSON.stringify(faits, null, 2);
@@ -858,6 +860,31 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
                 </div>
               </>
             )}
+        </div>
+      )}
+
+      {avant !== null && (
+        <div className={styles.confirmation}>
+          <p className={styles.explication}>
+            Tes données d’avant le dernier remplacement ({dateCourte(avant.le.slice(0, 10))})
+            ont été mises de côté. Y revenir met à son tour de côté ce que tu as
+            maintenant&nbsp;: rien ne se perd.
+          </p>
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.action}
+              onClick={() => {
+                let bloc: unknown = null;
+                try { bloc = JSON.parse(avant.brut); } catch { /* refusé plus bas */ }
+                void adopter(bloc).then((refus) => {
+                  signaler(refus ?? 'Données d’avant le remplacement rétablies.');
+                });
+              }}
+            >
+              Revenir à l’état d’avant
+            </button>
+          </div>
         </div>
       )}
 

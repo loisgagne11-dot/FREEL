@@ -49,6 +49,8 @@ export const PART_GARDEE_MAX = 0.8;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
+/** Copie de l'état local prise juste avant un remplacement complet — voir `garderInstantane`. */
+export const CLE_AVANT_REMPLACEMENT = 'freel.avant-remplacement.v1' as const;
 
 export interface Entreprise {
   readonly nom: string;

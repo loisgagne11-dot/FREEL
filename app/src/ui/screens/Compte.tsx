@@ -400,9 +400,10 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     setEtat({ phase: 'apercu-legacy', session, donnees: r.valeur, rapport });
   }
 
-  function confirmerLegacy(donnees: DonneesLegacy, session: Session): void {
-    remplacerParBundle(bundleDepuisLegacy(donnees));
+  async function confirmerLegacy(donnees: DonneesLegacy, session: Session): Promise<void> {
+    const refus = await remplacerParBundle(bundleDepuisLegacy(donnees));
     setEtat({ phase: 'connecte', session });
+    if (refus !== null) { setErreur(refus); return; }
     setMessage('Données de l’ancienne application chargées sur cet appareil.');
   }
 
@@ -521,7 +522,7 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
               titre="Données de l’ancienne application"
               rapport={etat.rapport}
               majLe={etat.donnees.updated_at}
-              onConfirmer={() => confirmerLegacy(etat.donnees, etat.session)}
+              onConfirmer={() => void confirmerLegacy(etat.donnees, etat.session)}
               onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
             />
           )}
