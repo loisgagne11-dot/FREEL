@@ -4,6 +4,7 @@ import { etatFacture, reediterFacture } from '../../state/selecteurs.facture';
 import styles from './Facture.module.css';
 import { Facturier } from '../components/Facturier';
 import { useRoute } from '../useRoute';
+import { Apercu, useSortieDocument } from '../documents/Apercu';
 
 /**
  * La rédaction et le document arrivent à la demande.
@@ -16,8 +17,13 @@ import { useRoute } from '../useRoute';
  */
 const NouvelleFacture = lazy(() => import('./Facture.redaction')
   .then((m) => ({ default: m.NouvelleFacture })));
-const DocumentFacture = lazy(() => import('./Facture.redaction')
+/* Le document vit dans `documents/`, avec sa feuille autonome : c'est le
+   MÊME papier que la rédaction montre en aperçu et que le fichier téléchargé
+   emporte. Deux rendus d'une facture finiraient par ne plus s'accorder, et
+   celui qu'on relit ne serait pas celui qui part. */
+const DocumentFacture = lazy(() => import('../documents/DocumentFacture')
   .then((m) => ({ default: m.DocumentFacture })));
+
 
 /** Le temps que le module de rédaction arrive. */
 function EnAttente() {
@@ -118,6 +124,7 @@ function FactureEmise(
   }
 
   const etat = etatFacture(reedition.facture);
+  const sortie = useSortieDocument();
 
   return (
     <>
@@ -125,8 +132,14 @@ function FactureEmise(
         <h1 className={styles.titre}>Facture {numero}</h1>
         <div className={styles.actions}>
           <button type="button" className={styles.actionPrincipale}
-            onClick={() => window.print()}>
-            Imprimer ou enregistrer en PDF
+            onClick={() => sortie('telecharger', `Facture ${numero}`,
+              ['Facture', numero, reedition.facture.destinataire.nom])}>
+            Télécharger
+          </button>
+          <button type="button" className={styles.action}
+            onClick={() => sortie('imprimer', `Facture ${numero}`,
+              ['Facture', numero, reedition.facture.destinataire.nom])}>
+            Imprimer
           </button>
           <button type="button" className={styles.action} onClick={onListe}>
             Retour au facturier
@@ -145,7 +158,9 @@ function FactureEmise(
       </p>
 
       <Suspense fallback={<EnAttente />}>
-        <DocumentFacture etat={etat} />
+        <Apercu>
+          <DocumentFacture etat={etat} brouillon={false} />
+        </Apercu>
       </Suspense>
     </>
   );

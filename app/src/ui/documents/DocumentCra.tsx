@@ -71,7 +71,10 @@ export function DocumentCra(
   const colonnes = lieuConnu ? 5 : 3;
 
   return (
-    <div className="doc">
+    <article
+      className="doc"
+      aria-label={`Compte-rendu d’activité — ${periode}${destinataire === null ? '' : ` — ${destinataire}`}`}
+    >
       <header className="doc-entete">
         <div>
           <p className="doc-marque">{marque(entreprise.nom)}</p>
@@ -164,7 +167,7 @@ export function DocumentCra(
           Bon pour accord — {destinataire ?? 'client(s)'}<span />
         </p>
       </div>
-    </div>
+    </article>
   );
 }
 

@@ -408,12 +408,29 @@ describe('la capacité de versement par mois', () => {
    * serait un constat. L'écran doit le dire au lieu d'annoncer « 0 € versés »,
    * qui se lirait comme une privation qu'on ne s'est pas imposée.
    */
-  it('dit d’un mois à venir qu’il est à venir, sans lui prêter de versé', () => {
+  it('ne prête aucun versé à un mois à venir', () => {
     poser({ recettes: [recette({ encaisseeLe: dateISO('2026-03-10') })] });
 
     const carte = screen.getByRole('region', { name: /Capacité de versement/ });
-    expect(within(carte).getByText(/SEP/).textContent).toContain('mois à venir');
     expect(within(carte).getByText(/SEP/).textContent).not.toContain('versés');
+  });
+
+  /*
+   * SIX MOIS À « −0,1 k€ » NE SONT PAS UN DIAGNOSTIC.
+   *
+   * Le contrôle visuel a montré la fin d'année entière en négatif : aucun de
+   * ces mois n'attendait quoi que ce soit, et le nombre ne venait que de
+   * dépenses projetées. Six colonnes rouges d'affilée se lisent « le reste de
+   * mon année est dans le rouge » — une conclusion que rien ne soutient.
+   */
+  it('s’abstient sur un mois à venir où rien n’est attendu, plutôt que d’afficher un négatif', () => {
+    poser({ recettes: [recette({ encaisseeLe: dateISO('2026-03-10') })] });
+
+    const carte = screen.getByRole('region', { name: /Capacité de versement/ });
+    expect(within(carte).getByText(/SEP/).textContent).toMatch(/Rien n’est encore attendu/);
+    // La colonne reste EN PLACE : la retirer décalerait les onze autres et
+    // personne ne verrait le trou.
+    expect(within(carte).getByText('DÉC')).toBeTruthy();
   });
 
   /**

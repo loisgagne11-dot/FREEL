@@ -96,9 +96,31 @@ export function natureDuMois(m: Mois, moisCourant: Mois): NatureDuMois {
 /**
  * La capacité de versement d'un mois.
  *
- * S'abstient — `refuse` — quand le taux de charges du mois n'est pas résolu.
- * Compter zéro charge donnerait une capacité surestimée d'un quart, et c'est
- * exactement le chiffre sur lequel on décide de se virer de l'argent.
+ * S'abstient — `refuse` — dans deux cas.
+ *
+ * 1. Le taux de charges du mois n'est pas résolu. Compter zéro charge donnerait
+ *    une capacité surestimée d'un quart, et c'est exactement le chiffre sur
+ *    lequel on décide de se virer de l'argent.
+ *
+ * 2. ─────────────────────────────────────────────────────────────────────────
+ *    UN MOIS À VENIR SANS RIEN D'ATTENDU N'A PAS UNE CAPACITÉ NÉGATIVE
+ *    ─────────────────────────────────────────────────────────────────────────
+ *
+ *    Sur un mois VÉCU, une capacité négative est un fait : le mois n'a rien
+ *    encaissé et un abonnement est parti. C'est le seul signal utile de ce
+ *    mois-là, et le remonter à zéro l'effacerait.
+ *
+ *    Sur un mois À VENIR, ce n'est plus un fait. Rien n'y est encore attendu —
+ *    aucune facture n'a d'échéance à cette date —, et le peu de dépenses
+ *    projetées suffit à produire un nombre négatif. Le contrôle visuel a montré
+ *    ce que ça donne : SIX mois d'affilée à « −0,1 k€ » en fin d'année, qui se
+ *    lisent « le reste de mon année est dans le rouge » alors qu'ils disent
+ *    seulement « on ne sait pas encore ».
+ *
+ *    Le mois s'abstient donc, et sa colonne reste en place avec son tiret : la
+ *    retirer décalerait les autres et personne ne verrait le trou. Un mois à
+ *    venir qui porte, lui, un encaissement attendu garde sa capacité — négative
+ *    comprise, puisqu'elle repose alors sur quelque chose.
  */
 export function capaciteDuMois(
   entree: EntreeCapacite,
@@ -108,6 +130,15 @@ export function capaciteDuMois(
   if (taux.statut === 'refuse') return taux;
 
   const nature = natureDuMois(entree.mois, moisCourant);
+
+  if (nature === 'projete' && entree.encaisse <= 0) {
+    return {
+      statut: 'refuse',
+      motif: `Rien n’est encore attendu sur ${entree.mois} : sa capacité de `
+        + `versement ne se calcule pas tant qu’aucun encaissement n’y est prévu.`
+    };
+  }
+
   const charges = euros(entree.encaisse * taux.valeur);
 
   const valeur: CapaciteDuMois = {

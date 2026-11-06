@@ -60,7 +60,7 @@ import styles from './Argent.performance.module.css';
  * Ils doivent rester d'accord avec `.barres { height }` et le bas de `.colonne`
  * dans la feuille de style, qui portent le commentaire réciproque.
  */
-const HAUTEUR_BARRES = 175;
+const HAUTEUR_BARRES = 200;
 const BAS_DES_BARRES = 22;
 
 /** Les mois de l'axe, dans la langue du dessin. */
@@ -780,7 +780,14 @@ function CarteCapacite(
               <div key={mois} className={styles.colonneStatique} title={c.motif}>
                 <span className={styles.valeurs}><span className={styles.valeurRefus}>—</span></span>
                 <span className={styles.barres} aria-hidden="true" />
-                <span className={styles.moisAxe}>{mois}</span>
+                <span className={styles.moisAxe}>
+                  {mois}
+                  {/* Le motif était porté par un `title` seul : une infobulle
+                      de survol, que rien n'annonce à qui écoute la page et que
+                      personne ne voit au doigt. Le tiret disait « — » et rien
+                      d'autre. */}
+                  <span className={styles.horsEcran}> : {c.motif}</span>
+                </span>
               </div>
             );
           }

@@ -14,6 +14,20 @@
  * Le budget ne se relève pas : on extrait ce qui n'a pas à être chargé pour
  * la consultation. C'est le même motif que `Activite.formulaires`, et le
  * même remède.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'APERÇU VIT PENDANT LA SAISIE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le document ne s'affichait qu'APRÈS l'émission. On remplissait donc un
+ * formulaire à l'aveugle, on émettait — geste irréversible : une facture
+ * irrégulière ne se corrige pas, elle s'annule par un avoir et se réémet sous
+ * un nouveau numéro —, et on découvrait ensuite ce qu'on venait de produire.
+ *
+ * Le handoff pose l'aperçu à côté de la saisie, et il a raison : c'est le seul
+ * moment où corriger coûte encore zéro. Le document lui-même vit désormais
+ * dans `documents/DocumentFacture`, sur la feuille que le fichier téléchargé
+ * emporte avec lui.
  */
 
 import { useId, useMemo, useState } from 'react';
@@ -27,7 +41,8 @@ import { Info } from '../components/Info';
 import { dateCourte, eurExact } from '../format';
 import styles from './Facture.module.css';
 import { Montant } from '../components/Montant';
-import { formaterIban } from '../../domain/calculs/identifiants';
+import { Apercu, useSortieDocument } from '../documents/Apercu';
+import { DocumentFacture } from '../documents/DocumentFacture';
 
 const TAUX_TVA_COURANTS = [
   { valeur: 0.20, libelle: '20 % — taux normal' },
@@ -69,6 +84,7 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
    */
   const [emise, setEmise] = useState<ReturnType<typeof etatFacture> | null>(null);
 
+  const sortie = useSortieDocument();
   const numero = useMemo(() => numeroSuivant(faits), [faits]);
   const client = faits.clients.find((c) => c.nom === clientNom);
 
@@ -104,6 +120,25 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
   const aCommence = clientNom !== ''
     || lignes.some((l) => l.designation !== '' || l.prixUnitaireHt > 0);
 
+  /* Sortir la facture émise : le numéro est attribué, le document est celui
+     qui est porté au livre. */
+  const sortirEmise = (action: 'imprimer' | 'telecharger'): void =>
+    sortie(action, `Facture ${emise?.facture.numero ?? ''}`,
+      ['Facture', emise?.facture.numero ?? '', emise?.facture.destinataire.nom ?? '']);
+
+  /*
+   * Sortir le BROUILLON, avant émission.
+   *
+   * Autorisé, parce qu'on relit un devis ou une facture avant de l'émettre, et
+   * parfois sur papier. Mais le fichier porte « brouillon » dans son nom ET
+   * dans le document : son numéro n'est pas encore attribué, deux brouillons
+   * du même jour portent le même, et l'un des deux deviendrait un doublon au
+   * livre de quelqu'un s'il partait tel quel.
+   */
+  const sortirBrouillon = (action: 'imprimer' | 'telecharger'): void =>
+    sortie(action, `Brouillon de facture ${numero}`,
+      ['Brouillon', 'facture', numero, clientNom]);
+
   function emettre(): void {
     if (!emissionPossible) return;
     ajouterRecette({
@@ -134,8 +169,12 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
           <h1 className={styles.titre}>Facture {emise.facture.numero}</h1>
           <div className={styles.actions}>
             <button type="button" className={styles.actionPrincipale}
-              onClick={() => window.print()}>
-              Imprimer ou enregistrer en PDF
+              onClick={() => sortirEmise('telecharger')}>
+              Télécharger
+            </button>
+            <button type="button" className={styles.action}
+              onClick={() => sortirEmise('imprimer')}>
+              Imprimer
             </button>
             <button type="button" className={styles.action} onClick={() => {
               setEmise(null); setLignes([ligneVide()]); setClientNom('');
@@ -158,7 +197,9 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
           </Info>
         </p>
 
-        <DocumentFacture etat={emise} />
+        <Apercu>
+          <DocumentFacture etat={emise} brouillon={false} />
+        </Apercu>
       </>
     );
   }
@@ -195,6 +236,11 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
         </div>
       )}
 
+      {/* L'ATELIER : la saisie à gauche, le document à droite.
+          En portrait les deux s'empilent — l'aperçu passe alors SOUS la
+          saisie, parce qu'on remplit d'abord et qu'on relit ensuite. */}
+      <div className={styles.atelier}>
+        <div className={styles.colonneSaisie}>
       <section className={styles.carte} aria-labelledby={`${idChamp}-saisie`}>
         <h2 id={`${idChamp}-saisie`} className={styles.titreCarte}>Destinataire</h2>
 
@@ -293,6 +339,24 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
           {emissionPossible ? 'Émettre la facture' : 'Compléter les mentions manquantes'}
         </button>
       </section>
+        </div>
+
+        <div className={styles.colonneApercu}>
+          <Apercu>
+            <DocumentFacture etat={etat} brouillon />
+          </Apercu>
+          <div className={styles.sorties}>
+            <button type="button" className={styles.action}
+              onClick={() => sortirBrouillon('imprimer')}>
+              Imprimer le brouillon
+            </button>
+            <button type="button" className={styles.action}
+              onClick={() => sortirBrouillon('telecharger')}>
+              Télécharger le brouillon
+            </button>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
@@ -326,104 +390,5 @@ function Totaux({ etat }: { etat: ReturnType<typeof etatFacture> }) {
         <dd>{dateCourte(t.echeanceLe)}</dd>
       </div>
     </dl>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Le document
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * La facture telle qu'elle s'imprime.
- *
- * Le même balisage sert à l'écran et au papier : la feuille de style
- * d'impression masque le reste de l'application et met ce bloc en page. Un
- * gabarit distinct pour l'impression finirait par diverger de ce qui est
- * affiché, et l'utilisateur signerait un document qu'il n'a pas relu.
- */
-export function DocumentFacture({ etat }: { etat: ReturnType<typeof etatFacture> }) {
-  const { facture: f, totaux: t } = etat;
-  const { emetteur: em, destinataire: de } = f;
-
-  return (
-    <article className={styles.document} aria-label={`Facture ${f.numero}`}>
-      <header className={styles.docEntete}>
-        <div>
-          <p className={styles.docNom}>{em.nom}</p>
-          <p className={styles.docLigne}>{em.adresse}</p>
-          <p className={styles.docLigne}>{em.codePostal} {em.ville}</p>
-          <p className={styles.docLigne}>SIRET {em.siret}</p>
-          {em.tvaIntracom !== '' && (
-            <p className={styles.docLigne}>TVA {em.tvaIntracom}</p>
-          )}
-        </div>
-        <div className={styles.docTitre}>
-          <p className={styles.docFacture}>Facture</p>
-          <p className={styles.docNumero}>{f.numero}</p>
-          <p className={styles.docLigne}>Émise le {dateCourte(f.emiseLe)}</p>
-          <p className={styles.docLigne}>Échéance {dateCourte(t.echeanceLe)}</p>
-        </div>
-      </header>
-
-      <section className={styles.docClient}>
-        <p className={styles.docLabel}>Facturé à</p>
-        <p className={styles.docNom}>{de.nom}</p>
-        <p className={styles.docLigne}>{de.adresse}</p>
-        {de.siret !== '' && <p className={styles.docLigne}>SIRET {de.siret}</p>}
-        {de.tvaIntracom !== '' && (
-          <p className={styles.docLigne}>TVA {de.tvaIntracom}</p>
-        )}
-      </section>
-
-      <table className={styles.docTable}>
-        <thead>
-          <tr>
-            <th scope="col">Désignation</th>
-            <th scope="col">Qté</th>
-            <th scope="col">P.U. HT</th>
-            {t.totalTva > 0 && <th scope="col">TVA</th>}
-            <th scope="col">Total HT</th>
-          </tr>
-        </thead>
-        <tbody>
-          {f.lignes.filter((l) => l.designation.trim() !== '').map((l, i) => (
-            <tr key={i}>
-              <td>{l.designation}</td>
-              <td>{l.quantite}</td>
-              <td><Montant>{eurExact(l.prixUnitaireHt)}</Montant></td>
-              {t.totalTva > 0 && (
-                <td>{(l.tauxTva * 100).toFixed(1).replace('.', ',')} %</td>
-              )}
-              <td><Montant>{eurExact(euros(l.quantite * l.prixUnitaireHt))}</Montant></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <div className={styles.docTotaux}>
-        <Totaux etat={etat} />
-      </div>
-
-      {/* OÙ PAYER.
-          `entreprise.iban` existait au schéma, était repris de l'ancienne
-          application à la migration — et n'atteignait aucun écran. Le client
-          recevait une facture régulière sur laquelle rien n'indiquait où
-          envoyer l'argent. Ce n'est pas une mention obligatoire ; c'est
-          seulement ce qui fait la différence entre une facture et une facture
-          payable. */}
-      {em.iban !== '' && (
-        <section className={styles.docReglement}>
-          <p className={styles.docLabel}>Règlement</p>
-          <p className={styles.docLigne}>
-            Par virement — IBAN <span className={styles.docIban}>{formaterIban(em.iban)}</span>
-          </p>
-          {em.bic !== '' && <p className={styles.docLigne}>BIC {em.bic}</p>}
-        </section>
-      )}
-
-      <footer className={styles.docPied}>
-        {etat.mentions.map((m) => <p key={m} className={styles.docMention}>{m}</p>)}
-      </footer>
-    </article>
   );
 }

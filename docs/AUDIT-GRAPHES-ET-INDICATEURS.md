@@ -126,13 +126,14 @@ pour laquelle ce document a été ouvert.
 | V6 | Frise de l'échéancier | ✅ | ✅ | ✅ **frise livrée** (lot B) — chaque obligation à sa date réelle sur l'année, repère « auj. ». Elle ne remplace pas la liste, elle la précède&nbsp;: la frise répond à « qu'est-ce qui vient », la liste à « qu'est-ce que j'en fais » |
 | V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **graphe combiné, sur le SOLDE réel** (lot B, refait lot L1) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Couvre janvier à décembre de l'année CHOISIE (plus de « douze mois glissants »)&nbsp;: les mois clos tracent le solde réel en trait plein (un fait, dérivé des faits jusqu'à leur fin de mois), les mois à venir le disponible projeté en pointillés, annoncés « prévu » — jamais un solde deviné, pour la raison que l'infobulle détaille |
 | V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
-| V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau |
+| V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau. **Lot R** : un mois à venir où rien n'est attendu s'ABSTIENT désormais au lieu d'afficher un négatif — voir §8 |
 | V10 | Cascade CA → charges → net | ✅ (deux fois) | ❌ | 🚫 §5.5 |
 | V11 | Donut de destination du CA | ✅ | ❌ | 🚫 §5.5 |
 | V12 | Sparklines dans les tuiles | ✅ | ❌ | 🚫 §5.5 |
 | V13 | Dépendance client | ✅ | ✅ | ⚠️ barre segmentée + légende chiffrée |
 | V14 | Occupation avec repère 100 % | ⚠️ | ✅ | ✅ **jauge livrée** (lot C4) dans « Le mois en chiffres », avec son dénominateur écrit dessous. La tuile qui donnait un SECOND chiffre d'occupation sur le même écran est retirée&nbsp;: §1.3 |
 | V24 | **Le compte rendu d'activité, semaine par semaine** | ⚠️ liste de numéros de jours | ✅ | ✅ **livré au lot P** — Outils › CRA, atelier deux colonnes avec aperçu vivant. Par semaine&nbsp;: le rang dans le mois, la plage réellement travaillée, une ligne par client ventilée télétravail / sur site, la phrase de tâches. Puis les totaux par client et le grand total. L'ancienne rendait « 1 2 3 4 7 8 9½ 10 »&nbsp;: exact et illisible — un client qui signe veut le volume, pas un calendrier à recopier |
+| V25 | **La facture, pendant qu'on l'écrit** | ⚠️ après émission | ✅ | ✅ **livrée au lot Q** — atelier deux colonnes, aperçu qui suit la frappe, bandeau « brouillon » tant que le numéro n'est pas attribué. Elle porte le HT, la TVA et le net à payer |
 | V15 | Impôt par tranche | ✅ barres | ✅ barres | ⚠️ **tableau exact** — progrès, la barre était décorative |
 | V16 | Projection par scénarios | ✅ | ❌ | 🚫 §5.5 |
 | V17 | Objectif de CA avec allure attendue | ✅ | ❌ | ✅ **livrée**, absente du handoff&nbsp;: repère mensuel sur le graphe et écart en JOURS en pied |
@@ -184,6 +185,7 @@ Ne sont listés que les verdicts qui appellent une décision.
 | **Jours travaillés du mois, par client qui signe** | 🟢 **lot P.** Sur le document ET sur l'écran Activité. La maille est le client OPÉRATIONNEL et non la mission&nbsp;: deux donneurs d'ordre derrière une même agence signent chacun le sien |
 | **Ventilation télétravail / sur site du mois** | 🟢 **lot P.** Lue sur le `lieu` des journées. Une journée sans lieu compte au total et va dans une colonne `sans lieu` — jamais rangée au hasard. Quand le mois n'en connaît aucun, les deux colonnes disparaissent au lieu d'afficher deux zéros trompeurs |
 | **Valorisation du mois au TJM** | 🟢 **déplacée au lot P**, pas perdue. Elle était sur le document remis au client&nbsp;; elle est maintenant sur l'écran Activité, où elle s'adresse à l'utilisateur. Un CRA qui porte un prix se renégocie au lieu de se signer |
+| **Total HT, TVA, net à payer d'une facture** | 🟢 **lot Q**, sur le document ET pendant la saisie. Les deux montants réclamés — « pour les factures j'ai besoin de voir les deux montants » |
 | **Statut d'un CRA — « envoyé le », « validé », « archivé »** | ❌ **volontairement absent.** Le handoff les dessine dans sa liste « CRA récents ». Aucun des trois n'est un fait enregistré&nbsp;: un CRA n'est pas un objet du modèle, c'est une VUE du planning. La colonne montre donc les mois à documenter, avec leur volume et le nombre de documents à produire. Le jour où l'envoi sera enregistré, la date viendra s'y poser |
 | **Dépendance client** | 🟢 sur le CA encaissé de l'année, bien motivé |
 | **Seuils en %** | 🟢 avec le reste en euros, ce que le % seul ne dit pas |
@@ -452,10 +454,90 @@ qui s'abstient plutôt que de deviner, et la phrase de tâches enregistrée
 2. **L'envoi du CRA, enregistré comme un fait.** Il débloquerait les statuts
    du handoff, qui sont aujourd'hui hors de portée faute de donnée.
 
-3. **Le paquet d'entrée est à 79,94 Ko pour un plafond de 80.** Le budget
-   passe, mais il ne reste rien. La cause est structurelle et connue&nbsp;: le
-   magasin porte ses cinquante actions d'écriture dans le premier rendu, alors
-   que le Pilote n'en déclenche presque aucune. C'est le remède que
-   `selecteurs.activite` a déjà appliqué aux sélecteurs — et il n'a jamais été
-   appliqué au magasin. **À faire en ouverture du lot suivant**, avant tout
-   ajout&nbsp;: l'invariant n°7 dit d'extraire, pas de relever.
+3. ~~**Le paquet d'entrée est à 79,94 Ko pour un plafond de 80.**~~ ✅ **Traité
+   au lot Q**, et pas volontairement&nbsp;: le budget a DÉPASSÉ (80,12 Ko) sur
+   l'ajout d'une seule action rapide, ce qui a rendu l'extraction obligatoire.
+   Cinq écritures ont quitté le magasin pour `state/ecritures.carnet` — celles
+   du carnet et du relevé, dont les gardes emportaient `calculs/carnet` et
+   `calculs/banque` dans le premier rendu pour des écrans chargés à la demande.
+   **77,09 Ko**, soit près de 3 Ko de marge retrouvés.
+
+   Deux choses ont été refusées au passage. Déplacer les GARDES dans les
+   écrans aurait rapporté les mêmes octets&nbsp;: c'eût été échanger un
+   invariant contre un budget — un second point d'entrée aurait accepté deux
+   clients homonymes, dont le nom sert justement de clé de rattachement. Et
+   ouvrir un second magasin aurait donné deux copies des faits, qui divergent
+   à la première écriture. Les écritures déplacées lisent donc le même état et
+   passent par `ecrireFaits`, seule porte vers le disque.
+
+   `verifier-cablage` a été étendu aux modules d'écriture : sans cela, un
+   simple déplacement de fichier aurait fait sortir cinq écritures du contrôle
+   — exactement le mécanisme que ce script existe pour empêcher.
+
+---
+
+## 8. Lot R — les graphes de l'écran Argent
+
+### 8.1 Six mois à « −0,1 k€ » n'étaient pas un diagnostic
+
+Le contrôle visuel montrait la fin d'année entière en négatif sur le plan de
+capacité : SEP, OCT, NOV, DÉC, tous à `−0,1 k€`. Aucun de ces mois n'attendait
+quoi que ce soit ; le nombre ne venait que de dépenses projetées. Quatre
+colonnes rouges d'affilée se lisent **« le reste de mon année est dans le
+rouge »** — une conclusion que rien ne soutient.
+
+`capaciteDuMois` s'abstient maintenant sur un mois **à venir** dont l'encaissé
+attendu est nul, et sa colonne porte un tiret avec son motif. Trois
+distinctions ont été tenues, et chacune compte :
+
+* sur un mois **vécu**, la même valeur négative reste juste — le mois n'a rien
+  encaissé et un abonnement est parti, c'est son seul signal utile ;
+* un mois **à venir qui attend un encaissement** garde sa capacité, négative
+  comprise : elle repose alors sur quelque chose ;
+* le **mois courant** est constaté, pas projeté : il ne s'abstient jamais.
+
+La colonne reste **en place** : la retirer décalerait les onze autres et
+personne ne verrait le trou.
+
+### 8.2 Le motif ne se lisait qu'à la souris
+
+La colonne refusée portait son motif dans un `title` — une infobulle de survol,
+que rien n'annonce à qui écoute la page et que personne n'atteint au doigt. Le
+tiret disait « — » et rien d'autre. Le motif est désormais du texte.
+
+### 8.3 Les barres, mesurées sur le handoff plutôt qu'estimées
+
+Les valeurs ont été **relevées dans la feuille du handoff**, pas approchées à
+l'œil :
+
+| | avant | handoff, donc maintenant |
+|---|---|---|
+| barre de série | 11 px, rayon 2 px | **14 px, rayon 4 px** (`.cabars .grp i`) |
+| barre de capacité | 22 px, rayon 2 px | **30 px max, rayon 6 px** (`.capbars .track`) |
+| écart entre deux séries | 3 px | **4 px** |
+| écart entre deux mois | 2 px | **12 px** |
+| hauteur de la bande | 175 px | **200 px** (`.cabars`) |
+
+Un écart au handoff est assumé : son `min-height: 4px` donne un moignon même à
+zéro. Un mois sans chiffre d'affaires afficherait une barre minuscule, qui se
+lit « un petit peu » plutôt que « rien ». L'étiquette dit déjà « 0 » ; le tracé
+se tait.
+
+### 8.4 Ce qui n'a PAS été touché, et pourquoi
+
+**Le graphe de trésorerie garde ses mois projetés à `−100 €`.** Le défaut a
+l'air identique à celui du §8.1 — quatre mois d'affilée en petit négatif — et
+il ne l'est pas. Ici le nombre est une **projection déclarée** : la carte « Où
+va ton disponible » écrit la règle en toutes lettres, « dépenses courantes :
+100 € par mois, moyenne des six derniers mois », et chaque colonne porte le
+mot « prévu ». Une hypothèse annoncée et sourcée n'est pas un artefact de
+formule. La corriger reviendrait à masquer une prévision juste.
+
+**Le vide sous le graphe de CA reste.** La carte de composition est plus haute
+que celle du graphe, et le rang laisse donc du fond de page en dessous.
+`align-items: stretch` a été essayé, mesuré et repoussé — le vide passe alors
+*à l'intérieur* de la carte, au-dessus des barres, et se lit comme un graphe
+qui n'a pas fini de charger. L'étirer vraiment demanderait que la bande cesse
+d'avoir une hauteur fixe, donc que la ligne d'objectif ne puisse plus se poser
+sur la même échelle sans mesurer le conteneur en JavaScript. Un repère faux
+coûte plus cher qu'un vide.

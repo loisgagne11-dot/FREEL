@@ -56,6 +56,16 @@ export const ACTIONS_RAPIDES: readonly ActionRapide[] = [
     icone: 'M3 4 H6 L8.5 15 H18 L20 7 H7.5 M8 19 H10 V21 H8 Z M14 19 H16 V21 H14 Z'
   },
   {
+    /* Le handoff ouvre sa rangée sur « Télécharger une facture ». Chez nous
+       elle mène au FACTURIER et non à la rédaction : télécharger, c'est
+       reprendre une facture déjà émise, et le facturier est le seul endroit
+       qui les liste. « Nouvelle facture », juste au-dessus, couvre l'autre
+       geste. */
+    libelle: 'Télécharger une facture',
+    href: '#/facture',
+    icone: 'M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M12 10 V17 M9 14 L12 17 L15 14'
+  },
+  {
     libelle: 'Importer un relevé',
     href: '#/achats/releve',
     icone: 'M12 3 V14 M8 10 L12 14 L16 10 M4 17 V20 H20 V17'

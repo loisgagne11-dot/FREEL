@@ -4,6 +4,12 @@ import { totaliser } from '../domain/calculs/livreRecettes';
 import { CLE_STOCKAGE, PART_GARDEE_MAX, VERSION_SCHEMA, faitsVides, type Recette } from './schema';
 import { stockageMemoire } from '../infra/migration';
 import { useFaits } from './store';
+/* Les écritures du carnet et du relevé ont quitté le magasin pour ne plus
+   peser sur le premier rendu : elles s'importent, mais restent les mêmes
+   écritures, avec les mêmes gardes et le même état. */
+import {
+  ajouterClient, modifierClient, supprimerClient, supprimerMission
+} from './ecritures.carnet';
 
 /**
  * Espionne `completerFaits` (`schema.migrations.ts`) SANS changer son
@@ -244,7 +250,7 @@ describe('carnet — clients', () => {
   const clients = () => useFaits.getState().faits.clients;
 
   it('ajoute un client', () => {
-    expect(useFaits.getState().ajouterClient(saisieClient('Dupont'))).toBeNull();
+    expect(ajouterClient(saisieClient('Dupont'))).toBeNull();
     expect(clients()).toHaveLength(1);
     expect(clients()[0]?.nom).toBe('Dupont');
   });
@@ -252,20 +258,20 @@ describe('carnet — clients', () => {
   // Le nom EST la clé de rattachement : deux homonymes rendraient indécidable
   // l'appartenance de chaque recette.
   it('refuse un homonyme, sans rien enregistrer', () => {
-    useFaits.getState().ajouterClient(saisieClient('Dupont'));
-    const refus = useFaits.getState().ajouterClient(saisieClient('dupont'));
+    ajouterClient(saisieClient('Dupont'));
+    const refus = ajouterClient(saisieClient('dupont'));
     expect(refus).toMatch(/déjà/i);
     expect(clients()).toHaveLength(1);
   });
 
   it('refuse un nom vide', () => {
-    expect(useFaits.getState().ajouterClient(saisieClient('  '))).toMatch(/obligatoire/i);
+    expect(ajouterClient(saisieClient('  '))).toMatch(/obligatoire/i);
   });
 
   // Sans propagation, les recettes resteraient attachées à un nom que plus
   // aucun client ne porte.
   it('propage un renommage sur les missions et les recettes', () => {
-    useFaits.getState().ajouterClient(saisieClient('Dupont'));
+    ajouterClient(saisieClient('Dupont'));
     const idClient = clients()[0]?.id as string;
     useFaits.getState().ajouterMission({
       clientId: null, clientNom: 'Dupont', description: 'Mission',
@@ -273,7 +279,7 @@ describe('carnet — clients', () => {
     });
     ajouter({ clientNom: 'Dupont' });
 
-    expect(useFaits.getState().modifierClient(idClient, { nom: 'Dupont SARL' })).toBeNull();
+    expect(modifierClient(idClient, { nom: 'Dupont SARL' })).toBeNull();
 
     const faits = useFaits.getState().faits;
     expect(faits.clients[0]?.nom).toBe('Dupont SARL');
@@ -284,18 +290,18 @@ describe('carnet — clients', () => {
   // Corriger la casse est un renommage : sans propagation, l'ancienne casse
   // subsisterait dans les recettes.
   it('propage aussi une simple correction de casse', () => {
-    useFaits.getState().ajouterClient(saisieClient('dupont'));
+    ajouterClient(saisieClient('dupont'));
     const idClient = clients()[0]?.id as string;
     ajouter({ clientNom: 'dupont' });
-    useFaits.getState().modifierClient(idClient, { nom: 'Dupont' });
+    modifierClient(idClient, { nom: 'Dupont' });
     expect(useFaits.getState().faits.recettes[0]?.clientNom).toBe('Dupont');
   });
 
   it('modifie un champ sans toucher aux rattachements', () => {
-    useFaits.getState().ajouterClient(saisieClient('Dupont'));
+    ajouterClient(saisieClient('Dupont'));
     const idClient = clients()[0]?.id as string;
     ajouter({ clientNom: 'Dupont' });
-    useFaits.getState().modifierClient(idClient, { pays: 'DE', tvaIntracom: 'DE123' });
+    modifierClient(idClient, { pays: 'DE', tvaIntracom: 'DE123' });
 
     expect(clients()[0]).toMatchObject({ nom: 'Dupont', pays: 'DE' });
     expect(useFaits.getState().faits.recettes[0]?.clientNom).toBe('Dupont');
@@ -304,17 +310,17 @@ describe('carnet — clients', () => {
   // Les recettes resteraient au livre mais sortiraient des délais de paiement
   // et de la DES sans que rien ne le signale.
   it('refuse de supprimer un client qui porte des recettes', () => {
-    useFaits.getState().ajouterClient(saisieClient('Dupont'));
+    ajouterClient(saisieClient('Dupont'));
     const idClient = clients()[0]?.id as string;
     ajouter({ clientNom: 'Dupont' });
 
-    expect(useFaits.getState().supprimerClient(idClient)).toMatch(/rattachées/i);
+    expect(supprimerClient(idClient)).toMatch(/rattachées/i);
     expect(clients()).toHaveLength(1);
   });
 
   it('supprime un client sans rattachement', () => {
-    useFaits.getState().ajouterClient(saisieClient('Seul'));
-    expect(useFaits.getState().supprimerClient(clients()[0]?.id as string)).toBeNull();
+    ajouterClient(saisieClient('Seul'));
+    expect(supprimerClient(clients()[0]?.id as string)).toBeNull();
     expect(clients()).toHaveLength(0);
   });
 });
@@ -331,7 +337,7 @@ describe('carnet — missions', () => {
   // Perdre le nom couperait la mission de son chiffre d'affaires, que le nom
   // seul rattache.
   it('rattache la mission au client par identifiant, sans perdre le nom', () => {
-    useFaits.getState().ajouterClient({
+    ajouterClient({
       nom: 'Dupont', adresse: '', siret: '', email: '',
       delaiPaiement: 'net_30' as const, pays: '', tvaIntracom: ''
     });
@@ -352,14 +358,14 @@ describe('carnet — missions', () => {
     useFaits.getState().ajouterMission(saisieMission('Dupont'));
     ajouter({ clientNom: 'Dupont', emiseLe: dateISO('2026-06-30') });
 
-    expect(useFaits.getState().supprimerMission(missions()[0]?.id as string))
+    expect(supprimerMission(missions()[0]?.id as string))
       .toMatch(/registre|inexplicable/i);
     expect(missions()).toHaveLength(1);
   });
 
   it('supprime une mission dont aucune recette ne relève', () => {
     useFaits.getState().ajouterMission(saisieMission('Dupont'));
-    expect(useFaits.getState().supprimerMission(missions()[0]?.id as string)).toBeNull();
+    expect(supprimerMission(missions()[0]?.id as string)).toBeNull();
     expect(missions()).toHaveLength(0);
   });
 

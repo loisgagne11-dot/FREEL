@@ -110,16 +110,60 @@ describe('abstention', () => {
  * exactement là où il compte.
  */
 describe('mois sans encaissement', () => {
-  it('rend une capacité négative à hauteur des dépenses', () => {
+  /*
+   * `if (r.statut === 'refuse') return;` a été retiré de ces deux tests.
+   * Il les rendait VIDES le jour où la capacité se met à s'abstenir : le test
+   * sortait avant sa première assertion et restait vert. C'est exactement le
+   * défaut que la mutation cherche — un test qui ne tient rien.
+   */
+  it('rend une capacité négative à hauteur des dépenses, sur un mois VÉCU', () => {
     const r = capaciteDuMois(entree('2026-02', { encaisse: 0, depenses: 480 }), mois('2026-08'));
-    if (r.statut === 'refuse') return;
+    expect(r.statut).not.toBe('refuse');
+    if (r.statut === 'refuse') throw new Error(r.motif);
     expect(r.valeur.charges).toBe(0);
     expect(r.valeur.capacite).toBe(-480);
   });
 
   it('rend zéro quand il n’y a ni encaissement ni dépense', () => {
     const r = capaciteDuMois(entree('2026-02', { encaisse: 0 }), mois('2026-08'));
-    if (r.statut === 'refuse') return;
+    expect(r.statut).not.toBe('refuse');
+    if (r.statut === 'refuse') throw new Error(r.motif);
     expect(r.valeur.capacite).toBe(0);
+  });
+});
+
+/*
+ * SIX MOIS À « −0,1 k€ » NE SONT PAS UN DIAGNOSTIC, C'EST UN ARTEFACT.
+ *
+ * Le contrôle visuel a montré la fin d'année entière en négatif sur le plan de
+ * capacité. Aucun de ces mois n'attendait quoi que ce soit : le nombre ne
+ * venait que de dépenses projetées, et se lisait « le reste de mon année est
+ * dans le rouge » — une conclusion que rien ne soutient.
+ *
+ * Sur un mois VÉCU la même valeur reste juste, et c'est toute la différence.
+ */
+describe('un mois à venir s’abstient tant que rien n’y est attendu', () => {
+  it('refuse la capacité d’un mois futur sans encaissement prévu', () => {
+    const r = capaciteDuMois(entree('2026-12', { encaisse: 0, depenses: 120 }), mois('2026-06'));
+    expect(r.statut).toBe('refuse');
+    if (r.statut !== 'refuse') return;
+    expect(r.motif).toMatch(/attendu/);
+  });
+
+  // Un mois à venir qui porte une échéance de facture a, lui, une capacité —
+  // négative comprise, puisqu'elle repose sur quelque chose.
+  it('garde la capacité d’un mois futur qui attend un encaissement', () => {
+    const r = capaciteDuMois(entree('2026-12', { encaisse: 200, depenses: 900 }), mois('2026-06'));
+    expect(r.statut).not.toBe('refuse');
+    if (r.statut === 'refuse') throw new Error(r.motif);
+    expect(r.valeur.capacite).toBeLessThan(0);
+  });
+
+  // Le mois COURANT est constaté, pas projeté : il ne s'abstient pas.
+  it('ne s’abstient pas sur le mois courant sans encaissement', () => {
+    const r = capaciteDuMois(entree('2026-06', { encaisse: 0, depenses: 120 }), mois('2026-06'));
+    expect(r.statut).not.toBe('refuse');
+    if (r.statut === 'refuse') throw new Error(r.motif);
+    expect(r.valeur.capacite).toBe(-120);
   });
 });

@@ -757,3 +757,111 @@ Le troisième onglet du handoff, **« Compte pro & banque »**, n'est pas dans
 Outils : l'import de relevé vit dans Achats. Le déplacer est un arbitrage
 d'architecture de l'information, pas un défaut de cet écran — et il touche
 deux écrans, donc il n'appartient pas à ce lot.
+
+---
+
+## 12. Lot Q (29/08) — la facture se voit pendant qu'on l'écrit
+
+### 12.1 Ce que le handoff demandait
+
+`pilote-nouvelle-facture` pose le même atelier que le CRA : client, numéro et
+période en haut à gauche, les lignes de prestation éditables en dessous, le
+total HT en pied de colonne — et l'aperçu du document à droite, vivant. Le
+pied porte `Enregistrer brouillon · Imprimer · Télécharger le PDF`.
+
+### 12.2 Ce qui est livré
+
+* L'**aperçu vivant**. Le document ne s'affichait qu'APRÈS l'émission : on
+  remplissait à l'aveugle, on émettait — geste irréversible, une facture
+  irrégulière ne se corrige pas —, et on découvrait ensuite ce qu'on venait de
+  produire. C'est le seul écart de fond avec le handoff, et il est corrigé.
+* Le **document sur la feuille partagée** (`documents/DocumentFacture`), la
+  même que le compte rendu d'activité, et la même que le fichier téléchargé
+  emporte. Un module CSS ne voyage pas : ses noms de classes sont hachés.
+* **Imprimer** et **Télécharger** à trois endroits : sur le brouillon, sur la
+  facture émise, et sur une facture rééditée depuis le livre des recettes.
+* Le **bandeau « brouillon »**, qui part avec le fichier.
+* Les **deux montants** — HT, TVA, net à payer — réclamés en toutes lettres.
+* L'action rapide **« Télécharger une facture »** sur le Pilote, qui mène au
+  facturier : télécharger, c'est reprendre une facture déjà émise, et le
+  facturier est le seul écran qui les liste.
+
+### 12.3 Les écarts assumés
+
+| Écart au handoff | Motif |
+|---|---|
+| Ce n'est pas une **modale** mais un écran | Le facturier est un écran à part entière chez nous, là où le handoff en fait un onglet d'Activité. Changer cela relève du choix de rail (§ le bilan visuel), pas de ce lot. La disposition, elle, est celle du handoff |
+| Pas de bouton **« Enregistrer brouillon »** | Il n'enregistre rien dans le handoff. Chez nous un brouillon se télécharge et s'imprime ; le conserver dans les faits demanderait de stocker les lignes, ce que le schéma refuse aujourd'hui — voir 12.5 |
+
+### 12.4 L'extraction que le budget a imposée
+
+L'ajout d'**une seule** action rapide a fait dépasser le paquet d'entrée :
+80,12 Ko pour un plafond de 80. L'invariant n°7 dit d'extraire, pas de
+relever — cinq écritures ont donc quitté le magasin pour
+`state/ecritures.carnet` : celles du carnet (ajout, modification, suppression
+d'un client, suppression d'une mission) et l'import de relevé. Leurs gardes
+emportaient `calculs/carnet` et `calculs/banque` dans le premier rendu, pour
+des écrans chargés à la demande. **77,09 Ko** après extraction.
+
+Deux solutions plus rapides ont été écartées, et il faut dire pourquoi :
+
+* **déplacer les gardes dans les écrans** aurait rapporté les mêmes octets, et
+  échangé un invariant contre un budget : un second point d'entrée — un
+  import, une restauration de sauvegarde — serait passé à côté du contrôle, et
+  le carnet aurait accepté deux clients homonymes ;
+* **ouvrir un second magasin** aurait donné deux copies des faits, qui
+  divergent à la première écriture.
+
+`verifier-cablage` lit désormais aussi les modules d'écriture. Sans cela, un
+déplacement de fichier aurait suffi à faire sortir cinq écritures du contrôle
+— précisément le défaut que ce script existe pour rendre impossible.
+
+### 12.5 Ce que ce lot laisse ouvert
+
+**Les lignes d'une facture ne sont pas conservées.** Une facture rééditée
+depuis le livre des recettes se rétablit en UNE désignation, et l'écran le dit.
+C'est défendable — le livre porte ce qui compte fiscalement — mais une facture
+est un document que l'on doit pouvoir reproduire à l'identique pendant dix ans.
+Les conserver serait un schéma 18, et un lot à soi seul.
+
+---
+
+## 13. Lot R — les graphes de l'écran Argent
+
+Le bilan visuel relevait cinq causes à « les graphes ne ressemblent pas au
+handoff et sont moins bien ». Voici ce qu'elles sont devenues après mesure —
+deux d'entre elles n'existaient pas.
+
+| Écart annoncé | Après vérification |
+|---|---|
+| Les mois vides mangent la moitié de la largeur | **Faux.** Le graphe de CA borne déjà au mois courant (`slice(0, indexCourant + 1)`). Ce qu'on prenait pour des mois vides, ce sont janvier et février réellement à zéro dans le jeu de démonstration |
+| Barres fines et à angle droit | **Vrai, corrigé.** 11 px → 14 px, rayon 2 px → 4 px, valeurs relevées dans la feuille du handoff |
+| Le tracé ne remplit pas la hauteur de sa carte | **Vrai en partie.** La bande passe de 175 à 200 px, comme le handoff. Le vide RESTANT sous la carte est un écart de hauteur entre les deux colonnes du rang, documenté au §13.2 |
+| La colonne de droite se vide | **Inversé.** C'est la colonne de GAUCHE qui se termine plus tôt : la composition est plus riche chez nous que dans le handoff |
+| Sept mois hachurés à `−0,1 k€` | **Vrai, corrigé à la source.** Voir §13.1 |
+
+### 13.1 La correction qui compte
+
+Un mois **à venir** dont rien n'est encore attendu n'a pas une capacité
+négative : il n'a pas de capacité. `capaciteDuMois` s'abstient, et la colonne
+porte un tiret avec son motif — désormais en texte, et non dans un `title` que
+seule la souris atteignait.
+
+La règle distingue trois cas, et c'est ce qui la rend juste : un mois **vécu**
+garde son négatif (c'est un fait), un mois **à venir qui attend un
+encaissement** aussi (il repose sur quelque chose), et le **mois courant** est
+constaté, donc ne s'abstient jamais.
+
+### 13.2 Deux choses délibérément non corrigées
+
+**Le graphe de trésorerie garde ses `−100 €` projetés.** Le symptôme ressemble
+à celui du §13.1 ; la cause est l'inverse. Ici le nombre vient d'une hypothèse
+ÉCRITE À L'ÉCRAN — « dépenses courantes : 100 € par mois, moyenne des six
+derniers mois » — et chaque colonne porte le mot « prévu ». Corriger reviendrait
+à masquer une prévision juste.
+
+**Le vide sous le graphe de CA.** `align-items: stretch` a été essayé et
+repoussé : le vide passe alors dans la carte, au-dessus des barres, et se lit
+comme un chargement inachevé. L'alternative — des barres qui s'étirent à la
+hauteur reçue — empêcherait la ligne d'objectif de se poser sur la même échelle
+sans mesurer le conteneur en JavaScript. Un repère faux coûte plus qu'un vide.

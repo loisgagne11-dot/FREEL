@@ -19,15 +19,11 @@
 import { create } from 'zustand';
 import { type DateISO, type Euros, type Mois, type Ratio, euros, ratio } from '../domain/types';
 import {
-  CLE_STOCKAGE, PART_GARDEE_MAX, type Client, type Depense, type Entreprise,
+  CLE_STOCKAGE, PART_GARDEE_MAX, type Depense, type Entreprise,
   type Faits, type Mission, type Recette, faitsVides, motifRefusFaits
 } from './schema';
-import {
-  nomAPropager, peutSupprimerClient, peutSupprimerMission, validerNomClient
-} from '../domain/calculs/carnet';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import { ecritureDAnnulation, prochainNumero } from '../domain/calculs/ecritureRecette';
-import { importerMouvements } from '../domain/calculs/banque';
 import type { MotifSansContrepartie } from '../domain/calculs/banque';
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
@@ -194,16 +190,9 @@ interface MagasinFaits {
 
   /* ── Relevé bancaire ──────────────────────────────────────────────────── */
 
-  /**
-   * Ajoute les opérations d'un relevé.
-   *
-   * Idempotent : réimporter un relevé qui chevauche le précédent — le cas
-   * ordinaire — n'ajoute que ce qui manque et ne double pas le solde. Rend le
-   * nombre d'opérations ajoutées et le nombre déjà connues.
-   */
-  readonly importerReleve: (
-    lignes: readonly { readonly date: DateISO; readonly libelle: string; readonly montant: Euros }[]
-  ) => { readonly ajoutes: number; readonly deja: number };
+  /* `importerReleve` a migré dans `ecritures.carnet` : elle emportait
+     `calculs/banque` dans le paquet d'entrée pour un écran chargé à la
+     demande. Voir l'en-tête de ce module. */
 
   /**
    * Rattache un mouvement à une écriture — ou le détache avec `null`.
@@ -451,36 +440,29 @@ interface MagasinFaits {
 
   /* ── Carnet : clients et missions ─────────────────────────────────────── */
 
-  /**
-   * Ajoute un client. Rend le motif du refus, ou `null`.
-   *
-   * Le nom est contrôlé par le domaine : il sert de clé de rattachement, donc
-   * il ne peut être ni vide ni homonyme d'un client existant.
-   */
-  readonly ajouterClient: (saisie: Omit<Client, 'id'>) => string | null;
-
-  /**
-   * Modifie un client, en PROPAGEANT un éventuel renommage.
-   *
-   * Missions et recettes rattachées suivent, dans la même écriture. Sans cela,
-   * renommer « Dupont » en « Dupont SARL » laisserait derrière lui des recettes
-   * attachées à un nom que plus aucun client ne porte : elles sortiraient des
-   * délais de paiement et de la déclaration européenne de services sans que
-   * rien ne le signale.
-   */
-  readonly modifierClient: (
-    id: string, modification: Partial<Omit<Client, 'id'>>
-  ) => string | null;
-
-  /** Supprime un client, si rien ne lui est rattaché. */
-  readonly supprimerClient: (id: string) => string | null;
+  /* Les écritures du CARNET — ajout, modification, suppression d'un client,
+     suppression d'une mission — ont migré dans `ecritures.carnet` : leurs
+     gardes emportaient `calculs/carnet` dans le paquet d'entrée pour un écran
+     chargé à la demande. Elles n'ont pas changé, seulement de fichier. */
 
   readonly ajouterMission: (saisie: Omit<Mission, 'id'>) => string;
   readonly modifierMission: (
     id: string, modification: Partial<Omit<Mission, 'id'>>
   ) => void;
-  /** Supprime une mission, si aucune recette de son client ne relève de sa période. */
-  readonly supprimerMission: (id: string) => string | null;
+}
+
+/**
+ * Pose un état de faits ET le persiste, en une seule opération.
+ *
+ * Exportée pour `ecritures.carnet`, qui porte les écritures sorties du
+ * magasin pour ne plus peser sur le premier rendu (voir son en-tête). C'est
+ * la SEULE porte vers le disque : une écriture qui appellerait `setState`
+ * sans elle laisserait l'état en mémoire et le compte inchangé au rechargement
+ * — le pire des deux mondes, puisque tout aurait eu l'air de marcher.
+ */
+export function ecrireFaits(faits: Faits): void {
+  useFaits.setState({ faits });
+  persister(stockageActif, faits);
 }
 
 /**
@@ -808,15 +790,6 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     get().modifierDepense(id, { rapprochement: etat });
   },
 
-  importerReleve: (lignes) => {
-    const actuel = get().faits;
-    const resultat = importerMouvements(actuel.mouvementsBancaires, lignes);
-    const faits: Faits = { ...actuel, mouvementsBancaires: resultat.mouvements };
-    set({ faits });
-    persister(stockageActif, faits);
-    return { ajoutes: resultat.ajoutes, deja: resultat.deja };
-  },
-
   rapprocherMouvement: (mouvementId, ecritureId) => {
     const actuel = get().faits;
     const faits: Faits = {
@@ -841,71 +814,6 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     };
     set({ faits });
     persister(stockageActif, faits);
-  },
-
-  ajouterClient: (saisie) => {
-    const actuel = get().faits;
-    const refus = validerNomClient(saisie.nom, actuel.clients);
-    if (refus !== null) return refus.message;
-
-    const client: Client = {
-      ...saisie,
-      nom: saisie.nom.trim(),
-      id: `cli-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-    };
-    const faits: Faits = { ...actuel, clients: [...actuel.clients, client] };
-    set({ faits });
-    persister(stockageActif, faits);
-    return null;
-  },
-
-  modifierClient: (id, modification) => {
-    const actuel = get().faits;
-    const existant = actuel.clients.find((c) => c.id === id);
-    if (existant === undefined) return 'Client introuvable.';
-
-    if (modification.nom !== undefined) {
-      const refus = validerNomClient(modification.nom, actuel.clients, id);
-      if (refus !== null) return refus.message;
-    }
-
-    const nouveauNom = modification.nom === undefined
-      ? null
-      : nomAPropager(existant.nom, modification.nom);
-
-    const clients = actuel.clients.map((c) =>
-      (c.id === id ? { ...c, ...modification, nom: nouveauNom ?? c.nom } : c));
-
-    // La propagation est faite ici, dans la même écriture que la modification :
-    // un renommage à moitié appliqué serait pire que pas de renommage du tout.
-    const faits: Faits = nouveauNom === null
-      ? { ...actuel, clients }
-      : {
-        ...actuel,
-        clients,
-        missions: actuel.missions.map((m) =>
-          (m.clientNom === existant.nom ? { ...m, clientNom: nouveauNom, clientId: id } : m)),
-        recettes: actuel.recettes.map((r) =>
-          (r.clientNom === existant.nom ? { ...r, clientNom: nouveauNom } : r))
-      };
-
-    set({ faits });
-    persister(stockageActif, faits);
-    return null;
-  },
-
-  supprimerClient: (id) => {
-    const actuel = get().faits;
-    const existant = actuel.clients.find((c) => c.id === id);
-    if (existant === undefined) return 'Client introuvable.';
-
-    const refus = peutSupprimerClient(existant.nom, actuel.missions, actuel.recettes);
-    if (refus !== null) return refus.message;
-
-    const faits: Faits = { ...actuel, clients: actuel.clients.filter((c) => c.id !== id) };
-    set({ faits });
-    persister(stockageActif, faits);
-    return null;
   },
 
   ajouterMission: (saisie) => {
@@ -935,20 +843,6 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     };
     set({ faits });
     persister(stockageActif, faits);
-  },
-
-  supprimerMission: (id) => {
-    const actuel = get().faits;
-    const existante = actuel.missions.find((m) => m.id === id);
-    if (existante === undefined) return 'Mission introuvable.';
-
-    const refus = peutSupprimerMission(existante, actuel.recettes);
-    if (refus !== null) return refus.message;
-
-    const faits: Faits = { ...actuel, missions: actuel.missions.filter((m) => m.id !== id) };
-    set({ faits });
-    persister(stockageActif, faits);
-    return null;
   },
 
   remplacerParBundle: async (bundle) => {

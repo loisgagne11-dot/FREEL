@@ -90,6 +90,11 @@ const VUES = [
    * où on va le chercher a bougé.
    */
   { hash: '#/facture', nom: 'activite-factures' },
+  /* La rédaction, avec son aperçu vivant : elle s'apparie à
+     `pilote-nouvelle-facture` du handoff. L'écran n'est pas une modale chez
+     nous — le facturier est un écran à part entière —, mais c'est le même
+     atelier : saisie à gauche, document à droite. */
+  { hash: '#/facture/nouvelle', nom: 'pilote-nouvelle-facture' },
   { hash: '#/activite', nom: 'activite-clients', ouvrir: ['Clients'] },
   /* La composition d'un chiffre, panneau ouvert.
      Une vue à part, et non un détail de l'écran Pilote : le panneau ne s'ouvre
