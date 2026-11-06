@@ -96,12 +96,14 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-around;
-  gap: 2px;
+  /* 12 px entre les mois, comme le handoff. À 2 px les colonnes se touchaient
+     et le graphe se lisait comme un bloc continu plutôt que comme douze mois. */
+  gap: 12px;
   /* `flex: 1` : le tracé prend toute la hauteur que la carte reçoit du rang, et
      les colonnes restent collées en bas. La bande des barres, elle, garde sa
      hauteur fixe — voir `.barres`. */
   flex: 1 1 auto;
-  min-height: 210px;
+  min-height: 235px;
   min-width: 0;
 }
 
@@ -168,20 +170,35 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 3px;
+  /* 4 px entre les deux barres d'un même mois, comme le handoff : à 3 px, les
+     deux séries se touchaient presque et se lisaient comme une seule barre
+     bicolore. */
+  gap: 4px;
   width: 100%;
-  height: 175px;
+  height: 200px;
   min-width: 0;
 }
 
+/* Épaisseur et arrondi RELEVÉS sur la feuille du handoff (`.cabars .grp i` :
+   14 px, rayon 4 px) et non estimés à l'œil. Les nôtres étaient à 11 px et
+   2 px : le contrôle visuel les a trouvées fines et carrées à côté de la
+   référence, et c'est la seule différence qui restait sur ce graphe. */
 .barreRealise,
 .barreEncaisse,
 .barreCapacite {
   display: block;
-  width: 11px;
+  width: 14px;
   max-width: 40%;
-  border-radius: 2px 2px 0 0;
-  min-height: 1px;
+  border-radius: 4px 4px 0 0;
+  /*
+   * ZÉRO NE DESSINE RIEN.
+   *
+   * Le handoff pose `min-height: 4px`, qui donne un moignon même à zéro. Un
+   * mois sans chiffre d'affaires afficherait alors une barre minuscule, qui se
+   * lit « un petit peu » plutôt que « rien ». L'étiquette au-dessus dit déjà
+   * « 0 » ; le tracé se tait.
+   */
+  min-height: 0;
 }
 
 .barreRealise { background: var(--blue); }
@@ -191,18 +208,25 @@
    couleur, et une barre pleine ne pourrait pas en contenir un second. */
 .barreCapacite {
   position: relative;
-  width: 22px;
+  /* 30 px de large et 6 px de rayon, relevés sur `.capbars .track` du handoff.
+     Une barre de capacité est plus large qu'une barre de série : elle en
+     contient une seconde, et à 22 px le plein n'avait pas la place de se
+     distinguer de son contour. */
+  width: 100%;
+  max-width: 30px;
+  border-radius: 6px 6px 0 0;
   border: 1px solid var(--line-2);
   background: var(--panel-2);
   display: flex;
   align-items: flex-end;
+  /* Le plein suit l'arrondi du contour au lieu de le déborder en angle droit. */
+  overflow: hidden;
 }
 
 .barreVerse {
   display: block;
   width: 100%;
   background: var(--green);
-  border-radius: 1px;
 }
 
 /* Le futur est hachuré : il ne se remplit jamais. Les rayures viennent d'un

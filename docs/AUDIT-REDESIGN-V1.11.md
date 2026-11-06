@@ -823,3 +823,45 @@ depuis le livre des recettes se rétablit en UNE désignation, et l'écran le di
 C'est défendable — le livre porte ce qui compte fiscalement — mais une facture
 est un document que l'on doit pouvoir reproduire à l'identique pendant dix ans.
 Les conserver serait un schéma 18, et un lot à soi seul.
+
+---
+
+## 13. Lot R — les graphes de l'écran Argent
+
+Le bilan visuel relevait cinq causes à « les graphes ne ressemblent pas au
+handoff et sont moins bien ». Voici ce qu'elles sont devenues après mesure —
+deux d'entre elles n'existaient pas.
+
+| Écart annoncé | Après vérification |
+|---|---|
+| Les mois vides mangent la moitié de la largeur | **Faux.** Le graphe de CA borne déjà au mois courant (`slice(0, indexCourant + 1)`). Ce qu'on prenait pour des mois vides, ce sont janvier et février réellement à zéro dans le jeu de démonstration |
+| Barres fines et à angle droit | **Vrai, corrigé.** 11 px → 14 px, rayon 2 px → 4 px, valeurs relevées dans la feuille du handoff |
+| Le tracé ne remplit pas la hauteur de sa carte | **Vrai en partie.** La bande passe de 175 à 200 px, comme le handoff. Le vide RESTANT sous la carte est un écart de hauteur entre les deux colonnes du rang, documenté au §13.2 |
+| La colonne de droite se vide | **Inversé.** C'est la colonne de GAUCHE qui se termine plus tôt : la composition est plus riche chez nous que dans le handoff |
+| Sept mois hachurés à `−0,1 k€` | **Vrai, corrigé à la source.** Voir §13.1 |
+
+### 13.1 La correction qui compte
+
+Un mois **à venir** dont rien n'est encore attendu n'a pas une capacité
+négative : il n'a pas de capacité. `capaciteDuMois` s'abstient, et la colonne
+porte un tiret avec son motif — désormais en texte, et non dans un `title` que
+seule la souris atteignait.
+
+La règle distingue trois cas, et c'est ce qui la rend juste : un mois **vécu**
+garde son négatif (c'est un fait), un mois **à venir qui attend un
+encaissement** aussi (il repose sur quelque chose), et le **mois courant** est
+constaté, donc ne s'abstient jamais.
+
+### 13.2 Deux choses délibérément non corrigées
+
+**Le graphe de trésorerie garde ses `−100 €` projetés.** Le symptôme ressemble
+à celui du §13.1 ; la cause est l'inverse. Ici le nombre vient d'une hypothèse
+ÉCRITE À L'ÉCRAN — « dépenses courantes : 100 € par mois, moyenne des six
+derniers mois » — et chaque colonne porte le mot « prévu ». Corriger reviendrait
+à masquer une prévision juste.
+
+**Le vide sous le graphe de CA.** `align-items: stretch` a été essayé et
+repoussé : le vide passe alors dans la carte, au-dessus des barres, et se lit
+comme un chargement inachevé. L'alternative — des barres qui s'étirent à la
+hauteur reçue — empêcherait la ligne d'objectif de se poser sur la même échelle
+sans mesurer le conteneur en JavaScript. Un repère faux coûte plus qu'un vide.
