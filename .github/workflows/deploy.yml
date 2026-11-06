@@ -54,7 +54,7 @@ jobs:
       # la racine du dépôt telle quelle : celle-ci contient désormais app/ avec
       # ses node_modules et ses sources, qui n'ont rien à faire en ligne.
       #
-      # Coexistence des deux versions (cf. docs/PLAN-REFONTE.md) :
+      # Coexistence des deux versions (cf. docs/archives/PLAN-REFONTE.md) :
       #   /            l'application actuelle, inchangée
       #   /v2/         la nouvelle, en construction
       # À la bascule, la nouvelle passera à la racine et l'ancienne sous

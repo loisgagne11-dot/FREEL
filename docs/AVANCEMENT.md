@@ -1,13 +1,10 @@
 # État d'avancement — reprise de session
 
-**Ce fichier est le point d'entrée de toute nouvelle session.** Il se lit en
-premier, avant tout autre document. Il est mis à jour à chaque fin de lot de
-travail. Si son contenu contredit un autre document, c'est lui qui fait foi
-sur l'état d'avancement — les autres font foi sur les décisions.
-
-**Dernière mise à jour** : 13 août 2026
-**Branche de travail** : `claude/orchestration-redesign-screens-0ee3sz`, repartie de `main`
-**Schéma des faits** : **v6**
+> **L'état d'avancement fait désormais foi dans [`LISTE-DE-SORTIE.md`](./LISTE-DE-SORTIE.md)** :
+> ce qui reste avant de dire « l'application est finie » y est, et nulle part ailleurs.
+> Ce fichier garde l'historique (§0 à §4), les invariants (§2), les conventions
+> (§6) et les commandes (§7), qui restent la référence. Ses repères chiffrés
+> (tests, schéma, branche) datent du 13 août 2026 et ne sont plus à jour.
 
 Les PR #245 à #264 sont **mergées et closes** : elles ne peuvent plus porter de
 travail, toute suite donne lieu à une nouvelle PR. Tout ce qu'elles contiennent
@@ -161,10 +158,10 @@ c'est-à-dire d'inventer un lien.
 | Ordre | Document | Ce qu'il apporte |
 |---|---|---|
 | 1 | **ce fichier** | Où on en est, quoi faire ensuite |
-| 2 | [`PLAN-REFONTE.md`](./PLAN-REFONTE.md) | Les 6 décisions arbitrées (D1–D6), le barème par périodes, les 7 jalons |
+| 2 | [`PLAN-REFONTE.md`](./archives/PLAN-REFONTE.md) | Les 6 décisions arbitrées (D1–D6), le barème par périodes, les 7 jalons |
 | 3 | [`AUDIT-REDESIGN-V1.11.md`](./AUDIT-REDESIGN-V1.11.md) | Le diagnostic complet |
 | 3 bis | [`AUDIT-ANCIENNE-VS-NOUVELLE.md`](./AUDIT-ANCIENNE-VS-NOUVELLE.md) | **Ce qui manque encore**, fonction par fonction, avec l'ordre de traitement proposé |
-| 3 ter | [`PLAN-PERFORMANCE-ET-DESIGN.md`](./PLAN-PERFORMANCE-ET-DESIGN.md) | Où en sont la **vitesse** et la **conformité au handoff**, ce qui est mesuré, ce qui ne l'est pas, et dans quel ordre s'y prendre |
+| 3 ter | [`PLAN-PERFORMANCE-ET-DESIGN.md`](./archives/PLAN-PERFORMANCE-ET-DESIGN.md) | Où en sont la **vitesse** et la **conformité au handoff**, ce qui est mesuré, ce qui ne l'est pas, et dans quel ordre s'y prendre |
 | 4 | [`design/03-design-system.md`](./design/03-design-system.md) et [`design/05-spec-ecrans.md`](./design/05-spec-ecrans.md) | **Les deux spécifications qui font foi sur le visuel** : tokens, composants, et écran par écran ce qui doit s'y trouver |
 | 5 | [`design/handoff-v1.11/`](./design/handoff-v1.11/) | **La source** : les prototypes eux-mêmes, plus `annexe-architecture-build5.md` (les deux stores, les règles de calcul, le vocabulaire). Lire d'abord son [`PROVENANCE.md`](./design/handoff-v1.11/PROVENANCE.md) |
 | 6 | le code lui-même | Les six écrans sont écrits ; leurs en-têtes portent le *pourquoi* de chaque choix |
@@ -519,7 +516,7 @@ for a in <actions>; do grep -rl "\b$a\b" src/ui --include=*.tsx; done
       annonçait un « comparateur micro-BNC vs déclaration contrôlée » en lui
       attachant la date du 30/09. Les deux ne vont pas ensemble : le 30
       septembre est la date limite de l'option pour le **versement
-      libératoire** (`PLAN-REFONTE.md`, tableau des dates, le dit
+      libératoire** (`archives/PLAN-REFONTE.md`, tableau des dates, le dit
       correctement), pas de l'option pour la déclaration contrôlée, qui a son
       propre calendrier. Le journal avait dérivé, et il aurait fait travailler
       sur le mauvais sujet — ou pire, agir sur le mauvais.

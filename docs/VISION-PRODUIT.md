@@ -134,7 +134,7 @@ Relevé dans le code au 14/08, pas supposé.
 
 ## Ce que cela change dans l'ordre de travail
 
-Les deux inventaires de conformité (`PLAN-CONFORMITE-100.md`) mesuraient l'écart
+Les deux inventaires de conformité (`archives/PLAN-CONFORMITE-100.md`) mesuraient l'écart
 à une maquette et à une ancienne application. Ils restent valables, mais **ils
 ne classaient pas par valeur d'usage**. Cet énoncé le fait, et il déplace
 l'ordre :

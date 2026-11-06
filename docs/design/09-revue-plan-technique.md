@@ -1,6 +1,6 @@
 # Revue du plan de refonte — second avis d'architecte
 
-**Objet** : `docs/PLAN-REFONTE.md` (27 juillet 2026)
+**Objet** : `docs/archives/PLAN-REFONTE.md` (27 juillet 2026)
 **Auteur de la revue** : même architecte que `07-critique-technique.md`
 **Convention** : `[V]` = vérifié par lecture directe du code pendant cette revue, avec citation `index.html:ligne` · `[R]` = repris d'un rapport amont · `[H]` = jugement d'architecte assumé comme tel.
 
