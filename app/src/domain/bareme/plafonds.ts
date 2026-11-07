@@ -14,21 +14,20 @@
  * connue avec confiance haute : 2023-2025), pas annuellement — d'où une
  * table à deux lignes plutôt qu'une par an.
  *
- * ⚠️ CONFIANCE SUR LA PÉRIODE 2026 : MOYENNE-BASSE, à vérifier avant tout
- * affichage engageant. Les valeurs 83 600 € / 203 100 € étaient portées par
- * l'ancienne application, étiquetées « loi de finances 2026 », mais elles
- * n'ont pas pu être recoupées à la source (impots.gouv.fr / texte de la
- * LF 2026) au moment d'écrire ce fichier — urssaf.fr renvoie 503 sur ses
- * pages de barème. Elles sont plausibles en ordre de grandeur (proches d'une
- * revalorisation à l'inflation de 77 700 / 188 700) mais NE DOIVENT PAS être
- * traitées comme acquises pour un calcul qui engage l'utilisateur avant
- * vérification.
+ * Les plafonds 2026 (83 600 € / 203 100 €, arrêté du 27/01/2026) sont
+ * confirmés pour 2026-2028 (vérifié le 07/11/2026).
+ *
+ * L'année de création, le plafond est proratisé : plafond × jours d'existence
+ * dans l'année / 365 (exemple officiel : 203 100 × 335 / 365 = 186 407 €,
+ * fiche F23267 vérifiée le 13/05/2026). Le plein plafond à une entreprise
+ * créée en octobre lui laisserait trois mois pour un seuil pensé pour douze.
  */
 
 import {
   type DateISO, type Euros, type Mois, type Resolution, type TypeActivite,
   dateISO, estUtilisable, euros, mois
 } from '../types';
+import { JOURS_PRORATA, joursDActivite } from './tva';
 
 export interface PeriodePlafond {
   readonly du: Mois;
@@ -59,15 +58,14 @@ export const PERIODES_PLAFONDS: readonly PeriodePlafond[] = [
   p(
     '2023-01', '2025-12',
     77700, 188700, 77700,
-    'Ancienne application, confiance HAUTE (corroboré par l\'audit comptable §3 pour 2023-2025)',
-    '2026-07-27'
+    'https://entreprendre.service-public.gouv.fr/vosdroits/F23267',
+    '2026-11-07'
   ),
   p(
     '2026-01', null,
     83600, 203100, 83600,
-    'Ancienne application, étiqueté « loi de finances 2026 » — confiance MOYENNE-BASSE, '
-      + 'NON confirmé à la source (impots.gouv.fr / texte de la LF 2026) à la date de vérification',
-    '2026-07-27'
+    'arrêté du 27/01/2026, https://entreprendre.service-public.gouv.fr/actualites/A18813',
+    '2026-11-07'
   )
 ];
 
@@ -84,7 +82,21 @@ const derniere = (): PeriodePlafond | undefined => PERIODES_PLAFONDS[PERIODES_PL
  * on extrapole vers le futur (le plafond en vigueur le reste jusqu'à
  * publication du suivant), jamais vers le passé.
  */
-export function plafondMicro(m: Mois, type: TypeActivite): Resolution<Euros> {
+export function plafondMicro(
+  m: Mois,
+  type: TypeActivite,
+  debutActivite: DateISO | null = null
+): Resolution<Euros> {
+  const r = plafondDuMois(m, type);
+  // Date inconnue : plafond plein, comme `seuilsTvaPourAnnee` — pas de
+  // pénalisation inventée sur une date qu'on ne connaît pas.
+  if (r.statut === 'refuse' || debutActivite === null
+      || Number(debutActivite.slice(0, 4)) !== Number(m.slice(0, 4))) return r;
+  const prorate = euros(Math.round((r.valeur * joursDActivite(debutActivite, Number(m.slice(0, 4)))) / JOURS_PRORATA));
+  return { ...r, valeur: prorate };
+}
+
+function plafondDuMois(m: Mois, type: TypeActivite): Resolution<Euros> {
   const couvrante = periodePlafondPour(m);
   if (couvrante) {
     return {
@@ -129,9 +141,10 @@ export function plafondMicro(m: Mois, type: TypeActivite): Resolution<Euros> {
 export function depasseLePlafond(
   caEncaisseAnnee: Euros,
   m: Mois,
-  type: TypeActivite
+  type: TypeActivite,
+  debutActivite: DateISO | null = null
 ): Resolution<boolean> {
-  const plafondR = plafondMicro(m, type);
+  const plafondR = plafondMicro(m, type, debutActivite);
   if (!estUtilisable(plafondR)) return plafondR;
 
   const depasse = caEncaisseAnnee > plafondR.valeur;

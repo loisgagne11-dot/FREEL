@@ -351,3 +351,15 @@ chiffre faux.
 | Recherche globale | ✅ | Voir `createSearchOverlay` |
 | Liste des factures | 🟢 | Onglet « Factures » d'Activité (rail du handoff) ; les anciennes adresses y mènent |
 
+## Lot 7 (07/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Synchronisation avec le compte | 🟢 | Une coupure réseau ne déconnecte plus (seul un refus 400/401 périme la session) ; 15 s au plus par requête ; une adresse en http est refusée à la saisie, avec le motif |
+| Import de relevé CSV | 🟢 | « 1e5 » et « 12abc » ne sont plus lus comme des montants : la ligne est écartée et nommée ; un libellé cité sur plusieurs lignes reste un seul libellé |
+| Impression, téléchargement | 🟢 | Cadre d'impression isolé et retiré après l'impression ; l'URL d'un export n'est plus révoquée avant que le navigateur l'ait lue |
+| Sécurité du contenu | 🆕 | Politique CSP sans script en ligne non déclaré — l'ancienne n'en avait aucune |
+| Autoliquidation de la TVA (franchise) | 🟢 | Montant corrigé (base × 20 %) ; libellé juste selon le régime |
+| ACRE, IR 2025, plafond du micro | 🟢 | Voir l'inventaire des indicateurs, lot 7 |
+| Brouillon de la facture du mois | 🟢 | Suit le mois de la barre du haut |
+

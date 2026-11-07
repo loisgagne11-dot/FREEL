@@ -15,12 +15,8 @@
  * changement survient, la règle est la même que pour `urssaf.ts` — AJOUTER
  * une période, ne jamais modifier celle-ci après coup.
  *
- * Confiance : haute pour BNC (34 %), corroborée par l'audit comptable
- * (`docs/audit/06-critique-comptable.md` §3). Moyenne-haute pour BIC_vente
- * (71 %) et BIC_service (50 %) : ce sont les valeurs de connaissance
- * générale du régime micro, mais l'audit ne les a pas spécifiquement
- * recoupées à la source — à vérifier sur impots.gouv.fr avant un usage qui
- * engage l'utilisateur.
+ * Confiance haute pour les trois taux et le minimum de 305 € : recoupés à la
+ * fiche F23267 le 07/11/2026 (BIC compris).
  */
 
 import {
@@ -53,9 +49,8 @@ export const PERIODES_ABATTEMENT: readonly PeriodeAbattement[] = [
   p(
     '2024-01', null,
     0.34, 0.71, 0.50,
-    'Connaissance générale du régime micro (BNC recoupé par l\'audit comptable §3 ; '
-      + 'BIC_vente et BIC_service non recoupés spécifiquement — à vérifier impots.gouv.fr)',
-    '2026-07-27'
+    'https://entreprendre.service-public.gouv.fr/vosdroits/F23267',
+    '2026-11-07'
   )
 ];
 
@@ -64,7 +59,7 @@ export const PERIODES_ABATTEMENT: readonly PeriodeAbattement[] = [
  * 34/50/71 % des recettes de la période sont inférieurs à ce montant,
  * l'abattement retenu est 305 € et non le pourcentage calculé.
  *
- * Confiance haute (corroborée par l'audit §3). Traité hors de la table par
+ * Source F23267, vérifiée le 07/11/2026. Traité hors de la table par
  * période — et non comme une donnée par activité — car c'est une règle
  * simple et indépendante du type d'activité ; si elle venait à changer, elle
  * devrait migrer vers une table par période comme les taux ci-dessus.

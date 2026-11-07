@@ -613,3 +613,16 @@ solde − provisions − réserve.
 | Compteur « à traiter » de « Facturer » | Rail | Sur l'entrée « Facturer » | Additionné sur « Activité », où vit la liste des factures |
 | Montant d'une facture, d'une dépense | Recherche ⌘K | — | Au centime ; « 1200 » retrouve 1 200,50 € |
 | Livre des recettes | Export CSV | — | Montants à virgule décimale, annulations en nombres négatifs, TVA inconnue laissée VIDE (pas « 0,00 ») |
+
+## Lot 7 (07/11) — finitions
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| TVA à autoliquider | Achats | Tirée d'un TTC : 16,67 € pour 100 € facturés par un prestataire de l'UE | Base × 20 % : 20 € (art. 283-2 du CGI) |
+| Cotisations sous ACRE | Provisions, versable, Argent | 50 % du taux, quelle que soit la date de création | 50 % pour un début avant le 01/07/2026, 75 % à partir de cette date (décret 2026-69) |
+| Impôt de l'activité 2026 | Provisions, comparateur | Hypothèse sur le barème des revenus 2024 | Hypothèse sur le barème des revenus 2025, publié (tranches et décote) |
+| Plafond du micro | Argent, « à traiter » | Plafond plein l'année de création | Proratisé aux jours d'activité (203 100 × 335 / 365 = 186 407 €) |
+| Parts des provisions | Argent → enveloppes, composition | Arrondies une à une : 1 à 2 centimes d'écart avec le total | Retombent exactement sur le total |
+| Montants en k€ | Graphes d'Argent | Deux arrondis (« 11 k€ » pour douze mois entre 10 500 et 11 400 €) | Une décimale partout au-delà de 1 000 € |
+| Jours de retard | Facturier, relances, DES, rapprochement, « à traiter » | Six calculs ; une date illisible donnait « 0 jour » de retard au facturier | Un seul, en UTC ; une date illisible ne passe plus pour « pas de retard » |
+

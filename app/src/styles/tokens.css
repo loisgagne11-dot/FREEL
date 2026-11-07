@@ -25,7 +25,7 @@
   --tint-3: rgba(196, 214, 196, .07);
   --text: #eef2ec;
   --muted: #8b9489;
-  --muted-2: #646b62;
+  --muted-2: #7d867a;
   --green: #5fd39a;
   --green-lite: #6fdca6;
   --green-deep: #1d6644;
@@ -84,7 +84,7 @@
   --tint-3: rgba(226, 231, 201, .10);
   --text: #eeeade;
   --muted: #a9ab95;
-  --muted-2: #8b8d78;
+  --muted-2: #929480;
   --green: #a3c489;
   --green-lite: #b4d49b;
   --green-deep: #3b4a2c;
@@ -127,7 +127,9 @@
 
 /* ---------- palette CLAIR ---------- */
 [data-theme="clair"] {
-  --bg: #f6f8f6;
+  /* Teinte légère : les cartes (#fff) ne se détachaient pas d'un fond
+     presque blanc, relevé au lot 5. */
+  --bg: #eef2ee;
   --bg-tint: #e7efe9;
   --panel: #ffffff;
   --panel-2: #ffffff;
@@ -139,8 +141,8 @@
   --tint-3: rgba(28, 40, 33, .08);
   --text: #18201c;
   --muted: #5c6862;
-  --muted-2: #69736c;
-  --green: #17845a;
+  --muted-2: #666f68;
+  --green: #167c55;
   --green-lite: #1d9668;
   --green-deep: #d6ebe0;
   --green-glow: rgba(23, 132, 90, .09);
@@ -201,8 +203,8 @@
   --tint-3: rgba(38, 40, 31, .09);
   --text: #26281f;
   --muted: #5f6153;
-  --muted-2: #75776a;
-  --green: #6f8f61;
+  --muted-2: #6b6d61;
+  --green: #59734e;
   --green-lite: #7d9b6f;
   --green-deep: #e2eddb;
   --green-glow: rgba(125, 155, 111, .15);

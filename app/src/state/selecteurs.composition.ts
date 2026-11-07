@@ -100,6 +100,7 @@ function detailProvisionsDe(faits: Faits, maintenant: Date) {
     {
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
+      debutActivite: faits.entreprise.debutActivite,
       // Un taux refusé vaut zéro ici, comme dans `etatPilote` : on ne fabrique
       // pas de taux, et la réserve dira que le total est sous-évalué.
       tauxImpotEtContributions: tauxR.statut === 'refuse' ? 0 : tauxR.valeur,

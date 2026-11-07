@@ -797,7 +797,8 @@ export interface TarifDeLaJournee {
  */
 export function tauxCotisationsAu(faits: Faits, m: Mois): Resolution<number> {
   return tauxCotisations(
-    m, faits.entreprise.typeActivite, sousAcreLe(faits)(m), periodesUrssafEffectives(faits)
+    m, faits.entreprise.typeActivite, sousAcreLe(faits)(m), periodesUrssafEffectives(faits),
+    faits.entreprise.debutActivite
   );
 }
 

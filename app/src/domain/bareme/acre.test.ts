@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mois } from '../types';
-import { PERIODES_ACRE, dernierMoisAcre, moisSousAcre, verifierIntegriteAcre } from './acre';
+import { dateISO, mois } from '../types';
+import { PERIODES_ACRE, exonerationAcre, dernierMoisAcre, moisSousAcre, verifierIntegriteAcre } from './acre';
 
 /** Raccourci de lecture : le dernier mois couvert, ou null si la règle refuse. */
 function fin(debut: string): string | null {
@@ -63,5 +63,32 @@ describe('durée de l\'ACRE — règle trimestrielle datée', () => {
 
   it('la table est saine : pas de trou, pas de chevauchement, une seule période ouverte', () => {
     expect(verifierIntegriteAcre()).toEqual([]);
+  });
+});
+
+describe('exonération ACRE selon la date de début d\'activité', () => {
+  const exo = (debut: string | null) => {
+    const r = exonerationAcre(debut === null ? null : dateISO(debut));
+    return r.statut === 'refuse' ? null : r.valeur;
+  };
+
+  // Un début au 15/06/2026 garde 50 % : l'exonération est acquise à la
+  // création. Appliquer 25 % parce qu'on cotise après juillet ferait payer
+  // trop de cotisations à quelqu'un dont l'exonération est plus large.
+  it('exonère de 50 % un début d\'activité antérieur au 1er juillet 2026', () => {
+    expect(exo('2026-06-15')).toBe(0.5);
+    expect(exo('2026-06-30')).toBe(0.5);
+  });
+
+  // Oublier cette marche ferait provisionner 50 % des cotisations au lieu de
+  // 75 % pour toute création récente : un reste à vivre gonflé de moitié.
+  it('exonère de 25 % un début d\'activité à partir du 1er juillet 2026', () => {
+    expect(exo('2026-07-01')).toBe(0.25);
+    expect(exo('2027-02-10')).toBe(0.25);
+  });
+
+  it('s\'abstient sans date de début, ou avant la plus ancienne règle connue', () => {
+    expect(exo(null)).toBeNull();
+    expect(exo('2020-01-01')).toBeNull();
   });
 });

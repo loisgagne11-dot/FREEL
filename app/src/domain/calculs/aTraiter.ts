@@ -17,6 +17,7 @@
  *     réel ou d'une échéance réelle, jamais d'une appréciation.
  */
 
+import { joursEntre } from '../dates';
 import {
   type DateISO, type Euros, type Mois, type TypeActivite,
   euros, moisDe
@@ -89,6 +90,8 @@ export interface EntreeATraiter {
   readonly periodicite: 'mensuel' | 'trimestriel';
   /** Mois de début d'activité : rien n'est dû avant. */
   readonly debutActivite: Mois | null;
+  /** Date exacte du début : le plafond du micro est proratisé au jour près l'année de création. */
+  readonly debutActiviteLe?: DateISO | null;
   /** Mois depuis lequel la TVA est due d'après les seuils (`null` : jamais, ou inconnu). */
   readonly tvaDueDepuis?: Mois | null;
   /** Factures émises depuis ce mois sans TVA, à un client en France, non annulées. */
@@ -177,9 +180,6 @@ export const SEUILS_PAR_DEFAUT: SeuilsAlerte = {
   partPlafond: 0.85,
   moisFraicheurBareme: 6
 };
-
-const joursEntre = (a: DateISO, b: DateISO): number =>
-  Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 
 /**
  * Décale une date d'un nombre de jours.
@@ -371,7 +371,7 @@ export function sujetsATraiter(
   }
 
   /* ---------- plafond du régime micro ---------- */
-  const plafond = plafondMicro(moisCourant, e.typeActivite);
+  const plafond = plafondMicro(moisCourant, e.typeActivite, e.debutActiviteLe ?? null);
   if (plafond.statut !== 'refuse' && plafond.valeur > 0
       && caAnnee >= plafond.valeur * seuils.partPlafond) {
     sujets.push({

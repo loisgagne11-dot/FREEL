@@ -72,3 +72,4 @@ export function moisTexte(nombre: number | null): string {
 export function formaterJours(jours: number): string {
   return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(jours);
 }
+

@@ -2,11 +2,9 @@
  * Barème des cotisations sociales du régime micro-social, par PÉRIODE.
  *
  * Pourquoi par période et non par année : le taux applicable aux BNC a
- * augmenté au 1er juillet 2024, puis de nouveau au 1er juillet 2026. Une
- * table indexée par année civile ne peut pas exprimer cela — elle
- * appliquerait un taux unique à des mois qui relèvent de deux barèmes
- * différents. C'est exactement le bug de la version précédente, qui
- * calculait juillet 2026 à 25,6 % au lieu de 26,1 %.
+ * augmenté au 1er juillet 2024. Une table indexée par année civile ne peut
+ * pas exprimer cela — elle appliquerait un taux unique à des mois qui
+ * relèvent de deux barèmes différents.
  *
  * RÈGLES D'ÉDITION — à respecter sous peine de fausser un historique :
  *
@@ -18,23 +16,16 @@
  *  3. Les périodes sont contiguës, sans trou ni chevauchement. Seule la
  *     dernière reste ouverte (`au: null` = toujours en vigueur).
  *
- * ⚠️ VÉRIFICATION DU 12/08/2026 — une erreur corrigée.
- *
- * La table portait une bascule à 26,1 % au 1er juillet 2026. Ce taux avait
- * bien été programmé par la réforme de 2024, mais le décret n° 2025-943 du
- * 8 septembre 2025 a plafonné la dernière marche à 25,6 %. La bascule n'a
- * donc jamais eu lieu, et l'application surestimait les cotisations d'un
- * demi-point sur toute recette encaissée depuis juillet 2026.
- *
- * urssaf.fr renvoie toujours 503 sur ses pages de barème ; la correction
- * s'appuie sur deux sources secondaires concordantes qui citent le décret.
- * Un avis d'appel réel reste le seul recoupement de premier ordre.
+ * Le 26,1 % programmé au 01/01/2026 par la réforme de 2024 a été plafonné à
+ * 25,6 % par le décret n° 2025-943 du 08/09/2025 : 25,6 % s'applique dès le
+ * 01/01/2026 en BNC, et il n'y a AUCUNE hausse au 1er juillet 2026.
  */
 
 import {
   type DateISO, type Mois, type Ratio, type Resolution, type TypeActivite,
-  dateISO, mois, ratio
+  dateISO, estUtilisable, mois, ratio
 } from '../types';
+import { exonerationAcre } from './acre';
 
 export interface PeriodeBareme {
   readonly du: Mois;
@@ -61,23 +52,12 @@ export const PERIODES_URSSAF: readonly PeriodeBareme[] = [
   p('2024-01', '2024-06', 0.211, 0.123, 0.212, 'urssaf.fr', '2026-08-12'),
   p('2024-07', '2024-12', 0.231, 0.123, 0.212, 'urssaf.fr', '2026-08-12'),
   p('2025-01', '2025-12', 0.246, 0.123, 0.212, 'urssaf.fr', '2026-08-12'),
-  // 26,1 % avait été programmé pour 2026 par la réforme de 2024, puis le
-  // décret n° 2025-943 du 8 septembre 2025 a plafonné la dernière marche à
-  // 25,6 %. La bascule au 1er juillet 2026 n'a donc jamais eu lieu : la
-  // période reste ouverte au taux de janvier.
+  // 26,1 % était programmé au 01/01/2026 ; le décret a plafonné à 25,6 %,
+  // applicable dès cette date. Pas de marche au 1er juillet 2026.
   p('2026-01', null, 0.256, 0.123, 0.212,
-    'décret n° 2025-943 du 08/09/2025 ; compta-online, l-expert-comptable', '2026-08-12')
+    'décret n° 2025-943 du 08/09/2025, https://www.legifrance.gouv.fr/loda/id/JORFTEXT000052211971 ; art. D613-4 CSS',
+    '2026-11-07')
 ];
-
-/**
- * Abattement ACRE : la moitié des cotisations normales.
- *
- * ⚠️ Un passage à 25 % au 1er juillet 2026 est possible mais NON confirmé.
- * À vérifier avant de recalculer un trimestre sous ACRE. Si le changement
- * est confirmé, il devra devenir lui aussi une donnée par période, et non
- * une constante.
- */
-export const ABATTEMENT_ACRE = ratio(0.5);
 
 /**
  * Fusionne le barème livré avec le code et les périodes saisies par
@@ -182,10 +162,15 @@ export function tauxCotisations(
   m: Mois,
   type: TypeActivite,
   sousAcre: boolean,
-  periodes: readonly PeriodeBareme[] = PERIODES_URSSAF
+  periodes: readonly PeriodeBareme[] = PERIODES_URSSAF,
+  debutActivite: DateISO | null = null
 ): Resolution<Ratio> {
+  // L'exonération dépend de la date de début d'activité : sans elle on
+  // s'abstient plutôt que de supposer 50 % ou 25 %.
+  const exo = sousAcre ? exonerationAcre(debutActivite) : null;
+  if (exo !== null && exo.statut === 'refuse') return exo;
   const appliquer = (brut: Ratio): Ratio =>
-    (sousAcre ? brut * ABATTEMENT_ACRE : brut) as Ratio;
+    (exo !== null && estUtilisable(exo) ? brut * (1 - exo.valeur) : brut) as Ratio;
 
   const couvrante = periodePour(m, periodes);
   if (couvrante) {

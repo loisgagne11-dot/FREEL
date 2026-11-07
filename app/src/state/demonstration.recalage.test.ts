@@ -61,6 +61,7 @@ describe('le jeu de démonstration, au 10 juin 2026', () => {
       const taux = tauxImpotEtContributions(regimeDe(demo), mois(trimestre[2] as string), 'BNC');
       const attendu = voletAProvisionner(base, { mois: [] }, {
         typeActivite: 'BNC', sousAcreLe: sousAcreLe(demo),
+        debutActivite: demo.entreprise.debutActivite,
         periodesUrssaf: periodesUrssafEffectives(demo),
         tauxImpotEtContributions: taux.statut === 'refuse' ? 0 : taux.valeur
       }).montant;

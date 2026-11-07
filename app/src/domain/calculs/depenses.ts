@@ -201,14 +201,21 @@ export function resumerDepenses(
 }
 
 /** Libellé du motif, à l'attention de l'utilisateur. */
-export function libelleMotif(motif: MotifNonRecuperable): string {
+export function libelleMotif(
+  motif: MotifNonRecuperable,
+  regimeTva: ContexteDepenses['regimeTva'] = 'franchise'
+): string {
   switch (motif) {
     case 'franchise':
       return 'Franchise en base : aucune TVA n’est déductible.';
     case 'justificatif_manquant':
       return 'Justificatif manquant : sans pièce, la TVA n’est pas récupérable.';
     case 'autoliquidation':
-      return 'Achat hors de France : TVA à autoliquider, due et non déductible.';
+      // Un assujetti déduit la TVA qu'il autoliquide (art. 283-2 CGI) ; seul
+      // le franchisé la supporte sans contrepartie.
+      return regimeTva === 'franchise'
+        ? 'Achat hors de France : TVA à autoliquider, due et non déductible.'
+        : 'Achat hors de France : TVA à autoliquider, déductible en contrepartie.';
     case 'taux_nul':
       return 'Aucune TVA sur cette dépense.';
   }

@@ -16,6 +16,7 @@ import { Chiffre } from '../components/Chiffre';
 import { Info } from '../components/Info';
 import { Montant } from '../components/Montant';
 import { eur, formaterJours, moisLong } from '../format';
+import { enKiloEuros } from '../format.kilo';
 import styles from './Argent.performance.module.css';
 
 /**
@@ -106,8 +107,10 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
   // retombe sur son dernier mois, décembre.
   useEffect(() => {
     setMoisLu(estAnneeCourante ? m0 : `${etat.annee}-12` as Mois);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- volontaire :
-    // seule une bascule d'ANNÉE doit recaler la lecture, pas chaque rendu.
+    // Volontaire : seule une bascule d'ANNÉE doit recaler la lecture, pas
+    // chaque rendu. (La directive visait la ligne de commentaire et ne
+    // désactivait rien ; le lint des hooks du lot 7 l'a relevé.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etat.annee]);
 
   const composition = useMemo(() => compositionDuMois(faits, moisLu), [faits, moisLu]);
@@ -440,18 +443,6 @@ function GrapheCa(
       )}
     </section>
   );
-}
-
-/**
- * Le design veut les montants du graphe libellés en k€ : au-dessus des barres,
- * un montant complet en euros serait trop long et se chevaucherait d'une barre
- * à l'autre.
- */
-function enKiloEuros(valeur: number): string {
-  if (valeur === 0) return '0';
-  const k = valeur / 1000;
-  const arrondi = k >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
-  return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(arrondi)} k€`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

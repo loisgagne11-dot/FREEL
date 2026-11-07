@@ -11,6 +11,8 @@ const ctx = (
 ): ContexteProvisions => ({
   typeActivite: type,
   sousAcreLe: () => acre,
+  // Avant le 01/07/2026 : exonération de 50 %.
+  debutActivite: dateISO('2025-02-01'),
   tauxImpotEtContributions: taux
 });
 
@@ -150,6 +152,7 @@ describe('ventilation des provisions par nature', () => {
   const ctx: ContexteProvisions = {
     typeActivite: 'BNC',
     sousAcreLe: () => false,
+    debutActivite: null,
     tauxImpotEtContributions: 0.022
   };
 
@@ -245,5 +248,23 @@ describe('ventilation des provisions par nature', () => {
     expect(apres.parNature.impot).toBe(0);
     expect(apres.parNature.cfp).toBe(0);
     expect(apres.parNature.urssaf).toBe(2560);
+  });
+  /**
+   * Arrondies chacune au centime, les parts ne retombent pas sur le total
+   * arrondi : un à deux centimes d'écart entre la somme des lignes affichées et
+   * le total affiché. Le balayage couvre assez de montants pour que l'arrondi
+   * naïf se trompe au moins une fois ; la méthode du plus fort reste ne se
+   * trompe jamais.
+   */
+  it('fait que les parts arrondies somment exactement au total arrondi', () => {
+    let ecarts = 0;
+    for (let cts = 1001; cts <= 1400; cts++) {
+      const d = provisions([], [
+        { id: 'r', montant: euros(cts / 100), encaisseeLe: dateISO('2026-03-15') }
+      ], { mois: [] }, { ...ctx, tauxImpotEtContributions: 0.022, tvaAReverser: euros(3.337) });
+      const somme = NATURES_DETTE.reduce((a, n) => a + Math.round(d.parNature[n] * 100), 0);
+      if (somme !== Math.round(d.total * 100)) ecarts++;
+    }
+    expect(ecarts).toBe(0);
   });
 });

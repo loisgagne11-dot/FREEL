@@ -23,7 +23,6 @@ const ATraiter = lazy(() => import('./Pilote.decisions')
 const Composition = lazy(() => import('../components/Composition')
   .then((m) => ({ default: m.Composition })));
 
-import styles from './Pilote.module.css';
 import { Montant } from '../components/Montant';
 import type { CleComposition } from '../../domain/calculs/composition';
 import type { Mois } from '../../domain/types';
@@ -56,6 +55,9 @@ import type { Mois } from '../../domain/types';
  * son propre sélecteur, que le paquet d'entrée n'a pas à embarquer pour qui
  * ne regarde que le mois en cours.
  */
+const BandeauxDuPilote = lazy(() => import('./Pilote.bandeaux')
+  .then((m) => ({ default: m.BandeauxDuPilote })));
+
 const FluxAutreMois = lazy(() => import('../components/FluxAutreMois.carte')
   .then((m) => ({ default: m.FluxAutreMoisCarte })));
 
@@ -127,32 +129,20 @@ export function Pilote({ mois: moisChoisi, onMois }: {
           TOUS les écrans : un quota atteint en cours de session doit se voir là
           où l'on saisit, pas seulement en revenant ici. */}
 
-      {chargement.phase === 'pret' && chargement.migrationEffectuee && (
-        <Bandeau ton="info" titre="Données reprises de la version précédente">
-          Une sauvegarde de l’état d’origine a été archivée avant toute écriture.
-        </Bandeau>
-      )}
-
-      {/* Un calcul incomplet n'est jamais présenté comme un résultat : un
-          versable trop élevé conduirait à se verser de l'argent déjà dû. */}
-      {etat.tresorerie.incomplet && (
-        <Bandeau ton="alerte" titre="Montants sous-évalués">
-          {/* Le motif n'est plus seulement « recette hors barème » : l'impôt sur
-              le revenu non provisionnable entre par la même porte, et le texte
-              nommait une cause qui n'était pas toujours la bonne. Chaque motif
-              se dit maintenant lui-même, ci-dessous. */}
-          Une partie de ce qui est dû n’a pas pu être provisionnée. Les montants
-          ci-dessous sont donc <strong>plus élevés que la réalité</strong>.
-          <ul className={styles.motifs}>
-            {etat.tresorerie.motifsIncomplets.map((m) => <li key={m}>{m}</li>)}
-          </ul>
-        </Bandeau>
-      )}
-
-      {etat.tauxImpotIndisponible && etat.motifTauxImpot !== null && (
-        <Bandeau ton="alerte" titre="Barème d’imposition manquant">
-          {etat.motifTauxImpot}
-        </Bandeau>
+      {/* Les bandeaux d'exception — reprise de l'ancienne version, montants
+          sous-évalués, barème manquant — arrivent à la demande, et seulement
+          quand l'un d'eux a quelque chose à dire : ce sont des états RARES, et
+          le paquet d'entrée a franchi son budget au lot 7. */}
+      {((chargement.phase === 'pret' && chargement.migrationEffectuee)
+        || etat.tresorerie.incomplet
+        || (etat.tauxImpotIndisponible && etat.motifTauxImpot !== null)) && (
+        <Suspense fallback={null}>
+          <BandeauxDuPilote
+            migration={chargement.phase === 'pret' && chargement.migrationEffectuee}
+            motifsIncomplets={etat.tresorerie.incomplet ? etat.tresorerie.motifsIncomplets : null}
+            motifTauxImpot={etat.tauxImpotIndisponible ? etat.motifTauxImpot : null}
+          />
+        </Suspense>
       )}
 
       {moisVu === mois
@@ -214,22 +204,6 @@ export function Pilote({ mois: moisChoisi, onMois }: {
 
 /* ---------- éléments locaux ---------- */
 
-export function Bandeau(
-  { ton, titre, children }: {
-    ton: 'info' | 'alerte';
-    titre: string;
-    children: React.ReactNode;
-  }
-) {
-  return (
-    // `role="status"` plutôt que `alert` : ces bandeaux sont présents au
-    // rendu, ils n'interrompent pas l'utilisateur en cours de tâche.
-    <section className={`${styles.bandeau} ${ton === 'alerte' ? styles.bandeauAlerte : styles.bandeauInfo}`} role="status">
-      <strong className={styles.bandeauTitre}>{titre}</strong>
-      <div className={styles.bandeauCorps}>{children}</div>
-    </section>
-  );
-}
 
 /** Les petits nombres s'écrivent en lettres dans une phrase ; au-delà, en chiffres. */
 const EN_LETTRES = ['zéro', 'une', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix'];

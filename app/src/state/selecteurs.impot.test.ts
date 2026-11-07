@@ -6,7 +6,7 @@ import { etatPilote, provisionIrDe, soldeImpotPrecedentDe } from './selecteurs';
 
 /*
  * Un foyer d'une part, sans autre revenu, qui a encaissé 60 000 € en 2026 au
- * régime du barème : 39 600 € imposables, 5 045,48 € d'impôt (barème 2024,
+ * régime du barème : 39 600 € imposables, 4 983,99 € d'impôt (barème 2025,
  * repris en hypothèse pour les années suivantes). Valeurs fictives.
  */
 function foyer(modifications: Partial<Faits> = {}): Faits {
@@ -26,7 +26,10 @@ function foyer(modifications: Partial<Faits> = {}): Faits {
   };
 }
 
-const IMPOT_2026 = 5045.48;
+// 2026 se résout en hypothèse sur le barème 2025 (loi n° 2026-103). Foyer d'une
+// part, 60 000 € × 66 % = 39 600 € imposables, brut au-delà de la décote :
+// (29 579 − 11 600) × 11 % = 1 977,69 ; (39 600 − 29 579) × 30 % = 3 006,30.
+const IMPOT_2026 = 4983.99;
 const finDecembre = new Date('2026-12-31T10:00:00');
 const debutJanvier = new Date('2027-01-02T10:00:00');
 
@@ -44,7 +47,7 @@ const reste = (r: ReturnType<typeof soldeImpotPrecedentDe>): number => {
  * AU 1ᴱᴿ JANVIER, L'IMPÔT DE L'ANNÉE ÉCOULÉE RESTE DE CÔTÉ.
  *
  * Si la règle sautait, la provision repartirait de zéro le 2 janvier : les
- * 5 045 € d'impôt sur les revenus de 2026 — qui se soldent à l'automne 2027 —
+ * 4 984 € d'impôt sur les revenus de 2026 — qui se soldent à l'automne 2027 —
  * sortiraient des provisions, et « tu peux te verser » monterait d'autant
  * jusqu'à la saisie de l'avis, l'été suivant.
  */

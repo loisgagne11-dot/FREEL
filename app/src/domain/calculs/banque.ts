@@ -29,6 +29,7 @@
  */
 
 import type { DateISO, Euros } from '../types';
+import { joursEntre } from '../dates';
 
 /**
  * Pourquoi un mouvement n'a aucune écriture en face.
@@ -172,12 +173,6 @@ export interface Candidats {
   readonly ecritures: readonly EcritureRapprochable[];
 }
 
-function joursEntre(a: DateISO, b: DateISO): number {
-  const t = (d: DateISO) =>
-    Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
-  return Math.abs(Math.round((t(b) - t(a)) / 86_400_000));
-}
-
 /**
  * Les écritures qui pourraient correspondre à un mouvement.
  *
@@ -203,13 +198,13 @@ export function candidatsPour(
     .filter((e) => !e.dejaRapprochee)
     .filter((e) => e.nature === natureAttendue)
     .filter((e) => Math.abs(e.montant - cible) < 0.005)
-    .filter((e) => e.date === null || joursEntre(e.date, mouvement.date) <= fenetreJours)
+    .filter((e) => e.date === null || Math.abs(joursEntre(e.date, mouvement.date)) <= fenetreJours)
     // La plus proche en date d'abord : c'est le candidat le plus probable, et
     // celui que l'utilisateur voudra voir en tête.
     .sort((a, b) => {
       if (a.date === null) return 1;
       if (b.date === null) return -1;
-      return joursEntre(a.date, mouvement.date) - joursEntre(b.date, mouvement.date);
+      return Math.abs(joursEntre(a.date, mouvement.date)) - Math.abs(joursEntre(b.date, mouvement.date));
     });
 }
 

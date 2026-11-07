@@ -7,6 +7,20 @@
          nav flottant. Jamais user-scalable=no : casserait le zoom, une
          régression d'accessibilité que le design n'impose pas. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Politique de sécurité du contenu.
+         · script-src : le même domaine, plus les DEUX scripts en ligne de cette
+           page (thème/confidentialité avant React, rattrapage d'index périmé),
+           désignés par empreinte plutôt que par 'unsafe-inline' : une injection
+           HTML ne pourrait pas en faire exécuter d'autres. L'empreinte porte sur
+           le contenu EXACT du script — modifier une espace la rend fausse et
+           l'application ne démarre plus ; src/infra/csp.test.ts échoue alors.
+         · style-src 'unsafe-inline' : React pose des style={{…}}.
+         · connect-src : le projet Supabase est saisi à l'exécution, d'où le
+           joker ; https seulement, comme l'exige src/infra/supabase.ts.
+         · frame-src 'self' : le cadre d'impression est un about:blank rempli par
+           document.write, sans src, que la politique ne bloque pas.
+         · object-src 'none', base-uri 'self', form-action 'self'. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-v0VED4C+psJSOdt4IirMvZ7olWpuGhJ7wXQcyLQGoKw=' 'sha256-GoZ1zuL3CoRltQ+dbOPcHTR6wIi5O+60siJAyEDh8KU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-src 'self' blob: about:; child-src 'self' blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'" />
     <title>Freel</title>
     <link rel="stylesheet" href="/src/styles/tokens.css" />
     <link rel="stylesheet" href="/src/styles/base.css" />

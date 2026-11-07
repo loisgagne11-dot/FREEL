@@ -766,7 +766,9 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
    * précaution que sur l'écran Compte, et pour la même raison.
    */
   const [aRestaurer, setARestaurer] = useState<Restauration | null>(null);
-  // Relue à chaque changement des faits : un remplacement vient d'en écrire une.
+  // Relue à chaque changement des faits : un remplacement vient d'en écrire
+  // une. `faits` n'est pas lu dans le calcul, il en est le DÉCLENCHEUR.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const avant = useMemo(() => instantaneAvantRemplacement(), [faits]);
 
   function exporter(): void {

@@ -37,7 +37,7 @@
  */
 
 import { type DateISO, type Euros, type Ratio, euros, ratio } from '../types';
-import { joursEntre } from './activite';
+import { joursEntre } from '../dates';
 import type { FactureSuivie, RecetteSuivie } from './facturier';
 
 /** Ce qu'un délai mesuré retient de sa facture. */

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type ConfigSupabase, type Session, type StockageLocal,
-  TABLE_FAITS, bundleDepuisLegacy, chargerDonneesLegacy, configEffective,
-  ecrireConfig, ecrireSession, lireConfig, lireSession, pousserFaits,
-  rafraichir, seConnecter, sessionValide, tirerFaits
+  DELAI_MAX_MS, TABLE_FAITS, bundleDepuisLegacy, chargerDonneesLegacy, configEffective,
+  ecrireConfig, ecrireSession, estRefusDAuthentification, lireConfig, lireSession, pousserFaits,
+  motifUrlRefusee, rafraichir, seConnecter, sessionValide, tirerFaits
 } from './supabase';
 
 const CONFIG: ConfigSupabase = { url: 'https://exemple.test', cleAnon: 'cle-anon' };
@@ -382,5 +382,69 @@ describe('conservation locale', () => {
     expect(configEffective(s)).toBeNull();
     ecrireConfig(s, CONFIG);
     expect(configEffective(s)).toMatchObject({ url: 'https://exemple.test' });
+  });
+});
+
+describe('robustesse réseau', () => {
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  // Effacer la session sur une coupure de wifi déconnecterait l'utilisateur
+  // pour une panne qui n'est pas la sienne.
+  it('ne tient pour un refus d’authentification que les codes 400 et 401', async () => {
+    const code = async (statut: number) => {
+      vi.stubGlobal('fetch', repondre({ message: 'x' }, statut));
+      return estRefusDAuthentification(await rafraichir(CONFIG, SESSION));
+    };
+    expect(await code(400)).toBe(true);
+    expect(await code(401)).toBe(true);
+    expect(await code(500)).toBe(false);
+    expect(await code(503)).toBe(false);
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    expect(estRefusDAuthentification(await rafraichir(CONFIG, SESSION))).toBe(false);
+  });
+
+  // Un 502 renvoie souvent une page HTML : le code HTTP doit survivre à
+  // l'échec de lecture du corps, sans quoi un 400 illisible passerait pour
+  // une panne réseau.
+  it('garde le code HTTP quand le corps de l’erreur n’est pas du JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 502, text: async () => '<html>Bad gateway</html>'
+    }));
+    const r = await rafraichir(CONFIG, SESSION);
+    expect(r).toMatchObject({ statut: 'erreur', code: 502 });
+  });
+
+  it('abandonne une requête sans réponse après le délai maximal, et le dit', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((_u: string, o: RequestInit) => new Promise((_ok, ko) => {
+      o.signal?.addEventListener('abort', () => ko(new DOMException('abort', 'AbortError')));
+    })));
+    const attente = seConnecter(CONFIG, 'a@b.test', 'x');
+    await vi.advanceTimersByTimeAsync(DELAI_MAX_MS + 1);
+    const r = await attente;
+    expect(r.statut).toBe('erreur');
+    if (r.statut === 'erreur') {
+      expect(r.motif).toMatch(/trop de temps/i);
+      expect(r.code).toBeUndefined();
+    }
+  });
+
+  // La clé et le jeton partent dans chaque requête : en http, en clair.
+  it('refuse une adresse de projet qui n’est pas en https, sans émettre de requête', async () => {
+    const appel = vi.fn();
+    vi.stubGlobal('fetch', appel);
+    const r = await seConnecter({ url: 'http://exemple.test', cleAnon: 'k' }, 'a@b.test', 'x');
+    expect(r.statut).toBe('erreur');
+    expect(appel).not.toHaveBeenCalled();
+    expect(motifUrlRefusee('http://localhost:54321')).not.toBeNull();
+    expect(motifUrlRefusee('exemple.test')).not.toBeNull();
+    expect(motifUrlRefusee('https://exemple.test')).toBeNull();
+  });
+
+  it('ne relit pas une configuration conservée en http', () => {
+    const s = stockageMemoire();
+    s.setItem('freel.config.supabase.v1', JSON.stringify({ url: 'http://exemple.test', cleAnon: 'k' }));
+    expect(lireConfig(s)).toBeNull();
   });
 });

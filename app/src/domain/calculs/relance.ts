@@ -1,5 +1,6 @@
 import type { DateISO, Euros } from '../types';
 import { euros } from '../types';
+import { joursEntre } from '../dates';
 import { INDEMNITE_RECOUVREMENT } from './facture';
 
 /**
@@ -58,18 +59,6 @@ export interface DetteDeRetard {
    * zéro ferait croire qu'il n'y a rien à réclamer.
    */
   readonly penalites: Euros | null;
-}
-
-/**
- * Nombre de jours entre deux dates ISO, en jours calendaires pleins.
- *
- * Le calcul se fait en UTC : passer par l'heure locale ferait varier le résultat
- * d'un jour selon le fuseau, et une pénalité se compte en jours.
- */
-function joursEntre(du: DateISO, au: DateISO): number {
-  const a = Date.parse(`${du}T00:00:00Z`);
-  const b = Date.parse(`${au}T00:00:00Z`);
-  return Math.round((b - a) / 86400000);
 }
 
 /**

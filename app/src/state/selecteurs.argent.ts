@@ -295,7 +295,7 @@ export function etatArgent(
 
   return {
     seuils: {
-      plafondMicro: plafondMicro(m, type),
+      plafondMicro: plafondMicro(m, type, debutActivite),
       franchiseTva: seuilsTvaPourAnnee(annee, type, debutActivite),
       assujettissementTva: assujettissementTva({
         annee, type, debutActivite,

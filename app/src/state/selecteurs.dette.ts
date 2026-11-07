@@ -57,6 +57,7 @@ export function detailDeLaDette(
     {
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
+      debutActivite: faits.entreprise.debutActivite,
       tauxImpotEtContributions: taux,
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       tvaAReverser: tvaAReverserDe(faits),

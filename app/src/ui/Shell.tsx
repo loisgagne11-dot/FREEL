@@ -1,6 +1,5 @@
 import { type MouseEvent, type ReactNode, Suspense, lazy } from 'react';
 import { RailNav } from './components/RailNav';
-import { IndicateurATraiter } from './components/IndicateurATraiter';
 import { useRoute } from './useRoute';
 import type { IdEcran } from './navigation';
 import styles from './Shell.module.css';
@@ -16,6 +15,15 @@ import styles from './Shell.module.css';
  * le temps qu'elles arrivent ; seuls les boutons apparaissent quelques
  * millisecondes plus tard.
  */
+/**
+ * La pastille « à traiter », différée pour la même raison que les pastilles
+ * système : le paquet d'entrée a franchi son budget au lot 7 (barèmes datés
+ * et sourcés), et une pastille de la barre peut arriver quelques millisecondes
+ * après l'écran — le Pilote, lui, montre déjà les mêmes décisions.
+ */
+const IndicateurATraiter = lazy(() =>
+  import('./components/IndicateurATraiter').then((m) => ({ default: m.IndicateurATraiter })));
+
 const PastillesSysteme = lazy(() =>
   import('./components/PastillesSysteme').then((m) => ({ default: m.PastillesSysteme })));
 
@@ -90,7 +98,7 @@ export function Shell({ children, compteurs, periode, actions }: ProprietesShell
           <div className={styles.grow} />
           {/* En tête des pastilles, jamais au-dessus d'un contrôle : en
               portrait il flotte au-dessus du dock, en paysage il vit ici. */}
-          <IndicateurATraiter ecranActif={ecran.id} />
+          <Suspense fallback={null}><IndicateurATraiter ecranActif={ecran.id} /></Suspense>
           <Suspense fallback={null}><PastillesSysteme /></Suspense>
           <div data-emplacement="actions" className={styles.actions}>{actions}</div>
         </header>

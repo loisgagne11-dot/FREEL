@@ -61,6 +61,46 @@ export type Resultat<T> =
     readonly code?: number;
   };
 
+/**
+ * Délai maximal d'une requête.
+ *
+ * Sans lui, un serveur qui accepte la connexion et ne répond jamais laisse le
+ * bouton « Se connecter » tourner indéfiniment : l'utilisateur ne sait pas
+ * s'il doit attendre ou recommencer.
+ */
+export const DELAI_MAX_MS = 15_000;
+
+/**
+ * Pourquoi une adresse de projet est refusée, ou `null` si elle est acceptable.
+ *
+ * Seul `https:` passe, sans exception pour `localhost` : le code n'en a jamais
+ * toléré, et la clé et le jeton partent dans chaque requête. Sur du `http:`
+ * ils circuleraient en clair, et une adresse saisie à la main (ou collée depuis
+ * un message) est exactement l'endroit où une faute passe inaperçue.
+ */
+export function motifUrlRefusee(url: string): string | null {
+  let analysee: URL;
+  try { analysee = new URL(url); } catch { return 'Adresse du projet invalide.'; }
+  if (analysee.protocol !== 'https:') {
+    return 'L’adresse du projet doit commencer par https:// : ta clé et ta session '
+      + 'ne doivent pas circuler en clair.';
+  }
+  return null;
+}
+
+/**
+ * La réponse est-elle un REFUS d'authentification ?
+ *
+ * C'est le seul cas où la session locale doit être effacée : 400 (jeton de
+ * renouvellement révoqué ou invalide) ou 401. Une erreur réseau, un 5xx ou un
+ * délai dépassé n'ont rien dit sur la validité de la session — l'effacer
+ * déconnecterait l'utilisateur à chaque coupure de wifi, et lui ferait
+ * ressaisir son mot de passe pour une panne qui n'était pas la sienne.
+ */
+export function estRefusDAuthentification(r: Resultat<unknown>): boolean {
+  return r.statut === 'erreur' && (r.code === 400 || r.code === 401);
+}
+
 /** Clé de conservation de la configuration de connexion. */
 export const CLE_CONFIG = 'freel.config.supabase.v1' as const;
 
@@ -74,6 +114,7 @@ export function configDeBuild(): ConfigSupabase | null {
   const url = import.meta.env['VITE_SUPABASE_URL'];
   const cle = import.meta.env['VITE_SUPABASE_ANON_KEY'];
   return typeof url === 'string' && url !== '' && typeof cle === 'string' && cle !== ''
+    && motifUrlRefusee(url) === null
     ? { url: url.replace(/\/+$/, ''), cleAnon: cle }
     : null;
 }
@@ -86,9 +127,15 @@ async function appeler(
   options: RequestInit & { readonly jeton?: string } = {}
 ): Promise<Resultat<unknown>> {
   const { jeton, ...reste } = options;
+  const refus = motifUrlRefusee(config.url);
+  if (refus !== null) return { statut: 'erreur', motif: refus };
+
+  const controle = new AbortController();
+  const minuteur = setTimeout(() => controle.abort(), DELAI_MAX_MS);
   try {
     const reponse = await fetch(`${config.url}${chemin}`, {
       ...reste,
+      signal: controle.signal,
       headers: {
         apikey: config.cleAnon,
         Authorization: `Bearer ${jeton ?? config.cleAnon}`,
@@ -98,7 +145,13 @@ async function appeler(
     });
 
     const texte = await reponse.text();
-    const corps: unknown = texte === '' ? null : JSON.parse(texte);
+    // Un corps illisible (page HTML d'un 502, par exemple) ne doit pas masquer
+    // le code HTTP : c'est lui qui décide si la session est à effacer.
+    let corps: unknown = null;
+    try { corps = texte === '' ? null : JSON.parse(texte); } catch { corps = null; }
+    if (reponse.ok && texte !== '' && corps === null) {
+      return { statut: 'erreur', motif: 'Réponse du serveur illisible.', code: reponse.status };
+    }
 
     if (!reponse.ok) {
       return { statut: 'erreur', motif: messageDErreur(reponse.status, corps), code: reponse.status };
@@ -109,8 +162,12 @@ async function appeler(
     // réaction : l'un se réessaie, l'autre demande une correction.
     return {
       statut: 'erreur',
-      motif: 'Le serveur est injoignable. Vérifie ta connexion, puis réessaie.'
+      motif: controle.signal.aborted
+        ? 'Le serveur met trop de temps à répondre. Vérifie ta connexion, puis réessaie.'
+        : 'Le serveur est injoignable. Vérifie ta connexion, puis réessaie.'
     };
+  } finally {
+    clearTimeout(minuteur);
   }
 }
 
@@ -479,6 +536,7 @@ export function lireConfig(stockage: StockageLocal): ConfigSupabase | null {
     if (brut === null) return null;
     const o = JSON.parse(brut) as Record<string, unknown>;
     return typeof o['url'] === 'string' && typeof o['cleAnon'] === 'string'
+      && motifUrlRefusee(o['url']) === null
       ? { url: o['url'].replace(/\/+$/, ''), cleAnon: o['cleAnon'] }
       : null;
   } catch {

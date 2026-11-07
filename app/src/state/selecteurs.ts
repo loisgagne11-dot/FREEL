@@ -313,6 +313,7 @@ export function entreeATraiter(
     desEnRetard: declarationsEnRetard(
       faits.recettes, preneursDeServices(faits), dateISOde(maintenant)
     ),
+    debutActiviteLe: faits.entreprise.debutActivite,
     debutActivite: faits.entreprise.debutActivite === null
       ? null
       : moisDe(faits.entreprise.debutActivite),
@@ -570,6 +571,7 @@ export function montantDeclaration(faits: Faits, mois: readonly Mois[]): Resolut
     {
       typeActivite: faits.entreprise.typeActivite,
       sousAcreLe: sousAcreLe(faits),
+      debutActivite: faits.entreprise.debutActivite,
       periodesUrssaf: periodesUrssafEffectives(faits),
       tauxImpotEtContributions: taux.valeur
     }
@@ -800,6 +802,7 @@ export function etatPilote(
     {
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
+      debutActivite: faits.entreprise.debutActivite,
       tauxImpotEtContributions: tauxImpot,
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       tvaAReverser: tvaAReverserDe(faits),

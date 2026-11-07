@@ -152,6 +152,8 @@ export const estDeclare = (p: PeriodesDeclarees, m: Mois): boolean => p.mois.inc
 export interface ContexteProvisions {
   readonly typeActivite: TypeActivite;
   readonly sousAcreLe: (m: Mois) => boolean;
+  /** Le taux d'exonération ACRE dépend de la date de début, pas du mois cotisé. */
+  readonly debutActivite: DateISO | null;
   /**
    * Le barème de cotisations à appliquer.
    *
@@ -264,10 +266,44 @@ export const LIBELLE_NATURE: Readonly<Record<NatureDette, string>> = {
 const ventilationVide = (): Record<NatureDette, number> =>
   ({ urssaf: 0, tva: 0, impot: 0, cfe: 0, cfp: 0 });
 
-const figer = (v: Record<NatureDette, number>): VentilationProvisions => ({
-  urssaf: euros(v.urssaf), tva: euros(v.tva), impot: euros(v.impot),
-  cfe: euros(v.cfe), cfp: euros(v.cfp)
-});
+/**
+ * Fige une ventilation en euros au centime, de sorte que la somme des parts
+ * égale EXACTEMENT `total`, lui-même arrondi au centime.
+ *
+ * Méthode du plus fort reste. Arrondir chaque part isolément ne retombe pas sur
+ * le total arrondi : 0,004 + 0,004 + 0,004 donne trois parts à 0,00 pour un
+ * total à 0,01 ; sur de vraies provisions, un à deux centimes d'écart entre la
+ * somme des lignes affichées et le total affiché, que l'utilisateur additionne
+ * à la calculatrice. Chaque part prend le centime inférieur, puis les centimes
+ * manquants vont aux parts dont la fraction perdue est la plus grande ; à
+ * égalité, l'ordre de `NATURES_DETTE`, pour que le résultat soit déterministe.
+ */
+function figer(v: Record<NatureDette, number>, total: number): VentilationProvisions {
+  const brut = NATURES_DETTE.map((n) => v[n] * 100);
+  const centimes = brut.map((x) => Math.floor(x + 1e-9));
+  let manque = Math.round(total * 100) - centimes.reduce((s, x) => s + x, 0);
+  // Au-delà d'un centime par part, l'écart n'est plus un arrondi : `total`
+  // n'est pas la somme des parts, et le répartir en silence fausserait une
+  // ligne pour faire tomber juste une addition. L'arrondi reste alors naïf, et
+  // l'écart visible.
+  if (Math.abs(manque) > centimes.length) {
+    brut.forEach((x, i) => { centimes[i] = Math.round(x); });
+    manque = 0;
+  }
+  // Les plus forts restes d'abord ; le tri est stable, donc à égalité l'ordre
+  // de `NATURES_DETTE` décide, et le résultat est déterministe. Un manque
+  // négatif retire aux plus petites fractions.
+  const ordre = brut.map((_, i) => i)
+    .sort((a, b) => (brut[b]! - centimes[b]!) - (brut[a]! - centimes[a]!));
+  if (manque < 0) ordre.reverse();
+  for (let k = 0; manque !== 0; k = (k + 1) % ordre.length) {
+    centimes[ordre[k]!]! += Math.sign(manque);
+    manque -= Math.sign(manque);
+  }
+  return Object.fromEntries(
+    NATURES_DETTE.map((n, i) => [n, euros(centimes[i]! / 100)])
+  ) as unknown as VentilationProvisions;
+}
 
 export interface DetailProvisions {
   /** Échéances émises et non payées. */
@@ -323,7 +359,7 @@ export function voletConstateParNature(
     if (estPayee(e)) continue;
     v[e.nature] += e.montant;
   }
-  return figer(v);
+  return figer(v, euros(Object.values(v).reduce((a, b) => a + b, 0)));
 }
 
 /**
@@ -363,7 +399,8 @@ export function voletAProvisionner(
     if (estDeclare(declarees, m)) continue;
 
     const taux: Resolution<number> = tauxCotisations(
-      m, ctx.typeActivite, ctx.sousAcreLe(m), ctx.periodesUrssaf
+      m, ctx.typeActivite, ctx.sousAcreLe(m), ctx.periodesUrssaf,
+      ctx.debutActivite
     );
     if (taux.statut === 'refuse') {
       nonCalculables.push({ id: r.id, motif: taux.motif });
@@ -400,9 +437,10 @@ export function voletAProvisionner(
   somme += tva;
   parNature.tva += tva;
 
+  const montant = euros(somme);
   return {
-    montant: euros(somme),
-    parNature: figer(parNature),
+    montant,
+    parNature: figer(parNature, montant),
     nonCalculables,
     impotRevenuNonProvisionne: impotR !== undefined && impotR.statut === 'refuse'
       ? impotR.motif
@@ -429,11 +467,12 @@ export function provisions(
     parNature[n] = ventileConstate[n] + aProvisionner.parNature[n];
   }
 
+  const total = euros(constate + aProvisionner.montant);
   return {
     voletConstate: constate,
     voletAProvisionner: aProvisionner.montant,
-    total: euros(constate + aProvisionner.montant),
-    parNature: figer(parNature),
+    total,
+    parNature: figer(parNature, total),
     recettesNonCalculables: aProvisionner.nonCalculables,
     impotRevenuNonProvisionne: aProvisionner.impotRevenuNonProvisionne
   };
