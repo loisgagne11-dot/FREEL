@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { mois } from '../../domain/types';
 import { CLE_STOCKAGE, type Depense, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Achats } from '../screens/Achats';
@@ -79,7 +80,7 @@ describe('filet d’erreur', () => {
       faits: { ...faitsVides(), depenses: [null as unknown as Depense] },
       chargement: { phase: 'pret' }
     } as never);
-    render(<FiletErreur portee="ecran"><Achats annee={2026} /></FiletErreur>);
+    render(<FiletErreur portee="ecran"><Achats mois={mois('2026-06')} /></FiletErreur>);
     expect(screen.getByRole('alert').textContent).toMatch(/Cet écran n’a pas pu s’afficher/);
   });
 });

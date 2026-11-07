@@ -110,7 +110,9 @@ export function Argent({ annee }: ProprietesArgent = {}) {
   const [section, setSection] = useState<Section>('tresorerie');
   const { ecran, sousRoute } = useRoute();
   const routeIci = ecran.id === 'argent' ? sousRoute : '';
-  const [registre, setRegistre] = useState<Registre>(() => (routeIci === 'livre' ? 'livre' : null));
+  const [registre, setRegistre] = useState<Registre>(
+    () => (routeIci === 'livre' ? 'livre' : routeIci === 'tva' ? 'tva' : null)
+  );
   /* `#/argent/livre` est la porte du pied du rail : le livre des recettes est
      un registre qu'on vient consulter, et le chercher sous une rangée de
      liens au bas de l'écran demandait de savoir qu'il y était. C'est un
@@ -118,10 +120,13 @@ export function Argent({ annee }: ProprietesArgent = {}) {
      redevient celle de l'écran — fermer le panneau puis recharger ne doit
      pas le rouvrir. */
   useEffect(() => {
-    if (routeIci !== 'livre') return;
-    setRegistre('livre');
+    if (routeIci !== 'livre' && routeIci !== 'tva') return;
+    setRegistre(routeIci);
     window.location.replace('#/argent');
   }, [routeIci]);
+  /* `#/argent/tva` est le lien « Suivi & déclaration TVA » du registre des
+     achats : même geste, même raison — la déclaration se prépare depuis la
+     dépense qu'on vient de justifier, pas en cherchant le bouton ici. */
   const idGroupe = useId();
 
   // `undefined` explicite : `etatArgent` retombe alors sur sa propre valeur

@@ -37,8 +37,12 @@ function semer(modifications: Partial<Faits> = {}): void {
 
 beforeEach(() => semer());
 
+// Les dépenses de test sont de septembre 2026 : l'écran s'ouvre désormais sur
+// le mois de la barre du haut, pas sur « Tout ».
+const MOIS_TEST = mois('2026-09');
+
 function rendre(stockage = stockageMemoireJustificatifs()) {
-  const rendu = render(<Achats stockage={stockage} />);
+  const rendu = render(<Achats stockage={stockage} mois={MOIS_TEST} />);
   return { ...rendu, stockage };
 }
 
@@ -58,11 +62,11 @@ describe('ce que l’absence de pièce coûte', () => {
     expect(screen.queryByText(/sans justificatif/i)).toBeNull();
   });
 
-  it('marque chaque ligne sans pièce', () => {
+  it('marque chaque ligne sans pièce, et dit pourquoi la TVA manque', () => {
     semer({ depenses: [depense()] });
     rendre();
-    expect(screen.getByText('Sans pièce')).toBeTruthy();
-    expect(screen.getByText('TVA non récupérable')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'à joindre' })).toBeTruthy();
+    expect(screen.getByTitle('TVA non récupérable : pièce manquante')).toBeTruthy();
   });
 });
 
@@ -156,19 +160,23 @@ describe('franchise en base', () => {
       depenses: [depense({ justificatifId: 'p1' })]
     });
     rendre();
-    expect(screen.getByText('Franchise')).toBeTruthy();
+    expect(screen.getByTitle('Franchise en base')).toBeTruthy();
     expect(screen.queryByText(/sans justificatif/i)).toBeNull();
   });
 });
 
 describe('achats hors de France', () => {
   it('annonce la TVA à autoliquider', () => {
+    // En franchise seulement : un assujetti déduit la TVA qu'il autoliquide.
+    // Ce test passait autrefois sur le libellé de la tuile « À autoliquider »,
+    // affiché en permanence — sans jamais vérifier le bandeau.
     semer({
-      depenses: [depense({ provenance: 'ue', montantTtc: euros(100), tauxTva: ratio(0) })]
+      entreprise: { ...faitsVides().entreprise, tvaDepuis: null },
+      depenses: [depense({ provenance: 'ue', montantTtc: euros(120), tauxTva: ratio(0.2) })]
     });
     rendre();
-    expect(screen.getByText(/à autoliquider/i)).toBeTruthy();
-    expect(screen.getByText('Autoliquidation')).toBeTruthy();
+    expect(screen.getByText(/de TVA à autoliquider/i)).toBeTruthy();
+    expect(screen.getByTitle('Autoliquidation')).toBeTruthy();
   });
 });
 
@@ -248,8 +256,10 @@ describe('saisie', () => {
     await utilisateur.click(screen.getByRole('button', { name: /Ajouter, puis déposer la pièce/ }));
 
     expect(useFaits.getState().faits.depenses[0]?.payeeLe).toBeNull();
-    const liste = screen.getByRole('list');
-    expect(within(liste).getByText('Date à saisir')).toBeTruthy();
+    // Une dépense sans date n'appartient à aucun mois : on la retrouve dans
+    // « Tout », et son panneau s'ouvre quand même à la création.
+    await utilisateur.click(screen.getByRole('button', { name: 'Tout' }));
+    expect(within(screen.getByRole('table')).getByText('Date à saisir')).toBeTruthy();
   });
 });
 
@@ -279,9 +289,10 @@ describe('période d’observation', () => {
 
   // Naviguer dans un ensemble qui contient déjà tout ne mène nulle part : une
   // flèche inerte apprendrait que les flèches ne servent parfois à rien.
-  it('n’offre pas de navigation sur « Tout »', () => {
+  it('n’offre pas de navigation sur « Tout »', async () => {
     semer();
     render(<Achats />);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Tout' }));
     expect(screen.queryByRole('button', { name: 'Période précédente' })).toBeNull();
   });
 
@@ -374,37 +385,26 @@ describe('corriger une dépense', () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
-   O1 — l'année de la barre du haut ancre la période de l'écran
+   Le mois de la barre du haut ancre la période de l'écran
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * L'ANNÉE ANCRE, ELLE NE FILTRE PAS.
+ * LE MOIS ANCRE, IL NE FILTRE PAS.
  *
- * Le sélecteur d'année ne s'affichait que sur Argent : on le tournait ailleurs
- * et rien ne bougeait. Il commande désormais l'ancre à partir de laquelle la
- * barre de période compte — une seule source pour « quelle année », une pour
- * « quelle finesse », et toute combinaison des deux désigne un intervalle réel.
+ * Avec l'ancre d'année, choisir « mars » dans la barre du haut laissait
+ * Achats sur décembre. Le mois choisi est LE mois de l'application.
  */
-describe('l’année choisie ancre la période', () => {
-  it('ouvre la maille « mois » sur le dernier mois d’une année passée', async () => {
-    const utilisateur = userEvent.setup();
-    semer({ depenses: [depense({ payeeLe: dateISO('2025-12-05') })] });
-    render(<Achats annee={2025} />);
-
-    await utilisateur.click(screen.getByRole('button', { name: /^Mois/ }));
-    expect(screen.getByText('Décembre 2025')).toBeTruthy();
+describe('le mois choisi ancre la période', () => {
+  it('ouvre sur le mois choisi, en maille « Mois » par défaut', () => {
+    semer();
+    render(<Achats mois={mois('2025-03')} />);
+    expect(screen.getByText('Mars 2025')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Mois' }).getAttribute('aria-pressed')).toBe('true');
   });
 
-  /**
-   * SUR L'ANNÉE COURANTE, ON GARDE AUJOURD'HUI. Ancrer au 31 décembre y ferait
-   * ouvrir l'écran sur un mois qui n'est pas encore arrivé, donc vide.
-   */
-  it('garde le mois en cours sur l’année courante', async () => {
-    const utilisateur = userEvent.setup();
+  it('retombe sur le mois courant quand l’écran est monté seul', () => {
     semer();
-    render(<Achats annee={new Date().getFullYear()} />);
-
-    await utilisateur.click(screen.getByRole('button', { name: /^Mois/ }));
+    render(<Achats />);
     const attendu = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' })
       .format(new Date());
     const [moisLu, anneeLue] = attendu.split(' ');
@@ -414,13 +414,141 @@ describe('l’année choisie ancre la période', () => {
   });
 
   /** La barre de période continue de naviguer PAR-DESSUS l'ancre. */
-  it('laisse reculer d’un mois à l’intérieur de l’année ancrée', async () => {
-    const utilisateur = userEvent.setup();
+  it('laisse reculer d’un mois à partir du mois choisi', async () => {
     semer();
-    render(<Achats annee={2025} />);
+    render(<Achats mois={mois('2025-03')} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: /précédent/i }));
+    expect(screen.getByText('Février 2025')).toBeTruthy();
+  });
 
-    await utilisateur.click(screen.getByRole('button', { name: /^Mois/ }));
-    await utilisateur.click(screen.getByRole('button', { name: /précédent/i }));
-    expect(screen.getByText('Novembre 2025')).toBeTruthy();
+  it('ne montre que les dépenses du mois choisi', () => {
+    semer({ depenses: [
+      depense({ id: 'a', libelle: 'Ce mois', payeeLe: dateISO('2026-09-10') }),
+      depense({ id: 'b', libelle: 'Autre mois', payeeLe: dateISO('2026-08-10') })
+    ] });
+    rendre();
+    expect(screen.getByText('Ce mois')).toBeTruthy();
+    expect(screen.queryByText('Autre mois')).toBeNull();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Tuiles, rapprochement, registre
+   ───────────────────────────────────────────────────────────────────────── */
+
+const mouvement = (m: Partial<Faits['mouvementsBancaires'][number]> = {}) => ({
+  id: 'm1', date: dateISO('2026-09-12'), libelle: 'PRLV GITHUB INC', montant: euros(-24),
+  rapprocheAvec: null, sansContrepartie: null, ...m
+});
+
+describe('repère et tuiles', () => {
+  it('annonce les justificatifs manquants avec l’accord du pluriel', () => {
+    semer({ depenses: [depense({ id: 'a' }), depense({ id: 'b' })] });
+    rendre();
+    expect(screen.getByText('2 justificatifs manquants')).toBeTruthy();
+  });
+
+  it('dit que tout est justifié quand chaque dépense a sa pièce', () => {
+    semer({ depenses: [depense({ justificatifId: 'p1' })] });
+    rendre();
+    expect(screen.getByText('Tout est justifié')).toBeTruthy();
+  });
+
+  it('souligne « À rapprocher » seulement quand il reste quelque chose', () => {
+    semer({ depenses: [depense({ justificatifId: 'p1' })] });
+    rendre();
+    expect(screen.getByText('À rapprocher').parentElement?.className).not.toMatch(/Soulignee/);
+    cleanup();
+    semer({ depenses: [depense()], mouvementsBancaires: [mouvement()] });
+    rendre();
+    expect(screen.getByText('À rapprocher').parentElement?.className).toMatch(/Soulignee/);
+  });
+});
+
+describe('rapprochement bancaire', () => {
+  // Sans ce bloc, une opération du compte sans dépense restait invisible
+  // dans l'écran des achats : la dépense oubliée n'était jamais saisie.
+  it('crée la dépense depuis l’opération, pré-remplie, et la relie', async () => {
+    semer({ mouvementsBancaires: [mouvement()] });
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Créer la dépense' }));
+    expect(screen.getByLabelText<HTMLInputElement>('Fournisseur').value).toBe('Github');
+    expect(screen.getByLabelText<HTMLInputElement>('Montant TTC (€)').value).toBe('24');
+    expect(screen.getByLabelText<HTMLInputElement>('Payée le').value).toBe('2026-09-12');
+
+    await utilisateur.click(screen.getByRole('button', { name: /Créer et relier/ }));
+    const faits = useFaits.getState().faits;
+    expect(faits.depenses).toHaveLength(1);
+    expect(faits.mouvementsBancaires[0]?.rapprocheAvec).toBe(faits.depenses[0]?.id);
+  });
+
+  it('relie une dépense saisie à l’opération qui lui correspond', async () => {
+    semer({
+      depenses: [depense({ montantTtc: euros(24), payeeLe: dateISO('2026-09-12') })],
+      mouvementsBancaires: [mouvement()]
+    });
+    rendre();
+    const bloc = screen.getByText('Rapprochement bancaire').closest('section') as HTMLElement;
+    // Deux « Relier » : l'opération (côté haut) et la dépense en attente. Les deux posent le même lien.
+    await userEvent.setup().click(within(bloc).getAllByRole('button', { name: 'Relier' })[0] as HTMLElement);
+    const faits = useFaits.getState().faits;
+    expect(faits.mouvementsBancaires[0]?.rapprocheAvec).toBe('d1');
+    expect(faits.depenses[0]?.rapprochement).toBe('rapproche');
+  });
+
+  it('associe un crédit à la facture en attente, encaissée à la date de l’opération', async () => {
+    semer({
+      recettes: [{
+        id: 'r1', clientNom: 'Client Fictif', libelle: 'Prestation', montant: euros(4160),
+        emiseLe: dateISO('2026-08-20'), encaisseeLe: null, modeReglement: null, numero: 'F-023'
+      }],
+      mouvementsBancaires: [mouvement({ montant: euros(4160), libelle: 'VIR SEPA CLIENT' })]
+    });
+    rendre();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Associer' }));
+    const faits = useFaits.getState().faits;
+    expect(faits.recettes[0]?.encaisseeLe).toBe('2026-09-12');
+    expect(faits.mouvementsBancaires[0]?.rapprocheAvec).toBe('r1');
+  });
+
+  it('range une dépense « hors compte » : elle n’attend plus d’opération', async () => {
+    semer({ depenses: [depense()], mouvementsBancaires: [mouvement({ montant: euros(-5) })] });
+    rendre();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Hors compte' }));
+    expect(useFaits.getState().faits.depenses[0]?.rapprochement).toBe('sans_banque');
+  });
+
+  it('n’apparaît pas sans relevé importé', () => {
+    semer({ depenses: [depense()] });
+    rendre();
+    expect(screen.queryByText('Rapprochement bancaire')).toBeNull();
+  });
+});
+
+describe('registre en tableau', () => {
+  it('marque les dépenses récurrentes d’un « ↻ » nommé', () => {
+    semer({ depenses: [
+      depense({ id: 'a', payeeLe: dateISO('2026-09-03') }),
+      depense({ id: 'b', payeeLe: dateISO('2026-08-03') })
+    ] });
+    rendre();
+    expect(screen.getAllByRole('img', { name: 'récurrente' })).toHaveLength(1);
+    expect(screen.getByText(/de dépenses récurrentes sur la période/)).toBeTruthy();
+  });
+
+  it('pointe le suivi de TVA vers #/argent/tva', () => {
+    semer({ depenses: [depense()] });
+    rendre();
+    expect(screen.getByRole('link', { name: /Suivi & déclaration TVA/ }).getAttribute('href'))
+      .toBe('#/argent/tva');
+  });
+
+  it('ouvre la dépense au clic sur sa ligne', async () => {
+    semer({ depenses: [depense()] });
+    rendre();
+    await userEvent.setup().click(screen.getByRole('button', { name: /Abonnement/ }));
+    expect(await screen.findByLabelText(/Déposer une pièce/i)).toBeTruthy();
   });
 });

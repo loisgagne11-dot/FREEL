@@ -75,6 +75,12 @@ export interface EtatAchats {
   readonly candidats: ReadonlyMap<string, readonly EcritureRapprochable[]>;
   /** Dépenses dont la date de paiement manque : ni exercice, ni régime. */
   readonly sansDate: number;
+  /**
+   * Une dépense par son identifiant, PÉRIODE IGNORÉE : le panneau de détail
+   * doit pouvoir ouvrir une dépense sans date ou d'un autre mois — celle qu'on
+   * vient de créer — que le registre, filtré, ne montre pas.
+   */
+  readonly trouver: (id: string) => LigneDepense | null;
   /** La période observée — l'écran l'affiche, il ne la redécoupe pas. */
   readonly periode: Periode;
 }
@@ -99,21 +105,33 @@ export function etatAchats(
   // affichée juste en dessous.
   const retenues = faits.depenses.filter((d) => dansLaPeriode(d.payeeLe, periode));
 
-  const lignes = [...retenues]
-    .sort(comparerParDate)
-    .map((depense) => {
-      const c = contexte(depense);
-      return {
-        depense,
-        tva: tvaDeDepense(depense, c),
-        rapprochement: rapprochementEffectif(depense, c),
-        regimeTva: c.regimeTva
-      };
-    });
+  // Un mouvement qui pointe vers la dépense la rapproche, quel que soit l'état
+  // stocké sur la dépense : le rapprochement fait depuis le relevé ne touche
+  // que le mouvement, et le registre afficherait « en attente » une dépense
+  // que le relevé dit rapprochée.
+  const reliees = new Set(
+    faits.mouvementsBancaires.map((m) => m.rapprocheAvec).filter((id): id is string => id !== null)
+  );
+  const ligneDe = (depense: Depense): LigneDepense => {
+    const c = contexte(depense);
+    const effectif = rapprochementEffectif(depense, c);
+    return {
+      depense,
+      tva: tvaDeDepense(depense, c),
+      rapprochement: effectif === 'en_attente' && reliees.has(depense.id) ? 'rapproche' : effectif,
+      regimeTva: c.regimeTva
+    };
+  };
+
+  const lignes = [...retenues].sort(comparerParDate).map(ligneDe);
 
   return {
     periode,
     lignes,
+    trouver: (id) => {
+      const d = faits.depenses.find((x) => x.id === id);
+      return d === undefined ? null : ligneDe(d);
+    },
     resume: resumerDepenses(retenues, contexte),
     banqueReliee: soldeEstSuivi(faits),
     resumeBanque: resumerRapprochement(faits.mouvementsBancaires, ecritures),

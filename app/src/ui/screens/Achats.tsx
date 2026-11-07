@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
-import { ajouterDepense, attacherJustificatif, definirRapprochement, modifierDepense, supprimerDepense } from '../../state/ecritures.achats';
+import {
+  ajouterDepense, attacherJustificatif, definirRapprochement, modifierDepense,
+  rapprocherMouvement, supprimerDepense
+} from '../../state/ecritures.achats';
 import { type LigneDepense, etatAchats } from '../../state/selecteurs.achats';
+import { fournisseurDepuisLibelle, suiviRapprochement, tuilesAchats } from '../../state/selecteurs.achats.suivi';
+import { moisCourant } from '../../state/selecteurs';
+import { depensesRecurrentes } from '../../domain/calculs/depenses.recurrence';
+import type { MouvementBancaire } from '../../domain/calculs/banque';
+import { BlocRapprochement } from './Achats.rapprochement';
+import { RegistreAchats } from './Achats.registre';
 import type { Depense } from '../../state/schema';
 import {
   type EtatRapprochement, type ProvenanceFournisseur,
   libelleMotif
 } from '../../domain/calculs/depenses';
-import { dateISO, euros, ratio } from '../../domain/types';
+import { type Mois, dateISO, euros, ratio } from '../../domain/types';
 import {
   type MetaJustificatif, type StockageJustificatifs,
   deposerJustificatif, stockageIndexedDB, verifierIntegrite
@@ -16,7 +25,7 @@ import {
 import { Greet } from '../components/Greet';
 import { BarrePeriode } from '../components/BarrePeriode';
 import {
-  type Granularite, ancreDeLAnnee, periodeCourante
+  type Granularite, ancreDuMois, periodeCourante
 } from '../../domain/calculs/periode';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
@@ -57,13 +66,13 @@ export interface ProprietesAchats {
    */
   readonly stockage?: StockageJustificatifs;
   /**
-   * L'année choisie dans la barre du haut : elle ANCRE la période de l'écran,
-   * elle ne s'y ajoute pas. Voir `ancreDeLAnnee`.
+   * Le mois choisi dans la barre du haut : il ANCRE la période de l'écran,
+   * elle ne s'y ajoute pas. Voir `ancreDuMois`.
    *
-   * `undefined` retombe sur l'année de l'horloge — le cas des tests qui
-   * montent cet écran seul, sans la coquille qui porte le sélecteur.
+   * `undefined` retombe sur le mois courant — le cas des tests qui montent
+   * cet écran seul, sans la coquille qui porte la barre.
    */
-  readonly annee?: number;
+  readonly mois?: Mois;
 }
 
 type Section = 'depenses' | 'releve';
@@ -77,12 +86,13 @@ const SECTIONS = [
 type Panneau =
   | { readonly type: 'ferme' }
   | { readonly type: 'detail'; readonly id: string }
-  | { readonly type: 'ajout' }
+  /** `depuis` : l'opération du relevé dont la dépense est créée. */
+  | { readonly type: 'ajout'; readonly depuis?: MouvementBancaire }
   | { readonly type: 'edition'; readonly id: string };
 
 const stockageParDefaut = stockageIndexedDB();
 
-export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats = {}) {
+export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats = {}) {
   const faits = useFaits((e) => e.faits);
 
   /**
@@ -112,41 +122,41 @@ export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats
    * de maille doit repartir de la période courante, pas conserver un décalage
    * de « trois mois en arrière » devenu « trois ans en arrière ».
    */
-  const [granularite, setGranularite] = useState<Granularite>('tout');
+  const [granularite, setGranularite] = useState<Granularite>('mois');
   const [decalage, setDecalage] = useState(0);
   /*
-   * L'ANNÉE CHOISIE EST L'ANCRE, PAS UN FILTRE DE PLUS.
+   * LE MOIS CHOISI EST L'ANCRE, PAS UN FILTRE DE PLUS.
    *
-   * La barre du haut dit QUELLE ANNÉE, la barre de période dit QUELLE FINESSE.
-   * Les empiler en deux filtres successifs donnerait « le mois d'août, dans
-   * l'année 2025 » alors que la barre pointe sur août 2026 — un ensemble vide
-   * présenté comme un résultat. Voir `ancreDeLAnnee`.
+   * La barre du haut dit QUEL MOIS, la barre de période dit QUELLE FINESSE.
+   * Les empiler en deux filtres donnerait « le mois d'août, dans le mois de
+   * mars » : un ensemble vide présenté comme un résultat. Voir `ancreDuMois`.
    */
-  const ancre = useMemo(() => ancreDeLAnnee(annee ?? new Date().getFullYear()), [annee]);
+  const ancre = useMemo(() => ancreDuMois(mois ?? moisCourant()), [mois]);
   const periode = useMemo(
     () => periodeCourante(granularite, ancre, decalage),
     [granularite, ancre, decalage]
   );
 
   const etat = useMemo(() => etatAchats(faits, new Date(), periode), [faits, periode]);
-  const selection = panneau.type === 'detail'
-    ? etat.lignes.find((l) => l.depense.id === panneau.id) ?? null
-    : null;
-  const enEdition = panneau.type === 'edition'
-    ? etat.lignes.find((l) => l.depense.id === panneau.id)?.depense ?? null
-    : null;
+  const suivi = useMemo(() => suiviRapprochement(faits, periode), [faits, periode]);
+  const recurrentes = useMemo(() => depensesRecurrentes(faits.depenses), [faits.depenses]);
+  const tuiles = useMemo(() => tuilesAchats(etat, suivi, recurrentes), [etat, suivi, recurrentes]);
+  // Par `trouver` et non dans `etat.lignes` : la dépense qu'on vient de créer
+  // sans date, ou d'un autre mois, n'est pas dans le registre filtré, et son
+  // panneau doit pourtant s'ouvrir pour y déposer la pièce.
+  const selection = panneau.type === 'detail' ? etat.trouver(panneau.id) : null;
+  const enEdition = panneau.type === 'edition' ? etat.trouver(panneau.id)?.depense ?? null : null;
+  const n = tuiles.justificatifsManquants;
 
   const fermer = useCallback(() => setPanneau({ type: 'ferme' }), []);
 
   return (
     <>
       <Greet
-        titre="Achats"
+        titre="Achats & justificatifs"
         sousTitre="Une dépense sans pièce ne récupère pas sa TVA : c’est la règle, et elle n’est pas contournable."
-        repere={etat.resume.sansJustificatif === 0
-          ? 'Tout est justifié'
-          : `${etat.resume.sansJustificatif} justificatif${etat.resume.sansJustificatif > 1 ? 's' : ''} manquant${etat.resume.sansJustificatif > 1 ? 's' : ''}`}
-        actions={section === 'depenses' && etat.lignes.length > 0 ? (
+        repere={n === 0 ? 'Tout est justifié' : `${n} justificatif${n > 1 ? 's' : ''} manquant${n > 1 ? 's' : ''}`}
+        actions={section === 'depenses' && faits.depenses.length > 0 ? (
           <button
             type="button"
             className={styles.actionPrincipale}
@@ -181,22 +191,31 @@ export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats
       />
 
       <div className={styles.grille}>
-        <Chiffre libelle="Total TTC" valeur={eur(etat.resume.totalTtc)} />
-        <Chiffre
-          libelle="TVA récupérable"
-          valeur={eur(etat.resume.tvaRecuperable)}
-          ton="accent"
-        />
-        <Chiffre
-          libelle="TVA perdue, faute de pièce"
-          valeur={eur(etat.resume.tvaPerdueFauteDePiece)}
-          ton={etat.resume.tvaPerdueFauteDePiece > 0 ? 'danger' : 'neutre'}
-        />
-        <Chiffre
-          libelle="À autoliquider"
-          valeur={eur(etat.resume.tvaAAutoliquider)}
-          ton={etat.resume.tvaAAutoliquider > 0 ? 'attention' : 'neutre'}
-        />
+        <Tuile libelle={`Dépenses · ${etat.periode.libelle.toLowerCase()}`}>
+          <Montant>{eur(tuiles.depenses.totalTtc)}</Montant>
+          <span className={styles.tuileSous}>
+            {tuiles.depenses.nombre} achat{tuiles.depenses.nombre > 1 ? 's' : ''} · TTC
+          </span>
+        </Tuile>
+        <Tuile libelle="TVA déductible">
+          <Montant>{eur(tuiles.tva.deductible)}</Montant>
+          {tuiles.tva.nonRecuperable > 0 && (
+            <span className={styles.tuileSous}>
+              <Montant>{eur(tuiles.tva.nonRecuperable)}</Montant> non récup. · pièce manquante
+            </span>
+          )}
+        </Tuile>
+        <Tuile libelle="À rapprocher" soulignee={tuiles.aRapprocher.total > 0}>
+          {tuiles.aRapprocher.total}
+          <span className={styles.tuileSous}>
+            {tuiles.aRapprocher.operations} opération{tuiles.aRapprocher.operations > 1 ? 's' : ''}
+            {' · '}{tuiles.aRapprocher.depenses} dépense{tuiles.aRapprocher.depenses > 1 ? 's' : ''}
+          </span>
+        </Tuile>
+        <Tuile libelle="Justificatifs manquants" soulignee={n > 0}>
+          {n}
+          <span className={styles.tuileSous}>à joindre avant déclaration</span>
+        </Tuile>
       </div>
 
       {/* Les avertissements sont au-dessus de la liste : les mettre en bas
@@ -242,6 +261,14 @@ export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats
         </p>
       )}
 
+      {suivi.aTraiter > 0 && (
+        <BlocRapprochement
+          suivi={suivi}
+          onCreer={(m) => setPanneau({ type: 'ajout', depuis: m })}
+          onOuvrir={(id) => setPanneau({ type: 'detail', id })}
+        />
+      )}
+
       {/*
         * Le registre est pliable, et sa synthèse est celle que la spec écrit
         * mot pour mot : « n achats · X € TTC · TVA déductible Y € · Z pièce(s)
@@ -252,14 +279,14 @@ export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats
       <CartePliable
         id="registre"
         ecran="achats"
-        titre="Dépenses"
+        titre={`Registre des achats — ${etat.periode.libelle.toLowerCase()}`}
         resume={synthese(etat)}
         {...(etat.sansDate > 0
           ? { actions: <span className={styles.compteur}>{etat.sansDate} sans date</span> }
           : {})}
       >
 
-        {etat.lignes.length === 0
+        {faits.depenses.length === 0
           ? (
             <Vide
               message={(
@@ -280,17 +307,30 @@ export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats
               )}
             />
           )
-          : (
-            <ul className={styles.liste}>
-              {etat.lignes.map((ligne) => (
-                <LigneListe
-                  key={ligne.depense.id}
-                  ligne={ligne}
-                  onOuvrir={() => setPanneau({ type: 'detail', id: ligne.depense.id })}
-                />
-              ))}
-            </ul>
-          )}
+          : etat.lignes.length === 0
+            ? <p className={styles.vide}>Aucune dépense sur cette période.</p>
+            : (
+              <RegistreAchats
+                lignes={etat.lignes}
+                periode={etat.periode}
+                recurrentes={recurrentes}
+                totalTtc={etat.resume.totalTtc}
+                totalTva={etat.resume.tvaRecuperable}
+                onOuvrir={(id) => setPanneau({ type: 'detail', id })}
+              />
+            )}
+
+        {tuiles.recurrentTtc > 0 && (
+          <p className={styles.recurrentes}>
+            <span aria-hidden="true">↻ </span>
+            <strong><Montant>{eur(tuiles.recurrentTtc)}</Montant></strong>
+            {' '}de dépenses récurrentes sur la période
+          </p>
+        )}
+
+        <p className={styles.piedRegistre}>
+          <a className={styles.lienTva} href="#/argent/tva">Suivi &amp; déclaration TVA</a>
+        </p>
       </CartePliable>
 
         </PanneauOnglet>
@@ -316,21 +356,31 @@ export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats
       </Sheet>
 
       <Sheet ouvert={panneau.type === 'ajout'} titre="Ajouter une dépense" onFermer={fermer}>
-        <FormulaireDepense
-          onValider={(champs) => {
-            const id = ajouterDepense({
-              ...champs,
-              // Une dépense naît sans pièce, et l'écran le dit immédiatement.
-              // Créer avec une pièce supposée serait revenir au `piece: true`
-              // de l'ancienne version.
-              justificatifId: null,
-              rapprochement: 'en_attente'
-            });
-            // On enchaîne sur le détail : c'est là que la pièce se dépose, et
-            // une dépense créée sans pièce est précisément le problème.
-            setPanneau({ type: 'detail', id });
-          }}
-        />
+        {panneau.type === 'ajout' && (
+          <FormulaireDepense
+            // Une clé par opération : passer d'une opération à l'autre doit
+            // repartir d'un formulaire neuf, pas garder la saisie précédente.
+            key={panneau.depuis?.id ?? 'vierge'}
+            {...(panneau.depuis === undefined ? {} : { prefill: prefillDepuis(panneau.depuis) })}
+            onValider={(champs) => {
+              const depuis = panneau.depuis;
+              const id = ajouterDepense({
+                ...champs,
+                // Une dépense naît sans pièce, et l'écran le dit immédiatement.
+                // Créer avec une pièce supposée serait revenir au `piece: true`
+                // de l'ancienne version.
+                justificatifId: null,
+                rapprochement: depuis === undefined ? 'en_attente' : 'rapproche'
+              });
+              // Créée DEPUIS une opération : le lien est posé dans le même
+              // geste, sinon l'opération resterait « sans dépense associée ».
+              if (depuis !== undefined) rapprocherMouvement(depuis.id, id);
+              // On enchaîne sur le détail : c'est là que la pièce se dépose, et
+              // une dépense créée sans pièce est précisément le problème.
+              setPanneau({ type: 'detail', id });
+            }}
+          />
+        )}
       </Sheet>
 
       <Sheet
@@ -354,52 +404,6 @@ export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats
       </Sheet>
     </>
   );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Liste
-   ───────────────────────────────────────────────────────────────────────── */
-
-function LigneListe({ ligne, onOuvrir }: { ligne: LigneDepense; onOuvrir: () => void }) {
-  const { depense, tva } = ligne;
-  return (
-    <li className={styles.ligne}>
-      <button type="button" className={styles.ouvrir} onClick={onOuvrir}>
-        <span className={styles.ligneTitre}>
-          <span className={styles.ligneLibelle}>{depense.libelle || 'Sans libellé'}</span>
-          <span className={styles.ligneMontant}><Montant>{eur(depense.montantTtc)}</Montant></span>
-        </span>
-        <span className={styles.ligneMeta}>
-          <span>{depense.fournisseur || 'Fournisseur non renseigné'}</span>
-          <span aria-hidden="true">·</span>
-          <span className={depense.payeeLe === null ? styles.manquant : undefined}>
-            {depense.payeeLe === null ? 'Date à saisir' : dateCourte(depense.payeeLe)}
-          </span>
-        </span>
-        <span className={styles.pastilles}>
-          <Pastille
-            ton={depense.justificatifId === null ? 'danger' : 'accent'}
-            texte={depense.justificatifId === null ? 'Sans pièce' : 'Pièce conservée'}
-          />
-          {tva.motifNonRecuperable === null
-            ? <Pastille ton="accent" texte={`TVA ${eur(tva.recuperable)}`} />
-            : <Pastille ton="neutre" texte={etiquetteMotif(ligne)} />}
-          <Pastille ton="neutre" texte={etiquetteRapprochement(ligne.rapprochement)} />
-        </span>
-      </button>
-    </li>
-  );
-}
-
-/** Étiquette courte du motif. Le texte complet est dans le panneau de détail. */
-function etiquetteMotif(ligne: LigneDepense): string {
-  switch (ligne.tva.motifNonRecuperable) {
-    case 'franchise': return 'Franchise';
-    case 'justificatif_manquant': return 'TVA non récupérable';
-    case 'autoliquidation': return 'Autoliquidation';
-    case 'taux_nul': return 'Sans TVA';
-    case null: return '';
-  }
 }
 
 function etiquetteRapprochement(etat: EtatRapprochement): string {
@@ -642,24 +646,43 @@ type ChampsDepense = Pick<
   Depense, 'libelle' | 'fournisseur' | 'provenance' | 'montantTtc' | 'tauxTva' | 'payeeLe'
 >;
 
+/** Ce qu'une opération du relevé donne au formulaire : à relire, pas à croire. */
+function prefillDepuis(m: MouvementBancaire): Prefill {
+  return {
+    libelle: fournisseurDepuisLibelle(m.libelle),
+    fournisseur: fournisseurDepuisLibelle(m.libelle),
+    montant: String(Math.abs(m.montant)),
+    date: m.date
+  };
+}
+
+interface Prefill {
+  readonly libelle: string;
+  readonly fournisseur: string;
+  readonly montant: string;
+  readonly date: string;
+}
+
 function FormulaireDepense(
-  { onValider, initiale }: {
+  { onValider, initiale, prefill }: {
     readonly onValider: (champs: ChampsDepense) => void;
+    /** Valeurs de départ d'une création, tirées d'une opération bancaire. */
+    readonly prefill?: Prefill;
     /** La dépense à corriger. Absente, le formulaire en crée une. */
     readonly initiale?: Depense;
   }
 ) {
   const idChamp = useId();
   const correction = initiale !== undefined;
-  const [libelle, setLibelle] = useState(initiale?.libelle ?? '');
-  const [fournisseur, setFournisseur] = useState(initiale?.fournisseur ?? '');
+  const [libelle, setLibelle] = useState(initiale?.libelle ?? prefill?.libelle ?? '');
+  const [fournisseur, setFournisseur] = useState(initiale?.fournisseur ?? prefill?.fournisseur ?? '');
   const [montant, setMontant] = useState(
-    initiale === undefined ? '' : String(initiale.montantTtc)
+    initiale === undefined ? (prefill?.montant ?? '') : String(initiale.montantTtc)
   );
   const [taux, setTaux] = useState(
     initiale === undefined ? '20' : String(Math.round(initiale.tauxTva * 1000) / 10)
   );
-  const [date, setDate] = useState(initiale?.payeeLe ?? '');
+  const [date, setDate] = useState(initiale?.payeeLe ?? prefill?.date ?? '');
   const [provenance, setProvenance] = useState<ProvenanceFournisseur>(
     initiale?.provenance ?? 'france'
   );
@@ -727,7 +750,7 @@ function FormulaireDepense(
       {erreur !== null && <p role="alert" className={styles.verdictDanger}>{erreur}</p>}
 
       <button type="submit" className={styles.actionPrincipale}>
-        {correction ? 'Enregistrer la correction' : 'Ajouter, puis déposer la pièce'}
+        {correction ? 'Enregistrer la correction' : prefill === undefined ? 'Ajouter, puis déposer la pièce' : 'Créer et relier à l’opération'}
       </button>
     </form>
   );
@@ -753,29 +776,20 @@ function Fait({ terme, valeur }: { terme: string; valeur: string }) {
   );
 }
 
-function Chiffre(
-  { libelle, valeur, ton = 'neutre' }: {
+function Tuile(
+  { libelle, soulignee = false, children }: {
     libelle: string;
-    valeur: string;
-    ton?: 'neutre' | 'accent' | 'attention' | 'danger';
+    /** Liseré ambre : il y a quelque chose à faire. */
+    soulignee?: boolean;
+    children: ReactNode;
   }
 ) {
-  const classe = ton === 'danger' ? styles.danger
-    : ton === 'attention' ? styles.attention
-    : ton === 'accent' ? styles.accent : '';
   return (
-    <div className={styles.chiffre}>
+    <div className={`${styles.tuile} ${soulignee ? styles.tuileSoulignee : ''}`}>
       <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classe}`}><Montant>{valeur}</Montant></span>
+      <span className={styles.montant}>{children}</span>
     </div>
   );
-}
-
-function Pastille({ ton, texte }: { ton: 'neutre' | 'accent' | 'danger'; texte: string }) {
-  if (texte === '') return null;
-  const classe = ton === 'danger' ? styles.pastilleDanger
-    : ton === 'accent' ? styles.pastilleAccent : '';
-  return <span className={`${styles.pastille} ${classe}`}>{texte}</span>;
 }
 
 /**

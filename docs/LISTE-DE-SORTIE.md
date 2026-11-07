@@ -137,11 +137,11 @@ Sert de filet aux lots 5 et 6.
 
 | Ligne | État |
 |---|---|
-| La période d'Achats suit le mois de la barre du haut, « Mois » par défaut comme le handoff (elle ouvrait sur « Tout ») | ⬜ |
-| Titre « Achats & justificatifs », repère « N justificatif(s) manquant(s) » | ⬜ |
-| Quatre tuiles du handoff : Dépenses de la période (TTC, nombre d'achats), TVA déductible (dont non récupérable faute de pièce), À rapprocher (opérations · dépenses), Justificatifs manquants ; l'autoliquidation reste en bandeau | ⬜ |
-| Bloc « Rapprochement bancaire » sur l'onglet Dépenses : opérations du compte sans dépense, avec l'action proposée (associer à une facture, relier à une dépense, **créer la dépense depuis l'opération**), et dépenses en attente de leur opération | ⬜ |
-| Registre des achats en tableau : date, fournisseur, TTC, dont TVA, justificatif, rapprochement ; ligne de total ; dépenses récurrentes DÉRIVÉES (même fournisseur, même montant, mois consécutifs), jamais saisies ; lien « Suivi & déclaration TVA » (`#/argent/tva`) | ⬜ |
+| La période d'Achats suit le mois de la barre du haut, « Mois » par défaut comme le handoff (elle ouvrait sur « Tout ») | ✅ fait : `ancreDuMois` ; une dépense sans date ne se voit plus qu'en « Tout ». *Facturier et Outils s'ancrent encore sur l'année : à aligner* |
+| Titre « Achats & justificatifs », repère « N justificatif(s) manquant(s) » | ✅ fait |
+| Quatre tuiles du handoff : Dépenses de la période (TTC, nombre d'achats), TVA déductible (dont non récupérable faute de pièce), À rapprocher (opérations · dépenses), Justificatifs manquants ; l'autoliquidation reste en bandeau | ✅ fait : les « justificatifs manquants » comptent les PIÈCES absentes, pas la TVA perdue (nulle en franchise, alors que la pièce manque) |
+| Bloc « Rapprochement bancaire » sur l'onglet Dépenses : opérations du compte sans dépense, avec l'action proposée (associer à une facture, relier à une dépense, **créer la dépense depuis l'opération**), et dépenses en attente de leur opération | ✅ fait : associer (encaisse la facture à la date de l'opération), relier, créer la dépense pré-remplie et reliée, hors compte. Un crédit sans facture propose « sans contrepartie », jamais une dépense |
+| Registre des achats en tableau : date, fournisseur, TTC, dont TVA, justificatif, rapprochement ; ligne de total ; dépenses récurrentes DÉRIVÉES (même fournisseur, même montant, mois consécutifs), jamais saisies ; lien « Suivi & déclaration TVA » (`#/argent/tva`) | ✅ fait ; défile dans sa carte sur téléphone |
 | Filtre par compte (Tous / Qonto / BNP / Perso) | ⬜ hors lot : ni les dépenses ni les mouvements ne portent de compte — demande un schéma 20 |
 
 ## Reste fonctionnel par écran
@@ -196,10 +196,10 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Tuiles « à rapprocher » et « justificatifs manquants » | ◐ | Les tuiles sont TTC, TVA récupérable, TVA perdue, à autoliquider ; les pièces manquantes sont dans le sous-titre | à planifier |
-| Rapprochement : créer une dépense depuis une opération orpheline | ⬜ | Seuls « associer » et « sans contrepartie » existent | à planifier |
+| Tuiles « à rapprocher » et « justificatifs manquants » | ✅ | Lot 8 | 8 |
+| Rapprochement : créer une dépense depuis une opération orpheline | ✅ | Lot 8 : formulaire pré-rempli, dépense reliée à l'opération | 8 |
 | État « ignorée » au rapprochement | ◐ | Le motif `autre` s'en approche | à planifier |
-| Dépenses récurrentes signalées, totalisées, générées | ⬜ | Aucune notion de récurrence | à planifier |
+| Dépenses récurrentes signalées, totalisées, générées | ◐ | Lot 8 : signalées et totalisées, DÉRIVÉES (même fournisseur, même montant, mois voisins) ; pas générées — une dépense créée d'avance serait un fait inventé | 8 |
 | Filtre par compte | ⬜ | Seule la barre de période existe | à planifier |
 | Import OFX | ⬜ | Aucun | à planifier |
 | Correction ou suppression à la main d'un mouvement importé | ⬜ | Aucune action | à planifier |

@@ -626,3 +626,13 @@ solde − provisions − réserve.
 | Montants en k€ | Graphes d'Argent | Deux arrondis (« 11 k€ » pour douze mois entre 10 500 et 11 400 €) | Une décimale partout au-delà de 1 000 € |
 | Jours de retard | Facturier, relances, DES, rapprochement, « à traiter » | Six calculs ; une date illisible donnait « 0 jour » de retard au facturier | Un seul, en UTC ; une date illisible ne passe plus pour « pas de retard » |
 
+## Lot 8 (07/11) — Achats
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Dépenses de la période | Achats | Total TTC de toute la période « Tout » | Total TTC du mois de la barre, et le nombre d'achats |
+| TVA déductible | Achats | « TVA récupérable » | Même nombre, avec la part perdue faute de pièce en sous-ligne |
+| À rapprocher | Achats | Seulement dans l'onglet Relevé | Opérations sans dépense + dépenses en attente de leur opération |
+| Justificatifs manquants | Achats | Dans le sous-titre | Tuile ; compte les pièces absentes, même sans TVA en jeu (franchise) |
+| Dépenses récurrentes | Achats → registre | — | Total des dépenses récurrentes de la période (dérivé) |
+
