@@ -1,10 +1,23 @@
-import type { MouseEvent, ReactNode } from 'react';
+import { type MouseEvent, type ReactNode, Suspense, lazy } from 'react';
 import { RailNav } from './components/RailNav';
-import { PastillesSysteme } from './components/PastillesSysteme';
 import { IndicateurATraiter } from './components/IndicateurATraiter';
 import { useRoute } from './useRoute';
 import type { IdEcran } from './navigation';
 import styles from './Shell.module.css';
+
+/**
+ * Les pastilles système (stockage, mode confidentiel, palette), chargées à la
+ * demande — comme le sélecteur d'année.
+ *
+ * Le paquet d'entrée a dépassé son budget au lot 3 (80,08 / 80 Ko) et
+ * l'invariant n°7 dit d'extraire. Elles sont sûres à différer : le mode
+ * confidentiel est appliqué AVANT React par le script de `index.html`, et ces
+ * pastilles ne font que le basculer. Les montants ne sont donc jamais visibles
+ * le temps qu'elles arrivent ; seuls les boutons apparaissent quelques
+ * millisecondes plus tard.
+ */
+const PastillesSysteme = lazy(() =>
+  import('./components/PastillesSysteme').then((m) => ({ default: m.PastillesSysteme })));
 
 export interface ProprietesShell {
   readonly children: ReactNode;
@@ -73,7 +86,7 @@ export function Shell({ children, compteurs, periode }: ProprietesShell) {
           {/* En tête des pastilles, jamais au-dessus d'un contrôle : en
               portrait il flotte au-dessus du dock, en paysage il vit ici. */}
           <IndicateurATraiter ecranActif={ecran.id} />
-          <PastillesSysteme />
+          <Suspense fallback={null}><PastillesSysteme /></Suspense>
           <div data-emplacement="actions" />
         </header>
 

@@ -89,6 +89,10 @@ export interface EntreeATraiter {
   readonly periodicite: 'mensuel' | 'trimestriel';
   /** Mois de début d'activité : rien n'est dû avant. */
   readonly debutActivite: Mois | null;
+  /** Mois depuis lequel la TVA est due d'après les seuils (`null` : jamais, ou inconnu). */
+  readonly tvaDueDepuis?: Mois | null;
+  /** Factures émises depuis ce mois sans TVA, à un client en France, non annulées. */
+  readonly facturesSansTva?: number;
   /**
    * Le barème de cotisations effectivement appliqué, périodes saisies par
    * l'utilisateur comprises. L'alerte de fraîcheur doit porter sur la table
@@ -319,7 +323,21 @@ export function sujetsATraiter(
       .reduce<number>((s, r) => s + r.montant, 0)
   );
   const resteTva = resteAvantMajore(caAnnee, moisCourant, e.typeActivite);
-  if (resteTva.statut !== 'refuse') {
+  const tvaDue = e.tvaDueDepuis ?? null;
+  if (tvaDue !== null && tvaDue <= moisCourant) {
+    // La TVA est due : les factures la portent désormais d'elles-mêmes. Il ne
+    // reste à traiter que celles émises sans elle depuis la date — réputées
+    // TTC. « Seuil franchi », seul, ne disait pas quoi faire.
+    if ((e.facturesSansTva ?? 0) > 0) {
+      sujets.push({
+        id: 'tva-a-regulariser',
+        ecran: 'activite',
+        gravite: 'retard',
+        nombre: e.facturesSansTva ?? 0,
+        donnees: { depuis: tvaDue }
+      });
+    }
+  } else if (resteTva.statut !== 'refuse') {
     const seuilMajore = caAnnee + resteTva.valeur;
     if (seuilMajore > 0 && caAnnee >= seuilMajore * seuils.partSeuilTva) {
       const franchi = resteTva.valeur <= 0;

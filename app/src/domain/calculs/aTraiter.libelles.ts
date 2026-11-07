@@ -123,6 +123,16 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         action: 'Saisir mes échéances'
       };
 
+    case 'tva-a-regulariser':
+      return {
+        intitule: pluriel(sujet.nombre, 'facture émise sans TVA', 'factures émises sans TVA'),
+        contexte: `La TVA est due depuis ${moisLisible(texte(d['depuis']))} : ces factures `
+          + 'sont réputées TTC, et la TVA est à reverser sur ce que tu as encaissé. Pour '
+          + 'régulariser, annule-les par un avoir et réémets-les avec la TVA. Les '
+          + 'nouvelles factures la portent déjà.',
+        action: 'Voir les factures'
+      };
+
     case 'seuil-tva': {
       const franchi = d['franchi'] === true;
       return {

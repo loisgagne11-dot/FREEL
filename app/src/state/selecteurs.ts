@@ -15,6 +15,7 @@ import {
   euros, moisDe
 } from '../domain/types';
 import { dernierMoisAcre, moisSousAcre, tauxImpotEtContributions } from '../domain/bareme';
+import { tvaDueDepuis } from '../domain/bareme/tva';
 import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
@@ -61,6 +62,32 @@ export function moisCourant(maintenant: Date = new Date()): Mois {
   return `${maintenant.getFullYear()}-${mm}` as Mois;
 }
 
+
+/**
+ * Le mois depuis lequel la TVA est due d'après les seuils, `null` si elle ne
+ * l'a jamais été ou si les seuils manquent pour en juger.
+ */
+export function tvaDueDepuisDe(faits: Faits): Mois | null {
+  const r = tvaDueDepuis(
+    recettesEncaissees(faits), faits.entreprise.typeActivite, faits.entreprise.debutActivite
+  );
+  return r.statut === 'refuse' ? null : r.valeur;
+}
+
+/**
+ * Le mois depuis lequel l'entreprise applique la TVA : l'OPTION saisie dans
+ * Réglages, ou le FRANCHISSEMENT des seuils, le plus tôt des deux.
+ *
+ * Une seule source pour les factures et la TVA déductible des dépenses. Le
+ * mois saisi décidait seul : sans lui, les factures partaient en franchise
+ * alors que la TVA était due depuis le franchissement.
+ */
+export function debutTvaEffectif(faits: Faits): Mois | null {
+  const option = faits.entreprise.tvaDepuis;
+  const due = tvaDueDepuisDe(faits);
+  if (due === null) return option;
+  return option !== null && option < due ? option : due;
+}
 
 /** Le régime d'imposition, tel qu'il découle des faits (discriminant D2). */
 export function regimeDe(faits: Faits, acomptePasSaisi: Euros = euros(0)): RegimeImposition {
@@ -232,6 +259,7 @@ export function entreeATraiter(
      une facture émise sans échéance serait réputée jamais échue, et les
      retards les plus anciens seraient précisément ceux qu'on ne verrait pas. */
   const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+  const tvaDue = tvaDueDepuisDe(faits);
   return {
     aujourdhui: dateISOde(maintenant),
     typeActivite: faits.entreprise.typeActivite,
@@ -257,8 +285,30 @@ export function entreeATraiter(
     debutActivite: faits.entreprise.debutActivite === null
       ? null
       : moisDe(faits.entreprise.debutActivite),
-    echeancesReglementaires
+    echeancesReglementaires,
+    tvaDueDepuis: tvaDue,
+    facturesSansTva: tvaDue === null ? 0 : facturesEmisesSansTva(faits, tvaDue)
   };
+}
+
+/**
+ * Les factures émises depuis le mois où la TVA est due, sans TVA, à un client
+ * établi en France — et non annulées.
+ *
+ * Elles sont réputées TTC : la TVA est à reverser sur ce qui a été encaissé.
+ * Un client hors de France n'en fait pas partie (autoliquidation ou
+ * exonération), ni une facture déjà annulée par un avoir — c'est précisément
+ * ainsi qu'on régularise, et le compteur doit alors retomber.
+ */
+function facturesEmisesSansTva(faits: Faits, depuis: Mois): number {
+  const pays = new Map(faits.clients.map((c) => [c.nom, c.pays.trim().toLowerCase()]));
+  const annulees = new Set(faits.recettes.flatMap((r) =>
+    (typeof r.annuleEcriture === 'string' ? [r.annuleEcriture] : [])));
+  return faits.recettes.filter((r) =>
+    r.emiseLe !== null && r.emiseLe.slice(0, 7) >= depuis
+    && typeof r.annuleEcriture !== 'string' && !annulees.has(r.id)
+    && !((r.tvaCollectee ?? 0) > 0)
+    && ['', 'france', 'fr'].includes(pays.get(r.clientNom) ?? '')).length;
 }
 
 /** Date du jour au format ISO, dérivée de l'horloge locale. */

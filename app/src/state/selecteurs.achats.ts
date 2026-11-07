@@ -33,7 +33,7 @@ import {
 } from '../domain/calculs/banque';
 import type { MouvementBancaire, ResumeRapprochement } from '../domain/calculs/banque';
 import { type Periode, dansLaPeriode, periodeCourante } from '../domain/calculs/periode';
-import { moisCourant, soldeEstSuivi } from './selecteurs';
+import { debutTvaEffectif, moisCourant, soldeEstSuivi } from './selecteurs';
 import type { Depense, Faits } from './schema';
 
 /**
@@ -45,7 +45,8 @@ import type { Depense, Faits } from './schema';
  * une dépense de mars rendrait déductible une TVA qui ne l'était pas.
  */
 export function regimeTvaAu(faits: Faits, m: Mois): RegimeTva {
-  const depuis = faits.entreprise.tvaDepuis;
+  // L'option OU le franchissement : voir `debutTvaEffectif`.
+  const depuis = debutTvaEffectif(faits);
   return depuis !== null && m >= depuis ? 'assujetti' : 'franchise';
 }
 

@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { instantaneAvantRemplacement, useFaits } from '../../state/store';
-import { dateDuJour, finAcreDe, soldeEstSuivi } from '../../state/selecteurs';
+import { dateDuJour, finAcreDe, soldeEstSuivi, tvaDueDepuisDe } from '../../state/selecteurs';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
 import { Montant } from '../components/Montant';
-import { dateCourte, eur } from '../format';
+import { dateCourte, eur, moisLong } from '../format';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -504,6 +504,8 @@ function ReservesEtVersements() {
  */
 function Profil() {
   const entreprise = useFaits((e) => e.faits.entreprise);
+  const faits = useFaits((e) => e.faits);
+  const tvaDue = useMemo(() => tvaDueDepuisDe(faits), [faits]);
   const modifier = useFaits((e) => e.modifierEntreprise);
   const idChamp = useId();
 
@@ -629,10 +631,16 @@ function Profil() {
             onChange={(e) => modifier({ bic: e.target.value })} />
         </Champ>
 
+        {/* Le franchissement des seuils se déduit des encaissements : ce champ
+            ne sert plus qu'à l'OPTION — choisir la TVA avant d'y être tenu. Il
+            décidait seul, et sans lui les factures partaient en franchise
+            alors que la TVA était due. */}
         <Champ
           id={`${idChamp}-tva`}
-          libelle="Assujetti à la TVA depuis"
-          aide="Laisser vide en franchise en base. Le régime est résolu à la date de chaque opération."
+          libelle="Option pour la TVA depuis (facultatif)"
+          aide={tvaDue === null
+            ? 'Le franchissement des seuils est détecté d’après tes encaissements. Ne renseigne ce mois que si tu as choisi la TVA avant d’y être tenu.'
+            : `D’après tes encaissements, la TVA est due depuis ${moisLong(tvaDue)} : tes factures la portent depuis. Ne renseigne ce mois que pour une option antérieure.`}
         >
           <input id={`${idChamp}-tva`} type="month" value={entreprise.tvaDepuis ?? ''}
             onChange={(e) => modifier({
