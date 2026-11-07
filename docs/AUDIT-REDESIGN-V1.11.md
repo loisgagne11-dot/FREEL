@@ -1023,3 +1023,8 @@ déjà portés à la liste de sortie, sauf les libellés : ajoutés ci-dessous.
 | Dépenses | Liste de cartes à pastilles | Registre en tableau, total, dépenses récurrentes « ↻ » et leur total, lien vers le dossier de TVA |
 | Filtre par compte | — | Absent, assumé : aucun compte n'est porté par les données (schéma 20 à prévoir) |
 
+Contrôle image contre image du lot 8 (agent contrôleur, deux thèmes et
+téléphone) : conforme avec réserves, les réserves gênantes corrigées dans le
+lot (navigation de mois en double, en-têtes chiffrés, indication de clic,
+icônes, sous-ligne de franchise). Captures regénérées et relues.
+

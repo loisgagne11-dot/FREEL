@@ -341,7 +341,7 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
         )}
 
         <p className={styles.piedRegistre}>
-          <a className={styles.lienTva} href="#/argent/tva"><span aria-hidden="true">→ </span>Suivi &amp; déclaration TVA</a>
+          <a className={styles.lienTva} href="#/argent/tva"><span aria-hidden="true">→</span>Suivi &amp; déclaration TVA</a>
         </p>
       </CartePliable>
 
