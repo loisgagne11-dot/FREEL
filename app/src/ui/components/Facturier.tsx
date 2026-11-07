@@ -30,6 +30,7 @@ import { Statut, type TonStatut } from './Statut';
 import { useToast } from './Toasts';
 import { Vide } from './Vide';
 import { dateCourte, eur } from '../format';
+import { decalerMois } from '../../domain/calculs/periode';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import { detteDeRetard, redigerRelance } from '../../domain/calculs/relance';
 import {
@@ -304,7 +305,7 @@ export function Facturier(
                même cadre font hésiter sur ce qui les distingue. */
             <Vide
               message={filtre === 'tout'
-                ? 'Aucune facture sur cette période. Émettez-en une, ou élargissez la période.'
+                ? 'Aucune facture sur cette période. Émets-en une, ou élargis la période.'
                 : 'Aucune facture dans cet état sur cette période.'}
             />
           )
@@ -1224,7 +1225,3 @@ function moisLisible(m: Mois): string {
   });
 }
 
-function decalerMois(m: Mois, pas: number): Mois {
-  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + pas;
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
-}

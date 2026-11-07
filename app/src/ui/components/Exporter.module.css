@@ -1,0 +1,43 @@
+/* Le bouton « Exporter ». Le menu a sa propre feuille, chargée avec lui. */
+
+.enveloppe { position: relative; }
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  /* Un champ et un bouton, pas des pastilles : le handoff les distingue
+     ainsi des pastilles d'état qui les précèdent. */
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.bouton:hover { border-color: var(--green); }
+
+.icone { width: 15px; height: 15px; flex-shrink: 0; color: var(--muted-2); }
+
+.bouton:hover .icone { color: var(--green); }
+
+/* L'icône porte le sens sur téléphone ; le nom accessible vient du texte, qui
+   reste dans le DOM. */
+@media (max-width: 760px) {
+  .bouton { justify-content: center; padding: 0; }
+  .libelle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+@media print { .enveloppe { display: none; } }

@@ -157,3 +157,16 @@ export function ancreDeLAnnee(annee: number, maintenant: Date = new Date()): Dat
   // 30 décembre, et l'ancre changerait de mois selon le fuseau du lecteur.
   return new Date(Date.UTC(annee, 11, 31, 12));
 }
+
+/**
+ * Le mois décalé de `pas` (négatif pour reculer).
+ *
+ * Il était écrit trois fois — Activité, le facturier, les projections
+ * d'Argent — à l'identique pour l'instant. Trois copies d'un calcul finissent
+ * par ne plus tomber d'accord (invariant n°4) ; le navigateur de mois de la
+ * barre du haut en aurait fait une quatrième.
+ */
+export function decalerMois(m: Mois, pas: number): Mois {
+  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + pas;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
+}

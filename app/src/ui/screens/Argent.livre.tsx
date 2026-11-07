@@ -84,7 +84,7 @@ export function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
           ? (
             <Vide
               message="Aucun encaissement enregistré. Le livre des recettes se remplit quand une facture émise est marquée encaissée."
-              action={<a className={styles.actionPrincipale} href="#/facture">Émettre une facture</a>}
+              action={<a className={styles.actionPrincipale} href="#/facture/nouvelle">Émettre une facture</a>}
             />
           )
           : (

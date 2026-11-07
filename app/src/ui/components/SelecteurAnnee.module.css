@@ -36,10 +36,11 @@
 .choix:hover { border-color: var(--green); }
 .choix:focus-visible { border-color: var(--green); outline: none; }
 
-/* Exigence de la cible : sous 1320 px, le libellé disparaît du rendu visuel
+/* Exigence de la cible : sous 1320 px — 1680 depuis le lot 6, pour la même
+   raison que les pastilles système —, le libellé disparaît du rendu visuel
    mais reste dans l'arbre d'accessibilité — même règle que les pastilles
    système, pour la même raison : la place revient au titre de l'écran. */
-@media (max-width: 1319px) {
+@media (max-width: 1679px) {
   .libelle {
     position: absolute;
     width: 1px;

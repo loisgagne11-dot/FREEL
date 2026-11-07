@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 6 novembre 2026.** Schéma des faits : v17. Branche de travail : PR #297.
+**Date : 7 novembre 2026.** Schéma des faits : v19. Branche de travail : PR #302.
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -104,13 +104,15 @@ Sert de filet aux lots 5 et 6.
 | Le code d'entrée est à 78,6 / 80 Ko : extraire avant d'ajouter | ✅ tenu : 78,8 Ko après le lot, les doublons retirés payant les ajouts |
 | Contrôle visuel image contre image avec le handoff | ✅ fait (agent contrôleur, deux thèmes) : « conforme avec réserves ». Corrigés : autonomie en chiffre clé, décisions en rangées bordées (retard souligné, étiquette de gravité lisible), raccourcis qui passent à la ligne au lieu d'être coupés à 1 440 px, étiquettes de colonnes colorées, titres en surtitre. *Restent mineurs, assumés : boutons d'action à 44 px (cible tactile, contrôlée par `verifier`) quand le handoff les fait à 30 ; pas de repli du bloc des décisions ; pas d'icône portefeuille ; en thème clair, cartes posées sur un fond blanc (lot 7, contraste).* |
 
-### Lot 6 — Barre du haut et rail
+### Lot 6 — Barre du haut et rail (PR #302)
 
 | Ligne | État |
 |---|---|
-| Navigateur de mois qui pilote tous les écrans ; recherche (client, numéro, montant) ; « + Nouveau » (facture, dépense, mission, congé) ; « Exporter » | ⬜ |
-| Livre des recettes en accès direct dans le rail ; carte utilisateur | ⬜ |
-| Rail tranché (décision n° 2) | ⬜ |
+| Navigateur de mois qui pilote tous les écrans ; recherche (client, numéro, montant) ; « + Nouveau » (facture, dépense, mission, congé) ; « Exporter » | ✅ fait : « ‹ juin 2026 › » en tête de barre, un seul mois pour l'application (`App`). Activité le suit et ses flèches le déplacent ; Argent, Achats et Outils en tirent l'année ; le Pilote en tire son flux — un mois passé se lit en constat (encaissé, payé, versé), un mois à venir en échéances (attendu, dû), sans versable dans les deux cas —, la santé et les décisions restent celles du jour. L'année reste à côté et ne change que le millésime du mois. Recherche ⌘K (factures, clients, missions, dépenses ; accents, casse et montants tolérés). « + Nouveau » ouvre la saisie, pas l'écran. « Exporter » : livre des recettes en CSV et sauvegarde JSON. *Renoncé, et écrit : l'export FEC du handoff — le micro-BNC tient un livre des recettes, pas une comptabilité en partie double.* Sur téléphone, la barre passe sur deux rangées et cesse d'être collante |
+| Livre des recettes en accès direct dans le rail ; carte utilisateur | ✅ fait : pied du rail en grand écran, `#/argent/livre` ouvre le registre ; carte « prénom — Micro-BNC · ACRE · VL » vers Réglages |
+| Rail tranché (décision n° 2) | ✅ fait, formule A : six entrées ; la liste des factures est l'onglet « Factures » d'Activité (Plan de charge · Missions · Factures · Clients), une facture ouverte allume « Activité ». Les onglets d'Activité suivent l'adresse (`#/activite/factures`…) ; `#/facture` seul y renvoie ; tous les liens « facturier » y mènent directement |
+| Contrôle visuel image contre image avec le handoff | ✅ fait (agent contrôleur, deux thèmes) : premier passage non conforme sur la barre du haut (mois et palette qui se chevauchaient à 1 440 px), corrigé ; logo du rail posé, avatar en disque. *Restent mineurs, assumés : icônes du rail et des onglets, onglet actif souligné plutôt que vert, pas de compte sur l'onglet Factures, pastilles Cloud / Drive / Qonto refusées.* |
+| Budgets : l'entrée (83,4) et Activité (40,15) les franchissaient en cours de lot | ✅ tenus en extrayant, plafonds intacts : boutons de la barre, pied du rail, détail du flux, éditeur de demi-journée, alerte de conservation, deux sélecteurs de Config et d'Argent. Entrée 79,9 / 80 Ko — **la marge est quasi nulle : le prochain ajout à l'entrée devra extraire d'abord** |
 | Q5 — budget de Réglages : l'écran Compte est désormais chargé à la demande (Réglages 39,92 → sous 38 Ko ; le plus lourd est Activité, 38,34 / 40) | ✅ fait (lot 1) |
 
 ### Lot 7 — Finitions (priorité 3, parallélisable)
@@ -118,6 +120,7 @@ Sert de filet aux lots 5 et 6.
 | Ligne | État |
 |---|---|
 | Q4 — `joursEntre` en six copies à sémantique divergente, `enKiloEuros` en deux arrondis : une source chacun (reporté du lot 2) | ⬜ |
+| Le brouillon « La facture de juin » du facturier garde ses propres flèches de mois, à côté du mois de la barre : le brancher dessus, ou dire pourquoi c'est un autre mois (le mois facturé) | ⬜ (vu au lot 6) |
 | L11 (suite) — arrondi des parts de la ventilation (1 à 2 centimes d'écart avec le total) | ⬜ |
 | Q8 — tutoiement : une douzaine de phrases vouvoient encore (relire à l'œil, `relance.ts` excepté) | ✅ fait au lot 3 : treize impératifs repris (Réglages, Activité, Facture, Échéances, CFE, Compte, messages Supabase) ; restent au vouvoiement les seules lettres au client et les citations dans les commentaires |
 | Q7 — contraste de `--muted-2` et de `--green` en thème calme (calculé, pas encore vu sur capture) | ⬜ |
@@ -175,7 +178,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Conservation des lignes d'une facture | ⬜ | Schéma 18 à prévoir ; une facture rééditée se rétablit en une désignation | à planifier |
 | « Enregistrer brouillon » | ⬜ | Dépend du point précédent | à planifier |
 | Envoi par courriel | ⬜ volontaire | Aucun envoi, ni pour la facture ni pour le CRA | — |
-| Place de « Facturer » dans le rail | ⬜ décision | Décision n° 2 | 6 |
+| Place de « Facturer » dans le rail | ✅ | Formule A : onglet « Factures » d'Activité, création par « + Nouveau » et le Pilote | 6 |
 
 ### Achats
 
@@ -194,7 +197,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Troisième onglet « Compte pro & banque » | ⬜ | L'import de relevé reste dans Achats | 6 |
+| Troisième onglet « Compte pro & banque » | ⬜ | L'import de relevé reste dans Achats — sorti du lot 6, qui ne touchait que la barre et le rail | à planifier |
 | Simulateur CFE avec base minimum par commune | ◐ | Lecture de l'avis × taux seulement, par décision | à planifier |
 | Comparateur micro-BNC vs déclaration contrôlée | ⬜ | Aucun module | à planifier |
 | Décote dans le comparateur d'impôt | ✅ | Appliquée, avec la situation du foyer (L8) | 3 |
@@ -203,7 +206,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Navigation en sept sections | ◐ | Quatre sections (Profil, Barème, Données, Compte) | 6 |
+| Navigation en sept sections | ◐ | Quatre sections (Profil, Barème, Données, Compte) — sorti du lot 6, qui ne touchait que la barre et le rail | à planifier |
 | Facturation : numérotation et mentions | ◐ | SIRET et IBAN contrôlés ; aucun réglage de numérotation ni de mentions | à planifier |
 | Coffre des documents | ⬜ | Aucun dépôt ; retenu au périmètre | à planifier |
 | Mode hors ligne, retard de synchronisation affiché | ◐ | Aucun `navigator.onLine` ; la pastille ne dit que relié, expiré ou local | à planifier |
@@ -215,7 +218,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Livre des recettes en CSV | ⬜ | Seuls des exports JSON et HTML existent | 6 (avec l'accès rail) |
+| Livre des recettes en CSV | ✅ | Menu « Exporter » : `;`, BOM, virgule décimale, filtre sur l'année d'encaissement, champs texte protégés contre les formules, TVA inconnue laissée vide | 6 |
 
 ### Transverse
 
@@ -227,7 +230,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Harnais différentiel contre l'application actuelle | ⬜ | Aucun script | à planifier |
 | Retirer les méta anti-cache de l'ancienne version | ⬜ | Lié à la bascule | à planifier |
 | Onboarding de première ouverture | ⬜ | Aucun en UI | à planifier |
-| Recherche globale | ⬜ | Aucune (voir lot 6) | 6 |
+| Recherche globale | ✅ | ⌘K / Ctrl K : factures (brouillons compris), clients, missions, dépenses ; montant par valeur | 6 |
 | Raccourcis clavier | ⬜ | Seulement dans les composants d'accessibilité | à planifier |
 | Conseils automatiques (`getInsights`) | ⬜ | Aucun | à planifier |
 | Écart du CA encaissé de l'année : quelle ligne l'explique | ⬜ à vérifier | Demande les données réelles du propriétaire, absentes du dépôt | à planifier |

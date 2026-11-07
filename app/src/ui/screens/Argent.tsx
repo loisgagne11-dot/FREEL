@@ -1,4 +1,4 @@
-import { Suspense, lazy, useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { etatArgent } from '../../state/selecteurs.argent';
 import { Greet } from '../components/Greet';
@@ -7,6 +7,7 @@ import { Etiquette, Piliers } from '../components/Piliers';
 import { Sheet } from '../components/Sheet';
 import { eur } from '../format';
 import styles from './Argent.module.css';
+import { useRoute } from '../useRoute';
 
 /**
  * L'onglet DES arrive à l'ouverture de son onglet.
@@ -107,7 +108,20 @@ export interface ProprietesArgent {
 export function Argent({ annee }: ProprietesArgent = {}) {
   const faits = useFaits((e) => e.faits);
   const [section, setSection] = useState<Section>('tresorerie');
-  const [registre, setRegistre] = useState<Registre>(null);
+  const { ecran, sousRoute } = useRoute();
+  const routeIci = ecran.id === 'argent' ? sousRoute : '';
+  const [registre, setRegistre] = useState<Registre>(() => (routeIci === 'livre' ? 'livre' : null));
+  /* `#/argent/livre` est la porte du pied du rail : le livre des recettes est
+     un registre qu'on vient consulter, et le chercher sous une rangée de
+     liens au bas de l'écran demandait de savoir qu'il y était. C'est un
+     GESTE, comme `#/activite/conges` : il ouvre le panneau, puis l'adresse
+     redevient celle de l'écran — fermer le panneau puis recharger ne doit
+     pas le rouvrir. */
+  useEffect(() => {
+    if (routeIci !== 'livre') return;
+    setRegistre('livre');
+    window.location.replace('#/argent');
+  }, [routeIci]);
   const idGroupe = useId();
 
   // `undefined` explicite : `etatArgent` retombe alors sur sa propre valeur

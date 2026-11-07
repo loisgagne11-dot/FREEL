@@ -958,3 +958,37 @@ Ce qui reste du handoff hors du lot : la barre du haut et le rail (lot 6) ;
 les modules « Dépendance client » et « CRA prêt » ; les feuilles de détail
 des décisions (renoncé, écrit dans la liste de sortie).
 
+
+## Lot 6 (07/11) — barre du haut et rail
+
+Rail en formule A (décision n° 2) et barre du haut du handoff.
+
+| Zone | Avant | Après |
+|---|---|---|
+| Rail | Sept entrées, dont « Facturer » | Six, comme le handoff ; une facture ouverte allume « Activité & congés » ; compteurs des factures additionnés sur Activité |
+| Pied du rail | — | « Livre des recettes » (ouvre le registre d'Argent) et carte « Camille — Micro-BNC · ACRE », vers Réglages. Grand écran seulement, comme le handoff |
+| Activité | Trois onglets | Quatre, dans l'ordre du handoff : Plan de charge · Missions · Factures · Clients. L'onglet suit l'adresse ; « Tes factures » en titre sur l'onglet Factures (le handoff garde « Ton plan de charge » : un titre qui ne décrit pas l'onglet ouvert apprend à ne plus le lire) |
+| Barre du haut | Nom de l'écran, sélecteur d'année hors Pilote | « ‹ Juin 2026 › » à gauche (le nom de l'écran revient là où le mois n'a pas de sens : Réglages, rédaction), année à côté, pastilles, « Rechercher… ⌘K », « Exporter », « + Nouveau » |
+| Barre du haut, téléphone | Une rangée | **Deux rangées, et plus collante** — écart assumé au handoff (« barre du haut sur un rang ») : 390 px ne tiennent pas le mois, trois pastilles et trois actions ; tout se chevauchait |
+| « Exporter » | — | Livre des recettes (CSV), sauvegarde (JSON), compte rendu d'activité, factures. **Pas d'export FEC** (décision D6, et §8 ci-dessus) |
+
+Contrôle image contre image par l'agent contrôleur, deux thèmes, sur Pilote,
+Activité (plan de charge, factures), Argent et Réglages. Premier passage :
+**non conforme** sur la barre du haut. À 1 440 px, avec plusieurs années de
+données, la flèche « › » passait sous le libellé « Année » et la palette sous la
+recherche : les libellés des pastilles ne se repliaient que sous 1 320 px, et la
+barre portait trois contrôles de plus. Corrigé : repli sous 1 680 px, le mois ne
+se comprime plus. Relevés et corrigés aussi : le mot « freel » manquait en tête
+du rail (posé en CSS, l'entrée étant à 0,1 Ko de son budget), l'avatar est un
+disque, et la capture de l'onglet Factures montrait « Chargement… » (le script
+attend désormais la liste). Captures regénérées et relues.
+
+Écarts restants, assumés : pastilles « Cloud / Google Drive / Qonto » du
+handoff refusées (rien ne les alimente, ligne `Pastilles` de l'inventaire des
+fonctions) ; pas de pastille « build » sous la carte utilisateur ; icônes du
+rail et des onglets différentes de celles du handoff, et onglet actif souligné
+plutôt que vert (mineurs) ; pas de compte sur l'onglet Factures (le facturier
+compte lui-même, par période — deux nombres pour « combien de factures » se
+contrediraient) ; « Exporter » et « + Nouveau » sur la rangée de la recherche en
+grand écran ; sur Réglages, « Exporter » et « + Nouveau » restent là où le
+handoff met « Enregistrer » (Réglages enregistre au fil de la saisie).

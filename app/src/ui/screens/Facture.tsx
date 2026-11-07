@@ -1,8 +1,7 @@
-import { Suspense, lazy, useMemo } from 'react';
+import { Suspense, lazy, useEffect, useMemo } from 'react';
 import { useFaits } from '../../state/store';
 import { etatFacture, reediterFacture } from '../../state/selecteurs.facture';
 import styles from './Facture.module.css';
-import { Facturier } from '../components/Facturier';
 import { useRoute } from '../useRoute';
 import { Apercu, useSortieDocument } from '../documents/Apercu';
 
@@ -30,7 +29,7 @@ function EnAttente() {
   return <p className={styles.bandeau} role="status">Un instant…</p>;
 }
 
-export function Facture({ annee }: { readonly annee?: number } = {}) {
+export function Facture() {
   /**
    * La vue vient de l'URL, pas d'un état local.
    *
@@ -45,7 +44,7 @@ export function Facture({ annee }: { readonly annee?: number } = {}) {
   if (sousRoute === 'nouvelle') {
     return (
       <Suspense fallback={<EnAttente />}>
-        <NouvelleFacture onListe={() => naviguerVers('facture')} />
+        <NouvelleFacture onListe={() => naviguerVers('activite', 'factures')} />
       </Suspense>
     );
   }
@@ -62,23 +61,24 @@ export function Facture({ annee }: { readonly annee?: number } = {}) {
     return (
       <FactureEmise
         numero={decodeURIComponent(sousRoute)}
-        onListe={() => naviguerVers('facture')}
+        onListe={() => naviguerVers('activite', 'factures')}
       />
     );
   }
 
-  return (
-    <>
-      <header className={styles.entete}>
-        <h1 className={styles.titre}>Facturer</h1>
-      </header>
-      <Facturier
-        onNouvelle={() => naviguerVers('facture', 'nouvelle')}
-        onRevoir={(numero) => naviguerVers('facture', encodeURIComponent(numero))}
-        {...(annee === undefined ? {} : { annee })}
-      />
-    </>
-  );
+  return <VersLesFactures />;
+}
+
+/**
+ * `#/facture` seul ne désigne plus rien : la liste vit sous Activité.
+ *
+ * L'adresse survit dans les favoris et dans les liens déjà collés ailleurs ;
+ * elle mène donc à l'onglet, par `replace` — sinon « retour » ramènerait ici,
+ * qui renverrait aussitôt là-bas, et l'utilisateur ne pourrait plus reculer.
+ */
+function VersLesFactures() {
+  useEffect(() => { window.location.replace('#/activite/factures'); }, []);
+  return <p className={styles.bandeau} role="status">Ouverture de tes factures…</p>;
 }
 
 /**
@@ -112,7 +112,7 @@ function FactureEmise(
           <h1 className={styles.titre}>Facture {numero}</h1>
           <div className={styles.actions}>
             <button type="button" className={styles.action} onClick={onListe}>
-              Retour au facturier
+              Retour aux factures
             </button>
           </div>
         </header>
@@ -142,7 +142,7 @@ function FactureEmise(
             Imprimer
           </button>
           <button type="button" className={styles.action} onClick={onListe}>
-            Retour au facturier
+            Retour aux factures
           </button>
         </div>
       </header>

@@ -102,10 +102,12 @@
   border: 0;
 }
 
-/* Exigence de la cible : sous 1320 px, les libellés des pastilles système
+/* Exigence de la cible : sous 1320 px — 1680 depuis le lot 6, la barre portant
+   désormais le mois, la recherche, « Exporter » et « + Nouveau » ; à 1 440 px
+   la palette passait sous la recherche —, les libellés des pastilles système
    disparaissent — la place revient au titre de l'écran. Le nom accessible
    du champ, lui, doit survivre : on ne peut donc pas le retirer du DOM. */
-@media (max-width: 1319px) {
+@media (max-width: 1679px) {
   .libelleBouton {
     position: absolute;
     width: 1px;
@@ -129,4 +131,11 @@
     white-space: nowrap;
     border: 0;
   }
+}
+
+/* Sur téléphone, la palette tient dans une largeur fixe : libre, le menu
+   s'étalait dès que la barre passait sur deux rangées et repoussait la
+   recherche et « + Nouveau » sur une troisième. */
+@media (max-width: 760px) {
+  .choix { width: 84px; }
 }

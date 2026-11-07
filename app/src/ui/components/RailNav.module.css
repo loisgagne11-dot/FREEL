@@ -107,6 +107,51 @@
 }
 
 /* ---------- desktop : rail latéral fixe, 212px, tous les libellés visibles ---------- */
+/* Le pied n'existe qu'en grand écran : voir `PiedDuRail`. */
+.pied { display: none; }
+
+@media (min-width: 761px) {
+  .pied {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .qui {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px 8px;
+    border-radius: 14px;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .qui:hover { background: var(--panel-2); }
+
+  .avatar {
+    flex: none;
+    width: 34px;
+    height: 34px;
+    /* Un disque, comme le handoff. */
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--green);
+    background: var(--green-glow);
+    box-shadow: inset 0 0 0 1px var(--green-line);
+  }
+
+  .quiTexte { display: flex; flex-direction: column; min-width: 0; }
+  .quiNom { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .quiRegime { font-size: 11.5px; color: var(--muted); }
+}
+
 @media (min-width: 761px) {
   /*
    * LE RAIL COLLE AU HAUT DE LA FENÊTRE, IL NE DÉFILE PAS AVEC LA PAGE.
@@ -144,6 +189,32 @@
     box-shadow: none;
     overflow-x: visible;
     overflow-y: auto;
+  }
+
+  /*
+   * Le mot « freel » en tête du rail, comme le handoff — l'avant-dernière
+   * lettre en vert.
+   *
+   * En CSS et non en JSX : le paquet d'entrée est à 0,1 Ko de son budget, et
+   * un logo n'a rien à y faire. Le dégradé, découpé à la forme du texte, pose
+   * le vert sur le quatrième caractère ; les deux couleurs sont des tokens,
+   * donc le mot suit les quatre palettes. Décoratif : le nom de l'application
+   * est déjà dans le titre de la page, rien n'est perdu pour un lecteur
+   * d'écran.
+   */
+  .rail::before {
+    content: 'freel';
+    display: block;
+    width: max-content;
+    margin: 0 13px 18px;
+    font-size: 23px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    background: linear-gradient(90deg, var(--text) 0 57%, var(--green) 57% 84%, var(--text) 84%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   .lien {

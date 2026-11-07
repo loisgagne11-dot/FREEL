@@ -1,6 +1,7 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { dateDuJour, moisCourant, provenanceSoldeDe, solde } from '../../state/selecteurs';
+import { dateDuJour, moisCourant, solde } from '../../state/selecteurs';
+import { provenanceSoldeDe } from '../../state/selecteurs.reglages';
 import { evolutionCompte, type EtatArgent, type EtatSeuils } from '../../state/selecteurs.argent';
 import type { DateISO, Euros, Mois } from '../../domain/types';
 import { euros } from '../../domain/types';

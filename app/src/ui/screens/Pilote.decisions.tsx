@@ -87,7 +87,20 @@ function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
             « levier → » du handoff. */}
         {levier !== null && <span className={styles.sujetLevier}>levier → {levier}</span>}
       </div>
-      <a className={styles.sujetAction} href={`#/${s.ecran}`}>{action}</a>
+      <a className={styles.sujetAction} href={adresseDuSujet(s.id, s.ecran)}>{action}</a>
     </li>
   );
+}
+
+/**
+ * Où mène l'action d'un sujet.
+ *
+ * L'écran seul ne suffit plus pour les factures : elles ont leur onglet sous
+ * Activité, et « Relancer » qui ouvrirait le plan de charge obligerait à
+ * chercher l'onglet une seconde fois — le reproche fait aux actions rapides.
+ */
+export function adresseDuSujet(id: string, ecran: string): string {
+  return id === 'factures-en-retard' || id === 'tva-a-regulariser'
+    ? '#/activite/factures'
+    : `#/${ecran}`;
 }

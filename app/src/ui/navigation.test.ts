@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ECRANS, ID_ECRAN_PAR_DEFAUT, resoudreEcran, resoudreRoute } from './navigation';
+import { ECRANS, ID_ECRAN_PAR_DEFAUT, resoudreEcran, resoudreRoute, ECRANS_DU_RAIL, entreeDuRail } from './navigation';
 
 describe('navigation — définition des écrans', () => {
   it('définit exactement les 7 écrans du produit', () => {
@@ -28,9 +28,24 @@ describe('navigation — définition des écrans', () => {
     }
   });
 
-  it("expose les libellés exacts attendus par la spec d'écrans", () => {
-    const libelles = ECRANS.map((e) => e.libelle);
-    expect(libelles).toEqual(['Pilote', 'Activité & congés', 'Argent', 'Facturer', 'Achats', 'Outils', 'Config']);
+  /**
+   * SIX ENTRÉES, COMME LE HANDOFF (décision n° 2, formule A).
+   *
+   * « Facturer » était la septième : la liste des factures est un onglet
+   * d'Activité, et une facture ouverte allume « Activité ».
+   */
+  it('met au rail les six entrées du handoff', () => {
+    expect(ECRANS_DU_RAIL.map((e) => e.libelle))
+      .toEqual(['Pilote', 'Activité & congés', 'Argent', 'Achats', 'Outils', 'Config']);
+  });
+
+  it('allume « Activité » sur une facture, et chaque autre écran sur lui-même', () => {
+    expect(entreeDuRail('facture')).toBe('activite');
+    expect(entreeDuRail('argent')).toBe('argent');
+  });
+
+  it('résout toujours les routes des factures', () => {
+    expect(resoudreEcran('#/facture/nouvelle').id).toBe('facture');
   });
 });
 

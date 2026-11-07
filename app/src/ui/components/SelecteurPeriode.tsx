@@ -1,9 +1,13 @@
 import { useEffect, useMemo } from 'react';
+import type { Mois } from '../../domain/types';
 import { useFaits } from '../../state/store';
+import { moisCourant } from '../../state/selecteurs';
 import { anneesDisponibles } from '../../state/selecteurs.argent';
 import { useRoute } from '../useRoute';
 import type { IdEcran } from '../navigation';
 import { SelecteurAnnee } from './SelecteurAnnee';
+import { NavigateurMois } from './NavigateurMois';
+import styles from './NavigateurMois.module.css';
 
 export interface ProprietesSelecteurPeriode {
   /**
@@ -12,7 +16,7 @@ export interface ProprietesSelecteurPeriode {
    * chacune un nom de propriété non minifiable au seul site d'appel qui
    * compte (`App.tsx`, jamais différé). Voir l'en-tête du budget plus bas.
    */
-  readonly etat: readonly [number, (annee: number) => void];
+  readonly etat: readonly [Mois, (m: Mois) => void];
 }
 
 /**
@@ -31,11 +35,15 @@ export interface ProprietesSelecteurPeriode {
  * d'affichage.
  *
  * Un sélecteur affiché mais sans effet serait pire que les deux : on le
- * tournerait, rien ne bougerait, et on cesserait de s'en servir sur les cinq
+ * tournerait, rien ne bougerait, et on cesserait de s'en servir sur les quatre
  * écrans où il marche.
  */
 const ECRANS_DATES: ReadonlySet<IdEcran> = new Set<IdEcran>([
-  'activite', 'argent', 'facture', 'achats', 'outils'
+  // Le Pilote y entre avec le navigateur de mois : son FLUX suit le mois
+  // choisi, sa santé et ses décisions restent celles d'aujourd'hui.
+  // Pas « facture » : sa liste est un onglet d'Activité, et rédiger ou
+  // rouvrir une facture n'a pas de période.
+  'pilote', 'activite', 'argent', 'achats', 'outils'
 ]);
 
 /**
@@ -70,10 +78,15 @@ const ECRANS_DATES: ReadonlySet<IdEcran> = new Set<IdEcran>([
  * anticipé de son petit paquet dès l'ouverture — négligeable au regard du
  * budget qu'il évite de faire franchir à l'entrée.
  */
-export function SelecteurPeriode({ etat: [valeur, onChange] }: ProprietesSelecteurPeriode) {
+export function SelecteurPeriode({ etat: [mois, onMois] }: ProprietesSelecteurPeriode) {
   const { ecran } = useRoute();
   const faits = useFaits((e) => e.faits);
   const annees = useMemo(() => anneesDisponibles(faits), [faits]);
+  const valeur = Number(mois.slice(0, 4));
+  /* Changer d'année garde le mois et ne change que son millésime : passer de
+     mars 2026 à 2025 donne mars 2025, et non décembre — c'est le mois qu'on
+     regardait, dans l'année qu'on vient de demander. */
+  const onChange = (annee: number): void => onMois(`${annee}-${mois.slice(5, 7)}` as Mois);
 
   // Si les faits changent sous le pied du choix courant — le dossier vient
   // d'être rechargé, ou la dernière recette d'une année future vient d'être
@@ -82,9 +95,14 @@ export function SelecteurPeriode({ etat: [valeur, onChange] }: ProprietesSelecte
   // option qui n'existe plus. L'année courante est TOUJOURS dans les bornes
   // (voir `anneesDisponibles`), ce repli est donc toujours valide.
   useEffect(() => {
-    if (!annees.includes(valeur)) onChange(new Date().getFullYear());
-  }, [annees, valeur, onChange]);
+    if (!annees.includes(valeur)) onMois(moisCourant());
+  }, [annees, valeur, onMois]);
 
   if (!ECRANS_DATES.has(ecran.id)) return null;
-  return <SelecteurAnnee annees={annees} valeur={valeur} onChange={onChange} />;
+  return (
+    <div className={styles.periode}>
+      <NavigateurMois mois={mois} courant={moisCourant()} onMois={onMois} />
+      <SelecteurAnnee annees={annees} valeur={valeur} onChange={onChange} />
+    </div>
+  );
 }

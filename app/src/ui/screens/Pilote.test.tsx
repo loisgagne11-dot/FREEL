@@ -1,10 +1,11 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { type Faits, entrepriseVide, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Pilote, salutation } from './Pilote';
+import { mois } from '../../domain/types';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -78,3 +79,24 @@ describe('la composition du Pilote', () => {
   });
 });
 
+/**
+ * LE FLUX SUIT LE MOIS DE LA BARRE ; LA SANTÉ ET LES DÉCISIONS, NON.
+ *
+ * Un mois passé se lit en constat, sans versable : le versable du jour
+ * affiché sous « mai 2026 » serait un montant qu'on ne pouvait pas se verser.
+ */
+describe('un autre mois', () => {
+  it('montre le flux de ce mois-là, sans versable, et ramène au mois courant', async () => {
+    semer();
+    const onMois = vi.fn();
+    render(<Pilote mois={mois('2026-05')} onMois={onMois} />);
+
+    expect(await screen.findByRole('heading', { name: /Le flux du mois · mai 2026/ })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Verser sur mon compte' })).toBeNull();
+    // La santé reste celle d'aujourd'hui.
+    expect(screen.getByRole('heading', { name: /Santé/ })).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Revenir à juin 2026' })[0]!);
+    expect(onMois).toHaveBeenCalledWith('2026-06');
+  });
+});

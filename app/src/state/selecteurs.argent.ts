@@ -26,6 +26,7 @@ import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
 import type { ProvisionImpotRevenu } from '../domain/calculs/provisionImpotRevenu';
 import { encoursDe, suivre } from '../domain/calculs/facturier';
 import { soldeAuDernierJourDe } from '../domain/calculs/solde';
+import { decalerMois } from '../domain/calculs/periode';
 import type { Faits } from './schema';
 import {
   dateDuJour, etatPilote, moisCourant, recettesEncaissees, remunerationDuMois
@@ -392,11 +393,6 @@ const MOIS_PROJETES = 12;
 /** Sur combien de mois passés on moyenne les dépenses courantes. */
 const MOIS_D_HISTORIQUE = 6;
 
-/** Le mois décalé de `pas`. */
-function decalerMois(m: Mois, pas: number): Mois {
-  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + pas;
-  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
-}
 
 export interface EtatProjection {
   readonly projection: ProjectionSolde;

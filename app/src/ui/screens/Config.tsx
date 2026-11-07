@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { instantaneAvantRemplacement, useFaits } from '../../state/store';
-import { dateDuJour, finAcreDe, soldeEstSuivi, tvaDueDepuisDe } from '../../state/selecteurs';
+import { dateDuJour, soldeEstSuivi, tvaDueDepuisDe } from '../../state/selecteurs';
+import { finAcreDe } from '../../state/selecteurs.reglages';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
-import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
 import { Montant } from '../components/Montant';
 import { dateCourte, eur, moisLong } from '../format';
@@ -14,6 +14,7 @@ import { controlerIban, controlerSiret } from '../../domain/calculs/identifiants
 import { useRoute } from '../useRoute';
 import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
+import { nomSauvegarde, telecharger } from '../../infra/telechargement';
 
 /**
  * Écran Config — profil, barème et données.
@@ -111,7 +112,7 @@ export function Config() {
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="donnees" actif={section === 'donnees'}>
-          <Donnees nomFichier={nomExport(faits.entreprise)} />
+          <Donnees nomFichier={nomSauvegarde(faits.entreprise.nom, dateDuJour())} />
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="compte" actif={section === 'compte'}>
@@ -769,13 +770,7 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
   const avant = useMemo(() => instantaneAvantRemplacement(), [faits]);
 
   function exporter(): void {
-    const contenu = JSON.stringify(faits, null, 2);
-    const url = URL.createObjectURL(new Blob([contenu], { type: 'application/json' }));
-    const lien = document.createElement('a');
-    lien.href = url;
-    lien.download = nomFichier;
-    lien.click();
-    URL.revokeObjectURL(url);
+    telecharger(nomFichier, JSON.stringify(faits, null, 2), 'application/json;charset=utf-8');
   }
 
   return (
@@ -935,12 +930,6 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
   );
 }
 
-/** Nom de fichier de l'export : lisible, daté, et sans nom de société vide. */
-function nomExport(entreprise: Entreprise): string {
-  const jour = dateDuJour();
-  const nom = entreprise.nom.trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
-  return `freel-${nom === '' ? 'donnees' : nom.toLowerCase()}-${jour}.json`;
-}
 
 /* ─────────────────────────────────────────────────────────────────────────
    Petits composants

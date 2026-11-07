@@ -1,40 +1,45 @@
 import type { IdEcran } from '../navigation';
-import { ECRANS } from '../navigation';
+import { ECRANS, ECRANS_DU_RAIL, entreeDuRail } from '../navigation';
+import { Suspense, lazy } from 'react';
 import styles from './RailNav.module.css';
+
+/**
+ * Le pied du rail — livre des recettes et carte de l'utilisateur — arrive à
+ * la demande : il n'existe qu'en grand écran, tout en bas, et le paquet
+ * d'entrée a franchi son budget au lot 6. Il apparaît quelques millisecondes
+ * après les entrées, là où personne ne regarde en premier.
+ */
+const PiedDuRail = lazy(() => import('./RailNav.pied').then((m) => ({ default: m.PiedDuRail })));
 
 export interface ProprietesRailNav {
   readonly ecranActif: IdEcran;
-  /**
-   * Compteur « à traiter » par écran, pour le badge de nav. Optionnel : le
-   * domaine qui les produira n'existe pas encore à ce stade du projet, et
-   * l'invariant du projet interdit d'inventer un chiffre à l'écran.
-   */
   readonly compteurs?: Partial<Record<IdEcran, number>>;
 }
 
 /**
- * Navigation principale, seule et unique implémentation pour les deux
- * formes (rail latéral desktop, dock flottant en portrait). Le choix de
- * forme est entièrement porté par les media queries de RailNav.module.css :
- * aucune mesure de fenêtre n'intervient ici, pour ne pas reproduire le bug
- * vérifié de l'ancienne version (`placeFab()`, qui reparentait un nœud
- * selon `window.innerWidth` et ne revenait jamais en arrière au-delà de
- * 600px une fois basculé).
+ * Le rail : six entrées, et en pied le livre des recettes et la carte de
+ * l'utilisateur — la disposition du handoff (décision n° 2, formule A).
+ *
+ * Le compteur d'une entrée additionne ceux des écrans qu'elle accueille : les
+ * sujets des factures (TVA à régulariser…) s'affichaient sur « Facturer »,
+ * ils s'affichent désormais sur « Activité », où vit leur liste.
  */
 export function RailNav({ ecranActif, compteurs }: ProprietesRailNav) {
+  const allumee = entreeDuRail(ecranActif);
   return (
     <nav className={styles.rail} aria-label="Navigation principale">
-      {ECRANS.map((ecran) => {
-        const actif = ecran.id === ecranActif;
-        const compteur = compteurs?.[ecran.id];
-        const aCompteur = typeof compteur === 'number' && compteur > 0;
+      {ECRANS_DU_RAIL.map((ecran) => {
+        const actif = ecran.id === allumee;
+        const compteur = ECRANS
+          .filter((e) => e.id === ecran.id || e.rattacheA === ecran.id)
+          .reduce((n, e) => n + (compteurs?.[e.id] ?? 0), 0);
         return (
           <a
             key={ecran.id}
             href={ecran.chemin}
-            // Nom accessible fixé ici, indépendant de la technique CSS qui
-            // masque le libellé visuel en portrait — un lecteur d'écran
-            // doit connaître chaque destination, même icône seule.
+            // Les entrées, distinguées des liens du pied : c'est sur elles
+            // que se mesurent le nombre d'onglets et les cibles tactiles.
+            data-role="entree"
             aria-label={ecran.libelle}
             aria-current={actif ? 'page' : undefined}
             className={actif ? `${styles.lien} ${styles.actif}` : styles.lien}
@@ -51,10 +56,7 @@ export function RailNav({ ecranActif, compteurs }: ProprietesRailNav) {
             <span className={styles.libelle} data-role="libelle" aria-hidden="true">
               {ecran.libelle}
             </span>
-            {aCompteur && (
-              // Décoratif pour l'instant : la sémantique du compteur (quoi,
-              // combien) viendra avec le domaine qui le produit ; on ne
-              // fabrique pas un texte d'annonce sur une valeur qu'on n'a pas.
+            {compteur > 0 && (
               <span className={styles.badge} aria-hidden="true">
                 {compteur}
               </span>
@@ -62,6 +64,8 @@ export function RailNav({ ecranActif, compteurs }: ProprietesRailNav) {
           </a>
         );
       })}
+      <Suspense fallback={null}><PiedDuRail /></Suspense>
     </nav>
   );
 }
+

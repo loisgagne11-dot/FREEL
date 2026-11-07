@@ -19,7 +19,6 @@ import {
   congeApresSaisie, creneauxDeLaPortee, creneauxOccupes, planifier, saisirSurPortee
 } from '../../domain/calculs/planning';
 import type { JourPlanifie } from '../../domain/calculs/planning';
-import { EditeurDemiJournee } from '../components/EditeurDemiJournee';
 import type { Affectation, SaisieDemiJournee } from '../components/EditeurDemiJournee';
 import {
   previsionDuMoisParMission, rapportParMission, tarifDeLaJournee
@@ -31,9 +30,11 @@ import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
-import { dateCourte, eur, formaterJours } from '../format';
+import { dateCourte, eur, formaterJours, moisLong } from '../format';
+import { decalerMois } from '../../domain/calculs/periode';
 import styles from './Activite.module.css';
 import { Montant } from '../components/Montant';
+import { useRoute } from '../useRoute';
 
 /**
  * Les formulaires arrivent à l'ouverture de leur panneau.
@@ -78,6 +79,26 @@ const CarteRapportParMission = lazy(() => import('./Activite.analyse')
  * On pose ses vacances trois ou quatre fois par an et on ouvre le plan de
  * charge tous les matins : voir l'en-tête de son module.
  */
+/**
+ * La liste des factures, rangée sous Activité (formule A du rail).
+ *
+ * C'est le même facturier que l'écran Facture montrait : un seul composant,
+ * deux portes d'entrée auraient fini par diverger. Il arrive à l'ouverture de
+ * son onglet — il pèse plus lourd que tout le reste de l'écran, et le plan de
+ * charge, qu'on ouvre tous les jours, n'a pas à l'attendre.
+ */
+const FacturierDiffere = lazy(() => import('../components/Facturier')
+  .then((m) => ({ default: m.Facturier })));
+
+/**
+ * L'éditeur d'une demi-journée n'existe qu'après un clic sur la grille : il
+ * arrive à ce moment-là. L'écran a franchi son budget au lot 6 (40,15 / 40 Ko)
+ * en prenant l'onglet Factures, et l'invariant n°7 dit d'extraire ce qui n'a
+ * rien à faire au premier affichage — l'éditeur en est.
+ */
+const EditeurDemiJournee = lazy(() => import('../components/EditeurDemiJournee')
+  .then((m) => ({ default: m.EditeurDemiJournee })));
+
 const PlageDeConges = lazy(() => import('./Activite.conges')
   .then((m) => ({ default: m.PlageDeConges })));
 
@@ -110,7 +131,35 @@ function EnAttenteDeFormulaire() {
  * viennent de `domain/calculs/activite.ts`.
  */
 
-type Section = 'charge' | 'missions' | 'clients';
+type Section = 'charge' | 'missions' | 'clients' | 'factures';
+
+/**
+ * L'onglet que désigne l'adresse.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'ONGLET VIT DANS L'URL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un état local rouvrait toujours le plan de charge : le lien « Factures »
+ * du rail, l'action rapide « Télécharger une facture » et le bouton
+ * « retour » d'une facture rouverte ne pouvaient pas désigner l'onglet où
+ * elles mènent. `nouvelle-mission` et `conges` sont des GESTES, pas des
+ * onglets : ils ouvrent le panneau ou descendent à la carte, puis l'adresse
+ * redevient celle de l'onglet — un rechargement ne doit pas rouvrir un
+ * formulaire qu'on a fermé.
+ */
+export function sectionDeLaRoute(sousRoute: string): Section {
+  switch (sousRoute) {
+    case 'missions':
+    case 'nouvelle-mission': return 'missions';
+    case 'clients': return 'clients';
+    case 'factures': return 'factures';
+    default: return 'charge';
+  }
+}
+
+/** L'ancre stable de la carte des congés, que vise `#/activite/conges`. */
+export const ID_CARTE_CONGES = 'carte-conges';
 
 /**
  * Les onglets, et ce que chacun contient.
@@ -125,53 +174,83 @@ type Section = 'charge' | 'missions' | 'clients';
 const sections = (nbMissions: number, nbClients: number) => [
   { id: 'charge' as Section, libelle: 'Plan de charge' },
   { id: 'missions' as Section, libelle: 'Missions', compte: nbMissions },
+  /* Entre Missions et Clients, comme le handoff : la facture suit la mission
+     qu'elle facture. Sans compte : le facturier compte lui-même ce qui reste
+     à encaisser, et un total de factures émises dénombrerait surtout le passé. */
+  { id: 'factures' as Section, libelle: 'Factures' },
   { id: 'clients' as Section, libelle: 'Clients', compte: nbClients }
 ];
 
 export interface ProprietesActivite {
   /**
-   * L'année choisie dans la barre du haut.
+   * Le mois choisi dans la barre du haut, et de quoi le changer.
    *
-   * Elle ANCRE le mois parcouru, elle ne le filtre pas : voir `ancreDeLAnnee`.
-   * `undefined` retombe sur l'année de l'horloge — le cas des tests qui
-   * montent cet écran seul, sans la coquille qui porte le sélecteur.
+   * Les flèches de la grille le déplacent : c'est LE mois de l'application,
+   * pas un second. `undefined` retombe sur un état local ouvert sur le mois
+   * de l'horloge — le cas des tests qui montent cet écran seul, sans la
+   * coquille qui porte le navigateur.
    */
-  readonly annee?: number;
+  readonly mois?: Mois;
+  readonly onMois?: (m: Mois) => void;
 }
 
-export function Activite({ annee }: ProprietesActivite = {}) {
+export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) {
   const faits = useFaits((e) => e.faits);
   const signaler = useToast();
 
-  const [section, setSection] = useState<Section>('charge');
-  const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
-  const [mois, setMois] = useState<Mois>(() => moisCourant());
+  const { ecran, sousRoute, naviguerVers } = useRoute();
+  // Monté seul (les tests), l'écran ne lit pas l'adresse d'un autre écran.
+  const routeIci = ecran.id === 'activite' ? sousRoute : '';
+  /* L'état local suit l'adresse, et non l'inverse : `hashchange` arrive après
+     le clic, et l'onglet ne doit pas attendre l'événement pour s'afficher. */
+  const [section, setSection] = useState<Section>(() => sectionDeLaRoute(routeIci));
+  useEffect(() => { setSection(sectionDeLaRoute(routeIci)); }, [routeIci]);
+  const [panneau, setPanneau] = useState<Panneau>(
+    () => (routeIci === 'nouvelle-mission' ? { type: 'mission', id: null } : { type: 'ferme' })
+  );
+
+  function changerDeSection(cible: Section): void {
+    setSection(cible);
+    naviguerVers('activite', cible === 'charge' ? '' : cible);
+  }
+
+  const [versConges, setVersConges] = useState(false);
+
+  /* Les deux gestes : ils agissent, puis rendent l'adresse de leur onglet par
+     `replace` — le « retour » du navigateur ne doit pas rejouer le geste. */
+  useEffect(() => {
+    if (routeIci === 'nouvelle-mission') {
+      setPanneau({ type: 'mission', id: null });
+      window.location.replace('#/activite/missions');
+    } else if (routeIci === 'conges') {
+      setVersConges(true);
+      window.location.replace('#/activite');
+    }
+  }, [routeIci]);
+
+  /* La descente attend que le plan de charge soit À L'ÉCRAN : venu de
+     l'onglet Factures, la carte des congés n'existe pas encore au moment où
+     l'adresse change, et la chercher tout de suite ne trouverait rien. */
+  useEffect(() => {
+    if (!versConges || section !== 'charge') return;
+    const carte = document.getElementById(ID_CARTE_CONGES);
+    carte?.scrollIntoView?.({ block: 'start' });
+    // Le focus suit le regard : au clavier, la page descendrait sans que la
+    // tabulation reparte de là.
+    carte?.focus({ preventScroll: true });
+    setVersConges(false);
+  }, [versConges, section]);
+  const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
+  const mois = moisChoisi ?? moisLocal;
+  const setMois = onMois ?? setMoisLocal;
+  const annee = Number(mois.slice(0, 4));
 
   /*
-   * ─────────────────────────────────────────────────────────────────────────
-   * CHANGER D'ANNÉE DÉPLACE LE MOIS, ET NE REMONTE PAS LA NAVIGATION À ZÉRO
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Le mois reste un état d'écran : on le fait défiler avec les flèches, et
-   * ce défilement doit survivre à un aller-retour vers Argent. Le dériver de
-   * l'année le rendrait immobile.
-   *
-   * Mais il doit SUIVRE l'année quand elle change, sinon le sélecteur ne fait
-   * rien ici — le défaut que ce lot corrige. On garde donc le mois de la
-   * bascule et on ne change que son millésime : passer de mars 2026 à 2025
-   * donne mars 2025, et non décembre. C'est le mois qu'on regardait, dans
-   * l'année qu'on vient de demander.
-   *
-   * Le garde `mois.slice(0, 4)` est ce qui empêche la boucle : sans lui,
-   * l'effet réécrirait le mois à chaque rendu et annulerait toute navigation
-   * au sein de l'année choisie.
+   * Changer d'année au sélecteur de la barre déplace ce mois-ci (même mois,
+   * autre millésime) : c'est désormais `App` qui le fait, pour tous les
+   * écrans. L'effet qui le faisait ici, et ne valait que pour Activité, est
+   * parti avec le mois local.
    */
-  const anneeVoulue = annee ?? new Date().getFullYear();
-  useEffect(() => {
-    setMois((actuel) => (Number(actuel.slice(0, 4)) === anneeVoulue
-      ? actuel
-      : `${anneeVoulue}-${actuel.slice(5, 7)}` as Mois));
-  }, [anneeVoulue]);
   const idGroupe = useId();
 
   const etat = useMemo(() => etatActivite(faits, mois), [faits, mois]);
@@ -184,10 +263,10 @@ export function Activite({ annee }: ProprietesActivite = {}) {
   // une question commerciale, et un mois de congés ou un mois creux ferait
   // passer une bonne mission pour une mauvaise.
   const rapports = useMemo(
-    () => rapportParMission(faits, Number(mois.slice(0, 4))), [faits, mois]
+    () => rapportParMission(faits, annee), [faits, annee]
   );
   const tarif = useMemo(
-    () => tarifDeLaJournee(faits, Number(mois.slice(0, 4))), [faits, mois]
+    () => tarifDeLaJournee(faits, annee), [faits, annee]
   );
 
   /*
@@ -359,8 +438,12 @@ export function Activite({ annee }: ProprietesActivite = {}) {
   return (
     <>
       <Greet
-        titre="Ton plan de charge"
-        sousTitre="Les congés posés sortent du dénominateur : le même travail sur moins de jours fait monter l’occupation."
+        {...(section === 'factures'
+          ? { titre: 'Tes factures', sousTitre: 'Ce qui est parti, ce qui reste à encaisser, et qui relancer.' }
+          : {
+            titre: 'Ton plan de charge',
+            sousTitre: 'Les congés posés sortent du dénominateur : le même travail sur moins de jours fait monter l’occupation.'
+          })}
         {...(section === 'charge' ? { repere: <ResumeDuMois chiffres={chiffres} /> } : {})}
         actions={(
           <>
@@ -385,7 +468,7 @@ export function Activite({ annee }: ProprietesActivite = {}) {
           idGroupe={idGroupe}
           onglets={sections(etat.missions.length, faits.clients.length)}
           actif={section}
-          onChange={setSection}
+          onChange={changerDeSection}
           libelle="Sections de l’écran Activité"
         />
 
@@ -603,7 +686,8 @@ export function Activite({ annee }: ProprietesActivite = {}) {
                 * semaines de vacances ne se posent pas en trente clics, même
                 * bons — et les deux comptes du mois dans « Le mois en chiffres ».
                 */}
-              <section className={styles.carte} aria-labelledby={`${idGroupe}-plage`}>
+              <section id={ID_CARTE_CONGES} tabIndex={-1} className={styles.carte}
+                aria-labelledby={`${idGroupe}-plage`}>
                 <h2 id={`${idGroupe}-plage`} className={styles.titreCarte}>
                   Congés
                   <Info libelle="Effet des congés sur l’occupation">
@@ -634,10 +718,10 @@ export function Activite({ annee }: ProprietesActivite = {}) {
                 */}
               <Suspense fallback={<EnAttenteDeFormulaire />}>
                 <CartePrevision previsions={previsions} mois={mois} />
-                <CarteRapportParMission rapports={rapports} annee={Number(mois.slice(0, 4))} />
+                <CarteRapportParMission rapports={rapports} annee={annee} />
                 <CarteTarifJournalier
                   tarif={tarif}
-                  annee={Number(mois.slice(0, 4))}
+                  annee={annee}
                   auBareme={!faits.entreprise.versementLiberatoire}
                 />
               </Suspense>
@@ -732,6 +816,16 @@ export function Activite({ annee }: ProprietesActivite = {}) {
             <OngletClients idGroupe={idGroupe} onOuvrirClient={(id) => setPanneau({ type: 'client', id })} delais={etat.delais} />
           </Suspense>
         </PanneauOnglet>
+
+        <PanneauOnglet idGroupe={idGroupe} id="factures" actif={section === 'factures'}>
+          <Suspense fallback={<EnAttenteDeFormulaire />}>
+            <FacturierDiffere
+              onNouvelle={() => naviguerVers('facture', 'nouvelle')}
+              onRevoir={(numero) => naviguerVers('facture', encodeURIComponent(numero))}
+              annee={annee}
+            />
+          </Suspense>
+        </PanneauOnglet>
       </div>
 
       <Sheet
@@ -768,15 +862,17 @@ export function Activite({ annee }: ProprietesActivite = {}) {
         onFermer={() => setAEditer(null)}
       >
         {jourEdite !== null && aEditer !== null && (
-          <EditeurDemiJournee
-            jour={jourEdite}
-            creneauInitial={aEditer.creneau}
-            affectations={affectations}
-            onEnregistrer={(saisie) => appliquerSaisie(aEditer.date, saisie)}
-            onAnnuler={() => setAEditer(null)}
-          />
+          <Suspense fallback={<EnAttenteDeFormulaire />}>
+            <EditeurDemiJournee
+              jour={jourEdite}
+              creneauInitial={aEditer.creneau}
+              affectations={affectations}
+              onEnregistrer={(saisie) => appliquerSaisie(aEditer.date, saisie)}
+              onAnnuler={() => setAEditer(null)}
+            />
+          </Suspense>
         )}
-            </Sheet>
+      </Sheet>
     </>
   );
 }
@@ -888,17 +984,6 @@ function DependanceClients({ poids }: { poids: readonly PoidsClient[] }) {
    Présentation
    ───────────────────────────────────────────────────────────────────────── */
 
-function decalerMois(m: Mois, pas: number): Mois {
-  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + pas;
-  const annee = Math.floor(total / 12);
-  const mois = String((total % 12) + 1).padStart(2, '0');
-  return `${annee}-${mois}` as Mois;
-}
-
-function moisLong(m: Mois): string {
-  const date = new Date(`${m}-01T00:00:00`);
-  return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(date);
-}
 
 /**
  * Où une demi-journée PEUT être rattachée.

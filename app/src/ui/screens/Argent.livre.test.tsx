@@ -133,3 +133,23 @@ describe('livre vide', () => {
     expect(screen.getByRole('link', { name: 'Émettre une facture' })).toBeTruthy();
   });
 });
+
+/**
+ * LA PORTE DU PIED DU RAIL.
+ *
+ * `#/argent/livre` ouvre le registre directement : le chercher sous une
+ * rangée de liens au bas d'Argent demandait de savoir qu'il y était. L'adresse
+ * redevient ensuite celle de l'écran — recharger après avoir fermé le panneau
+ * ne doit pas le rouvrir.
+ */
+describe('l’adresse du livre', () => {
+  afterEach(() => { window.location.hash = ''; });
+
+  it('ouvre le registre sur `#/argent/livre`, puis rend l’adresse de l’écran', async () => {
+    semer({ recettes: [recette()] });
+    window.location.hash = '#/argent/livre';
+    render(<Argent />);
+    expect(await screen.findByRole('heading', { name: /^Écritures/ })).toBeTruthy();
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/argent'));
+  });
+});
