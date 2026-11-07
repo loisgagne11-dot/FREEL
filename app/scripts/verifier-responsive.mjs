@@ -47,8 +47,21 @@ const ECRANS = [
   { hash: '#/achats', nom: 'achats' },
   { hash: '#/activite', nom: 'activite' },
   { hash: '#/config', nom: 'config' },
-  { hash: '#/facture', nom: 'facture' }
+  // La liste des factures est un onglet d'Activité (formule A du rail) ; la
+  // rédaction reste sous `#/facture/…`, et c'est l'un des écrans les plus denses.
+  { hash: '#/activite/factures', nom: 'factures' },
+  { hash: '#/facture/nouvelle', nom: 'facture-nouvelle' }
 ];
+
+/**
+ * Les entrées du rail : six, comme le handoff (décision n° 2, formule A).
+ *
+ * Ce n'est plus le nombre d'écrans : la liste des factures vit sous Activité,
+ * et le pied du rail porte deux liens de plus (livre des recettes, carte de
+ * l'utilisateur) qui ne sont pas des entrées — masqués sur téléphone, ils
+ * tiraient la plus petite cible tactile à 0 px.
+ */
+const ENTREES_DU_RAIL = 6;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -161,7 +174,7 @@ for (const taille of TAILLES) {
       // premier nav de la page », pas « le rail de navigation ».
       const nav = document.querySelector('nav[aria-label="Navigation principale"]');
       const style = nav ? getComputedStyle(nav) : null;
-      const liens = nav ? [...nav.querySelectorAll('a')] : [];
+      const liens = nav ? [...nav.querySelectorAll('a[data-role="entree"]')] : [];
       const hauteurs = liens.map((a) => a.getBoundingClientRect().height);
       return {
         theme: document.documentElement.getAttribute('data-theme'),
@@ -215,7 +228,10 @@ for (const taille of TAILLES) {
       mesures.largeurDocument <= mesures.largeurFenetre + 1,
       `${prefixe} aucun débordement horizontal (${mesures.largeurDocument} ≤ ${mesures.largeurFenetre})`
     );
-    constate(mesures.navPresente && mesures.nbLiens === 7, `${prefixe} 7 onglets de navigation`);
+    constate(
+      mesures.navPresente && mesures.nbLiens === ENTREES_DU_RAIL,
+      `${prefixe} ${ENTREES_DU_RAIL} entrées de navigation (${mesures.nbLiens})`
+    );
     constate(mesures.contenuPresent, `${prefixe} contenu principal présent et ciblable`);
     if (mesures.pastilleDansLaFenetre !== null) {
       constate(
@@ -226,7 +242,7 @@ for (const taille of TAILLES) {
 
     if (taille.portrait) {
       constate(mesures.navPosition === 'fixed', `${prefixe} dock flottant en portrait`);
-      // Exigence de la cible : sept onglets dans ~340 px ne tiennent que si
+      // Exigence de la cible : six onglets dans ~340 px ne tiennent que si
       // un seul porte son libellé. La règle vit en CSS ; sans assertion, une
       // refonte de la feuille la casserait sans que rien ne le signale.
       constate(
@@ -262,7 +278,7 @@ for (const taille of TAILLES) {
       // En desktop la place existe : tous les onglets sont nommés. Un rail
       // d'icônes muettes obligerait à deviner.
       constate(
-        mesures.nbLibellesVisibles === ECRANS.length,
+        mesures.nbLibellesVisibles === ENTREES_DU_RAIL,
         `${prefixe} tous les onglets nommés en desktop (${mesures.nbLibellesVisibles})`
       );
     }

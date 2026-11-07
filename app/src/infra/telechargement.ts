@@ -66,9 +66,29 @@ export function nomDeFichier(...morceaux: readonly string[]): string {
     .join('_');
 }
 
-/** Enregistre le document sur le disque de l'utilisateur. */
-export function telecharger(nom: string, contenu: string): void {
-  const url = URL.createObjectURL(new Blob([contenu], { type: 'text/html;charset=utf-8' }));
+/**
+ * Le nom du fichier de sauvegarde : lisible, daté, sans nom de société vide.
+ *
+ * Une seule règle pour les deux boutons qui en produisent une (Config et le
+ * menu « Exporter ») : deux sauvegardes du même jour portent le même nom, quel
+ * que soit l'endroit d'où elles sont parties.
+ */
+export function nomSauvegarde(nomEntreprise: string, jour: string): string {
+  const nom = nomEntreprise.trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
+  return `freel-${nom === '' ? 'donnees' : nom.toLowerCase()}-${jour}.json`;
+}
+
+/**
+ * Enregistre le document sur le disque de l'utilisateur.
+ *
+ * Le type par défaut reste HTML : c'est ce que produisent tous les appelants
+ * d'origine. Un CSV ou un JSON déclaré `text/html` s'enregistrerait avec la
+ * mauvaise extension sur certains navigateurs, d'où le paramètre.
+ */
+export function telecharger(
+  nom: string, contenu: string, type: string = 'text/html;charset=utf-8'
+): void {
+  const url = URL.createObjectURL(new Blob([contenu], { type }));
   const lien = document.createElement('a');
   lien.href = url;
   lien.download = nom;

@@ -53,13 +53,12 @@ const visible = () => screen.queryByLabelText('Année') !== null;
  *
  * Le sélecteur ne s'affichait que sur Argent : on le tournait ailleurs et rien
  * ne bougeait, parce qu'il n'y était même pas. Il commande désormais l'ancre de
- * période des cinq écrans qui en ont une.
+ * période des quatre écrans qui en ont une.
  */
 describe('le sélecteur d’année s’affiche là où il a quelque chose à ancrer', () => {
   it.each([
     ['#/activite', 'quelle année de mois on parcourt'],
     ['#/argent', 'le chiffre d’affaires, les seuils, les provisions'],
-    ['#/facture', 'l’ancre de la barre de période'],
     ['#/achats', 'l’ancre de la barre de période'],
     ['#/outils', 'le barème du simulateur d’impôt']
   ])('s’affiche sur %s — %s', (chemin) => {
@@ -81,7 +80,10 @@ describe('le sélecteur d’année s’affiche là où il a quelque chose à anc
    */
   it.each([
     ['#/pilote', 'le poste de pilotage d’aujourd’hui'],
-    ['#/config', 'des réglages, aucune période']
+    ['#/config', 'des réglages, aucune période'],
+    // La liste des factures est un onglet d'Activité ; rédiger ou rouvrir une
+    // facture n'a pas de période.
+    ['#/facture/nouvelle', 'la rédaction d’une facture']
   ])('reste absent de %s — %s', (chemin) => {
     surLEcran(chemin);
     expect(visible()).toBe(false);

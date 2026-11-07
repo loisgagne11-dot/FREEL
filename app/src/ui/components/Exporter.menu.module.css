@@ -1,0 +1,45 @@
+/* Le menu Exporter. Chargé à la demande, hors du paquet d'entrée. */
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 260px;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  box-shadow: var(--sh-3);
+}
+
+.legende {
+  padding: 8px 12px 4px;
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.separateur { height: 1px; margin: 6px 4px; background: var(--line); }
+
+.entree {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.entree:hover,
+.entree:focus-visible { background: var(--tint-3); outline: none; box-shadow: inset 2px 0 0 var(--green); }

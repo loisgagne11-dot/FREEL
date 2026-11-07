@@ -70,6 +70,17 @@
   min-width: 0;
 }
 
+/* Recherche, export : des boutons qui ne rétrécissent pas — c'est le titre
+   qui cède, lui seul sait tronquer. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.actions:empty { display: none; }
+
 /* ---------- zone de contenu ---------- */
 
 .contenu {

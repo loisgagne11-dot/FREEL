@@ -27,7 +27,12 @@ function semer(modifications: Partial<Faits> = {}): void {
   useFaits.setState({ faits: { ...faitsVides(), ...modifications } });
 }
 
-beforeEach(() => { figerHorloge(); semer(); });
+beforeEach(() => {
+  figerHorloge(); semer();
+  // L'onglet suit l'adresse : un test qui en change ne doit pas ouvrir le
+  // suivant sur un autre onglet que le plan de charge.
+  window.location.hash = '';
+});
 
 const mission = (m: Partial<Faits['missions'][number]> = {}) => ({
   id: 'mis-1', clientId: null, clientNom: 'ClientA', description: 'Mission A',
@@ -74,6 +79,8 @@ async function editer(
   // tests qui visent une journée précise passent une expression qui la nomme ;
   // ceux à qui n'importe quelle moitié libre convient prennent la première.
   await utilisateur.click(screen.getAllByRole('button', { name: nomDeLaMoitie })[0]!);
+  // L'éditeur arrive à la demande (premier clic sur la grille) : on l'attend.
+  await screen.findByRole('button', { name: 'Enregistrer' });
   if (portee !== undefined) {
     await utilisateur.click(screen.getByRole('button', { name: portee }));
   }
@@ -1227,5 +1234,58 @@ describe('l’année choisie déplace le mois parcouru', () => {
     // sur le millésime, l'effet remettrait juillet à chaque passage.
     rendu.rerender(<Activite annee={2026} />);
     expect(periode()).toBe('juin 2026');
+  });
+});
+
+/**
+ * L'ONGLET VIT DANS L'ADRESSE (formule A du rail).
+ *
+ * La liste des factures est un onglet d'Activité, et le lien « Factures »,
+ * l'action rapide et le retour d'une facture rouverte doivent pouvoir le
+ * DÉSIGNER. Un état local rouvrait toujours le plan de charge.
+ */
+describe('Activité — les onglets suivent l’adresse', () => {
+  it('ouvre l’onglet Factures quand l’adresse le désigne', async () => {
+    window.location.hash = '#/activite/factures';
+    render(<Activite />);
+    expect(screen.getByRole('tab', { name: /Factures/ }).getAttribute('aria-selected')).toBe('true');
+    expect(await screen.findByRole('button', { name: 'Nouvelle facture' })).toBeTruthy();
+  });
+
+  it('écrit l’onglet choisi dans l’adresse', async () => {
+    window.location.hash = '#/activite';
+    render(<Activite />);
+    await userEvent.click(screen.getByRole('tab', { name: /Clients/ }));
+    expect(window.location.hash).toBe('#/activite/clients');
+    await userEvent.click(screen.getByRole('tab', { name: /Plan de charge/ }));
+    expect(window.location.hash).toBe('#/activite');
+  });
+
+  it('mène « Nouvelle facture » à la rédaction', async () => {
+    window.location.hash = '#/activite/factures';
+    render(<Activite />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Nouvelle facture' }));
+    expect(window.location.hash).toBe('#/facture/nouvelle');
+  });
+
+  /**
+   * `nouvelle-mission` est un GESTE, pas un onglet : il ouvre le formulaire,
+   * puis l'adresse redevient celle de l'onglet — un rechargement ne doit pas
+   * rouvrir un formulaire qu'on a fermé.
+   */
+  it('ouvre le formulaire de mission sur « nouvelle-mission », puis rend l’adresse de l’onglet', async () => {
+    window.location.hash = '#/activite/nouvelle-mission';
+    render(<Activite />);
+    expect(await screen.findByRole('dialog', { name: 'Nouvelle mission' })).toBeTruthy();
+    expect(window.location.hash).toBe('#/activite/missions');
+  });
+
+  it('descend à la carte des congés sur « conges »', async () => {
+    window.location.hash = '#/activite/conges';
+    render(<Activite />);
+    const carte = document.getElementById('carte-conges');
+    expect(carte).not.toBeNull();
+    await vi.waitFor(() => expect(document.activeElement).toBe(carte));
+    expect(window.location.hash).toBe('#/activite');
   });
 });

@@ -31,11 +31,13 @@ export interface ProprietesSelecteurPeriode {
  * d'affichage.
  *
  * Un sélecteur affiché mais sans effet serait pire que les deux : on le
- * tournerait, rien ne bougerait, et on cesserait de s'en servir sur les cinq
+ * tournerait, rien ne bougerait, et on cesserait de s'en servir sur les quatre
  * écrans où il marche.
  */
 const ECRANS_DATES: ReadonlySet<IdEcran> = new Set<IdEcran>([
-  'activite', 'argent', 'facture', 'achats', 'outils'
+  // Pas « facture » : sa liste est un onglet d'Activité, et rédiger ou
+  // rouvrir une facture n'a pas de période.
+  'activite', 'argent', 'achats', 'outils'
 ]);
 
 /**

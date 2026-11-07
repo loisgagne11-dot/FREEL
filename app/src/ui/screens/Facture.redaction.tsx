@@ -183,7 +183,7 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
               Nouvelle facture
             </button>
             <button type="button" className={styles.action} onClick={onListe}>
-              Retour au facturier
+              Retour aux factures
             </button>
           </div>
         </header>
@@ -211,7 +211,7 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
         <h1 className={styles.titre}>Nouvelle facture</h1>
         <span className={styles.numero}>{numero}</span>
         <button type="button" className={styles.action} onClick={onListe}>
-          Retour au facturier
+          Retour aux factures
         </button>
       </header>
 

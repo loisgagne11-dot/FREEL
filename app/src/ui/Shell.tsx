@@ -36,6 +36,12 @@ export interface ProprietesShell {
    * prévue par le dessin, en tête de barre.
    */
   readonly periode?: ReactNode;
+  /**
+   * Les services transverses de la barre : recherche, export, création.
+   * Fournis par l'appelant pour la même raison que `periode` — ils lisent
+   * l'année choisie, que la coquille n'a pas à connaître.
+   */
+  readonly actions?: ReactNode;
 }
 
 const ID_CONTENU = 'contenu-principal';
@@ -62,7 +68,7 @@ function surClicEvitement(evenement: MouseEvent<HTMLAnchorElement>): void {
  * uniquement de `useRoute`, qui lit la même source (`navigation.ts`) que
  * RailNav, donc les deux ne peuvent jamais diverger sur « quel écran ».
  */
-export function Shell({ children, compteurs, periode }: ProprietesShell) {
+export function Shell({ children, compteurs, periode, actions }: ProprietesShell) {
   const { ecran } = useRoute();
 
   return (
@@ -81,13 +87,11 @@ export function Shell({ children, compteurs, periode }: ProprietesShell) {
               (sélecteur de période) et fourni par l'appelant, qui seul sait
               quelle route est active. */}
           <div data-emplacement="selecteur-periode">{periode}</div>
-          {/* Emplacement réservé pour des services transverses pas encore
-              construits (actions Exporter/Nouveau). On ne les invente pas ici. */}
           {/* En tête des pastilles, jamais au-dessus d'un contrôle : en
               portrait il flotte au-dessus du dock, en paysage il vit ici. */}
           <IndicateurATraiter ecranActif={ecran.id} />
           <Suspense fallback={null}><PastillesSysteme /></Suspense>
-          <div data-emplacement="actions" />
+          <div data-emplacement="actions" className={styles.actions}>{actions}</div>
         </header>
 
         <main id={ID_CONTENU} tabIndex={-1} className={styles.contenu}>

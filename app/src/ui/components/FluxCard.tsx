@@ -1,8 +1,8 @@
-import { useId, useState } from 'react';
+import { Suspense, lazy, useId, useState } from 'react';
 import type { Euros } from '../../domain/types';
 import type { FluxDuMois, LigneFlux } from '../../state/selecteurs';
 import { Info } from './Info';
-import { dateCourte, eur } from '../format';
+import { eur } from '../format';
 import styles from './FluxCard.module.css';
 import { Montant } from './Montant';
 
@@ -32,8 +32,21 @@ import { Montant } from './Montant';
  * carte. Il s'ouvre sur sa composition, comme la carte le faisait.
  */
 
+/**
+ * Le détail déplié arrive au clic sur « Voir le détail » : il n'est pas vu à
+ * l'ouverture du Pilote, et le paquet d'entrée a franchi son budget au lot 6.
+ * Le conteneur, lui, existe toujours — `aria-controls` doit désigner quelque
+ * chose ; c'est son contenu qui arrive.
+ */
+const DetailDuFlux = lazy(() => import('./FluxCard.detail').then((m) => ({ default: m.DetailDuFlux })));
+
 /** Combien de lignes tiennent dans une colonne avant « Voir le détail ». */
 const LIGNES_PAR_COLONNE = 4;
+
+/** Là où le statut d'un encaissement se met à jour : la liste des factures. */
+export const VERS_FACTURES = '#/activite/factures';
+/** Là où le statut d'une sortie se met à jour : l'échéancier. */
+const VERS_ECHEANCIER = '#/argent';
 
 export function FluxCard(
   { flux, periode, onVersable, dejaVerse, besoinMensuel }: {
@@ -64,8 +77,8 @@ export function FluxCard(
   const payees = sorties.filter((l) => l.regle).reduce((s, l) => s + l.montant, 0);
 
   const detaillables = [
-    { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes, vers: '#/facture' },
-    { cle: 'sorties', titre: 'Sorties', lignes: sorties, vers: '#/argent' }
+    { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes, vers: VERS_FACTURES },
+    { cle: 'sorties', titre: 'Sorties', lignes: sorties, vers: VERS_ECHEANCIER }
   ].filter((d) => d.lignes.length > 0);
 
   return (
@@ -95,7 +108,7 @@ export function FluxCard(
               ? <>encaissé · <Montant>{eur(flux.entrees.enAttente)}</Montant> en attente</>
               : 'encaissé · rien en attente'}
           </p>
-          <Lignes lignes={flux.entrees.lignes} vers="#/facture" />
+          <Lignes lignes={flux.entrees.lignes} vers={VERS_FACTURES} />
         </div>
 
         <div className={styles.colonne}>
@@ -108,7 +121,7 @@ export function FluxCard(
               ? <><Montant>{eur(payees as Euros)}</Montant> payé · <Montant>{eur(flux.sorties.total)}</Montant> à venir</>
               : 'Rien à mettre de côté'}
           </p>
-          <Lignes lignes={sorties} vers="#/argent" />
+          <Lignes lignes={sorties} vers={VERS_ECHEANCIER} />
         </div>
 
         <div className={styles.colonne}>
@@ -163,23 +176,25 @@ export function FluxCard(
       {/* Le conteneur existe toujours pour que `aria-controls` désigne quelque
           chose ; c'est son contenu qui apparaît. */}
       <div id={idDetail} className={styles.details} hidden={!ouvert}>
-        {detaillables.map((d) => (
-          <Detail key={d.cle} titre={d.titre} lignes={d.lignes} vers={d.vers} />
-        ))}
+        {ouvert && (
+          <Suspense fallback={null}>
+            <DetailDuFlux blocs={detaillables} />
+          </Suspense>
+        )}
       </div>
     </section>
   );
 }
 
 /** La pastille d'une ligne : ce qui est fait, ce qui attend, ce qui est en retard. */
-function Pastille({ ligne, vers }: { ligne: LigneFlux; vers: string }) {
+export function Pastille({ ligne, vers }: { ligne: LigneFlux; vers: string }) {
   const [classe, texte] = ligne.regle
-    ? [styles.fait, vers === '#/facture' ? 'encaissé' : 'payé']
+    ? [styles.fait, vers === VERS_FACTURES ? 'encaissé' : 'payé']
     : ligne.enRetard === true
       ? [styles.retard, 'en retard']
       : ligne.id === 'a-provisionner'
         ? [styles.attente, 'à provisionner']
-        : [styles.attente, vers === '#/facture' ? 'en attente' : 'à venir'];
+        : [styles.attente, vers === VERS_FACTURES ? 'en attente' : 'à venir'];
   return <span className={`${styles.pastille} ${classe}`}>{texte}</span>;
 }
 
@@ -197,29 +212,5 @@ function Lignes({ lignes, vers }: { lignes: readonly LigneFlux[]; vers: string }
         </li>
       ))}
     </ul>
-  );
-}
-
-function Detail(
-  { titre, lignes, vers }: { titre: string; lignes: readonly LigneFlux[]; vers: string }
-) {
-  return (
-    <div className={styles.bloc}>
-      <h3 className={styles.titreBloc}>{titre} ({lignes.length})</h3>
-      <ul className={styles.lignes}>
-        {lignes.map((l) => (
-          <li key={l.id} className={styles.ligne}>
-            <span className={styles.ligneLibelle}>
-              {l.libelle}
-              {l.date !== null && <span className={styles.ligneDate}> · {dateCourte(l.date)}</span>}
-            </span>
-            <span className={styles.ligneDroite}>
-              <span className={styles.ligneMontant}><Montant>{eur(l.montant)}</Montant></span>
-              <a href={vers} className={styles.lienPastille}><Pastille ligne={l} vers={vers} /></a>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }

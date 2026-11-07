@@ -38,6 +38,10 @@ import { aTraiter } from './state/selecteurs';
 import { compteursParEcran } from './domain/calculs/aTraiter';
 import { FiletErreur } from './ui/components/FiletErreur';
 
+/** Recherche et export : différés, voir l'en-tête de `BarreActions`. */
+const BarreActions = lazy(() => import('./ui/components/BarreActions')
+  .then((m) => ({ default: m.BarreActions })));
+
 /**
  * Attente de chargement d'un écran. Sobre et sans animation : sur une connexion
  * correcte le fragment arrive en quelques dizaines de millisecondes, et un
@@ -58,8 +62,10 @@ function EnChargement() {
  * `never`, donc ajouter un écran à la navigation sans le router ici ne
  * compile pas. Un `return null` final aurait laissé passer un écran blanc.
  *
- * `annee` va aux CINQ écrans qui ont une période à ancrer. Pilote et Config
- * ne la reçoivent pas : le premier est le poste de pilotage d'aujourd'hui —
+ * `annee` va aux QUATRE écrans qui ont une période à ancrer. Facture ne la
+ * reçoit plus : la liste des factures est un onglet d'Activité, et ce qui
+ * reste sous `#/facture/…` — rédiger, rouvrir une facture — n'a pas d'année.
+ * Pilote et Config ne la reçoivent pas : le premier est le poste de pilotage d'aujourd'hui —
  * « combien je peux me verser » n'a pas d'année —, le second ne porte que des
  * réglages. C'est la même liste que `ECRANS_DATES` dans `SelecteurPeriode`,
  * qui décide d'afficher le contrôle ou non ; les deux doivent rester
@@ -86,7 +92,7 @@ function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], annee: num
     case 'pilote': return <Pilote />;
     case 'activite': return <Activite annee={annee} />;
     case 'argent': return <Argent annee={annee} />;
-    case 'facture': return <Facture annee={annee} />;
+    case 'facture': return <Facture />;
     case 'achats': return <Achats annee={annee} />;
     case 'outils': return <Outils annee={annee} />;
     case 'config': return <Config />;
@@ -173,6 +179,11 @@ export function App() {
           // dérangeant que l'absence du contrôle le temps qu'il arrive.
           <Suspense fallback={null}>
             <SelecteurPeriode etat={etatAnnee} />
+          </Suspense>
+        )}
+        actions={(
+          <Suspense fallback={null}>
+            <BarreActions annee={anneeChoisie} />
           </Suspense>
         )}
       >

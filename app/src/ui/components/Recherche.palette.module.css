@@ -1,0 +1,104 @@
+/* La palette de recherche. Chargée à la demande, hors du paquet d'entrée. */
+
+.voile {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 10vh 12px 12px;
+  background: var(--scrim);
+}
+
+.boite {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, 100%);
+  max-height: 76vh;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  box-shadow: var(--sh-3);
+  overflow: hidden;
+}
+
+.saisie {
+  min-height: 52px;
+  padding: 0 18px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.saisie:focus-visible { box-shadow: inset 0 -2px 0 var(--green); }
+
+.liste { overflow-y: auto; padding: 6px; }
+
+.groupe {
+  padding: 10px 12px 4px;
+  font-size: 9px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.optionActive { background: var(--tint-3); box-shadow: inset 2px 0 0 var(--green); }
+
+.texte { display: flex; flex-direction: column; min-width: 0; }
+
+.titre {
+  font-size: 13.5px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.montant {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.vide { margin: 0; padding: 18px; font-size: 13px; color: var(--muted); }
+
+.aide {
+  margin: 0;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px;
+  color: var(--muted-2);
+}
+
+/* Sur téléphone il n'y a pas de clavier à qui rappeler les touches. */
+@media (max-width: 760px) {
+  .aide { display: none; }
+  .voile { padding-top: 6vh; }
+}
+
+@media print { .voile { display: none; } }

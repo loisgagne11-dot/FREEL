@@ -21,6 +21,13 @@ export interface Ecran {
   /** Chemin de route, sous forme de hash — l'app est servie en statique, sans routeur d'historique. */
   readonly chemin: string;
   readonly icone: string;
+  /**
+   * L'entrée du rail qui s'allume quand on est sur cet écran, s'il n'a pas
+   * la sienne. Les factures n'ont plus d'entrée (décision n° 2, formule A) :
+   * leur liste est un onglet d'Activité, et une facture ouverte allume
+   * « Activité ».
+   */
+  readonly rattacheA?: IdEcran;
 }
 
 /** Écran affiché quand le hash est vide ou ne correspond à aucun écran connu. */
@@ -50,7 +57,8 @@ export const ECRANS: readonly Ecran[] = [
   },
   {
     id: 'facture',
-    libelle: 'Facturer',
+    libelle: 'Factures',
+    rattacheA: 'activite',
     chemin: '#/facture',
     // Document : émettre une facture.
     icone: 'M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M9 12 H16 M9 16 H14'
@@ -123,3 +131,17 @@ export function resoudreRoute(hash: string): Route {
 export function resoudreEcran(hash: string): Ecran {
   return resoudreRoute(hash).ecran;
 }
+
+/**
+ * Les six entrées du rail, comme le handoff : Pilote, Activité & congés,
+ * Argent, Achats, Outils, Config. « Facturer » en était la septième — la
+ * liste des factures est devenue un onglet d'Activité, et la création passe
+ * par « + Nouveau » et par le Pilote (décision n° 2 du 6/11, formule A).
+ */
+export const ECRANS_DU_RAIL: readonly Ecran[] = ECRANS.filter((e) => e.rattacheA === undefined);
+
+/** L'entrée du rail allumée pour un écran : la sienne, ou celle qui l'accueille. */
+export function entreeDuRail(id: IdEcran): IdEcran {
+  return ECRANS.find((e) => e.id === id)?.rattacheA ?? id;
+}
+

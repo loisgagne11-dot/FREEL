@@ -89,14 +89,17 @@ describe('le détail', () => {
     render(<FluxCard flux={FLUX} periode="août 2026" {...RIEN} />);
     const bouton = screen.getByRole('button', { name: 'Voir le détail' });
     expect(bouton.getAttribute('aria-expanded')).toBe('false');
-    expect(document.querySelector('[hidden]')?.textContent).toMatch(/Client de démo/);
+    // Le conteneur existe — `aria-controls` le désigne —, son contenu arrive
+    // au premier dépliage.
+    const conteneur = document.getElementById(bouton.getAttribute('aria-controls') as string);
+    expect(conteneur?.hidden).toBe(true);
   });
 
   it('ouvre les listes de toutes les colonnes d’un seul geste', async () => {
     render(<FluxCard flux={FLUX} periode="août 2026" {...RIEN} />);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Voir le détail' }));
 
-    expect(screen.getByText(/Encaissements \(2\)/)).toBeTruthy();
+    expect(await screen.findByText(/Encaissements \(2\)/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Masquer le détail' })).toBeTruthy();
   });
 
@@ -108,7 +111,7 @@ describe('le détail', () => {
     const bouton = () => screen.getByRole('button', { name: 'Masquer le détail' });
 
     const details = document.getElementById(bouton().getAttribute('aria-controls') as string) as HTMLElement;
-    const ligne = within(details).getByText(/Client de démo/).closest('li') as HTMLElement;
+    const ligne = (await within(details).findByText(/Client de démo/)).closest('li') as HTMLElement;
     expect(ligne.textContent).toMatch(/4\s*000/u);
   });
 
@@ -156,11 +159,12 @@ describe('les lignes et leurs pastilles', () => {
     expect(pastille('Client en retard')).toMatch(/en retard/);
   });
 
-  it('mène une facture au facturier, une sortie à l’échéancier', () => {
+  // La liste des factures est un onglet d'Activité (formule A du rail).
+  it('mène une facture à la liste des factures, une sortie à l’échéancier', () => {
     render(<FluxCard flux={avecRetard} periode="août 2026" {...RIEN} />);
     const entrees = screen.getByText('Entrées').parentElement as HTMLElement;
     const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
-    expect(within(entrees).getByText('Autre client').closest('a')?.getAttribute('href')).toBe('#/facture');
+    expect(within(entrees).getByText('Autre client').closest('a')?.getAttribute('href')).toBe('#/activite/factures');
     expect(within(sorties).getByText('Charges sur encaissements').closest('a')?.getAttribute('href')).toBe('#/argent');
   });
 });

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { euros, mois } from '../../domain/types';
 import { type Client, type Faits, faitsVides } from '../../state/schema';
@@ -287,24 +287,15 @@ describe('l’adresse de la rédaction', () => {
     expect(screen.getByLabelText('Client')).toBeTruthy();
   });
 
-  it('ouvre le facturier sans sous-route', () => {
+  /**
+   * `#/facture` seul ne désigne plus la liste : elle est un onglet d'Activité.
+   * L'adresse survit dans les favoris ; elle y mène, par `replace`.
+   */
+  it('renvoie l’adresse de la liste vers l’onglet Factures d’Activité', async () => {
     semer({ clients: [client()] });
     window.location.hash = '#/facture';
     render(<Facture />);
-    expect(screen.getByRole('heading', { name: 'Facturer' })).toBeTruthy();
-  });
-
-  // Le bouton du facturier écrit l'adresse : c'est ce qui rend l'état partageable
-  // et le retour navigateur cohérent.
-  it('porte l’adresse dans l’URL quand on clique « Nouvelle facture »', async () => {
-    semer({ clients: [client()] });
-    window.location.hash = '#/facture';
-    render(<Facture />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Nouvelle facture' }));
-
-    expect(window.location.hash).toBe('#/facture/nouvelle');
-    expect(await screen.findByLabelText('Client')).toBeTruthy();
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/activite/factures'));
   });
 });
 
