@@ -20,7 +20,7 @@ import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
   type VentilationProvisions,
-  estPayee, exerciceDe, provisions as calculerProvisions
+  estPayee, exerciceDe, provisions as calculerProvisions, voletAProvisionner
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
 import {
@@ -37,6 +37,7 @@ import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
 import { type ProvenanceSolde, soldeDerive } from '../domain/calculs/solde';
+import { moisDeLaPeriode } from '../domain/calculs/declarations';
 import type { RegimeTva } from '../domain/calculs/depenses';
 import { tvaDeDepense } from '../domain/calculs/depenses.tva';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
@@ -551,7 +552,47 @@ export function aTraiter(
 ): readonly SujetATraiter[] {
   return sujetsATraiter(
     entreeATraiter(faits, echeancesReglementairesActives(faits, maintenant), maintenant)
+  ).map((s) => {
+    // La déclaration arrive avec ce qu'il faut payer : c'est la question qu'on
+    // se pose en ouvrant le site de l'URSSAF. Calculé ici et non dans le
+    // domaine des sujets, qui ne connaît pas les barèmes.
+    if (s.id !== 'periodes-a-declarer' || typeof s.donnees['periode'] !== 'string') return s;
+    const m = montantDeclaration(
+      faits, moisDeLaPeriode(s.donnees['periode'], faits.entreprise.urssafPeriodicite)
+    );
+    return { ...s, donnees: { ...s.donnees, montant: m.statut === 'refuse' ? null : m.valeur } };
+  });
+}
+
+/**
+ * Ce que coûte la déclaration d'une période : cotisations, plus le versement
+ * libératoire s'il y a lieu, plus la CFP, sur les encaissements de la période
+ * — la même règle que le volet « à provisionner », taux au mois de chaque
+ * encaissement.
+ *
+ * Refusé si un taux manque : un montant calculé avec un taux à zéro se lirait
+ * comme un fait, et se recopierait sur le formulaire. Une période sans
+ * encaissement, elle, coûte un vrai zéro — elle se déclare quand même.
+ */
+export function montantDeclaration(faits: Faits, mois: readonly Mois[]): Resolution<Euros> {
+  const dans = new Set<string>(mois);
+  const dernier = mois[mois.length - 1];
+  if (dernier === undefined) return { statut: 'refuse', motif: 'Période vide.' };
+  const taux = tauxImpotEtContributions(regimeDe(faits), dernier, faits.entreprise.typeActivite);
+  if (taux.statut === 'refuse') return taux;
+  const calcul = voletAProvisionner(
+    recettesEncaissees(faits).filter((r) => dans.has(r.encaisseeLe.slice(0, 7))),
+    { mois: [] },
+    {
+      typeActivite: faits.entreprise.typeActivite,
+      sousAcreLe: sousAcreLe(faits),
+      periodesUrssaf: periodesUrssafEffectives(faits),
+      tauxImpotEtContributions: taux.valeur
+    }
   );
+  const refus = calcul.nonCalculables[0];
+  if (refus !== undefined) return { statut: 'refuse', motif: refus.motif };
+  return { statut: 'publie', valeur: calcul.montant, source: taux.source, verifieLe: taux.verifieLe };
 }
 
 /**

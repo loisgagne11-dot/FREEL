@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Mois } from '../types';
-import { periodesADeclarer } from './declarations';
+import { dateLimiteDeclaration, periodesADeclarer } from './declarations';
 
 const enc = (encaisseeLe: string, montant = 1000) => ({ encaisseeLe, montant });
 const AUJOURDHUI = '2026-08-13';
@@ -118,3 +118,30 @@ describe('déclarations à zéro', () => {
     expect(p.map((x) => x.id)).toContain('2026-04');
   });
 });
+
+/**
+ * LA DATE LIMITE : LE DERNIER JOUR DU MOIS SUIVANT.
+ *
+ * Par le calendrier, pas par « + 1 mois » : le 31 janvier + 1 mois n'existe
+ * pas, et février change de longueur.
+ */
+describe('date limite de déclaration', () => {
+  it.each([
+    ['2026-03', '2026-04-30'], // T1
+    ['2026-06', '2026-07-31'], // T2
+    ['2026-09', '2026-10-31'], // T3
+    ['2026-12', '2027-01-31'], // T4 : l'année change
+    ['2027-01', '2027-02-28'], // mensuel, février
+    ['2028-01', '2028-02-29'] // année bissextile
+  ])('%s se déclare jusqu’au %s', (m, limite) => {
+    expect(dateLimiteDeclaration(m as Mois)).toBe(limite);
+  });
+
+  it('porte la limite sur chaque période, au dernier mois couvert', () => {
+    const [t2] = periodesADeclarer(
+      [{ encaisseeLe: '2026-05-10', montant: 100 }], 'trimestriel', [], '2026-07-15'
+    );
+    expect(t2?.limite).toBe('2026-07-31');
+  });
+});
+

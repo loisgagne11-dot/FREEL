@@ -24,7 +24,7 @@ import {
 import { resteAvantMajore } from '../bareme/tva';
 import { plafondMicro } from '../bareme/plafonds';
 import { PERIODES_URSSAF, type PeriodeBareme } from '../bareme/urssaf';
-import { periodesADeclarer } from './declarations';
+import { type PeriodeADeclarer, periodesADeclarer } from './declarations';
 
 /** L'écran qui règle le sujet. Sert au badge de navigation et au lien. */
 export type EcranCible = 'pilote' | 'activite' | 'argent' | 'achats' | 'outils' | 'config';
@@ -217,7 +217,7 @@ function ajouterMois(m: Mois, n: number): Mois {
  * l'échéancier : deux règles du même nom faisaient réclamer ici des périodes
  * que l'échéancier ne montrait pas, et l'alerte ne pouvait jamais s'éteindre.
  */
-function periodesADeclarerEchues(e: EntreeATraiter): readonly Mois[] {
+function periodesCloses(e: EntreeATraiter): readonly PeriodeADeclarer[] {
   const encaissements = e.recettes
     .filter((r) => r.encaisseeLe !== null)
     .map((r) => ({ encaisseeLe: r.encaisseeLe as DateISO, montant: r.montant }));
@@ -225,8 +225,7 @@ function periodesADeclarerEchues(e: EntreeATraiter): readonly Mois[] {
     encaissements, e.periodicite, e.periodesDeclarees, e.aujourdhui, e.debutActivite
   )
     .filter((p) => p.close && !p.declaree)
-    .map((p) => p.mois[0] as Mois)
-    .sort();
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /** Le mois de la dernière vérification de barème la plus ancienne. */
@@ -289,15 +288,28 @@ export function sujetsATraiter(
   }
 
   /* ---------- périodes à déclarer ---------- */
-  const aDeclarer = periodesADeclarerEchues(e);
+  //
+  // Une période close n'est pas en retard le lendemain de sa clôture : elle se
+  // déclare jusqu'au dernier jour du mois suivant. Le Pilote l'annonçait
+  // « en retard » dès le 1er juillet pour un trimestre dû le 31 — l'alerte
+  // rouge la plus fréquente de l'application était fausse un mois sur trois.
+  // « À faire » avant la date limite, « en retard » après.
+  const aDeclarer = periodesCloses(e);
   if (aDeclarer.length > 0) {
-    const premiere = aDeclarer[0] as Mois;
+    const premiere = aDeclarer[0] as PeriodeADeclarer;
+    const enRetard = aDeclarer.some((p) => p.limite < e.aujourdhui);
     sujets.push({
       id: 'periodes-a-declarer',
       ecran: 'argent',
-      gravite: 'retard',
+      gravite: enRetard ? 'retard' : 'a_faire',
       nombre: aDeclarer.length,
-      donnees: { depuis: premiere }
+      donnees: {
+        depuis: premiere.mois[0] as Mois,
+        periode: premiere.id,
+        libelle: premiere.libelle,
+        limite: premiere.limite,
+        base: premiere.encaisse
+      }
     });
   }
 

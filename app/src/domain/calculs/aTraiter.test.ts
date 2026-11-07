@@ -108,7 +108,40 @@ describe('périodes à déclarer', () => {
     expect(s).toBeDefined();
     expect(s?.ecran).toBe('argent');
     // La prose est destinée à l'utilisateur : « juin 2026 », pas « 2026-06 ».
-    expect(s === undefined ? '' : formuler(s).contexte).toContain('juin 2026');
+    const f = s === undefined ? null : formuler(s);
+    expect(`${f?.intitule} ${f?.contexte}`).toContain('juin 2026');
+  });
+
+  /**
+   * UNE PÉRIODE CLOSE N'EST PAS EN RETARD LE LENDEMAIN DE SA CLÔTURE.
+   *
+   * Elle se déclare jusqu'au dernier jour du mois suivant. Le Pilote
+   * l'annonçait en rouge dès le 1er : l'alerte la plus fréquente de
+   * l'application était fausse un mois sur trois.
+   */
+  it('dit « à faire, avant le … » dans la fenêtre de déclaration', () => {
+    // Juin, déclaré jusqu'au 31 juillet ; on est le 28.
+    const s = sujetsATraiter(entree({ recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })] }))
+      .find((x) => x.id === 'periodes-a-declarer');
+    expect(s?.gravite).toBe('a_faire');
+    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/avant le 31 juillet/);
+  });
+
+  it('passe en retard le lendemain de la date limite', () => {
+    const s = sujetsATraiter(entree({
+      aujourdhui: dateISO('2026-08-01'),
+      recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })]
+    })).find((x) => x.id === 'periodes-a-declarer');
+    expect(s?.gravite).toBe('retard');
+    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/date limite dépassée/);
+  });
+
+  it('annonce la base encaissée et le montant à payer, ou « à vérifier »', () => {
+    const s = sujetsATraiter(entree({ recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })] }))
+      .find((x) => x.id === 'periodes-a-declarer');
+    if (s === undefined) throw new Error('sujet attendu');
+    expect(formuler({ ...s, donnees: { ...s.donnees, montant: 412 } }).contexte).toMatch(/à payer 412 €/);
+    expect(formuler(s).contexte).toMatch(/à payer à vérifier/);
   });
 
   // Réclamer la déclaration du mois courant serait un faux positif quotidien.

@@ -1,16 +1,16 @@
 import { useId, useMemo } from 'react';
 import { useFaits } from '../../state/store';
 import { annulerPeriodeDeclaree, marquerPeriodeDeclaree } from '../../state/ecritures.echeances';
-import type { Mois } from '../../domain/types';
-import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
-import { periodesADeclarer } from '../../domain/calculs/declarations';
+import type { Euros, Mois, Resolution } from '../../domain/types';
+import { dateDuJour, montantDeclaration, recettesEncaissees } from '../../state/selecteurs';
+import { type PeriodeADeclarer, periodesADeclarer } from '../../domain/calculs/declarations';
 import { Echeances } from '../components/Echeances';
 import { FriseEcheances } from '../components/FriseEcheances';
 import { Info } from '../components/Info';
 import { Montant } from '../components/Montant';
 import { Statut } from '../components/Statut';
 import { useToast } from '../components/Toasts';
-import { eur } from '../format';
+import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
 
 /**
@@ -148,6 +148,13 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
                     ? 'Rien encaissé'
                     : 'Rien encaissé : à déclarer à zéro, c’est obligatoire'}
               </span>
+              {/* Ce qu'il faut payer, et jusqu'à quand : les deux chiffres
+                  qu'on vient chercher avant d'ouvrir le site de l'URSSAF. Le
+                  Pilote annonce le même montant — une seule règle,
+                  `montantDeclaration`. */}
+              {p.close && !p.declaree && (
+                <AFaire periode={p} montant={montantDeclaration(faits, p.mois)} />
+              )}
             </span>
 
             {p.declaree
@@ -194,3 +201,18 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
     </section>
   );
 }
+
+/** « À payer 1 970 € · avant le 31 juillet » — ou « date limite dépassée ». */
+function AFaire({ periode: p, montant }: { periode: PeriodeADeclarer; montant: Resolution<Euros> }) {
+  const depassee = p.limite < dateDuJour();
+  return (
+    <span className={depassee ? styles.declarationRetard : styles.declarationLimite}>
+      {montant.statut === 'refuse'
+        ? 'À payer : à vérifier (taux manquant)'
+        : <>À payer <Montant>{eur(montant.valeur)}</Montant></>}
+      {' · '}
+      {depassee ? `date limite dépassée (${dateCourte(p.limite)})` : `avant le ${dateCourte(p.limite)}`}
+    </span>
+  );
+}
+
