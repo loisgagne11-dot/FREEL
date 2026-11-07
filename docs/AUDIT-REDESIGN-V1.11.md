@@ -1002,3 +1002,14 @@ handoff met « Enregistrer » (Réglages enregistre au fil de la saisie).
 | Pastille « à traiter » | Dans le paquet d'entrée | Différée, comme les pastilles système (budget) |
 | Facturier | Brouillon du mois avec ses propres flèches | Ses flèches déplacent le mois de la barre |
 
+Contrôle image contre image par l'agent contrôleur, deux thèmes (Pilote,
+Achats, Argent Trésorerie et Performance, Factures) : **aucune régression du
+lot**. Textes secondaires lisibles, verts conservés, cartes claires
+détachées, étiquettes en k€ sans chevauchement. La pastille « à traiter »
+absente d'Argent et d'Achats ne montre que les sujets de l'écran ouvert, et la
+démonstration n'en a aucun là : c'est voulu. Les écarts relevés sur Achats
+(registre en tableau, rapprochement, filtre par compte), sur l'échéancier
+(jalons réglementaires à venir) et sur trois libellés du handoff (« Réserve
+matelas », « CA réalisé », « Réserve auto gardée ») sont antérieurs au lot et
+déjà portés à la liste de sortie, sauf les libellés : ajoutés ci-dessous.
+
