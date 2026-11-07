@@ -495,6 +495,11 @@ function recettesDuSchema15(recettes: readonly Recette[]): readonly Recette[] {
  * `faitsVides()`, à `null` — jamais `false`, qui dirait « seul » d'un foyer
  * dont on ne sait rien. Test nommé : « un compte de schéma 17 reçoit une
  * imposition commune nulle, et non `undefined` ».
+ *
+ * v18 → v19 : `entreprise.prenom`, pour la salutation du Pilote. Champ d'un
+ * SOUS-OBJET, pas d'une liste : `{ ...entrepriseVide(), ...entreprise }`
+ * ci-dessous le comble à la chaîne vide. Test nommé : « un compte de schéma
+ * 18 reçoit un prénom vide, et non `undefined` ».
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;

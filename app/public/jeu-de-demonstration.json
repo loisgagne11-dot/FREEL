@@ -19,9 +19,10 @@
     "invalide) — invariant n°6 : le dépôt est public, aucune donnée personnelle",
     "n'y entre."
   ],
-  "version": 18,
+  "version": 19,
   "entreprise": {
     "nom": "Atelier de démonstration",
+    "prenom": "Camille",
     "siret": "000 000 000 00000",
     "debutActivite": "2025-10-01",
     "typeActivite": "BNC",

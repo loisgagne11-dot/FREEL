@@ -917,3 +917,16 @@ describe('schéma 17 → 18 : la situation du foyer', () => {
       .toMatch(/impositionCommune/);
   });
 });
+
+/**
+ * v18 → v19 : le prénom, pour la salutation. Comblé à la chaîne vide : un
+ * `undefined` s'afficherait « Bonjour undefined ».
+ */
+describe('schéma 18 → 19 : le prénom', () => {
+  it('un compte de schéma 18 reçoit un prénom vide, et non `undefined`', () => {
+    const f = completerFaits({ version: 18, entreprise: { nom: 'Atelier' } });
+    expect(f.entreprise.prenom).toBe('');
+    expect(f.entreprise.nom).toBe('Atelier');
+  });
+});
+

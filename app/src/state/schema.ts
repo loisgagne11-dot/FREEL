@@ -34,7 +34,7 @@ import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 18 as const;
+export const VERSION_SCHEMA = 19 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -54,6 +54,15 @@ export const CLE_AVANT_REMPLACEMENT = 'freel.avant-remplacement.v1' as const;
 
 export interface Entreprise {
   readonly nom: string;
+  /**
+   * Le prénom de la personne, pour la saluer sur le Pilote — rien d'autre.
+   *
+   * Il ne figure sur aucun document : une facture porte le nom de
+   * l'entreprise. Vide tant qu'il n'est pas saisi, et la salutation s'en passe
+   * plutôt que de saluer l'entreprise (« Bonjour Atelier de démonstration »).
+   * Jamais écrit dans le code : le dépôt est public.
+   */
+  readonly prenom: string;
   readonly siret: string;
   /** Début d'activité. Détermine notamment la période d'ACRE. */
   readonly debutActivite: DateISO | null;
@@ -594,7 +603,7 @@ export interface Faits {
 
 export function entrepriseVide(): Entreprise {
   return {
-    nom: '', siret: '', debutActivite: null, typeActivite: 'BNC', acre: false,
+    nom: '', prenom: '', siret: '', debutActivite: null, typeActivite: 'BNC', acre: false,
     versementLiberatoire: false, tvaDepuis: null, tvaIntracom: '', iban: '',
     bic: '', adresse: '', codePostal: '', ville: '', codeApe: '', email: '',
     telephone: '', urssafPeriodicite: 'mensuel', onboardingFait: false

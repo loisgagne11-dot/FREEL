@@ -86,8 +86,8 @@ export function Pilote() {
   return (
     <>
       <Greet
-        titre={salutation(faits.entreprise.nom)}
-        sousTitre={phraseDAccueil(sujets.length, moisLong(mois))}
+        titre={salutation(faits.entreprise.prenom, sujets.length)}
+        sousTitre="Ton mois en un coup d’œil : ce qui entre, ce qui sort, ce que tu peux te verser."
         repere={<>Solde compte · <Montant>{eur(etat.tresorerie.solde)}</Montant></>}
       />
 
@@ -348,29 +348,24 @@ function Chiffre(
   );
 }
 
-/**
- * « Bonjour » suivi du nom, quand on le connaît.
- *
- * Le nom vient de la configuration de l'utilisateur, jamais du code : rien
- * d'identifiant n'est écrit dans le dépôt. Tant qu'il n'est pas renseigné,
- * on salue sans nommer plutôt que d'afficher un « Bonjour  » amputé.
- */
-function salutation(nom: string): string {
-  const propre = nom.trim();
-  return propre === '' ? 'Bonjour' : `Bonjour ${propre}`;
-}
+/** Les petits nombres s'écrivent en lettres dans une phrase ; au-delà, en chiffres. */
+const EN_LETTRES = ['zéro', 'une', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix'];
 
 /**
- * Ce qui attend, en une phrase.
+ * « Bonjour Camille — deux décisions t'attendent. »
  *
- * La spec ouvre le Pilote sur « quatre décisions t'attendent » — un état
- * qu'on lit en une seconde, là où quatre tuiles demandent d'être comparées.
- * Le cas « rien à traiter » n'est pas un vide à masquer : c'est la bonne
- * nouvelle de la journée, et elle mérite d'être dite.
+ * La phrase du handoff, en une ligne : qui, et combien de choses attendent —
+ * un état qu'on lit en une seconde, là où quatre tuiles demandent d'être
+ * comparées. Le prénom vient de Réglages, jamais du code (le dépôt est
+ * public) ; tant qu'il manque, on salue sans nommer. On saluait l'entreprise
+ * — « Bonjour Atelier de démonstration » — faute de mieux.
+ *
+ * « Rien ne réclame ton attention » n'est pas un vide à masquer : c'est la
+ * bonne nouvelle de la journée.
  */
-function phraseDAccueil(nbSujets: number, mois: string): string {
-  if (nbSujets === 0) return `Rien ne demande ton attention en ${mois.toLowerCase()}.`;
-  return nbSujets === 1
-    ? `Une décision t’attend en ${mois.toLowerCase()}.`
-    : `${nbSujets} décisions t’attendent en ${mois.toLowerCase()}.`;
+export function salutation(prenom: string, nbSujets: number): string {
+  const qui = prenom.trim() === '' ? 'Bonjour' : `Bonjour ${prenom.trim()}`;
+  if (nbSujets === 0) return `${qui} — rien ne réclame ton attention.`;
+  if (nbSujets === 1) return `${qui} — une décision t’attend.`;
+  return `${qui} — ${EN_LETTRES[nbSujets] ?? String(nbSujets)} décisions t’attendent.`;
 }
