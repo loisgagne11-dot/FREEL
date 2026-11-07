@@ -81,12 +81,13 @@ export function Shell({ children, compteurs, periode, actions }: ProprietesShell
 
       <div className={styles.colonne}>
         <header className={styles.topbar}>
+          {/* La période en tête de barre, comme le handoff (« ‹ juin 2026 › »).
+              Son contenu est fourni par l'appelant, qui seul sait quelle route
+              est active ; quand il ne rend rien (Config, rédaction d'une
+              facture), le nom de l'écran reprend la place — voir la feuille. */}
+          <div data-emplacement="selecteur-periode" className={styles.periode}>{periode}</div>
           <span className={styles.titre}>{ecran.libelle}</span>
           <div className={styles.grow} />
-          {/* Emplacement réservé — son contenu est propre à chaque écran
-              (sélecteur de période) et fourni par l'appelant, qui seul sait
-              quelle route est active. */}
-          <div data-emplacement="selecteur-periode">{periode}</div>
           {/* En tête des pastilles, jamais au-dessus d'un contrôle : en
               portrait il flotte au-dessus du dock, en paysage il vit ici. */}
           <IndicateurATraiter ecranActif={ecran.id} />

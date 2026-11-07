@@ -30,7 +30,8 @@ import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
-import { dateCourte, eur, formaterJours } from '../format';
+import { dateCourte, eur, formaterJours, moisLong } from '../format';
+import { decalerMois } from '../../domain/calculs/periode';
 import styles from './Activite.module.css';
 import { Montant } from '../components/Montant';
 import { useRoute } from '../useRoute';
@@ -182,16 +183,18 @@ const sections = (nbMissions: number, nbClients: number) => [
 
 export interface ProprietesActivite {
   /**
-   * L'année choisie dans la barre du haut.
+   * Le mois choisi dans la barre du haut, et de quoi le changer.
    *
-   * Elle ANCRE le mois parcouru, elle ne le filtre pas : voir `ancreDeLAnnee`.
-   * `undefined` retombe sur l'année de l'horloge — le cas des tests qui
-   * montent cet écran seul, sans la coquille qui porte le sélecteur.
+   * Les flèches de la grille le déplacent : c'est LE mois de l'application,
+   * pas un second. `undefined` retombe sur un état local ouvert sur le mois
+   * de l'horloge — le cas des tests qui montent cet écran seul, sans la
+   * coquille qui porte le navigateur.
    */
-  readonly annee?: number;
+  readonly mois?: Mois;
+  readonly onMois?: (m: Mois) => void;
 }
 
-export function Activite({ annee }: ProprietesActivite = {}) {
+export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) {
   const faits = useFaits((e) => e.faits);
   const signaler = useToast();
 
@@ -237,33 +240,17 @@ export function Activite({ annee }: ProprietesActivite = {}) {
     carte?.focus({ preventScroll: true });
     setVersConges(false);
   }, [versConges, section]);
-  const [mois, setMois] = useState<Mois>(() => moisCourant());
+  const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
+  const mois = moisChoisi ?? moisLocal;
+  const setMois = onMois ?? setMoisLocal;
+  const annee = Number(mois.slice(0, 4));
 
   /*
-   * ─────────────────────────────────────────────────────────────────────────
-   * CHANGER D'ANNÉE DÉPLACE LE MOIS, ET NE REMONTE PAS LA NAVIGATION À ZÉRO
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Le mois reste un état d'écran : on le fait défiler avec les flèches, et
-   * ce défilement doit survivre à un aller-retour vers Argent. Le dériver de
-   * l'année le rendrait immobile.
-   *
-   * Mais il doit SUIVRE l'année quand elle change, sinon le sélecteur ne fait
-   * rien ici — le défaut que ce lot corrige. On garde donc le mois de la
-   * bascule et on ne change que son millésime : passer de mars 2026 à 2025
-   * donne mars 2025, et non décembre. C'est le mois qu'on regardait, dans
-   * l'année qu'on vient de demander.
-   *
-   * Le garde `mois.slice(0, 4)` est ce qui empêche la boucle : sans lui,
-   * l'effet réécrirait le mois à chaque rendu et annulerait toute navigation
-   * au sein de l'année choisie.
+   * Changer d'année au sélecteur de la barre déplace ce mois-ci (même mois,
+   * autre millésime) : c'est désormais `App` qui le fait, pour tous les
+   * écrans. L'effet qui le faisait ici, et ne valait que pour Activité, est
+   * parti avec le mois local.
    */
-  const anneeVoulue = annee ?? new Date().getFullYear();
-  useEffect(() => {
-    setMois((actuel) => (Number(actuel.slice(0, 4)) === anneeVoulue
-      ? actuel
-      : `${anneeVoulue}-${actuel.slice(5, 7)}` as Mois));
-  }, [anneeVoulue]);
   const idGroupe = useId();
 
   const etat = useMemo(() => etatActivite(faits, mois), [faits, mois]);
@@ -276,10 +263,10 @@ export function Activite({ annee }: ProprietesActivite = {}) {
   // une question commerciale, et un mois de congés ou un mois creux ferait
   // passer une bonne mission pour une mauvaise.
   const rapports = useMemo(
-    () => rapportParMission(faits, Number(mois.slice(0, 4))), [faits, mois]
+    () => rapportParMission(faits, annee), [faits, annee]
   );
   const tarif = useMemo(
-    () => tarifDeLaJournee(faits, Number(mois.slice(0, 4))), [faits, mois]
+    () => tarifDeLaJournee(faits, annee), [faits, annee]
   );
 
   /*
@@ -731,10 +718,10 @@ export function Activite({ annee }: ProprietesActivite = {}) {
                 */}
               <Suspense fallback={<EnAttenteDeFormulaire />}>
                 <CartePrevision previsions={previsions} mois={mois} />
-                <CarteRapportParMission rapports={rapports} annee={Number(mois.slice(0, 4))} />
+                <CarteRapportParMission rapports={rapports} annee={annee} />
                 <CarteTarifJournalier
                   tarif={tarif}
-                  annee={Number(mois.slice(0, 4))}
+                  annee={annee}
                   auBareme={!faits.entreprise.versementLiberatoire}
                 />
               </Suspense>
@@ -835,7 +822,7 @@ export function Activite({ annee }: ProprietesActivite = {}) {
             <FacturierDiffere
               onNouvelle={() => naviguerVers('facture', 'nouvelle')}
               onRevoir={(numero) => naviguerVers('facture', encodeURIComponent(numero))}
-              {...(annee === undefined ? {} : { annee })}
+              annee={annee}
             />
           </Suspense>
         </PanneauOnglet>
@@ -997,17 +984,6 @@ function DependanceClients({ poids }: { poids: readonly PoidsClient[] }) {
    Présentation
    ───────────────────────────────────────────────────────────────────────── */
 
-function decalerMois(m: Mois, pas: number): Mois {
-  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + pas;
-  const annee = Math.floor(total / 12);
-  const mois = String((total % 12) + 1).padStart(2, '0');
-  return `${annee}-${mois}` as Mois;
-}
-
-function moisLong(m: Mois): string {
-  const date = new Date(`${m}-01T00:00:00`);
-  return new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(date);
-}
 
 /**
  * Où une demi-journée PEUT être rattachée.

@@ -26,6 +26,7 @@ const Composition = lazy(() => import('../components/Composition')
 import styles from './Pilote.module.css';
 import { Montant } from '../components/Montant';
 import type { CleComposition } from '../../domain/calculs/composition';
+import type { Mois } from '../../domain/types';
 
 /**
  * Écran Pilote — « combien je peux me verser, et qu'est-ce qui coince ».
@@ -50,12 +51,30 @@ import type { CleComposition } from '../../domain/calculs/composition';
  *     touche trois fois par an n'a pas à être téléchargé par tout le monde à
  *     chaque ouverture.
  */
-export function Pilote() {
+/**
+ * Le flux d'un autre mois, chargé quand on quitte le mois courant : il porte
+ * son propre sélecteur, que le paquet d'entrée n'a pas à embarquer pour qui
+ * ne regarde que le mois en cours.
+ */
+const FluxAutreMois = lazy(() => import('../components/FluxAutreMois.carte')
+  .then((m) => ({ default: m.FluxAutreMoisCarte })));
+
+export function Pilote({ mois: moisChoisi, onMois }: {
+  /** Le mois de la barre du haut ; le mois courant quand l'écran est monté seul. */
+  readonly mois?: Mois;
+  readonly onMois?: (m: Mois) => void;
+} = {}) {
   const faits = useFaits((e) => e.faits);
   const chargement = useFaits((e) => e.chargement);
   const [compose, setCompose] = useState<CleComposition | null>(null);
 
+  /*
+   * Le flux suit le mois de la barre ; la santé et les décisions, non : elles
+   * disent où l'on en est AUJOURD'HUI, et « combien je peux me verser » n'a
+   * pas de mois passé.
+   */
   const mois = moisCourant();
+  const moisVu = moisChoisi ?? mois;
   // Recalculé à chaque changement de faits, jamais stocké.
   const etat = useMemo(() => etatPilote(faits), [faits]);
   const sujets = useMemo(() => aTraiter(faits), [faits]);
@@ -136,13 +155,21 @@ export function Pilote() {
         </Bandeau>
       )}
 
-      <FluxCard
-        flux={flux}
-        periode={moisLong(mois).toLowerCase()}
-        onVersable={() => setCompose('versable')}
-        dejaVerse={soldeEstSuivi(faits) ? verseCeMois : null}
-        besoinMensuel={faits.besoinMensuel}
-      />
+      {moisVu === mois
+        ? (
+          <FluxCard
+            flux={flux}
+            periode={moisLong(mois).toLowerCase()}
+            onVersable={() => setCompose('versable')}
+            dejaVerse={soldeEstSuivi(faits) ? verseCeMois : null}
+            besoinMensuel={faits.besoinMensuel}
+          />
+        )
+        : (
+          <Suspense fallback={null}>
+            <FluxAutreMois mois={moisVu} courant={mois} onRevenir={() => onMois?.(mois)} />
+          </Suspense>
+        )}
 
       <SanteCard indicateurs={sante} autonomie={etat.autonomie} reserve={etat.tresorerie.reserve} />
 

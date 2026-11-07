@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { dateISO, euros } from '../../domain/types';
+import { dateISO, euros, mois } from '../../domain/types';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Activite } from './Activite';
@@ -1189,18 +1189,18 @@ describe('ce qu’une journée rapporte', () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
-   O1 — l'année de la barre du haut déplace le mois parcouru
+   Le mois de la barre du haut est celui de l'écran
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * CHANGER D'ANNÉE DÉPLACE LE MOIS, IL NE REMONTE PAS LA NAVIGATION À ZÉRO.
+ * UN SEUL MOIS POUR TOUTE L'APPLICATION.
  *
- * Le mois reste un état d'écran — on le fait défiler avec les flèches, et ce
- * défilement doit survivre à un aller-retour vers Argent. Mais il doit SUIVRE
- * l'année, sinon le sélecteur ne fait rien ici : c'est le défaut que ce lot
- * corrige.
+ * Activité avait ses propres flèches et son propre mois : en revenant du
+ * Pilote, on ne savait plus ce qu'on regardait. Le mois vient de la barre du
+ * haut, et les flèches de la grille le DÉPLACENT — elles ne tiennent plus un
+ * second mois à elles.
  */
-describe('l’année choisie déplace le mois parcouru', () => {
+describe('le mois de la barre du haut', () => {
   const periode = () =>
     screen.getByRole('status', { name: 'Période affichée' }).textContent;
 
@@ -1211,29 +1211,19 @@ describe('l’année choisie déplace le mois parcouru', () => {
     return utilisateur;
   };
 
-  it('garde le mois et ne change que son millésime', async () => {
-    const rendu = render(<Activite annee={2026} />);
+  it('affiche le mois choisi dans la barre', async () => {
+    render(<Activite mois={mois('2025-07')} onMois={() => {}} />);
     await enVueMois();
-    expect(periode()).toBe('juillet 2026');
-
-    // Le mois regardé reste juillet : c'est celui qu'on consultait, dans
-    // l'année qu'on vient de demander. Retomber sur décembre ferait perdre
-    // le point de comparaison qu'on cherchait justement.
-    rendu.rerender(<Activite annee={2025} />);
     expect(periode()).toBe('juillet 2025');
   });
 
-  it('n’écrase pas une navigation faite à l’intérieur de l’année', async () => {
-    const rendu = render(<Activite annee={2026} />);
+  it('fait déplacer par ses flèches le mois de la barre, pas un mois à elle', async () => {
+    const onMois = vi.fn();
+    render(<Activite mois={mois('2026-07')} onMois={onMois} />);
     const utilisateur = await enVueMois();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Mois précédent' }));
-    expect(periode()).toBe('juin 2026');
-
-    // Un nouveau rendu à la MÊME année ne doit rien réécrire : sans le garde
-    // sur le millésime, l'effet remettrait juillet à chaque passage.
-    rendu.rerender(<Activite annee={2026} />);
-    expect(periode()).toBe('juin 2026');
+    expect(onMois).toHaveBeenCalledWith('2026-06');
   });
 });
 

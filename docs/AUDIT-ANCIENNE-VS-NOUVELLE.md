@@ -149,7 +149,7 @@ un trou qui ne fait échouer aucun test.
 | `isTVAApplicable`, autoliquidation | 🟢 | Autoliquidation détectée à l'achat : TVA **due et non déductible** |
 | Déclaration européenne de services (DES) | 🟢 | **N'existe pas dans l'ancienne.** 750 € d'amende par déclaration manquante, sans seuil |
 | `exportFEC` | 🚫 | Décision D6, hors périmètre. Code conservé sur la branche de sauvegarde |
-| `exportLivreRecettes`, `exportLivreRecettesPDF` | ✅ | Livre imprimable, et **conforme** — mentions obligatoires constatées une par une |
+| `exportLivreRecettes`, `exportLivreRecettesPDF` | ✅ | Livre imprimable, et **conforme** — mentions obligatoires constatées une par une. **Lot 6 :** en CSV aussi, depuis « Exporter », pour un tableur français (`;`, BOM, virgule décimale), filtré sur l'année d'ENCAISSEMENT ; un nom de client qui commence comme une formule est neutralisé |
 | `computeEcheancesReglementaires`, `getLegalMilestones`, `renderLegalTimeline` | ⚠️ | Les échéances réglementaires alertent (facturation électronique au 01/09/2026) ; pas de frise chronologique |
 
 ## 5. Achats, banque, justificatifs
@@ -194,8 +194,8 @@ un trou qui ne fait échouer aucun test.
 | `importData` / `importJSON` — **restauration** | ✅ | **Ajouté le 13/08.** Le fichier est lu, son contenu **annoncé** — tant de recettes, de dépenses, de missions —, et rien n'est écrasé avant confirmation. Le refus de fond (schéma plus récent que ce code) est relayé à l'écran plutôt qu'avalé. **Lot 1 (06/11)** : chaque élément de liste est contrôlé (un `[null]` faisait planter l'application à chaque ouverture) ; l'état local est **mis de côté** avant tout remplacement, et « Revenir à l'état d'avant » le rétablit |
 | Sûreté de l'enregistrement local | 🟢 | **Lot 1 (06/11), absent de l'ancienne** : deux onglets ne s'effacent plus (écoute `storage`, contrôle de révision avant écriture) ; un stockage plein se signale sur tous les écrans au lieu d'avaler les saisies ; un écran qui plante affiche un filet avec téléchargement des données brutes au lieu d'une page blanche |
 | `showOnboarding` et sa séquence | ❌ | Aucun parcours de première ouverture ; on arrive sur un Pilote vide |
-| `createSearchOverlay`, `performSearch` | ❌ | Pas de recherche globale |
-| `initKeyboardShortcuts`, `createKeyboardHelp` | ❌ | Pas de raccourcis clavier |
+| `createSearchOverlay`, `performSearch` | ✅ | **Lot 6.** ⌘K / Ctrl K : factures (brouillons compris), clients, missions, dépenses. Accents et casse ignorés ; un montant se cherche par sa valeur (« 1200 » trouve 1 200,50 €) ; le début d'un mot passe avant le milieu |
+| `initKeyboardShortcuts`, `createKeyboardHelp` | ⚠️ | ⌘K seul (lot 6) ; pas d'autres raccourcis ni d'aide |
 | `createNotifCenter`, `updateNotifBadge` | ⚠️ | Les badges par onglet existent ; pas de centre de notifications avec historique |
 | `adaptMobileGrids` | 🟢 | **Supprimé volontairement** : l'ancienne recalculait les grilles en JS, avec un bug vérifié — élargir au-delà de 600 px ne les restaurait jamais. Tout est en CSS (invariant n°7) |
 | `luhnCheck`, `ibanMod97Check` | ✅ | **Repris le 14/08**, dans `calculs/identifiants.ts`. Clé de Luhn sur le SIRET (avec l'exception La Poste), clé mod-97 sur l'IBAN, calculée par réduction au fil de la lecture — un `Number` sur la chaîne entière donnerait un modulo faux **sans lever d'erreur**. On signale, on ne bloque jamais : une clé dit « improbable », pas « faux » |
@@ -339,4 +339,15 @@ chiffre faux.
 | Déclaration URSSAF | 🟢 | Date limite (dernier jour du mois suivant) ; « à faire avant le … » puis « en retard » ; base encaissée et montant à payer, sur le Pilote et dans l'échéancier. L'ancienne ne datait ni ne chiffrait la déclaration |
 | Prénom | 🟢 | Saisi dans Réglages → Profil, pour la salutation seulement |
 | Statuts du flux | 🟢 | Chaque facture et chaque échéance du mois a sa pastille, qui mène là où elle se met à jour |
+
+## Lot 6 (07/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Mois parcouru | 🟢 | Un seul mois pour toute l'application, en tête de barre ; l'année n'en change que le millésime. L'ancienne avait une période par écran |
+| Flux d'un mois passé ou à venir | 🟢 | **N'existe pas dans l'ancienne.** Passé : encaissé, payé, versé (au relevé). À venir : factures attendues à leur échéance, échéances dues. Aucun versable hors du mois courant |
+| Création depuis n'importe quel écran | 🟢 | « + Nouveau » : facture, dépense, mission, congés — chaque entrée ouvre la saisie |
+| Livre des recettes en CSV | 🟢 | Voir `exportLivreRecettes` |
+| Recherche globale | ✅ | Voir `createSearchOverlay` |
+| Liste des factures | 🟢 | Onglet « Factures » d'Activité (rail du handoff) ; les anciennes adresses y mènent |
 

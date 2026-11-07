@@ -958,3 +958,20 @@ Ce qui reste du handoff hors du lot : la barre du haut et le rail (lot 6) ;
 les modules « Dépendance client » et « CRA prêt » ; les feuilles de détail
 des décisions (renoncé, écrit dans la liste de sortie).
 
+
+## Lot 6 (07/11) — barre du haut et rail
+
+Rail en formule A (décision n° 2) et barre du haut du handoff.
+
+| Zone | Avant | Après |
+|---|---|---|
+| Rail | Sept entrées, dont « Facturer » | Six, comme le handoff ; une facture ouverte allume « Activité & congés » ; compteurs des factures additionnés sur Activité |
+| Pied du rail | — | « Livre des recettes » (ouvre le registre d'Argent) et carte « Camille — Micro-BNC · ACRE », vers Réglages. Grand écran seulement, comme le handoff |
+| Activité | Trois onglets | Quatre, dans l'ordre du handoff : Plan de charge · Missions · Factures · Clients. L'onglet suit l'adresse ; « Tes factures » en titre sur l'onglet Factures (le handoff garde « Ton plan de charge » : un titre qui ne décrit pas l'onglet ouvert apprend à ne plus le lire) |
+| Barre du haut | Nom de l'écran, sélecteur d'année hors Pilote | « ‹ Juin 2026 › » à gauche (le nom de l'écran revient là où le mois n'a pas de sens : Réglages, rédaction), année à côté, pastilles, « Rechercher… ⌘K », « Exporter », « + Nouveau » |
+| Barre du haut, téléphone | Une rangée | **Deux rangées, et plus collante** — écart assumé au handoff (« barre du haut sur un rang ») : 390 px ne tiennent pas le mois, trois pastilles et trois actions ; tout se chevauchait |
+| « Exporter » | — | Livre des recettes (CSV), sauvegarde (JSON), compte rendu d'activité, factures. **Pas d'export FEC** (décision D6, et §8 ci-dessus) |
+
+Écarts restants : pastilles « Cloud / Google Drive / Qonto » du handoff
+refusées (rien ne les alimente, ligne `Pastilles` de l'inventaire des
+fonctions) ; pas de pastille « build » sous la carte utilisateur.

@@ -1,8 +1,8 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
-import { dateISO, euros } from '../../domain/types';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { type Mois, dateISO, euros, mois } from '../../domain/types';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { SelecteurPeriode } from './SelecteurPeriode';
@@ -35,7 +35,9 @@ const recette = (id: string, annee: number): Faits['recettes'][number] => ({
  * avant le rendu est la seule façon d'obtenir l'écran voulu sans simuler la
  * navigation entière.
  */
-function surLEcran(chemin: string, multiAnnee = true): void {
+function surLEcran(
+  chemin: string, multiAnnee = true, choisi: Mois = mois('2026-06'), onMois: (m: Mois) => void = () => {}
+): void {
   window.location.hash = chemin;
   useFaits.setState({
     faits: {
@@ -43,7 +45,7 @@ function surLEcran(chemin: string, multiAnnee = true): void {
       recettes: multiAnnee ? [recette('a', 2025), recette('b', 2026)] : []
     } as Faits
   });
-  render(<SelecteurPeriode etat={[2026, () => {}]} />);
+  render(<SelecteurPeriode etat={[choisi, onMois]} />);
 }
 
 const visible = () => screen.queryByLabelText('Année') !== null;
@@ -57,6 +59,7 @@ const visible = () => screen.queryByLabelText('Année') !== null;
  */
 describe('le sélecteur d’année s’affiche là où il a quelque chose à ancrer', () => {
   it.each([
+    ['#/pilote', 'le flux du mois suit le mois choisi'],
     ['#/activite', 'quelle année de mois on parcourt'],
     ['#/argent', 'le chiffre d’affaires, les seuils, les provisions'],
     ['#/achats', 'l’ancre de la barre de période'],
@@ -79,7 +82,6 @@ describe('le sélecteur d’année s’affiche là où il a quelque chose à anc
    * écrans où il marche.
    */
   it.each([
-    ['#/pilote', 'le poste de pilotage d’aujourd’hui'],
     ['#/config', 'des réglages, aucune période'],
     // La liste des factures est un onglet d'Activité ; rédiger ou rouvrir une
     // facture n'a pas de période.
@@ -99,5 +101,41 @@ describe('le sélecteur d’année s’affiche là où il a quelque chose à anc
   it('se masque sur un dossier qui n’a qu’une année', () => {
     surLEcran('#/argent', false);
     expect(visible()).toBe(false);
+  });
+});
+
+/**
+ * LE MOIS DE TOUTE L'APPLICATION, EN TÊTE DE BARRE.
+ *
+ * Le handoff met « ‹ juin 2026 › » au-dessus de tous les écrans. L'année
+ * reste à côté pour sauter d'un exercice à l'autre, mais elle ne tient plus
+ * d'état à elle : elle déplace le mois.
+ */
+describe('le navigateur de mois', () => {
+  it('avance et recule d’un mois, en traversant les années', () => {
+    const onMois = vi.fn();
+    surLEcran('#/pilote', true, mois('2026-01'), onMois);
+    fireEvent.click(screen.getByRole('button', { name: 'Mois précédent' }));
+    expect(onMois).toHaveBeenLastCalledWith('2025-12');
+    fireEvent.click(screen.getByRole('button', { name: 'Mois suivant' }));
+    expect(onMois).toHaveBeenLastCalledWith('2026-02');
+  });
+
+  it('garde le mois quand on change d’année, et n’en change que le millésime', () => {
+    const onMois = vi.fn();
+    surLEcran('#/argent', true, mois('2026-03'), onMois);
+    fireEvent.change(screen.getByLabelText('Année'), { target: { value: '2025' } });
+    expect(onMois).toHaveBeenLastCalledWith('2025-03');
+  });
+
+  it('n’offre « Aujourd’hui » que loin du mois courant', () => {
+    surLEcran('#/pilote', true, mois('2026-06'));
+    expect(screen.queryByRole('button', { name: 'Aujourd’hui' })).toBeNull();
+    cleanup();
+
+    const onMois = vi.fn();
+    surLEcran('#/pilote', true, mois('2026-02'), onMois);
+    fireEvent.click(screen.getByRole('button', { name: 'Aujourd’hui' }));
+    expect(onMois).toHaveBeenLastCalledWith('2026-06');
   });
 });

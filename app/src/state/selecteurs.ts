@@ -14,7 +14,7 @@ import {
   type DateISO, type Euros, type Mois, type Resolution, type TypeActivite,
   euros, moisDe
 } from '../domain/types';
-import { dernierMoisAcre, moisSousAcre, tauxImpotEtContributions } from '../domain/bareme';
+import { moisSousAcre, tauxImpotEtContributions } from '../domain/bareme';
 import { tvaDueDepuis } from '../domain/bareme/tva';
 import type { RegimeImposition } from '../domain/bareme';
 import {
@@ -36,7 +36,7 @@ import {
 import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
-import { type ProvenanceSolde, soldeDerive } from '../domain/calculs/solde';
+import { soldeDerive } from '../domain/calculs/solde';
 import { moisDeLaPeriode } from '../domain/calculs/declarations';
 import type { RegimeTva } from '../domain/calculs/depenses';
 import { tvaDeDepense } from '../domain/calculs/depenses.tva';
@@ -190,19 +190,6 @@ export function solde(faits: Faits): Euros {
   ).montant;
 }
 
-/**
- * D'où vient le solde affiché — dérivé des faits, rapproché d'un relevé,
- * simplement saisi faute des deux, ou saisi SANS DATE (voir `ProvenanceSolde`
- * pour ce que distingue chaque état — en particulier `'sansDate'`, l'état
- * d'abstention tant que `soldeInitialAu` est `null`).
- */
-export function provenanceSoldeDe(faits: Faits): ProvenanceSolde {
-  return soldeDerive(
-    faits.soldeInitial, faits.soldeInitialAu,
-    recettesEncaissees(faits), faits.depenses, faits.echeances,
-    faits.mouvementsBancaires
-  ).provenance;
-}
 
 /**
  * Un relevé est-il disponible ?
@@ -271,18 +258,6 @@ export function sousAcreLe(faits: Faits): (m: Mois) => boolean {
   return (m) => moisSousAcre(moisDebut, m);
 }
 
-/**
- * Le dernier mois d'ACRE, pour que l'écran Config puisse l'écrire en clair.
- *
- * `null` quand l'ACRE n'est pas déclarée ou que le début d'activité manque :
- * il n'y a alors rien à afficher, et une date inventée serait recoupée contre
- * l'attestation URSSAF puis crue.
- */
-export function finAcreDe(faits: Faits): Resolution<Mois> | null {
-  const debut = faits.entreprise.debutActivite;
-  if (!faits.entreprise.acre || debut === null) return null;
-  return dernierMoisAcre(moisDe(debut));
-}
 
 /**
  * Construit l'entrée de la requête « à traiter » depuis les faits.
@@ -305,7 +280,7 @@ export function finAcreDe(faits: Faits): Resolution<Mois> | null {
  * émise sans échéance serait réputée jamais échue, et les retards les plus
  * anciens seraient précisément ceux qu'on ne verrait pas.
  */
-function echeanceDesFactures(faits: Faits): (r: Recette) => DateISO | null {
+export function echeanceDesFactures(faits: Faits): (r: Recette) => DateISO | null {
   const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
   return (r) => (r.emiseLe === null
     ? null
@@ -890,7 +865,7 @@ export interface FluxDuMois {
   };
 }
 
-const LIBELLE_NATURE: Readonly<Record<NatureDette, string>> = {
+export const LIBELLE_NATURE: Readonly<Record<NatureDette, string>> = {
   urssaf: 'Cotisations URSSAF',
   tva: 'TVA',
   impot: 'Impôt sur le revenu',

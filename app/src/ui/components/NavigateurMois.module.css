@@ -1,0 +1,83 @@
+/* Le mois en tête de barre, comme le handoff : le mois en titre, les flèches
+   en petits carrés de part et d'autre. */
+
+.navigateur {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mois {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  white-space: nowrap;
+  /* Largeur stable : « septembre » et « mai » ne doivent pas faire danser
+     les flèches sous le doigt. */
+  min-width: 8.5em;
+  text-align: center;
+}
+
+.mois::first-letter { text-transform: uppercase; }
+
+.pas {
+  /* 44 px : la cible minimale au doigt, le carré visible reste petit. */
+  min-width: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+  position: relative;
+}
+
+.pas::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+}
+
+.pas:hover { color: var(--text); }
+.pas:hover::before { border-color: var(--green); }
+.pas:focus-visible { outline: 2px solid var(--green); outline-offset: -4px; border-radius: 10px; }
+
+.retour {
+  min-height: 44px;
+  padding: 0 10px;
+  border: none;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 560;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.retour:hover { text-decoration: underline; }
+
+/* Sur téléphone la barre est comptée : le mois se resserre, le retour reste —
+   c'est lui qu'on cherche quand on s'est perdu dans les mois. */
+@media (max-width: 760px) {
+  .mois { font-size: 15px; }
+}
+
+/* Le mois et l'année côte à côte ; sur téléphone l'année s'efface — les
+   flèches traversent les années, et la barre n'a pas la place des deux. */
+.periode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .periode > :not(.navigateur) { display: none; }
+}

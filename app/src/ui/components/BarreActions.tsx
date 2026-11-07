@@ -1,8 +1,10 @@
 import { Recherche } from './Recherche';
 import { Exporter } from './Exporter';
+import { Nouveau } from './Nouveau';
 
 /**
- * Les services transverses de la barre du haut, en un seul module différé.
+ * Les services transverses de la barre du haut — chercher, exporter, créer —
+ * en un seul module différé.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI ILS NE SONT PAS DANS L'ENTRÉE
@@ -20,6 +22,7 @@ export function BarreActions({ annee }: { readonly annee: number }) {
     <>
       <Recherche />
       <Exporter annee={annee} />
+      <Nouveau />
     </>
   );
 }

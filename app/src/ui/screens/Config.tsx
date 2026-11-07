@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { instantaneAvantRemplacement, useFaits } from '../../state/store';
-import { dateDuJour, finAcreDe, soldeEstSuivi, tvaDueDepuisDe } from '../../state/selecteurs';
+import { dateDuJour, soldeEstSuivi, tvaDueDepuisDe } from '../../state/selecteurs';
+import { finAcreDe } from '../../state/selecteurs.reglages';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
 import { Montant } from '../components/Montant';

@@ -65,6 +65,14 @@
   min-width: 0;
 }
 
+/* La période remplace le nom de l'écran quand elle s'affiche : le rail dit
+   déjà où l'on est, la barre dit QUAND. Vide (Config, rédaction), elle
+   s'efface et le nom revient — la coquille n'a pas à savoir sur quel écran
+   l'une ou l'autre a un sens. */
+.periode { display: contents; }
+.periode:empty { display: none; }
+.periode:not(:empty) + .titre { display: none; }
+
 .grow {
   flex: 1;
   min-width: 0;
@@ -157,4 +165,25 @@
   .topbar {
     padding: 12px 20px;
   }
+}
+
+/* ---------- téléphone : deux rangées ---------- */
+
+/*
+ * 390 px ne tiennent pas le mois, les pastilles, la recherche, l'export et
+ * « + Nouveau » sur une ligne : tout se chevauchait, le mois sous ses propres
+ * flèches. Le mois prend la première rangée entière, les actions la seconde.
+ *
+ * Et la barre cesse d'être collante : deux rangées collées en haut prendraient
+ * un septième de l'écran à chaque défilement. En portrait, la navigation est
+ * le dock du bas, et la pastille « à traiter » flotte au-dessus de lui — rien
+ * de ce qu'on atteint en défilant ne vit dans cette barre.
+ */
+@media (max-width: 760px) {
+  .topbar {
+    position: static;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
+  .periode > * { flex: 1 0 100%; }
 }

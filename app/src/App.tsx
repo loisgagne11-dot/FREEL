@@ -1,6 +1,6 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Shell } from './ui/Shell';
-import { FournisseurToasts, useToast } from './ui/components/Toasts';
+import { FournisseurToasts } from './ui/components/Toasts';
 import { useRoute } from './ui/useRoute';
 import { useFaits } from './state/store';
 
@@ -26,7 +26,7 @@ const SelecteurPeriode = lazy(() => import('./ui/components/SelecteurPeriode')
  * Pilote n'est PAS découpé : c'est l'écran d'entrée, et le découper ajouterait
  * un aller-retour réseau juste avant le contenu qu'on vient chercher.
  */
-import { Bandeau, Pilote } from './ui/screens/Pilote';
+import { Pilote } from './ui/screens/Pilote';
 
 const Argent = lazy(() => import('./ui/screens/Argent').then((m) => ({ default: m.Argent })));
 const Outils = lazy(() => import('./ui/screens/Outils').then((m) => ({ default: m.Outils })));
@@ -34,7 +34,11 @@ const Achats = lazy(() => import('./ui/screens/Achats').then((m) => ({ default: 
 const Activite = lazy(() => import('./ui/screens/Activite').then((m) => ({ default: m.Activite })));
 const Config = lazy(() => import('./ui/screens/Config').then((m) => ({ default: m.Config })));
 const Facture = lazy(() => import('./ui/screens/Facture').then((m) => ({ default: m.Facture })));
-import { aTraiter } from './state/selecteurs';
+import { aTraiter, moisCourant } from './state/selecteurs';
+import type { Mois } from './domain/types';
+
+/** Le mois choisi dans la barre du haut, tel que `useState` le rend. */
+type EtatMois = readonly [Mois, (m: Mois) => void];
 import { compteursParEcran } from './domain/calculs/aTraiter';
 import { FiletErreur } from './ui/components/FiletErreur';
 
@@ -62,18 +66,20 @@ function EnChargement() {
  * `never`, donc ajouter un écran à la navigation sans le router ici ne
  * compile pas. Un `return null` final aurait laissé passer un écran blanc.
  *
- * `annee` va aux QUATRE écrans qui ont une période à ancrer. Facture ne la
- * reçoit plus : la liste des factures est un onglet d'Activité, et ce qui
- * reste sous `#/facture/…` — rédiger, rouvrir une facture — n'a pas d'année.
- * Pilote et Config ne la reçoivent pas : le premier est le poste de pilotage d'aujourd'hui —
- * « combien je peux me verser » n'a pas d'année —, le second ne porte que des
- * réglages. C'est la même liste que `ECRANS_DATES` dans `SelecteurPeriode`,
+ * Le MOIS va au Pilote (son flux du mois) et à Activité (sa grille) ; son
+ * ANNÉE aux trois écrans qui raisonnent à l'année. Facture ne reçoit rien :
+ * la liste des factures est un onglet d'Activité, et ce qui reste sous
+ * `#/facture/…` — rédiger, rouvrir une facture — n'a pas de période.
+ * Config ne reçoit rien non plus : il ne porte que des réglages. Le Pilote
+ * reçoit le mois mais n'en tire que son flux : santé et décisions restent
+ * celles d'aujourd'hui — « combien je peux me verser » n'a pas de mois
+ * passé. C'est la même liste que `ECRANS_DATES` dans `SelecteurPeriode`,
  * qui décide d'afficher le contrôle ou non ; les deux doivent rester
  * d'accord, faute de quoi on afficherait un sélecteur sans effet ou un effet
  * sans sélecteur.
  *
- * Appelée comme une fonction ordinaire depuis `App` (`Ecran(annee)`), pas
- * comme un élément JSX (`<Ecran annee={annee} />`) : les deux sont
+ * Appelée comme une fonction ordinaire depuis `App` (`Ecran(etatMois)`), pas
+ * comme un élément JSX (`<Ecran mois={mois} />`) : les deux sont
  * équivalents pour React tant que l'appel reste inconditionnel au même
  * endroit à chaque rendu — ce qui est le cas ici —, mais la forme fonction
  * n'a pas besoin d'un objet de props, donc pas d'un nom de propriété qui
@@ -82,15 +88,16 @@ function EnChargement() {
  * Le filet porte la route en clé : un écran tombé se relève quand on en
  * change, sans recharger la page.
  */
-function Ecran(annee: number) {
+function Ecran([mois, setMois]: EtatMois) {
   const { ecran } = useRoute();
-  return <FiletErreur key={ecran.id} portee="ecran">{contenuEcran(ecran.id, annee)}</FiletErreur>;
+  return <FiletErreur key={ecran.id} portee="ecran">{contenuEcran(ecran.id, mois, setMois)}</FiletErreur>;
 }
 
-function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], annee: number) {
+function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], mois: Mois, setMois: (m: Mois) => void) {
+  const annee = Number(mois.slice(0, 4));
   switch (id) {
-    case 'pilote': return <Pilote />;
-    case 'activite': return <Activite annee={annee} />;
+    case 'pilote': return <Pilote mois={mois} onMois={setMois} />;
+    case 'activite': return <Activite mois={mois} onMois={setMois} />;
     case 'argent': return <Argent annee={annee} />;
     case 'facture': return <Facture />;
     case 'achats': return <Achats annee={annee} />;
@@ -104,31 +111,11 @@ function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], annee: num
 }
 
 /**
- * Ce qui menace la conservation des saisies, sur TOUS les écrans.
- *
- * L'alerte vivait sur le Pilote seul. Elle ne servait qu'au démarrage : un
- * stockage qui sature en cours de session se découvre en pleine saisie d'une
- * facture, et c'est là qu'il faut le lire. Une saisie écartée parce qu'un
- * autre onglet avait écrit entre-temps se dit aussi — sinon elle aurait l'air
- * d'avoir été enregistrée.
+ * L'alerte de conservation, différée : voir son en-tête. Montée sur tous les
+ * écrans, elle arrive quelques millisecondes après eux.
  */
-function AlerteConservation() {
-  const chargement = useFaits((e) => e.chargement);
-  const ecartees = useFaits((e) => e.saisiesEcartees);
-  const toast = useToast();
-  const dejaSignalees = useRef(ecartees);
-  useEffect(() => {
-    if (ecartees > dejaSignalees.current) {
-      toast('Une autre fenêtre de l’application venait d’enregistrer : ta dernière '
-        + 'saisie n’a pas été appliquée. Les données ont été rechargées, refais-la.');
-    }
-    dejaSignalees.current = ecartees;
-  }, [ecartees, toast]);
-
-  return chargement.phase === 'sans-persistance' ? (
-    <Bandeau ton="alerte" titre="Tes saisies ne sont pas conservées">{chargement.motif}</Bandeau>
-  ) : null;
-}
+const AlerteConservation = lazy(() => import('./ui/components/AlerteConservation')
+  .then((m) => ({ default: m.AlerteConservation })));
 
 export function App() {
   const initialiser = useFaits((e) => e.initialiser);
@@ -139,25 +126,26 @@ export function App() {
   const compteurs = useMemo(() => compteursParEcran(aTraiter(faits)), [faits]);
 
   /**
-   * L'année affichée par le sélecteur de la barre du haut.
+   * Le mois affiché par le navigateur de la barre du haut — et, par lui,
+   * l'année des écrans qui raisonnent à l'année.
    *
    * ─────────────────────────────────────────────────────────────────────
    * UNE PRÉFÉRENCE D'AFFICHAGE, PAS UN FAIT
    * ─────────────────────────────────────────────────────────────────────
    *
    * Elle ne vit PAS dans `Faits` (invariant n°1) : ce n'est rien qui se soit
-   * produit dans le dossier, seulement ce qu'on regarde en ce moment. Elle
+   * produit dans le dossier, seulement ce qu'on regarde en ce moment. Il
    * vit ici, au-dessus de tous les écrans, pour une seule raison concrète :
-   * passer de Pilote à Argent et y revenir ne doit pas la remettre à l'année
-   * courante. Un état local à l'écran Argent serait remonté à zéro à chaque
+   * passer de Pilote à Argent et y revenir ne doit pas le remettre au mois
+   * courant. Un état local à l'écran Argent serait remonté à zéro à chaque
    * démontage — exactement le défaut relevé par l'audit des indicateurs.
    *
-   * Ce que ce composant ignore volontairement : les BORNES de ce nombre.
+   * Ce que ce composant ignore volontairement : les BORNES de ce mois.
    * `anneesDisponibles` et le repli quand le choix sort des bornes vivent
    * dans `SelecteurPeriode`, chargé à la demande — voir son en-tête.
    */
-  const etatAnnee = useState<number>(() => new Date().getFullYear());
-  const [anneeChoisie] = etatAnnee;
+  const etatMois: EtatMois = useState<Mois>(() => moisCourant());
+  const [moisChoisi] = etatMois;
 
   // Chargement et migration au démarrage, une seule fois. `initialiser` est
   // idempotent côté migration : un second appel ne réécrit rien.
@@ -178,18 +166,18 @@ export function App() {
           // dizaines de millisecondes sur une connexion correcte, plus
           // dérangeant que l'absence du contrôle le temps qu'il arrive.
           <Suspense fallback={null}>
-            <SelecteurPeriode etat={etatAnnee} />
+            <SelecteurPeriode etat={etatMois} />
           </Suspense>
         )}
         actions={(
           <Suspense fallback={null}>
-            <BarreActions annee={anneeChoisie} />
+            <BarreActions annee={Number(moisChoisi.slice(0, 4))} />
           </Suspense>
         )}
       >
-        <AlerteConservation />
+        <Suspense fallback={null}><AlerteConservation /></Suspense>
         <Suspense fallback={<EnChargement />}>
-          {Ecran(anneeChoisie)}
+          {Ecran(etatMois)}
         </Suspense>
       </Shell>
     </FournisseurToasts>

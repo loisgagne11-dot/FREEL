@@ -4,9 +4,10 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  aTraiter, caEncaisseAnnee, echeancesReglementairesActives, etatPilote, finAcreDe, moisCourant,
-  provenanceSoldeDe, recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe
+  aTraiter, caEncaisseAnnee, echeancesReglementairesActives, etatPilote, moisCourant,
+  recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe
 } from './selecteurs';
+import { finAcreDe, provenanceSoldeDe } from './selecteurs.reglages';
 import { periodeCourante } from '../domain/calculs/periode';
 import { anneesDisponibles, etatArgent } from './selecteurs.argent';
 import { etatFacturier } from './selecteurs.facture';

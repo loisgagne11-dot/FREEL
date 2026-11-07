@@ -130,3 +130,10 @@
     border: 0;
   }
 }
+
+/* Sur téléphone, la palette tient dans une largeur fixe : libre, le menu
+   s'étalait dès que la barre passait sur deux rangées et repoussait la
+   recherche et « + Nouveau » sur une troisième. */
+@media (max-width: 760px) {
+  .choix { width: 84px; }
+}
