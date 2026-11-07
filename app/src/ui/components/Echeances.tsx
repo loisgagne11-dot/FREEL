@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
+import { ajouterEcheances, enregistrerPaiement, modifierEcheance, supprimerEcheance } from '../../state/ecritures.echeances';
 import type { Echeance, NatureDette } from '../../domain/calculs/provisions';
 import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
 import { dateISO, euros } from '../../domain/types';
@@ -89,10 +90,9 @@ type Panneau =
 
 export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: Date }) {
   const faits = useFaits((e) => e.faits);
-  const ajouterSerie = useFaits((e) => e.ajouterEcheances);
-  const modifier = useFaits((e) => e.modifierEcheance);
-  const supprimer = useFaits((e) => e.supprimerEcheance);
-  const enregistrerPaiement = useFaits((e) => e.enregistrerPaiement);
+  const ajouterSerie = ajouterEcheances;
+  const modifier = modifierEcheance;
+  const supprimer = supprimerEcheance;
   const signaler = useToast();
 
   const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { DetailDette, LigneDette, StatutLigneDette } from '../../domain/calculs/detailDette';
 import { dateDuJour } from '../../state/selecteurs';
-import { useFaits } from '../../state/store';
+import { enregistrerPaiement, marquerPeriodeDeclaree } from '../../state/ecritures.echeances';
 import { dateISO } from '../../domain/types';
 import { Montant } from './Montant';
 import { useToast } from './Toasts';
@@ -97,8 +97,6 @@ const LIBELLE_STATUT: Readonly<Record<StatutLigneDette, string>> = {
 
 /** Une ligne du détail, avec le geste qui la fait avancer. */
 function Ligne({ ligne }: { readonly ligne: LigneDette }) {
-  const marquerPeriodeDeclaree = useFaits((e) => e.marquerPeriodeDeclaree);
-  const enregistrerPaiement = useFaits((e) => e.enregistrerPaiement);
   const signaler = useToast();
   const [confirme, setConfirme] = useState(false);
 

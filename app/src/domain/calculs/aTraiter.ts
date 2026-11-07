@@ -24,6 +24,7 @@ import {
 import { resteAvantMajore } from '../bareme/tva';
 import { plafondMicro } from '../bareme/plafonds';
 import { PERIODES_URSSAF, type PeriodeBareme } from '../bareme/urssaf';
+import { periodesADeclarer } from './declarations';
 
 /** L'écran qui règle le sujet. Sert au badge de navigation et au lien. */
 export type EcranCible = 'pilote' | 'activite' | 'argent' | 'achats' | 'outils' | 'config';
@@ -194,50 +195,23 @@ function ajouterMois(m: Mois, n: number): Mois {
    plus de prose, seulement des chiffres et des gravités. */
 
 /**
- * Les périodes déclaratives échues et non déclarées, alors que des recettes y
- * ont été encaissées.
+ * Les périodes déclaratives closes et non déclarées, représentées par leur
+ * premier mois.
  *
- * On ne réclame une déclaration que si la période est TERMINÉE : réclamer la
- * déclaration du mois en cours serait un faux positif quotidien.
+ * La règle vit dans `declarations.periodesADeclarer`, la même que celle de
+ * l'échéancier : deux règles du même nom faisaient réclamer ici des périodes
+ * que l'échéancier ne montrait pas, et l'alerte ne pouvait jamais s'éteindre.
  */
-function periodesADeclarer(e: EntreeATraiter): readonly Mois[] {
-  const moisCourant = moisDe(e.aujourdhui);
-  const declarees = new Set(e.periodesDeclarees);
-
-  // Les mois où de l'argent est entré. Une période sans recette n'est pas
-  // pour autant sans obligation — la déclaration à zéro est due — mais on ne
-  // peut pas la réclamer sans connaître le début d'activité.
-  const moisAvecRecettes = new Set(
-    e.recettes
-      .filter((r) => r.encaisseeLe !== null)
-      .map((r) => moisDe(r.encaisseeLe as DateISO))
-  );
-
-  const candidats = new Set<Mois>(moisAvecRecettes);
-  if (e.debutActivite !== null) {
-    // Déclaration à zéro incluse : l'obligation existe même sans recette.
-    let m = e.debutActivite;
-    while (m < moisCourant) {
-      candidats.add(m);
-      m = ajouterMois(m, 1);
-    }
-  }
-
-  const echues = [...candidats].filter((m) => m < moisCourant && !declarees.has(m));
-
-  if (e.periodicite === 'mensuel') return echues.sort();
-
-  // En trimestriel, une période est un trimestre : on ne réclame que les
-  // trimestres entièrement échus, et on les représente par leur premier mois.
-  const trimestres = new Set<Mois>();
-  for (const m of echues) {
-    const [a, mm] = m.split('-');
-    const premierMoisTrimestre = Math.floor((Number(mm) - 1) / 3) * 3 + 1;
-    const debut = `${a}-${String(premierMoisTrimestre).padStart(2, '0')}` as Mois;
-    // Le trimestre doit être clos : son dernier mois est révolu.
-    if (ajouterMois(debut, 2) < moisCourant) trimestres.add(debut);
-  }
-  return [...trimestres].sort();
+function periodesADeclarerEchues(e: EntreeATraiter): readonly Mois[] {
+  const encaissements = e.recettes
+    .filter((r) => r.encaisseeLe !== null)
+    .map((r) => ({ encaisseeLe: r.encaisseeLe as DateISO, montant: r.montant }));
+  return periodesADeclarer(
+    encaissements, e.periodicite, e.periodesDeclarees, e.aujourdhui, e.debutActivite
+  )
+    .filter((p) => p.close && !p.declaree)
+    .map((p) => p.mois[0] as Mois)
+    .sort();
 }
 
 /** Le mois de la dernière vérification de barème la plus ancienne. */
@@ -300,7 +274,7 @@ export function sujetsATraiter(
   }
 
   /* ---------- périodes à déclarer ---------- */
-  const aDeclarer = periodesADeclarer(e);
+  const aDeclarer = periodesADeclarerEchues(e);
   if (aDeclarer.length > 0) {
     const premiere = aDeclarer[0] as Mois;
     sujets.push({

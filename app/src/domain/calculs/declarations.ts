@@ -59,19 +59,45 @@ const MOIS_LISIBLES = [
 ];
 
 /**
- * Range les encaissements en périodes déclarables.
+ * Range les encaissements en périodes déclarables — la SEULE règle des
+ * périodes à déclarer, pour le Pilote comme pour l'échéancier.
  *
- * Seules les périodes qui portent au moins un encaissement sont rendues : une
- * période vide n'a rien à déclarer, et l'afficher ferait une liste de cases à
- * cocher sans objet où les vraies échéances se perdraient.
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX RÈGLES DU MÊME NOM, ET UN CUL-DE-SAC
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le Pilote comptait toute période close depuis le début d'activité,
+ * déclarations à zéro comprises ; l'échéancier ne gardait que les périodes
+ * portant un encaissement. Le Pilote annonçait « 4 périodes à déclarer », le
+ * bouton « Déclarer » menait à l'échéancier, qui n'en montrait qu'une : les
+ * trois autres ne pouvaient jamais être marquées, et l'alerte ne disparaissait
+ * jamais.
+ *
+ * La règle retenue est celle du Pilote, parce qu'elle est celle de l'URSSAF :
+ * une période close se déclare, même à zéro. Une période vide n'est donc
+ * rendue que si elle est close et postérieure au début d'activité — une
+ * période en cours sans recette n'a encore rien à dire.
  */
 export function periodesADeclarer(
   encaissements: readonly { readonly encaisseeLe: string; readonly montant: number }[],
   periodicite: Periodicite,
   declarees: readonly Mois[],
-  aujourdhui: string
+  aujourdhui: string,
+  debutActivite: Mois | null = null
 ): readonly PeriodeADeclarer[] {
   const parPeriode = new Map<string, { mois: Set<string>; total: number }>();
+  const moisCourant = aujourdhui.slice(0, 7);
+
+  // Les périodes closes depuis le début d'activité, vides comprises : la
+  // déclaration à zéro est due.
+  if (debutActivite !== null) {
+    for (let m: string = debutActivite; m < moisCourant; m = moisSuivant(m)) {
+      const cle = clePeriode(m, periodicite);
+      const couverts = moisDeLaPeriode(cle, periodicite);
+      if ((couverts[couverts.length - 1] as string) >= moisCourant) continue;
+      if (!parPeriode.has(cle)) parPeriode.set(cle, { mois: new Set<string>(), total: 0 });
+    }
+  }
 
   for (const e of encaissements) {
     const m = e.encaisseeLe.slice(0, 7);
@@ -84,7 +110,6 @@ export function periodesADeclarer(
   }
 
   const dejaDeclares = new Set<string>(declarees);
-  const moisCourant = aujourdhui.slice(0, 7);
 
   return [...parPeriode.entries()]
     .map(([id, { mois, total }]) => {
@@ -105,6 +130,11 @@ export function periodesADeclarer(
     // La plus récente en tête : c'est celle qu'on vient déclarer.
     .sort((a, b) => b.id.localeCompare(a.id))
     .map(({ _tri, ...p }) => p);
+}
+
+function moisSuivant(m: string): string {
+  const total = Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7));
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
 }
 
 function clePeriode(mois: string, periodicite: Periodicite): string {

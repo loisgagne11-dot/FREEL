@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
+import { ajouterPeriodeUrssaf, retirerPeriodeUrssaf } from '../../state/ecritures.activite';
 import { periodesUrssafEffectives } from '../../state/selecteurs';
 import { PERIODES_URSSAF, type PeriodeBareme } from '../../domain/bareme/urssaf';
 import { dateISO, mois, ratio } from '../../domain/types';
@@ -47,8 +48,8 @@ function pourcent(r: number): string {
 
 export function Bareme() {
   const faits = useFaits((e) => e.faits);
-  const ajouter = useFaits((e) => e.ajouterPeriodeUrssaf);
-  const retirer = useFaits((e) => e.retirerPeriodeUrssaf);
+  const ajouter = ajouterPeriodeUrssaf;
+  const retirer = retirerPeriodeUrssaf;
   const idChamp = useId();
 
   const effectives = useMemo(() => periodesUrssafEffectives(faits), [faits]);

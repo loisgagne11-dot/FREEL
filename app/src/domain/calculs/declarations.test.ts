@@ -85,3 +85,36 @@ describe('périodes à déclarer', () => {
       .toBe('T3 2026');
   });
 });
+
+/**
+ * UNE PÉRIODE CLOSE SE DÉCLARE, MÊME SANS RECETTE.
+ *
+ * Si la règle sautait, l'échéancier ne montrerait que les périodes portant un
+ * encaissement, alors que le Pilote — et l'URSSAF — réclament aussi les
+ * déclarations à zéro. Le bouton « Déclarer » du Pilote menait ainsi à un
+ * écran où la période réclamée n'existait pas : l'alerte ne s'éteignait
+ * jamais.
+ */
+describe('déclarations à zéro', () => {
+  const encaissements = [{ encaisseeLe: '2026-05-12', montant: 4000 }];
+
+  it('rend les périodes closes sans recette depuis le début d’activité', () => {
+    const p = periodesADeclarer(encaissements, 'trimestriel', [], '2026-08-15', '2026-01' as Mois);
+    const t1 = p.find((x) => x.id === '2026-T1');
+    expect(t1?.encaisse).toBe(0);
+    expect(t1?.close).toBe(true);
+    expect(p.find((x) => x.id === '2026-T2')?.encaisse).toBe(4000);
+  });
+
+  // Une période en cours sans recette n'a encore rien à dire.
+  it('ne rend pas la période en cours tant qu’elle est vide', () => {
+    const p = periodesADeclarer(encaissements, 'trimestriel', [], '2026-08-15', '2026-01' as Mois);
+    expect(p.some((x) => x.id === '2026-T3')).toBe(false);
+  });
+
+  it('ne remonte pas avant le début d’activité', () => {
+    const p = periodesADeclarer(encaissements, 'mensuel', [], '2026-08-15', '2026-04' as Mois);
+    expect(p.some((x) => x.id < '2026-04')).toBe(false);
+    expect(p.map((x) => x.id)).toContain('2026-04');
+  });
+});

@@ -1,5 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
+import { marquerSansContrepartie, rapprocherMouvement, viderReleve } from '../../state/ecritures.achats';
 import { importerReleve } from '../../state/ecritures.carnet';
 import { etatAchats } from '../../state/selecteurs.achats';
 import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calculs/banque';
@@ -41,7 +42,6 @@ export function Releve() {
   const faits = useFaits((e) => e.faits);
   /* Hors du magasin : elle emportait `calculs/banque` dans le paquet
      d'entrée. Voir `state/ecritures.carnet`. */
-  const viderReleve = useFaits((e) => e.viderReleve);
 
   const [retour, setRetour] = useState<Retour>(null);
   const [enCours, setEnCours] = useState(false);
@@ -218,8 +218,8 @@ function LigneMouvement(
     candidats: readonly EcritureRapprochable[];
   }
 ) {
-  const rapprocher = useFaits((e) => e.rapprocherMouvement);
-  const marquerSans = useFaits((e) => e.marquerSansContrepartie);
+  const rapprocher = rapprocherMouvement;
+  const marquerSans = marquerSansContrepartie;
   const debit = mouvement.montant < 0;
 
   return (

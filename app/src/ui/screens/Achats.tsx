@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
+import { ajouterDepense, attacherJustificatif, definirRapprochement, modifierDepense, supprimerDepense } from '../../state/ecritures.achats';
 import { type LigneDepense, etatAchats } from '../../state/selecteurs.achats';
 import type { Depense } from '../../state/schema';
 import {
@@ -83,11 +84,6 @@ const stockageParDefaut = stockageIndexedDB();
 
 export function Achats({ stockage = stockageParDefaut, annee }: ProprietesAchats = {}) {
   const faits = useFaits((e) => e.faits);
-  const attacherJustificatif = useFaits((e) => e.attacherJustificatif);
-  const definirRapprochement = useFaits((e) => e.definirRapprochement);
-  const ajouterDepense = useFaits((e) => e.ajouterDepense);
-  const supprimerDepense = useFaits((e) => e.supprimerDepense);
-  const modifierDepense = useFaits((e) => e.modifierDepense);
 
   /**
    * L'URL peut désigner une section et ouvrir la saisie.

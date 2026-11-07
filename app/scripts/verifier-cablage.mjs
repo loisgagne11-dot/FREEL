@@ -58,7 +58,10 @@ const MAGASIN = join(RACINE, 'state/store.ts');
  */
 const ECRITURES = [
   join(RACINE, 'state/ecritures.carnet.ts'),
-  join(RACINE, 'state/ecritures.recettes.ts')
+  join(RACINE, 'state/ecritures.recettes.ts'),
+  join(RACINE, 'state/ecritures.echeances.ts'),
+  join(RACINE, 'state/ecritures.achats.ts'),
+  join(RACINE, 'state/ecritures.activite.ts')
 ];
 const SOURCES = [MAGASIN, ...ECRITURES];
 

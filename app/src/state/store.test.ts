@@ -5,6 +5,7 @@ import { CLE_STOCKAGE, PART_GARDEE_MAX, VERSION_SCHEMA, faitsVides, type Recette
 import { stockageMemoire } from '../infra/migration';
 import { useFaits } from './store';
 import { ajouterRecette, annulerRecette, encaisserRecette, supprimerBrouillon } from './ecritures.recettes';
+import { ajouterMission, ajouterPeriodeUrssaf, modifierMission, poserPlageDeConges } from './ecritures.activite';
 /* Les écritures du carnet et du relevé ont quitté le magasin pour ne plus
    peser sur le premier rendu : elles s'importent, mais restent les mêmes
    écritures, avec les mêmes gardes et le même état. */
@@ -177,9 +178,8 @@ describe('barème saisi', () => {
   });
 
   it('remplace une saisie antérieure au même début de période', () => {
-    const magasin = useFaits.getState();
-    magasin.ajouterPeriodeUrssaf(periode('2027-01', 0.272));
-    magasin.ajouterPeriodeUrssaf(periode('2027-01', 0.275));
+    ajouterPeriodeUrssaf(periode('2027-01', 0.272));
+    ajouterPeriodeUrssaf(periode('2027-01', 0.275));
 
     const ajoutees = useFaits.getState().faits.periodesUrssafAjoutees;
     expect(ajoutees).toHaveLength(1);
@@ -187,7 +187,7 @@ describe('barème saisi', () => {
   });
 
   it('rend le motif du refus sans rien enregistrer', () => {
-    const refus = useFaits.getState().ajouterPeriodeUrssaf(periode('2024-03', 0.3));
+    const refus = ajouterPeriodeUrssaf(periode('2024-03', 0.3));
     expect(refus).not.toBeNull();
     expect(useFaits.getState().faits.periodesUrssafAjoutees).toHaveLength(0);
   });
@@ -203,19 +203,17 @@ describe('congés', () => {
    * et il n'en reste qu'un.
    */
   it('pose et retire une date d’un même geste', () => {
-    const magasin = useFaits.getState();
-    magasin.poserPlageDeConges([dateISO('2026-07-27')], true);
+    poserPlageDeConges([dateISO('2026-07-27')], true);
     expect(useFaits.getState().faits.conges).toEqual([
       { date: '2026-07-27', quotite: 1 }
     ]);
-    useFaits.getState().poserPlageDeConges([dateISO('2026-07-27')], false);
+    poserPlageDeConges([dateISO('2026-07-27')], false);
     expect(useFaits.getState().faits.conges).toEqual([]);
   });
 
   it('ne duplique pas une date déjà posée, et garde l’ordre', () => {
-    const magasin = useFaits.getState();
-    magasin.poserPlageDeConges([dateISO('2026-07-28'), dateISO('2026-07-27')], true);
-    magasin.poserPlageDeConges([dateISO('2026-07-27')], true);
+    poserPlageDeConges([dateISO('2026-07-28'), dateISO('2026-07-27')], true);
+    poserPlageDeConges([dateISO('2026-07-27')], true);
     expect(useFaits.getState().faits.conges.map((c) => c.date))
       .toEqual(['2026-07-27', '2026-07-28']);
   });
@@ -225,7 +223,7 @@ describe('congés', () => {
    * longtemps, et qu'un solde de congés qui compte 0,5 pour 1 est faux.
    */
   it('pose une demi-journée quand on le demande', () => {
-    useFaits.getState().poserPlageDeConges([dateISO('2026-07-27')], true, 0.5);
+    poserPlageDeConges([dateISO('2026-07-27')], true, 0.5);
     expect(useFaits.getState().faits.conges).toEqual([
       { date: '2026-07-27', quotite: 0.5 }
     ]);
@@ -233,9 +231,8 @@ describe('congés', () => {
 
   // Reposer la même date avec une autre quotité corrige, sans dupliquer.
   it('remplace la quotité d’une date déjà posée', () => {
-    const magasin = useFaits.getState();
-    magasin.poserPlageDeConges([dateISO('2026-07-27')], true, 1);
-    magasin.poserPlageDeConges([dateISO('2026-07-27')], true, 0.5);
+    poserPlageDeConges([dateISO('2026-07-27')], true, 1);
+    poserPlageDeConges([dateISO('2026-07-27')], true, 0.5);
     expect(useFaits.getState().faits.conges).toEqual([
       { date: '2026-07-27', quotite: 0.5 }
     ]);
@@ -274,7 +271,7 @@ describe('carnet — clients', () => {
   it('propage un renommage sur les missions et les recettes', () => {
     ajouterClient(saisieClient('Dupont'));
     const idClient = clients()[0]?.id as string;
-    useFaits.getState().ajouterMission({
+    ajouterMission({
       clientId: null, clientNom: 'Dupont', description: 'Mission',
       tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active', entites: []
     });
@@ -343,20 +340,20 @@ describe('carnet — missions', () => {
       delaiPaiement: 'net_30' as const, pays: '', tvaIntracom: ''
     });
     const idClient = useFaits.getState().faits.clients[0]?.id;
-    useFaits.getState().ajouterMission(saisieMission('Dupont'));
+    ajouterMission(saisieMission('Dupont'));
 
     expect(missions()[0]).toMatchObject({ clientId: idClient, clientNom: 'Dupont' });
   });
 
   it('accepte une mission pour un client hors carnet, sans identifiant', () => {
-    useFaits.getState().ajouterMission(saisieMission('Inconnu'));
+    ajouterMission(saisieMission('Inconnu'));
     expect(missions()[0]).toMatchObject({ clientId: null, clientNom: 'Inconnu' });
   });
 
   // Une facture émise ne se retire pas du registre : supprimer la mission qui
   // la justifie rendrait sa présence inexplicable.
   it('refuse de supprimer une mission dont une recette relève de la période', () => {
-    useFaits.getState().ajouterMission(saisieMission('Dupont'));
+    ajouterMission(saisieMission('Dupont'));
     ajouter({ clientNom: 'Dupont', emiseLe: dateISO('2026-06-30') });
 
     expect(supprimerMission(missions()[0]?.id as string))
@@ -365,14 +362,14 @@ describe('carnet — missions', () => {
   });
 
   it('supprime une mission dont aucune recette ne relève', () => {
-    useFaits.getState().ajouterMission(saisieMission('Dupont'));
+    ajouterMission(saisieMission('Dupont'));
     expect(supprimerMission(missions()[0]?.id as string)).toBeNull();
     expect(missions()).toHaveLength(0);
   });
 
   it('modifie une mission', () => {
-    useFaits.getState().ajouterMission(saisieMission('Dupont'));
-    useFaits.getState().modifierMission(missions()[0]?.id as string, { statut: 'terminee', entites: [] });
+    ajouterMission(saisieMission('Dupont'));
+    modifierMission(missions()[0]?.id as string, { statut: 'terminee', entites: [] });
     expect(missions()[0]?.statut).toBe('terminee');
   });
 });

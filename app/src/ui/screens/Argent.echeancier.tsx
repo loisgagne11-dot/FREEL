@@ -1,5 +1,7 @@
 import { useId, useMemo } from 'react';
 import { useFaits } from '../../state/store';
+import { annulerPeriodeDeclaree, marquerPeriodeDeclaree } from '../../state/ecritures.echeances';
+import type { Mois } from '../../domain/types';
 import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
 import { periodesADeclarer } from '../../domain/calculs/declarations';
 import { Echeances } from '../components/Echeances';
@@ -105,15 +107,18 @@ export function Echeancier({ annee }: { readonly annee: number }) {
  */
 function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
   const faits = useFaits((e) => e.faits);
-  const marquer = useFaits((e) => e.marquerPeriodeDeclaree);
-  const annuler = useFaits((e) => e.annulerPeriodeDeclaree);
+  const marquer = marquerPeriodeDeclaree;
+  const annuler = annulerPeriodeDeclaree;
   const signaler = useToast();
 
+  // Le début d'activité fait apparaître les périodes closes SANS recette : la
+  // déclaration à zéro est due, et le Pilote la réclame avec la même règle.
   const periodes = useMemo(() => periodesADeclarer(
     recettesEncaissees(faits),
     faits.entreprise.urssafPeriodicite,
     faits.periodesDeclarees,
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10),
+    faits.entreprise.debutActivite === null ? null : faits.entreprise.debutActivite.slice(0, 7) as Mois
   ), [faits]);
 
   if (periodes.length === 0) return null;
@@ -137,7 +142,9 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
             <span className={styles.declarationTitre}>
               <span>{p.libelle}</span>
               <span className={styles.declarationMontant}>
-                <Montant>{eur(p.encaisse)}</Montant> encaissés
+                {p.encaisse > 0
+                  ? <><Montant>{eur(p.encaisse)}</Montant> encaissés</>
+                  : 'Rien encaissé : à déclarer à 0 €, c’est obligatoire'}
               </span>
             </span>
 

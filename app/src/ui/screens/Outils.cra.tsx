@@ -4,6 +4,7 @@ import { mois as moisDe } from '../../domain/types';
 import { pourDestinataire, syntheseHebdomadaire } from '../../domain/calculs/cra';
 import { destinatairesDuMois, journeesDuMois } from '../../state/selecteurs.cra';
 import { useFaits } from '../../state/store';
+import { noterSemaineCra } from '../../state/ecritures.activite';
 import { DocumentCra, enJours, plageDeSemaine } from '../documents/DocumentCra';
 import { Apercu, useSortieDocument } from '../documents/Apercu';
 import { Sheet } from '../components/Sheet';
@@ -57,7 +58,7 @@ const TOUS = '\u0000tous';
 
 export function GenerateurCra({ ouvert, onFermer, annee }: ProprietesGenerateurCra) {
   const faits = useFaits((e) => e.faits);
-  const noter = useFaits((e) => e.noterSemaineCra);
+  const noter = noterSemaineCra;
   const sortie = useSortieDocument();
 
   /*
