@@ -430,7 +430,11 @@ describe('restauration d’une sauvegarde', () => {
       screen.getByRole('button', { name: 'Remplacer mes données par cette sauvegarde' })
     );
 
-    expect(useFaits.getState().faits.clients[0]?.nom).toBe('Client repris');
+    // La restauration est asynchrone (copie de l'état actuel, puis migration
+    // chargée à la demande). Lue sans l'attendre, l'assertion passait en local
+    // et échouait sur une machine plus lente — et la restauration, finissant
+    // après coup, débordait sur le test suivant.
+    await waitFor(() => expect(useFaits.getState().faits.clients[0]?.nom).toBe('Client repris'));
   });
 
   it('laisse annuler sans rien toucher', async () => {
