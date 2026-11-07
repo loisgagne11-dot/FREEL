@@ -122,7 +122,14 @@ export const estPayee = (e: Echeance): boolean => e.payeeLe !== null;
 /** Une recette encaissée. Le fait générateur de la dette sociale. */
 export interface RecetteEncaissee {
   readonly id: string;
+  /** HORS TAXE : l'assiette des cotisations, du chiffre d'affaires et des seuils. */
   readonly montant: Euros;
+  /**
+   * La TVA encaissée avec elle — zéro en franchise. Elle n'entre dans AUCUNE
+   * assiette, mais elle est entrée sur le compte : le solde la compte, et elle
+   * reste due tant qu'elle n'est pas reversée (voir `tvaAReverser`).
+   */
+  readonly tva?: Euros;
   /** Date d'ENCAISSEMENT, pas de facturation. C'est elle qui compte. */
   readonly encaisseeLe: DateISO;
 }
@@ -196,6 +203,18 @@ export interface ContexteProvisions {
    * remonte jusqu'à l'écran par `DetailProvisions`.
    */
   readonly impotRevenu?: Resolution<Euros> | undefined;
+  /**
+   * La TVA encaissée et pas encore appelée par une échéance, en euros.
+   *
+   * Encaissée TTC, la TVA n'est pas à soi : elle se reverse. Le solde la
+   * compte désormais (il ne comptait que le hors-taxe) ; sans cette ligne, elle
+   * passerait donc dans le disponible, puis dans « tu peux te verser ». Les
+   * échéances de TVA saisies sont retranchées en amont, comme les acomptes
+   * d'impôt : sinon le volet 1 et ce montant compteraient deux fois la même
+   * dette. La TVA déductible n'en est pas retranchée — ce montant est un
+   * plafond prudent, que la déclaration ramène au juste.
+   */
+  readonly tvaAReverser?: Euros;
 }
 
 /**
@@ -376,6 +395,10 @@ export function voletAProvisionner(
   const impotRevenu = impotR !== undefined && impotR.statut !== 'refuse' ? impotR.valeur : 0;
   somme += impotRevenu;
   parNature.impot += impotRevenu;
+
+  const tva = Math.max(0, ctx.tvaAReverser ?? 0);
+  somme += tva;
+  parNature.tva += tva;
 
   return {
     montant: euros(somme),

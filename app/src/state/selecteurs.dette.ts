@@ -31,7 +31,7 @@ import type { NatureDette } from '../domain/calculs/provisions';
 import { type DetailDette, detailDette } from '../domain/calculs/detailDette';
 import type { Faits } from './schema';
 import {
-  impotRevenuAProvisionner, moisCourant, periodesUrssafEffectives, recettesEncaissees,
+  impotRevenuAProvisionner, moisCourant, tvaAReverserDe, periodesUrssafEffectives, recettesEncaissees,
   regimeDe, sousAcreLe
 } from './selecteurs';
 import { tauxImpotEtContributions } from '../domain/bareme';
@@ -59,6 +59,7 @@ export function detailDeLaDette(
       sousAcreLe: sousAcreLe(faits),
       tauxImpotEtContributions: taux,
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
+      tvaAReverser: tvaAReverserDe(faits),
       periodesUrssaf: periodesUrssafEffectives(faits)
     }
   );

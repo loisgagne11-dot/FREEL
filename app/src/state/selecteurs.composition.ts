@@ -38,7 +38,7 @@ import { soldeDerive } from '../domain/calculs/solde';
 import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';
 import {
-  etatPilote, impotRevenuAProvisionner, moisCourant, periodesUrssafEffectives, recettesEncaissees,
+  etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, periodesUrssafEffectives, recettesEncaissees,
   regimeDe, sousAcreLe
 } from './selecteurs';
 
@@ -104,6 +104,7 @@ function detailProvisionsDe(faits: Faits, maintenant: Date) {
       // pas de taux, et la réserve dira que le total est sous-évalué.
       tauxImpotEtContributions: tauxR.statut === 'refuse' ? 0 : tauxR.valeur,
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
+      tvaAReverser: tvaAReverserDe(faits),
       periodesUrssaf: periodesUrssafEffectives(faits)
     }
   );

@@ -105,7 +105,24 @@ export function regimeDe(faits: Faits, acomptePasSaisi: Euros = euros(0)): Regim
 export function recettesEncaissees(faits: Faits): readonly RecetteEncaissee[] {
   return faits.recettes
     .filter((r): r is typeof r & { encaisseeLe: DateISO } => r.encaisseeLe !== null)
-    .map((r) => ({ id: r.id, montant: r.montant, encaisseeLe: r.encaisseeLe }));
+    .map((r) => ({
+      id: r.id, montant: r.montant, encaisseeLe: r.encaisseeLe, tva: euros(r.tvaCollectee ?? 0)
+    }));
+}
+
+/**
+ * La TVA encaissée et pas encore appelée : collectée sur les encaissements,
+ * moins les échéances de TVA saisies (payées ou non — le volet 1 reprend
+ * déjà celles qui ne le sont pas). Jamais négative.
+ */
+export function tvaAReverserDe(faits: Faits): Euros {
+  const collectee = faits.recettes
+    .filter((r) => r.encaisseeLe !== null)
+    .reduce<number>((t, r) => t + (r.tvaCollectee ?? 0), 0);
+  const appelee = faits.echeances
+    .filter((e) => e.nature === 'tva')
+    .reduce<number>((t, e) => t + (e.montantPaye ?? e.montant), 0);
+  return euros(Math.max(0, collectee - appelee));
 }
 
 /** Chiffre d'affaires encaissé sur une année civile. */
@@ -715,6 +732,7 @@ export function etatPilote(
       sousAcreLe: sousAcreLe(faits),
       tauxImpotEtContributions: tauxImpot,
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
+      tvaAReverser: tvaAReverserDe(faits),
       periodesUrssaf: periodesUrssafEffectives(faits)
     }
   );

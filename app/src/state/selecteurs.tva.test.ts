@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { type DateISO, dateISO, euros, mois } from '../domain/types';
 import { tvaDueDepuis } from '../domain/bareme/tva';
+import type { Echeance } from '../domain/calculs/provisions';
 import { type Faits, type Recette, faitsVides } from './schema';
-import { aTraiter, debutTvaEffectif } from './selecteurs';
+import { aTraiter, debutTvaEffectif, etatPilote, solde } from './selecteurs';
 import { regimeTvaAu } from './selecteurs.achats';
 import { emetteurDe } from './selecteurs.facture';
 
@@ -119,5 +120,53 @@ describe('factures à régulariser', () => {
       }] as never
     });
     expect(sujet(f)).toBeUndefined();
+  });
+});
+
+/**
+ * LA TVA ENCAISSÉE N'EST PAS À SOI, ET ELLE NE DISPARAÎT PAS DEUX FOIS.
+ *
+ * Le solde ne comptait que le hors-taxe : sur une facture de 1 000 € HT payée
+ * 1 200 €, il manquait 200 € au solde, puis le reversement les retranchait une
+ * seconde fois — 800 € calculés pour 1 000 € réels. Et rien ne gardait la TVA
+ * de côté entre l'encaissement et le reversement.
+ */
+describe('TVA encaissée', () => {
+  const facture = recette('2026-10-05', 1000, { tvaCollectee: euros(200) });
+  const base = faits({
+    soldeInitial: euros(5000),
+    soldeInitialAu: dateISO('2026-09-30'),
+    recettes: [facture],
+    entreprise: { ...faitsVides().entreprise, debutActivite: dateISO('2025-01-01'), tvaDepuis: mois('2026-01') }
+  });
+  const quand = new Date('2026-10-20T10:00:00');
+  const appel: Echeance = {
+    id: 'tva-t4', nature: 'tva', montant: euros(200),
+    echeanceLe: dateISO('2026-10-24'), payeeLe: null, montantPaye: null
+  };
+
+  it('compte au solde ce que le client a versé, TVA comprise', () => {
+    expect(solde(base)).toBe(6200);
+  });
+
+  it('garde la TVA de côté jusqu’à son reversement, sans la compter deux fois', () => {
+    const avant = etatPilote(base, [], quand);
+    expect(avant.provisionsParNature.tva).toBe(200);
+
+    // L'appel saisi : la même dette passe au volet 1, pas en plus.
+    const appelee = faits({ ...base, echeances: [appel] });
+    expect(etatPilote(appelee, [appel], quand).provisionsParNature.tva).toBe(200);
+  });
+
+  // La propriété qui compte : encaisser puis reverser la TVA ne change pas ce
+  // qu'on peut se verser. Avant, le reversement le faisait baisser de 200 €.
+  it('ne fait varier le versable ni à l’encaissement ni au reversement', () => {
+    const sansFacture = faits({ ...base, recettes: [recette('2026-10-05', 1000, { tvaCollectee: euros(0) })] });
+    const payee = { ...appel, payeeLe: dateISO('2026-10-24') };
+    const reversee = faits({ ...base, echeances: [payee] });
+
+    const versable = (f: Faits, e: readonly Echeance[]) => etatPilote(f, e, quand).tresorerie.versable;
+    expect(versable(base, [])).toBeCloseTo(versable(sansFacture, []), 2);
+    expect(versable(reversee, [payee])).toBeCloseTo(versable(sansFacture, []), 2);
   });
 });
