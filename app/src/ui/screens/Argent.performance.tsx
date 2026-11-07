@@ -15,7 +15,7 @@ import { useRoute } from '../useRoute';
 import { Chiffre } from '../components/Chiffre';
 import { Info } from '../components/Info';
 import { Montant } from '../components/Montant';
-import { eur, formaterJours, moisLong } from '../format';
+import { enKiloEuros, eur, formaterJours, moisLong } from '../format';
 import styles from './Argent.performance.module.css';
 
 /**
@@ -440,18 +440,6 @@ function GrapheCa(
       )}
     </section>
   );
-}
-
-/**
- * Le design veut les montants du graphe libellés en k€ : au-dessus des barres,
- * un montant complet en euros serait trop long et se chevaucherait d'une barre
- * à l'autre.
- */
-function enKiloEuros(valeur: number): string {
-  if (valeur === 0) return '0';
-  const k = valeur / 1000;
-  const arrondi = k >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
-  return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(arrondi)} k€`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@
  */
 
 import { type DateISO, type Euros, type Mois, type Ratio, euros, ratio } from '../types';
+import { joursEntre } from '../dates';
 
 /**
  * Zone d'application des jours fériés.
@@ -412,13 +413,6 @@ export interface DelaiClient {
   readonly enAttente: Euros;
   /** Factures émises depuis plus longtemps que le délai médian observé. */
   readonly enRetard: number;
-}
-
-/** Nombre de jours entre deux dates ISO. */
-export function joursEntre(debut: DateISO, fin: DateISO): number {
-  const a = Date.UTC(Number(debut.slice(0, 4)), Number(debut.slice(5, 7)) - 1, Number(debut.slice(8, 10)));
-  const b = Date.UTC(Number(fin.slice(0, 4)), Number(fin.slice(5, 7)) - 1, Number(fin.slice(8, 10)));
-  return Math.round((b - a) / 86_400_000);
 }
 
 function mediane(valeurs: readonly number[]): number | null {

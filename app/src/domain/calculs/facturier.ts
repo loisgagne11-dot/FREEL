@@ -1,5 +1,6 @@
 import type { DateISO, Euros } from '../types';
 import { euros } from '../types';
+import { joursEntre } from '../dates';
 
 /**
  * Le suivi des factures — de l'émission au règlement.
@@ -199,7 +200,7 @@ export function suivre<R extends RecetteSuivie>(
       recette,
       statut,
       echeanceLe,
-      joursDeRetard: enRetard ? joursEntre(echeanceLe as DateISO, aujourdhui) : 0
+      joursDeRetard: enRetard ? Math.max(0, joursEntre(echeanceLe as DateISO, aujourdhui)) : 0
     };
   });
 }
@@ -227,20 +228,6 @@ function statutDe(
   // l'ait envoyée ou non, et si on ne l'a pas envoyée, c'est le premier
   // problème à régler.
   return recette.envoyeeLe == null ? 'emise' : 'envoyee';
-}
-
-/**
- * Le nombre de jours entre deux dates ISO.
- *
- * Calculé en UTC : en heure locale, un passage à l'heure d'été fait un jour de
- * 23 heures, et la division donnerait 0,96 jour — tronqué à zéro, un retard
- * d'un jour disparaîtrait.
- */
-function joursEntre(depuis: DateISO, jusqua: DateISO): number {
-  const a = Date.parse(`${depuis}T00:00:00Z`);
-  const b = Date.parse(`${jusqua}T00:00:00Z`);
-  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
-  return Math.max(0, Math.round((b - a) / 86_400_000));
 }
 
 /** Ce qui a été facturé et qui n'est pas rentré. */

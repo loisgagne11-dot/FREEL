@@ -17,6 +17,7 @@
  *     réel ou d'une échéance réelle, jamais d'une appréciation.
  */
 
+import { joursEntre } from '../dates';
 import {
   type DateISO, type Euros, type Mois, type TypeActivite,
   euros, moisDe
@@ -177,9 +178,6 @@ export const SEUILS_PAR_DEFAUT: SeuilsAlerte = {
   partPlafond: 0.85,
   moisFraicheurBareme: 6
 };
-
-const joursEntre = (a: DateISO, b: DateISO): number =>
-  Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 
 /**
  * Décale une date d'un nombre de jours.

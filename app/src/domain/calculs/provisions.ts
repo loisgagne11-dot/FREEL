@@ -264,10 +264,47 @@ export const LIBELLE_NATURE: Readonly<Record<NatureDette, string>> = {
 const ventilationVide = (): Record<NatureDette, number> =>
   ({ urssaf: 0, tva: 0, impot: 0, cfe: 0, cfp: 0 });
 
-const figer = (v: Record<NatureDette, number>): VentilationProvisions => ({
-  urssaf: euros(v.urssaf), tva: euros(v.tva), impot: euros(v.impot),
-  cfe: euros(v.cfe), cfp: euros(v.cfp)
-});
+/**
+ * Fige une ventilation en euros au centime, de sorte que la somme des parts
+ * égale EXACTEMENT `total`, lui-même arrondi au centime.
+ *
+ * Méthode du plus fort reste. Arrondir chaque part isolément ne retombe pas sur
+ * le total arrondi : 0,004 + 0,004 + 0,004 donne trois parts à 0,00 pour un
+ * total à 0,01 ; sur de vraies provisions, un à deux centimes d'écart entre la
+ * somme des lignes affichées et le total affiché, que l'utilisateur additionne
+ * à la calculatrice. Chaque part prend le centime inférieur, puis les centimes
+ * manquants vont aux parts dont la fraction perdue est la plus grande ; à
+ * égalité, l'ordre de `NATURES_DETTE`, pour que le résultat soit déterministe.
+ */
+function figer(v: Record<NatureDette, number>, total: number): VentilationProvisions {
+  const cible = Math.round(total * 100);
+  const parts = NATURES_DETTE.map((nature, rang) => {
+    const brut = v[nature] * 100;
+    const plancher = Math.floor(brut + 1e-9);
+    return { nature, rang, centimes: plancher, reste: brut - plancher };
+  });
+  let manque = cible - parts.reduce((s, p) => s + p.centimes, 0);
+  // Au-delà d'un centime par part, l'écart n'est plus un arrondi : `total`
+  // n'est pas la somme des parts, et le répartir en silence fausserait une
+  // ligne pour faire tomber juste une addition. On rend alors l'arrondi naïf,
+  // et l'écart reste visible.
+  if (Math.abs(manque) > parts.length) {
+    return {
+      urssaf: euros(v.urssaf), tva: euros(v.tva), impot: euros(v.impot),
+      cfe: euros(v.cfe), cfp: euros(v.cfp)
+    };
+  }
+  const parReste = [...parts].sort((a, b) => b.reste - a.reste || a.rang - b.rang);
+  // Reste négatif : on retire aux plus petites fractions, symétriquement.
+  if (manque < 0) parReste.reverse();
+  for (let i = 0; manque !== 0; i = (i + 1) % parReste.length) {
+    (parReste[i] as { centimes: number }).centimes += Math.sign(manque);
+    manque -= Math.sign(manque);
+  }
+  const f = (n: NatureDette): Euros =>
+    euros((parts.find((p) => p.nature === n) as { centimes: number }).centimes / 100);
+  return { urssaf: f('urssaf'), tva: f('tva'), impot: f('impot'), cfe: f('cfe'), cfp: f('cfp') };
+}
 
 export interface DetailProvisions {
   /** Échéances émises et non payées. */
@@ -323,7 +360,7 @@ export function voletConstateParNature(
     if (estPayee(e)) continue;
     v[e.nature] += e.montant;
   }
-  return figer(v);
+  return figer(v, euros(Object.values(v).reduce((a, b) => a + b, 0)));
 }
 
 /**
@@ -400,9 +437,10 @@ export function voletAProvisionner(
   somme += tva;
   parNature.tva += tva;
 
+  const montant = euros(somme);
   return {
-    montant: euros(somme),
-    parNature: figer(parNature),
+    montant,
+    parNature: figer(parNature, montant),
     nonCalculables,
     impotRevenuNonProvisionne: impotR !== undefined && impotR.statut === 'refuse'
       ? impotR.motif
@@ -429,11 +467,12 @@ export function provisions(
     parNature[n] = ventileConstate[n] + aProvisionner.parNature[n];
   }
 
+  const total = euros(constate + aProvisionner.montant);
   return {
     voletConstate: constate,
     voletAProvisionner: aProvisionner.montant,
-    total: euros(constate + aProvisionner.montant),
-    parNature: figer(parNature),
+    total,
+    parNature: figer(parNature, total),
     recettesNonCalculables: aProvisionner.nonCalculables,
     impotRevenuNonProvisionne: aProvisionner.impotRevenuNonProvisionne
   };

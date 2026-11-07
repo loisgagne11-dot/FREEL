@@ -42,6 +42,7 @@
  */
 
 import { type DateISO, type Euros, type Mois, euros } from '../types';
+import { joursEntre } from '../dates';
 
 /**
  * Les 27 États membres, par code ISO.
@@ -225,12 +226,6 @@ export interface DeclarationEnRetard {
   readonly joursDeRetard: number;
   readonly nombreLignes: number;
   readonly total: Euros;
-}
-
-function joursEntre(a: DateISO, b: DateISO): number {
-  const t = (d: DateISO) =>
-    Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
-  return Math.round((t(b) - t(a)) / 86_400_000);
 }
 
 /** Le mois d'une date. */

@@ -27,7 +27,7 @@ import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
 import { Montant } from '../components/Montant';
 import { Donut, PhraseRepartition } from '../components/Donut';
-import { dateCourte, eur, moisTexte } from '../format';
+import { dateCourte, enKiloEuros, eur, moisTexte } from '../format';
 import styles from './Argent.module.css';
 
 /**
@@ -79,30 +79,6 @@ const Echeancier = lazy(() => import('./Argent.echeancier')
  */
 const Composition = lazy(() => import('../components/Composition')
   .then((m) => ({ default: m.Composition })));
-
-/**
- * Les montants abrégés des étiquettes de graphe.
- *
- * Sous mille euros, l'abréviation en k€ perdrait le seul chiffre significatif :
- * « 0,3 k€ » se lit moins bien que « 340 € », et sur un net mensuel c'est
- * précisément l'ordre de grandeur courant.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * UN SEUL CHIFFRE APRÈS LA VIRGULE, MÊME AU-DELÀ DE DIX MILLE EUROS
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Une première version arrondissait à l'entier dès 10 k€ — « 11 k€ », sans
- * décimale. Un contrôle visuel l'a relevé : douze mois qui varient entre
- * 10 500 € et 11 400 € affichaient tous « 11 k€ », neuf fois la même
- * étiquette sur une courbe qui bouge réellement. Garder la décimale, quelle
- * que soit l'ampleur du solde, rend les colonnes de nouveau distinguables.
- */
-function enKiloEuros(valeur: number): string {
-  const abs = Math.abs(valeur);
-  if (abs < 1000) return eur(euros(Math.round(valeur)));
-  const arrondi = Math.round(valeur / 100) / 10;
-  return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(arrondi)} k€`;
-}
 
 /** Les mois de l'axe, sur trois lettres comme partout ailleurs dans l'écran. */
 const MOIS_COURTS = [

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../types';
+import { joursEntre } from '../dates';
 import {
   type RecettePayee,
   calendrierDuMois, chargeDuMois, decompterJours, delaisParClient, estWeekEnd,
-  joursCongeables, joursDuMois, joursEntre, joursEquivalents, joursFeries,
+  joursCongeables, joursDuMois, joursEquivalents, joursFeries,
   paques, planDeCharge
 } from './activite';
 
