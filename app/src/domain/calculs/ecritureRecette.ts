@@ -63,6 +63,13 @@ export function ecritureDAnnulation(
     clientNom: origine.clientNom,
     libelle: `Annulation — ${origine.libelle}`,
     montant: euros(-origine.montant),
+    // La TVA s'annule avec le montant, au signe opposé. Sans elle, l'avoir
+    // n'annulait que le hors-taxe : la TVA de la facture annulée restait
+    // « collectée », et le dossier du trimestre de l'avoir ne portait pas la
+    // régularisation. Inconnue (`null`), elle reste inconnue.
+    ...(origine.tvaCollectee === undefined ? {} : {
+      tvaCollectee: origine.tvaCollectee === null ? null : euros(-origine.tvaCollectee)
+    }),
     emiseLe: origine.emiseLe,
     encaisseeLe: aujourdhui,
     modeReglement: origine.modeReglement,

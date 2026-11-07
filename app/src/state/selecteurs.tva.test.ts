@@ -3,8 +3,10 @@ import { type DateISO, dateISO, euros, mois } from '../domain/types';
 import { tvaDueDepuis } from '../domain/bareme/tva';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Faits, type Recette, faitsVides } from './schema';
-import { aTraiter, debutTvaEffectif, etatPilote, solde } from './selecteurs';
+import { ecritureDAnnulation } from '../domain/calculs/ecritureRecette';
+import { aTraiter, debutTvaEffectif, etatPilote, solde, tvaAReverserDe } from './selecteurs';
 import { regimeTvaAu } from './selecteurs.achats';
+import { dossierTvaDuTrimestre } from './selecteurs.argent';
 import { emetteurDe } from './selecteurs.facture';
 
 /*
@@ -168,5 +170,40 @@ describe('TVA encaissée', () => {
     const versable = (f: Faits, e: readonly Echeance[]) => etatPilote(f, e, quand).tresorerie.versable;
     expect(versable(base, [])).toBeCloseTo(versable(sansFacture, []), 2);
     expect(versable(reversee, [payee])).toBeCloseTo(versable(sansFacture, []), 2);
+  });
+});
+
+/**
+ * LA TVA D'UN AVOIR SE RÉGULARISE AU TRIMESTRE DE L'AVOIR.
+ *
+ * L'annulation ne reprenait que le hors-taxe, et le dossier écartait les
+ * avoirs : une facture de 1 000 € HT + 200 € de TVA, encaissée en mars puis
+ * annulée en mai, laissait 200 € « collectés » pour toujours. La TVA déclarée
+ * au premier trimestre ne revenait jamais au deuxième.
+ */
+describe('TVA des avoirs', () => {
+  const mars = recette('2026-03-10', 1000, { tvaCollectee: euros(200) });
+  const avoir = ecritureDAnnulation(mars, dateISO('2026-05-12'), `${mars.id}-annulation`) as Recette;
+  const f = faits({
+    recettes: [mars, avoir],
+    entreprise: { ...faitsVides().entreprise, debutActivite: dateISO('2025-01-01'), tvaDepuis: mois('2026-01') }
+  });
+
+  it('reprend la TVA de la facture annulée, au signe opposé', () => {
+    expect(avoir.montant).toBe(-1000);
+    expect(avoir.tvaCollectee).toBe(-200);
+  });
+
+  it('laisse la facture à son trimestre et porte la régularisation à celui de l’avoir', () => {
+    const t1 = dossierTvaDuTrimestre(f, dateISO('2026-01-01'), dateISO('2026-03-31'));
+    const t2 = dossierTvaDuTrimestre(f, dateISO('2026-04-01'), dateISO('2026-06-30'));
+    expect(t1.collectee).toBe(200);
+    expect(t2.collectee).toBe(-200);
+    expect(t2.baseHt).toBe(-1000);
+    expect(t2.encaissements.map((e) => e.avoir)).toEqual([true]);
+  });
+
+  it('ne laisse plus rien à reverser une fois la facture annulée', () => {
+    expect(tvaAReverserDe(f)).toBe(0);
   });
 });

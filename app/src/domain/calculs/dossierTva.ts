@@ -51,6 +51,11 @@ export interface PieceCollectee {
   readonly montantHt: Euros;
   /** TVA du document, ou `null` si elle n'a pas été conservée. */
   readonly tva: Euros | null;
+  /**
+   * La pièce est un avoir : elle porte le numéro de la facture qu'elle annule,
+   * en négatif. Sans la mention, la ligne se lit comme un doublon de saisie.
+   */
+  readonly avoir?: boolean;
 }
 
 /** Une dépense qui ouvre droit à déduction. */
