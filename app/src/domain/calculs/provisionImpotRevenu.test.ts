@@ -4,6 +4,7 @@ import {
   type EntreeProvisionIr, type ProvisionImpotRevenu,
   provisionImpotRevenu
 } from './provisionImpotRevenu';
+import { comparerRegimes } from './comparateurVl';
 
 /**
  * Les cas se calent sur 2024, seul millésime de barème PUBLIÉ : c'est le seul
@@ -62,17 +63,35 @@ describe('provision d\'impôt sur le revenu', () => {
   });
 
   /**
-   * L'IMPÔT DU FOYER N'EST PAS L'IMPÔT DU MICRO.
+   * L'ACTIVITÉ COÛTE CE QU'ELLE AJOUTE À L'IMPÔT DU FOYER.
    *
-   * Avec 39 600 € de micro et 39 600 € d'autres revenus, le foyer paie
-   * beaucoup plus — la tranche à 30 % puis 41 % — mais la moitié seulement de
-   * cet impôt est imputable au micro. Provisionner l'impôt du foyer entier
-   * ferait mettre de côté l'impôt du conjoint.
+   * Une part, 30 000 € d'autres revenus, 30 000 € encaissés (19 800 €
+   * imposables). Barème 2024 : 8 105,48 € avec l'activité, 2 165,48 € sans —
+   * l'activité coûte 5 940 €. Le prorata au taux moyen en retenait 3 223 € :
+   * si la règle revenait, 2 717 € d'impôt passeraient dans « tu peux te
+   * verser ». Arbitré au taux marginal le 6/11/2026.
    */
-  it('n’attribue au micro que sa quote-part de l’impôt du foyer', () => {
-    const v = valeur({ foyer: { partsFiscales: 1, autresRevenusFoyer: euros(39600), versementPerDeductible: euros(0) } });
-    expect(v.impotMicro).toBeLessThan(v.impotFoyer);
-    expect(v.impotMicro).toBeCloseTo(v.impotFoyer / 2, 2);
+  it('impute à l’activité ce qu’elle ajoute à l’impôt du foyer', () => {
+    const v = valeur({
+      caEncaisseConstate: euros(30000),
+      foyer: { partsFiscales: 1, autresRevenusFoyer: euros(30000), versementPerDeductible: euros(0) }
+    });
+    expect(v.impotFoyer).toBeCloseTo(8105.48, 2);
+    expect(v.impotMicro).toBeCloseTo(5940, 2);
+  });
+
+  // Invariant n°4 : le comparateur et la provision disaient deux « impôts de
+  // l'activité » différents pour le même foyer.
+  it('rend le même impôt de l’activité que le comparateur', () => {
+    const v = valeur({
+      caEncaisseConstate: euros(30000),
+      foyer: { partsFiscales: 2, autresRevenusFoyer: euros(30000), versementPerDeductible: euros(0) }
+    });
+    const c = comparerRegimes(euros(30000), mois('2024-06') as Mois, 'BNC', {
+      parts: 2, autresRevenus: euros(30000)
+    } as Parameters<typeof comparerRegimes>[3]);
+    if (c.statut === 'refuse') throw new Error(c.motif);
+    expect(v.impotMicro).toBeCloseTo(c.valeur.bareme, 2);
   });
 
   /**

@@ -522,7 +522,7 @@ function PanneauEncaissement(
     readonly onValider: (date: string, mode: ModeReglement) => void;
   }
 ) {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState<string>(() => dateDuJour());
   const [mode, setMode] = useState<ModeReglement>('virement');
   const id = useId();
 

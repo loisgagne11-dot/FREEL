@@ -305,3 +305,12 @@ version.
 **Ce n'est pas un correctif à écrire.** Aligner la nouvelle sur l'ancienne
 reviendrait à réintroduire trois erreurs de définition pour retrouver un
 chiffre faux.
+
+## Lot 2 (07/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Saisie d'une échéance d'impôt | 🟢 | Nouveau choix « Ce qu'elle règle » : acompte de l'année, ou solde de l'impôt de l'année précédente (champ optionnel `exercice`). L'ancienne ne distinguait pas les deux |
+| Déclarations URSSAF à zéro | 🟢 | Les périodes closes sans recette se marquent déclarées depuis l'échéancier ; l'alerte du Pilote peut enfin s'éteindre |
+| Dates « aujourd'hui » | 🟢 | Date du calendrier local partout (une facture émise à 0 h 30 le 1er janvier n'est plus datée de l'année précédente) |
+

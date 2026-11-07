@@ -541,3 +541,21 @@ qui n'a pas fini de charger. L'étirer vraiment demanderait que la bande cesse
 d'avoir une hauteur fixe, donc que la ligne d'objectif ne puisse plus se poser
 sur la même échelle sans mesurer le conteneur en JavaScript. Un repère faux
 coûte plus cher qu'un vide.
+
+## Lot 2 (07/11) — un chiffre, une source
+
+Six nombres lus à l'écran changent de valeur ou de sens. Chacun est tenu par
+un test nommé, prouvé par mutation.
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Provision d'impôt sur le revenu | Argent → enveloppes, versable | Repartait de zéro le 1er janvier | Garde le solde estimé de l'année écoulée jusqu'à la saisie de l'avis (« Solde de l'impôt N ») |
+| Impôt de l'activité | Provision et comparateur VL | Prorata au taux moyen dans la provision, surcroît dans le comparateur | Surcroît (taux marginal) partout, une seule fonction — décision du propriétaire |
+| Enveloppe URSSAF / impôt | Argent → enveloppes, donut | CFP (0,2 %) rangée en impôt | CFP dans sa propre enveloppe ; URSSAF + CFP = ce que demande la déclaration |
+| « N périodes à déclarer » | Pilote, Santé, échéancier | Pilote : périodes à zéro comprises ; échéancier : seulement avec encaissement | Une seule règle ; l'échéancier dit « à déclarer à zéro » |
+| « N à traiter » | Barre du haut | Somme des quantités (« 5 ») | Nombre de sujets (« 2 »), comme la salutation et les badges |
+| TJM net, capacité de versement | Activité, Argent → performance | « net de cotisations et impôt » | « avant impôt sur le revenu » au barème |
+
+**Non fait, reporté au lot 7** : le même montant s'affiche encore en k€ avec
+deux arrondis différents entre Trésorerie et Performance (`enKiloEuros`).
+

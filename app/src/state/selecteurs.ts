@@ -19,7 +19,7 @@ import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
   type VentilationProvisions,
-  estPayee, provisions as calculerProvisions
+  estPayee, exerciceDe, provisions as calculerProvisions
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
 import {
@@ -456,9 +456,10 @@ export function aTraiter(
  * c'est lui qui est sorti du compte.
  */
 function acomptesPasDeLAnnee(faits: Faits, annee: number): Euros {
-  const prefixe = String(annee);
+  // Par l'exercice réglé, pas par la date : le solde de l'an dernier, prélevé
+  // à l'automne, n'est pas un acompte de cette année (voir `Echeance.exercice`).
   return euros(faits.echeances
-    .filter((e) => e.nature === 'impot' && e.echeanceLe.startsWith(prefixe))
+    .filter((e) => e.nature === 'impot' && exerciceDe(e) === annee)
     .reduce<number>((somme, e) => somme + (e.montantPaye ?? e.montant), 0));
 }
 
@@ -504,6 +505,79 @@ export function provisionIrDe(
   });
 }
 
+/**
+ * Le solde estimé de l'impôt de l'ANNÉE PRÉCÉDENTE, tant que son avis n'est
+ * pas saisi.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * AU 1ᴱᴿ JANVIER, L'IMPÔT DE L'ANNÉE ÉCOULÉE DISPARAISSAIT DE LA PROVISION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La provision ne regardait que l'année de l'horloge. Le 2 janvier, son
+ * assiette repartait de zéro : l'impôt des revenus de l'année écoulée — dont
+ * le solde ne se paie qu'à l'automne suivant — sortait des provisions, et le
+ * « tu peux te verser » montait d'autant jusqu'à la saisie de l'avis, l'été
+ * venu. C'est le moment de l'année où l'écran invitait le plus à se verser
+ * de l'argent dû.
+ *
+ * L'estimation tient jusqu'à ce qu'une échéance d'impôt portant cet exercice
+ * soit saisie : l'avis est alors un fait, au volet 1, et le garder ici le
+ * compterait deux fois. Elle cesse aussi d'elle-même l'année suivante — le
+ * solde a été prélevé ou remboursé entre-temps. Rien n'est inventé pour une
+ * année sans encaissement.
+ */
+export function soldeImpotPrecedentDe(
+  faits: Faits,
+  maintenant: Date = new Date()
+): Resolution<ProvisionImpotRevenu> | null {
+  if (faits.entreprise.versementLiberatoire) return null;
+  const precedente = Number(moisCourant(maintenant).slice(0, 4)) - 1;
+  const assiette = caEncaisseAnnee(faits, precedente);
+  if (assiette <= 0) return null;
+  if (faits.echeances.some((e) => e.nature === 'impot' && e.exercice === precedente)) return null;
+
+  return provisionImpotRevenu({
+    annee: precedente,
+    moisCourant: `${precedente}-12` as Mois,
+    typeActivite: faits.entreprise.typeActivite,
+    caEncaisseConstate: assiette,
+    // L'année est close : il n'y a plus rien à attendre, et le dire évite que
+    // l'estimation se présente comme un plancher.
+    caAttendu: euros(0),
+    foyer: {
+      partsFiscales: faits.partsFiscales,
+      autresRevenusFoyer: faits.autresRevenusFoyer,
+      versementPerDeductible: faits.versementPerDeductible
+    },
+    acomptesPasSaisis: acomptesPasDeLAnnee(faits, precedente)
+  });
+}
+
+/**
+ * L'impôt sur le revenu que le volet 2 doit retenir : le reste de l'année en
+ * cours, plus le solde estimé de l'année précédente tant que son avis manque.
+ *
+ * Une seule fonction pour les trois appelants (Pilote, composition, dette) :
+ * l'oubli du solde dans l'un d'eux aurait fait dire deux versables différents
+ * au même écran.
+ */
+export function impotRevenuAProvisionner(
+  faits: Faits,
+  maintenant: Date = new Date()
+): Resolution<Euros> | undefined {
+  const parts = [provisionIrDe(faits, maintenant), soldeImpotPrecedentDe(faits, maintenant)]
+    .map(resteAProvisionnerDe)
+    .filter((r): r is Resolution<Euros> => r !== undefined);
+  if (parts.length === 0) return undefined;
+  const refus = parts.find((r) => r.statut === 'refuse');
+  if (refus !== undefined) return refus;
+  const valeur = euros(parts.reduce<number>((t, r) => t + (r.statut === 'refuse' ? 0 : r.valeur), 0));
+  const hypothese = parts.find((r) => r.statut === 'hypothese');
+  if (hypothese !== undefined && hypothese.statut === 'hypothese') return { ...hypothese, valeur };
+  const premiere = parts[0];
+  return premiere !== undefined && premiere.statut === 'publie' ? { ...premiere, valeur } : undefined;
+}
+
 /** Le reste à provisionner, dans la résolution qu'attend le volet 2. */
 export function resteAProvisionnerDe(
   r: Resolution<ProvisionImpotRevenu> | null
@@ -544,6 +618,8 @@ export interface EtatPilote {
    * quand les parts, les autres revenus ou le barème manquent.
    */
   readonly provisionImpotRevenu: Resolution<ProvisionImpotRevenu> | null;
+  /** Le solde estimé de l'impôt de l'année précédente, tant que son avis manque. */
+  readonly soldeImpotPrecedent: Resolution<ProvisionImpotRevenu> | null;
 }
 
 /**
@@ -588,7 +664,7 @@ export function etatPilote(
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
       tauxImpotEtContributions: tauxImpot,
-      impotRevenu: resteAProvisionnerDe(provisionIr),
+      impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       periodesUrssaf: periodesUrssafEffectives(faits)
     }
   );
@@ -606,7 +682,8 @@ export function etatPilote(
     autonomie: autonomieMois(tresorerie.versable, faits.besoinMensuel),
     tauxImpotIndisponible: tauxImpotR.statut === 'refuse',
     motifTauxImpot: tauxImpotR.statut === 'refuse' ? tauxImpotR.motif : null,
-    provisionImpotRevenu: provisionIr
+    provisionImpotRevenu: provisionIr,
+    soldeImpotPrecedent: soldeImpotPrecedentDe(faits, maintenant)
   };
 }
 
@@ -756,7 +833,18 @@ export function preneursDeServices(faits: Faits): ReadonlyMap<string, PreneurSer
    ───────────────────────────────────────────────────────────────────────── */
 
 
-/** La date du jour, au format ISO, sans passer par le fuseau local. */
+/**
+ * La date du jour, au format ISO, dans le fuseau de l'utilisateur.
+ *
+ * Elle passait par `toISOString`, donc par l'heure UTC, quand `moisCourant` lit
+ * l'heure locale. Le 1er janvier à 0 h 30 à Paris, l'application était en
+ * janvier et datée du 31 décembre : une facture émise ou annulée à ce
+ * moment-là tombait dans l'année précédente — chiffre d'affaires, seuils,
+ * numérotation. Le jour est celui du calendrier de la personne, pas de
+ * Greenwich.
+ */
 export function dateDuJour(maintenant: Date = new Date()): DateISO {
-  return maintenant.toISOString().slice(0, 10) as DateISO;
+  const mm = String(maintenant.getMonth() + 1).padStart(2, '0');
+  const jj = String(maintenant.getDate()).padStart(2, '0');
+  return `${maintenant.getFullYear()}-${mm}-${jj}` as DateISO;
 }

@@ -150,6 +150,48 @@ export function irParTranches(revenuImposable: Euros, tranches: readonly Tranche
   return euros(Math.max(0, impot));
 }
 
+/** L'impôt d'un foyer : le barème sur UNE part, remultiplié par les parts. */
+export function impotDuFoyer(revenu: number, parts: number, tranches: readonly TrancheIR[]): Euros {
+  if (revenu <= 0 || parts <= 0) return euros(0);
+  return euros(irParTranches(euros(revenu / parts), tranches) * parts);
+}
+
+/**
+ * Ce qu'une activité AJOUTE à l'impôt du foyer : l'impôt avec elle, moins
+ * l'impôt sans elle.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE PRORATA ATTRIBUAIT À L'ACTIVITÉ LE TAUX MOYEN DU FOYER
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La provision partageait l'impôt du foyer au prorata des revenus ; le
+ * comparateur avec le versement libératoire, lui, prenait déjà le surcroît.
+ * Deux écrans, deux « impôts de l'activité ». Or l'activité s'empile sur les
+ * autres revenus : elle est imposée au taux le plus haut qu'elle fait
+ * atteindre, pas au taux moyen. Exemple : une part, 30 000 € d'autres
+ * revenus, 19 800 € imposables d'activité — le surcroît est de 5 940 €, le
+ * prorata en retenait 3 223 €, et le reste passait dans « tu peux te verser ».
+ *
+ * Arbitré par le propriétaire le 6/11/2026. Avec le prélèvement à la source,
+ * une partie de ce surcroît sera prélevée sur un salaire plutôt que sur le
+ * compte pro ; c'est pourtant bien ce que l'activité coûte au foyer, et une
+ * provision trop haute revient, une trop basse se paie de sa poche.
+ *
+ * La déduction (versement PER) profite au foyer dans les deux cas : elle se
+ * retranche avec et sans l'activité.
+ */
+export function surcroitDImpot(
+  revenuActivite: number,
+  autresRevenus: number,
+  deduction: number,
+  parts: number,
+  tranches: readonly TrancheIR[]
+): Euros {
+  const avec = impotDuFoyer(Math.max(0, revenuActivite + autresRevenus - deduction), parts, tranches);
+  const sans = impotDuFoyer(Math.max(0, autresRevenus - deduction), parts, tranches);
+  return euros(Math.max(0, avec - sans));
+}
+
 // ────────────────────────── Versement libératoire ─────────────────────────
 
 export interface PeriodeVersementLiberatoire {

@@ -32,6 +32,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
+import { dateDuJour } from '../../state/selecteurs';
 import { ajouterRecette } from '../../state/ecritures.recettes';
 import {
   destinataireDe, emetteurDe, etatFacture, numeroSuivant
@@ -72,7 +73,7 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
   const idChamp = useId();
 
   const [clientNom, setClientNom] = useState('');
-  const [emiseLe, setEmiseLe] = useState(() => new Date().toISOString().slice(0, 10));
+  const [emiseLe, setEmiseLe] = useState<string>(() => dateDuJour());
   const [lignes, setLignes] = useState<readonly LigneFacture[]>([ligneVide()]);
   /**
    * La facture émise, FIGÉE.

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
+import { poserAjustement, poserPlageDeConges, retirerAjustements } from '../../state/ecritures.activite';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import {
   type PoidsClient,
@@ -140,9 +141,6 @@ export interface ProprietesActivite {
 
 export function Activite({ annee }: ProprietesActivite = {}) {
   const faits = useFaits((e) => e.faits);
-  const poserAjustement = useFaits((e) => e.poserAjustement);
-  const poserPlageDeConges = useFaits((e) => e.poserPlageDeConges);
-  const retirerAjustements = useFaits((e) => e.retirerAjustements);
   const signaler = useToast();
 
   const [section, setSection] = useState<Section>('charge');
@@ -637,7 +635,11 @@ export function Activite({ annee }: ProprietesActivite = {}) {
               <Suspense fallback={<EnAttenteDeFormulaire />}>
                 <CartePrevision previsions={previsions} mois={mois} />
                 <CarteRapportParMission rapports={rapports} annee={Number(mois.slice(0, 4))} />
-                <CarteTarifJournalier tarif={tarif} annee={Number(mois.slice(0, 4))} />
+                <CarteTarifJournalier
+                  tarif={tarif}
+                  annee={Number(mois.slice(0, 4))}
+                  auBareme={!faits.entreprise.versementLiberatoire}
+                />
               </Suspense>
             </div>
 

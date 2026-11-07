@@ -370,12 +370,17 @@ describe('état de l\'écran Pilote', () => {
     expect(e.tresorerie.versable).toBeCloseTo(versableAvant - 5045.48, 2);
   });
 
-  // La ventilation doit rester lisible : la CFP est un taux, l'impôt sur le
-  // revenu un montant annuel, et les deux se lisent sur la même ligne sans se
-  // recouvrir.
-  it('range l’impôt sur le revenu dans la nature « impot », à côté de la CFP', () => {
+  /**
+   * LA CFP SE RANGE AVEC CE QUI SE PAIE À L'URSSAF.
+   *
+   * Elle se paie avec la déclaration, 0,2 % en BNC. Rangée en « impôt », la
+   * ligne URSSAF affichait 0,2 % de moins que ce que l'URSSAF demande — relevé
+   * par le propriétaire en déclarant. Le total, lui, ne change pas.
+   */
+  it('range la CFP à part, et l’impôt sur le revenu seul en « impot »', () => {
     const e = etatPilote(auBareme(), [], maintenant);
-    expect(e.provisionsParNature.impot).toBeCloseTo(60000 * 0.002 + 5045.48, 2);
+    expect(e.provisionsParNature.impot).toBeCloseTo(5045.48, 2);
+    expect(e.provisionsParNature.cfp).toBeCloseTo(60000 * 0.002, 2);
     expect(e.provisionsParNature.urssaf).toBeCloseTo(60000 * 0.256, 2);
   });
 
@@ -395,7 +400,7 @@ describe('état de l\'écran Pilote', () => {
     // Volet 1 : l'acompte appelé et non payé. Volet 2 : l'impôt de l'année
     // moins ce même acompte. La somme vaut l'impôt de l'année, pas le double.
     expect(e.voletConstate).toBe(2000);
-    expect(e.provisionsParNature.impot).toBeCloseTo(60000 * 0.002 + 5045.48, 2);
+    expect(e.provisionsParNature.impot).toBeCloseTo(5045.48, 2);
   });
 
   // Les deux régimes sont exclusifs : sous versement libératoire, l'impôt est
@@ -406,7 +411,8 @@ describe('état de l\'écran Pilote', () => {
       [], maintenant
     );
     expect(e.provisionImpotRevenu).toBeNull();
-    expect(e.provisionsParNature.impot).toBeCloseTo(60000 * (0.002 + 0.022), 2);
+    expect(e.provisionsParNature.impot).toBeCloseTo(60000 * 0.022, 2);
+    expect(e.provisionsParNature.cfp).toBeCloseTo(60000 * 0.002, 2);
   });
 
   /**

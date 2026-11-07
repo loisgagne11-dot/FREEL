@@ -38,8 +38,8 @@ import { soldeDerive } from '../domain/calculs/solde';
 import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';
 import {
-  etatPilote, moisCourant, periodesUrssafEffectives, provisionIrDe, recettesEncaissees,
-  regimeDe, resteAProvisionnerDe, sousAcreLe
+  etatPilote, impotRevenuAProvisionner, moisCourant, periodesUrssafEffectives, recettesEncaissees,
+  regimeDe, sousAcreLe
 } from './selecteurs';
 
 export function compositionDe(
@@ -103,7 +103,7 @@ function detailProvisionsDe(faits: Faits, maintenant: Date) {
       // Un taux refusé vaut zéro ici, comme dans `etatPilote` : on ne fabrique
       // pas de taux, et la réserve dira que le total est sous-évalué.
       tauxImpotEtContributions: tauxR.statut === 'refuse' ? 0 : tauxR.valeur,
-      impotRevenu: resteAProvisionnerDe(provisionIrDe(faits, maintenant)),
+      impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       periodesUrssaf: periodesUrssafEffectives(faits)
     }
   );

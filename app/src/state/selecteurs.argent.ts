@@ -186,6 +186,8 @@ export interface EtatArgent {
    * `null` sous le versement libératoire.
    */
   readonly provisionImpotRevenu: Resolution<ProvisionImpotRevenu> | null;
+  /** Le solde estimé de l'impôt de l'année précédente, tant que son avis manque. */
+  readonly soldeImpotPrecedent: Resolution<ProvisionImpotRevenu> | null;
   /**
    * Quelle part de ce qui est dû est effectivement sur le compte, entre 0 et 1.
    *
@@ -316,6 +318,7 @@ export function etatArgent(
     voletAProvisionner: pilote.voletAProvisionner,
     provisionsParNature: pilote.provisionsParNature,
     provisionImpotRevenu: pilote.provisionImpotRevenu,
+    soldeImpotPrecedent: pilote.soldeImpotPrecedent,
     couvertureProvisions: pilote.tresorerie.provisions <= 0
       ? 1
       : Math.min(1, Math.max(0, pilote.tresorerie.solde / pilote.tresorerie.provisions))

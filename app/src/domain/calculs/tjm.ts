@@ -79,7 +79,9 @@ export function tjmEffectif(
 }
 
 /**
- * Ce qu'il reste d'une journée, cotisations et impôt déduits.
+ * Ce qu'il reste d'une journée, cotisations et contributions déduites — et
+ * l'impôt seulement sous versement libératoire : au barème, il dépend du foyer
+ * et l'écran dit « avant impôt ».
  *
  * Le taux est celui qu'on donne — cotisations sociales plus impôt et
  * contributions, en part du chiffre d'affaires encaissé. Ce module n'a aucune

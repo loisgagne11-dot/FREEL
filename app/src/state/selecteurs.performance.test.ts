@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { valeurPubliee } from '../test/resolution';
 import { type DateISO, type Mois, dateISO, euros, mois } from '../domain/types';
 import { type Faits, type Mission, type Recette, entiteVide, faitsVides } from './schema';
 import {
@@ -234,17 +235,15 @@ describe('capacité de versement par mois', () => {
     const octobre = capacite(10);
     expect(mars?.statut).toBe('publie');
     expect(octobre?.statut).toBe('publie');
-    if (mars?.statut === 'refuse' || octobre?.statut === 'refuse') return;
     // CFP comprise : 12,8 % + 0,2 % contre 25,6 % + 0,2 %.
-    expect(mars?.valeur.charges).toBe(1300);
-    expect(octobre?.valeur.charges).toBe(2580);
+    expect(valeurPubliee(mars).charges).toBe(1300);
+    expect(valeurPubliee(octobre).charges).toBe(2580);
   });
 
   it('porte le versé constaté d’un mois passé', () => {
-    const mars = capacite(3);
-    if (mars === undefined || mars.statut === 'refuse') return;
-    expect(mars.valeur.nature).toBe('constate');
-    expect(mars.valeur.verse).toBe(2500);
+    const mars = valeurPubliee(capacite(3));
+    expect(mars.nature).toBe('constate');
+    expect(mars.verse).toBe(2500);
   });
 
   /**
@@ -254,11 +253,20 @@ describe('capacité de versement par mois', () => {
    * dessinerait un plein dans une barre projetée.
    */
   it('ne fabrique aucun versé sur un mois à venir', () => {
-    const parMoisEnJuin = capaciteParMois(f, new Date('2026-06-15T10:00:00Z'));
-    const octobre = parMoisEnJuin[9];
-    if (octobre === undefined || octobre.statut === 'refuse') return;
-    expect(octobre.valeur.nature).toBe('projete');
-    expect(octobre.valeur.verse).toBeNull();
+    // Octobre doit ATTENDRE quelque chose : sans cela il s'abstient (lot R),
+    // et ce test ne vérifiait plus rien depuis — la garde le faisait sortir
+    // avant sa première assertion. Une facture émise en juin, d'échéance
+    // octobre, lui donne un encaissement attendu.
+    const avecAttendu = faits({
+      ...f,
+      recettes: [...f.recettes, recette({
+        emiseLe: dateISO('2026-06-10'), encaisseeLe: null, echeanceLe: dateISO('2026-10-15')
+      })]
+    });
+    const parMoisEnJuin = capaciteParMois(avecAttendu, new Date('2026-06-15T10:00:00Z'));
+    const octobre = valeurPubliee(parMoisEnJuin[9]);
+    expect(octobre.nature).toBe('projete');
+    expect(octobre.verse).toBeNull();
   });
 
   it('s’abstient sur un mois dont le barème ne couvre pas la période', () => {
@@ -270,10 +278,9 @@ describe('capacité de versement par mois', () => {
   });
 
   it('rend une capacité nulle sur un mois sans encaissement ni dépense', () => {
-    const fevrier = capacite(2);
-    if (fevrier === undefined || fevrier.statut === 'refuse') return;
-    expect(fevrier.valeur.encaisse).toBe(0);
-    expect(fevrier.valeur.capacite).toBe(0);
+    const fevrier = valeurPubliee(capacite(2));
+    expect(fevrier.encaisse).toBe(0);
+    expect(fevrier.capacite).toBe(0);
   });
 });
 

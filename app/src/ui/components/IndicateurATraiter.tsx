@@ -70,7 +70,11 @@ export function IndicateurATraiter({ ecranActif }: { readonly ecranActif: string
     ? tous
     : tous.filter((s) => s.ecran === (ecranActif as EcranCible));
 
-  const total = sujets.reduce((n, s) => n + s.nombre, 0);
+  // On compte des SUJETS — ce sur quoi on agit —, pas des unités. La somme
+  // des `nombre` affichait « 5 à traiter » quand la salutation du Pilote et
+  // les badges du rail disaient « 2 » : deux chiffres pour la même question,
+  // sur le même écran. « 2 factures en retard » reste dit, dans la ligne.
+  const total = sujets.length;
   if (total === 0) return null;
 
   return (

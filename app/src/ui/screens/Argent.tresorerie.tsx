@@ -218,7 +218,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
           </Info>
         </h3>
         <Enveloppes etat={etat} />
-        <NoteImpotRevenu provision={etat.provisionImpotRevenu} />
+        <NoteImpotRevenu provision={etat.provisionImpotRevenu} solde={etat.soldeImpotPrecedent} />
       </CartePliable>
 
       {/* Les seuils viennent APRÈS : ils répondent à « où j'en suis dans
@@ -1236,9 +1236,22 @@ function PhraseDeFranchissement({ statut: f }: { readonly statut: Franchissement
  * cotisations, il n'y a pas de seconde ligne à expliquer.
  */
 function NoteImpotRevenu(
-  { provision }: { readonly provision: EtatArgent['provisionImpotRevenu'] }
+  { provision, solde }: {
+    readonly provision: EtatArgent['provisionImpotRevenu'];
+    readonly solde: EtatArgent['soldeImpotPrecedent'];
+  }
 ) {
   if (provision === null) return null;
+  // Le solde de l'an dernier se dit à part : c'est une autre année, qui se
+  // paie à une autre date, et qui sort des provisions d'une autre façon — à la
+  // saisie de son avis.
+  const ligneSolde = solde !== null && solde.statut !== 'refuse' && solde.valeur.resteAProvisionner > 0 && (
+    <li>
+      <strong>Solde de l’impôt {solde.valeur.annee}&nbsp;: {eur(solde.valeur.resteAProvisionner)}</strong>{' '}
+      estimés, prélevés à l’automne {solde.valeur.annee + 1}. Ils restent de côté jusqu’à ce que
+      tu saisisses l’avis, en échéance « Solde de l’impôt {solde.valeur.annee} ».
+    </li>
+  );
 
   if (provision.statut === 'refuse') {
     return (
@@ -1261,6 +1274,7 @@ function NoteImpotRevenu(
         {p.parMoisRestant !== null
           && ` Soit ${eur(p.parMoisRestant)} par mois sur ${p.moisRestants} mois.`}
       </li>
+      {ligneSolde}
       {p.ignore.map((r) => <li key={r}>{LIBELLE_IGNORE_IR[r]}</li>)}
     </ul>
   );

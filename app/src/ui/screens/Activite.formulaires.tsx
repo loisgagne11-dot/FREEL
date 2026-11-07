@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { dateISO, euros } from '../../domain/types';
 import type { DateISO } from '../../domain/types';
 import { useFaits } from '../../state/store';
+import { ajouterMission, modifierMission } from '../../state/ecritures.activite';
 import {
   ajouterClient, modifierClient, supprimerClient, supprimerMission
 } from '../../state/ecritures.carnet';
@@ -185,8 +186,8 @@ export function FormulaireMission(
   { id, onFini }: { id: string | null; onFini: () => void }
 ) {
   const faits = useFaits((e) => e.faits);
-  const ajouter = useFaits((e) => e.ajouterMission);
-  const modifier = useFaits((e) => e.modifierMission);
+  const ajouter = ajouterMission;
+  const modifier = modifierMission;
   const supprimer = supprimerMission;
   const signaler = useToast();
   const idChamp = useId();

@@ -880,3 +880,19 @@ au contrôle visuel :
 
 Aucun de ces états n'apparaît sur les captures de référence : ils ne
 surviennent qu'en cas d'incident. Ils sont tenus par des tests nommés.
+
+## 15. Lot 2 (07/11) — un chiffre, une source
+
+Changements visibles, contrôlés sur capture (thème sombre, jeu de démonstration) :
+
+| Écran | Changement |
+|---|---|
+| Argent → enveloppes | Une enveloppe « CFP — formation professionnelle » apparaît à côté de l'URSSAF |
+| Argent → périodes URSSAF | Les trimestres clos sans recette s'affichent « Rien encaissé : à déclarer à zéro, c'est obligatoire » (sans montant en clair : le mode confidentiel l'aurait laissé lisible), avec « Marquer déclarée » ; une fois déclarés, « Rien encaissé » seul |
+| Argent → note d'impôt | Une ligne « Solde de l'impôt N » entre janvier et la saisie de l'avis |
+| Saisie d'une échéance | Pour l'impôt : « Ce qu'elle règle » (acompte / solde de l'année précédente) |
+| Barre du haut | « à traiter » compte les sujets : le Pilote dit désormais le même nombre partout (2 sur la démo) |
+| Activité → tarif journalier | « nets avant impôt » au barème |
+
+Le Pilote garde ses écarts au handoff (doublons, « Décisions du jour »), traités au lot 5.
+

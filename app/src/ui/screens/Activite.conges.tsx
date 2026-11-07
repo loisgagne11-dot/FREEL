@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { joursCongeables } from '../../domain/calculs/activite';
 import { dateISO } from '../../domain/types';
-import { useFaits } from '../../state/store';
+import { poserPlageDeConges } from '../../state/ecritures.activite';
 import { Info } from '../components/Info';
 import { useToast } from '../components/Toasts';
 import styles from './Activite.module.css';
@@ -49,7 +49,7 @@ import styles from './Activite.module.css';
  * défaire à la main ce qu'on croyait avoir fait d'un coup.
  */
 export function PlageDeConges() {
-  const poserPlage = useFaits((e) => e.poserPlageDeConges);
+  const poserPlage = poserPlageDeConges;
   const signaler = useToast();
   const id = useId();
 

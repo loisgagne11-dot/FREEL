@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { instantaneAvantRemplacement, useFaits } from '../../state/store';
-import { finAcreDe, soldeEstSuivi } from '../../state/selecteurs';
+import { dateDuJour, finAcreDe, soldeEstSuivi } from '../../state/selecteurs';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
@@ -900,7 +900,7 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
 
 /** Nom de fichier de l'export : lisible, daté, et sans nom de société vide. */
 function nomExport(entreprise: Entreprise): string {
-  const jour = new Date().toISOString().slice(0, 10);
+  const jour = dateDuJour();
   const nom = entreprise.nom.trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '');
   return `freel-${nom === '' ? 'donnees' : nom.toLowerCase()}-${jour}.json`;
 }

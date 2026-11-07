@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type Mois, type Resolution, dateISO, euros, mois } from '../types';
+import { valeurPubliee, valeurRefusee } from '../../test/resolution';
 import { capaciteDuMois, natureDuMois } from './capaciteVersement';
 
 const publie = (valeur: number): Resolution<number> => ({
@@ -38,14 +39,15 @@ describe('le taux se prend au mois', () => {
 
     expect(sousAcre.statut).toBe('publie');
     expect(apresAcre.statut).toBe('publie');
-    if (sousAcre.statut === 'refuse' || apresAcre.statut === 'refuse') return;
+    const avant = valeurPubliee(sousAcre);
+    const apres = valeurPubliee(apresAcre);
 
-    expect(sousAcre.valeur.charges).toBe(1230);
-    expect(apresAcre.valeur.charges).toBe(2460);
+    expect(avant.charges).toBe(1230);
+    expect(apres.charges).toBe(2460);
     // Un taux moyen (0,1845) aurait donné 8 155 € des deux côtés : les deux
     // mois ne doivent surtout pas se ressembler.
-    expect(sousAcre.valeur.capacite).toBe(8770);
-    expect(apresAcre.valeur.capacite).toBe(7540);
+    expect(avant.capacite).toBe(8770);
+    expect(apres.capacite).toBe(7540);
   });
 
   it('reste une hypothèse quand le taux en est une', () => {
@@ -66,16 +68,16 @@ describe('mois à venir', () => {
   it('ne porte aucun versé, même si on lui en passe un', () => {
     const r = capaciteDuMois(entree('2026-11', { verse: 2000 }), mois('2026-08'));
     expect(r.statut).toBe('publie');
-    if (r.statut === 'refuse') return;
-    expect(r.valeur.nature).toBe('projete');
-    expect(r.valeur.verse).toBeNull();
+    const v = valeurPubliee(r);
+    expect(v.nature).toBe('projete');
+    expect(v.verse).toBeNull();
   });
 
   it('garde le versé d’un mois passé', () => {
     const r = capaciteDuMois(entree('2026-06', { verse: 2000 }), mois('2026-08'));
-    if (r.statut === 'refuse') return;
-    expect(r.valeur.nature).toBe('constate');
-    expect(r.valeur.verse).toBe(2000);
+    const v = valeurPubliee(r);
+    expect(v.nature).toBe('constate');
+    expect(v.verse).toBe(2000);
   });
 
   it('range le mois courant parmi les constatés', () => {
@@ -83,8 +85,7 @@ describe('mois à venir', () => {
     // effacerait le versement du mois en cours — celui qu'on regarde.
     expect(natureDuMois(mois('2026-08'), mois('2026-08'))).toBe('constate');
     const r = capaciteDuMois(entree('2026-08', { verse: 1500 }), mois('2026-08'));
-    if (r.statut === 'refuse') return;
-    expect(r.valeur.verse).toBe(1500);
+    expect(valeurPubliee(r).verse).toBe(1500);
   });
 });
 
@@ -111,24 +112,23 @@ describe('abstention', () => {
  */
 describe('mois sans encaissement', () => {
   /*
-   * `if (r.statut === 'refuse') return;` a été retiré de ces deux tests.
-   * Il les rendait VIDES le jour où la capacité se met à s'abstenir : le test
-   * sortait avant sa première assertion et restait vert. C'est exactement le
-   * défaut que la mutation cherche — un test qui ne tient rien.
+   * Ces deux tests lèvent sur un refus (`throw`) au lieu de sortir. Une garde
+   * `if (r.statut === 'refuse') return;` les aurait rendus VIDES le jour où la
+   * capacité se met à s'abstenir : sortie avant la première assertion, test
+   * vert. Tout le fichier passe désormais par `valeurPubliee`, qui lève de même.
    */
   it('rend une capacité négative à hauteur des dépenses, sur un mois VÉCU', () => {
     const r = capaciteDuMois(entree('2026-02', { encaisse: 0, depenses: 480 }), mois('2026-08'));
     expect(r.statut).not.toBe('refuse');
-    if (r.statut === 'refuse') throw new Error(r.motif);
-    expect(r.valeur.charges).toBe(0);
-    expect(r.valeur.capacite).toBe(-480);
+    const v = valeurPubliee(r);
+    expect(v.charges).toBe(0);
+    expect(v.capacite).toBe(-480);
   });
 
   it('rend zéro quand il n’y a ni encaissement ni dépense', () => {
     const r = capaciteDuMois(entree('2026-02', { encaisse: 0 }), mois('2026-08'));
     expect(r.statut).not.toBe('refuse');
-    if (r.statut === 'refuse') throw new Error(r.motif);
-    expect(r.valeur.capacite).toBe(0);
+    expect(valeurPubliee(r).capacite).toBe(0);
   });
 });
 
@@ -146,8 +146,7 @@ describe('un mois à venir s’abstient tant que rien n’y est attendu', () => 
   it('refuse la capacité d’un mois futur sans encaissement prévu', () => {
     const r = capaciteDuMois(entree('2026-12', { encaisse: 0, depenses: 120 }), mois('2026-06'));
     expect(r.statut).toBe('refuse');
-    if (r.statut !== 'refuse') return;
-    expect(r.motif).toMatch(/attendu/);
+    expect(valeurRefusee(r)).toMatch(/attendu/);
   });
 
   // Un mois à venir qui porte une échéance de facture a, lui, une capacité —
@@ -155,15 +154,13 @@ describe('un mois à venir s’abstient tant que rien n’y est attendu', () => 
   it('garde la capacité d’un mois futur qui attend un encaissement', () => {
     const r = capaciteDuMois(entree('2026-12', { encaisse: 200, depenses: 900 }), mois('2026-06'));
     expect(r.statut).not.toBe('refuse');
-    if (r.statut === 'refuse') throw new Error(r.motif);
-    expect(r.valeur.capacite).toBeLessThan(0);
+    expect(valeurPubliee(r).capacite).toBeLessThan(0);
   });
 
   // Le mois COURANT est constaté, pas projeté : il ne s'abstient pas.
   it('ne s’abstient pas sur le mois courant sans encaissement', () => {
     const r = capaciteDuMois(entree('2026-06', { encaisse: 0, depenses: 120 }), mois('2026-06'));
     expect(r.statut).not.toBe('refuse');
-    if (r.statut === 'refuse') throw new Error(r.motif);
-    expect(r.valeur.capacite).toBe(-120);
+    expect(valeurPubliee(r).capacite).toBe(-120);
   });
 });

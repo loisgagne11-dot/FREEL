@@ -65,8 +65,11 @@ describe('indicateur à traiter', () => {
     semer({ recettes: [enRetard('r1'), enRetard('r2')] });
     render(<IndicateurATraiter ecranActif="pilote" />);
 
+    // Deux factures en retard forment UN sujet : la pastille dit « 1 », comme
+    // la salutation du Pilote et le badge du rail ; le détail dit « 2 ».
     const pastille = screen.getByRole('button', { name: /à traiter/ });
-    expect(pastille.textContent).toContain('2');
+    expect(pastille.textContent).toContain('1');
+    expect(pastille.textContent).not.toContain('2');
 
     await userEvent.setup().click(pastille);
     // `findBy` et non `getBy` : le panneau est chargé à la demande, comme les
