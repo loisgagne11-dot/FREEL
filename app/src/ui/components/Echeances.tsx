@@ -5,6 +5,7 @@ import type { Echeance, NatureDette } from '../../domain/calculs/provisions';
 import { LIBELLE_NATURE, NATURES_DETTE } from '../../domain/calculs/provisions';
 import { dateISO, euros } from '../../domain/types';
 import type { DateISO, Euros } from '../../domain/types';
+import { dateDuJour } from '../../state/selecteurs';
 import { type Cadence, REPETITIONS_MAX, datesRepetees } from '../../domain/calculs/echeancier';
 import { Info } from './Info';
 import { Montant } from './Montant';
@@ -97,7 +98,7 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
 
   const [panneau, setPanneau] = useState<Panneau>({ type: 'ferme' });
 
-  const jour = aujourdhui.toISOString().slice(0, 10);
+  const jour = dateDuJour(aujourdhui);
   const mois = useMemo(() => grouperParMois(faits.echeances), [faits.echeances]);
   const aPayer = faits.echeances.filter((e) => e.payeeLe === null);
   const total = euros(aPayer.reduce((s, e) => s + e.montant, 0));
@@ -358,7 +359,7 @@ function FormulairePaiement(
   }
 ) {
   const id = useId();
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState<string>(() => dateDuJour());
   const [montant, setMontant] = useState(String(echeance.montant));
   const [erreur, setErreur] = useState<string | null>(null);
 

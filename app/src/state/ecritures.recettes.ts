@@ -3,6 +3,7 @@ import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import { ecritureDAnnulation, prochainNumero } from '../domain/calculs/ecritureRecette';
 import type { Faits, Recette } from './schema';
 import { ecrireFaits, useFaits } from './store';
+import { dateDuJour } from './selecteurs';
 
 /**
  * Les écritures du livre des recettes : émettre, envoyer, encaisser, relancer,
@@ -148,7 +149,7 @@ export function annulerRecette(id: string, aujourdhui?: DateISO): string | null 
     return 'Ce brouillon n’a jamais été émis : il se supprime, il n’y a rien '
       + 'à annuler.';
   }
-  const jour = aujourdhui ?? (new Date().toISOString().slice(0, 10) as DateISO);
+  const jour = aujourdhui ?? dateDuJour();
   const inverse = ecritureDAnnulation(origine, jour, `${origine.id}-annulation`);
   if (actuel.recettes.some((r) => r.id === inverse.id)) {
     return 'Cette recette a déjà été annulée.';

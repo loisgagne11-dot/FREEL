@@ -33,6 +33,7 @@ import { dansLaPeriode, type Periode } from '../domain/calculs/periode';
 import type { DateISO, Euros } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Client, Faits, Recette } from './schema';
+import { dateDuJour } from './selecteurs';
 import type { Mois } from '../domain/types';
 import {
   type BrouillonDeFacture, type FactureEmise, type LigneDeBrouillon, brouillonsDuMois
@@ -203,7 +204,7 @@ export function etatFacturier(
   const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
   const secours = (nom: string, emiseLe: DateISO) =>
     echeanceDe(emiseLe, formules.get(nom) ?? FORMULE_PAR_DEFAUT);
-  const aujourdhui = maintenant.toISOString().slice(0, 10) as DateISO;
+  const aujourdhui = dateDuJour(maintenant);
 
   const toutes = suivre(faits.recettes, secours, aujourdhui);
 

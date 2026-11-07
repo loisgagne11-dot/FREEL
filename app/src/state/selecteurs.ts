@@ -833,7 +833,18 @@ export function preneursDeServices(faits: Faits): ReadonlyMap<string, PreneurSer
    ───────────────────────────────────────────────────────────────────────── */
 
 
-/** La date du jour, au format ISO, sans passer par le fuseau local. */
+/**
+ * La date du jour, au format ISO, dans le fuseau de l'utilisateur.
+ *
+ * Elle passait par `toISOString`, donc par l'heure UTC, quand `moisCourant` lit
+ * l'heure locale. Le 1er janvier à 0 h 30 à Paris, l'application était en
+ * janvier et datée du 31 décembre : une facture émise ou annulée à ce
+ * moment-là tombait dans l'année précédente — chiffre d'affaires, seuils,
+ * numérotation. Le jour est celui du calendrier de la personne, pas de
+ * Greenwich.
+ */
 export function dateDuJour(maintenant: Date = new Date()): DateISO {
-  return maintenant.toISOString().slice(0, 10) as DateISO;
+  const mm = String(maintenant.getMonth() + 1).padStart(2, '0');
+  const jj = String(maintenant.getDate()).padStart(2, '0');
+  return `${maintenant.getFullYear()}-${mm}-${jj}` as DateISO;
 }

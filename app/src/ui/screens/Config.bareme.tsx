@@ -1,9 +1,9 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { ajouterPeriodeUrssaf, retirerPeriodeUrssaf } from '../../state/ecritures.activite';
-import { periodesUrssafEffectives } from '../../state/selecteurs';
+import { dateDuJour, periodesUrssafEffectives } from '../../state/selecteurs';
 import { PERIODES_URSSAF, type PeriodeBareme } from '../../domain/bareme/urssaf';
-import { dateISO, mois, ratio } from '../../domain/types';
+import { mois, ratio } from '../../domain/types';
 import { Info } from '../components/Info';
 import { Champ } from '../components/Champ';
 import { dateCourte } from '../format';
@@ -190,7 +190,7 @@ function FormulairePeriode(
       source: source.trim(),
       // La date de vérification est celle de la saisie : c'est le jour où un
       // humain a lu la valeur à sa source.
-      verifieLe: dateISO(new Date().toISOString().slice(0, 10))
+      verifieLe: dateDuJour()
     });
 
     if (refus !== null) {

@@ -179,8 +179,12 @@ const joursEntre = (a: DateISO, b: DateISO): number =>
  * une facture est en retard ou non.
  */
 export function ajouterJours(d: DateISO, n: number): DateISO {
-  const date = new Date(d);
-  date.setDate(date.getDate() + n);
+  // Tout en UTC. La version précédente lisait la date en UTC, ajoutait les
+  // jours en heure LOCALE, puis relisait en UTC : à Paris, au passage à
+  // l'heure d'été, « 29 mars + 1 jour » rendait le 29 mars. Les tests, eux,
+  // tournent en UTC, et ne pouvaient pas le voir.
+  const date = new Date(`${d}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + n);
   return date.toISOString().slice(0, 10) as DateISO;
 }
 

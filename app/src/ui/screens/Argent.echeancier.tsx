@@ -117,7 +117,7 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
     recettesEncaissees(faits),
     faits.entreprise.urssafPeriodicite,
     faits.periodesDeclarees,
-    new Date().toISOString().slice(0, 10),
+    dateDuJour(),
     faits.entreprise.debutActivite === null ? null : faits.entreprise.debutActivite.slice(0, 7) as Mois
   ), [faits]);
 

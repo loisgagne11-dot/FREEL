@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react';
 import { CLE_STOCKAGE } from '../../state/schema';
+import { dateDuJour } from '../../state/selecteurs';
 
 /**
  * Ce qu'on montre quand un écran lève une exception, au lieu d'un écran blanc.
@@ -45,7 +46,7 @@ function telechargerDonneesBrutes(contenu: string): void {
   const url = URL.createObjectURL(new Blob([contenu], { type: 'application/json' }));
   const lien = document.createElement('a');
   lien.href = url;
-  lien.download = `freel-donnees-brutes-${new Date().toISOString().slice(0, 10)}.json`;
+  lien.download = `freel-donnees-brutes-${dateDuJour()}.json`;
   document.body.appendChild(lien);
   lien.click();
   lien.remove();
