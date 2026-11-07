@@ -1,0 +1,96 @@
+{
+  "c": {
+    "nom": "Entreprise Démo Ancienne",
+    "siret": "000 000 000 00020",
+    "debut": "2025-09-01",
+    "typeActivite": "BNC",
+    "acre": true,
+    "prelevementLiberatoire": false,
+    "tvaDepuis": "",
+    "tvaIntracom": "",
+    "iban": "FR00 0000 0000 0000 0000 0000 000",
+    "bic": "",
+    "adresse": "1 rue de la Démonstration",
+    "codeApe": "70.22Z",
+    "urssafPeriodicite": "trimestriel",
+    "onboardingDone": true
+  },
+  "m": [
+    {
+      "id": "MIS-A",
+      "client": "Agence Démo Ancienne",
+      "description": "Mission conseil, importée sans lieu",
+      "tjm": 450,
+      "debut": "2025-09-08",
+      "fin": null,
+      "statut": "active",
+      "factures": [
+        {
+          "id": "F-A1", "numero": "2025-001", "ht": 4500, "ttc": 4500, "jours": 10,
+          "mois": "2025-09", "dateEnvoi": "2025-09-30", "status": "payée",
+          "datePaiementReel": "2025-10-28", "modeReglement": "virement"
+        },
+        {
+          "id": "F-A2", "numero": "2025-002", "ht": 6300, "ttc": 6300, "jours": 14,
+          "mois": "2025-10", "dateEnvoi": "2025-10-31", "status": "envoyée"
+        }
+      ],
+      "periodes": [
+        {
+          "debut": "2025-09-08", "fin": "2026-12-31",
+          "joursMap": { "lun": 1, "mar": 1, "mer": 1, "jeu": 0.5 },
+          "joursSemaine": 3.5, "tjm": 450
+        }
+      ],
+      "lignes": [
+        { "ym": "2025-12", "ajustements": { "2025-12-15": 0, "2025-12-16": 0.5 } },
+        { "ym": "2026-01", "ajustements": { "2026-01-02": 1 } }
+      ],
+      "congesDates": ["2025-12-24", "2025-12-26_half"]
+    },
+    {
+      "id": "MIS-B",
+      "client": "Agence Démo Ancienne",
+      "description": "Mission via agence, deux clients finaux",
+      "tjm": 500,
+      "debut": "2026-01-05",
+      "fin": "2026-06-30",
+      "statut": "en_cours",
+      "factures": [],
+      "periodes": [
+        {
+          "debut": "2026-01-05", "fin": "2026-06-30",
+          "joursMap": { "lun": 1, "mar": 1, "mer": 1, "jeu": 1 },
+          "joursSemaine": 4, "tjm": 500
+        }
+      ],
+      "entites": [
+        { "id": "e1", "nom": "Client Final Démo A", "couleur": "#22c55e", "joursParSemaine": { "lun": 1, "mar": 1 } },
+        { "id": "e2", "nom": "Client Final Démo B", "couleur": "#38bdf8", "joursParSemaine": { "mer": 1, "jeu": 1 } }
+      ]
+    }
+  ],
+  "cl": [
+    {
+      "id": "CLI-A", "nom": "Agence Démo Ancienne", "adresse": "", "siret": "",
+      "email": "compta@agence-ancienne.example.com", "delaiPaiement": 30
+    }
+  ],
+  "t": {
+    "soldeInitial": 3200,
+    "salaireEstime": 2000,
+    "reserveCompte": 500,
+    "mouvements": [
+      {
+        "id": "CH-1", "type": "Charge", "categorie": "Logiciels", "description": "Abonnement Démo",
+        "montant": 50, "montantTTC": 60, "tvaDeductible": 10, "tvaRate": 20,
+        "mois": "2025-11", "date": "2025-11-04"
+      }
+    ],
+    "paidCharges": {},
+    "conges": { "2026-02": [12, 13] },
+    "rendementActif": false
+  },
+  "ir": { "2025": { "parts": 1 } },
+  "_ts": 1750000000000
+}

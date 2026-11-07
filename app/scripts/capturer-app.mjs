@@ -31,7 +31,11 @@
  * bouge ferait bouger la moitié des chiffres d'une capture à l'autre, et on ne
  * saurait plus distinguer une régression d'un jour qui passe.
  *
- * Usage : node scripts/capturer-app.mjs [--theme=clair|sombre] [--ecran=argent]
+ * Usage : node scripts/capturer-app.mjs [--theme=clair|sombre] [--ecran=argent] [--jeu=essai]
+ *
+ * `--jeu=essai` charge `src/test/jeu-d-essai.json` (horloge au 15 décembre
+ * 2026) et écrit dans `docs/design/captures-app/essai/`. Sans l'option, rien
+ * ne change.
  */
 
 import { chromium } from 'playwright';
@@ -40,20 +44,46 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const RACINE = resolve(import.meta.dirname, '../..');
-const SORTIE = join(RACINE, 'docs/design/captures-app');
-/* Le jeu vient de `app/public/`, d'où l'application elle-même le charge — et
-   non d'une copie dans `docs/`. Le script pointait vers `docs/design/`, où
-   rien ne se trouve : il levait avant d'ouvrir un navigateur, et personne ne
-   l'a vu parce qu'aucune capture manquante ne fait échouer `npm run verifier`.
-   Une seconde copie du jeu aurait de toute façon fini par diverger de celle
-   que l'application sert. */
-const JEU = JSON.parse(
-  readFileSync(join(RACINE, 'app/public/jeu-de-demonstration.json'), 'utf8')
-);
+
+const argument = (nom) =>
+  (process.argv.find((a) => a.startsWith(`--${nom}=`)) ?? '').split('=')[1];
+
+/* Deux jeux, deux horloges, deux dossiers.
+   Le jeu de démonstration est celui du handoff : il se compare aux captures de
+   design, d'où son horloge au 10 juin. Le jeu d'essai (`--jeu=essai`) est un
+   compte de FORME RÉELLE — ACRE éteinte, TVA franchie, avoir, foyer à deux
+   parts — qui ne se compare à aucune capture : il sert à regarder les écrans
+   sur des données qui ont l'épaisseur d'un vrai compte, là où le jeu de
+   démonstration est trop propre pour révéler un champ vide, un libellé qui
+   déborde ou un graphe aplati. Il a son propre dossier : le mélanger aux
+   captures appariées au handoff ferait comparer, sans que rien l'avertisse,
+   deux écrans qui ne montrent pas le même compte. */
+const jeuDemande = argument('jeu');
+if (jeuDemande !== undefined && jeuDemande !== '' && jeuDemande !== 'essai') {
+  console.error(`Jeu inconnu : « ${jeuDemande} » (attendu : essai, ou rien pour la démonstration).`);
+  process.exit(1);
+}
+const JEU_ESSAI = jeuDemande === 'essai';
+
+const SORTIE = join(RACINE, 'docs/design/captures-app', JEU_ESSAI ? 'essai' : '');
+/* Le jeu de démonstration vient de `app/public/`, d'où l'application elle-même
+   le charge — et non d'une copie dans `docs/`. Le script pointait vers
+   `docs/design/`, où rien ne se trouve : il levait avant d'ouvrir un
+   navigateur, et personne ne l'a vu parce qu'aucune capture manquante ne fait
+   échouer `npm run verifier`. Une seconde copie du jeu aurait de toute façon
+   fini par diverger de celle que l'application sert. */
+const JEU = JSON.parse(readFileSync(
+  JEU_ESSAI
+    ? join(RACINE, 'app/src/test/jeu-d-essai.json')
+    : join(RACINE, 'app/public/jeu-de-demonstration.json'),
+  'utf8'
+));
 const PORT = 4174;
 
-/** Le 10 juin 2026, comme le handoff. Voir l'en-tête. */
-const AUJOURDHUI = '2026-06-10T09:00:00Z';
+/** Le 10 juin 2026, comme le handoff. Voir l'en-tête. Le jeu d'essai, lui, est
+    daté du 15 décembre 2026 : rien n'y est postérieur, et le CFE, le troisième
+    trimestre à déclarer et les factures de novembre y sont tous visibles. */
+const AUJOURDHUI = JEU_ESSAI ? '2026-12-15T09:00:00Z' : '2026-06-10T09:00:00Z';
 
 /**
  * Les vues, nommées comme celles du handoff.
@@ -116,9 +146,6 @@ const VUES = [
   { hash: '#/outils/cra', nom: 'pilote-cra', attendre: '[role="dialog"]' },
   { hash: '#/config', nom: 'config-profil' }
 ];
-
-const argument = (nom) =>
-  (process.argv.find((a) => a.startsWith(`--${nom}=`)) ?? '').split('=')[1];
 
 const themeDemande = argument('theme');
 const THEMES = themeDemande === 'clair' ? ['clair']
@@ -265,8 +292,13 @@ apercu.kill();
 
 writeFileSync(join(SORTIE, 'INDEX.md'),
   '# Captures de l’application\n\n'
-  + 'Générées par `app/scripts/capturer-app.mjs` sur\n'
-  + '`docs/design/jeu-de-demonstration.json`, horloge figée au 10 juin 2026.\n\n'
+  + (JEU_ESSAI
+    ? 'Générées par `app/scripts/capturer-app.mjs --jeu=essai` sur\n'
+      + '`app/src/test/jeu-d-essai.json`, horloge figée au 15 décembre 2026.\n\n'
+      + 'Ce compte est fictif mais de forme réelle : il ne se compare à aucune capture du\n'
+      + 'handoff, il se REGARDE — champs vides, libellés qui débordent, graphes aplatis.\n\n'
+    : 'Générées par `app/scripts/capturer-app.mjs` sur\n'
+      + '`docs/design/jeu-de-demonstration.json`, horloge figée au 10 juin 2026.\n\n')
   + 'Chaque fichier a un homonyme dans `docs/design/captures/` : c’est la paire\n'
   + 'que `controleur-visuel` compare. Une capture absente ici et présente là\n'
   + 'signifie que l’écran n’est pas encore fait — c’est une information, pas une\n'
