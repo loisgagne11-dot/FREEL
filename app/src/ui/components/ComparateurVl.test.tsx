@@ -61,7 +61,35 @@ describe('point de départ', () => {
   it('n’affiche aucun résultat tant que rien n’est saisi', () => {
     semer();
     render(<ComparateurVl />);
-    expect(screen.getByText(/Saisissez un chiffre d’affaires/)).toBeTruthy();
+    expect(screen.getByText(/Saisis un chiffre d’affaires/)).toBeTruthy();
+  });
+});
+
+/**
+ * Les champs du foyer partaient de « 1 part, 0 € » quoi qu'on ait saisi en
+ * Réglages : le comparateur comparait par défaut un foyer qui n'était pas le
+ * sien.
+ */
+describe('foyer', () => {
+  it('reprend les parts, les autres revenus et la situation saisis en Réglages', () => {
+    semer({
+      recettes: [encaissee(38000)],
+      partsFiscales: 2.5, autresRevenusFoyer: euros(24000), impositionCommune: true
+    });
+    render(<ComparateurVl />);
+    expect(screen.getByLabelText<HTMLInputElement>(/Parts du foyer/).value).toBe('2,5');
+    expect(screen.getByLabelText<HTMLInputElement>(/Autres revenus imposables/).value).toBe('24000');
+    expect(screen.getByLabelText<HTMLSelectElement>(/Situation du foyer/).value).toBe('commune');
+  });
+
+  it('dit quand la situation, non renseignée, change le montant au barème', () => {
+    // 6 000 € imposables, deux parts, 46 000 € d'autres revenus.
+    semer({
+      recettes: [encaissee(Math.round(6000 / 0.66))],
+      partsFiscales: 2, autresRevenusFoyer: euros(46000)
+    });
+    render(<ComparateurVl />);
+    expect(screen.getByText(/Ta situation change le montant au barème/)).toBeTruthy();
   });
 });
 
@@ -121,7 +149,8 @@ describe('ce que le calcul ne dit pas', () => {
     semer({ recettes: [encaissee(40000)] });
     render(<ComparateurVl />);
     const limites = screen.getByText(/Ce que ce calcul ne dit pas/).parentElement as HTMLElement;
-    expect(limites.textContent).toMatch(/surestimé/);
     expect(limites.textContent).toMatch(/sous-estimé/);
+    // La décote est appliquée : elle ne figure plus parmi les limites.
+    expect(limites.textContent).not.toMatch(/décote/i);
   });
 });

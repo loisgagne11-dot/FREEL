@@ -194,7 +194,7 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
 function phrase(regime: RegimeCfe, annee: number): string {
   switch (regime.type) {
     case 'exonere-creation':
-      return `Année de création : tu es exonéré de CFE pour ${annee}. Pensez en revanche `
+      return `Année de création : tu es exonéré de CFE pour ${annee}. Pense en revanche `
         + 'à déposer la déclaration initiale 1447-C avant le 31 décembre — c’est elle qui '
         + 'établit ta base, et l’omettre fait perdre l’exonération de première année.';
     case 'base-reduite-moitie':

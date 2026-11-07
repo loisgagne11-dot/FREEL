@@ -896,3 +896,25 @@ Changements visibles, contrôlés sur capture (thème sombre, jeu de démonstrat
 
 Le Pilote garde ses écarts au handoff (doublons, « Décisions du jour »), traités au lot 5.
 
+## 16. Lot 3 (07/11) — TVA franchie en cours d'année, décote
+
+Changements visibles, contrôlés sur capture dans les deux thèmes. Le jeu de
+démonstration n'est pas assujetti à la TVA : le contrôle des écrans de TVA
+s'est fait sur un jeu fictif monté pour l'occasion (facture de 1 000 € HT +
+200 € de TVA encaissée en août, avoir en octobre, foyer de deux parts), hors
+du dépôt.
+
+| Écran | Changement |
+|---|---|
+| Réglages → Profil | Le champ TVA devient « Option pour la TVA depuis (facultatif) » et dit le mois déduit des encaissements |
+| Barre du haut, Pilote | Sujet « N factures émises sans TVA à régulariser » après un franchissement |
+| Argent → dossier de TVA | L'avoir apparaît au trimestre où il est émis, « Avoir sur 2026-090 — … », en négatif ; le trimestre affiche « Crédit de TVA à reporter » quand l'avoir l'emporte |
+| Argent → solde, enveloppes | Pour un assujetti : solde TTC, enveloppe de TVA collectée non reversée |
+| Réglages → Trésorerie | Nouveau champ « Situation du foyer » (non renseignée / seul·e / marié·e ou pacsé·e) entre les parts et les autres revenus |
+| Outils → comparateur | Mêmes champs du foyer, préremplis depuis Réglages ; note « Ta situation change le montant au barème » quand elle manque et compte ; la décote ne figure plus parmi « Ce que ce calcul ne dit pas » |
+| Partout | Treize phrases d'aide passées au tutoiement |
+
+Le Pilote garde ses écarts au handoff, traités au lot 5. Le code d'entrée
+pèse 78,89 Ko pour 80 : le lot 5, qui touche le Pilote, devra extraire avant
+d'ajouter.
+

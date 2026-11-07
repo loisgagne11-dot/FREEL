@@ -73,14 +73,14 @@ Chaque correctif porte son test de mutation.
 
 Touche le Pilote et l'Argent : captures à regénérer.
 
-### Lot 3 — TVA franchie en cours d'année (priorité 2)
+### Lot 3 — TVA franchie en cours d'année (PR #299)
 
 | Ligne | État |
 |---|---|
-| L3 — dériver `tvaExigibleDepuis` des encaissements ; la saisie ne garde que l'option ; afficher la date et les factures concernées | ⬜ |
-| L7 — solde en TTC et provision de la TVA collectée non reversée | ⬜ |
-| L6 — TVA des avoirs : recopier la TVA au signe opposé dans l'annulation | ⬜ |
-| L8 — décote dans le comparateur (en `Resolution`), ou abstention sous le seuil où elle joue | ⬜ |
+| L3 — une seule source du mois de TVA (`debutTvaEffectif`) : dérivé des encaissements, l'option saisie seulement si elle est antérieure ; factures et dépenses la lisent ; sujet « factures à régulariser » qui compte les factures émises sans TVA depuis le franchissement | ✅ fait. *Correction de l'audit : la date était déjà calculée et affichée ; le défaut réel était deux sources — les factures lisaient la saisie, qui restait vide.* |
+| L7 — solde en TTC (le client verse la TVA) et provision de la TVA collectée non reversée ; encaisser puis reverser ne fait plus varier le versable | ✅ fait |
+| L6 — l'avoir reprend la TVA au signe opposé ; le dossier de TVA compte les avoirs au trimestre de l'avoir et les marque « Avoir sur … » | ✅ fait |
+| L8 — décote appliquée (barème 2024 : 889 € / 1 470 €, 45,25 %, BOFiP du 14/04/2025) dans la seule fonction partagée par la provision et le comparateur ; nouveau fait « situation du foyer » (schéma 18) — inconnue, la décote la moins favorable est retenue et l'écran le dit quand elle change le montant ; le comparateur reprend les parts et revenus saisis | ✅ fait |
 
 ### Lot 4 — Jeu d'essai à forme réelle et démo en bonne santé (priorité 2)
 
@@ -117,7 +117,7 @@ Sert de filet aux lots 5 et 6.
 |---|---|
 | Q4 — `joursEntre` en six copies à sémantique divergente, `enKiloEuros` en deux arrondis : une source chacun (reporté du lot 2) | ⬜ |
 | L11 (suite) — arrondi des parts de la ventilation (1 à 2 centimes d'écart avec le total) | ⬜ |
-| Q8 — tutoiement : une douzaine de phrases vouvoient encore (relire à l'œil, `relance.ts` excepté) | ⬜ |
+| Q8 — tutoiement : une douzaine de phrases vouvoient encore (relire à l'œil, `relance.ts` excepté) | ✅ fait au lot 3 : treize impératifs repris (Réglages, Activité, Facture, Échéances, CFE, Compte, messages Supabase) ; restent au vouvoiement les seules lettres au client et les citations dans les commentaires |
 | Q7 — contraste de `--muted-2` et de `--green` en thème calme (calculé, pas encore vu sur capture) | ⬜ |
 | Q6 — lint des hooks React dans `verifier` | ⬜ |
 | Q9 — code mort (`GrapheBarres`, classes CSS de l'ancien calendrier) ; iframe d'impression retirée sur `afterprint` ; anti-rebond dans `persister` ; `as never` de `Facturier.tsx` ; modules de plus de 800 lignes | ⬜ |
@@ -194,7 +194,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Troisième onglet « Compte pro & banque » | ⬜ | L'import de relevé reste dans Achats | 6 |
 | Simulateur CFE avec base minimum par commune | ◐ | Lecture de l'avis × taux seulement, par décision | à planifier |
 | Comparateur micro-BNC vs déclaration contrôlée | ⬜ | Aucun module | à planifier |
-| Décote dans le comparateur d'impôt | ⬜ | Voir L8 | 3 |
+| Décote dans le comparateur d'impôt | ✅ | Appliquée, avec la situation du foyer (L8) | 3 |
 
 ### Réglages / Compte
 

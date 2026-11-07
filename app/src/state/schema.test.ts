@@ -894,3 +894,26 @@ describe('le jeu de démonstration', () => {
     expect(brutDemo['soldeInitialAu']).toBe('2026-03-30');
   });
 });
+
+/**
+ * v17 → v18 : la situation du foyer, pour la décote. Comblée à `null` — et
+ * jamais à `false`, qui dirait « seul » d'un foyer dont on ne sait rien.
+ */
+describe('schéma 17 → 18 : la situation du foyer', () => {
+  it('un compte de schéma 17 reçoit une imposition commune nulle, et non `undefined`', () => {
+    const f = completerFaits({ version: 17, soldeInitial: 0 });
+    expect(f.impositionCommune).toBeNull();
+  });
+
+  it('accepte son absence, vrai, faux ou nul', () => {
+    expect(motifRefusFaits({ version: 17, soldeInitial: 0 })).toBeNull();
+    for (const v of [true, false, null]) {
+      expect(motifRefusFaits({ ...faitsVides(), impositionCommune: v })).toBeNull();
+    }
+  });
+
+  it('refuse une valeur qui n’est pas un booléen', () => {
+    expect(motifRefusFaits({ ...faitsVides(), impositionCommune: 'marié' }))
+      .toMatch(/impositionCommune/);
+  });
+});

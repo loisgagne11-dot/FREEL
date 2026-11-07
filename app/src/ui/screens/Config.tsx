@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { instantaneAvantRemplacement, useFaits } from '../../state/store';
-import { dateDuJour, finAcreDe, soldeEstSuivi } from '../../state/selecteurs';
+import { dateDuJour, finAcreDe, soldeEstSuivi, tvaDueDepuisDe } from '../../state/selecteurs';
 import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
 import type { Entreprise } from '../../state/schema';
 import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
 import { Montant } from '../components/Montant';
-import { dateCourte, eur } from '../format';
+import { dateCourte, eur, moisLong } from '../format';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
@@ -253,7 +253,7 @@ function Tresorerie() {
           libelle="Objectif de chiffre d’affaires sur l’année"
           aide="Facultatif. Sur l’encaissé, comme les plafonds et l’impôt — un
                 objectif sur le facturé serait atteint sans que le compte l’ait
-                vu passer. Laissez vide pour ne pas en fixer."
+                vu passer. Laisse vide pour ne pas en fixer."
         >
           <input
             id={`${idChamp}-objectif`}
@@ -330,6 +330,26 @@ function FoyerFiscal() {
           value={faits.partsFiscales ?? ''}
           onChange={(e) => definir({ partsFiscales: nombreOuNull(e.target.value) })}
         />
+      </Champ>
+
+      <Champ
+        id={`${idChamp}-commune`}
+        libelle="Situation du foyer"
+        aide="Elle fixe le plafond de la décote, qui allège l’impôt des foyers
+              modestes. Les parts ne la disent pas : un parent isolé en a deux,
+              comme un couple."
+      >
+        <select
+          id={`${idChamp}-commune`}
+          value={faits.impositionCommune === null ? '' : faits.impositionCommune ? 'commune' : 'seul'}
+          onChange={(e) => definir({
+            impositionCommune: e.target.value === '' ? null : e.target.value === 'commune'
+          })}
+        >
+          <option value="">Non renseignée</option>
+          <option value="seul">Seul·e — célibataire, divorcé·e, veuf·ve</option>
+          <option value="commune">Marié·e ou pacsé·e</option>
+        </select>
       </Champ>
 
       <Champ
@@ -504,6 +524,8 @@ function ReservesEtVersements() {
  */
 function Profil() {
   const entreprise = useFaits((e) => e.faits.entreprise);
+  const faits = useFaits((e) => e.faits);
+  const tvaDue = useMemo(() => tvaDueDepuisDe(faits), [faits]);
   const modifier = useFaits((e) => e.modifierEntreprise);
   const idChamp = useId();
 
@@ -629,10 +651,16 @@ function Profil() {
             onChange={(e) => modifier({ bic: e.target.value })} />
         </Champ>
 
+        {/* Le franchissement des seuils se déduit des encaissements : ce champ
+            ne sert plus qu'à l'OPTION — choisir la TVA avant d'y être tenu. Il
+            décidait seul, et sans lui les factures partaient en franchise
+            alors que la TVA était due. */}
         <Champ
           id={`${idChamp}-tva`}
-          libelle="Assujetti à la TVA depuis"
-          aide="Laisser vide en franchise en base. Le régime est résolu à la date de chaque opération."
+          libelle="Option pour la TVA depuis (facultatif)"
+          aide={tvaDue === null
+            ? 'Le franchissement des seuils est détecté d’après tes encaissements. Ne renseigne ce mois que si tu as choisi la TVA avant d’y être tenu.'
+            : `D’après tes encaissements, la TVA est due depuis ${moisLong(tvaDue)} : tes factures la portent depuis. Ne renseigne ce mois que pour une option antérieure.`}
         >
           <input id={`${idChamp}-tva`} type="month" value={entreprise.tvaDepuis ?? ''}
             onChange={(e) => modifier({
@@ -817,7 +845,7 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
       <p className={styles.explication}>
         Des clients, des missions, des factures et des échéances manifestement
         fictifs, pour voir l’application remplie. Ils remplacent tes données&nbsp;:
-        exportez-les d’abord si elles comptent.
+        exporte-les d’abord si elles comptent.
       </p>
 
       {aRestaurer !== null && (
@@ -993,7 +1021,7 @@ async function lireSauvegarde(fichier: File): Promise<Restauration> {
   } catch {
     return {
       statut: 'illisible',
-      motif: 'Ce fichier n’est pas du JSON. Choisissez un export produit par l’application.'
+      motif: 'Ce fichier n’est pas du JSON. Choisis un export produit par l’application.'
     };
   }
 

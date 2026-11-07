@@ -26,6 +26,8 @@ export const LIBELLE_IGNORE_IR: Readonly<Record<IgnoreParLaProvisionIr, string>>
   versement_per_non_renseigne: 'Versement PER non renseigné, donc non déduit : impôt au plus haut.',
   plafonnement_quotient_familial:
     'Plafonnement du quotient familial non appliqué : impôt réel plus élevé.',
-  decote_et_reductions_d_impot: 'Ni décote ni réductions d’impôt : impôt réel plus faible.',
+  situation_familiale_non_renseignee:
+    'Mariage ou Pacs non renseigné : la décote est prise au cas le moins favorable.',
+  reductions_et_credits_d_impot: 'Ni réductions ni crédits d’impôt : impôt réel plus faible.',
   bareme_de_l_annee_non_publie: 'Barème non publié pour cette année : dernier connu repris.'
 };

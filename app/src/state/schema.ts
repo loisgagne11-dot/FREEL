@@ -34,7 +34,7 @@ import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 17 as const;
+export const VERSION_SCHEMA = 18 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -581,6 +581,15 @@ export interface Faits {
   readonly autresRevenusFoyer: Euros | null;
   /** Versements sur un plan d'épargne retraite, déductibles du revenu global. */
   readonly versementPerDeductible: Euros | null;
+  /**
+   * Marié ou pacsé, soumis à imposition commune (`true`), seul (`false`), ou
+   * `null` tant que rien n'est saisi.
+   *
+   * Il ne fixe qu'une chose : le plafond de la décote. Les parts ne le disent
+   * pas — un parent isolé en a deux, comme un couple sans enfant — et le
+   * deviner ferait appliquer la décote d'un couple à qui n'en est pas un.
+   */
+  readonly impositionCommune: boolean | null;
 }
 
 export function entrepriseVide(): Entreprise {
@@ -602,7 +611,8 @@ export function faitsVides(): Faits {
     partGardeeAuVersement: ratio(0),
     objectifCaAnnuel: null,
     periodesDeclarees: [], echeances: [], configImpotBrute: {},
-    partsFiscales: null, autresRevenusFoyer: null, versementPerDeductible: null
+    partsFiscales: null, autresRevenusFoyer: null, versementPerDeductible: null,
+    impositionCommune: null
   };
 }
 
@@ -720,6 +730,10 @@ export function motifRefusFaits(brut: unknown): string | null {
     if (cle in o && v !== null && (typeof v !== 'number' || !Number.isFinite(v))) {
       return `Le champ « ${cle} » devrait être un nombre, être nul, ou être absent.`;
     }
+  }
+  const commune = o['impositionCommune'];
+  if ('impositionCommune' in o && commune !== null && typeof commune !== 'boolean') {
+    return 'Le champ « impositionCommune » devrait être vrai, faux, nul, ou être absent.';
   }
 
   const entreprise = o['entreprise'];

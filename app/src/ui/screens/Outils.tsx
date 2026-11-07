@@ -191,7 +191,7 @@ export function Outils({ annee }: ProprietesOutils = {}) {
 
         {simulation === null && (
           <p className={styles.attente}>
-            Saisissez un montant pour voir l’estimation.
+            Saisis un montant pour voir l’estimation.
           </p>
         )}
 

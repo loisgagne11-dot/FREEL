@@ -390,7 +390,7 @@ function EditeurEntites(
 
       {!datees && (
         <p className={styles.aide}>
-          Renseignez le début et la fin de la mission&nbsp;: sans plage de
+          Renseigne le début et la fin de la mission&nbsp;: sans plage de
           dates, le rythme ne peut se poser sur aucune journée.
         </p>
       )}

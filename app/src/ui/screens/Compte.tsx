@@ -895,9 +895,9 @@ function SaisieConfig(
           &nbsp;: l’URL du projet et la clé <em>anon public</em>. Cette clé est
           faite pour être publique&nbsp;; ce qui protège les données, ce sont les
           règles d’accès définies sur le serveur. La base doit être préparée une
-          fois&nbsp;: copiez le <strong>contenu</strong> du fichier
+          fois&nbsp;: copie le <strong>contenu</strong> du fichier
           <em> docs/supabase.sql</em> du dépôt dans l’éditeur SQL du projet, et
-          exécutez-le.
+          exécute-le.
         </Info>
       </h2>
 

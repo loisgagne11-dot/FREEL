@@ -33,7 +33,7 @@ import { dansLaPeriode, type Periode } from '../domain/calculs/periode';
 import type { DateISO, Euros } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Client, Faits, Recette } from './schema';
-import { dateDuJour } from './selecteurs';
+import { dateDuJour, debutTvaEffectif } from './selecteurs';
 import type { Mois } from '../domain/types';
 import {
   type BrouillonDeFacture, type FactureEmise, type LigneDeBrouillon, brouillonsDuMois
@@ -44,8 +44,9 @@ import {
 } from '../domain/calculs/delaiPaiement';
 
 /** L'émetteur, tel qu'il doit figurer sur une facture. */
-export function emetteurDe(faits: Faits): Emetteur {
+export function emetteurDe(faits: Faits, maintenant: Date = new Date()): Emetteur {
   const e = faits.entreprise;
+  const debutTva = debutTvaEffectif(faits);
   return {
     nom: e.nom,
     siret: e.siret,
@@ -53,10 +54,10 @@ export function emetteurDe(faits: Faits): Emetteur {
     codePostal: e.codePostal,
     ville: e.ville,
     tvaIntracom: e.tvaIntracom,
-    // La franchise se déduit de l'absence de mois d'assujettissement : c'est
-    // le même fait qui commande la TVA déductible des dépenses, et deux
-    // sources se contrediraient.
-    enFranchise: e.tvaDepuis === null,
+    // La même source que la TVA déductible des dépenses : l'option saisie ou
+    // le franchissement des seuils. Au franchissement, les factures portent la
+    // TVA d'elles-mêmes — ce que promet le handoff.
+    enFranchise: debutTva === null || dateDuJour(maintenant).slice(0, 7) < debutTva,
     // Ils existaient au schéma et n'atteignaient jamais le document : la
     // facture partait sans dire où payer.
     iban: e.iban,

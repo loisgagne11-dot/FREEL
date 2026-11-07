@@ -870,7 +870,10 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // règle du schéma — jamais par une seconde lecture écrite ici. La donnée
     // brute reste conservée à côté : elle porte l'historique par année que les
     // trois faits, eux, ne gardent pas.
-    ...foyerFiscalDepuisConfigImpot(objet(legacy['ir']))
+    ...foyerFiscalDepuisConfigImpot(objet(legacy['ir'])),
+    // L'ancienne application ne connaissait pas la situation du foyer : elle
+    // ignorait la décote. Rien à reprendre, donc rien à deviner.
+    impositionCommune: null
   };
 }
 

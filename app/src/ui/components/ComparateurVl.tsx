@@ -43,8 +43,14 @@ import styles from './ComparateurVl.module.css';
  * que l'application ne porte pas, et l'invariant n°1 interdit de l'écrire au
  * jugé. L'écran rend l'arithmétique, jamais le droit d'opter.
  *
- * Trois simplifications sont dites, avec le SENS de chaque écart : sans elles,
- * un résultat serré se lirait comme un verdict.
+ * Deux simplifications sont dites, avec le SENS de chaque écart : sans elles,
+ * un résultat serré se lirait comme un verdict. La décote, elle, est
+ * appliquée — et quand la situation du foyer manque et qu'elle changerait le
+ * montant, l'écran le dit au lieu de choisir en silence.
+ *
+ * Les champs du foyer partent de ce qui est saisi en Réglages : les reprendre
+ * à « 1 part, 0 € » faisait comparer, par défaut, un foyer qui n'est pas le
+ * sien.
  */
 export function ComparateurVl() {
   const faits = useFaits((e) => e.faits);
@@ -58,8 +64,11 @@ export function ComparateurVl() {
   // porte sur l'année PROCHAINE, et personne ne fera exactement le même
   // chiffre. Le vrai chiffre sert de point de départ, pas de contrainte.
   const [caSaisi, setCaSaisi] = useState(() => (caReel > 0 ? String(Math.round(caReel)) : ''));
-  const [parts, setParts] = useState('1');
-  const [autres, setAutres] = useState('0');
+  const [parts, setParts] = useState(() =>
+    (faits.partsFiscales !== null ? String(faits.partsFiscales).replace('.', ',') : '1'));
+  const [autres, setAutres] = useState(() => String(Math.round(faits.autresRevenusFoyer ?? 0)));
+  const [situation, setSituation] = useState(() =>
+    (faits.impositionCommune === null ? '' : faits.impositionCommune ? 'commune' : 'seul'));
 
   const ca = Number(caSaisi.replace(',', '.'));
   const caValide = caSaisi.trim() !== '' && Number.isFinite(ca) && ca >= 0;
@@ -70,9 +79,10 @@ export function ComparateurVl() {
     const a = Number(autres.replace(',', '.'));
     return comparerRegimes(euros(ca), moisDe(m), faits.entreprise.typeActivite, {
       parts: Number.isFinite(p) && p > 0 ? p : 1,
-      autresRevenus: euros(Number.isFinite(a) && a > 0 ? a : 0)
+      autresRevenus: euros(Number.isFinite(a) && a > 0 ? a : 0),
+      impositionCommune: situation === '' ? null : situation === 'commune'
     });
-  }, [ca, caValide, parts, autres, m, faits.entreprise.typeActivite]);
+  }, [ca, caValide, parts, autres, situation, m, faits.entreprise.typeActivite]);
 
   return (
     <section className={styles.carte} aria-labelledby={`${id}-titre`}>
@@ -134,6 +144,27 @@ export function ComparateurVl() {
         </p>
 
         <p className={styles.champ}>
+          <label className={styles.libelle} htmlFor={`${id}-situation`}>
+            Situation du foyer
+          </label>
+          <select
+            id={`${id}-situation`}
+            className={styles.saisie}
+            value={situation}
+            onChange={(e) => setSituation(e.target.value)}
+            aria-describedby={`${id}-situation-aide`}
+          >
+            <option value="">Non renseignée</option>
+            <option value="seul">Seul·e</option>
+            <option value="commune">Marié·e ou pacsé·e</option>
+          </select>
+          <span id={`${id}-situation-aide`} className={styles.aide}>
+            Elle fixe le plafond de la décote, qui allège l’impôt des foyers
+            modestes.
+          </span>
+        </p>
+
+        <p className={styles.champ}>
           <label className={styles.libelle} htmlFor={`${id}-autres`}>
             Autres revenus imposables du foyer (€)
           </label>
@@ -155,7 +186,7 @@ export function ComparateurVl() {
       </div>
 
       {resultat === null && (
-        <p className={styles.attente}>Saisissez un chiffre d’affaires pour comparer.</p>
+        <p className={styles.attente}>Saisis un chiffre d’affaires pour comparer.</p>
       )}
 
       {resultat !== null && resultat.statut === 'refuse' && (
@@ -208,6 +239,13 @@ export function ComparateurVl() {
               )}
           </p>
 
+          {resultat.valeur.situationDecisive && (
+            <p className={styles.hypothese} role="note">
+              Ta situation change le montant au barème&nbsp;: tant qu’elle
+              n’est pas renseignée, la décote la moins favorable est retenue.
+            </p>
+          )}
+
           {resultat.statut === 'hypothese' && (
             <p className={styles.hypothese} role="note">
               Barème non encore publié pour cette période&nbsp;: le calcul
@@ -227,11 +265,6 @@ export function ComparateurVl() {
             que l’application ne porte pas&nbsp;: à vérifier avant de décider.
           </li>
           <li>
-            <strong>Pas de décote</strong>, qui allège l’impôt des revenus
-            modestes. Le barème est donc <em>surestimé</em> en bas de l’échelle,
-            à son désavantage.
-          </li>
-          <li>
             <strong>Pas de plafonnement du quotient familial</strong>, qui le
             renchérit pour les foyers aisés à plusieurs parts. Le barème est
             donc <em>sous-estimé</em> en haut.
@@ -241,9 +274,8 @@ export function ComparateurVl() {
           </li>
         </ul>
         <p>
-          Les deux premiers écarts jouent en sens contraire&nbsp;: un résultat
-          serré ne se tranche pas sur ces chiffres seuls. Le simulateur officiel
-          de l’administration fiscale reste l’arbitre.
+          Un résultat serré ne se tranche pas sur ces chiffres seuls. Le
+          simulateur officiel de l’administration fiscale reste l’arbitre.
         </p>
       </details>
     </section>

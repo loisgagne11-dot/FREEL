@@ -415,7 +415,7 @@ function FormulairePaiement(
           onChange={(e) => setMontant(e.target.value)}
         />
         <span className={styles.aide}>
-          Prérempli à l’appel. Modifiez-le s’il diffère — régularisation,
+          Prérempli à l’appel. Modifie-le s’il diffère — régularisation,
           changement de taux, majoration&nbsp;: l’écart est conservé, c’est lui
           qui explique un solde qui ne tombe pas juste.
         </span>

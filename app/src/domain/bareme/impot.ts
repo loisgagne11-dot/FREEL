@@ -70,8 +70,62 @@ export interface PeriodeIR {
   readonly du: Mois;
   readonly au: Mois | null;
   readonly tranches: readonly TrancheIR[];
+  /** La décote du même millésime : elle est votée avec les tranches. */
+  readonly decote: ParametresDecote;
   readonly source: string;
   readonly verifieLe: DateISO;
+}
+
+/**
+ * La décote (CGI art. 197, I-4) : `plafond − coefficient × impôt brut`,
+ * retranchée de l'impôt brut tant qu'elle est positive.
+ *
+ * Le plafond dépend de la situation du foyer — seul, ou soumis à imposition
+ * commune — et NON du nombre de parts : un parent isolé a deux parts et le
+ * plafond d'une personne seule.
+ */
+export interface ParametresDecote {
+  /** Célibataires, divorcés, veufs. */
+  readonly plafondSeul: Euros;
+  /** Mariés ou pacsés, soumis à imposition commune. */
+  readonly plafondCommune: Euros;
+  readonly coefficient: Ratio;
+}
+
+/** Ce que la décote doit savoir du foyer. `null` : on ne le sait pas. */
+export type SituationDecote = 'seul' | 'commune';
+
+/**
+ * La situation qui fixe le plafond de la décote, d'après les faits saisis.
+ *
+ * Moins de deux parts, c'est une personne seule : un couple en a au moins
+ * deux. Au-delà, deux parts disent « couple » aussi bien que « parent
+ * isolé » — et la réponse se déclare, elle ne se devine pas.
+ */
+export function situationDecote(parts: number, impositionCommune: boolean | null): SituationDecote | null {
+  if (impositionCommune !== null) return impositionCommune ? 'commune' : 'seul';
+  return parts < 2 ? 'seul' : null;
+}
+
+/** La décote d'un impôt brut, jamais supérieure à lui. */
+export function decote(impotBrut: number, situation: SituationDecote, p: ParametresDecote): Euros {
+  const plafond = situation === 'commune' ? p.plafondCommune : p.plafondSeul;
+  return euros(Math.min(Math.max(0, impotBrut), Math.max(0, plafond - p.coefficient * impotBrut)));
+}
+
+/** Le barème d'un millésime : tranches et décote, résolus ensemble. */
+export interface BaremeIR {
+  readonly tranches: readonly TrancheIR[];
+  readonly decote: ParametresDecote;
+}
+
+/**
+ * La décote à appliquer à un calcul : ses paramètres, et la situation du
+ * foyer — `null` quand elle n'est pas connue (voir `surcroitDImpot`).
+ */
+export interface DecoteDuFoyer {
+  readonly parametres: ParametresDecote;
+  readonly situation: SituationDecote | null;
 }
 
 /**
@@ -95,7 +149,12 @@ export const PERIODES_IR: readonly PeriodeIR[] = [
       { seuil: euros(83823), taux: ratio(0.41) },
       { seuil: euros(180294), taux: ratio(0.45) }
     ],
-    source: 'Audit comptable §3 — tranches revenus 2024, déclaration 2025',
+    // BOFiP, BOI-IR-LIQ-20-20-30 du 14/04/2025 : 889 € et 1 470 €, moins
+    // 45,25 % de l'impôt brut — décote nulle à partir de 1 965 € (seul) et
+    // 3 249 € (imposition commune) d'impôt brut.
+    decote: { plafondSeul: euros(889), plafondCommune: euros(1470), coefficient: ratio(0.4525) },
+    source: 'Audit comptable §3 — tranches revenus 2024, déclaration 2025 ; '
+      + 'décote : BOFiP BOI-IR-LIQ-20-20-30-20250414',
     verifieLe: dateISO('2026-07-27')
   }
 ];
@@ -107,11 +166,18 @@ export function periodeTranchesIRPour(m: Mois): PeriodeIR | undefined {
 const premiereIR = (): PeriodeIR | undefined => PERIODES_IR[0];
 const derniereIR = (): PeriodeIR | undefined => PERIODES_IR[PERIODES_IR.length - 1];
 
-/** Tranches applicables à un mois. Même asymétrie du temps que `urssaf.ts`. */
-export function tranchesIR(m: Mois): Resolution<readonly TrancheIR[]> {
+/**
+ * Le barème — tranches et décote — applicable à un mois. Même asymétrie du
+ * temps que `urssaf.ts` : le passé non couvert est refusé, l'avenir reprend
+ * le dernier millésime connu, en hypothèse.
+ */
+export function baremeIR(m: Mois): Resolution<BaremeIR> {
   const couvrante = periodeTranchesIRPour(m);
   if (couvrante) {
-    return { statut: 'publie', valeur: couvrante.tranches, source: couvrante.source, verifieLe: couvrante.verifieLe };
+    return {
+      statut: 'publie', valeur: { tranches: couvrante.tranches, decote: couvrante.decote },
+      source: couvrante.source, verifieLe: couvrante.verifieLe
+    };
   }
 
   const debut = premiereIR();
@@ -128,7 +194,16 @@ export function tranchesIR(m: Mois): Resolution<readonly TrancheIR[]> {
     return { statut: 'refuse', motif: 'Aucun barème IR saisi.' };
   }
 
-  return { statut: 'hypothese', valeur: fin.tranches, source: fin.source, verifieLe: fin.verifieLe, depuis: fin.du };
+  return {
+    statut: 'hypothese', valeur: { tranches: fin.tranches, decote: fin.decote },
+    source: fin.source, verifieLe: fin.verifieLe, depuis: fin.du
+  };
+}
+
+/** Tranches applicables à un mois : le barème, sans sa décote. */
+export function tranchesIR(m: Mois): Resolution<readonly TrancheIR[]> {
+  const r = baremeIR(m);
+  return r.statut === 'refuse' ? r : { ...r, valeur: r.valeur.tranches };
 }
 
 /**
@@ -150,10 +225,25 @@ export function irParTranches(revenuImposable: Euros, tranches: readonly Tranche
   return euros(Math.max(0, impot));
 }
 
-/** L'impôt d'un foyer : le barème sur UNE part, remultiplié par les parts. */
-export function impotDuFoyer(revenu: number, parts: number, tranches: readonly TrancheIR[]): Euros {
+/**
+ * L'impôt d'un foyer : le barème sur UNE part, remultiplié par les parts,
+ * puis la décote quand la situation du foyer est connue.
+ *
+ * Situation inconnue (`null`), c'est le plafond d'une personne seule qui
+ * s'applique : la plus petite des deux décotes, donc l'impôt le plus haut des
+ * deux cas possibles. Une provision trop haute revient ; une trop basse se
+ * paie de sa poche.
+ */
+export function impotDuFoyer(
+  revenu: number,
+  parts: number,
+  tranches: readonly TrancheIR[],
+  decoteFoyer: DecoteDuFoyer | null = null
+): Euros {
   if (revenu <= 0 || parts <= 0) return euros(0);
-  return euros(irParTranches(euros(revenu / parts), tranches) * parts);
+  const brut = irParTranches(euros(revenu / parts), tranches) * parts;
+  if (decoteFoyer === null) return euros(brut);
+  return euros(brut - decote(brut, decoteFoyer.situation ?? 'seul', decoteFoyer.parametres));
 }
 
 /**
@@ -179,17 +269,63 @@ export function impotDuFoyer(revenu: number, parts: number, tranches: readonly T
  *
  * La déduction (versement PER) profite au foyer dans les deux cas : elle se
  * retranche avec et sans l'activité.
+ *
+ * La décote aussi se calcule des deux côtés, et elle ne joue pas toujours
+ * dans le sens qu'on croit. Le comparateur l'ignorait au motif qu'elle
+ * « allège l'impôt des revenus modestes » : vrai pour le foyer, faux pour le
+ * surcroît. Quand le foyer est DÉJÀ dans la zone où elle s'éteint, chaque
+ * euro d'impôt brut en plus retire 45,25 centimes de décote : le surcroît est
+ * PLUS ÉLEVÉ que le barème seul. Une part, 20 000 € d'autres revenus, 6 000 €
+ * d'activité imposable : 660 € au barème seul, 958,65 € avec la décote. Elle
+ * ne l'allège que pour un foyer qui partait d'un impôt nul.
  */
 export function surcroitDImpot(
   revenuActivite: number,
   autresRevenus: number,
   deduction: number,
   parts: number,
-  tranches: readonly TrancheIR[]
+  tranches: readonly TrancheIR[],
+  decoteFoyer: DecoteDuFoyer | null = null
 ): Euros {
-  const avec = impotDuFoyer(Math.max(0, revenuActivite + autresRevenus - deduction), parts, tranches);
-  const sans = impotDuFoyer(Math.max(0, autresRevenus - deduction), parts, tranches);
-  return euros(Math.max(0, avec - sans));
+  const pour = (d: DecoteDuFoyer | null): number => {
+    const avec = impotDuFoyer(Math.max(0, revenuActivite + autresRevenus - deduction), parts, tranches, d);
+    const sans = impotDuFoyer(Math.max(0, autresRevenus - deduction), parts, tranches, d);
+    return Math.max(0, avec - sans);
+  };
+  if (decoteFoyer === null || decoteFoyer.situation !== null) return euros(pour(decoteFoyer));
+
+  // Situation inconnue : le plus haut des deux surcroîts possibles. Ce n'est
+  // pas toujours celui de la personne seule — la décote du couple s'éteint
+  // plus haut, et dans cette zone chaque euro d'impôt brut en retire 45,25
+  // centimes : c'est alors le couple dont l'activité coûte le plus.
+  const { parametres } = decoteFoyer;
+  return euros(Math.max(
+    pour({ parametres, situation: 'seul' }),
+    pour({ parametres, situation: 'commune' })
+  ));
+}
+
+/**
+ * La situation du foyer change-t-elle ce que l'activité coûte ? Seulement
+ * quand elle n'est pas connue ET que les deux décotes possibles donnent deux
+ * surcroîts différents — au-dessus de ~3 249 € d'impôt brut, aucune ne joue,
+ * et la demander serait du bruit.
+ */
+export function situationDecoteDecisive(
+  revenuActivite: number,
+  autresRevenus: number,
+  deduction: number,
+  parts: number,
+  tranches: readonly TrancheIR[],
+  decoteFoyer: DecoteDuFoyer | null
+): boolean {
+  if (decoteFoyer === null || decoteFoyer.situation !== null) return false;
+  const { parametres } = decoteFoyer;
+  const seul = surcroitDImpot(revenuActivite, autresRevenus, deduction, parts, tranches,
+    { parametres, situation: 'seul' });
+  const commune = surcroitDImpot(revenuActivite, autresRevenus, deduction, parts, tranches,
+    { parametres, situation: 'commune' });
+  return Math.abs(seul - commune) >= 0.01;
 }
 
 // ────────────────────────── Versement libératoire ─────────────────────────

@@ -72,10 +72,28 @@ describe('profil', () => {
     expect(useFaits.getState().faits.entreprise.versementLiberatoire).toBe(true);
   });
 
-  it('laisse la TVA vide en franchise en base', async () => {
+  it('laisse l’option pour la TVA vide en franchise en base', async () => {
     render(<Config />);
-    expect(screen.getByLabelText(/Assujetti à la TVA depuis/)).toHaveProperty('value', '');
+    expect(screen.getByLabelText(/Option pour la TVA depuis/)).toHaveProperty('value', '');
     expect(useFaits.getState().faits.entreprise.tvaDepuis).toBeNull();
+  });
+
+  // Le franchissement se déduit des encaissements : le champ le dit, au lieu de
+  // laisser croire qu'il faut le saisir pour que les factures portent la TVA.
+  it('dit depuis quand la TVA est due quand les seuils sont franchis', async () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        entreprise: { ...faitsVides().entreprise, debutActivite: dateISO('2025-01-01') },
+        recettes: Array.from({ length: 9 }, (_, i) => ({
+          id: `r${i}`, clientNom: 'Client démo', libelle: 'Prestation', montant: euros(5000),
+          emiseLe: dateISO(`2026-0${i + 1}-10`), encaisseeLe: dateISO(`2026-0${i + 1}-10`),
+          modeReglement: 'virement' as const, numero: `F-${i}`
+        }))
+      }
+    });
+    render(<Config />);
+    expect(screen.getByText(/la TVA est due depuis septembre 2026/)).toBeTruthy();
   });
 });
 

@@ -117,6 +117,7 @@ interface MagasinFaits {
     readonly partsFiscales?: number | null;
     readonly autresRevenusFoyer?: Euros | null;
     readonly versementPerDeductible?: Euros | null;
+    readonly impositionCommune?: boolean | null;
   }) => void;
 
   /* Les écritures des PÉRIODES DÉCLARÉES et des ÉCHÉANCES ont migré dans

@@ -434,6 +434,82 @@ export function assujettissementTva(
 }
 
 /**
+ * Le premier mois où la TVA est due, d'après les seuils et les encaissements
+ * de TOUTES les années d'activité — ou `null` si elle ne l'a jamais été.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX SOURCES POUR UNE MÊME DATE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `assujettissementTva` savait dater le franchissement, et l'écran Argent
+ * l'affichait (« Redevable de la TVA depuis le 1er … »). Mais les factures et
+ * la TVA déductible des dépenses obéissaient à un autre fait : le mois saisi à
+ * la main dans Réglages. Sans saisie, les factures partaient « en franchise »
+ * alors que la TVA était due — réputées TTC, la TVA à reverser sur ce qu'on
+ * avait encaissé. Le handoff le dit sans ambiguïté : au franchissement, Freel
+ * ajoute la TVA aux factures.
+ *
+ * On remonte année par année depuis la première : la première année
+ * redevable — ou dont la franchise est perdue au 1er janvier suivant — donne
+ * la date. Une année dont les seuils manquent est sautée ; si aucune date ne
+ * se dégage et qu'une année a dû être sautée, on s'abstient plutôt que de
+ * conclure à une franchise qu'on n'a pas pu vérifier.
+ *
+ * Un retour en franchise (deux années de suite sous les seuils) n'est pas
+ * modélisé : il demande une démarche, et le supposer ferait retirer la TVA de
+ * factures où elle est due.
+ */
+export function tvaDueDepuis(
+  encaissements: readonly { readonly encaisseeLe: string; readonly montant: number }[],
+  type: TypeActivite,
+  debutActivite: DateISO | null
+): Resolution<Mois | null> {
+  const parAnneeMois = new Map<string, number>();
+  for (const e of encaissements) {
+    const m = e.encaisseeLe.slice(0, 7);
+    parAnneeMois.set(m, (parAnneeMois.get(m) ?? 0) + e.montant);
+  }
+  const annees = [...parAnneeMois.keys()].map((m) => Number(m.slice(0, 4)));
+  if (debutActivite !== null) annees.push(Number(debutActivite.slice(0, 4)));
+  if (annees.length === 0) {
+    return { statut: 'publie', valeur: null, source: 'aucun encaissement', verifieLe: dateISO('2026-01-01') };
+  }
+  const premiere = Math.min(...annees);
+  const derniere = Math.max(...annees);
+
+  const totalAnnee = (a: number): Euros => euros([...parAnneeMois.entries()]
+    .filter(([m]) => m.startsWith(`${a}-`)).reduce<number>((t, [, v]) => t + v, 0));
+
+  let refus: Resolution<Mois | null> | null = null;
+  let derniereResolue: Exclude<Resolution<StatutAssujettissementTva>, { statut: 'refuse' }> | null = null;
+  for (let a = premiere; a <= derniere; a += 1) {
+    const r = assujettissementTva({
+      annee: a, type, debutActivite,
+      caAnneePrecedente: totalAnnee(a - 1),
+      parMoisAnneeEnCours: Array.from({ length: 12 }, (_, i) => {
+        const m = mois(`${a}-${String(i + 1).padStart(2, '0')}`);
+        return { mois: m, encaisse: euros(parAnneeMois.get(m) ?? 0) };
+      })
+    });
+    if (r.statut === 'refuse') { refus = r; continue; }
+    derniereResolue = r;
+    if (r.valeur.cas !== 'sous_franchise') {
+      const depuis = r.valeur.depuis;
+      return r.statut === 'publie'
+        ? { statut: 'publie', valeur: depuis, source: r.source, verifieLe: r.verifieLe }
+        : { statut: 'hypothese', valeur: depuis, source: r.source, verifieLe: r.verifieLe, depuis: r.depuis };
+    }
+  }
+  if (refus !== null || derniereResolue === null) return refus ?? { statut: 'refuse', motif: 'Seuils de TVA indisponibles.' };
+  return derniereResolue.statut === 'publie'
+    ? { statut: 'publie', valeur: null, source: derniereResolue.source, verifieLe: derniereResolue.verifieLe }
+    : {
+      statut: 'hypothese', valeur: null, source: derniereResolue.source,
+      verifieLe: derniereResolue.verifieLe, depuis: derniereResolue.depuis
+    };
+}
+
+/**
  * Contrôle d'intégrité de la table, exécuté par les tests.
  * Renvoie la liste des anomalies ; vide si la table est saine.
  */

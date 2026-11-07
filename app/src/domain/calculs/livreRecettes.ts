@@ -52,6 +52,12 @@ export interface EcritureRecette {
   readonly numero: string;
   /** Identifiant de l'écriture que celle-ci annule, le cas échéant. */
   readonly annuleEcriture?: string | null;
+  /**
+   * TVA collectée sur l'écriture, quand elle est connue. Portée ici pour que
+   * l'écriture d'annulation la reprenne au signe opposé (voir
+   * `ecritureDAnnulation`) ; le livre lui-même tient en hors taxe.
+   */
+  readonly tvaCollectee?: Euros | null;
   /** Recette globalisée en fin de journée, sans identité de client. */
   readonly globalisee?: boolean;
 }

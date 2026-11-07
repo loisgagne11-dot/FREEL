@@ -148,12 +148,12 @@ function messageDErreur(code: number, corps: unknown): string {
     // « syntax error at or near "docs" ». Un message qui nomme un fichier sans
     // dire quoi en faire se lit comme une commande à taper.
     return 'Table introuvable côté serveur : la base n’est pas encore préparée pour '
-      + 'cette version. Ouvrez le fichier « docs/supabase.sql » du dépôt, copiez '
-      + 'son CONTENU dans l’éditeur SQL du projet Supabase, exécutez-le, puis '
-      + 'réessayez.';
+      + 'cette version. Ouvre le fichier « docs/supabase.sql » du dépôt, copie '
+      + 'son CONTENU dans l’éditeur SQL du projet Supabase, exécute-le, puis '
+      + 'réessaie.';
   }
   if (code === 429) {
-    return 'Trop de tentatives. Attendez une minute avant de réessayer.';
+    return 'Trop de tentatives. Attends une minute avant de réessayer.';
   }
   return brut !== '' ? brut : `Erreur ${code}.`;
 }

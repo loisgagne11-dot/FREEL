@@ -127,8 +127,10 @@ describe('provision d\'impôt sur le revenu', () => {
     }).impotFoyer;
     expect(deuxParts).toBeLessThan(unePart);
     // 39 600 / 2 = 19 800, entièrement dans la tranche à 11 % :
-    //   (19 800 − 11 497) × 11 % × 2 = 1 826,66
-    expect(deuxParts).toBe(1826.66);
+    //   (19 800 − 11 497) × 11 % × 2 = 1 826,66 d'impôt brut.
+    // Situation non renseignée : décote d'une personne seule, la plus faible,
+    //   889 − 45,25 % × 1 826,66 = 62,44 → 1 764,22.
+    expect(deuxParts).toBe(1764.22);
   });
 
   /**
@@ -175,7 +177,38 @@ describe('provision d\'impôt sur le revenu', () => {
     expect(v.ignore).toContain('versement_per_non_renseigne');
     // Toujours dites, celles-là : elles ne dépendent d'aucune saisie.
     expect(v.ignore).toContain('plafonnement_quotient_familial');
-    expect(v.ignore).toContain('decote_et_reductions_d_impot');
+    expect(v.ignore).toContain('reductions_et_credits_d_impot');
+  });
+
+  /**
+   * LA DÉCOTE DÉPEND D'UNE SITUATION QUE LES PARTS NE DISENT PAS.
+   *
+   * Deux parts, 46 000 € d'autres revenus, 9 091 € encaissés (6 000 €
+   * imposables après 34 %) : 660 € si l'on est seul, 958,65 € en couple. La
+   * situation inconnue fait retenir le plus haut, et le dire.
+   */
+  it('retient la décote la moins favorable tant que la situation manque, et le dit', () => {
+    const foyer = { partsFiscales: 2, autresRevenusFoyer: euros(46000), versementPerDeductible: euros(0) };
+    const ca = { caEncaisseConstate: euros(6000 / 0.66) };
+    const inconnue = valeur({ ...ca, foyer });
+    const couple = valeur({ ...ca, foyer: { ...foyer, impositionCommune: true } });
+    const seule = valeur({ ...ca, foyer: { ...foyer, impositionCommune: false } });
+
+    expect(seule.impotMicro).toBe(660);
+    expect(couple.impotMicro).toBe(958.65);
+    expect(inconnue.impotMicro).toBe(958.65);
+    expect(inconnue.ignore).toContain('situation_familiale_non_renseignee');
+    expect(couple.ignore).not.toContain('situation_familiale_non_renseignee');
+  });
+
+  it('ne réclame pas la situation quand aucune décote ne joue', () => {
+    // 120 000 € encaissés pour deux parts : 10 090,96 € d'impôt brut, bien
+    // au-dessus des 3 249 € où la décote du couple s'éteint.
+    const v = valeur({
+      caEncaisseConstate: euros(120000),
+      foyer: { partsFiscales: 2, autresRevenusFoyer: euros(0), versementPerDeductible: euros(0) }
+    });
+    expect(v.ignore).not.toContain('situation_familiale_non_renseignee');
   });
 
   it('répartit le reste sur les mois restants, mois courant inclus', () => {

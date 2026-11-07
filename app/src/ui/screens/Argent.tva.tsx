@@ -149,6 +149,7 @@ export function DossierTvaPanneau() {
             {dossier.encaissements.map((e) => (
               <li key={e.id}>
                 <span className={styles.pieceNom}>
+                  {e.avoir === true ? 'Avoir sur ' : ''}
                   {e.numero || 'Sans numéro'} — {e.clientNom || 'Client non renseigné'}
                 </span>
                 <span className={styles.pieceDate}>{dateCourte(e.encaisseeLe)}</span>

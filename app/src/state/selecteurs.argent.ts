@@ -341,9 +341,12 @@ export function etatArgent(
  * les factures partout ailleurs dans cette application. Les confondre décale
  * une déclaration entière d'un trimestre.
  *
- * Les avoirs sont écartés : une écriture d'annulation neutralise déjà le
- * montant de la facture qu'elle vise, et compter les deux ferait entrer un
- * montant négatif sans sa contrepartie.
+ * Les avoirs COMPTENT, au trimestre de l'avoir et au signe opposé. Ils
+ * étaient écartés, au motif qu'une annulation « neutralise déjà » la facture :
+ * vrai pour le chiffre d'affaires, faux pour la TVA. La facture annulée reste
+ * dans le trimestre où elle a été déclarée ; c'est le trimestre de l'avoir qui
+ * porte la régularisation. Sans elle, 200 € de TVA déjà reversés sur une
+ * facture annulée ne revenaient jamais.
  */
 export function dossierTvaDuTrimestre(
   faits: Faits,
@@ -352,8 +355,7 @@ export function dossierTvaDuTrimestre(
   maintenant: Date = new Date()
 ): DossierTva {
   const encaissements: PieceCollectee[] = faits.recettes
-    .filter((r): r is typeof r & { encaisseeLe: DateISO } =>
-      r.encaisseeLe !== null && typeof r.annuleEcriture !== 'string')
+    .filter((r): r is typeof r & { encaisseeLe: DateISO } => r.encaisseeLe !== null)
     .map((r) => ({
       id: r.id,
       numero: r.numero,
@@ -362,7 +364,8 @@ export function dossierTvaDuTrimestre(
       montantHt: r.montant,
       // `undefined` et `null` disent la même chose ici — la TVA n'a pas été
       // conservée — et le dossier les compte à part plutôt que pour zéro.
-      tva: r.tvaCollectee ?? null
+      tva: r.tvaCollectee ?? null,
+      avoir: typeof r.annuleEcriture === 'string'
     }));
 
   const contexte = contexteDepense(faits, maintenant);

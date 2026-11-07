@@ -308,7 +308,11 @@ export function soldeDerive(
     ? []
     : echeances.filter((e) => estPayee(e) && (e.payeeLe as DateISO) > soldeInitialAu);
 
-  const partRecettes = recettesRetenues.reduce<number>((s, r) => s + r.montant, 0);
+  // TTC : c'est ce que le client a versé sur le compte. Le hors-taxe seul
+  // faisait manquer la TVA au solde, puis la retranchait une seconde fois au
+  // reversement — 800 € calculés pour 1 000 € réels, sur une facture de
+  // 1 000 € HT encaissée 1 200 €.
+  const partRecettes = recettesRetenues.reduce<number>((s, r) => s + r.montant + (r.tva ?? 0), 0);
   const partDepenses = depensesRetenues.reduce<number>((s, d) => s + d.montantTtc, 0);
   const partEcheances = echeancesRetenues.reduce<number>(
     (s, e) => s + (e.montantPaye ?? e.montant), 0
