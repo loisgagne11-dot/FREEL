@@ -33,10 +33,10 @@ import styles from './Pilote.module.css';
  */
 export function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] }) {
   return (
-    <section className={styles.carte} aria-labelledby="titre-a-traiter">
+    <section className={`${styles.carte} ${styles.decisions}`} aria-labelledby="titre-a-traiter">
       <h2 id="titre-a-traiter" className={styles.titreCarte}>
-        À traiter
-        {sujets.length > 0 && <span className={styles.compteur}>{sujets.length}</span>}
+        Décisions du jour
+        {sujets.length > 0 && <span className={styles.compteur}>{sujets.length} à traiter</span>}
       </h2>
 
       {sujets.length === 0 ? (
@@ -52,7 +52,7 @@ export function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] }) {
 
 /** Une décision : sa gravité, son intitulé, son contexte, son action. */
 function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
-  const { intitule, contexte, action } = formuler(s);
+  const { intitule, contexte, action, levier } = formuler(s);
   return (
     <li className={styles.sujet}>
       <span
@@ -81,6 +81,9 @@ function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
         <span className={styles.sujetContexte}>
           <Montant>{contexte}</Montant>
         </span>
+        {/* Ce que l'application a déjà préparé pour agir — la ligne
+            « levier → » du handoff. */}
+        {levier !== null && <span className={styles.sujetLevier}>levier → {levier}</span>}
       </div>
       <a className={styles.sujetAction} href={`#/${s.ecran}`}>{action}</a>
     </li>

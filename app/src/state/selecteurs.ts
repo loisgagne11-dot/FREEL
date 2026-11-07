@@ -41,7 +41,7 @@ import { moisDeLaPeriode } from '../domain/calculs/declarations';
 import type { RegimeTva } from '../domain/calculs/depenses';
 import { tvaDeDepense } from '../domain/calculs/depenses.tva';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
-import type { Faits } from './schema';
+import type { Faits, Recette } from './schema';
 import {
   FORMULE_PAR_DEFAUT, echeanceDe
 } from '../domain/calculs/delaiPaiement';
@@ -296,16 +296,28 @@ export function finAcreDe(faits: Faits): Resolution<Mois> | null {
  * finiraient par diverger d'un jour — celui qui décide d'une relance.
  */
 
+/**
+ * L'échéance d'une facture, pour le sujet « en retard » comme pour la
+ * pastille du flux : une seule règle.
+ *
+ * Elle vient de la recette : elle est imprimée sur le document. Le secours ne
+ * sert qu'à une facture qu'aucune migration n'aurait comblée — une facture
+ * émise sans échéance serait réputée jamais échue, et les retards les plus
+ * anciens seraient précisément ceux qu'on ne verrait pas.
+ */
+function echeanceDesFactures(faits: Faits): (r: Recette) => DateISO | null {
+  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+  return (r) => (r.emiseLe === null
+    ? null
+    : r.echeanceLe ?? echeanceDe(r.emiseLe, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT));
+}
+
 export function entreeATraiter(
   faits: Faits,
   echeancesReglementaires: EntreeATraiter['echeancesReglementaires'] = [],
   maintenant: Date = new Date()
 ): EntreeATraiter {
-  /* L'échéance vient de la recette : elle est imprimée sur le document. Le
-     secours ne sert qu'à une facture qu'aucune migration n'aurait comblée —
-     une facture émise sans échéance serait réputée jamais échue, et les
-     retards les plus anciens seraient précisément ceux qu'on ne verrait pas. */
-  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+  const echeance = echeanceDesFactures(faits);
   const tvaDue = tvaDueDepuisDe(faits);
   return {
     aujourdhui: dateISOde(maintenant),
@@ -317,10 +329,7 @@ export function entreeATraiter(
       encaisseeLe: r.encaisseeLe,
       modeReglement: r.modeReglement,
       clientNom: r.clientNom,
-      echeanceLe: r.emiseLe === null
-        ? null
-        : r.echeanceLe
-          ?? echeanceDe(r.emiseLe, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT)
+      echeanceLe: echeance(r)
     })),
     periodesDeclarees: faits.periodesDeclarees,
     echeancesSaisies: faits.echeances.length,
@@ -854,6 +863,8 @@ export interface LigneFlux {
   readonly date: DateISO | null;
   /** Ce qui est fait, et ce qui ne l'est pas encore. */
   readonly regle: boolean;
+  /** Non réglé et passé son échéance : la pastille « en retard ». */
+  readonly enRetard?: boolean;
 }
 
 export interface FluxDuMois {
@@ -913,8 +924,10 @@ export function fluxDuMois(
   faits: Faits,
   m: Mois,
   etat: EtatPilote,
-  echeances: readonly Echeance[] = faits.echeances
+  echeances: readonly Echeance[] = faits.echeances,
+  aujourdhui: DateISO = dateDuJour()
 ): FluxDuMois {
+  const echeance = echeanceDesFactures(faits);
   const encaisseesDuMois = faits.recettes.filter(
     (r) => r.encaisseeLe !== null && r.encaisseeLe.startsWith(m)
   );
@@ -939,13 +952,17 @@ export function fluxDuMois(
           date: r.encaisseeLe,
           regle: true
         })),
-        ...enAttente.map((r) => ({
-          id: r.id,
-          libelle: r.clientNom !== '' ? r.clientNom : r.libelle,
-          montant: r.montant,
-          date: r.emiseLe,
-          regle: false
-        }))
+        ...enAttente.map((r) => {
+          const limite = echeance(r);
+          return {
+            id: r.id,
+            libelle: r.clientNom !== '' ? r.clientNom : r.libelle,
+            montant: r.montant,
+            date: r.emiseLe,
+            regle: false,
+            enRetard: limite !== null && limite < aujourdhui
+          };
+        })
       ]
     },
     sorties: {

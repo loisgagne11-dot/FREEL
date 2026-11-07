@@ -1,5 +1,4 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
-import { euros } from '../../domain/types';
 import { useFaits } from '../../state/store';
 import {
   aTraiter, etatPilote, fluxDuMois, moisCourant, remunerationDuMois, soldeEstSuivi
@@ -8,7 +7,7 @@ import { Greet } from '../components/Greet';
 import { ActionsRapides } from '../components/ActionsRapides';
 import { FluxCard } from '../components/FluxCard';
 import { SanteCard, indicateursDeSante } from '../components/SanteCard';
-import { eur, moisLong, moisTexte } from '../format';
+import { eur, moisLong } from '../format';
 const ATraiter = lazy(() => import('./Pilote.decisions')
   .then((m) => ({ default: m.ATraiter })));
 
@@ -26,7 +25,6 @@ const Composition = lazy(() => import('../components/Composition')
 
 import styles from './Pilote.module.css';
 import { Montant } from '../components/Montant';
-import { Info } from '../components/Info';
 import type { CleComposition } from '../../domain/calculs/composition';
 
 /**
@@ -72,16 +70,26 @@ export function Pilote() {
    * réalité, ce qui est exactement le défaut relevé sur l'ancienne version.
    */
   const sante = useMemo(() => {
-    const impayees = flux.entrees.lignes.filter((l) => !l.regle);
-    const periodes = sujets.find((x) => x.id === 'periodes-a-declarer');
+    const sujet = (id: string) => sujets.find((x) => x.id === id);
+    const periodes = sujet('periodes-a-declarer');
+    const des = sujet('des-en-retard');
+    const factures = sujet('factures-en-retard');
+    // Le régime ne change qu'en « retard » : TVA due sur des factures émises
+    // sans, seuil franchi, plafond dépassé — les mêmes sujets que la liste.
+    const regime = sujet('tva-a-regulariser') !== undefined ? 'TVA due sur des factures émises sans'
+      : sujet('seuil-tva')?.gravite === 'retard' ? 'seuil majoré de TVA franchi'
+        : sujet('plafond-micro')?.gravite === 'retard' ? 'plafond du micro dépassé'
+          : null;
     return indicateursDeSante({
       dispo: etat.tresorerie.dispo,
       provisions: etat.tresorerie.provisions,
-      impayes: impayees.length,
-      montantImpaye: flux.entrees.enAttente,
-      periodesEnRetard: periodes?.nombre ?? 0
+      facturesEnRetard: factures?.nombre ?? 0,
+      montantEnRetard: Number(factures?.donnees['total'] ?? 0),
+      declarationsEnRetard: (periodes?.gravite === 'retard' ? periodes.nombre : 0) + (des?.nombre ?? 0),
+      declarationAvant: periodes?.gravite === 'a_faire' ? String(periodes.donnees['limite']) : null,
+      regime
     });
-  }, [flux, etat, sujets]);
+  }, [etat, sujets]);
 
   return (
     <>
@@ -128,110 +136,25 @@ export function Pilote() {
         </Bandeau>
       )}
 
-      <section className={styles.versable} aria-labelledby="titre-versable">
-        <h2 id="titre-versable" className={styles.libelle}>Je peux me verser</h2>
-        {/*
-          * LE CHIFFRE PRINCIPAL S'OUVRE COMME LES AUTRES.
-          *
-          * C'est celui sur lequel on décide — et donc celui qu'on a le plus de
-          * raisons de vouloir vérifier avant de virer l'argent. Le laisser seul
-          * non cliquable, alors que les quatre tuiles du dessous s'ouvrent,
-          * aurait fait exactement l'inverse de ce que ce lot cherche.
-          */}
-        <button
-          type="button"
-          className={styles.montantPrincipal}
-          onClick={() => setCompose('versable')}
-        >
-          <Montant>{eur(etat.tresorerie.versable)}</Montant>
-          <span className={styles.horsEcran}> — d’où vient ce chiffre</span>
-          <span className={styles.chevronPrincipal} aria-hidden="true">›</span>
-        </button>
-        <p className={styles.sousLigne}>
-          Autonomie&nbsp;: {moisTexte(etat.autonomie)}
-          {faits.besoinMensuel <= 0 && (
-            <span className={styles.note}> — renseigne ton besoin mensuel pour la calculer</span>
-          )}
-        </p>
-        {/* Ce qui est DÉJÀ sorti ce mois-ci. Sans cette ligne, « je peux me
-            verser 3 000 » se lit comme « en plus », alors qu'on s'est
-            peut-être déjà versé 2 500 le 5. */}
-        {soldeEstSuivi(faits) && (
-          <p className={styles.sousLigne}>
-            Déjà versé ce mois&nbsp;: <Montant>{eur(verseCeMois)}</Montant>
-            {faits.besoinMensuel > 0 && verseCeMois < faits.besoinMensuel && (
-              <span className={styles.note}>
-                {' '}— il manque <Montant>{eur(euros(faits.besoinMensuel - verseCeMois))}</Montant>
-                {' '}pour couvrir ton besoin
-              </span>
-            )}
-            <Info libelle="D’où vient ce chiffre">
-              Des virements du relevé que tu as marqués «&nbsp;rémunération
-              que je me suis versée&nbsp;», dans Achats&nbsp;› Relevé bancaire.
-              Se verser de l’argent n’est pas une opération comptable en
-              micro&nbsp;: la personne et l’entreprise sont la même. Le virement
-              est déjà au relevé — il n’y a rien à saisir, seulement à nommer.
-            </Info>
-          </p>
-        )}
-      </section>
-
       <FluxCard
         flux={flux}
-        periode={moisLong(mois)}
-        versementPossible={etat.tresorerie.versable > 0}
+        periode={moisLong(mois).toLowerCase()}
+        onVersable={() => setCompose('versable')}
+        dejaVerse={soldeEstSuivi(faits) ? verseCeMois : null}
+        besoinMensuel={faits.besoinMensuel}
       />
 
       <SanteCard indicateurs={sante} autonomie={etat.autonomie} />
 
-      <div className={styles.grille}>
-        <Chiffre
-          libelle="Solde"
-          valeur={eur(etat.tresorerie.solde)}
-          onOuvrir={() => setCompose('solde')}
-          {...(soldeEstSuivi(faits)
-            ? {}
-            : { precision: 'saisi, aucun relevé importé' })}
-        />
-        <Chiffre
-          libelle="À garder de côté"
-          valeur={eur(etat.tresorerie.provisions)}
-          ton={etat.tresorerie.provisions > 0 ? 'attention' : 'neutre'}
-          onOuvrir={() => setCompose('provisions')}
-        />
-        <Chiffre
-          libelle="Disponible"
-          valeur={eur(etat.tresorerie.dispo)}
-          ton={etat.tresorerie.dispo < 0 ? 'danger' : 'neutre'}
-          onOuvrir={() => setCompose('disponible')}
-        />
-        {/* Le seuil de sécurité ne s'ouvre pas : c'est un réglage, pas un
-            résultat. Il n'a pas de termes — il se change dans Config. */}
-        <Chiffre libelle="Seuil de sécurité" valeur={eur(etat.tresorerie.reserve)} />
-      </div>
-
-      <section className={styles.carte} aria-labelledby="titre-provisions">
-        <h2 id="titre-provisions" className={styles.titreCarte}>Ce que je dois</h2>
-        <dl className={styles.detail}>
-          <div className={styles.ligne}>
-            <dt>Échéances à payer</dt>
-            <dd><Montant>{eur(etat.voletConstate)}</Montant></dd>
-          </div>
-          <div className={styles.ligne}>
-            <dt>
-              Charges sur recettes encaissées
-              <span className={styles.aide}>
-                non encore déclarées — la dette naît à l’encaissement
-              </span>
-            </dt>
-            <dd><Montant>{eur(etat.voletAProvisionner)}</Montant></dd>
-          </div>
-          <div className={`${styles.ligne} ${styles.total}`}>
-            <dt>Total</dt>
-            <dd><Montant>{eur(etat.tresorerie.provisions)}</Montant></dd>
-          </div>
-        </dl>
-      </section>
+      {/*
+        * SANS DOUBLONS.
+        *
+        * Le Pilote répétait trois fois les mêmes chiffres : une carte « Je
+        * peux me verser » (la colonne Rémunération le dit), quatre tuiles
+        * Solde · À garder · Disponible · Seuil (l'en-tête de l'écran Argent,
+        * à un clic), et « Ce que je dois » (la colonne Sorties). Le handoff
+        * n'en a aucun : le flux, la santé, puis les décisions.
+        */}
 
       {/* Sous la ligne de flottaison, donc chargée après le premier rendu :
           elle tire la mise en mots des sujets, dix kilo-octets de français que
@@ -278,73 +201,6 @@ export function Bandeau(
       <strong className={styles.bandeauTitre}>{titre}</strong>
       <div className={styles.bandeauCorps}>{children}</div>
     </section>
-  );
-}
-
-/**
- * La tuile de chiffre du Pilote.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * POURQUOI ELLE N'EST PAS `components/Chiffre`
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Les deux se ressemblent à s'y méprendre, et la tentation de les fondre est
- * revenue à chaque lot. Elles diffèrent sur un point que le dessin tranche :
- * le Pilote met ses libellés en CAPITALES ESPACÉES, l'écran Argent en casse
- * ordinaire — et le commentaire de `Chiffre.module.css` dit pourquoi il a
- * fallu les y retirer. Les fondre imposerait une casse aux deux écrans, ou
- * ajouterait une variante à un composant partagé pour un seul appelant.
- *
- * L'invariant « une source unique par notion » vise les CALCULS : deux
- * additions du même montant finissent par diverger. Deux mises en forme
- * distinctes de deux dessins distincts ne divergent pas — elles sont déjà
- * différentes, et à dessein.
- */
-function Chiffre(
-  { libelle, valeur, ton = 'neutre', precision, onOuvrir }: {
-    libelle: string;
-    valeur: string;
-    ton?: 'neutre' | 'attention' | 'danger';
-    /**
-     * D'où sort le chiffre, quand ce n'est pas évident.
-     *
-     * Un solde sans relevé importé n'est pas suivi : c'est le montant saisi,
-     * figé. L'afficher comme les autres le ferait lire comme une position
-     * bancaire à jour — et une position bancaire fausse commande de mauvaises
-     * décisions de trésorerie.
-     */
-    precision?: string;
-    /**
-     * Ce qui s'ouvre au clic : la composition du chiffre.
-     *
-     * Absent sur le seuil de sécurité, qui n'a pas de formule — c'est un
-     * réglage, pas un résultat. Une tuile qui s'ouvrirait sur « seuil de
-     * sécurité = seuil de sécurité » apprendrait à ne plus cliquer sur les
-     * trois autres.
-     */
-    onOuvrir?: () => void;
-  }
-) {
-  const classeTon = ton === 'danger' ? styles.danger : ton === 'attention' ? styles.attention : '';
-  const contenu = (
-    <>
-      <span className={styles.libelle}>{libelle}</span>
-      <span className={`${styles.montant} ${classeTon}`}><Montant>{valeur}</Montant></span>
-      {precision !== undefined && <span className={styles.precision}>{precision}</span>}
-    </>
-  );
-
-  if (onOuvrir === undefined) return <div className={styles.chiffre}>{contenu}</div>;
-
-  return (
-    <button type="button" className={`${styles.chiffre} ${styles.cliquable}`} onClick={onOuvrir}>
-      {contenu}
-      {/* Le nom accessible du bouton est son contenu, qui décrit le chiffre et
-          non le geste : entendu au clavier, il ne dit pas ce que la touche
-          Entrée va faire. Le chevron fait le même travail à l'œil. */}
-      <span className={styles.horsEcran}> — d’où vient ce chiffre</span>
-      <span className={styles.chevron} aria-hidden="true">›</span>
-    </button>
   );
 }
 

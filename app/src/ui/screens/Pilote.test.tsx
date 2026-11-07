@@ -46,3 +46,35 @@ describe('la salutation', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).not.toMatch(/Atelier/);
   });
 });
+
+/**
+ * SANS DOUBLONS.
+ *
+ * Le versable avait sa carte ET sa colonne ; quatre tuiles répétaient
+ * l'en-tête de l'écran Argent ; « Ce que je dois » répétait la colonne
+ * Sorties. Le handoff : le flux, la santé, les décisions.
+ */
+describe('la composition du Pilote', () => {
+  it('ne répète plus le versable, les tuiles d’Argent ni « Ce que je dois »', () => {
+    semer();
+    render(<Pilote />);
+    expect(screen.queryByRole('heading', { name: 'Je peux me verser' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Ce que je dois' })).toBeNull();
+    expect(screen.queryByText('Seuil de sécurité')).toBeNull();
+    expect(screen.queryByText('À garder de côté')).toBeNull();
+  });
+
+  it('montre le flux, la santé, puis les décisions du jour', async () => {
+    semer();
+    render(<Pilote />);
+    const titres = async () => (await screen.findAllByRole('heading', { level: 2 }))
+      .map((h) => h.textContent ?? '');
+    await screen.findByRole('heading', { name: /Décisions du jour/ });
+    const ordre = (await titres()).map((t) =>
+      (t.startsWith('Le flux du mois') ? 'flux' : t.startsWith('Santé') ? 'santé'
+        : t.startsWith('Décisions du jour') ? 'décisions' : 'autre'))
+      .filter((t) => t !== 'autre');
+    expect(ordre).toEqual(['flux', 'santé', 'décisions']);
+  });
+});
+
