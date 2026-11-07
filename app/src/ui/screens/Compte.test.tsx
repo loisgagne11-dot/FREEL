@@ -628,3 +628,57 @@ describe('cohabitation avec l’ancienne application', () => {
     expect(versLegacy).toEqual([]);
   });
 });
+
+/**
+ * UNE COUPURE RÉSEAU NE DÉCONNECTE PAS.
+ *
+ * La session expirée se renouvelle au chargement ; l'écran l'effaçait sur TOUT
+ * échec du renouvellement. Une coupure de wifi ou une panne passagère du
+ * serveur obligeait à se reconnecter pour rien. Seul un refus (400, 401)
+ * périme la session.
+ */
+describe('le renouvellement de session', () => {
+  const sessionExpiree = () => JSON.stringify({
+    jeton: 'j', jetonRafraichissement: 'r', expireLe: Date.now() - 1000,
+    utilisateurId: 'user-1', email: 'demo@exemple.test'
+  });
+
+  it('garde la session quand le serveur est seulement indisponible', async () => {
+    const appel = reponses({ corps: { message: 'indisponible' }, statut: 503 });
+    const local = CONFIGURE();
+    local.contenu['freel.session.supabase.v1'] = sessionExpiree();
+    render(<Compte stockage={local} />);
+    await vi.waitFor(() => expect(appel).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(local.contenu['freel.session.supabase.v1']).toBeDefined();
+  });
+
+  it('efface la session quand le serveur la refuse', async () => {
+    reponses({ corps: { message: 'jeton invalide' }, statut: 401 });
+    const local = CONFIGURE();
+    local.contenu['freel.session.supabase.v1'] = sessionExpiree();
+    render(<Compte stockage={local} />);
+    await vi.waitFor(() => expect(local.contenu['freel.session.supabase.v1']).toBeUndefined());
+  });
+});
+
+/**
+ * UNE ADRESSE EN CLAIR EST REFUSÉE AVANT D'ÊTRE ENREGISTRÉE.
+ *
+ * Elle était enregistrée, puis refusée à la relecture : l'écran de saisie
+ * revenait sans un mot.
+ */
+describe('l’adresse du projet', () => {
+  it('refuse une adresse en http, et dit pourquoi', async () => {
+    const local = stockage();
+    render(<Compte stockage={local} />);
+    const utilisateur = userEvent.setup();
+    await utilisateur.type(screen.getByRole('textbox', { name: /URL du projet/ }), 'http://exemple.test');
+    await utilisateur.type(screen.getByRole('textbox', { name: /Clé publique/ }), 'cle-anon');
+    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    expect(screen.getByRole('alert').textContent).toMatch(/https:\/\//);
+    expect(local.contenu[CLE_CONFIG]).toBeUndefined();
+  });
+});
+

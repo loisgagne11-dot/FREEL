@@ -277,33 +277,30 @@ const ventilationVide = (): Record<NatureDette, number> =>
  * égalité, l'ordre de `NATURES_DETTE`, pour que le résultat soit déterministe.
  */
 function figer(v: Record<NatureDette, number>, total: number): VentilationProvisions {
-  const cible = Math.round(total * 100);
-  const parts = NATURES_DETTE.map((nature, rang) => {
-    const brut = v[nature] * 100;
-    const plancher = Math.floor(brut + 1e-9);
-    return { nature, rang, centimes: plancher, reste: brut - plancher };
-  });
-  let manque = cible - parts.reduce((s, p) => s + p.centimes, 0);
+  const brut = NATURES_DETTE.map((n) => v[n] * 100);
+  const centimes = brut.map((x) => Math.floor(x + 1e-9));
+  let manque = Math.round(total * 100) - centimes.reduce((s, x) => s + x, 0);
   // Au-delà d'un centime par part, l'écart n'est plus un arrondi : `total`
   // n'est pas la somme des parts, et le répartir en silence fausserait une
-  // ligne pour faire tomber juste une addition. On rend alors l'arrondi naïf,
-  // et l'écart reste visible.
-  if (Math.abs(manque) > parts.length) {
-    return {
-      urssaf: euros(v.urssaf), tva: euros(v.tva), impot: euros(v.impot),
-      cfe: euros(v.cfe), cfp: euros(v.cfp)
-    };
+  // ligne pour faire tomber juste une addition. L'arrondi reste alors naïf, et
+  // l'écart visible.
+  if (Math.abs(manque) > centimes.length) {
+    brut.forEach((x, i) => { centimes[i] = Math.round(x); });
+    manque = 0;
   }
-  const parReste = [...parts].sort((a, b) => b.reste - a.reste || a.rang - b.rang);
-  // Reste négatif : on retire aux plus petites fractions, symétriquement.
-  if (manque < 0) parReste.reverse();
-  for (let i = 0; manque !== 0; i = (i + 1) % parReste.length) {
-    (parReste[i] as { centimes: number }).centimes += Math.sign(manque);
+  // Les plus forts restes d'abord ; le tri est stable, donc à égalité l'ordre
+  // de `NATURES_DETTE` décide, et le résultat est déterministe. Un manque
+  // négatif retire aux plus petites fractions.
+  const ordre = brut.map((_, i) => i)
+    .sort((a, b) => (brut[b]! - centimes[b]!) - (brut[a]! - centimes[a]!));
+  if (manque < 0) ordre.reverse();
+  for (let k = 0; manque !== 0; k = (k + 1) % ordre.length) {
+    centimes[ordre[k]!]! += Math.sign(manque);
     manque -= Math.sign(manque);
   }
-  const f = (n: NatureDette): Euros =>
-    euros((parts.find((p) => p.nature === n) as { centimes: number }).centimes / 100);
-  return { urssaf: f('urssaf'), tva: f('tva'), impot: f('impot'), cfe: f('cfe'), cfp: f('cfp') };
+  return Object.fromEntries(
+    NATURES_DETTE.map((n, i) => [n, euros(centimes[i]! / 100)])
+  ) as unknown as VentilationProvisions;
 }
 
 export interface DetailProvisions {

@@ -27,7 +27,8 @@ import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
 import { Montant } from '../components/Montant';
 import { Donut, PhraseRepartition } from '../components/Donut';
-import { dateCourte, enKiloEuros, eur, moisTexte } from '../format';
+import { dateCourte, eur, moisTexte } from '../format';
+import { enKiloEuros } from '../format.kilo';
 import styles from './Argent.module.css';
 
 /**

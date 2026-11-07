@@ -383,7 +383,7 @@ function EditeurEntites(
           journées se posent toutes seules. On ne corrige ensuite que ce qui
           s’est passé autrement, et le CRA tombe à la fin du mois.
           {' '}Si la mission passe par une agence et couvre plusieurs donneurs
-          d’ordre, ajoutez-en un par client&nbsp;: chacun a son rythme, et
+          d’ordre, ajoutes-en un par client&nbsp;: chacun a son rythme, et
           chacun signera son propre CRA.
         </Info>
       </legend>
@@ -639,7 +639,7 @@ function EditeurRythmes(
       )}
       {plusieurs && (
         <p className={styles.aide}>
-          Un mois par ligne&nbsp;: modifiez ceux qui changent, laissez les autres.
+          Un mois par ligne&nbsp;: modifie ceux qui changent, laisse les autres.
           Les dates restent modifiables si le changement tombe en cours de mois.
         </p>
       )}

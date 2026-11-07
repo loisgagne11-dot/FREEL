@@ -219,3 +219,50 @@ describe('encodage', () => {
     expect(texte).toBe('Date;Libellé;Montant');
   });
 });
+
+describe('robustesse de la lecture', () => {
+  // Sans cela, `parseFloat` lirait « 1e5 » comme 100 000 € : un solde faussé
+  // d'un facteur 100 000 sans la moindre alerte.
+  it('refuse la notation scientifique au lieu de la lire comme un grand nombre', () => {
+    expect(lireMontant('1e5')).toBeNull();
+    expect(lireMontant('2E3')).toBeNull();
+  });
+
+  // `parseFloat('12abc')` vaut 12 : une cellule qui n'est pas un montant
+  // entrerait dans les comptes sous un montant inventé.
+  it('refuse un montant suivi de texte au lieu de le tronquer', () => {
+    expect(lireMontant('12abc')).toBeNull();
+    expect(lireMontant('12,50 EUR')).toBeNull();
+    expect(lireMontant('1,234.56')).toBe(1234.56);
+  });
+
+  it('dit dans le compte rendu la ligne écartée pour montant illisible', () => {
+    const rapport = lignes(
+      'Date;Libellé;Montant\n15/07/2026;OK;-10,00\n16/07/2026;Douteux;12abc\n17/07/2026;Autre;1e5\n'
+    );
+    expect(rapport.lignes).toHaveLength(1);
+    expect(rapport.ignorees).toEqual([
+      { ligne: 3, motif: 'montant illisible ou absent' },
+      { ligne: 4, motif: 'montant illisible ou absent' }
+    ]);
+  });
+
+  // Un split sur les sauts de ligne couperait le libellé en deux et ferait
+  // disparaître l'opération (la seconde moitié n'a pas de date).
+  it('garde en un seul libellé un champ cité qui contient un saut de ligne', () => {
+    const rapport = lignes(
+      'Date;Libellé;Montant\r\n15/07/2026;"VIR SEPA\r\nLOYER JUILLET";-500,00\r\n16/07/2026;Café;-3,00\r\n'
+    );
+    expect(rapport.lignes).toHaveLength(2);
+    expect(rapport.lignes[0]?.libelle).toBe('VIR SEPA LOYER JUILLET');
+    expect(rapport.lignes[0]?.montant).toBe(-500);
+    expect(rapport.ignorees).toEqual([]);
+  });
+
+  it('numérote les lignes écartées selon le fichier, saut de ligne cité compris', () => {
+    const rapport = lignes(
+      'Date;Libellé;Montant\n15/07/2026;"A\nB";-5,00\n99/99/2026;X;-1,00\n16/07/2026;Ok;-2,00\n'
+    );
+    expect(rapport.ignorees[0]?.ligne).toBe(4);
+  });
+});

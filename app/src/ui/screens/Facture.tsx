@@ -104,6 +104,11 @@ function FactureEmise(
 ) {
   const faits = useFaits((e) => e.faits);
   const reedition = useMemo(() => reediterFacture(faits, numero), [faits, numero]);
+  // Avant le `return` anticipé : un hook appelé seulement quand la facture est
+  // rééditable change le nombre de hooks entre deux rendus du même composant
+  // (facture supprimée ou données rechargées pendant l'affichage), et React
+  // lève « rendered fewer hooks than expected » au lieu d'afficher le message.
+  const sortie = useSortieDocument();
 
   if (reedition.cas === 'impossible') {
     return (
@@ -124,7 +129,6 @@ function FactureEmise(
   }
 
   const etat = etatFacture(reedition.facture);
-  const sortie = useSortieDocument();
 
   return (
     <>

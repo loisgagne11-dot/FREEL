@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { enKiloEuros } from './format';
+import { enKiloEuros } from './format.kilo';
 
 // Intl fr-FR met des espaces insécables et un vrai signe moins (U+2212).
 const norm = (s: string) => s.replace(/[  ]/g, ' ').replace('−', '-');

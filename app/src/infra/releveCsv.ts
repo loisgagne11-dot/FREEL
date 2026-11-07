@@ -100,6 +100,42 @@ export function decouper(ligne: string, separateur: string): readonly string[] {
   return champs.map((v) => v.trim());
 }
 
+/**
+ * Découpe le contenu en enregistrements, en respectant les guillemets (RFC 4180).
+ *
+ * Un `split` sur les sauts de ligne coupe en deux un libellé cité qui en
+ * contient un — « "VIR SEPA\nLOYER" » — et la seconde moitié devient une ligne
+ * « à date illisible » : l'opération disparaît et son libellé est tronqué.
+ * Le numéro rendu est celui de la ligne PHYSIQUE où l'enregistrement commence,
+ * pour que le compte rendu renvoie au bon endroit du fichier.
+ */
+export function decouperEnregistrements(
+  contenu: string
+): readonly { readonly texte: string; readonly ligne: number }[] {
+  const enregistrements: { texte: string; ligne: number }[] = [];
+  let courant = '';
+  let entreGuillemets = false;
+  let ligneCourante = 1;
+  let ligneDebut = 1;
+
+  for (let i = 0; i < contenu.length; i++) {
+    const c = contenu[i] as string;
+    if (c === '"') entreGuillemets = !entreGuillemets;
+    if (c === '\n') {
+      ligneCourante++;
+      if (!entreGuillemets) {
+        enregistrements.push({ texte: courant.replace(/\r$/, ''), ligne: ligneDebut });
+        courant = '';
+        ligneDebut = ligneCourante;
+        continue;
+      }
+    }
+    courant += c;
+  }
+  enregistrements.push({ texte: courant.replace(/\r$/, ''), ligne: ligneDebut });
+  return enregistrements;
+}
+
 /* ── Reconnaissance des colonnes ───────────────────────────────────────── */
 
 const normaliser = (s: string): string =>
@@ -175,7 +211,12 @@ export function lireMontant(brut: string): number | null {
     if (apres === 3 && /^\d{1,3}\.\d{3}$/.test(texte)) texte = texte.replace('.', '');
   }
 
-  const valeur = Number.parseFloat(texte);
+  // `parseFloat` s'arrête au premier caractère qu'il ne comprend pas : « 12abc »
+  // donnerait 12 et « 1e5 » donnerait 100 000, sans que rien ne signale que la
+  // cellule n'était pas un montant. Un relevé lu avec un zéro de trop est pire
+  // qu'une ligne refusée, car le refus, lui, est dit dans le compte rendu.
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(texte)) return null;
+  const valeur = Number(texte);
   return Number.isFinite(valeur) ? signe * valeur : null;
 }
 
@@ -240,7 +281,9 @@ const LIGNES_ENTETE_TOLEREES = 12;
  * colonne de montant.
  */
 export function lireReleve(contenu: string): ResultatLecture {
-  const lignes = contenu.split(/\r?\n/);
+  const enregistrements = decouperEnregistrements(contenu);
+  const lignes = enregistrements.map((e) => e.texte);
+  const numeros = enregistrements.map((e) => e.ligne);
   const limite = Math.min(LIGNES_ENTETE_TOLEREES, lignes.length);
 
   for (let i = 0; i < limite; i++) {
@@ -258,7 +301,7 @@ export function lireReleve(contenu: string): ResultatLecture {
     const aUnMontant = iMontant !== -1 || (iDebit !== -1 && iCredit !== -1);
     if (iDate === -1 || !aUnMontant) continue;
 
-    return lireCorps(lignes, i + 1, {
+    return lireCorps(lignes, numeros, i + 1, {
       separateur, titres, iDate, iLibelle, iMontant, iDebit, iCredit
     });
   }
@@ -283,6 +326,7 @@ interface Reperes {
 
 function lireCorps(
   lignes: readonly string[],
+  numeros: readonly number[],
   depart: number,
   reperes: Reperes
 ): ResultatLecture {
@@ -314,24 +358,26 @@ function lireCorps(
     const champs = decouper(brute, separateur);
     const date = lireDate(champs[iDate] ?? '', format);
     if (date === null) {
-      ignorees.push({ ligne: i + 1, motif: `date illisible (« ${champs[iDate] ?? ''} »)` });
+      ignorees.push({ ligne: numeros[i] ?? i + 1, motif: `date illisible (« ${champs[iDate] ?? ''} »)` });
       continue;
     }
 
     const montant = montantDeLigne(champs, iMontant, iDebit, iCredit);
     if (montant === null) {
-      ignorees.push({ ligne: i + 1, motif: 'montant illisible ou absent' });
+      ignorees.push({ ligne: numeros[i] ?? i + 1, motif: 'montant illisible ou absent' });
       continue;
     }
     // Une opération à zéro n'a rien à rapprocher et fausserait les compteurs.
     if (montant === 0) {
-      ignorees.push({ ligne: i + 1, motif: 'montant nul' });
+      ignorees.push({ ligne: numeros[i] ?? i + 1, motif: 'montant nul' });
       continue;
     }
 
     retenues.push({
       date,
-      libelle: (iLibelle === -1 ? '' : champs[iLibelle] ?? '').trim(),
+      // Un saut de ligne cité reste DANS le libellé à la lecture, mais il est
+      // replié ici : affiché ou rapproché, il ne doit pas casser la mise en page.
+      libelle: (iLibelle === -1 ? '' : champs[iLibelle] ?? '').replace(/\s+/g, ' ').trim(),
       montant: euros(montant)
     });
   }

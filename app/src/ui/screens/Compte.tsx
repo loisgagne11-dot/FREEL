@@ -3,7 +3,8 @@ import { useFaits } from '../../state/store';
 import {
   type ConfigSupabase, type DonneesLegacy, type InstantaneDistant, type Session,
   bundleDepuisLegacy, chargerDonneesLegacy, configDeBuild, configEffective,
-  ecrireConfig, ecrireSession, lireSession, pousserFaits, rafraichir,
+  ecrireConfig, ecrireSession, estRefusDAuthentification, lireSession, motifUrlRefusee,
+  pousserFaits, rafraichir,
   seConnecter, seDeconnecter, sessionValide, tirerFaits
 } from '../../infra/supabase';
 import { VERSION_SCHEMA, type Faits, motifRefusFaits } from '../../state/schema';
@@ -249,7 +250,10 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
         ecrireSession(local, r.valeur);
         setEtat({ phase: 'connecte', session: r.valeur });
         void relireEtatDistant(r.valeur);
-      } else {
+      } else if (estRefusDAuthentification(r)) {
+        // Seul un REFUS du serveur (400, 401) périme la session. Effacer sur
+        // toute erreur déconnectait l'utilisateur à chaque coupure de wifi ou
+        // panne passagère du serveur : il devait se reconnecter pour rien.
         ecrireSession(local, null);
       }
     });
@@ -647,7 +651,7 @@ function ConfirmerEnvoi(
         )}
       <p className={styles.consequence}>
         Si tu voulais au contraire récupérer ces données ici, reviens en
-        arrière et choisissez <em>Charger le compte sur cet appareil</em>, ou
+        arrière et choisis <em>Charger le compte sur cet appareil</em>, ou
         <em> Reprendre les données de l’ancienne application</em>.
       </p>
       <div className={styles.actions}>
@@ -885,6 +889,10 @@ function SaisieConfig(
 ) {
   const [url, setUrl] = useState('');
   const [cle, setCle] = useState('');
+  /* Une adresse en http était enregistrée telle quelle, puis refusée à la
+     relecture : l'écran de saisie revenait sans un mot. Le refus se dit ici,
+     avant d'enregistrer. */
+  const [refus, setRefus] = useState<string | null>(null);
 
   return (
     <section className={styles.carte} aria-labelledby={`${idChamp}-config`}>
@@ -909,8 +917,14 @@ function SaisieConfig(
 
       <form
         className={styles.formulaire}
-        onSubmit={(e) => { e.preventDefault(); onValider({ url: url.trim(), cleAnon: cle.trim() }); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          const motif = motifUrlRefusee(url.trim());
+          setRefus(motif);
+          if (motif === null) onValider({ url: url.trim(), cleAnon: cle.trim() });
+        }}
       >
+        {refus !== null && <p className={styles.echec} role="alert">{refus}</p>}
         <p className={styles.champ}>
           <label htmlFor={`${idChamp}-url`}>URL du projet</label>
           <input id={`${idChamp}-url`} type="url" placeholder="https://exemple.supabase.co"

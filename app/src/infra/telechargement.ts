@@ -94,10 +94,21 @@ export function telecharger(
   lien.download = nom;
   document.body.appendChild(lien);
   lien.click();
-  // Le retrait est différé : révoquer l'URL dans la même tâche annule le
-  // téléchargement sur certains navigateurs, qui n'ont pas encore lu le blob.
-  setTimeout(() => { lien.remove(); URL.revokeObjectURL(url); }, 200);
+  // Le lien est retiré à la tâche suivante, mais l'URL du blob survit bien
+  // plus longtemps : Safari et Firefox lisent le blob APRÈS le retour de
+  // `click()`, parfois après une boîte « Enregistrer sous » que l'utilisateur
+  // met plusieurs secondes à valider. Révoquer à 200 ms donnait un fichier vide
+  // ou un échec silencieux sur un gros export. Le blob ne coûte que de la
+  // mémoire jusqu'à la révocation, d'où un délai long mais borné.
+  setTimeout(() => lien.remove(), 0);
+  setTimeout(() => URL.revokeObjectURL(url), DELAI_REVOCATION_MS);
 }
+
+/** Durée de vie de l'URL d'un fichier téléchargé. */
+export const DELAI_REVOCATION_MS = 30_000;
+
+/** Repli si le navigateur n'émet jamais `afterprint` (Safari mobile, notamment). */
+export const DELAI_RETRAIT_CADRE_MS = 60_000;
 
 /**
  * Imprime le document SEUL, sans l'interface autour.
@@ -112,6 +123,18 @@ export function telecharger(
  */
 export function imprimer(contenu: string): boolean {
   const cadre = document.createElement('iframe');
+  // Le jeu de droits est le minimum que ce code exige :
+  //  · `allow-same-origin` — on écrit dans le cadre par `contentWindow.document`
+  //    et on y appelle `print()` ; sans l'origine commune, l'accès est refusé ;
+  //  · `allow-modals` — Chrome ignore `print()` dans un cadre sandboxé qui ne
+  //    l'a pas, sans erreur : le bouton « Imprimer » ne ferait rien.
+  // `allow-scripts` est volontairement ABSENT : le document imprimé ne contient
+  // aucun script, et en ajouter à côté de `allow-same-origin` permettrait au
+  // cadre de retirer son propre sandbox. Un nom de client contenant du HTML
+  // qui échapperait à l'échappement n'exécuterait donc rien.
+  // L'attribut doit être posé AVANT l'insertion : après, il ne s'applique qu'à
+  // la prochaine navigation, pas au document vide déjà chargé.
+  cadre.setAttribute('sandbox', 'allow-same-origin allow-modals');
   cadre.setAttribute('aria-hidden', 'true');
   cadre.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
   document.body.appendChild(cadre);
@@ -123,6 +146,14 @@ export function imprimer(contenu: string): boolean {
   doc.write(contenu);
   doc.close();
 
+  // Le retrait attend `afterprint` : détruire le cadre pendant que la boîte
+  // d'impression est ouverte l'annule l'impression, et le retirer au bout de
+  // 2 s fixes l'annulait si l'utilisateur mettait plus longtemps à choisir.
+  // Sans retrait du tout, chaque impression laissait un cadre dans la page.
+  const retirer = (): void => { cadre.remove(); };
+  cadre.contentWindow?.addEventListener('afterprint', retirer);
+  setTimeout(retirer, DELAI_RETRAIT_CADRE_MS);
+
   try {
     cadre.contentWindow?.focus();
     cadre.contentWindow?.print();
@@ -130,8 +161,5 @@ export function imprimer(contenu: string): boolean {
     cadre.remove();
     return false;
   }
-  // Le retrait est différé : détruire le cadre pendant que la boîte
-  // d'impression est ouverte l'annule.
-  setTimeout(() => cadre.remove(), 2_000);
   return true;
 }

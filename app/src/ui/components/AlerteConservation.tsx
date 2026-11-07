@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFaits } from '../../state/store';
 import { useToast } from './Toasts';
-import { Bandeau } from '../screens/Pilote';
+import { Bandeau } from '../screens/Pilote.bandeaux';
 
 /**
  * Ce qui menace la conservation des saisies, sur TOUS les écrans.
