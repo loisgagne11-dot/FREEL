@@ -136,7 +136,8 @@
     flex: none;
     width: 34px;
     height: 34px;
-    border-radius: 11px;
+    /* Un disque, comme le handoff. */
+    border-radius: 50%;
     display: grid;
     place-items: center;
     font-size: 12px;
@@ -188,6 +189,32 @@
     box-shadow: none;
     overflow-x: visible;
     overflow-y: auto;
+  }
+
+  /*
+   * Le mot « freel » en tête du rail, comme le handoff — l'avant-dernière
+   * lettre en vert.
+   *
+   * En CSS et non en JSX : le paquet d'entrée est à 0,1 Ko de son budget, et
+   * un logo n'a rien à y faire. Le dégradé, découpé à la forme du texte, pose
+   * le vert sur le quatrième caractère ; les deux couleurs sont des tokens,
+   * donc le mot suit les quatre palettes. Décoratif : le nom de l'application
+   * est déjà dans le titre de la page, rien n'est perdu pour un lecteur
+   * d'écran.
+   */
+  .rail::before {
+    content: 'freel';
+    display: block;
+    width: max-content;
+    margin: 0 13px 18px;
+    font-size: 23px;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    background: linear-gradient(90deg, var(--text) 0 57%, var(--green) 57% 84%, var(--text) 84%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   .lien {

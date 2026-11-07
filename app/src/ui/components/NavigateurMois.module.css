@@ -75,7 +75,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 0;
+  /* Le mois ne se comprime pas : comprimé, il passait sous ses propres
+     flèches. C'est le nom de l'écran, ailleurs, qui sait tronquer. */
+  flex: none;
 }
 
 @media (max-width: 760px) {

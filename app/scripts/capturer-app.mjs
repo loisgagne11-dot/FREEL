@@ -108,7 +108,7 @@ const VUES = [
   { hash: '#/activite', nom: 'activite-missions', ouvrir: ['Missions'] },
   /* L'onglet Factures d'Activité, comme le handoff : depuis le lot 6 (rail en
      formule A), la liste des factures n'est plus un écran à part. */
-  { hash: '#/activite/factures', nom: 'activite-factures' },
+  { hash: '#/activite/factures', nom: 'activite-factures', attendre: 'button:has-text("Nouvelle facture")' },
   /* La rédaction, avec son aperçu vivant : elle s'apparie à
      `pilote-nouvelle-facture` du handoff. L'écran n'est pas une modale chez
      nous — le facturier est un écran à part entière —, mais c'est le même
