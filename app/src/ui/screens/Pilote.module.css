@@ -109,9 +109,20 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  margin: 0;
+  gap: 8px;
+  margin: 12px 0 0;
   padding: 0;
 }
+
+/* Les titres des blocs du Pilote en surtitre, comme le handoff (« DÉCISIONS
+   DU JOUR ») : petite capitale espacée, le contenu porte le poids. */
+.decisions .titreCarte {
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+.decisions .compteur { text-transform: none; letter-spacing: 0; }
 
 .sujet {
   display: grid;
@@ -119,24 +130,35 @@
      peut rétrécir : c'est ce qui évite tout débordement en portrait. */
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
-  gap: 10px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--line);
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
 }
 
-.sujet:last-child { border-bottom: none; }
+/* Une décision en retard se détache, comme la carte « urgente » du handoff :
+   un liseré et un fond rouges, sans crier sur toute la liste. */
+.sujetRetard { border-color: var(--red-line); background: var(--red-soft); }
 
+
+
+/* La tuile de gravité, à la place de l'icône du handoff : un carré teinté et
+   son point — la gravité se lit aussi dans l'étiquette, pour qui ne distingue
+   pas les couleurs. */
 .puce {
-  width: 9px;
-  height: 9px;
-  border-radius: 100px;
-  margin-top: 5px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
   flex: none;
+  display: grid;
+  place-items: center;
 }
+.puce::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
 
-.puceRetard { background: var(--red); }
-.puceAFaire { background: var(--amber); }
-.puceInfo { background: var(--blue); }
+.puceRetard { color: var(--red); background: var(--red-soft); }
+.puceAFaire { color: var(--amber); background: var(--amber-soft); }
+.puceInfo { color: var(--blue); background: var(--blue-soft); }
 
 .sujetCorps {
   display: flex;
@@ -161,9 +183,11 @@
   font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--muted-2);
-  font-weight: 500;
+  font-weight: 600;
 }
+.graviteRetard { color: var(--red); }
+.graviteAFaire { color: var(--amber); }
+.graviteInfo { color: var(--blue); }
 
 .sujetContexte {
   font-size: 12px;

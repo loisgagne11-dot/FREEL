@@ -19,15 +19,20 @@
   margin-bottom: 14px;
 }
 
+/* En surtitre, comme le handoff (« → LE FLUX DU MOIS · JUIN 2026 ») : la
+   carte se lit par ses montants, pas par son titre. */
 .titreCarte {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 14px;
-  font-weight: 620;
-  letter-spacing: -0.02em;
-  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green);
 }
+.titreCarte::before { content: '→'; }
 
 .indice { font-size: 11px; color: var(--muted-2); }
 
@@ -54,17 +59,25 @@
   padding-left: 10px;
 }
 
+/* Les étiquettes de colonne portent leur couleur et une puce carrée, comme
+   le handoff : le code couleur ne vivait que dans le montant. */
 .libelle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted-2);
 }
+.libelle::before { content: ''; width: 7px; height: 7px; border-radius: 2px; background: currentColor; }
 
 /* Le montant se réduit avec la fenêtre : à 390 px une colonne fait ~105 px, et
    un montant à six chiffres déborderait à taille fixe. `clamp` évite d'avoir à
    choisir entre « illisible » et « tronqué ». */
 .montant {
+  line-height: 1.15;
   font-size: clamp(15px, 4.6vw, 19px);
   letter-spacing: -0.03em;
   font-weight: 620;
@@ -76,6 +89,7 @@
 .sortie { color: var(--amber); }
 
 .note {
+  margin: 0;
   font-size: 10px;
   line-height: 1.45;
   color: var(--muted);

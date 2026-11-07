@@ -144,7 +144,7 @@ export function Pilote() {
         besoinMensuel={faits.besoinMensuel}
       />
 
-      <SanteCard indicateurs={sante} autonomie={etat.autonomie} />
+      <SanteCard indicateurs={sante} autonomie={etat.autonomie} reserve={etat.tresorerie.reserve} />
 
       {/*
         * SANS DOUBLONS.

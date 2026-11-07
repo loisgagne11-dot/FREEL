@@ -39,10 +39,16 @@ export interface Indicateur {
  * disposition du handoff, sur une seule barre.
  */
 export function SanteCard(
-  { indicateurs, autonomie }: {
+  { indicateurs, autonomie, reserve }: {
     readonly indicateurs: readonly Indicateur[];
     /** Mois d'autonomie, ou `null` quand le besoin mensuel n'est pas renseigné. */
     readonly autonomie: number | null;
+    /**
+     * Le seuil de sécurité, que l'autonomie ne touche pas. Nommé avec son
+     * montant : c'est le seul endroit du Pilote où il paraît, depuis que les
+     * tuiles en double sont parties.
+     */
+    readonly reserve: number;
   }
 ) {
   const synthese = syntheseDeSante(indicateurs);
@@ -84,7 +90,13 @@ export function SanteCard(
       <p className={styles.autonomie}>
         {autonomie === null
           ? 'Autonomie inconnue'
-          : <><strong>{moisTexte(autonomie)}</strong> d’autonomie, sans toucher à la réserve</>}
+          : <>
+            <span className={styles.autonomieValeur}>{moisTexte(autonomie)}</span>
+            <span className={styles.autonomieLibelle}>
+              d’autonomie, sans toucher
+              {reserve > 0 ? <> à ta réserve de <Montant>{eur(reserve)}</Montant></> : ' à la réserve'}
+            </span>
+          </>}
       </p>
     </section>
   );

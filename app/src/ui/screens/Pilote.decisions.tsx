@@ -54,7 +54,7 @@ export function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] }) {
 function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
   const { intitule, contexte, action, levier } = formuler(s);
   return (
-    <li className={styles.sujet}>
+    <li className={`${styles.sujet} ${s.gravite === 'retard' ? styles.sujetRetard : ''}`}>
       <span
         className={`${styles.puce} ${
           s.gravite === 'retard' ? styles.puceRetard
@@ -68,7 +68,9 @@ function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
           {intitule}
           {/* Le libellé porte déjà la quantité quand elle compte ; on
               n'affiche pas « 1 » qui n'apprendrait rien. */}
-          <span className={styles.sujetGravite}>
+          <span className={`${styles.sujetGravite} ${
+            s.gravite === 'retard' ? styles.graviteRetard
+            : s.gravite === 'a_faire' ? styles.graviteAFaire : styles.graviteInfo}`}>
             {s.gravite === 'retard' ? 'En retard'
               : s.gravite === 'a_faire' ? 'À faire' : 'Information'}
           </span>

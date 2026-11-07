@@ -66,7 +66,7 @@ Chaque correctif porte son test de mutation.
 | L4 — provision du solde de l'impôt N-1 jusqu'à la saisie de l'avis ; une échéance d'impôt peut porter l'exercice qu'elle règle ; test qui traverse le 31 décembre | ✅ fait |
 | L5 — impôt de l'activité au taux marginal (décision 3), une seule fonction partagée avec le comparateur | ✅ fait |
 | L9 — « avant impôt » écrit au barème sur le net d'une journée et la capacité de versement | ✅ fait |
-| L12 — CFP rangée dans sa nature `cfp` (enveloppe à part), plus en « impôt » | ✅ fait. *Le montant à payer par déclaration (cotisations 25,6 % + CFP 0,2 %) n'est pas encore affiché : l'échéancier ne montre que la base encaissée — lot 5, avec la ligne « Déclarer » du Pilote.* |
+| L12 — CFP rangée dans sa nature `cfp` (enveloppe à part), plus en « impôt » | ✅ fait. *Le montant à payer par déclaration (cotisations + CFP) s'affiche depuis le lot 5, sur le Pilote et dans l'échéancier.* |
 | L11 — date du jour locale partout (elle était en UTC quand le mois courant est local) ; `ajouterJours` juste au changement d'heure ; tests à l'heure de Paris | ✅ fait. *Arrondi des parts : reporté au lot 7.* |
 | Q2 — plus aucun test qui sort avant sa première assertion (`test/resolution.ts`) ; un test vide depuis le lot R vérifie de nouveau | ✅ fait |
 | Q4 — `domain/dates.ts` et `ui/format.ts` comme seules sources | ↪ reporté au lot 7 : unifier `enKiloEuros` change les étiquettes des graphes (« 10,2 k€ » ↔ « 10 k€ ») et demande son contrôle visuel |
@@ -92,17 +92,17 @@ Touche le Pilote et l'Argent : captures à regénérer.
 
 Sert de filet aux lots 5 et 6.
 
-### Lot 5 — Pilote aligné sur le handoff
+### Lot 5 — Pilote aligné sur le handoff (PR #301)
 
 | Ligne | État |
 |---|---|
-| « Décisions du jour » en bloc principal ; une ligne par élément avec pastille de statut cliquable et « levier → » | ⬜ |
-| Phrase de synthèse de santé à règle de priorité écrite (le score /100 du handoff reste refusé : pondérations arbitraires, `AUDIT-GRAPHES-ET-INDICATEURS.md` §5.1) | ⬜ |
-| Salutation « Bonjour {prénom} — n sujets ce matin », prénom saisi dans Réglages, jamais en dur | ⬜ |
-| Plus aucun doublon (versable, tuiles d'Argent, « Ce que je dois ») ; demi-largeur vide à côté de la carte versable | ⬜ |
-| Une période close mais encore dans sa fenêtre de déclaration est annoncée « en retard » dès le lendemain de sa clôture (trouvé au lot 4) : « à déclarer avant le … », à faire, et « en retard » seulement passé la date limite — comme le « Déclarer l'URSSAF T2 — guichet ouvert » du handoff | ⬜ |
-| Le code d'entrée est à 78,6 / 80 Ko : extraire avant d'ajouter | ⬜ |
-| Contrôle visuel image contre image avec le handoff | ⬜ |
+| « Décisions du jour » en bloc principal ; une ligne par élément avec pastille de statut cliquable et « levier → » | ✅ fait : pleine largeur, « N à traiter », un levier par sujet vérifié contre la fonction qu'il annonce. Les pastilles cliquables sont celles du flux (encaissé, en attente, en retard ; payé, à venir), qui mènent au facturier ou à l'échéancier. *Renoncé, et écrit : les feuilles de détail du handoff (`tpl-*`) — les décisions mènent à l'écran qui règle ; la feuille « Seuil de TVA — deux leviers chiffrés » ; l'estimation « bascule en septembre » sur le Pilote (Argent la donne, au rythme de l'encaissé) ; la décision positive (« CRA prêt ») et « Dépendance client », hors de ce lot.* |
+| Phrase de synthèse de santé à règle de priorité écrite (le score /100 du handoff reste refusé : pondérations arbitraires, `AUDIT-GRAPHES-ET-INDICATEURS.md` §5.1) | ✅ fait : provisions à découvert, déclaration en retard, régime (TVA due, plafond dépassé), facture en retard, déclaration à faire ; « Tout est en ordre » sinon. Le constat « Factures » compte les factures en retard, plus celles en attente |
+| Salutation « Bonjour {prénom} — n sujets ce matin », prénom saisi dans Réglages, jamais en dur | ✅ fait : « Bonjour Camille — deux décisions t'attendent. » ; `entreprise.prenom`, schéma 19 |
+| Plus aucun doublon (versable, tuiles d'Argent, « Ce que je dois ») ; demi-largeur vide à côté de la carte versable | ✅ fait : le versable vit dans la colonne Rémunération du flux |
+| Une période close mais encore dans sa fenêtre de déclaration est annoncée « en retard » dès le lendemain de sa clôture (trouvé au lot 4) : « à déclarer avant le … », à faire, et « en retard » seulement passé la date limite — comme le « Déclarer l'URSSAF T2 — guichet ouvert » du handoff | ✅ fait, avec la base encaissée et le montant à payer (cotisations + VL + CFP) sur le Pilote et dans l'échéancier — le reste du L12 |
+| Le code d'entrée est à 78,6 / 80 Ko : extraire avant d'ajouter | ✅ tenu : 78,8 Ko après le lot, les doublons retirés payant les ajouts |
+| Contrôle visuel image contre image avec le handoff | ✅ fait (agent contrôleur, deux thèmes) : « conforme avec réserves ». Corrigés : autonomie en chiffre clé, décisions en rangées bordées (retard souligné, étiquette de gravité lisible), raccourcis qui passent à la ligne au lieu d'être coupés à 1 440 px, étiquettes de colonnes colorées, titres en surtitre. *Restent mineurs, assumés : boutons d'action à 44 px (cible tactile, contrôlée par `verifier`) quand le handoff les fait à 30 ; pas de repli du bloc des décisions ; pas d'icône portefeuille ; en thème clair, cartes posées sur un fond blanc (lot 7, contraste).* |
 
 ### Lot 6 — Barre du haut et rail
 

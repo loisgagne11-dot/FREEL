@@ -95,7 +95,7 @@ describe('factures en retard', () => {
     });
     const s = sujetsATraiter(e).find((x) => x.id === 'factures-en-retard');
     expect(s?.nombre).toBe(2);
-    expect(s === undefined ? '' : formuler(s).contexte).toContain('3000');
+    expect(s === undefined ? '' : formuler(s).contexte).toMatch(/3\s000 €/u);
   });
 });
 
@@ -198,7 +198,7 @@ describe('seuil majoré de TVA', () => {
     expect(s).toBeDefined();
     expect(s?.gravite).toBe('a_faire');
     expect(s === undefined ? '' : formuler(s).intitule).toMatch(/proche/i);
-    expect(s === undefined ? '' : formuler(s).contexte).toContain('6250');
+    expect(s === undefined ? '' : formuler(s).contexte).toMatch(/6\s250 €/u);
   });
 
   it('passe en retard une fois le seuil franchi, et explique le coût', () => {

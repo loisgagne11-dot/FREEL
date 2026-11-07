@@ -86,7 +86,7 @@ export function FluxCard(
 
       <div className={styles.colonnes}>
         <div className={styles.colonne}>
-          <span className={styles.libelle}>Entrées</span>
+          <span className={`${styles.libelle} ${styles.entree}`}>Entrées</span>
           <span className={`${styles.montant} ${styles.entree}`}>
             <Montant>{eur(flux.entrees.encaisse)}</Montant>
           </span>
@@ -99,7 +99,7 @@ export function FluxCard(
         </div>
 
         <div className={styles.colonne}>
-          <span className={styles.libelle}>Sorties</span>
+          <span className={`${styles.libelle} ${styles.sortie}`}>Sorties</span>
           <span className={`${styles.montant} ${styles.sortie}`}>
             <Montant>{eur(flux.sorties.total)}</Montant>
           </span>
@@ -112,7 +112,7 @@ export function FluxCard(
         </div>
 
         <div className={styles.colonne}>
-          <span className={styles.libelle}>Rémunération</span>
+          <span className={`${styles.libelle} ${styles.entree}`}>Rémunération</span>
           <button type="button" className={`${styles.montant} ${styles.versable}`} onClick={onVersable}>
             <Montant>{eur(flux.remuneration.versable)}</Montant>
             <span className={styles.horsEcran}> — d’où vient ce chiffre</span>

@@ -591,3 +591,14 @@ d'essai à sept dates et refuse tout NaN ou Infinity ; il vérifie aussi que le
 Pilote et l'échéancier comptent les mêmes périodes, et que le versable vaut
 solde − provisions − réserve.
 
+## Lot 5 (07/11) — le Pilote du handoff
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Versable | Pilote | Deux fois : carte « Je peux me verser » et colonne Rémunération | Une fois, colonne Rémunération, cliquable vers sa composition |
+| Solde, À garder, Disponible, Seuil | Pilote | Quatre tuiles, doublons de l'en-tête d'Argent | Retirées du Pilote (Argent, à un clic) ; le solde reste dans la pastille de l'en-tête |
+| « Ce que je dois » | Pilote | Carte à part | La colonne Sorties : payé · à venir, une ligne par échéance et une pour les charges à provisionner |
+| Constat « Factures » | Pilote → Santé | Factures EN ATTENTE (une facture à trente jours y passait pour un problème) | Factures EN RETARD |
+| « N périodes à déclarer » | Pilote, échéancier | « En retard » dès la clôture | « À faire » jusqu'à la date limite, avec base et montant à payer |
+| Phrase de santé | Pilote | Trois rangs (provisions, déclarations, factures) | Cinq rangs écrits, régime et déclaration à faire compris |
+

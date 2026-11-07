@@ -72,12 +72,12 @@ describe('barre santé', () => {
    * d'apparence officielle que personne n'a validé.
    */
   it('n’affiche aucune note globale inventée', () => {
-    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} />);
+    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} reserve={2470} />);
     expect(screen.queryByText(/\/\s?100/)).toBeNull();
   });
 
   it('affiche les trois constats', () => {
-    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} />);
+    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} reserve={2470} />);
     expect(screen.getByText('Provisions couvertes')).toBeTruthy();
     expect(screen.getByText('Factures à jour')).toBeTruthy();
     expect(screen.getByText('Déclarations à jour')).toBeTruthy();
@@ -86,7 +86,7 @@ describe('barre santé', () => {
   // Sans besoin mensuel, l'autonomie n'est pas calculable : « 0 mois » ferait
   // croire à une trésorerie à sec.
   it('dit que l’autonomie est inconnue plutôt que d’afficher zéro', () => {
-    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={null} />);
+    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={null} reserve={2470} />);
     expect(screen.getByText('Autonomie inconnue')).toBeTruthy();
   });
 });
@@ -148,3 +148,10 @@ describe('phrase de synthèse', () => {
     expect(syntheseDeSante([]).ton).toBe('bon');
   });
 });
+
+// Le seul endroit du Pilote où la réserve paraît : l'autonomie la nomme.
+it('nomme la réserve que l’autonomie ne touche pas', () => {
+  render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} reserve={2470} />);
+  expect(screen.getByText(/d’autonomie/).textContent).toMatch(/réserve de 2\s*470/u);
+});
+

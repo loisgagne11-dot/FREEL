@@ -102,7 +102,7 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
     case 'factures-en-retard':
       return {
         intitule: pluriel(sujet.nombre, 'facture en retard', 'factures en retard'),
-        contexte: `${nombre(d['total'])} € impayés, dont `
+        contexte: `${euro(nombre(d['total']))} impayés, dont `
           + `${pluriel(nombre(d['plusAncienne']), 'jour', 'jours')} de retard `
           + 'sur la plus ancienne.',
         action: 'Relancer',
@@ -123,7 +123,7 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         ),
         contexte: depuis === '' ? '' :
           `Depuis ${moisLisible(depuis)}. L’amende est forfaitaire : `
-          + `${nombre(d['amende'])} € encourus. La franchise en base n’en dispense pas.`,
+          + `${euro(nombre(d['amende']))} encourus. La franchise en base n’en dispense pas.`,
         action: 'Déposer',
         levier: 'les lignes par client sont prêtes dans Argent › Déclaration européenne de services'
       };
@@ -189,7 +189,7 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
           ? 'La TVA est due immédiatement. Une facture émise sans TVA après le '
             + 'franchissement est réputée TTC : la part de TVA est à reverser sans '
             + 'avoir pu être répercutée au client.'
-          : `Il reste ${nombre(d['reste'])} € facturables avant assujettissement immédiat.`,
+          : `Il reste ${euro(nombre(d['reste']))} facturables avant assujettissement immédiat.`,
         action: franchi ? 'Régulariser' : 'Voir le détail',
         /* En franchise, on ne facture pas la TVA de sa propre initiative : il
            faut opter (un engagement) ou franchir le seuil. Et en BNC, c'est
@@ -206,7 +206,7 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         intitule: d['depasse'] === true
           ? 'Plafond du régime micro dépassé'
           : 'Plafond du régime micro proche',
-        contexte: `${nombre(d['ca'])} € encaissés sur ${nombre(d['plafond'])} € de plafond.`,
+        contexte: `${euro(nombre(d['ca']))} encaissés sur ${euro(nombre(d['plafond']))} de plafond.`,
         action: 'Voir le détail',
         levier: 'un seul dépassement ne te sort pas du micro si tu repasses sous le plafond '
           + 'l’année suivante ; deux années de suite, oui'

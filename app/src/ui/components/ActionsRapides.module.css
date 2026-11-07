@@ -63,4 +63,11 @@
   .rangee { flex-direction: column; align-items: stretch; gap: 6px; }
 }
 
+/* En grand écran, la rangée passe à la ligne comme le handoff : défiler
+   n'y a plus de raison, et le dernier raccourci était coupé au bord droit à
+   1 440 px, sans rien qui dise qu'il en restait. */
+@media (min-width: 761px) {
+  .liste { flex-wrap: wrap; overflow-x: visible; }
+}
+
 @media print { .rangee { display: none; } }
