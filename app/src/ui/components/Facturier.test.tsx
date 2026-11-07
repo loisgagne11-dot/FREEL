@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { dateISO, euros } from '../../domain/types';
+import { dateISO, euros, mois } from '../../domain/types';
 import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { stockageMemoireJustificatifs } from '../../infra/justificatifs';
@@ -453,6 +453,27 @@ describe('la facture du mois, avant qu’elle existe', () => {
       email: '', telephone: '', rythmes: [rythme], ajustements: {}
     }]
   };
+
+  /**
+   * LE MOIS FACTURÉ EST CELUI DE LA BARRE.
+   *
+   * Le brouillon avait ses propres flèches : on regardait mai en haut et la
+   * facture de juin en bas, sans que rien ne le signale.
+   */
+  it('propose la facture du mois de la barre, et ses flèches déplacent ce mois-là', async () => {
+    semer([], { missions: [missionPlanifiee] });
+    const onMois = vi.fn();
+    render(
+      <FournisseurToasts>
+        <Facturier onNouvelle={() => {}} stockage={stockageMemoireJustificatifs()}
+          mois={mois('2026-05')} onMois={onMois} />
+      </FournisseurToasts>
+    );
+    expect(screen.getByRole('heading', { name: /La facture de mai 2026/ })).toBeTruthy();
+    await userEvent.click(within(screen.getByLabelText('Mois facturé').closest('section') as HTMLElement)
+      .getByRole('button', { name: 'Mois suivant' }));
+    expect(onMois).toHaveBeenCalledWith('2026-06');
+  });
 
   it('propose la facture du mois sans qu’on la demande', () => {
     semer([], { missions: [missionPlanifiee] });
