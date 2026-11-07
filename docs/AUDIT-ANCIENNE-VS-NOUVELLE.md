@@ -314,3 +314,13 @@ chiffre faux.
 | Déclarations URSSAF à zéro | 🟢 | Les périodes closes sans recette se marquent déclarées depuis l'échéancier ; l'alerte du Pilote peut enfin s'éteindre |
 | Dates « aujourd'hui » | 🟢 | Date du calendrier local partout (une facture émise à 0 h 30 le 1er janvier n'est plus datée de l'année précédente) |
 
+## Lot 3 (07/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Passage à la TVA en cours d'année | 🟢 | Le mois de TVA se déduit des encaissements (seuil majoré franchi, ou franchise perdue l'année d'avant) ; la saisie ne porte plus que l'option. Factures et dépenses lisent la même source : une facture émise après le franchissement porte la TVA sans attendre une saisie. L'ancienne exigeait la date à la main |
+| Factures émises sans TVA après le franchissement | 🟢 | Nouveau sujet « à traiter » qui les compte ; il retombe quand elles sont annulées par un avoir |
+| Annulation d'une facture avec TVA (avoir) | 🟢 | L'avoir reprend la TVA au signe opposé et entre au dossier de TVA du trimestre où il est émis, marqué « Avoir sur … ». Avant : la TVA de la facture annulée restait collectée |
+| Situation du foyer (mariage ou Pacs) | 🟢 | Nouveau fait, facultatif, en Réglages → Trésorerie et dans le comparateur ; il fixe le plafond de la décote. L'ancienne ignorait la décote |
+| Comparateur versement libératoire / barème | 🟢 | Reprend les parts, les autres revenus et la situation saisis en Réglages (il repartait de « 1 part, 0 € ») ; applique la décote |
+

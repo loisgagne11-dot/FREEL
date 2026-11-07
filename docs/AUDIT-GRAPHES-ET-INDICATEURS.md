@@ -559,3 +559,22 @@ un test nommé, prouvé par mutation.
 **Non fait, reporté au lot 7** : le même montant s'affiche encore en k€ avec
 deux arrondis différents entre Trésorerie et Performance (`enKiloEuros`).
 
+## Lot 3 (07/11) — TVA franchie en cours d'année, décote
+
+Six nombres lus à l'écran changent de valeur ou de sens. Chacun est tenu par
+un test nommé, prouvé par mutation.
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Solde du compte | Pilote, Argent | Hors taxe : sur une facture de 1 000 € HT payée 1 200 €, il manquait 200 € | Ce que le client a versé, TVA comprise |
+| Provision de TVA | Argent → enveloppes, versable | Rien entre l'encaissement et la saisie de l'appel ; le reversement retranchait une seconde fois | La TVA collectée non encore appelée est gardée de côté ; encaisser puis reverser ne fait plus varier le versable |
+| Mois de passage à la TVA | Réglages → Profil, factures, dépenses | Deux sources : la date calculée s'affichait, les factures lisaient la saisie restée vide | Une seule (`debutTvaEffectif`) |
+| « Factures à régulariser » | Barre du haut, Pilote | — | Nombre de factures émises sans TVA depuis le franchissement |
+| TVA collectée du trimestre | Argent → dossier de TVA | Avoirs écartés : la TVA d'une facture annulée ne revenait jamais | L'avoir compte au trimestre de l'avoir, au signe opposé |
+| Impôt de l'activité | Provision d'impôt, comparateur VL | Sans décote | Décote du barème 2024 (889 € / 1 470 €, 45,25 %) ; situation inconnue → la moins favorable, dite à l'écran quand elle change le montant |
+
+**À savoir** : la décote ne fait pas toujours baisser l'impôt de l'activité.
+Pour un foyer déjà dans la zone où elle s'éteint, chaque euro d'impôt brut en
+retire 45,25 centimes : une part, 20 000 € d'autres revenus, 6 000 €
+imposables — 660 € au barème seul, 958,65 € avec la décote.
+
