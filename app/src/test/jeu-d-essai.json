@@ -1,8 +1,9 @@
 {
   "_lisezMoi": "Jeu d’essai à FORME RÉELLE, entièrement fictif : mêmes structures qu’un compte réel (ACRE qui s’éteint, TVA franchie en cours d’année, avoir, foyer à deux parts, passage du 31 décembre), aucune donnée personnelle. Il sert aux tests d’intégration (src/integration) et à capturer-app.mjs --jeu=essai, jamais à la démonstration.",
-  "version": 18,
+  "version": 19,
   "entreprise": {
     "nom": "Entreprise Démo Indépendant",
+    "prenom": "",
     "siret": "000 000 000 00010",
     "debutActivite": "2025-04-01",
     "typeActivite": "BNC",

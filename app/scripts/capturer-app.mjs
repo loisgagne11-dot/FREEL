@@ -132,7 +132,10 @@ const VUES = [
      exactement le cas où « les tests sont verts et personne n'a regardé » — et
      le premier passage a produit un chevron collé au montant comme une
      virgule, que rien d'autre qu'un œil ne pouvait voir. */
-  { hash: '#/pilote', nom: 'pilote-composition', ouvrir: ['Solde'] },
+  /* Depuis le lot 5, la composition s'ouvre sur le versable de la colonne
+     Rémunération : les tuiles (« Solde »…) sont parties avec les doublons.
+     Le libellé est un motif — le nom du bouton commence par le montant. */
+  { hash: '#/pilote', nom: 'pilote-composition', ouvrir: ['.*d’où vient ce chiffre'] },
   { hash: '#/argent', nom: 'argent-tresorerie' },
   { hash: '#/argent', nom: 'argent-performance', ouvrir: ['Performance'] },
   { hash: '#/achats', nom: 'achats' },

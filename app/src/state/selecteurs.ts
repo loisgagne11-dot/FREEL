@@ -20,7 +20,7 @@ import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
   type VentilationProvisions,
-  estPayee, exerciceDe, provisions as calculerProvisions
+  estPayee, exerciceDe, provisions as calculerProvisions, voletAProvisionner
 } from '../domain/calculs/provisions';
 import { type ResultatTresorerie, autonomieMois, calculerTresorerie } from '../domain/calculs/tresorerie';
 import {
@@ -37,10 +37,11 @@ import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
 import { type ProvenanceSolde, soldeDerive } from '../domain/calculs/solde';
+import { moisDeLaPeriode } from '../domain/calculs/declarations';
 import type { RegimeTva } from '../domain/calculs/depenses';
 import { tvaDeDepense } from '../domain/calculs/depenses.tva';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
-import type { Faits } from './schema';
+import type { Faits, Recette } from './schema';
 import {
   FORMULE_PAR_DEFAUT, echeanceDe
 } from '../domain/calculs/delaiPaiement';
@@ -295,16 +296,28 @@ export function finAcreDe(faits: Faits): Resolution<Mois> | null {
  * finiraient par diverger d'un jour — celui qui décide d'une relance.
  */
 
+/**
+ * L'échéance d'une facture, pour le sujet « en retard » comme pour la
+ * pastille du flux : une seule règle.
+ *
+ * Elle vient de la recette : elle est imprimée sur le document. Le secours ne
+ * sert qu'à une facture qu'aucune migration n'aurait comblée — une facture
+ * émise sans échéance serait réputée jamais échue, et les retards les plus
+ * anciens seraient précisément ceux qu'on ne verrait pas.
+ */
+function echeanceDesFactures(faits: Faits): (r: Recette) => DateISO | null {
+  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+  return (r) => (r.emiseLe === null
+    ? null
+    : r.echeanceLe ?? echeanceDe(r.emiseLe, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT));
+}
+
 export function entreeATraiter(
   faits: Faits,
   echeancesReglementaires: EntreeATraiter['echeancesReglementaires'] = [],
   maintenant: Date = new Date()
 ): EntreeATraiter {
-  /* L'échéance vient de la recette : elle est imprimée sur le document. Le
-     secours ne sert qu'à une facture qu'aucune migration n'aurait comblée —
-     une facture émise sans échéance serait réputée jamais échue, et les
-     retards les plus anciens seraient précisément ceux qu'on ne verrait pas. */
-  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+  const echeance = echeanceDesFactures(faits);
   const tvaDue = tvaDueDepuisDe(faits);
   return {
     aujourdhui: dateISOde(maintenant),
@@ -316,10 +329,7 @@ export function entreeATraiter(
       encaisseeLe: r.encaisseeLe,
       modeReglement: r.modeReglement,
       clientNom: r.clientNom,
-      echeanceLe: r.emiseLe === null
-        ? null
-        : r.echeanceLe
-          ?? echeanceDe(r.emiseLe, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT)
+      echeanceLe: echeance(r)
     })),
     periodesDeclarees: faits.periodesDeclarees,
     echeancesSaisies: faits.echeances.length,
@@ -551,7 +561,47 @@ export function aTraiter(
 ): readonly SujetATraiter[] {
   return sujetsATraiter(
     entreeATraiter(faits, echeancesReglementairesActives(faits, maintenant), maintenant)
+  ).map((s) => {
+    // La déclaration arrive avec ce qu'il faut payer : c'est la question qu'on
+    // se pose en ouvrant le site de l'URSSAF. Calculé ici et non dans le
+    // domaine des sujets, qui ne connaît pas les barèmes.
+    if (s.id !== 'periodes-a-declarer' || typeof s.donnees['periode'] !== 'string') return s;
+    const m = montantDeclaration(
+      faits, moisDeLaPeriode(s.donnees['periode'], faits.entreprise.urssafPeriodicite)
+    );
+    return { ...s, donnees: { ...s.donnees, montant: m.statut === 'refuse' ? null : m.valeur } };
+  });
+}
+
+/**
+ * Ce que coûte la déclaration d'une période : cotisations, plus le versement
+ * libératoire s'il y a lieu, plus la CFP, sur les encaissements de la période
+ * — la même règle que le volet « à provisionner », taux au mois de chaque
+ * encaissement.
+ *
+ * Refusé si un taux manque : un montant calculé avec un taux à zéro se lirait
+ * comme un fait, et se recopierait sur le formulaire. Une période sans
+ * encaissement, elle, coûte un vrai zéro — elle se déclare quand même.
+ */
+export function montantDeclaration(faits: Faits, mois: readonly Mois[]): Resolution<Euros> {
+  const dans = new Set<string>(mois);
+  const dernier = mois[mois.length - 1];
+  if (dernier === undefined) return { statut: 'refuse', motif: 'Période vide.' };
+  const taux = tauxImpotEtContributions(regimeDe(faits), dernier, faits.entreprise.typeActivite);
+  if (taux.statut === 'refuse') return taux;
+  const calcul = voletAProvisionner(
+    recettesEncaissees(faits).filter((r) => dans.has(r.encaisseeLe.slice(0, 7))),
+    { mois: [] },
+    {
+      typeActivite: faits.entreprise.typeActivite,
+      sousAcreLe: sousAcreLe(faits),
+      periodesUrssaf: periodesUrssafEffectives(faits),
+      tauxImpotEtContributions: taux.valeur
+    }
   );
+  const refus = calcul.nonCalculables[0];
+  if (refus !== undefined) return { statut: 'refuse', motif: refus.motif };
+  return { statut: 'publie', valeur: calcul.montant, source: taux.source, verifieLe: taux.verifieLe };
 }
 
 /**
@@ -813,6 +863,8 @@ export interface LigneFlux {
   readonly date: DateISO | null;
   /** Ce qui est fait, et ce qui ne l'est pas encore. */
   readonly regle: boolean;
+  /** Non réglé et passé son échéance : la pastille « en retard ». */
+  readonly enRetard?: boolean;
 }
 
 export interface FluxDuMois {
@@ -872,8 +924,10 @@ export function fluxDuMois(
   faits: Faits,
   m: Mois,
   etat: EtatPilote,
-  echeances: readonly Echeance[] = faits.echeances
+  echeances: readonly Echeance[] = faits.echeances,
+  aujourdhui: DateISO = dateDuJour()
 ): FluxDuMois {
+  const echeance = echeanceDesFactures(faits);
   const encaisseesDuMois = faits.recettes.filter(
     (r) => r.encaisseeLe !== null && r.encaisseeLe.startsWith(m)
   );
@@ -898,13 +952,17 @@ export function fluxDuMois(
           date: r.encaisseeLe,
           regle: true
         })),
-        ...enAttente.map((r) => ({
-          id: r.id,
-          libelle: r.clientNom !== '' ? r.clientNom : r.libelle,
-          montant: r.montant,
-          date: r.emiseLe,
-          regle: false
-        }))
+        ...enAttente.map((r) => {
+          const limite = echeance(r);
+          return {
+            id: r.id,
+            libelle: r.clientNom !== '' ? r.clientNom : r.libelle,
+            montant: r.montant,
+            date: r.emiseLe,
+            regle: false,
+            enRetard: limite !== null && limite < aujourdhui
+          };
+        })
       ]
     },
     sorties: {

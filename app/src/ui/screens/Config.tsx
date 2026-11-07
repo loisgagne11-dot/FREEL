@@ -539,6 +539,15 @@ function Profil() {
             onChange={(e) => modifier({ nom: e.target.value })} />
         </Champ>
 
+        <Champ
+          id={`${idChamp}-prenom`}
+          libelle="Ton prénom"
+          aide="Pour te saluer sur le Pilote. Il ne figure sur aucun document."
+        >
+          <input id={`${idChamp}-prenom`} value={entreprise.prenom} autoComplete="given-name"
+            onChange={(e) => modifier({ prenom: e.target.value })} />
+        </Champ>
+
         {/*
           * LE SIRET EST CONTRÔLÉ, PAS SEULEMENT DEMANDÉ.
           *

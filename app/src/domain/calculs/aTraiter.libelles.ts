@@ -35,6 +35,16 @@ export interface SujetFormule {
   readonly contexte: string;
   /** Libellé de l'action à mener. */
   readonly action: string;
+  /**
+   * Ce que l'application a déjà préparé pour la mener — la ligne
+   * « levier → » du handoff. `null` quand l'action suffit à le dire.
+   *
+   * Un levier ne promet que ce qui EXISTE : chacun a été vérifié contre la
+   * fonction qu'il annonce (relance à trois tons, montants de l'échéancier,
+   * lignes par client de la déclaration européenne). Un levier qui promet une
+   * aide absente est un manque silencieux.
+   */
+  readonly levier: string | null;
 }
 
 /** Accorde un nom au nombre, en préfixant la quantité. */
@@ -43,6 +53,16 @@ function pluriel(n: number, singulier: string, plurielMot: string): string {
 }
 
 /** « 2026-03 » → « mars 2026 ». */
+/** « 31 juillet » : la date limite d'une déclaration, sans l'année. */
+function jourLisible(d: string): string {
+  return new Date(`${d}T00:00:00Z`).toLocaleDateString('fr-FR', {
+    day: 'numeric', month: 'long', timeZone: 'UTC'
+  });
+}
+
+const euro = (n: number): string =>
+  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n)} €`;
+
 function moisLisible(m: string): string {
   return new Date(`${m}-01T00:00:00Z`).toLocaleDateString('fr-FR', {
     month: 'long', year: 'numeric', timeZone: 'UTC'
@@ -73,7 +93,8 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
     return {
       intitule: texte(d['intitule']),
       contexte: complement === '' ? delai : `${delai} ${complement}`,
-      action: texte(d['action']) === '' ? 'Se préparer' : texte(d['action'])
+      action: texte(d['action']) === '' ? 'Se préparer' : texte(d['action']),
+      levier: null
     };
   }
 
@@ -81,10 +102,12 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
     case 'factures-en-retard':
       return {
         intitule: pluriel(sujet.nombre, 'facture en retard', 'factures en retard'),
-        contexte: `${nombre(d['total'])} € impayés, dont `
+        contexte: `${euro(nombre(d['total']))} impayés, dont `
           + `${pluriel(nombre(d['plusAncienne']), 'jour', 'jours')} de retard `
           + 'sur la plus ancienne.',
-        action: 'Relancer'
+        action: 'Relancer',
+        levier: 'la relance est rédigée au ton qui convient — rappel, ferme, puis mise en '
+          + 'demeure ; tu n’as qu’à l’envoyer'
       };
 
     /* La sanction est forfaitaire et par déclaration : 750 € qu'on ait vendu
@@ -100,19 +123,40 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         ),
         contexte: depuis === '' ? '' :
           `Depuis ${moisLisible(depuis)}. L’amende est forfaitaire : `
-          + `${nombre(d['amende'])} € encourus. La franchise en base n’en dispense pas.`,
-        action: 'Déposer'
+          + `${euro(nombre(d['amende']))} encourus. La franchise en base n’en dispense pas.`,
+        action: 'Déposer',
+        levier: 'les lignes par client sont prêtes dans Argent › Déclaration européenne de services'
       };
     }
 
-    case 'periodes-a-declarer':
+    /* Une seule période : la ligne du handoff — laquelle, jusqu'à quand, sur
+       quelle base, pour combien. Plusieurs : leur nombre et depuis quand ; le
+       détail de chacune est dans l'échéancier. Le montant manque quand un taux
+       manque : « à vérifier », jamais un montant calculé à taux zéro. */
+    case 'periodes-a-declarer': {
+      const enRetard = sujet.gravite === 'retard';
+      const levier = 'les montants à recopier sur le site de l’URSSAF sont prêts dans '
+        + 'l’échéancier';
+      if (sujet.nombre > 1) {
+        return {
+          intitule: pluriel(sujet.nombre, 'période à déclarer', 'périodes à déclarer'),
+          contexte: `Depuis ${moisLisible(texte(d['depuis']))}. Tant qu’une période n’est `
+            + 'pas déclarée, sa charge reste provisionnée et le versable est minoré '
+            + 'd’autant.',
+          action: 'Déclarer',
+          levier
+        };
+      }
+      const limite = jourLisible(texte(d['limite']));
+      const montant = typeof d['montant'] === 'number' ? euro(d['montant']) : 'à vérifier';
       return {
-        intitule: pluriel(sujet.nombre, 'période à déclarer', 'périodes à déclarer'),
-        contexte: `Depuis ${moisLisible(texte(d['depuis']))}. Tant qu’une période n’est `
-          + 'pas déclarée, sa charge reste provisionnée et le versable est minoré '
-          + 'd’autant.',
-        action: 'Déclarer'
+        intitule: `Déclarer l’URSSAF ${texte(d['libelle'])} — `
+          + (enRetard ? `date limite dépassée (${limite})` : `avant le ${limite}`),
+        contexte: `Base encaissée ${euro(nombre(d['base']))} · à payer ${montant}.`,
+        action: 'Déclarer',
+        levier
       };
+    }
 
     /* Une omission ne se voit pas : elle produit un chiffre plausible, juste
        trop élevé. D'où l'insistance sur le SENS de l'erreur. */
@@ -122,7 +166,8 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         contexte: 'Tu encaisses depuis plusieurs mois sans qu’aucun appel de '
           + 'cotisations, avis d’impôt ou CFE ne soit saisi. Tant qu’ils manquent, '
           + 'le disponible et le versable sont SURESTIMÉS — c’est le sens qui coûte cher.',
-        action: 'Saisir mes échéances'
+        action: 'Saisir mes échéances',
+        levier: 'saisir un avis prend une minute, et rend le versable juste'
       };
 
     case 'tva-a-regulariser':
@@ -132,7 +177,8 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
           + 'sont réputées TTC, et la TVA est à reverser sur ce que tu as encaissé. Pour '
           + 'régulariser, annule-les par un avoir et réémets-les avec la TVA. Les '
           + 'nouvelles factures la portent déjà.',
-        action: 'Voir les factures'
+        action: 'Voir les factures',
+        levier: 'un avoir puis une nouvelle facture, depuis le facturier'
       };
 
     case 'seuil-tva': {
@@ -143,8 +189,15 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
           ? 'La TVA est due immédiatement. Une facture émise sans TVA après le '
             + 'franchissement est réputée TTC : la part de TVA est à reverser sans '
             + 'avoir pu être répercutée au client.'
-          : `Il reste ${nombre(d['reste'])} € facturables avant assujettissement immédiat.`,
-        action: franchi ? 'Régulariser' : 'Voir le détail'
+          : `Il reste ${euro(nombre(d['reste']))} facturables avant assujettissement immédiat.`,
+        action: franchi ? 'Régulariser' : 'Voir le détail',
+        /* En franchise, on ne facture pas la TVA de sa propre initiative : il
+           faut opter (un engagement) ou franchir le seuil. Et en BNC, c'est
+           l'ENCAISSEMENT qui compte, pas la facture. */
+        levier: franchi
+          ? null
+          : 'repousser un encaissement à l’an prochain, ou opter pour la TVA — un '
+            + 'engagement, à voir avec ton expert-comptable'
       };
     }
 
@@ -153,8 +206,10 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         intitule: d['depasse'] === true
           ? 'Plafond du régime micro dépassé'
           : 'Plafond du régime micro proche',
-        contexte: `${nombre(d['ca'])} € encaissés sur ${nombre(d['plafond'])} € de plafond.`,
-        action: 'Voir le détail'
+        contexte: `${euro(nombre(d['ca']))} encaissés sur ${euro(nombre(d['plafond']))} de plafond.`,
+        action: 'Voir le détail',
+        levier: 'un seul dépassement ne te sort pas du micro si tu repasses sous le plafond '
+          + 'l’année suivante ; deux années de suite, oui'
       };
 
     case 'livre-recettes-incomplet':
@@ -165,7 +220,8 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
           'recettes sans mode de règlement'
         ),
         contexte: 'Le mode de règlement est une mention obligatoire du livre des recettes.',
-        action: 'Compléter'
+        action: 'Compléter',
+        levier: null
       };
 
     case 'bareme-a-verifier':
@@ -173,12 +229,14 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         intitule: 'Barème à revérifier',
         contexte: `Dernière vérification en ${moisLisible(texte(d['verifieLe']))}. Les taux `
           + 'changent au 1er janvier et, depuis 2024, en cours d’année.',
-        action: 'Vérifier'
+        action: 'Vérifier',
+        levier: 'comparer avec urssaf.fr, et ajouter une période dans Réglages › Barème si le '
+          + 'taux a changé'
       };
 
     default:
       /* Un identifiant inconnu ne doit pas faire tomber le panneau : la ligne
          s'affiche sans texte, ce qui se voit — et ce qui se voit se corrige. */
-      return { intitule: sujet.id, contexte: '', action: 'Voir' };
+      return { intitule: sujet.id, contexte: '', action: 'Voir', levier: null };
   }
 }

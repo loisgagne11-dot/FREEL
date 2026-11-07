@@ -7,13 +7,15 @@ import { SanteCard, indicateursDeSante, syntheseDeSante } from './SanteCard';
 afterEach(cleanup);
 
 const SAIN = {
-  dispo: 3000, provisions: 980, impayes: 0, montantImpaye: 0, periodesEnRetard: 0
-};
+  dispo: 3000, provisions: 980, facturesEnRetard: 0, montantEnRetard: 0,
+  declarationsEnRetard: 0, declarationAvant: null, regime: null
+} as const;
+
+const constat = (i: ReturnType<typeof indicateursDeSante>, id: string) => i.find((x) => x.id === id);
 
 describe('constats de santé', () => {
   it('dit que les provisions sont couvertes quand le disponible tient', () => {
-    const [provisions] = indicateursDeSante(SAIN);
-    expect(provisions?.etat).toBe('bon');
+    expect(constat(indicateursDeSante(SAIN), 'provisions')?.etat).toBe('bon');
   });
 
   /**
@@ -22,55 +24,69 @@ describe('constats de santé', () => {
    * c'est une alerte.
    */
   it('alerte quand le disponible ne couvre plus les provisions', () => {
-    const [provisions] = indicateursDeSante({ ...SAIN, dispo: -1200 });
-    expect(provisions?.etat).toBe('alerte');
-    expect(provisions?.valeur).toMatch(/il manque/);
+    const p = constat(indicateursDeSante({ ...SAIN, dispo: -1200 }), 'provisions');
+    expect(p?.etat).toBe('alerte');
+    expect(p?.valeur).toMatch(/il manque/);
   });
 
   it('distingue « rien à provisionner » de « couvert »', () => {
-    const [provisions] = indicateursDeSante({ ...SAIN, provisions: 0 });
-    expect(provisions?.valeur).toMatch(/rien à provisionner/);
-    expect(provisions?.etat).toBe('bon');
+    const p = constat(indicateursDeSante({ ...SAIN, provisions: 0 }), 'provisions');
+    expect(p?.valeur).toMatch(/rien à provisionner/);
+    expect(p?.etat).toBe('bon');
   });
 
-  it('compte les impayés et leur montant', () => {
-    const [, factures] = indicateursDeSante({
-      ...SAIN, impayes: 3, montantImpaye: 12000
-    });
-    expect(factures?.etat).toBe('attention');
-    expect(factures?.valeur).toMatch(/3 en attente/);
+  /**
+   * LES FACTURES EN RETARD, PAS EN ATTENTE.
+   *
+   * Le constat comptait les factures en attente : une facture à trente jours,
+   * parfaitement normale, y passait pour un problème.
+   */
+  it('compte les factures en retard et leur montant', () => {
+    const f = constat(indicateursDeSante({ ...SAIN, facturesEnRetard: 2, montantEnRetard: 3000 }), 'factures');
+    expect(f?.etat).toBe('attention');
+    expect(f?.libelle).toBe('Factures en retard');
+    expect(f?.valeur).toMatch(/2 factures · 3\s*000/u);
+    expect(constat(indicateursDeSante(SAIN), 'factures')?.libelle).toBe('Factures à jour');
   });
 
-  it('alerte sur les périodes non déclarées', () => {
-    const [, , declarations] = indicateursDeSante({ ...SAIN, periodesEnRetard: 2 });
-    expect(declarations?.etat).toBe('alerte');
-    expect(declarations?.valeur).toMatch(/2 périodes en retard/);
+  it('alerte sur les périodes en retard, prévient d’une déclaration à faire', () => {
+    expect(constat(indicateursDeSante({ ...SAIN, declarationsEnRetard: 2 }), 'declarations')?.etat)
+      .toBe('alerte');
+    const aFaire = constat(indicateursDeSante({ ...SAIN, declarationAvant: '2026-07-31' }), 'declarations');
+    expect(aFaire?.etat).toBe('attention');
+    expect(aFaire?.valeur).toMatch(/avant le 31 juil/);
+  });
+
+  // Une ligne « régime : rien » en permanence apprendrait à ne plus lire la barre.
+  it('ne montre le régime que lorsqu’il change', () => {
+    expect(constat(indicateursDeSante(SAIN), 'regime')).toBeUndefined();
+    expect(constat(indicateursDeSante({ ...SAIN, regime: 'plafond du micro dépassé' }), 'regime')?.etat)
+      .toBe('alerte');
   });
 });
 
-describe('carte santé', () => {
+describe('barre santé', () => {
   /**
-   * La maquette affichait « 78/100 », mais la spec relève que ces valeurs
-   * sont écrites en dur, sans aucune fonction pour les calculer. Inventer la
-   * formule produirait un chiffre d'apparence officielle que personne n'a
-   * validé — et une note se retient, se compare, puis commande des décisions.
+   * La maquette affichait « 78/100 », mais ces valeurs sont écrites en dur,
+   * sans fonction pour les calculer. Inventer la formule produirait un chiffre
+   * d'apparence officielle que personne n'a validé.
    */
   it('n’affiche aucune note globale inventée', () => {
-    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} />);
+    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} reserve={2470} />);
     expect(screen.queryByText(/\/\s?100/)).toBeNull();
   });
 
   it('affiche les trois constats', () => {
-    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} />);
+    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} reserve={2470} />);
     expect(screen.getByText('Provisions couvertes')).toBeTruthy();
-    expect(screen.getByText('Factures')).toBeTruthy();
-    expect(screen.getByText('Déclarations')).toBeTruthy();
+    expect(screen.getByText('Factures à jour')).toBeTruthy();
+    expect(screen.getByText('Déclarations à jour')).toBeTruthy();
   });
 
-  // Sans besoin mensuel renseigné, l'autonomie n'est pas calculable : afficher
-  // « 0 mois » ferait croire à une trésorerie à sec.
+  // Sans besoin mensuel, l'autonomie n'est pas calculable : « 0 mois » ferait
+  // croire à une trésorerie à sec.
   it('dit que l’autonomie est inconnue plutôt que d’afficher zéro', () => {
-    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={null} />);
+    render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={null} reserve={2470} />);
     expect(screen.getByText('Autonomie inconnue')).toBeTruthy();
   });
 });
@@ -78,64 +94,64 @@ describe('carte santé', () => {
 /**
  * LE COUP D'ŒIL, SANS INVENTER DE NOTE.
  *
- * Refuser le « 78/100 » était juste : sa formule aurait été inventée. Mais le
- * score répondait à une vraie question — « est-ce que ça va ? » — en UNE
- * information, et trois pastilles en font trois. La phrase répond à la même
- * question sans rien pondérer : elle nomme LE PLUS GRAVE.
+ * La phrase répond à « est-ce que ça va ? » sans rien pondérer : elle nomme
+ * LE PLUS GRAVE, dans un ordre écrit.
  */
 describe('phrase de synthèse', () => {
-  const sain = { dispo: 5000, provisions: 2000, impayes: 0, montantImpaye: 0, periodesEnRetard: 0 };
-
-  it('ne réclame rien quand les trois constats sont bons', () => {
-    const s = syntheseDeSante(indicateursDeSante(sain));
+  it('dit « tout est en ordre » quand les constats sont bons', () => {
+    const s = syntheseDeSante(indicateursDeSante(SAIN));
     expect(s.ton).toBe('bon');
-    expect(s.phrase).toMatch(/Rien ne réclame/);
+    expect(s.phrase).toBe('Tout est en ordre.');
   });
 
   /**
-   * LE POINT QUI COMPTE. L'ordre est une GRAVITÉ, pas une pondération : une
-   * provision non couverte est le seul des trois qui soit DÉJÀ dépensé, et il
-   * passe donc devant une déclaration en retard comme devant un impayé.
+   * L'ordre est une GRAVITÉ : une provision à découvert est le seul constat
+   * DÉJÀ dépensé, et passe devant tout le reste.
    */
-  it('nomme la provision non couverte avant tout le reste', () => {
+  it('nomme la provision à découvert avant tout le reste', () => {
     const s = syntheseDeSante(indicateursDeSante({
-      ...sain, dispo: -1240, impayes: 3, montantImpaye: 9000, periodesEnRetard: 2
+      ...SAIN, dispo: -1240, facturesEnRetard: 3, montantEnRetard: 9000,
+      declarationsEnRetard: 2, regime: 'TVA due'
     }));
     expect(s.ton).toBe('alerte');
-    expect(s.phrase).toMatch(/Provisions/);
+    expect(s.phrase).toMatch(/Provisions à découvert/);
     expect(s.phrase).toMatch(/1\s*240/u);
   });
 
-  /** Une déclaration en retard passe devant un impayé : sa pénalité court seule. */
-  it('place la déclaration en retard devant l’impayé', () => {
-    const s = syntheseDeSante(indicateursDeSante({
-      ...sain, impayes: 2, montantImpaye: 4000, periodesEnRetard: 1
-    }));
-    expect(s.phrase).toMatch(/Déclarations/);
-  });
-
-  /** Un impayé seul ne déclenche qu'une attention : un tiers doit, rien n'est perdu. */
-  it('signale l’impayé sans en faire une alerte', () => {
-    const s = syntheseDeSante(indicateursDeSante({
-      ...sain, impayes: 1, montantImpaye: 4000
-    }));
-    expect(s.ton).toBe('attention');
-    expect(s.phrase).toMatch(/Factures/);
+  /** Une déclaration en retard passe devant un changement de régime. */
+  it('place la déclaration en retard devant le régime', () => {
+    const s = syntheseDeSante(indicateursDeSante({ ...SAIN, declarationsEnRetard: 1, regime: 'TVA due' }));
+    expect(s.phrase).toMatch(/Déclarations en retard/);
   });
 
   /**
-   * Le sujet est nommé ET chiffré : « attention » sans dire à quoi oblige à
-   * aller chercher, ce qui est exactement ce que le coup d'œil doit éviter.
+   * Le régime passe devant une facture en retard : la liste des décisions le
+   * classe « en retard » — la phrase ne peut pas dire « tout va bien » à côté.
    */
-  it('chiffre ce qu’elle nomme', () => {
+  it('place le régime devant la facture en retard', () => {
     const s = syntheseDeSante(indicateursDeSante({
-      ...sain, impayes: 2, montantImpaye: 7500
+      ...SAIN, facturesEnRetard: 1, montantEnRetard: 1200, regime: 'plafond du micro dépassé'
     }));
-    expect(s.phrase).toMatch(/7\s*500/u);
+    expect(s.phrase).toMatch(/plafond du micro dépassé/);
   });
 
-  /** Une liste vide ne fait pas échouer la carte. */
+  /** Une facture en retard passe devant une déclaration encore dans sa fenêtre. */
+  it('place la facture en retard devant la déclaration à faire', () => {
+    const s = syntheseDeSante(indicateursDeSante({
+      ...SAIN, facturesEnRetard: 1, montantEnRetard: 1200, declarationAvant: '2026-07-31'
+    }));
+    expect(s.ton).toBe('attention');
+    expect(s.phrase).toMatch(/Factures en retard/);
+  });
+
   it('ne casse pas sur une liste vide', () => {
     expect(syntheseDeSante([]).ton).toBe('bon');
   });
 });
+
+// Le seul endroit du Pilote où la réserve paraît : l'autonomie la nomme.
+it('nomme la réserve que l’autonomie ne touche pas', () => {
+  render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} reserve={2470} />);
+  expect(screen.getByText(/d’autonomie/).textContent).toMatch(/réserve de 2\s*470/u);
+});
+

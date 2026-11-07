@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import type { Euros } from '../../domain/types';
 import type { FluxDuMois, LigneFlux } from '../../state/selecteurs';
 import { Info } from './Info';
 import { dateCourte, eur } from '../format';
@@ -6,75 +7,72 @@ import styles from './FluxCard.module.css';
 import { Montant } from './Montant';
 
 /**
- * « Le flux du mois » — la carte centrale du Pilote dans la spec de design.
+ * Le flux du mois : ce qui entre, ce qui sort, ce qui reste pour soi.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * TROIS COLONNES PARCE QUE CE SONT TROIS QUESTIONS
+ * TROIS COLONNES, ET LEURS LIGNES
  * ─────────────────────────────────────────────────────────────────────────
  *
- * « Combien est rentré », « combien doit sortir », « combien reste-t-il pour
- * moi » ne se répondent pas avec le même chiffre. Empilées dans une liste,
- * elles obligent à faire la soustraction de tête — et c'est exactement le
- * calcul qu'on se trompe à faire un jour de fatigue, celui qui fait qu'on se
- * verse de l'argent déjà dû.
+ * Le handoff met sous chaque total les lignes qui le font, chacune avec sa
+ * pastille — encaissé, en attente, en retard ; payé, à venir. Un total seul
+ * ne dit pas QUI n'a pas payé : il fallait déplier un détail pour le savoir.
+ * Les pastilles mènent là où le statut se met à jour — le facturier pour une
+ * facture, l'échéancier pour une échéance —, d'où « clique un statut ».
  *
- * Côte à côte, l'écart se voit sans être calculé.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * CÔTE À CÔTE Y COMPRIS SUR TÉLÉPHONE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * La version précédente ne mettait les colonnes côte à côte qu'au-delà de
- * 900 px : sur téléphone — là où l'application est réellement consultée — les
- * trois chiffres s'empilaient sur trois écrans, et la comparaison qui fait
- * tout l'intérêt de la carte redevenait un calcul de tête.
- *
- * La spec de design tranche autrement (`v1.11.css`, media query téléphone) :
- * `.flux3{grid-template-columns:repeat(3,1fr)}`, libellé à 9 px, montant à
- * 19 px, sous-ligne à 10 px. Trois colonnes tiennent dans 390 px à condition
- * que chacune se réduise au strict nécessaire — un libellé, un montant, une
- * sous-ligne courte. C'est ce que fait ce composant, et c'est pourquoi les
- * sous-lignes sont des fragments et non des phrases.
+ * Sur téléphone, une colonne fait une centaine de pixels : une liste n'y tient
+ * pas. Les colonnes n'y gardent que leurs totaux, et « Voir le détail » rend
+ * toutes les lignes sur la largeur.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * LE DÉTAIL EST REPLIÉ, PAS ABSENT — ET IL EST HORS DES COLONNES
+ * LE VERSABLE VIT ICI, ET NULLE PART AILLEURS SUR LE PILOTE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Chaque colonne a sa liste — quelles factures, quelles échéances. Mais une
- * liste dans une colonne de 110 px n'est plus lisible : la spec s'en sort en
- * masquant les montants du détail sur téléphone, ce qu'on refuse ici — un
- * « voir le détail » qui montre des libellés sans montants ne détaille rien.
- *
- * Les listes sont donc sorties des colonnes, sous un seul dépliant qui les
- * ouvre ensemble. Elles occupent toute la largeur en portrait, et se
- * réalignent sous leur colonne quand la place existe.
+ * Il avait sa propre carte au-dessus, et la colonne « Rémunération » le
+ * répétait : deux fois le même chiffre, et une demi-largeur vide à côté de la
+ * carte. Il s'ouvre sur sa composition, comme la carte le faisait.
  */
+
+/** Combien de lignes tiennent dans une colonne avant « Voir le détail ». */
+const LIGNES_PAR_COLONNE = 4;
+
 export function FluxCard(
-  { flux, periode, versementPossible }: {
+  { flux, periode, onVersable, dejaVerse, besoinMensuel }: {
     readonly flux: FluxDuMois;
     readonly periode: string;
-    /**
-     * Le versement est-il seulement possible ?
-     *
-     * Un bouton « Verser » actif alors que le versable est nul invite à un
-     * geste qui ne peut pas aboutir.
-     */
-    readonly versementPossible: boolean;
+    /** Ouvre la composition du versable. */
+    readonly onVersable: () => void;
+    /** Ce qui est déjà sorti vers soi ce mois-ci, ou `null` sans relevé. */
+    readonly dejaVerse: Euros | null;
+    readonly besoinMensuel: Euros;
   }
 ) {
   const [ouvert, setOuvert] = useState(false);
   const idDetail = useId();
+  const versementPossible = flux.remuneration.versable > 0;
+
+  const sorties: readonly LigneFlux[] = [
+    ...flux.sorties.lignes,
+    // La dette des encaissements non déclarés n'a pas encore d'échéance : elle
+    // a quand même sa ligne, c'est la plus grosse sortie à venir du mois.
+    ...(flux.sorties.aProvisionner > 0
+      ? [{
+        id: 'a-provisionner', libelle: 'Charges sur encaissements', montant: flux.sorties.aProvisionner,
+        date: null, regle: false
+      }]
+      : [])
+  ];
+  const payees = sorties.filter((l) => l.regle).reduce((s, l) => s + l.montant, 0);
 
   const detaillables = [
-    { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes },
-    { cle: 'sorties', titre: 'Échéances', lignes: flux.sorties.lignes }
+    { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes, vers: '#/facture' },
+    { cle: 'sorties', titre: 'Sorties', lignes: sorties, vers: '#/argent' }
   ].filter((d) => d.lignes.length > 0);
 
   return (
     <section className={styles.carte} aria-labelledby="titre-flux">
       <header className={styles.entete}>
         <h2 id="titre-flux" className={styles.titreCarte}>
-          Le flux du mois
+          Le flux du mois · {periode}
           <Info libelle="Ce que montrent les trois colonnes">
             Ce qui est <strong>entré</strong> sur le mois, ce qui doit en
             <strong> sortir</strong>, et ce qu’il reste pour toi. L’argent en
@@ -83,60 +81,69 @@ export function FluxCard(
             l’écran celle qu’il faut relancer.
           </Info>
         </h2>
-        <p className={styles.periode}>{periode}</p>
+        <p className={styles.indice}>clique un statut pour le mettre à jour</p>
       </header>
 
       <div className={styles.colonnes}>
         <div className={styles.colonne}>
-          <span className={styles.libelle}>Entrées</span>
+          <span className={`${styles.libelle} ${styles.entree}`}>Entrées</span>
           <span className={`${styles.montant} ${styles.entree}`}>
             <Montant>{eur(flux.entrees.encaisse)}</Montant>
           </span>
           <p className={styles.note}>
             {flux.entrees.enAttente > 0
-              ? <><Montant>{eur(flux.entrees.enAttente)}</Montant> encore en attente</>
-              : 'Rien en attente'}
+              ? <>encaissé · <Montant>{eur(flux.entrees.enAttente)}</Montant> en attente</>
+              : 'encaissé · rien en attente'}
           </p>
+          <Lignes lignes={flux.entrees.lignes} vers="#/facture" />
         </div>
 
         <div className={styles.colonne}>
-          <span className={styles.libelle}>Sorties</span>
+          <span className={`${styles.libelle} ${styles.sortie}`}>Sorties</span>
           <span className={`${styles.montant} ${styles.sortie}`}>
             <Montant>{eur(flux.sorties.total)}</Montant>
           </span>
-          {/* Deux fragments plutôt qu'une phrase : dans une colonne étroite,
-              une phrase se hache en six lignes et le rapport entre les deux
-              montants — le seul renseignement utile — s'y perd. */}
           <p className={styles.note}>
-            {flux.sorties.total > 0
-              ? (
-                <>
-                  <span className={styles.fragment}>
-                    <Montant>{eur(flux.sorties.aProvisionner)}</Montant> à provisionner
-                  </span>
-                  <span className={styles.fragment}>
-                    <Montant>{eur(flux.sorties.constate)}</Montant> déjà constaté
-                  </span>
-                </>
-              )
+            {sorties.length > 0
+              ? <><Montant>{eur(payees as Euros)}</Montant> payé · <Montant>{eur(flux.sorties.total)}</Montant> à venir</>
               : 'Rien à mettre de côté'}
           </p>
+          <Lignes lignes={sorties} vers="#/argent" />
         </div>
 
         <div className={styles.colonne}>
-          <span className={styles.libelle}>Rémunération</span>
-          <span className={styles.montant}><Montant>{eur(flux.remuneration.versable)}</Montant></span>
+          <span className={`${styles.libelle} ${styles.entree}`}>Rémunération</span>
+          <button type="button" className={`${styles.montant} ${styles.versable}`} onClick={onVersable}>
+            <Montant>{eur(flux.remuneration.versable)}</Montant>
+            <span className={styles.horsEcran}> — d’où vient ce chiffre</span>
+            <span className={styles.chevron} aria-hidden="true">›</span>
+          </button>
           <p className={styles.note}>
             {versementPossible
-              ? <><Montant>{eur(flux.remuneration.provisions)}</Montant> restent de côté</>
-              : 'Rien n’est versable'}
+              ? <>Ce que tu peux te verser, <strong>hors provisions</strong>.</>
+              : 'Rien n’est versable ce mois-ci.'}
           </p>
+          {/* Ce qui est DÉJÀ sorti ce mois-ci : sans cette ligne, « 3 000 »
+              se lit « en plus », alors qu'on s'est peut-être versé 2 500 le 5. */}
+          {dejaVerse !== null && (
+            <p className={styles.note}>
+              Déjà versé&nbsp;: <Montant>{eur(dejaVerse)}</Montant>
+              {besoinMensuel > 0 && dejaVerse < besoinMensuel && (
+                <> — il manque <Montant>{eur((besoinMensuel - dejaVerse) as Euros)}</Montant> pour ton besoin</>
+              )}
+            </p>
+          )}
+          {versementPossible && (
+            <a className={`${styles.action} ${styles.principale} ${styles.dansLaColonne}`} href="#/argent">
+              Verser sur mon compte
+            </a>
+          )}
         </div>
       </div>
 
       <div className={styles.pied}>
         {versementPossible && (
-          <a className={`${styles.action} ${styles.principale}`} href="#/argent">
+          <a className={`${styles.action} ${styles.principale} ${styles.sousLesColonnes}`} href="#/argent">
             Verser sur mon compte
           </a>
         )}
@@ -157,15 +164,45 @@ export function FluxCard(
           chose ; c'est son contenu qui apparaît. */}
       <div id={idDetail} className={styles.details} hidden={!ouvert}>
         {detaillables.map((d) => (
-          <Detail key={d.cle} titre={d.titre} lignes={d.lignes} />
+          <Detail key={d.cle} titre={d.titre} lignes={d.lignes} vers={d.vers} />
         ))}
       </div>
     </section>
   );
 }
 
-/** Une liste de détail, sous son intitulé. */
-function Detail({ titre, lignes }: { titre: string; lignes: readonly LigneFlux[] }) {
+/** La pastille d'une ligne : ce qui est fait, ce qui attend, ce qui est en retard. */
+function Pastille({ ligne, vers }: { ligne: LigneFlux; vers: string }) {
+  const [classe, texte] = ligne.regle
+    ? [styles.fait, vers === '#/facture' ? 'encaissé' : 'payé']
+    : ligne.enRetard === true
+      ? [styles.retard, 'en retard']
+      : ligne.id === 'a-provisionner'
+        ? [styles.attente, 'à provisionner']
+        : [styles.attente, vers === '#/facture' ? 'en attente' : 'à venir'];
+  return <span className={`${styles.pastille} ${classe}`}>{texte}</span>;
+}
+
+/** Les premières lignes d'une colonne, en grand écran seulement. */
+function Lignes({ lignes, vers }: { lignes: readonly LigneFlux[]; vers: string }) {
+  if (lignes.length === 0) return null;
+  return (
+    <ul className={styles.items}>
+      {lignes.slice(0, LIGNES_PAR_COLONNE).map((l) => (
+        <li key={l.id}>
+          <a className={styles.item} href={vers}>
+            <span className={styles.itemNom}>{l.libelle}</span>
+            <Pastille ligne={l} vers={vers} />
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Detail(
+  { titre, lignes, vers }: { titre: string; lignes: readonly LigneFlux[]; vers: string }
+) {
   return (
     <div className={styles.bloc}>
       <h3 className={styles.titreBloc}>{titre} ({lignes.length})</h3>
@@ -174,10 +211,12 @@ function Detail({ titre, lignes }: { titre: string; lignes: readonly LigneFlux[]
           <li key={l.id} className={styles.ligne}>
             <span className={styles.ligneLibelle}>
               {l.libelle}
-              {l.date !== null && <> · {dateCourte(l.date)}</>}
-              {!l.regle && <> · en attente</>}
+              {l.date !== null && <span className={styles.ligneDate}> · {dateCourte(l.date)}</span>}
             </span>
-            <span className={styles.ligneMontant}><Montant>{eur(l.montant)}</Montant></span>
+            <span className={styles.ligneDroite}>
+              <span className={styles.ligneMontant}><Montant>{eur(l.montant)}</Montant></span>
+              <a href={vers} className={styles.lienPastille}><Pastille ligne={l} vers={vers} /></a>
+            </span>
           </li>
         ))}
       </ul>

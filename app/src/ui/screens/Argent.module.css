@@ -284,6 +284,19 @@
 
 .declarationAttente { font-size: 11.5px; color: var(--muted-2); }
 
+/* Le montant à payer d'une période close : ambre dans la fenêtre de
+   déclaration, rouge une fois la date limite passée — les deux tons du Pilote
+   pour « à faire » et « en retard ». */
+.declarationLimite,
+.declarationRetard {
+  flex-basis: 100%;
+  font-size: 12px;
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+}
+.declarationLimite { color: var(--amber); }
+.declarationRetard { color: var(--red); }
+
 /* En paysage, le geste et son libellé tiennent sur un rang : la liste est
    une suite de décisions courtes, pas un tableau à parcourir. */
 @media (min-width: 761px) {

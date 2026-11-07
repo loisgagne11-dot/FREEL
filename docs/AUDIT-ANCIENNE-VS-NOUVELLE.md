@@ -332,3 +332,11 @@ chiffre faux.
 | Jeu de démonstration (Réglages → Données) | 🟢 | Montre une activité sereine et se recale sur la date du jour ; l'ancienne n'en avait pas |
 | Rappels réglementaires | 🟢 | La facturation électronique ne reste plus « en retard » pour toujours après sa date : « en vigueur », puis plus rien un mois après |
 
+## Lot 5 (07/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Déclaration URSSAF | 🟢 | Date limite (dernier jour du mois suivant) ; « à faire avant le … » puis « en retard » ; base encaissée et montant à payer, sur le Pilote et dans l'échéancier. L'ancienne ne datait ni ne chiffrait la déclaration |
+| Prénom | 🟢 | Saisi dans Réglages → Profil, pour la salutation seulement |
+| Statuts du flux | 🟢 | Chaque facture et chaque échéance du mois a sa pastille, qui mène là où elle se met à jour |
+

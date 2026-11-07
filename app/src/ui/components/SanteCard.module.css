@@ -1,98 +1,114 @@
-/* Carte « Santé ». Mobile-first, aucune couleur en dur. */
+/* Barre « Santé ». Mobile-first : empilée sur téléphone, sur une ligne en
+   grand écran, comme le handoff (`.sante-row`). Aucune couleur en dur. */
 
-.carte {
+.barre {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   background: linear-gradient(160deg, var(--card-a), var(--card-b));
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 15px 16px;
+  padding: 14px 16px;
   box-shadow: var(--sh-1);
   margin-bottom: 12px;
   min-width: 0;
 }
 
-.entete {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-bottom: 10px;
-}
-
-.titreCarte {
+.titre {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 14px;
+  font-size: 10.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
   font-weight: 620;
-  letter-spacing: -0.02em;
-  color: var(--text);
+  color: var(--muted-2);
 }
 
-.autonomie {
-  font-size: 12px;
-  font-weight: 560;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 100px;
-  padding: 4px 11px;
-  white-space: nowrap;
-}
-
-.indicateurs { list-style: none; display: flex; flex-direction: column; margin: 0; padding: 0; }
-
-.indicateur {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
-  min-width: 0;
-}
-
-.indicateur:last-child { border-bottom: none; }
-
-/* L'état est porté par la couleur ET par le texte de la valeur : une pastille
-   seule laisserait un daltonien sans information. */
-.pastille {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  align-self: center;
-}
-
-.bon { background: var(--green); }
-.attention { background: var(--amber); }
-.alerte { background: var(--red); }
-
-.libelle { color: var(--muted); flex: none; }
-
-.valeur {
-  margin-left: auto;
-  color: var(--text);
-  font-weight: 560;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  min-width: 0;
-}
-
-/* La phrase de synthèse : le coup d'œil. Elle porte le ton du plus grave des
-   constats, et rien d'autre — un fond coloré ferait de chaque consultation une
-   alerte, y compris quand tout va bien. */
+/* La phrase : le coup d'œil. Elle porte le ton du plus grave des constats
+   par un filet, pas par un fond — un fond coloré ferait de chaque
+   consultation une alerte, y compris quand tout va bien. */
 .synthese {
-  margin: 10px 0 12px;
-  font-size: 13.5px;
-  font-weight: 560;
-  line-height: 1.5;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
   color: var(--text);
   padding-left: 10px;
   border-left: 3px solid var(--line-2);
+  min-width: 0;
 }
 
 .synthese.bon { border-left-color: var(--green); }
 .synthese.attention { border-left-color: var(--amber); }
-.synthese.alerte { border-left-color: var(--red, var(--amber)); }
+.synthese.alerte { border-left-color: var(--red); }
+
+.indicateurs {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.indicateur {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.valeur { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* L'état est porté par la couleur ET par le libellé : une pastille seule
+   laisserait un daltonien sans information. */
+.pastille { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.pastille.bon { background: var(--green); }
+.pastille.attention { background: var(--amber); }
+.pastille.alerte { background: var(--red); }
+
+/* Le chiffre clé de la barre, comme le « 4,2 mois » du handoff : en chasse
+   fixe, en vert, dans un encadré — la phrase qui le qualifie vient en second. */
+.autonomie {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--green-glow);
+  border: 1px solid var(--green-line);
+  border-radius: 12px;
+  padding: 7px 13px;
+}
+
+.autonomieValeur {
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.autonomieLibelle { max-width: 26ch; line-height: 1.35; }
+
+/* En grand écran, deux rangées : le titre, la phrase et l'autonomie sur la
+   première — le coup d'œil —, les constats sur la seconde. Sur une seule
+   rangée, l'autonomie passait à la ligne toute seule, au bout de la barre. */
+@media (min-width: 761px) {
+  .barre {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px 18px;
+  }
+  .titre { grid-column: 1; grid-row: 1; }
+  .synthese { grid-column: 2; grid-row: 1; }
+  .autonomie { grid-column: 3; grid-row: 1; align-self: center; }
+  .indicateurs { grid-column: 2 / -1; grid-row: 2; }
+}

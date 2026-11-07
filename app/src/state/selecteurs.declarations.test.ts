@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
 import { periodesADeclarer } from '../domain/calculs/declarations';
 import { type Faits, faitsVides } from './schema';
-import { aTraiter, recettesEncaissees } from './selecteurs';
+import { aTraiter, etatPilote, montantDeclaration, recettesEncaissees } from './selecteurs';
+import type { Recette } from './schema';
+
+const recetteEncaissee = (id: string, le: string, montant: number): Recette => ({
+  id, clientNom: 'Client', libelle: 'Prestation', montant: euros(montant),
+  emiseLe: dateISO(le), encaisseeLe: dateISO(le), modeReglement: 'virement', numero: id
+});
 
 /**
  * LE PILOTE NE RÉCLAME QUE CE QUE L'ÉCHÉANCIER PERMET DE DÉCLARER.
@@ -47,5 +53,48 @@ describe('accord du Pilote et de l’échéancier', () => {
       ).filter((p) => p.close).flatMap((p) => p.mois)
     };
     expect(aTraiter(toutDeclare, maintenant).some((s) => s.id === 'periodes-a-declarer')).toBe(false);
+  });
+});
+
+/**
+ * CE QUE COÛTE LA DÉCLARATION : LA MÊME RÈGLE QUE LE VOLET « À PROVISIONNER ».
+ *
+ * Le Pilote et l'échéancier annoncent ce montant ; il doit valoir, au centime,
+ * ce que la provision gardait pour ces encaissements — sinon on déclare un
+ * chiffre et on en a provisionné un autre.
+ */
+describe('montant d’une déclaration', () => {
+  const base = (): Faits => ({
+    ...faitsVides(),
+    entreprise: {
+      ...faitsVides().entreprise, debutActivite: dateISO('2025-01-01'),
+      versementLiberatoire: true, urssafPeriodicite: 'trimestriel'
+    },
+    recettes: [
+      recetteEncaissee('a', '2026-04-14', 5200), recetteEncaissee('b', '2026-05-28', 3600),
+      recetteEncaissee('c', '2026-07-02', 9999)
+    ]
+  });
+
+  it('vaut le volet « à provisionner » des encaissements de la période', () => {
+    const f = { ...base(), recettes: base().recettes.slice(0, 2) };
+    const m = montantDeclaration(f, [mois('2026-04'), mois('2026-05'), mois('2026-06')]);
+    const provision = etatPilote(f, [], new Date('2026-06-20T09:00:00Z')).voletAProvisionner;
+    expect(m.statut).toBe('publie');
+    expect(m.statut === 'refuse' ? null : m.valeur).toBeCloseTo(provision, 2);
+  });
+
+  it('vaut un vrai zéro pour une période sans encaissement', () => {
+    const m = montantDeclaration(base(), [mois('2026-01'), mois('2026-02'), mois('2026-03')]);
+    expect(m.statut === 'refuse' ? null : m.valeur).toBe(0);
+  });
+
+  it('arrive avec le sujet de la déclaration', () => {
+    const declarees = ['2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06', '2025-07',
+      '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03'].map(mois);
+    const s = aTraiter({ ...base(), periodesDeclarees: declarees }, new Date('2026-07-10T09:00:00Z'))
+      .find((x) => x.id === 'periodes-a-declarer');
+    expect(s?.gravite).toBe('a_faire');
+    expect(typeof s?.donnees['montant']).toBe('number');
   });
 });

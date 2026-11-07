@@ -19,17 +19,22 @@
   margin-bottom: 14px;
 }
 
+/* En surtitre, comme le handoff (« → LE FLUX DU MOIS · JUIN 2026 ») : la
+   carte se lit par ses montants, pas par son titre. */
 .titreCarte {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 14px;
-  font-weight: 620;
-  letter-spacing: -0.02em;
-  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green);
 }
+.titreCarte::before { content: '→'; }
 
-.periode { font-size: 12px; color: var(--muted-2); }
+.indice { font-size: 11px; color: var(--muted-2); }
 
 /* Trois colonnes côte à côte À TOUTE LARGEUR, y compris sur téléphone.
    C'est le choix de la spec (`v1.11.css` : `.flux3{repeat(3,1fr);gap:10px}`) et
@@ -54,17 +59,25 @@
   padding-left: 10px;
 }
 
+/* Les étiquettes de colonne portent leur couleur et une puce carrée, comme
+   le handoff : le code couleur ne vivait que dans le montant. */
 .libelle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--muted-2);
 }
+.libelle::before { content: ''; width: 7px; height: 7px; border-radius: 2px; background: currentColor; }
 
 /* Le montant se réduit avec la fenêtre : à 390 px une colonne fait ~105 px, et
    un montant à six chiffres déborderait à taille fixe. `clamp` évite d'avoir à
    choisir entre « illisible » et « tronqué ». */
 .montant {
+  line-height: 1.15;
   font-size: clamp(15px, 4.6vw, 19px);
   letter-spacing: -0.03em;
   font-weight: 620;
@@ -76,6 +89,7 @@
 .sortie { color: var(--amber); }
 
 .note {
+  margin: 0;
   font-size: 10px;
   line-height: 1.45;
   color: var(--muted);
@@ -83,9 +97,79 @@
   overflow-wrap: anywhere;
 }
 
-/* Deux renseignements de même rang : chacun sa ligne, pour que le rapport
-   entre les deux montants se lise d'un coup d'œil. */
-.fragment { display: block; }
+/* Le versable est le chiffre de la colonne qu'on vient vérifier avant de
+   virer l'argent : il s'ouvre sur sa composition. */
+.versable {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  color: var(--green);
+  cursor: pointer;
+  text-align: left;
+}
+.versable:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; border-radius: 4px; }
+.chevron { font-size: 0.7em; color: var(--muted-2); }
+
+.horsEcran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── Les lignes d'une colonne, et leurs pastilles ───────────────────────── */
+
+/* Absentes sur téléphone : voir l'en-tête du composant. */
+.items {
+  display: none;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12.5px;
+}
+.item:hover { background: var(--panel-2); }
+
+.itemNom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pastille {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+.fait { color: var(--green); background: var(--green-glow); }
+.attente { color: var(--amber); background: var(--amber-soft); }
+.retard { color: var(--red); background: var(--red-soft); }
+
+.lienPastille { text-decoration: none; }
+
+/* Le bouton de versement : dans sa colonne en grand écran, comme le handoff ;
+   sous les colonnes sur téléphone, où une colonne n'a pas la place d'un
+   bouton de 44 px. */
+.dansLaColonne { display: none; margin-top: 8px; justify-content: center; }
 
 /* ── Pied : les actions ─────────────────────────────────────────────────── */
 
@@ -178,6 +262,10 @@
   min-width: 0;
 }
 
+.ligneDate { color: var(--muted-2); }
+
+.ligneDroite { display: inline-flex; align-items: center; gap: 8px; }
+
 .ligneMontant {
   color: var(--text);
   font-weight: 560;
@@ -186,6 +274,9 @@
 }
 
 @media (min-width: 761px) {
+  .items { display: flex; }
+  .dansLaColonne { display: inline-flex; }
+  .sousLesColonnes { display: none; }
   .colonnes { gap: 18px; }
   .colonne + .colonne { padding-left: 18px; }
   .libelle { font-size: 10.5px; letter-spacing: 0.11em; }

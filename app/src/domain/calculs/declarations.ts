@@ -1,4 +1,4 @@
-import type { Euros, Mois } from '../types';
+import type { DateISO, Euros, Mois } from '../types';
 import { euros } from '../types';
 
 /**
@@ -51,6 +51,12 @@ export interface PeriodeADeclarer {
    * « à provisionner » des recettes encore à encaisser dessus.
    */
   readonly close: boolean;
+  /**
+   * La date limite de déclaration : le dernier jour du mois qui suit la
+   * période — 30 avril, 31 juillet, 31 octobre, 31 janvier en trimestriel.
+   * Avant elle, une période close est « à déclarer » ; après, « en retard ».
+   */
+  readonly limite: DateISO;
 }
 
 const MOIS_LISIBLES = [
@@ -124,6 +130,7 @@ export function periodesADeclarer(
         encaisse: euros(total),
         declaree: couverts.every((m) => dejaDeclares.has(m)),
         close: (couverts[couverts.length - 1] as string) < moisCourant,
+        limite: dateLimiteDeclaration(couverts[couverts.length - 1] as Mois),
         _tri: [...mois].sort()[0] ?? id
       };
     })
@@ -144,7 +151,20 @@ function clePeriode(mois: string, periodicite: Periodicite): string {
   return `${annee}-T${trimestre}`;
 }
 
-function moisDeLaPeriode(id: string, periodicite: Periodicite): readonly Mois[] {
+/**
+ * Le dernier jour du mois qui suit `dernierMois`.
+ *
+ * Par le jour zéro du mois d'après — le calendrier fait le travail — et non
+ * par un « + 1 mois » sur une date, qui tombe à côté dès qu'un mois a moins
+ * de jours que le précédent (31 janvier + 1 mois n'existe pas).
+ */
+export function dateLimiteDeclaration(dernierMois: Mois): DateISO {
+  const annee = Number(dernierMois.slice(0, 4));
+  const mois = Number(dernierMois.slice(5, 7)); // 1 à 12 ; l'index 0-based du mois d'après
+  return new Date(Date.UTC(annee, mois + 1, 0)).toISOString().slice(0, 10) as DateISO;
+}
+
+export function moisDeLaPeriode(id: string, periodicite: Periodicite): readonly Mois[] {
   if (periodicite === 'mensuel') return [id as Mois];
   const annee = id.slice(0, 4);
   const trimestre = Number(id.slice(6));

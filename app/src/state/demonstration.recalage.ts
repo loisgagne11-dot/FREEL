@@ -1,10 +1,9 @@
-import { type DateISO, type Mois, dateISO, euros, mois } from '../domain/types';
-import { tauxImpotEtContributions } from '../domain/bareme/impot';
+import { type DateISO, dateISO, euros, mois } from '../domain/types';
 import { periodesADeclarer } from '../domain/calculs/declarations';
-import { type Echeance, voletAProvisionner } from '../domain/calculs/provisions';
+import type { Echeance } from '../domain/calculs/provisions';
 import { type Faits, type Recette, motifRefusFaits } from './schema';
 import { completerFaits } from './schema.migrations';
-import { periodesUrssafEffectives, recettesEncaissees, regimeDe, sousAcreLe } from './selecteurs';
+import { montantDeclaration, recettesEncaissees } from './selecteurs';
 
 /**
  * Recale le jeu de démonstration sur la date du jour.
@@ -102,13 +101,6 @@ function renumeroter(recettes: readonly Recette[], anneeCourante: string): reado
   });
 }
 
-/** Le dernier jour du mois qui suit `m` : la date limite d'une déclaration. */
-function dateLimite(m: Mois): DateISO {
-  const annee = Number(m.slice(0, 4));
-  const suivant = Number(m.slice(5, 7)) + 1; // mois d'après, 1-indexé
-  return dateISO(new Date(Date.UTC(annee, suivant, 0)).toISOString().slice(0, 10));
-}
-
 export function recalerDemonstration(faits: Faits, aujourdhui: DateISO): Faits {
   const semaines = Math.floor((instant(aujourdhui) - instant(ANCRE_DEMONSTRATION)) / (7 * JOUR));
   if (semaines <= 0) return faits;
@@ -132,22 +124,13 @@ export function recalerDemonstration(faits: Faits, aujourdhui: DateISO): Faits {
     aujourdhui, debut === null ? null : mois(debut.slice(0, 7))
   ).filter((p) => p.close);
 
-  const ctx = {
-    typeActivite: decale.entreprise.typeActivite,
-    sousAcreLe: sousAcreLe(avecRecettes),
-    periodesUrssaf: periodesUrssafEffectives(avecRecettes)
-  };
   const veille = decalerDate(aujourdhui, -1);
   const paiements: Echeance[] = closes.flatMap((p) => {
-    const dans = new Set<string>(p.mois);
-    const encaissees = recettesEncaissees(avecRecettes).filter((r) => dans.has(r.encaisseeLe.slice(0, 7)));
-    const dernier = p.mois[p.mois.length - 1] as Mois;
-    const taux = tauxImpotEtContributions(regimeDe(avecRecettes), dernier, ctx.typeActivite);
-    const montant = voletAProvisionner(encaissees, { mois: [] }, {
-      ...ctx, tauxImpotEtContributions: taux.statut === 'refuse' ? 0 : taux.valeur
-    }).montant;
+    // Le montant que le Pilote annonce pour la déclaration : une seule règle.
+    const calcul = montantDeclaration(avecRecettes, p.mois);
+    const montant = calcul.statut === 'refuse' ? 0 : calcul.valeur;
     if (montant <= 0) return [];
-    const limite = dateLimite(dernier);
+    const limite = p.limite;
     // Payée deux jours avant la limite, ou hier si la limite n'est pas
     // encore passée : une période close se déclare et se paie d'un geste.
     const payee = dateISO(limite < aujourdhui ? decalerDate(limite, -2) : veille);

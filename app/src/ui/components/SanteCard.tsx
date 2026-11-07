@@ -1,5 +1,5 @@
 import { Info } from './Info';
-import { eur, moisTexte } from '../format';
+import { dateCourte, eur, moisTexte } from '../format';
 import { Montant } from './Montant';
 import styles from './SanteCard.module.css';
 
@@ -11,17 +11,18 @@ export type EtatIndicateur = 'bon' | 'attention' | 'alerte';
  * La règle de priorité s'appuie dessus : trier sur le texte affiché ferait
  * dépendre l'ordre de gravité d'une reformulation.
  */
-export type SujetDeSante = 'provisions' | 'factures' | 'declarations';
+export type SujetDeSante = 'provisions' | 'declarations' | 'regime' | 'factures';
 
 export interface Indicateur {
   readonly id: SujetDeSante;
   readonly libelle: string;
+  /** Le détail chiffré, ou '' quand le libellé suffit (« Déclarations à jour »). */
   readonly valeur: string;
   readonly etat: EtatIndicateur;
 }
 
 /**
- * « Santé société » — la carte de synthèse du Pilote dans la spec de design.
+ * « Santé » — la barre de synthèse du Pilote.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI IL N'Y A PAS DE SCORE SUR 100
@@ -29,179 +30,177 @@ export interface Indicateur {
  *
  * La maquette affiche « 78/100 », décomposé en 28/30, 20/35 et 30/35. La spec
  * le relève elle-même : ces valeurs sont **écrites en dur dans le HTML**, et
- * aucune fonction ne les calcule nulle part.
+ * aucune fonction ne les calcule nulle part. Il aurait fallu inventer la
+ * formule : chaque pondération est défendable, aucune n'est vérifiable, et
+ * une note se retient, se compare, puis commande des décisions.
  *
- * Il aurait fallu inventer la formule : quel poids pour les provisions, pour
- * les impayés, pour les déclarations ? Chaque réponse est défendable, aucune
- * n'est vérifiable, et le résultat serait un chiffre d'apparence officielle
- * que personne n'a validé. Un « 78/100 » se retient et se compare d'un mois
- * sur l'autre — c'est-à-dire qu'il commande des décisions.
- *
- * Les trois indicateurs, eux, sont vrais et se lisent directement : les
- * provisions sont couvertes ou non, il y a des impayés ou non, des périodes
- * en retard ou non. On perd la satisfaction d'une note ; on gagne de ne rien
- * affirmer qu'on ne puisse démontrer.
+ * À sa place, une PHRASE qui nomme le plus grave des constats, selon un ordre
+ * écrit (voir `GRAVITE`), puis les constats eux-mêmes et l'autonomie — la
+ * disposition du handoff, sur une seule barre.
  */
 export function SanteCard(
-  { indicateurs, autonomie }: {
+  { indicateurs, autonomie, reserve }: {
     readonly indicateurs: readonly Indicateur[];
     /** Mois d'autonomie, ou `null` quand le besoin mensuel n'est pas renseigné. */
     readonly autonomie: number | null;
+    /**
+     * Le seuil de sécurité, que l'autonomie ne touche pas. Nommé avec son
+     * montant : c'est le seul endroit du Pilote où il paraît, depuis que les
+     * tuiles en double sont parties.
+     */
+    readonly reserve: number;
   }
 ) {
   const synthese = syntheseDeSante(indicateurs);
 
   return (
-    <section className={styles.carte} aria-labelledby="titre-sante">
-      <header className={styles.entete}>
-        <h2 id="titre-sante" className={styles.titreCarte}>
-          Santé
-          <Info libelle="Pourquoi aucune note globale">
-            La maquette affichait un score sur 100. Il aurait fallu en inventer
-            la formule&nbsp;: quel poids donner aux provisions, aux impayés, aux
-            déclarations&nbsp;? Chaque réponse est défendable, aucune n’est
-            vérifiable — et une note se retient, se compare, puis commande des
-            décisions. La phrase de synthèse, elle, ne pondère rien&nbsp;: elle
-            nomme le plus grave des trois constats, selon un ordre de gravité
-            écrit — une provision déjà dépensée passe avant une déclaration en
-            retard, qui passe avant un impayé.
-          </Info>
-        </h2>
-        <p className={styles.autonomie}>
-          {/* L'assiette est NOMMÉE. « 4,2 mois d'autonomie » ne dit pas sur
-              quoi l'on tient : ici sur le versable, réserve exclue — donc le
-              chiffre est volontairement prudent, et il y a du matelas derrière
-              lui. Le taire ferait lire un chiffre de survie là où c'est un
-              chiffre de confort. */}
-          {autonomie === null
-            ? 'Autonomie inconnue'
-            : `${moisTexte(autonomie)} d’autonomie, sans toucher à la réserve`}
-        </p>
-      </header>
+    <section className={styles.barre} aria-labelledby="titre-sante">
+      <h2 id="titre-sante" className={styles.titre}>
+        Santé
+        <Info libelle="Pourquoi aucune note globale">
+          La maquette affichait un score sur 100. Il aurait fallu en inventer
+          la formule&nbsp;: quel poids donner aux provisions, aux impayés, aux
+          déclarations&nbsp;? Chaque réponse est défendable, aucune n’est
+          vérifiable — et une note se retient, se compare, puis commande des
+          décisions. La phrase, elle, ne pondère rien&nbsp;: elle nomme le plus
+          grave des constats, dans un ordre écrit — une provision déjà
+          dépensée, puis une déclaration en retard, puis un changement de
+          régime, puis une facture en retard, puis une déclaration à faire.
+        </Info>
+      </h2>
 
-      {/* Le coup d'œil, que trois pastilles ne donnaient pas : elles sont
-          vraies mais elles font trois informations, quand la question — « est-ce
-          que ça va ? » — en attend une. La phrase nomme le plus grave, sans
-          pondérer quoi que ce soit. */}
       <p className={`${styles.synthese} ${styles[synthese.ton]}`} role="status">
-        {synthese.phrase}
+        <Montant>{synthese.phrase}</Montant>
       </p>
 
       <ul className={styles.indicateurs}>
         {indicateurs.map((i) => (
-          <li key={i.libelle} className={styles.indicateur}>
+          <li key={i.id} className={styles.indicateur}>
             <span className={`${styles.pastille} ${styles[i.etat]}`} aria-hidden="true" />
-            <span className={styles.libelle}>{i.libelle}</span>
-            <span className={styles.valeur}><Montant>{i.valeur}</Montant></span>
+            {i.libelle}
+            {i.valeur !== '' && <span className={styles.valeur}> · <Montant>{i.valeur}</Montant></span>}
           </li>
         ))}
       </ul>
+
+      {/* L'assiette est NOMMÉE : « 4,2 mois » ne dit pas sur quoi l'on tient.
+          Ici sur le versable, réserve exclue — un chiffre de confort, avec du
+          matelas derrière lui, et non de survie. Inconnue sans besoin
+          mensuel : « 0 mois » ferait croire à une trésorerie à sec. */}
+      <p className={styles.autonomie}>
+        {autonomie === null
+          ? 'Autonomie inconnue'
+          : <>
+            <span className={styles.autonomieValeur}>{moisTexte(autonomie)}</span>
+            <span className={styles.autonomieLibelle}>
+              d’autonomie, sans toucher
+              {reserve > 0 ? <> à ta réserve de <Montant>{eur(reserve)}</Montant></> : ' à la réserve'}
+            </span>
+          </>}
+      </p>
     </section>
   );
 }
 
 /**
- * Les trois constats, tirés des faits.
+ * Les constats, tirés des mêmes sujets que les décisions du jour.
  *
- * Aucun seuil n'est inventé ici : « couvertes » signifie que le disponible
- * n'est pas négatif, « à jour » qu'aucune période déclarable ne traîne. Ce
- * sont des états binaires observables, pas des appréciations.
+ * Aucun seuil n'est inventé : « couvertes », c'est un disponible qui n'est pas
+ * négatif ; « en retard », une échéance ou une date limite passée. Le constat
+ * « Factures » compte les factures EN RETARD — il comptait les factures en
+ * attente, et une facture à trente jours, normale, y passait pour un problème.
+ * Le régime n'apparaît que lorsqu'il change : une ligne « régime : rien » en
+ * permanence apprendrait à ne plus lire la barre.
  */
 export function indicateursDeSante(
-  { dispo, provisions, impayes, montantImpaye, periodesEnRetard }: {
+  { dispo, provisions, facturesEnRetard, montantEnRetard, declarationsEnRetard, declarationAvant, regime }: {
     readonly dispo: number;
     readonly provisions: number;
-    readonly impayes: number;
-    readonly montantImpaye: number;
-    readonly periodesEnRetard: number;
+    readonly facturesEnRetard: number;
+    readonly montantEnRetard: number;
+    readonly declarationsEnRetard: number;
+    /** La date limite d'une déclaration à faire, encore dans sa fenêtre. */
+    readonly declarationAvant: string | null;
+    /** Ce qui change le régime (TVA due, plafond dépassé), ou `null`. */
+    readonly regime: string | null;
   }
 ): readonly Indicateur[] {
-  return [
-    {
-      id: 'provisions',
-      libelle: 'Provisions couvertes',
-      valeur: provisions === 0
-        ? 'rien à provisionner'
-        : dispo >= 0 ? `${eur(provisions)} de côté` : `il manque ${eur(-dispo)}`,
-      etat: provisions === 0 ? 'bon' : dispo >= 0 ? 'bon' : 'alerte'
-    },
-    {
-      id: 'factures',
-      libelle: 'Factures',
-      valeur: impayes === 0
-        ? 'aucun impayé'
-        : `${impayes} en attente · ${eur(montantImpaye)}`,
-      etat: impayes === 0 ? 'bon' : 'attention'
-    },
-    {
-      id: 'declarations',
-      libelle: 'Déclarations',
-      valeur: periodesEnRetard === 0
-        ? 'à jour'
-        : `${periodesEnRetard} période${periodesEnRetard > 1 ? 's' : ''} en retard`,
-      etat: periodesEnRetard === 0 ? 'bon' : 'alerte'
-    }
+  const constats: Indicateur[] = [
+    dispo >= 0
+      ? {
+        id: 'provisions', libelle: 'Provisions couvertes', etat: 'bon',
+        valeur: provisions === 0 ? 'rien à provisionner' : `${eur(provisions)} de côté`
+      }
+      : { id: 'provisions', libelle: 'Provisions à découvert', etat: 'alerte', valeur: `il manque ${eur(-dispo)}` },
+    facturesEnRetard === 0
+      ? { id: 'factures', libelle: 'Factures à jour', etat: 'bon', valeur: '' }
+      : {
+        id: 'factures', libelle: 'Factures en retard', etat: 'attention',
+        valeur: `${facturesEnRetard} facture${facturesEnRetard > 1 ? 's' : ''} · ${eur(montantEnRetard)}`
+      },
+    declarationsEnRetard > 0
+      ? {
+        id: 'declarations', libelle: 'Déclarations en retard', etat: 'alerte',
+        valeur: `${declarationsEnRetard} période${declarationsEnRetard > 1 ? 's' : ''}`
+      }
+      : declarationAvant !== null
+        ? {
+          id: 'declarations', libelle: 'Déclaration à faire', etat: 'attention',
+          valeur: `avant le ${dateCourte(declarationAvant)}`
+        }
+        : { id: 'declarations', libelle: 'Déclarations à jour', etat: 'bon', valeur: '' }
   ];
+  if (regime !== null) {
+    constats.push({ id: 'regime', libelle: 'Régime', etat: 'alerte', valeur: regime });
+  }
+  return constats;
 }
 
 /**
  * Le coup d'œil, sans inventer de note.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * CE QUE LE SCORE FAISAIT BIEN, ET QU'ON AVAIT PERDU
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Refuser le « 78/100 » était juste : sa formule aurait été inventée. Mais le
- * score répondait à une vraie question — « est-ce que ça va ? » — en UNE
- * information, et trois pastilles en font trois. On avait raison sur le fond
- * et on avait perdu l'usage.
- *
- * Une phrase répond à la même question sans rien pondérer. Elle ne mélange
- * pas les constats : elle nomme LE PLUS GRAVE, et le nomme en toutes lettres.
- *
- * ─────────────────────────────────────────────────────────────────────────
  * L'ORDRE EST UNE GRAVITÉ, PAS UNE PONDÉRATION
  * ─────────────────────────────────────────────────────────────────────────
  *
- * C'est ce qui distingue cette phrase d'un score. On n'attribue aucun poids ;
- * on classe des conséquences, et le classement se justifie :
+ * On n'attribue aucun poids ; on classe des conséquences :
  *
- *  1. PROVISIONS non couvertes — l'argent dû a déjà été dépensé. C'est le seul
- *     des trois qui soit déjà consommé : il ne se rattrape qu'en trouvant la
- *     somme ailleurs, et les majorations courent pendant ce temps.
+ *  1. PROVISIONS à découvert — l'argent dû a déjà été dépensé. C'est le seul
+ *     constat déjà consommé : il ne se rattrape qu'en trouvant la somme
+ *     ailleurs, et les majorations courent pendant ce temps.
  *  2. DÉCLARATIONS en retard — la pénalité est automatique et croît seule,
- *     mais la somme, elle, est encore là.
- *  3. IMPAYÉS — c'est un tiers qui doit. Désagréable, réversible, et la
- *     trésorerie n'est pas encore atteinte.
+ *     mais la somme est encore là.
+ *  3. RÉGIME — TVA due sur des factures émises sans, plafond du micro
+ *     dépassé : rien n'est encore perdu, mais chaque facture qui part sans
+ *     correction aggrave la régularisation. La liste des décisions les classe
+ *     « en retard » : la phrase ne peut pas dire « tout est en ordre » à côté.
+ *  4. FACTURES en retard — un tiers doit. Désagréable, réversible.
+ *  5. DÉCLARATION à faire dans sa fenêtre — rien n'est en retard, la date
+ *     approche.
  *
- * Le pire des trois gouverne le ton. À égalité de gravité, l'ordre ci-dessus
- * tranche — parce qu'un ordre arbitraire mais ÉCRIT vaut mieux qu'un ordre
- * d'exécution qu'on découvrirait à l'usage.
+ * L'ÉTAT gouverne d'abord (alerte, puis attention) ; le tableau ci-dessous ne
+ * tranche qu'entre constats du même état. Les alertes sont les rangs 1 à 3
+ * (provisions, déclaration en retard, régime) ; les attentions, les rangs 4 et
+ * 5 (facture en retard, déclaration à faire). D'où cet ordre, qui respecte
+ * les deux : une facture n'est jamais une alerte, une déclaration à faire
+ * jamais qu'une attention.
  */
-const GRAVITE: readonly SujetDeSante[] = ['provisions', 'declarations', 'factures'];
+const GRAVITE: readonly SujetDeSante[] = ['provisions', 'factures', 'declarations', 'regime'];
 
 export interface SyntheseDeSante {
   readonly ton: EtatIndicateur;
   readonly phrase: string;
 }
 
-export function syntheseDeSante(
-  indicateurs: readonly Indicateur[]
-): SyntheseDeSante {
+export function syntheseDeSante(indicateurs: readonly Indicateur[]): SyntheseDeSante {
   const rang = (i: Indicateur) => GRAVITE.indexOf(i.id);
   const gravite = (e: EtatIndicateur) => (e === 'alerte' ? 0 : e === 'attention' ? 1 : 2);
-
   const pire = [...indicateurs]
     .sort((a, b) => gravite(a.etat) - gravite(b.etat) || rang(a) - rang(b))[0];
 
-  if (pire === undefined || pire.etat === 'bon') {
-    return { ton: 'bon', phrase: 'Rien ne réclame ton attention.' };
-  }
+  if (pire === undefined || pire.etat === 'bon') return { ton: 'bon', phrase: 'Tout est en ordre.' };
 
-  // Le sujet est nommé ET chiffré : « attention » sans dire à quoi oblige à
-  // aller chercher, ce qui est exactement ce que le coup d'œil doit éviter.
-  return {
-    ton: pire.etat,
-    phrase: `${pire.libelle} — ${pire.valeur}.`
-  };
+  // Nommé ET chiffré : « attention » sans dire à quoi oblige à aller chercher,
+  // ce que le coup d'œil doit éviter.
+  return { ton: pire.etat, phrase: `${pire.libelle}${pire.valeur === '' ? '' : ` — ${pire.valeur}`}.` };
 }

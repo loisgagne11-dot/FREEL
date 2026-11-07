@@ -936,3 +936,25 @@ Le Pilote garde ses écarts au handoff (doublons, « Décisions du jour »),
 traités au lot 5. Le jeu d'essai montre que le Pilote annonce « en retard »
 une période close encore dans sa fenêtre de déclaration : inscrit au lot 5.
 
+## 18. Lot 5 (07/11) — le Pilote du handoff
+
+Captures regénérées dans les deux thèmes et relues ; contrôle image contre
+image par l'agent contrôleur (`docs/design/captures/*-pilote.png`) : conforme
+avec réserves, les réserves gênantes corrigées dans le lot.
+
+| Zone | Avant | Après |
+|---|---|---|
+| Salutation | « Bonjour Atelier de démonstration » + « 2 décisions t'attendent en juin 2026 » | « Bonjour Camille — deux décisions t'attendent. » + « Ton mois en un coup d'œil… » |
+| Raccourcis | Une rangée coupée au bord droit à 1 440 px | Passent à la ligne en grand écran (défilement conservé sur téléphone) |
+| Carte « Je peux me verser » | Demi-largeur, vide à côté | Retirée : le versable est dans la colonne Rémunération |
+| Le flux du mois | Totaux seuls, détail replié | Surtitre « → LE FLUX DU MOIS · JUIN 2026 », étiquettes colorées, lignes avec pastilles cliquables (encaissé / en attente / en retard ; payé / à venir / à provisionner), versable cliquable, déjà versé, bouton dans la colonne |
+| Santé | Carte, bandeau orange, trois rangées | Barre : phrase de synthèse, constats en ligne, autonomie en chiffre clé avec la réserve nommée |
+| Tuiles Solde / À garder / Disponible / Seuil | Sous la santé | Retirées (en-tête d'Argent) |
+| « Ce que je dois » | Carte demi-largeur | Retirée (colonne Sorties) |
+| Décisions du jour | « À traiter », demi-largeur, lignes plates | Pleine largeur, surtitre, rangées bordées, tuile de gravité, retard souligné, ligne « levier → » |
+| Argent → périodes URSSAF | Base encaissée seule | « À payer X € · avant le … » / « date limite dépassée » |
+
+Ce qui reste du handoff hors du lot : la barre du haut et le rail (lot 6) ;
+les modules « Dépendance client » et « CRA prêt » ; les feuilles de détail
+des décisions (renoncé, écrit dans la liste de sortie).
+
