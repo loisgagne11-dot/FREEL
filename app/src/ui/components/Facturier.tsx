@@ -133,8 +133,15 @@ const FILTRES: readonly { readonly id: StatutFacture | 'tout'; readonly libelle:
 const stockageParDefaut = stockageIndexedDB();
 
 export function Facturier(
-  { onNouvelle, onRevoir, stockage = stockageParDefaut, annee }: {
+  { onNouvelle, onRevoir, stockage = stockageParDefaut, annee, mois, onMois }: {
     readonly onNouvelle: () => void;
+    /**
+     * Le mois de la barre du haut, et de quoi le changer : c'est le mois dont
+     * le brouillon propose la facture. `undefined` retombe sur un état local —
+     * le cas des tests qui montent ce composant seul.
+     */
+    readonly mois?: Mois;
+    readonly onMois?: (m: Mois) => void;
     /**
      * L'année choisie dans la barre du haut.
      *
@@ -230,7 +237,7 @@ export function Facturier(
         onDecaler={(pas) => { setDecalage((d) => d + pas); setLimite(LIGNES_PAR_PAGE); }}
       />
 
-      <BrouillonDuMois />
+      <BrouillonDuMois {...(mois === undefined ? {} : { mois })} {...(onMois === undefined ? {} : { onMois })} />
 
       <div className={styles.grille}>
         <Chiffre libelle="Reste à rentrer" valeur={eur(etat.resteARentrer)} />
@@ -901,7 +908,7 @@ function PanneauRelance(
         {relancesFaites === 0
           ? 'Jamais relancée.'
           : `${relancesFaites} relance${relancesFaites > 1 ? 's' : ''} — la dernière le `
-            + `${dateCourte(facture.recette.relancesLe?.[relancesFaites - 1] as never)}.`}
+            + `${dateCourte(facture.recette.relancesLe?.[relancesFaites - 1] ?? null)}.`}
         {' '}{dette.joursDeRetard} jour{dette.joursDeRetard > 1 ? 's' : ''} de retard.
       </p>
 
@@ -993,11 +1000,24 @@ function PanneauRelance(
  * numéro, entre au registre, et ne bouge plus qu'à l'annulation. C'est
  * pourquoi c'est un bouton, et le seul de cette carte.
  */
-function BrouillonDuMois() {
+function BrouillonDuMois(
+  { mois: moisChoisi, onMois }: { readonly mois?: Mois; readonly onMois?: (m: Mois) => void }
+) {
   const faits = useFaits((e) => e.faits);
   const signaler = useToast();
 
-  const [mois, setMois] = useState<Mois>(() => moisCourant());
+  /*
+   * LE MOIS FACTURÉ EST CELUI DE LA BARRE.
+   *
+   * Le brouillon avait ses propres flèches, à côté du « ‹ juin 2026 › » de la
+   * barre du haut : on pouvait regarder mai en haut et la facture de juin en
+   * bas, sans que rien ne le signale. Ses flèches déplacent désormais le mois
+   * de l'application — elles restent là parce que c'est ici qu'on cherche la
+   * facture du mois précédent, le jour où on l'émet.
+   */
+  const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
+  const mois = moisChoisi ?? moisLocal;
+  const setMois = onMois ?? setMoisLocal;
   const brouillons = useMemo(() => brouillonsDeFacture(faits, mois), [faits, mois]);
 
   if (brouillons.length === 0) return null;

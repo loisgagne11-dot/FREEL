@@ -823,6 +823,8 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
               onNouvelle={() => naviguerVers('facture', 'nouvelle')}
               onRevoir={(numero) => naviguerVers('facture', encodeURIComponent(numero))}
               annee={annee}
+              mois={mois}
+              onMois={setMois}
             />
           </Suspense>
         </PanneauOnglet>
