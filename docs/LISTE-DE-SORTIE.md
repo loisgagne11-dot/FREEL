@@ -82,13 +82,13 @@ Touche le Pilote et l'Argent : captures à regénérer.
 | L6 — l'avoir reprend la TVA au signe opposé ; le dossier de TVA compte les avoirs au trimestre de l'avoir et les marque « Avoir sur … » | ✅ fait |
 | L8 — décote appliquée (barème 2024 : 889 € / 1 470 €, 45,25 %, BOFiP du 14/04/2025) dans la seule fonction partagée par la provision et le comparateur ; nouveau fait « situation du foyer » (schéma 18) — inconnue, la décote la moins favorable est retenue et l'écran le dit quand elle change le montant ; le comparateur reprend les parts et revenus saisis | ✅ fait |
 
-### Lot 4 — Jeu d'essai à forme réelle et démo en bonne santé (priorité 2)
+### Lot 4 — Jeu d'essai à forme réelle et démo en bonne santé (PR #300)
 
 | Ligne | État |
 |---|---|
-| Jeu d'essai de structure réelle, valeurs factices : mission via agence, import ancien sans lieu, TVA franchie en juin, avoir, foyer à deux parts avec salaire, ACRE qui s'éteint, passage du 31 décembre ; il entre dans les captures et les tests d'intégration | ⬜ |
-| Démo réécrite pour montrer un indépendant serein avec un ou deux sujets (aujourd'hui : quatre périodes en retard, 0,1 mois d'autonomie) | ⬜ |
-| Contrôle de confidentialité relu à l'œil | ⬜ |
+| Jeu d'essai de structure réelle, valeurs factices : mission via agence, import ancien sans lieu, TVA franchie en juin, avoir, foyer à deux parts avec salaire, ACRE qui s'éteint, passage du 31 décembre ; il entre dans les captures et les tests d'intégration | ✅ fait : `app/src/test/jeu-d-essai*.json`, 83 tests dans `src/integration/` (dont `<App />` rendu sur les sept écrans), `capturer-app.mjs --jeu=essai`. *Il a trouvé deux défauts, corrigés : provision de TVA qui gardait la TVA déductible ; import ancien qui laissait des champs de recette absents.* |
+| Démo réécrite pour montrer un indépendant serein avec un ou deux sujets (aujourd'hui : quatre périodes en retard, 0,1 mois d'autonomie) | ✅ fait : au 10 juin, une facture à relancer, 3,3 mois d'autonomie. Recalée sur la date du jour quand on la charge (balayée sur deux ans). *Trouvé au passage : le rappel de facturation électronique restait « en retard » pour toujours après le 1er septembre 2026 — corrigé.* |
+| Contrôle de confidentialité relu à l'œil | ✅ fait : un nom de client réel retiré d'un exemple de saisie de l'ancienne version ; démo et jeu d'essai relus nom par nom. *Il reste dans l'historique git, que ce dépôt public ne réécrit pas.* |
 
 Sert de filet aux lots 5 et 6.
 
@@ -100,6 +100,8 @@ Sert de filet aux lots 5 et 6.
 | Phrase de synthèse de santé à règle de priorité écrite (le score /100 du handoff reste refusé : pondérations arbitraires, `AUDIT-GRAPHES-ET-INDICATEURS.md` §5.1) | ⬜ |
 | Salutation « Bonjour {prénom} — n sujets ce matin », prénom saisi dans Réglages, jamais en dur | ⬜ |
 | Plus aucun doublon (versable, tuiles d'Argent, « Ce que je dois ») ; demi-largeur vide à côté de la carte versable | ⬜ |
+| Une période close mais encore dans sa fenêtre de déclaration est annoncée « en retard » dès le lendemain de sa clôture (trouvé au lot 4) : « à déclarer avant le … », à faire, et « en retard » seulement passé la date limite — comme le « Déclarer l'URSSAF T2 — guichet ouvert » du handoff | ⬜ |
+| Le code d'entrée est à 78,6 / 80 Ko : extraire avant d'ajouter | ⬜ |
 | Contrôle visuel image contre image avec le handoff | ⬜ |
 
 ### Lot 6 — Barre du haut et rail
@@ -123,6 +125,7 @@ Sert de filet aux lots 5 et 6.
 | Q9 — code mort (`GrapheBarres`, classes CSS de l'ancien calendrier) ; iframe d'impression retirée sur `afterprint` ; anti-rebond dans `persister` ; `as never` de `Facturier.tsx` ; modules de plus de 800 lignes | ⬜ |
 | S7 — robustesse réseau (n'effacer la session que sur 400/401, délai maximal, `https:` exigé), relevé CSV (`1e5`, `12abc`, libellé multi-ligne), CSP, sandbox de l'iframe d'impression, URL d'export révoquée trop tôt | ⬜ |
 | L10 — barèmes à recouper : taux BNC, ACRE, tranches 2025-2026, profil CIPAV, plafond du versement libératoire, seuils de TVA spécifiques, plafond micro proratisé | ⬜ |
+| L13 — autoliquidation en franchise : la TVA due sur un achat de service à un fournisseur de l'UE (`aAutoliquider`, ex. un abonnement logiciel) n'entre dans aucune provision ni aucun dossier — à confirmer côté fiscal avant de coder (vu au lot 4) | ⬜ |
 | Contrôles à ajouter à `verifier` : octets nuls, lint des hooks, contraste, impératifs en -ez, code mort | ⬜ |
 | Modules retenus du handoff encore absents : provisions en pilote automatique, brief du lundi | ⬜ |
 

@@ -578,3 +578,16 @@ Pour un foyer déjà dans la zone où elle s'éteint, chaque euro d'impôt brut 
 retire 45,25 centimes : une part, 20 000 € d'autres revenus, 6 000 €
 imposables — 660 € au barème seul, 958,65 € avec la décote.
 
+## Lot 4 (07/11) — jeu d'essai, démonstration
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Provision de TVA | Argent → enveloppes, versable | Gardait la TVA déductible déjà nettée par l'échéance de TVA (1 300 € au lieu de 1 140 sur le jeu d'essai) | Collectée − déductible − échéances : égale au dossier du trimestre (test nommé) |
+| « N à traiter » | Barre du haut, Pilote | +1 « en retard » permanent depuis le 1er septembre 2026 (facturation électronique) | « en vigueur depuis N jours », à faire, pendant un mois |
+| Tous les nombres du jeu de démonstration | Captures, démo chargée | 4 périodes en retard, versable 140 €, 0,1 mois d'autonomie au 10 juin | Aucune période en retard, versable 7 556 €, 3,3 mois ; provisions 1 970 € (l'URSSAF T2 du handoff : 1 980 €) |
+
+**Filet** : `src/integration/` parcourt toutes les sorties d'écran du jeu
+d'essai à sept dates et refuse tout NaN ou Infinity ; il vérifie aussi que le
+Pilote et l'échéancier comptent les mêmes périodes, et que le versable vaut
+solde − provisions − réserve.
+

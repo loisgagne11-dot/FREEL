@@ -918,3 +918,21 @@ Le Pilote garde ses écarts au handoff, traités au lot 5. Le code d'entrée
 pèse 78,89 Ko pour 80 : le lot 5, qui touche le Pilote, devra extraire avant
 d'ajouter.
 
+## 17. Lot 4 (07/11) — démonstration sereine, jeu d'essai
+
+Captures regénérées dans les deux thèmes (jeu de démonstration, 10 juin 2026)
+et relues ; le jeu d'essai a ses propres captures (`captures-app/essai/`,
+15 décembre 2026), qui ne se comparent à aucune capture du handoff.
+
+| Écran | Changement |
+|---|---|
+| Pilote | La démonstration ne montre plus « 4 périodes en retard » ni un versable de 140 € : 7 556 € versables, 3,3 mois d'autonomie, deux sujets (une facture à relancer, l'information de la facturation électronique). Le handoff, lui, annonce 4,2 mois et quatre décisions |
+| Argent → enveloppes | Provisions 1 970 €, au niveau de l'« URSSAF T2 1 980 € » du handoff ; frise et échéances reçues : URSSAF de janvier (841 €) et d'avril (1 484 €), chacune au montant de son trimestre |
+| Argent → périodes URSSAF | T4 2025 et T1 2026 déclarés, T2 2026 en cours |
+| Pilote, barre du haut | Le rappel de la facturation électronique dit « en vigueur depuis N jours » un mois après le 1er septembre 2026, au lieu de rester « en retard » |
+| Réglages → Données | « Charger un jeu de démonstration » le recale sur la date du jour |
+
+Le Pilote garde ses écarts au handoff (doublons, « Décisions du jour »),
+traités au lot 5. Le jeu d'essai montre que le Pilote annonce « en retard »
+une période close encore dans sa fenêtre de déclaration : inscrit au lot 5.
+

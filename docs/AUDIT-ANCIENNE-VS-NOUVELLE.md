@@ -324,3 +324,11 @@ chiffre faux.
 | Situation du foyer (mariage ou Pacs) | 🟢 | Nouveau fait, facultatif, en Réglages → Trésorerie et dans le comparateur ; il fixe le plafond de la décote. L'ancienne ignorait la décote |
 | Comparateur versement libératoire / barème | 🟢 | Reprend les parts, les autres revenus et la situation saisis en Réglages (il repartait de « 1 part, 0 € ») ; applique la décote |
 
+## Lot 4 (07/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Reprise d'une sauvegarde de l'ancienne application | 🟢 | Les recettes reprises reçoivent désormais les champs apparus depuis (échéance, envoi, relances, TVA, pièce) : avant, l'échéance de chaque facture reprise était recalculée à chaque lecture. Une sauvegarde sans lieu sur les journées se reprend et se calcule (plan de charge, CRA) — testé |
+| Jeu de démonstration (Réglages → Données) | 🟢 | Montre une activité sereine et se recale sur la date du jour ; l'ancienne n'en avait pas |
+| Rappels réglementaires | 🟢 | La facturation électronique ne reste plus « en retard » pour toujours après sa date : « en vigueur », puis plus rien un mois après |
+
