@@ -489,6 +489,12 @@ function recettesDuSchema15(recettes: readonly Recette[]): readonly Recette[] {
  * lèverait au premier chargement d'un compte existant — la migration de
  * surface a l'air de suffire jusqu'au jour où quelqu'un déplace le champ dans
  * un élément de liste.
+ *
+ * v17 → v18 : `impositionCommune`, la situation du foyer pour la décote.
+ * Champ de PREMIER NIVEAU : la fusion de surface le comble depuis
+ * `faitsVides()`, à `null` — jamais `false`, qui dirait « seul » d'un foyer
+ * dont on ne sait rien. Test nommé : « un compte de schéma 17 reçoit une
+ * imposition commune nulle, et non `undefined` ».
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;

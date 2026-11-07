@@ -253,7 +253,7 @@ function Tresorerie() {
           libelle="Objectif de chiffre d’affaires sur l’année"
           aide="Facultatif. Sur l’encaissé, comme les plafonds et l’impôt — un
                 objectif sur le facturé serait atteint sans que le compte l’ait
-                vu passer. Laissez vide pour ne pas en fixer."
+                vu passer. Laisse vide pour ne pas en fixer."
         >
           <input
             id={`${idChamp}-objectif`}
@@ -330,6 +330,26 @@ function FoyerFiscal() {
           value={faits.partsFiscales ?? ''}
           onChange={(e) => definir({ partsFiscales: nombreOuNull(e.target.value) })}
         />
+      </Champ>
+
+      <Champ
+        id={`${idChamp}-commune`}
+        libelle="Situation du foyer"
+        aide="Elle fixe le plafond de la décote, qui allège l’impôt des foyers
+              modestes. Les parts ne la disent pas : un parent isolé en a deux,
+              comme un couple."
+      >
+        <select
+          id={`${idChamp}-commune`}
+          value={faits.impositionCommune === null ? '' : faits.impositionCommune ? 'commune' : 'seul'}
+          onChange={(e) => definir({
+            impositionCommune: e.target.value === '' ? null : e.target.value === 'commune'
+          })}
+        >
+          <option value="">Non renseignée</option>
+          <option value="seul">Seul·e — célibataire, divorcé·e, veuf·ve</option>
+          <option value="commune">Marié·e ou pacsé·e</option>
+        </select>
       </Champ>
 
       <Champ
@@ -825,7 +845,7 @@ function Donnees({ nomFichier }: { nomFichier: string }) {
       <p className={styles.explication}>
         Des clients, des missions, des factures et des échéances manifestement
         fictifs, pour voir l’application remplie. Ils remplacent tes données&nbsp;:
-        exportez-les d’abord si elles comptent.
+        exporte-les d’abord si elles comptent.
       </p>
 
       {aRestaurer !== null && (
@@ -1001,7 +1021,7 @@ async function lireSauvegarde(fichier: File): Promise<Restauration> {
   } catch {
     return {
       statut: 'illisible',
-      motif: 'Ce fichier n’est pas du JSON. Choisissez un export produit par l’application.'
+      motif: 'Ce fichier n’est pas du JSON. Choisis un export produit par l’application.'
     };
   }
 

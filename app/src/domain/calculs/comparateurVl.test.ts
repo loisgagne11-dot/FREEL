@@ -122,3 +122,29 @@ describe('résolution', () => {
     expect(r.statut === 'publie' || r.statut === 'hypothese').toBe(true);
   });
 });
+
+/**
+ * LA DÉCOTE EST APPLIQUÉE, ET LA SITUATION DU FOYER COMPTE.
+ *
+ * Écartée, elle faisait dire au comparateur 660 € au barème pour une
+ * activité qui en coûte 958,65 € à un foyer déjà dans la zone où elle
+ * s'éteint (une part, 20 000 € d'autres revenus, 6 000 € imposables).
+ */
+describe('décote', () => {
+  // 9 090,91 € de CA BNC, 34 % d'abattement : 6 000 € imposables.
+  const ca = 6000 / 0.66;
+
+  it('entre dans le montant au barème', () => {
+    const c = comparaison(ca, { parts: 1, autresRevenus: euros(20000) });
+    expect(c.bareme).toBe(958.65);
+    expect(c.situationDecisive).toBe(false);
+  });
+
+  it('signale quand la situation, non renseignée, changerait le résultat', () => {
+    const inconnue = comparaison(ca, { parts: 2, autresRevenus: euros(46000) });
+    expect(inconnue.situationDecisive).toBe(true);
+    const declaree = comparaison(ca, { parts: 2, autresRevenus: euros(46000), impositionCommune: false });
+    expect(declaree.situationDecisive).toBe(false);
+    expect(declaree.bareme).toBe(660);
+  });
+});

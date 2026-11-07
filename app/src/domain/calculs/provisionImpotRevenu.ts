@@ -44,13 +44,20 @@ import {
   euros
 } from '../types';
 import { revenuApresAbattement } from '../bareme/abattement';
-import { impotDuFoyer, surcroitDImpot, tranchesIR } from '../bareme/impot';
+import {
+  baremeIR, impotDuFoyer, situationDecote, situationDecoteDecisive, surcroitDImpot
+} from '../bareme/impot';
 
 /** Les faits du foyer fiscal. `null` veut dire « pas renseigné », jamais zéro. */
 export interface FoyerFiscalImpot {
   readonly partsFiscales: number | null;
   readonly autresRevenusFoyer: Euros | null;
   readonly versementPerDeductible: Euros | null;
+  /**
+   * Marié ou pacsé, soumis à imposition commune — ou `null`, pas renseigné.
+   * Facultatif pour l'appelant : il ne sert qu'à la décote.
+   */
+  readonly impositionCommune?: boolean | null;
 }
 
 export interface EntreeProvisionIr {
@@ -90,7 +97,8 @@ export type IgnoreParLaProvisionIr =
   | 'autres_revenus_foyer_non_renseignes'
   | 'versement_per_non_renseigne'
   | 'plafonnement_quotient_familial'
-  | 'decote_et_reductions_d_impot'
+  | 'situation_familiale_non_renseignee'
+  | 'reductions_et_credits_d_impot'
   | 'bareme_de_l_annee_non_publie';
 
 export interface ProvisionImpotRevenu {
@@ -147,8 +155,8 @@ export function provisionImpotRevenu(
     };
   }
 
-  const tranches = tranchesIR(entree.moisCourant);
-  if (tranches.statut === 'refuse') return tranches;
+  const bareme = baremeIR(entree.moisCourant);
+  if (bareme.statut === 'refuse') return bareme;
 
   const assiette = euros(entree.caEncaisseConstate + (entree.caAttendu ?? 0));
   const apresAbattement = revenuApresAbattement(assiette, entree.moisCourant, entree.typeActivite);
@@ -162,11 +170,16 @@ export function provisionImpotRevenu(
   // Quotient familial : le barème s'applique à une part, le résultat se
   // remultiplie. L'appliquer au revenu entier ferait payer la tranche haute
   // à un foyer qui la divise en plusieurs parts.
-  const impotFoyer = impotDuFoyer(revenuFoyer, partsFiscales, tranches.valeur);
+  const { tranches } = bareme.valeur;
+  const decoteFoyer = {
+    parametres: bareme.valeur.decote,
+    situation: situationDecote(partsFiscales, entree.foyer.impositionCommune ?? null)
+  };
+  const impotFoyer = impotDuFoyer(revenuFoyer, partsFiscales, tranches, decoteFoyer);
 
   // Ce que l'activité AJOUTE à l'impôt du foyer, pas sa quote-part au taux
   // moyen : voir `surcroitDImpot`, la même fonction que le comparateur.
-  const impotMicro = surcroitDImpot(revenuMicro, autres, per, partsFiscales, tranches.valeur);
+  const impotMicro = surcroitDImpot(revenuMicro, autres, per, partsFiscales, tranches, decoteFoyer);
 
   const resteAProvisionner = euros(Math.max(0, impotMicro - entree.acomptesPasSaisis));
   const moisRestants = Math.max(0, 12 - Number(entree.moisCourant.slice(5, 7)) + 1);
@@ -175,8 +188,11 @@ export function provisionImpotRevenu(
   if (entree.caAttendu === null) ignore.push('encaissements_a_venir_non_fournis');
   if (autresRevenusFoyer === null) ignore.push('autres_revenus_foyer_non_renseignes');
   if (versementPerDeductible === null) ignore.push('versement_per_non_renseigne');
-  ignore.push('plafonnement_quotient_familial', 'decote_et_reductions_d_impot');
-  if (tranches.statut === 'hypothese') ignore.push('bareme_de_l_annee_non_publie');
+  if (situationDecoteDecisive(revenuMicro, autres, per, partsFiscales, tranches, decoteFoyer)) {
+    ignore.push('situation_familiale_non_renseignee');
+  }
+  ignore.push('plafonnement_quotient_familial', 'reductions_et_credits_d_impot');
+  if (bareme.statut === 'hypothese') ignore.push('bareme_de_l_annee_non_publie');
 
   const valeur: ProvisionImpotRevenu = {
     annee: entree.annee,
@@ -194,19 +210,19 @@ export function provisionImpotRevenu(
 
   // La résolution la plus prudente des deux composantes : une hypothèse sur
   // le barème ou sur l'abattement rend l'ensemble une hypothèse.
-  if (tranches.statut === 'publie' && apresAbattement.statut === 'publie') {
+  if (bareme.statut === 'publie' && apresAbattement.statut === 'publie') {
     return {
       statut: 'publie', valeur,
-      source: `${tranches.source} + ${apresAbattement.source}`, verifieLe: tranches.verifieLe
+      source: `${bareme.source} + ${apresAbattement.source}`, verifieLe: bareme.verifieLe
     };
   }
-  const depuis = tranches.statut === 'hypothese'
-    ? tranches.depuis
+  const depuis = bareme.statut === 'hypothese'
+    ? bareme.depuis
     : (apresAbattement as Extract<typeof apresAbattement, { statut: 'hypothese' }>).depuis;
   return {
     statut: 'hypothese', valeur,
-    source: `${tranches.source} + ${apresAbattement.source}`,
-    verifieLe: tranches.verifieLe,
+    source: `${bareme.source} + ${apresAbattement.source}`,
+    verifieLe: bareme.verifieLe,
     depuis
   };
 }

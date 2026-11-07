@@ -566,7 +566,8 @@ export function provisionIrDe(
     foyer: {
       partsFiscales: faits.partsFiscales,
       autresRevenusFoyer: faits.autresRevenusFoyer,
-      versementPerDeductible: faits.versementPerDeductible
+      versementPerDeductible: faits.versementPerDeductible,
+      impositionCommune: faits.impositionCommune
     },
     acomptesPasSaisis: acomptesPasDeLAnnee(faits, annee)
   });
@@ -614,7 +615,8 @@ export function soldeImpotPrecedentDe(
     foyer: {
       partsFiscales: faits.partsFiscales,
       autresRevenusFoyer: faits.autresRevenusFoyer,
-      versementPerDeductible: faits.versementPerDeductible
+      versementPerDeductible: faits.versementPerDeductible,
+      impositionCommune: faits.impositionCommune
     },
     acomptesPasSaisis: acomptesPasDeLAnnee(faits, precedente)
   });

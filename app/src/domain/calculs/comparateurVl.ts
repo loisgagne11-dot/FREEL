@@ -1,6 +1,8 @@
 import type { Euros, Mois, Ratio, Resolution, TypeActivite } from '../types';
 import { euros } from '../types';
-import { surcroitDImpot, tauxVersementLiberatoire, tranchesIR } from '../bareme/impot';
+import {
+  baremeIR, situationDecote, situationDecoteDecisive, surcroitDImpot, tauxVersementLiberatoire
+} from '../bareme/impot';
 import { revenuApresAbattement } from '../bareme/abattement';
 
 /**
@@ -31,17 +33,19 @@ import { revenuApresAbattement } from '../bareme/abattement';
  * l'impôt avec elle, moins l'impôt sans elle. C'est ce surcroît qui se
  * compare aux 2,2 %.
  *
- * Trois simplifications sont assumées, et l'écran les dit :
+ * La décote est appliquée — elle l'est des deux côtés du surcroît, voir
+ * `surcroitDImpot`. Elle était écartée au motif qu'elle « surestime le barème
+ * en bas de l'échelle » ; c'est faux dans la zone où elle s'éteint, où elle
+ * renchérit au contraire chaque euro gagné de 45,25 %. Son plafond dépend de
+ * la situation du foyer : inconnue, c'est le cas le moins favorable qui est
+ * retenu, et `situationDecisive` dit quand la réponse changerait le résultat.
  *
- *   · pas de décote, qui allège l'impôt des revenus modestes — le barème est
- *     donc SURESTIMÉ en bas de l'échelle, au désavantage du barème ;
+ * Deux simplifications restent assumées, et l'écran les dit :
+ *
  *   · pas de plafonnement du quotient familial, qui le renchérit pour les
  *     foyers aisés à plusieurs parts — le barème est donc SOUS-estimé en
  *     haut ;
  *   · aucune réduction ni crédit d'impôt.
- *
- * Le sens de chaque écart est donné parce qu'il change la lecture : un
- * résultat serré ne se tranche pas sur ces chiffres seuls.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * UNE CONDITION QUE CE MODULE NE VÉRIFIE PAS
@@ -67,6 +71,8 @@ export interface FoyerFiscal {
    * revenu du foyer — c'est-à-dire à toujours conclure en faveur du barème.
    */
   readonly autresRevenus: Euros;
+  /** Marié ou pacsé (`true`), seul (`false`), ou pas renseigné (`null`). */
+  readonly impositionCommune?: boolean | null;
 }
 
 export interface Comparaison {
@@ -87,6 +93,11 @@ export interface Comparaison {
   readonly ecart: Euros;
   /** Ce qui est le moins cher, ou `null` à égalité stricte. */
   readonly avantage: 'versement_liberatoire' | 'bareme' | null;
+  /**
+   * La situation du foyer n'est pas connue et elle changerait le montant au
+   * barème : le cas le moins favorable a été retenu, l'écran doit le dire.
+   */
+  readonly situationDecisive: boolean;
 }
 
 /**
@@ -108,14 +119,19 @@ export function comparerRegimes(
   const revenuR = revenuApresAbattement(caAnnuel, m, type);
   if (revenuR.statut === 'refuse') return revenuR;
 
-  const tranchesR = tranchesIR(m);
+  const tranchesR = baremeIR(m);
   if (tranchesR.statut === 'refuse') return tranchesR;
 
   const vl = euros(caAnnuel * tauxR.valeur);
-  const tranches = tranchesR.valeur;
+  const { tranches } = tranchesR.valeur;
+  const parts = Math.max(1, foyer.parts);
+  const decoteFoyer = {
+    parametres: tranchesR.valeur.decote,
+    situation: situationDecote(parts, foyer.impositionCommune ?? null)
+  };
 
   // Le surcroît : l'impôt du foyer AVEC l'activité, moins celui SANS elle.
-  const bareme = surcroitDImpot(revenuR.valeur, foyer.autresRevenus, 0, Math.max(1, foyer.parts), tranches);
+  const bareme = surcroitDImpot(revenuR.valeur, foyer.autresRevenus, 0, parts, tranches, decoteFoyer);
 
   const ecart = euros(vl - bareme);
   const valeur: Comparaison = {
@@ -124,7 +140,10 @@ export function comparerRegimes(
     bareme,
     revenuApresAbattement: revenuR.valeur,
     ecart,
-    avantage: ecart === 0 ? null : (ecart > 0 ? 'bareme' : 'versement_liberatoire')
+    avantage: ecart === 0 ? null : (ecart > 0 ? 'bareme' : 'versement_liberatoire'),
+    situationDecisive: situationDecoteDecisive(
+      revenuR.valeur, foyer.autresRevenus, 0, parts, tranches, decoteFoyer
+    )
   };
 
   // L'hypothèse se propage : si l'un des trois éléments est extrapolé, le

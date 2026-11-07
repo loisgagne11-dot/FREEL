@@ -16,7 +16,7 @@
     "Les dates sont ancrées en 2026 pour reproduire l'état du handoff, daté de",
     "juin 2026."
   ],
-  "version": 17,
+  "version": 18,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "siret": "000 000 000 00000",
@@ -746,5 +746,6 @@
   "partGardeeAuVersement": 0,
   "partsFiscales": null,
   "autresRevenusFoyer": null,
-  "versementPerDeductible": null
+  "versementPerDeductible": null,
+  "impositionCommune": null
 }
