@@ -217,7 +217,17 @@ export function CarteRapportParMission(
  * un taux supposé serait la pire des approximations.
  */
 export function CarteTarifJournalier(
-  { tarif, annee }: { readonly tarif: TarifDeLaJournee; readonly annee: number }
+  { tarif, annee, auBareme }: {
+    readonly tarif: TarifDeLaJournee;
+    readonly annee: number;
+    /**
+     * Au barème, le net ne retire que cotisations et CFP : l'impôt sur le
+     * revenu dépend du foyer et se provisionne à part. Le dire évite qu'un
+     * « net » se lise comme ce qui reste vraiment — c'est sur ce chiffre qu'on
+     * accepte une mission.
+     */
+    readonly auBareme: boolean;
+  }
 ) {
   const { effectif, net } = tarif;
   if (effectif.effectif === null || effectif.affiche === null) return null;
@@ -234,15 +244,18 @@ export function CarteTarifJournalier(
             tarif de chaque mission. Le <strong>tarif effectif</strong> divise
             ce qui a réellement été facturé par les mêmes journées&nbsp;: leur
             écart mesure ce qui se perd en remises, forfaits et jours non
-            facturés. Le <strong>net</strong> retire cotisations et impôt — près
+            facturés. Le <strong>net</strong> retire les cotisations — près
             d’un quart du chiffre d’affaires en micro-BNC, et l’écart que l’on
             sous-estime le plus au moment de dire oui à une mission.
+            {auBareme
+              ? ' Au barème, l’impôt sur le revenu n’y est pas : il dépend de ton foyer, et se met de côté à part.'
+              : ' Le versement libératoire y est compris : l’impôt est payé avec les cotisations.'}
           </Info>}
       resume={(
         <>
           <Montant>{eur(effectif.effectif)}</Montant> facturés par jour
           {net.statut !== 'refuse' && (
-            <>{' · '}<Montant>{eur(net.valeur)}</Montant> nets</>
+            <>{' · '}<Montant>{eur(net.valeur)}</Montant> {auBareme ? 'nets avant impôt' : 'nets'}</>
           )}
         </>
       )}
@@ -267,7 +280,7 @@ export function CarteTarifJournalier(
           </div>
         )}
         <div className={`${styles.ligne} ${styles.total}`}>
-          <dt>Ce qu’il te reste, charges déduites</dt>
+          <dt>Ce qu’il te reste, charges déduites{auBareme && ', avant impôt sur le revenu'}</dt>
           <dd>
             {net.statut === 'refuse'
               ? <span className={styles.vide}>{net.motif}</span>

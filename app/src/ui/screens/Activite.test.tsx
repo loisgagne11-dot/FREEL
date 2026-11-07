@@ -1148,6 +1148,31 @@ describe('ce qu’une journée rapporte', () => {
     expect(montant).not.toBe('500 €');
   });
 
+  /**
+   * AU BARÈME, LE NET N'EST PAS CE QUI RESTE.
+   *
+   * Il ne retire que les cotisations : l'impôt sur le revenu dépend du foyer
+   * et se provisionne à part. Sans la mention, on lit le net comme ce que
+   * rapporte vraiment une journée — et c'est sur ce chiffre qu'on dit oui à
+   * une mission. Sous versement libératoire, l'impôt y est : pas de mention.
+   */
+  it('dit « avant impôt » au barème, et pas sous versement libératoire', () => {
+    const avecMission = {
+      missions: [missionTarifee],
+      recettes: [recette({ montant: euros(11_000), emiseLe: dateISO('2026-01-31') })]
+    };
+    semer(avecMission);
+    const { unmount } = render(<Activite />);
+    expect(screen.getByText(/charges déduites, avant impôt sur le revenu/)).toBeTruthy();
+    unmount();
+
+    semer({ ...avecMission, entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } });
+    render(<Activite />);
+    // La ligne est bien là — seule la mention disparaît.
+    expect(screen.getByText(/Ce qu’il te reste, charges déduites/)).toBeTruthy();
+    expect(screen.queryByText(/avant impôt sur le revenu/)).toBeNull();
+  });
+
   /** Sans journée travaillée, il n'y a pas de moyenne à montrer. */
   it('ne montre rien sans journée travaillée', () => {
     semer({ missions: [] });

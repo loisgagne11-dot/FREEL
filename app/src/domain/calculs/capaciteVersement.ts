@@ -48,7 +48,11 @@ export interface CapaciteDuMois {
   readonly nature: NatureDuMois;
   /** Encaissé du mois : constaté s'il est passé, attendu s'il est à venir. */
   readonly encaisse: Euros;
-  /** Cotisations et impôt dus sur cet encaissé, au taux de CE mois. */
+  /**
+   * Cotisations et contributions dues sur cet encaissé, au taux de CE mois —
+   * versement libératoire compris s'il est choisi. Au barème, l'impôt sur le
+   * revenu n'y est PAS : il dépend du foyer et se provisionne à part.
+   */
   readonly charges: Euros;
   readonly depenses: Euros;
   /**

@@ -764,8 +764,9 @@ function CarteCapacite(
           Capacité de versement par mois
           <Info libelle="Comment lire ces barres">
             La barre dit ce que le mois <em>autorisait</em>&nbsp;: encaissé, moins
-            les charges au taux de <em>ce</em> mois-là, moins les dépenses. Le
-            plein dit ce que tu as pris. Les mois à venir sont hachurés et
+            les cotisations au taux de <em>ce</em> mois-là, moins les dépenses.
+            Au barème, l’impôt sur le revenu n’y est pas déduit&nbsp;: il se met
+            de côté à part, dans les provisions. Le plein dit ce que tu as pris. Les mois à venir sont hachurés et
             n’ont aucun plein&nbsp;— rien n’en est encore sorti.
           </Info>
         </h2>

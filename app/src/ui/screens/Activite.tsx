@@ -635,7 +635,11 @@ export function Activite({ annee }: ProprietesActivite = {}) {
               <Suspense fallback={<EnAttenteDeFormulaire />}>
                 <CartePrevision previsions={previsions} mois={mois} />
                 <CarteRapportParMission rapports={rapports} annee={Number(mois.slice(0, 4))} />
-                <CarteTarifJournalier tarif={tarif} annee={Number(mois.slice(0, 4))} />
+                <CarteTarifJournalier
+                  tarif={tarif}
+                  annee={Number(mois.slice(0, 4))}
+                  auBareme={!faits.entreprise.versementLiberatoire}
+                />
               </Suspense>
             </div>
 

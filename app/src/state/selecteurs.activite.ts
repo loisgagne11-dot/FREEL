@@ -768,7 +768,8 @@ export function rapportParMission(
 export interface TarifDeLaJournee {
   readonly effectif: TjmEffectif;
   /**
-   * Ce qu'il reste d'une journée facturée, cotisations et impôt déduits.
+   * Ce qu'il reste d'une journée facturée, cotisations déduites — avant
+   * impôt sur le revenu au barème (voir `tjmNet`).
    *
    * Une `Resolution` : le barème peut ne pas couvrir la période, et un « ce qui
    * vous reste par jour » calculé sur un taux supposé serait précisément le
