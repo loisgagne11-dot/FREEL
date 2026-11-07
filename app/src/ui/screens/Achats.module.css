@@ -448,6 +448,9 @@
 }
 
 .numerique { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* `.tableau th` aligne à gauche avec une spécificité plus forte : sans cette
+   règle, l'en-tête « TTC » restait à gauche, loin de ses montants. */
+.tableau .numerique { text-align: right; }
 .rangee { cursor: pointer; }
 .rangee:hover { background: var(--panel-2); }
 .tableau .ouvrir { padding: 0; min-height: 0; width: auto; }

@@ -296,30 +296,18 @@ describe('période d’observation', () => {
     expect(screen.queryByRole('button', { name: 'Période précédente' })).toBeNull();
   });
 
-  it('offre la navigation dès qu’une maille est bornée', async () => {
+  /**
+   * PAS DE SECONDE PAIRE DE FLÈCHES.
+   *
+   * La période d'Achats est ancrée sur le mois de la barre du haut : ses
+   * flèches à elle déplaçaient une autre période que celle de la barre, et
+   * l'écran affichait deux « ‹ juin 2026 › » qui pouvaient se contredire.
+   */
+  it('laisse la navigation au mois de la barre du haut', async () => {
     semer();
     render(<Achats />);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Mois' }));
-    expect(screen.getByRole('button', { name: 'Période précédente' })).toBeTruthy();
-  });
-
-  /**
-   * Changer de maille repart de la période courante. Conserver un décalage de
-   * « trois mois en arrière » en passant à l'année donnerait « trois ans en
-   * arrière » — un saut que personne n'a demandé.
-   */
-  it('repart de la période courante quand on change de maille', async () => {
-    semer();
-    render(<Achats />);
-    const utilisateur = userEvent.setup();
-
-    await utilisateur.click(screen.getByRole('button', { name: 'Année' }));
-    const courante = screen.getByRole('status').textContent;
-    await utilisateur.click(screen.getByRole('button', { name: 'Période précédente' }));
-    await utilisateur.click(screen.getByRole('button', { name: 'Mois' }));
-    await utilisateur.click(screen.getByRole('button', { name: 'Année' }));
-
-    expect(screen.getByRole('status').textContent).toBe(courante);
+    expect(screen.queryByRole('button', { name: 'Période précédente' })).toBeNull();
   });
 });
 
@@ -398,7 +386,7 @@ describe('le mois choisi ancre la période', () => {
   it('ouvre sur le mois choisi, en maille « Mois » par défaut', () => {
     semer();
     render(<Achats mois={mois('2025-03')} />);
-    expect(screen.getByText('Mars 2025')).toBeTruthy();
+    expect(screen.getByText(/Dépenses · mars 2025/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Mois' }).getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -407,18 +395,15 @@ describe('le mois choisi ancre la période', () => {
     render(<Achats />);
     const attendu = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' })
       .format(new Date());
-    const [moisLu, anneeLue] = attendu.split(' ');
-    expect(screen.getByText(
-      `${(moisLu ?? '').charAt(0).toUpperCase()}${(moisLu ?? '').slice(1)} ${anneeLue ?? ''}`
-    )).toBeTruthy();
+    expect(screen.getByText(`Dépenses · ${attendu}`)).toBeTruthy();
   });
 
-  /** La barre de période continue de naviguer PAR-DESSUS l'ancre. */
-  it('laisse reculer d’un mois à partir du mois choisi', async () => {
+  /** Ce sont les flèches de la barre du haut qui déplacent la période. */
+  it('suit le mois de la barre quand il change', () => {
     semer();
-    render(<Achats mois={mois('2025-03')} />);
-    await userEvent.setup().click(screen.getByRole('button', { name: /précédent/i }));
-    expect(screen.getByText('Février 2025')).toBeTruthy();
+    const rendu = render(<Achats mois={mois('2025-03')} />);
+    rendu.rerender(<Achats mois={mois('2025-02')} />);
+    expect(screen.getByText(/Dépenses · février 2025/)).toBeTruthy();
   });
 
   it('ne montre que les dépenses du mois choisi', () => {

@@ -188,6 +188,9 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
         periode={periode}
         onGranularite={(g) => { setGranularite(g); setDecalage(0); }}
         onDecaler={(pas) => setDecalage((d) => d + pas)}
+        // Le mois se choisit dans la barre du haut : pas de seconde paire de
+        // flèches qui déplacerait une autre période que la sienne.
+        navigation={false}
       />
 
       <div className={styles.grille}>
