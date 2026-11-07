@@ -35,6 +35,7 @@ import {
 import { JOURS_SEMAINE, type AjustementJour } from '../domain/calculs/planning';
 import { formuleDepuisJours } from '../domain/calculs/delaiPaiement';
 import type { ClientOperationnel } from '../state/schema';
+import { completerFaits } from '../state/schema.migrations';
 import type { Echeance, NatureDette } from '../domain/calculs/provisions';
 import {
   CLE_BUNDLE_LEGACY, CLE_OBJECTIF_LEGACY, PREFIXE_LEGACY,
@@ -755,7 +756,13 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     champsNonRepris.push('treasury.mouvements (hors charges)');
   }
 
-  return {
+  // Par le comblement de schéma, comme tout bloc adopté : la conversion ne
+  // posait pas les champs de recette apparus aux schémas 9 à 16 (échéance,
+  // envoi, relances, TVA, pièce), et `remplacerParBundle` persistait ces
+  // recettes incomplètes. L'échéance de chaque facture reprise était alors
+  // recalculée d'après la formule du client à chaque lecture — ce que le
+  // fait stocké existe pour empêcher. Trouvé par le jeu d'essai (lot 4).
+  return completerFaits({
     version: VERSION_SCHEMA,
     entreprise: {
       ...entrepriseVide(),
@@ -874,7 +881,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     // L'ancienne application ne connaissait pas la situation du foyer : elle
     // ignorait la décote. Rien à reprendre, donc rien à deviner.
     impositionCommune: null
-  };
+  });
 }
 
 /**

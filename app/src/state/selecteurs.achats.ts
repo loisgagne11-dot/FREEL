@@ -21,7 +21,6 @@
  * rien.
  */
 
-import type { Mois } from '../domain/types';
 import { moisDe } from '../domain/types';
 import {
   type ContexteDepenses, type EtatRapprochement, type RegimeTva,
@@ -33,22 +32,12 @@ import {
 } from '../domain/calculs/banque';
 import type { MouvementBancaire, ResumeRapprochement } from '../domain/calculs/banque';
 import { type Periode, dansLaPeriode, periodeCourante } from '../domain/calculs/periode';
-import { debutTvaEffectif, moisCourant, soldeEstSuivi } from './selecteurs';
+import { moisCourant, regimeTvaAu, soldeEstSuivi } from './selecteurs';
 import type { Depense, Faits } from './schema';
 
-/**
- * Le régime de TVA en vigueur à un mois donné.
- *
- * Résolu par période, comme les taux URSSAF, et pour la même raison : une
- * entreprise qui franchit le seuil en cours d'année relève de la franchise
- * avant, et de l'assujettissement après. Appliquer le régime d'aujourd'hui à
- * une dépense de mars rendrait déductible une TVA qui ne l'était pas.
- */
-export function regimeTvaAu(faits: Faits, m: Mois): RegimeTva {
-  // L'option OU le franchissement : voir `debutTvaEffectif`.
-  const depuis = debutTvaEffectif(faits);
-  return depuis !== null && m >= depuis ? 'assujetti' : 'franchise';
-}
+/* `regimeTvaAu` vit dans `selecteurs` : la provision de TVA en a besoin, et
+   ce module importe déjà celui-là. Réexporté pour ses lecteurs d'ici. */
+export { regimeTvaAu } from './selecteurs';
 
 /**
  * Le contexte d'une dépense : régime à sa date de paiement, et disponibilité

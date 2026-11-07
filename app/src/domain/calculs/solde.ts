@@ -61,7 +61,8 @@
  */
 
 import { type DateISO, type Euros, euros } from '../types';
-import { type MouvementBancaire, soldeBancaire } from './banque';
+import type { MouvementBancaire } from './banque';
+import { soldeBancaire } from './banque.solde';
 import type { Depense } from './depenses';
 import { type Echeance, type RecetteEncaissee, estPayee } from './provisions';
 
