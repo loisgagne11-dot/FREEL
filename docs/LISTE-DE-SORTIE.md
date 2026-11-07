@@ -21,8 +21,8 @@ Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 | N° | Décision | État | Recommandation de l'audit |
 |---|---|---|---|
 | 1 | Fusionner la PR #296 | ✅ faite, fusionnée le 6/11 | — |
-| 2 | Rail : six entrées comme le handoff, ou garder « Facturer » | ⬜ en attente | Suivre le handoff : la facture se crée depuis « + Nouveau » et depuis le Pilote. Conditionne le lot 6. |
-| 3 | Impôt de l'activité : taux marginal ou prorata | ⬜ en attente | Marginal : c'est le surcoût réel pour le foyer, et ce que calcule déjà le comparateur. Conditionne L5 (lot 2). |
+| 2 | Rail : six entrées comme le handoff, ou garder « Facturer » | ✅ décidé le 6/11 : **formule A**, suivre le handoff (la liste des factures devient un onglet d'Activité, la création passe par « + Nouveau » et le Pilote) | Lot 6. |
+| 3 | Impôt de l'activité : taux marginal ou prorata | ✅ décidé le 6/11 : **marginal** | Fait en L5 (lot 2). |
 | 4 | Prénom du propriétaire dans les sources publiques du handoff et les captures | ✅ accepté le 6/11 — remplacé par la persona « Camille Demo » déjà présente dans le handoff, captures regénérées ; l'historique git n'est pas réécrit | — |
 | 5 | Adresse du projet Supabase en dur dans l'ancienne `index.html` | ✅ accepté le 6/11 — ligne retirée, fichier conservé ; l'adresse se saisit dans l'onglet « Cloud & Vie privée » de l'ancienne application | — |
 | 6 | Contrôle du taux BNC 2026 (25,6 %) sur l'avis URSSAF réel | ✅ confirmé le 6/11 par le propriétaire. Il signale aussi les 0,2 % de CFP payés avec la déclaration : voir L12 (lot 2) | — |
@@ -57,19 +57,19 @@ ne se réutilisent jamais.
 
 Chaque correctif porte son test de mutation.
 
-### Lot 2 — Un chiffre, une source (avant le 1er janvier 2027)
+### Lot 2 — Un chiffre, une source (PR #298)
 
 | Ligne | État |
 |---|---|
-| L1 — une seule `periodesADeclarer` ; l'échéancier propose « Déclarer 0 € » (une déclaration à zéro reste obligatoire) | ⬜ |
-| L2 — un seul sélecteur `nombreATraiter`, compté en sujets, identique partout | ⬜ |
-| L4 — garder la provision d'impôt de N-1 jusqu'au solde, avec un test qui traverse le 31 décembre | ⬜ |
-| L5 — une seule méthode d'impôt de l'activité (selon la décision n° 3) | ⬜ |
-| L9 — écrire « avant impôt » sur tout net ou toute capacité qui l'exclut | ⬜ |
-| L12 — CFP (0,2 % en BNC, payée à l'URSSAF avec la déclaration) : comptée dans le total à mettre de côté, mais rangée en « impôt » ; le montant URSSAF affiché est donc 0,2 % sous ce que l'URSSAF demande. La ranger en nature `cfp`, et montrer « cotisations 25,6 % + CFP 0,2 % » à la déclaration | ⬜ |
-| L11 — date locale pour les annulations (la date UTC bascule dans l'année précédente) ; CFP rangée dans la nature `cfp` ; arrondi des parts | ⬜ |
-| Q2 — les cinq tests qui ne tiennent rien (`if (statut === 'refuse') return;` sans assertion) : utilitaire `publie(r)` | ⬜ |
-| Q4 — `domain/dates.ts` et `ui/format.ts` comme seules sources (`joursEntre` en six copies, `enKiloEuros`, libellé « mois année ») | ⬜ |
+| L1 — une seule `periodesADeclarer`, avec les déclarations à zéro ; l'échéancier dit « à déclarer à zéro » ; test d'accord Pilote ↔ échéancier | ✅ fait |
+| L2 — la pastille « à traiter » compte des sujets, comme la salutation et les badges du rail | ✅ fait |
+| L4 — provision du solde de l'impôt N-1 jusqu'à la saisie de l'avis ; une échéance d'impôt peut porter l'exercice qu'elle règle ; test qui traverse le 31 décembre | ✅ fait |
+| L5 — impôt de l'activité au taux marginal (décision 3), une seule fonction partagée avec le comparateur | ✅ fait |
+| L9 — « avant impôt » écrit au barème sur le net d'une journée et la capacité de versement | ✅ fait |
+| L12 — CFP rangée dans sa nature `cfp` (enveloppe à part), plus en « impôt » | ✅ fait. *Le montant à payer par déclaration (cotisations 25,6 % + CFP 0,2 %) n'est pas encore affiché : l'échéancier ne montre que la base encaissée — lot 5, avec la ligne « Déclarer » du Pilote.* |
+| L11 — date du jour locale partout (elle était en UTC quand le mois courant est local) ; `ajouterJours` juste au changement d'heure ; tests à l'heure de Paris | ✅ fait. *Arrondi des parts : reporté au lot 7.* |
+| Q2 — plus aucun test qui sort avant sa première assertion (`test/resolution.ts`) ; un test vide depuis le lot R vérifie de nouveau | ✅ fait |
+| Q4 — `domain/dates.ts` et `ui/format.ts` comme seules sources | ↪ reporté au lot 7 : unifier `enKiloEuros` change les étiquettes des graphes (« 10,2 k€ » ↔ « 10 k€ ») et demande son contrôle visuel |
 
 Touche le Pilote et l'Argent : captures à regénérer.
 
@@ -115,6 +115,8 @@ Sert de filet aux lots 5 et 6.
 
 | Ligne | État |
 |---|---|
+| Q4 — `joursEntre` en six copies à sémantique divergente, `enKiloEuros` en deux arrondis : une source chacun (reporté du lot 2) | ⬜ |
+| L11 (suite) — arrondi des parts de la ventilation (1 à 2 centimes d'écart avec le total) | ⬜ |
 | Q8 — tutoiement : une douzaine de phrases vouvoient encore (relire à l'œil, `relance.ts` excepté) | ⬜ |
 | Q7 — contraste de `--muted-2` et de `--green` en thème calme (calculé, pas encore vu sur capture) | ⬜ |
 | Q6 — lint des hooks React dans `verifier` | ⬜ |

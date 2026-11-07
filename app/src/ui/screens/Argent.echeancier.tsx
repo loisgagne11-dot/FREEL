@@ -144,7 +144,9 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
               <span className={styles.declarationMontant}>
                 {p.encaisse > 0
                   ? <><Montant>{eur(p.encaisse)}</Montant> encaissés</>
-                  : 'Rien encaissé : à déclarer à 0 €, c’est obligatoire'}
+                  : p.declaree
+                    ? 'Rien encaissé'
+                    : 'Rien encaissé : à déclarer à zéro, c’est obligatoire'}
               </span>
             </span>
 
