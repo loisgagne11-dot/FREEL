@@ -254,7 +254,7 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
             {client === undefined && clientNom !== '' && (
               <span className={styles.aide}>
                 Ce client n’est pas au carnet : son adresse et son pays manqueront.
-                Créez-le dans Activité → Clients.
+                Crée-le dans Activité → Clients.
               </span>
             )}
           </p>

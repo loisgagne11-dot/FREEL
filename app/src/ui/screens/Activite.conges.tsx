@@ -114,7 +114,7 @@ export function PlageDeConges() {
         */}
       <p className={styles.plageCompte}>
         {!valide
-          ? 'Choisissez deux dates.'
+          ? 'Choisis deux dates.'
           : jours.length === 0
             ? 'Aucun jour ouvré dans cette plage.'
             : `${jours.length} jour${jours.length > 1 ? 's' : ''} ouvré${jours.length > 1 ? 's' : ''}`

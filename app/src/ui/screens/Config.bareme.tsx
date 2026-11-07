@@ -166,7 +166,7 @@ function FormulairePeriode(
     evenement.preventDefault();
 
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(du)) {
-      setRetour({ ton: 'echec', texte: 'Indiquez le mois où la période commence.' });
+      setRetour({ ton: 'echec', texte: 'Indique le mois où la période commence.' });
       return;
     }
     const taux = [bnc, bicService, bicVente].map(enRatio);
