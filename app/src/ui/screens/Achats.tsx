@@ -7,7 +7,7 @@ import {
 } from '../../state/ecritures.achats';
 import { type LigneDepense, etatAchats } from '../../state/selecteurs.achats';
 import { fournisseurDepuisLibelle, suiviRapprochement, tuilesAchats } from '../../state/selecteurs.achats.suivi';
-import { moisCourant } from '../../state/selecteurs';
+import { moisCourant, regimeTvaAu } from '../../state/selecteurs';
 import { depensesRecurrentes } from '../../domain/calculs/depenses.recurrence';
 import type { MouvementBancaire } from '../../domain/calculs/banque';
 import { BlocRapprochement } from './Achats.rapprochement';
@@ -207,6 +207,11 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
               <Montant>{eur(tuiles.tva.nonRecuperable)}</Montant> non récup. · pièce manquante
             </span>
           )}
+          {/* « 0 € » seul se lit comme un oubli ; en franchise, c'est la règle. */}
+          {tuiles.tva.nonRecuperable === 0 && tuiles.tva.deductible === 0
+            && regimeTvaAu(faits, mois ?? moisCourant()) === 'franchise' && (
+            <span className={styles.tuileSous}>franchise : aucune TVA à déduire</span>
+          )}
         </Tuile>
         <Tuile libelle="À rapprocher" soulignee={tuiles.aRapprocher.total > 0}>
           {tuiles.aRapprocher.total}
@@ -284,9 +289,13 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
         ecran="achats"
         titre={`Registre des achats — ${etat.periode.libelle.toLowerCase()}`}
         resume={synthese(etat)}
-        {...(etat.sansDate > 0
-          ? { actions: <span className={styles.compteur}>{etat.sansDate} sans date</span> }
-          : {})}
+        actions={(
+          <>
+            {/* La ligne entière s'ouvre : sans le dire, rien ne l'indique. */}
+            <span className={styles.indice}>clic = détail &amp; pièce</span>
+            {etat.sansDate > 0 && <span className={styles.compteur}>{etat.sansDate} sans date</span>}
+          </>
+        )}
       >
 
         {faits.depenses.length === 0
@@ -332,7 +341,7 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
         )}
 
         <p className={styles.piedRegistre}>
-          <a className={styles.lienTva} href="#/argent/tva">Suivi &amp; déclaration TVA</a>
+          <a className={styles.lienTva} href="#/argent/tva"><span aria-hidden="true">→ </span>Suivi &amp; déclaration TVA</a>
         </p>
       </CartePliable>
 

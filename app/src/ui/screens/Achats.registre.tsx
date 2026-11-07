@@ -68,11 +68,12 @@ export function RegistreAchats(
                 </td>
                 <td>
                   {depense.justificatifId === null
-                    ? <button type="button" className={`${styles.lienPiece} ${styles.manquant}`}>à joindre</button>
-                    : <span className={styles.pieceJointe}>pièce jointe</span>}
+                    ? <button type="button" className={`${styles.lienPiece} ${styles.manquant}`}><span aria-hidden="true">⚠ </span>à joindre</button>
+                    : <span className={styles.pieceJointe}><span aria-hidden="true">✓ </span>pièce jointe</span>}
                 </td>
                 <td>
                   <span className={styles.etatRapprochement} data-etat={ligne.rapprochement}>
+                    <span aria-hidden="true">{ligne.rapprochement === 'rapproche' ? '✓ ' : ligne.rapprochement === 'en_attente' ? '◷ ' : ''}</span>
                     {etat(ligne.rapprochement)}
                   </span>
                 </td>
