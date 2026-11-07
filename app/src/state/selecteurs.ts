@@ -346,12 +346,23 @@ export const ECHEANCES_REGLEMENTAIRES: readonly {
   readonly intitule: string;
   readonly date: DateISO;
   readonly preavisJours: number;
+  /**
+   * Combien de jours le rappel survit à sa date.
+   *
+   * Aucun fait ne dit qu'une de ces obligations est remplie : rien ne
+   * l'efface. La date passée, le rappel devenait « en retard » pour toujours —
+   * en rouge sur le Pilote de tout le monde depuis le 1er septembre 2026, prêt
+   * ou pas. Un rappel qu'on ne peut pas traiter apprend à ignorer les
+   * rappels : celui-ci dit « en vigueur » pendant un mois, puis se tait.
+   */
+  readonly rappelApresJours: number;
 }[] = [
   {
     id: 'facturation-electronique-reception',
     intitule: 'Facturation électronique : réception obligatoire',
     date: '2026-09-01' as DateISO,
-    preavisJours: 120
+    preavisJours: 120,
+    rappelApresJours: 30
   }
 ];
 
@@ -367,9 +378,12 @@ export function echeancesReglementairesActives(
     return jours <= preavisJours;
   };
 
+  const joursAvant = (date: DateISO): number => Math.round(
+    (new Date(date).getTime() - new Date(aujourdhui).getTime()) / 86400000
+  );
   const fixes = ECHEANCES_REGLEMENTAIRES
-    .filter((e) => dansLePreavis(e.date, e.preavisJours))
-    .map((e) => ({ id: e.id, intitule: e.intitule, date: e.date }));
+    .filter((e) => dansLePreavis(e.date, e.preavisJours) && joursAvant(e.date) >= -e.rappelApresJours)
+    .map((e) => ({ id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true }));
 
   const cfe = echeancesCfe(faits, maintenant)
     .filter((e) => dansLePreavis(e.date, e.preavisJours))

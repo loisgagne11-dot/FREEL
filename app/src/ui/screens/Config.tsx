@@ -994,6 +994,10 @@ type Restauration =
  * qui saisit ses vraies données ne téléchargera jamais. Il est aussi la source
  * dont `scripts/capturer-app.mjs` se sert pour rendre nos écrans dans les mêmes
  * conditions que le handoff — un seul fichier, pas une copie qui dérive.
+ *
+ * Écrit au 10 juin 2026, il est recalé sur la date du jour avant d'être
+ * proposé : voir `recalerDemonstration`. Les captures, elles, le chargent tel
+ * quel, horloge figée.
  */
 async function lireJeuDeDemonstration(): Promise<Restauration> {
   try {
@@ -1001,7 +1005,9 @@ async function lireJeuDeDemonstration(): Promise<Restauration> {
     if (!reponse.ok) {
       return { statut: 'illisible', motif: 'Le jeu de démonstration n’a pas pu être chargé.' };
     }
-    return resumerBloc(await reponse.json());
+    const brut: unknown = await reponse.json();
+    const { recalerJeuBrut } = await import('../../state/demonstration.recalage');
+    return resumerBloc(recalerJeuBrut(brut, dateDuJour()));
   } catch {
     return { statut: 'illisible', motif: 'Le jeu de démonstration n’a pas pu être chargé.' };
   }

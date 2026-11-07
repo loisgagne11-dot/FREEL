@@ -231,10 +231,28 @@ describe('échéances réglementaires', () => {
     expect(s?.gravite).toBe('information');
   });
 
+  // Une échéance qui se RÈGLE (la CFE : saisir l'échéance) : dépassée sans
+  // l'être, elle est bien en retard.
   it('passe en retard une fois dépassée, sans disparaître', () => {
     const s = sujetsATraiter(avecEcheance('2026-06-01')).find((x) => x.id === 'echeance-fe');
     expect(s?.gravite).toBe('retard');
     expect(s === undefined ? '' : formuler(s).contexte).toMatch(/dépassée/);
+  });
+
+  /**
+   * UNE OBLIGATION QUE RIEN NE PERMET DE COCHER N'EST PAS « EN RETARD ».
+   *
+   * La facturation électronique s'affichait en rouge sur le Pilote de tout le
+   * monde depuis le 1er septembre 2026, prêt ou non, et rien ne l'effaçait.
+   */
+  it('dit « en vigueur », à faire, une obligation sans suivi dont la date est passée', () => {
+    const s = sujetsATraiter(entree({
+      echeancesReglementaires: [{
+        id: 'fe', intitule: 'Facturation électronique', date: dateISO('2026-06-01'), sansSuivi: true
+      }]
+    })).find((x) => x.id === 'echeance-fe');
+    expect(s?.gravite).toBe('a_faire');
+    expect(s === undefined ? '' : formuler(s).contexte).toMatch(/En vigueur depuis/);
   });
 });
 
