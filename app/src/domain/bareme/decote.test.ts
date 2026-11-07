@@ -103,3 +103,28 @@ describe('situation du foyer', () => {
     expect(situationDecoteDecisive(6000, 46000, 0, 2, tranches, commune)).toBe(false);
   });
 });
+
+describe('barème des revenus 2025 (loi n° 2026-103)', () => {
+  const b25 = baremeIR(mois('2025-06'));
+  if (b25.statut !== 'publie') throw new Error('barème 2025 attendu publié');
+
+  // À la main, personne seule, 1 part, 20 000 € imposables :
+  //   brut     = (20 000 − 11 600) × 11 % = 924 €
+  //   décote   = 897 − 45,25 % × 924 = 897 − 418,11 = 478,89 €
+  //   impôt    = 924 − 478,89 = 445,11 €
+  // Garder le barème 2024 donnerait ~ 469,5 € : une provision d'impôt fausse
+  // de plus de 20 € sur chaque déclaration 2026.
+  it('calcule l’impôt 2025 d’une personne seule avec décote', () => {
+    const impot = impotDuFoyer(20000, 1, b25.valeur.tranches, {
+      parametres: b25.valeur.decote, situation: 'seul'
+    });
+    expect(impot).toBeCloseTo(445.11, 2);
+  });
+
+  it('reprend le barème 2025 en hypothèse pour 2026, sans le publier', () => {
+    const r = baremeIR(mois('2026-03'));
+    expect(r.statut).toBe('hypothese');
+    expect(r.statut === 'hypothese' && r.depuis).toBe('2025-01');
+    expect(r.statut !== 'refuse' && r.valeur.decote.plafondCommune).toBe(1483);
+  });
+});

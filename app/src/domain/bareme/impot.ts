@@ -58,8 +58,8 @@ export interface TrancheIR {
  * voté en loi de finances de l'année N+1 s'applique aux revenus de N) — pas
  * à une fenêtre glissante comme le taux URSSAF. Contrairement à
  * `urssaf.ts`, la dernière période connue ici est donc VOLONTAIREMENT
- * fermée (`au` renseigné) plutôt que laissée ouverte : le barème 2024 était
- * applicable spécifiquement aux revenus 2024, et rien ne garantit qu'il
+ * fermée (`au` renseigné) plutôt que laissée ouverte : chaque barème est
+ * applicable spécifiquement à son année de revenus, et rien ne garantit qu'il
  * reste inchangé pour l'année suivante (le seuil est même réévalué chaque
  * année par indexation à l'inflation). Une période close signale
  * honnêtement « c'est tout ce que je sais », et la fonction de résolution
@@ -129,14 +129,10 @@ export interface DecoteDuFoyer {
 }
 
 /**
- * Tranches applicables aux revenus 2024 (déclaration 2025), seul millésime
- * identifié avec confiance haute par l'audit comptable (§3). Les tranches
- * applicables aux revenus 2025 (déclaration 2026) — donc à l'année en cours
- * au moment d'écrire ce fichier — ne sont PAS saisies : un gel du barème a
- * été discuté en loi de finances 2026 sans que je puisse trancher son
- * issue. Un mois de 2025 ou 2026 sera donc résolu en HYPOTHÈSE (reprise du
- * dernier barème connu), jamais en `publie` — ce qui est le comportement
- * honnête recherché.
+ * Tranches applicables aux revenus 2024 (déclaration 2025) et 2025
+ * (déclaration 2026, loi n° 2026-103 du 19/02/2026). Un mois postérieur au
+ * dernier millésime saisi (2026 et suivants) est résolu en HYPOTHÈSE — reprise
+ * du barème 2025 — jamais en `publie`.
  */
 export const PERIODES_IR: readonly PeriodeIR[] = [
   {
@@ -156,6 +152,21 @@ export const PERIODES_IR: readonly PeriodeIR[] = [
     source: 'Audit comptable §3 — tranches revenus 2024, déclaration 2025 ; '
       + 'décote : BOFiP BOI-IR-LIQ-20-20-30-20250414',
     verifieLe: dateISO('2026-07-27')
+  },
+  {
+    du: mois('2025-01'),
+    au: mois('2025-12'),
+    tranches: [
+      { seuil: euros(0), taux: ratio(0) },
+      { seuil: euros(11600), taux: ratio(0.11) },
+      { seuil: euros(29579), taux: ratio(0.30) },
+      { seuil: euros(84577), taux: ratio(0.41) },
+      { seuil: euros(181917), taux: ratio(0.45) }
+    ],
+    decote: { plafondSeul: euros(897), plafondCommune: euros(1483), coefficient: ratio(0.4525) },
+    source: 'loi n° 2026-103 du 19/02/2026, https://entreprendre.service-public.gouv.fr/actualites/A18045 ; '
+      + 'décote : https://bofip.impots.gouv.fr/bofip/2495-PGP.html/identifiant=BOI-IR-LIQ-20-20-30-20260407',
+    verifieLe: dateISO('2026-11-07')
   }
 ];
 
@@ -339,11 +350,11 @@ export interface PeriodeVersementLiberatoire {
 }
 
 /**
- * 2,2 % BNC, 1 % BIC vente, 1,7 % BIC service — repris de l'ancienne
- * application, confiance HAUTE (corroboré par l'audit comptable §3). Taux
+ * 2,2 % BNC, 1 % BIC vente, 1,7 % BIC service — source officielle
+ * vérifiée le 07/11/2026. Taux
  * stables historiquement ; table par période au cas où ils changeraient,
  * même convention que `urssaf.ts` : ajouter, ne jamais modifier après coup.
- * Non réduit par l'ACRE (voir `urssaf.ts`, `ABATTEMENT_ACRE`, qui ne
+ * Non réduit par l'ACRE (voir `acre.ts`, `exonerationAcre`, qui ne
  * s'applique qu'aux cotisations sociales).
  */
 export const PERIODES_VERSEMENT_LIBERATOIRE: readonly PeriodeVersementLiberatoire[] = [
@@ -351,8 +362,8 @@ export const PERIODES_VERSEMENT_LIBERATOIRE: readonly PeriodeVersementLiberatoir
     du: mois('2024-01'),
     au: null,
     taux: { BNC: ratio(0.022), BIC_vente: ratio(0.01), BIC_service: ratio(0.017) },
-    source: 'Ancienne application, confiance haute (audit comptable §3)',
-    verifieLe: dateISO('2026-07-27')
+    source: 'https://www.impots.gouv.fr/professionnel/le-versement-liberatoire',
+    verifieLe: dateISO('2026-11-07')
   }
 ];
 
@@ -399,7 +410,7 @@ export interface PeriodeCfp {
 
 /**
  * 0,2 % pour les professions libérales (BNC), 0,1 % pour les commerçants
- * (BIC_vente) — confiance haute (audit comptable §3).
+ * (BIC_vente) — source officielle vérifiée le 07/11/2026.
  *
  * BIC_service : ce projet ne distingue pas « prestation de service
  * commerciale ou libérale non réglementée » (0,2 %, retenu ici) de
@@ -413,9 +424,10 @@ export const PERIODES_CFP: readonly PeriodeCfp[] = [
     du: mois('2024-01'),
     au: null,
     taux: { BNC: ratio(0.002), BIC_vente: ratio(0.001), BIC_service: ratio(0.002) },
-    source: 'Ancienne application / connaissance générale du régime micro, confiance haute sauf '
-      + 'BIC_service (moyenne, voir commentaire ci-dessus)',
-    verifieLe: dateISO('2026-07-27')
+    source: 'https://www.economie.gouv.fr/entreprises/gerer-sa-micro-entreprise/'
+      + 'micro-entreprises-quel-est-le-montant-de-vos-cotisations-sociales '
+      + '(BIC_service : choix de ce projet, voir commentaire ci-dessus)',
+    verifieLe: dateISO('2026-11-07')
   }
 ];
 

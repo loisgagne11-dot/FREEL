@@ -992,3 +992,13 @@ compte lui-même, par période — deux nombres pour « combien de factures » s
 contrediraient) ; « Exporter » et « + Nouveau » sur la rangée de la recherche en
 grand écran ; sur Réglages, « Exporter » et « + Nouveau » restent là où le
 handoff met « Enregistrer » (Réglages enregistre au fil de la saisie).
+
+## Lot 7 (07/11) — finitions
+
+| Zone | Avant | Après |
+|---|---|---|
+| Thème clair | Cartes blanches posées sur un fond presque blanc : on ne les distinguait pas | Fond de page teinté (`#eef2ee`), cartes détachées — capture relue |
+| Contraste, quatre palettes | `--muted-2` et `--green` sous 4,5:1 (thème calme à 3,2) | Six jetons relevés à teinte constante ; un contrôle de `verifier` le tient désormais |
+| Pastille « à traiter » | Dans le paquet d'entrée | Différée, comme les pastilles système (budget) |
+| Facturier | Brouillon du mois avec ses propres flèches | Ses flèches déplacent le mois de la barre |
+

@@ -22,10 +22,9 @@
  * s'arrête à la fin du T4 2025, soit le 31/12/2025 — onze mois, et non douze.
  * Un début en décembre n'en donne que dix.
  *
- * Ce n'est pas une lecture de texte faite au clavier : la fin d'exonération
- * a été CONSTATÉE sur un compte réel — début d'activité au 01/02/2025, ACRE
- * appliquée jusqu'à décembre 2025 incluse, taux plein depuis janvier 2026.
- * Le constat et la règle tombent d'accord.
+ * Source : fiche service-public F11677, vérifiée le 07/11/2026. Elle tombe
+ * d'accord avec un constat fait sur un compte réel : début d'activité au
+ * 01/02/2025, ACRE appliquée jusqu'à décembre 2025 incluse.
  *
  * L'écart avec l'ancienne implémentation va dans le sens prudent : moins
  * d'exonération, donc plus de charges provisionnées. C'est le bon sens de
@@ -34,8 +33,8 @@
  */
 
 import {
-  type DateISO, type Mois, type Resolution,
-  dateISO, mois
+  type DateISO, type Mois, type Ratio, type Resolution,
+  dateISO, mois, ratio
 } from '../types';
 
 export interface PeriodeAcre {
@@ -63,15 +62,57 @@ export const PERIODES_ACRE: readonly PeriodeAcre[] = [
     trimestresApresAffiliation: 3,
     // La justification longue est dans l'en-tête : elle est gratuite en
     // commentaire, et coûterait au premier rendu dans cette chaîne-ci.
-    source: 'Micro-social, fin du 3ᵉ trimestre civil suivant l\'affiliation — '
-      + 'confirmé par constat sur un compte réel',
-    verifieLe: dateISO('2026-08-16')
+    source: 'https://entreprendre.service-public.gouv.fr/vosdroits/F11677',
+    verifieLe: dateISO('2026-11-07')
   }
 ];
 
 /** La règle applicable à un mois de début d'activité. */
 export function periodeAcrePour(m: Mois): PeriodeAcre | undefined {
   return PERIODES_ACRE.find((per) => m >= per.du && (per.au === null || m <= per.au));
+}
+
+/**
+ * Part des cotisations normales que l'ACRE EXONÈRE, selon la DATE DE DÉBUT
+ * d'activité — pas selon le mois cotisé : un début au 15/06/2026 reste à 50 %
+ * pendant toute sa durée, même pour des cotisations dues après le 1er juillet.
+ * Appliquer le taux du mois cotisé ferait payer 75 % à quelqu'un dont
+ * l'exonération est acquise à 50 %.
+ */
+export interface PeriodeAbattementAcre {
+  /** Premier jour de début d'activité visé. */
+  readonly du: DateISO;
+  /** `null` : toujours en vigueur. */
+  readonly au: DateISO | null;
+  readonly exoneration: Ratio;
+  readonly source: string;
+  readonly verifieLe: DateISO;
+}
+
+export const PERIODES_ABATTEMENT_ACRE: readonly PeriodeAbattementAcre[] = [
+  {
+    du: dateISO('2024-01-01'), au: dateISO('2026-06-30'), exoneration: ratio(0.5),
+    source: 'https://entreprendre.service-public.gouv.fr/vosdroits/F11677',
+    verifieLe: dateISO('2026-11-07')
+  },
+  {
+    du: dateISO('2026-07-01'), au: null, exoneration: ratio(0.25),
+    source: 'décret n° 2026-69 du 06/02/2026, https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053449085 ; '
+      + 'https://entreprendre.service-public.gouv.fr/vosdroits/F11677',
+    verifieLe: dateISO('2026-11-07')
+  }
+];
+
+/** Exonération ACRE pour un début d'activité ; refus si la date est inconnue ou trop ancienne. */
+export function exonerationAcre(debut: DateISO | null): Resolution<Ratio> {
+  if (debut === null) {
+    return { statut: 'refuse', motif: 'Date de début d\'activité inconnue : l\'exonération ACRE en dépend.' };
+  }
+  const per = PERIODES_ABATTEMENT_ACRE.find((x) => debut >= x.du && (x.au === null || debut <= x.au));
+  if (per === undefined) {
+    return { statut: 'refuse', motif: `Aucune exonération ACRE connue pour un début d'activité au ${debut}.` };
+  }
+  return { statut: 'publie', valeur: per.exoneration, source: per.source, verifieLe: per.verifieLe };
 }
 
 const premiere = (): PeriodeAcre | undefined => PERIODES_ACRE[0];

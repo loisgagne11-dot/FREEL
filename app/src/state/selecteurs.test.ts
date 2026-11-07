@@ -353,7 +353,7 @@ describe('état de l\'écran Pilote', () => {
    *
    * Sous le régime du barème, `tauxImpotEtContributions` ne rend que la CFP —
    * 0,2 %. La ligne « impôt » du volet 2 valait donc 120 € sur 60 000 € de
-   * chiffre d'affaires, et le versable proposait de se verser les 5 045 €
+   * chiffre d'affaires, et le versable proposait de se verser les 4 984 €
    * d'impôt sur le revenu de l'année. Si ce test sautait, l'application
    * inviterait de nouveau à dépenser l'argent du fisc.
    */
@@ -367,8 +367,9 @@ describe('état de l\'écran Pilote', () => {
     // disponible aurait alors été invisible.
     const versableAvant = (60000 + 60000) - provisionsSansImpot;
     expect(e.tresorerie.versable).toBeLessThan(versableAvant);
-    // 60 000 × 66 % = 39 600 imposables ; barème : 5 045,48 €.
-    expect(e.tresorerie.versable).toBeCloseTo(versableAvant - 5045.48, 2);
+    // 60 000 × 66 % = 39 600 imposables ; barème 2025 repris en hypothèse :
+    // 1 977,69 + 3 006,30 = 4 983,99 €.
+    expect(e.tresorerie.versable).toBeCloseTo(versableAvant - 4983.99, 2);
   });
 
   /**
@@ -380,7 +381,7 @@ describe('état de l\'écran Pilote', () => {
    */
   it('range la CFP à part, et l’impôt sur le revenu seul en « impot »', () => {
     const e = etatPilote(auBareme(), [], maintenant);
-    expect(e.provisionsParNature.impot).toBeCloseTo(5045.48, 2);
+    expect(e.provisionsParNature.impot).toBeCloseTo(4983.99, 2);
     expect(e.provisionsParNature.cfp).toBeCloseTo(60000 * 0.002, 2);
     expect(e.provisionsParNature.urssaf).toBeCloseTo(60000 * 0.256, 2);
   });
@@ -401,7 +402,7 @@ describe('état de l\'écran Pilote', () => {
     // Volet 1 : l'acompte appelé et non payé. Volet 2 : l'impôt de l'année
     // moins ce même acompte. La somme vaut l'impôt de l'année, pas le double.
     expect(e.voletConstate).toBe(2000);
-    expect(e.provisionsParNature.impot).toBeCloseTo(5045.48, 2);
+    expect(e.provisionsParNature.impot).toBeCloseTo(4983.99, 2);
   });
 
   // Les deux régimes sont exclusifs : sous versement libératoire, l'impôt est

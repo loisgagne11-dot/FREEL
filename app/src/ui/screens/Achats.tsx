@@ -500,7 +500,7 @@ function DetailDepense(
           )
           : (
             <>
-              <p className={styles.verdict}>{libelleMotif(tva.motifNonRecuperable)}</p>
+              <p className={styles.verdict}>{libelleMotif(tva.motifNonRecuperable, ligne.regimeTva)}</p>
               {tva.aAutoliquider > 0 && (
                 <p className={styles.verdictAttention}>
                   <Montant>{eurExact(tva.aAutoliquider)}</Montant> à autoliquider et à déclarer.

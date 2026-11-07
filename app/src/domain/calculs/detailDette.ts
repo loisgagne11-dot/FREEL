@@ -190,7 +190,8 @@ function estimationParMois(
     if (estDeclare(declarees, m)) continue;
 
     const taux: Resolution<number> = tauxCotisations(
-      m, ctx.typeActivite, ctx.sousAcreLe(m), ctx.periodesUrssaf
+      m, ctx.typeActivite, ctx.sousAcreLe(m), ctx.periodesUrssaf,
+      ctx.debutActivite
     );
     if (taux.statut === 'refuse') {
       if (!nonCalculables.some((n) => n.mois === m)) {

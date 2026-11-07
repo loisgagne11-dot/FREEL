@@ -65,7 +65,22 @@ describe('autoliquidation sur les achats hors de France', () => {
     const t = tvaDeDepense(depense({ provenance: 'ue', montantTtc: euros(100), tauxTva: ratio(0) }), FRANCHISE);
     expect(t.recuperable).toBe(0);
     expect(t.motifNonRecuperable).toBe('autoliquidation');
-    expect(t.aAutoliquider).toBeGreaterThan(0);
+    expect(t.aAutoliquider).toBe(20);
+  });
+
+  // La facture d'un prestataire UE est émise hors taxe : la TVA due est
+  // base × 20 %. Si on la traitait comme un TTC (TTC − TTC/1,2), on
+  // déclarerait 16,67 € au lieu de 20 € et la TVA serait sous-déclarée d'un sixième.
+  it('autoliquide base × 20 % et non la part contenue dans un TTC', () => {
+    const t = tvaDeDepense(depense({ provenance: 'ue', montantTtc: euros(100), tauxTva: ratio(0) }), FRANCHISE);
+    expect(t.aAutoliquider).toBe(20);
+    expect(t.aAutoliquider).not.toBeCloseTo(16.67, 1);
+  });
+
+  it('dit « déductible » du libellé d\'autoliquidation pour un assujetti, « non déductible » en franchise', () => {
+    expect(libelleMotif('autoliquidation', 'franchise')).toContain('non déductible');
+    expect(libelleMotif('autoliquidation', 'assujetti')).not.toContain('non déductible');
+    expect(libelleMotif('autoliquidation', 'assujetti')).toContain('déductible');
   });
 
   it('traite de même un fournisseur hors UE', () => {

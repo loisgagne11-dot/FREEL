@@ -45,18 +45,14 @@
  *
  * `seuilsTvaPourAnnee` calcule le prorata temporis de la première année
  * d'activité (à partir de `debutActivite`) : les deux seuils sont réduits au
- * nombre de jours d'activité rapporté à 365, une convention usuelle pour ce
- * type de prorata en droit fiscal français — confiance moyenne, la
- * formulation exacte (365 fixes vs jours réels de l'année) n'a pas été
- * recoupée au BOFiP pour ce module précis.
+ * nombre de jours d'activité rapporté à 365. Confiance HAUTE : conforme au
+ * BOFiP BOI-TVA-DECLA-40-10-10 §285 et §290, vérifié le 2026-11-07
+ * (https://bofip.impots.gouv.fr/bofip/849-PGP.html/identifiant=BOI-TVA-DECLA-40-10-10-20260701).
  *
- * ⚠️ RÉSERVE MAJEURE, NON IMPLÉMENTÉE DÉLIBÉRÉMENT : un projet de seuil
- * unique à 25 000 € a été voté en loi de finances 2025 puis suspendu et
- * renvoyé aux débats budgétaires suivants. Le rapport comptable indique
- * qu'il aurait été rejeté, mais je ne connais pas son sort définitif à la
- * date de vérification ci-dessous. C'est le paramètre le plus volatile de
- * tout le barème fiscal — NE PAS implémenter cette hypothèse tant qu'elle
- * n'est pas confirmée à la source (impots.gouv.fr / texte de loi promulgué).
+ * Le projet de seuil unique à 25 000 € est ABANDONNÉ : les seuils 37 500 /
+ * 41 250 € et 85 000 / 93 500 € restent en vigueur en 2026
+ * (https://entreprendre.service-public.gouv.fr/vosdroits/F21746, vérifié le
+ * 2026-11-07). Ne pas le réintroduire.
  *
  * ⚠️ RATTACHEMENT À L'ENCAISSEMENT : pour une prestation de services, la TVA
  * est exigible au PAIEMENT, pas à la facturation (art. 269 CGI). Toutes les
@@ -69,7 +65,7 @@
 
 import {
   type DateISO, type Euros, type Mois, type Resolution, type TypeActivite,
-  dateISO, estUtilisable, euros, mois
+  dateISO, estUtilisable, euros, mois, ratio
 } from '../types';
 
 export interface SeuilsTva {
@@ -108,16 +104,26 @@ const p = (
   verifieLe: dateISO(verifieLe)
 });
 
+/**
+ * Taux normal de TVA. Une seule source : il sert à la TVA due par le preneur
+ * d'un achat intracommunautaire, où le coder en dur dans le calcul des
+ * dépenses l'aurait soustrait au barème daté.
+ * Art. 278 CGI, vérifié le 2026-11-07.
+ */
+export const TAUX_TVA_NORMAL = {
+  taux: ratio(0.20),
+  source: 'https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000027758458',
+  verifieLe: dateISO('2026-11-07')
+} as const;
+
 export const PERIODES_TVA: readonly PeriodeTva[] = [
   p(
     '2025-01', null,
     37500, 41250,
     85000, 93500,
-    'Ancienne application ; issues de la transposition de la directive UE 2020/285 '
-      + 'applicable depuis 2025 — confiance MOYENNE-HAUTE (audit comptable §3). '
-      + 'Voir réserve sur le projet de seuil unique à 25 000 € en tête de fichier : '
-      + 'NON pris en compte ici, sort définitif inconnu à la date de vérification.',
-    '2026-07-27'
+    'https://entreprendre.service-public.gouv.fr/vosdroits/F21746 '
+      + '(seuil unique à 25 000 € abandonné ; seuils inchangés en 2026)',
+    '2026-11-07'
   )
 ];
 
@@ -268,7 +274,7 @@ export function resteAvantFranchise(
  * année bissextile — convention usuelle des prorata fiscaux français (voir
  * confiance en tête de fichier), qui évite qu'un début d'activité au même
  * jour calendaire donne un seuil légèrement différent selon l'année. */
-const JOURS_PRORATA = 365;
+export const JOURS_PRORATA = 365;
 
 /**
  * Jours d'activité entre `debutActivite` et le 31 décembre de `annee`,
@@ -276,7 +282,7 @@ const JOURS_PRORATA = 365;
  * jours (année pleine, prorata neutre) ; c'est le garde-fou qui vérifie que
  * la formule ne mord pas sur elle-même.
  */
-function joursDActivite(debutActivite: DateISO, annee: number): number {
+export function joursDActivite(debutActivite: DateISO, annee: number): number {
   const debut = Date.parse(`${debutActivite}T00:00:00Z`);
   const fin = Date.parse(`${annee}-12-31T00:00:00Z`);
   return Math.round((fin - debut) / 86_400_000) + 1;

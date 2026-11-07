@@ -62,15 +62,19 @@ export type RegimeCfe =
 /**
  * Chiffre d'affaires au plus égal auquel la cotisation minimum n'est pas due.
  *
- * Art. 1647 D du CGI. C'est un seuil de **dispense**, pas un abattement : au
+ * Art. 1647 D du CGI, vérifié le 07/11/2026 :
+ * https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000038686433.
+ * C'est un seuil de **dispense**, pas un abattement : au
  * premier euro au-dessus, la cotisation minimum est due en entier.
  */
 export const CA_SANS_COTISATION_MINIMUM = euros(5000);
 
-/** Montant de CFE de l'année précédente à partir duquel un acompte est dû au 15/06. */
+/** Montant de CFE de l'année précédente à partir duquel un acompte est dû au 15/06.
+ * Aucune source trouvée : non recoupé au 07/11/2026. */
 export const CFE_DECLENCHANT_ACOMPTE = euros(3000);
 
-/** Part de la CFE de l'année précédente appelée en acompte. */
+/** Part de la CFE de l'année précédente appelée en acompte.
+ * Aucune source trouvée : non recoupé au 07/11/2026. */
 export const PART_ACOMPTE = 0.5;
 
 /**

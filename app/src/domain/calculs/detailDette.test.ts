@@ -8,6 +8,7 @@ import { PERIODES_URSSAF } from '../bareme/urssaf';
 const CTX: ContexteProvisions = {
   typeActivite: 'BNC',
   sousAcreLe: () => false,
+  debutActivite: null,
   tauxImpotEtContributions: 0.022,
   periodesUrssaf: PERIODES_URSSAF
 };

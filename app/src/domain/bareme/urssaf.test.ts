@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, mois, ratio, type TypeActivite } from '../types';
 import {
-  ABATTEMENT_ACRE, PERIODES_URSSAF, fusionnerPeriodes, libelleHypothese,
+  PERIODES_URSSAF, fusionnerPeriodes, libelleHypothese,
   periodePour, tauxCotisations, validerAjout, verifierIntegrite
 } from './urssaf';
 
 /** Raccourci de lecture : le taux, ou null si le barème refuse. */
 function taux(m: string, type: TypeActivite = 'BNC', acre = false): number | null {
-  const r = tauxCotisations(mois(m), type, acre);
+  const r = tauxCotisations(mois(m), type, acre, undefined, acre ? dateISO('2026-01-15') : null);
   return r.statut === 'refuse' ? null : r.valeur;
 }
 
@@ -46,7 +46,24 @@ describe('barème URSSAF — résolution par période', () => {
   });
 
   it('applique l\'abattement ACRE', () => {
-    expect(taux('2026-07', 'BNC', true)).toBeCloseTo(0.256 * ABATTEMENT_ACRE, 10);
+    expect(taux('2026-07', 'BNC', true)).toBeCloseTo(0.256 * 0.5, 10);
+  });
+});
+
+describe('ACRE : le taux suit la date de début, pas le mois cotisé', () => {
+  const avec = (debut: string) => {
+    const r = tauxCotisations(mois('2026-09'), 'BNC', true, undefined, dateISO(debut));
+    return r.statut === 'refuse' ? null : r.valeur;
+  };
+
+  // 25,6 % × (1 − 50 %) = 12,8 % ; 25,6 % × (1 − 25 %) = 19,2 %.
+  it('paie 50 % du taux pour un début en juin 2026, 75 % pour un début en juillet 2026', () => {
+    expect(avec('2026-06-15')).toBeCloseTo(0.128, 10);
+    expect(avec('2026-07-01')).toBeCloseTo(0.192, 10);
+  });
+
+  it('refuse le taux sous ACRE quand la date de début est inconnue', () => {
+    expect(tauxCotisations(mois('2026-09'), 'BNC', true).statut).toBe('refuse');
   });
 });
 
@@ -183,7 +200,7 @@ describe('barème complété par l’utilisateur', () => {
 
   it('applique l’abattement ACRE sur un taux ajouté comme sur un autre', () => {
     const fusionne = fusionnerPeriodes(BASE, [per('2027-01', null, 0.272)]);
-    const r = tauxCotisations(mois('2027-03'), 'BNC', true, fusionne);
+    const r = tauxCotisations(mois('2027-03'), 'BNC', true, fusionne, dateISO('2026-01-15'));
     expect(r.statut === 'publie' && r.valeur).toBeCloseTo(0.136, 10);
   });
 });

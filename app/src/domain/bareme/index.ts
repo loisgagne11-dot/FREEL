@@ -24,14 +24,14 @@
  */
 
 export {
-  ABATTEMENT_ACRE, PERIODES_URSSAF,
+  PERIODES_URSSAF,
   libelleHypothese, periodePour, tauxCotisations, verifierIntegrite as verifierIntegriteUrssaf
 } from './urssaf';
 
 export type { PeriodeBareme } from './urssaf';
 
 export {
-  PERIODES_ACRE,
+  PERIODES_ACRE, PERIODES_ABATTEMENT_ACRE, exonerationAcre,
   dernierMoisAcre, moisSousAcre, periodeAcrePour, verifierIntegriteAcre
 } from './acre';
 export type { PeriodeAcre } from './acre';

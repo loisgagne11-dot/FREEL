@@ -1,4 +1,5 @@
-import { type Euros, type Ratio, euros, ratio } from '../types';
+import { TAUX_TVA_NORMAL } from '../bareme/tva';
+import { type Euros, type Ratio, euros } from '../types';
 import type { ContexteDepenses, Depense, TvaDepense } from './depenses';
 
 /*
@@ -27,12 +28,17 @@ export function tvaContenue(montantTtc: Euros, taux: Ratio): Euros {
 export function tvaDeDepense(depense: Depense, contexte: ContexteDepenses): TvaDepense {
   const brute = tvaContenue(depense.montantTtc, depense.tauxTva);
 
-  // Achat hors de France : l'acheteur autoliquide. La TVA est due ET non
-  // déductible pour un assujetti en franchise — c'est ce double effet que
-  // l'ancienne application ignorait complètement.
+  // Achat hors de France : l'acheteur autoliquide. En franchise, la TVA est
+  // due ET non déductible — double effet que l'ancienne application ignorait.
+  // Le prestataire facture HORS TAXE : la TVA due est base × 20 % (art. 283-2
+  // CGI), pas la part « contenue » dans un TTC. Extraire 20 % d'un montant
+  // pris pour un TTC donnait 1/6 au lieu de 1/5 : 16,67 € pour 100 € facturés,
+  // 20 € dus. Sources : https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000051214570
+  // et https://www.impots.gouv.fr/professionnel/questions/je-suis-micro-entrepreneur-ou-la-tete-dune-micro-entreprise-ai-je-des
+  // (vérifiées le 2026-11-07).
   if (depense.provenance !== 'france') {
     const aAutoliquider = contexte.regimeTva === 'franchise'
-      ? tvaContenue(depense.montantTtc, ratio(0.20))
+      ? euros(depense.montantTtc * TAUX_TVA_NORMAL.taux)
       : brute;
     return {
       recuperable: euros(0),

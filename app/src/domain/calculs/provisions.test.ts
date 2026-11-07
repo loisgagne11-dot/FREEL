@@ -11,6 +11,8 @@ const ctx = (
 ): ContexteProvisions => ({
   typeActivite: type,
   sousAcreLe: () => acre,
+  // Avant le 01/07/2026 : exonération de 50 %.
+  debutActivite: dateISO('2025-02-01'),
   tauxImpotEtContributions: taux
 });
 
@@ -150,6 +152,7 @@ describe('ventilation des provisions par nature', () => {
   const ctx: ContexteProvisions = {
     typeActivite: 'BNC',
     sousAcreLe: () => false,
+    debutActivite: null,
     tauxImpotEtContributions: 0.022
   };
 
