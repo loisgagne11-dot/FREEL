@@ -9523,7 +9523,7 @@ function showMissionModal(mission) {
       var head = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' } });
       var swatch = el('input', { type: 'color', id: 'mEntColor_' + idx, value: ent.couleur || entitePalette[idx % entitePalette.length], style: { width: '32px', height: '28px', border: 'none', borderRadius: '4px', cursor: 'pointer', padding: '0', background: 'transparent' } });
       head.appendChild(swatch);
-      var nameInput = el('input', { type: 'text', id: 'mEntNom_' + idx, value: ent.nom || '', placeholder: 'Ex: Airbus, H4E…', class: 'form-input', style: { flex: '1', fontSize: '13px', fontWeight: '600', padding: '6px 8px' } });
+      var nameInput = el('input', { type: 'text', id: 'mEntNom_' + idx, value: ent.nom || '', placeholder: 'Ex : Agence Démo, Client final…', class: 'form-input', style: { flex: '1', fontSize: '13px', fontWeight: '600', padding: '6px 8px' } });
       head.appendChild(nameInput);
       head.appendChild(el('button', { class: 'periode-remove', style: { position: 'static' }, onclick: function() {
         // Lire valeurs avant suppression
