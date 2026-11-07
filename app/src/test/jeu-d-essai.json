@@ -1,0 +1,855 @@
+{
+  "_lisezMoi": "Jeu d’essai à FORME RÉELLE, entièrement fictif : mêmes structures qu’un compte réel (ACRE qui s’éteint, TVA franchie en cours d’année, avoir, foyer à deux parts, passage du 31 décembre), aucune donnée personnelle. Il sert aux tests d’intégration (src/integration) et à capturer-app.mjs --jeu=essai, jamais à la démonstration.",
+  "version": 18,
+  "entreprise": {
+    "nom": "Entreprise Démo Indépendant",
+    "siret": "000 000 000 00010",
+    "debutActivite": "2025-04-01",
+    "typeActivite": "BNC",
+    "acre": true,
+    "versementLiberatoire": false,
+    "tvaDepuis": null,
+    "tvaIntracom": "",
+    "iban": "FR00 0000 0000 0000 0000 0000 000",
+    "bic": "",
+    "adresse": "1 rue de la Démonstration",
+    "codePostal": "00000",
+    "ville": "Ville Démo",
+    "codeApe": "70.22Z",
+    "email": "contact@entreprise-demo.example.com",
+    "telephone": "",
+    "urssafPeriodicite": "trimestriel",
+    "onboardingFait": true
+  },
+  "clients": [
+    {
+      "id": "cl-agence",
+      "nom": "Agence Démo Conseil",
+      "adresse": "3 boulevard de l’Exemple, 00000 Ville Démo",
+      "siret": "000 000 000 00011",
+      "email": "compta@agence-demo.example.com",
+      "delaiPaiement": "fdm_30",
+      "pays": "FR",
+      "tvaIntracom": ""
+    },
+    {
+      "id": "cl-direct",
+      "nom": "Société Démo Direct",
+      "adresse": "4 place de l’Essai, 00000 Ville Démo",
+      "siret": "000 000 000 00012",
+      "email": "contact@direct-demo.example.com",
+      "delaiPaiement": "net_30",
+      "pays": "FR",
+      "tvaIntracom": ""
+    }
+  ],
+  "missions": [
+    {
+      "id": "mis-agence",
+      "clientId": "cl-agence",
+      "clientNom": "Agence Démo Conseil",
+      "description": "Conseil en organisation, via l’agence",
+      "tjm": 480,
+      "debut": "2025-04-14",
+      "fin": null,
+      "statut": "active",
+      "delaiPaiement": null,
+      "entites": [
+        {
+          "id": "ent-client-final",
+          "nom": "Client Final Démo",
+          "couleur": "#22c55e",
+          "adresse": "2 avenue de l’Exemple, 00000 Ville Démo",
+          "contact": "Contact Démo",
+          "email": "contact@client-final-demo.example.com",
+          "telephone": "",
+          "rythmes": [
+            {
+              "du": "2025-04-14",
+              "au": "2025-12-31",
+              "parJour": {
+                "lun": 1,
+                "mar": 1,
+                "mer": 1,
+                "jeu": 1
+              },
+              "tjm": null
+            },
+            {
+              "du": "2026-01-01",
+              "au": "2026-12-31",
+              "parJour": {
+                "lun": 1,
+                "mar": 1,
+                "mer": 1,
+                "jeu": 1
+              },
+              "tjm": null
+            },
+            {
+              "du": "2027-01-01",
+              "au": "2027-06-30",
+              "parJour": {
+                "lun": 1,
+                "mar": 1,
+                "mer": 1,
+                "jeu": 1
+              },
+              "tjm": 500
+            }
+          ],
+          "ajustements": {
+            "2026-12-07": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
+            },
+            "2026-12-08": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            },
+            "2026-12-09": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "sur_site"
+            },
+            "2027-01-05": {
+              "quotite": 1,
+              "creneaux": [
+                "matin",
+                "apresMidi"
+              ],
+              "lieu": "teletravail"
+            },
+            "2027-01-07": {
+              "quotite": 0.5,
+              "creneaux": [
+                "matin"
+              ],
+              "lieu": "sur_site"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "mis-audit",
+      "clientId": "cl-direct",
+      "clientNom": "Société Démo Direct",
+      "description": "Audit ponctuel",
+      "tjm": 600,
+      "debut": "2026-04-01",
+      "fin": "2026-05-08",
+      "statut": "terminee",
+      "delaiPaiement": null,
+      "entites": [
+        {
+          "id": "ent-direct",
+          "nom": "Société Démo Direct",
+          "couleur": "#38bdf8",
+          "adresse": "",
+          "contact": "",
+          "email": "",
+          "telephone": "",
+          "rythmes": [
+            {
+              "du": "2026-04-01",
+              "au": "2026-05-08",
+              "parJour": {
+                "mar": 1,
+                "ven": 0.5
+              },
+              "tjm": null
+            }
+          ],
+          "ajustements": {}
+        }
+      ]
+    }
+  ],
+  "recettes": [
+    {
+      "id": "rec-2025-001",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — avril 2025",
+      "montant": 3600,
+      "emiseLe": "2025-04-30",
+      "envoyeeLe": "2025-04-30",
+      "encaisseeLe": "2025-05-26",
+      "modeReglement": "virement",
+      "numero": "2025-001",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2025-05-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2025-002",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — mai 2025",
+      "montant": 3840,
+      "emiseLe": "2025-05-31",
+      "envoyeeLe": "2025-05-31",
+      "encaisseeLe": "2025-06-26",
+      "modeReglement": "virement",
+      "numero": "2025-002",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2025-06-30",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2025-003",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — juin 2025",
+      "montant": 3360,
+      "emiseLe": "2025-06-30",
+      "envoyeeLe": "2025-06-30",
+      "encaisseeLe": "2025-07-26",
+      "modeReglement": "virement",
+      "numero": "2025-003",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2025-07-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2025-004",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — juillet 2025",
+      "montant": 3840,
+      "emiseLe": "2025-07-31",
+      "envoyeeLe": "2025-07-31",
+      "encaisseeLe": "2025-08-26",
+      "modeReglement": "virement",
+      "numero": "2025-004",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2025-08-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2025-005",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — août 2025",
+      "montant": 1440,
+      "emiseLe": "2025-08-31",
+      "envoyeeLe": "2025-08-31",
+      "encaisseeLe": "2025-09-26",
+      "modeReglement": "virement",
+      "numero": "2025-005",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2025-09-30",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2025-006",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — septembre 2025",
+      "montant": 3840,
+      "emiseLe": "2025-09-30",
+      "envoyeeLe": "2025-09-30",
+      "encaisseeLe": "2025-10-26",
+      "modeReglement": "virement",
+      "numero": "2025-006",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2025-10-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2025-007",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — octobre 2025",
+      "montant": 3840,
+      "emiseLe": "2025-10-31",
+      "envoyeeLe": "2025-10-31",
+      "encaisseeLe": "2025-11-26",
+      "modeReglement": "virement",
+      "numero": "2025-007",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2025-11-30",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2025-008",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — novembre 2025",
+      "montant": 3840,
+      "emiseLe": "2025-11-30",
+      "envoyeeLe": "2025-11-30",
+      "encaisseeLe": "2025-12-26",
+      "modeReglement": "virement",
+      "numero": "2025-008",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2025-12-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2025-009",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — décembre 2025",
+      "montant": 4320,
+      "emiseLe": "2025-12-31",
+      "envoyeeLe": "2025-12-31",
+      "encaisseeLe": "2026-01-26",
+      "modeReglement": "virement",
+      "numero": "2025-009",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-01-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-001",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — janvier 2026",
+      "montant": 6720,
+      "emiseLe": "2026-01-31",
+      "envoyeeLe": "2026-01-31",
+      "encaisseeLe": "2026-02-26",
+      "modeReglement": "virement",
+      "numero": "2026-001",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-03-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-002",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — février 2026",
+      "montant": 7200,
+      "emiseLe": "2026-02-28",
+      "envoyeeLe": "2026-02-28",
+      "encaisseeLe": "2026-03-26",
+      "modeReglement": "virement",
+      "numero": "2026-002",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-03-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-003",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — mars 2026",
+      "montant": 6720,
+      "emiseLe": "2026-03-31",
+      "envoyeeLe": "2026-03-31",
+      "encaisseeLe": "2026-04-26",
+      "modeReglement": "virement",
+      "numero": "2026-003",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-04-30",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-004",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — avril 2026",
+      "montant": 7200,
+      "emiseLe": "2026-04-30",
+      "envoyeeLe": "2026-04-30",
+      "encaisseeLe": "2026-05-26",
+      "modeReglement": "virement",
+      "numero": "2026-004",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-05-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-012",
+      "clientNom": "Société Démo Direct",
+      "libelle": "Audit ponctuel",
+      "montant": 2400,
+      "emiseLe": "2026-05-12",
+      "envoyeeLe": "2026-05-12",
+      "encaisseeLe": "2026-06-12",
+      "modeReglement": "virement",
+      "numero": "2026-012",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-06-11",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-005",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — mai 2026",
+      "montant": 7200,
+      "emiseLe": "2026-05-31",
+      "envoyeeLe": "2026-05-31",
+      "encaisseeLe": "2026-06-26",
+      "modeReglement": "virement",
+      "numero": "2026-005",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-06-30",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-006",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — juin 2026",
+      "montant": 7200,
+      "emiseLe": "2026-06-30",
+      "envoyeeLe": "2026-06-30",
+      "encaisseeLe": "2026-07-26",
+      "modeReglement": "virement",
+      "numero": "2026-006",
+      "tvaCollectee": 1440,
+      "relancesLe": [],
+      "echeanceLe": "2026-07-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-007",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — juillet 2026",
+      "montant": 4800,
+      "emiseLe": "2026-07-31",
+      "envoyeeLe": "2026-07-31",
+      "encaisseeLe": "2026-08-26",
+      "modeReglement": "virement",
+      "numero": "2026-007",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-08-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-avoir-formation",
+      "clientNom": "Société Démo Direct",
+      "libelle": "Annulation — Atelier de formation",
+      "montant": -1500,
+      "emiseLe": "2026-08-05",
+      "envoyeeLe": "2026-08-05",
+      "encaisseeLe": "2026-11-12",
+      "modeReglement": "virement",
+      "numero": "2026-013",
+      "tvaCollectee": -300,
+      "relancesLe": [],
+      "echeanceLe": "2026-09-04",
+      "justificatifId": null,
+      "annuleEcriture": "rec-formation"
+    },
+    {
+      "id": "rec-formation",
+      "clientNom": "Société Démo Direct",
+      "libelle": "Atelier de formation",
+      "montant": 1500,
+      "emiseLe": "2026-08-05",
+      "envoyeeLe": "2026-08-05",
+      "encaisseeLe": "2026-08-28",
+      "modeReglement": "virement",
+      "numero": "2026-013",
+      "tvaCollectee": 300,
+      "relancesLe": [],
+      "echeanceLe": "2026-09-04",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-008",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — août 2026",
+      "montant": 4320,
+      "emiseLe": "2026-08-31",
+      "envoyeeLe": "2026-08-31",
+      "encaisseeLe": "2026-09-26",
+      "modeReglement": "virement",
+      "numero": "2026-008",
+      "tvaCollectee": 864,
+      "relancesLe": [],
+      "echeanceLe": "2026-09-30",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-009",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — septembre 2026",
+      "montant": 7200,
+      "emiseLe": "2026-09-30",
+      "envoyeeLe": "2026-09-30",
+      "encaisseeLe": "2026-10-26",
+      "modeReglement": "virement",
+      "numero": "2026-009",
+      "tvaCollectee": 0,
+      "relancesLe": [],
+      "echeanceLe": "2026-10-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-010",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — octobre 2026",
+      "montant": 7200,
+      "emiseLe": "2026-10-31",
+      "envoyeeLe": "2026-10-31",
+      "encaisseeLe": "2026-11-26",
+      "modeReglement": "virement",
+      "numero": "2026-010",
+      "tvaCollectee": 1440,
+      "relancesLe": [],
+      "echeanceLe": "2026-11-30",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-2026-011",
+      "clientNom": "Agence Démo Conseil",
+      "libelle": "Mission conseil — novembre 2026",
+      "montant": 7200,
+      "emiseLe": "2026-11-30",
+      "envoyeeLe": "2026-11-30",
+      "encaisseeLe": null,
+      "modeReglement": null,
+      "numero": "2026-011",
+      "tvaCollectee": 1440,
+      "relancesLe": [],
+      "echeanceLe": "2026-12-31",
+      "justificatifId": null
+    },
+    {
+      "id": "rec-suivi-decembre",
+      "clientNom": "Société Démo Direct",
+      "libelle": "Atelier de suivi",
+      "montant": 1800,
+      "emiseLe": "2026-12-10",
+      "envoyeeLe": "2026-12-10",
+      "encaisseeLe": null,
+      "modeReglement": null,
+      "numero": "2026-014",
+      "tvaCollectee": 360,
+      "relancesLe": [],
+      "echeanceLe": "2027-01-09",
+      "justificatifId": null
+    }
+  ],
+  "depenses": [
+    {
+      "id": "dep-assurance",
+      "libelle": "Assurance responsabilité civile",
+      "fournisseur": "Assureur Démo",
+      "provenance": "france",
+      "montantTtc": 310,
+      "tauxTva": 0,
+      "payeeLe": "2026-01-15",
+      "justificatifId": "just-demo-assurance",
+      "rapprochement": "sans_banque"
+    },
+    {
+      "id": "dep-logiciel",
+      "libelle": "Abonnement logiciel de gestion",
+      "fournisseur": "Éditeur Démo SAS",
+      "provenance": "france",
+      "montantTtc": 42,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-02-10",
+      "justificatifId": "just-demo-logiciel",
+      "rapprochement": "sans_banque"
+    },
+    {
+      "id": "dep-materiel",
+      "libelle": "Écran de bureau",
+      "fournisseur": "Boutique Démo",
+      "provenance": "france",
+      "montantTtc": 960,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-07-08",
+      "justificatifId": "just-demo-ecran",
+      "rapprochement": "sans_banque"
+    },
+    {
+      "id": "dep-licence-ue",
+      "libelle": "Licence logicielle (fournisseur européen)",
+      "fournisseur": "Éditeur Européen Démo",
+      "provenance": "ue",
+      "montantTtc": 71.98,
+      "tauxTva": 0.2,
+      "payeeLe": "2026-09-12",
+      "justificatifId": "just-demo-licence",
+      "rapprochement": "sans_banque"
+    },
+    {
+      "id": "dep-train",
+      "libelle": "Déplacement chez le client",
+      "fournisseur": "Transporteur Démo",
+      "provenance": "france",
+      "montantTtc": 88,
+      "tauxTva": 0.1,
+      "payeeLe": "2026-10-02",
+      "justificatifId": null,
+      "rapprochement": "sans_banque"
+    }
+  ],
+  "conges": [
+    {
+      "date": "2026-08-10",
+      "quotite": 1
+    },
+    {
+      "date": "2026-08-11",
+      "quotite": 1
+    },
+    {
+      "date": "2026-08-12",
+      "quotite": 1
+    },
+    {
+      "date": "2026-12-24",
+      "quotite": 0.5
+    },
+    {
+      "date": "2026-12-28",
+      "quotite": 1
+    },
+    {
+      "date": "2026-12-29",
+      "quotite": 1
+    },
+    {
+      "date": "2026-12-31",
+      "quotite": 1
+    }
+  ],
+  "notesCra": [
+    {
+      "semaine": "2026-12-07",
+      "destinataire": "Client Final Démo",
+      "texte": "Ateliers de cadrage · rédaction de la note de synthèse"
+    }
+  ],
+  "mouvementsBancaires": [
+    {
+      "id": "mv-remuneration-2026-01",
+      "date": "2026-01-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-02",
+      "date": "2026-02-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-03",
+      "date": "2026-03-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-04",
+      "date": "2026-04-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-05",
+      "date": "2026-05-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-06",
+      "date": "2026-06-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-07",
+      "date": "2026-07-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-08",
+      "date": "2026-08-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-09",
+      "date": "2026-09-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-10",
+      "date": "2026-10-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    },
+    {
+      "id": "mv-remuneration-2026-11",
+      "date": "2026-11-27",
+      "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
+      "montant": -3000,
+      "rapprocheAvec": null,
+      "sansContrepartie": "remuneration"
+    }
+  ],
+  "periodesUrssafAjoutees": [],
+  "soldeInitial": 6400,
+  "soldeInitialAu": "2025-12-31",
+  "reserve": 8000,
+  "besoinMensuel": 3000,
+  "partGardeeAuVersement": 0.1,
+  "objectifCaAnnuel": 80000,
+  "periodesDeclarees": [
+    "2025-04",
+    "2025-05",
+    "2025-06",
+    "2025-07",
+    "2025-08",
+    "2025-09",
+    "2025-10",
+    "2025-11",
+    "2025-12",
+    "2026-01",
+    "2026-02",
+    "2026-03",
+    "2026-04",
+    "2026-05",
+    "2026-06"
+  ],
+  "echeances": [
+    {
+      "id": "ech-urssaf-2025-t2",
+      "nature": "urssaf",
+      "montant": 915,
+      "echeanceLe": "2025-07-31",
+      "payeeLe": "2025-07-31",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-urssaf-2025-t3",
+      "nature": "urssaf",
+      "montant": 1063,
+      "echeanceLe": "2025-10-31",
+      "payeeLe": "2025-10-31",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-urssaf-2025-t4",
+      "nature": "urssaf",
+      "montant": 1417,
+      "echeanceLe": "2026-01-31",
+      "payeeLe": "2026-01-30",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-urssaf-2026-t1",
+      "nature": "urssaf",
+      "montant": 2335,
+      "echeanceLe": "2026-04-30",
+      "payeeLe": "2026-04-30",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-urssaf-2026-t2",
+      "nature": "urssaf",
+      "montant": 6021,
+      "echeanceLe": "2026-07-31",
+      "payeeLe": "2026-07-31",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-tva-2026-t3",
+      "nature": "tva",
+      "montant": 2444,
+      "echeanceLe": "2026-10-24",
+      "payeeLe": "2026-10-24",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-impot-solde-2025",
+      "nature": "impot",
+      "montant": 640,
+      "echeanceLe": "2026-09-25",
+      "payeeLe": "2026-09-25",
+      "montantPaye": null,
+      "exercice": 2025
+    },
+    {
+      "id": "ech-impot-acompte-09",
+      "nature": "impot",
+      "montant": 150,
+      "echeanceLe": "2026-09-15",
+      "payeeLe": "2026-09-15",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-impot-acompte-10",
+      "nature": "impot",
+      "montant": 150,
+      "echeanceLe": "2026-10-15",
+      "payeeLe": "2026-10-15",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-impot-acompte-11",
+      "nature": "impot",
+      "montant": 150,
+      "echeanceLe": "2026-11-15",
+      "payeeLe": "2026-11-16",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-impot-acompte-12",
+      "nature": "impot",
+      "montant": 150,
+      "echeanceLe": "2026-12-15",
+      "payeeLe": "2026-12-15",
+      "montantPaye": null
+    },
+    {
+      "id": "ech-cfe-2026",
+      "nature": "cfe",
+      "montant": 214,
+      "echeanceLe": "2026-12-15",
+      "payeeLe": null,
+      "montantPaye": null
+    }
+  ],
+  "configImpotBrute": {},
+  "partsFiscales": 2,
+  "autresRevenusFoyer": 31000,
+  "versementPerDeductible": 0,
+  "impositionCommune": true
+}

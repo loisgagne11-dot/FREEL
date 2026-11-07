@@ -37,6 +37,8 @@ import {
   PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
 import { type ProvenanceSolde, soldeDerive } from '../domain/calculs/solde';
+import type { RegimeTva } from '../domain/calculs/depenses';
+import { tvaDeDepense } from '../domain/calculs/depenses.tva';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
 import type { Faits } from './schema';
 import {
@@ -111,18 +113,45 @@ export function recettesEncaissees(faits: Faits): readonly RecetteEncaissee[] {
 }
 
 /**
+ * Le régime de TVA en vigueur à un mois donné.
+ *
+ * Résolu par période, comme les taux URSSAF, et pour la même raison : une
+ * entreprise qui franchit le seuil en cours d'année relève de la franchise
+ * avant, et de l'assujettissement après. Appliquer le régime d'aujourd'hui à
+ * une dépense de mars rendrait déductible une TVA qui ne l'était pas.
+ */
+export function regimeTvaAu(faits: Faits, m: Mois): RegimeTva {
+  // L'option OU le franchissement : voir `debutTvaEffectif`.
+  const depuis = debutTvaEffectif(faits);
+  return depuis !== null && m >= depuis ? 'assujetti' : 'franchise';
+}
+
+/**
  * La TVA encaissée et pas encore appelée : collectée sur les encaissements,
- * moins les échéances de TVA saisies (payées ou non — le volet 1 reprend
- * déjà celles qui ne le sont pas). Jamais négative.
+ * MOINS LA TVA DÉDUCTIBLE des dépenses payées, moins les échéances de TVA
+ * saisies (payées ou non — le volet 1 reprend déjà celles qui ne le sont
+ * pas). Jamais négative.
+ *
+ * La déductible manquait : une échéance de TVA est le montant NET d'un
+ * trimestre — collectée moins déductible — et la retrancher de la seule
+ * collectée laissait la déductible en provision pour toujours. Le jeu d'essai
+ * l'a vu : 1 300 € provisionnés quand le dossier du trimestre en dit 1 140.
+ * Même règle que le dossier : régime au mois de paiement, pièce exigée.
  */
 export function tvaAReverserDe(faits: Faits): Euros {
   const collectee = faits.recettes
     .filter((r) => r.encaisseeLe !== null)
     .reduce<number>((t, r) => t + (r.tvaCollectee ?? 0), 0);
+  const banqueSynchronisee = soldeEstSuivi(faits);
+  const deductible = faits.depenses
+    .filter((d): d is typeof d & { payeeLe: DateISO } => d.payeeLe !== null)
+    .reduce<number>((t, d) => t + tvaDeDepense(d, {
+      regimeTva: regimeTvaAu(faits, moisDe(d.payeeLe)), banqueSynchronisee
+    }).recuperable, 0);
   const appelee = faits.echeances
     .filter((e) => e.nature === 'tva')
     .reduce<number>((t, e) => t + (e.montantPaye ?? e.montant), 0);
-  return euros(Math.max(0, collectee - appelee));
+  return euros(Math.max(0, collectee - deductible - appelee));
 }
 
 /** Chiffre d'affaires encaissé sur une année civile. */
@@ -346,12 +375,23 @@ export const ECHEANCES_REGLEMENTAIRES: readonly {
   readonly intitule: string;
   readonly date: DateISO;
   readonly preavisJours: number;
+  /**
+   * Combien de jours le rappel survit à sa date.
+   *
+   * Aucun fait ne dit qu'une de ces obligations est remplie : rien ne
+   * l'efface. La date passée, le rappel devenait « en retard » pour toujours —
+   * en rouge sur le Pilote de tout le monde depuis le 1er septembre 2026, prêt
+   * ou pas. Un rappel qu'on ne peut pas traiter apprend à ignorer les
+   * rappels : celui-ci dit « en vigueur » pendant un mois, puis se tait.
+   */
+  readonly rappelApresJours: number;
 }[] = [
   {
     id: 'facturation-electronique-reception',
     intitule: 'Facturation électronique : réception obligatoire',
     date: '2026-09-01' as DateISO,
-    preavisJours: 120
+    preavisJours: 120,
+    rappelApresJours: 30
   }
 ];
 
@@ -367,9 +407,12 @@ export function echeancesReglementairesActives(
     return jours <= preavisJours;
   };
 
+  const joursAvant = (date: DateISO): number => Math.round(
+    (new Date(date).getTime() - new Date(aujourdhui).getTime()) / 86400000
+  );
   const fixes = ECHEANCES_REGLEMENTAIRES
-    .filter((e) => dansLePreavis(e.date, e.preavisJours))
-    .map((e) => ({ id: e.id, intitule: e.intitule, date: e.date }));
+    .filter((e) => dansLePreavis(e.date, e.preavisJours) && joursAvant(e.date) >= -e.rappelApresJours)
+    .map((e) => ({ id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true }));
 
   const cfe = echeancesCfe(faits, maintenant)
     .filter((e) => dansLePreavis(e.date, e.preavisJours))

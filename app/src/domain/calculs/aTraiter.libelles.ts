@@ -64,9 +64,11 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
 
   if (sujet.id.startsWith('echeance-')) {
     const jours = nombre(d['jours']);
-    const delai = jours < 0
-      ? `Échéance dépassée depuis ${pluriel(-jours, 'jour', 'jours')}.`
-      : `Dans ${pluriel(jours, 'jour', 'jours')}.`;
+    const delai = jours >= 0
+      ? `Dans ${pluriel(jours, 'jour', 'jours')}.`
+      : d['enVigueur'] === true
+        ? `En vigueur depuis ${pluriel(-jours, 'jour', 'jours')}.`
+        : `Échéance dépassée depuis ${pluriel(-jours, 'jour', 'jours')}.`;
     const complement = texte(d['contexte']);
     return {
       intitule: texte(d['intitule']),

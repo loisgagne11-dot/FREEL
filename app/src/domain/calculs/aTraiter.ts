@@ -142,6 +142,13 @@ export interface EntreeATraiter {
     readonly action?: string;
     /** Ce qui rend la date urgente, quand elle ne parle pas d'elle-même. */
     readonly contexte?: string;
+    /**
+     * Aucun fait ne dit l'obligation remplie (facturation électronique) : sa
+     * date passée, elle est « en vigueur », pas « en retard » — l'application
+     * ne sait pas si l'on est prêt. La CFE, elle, se règle en saisissant
+     * l'échéance : non saisie après la date, elle est bien en retard.
+     */
+    readonly sansSuivi?: boolean;
   }[];
 }
 
@@ -397,12 +404,15 @@ export function sujetsATraiter(
     sujets.push({
       id: `echeance-${ech.id}`,
       ecran: ech.ecran ?? 'config',
-      gravite: jours < 0 ? 'retard' : jours <= 30 ? 'a_faire' : 'information',
+      gravite: jours < 0
+        ? (ech.sansSuivi === true ? 'a_faire' : 'retard')
+        : jours <= 30 ? 'a_faire' : 'information',
       nombre: 1,
       /* Ces trois textes viennent de l'APPELANT, pas d'ici : les recopier
          tels quels n'ajoute aucune phrase au paquet d'entrée. */
       donnees: {
         jours,
+        enVigueur: ech.sansSuivi === true && jours < 0,
         intitule: ech.intitule,
         contexte: ech.contexte ?? null,
         action: ech.action ?? null

@@ -28,7 +28,7 @@
  * L'empreinte — date, montant, libellé normalisé — rend l'import idempotent.
  */
 
-import { type DateISO, type Euros, euros } from '../types';
+import type { DateISO, Euros } from '../types';
 
 /**
  * Pourquoi un mouvement n'a aucune écriture en face.
@@ -142,26 +142,8 @@ export function importerMouvements(
   };
 }
 
-/**
- * Solde initial plus la somme d'un ensemble de mouvements.
- *
- * Volontairement générique dans ce qu'elle reçoit : elle sert au solde
- * purement bancaire (tous les mouvements d'un relevé), mais aussi de brique à
- * `soldeDerive` (`./solde.ts`), qui ne lui passe que le sous-ensemble des
- * mouvements « sans contrepartie » pour ne pas compter deux fois ce que les
- * faits — recettes, dépenses, échéances — comptent déjà.
- *
- * Le SOLDE DE L'APPLICATION, celui qu'un écran doit afficher, n'est plus
- * cette fonction seule : voir `soldeDerive`, qui ajoute aux mouvements les
- * faits que le relevé ne reflète pas encore. Une source unique par notion
- * (invariant n°4) — cette fonction-ci n'en est qu'un rouage.
- */
-export function soldeBancaire(
-  soldeInitial: Euros,
-  mouvements: readonly MouvementBancaire[]
-): Euros {
-  return euros(mouvements.reduce<number>((s, m) => s + m.montant, soldeInitial));
-}
+/* `soldeBancaire` vit dans `banque.solde` : voir l'en-tête de ce module. */
+export { soldeBancaire } from './banque.solde';
 
 /** Une écriture candidate au rapprochement — dépense ou recette. */
 export interface EcritureRapprochable {

@@ -4,7 +4,7 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import {
-  aTraiter, caEncaisseAnnee, etatPilote, finAcreDe, moisCourant,
+  aTraiter, caEncaisseAnnee, echeancesReglementairesActives, etatPilote, finAcreDe, moisCourant,
   provenanceSoldeDe, recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe
 } from './selecteurs';
 import { periodeCourante } from '../domain/calculs/periode';
@@ -1007,5 +1007,24 @@ describe('années proposables au sélecteur de période', () => {
   it('ajoute l’année suivante seulement si un fait y figure déjà', () => {
     const jeu = faits({ missions: [mission('2027-01-05', '2027-03-01')] });
     expect(anneesDisponibles(jeu, new Date('2026-07-15'))).toEqual([2026, 2027]);
+  });
+});
+
+/**
+ * LE RAPPEL DE LA FACTURATION ÉLECTRONIQUE SE TAIT UN MOIS APRÈS SA DATE.
+ *
+ * Aucun fait ne dit qu'on est prêt : sans fin, le rappel restait pour
+ * toujours — et un rappel qu'on ne peut pas traiter apprend à les ignorer.
+ */
+describe('obligations réglementaires datées', () => {
+  const fe = (quand: string) => echeancesReglementairesActives(faitsVides(), new Date(`${quand}T09:00:00Z`))
+    .find((e) => e.id === 'facturation-electronique-reception');
+
+  it('reste un mois après sa date, sans suivi possible', () => {
+    expect(fe('2026-09-20')).toMatchObject({ sansSuivi: true });
+  });
+
+  it('disparaît passé ce mois', () => {
+    expect(fe('2026-10-05')).toBeUndefined();
   });
 });
