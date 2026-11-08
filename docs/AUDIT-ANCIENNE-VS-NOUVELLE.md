@@ -371,3 +371,9 @@ chiffre faux.
 | Relier une dépense à son opération, depuis Achats | 🟢 | Proposé quand une opération compatible existe ; « hors compte » sinon |
 | Dépenses récurrentes | 🟢 | Repérées sans saisie (même fournisseur, même montant, mois voisins) et totalisées sur la période ; jamais générées d'avance |
 
+## Lot 9 (08/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Réglages | 🟢 | Sept sections, chacune à son adresse (un lien peut ouvrir directement « Réserve & versements ») ; aucun réglage ajouté ni retiré |
+

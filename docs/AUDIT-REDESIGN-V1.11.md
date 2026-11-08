@@ -1028,3 +1028,12 @@ téléphone) : conforme avec réserves, les réserves gênantes corrigées dans 
 lot (navigation de mois en double, en-têtes chiffrés, indication de clic,
 icônes, sous-ligne de franchise). Captures regénérées et relues.
 
+## Lot 9 (08/11) — les Réglages du handoff
+
+| Zone | Avant | Après |
+|---|---|---|
+| Organisation | Quatre onglets ; « Profil » mêlait l'entreprise, la trésorerie et le foyer fiscal | « Configuration » en deux colonnes : sept sections à gauche (icône, titre, sous-titre, chevron), le panneau à droite ; la section dans l'adresse |
+| ACRE, versement libératoire | Cases à cocher | Interrupteurs, comme le handoff (`role="switch"`) |
+| Facturation | IBAN et BIC perdus dans le profil | Section à part ; elle dit que la numérotation est automatique plutôt que de dessiner des champs qui n'enregistrent rien |
+| Champs du handoff absents | — | Code APE, régime en liste, préfixe et prochain numéro, délai, pénalités, logo : aucun n'existe dans les données — non dessinés, assumé |
+

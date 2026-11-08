@@ -149,8 +149,8 @@ Sert de filet aux lots 5 et 6.
 
 | Ligne | État |
 |---|---|
-| « Configuration » en deux colonnes : à gauche les sept sections (icône, titre, sous-titre, chevron), à droite le panneau de la section ouverte ; sur téléphone, la liste puis le panneau. La section vit dans l'adresse (`#/config/profil`…) | ⬜ |
-| Profil & statut (identité, adresse, début d'activité, type, TVA intracommunautaire, ACRE et versement libératoire en interrupteurs) · Paramètres fiscaux (barème, périodicité URSSAF, option TVA, foyer fiscal) · Réserve & versements (solde de départ, besoin mensuel, seuil, part gardée, objectif) · Facturation (IBAN, BIC) · Livre des recettes (conformité, accès au registre) · Compte & synchronisation · Données & export | ⬜ |
+| « Configuration » en deux colonnes : à gauche les sept sections (icône, titre, sous-titre, chevron), à droite le panneau de la section ouverte ; sur téléphone, la liste puis le panneau. La section vit dans l'adresse (`#/config/profil`…) | ✅ fait ; `#/config` seul et toute adresse inconnue ouvrent Profil ; chaque section arrive à la demande |
+| Profil & statut (identité, adresse, début d'activité, type, TVA intracommunautaire, ACRE et versement libératoire en interrupteurs) · Paramètres fiscaux (barème, périodicité URSSAF, option TVA, foyer fiscal) · Réserve & versements (solde de départ, besoin mensuel, seuil, part gardée, objectif) · Facturation (IBAN, BIC) · Livre des recettes (conformité, accès au registre) · Compte & synchronisation · Données & export | ✅ fait ; chaque champ garde son comportement. Les messages qui renvoyaient aux anciens onglets (« Config › Solde du compte », « Réglages → Données », « Réglages › Barème ») nomment les nouvelles sections |
 | Numérotation des factures et mentions personnalisées | ⬜ hors lot : aucun réglage n'existe ; à concevoir |
 
 ## Reste fonctionnel par écran
@@ -227,7 +227,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Navigation en sept sections | ◐ | Quatre sections (Profil, Barème, Données, Compte) | 9 |
+| Navigation en sept sections | ✅ | Lot 9 | 9 |
 | Facturation : numérotation et mentions | ◐ | SIRET et IBAN contrôlés ; aucun réglage de numérotation ni de mentions | à planifier |
 | Coffre des documents | ⬜ | Aucun dépôt ; retenu au périmètre | à planifier |
 | Mode hors ligne, retard de synchronisation affiché | ◐ | Aucun `navigator.onLine` ; la pastille ne dit que relié, expiré ou local | à planifier |
