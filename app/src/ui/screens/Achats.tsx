@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import {
@@ -91,6 +91,7 @@ type Panneau =
   | { readonly type: 'edition'; readonly id: string };
 
 const stockageParDefaut = stockageIndexedDB();
+const RappelArchive = lazy(() => import('./Achats.archive'));
 
 export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats = {}) {
   const faits = useFaits((e) => e.faits);
@@ -166,6 +167,8 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
           </button>
         ) : undefined}
       />
+
+      <Suspense fallback={null}><RappelArchive stockage={stockage} /></Suspense>
 
       <div className={styles.sections}>
         <Onglets

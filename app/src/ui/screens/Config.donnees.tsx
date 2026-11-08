@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { instantaneAvantRemplacement, useFaits } from '../../state/store';
 import { dateDuJour } from '../../state/selecteurs';
@@ -6,6 +6,13 @@ import { CLE_STOCKAGE, faitsVides, type Recette } from '../../state/schema';
 import { livreRecettesCsv } from '../../domain/calculs/livreRecettesCsv';
 import { dateCourte } from '../format';
 import { nomSauvegarde, telecharger } from '../../infra/telechargement';
+import {
+  stockageIndexedDB, type MetaJustificatif, type StockageJustificatifs
+} from '../../infra/justificatifs';
+import type { lireArchive } from '../../infra/justificatifs.archive';
+import { lireDerniereArchive } from '../../infra/archive.derniere';
+import { ErreurArchive } from '../../infra/archive.zip';
+import { RangeeArchive } from './Config.donnees.archive';
 import styles from './Config.module.css';
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -27,7 +34,11 @@ import styles from './Config.module.css';
  * recettes n'y figurait pas — il fallait savoir qu'il vivait dans le menu
  * « Exporter » de la barre du haut.
  */
-export function Donnees() {
+const stockageParDefaut = stockageIndexedDB();
+
+export function Donnees(
+  { stockage = stockageParDefaut }: { readonly stockage?: StockageJustificatifs } = {}
+) {
   const faits = useFaits((e) => e.faits);
   const nomFichier = nomSauvegarde(faits.entreprise.nom, dateDuJour());
   const chargement = useFaits((e) => e.chargement);
@@ -44,10 +55,58 @@ export function Donnees() {
    * précaution que sur l'écran Compte, et pour la même raison.
    */
   const [aRestaurer, setARestaurer] = useState<Restauration | null>(null);
+  /**
+   * La confirmation s'affiche sous toutes les lignes : sur téléphone, à trois
+   * cents pixels sous « Choisir un fichier » qui l'a demandée, hors de la vue.
+   * On choisissait un fichier et rien ne semblait se passer. Elle vient donc
+   * à l'écran, et le focus avec elle — le clavier y est aussitôt.
+   */
+  const refConfirmation = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (aRestaurer === null) return;
+    refConfirmation.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    refConfirmation.current?.focus({ preventScroll: true });
+  }, [aRestaurer]);
   // Relue à chaque changement des faits : un remplacement vient d'en écrire
   // une. `faits` n'est pas lu dans le calcul, il en est le DÉCLENCHEUR.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const avant = useMemo(() => instantaneAvantRemplacement(), [faits]);
+
+  /**
+   * Les pièces de ce navigateur, relues après chaque archive ou restauration.
+   * `null` si elles ne se lisent pas (IndexedDB absent ou bloqué) : l'écran
+   * se tait plutôt que d'annoncer « aucun justificatif » à tort.
+   */
+  const [metas, setMetas] = useState<readonly MetaJustificatif[] | null>(null);
+  const [derniere, setDerniere] = useState<string | null>(() => lireDerniereArchive());
+  const relirePieces = useCallback(() => {
+    setDerniere(lireDerniereArchive());
+    stockage.lister().then(setMetas, () => setMetas(null));
+  }, [stockage]);
+  useEffect(() => { relirePieces(); }, [relirePieces]);
+  /** Les pièces qu'une restauration a refusées : elles se disent, une par une. */
+  const [refusPieces, setRefusPieces] =
+    useState<readonly { readonly nomFichier: string; readonly motif: string }[] | null>(null);
+
+  /**
+   * Restaure les pièces d'une archive, puis — si demandé — ses faits.
+   *
+   * Les pièces D'ABORD : leur dépôt est additif et ne détruit rien. Adopter
+   * les faits en premier, puis échouer sur les pièces, laisserait des faits
+   * qui pointent vers des fichiers absents.
+   */
+  async function restaurerArchive(
+    lue: Awaited<ReturnType<typeof lireArchive>>, avecLesFaits: boolean
+  ): Promise<void> {
+    const { restaurerPieces } = await import('../../infra/justificatifs.archive');
+    const bilan = await restaurerPieces(lue, stockage);
+    const refus = avecLesFaits ? await adopter(lue.faits) : null;
+    const pieces = `${bilan.ajoutees}\u00a0pièce(s) ajoutée(s), ${bilan.dejaPresentes} déjà présente(s)`;
+    signaler(refus ?? (avecLesFaits ? `Archive restaurée : ${pieces}.` : `${pieces}.`));
+    setRefusPieces(bilan.refusees.length > 0 ? bilan.refusees : null);
+    setARestaurer(null);
+    relirePieces();
+  }
 
   function exporter(): void {
     telecharger(nomFichier, JSON.stringify(faits, null, 2), 'application/json;charset=utf-8');
@@ -101,22 +160,27 @@ export function Donnees() {
           </div>
         </li>
 
+        <RangeeArchive
+          faits={faits} stockage={stockage} metas={metas} derniere={derniere}
+          onFaite={relirePieces}
+        />
+
         <li className={styles.rangee}>
           <div className={styles.rangeeTexte}>
-            <span className={styles.rangeeTitre}>Sauvegarde complète (JSON)</span>
+            <span className={styles.rangeeTitre}>Sauvegarde des données (JSON)</span>
             <span className={styles.rangeeAide}>
               {compte(faits.recettes.length, 'recette')}, {compte(faits.depenses.length, 'dépense')},
               {' '}{compte(faits.missions.length, 'mission')}, {compte(faits.clients.length, 'client')} et
               {' '}{compte(faits.periodesDeclarees.length, 'période déclarée', 'périodes déclarées')}&nbsp;:
-              tout, réimportable à tout moment. Les justificatifs n’y sont pas&nbsp;:
-              ce sont des fichiers, conservés à part dans le navigateur.
+              un fichier léger, réimportable à tout moment. Les justificatifs n’y sont
+              pas&nbsp;: seule l’archive complète les emporte.
             </span>
           </div>
           <div className={styles.rangeeAction}>
             <button
               type="button"
               className={styles.action}
-              aria-label="Sauvegarder toutes mes données (JSON)"
+              aria-label="Sauvegarder mes données sans les justificatifs (JSON)"
               onClick={exporter}
             >
               Sauvegarder
@@ -128,8 +192,8 @@ export function Donnees() {
           <div className={styles.rangeeTexte}>
             <span className={styles.rangeeTitre}>Restaurer une sauvegarde</span>
             <span className={styles.rangeeAide}>
-              Un fichier produit par «&nbsp;Sauvegarder&nbsp;». Son contenu te sera
-              montré avant d’écraser quoi que ce soit.
+              Une archive (ZIP) ou une sauvegarde (JSON) produite ici. Son contenu
+              te sera montré avant d’écraser quoi que ce soit.
             </span>
           </div>
           <div className={styles.rangeeAction}>
@@ -144,7 +208,7 @@ export function Donnees() {
                 className={styles.invisible}
                 aria-label="Restaurer une sauvegarde"
                 type="file"
-                accept="application/json,.json"
+                accept="application/json,.json,application/zip,.zip"
                 onChange={(e) => {
                   const fichier = e.target.files?.[0];
                   // Le champ est vidé pour que rechoisir le MÊME fichier déclenche à
@@ -152,7 +216,7 @@ export function Donnees() {
                   // même fichier ne ferait rien, et l'écran paraîtrait cassé.
                   e.target.value = '';
                   if (fichier === undefined) return;
-                  void lireSauvegarde(fichier).then(setARestaurer);
+                  void lireSauvegarde(fichier, metas).then(setARestaurer);
                 }}
               />
             </label>
@@ -195,7 +259,7 @@ export function Donnees() {
             <span className={styles.rangeeAide}>
               Vide l’application dans ce navigateur. Ce que tu as maintenant est
               mis de côté&nbsp;: «&nbsp;Revenir à l’état d’avant&nbsp;» le rétablit.
-              Un compte relié n’est pas touché.
+              Un compte relié n’est pas touché, et les justificatifs restent conservés.
             </span>
           </div>
           <div className={styles.rangeeAction}>
@@ -212,12 +276,14 @@ export function Donnees() {
       </ul>
 
       {aRestaurer !== null && (
-        <div className={styles.confirmation} role="alert">
+        <div ref={refConfirmation} tabIndex={-1} className={styles.confirmation} role="alert">
           {aRestaurer.statut === 'illisible'
             ? <p className={styles.echec}>{aRestaurer.motif}</p>
             : (
               <>
-                {aRestaurer.origine === 'vide'
+                {aRestaurer.origine === 'archive' && aRestaurer.archive !== undefined
+                  ? <ConfirmationArchive archive={aRestaurer.archive} resume={aRestaurer.resume} />
+                  : aRestaurer.origine === 'vide'
                   ? (
                     <p>
                       L’application sera <strong>vide</strong>&nbsp;: ni client, ni mission,
@@ -232,12 +298,35 @@ export function Donnees() {
                       {' '}<strong>{aRestaurer.resume.clients}</strong> client(s).
                     </p>
                   )}
-                <p className={styles.explication}>
-                  {aRestaurer.origine === 'vide' ? 'Vider' : 'La restaurer'} <strong>remplace</strong> tout
-                  ce qui est actuellement dans l’application, qui est mis de côté.
-                  Les justificatifs déposés ne sont pas concernés&nbsp;: ils vivent
-                  à part, et une sauvegarde JSON ne les contient pas.
-                </p>
+                {aRestaurer.origine !== 'archive' && (
+                  <p className={styles.explication}>
+                    {aRestaurer.origine === 'vide' ? 'Vider' : 'La restaurer'} <strong>remplace</strong> tout
+                    ce qui est actuellement dans l’application, qui est mis de côté.
+                    Les justificatifs déposés ne sont pas concernés&nbsp;: ils vivent
+                    à part, et une sauvegarde JSON ne les contient pas.
+                  </p>
+                )}
+                {aRestaurer.origine === 'archive' && aRestaurer.archive !== undefined ? (
+                  <div className={styles.actions}>
+                    <button
+                      type="button"
+                      className={styles.actionPrincipale}
+                      onClick={() => { void restaurerArchive(aRestaurer.archive!.lue, true); }}
+                    >
+                      Tout remplacer par cette archive
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.action}
+                      onClick={() => { void restaurerArchive(aRestaurer.archive!.lue, false); }}
+                    >
+                      Ajouter seulement les pièces manquantes
+                    </button>
+                    <button type="button" className={styles.action} onClick={() => setARestaurer(null)}>
+                      Annuler
+                    </button>
+                  </div>
+                ) : (
                 <div className={styles.actions}>
                   <button
                     type="button"
@@ -262,8 +351,25 @@ export function Donnees() {
                     Annuler
                   </button>
                 </div>
+                )}
               </>
             )}
+        </div>
+      )}
+
+      {refusPieces !== null && (
+        <div className={styles.confirmation} role="alert">
+          <p>
+            {refusPieces.length} pièce(s) de l’archive n’ont pas été restaurées&nbsp;:
+          </p>
+          <ul className={styles.listeRefus}>
+            {refusPieces.map((r) => <li key={`${r.nomFichier}-${r.motif}`}>{r.nomFichier} — {r.motif}</li>)}
+          </ul>
+          <div className={styles.actions}>
+            <button type="button" className={styles.action} onClick={() => setRefusPieces(null)}>
+              Fermer
+            </button>
+          </div>
         </div>
       )}
 
@@ -336,7 +442,15 @@ type Restauration =
   | {
     readonly statut: 'lisible';
     /** « vide » : repartir de zéro — même confirmation, autre annonce. */
-    readonly origine: 'sauvegarde' | 'vide';
+    readonly origine: 'sauvegarde' | 'vide' | 'archive';
+    /** Ce qu'une archive ZIP ajoute à l'annonce : ses pièces, sa date. */
+    readonly archive?: {
+      readonly lue: Awaited<ReturnType<typeof lireArchive>>;
+      readonly pieces: number;
+      readonly produiteLe: string;
+      /** Pièces d'ici dont le fait n'existera plus si l'on adopte ses faits. */
+      readonly orphelines: number;
+    };
     readonly brut: unknown;
     readonly resume: {
       readonly recettes: number; readonly depenses: number;
@@ -384,7 +498,10 @@ async function lireJeuDeDemonstration(): Promise<Restauration> {
  * que ce qu'il faut pour ANNONCER le contenu : un fichier illisible doit se
  * dire tout de suite, pas après une confirmation.
  */
-async function lireSauvegarde(fichier: File): Promise<Restauration> {
+async function lireSauvegarde(
+  fichier: File, metas: readonly MetaJustificatif[] | null
+): Promise<Restauration> {
+  if (/\.zip$/i.test(fichier.name) || /zip/.test(fichier.type)) return lireArchiveComplete(fichier, metas);
   let texte: string;
   try {
     texte = await fichier.text();
@@ -403,6 +520,72 @@ async function lireSauvegarde(fichier: File): Promise<Restauration> {
   }
 
   return resumerBloc(brut);
+}
+
+/**
+ * Lit une archive complète sans rien écrire : ni pièce, ni fait.
+ *
+ * Le module d'archive arrive à la demande. Le motif d'une `ErreurArchive`
+ * est écrit pour l'utilisateur ; celui d'une autre erreur ne l'est pas.
+ */
+async function lireArchiveComplete(
+  fichier: File, metas: readonly MetaJustificatif[] | null
+): Promise<Restauration> {
+  let module: typeof import('../../infra/justificatifs.archive') | null = null;
+  try {
+    module = await import('../../infra/justificatifs.archive');
+    const lue = await module.lireArchive(fichier);
+    const resume = resumerBloc(lue.faits);
+    if (resume.statut === 'illisible') return resume;
+    return {
+      ...resume,
+      origine: 'archive',
+      archive: {
+        lue,
+        pieces: lue.manifeste.pieces.filter((p) => p.chemin !== null).length,
+        produiteLe: lue.manifeste.produiteLe,
+        orphelines: metas === null ? 0 : module.orphelinesApres(metas, lue.faits)
+      }
+    };
+  } catch (e) {
+    return {
+      statut: 'illisible',
+      motif: e instanceof ErreurArchive
+        ? e.message
+        : 'Cette archive n’a pas pu être lue.'
+    };
+  }
+}
+
+/** Ce qu'une archive apporte, et ce qu'elle laisserait sans fait. */
+function ConfirmationArchive(
+  { archive, resume }: {
+    readonly archive: NonNullable<Extract<Restauration, { statut: 'lisible' }>['archive']>;
+    readonly resume: Extract<Restauration, { statut: 'lisible' }>['resume'];
+  }
+) {
+  return (
+    <>
+      <p>
+        Cette archive du {dateCourte(archive.produiteLe.slice(0, 10))} contient
+        {' '}<strong>{resume.recettes}</strong> recette(s), <strong>{resume.depenses}</strong> dépense(s),
+        {' '}<strong>{resume.missions}</strong> mission(s), <strong>{resume.clients}</strong> client(s)
+        {' '}et <strong>{archive.pieces}</strong> justificatif(s).
+      </p>
+      <p className={styles.explication}>
+        «&nbsp;Tout remplacer&nbsp;» restaure d’abord les justificatifs, puis
+        remplace tes données, qui sont mises de côté. «&nbsp;Ajouter seulement
+        les pièces manquantes&nbsp;» garde tes données telles quelles — c’est
+        le geste quand tu changes de navigateur. Aucun justificatif d’ici n’est
+        jamais supprimé.
+        {archive.orphelines > 0 && (
+          <> Si tu remplaces tout, {archive.orphelines} justificatif(s) déposé(s) ici
+          ne correspondront plus à aucun fait&nbsp;: ils restent conservés, mais
+          détachés.</>
+        )}
+      </p>
+    </>
+  );
 }
 
 /** Annonce ce qu'un bloc contient, sans rien adopter. */

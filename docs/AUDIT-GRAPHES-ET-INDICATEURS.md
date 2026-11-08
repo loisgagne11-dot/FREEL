@@ -647,3 +647,14 @@ solde − provisions − réserve.
 | Contenu d'une sauvegarde | Réglages → Données | Tableau de comptes (recettes, dépenses, missions, clients, périodes) | Les mêmes comptes, dans la ligne « Sauvegarde complète (JSON) » |
 | Livre des recettes | Réglages → Données | Seulement dans le menu « Exporter » | Ligne « Livre des recettes (CSV) », année au choix dès qu'il y en a deux |
 
+## Lot 10 (08/11) — justificatifs
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Justificatifs conservés, et leur poids | Réglages → Données, ligne de l'archive | — | « tes 12 justificatifs (3,4 Mo) » ; se tait si IndexedDB ne se lit pas, plutôt que d'annoncer zéro |
+| Justificatifs pas encore archivés | Données, Achats | — | Pièces déposées après la dernière archive faite DANS CE NAVIGATEUR (toutes s'il n'y en a jamais eu) |
+| Date de la dernière archive | Données | — | Date courte ; fait d'environnement, hors des faits |
+| Pièces altérées, illisibles, sans fait | Données, après l'archive ; manifeste | — | Comptées et nommées ; jamais retirées en silence |
+| Contenu d'une archive à restaurer | Confirmation | Recettes, dépenses, missions, clients | + justificatifs, date de l'archive, pièces d'ici qui seraient détachées |
+| Pièces restaurées | Message après restauration | — | « N pièce(s) ajoutée(s), M déjà présente(s) », et la liste des refus avec leur motif |
+

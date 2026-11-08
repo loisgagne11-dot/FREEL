@@ -86,9 +86,12 @@ export function nomSauvegarde(nomEntreprise: string, jour: string): string {
  * mauvaise extension sur certains navigateurs, d'où le paramètre.
  */
 export function telecharger(
-  nom: string, contenu: string, type: string = 'text/html;charset=utf-8'
+  nom: string, contenu: string | Blob, type: string = 'text/html;charset=utf-8'
 ): void {
-  const url = URL.createObjectURL(new Blob([contenu], { type }));
+  // Un Blob passe tel quel : l'archive des justificatifs en est un, fait de
+  // morceaux qui référencent les pièces au lieu de les copier — la convertir
+  // en chaîne chargerait toutes les pièces en mémoire d'un coup.
+  const url = URL.createObjectURL(contenu instanceof Blob ? contenu : new Blob([contenu], { type }));
   const lien = document.createElement('a');
   lien.href = url;
   lien.download = nom;

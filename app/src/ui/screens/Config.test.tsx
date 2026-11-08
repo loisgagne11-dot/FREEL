@@ -1054,7 +1054,8 @@ describe('navigation entre les sections', () => {
 
   it('Données : l’export et la restauration', async () => {
     await afficher('donnees');
-    expect(screen.getByRole('button', { name: /Sauvegarder toutes mes données/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Créer l’archive complète (ZIP)' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Sauvegarder mes données sans les justificatifs/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /Télécharger le livre des recettes/ })).toBeTruthy();
     expect(screen.getByLabelText('Restaurer une sauvegarde')).toBeTruthy();
   });

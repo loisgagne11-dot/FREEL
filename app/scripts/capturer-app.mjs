@@ -148,7 +148,7 @@ const VUES = [
   { hash: '#/config/fiscal', nom: 'config-fiscal', attendre: 'text=Périodicité des cotisations' },
   { hash: '#/config/reserve', nom: 'config-reserve', attendre: 'text=Seuil de sécurité' },
   { hash: '#/config/facturation', nom: 'config-facturation', attendre: 'label:has-text("IBAN")' },
-  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Sauvegarde complète (JSON)' },
+  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
   { hash: '#/config/compte', nom: 'config-cloud', attendre: 'text=Relier un compte' }
 ];
 

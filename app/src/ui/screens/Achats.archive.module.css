@@ -1,0 +1,27 @@
+/* Un bandeau discret : ambre, comme tout ce qui attend un geste sans être
+   une faute. Le lien porte l'action ; le texte dit pourquoi. */
+.rappel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--amber);
+  border-radius: var(--r-sm);
+  background: var(--amber-soft);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lien {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

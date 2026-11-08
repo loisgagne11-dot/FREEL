@@ -51,7 +51,7 @@ ne se réutilisent jamais.
 | S3 — deux onglets : écoute de `storage`, contrôle de révision avant écriture ; l'autre onglet l'emporte et la saisie écartée est signalée ; une version plus récente ouverte à côté arrête l'écriture | ✅ fait |
 | S4 — quota plein : « sans persistance » au premier échec, levé quand l'espace revient ; au démarrage, un stockage plein se lit au lieu de passer pour une navigation privée ; l'alerte est visible sur tous les écrans | ✅ fait |
 | S5 — justificatifs : stockage persistant demandé au premier dépôt ; « pièce conservée » seulement à la validation de la transaction | ✅ fait |
-| S5 (suite) — export des pièces (archive téléchargeable) : elles ne sont ni dans l'export JSON ni dans la synchronisation, et sont à conservation légale | ⬜ à planifier (lot 7) |
+| S5 (suite) — export des pièces (archive téléchargeable) : elles ne sont ni dans l'export JSON ni dans la synchronisation, et sont à conservation légale | ✅ fait au lot 10 : archive complète et sa restauration ; la synchronisation des pièces reste hors lot |
 | S6 — copie de l'état local avant toute restauration, récupération de compte ou reprise de l'ancienne application ; « Revenir à l'état d'avant » dans Réglages → Données ; remplacement refusé si la copie ne peut pas s'écrire | ✅ fait |
 | Q3 — `verifierAbsenceDePerte` à l'import : réévalué. La conversion passe ce contrôle sur tous les cas atypiques sondés (doublons, montants en texte, factures nulles), et il compare des nombres et des totaux — il n'aurait pas vu les écarts réellement rencontrés (journées sans lieu, missions via agence). Non câblé : aucun test ne pourrait prouver qu'il sert | ✅ clos sans changement |
 
@@ -156,6 +156,27 @@ Sert de filet aux lots 5 et 6.
 | Troisième contrôle visuel du lot 9 | ✅ fait : les quatre corrections confirmées dans les deux thèmes. Il a trouvé un débordement à 390 px sur Paramètres fiscaux (page de 609 px) : l'en-tête « Actions » réservé aux lecteurs d'écran, en position absolue, échappait au conteneur défilant de la table — défaut antérieur au lot, invisible parce que le contrôle responsive ne visitait que `#/config`. Corrigé, et le contrôle visite désormais les sept sections (280 combinaisons) ; sans le correctif, il échoue sur les quatre palettes. Le foyer fiscal a reçu son titre |
 | Effacer le compte distant (RGPD) | ⬜ hors lot : « Repartir de zéro » ne vide que ce navigateur ; supprimer la ligne `user_data` demande une action côté Supabase à concevoir |
 
+### Lot 10 — Les justificatifs se sauvegardent (priorité 1 : S5 suite, l'irréversible)
+
+Les pièces vivent dans IndexedDB, dans un seul navigateur. Ni l'export JSON ni
+la synchronisation ne les emportent, alors qu'elles sont à conservation légale :
+un navigateur réinitialisé, un ordinateur changé, et six ans de justificatifs
+disparaissent sans qu'aucune sauvegarde les ait jamais contenus.
+
+| Ligne | État |
+|---|---|
+| Archive ZIP complète depuis Données & export : les faits (le même JSON que la sauvegarde), chaque pièce sous un nom lisible SANS l'application, rangée par année DU FAIT puis par nature (`justificatifs/2026/depenses/2026-03-14 Fournisseur 89,00 €.pdf`, suffixe en cas de collision), un manifeste versionné (nom d'origine, empreinte, date de dépôt, fait rattaché et sa date, statut intacte / altérée / illisible / orpheline), un `LISEZMOI.txt`. Écrite sans dépendance (ZIP « stocké », noms UTF-8, sans ZIP64 : 4 Go et 65 535 entrées au plus, refus explicite au-delà), construite en morceaux : une pièce lue à la fois | ✅ fait |
+| Chaque pièce est revérifiée (SHA-256) avant d'entrer dans l'archive ; une pièce altérée ou illisible est signalée à l'écran et dans le manifeste, jamais tue | ✅ fait |
+| Restauration par le même bouton que la sauvegarde JSON. La confirmation dit la date de l'archive, ce qu'elle contient, et combien de pièces d'ici se retrouveraient sans fait. Deux gestes : « Tout remplacer » (pièces D'ABORD, faits ensuite) et « Ajouter seulement les pièces manquantes » (faits intacts — le cas de qui change de navigateur). Chaque pièce est recontrôlée contre le manifeste avant d'être redéposée avec son identifiant, son empreinte et sa date de dépôt d'origine ; une pièce déjà présente n'est pas dupliquée ; aucune pièce n'est jamais supprimée par une restauration | ✅ fait |
+| Rappel : « Dernière archive le … » et « N pièces déposées depuis » en Données, et sur Achats tant qu'il en reste. La date de la dernière archive est un fait de CET environnement, pas un fait métier : rangée à part, hors des faits, de l'export et de la synchronisation — une archive faite ailleurs ne protège pas les pièces d'ici | ✅ fait |
+| Durée de conservation lue à l'écran et dans le LISEZMOI : 6 ans au moins (LPF art. L102 B), 10 ans pour les documents comptables d'une activité commerciale (C. com. art. L123-22) — sans date butoir tirée du dépôt : le délai court depuis le document ou la dernière opération. Aucune promesse de valeur probante : l'empreinte montre que le fichier n'a pas changé depuis son dépôt, elle ne remplace ni l'original ni un archivage à valeur probante (le commentaire de `justificatifs.ts` est adouci dans le même sens) | ✅ fait |
+| Les textes de Données qui disaient « les justificatifs n'y sont pas » distinguent la sauvegarde JSON (sans pièces) de l'archive (avec) | ✅ fait |
+| Contrôle visuel du lot 10 (agent contrôleur, deux thèmes et téléphone, avec de vraies pièces dans IndexedDB : jamais archivées, archivées, restauration, rappel sur Achats) | ✅ fait : conforme, sans défaut bloquant. Corrigé dans le lot : la confirmation de restauration tombait hors de la vue sur téléphone (elle y défile désormais et prend le focus), ses boutons secondaires passaient pour désactivés. Archive réelle relue par `unzip -t` : sans erreur, noms lisibles. *Restent mineurs : boutons des lignes sans icône (la maquette en porte), « Tout remplacer » sans couleur d'alerte* |
+| Pièces devenues orphelines après une restauration ou « Repartir de zéro » : `motifRefusSuppression` les déclare supprimables. Aucun écran ne supprime de pièce aujourd'hui | ⬜ hors lot : contrainte écrite pour le futur écran de suppression — refuser pendant la durée de conservation |
+| Archive d'une année « pour le comptable », non restaurable | ⬜ hors lot : le rangement par année de l'archive complète y prépare |
+| Synchronisation des pièces avec le compte | ⬜ hors lot : demande un stockage de fichiers côté Supabase |
+| Nettoyage de cette liste : lignes faites restées ouvertes (grille ACRE, ACRE à 25 %, restauration sans copie de secours) ; la durée de conservation est de 6 ans (LPF L102 B), pas 10 | ✅ fait |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
@@ -178,9 +199,9 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Cycle d'échéance enrichi (à déclarer, déclarée, payée, daté) | ◐ | `Echeance` ne porte que `payeeLe` et `montantPaye` ; « déclarée » est un fait distinct, sans date | à planifier |
 | Frise des jalons réglementaires | ◐ | La frise trace les échéances saisies, pas les jalons | à planifier |
 | Détail de la projection d'autonomie | ◐ | Seul `autonomieMois` est affiché | à planifier |
-| Mention de conservation de 10 ans | ⬜ | `ANNEES_CONSERVATION` n'est lue par aucun fichier de `ui/` | à planifier |
-| Grille ACRE par période | ⬜ | `ABATTEMENT_ACRE` est une constante | 7 (L10) |
-| Abattement ACRE à 25 % au 01/07/2026 | ⬜ à vérifier | Annoncé « probable mais non confirmé » ; aucune trace dans le code | 7 (L10) |
+| Mention de la durée de conservation | ✅ | Lue en Données (ligne de l'archive) et dans le LISEZMOI de l'archive : 6 ans (LPF L102 B), 10 pour une activité commerciale | 10 |
+| Grille ACRE par période | ✅ | `PERIODES_ABATTEMENT_ACRE`, par date de création | 7 (L10) |
+| Abattement ACRE à 25 % au 01/07/2026 | ✅ | Confirmé par le décret 2026-69 ; appliqué aux créations à partir de cette date, lu sous l'interrupteur (lot 9) | 7 (L10) |
 | Provision mensuelle de l'IR (`addIRMonthlyProvisions`) | ◐ | Plancher existant, non réparti mois par mois | 2 |
 | Provisions automatiques : enveloppes remplies à chaque encaissement, ordre de virement préparé | ⬜ | Aucun code | 7 |
 | Comparaison N−1 / tendance | ⬜ volontaire | Reportée (« utile la troisième année ») | à planifier |
@@ -215,7 +236,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Filtre par compte | ⬜ | Seule la barre de période existe | à planifier |
 | Import OFX | ⬜ | Aucun | à planifier |
 | Correction ou suppression à la main d'un mouvement importé | ⬜ | Aucune action | à planifier |
-| Justificatifs sauvegardés et protégés de l'éviction | ◐ | Voir S5 | 1 |
+| Justificatifs sauvegardés et protégés de l'éviction | ✅ | Protégés de l'éviction (S5) ; archive complète et rappel « pas encore archivés » sur Achats (lot 10) | 10 |
 
 ### Outils
 
@@ -236,7 +257,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Mode hors ligne, retard de synchronisation affiché | ◐ | Aucun `navigator.onLine` ; la pastille ne dit que relié, expiré ou local | à planifier |
 | Synchronisation temps réel multi-appareils | ⬜ | Synchronisation manuelle seulement | à planifier |
 | Règles d'accès de `user_data` vérifiées et documentées | ⬜ | `supabase.sql` ne les touche pas | à planifier |
-| Restauration et récupération sans copie de secours | ⬜ | Voir S6 | 1 |
+| Restauration et récupération sans copie de secours | ✅ | Copie de l'état d'avant (S6), « Revenir à l'état d'avant » dans Données | 1 |
 
 ### Documents
 

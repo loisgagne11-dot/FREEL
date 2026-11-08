@@ -381,3 +381,11 @@ chiffre faux.
 | Repartir de zéro | 🟢 nouveau | Vide l'application dans ce navigateur après confirmation ; l'état d'avant est mis de côté et se rétablit. Le compte distant n'est pas touché |
 | Mentions légales des factures | 🟢 | Lisibles dans Facturation, tirées de la fonction qui les imprime |
 
+## Lot 10 (08/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Sauvegarde des justificatifs | 🟢 nouveau | L'ancienne application n'exportait aucune pièce (livre des recettes, PDF et FEC seulement). Archive ZIP : faits, pièces nommées et rangées par année du fait et par nature, manifeste à empreintes, LISEZMOI ; lisible sans l'application |
+| Restauration des justificatifs | 🟢 nouveau | Pièces recontrôlées (CRC et SHA-256) avant d'être redéposées avec leur identifiant et leur date de dépôt ; jamais de doublon ni de suppression ; « Ajouter seulement les pièces manquantes » laisse les faits intacts |
+| Rappel d'archive | 🟢 nouveau | « Dernière archive le … » et pièces déposées depuis, en Données et sur Achats ; la date vit dans ce navigateur, hors des faits |
+

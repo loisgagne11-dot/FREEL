@@ -49,7 +49,16 @@ export const SEUIL_GLOBALISATION_DETAIL: SeuilDate = {
 export const ANNEES_CONSERVATION = {
   valeur: 6,
   source: 'LPF, art. L102 B — délai de conservation des documents',
-  verifieLe: dateISO('2026-08-12')
+  verifieLe: dateISO('2026-08-12'),
+  /**
+   * Documents comptables d'une activité commerciale : plus long que le délai
+   * fiscal. Il ne concerne pas le micro-BNC, mais l'archive le mentionne pour
+   * qui la remettrait à un tiers ; l'afficher sans le dater le laisserait vieillir.
+   */
+  activiteCommerciale: {
+    valeur: 10,
+    source: 'C. com., art. L123-22 — documents comptables des commerçants'
+  }
 } as const;
 
 /** Contrôle d'intégrité, agrégé par `bareme/index`. */
@@ -63,6 +72,9 @@ export function verifierIntegriteRecettes(): readonly string[] {
   }
   if (ANNEES_CONSERVATION.valeur < 1) {
     ecarts.push('recettes : la durée de conservation doit couvrir au moins un exercice.');
+  }
+  if (ANNEES_CONSERVATION.activiteCommerciale.valeur < ANNEES_CONSERVATION.valeur) {
+    ecarts.push('recettes : la conservation commerciale ne peut pas être plus courte que la conservation fiscale.');
   }
   return ecarts;
 }

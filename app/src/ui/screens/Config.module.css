@@ -433,6 +433,13 @@
 
 .confirmation p { margin: 0; }
 
+/* Dans une confirmation, chaque bouton est un vrai choix : gris pâle, ils
+   passaient pour désactivés (« Ajouter seulement les pièces manquantes »,
+   « Annuler »). Le texte reprend sa couleur pleine. */
+.confirmation .action { color: var(--text); border-color: var(--line-2); }
+.confirmation:focus { outline: none; }
+.confirmation:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .action {
@@ -520,6 +527,20 @@
 }
 
 .rangeeDanger .rangeeTitre { color: var(--red); }
+
+/* L'état de l'archive : ambre tant que des pièces n'existent qu'ici, vert
+   quand toutes sont dans la dernière archive. Le texte dit l'état ; la
+   couleur ne fait que le souligner. */
+.rangeeAlerte { font-size: 12.5px; line-height: 1.5; color: var(--amber); font-weight: 560; }
+.rangeeOk { font-size: 12.5px; line-height: 1.5; color: var(--green); }
+
+.listeRefus {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 
 .actionDanger { border-color: var(--red-line); color: var(--red); }
 .actionDanger:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); }
