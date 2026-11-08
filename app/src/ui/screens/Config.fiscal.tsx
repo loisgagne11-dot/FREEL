@@ -50,6 +50,9 @@ function FoyerFiscal() {
 
   return (
     <div className={styles.carte}>
+    {/* Sans titre, ce bloc de quatre champs se lisait comme la suite de la
+        périodicité, alors qu'il ne sert qu'à l'impôt sur le revenu. */}
+    <h2 className={styles.titreCarte}>Foyer fiscal</h2>
     <div className={styles.formulaire}>
       <Champ
         id={`${idChamp}-parts`}

@@ -47,6 +47,16 @@ const ECRANS = [
   { hash: '#/achats', nom: 'achats' },
   { hash: '#/activite', nom: 'activite' },
   { hash: '#/config', nom: 'config' },
+  // Chaque section des Réglages arrive à la demande, APRÈS le titre de
+  // l'écran : sans attendre son contenu, on mesurait un panneau vide. Seul
+  // `#/config` (Profil) était visité, et l'adresse Légifrance des Paramètres
+  // fiscaux élargissait la page à 609 px sur téléphone sans que rien ne le voie.
+  { hash: '#/config/fiscal', nom: 'config-fiscal', attendre: 'text=Ajouter une période' },
+  { hash: '#/config/reserve', nom: 'config-reserve', attendre: 'text=Seuil de sécurité' },
+  { hash: '#/config/facturation', nom: 'config-facturation', attendre: 'text=Mentions portées' },
+  { hash: '#/config/livre', nom: 'config-livre', attendre: 'text=Ouvrir le livre des recettes' },
+  { hash: '#/config/compte', nom: 'config-compte', attendre: 'h2:has-text("Compte & synchronisation")' },
+  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Sauvegarde complète (JSON)' },
   // La liste des factures est un onglet d'Activité (formule A du rail) ; la
   // rédaction reste sous `#/facture/…`, et c'est l'un des écrans les plus denses.
   { hash: '#/activite/factures', nom: 'factures' },
@@ -163,6 +173,7 @@ for (const taille of TAILLES) {
     // précédent monté en `display: none`. Un `h1` tout court se satisfait de ce
     // titre fantôme, puis expire en l'attendant visible.
     await page.waitForSelector('h1:visible', { timeout: 10000 });
+    if (ecran.attendre) await page.waitForSelector(ecran.attendre, { state: 'visible', timeout: 10000 });
 
     const mesures = await page.evaluate(() => {
       // La navigation PRINCIPALE, désignée par son nom accessible.

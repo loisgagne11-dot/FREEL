@@ -120,6 +120,10 @@
   line-height: 1.6;
   color: var(--muted);
   margin-top: 10px;
+  /* La source d'un taux est souvent une adresse Légifrance d'un seul tenant :
+     sur téléphone, elle sortait de sa carte. Elle se coupe là où elle
+     dépasse, et seulement là. */
+  overflow-wrap: break-word;
 }
 
 /* ── Formulaires ───────────────────────────────────────────────────────── */
@@ -279,6 +283,11 @@
   overflow-x: auto;
   margin: 0 -16px;
   padding: 0 16px;
+  /* Sans lui, l'en-tête « Actions » réservé aux lecteurs d'écran — en
+     position absolue — prenait pour repère un ancêtre HORS du conteneur
+     défilant : il échappait au défilement et élargissait la page à 609 px
+     sur téléphone. */
+  position: relative;
 }
 
 .table {
