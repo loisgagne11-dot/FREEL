@@ -1041,3 +1041,11 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Facturation | « Mentions posées d'office » | Les mentions se lisent, dans la forme où elles s'impriment, et suivent le régime (la mention 293 B disparaît au passage à la TVA) |
 | Écarts assumés (second contrôle visuel) | — | « Mise à jour automatique des barèmes », « Alerte d'approche des seuils » (l'alerte existe, sans réglage), « Provisionner automatiquement », « Me rappeler le versement », « Synchronisation bancaire », « Export FEC » : aucun ne correspond à une fonction — non dessinés. « Effacer toutes les données » devient « Repartir de zéro » : rien n'efface le compte distant, et ce qui part est mis de côté. L'état « compte relié » de la section Compte n'est pas capturable sans projet Supabase |
 
+## Lot 10 (08/11) — les justificatifs se sauvegardent
+
+| Zone | Avant | Après |
+|---|---|---|
+| Réglages → Données & export | Sauvegarde « complète (JSON) » qui ne contenait aucune pièce | « Archive complète (ZIP) » en tête : nombre et poids des justificatifs, « Dernière archive le … » (vert) ou « Jamais archivés depuis ce navigateur » / « N déposés depuis » (ambre). La sauvegarde JSON devient « Sauvegarde des données (JSON) » et dit qu'elle n'emporte pas les pièces |
+| Restauration | JSON seulement | JSON ou ZIP par le même bouton ; pour une archive, la confirmation donne sa date, ce qu'elle contient, les pièces d'ici qui seraient détachées, et deux gestes : « Tout remplacer par cette archive » et « Ajouter seulement les pièces manquantes » ; les pièces refusées sont listées une par une |
+| Achats | — | Bandeau ambre « N justificatifs pas encore archivés : ils n'existent que dans ce navigateur » avec « Créer une archive », tant qu'il en reste ; chargé à part (l'écran est à 39,5 / 40 Ko) |
+
