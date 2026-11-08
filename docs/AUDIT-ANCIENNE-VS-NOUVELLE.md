@@ -363,3 +363,11 @@ chiffre faux.
 | ACRE, IR 2025, plafond du micro | 🟢 | Voir l'inventaire des indicateurs, lot 7 |
 | Brouillon de la facture du mois | 🟢 | Suit le mois de la barre du haut |
 
+## Lot 8 (07/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Créer une dépense depuis une opération du relevé | 🆕 | Formulaire pré-rempli (fournisseur tiré du libellé, montant, date), dépense reliée à l'opération. L'ancienne ne le faisait pas |
+| Relier une dépense à son opération, depuis Achats | 🟢 | Proposé quand une opération compatible existe ; « hors compte » sinon |
+| Dépenses récurrentes | 🟢 | Repérées sans saisie (même fournisseur, même montant, mois voisins) et totalisées sur la période ; jamais générées d'avance |
+

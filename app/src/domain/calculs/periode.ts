@@ -159,6 +159,26 @@ export function ancreDeLAnnee(annee: number, maintenant: Date = new Date()): Dat
 }
 
 /**
+ * La date depuis laquelle une période se compte, pour un MOIS choisi.
+ *
+ * Le mois de la barre du haut est LE mois de l'application : il ancre la
+ * période des écrans au lieu de se contenter de l'année. Avec l'ancre d'année,
+ * choisir « mars » dans la barre laissait Achats sur décembre.
+ *
+ * Même règle que `ancreDeLAnnee` : le mois courant garde `maintenant` (rien
+ * n'est avancé ni reculé), un autre mois prend son DERNIER jour à midi UTC.
+ * À minuit, un fuseau à l'ouest ferait basculer l'ancre sur le mois précédent.
+ */
+export function ancreDuMois(m: Mois, maintenant: Date = new Date()): Date {
+  const annee = Number(m.slice(0, 4));
+  const numero = Number(m.slice(5, 7));
+  if (maintenant.getFullYear() === annee && maintenant.getMonth() + 1 === numero) {
+    return maintenant;
+  }
+  return new Date(Date.UTC(annee, numero, 0, 12));
+}
+
+/**
  * Le mois décalé de `pas` (négatif pour reculer).
  *
  * Il était écrit trois fois — Activité, le facturier, les projections

@@ -31,7 +31,12 @@
  * bouge ferait bouger la moitié des chiffres d'une capture à l'autre, et on ne
  * saurait plus distinguer une régression d'un jour qui passe.
  *
- * Usage : node scripts/capturer-app.mjs [--theme=clair|sombre] [--ecran=argent] [--jeu=essai]
+ * Usage : node scripts/capturer-app.mjs [--theme=clair|sombre] [--ecran=argent] [--jeu=essai] [--largeur=390]
+ *
+ * `--largeur` photographie à une autre largeur (téléphone : 390). Le contrôle
+ * responsive charge les écrans VIDES : un tableau qui ne s'affiche qu'avec des
+ * données (le registre d'Achats) ne s'y voit jamais. Le fichier porte alors la
+ * largeur dans son nom, pour ne pas écraser la capture de référence.
  *
  * `--jeu=essai` charge `src/test/jeu-d-essai.json` (horloge au 15 décembre
  * 2026) et écrit dans `docs/design/captures-app/essai/`. Sans l'option, rien
@@ -181,7 +186,8 @@ const manquees = [];
 let capturees = 0;
 
 for (const theme of THEMES) {
-  const contexte = await navigateur.newContext({ viewport: { width: 1440, height: 960 } });
+  const LARGEUR = Number(argument('largeur') ?? 1440) || 1440;
+  const contexte = await navigateur.newContext({ viewport: { width: LARGEUR, height: 960 } });
   await contexte.addInitScript(
     ({ palette, faits, cle, maintenant }) => {
       window.localStorage.setItem('freel-v111-theme', palette);
@@ -269,7 +275,8 @@ for (const theme of THEMES) {
       await page.waitForTimeout(400);
     }
 
-    await page.screenshot({ path: join(SORTIE, `${theme}-${vue.nom}.png`), fullPage: true });
+    const suffixe = LARGEUR === 1440 ? '' : `-${LARGEUR}`;
+    await page.screenshot({ path: join(SORTIE, `${theme}-${vue.nom}${suffixe}.png`), fullPage: true });
     capturees += 1;
     if (erreurs.length > 0) {
       manquees.push(`${theme}-${vue.nom} capturé MAIS erreur JS : ${erreurs[0]}`);

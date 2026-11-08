@@ -100,7 +100,7 @@ function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], mois: Mois
     case 'activite': return <Activite mois={mois} onMois={setMois} />;
     case 'argent': return <Argent annee={annee} />;
     case 'facture': return <Facture />;
-    case 'achats': return <Achats annee={annee} />;
+    case 'achats': return <Achats mois={mois} />;
     case 'outils': return <Outils annee={annee} />;
     case 'config': return <Config />;
     default: {

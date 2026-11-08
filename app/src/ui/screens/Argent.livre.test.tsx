@@ -152,4 +152,14 @@ describe('l’adresse du livre', () => {
     expect(await screen.findByRole('heading', { name: /^Écritures/ })).toBeTruthy();
     await vi.waitFor(() => expect(window.location.hash).toBe('#/argent'));
   });
+
+  // Le registre des achats renvoie ici : sans ce geste, le lien « Suivi &
+  // déclaration TVA » atterrirait sur Argent sans rien ouvrir.
+  it('ouvre le dossier de TVA sur `#/argent/tva`, puis rend l’adresse de l’écran', async () => {
+    semer({ recettes: [recette()] });
+    window.location.hash = '#/argent/tva';
+    render(<Argent />);
+    expect(await screen.findByRole('dialog', { name: 'Déclaration de TVA' })).toBeTruthy();
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/argent'));
+  });
 });

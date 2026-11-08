@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { dateISO } from '../types';
-import { ancreDeLAnnee, dansLaPeriode, moisDeLaPeriode, periodeCourante } from './periode';
+import { dateISO, mois } from '../types';
+import { ancreDeLAnnee, ancreDuMois, dansLaPeriode, moisDeLaPeriode, periodeCourante } from './periode';
 
 const LE = (s: string) => new Date(`${s}T12:00:00Z`);
 
@@ -149,5 +149,37 @@ describe('l’ancre d’une année', () => {
     const ancre = ancreDeLAnnee(2025, MAINTENANT);
     expect(ancre.getUTCMonth()).toBe(11);
     expect(ancre.getUTCHours()).toBe(12);
+  });
+});
+
+describe('l’ancre d’un mois', () => {
+  const MAINTENANT = new Date('2026-06-10T09:00:00Z');
+
+  // Le mois courant garde aujourd'hui : l'ancrer à sa fin ferait compter le
+  // « mois précédent » depuis le 30, pas depuis le mois où l'on est.
+  it('garde aujourd’hui sur le mois en cours', () => {
+    expect(ancreDuMois(mois('2026-06'), MAINTENANT)).toBe(MAINTENANT);
+  });
+
+  // Avec l'ancre d'année, choisir « mars » dans la barre du haut laissait
+  // l'écran sur décembre : le mois choisi n'ancrait rien.
+  it('ancre un autre mois sur son propre mois, pas sur la fin de l’année', () => {
+    expect(periodeCourante('mois', ancreDuMois(mois('2026-03'), MAINTENANT)).libelle)
+      .toBe('Mars 2026');
+    expect(periodeCourante('trimestre', ancreDuMois(mois('2026-03'), MAINTENANT)).libelle)
+      .toBe('T1 2026');
+  });
+
+  it('prend le dernier jour du mois, bissextile comprise', () => {
+    const ancre = ancreDuMois(mois('2024-02'), MAINTENANT);
+    expect(ancre.getUTCDate()).toBe(29);
+    expect(ancre.getUTCHours()).toBe(12);
+  });
+
+  // Le même mois d'une autre année n'est PAS le mois courant.
+  it('ne confond pas le même mois d’une autre année avec le mois courant', () => {
+    expect(ancreDuMois(mois('2025-06'), MAINTENANT)).not.toBe(MAINTENANT);
+    expect(periodeCourante('mois', ancreDuMois(mois('2025-06'), MAINTENANT)).libelle)
+      .toBe('Juin 2025');
   });
 });

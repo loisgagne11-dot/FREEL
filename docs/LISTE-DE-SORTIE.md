@@ -133,6 +133,18 @@ Sert de filet aux lots 5 et 6.
 | Modules retenus du handoff encore absents : provisions en pilote automatique, brief du lundi | ⬜ |
 | Contrôle visuel du lot 7 | ✅ fait (agent contrôleur, deux thèmes) : aucune régression. Relevé au passage, antérieur au lot : trois libellés du handoff remplacés — « Réserve matelas » (chez nous « Seuil de sécurité »), « CA réalisé » (« CA facturé »), « Réserve auto gardée » (« Part gardée ») ; à trancher avant la fin, chacun avait une raison au lot qui l'a posé |
 
+### Lot 8 — Achats du handoff (priorité 2 : l'écran le plus éloigné de la maquette au contrôle visuel du lot 7)
+
+| Ligne | État |
+|---|---|
+| La période d'Achats suit le mois de la barre du haut, « Mois » par défaut comme le handoff (elle ouvrait sur « Tout ») | ✅ fait : `ancreDuMois` ; une dépense sans date ne se voit plus qu'en « Tout ». *Facturier et Outils s'ancrent encore sur l'année : à aligner* |
+| Titre « Achats & justificatifs », repère « N justificatif(s) manquant(s) » | ✅ fait |
+| Quatre tuiles du handoff : Dépenses de la période (TTC, nombre d'achats), TVA déductible (dont non récupérable faute de pièce), À rapprocher (opérations · dépenses), Justificatifs manquants ; l'autoliquidation reste en bandeau | ✅ fait : les « justificatifs manquants » comptent les PIÈCES absentes, pas la TVA perdue (nulle en franchise, alors que la pièce manque) |
+| Bloc « Rapprochement bancaire » sur l'onglet Dépenses : opérations du compte sans dépense, avec l'action proposée (associer à une facture, relier à une dépense, **créer la dépense depuis l'opération**), et dépenses en attente de leur opération | ✅ fait : associer (encaisse la facture à la date de l'opération), relier, créer la dépense pré-remplie et reliée, hors compte. Un crédit sans facture propose « sans contrepartie », jamais une dépense |
+| Registre des achats en tableau : date, fournisseur, TTC, dont TVA, justificatif, rapprochement ; ligne de total ; dépenses récurrentes DÉRIVÉES (même fournisseur, même montant, mois consécutifs), jamais saisies ; lien « Suivi & déclaration TVA » (`#/argent/tva`) | ✅ fait ; défile dans sa carte sur téléphone |
+| Filtre par compte (Tous / Qonto / BNP / Perso) | ⬜ hors lot : ni les dépenses ni les mouvements ne portent de compte — demande un schéma 20 |
+| Contrôle visuel du lot 8 | ✅ fait (agent contrôleur, deux thèmes et téléphone 390 px) : conforme avec réserves. Corrigé dans le lot : une seule navigation de mois (la barre de période gardait ses flèches), en-têtes chiffrés alignés, « clic = détail & pièce », icônes des justificatifs et du rapprochement, sous-ligne de franchise sous la TVA déductible. *Restent mineurs : rien n'indique sur téléphone que le registre défile ; les actions « associer / relier / créer » ne se voient sur aucune capture (la démonstration n'a pas d'opération orpheline) — elles sont tenues par des tests. Écran Achats à 39,1 / 40 Ko : extraire avant tout ajout* |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
@@ -185,10 +197,10 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Tuiles « à rapprocher » et « justificatifs manquants » | ◐ | Les tuiles sont TTC, TVA récupérable, TVA perdue, à autoliquider ; les pièces manquantes sont dans le sous-titre | à planifier |
-| Rapprochement : créer une dépense depuis une opération orpheline | ⬜ | Seuls « associer » et « sans contrepartie » existent | à planifier |
+| Tuiles « à rapprocher » et « justificatifs manquants » | ✅ | Lot 8 | 8 |
+| Rapprochement : créer une dépense depuis une opération orpheline | ✅ | Lot 8 : formulaire pré-rempli, dépense reliée à l'opération | 8 |
 | État « ignorée » au rapprochement | ◐ | Le motif `autre` s'en approche | à planifier |
-| Dépenses récurrentes signalées, totalisées, générées | ⬜ | Aucune notion de récurrence | à planifier |
+| Dépenses récurrentes signalées, totalisées, générées | ◐ | Lot 8 : signalées et totalisées, DÉRIVÉES (même fournisseur, même montant, mois voisins) ; pas générées — une dépense créée d'avance serait un fait inventé | 8 |
 | Filtre par compte | ⬜ | Seule la barre de période existe | à planifier |
 | Import OFX | ⬜ | Aucun | à planifier |
 | Correction ou suppression à la main d'un mouvement importé | ⬜ | Aucune action | à planifier |
