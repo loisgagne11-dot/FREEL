@@ -51,7 +51,7 @@ ne se réutilisent jamais.
 | S3 — deux onglets : écoute de `storage`, contrôle de révision avant écriture ; l'autre onglet l'emporte et la saisie écartée est signalée ; une version plus récente ouverte à côté arrête l'écriture | ✅ fait |
 | S4 — quota plein : « sans persistance » au premier échec, levé quand l'espace revient ; au démarrage, un stockage plein se lit au lieu de passer pour une navigation privée ; l'alerte est visible sur tous les écrans | ✅ fait |
 | S5 — justificatifs : stockage persistant demandé au premier dépôt ; « pièce conservée » seulement à la validation de la transaction | ✅ fait |
-| S5 (suite) — export des pièces (archive téléchargeable) : elles ne sont ni dans l'export JSON ni dans la synchronisation, et sont à conservation légale | ⬜ à planifier (lot 7) |
+| S5 (suite) — export des pièces (archive téléchargeable) : elles ne sont ni dans l'export JSON ni dans la synchronisation, et sont à conservation légale | ⬜ lot 10 |
 | S6 — copie de l'état local avant toute restauration, récupération de compte ou reprise de l'ancienne application ; « Revenir à l'état d'avant » dans Réglages → Données ; remplacement refusé si la copie ne peut pas s'écrire | ✅ fait |
 | Q3 — `verifierAbsenceDePerte` à l'import : réévalué. La conversion passe ce contrôle sur tous les cas atypiques sondés (doublons, montants en texte, factures nulles), et il compare des nombres et des totaux — il n'aurait pas vu les écarts réellement rencontrés (journées sans lieu, missions via agence). Non câblé : aucun test ne pourrait prouver qu'il sert | ✅ clos sans changement |
 
@@ -171,7 +171,7 @@ disparaissent sans qu'aucune sauvegarde les ait jamais contenus.
 | Pièces orphelines (rattachées à aucun fait courant) : incluses, marquées comme telles dans le manifeste | ⬜ |
 | Durée de conservation (`ANNEES_CONSERVATION`, 6 ans, LPF art. L102 B) lue à l'écran, là où l'on dépose et là où l'on sauvegarde | ⬜ |
 | Synchronisation des pièces avec le compte | ⬜ hors lot : demande un stockage de fichiers côté Supabase |
-| Nettoyage de cette liste : lignes faites restées ouvertes (grille ACRE, ACRE à 25 %, restauration sans copie de secours) | ⬜ |
+| Nettoyage de cette liste : lignes faites restées ouvertes (grille ACRE, ACRE à 25 %, restauration sans copie de secours) ; la durée de conservation est de 6 ans (LPF L102 B), pas 10 | ✅ fait |
 
 ## Reste fonctionnel par écran
 
@@ -195,9 +195,9 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Cycle d'échéance enrichi (à déclarer, déclarée, payée, daté) | ◐ | `Echeance` ne porte que `payeeLe` et `montantPaye` ; « déclarée » est un fait distinct, sans date | à planifier |
 | Frise des jalons réglementaires | ◐ | La frise trace les échéances saisies, pas les jalons | à planifier |
 | Détail de la projection d'autonomie | ◐ | Seul `autonomieMois` est affiché | à planifier |
-| Mention de conservation de 10 ans | ⬜ | `ANNEES_CONSERVATION` n'est lue par aucun fichier de `ui/` | à planifier |
-| Grille ACRE par période | ⬜ | `ABATTEMENT_ACRE` est une constante | 7 (L10) |
-| Abattement ACRE à 25 % au 01/07/2026 | ⬜ à vérifier | Annoncé « probable mais non confirmé » ; aucune trace dans le code | 7 (L10) |
+| Mention de la durée de conservation | ⬜ | `ANNEES_CONSERVATION` (6 ans, LPF L102 B — et non 10 : ce délai vise les commerçants) n'est lue par aucun fichier de `ui/` | 10 |
+| Grille ACRE par période | ✅ | `PERIODES_ABATTEMENT_ACRE`, par date de création | 7 (L10) |
+| Abattement ACRE à 25 % au 01/07/2026 | ✅ | Confirmé par le décret 2026-69 ; appliqué aux créations à partir de cette date, lu sous l'interrupteur (lot 9) | 7 (L10) |
 | Provision mensuelle de l'IR (`addIRMonthlyProvisions`) | ◐ | Plancher existant, non réparti mois par mois | 2 |
 | Provisions automatiques : enveloppes remplies à chaque encaissement, ordre de virement préparé | ⬜ | Aucun code | 7 |
 | Comparaison N−1 / tendance | ⬜ volontaire | Reportée (« utile la troisième année ») | à planifier |
@@ -232,7 +232,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Filtre par compte | ⬜ | Seule la barre de période existe | à planifier |
 | Import OFX | ⬜ | Aucun | à planifier |
 | Correction ou suppression à la main d'un mouvement importé | ⬜ | Aucune action | à planifier |
-| Justificatifs sauvegardés et protégés de l'éviction | ◐ | Voir S5 | 1 |
+| Justificatifs sauvegardés et protégés de l'éviction | ◐ | Protégés de l'éviction (S5) ; sauvegarde par archive au lot 10 | 10 |
 
 ### Outils
 
@@ -253,7 +253,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Mode hors ligne, retard de synchronisation affiché | ◐ | Aucun `navigator.onLine` ; la pastille ne dit que relié, expiré ou local | à planifier |
 | Synchronisation temps réel multi-appareils | ⬜ | Synchronisation manuelle seulement | à planifier |
 | Règles d'accès de `user_data` vérifiées et documentées | ⬜ | `supabase.sql` ne les touche pas | à planifier |
-| Restauration et récupération sans copie de secours | ⬜ | Voir S6 | 1 |
+| Restauration et récupération sans copie de secours | ✅ | Copie de l'état d'avant (S6), « Revenir à l'état d'avant » dans Données | 1 |
 
 ### Documents
 
