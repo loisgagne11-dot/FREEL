@@ -439,7 +439,18 @@ export function amendeMentions(
  * de gabarit pourrait en faire disparaître une.
  */
 export function mentionsAPorter(facture: Facture): readonly string[] {
-  const regime = regimeDeLaFacture(facture.emetteur, facture.destinataire);
+  return mentionsDuRegime(regimeDeLaFacture(facture.emetteur, facture.destinataire));
+}
+
+/**
+ * Les mentions d'un régime, sans facture.
+ *
+ * Les Réglages les montrent avant toute facture : « posées d'office » ne
+ * disait pas lesquelles, et l'on ne pouvait vérifier la mention de franchise
+ * qu'en émettant une facture. Même fonction que l'impression — un texte
+ * recopié dans l'écran finirait par différer de celui qui part chez le client.
+ */
+export function mentionsDuRegime(regime: RegimeFacture): readonly string[] {
   const mentions: string[] = [];
 
   if (regime === 'franchise') {

@@ -1,11 +1,18 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useFaits } from '../../state/store';
-import { tvaDueDepuisDe } from '../../state/selecteurs';
-import { euros, mois } from '../../domain/types';
-import { moisLong } from '../format';
+import {
+  moisCourant, periodesUrssafEffectives, tvaDueDepuisDe
+} from '../../state/selecteurs';
+import { euros, estUtilisable, mois, moisDe, type Resolution } from '../../domain/types';
+import {
+  MINIMUM_ABATTEMENT, moisSousAcre, plafondMicro, seuilsTvaPourAnnee,
+  tauxAbattement, tauxCfp, tauxCotisations, tauxVersementLiberatoire
+} from '../../domain/bareme';
+import { dateCourte, eur, moisLong, pct } from '../format';
 import { Champ } from '../components/Champ';
 import { Bareme } from './Config.bareme';
 import styles from './Config.module.css';
+import fiscal from './Config.fiscal.module.css';
 
 /**
  * Le foyer fiscal : parts, autres revenus, versement PER.
@@ -142,6 +149,7 @@ function FoyerFiscal() {
 export function Fiscal() {
   return (
     <>
+      <BaremesEnVigueur />
       <Declaration />
       <FoyerFiscal />
       <Bareme />
@@ -159,15 +167,43 @@ function Declaration() {
   return (
     <div className={styles.carte}>
       <div className={styles.formulaire}>
-        <Champ id={`${idChamp}-periodicite`} libelle="Périodicité de déclaration URSSAF">
-          <select id={`${idChamp}-periodicite`} value={entreprise.urssafPeriodicite}
-            onChange={(e) => modifier({
-              urssafPeriodicite: e.target.value === 'trimestriel' ? 'trimestriel' : 'mensuel'
-            })}>
-            <option value="mensuel">Mensuelle</option>
-            <option value="trimestriel">Trimestrielle</option>
-          </select>
-        </Champ>
+        <div className={fiscal.periodicite}>
+          <div>
+            <p id={`${idChamp}-periodicite`} className={fiscal.periodiciteTitre}>
+              Périodicité des cotisations
+            </p>
+            <p className={fiscal.aide}>
+              Rythme de déclaration URSSAF — elle règle l’échéancier et ce que le
+              Pilote te demande de déclarer.
+            </p>
+          </div>
+          <div role="radiogroup" aria-labelledby={`${idChamp}-periodicite`}
+            className={fiscal.interrupteur}>
+            {([['mensuel', 'Mensuelle'], ['trimestriel', 'Trimestrielle']] as const).map(([valeur, libelle]) => (
+              <button key={valeur} type="button" role="radio"
+                aria-checked={entreprise.urssafPeriodicite === valeur}
+                // Une seule position est dans l'ordre de tabulation, comme un
+                // groupe radio natif : les flèches choisissent l'autre.
+                tabIndex={entreprise.urssafPeriodicite === valeur ? 0 : -1}
+                className={fiscal.position}
+                onClick={() => modifier({ urssafPeriodicite: valeur })}
+                onKeyDown={(e) => {
+                  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                    e.preventDefault();
+                    modifier({
+                      urssafPeriodicite: valeur === 'mensuel' ? 'trimestriel' : 'mensuel'
+                    });
+                    const autre = e.currentTarget.parentElement?.querySelector<HTMLElement>(
+                      `button:not([aria-checked="true"])`
+                    );
+                    autre?.focus();
+                  }
+                }}>
+                {libelle}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Le franchissement des seuils se déduit des encaissements : ce champ
             ne sert plus qu'à l'OPTION — choisir la TVA avant d'y être tenu. Il
@@ -189,5 +225,104 @@ function Declaration() {
         </Champ>
       </div>
     </div>
+  );
+}
+
+/** Une valeur du barème, en lecture seule : un fait publié, pas un réglage. */
+function ValeurBareme(
+  { libelle, resolution, formater, aide }: {
+    libelle: string;
+    resolution: Resolution<number>;
+    formater: (v: number) => string;
+    aide: ReactNode;
+  }
+) {
+  return (
+    <div className={fiscal.valeur}>
+      <dt>{libelle}</dt>
+      {/* Un refus se dit : « — » et le motif, jamais un zéro qui passerait
+          pour un taux nul. */}
+      <dd className={fiscal.chiffre}>
+        {estUtilisable(resolution) ? formater(resolution.valeur) : '—'}
+      </dd>
+      <dd className={fiscal.aide}>
+        {resolution.statut === 'refuse' ? resolution.motif : aide}
+        {resolution.statut === 'hypothese' ? ' (hypothèse)' : ''}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * Les valeurs du barème en vigueur ce mois-ci.
+ *
+ * Aucun bouton « Mettre à jour » : les barèmes sont dans le code, et un bouton
+ * sans effet ferait croire qu'on les rafraîchit depuis une source en ligne.
+ * La carte relit les mêmes fonctions que les calculs — une seconde lecture
+ * du barème finirait par afficher un taux que l'application n'applique pas.
+ */
+function BaremesEnVigueur() {
+  const faits = useFaits((e) => e.faits);
+  const { typeActivite, debutActivite, acre, versementLiberatoire } = faits.entreprise;
+  const courant = moisCourant();
+  const periodes = periodesUrssafEffectives(faits);
+
+  const sousAcre = acre && debutActivite !== null
+    && moisSousAcre(moisDe(debutActivite), courant);
+  const tauxPlein = tauxCotisations(courant, typeActivite, false, periodes, debutActivite);
+  const tauxEffectif = sousAcre
+    ? tauxCotisations(courant, typeActivite, true, periodes, debutActivite)
+    : tauxPlein;
+
+  const abattement = tauxAbattement(courant, typeActivite);
+  const plafond = plafondMicro(courant, typeActivite, debutActivite);
+  const plafondPlein = plafondMicro(courant, typeActivite, null);
+  const proratise = estUtilisable(plafond) && estUtilisable(plafondPlein)
+    && plafond.valeur !== plafondPlein.valeur;
+  const seuils = seuilsTvaPourAnnee(Number(courant.slice(0, 4)), typeActivite, debutActivite);
+  const franchise: Resolution<number> = estUtilisable(seuils)
+    ? { ...seuils, valeur: seuils.valeur.franchise }
+    : seuils;
+
+  const verifieLe = estUtilisable(tauxPlein) ? tauxPlein.verifieLe : null;
+
+  return (
+    <section className={fiscal.baremes} aria-labelledby="baremes-vigueur">
+      <header className={fiscal.bandeau}>
+        <h3 id="baremes-vigueur" className={fiscal.bandeauTitre}>
+          Barèmes {courant.slice(0, 4)} en vigueur
+        </h3>
+        <p className={fiscal.aide}>
+          Abattement, cotisations, plafonds, seuil TVA — tirés des textes publiés,
+          sources dans la table des cotisations ci-dessous.
+          {verifieLe !== null && ` Vérifiés le ${dateCourte(verifieLe)}.`}
+        </p>
+      </header>
+      <dl className={fiscal.grille}>
+        <ValeurBareme libelle="Abattement forfaitaire" resolution={abattement}
+          formater={pct}
+          aide={`${estUtilisable(abattement) ? pct(abattement.valeur) : ''} du chiffre d’affaires, minimum ${eur(MINIMUM_ABATTEMENT)}. Le reste est ta base imposable.`} />
+        <ValeurBareme libelle="Taux de cotisations" resolution={tauxEffectif}
+          formater={pct}
+          aide={sousAcre && estUtilisable(tauxPlein) && estUtilisable(tauxEffectif)
+            ? `Taux plein ${pct(tauxPlein.valeur)} → ${pct(tauxEffectif.valeur)} avec l’ACRE`
+            : 'Taux plein, hors ACRE'} />
+        <ValeurBareme libelle="Versement libératoire"
+          resolution={tauxVersementLiberatoire(courant, typeActivite)} formater={pct}
+          aide={versementLiberatoire
+            ? 'Tu as opté : prélevé à chaque déclaration'
+            : 'Seulement si tu as opté (Profil & statut)'} />
+        <ValeurBareme libelle="Formation professionnelle (CFP)"
+          resolution={tauxCfp(courant, typeActivite)} formater={pct}
+          aide="Contribution due avec les cotisations." />
+        <ValeurBareme libelle="Plafond micro" resolution={plafond} formater={eur}
+          aide={proratise
+            ? 'Proratisé sur ta première année d’activité'
+            : 'Chiffre d’affaires annuel à ne pas dépasser.'} />
+        <ValeurBareme libelle="Seuil de franchise de TVA" resolution={franchise}
+          formater={eur}
+          aide="Au-delà, la TVA s’applique ; l’application te prévient en approchant." />
+      </dl>
+    </section>
   );
 }

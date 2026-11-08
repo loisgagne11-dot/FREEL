@@ -1,6 +1,8 @@
 import { useId } from 'react';
 import { useFaits } from '../../state/store';
 import { controlerIban } from '../../domain/calculs/identifiants';
+import { mentionsDuRegime } from '../../domain/calculs/facture';
+import { emetteurDe } from '../../state/selecteurs.facture';
 import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
 
@@ -16,7 +18,8 @@ import styles from './Config.module.css';
  * non trois semaines plus tard en relançant un virement qui n'est jamais parti.
  */
 export function Facturation() {
-  const entreprise = useFaits((e) => e.faits.entreprise);
+  const faits = useFaits((e) => e.faits);
+  const entreprise = faits.entreprise;
   const modifier = useFaits((e) => e.modifierEntreprise);
   const idChamp = useId();
 
@@ -41,14 +44,28 @@ export function Facturation() {
         </Champ>
       </div>
 
-      {/* Le handoff montre ici un préfixe, un délai, des pénalités et un logo.
-          Rien de cela n'existe dans les faits : afficher des champs qui
-          n'écrivent nulle part laisserait croire à un réglage. On dit donc ce
-          qui est, plutôt que de dessiner des champs morts. */}
+      {/* Le handoff montre ici la mention de franchise dans un champ. Elle
+          n'est pas un réglage — la loi la dicte, et le régime la choisit —
+          mais elle doit se LIRE : « posées d'office » ne disait pas lesquelles.
+          Un client assujetti dans un autre État de l'Union reçoit la mention
+          d'autoliquidation à la place ; elle se voit sur sa facture. */}
+      <div className={styles.mentions}>
+        <p className={styles.mentionsTitre}>
+          Mentions portées sur chaque facture à un client en France
+        </p>
+        <ul>
+          {mentionsDuRegime(emetteurDe(faits).enFranchise ? 'franchise' : 'tva_francaise')
+            .map((m) => <li key={m}>{m}</li>)}
+        </ul>
+      </div>
+
+      {/* Le handoff montre aussi un préfixe, un délai et un logo. Rien de cela
+          n'existe dans les faits : afficher des champs qui n'écrivent nulle
+          part laisserait croire à un réglage. */}
       <p className={styles.explication}>
-        La numérotation des factures est automatique (année-numéro) et les
-        mentions légales sont posées d’office&nbsp;: aucun réglage n’existe
-        encore pour les personnaliser.
+        La numérotation des factures est automatique (année-numéro) et ces
+        mentions suivent ton régime de TVA&nbsp;: aucun réglage n’existe encore
+        pour les personnaliser.
       </p>
     </div>
   );

@@ -376,4 +376,8 @@ chiffre faux.
 | Fonction | Verdict | Détail |
 |---|---|---|
 | Réglages | 🟢 | Sept sections, chacune à son adresse (un lien peut ouvrir directement « Réserve & versements ») ; aucun réglage ajouté ni retiré |
+| Barèmes appliqués | 🟢 | Lisibles dans Paramètres fiscaux (abattement, cotisations, VL, CFP, plafond, franchise), relus dans les fonctions des calculs |
+| Livre des recettes en CSV | 🟢 | Aussi dans Données & export, avec le choix de l'année |
+| Repartir de zéro | 🟢 nouveau | Vide l'application dans ce navigateur après confirmation ; l'état d'avant est mis de côté et se rétablit. Le compte distant n'est pas touché |
+| Mentions légales des factures | 🟢 | Lisibles dans Facturation, tirées de la fonction qui les imprime |
 

@@ -112,7 +112,7 @@ export function Config() {
     { id: 'facturation', titre: 'Facturation', sousTitre: 'RIB, mentions' },
     { id: 'livre', titre: 'Livre des recettes', sousTitre: 'Registre obligatoire' },
     { id: 'compte', titre: 'Compte & synchronisation', sousTitre: 'Multi-appareils · pièces' },
-    { id: 'donnees', titre: 'Données & export', sousTitre: 'Sauvegarde, restauration' }
+    { id: 'donnees', titre: 'Données & export', sousTitre: 'Livre CSV, sauvegarde, restauration' }
   ];
   const courante = entrees.find((x) => x.id === section) ?? entrees[0]!;
   const attente = <p role="status" className={styles.aide}>Chargement…</p>;

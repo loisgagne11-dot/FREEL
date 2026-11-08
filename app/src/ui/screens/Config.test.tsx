@@ -243,8 +243,67 @@ describe('données', () => {
 
   it('dit combien de faits sont conservés, et où', async () => {
     await ouvrirDonnees({ periodesDeclarees: [mois('2026-06')] });
-    expect(screen.getByText('Périodes déclarées').nextSibling?.textContent).toBe('1');
+    // Le normaliseur de Testing Library ramène l'espace insécable à une espace.
+    expect(screen.getByText(/1 période déclarée/)).toBeTruthy();
     expect(screen.getByText('freel.faits.v1')).toBeTruthy();
+  });
+
+  /**
+   * Le livre des recettes ne se trouvait que dans le menu « Exporter » de la
+   * barre du haut ; le handoff le range ici. En janvier, c'est l'année qui
+   * vient de finir qu'on cherche : elle se choisit.
+   */
+  it('télécharge le livre des recettes de l’année choisie', async () => {
+    const telechargements: string[] = [];
+    const creer = URL.createObjectURL;
+    URL.createObjectURL = (() => 'blob:essai') as typeof URL.createObjectURL;
+    const cliquer = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      telechargements.push(this.download);
+    };
+    try {
+      await ouvrirDonnees({
+        recettes: [{
+          id: 'r1', clientNom: 'Client démo', libelle: 'Prestation', montant: euros(1000),
+          emiseLe: dateISO('2025-11-02'), encaisseeLe: dateISO('2025-12-12'),
+          modeReglement: 'virement', numero: '2025-001', echeanceLe: dateISO('2025-12-02')
+        }]
+      });
+      const utilisateur = utilisateurTest();
+      await utilisateur.selectOptions(screen.getByLabelText('Année du livre des recettes'), '2025');
+      await utilisateur.click(screen.getByRole('button', { name: /Télécharger le livre des recettes 2025/ }));
+      expect(telechargements).toEqual(['livre-des-recettes-2025.csv']);
+    } finally {
+      URL.createObjectURL = creer;
+      HTMLAnchorElement.prototype.click = cliquer;
+    }
+  });
+
+  /**
+   * Repartir de zéro écrase autant qu'une restauration : même confirmation,
+   * et ce qui part est mis de côté.
+   */
+  it('ne vide l’application qu’après confirmation, et garde de quoi revenir', async () => {
+    const deja = {
+      ...faitsVides(),
+      clients: [{
+        id: 'existant', nom: 'Déjà là', adresse: '', siret: '', email: '',
+        delaiPaiement: 'net_30', pays: '', tvaIntracom: ''
+      }]
+    };
+    useFaits.getState().initialiser(stockageMemoire({ [CLE_STOCKAGE]: JSON.stringify(deja) }));
+    await afficher('donnees', <FournisseurToasts><Config /></FournisseurToasts>);
+    const utilisateur = utilisateurTest();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Vider l’application' }));
+    expect(useFaits.getState().faits.clients).toHaveLength(1);
+
+    const confirmer = within(screen.getByRole('alert')).getByRole('button', { name: 'Vider l’application' });
+    await utilisateur.click(confirmer);
+    await waitFor(() => expect(useFaits.getState().faits.clients).toHaveLength(0));
+
+    await utilisateur.click(await screen.findByRole('button', { name: 'Revenir à l’état d’avant' }));
+    await waitFor(() => expect(useFaits.getState().faits.clients[0]?.nom).toBe('Déjà là'));
   });
 
   // Laisser croire à une sauvegarde complète serait pire que de ne rien dire.
@@ -917,7 +976,7 @@ describe('navigation entre les sections', () => {
     await afficher('profil');
     expect(within(nav()).getAllByRole('button')).toHaveLength(7);
     expect(within(nav()).getByText('Abattement, cotisations, TVA')).toBeTruthy();
-    expect(within(nav()).getByText('Sauvegarde, restauration')).toBeTruthy();
+    expect(within(nav()).getByText('Livre CSV, sauvegarde, restauration')).toBeTruthy();
   });
 
   it('construit le sous-titre du profil depuis les faits', async () => {
@@ -946,7 +1005,7 @@ describe('navigation entre les sections', () => {
 
   it('Paramètres fiscaux : périodicité, option TVA, foyer et barème', async () => {
     await afficher('fiscal');
-    expect(screen.getByLabelText('Périodicité de déclaration URSSAF')).toBeTruthy();
+    expect(screen.getByRole('radiogroup', { name: 'Périodicité des cotisations' })).toBeTruthy();
     expect(screen.getByLabelText(/Option pour la TVA depuis/)).toBeTruthy();
     expect(screen.getByLabelText(/Parts fiscales/)).toBeTruthy();
     expect(screen.getByRole('table')).toBeTruthy();
@@ -969,6 +1028,24 @@ describe('navigation entre les sections', () => {
     expect(screen.getByText(/numérotation des factures est automatique/)).toBeTruthy();
   });
 
+  /**
+   * « Posées d'office » ne disait pas lesquelles. La mention se lit avant
+   * toute facture, et elle suit le régime : au franchissement des seuils, la
+   * mention de franchise disparaît d'elle-même.
+   */
+  it('Facturation : montre la mention de franchise tant qu’on y est, et plus après', async () => {
+    await afficher('facturation');
+    expect(screen.getByText('TVA non applicable, article 293 B du CGI.')).toBeTruthy();
+    cleanup();
+
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, tvaDepuis: mois('2020-01') } }
+    });
+    await afficher('facturation');
+    expect(screen.queryByText(/293 B/)).toBeNull();
+    expect(screen.getByText(/pénalités sont dues/)).toBeTruthy();
+  });
+
   it('Livre des recettes : renvoie vers le registre dans Argent', async () => {
     await afficher('livre');
     const lien = screen.getByRole('link', { name: 'Ouvrir le livre des recettes' });
@@ -977,7 +1054,8 @@ describe('navigation entre les sections', () => {
 
   it('Données : l’export et la restauration', async () => {
     await afficher('donnees');
-    expect(screen.getByRole('button', { name: 'Exporter mes données' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Sauvegarder toutes mes données/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Télécharger le livre des recettes/ })).toBeTruthy();
     expect(screen.getByLabelText('Restaurer une sauvegarde')).toBeTruthy();
   });
 
