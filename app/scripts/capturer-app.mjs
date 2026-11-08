@@ -141,7 +141,15 @@ const VUES = [
      capture d'écran, et c'est justement là que les défauts se logent. */
   { hash: '#/outils', nom: 'outils-cra', ouvrir: ['CRA'] },
   { hash: '#/outils/cra', nom: 'pilote-cra', attendre: '[role="dialog"]' },
-  { hash: '#/config', nom: 'config-profil' }
+  { hash: '#/config', nom: 'config-profil' },
+  /* Les autres sections des Réglages (lot 9), chacune appariée à sa capture
+     du handoff. Chacune arrive à la demande : sans `attendre`, la photo
+     montrait « Chargement… » et le contrôle visuel ne pouvait rien juger. */
+  { hash: '#/config/fiscal', nom: 'config-fiscal', attendre: 'text=Périodicité des cotisations' },
+  { hash: '#/config/reserve', nom: 'config-reserve', attendre: 'text=Seuil de sécurité' },
+  { hash: '#/config/facturation', nom: 'config-facturation', attendre: 'label:has-text("IBAN")' },
+  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Sauvegarde complète (JSON)' },
+  { hash: '#/config/compte', nom: 'config-cloud', attendre: 'text=Relier un compte' }
 ];
 
 const themeDemande = argument('theme');

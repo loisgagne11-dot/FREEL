@@ -179,6 +179,19 @@ export function ancreDuMois(m: Mois, maintenant: Date = new Date()): Date {
 }
 
 /**
+ * Le dernier jour d'un mois, au format ISO.
+ *
+ * L'écran Profil écrivait la fin d'ACRE « 31/{mois} » : juste en décembre et
+ * en mars, faux en juin et en septembre — « 31/09/2026 », une date qui
+ * n'existe pas, sur la ligne même qu'on recoupe avec l'attestation URSSAF.
+ */
+export function finDuMois(m: Mois): DateISO {
+  const annee = Number(m.slice(0, 4));
+  const numero = Number(m.slice(5, 7));
+  return jour(annee, numero, dernierJour(annee, numero));
+}
+
+/**
  * Le mois décalé de `pas` (négatif pour reculer).
  *
  * Il était écrit trois fois — Activité, le facturier, les projections

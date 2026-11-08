@@ -380,13 +380,13 @@ export function mentionsManquantes(facture: Facture): readonly Manque[] {
     'Date d’émission absente ou invalide.');
 
   exiger(emetteur.nom.trim() !== '', 'identite_emetteur',
-    'Ton nom ou ta dénomination est absent. À renseigner dans Config → Profil.');
+    'Ton nom ou ta dénomination est absent. À renseigner dans Config → Profil & statut.');
   exiger(emetteur.siret.trim() !== '', 'siret_emetteur',
-    'Ton SIRET est absent. À renseigner dans Config → Profil.');
+    'Ton SIRET est absent. À renseigner dans Config → Profil & statut.');
   exiger(
     emetteur.adresse.trim() !== '' || emetteur.ville.trim() !== '',
     'adresse_emetteur',
-    'Ton adresse est absente. À renseigner dans Config → Profil.'
+    'Ton adresse est absente. À renseigner dans Config → Profil & statut.'
   );
 
   exiger(destinataire.nom.trim() !== '', 'identite_destinataire',
@@ -439,7 +439,18 @@ export function amendeMentions(
  * de gabarit pourrait en faire disparaître une.
  */
 export function mentionsAPorter(facture: Facture): readonly string[] {
-  const regime = regimeDeLaFacture(facture.emetteur, facture.destinataire);
+  return mentionsDuRegime(regimeDeLaFacture(facture.emetteur, facture.destinataire));
+}
+
+/**
+ * Les mentions d'un régime, sans facture.
+ *
+ * Les Réglages les montrent avant toute facture : « posées d'office » ne
+ * disait pas lesquelles, et l'on ne pouvait vérifier la mention de franchise
+ * qu'en émettant une facture. Même fonction que l'impression — un texte
+ * recopié dans l'écran finirait par différer de celui qui part chez le client.
+ */
+export function mentionsDuRegime(regime: RegimeFacture): readonly string[] {
   const mentions: string[] = [];
 
   if (regime === 'franchise') {

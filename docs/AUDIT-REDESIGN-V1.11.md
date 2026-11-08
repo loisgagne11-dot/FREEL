@@ -1028,3 +1028,16 @@ téléphone) : conforme avec réserves, les réserves gênantes corrigées dans 
 lot (navigation de mois en double, en-têtes chiffrés, indication de clic,
 icônes, sous-ligne de franchise). Captures regénérées et relues.
 
+## Lot 9 (08/11) — les Réglages du handoff
+
+| Zone | Avant | Après |
+|---|---|---|
+| Organisation | Quatre onglets ; « Profil » mêlait l'entreprise, la trésorerie et le foyer fiscal | « Configuration » en deux colonnes : sept sections à gauche (icône, titre, sous-titre, chevron), le panneau à droite ; la section dans l'adresse |
+| ACRE, versement libératoire | Cases à cocher | Interrupteurs, comme le handoff (`role="switch"`) |
+| Facturation | IBAN et BIC perdus dans le profil | Section à part ; elle dit que la numérotation est automatique plutôt que de dessiner des champs qui n'enregistrent rien |
+| Champs du handoff absents | — | Code APE, régime en liste, préfixe et prochain numéro, délai, pénalités, logo : aucun n'existe dans les données — non dessinés, assumé |
+| Paramètres fiscaux | Liste déroulante de périodicité, puis la table des cotisations | Carte « Barèmes {année} en vigueur » (six valeurs en lecture seule, sans le bouton « Mettre à jour » : les barèmes sont dans le code) ; périodicité en bouton à deux positions Mensuelle / Trimestrielle ; la source d'un taux (adresse Légifrance) s'enroule au lieu de passer sur « vérifié le » |
+| Données & export | Tableau de comptes, bouton isolé, champ fichier natif (« Choose File ») | Une ligne par geste, titre et explication à gauche, bouton à droite : livre des recettes (CSV), sauvegarde complète (JSON), restauration, démonstration, « Repartir de zéro » en rouge |
+| Facturation | « Mentions posées d'office » | Les mentions se lisent, dans la forme où elles s'impriment, et suivent le régime (la mention 293 B disparaît au passage à la TVA) |
+| Écarts assumés (second contrôle visuel) | — | « Mise à jour automatique des barèmes », « Alerte d'approche des seuils » (l'alerte existe, sans réglage), « Provisionner automatiquement », « Me rappeler le versement », « Synchronisation bancaire », « Export FEC » : aucun ne correspond à une fonction — non dessinés. « Effacer toutes les données » devient « Repartir de zéro » : rien n'efface le compte distant, et ce qui part est mis de côté. L'état « compte relié » de la section Compte n'est pas capturable sans projet Supabase |
+

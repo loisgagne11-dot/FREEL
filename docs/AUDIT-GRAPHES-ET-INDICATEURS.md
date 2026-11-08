@@ -636,3 +636,14 @@ solde − provisions − réserve.
 | Justificatifs manquants | Achats | Dans le sous-titre | Tuile ; compte les pièces absentes, même sans TVA en jeu (franchise) |
 | Dépenses récurrentes | Achats → registre | — | Total des dépenses récurrentes de la période (dérivé) |
 
+## Lot 9 (08/11) — Réglages
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Fin de l'exonération ACRE | Réglages → Profil (sous l'interrupteur, et la fenêtre d'ACRE) | « 31/{mois} » écrit en dur : « 31/09/2026 », « 31/06/2027 » — des dates qui n'existent pas | Le vrai dernier jour du trimestre (`finDuMois`) : 30/09, 30/06 |
+| Taux d'exonération ACRE | Réglages → Profil | Dans une bulle | Sous l'interrupteur : 50 % ou 25 % selon la date de création |
+| Taux du versement libératoire | Réglages → Profil | Dans une bulle | Sous l'interrupteur, lu dans le barème du mois |
+| Abattement, taux de cotisations (plein → avec ACRE), versement libératoire, CFP, plafond du micro (proratisé l'année de création), seuil de franchise de TVA | Réglages → Paramètres fiscaux, « Barèmes {année} en vigueur » | Absents : seule la table des cotisations par période se lisait | Six valeurs en lecture seule, relues dans les fonctions mêmes des calculs ; un refus s'écrit « — » avec son motif, jamais 0 % ; « vérifiés le » tiré du barème |
+| Contenu d'une sauvegarde | Réglages → Données | Tableau de comptes (recettes, dépenses, missions, clients, périodes) | Les mêmes comptes, dans la ligne « Sauvegarde complète (JSON) » |
+| Livre des recettes | Réglages → Données | Seulement dans le menu « Exporter » | Ligne « Livre des recettes (CSV) », année au choix dès qu'il y en a deux |
+

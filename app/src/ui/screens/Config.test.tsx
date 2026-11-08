@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -18,13 +19,29 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2027-01-20T09:00:00Z'));
   useFaits.setState({ faits: faitsVides(), chargement: { phase: 'initial' } });
+  // La section ouverte vit dans l'adresse : une adresse laissée par un test
+  // ouvrirait la section d'un autre à la place de Profil.
+  window.location.hash = '';
 });
 
 const utilisateurTest = () => userEvent.setup();
 
+/**
+ * Ouvre une section par l'adresse, comme le fait un lien ou un rechargement.
+ *
+ * Les sections sont chargées à la demande : sans l'attente de la fin du
+ * chargement, on interrogerait l'écran « Chargement… » et non la section.
+ */
+async function afficher(
+  section: string, ecran: React.ReactElement = <Config />
+) {
+  window.location.hash = `#/config/${section}`;
+  render(ecran);
+  await waitFor(() => expect(screen.queryByText('Chargement…')).toBeNull());
+}
+
 async function ouvrirBareme() {
-  render(<Config />);
-  await utilisateurTest().click(screen.getByRole('tab', { name: 'Barème' }));
+  await afficher('fiscal');
   // La section est chargée à la demande : sans cette attente, on interrogerait
   // l'écran de chargement et non le barème.
   await screen.findByRole('table');
@@ -46,14 +63,14 @@ describe('profil', () => {
   // L'ancienne version avait un formulaire à valider, et la moitié des champs
   // n'étaient jamais persistés faute de clic sur « Enregistrer ».
   it('écrit dans les faits sans bouton d’enregistrement', async () => {
-    render(<Config />);
+    await afficher('profil');
     const utilisateur = utilisateurTest();
     await utilisateur.type(screen.getByLabelText('Nom'), 'Exemple');
     expect(useFaits.getState().faits.entreprise.nom).toBe('Exemple');
   });
 
   it('change le type d’activité, qui détermine taux, abattement et plafond', async () => {
-    render(<Config />);
+    await afficher('profil');
     const utilisateur = utilisateurTest();
     await utilisateur.selectOptions(
       screen.getByLabelText('Type d’activité'), 'BIC_service'
@@ -64,16 +81,16 @@ describe('profil', () => {
   // Discriminant exclusif : l'ancienne version cumulait versement libératoire
   // et barème progressif, et surestimait l'impôt à provisionner.
   it('bascule le versement libératoire', async () => {
-    render(<Config />);
+    await afficher('profil');
     const utilisateur = utilisateurTest();
     await utilisateur.click(
-      screen.getByRole('checkbox', { name: /Versement libératoire/ })
+      screen.getByRole('switch', { name: /Versement libératoire/ })
     );
     expect(useFaits.getState().faits.entreprise.versementLiberatoire).toBe(true);
   });
 
   it('laisse l’option pour la TVA vide en franchise en base', async () => {
-    render(<Config />);
+    await afficher('fiscal');
     expect(screen.getByLabelText(/Option pour la TVA depuis/)).toHaveProperty('value', '');
     expect(useFaits.getState().faits.entreprise.tvaDepuis).toBeNull();
   });
@@ -92,7 +109,7 @@ describe('profil', () => {
         }))
       }
     });
-    render(<Config />);
+    await afficher('fiscal');
     expect(screen.getByText(/la TVA est due depuis septembre 2026/)).toBeTruthy();
   });
 });
@@ -221,14 +238,72 @@ describe('ajout d’une période', () => {
 describe('données', () => {
   async function ouvrirDonnees(faits: Partial<Faits> = {}) {
     useFaits.setState({ faits: { ...faitsVides(), ...faits } });
-    render(<Config />);
-    await utilisateurTest().click(screen.getByRole('tab', { name: 'Données' }));
+    await afficher('donnees');
   }
 
   it('dit combien de faits sont conservés, et où', async () => {
     await ouvrirDonnees({ periodesDeclarees: [mois('2026-06')] });
-    expect(screen.getByText('Périodes déclarées').nextSibling?.textContent).toBe('1');
+    // Le normaliseur de Testing Library ramène l'espace insécable à une espace.
+    expect(screen.getByText(/1 période déclarée/)).toBeTruthy();
     expect(screen.getByText('freel.faits.v1')).toBeTruthy();
+  });
+
+  /**
+   * Le livre des recettes ne se trouvait que dans le menu « Exporter » de la
+   * barre du haut ; le handoff le range ici. En janvier, c'est l'année qui
+   * vient de finir qu'on cherche : elle se choisit.
+   */
+  it('télécharge le livre des recettes de l’année choisie', async () => {
+    const telechargements: string[] = [];
+    const creer = URL.createObjectURL;
+    URL.createObjectURL = (() => 'blob:essai') as typeof URL.createObjectURL;
+    const cliquer = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      telechargements.push(this.download);
+    };
+    try {
+      await ouvrirDonnees({
+        recettes: [{
+          id: 'r1', clientNom: 'Client démo', libelle: 'Prestation', montant: euros(1000),
+          emiseLe: dateISO('2025-11-02'), encaisseeLe: dateISO('2025-12-12'),
+          modeReglement: 'virement', numero: '2025-001', echeanceLe: dateISO('2025-12-02')
+        }]
+      });
+      const utilisateur = utilisateurTest();
+      await utilisateur.selectOptions(screen.getByLabelText('Année du livre des recettes'), '2025');
+      await utilisateur.click(screen.getByRole('button', { name: /Télécharger le livre des recettes 2025/ }));
+      expect(telechargements).toEqual(['livre-des-recettes-2025.csv']);
+    } finally {
+      URL.createObjectURL = creer;
+      HTMLAnchorElement.prototype.click = cliquer;
+    }
+  });
+
+  /**
+   * Repartir de zéro écrase autant qu'une restauration : même confirmation,
+   * et ce qui part est mis de côté.
+   */
+  it('ne vide l’application qu’après confirmation, et garde de quoi revenir', async () => {
+    const deja = {
+      ...faitsVides(),
+      clients: [{
+        id: 'existant', nom: 'Déjà là', adresse: '', siret: '', email: '',
+        delaiPaiement: 'net_30', pays: '', tvaIntracom: ''
+      }]
+    };
+    useFaits.getState().initialiser(stockageMemoire({ [CLE_STOCKAGE]: JSON.stringify(deja) }));
+    await afficher('donnees', <FournisseurToasts><Config /></FournisseurToasts>);
+    const utilisateur = utilisateurTest();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Vider l’application' }));
+    expect(useFaits.getState().faits.clients).toHaveLength(1);
+
+    const confirmer = within(screen.getByRole('alert')).getByRole('button', { name: 'Vider l’application' });
+    await utilisateur.click(confirmer);
+    await waitFor(() => expect(useFaits.getState().faits.clients).toHaveLength(0));
+
+    await utilisateur.click(await screen.findByRole('button', { name: 'Revenir à l’état d’avant' }));
+    await waitFor(() => expect(useFaits.getState().faits.clients[0]?.nom).toBe('Déjà là'));
   });
 
   // Laisser croire à une sauvegarde complète serait pire que de ne rien dire.
@@ -242,8 +317,7 @@ describe('données', () => {
       faits: faitsVides(),
       chargement: { phase: 'sans-persistance', motif: 'Stockage bloqué.' }
     });
-    render(<Config />);
-    await utilisateurTest().click(screen.getByRole('tab', { name: 'Données' }));
+    await afficher('donnees');
     expect(screen.getByRole('alert').textContent).toBe('Stockage bloqué.');
   });
 });
@@ -267,7 +341,7 @@ describe('propositions retirées', () => {
  */
 describe('trésorerie', () => {
   it('écrit le solde du compte dans les faits', async () => {
-    render(<Config />);
+    await afficher('reserve');
     const utilisateur = utilisateurTest();
 
     const champ = screen.getByRole('spinbutton', { name: /Solde de ton compte/ });
@@ -278,7 +352,7 @@ describe('trésorerie', () => {
   });
 
   it('écrit le besoin mensuel, sans lequel l’autonomie reste à zéro', async () => {
-    render(<Config />);
+    await afficher('reserve');
     const utilisateur = utilisateurTest();
 
     const champ = screen.getByRole('spinbutton', { name: /Besoin mensuel/ });
@@ -302,12 +376,12 @@ describe('trésorerie', () => {
    * deux fois. Le nouveau libellé ne mentionne plus « aujourd’hui » : c'est
    * la date, saisie à part, qui porte cette information.
    */
-  it('dit que le montant vaut solde tant qu’aucun relevé n’est importé', () => {
-    render(<Config />);
+  it('dit que le montant vaut solde tant qu’aucun relevé n’est importé', async () => {
+    await afficher('reserve');
     expect(screen.getByRole('spinbutton', { name: 'Solde de ton compte' })).toBeTruthy();
   });
 
-  it('change de libellé dès qu’un relevé est importé', () => {
+  it('change de libellé dès qu’un relevé est importé', async () => {
     const faits: Faits = {
       ...faitsVides(),
       mouvementsBancaires: [{
@@ -316,7 +390,7 @@ describe('trésorerie', () => {
       }]
     };
     useFaits.setState({ faits });
-    render(<Config />);
+    await afficher('reserve');
 
     expect(screen.getByRole('spinbutton', { name: /avant le premier mouvement/ })).toBeTruthy();
   });
@@ -330,7 +404,7 @@ describe('trésorerie', () => {
    */
   describe('date du solde de départ', () => {
     it('écrit la date dans les faits', async () => {
-      render(<Config />);
+      await afficher('reserve');
       const utilisateur = utilisateurTest();
 
       const champDate = screen.getByLabelText('Ce solde était vrai le');
@@ -339,20 +413,20 @@ describe('trésorerie', () => {
       expect(useFaits.getState().faits.soldeInitialAu).toBe('2026-08-01');
     });
 
-    it('dit que l’application s’abstient de dériver tant qu’aucune date n’est posée', () => {
-      render(<Config />);
+    it('dit que l’application s’abstient de dériver tant qu’aucune date n’est posée', async () => {
+      await afficher('reserve');
       expect(screen.getByText(/elle s’abstient donc de l’ajouter/)).toBeTruthy();
     });
 
-    it('dit ce que dater le solde change, une fois la date posée', () => {
+    it('dit ce que dater le solde change, une fois la date posée', async () => {
       useFaits.setState({ faits: { ...faitsVides(), soldeInitialAu: dateISO('2026-08-01') } });
-      render(<Config />);
+      await afficher('reserve');
       expect(screen.getByText(/s’ajoute désormais au solde affiché/)).toBeTruthy();
     });
 
     it('efface la date quand le champ est vidé', async () => {
       useFaits.setState({ faits: { ...faitsVides(), soldeInitialAu: dateISO('2026-08-01') } });
-      render(<Config />);
+      await afficher('reserve');
       const utilisateur = utilisateurTest();
 
       await utilisateur.clear(screen.getByLabelText('Ce solde était vrai le'));
@@ -369,15 +443,15 @@ describe('trésorerie', () => {
    * fixé ». C'est cet état-là qui fait que le graphe ne trace aucune ligne
    * d'objectif — et un zéro stocké l'aurait fait tracer, à zéro.
    */
-  it('part sans objectif de chiffre d’affaires', () => {
-    render(<Config />);
+  it('part sans objectif de chiffre d’affaires', async () => {
+    await afficher('reserve');
     const champ = screen.getByRole('spinbutton', { name: /Objectif de chiffre d’affaires/ });
     expect((champ as HTMLInputElement).value).toBe('');
     expect(useFaits.getState().faits.objectifCaAnnuel).toBeNull();
   });
 
   it('écrit l’objectif de chiffre d’affaires dans les faits', async () => {
-    render(<Config />);
+    await afficher('reserve');
     const utilisateur = utilisateurTest();
 
     const champ = screen.getByRole('spinbutton', { name: /Objectif de chiffre d’affaires/ });
@@ -388,7 +462,7 @@ describe('trésorerie', () => {
 
   it('efface l’objectif quand on vide le champ, au lieu de le mettre à zéro', async () => {
     useFaits.setState({ faits: { ...faitsVides(), objectifCaAnnuel: euros(60_000) } });
-    render(<Config />);
+    await afficher('reserve');
     const utilisateur = utilisateurTest();
 
     await utilisateur.clear(screen.getByRole('spinbutton', { name: /Objectif de chiffre d’affaires/ }));
@@ -408,10 +482,8 @@ describe('restauration d’une sauvegarde', () => {
     new File([JSON.stringify(contenu)], nom, { type: 'application/json' });
 
   async function ouvrirDonnees() {
-    render(<FournisseurToasts><Config /></FournisseurToasts>);
-    const utilisateur = utilisateurTest();
-    await utilisateur.click(screen.getByRole('tab', { name: 'Données' }));
-    return utilisateur;
+    await afficher('donnees', <FournisseurToasts><Config /></FournisseurToasts>);
+    return utilisateurTest();
   }
 
   const bloc = {
@@ -547,7 +619,7 @@ describe('restauration d’une sauvegarde', () => {
  */
 describe('identité de l’entreprise', () => {
   it('permet de saisir l’adresse, sans laquelle aucune facture ne peut sortir', async () => {
-    render(<Config />);
+    await afficher('profil');
     const utilisateur = utilisateurTest();
 
     await utilisateur.type(screen.getByLabelText('Adresse'), '1 rue Exemple');
@@ -561,7 +633,7 @@ describe('identité de l’entreprise', () => {
   });
 
   it('permet de saisir l’IBAN, sans lequel la facture est impayable', async () => {
-    render(<Config />);
+    await afficher('facturation');
     await utilisateurTest().type(
       screen.getByLabelText('IBAN'), 'FR0000000000000000000000000'
     );
@@ -578,19 +650,19 @@ describe('identité de l’entreprise', () => {
  */
 describe('contrôle des identifiants', () => {
   it('signale un SIRET dont la clé ne tombe pas juste', async () => {
-    render(<Config />);
+    await afficher('profil');
     await utilisateurTest().type(screen.getByLabelText('SIRET'), '12000101100001');
     expect(await screen.findByText(/clé de contrôle/)).toBeTruthy();
   });
 
   it('ne dit rien d’un SIRET valide', async () => {
-    render(<Config />);
+    await afficher('profil');
     await utilisateurTest().type(screen.getByLabelText('SIRET'), '12000101100010');
     expect(screen.queryByText(/clé de contrôle/)).toBeNull();
   });
 
   it('signale un IBAN dont la clé ne tombe pas juste', async () => {
-    render(<Config />);
+    await afficher('facturation');
     await utilisateurTest().type(
       screen.getByLabelText('IBAN'), 'FR1111111111111111111111111'
     );
@@ -603,7 +675,7 @@ describe('contrôle des identifiants', () => {
    * n'est pas une preuve serait pire que le laisser passer.
    */
   it('n’empêche jamais la saisie', async () => {
-    render(<Config />);
+    await afficher('profil');
     const champ = screen.getByLabelText('SIRET') as HTMLInputElement;
     await utilisateurTest().type(champ, '12000101100001');
     expect(champ.value).toBe('12000101100001');
@@ -612,8 +684,8 @@ describe('contrôle des identifiants', () => {
 
   // Un formulaire vierge n'est pas un formulaire fautif : un avertissement
   // permanent cesse d'être lu.
-  it('ne reproche rien sur un champ vide', () => {
-    render(<Config />);
+  it('ne reproche rien sur un champ vide', async () => {
+    await afficher('profil');
     expect(screen.queryByText(/clé de contrôle/)).toBeNull();
     expect(screen.queryByText(/que des chiffres/)).toBeNull();
   });
@@ -636,9 +708,8 @@ describe('jeu de démonstration', () => {
       { status: 200 }
     )) as typeof fetch;
 
-    render(<Config />);
+    await afficher('donnees');
     const utilisateur = utilisateurTest();
-    await utilisateur.click(screen.getByRole('tab', { name: /Données/ }));
     await utilisateur.click(screen.getByRole('button', { name: 'Charger un jeu de démonstration' }));
 
     // La confirmation annonce le contenu, et rien n'est encore écrit.
@@ -649,9 +720,8 @@ describe('jeu de démonstration', () => {
   it('dit que le jeu n’a pas pu être chargé plutôt que d’échouer en silence', async () => {
     globalThis.fetch = (async () => new Response('', { status: 404 })) as typeof fetch;
 
-    render(<Config />);
+    await afficher('donnees');
     const utilisateur = utilisateurTest();
-    await utilisateur.click(screen.getByRole('tab', { name: /Données/ }));
     await utilisateur.click(screen.getByRole('button', { name: 'Charger un jeu de démonstration' }));
 
     expect(await screen.findByText(/n’a pas pu être chargé/)).toBeTruthy();
@@ -677,8 +747,8 @@ describe('seuil de sécurité et part gardée', () => {
   const curseurPart = () =>
     screen.getByRole('slider', { name: /Part gardée/ }) as HTMLInputElement;
 
-  it('écrit le seuil de sécurité dans les faits', () => {
-    render(<Config />);
+  it('écrit le seuil de sécurité dans les faits', async () => {
+    await afficher('reserve');
     fireEvent.change(champSeuil(), { target: { value: '3500' } });
     expect(useFaits.getState().faits.reserve).toBe(3500);
   });
@@ -689,8 +759,8 @@ describe('seuil de sécurité et part gardée', () => {
    * solde : quelqu'un qui a 8 000 € en banque mais n'a pas encore saisi son
    * solde de départ n'aurait pas pu se fixer un plancher à 5 000 €.
    */
-  it('n’enferme pas le seuil dans la borne d’un curseur', () => {
-    render(<Config />);
+  it('n’enferme pas le seuil dans la borne d’un curseur', async () => {
+    await afficher('reserve');
     fireEvent.change(champSeuil(), { target: { value: '5000' } });
     expect(useFaits.getState().faits.reserve).toBe(5000);
   });
@@ -701,11 +771,11 @@ describe('seuil de sécurité et part gardée', () => {
    * doit dire les DEUX réglages, sinon elle décrit un autre calcul que celui
    * qui s'applique.
    */
-  it('dit le calcul complet, seuil compris', () => {
+  it('dit le calcul complet, seuil compris', async () => {
     useFaits.setState({
       faits: { ...faitsVides(), soldeInitial: euros(8000), reserve: euros(5000) }
     });
-    render(<Config />);
+    await afficher('reserve');
     fireEvent.change(curseurPart(), { target: { value: '50' } });
 
     const phrase = screen.getByText(/Sur un solde de/).textContent ?? '';
@@ -715,8 +785,8 @@ describe('seuil de sécurité et part gardée', () => {
     expect(phrase).toMatch(/1\s?500/u);   // ce qu'il reste à se verser
   });
 
-  it('écrit la part gardée en ratio, pas en pourcentage', () => {
-    render(<Config />);
+  it('écrit la part gardée en ratio, pas en pourcentage', async () => {
+    await afficher('reserve');
     fireEvent.change(curseurPart(), { target: { value: '25' } });
     expect(useFaits.getState().faits.partGardeeAuVersement).toBeCloseTo(0.25, 10);
   });
@@ -725,14 +795,14 @@ describe('seuil de sécurité et part gardée', () => {
    * Un défaut à 50 %, comme dans le prototype, couperait en deux le versable de
    * tout compte existant sans qu'un geste ait été fait.
    */
-  it('part de zéro pour cent, qui ne décide rien', () => {
-    render(<Config />);
+  it('part de zéro pour cent, qui ne décide rien', async () => {
+    await afficher('reserve');
     expect(curseurPart().value).toBe('0');
     expect(useFaits.getState().faits.partGardeeAuVersement).toBe(0);
   });
 
-  it('ne laisse pas régler une part au-delà du maximum du schéma', () => {
-    render(<Config />);
+  it('ne laisse pas régler une part au-delà du maximum du schéma', async () => {
+    await afficher('reserve');
     expect(Number(curseurPart().max)).toBe(PART_GARDEE_MAX * 100);
   });
 
@@ -740,8 +810,8 @@ describe('seuil de sécurité et part gardée', () => {
    * Un plancher négatif n'existe pas : il autoriserait un versement supérieur
    * au disponible.
    */
-  it('refuse un seuil négatif plutôt que de l’enregistrer', () => {
-    render(<Config />);
+  it('refuse un seuil négatif plutôt que de l’enregistrer', async () => {
+    await afficher('reserve');
     fireEvent.change(champSeuil(), { target: { value: '-400' } });
     expect(useFaits.getState().faits.reserve).toBe(0);
   });
@@ -756,8 +826,8 @@ describe('foyer fiscal', () => {
    * comme un résultat. Entre une part et trois, l'impôt va du simple au
    * double, et c'est le versable qui en dépend.
    */
-  it('n’affiche aucune valeur tant que rien n’est renseigné', () => {
-    render(<Config />);
+  it('n’affiche aucune valeur tant que rien n’est renseigné', async () => {
+    await afficher('fiscal');
     const parts = screen.getByLabelText(/Parts fiscales/) as HTMLInputElement;
     const autres = screen.getByLabelText(/Autres revenus imposables/) as HTMLInputElement;
     const per = screen.getByLabelText(/Versement PER/) as HTMLInputElement;
@@ -766,8 +836,8 @@ describe('foyer fiscal', () => {
     expect(per.value).toBe('');
   });
 
-  it('enregistre les trois faits du foyer à la frappe', () => {
-    render(<Config />);
+  it('enregistre les trois faits du foyer à la frappe', async () => {
+    await afficher('fiscal');
     fireEvent.change(screen.getByLabelText(/Parts fiscales/), { target: { value: '2.5' } });
     fireEvent.change(screen.getByLabelText(/Autres revenus imposables/), { target: { value: '12000' } });
     fireEvent.change(screen.getByLabelText(/Versement PER/), { target: { value: '3000' } });
@@ -781,9 +851,9 @@ describe('foyer fiscal', () => {
   // Effacer un champ n'est pas saisir zéro : c'est revenir à « non renseigné »,
   // ce qui fait de nouveau refuser la provision d'impôt au lieu de la calculer
   // sur un foyer sans autres revenus.
-  it('un champ vidé redevient « non renseigné », pas zéro', () => {
+  it('un champ vidé redevient « non renseigné », pas zéro', async () => {
     useFaits.setState({ faits: { ...faitsVides(), partsFiscales: 2 } });
-    render(<Config />);
+    await afficher('fiscal');
     fireEvent.change(screen.getByLabelText(/Parts fiscales/), { target: { value: '' } });
     expect(useFaits.getState().faits.partsFiscales).toBeNull();
   });
@@ -798,19 +868,205 @@ describe('fenêtre d’ACRE', () => {
    * cas est celui constaté sur un compte réel : début au 01/02/2025,
    * exonération jusqu'au 31/12/2025.
    */
-  it('écrit la date de fin quand l’ACRE est déclarée', () => {
+  it('écrit la date de fin quand l’ACRE est déclarée', async () => {
     useFaits.setState({
       faits: {
         ...faitsVides(),
         entreprise: { ...faitsVides().entreprise, acre: true, debutActivite: dateISO('2025-02-01') }
       }
     });
-    render(<Config />);
-    expect(screen.getByText(/31\/12\/2025/)).toBeTruthy();
+    await afficher('profil');
+    expect(screen.getAllByText(/31\/12\/2025/).length).toBeGreaterThan(0);
   });
 
-  it('n’écrit aucune date quand l’ACRE n’est pas déclarée', () => {
-    render(<Config />);
+  /**
+   * LE TAUX ET LA FIN SE LISENT SOUS L'INTERRUPTEUR, comme le handoff.
+   *
+   * Ils vivaient dans une bulle : on activait l'ACRE sans voir ni l'un ni
+   * l'autre, alors que le taux dépend de la date de création (50 % avant le
+   * 1er juillet 2026, 25 % après).
+   */
+  it('dit sous l’interrupteur le taux d’exonération et sa fin', async () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        entreprise: { ...faitsVides().entreprise, acre: true, debutActivite: dateISO('2026-07-15') }
+      }
+    });
+    await afficher('profil');
+    expect(screen.getByText(/Exonération de 25\s% des cotisations jusqu’au/u)).toBeTruthy();
+  });
+
+  /**
+   * Une affiliation en juillet finit au 30 juin : le jour était écrit « 31 »
+   * en dur, et la ligne qu'on recoupe avec l'attestation portait une date qui
+   * n'existe pas.
+   */
+  it('écrit le vrai dernier jour quand le trimestre finit un 30', async () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        entreprise: { ...faitsVides().entreprise, acre: true, debutActivite: dateISO('2026-07-15') }
+      }
+    });
+    await afficher('profil');
+    expect(screen.getAllByText(/30\/06\/2027/).length).toBe(2);
+    expect(screen.queryByText(/31\/06/)).toBeNull();
+  });
+
+  it('n’écrit aucune date quand l’ACRE n’est pas déclarée', async () => {
+    await afficher('profil');
     expect(screen.queryByText(/Exonération jusqu’au/)).toBeNull();
+  });
+});
+
+/**
+ * LA SECTION OUVERTE VIT DANS L'ADRESSE.
+ *
+ * La pastille Cloud envoie vers `#/config/compte` : si l'adresse ne désignait
+ * pas la section, quelqu'un dont la session a expiré atterrirait sur Profil
+ * et chercherait où se reconnecter. Et un rechargement doit retomber sur la
+ * section qu'on réglait.
+ */
+describe('navigation entre les sections', () => {
+  const nav = () => screen.getByRole('navigation', { name: 'Sections des réglages' });
+
+  it('ouvre Profil quand l’adresse ne désigne aucune section', async () => {
+    await afficher('');
+    expect(within(nav()).getByRole('button', { name: /Profil & statut/ }).getAttribute('aria-current'))
+      .toBe('page');
+    expect(screen.getByRole('heading', { level: 2, name: 'Profil & statut' })).toBeTruthy();
+  });
+
+  it('ouvre Profil quand l’adresse désigne une section inconnue', async () => {
+    await afficher('bareme');
+    expect(screen.getByRole('heading', { level: 2, name: 'Profil & statut' })).toBeTruthy();
+  });
+
+  it('suit l’adresse : #/config/reserve ouvre la réserve', async () => {
+    await afficher('reserve');
+    expect(screen.getByRole('heading', { level: 2, name: 'Réserve & versements' })).toBeTruthy();
+    expect(screen.getByLabelText('Seuil de sécurité')).toBeTruthy();
+    expect(within(nav()).getByRole('button', { name: /Réserve & versements/ })
+      .getAttribute('aria-current')).toBe('page');
+  });
+
+  it('change de section quand l’adresse change, sans clic', async () => {
+    await afficher('profil');
+    window.location.hash = '#/config/facturation';
+    expect(await screen.findByLabelText('IBAN')).toBeTruthy();
+  });
+
+  it('écrit l’adresse au clic sur une entrée', async () => {
+    await afficher('profil');
+    await utilisateurTest().click(within(nav()).getByRole('button', { name: /Facturation/ }));
+    expect(window.location.hash).toBe('#/config/facturation');
+    expect(await screen.findByLabelText('IBAN')).toBeTruthy();
+  });
+
+  it('n’en marque qu’une seule comme ouverte', async () => {
+    await afficher('donnees');
+    const ouvertes = within(nav()).getAllByRole('button')
+      .filter((b) => b.getAttribute('aria-current') === 'page');
+    expect(ouvertes).toHaveLength(1);
+    expect(ouvertes[0]?.textContent).toMatch(/Données & export/);
+  });
+
+  it('liste les sept sections, sous-titre compris', async () => {
+    await afficher('profil');
+    expect(within(nav()).getAllByRole('button')).toHaveLength(7);
+    expect(within(nav()).getByText('Abattement, cotisations, TVA')).toBeTruthy();
+    expect(within(nav()).getByText('Livre CSV, sauvegarde, restauration')).toBeTruthy();
+  });
+
+  it('construit le sous-titre du profil depuis les faits', async () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        entreprise: { ...faitsVides().entreprise, acre: true, siret: 'x' }
+      }
+    });
+    await afficher('profil');
+    expect(within(nav()).getByText('Micro-BNC · ACRE · SIRET')).toBeTruthy();
+  });
+
+  it('donne à chaque entrée une cible tactile d’au moins 44 px', () => {
+    // jsdom ne calcule pas la mise en page : on vérifie que la règle existe.
+    const css = readFileSync('src/ui/screens/Config.module.css', 'utf8');
+    expect(css).toMatch(/\.entree \{[^}]*min-height: 56px/);
+  });
+
+  it('Profil : ACRE et versement libératoire sont des interrupteurs', async () => {
+    await afficher('profil');
+    expect(screen.getByRole('switch', { name: /ACRE/ })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: /Versement libératoire/ })).toBeTruthy();
+    expect(screen.getByLabelText('Numéro de TVA intracommunautaire')).toBeTruthy();
+  });
+
+  it('Paramètres fiscaux : périodicité, option TVA, foyer et barème', async () => {
+    await afficher('fiscal');
+    expect(screen.getByRole('radiogroup', { name: 'Périodicité des cotisations' })).toBeTruthy();
+    expect(screen.getByLabelText(/Option pour la TVA depuis/)).toBeTruthy();
+    expect(screen.getByLabelText(/Parts fiscales/)).toBeTruthy();
+    expect(screen.getByRole('table')).toBeTruthy();
+  });
+
+  it('Réserve : solde, besoin, seuil, part gardée et objectif', async () => {
+    await afficher('reserve');
+    expect(screen.getByLabelText('Solde de ton compte')).toBeTruthy();
+    expect(screen.getByLabelText('Besoin mensuel')).toBeTruthy();
+    expect(screen.getByLabelText('Part gardée à chaque versement')).toBeTruthy();
+    expect(screen.getByLabelText(/Objectif de chiffre d’affaires/)).toBeTruthy();
+  });
+
+  // Dire qu'aucun réglage n'existe vaut mieux que dessiner des champs qui
+  // n'écrivent nulle part.
+  it('Facturation : IBAN, BIC, et l’aveu que la numérotation n’est pas réglable', async () => {
+    await afficher('facturation');
+    expect(screen.getByLabelText('IBAN')).toBeTruthy();
+    expect(screen.getByLabelText('BIC')).toBeTruthy();
+    expect(screen.getByText(/numérotation des factures est automatique/)).toBeTruthy();
+  });
+
+  /**
+   * « Posées d'office » ne disait pas lesquelles. La mention se lit avant
+   * toute facture, et elle suit le régime : au franchissement des seuils, la
+   * mention de franchise disparaît d'elle-même.
+   */
+  it('Facturation : montre la mention de franchise tant qu’on y est, et plus après', async () => {
+    await afficher('facturation');
+    expect(screen.getByText('TVA non applicable, article 293 B du CGI.')).toBeTruthy();
+    cleanup();
+
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, tvaDepuis: mois('2020-01') } }
+    });
+    await afficher('facturation');
+    expect(screen.queryByText(/293 B/)).toBeNull();
+    expect(screen.getByText(/pénalités sont dues/)).toBeTruthy();
+  });
+
+  it('Livre des recettes : renvoie vers le registre dans Argent', async () => {
+    await afficher('livre');
+    const lien = screen.getByRole('link', { name: 'Ouvrir le livre des recettes' });
+    expect(lien.getAttribute('href')).toBe('#/argent/livre');
+  });
+
+  it('Données : l’export et la restauration', async () => {
+    await afficher('donnees');
+    expect(screen.getByRole('button', { name: /Sauvegarder toutes mes données/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Télécharger le livre des recettes/ })).toBeTruthy();
+    expect(screen.getByLabelText('Restaurer une sauvegarde')).toBeTruthy();
+  });
+
+  it('Compte : ouvre la synchronisation', async () => {
+    await afficher('compte');
+    expect(screen.getByRole('heading', { level: 2, name: 'Compte & synchronisation' })).toBeTruthy();
+  });
+
+  it('ne mentionne plus les anciens onglets', async () => {
+    await afficher('profil');
+    expect(screen.queryByRole('tab')).toBeNull();
+    expect(screen.queryByText('Sections de l’écran Config')).toBeNull();
   });
 });

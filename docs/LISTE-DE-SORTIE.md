@@ -145,6 +145,17 @@ Sert de filet aux lots 5 et 6.
 | Filtre par compte (Tous / Qonto / BNP / Perso) | ⬜ hors lot : ni les dépenses ni les mouvements ne portent de compte — demande un schéma 20 |
 | Contrôle visuel du lot 8 | ✅ fait (agent contrôleur, deux thèmes et téléphone 390 px) : conforme avec réserves. Corrigé dans le lot : une seule navigation de mois (la barre de période gardait ses flèches), en-têtes chiffrés alignés, « clic = détail & pièce », icônes des justificatifs et du rapprochement, sous-ligne de franchise sous la TVA déductible. *Restent mineurs : rien n'indique sur téléphone que le registre défile ; les actions « associer / relier / créer » ne se voient sur aucune capture (la démonstration n'a pas d'opération orpheline) — elles sont tenues par des tests. Écran Achats à 39,1 / 40 Ko : extraire avant tout ajout* |
 
+### Lot 9 — Réglages du handoff (priorité 2 : quatre onglets contre sept sections dans la maquette)
+
+| Ligne | État |
+|---|---|
+| « Configuration » en deux colonnes : à gauche les sept sections (icône, titre, sous-titre, chevron), à droite le panneau de la section ouverte ; sur téléphone, la liste puis le panneau. La section vit dans l'adresse (`#/config/profil`…) | ✅ fait ; `#/config` seul et toute adresse inconnue ouvrent Profil ; chaque section arrive à la demande |
+| Profil & statut (identité, adresse, début d'activité, type, TVA intracommunautaire, ACRE et versement libératoire en interrupteurs) · Paramètres fiscaux (barème, périodicité URSSAF, option TVA, foyer fiscal) · Réserve & versements (solde de départ, besoin mensuel, seuil, part gardée, objectif) · Facturation (IBAN, BIC) · Livre des recettes (conformité, accès au registre) · Compte & synchronisation · Données & export | ✅ fait ; chaque champ garde son comportement. Les messages qui renvoyaient aux anciens onglets (« Config › Solde du compte », « Réglages → Données », « Réglages › Barème ») nomment les nouvelles sections |
+| Numérotation des factures et mentions personnalisées | ⬜ hors lot : aucun réglage n'existe ; à concevoir |
+| Contrôle visuel du lot 9 (agent contrôleur, six sections, deux thèmes, deux passages) | ✅ fait. Corrigé dans le lot : fin d'ACRE « 31/09/2026 » (date inexistante, le jour était écrit en dur — défaut antérieur au lot, aussi dans la fenêtre d'ACRE) ; source de la table des cotisations qui passait sur « vérifié le » ; carte « Barèmes en vigueur » (six valeurs) et périodicité en deux positions ; Données en lignes avec le livre des recettes CSV, un vrai bouton de restauration et « Repartir de zéro » ; mentions de facture lisibles. *Restent assumés : interrupteurs du handoff sans fonction derrière (mise à jour des barèmes, provisionner, rappel, synchronisation bancaire), export FEC, vocabulaire « matelas » (à arbitrer avec les deux autres libellés), montants des champs sans espace des milliers, état « compte relié » non capturé* |
+| Troisième contrôle visuel du lot 9 | ✅ fait : les quatre corrections confirmées dans les deux thèmes. Il a trouvé un débordement à 390 px sur Paramètres fiscaux (page de 609 px) : l'en-tête « Actions » réservé aux lecteurs d'écran, en position absolue, échappait au conteneur défilant de la table — défaut antérieur au lot, invisible parce que le contrôle responsive ne visitait que `#/config`. Corrigé, et le contrôle visite désormais les sept sections (280 combinaisons) ; sans le correctif, il échoue sur les quatre palettes. Le foyer fiscal a reçu son titre |
+| Effacer le compte distant (RGPD) | ⬜ hors lot : « Repartir de zéro » ne vide que ce navigateur ; supprimer la ligne `user_data` demande une action côté Supabase à concevoir |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
@@ -219,7 +230,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Navigation en sept sections | ◐ | Quatre sections (Profil, Barème, Données, Compte) — sorti du lot 6, qui ne touchait que la barre et le rail | à planifier |
+| Navigation en sept sections | ✅ | Lot 9 | 9 |
 | Facturation : numérotation et mentions | ◐ | SIRET et IBAN contrôlés ; aucun réglage de numérotation ni de mentions | à planifier |
 | Coffre des documents | ⬜ | Aucun dépôt ; retenu au périmètre | à planifier |
 | Mode hors ligne, retard de synchronisation affiché | ◐ | Aucun `navigator.onLine` ; la pastille ne dit que relié, expiré ou local | à planifier |
