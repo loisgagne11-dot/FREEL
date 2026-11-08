@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useToast } from '../components/Toasts';
 import { instantaneAvantRemplacement, useFaits } from '../../state/store';
 import { dateDuJour } from '../../state/selecteurs';
@@ -55,6 +55,18 @@ export function Donnees(
    * précaution que sur l'écran Compte, et pour la même raison.
    */
   const [aRestaurer, setARestaurer] = useState<Restauration | null>(null);
+  /**
+   * La confirmation s'affiche sous toutes les lignes : sur téléphone, à trois
+   * cents pixels sous « Choisir un fichier » qui l'a demandée, hors de la vue.
+   * On choisissait un fichier et rien ne semblait se passer. Elle vient donc
+   * à l'écran, et le focus avec elle — le clavier y est aussitôt.
+   */
+  const refConfirmation = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (aRestaurer === null) return;
+    refConfirmation.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    refConfirmation.current?.focus({ preventScroll: true });
+  }, [aRestaurer]);
   // Relue à chaque changement des faits : un remplacement vient d'en écrire
   // une. `faits` n'est pas lu dans le calcul, il en est le DÉCLENCHEUR.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,7 +276,7 @@ export function Donnees(
       </ul>
 
       {aRestaurer !== null && (
-        <div className={styles.confirmation} role="alert">
+        <div ref={refConfirmation} tabIndex={-1} className={styles.confirmation} role="alert">
           {aRestaurer.statut === 'illisible'
             ? <p className={styles.echec}>{aRestaurer.motif}</p>
             : (

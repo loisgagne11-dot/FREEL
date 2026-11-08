@@ -433,6 +433,13 @@
 
 .confirmation p { margin: 0; }
 
+/* Dans une confirmation, chaque bouton est un vrai choix : gris pâle, ils
+   passaient pour désactivés (« Ajouter seulement les pièces manquantes »,
+   « Annuler »). Le texte reprend sa couleur pleine. */
+.confirmation .action { color: var(--text); border-color: var(--line-2); }
+.confirmation:focus { outline: none; }
+.confirmation:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .action {

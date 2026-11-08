@@ -154,6 +154,27 @@ describe('la restauration d’une archive', () => {
     expect((await screen.findByRole('alert')).textContent).toMatch(/1 justificatif\(s\) déposé\(s\) ici\s+ne correspondront plus/);
   });
 
+  /**
+   * Sur téléphone, la confirmation tombait trois cents pixels sous le bouton
+   * qui l'avait demandée : on choisissait un fichier, rien ne semblait venir.
+   */
+  it('amène la confirmation à l’écran et y place le focus', async () => {
+    // jsdom n'implémente pas `scrollIntoView` : on le pose le temps du test.
+    const defiler = vi.fn();
+    Element.prototype.scrollIntoView = defiler;
+    try {
+      const fichier = await archiveDe(faitsAvec([depense()]), [await piece('piece-1', 'dep-1', 'facture')]);
+      const utilisateur = afficher(stockageMemoireJustificatifs());
+
+      await utilisateur.upload(screen.getByLabelText('Restaurer une sauvegarde'), fichier);
+      const confirmation = await screen.findByRole('alert');
+      await waitFor(() => expect(defiler).toHaveBeenCalled());
+      expect(document.activeElement).toBe(confirmation);
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
   it('dit pourquoi un ZIP qui n’est pas une archive de l’application est refusé', async () => {
     const utilisateur = afficher(stockageMemoireJustificatifs());
     await utilisateur.upload(
