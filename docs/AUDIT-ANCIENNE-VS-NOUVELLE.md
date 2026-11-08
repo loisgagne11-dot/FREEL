@@ -389,3 +389,9 @@ chiffre faux.
 | Restauration des justificatifs | 🟢 nouveau | Pièces recontrôlées (CRC et SHA-256) avant d'être redéposées avec leur identifiant et leur date de dépôt ; jamais de doublon ni de suppression ; « Ajouter seulement les pièces manquantes » laisse les faits intacts |
 | Rappel d'archive | 🟢 nouveau | « Dernière archive le … » et pièces déposées depuis, en Données et sur Achats ; la date vit dans ce navigateur, hors des faits |
 
+## Lot 11 (08/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Vérification des règles d'accès du projet | 🟢 nouveau | L'ancienne application documentait une règle pour `user_data` sans jamais vérifier qu'elle était appliquée. La nouvelle compte, sans session et sans rien lire, les lignes visibles avec la clé publique, sur ses deux tables |
+| `docs/supabase.sql` | 🟢 | Porte aussi la règle de `user_data` (la même que l'ancienne documentait : l'ancienne application continue de fonctionner) |

@@ -658,3 +658,8 @@ solde − provisions − réserve.
 | Contenu d'une archive à restaurer | Confirmation | Recettes, dépenses, missions, clients | + justificatifs, date de l'archive, pièces d'ici qui seraient détachées |
 | Pièces restaurées | Message après restauration | — | « N pièce(s) ajoutée(s), M déjà présente(s) », et la liste des refus avec leur motif |
 
+## Lot 11 (08/11) — règles d'accès
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Lignes lisibles sans connexion, par table | Compte & synchronisation | — | Compté par le serveur (`Content-Range`), jamais lu ; un total absent ou une requête refusée s'affiche « vérification impossible », jamais 0 |

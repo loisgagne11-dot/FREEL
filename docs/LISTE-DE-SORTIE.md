@@ -189,10 +189,11 @@ compte.
 
 | Ligne | État |
 |---|---|
-| Sonde anonyme : avec la seule clé publique, sans session, l'application demande à Supabase COMBIEN de lignes de `freel_faits` et de `user_data` se lisent (`HEAD` + `Prefer: count=exact`) — sans jamais en lire le contenu. Plus de zéro : les données sont exposées | ⬜ |
-| Compte & synchronisation : verdict lisible (« ne se lisent pas sans connexion », « exposées : N ligne(s) », « table absente », « vérification impossible » avec la raison), relancé à la demande et à l'ouverture quand un projet est configuré ; en cas d'exposition, alerte rouge et le SQL à appliquer, copiable | ⬜ |
-| `docs/supabase.sql` : section `user_data` — activer RLS et la règle « chacun les siens », identique à celle que documentait l'ancienne application (elle continue donc de fonctionner) ; idempotente | ⬜ |
-| Une sonde qui échoue (réseau, CSP, projet mal saisi) ne passe JAMAIS pour « protégé » | ⬜ |
+| Sonde anonyme : avec la seule clé publique, sans session, l'application demande à Supabase COMBIEN de lignes de `freel_faits` et de `user_data` se lisent (`HEAD` + `Prefer: count=exact`) — sans jamais en lire le contenu. Plus de zéro : les données sont exposées | ✅ fait |
+| Compte & synchronisation : verdict lisible (« ne se lisent pas sans connexion », « exposées : N ligne(s) », « table absente », « vérification impossible » avec la raison), relancé à la demande et à l'ouverture quand un projet est configuré ; en cas d'exposition, alerte rouge et le SQL à appliquer, copiable | ✅ fait |
+| `docs/supabase.sql` : section `user_data` — activer RLS et la règle « chacun les siens », identique à celle que documentait l'ancienne application (elle continue donc de fonctionner) ; idempotente | ✅ fait |
+| Une sonde qui échoue (réseau, CSP, projet mal saisi) ne passe JAMAIS pour « protégé » | ✅ fait |
+| Contrôle visuel (deux thèmes, téléphone, projet fictif aux réponses simulées : faits protégés, ancienne table exposée) | ✅ fait : verdicts lisibles, alerte et SQL dans la largeur du téléphone. *Le comportement réel de PostgREST (total `*/0` d'une table vide, 404 d'une table absente) est tenu par les tests, pas encore par un vrai projet : à confirmer à la première vérification sur ton compte* |
 
 ## Reste fonctionnel par écran
 
@@ -273,7 +274,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Coffre des documents | ⬜ | Aucun dépôt ; retenu au périmètre | à planifier |
 | Mode hors ligne, retard de synchronisation affiché | ◐ | Aucun `navigator.onLine` ; la pastille ne dit que relié, expiré ou local | à planifier |
 | Synchronisation temps réel multi-appareils | ⬜ | Synchronisation manuelle seulement | à planifier |
-| Règles d'accès de `user_data` vérifiées et documentées | ⬜ | `supabase.sql` ne les touche pas | 11 |
+| Règles d'accès de `user_data` vérifiées et documentées | ✅ | Sonde anonyme dans Compte, règle « chacun les siens » dans `supabase.sql` | 11 |
 | Restauration et récupération sans copie de secours | ✅ | Copie de l'état d'avant (S6), « Revenir à l'état d'avant » dans Données | 1 |
 
 ### Documents
