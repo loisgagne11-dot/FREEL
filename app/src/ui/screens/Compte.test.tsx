@@ -8,6 +8,19 @@ import { useFaits } from '../../state/store';
 import { CLE_CONFIG } from '../../infra/supabase';
 import { Compte } from './Compte';
 
+/*
+ * Le bloc « Règles d'accès » sonde le projet à l'ouverture. Ces tests décrivent
+ * des échanges de connexion rangés dans l'ordre des appels à `fetch` : une
+ * sonde qui s'y glisserait leur volerait leurs réponses. La sonde a ses propres
+ * tests (`supabase.acces.test.ts`, `Compte.acces.test.tsx`).
+ */
+vi.mock('../../infra/supabase.acces', async (original) => ({
+  ...(await original<typeof import('../../infra/supabase.acces')>()),
+  sonderAccesAnonyme: async () => ({
+    faits: { statut: 'protegee' }, legacy: { statut: 'protegee' }, le: '2026-11-08T10:00:00.000Z'
+  })
+}));
+
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 beforeEach(() => {
