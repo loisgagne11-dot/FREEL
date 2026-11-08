@@ -156,6 +156,23 @@ Sert de filet aux lots 5 et 6.
 | Troisième contrôle visuel du lot 9 | ✅ fait : les quatre corrections confirmées dans les deux thèmes. Il a trouvé un débordement à 390 px sur Paramètres fiscaux (page de 609 px) : l'en-tête « Actions » réservé aux lecteurs d'écran, en position absolue, échappait au conteneur défilant de la table — défaut antérieur au lot, invisible parce que le contrôle responsive ne visitait que `#/config`. Corrigé, et le contrôle visite désormais les sept sections (280 combinaisons) ; sans le correctif, il échoue sur les quatre palettes. Le foyer fiscal a reçu son titre |
 | Effacer le compte distant (RGPD) | ⬜ hors lot : « Repartir de zéro » ne vide que ce navigateur ; supprimer la ligne `user_data` demande une action côté Supabase à concevoir |
 
+### Lot 10 — Les justificatifs se sauvegardent (priorité 1 : S5 suite, l'irréversible)
+
+Les pièces vivent dans IndexedDB, dans un seul navigateur. Ni l'export JSON ni
+la synchronisation ne les emportent, alors qu'elles sont à conservation légale :
+un navigateur réinitialisé, un ordinateur changé, et six ans de justificatifs
+disparaissent sans qu'aucune sauvegarde les ait jamais contenus.
+
+| Ligne | État |
+|---|---|
+| Archive ZIP complète depuis Données & export : les faits (le même JSON que la sauvegarde), chaque pièce sous un nom lisible SANS l'application (`justificatifs/2026/2026-03-14 Fournisseur 89,00 €.pdf`), un manifeste (empreinte, date de dépôt, fait rattaché), un `LISEZMOI.txt`. Écrite sans dépendance (ZIP « stocké », CRC-32), construite en morceaux : une pièce lue à la fois | ⬜ |
+| Chaque pièce est revérifiée (SHA-256) avant d'entrer dans l'archive ; une pièce altérée ou illisible est signalée à l'écran et dans le manifeste, jamais tue | ⬜ |
+| Restauration d'une archive par le même bouton que la sauvegarde JSON, avec la même confirmation, qui annonce aussi le nombre de pièces. Chaque pièce est recontrôlée contre le manifeste avant d'être redéposée avec son identifiant, son empreinte et sa date de dépôt d'origine ; une pièce déjà présente (même identifiant, même empreinte) n'est pas dupliquée | ⬜ |
+| Pièces orphelines (rattachées à aucun fait courant) : incluses, marquées comme telles dans le manifeste | ⬜ |
+| Durée de conservation (`ANNEES_CONSERVATION`, 6 ans, LPF art. L102 B) lue à l'écran, là où l'on dépose et là où l'on sauvegarde | ⬜ |
+| Synchronisation des pièces avec le compte | ⬜ hors lot : demande un stockage de fichiers côté Supabase |
+| Nettoyage de cette liste : lignes faites restées ouvertes (grille ACRE, ACRE à 25 %, restauration sans copie de secours) | ⬜ |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
