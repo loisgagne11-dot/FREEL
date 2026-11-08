@@ -2,6 +2,9 @@ import { lazy, Suspense, useEffect, useId, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { finAcreDe } from '../../state/selecteurs.reglages';
 import { dateISO, type TypeActivite } from '../../domain/types';
+import { exonerationAcre, tauxVersementLiberatoire } from '../../domain/bareme';
+import { moisCourant } from '../../state/selecteurs';
+import { pct } from '../format';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { controlerSiret } from '../../domain/calculs/identifiants';
@@ -292,14 +295,16 @@ function Profil() {
       <div className={styles.interrupteurs}>
         <Interrupteur
           id={`${idChamp}-acre`}
-          libelle="Bénéficiaire de l’ACRE"
+          libelle="ACRE — exonération partielle"
+          resume={<ResumeAcre />}
           coche={entreprise.acre}
           onChange={(v) => modifier({ acre: v })}
           aide={<FenetreAcre />}
         />
         <Interrupteur
           id={`${idChamp}-vl`}
-          libelle="Versement libératoire de l’impôt sur le revenu"
+          libelle="Versement libératoire de l’impôt"
+          resume={<ResumeVl type={entreprise.typeActivite} />}
           coche={entreprise.versementLiberatoire}
           onChange={(v) => modifier({ versementLiberatoire: v })}
           aide={
@@ -313,6 +318,40 @@ function Profil() {
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * Ce que l'ACRE change, en une ligne sous l'interrupteur — comme le handoff.
+ *
+ * L'explication vivait dans une bulle : on activait l'ACRE sans voir ni son
+ * taux ni sa date de fin, alors que les deux dépendent de la date de création
+ * (50 % avant le 1er juillet 2026, 25 % après). Rien n'est écrit quand la
+ * règle s'abstient : un taux inventé serait cru.
+ */
+function ResumeAcre() {
+  const faits = useFaits((e) => e.faits);
+  const taux = exonerationAcre(faits.entreprise.debutActivite);
+  const fin = finAcreDe(faits);
+  if (!faits.entreprise.acre) return <>Exonération partielle des cotisations les premiers trimestres, sur demande à l’URSSAF.</>;
+  if (taux.statut === 'refuse') return <>Renseigne le début d’activité pour connaître le taux et la fin.</>;
+  return (
+    <>
+      Exonération de {Math.round(taux.valeur * 100)}&nbsp;% des cotisations
+      {fin !== null && fin.statut !== 'refuse'
+        && <> jusqu’au 31/{fin.valeur.slice(5, 7)}/{fin.valeur.slice(0, 4)}</>}.
+    </>
+  );
+}
+
+/** Ce que le versement libératoire change, avec le taux du barème. */
+function ResumeVl({ type }: { readonly type: TypeActivite }) {
+  const taux = tauxVersementLiberatoire(moisCourant(), type);
+  return (
+    <>
+      Impôt payé à chaque déclaration
+      {taux.statut !== 'refuse' && <> ({pct(taux.valeur)} du chiffre d’affaires)</>}, plutôt qu’au barème.
+    </>
   );
 }
 
@@ -352,22 +391,27 @@ function FenetreAcre() {
    ───────────────────────────────────────────────────────────────────────── */
 
 function Interrupteur(
-  { id, libelle, coche, onChange, aide }: {
+  { id, libelle, coche, onChange, aide, resume }: {
     id: string;
     libelle: string;
     coche: boolean;
     onChange: (v: boolean) => void;
     aide?: React.ReactNode;
+    /** Ce que l'option change, lisible sans ouvrir la bulle. */
+    resume?: React.ReactNode;
   }
 ) {
   return (
-    <p className={styles.interrupteur}>
+    <div className={styles.interrupteur}>
+      <span className={styles.interrupteurTexte}>
+        <label htmlFor={id} className={styles.interrupteurLibelle}>
+          {libelle}
+          {aide !== undefined && <Info libelle={`Explication : ${libelle}`}>{aide}</Info>}
+        </label>
+        {resume !== undefined && <span className={styles.interrupteurResume}>{resume}</span>}
+      </span>
       <input id={id} type="checkbox" role="switch" checked={coche}
         onChange={(e) => onChange(e.target.checked)} />
-      <label htmlFor={id}>
-        {libelle}
-        {aide !== undefined && <Info libelle={`Explication : ${libelle}`}>{aide}</Info>}
-      </label>
-    </p>
+    </div>
   );
 }

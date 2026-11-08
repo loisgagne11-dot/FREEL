@@ -143,12 +143,13 @@ const VUES = [
   { hash: '#/outils/cra', nom: 'pilote-cra', attendre: '[role="dialog"]' },
   { hash: '#/config', nom: 'config-profil' },
   /* Les autres sections des Réglages (lot 9), chacune appariée à sa capture
-     du handoff. */
-  { hash: '#/config/fiscal', nom: 'config-fiscal' },
-  { hash: '#/config/reserve', nom: 'config-reserve' },
-  { hash: '#/config/facturation', nom: 'config-facturation' },
-  { hash: '#/config/donnees', nom: 'config-donnees' },
-  { hash: '#/config/compte', nom: 'config-cloud' }
+     du handoff. Chacune arrive à la demande : sans `attendre`, la photo
+     montrait « Chargement… » et le contrôle visuel ne pouvait rien juger. */
+  { hash: '#/config/fiscal', nom: 'config-fiscal', attendre: 'text=Périodicité de déclaration URSSAF' },
+  { hash: '#/config/reserve', nom: 'config-reserve', attendre: 'text=Seuil de sécurité' },
+  { hash: '#/config/facturation', nom: 'config-facturation', attendre: 'label:has-text("IBAN")' },
+  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'button:has-text("Exporter mes données")' },
+  { hash: '#/config/compte', nom: 'config-cloud', attendre: 'text=Relier un compte' }
 ];
 
 const themeDemande = argument('theme');

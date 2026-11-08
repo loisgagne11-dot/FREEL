@@ -817,7 +817,25 @@ describe('fenêtre d’ACRE', () => {
       }
     });
     await afficher('profil');
-    expect(screen.getByText(/31\/12\/2025/)).toBeTruthy();
+    expect(screen.getAllByText(/31\/12\/2025/).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * LE TAUX ET LA FIN SE LISENT SOUS L'INTERRUPTEUR, comme le handoff.
+   *
+   * Ils vivaient dans une bulle : on activait l'ACRE sans voir ni l'un ni
+   * l'autre, alors que le taux dépend de la date de création (50 % avant le
+   * 1er juillet 2026, 25 % après).
+   */
+  it('dit sous l’interrupteur le taux d’exonération et sa fin', async () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        entreprise: { ...faitsVides().entreprise, acre: true, debutActivite: dateISO('2026-07-15') }
+      }
+    });
+    await afficher('profil');
+    expect(screen.getByText(/Exonération de 25\s% des cotisations jusqu’au/u)).toBeTruthy();
   });
 
   it('n’écrit aucune date quand l’ACRE n’est pas déclarée', async () => {
