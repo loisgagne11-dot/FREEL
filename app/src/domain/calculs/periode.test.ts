@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, mois } from '../types';
-import { ancreDeLAnnee, ancreDuMois, dansLaPeriode, moisDeLaPeriode, periodeCourante } from './periode';
+import {
+  ancreDeLAnnee, ancreDuMois, dansLaPeriode, finDuMois, moisDeLaPeriode, periodeCourante
+} from './periode';
 
 const LE = (s: string) => new Date(`${s}T12:00:00Z`);
 
@@ -181,5 +183,18 @@ describe('l’ancre d’un mois', () => {
     expect(ancreDuMois(mois('2025-06'), MAINTENANT)).not.toBe(MAINTENANT);
     expect(periodeCourante('mois', ancreDuMois(mois('2025-06'), MAINTENANT)).libelle)
       .toBe('Juin 2025');
+  });
+});
+
+/**
+ * « 31/09/2026 » s'affichait comme fin d'ACRE : le jour était écrit en dur.
+ */
+describe('la fin d’un mois', () => {
+  it('connaît les mois de trente jours et février, bissextile compris', () => {
+    expect(finDuMois(mois('2026-09'))).toBe('2026-09-30');
+    expect(finDuMois(mois('2027-06'))).toBe('2027-06-30');
+    expect(finDuMois(mois('2025-12'))).toBe('2025-12-31');
+    expect(finDuMois(mois('2026-02'))).toBe('2026-02-28');
+    expect(finDuMois(mois('2028-02'))).toBe('2028-02-29');
   });
 });

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useId, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { finAcreDe } from '../../state/selecteurs.reglages';
+import { finDuMois } from '../../domain/calculs/periode';
 import { dateISO, type TypeActivite } from '../../domain/types';
 import { exonerationAcre, tauxVersementLiberatoire } from '../../domain/bareme';
 import { moisCourant } from '../../state/selecteurs';
@@ -339,7 +340,7 @@ function ResumeAcre() {
     <>
       Exonération de {Math.round(taux.valeur * 100)}&nbsp;% des cotisations
       {fin !== null && fin.statut !== 'refuse'
-        && <> jusqu’au 31/{fin.valeur.slice(5, 7)}/{fin.valeur.slice(0, 4)}</>}.
+        && <> jusqu’au {jourNumerique(finDuMois(fin.valeur))}</>}.
     </>
   );
 }
@@ -378,12 +379,20 @@ function FenetreAcre() {
 
   return (
     <>
-      Exonération jusqu’au <strong>31/{fin.valeur.slice(5, 7)}/{fin.valeur.slice(0, 4)}</strong>{' '}
+      Exonération jusqu’au <strong>{jourNumerique(finDuMois(fin.valeur))}</strong>{' '}
       inclus, puis taux plein — jusqu’à la fin du 3<sup>e</sup> trimestre civil suivant
       celui de l’affiliation. À recouper avec ton attestation URSSAF.
       {fin.statut === 'hypothese' && ' Règle extrapolée, non publiée pour cette période.'}
     </>
   );
+}
+
+/**
+ * « 30/09/2026 » : la forme de l'attestation URSSAF, avec laquelle la date se
+ * recoupe — « 30 sept. 2026 » obligerait à traduire avant de comparer.
+ */
+function jourNumerique(d: string): string {
+  return `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -838,6 +838,23 @@ describe('fenêtre d’ACRE', () => {
     expect(screen.getByText(/Exonération de 25\s% des cotisations jusqu’au/u)).toBeTruthy();
   });
 
+  /**
+   * Une affiliation en juillet finit au 30 juin : le jour était écrit « 31 »
+   * en dur, et la ligne qu'on recoupe avec l'attestation portait une date qui
+   * n'existe pas.
+   */
+  it('écrit le vrai dernier jour quand le trimestre finit un 30', async () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        entreprise: { ...faitsVides().entreprise, acre: true, debutActivite: dateISO('2026-07-15') }
+      }
+    });
+    await afficher('profil');
+    expect(screen.getAllByText(/30\/06\/2027/).length).toBe(2);
+    expect(screen.queryByText(/31\/06/)).toBeNull();
+  });
+
   it('n’écrit aucune date quand l’ACRE n’est pas déclarée', async () => {
     await afficher('profil');
     expect(screen.queryByText(/Exonération jusqu’au/)).toBeNull();
