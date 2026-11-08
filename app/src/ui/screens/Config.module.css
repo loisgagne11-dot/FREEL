@@ -521,6 +521,20 @@
 
 .rangeeDanger .rangeeTitre { color: var(--red); }
 
+/* L'état de l'archive : ambre tant que des pièces n'existent qu'ici, vert
+   quand toutes sont dans la dernière archive. Le texte dit l'état ; la
+   couleur ne fait que le souligner. */
+.rangeeAlerte { font-size: 12.5px; line-height: 1.5; color: var(--amber); font-weight: 560; }
+.rangeeOk { font-size: 12.5px; line-height: 1.5; color: var(--green); }
+
+.listeRefus {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .actionDanger { border-color: var(--red-line); color: var(--red); }
 .actionDanger:hover { border-color: var(--red); color: var(--red); background: var(--red-soft); }
 

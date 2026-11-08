@@ -13,8 +13,10 @@
  * Chaque pièce porte une **empreinte SHA-256** et un **horodatage**. L'audit
  * comptable classait les pièces de l'ancienne version comme « sans valeur
  * probante » : un booléen `piece: true`, aucun fichier, aucune trace. Une
- * copie numérique n'a de valeur en contrôle que si l'on peut montrer qu'elle
- * n'a pas été modifiée depuis son dépôt — c'est ce que l'empreinte établit.
+ * copie numérique n'a d'intérêt en contrôle que si l'on peut montrer qu'elle
+ * n'a pas été modifiée depuis son dépôt — c'est tout ce que l'empreinte
+ * établit : la NON-ALTÉRATION depuis le dépôt. Elle ne fait pas de la copie un
+ * archivage à valeur probante, et ne remplace pas l'original.
  *
  * Le module ne SUPPRIME jamais une pièce liée à un fait encore existant (voir
  * `motifRefusSuppression` plus bas). Les durées de conservation se comptent en
