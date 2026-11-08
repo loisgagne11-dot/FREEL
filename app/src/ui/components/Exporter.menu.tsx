@@ -43,8 +43,13 @@ export default function MenuExport(
             'text/csv;charset=utf-8'
           )
         },
+        // L'archive se crée là où l'on voit ce qu'elle protège (combien de
+        // pièces, depuis quand) : le menu y mène plutôt que de la lancer à
+        // l'aveugle. Le JSON, lui, ne contient AUCUNE pièce — son ancien nom,
+        // « Sauvegarde complète », le laissait croire.
+        { libelle: 'Archive complète avec justificatifs (ZIP)', href: '#/config/donnees' },
         {
-          libelle: 'Sauvegarde complète (JSON)',
+          libelle: 'Sauvegarde des données (JSON)',
           action: () => telecharger(
             nomSauvegarde(faits.entreprise.nom, dateDuJour()),
             JSON.stringify(faits, null, 2),

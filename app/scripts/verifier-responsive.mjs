@@ -56,7 +56,7 @@ const ECRANS = [
   { hash: '#/config/facturation', nom: 'config-facturation', attendre: 'text=Mentions portées' },
   { hash: '#/config/livre', nom: 'config-livre', attendre: 'text=Ouvrir le livre des recettes' },
   { hash: '#/config/compte', nom: 'config-compte', attendre: 'h2:has-text("Compte & synchronisation")' },
-  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Sauvegarde complète (JSON)' },
+  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
   // La liste des factures est un onglet d'Activité (formule A du rail) ; la
   // rédaction reste sous `#/facture/…`, et c'est l'un des écrans les plus denses.
   { hash: '#/activite/factures', nom: 'factures' },
