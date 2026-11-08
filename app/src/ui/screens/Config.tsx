@@ -1,23 +1,26 @@
-import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
-import { useToast } from '../components/Toasts';
-import { instantaneAvantRemplacement, useFaits } from '../../state/store';
-import { dateDuJour, soldeEstSuivi, tvaDueDepuisDe } from '../../state/selecteurs';
+import { lazy, Suspense, useEffect, useId, useState } from 'react';
+import { useFaits } from '../../state/store';
 import { finAcreDe } from '../../state/selecteurs.reglages';
-import { dateISO, euros, mois, ratio, type TypeActivite } from '../../domain/types';
-import { CLE_STOCKAGE, PART_GARDEE_MAX } from '../../state/schema';
-import { Montant } from '../components/Montant';
-import { dateCourte, eur, moisLong } from '../format';
+import { dateISO, type TypeActivite } from '../../domain/types';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
-import { Onglets, PanneauOnglet } from '../components/Onglets';
-import { controlerIban, controlerSiret } from '../../domain/calculs/identifiants';
+import { controlerSiret } from '../../domain/calculs/identifiants';
 import { useRoute } from '../useRoute';
 import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
-import { nomSauvegarde, telecharger } from '../../infra/telechargement';
 
 /**
- * Écran Config — profil, barème et données.
+ * Écran Config — les réglages, en sept sections.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI LA PLUPART DES SECTIONS SONT DANS D'AUTRES FICHIERS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Config était à 39,05 / 40 Ko avant que la liste des sections n'arrive. Le
+ * plafond ne se relève pas : chaque section hors Profil part dans son module,
+ * chargé quand on l'ouvre. Profil reste ici parce que c'est celle qu'on voit
+ * à l'ouverture — la charger à la demande ferait attendre l'écran sur son
+ * propre contenu par défaut.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * L'ÉCRAN QUI REND LE BARÈME MAINTENABLE
@@ -26,32 +29,25 @@ import { nomSauvegarde, telecharger } from '../../infra/telechargement';
  * Les taux officiels changent, et l'application ne peut pas être redéployée à
  * chaque publication. Sans porte d'entrée, deux issues, toutes deux mauvaises :
  * un taux périmé appliqué indéfiniment, ou une alerte de fraîcheur qui bloque
- * les déclarations sans que personne puisse la lever.
- *
- * La section Barème ouvre donc cette porte, sans renoncer aux garanties :
- *   · une période s'AJOUTE, elle ne réécrit pas le passé ;
- *   · elle porte sa source et sa date de vérification, comme celles livrées
- *     avec le code ;
- *   · la table affichée est celle **réellement appliquée** par les calculs, et
- *     non une copie qui pourrait en diverger.
+ * les déclarations sans que personne puisse la lever. La section « Paramètres
+ * fiscaux » ouvre cette porte : une période s'AJOUTE, elle ne réécrit pas le
+ * passé, et la table affichée est celle réellement appliquée par les calculs.
  *
  * La section « Propositions Claude Code » de l'ancienne version a été retirée
  * (décision D5) : elle proposait des actions que rien ne rattachait aux faits.
  */
 
-type Section = 'profil' | 'bareme' | 'donnees' | 'compte';
+type Section = 'profil' | 'fiscal' | 'reserve' | 'facturation' | 'livre' | 'compte' | 'donnees';
 
-const SECTIONS = [
-  { id: 'profil' as Section, libelle: 'Profil' },
-  { id: 'bareme' as Section, libelle: 'Barème' },
-  { id: 'donnees' as Section, libelle: 'Données' },
-  { id: 'compte' as Section, libelle: 'Compte' }
-];
-
-const Bareme = lazy(() => import('./Config.bareme').then((m) => ({ default: m.Bareme })));
+const Fiscal = lazy(() => import('./Config.fiscal').then((m) => ({ default: m.Fiscal })));
+const Reserve = lazy(() => import('./Config.reserve').then((m) => ({ default: m.Reserve })));
+const Facturation = lazy(() => import('./Config.facturation').then((m) => ({ default: m.Facturation })));
+const LivreDesRecettes = lazy(
+  () => import('./Config.facturation').then((m) => ({ default: m.LivreDesRecettes }))
+);
+const Donnees = lazy(() => import('./Config.donnees').then((m) => ({ default: m.Donnees })));
 // Le compte en ligne aussi : c'est l'écran le plus lourd après le barème, on
-// ne l'ouvre que pour synchroniser, et sa garde de schéma à l'envoi avait
-// amené Réglages à 39,92 / 40 Ko (invariant n°7 : on extrait).
+// ne l'ouvre que pour synchroniser (invariant n°7 : on extrait).
 const Compte = lazy(() => import('./Compte').then((m) => ({ default: m.Compte })));
 
 const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: string }[] = [
@@ -60,456 +56,127 @@ const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: st
   { id: 'BIC_vente', libelle: 'BIC — vente de marchandises' }
 ];
 
+/** Tracés d'icônes simples, sur une grille de 16 : aucune bibliothèque d'icônes. */
+const ICONES: Record<Section, string> = {
+  profil: 'M4 2h8v12H4zM6 5h4M6 8h4M6 11h2',
+  fiscal: 'M3 13L13 3M5 5.5a1 1 0 100-.01M11 11.5a1 1 0 100-.01',
+  reserve: 'M2.5 4h11v9h-11zM2.5 7h11M10 10h2',
+  facturation: 'M4 2h6l3 3v9H4zM10 2v3h3',
+  livre: 'M4 2.5h8v11H4zM4 11h8',
+  compte: 'M4.5 12a3 3 0 01.3-6A4 4 0 0112 7a2.5 2.5 0 01-.5 5z',
+  donnees: 'M8 2v8M5 7l3 3 3-3M3 13h10'
+};
+
 export function Config() {
   const faits = useFaits((e) => e.faits);
+  const entreprise = faits.entreprise;
   /**
-   * L'URL peut désigner une section.
+   * La section ouverte vit dans l'adresse : `#/config/compte` ouvre le compte,
+   * c'est la destination de la pastille Cloud de la barre du haut, qui annonce
+   * une session expirée — l'y envoyer sur « Profil » lui ferait chercher où se
+   * reconnecter. Et un rechargement doit retomber sur la même section.
    *
-   * `#/config/compte` ouvre le compte : c'est la destination de la pastille
-   * Cloud de la barre du haut, qui annonce une session expirée. L'y envoyer
-   * sur l'onglet « Profil » lui ferait chercher où se reconnecter.
-   *
-   * La sous-route AMORCE l'état, elle ne le contraint pas : sans quoi cliquer
-   * sur un autre onglet serait aussitôt annulé par l'adresse.
+   * L'état local suit l'adresse, et non l'inverse : `hashchange` arrive après
+   * le clic, et la section ne doit pas attendre l'événement pour s'afficher.
+   * Monté seul (les tests), l'écran ne lit pas l'adresse d'un autre écran.
    */
-  const { sousRoute } = useRoute();
-  const [section, setSection] = useState<Section>(
-    (SECTIONS.some((x) => x.id === sousRoute) ? sousRoute : 'profil') as Section
-  );
-  useEffect(() => {
-    if (SECTIONS.some((x) => x.id === sousRoute)) setSection(sousRoute as Section);
-  }, [sousRoute]);
-  const idGroupe = useId();
+  const { ecran, sousRoute, naviguerVers } = useRoute();
+  const routeIci = ecran.id === 'config' ? sousRoute : '';
+  const depuisAdresse = (r: string): Section =>
+    (SECTIONS.some((x) => x.id === r) ? r : 'profil') as Section;
+  const [section, setSection] = useState<Section>(() => depuisAdresse(routeIci));
+  useEffect(() => { setSection(depuisAdresse(routeIci)); }, [routeIci]);
+  const idTitre = useId();
+
+  function ouvrir(cible: Section): void {
+    setSection(cible);
+    naviguerVers('config', cible);
+  }
+
+  // Dérivé des faits, jamais stocké : le sous-titre ne peut pas mentir sur le
+  // régime puisqu'il est recalculé à chaque rendu.
+  const sousTitreProfil = [
+    entreprise.typeActivite === 'BNC' ? 'Micro-BNC' : 'Micro-BIC',
+    entreprise.acre ? 'ACRE' : null,
+    entreprise.siret.trim() === '' ? 'SIRET à saisir' : 'SIRET'
+  ].filter((x) => x !== null).join(' · ');
+
+  const entrees: readonly { id: Section; titre: string; sousTitre: string }[] = [
+    { id: 'profil', titre: 'Profil & statut', sousTitre: sousTitreProfil },
+    { id: 'fiscal', titre: 'Paramètres fiscaux', sousTitre: 'Abattement, cotisations, TVA' },
+    { id: 'reserve', titre: 'Réserve & versements', sousTitre: 'Matelas, seuil de sécurité' },
+    { id: 'facturation', titre: 'Facturation', sousTitre: 'RIB, mentions' },
+    { id: 'livre', titre: 'Livre des recettes', sousTitre: 'Registre obligatoire' },
+    { id: 'compte', titre: 'Compte & synchronisation', sousTitre: 'Multi-appareils · pièces' },
+    { id: 'donnees', titre: 'Données & export', sousTitre: 'Sauvegarde, restauration' }
+  ];
+  const courante = entrees.find((x) => x.id === section) ?? entrees[0]!;
+  const attente = <p role="status" className={styles.aide}>Chargement…</p>;
 
   return (
     <>
       <Greet
-        titre="Config"
+        titre="Configuration"
         sousTitre="Ton régime, tes barèmes, tes données. Chaque champ s’enregistre à la frappe."
       />
 
-      <div className={styles.sections}>
-        <Onglets
-          idGroupe={idGroupe}
-          onglets={SECTIONS}
-          actif={section}
-          onChange={setSection}
-          libelle="Sections de l’écran Config"
-        />
+      {/* Liste au-dessus du panneau sur téléphone, plutôt qu'une liste seule
+          qui ouvrirait le panneau à part : `#/config` doit ouvrir Profil, et
+          une page de navigation sans contenu ferait un clic de plus pour le
+          réglage le plus courant. Le coût — sept entrées avant le formulaire —
+          est celui de la lisibilité ; en grand écran la liste passe à gauche. */}
+      <div className={styles.mise}>
+        <nav aria-label="Sections des réglages" className={styles.liste}>
+          {entrees.map((x) => (
+            <button
+              key={x.id}
+              type="button"
+              className={styles.entree}
+              aria-current={x.id === section ? 'page' : undefined}
+              onClick={() => ouvrir(x.id)}
+            >
+              <span className={styles.icone} aria-hidden="true">
+                <svg viewBox="0 0 16 16" width="16" height="16" fill="none"
+                  stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d={ICONES[x.id]} />
+                </svg>
+              </span>
+              <span className={styles.entreeTexte}>
+                <span className={styles.entreeTitre}>{x.titre}</span>
+                <span className={styles.entreeSousTitre}>{x.sousTitre}</span>
+              </span>
+              <svg className={styles.chevron} viewBox="0 0 16 16" width="14" height="14" fill="none"
+                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 3l5 5-5 5" />
+              </svg>
+            </button>
+          ))}
+        </nav>
 
-        <PanneauOnglet idGroupe={idGroupe} id="profil" actif={section === 'profil'}>
-          <Profil />
-          <Tresorerie />
-        </PanneauOnglet>
-
-        <PanneauOnglet idGroupe={idGroupe} id="bareme" actif={section === 'bareme'}>
-          {/* Chargé à la demande : c'est la plus grosse section de l'écran, et
-              on ne l'ouvre que quand un taux officiel change — une fois ou
-              deux par an. */}
-          <Suspense fallback={<p role="status" className={styles.aide}>Chargement…</p>}>
-            {section === 'bareme' && <Bareme />}
-          </Suspense>
-        </PanneauOnglet>
-
-        <PanneauOnglet idGroupe={idGroupe} id="donnees" actif={section === 'donnees'}>
-          <Donnees nomFichier={nomSauvegarde(faits.entreprise.nom, dateDuJour())} />
-        </PanneauOnglet>
-
-        <PanneauOnglet idGroupe={idGroupe} id="compte" actif={section === 'compte'}>
-          {/* Monté seulement à l'ouverture : reprendre une session et
-              interroger le serveur n'a pas à se produire chaque fois qu'on
-              vient régler son profil. */}
-          <Suspense fallback={<p role="status" className={styles.aide}>Chargement…</p>}>
+        <section className={styles.panneau} aria-labelledby={idTitre}>
+          <h2 id={idTitre} className={styles.titrePanneau}>{courante.titre}</h2>
+          {/* Une section n'est montée qu'à son ouverture : reprendre une
+              session ou lire un barème n'a pas à se produire chaque fois
+              qu'on vient régler son profil. */}
+          <Suspense fallback={attente}>
+            {section === 'profil' && <Profil />}
+            {section === 'fiscal' && <Fiscal />}
+            {section === 'reserve' && <Reserve />}
+            {section === 'facturation' && <Facturation />}
+            {section === 'livre' && <LivreDesRecettes />}
             {section === 'compte' && <Compte />}
+            {section === 'donnees' && <Donnees />}
           </Suspense>
-        </PanneauOnglet>
+        </section>
       </div>
     </>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   Trésorerie
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * Le point de départ du solde, sa date, et le besoin mensuel.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * DEUX FAITS QUI N'AVAIENT AUCUNE PORTE D'ENTRÉE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * `soldeInitial` et `besoinMensuel` existaient dans le schéma et dans le
- * magasin, mais aucun écran ne les écrivait. Un utilisateur venu de
- * l'ancienne application héritait donc d'un solde qu'il ne pouvait pas
- * corriger, et d'une autonomie bloquée à zéro mois faute de besoin déclaré.
- * Un fait qu'on ne peut pas saisir est un fait qui restera faux.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * UN SOLDE N'EST UN POINT DE DÉPART QUE S'IL EST DATÉ
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Ce champ s'appelait « Solde du compte aujourd'hui », et c'était le bug : ce
- * montant contient DÉJÀ tous les encaissements et paiements passés, exactement
- * comme n'importe quel solde bancaire. L'application dérivait pourtant le
- * solde affiché en y rajoutant les recettes encaissées et les dépenses payées
- * — une seconde fois le même euro, dans le sens le plus dangereux : un solde
- * plus haut qu'il ne l'est, qui invite à se verser de l'argent déjà sorti.
- *
- * Le champ demande maintenant deux choses : le montant, ET la date à laquelle
- * il était vrai. Sans elle, l'application ne peut pas savoir ce qu'il contient
- * déjà et S'ABSTIENT de rien y ajouter (voir `domain/calculs/solde.ts`,
- * `ProvenanceSolde['sansDate']`) — le comportement d'avant que le solde ne se
- * dérive des faits. Avec elle, seuls les faits STRICTEMENT postérieurs
- * s'ajoutent : une recette encaissée hier, saisie après coup, ne s'y rajoute
- * pas ; une recette encaissée demain, si.
- */
-function Tresorerie() {
-  const faits = useFaits((e) => e.faits);
-  const definirSoldeInitial = useFaits((e) => e.definirSoldeInitial);
-  const definirSoldeInitialAu = useFaits((e) => e.definirSoldeInitialAu);
-  const definirBesoinMensuel = useFaits((e) => e.definirBesoinMensuel);
-  const definirObjectif = useFaits((e) => e.definirObjectifCaAnnuel);
-  const idChamp = useId();
-  const suivi = soldeEstSuivi(faits);
-
-  return (
-    <section className={styles.carte} aria-labelledby={`${idChamp}-titre`}>
-      <h2 id={`${idChamp}-titre`} className={styles.titreCarte}>
-        Trésorerie
-        <Info libelle="D’où vient le solde">
-          Le solde de cette application vient de ta <strong>banque</strong>,
-          pas d’un calcul. Tu indiques ici le point de départ&nbsp;; les
-          mouvements d’un relevé importé, et les faits enregistrés APRÈS la
-          date que tu poses, s’y ajoutent ensuite. L’ancienne version, elle,
-          simulait le solde à partir des encaissements et des charges cochées
-          payées — un chiffre qui dérive dès qu’une case est mal cochée.
-        </Info>
-      </h2>
-
-      <div className={styles.formulaire}>
-        <Champ
-          id={`${idChamp}-solde`}
-          libelle={suivi ? 'Solde avant le premier mouvement importé' : 'Solde de ton compte'}
-          aide={suivi
-            ? 'Un relevé est importé : ce montant est le point de départ auquel '
-              + 'ses mouvements s’ajoutent. Le modifier décale tout le solde.'
-            : 'Le montant que tu relèves sur ton compte, à la date que tu '
-              + 'indiques juste en dessous.'}
-        >
-          <input
-            id={`${idChamp}-solde`}
-            type="number"
-            inputMode="decimal"
-            step="0.01"
-            value={faits.soldeInitial}
-            onChange={(e) => definirSoldeInitial(euros(Number(e.target.value) || 0))}
-          />
-        </Champ>
-
-        <Champ
-          id={`${idChamp}-solde-date`}
-          libelle="Ce solde était vrai le"
-          aide={faits.soldeInitialAu === null
-            ? 'Sans cette date, l’application ne peut pas savoir si une recette '
-              + 'ou une dépense que tu enregistres ensuite est déjà comptée '
-              + 'dans ce montant — elle s’abstient donc de l’ajouter, et le '
-              + 'solde affiché reste exactement celui du dessus.'
-            : 'Tout ce que tu encaisses ou paies APRÈS cette date s’ajoute '
-              + 'désormais au solde affiché ; ce qui est daté d’avant, ou de '
-              + 'ce jour-là, est déjà compté dans le montant ci-dessus.'}
-        >
-          <input
-            id={`${idChamp}-solde-date`}
-            type="date"
-            value={faits.soldeInitialAu ?? ''}
-            onChange={(e) => definirSoldeInitialAu(
-              /^\d{4}-\d{2}-\d{2}$/.test(e.target.value) ? dateISO(e.target.value) : null
-            )}
-          />
-        </Champ>
-
-        <Champ
-          id={`${idChamp}-besoin`}
-          libelle="Besoin mensuel"
-          aide="Ce qu’il te faut pour vivre chaque mois. Sert à calculer ton
-                autonomie ; à zéro, l’autonomie affichée reste à zéro mois."
-        >
-          <input
-            id={`${idChamp}-besoin`}
-            type="number"
-            inputMode="decimal"
-            step="1"
-            value={faits.besoinMensuel}
-            onChange={(e) => definirBesoinMensuel(euros(Number(e.target.value) || 0))}
-          />
-        </Champ>
-
-        {/* Le champ est vide quand aucun objectif n'est fixé, et non à « 0 ».
-            Un zéro affiché se lirait comme un objectif de zéro euro, alors que
-            l'état réel est « je ne m'en suis pas fixé » — et c'est cet état-là
-            qui fait que le graphe n'affiche aucune ligne d'objectif. */}
-        <Champ
-          id={`${idChamp}-objectif`}
-          libelle="Objectif de chiffre d’affaires sur l’année"
-          aide="Facultatif. Sur l’encaissé, comme les plafonds et l’impôt — un
-                objectif sur le facturé serait atteint sans que le compte l’ait
-                vu passer. Laisse vide pour ne pas en fixer."
-        >
-          <input
-            id={`${idChamp}-objectif`}
-            type="number"
-            inputMode="decimal"
-            step="1000"
-            min="0"
-            placeholder="Aucun objectif"
-            value={faits.objectifCaAnnuel ?? ''}
-            onChange={(e) => definirObjectif(
-              e.target.value === '' ? null : euros(Number(e.target.value) || 0)
-            )}
-          />
-        </Champ>
-      </div>
-
-      <ReservesEtVersements />
-      <FoyerFiscal />
-    </section>
-  );
-}
-
-/**
- * Le foyer fiscal : parts, autres revenus, versement PER.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * TROIS FAITS QUI DORMAIENT SANS PORTE D'ENTRÉE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Ils étaient repris de l'ancienne application dans `configImpotBrute` —
- * conservés bruts, jamais interprétés, jamais saisissables. Sans eux, la
- * provision d'impôt sur le revenu ne peut pas se calculer : sous le régime du
- * barème, la ligne « impôt » du volet 2 ne valait donc que la CFP, 0,2 %, et
- * le versable était surévalué de tout l'impôt de l'année.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LES CHAMPS RESTENT VIDES, ET C'EST LE POINT
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Ni « 1 » de parts, ni « 0 » d'autres revenus par défaut : « je n'ai pas
- * renseigné » et « je suis seul » sont deux états différents, et le second se
- * déclare. Un défaut affiché ferait passer pour un résultat un impôt calculé
- * sur un foyer inventé — et l'écart entre une et trois parts va du simple au
- * double.
- *
- * Ils sont rangés en Trésorerie et non en Profil parce que c'est là qu'on
- * regarde ce qu'il faut garder de côté : c'est la seule chose que ces trois
- * faits servent à calculer.
- */
-function FoyerFiscal() {
-  const faits = useFaits((e) => e.faits);
-  const definir = useFaits((e) => e.definirFoyerFiscal);
-  const idChamp = useId();
-
-  const nombreOuNull = (valeur: string): number | null =>
-    valeur === '' ? null : (Number(valeur) || 0);
-
-  return (
-    <div className={styles.formulaire}>
-      <Champ
-        id={`${idChamp}-parts`}
-        libelle="Parts fiscales du foyer"
-        aide="Le quotient familial de ton avis d’imposition. Tant qu’il est vide,
-              l’impôt sur le revenu n’est pas provisionné — et l’application le dit
-              plutôt que d’en supposer une."
-      >
-        <input
-          id={`${idChamp}-parts`}
-          type="number"
-          inputMode="decimal"
-          step="0.25"
-          min="0.5"
-          placeholder="Non renseigné"
-          value={faits.partsFiscales ?? ''}
-          onChange={(e) => definir({ partsFiscales: nombreOuNull(e.target.value) })}
-        />
-      </Champ>
-
-      <Champ
-        id={`${idChamp}-commune`}
-        libelle="Situation du foyer"
-        aide="Elle fixe le plafond de la décote, qui allège l’impôt des foyers
-              modestes. Les parts ne la disent pas : un parent isolé en a deux,
-              comme un couple."
-      >
-        <select
-          id={`${idChamp}-commune`}
-          value={faits.impositionCommune === null ? '' : faits.impositionCommune ? 'commune' : 'seul'}
-          onChange={(e) => definir({
-            impositionCommune: e.target.value === '' ? null : e.target.value === 'commune'
-          })}
-        >
-          <option value="">Non renseignée</option>
-          <option value="seul">Seul·e — célibataire, divorcé·e, veuf·ve</option>
-          <option value="commune">Marié·e ou pacsé·e</option>
-        </select>
-      </Champ>
-
-      <Champ
-        id={`${idChamp}-autres`}
-        libelle="Autres revenus imposables du foyer, sur l’année"
-        aide="Salaires du conjoint, revenus fonciers… hors micro-entreprise. Ils
-              déterminent la tranche où ton résultat vient s’empiler : les ignorer
-              sous-estime l’impôt."
-      >
-        <input
-          id={`${idChamp}-autres`}
-          type="number"
-          inputMode="decimal"
-          step="100"
-          min="0"
-          placeholder="Non renseignés"
-          value={faits.autresRevenusFoyer ?? ''}
-          onChange={(e) => {
-            const v = nombreOuNull(e.target.value);
-            definir({ autresRevenusFoyer: v === null ? null : euros(v) });
-          }}
-        />
-      </Champ>
-
-      <Champ
-        id={`${idChamp}-per`}
-        libelle="Versement PER déductible, sur l’année"
-        aide="Ce que tu verses sur un plan d’épargne retraite, déductible du revenu
-              global. Non renseigné, il n’est pas déduit : l’impôt estimé est alors au
-              plus haut."
-      >
-        <input
-          id={`${idChamp}-per`}
-          type="number"
-          inputMode="decimal"
-          step="100"
-          min="0"
-          placeholder="Non renseigné"
-          value={faits.versementPerDeductible ?? ''}
-          onChange={(e) => {
-            const v = nombreOuNull(e.target.value);
-            definir({ versementPerDeductible: v === null ? null : euros(v) });
-          }}
-        />
-      </Champ>
-    </div>
-  );
-}
-
-/**
- * Les deux réglages de prudence — sources uniques, et deux notions distinctes.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * UN PLANCHER EN EUROS N'EST PAS UNE PART EN POURCENTAGE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Le SEUIL DE SÉCURITÉ est un montant absolu : la ligne sous laquelle le compte
- * ne descend pas (D4, fait `reserve`). La PART GARDÉE est une fraction du
- * versable qu'on choisit de ne pas prendre ce mois-ci.
- *
- * Les confondre — c'est-à-dire exprimer le plancher en pourcentage du
- * disponible, comme le fait le prototype du handoff — fabrique une boucle : le
- * plancher descend à mesure qu'on vide le compte, et le versement soutenable
- * finit par tout autoriser. Ce n'est pas une préférence de conception, c'est
- * une rétroaction.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * POURQUOI ILS SONT ICI ET PLUS SUR LE PILOTE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Le handoff les range dans « Réserve & versements », et le Pilote n'y montre
- * que le montant qui en résulte. Le second motif a tranché : le Pilote est le
- * seul écran du paquet d'entrée, et le second curseur lui a fait franchir son
- * plafond. La règle du projet est d'extraire ce qui n'a rien à faire là.
- *
- * L'état local ne sert qu'à la fluidité du glissement ; la valeur part dans le
- * magasin à chaque changement, de sorte qu'il n'existe jamais deux vérités.
- */
-function ReservesEtVersements() {
-  const reserve = useFaits((e) => e.faits.reserve);
-  const partGardee = useFaits((e) => e.faits.partGardeeAuVersement);
-  const soldeInitial = useFaits((e) => e.faits.soldeInitial);
-  const definirReserve = useFaits((e) => e.definirReserve);
-  const definirPartGardee = useFaits((e) => e.definirPartGardee);
-  const idChamp = useId();
-
-  const [saisiePart, setSaisiePart] = useState<number | null>(null);
-  const pourcent = Math.round((saisiePart ?? partGardee) * 100);
-  // Le versable qui résulte des deux réglages, pour que la phrase dise le
-  // calcul plutôt que de le laisser deviner. Dérivé, jamais stocké.
-  const versable = Math.max(0, soldeInitial - reserve);
-
-  return (
-    <div className={styles.formulaire}>
-      {/* Un CHAMP et non un curseur, contrairement à la part : c'est ce que
-          montre la capture, et c'est juste. Une plage a besoin d'une borne
-          haute, et la seule disponible ici est le solde — quelqu'un qui a
-          8 000 € en banque mais n'a pas encore saisi son solde de départ ne
-          pourrait pas se fixer un plancher à 5 000 €. */}
-      <Champ
-        id={`${idChamp}-seuil`}
-        libelle="Seuil de sécurité"
-        aide="Le montant que tu gardes sur le compte quoi qu’il arrive. Il est
-              retiré du disponible pour obtenir ce que tu peux te verser,
-              et c’est le plancher tracé sur tes courbes."
-      >
-        <input
-          id={`${idChamp}-seuil`}
-          type="number"
-          inputMode="decimal"
-          step="50"
-          min="0"
-          value={reserve}
-          onChange={(e) => definirReserve(euros(Math.max(0, Number(e.target.value) || 0)))}
-        />
-      </Champ>
-
-      <p className={styles.champ}>
-        <label htmlFor={`${idChamp}-part`}>Part gardée à chaque versement</label>
-        <span className={styles.curseurRangee}>
-          <input
-            id={`${idChamp}-part`}
-            type="range"
-            className={styles.curseur}
-            min={0}
-            max={PART_GARDEE_MAX * 100}
-            step={5}
-            value={pourcent}
-            aria-valuetext={`${pourcent} %`}
-            onChange={(e) => {
-              const v = Number(e.target.value) / 100;
-              setSaisiePart(v);
-              definirPartGardee(ratio(v));
-            }}
-            onBlur={() => setSaisiePart(null)}
-          />
-          <output className={styles.curseurValeur}>{pourcent}&nbsp;%</output>
-        </span>
-        <span className={styles.aide}>
-          Ce que tu laisses sur le compte <strong>au-dessus du seuil</strong>,
-          à chaque versement. À 0&nbsp;% rien ne change&nbsp;: c’est le réglage
-          par défaut, et il ne décide rien à ta place.
-        </span>
-      </p>
-
-      {/* La phrase dit le calcul, seuil compris. Le prototype du handoff écrit
-          « sur ta part disponible, tu gardes N % » — sans le seuil, ce qui à
-          0 % proposerait de verser le matelas avec. */}
-      <p className={styles.explication}>
-        Sur un solde de <Montant>{eur(soldeInitial)}</Montant>, le seuil en garde{' '}
-        <Montant>{eur(reserve)}</Montant>&nbsp;; des{' '}
-        <Montant>{eur(versable)}</Montant> restants tu en laisses{' '}
-        {pourcent}&nbsp;%, soit{' '}
-        <Montant>{eur(Math.round(versable * (1 - pourcent / 100)))}</Montant> à
-        te verser.
-      </p>
-    </div>
-  );
-}
+const SECTIONS: readonly { id: Section }[] = [
+  { id: 'profil' }, { id: 'fiscal' }, { id: 'reserve' }, { id: 'facturation' },
+  { id: 'livre' }, { id: 'compte' }, { id: 'donnees' }
+];
 
 /* ─────────────────────────────────────────────────────────────────────────
    Profil
@@ -522,18 +189,17 @@ function ReservesEtVersements() {
  * L'ancienne version avait un formulaire à valider, et la moitié des champs
  * n'étaient jamais persistés faute de clic — l'utilisateur croyait avoir
  * renseigné son régime alors que les calculs tournaient encore sur le défaut.
+ *
+ * L'IBAN, le BIC, la périodicité URSSAF et l'option TVA ont suivi leur
+ * section (Facturation, Paramètres fiscaux) : ici ne reste que l'identité et
+ * le régime, comme dans le handoff.
  */
 function Profil() {
   const entreprise = useFaits((e) => e.faits.entreprise);
-  const faits = useFaits((e) => e.faits);
-  const tvaDue = useMemo(() => tvaDueDepuisDe(faits), [faits]);
   const modifier = useFaits((e) => e.modifierEntreprise);
   const idChamp = useId();
-
   return (
-    <section className={styles.carte} aria-labelledby={`${idChamp}-titre`}>
-      <h2 id={`${idChamp}-titre`} className={styles.titreCarte}>Entreprise et régime</h2>
-
+    <div className={styles.carte}>
       <div className={styles.formulaire}>
         <Champ id={`${idChamp}-nom`} libelle="Nom">
           <input id={`${idChamp}-nom`} value={entreprise.nom}
@@ -613,16 +279,6 @@ function Profil() {
           </select>
         </Champ>
 
-        <Champ id={`${idChamp}-periodicite`} libelle="Périodicité de déclaration URSSAF">
-          <select id={`${idChamp}-periodicite`} value={entreprise.urssafPeriodicite}
-            onChange={(e) => modifier({
-              urssafPeriodicite: e.target.value === 'trimestriel' ? 'trimestriel' : 'mensuel'
-            })}>
-            <option value="mensuel">Mensuelle</option>
-            <option value="trimestriel">Trimestrielle</option>
-          </select>
-        </Champ>
-
         <Champ
           id={`${idChamp}-intracom`}
           libelle="Numéro de TVA intracommunautaire"
@@ -630,54 +286,6 @@ function Profil() {
         >
           <input id={`${idChamp}-intracom`} value={entreprise.tvaIntracom}
             onChange={(e) => modifier({ tvaIntracom: e.target.value })} />
-        </Champ>
-
-        {/*
-          * OÙ VOUS PAYER.
-          *
-          * `iban` existait au schéma et était même repris de l'ancienne
-          * application à la migration — mais aucun écran ne le montrait et le
-          * document imprimé ne le portait pas. Le client recevait une facture
-          * régulière sur laquelle rien n'indiquait où envoyer l'argent.
-          *
-          * L'IBAN porte une clé mod-97 : une inversion de caractères se voit
-          * ici, et non trois semaines plus tard en relançant un virement qui
-          * n'est jamais parti.
-          */}
-        <Champ
-          id={`${idChamp}-iban`}
-          libelle="IBAN"
-          aide="Figure sur tes factures, pour que le client sache où virer. Rien n’est envoyé nulle part."
-          controle={controlerIban(entreprise.iban)}
-        >
-          <input id={`${idChamp}-iban`} autoComplete="off" spellCheck={false}
-            value={entreprise.iban}
-            onChange={(e) => modifier({ iban: e.target.value })} />
-        </Champ>
-
-        <Champ id={`${idChamp}-bic`} libelle="BIC" aide="Facultatif pour un virement SEPA.">
-          <input id={`${idChamp}-bic`} autoComplete="off" spellCheck={false}
-            value={entreprise.bic}
-            onChange={(e) => modifier({ bic: e.target.value })} />
-        </Champ>
-
-        {/* Le franchissement des seuils se déduit des encaissements : ce champ
-            ne sert plus qu'à l'OPTION — choisir la TVA avant d'y être tenu. Il
-            décidait seul, et sans lui les factures partaient en franchise
-            alors que la TVA était due. */}
-        <Champ
-          id={`${idChamp}-tva`}
-          libelle="Option pour la TVA depuis (facultatif)"
-          aide={tvaDue === null
-            ? 'Le franchissement des seuils est détecté d’après tes encaissements. Ne renseigne ce mois que si tu as choisi la TVA avant d’y être tenu.'
-            : `D’après tes encaissements, la TVA est due depuis ${moisLong(tvaDue)} : tes factures la portent depuis. Ne renseigne ce mois que pour une option antérieure.`}
-        >
-          <input id={`${idChamp}-tva`} type="month" value={entreprise.tvaDepuis ?? ''}
-            onChange={(e) => modifier({
-              tvaDepuis: /^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)
-                ? mois(e.target.value)
-                : null
-            })} />
         </Champ>
       </div>
 
@@ -704,7 +312,7 @@ function Profil() {
           }
         />
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -740,200 +348,6 @@ function FenetreAcre() {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Données
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * Export des faits.
- *
- * Un export brut et complet, pas un rapport : ce qui compte ici est de pouvoir
- * récupérer ses données sans l'application. Les pièces justificatives ne sont
- * pas incluses — elles vivent dans IndexedDB et pèsent trop pour un fichier
- * texte —, et le dire vaut mieux que de laisser croire à une sauvegarde
- * complète.
- */
-function Donnees({ nomFichier }: { nomFichier: string }) {
-  const faits = useFaits((e) => e.faits);
-  const chargement = useFaits((e) => e.chargement);
-  const adopter = useFaits((e) => e.adopterFaitsDistants);
-  const signaler = useToast();
-  const idChamp = useId();
-  /**
-   * Ce qu'une sauvegarde contient, AVANT de l'appliquer.
-   *
-   * Restaurer écrase tout. Le faire au clic sur « parcourir » ferait perdre
-   * une saisie du jour sans que personne l'ait vue passer — c'est la même
-   * précaution que sur l'écran Compte, et pour la même raison.
-   */
-  const [aRestaurer, setARestaurer] = useState<Restauration | null>(null);
-  // Relue à chaque changement des faits : un remplacement vient d'en écrire
-  // une. `faits` n'est pas lu dans le calcul, il en est le DÉCLENCHEUR.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const avant = useMemo(() => instantaneAvantRemplacement(), [faits]);
-
-  function exporter(): void {
-    telecharger(nomFichier, JSON.stringify(faits, null, 2), 'application/json;charset=utf-8');
-  }
-
-  return (
-    <section className={styles.carte} aria-labelledby={`${idChamp}-donnees`}>
-      <h2 id={`${idChamp}-donnees`} className={styles.titreCarte}>Tes données</h2>
-
-      {chargement.phase === 'sans-persistance' && (
-        <p className={styles.echec} role="alert">{chargement.motif}</p>
-      )}
-
-      <dl className={styles.detail}>
-        <div className={styles.ligne}>
-          <dt>Recettes</dt>
-          <dd>{faits.recettes.length}</dd>
-        </div>
-        <div className={styles.ligne}>
-          <dt>Dépenses</dt>
-          <dd>{faits.depenses.length}</dd>
-        </div>
-        <div className={styles.ligne}>
-          <dt>Missions</dt>
-          <dd>{faits.missions.length}</dd>
-        </div>
-        <div className={styles.ligne}>
-          <dt>Clients</dt>
-          <dd>{faits.clients.length}</dd>
-        </div>
-        <div className={styles.ligne}>
-          <dt>Périodes déclarées</dt>
-          <dd>{faits.periodesDeclarees.length}</dd>
-        </div>
-        <div className={styles.ligne}>
-          <dt>Emplacement</dt>
-          <dd className={styles.source}>{CLE_STOCKAGE}</dd>
-        </div>
-      </dl>
-
-      <button type="button" className={styles.actionPrincipale} onClick={exporter}>
-        Exporter mes données
-      </button>
-
-      <p className={styles.champ}>
-        <label htmlFor={`${idChamp}-restaurer`}>Restaurer une sauvegarde</label>
-        <input
-          id={`${idChamp}-restaurer`}
-          type="file"
-          accept="application/json,.json"
-          onChange={(e) => {
-            const fichier = e.target.files?.[0];
-            // Le champ est vidé pour que rechoisir le MÊME fichier déclenche à
-            // nouveau l'événement : sans cela, annuler puis recommencer avec le
-            // même fichier ne ferait rien, et l'écran paraîtrait cassé.
-            e.target.value = '';
-            if (fichier === undefined) return;
-            void lireSauvegarde(fichier).then(setARestaurer);
-          }}
-        />
-        <span className={styles.aide}>
-          Un fichier produit par «&nbsp;Exporter mes données&nbsp;». Son contenu
-          te sera montré avant d’écraser quoi que ce soit.
-        </span>
-      </p>
-
-      {/* Une application vide ne montre rien de ce qu'elle sait faire : les
-          graphes sont plats, les indicateurs à zéro, et on ne peut pas juger.
-          Le jeu de démonstration passe par la MÊME confirmation qu'une
-          restauration — il écrase autant qu'elle, et l'appeler « démonstration »
-          ne le rend pas moins destructeur. */}
-      <button
-        type="button"
-        className={styles.action}
-        onClick={() => { void lireJeuDeDemonstration().then(setARestaurer); }}
-      >
-        Charger un jeu de démonstration
-      </button>
-      <p className={styles.explication}>
-        Des clients, des missions, des factures et des échéances manifestement
-        fictifs, pour voir l’application remplie. Ils remplacent tes données&nbsp;:
-        exporte-les d’abord si elles comptent.
-      </p>
-
-      {aRestaurer !== null && (
-        <div className={styles.confirmation} role="alert">
-          {aRestaurer.statut === 'illisible'
-            ? <p className={styles.echec}>{aRestaurer.motif}</p>
-            : (
-              <>
-                <p>
-                  Cette sauvegarde contient <strong>{aRestaurer.resume.recettes}</strong> recette(s),
-                  {' '}<strong>{aRestaurer.resume.depenses}</strong> dépense(s),
-                  {' '}<strong>{aRestaurer.resume.missions}</strong> mission(s) et
-                  {' '}<strong>{aRestaurer.resume.clients}</strong> client(s).
-                </p>
-                <p className={styles.explication}>
-                  La restaurer <strong>remplace</strong> tout ce qui est actuellement
-                  dans l’application. Les justificatifs déposés ne sont pas concernés&nbsp;:
-                  ils vivent à part, et une sauvegarde JSON ne les contient pas.
-                </p>
-                <div className={styles.actions}>
-                  <button
-                    type="button"
-                    className={styles.actionPrincipale}
-                    onClick={() => {
-                      void adopter(aRestaurer.brut).then((refus) => {
-                        signaler(refus ?? 'Sauvegarde restaurée.');
-                        setARestaurer(null);
-                      });
-                    }}
-                  >
-                    Remplacer mes données par cette sauvegarde
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.action}
-                    onClick={() => setARestaurer(null)}
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </>
-            )}
-        </div>
-      )}
-
-      {avant !== null && (
-        <div className={styles.confirmation}>
-          <p className={styles.explication}>
-            Tes données d’avant le dernier remplacement ({dateCourte(avant.le.slice(0, 10))})
-            ont été mises de côté. Y revenir met à son tour de côté ce que tu as
-            maintenant&nbsp;: rien ne se perd.
-          </p>
-          <div className={styles.actions}>
-            <button
-              type="button"
-              className={styles.action}
-              onClick={() => {
-                let bloc: unknown = null;
-                try { bloc = JSON.parse(avant.brut); } catch { /* refusé plus bas */ }
-                void adopter(bloc).then((refus) => {
-                  signaler(refus ?? 'Données d’avant le remplacement rétablies.');
-                });
-              }}
-            >
-              Revenir à l’état d’avant
-            </button>
-          </div>
-        </div>
-      )}
-
-      <p className={styles.explication}>
-        L’export contient tous les faits saisis, au format JSON. Les
-        justificatifs n’y sont pas&nbsp;: ce sont des fichiers, conservés à part
-        dans le navigateur. Les données de l’ancienne version restent en place
-        et ne sont jamais effacées.
-      </p>
-    </section>
-  );
-}
-
-
-/* ─────────────────────────────────────────────────────────────────────────
    Petits composants
    ───────────────────────────────────────────────────────────────────────── */
 
@@ -948,7 +362,7 @@ function Interrupteur(
 ) {
   return (
     <p className={styles.interrupteur}>
-      <input id={id} type="checkbox" checked={coche}
+      <input id={id} type="checkbox" role="switch" checked={coche}
         onChange={(e) => onChange(e.target.checked)} />
       <label htmlFor={id}>
         {libelle}
@@ -956,104 +370,4 @@ function Interrupteur(
       </label>
     </p>
   );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   Restauration d'une sauvegarde
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * Une sauvegarde lue, et ce qu'on peut en dire sans l'appliquer.
- *
- * L'export existait depuis le début, la restauration non. Une sauvegarde qu'on
- * ne sait pas relire n'est pas une sauvegarde : c'est un fichier qui rassure.
- */
-type Restauration =
-  | { readonly statut: 'illisible'; readonly motif: string }
-  | {
-    readonly statut: 'lisible';
-    readonly brut: unknown;
-    readonly resume: {
-      readonly recettes: number; readonly depenses: number;
-      readonly missions: number; readonly clients: number;
-    };
-  };
-
-/**
- * Lit un fichier de sauvegarde sans rien écrire.
- *
- * La validation de fond — schéma trop récent, listes mal formées — appartient
- * à `adopterFaitsDistants`, qui la fait au moment d'adopter. Ici on ne vérifie
- * que ce qu'il faut pour ANNONCER le contenu : un fichier illisible doit se
- * dire tout de suite, pas après une confirmation.
- */
-/**
- * Le jeu de démonstration, servi comme fichier statique.
- *
- * Il n'est PAS importé dans le paquet : ce sont douze kilo-octets que quelqu'un
- * qui saisit ses vraies données ne téléchargera jamais. Il est aussi la source
- * dont `scripts/capturer-app.mjs` se sert pour rendre nos écrans dans les mêmes
- * conditions que le handoff — un seul fichier, pas une copie qui dérive.
- *
- * Écrit au 10 juin 2026, il est recalé sur la date du jour avant d'être
- * proposé : voir `recalerDemonstration`. Les captures, elles, le chargent tel
- * quel, horloge figée.
- */
-async function lireJeuDeDemonstration(): Promise<Restauration> {
-  try {
-    const reponse = await fetch(`${import.meta.env.BASE_URL}jeu-de-demonstration.json`);
-    if (!reponse.ok) {
-      return { statut: 'illisible', motif: 'Le jeu de démonstration n’a pas pu être chargé.' };
-    }
-    const brut: unknown = await reponse.json();
-    const { recalerJeuBrut } = await import('../../state/demonstration.recalage');
-    return resumerBloc(recalerJeuBrut(brut, dateDuJour()));
-  } catch {
-    return { statut: 'illisible', motif: 'Le jeu de démonstration n’a pas pu être chargé.' };
-  }
-}
-
-async function lireSauvegarde(fichier: File): Promise<Restauration> {
-  let texte: string;
-  try {
-    texte = await fichier.text();
-  } catch {
-    return { statut: 'illisible', motif: 'Le fichier n’a pas pu être lu.' };
-  }
-
-  let brut: unknown;
-  try {
-    brut = JSON.parse(texte);
-  } catch {
-    return {
-      statut: 'illisible',
-      motif: 'Ce fichier n’est pas du JSON. Choisis un export produit par l’application.'
-    };
-  }
-
-  return resumerBloc(brut);
-}
-
-/** Annonce ce qu'un bloc contient, sans rien adopter. */
-function resumerBloc(brut: unknown): Restauration {
-  if (typeof brut !== 'object' || brut === null || Array.isArray(brut)) {
-    return {
-      statut: 'illisible',
-      motif: 'Ce fichier ne contient pas un bloc de faits exploitable.'
-    };
-  }
-
-  const o = brut as Record<string, unknown>;
-  const compter = (cle: string) => (Array.isArray(o[cle]) ? (o[cle] as unknown[]).length : 0);
-
-  return {
-    statut: 'lisible',
-    brut,
-    resume: {
-      recettes: compter('recettes'),
-      depenses: compter('depenses'),
-      missions: compter('missions'),
-      clients: compter('clients')
-    }
-  };
 }

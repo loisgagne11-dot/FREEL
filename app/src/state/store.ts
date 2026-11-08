@@ -54,7 +54,7 @@ function stockageNavigateur(): { readonly stockage: Stockage | null; readonly pl
 
 const MOTIF_PLEIN = 'Le stockage du navigateur est plein (ou bloqué en écriture) : '
   + 'tes données s’affichent, mais tes dernières saisies ne sont plus enregistrées. '
-  + 'Télécharge une sauvegarde depuis Réglages → Données, puis libère de l’espace.';
+  + 'Télécharge une sauvegarde depuis Config → Données & export, puis libère de l’espace.';
 
 export type EtatChargement =
   | { readonly phase: 'initial' }
@@ -299,7 +299,7 @@ function garderInstantane(): string | null {
     return null;
   } catch {
     return 'Impossible de mettre de côté tes données actuelles avant de les remplacer '
-      + '(stockage plein). Télécharge d’abord une sauvegarde depuis Réglages → Données.';
+      + '(stockage plein). Télécharge d’abord une sauvegarde depuis Config → Données & export.';
   }
 }
 

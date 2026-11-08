@@ -9,10 +9,88 @@
   color: var(--text);
 }
 
-.sections {
+/* ── Liste des sections et panneau ─────────────────────────────────────── */
+
+.mise {
   display: flex;
   flex-direction: column;
+  gap: 16px;
   min-width: 0;
+}
+
+.liste {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.entree {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+  background: linear-gradient(160deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.entree:hover { border-color: var(--line-2); }
+.entree:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* L'entrée ouverte : liseré vert et pastille allumée, comme le handoff. */
+.entree[aria-current='page'] {
+  border-color: var(--green-line);
+  background: var(--green-glow);
+}
+
+.icone {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: var(--panel-3);
+  color: var(--muted);
+}
+
+.entree[aria-current='page'] .icone { color: var(--green); background: var(--green-glow); }
+
+.entreeTexte { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.entreeTitre { font-size: 13.5px; font-weight: 620; color: var(--text); }
+.entreeSousTitre { font-size: 11.5px; line-height: 1.4; color: var(--muted-2); }
+.chevron { flex: none; color: var(--muted-2); }
+
+.panneau {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.titrePanneau {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.lien {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 8px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 560;
 }
 
 .carte {
@@ -112,7 +190,37 @@
   min-width: 0;
 }
 
-.interrupteur input { width: 18px; height: 18px; flex: none; accent-color: var(--green); }
+/* Un interrupteur, comme le handoff : c'est une case à cocher au clavier et au
+   lecteur d'écran (role="switch"), seul le dessin change. */
+.interrupteur input {
+  appearance: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  flex: none;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--panel-3);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.interrupteur input::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.interrupteur input:checked { background: var(--green-glow); border-color: var(--green-line); }
+.interrupteur input:checked::before { transform: translateX(16px); background: var(--green); }
+.interrupteur input:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 
 .interrupteur label {
   display: flex;
@@ -272,7 +380,16 @@
 
 @media (min-width: 761px) {
   .entete { grid-column: 1 / -1; }
-  .sections { grid-column: 1 / -1; }
+
+  /* La liste garde sa largeur propre ; le panneau prend le reste. `minmax(0, 1fr)`
+     et non `1fr` : sinon la table du barème, large de 560 px, élargirait la
+     colonne au lieu de défiler dans son conteneur. */
+  .mise {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    align-items: start;
+    gap: 22px;
+  }
 }
 
 /* Confirmation avant restauration. Encadrée et distincte du reste : ce qui

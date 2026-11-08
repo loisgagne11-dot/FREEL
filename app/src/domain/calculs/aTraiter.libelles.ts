@@ -230,7 +230,7 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         contexte: `Dernière vérification en ${moisLisible(texte(d['verifieLe']))}. Les taux `
           + 'changent au 1er janvier et, depuis 2024, en cours d’année.',
         action: 'Vérifier',
-        levier: 'comparer avec urssaf.fr, et ajouter une période dans Réglages › Barème si le '
+        levier: 'comparer avec urssaf.fr, et ajouter une période dans Config › Paramètres fiscaux si le '
           + 'taux a changé'
       };
 

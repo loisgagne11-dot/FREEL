@@ -250,7 +250,7 @@ export function compositionSolde(
       ? [
         'Ton solde de départ n’a pas de date : l’application ne sait pas si tes '
         + 'encaissements et tes dépenses y sont déjà compris, et s’abstient donc '
-        + 'de les ajouter. Renseigne la date dans Config › Solde du compte pour '
+        + 'de les ajouter. Renseigne la date dans Config › Réserve & versements pour '
         + 'que le solde suive tes saisies.'
       ]
       : []

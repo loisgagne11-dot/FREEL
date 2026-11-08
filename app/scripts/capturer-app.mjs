@@ -141,7 +141,14 @@ const VUES = [
      capture d'écran, et c'est justement là que les défauts se logent. */
   { hash: '#/outils', nom: 'outils-cra', ouvrir: ['CRA'] },
   { hash: '#/outils/cra', nom: 'pilote-cra', attendre: '[role="dialog"]' },
-  { hash: '#/config', nom: 'config-profil' }
+  { hash: '#/config', nom: 'config-profil' },
+  /* Les autres sections des Réglages (lot 9), chacune appariée à sa capture
+     du handoff. */
+  { hash: '#/config/fiscal', nom: 'config-fiscal' },
+  { hash: '#/config/reserve', nom: 'config-reserve' },
+  { hash: '#/config/facturation', nom: 'config-facturation' },
+  { hash: '#/config/donnees', nom: 'config-donnees' },
+  { hash: '#/config/compte', nom: 'config-cloud' }
 ];
 
 const themeDemande = argument('theme');

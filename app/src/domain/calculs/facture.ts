@@ -380,13 +380,13 @@ export function mentionsManquantes(facture: Facture): readonly Manque[] {
     'Date d’émission absente ou invalide.');
 
   exiger(emetteur.nom.trim() !== '', 'identite_emetteur',
-    'Ton nom ou ta dénomination est absent. À renseigner dans Config → Profil.');
+    'Ton nom ou ta dénomination est absent. À renseigner dans Config → Profil & statut.');
   exiger(emetteur.siret.trim() !== '', 'siret_emetteur',
-    'Ton SIRET est absent. À renseigner dans Config → Profil.');
+    'Ton SIRET est absent. À renseigner dans Config → Profil & statut.');
   exiger(
     emetteur.adresse.trim() !== '' || emetteur.ville.trim() !== '',
     'adresse_emetteur',
-    'Ton adresse est absente. À renseigner dans Config → Profil.'
+    'Ton adresse est absente. À renseigner dans Config → Profil & statut.'
   );
 
   exiger(destinataire.nom.trim() !== '', 'identite_destinataire',
