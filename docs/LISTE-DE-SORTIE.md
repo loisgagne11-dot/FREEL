@@ -226,6 +226,23 @@ d'un argent pas encore arrivé) ; au 31 décembre, c'est l'impôt entier.
 | Contrôle visuel du lot 12 (Pilote sur la démonstration, Argent sur le jeu d'essai au barème) | ✅ fait : le Pilote, une fois le calcul « à traiter » arrivé, est identique (pastilles, décisions, santé). Argent dit « 9 665 € à mettre de côté aujourd'hui… taux moyen de l'année projetée… 11 285 € d'impôt sur 79 680 € de chiffre d'affaires projeté… moins 600 € d'acomptes ; il restera 1 020 € » — recalculé hors écran : 11 284,62 × 0,9096 − 600 = 9 664,93 € |
 | Le jeu de démonstration est en versement libératoire, sans parts fiscales : la ligne d'impôt sur le revenu n'y paraît pas, avant comme après | ⬜ à décider : la capture ne montre donc pas ce lot ; un jeu « au barème » le montrerait |
 
+### Lot 13 — Ce qui est dû se voit en entier (priorité 2 : le faux)
+
+Deux sommes dues échappent encore au versable ou à son détail. La TVA
+autoliquidée d'un achat de service à un fournisseur de l'Union est due
+(confirmé au lot 7 : art. 283-2 du CGI, la franchise est sans incidence) et
+n'entre dans aucune provision : le versable est trop haut d'autant. Et le
+détail de la dette « impôt » ne montre pas la provision d'impôt sur le revenu
+que le versable retient pourtant.
+
+| Ligne | État |
+|---|---|
+| TVA autoliquidée dans les provisions : la somme des `aAutoliquider` des dépenses payées et non encore réglée à l'administration entre dans l'enveloppe TVA, en `hypothese` (« échéance de dépôt à confirmer auprès de ton service des impôts ») — le montant est sûr, seule la date ne l'est pas ; AUCUNE date d'échéance n'est inventée | ⬜ |
+| La TVA autoliquidée réglée (échéance TVA saisie comme payée) cesse d'être provisionnée — sans double compte avec la TVA collectée d'un assujetti | ⬜ |
+| Détail de la dette « impôt » : la provision d'impôt sur le revenu de l'année (et le solde de l'année précédente tant que l'avis manque), au même chiffre que le versable | ⬜ |
+| Pilote, composition, enveloppes et dette tombent d'accord (test d'accord) | ⬜ |
+| Rappel de déclaration de la TVA autoliquidée à une date précise | ⬜ hors lot : date d'exigibilité et échéance de dépôt d'un franchisé à confirmer auprès du SIE |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
