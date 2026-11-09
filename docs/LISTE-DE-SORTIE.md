@@ -245,6 +245,26 @@ que le versable retient pourtant.
 | Le dossier de déclaration de TVA du trimestre (`dossierTvaDuTrimestre`) ignore la TVA autoliquidée d'un franchisé devenu redevable en cours d'année | ⬜ hors lot : la provision la retient, le dossier pas encore — à reprendre avec le rappel de déclaration |
 | « Reste à sortir » du détail de la dette ne compte que l'appelé : l'impôt sur le revenu et la TVA s'affichent à côté, en blocs | ⬜ à trancher : la vignette et le détail peuvent donc montrer deux totaux |
 
+### Lot 14 — Les écrans s'ouvrent d'un coup (à planifier : le contrôle de vitesse échoue une fois sur deux)
+
+Constaté au lot 13, présent avant le lot 12 (mesuré sur l'état fusionné du
+lot 11) : `verifier:vitesse` échoue environ une exécution sur deux, toujours
+autour de **810 ms** au lieu de ~320, sur Facture, Outils, Config ou Activité.
+Les requêtes finissent toutes en moins de 50 ms : l'attente est dans le RENDU.
+React 19 retient la révélation d'une frontière `Suspense` 300 ms après qu'un
+repli a été montré (et une fenêtre de 500 ms) : quand un écran chargé à la
+demande charge lui-même, ENSUITE, ses morceaux à la demande (sections de
+Config, onglets d'Activité, rédaction de Facture), les retenues s'additionnent.
+Selon l'ordre d'arrivée des morceaux, on tombe sur 320 ou sur 810 ms — d'où le
+contrôle tantôt vert, tantôt rouge. Pour l'utilisateur, « Chargement… » dure
+parfois près d'une seconde.
+
+| Ligne | État |
+|---|---|
+| Précharger les morceaux imbriqués dès que l'écran parent est chargé (l'`import()` des sections part avec celui de l'écran), pour qu'une seule frontière se révèle | ⬜ |
+| Le contrôle de vitesse passe dix fois de suite | ⬜ |
+| Aucun budget relevé : le préchargement ne change pas le poids téléchargé au premier rendu | ⬜ |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
