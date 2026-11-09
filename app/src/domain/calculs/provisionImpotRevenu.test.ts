@@ -211,10 +211,81 @@ describe('provision d\'impôt sur le revenu', () => {
     expect(v.ignore).not.toContain('situation_familiale_non_renseignee');
   });
 
-  it('répartit le reste sur les mois restants, mois courant inclus', () => {
-    const v = valeur({ moisCourant: mois('2024-10') as Mois });
-    expect(v.moisRestants).toBe(3);
-    expect(v.parMoisRestant).toBe(euros(v.resteAProvisionner / 3));
+  it('compte les mois restants, mois courant inclus', () => {
+    expect(valeur({ moisCourant: mois('2024-10') as Mois }).moisRestants).toBe(3);
+  });
+
+  /**
+   * LE DÉFAUT DU LOT 12, SUR LE CAS FICTIF QUI L'A RÉVÉLÉ.
+   *
+   * 30 000 € encaissés au 30 juin, autant à venir, une part, rien d'autre.
+   * Sur l'encaissé seul, l'impôt tombait au taux d'un revenu de demi-année
+   * (quelques centaines d'euros) alors que l'année en coûte plus de 2 000 pour
+   * ce qui est déjà entré. Si la règle sautait, le versable resterait
+   * surévalué de ~2 100 € au premier semestre, puis s'effondrerait.
+   */
+  it('provisionne au taux de l’année projetée, pas à celui d’un revenu de demi-année', () => {
+    const juin = { annee: 2026, moisCourant: mois('2026-06') as Mois, caEncaisseConstate: euros(30000) };
+    const plancher = valeur({ ...juin, caAttendu: null });
+    const v = valeur({ ...juin, caAttendu: euros(30000) });
+
+    expect(v.caProjete).toBe(60000);
+    expect(v.partEncaissee).toBe(0.5);
+    expect(v.impotAnneeProjetee).toBe(v.impotMicro);
+    expect(Math.abs(v.resteAProvisionner - v.impotAnneeProjetee * 0.5)).toBeLessThan(0.01);
+    expect(v.resteAProvisionner).toBeGreaterThanOrEqual(4 * plancher.resteAProvisionner);
+  });
+
+  /** Au 31 décembre rien n'est attendu : tout est entré, l'impôt est dû en entier. */
+  it('provisionne l’impôt entier, moins les acomptes, quand tout est encaissé', () => {
+    const v = valeur({
+      moisCourant: mois('2024-12') as Mois,
+      caEncaisseConstate: euros(60000), caAttendu: euros(0),
+      acomptesPasSaisis: euros(1000)
+    });
+    expect(v.partEncaissee).toBe(1);
+    expect(v.resteAProvisionner).toBe(euros(v.impotAnneeProjetee - 1000));
+    expect(v.resteSurEncaissementsAVenir).toBe(0);
+  });
+
+  /**
+   * Même année projetée, argent arrivé à des rythmes différents : la provision
+   * suit l'argent reçu. Si elle suivait le calendrier, 50 € reçus seraient
+   * grevés de l'impôt de 59 950 € pas encore arrivés.
+   */
+  it('suit l’argent réellement reçu quand les encaissements sont irréguliers', () => {
+    const base = { caAttendu: null as Euros | null };
+    const peu = valeur({ ...base, caEncaisseConstate: euros(15000), caAttendu: euros(45000) });
+    const beaucoup = valeur({ ...base, caEncaisseConstate: euros(45000), caAttendu: euros(15000) });
+
+    expect(peu.caProjete).toBe(beaucoup.caProjete);
+    expect(peu.impotAnneeProjetee).toBe(beaucoup.impotAnneeProjetee);
+    expect(peu.partEncaissee).toBe(0.25);
+    expect(beaucoup.partEncaissee).toBe(0.75);
+    expect(Math.abs(beaucoup.resteAProvisionner - 3 * peu.resteAProvisionner)).toBeLessThan(0.02);
+  });
+
+  it('dit ce qu’il reste à mettre de côté sur les encaissements à venir', () => {
+    const v = valeur({ caEncaisseConstate: euros(30000), caAttendu: euros(30000), acomptesPasSaisis: euros(500) });
+    expect(Math.abs(
+      v.resteAProvisionner + v.resteSurEncaissementsAVenir + 500 - v.impotAnneeProjetee
+    )).toBeLessThan(0.02);
+  });
+
+  /**
+   * Des encaissements attendus sont des promesses : l'ensemble cesse d'être
+   * un fait. Sans eux, la provision ne repose que sur du constaté.
+   */
+  it('devient une hypothèse dès que les encaissements attendus contribuent, et le dit', () => {
+    const avec = provisionImpotRevenu(entree({ caAttendu: euros(10000) }));
+    expect(avec.statut).toBe('hypothese');
+    expect(avec.statut !== 'refuse' && avec.source).toMatch(/factures émises et planning/);
+    expect(avec.statut === 'hypothese' && avec.depuis).toBeTruthy();
+
+    const sans = provisionImpotRevenu(entree({ caAttendu: euros(0) }));
+    expect(sans.statut).toBe('publie');
+    expect(sans.statut !== 'refuse' && sans.valeur.ignore).toContain('aucun_encaissement_attendu');
+    expect(avec.statut !== 'refuse' && avec.valeur.ignore).not.toContain('aucun_encaissement_attendu');
   });
 
   /**
@@ -244,3 +315,24 @@ describe('provision d\'impôt sur le revenu', () => {
     expect(Number.isFinite(v.impotMicro)).toBe(true);
   });
 });
+
+/**
+ * Une année close ne peut plus rien recevoir : « l'impôt montera si d'autres
+ * recettes arrivent » y serait faux. Le solde de l'année précédente le portait.
+ */
+describe('année close', () => {
+  it('ne dit pas « aucun encaissement attendu » d’une année terminée', () => {
+    const base = {
+      annee: 2025, moisCourant: mois('2025-12'), typeActivite: 'BNC' as const,
+      caEncaisseConstate: euros(40000), caAttendu: euros(0),
+      foyer: { partsFiscales: 1, autresRevenusFoyer: euros(0), versementPerDeductible: euros(0), impositionCommune: null },
+      acomptesPasSaisis: euros(0)
+    };
+    const ouverte = provisionImpotRevenu(base);
+    const close = provisionImpotRevenu({ ...base, anneeClose: true });
+    if (ouverte.statut === 'refuse' || close.statut === 'refuse') throw new Error('refus inattendu');
+    expect(ouverte.valeur.ignore).toContain('aucun_encaissement_attendu');
+    expect(close.valeur.ignore).not.toContain('aucun_encaissement_attendu');
+  });
+});
+

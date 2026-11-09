@@ -395,3 +395,10 @@ chiffre faux.
 |---|---|---|
 | Vérification des règles d'accès du projet | 🟢 nouveau | L'ancienne application documentait une règle pour `user_data` sans jamais vérifier qu'elle était appliquée. La nouvelle compte, sans session et sans rien lire, les lignes visibles avec la clé publique, sur ses deux tables |
 | `docs/supabase.sql` | 🟢 | Porte aussi la règle de `user_data` (la même que l'ancienne documentait : l'ancienne application continue de fonctionner) |
+
+## Lot 12 (09/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Provision d'impôt sur le revenu (`getIRForYear`, `addIRMonthlyProvisions`) | 🟢 | L'ancienne provisionnait l'impôt entier de l'année (encaissé + facturé) dès qu'une facture était connue, réparti sur les mois encaissés. La nouvelle prend la même assiette, planning compris, et met de côté le taux moyen de l'année sur ce qui est entré : rien n'est retenu sur un argent pas encore arrivé, et au 31 décembre l'impôt est entier |
+

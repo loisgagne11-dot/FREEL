@@ -1,11 +1,12 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
-  aTraiter, etatPilote, fluxDuMois, moisCourant, remunerationDuMois, soldeEstSuivi
+  etatPilote, fluxDuMois, moisCourant, remunerationDuMois, soldeEstSuivi
 } from '../../state/selecteurs';
 import { Greet } from '../components/Greet';
 import { ActionsRapides } from '../components/ActionsRapides';
 import { FluxCard } from '../components/FluxCard';
+import { useATraiter } from '../useATraiter';
 import { SanteCard, indicateursDeSante } from '../components/SanteCard';
 import { eur, moisLong } from '../format';
 const ATraiter = lazy(() => import('./Pilote.decisions')
@@ -79,7 +80,8 @@ export function Pilote({ mois: moisChoisi, onMois }: {
   const moisVu = moisChoisi ?? mois;
   // Recalculé à chaque changement de faits, jamais stocké.
   const etat = useMemo(() => etatPilote(faits), [faits]);
-  const sujets = useMemo(() => aTraiter(faits), [faits]);
+  // `null` tant que le calcul n'est pas chargé : inconnu, pas « aucun sujet ».
+  const sujets = useATraiter(faits);
   const flux = useMemo(() => fluxDuMois(faits, mois, etat), [faits, mois, etat]);
   const verseCeMois = useMemo(() => remunerationDuMois(faits, mois), [faits, mois]);
 
@@ -91,6 +93,7 @@ export function Pilote({ mois: moisChoisi, onMois }: {
    * réalité, ce qui est exactement le défaut relevé sur l'ancienne version.
    */
   const sante = useMemo(() => {
+    if (sujets === null) return null;
     const sujet = (id: string) => sujets.find((x) => x.id === id);
     const periodes = sujet('periodes-a-declarer');
     const des = sujet('des-en-retard');
@@ -115,7 +118,7 @@ export function Pilote({ mois: moisChoisi, onMois }: {
   return (
     <>
       <Greet
-        titre={salutation(faits.entreprise.prenom, sujets.length)}
+        titre={salutation(faits.entreprise.prenom, sujets === null ? null : sujets.length)}
         sousTitre="Ton mois en un coup d’œil : ce qui entre, ce qui sort, ce que tu peux te verser."
         repere={<>Solde compte · <Montant>{eur(etat.tresorerie.solde)}</Montant></>}
       />
@@ -161,6 +164,8 @@ export function Pilote({ mois: moisChoisi, onMois }: {
           </Suspense>
         )}
 
+      {/* Sans les sujets, « 0 facture en retard » serait un faux « tout va bien » :
+          la phrase attend, la carte non — elle pousserait la page en arrivant. */}
       <SanteCard indicateurs={sante} autonomie={etat.autonomie} reserve={etat.tresorerie.reserve} />
 
       {/*
@@ -220,8 +225,11 @@ const EN_LETTRES = ['zéro', 'une', 'deux', 'trois', 'quatre', 'cinq', 'six', 's
  * « Rien ne réclame ton attention » n'est pas un vide à masquer : c'est la
  * bonne nouvelle de la journée.
  */
-export function salutation(prenom: string, nbSujets: number): string {
+export function salutation(prenom: string, nbSujets: number | null): string {
   const qui = prenom.trim() === '' ? 'Bonjour' : `Bonjour ${prenom.trim()}`;
+  // Inconnu (calcul pas encore chargé) n'est pas zéro : « rien ne réclame ton
+  // attention » dit à tort que tout va bien.
+  if (nbSujets === null) return `${qui}.`;
   if (nbSujets === 0) return `${qui} — rien ne réclame ton attention.`;
   if (nbSujets === 1) return `${qui} — une décision t’attend.`;
   return `${qui} — ${EN_LETTRES[nbSujets] ?? String(nbSujets)} décisions t’attendent.`;

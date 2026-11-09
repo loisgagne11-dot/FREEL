@@ -29,7 +29,8 @@ import {
   type DeclarationDes, type DeclarationEnRetard,
   amendeEncourue, declarationDuMois, declarationsEnRetard
 } from '../domain/calculs/des';
-import { dateDuJour, preneursDeServices } from './selecteurs';
+import { dateDuJour } from './selecteurs';
+import { preneursDeServices } from './selecteurs.aTraiter';
 import type { Faits, Recette } from './schema';
 import {
   FORMULE_PAR_DEFAUT, echeanceDe

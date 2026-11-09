@@ -21,6 +21,8 @@ import type { IgnoreParLaProvisionIr } from './provisionImpotRevenu';
 export const LIBELLE_IGNORE_IR: Readonly<Record<IgnoreParLaProvisionIr, string>> = {
   encaissements_a_venir_non_fournis:
     'Assiette limitée à l’encaissé constaté : montant plancher, il montera.',
+  aucun_encaissement_attendu:
+    'Aucune facture à encaisser ni revenu planifié d’ici décembre : l’impôt est estimé sur l’encaissé seul et montera si d’autres recettes arrivent.',
   autres_revenus_foyer_non_renseignes:
     'Autres revenus du foyer non renseignés, comptés pour zéro : impôt sous-estimé.',
   versement_per_non_renseigne: 'Versement PER non renseigné, donc non déduit : impôt au plus haut.',

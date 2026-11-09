@@ -3,10 +3,8 @@ import { formuler } from '../domain/calculs/aTraiter.libelles';
 import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
-import {
-  aTraiter, caEncaisseAnnee, echeancesReglementairesActives, etatPilote, moisCourant,
-  recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe
-} from './selecteurs';
+import { caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe } from './selecteurs';
+import { aTraiter, echeancesReglementairesActives } from './selecteurs.aTraiter';
 import { finAcreDe, provenanceSoldeDe } from './selecteurs.reglages';
 import { periodeCourante } from '../domain/calculs/periode';
 import { anneesDisponibles, etatArgent } from './selecteurs.argent';
@@ -431,14 +429,17 @@ describe('état de l\'écran Pilote', () => {
     expect(e.tresorerie.motifsIncomplets.join(' ')).toMatch(/parts/i);
   });
 
-  // Le pipeline des encaissements à venir n'est pas accessible depuis ici
-  // (`etatProjection` appelle `etatPilote`) : le montant est un plancher, et
-  // il le dit plutôt que de passer pour l'impôt complet de l'année.
-  it('dit que les encaissements à venir ne sont pas dans l’assiette', () => {
+  // `provisionIrDe` lit désormais lui-même le pipeline (lot 12). Sans facture
+  // émise ni planning, rien n'est attendu : le montant reste celui de l'encaissé
+  // seul, et il le dit sous ce motif-là. L'ancien motif, « non fournis »,
+  // décrivait un défaut — aucun appelant ne passait le pipeline — qui n'existe plus.
+  it('dit qu’aucun encaissement n’est attendu quand le pipeline est vide', () => {
     const e = etatPilote(auBareme(), [], maintenant);
     const r = e.provisionImpotRevenu;
     expect(r !== null && r.statut !== 'refuse' && r.valeur.ignore)
-      .toContain('encaissements_a_venir_non_fournis');
+      .toContain('aucun_encaissement_attendu');
+    expect(r !== null && r.statut !== 'refuse' && r.valeur.ignore)
+      .not.toContain('encaissements_a_venir_non_fournis');
   });
 });
 

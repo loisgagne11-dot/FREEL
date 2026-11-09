@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
 import { periodesADeclarer } from '../domain/calculs/declarations';
 import { type Faits, faitsVides } from './schema';
-import { aTraiter, etatPilote, montantDeclaration, recettesEncaissees } from './selecteurs';
+import { etatPilote, recettesEncaissees } from './selecteurs';
+import { aTraiter, montantDeclaration } from './selecteurs.aTraiter';
 import type { Recette } from './schema';
 
 const recetteEncaissee = (id: string, le: string, montant: number): Recette => ({

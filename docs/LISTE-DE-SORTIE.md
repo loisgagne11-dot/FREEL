@@ -215,12 +215,15 @@ d'un argent pas encore arrivé) ; au 31 décembre, c'est l'impôt entier.
 
 | Ligne | État |
 |---|---|
-| Le pipeline (factures émises non réglées, revenu du planning, sur l'année en cours) sort d'`etatProjection` dans une fonction à lui, que lisent la projection ET la provision — un seul calcul, pas de cycle | ⬜ |
-| `provisionImpotRevenu` : impôt de l'année projetée, taux moyen, part encaissée ; à mettre de côté = impôt projeté × part encaissée − acomptes. Sans pipeline (rien d'attendu), l'impôt projeté est celui de l'encaissé : l'actuel, et il le dit | ⬜ |
-| Résolution : la part constatée reste `publie` ; dès que le pipeline contribue, l'ensemble est une `hypothese` avec sa source (« factures émises et planning ») | ⬜ |
-| Pilote, composition et dette lisent le même chiffre (`impotRevenuAProvisionner`) ; test d'accord des trois et test chiffré du cas fictif ci-dessus | ⬜ |
-| L'écran dit, là où l'impôt se lit (composition du versable, Argent), qu'il est calculé au taux de l'année projetée, et sur quelle projection | ⬜ |
+| Le pipeline (factures émises non réglées, revenu du planning, sur l'année en cours) sort d'`etatProjection` dans une fonction à lui, que lisent la projection ET la provision — un seul calcul, pas de cycle | ✅ fait |
+| `provisionImpotRevenu` : impôt de l'année projetée, taux moyen, part encaissée ; à mettre de côté = impôt projeté × part encaissée − acomptes. Sans pipeline (rien d'attendu), l'impôt projeté est celui de l'encaissé : l'actuel, et il le dit | ✅ fait |
+| Résolution : la part constatée reste `publie` ; dès que le pipeline contribue, l'ensemble est une `hypothese` avec sa source (« factures émises et planning ») | ✅ fait |
+| Pilote, composition et dette lisent le même chiffre (`impotRevenuAProvisionner`) ; test d'accord des trois et test chiffré du cas fictif ci-dessus | ✅ fait pour Pilote et composition (test d'accord) ; *le détail de la dette « impôt » ne montre pas la provision d'IR — il ne lit que le taux sur les encaissements : à reprendre* |
+| L'écran dit, là où l'impôt se lit (composition du versable, Argent), qu'il est calculé au taux de l'année projetée, et sur quelle projection | ✅ fait |
 | Répartition mois par mois de l'ancienne application (`addIRMonthlyProvisions`) | ⬜ hors lot : la règle ci-dessus la rend inutile pour le versable ; l'échéancier mensuel est un autre sujet |
+| Budget d'entrée : lire le planning dans le premier rendu le portait à 84,7 / 80 Ko. Rien n'est relevé : les sujets « à traiter » (pastilles du rail, indicateur de la barre, décisions du Pilote — aucun ne porte le versable) se calculent dans un module chargé à la demande ; prévision, planification et calendrier sortent dans des modules à eux. Entrée à 73,8 Ko | ✅ fait. Pendant le chargement, aucun « 0 » ni « rien ne réclame ton attention » : la salutation reste neutre, la phrase de santé vide (`aria-busy`), la carte en place |
+| Le solde de l'année précédente disait « l'impôt montera si d'autres recettes arrivent » d'une année close | ✅ corrigé (`anneeClose`) |
+| Le jeu de démonstration est en versement libératoire, sans parts fiscales : la ligne d'impôt sur le revenu n'y paraît pas, avant comme après | ⬜ à décider : la capture ne montre donc pas ce lot ; un jeu « au barème » le montrerait |
 
 ## Reste fonctionnel par écran
 
@@ -234,7 +237,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Statuts cliquables dans « Le flux du mois » | ◐ | Détail en lecture seule ; aucun statut ne se modifie depuis l'écran | 5 |
 | Actions rapides personnalisables | ⬜ | Liste figée : ni catalogue, ni « + », ni persistance | à planifier |
 | Panneau « Pointer un encaissement » | ◐ | `encaisserRecette` n'est appelée que depuis le facturier | 5 |
-| Provision d'IR sur les encaissements attendus | ⬜ | Les trois appelants de `provisionIrDe` ne passent jamais `caAttendu` : la provision reste un plancher sur l'encaissé | 12 |
+| Provision d'IR sur les encaissements attendus | ✅ | Taux moyen de l'année projetée (encaissé + factures émises + planning) appliqué à l'encaissé | 12 |
 
 ### Argent
 

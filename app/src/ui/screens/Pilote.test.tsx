@@ -1,11 +1,12 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { type Faits, entrepriseVide, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Pilote, salutation } from './Pilote';
 import { mois } from '../../domain/types';
+import { ATraiter } from './Pilote.decisions';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -40,11 +41,37 @@ describe('la salutation', () => {
     expect(salutation('Camille', 12)).toBe('Bonjour Camille — 12 décisions t’attendent.');
   });
 
-  it('lit le prénom saisi en Réglages', () => {
+  it('lit le prénom saisi en Réglages', async () => {
     semer({ entreprise: { ...entrepriseVide(), nom: 'Atelier', prenom: 'Camille' } });
     render(<Pilote />);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/^Bonjour Camille — /);
+    // Le calcul des sujets arrive après le premier rendu : la phrase complète
+    // n'existe qu'ensuite.
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 }).textContent)
+      .toMatch(/^Bonjour Camille — /));
     expect(screen.getByRole('heading', { level: 1 }).textContent).not.toMatch(/Atelier/);
+  });
+
+  /**
+   * INCONNU N'EST PAS ZÉRO.
+   *
+   * Le calcul des sujets voyage à part. Tant qu'il n'est pas là, dire « rien ne
+   * réclame ton attention » ferait croire à un dossier en retard que tout va
+   * bien — le sens dangereux de l'erreur. Si cette règle sautait, la
+   * salutation et la carte des décisions annonceraient le calme pendant le
+   * chargement.
+   */
+  it('ne dit pas que rien ne réclame d’attention tant que les sujets sont inconnus', () => {
+    expect(salutation('Camille', null)).toBe('Bonjour Camille.');
+    expect(salutation('Camille', null)).not.toMatch(/rien ne réclame/);
+
+    render(<ATraiter sujets={null} />);
+    expect(screen.queryByText(/Rien ne réclame ton attention/)).toBeNull();
+    expect(screen.getByRole('heading', { name: /Décisions du jour/ })).toBeTruthy();
+  });
+
+  it('dit que rien ne réclame d’attention quand la liste est connue et vide', () => {
+    render(<ATraiter sujets={[]} />);
+    expect(screen.getByText(/Rien ne réclame ton attention/)).toBeTruthy();
   });
 });
 

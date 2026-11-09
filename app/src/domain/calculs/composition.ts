@@ -281,7 +281,10 @@ export function compositionProvisions(detail: DetailProvisions): Composition {
       libelle: LIBELLE_NATURE[n],
       montant: detail.parNature[n],
       signe: 'plus' as const,
-      precision: null,
+      // « dont » : la nature mêle les acomptes appelés (un fait) et la
+      // provision (une estimation). Dire « au taux de l'année projetée » de
+      // l'ensemble ferait croire qu'un acompte notifié est estimé.
+      precision: n === 'impot' ? 'dont provision au taux de l’année projetée' : null,
       date: null
     }));
 

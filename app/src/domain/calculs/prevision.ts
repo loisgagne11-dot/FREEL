@@ -1,6 +1,7 @@
 import type { DateISO, Euros, Mois } from '../types';
 import { euros } from '../types';
-import { type JourPlanifie, type Quotite, type Rythme, rythmePour } from './planning';
+import type { JourPlanifie, Quotite, Rythme } from './planning';
+import { rythmePour } from './planification';
 
 /**
  * La prévision de revenu d'une mission.

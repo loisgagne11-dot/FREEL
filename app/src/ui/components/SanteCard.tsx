@@ -40,7 +40,13 @@ export interface Indicateur {
  */
 export function SanteCard(
   { indicateurs, autonomie, reserve }: {
-    readonly indicateurs: readonly Indicateur[];
+    /**
+     * `null` tant que les sujets « à traiter » ne sont pas calculés (ils
+     * arrivent à la demande). La carte paraît quand même : l'autonomie et la
+     * réserve n'en dépendent pas, et une carte qui surgit après coup pousse
+     * toute la page. Seule la phrase attend — vide, jamais « tout va bien ».
+     */
+    readonly indicateurs: readonly Indicateur[] | null;
     /** Mois d'autonomie, ou `null` quand le besoin mensuel n'est pas renseigné. */
     readonly autonomie: number | null;
     /**
@@ -51,7 +57,7 @@ export function SanteCard(
     readonly reserve: number;
   }
 ) {
-  const synthese = syntheseDeSante(indicateurs);
+  const synthese = indicateurs === null ? null : syntheseDeSante(indicateurs);
 
   return (
     <section className={styles.barre} aria-labelledby="titre-sante">
@@ -69,12 +75,16 @@ export function SanteCard(
         </Info>
       </h2>
 
-      <p className={`${styles.synthese} ${styles[synthese.ton]}`} role="status">
-        <Montant>{synthese.phrase}</Montant>
-      </p>
+      {synthese === null
+        ? <p className={styles.synthese} role="status" aria-busy="true">{'\u00a0'}</p>
+        : (
+          <p className={`${styles.synthese} ${styles[synthese.ton]}`} role="status">
+            <Montant>{synthese.phrase}</Montant>
+          </p>
+        )}
 
       <ul className={styles.indicateurs}>
-        {indicateurs.map((i) => (
+        {(indicateurs ?? []).map((i) => (
           <li key={i.id} className={styles.indicateur}>
             <span className={`${styles.pastille} ${styles[i.etat]}`} aria-hidden="true" />
             {i.libelle}

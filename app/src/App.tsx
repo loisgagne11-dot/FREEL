@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Shell } from './ui/Shell';
 import { FournisseurToasts } from './ui/components/Toasts';
 import { useRoute } from './ui/useRoute';
@@ -34,12 +34,12 @@ const Achats = lazy(() => import('./ui/screens/Achats').then((m) => ({ default: 
 const Activite = lazy(() => import('./ui/screens/Activite').then((m) => ({ default: m.Activite })));
 const Config = lazy(() => import('./ui/screens/Config').then((m) => ({ default: m.Config })));
 const Facture = lazy(() => import('./ui/screens/Facture').then((m) => ({ default: m.Facture })));
-import { aTraiter, moisCourant } from './state/selecteurs';
+import { moisCourant } from './state/selecteurs';
+import { useCompteursATraiter } from './ui/useATraiter';
 import type { Mois } from './domain/types';
 
 /** Le mois choisi dans la barre du haut, tel que `useState` le rend. */
 type EtatMois = readonly [Mois, (m: Mois) => void];
-import { compteursParEcran } from './domain/calculs/aTraiter';
 import { FiletErreur } from './ui/components/FiletErreur';
 
 /** Recherche et export : différés, voir l'en-tête de `BarreActions`. */
@@ -123,7 +123,9 @@ export function App() {
 
   // Les badges viennent de la même requête que la liste de l'écran Pilote :
   // une seule source, donc jamais de badge qui contredit la liste.
-  const compteurs = useMemo(() => compteursParEcran(aTraiter(faits)), [faits]);
+  // `undefined` tant que le calcul n'est pas chargé : pas de pastille plutôt
+  // qu'un « 0 » qui dirait qu'il n'y a rien à traiter.
+  const compteurs = useCompteursATraiter(faits);
 
   /**
    * Le mois affiché par le navigateur de la barre du haut — et, par lui,
@@ -154,7 +156,7 @@ export function App() {
   return (
     <FournisseurToasts>
       <Shell
-        compteurs={compteurs}
+        {...(compteurs ? { compteurs } : {})}
         // Monté sur les sept écrans : c'est `SelecteurPeriode` lui-même qui
         // décide de se taire sur Pilote et Config (voir son en-tête) — Shell ne
         // doit pas apprendre le nom d'un écran pour rester ignorante du

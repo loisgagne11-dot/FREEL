@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Faits, type Recette, faitsVides } from '../../state/schema';
@@ -31,6 +31,9 @@ const enRetard = (id: string): Recette => ({
   numero: `2025-${id}`
 });
 
+/** Laisse le module de calcul, chargé à la demande, arriver. */
+const attendreLeCalcul = () => act(async () => { await import('../../state/selecteurs.aTraiter'); });
+
 function semer(modifications: Partial<Faits> = {}): void {
   useFaits.setState({ faits: { ...faitsVides(), ...modifications } });
 }
@@ -53,11 +56,28 @@ describe('indicateur à traiter', () => {
    * donc toujours au moins un sujet — ce qui est le comportement voulu, mais
    * empêche de tester le cas vide.
    */
-  it('n’apparaît pas quand il n’y a rien à traiter', () => {
+  it('n’apparaît pas quand il n’y a rien à traiter', async () => {
     vi.setSystemTime(new Date('2026-01-15T09:00:00Z'));
     semer();
     render(<IndicateurATraiter ecranActif="pilote" />);
+    await attendreLeCalcul();
     expect(screen.queryByRole('button', { name: /à traiter/ })).toBeNull();
+  });
+
+  /**
+   * AVANT LE CHARGEMENT, ON NE SAIT PAS : ON NE DIT RIEN.
+   *
+   * Le calcul voyage à part. Si l'indicateur se comportait comme une liste
+   * vide, il serait absent pour un dossier qui a des retards, puis surgirait :
+   * ici l'absence est la même, mais c'est le crochet qui doit rendre `null`
+   * plutôt que `[]` — voir le test du Pilote pour ce que `[]` ferait dire.
+   */
+  it('n’affiche rien tant que le calcul n’est pas chargé, puis la pastille', async () => {
+    semer({ recettes: [enRetard('r1')] });
+    render(<IndicateurATraiter ecranActif="pilote" />);
+    expect(screen.queryByRole('button', { name: /à traiter/ })).toBeNull();
+    await attendreLeCalcul();
+    expect(screen.getByRole('button', { name: /à traiter/ })).toBeTruthy();
   });
 
   it('chiffre les sujets et ouvre leur détail', async () => {
@@ -67,7 +87,7 @@ describe('indicateur à traiter', () => {
 
     // Deux factures en retard forment UN sujet : la pastille dit « 1 », comme
     // la salutation du Pilote et le badge du rail ; le détail dit « 2 ».
-    const pastille = screen.getByRole('button', { name: /à traiter/ });
+    const pastille = await screen.findByRole('button', { name: /à traiter/ });
     expect(pastille.textContent).toContain('1');
     expect(pastille.textContent).not.toContain('2');
 
@@ -82,23 +102,24 @@ describe('indicateur à traiter', () => {
    * Sur un écran donné, « 5 » doit vouloir dire « cinq choses ICI », pas
    * « cinq choses quelque part ». C'est ce qui rend la pastille lisible.
    */
-  it('ne montre que les sujets de l’écran où l’on est', () => {
+  it('ne montre que les sujets de l’écran où l’on est', async () => {
     semer({ recettes: [enRetard('r1')] });
     // Les factures en retard relèvent d'Activité : Achats ne doit rien montrer.
     render(<IndicateurATraiter ecranActif="achats" />);
+    await attendreLeCalcul();
     expect(screen.queryByRole('button', { name: /à traiter/ })).toBeNull();
   });
 
-  it('montre tout sur le Pilote, qui est le poste de pilotage', () => {
+  it('montre tout sur le Pilote, qui est le poste de pilotage', async () => {
     semer({ recettes: [enRetard('r1')] });
     render(<IndicateurATraiter ecranActif="pilote" />);
-    expect(screen.getByRole('button', { name: /à traiter/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /à traiter/ })).toBeTruthy();
   });
 
-  it('montre les sujets de l’écran concerné quand on y est', () => {
+  it('montre les sujets de l’écran concerné quand on y est', async () => {
     semer({ recettes: [enRetard('r1')] });
     render(<IndicateurATraiter ecranActif="activite" />);
-    expect(screen.getByRole('button', { name: /à traiter/ })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /à traiter/ })).toBeTruthy();
   });
 
   // Chaque sujet porte l'action qui le règle : une liste sans issue serait un
@@ -106,7 +127,7 @@ describe('indicateur à traiter', () => {
   it('donne à chaque sujet le chemin qui le règle', async () => {
     semer({ recettes: [enRetard('r1')] });
     render(<IndicateurATraiter ecranActif="pilote" />);
-    await userEvent.setup().click(screen.getByRole('button', { name: /à traiter/ }));
+    await userEvent.setup().click(await screen.findByRole('button', { name: /à traiter/ }));
     await screen.findByRole('dialog');
 
     const lien = screen.getAllByRole('link')[0] as HTMLAnchorElement;
