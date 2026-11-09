@@ -663,3 +663,12 @@ solde − provisions − réserve.
 | Nombre lu | Où | Avant | Après |
 |---|---|---|---|
 | Lignes lisibles sans connexion, par table | Compte & synchronisation | — | Compté par le serveur (`Content-Range`), jamais lu ; un total absent ou une requête refusée s'affiche « vérification impossible », jamais 0 |
+
+## Lot 12 (09/11) — l'impôt au taux de l'année
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Impôt sur le revenu à mettre de côté | Versable du Pilote, composition, Argent | Impôt calculé sur l'encaissé seul — un plancher, faux dès qu'une tranche est franchie (cas fictif : 413 € au 30 juin pour 30 000 € encaissés) | Impôt de l'année projetée × part encaissée − acomptes (≈ 2 520 € sur le même cas) ; `hypothese` dès que le pipeline contribue |
+| Impôt estimé de l'année, chiffre d'affaires projeté, taux moyen | Argent → hypothèses | « X € estimés sur la part micro », « soit Y € par mois » | Les trois nommés, et ce qui restera à mettre de côté sur les encaissements à venir |
+| Pastilles du rail, indicateur « à traiter », décisions du Pilote | Partout | Calculés au premier rendu | Calculés à la demande : absents un instant, jamais « 0 » |
+

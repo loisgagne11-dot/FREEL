@@ -231,7 +231,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     semer({ recettes: [recette(60000)], partsFiscales: 1 });
     render(<Argent />);
     await attendreTresorerie();
-    expect(screen.getAllByText(/restant à\s+mettre de côté/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/à\s+mettre de côté\s+aujourd/).length).toBeGreaterThan(0);
     // Autres revenus et PER non renseignés : deux réserves qui vont dans des
     // sens opposés, et qui doivent être dites toutes les deux.
     expect(screen.getByText(/Autres revenus du foyer non renseignés/)).toBeTruthy();
@@ -249,7 +249,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     render(<Argent />);
     await attendreTresorerie();
     expect(screen.queryAllByText(/non provisionné/)).toHaveLength(0);
-    expect(screen.queryAllByText(/restant à\s+mettre de côté/)).toHaveLength(0);
+    expect(screen.queryAllByText(/à\s+mettre de côté\s+aujourd/)).toHaveLength(0);
   });
 });
 

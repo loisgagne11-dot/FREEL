@@ -27,7 +27,7 @@ import { Info } from '../components/Info';
 import { Jauge } from '../components/Jauge';
 import { Montant } from '../components/Montant';
 import { Donut, PhraseRepartition } from '../components/Donut';
-import { dateCourte, eur, moisTexte } from '../format';
+import { dateCourte, eur, moisTexte, pct } from '../format';
 import { enKiloEuros } from '../format.kilo';
 import styles from './Argent.module.css';
 
@@ -1246,11 +1246,14 @@ function NoteImpotRevenu(
   return (
     <ul className={styles.hypotheses}>
       <li>
-        <strong>Impôt sur le revenu&nbsp;: {eur(p.resteAProvisionner)}</strong> restant à
-        mettre de côté pour {p.annee} — {eur(p.impotMicro)} estimés sur la part micro,
+        <strong>Impôt sur le revenu&nbsp;: {eur(p.resteAProvisionner)}</strong> à mettre de
+        côté aujourd’hui pour {p.annee} — le taux moyen de l’année projetée
+        ({pct(p.impotAnneeProjetee / Math.max(1, p.caProjete))} du chiffre d’affaires)
+        appliqué à ce qui est déjà entré. L’année est estimée à {eur(p.impotAnneeProjetee)} d’impôt
+        sur {eur(p.caProjete)} de chiffre d’affaires projeté (encaissé plus attendu),
         moins {eur(p.acomptesPasSaisis)} d’acomptes déjà appelés.
-        {p.parMoisRestant !== null
-          && ` Soit ${eur(p.parMoisRestant)} par mois sur ${p.moisRestants} mois.`}
+        {p.resteSurEncaissementsAVenir > 0
+          && ` Il restera ${eur(p.resteSurEncaissementsAVenir)} à mettre de côté sur les encaissements à venir.`}
       </li>
       {ligneSolde}
       {p.ignore.map((r) => <li key={r}>{LIBELLE_IGNORE_IR[r]}</li>)}

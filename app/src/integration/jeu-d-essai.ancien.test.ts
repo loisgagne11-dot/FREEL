@@ -7,7 +7,8 @@ import { motifRefusFaits, VERSION_SCHEMA } from '../state/schema';
 import { completerFaits } from '../state/schema.migrations';
 import { craDuMoisParMission, etatActivite, planningDuMois } from '../state/selecteurs.activite';
 import { journeesDuMois } from '../state/selecteurs.cra';
-import { aTraiter, etatPilote } from '../state/selecteurs';
+import { etatPilote } from '../state/selecteurs';
+import { aTraiter } from '../state/selecteurs.aTraiter';
 import { le } from '../test/jeu-d-essai';
 
 /**

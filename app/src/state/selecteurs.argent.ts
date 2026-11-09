@@ -24,16 +24,14 @@ import type { Resolution } from '../domain/types';
 import { type Echeance, type VentilationProvisions, estPayee } from '../domain/calculs/provisions';
 import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
 import type { ProvisionImpotRevenu } from '../domain/calculs/provisionImpotRevenu';
-import { encoursDe, suivre } from '../domain/calculs/facturier';
+import { encoursDe } from '../domain/calculs/facturier';
 import { soldeAuDernierJourDe } from '../domain/calculs/solde';
 import { decalerMois } from '../domain/calculs/periode';
 import type { Faits } from './schema';
 import {
-  dateDuJour, etatPilote, moisCourant, recettesEncaissees, remunerationDuMois
+  etatPilote, moisCourant, recettesEncaissees, remunerationDuMois
 } from './selecteurs';
-import {
-  previsionDuMoisParMission, tauxDeChargesAu
-} from './selecteurs.activite';
+import { tauxDeChargesAu } from './selecteurs.activite';
 import {
   type ProjectionSolde, depensesMensuellesMoyennes, projeterDisponible
 } from '../domain/calculs/projectionSolde';
@@ -43,28 +41,11 @@ import {
   type DossierTva, type PieceCollectee, type PieceDeduite, dossierTva
 } from '../domain/calculs/dossierTva';
 import {
-  FORMULE_PAR_DEFAUT, echeanceDe, formuleOuNull
-} from '../domain/calculs/delaiPaiement';
+  encaissementsAttendusParMois, facturesSuivies, finDuMoisISO
+} from './selecteurs.pipeline';
 
-/**
- * Toutes les factures, avec leur statut dérivé à la date du jour.
- *
- * Le délai de paiement vient du carnet ; à défaut de client rattaché, le délai
- * légal supplétif. Retenir zéro afficherait « en retard » dès l'émission.
- */
-export function facturesSuivies(faits: Faits, maintenant: Date = new Date()) {
-  /* Secours : l'échéance manque sur la recette (bloc écrit à la main, jeu
-     d'essai). On la reconstruit depuis les conditions actuelles du client —
-     faute de mieux, et sans l'écrire nulle part. */
-  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
-  const secours = (nom: string, emiseLe: DateISO) =>
-    echeanceDe(emiseLe, formules.get(nom) ?? FORMULE_PAR_DEFAUT);
-  return suivre(
-    faits.recettes,
-    secours,
-    dateDuJour(maintenant)
-  );
-}
+// Réexport : les lecteurs existants (performance) importent d'ici.
+export { facturesSuivies };
 
 /**
  * Les années que le sélecteur de la barre du haut peut proposer.
@@ -417,100 +398,6 @@ export interface EtatProjection {
 }
 
 /**
- * Ce que le compte devient sur douze mois, avec et sans se verser.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * D'OÙ VIENNENT LES ENCAISSEMENTS ATTENDUS
- * ─────────────────────────────────────────────────────────────────────────
- *
- * De deux sources, et d'aucune autre — surtout pas d'une extrapolation du
- * passé :
- *
- *  1. les factures **déjà émises et non réglées**, portées au mois de leur
- *     échéance. C'est un fait : le document est parti, la somme est due ;
- *  2. le **revenu prévu au planning** des mois à venir, décalé du délai de
- *     paiement du client. C'est le rythme que l'utilisateur a lui-même saisi,
- *     pas une tendance devinée.
- *
- * Une facture échue depuis longtemps et toujours impayée est portée au mois
- * COURANT plutôt qu'à sa date passée : l'argent n'est pas rentré, mais il
- * n'est pas perdu non plus, et le faire disparaître de la projection
- * reviendrait à l'abandonner sans le dire.
- */
-/**
- * Les encaissements attendus, mois par mois, sur l'horizon fourni.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * EXTRAIT POUR SERVIR À DEUX HORIZONS DIFFÉRENTS
- * ─────────────────────────────────────────────────────────────────────────
- *
- * `etatProjection` l'appelle sur douze mois glissants — c'est la carte
- * « Où va ton disponible ». Le graphe « Évolution du compte » (voir
- * `evolutionCompte`) l'appelle sur un horizon variable, qui dépend de
- * l'année regardée et peut être plus court (le reste de l'année en cours) ou
- * plus long (une année future déjà annoncée par un fait). Un seul calcul
- * d'attente, deux fenêtres — jamais une seconde implémentation qui aurait pu
- * diverger de la première.
- *
- * Le premier mois d'`horizon` sert de PLANCHER : une facture déjà échue
- * retombe dessus plutôt que sur sa date passée, qui n'a plus de sens une fois
- * l'horizon commencé. Voir l'appelant pour ce que ce plancher vaut dans
- * chaque cas — le mois courant pour `etatProjection`, le mois suivant pour
- * `evolutionCompte`, qui traite le mois courant comme un fait et non comme
- * une projection.
- */
-function encaissementsAttendusParMois(
-  faits: Faits,
-  horizon: readonly Mois[],
-  maintenant: Date
-): Map<Mois, number> {
-  const attendu = new Map<Mois, number>(horizon.map((m) => [m, 0]));
-  if (horizon.length === 0) return attendu;
-  const plancher = horizon[0] as Mois;
-
-  /* Le décalage de l'encaissement attendu suit la FORMULE, pas un nombre de
-     jours : « 30 jours fin de mois » repousse une facture du 12 juin au
-     31 juillet, dix-neuf jours plus loin qu'une simple addition. Sur une
-     prévision de trésorerie, dix-neuf jours changent le mois. */
-  const formulesClient = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
-
-  const ajouter = (m: Mois, montant: number): void => {
-    // Hors fenêtre : ni avant le plancher — l'argent d'hier est déjà au
-    // solde — ni au-delà de l'horizon.
-    if (attendu.has(m)) attendu.set(m, (attendu.get(m) ?? 0) + montant);
-  };
-
-  // 1. Les factures émises et non réglées, à l'échéance. Une échéance déjà
-  //    passée retombe sur le plancher : la somme est toujours due.
-  for (const f of facturesSuivies(faits, maintenant)) {
-    if (f.statut !== 'emise' && f.statut !== 'envoyee' && f.statut !== 'en_retard') continue;
-    const echeance = (f.echeanceLe ?? plancher).slice(0, 7) as Mois;
-    ajouter(echeance < plancher ? plancher : echeance, f.recette.montant);
-  }
-
-  /* 2. Le revenu prévu au planning, daté à son ÉCHÉANCE réelle.
-        Le mois M se facture le dernier jour du mois, et l'échéance suit la
-        formule convenue. Le calcul précédent divisait un nombre de jours par
-        trente et arrondissait au mois supérieur : « 30 jours fin de mois »
-        s'y traduisait par un mois de décalage, alors qu'une facture du
-        31 juillet à cette formule n'est due que le 30 septembre. Un mois
-        d'écart sur chaque mission, sur toute la prévision. */
-  const parMission = new Map(faits.missions.map((mi) => [mi.id, mi]));
-  for (const m of horizon) {
-    for (const p of previsionDuMoisParMission(faits, m)) {
-      const mission = parMission.get(p.missionId);
-      const nom = mission?.clientNom ?? '';
-      const emiseLe = finDuMoisISO(m);
-      const formule = formuleOuNull(mission?.delaiPaiement)
-        ?? formulesClient.get(nom) ?? FORMULE_PAR_DEFAUT;
-      ajouter(echeanceDe(emiseLe, formule).slice(0, 7) as Mois, p.prevision.montantRetenu);
-    }
-  }
-
-  return attendu;
-}
-
-/**
  * Six mois d'historique de dépenses payées, ramenés à leur moyenne — ou
  * `null` si l'historique est trop court.
  *
@@ -589,14 +476,6 @@ export function etatProjection(
 }
 
 
-
-/** Le dernier jour d'un mois, au format ISO. */
-function finDuMoisISO(m: Mois): DateISO {
-  const d = new Date(`${m}-01T00:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + 1);
-  d.setUTCDate(0);
-  return d.toISOString().slice(0, 10) as DateISO;
-}
 
 /** Nombre de mois entre `a` et `b` — positif si `b` est postérieur à `a`. */
 function differenceMois(a: Mois, b: Mois): number {

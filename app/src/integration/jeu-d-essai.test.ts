@@ -4,11 +4,8 @@ import { ecritureDAnnulation } from '../domain/calculs/ecritureRecette';
 import type { EcritureRecette } from '../domain/calculs/livreRecettes';
 import { type DateISO, type Mois, dateISO, euros, mois } from '../domain/types';
 import { VERSION_SCHEMA, type Faits, motifRefusFaits } from '../state/schema';
-import {
-  aTraiter, debutTvaEffectif, dateDuJour, etatPilote, fluxDuMois, moisCourant,
-  provisionIrDe, recettesEncaissees, sousAcreLe, soldeImpotPrecedentDe, solde,
-  caEncaisseAnnee, tvaDueDepuisDe
-} from '../state/selecteurs';
+import { debutTvaEffectif, dateDuJour, etatPilote, fluxDuMois, moisCourant, provisionIrDe, recettesEncaissees, sousAcreLe, soldeImpotPrecedentDe, solde, caEncaisseAnnee, tvaDueDepuisDe } from '../state/selecteurs';
+import { aTraiter } from '../state/selecteurs.aTraiter';
 import { finAcreDe } from '../state/selecteurs.reglages';
 import { etatActivite, craDuMoisParMission, tauxCotisationsAu } from '../state/selecteurs.activite';
 import { dossierTvaDuTrimestre, etatArgent } from '../state/selecteurs.argent';

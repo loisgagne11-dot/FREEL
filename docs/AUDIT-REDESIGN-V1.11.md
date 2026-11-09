@@ -1054,3 +1054,12 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Zone | Avant | Après |
 |---|---|---|
 | Réglages → Compte & synchronisation | — | Bloc « Règles d'accès », dès qu'un projet est configuré : un verdict par table (vert « ne se lisent pas sans connexion », rouge « EXPOSÉES : N ligne(s) », neutre « table absente », ambre « vérification impossible » et sa raison), « Vérifier », « vérifié le … » ; en cas d'exposition, alerte rouge avec le SQL à appliquer et « Copier le SQL » |
+
+## Lot 12 (09/11) — l'impôt au taux de l'année
+
+| Zone | Avant | Après |
+|---|---|---|
+| Argent → hypothèses de l'impôt | « restant à mettre de côté … soit Y € par mois » | « à mettre de côté aujourd'hui », taux moyen de l'année projetée, impôt estimé et chiffre d'affaires projeté, reste sur les encaissements à venir |
+| Composition du versable | « Impôt sur le revenu » | « dont provision au taux de l'année projetée » |
+| Pilote, premier rendu | Salutation, santé et décisions calculées d'emblée | Salutation neutre et phrase de santé vide un instant, le temps que le calcul « à traiter » arrive ; la carte Santé est en place dès le premier rendu |
+

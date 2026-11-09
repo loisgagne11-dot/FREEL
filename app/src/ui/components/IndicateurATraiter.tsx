@@ -1,6 +1,6 @@
-import { Suspense, lazy, useMemo, useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { aTraiter } from '../../state/selecteurs';
+import { useATraiter } from '../useATraiter';
 import type { EcranCible } from '../../domain/calculs/aTraiter';
 import styles from './IndicateurATraiter.module.css';
 
@@ -63,7 +63,8 @@ export function IndicateurATraiter({ ecranActif }: { readonly ecranActif: string
   const faits = useFaits((e) => e.faits);
   const [ouvert, setOuvert] = useState(false);
 
-  const tous = useMemo(() => aTraiter(faits), [faits]);
+  const tous = useATraiter(faits);
+  if (tous === null) return null;
   // Le Pilote est le poste de pilotage : il montre tout. Ailleurs, on ne
   // montre que ce qui se règle ici.
   const sujets = ecranActif === 'pilote'

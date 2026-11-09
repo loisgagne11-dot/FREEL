@@ -6,9 +6,8 @@ import { tauxImpotEtContributions } from '../domain/bareme/impot';
 import { voletAProvisionner } from '../domain/calculs/provisions';
 import { motifRefusFaits, type Faits } from './schema';
 import { completerFaits } from './schema.migrations';
-import {
-  aTraiter, etatPilote, periodesUrssafEffectives, recettesEncaissees, regimeDe, sousAcreLe
-} from './selecteurs';
+import { etatPilote, periodesUrssafEffectives, recettesEncaissees, regimeDe, sousAcreLe } from './selecteurs';
+import { aTraiter } from './selecteurs.aTraiter';
 import { ANCRE_DEMONSTRATION, recalerDemonstration, recalerJeuBrut } from './demonstration.recalage';
 
 /** Le jeu RÉEL, tel qu'il est servi — pas une copie écrite dans le test. */

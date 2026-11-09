@@ -78,6 +78,12 @@ export interface EntreeProvisionIr {
    * saurait alors laquelle fait foi.
    */
   readonly caAttendu: Euros | null;
+  /**
+   * L'année est terminée : rien ne peut plus s'y ajouter. Sans ce drapeau, le
+   * solde de l'année précédente portait « l'impôt montera si d'autres
+   * recettes arrivent » — faux pour une année close.
+   */
+  readonly anneeClose?: boolean;
   readonly foyer: FoyerFiscalImpot;
   /**
    * Acomptes de prélèvement à la source déjà saisis pour l'année, payés ou
@@ -94,6 +100,7 @@ export interface EntreeProvisionIr {
  */
 export type IgnoreParLaProvisionIr =
   | 'encaissements_a_venir_non_fournis'
+  | 'aucun_encaissement_attendu'
   | 'autres_revenus_foyer_non_renseignes'
   | 'versement_per_non_renseigne'
   | 'plafonnement_quotient_familial'
@@ -105,21 +112,43 @@ export interface ProvisionImpotRevenu {
   readonly annee: number;
   /** Le chiffre d'affaires retenu : constaté, plus l'attendu s'il est fourni. */
   readonly assiette: Euros;
+  /**
+   * Le chiffre d'affaires de l'année PROJETÉE : encaissé constaté plus
+   * encaissements attendus d'ici décembre. C'est l'assiette, nommée pour ce
+   * que l'écran en dit.
+   */
+  readonly caProjete: Euros;
   /** L'assiette après abattement forfaitaire : le revenu imposable du micro. */
   readonly revenuImposableMicro: Euros;
   /** Micro + autres revenus du foyer − versement PER. */
   readonly revenuImposableFoyer: Euros;
   /** Impôt du foyer entier, quotient familial appliqué. */
   readonly impotFoyer: Euros;
-  /** Ce que l'activité ajoute à cet impôt (avec − sans elle) : c'est lui qu'on provisionne. */
+  /** Ce que l'activité ajoute à cet impôt (avec − sans elle), sur l'année projetée. */
   readonly impotMicro: Euros;
+  /** Le même montant, sous le nom que lit la règle : l'impôt de l'année PROJETÉE. */
+  readonly impotAnneeProjetee: Euros;
+  /**
+   * Part du chiffre d'affaires projeté déjà entrée sur le compte, de 0 à 1 ;
+   * 1 quand l'assiette est nulle. C'est elle qui tient la provision à ce qui
+   * est entré, sans appliquer à un solde de juin l'impôt d'un argent de
+   * décembre.
+   */
+  readonly partEncaissee: number;
   readonly acomptesPasSaisis: Euros;
-  /** Ce qui reste dû après les acomptes déjà saisis. Jamais négatif. */
+  /**
+   * Ce qu'il faut avoir mis de côté AUJOURD'HUI :
+   * `impôt de l'année projetée × part encaissée − acomptes`, jamais négatif.
+   */
   readonly resteAProvisionner: Euros;
   /** Mois restants de l'année, mois courant inclus. */
   readonly moisRestants: number;
-  /** Le rythme de mise de côté conseillé, ou `null` si l'année est finie. */
-  readonly parMoisRestant: Euros | null;
+  /**
+   * Ce qu'il restera à mettre de côté au fil des encaissements À VENIR :
+   * `impôt de l'année − acomptes − déjà à mettre de côté`, jamais négatif.
+   * Ce n'est pas un montant dû aujourd'hui, et il ne doit pas se lire comme tel.
+   */
+  readonly resteSurEncaissementsAVenir: Euros;
   readonly ignore: readonly IgnoreParLaProvisionIr[];
 }
 
@@ -132,10 +161,25 @@ export interface ProvisionImpotRevenu {
  *
  * Le refus serait le réflexe du projet, et il serait faux ici : sans montant,
  * la ligne « impôt » du volet 2 retombe à ZÉRO — l'état exact qu'on répare,
- * et le sens dangereux de l'erreur. Calculé sur le seul encaissé constaté, le
- * montant reste un PLANCHER : c'est l'impôt dû sur de l'argent déjà reçu, et
- * il ne peut que monter quand le reste de l'année s'ajoute. Le manque est
- * porté par `ignore`, donc dit à l'écran.
+ * et le sens dangereux de l'erreur. Sans encaissement attendu (`null` ou 0),
+ * l'impôt de l'année projetée est celui de l'encaissé seul, et la part
+ * encaissée vaut 1 : le montant reste un PLANCHER, qui monte si d'autres
+ * recettes arrivent. Le manque est porté par `ignore`, donc dit à l'écran.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * AU TAUX DE L'ANNÉE, PAS AU TAUX DU SOLDE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Contre-exemple qui a motivé la règle : 30 000 € encaissés au 30 juin à
+ * rythme constant, une part, aucun autre revenu. Calculé sur l'encaissé seul,
+ * l'impôt tombait à 413 € (le taux moyen d'un revenu de demi-année) alors que
+ * l'année entière coûtera environ 5 080 €, dont environ 2 520 € pour ce qui est
+ * déjà entré : le versable était surévalué de 2 100 € puis s'effondrait au
+ * second semestre. On provisionne donc `impôt de l'année projetée × part déjà
+ * encaissée` : à rythme constant c'est le prorata du temps, avec des
+ * encaissements irréguliers cela suit l'argent reçu, et au 31 décembre c'est
+ * l'impôt entier. Les acomptes se retranchent ENSUITE, sur le total : leur
+ * appliquer la part les ferait compter deux fois à moitié.
  *
  * Les parts, elles, font refuser : sans elles, aucun quotient familial ne
  * peut être formé, et en supposer une seule surestimerait l'impôt du simple
@@ -181,11 +225,20 @@ export function provisionImpotRevenu(
   // moyen : voir `surcroitDImpot`, la même fonction que le comparateur.
   const impotMicro = surcroitDImpot(revenuMicro, autres, per, partsFiscales, tranches, decoteFoyer);
 
-  const resteAProvisionner = euros(Math.max(0, impotMicro - entree.acomptesPasSaisis));
+  // Assiette nulle : rien n'est entré ni attendu, la part est sans objet et
+  // vaut 1 plutôt qu'une division par zéro.
+  const partEncaissee = assiette > 0 ? entree.caEncaisseConstate / assiette : 1;
+  const resteAProvisionner = euros(
+    Math.max(0, impotMicro * partEncaissee - entree.acomptesPasSaisis)
+  );
+  const resteSurEncaissementsAVenir = euros(
+    Math.max(0, impotMicro - entree.acomptesPasSaisis - resteAProvisionner)
+  );
   const moisRestants = Math.max(0, 12 - Number(entree.moisCourant.slice(5, 7)) + 1);
 
   const ignore: IgnoreParLaProvisionIr[] = [];
   if (entree.caAttendu === null) ignore.push('encaissements_a_venir_non_fournis');
+  else if (entree.caAttendu === 0 && entree.anneeClose !== true) ignore.push('aucun_encaissement_attendu');
   if (autresRevenusFoyer === null) ignore.push('autres_revenus_foyer_non_renseignes');
   if (versementPerDeductible === null) ignore.push('versement_per_non_renseigne');
   if (situationDecoteDecisive(revenuMicro, autres, per, partsFiscales, tranches, decoteFoyer)) {
@@ -197,19 +250,36 @@ export function provisionImpotRevenu(
   const valeur: ProvisionImpotRevenu = {
     annee: entree.annee,
     assiette,
+    caProjete: assiette,
     revenuImposableMicro: revenuMicro,
     revenuImposableFoyer: revenuFoyer,
     impotFoyer,
     impotMicro,
+    impotAnneeProjetee: impotMicro,
+    partEncaissee,
     acomptesPasSaisis: entree.acomptesPasSaisis,
     resteAProvisionner,
     moisRestants,
-    parMoisRestant: moisRestants > 0 ? euros(resteAProvisionner / moisRestants) : null,
+    resteSurEncaissementsAVenir,
     ignore
   };
 
-  // La résolution la plus prudente des deux composantes : une hypothèse sur
-  // le barème ou sur l'abattement rend l'ensemble une hypothèse.
+  // La résolution la plus prudente des composantes : une hypothèse sur le
+  // barème ou sur l'abattement rend l'ensemble une hypothèse. Les
+  // encaissements attendus en sont une aussi : factures non réglées et
+  // planning sont des promesses, pas des faits. Sans eux (`null` ou 0), la
+  // provision ne repose que sur du constaté et reste `publie`.
+  const pipelineContribue = entree.caAttendu !== null && entree.caAttendu > 0;
+  if (pipelineContribue) {
+    return {
+      statut: 'hypothese', valeur,
+      source: `${bareme.source} + ${apresAbattement.source} ; encaissements attendus : factures émises et planning`,
+      verifieLe: bareme.verifieLe,
+      depuis: bareme.statut === 'hypothese'
+        ? bareme.depuis
+        : apresAbattement.statut === 'hypothese' ? apresAbattement.depuis : entree.moisCourant
+    };
+  }
   if (bareme.statut === 'publie' && apresAbattement.statut === 'publie') {
     return {
       statut: 'publie', valeur,

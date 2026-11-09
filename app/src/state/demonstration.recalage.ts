@@ -3,7 +3,8 @@ import { periodesADeclarer } from '../domain/calculs/declarations';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Faits, type Recette, motifRefusFaits } from './schema';
 import { completerFaits } from './schema.migrations';
-import { montantDeclaration, recettesEncaissees } from './selecteurs';
+import { recettesEncaissees } from './selecteurs';
+import { montantDeclaration } from './selecteurs.aTraiter';
 
 /**
  * Recale le jeu de démonstration sur la date du jour.

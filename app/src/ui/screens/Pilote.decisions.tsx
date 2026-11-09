@@ -31,7 +31,17 @@ import styles from './Pilote.module.css';
  * Une liste vide n'est pas un vide à masquer : c'est une information, et la
  * meilleure qu'on puisse donner.
  */
-export function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] }) {
+export function ATraiter({ sujets }: { sujets: readonly SujetATraiter[] | null }) {
+  // `null` : le calcul n'est pas chargé. Ni liste ni « Rien ne réclame ton
+  // attention » — on ne sait pas encore, et dire le contraire serait faux.
+  if (sujets === null) {
+    return (
+      <section className={`${styles.carte} ${styles.decisions}`} aria-labelledby="titre-a-traiter" aria-busy="true">
+        <h2 id="titre-a-traiter" className={styles.titreCarte}>Décisions du jour</h2>
+      </section>
+    );
+  }
+
   return (
     <section className={`${styles.carte} ${styles.decisions}`} aria-labelledby="titre-a-traiter">
       <h2 id="titre-a-traiter" className={styles.titreCarte}>
