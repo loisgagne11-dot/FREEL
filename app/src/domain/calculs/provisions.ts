@@ -213,10 +213,16 @@ export interface ContexteProvisions {
    * passerait donc dans le disponible, puis dans « tu peux te verser ». Les
    * échéances de TVA saisies sont retranchées en amont, comme les acomptes
    * d'impôt : sinon le volet 1 et ce montant compteraient deux fois la même
-   * dette. La TVA déductible n'en est pas retranchée — ce montant est un
-   * plafond prudent, que la déclaration ramène au juste.
+   * dette. Il comprend la TVA autoliquidée sur les achats à l'Union (lot 13),
+   * ajoutée avant ce retranchement.
    */
   readonly tvaAReverser?: Euros;
+  /**
+   * La part de `tvaAReverser` qui vient d'achats autoliquidés — information
+   * pour le détail, JAMAIS ajoutée : elle est déjà dans `tvaAReverser`, et la
+   * recompter ici la ferait payer deux fois.
+   */
+  readonly tvaAutoliquidee?: Resolution<Euros> | null;
 }
 
 /**

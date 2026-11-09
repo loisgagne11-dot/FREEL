@@ -672,3 +672,11 @@ solde − provisions − réserve.
 | Impôt estimé de l'année, chiffre d'affaires projeté, taux moyen | Argent → hypothèses | « X € estimés sur la part micro », « soit Y € par mois » | Les trois nommés, et ce qui restera à mettre de côté sur les encaissements à venir |
 | Pastilles du rail, indicateur « à traiter », décisions du Pilote | Partout | Calculés au premier rendu | Calculés à la demande : absents un instant, jamais « 0 » |
 
+## Lot 13 (09/11) — ce qui est dû
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| TVA à reverser (provision) | Versable, enveloppes, composition, dette | Collectée − déductible − réglée | + TVA autoliquidée des achats de services dans l'Union payés EN FRANCHISE (hypothèse, sans date de dépôt) ; chez un redevable elle s'annule et n'ajoute rien |
+| « dont TVA autoliquidée » | Détail de l'enveloppe TVA | — | Plafonnée à ce qui reste provisionné |
+| Impôt sur le revenu à mettre de côté | Détail de la dette « impôt » | Absent : seul le taux sur les encaissements y figurait | Au même chiffre que le versable |
+

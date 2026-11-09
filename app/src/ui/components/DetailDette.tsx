@@ -63,7 +63,32 @@ export function PanneauDetailDette({ detail }: { readonly detail: DetailDette })
         </p>
       )}
 
-      {detail.annees.length === 0
+      {detail.impotRevenu !== null && (
+        <p className={styles.provisionIr} role="status">
+          {detail.impotRevenu.statut === 'refuse'
+            ? <>Impôt sur le revenu non provisionné&nbsp;: {detail.impotRevenu.motif}</>
+            : (
+              <>
+                Impôt sur le revenu à mettre de côté&nbsp;:{' '}
+                <strong><Montant>{eur(detail.impotRevenu.valeur)}</Montant></strong>
+                {' '}en plus des lignes ci-dessous
+                {detail.impotRevenu.statut === 'hypothese' && ' (estimation)'}
+              </>
+            )}
+        </p>
+      )}
+
+      {/* « dont » : la part autoliquidée est déjà dans la provision de TVA,
+          elle ne s'y ajoute pas. Pas de date : aucune n'est connue. */}
+      {detail.tvaAutoliquidee !== null && detail.tvaAutoliquidee.statut !== 'refuse' && (
+        <p className={styles.provisionIr} role="status">
+          dont TVA autoliquidée sur tes achats de services dans l’Union&nbsp;:{' '}
+          <strong><Montant>{eur(detail.tvaAutoliquidee.valeur)}</Montant></strong>
+          {' '}— date de dépôt à confirmer auprès de ton service des impôts
+        </p>
+      )}
+
+      {detail.annees.length === 0 && detail.impotRevenu === null && detail.tvaAutoliquidee === null
         ? (
           <p className={styles.vide}>
             Rien à ce titre pour l’instant. Cette enveloppe se remplira quand un

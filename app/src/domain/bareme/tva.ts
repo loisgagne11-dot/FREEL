@@ -116,6 +116,17 @@ export const TAUX_TVA_NORMAL = {
   verifieLe: dateISO('2026-11-07')
 } as const;
 
+/**
+ * Provenance de la TVA autoliquidée sur un achat de service à un fournisseur
+ * de l'Union. Le MONTANT est sûr (art. 283-2 CGI, la franchise y est sans
+ * incidence — confirmé au lot 7) ; seule la date de dépôt ne l'est pas, et
+ * aucune n'est inventée : d'où l'hypothèse plutôt que le publié.
+ */
+export const AUTOLIQUIDATION_TVA = {
+  source: 'art. 283-2 du CGI ; échéance de dépôt à confirmer auprès de ton service des impôts',
+  verifieLe: dateISO('2026-11-07')
+} as const;
+
 export const PERIODES_TVA: readonly PeriodeTva[] = [
   p(
     '2025-01', null,
