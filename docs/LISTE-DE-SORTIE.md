@@ -195,6 +195,33 @@ compte.
 | Une sonde qui échoue (réseau, CSP, projet mal saisi) ne passe JAMAIS pour « protégé » | ✅ fait |
 | Contrôle visuel (deux thèmes, téléphone, projet fictif aux réponses simulées : faits protégés, ancienne table exposée) | ✅ fait : verdicts lisibles, alerte et SQL dans la largeur du téléphone. *Le comportement réel de PostgREST (total `*/0` d'une table vide, 404 d'une table absente) est tenu par les tests, pas encore par un vrai projet : à confirmer à la première vérification sur ton compte* |
 
+### Lot 12 — L'impôt se provisionne au taux de l'année (priorité 2 : un chiffre faux fait verser trop)
+
+La provision d'impôt sur le revenu se calcule sur le seul encaissé : un
+« plancher ». Il est faux dès que l'activité franchit une tranche en cours
+d'année — le cas courant d'un micro-entrepreneur seul. Exemple FICTIF : 30 000 €
+encaissés au 30 juin, rythme constant, une part, aucun autre revenu : la
+provision affichée est de 413 € ; l'année coûtera environ 5 080 €, dont environ
+2 520 € correspondent à ce qui est déjà entré. Le versable est surévalué
+d'environ 2 100 €, puis s'effondre au second semestre.
+
+**Règle retenue** : mettre de côté, sur ce qui est entré, le TAUX MOYEN DE
+L'ANNÉE PROJETÉE — impôt de l'année (encaissé + attendu : factures émises non
+réglées et revenu du planning, le pipeline d'`etatProjection`) × part déjà
+encaissée, moins les acomptes de prélèvement à la source. À rythme constant,
+c'est le prorata du temps ; quand les encaissements sont irréguliers, il suit
+l'argent réellement reçu (on ne provisionne pas, sur le solde du jour, l'impôt
+d'un argent pas encore arrivé) ; au 31 décembre, c'est l'impôt entier.
+
+| Ligne | État |
+|---|---|
+| Le pipeline (factures émises non réglées, revenu du planning, sur l'année en cours) sort d'`etatProjection` dans une fonction à lui, que lisent la projection ET la provision — un seul calcul, pas de cycle | ⬜ |
+| `provisionImpotRevenu` : impôt de l'année projetée, taux moyen, part encaissée ; à mettre de côté = impôt projeté × part encaissée − acomptes. Sans pipeline (rien d'attendu), l'impôt projeté est celui de l'encaissé : l'actuel, et il le dit | ⬜ |
+| Résolution : la part constatée reste `publie` ; dès que le pipeline contribue, l'ensemble est une `hypothese` avec sa source (« factures émises et planning ») | ⬜ |
+| Pilote, composition et dette lisent le même chiffre (`impotRevenuAProvisionner`) ; test d'accord des trois et test chiffré du cas fictif ci-dessus | ⬜ |
+| L'écran dit, là où l'impôt se lit (composition du versable, Argent), qu'il est calculé au taux de l'année projetée, et sur quelle projection | ⬜ |
+| Répartition mois par mois de l'ancienne application (`addIRMonthlyProvisions`) | ⬜ hors lot : la règle ci-dessus la rend inutile pour le versable ; l'échéancier mensuel est un autre sujet |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
@@ -207,7 +234,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Statuts cliquables dans « Le flux du mois » | ◐ | Détail en lecture seule ; aucun statut ne se modifie depuis l'écran | 5 |
 | Actions rapides personnalisables | ⬜ | Liste figée : ni catalogue, ni « + », ni persistance | à planifier |
 | Panneau « Pointer un encaissement » | ◐ | `encaisserRecette` n'est appelée que depuis le facturier | 5 |
-| Provision d'IR sur les encaissements attendus | ⬜ | Les trois appelants de `provisionIrDe` ne passent jamais `caAttendu` : la provision reste un plancher sur l'encaissé | 2 (avec L4, L5) |
+| Provision d'IR sur les encaissements attendus | ⬜ | Les trois appelants de `provisionIrDe` ne passent jamais `caAttendu` : la provision reste un plancher sur l'encaissé | 12 |
 
 ### Argent
 
