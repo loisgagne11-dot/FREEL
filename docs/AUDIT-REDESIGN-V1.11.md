@@ -1049,3 +1049,8 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Restauration | JSON seulement | JSON ou ZIP par le même bouton ; pour une archive, la confirmation donne sa date, ce qu'elle contient, les pièces d'ici qui seraient détachées, et deux gestes : « Tout remplacer par cette archive » et « Ajouter seulement les pièces manquantes » ; les pièces refusées sont listées une par une |
 | Achats | — | Bandeau ambre « N justificatifs pas encore archivés : ils n'existent que dans ce navigateur » avec « Créer une archive », tant qu'il en reste ; chargé à part (l'écran est à 39,5 / 40 Ko) |
 
+## Lot 11 (08/11) — le compte ne fuit pas
+
+| Zone | Avant | Après |
+|---|---|---|
+| Réglages → Compte & synchronisation | — | Bloc « Règles d'accès », dès qu'un projet est configuré : un verdict par table (vert « ne se lisent pas sans connexion », rouge « EXPOSÉES : N ligne(s) », neutre « table absente », ambre « vérification impossible » et sa raison), « Vérifier », « vérifié le … » ; en cas d'exposition, alerte rouge avec le SQL à appliquer et « Copier le SQL » |

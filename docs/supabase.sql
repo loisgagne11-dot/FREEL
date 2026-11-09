@@ -5,13 +5,15 @@
 -- À exécuter une fois, dans l'éditeur SQL du projet Supabase.
 --
 -- ───────────────────────────────────────────────────────────────────────────
--- CE SCRIPT NE TOUCHE PAS À `user_data`
+-- CE SCRIPT NE CHANGE PAS `user_data`, IL NE FAIT QUE LA PROTÉGER
 -- ───────────────────────────────────────────────────────────────────────────
 --
--- `user_data` est la table de l'ancienne application. Elle reste telle
--- quelle : tant que les deux versions coexistent, l'ancienne doit continuer
--- de fonctionner exactement comme avant. La nouvelle la LIT pour reprendre
--- les données, et n'y écrit jamais.
+-- `user_data` est la table de l'ancienne application. Ses colonnes et ses
+-- données restent telles quelles : tant que les deux versions coexistent,
+-- l'ancienne doit continuer de fonctionner exactement comme avant. La
+-- nouvelle la LIT pour reprendre les données, et n'y écrit jamais. La seule
+-- chose que ce script y fait est d'y poser les règles d'accès (section
+-- finale) : voir pourquoi là-bas.
 --
 -- ───────────────────────────────────────────────────────────────────────────
 -- POURQUOI UN COMPTEUR `version`
@@ -80,3 +82,24 @@ create policy "freel_faits — modifier les siens"
 -- une règle qui l'autoriserait ne servirait qu'à rendre possible un accident.
 -- L'effacement d'un compte se fait depuis le tableau de bord Supabase, où il
 -- est un acte délibéré ; la cascade sur `auth.users` s'en charge alors.
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- `user_data` — LA TABLE DE L'ANCIENNE APPLICATION
+-- ───────────────────────────────────────────────────────────────────────────
+--
+-- La clé « anon » figure dans le code de toute page servie. Si `user_data`
+-- n'a pas de règles d'accès, cette clé publique suffit à lire les finances de
+-- CHAQUE compte. L'ancienne application documentait ces règles dans son code,
+-- mais rien ne dit qu'elles ont été appliquées ; la nouvelle relit cette table,
+-- elle ne peut donc pas se contenter de le supposer.
+--
+-- Ce bloc ne change ni colonne ni donnée. Il est idempotent, et c'est la règle
+-- que l'ancienne application documentait : elle continue de fonctionner.
+
+alter table public.user_data enable row level security;
+
+drop policy if exists "user_data — chacun les siens" on public.user_data;
+create policy "user_data — chacun les siens"
+  on public.user_data for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);

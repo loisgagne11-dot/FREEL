@@ -22,6 +22,7 @@ import { convertirBundle } from '../../infra/migration.legacy';
 import { estLeJeuDeDemonstration } from '../../domain/calculs/demonstration';
 import { Info } from '../components/Info';
 import { dateCourte } from '../format';
+import { ReglesDAcces } from './Compte.acces';
 import styles from './Compte.module.css';
 
 /**
@@ -425,9 +426,9 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
         Compte et synchronisation
         <Info libelle="Ce que fait la connexion au compte">
           Elle enregistre et relit les données de cette version dans une table
-          qui lui est propre. <strong>La table de l’ancienne application n’est
-          jamais modifiée</strong>&nbsp;: elle reste utilisable, et un essai de
-          cette version ne peut pas abîmer ses données.
+          qui lui est propre. <strong>Les données de l’ancienne application ne
+          sont jamais modifiées</strong>&nbsp;: elle reste utilisable, et un essai de
+          cette version ne peut pas les abîmer.
         </Info>
       </h2>
 
@@ -554,6 +555,8 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
           )}
         </>
       )}
+
+      <ReglesDAcces config={config} />
 
       {erreur !== null && <p role="alert" className={styles.echec}>{erreur}</p>}
       {message !== null && <p role="status" className={styles.succes}>{message}</p>}
