@@ -171,7 +171,7 @@ function Ligne(
         {!ouverte && (
           <button type="button" data-pointer className={styles.marquer} onClick={onOuvrir}>
             Marquer payée
-            <span className={styles.horsEcran}> — {libelle}, échéance le {dateCourte(e.echeanceLe)}</span>
+            {' '}<span className={styles.horsEcran}>— {libelle}, échéance le {dateCourte(e.echeanceLe)}</span>
           </button>
         )}
       </div>

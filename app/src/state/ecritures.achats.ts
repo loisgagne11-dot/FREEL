@@ -106,3 +106,23 @@ export function marquerSansContrepartie(mouvementId: string, motif: MotifSansCon
 export function viderReleve(): void {
   ecrireFaits({ ...faitsCourants(), mouvementsBancaires: [] });
 }
+
+/**
+ * Retire UNE opération du relevé — une ligne venue d'un autre compte, un
+ * doublon d'un export mal découpé.
+ *
+ * Il n'y avait que `viderReleve` : pour écarter une ligne, il fallait tout
+ * effacer et réimporter, en perdant chaque rapprochement fait à la main. Le
+ * rapprochement de la ligne part avec elle — il est porté par le mouvement —,
+ * mais la dépense ou la recette qu'elle désignait reste au registre : une
+ * recette encaissée par ce rapprochement le reste. Corriger le montant d'une
+ * ligne n'aurait pas de sens : c'est le relevé de la banque qui fait foi ; on
+ * retire, et on réimporte s'il le faut.
+ */
+export function retirerMouvement(mouvementId: string): void {
+  const actuel = faitsCourants();
+  ecrireFaits({
+    ...actuel,
+    mouvementsBancaires: actuel.mouvementsBancaires.filter((m) => m.id !== mouvementId)
+  });
+}

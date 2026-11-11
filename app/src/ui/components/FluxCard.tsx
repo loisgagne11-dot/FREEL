@@ -138,7 +138,7 @@ export function FluxCard(
           <span className={`${styles.libelle} ${styles.entree}`}>Rémunération</span>
           <button type="button" className={`${styles.montant} ${styles.versable}`} onClick={onVersable}>
             <Montant>{eur(flux.remuneration.versable)}</Montant>
-            <span className={styles.horsEcran}> — d’où vient ce chiffre</span>
+            {' '}<span className={styles.horsEcran}>— d’où vient ce chiffre</span>
             <span className={styles.chevron} aria-hidden="true">›</span>
           </button>
           <p className={styles.note}>
@@ -241,7 +241,7 @@ function Lignes(
               <button type="button" className={styles.item} onClick={() => onPointer(l.id)}>
                 <span className={styles.itemNom}>{l.libelle}</span>
                 <Pastille ligne={l} vers={vers} />
-                <span className={styles.horsEcran}> — {gesteDe(vers)}</span>
+                {' '}<span className={styles.horsEcran}>— {gesteDe(vers)}</span>
               </button>
             )
             : (

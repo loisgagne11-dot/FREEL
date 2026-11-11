@@ -1121,3 +1121,10 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Zone | Avant | Après |
 |---|---|---|
 | Argent › Préparer ma déclaration de TVA | Base et TVA collectée en total seulement | + « Collectée, par taux » (base et TVA, du plus fort au plus faible) ; bandeau qui nomme les factures mêlées à répartir à la main ; aide corrigée (les lignes sont conservées depuis le schéma 20) |
+
+## Lot 21 (11/11) — le relevé ne s'efface plus d'un clic
+
+| Zone | Avant | Après |
+|---|---|---|
+| Achats › Relevé › Effacer les opérations importées | Un clic vidait tout | Confirmation sur place : combien d'opérations partent, combien étaient rapprochées ou pointées, et que les dépenses et recettes restent |
+| Achats › Relevé › chaque opération | Aucun retrait possible | « Retirer du relevé », confirmé sur la ligne |

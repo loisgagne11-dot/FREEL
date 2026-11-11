@@ -77,7 +77,7 @@ export function Chiffre(
         * La mention hors écran complète le nom sans encombrer la tuile ; le
         * chevron, lui, fait le même travail à l'œil.
         */}
-      <span className={styles.horsEcran}> — d’où vient ce chiffre</span>
+      {' '}<span className={styles.horsEcran}>— d’où vient ce chiffre</span>
       <span className={styles.chevron} aria-hidden="true">›</span>
     </button>
   );
