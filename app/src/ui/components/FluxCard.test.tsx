@@ -186,12 +186,38 @@ describe('les lignes et leurs pastilles', () => {
     expect(within(sorties).queryByRole('button')).toBeNull();
   });
 
+  /**
+   * Côté Sorties, le même geste : la pastille d'une échéance à payer ouvre son
+   * pointage. « Charges sur encaissements » n'est pas une échéance mais une
+   * estimation — rien à payer — et garde son lien.
+   */
+  it('ouvre le paiement d’une échéance à payer, pas celui d’une estimation ni d’une payée', async () => {
+    const onPayer = vi.fn();
+    const avecEcheances: FluxDuMois = {
+      ...FLUX,
+      sorties: {
+        ...FLUX.sorties,
+        lignes: [
+          { id: 'e-payee', libelle: 'TVA', montant: euros(300), date: dateISO('2026-08-01'), regle: true },
+          { id: 'e-retard', libelle: 'Cotisations URSSAF', montant: euros(900), date: dateISO('2026-07-05'), regle: false, enRetard: true }
+        ]
+      }
+    };
+    render(<FluxCard flux={avecEcheances} periode="août 2026" {...RIEN} onPayer={onPayer} />);
+    const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
+
+    await userEvent.click(within(sorties).getByRole('button', { name: /Cotisations URSSAF.*pointer le paiement/ }));
+    expect(onPayer).toHaveBeenCalledWith('e-retard');
+    expect(within(sorties).getByText('TVA').closest('a')?.getAttribute('href')).toBe('#/argent');
+    expect(within(sorties).getByText('Charges sur encaissements').closest('a')?.getAttribute('href')).toBe('#/argent');
+  });
+
   it('fait de même dans le détail déplié, la seule vue des lignes sur téléphone', async () => {
     const onPointer = vi.fn();
     render(<FluxCard flux={avecRetard} periode="août 2026" {...RIEN} onPointer={onPointer} />);
     await userEvent.click(screen.getByRole('button', { name: 'Voir le détail' }));
 
-    await userEvent.click(await screen.findByRole('button', { name: /pointer l’encaissement de Autre client/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /pointer l’encaissement : Autre client/ }));
     expect(onPointer).toHaveBeenCalledWith('r2');
   });
 });

@@ -1,5 +1,6 @@
-/* La date et le mode d'un encaissement. Cibles de 44 px : on pointe un virement
-   au pouce autant qu'à la souris. */
+/* Les deux formulaires de règlement — encaissement d'une facture, paiement
+   d'une échéance — partagent leur allure : même geste, même place des champs.
+   Cibles de 44 px : on pointe un virement au pouce autant qu'à la souris. */
 
 .formulaire { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
@@ -60,7 +61,9 @@
 
 @media (min-width: 761px) {
   .enLigne { flex-direction: row; align-items: flex-end; flex-wrap: wrap; }
-  .enLigne .champ { flex: 0 1 190px; }
+  /* 230 px : « MONTANT RÉELLEMENT DÉBITÉ (€) » tient sur une ligne, et les deux
+     champs restent alignés sur leur bord bas. */
+  .enLigne .champ { flex: 0 1 230px; }
   /* Le refus prend la ligne entière : coincé entre deux champs, il ne se lit
      pas, et il pousse les boutons hors de la vue. */
   .enLigne .refus { flex-basis: 100%; }

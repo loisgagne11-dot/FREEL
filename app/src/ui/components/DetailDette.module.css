@@ -207,8 +207,6 @@
    d'abord, parce que c'est celui qu'on est venu chercher. */
 .confirmation {
   grid-column: 1 / -1;
-  display: flex;
-  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
 }
-
-.confirmation > * { flex: 1 1 0; grid-column: auto; }

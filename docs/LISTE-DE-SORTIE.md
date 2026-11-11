@@ -300,9 +300,24 @@ geste du quotidien — un virement arrive, on le pointe. Le handoff a un panneau
 | « Marquer payé » ouvre sur la ligne la date (aujourd'hui par défaut) et le mode de règlement — deux mentions obligatoires du livre des recettes, la même règle que le facturier (`encaisserRecette`) ; confirmer pointe la facture, la ligne quitte la liste, le flux et le versable se mettent à jour | ✅ un seul formulaire pour les deux écrans (`FormulaireEncaissement`) ; mode proposé = dernier mode du client ; date future refusée ; focus relayé à la ligne suivante |
 | Les pastilles « en attente » et « en retard » de la colonne Entrées ouvrent ce panneau ; celles des sorties gardent leur lien vers l'échéancier | ✅ saisie déjà ouverte sur la facture cliquée ; aussi dans le détail déplié (téléphone) ; + action rapide « Pointer un encaissement » et « + Nouveau › Encaissement » (`#/pilote/encaissements`), comme le catalogue du handoff |
 | Chargé à la demande : le Pilote est dans le paquet d'entrée (75 / 80 Ko) | ✅ voir budgets ci-dessous |
-| Marquer une ÉCHÉANCE payée depuis le Pilote | ⬜ hors lot : même geste pour les sorties, à faire ensuite |
+| Marquer une ÉCHÉANCE payée depuis le Pilote | ✅ lot 17 |
 | Une facture annulée par un avoir et son écriture d'annulation figuraient « en attente » dans le flux (total juste, client affiché deux fois dont une en négatif), dans les factures en attente du livre des recettes, et le rapprochement bancaire proposait d'encaisser la facture annulée | ✅ trouvé en cours de lot : une seule liste `facturesAEncaisser` pour le flux du mois, le flux d'un autre mois, le panneau, le livre des recettes et le rapprochement |
 | `encaisserRecette` acceptait une facture annulée (le rapprochement bancaire pouvait la proposer) | ✅ refusé, comme l'écriture d'annulation |
+
+### Lot 17 — Pointer une échéance payée depuis le Pilote (priorité 3 : le geste quotidien) — PR #313
+
+Le pendant du lot 16 pour la colonne Sorties : un prélèvement URSSAF part, on
+le pointe d'ici. Le handoff n'a pas d'écran pour ce geste : le panneau reprend
+celui des encaissements, et la règle de l'échéancier.
+
+| Ligne | État |
+|---|---|
+| Panneau « Sorties — pointe une échéance comme payée » ouvert depuis le Pilote : à gauche « Reste à payer — N échéances · total » ; à droite les échéances non payées jusqu'à la fin du mois, en retard d'abord (nature, appel du …, montant, pastille « en retard ») ; sous la liste, « N autres échéances à venir » mène à l'échéancier ; au pied « Payée, l'échéance sort des provisions » et « Terminé » | ✅ `Sorties.tsx`, même feuille de style que le panneau d'encaissement (`Pointage.module.css`) ; « N autres plus tard (montant) — voir l'échéancier » dans la colonne de gauche |
+| « Marquer payée » ouvre sur la ligne la date du débit (aujourd'hui, jamais future) et le montant réellement débité (prérempli à l'appel ; l'écart se garde) — la règle de l'échéancier (`enregistrerPaiement`) ; un seul formulaire pour l'échéancier, le détail de la dette et le panneau | ✅ `FormulairePaiement` ; la date future est désormais refusée aussi à l'échéancier (ses tests payaient un 8 septembre sous une horloge au 13 août) |
+| Détail de la dette : « Payé aujourd'hui » devient le même formulaire — un prélèvement d'hier ne pouvait pas y recevoir sa date | ✅ « Enregistrer le paiement » ouvre la date et le montant, « Confirmer le paiement » écrit |
+| Les pastilles « à venir » et « en retard » des échéances du flux ouvrent ce panneau sur l'échéance cliquée ; « payé » et « Charges sur encaissements » (rien à payer : une estimation) gardent leur lien | ✅ aussi dans le détail déplié (téléphone) |
+| Le flux ne montrait que les échéances DU MOIS : un appel du mois dernier resté impayé disparaissait de la colonne Sorties (le total, tiré des provisions, le comptait). Une échéance en retard y reste, comme une facture impayée côté Entrées | ✅ |
+| Une seule liste `echeancesAPayer` pour le flux et le panneau ; chargé à la demande | ✅ |
 
 ## Reste fonctionnel par écran
 
@@ -313,7 +328,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Statuts cliquables dans « Le flux du mois » | ◐ | Les entrées se pointent depuis l'écran ; les échéances (sorties) mènent encore à l'échéancier | 16 |
+| Statuts cliquables dans « Le flux du mois » | ✅ | Entrées et échéances se pointent depuis l'écran ; seule l'estimation « Charges sur encaissements » mène à l'écran qui l'explique | 16, 17 |
 | Actions rapides personnalisables | ⬜ | Liste figée : ni catalogue, ni « + », ni persistance | à planifier |
 | Panneau « Pointer un encaissement » | ✅ | Pastilles des entrées, action rapide, « + Nouveau » | 16 |
 | Provision d'IR sur les encaissements attendus | ✅ | Taux moyen de l'année projetée (encaissé + factures émises + planning) appliqué à l'encaissé | 12 |

@@ -9,6 +9,7 @@ import { dateDuJour } from '../../state/selecteurs';
 import { type Cadence, REPETITIONS_MAX, datesRepetees } from '../../domain/calculs/echeancier';
 import { Info } from './Info';
 import { Montant } from './Montant';
+import { FormulairePaiement } from './FormulairePaiement';
 import { Sheet } from './Sheet';
 import { Statut, type TonStatut } from './Statut';
 import { useToast } from './Toasts';
@@ -208,7 +209,7 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
         onFermer={() => setPanneau({ type: 'ferme' })}
       >
         {enPaiement !== null && (
-          <FormulairePaiement
+          <PanneauPaiement
             echeance={enPaiement}
             onValider={(payeeLe, montantPaye) => {
               enregistrerPaiement(enPaiement.id, payeeLe, montantPaye);
@@ -352,81 +353,26 @@ function Ligne(
  * régularisation de fin de trimestre, un changement de taux ou une majoration
  * de retard font partir autre chose.
  */
-function FormulairePaiement(
+/** Le rappel de l'appel, puis le formulaire partagé : voir `FormulairePaiement`. */
+function PanneauPaiement(
   { echeance, onValider }: {
     readonly echeance: Echeance;
     readonly onValider: (payeeLe: DateISO, montantPaye: Euros | null) => void;
   }
 ) {
-  const id = useId();
-  const [date, setDate] = useState<string>(() => dateDuJour());
-  const [montant, setMontant] = useState(String(echeance.montant));
-  const [erreur, setErreur] = useState<string | null>(null);
-
-  function soumettre(evenement: React.FormEvent): void {
-    evenement.preventDefault();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      setErreur('La date du débit est obligatoire : sans elle, on ne peut ni la '
-        + 'rapprocher du relevé, ni savoir de quel mois la sortie relève.');
-      return;
-    }
-    const valeur = Number.parseFloat(montant.replace(',', '.'));
-    if (!Number.isFinite(valeur) || valeur <= 0) {
-      setErreur('Le montant débité doit être un nombre supérieur à zéro.');
-      return;
-    }
-    setErreur(null);
-    // `null` quand les deux coïncident : ne stocker l'écart que lorsqu'il
-    // existe évite de faire croire à une différence là où il n'y en a pas.
-    onValider(dateISO(date), valeur === echeance.montant ? null : euros(valeur));
-  }
-
   return (
-    <form className={styles.formulaire} onSubmit={soumettre} noValidate>
+    <div className={styles.formulaire}>
       <p className={styles.rappel}>
         {LIBELLE[echeance.nature]} — appel du {dateCourte(echeance.echeanceLe)}
         <strong><Montant>{eur(echeance.montant)}</Montant></strong>
       </p>
-
-      <p className={styles.champ}>
-        <label className={styles.libelle} htmlFor={`${id}-date`}>Date du débit</label>
-        <input
-          id={`${id}-date`}
-          type="date"
-          className={styles.saisie}
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
-        <span className={styles.aide}>
-          Celle du relevé, pas celle de l’échéance&nbsp;: c’est elle qui permet
-          de rapprocher le paiement, et de savoir de quel mois la sortie relève.
-        </span>
-      </p>
-
-      <p className={styles.champ}>
-        <label className={styles.libelle} htmlFor={`${id}-montant`}>
-          Montant réellement débité (€)
-        </label>
-        <input
-          id={`${id}-montant`}
-          inputMode="decimal"
-          className={styles.saisie}
-          value={montant}
-          onChange={(e) => setMontant(e.target.value)}
-        />
-        <span className={styles.aide}>
-          Prérempli à l’appel. Modifie-le s’il diffère — régularisation,
-          changement de taux, majoration&nbsp;: l’écart est conservé, c’est lui
-          qui explique un solde qui ne tombe pas juste.
-        </span>
-      </p>
-
-      {erreur !== null && <p role="alert" className={styles.refus}>{erreur}</p>}
-
-      <button type="submit" className={styles.actionPrincipale}>
-        Enregistrer le paiement
-      </button>
-    </form>
+      <FormulairePaiement
+        avecAides
+        montantAppele={echeance.montant}
+        libelleValider="Enregistrer le paiement"
+        onValider={onValider}
+      />
+    </div>
   );
 }
 

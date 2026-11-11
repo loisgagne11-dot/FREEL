@@ -1092,3 +1092,12 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Pastilles des entrées du flux | Liens vers le facturier | Boutons qui ouvrent le panneau sur la facture cliquée, saisie déjà ouverte ; mêmes boutons dans le détail déplié (téléphone). Pastilles « encaissé » et sorties inchangées |
 | Actions rapides, « + Nouveau » | — | « Pointer un encaissement » / « Encaissement » ouvrent le panneau de n'importe quel écran (`#/pilote/encaissements`) |
 | Facturier › Enregistrer le règlement | Formulaire propre | Le même formulaire que le panneau (`FormulaireEncaissement`), mode proposé selon le client, date future refusée |
+
+## Lot 17 (11/11) — pointer une échéance payée depuis le Pilote
+
+| Zone | Avant | Après |
+|---|---|---|
+| Panneau « Sorties » (pas d'écran au handoff) | Absent : les pastilles des sorties menaient à l'échéancier | Atelier jumeau du panneau d'encaissement : « Reste à payer ce mois-ci » (N échéances · total), renvoi « N autres plus tard — voir l'échéancier », astuce ; lignes sigle de nature, libellé, « échéance le … », pastille « en retard », montant, « Marquer payée » ; pied « Payée, l'échéance sort des provisions » et « Terminé » |
+| Pastilles des sorties du flux | Liens vers l'échéancier | Boutons qui ouvrent le panneau sur l'échéance cliquée (aussi dans le détail déplié) ; « payé » et « Charges sur encaissements » gardent leur lien |
+| Détail de la dette › Enregistrer le paiement | « Payé aujourd'hui » / « Annuler » | Date du débit et montant débité sur la ligne, « Confirmer le paiement » |
+| Échéancier › Enregistrer le paiement | Formulaire propre | Le même formulaire (`FormulairePaiement`) ; date future refusée |

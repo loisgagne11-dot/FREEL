@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ModeReglement } from '../../domain/calculs/livreRecettes';
 import { dateDuJour } from '../../state/selecteurs';
-import styles from './FormulaireEncaissement.module.css';
+import styles from './FormulaireReglement.module.css';
 
 /**
  * Les deux mentions qu'exige un encaissement : la date et le mode de règlement.

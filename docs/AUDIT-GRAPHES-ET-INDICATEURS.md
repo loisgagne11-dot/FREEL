@@ -696,3 +696,10 @@ solde − provisions − réserve.
 | « en attente » et lignes d'entrées du flux | Pilote, flux d'un autre mois | Une facture annulée par un avoir et son écriture d'annulation y figuraient toutes deux (le total retombait juste, les lignes montraient le client deux fois, dont une en négatif) | Ni l'une ni l'autre ; total inchangé |
 | Factures en attente du livre des recettes | Argent → Livre des recettes | La facture annulée et son avoir négatif y figuraient | Même liste que le flux et le panneau |
 | Montant d'une ligne du panneau | Panneau Encaissements | — | TTC quand la facture porte une TVA (ce qu'on lit sur le relevé), HT en dessous ; HT seul sinon |
+
+## Lot 17 (11/11) — pointer une échéance payée
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Lignes de la colonne Sorties | Pilote › Le flux du mois | Les échéances du mois seulement : un appel du mois dernier impayé disparaissait de la liste (le total des provisions le comptait toujours) | Payées du mois, puis tout ce qui reste à payer jusqu'à la fin du mois, retards compris, « en retard » |
+| Reste à payer ce mois-ci (nombre, total), autres plus tard | Pilote → panneau Sorties | — | Échéances non payées jusqu'à la fin du mois ; le reste compté à part (source unique `echeancesAPayer`) |

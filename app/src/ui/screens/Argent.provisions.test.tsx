@@ -337,8 +337,18 @@ describe('le détail d’une enveloppe', () => {
 
     expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBeNull();
 
-    await utilisateur().click(panneau.getByRole('button', { name: 'Payé aujourd’hui' }));
-    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-07-15');
+    // La date du débit et le montant s'ouvrent, préremplis : rien n'est
+    // encore écrit.
+    const date = panneau.getByLabelText('Date du débit');
+    expect((date as HTMLInputElement).value).toBe('2026-07-15');
+    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBeNull();
+
+    // Un prélèvement d'hier reçoit sa date — « Payé aujourd'hui » ne le
+    // permettait pas.
+    await utilisateur().clear(date);
+    await utilisateur().type(date, '2026-07-14');
+    await utilisateur().click(panneau.getByRole('button', { name: 'Confirmer le paiement' }));
+    expect(useFaits.getState().faits.echeances[0]).toMatchObject({ payeeLe: '2026-07-14', montantPaye: null });
   });
 });
 
