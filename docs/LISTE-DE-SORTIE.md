@@ -286,6 +286,22 @@ le dossier taisait — les deux chiffres ne tombaient plus d'accord.
 | Pour un franchisé, le dossier dit qu'une déclaration est à déposer pour ces achats, SANS date d'échéance (à confirmer auprès du SIE) | ✅ fait |
 | Achats de services HORS de l'Union (un abonnement d'un fournisseur américain) : autoliquidés eux aussi, mais pas à la ligne A3, réservée aux prestations intracommunautaires | ✅ le bloc s'intitule « Achats de services à l'étranger » ; la ligne A3 ne porte que les achats de l'Union ; les autres ont leurs propres totaux, « ligne à confirmer » — aucun numéro de ligne inventé |
 
+### Lot 16 — Pointer un encaissement depuis le Pilote (priorité 3 : le geste quotidien)
+
+La carte « Le flux du mois » écrit « clique un statut pour le mettre à jour »,
+mais un clic emmène au facturier : rien ne se met à jour d'ici. Or c'est LE
+geste du quotidien — un virement arrive, on le pointe. Le handoff a un panneau
+« Encaissements — pointe une facture comme payée » (capture
+`pilote-encaissements`).
+
+| Ligne | État |
+|---|---|
+| Panneau « Encaissements » ouvert depuis le Pilote : à gauche « Reste à encaisser — N factures en attente · X € » ; à droite les factures émises non réglées, en retard d'abord (client, numéro, émise le, échéance, montant, pastille « en retard ») ; au pied « Encaissé ≠ facturé — seul l'encaissé compte pour l'URSSAF » et « Terminé » | ⬜ |
+| « Marquer payé » ouvre sur la ligne la date (aujourd'hui par défaut) et le mode de règlement — deux mentions obligatoires du livre des recettes, la même règle que le facturier (`encaisserRecette`) ; confirmer pointe la facture, la ligne quitte la liste, le flux et le versable se mettent à jour | ⬜ |
+| Les pastilles « en attente » et « en retard » de la colonne Entrées ouvrent ce panneau ; celles des sorties gardent leur lien vers l'échéancier | ⬜ |
+| Chargé à la demande : le Pilote est dans le paquet d'entrée (75 / 80 Ko) | ⬜ |
+| Marquer une ÉCHÉANCE payée depuis le Pilote | ⬜ hors lot : même geste pour les sorties, à faire ensuite |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
