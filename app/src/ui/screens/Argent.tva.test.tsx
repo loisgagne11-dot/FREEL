@@ -153,4 +153,50 @@ describe('dossier de déclaration de TVA', () => {
     }
     expect(d.getByLabelText('Trimestre déclaré').textContent).toBe('T4 2025');
   });
+
+  const achatUe = (montant: number) => ({
+    id: 'ue1', libelle: 'Hébergement', fournisseur: 'Fournisseur d’essai',
+    provenance: 'ue' as const, montantTtc: euros(montant), tauxTva: 0.2 as never,
+    payeeLe: dateISO('2026-08-05'), justificatifId: null, rapprochement: 'aucun' as never
+  });
+
+  /**
+   * La ligne A3 ne reçoit que les prestations intracommunautaires. Y reporter
+   * le total, achat américain compris, ferait déclarer à la mauvaise ligne.
+   */
+  it('ne met à la ligne A3 que les achats de l’Union, pas ceux d’ailleurs', async () => {
+    semer({
+      depenses: [
+        achatUe(120),
+        { ...achatUe(240), id: 'us1', fournisseur: 'Logiciel d’essai', provenance: 'hors_ue' as const }
+      ] as Faits['depenses']
+    });
+    const d = within(await ouvrirDossier());
+    const a3 = d.getByText(/Ligne A3 : TVA due/).closest('div');
+    const horsUnion = d.getByText(/Achats hors Union : TVA due/).closest('div');
+    expect(a3?.textContent).toMatch(/due\s*20\s€/u);
+    expect(a3?.textContent).not.toMatch(/60/);
+    expect(horsUnion?.textContent).toMatch(/due\s*40\s€/u);
+  });
+
+  it('montre le bloc des achats autoliquidés quand il y en a, pas sinon', async () => {
+    semer();
+    expect(within(await ouvrirDossier()).queryByText(/Achats de services à l’étranger/)).toBeNull();
+    cleanup();
+    semer({ depenses: [achatUe(120)] as Faits['depenses'] });
+    const d = within(await ouvrirDossier());
+    expect(d.getByText(/Achats de services à l’étranger/)).toBeTruthy();
+    expect(d.getByText(/Ligne A3 : TVA due/)).toBeTruthy();
+    expect(d.getByText(/la même TVA est déductible/i)).toBeTruthy();
+  });
+
+  // Aucune échéance de dépôt n'est sourcée : une date inventée ferait déposer
+  // trop tard ou trop tôt.
+  it('dit au franchisé qu’une déclaration est à déposer, sans aucune date', async () => {
+    useFaits.setState({ faits: { ...faitsVides(), depenses: [achatUe(100)] as Faits['depenses'] } as Faits });
+    const d = within(await ouvrirDossier());
+    const phrase = d.getByText(/Due et non déductible en franchise/);
+    expect(phrase.textContent).toMatch(/ton service des impôts/);
+    expect(phrase.textContent).not.toMatch(/\d/);
+  });
 });

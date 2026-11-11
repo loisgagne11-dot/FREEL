@@ -242,7 +242,7 @@ que le versable retient pourtant.
 | Détail de la dette « impôt » : la provision d'impôt sur le revenu de l'année (et le solde de l'année précédente tant que l'avis manque), au même chiffre que le versable | ✅ fait (`impotRevenuAProvisionner`, lu, jamais recalculé) |
 | Pilote, composition, enveloppes et dette tombent d'accord (test d'accord) | ✅ fait, TVA et impôt |
 | Rappel de déclaration de la TVA autoliquidée à une date précise | ⬜ hors lot : date d'exigibilité et échéance de dépôt d'un franchisé à confirmer auprès du SIE |
-| Le dossier de déclaration de TVA du trimestre (`dossierTvaDuTrimestre`) ignore la TVA autoliquidée d'un franchisé devenu redevable en cours d'année | ⬜ hors lot : la provision la retient, le dossier pas encore — à reprendre avec le rappel de déclaration |
+| Le dossier de déclaration de TVA du trimestre (`dossierTvaDuTrimestre`) ignore la TVA autoliquidée d'un franchisé devenu redevable en cours d'année | ✅ lot 15 |
 | « Reste à sortir » du détail de la dette ne compte que l'appelé : l'impôt sur le revenu et la TVA s'affichent à côté, en blocs | ⬜ à trancher : la vignette et le détail peuvent donc montrer deux totaux |
 
 ### Lot 14 — Les écrans s'ouvrent d'un coup (priorité 3 : le contrôle de vitesse échouait une fois sur deux)
@@ -267,6 +267,24 @@ cascades sur Argent et Activité.
 | Aucun budget relevé | ✅ entrée 75,0 / 80 Ko (+0,5 Ko pour le préchargement), premier rendu 285 / 300 |
 | Mode discret : le graphe de capacité d'Argent écrivait ses montants en clair dans le texte réservé aux lecteurs d'écran (« 0 € de capacité, 0 € versés »). Défaut antérieur, révélé quand le graphe s'est mis à paraître d'emblée : le contrôle de confidentialité le voit désormais | ✅ corrigé : les montants passent par `<Montant>`, masqués comme le reste |
 | `startTransition` sur le changement de route | ⬜ écarté : il supprime le repli mais garde l'ancien écran affiché pendant le chargement — un clic sur un écran lent paraît sans effet, et le contrôle ne mesurerait plus rien |
+
+### Lot 15 — Le dossier de TVA dit tout ce qui se déclare (priorité 2 : le faux)
+
+« Préparer ma déclaration de TVA » donne les chiffres à reporter sur la
+déclaration du trimestre. Il ignore la TVA autoliquidée des achats de services
+dans l'Union. Chez un redevable, elle se déclare pourtant — due ET déductible
+sur la même déclaration, nette nulle : l'omettre rend la déclaration fausse,
+même si le solde à payer ne change pas. Chez un franchisé, elle est due et non
+déductible : un vrai paiement, que la provision retient depuis le lot 13 et que
+le dossier taisait — les deux chiffres ne tombaient plus d'accord.
+
+| Ligne | État |
+|---|---|
+| Le dossier liste les achats autoliquidés payés dans le trimestre : base hors taxe et TVA due, à la ligne de la déclaration qui les reçoit (ligne A3 — achats de prestations de services intracommunautaires) | ✅ fait (`autoliquidations` du dossier ; base HT par `baseHtAutoliquidee`, à côté de `tvaDeDepense`). Aucune autre ligne du formulaire n'est numérotée dans l'application : « ligne 20 » non sourcée, non écrite. Les achats hors Union y figurent aussi (la provision les compte) avec la mention « ligne à confirmer » |
+| Redevable : la même TVA figure aussi en TVA déductible — le solde à payer ne bouge pas, la déclaration est juste. Franchisé : due, non déductible, ajoutée au solde à payer | ✅ fait |
+| Le dossier et la provision retombent d'accord (le test d'intégration redevient une égalité stricte : provision TVA = à payer du dossier) | ✅ fait (tests d'accord franchisé et redevable) |
+| Pour un franchisé, le dossier dit qu'une déclaration est à déposer pour ces achats, SANS date d'échéance (à confirmer auprès du SIE) | ✅ fait |
+| Achats de services HORS de l'Union (un abonnement d'un fournisseur américain) : autoliquidés eux aussi, mais pas à la ligne A3, réservée aux prestations intracommunautaires | ✅ le bloc s'intitule « Achats de services à l'étranger » ; la ligne A3 ne porte que les achats de l'Union ; les autres ont leurs propres totaux, « ligne à confirmer » — aucun numéro de ligne inventé |
 
 ## Reste fonctionnel par écran
 

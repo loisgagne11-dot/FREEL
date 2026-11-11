@@ -409,3 +409,9 @@ chiffre faux.
 | TVA autoliquidée d'un franchisé | 🟢 | L'ancienne application l'ignorait ; la nouvelle la calculait (lot 7) sans la provisionner. Elle entre dans la provision TVA, en hypothèse |
 | Détail de la dette « impôt » | 🟢 | Montre la provision d'impôt sur le revenu que le versable retient |
 
+## Lot 15 (11/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Dossier de déclaration de TVA | 🟢 | Porte les achats autoliquidés du trimestre, par provenance ; son solde retombe sur la provision |
+

@@ -67,6 +67,28 @@ export interface PieceDeduite {
   readonly tvaRecuperable: Euros;
 }
 
+/**
+ * Un achat de service à un fournisseur étranger, dont l'acheteur autoliquide la
+ * TVA (art. 283-2 CGI). Le prestataire facture hors taxe : la TVA se déclare
+ * côté acheteur.
+ */
+export interface PieceAutoliquidee {
+  readonly id: string;
+  readonly libelle: string;
+  readonly fournisseur: string;
+  /** `ue` ou `hors_ue` : la ligne du formulaire n'est pas la même. */
+  readonly provenance: 'ue' | 'hors_ue';
+  readonly payeeLe: DateISO;
+  readonly baseHt: Euros;
+  readonly tvaDue: Euros;
+  /**
+   * Le régime AU MOIS DE PAIEMENT, pas celui d'aujourd'hui : un franchisé
+   * devenu redevable en cours d'année a des achats des deux espèces dans la
+   * même année, et seul le second côté déduit.
+   */
+  readonly regime: 'franchise' | 'assujetti';
+}
+
 export interface DossierTva {
   readonly du: DateISO;
   readonly au: DateISO;
@@ -93,6 +115,17 @@ export interface DossierTva {
   readonly encaissementsSansTva: readonly PieceCollectee[];
   /** Base hors taxes des encaissements de la période, ligne du formulaire. */
   readonly baseHt: Euros;
+  /** Les achats autoliquidés payés dans la période, dans l'ordre de paiement. */
+  readonly autoliquidations: readonly PieceAutoliquidee[];
+  readonly autoliquideeBase: Euros;
+  /** TVA due sur ces achats, quel que soit le régime. */
+  readonly autoliquideeDue: Euros;
+  /**
+   * La part de cette TVA qui se déduit : toute celle d'un redevable, rien en
+   * franchise. Sans cette asymétrie, un franchisé verrait son solde baisser de
+   * ce qu'il doit réellement.
+   */
+  readonly autoliquideeDeductible: Euros;
 }
 
 const dansLaPeriode = (d: DateISO, du: DateISO, au: DateISO): boolean => d >= du && d <= au;
@@ -105,11 +138,12 @@ const dansLaPeriode = (d: DateISO, du: DateISO, au: DateISO): boolean => d >= du
  * rouvrir le facturier.
  */
 export function dossierTva(
-  { du, au, encaissements, achats }: {
+  { du, au, encaissements, achats, autoliquidations = [] }: {
     readonly du: DateISO;
     readonly au: DateISO;
     readonly encaissements: readonly PieceCollectee[];
     readonly achats: readonly PieceDeduite[];
+    readonly autoliquidations?: readonly PieceAutoliquidee[];
   }
 ): DossierTva {
   const retenus = encaissements
@@ -119,6 +153,16 @@ export function dossierTva(
   const retenusAchats = achats
     .filter((a) => dansLaPeriode(a.payeeLe, du, au) && a.tvaRecuperable > 0)
     .sort((a, b) => a.payeeLe.localeCompare(b.payeeLe));
+
+  const retenusAuto = autoliquidations
+    .filter((a) => dansLaPeriode(a.payeeLe, du, au))
+    .sort((a, b) => a.payeeLe.localeCompare(b.payeeLe));
+  const somme = (l: readonly PieceAutoliquidee[], f: (a: PieceAutoliquidee) => number): Euros =>
+    euros(l.reduce((s, a) => s + f(a), 0));
+  const autoliquideeDue = somme(retenusAuto, (a) => a.tvaDue);
+  const autoliquideeDeductible = somme(
+    retenusAuto.filter((a) => a.regime === 'assujetti'), (a) => a.tvaDue
+  );
 
   const connus = retenus.filter((e) => e.tva !== null);
   const inconnus = retenus.filter((e) => e.tva === null);
@@ -131,14 +175,21 @@ export function dossierTva(
     au,
     collectee,
     deductible,
-    aPayer: euros(collectee - deductible),
+    // L'autoliquidée due s'ajoute, sa part déductible se retranche : nette nulle
+    // chez un redevable, due en entier chez un franchisé. C'est ce que la
+    // provision retient aussi — deux chiffres, une règle.
+    aPayer: euros(collectee + autoliquideeDue - deductible - autoliquideeDeductible),
     encaissements: retenus,
     achats: retenusAchats,
     encaissementsSansTva: inconnus,
     // La base porte TOUS les encaissements, y compris ceux dont la TVA est
     // inconnue : le chiffre d'affaires, lui, est connu — c'est le montant porté
     // au livre. Seule la taxe manque.
-    baseHt: euros(retenus.reduce((s, e) => s + e.montantHt, 0))
+    baseHt: euros(retenus.reduce((s, e) => s + e.montantHt, 0)),
+    autoliquidations: retenusAuto,
+    autoliquideeBase: somme(retenusAuto, (a) => a.baseHt),
+    autoliquideeDue,
+    autoliquideeDeductible
   };
 }
 
