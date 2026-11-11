@@ -229,7 +229,7 @@ function Ligne(
         {!ouverte && (
           <button type="button" data-pointer className={styles.marquer} onClick={onOuvrir}>
             Marquer payé
-            <span className={styles.horsEcran}> — {r.numero || 'sans numéro'}, {client}</span>
+            {' '}<span className={styles.horsEcran}>— {r.numero || 'sans numéro'}, {client}</span>
           </button>
         )}
       </div>
@@ -266,7 +266,7 @@ function Brouillon({ recette: r, teinte }: { readonly recette: Recette; readonly
         <span className={styles.montant}><Montant>{eur(r.montant)}</Montant></span>
         <a className={styles.emettre} href="#/activite/factures">
           à émettre
-          <span className={styles.horsEcran}> — {r.numero || 'sans numéro'}, {client}, dans le facturier</span>
+          {' '}<span className={styles.horsEcran}>— {r.numero || 'sans numéro'}, {client}, dans le facturier</span>
         </a>
       </div>
     </li>

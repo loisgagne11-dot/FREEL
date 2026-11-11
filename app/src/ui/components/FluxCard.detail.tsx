@@ -48,7 +48,7 @@ function Detail(
                 ? (
                   <button type="button" className={styles.boutonPastille} onClick={() => onPointer(l.id)}>
                     <Pastille ligne={l} vers={vers} />
-                    <span className={styles.horsEcran}> — {gesteDe(vers)} : {l.libelle}</span>
+                    {' '}<span className={styles.horsEcran}>— {gesteDe(vers)} : {l.libelle}</span>
                   </button>
                 )
                 : <a href={vers} className={styles.lienPastille}><Pastille ligne={l} vers={vers} /></a>}

@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { marquerSansContrepartie, rapprocherMouvement, viderReleve } from '../../state/ecritures.achats';
+import { marquerSansContrepartie, rapprocherMouvement, retirerMouvement, viderReleve } from '../../state/ecritures.achats';
 import { importerReleve } from '../../state/ecritures.carnet';
 import { etatAchats } from '../../state/selecteurs.achats';
 import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calculs/banque';
@@ -45,6 +45,7 @@ export function Releve() {
 
   const [retour, setRetour] = useState<Retour>(null);
   const [enCours, setEnCours] = useState(false);
+  const [confirmeEffacement, setConfirmeEffacement] = useState(false);
   const idChamp = useId();
 
   const etat = useMemo(() => etatAchats(faits), [faits]);
@@ -124,14 +125,38 @@ export function Releve() {
           </div>
         )}
 
-        {resume.total > 0 && (
-          <button
-            type="button"
-            className={styles.action}
-            onClick={() => { viderReleve(); setRetour(null); }}
-          >
+        {/*
+          * EFFACER LE RELEVÉ DEMANDE UNE CONFIRMATION, QUI DIT CE QUI PART.
+          *
+          * Un clic vidait tout, sans retour possible : chaque rapprochement
+          * fait à la main et chaque rémunération pointée avec. Les dépenses
+          * et les recettes, elles, restent — on le dit aussi, pour qu'on ose
+          * effacer un relevé importé par erreur.
+          */}
+        {resume.total > 0 && !confirmeEffacement && (
+          <button type="button" className={styles.action} onClick={() => setConfirmeEffacement(true)}>
             Effacer les opérations importées
           </button>
+        )}
+        {resume.total > 0 && confirmeEffacement && (
+          <div className={styles.confirmation} role="group" aria-label="Confirmer l’effacement du relevé">
+            <p>
+              {resume.total} opération{resume.total > 1 ? 's' : ''} quitteront le relevé
+              {faits.mouvementsBancaires.some((m) => m.rapprocheAvec !== null || m.sansContrepartie !== null) && (
+                <>, dont {pointees(faits.mouvementsBancaires)} déjà rapprochée{pointees(faits.mouvementsBancaires) > 1 ? 's' : ''} ou
+                  pointée{pointees(faits.mouvementsBancaires) > 1 ? 's' : ''} à la main — ce travail sera perdu</>
+              )}. Tes dépenses et tes recettes restent.
+            </p>
+            <span className={styles.actions}>
+              <button type="button" className={styles.actionDanger}
+                onClick={() => { viderReleve(); setRetour(null); setConfirmeEffacement(false); }}>
+                Tout effacer
+              </button>
+              <button type="button" className={styles.action} onClick={() => setConfirmeEffacement(false)}>
+                Garder le relevé
+              </button>
+            </span>
+          </div>
         )}
       </section>
 
@@ -212,6 +237,11 @@ function Interpretation({ rapport }: { rapport: RapportLecture }) {
   );
 }
 
+/** Les opérations sur lesquelles on a déjà tranché : rapprochées, ou pointées sans contrepartie. */
+function pointees(mouvements: readonly MouvementBancaire[]): number {
+  return mouvements.filter((m) => m.rapprocheAvec !== null || m.sansContrepartie !== null).length;
+}
+
 function LigneMouvement(
   { mouvement, candidats }: {
     mouvement: MouvementBancaire;
@@ -221,6 +251,7 @@ function LigneMouvement(
   const rapprocher = rapprocherMouvement;
   const marquerSans = marquerSansContrepartie;
   const debit = mouvement.montant < 0;
+  const [aRetirer, setARetirer] = useState(false);
 
   return (
     <li className={styles.mouvement}>
@@ -315,6 +346,37 @@ function LigneMouvement(
               </span>
             </>
           )}
+
+      {/* Retirer UNE ligne — celle d'un autre compte, un doublon — sans
+          effacer tout le relevé. Confirmée sur place, comme tout ce qui ne se
+          défait pas. */}
+      {!aRetirer
+        ? (
+          <button type="button" className={styles.actionDiscrete} onClick={() => setARetirer(true)}>
+            {/* L'espace HORS de la portée masquée : le calcul du nom accessible
+                rogne celle qui ouvre un élément, et le lecteur d'écran disait
+                « relevé— PRLV ». */}
+            Retirer du relevé{' '}
+            <span className={styles.horsEcran}>— {mouvement.libelle || 'sans libellé'}, {dateCourte(mouvement.date)}</span>
+          </button>
+        )
+        : (
+          <span className={styles.confirmation} role="group" aria-label="Confirmer le retrait de la ligne">
+            <span>
+              Cette ligne quittera le relevé
+              {mouvement.rapprocheAvec !== null && ', avec son rapprochement — la pièce rapprochée reste au registre'}.
+              {' '}Un nouvel import du même relevé la ramènerait.
+            </span>
+            <span className={styles.actions}>
+              <button type="button" className={styles.actionDanger} onClick={() => retirerMouvement(mouvement.id)}>
+                Retirer la ligne
+              </button>
+              <button type="button" className={styles.action} onClick={() => setARetirer(false)}>
+                Garder
+              </button>
+            </span>
+          </span>
+        )}
     </li>
   );
 }

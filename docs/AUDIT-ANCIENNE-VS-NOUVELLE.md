@@ -452,3 +452,10 @@ chiffre faux.
 | Fonction | Verdict | Détail |
 |---|---|---|
 | Ventiler la TVA collectée par taux pour la déclaration | 🟢 | Absent des deux versions ; depuis les lignes conservées, ou le taux unique d'une facture ; les factures mêlées sans détail sont signalées, jamais réparties au hasard |
+
+## Lot 21 (11/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Effacer le relevé importé | 🟢 | Sans confirmation, avec la perte de tous les rapprochements faits à la main ; confirmé, et la perte est chiffrée |
+| Retirer une opération importée | 🟢 | Impossible sans tout effacer ; retrait d'une ligne, la pièce rapprochée reste au registre |

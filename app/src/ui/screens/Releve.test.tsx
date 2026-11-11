@@ -97,14 +97,63 @@ describe('import', () => {
     expect(screen.getByText(/1 ligne\(s\) écartée\(s\)/)).toBeTruthy();
   });
 
-  it('efface les opérations sur demande, sans toucher aux dépenses', async () => {
+  /**
+   * Un clic vidait tout, sans retour possible — chaque rapprochement fait à la
+   * main avec. La confirmation dit ce qui part, et que les dépenses restent.
+   */
+  it('efface les opérations après confirmation, sans toucher aux dépenses', async () => {
     semer({ depenses: [depense()] });
     render(<Releve />);
     const utilisateur = await importer();
+    await utilisateur.click(screen.getAllByRole('button', { name: /Une écriture correspond|Abonnement/ })[0]!);
 
     await utilisateur.click(screen.getByRole('button', { name: /Effacer les opérations/ }));
+    expect(useFaits.getState().faits.mouvementsBancaires).toHaveLength(2);
+    const confirmation = screen.getByRole('group', { name: /Confirmer l’effacement du relevé/ });
+    expect(confirmation.textContent).toMatch(/2 opérations quitteront le relevé, dont 1 déjà rapprochée/);
+    expect(confirmation.textContent).toMatch(/Tes dépenses et tes recettes restent/);
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Tout effacer' }));
     expect(useFaits.getState().faits.mouvementsBancaires).toHaveLength(0);
     expect(useFaits.getState().faits.depenses).toHaveLength(1);
+  });
+
+  it('« Garder le relevé » n’efface rien', async () => {
+    render(<Releve />);
+    const utilisateur = await importer();
+    await utilisateur.click(screen.getByRole('button', { name: /Effacer les opérations/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Garder le relevé' }));
+    expect(useFaits.getState().faits.mouvementsBancaires).toHaveLength(2);
+  });
+});
+
+/**
+ * Une ligne venue d'un autre compte, un doublon : elle se retire seule, sans
+ * effacer le relevé — et sans emporter la pièce qu'elle rapprochait.
+ */
+describe('retirer une ligne', () => {
+  it('retire la seule ligne visée, après confirmation, et garde la dépense rapprochée', async () => {
+    semer({ depenses: [depense()] });
+    render(<Releve />);
+    const utilisateur = await importer();
+    const mouvements = () => useFaits.getState().faits.mouvementsBancaires;
+    const abonnement = mouvements().find((m) => m.libelle === 'PRLV ABONNEMENT');
+
+    await utilisateur.click(screen.getByRole('button', { name: /Retirer du relevé — PRLV ABONNEMENT/ }));
+    expect(mouvements()).toHaveLength(2);
+    await utilisateur.click(screen.getByRole('button', { name: 'Retirer la ligne' }));
+
+    expect(mouvements().map((m) => m.id)).not.toContain(abonnement?.id);
+    expect(mouvements()).toHaveLength(1);
+    expect(useFaits.getState().faits.depenses).toHaveLength(1);
+  });
+
+  it('« Garder » ne retire rien', async () => {
+    render(<Releve />);
+    const utilisateur = await importer();
+    await utilisateur.click(screen.getByRole('button', { name: /Retirer du relevé — PRLV ABONNEMENT/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Garder' }));
+    expect(useFaits.getState().faits.mouvementsBancaires).toHaveLength(2);
   });
 });
 

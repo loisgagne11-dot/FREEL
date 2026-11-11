@@ -370,6 +370,20 @@ conservées ».
 | L'écran affiche le tableau par taux, et dit combien de pièces restent à répartir et pourquoi ; l'aide ne dit plus que les lignes ne sont pas conservées | ✅ « Collectée, par taux » ; les pièces à répartir sont nommées par leur numéro |
 | « Revoir la facture » d'une écriture d'annulation : refusée sous le motif « plusieurs taux », qui ne la concernait pas | ✅ trouvé en cours de lot : refus avec son vrai motif — une annulation ne se réédite pas en « FACTURE » sous le numéro de l'original |
 
+### Lot 21 — Le relevé ne s'efface plus d'un clic, et une ligne se retire seule (priorité 1 : l'irréversible) — PR #317
+
+« Effacer les opérations importées » vidait TOUT le relevé d'un seul clic,
+sans confirmation — et avec lui chaque rapprochement fait à la main, et
+chaque rémunération pointée. Rien ne le défaisait. À l'inverse, une seule
+ligne venue d'un autre compte ou en double ne se retirait qu'en effaçant
+tout.
+
+| Ligne | État |
+|---|---|
+| « Effacer les opérations importées » demande une confirmation sur place, qui dit ce qui sera perdu (N opérations, dont R rapprochées et P pointées) et que les dépenses et recettes restent | ✅ « Tout effacer » / « Garder le relevé » |
+| « Retirer » sur une ligne, avec confirmation : la ligne quitte le relevé (et son rapprochement avec elle) ; la dépense ou la recette rapprochée reste au registre ; un nouvel import du même relevé la ramènerait — on le dit | ✅ `retirerMouvement` ; « Retirer du relevé » sous chaque ligne, cible de 44 px |
+| Les noms accessibles des boutons à précision masquée (« Marquer payé », « Retirer du relevé », pastilles du flux, « d'où vient ce chiffre ») collaient le mot au tiret — « payé— 2026-024 » | ✅ trouvé en cours de lot : l'espace sort de la portée masquée, que le calcul du nom rognait |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
@@ -428,7 +442,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Dépenses récurrentes signalées, totalisées, générées | ◐ | Lot 8 : signalées et totalisées, DÉRIVÉES (même fournisseur, même montant, mois voisins) ; pas générées — une dépense créée d'avance serait un fait inventé | 8 |
 | Filtre par compte | ⬜ | Seule la barre de période existe | à planifier |
 | Import OFX | ⬜ | Aucun | à planifier |
-| Correction ou suppression à la main d'un mouvement importé | ⬜ | Aucune action | à planifier |
+| Correction ou suppression à la main d'un mouvement importé | ✅ | Retrait d'une ligne, confirmé ; la correction d'un relevé n'a pas de sens : on retire et on réimporte | 21 |
 | Justificatifs sauvegardés et protégés de l'éviction | ✅ | Protégés de l'éviction (S5) ; archive complète et rappel « pas encore archivés » sur Achats (lot 10) | 10 |
 
 ### Outils

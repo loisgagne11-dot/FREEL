@@ -722,3 +722,9 @@ solde − provisions − réserve.
 | Nombre lu | Où | Avant | Après |
 |---|---|---|---|
 | Base et TVA collectée, par taux | Argent → Préparer ma déclaration de TVA | — (total seulement) | Par taux, avoirs déduits au signe opposé ; les pièces sans ventilation lisible comptent au total de TVA, pas au tableau |
+
+## Lot 21 (11/11) — relevé
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Opérations qui partiraient, dont rapprochées ou pointées | Achats › Relevé, confirmation d'effacement | — | Compté sur le relevé au moment de confirmer |
