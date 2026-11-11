@@ -73,6 +73,15 @@ export function DossierTvaPanneau() {
 
   const credit = estUnCredit(dossier);
   const complet = estComplet(dossier);
+  const enFranchise = dossier.autoliquidations.some((a) => a.regime === 'franchise');
+  const chezUnRedevable = dossier.autoliquidations.some((a) => a.regime === 'assujetti');
+  const horsUnion = dossier.autoliquidations.some((a) => a.provenance === 'hors_ue');
+  const totauxDe = (provenance: 'ue' | 'hors_ue') => dossier.autoliquidations
+    .filter((a) => a.provenance === provenance)
+    .reduce((t, a) => ({ base: euros(t.base + a.baseHt), tva: euros(t.tva + a.tvaDue) }),
+      { base: euros(0), tva: euros(0) });
+  const intraUnion = totauxDe('ue');
+  const horsUnionTotaux = totauxDe('hors_ue');
 
   return (
     <div className={styles.dossier}>
@@ -112,6 +121,18 @@ export function DossierTvaPanneau() {
           <dt>TVA déductible sur achats</dt>
           <dd><Montant>{eur(dossier.deductible)}</Montant></dd>
         </div>
+        {dossier.autoliquidations.length > 0 && (
+          <div className={styles.ligne}>
+            <dt>TVA autoliquidée due</dt>
+            <dd><Montant>{eur(dossier.autoliquideeDue)}</Montant></dd>
+          </div>
+        )}
+        {dossier.autoliquideeDeductible > 0 && (
+          <div className={styles.ligne}>
+            <dt>TVA autoliquidée déductible</dt>
+            <dd><Montant>{eur(dossier.autoliquideeDeductible)}</Montant></dd>
+          </div>
+        )}
         <div className={`${styles.ligne} ${styles.total}`}>
           {/* Un crédit n'est pas une somme à payer : afficher « −450 € à
               reverser » ferait chercher une erreur là où il y a un droit. */}
@@ -187,6 +208,82 @@ export function DossierTvaPanneau() {
             ))}
           </ul>
         )}
+
+      {dossier.autoliquidations.length > 0 && (
+        <>
+          <h3 className={styles.sousTitre}>
+            Achats de services à l’étranger (autoliquidation) ({dossier.autoliquidations.length})
+          </h3>
+          <ul className={styles.listePieces}>
+            {dossier.autoliquidations.map((a) => (
+              <li key={a.id}>
+                <span className={styles.pieceNom}>
+                  {a.libelle || 'Sans libellé'} — {a.fournisseur || 'Fournisseur non renseigné'}
+                  {a.provenance === 'hors_ue' ? ' (hors Union)' : ''}
+                </span>
+                <span className={styles.pieceDate}>{dateCourte(a.payeeLe)}</span>
+                <span className={styles.pieceMontant}>
+                  <Montant>{eur(a.baseHt)}</Montant>
+                </span>
+                <span className={styles.pieceMontant}>
+                  <Montant>{eur(a.tvaDue)}</Montant>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {/* « Ligne A3 » vient du cahier des charges du lot 15 ; aucune autre
+              ligne du formulaire n'est numérotée dans l'application : une
+              numérotation non sourcée ferait recopier un chiffre au mauvais
+              endroit d'un document officiel. */}
+          {/* La ligne A3 ne reçoit QUE les prestations intracommunautaires :
+              y reporter le total, achats hors Union compris, ferait déclarer
+              à la mauvaise ligne un abonnement d'un fournisseur américain. */}
+          {intraUnion.base > 0 && (
+            <dl className={styles.detail}>
+              <div className={styles.ligne}>
+                <dt>Ligne A3 — achats de prestations de services intracommunautaires : base</dt>
+                <dd><Montant>{eur(intraUnion.base)}</Montant></dd>
+              </div>
+              <div className={styles.ligne}>
+                <dt>Ligne A3 : TVA due</dt>
+                <dd><Montant>{eur(intraUnion.tva)}</Montant></dd>
+              </div>
+            </dl>
+          )}
+          {horsUnion && (
+            <>
+              <dl className={styles.detail}>
+                <div className={styles.ligne}>
+                  <dt>Achats hors Union : base</dt>
+                  <dd><Montant>{eur(horsUnionTotaux.base)}</Montant></dd>
+                </div>
+                <div className={styles.ligne}>
+                  <dt>Achats hors Union : TVA due</dt>
+                  <dd><Montant>{eur(horsUnionTotaux.tva)}</Montant></dd>
+                </div>
+              </dl>
+              <p className={styles.vide}>
+                Les achats hors Union ne vont pas sur la ligne des prestations
+                intracommunautaires&nbsp;: la ligne qui les reçoit est à confirmer.
+              </p>
+            </>
+          )}
+          {chezUnRedevable && (
+            <p className={styles.vide}>
+              La même TVA est déductible sur cette déclaration&nbsp;: elle se
+              reporte aussi en TVA déductible, et le solde à payer ne bouge pas.
+            </p>
+          )}
+          {/* Aucune date : l'échéance de dépôt d'un franchisé n'est pas sourcée. */}
+          {enFranchise && (
+            <p className={styles.bandeau} role="status">
+              Due et non déductible en franchise&nbsp;: une déclaration est à
+              déposer pour ces achats&nbsp;; date de dépôt à confirmer auprès de
+              ton service des impôts.
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

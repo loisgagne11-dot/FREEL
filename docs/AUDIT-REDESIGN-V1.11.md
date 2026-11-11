@@ -1076,3 +1076,9 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 |---|---|---|
 | Changement d'écran | « Chargement… » ~300 ms à chaque ouverture, même code déjà arrivé | Écran rendu directement une fois préchargé (au repos, après le premier rendu) : 25 à 170 ms selon l'écran ; le repli ne paraît plus que sur un lien direct ou un réseau lent |
 
+## Lot 15 (11/11) — dossier de TVA
+
+| Zone | Avant | Après |
+|---|---|---|
+| Préparer ma déclaration de TVA | Collectée et déductible | + bloc « Achats de services à l'étranger (autoliquidation) » : la liste, la ligne A3, les achats hors Union à part ; chez un redevable « la même TVA est déductible », chez un franchisé « une déclaration est à déposer… date à confirmer auprès de ton service des impôts » |
+

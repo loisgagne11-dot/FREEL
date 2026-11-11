@@ -66,3 +66,18 @@ export function tvaDeDepense(depense: Depense, contexte: ContexteDepenses): TvaD
 
   return { recuperable: brute, motifNonRecuperable: null, aAutoliquider: euros(0) };
 }
+
+/**
+ * Base hors taxe d'un achat autoliquidé — la ligne que la déclaration reçoit
+ * avec la TVA due.
+ *
+ * Elle vit ici, à côté de `tvaDeDepense`, parce que les deux se répondent :
+ * en franchise le prestataire facture hors taxe, la base est le montant payé
+ * et la TVA due en est 20 % ; chez un redevable le montant est lu comme un
+ * TTC et la TVA due en est la part contenue, donc base = TTC − TVA due.
+ * Recalculée à côté, la base cesserait un jour de valoir « TVA due / taux ».
+ */
+export function baseHtAutoliquidee(depense: Depense, contexte: ContexteDepenses): Euros {
+  if (contexte.regimeTva === 'franchise') return depense.montantTtc;
+  return euros(depense.montantTtc - tvaDeDepense(depense, contexte).aAutoliquider);
+}

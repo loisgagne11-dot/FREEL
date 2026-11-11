@@ -680,3 +680,10 @@ solde − provisions − réserve.
 | « dont TVA autoliquidée » | Détail de l'enveloppe TVA | — | Plafonnée à ce qui reste provisionné |
 | Impôt sur le revenu à mettre de côté | Détail de la dette « impôt » | Absent : seul le taux sur les encaissements y figurait | Au même chiffre que le versable |
 
+## Lot 15 (11/11) — dossier de TVA
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| TVA autoliquidée à déclarer (base, TVA due) | Argent → Préparer ma déclaration de TVA | Absente | Ligne A3 pour les achats de l'Union ; totaux à part pour les achats hors Union (ligne à confirmer) |
+| Solde à payer du dossier | Même panneau | Collectée − déductible | + autoliquidée due − autoliquidée déductible : inchangé chez un redevable, + la TVA due en franchise ; égal à la provision TVA |
+

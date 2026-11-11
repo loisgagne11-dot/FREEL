@@ -37,8 +37,9 @@ import {
 } from '../domain/calculs/projectionSolde';
 import { contexteDepense } from './selecteurs.achats';
 import { tvaDeDepense } from '../domain/calculs/depenses';
+import { baseHtAutoliquidee } from '../domain/calculs/depenses.tva';
 import {
-  type DossierTva, type PieceCollectee, type PieceDeduite, dossierTva
+  type DossierTva, type PieceAutoliquidee, type PieceCollectee, type PieceDeduite, dossierTva
 } from '../domain/calculs/dossierTva';
 import {
   encaissementsAttendusParMois, facturesSuivies, finDuMoisISO
@@ -361,7 +362,25 @@ export function dossierTvaDuTrimestre(
       tvaRecuperable: tvaDeDepense(d, contexte(d)).recuperable
     }));
 
-  return dossierTva({ du, au, encaissements, achats });
+  // Même régime (au mois de paiement) et même règle de TVA que la provision :
+  // `contexte(d)` lit `regimeTvaAu` sur `payeeLe`.
+  const autoliquidations: PieceAutoliquidee[] = [];
+  for (const d of faits.depenses) {
+    if (d.payeeLe === null || d.provenance === 'france') continue;
+    const c = contexte(d);
+    autoliquidations.push({
+      id: d.id,
+      libelle: d.libelle,
+      fournisseur: d.fournisseur,
+      provenance: d.provenance,
+      payeeLe: d.payeeLe,
+      baseHt: baseHtAutoliquidee(d, c),
+      tvaDue: tvaDeDepense(d, c).aAutoliquider,
+      regime: c.regimeTva
+    });
+  }
+
+  return dossierTva({ du, au, encaissements, achats, autoliquidations });
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
