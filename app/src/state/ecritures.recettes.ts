@@ -73,6 +73,15 @@ export function encaisserRecette(
     return 'Cette recette est déjà encaissée. Pour la corriger, annule-la : '
       + 'le livre des recettes se tient en ajout seul.';
   }
+  // Une facture annulée par un avoir ne rapporte plus rien : l'encaisser
+  // porterait au livre un chiffre d'affaires que l'avoir a déjà effacé, et le
+  // rapprochement bancaire peut très bien la proposer pour un virement du
+  // même montant. Même refus pour l'écriture d'annulation elle-même.
+  if (typeof recette.annuleEcriture === 'string'
+    || actuel.recettes.some((r) => r.annuleEcriture === id)) {
+    return 'Cette facture est annulée par un avoir : il n’y a plus rien à '
+      + 'encaisser.';
+  }
   ecrireFaits(avecRecettes(actuel, actuel.recettes.map((r) =>
     (r.id === id ? { ...r, encaisseeLe, modeReglement } : r))));
   return null;

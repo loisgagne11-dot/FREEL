@@ -415,3 +415,11 @@ chiffre faux.
 |---|---|---|
 | Dossier de déclaration de TVA | 🟢 | Porte les achats autoliquidés du trimestre, par provenance ; son solde retombe sur la provision |
 
+
+## Lot 16 (11/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Pointer un encaissement depuis le Pilote | 🟢 | L'ancienne application basculait la facture « payée » d'un clic, sans date ni mode. La nouvelle le faisait seulement dans le facturier ; le Pilote le fait désormais, avec les deux mentions du livre des recettes |
+| Encaisser une facture annulée par un avoir | 🟢 | Accepté jusqu'ici par l'écriture, et proposé par le rapprochement bancaire pour un virement du même montant ; le rapprochement ne la propose plus, et l'écriture la refuse, comme son écriture d'annulation |
+| Date d'encaissement dans le futur | 🟢 | Acceptée ; refusée par le formulaire, au facturier comme au Pilote |

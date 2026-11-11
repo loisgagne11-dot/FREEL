@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
   etatPilote, fluxDuMois, moisCourant, remunerationDuMois, soldeEstSuivi
@@ -9,6 +9,7 @@ import { FluxCard } from '../components/FluxCard';
 import { useATraiter } from '../useATraiter';
 import { SanteCard, indicateursDeSante } from '../components/SanteCard';
 import { eur, moisLong } from '../format';
+import { useRoute } from '../useRoute';
 const ATraiter = lazy(() => import('./Pilote.decisions')
   .then((m) => ({ default: m.ATraiter })));
 
@@ -23,6 +24,14 @@ const ATraiter = lazy(() => import('./Pilote.decisions')
  */
 const Composition = lazy(() => import('../components/Composition')
   .then((m) => ({ default: m.Composition })));
+
+/**
+ * Le panneau qui pointe un encaissement. Différé comme `Composition` : il
+ * emporte le formulaire de règlement et le `Sheet`, et ne s'ouvre qu'au moment
+ * où un virement arrive.
+ */
+const Encaissements = lazy(() => import('../components/Encaissements')
+  .then((m) => ({ default: m.Encaissements })));
 
 import { Montant } from '../components/Montant';
 import type { CleComposition } from '../../domain/calculs/composition';
@@ -70,6 +79,27 @@ export function Pilote({ mois: moisChoisi, onMois }: {
   const faits = useFaits((e) => e.faits);
   const chargement = useFaits((e) => e.chargement);
   const [compose, setCompose] = useState<CleComposition | null>(null);
+  /*
+   * Le panneau d'encaissement : fermé (`null`), ouvert sur toute la liste
+   * (`''`), ou ouvert sur la facture dont on a cliqué la pastille.
+   */
+  const [pointage, setPointage] = useState<string | null>(null);
+  // Stable, et ce n'est pas un détail : le dialogue rejoue son effet d'ouverture
+  // — focus au premier bouton — à chaque nouvelle fonction de fermeture. Or
+  // chaque pointage change les faits, donc rend le Pilote : le focus sautait
+  // en tête du panneau à chaque facture pointée.
+  const fermerPointage = useCallback(() => setPointage(null), []);
+  const { ecran, sousRoute } = useRoute();
+  /* `#/pilote/encaissements` est un GESTE, comme `#/argent/livre` : l'action
+     rapide et « + Nouveau » l'ouvrent de n'importe où, puis l'adresse redevient
+     celle de l'écran — fermer le panneau puis recharger ne doit pas le
+     rouvrir. */
+  const routeEncaissements = ecran.id === 'pilote' && sousRoute === 'encaissements';
+  useEffect(() => {
+    if (!routeEncaissements) return;
+    setPointage('');
+    window.location.replace('#/pilote');
+  }, [routeEncaissements]);
 
   /*
    * Le flux suit le mois de la barre ; la santé et les décisions, non : elles
@@ -154,6 +184,7 @@ export function Pilote({ mois: moisChoisi, onMois }: {
             flux={flux}
             periode={moisLong(mois).toLowerCase()}
             onVersable={() => setCompose('versable')}
+            onPointer={setPointage}
             dejaVerse={soldeEstSuivi(faits) ? verseCeMois : null}
             besoinMensuel={faits.besoinMensuel}
           />
@@ -188,6 +219,12 @@ export function Pilote({ mois: moisChoisi, onMois }: {
       {compose !== null && (
         <Suspense fallback={null}>
           <Composition cle={compose} onFermer={() => setCompose(null)} />
+        </Suspense>
+      )}
+
+      {pointage !== null && (
+        <Suspense fallback={null}>
+          <Encaissements cible={pointage === '' ? null : pointage} onFermer={fermerPointage} />
         </Suspense>
       )}
 

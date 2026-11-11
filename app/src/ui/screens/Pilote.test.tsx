@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { type Faits, entrepriseVide, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Pilote, salutation } from './Pilote';
@@ -125,5 +125,44 @@ describe('un autre mois', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Revenir à juin 2026' })[0]!);
     expect(onMois).toHaveBeenCalledWith('2026-06');
+  });
+});
+
+/**
+ * LE GESTE DU QUOTIDIEN, DEPUIS LE PILOTE.
+ *
+ * Un virement arrive : la pastille de la facture dans « Le flux du mois »
+ * ouvre son pointage, et le flux suit dès la confirmation — sans passer par
+ * le facturier.
+ */
+describe('pointer un encaissement', () => {
+  const impayee = {
+    id: 'impayee', clientNom: 'Client démo', libelle: 'Prestation', montant: 1500,
+    emiseLe: '2026-04-02', encaisseeLe: null, modeReglement: null,
+    numero: '2026-001', echeanceLe: '2026-05-02'
+  } as unknown as Faits['recettes'][number];
+
+  it('ouvre le panneau depuis la pastille en retard, et le flux suit le pointage', async () => {
+    semer({ recettes: [impayee] });
+    render(<Pilote />);
+    const entrees = screen.getByText('Entrées').parentElement as HTMLElement;
+    expect(entrees.querySelector('p')?.textContent).toMatch(/1\s*500.*en attente/u);
+
+    fireEvent.click(screen.getByRole('button', { name: /Client démo.*en retard.*pointer l’encaissement/ }));
+    const panneau = await screen.findByRole('dialog', { name: /Encaissements/ });
+
+    fireEvent.click(within(panneau).getByRole('button', { name: 'Confirmer le règlement' }));
+
+    expect(useFaits.getState().faits.recettes[0]?.encaisseeLe).toBe('2026-06-10');
+    expect(entrees.querySelector('p')?.textContent).toMatch(/rien en attente/);
+  });
+
+  /** L'action rapide et « + Nouveau » ouvrent le panneau de n'importe où. */
+  it('s’ouvre par son adresse, qui redevient celle du Pilote', async () => {
+    semer({ recettes: [impayee] });
+    window.location.hash = '#/pilote/encaissements';
+    render(<Pilote />);
+    expect(await screen.findByRole('dialog', { name: /Encaissements/ })).toBeTruthy();
+    await waitFor(() => expect(window.location.hash).toBe('#/pilote'));
   });
 });

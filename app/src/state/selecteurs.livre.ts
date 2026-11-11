@@ -30,11 +30,9 @@ import {
   amendeEncourue, declarationDuMois, declarationsEnRetard
 } from '../domain/calculs/des';
 import { dateDuJour } from './selecteurs';
+import { facturesAEncaisser } from './selecteurs.pipeline';
 import { preneursDeServices } from './selecteurs.aTraiter';
 import type { Faits, Recette } from './schema';
-import {
-  FORMULE_PAR_DEFAUT, echeanceDe
-} from '../domain/calculs/delaiPaiement';
 
 /* ─────────────────────────────────────────────────────────────────────────
    Déclaration européenne de services
@@ -136,18 +134,11 @@ function recettesEnAttente(
   faits: Faits,
   maintenant: Date = new Date()
 ): readonly RecetteEnAttente[] {
-  /* L'échéance est LUE sur la recette : elle est imprimée sur le document
-     envoyé. Le secours ne sert qu'à une recette qu'aucune migration n'aurait
-     comblée. */
-  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
-  const aujourdhui = dateDuJour(maintenant);
-
-  return faits.recettes
-    .filter((r) => r.encaisseeLe === null && r.emiseLe !== null)
-    .map((r) => {
-      const echeanceLe = r.echeanceLe
-        ?? echeanceDe(r.emiseLe as DateISO, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT);
-      return { ...r, echeanceLe, enRetard: echeanceLe < aujourdhui };
-    })
+  /* La liste vient de `facturesAEncaisser`, comme le flux du Pilote et le
+     panneau qui pointe un règlement. Recalculée ici, elle gardait une facture
+     annulée par un avoir — et son écriture d'annulation, au montant négatif —
+     parmi les factures « en attente » du registre. */
+  return facturesAEncaisser(faits, dateDuJour(maintenant))
+    .map(({ recette, echeanceLe, statut }) => ({ ...recette, echeanceLe, enRetard: statut === 'en_retard' }))
     .sort((a, b) => (b.emiseLe as DateISO).localeCompare(a.emiseLe as DateISO));
 }

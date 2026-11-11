@@ -150,6 +150,24 @@
 }
 .item:hover { background: var(--panel-2); }
 
+/* Une ligne d'entrée qu'on peut pointer est un bouton, pas un lien : elle
+   ouvre le panneau d'encaissement sans quitter l'écran. Même allure. */
+button.item {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item:focus-visible,
+.boutonPastille:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
 .itemNom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pastille {
@@ -165,6 +183,18 @@
 .retard { color: var(--red); background: var(--red-soft); }
 
 .lienPastille { text-decoration: none; }
+
+/* 44 px de cible sur téléphone, où le détail est la seule vue des lignes. */
+.boutonPastille {
+  min-height: 44px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
 
 /* Le bouton de versement : dans sa colonne en grand écran, comme le handoff ;
    sous les colonnes sur téléphone, où une colonne n'a pas la place d'un

@@ -16,8 +16,10 @@ import { Montant } from './Montant';
  * Le handoff met sous chaque total les lignes qui le font, chacune avec sa
  * pastille — encaissé, en attente, en retard ; payé, à venir. Un total seul
  * ne dit pas QUI n'a pas payé : il fallait déplier un détail pour le savoir.
- * Les pastilles mènent là où le statut se met à jour — le facturier pour une
- * facture, l'échéancier pour une échéance —, d'où « clique un statut ».
+ * « Clique un statut » : la pastille d'une facture qui attend son argent ouvre
+ * le panneau qui la pointe, ICI — l'aller-retour au facturier pour un virement
+ * reçu était le geste le plus long de l'outil pour le plus fréquent. Celle
+ * d'une échéance mène encore à l'échéancier.
  *
  * Sur téléphone, une colonne fait une centaine de pixels : une liste n'y tient
  * pas. Les colonnes n'y gardent que leurs totaux, et « Voir le détail » rend
@@ -49,11 +51,17 @@ export const VERS_FACTURES = '#/activite/factures';
 const VERS_ECHEANCIER = '#/argent';
 
 export function FluxCard(
-  { flux, periode, onVersable, dejaVerse, besoinMensuel }: {
+  { flux, periode, onVersable, onPointer, dejaVerse, besoinMensuel }: {
     readonly flux: FluxDuMois;
     readonly periode: string;
     /** Ouvre la composition du versable. */
     readonly onVersable: () => void;
+    /**
+     * Ouvre le panneau d'encaissement sur une facture. Absent, les pastilles
+     * des entrées restent des liens vers le facturier — le cas d'un montage
+     * sans Pilote.
+     */
+    readonly onPointer?: (idRecette: string) => void;
     /** Ce qui est déjà sorti vers soi ce mois-ci, ou `null` sans relevé. */
     readonly dejaVerse: Euros | null;
     readonly besoinMensuel: Euros;
@@ -77,7 +85,7 @@ export function FluxCard(
   const payees = sorties.filter((l) => l.regle).reduce((s, l) => s + l.montant, 0);
 
   const detaillables = [
-    { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes, vers: VERS_FACTURES },
+    { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes, vers: VERS_FACTURES, onPointer },
     { cle: 'sorties', titre: 'Sorties', lignes: sorties, vers: VERS_ECHEANCIER }
   ].filter((d) => d.lignes.length > 0);
 
@@ -108,7 +116,7 @@ export function FluxCard(
               ? <>encaissé · <Montant>{eur(flux.entrees.enAttente)}</Montant> en attente</>
               : 'encaissé · rien en attente'}
           </p>
-          <Lignes lignes={flux.entrees.lignes} vers={VERS_FACTURES} />
+          <Lignes lignes={flux.entrees.lignes} vers={VERS_FACTURES} onPointer={onPointer} />
         </div>
 
         <div className={styles.colonne}>
@@ -199,16 +207,32 @@ export function Pastille({ ligne, vers }: { ligne: LigneFlux; vers: string }) {
 }
 
 /** Les premières lignes d'une colonne, en grand écran seulement. */
-function Lignes({ lignes, vers }: { lignes: readonly LigneFlux[]; vers: string }) {
+function Lignes(
+  { lignes, vers, onPointer }: {
+    lignes: readonly LigneFlux[];
+    vers: string;
+    onPointer?: ((id: string) => void) | undefined;
+  }
+) {
   if (lignes.length === 0) return null;
   return (
     <ul className={styles.items}>
       {lignes.slice(0, LIGNES_PAR_COLONNE).map((l) => (
         <li key={l.id}>
-          <a className={styles.item} href={vers}>
-            <span className={styles.itemNom}>{l.libelle}</span>
-            <Pastille ligne={l} vers={vers} />
-          </a>
+          {onPointer !== undefined && !l.regle
+            ? (
+              <button type="button" className={styles.item} onClick={() => onPointer(l.id)}>
+                <span className={styles.itemNom}>{l.libelle}</span>
+                <Pastille ligne={l} vers={vers} />
+                <span className={styles.horsEcran}> — pointer l’encaissement</span>
+              </button>
+            )
+            : (
+              <a className={styles.item} href={vers}>
+                <span className={styles.itemNom}>{l.libelle}</span>
+                <Pastille ligne={l} vers={vers} />
+              </a>
+            )}
         </li>
       ))}
     </ul>

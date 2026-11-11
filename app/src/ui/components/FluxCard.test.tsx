@@ -167,6 +167,33 @@ describe('les lignes et leurs pastilles', () => {
     expect(within(entrees).getByText('Autre client').closest('a')?.getAttribute('href')).toBe('#/activite/factures');
     expect(within(sorties).getByText('Charges sur encaissements').closest('a')?.getAttribute('href')).toBe('#/argent');
   });
+
+  /**
+   * « Clique un statut pour le mettre à jour » : sur le Pilote, la pastille
+   * d'une facture qui attend son argent ouvre le panneau qui la pointe, au lieu
+   * d'emmener la chercher dans le facturier.
+   */
+  it('ouvre le pointage d’une facture en attente ou en retard, pas d’une facture encaissée', async () => {
+    const onPointer = vi.fn();
+    render(<FluxCard flux={avecRetard} periode="août 2026" {...RIEN} onPointer={onPointer} />);
+    const entrees = screen.getByText('Entrées').parentElement as HTMLElement;
+
+    await userEvent.click(within(entrees).getByRole('button', { name: /Client en retard.*pointer l’encaissement/ }));
+    expect(onPointer).toHaveBeenCalledWith('r3');
+
+    expect(within(entrees).getByText('Client de démo').closest('a')?.getAttribute('href')).toBe('#/activite/factures');
+    const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
+    expect(within(sorties).queryByRole('button')).toBeNull();
+  });
+
+  it('fait de même dans le détail déplié, la seule vue des lignes sur téléphone', async () => {
+    const onPointer = vi.fn();
+    render(<FluxCard flux={avecRetard} periode="août 2026" {...RIEN} onPointer={onPointer} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Voir le détail' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: /pointer l’encaissement de Autre client/ }));
+    expect(onPointer).toHaveBeenCalledWith('r2');
+  });
 });
 
 /**

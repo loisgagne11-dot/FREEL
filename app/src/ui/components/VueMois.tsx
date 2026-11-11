@@ -1,7 +1,7 @@
 import type { CreneauDuJour, JourDeLaSemaine, PlanningPeriode } from '../../state/selecteurs.activite';
 import type { Creneau } from '../../domain/calculs/planning';
 import type { DateISO } from '../../domain/types';
-import { dateCourte } from '../format';
+import { dateCourte, initiales } from '../format';
 import { decompterJours } from '../../domain/calculs/activite';
 import styles from './VueMois.module.css';
 
@@ -298,19 +298,6 @@ function fondBande(occupants: readonly { readonly couleur: string }[]): string |
   return `linear-gradient(90deg, ${tranches})`;
 }
 
-/**
- * « Brasserie Vent d'Ouest » → « BV ».
- *
- * Deux lettres, prises sur les deux premiers mots. Un seul mot donne ses deux
- * premières lettres — « Kessler » ferait sinon un « K » solitaire, que tout
- * autre client en K rendrait ambigu.
- */
-function initiales(nom: string): string {
-  const mots = nom.split(/[\s'’-]+/u).filter((m) => m !== '');
-  if (mots.length === 0) return '?';
-  if (mots.length === 1) return (mots[0] as string).slice(0, 2).toUpperCase();
-  return `${(mots[0] as string)[0] ?? ''}${(mots[1] as string)[0] ?? ''}`.toUpperCase();
-}
 
 /**
  * L'état d'une moitié, en toutes lettres.

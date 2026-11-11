@@ -1082,3 +1082,13 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 |---|---|---|
 | Préparer ma déclaration de TVA | Collectée et déductible | + bloc « Achats de services à l'étranger (autoliquidation) » : la liste, la ligne A3, les achats hors Union à part ; chez un redevable « la même TVA est déductible », chez un franchisé « une déclaration est à déposer… date à confirmer auprès de ton service des impôts » |
 
+
+## Lot 16 (11/11) — pointer un encaissement depuis le Pilote
+
+| Zone | Avant | Après |
+|---|---|---|
+| Panneau « Encaissements » (capture `pilote-encaissements`) | Absent : « clique un statut » emmenait au facturier | Atelier centré : à gauche « Reste à encaisser » (N factures · total) et une astuce ; à droite les factures émises non réglées, en retard d'abord (initiales, client, numéro · émise le · échéance, pastille « en retard », montant, « Marquer payé ») ; brouillons grisés « à émettre » ; pied « Encaissé ≠ facturé » et « Terminé ». Plein écran sur téléphone |
+| « Marquer payé » | — | Ouvre sur la ligne la date (aujourd'hui, jamais future) et le mode (celui du dernier règlement du client, sinon virement) ; « Confirmer le règlement » écrit, « Annuler » referme |
+| Pastilles des entrées du flux | Liens vers le facturier | Boutons qui ouvrent le panneau sur la facture cliquée, saisie déjà ouverte ; mêmes boutons dans le détail déplié (téléphone). Pastilles « encaissé » et sorties inchangées |
+| Actions rapides, « + Nouveau » | — | « Pointer un encaissement » / « Encaissement » ouvrent le panneau de n'importe quel écran (`#/pilote/encaissements`) |
+| Facturier › Enregistrer le règlement | Formulaire propre | Le même formulaire que le panneau (`FormulaireEncaissement`), mode proposé selon le client, date future refusée |

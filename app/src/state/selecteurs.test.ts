@@ -584,6 +584,22 @@ describe('livre des recettes', () => {
     expect(etat.enAttente.map((e) => e.id)).toEqual(['recente', 'vieille']);
   });
 
+  // Annulée par un avoir, une facture n'attend plus rien ; son écriture
+  // d'annulation, au montant négatif, encore moins.
+  it('ne compte en attente ni une facture annulée ni son avoir', () => {
+    const etat = etatLivre(faits({
+      recettes: [
+        rec({ id: 'attente', numero: '2026-001', encaisseeLe: null, modeReglement: null }),
+        rec({ id: 'annulee', numero: '2026-002', encaisseeLe: null, modeReglement: null }),
+        rec({
+          id: 'annulee-annulation', numero: '2026-003', montant: euros(-4000),
+          encaisseeLe: null, modeReglement: null, annuleEcriture: 'annulee'
+        })
+      ]
+    }));
+    expect(etat.enAttente.map((e) => e.id)).toEqual(['attente']);
+  });
+
   // Un écart affiché seulement dans un récapitulatif oblige à retrouver la
   // ligne concernée à la main.
   it('rattache chaque écart à son écriture', () => {

@@ -286,6 +286,24 @@ le dossier taisait — les deux chiffres ne tombaient plus d'accord.
 | Pour un franchisé, le dossier dit qu'une déclaration est à déposer pour ces achats, SANS date d'échéance (à confirmer auprès du SIE) | ✅ fait |
 | Achats de services HORS de l'Union (un abonnement d'un fournisseur américain) : autoliquidés eux aussi, mais pas à la ligne A3, réservée aux prestations intracommunautaires | ✅ le bloc s'intitule « Achats de services à l'étranger » ; la ligne A3 ne porte que les achats de l'Union ; les autres ont leurs propres totaux, « ligne à confirmer » — aucun numéro de ligne inventé |
 
+### Lot 16 — Pointer un encaissement depuis le Pilote (priorité 3 : le geste quotidien) — PR #312
+
+La carte « Le flux du mois » écrit « clique un statut pour le mettre à jour »,
+mais un clic emmène au facturier : rien ne se met à jour d'ici. Or c'est LE
+geste du quotidien — un virement arrive, on le pointe. Le handoff a un panneau
+« Encaissements — pointe une facture comme payée » (capture
+`pilote-encaissements`).
+
+| Ligne | État |
+|---|---|
+| Panneau « Encaissements » ouvert depuis le Pilote : à gauche « Reste à encaisser — N factures en attente · X € » ; à droite les factures émises non réglées, en retard d'abord (client, numéro, émise le, échéance, montant, pastille « en retard ») ; au pied « Encaissé ≠ facturé — seul l'encaissé compte pour l'URSSAF » et « Terminé » | ✅ `Encaissements.tsx` ; brouillons grisés « à émettre » (lien vers le facturier), comme la maquette ; TTC sur la ligne quand la facture porte une TVA |
+| « Marquer payé » ouvre sur la ligne la date (aujourd'hui par défaut) et le mode de règlement — deux mentions obligatoires du livre des recettes, la même règle que le facturier (`encaisserRecette`) ; confirmer pointe la facture, la ligne quitte la liste, le flux et le versable se mettent à jour | ✅ un seul formulaire pour les deux écrans (`FormulaireEncaissement`) ; mode proposé = dernier mode du client ; date future refusée ; focus relayé à la ligne suivante |
+| Les pastilles « en attente » et « en retard » de la colonne Entrées ouvrent ce panneau ; celles des sorties gardent leur lien vers l'échéancier | ✅ saisie déjà ouverte sur la facture cliquée ; aussi dans le détail déplié (téléphone) ; + action rapide « Pointer un encaissement » et « + Nouveau › Encaissement » (`#/pilote/encaissements`), comme le catalogue du handoff |
+| Chargé à la demande : le Pilote est dans le paquet d'entrée (75 / 80 Ko) | ✅ voir budgets ci-dessous |
+| Marquer une ÉCHÉANCE payée depuis le Pilote | ⬜ hors lot : même geste pour les sorties, à faire ensuite |
+| Une facture annulée par un avoir et son écriture d'annulation figuraient « en attente » dans le flux (total juste, client affiché deux fois dont une en négatif), dans les factures en attente du livre des recettes, et le rapprochement bancaire proposait d'encaisser la facture annulée | ✅ trouvé en cours de lot : une seule liste `facturesAEncaisser` pour le flux du mois, le flux d'un autre mois, le panneau, le livre des recettes et le rapprochement |
+| `encaisserRecette` acceptait une facture annulée (le rapprochement bancaire pouvait la proposer) | ✅ refusé, comme l'écriture d'annulation |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
@@ -295,9 +313,9 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Statuts cliquables dans « Le flux du mois » | ◐ | Détail en lecture seule ; aucun statut ne se modifie depuis l'écran | 5 |
+| Statuts cliquables dans « Le flux du mois » | ◐ | Les entrées se pointent depuis l'écran ; les échéances (sorties) mènent encore à l'échéancier | 16 |
 | Actions rapides personnalisables | ⬜ | Liste figée : ni catalogue, ni « + », ni persistance | à planifier |
-| Panneau « Pointer un encaissement » | ◐ | `encaisserRecette` n'est appelée que depuis le facturier | 5 |
+| Panneau « Pointer un encaissement » | ✅ | Pastilles des entrées, action rapide, « + Nouveau » | 16 |
 | Provision d'IR sur les encaissements attendus | ✅ | Taux moyen de l'année projetée (encaissé + factures émises + planning) appliqué à l'encaissé | 12 |
 
 ### Argent

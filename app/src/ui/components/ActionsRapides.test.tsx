@@ -33,8 +33,10 @@ describe('actions rapides', () => {
   it('ne mène jamais nulle part', () => {
     for (const action of ACTIONS_RAPIDES) {
       const route = resoudreRoute(action.href);
-      // Aucune action ne pointe le Pilote : elles en partent toutes.
-      expect(route.ecran.id).not.toBe('pilote');
+      // Aucune action ne pointe le Pilote : elles en partent toutes — sauf le
+      // pointage d'un encaissement, qui ouvre SON panneau par une sous-route.
+      // Le Pilote nu serait le repli d'une adresse inconnue.
+      if (route.ecran.id === 'pilote') expect(route.sousRoute).toBe('encaissements');
     }
   });
 

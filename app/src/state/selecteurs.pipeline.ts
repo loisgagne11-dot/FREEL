@@ -16,11 +16,11 @@
 
 import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros } from '../domain/types';
-import { suivre } from '../domain/calculs/facturier';
+import { type FactureSuivie, type StatutFacture, suivre } from '../domain/calculs/facturier';
 import {
   FORMULE_PAR_DEFAUT, echeanceDe, formuleOuNull
 } from '../domain/calculs/delaiPaiement';
-import type { Faits } from './schema';
+import type { Faits, Recette } from './schema';
 import { dateDuJour, moisCourant } from './selecteurs';
 import { previsionDuMoisParMission } from './selecteurs.prevision';
 
@@ -31,17 +31,51 @@ import { previsionDuMoisParMission } from './selecteurs.prevision';
  * légal supplétif. Retenir zéro afficherait « en retard » dès l'émission.
  */
 export function facturesSuivies(faits: Faits, maintenant: Date = new Date()) {
+  return suivreAu(faits, dateDuJour(maintenant));
+}
+
+function suivreAu(faits: Faits, aujourdhui: DateISO): readonly FactureSuivie<Recette>[] {
   /* Secours : l'échéance manque sur la recette (bloc écrit à la main, jeu
      d'essai). On la reconstruit depuis les conditions actuelles du client —
      faute de mieux, et sans l'écrire nulle part. */
   const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
   const secours = (nom: string, emiseLe: DateISO) =>
     echeanceDe(emiseLe, formules.get(nom) ?? FORMULE_PAR_DEFAUT);
-  return suivre(
-    faits.recettes,
-    secours,
-    dateDuJour(maintenant)
-  );
+  return suivre(faits.recettes, secours, aujourdhui);
+}
+
+/** Les statuts d'une facture qui attend encore son argent. */
+const A_ENCAISSER: ReadonlySet<StatutFacture> = new Set(['emise', 'envoyee', 'en_retard']);
+
+/**
+ * Les factures émises qui attendent leur règlement — la plus ancienne échéance
+ * d'abord.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE SEULE LISTE POUR LE FLUX ET POUR LE PANNEAU QUI LA POINTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le flux du mois comptait « en attente » toute recette émise sans date
+ * d'encaissement. Une facture annulée par un avoir en était une, et son
+ * écriture d'annulation aussi : le total retombait juste, les deux se
+ * compensant, mais la colonne affichait le client deux fois — dont une fois
+ * avec un montant négatif « en attente ». Le panneau d'encaissement, lui, ne
+ * peut proposer de pointer ni l'une ni l'autre. Deux règles, et l'écran
+ * aurait dit « 3 en attente » au-dessus d'un panneau qui en liste deux.
+ *
+ * L'ORDRE EST CELUI DE L'URGENCE : par échéance croissante. Une échéance
+ * passée précède toujours une échéance à venir, donc les retards viennent en
+ * tête, le plus ancien d'abord — c'est celui qu'on cherche des yeux quand un
+ * virement arrive, et celui qu'il faut relancer s'il n'arrive pas.
+ */
+export function facturesAEncaisser(
+  faits: Faits,
+  aujourdhui: DateISO = dateDuJour()
+): readonly FactureSuivie<Recette>[] {
+  return suivreAu(faits, aujourdhui)
+    .filter((f) => A_ENCAISSER.has(f.statut))
+    .sort((a, b) => (a.echeanceLe ?? '').localeCompare(b.echeanceLe ?? '')
+      || a.recette.numero.localeCompare(b.recette.numero));
 }
 
 /** Le dernier jour d'un mois, au format ISO. */

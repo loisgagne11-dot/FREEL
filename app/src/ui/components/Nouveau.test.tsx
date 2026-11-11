@@ -21,6 +21,7 @@ describe('« + Nouveau »', () => {
     const cible = (nom: string) => within(menu).getByRole('menuitem', { name: nom }).getAttribute('href');
     expect(cible('Facture')).toBe('#/facture/nouvelle');
     expect(cible('Dépense')).toBe('#/achats/depense');
+    expect(cible('Encaissement')).toBe('#/pilote/encaissements');
     expect(cible('Mission')).toBe('#/activite/nouvelle-mission');
     expect(cible('Congés')).toBe('#/activite/conges');
   });
