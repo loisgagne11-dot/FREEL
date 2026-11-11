@@ -459,3 +459,15 @@ chiffre faux.
 |---|---|---|
 | Effacer le relevé importé | 🟢 | Sans confirmation, avec la perte de tous les rapprochements faits à la main ; confirmé, et la perte est chiffrée |
 | Retirer une opération importée | 🟢 | Impossible sans tout effacer ; retrait d'une ligne, la pièce rapprochée reste au registre |
+
+## Lot 22 (11/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Annuler une facture par un avoir | 🟢 | Confirmé ; la conséquence distingue l'encaissée (remboursement au livre à la date du jour, chiffre d'affaires à déclarer en baisse) de la facture due (neutralisée) |
+| Avoir sur une facture envoyée | 🟢 | Impossible jusqu'ici : « envoyée » manquait à la condition du bouton |
+| Écriture inverse au livre des recettes | 🟢 | Confirmée ; plus offerte sur une écriture déjà annulée, dont le second clic était refusé en silence |
+| Supprimer un brouillon, une échéance, un client, une mission | 🟢 | Confirmés ; client et mission refusés le disent avant |
+| Supprimer une dépense | 🟢 | Confirmée ; le mouvement du relevé rapproché à elle revient « à traiter » — il restait « Rapprochée » à une écriture disparue |
+| Repasser une échéance à payer | 🟢 | Confirmé : la date et le montant du débit se perdaient d'un clic |
+| Retirer une période URSSAF saisie, revenir au rythme d'une semaine | 🟢 | Confirmés |

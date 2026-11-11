@@ -1,9 +1,10 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { ajouterPeriodeUrssaf, retirerPeriodeUrssaf } from '../../state/ecritures.activite';
+import { BlocConfirmation } from '../components/ConfirmationSurPlace';
 import { dateDuJour, periodesUrssafEffectives } from '../../state/selecteurs';
 import { PERIODES_URSSAF, type PeriodeBareme } from '../../domain/bareme/urssaf';
-import { mois, ratio } from '../../domain/types';
+import { type Mois, mois, ratio } from '../../domain/types';
 import { Info } from '../components/Info';
 import { Champ } from '../components/Champ';
 import { dateCourte } from '../format';
@@ -51,6 +52,8 @@ export function Bareme() {
   const ajouter = ajouterPeriodeUrssaf;
   const retirer = retirerPeriodeUrssaf;
   const idChamp = useId();
+  const [aRetirer, setARetirer] = useState<Mois | null>(null);
+  const boutons = useRef(new Map<Mois, HTMLButtonElement>());
 
   const effectives = useMemo(() => periodesUrssafEffectives(faits), [faits]);
   const ajouteesParDebut = useMemo(
@@ -111,9 +114,12 @@ export function Bareme() {
                   <td>
                     {ajouteesParDebut.has(p.du) && (
                       <button
+                        ref={(b) => { if (b === null) boutons.current.delete(p.du); else boutons.current.set(p.du, b); }}
                         type="button"
                         className={styles.action}
-                        onClick={() => retirer(p.du)}
+                        aria-expanded={aRetirer === p.du}
+                        aria-label={`Retirer la période saisie du ${p.du}`}
+                        onClick={() => setARetirer(p.du)}
                       >
                         Retirer
                       </button>
@@ -124,6 +130,30 @@ export function Bareme() {
             </tbody>
           </table>
         </div>
+
+        {/* Sous le tableau, pas dans sa cellule : posée dans la dernière
+            colonne, la confirmation élargissait un tableau qui défile et en
+            poussait la période hors de la carte. Retirer change les
+            cotisations de mois entiers : confirmé. */}
+        {aRetirer !== null && (
+          <BlocConfirmation
+            key={aRetirer}
+            consequence={(
+              <>
+                La période saisie du {aRetirer} quitte le barème&nbsp;: ses
+                mois reprennent le taux que l’application connaît — ou
+                n’en ont plus —, et leurs cotisations sont recalculées.
+              </>
+            )}
+            libelleConfirmer="Retirer la période"
+            onConfirmer={() => { retirer(aRetirer); setARetirer(null); }}
+            onGarder={() => {
+              const du = aRetirer;
+              setARetirer(null);
+              requestAnimationFrame(() => boutons.current.get(du)?.focus());
+            }}
+          />
+        )}
 
         {faits.periodesUrssafAjoutees.length > 0 && (
           <p className={styles.explication}>

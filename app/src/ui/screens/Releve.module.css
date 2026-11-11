@@ -205,37 +205,6 @@
 
 /* La confirmation se pose à la place du bouton qui l'a demandée : on ne
    cherche pas ailleurs ce qu'on vient de déclencher. */
-.confirmation {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--red-line);
-  border-radius: var(--r-sm);
-  background: var(--red-soft);
-  color: var(--text);
-  font-size: 12.5px;
-  line-height: 1.45;
-}
-
-.confirmation p { margin: 0; }
-
-.actionDanger {
-  min-height: 44px;
-  padding: 0 14px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--red);
-  background: var(--red);
-  color: var(--bg);
-  font-size: 12.5px;
-  font-weight: 620;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.actionDanger:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
-
 /* Retirer une ligne est rare : un lien discret sous la ligne, qui ne dispute
    pas l'attention aux gestes de rapprochement — mais une cible de 44 px. */
 .actionDiscrete {
@@ -254,13 +223,3 @@
 
 .actionDiscrete:hover { color: var(--text); }
 .actionDiscrete:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-
-.horsEcran {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}

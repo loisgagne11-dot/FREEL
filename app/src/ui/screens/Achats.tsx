@@ -33,6 +33,7 @@ import { useRoute } from '../useRoute';
 import { CartePliable } from '../components/CartePliable';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
+import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { dateCourte, eur, eurExact } from '../format';
 import styles from './Achats.module.css';
 import { Montant } from '../components/Montant';
@@ -464,6 +465,9 @@ function DetailDepense(
   }
 ) {
   const { depense, tva } = ligne;
+  const rapprocheeAuReleve = useFaits(
+    (e) => e.faits.mouvementsBancaires.some((m) => m.rapprocheAvec === depense.id)
+  );
   const [retour, setRetour] = useState<Retour>(null);
   const [enCours, setEnCours] = useState(false);
   const idChamp = useId();
@@ -632,9 +636,22 @@ function DetailDepense(
         <button type="button" className={styles.actionPrincipale} onClick={onCorriger}>
           Corriger cette dépense
         </button>
-        <button type="button" className={styles.supprimer} onClick={onSupprimer}>
-          Supprimer cette dépense
-        </button>
+        <ConfirmationSurPlace
+          libelle="Supprimer cette dépense"
+          classeDeclencheur={styles.supprimer}
+          consequence={(
+            <>
+              La dépense de <Montant>{eurExact(depense.montantTtc)}</Montant>
+              {depense.fournisseur !== '' && <> chez {depense.fournisseur}</>}
+              {depense.payeeLe !== null && <> du {dateCourte(depense.payeeLe)}</>}
+              {' '}quitte le registre{tva.recuperable > 0 && <>, et sa TVA déductible avec elle</>}
+              {rapprocheeAuReleve && <>&nbsp;; l’opération du relevé qui lui était rapprochée revient à traiter</>}.
+              {depense.justificatifId !== null && <> Sa pièce n’est pas effacée&nbsp;: l’archive des justificatifs la garde, parmi les pièces sans fait.</>}
+            </>
+          )}
+          libelleConfirmer="Supprimer la dépense"
+          onConfirmer={onSupprimer}
+        />
       </div>
     </div>
   );

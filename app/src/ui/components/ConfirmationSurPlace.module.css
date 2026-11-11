@@ -1,0 +1,62 @@
+/* La confirmation d'un geste qui ne se défait pas.
+
+   Elle prend toute la largeur de la rangée où était le bouton : posée dans
+   une rangée d'actions qui passe à la ligne, elle se glisse dessous au lieu
+   de s'écraser entre « Relancer » et « Joindre une pièce ». */
+.confirmation {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--red-line);
+  border-radius: var(--r-sm);
+  background: var(--red-soft);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+}
+
+.consequence { margin: 0; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+.confirmer,
+.garder {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.confirmer {
+  border: 1px solid var(--red);
+  background: var(--red);
+  color: var(--bg);
+  font-weight: 620;
+}
+
+.garder {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.confirmer:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.garder:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.horsEcran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

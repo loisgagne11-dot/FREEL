@@ -138,13 +138,27 @@ describe('suppression d’un client', () => {
     expect(useFaits.getState().faits.clients).toHaveLength(1);
   });
 
-  it('supprime un client sans rattachement', async () => {
+  it('supprime un client sans rattachement, une fois confirmé', async () => {
     semer({ clients: [client()] });
     const utilisateur = await ouvrir('Clients');
     await utilisateur.click(screen.getByRole('button', { name: /Dupont/ }));
     await utilisateur.click(screen.getByRole('button', { name: 'Supprimer ce client' }));
+    expect(useFaits.getState().faits.clients).toHaveLength(1);
+    expect(screen.getByRole('group', { name: /quitte le carnet, avec ses coordonnées/ })).toBeTruthy();
 
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer le client' }));
     expect(useFaits.getState().faits.clients).toHaveLength(0);
+  });
+
+  // Confirmer pour s'entendre dire non : le refus vient avant la confirmation.
+  it('ne demande pas de confirmer une suppression que l’écriture refuserait', async () => {
+    semer({ clients: [client()], recettes: [recette()] });
+    const utilisateur = await ouvrir('Clients');
+    await utilisateur.click(screen.getByRole('button', { name: /Dupont/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer ce client' }));
+
+    expect(screen.queryByRole('group', { name: /quitte le carnet/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Supprimer ce client' })).toBeTruthy();
   });
 });
 
@@ -214,6 +228,28 @@ describe('missions', () => {
 
     expect(screen.getByRole('alert').textContent).toMatch(/registre|inexplicable/i);
     expect(useFaits.getState().faits.missions).toHaveLength(1);
+  });
+
+  /**
+   * Le rythme et les journées corrigées au planning vivent dans la mission :
+   * un clic les emportait, et le planning perdait ses jours.
+   */
+  it('supprime une mission sans recette rattachée, une fois confirmé', async () => {
+    semer({
+      missions: [{
+        id: 'm1', clientId: null, clientNom: 'Dupont', description: 'Mission',
+        tjm: euros(400), debut: null, fin: null, statut: 'active', entites: []
+      }]
+    });
+    const utilisateur = await ouvrir('Missions');
+    await utilisateur.click(within(screen.getByRole('list')).getByRole('button', { name: /Mission/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette mission' }));
+    expect(useFaits.getState().faits.missions).toHaveLength(1);
+    const confirmation = screen.getByRole('group', { name: /quitte le carnet/ });
+    expect(confirmation.textContent).toMatch(/pour Dupont.*son rythme et les journées corrigées/su);
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer la mission' }));
+    expect(useFaits.getState().faits.missions).toHaveLength(0);
   });
 
   it('permet de marquer une mission perdue', async () => {

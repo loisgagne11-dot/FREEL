@@ -15,6 +15,7 @@ import { Statut, type TonStatut } from './Statut';
 import { useToast } from './Toasts';
 import { Vide } from './Vide';
 import { CartePliable } from './CartePliable';
+import { ConfirmationSurPlace } from './ConfirmationSurPlace';
 import { dateCourte, eur, moisLong } from '../format';
 import styles from './Echeances.module.css';
 
@@ -83,6 +84,11 @@ const NATURES: readonly { readonly id: NatureDette; readonly libelle: string }[]
 
 const LIBELLE: Readonly<Record<NatureDette, string>> = {
   urssaf: 'URSSAF', tva: 'TVA', impot: 'Impôt', cfe: 'CFE', cfp: 'CFP'
+};
+
+/** La nature dans une phrase : « l'appel de TVA », « l'échéance d'impôt ». */
+const DE_NATURE: Readonly<Record<NatureDette, string>> = {
+  urssaf: 'de cotisations URSSAF', tva: 'de TVA', impot: 'd’impôt', cfe: 'de CFE', cfp: 'de CFP'
 };
 
 type Panneau =
@@ -328,9 +334,24 @@ function Ligne(
       <span className={styles.ligneActions}>
         {payee
           ? (
-            <button type="button" className={styles.actionSecondaire} onClick={onDepayer}>
-              Repasser à payer
-            </button>
+            /* Repasser à payer efface la date du débit et le montant
+               réellement parti — l'écart compris, qui expliquait un solde.
+               Rien ne les retrouve : confirmé. */
+            <ConfirmationSurPlace
+              libelle="Repasser à payer"
+              precision={`${LIBELLE[echeance.nature]}, échéance le ${dateCourte(echeance.echeanceLe)}`}
+              classeDeclencheur={styles.actionSecondaire}
+              consequence={(
+                <>
+                  Le paiement du {dateCourte(echeance.payeeLe)}
+                  {' '}(<Montant>{eur(echeance.montantPaye ?? echeance.montant)}</Montant>)
+                  {' '}sera oublié&nbsp;: l’échéance redevient due, et revient dans les provisions.
+                </>
+              )}
+              libelleConfirmer="Repasser à payer"
+              libelleGarder="Garder le paiement"
+              onConfirmer={onDepayer}
+            />
           )
           : (
             <button type="button" className={styles.actionLigne} onClick={onPayer}>
@@ -421,6 +442,38 @@ function statutDe(
   if (e.payeeLe !== null) return { libelle: 'Payée', ton: 'ok' };
   if (jour > e.echeanceLe) return { libelle: 'En retard', ton: 'retard' };
   return { libelle: 'À payer', ton: 'attente' };
+}
+
+/**
+ * Ce que la suppression d'une échéance change — selon qu'elle est payée.
+ *
+ * Non payée, elle est l'appel que les provisions retiennent : la supprimer
+ * les fait baisser d'autant, et le versable monte — à ne faire que pour une
+ * saisie en double ou erronée. Payée, elle n'est plus provisionnée, mais son
+ * paiement disparaît avec elle : la sortie quitte le flux de son mois, et pour
+ * la TVA et l'impôt, ce qui était réglé ne l'est plus — la provision remonte.
+ */
+function ConsequenceSuppression({ echeance: e }: { readonly echeance: Echeance }) {
+  const libelle = DE_NATURE[e.nature];
+  if (e.payeeLe === null) {
+    return (
+      <>
+        L’appel {libelle} de <Montant>{eur(e.montant)}</Montant> du
+        {' '}{dateCourte(e.echeanceLe)} quitte l’échéancier et les provisions&nbsp;:
+        ce que tu peux te verser monte d’autant. À ne faire que pour une saisie
+        en double ou erronée.
+      </>
+    );
+  }
+  const regle = e.nature === 'tva' || e.nature === 'impot';
+  return (
+    <>
+      L’échéance {libelle} du {dateCourte(e.echeanceLe)} quitte l’échéancier,
+      avec son paiement du {dateCourte(e.payeeLe)}&nbsp;: il ne comptera plus
+      dans les sorties de son mois
+      {regle && <>, ni dans ce qui est déjà réglé — la provision remontera d’autant</>}.
+    </>
+  );
 }
 
 type Champs = Omit<Echeance, 'id'>;
@@ -600,10 +653,14 @@ function Formulaire(
             : 'Enregistrer les échéances'}
       </button>
 
-      {onSupprimer !== undefined && (
-        <button type="button" className={styles.supprimer} onClick={onSupprimer}>
-          Supprimer cette échéance
-        </button>
+      {onSupprimer !== undefined && initiale !== null && (
+        <ConfirmationSurPlace
+          libelle="Supprimer cette échéance"
+          classeDeclencheur={styles.supprimer}
+          consequence={<ConsequenceSuppression echeance={initiale} />}
+          libelleConfirmer="Supprimer l’échéance"
+          onConfirmer={onSupprimer}
+        />
       )}
     </form>
   );

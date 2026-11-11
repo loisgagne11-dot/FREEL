@@ -435,7 +435,34 @@ describe('revenir au rythme', () => {
         onRevenirAuRythme={defaire}
       />
     );
-    await userEvent.setup().click(screen.getByRole('button', { name: /Revenir au rythme/ }));
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
+    // Les corrections de la semaine sont des faits saisis un par un : rien ne
+    // part avant la confirmation.
+    expect(defaire).not.toHaveBeenCalled();
+    await utilisateur.click(screen.getByRole('button', { name: 'Revenir au rythme' }));
     expect(defaire).toHaveBeenCalledOnce();
+  });
+
+  it('compte les journées dont les corrections partiront', async () => {
+    const defaire = vi.fn();
+    render(
+      <VueSemaine
+        planning={semaine({
+          '2026-07-06': jour('2026-07-06', { lignes: [ligne({ ajuste: true })] }),
+          '2026-07-07': jour('2026-07-07', { lignes: [ligne({ ajuste: true })] }),
+          '2026-07-08': jour('2026-07-08', { lignes: [ligne()] })
+        })}
+        aujourdhui={dateISO('2026-07-08')}
+        onBasculer={() => { /* ailleurs */ }}
+        onRevenirAuRythme={defaire}
+      />
+    );
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
+    expect(screen.getByRole('group', { name: /Les corrections de 2 journées de cette semaine seront retirées/ })).toBeTruthy();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Garder les corrections' }));
+    expect(defaire).not.toHaveBeenCalled();
   });
 });

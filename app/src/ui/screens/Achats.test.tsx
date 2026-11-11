@@ -372,6 +372,83 @@ describe('corriger une dépense', () => {
   });
 });
 
+/**
+ * SUPPRIMER UNE DÉPENSE SE CONFIRME, ET DÉFAIT SON RAPPROCHEMENT.
+ *
+ * Un clic la retirait, et le mouvement du relevé qui lui était rapproché
+ * restait « Rapprochée » à une écriture disparue : il sortait de la file à
+ * traiter sans contrepartie au registre.
+ */
+describe('supprimer une dépense', () => {
+  const rapprochee = () => ({
+    depenses: [depense({ justificatifId: 'j1', rapprochement: 'rapproche' })],
+    mouvementsBancaires: [{
+      id: 'm1', date: dateISO('2026-09-10'), libelle: 'PRLV FOURNISSEUR', montant: euros(-120),
+      rapprocheAvec: 'd1', sansContrepartie: null
+    }]
+  });
+
+  it('dit ce qui part et ce qui reste, et ne supprime qu’à la confirmation', async () => {
+    semer(rapprochee());
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette dépense' }));
+
+    expect(useFaits.getState().faits.depenses).toHaveLength(1);
+    const confirmation = screen.getByRole('group', { name: /quitte le registre/ });
+    expect(confirmation.textContent).toMatch(/120.*chez Fournisseur.*10 sept/su);
+    expect(confirmation.textContent).toMatch(/opération du relevé qui lui était rapprochée revient à traiter/);
+    expect(confirmation.textContent).toMatch(/pièce n’est pas effacée/);
+
+    await utilisateur.click(within(confirmation).getByRole('button', { name: 'Supprimer la dépense' }));
+    expect(useFaits.getState().faits.depenses).toHaveLength(0);
+  });
+
+  it('remet à traiter le mouvement qui lui était rapproché', async () => {
+    semer(rapprochee());
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette dépense' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer la dépense' }));
+
+    expect(useFaits.getState().faits.mouvementsBancaires[0]?.rapprocheAvec).toBeNull();
+  });
+
+  // En franchise, il n'y a pas de TVA déductible à perdre : la phrase ne
+  // l'invente pas.
+  it('ne parle de TVA déductible que s’il y en a', async () => {
+    semer({ ...rapprochee(), entreprise: { ...faitsVides().entreprise, tvaDepuis: null } });
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette dépense' }));
+    expect(screen.getByRole('group', { name: /quitte le registre/ }).textContent).not.toMatch(/TVA déductible/);
+  });
+
+  it('dit que la TVA déductible part avec la dépense, chez un redevable', async () => {
+    semer(rapprochee());
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette dépense' }));
+    expect(screen.getByRole('group', { name: /quitte le registre/ }).textContent).toMatch(/et sa TVA déductible avec elle/);
+  });
+
+  it('« Garder » ne supprime rien', async () => {
+    semer(rapprochee());
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette dépense' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Garder' }));
+
+    expect(useFaits.getState().faits.depenses).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Supprimer cette dépense' })).toBeTruthy();
+  });
+});
+
 /* ─────────────────────────────────────────────────────────────────────────
    Le mois de la barre du haut ancre la période de l'écran
    ───────────────────────────────────────────────────────────────────────── */

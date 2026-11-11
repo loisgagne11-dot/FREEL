@@ -109,7 +109,7 @@ describe('états affichés', () => {
     semer([recette({ id: 'r1', emiseLe: null, numero: '' })]);
     rendre();
     expect(screen.getByText('Brouillon')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Supprimer le brouillon' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Supprimer le brouillon/ })).toBeTruthy();
   });
 
   /**
@@ -119,8 +119,101 @@ describe('états affichés', () => {
   it('n’offre pas de supprimer une facture émise', () => {
     semer([recette({ id: 'r1' })]);
     rendre();
-    expect(screen.queryByRole('button', { name: 'Supprimer le brouillon' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Annuler par un avoir' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Supprimer le brouillon/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Annuler par un avoir/ })).toBeTruthy();
+  });
+});
+
+/**
+ * RIEN NE S'ANNULE NI NE S'EFFACE D'UN CLIC.
+ *
+ * « Annuler par un avoir » se trouvait sur la même ligne que « Relancer » et
+ * émettait d'un clic une écriture que rien ne défait. Sur une facture
+ * encaissée, c'est un remboursement inscrit au livre à la date du jour : le
+ * chiffre d'affaires à déclarer baisse d'autant.
+ */
+describe('les gestes qui ne se défont pas', () => {
+  it('n’émet l’avoir qu’après une confirmation qui dit ce qu’il écrit', async () => {
+    semer([recette({ id: 'r1', encaisseeLe: dateISO('2026-08-05'), modeReglement: 'virement' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: /^Annuler par un avoir/ }));
+    expect(useFaits.getState().faits.recettes).toHaveLength(1);
+    const confirmation = screen.getByRole('group', { name: /remboursement/ });
+    expect(confirmation.textContent).toMatch(/au 13 août 2026.*chiffre d’affaires à déclarer baisse/su);
+    expect(confirmation.textContent).toMatch(/si tu rembourses Client France/);
+
+    await utilisateur.click(within(confirmation).getByRole('button', { name: 'Émettre l’avoir' }));
+    const recettes = useFaits.getState().faits.recettes;
+    expect(recettes).toHaveLength(2);
+    expect(recettes[1]?.annuleEcriture).toBe('r1');
+  });
+
+  // Une facture qui attend son règlement n'a rien au livre : l'avoir n'y
+  // inscrit pas de remboursement, il neutralise ce qui était dû.
+  it('dit d’une facture non réglée qu’elle ne sera plus due, sans parler de remboursement', async () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Annuler par un avoir/ }));
+    const confirmation = screen.getByRole('group', { name: /ne seront plus dus/ });
+    expect(confirmation.textContent).not.toMatch(/rembours/);
+    expect(confirmation.textContent).toMatch(/nouvelle facture/);
+  });
+
+  it('« Garder la facture » n’émet rien et rend le focus au bouton', async () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /^Annuler par un avoir/ }));
+    // Le focus va sur le choix sans conséquence : une frappe d'Entrée de trop
+    // ne détruit rien.
+    expect(document.activeElement?.textContent).toBe('Garder la facture');
+
+    await utilisateur.keyboard('{Enter}');
+    expect(useFaits.getState().faits.recettes).toHaveLength(1);
+    expect(document.activeElement?.textContent).toMatch(/^Annuler par un avoir/);
+  });
+
+  it('Échap renonce aussi', async () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /^Annuler par un avoir/ }));
+    await utilisateur.keyboard('{Escape}');
+    expect(screen.queryByRole('group', { name: /ne seront plus dus/ })).toBeNull();
+    expect(useFaits.getState().faits.recettes).toHaveLength(1);
+  });
+
+  /**
+   * La facture partie chez le client — la plus susceptible d'être contestée —
+   * était la seule qui ne pouvait pas s'annuler : « envoyée » manquait à la
+   * condition du bouton.
+   */
+  it('offre l’avoir sur une facture envoyée', () => {
+    semer([recette({ id: 'r1', envoyeeLe: dateISO('2026-08-02') })]);
+    rendre();
+    expect(screen.getByText('Envoyée')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Annuler par un avoir/ })).toBeTruthy();
+  });
+
+  it('nomme la facture dans le nom du bouton, répété ligne après ligne', () => {
+    semer([recette({ id: 'r1', numero: '2026-001' }), recette({ id: 'r2', numero: '2026-002' })]);
+    rendre();
+    expect(screen.getByRole('button', { name: 'Annuler par un avoir — 2026-002, Client France' })).toBeTruthy();
+  });
+
+  it('ne supprime un brouillon qu’après avoir dit ce qui part', async () => {
+    semer([recette({ id: 'r1', emiseLe: null, numero: '2026-007' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /^Supprimer le brouillon/ }));
+    expect(useFaits.getState().faits.recettes).toHaveLength(1);
+    const confirmation = screen.getByRole('group', { name: /disparaît/ });
+    expect(confirmation.textContent).toMatch(/1\s000.*Client France.*2026-007 redevient libre/su);
+
+    await utilisateur.click(within(confirmation).getByRole('button', { name: 'Supprimer le brouillon' }));
+    expect(useFaits.getState().faits.recettes).toHaveLength(0);
   });
 });
 

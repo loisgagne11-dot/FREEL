@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 7 novembre 2026.** Schéma des faits : v20. Branche de travail : PR #302.
+**Date : 11 novembre 2026.** Schéma des faits : v20. Branche de travail : PR #302.
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -383,6 +383,29 @@ tout.
 | « Effacer les opérations importées » demande une confirmation sur place, qui dit ce qui sera perdu (N opérations, dont R rapprochées et P pointées) et que les dépenses et recettes restent | ✅ « Tout effacer » / « Garder le relevé » |
 | « Retirer » sur une ligne, avec confirmation : la ligne quitte le relevé (et son rapprochement avec elle) ; la dépense ou la recette rapprochée reste au registre ; un nouvel import du même relevé la ramènerait — on le dit | ✅ `retirerMouvement` ; « Retirer du relevé » sous chaque ligne, cible de 44 px |
 | Les noms accessibles des boutons à précision masquée (« Marquer payé », « Retirer du relevé », pastilles du flux, « d'où vient ce chiffre ») collaient le mot au tiret — « payé— 2026-024 » | ✅ trouvé en cours de lot : l'espace sort de la portée masquée, que le calcul du nom rognait |
+
+### Lot 22 — Rien ne s'annule ni ne s'efface d'un clic (priorité 1 : l'irréversible) — PR #318
+
+Le lot 21 a trouvé un geste destructeur sans confirmation ; la revue de tous
+les autres en trouve neuf. Le plus lourd : « Annuler par un avoir », à côté de
+« Relancer » sur la même ligne, émet d'un clic une écriture qui ne se défait
+pas — et, sur une facture déjà encaissée, inscrit au livre un remboursement
+à la date du jour, qui fait baisser le chiffre d'affaires du trimestre
+déclaré à l'URSSAF.
+
+| Ligne | État |
+|---|---|
+| « Annuler par un avoir » (facturier) et « Annuler par écriture inverse » (livre des recettes) se confirment sur place et disent ce qui s'écrit : facture encaissée → −X € au livre à la date du jour, en déduction du chiffre d'affaires du trimestre, à ne faire que si le client est remboursé ; facture non encaissée → les X € attendus du client sont neutralisés. Un avoir ne se défait pas | ✅ `ConsequenceAvoir`, une phrase pour les deux écrans ; au livre, une écriture déjà annulée n'offre plus le bouton (trouvé en cours de lot : le second clic était refusé en silence) |
+| Une facture **envoyée** n'offrait pas « Annuler par un avoir » : le statut manquait à la condition | ✅ |
+| « Supprimer le brouillon » : confirmé, dit ce qui part et que le numéro redevient libre | ✅ |
+| « Supprimer cette dépense » : confirmée ; le mouvement du relevé rapproché à elle revient « à traiter » — il restait « Rapprochée » à une dépense disparue, et la tuile « à rapprocher » le taisait ; la pièce jointe reste conservée | ✅ `supprimerDepense` défait le rapprochement ; la TVA déductible n'est nommée que s'il y en a, le montant est au centime |
+| « Supprimer cette échéance » : confirmée ; une échéance payée emporte son paiement, et la dette revient dans les provisions | ✅ corrigé en cours de lot : non payée, elle QUITTE les provisions (le versable monte) ; payée, elle emporte son paiement, et pour la TVA et l'impôt ce qui était réglé ne l'est plus |
+| « Repasser à payer » : confirmé, la date et le montant du débit se perdent | ✅ |
+| « Supprimer ce client », « Supprimer cette mission » : confirmés ; la mission emporte son rythme et son TJM | ✅ et les journées corrigées au planning ; un refus (factures rattachées) s'affiche avant la confirmation, pas après |
+| « Retirer » une période URSSAF saisie : confirmé, la période reprend le taux connu de l'application | ✅ confirmation SOUS le tableau (`BlocConfirmation`) : dans la cellule, elle poussait les premières colonnes hors de la carte |
+| « Revenir au rythme sur cette semaine » : confirmé, en comptant les corrections qui partent | ✅ compte les journées corrigées |
+| Une seule confirmation (`ConfirmationSurPlace`), que le relevé du lot 21 reprend : le focus va sur « Garder », et revient au bouton quand on garde — au lot 21, le bouton disparaissait sous le focus, qui retombait au début de la page | ✅ Échap renonce sans fermer le panneau qui la contient ; le groupe est nommé par la conséquence |
+| Contrôle visuel : facturier, détail d'une dépense, échéancier, barème, relevé — sombre 1440 et clair 390, jeu de démonstration | ✅ aucun débordement, focus sur « Garder » partout, aucune erreur JS |
 
 ## Reste fonctionnel par écran
 

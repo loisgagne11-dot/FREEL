@@ -109,7 +109,7 @@ describe('import', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: /Effacer les opérations/ }));
     expect(useFaits.getState().faits.mouvementsBancaires).toHaveLength(2);
-    const confirmation = screen.getByRole('group', { name: /Confirmer l’effacement du relevé/ });
+    const confirmation = screen.getByRole('group', { name: /quitteront le relevé/ });
     expect(confirmation.textContent).toMatch(/2 opérations quitteront le relevé, dont 1 déjà rapprochée/);
     expect(confirmation.textContent).toMatch(/Tes dépenses et tes recettes restent/);
 
@@ -124,6 +124,20 @@ describe('import', () => {
     await utilisateur.click(screen.getByRole('button', { name: /Effacer les opérations/ }));
     await utilisateur.click(screen.getByRole('button', { name: 'Garder le relevé' }));
     expect(useFaits.getState().faits.mouvementsBancaires).toHaveLength(2);
+  });
+
+  /**
+   * Le bouton cliqué disparaît sous la confirmation : le focus retombait au
+   * début de la page, et le clavier repartait de la barre du haut.
+   */
+  it('pose le focus sur « Garder le relevé », et le rend au bouton quand on garde', async () => {
+    render(<Releve />);
+    const utilisateur = await importer();
+    await utilisateur.click(screen.getByRole('button', { name: /Effacer les opérations/ }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Garder le relevé' }));
+
+    await utilisateur.keyboard('{Enter}');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Effacer les opérations/ }));
   });
 });
 

@@ -7,6 +7,7 @@ import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calcu
 import { decoderFichier, lireReleve, type RapportLecture } from '../../infra/releveCsv';
 import { Info } from '../components/Info';
 import { CartePliable } from '../components/CartePliable';
+import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { dateCourte, eur } from '../format';
 import styles from './Releve.module.css';
 import { Montant } from '../components/Montant';
@@ -45,7 +46,7 @@ export function Releve() {
 
   const [retour, setRetour] = useState<Retour>(null);
   const [enCours, setEnCours] = useState(false);
-  const [confirmeEffacement, setConfirmeEffacement] = useState(false);
+  const pointeesALaMain = pointees(faits.mouvementsBancaires);
   const idChamp = useId();
 
   const etat = useMemo(() => etatAchats(faits), [faits]);
@@ -133,30 +134,23 @@ export function Releve() {
           * et les recettes, elles, restent — on le dit aussi, pour qu'on ose
           * effacer un relevé importé par erreur.
           */}
-        {resume.total > 0 && !confirmeEffacement && (
-          <button type="button" className={styles.action} onClick={() => setConfirmeEffacement(true)}>
-            Effacer les opérations importées
-          </button>
-        )}
-        {resume.total > 0 && confirmeEffacement && (
-          <div className={styles.confirmation} role="group" aria-label="Confirmer l’effacement du relevé">
-            <p>
-              {resume.total} opération{resume.total > 1 ? 's' : ''} quitteront le relevé
-              {faits.mouvementsBancaires.some((m) => m.rapprocheAvec !== null || m.sansContrepartie !== null) && (
-                <>, dont {pointees(faits.mouvementsBancaires)} déjà rapprochée{pointees(faits.mouvementsBancaires) > 1 ? 's' : ''} ou
-                  pointée{pointees(faits.mouvementsBancaires) > 1 ? 's' : ''} à la main — ce travail sera perdu</>
-              )}. Tes dépenses et tes recettes restent.
-            </p>
-            <span className={styles.actions}>
-              <button type="button" className={styles.actionDanger}
-                onClick={() => { viderReleve(); setRetour(null); setConfirmeEffacement(false); }}>
-                Tout effacer
-              </button>
-              <button type="button" className={styles.action} onClick={() => setConfirmeEffacement(false)}>
-                Garder le relevé
-              </button>
-            </span>
-          </div>
+        {resume.total > 0 && (
+          <ConfirmationSurPlace
+            libelle="Effacer les opérations importées"
+            classeDeclencheur={styles.action}
+            consequence={(
+              <>
+                {resume.total} opération{resume.total > 1 ? 's' : ''} quitteront le relevé
+                {pointeesALaMain > 0 && (
+                  <>, dont {pointeesALaMain} déjà rapprochée{pointeesALaMain > 1 ? 's' : ''} ou
+                    pointée{pointeesALaMain > 1 ? 's' : ''} à la main — ce travail sera perdu</>
+                )}. Tes dépenses et tes recettes restent.
+              </>
+            )}
+            libelleConfirmer="Tout effacer"
+            libelleGarder="Garder le relevé"
+            onConfirmer={() => { viderReleve(); setRetour(null); }}
+          />
         )}
       </section>
 
@@ -251,7 +245,6 @@ function LigneMouvement(
   const rapprocher = rapprocherMouvement;
   const marquerSans = marquerSansContrepartie;
   const debit = mouvement.montant < 0;
-  const [aRetirer, setARetirer] = useState(false);
 
   return (
     <li className={styles.mouvement}>
@@ -350,33 +343,20 @@ function LigneMouvement(
       {/* Retirer UNE ligne — celle d'un autre compte, un doublon — sans
           effacer tout le relevé. Confirmée sur place, comme tout ce qui ne se
           défait pas. */}
-      {!aRetirer
-        ? (
-          <button type="button" className={styles.actionDiscrete} onClick={() => setARetirer(true)}>
-            {/* L'espace HORS de la portée masquée : le calcul du nom accessible
-                rogne celle qui ouvre un élément, et le lecteur d'écran disait
-                « relevé— PRLV ». */}
-            Retirer du relevé{' '}
-            <span className={styles.horsEcran}>— {mouvement.libelle || 'sans libellé'}, {dateCourte(mouvement.date)}</span>
-          </button>
-        )
-        : (
-          <span className={styles.confirmation} role="group" aria-label="Confirmer le retrait de la ligne">
-            <span>
-              Cette ligne quittera le relevé
-              {mouvement.rapprocheAvec !== null && ', avec son rapprochement — la pièce rapprochée reste au registre'}.
-              {' '}Un nouvel import du même relevé la ramènerait.
-            </span>
-            <span className={styles.actions}>
-              <button type="button" className={styles.actionDanger} onClick={() => retirerMouvement(mouvement.id)}>
-                Retirer la ligne
-              </button>
-              <button type="button" className={styles.action} onClick={() => setARetirer(false)}>
-                Garder
-              </button>
-            </span>
-          </span>
+      <ConfirmationSurPlace
+        libelle="Retirer du relevé"
+        precision={`${mouvement.libelle || 'sans libellé'}, ${dateCourte(mouvement.date)}`}
+        classeDeclencheur={styles.actionDiscrete}
+        consequence={(
+          <>
+            Cette ligne quittera le relevé
+            {mouvement.rapprocheAvec !== null && ', avec son rapprochement — la pièce rapprochée reste au registre'}.
+            {' '}Un nouvel import du même relevé la ramènerait.
+          </>
         )}
+        libelleConfirmer="Retirer la ligne"
+        onConfirmer={() => retirerMouvement(mouvement.id)}
+      />
     </li>
   );
 }
