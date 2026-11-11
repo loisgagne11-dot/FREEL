@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
+import { composantALaDemande } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
 import { poserAjustement, poserPlageDeConges, retirerAjustements } from '../../state/ecritures.activite';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
@@ -55,12 +56,12 @@ const FormulaireMission = lazy(() => import('./Activite.formulaires')
  * client puis rarement, et le plan de charge — ce qu'on ouvre dix fois par
  * semaine — n'a aucune raison d'en payer le téléchargement.
  */
-const OngletClients = lazy(() => import('./Activite.clients')
-  .then((m) => ({ default: m.OngletClients })));
+const OngletClients = composantALaDemande(() => import('./Activite.clients')
+  .then((m) => m.OngletClients), true);
 
 /** L'onglet Missions, même motif : une liste qu'on ouvre pour modifier. */
-const OngletMissions = lazy(() => import('./Activite.missions')
-  .then((m) => ({ default: m.OngletMissions })));
+const OngletMissions = composantALaDemande(() => import('./Activite.missions')
+  .then((m) => m.OngletMissions), true);
 
 /**
  * Les trois cartes d'analyse arrivent APRÈS le plan de charge.
@@ -69,10 +70,10 @@ const OngletMissions = lazy(() => import('./Activite.missions')
  * celle qui amène sur l'écran : leur chargement se lit comme un bas de page qui
  * se remplit, et l'ouverture du plan de charge ne le paie plus.
  */
-const CartePrevision = lazy(() => import('./Activite.analyse')
-  .then((m) => ({ default: m.CartePrevision })));
-const CarteRapportParMission = lazy(() => import('./Activite.analyse')
-  .then((m) => ({ default: m.CarteRapportParMission })));
+const CartePrevision = composantALaDemande(() => import('./Activite.analyse')
+  .then((m) => m.CartePrevision), true);
+const CarteRapportParMission = composantALaDemande(() => import('./Activite.analyse')
+  .then((m) => m.CarteRapportParMission), true);
 /**
  * Le formulaire de pose de congés, différé.
  *
@@ -87,8 +88,8 @@ const CarteRapportParMission = lazy(() => import('./Activite.analyse')
  * son onglet — il pèse plus lourd que tout le reste de l'écran, et le plan de
  * charge, qu'on ouvre tous les jours, n'a pas à l'attendre.
  */
-const FacturierDiffere = lazy(() => import('../components/Facturier')
-  .then((m) => ({ default: m.Facturier })));
+const FacturierDiffere = composantALaDemande(() => import('../components/Facturier')
+  .then((m) => m.Facturier), true);
 
 /**
  * L'éditeur d'une demi-journée n'existe qu'après un clic sur la grille : il
@@ -99,11 +100,11 @@ const FacturierDiffere = lazy(() => import('../components/Facturier')
 const EditeurDemiJournee = lazy(() => import('../components/EditeurDemiJournee')
   .then((m) => ({ default: m.EditeurDemiJournee })));
 
-const PlageDeConges = lazy(() => import('./Activite.conges')
-  .then((m) => ({ default: m.PlageDeConges })));
+const PlageDeConges = composantALaDemande(() => import('./Activite.conges')
+  .then((m) => m.PlageDeConges), true);
 
-const CarteTarifJournalier = lazy(() => import('./Activite.analyse')
-  .then((m) => ({ default: m.CarteTarifJournalier })));
+const CarteTarifJournalier = composantALaDemande(() => import('./Activite.analyse')
+  .then((m) => m.CarteTarifJournalier), true);
 
 /** L'attente d'un formulaire, dans son panneau. Sobre : elle dure un instant. */
 function EnAttenteDeFormulaire() {

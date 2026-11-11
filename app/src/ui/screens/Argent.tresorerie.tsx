@@ -1,4 +1,5 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
+import { composantALaDemande } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant, solde } from '../../state/selecteurs';
 import { provenanceSoldeDe } from '../../state/selecteurs.reglages';
@@ -57,8 +58,8 @@ import styles from './Argent.module.css';
  * puis-je me verser ? » — et qu'on ne consulte pas en vérifiant son solde. Ils
  * vivent donc dans leur propre module, chargé à l'ouverture de leur carte.
  */
-const ProjectionPanneau = lazy(() => import('./Argent.projection')
-  .then((m) => ({ default: m.ProjectionPanneau })));
+const ProjectionPanneau = composantALaDemande(() => import('./Argent.projection')
+  .then((m) => m.ProjectionPanneau), true);
 
 /**
  * L'échéancier : frise de l'année, liste des appels, périodes URSSAF.
@@ -66,8 +67,8 @@ const ProjectionPanneau = lazy(() => import('./Argent.projection')
  * Différé, et seul bloc du pilier à l'être. Il est sous la ligne de flottaison
  * et ne s'ouvre que pour payer ou déclarer. Voir l'en-tête de son module.
  */
-const Echeancier = lazy(() => import('./Argent.echeancier')
-  .then((m) => ({ default: m.Echeancier })));
+const Echeancier = composantALaDemande(() => import('./Argent.echeancier')
+  .then((m) => m.Echeancier), true);
 
 /**
  * La composition d'un chiffre, au clic sur sa tuile.

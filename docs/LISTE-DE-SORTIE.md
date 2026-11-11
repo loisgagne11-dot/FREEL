@@ -245,26 +245,27 @@ que le versable retient pourtant.
 | Le dossier de déclaration de TVA du trimestre (`dossierTvaDuTrimestre`) ignore la TVA autoliquidée d'un franchisé devenu redevable en cours d'année | ⬜ hors lot : la provision la retient, le dossier pas encore — à reprendre avec le rappel de déclaration |
 | « Reste à sortir » du détail de la dette ne compte que l'appelé : l'impôt sur le revenu et la TVA s'affichent à côté, en blocs | ⬜ à trancher : la vignette et le détail peuvent donc montrer deux totaux |
 
-### Lot 14 — Les écrans s'ouvrent d'un coup (priorité 3 : le contrôle de vitesse échoue une fois sur deux)
+### Lot 14 — Les écrans s'ouvrent d'un coup (priorité 3 : le contrôle de vitesse échouait une fois sur deux)
 
-Constaté au lot 13, présent avant le lot 12 (mesuré sur l'état fusionné du
-lot 11) : `verifier:vitesse` échoue environ une exécution sur deux, toujours
-autour de **810 ms** au lieu de ~320, sur Facture, Outils, Config ou Activité.
-Les requêtes finissent toutes en moins de 50 ms : l'attente est dans le RENDU.
-React 19 retient la révélation d'une frontière `Suspense` 300 ms après qu'un
-repli a été montré (et une fenêtre de 500 ms) : quand un écran chargé à la
-demande charge lui-même, ENSUITE, ses morceaux à la demande (sections de
-Config, onglets d'Activité, rédaction de Facture), les retenues s'additionnent.
-Selon l'ordre d'arrivée des morceaux, on tombe sur 320 ou sur 810 ms — d'où le
-contrôle tantôt vert, tantôt rouge. Pour l'utilisateur, « Chargement… » dure
-parfois près d'une seconde.
+**Diagnostic corrigé en cours de lot.** Le premier relevé (810 ms) mêlait deux
+choses. (1) Un ARTEFACT DE MESURE : `waitForSelector` espace ses essais jusqu'à
+500 ms ; un écran affiché à 320 ms se mesurait à 810 dès qu'il manquait l'essai
+de 300 ms — d'où le contrôle tantôt vert, tantôt rouge, sur un délai que
+l'utilisateur ne voyait pas. (2) Un vrai délai, plus petit : à chaque ouverture
+d'écran, `lazy` suspend toujours une fois, même code déjà arrivé, et React
+retient la révélation 300 ms après avoir montré « Chargement… ». Pas de
+cascade de morceaux imbriqués sur Config, Outils ni Facture ; de vraies
+cascades sur Argent et Activité.
 
 | Ligne | État |
 |---|---|
-| Précharger les morceaux imbriqués dès que l'écran parent est chargé, pour qu'une seule frontière se révèle : à l'évaluation du module parent, partent l'`import()` des morceaux que l'écran affiche toujours, et celui de la section que l'adresse désigne (`#/config/fiscal` → `Config.fiscal`) — pas des sept : on ne télécharge pas ce qu'on ne regarde pas | ⬜ |
-| Mesuré avant d'écrire : la cascade exacte de chaque écran lent (Config, Activité, Facture, Outils) relevée dans le navigateur, et la retenue qu'elle provoque | ⬜ |
-| Le contrôle de vitesse passe dix fois de suite | ⬜ |
-| Aucun budget relevé : le préchargement ne change pas le poids téléchargé au premier rendu | ⬜ |
+| Mesuré avant d'écrire : requêtes datées, apparition et disparition du repli, sondage à chaque image contre `waitForSelector` | ✅ fait |
+| `composantALaDemande` : une seule promesse pour le préchargement et `lazy` ; une fois le code arrivé, l'écran est rendu directement, sans repli ; tant qu'il n'est pas là (lien direct, réseau lent), `lazy` et son repli comme avant ; le choix est fait au montage — basculer en cours de vie démonterait l'écran et la saisie en cours | ✅ fait |
+| Préchargés au repos, APRÈS le premier rendu : les six écrans et les morceaux qu'ils affichent toujours (trésorerie et performance d'Argent, projection, échéancier, onglets d'Activité, rédaction de facture). Par l'adresse seulement : la section de Config et le CRA d'Outils — jamais les sept sections. Restent à la demande : formulaires, éditeurs, registres, composition, document de facture | ✅ fait |
+| Le contrôle de vitesse sonde à chaque image (`waitForFunction`, `polling: 'raf'`), même critère — un titre de niveau 1 visible —, même plafond de 600 ms | ✅ fait |
+| Le contrôle de vitesse passe dix fois de suite | ✅ fait : médianes de 25 à 171 ms (Argent, le plus lourd), contre ~320 ms avant |
+| Aucun budget relevé | ✅ entrée 75,0 / 80 Ko (+0,5 Ko pour le préchargement), premier rendu 285 / 300 |
+| `startTransition` sur le changement de route | ⬜ écarté : il supprime le repli mais garde l'ancien écran affiché pendant le chargement — un clic sur un écran lent paraît sans effet, et le contrôle ne mesurerait plus rien |
 
 ## Reste fonctionnel par écran
 

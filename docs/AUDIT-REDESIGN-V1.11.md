@@ -1070,3 +1070,9 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Détail de l'enveloppe TVA | Collectée et réglée | + « dont TVA autoliquidée sur tes achats de services dans l'Union : X € — date de dépôt à confirmer auprès de ton service des impôts », quand il y en a |
 | Détail de la dette « impôt » | Taux sur les encaissements | + « Impôt sur le revenu à mettre de côté : X € (estimation) », ou le motif d'abstention |
 
+## Lot 14 (11/11) — les écrans s'ouvrent d'un coup
+
+| Zone | Avant | Après |
+|---|---|---|
+| Changement d'écran | « Chargement… » ~300 ms à chaque ouverture, même code déjà arrivé | Écran rendu directement une fois préchargé (au repos, après le premier rendu) : 25 à 170 ms selon l'écran ; le repli ne paraît plus que sur un lien direct ou un réseau lent |
+

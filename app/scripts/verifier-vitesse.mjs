@@ -250,7 +250,15 @@ for (const ecran of ECRANS) {
     const debut = Date.now();
     await page.evaluate((hash) => { window.location.hash = hash; }, `#/${ecran}`);
     try {
-      await page.waitForSelector('h1:visible', { timeout: PLAFOND_MS * 8 });
+      // Sondé à chaque image, pas au rythme de `waitForSelector` : celui-ci
+      // espace ses essais (jusqu'à 500 ms entre deux), et un écran affiché à
+      // 320 ms se mesurait à 810 — le contrôle échouait une fois sur deux sur
+      // un délai qui n'existait pas pour l'utilisateur (lot 14). Même critère
+      // qu'avant : un titre de niveau 1 réellement visible.
+      await page.waitForFunction(() => [...document.querySelectorAll('h1')].some((h) => {
+        const r = h.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(h).visibility !== 'hidden';
+      }), undefined, { polling: 'raf', timeout: PLAFOND_MS * 8 });
     } catch {
       temps.push(Number.POSITIVE_INFINITY);
       continue;

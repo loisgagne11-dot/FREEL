@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useId, useState } from 'react';
+import { Suspense, useEffect, useId, useState } from 'react';
+import { adresseCourante, sousRouteSiEcran, composantALaDemande } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
 import { finAcreDe } from '../../state/selecteurs.reglages';
 import { finDuMois } from '../../domain/calculs/periode';
@@ -43,16 +44,21 @@ import styles from './Config.module.css';
 
 type Section = 'profil' | 'fiscal' | 'reserve' | 'facturation' | 'livre' | 'compte' | 'donnees';
 
-const Fiscal = lazy(() => import('./Config.fiscal').then((m) => ({ default: m.Fiscal })));
-const Reserve = lazy(() => import('./Config.reserve').then((m) => ({ default: m.Reserve })));
-const Facturation = lazy(() => import('./Config.facturation').then((m) => ({ default: m.Facturation })));
-const LivreDesRecettes = lazy(
-  () => import('./Config.facturation').then((m) => ({ default: m.LivreDesRecettes }))
+const Fiscal = composantALaDemande(() => import('./Config.fiscal')
+  .then((m) => m.Fiscal), false);
+const Reserve = composantALaDemande(() => import('./Config.reserve')
+  .then((m) => m.Reserve), false);
+const Facturation = composantALaDemande(() => import('./Config.facturation')
+  .then((m) => m.Facturation), false);
+const LivreDesRecettes = composantALaDemande(
+  () => import('./Config.facturation').then((m) => m.LivreDesRecettes)
 );
-const Donnees = lazy(() => import('./Config.donnees').then((m) => ({ default: m.Donnees })));
+const Donnees = composantALaDemande(() => import('./Config.donnees')
+  .then((m) => m.Donnees), false);
 // Le compte en ligne aussi : c'est l'écran le plus lourd après le barème, on
 // ne l'ouvre que pour synchroniser (invariant n°7 : on extrait).
-const Compte = lazy(() => import('./Compte').then((m) => ({ default: m.Compte })));
+const Compte = composantALaDemande(() => import('./Compte')
+  .then((m) => m.Compte), false);
 
 const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: string }[] = [
   { id: 'BNC', libelle: 'BNC — prestations libérales' },
@@ -423,4 +429,25 @@ function Interrupteur(
         onChange={(e) => onChange(e.target.checked)} />
     </div>
   );
+}
+
+/*
+ * Les sections se chargent à la demande, mais celle que l'adresse désigne part
+ * dès l'évaluation du module, en même temps que l'écran s'affiche : sans cela,
+ * `#/config/fiscal` ouvert d'emblée montrait l'écran, PUIS « Chargement… »
+ * pendant le téléchargement de la section, et les deux replis s'additionnent
+ * (React retient chacun 300 ms). Pas les sept : un lien vers Profil n'a pas à
+ * télécharger le barème. Profil n'est pas à la demande, il part avec l'écran.
+ */
+const routeConfig = sousRouteSiEcran('config', adresseCourante());
+if (routeConfig !== null) {
+  switch (routeConfig) {
+    case 'fiscal': Fiscal.lancer(); break;
+    case 'reserve': Reserve.lancer(); break;
+    case 'facturation': Facturation.lancer(); break;
+    case 'livre': LivreDesRecettes.lancer(); break;
+    case 'compte': Compte.lancer(); break;
+    case 'donnees': Donnees.lancer(); break;
+    default: break;
+  }
 }
