@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { precharger } from './ui/composantALaDemande';
 import { FiletErreur } from './ui/components/FiletErreur';
 
 // Ordre de chargement significatif : les tokens d'abord, la base ensuite.
@@ -23,3 +24,6 @@ createRoot(racine).render(
     </FiletErreur>
   </StrictMode>
 );
+
+// Après le premier rendu : les autres écrans arrivent pendant que l'utilisateur lit.
+precharger();

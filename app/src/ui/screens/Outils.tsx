@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useId, useMemo, useState } from 'react';
+import { Suspense, useEffect, useId, useMemo, useState } from 'react';
+import { adresseCourante, sousRouteSiEcran, composantALaDemande } from '../composantALaDemande';
 import { euros, mois as moisDe } from '../../domain/types';
 import {
   irParTranches, revenuApresAbattement, tauxAbattement, tranchesIR
@@ -27,8 +28,8 @@ import { CarteCra } from './Outils.craCarte';
  * lourd sans qu'aucun simulateur en profite. C'est l'invariant n°7 appliqué
  * avant que le budget ne dépasse plutôt qu'après.
  */
-const GenerateurCra = lazy(() => import('./Outils.cra')
-  .then((m) => ({ default: m.GenerateurCra })));
+const GenerateurCra = composantALaDemande(() => import('./Outils.cra')
+  .then((m) => m.GenerateurCra), false);
 
 type SectionOutils = 'impot' | 'cra';
 
@@ -300,3 +301,7 @@ export function Outils({ annee }: ProprietesOutils = {}) {
     </>
   );
 }
+
+// Le CRA ne s'ouvre que par `#/outils/cra` : n'en charger le module que si
+// l'adresse le désigne, pour que l'écran et lui arrivent d'un même mouvement.
+if (sousRouteSiEcran('outils', adresseCourante()) === 'cra') GenerateurCra.lancer();

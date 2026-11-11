@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo } from 'react';
+import { composantALaDemande } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
 import { etatFacture, reediterFacture } from '../../state/selecteurs.facture';
 import styles from './Facture.module.css';
@@ -14,8 +15,8 @@ import { Apercu, useSortieDocument } from '../documents/Apercu';
  * dépasser le budget de l'écran différé le plus lourd ; le budget ne se
  * relève pas, on extrait.
  */
-const NouvelleFacture = lazy(() => import('./Facture.redaction')
-  .then((m) => ({ default: m.NouvelleFacture })));
+const NouvelleFacture = composantALaDemande(() => import('./Facture.redaction')
+  .then((m) => m.NouvelleFacture), true);
 /* Le document vit dans `documents/`, avec sa feuille autonome : c'est le
    MÊME papier que la rédaction montre en aperçu et que le fichier téléchargé
    emporte. Deux rendus d'une facture finiraient par ne plus s'accorder, et

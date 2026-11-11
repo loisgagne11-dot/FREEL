@@ -27,13 +27,14 @@ const SelecteurPeriode = lazy(() => import('./ui/components/SelecteurPeriode')
  * un aller-retour réseau juste avant le contenu qu'on vient chercher.
  */
 import { Pilote } from './ui/screens/Pilote';
+import { composantALaDemande } from './ui/composantALaDemande';
 
-const Argent = lazy(() => import('./ui/screens/Argent').then((m) => ({ default: m.Argent })));
-const Outils = lazy(() => import('./ui/screens/Outils').then((m) => ({ default: m.Outils })));
-const Achats = lazy(() => import('./ui/screens/Achats').then((m) => ({ default: m.Achats })));
-const Activite = lazy(() => import('./ui/screens/Activite').then((m) => ({ default: m.Activite })));
-const Config = lazy(() => import('./ui/screens/Config').then((m) => ({ default: m.Config })));
-const Facture = lazy(() => import('./ui/screens/Facture').then((m) => ({ default: m.Facture })));
+const Argent = composantALaDemande(() => import('./ui/screens/Argent').then((m) => m.Argent), true);
+const Outils = composantALaDemande(() => import('./ui/screens/Outils').then((m) => m.Outils), true);
+const Achats = composantALaDemande(() => import('./ui/screens/Achats').then((m) => m.Achats), true);
+const Activite = composantALaDemande(() => import('./ui/screens/Activite').then((m) => m.Activite), true);
+const Config = composantALaDemande(() => import('./ui/screens/Config').then((m) => m.Config), true);
+const Facture = composantALaDemande(() => import('./ui/screens/Facture').then((m) => m.Facture), true);
 import { moisCourant } from './state/selecteurs';
 import { useCompteursATraiter } from './ui/useATraiter';
 import type { Mois } from './domain/types';

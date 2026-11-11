@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
+import { composantALaDemande } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
 import { etatArgent } from '../../state/selecteurs.argent';
 import { Greet } from '../components/Greet';
@@ -42,8 +43,8 @@ const DossierTvaPanneau = lazy(() => import('./Argent.tva')
  * qu'une coquille, et chacun a la place de grandir sans que l'autre en paie
  * le poids.
  */
-const Tresorerie = lazy(() => import('./Argent.tresorerie')
-  .then((m) => ({ default: m.Tresorerie })));
+const Tresorerie = composantALaDemande(() => import('./Argent.tresorerie')
+  .then((m) => m.Tresorerie), true);
 
 /** Le registre : on l'ouvre pour vérifier ou justifier, pas tous les jours. */
 const LivreDesRecettes = lazy(() => import('./Argent.livre')
@@ -56,8 +57,8 @@ const LivreDesRecettes = lazy(() => import('./Argent.livre')
  * à 39,83 Ko sur un budget de 40, et on ouvre Argent pour regarder son solde
  * bien plus souvent que pour lire son année. Voir l'en-tête du module.
  */
-const Performance = lazy(() => import('./Argent.performance')
-  .then((m) => ({ default: m.Performance })));
+const Performance = composantALaDemande(() => import('./Argent.performance')
+  .then((m) => m.Performance), true);
 
 /**
  * Écran Argent — trésorerie et performance.
