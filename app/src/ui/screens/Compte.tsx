@@ -233,6 +233,10 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
   const [distant, setDistant] = useState<EtatDistant>('inconnu');
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // Le bilan d'un effacement s'affiche SOUS ses boutons : posé en bas de la
+  // carte, après les règles d'accès, il sortait de l'écran sur téléphone, et
+  // le geste le plus grave de l'écran restait sans réponse visible.
+  const [effacement, setEffacement] = useState<{ readonly echec: boolean; readonly texte: string } | null>(null);
   const [enCours, setEnCours] = useState(false);
   const idChamp = useId();
 
@@ -423,6 +427,7 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     setEnCours(true);
     setErreur(null);
     setMessage(null);
+    setEffacement(null);
     const r: ResultatEffacement = quoi === 'faits'
       ? await effacerFaitsDuCompte(config, session)
       : await effacerDonneesLegacy(config, session);
@@ -431,18 +436,21 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     const copie = quoi === 'faits' ? 'de cette version' : 'de l’ancienne application';
     switch (r.statut) {
       case 'efface':
-        setMessage(`Données ${copie} effacées du compte. Relu après coup : il n’en reste rien.`);
+        setEffacement({ echec: false, texte: `Données ${copie} effacées du compte. Relu après coup : il n’en reste rien.` });
         return;
       case 'deja-vide':
-        setMessage(`Le compte ne contenait aucune donnée ${copie} : rien à effacer.`);
+        setEffacement({ echec: false, texte: `Le compte ne contenait aucune donnée ${copie} : rien à effacer.` });
         return;
       case 'regle-absente':
-        setErreur('Rien n’a été effacé : le serveur n’autorise pas encore la suppression. '
-          + 'Ouvre le fichier « docs/supabase.sql » du dépôt, copie son CONTENU dans '
-          + 'l’éditeur SQL du projet Supabase, exécute-le, puis réessaie.');
+        setEffacement({
+          echec: true,
+          texte: 'Rien n’a été effacé : le serveur n’autorise pas encore la suppression. '
+            + 'Ouvre le fichier « docs/supabase.sql » du dépôt, copie son CONTENU dans '
+            + 'l’éditeur SQL du projet Supabase, exécute-le, puis réessaie.'
+        });
         return;
       case 'erreur':
-        setErreur(r.motif);
+        setEffacement({ echec: true, texte: r.motif });
     }
   }
 
@@ -594,6 +602,11 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
                   />
                 </li>
               </ul>
+              {effacement !== null && (
+                <p role={effacement.echec ? 'alert' : 'status'} className={effacement.echec ? styles.echec : styles.succes}>
+                  {effacement.texte}
+                </p>
+              )}
               <p className={styles.explication}>
                 Ton <strong>identifiant de connexion</strong> n’est pas supprimé
                 par ces gestes&nbsp;: il se supprime dans le tableau de bord du

@@ -1155,3 +1155,9 @@ dépense, échéancier, barème, relevé — aucun débordement, aucune erreur.
 |---|---|---|
 | Adresse du site | Ancienne version à la racine, nouvelle sous `/v2/` | Nouvelle à la racine ; `/v2/` y redirige en gardant l'écran |
 | Ancienne version | Modifiable, à la racine | Sous `/legacy/`, en lecture seule, bandeau rouille « rien n'y est enregistré » collé sous son en-tête, lien vers la nouvelle (1440 et 390 relus, au repos et en défilement) |
+
+## Lot 25 (11/11) — effacer ses données du compte
+
+| Zone | Avant | Après |
+|---|---|---|
+| Config › Compte & synchronisation | Aucun moyen d'effacer le compte | Section « Effacer mes données du compte », sous un filet, après les gestes courants : deux boutons, chacun confirmé sur place ; bilan sous les boutons ; ce qui reste (identifiant, données de l'appareil) dit en clair |

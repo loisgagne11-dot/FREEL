@@ -744,3 +744,7 @@ solde − provisions − réserve.
 
 Aucun nombre lu ne change : le lot déplace les deux versions sans toucher à
 leurs calculs.
+
+## Lot 25 (11/11) — compte
+
+Aucun nombre lu ne change.

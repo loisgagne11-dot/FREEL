@@ -480,3 +480,9 @@ chiffre faux.
 | Consulter l'ancienne application | 🟢 | Toujours possible, sous `/legacy/`, en lecture seule : aucune écriture dans le stockage ni vers le compte (`verifier:bascule`) |
 | Saisir dans l'ancienne application | ⚪ retiré, voulu | Une saisie y serait perdue ou écraserait la reprise ; le bandeau mène à la nouvelle version |
 | Reprise de l'ancienne vers la nouvelle | 🟢 | Inchangée : même origine, même stockage — éprouvée sur le site assemblé |
+
+## Lot 25 (11/11) — effacer ses données du compte
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Effacer ses données du compte (RGPD) | 🟢 nouveau | L'ancienne application n'en avait pas. Copie par copie, confirmé, prouvé par relecture ; la règle de suppression manquante est détectée au lieu d'un faux « effacé » |
