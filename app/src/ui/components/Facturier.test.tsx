@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois } from '../../domain/types';
 import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
+import { reediterFacture } from '../../state/selecteurs.facture';
 import { stockageMemoireJustificatifs } from '../../infra/justificatifs';
 import { FournisseurToasts } from './Toasts';
 import { Facturier } from './Facturier';
@@ -560,6 +561,25 @@ describe('la facture du mois, avant qu’elle existe', () => {
     expect(recettes[0]?.numero).not.toBe('');
     expect(recettes[0]?.emiseLe).not.toBeNull();
     expect(recettes[0]?.clientNom).toBe('Client France');
+  });
+
+  /**
+   * En franchise, la facture émise depuis son brouillon garde ses lignes et
+   * sa TVA — zéro, connue. Sans elles, « Revoir la facture » la refusait, et
+   * le dossier de TVA la signalait « TVA inconnue ».
+   */
+  it('conserve à l’émission les lignes et la TVA nulle d’une franchise, et la facture se revoit', async () => {
+    semer([], { missions: [missionPlanifiee] });
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Émettre cette facture' }));
+
+    const r = useFaits.getState().faits.recettes[0];
+    expect(r?.tvaCollectee).toBe(0);
+    expect(r?.lignes?.map((l) => l.prixUnitaireHt)).toEqual([500]);
+    expect(r?.lignes?.reduce((s, l) => s + l.quantite * l.prixUnitaireHt, 0)).toBe(r?.montant);
+    expect(reediterFacture(useFaits.getState().faits, r?.numero ?? '').cas).toBe('reeditee');
   });
 
   /**

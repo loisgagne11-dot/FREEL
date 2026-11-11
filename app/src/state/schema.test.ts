@@ -930,3 +930,38 @@ describe('schéma 18 → 19 : le prénom', () => {
   });
 });
 
+
+/**
+ * LES LIGNES D'UNE FACTURE (schéma 20).
+ *
+ * Un champ apparu dans un ÉLÉMENT de liste : la fusion de surface ne
+ * l'atteint pas. Une recette de schéma 19 doit en ressortir avec `null` —
+ * « détail non conservé » —, jamais `undefined`, jamais une ligne fabriquée
+ * depuis son total.
+ */
+describe('schéma 19 → 20 : les lignes des factures', () => {
+  const recette19 = {
+    id: 'r1', clientNom: 'Client démo', libelle: 'Mission', montant: 1000,
+    emiseLe: '2026-05-02', encaisseeLe: null, modeReglement: null, numero: '2026-001'
+  };
+
+  it('une recette de schéma 19 reçoit des lignes nulles, et non `undefined`', () => {
+    const f = completerFaits({ version: 19, recettes: [recette19] });
+    expect(f.recettes[0]).toHaveProperty('lignes', null);
+  });
+
+  it('accepte au schéma courant des lignes lisibles, et les garde', () => {
+    const ligne = { designation: 'Atelier', quantite: 3, prixUnitaireHt: 480, tauxTva: 0 };
+    const bloc = { ...faitsVides(), recettes: [{ ...recette19, lignes: [ligne] }] };
+    expect(motifRefusFaits(bloc)).toBeNull();
+  });
+
+  /** Un prix qui n'est pas un nombre ferait lever la réédition — et le facturier — à chaque ouverture. */
+  it('refuse au schéma courant une ligne illisible', () => {
+    const bloc = {
+      ...faitsVides(),
+      recettes: [{ ...recette19, lignes: [{ designation: 'Atelier', quantite: 3, prixUnitaireHt: '480', tauxTva: 0 }] }]
+    };
+    expect(motifRefusFaits(bloc)).toMatch(/recettes/);
+  });
+});

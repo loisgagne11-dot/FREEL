@@ -1,6 +1,6 @@
 {
   "_lisezMoi": "Jeu d’essai à FORME RÉELLE, entièrement fictif : mêmes structures qu’un compte réel (ACRE qui s’éteint, TVA franchie en cours d’année, avoir, foyer à deux parts, passage du 31 décembre), aucune donnée personnelle. Il sert aux tests d’intégration (src/integration) et à capturer-app.mjs --jeu=essai, jamais à la démonstration.",
-  "version": 19,
+  "version": 20,
   "entreprise": {
     "nom": "Entreprise Démo Indépendant",
     "prenom": "",
@@ -192,7 +192,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-05-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2025-002",
@@ -207,7 +208,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-06-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2025-003",
@@ -222,7 +224,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-07-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2025-004",
@@ -237,7 +240,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-08-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2025-005",
@@ -252,7 +256,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-09-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2025-006",
@@ -267,7 +272,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-10-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2025-007",
@@ -282,7 +288,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-11-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2025-008",
@@ -297,7 +304,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-12-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2025-009",
@@ -312,7 +320,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-01-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-001",
@@ -327,7 +336,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-03-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-002",
@@ -342,7 +352,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-03-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-003",
@@ -357,7 +368,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-04-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-004",
@@ -372,7 +384,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-05-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-012",
@@ -387,7 +400,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-06-11",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-005",
@@ -402,7 +416,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-06-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-006",
@@ -417,7 +432,8 @@
       "tvaCollectee": 1440,
       "relancesLe": [],
       "echeanceLe": "2026-07-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-007",
@@ -432,7 +448,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-08-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-avoir-formation",
@@ -448,7 +465,8 @@
       "relancesLe": [],
       "echeanceLe": "2026-09-04",
       "justificatifId": null,
-      "annuleEcriture": "rec-formation"
+      "annuleEcriture": "rec-formation",
+      "lignes": null
     },
     {
       "id": "rec-formation",
@@ -463,7 +481,8 @@
       "tvaCollectee": 300,
       "relancesLe": [],
       "echeanceLe": "2026-09-04",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-008",
@@ -478,7 +497,8 @@
       "tvaCollectee": 864,
       "relancesLe": [],
       "echeanceLe": "2026-09-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-009",
@@ -493,7 +513,8 @@
       "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-10-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-010",
@@ -508,7 +529,8 @@
       "tvaCollectee": 1440,
       "relancesLe": [],
       "echeanceLe": "2026-11-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-2026-011",
@@ -523,7 +545,8 @@
       "tvaCollectee": 1440,
       "relancesLe": [],
       "echeanceLe": "2026-12-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     },
     {
       "id": "rec-suivi-decembre",
@@ -538,7 +561,8 @@
       "tvaCollectee": 360,
       "relancesLe": [],
       "echeanceLe": "2027-01-09",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     }
   ],
   "depenses": [

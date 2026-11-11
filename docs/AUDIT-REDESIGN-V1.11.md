@@ -1101,3 +1101,9 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Pastilles des sorties du flux | Liens vers l'échéancier | Boutons qui ouvrent le panneau sur l'échéance cliquée (aussi dans le détail déplié) ; « payé » et « Charges sur encaissements » gardent leur lien |
 | Détail de la dette › Enregistrer le paiement | « Payé aujourd'hui » / « Annuler » | Date du débit et montant débité sur la ligne, « Confirmer le paiement » |
 | Échéancier › Enregistrer le paiement | Formulaire propre | Le même formulaire (`FormulairePaiement`) ; date future refusée |
+
+## Lot 18 (11/11) — les lignes d'une facture se conservent
+
+| Zone | Avant | Après |
+|---|---|---|
+| Facturier › Revoir la facture | Une seule ligne au prix du total ; refus pour une facture à deux taux ; refus pour toute facture de la démonstration (TVA « inconnue ») | Les lignes du document émis, telles que le client les a reçues ; les factures d'avant le schéma 20 gardent l'ancien comportement |

@@ -19,7 +19,7 @@
     "invalide) — invariant n°6 : le dépôt est public, aucune donnée personnelle",
     "n'y entre."
   ],
-  "version": 19,
+  "version": 20,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "prenom": "Camille",
@@ -443,10 +443,18 @@
       "encaisseeLe": "2025-11-27",
       "modeReglement": "virement",
       "numero": "2025-001",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-11-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Lancement de marque — audit",
+          "quantite": 5,
+          "prixUnitaireHt": 520,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-002",
@@ -458,10 +466,18 @@
       "encaisseeLe": "2025-12-29",
       "modeReglement": "virement",
       "numero": "2025-002",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2025-12-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Lancement de marque — maquettes",
+          "quantite": 6,
+          "prixUnitaireHt": 520,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-003",
@@ -473,10 +489,18 @@
       "encaisseeLe": "2026-01-26",
       "modeReglement": "virement",
       "numero": "2025-003",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-02-14",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Atelier de cadrage",
+          "quantite": 3,
+          "prixUnitaireHt": 480,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-004",
@@ -488,10 +512,18 @@
       "encaisseeLe": "2026-01-30",
       "modeReglement": "virement",
       "numero": "2025-004",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-01-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Lancement de marque — déclinaisons",
+          "quantite": 5.5,
+          "prixUnitaireHt": 520,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-005",
@@ -503,10 +535,18 @@
       "encaisseeLe": "2026-02-27",
       "modeReglement": "virement",
       "numero": "2026-001",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-02-28",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Lancement de marque — livraison",
+          "quantite": 6.5,
+          "prixUnitaireHt": 520,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-006",
@@ -518,10 +558,18 @@
       "encaisseeLe": "2026-03-31",
       "modeReglement": "virement",
       "numero": "2026-002",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-03-31",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Audit du site",
+          "quantite": 4,
+          "prixUnitaireHt": 520,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-021",
@@ -533,10 +581,18 @@
       "encaisseeLe": "2026-04-14",
       "modeReglement": "virement",
       "numero": "2026-003",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-04-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Catalogue — cadrage",
+          "quantite": 10,
+          "prixUnitaireHt": 520,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-022",
@@ -548,10 +604,24 @@
       "encaisseeLe": "2026-05-28",
       "modeReglement": "virement",
       "numero": "2026-004",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-06-14",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Identité de marque — ateliers de cadrage",
+          "quantite": 3,
+          "prixUnitaireHt": 480,
+          "tauxTva": 0
+        },
+        {
+          "designation": "Identité de marque — création du logotype",
+          "quantite": 4.5,
+          "prixUnitaireHt": 480,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-023",
@@ -563,10 +633,18 @@
       "encaisseeLe": "2026-06-04",
       "modeReglement": "virement",
       "numero": "2026-005",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-05-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Refonte du site — lot 1",
+          "quantite": 8,
+          "prixUnitaireHt": 520,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-024",
@@ -578,10 +656,18 @@
       "encaisseeLe": null,
       "modeReglement": null,
       "numero": "2026-006",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-05-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Refonte du site — ajustements",
+          "quantite": 3,
+          "prixUnitaireHt": 400,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-025",
@@ -593,10 +679,18 @@
       "encaisseeLe": null,
       "modeReglement": null,
       "numero": "2026-007",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-07-14",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Identité de marque — lot 2",
+          "quantite": 5,
+          "prixUnitaireHt": 480,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-026",
@@ -608,10 +702,24 @@
       "encaisseeLe": null,
       "modeReglement": null,
       "numero": "2026-008",
-      "tvaCollectee": null,
+      "tvaCollectee": 0,
       "relancesLe": [],
       "echeanceLe": "2026-07-30",
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": [
+        {
+          "designation": "Refonte du site — intégration",
+          "quantite": 5,
+          "prixUnitaireHt": 460,
+          "tauxTva": 0
+        },
+        {
+          "designation": "Frais de déplacement",
+          "quantite": 1,
+          "prixUnitaireHt": 110,
+          "tauxTva": 0
+        }
+      ]
     },
     {
       "id": "rec-027",
@@ -626,7 +734,8 @@
       "tvaCollectee": null,
       "relancesLe": [],
       "echeanceLe": null,
-      "justificatifId": null
+      "justificatifId": null,
+      "lignes": null
     }
   ],
   "depenses": [

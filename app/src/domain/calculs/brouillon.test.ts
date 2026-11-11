@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { euros, mois } from '../types';
 import type { LigneDeBrouillon } from './brouillon';
-import { brouillonsDuMois, libelleDeLaFacture } from './brouillon';
+import { brouillonsDuMois, libelleDeLaFacture, lignesDuBrouillonEnFranchise } from './brouillon';
 
 const M = mois('2026-07');
 
@@ -150,5 +150,28 @@ describe('libellé de la facture', () => {
       ligne({ missionId: 'b', libelle: 'B' })
     ]);
     expect(libelleDeLaFacture(b[0] as never)).toBe('2 missions — juillet 2026');
+  });
+});
+
+/**
+ * LES LIGNES D'UNE FACTURE ÉMISE DEPUIS SON BROUILLON.
+ *
+ * Jours × prix journalier quand la division tombe juste ; sinon le montant en
+ * une quantité, les jours dans la désignation — un prix arrondi dont le
+ * produit ne retomberait pas sur le total contredirait le livre.
+ */
+describe('lignes du brouillon, en franchise', () => {
+  it('écrit jours × prix journalier, au taux zéro', () => {
+    const b = brouillonsDuMois(M, [ligne({ libelle: 'Refonte', jours: 10, montant: euros(5000) })]);
+    expect(lignesDuBrouillonEnFranchise(b[0] as never)).toEqual([
+      { designation: 'Refonte', quantite: 10, prixUnitaireHt: 500, tauxTva: 0 }
+    ]);
+  });
+
+  it('garde le montant entier quand la division ne tombe pas juste', () => {
+    const b = brouillonsDuMois(M, [ligne({ libelle: 'Refonte', jours: 3, montant: euros(1000) })]);
+    expect(lignesDuBrouillonEnFranchise(b[0] as never)).toEqual([
+      { designation: 'Refonte — 3 j', quantite: 1, prixUnitaireHt: 1000, tauxTva: 0 }
+    ]);
   });
 });

@@ -229,6 +229,23 @@ describe('émission', () => {
     expect(recette?.encaisseeLe).toBeNull();
   });
 
+  /**
+   * Le détail que le client a reçu se garde à l'émission : il ne se devine
+   * plus ensuite (schéma 20). En franchise, le taux conservé est zéro — celui
+   * que le document applique.
+   */
+  it('conserve les lignes du document émis', async () => {
+    semer({ clients: [client()] });
+    await rendreSaisie();
+    const utilisateur = userEvent.setup();
+    await remplir(utilisateur);
+    await utilisateur.click(screen.getByRole('button', { name: 'Émettre la facture' }));
+
+    expect(useFaits.getState().faits.recettes[0]?.lignes).toEqual([
+      { designation: 'Développement', quantite: 10, prixUnitaireHt: 400, tauxTva: 0 }
+    ]);
+  });
+
   it('numérote à la suite des factures existantes', async () => {
     semer({
       clients: [client()],

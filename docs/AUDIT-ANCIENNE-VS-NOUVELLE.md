@@ -431,3 +431,11 @@ chiffre faux.
 | Pointer une échéance payée depuis le Pilote | 🟢 | Seulement à l'échéancier et dans le détail de la dette jusqu'ici ; aussi depuis la colonne Sorties du flux |
 | Date du paiement dans le détail de la dette | 🟢 | « Payé aujourd'hui » seulement : un débit d'hier tombait dans le mauvais mois le premier du mois. Date et montant saisis, comme à l'échéancier |
 | Date de débit dans le futur | 🟢 | Acceptée à l'échéancier ; refusée partout |
+
+## Lot 18 (11/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Conserver le détail d'une facture émise | 🟢 | Schéma 20 : les lignes (désignation, quantité, prix unitaire, taux appliqué) sont gardées à l'émission, depuis l'éditeur comme depuis le brouillon du mois en franchise |
+| Rééditer une facture à plusieurs taux | 🟢 | Refusée faute de détail ; rétablie depuis ses lignes |
+| Émettre depuis le brouillon du mois, en franchise | 🟢 | TVA non portée (« inconnue ») : la facture ne se revoyait pas. TVA nulle et lignes conservées |
