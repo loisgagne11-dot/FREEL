@@ -271,10 +271,6 @@
 
 .action:hover { color: var(--text); border-color: var(--red); }
 
-/* Une cellule de tableau ne donne pas de largeur : la confirmation de retrait
-   d'une période s'y serait tassée en colonne d'un mot. */
-.confirmationCellule { min-width: 17rem; }
-
 .succes { font-size: 12.5px; line-height: 1.55; color: var(--green); }
 .echec { font-size: 12.5px; line-height: 1.55; color: var(--red); }
 

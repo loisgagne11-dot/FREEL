@@ -215,7 +215,7 @@ describe('ajout d’une période', () => {
     await ouvrirBareme();
     const utilisateur = utilisateurTest();
     await saisirPeriode(utilisateur, { du: '2027-01', bnc: '27,2', source: 'avis' });
-    await utilisateur.click(screen.getByRole('button', { name: /^Retirer — la période saisie du 2027-01/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Retirer la période saisie du 2027-01' }));
     // Retirer change les cotisations de mois entiers : confirmé, et dit.
     expect(useFaits.getState().faits.periodesUrssafAjoutees).toHaveLength(1);
     expect(screen.getByRole('group', { name: /cotisations sont recalculées/ })).toBeTruthy();
@@ -224,6 +224,19 @@ describe('ajout d’une période', () => {
     expect(useFaits.getState().faits.periodesUrssafAjoutees).toHaveLength(0);
     const effectives = periodesUrssafEffectives(useFaits.getState().faits);
     expect(effectives).toEqual(PERIODES_URSSAF);
+  });
+
+  it('« Garder » ne retire rien, et rend le focus au bouton de la période', async () => {
+    await ouvrirBareme();
+    const utilisateur = utilisateurTest();
+    await saisirPeriode(utilisateur, { du: '2027-01', bnc: '27,2', source: 'avis' });
+    const bouton = screen.getByRole('button', { name: 'Retirer la période saisie du 2027-01' });
+    await utilisateur.click(bouton);
+    expect(document.activeElement?.textContent).toBe('Garder');
+
+    await utilisateur.keyboard('{Enter}');
+    expect(useFaits.getState().faits.periodesUrssafAjoutees).toHaveLength(1);
+    await waitFor(() => expect(document.activeElement).toBe(bouton));
   });
 
   // Le seul moyen de corriger une valeur livrée fausse sans attendre un

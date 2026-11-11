@@ -1128,3 +1128,22 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 |---|---|---|
 | Achats › Relevé › Effacer les opérations importées | Un clic vidait tout | Confirmation sur place : combien d'opérations partent, combien étaient rapprochées ou pointées, et que les dépenses et recettes restent |
 | Achats › Relevé › chaque opération | Aucun retrait possible | « Retirer du relevé », confirmé sur la ligne |
+
+## Lot 22 (11/11) — rien ne s'annule ni ne s'efface d'un clic
+
+Une seule confirmation sur place (`ConfirmationSurPlace`), rouge pâle, qui
+dit la conséquence et pose le focus sur « Garder ». Contrôle visuel sur le
+jeu de démonstration, sombre 1440 et clair 390 : facturier, détail d'une
+dépense, échéancier, barème, relevé — aucun débordement, aucune erreur.
+
+| Zone | Avant | Après |
+|---|---|---|
+| Activité › Factures › Annuler par un avoir | Un clic émettait l'avoir ; absent d'une facture envoyée | Confirmation sous la rangée d'actions, qui distingue facture encaissée (remboursement au livre) et facture due ; offert aussi sur une facture envoyée |
+| Activité › Factures › Supprimer le brouillon | Un clic | Confirmé, avec le montant, le client et le numéro libéré |
+| Argent › Livre des recettes › Annuler par écriture inverse | Un clic ; le bouton restait sur une écriture déjà annulée | Confirmé ; disparaît une fois l'écriture inverse inscrite |
+| Achats › détail d'une dépense › Supprimer | Un clic | Confirmé, montant au centime comme la fiche |
+| Argent › Échéances › Repasser à payer, Supprimer cette échéance | Un clic | Confirmés |
+| Activité › Carnet › Supprimer ce client / cette mission | Un clic, refus après coup | Refus avant la confirmation ; sinon confirmé |
+| Config › Fiscal › Retirer une période saisie | Un clic | Confirmation SOUS le tableau : posée dans la dernière cellule, elle élargissait le tableau et poussait ses premières colonnes hors de la carte en grand écran |
+| Activité › Semaine › Revenir au rythme | Un clic | Confirmé, en comptant les journées |
+| Achats › Relevé | Confirmations propres au lot 21, focus perdu | Le composant commun ; le focus va sur « Garder » |

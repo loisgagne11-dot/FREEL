@@ -416,6 +416,26 @@ describe('supprimer une dépense', () => {
     expect(useFaits.getState().faits.mouvementsBancaires[0]?.rapprocheAvec).toBeNull();
   });
 
+  // En franchise, il n'y a pas de TVA déductible à perdre : la phrase ne
+  // l'invente pas.
+  it('ne parle de TVA déductible que s’il y en a', async () => {
+    semer({ ...rapprochee(), entreprise: { ...faitsVides().entreprise, tvaDepuis: null } });
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette dépense' }));
+    expect(screen.getByRole('group', { name: /quitte le registre/ }).textContent).not.toMatch(/TVA déductible/);
+  });
+
+  it('dit que la TVA déductible part avec la dépense, chez un redevable', async () => {
+    semer(rapprochee());
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette dépense' }));
+    expect(screen.getByRole('group', { name: /quitte le registre/ }).textContent).toMatch(/et sa TVA déductible avec elle/);
+  });
+
   it('« Garder » ne supprime rien', async () => {
     semer(rapprochee());
     rendre();

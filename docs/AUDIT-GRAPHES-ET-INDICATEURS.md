@@ -728,3 +728,13 @@ solde − provisions − réserve.
 | Nombre lu | Où | Avant | Après |
 |---|---|---|---|
 | Opérations qui partiraient, dont rapprochées ou pointées | Achats › Relevé, confirmation d'effacement | — | Compté sur le relevé au moment de confirmer |
+
+## Lot 22 (11/11) — confirmations
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Montant de l'avoir (TTC et HT quand il y a une TVA) et date du remboursement | Activité › Factures, Argent › Livre, confirmation | — | Lu sur la facture, au jour de la confirmation |
+| Montant de la dépense supprimée | Achats › détail, confirmation | — | Au centime, comme la fiche (l'arrondi à l'euro disait 36 € pour 35,98 €) |
+| Paiement oublié (date, montant réellement débité) | Argent › Échéances, « Repasser à payer » | — | Lu sur l'échéance |
+| Journées dont les corrections partent | Activité › Semaine, « Revenir au rythme » | — | Comptées sur la semaine affichée |
+| « À rapprocher » (tuile et file du relevé) | Achats | Sous-comptait le mouvement d'une dépense supprimée, resté « Rapprochée » | Le mouvement y revient |

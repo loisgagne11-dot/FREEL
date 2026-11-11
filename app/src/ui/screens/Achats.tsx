@@ -641,10 +641,10 @@ function DetailDepense(
           classeDeclencheur={styles.supprimer}
           consequence={(
             <>
-              La dépense de <Montant>{eur(depense.montantTtc)}</Montant>
+              La dépense de <Montant>{eurExact(depense.montantTtc)}</Montant>
               {depense.fournisseur !== '' && <> chez {depense.fournisseur}</>}
               {depense.payeeLe !== null && <> du {dateCourte(depense.payeeLe)}</>}
-              {' '}quitte le registre, et sa TVA déductible avec elle
+              {' '}quitte le registre{tva.recuperable > 0 && <>, et sa TVA déductible avec elle</>}
               {rapprocheeAuReleve && <>&nbsp;; l’opération du relevé qui lui était rapprochée revient à traiter</>}.
               {depense.justificatifId !== null && <> Sa pièce n’est pas effacée&nbsp;: l’archive des justificatifs la garde, parmi les pièces sans fait.</>}
             </>

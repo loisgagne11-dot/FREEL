@@ -37,7 +37,7 @@ import styles from './ConfirmationSurPlace.module.css';
  */
 export function ConfirmationSurPlace(
   {
-    libelle, precision, classeDeclencheur, classeConfirmation, consequence,
+    libelle, precision, classeDeclencheur, consequence,
     libelleConfirmer, libelleGarder = 'Garder', onConfirmer, peutOuvrir
   }: {
     /** Le libellé du bouton d'origine. */
@@ -48,8 +48,6 @@ export function ConfirmationSurPlace(
      */
     readonly precision?: string;
     readonly classeDeclencheur: string | undefined;
-    /** Une largeur à tenir là où le parent n'en donne pas — une cellule de tableau. */
-    readonly classeConfirmation?: string | undefined;
     /** Ce que le geste fait perdre ou change — jamais une simple question. */
     readonly consequence: ReactNode;
     readonly libelleConfirmer: string;
@@ -65,19 +63,14 @@ export function ConfirmationSurPlace(
 ) {
   const [ouverte, setOuverte] = useState(false);
   const bouton = useRef<HTMLButtonElement | null>(null);
-  const garder = useRef<HTMLButtonElement | null>(null);
   // Rendre le focus au bouton seulement quand on revient d'une confirmation
   // gardée : au premier rendu, le voler serait un défaut bien pire.
   const rendreLeFocus = useRef(false);
-  const id = useId();
 
   useEffect(() => {
-    if (ouverte) {
-      garder.current?.focus();
-    } else if (rendreLeFocus.current) {
-      rendreLeFocus.current = false;
-      bouton.current?.focus();
-    }
+    if (ouverte || !rendreLeFocus.current) return;
+    rendreLeFocus.current = false;
+    bouton.current?.focus();
   }, [ouverte]);
 
   function ouvrir(): void {
@@ -112,8 +105,42 @@ export function ConfirmationSurPlace(
   }
 
   return (
+    <BlocConfirmation
+      consequence={consequence}
+      libelleConfirmer={libelleConfirmer}
+      libelleGarder={libelleGarder}
+      onConfirmer={confirmer}
+      onGarder={renoncer}
+    />
+  );
+}
+
+/**
+ * La confirmation seule, pour l'appelant qui ne peut pas la poser à la place
+ * du bouton.
+ *
+ * Le barème en est le cas : le bouton « Retirer » vit dans la dernière cellule
+ * d'un tableau qui défile. La confirmation posée là élargissait le tableau et
+ * en poussait les premières colonnes hors de la carte ; elle se pose sous le
+ * tableau, et c'est l'appelant qui rend le focus au bouton.
+ */
+export function BlocConfirmation(
+  { consequence, libelleConfirmer, libelleGarder = 'Garder', onConfirmer, onGarder }: {
+    readonly consequence: ReactNode;
+    readonly libelleConfirmer: string;
+    readonly libelleGarder?: string;
+    readonly onConfirmer: () => void;
+    readonly onGarder: () => void;
+  }
+) {
+  const garder = useRef<HTMLButtonElement | null>(null);
+  const id = useId();
+
+  useEffect(() => { garder.current?.focus(); }, []);
+
+  return (
     <div
-      className={`${styles.confirmation} ${classeConfirmation ?? ''}`}
+      className={styles.confirmation}
       role="group"
       aria-labelledby={`${id}-consequence`}
       onKeyDown={(e) => {
@@ -122,15 +149,15 @@ export function ConfirmationSurPlace(
         if (e.key !== 'Escape') return;
         e.preventDefault();
         e.stopPropagation();
-        renoncer();
+        onGarder();
       }}
     >
       <p id={`${id}-consequence`} className={styles.consequence}>{consequence}</p>
       <span className={styles.actions}>
-        <button type="button" className={styles.confirmer} onClick={confirmer}>
+        <button type="button" className={styles.confirmer} onClick={onConfirmer}>
           {libelleConfirmer}
         </button>
-        <button ref={garder} type="button" className={styles.garder} onClick={renoncer}>
+        <button ref={garder} type="button" className={styles.garder} onClick={onGarder}>
           {libelleGarder}
         </button>
       </span>
