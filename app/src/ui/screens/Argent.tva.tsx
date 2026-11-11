@@ -141,6 +141,34 @@ export function DossierTvaPanneau() {
         </div>
       </dl>
 
+      {/* PAR TAUX, COMME LE FORMULAIRE LE DEMANDE.
+          Le total collecté ne se reporte nulle part tel quel : le formulaire
+          veut la base et la TVA taux par taux. Les donner ici évite de rouvrir
+          chaque facture pour les répartir. Le taux zéro n'y figure pas : il
+          n'appelle aucune TVA. */}
+      {dossier.parTaux.some((p) => p.taux > 0) && (
+        <>
+          <h3 className={styles.sousTitre}>Collectée, par taux</h3>
+          <dl className={styles.detail} aria-label="TVA collectée par taux">
+            {dossier.parTaux.filter((p) => p.taux > 0).map((p) => (
+              <div key={p.taux} className={styles.ligne}>
+                <dt>{libelleTaux(p.taux)} · base <Montant>{eur(p.base)}</Montant></dt>
+                <dd><Montant>{eur(p.tva)}</Montant></dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
+      {dossier.aVentiler.length > 0 && (
+        <p className={styles.bandeau} role="status">
+          {dossier.aVentiler.length} encaissement{dossier.aVentiler.length > 1 ? 's mêlent' : ' mêle'} plusieurs
+          taux sans détail conservé ({dossier.aVentiler.map((e) => e.numero || 'sans numéro').join(', ')})&nbsp;:
+          {dossier.aVentiler.length > 1 ? ' leur' : ' sa'} TVA est comptée au total, mais{' '}
+          {dossier.aVentiler.length > 1 ? 'leur base est' : 'sa base est'} à répartir entre les taux
+          d’après {dossier.aVentiler.length > 1 ? 'les documents' : 'le document'}.
+        </p>
+      )}
+
       {/* Sous-évaluer une TVA collectée est le sens dangereux de l'erreur :
           c'est celui qui produit un rappel. On le dit plutôt que d'annoncer un
           total qui a l'air complet — c'est un montant qui part sur un
@@ -151,10 +179,11 @@ export function DossierTvaPanneau() {
           {dossier.encaissementsSansTva.length > 1 ? 's ne portent' : ' ne porte'} pas
           de TVA connue&nbsp;: le total collecté est <strong>sous-évalué</strong> d’autant.
           <Info libelle="Pourquoi cette TVA manque">
-            La TVA d’une facture ne se recalcule pas&nbsp;: ses lignes ne sont
-            pas conservées, et un document peut porter plusieurs taux — 20 %,
-            10 %, 5,5 %. Les factures émises depuis que l’application la garde
-            la portent&nbsp;; les plus anciennes sont à relever sur le document
+            La TVA d’une facture ne se recalcule pas depuis son total&nbsp;: un
+            document peut porter plusieurs taux — 20 %, 10 %, 5,5 %. Les
+            factures émises depuis que l’application garde leur TVA la portent,
+            et celles émises depuis qu’elle garde leurs lignes se ventilent
+            seules&nbsp;; les plus anciennes sont à relever sur le document
             lui-même.
           </Info>
         </p>
@@ -286,4 +315,9 @@ export function DossierTvaPanneau() {
       )}
     </div>
   );
+}
+
+/** « 20 % », « 5,5 % » : le taux comme le formulaire l'écrit. */
+function libelleTaux(taux: number): string {
+  return `${String(Math.round(taux * 1000) / 10).replace('.', ',')}\u00a0%`;
 }

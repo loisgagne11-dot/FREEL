@@ -1,5 +1,6 @@
 import type { DateISO, Euros } from '../types';
 import { euros } from '../types';
+import { tauxReconnu } from '../bareme/tva';
 
 /**
  * Le dossier de déclaration de TVA — tout ce qu'il faut pour remplir le
@@ -41,6 +42,56 @@ import { euros } from '../types';
  * celui qui produit un rappel.
  */
 
+/** La base et la TVA d'une pièce, ou d'un dossier, à un taux donné. */
+export interface PartTaux {
+  readonly taux: number;
+  readonly base: Euros;
+  readonly tva: Euros;
+}
+
+/**
+ * La ventilation par taux d'un encaissement.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE FORMULAIRE DEMANDE LA BASE PAR TAUX, PAS UN TOTAL
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Trois sources, dans cet ordre, et jamais une quatrième :
+ *
+ *  1. les LIGNES conservées depuis le schéma 20 — le document lui-même ;
+ *  2. à défaut, le taux UNIQUE que trahit le rapport TVA / HT, quand il tombe
+ *     sur un taux légal ;
+ *  3. sinon `null` : la facture mêlait des taux et son détail est perdu. Elle
+ *     est « à ventiler » à la main, et l'écran le dit. La répartir au prorata,
+ *     ou tout mettre à 20 %, ce serait inventer une base sur un formulaire
+ *     officiel.
+ *
+ * Des lignes qui ne retombent pas sur le montant et la TVA du livre ne sont
+ * pas crues : c'est le livre qui fait foi, comme à la réédition.
+ *
+ * `null` aussi quand la TVA elle-même est inconnue : ce cas-là est déjà compté
+ * à part (`encaissementsSansTva`).
+ */
+export function ventilationParTaux(
+  montantHt: Euros,
+  tva: Euros | null,
+  lignes: readonly { readonly quantite: number; readonly prixUnitaireHt: number; readonly tauxTva: number }[] | null
+): readonly PartTaux[] | null {
+  if (tva === null) return null;
+  if (lignes !== null && lignes.length > 0) {
+    const parts = new Map<number, number>();
+    for (const l of lignes) parts.set(l.tauxTva, (parts.get(l.tauxTva) ?? 0) + l.quantite * l.prixUnitaireHt);
+    const ventilee = [...parts.entries()]
+      .map(([taux, base]) => ({ taux, base: euros(base), tva: euros(base * taux) }));
+    const base = ventilee.reduce((s, p) => s + p.base, 0);
+    const taxe = ventilee.reduce((s, p) => s + p.tva, 0);
+    if (Math.abs(base - montantHt) < 0.005 && Math.abs(taxe - tva) < 0.005) return ventilee;
+    return null;
+  }
+  const taux = tauxReconnu(montantHt, tva);
+  return taux === null ? null : [{ taux, base: montantHt, tva }];
+}
+
 /** Une facture qui entre dans la déclaration. */
 export interface PieceCollectee {
   readonly id: string;
@@ -56,6 +107,8 @@ export interface PieceCollectee {
    * en négatif. Sans la mention, la ligne se lit comme un doublon de saisie.
    */
   readonly avoir?: boolean;
+  /** Sa base et sa TVA par taux — voir `ventilationParTaux` ; `null` si elles ne se lisent pas. */
+  readonly ventilation: readonly PartTaux[] | null;
 }
 
 /** Une dépense qui ouvre droit à déduction. */
@@ -115,6 +168,18 @@ export interface DossierTva {
   readonly encaissementsSansTva: readonly PieceCollectee[];
   /** Base hors taxes des encaissements de la période, ligne du formulaire. */
   readonly baseHt: Euros;
+  /**
+   * Base et TVA de la période par taux, du plus fort au plus faible — ce que
+   * le formulaire demande ligne par ligne. Ne porte que les pièces ventilées.
+   */
+  readonly parTaux: readonly PartTaux[];
+  /**
+   * Les encaissements dont la TVA est connue mais pas sa répartition : une
+   * facture d'avant le schéma 20 qui mêlait des taux. Leur TVA compte dans
+   * `collectee` ; leur base est à répartir à la main entre les lignes du
+   * formulaire.
+   */
+  readonly aVentiler: readonly PieceCollectee[];
   /** Les achats autoliquidés payés dans la période, dans l'ordre de paiement. */
   readonly autoliquidations: readonly PieceAutoliquidee[];
   readonly autoliquideeBase: Euros;
@@ -186,11 +251,31 @@ export function dossierTva(
     // inconnue : le chiffre d'affaires, lui, est connu — c'est le montant porté
     // au livre. Seule la taxe manque.
     baseHt: euros(retenus.reduce((s, e) => s + e.montantHt, 0)),
+    parTaux: totauxParTaux(connus),
+    aVentiler: connus.filter((e) => e.ventilation === null),
     autoliquidations: retenusAuto,
     autoliquideeBase: somme(retenusAuto, (a) => a.baseHt),
     autoliquideeDue,
     autoliquideeDeductible
   };
+}
+
+/**
+ * Les parts des pièces ventilées, cumulées par taux. Un avoir y entre au signe
+ * opposé : il diminue la base et la TVA du taux de la facture qu'il annule,
+ * dans le trimestre où il est porté.
+ */
+function totauxParTaux(pieces: readonly PieceCollectee[]): readonly PartTaux[] {
+  const cumul = new Map<number, { base: number; tva: number }>();
+  for (const p of pieces) {
+    for (const part of p.ventilation ?? []) {
+      const c = cumul.get(part.taux) ?? { base: 0, tva: 0 };
+      cumul.set(part.taux, { base: c.base + part.base, tva: c.tva + part.tva });
+    }
+  }
+  return [...cumul.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([taux, c]) => ({ taux, base: euros(c.base), tva: euros(c.tva) }));
 }
 
 /** Le dossier annonce-t-il un crédit de TVA plutôt qu'une somme à verser ? */

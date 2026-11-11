@@ -314,6 +314,13 @@ describe('réédition d’une facture émise', () => {
     if (r.cas === 'impossible') expect(r.motif).toMatch(/ne retombent pas/);
   });
 
+  /** Une annulation porte le numéro de la facture qu'elle annule : rééditée en « FACTURE » négative, elle se confondrait avec elle. */
+  it('refuse de rééditer une écriture d’annulation comme une facture', () => {
+    const r = factureDepuisRecette(recette({ montant: euros(-1000), tvaCollectee: euros(-200) }), ASSUJETTI, CLIENT_FR);
+    expect(r.cas).toBe('impossible');
+    if (r.cas === 'impossible') expect(r.motif).toMatch(/écriture d’annulation/);
+  });
+
   /** Une TVA jamais conservée ne se suppose pas : le document porterait le
       même numéro que l'original en disant autre chose. */
   it('refuse quand la TVA n’a pas été conservée', () => {

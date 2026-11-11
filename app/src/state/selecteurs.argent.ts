@@ -39,7 +39,7 @@ import { contexteDepense } from './selecteurs.achats';
 import { tvaDeDepense } from '../domain/calculs/depenses';
 import { baseHtAutoliquidee } from '../domain/calculs/depenses.tva';
 import {
-  type DossierTva, type PieceAutoliquidee, type PieceCollectee, type PieceDeduite, dossierTva
+  type DossierTva, type PieceAutoliquidee, type PieceCollectee, type PieceDeduite, dossierTva, ventilationParTaux
 } from '../domain/calculs/dossierTva';
 import {
   encaissementsAttendusParMois, facturesSuivies, finDuMoisISO
@@ -348,7 +348,8 @@ export function dossierTvaDuTrimestre(
       // `undefined` et `null` disent la même chose ici — la TVA n'a pas été
       // conservée — et le dossier les compte à part plutôt que pour zéro.
       tva: r.tvaCollectee ?? null,
-      avoir: typeof r.annuleEcriture === 'string'
+      avoir: typeof r.annuleEcriture === 'string',
+      ventilation: ventilationParTaux(r.montant, r.tvaCollectee ?? null, r.lignes ?? null)
     }));
 
   const contexte = contexteDepense(faits, maintenant);
