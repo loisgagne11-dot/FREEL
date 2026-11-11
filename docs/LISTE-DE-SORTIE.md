@@ -245,7 +245,7 @@ que le versable retient pourtant.
 | Le dossier de déclaration de TVA du trimestre (`dossierTvaDuTrimestre`) ignore la TVA autoliquidée d'un franchisé devenu redevable en cours d'année | ⬜ hors lot : la provision la retient, le dossier pas encore — à reprendre avec le rappel de déclaration |
 | « Reste à sortir » du détail de la dette ne compte que l'appelé : l'impôt sur le revenu et la TVA s'affichent à côté, en blocs | ⬜ à trancher : la vignette et le détail peuvent donc montrer deux totaux |
 
-### Lot 14 — Les écrans s'ouvrent d'un coup (à planifier : le contrôle de vitesse échoue une fois sur deux)
+### Lot 14 — Les écrans s'ouvrent d'un coup (priorité 3 : le contrôle de vitesse échoue une fois sur deux)
 
 Constaté au lot 13, présent avant le lot 12 (mesuré sur l'état fusionné du
 lot 11) : `verifier:vitesse` échoue environ une exécution sur deux, toujours
@@ -261,7 +261,8 @@ parfois près d'une seconde.
 
 | Ligne | État |
 |---|---|
-| Précharger les morceaux imbriqués dès que l'écran parent est chargé (l'`import()` des sections part avec celui de l'écran), pour qu'une seule frontière se révèle | ⬜ |
+| Précharger les morceaux imbriqués dès que l'écran parent est chargé, pour qu'une seule frontière se révèle : à l'évaluation du module parent, partent l'`import()` des morceaux que l'écran affiche toujours, et celui de la section que l'adresse désigne (`#/config/fiscal` → `Config.fiscal`) — pas des sept : on ne télécharge pas ce qu'on ne regarde pas | ⬜ |
+| Mesuré avant d'écrire : la cascade exacte de chaque écran lent (Config, Activité, Facture, Outils) relevée dans le navigateur, et la retenue qu'elle provoque | ⬜ |
 | Le contrôle de vitesse passe dix fois de suite | ⬜ |
 | Aucun budget relevé : le préchargement ne change pas le poids téléchargé au premier rendu | ⬜ |
 
