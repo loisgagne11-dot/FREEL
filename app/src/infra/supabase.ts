@@ -290,8 +290,8 @@ export const TABLE_LEGACY = 'user_data';
  * Ce que l'ancienne application conservait, tel qu'elle le conservait.
  *
  * Ces colonnes portent la structure du bundle local d'origine. On les lit pour
- * reprendre les données du compte ; on n'écrit jamais dedans, pour que
- * l'ancienne version reste utilisable pendant toute la cohabitation.
+ * reprendre les données du compte ; on n'y écrit jamais — à une exception
+ * près, demandée expressément : l'effacement (`effacerDonneesLegacy`).
  */
 export interface DonneesLegacy {
   readonly company: unknown;
@@ -526,6 +526,73 @@ export async function pousserFaits(
     return { statut: 'conflit', distant: await relireApresRefus(config, session) };
   }
   return { statut: 'ok', instantane: instantaneDepuis(ecrite) };
+}
+
+/* ── Effacement (droit à l'effacement) ─────────────────────────────────── */
+
+/**
+ * Ce que l'effacement a CONSTATÉ, relecture faite.
+ *
+ * Le serveur ne dit pas « refusé » quand une règle d'accès manque : la règle
+ * filtre la ligne, la suppression n'atteint rien, et la réponse est un
+ * succès vide. Un effacement qui ne relirait pas annoncerait « effacé » à
+ * quelqu'un dont les données sont toujours là — l'erreur la plus grave
+ * possible pour ce geste-là.
+ */
+export type ResultatEffacement =
+  | { readonly statut: 'efface' }
+  | { readonly statut: 'deja-vide' }
+  /** La ligne est toujours là : la règle de suppression n'est pas installée. */
+  | { readonly statut: 'regle-absente' }
+  | { readonly statut: 'erreur'; readonly motif: string };
+
+async function effacerLigne(
+  config: ConfigSupabase,
+  session: Session,
+  table: string
+): Promise<ResultatEffacement> {
+  const chemin = `/rest/v1/${table}?user_id=eq.${encodeURIComponent(session.utilisateurId)}`;
+  const r = await appeler(config, chemin, {
+    method: 'DELETE',
+    jeton: session.jeton,
+    headers: { Prefer: 'return=representation' }
+  });
+  if (r.statut === 'erreur') return { statut: 'erreur', motif: r.motif };
+
+  // La relecture est la seule preuve : voir ci-dessus.
+  const relu = await appeler(config, `${chemin}&select=user_id`, { jeton: session.jeton });
+  if (relu.statut === 'erreur') {
+    return {
+      statut: 'erreur',
+      motif: `L’effacement a été demandé, mais la relecture a échoué (${relu.motif}). `
+        + 'Recharge l’écran pour vérifier ce qui reste.'
+    };
+  }
+  if (Array.isArray(relu.valeur) && relu.valeur.length > 0) return { statut: 'regle-absente' };
+  return Array.isArray(r.valeur) && r.valeur.length > 0 ? { statut: 'efface' } : { statut: 'deja-vide' };
+}
+
+/**
+ * Efface du compte la copie des données de CETTE version.
+ *
+ * Les données de cet appareil ne sont pas touchées : elles s'effacent dans
+ * Données, « Repartir de zéro ». Et l'identifiant de connexion reste — le
+ * supprimer demande la clé de service du projet, qui n'a rien à faire dans
+ * une page servie à tous.
+ */
+export function effacerFaitsDuCompte(config: ConfigSupabase, session: Session): Promise<ResultatEffacement> {
+  return effacerLigne(config, session, TABLE_FAITS);
+}
+
+/**
+ * Efface du compte les données de l'ANCIENNE application.
+ *
+ * La seule écriture que cette version fasse jamais dans `user_data`, et
+ * seulement sur demande expresse : la reprise s'en sert, et l'ancienne
+ * version, en lecture seule depuis la bascule, les affiche encore.
+ */
+export function effacerDonneesLegacy(config: ConfigSupabase, session: Session): Promise<ResultatEffacement> {
+  return effacerLigne(config, session, TABLE_LEGACY);
 }
 
 /* ── Conservation locale ───────────────────────────────────────────────── */

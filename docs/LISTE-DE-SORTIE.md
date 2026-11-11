@@ -63,7 +63,7 @@ Le lot 27 peut se couper en deux PR : l'estimation est de **22 à 23 lots**.
 Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 « Détacher » une pièce, arrivée juste après la fusion de la PR #318.
 
-### Lot 24 — La bascule (PR #320)
+### Lot 24 — La bascule (PR #320, fusionnée, en ligne le 11/11)
 
 | Ligne | État |
 |---|---|
@@ -74,13 +74,14 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 | La reprise depuis l'ancienne version continue de fonctionner (même origine, même stockage) — testé | ✅ dans `verifier:bascule`, sur le site assemblé |
 | Contrôle visuel de la copie publiée (1440 et 390, au repos et en défilement) | ✅ |
 
-### Lot 25 — Effacer le compte distant (RGPD)
+### Lot 25 — Effacer le compte distant (RGPD) — PR #321
 
 | Ligne | État |
 |---|---|
-| « Effacer mes données du compte » : supprime la ligne de `freel_faits` (et, sur demande, celle de `user_data`), après une sauvegarde proposée et une confirmation qui dit ce qui part ; relecture qui prouve l'effacement | ⬜ |
-| `docs/supabase.sql` : règle « supprimer les siens » sur `freel_faits` — elle n'existe pas (lire, créer, modifier seulement) ; à exécuter par le propriétaire | ⬜ |
-| Ce qui reste dit : l'identifiant de connexion ne se supprime qu'avec la clé de service, qui ne doit jamais être dans le client ; la marche à suivre est écrite | ⬜ |
+| « Effacer mes données du compte » : supprime la ligne de `freel_faits` (et, sur demande, celle de `user_data`), après une sauvegarde proposée et une confirmation qui dit ce qui part ; relecture qui prouve l'effacement | ✅ deux gestes, un par copie (celle de l'ancienne application sert encore à la reprise) ; `effacerFaitsDuCompte` / `effacerDonneesLegacy` relisent après la suppression : une ligne encore là se dit « la règle de suppression manque », jamais « effacé » ; bilan affiché sous les boutons (en bas de la carte, il sortait de l'écran sur téléphone) |
+| `docs/supabase.sql` : règle « supprimer les siens » sur `freel_faits` — elle n'existe pas (lire, créer, modifier seulement) ; à exécuter par le propriétaire | ✅ écrite ; **à exécuter par le propriétaire** dans l'éditeur SQL du projet. `user_data` l'avait déjà (« for all ») |
+| Ce qui reste dit : l'identifiant de connexion ne se supprime qu'avec la clé de service, qui ne doit jamais être dans le client ; la marche à suivre est écrite | ✅ à l'écran : tableau de bord Supabase (Authentication, puis Users) ; données de cet appareil : Données, « Repartir de zéro » |
+| Contrôle visuel : Compte connecté (serveur simulé), confirmation et bilan, sombre 1440 et clair 390 | ✅ focus sur « Garder », aucune erreur JS |
 
 ### Lot 26 — L'accueil à la première ouverture
 

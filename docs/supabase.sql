@@ -76,12 +76,23 @@ create policy "freel_faits — modifier les siens"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Aucune règle de SUPPRESSION, volontairement.
+-- SUPPRIMER LES SIENS — le droit à l’effacement (lot 25 de la liste de sortie).
 --
--- Rien dans l'application ne supprime les données comptables d'un compte, et
--- une règle qui l'autoriserait ne servirait qu'à rendre possible un accident.
--- L'effacement d'un compte se fait depuis le tableau de bord Supabase, où il
--- est un acte délibéré ; la cascade sur `auth.users` s'en charge alors.
+-- Cette règle était volontairement absente : « une règle qui l'autoriserait ne
+-- servirait qu'à rendre possible un accident ». L'application offre désormais
+-- d'effacer ses données du compte, depuis l'écran Compte — confirmé sur place,
+-- et PROUVÉ par une relecture. Sans cette règle, la suppression ne fait rien
+-- (la ligne est filtrée, le serveur répond « succès ») : l'application le
+-- détecte en relisant, et renvoie ici.
+--
+-- Elle ne touche que la ligne de l'utilisateur connecté, comme les trois
+-- autres. L'identifiant de connexion, lui, ne se supprime que depuis le
+-- tableau de bord (Authentication, puis Users).
+
+drop policy if exists "freel_faits — supprimer les siens" on public.freel_faits;
+create policy "freel_faits — supprimer les siens"
+  on public.freel_faits for delete
+  using (auth.uid() = user_id);
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- `user_data` — LA TABLE DE L'ANCIENNE APPLICATION

@@ -1,8 +1,9 @@
 import { useEffect, useId, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
-  type ConfigSupabase, type DonneesLegacy, type InstantaneDistant, type Session,
-  bundleDepuisLegacy, chargerDonneesLegacy, configDeBuild, configEffective,
+  type ConfigSupabase, type DonneesLegacy, type InstantaneDistant, type ResultatEffacement,
+  type Session, bundleDepuisLegacy, chargerDonneesLegacy, configDeBuild, configEffective,
+  effacerDonneesLegacy, effacerFaitsDuCompte,
   ecrireConfig, ecrireSession, estRefusDAuthentification, lireSession, motifUrlRefusee,
   pousserFaits, rafraichir,
   seConnecter, seDeconnecter, sessionValide, tirerFaits
@@ -21,6 +22,7 @@ import type { RapportMigration } from '../../infra/migration';
 import { convertirBundle } from '../../infra/migration.legacy';
 import { estLeJeuDeDemonstration } from '../../domain/calculs/demonstration';
 import { Info } from '../components/Info';
+import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { dateCourte } from '../format';
 import { ReglesDAcces } from './Compte.acces';
 import styles from './Compte.module.css';
@@ -231,6 +233,10 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
   const [distant, setDistant] = useState<EtatDistant>('inconnu');
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // Le bilan d'un effacement s'affiche SOUS ses boutons : posé en bas de la
+  // carte, après les règles d'accès, il sortait de l'écran sur téléphone, et
+  // le geste le plus grave de l'écran restait sans réponse visible.
+  const [effacement, setEffacement] = useState<{ readonly echec: boolean; readonly texte: string } | null>(null);
   const [enCours, setEnCours] = useState(false);
   const idChamp = useId();
 
@@ -412,6 +418,42 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     setMessage('Données de l’ancienne application chargées sur cet appareil.');
   }
 
+  /**
+   * Efface du compte l'une des deux copies, et dit ce que la relecture a
+   * constaté — jamais ce que le serveur a simplement accepté.
+   */
+  async function effacer(session: Session, quoi: 'faits' | 'legacy'): Promise<void> {
+    if (config === null) return;
+    setEnCours(true);
+    setErreur(null);
+    setMessage(null);
+    setEffacement(null);
+    const r: ResultatEffacement = quoi === 'faits'
+      ? await effacerFaitsDuCompte(config, session)
+      : await effacerDonneesLegacy(config, session);
+    if (quoi === 'faits') await relireEtatDistant(session);
+    setEnCours(false);
+    const copie = quoi === 'faits' ? 'de cette version' : 'de l’ancienne application';
+    switch (r.statut) {
+      case 'efface':
+        setEffacement({ echec: false, texte: `Données ${copie} effacées du compte. Relu après coup : il n’en reste rien.` });
+        return;
+      case 'deja-vide':
+        setEffacement({ echec: false, texte: `Le compte ne contenait aucune donnée ${copie} : rien à effacer.` });
+        return;
+      case 'regle-absente':
+        setEffacement({
+          echec: true,
+          texte: 'Rien n’a été effacé : le serveur n’autorise pas encore la suppression. '
+            + 'Ouvre le fichier « docs/supabase.sql » du dépôt, copie son CONTENU dans '
+            + 'l’éditeur SQL du projet Supabase, exécute-le, puis réessaie.'
+        });
+        return;
+      case 'erreur':
+        setEffacement({ echec: true, texte: r.motif });
+    }
+  }
+
   async function deconnecter(session: Session): Promise<void> {
     if (config !== null) await seDeconnecter(config, session);
     ecrireSession(local, null);
@@ -427,8 +469,9 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
         <Info libelle="Ce que fait la connexion au compte">
           Elle enregistre et relit les données de cette version dans une table
           qui lui est propre. <strong>Les données de l’ancienne application ne
-          sont jamais modifiées</strong>&nbsp;: elle reste utilisable, et un essai de
-          cette version ne peut pas les abîmer.
+          sont jamais modifiées</strong>, sauf si tu demandes leur effacement&nbsp;:
+          la reprise s’en sert, et l’ancienne version les affiche encore, en
+          lecture seule.
         </Info>
       </h2>
 
@@ -495,8 +538,8 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
                   </button>
                   <p className={styles.consequence}>
                     Lit la table de <strong>l’ancienne version</strong> et la
-                    convertit. Elle n’est jamais modifiée&nbsp;: l’ancienne
-                    application continue de fonctionner.
+                    convertit. Elle n’est pas modifiée&nbsp;: l’ancienne
+                    application reste consultable, en lecture seule.
                   </p>
                 </li>
 
@@ -510,6 +553,69 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
                   </button>
                 </li>
               </ul>
+
+              {/*
+                * LE DROIT À L'EFFACEMENT, DEPUIS L'APPLICATION.
+                *
+                * « Repartir de zéro » ne vidait que ce navigateur : les données
+                * restaient sur le compte, et rien ne disait comment les en
+                * retirer. Chaque copie s'efface à part — celle de l'ancienne
+                * application sert encore à la reprise —, et l'effacement se
+                * PROUVE en relisant : un serveur sans règle de suppression
+                * répond « succès » sans rien effacer.
+                */}
+              <h3 className={styles.sousTitre}>Effacer mes données du compte</h3>
+              <ul className={styles.operations}>
+                <li className={styles.operation}>
+                  <ConfirmationSurPlace
+                    libelle="Effacer la copie de cette version"
+                    classeDeclencheur={styles.action}
+                    desactive={enCours}
+                    consequence={(
+                      <>
+                        La copie de cette version enregistrée sur le compte sera
+                        effacée, puis relue pour le prouver. Rien ne la ramène,
+                        sinon un nouvel envoi depuis un appareil. Cet appareil
+                        garde ses données&nbsp;: une sauvegarde JSON (Données)
+                        d’abord reste prudente.
+                      </>
+                    )}
+                    libelleConfirmer="Effacer du compte"
+                    onConfirmer={() => void effacer(etat.session, 'faits')}
+                  />
+                </li>
+                <li className={styles.operation}>
+                  <ConfirmationSurPlace
+                    libelle="Effacer les données de l’ancienne application"
+                    classeDeclencheur={styles.action}
+                    desactive={enCours}
+                    consequence={(
+                      <>
+                        Les données de l’ancienne application enregistrées sur le
+                        compte seront effacées, puis relues pour le prouver. Fais
+                        d’abord la reprise si tu en as besoin&nbsp;: ensuite, le
+                        compte n’aura plus rien à reprendre.
+                      </>
+                    )}
+                    libelleConfirmer="Effacer du compte"
+                    onConfirmer={() => void effacer(etat.session, 'legacy')}
+                  />
+                </li>
+              </ul>
+              {effacement !== null && (
+                <p role={effacement.echec ? 'alert' : 'status'} className={effacement.echec ? styles.echec : styles.succes}>
+                  {effacement.texte}
+                </p>
+              )}
+              <p className={styles.explication}>
+                Ton <strong>identifiant de connexion</strong> n’est pas supprimé
+                par ces gestes&nbsp;: il se supprime dans le tableau de bord du
+                projet Supabase (Authentication, puis Users). C’est le seul
+                endroit où la clé de service — celle qui permet tout — a sa
+                place&nbsp;; elle n’en a aucune dans une page servie à tous.
+                Les données de <strong>cet appareil</strong> s’effacent dans
+                Données, «&nbsp;Repartir de zéro&nbsp;».
+              </p>
             </>
           )}
 
