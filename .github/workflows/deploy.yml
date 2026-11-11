@@ -51,25 +51,19 @@ jobs:
         run: npm run build
 
       # Répertoire de publication construit explicitement, plutôt que d'envoyer
-      # la racine du dépôt telle quelle : celle-ci contient désormais app/ avec
-      # ses node_modules et ses sources, qui n'ont rien à faire en ligne.
+      # la racine du dépôt telle quelle : celle-ci contient app/ avec ses
+      # node_modules et ses sources, qui n'ont rien à faire en ligne.
       #
-      # Coexistence des deux versions (cf. docs/archives/PLAN-REFONTE.md) :
-      #   /            l'application actuelle, inchangée
-      #   /v2/         la nouvelle, en construction
-      # À la bascule, la nouvelle passera à la racine et l'ancienne sous
-      # /legacy/, neutralisée en écriture.
+      # La bascule (lot 24) : la nouvelle application à la racine, l'ancienne
+      # sous /legacy/ en lecture seule, /v2/ redirigé vers la racine. Le détail
+      # — et la raison de chaque choix — vit dans le script, qui est aussi
+      # celui que `npm run verifier:bascule` éprouve dans un navigateur.
       - name: Assemble the site
         run: |
           set -euo pipefail
-          rm -rf _site
-          mkdir -p _site/v2
-          cp index.html _site/index.html
-          cp -R app/dist/. _site/v2/
-          # Empêche Jekyll d'ignorer les fichiers commençant par un tiret bas.
-          touch _site/.nojekyll
+          node app/scripts/assembler-site.mjs _site
           echo "Contenu publié :"
-          find _site -maxdepth 2 -type f | sort
+          find _site -maxdepth 2 -type f -name '*.html' | sort
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
