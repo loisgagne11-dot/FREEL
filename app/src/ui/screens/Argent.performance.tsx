@@ -814,9 +814,13 @@ function CarteCapacite(
                 className={`${styles.moisAxe} ${i === indexCourant ? styles.moisCourantAxe : ''}`}
               >
                 {mois}
+                {/* Le texte lu par les lecteurs d'écran porte les montants : en
+                    mode discret il les masque comme le reste de l'écran. Écrits
+                    en clair, ils se lisaient encore dans le document (lot 14 :
+                    révélé quand ce graphe s'est mis à paraître d'emblée). */}
                 <span className={styles.horsEcran}>
-                  {' '}: {eur(v.capacite)} de capacité
-                  {v.verse === null ? ', mois à venir' : `, ${eur(v.verse)} versés`}
+                  {' '}: <Montant>{eur(v.capacite)}</Montant> de capacité
+                  {v.verse === null ? ', mois à venir' : <>, <Montant>{eur(v.verse)}</Montant> versés</>}
                 </span>
               </span>
             </div>

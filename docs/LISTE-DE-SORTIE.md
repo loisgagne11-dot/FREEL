@@ -265,6 +265,7 @@ cascades sur Argent et Activité.
 | Le contrôle de vitesse sonde à chaque image (`waitForFunction`, `polling: 'raf'`), même critère — un titre de niveau 1 visible —, même plafond de 600 ms | ✅ fait |
 | Le contrôle de vitesse passe dix fois de suite | ✅ fait : médianes de 25 à 171 ms (Argent, le plus lourd), contre ~320 ms avant |
 | Aucun budget relevé | ✅ entrée 75,0 / 80 Ko (+0,5 Ko pour le préchargement), premier rendu 285 / 300 |
+| Mode discret : le graphe de capacité d'Argent écrivait ses montants en clair dans le texte réservé aux lecteurs d'écran (« 0 € de capacité, 0 € versés »). Défaut antérieur, révélé quand le graphe s'est mis à paraître d'emblée : le contrôle de confidentialité le voit désormais | ✅ corrigé : les montants passent par `<Montant>`, masqués comme le reste |
 | `startTransition` sur le changement de route | ⬜ écarté : il supprime le repli mais garde l'ancien écran affiché pendant le chargement — un clic sur un écran lent paraît sans effet, et le contrôle ne mesurerait plus rien |
 
 ## Reste fonctionnel par écran
