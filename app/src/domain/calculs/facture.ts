@@ -154,7 +154,17 @@ const TAUX_TVA_CONNUS: readonly number[] = [0.2, 0.1, 0.055, 0.021, 0];
  * l'original, donc indiscernable de lui. On refuse, et on dit pourquoi.
  */
 export type ReeditionFacture =
-  | { readonly cas: 'reeditee'; readonly facture: Facture }
+  | {
+    readonly cas: 'reeditee';
+    readonly facture: Facture;
+    /**
+     * Vrai quand le document vient des lignes conservées (schéma 20) ; faux
+     * quand il se rétablit en une seule désignation. L'écran le dit : une
+     * facture d'origine à plusieurs lignes ne se présente pas pareil dans les
+     * deux cas.
+     */
+    readonly lignesConservees: boolean;
+  }
   | { readonly cas: 'impossible'; readonly motif: string };
 
 /**
@@ -172,6 +182,8 @@ export function factureDepuisRecette(
     readonly montant: Euros;
     readonly emiseLe: DateISO | null;
     readonly tvaCollectee?: Euros | null;
+    /** Les lignes du document émis, depuis le schéma 20 ; `null` avant. */
+    readonly lignes?: readonly LigneFacture[] | null;
   },
   emetteur: Emetteur,
   destinataire: Destinataire
@@ -215,6 +227,33 @@ export function factureDepuisRecette(
     };
   }
 
+  /*
+   * LES LIGNES CONSERVÉES FONT LE DOCUMENT.
+   *
+   * Depuis le schéma 20, la facture garde ses lignes : la réédition les rend
+   * telles que le client les a reçues, plusieurs taux compris. Elles doivent
+   * pourtant retomber sur le montant et la TVA portés au livre — c'est le livre
+   * qui fait foi. Si elles s'en écartent (un bloc retouché à la main, un
+   * régime qui a changé depuis), on refuse plutôt que d'imprimer un total qui
+   * contredit le registre sous le numéro de l'original.
+   */
+  const conservees = recette.lignes ?? null;
+  if (conservees !== null && conservees.length > 0) {
+    const facture: Facture = {
+      numero: recette.numero, emiseLe: recette.emiseLe, emetteur, destinataire, lignes: conservees
+    };
+    const t = totaux(facture);
+    if (Math.abs(t.totalHt - recette.montant) >= 0.005 || Math.abs(t.totalTva - tva) >= 0.005) {
+      return {
+        cas: 'impossible',
+        motif: 'Les lignes conservées de cette facture ne retombent pas sur le '
+          + 'montant et la TVA portés au livre des recettes. La rééditer '
+          + 'imprimerait un total qui contredit le registre.'
+      };
+    }
+    return { cas: 'reeditee', facture, lignesConservees: true };
+  }
+
   const taux = tauxReconnu(recette.montant, tva);
   if (taux === null) {
     return {
@@ -227,6 +266,7 @@ export function factureDepuisRecette(
 
   return {
     cas: 'reeditee',
+    lignesConservees: false,
     facture: {
       numero: recette.numero,
       emiseLe: recette.emiseLe,
@@ -243,6 +283,29 @@ export function factureDepuisRecette(
       }]
     }
   };
+}
+
+/**
+ * Les lignes à conserver au livre, à l'émission.
+ *
+ * Celles que le document imprime ET celles qui pèsent dans son total : une
+ * ligne chiffrée sans désignation n'est pas imprimée mais compte dans le
+ * montant, et la laisser de côté ferait refuser la réédition pour un écart.
+ *
+ * Le taux conservé est celui que le document APPLIQUE : zéro en franchise ou
+ * en autoliquidation, quel que soit le taux saisi sur la ligne. Le régime peut
+ * changer ensuite ; la facture, elle, a été émise sous celui du jour.
+ */
+export function lignesAConserver(facture: Facture): readonly LigneFacture[] {
+  const sansTva = regimeDeLaFacture(facture.emetteur, facture.destinataire) !== 'tva_francaise';
+  return facture.lignes
+    .filter((l) => l.designation.trim() !== '' || l.quantite * l.prixUnitaireHt !== 0)
+    .map((l) => ({
+      designation: l.designation,
+      quantite: l.quantite,
+      prixUnitaireHt: l.prixUnitaireHt,
+      tauxTva: sansTva ? ratio(0) : l.tauxTva
+    }));
 }
 
 /**

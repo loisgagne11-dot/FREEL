@@ -34,7 +34,7 @@ import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 19 as const;
+export const VERSION_SCHEMA = 20 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -345,6 +345,34 @@ export interface Recette {
    * jamais un booléen qui ne permettrait pas de retrouver la pièce.
    */
   readonly justificatifId?: string | null;
+  /**
+   * Les lignes du document émis, telles que le client les a reçues.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * LE DÉTAIL D'UNE FACTURE NE SE RECONSTRUIT PAS
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Jusqu'au schéma 19, une facture émise ne gardait que son total HT, sa TVA
+   * et ses désignations mises bout à bout. « Revoir la facture » la rétablissait
+   * en une seule ligne au prix du total — un document qui porte le numéro de
+   * l'original sans lui ressembler —, et la refusait quand elle mêlait deux
+   * taux de TVA. Diviser le total par les jours pour retrouver « 18 j × 430 € »
+   * donne un prix arrondi dont le produit ne retombe pas sur le total : le
+   * détail ne se devine pas, il se garde.
+   *
+   * `null` quand il n'est pas conservé : une facture d'avant le schéma 20, une
+   * recette saisie sans document, une écriture d'annulation. `null` n'est pas
+   * une liste vide — une facture a au moins une ligne.
+   */
+  readonly lignes?: readonly LigneConservee[] | null;
+}
+
+/** Une ligne de facture conservée : ce que le document imprimait. */
+export interface LigneConservee {
+  readonly designation: string;
+  readonly quantite: number;
+  readonly prixUnitaireHt: Euros;
+  readonly tauxTva: Ratio;
 }
 
 /**
@@ -808,7 +836,16 @@ function motifRefusElements(o: Record<string, unknown>, version: number): string
     if (i !== -1) return illisible('periodesDeclarees', i);
   }
 
-  if (version !== VERSION_SCHEMA || !Array.isArray(o['missions'])) return null;
+  if (version !== VERSION_SCHEMA) return null;
+  /* Les lignes d'une facture : une liste dans un élément de liste, que rien ne
+     reconstruit au schéma courant. Une ligne sans prix numérique ferait lever
+     la réédition — et le facturier avec elle — à chaque ouverture. */
+  const recettes = o['recettes'];
+  if (Array.isArray(recettes)) {
+    const i = (recettes as Record<string, unknown>[]).findIndex((r) => !lignesLisibles(r['lignes']));
+    if (i !== -1) return illisible('recettes', i);
+  }
+  if (!Array.isArray(o['missions'])) return null;
   for (const [i, m] of (o['missions'] as Record<string, unknown>[]).entries()) {
     const entites = m['entites'];
     const entitesLisibles = Array.isArray(entites) && entites.every((e) =>
@@ -818,6 +855,17 @@ function motifRefusElements(o: Record<string, unknown>, version: number): string
     if (!entitesLisibles) return illisible('missions', i);
   }
   return null;
+}
+
+/** Absentes, nulles, ou une liste de lignes dont chaque champ a son type. */
+function lignesLisibles(lignes: unknown): boolean {
+  if (lignes === undefined || lignes === null) return true;
+  return Array.isArray(lignes) && lignes.every((l) =>
+    estEnregistrement(l)
+    && typeof l['designation'] === 'string'
+    && Number.isFinite(l['quantite'])
+    && Number.isFinite(l['prixUnitaireHt'])
+    && Number.isFinite(l['tauxTva']));
 }
 
 /**

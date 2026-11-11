@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import { ajouterRecette, annulerRecette, attacherJustificatifRecette, consignerRelance, encaisserRecette, marquerEnvoyee, supprimerBrouillon } from '../../state/ecritures.recettes';
-import { brouillonsDeFacture, etatFacturier } from '../../state/selecteurs.facture';
+import { brouillonsDeFacture, emetteurDe, etatFacturier } from '../../state/selecteurs.facture';
 import { dernierModeDeReglement } from '../../state/selecteurs.encaissement';
 import type { EcartDeFacturation } from '../../domain/calculs/brouillon';
 import { euros } from '../../domain/types';
@@ -36,7 +36,7 @@ import { decalerMois } from '../../domain/calculs/periode';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import { detteDeRetard, redigerRelance } from '../../domain/calculs/relance';
 import {
-  type BrouillonDeFacture, libelleDeLaFacture
+  type BrouillonDeFacture, libelleDeLaFacture, lignesDuBrouillonEnFranchise
 } from '../../domain/calculs/brouillon';
 import styles from './Facturier.module.css';
 
@@ -979,13 +979,19 @@ function BrouillonDuMois(
   if (brouillons.length === 0) return null;
 
   function emettre(b: BrouillonDeFacture): void {
+    // En franchise, la TVA de la facture est CONNUE — zéro — et ses lignes
+    // aussi. Sans elles, la facture ne pouvait pas être revue, et le dossier
+    // de TVA la signalait « TVA inconnue ». Hors franchise, le taux n'est pas
+    // choisi ici : on n'en suppose pas un.
+    const enFranchise = emetteurDe(faits).enFranchise;
     ajouterRecette({
       clientNom: b.clientNom,
       libelle: libelleDeLaFacture(b),
       montant: b.total,
       emiseLe: dateDuJour(),
       encaisseeLe: null,
-      modeReglement: null
+      modeReglement: null,
+      ...(enFranchise ? { tvaCollectee: euros(0), lignes: lignesDuBrouillonEnFranchise(b) } : { lignes: null })
     });
     signaler(`Facture émise pour ${b.clientNom}. Elle porte un numéro et entre au registre.`);
   }

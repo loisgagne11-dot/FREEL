@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 7 novembre 2026.** Schéma des faits : v19. Branche de travail : PR #302.
+**Date : 7 novembre 2026.** Schéma des faits : v20. Branche de travail : PR #302.
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -319,6 +319,27 @@ celui des encaissements, et la règle de l'échéancier.
 | Le flux ne montrait que les échéances DU MOIS : un appel du mois dernier resté impayé disparaissait de la colonne Sorties (le total, tiré des provisions, le comptait). Une échéance en retard y reste, comme une facture impayée côté Entrées | ✅ |
 | Une seule liste `echeancesAPayer` pour le flux et le panneau ; chargé à la demande | ✅ |
 
+### Lot 18 — Conserver les lignes d'une facture (priorité 1 : l'irréversible) — PR #314
+
+Une facture émise ne garde au livre que son total HT, sa TVA et ses
+désignations mises bout à bout. Le document envoyé au client, lui, portait
+des lignes : « 18 j × 430 € », deux taux de TVA. « Revoir la facture » la
+rétablit donc en une seule ligne — un document qui porte le même numéro que
+l'original sans lui ressembler — ou la refuse quand elle mêlait deux taux.
+Chaque facture émise aujourd'hui perd ce détail pour toujours : c'est le
+premier critère d'ordre, l'irréversible.
+
+| Ligne | État |
+|---|---|
+| Schéma 20 : `Recette.lignes` (désignation, quantité, prix unitaire HT, taux de TVA), `null` quand le détail n'est pas conservé ; une version antérieure de l'application REFUSE ce bloc au lieu de le réécrire sans les lignes | ✅ |
+| Migration 19 → 20 qui descend dans la liste des recettes (`lignes: null`), validation au schéma courant (une ligne illisible refuse le bloc), test de chaque version | ✅ `recettesDuSchema19`, `lignesLisibles` ; jeu de démonstration et jeu d'essai passés au schéma 20 |
+| L'éditeur de facture conserve les lignes du document à l'émission | ✅ `lignesAConserver` : les lignes imprimées et celles qui pèsent dans le total, au taux APPLIQUÉ (zéro en franchise ou en autoliquidation) |
+| « Émettre » depuis le brouillon du mois (facturier) conserve ses lignes (jours × TJM) — et sa TVA en franchise (zéro, connue), qu'il ne portait pas : la facture ne pouvait pas être revue et le dossier de TVA la signalait « inconnue » | ✅ en franchise ; montant entier en une quantité quand la division ne tombe pas juste |
+| « Revoir la facture » rétablit les lignes conservées, plusieurs taux compris ; refuse si elles ne retombent pas sur le montant et la TVA du livre ; une facture d'avant le schéma 20 garde le comportement actuel | ✅ |
+| Ventiler la TVA d'une facture à plusieurs taux dans le dossier de déclaration | ⬜ hors lot : les lignes le permettront |
+| « Émettre » depuis le brouillon du mois HORS franchise : ni TVA ni lignes conservées (le taux n'est pas choisi), donc pas de réédition possible | ⬜ hors lot : passer par l'éditeur prérempli plutôt que de supposer un taux |
+| Le jeu de démonstration portait une TVA « inconnue » sur toutes ses factures alors qu'il est en franchise : aucune ne pouvait être revue | ✅ trouvé en cours de lot : TVA nulle et lignes fictives (deux factures à deux lignes) |
+
 ## Reste fonctionnel par écran
 
 Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
@@ -362,7 +383,7 @@ existe et est appelé depuis un écran, pas que le test mord.
 
 | Élément | État | Ce qui manque | Lot proposé |
 |---|---|---|---|
-| Conservation des lignes d'une facture | ⬜ | Schéma 18 à prévoir ; une facture rééditée se rétablit en une désignation | à planifier |
+| Conservation des lignes d'une facture | ✅ | Schéma 20 ; les factures émises avant restent rééditées en une désignation | 18 |
 | « Enregistrer brouillon » | ⬜ | Dépend du point précédent | à planifier |
 | Envoi par courriel | ⬜ volontaire | Aucun envoi, ni pour la facture ni pour le CRA | — |
 | Place de « Facturer » dans le rail | ✅ | Formule A : onglet « Factures » d'Activité, création par « + Nouveau » et le Pilote | 6 |

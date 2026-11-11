@@ -3,7 +3,7 @@ import { dateISO, euros, ratio } from '../types';
 import {
   type Destinataire, type Emetteur, type Facture,
   AMENDE_PAR_MENTION, INDEMNITE_RECOUVREMENT,
-  amendeMentions, factureDepuisRecette, mentionsAPorter, mentionsManquantes,
+  amendeMentions, factureDepuisRecette, lignesAConserver, mentionsAPorter, mentionsManquantes,
   regimeDeLaFacture, totaux, verifierIntegriteFacture
 } from './facture';
 
@@ -289,6 +289,31 @@ describe('réédition d’une facture émise', () => {
     if (r.cas === 'impossible') expect(r.motif).toMatch(/plusieurs taux/);
   });
 
+  /**
+   * LES LIGNES CONSERVÉES (schéma 20).
+   *
+   * La même facture à deux taux, que le test précédent refuse faute de
+   * détail : avec ses lignes, elle se rétablit telle que le client l'a reçue.
+   */
+  it('rétablit les lignes conservées, plusieurs taux compris', () => {
+    const lignes = [
+      { designation: 'Conseil', quantite: 5, prixUnitaireHt: euros(100), tauxTva: ratio(0.2) },
+      { designation: 'Formation', quantite: 1, prixUnitaireHt: euros(500), tauxTva: ratio(0.1) }
+    ];
+    const r = factureDepuisRecette(recette({ tvaCollectee: euros(150), lignes }), ASSUJETTI, CLIENT_FR);
+    if (r.cas !== 'reeditee') throw new Error('réédition attendue');
+    expect(r.facture.lignes).toEqual(lignes);
+    expect(totaux(r.facture).totalTva).toBe(150);
+  });
+
+  /** Le livre fait foi : des lignes qui le contredisent ne s'impriment pas sous son numéro. */
+  it('refuse des lignes conservées qui ne retombent pas sur le montant du livre', () => {
+    const lignes = [{ designation: 'Conseil', quantite: 4, prixUnitaireHt: euros(100), tauxTva: ratio(0.2) }];
+    const r = factureDepuisRecette(recette({ tvaCollectee: euros(80), lignes }), ASSUJETTI, CLIENT_FR);
+    expect(r.cas).toBe('impossible');
+    if (r.cas === 'impossible') expect(r.motif).toMatch(/ne retombent pas/);
+  });
+
   /** Une TVA jamais conservée ne se suppose pas : le document porterait le
       même numéro que l'original en disant autre chose. */
   it('refuse quand la TVA n’a pas été conservée', () => {
@@ -316,5 +341,35 @@ describe('réédition d’une facture émise', () => {
     const r = factureDepuisRecette(recette(), EMETTEUR, CLIENT_FR);
     expect(r.cas).toBe('impossible');
     if (r.cas === 'impossible') expect(r.motif).toMatch(/franchise/);
+  });
+});
+
+/**
+ * CE QUE L'ÉMISSION CONSERVE.
+ *
+ * Les lignes imprimées, et celles qui pèsent dans le total sans être
+ * imprimées : les laisser de côté ferait refuser la réédition pour un écart.
+ * Le taux est celui que le document APPLIQUE.
+ */
+describe('lignes conservées à l’émission', () => {
+  const facture = (lignes: Facture['lignes'], emetteur: Emetteur = EMETTEUR): Facture => ({
+    numero: '2026-001', emiseLe: dateISO('2026-06-30'), emetteur, destinataire: CLIENT_FR, lignes
+  });
+
+  it('écarte la ligne vide, garde la ligne chiffrée sans désignation', () => {
+    const conservees = lignesAConserver(facture([
+      { designation: 'Conseil', quantite: 2, prixUnitaireHt: euros(400), tauxTva: ratio(0.2) },
+      { designation: '', quantite: 1, prixUnitaireHt: euros(0), tauxTva: ratio(0.2) },
+      { designation: '', quantite: 1, prixUnitaireHt: euros(50), tauxTva: ratio(0.2) }
+    ]));
+    expect(conservees.map((l) => l.prixUnitaireHt)).toEqual([400, 50]);
+  });
+
+  /** En franchise, le document ne porte aucune TVA, quel que soit le taux saisi sur la ligne. */
+  it('conserve le taux appliqué, zéro en franchise', () => {
+    const conservees = lignesAConserver(facture([
+      { designation: 'Conseil', quantite: 2, prixUnitaireHt: euros(400), tauxTva: ratio(0.2) }
+    ]));
+    expect(conservees[0]?.tauxTva).toBe(0);
   });
 });

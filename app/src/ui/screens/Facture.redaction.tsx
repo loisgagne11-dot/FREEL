@@ -37,7 +37,7 @@ import { ajouterRecette } from '../../state/ecritures.recettes';
 import {
   destinataireDe, emetteurDe, etatFacture, numeroSuivant
 } from '../../state/selecteurs.facture';
-import type { Facture as FactureDomaine, LigneFacture } from '../../domain/calculs/facture';
+import { type Facture as FactureDomaine, type LigneFacture, lignesAConserver } from '../../domain/calculs/facture';
 import { dateISO, euros, ratio } from '../../domain/types';
 import { Info } from '../components/Info';
 import { dateCourte, eurExact } from '../format';
@@ -148,11 +148,12 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
       // Le montant porté au livre est le HT : c'est l'assiette du chiffre
       // d'affaires en micro, et celle que l'URSSAF réclame.
       montant: etat.totaux.totalHt,
-      // La TVA du document est conservée telle quelle : elle ne se recalcule
-      // pas — les lignes ne sont pas gardées, et une facture peut porter
-      // plusieurs taux. La jeter obligeait à la supposer au moment de
-      // déclarer, sur un formulaire officiel.
+      // La TVA du document est conservée telle quelle : la jeter obligeait à
+      // la supposer au moment de déclarer, sur un formulaire officiel.
       tvaCollectee: etat.totaux.totalTva,
+      // Et ses lignes, depuis le schéma 20 : sans elles, « Revoir la facture »
+      // rendait une seule ligne au prix du total — voir `Recette.lignes`.
+      lignes: lignesAConserver(facture),
       emiseLe: facture.emiseLe,
       // L'encaissement viendra plus tard : porter une recette comme encaissée
       // à l'émission ferait déclarer un revenu qui n'est pas rentré.

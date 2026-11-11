@@ -703,3 +703,10 @@ solde − provisions − réserve.
 |---|---|---|---|
 | Lignes de la colonne Sorties | Pilote › Le flux du mois | Les échéances du mois seulement : un appel du mois dernier impayé disparaissait de la liste (le total des provisions le comptait toujours) | Payées du mois, puis tout ce qui reste à payer jusqu'à la fin du mois, retards compris, « en retard » |
 | Reste à payer ce mois-ci (nombre, total), autres plus tard | Pilote → panneau Sorties | — | Échéances non payées jusqu'à la fin du mois ; le reste compté à part (source unique `echeancesAPayer`) |
+
+## Lot 18 (11/11) — lignes d'une facture
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Quantités, prix unitaires, totaux par taux d'une facture rééditée | Facturier › Revoir la facture | Une ligne « 1 × total » ; refus à deux taux | Les lignes émises ; refus si elles ne retombent pas sur le montant et la TVA du livre |
+| TVA des factures émises depuis le brouillon du mois en franchise | Dossier de TVA, facturier | « inconnue » (non portée) | Zéro, connue |

@@ -417,6 +417,20 @@ function recettesDuSchema15(recettes: readonly Recette[]): readonly Recette[] {
 }
 
 /**
+ * v19 → v20 : les lignes d'une facture, `Recette.lignes`.
+ *
+ * Un champ apparu dans un ÉLÉMENT de liste : la fusion de surface ne l'atteint
+ * pas, d'où cette fonction. Il est comblé à `null` — « détail non conservé »,
+ * ce qui est exactement vrai d'une facture émise avant ce schéma. Jamais à une
+ * ligne fabriquée depuis le total : ce serait inventer le document que le
+ * client a reçu, et la réédition refuserait ensuite d'avouer qu'elle ne le
+ * connaît pas.
+ */
+function recettesDuSchema19(recettes: readonly Recette[]): readonly Recette[] {
+  return recettes.map((r) => (r.lignes === undefined ? { ...r, lignes: null } : r));
+}
+
+/**
  * Complète un bloc validé avec les valeurs par défaut des champs absents, et
  * CONVERTIT les formats des schémas antérieurs.
  *
@@ -526,8 +540,8 @@ export function completerFaits(brut: unknown): Faits {
     missions: missionsDuSchema1(o['missions']),
     mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires']),
     echeances: echeancesDuSchema5(o['echeances']),
-    recettes: recettesDuSchema15(
+    recettes: recettesDuSchema19(recettesDuSchema15(
       recettesDuSchema12(recettesDuSchema6(o['recettes']), o['clients'])
-    )
+    ))
   } as Faits;
 }
