@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { dateISO, euros } from '../../domain/types';
+import { dateISO, euros, ratio } from '../../domain/types';
 import type { Echeance } from '../../domain/calculs/provisions';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
@@ -339,5 +339,42 @@ describe('le détail d’une enveloppe', () => {
 
     await utilisateur().click(panneau.getByRole('button', { name: 'Payé aujourd’hui' }));
     expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-07-15');
+  });
+});
+
+/**
+ * LA TVA AUTOLIQUIDÉE SE DIT DANS LE DÉTAIL DE L'ENVELOPPE TVA.
+ *
+ * Si la ligne sautait, la vignette afficherait 20 € de « TVA à reverser » sans
+ * que rien n'explique d'où vient une TVA que le franchisé n'a jamais collectée
+ * — et sans dire que la date de dépôt reste à confirmer.
+ */
+describe('TVA autoliquidée, à l’écran', () => {
+  const achatUe = {
+    id: 'd1', libelle: 'Abonnement', fournisseur: 'Logiciel démo', provenance: 'ue' as const,
+    montantTtc: euros(100), tauxTva: ratio(0.2), payeeLe: dateISO('2026-06-10'),
+    justificatifId: null, rapprochement: 'sans_banque' as const
+  };
+
+  it('affiche la ligne « dont TVA autoliquidée » quand il y en a', async () => {
+    semer({ depenses: [achatUe] });
+    render(<Argent />);
+    await attendreTresorerie();
+    await userEvent.setup().click(screen.getByRole('button', { name: /TVA à reverser/i }));
+
+    const panneau = within(await screen.findByRole('dialog'));
+    expect(panneau.getByText(/dont TVA autoliquidée sur tes achats de services dans l’Union/)).toBeTruthy();
+    expect(panneau.getByText(/date de dépôt à confirmer auprès de ton service des impôts/)).toBeTruthy();
+  });
+
+  it('n’affiche pas la ligne quand aucun achat n’est autoliquidé', async () => {
+    semer({ echeances: [ech('t1', 'tva', 500)] });
+    render(<Argent />);
+    await attendreTresorerie();
+    await userEvent.setup().click(screen.getByRole('button', { name: /TVA à reverser/i }));
+
+    const panneau = within(await screen.findByRole('dialog'));
+    expect(panneau.getByText('Reste à sortir')).toBeTruthy();
+    expect(panneau.queryByText(/TVA autoliquidée/)).toBeNull();
   });
 });

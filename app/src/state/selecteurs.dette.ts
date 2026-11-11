@@ -23,15 +23,18 @@
  *
  * L'IMPÔT SUR LE REVENU EST LA SEULE PIÈCE QUI NE SE VENTILE PAS. C'est une
  * dette annuelle du foyer, pas une part d'encaissement : elle n'a pas de mois
- * auquel se rattacher. Elle reste donc dans le total des provisions sans
- * apparaître ligne à ligne, et l'écart entre les deux est exactement elle.
+ * auquel se rattacher. Elle ne s'affiche donc pas ligne à ligne mais dans un
+ * bloc à part (`DetailDette.impotRevenu`), lu de `impotRevenuAProvisionner` —
+ * la fonction même que le versable appelle. Quand le détail la taisait,
+ * l'écart avec la vignette était exactement elle, et rien ne le disait.
  */
 
 import type { NatureDette } from '../domain/calculs/provisions';
 import { type DetailDette, detailDette } from '../domain/calculs/detailDette';
 import type { Faits } from './schema';
 import {
-  impotRevenuAProvisionner, moisCourant, tvaAReverserDe, periodesUrssafEffectives, recettesEncaissees,
+  impotRevenuAProvisionner, moisCourant, tvaAReverserDe, tvaAutoliqueeProvisionnee,
+  periodesUrssafEffectives, recettesEncaissees,
   regimeDe, sousAcreLe
 } from './selecteurs';
 import { tauxImpotEtContributions } from '../domain/bareme';
@@ -61,6 +64,7 @@ export function detailDeLaDette(
       tauxImpotEtContributions: taux,
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       tvaAReverser: tvaAReverserDe(faits),
+      tvaAutoliquidee: tvaAutoliqueeProvisionnee(faits, maintenant),
       periodesUrssaf: periodesUrssafEffectives(faits)
     }
   );

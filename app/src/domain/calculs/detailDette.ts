@@ -113,6 +113,16 @@ export interface DetailDette {
    * pire qu'une absence de total : il a l'air d'une réponse.
    */
   readonly nonCalculables: readonly { readonly mois: Mois; readonly motif: string }[];
+  /**
+   * Nature `impot` : la provision d'impôt sur le revenu retenue par le versable,
+   * au même chiffre. Elle ne se ventile pas par mois (dette annuelle du foyer),
+   * d'où un champ à part plutôt qu'une ligne : sans lui, le détail montrait le
+   * taux sur les encaissements et taisait l'essentiel de l'impôt. `null` hors
+   * de cette nature ou sans provision (versement libératoire).
+   */
+  readonly impotRevenu: Resolution<Euros> | null;
+  /** Nature `tva` : la part autoliquidée de la provision (« dont »), sinon `null`. */
+  readonly tvaAutoliquidee: Resolution<Euros> | null;
 }
 
 /**
@@ -162,7 +172,11 @@ export function detailDette(
     }
   }
 
-  return assembler(nature, lignes, nonCalculables);
+  return {
+    ...assembler(nature, lignes, nonCalculables),
+    impotRevenu: nature === 'impot' ? ctx.impotRevenu ?? null : null,
+    tvaAutoliquidee: nature === 'tva' ? ctx.tvaAutoliquidee ?? null : null
+  };
 }
 
 /**
@@ -226,7 +240,7 @@ function assembler(
   nature: NatureDette,
   lignes: readonly LigneDette[],
   nonCalculables: readonly { readonly mois: Mois; readonly motif: string }[]
-): DetailDette {
+): Omit<DetailDette, 'impotRevenu' | 'tvaAutoliquidee'> {
   const parAnnee = new Map<number, LigneDette[]>();
   for (const l of lignes) {
     const a = Number(l.mois.slice(0, 4));

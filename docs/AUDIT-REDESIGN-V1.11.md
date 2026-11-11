@@ -1063,3 +1063,10 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Composition du versable | « Impôt sur le revenu » | « dont provision au taux de l'année projetée » |
 | Pilote, premier rendu | Salutation, santé et décisions calculées d'emblée | Salutation neutre et phrase de santé vide un instant, le temps que le calcul « à traiter » arrive ; la carte Santé est en place dès le premier rendu |
 
+## Lot 13 (09/11) — ce qui est dû
+
+| Zone | Avant | Après |
+|---|---|---|
+| Détail de l'enveloppe TVA | Collectée et réglée | + « dont TVA autoliquidée sur tes achats de services dans l'Union : X € — date de dépôt à confirmer auprès de ton service des impôts », quand il y en a |
+| Détail de la dette « impôt » | Taux sur les encaissements | + « Impôt sur le revenu à mettre de côté : X € (estimation) », ou le motif d'abstention |
+

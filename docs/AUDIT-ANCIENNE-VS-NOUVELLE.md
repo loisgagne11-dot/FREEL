@@ -402,3 +402,10 @@ chiffre faux.
 |---|---|---|
 | Provision d'impôt sur le revenu (`getIRForYear`, `addIRMonthlyProvisions`) | 🟢 | L'ancienne provisionnait l'impôt entier de l'année (encaissé + facturé) dès qu'une facture était connue, réparti sur les mois encaissés. La nouvelle prend la même assiette, planning compris, et met de côté le taux moyen de l'année sur ce qui est entré : rien n'est retenu sur un argent pas encore arrivé, et au 31 décembre l'impôt est entier |
 
+## Lot 13 (09/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| TVA autoliquidée d'un franchisé | 🟢 | L'ancienne application l'ignorait ; la nouvelle la calculait (lot 7) sans la provisionner. Elle entre dans la provision TVA, en hypothèse |
+| Détail de la dette « impôt » | 🟢 | Montre la provision d'impôt sur le revenu que le versable retient |
+

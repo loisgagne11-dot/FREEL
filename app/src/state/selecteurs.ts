@@ -15,7 +15,7 @@ import {
   euros, moisDe
 } from '../domain/types';
 import { moisSousAcre, tauxImpotEtContributions } from '../domain/bareme';
-import { tvaDueDepuis } from '../domain/bareme/tva';
+import { AUTOLIQUIDATION_TVA, tvaDueDepuis } from '../domain/bareme/tva';
 import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
@@ -130,21 +130,83 @@ export function regimeTvaAu(faits: Faits, m: Mois): RegimeTva {
  * collectée laissait la déductible en provision pour toujours. Le jeu d'essai
  * l'a vu : 1 300 € provisionnés quand le dossier du trimestre en dit 1 140.
  * Même règle que le dossier : régime au mois de paiement, pièce exigée.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA TVA AUTOLIQUIDÉE S'AJOUTE À LA COLLECTÉE, AVANT LE RETRANCHEMENT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un achat de service à un fournisseur de l'Union fait naître une TVA due par
+ * l'acheteur (art. 283-2 CGI), franchisé compris. Elle ne passait dans aucune
+ * provision : le versable était trop haut d'autant.
+ *
+ * Elle se déclare sur la MÊME déclaration que la collectée, donc une échéance
+ * de TVA saisie règle les deux d'un seul montant. L'ajouter APRÈS le
+ * retranchement des échéances compterait deux fois : un assujetti avec 300 €
+ * collectés et 20 € autoliquidés, qui règle 320 €, verrait 20 € rester
+ * provisionnés pour toujours. Même fenêtre et même « réglé » que la collectée :
+ * tout l'historique, toutes les échéances `tva` (les non payées sont reprises
+ * par le volet 1, pas ici).
+ *
+ * Chez un assujetti, cette TVA est en principe aussi déductible sur la même
+ * déclaration (neutre) ; `recuperable` ne la reprend pas, de sorte que le
+ * montant reste un plafond prudent — l'erreur va dans le sens d'en mettre de
+ * côté, pas d'en laisser se verser.
  */
 export function tvaAReverserDe(faits: Faits): Euros {
   const collectee = faits.recettes
     .filter((r) => r.encaisseeLe !== null)
     .reduce<number>((t, r) => t + (r.tvaCollectee ?? 0), 0);
-  const banqueSynchronisee = soldeEstSuivi(faits);
-  const deductible = faits.depenses
-    .filter((d): d is typeof d & { payeeLe: DateISO } => d.payeeLe !== null)
-    .reduce<number>((t, d) => t + tvaDeDepense(d, {
-      regimeTva: regimeTvaAu(faits, moisDe(d.payeeLe)), banqueSynchronisee
-    }).recuperable, 0);
+  const { deductible, autoliquidee } = tvaDesDepensesPayees(faits);
   const appelee = faits.echeances
     .filter((e) => e.nature === 'tva')
     .reduce<number>((t, e) => t + (e.montantPaye ?? e.montant), 0);
-  return euros(Math.max(0, collectee - deductible - appelee));
+  return euros(Math.max(0, collectee + autoliquidee - deductible - appelee));
+}
+
+/** La TVA déductible et la TVA autoliquidée des dépenses payées : une règle, un passage. */
+function tvaDesDepensesPayees(faits: Faits): { deductible: number; autoliquidee: number } {
+  const banqueSynchronisee = soldeEstSuivi(faits);
+  let deductible = 0;
+  let autoliquidee = 0;
+  for (const d of faits.depenses) {
+    if (d.payeeLe === null) continue;
+    const regime = regimeTvaAu(faits, moisDe(d.payeeLe));
+    const tva = tvaDeDepense(d, { regimeTva: regime, banqueSynchronisee });
+    deductible += tva.recuperable;
+    // Chez un redevable, la TVA autoliquidée est due ET déductible sur la même
+    // déclaration : elle s'annule. La compter due sans la compter déductible
+    // provisionnait en trop chaque achat de service européen d'un assujetti.
+    // Seul un franchisé, qui ne déduit rien, la doit vraiment.
+    if (regime === 'franchise') autoliquidee += tva.aAutoliquider;
+  }
+  return { deductible, autoliquidee };
+}
+
+/**
+ * La part de la provision de TVA qui vient d'achats autoliquidés, pour la dire
+ * à l'écran — `null` quand il n'y en a pas, ou plus.
+ *
+ * Plafonnée à la provision elle-même : un « dont » ne peut pas dépasser son
+ * total, et quand des échéances payées ont réglé une partie seulement, on ne
+ * sait pas laquelle des deux TVA elles ont réglée. Afficher les 20 € quand il
+ * ne reste que 5 € provisionnés serait annoncer une somme que rien ne retient.
+ *
+ * Une `hypothese`, jamais un `publie` : le montant est sûr, la date de dépôt
+ * ne l'est pas, et aucune échéance n'est inventée.
+ */
+export function tvaAutoliqueeProvisionnee(
+  faits: Faits,
+  maintenant: Date = new Date()
+): Resolution<Euros> | null {
+  const part = Math.min(tvaDesDepensesPayees(faits).autoliquidee, tvaAReverserDe(faits));
+  if (part <= 0) return null;
+  return {
+    statut: 'hypothese',
+    valeur: euros(part),
+    source: AUTOLIQUIDATION_TVA.source,
+    verifieLe: AUTOLIQUIDATION_TVA.verifieLe,
+    depuis: moisCourant(maintenant)
+  };
 }
 
 /** Chiffre d'affaires encaissé sur une année civile. */
