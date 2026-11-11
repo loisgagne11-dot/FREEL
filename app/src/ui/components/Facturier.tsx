@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import { ajouterRecette, annulerRecette, attacherJustificatifRecette, consignerRelance, encaisserRecette, marquerEnvoyee, supprimerBrouillon } from '../../state/ecritures.recettes';
 import { brouillonsDeFacture, etatFacturier } from '../../state/selecteurs.facture';
+import { dernierModeDeReglement } from '../../state/selecteurs.encaissement';
 import type { EcartDeFacturation } from '../../domain/calculs/brouillon';
 import { euros } from '../../domain/types';
 import type { Euros } from '../../domain/types';
@@ -25,6 +26,7 @@ import type { Recouvrement } from '../../domain/calculs/recouvrement';
 import { BarrePeriode } from './BarrePeriode';
 import { Info } from './Info';
 import { Montant } from './Montant';
+import { FormulaireEncaissement } from './FormulaireEncaissement';
 import { Sheet } from './Sheet';
 import { Statut, type TonStatut } from './Statut';
 import { useToast } from './Toasts';
@@ -93,14 +95,6 @@ const TONS: Readonly<Record<StatutFacture, TonStatut>> = {
   annulee: 'neutre',
   annulation: 'neutre'
 };
-
-const MODES: readonly { readonly id: ModeReglement; readonly libelle: string }[] = [
-  { id: 'virement', libelle: 'Virement' },
-  { id: 'carte', libelle: 'Carte' },
-  { id: 'cheque', libelle: 'Chèque' },
-  { id: 'especes', libelle: 'Espèces' },
-  { id: 'autre', libelle: 'Autre' }
-];
 
 /**
  * Combien de lignes on rend d'un coup.
@@ -358,6 +352,7 @@ export function Facturier(
           <PanneauEncaissement
             facture={aEncaisser}
             refus={refus}
+            modeParDefaut={dernierModeDeReglement(faits, aEncaisser.recette.clientNom)}
             onValider={(date, mode) => encaisser(aEncaisser.recette.id, date, mode)}
           />
         )}
@@ -524,16 +519,13 @@ function Ligne(
 }
 
 function PanneauEncaissement(
-  { facture, refus, onValider }: {
+  { facture, refus, modeParDefaut, onValider }: {
     readonly facture: FactureSuivie<Recette>;
     readonly refus: string | null;
+    readonly modeParDefaut: ModeReglement;
     readonly onValider: (date: string, mode: ModeReglement) => void;
   }
 ) {
-  const [date, setDate] = useState<string>(() => dateDuJour());
-  const [mode, setMode] = useState<ModeReglement>('virement');
-  const id = useId();
-
   return (
     <div className={styles.panneau}>
       <p className={styles.rappel}>
@@ -543,51 +535,15 @@ function PanneauEncaissement(
         </strong>
       </p>
 
-      {/* `htmlFor` explicite plutôt qu'un label enveloppant : l'aide fait
-          partie du contenu du label, et l'envelopper collerait ses deux
-          phrases au nom accessible du champ. */}
-      <p className={styles.champ}>
-        <label className={styles.libelle} htmlFor={`${id}-date`}>Date d’encaissement</label>
-        <input
-          id={`${id}-date`}
-          type="date"
-          className={styles.saisie}
-          value={date}
-          aria-describedby={`${id}-date-aide`}
-          onChange={(e) => setDate(e.target.value)}
-        />
-        <span id={`${id}-date-aide`} className={styles.aide}>
-          La date où l’argent est arrivé, pas celle de la facture&nbsp;: en
-          micro, le chiffre d’affaires se compte à l’encaissement.
-        </span>
-      </p>
-
-      <p className={styles.champ}>
-        <label className={styles.libelle} htmlFor={`${id}-mode`}>Mode de règlement</label>
-        <select
-          id={`${id}-mode`}
-          className={styles.saisie}
-          value={mode}
-          aria-describedby={`${id}-mode-aide`}
-          onChange={(e) => setMode(e.target.value as ModeReglement)}
-        >
-          {MODES.map((m) => <option key={m.id} value={m.id}>{m.libelle}</option>)}
-        </select>
-        <span id={`${id}-mode-aide`} className={styles.aide}>
-          Mention obligatoire du livre des recettes. C’est elle qui manquait à
-          l’ancienne application, et qui rendait son registre non conforme.
-        </span>
-      </p>
-
-      {refus !== null && <p className={styles.refus} role="alert">{refus}</p>}
-
-      <button
-        type="button"
-        className={styles.actionPrincipale}
-        onClick={() => onValider(date, mode)}
-      >
-        Porter au livre des recettes
-      </button>
+      {/* Le même formulaire que le panneau « Encaissements » du Pilote : voir
+          l'en-tête de `FormulaireEncaissement`. */}
+      <FormulaireEncaissement
+        avecAides
+        modeParDefaut={modeParDefaut}
+        refus={refus}
+        libelleValider="Porter au livre des recettes"
+        onValider={onValider}
+      />
     </div>
   );
 }

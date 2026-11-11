@@ -1,0 +1,67 @@
+/* La date et le mode d'un encaissement. Cibles de 44 px : on pointe un virement
+   au pouce autant qu'à la souris. */
+
+.formulaire { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.champ { margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.libelle {
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.saisie {
+  min-height: 44px;
+  padding: 0 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+  width: 100%;
+}
+
+.saisie:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+.aide { font-size: 11.5px; color: var(--muted-2); line-height: 1.45; }
+
+.refus {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--red-line);
+  background: var(--red-soft);
+  color: var(--text);
+  font-size: 12.5px;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.valider, .annuler {
+  min-height: 44px;
+  padding: 0 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 560;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.valider { border-color: var(--green-line); color: var(--green); }
+
+.valider:hover, .annuler:hover { border-color: var(--green); }
+
+@media (min-width: 761px) {
+  .enLigne { flex-direction: row; align-items: flex-end; flex-wrap: wrap; }
+  .enLigne .champ { flex: 0 1 190px; }
+  /* Le refus prend la ligne entière : coincé entre deux champs, il ne se lit
+     pas, et il pousse les boutons hors de la vue. */
+  .enLigne .refus { flex-basis: 100%; }
+}

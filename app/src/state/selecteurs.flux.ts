@@ -2,9 +2,9 @@ import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Faits } from './schema';
 import {
-  type LigneFlux, LIBELLE_NATURE, dateDuJour, echeanceDesFactures, remunerationDuMois,
-  soldeEstSuivi
+  type LigneFlux, LIBELLE_NATURE, dateDuJour, remunerationDuMois, soldeEstSuivi
 } from './selecteurs';
+import { facturesAEncaisser } from './selecteurs.pipeline';
 import { estPayee } from '../domain/calculs/provisions';
 
 /**
@@ -55,16 +55,15 @@ export function fluxDUnAutreMois(
   faits: Faits, m: Mois, aujourdhui: DateISO = dateDuJour()
 ): FluxDUnAutreMois {
   const temps = m < aujourdhui.slice(0, 7) ? 'passe' : 'futur';
-  const echeance = echeanceDesFactures(faits);
   const libelle = (r: Faits['recettes'][number]): string => (r.clientNom !== '' ? r.clientNom : r.libelle);
   const total = (liste: readonly { readonly montant: Euros }[]): Euros =>
     euros(liste.reduce((s, x) => s + x.montant, 0));
 
   const encaissees = faits.recettes.filter((r) => r.encaisseeLe?.startsWith(m) === true);
-  const attendues = faits.recettes.filter((r) => {
-    if (r.emiseLe === null || r.encaisseeLe !== null) return false;
-    return echeance(r)?.startsWith(m) === true;
-  });
+  // La même liste que le flux du mois courant et le panneau d'encaissement :
+  // une facture annulée par un avoir n'est plus attendue nulle part.
+  const attendues = facturesAEncaisser(faits, aujourdhui)
+    .filter((f) => f.echeanceLe?.startsWith(m) === true);
   const echeances = faits.echeances.filter((e) => e.echeanceLe.startsWith(m));
   const reglees = echeances.filter((e) => estPayee(e));
 
@@ -72,13 +71,13 @@ export function fluxDUnAutreMois(
     temps,
     entrees: {
       encaisse: total(encaissees),
-      attendu: total(attendues),
+      attendu: total(attendues.map((f) => f.recette)),
       lignes: [
         ...encaissees.map((r) => ({
           id: r.id, libelle: libelle(r), montant: r.montant, date: r.encaisseeLe, regle: true
         })),
-        ...attendues.map((r) => ({
-          id: r.id, libelle: libelle(r), montant: r.montant, date: echeance(r),
+        ...attendues.map(({ recette: r, echeanceLe }) => ({
+          id: r.id, libelle: libelle(r), montant: r.montant, date: echeanceLe,
           regle: false, enRetard: temps === 'passe'
         }))
       ]

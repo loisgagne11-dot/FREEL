@@ -96,6 +96,18 @@ describe('encaissement', () => {
     expect(encaisserRecette('fantome', dateISO('2026-07-15'), 'carte'))
       .toMatch(/introuvable/i);
   });
+
+  // Le rapprochement bancaire peut proposer une facture annulée pour un
+  // virement du même montant : l'encaisser porterait au livre un chiffre
+  // d'affaires que l'avoir a déjà effacé.
+  it('refuse d’encaisser une facture annulée, comme son avoir', () => {
+    const id = ajouter({ encaisseeLe: null, modeReglement: null });
+    annulerRecette(id, dateISO('2026-07-01'));
+    expect(encaisserRecette(id, dateISO('2026-07-15'), 'virement')).toMatch(/annulée par un avoir/);
+    expect(encaisserRecette(`${id}-annulation`, dateISO('2026-07-15'), 'virement'))
+      .toMatch(/annulée par un avoir/);
+    expect(recettes().every((r) => r.encaisseeLe === null)).toBe(true);
+  });
 });
 
 describe('ajout seul', () => {

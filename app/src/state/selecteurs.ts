@@ -33,7 +33,7 @@ import { soldeDerive } from '../domain/calculs/solde';
 import type { RegimeTva } from '../domain/calculs/depenses';
 import { tvaDeDepense } from '../domain/calculs/depenses.tva';
 import type { Faits, Recette } from './schema';
-import { encaissementsAttendusDeLAnnee } from './selecteurs.pipeline';
+import { encaissementsAttendusDeLAnnee, facturesAEncaisser } from './selecteurs.pipeline';
 import {
   FORMULE_PAR_DEFAUT, echeanceDe
 } from '../domain/calculs/delaiPaiement';
@@ -660,13 +660,16 @@ export function fluxDuMois(
   echeances: readonly Echeance[] = faits.echeances,
   aujourdhui: DateISO = dateDuJour()
 ): FluxDuMois {
-  const echeance = echeanceDesFactures(faits);
   const encaisseesDuMois = faits.recettes.filter(
     (r) => r.encaisseeLe !== null && r.encaisseeLe.startsWith(m)
   );
   // Une écriture d'annulation porte un montant négatif : elle doit diminuer
   // l'encaissé, pas s'y ajouter comme une recette de plus.
-  const enAttente = faits.recettes.filter((r) => r.emiseLe !== null && r.encaisseeLe === null);
+  //
+  // L'attente, elle, vient de la liste que pointe le panneau d'encaissement :
+  // voir `facturesAEncaisser` pour la facture annulée qui y apparaissait deux
+  // fois.
+  const enAttente = facturesAEncaisser(faits, aujourdhui);
 
   const echeancesDuMois = echeances.filter((e) => e.echeanceLe.startsWith(m));
 
@@ -676,7 +679,7 @@ export function fluxDuMois(
   return {
     entrees: {
       encaisse: total(encaisseesDuMois),
-      enAttente: total(enAttente),
+      enAttente: total(enAttente.map((f) => f.recette)),
       lignes: [
         ...encaisseesDuMois.map((r) => ({
           id: r.id,
@@ -685,17 +688,14 @@ export function fluxDuMois(
           date: r.encaisseeLe,
           regle: true
         })),
-        ...enAttente.map((r) => {
-          const limite = echeance(r);
-          return {
-            id: r.id,
-            libelle: r.clientNom !== '' ? r.clientNom : r.libelle,
-            montant: r.montant,
-            date: r.emiseLe,
-            regle: false,
-            enRetard: limite !== null && limite < aujourdhui
-          };
-        })
+        ...enAttente.map(({ recette: r, statut }) => ({
+          id: r.id,
+          libelle: r.clientNom !== '' ? r.clientNom : r.libelle,
+          montant: r.montant,
+          date: r.emiseLe,
+          regle: false,
+          enRetard: statut === 'en_retard'
+        }))
       ]
     },
     sorties: {

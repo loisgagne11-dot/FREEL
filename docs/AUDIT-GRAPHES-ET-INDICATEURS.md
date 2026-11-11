@@ -687,3 +687,11 @@ solde − provisions − réserve.
 | TVA autoliquidée à déclarer (base, TVA due) | Argent → Préparer ma déclaration de TVA | Absente | Ligne A3 pour les achats de l'Union ; totaux à part pour les achats hors Union (ligne à confirmer) |
 | Solde à payer du dossier | Même panneau | Collectée − déductible | + autoliquidée due − autoliquidée déductible : inchangé chez un redevable, + la TVA due en franchise ; égal à la provision TVA |
 
+
+## Lot 16 (11/11) — pointer un encaissement
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Reste à encaisser (nombre de factures, total) | Pilote → panneau Encaissements | — | Factures émises, non réglées, non annulées ; le même total que « en attente » du flux (source unique `facturesAEncaisser`) ; TTC attendu sur le compte précisé quand les factures portent une TVA connue |
+| « en attente » et lignes d'entrées du flux | Pilote, flux d'un autre mois | Une facture annulée par un avoir et son écriture d'annulation y figuraient toutes deux (le total retombait juste, les lignes montraient le client deux fois, dont une en négatif) | Ni l'une ni l'autre ; total inchangé |
+| Montant d'une ligne du panneau | Panneau Encaissements | — | TTC quand la facture porte une TVA (ce qu'on lit sur le relevé), HT en dessous ; HT seul sinon |

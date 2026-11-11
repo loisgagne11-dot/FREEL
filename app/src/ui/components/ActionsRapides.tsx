@@ -43,6 +43,15 @@ export const ACTIONS_RAPIDES: readonly ActionRapide[] = [
     icone: 'M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M12 11 V17 M9 14 H15'
   },
   {
+    /* Le geste le plus fréquent de l'outil : un virement arrive, on le pointe.
+       Le handoff le range dans « Saisir », à côté de la nouvelle facture. Il
+       ouvre le panneau d'encaissement du Pilote — un geste, pas un écran : voir
+       `Pilote`. */
+    libelle: 'Pointer un encaissement',
+    href: '#/pilote/encaissements',
+    icone: 'M4 12.5 L9 17.5 L20 6.5'
+  },
+  {
     /* Le handoff met le CRA en deuxième position des actions rapides, avant la
        dépense : c'est le livrable qu'on remet à un client, et le seul geste du
        mois qui a une échéance. Une dépense se saisit quand on veut. */

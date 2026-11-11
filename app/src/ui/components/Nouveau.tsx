@@ -13,13 +13,15 @@ import menu from './Exporter.menu.module.css';
  * « Nouvelle facture » qui déposerait sur la liste des factures obligerait à
  * chercher le bouton une seconde fois — le reproche exact fait à l'ancienne
  * version. Chaque entrée vise donc la sous-route qui OUVRE la saisie : la
- * rédaction, le formulaire de dépense, celui de mission, la carte des congés.
+ * rédaction, le panneau d'encaissement du Pilote, le formulaire de dépense,
+ * celui de mission, la carte des congés.
  *
  * Il vit dans `BarreActions`, déjà différé : il n'a pas besoin d'un second
- * chargement à la demande pour un menu de quatre liens.
+ * chargement à la demande pour un menu de cinq liens.
  */
 const ENTREES: readonly { readonly libelle: string; readonly href: string }[] = [
   { libelle: 'Facture', href: '#/facture/nouvelle' },
+  { libelle: 'Encaissement', href: '#/pilote/encaissements' },
   { libelle: 'Dépense', href: '#/achats/depense' },
   { libelle: 'Mission', href: '#/activite/nouvelle-mission' },
   { libelle: 'Congés', href: '#/activite/conges' }

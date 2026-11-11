@@ -130,6 +130,10 @@ const VUES = [
      Rémunération : les tuiles (« Solde »…) sont parties avec les doublons.
      Le libellé est un motif — le nom du bouton commence par le montant. */
   { hash: '#/pilote', nom: 'pilote-composition', ouvrir: ['.*d’où vient ce chiffre'] },
+  /* Le panneau s'ouvre par son adresse, comme l'action rapide et « + Nouveau »
+     l'ouvrent : c'est le chemin que prend l'utilisateur, et il ne dépend pas de
+     la présence d'une facture en retard dans la démo. */
+  { hash: '#/pilote/encaissements', nom: 'pilote-encaissements', attendre: 'text=Reste à encaisser' },
   { hash: '#/argent', nom: 'argent-tresorerie' },
   { hash: '#/argent', nom: 'argent-performance', ouvrir: ['Performance'] },
   { hash: '#/achats', nom: 'achats' },

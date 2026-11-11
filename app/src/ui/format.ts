@@ -73,3 +73,19 @@ export function formaterJours(jours: number): string {
   return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(jours);
 }
 
+/**
+ * « Brasserie Vent d'Ouest » → « BV ».
+ *
+ * Deux lettres, prises sur les deux premiers mots. Un seul mot donne ses deux
+ * premières lettres — « Kessler » ferait sinon un « K » solitaire, que tout
+ * autre client en K rendrait ambigu.
+ *
+ * Partagée par le plan de charge et le panneau d'encaissement : deux règles
+ * donneraient deux pastilles différentes au même client.
+ */
+export function initiales(nom: string): string {
+  const mots = nom.split(/[\s'’-]+/u).filter((m) => m !== '');
+  if (mots.length === 0) return '?';
+  if (mots.length === 1) return (mots[0] as string).slice(0, 2).toUpperCase();
+  return `${(mots[0] as string)[0] ?? ''}${(mots[1] as string)[0] ?? ''}`.toUpperCase();
+}
