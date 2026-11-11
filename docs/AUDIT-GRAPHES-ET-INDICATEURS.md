@@ -694,4 +694,5 @@ solde − provisions − réserve.
 |---|---|---|---|
 | Reste à encaisser (nombre de factures, total) | Pilote → panneau Encaissements | — | Factures émises, non réglées, non annulées ; le même total que « en attente » du flux (source unique `facturesAEncaisser`) ; TTC attendu sur le compte précisé quand les factures portent une TVA connue |
 | « en attente » et lignes d'entrées du flux | Pilote, flux d'un autre mois | Une facture annulée par un avoir et son écriture d'annulation y figuraient toutes deux (le total retombait juste, les lignes montraient le client deux fois, dont une en négatif) | Ni l'une ni l'autre ; total inchangé |
+| Factures en attente du livre des recettes | Argent → Livre des recettes | La facture annulée et son avoir négatif y figuraient | Même liste que le flux et le panneau |
 | Montant d'une ligne du panneau | Panneau Encaissements | — | TTC quand la facture porte une TVA (ce qu'on lit sur le relevé), HT en dessous ; HT seul sinon |

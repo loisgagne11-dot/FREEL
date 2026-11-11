@@ -122,6 +122,9 @@
   font-weight: 650;
 }
 
+.teinte1 { background: var(--blue-soft); color: var(--blue); }
+.teinte2 { background: var(--amber-soft); color: var(--amber); }
+
 .texte {
   grid-area: texte;
   display: flex;

@@ -47,6 +47,19 @@ describe('propositions de rapprochement', () => {
     expect(s.operations[0]?.action).toMatchObject({ type: 'associer', recetteId: 'r1', encaisser: true });
   });
 
+  // Un virement du montant d'une facture annulée ne la règle pas : l'avoir
+  // l'a effacée du chiffre d'affaires.
+  it('ne propose pas d’encaisser une facture annulée par un avoir', () => {
+    const s = suiviRapprochement(faits({
+      recettes: [
+        facture(),
+        facture({ id: 'r1-annulation', numero: 'F-024', montant: euros(-4160), annuleEcriture: 'r1' })
+      ],
+      mouvementsBancaires: [mvt({ montant: euros(4160), libelle: 'VIR SEPA CLIENT' })]
+    }), JUIN);
+    expect(s.operations[0]?.action).not.toMatchObject({ type: 'associer', recetteId: 'r1' });
+  });
+
   it('n’associe pas sans encaisser une facture déjà encaissée', () => {
     const s = suiviRapprochement(faits({
       recettes: [facture({ encaisseeLe: dateISO('2026-06-12'), modeReglement: 'virement' })],

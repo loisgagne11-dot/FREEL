@@ -421,5 +421,5 @@ chiffre faux.
 | Fonction | Verdict | Détail |
 |---|---|---|
 | Pointer un encaissement depuis le Pilote | 🟢 | L'ancienne application basculait la facture « payée » d'un clic, sans date ni mode. La nouvelle le faisait seulement dans le facturier ; le Pilote le fait désormais, avec les deux mentions du livre des recettes |
-| Encaisser une facture annulée par un avoir | 🟢 | Accepté jusqu'ici par l'écriture (le rapprochement bancaire pouvait la proposer) ; refusé, comme son écriture d'annulation |
+| Encaisser une facture annulée par un avoir | 🟢 | Accepté jusqu'ici par l'écriture, et proposé par le rapprochement bancaire pour un virement du même montant ; le rapprochement ne la propose plus, et l'écriture la refuse, comme son écriture d'annulation |
 | Date d'encaissement dans le futur | 🟢 | Acceptée ; refusée par le formulaire, au facturier comme au Pilote |

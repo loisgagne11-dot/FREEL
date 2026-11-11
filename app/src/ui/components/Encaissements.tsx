@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { dateISO, euros } from '../../domain/types';
 import { type FactureSuivie, montantsDeLaFacture } from '../../domain/calculs/facturier';
 import type { ModeReglement } from '../../domain/calculs/livreRecettes';
-import type { Recette } from '../../state/schema';
+import type { Client, Recette } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { encaisserRecette } from '../../state/ecritures.recettes';
 import { dernierModeDeReglement } from '../../state/selecteurs.encaissement';
@@ -67,6 +67,7 @@ export function Encaissements(
     () => (cible !== null && attente.some((f) => f.recette.id === cible) ? cible : null)
   );
   const [refus, setRefus] = useState<string | null>(null);
+  const teintes = useMemo(() => teintesDesClients(faits.clients), [faits.clients]);
   const liste = useRef<HTMLUListElement | null>(null);
   const termine = useRef<HTMLButtonElement | null>(null);
 
@@ -156,6 +157,7 @@ export function Encaissements(
               <Ligne
                 key={f.recette.id}
                 facture={f}
+                teinte={teintes(f.recette.clientNom)}
                 ouverte={ouverte === f.recette.id}
                 focaliser={cible === f.recette.id}
                 refus={ouverte === f.recette.id ? refus : null}
@@ -165,7 +167,7 @@ export function Encaissements(
                 onConfirmer={(date, mode) => confirmer(f.recette.id, date, mode)}
               />
             ))}
-            {brouillons.map((r) => <Brouillon key={r.id} recette={r} />)}
+            {brouillons.map((r) => <Brouillon key={r.id} recette={r} teinte={teintes(r.clientNom)} />)}
           </ul>
         </div>
       </div>
@@ -173,9 +175,23 @@ export function Encaissements(
   );
 }
 
+/**
+ * La teinte de la pastille d'initiales, par rang du client au carnet.
+ *
+ * Deux clients côte à côte doivent se distinguer d'un coup d'œil, comme dans
+ * le handoff — « SL » deux fois en vert, puis « AN » en bleu, se lit avant le
+ * nom. Trois teintes du thème plutôt que des couleurs en dur, qui ne suivraient
+ * pas les quatre palettes.
+ */
+function teintesDesClients(clients: readonly Client[]): (nom: string) => string {
+  const rang = new Map(clients.map((c, i) => [c.nom, i]));
+  return (nom) => styles[`teinte${(rang.get(nom) ?? 0) % 3}`] ?? '';
+}
+
 function Ligne(
-  { facture, ouverte, focaliser, refus, modeParDefaut, onOuvrir, onAnnuler, onConfirmer }: {
+  { facture, teinte, ouverte, focaliser, refus, modeParDefaut, onOuvrir, onAnnuler, onConfirmer }: {
     readonly facture: FactureSuivie<Recette>;
+    readonly teinte: string;
     readonly ouverte: boolean;
     readonly focaliser: boolean;
     readonly refus: string | null;
@@ -193,7 +209,9 @@ function Ligne(
   return (
     <li className={`${styles.ligne} ${enRetard ? styles.ligneEnRetard : ''}`}>
       <div className={styles.entete}>
-        <span className={styles.avatar} aria-hidden="true">{initiales(client)}</span>
+        <span className={`${styles.avatar} ${teinte}`} aria-hidden="true">
+          {initiales(client)}
+        </span>
         <span className={styles.texte}>
           <span className={styles.client}>{client}</span>
           <span className={styles.meta}>
@@ -233,12 +251,14 @@ function Ligne(
 }
 
 /** Un brouillon : rien à pointer, mais de l'argent qui n'est pas encore demandé. */
-function Brouillon({ recette: r }: { readonly recette: Recette }) {
+function Brouillon({ recette: r, teinte }: { readonly recette: Recette; readonly teinte: string }) {
   const client = r.clientNom !== '' ? r.clientNom : 'Client non renseigné';
   return (
     <li className={`${styles.ligne} ${styles.ligneBrouillon}`}>
       <div className={styles.entete}>
-        <span className={styles.avatar} aria-hidden="true">{initiales(client)}</span>
+        <span className={`${styles.avatar} ${teinte}`} aria-hidden="true">
+          {initiales(client)}
+        </span>
         <span className={styles.texte}>
           <span className={styles.client}>{client}</span>
           <span className={styles.meta}>{r.numero || 'Sans numéro'} · brouillon, pas encore émise</span>

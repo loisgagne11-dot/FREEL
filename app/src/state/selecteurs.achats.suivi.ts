@@ -19,6 +19,8 @@ import { type Periode, dansLaPeriode } from '../domain/calculs/periode';
 import { rapprochementEffectif } from '../domain/calculs/depenses';
 import { contexteDepense, ecrituresRapprochables, type EtatAchats } from './selecteurs.achats';
 import type { Depense, Faits } from './schema';
+import { dateDuJour } from './selecteurs';
+import { facturesAEncaisser } from './selecteurs.pipeline';
 
 export type ActionOperation =
   /** Un crédit qui règle une facture : `encaisser` quand elle n'est pas encore passée en encaissée. */
@@ -97,9 +99,12 @@ export function suiviRapprochement(
 
   // Les factures attendues : un crédit les règle plusieurs semaines après leur
   // émission, la fenêtre de sept jours des écritures datées ne s'y applique pas.
-  const attendues = faits.recettes
-    .filter((r) => r.encaisseeLe === null && r.emiseLe !== null && r.annuleEcriture == null)
-    .map((r) => ({
+  //
+  // La liste unique des factures à encaisser : le filtre local écartait
+  // l'écriture d'annulation mais gardait la facture qu'elle annule, si bien
+  // qu'un virement du même montant proposait de l'encaisser.
+  const attendues = facturesAEncaisser(faits, dateDuJour(maintenant))
+    .map(({ recette: r }) => ({
       id: r.id,
       libelle: r.numero ? `Facture ${r.numero} · ${r.clientNom}` : (r.libelle || r.clientNom),
       montant: r.montant,

@@ -301,7 +301,7 @@ geste du quotidien — un virement arrive, on le pointe. Le handoff a un panneau
 | Les pastilles « en attente » et « en retard » de la colonne Entrées ouvrent ce panneau ; celles des sorties gardent leur lien vers l'échéancier | ✅ saisie déjà ouverte sur la facture cliquée ; aussi dans le détail déplié (téléphone) ; + action rapide « Pointer un encaissement » et « + Nouveau › Encaissement » (`#/pilote/encaissements`), comme le catalogue du handoff |
 | Chargé à la demande : le Pilote est dans le paquet d'entrée (75 / 80 Ko) | ✅ voir budgets ci-dessous |
 | Marquer une ÉCHÉANCE payée depuis le Pilote | ⬜ hors lot : même geste pour les sorties, à faire ensuite |
-| Une facture annulée par un avoir et son écriture d'annulation figuraient « en attente » dans le flux (total juste, client affiché deux fois dont une en négatif) | ✅ trouvé en cours de lot : une seule liste `facturesAEncaisser` pour le flux du mois, le flux d'un autre mois et le panneau |
+| Une facture annulée par un avoir et son écriture d'annulation figuraient « en attente » dans le flux (total juste, client affiché deux fois dont une en négatif), dans les factures en attente du livre des recettes, et le rapprochement bancaire proposait d'encaisser la facture annulée | ✅ trouvé en cours de lot : une seule liste `facturesAEncaisser` pour le flux du mois, le flux d'un autre mois, le panneau, le livre des recettes et le rapprochement |
 | `encaisserRecette` acceptait une facture annulée (le rapprochement bancaire pouvait la proposer) | ✅ refusé, comme l'écriture d'annulation |
 
 ## Reste fonctionnel par écran
