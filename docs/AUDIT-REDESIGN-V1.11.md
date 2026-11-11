@@ -1148,3 +1148,10 @@ dépense, échéancier, barème, relevé — aucun débordement, aucune erreur.
 | Activité › Semaine › Revenir au rythme | Un clic | Confirmé, en comptant les journées |
 | Achats › Relevé | Confirmations propres au lot 21, focus perdu | Le composant commun ; le focus va sur « Garder » |
 | Achats › détail d'une dépense, Factures › Pièce jointe › Détacher | Un clic | Confirmé, avec la TVA récupérable qui part |
+
+## Lot 24 (11/11) — la bascule
+
+| Zone | Avant | Après |
+|---|---|---|
+| Adresse du site | Ancienne version à la racine, nouvelle sous `/v2/` | Nouvelle à la racine ; `/v2/` y redirige en gardant l'écran |
+| Ancienne version | Modifiable, à la racine | Sous `/legacy/`, en lecture seule, bandeau rouille « rien n'y est enregistré » collé sous son en-tête, lien vers la nouvelle (1440 et 390 relus, au repos et en défilement) |

@@ -13,8 +13,13 @@ Application web de pilotage d'activite pour micro-entrepreneurs et freelances.
 
 ## Utilisation
 
-Ouvrir `index.html` dans un navigateur ou acceder a :
-**https://loisgagne11-dot.github.io/FREEL/**
+**https://loisgagne11-dot.github.io/FREEL/** — l'application (code dans `app/`).
+
+L'ancienne version reste consultable, en lecture seule, sous
+**https://loisgagne11-dot.github.io/FREEL/legacy/** : rien de ce qu'on y fait
+n'est enregistré. Son code est `index.html`, à la racine du dépôt, conservé
+comme référence fonctionnelle. L'ancienne adresse de la nouvelle version,
+`/FREEL/v2/`, redirige vers la racine.
 
 ## Caracteristiques techniques
 

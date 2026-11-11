@@ -472,3 +472,11 @@ chiffre faux.
 | Repasser une échéance à payer | 🟢 | Confirmé : la date et le montant du débit se perdaient d'un clic |
 | Retirer une période URSSAF saisie, revenir au rythme d'une semaine | 🟢 | Confirmés |
 | Détacher une pièce d'une dépense ou d'une facture | 🟢 | Confirmé : le fichier ne se rattache qu'en le redéposant, et la TVA d'une dépense cesse d'être récupérable |
+
+## Lot 24 (11/11) — la bascule
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Consulter l'ancienne application | 🟢 | Toujours possible, sous `/legacy/`, en lecture seule : aucune écriture dans le stockage ni vers le compte (`verifier:bascule`) |
+| Saisir dans l'ancienne application | ⚪ retiré, voulu | Une saisie y serait perdue ou écraserait la reprise ; le bandeau mène à la nouvelle version |
+| Reprise de l'ancienne vers la nouvelle | 🟢 | Inchangée : même origine, même stockage — éprouvée sur le site assemblé |
