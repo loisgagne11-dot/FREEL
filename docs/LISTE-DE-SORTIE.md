@@ -58,20 +58,21 @@ au sens de `CLAUDE.md`. Les sept premiers lots suivent l'ordre imposé par le
 propriétaire (décision 7) ; les suivants, l'ordre irréversible → faux → laid.
 Le lot 27 peut se couper en deux PR : l'estimation est de **22 à 23 lots**.
 
-### Lot 23 — Plan de sortie final, et « Détacher » confirmé (PR #319, en cours)
+### Lot 23 — Plan de sortie final, et « Détacher » confirmé (PR #319, fusionnée)
 
 Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 « Détacher » une pièce, arrivée juste après la fusion de la PR #318.
 
-### Lot 24 — La bascule
+### Lot 24 — La bascule (PR #320)
 
 | Ligne | État |
 |---|---|
-| Déploiement : la nouvelle version à la racine, l'ancienne sous `/legacy/` ; `/v2/` redirige vers la racine en gardant l'adresse de l'écran. `index.html` reste à la racine du dépôt (règle du projet) : seul l'assemblage du site change | ⬜ |
-| L'ancienne version en lecture seule : aucune écriture dans le stockage du navigateur ni vers le compte ; bandeau qui renvoie à la nouvelle | ⬜ |
-| Test Playwright « zéro écriture depuis `/legacy/` » : stockage et réseau instrumentés, gestes courants joués, aucune écriture constatée | ⬜ |
-| Méta anti-cache de l'ancienne version retirées | ⬜ |
-| La reprise depuis l'ancienne version continue de fonctionner (même origine, même stockage) — testé | ⬜ |
+| Déploiement : la nouvelle version à la racine, l'ancienne sous `/legacy/` ; `/v2/` redirige vers la racine en gardant l'adresse de l'écran. `index.html` reste à la racine du dépôt (règle du projet) : seul l'assemblage du site change | ✅ `scripts/assembler-site.mjs`, appelé par le déploiement |
+| L'ancienne version en lecture seule : aucune écriture dans le stockage du navigateur ni vers le compte ; bandeau qui renvoie à la nouvelle | ✅ garde posé avant tout script de la copie publiée : stockage remplacé par un mandataire sans écriture (affectation directe comprise), seules les lectures partent sur le réseau ; bandeau collé sous l'en-tête fixe de l'ancienne application (collé en haut, il couvrait sa navigation au défilement) |
+| Test Playwright « zéro écriture depuis `/legacy/` » : stockage et réseau instrumentés, gestes courants joués, aucune écriture constatée | ✅ `verifier:bascule`, dans `verifier` : tout ce qui se clique, confirmations acceptées, plus des écritures directes (stockage, `fetch`, `XMLHttpRequest`, `sendBeacon`). Sans le garde : quatre contrôles échouent |
+| Méta anti-cache de l'ancienne version retirées | ✅ sur la copie publiée ; `index.html` du dépôt inchangé |
+| La reprise depuis l'ancienne version continue de fonctionner (même origine, même stockage) — testé | ✅ dans `verifier:bascule`, sur le site assemblé |
+| Contrôle visuel de la copie publiée (1440 et 390, au repos et en défilement) | ✅ |
 
 ### Lot 25 — Effacer le compte distant (RGPD)
 
@@ -266,10 +267,10 @@ le test mord.
 | Élément | État | Ce qui manque | Lot |
 |---|---|---|---|
 | Brief du lundi | ⬜ | Aucun code | 44 |
-| Bascule : nouvelle version à la racine, ancienne sous `/legacy/` neutralisée en écriture | ⬜ | Le déploiement garde l'ancienne à la racine et la nouvelle dans `/v2/` | 24 |
-| Test Playwright « zéro écriture depuis `/legacy/` » | ⬜ | Aucun script | 24 |
+| Bascule : nouvelle version à la racine, ancienne sous `/legacy/` neutralisée en écriture | ✅ | — | 24 |
+| Test Playwright « zéro écriture depuis `/legacy/` » | ✅ | `verifier:bascule` | 24 |
 | Harnais différentiel contre l'application actuelle | ⬜ | Aucun script | 45 |
-| Retirer les méta anti-cache de l'ancienne version | ⬜ | Lié à la bascule | 24 |
+| Retirer les méta anti-cache de l'ancienne version | ✅ | Sur la copie publiée | 24 |
 | Onboarding de première ouverture | ⬜ | Aucun en UI | 26 |
 | Recherche globale | ✅ | ⌘K / Ctrl K : factures (brouillons compris), clients, missions, dépenses ; montant par valeur | 6 |
 | Raccourcis clavier | ⬜ | Seulement dans les composants d'accessibilité | 45 |

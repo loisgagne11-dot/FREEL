@@ -739,3 +739,8 @@ solde − provisions − réserve.
 | Journées dont les corrections partent | Activité › Semaine, « Revenir au rythme » | — | Comptées sur la semaine affichée |
 | TVA qui cesse d'être récupérable | Achats › détail, « Détacher » | — | Lue sur la dépense (au centime) |
 | « À rapprocher » (tuile et file du relevé) | Achats | Sous-comptait le mouvement d'une dépense supprimée, resté « Rapprochée » | Le mouvement y revient |
+
+## Lot 24 (11/11) — bascule
+
+Aucun nombre lu ne change : le lot déplace les deux versions sans toucher à
+leurs calculs.

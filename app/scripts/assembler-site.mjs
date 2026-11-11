@@ -122,13 +122,19 @@ export const GARDE_LECTURE_SEULE = `<script data-freel-lecture-seule>
     b.style.cssText = 'position:sticky;top:0;z-index:2147483647;display:flex;flex-wrap:wrap;gap:6px 12px;'
       + 'align-items:center;justify-content:center;padding:8px 16px;background:#7c2d12;color:#fff;'
       + 'font:600 13px/1.4 system-ui,sans-serif;text-align:center';
-    b.appendChild(document.createTextNode('Ancienne version, en lecture seule : rien de ce que tu fais ici n’est enregistré.'));
+    b.appendChild(document.createTextNode('Ancienne version, en lecture seule : rien n’y est enregistré.'));
     var lien = document.createElement('a');
     lien.href = '../';
     lien.textContent = 'Ouvrir la nouvelle version';
     lien.style.cssText = 'color:#fff;text-decoration:underline';
     b.appendChild(lien);
     document.body.insertBefore(b, document.body.firstChild);
+    // Collé SOUS l'en-tête fixe de l'ancienne application, qui réserve sa
+    // hauteur par la marge du corps : collé à 0, le bandeau passait par-dessus
+    // ses boutons de navigation dès qu'on faisait défiler.
+    var caler = function () { b.style.top = getComputedStyle(document.body).paddingTop; };
+    caler();
+    window.addEventListener('resize', caler);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bandeau);
   else bandeau();
