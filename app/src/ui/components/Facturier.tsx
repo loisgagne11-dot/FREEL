@@ -24,6 +24,8 @@ import {
 } from '../../infra/justificatifs';
 import type { Recouvrement } from '../../domain/calculs/recouvrement';
 import { BarrePeriode } from './BarrePeriode';
+import { ConfirmationSurPlace } from './ConfirmationSurPlace';
+import { ConsequenceAvoir } from './ConsequenceAvoir';
 import { Info } from './Info';
 import { Montant } from './Montant';
 import { FormulaireEncaissement } from './FormulaireEncaissement';
@@ -408,6 +410,7 @@ function Ligne(
   }
 ) {
   const { recette: r, statut, echeanceLe, joursDeRetard } = facture;
+  const designation = `${r.numero || 'sans numéro'}, ${r.clientNom || 'client non renseigné'}`;
 
   return (
     <li className={styles.ligne}>
@@ -497,16 +500,36 @@ function Ligne(
         )}
         {/* Une facture émise ne se supprime pas : elle a circulé, et retirer
             son numéro laisserait un trou que le contrôle lit comme une
-            facture escamotée. Elle s'annule par un avoir. */}
-        {(statut === 'emise' || statut === 'en_retard' || statut === 'encaissee') && (
-          <button type="button" className={styles.actionSecondaire} onClick={onAnnuler}>
-            Annuler par un avoir
-          </button>
+            facture escamotée. Elle s'annule par un avoir — confirmé, car rien
+            ne le défait. « Envoyée » manquait à la liste : la facture partie
+            chez le client, la plus susceptible d'être contestée, était la
+            seule qui ne pouvait pas s'annuler. */}
+        {(statut === 'emise' || statut === 'envoyee' || statut === 'en_retard' || statut === 'encaissee') && (
+          <ConfirmationSurPlace
+            libelle="Annuler par un avoir"
+            precision={designation}
+            classeDeclencheur={styles.actionSecondaire}
+            consequence={<ConsequenceAvoir recette={r} aujourdhui={dateDuJour()} />}
+            libelleConfirmer="Émettre l’avoir"
+            libelleGarder="Garder la facture"
+            onConfirmer={onAnnuler}
+          />
         )}
         {statut === 'brouillon' && (
-          <button type="button" className={styles.actionSecondaire} onClick={onJeter}>
-            Supprimer le brouillon
-          </button>
+          <ConfirmationSurPlace
+            libelle="Supprimer le brouillon"
+            precision={designation}
+            classeDeclencheur={styles.actionSecondaire}
+            consequence={(
+              <>
+                Le brouillon de <Montant>{eur(r.montant)}</Montant> pour
+                {' '}{r.clientNom || 'un client non renseigné'} disparaît
+                {r.numero !== '' && <>&nbsp;; son numéro {r.numero} redevient libre</>}.
+              </>
+            )}
+            libelleConfirmer="Supprimer le brouillon"
+            onConfirmer={onJeter}
+          />
         )}
         {/* Disponible quel que soit le statut : une facture reprise de
             l'ancienne version ou établie hors de l'application peut arriver

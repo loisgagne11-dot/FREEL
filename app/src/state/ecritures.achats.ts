@@ -49,9 +49,24 @@ export function modifierDepense(id: string, modification: Partial<Omit<Depense, 
   });
 }
 
+/**
+ * Supprime une dépense — et défait le rapprochement qui la désignait.
+ *
+ * Le mouvement du relevé rapproché à la dépense restait « Rapprochée » à une
+ * écriture disparue : il sortait de la file « à traiter » sans contrepartie
+ * au registre, et la tuile « à rapprocher » le taisait. Il y revient, comme
+ * si on avait cliqué « Défaire ». La pièce jointe, elle, n'est pas touchée :
+ * elle est à conservation légale, et l'archive la range parmi les pièces
+ * sans fait.
+ */
 export function supprimerDepense(id: string): void {
   const actuel = faitsCourants();
-  ecrireFaits({ ...actuel, depenses: actuel.depenses.filter((d) => d.id !== id) });
+  ecrireFaits({
+    ...actuel,
+    depenses: actuel.depenses.filter((d) => d.id !== id),
+    mouvementsBancaires: actuel.mouvementsBancaires.map((m) =>
+      (m.rapprocheAvec === id ? { ...m, rapprocheAvec: null } : m))
+  });
 }
 
 /**

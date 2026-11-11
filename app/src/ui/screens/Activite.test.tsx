@@ -830,6 +830,7 @@ describe('revenir au rythme sur une semaine', () => {
     const utilisateur = await ouvrirSemaine();
 
     await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Revenir au rythme' }));
 
     const ajustements = useFaits.getState().faits.missions[0]?.entites[0]?.ajustements ?? {};
     expect(ajustements).toEqual({ '2026-06-01': { quotite: 0 } });
@@ -854,6 +855,7 @@ describe('revenir au rythme sur une semaine', () => {
     render(<Activite />);
     const utilisateur = await ouvrirSemaine();
     await utilisateur.click(screen.getByRole('button', { name: /Revenir au rythme/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Revenir au rythme' }));
 
     // Le lundi 13 juillet redevient travaillé sur ses DEUX moitiés, comme le
     // rythme le dit. Le remettre à zéro laisserait les deux à « libre ».

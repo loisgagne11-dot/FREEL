@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { ajouterPeriodeUrssaf, retirerPeriodeUrssaf } from '../../state/ecritures.activite';
+import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { dateDuJour, periodesUrssafEffectives } from '../../state/selecteurs';
 import { PERIODES_URSSAF, type PeriodeBareme } from '../../domain/bareme/urssaf';
 import { mois, ratio } from '../../domain/types';
@@ -110,13 +111,21 @@ export function Bareme() {
                   <td>{dateCourte(p.verifieLe)}</td>
                   <td>
                     {ajouteesParDebut.has(p.du) && (
-                      <button
-                        type="button"
-                        className={styles.action}
-                        onClick={() => retirer(p.du)}
-                      >
-                        Retirer
-                      </button>
+                      <ConfirmationSurPlace
+                        libelle="Retirer"
+                        precision={`la période saisie du ${p.du}`}
+                        classeDeclencheur={styles.action}
+                        classeConfirmation={styles.confirmationCellule}
+                        consequence={(
+                          <>
+                            La période saisie du {p.du} quitte le barème&nbsp;: ses
+                            mois reprennent le taux que l’application connaît — ou
+                            n’en ont plus —, et leurs cotisations sont recalculées.
+                          </>
+                        )}
+                        libelleConfirmer="Retirer la période"
+                        onConfirmer={() => retirer(p.du)}
+                      />
                     )}
                   </td>
                 </tr>

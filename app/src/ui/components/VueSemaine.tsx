@@ -3,6 +3,7 @@ import type { Creneau, Lieu } from '../../domain/calculs/planning';
 import type { DateISO } from '../../domain/types';
 import { dateCourte } from '../format';
 import { decompterJours } from '../../domain/calculs/activite';
+import { ConfirmationSurPlace } from './ConfirmationSurPlace';
 import styles from './VueSemaine.module.css';
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -73,7 +74,8 @@ export function VueSemaine(
 ) {
   // Le bouton n'apparaît que s'il y a quelque chose à défaire. Un bouton
   // toujours là qui ne fait rien apprend à ne plus le regarder.
-  const corrigee = planning.jours.some((j) => j.parMission.some((l) => l.ajuste));
+  const joursCorriges = planning.jours.filter((j) => j.parMission.some((l) => l.ajuste)).length;
+  const corrigee = joursCorriges > 0;
 
   /**
    * Le décompte de la semaine affichée, calculé par le DOMAINE.
@@ -174,10 +176,25 @@ export function VueSemaine(
         <strong>{formater(planning.totalRetenu)} j</strong>
       </p>
 
+      {/* Les corrections d'une semaine — une demi-journée de plus, un jour
+          passé chez un autre client — sont des faits saisis un par un.
+          « Revenir au rythme » les retire toutes d'un geste : confirmé, et
+          compté, pour qu'on sache ce qui part. */}
       {corrigee && (
-        <button type="button" className={styles.revenir} onClick={onRevenirAuRythme}>
-          Revenir au rythme sur cette semaine
-        </button>
+        <ConfirmationSurPlace
+          libelle="Revenir au rythme sur cette semaine"
+          classeDeclencheur={styles.revenir}
+          consequence={(
+            <>
+              Les corrections de {joursCorriges === 1 ? 'la journée corrigée' : `${joursCorriges} journées`}
+              {' '}de cette semaine seront retirées&nbsp;: {joursCorriges === 1 ? 'elle reprend' : 'elles reprennent'}
+              {' '}le rythme de {joursCorriges === 1 ? 'sa' : 'leur'} mission.
+            </>
+          )}
+          libelleConfirmer="Revenir au rythme"
+          libelleGarder="Garder les corrections"
+          onConfirmer={onRevenirAuRythme}
+        />
       )}
     </>
   );

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import type { Echeance } from '../../domain/calculs/provisions';
@@ -195,8 +195,27 @@ describe('enregistrer un paiement', () => {
   it('se dépaie, pour rattraper une erreur', async () => {
     semer([echeance({ id: 'e1', payeeLe: dateISO('2026-09-05'), montantPaye: null })]);
     rendre();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Repasser à payer' }));
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /^Repasser à payer/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Repasser à payer' }));
     expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBeNull();
+  });
+
+  /**
+   * Repasser à payer efface la date du débit et le montant parti, écart
+   * compris : un clic suffisait, à côté de « Corriger ».
+   */
+  it('dit que le paiement sera oublié, et le garde si l’on renonce', async () => {
+    semer([echeance({ id: 'e1', payeeLe: dateISO('2026-09-05'), montantPaye: euros(2450) })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /^Repasser à payer/ }));
+    const confirmation = screen.getByRole('group', { name: /sera oublié/ });
+    expect(confirmation.textContent).toMatch(/5 sept\. 2026.*2\s450.*revient dans les provisions/su);
+
+    await utilisateur.click(within(confirmation).getByRole('button', { name: 'Garder le paiement' }));
+    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-09-05');
+    expect(useFaits.getState().faits.echeances[0]?.montantPaye).toBe(2450);
   });
 });
 
@@ -251,8 +270,36 @@ describe('corriger', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: 'Corriger' }));
     await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette échéance' }));
+    expect(useFaits.getState().faits.echeances).toHaveLength(1);
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer l’échéance' }));
 
     expect(useFaits.getState().faits.echeances).toEqual([]);
+  });
+
+  /**
+   * Non payée, l'échéance est l'appel que les provisions retiennent : la
+   * supprimer fait monter le versable. Payée, elle emporte son paiement.
+   */
+  it('dit d’un appel non payé qu’il quitte les provisions', async () => {
+    semer([echeance({ id: 'e1', nature: 'tva', montant: euros(300) })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Corriger' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette échéance' }));
+    const confirmation = screen.getByRole('group', { name: /quitte l’échéancier et les provisions/ });
+    expect(confirmation.textContent).toMatch(/L’appel de TVA de 300/);
+    expect(confirmation.textContent).toMatch(/te verser monte/);
+  });
+
+  it('dit d’une échéance payée qu’elle emporte son paiement', async () => {
+    semer([echeance({ id: 'e1', nature: 'impot', payeeLe: dateISO('2026-09-05'), montantPaye: null })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Corriger' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette échéance' }));
+    const confirmation = screen.getByRole('group', { name: /avec son paiement du 5 sept\. 2026/ });
+    expect(confirmation.textContent).toMatch(/L’échéance d’impôt/);
+    expect(confirmation.textContent).toMatch(/la provision remontera/);
   });
 });
 

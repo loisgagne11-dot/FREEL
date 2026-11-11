@@ -8,6 +8,10 @@ import { Montant } from '../components/Montant';
 import { Statut, statutRecette } from '../components/Statut';
 import { Vide } from '../components/Vide';
 import { Chiffre } from '../components/Chiffre';
+import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
+import { ConsequenceAvoir } from '../components/ConsequenceAvoir';
+import { useToast } from '../components/Toasts';
+import { dateDuJour } from '../../state/selecteurs';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
 
@@ -35,6 +39,14 @@ import styles from './Argent.module.css';
 export function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
   const faits = useFaits((e) => e.faits);
   const etat = useMemo(() => etatLivre(faits), [faits]);
+  const signaler = useToast();
+  // Une écriture déjà annulée gardait son bouton, et le second clic était
+  // refusé en silence (« déjà annulée ») : le bouton ne promet plus ce que
+  // l'écriture refusera.
+  const annulees = useMemo(
+    () => new Set(faits.recettes.flatMap((r) => (r.annuleEcriture == null ? [] : [r.annuleEcriture]))),
+    [faits.recettes]
+  );
 
   return (
     <>
@@ -107,14 +119,19 @@ export function LivreDesRecettes({ idGroupe }: { idGroupe: string }) {
                   {etat.ecartsParEcriture.get(e.id)?.map((ecart) => (
                     <span key={ecart.nature} className={styles.alerteLigne}>{ecart.message}</span>
                   ))}
-                  {!estAnnulation(e) && (
-                    <button
-                      type="button"
-                      className={styles.actionLigne}
-                      onClick={() => annulerRecette(e.id)}
-                    >
-                      Annuler par écriture inverse
-                    </button>
+                  {!estAnnulation(e) && !annulees.has(e.id) && (
+                    <ConfirmationSurPlace
+                      libelle="Annuler par écriture inverse"
+                      precision={`${e.numero || 'sans numéro'}, ${e.clientNom || 'client non renseigné'}`}
+                      classeDeclencheur={styles.actionLigne}
+                      consequence={<ConsequenceAvoir recette={e} aujourdhui={dateDuJour()} />}
+                      libelleConfirmer="Inscrire l’écriture inverse"
+                      libelleGarder="Garder l’écriture"
+                      onConfirmer={() => {
+                        const motif = annulerRecette(e.id);
+                        signaler(motif ?? `Écriture inverse inscrite pour ${e.numero || 'l’écriture sans numéro'}.`);
+                      }}
+                    />
                   )}
                 </li>
               ))}

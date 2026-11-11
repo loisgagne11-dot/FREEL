@@ -384,7 +384,7 @@ tout.
 | « Retirer » sur une ligne, avec confirmation : la ligne quitte le relevé (et son rapprochement avec elle) ; la dépense ou la recette rapprochée reste au registre ; un nouvel import du même relevé la ramènerait — on le dit | ✅ `retirerMouvement` ; « Retirer du relevé » sous chaque ligne, cible de 44 px |
 | Les noms accessibles des boutons à précision masquée (« Marquer payé », « Retirer du relevé », pastilles du flux, « d'où vient ce chiffre ») collaient le mot au tiret — « payé— 2026-024 » | ✅ trouvé en cours de lot : l'espace sort de la portée masquée, que le calcul du nom rognait |
 
-### Lot 22 — Rien ne s'annule ni ne s'efface d'un clic (priorité 1 : l'irréversible) — PR à ouvrir
+### Lot 22 — Rien ne s'annule ni ne s'efface d'un clic (priorité 1 : l'irréversible) — PR #318
 
 Le lot 21 a trouvé un geste destructeur sans confirmation ; la revue de tous
 les autres en trouve neuf. Le plus lourd : « Annuler par un avoir », à côté de

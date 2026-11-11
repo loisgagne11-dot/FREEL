@@ -82,25 +82,49 @@ describe('ajout seul', () => {
   it('annule par une écriture inverse, sans rien effacer', async () => {
     semer({ recettes: [recette()] });
     await ouvrirLivre();
+    const utilisateur = userEvent.setup();
 
-    await userEvent.setup().click(
-      screen.getByRole('button', { name: /Annuler par écriture inverse/ })
-    );
+    await utilisateur.click(screen.getByRole('button', { name: /Annuler par écriture inverse/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Inscrire l’écriture inverse' }));
 
     expect(useFaits.getState().faits.recettes).toHaveLength(2);
     expect(screen.getByText('Écritures au livre').nextSibling?.textContent).toBe('2');
     expect(screen.getByText('Total encaissé').nextSibling?.textContent).toMatch(/^0\s€$/u);
   });
 
-  // Proposer d'annuler une annulation empilerait des écritures sans fin.
-  it('n’offre pas d’annuler une écriture d’annulation', async () => {
+  /**
+   * L'écriture inverse est un remboursement daté du jour : elle fait baisser
+   * le chiffre d'affaires à déclarer. Un clic l'inscrivait, et rien ne la
+   * défait.
+   */
+  it('dit ce que l’écriture inverse change avant de l’inscrire, et n’inscrit rien si l’on garde', async () => {
+    semer({ recettes: [recette()] });
+    await ouvrirLivre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: /Annuler par écriture inverse/ }));
+    const confirmation = screen.getByRole('group', { name: /remboursement.*chiffre d’affaires à déclarer baisse/ });
+    expect(confirmation.textContent).toMatch(/ne se défait pas/);
+    expect(useFaits.getState().faits.recettes).toHaveLength(1);
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Garder l’écriture' }));
+    expect(useFaits.getState().faits.recettes).toHaveLength(1);
+    expect(document.activeElement?.textContent).toMatch(/^Annuler par écriture inverse/);
+  });
+
+  /**
+   * Proposer d'annuler une annulation empilerait des écritures sans fin ; et
+   * l'écriture d'origine, une fois annulée, gardait son bouton — dont le
+   * second clic était refusé en silence.
+   */
+  it('n’offre plus rien à annuler une fois l’écriture inverse inscrite', async () => {
     semer({ recettes: [recette()] });
     await ouvrirLivre();
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('button', { name: /Annuler par écriture inverse/ }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Inscrire l’écriture inverse' }));
 
-    expect(screen.getAllByRole('button', { name: /Annuler par écriture inverse/ }))
-      .toHaveLength(1);
+    expect(screen.queryAllByRole('button', { name: /Annuler par écriture inverse/ })).toHaveLength(0);
   });
 });
 

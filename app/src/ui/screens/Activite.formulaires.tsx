@@ -7,6 +7,8 @@ import {
   ajouterClient, modifierClient, supprimerClient, supprimerMission
 } from '../../state/ecritures.carnet';
 import { useToast } from '../components/Toasts';
+import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
+import { peutSupprimerClient, peutSupprimerMission } from '../../domain/calculs/carnet';
 import { Info } from '../components/Info';
 import { entiteVide } from '../../state/schema';
 import type { Client, ClientOperationnel, Mission } from '../../state/schema';
@@ -76,6 +78,8 @@ export function FormulaireClient(
   { id, onFini }: { id: string | null; onFini: () => void }
 ) {
   const clients = useFaits((e) => e.faits.clients);
+  const missions = useFaits((e) => e.faits.missions);
+  const recettes = useFaits((e) => e.faits.recettes);
   /* Ces écritures vivent hors du magasin : elles emportaient les gardes du
      carnet dans le paquet d'entrée pour un écran chargé à la demande. Voir
      `state/ecritures.carnet`. */
@@ -167,15 +171,32 @@ export function FormulaireClient(
       </button>
 
       {existant !== undefined && (
-        <button type="button" className={styles.supprimer}
-          onClick={() => {
+        <ConfirmationSurPlace
+          libelle="Supprimer ce client"
+          classeDeclencheur={styles.supprimer}
+          // Un client qui a des missions ou des factures est refusé par
+          // l'écriture : le dire tout de suite, plutôt qu'après une
+          // confirmation validée pour rien.
+          peutOuvrir={() => {
+            const refus = peutSupprimerClient(existant.nom, missions, recettes);
+            setErreur(refus?.message ?? null);
+            return refus === null;
+          }}
+          consequence={(
+            <>
+              La fiche de {existant.nom || 'ce client'} quitte le carnet, avec
+              ses coordonnées&nbsp;: il faudra les ressaisir pour lui facturer
+              de nouveau.
+            </>
+          )}
+          libelleConfirmer="Supprimer le client"
+          onConfirmer={() => {
             const refus = supprimer(existant.id);
             if (refus !== null) { setErreur(refus); return; }
             signaler('Client supprimé.');
             onFini();
-          }}>
-          Supprimer ce client
-        </button>
+          }}
+        />
       )}
     </form>
   );
@@ -304,15 +325,34 @@ export function FormulaireMission(
       </button>
 
       {existante !== undefined && (
-        <button type="button" className={styles.supprimer}
-          onClick={() => {
+        <ConfirmationSurPlace
+          libelle="Supprimer cette mission"
+          classeDeclencheur={styles.supprimer}
+          peutOuvrir={() => {
+            const refus = peutSupprimerMission(existante, faits.recettes);
+            setErreur(refus?.message ?? null);
+            return refus === null;
+          }}
+          // Le rythme et les journées corrigées au planning vivent DANS la
+          // mission : ils partent avec elle, et le planning comme les
+          // projections de chiffre d'affaires perdent ses jours.
+          consequence={(
+            <>
+              La mission {existante.description || 'sans description'}
+              {existante.clientNom !== '' && <> pour {existante.clientNom}</>} quitte
+              le carnet, avec son TJM, son rythme et les journées corrigées au
+              planning&nbsp;: ses jours disparaissent du planning et des
+              projections.
+            </>
+          )}
+          libelleConfirmer="Supprimer la mission"
+          onConfirmer={() => {
             const refus = supprimer(existante.id);
             if (refus !== null) { setErreur(refus); return; }
             signaler('Mission supprimée.');
             onFini();
-          }}>
-          Supprimer cette mission
-        </button>
+          }}
+        />
       )}
     </form>
   );

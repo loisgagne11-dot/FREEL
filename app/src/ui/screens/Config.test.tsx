@@ -215,7 +215,11 @@ describe('ajout d’une période', () => {
     await ouvrirBareme();
     const utilisateur = utilisateurTest();
     await saisirPeriode(utilisateur, { du: '2027-01', bnc: '27,2', source: 'avis' });
-    await utilisateur.click(screen.getByRole('button', { name: 'Retirer' }));
+    await utilisateur.click(screen.getByRole('button', { name: /^Retirer — la période saisie du 2027-01/ }));
+    // Retirer change les cotisations de mois entiers : confirmé, et dit.
+    expect(useFaits.getState().faits.periodesUrssafAjoutees).toHaveLength(1);
+    expect(screen.getByRole('group', { name: /cotisations sont recalculées/ })).toBeTruthy();
+    await utilisateur.click(screen.getByRole('button', { name: 'Retirer la période' }));
 
     expect(useFaits.getState().faits.periodesUrssafAjoutees).toHaveLength(0);
     const effectives = periodesUrssafEffectives(useFaits.getState().faits);
