@@ -471,3 +471,4 @@ chiffre faux.
 | Supprimer une dépense | 🟢 | Confirmée ; le mouvement du relevé rapproché à elle revient « à traiter » — il restait « Rapprochée » à une écriture disparue |
 | Repasser une échéance à payer | 🟢 | Confirmé : la date et le montant du débit se perdaient d'un clic |
 | Retirer une période URSSAF saisie, revenir au rythme d'une semaine | 🟢 | Confirmés |
+| Détacher une pièce d'une dépense ou d'une facture | 🟢 | Confirmé : le fichier ne se rattache qu'en le redéposant, et la TVA d'une dépense cesse d'être récupérable |

@@ -851,7 +851,12 @@ describe('pièce jointe d’une recette', () => {
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Pièce jointe' }));
-    await utilisateur.click(screen.getByRole('button', { name: 'Détacher' }));
+    await utilisateur.click(screen.getByRole('button', { name: /^Détacher/ }));
+    // Le fichier ne se rattache qu'en le redéposant : rien ne part avant la
+    // confirmation, qui le dit.
+    expect(useFaits.getState().faits.recettes[0]?.justificatifId).toBe('p1');
+    expect(screen.getByRole('group', { name: /ne sera plus rattachée à la facture 2026-001.*redéposer/s })).toBeTruthy();
+    await utilisateur.click(screen.getByRole('button', { name: 'Détacher la pièce' }));
 
     expect(useFaits.getState().faits.recettes[0]?.justificatifId).toBeNull();
   });

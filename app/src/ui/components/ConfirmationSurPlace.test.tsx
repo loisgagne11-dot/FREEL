@@ -68,6 +68,12 @@ describe('la confirmation sur place', () => {
     expect(screen.getByRole('button', { name: 'Supprimer — 2026-014, Client' })).toBeTruthy();
   });
 
+  // Pendant un dépôt de pièce, « Détacher » attendait : il attend encore.
+  it('reste inactif tant que l’appelant le demande', () => {
+    rendre({ desactive: true });
+    expect(screen.getByRole('button', { name: 'Supprimer' }).hasAttribute('disabled')).toBe(true);
+  });
+
   /**
    * Confirmer pour s'entendre dire non : l'appelant qui sait que l'écriture
    * refusera le dit avant d'ouvrir.

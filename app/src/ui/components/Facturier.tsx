@@ -693,14 +693,22 @@ function PanneauJustificatif(
           >
             Vérifier l’intégrité
           </button>
-          <button
-            type="button"
-            className={styles.actionSecondaire}
-            disabled={enCours}
-            onClick={() => { onAttacher(null); setRetour(null); }}
-          >
-            Détacher
-          </button>
+          <ConfirmationSurPlace
+            libelle="Détacher"
+            precision="la pièce de cette facture"
+            classeDeclencheur={styles.actionSecondaire}
+            consequence={(
+              <>
+                La pièce ne sera plus rattachée à la facture
+                {' '}{facture.recette.numero || 'sans numéro'}. Le fichier reste dans
+                l’archive des justificatifs, parmi les pièces sans fait&nbsp;; pour
+                le rattacher, il faudra le redéposer.
+              </>
+            )}
+            libelleConfirmer="Détacher la pièce"
+            desactive={enCours}
+            onConfirmer={() => { onAttacher(null); setRetour(null); }}
+          />
         </div>
       )}
 

@@ -16,7 +16,7 @@ nombre lu. Ici, on ne garde que ce qui n'est pas fait.
 
 Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 
-## Décisions attendues du propriétaire
+## Décisions du propriétaire
 
 | N° | Décision | État | Recommandation de l'audit |
 |---|---|---|---|
@@ -26,12 +26,263 @@ Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 | 4 | Prénom du propriétaire dans les sources publiques du handoff et les captures | ✅ accepté le 6/11 — remplacé par la persona « Camille Demo » déjà présente dans le handoff, captures regénérées ; l'historique git n'est pas réécrit | — |
 | 5 | Adresse du projet Supabase en dur dans l'ancienne `index.html` | ✅ accepté le 6/11 — ligne retirée, fichier conservé ; l'adresse se saisit dans l'onglet « Cloud & Vie privée » de l'ancienne application | — |
 | 6 | Contrôle du taux BNC 2026 (25,6 %) sur l'avis URSSAF réel | ✅ confirmé le 6/11 par le propriétaire. Il signale aussi les 0,2 % de CFP payés avec la déclaration : voir L12 (lot 2) | — |
+| 7 | Périmètre | ✅ décidé le 11/11 : **aucune coupe**. Tout ce qui était classé « après la v1 », « hors lot » ou « volontaire » fait partie du produit fini. Ordre imposé : la bascule, l'effacement du compte distant, l'accueil, l'impôt calé sur les échéances réelles et réparti par mois, « déclarée » datée et « ignorée » au rapprochement, « Enregistrer en brouillon », les derniers contrôles visuels — puis tout le reste | Lots 24 à 45 ci-dessous. La section « Abandonné » garde ce qui a été refusé avec motif, à rouvrir sur demande |
+| 8 | « Reste à sortir » | ✅ tranché le 11/11 : tout ce qui est sur le compte et dû à quelqu'un d'autre — cotisations URSSAF et CFP, TVA, impôt sur le revenu, CFE —, déjà appelé ou couru sur les encaissements. **Un seul total, identique dans la vignette et dans le détail de la dette** | Lot 33 |
+| 9 | Jeu de démonstration « au barème » | ✅ décidé le 11/11 : **non**. La démo reste factice (partage, captures, tests). Le comportement se vérifie sur les données réelles, hors dépôt | Lot 32 |
+| 10 | Dates officielles | ✅ décidé le 11/11 : toute la frise aux dates des sources officielles, **citées dans le code** ; « à confirmer auprès du SIE » remplacé par la règle officielle quand elle existe, et dit quand elle n'existe pas | Lot 34 ; relevé ci-dessous |
+| 11 | Impôt sur le revenu de première année | ✅ décidé le 11/11 : le cas réel du propriétaire (pas d'acompte la première année, puis solde de N-1 étalé ET acomptes de N à partir de septembre) se saisit et se provisionne : solde et acomptes séparés, rien de compté deux fois | Lot 27 |
+| 12 | Données réelles | ✅ accordé le 11/11 : elles servent à vérifier les chiffres, **dans le dossier temporaire de la session seulement**. Rien de réel dans le dépôt (tests, démo, docs, commits) ; les identifiants Supabase ne sont jamais manipulés | Lot 32 |
+| 13 | Mission à plusieurs clients | ✅ demandé le 11/11 : arrêter un client sur une mission (« arrêté le … ») et continuer avec un autre, sans clore la mission | Lot 31 |
 
-## Lots en cours et à venir
+## Dates officielles relevées (11/11/2026)
 
-Principe d'ordre : d'abord l'irréversible (une donnée perdue ne revient pas),
-puis le faux (un chiffre faux fait prendre une mauvaise décision), puis le laid.
-Une PR par lot, finie au sens de `CLAUDE.md` avant d'être proposée. Les
+Relevé fait pour la décision 10, sur les sites officiels. Chaque règle sera
+citée dans le code qui l'applique (lot 34) ; une date publiée année par année
+reste une `hypothese` pour les années non publiées.
+
+| Échéance | Règle officielle | Source |
+|---|---|---|
+| URSSAF, micro-entrepreneur, déclaration et paiement | Mensuel : dernier jour du mois suivant. Trimestriel : 30 avril, 31 juillet, 31 octobre, 31 janvier. Reportée au jour ouvré suivant si elle tombe un samedi, un dimanche ou un jour férié — sauf annonce contraire (31/10/2026 maintenu un samedi) | autoentrepreneur.urssaf.fr, « Déclarer et payer mes cotisations » et actualité du 31/10/2026 |
+| CFE | Solde au 15 décembre ; acompte de 50 % au 15 juin si la CFE de l'an passé atteint 3 000 € ; jour ouvré suivant si le 15 tombe un week-end. Prélèvement à l'échéance : adhésion jusqu'au 30 novembre. Mensualisation : jusqu'au 30 juin | impots.gouv.fr, « Comment puis-je accéder à mon avis d'acompte ou de solde de CFE » ; dépliant CFE 2026 |
+| Impôt sur le revenu, solde de l'année N-1 | ≤ 300 € : une fois, fin septembre. > 300 € : quatre prélèvements égaux de septembre à décembre (2026 : 25/09, 26/10, 26/11, 28/12). Avis édités en octobre : deux prélèvements (2026 : 25/11, 28/12) | impots.gouv.fr, « Le montant de mon impôt est supérieur à 300 € » ; pages « PART 25/09/2026 » ; economie.gouv.fr, « Impôt : vos échéances du mois » |
+| Impôt sur le revenu, acomptes du prélèvement à la source (BNC) | Le 15 de chaque mois ; sur option, le 15 février, 15 mai, 15 août, 15 novembre ; jour ouvré suivant | impots.gouv.fr, « Les acomptes de prélèvement à la source » ; BOFiP BOI-IR-PAS-30-20-10 |
+| Impôt sur le revenu, première année BNC | Aucun acompte obligatoire l'année de création ni jusqu'au 31 août N+1 ; l'acompte est calculé après la déclaration et prélevé **à compter de septembre N+1**. Acompte volontaire possible dès le début | BOFiP BOI-IR-PAS-20-20-20 (début de perception), exemple d'une activité créée le 1er avril N |
+| TVA d'un redevable, régime réel normal | Déclaration 3310-CA3 mensuelle, déposée et payée le mois suivant, à la date de l'espace professionnel (fenêtre du 15 au 24, variable d'un mois à l'autre). Entreprise individuelle : selon l'initiale du nom — Paris, 92, 93, 94 : A à H le 15, I à Z le 17 ; autres départements : A à H le 16, I à Z le 19 | BOFiP BOI-TVA-DECLA-20-20-10-10 (version en vigueur depuis le 18/01/2023) ; calendrier fiscal impots.gouv.fr |
+| TVA, régime simplifié | **Supprimé au 1er janvier 2027** (loi de finances 2025, art. 38) : passage automatique au réel normal (CA3) ; dernière CA12 au 4 mai 2027 pour 2026 ; aucun acompte en décembre 2027, ni en juillet 2027 pour un exercice civil | impots.gouv.fr, actualité du 22/09/2026 |
+| TVA autoliquidée d'un franchisé (service acheté à un prestataire de l'Union) | Obligation confirmée : demander un numéro de TVA intracommunautaire, autoliquider, **déclarer et verser en France** (CA3, ligne A3). **Aucun texte lu ne fixe une échéance propre au franchisé** : le calendrier de la CA3 ci-dessus est le seul publié ; il s'appliquera en `hypothese`, source citée, et l'écran le dira | impots.gouv.fr, « Je suis micro-entrepreneur… Ai-je des obligations déclaratives en matière de TVA ? » (modifiée le 14/10/2026) ; notice 3310-CA3 |
+
+## Plan jusqu'à « fini » — 22 lots estimés (24 à 45)
+
+Une PR par lot, ouverte au premier commit, fusionnée seulement une fois finie
+au sens de `CLAUDE.md`. Les sept premiers lots suivent l'ordre imposé par le
+propriétaire (décision 7) ; les suivants, l'ordre irréversible → faux → laid.
+Le lot 27 peut se couper en deux PR : l'estimation est de **22 à 23 lots**.
+
+### Lot 23 — Plan de sortie final, et « Détacher » confirmé (PR #319, en cours)
+
+Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
+« Détacher » une pièce, arrivée juste après la fusion de la PR #318.
+
+### Lot 24 — La bascule
+
+| Ligne | État |
+|---|---|
+| Déploiement : la nouvelle version à la racine, l'ancienne sous `/legacy/` ; `/v2/` redirige vers la racine en gardant l'adresse de l'écran. `index.html` reste à la racine du dépôt (règle du projet) : seul l'assemblage du site change | ⬜ |
+| L'ancienne version en lecture seule : aucune écriture dans le stockage du navigateur ni vers le compte ; bandeau qui renvoie à la nouvelle | ⬜ |
+| Test Playwright « zéro écriture depuis `/legacy/` » : stockage et réseau instrumentés, gestes courants joués, aucune écriture constatée | ⬜ |
+| Méta anti-cache de l'ancienne version retirées | ⬜ |
+| La reprise depuis l'ancienne version continue de fonctionner (même origine, même stockage) — testé | ⬜ |
+
+### Lot 25 — Effacer le compte distant (RGPD)
+
+| Ligne | État |
+|---|---|
+| « Effacer mes données du compte » : supprime la ligne de `freel_faits` (et, sur demande, celle de `user_data`), après une sauvegarde proposée et une confirmation qui dit ce qui part ; relecture qui prouve l'effacement | ⬜ |
+| `docs/supabase.sql` : règle « supprimer les siens » sur `freel_faits` — elle n'existe pas (lire, créer, modifier seulement) ; à exécuter par le propriétaire | ⬜ |
+| Ce qui reste dit : l'identifiant de connexion ne se supprime qu'avec la clé de service, qui ne doit jamais être dans le client ; la marche à suivre est écrite | ⬜ |
+
+### Lot 26 — L'accueil à la première ouverture
+
+| Ligne | État |
+|---|---|
+| Trois chemins : reprendre l'ancienne application (si ses données sont là ou sur le compte), restaurer une sauvegarde, commencer — profil minimal (prénom, activité, début d'activité, ACRE, versement libératoire, TVA) | ⬜ |
+| Le jeu de démonstration se charge depuis l'accueil, marqué « démonstration » tant qu'il est là | ⬜ |
+
+### Lot 27 — L'impôt sur le revenu suit ses échéances réelles, mois par mois
+
+| Ligne | État |
+|---|---|
+| Provision d'impôt calée sur les échéances réelles : acomptes du 15 et solde de N-1 lus dans l'échéancier, prévus à leurs dates officielles quand ils ne sont pas encore saisis | ⬜ |
+| Répartition mois par mois (l'ancien `addIRMonthlyProvisions`) : ce qu'il faut avoir mis de côté à chaque fin de mois | ⬜ |
+| Solde de N-1 : une fois fin septembre sous 300 €, en quatre de septembre à décembre au-dessus, deux pour un avis d'octobre | ⬜ |
+| Première année BNC : aucun acompte jusqu'au 31 août N+1, acomptes de N+1 dès septembre ; le cas du propriétaire — solde de N étalé ET acomptes de N+1 chaque mois à partir de septembre — se saisit en deux séries distinctes (l'échéance porte l'exercice qu'elle règle, déjà au schéma) ; test d'intégration qui traverse septembre-décembre et prouve que rien n'est compté deux fois | ⬜ |
+
+### Lot 28 — « Déclarée » datée, et « ignorée » au rapprochement (schéma 21)
+
+| Ligne | État |
+|---|---|
+| Une période se déclare À UNE DATE (`declareeLe`) ; le cycle à déclarer → déclarée le … → payée le … se lit dans l'échéancier ; migration 20 → 21 qui descend dans la liste | ⬜ |
+| Une opération du relevé peut être « ignorée » (frais bancaires, virement interne), distincte de « sans contrepartie » ; elle sort de la file à traiter et se reprend | ⬜ |
+
+### Lot 29 — « Enregistrer en brouillon »
+
+| Ligne | État |
+|---|---|
+| L'éditeur de facture enregistre un brouillon avec ses lignes (schéma 20), sans réserver de numéro ; il se rouvre, s'émet ou se supprime (confirmé, lot 22) | ⬜ |
+
+### Lot 30 — Derniers contrôles visuels
+
+| Ligne | État |
+|---|---|
+| Chaque écran contre sa capture du handoff, deux thèmes, quatre largeurs, par l'agent contrôleur ; écarts corrigés dans le lot | ⬜ |
+| « Évolution du compte » relue dans les deux thèmes ; sélecteur d'année sur un jeu à deux années | ⬜ |
+
+### Lot 31 — Une mission à plusieurs clients
+
+Le schéma le permet déjà : depuis le schéma 4, une mission porte plusieurs
+clients opérationnels, chacun avec SES plages de rythme datées (`du`, `au`)
+et ses journées corrigées. **Pas de migration** : arrêter un client, c'est
+borner ses plages et ses corrections à une date. Ce qui manque est le geste,
+l'affichage et la reprise.
+
+| Ligne | État |
+|---|---|
+| « Arrêter ce client le … » : borne ses plages à la date, retire ses corrections postérieures (confirmé, en les comptant) ; la mission continue avec les autres | ⬜ |
+| Le client arrêté se lit « arrêté le … » dans la mission ; le planning, le CRA et le brouillon du mois ne lui comptent plus de jours après cette date | ⬜ |
+| « Retirer » un client opérationnel du formulaire emporte ses plages et ses corrections : confirmé, et « Arrêter le … » proposé à la place | ⬜ |
+| Reprise : l'ancienne application disait QUEL client travaillait QUEL jour (`lignes[].entiteByDay`) ; la reprise l'ignore aujourd'hui, en silence — chaque client garde sa semaine type sur toute la mission (un client arrêté continue donc au planning) et toutes les corrections vont au premier. À reprendre jour par jour, ou à lister dans le rapport | ⬜ |
+| À trancher avec le propriétaire si les deux clients se FACTURENT séparément : la facture suit aujourd'hui le client de la mission ; facturer par client opérationnel demanderait un client de facturation par plage (schéma 21 ou 22) | ⬜ à décider |
+
+### Lot 32 — Vérification sur les données réelles (hors dépôt)
+
+| Ligne | État |
+|---|---|
+| Les données du propriétaire, transmises selon la procédure convenue, lues dans le dossier temporaire de la session seulement ; rien n'en sort vers le dépôt | ⬜ |
+| Écart du CA encaissé de l'année : quelle ligne l'explique ; reprise vérifiée mission par mission | ⬜ |
+| Chaque défaut trouvé se corrige avec un test sur des données FACTICES de même forme | ⬜ |
+
+### Lot 33 — « Reste à sortir » : un seul total
+
+| Ligne | État |
+|---|---|
+| Une seule source (`resteASortir`) : URSSAF et CFP, TVA, impôt sur le revenu, CFE, appelés ou courus ; ventilée par nature | ⬜ |
+| La vignette et le détail de la dette lisent ce même total ; test d'accord | ⬜ |
+
+### Lot 34 — La frise aux dates officielles
+
+| Ligne | État |
+|---|---|
+| Jalons réglementaires dans la frise (et plus seulement les échéances saisies), aux dates du relevé ci-dessus, source citée dans le code, report au jour ouvré | ⬜ |
+| TVA : calendrier de la CA3 (entreprise individuelle par initiale), fin du régime simplifié au 01/01/2027 ; TVA autoliquidée d'un franchisé à la date de la CA3, en hypothèse dite | ⬜ |
+| Barèmes restants de L10 : profil CIPAV (demande un type d'activité au schéma), plafond de revenu fiscal de référence du versement libératoire, seuils de TVA spécifiques ; **mention « article 293 B du CGI » à remplacer au 01/01/2027 par l'article du CIBS** — daté : à livrer avant le 1er janvier, quitte à sortir ce point en avance | ⬜ |
+
+### Lots 35 à 45 — Le reste, sans coupe
+
+| Lot | Contenu |
+|---|---|
+| 35 | Provisions automatiques : enveloppes remplies à chaque encaissement, ordre de virement préparé ; détail de la projection d'autonomie |
+| 36 | Activité : « Ce que Freel remarque » et conseils automatiques ; avancement `j / j` et filtres des missions ; composition au clic du TJM effectif et de la marge nette |
+| 37 | Lieu par défaut sur le client (les journées reprises « sans lieu » s'en complètent) ; statut d'un CRA (envoyé, validé, archivé) — schéma |
+| 38 | Pilote : actions rapides personnalisables (catalogue, « + », persistance) |
+| 39 | Achats : filtre par compte (le compte porté par l'opération et la dépense — schéma) ; import OFX |
+| 40 | Justificatifs : synchronisation avec le compte (stockage de fichiers) ; suppression d'une pièce orpheline, refusée pendant la durée de conservation ; archive annuelle « pour le comptable » |
+| 41 | Réglages : numérotation et mentions des factures ; coffre des documents |
+| 42 | Synchronisation : mode hors ligne et retard affiché ; synchronisation en temps réel entre appareils |
+| 43 | Outils : onglet « Compte pro & banque » ; comparateur micro-BNC / déclaration contrôlée |
+| 44 | Envoi par courriel de la facture et du CRA ; comparaison N−1 et tendance ; brief du lundi |
+| 45 | Raccourcis clavier ; harnais différentiel contre l'ancienne application |
+
+## Reste fonctionnel par écran
+
+Vérifié dans le code le 6 novembre 2026, colonne « Lot » mise à jour le 11 :
+« fait » veut dire que le code existe et est appelé depuis un écran, pas que
+le test mord.
+
+### Pilote
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| Statuts cliquables dans « Le flux du mois » | ✅ | Entrées et échéances se pointent depuis l'écran ; seule l'estimation « Charges sur encaissements » mène à l'écran qui l'explique | 16, 17 |
+| Actions rapides personnalisables | ⬜ | Liste figée : ni catalogue, ni « + », ni persistance | 38 |
+| Panneau « Pointer un encaissement » | ✅ | Pastilles des entrées, action rapide, « + Nouveau » | 16 |
+| Provision d'IR sur les encaissements attendus | ✅ | Taux moyen de l'année projetée (encaissé + factures émises + planning) appliqué à l'encaissé | 12 |
+
+### Argent
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| Provision d'impôt alignée sur les échéances réelles | ◐ | La provision d'IR ne lit pas les acomptes et le solde à leurs dates | 27 |
+| Cycle d'échéance enrichi (à déclarer, déclarée, payée, daté) | ◐ | `Echeance` ne porte que `payeeLe` et `montantPaye` ; « déclarée » est un fait distinct, sans date | 28 |
+| Frise des jalons réglementaires | ◐ | La frise trace les échéances saisies, pas les jalons | 34 |
+| Détail de la projection d'autonomie | ◐ | Seul `autonomieMois` est affiché | 35 |
+| Mention de la durée de conservation | ✅ | Lue en Données (ligne de l'archive) et dans le LISEZMOI de l'archive : 6 ans (LPF L102 B), 10 pour une activité commerciale | 10 |
+| Grille ACRE par période | ✅ | `PERIODES_ABATTEMENT_ACRE`, par date de création | 7 (L10) |
+| Abattement ACRE à 25 % au 01/07/2026 | ✅ | Confirmé par le décret 2026-69 ; appliqué aux créations à partir de cette date, lu sous l'interrupteur (lot 9) | 7 (L10) |
+| Provision mensuelle de l'IR (`addIRMonthlyProvisions`) | ◐ | Plancher existant, non réparti mois par mois | 27 |
+| Provisions automatiques : enveloppes remplies à chaque encaissement, ordre de virement préparé | ⬜ | Aucun code | 35 |
+| Comparaison N−1 / tendance | ⬜ | Plus de report (décision 7) | 44 |
+
+### Activité
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| « Ce que Freel remarque » | ⬜ | Seul « Le mois en chiffres » est livré | 36 |
+| Onglet Missions : avancement `j / j` et filtres par statut | ◐ | CA, encaissé, reste, TJM et statut affichés ; ni avancement en jours ni filtre | 36 |
+| Lieu par défaut sur le client | ⬜ | Aucun `lieuParDefaut` ; les journées reprises restent « sans lieu » (l'ancienne application n'en avait pas) | 37 |
+| Statut d'un CRA (envoyé, validé, archivé) | ⬜ | Aucun champ « envoyé » au schéma | 37 |
+| Composition au clic du TJM effectif et de la marge nette | ⬜ | `Composition` n'est pas importé par Activité | 36 |
+
+### Facturer / Facture
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| Conservation des lignes d'une facture | ✅ | Schéma 20 ; les factures émises avant restent rééditées en une désignation | 18 |
+| « Enregistrer brouillon » | ⬜ | Les lignes se conservent depuis le lot 18 | 29 |
+| Envoi par courriel | ⬜ | Aucun envoi, ni pour la facture ni pour le CRA | 44 |
+| Place de « Facturer » dans le rail | ✅ | Formule A : onglet « Factures » d'Activité, création par « + Nouveau » et le Pilote | 6 |
+
+### Achats
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| Tuiles « à rapprocher » et « justificatifs manquants » | ✅ | Lot 8 | 8 |
+| Rapprochement : créer une dépense depuis une opération orpheline | ✅ | Lot 8 : formulaire pré-rempli, dépense reliée à l'opération | 8 |
+| État « ignorée » au rapprochement | ◐ | Le motif `autre` s'en approche | 28 |
+| Dépenses récurrentes signalées, totalisées, générées | ◐ | Lot 8 : signalées et totalisées, DÉRIVÉES (même fournisseur, même montant, mois voisins) ; pas générées — une dépense créée d'avance serait un fait inventé | 8 |
+| Filtre par compte | ⬜ | Seule la barre de période existe | 39 |
+| Import OFX | ⬜ | Aucun | 39 |
+| Correction ou suppression à la main d'un mouvement importé | ✅ | Retrait d'une ligne, confirmé ; la correction d'un relevé n'a pas de sens : on retire et on réimporte | 21 |
+| Justificatifs sauvegardés et protégés de l'éviction | ✅ | Protégés de l'éviction (S5) ; archive complète et rappel « pas encore archivés » sur Achats (lot 10) | 10 |
+
+### Outils
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| Troisième onglet « Compte pro & banque » | ⬜ | L'import de relevé reste dans Achats | 43 |
+| Simulateur CFE avec base minimum par commune | ◐ | Lecture de l'avis × taux seulement, par décision (voir « Abandonné ») | — |
+| Comparateur micro-BNC vs déclaration contrôlée | ⬜ | Aucun module | 43 |
+| Décote dans le comparateur d'impôt | ✅ | Appliquée, avec la situation du foyer (L8) | 3 |
+
+### Réglages / Compte
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| Navigation en sept sections | ✅ | Lot 9 | 9 |
+| Facturation : numérotation et mentions | ◐ | SIRET et IBAN contrôlés ; aucun réglage de numérotation ni de mentions | 41 |
+| Coffre des documents | ⬜ | Aucun dépôt ; retenu au périmètre | 41 |
+| Mode hors ligne, retard de synchronisation affiché | ◐ | Aucun `navigator.onLine` ; la pastille ne dit que relié, expiré ou local | 42 |
+| Synchronisation temps réel multi-appareils | ⬜ | Synchronisation manuelle seulement | 42 |
+| Règles d'accès de `user_data` vérifiées et documentées | ✅ | Sonde anonyme dans Compte, règle « chacun les siens » dans `supabase.sql` | 11 |
+| Restauration et récupération sans copie de secours | ✅ | Copie de l'état d'avant (S6), « Revenir à l'état d'avant » dans Données | 1 |
+
+### Documents
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| Livre des recettes en CSV | ✅ | Menu « Exporter » : `;`, BOM, virgule décimale, filtre sur l'année d'encaissement, champs texte protégés contre les formules, TVA inconnue laissée vide | 6 |
+
+### Transverse
+
+| Élément | État | Ce qui manque | Lot |
+|---|---|---|---|
+| Brief du lundi | ⬜ | Aucun code | 44 |
+| Bascule : nouvelle version à la racine, ancienne sous `/legacy/` neutralisée en écriture | ⬜ | Le déploiement garde l'ancienne à la racine et la nouvelle dans `/v2/` | 24 |
+| Test Playwright « zéro écriture depuis `/legacy/` » | ⬜ | Aucun script | 24 |
+| Harnais différentiel contre l'application actuelle | ⬜ | Aucun script | 45 |
+| Retirer les méta anti-cache de l'ancienne version | ⬜ | Lié à la bascule | 24 |
+| Onboarding de première ouverture | ⬜ | Aucun en UI | 26 |
+| Recherche globale | ✅ | ⌘K / Ctrl K : factures (brouillons compris), clients, missions, dépenses ; montant par valeur | 6 |
+| Raccourcis clavier | ⬜ | Seulement dans les composants d'accessibilité | 45 |
+| Conseils automatiques (`getInsights`) | ⬜ | Aucun | 36 |
+| Écart du CA encaissé de l'année : quelle ligne l'explique | ⬜ à vérifier | Données réelles du propriétaire, hors dépôt (décision 12) | 32 |
+| Reprise de l'ancienne application à refaire | ⬜ à vérifier | Action du propriétaire ; la répartition jour par jour entre clients d'une mission n'est pas reprise (lot 31) | 31, 32 |
+| Contrôle visuel de « Évolution du compte » dans les deux thèmes | ⬜ à vérifier | Captures non relues | 30 |
+| Captures : sélecteur d'année absent (le jeu ne porte qu'une année) | ⬜ à vérifier | Non inspecté | 30 |
+
+## Lots livrés (0 à 22)
+
+L'historique, tel qu'il a été tenu lot par lot. Les mentions « hors lot » ou
+« à décider » qu'il contient renvoient désormais au plan ci-dessus. Les
 identifiants L, S, Q sont ceux de l'audit du 6 novembre 2026. Les noms de lots
 ne se réutilisent jamais.
 
@@ -127,10 +378,10 @@ Sert de filet aux lots 5 et 6.
 | Q6 — lint des hooks React dans `verifier` | ✅ fait au lot 7 : `verifier:hooks` (eslint, deux règles seulement). Une violation réelle corrigée : `FactureEmise` appelait un hook après un `return` anticipé ; deux directives `eslint-disable` mal placées, qui ne désactivaient rien |
 | Q9 — code mort (`GrapheBarres`, classes CSS de l'ancien calendrier) ; iframe d'impression retirée sur `afterprint` ; anti-rebond dans `persister` ; `as never` de `Facturier.tsx` ; modules de plus de 800 lignes | ◐ lot 7 : `GrapheBarres` et quinze classes de l'ancien calendrier retirés ; cadre d'impression retiré sur `afterprint` ; `as never` retiré. *Restent : l'anti-rebond de `persister`, le découpage des modules de plus de 800 lignes (Activité, Facturier, Config — sans défaut constaté, à faire quand on les touche), quatre classes CSS peut-être mortes (`.case`, `.colonneSimple`, `.jauges`, `.invisible`) à vérifier contre les accès dynamiques* |
 | S7 — robustesse réseau (n'effacer la session que sur 400/401, délai maximal, `https:` exigé), relevé CSV (`1e5`, `12abc`, libellé multi-ligne), CSP, sandbox de l'iframe d'impression, URL d'export révoquée trop tôt | ✅ fait au lot 7 : une coupure réseau ne déconnecte plus ; 15 s au plus par requête ; une adresse en http est refusée à la saisie, avec le motif ; `1e5` et `12abc` écartés et nommés au compte rendu d'import ; libellé cité sur plusieurs lignes gardé entier (RFC 4180) ; cadre d'impression `sandbox`, retiré après impression ; URL d'export révoquée après 30 s ; CSP sans `unsafe-inline` pour les scripts (empreintes tenues par un test). *Reste : l'impression réelle sous Firefox et Safari, à vérifier à la main* |
-| L10 — barèmes à recouper : taux BNC, ACRE, tranches 2025-2026, profil CIPAV, plafond du versement libératoire, seuils de TVA spécifiques, plafond micro proratisé | ◐ lot 7 : recoupés le 07/11/2026 contre Légifrance, BOFiP, impots.gouv et service-public (urssaf.fr était inaccessible). Corrigés : ACRE à 25 % d'exonération pour un début d'activité à partir du 01/07/2026 (décret 2026-69) ; barème de l'IR et décote des revenus 2025 (loi 2026-103) ; plafond du micro proratisé l'année de création ; sources officielles à la place de « ancienne application » ; commentaires périmés (« hausse au 1er juillet 2026 » en BNC : il n'y en a pas). *Restent, à planifier : profil CIPAV (23,2 %, demande un type d'activité au schéma) ; plafond de revenu fiscal de référence du versement libératoire ; seuils de TVA spécifiques (avocats, auteurs) ; acompte de CFE non recoupé ; **mention « article 293 B du CGI » à remplacer au 01/01/2027 par l'article du CIBS** — les sources divergent sur le numéro (L. 223-3 ou L. 233-3), à vérifier au Journal officiel avant décembre* |
+| L10 — barèmes à recouper : taux BNC, ACRE, tranches 2025-2026, profil CIPAV, plafond du versement libératoire, seuils de TVA spécifiques, plafond micro proratisé | ◐ lot 7 : recoupés le 07/11/2026 contre Légifrance, BOFiP, impots.gouv et service-public (urssaf.fr était inaccessible). Corrigés : ACRE à 25 % d'exonération pour un début d'activité à partir du 01/07/2026 (décret 2026-69) ; barème de l'IR et décote des revenus 2025 (loi 2026-103) ; plafond du micro proratisé l'année de création ; sources officielles à la place de « ancienne application » ; commentaires périmés (« hausse au 1er juillet 2026 » en BNC : il n'y en a pas). *Restent, → lot 34 : profil CIPAV (23,2 %, demande un type d'activité au schéma) ; plafond de revenu fiscal de référence du versement libératoire ; seuils de TVA spécifiques (avocats, auteurs) ; acompte de CFE non recoupé ; **mention « article 293 B du CGI » à remplacer au 01/01/2027 par l'article du CIBS** — les sources divergent sur le numéro (L. 223-3 ou L. 233-3), à vérifier au Journal officiel avant décembre* |
 | L13 (provision : ✅ lot 13) — autoliquidation en franchise : la TVA due sur un achat de service à un fournisseur de l'UE (`aAutoliquider`, ex. un abonnement logiciel) n'entre dans aucune provision ni aucun dossier — à confirmer côté fiscal avant de coder (vu au lot 4) | ◐ lot 7 : **confirmé** (art. 283-2 et 259 du CGI ; BOFiP BOI-TVA-DECLA-10-10-20 §140 : la franchise est sans incidence ; FAQ impots.gouv) — due, déclarée sur une CA3 (ligne A3), non déductible, numéro de TVA intracommunautaire requis. **Erreur de calcul corrigée** : le montant était tiré d'un TTC (16,67 € pour 100 €) au lieu de base × 20 % (20 €). *Restent : l'entrée de cette TVA dans les provisions et un rappel de déclaration — la date d'exigibilité et l'échéance de dépôt d'un franchisé ne sont écrites dans aucun texte trouvé, à confirmer auprès du SIE avant de coder une date* |
 | Contrôles à ajouter à `verifier` : octets nuls, lint des hooks, contraste, impératifs en -ez, code mort | ✅ fait au lot 7 : cinq contrôles, chacun prouvé en introduisant le défaut. Le contrôle du tutoiement lit l'arbre syntaxique (chaînes et texte JSX seulement) ; il a trouvé trois vouvoiements restants (Compte, formulaires d'Activité), corrigés |
-| Modules retenus du handoff encore absents : provisions en pilote automatique, brief du lundi | ⬜ |
+| Modules retenus du handoff encore absents : provisions en pilote automatique, brief du lundi | ⬜ → lots 35 et 44 |
 | Contrôle visuel du lot 7 | ✅ fait (agent contrôleur, deux thèmes) : aucune régression. Relevé au passage, antérieur au lot : trois libellés du handoff remplacés — « Réserve matelas » (chez nous « Seuil de sécurité »), « CA réalisé » (« CA facturé »), « Réserve auto gardée » (« Part gardée ») ; à trancher avant la fin, chacun avait une raison au lot qui l'a posé |
 
 ### Lot 8 — Achats du handoff (priorité 2 : l'écran le plus éloigné de la maquette au contrôle visuel du lot 7)
@@ -142,7 +393,7 @@ Sert de filet aux lots 5 et 6.
 | Quatre tuiles du handoff : Dépenses de la période (TTC, nombre d'achats), TVA déductible (dont non récupérable faute de pièce), À rapprocher (opérations · dépenses), Justificatifs manquants ; l'autoliquidation reste en bandeau | ✅ fait : les « justificatifs manquants » comptent les PIÈCES absentes, pas la TVA perdue (nulle en franchise, alors que la pièce manque) |
 | Bloc « Rapprochement bancaire » sur l'onglet Dépenses : opérations du compte sans dépense, avec l'action proposée (associer à une facture, relier à une dépense, **créer la dépense depuis l'opération**), et dépenses en attente de leur opération | ✅ fait : associer (encaisse la facture à la date de l'opération), relier, créer la dépense pré-remplie et reliée, hors compte. Un crédit sans facture propose « sans contrepartie », jamais une dépense |
 | Registre des achats en tableau : date, fournisseur, TTC, dont TVA, justificatif, rapprochement ; ligne de total ; dépenses récurrentes DÉRIVÉES (même fournisseur, même montant, mois consécutifs), jamais saisies ; lien « Suivi & déclaration TVA » (`#/argent/tva`) | ✅ fait ; défile dans sa carte sur téléphone |
-| Filtre par compte (Tous / Qonto / BNP / Perso) | ⬜ hors lot : ni les dépenses ni les mouvements ne portent de compte — demande un schéma 20 |
+| Filtre par compte (Tous / Qonto / BNP / Perso) | ⬜ → lot 39 : ni les dépenses ni les mouvements ne portent de compte — demande un schéma |
 | Contrôle visuel du lot 8 | ✅ fait (agent contrôleur, deux thèmes et téléphone 390 px) : conforme avec réserves. Corrigé dans le lot : une seule navigation de mois (la barre de période gardait ses flèches), en-têtes chiffrés alignés, « clic = détail & pièce », icônes des justificatifs et du rapprochement, sous-ligne de franchise sous la TVA déductible. *Restent mineurs : rien n'indique sur téléphone que le registre défile ; les actions « associer / relier / créer » ne se voient sur aucune capture (la démonstration n'a pas d'opération orpheline) — elles sont tenues par des tests. Écran Achats à 39,1 / 40 Ko : extraire avant tout ajout* |
 
 ### Lot 9 — Réglages du handoff (priorité 2 : quatre onglets contre sept sections dans la maquette)
@@ -151,10 +402,10 @@ Sert de filet aux lots 5 et 6.
 |---|---|
 | « Configuration » en deux colonnes : à gauche les sept sections (icône, titre, sous-titre, chevron), à droite le panneau de la section ouverte ; sur téléphone, la liste puis le panneau. La section vit dans l'adresse (`#/config/profil`…) | ✅ fait ; `#/config` seul et toute adresse inconnue ouvrent Profil ; chaque section arrive à la demande |
 | Profil & statut (identité, adresse, début d'activité, type, TVA intracommunautaire, ACRE et versement libératoire en interrupteurs) · Paramètres fiscaux (barème, périodicité URSSAF, option TVA, foyer fiscal) · Réserve & versements (solde de départ, besoin mensuel, seuil, part gardée, objectif) · Facturation (IBAN, BIC) · Livre des recettes (conformité, accès au registre) · Compte & synchronisation · Données & export | ✅ fait ; chaque champ garde son comportement. Les messages qui renvoyaient aux anciens onglets (« Config › Solde du compte », « Réglages → Données », « Réglages › Barème ») nomment les nouvelles sections |
-| Numérotation des factures et mentions personnalisées | ⬜ hors lot : aucun réglage n'existe ; à concevoir |
+| Numérotation des factures et mentions personnalisées | ⬜ → lot 41 : aucun réglage n'existe |
 | Contrôle visuel du lot 9 (agent contrôleur, six sections, deux thèmes, deux passages) | ✅ fait. Corrigé dans le lot : fin d'ACRE « 31/09/2026 » (date inexistante, le jour était écrit en dur — défaut antérieur au lot, aussi dans la fenêtre d'ACRE) ; source de la table des cotisations qui passait sur « vérifié le » ; carte « Barèmes en vigueur » (six valeurs) et périodicité en deux positions ; Données en lignes avec le livre des recettes CSV, un vrai bouton de restauration et « Repartir de zéro » ; mentions de facture lisibles. *Restent assumés : interrupteurs du handoff sans fonction derrière (mise à jour des barèmes, provisionner, rappel, synchronisation bancaire), export FEC, vocabulaire « matelas » (à arbitrer avec les deux autres libellés), montants des champs sans espace des milliers, état « compte relié » non capturé* |
 | Troisième contrôle visuel du lot 9 | ✅ fait : les quatre corrections confirmées dans les deux thèmes. Il a trouvé un débordement à 390 px sur Paramètres fiscaux (page de 609 px) : l'en-tête « Actions » réservé aux lecteurs d'écran, en position absolue, échappait au conteneur défilant de la table — défaut antérieur au lot, invisible parce que le contrôle responsive ne visitait que `#/config`. Corrigé, et le contrôle visite désormais les sept sections (280 combinaisons) ; sans le correctif, il échoue sur les quatre palettes. Le foyer fiscal a reçu son titre |
-| Effacer le compte distant (RGPD) | ⬜ hors lot : « Repartir de zéro » ne vide que ce navigateur ; supprimer la ligne `user_data` demande une action côté Supabase à concevoir |
+| Effacer le compte distant (RGPD) | ⬜ → lot 25 : « Repartir de zéro » ne vide que ce navigateur |
 
 ### Lot 10 — Les justificatifs se sauvegardent (priorité 1 : S5 suite, l'irréversible)
 
@@ -172,9 +423,9 @@ disparaissent sans qu'aucune sauvegarde les ait jamais contenus.
 | Durée de conservation lue à l'écran et dans le LISEZMOI : 6 ans au moins (LPF art. L102 B), 10 ans pour les documents comptables d'une activité commerciale (C. com. art. L123-22) — sans date butoir tirée du dépôt : le délai court depuis le document ou la dernière opération. Aucune promesse de valeur probante : l'empreinte montre que le fichier n'a pas changé depuis son dépôt, elle ne remplace ni l'original ni un archivage à valeur probante (le commentaire de `justificatifs.ts` est adouci dans le même sens) | ✅ fait |
 | Les textes de Données qui disaient « les justificatifs n'y sont pas » distinguent la sauvegarde JSON (sans pièces) de l'archive (avec) | ✅ fait |
 | Contrôle visuel du lot 10 (agent contrôleur, deux thèmes et téléphone, avec de vraies pièces dans IndexedDB : jamais archivées, archivées, restauration, rappel sur Achats) | ✅ fait : conforme, sans défaut bloquant. Corrigé dans le lot : la confirmation de restauration tombait hors de la vue sur téléphone (elle y défile désormais et prend le focus), ses boutons secondaires passaient pour désactivés. Archive réelle relue par `unzip -t` : sans erreur, noms lisibles. *Restent mineurs : boutons des lignes sans icône (la maquette en porte), « Tout remplacer » sans couleur d'alerte* |
-| Pièces devenues orphelines après une restauration ou « Repartir de zéro » : `motifRefusSuppression` les déclare supprimables. Aucun écran ne supprime de pièce aujourd'hui | ⬜ hors lot : contrainte écrite pour le futur écran de suppression — refuser pendant la durée de conservation |
-| Archive d'une année « pour le comptable », non restaurable | ⬜ hors lot : le rangement par année de l'archive complète y prépare |
-| Synchronisation des pièces avec le compte | ⬜ hors lot : demande un stockage de fichiers côté Supabase |
+| Pièces devenues orphelines après une restauration ou « Repartir de zéro » : `motifRefusSuppression` les déclare supprimables. Aucun écran ne supprime de pièce aujourd'hui | ⬜ → lot 40 : contrainte écrite pour le futur écran de suppression — refuser pendant la durée de conservation |
+| Archive d'une année « pour le comptable », non restaurable | ⬜ → lot 40 : le rangement par année de l'archive complète y prépare |
+| Synchronisation des pièces avec le compte | ⬜ → lot 40 : demande un stockage de fichiers côté Supabase |
 | Nettoyage de cette liste : lignes faites restées ouvertes (grille ACRE, ACRE à 25 %, restauration sans copie de secours) ; la durée de conservation est de 6 ans (LPF L102 B), pas 10 | ✅ fait |
 
 ### Lot 11 — Le compte ne fuit pas (priorité 1 : une fuite ne se rattrape pas)
@@ -220,11 +471,11 @@ d'un argent pas encore arrivé) ; au 31 décembre, c'est l'impôt entier.
 | Résolution : la part constatée reste `publie` ; dès que le pipeline contribue, l'ensemble est une `hypothese` avec sa source (« factures émises et planning ») | ✅ fait |
 | Pilote, composition et dette lisent le même chiffre (`impotRevenuAProvisionner`) ; test d'accord des trois et test chiffré du cas fictif ci-dessus | ✅ fait pour Pilote et composition (test d'accord) ; *le détail de la dette « impôt » ne montre pas la provision d'IR — il ne lit que le taux sur les encaissements : à reprendre* |
 | L'écran dit, là où l'impôt se lit (composition du versable, Argent), qu'il est calculé au taux de l'année projetée, et sur quelle projection | ✅ fait |
-| Répartition mois par mois de l'ancienne application (`addIRMonthlyProvisions`) | ⬜ hors lot : la règle ci-dessus la rend inutile pour le versable ; l'échéancier mensuel est un autre sujet |
+| Répartition mois par mois de l'ancienne application (`addIRMonthlyProvisions`) | ⬜ → lot 27 |
 | Budget d'entrée : lire le planning dans le premier rendu le portait à 84,7 / 80 Ko. Rien n'est relevé : les sujets « à traiter » (pastilles du rail, indicateur de la barre, décisions du Pilote — aucun ne porte le versable) se calculent dans un module chargé à la demande ; prévision, planification et calendrier sortent dans des modules à eux. Entrée à 73,8 Ko | ✅ fait. Pendant le chargement, aucun « 0 » ni « rien ne réclame ton attention » : la salutation reste neutre, la phrase de santé vide (`aria-busy`), la carte en place |
 | Le solde de l'année précédente disait « l'impôt montera si d'autres recettes arrivent » d'une année close | ✅ corrigé (`anneeClose`) |
 | Contrôle visuel du lot 12 (Pilote sur la démonstration, Argent sur le jeu d'essai au barème) | ✅ fait : le Pilote, une fois le calcul « à traiter » arrivé, est identique (pastilles, décisions, santé). Argent dit « 9 665 € à mettre de côté aujourd'hui… taux moyen de l'année projetée… 11 285 € d'impôt sur 79 680 € de chiffre d'affaires projeté… moins 600 € d'acomptes ; il restera 1 020 € » — recalculé hors écran : 11 284,62 × 0,9096 − 600 = 9 664,93 € |
-| Le jeu de démonstration est en versement libératoire, sans parts fiscales : la ligne d'impôt sur le revenu n'y paraît pas, avant comme après | ⬜ à décider : la capture ne montre donc pas ce lot ; un jeu « au barème » le montrerait |
+| Le jeu de démonstration est en versement libératoire, sans parts fiscales : la ligne d'impôt sur le revenu n'y paraît pas, avant comme après | ✅ décidé le 11/11 (décision 9) : pas de jeu « au barème » ; vérifié sur les données réelles au lot 32 : la capture ne montre donc pas ce lot ; un jeu « au barème » le montrerait |
 
 ### Lot 13 — Ce qui est dû se voit en entier (priorité 2 : le faux)
 
@@ -241,9 +492,9 @@ que le versable retient pourtant.
 | La TVA autoliquidée réglée (échéance TVA saisie comme payée) cesse d'être provisionnée — sans double compte avec la TVA collectée d'un assujetti | ✅ fait : additionnée AVANT le retranchement des échéances TVA payées — une seule règle de « réglé », celle de la TVA collectée |
 | Détail de la dette « impôt » : la provision d'impôt sur le revenu de l'année (et le solde de l'année précédente tant que l'avis manque), au même chiffre que le versable | ✅ fait (`impotRevenuAProvisionner`, lu, jamais recalculé) |
 | Pilote, composition, enveloppes et dette tombent d'accord (test d'accord) | ✅ fait, TVA et impôt |
-| Rappel de déclaration de la TVA autoliquidée à une date précise | ⬜ hors lot : date d'exigibilité et échéance de dépôt d'un franchisé à confirmer auprès du SIE |
+| Rappel de déclaration de la TVA autoliquidée à une date précise | ⬜ → lot 34 : aucune échéance propre au franchisé n'est publiée ; calendrier de la CA3 en hypothèse (relevé du 11/11) |
 | Le dossier de déclaration de TVA du trimestre (`dossierTvaDuTrimestre`) ignore la TVA autoliquidée d'un franchisé devenu redevable en cours d'année | ✅ lot 15 |
-| « Reste à sortir » du détail de la dette ne compte que l'appelé : l'impôt sur le revenu et la TVA s'affichent à côté, en blocs | ⬜ à trancher : la vignette et le détail peuvent donc montrer deux totaux |
+| « Reste à sortir » du détail de la dette ne compte que l'appelé : l'impôt sur le revenu et la TVA s'affichent à côté, en blocs | ⬜ → lot 33, tranché le 11/11 (décision 8) |
 
 ### Lot 14 — Les écrans s'ouvrent d'un coup (priorité 3 : le contrôle de vitesse échouait une fois sur deux)
 
@@ -384,7 +635,7 @@ tout.
 | « Retirer » sur une ligne, avec confirmation : la ligne quitte le relevé (et son rapprochement avec elle) ; la dépense ou la recette rapprochée reste au registre ; un nouvel import du même relevé la ramènerait — on le dit | ✅ `retirerMouvement` ; « Retirer du relevé » sous chaque ligne, cible de 44 px |
 | Les noms accessibles des boutons à précision masquée (« Marquer payé », « Retirer du relevé », pastilles du flux, « d'où vient ce chiffre ») collaient le mot au tiret — « payé— 2026-024 » | ✅ trouvé en cours de lot : l'espace sort de la portée masquée, que le calcul du nom rognait |
 
-### Lot 22 — Rien ne s'annule ni ne s'efface d'un clic (priorité 1 : l'irréversible) — PR #318
+### Lot 22 — Rien ne s'annule ni ne s'efface d'un clic (priorité 1 : l'irréversible) — PR #318, fusionnée ; « Détacher » dans la PR #319
 
 Le lot 21 a trouvé un geste destructeur sans confirmation ; la revue de tous
 les autres en trouve neuf. Le plus lourd : « Annuler par un avoir », à côté de
@@ -405,113 +656,8 @@ déclaré à l'URSSAF.
 | « Retirer » une période URSSAF saisie : confirmé, la période reprend le taux connu de l'application | ✅ confirmation SOUS le tableau (`BlocConfirmation`) : dans la cellule, elle poussait les premières colonnes hors de la carte |
 | « Revenir au rythme sur cette semaine » : confirmé, en comptant les corrections qui partent | ✅ compte les journées corrigées |
 | Une seule confirmation (`ConfirmationSurPlace`), que le relevé du lot 21 reprend : le focus va sur « Garder », et revient au bouton quand on garde — au lot 21, le bouton disparaissait sous le focus, qui retombait au début de la page | ✅ Échap renonce sans fermer le panneau qui la contient ; le groupe est nommé par la conséquence |
-| Contrôle visuel : facturier, détail d'une dépense, échéancier, barème, relevé — sombre 1440 et clair 390, jeu de démonstration | ✅ aucun débordement, focus sur « Garder » partout, aucune erreur JS |
-
-## Reste fonctionnel par écran
-
-Vérifié dans le code le 6 novembre 2026 : « fait » veut dire que le code
-existe et est appelé depuis un écran, pas que le test mord.
-
-### Pilote
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| Statuts cliquables dans « Le flux du mois » | ✅ | Entrées et échéances se pointent depuis l'écran ; seule l'estimation « Charges sur encaissements » mène à l'écran qui l'explique | 16, 17 |
-| Actions rapides personnalisables | ⬜ | Liste figée : ni catalogue, ni « + », ni persistance | à planifier |
-| Panneau « Pointer un encaissement » | ✅ | Pastilles des entrées, action rapide, « + Nouveau » | 16 |
-| Provision d'IR sur les encaissements attendus | ✅ | Taux moyen de l'année projetée (encaissé + factures émises + planning) appliqué à l'encaissé | 12 |
-
-### Argent
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| Provision d'impôt alignée sur les échéances réelles | ◐ | Les prévisions suivent la formule de délai ; la provision d'IR n'utilise pas ce pipeline | 2 |
-| Cycle d'échéance enrichi (à déclarer, déclarée, payée, daté) | ◐ | `Echeance` ne porte que `payeeLe` et `montantPaye` ; « déclarée » est un fait distinct, sans date | à planifier |
-| Frise des jalons réglementaires | ◐ | La frise trace les échéances saisies, pas les jalons | à planifier |
-| Détail de la projection d'autonomie | ◐ | Seul `autonomieMois` est affiché | à planifier |
-| Mention de la durée de conservation | ✅ | Lue en Données (ligne de l'archive) et dans le LISEZMOI de l'archive : 6 ans (LPF L102 B), 10 pour une activité commerciale | 10 |
-| Grille ACRE par période | ✅ | `PERIODES_ABATTEMENT_ACRE`, par date de création | 7 (L10) |
-| Abattement ACRE à 25 % au 01/07/2026 | ✅ | Confirmé par le décret 2026-69 ; appliqué aux créations à partir de cette date, lu sous l'interrupteur (lot 9) | 7 (L10) |
-| Provision mensuelle de l'IR (`addIRMonthlyProvisions`) | ◐ | Plancher existant, non réparti mois par mois | 2 |
-| Provisions automatiques : enveloppes remplies à chaque encaissement, ordre de virement préparé | ⬜ | Aucun code | 7 |
-| Comparaison N−1 / tendance | ⬜ volontaire | Reportée (« utile la troisième année ») | à planifier |
-
-### Activité
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| « Ce que Freel remarque » | ⬜ | Seul « Le mois en chiffres » est livré | à planifier |
-| Onglet Missions : avancement `j / j` et filtres par statut | ◐ | CA, encaissé, reste, TJM et statut affichés ; ni avancement en jours ni filtre | à planifier |
-| Lieu par défaut sur le client | ⬜ | Aucun `lieuParDefaut` ; les journées importées restent « sans lieu » (voir Q3, jeu d'essai du lot 4) | 4 |
-| Statut d'un CRA (envoyé, validé, archivé) | ⬜ volontaire | Aucun champ « envoyé » au schéma | à planifier |
-| Composition au clic du TJM effectif et de la marge nette | ⬜ | `Composition` n'est pas importé par Activité | à planifier |
-
-### Facturer / Facture
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| Conservation des lignes d'une facture | ✅ | Schéma 20 ; les factures émises avant restent rééditées en une désignation | 18 |
-| « Enregistrer brouillon » | ⬜ | Dépend du point précédent | à planifier |
-| Envoi par courriel | ⬜ volontaire | Aucun envoi, ni pour la facture ni pour le CRA | — |
-| Place de « Facturer » dans le rail | ✅ | Formule A : onglet « Factures » d'Activité, création par « + Nouveau » et le Pilote | 6 |
-
-### Achats
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| Tuiles « à rapprocher » et « justificatifs manquants » | ✅ | Lot 8 | 8 |
-| Rapprochement : créer une dépense depuis une opération orpheline | ✅ | Lot 8 : formulaire pré-rempli, dépense reliée à l'opération | 8 |
-| État « ignorée » au rapprochement | ◐ | Le motif `autre` s'en approche | à planifier |
-| Dépenses récurrentes signalées, totalisées, générées | ◐ | Lot 8 : signalées et totalisées, DÉRIVÉES (même fournisseur, même montant, mois voisins) ; pas générées — une dépense créée d'avance serait un fait inventé | 8 |
-| Filtre par compte | ⬜ | Seule la barre de période existe | à planifier |
-| Import OFX | ⬜ | Aucun | à planifier |
-| Correction ou suppression à la main d'un mouvement importé | ✅ | Retrait d'une ligne, confirmé ; la correction d'un relevé n'a pas de sens : on retire et on réimporte | 21 |
-| Justificatifs sauvegardés et protégés de l'éviction | ✅ | Protégés de l'éviction (S5) ; archive complète et rappel « pas encore archivés » sur Achats (lot 10) | 10 |
-
-### Outils
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| Troisième onglet « Compte pro & banque » | ⬜ | L'import de relevé reste dans Achats — sorti du lot 6, qui ne touchait que la barre et le rail | à planifier |
-| Simulateur CFE avec base minimum par commune | ◐ | Lecture de l'avis × taux seulement, par décision | à planifier |
-| Comparateur micro-BNC vs déclaration contrôlée | ⬜ | Aucun module | à planifier |
-| Décote dans le comparateur d'impôt | ✅ | Appliquée, avec la situation du foyer (L8) | 3 |
-
-### Réglages / Compte
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| Navigation en sept sections | ✅ | Lot 9 | 9 |
-| Facturation : numérotation et mentions | ◐ | SIRET et IBAN contrôlés ; aucun réglage de numérotation ni de mentions | à planifier |
-| Coffre des documents | ⬜ | Aucun dépôt ; retenu au périmètre | à planifier |
-| Mode hors ligne, retard de synchronisation affiché | ◐ | Aucun `navigator.onLine` ; la pastille ne dit que relié, expiré ou local | à planifier |
-| Synchronisation temps réel multi-appareils | ⬜ | Synchronisation manuelle seulement | à planifier |
-| Règles d'accès de `user_data` vérifiées et documentées | ✅ | Sonde anonyme dans Compte, règle « chacun les siens » dans `supabase.sql` | 11 |
-| Restauration et récupération sans copie de secours | ✅ | Copie de l'état d'avant (S6), « Revenir à l'état d'avant » dans Données | 1 |
-
-### Documents
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| Livre des recettes en CSV | ✅ | Menu « Exporter » : `;`, BOM, virgule décimale, filtre sur l'année d'encaissement, champs texte protégés contre les formules, TVA inconnue laissée vide | 6 |
-
-### Transverse
-
-| Élément | État | Ce qui manque | Lot proposé |
-|---|---|---|---|
-| Brief du lundi | ⬜ | Aucun code | 7 |
-| Bascule : nouvelle version à la racine, ancienne sous `/legacy/` neutralisée en écriture | ⬜ | Le déploiement garde l'ancienne à la racine et la nouvelle dans `/v2/` | à planifier |
-| Test Playwright « zéro écriture depuis `/legacy/` » | ⬜ | Aucun script | à planifier |
-| Harnais différentiel contre l'application actuelle | ⬜ | Aucun script | à planifier |
-| Retirer les méta anti-cache de l'ancienne version | ⬜ | Lié à la bascule | à planifier |
-| Onboarding de première ouverture | ⬜ | Aucun en UI | à planifier |
-| Recherche globale | ✅ | ⌘K / Ctrl K : factures (brouillons compris), clients, missions, dépenses ; montant par valeur | 6 |
-| Raccourcis clavier | ⬜ | Seulement dans les composants d'accessibilité | à planifier |
-| Conseils automatiques (`getInsights`) | ⬜ | Aucun | à planifier |
-| Écart du CA encaissé de l'année : quelle ligne l'explique | ⬜ à vérifier | Demande les données réelles du propriétaire, absentes du dépôt | à planifier |
-| Reprise de l'ancienne application à refaire | ⬜ à vérifier | Action du propriétaire, pas du code | après lot 1 (Q3) |
-| Contrôle visuel de « Évolution du compte » dans les deux thèmes | ⬜ à vérifier | Captures non relues | à planifier |
-| Captures : sélecteur d'année absent (le jeu ne porte qu'une année) | ⬜ à vérifier | Non inspecté | 4 |
+| « Détacher » une pièce (dépense, facture) : un clic, et le fichier ne se rattache qu'en le redéposant ; sur une dépense, la TVA récupérable part avec | ✅ trouvé à la relecture du lot : confirmé, la TVA perdue chiffrée |
+| Contrôle visuel : facturier, livre, détail d'une dépense (suppression, détachement), échéancier, barème, relevé, carnet (mission), semaine (revenir au rythme) — sombre 1440 et clair 390, jeu de démonstration | ✅ aucun débordement, focus sur « Garder » partout, aucune erreur JS |
 
 ## Abandonné, avec la décision
 
@@ -528,7 +674,6 @@ existe et est appelé depuis un écran, pas que le test mord.
 | Centre de notifications | Hors périmètre cible |
 | Score de santé sur 100, cascade, donut de destination, scénarios, sparklines | Refusés avec motif (`AUDIT-GRAPHES-ET-INDICATEURS.md` §5.5) ; le Pilote reçoit une phrase de synthèse (lot 5) |
 | Type « Indispo » du créneau | Non repris : le schéma ne connaît que le congé |
-| Onglet Factures dans Activité | Le facturier est un écran à part |
 | Simulateur CFE à grille de bases minimales | Refusé au profit de la lecture de l'avis |
 
 ## Ce qui est fait

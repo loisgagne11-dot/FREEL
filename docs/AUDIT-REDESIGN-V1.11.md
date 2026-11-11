@@ -1147,3 +1147,4 @@ dépense, échéancier, barème, relevé — aucun débordement, aucune erreur.
 | Config › Fiscal › Retirer une période saisie | Un clic | Confirmation SOUS le tableau : posée dans la dernière cellule, elle élargissait le tableau et poussait ses premières colonnes hors de la carte en grand écran |
 | Activité › Semaine › Revenir au rythme | Un clic | Confirmé, en comptant les journées |
 | Achats › Relevé | Confirmations propres au lot 21, focus perdu | Le composant commun ; le focus va sur « Garder » |
+| Achats › détail d'une dépense, Factures › Pièce jointe › Détacher | Un clic | Confirmé, avec la TVA récupérable qui part |

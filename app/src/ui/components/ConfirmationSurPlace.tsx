@@ -38,7 +38,7 @@ import styles from './ConfirmationSurPlace.module.css';
 export function ConfirmationSurPlace(
   {
     libelle, precision, classeDeclencheur, consequence,
-    libelleConfirmer, libelleGarder = 'Garder', onConfirmer, peutOuvrir
+    libelleConfirmer, libelleGarder = 'Garder', onConfirmer, peutOuvrir, desactive = false
   }: {
     /** Le libellé du bouton d'origine. */
     readonly libelle: string;
@@ -59,6 +59,8 @@ export function ConfirmationSurPlace(
      * non. L'appelant affiche le refus et rend `false`.
      */
     readonly peutOuvrir?: () => boolean;
+    /** Le bouton d'origine attend, par exemple pendant un dépôt de pièce. */
+    readonly desactive?: boolean;
   }
 ) {
   const [ouverte, setOuverte] = useState(false);
@@ -93,7 +95,7 @@ export function ConfirmationSurPlace(
 
   if (!ouverte) {
     return (
-      <button ref={bouton} type="button" className={classeDeclencheur} onClick={ouvrir}>
+      <button ref={bouton} type="button" className={classeDeclencheur} disabled={desactive} onClick={ouvrir}>
         {libelle}
         {/* L'espace HORS de la portée masquée : le calcul du nom accessible
             rogne celle qui ouvre un élément (« avoir— 2026-014 »). */}
