@@ -643,6 +643,65 @@ describe('cohabitation avec l’ancienne application', () => {
 });
 
 /**
+ * LE DROIT À L'EFFACEMENT, DEPUIS L'APPLICATION.
+ *
+ * « Repartir de zéro » ne vidait que ce navigateur. L'effacement du compte se
+ * confirme, se fait copie par copie, et se PROUVE en relisant : un serveur
+ * sans règle de suppression répond « succès » sans rien effacer.
+ */
+describe('effacer mes données du compte', () => {
+  it('efface la copie de cette version, après confirmation, et dit ce que la relecture constate', async () => {
+    const appel = reponses(SESSION_OK, ligneDistante(3), ligneDistante(3), COMPTE_VIDE, COMPTE_VIDE);
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(await screen.findByRole('button', { name: 'Effacer la copie de cette version' }));
+    expect(ecritures(appel)).toEqual([]);
+    expect(screen.getByRole('group', { name: /relue pour le prouver/ })).toBeTruthy();
+    await utilisateur.click(screen.getByRole('button', { name: 'Effacer du compte' }));
+
+    await screen.findByText(/Données de cette version effacées du compte\. Relu après coup/);
+    const effacements = ecritures(appel);
+    expect(effacements).toHaveLength(1);
+    expect(effacements[0]?.methode).toBe('DELETE');
+    expect(effacements[0]?.url).toContain('freel_faits?user_id=eq.user-1');
+  });
+
+  it('ne dit pas « effacé » quand la ligne est toujours là : la règle de suppression manque', async () => {
+    reponses(SESSION_OK, ligneDistante(3), { corps: [] }, ligneDistante(3), ligneDistante(3));
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(await screen.findByRole('button', { name: 'Effacer la copie de cette version' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Effacer du compte' }));
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Rien n’a été effacé.*docs\/supabase\.sql/s);
+    expect(screen.queryByText(/effacées du compte/)).toBeNull();
+  });
+
+  it('efface les données de l’ancienne application dans SA table, et seulement sur demande', async () => {
+    const appel = reponses(SESSION_OK, COMPTE_VIDE, BUNDLE_LEGACY, COMPTE_VIDE);
+    render(<Compte stockage={CONFIGURE()} />);
+    const utilisateur = await seConnecter();
+
+    await utilisateur.click(await screen.findByRole('button', { name: 'Effacer les données de l’ancienne application' }));
+    expect(screen.getByRole('group', { name: /Fais d’abord la reprise/ })).toBeTruthy();
+    await utilisateur.click(screen.getByRole('button', { name: 'Effacer du compte' }));
+
+    await screen.findByText(/Données de l’ancienne application effacées du compte/);
+    expect(ecritures(appel).map((e) => e.url)).toEqual([expect.stringContaining('user_data?user_id=eq.user-1')]);
+  });
+
+  it('dit que l’identifiant de connexion reste, et où il se supprime', async () => {
+    reponses(SESSION_OK, COMPTE_VIDE);
+    render(<Compte stockage={CONFIGURE()} />);
+    await seConnecter();
+    expect((await screen.findByText(/identifiant de connexion/)).closest('p')?.textContent)
+      .toMatch(/tableau de bord du\s+projet Supabase \(Authentication, puis Users\)/);
+  });
+});
+
+/**
  * UNE COUPURE RÉSEAU NE DÉCONNECTE PAS.
  *
  * La session expirée se renouvelle au chargement ; l'écran l'effaçait sur TOUT

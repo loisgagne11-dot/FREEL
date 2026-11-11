@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type ConfigSupabase, type Session, type StockageLocal,
   DELAI_MAX_MS, TABLE_FAITS, bundleDepuisLegacy, chargerDonneesLegacy, configEffective,
+  effacerDonneesLegacy, effacerFaitsDuCompte,
   ecrireConfig, ecrireSession, estRefusDAuthentification, lireConfig, lireSession, pousserFaits,
   motifUrlRefusee, rafraichir, seConnecter, sessionValide, tirerFaits
 } from './supabase';
@@ -446,5 +447,53 @@ describe('robustesse réseau', () => {
     const s = stockageMemoire();
     s.setItem('freel.config.supabase.v1', JSON.stringify({ url: 'http://exemple.test', cleAnon: 'k' }));
     expect(lireConfig(s)).toBeNull();
+  });
+});
+
+
+/**
+ * L'EFFACEMENT SE PROUVE EN RELISANT.
+ *
+ * Sans règle de suppression, le serveur ne refuse pas : la règle d'accès
+ * filtre la ligne, la suppression n'atteint rien, et la réponse est un succès
+ * vide. Annoncer « effacé » sur la foi de ce succès dirait à quelqu'un que ses
+ * données sont parties alors qu'elles sont toujours là.
+ */
+describe('effacement du compte', () => {
+  it('efface la ligne du compte connecté, et la relecture le prouve', async () => {
+    const appel = repondreEnSuite([[LIGNE], 200], [[], 200]);
+    vi.stubGlobal('fetch', appel);
+
+    expect(await effacerFaitsDuCompte(CONFIG, SESSION)).toEqual({ statut: 'efface' });
+    const [url, init] = appel.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`${TABLE_FAITS}?user_id=eq.user-1`);
+    expect(init.method).toBe('DELETE');
+    // Seconde requête : la relecture, une lecture.
+    const [, relecture] = appel.mock.calls[1] as [string, RequestInit];
+    expect(relecture.method).toBeUndefined();
+  });
+
+  it('dit que la règle manque quand la ligne est toujours là après la suppression', async () => {
+    vi.stubGlobal('fetch', repondreEnSuite([[], 200], [[{ user_id: 'user-1' }], 200]));
+    expect(await effacerFaitsDuCompte(CONFIG, SESSION)).toEqual({ statut: 'regle-absente' });
+  });
+
+  it('distingue un compte déjà vide d’un effacement', async () => {
+    vi.stubGlobal('fetch', repondreEnSuite([[], 200], [[], 200]));
+    expect(await effacerFaitsDuCompte(CONFIG, SESSION)).toEqual({ statut: 'deja-vide' });
+  });
+
+  it('ne conclut rien quand la relecture échoue', async () => {
+    vi.stubGlobal('fetch', repondreEnSuite([[LIGNE], 200], [{ message: 'oups' }, 500]));
+    const r = await effacerFaitsDuCompte(CONFIG, SESSION);
+    expect(r.statut).toBe('erreur');
+  });
+
+  it('efface les données de l’ancienne application dans SA table, sur demande', async () => {
+    const appel = repondreEnSuite([[{ user_id: 'user-1' }], 200], [[], 200]);
+    vi.stubGlobal('fetch', appel);
+    expect(await effacerDonneesLegacy(CONFIG, SESSION)).toEqual({ statut: 'efface' });
+    const [url] = appel.mock.calls[0] as [string];
+    expect(url).toContain('user_data?user_id=eq.user-1');
   });
 });
