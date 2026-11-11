@@ -1115,3 +1115,9 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 |---|---|---|
 | Activité › Factures › La facture du mois | « Émettre cette facture », en un clic, quel que soit le régime | En franchise : « Émettre cette facture » et « Ajuster avant d'émettre » ; hors franchise : « Rédiger cette facture » seulement |
 | Nouvelle facture | Toujours vierge | Préremplie depuis le brouillon (`#/facture/brouillon:<mois>:<client>`), avec un bandeau qui dit d'où viennent les lignes, ou que le brouillon n'existe plus |
+
+## Lot 20 (11/11) — le dossier de TVA ventile par taux
+
+| Zone | Avant | Après |
+|---|---|---|
+| Argent › Préparer ma déclaration de TVA | Base et TVA collectée en total seulement | + « Collectée, par taux » (base et TVA, du plus fort au plus faible) ; bandeau qui nomme les factures mêlées à répartir à la main ; aide corrigée (les lignes sont conservées depuis le schéma 20) |

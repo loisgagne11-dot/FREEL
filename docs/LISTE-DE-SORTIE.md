@@ -336,7 +336,7 @@ premier critère d'ordre, l'irréversible.
 | L'éditeur de facture conserve les lignes du document à l'émission | ✅ `lignesAConserver` : les lignes imprimées et celles qui pèsent dans le total, au taux APPLIQUÉ (zéro en franchise ou en autoliquidation) |
 | « Émettre » depuis le brouillon du mois (facturier) conserve ses lignes (jours × TJM) — et sa TVA en franchise (zéro, connue), qu'il ne portait pas : la facture ne pouvait pas être revue et le dossier de TVA la signalait « inconnue » | ✅ en franchise ; montant entier en une quantité quand la division ne tombe pas juste |
 | « Revoir la facture » rétablit les lignes conservées, plusieurs taux compris ; refuse si elles ne retombent pas sur le montant et la TVA du livre ; une facture d'avant le schéma 20 garde le comportement actuel | ✅ |
-| Ventiler la TVA d'une facture à plusieurs taux dans le dossier de déclaration | ⬜ hors lot : les lignes le permettront |
+| Ventiler la TVA d'une facture à plusieurs taux dans le dossier de déclaration | ✅ lot 20 |
 | « Émettre » depuis le brouillon du mois HORS franchise : ni TVA ni lignes conservées (le taux n'est pas choisi), donc pas de réédition possible | ✅ lot 19 : le brouillon ouvre l'éditeur prérempli |
 | Le jeu de démonstration portait une TVA « inconnue » sur toutes ses factures alors qu'il est en franchise : aucune ne pouvait être revue | ✅ trouvé en cours de lot : TVA nulle et lignes fictives (deux factures à deux lignes) |
 
@@ -353,6 +353,22 @@ compte « inconnue ».
 | `#/facture/brouillon:<mois>:<client>` ouvre l'éditeur prérempli depuis le brouillon : client, une ligne par mission en jours × prix journalier ; recalculé depuis les faits (rien de stocké, un rechargement le retrouve) ; un brouillon disparu ouvre l'éditeur vide et le dit | ✅ `adresseBrouillon.ts` ; un nom de client portant « / » survit au routeur ; bandeau « Reprise du brouillon de … », et hors franchise « Vérifie le taux de TVA de chaque ligne » |
 | Hors franchise, le brouillon propose « Rédiger cette facture » (l'éditeur prérempli, où le taux se choisit) à la place de « Émettre » | ✅ |
 | En franchise, « Émettre cette facture » reste en un clic (lot 18), et « Ajuster avant d'émettre » ouvre l'éditeur prérempli | ✅ |
+
+### Lot 20 — Le dossier de TVA ventile par taux (priorité 2 : le faux) — PR #316
+
+« Au clic, j'ai toutes les informations pour remplir ma déclaration » : le
+formulaire demande la base et la TVA PAR TAUX (20 %, 10 %, 5,5 %…), et le
+dossier ne donnait qu'un total. Il fallait rouvrir chaque facture pour
+répartir. Depuis le lot 18 les lignes sont conservées : la ventilation se lit.
+Et l'aide du dossier affirmait encore que « les lignes ne sont pas
+conservées ».
+
+| Ligne | État |
+|---|---|
+| Chaque encaissement porte sa ventilation par taux : depuis ses lignes conservées ; à défaut, depuis le taux unique que trahit le rapport TVA / HT ; sinon « à ventiler » — jamais une répartition supposée | ✅ `ventilationParTaux` ; une seule liste des taux légaux et une seule règle de reconnaissance (`bareme/tva`), lues par la réédition et par le dossier |
+| Le dossier totalise base et TVA par taux, avoirs compris (au signe opposé), et compte à part les encaissements à ventiler à la main | ✅ |
+| L'écran affiche le tableau par taux, et dit combien de pièces restent à répartir et pourquoi ; l'aide ne dit plus que les lignes ne sont pas conservées | ✅ « Collectée, par taux » ; les pièces à répartir sont nommées par leur numéro |
+| « Revoir la facture » d'une écriture d'annulation : refusée sous le motif « plusieurs taux », qui ne la concernait pas | ✅ trouvé en cours de lot : refus avec son vrai motif — une annulation ne se réédite pas en « FACTURE » sous le numéro de l'original |
 
 ## Reste fonctionnel par écran
 

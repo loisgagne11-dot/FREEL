@@ -200,3 +200,33 @@ describe('dossier de déclaration de TVA', () => {
     expect(phrase.textContent).not.toMatch(/\d/);
   });
 });
+
+/**
+ * PAR TAUX, COMME LE FORMULAIRE LE DEMANDE.
+ *
+ * Le formulaire veut la base et la TVA taux par taux. Une facture émise avec
+ * ses lignes se ventile seule ; une facture plus ancienne qui mêlait deux taux
+ * est signalée « à répartir », jamais répartie au hasard.
+ */
+describe('la TVA collectée par taux', () => {
+  it('ventile les lignes conservées, et signale la facture mêlée sans détail', async () => {
+    semer({
+      recettes: [
+        {
+          ...recette('2026-010', '2026-08-10', 1000, 150),
+          lignes: [
+            { designation: 'Conseil', quantite: 5, prixUnitaireHt: euros(100), tauxTva: 0.2 },
+            { designation: 'Formation', quantite: 1, prixUnitaireHt: euros(500), tauxTva: 0.1 }
+          ]
+        },
+        recette('2025-014', '2026-09-02', 1000, 150)
+      ] as unknown as Faits['recettes']
+    });
+    const panneau = await ouvrirDossier();
+
+    const parTaux = within(panneau).getByLabelText('TVA collectée par taux');
+    expect(parTaux.textContent).toMatch(/20\s%.*base\s*500.*100/u);
+    expect(parTaux.textContent).toMatch(/10\s%.*base\s*500.*50/u);
+    expect(within(panneau).getByText(/mêle plusieurs taux sans détail conservé \(2025-014\)/)).toBeTruthy();
+  });
+});

@@ -34,6 +34,7 @@
 import { type DateISO, type Euros, type Ratio, euros, ratio } from '../types';
 import { estDansLUe } from './des';
 import { type FormuleDelai, echeanceDe } from './delaiPaiement';
+import { tauxReconnu } from '../bareme/tva';
 
 /**
  * Indemnité forfaitaire pour frais de recouvrement.
@@ -121,14 +122,6 @@ export interface Facture {
   readonly lignes: readonly LigneFacture[];
 }
 
-/**
- * Les taux de TVA en vigueur en France, du plus courant au plus rare.
- *
- * Ils servent à RECONNAÎTRE un taux, pas à en proposer un : voir
- * `factureDepuisRecette`. Une liste qui sert à reconnaître peut être fermée,
- * là où une liste qui sert à proposer devrait suivre les évolutions du barème.
- */
-const TAUX_TVA_CONNUS: readonly number[] = [0.2, 0.1, 0.055, 0.021, 0];
 
 /**
  * Ce qu'on peut rééditer d'une facture déjà émise.
@@ -254,6 +247,18 @@ export function factureDepuisRecette(
     return { cas: 'reeditee', facture, lignesConservees: true };
   }
 
+  // Une écriture d'annulation — HT négatif — ne se réédite pas comme une
+  // facture : elle porte le numéro de l'original, et un document « FACTURE »
+  // à montant négatif sous ce numéro se confondrait avec lui.
+  if (recette.montant < 0) {
+    return {
+      cas: 'impossible',
+      motif: 'C’est une écriture d’annulation : elle ne se réédite pas comme '
+        + 'une facture, sous le numéro de celle qu’elle annule.'
+    };
+  }
+
+  // Le taux se lit dans le rapport HT / TVA (`bareme/tva`).
   const taux = tauxReconnu(recette.montant, tva);
   if (taux === null) {
     return {
@@ -308,18 +313,6 @@ export function lignesAConserver(facture: Facture): readonly LigneFacture[] {
     }));
 }
 
-/**
- * Le taux de TVA d'une facture, s'il est reconnaissable.
- *
- * `null` quand le rapport ne tombe sur aucun taux légal — ce qui arrive dès
- * que la facture en mêlait deux. La tolérance d'un demi-centime absorbe les
- * arrondis d'affichage sans jamais accepter un taux voisin : le plus serré des
- * écarts entre deux taux légaux est de 3,4 points, très loin devant.
- */
-function tauxReconnu(ht: Euros, tva: Euros): number | null {
-  if (ht <= 0) return tva === 0 ? 0 : null;
-  return TAUX_TVA_CONNUS.find((t) => Math.abs(ht * t - tva) < 0.005) ?? null;
-}
 
 /* ── Totaux ────────────────────────────────────────────────────────────── */
 

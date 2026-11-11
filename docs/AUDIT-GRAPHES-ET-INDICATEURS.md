@@ -716,3 +716,9 @@ solde − provisions − réserve.
 | Nombre lu | Où | Avant | Après |
 |---|---|---|---|
 | Jours et prix journalier préremplis | Nouvelle facture, depuis le brouillon | — | Une ligne par mission, recalculée depuis le planning (jours fériés exclus) |
+
+## Lot 20 (11/11) — TVA par taux
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Base et TVA collectée, par taux | Argent → Préparer ma déclaration de TVA | — (total seulement) | Par taux, avoirs déduits au signe opposé ; les pièces sans ventilation lisible comptent au total de TVA, pas au tableau |

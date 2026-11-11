@@ -446,3 +446,9 @@ chiffre faux.
 |---|---|---|
 | Émettre la facture du mois hors franchise | 🟢 | Portait au livre une facture sans TVA ni lignes, impossible ensuite à revoir ou à télécharger ; ouvre l'éditeur prérempli, où le taux se choisit |
 | Ajuster le brouillon du mois avant de l'émettre | 🟢 | Aucun chemin : il fallait tout ressaisir dans une facture vierge |
+
+## Lot 20 (11/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Ventiler la TVA collectée par taux pour la déclaration | 🟢 | Absent des deux versions ; depuis les lignes conservées, ou le taux unique d'une facture ; les factures mêlées sans détail sont signalées, jamais réparties au hasard |
