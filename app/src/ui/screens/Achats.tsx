@@ -33,10 +33,10 @@ import { useRoute } from '../useRoute';
 import { CartePliable } from '../components/CartePliable';
 import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
-import { Releve } from './Releve';
 import { dateCourte, eur, eurExact } from '../format';
 import styles from './Achats.module.css';
 import { Montant } from '../components/Montant';
+import { composantALaDemande } from '../composantALaDemande';
 
 /**
  * Écran Achats — dépenses, justificatifs et TVA déductible.
@@ -92,6 +92,18 @@ type Panneau =
 
 const stockageParDefaut = stockageIndexedDB();
 const RappelArchive = lazy(() => import('./Achats.archive'));
+
+/**
+ * Le relevé et son rapprochement, chargés à la demande.
+ *
+ * L'onglet ne se monte qu'à son ouverture, mais le module voyageait dans le
+ * paquet de l'écran : la confirmation de l'effacement et le retrait d'une
+ * ligne (lot 21) l'ont fait passer à 41,4 Ko, au-dessus des 40 du budget. On
+ * importe un relevé une fois par mois ; consulter ses dépenses n'a pas à en
+ * payer le téléchargement. Préchargé au repos, il s'affiche sans attente quand
+ * on ouvre l'onglet.
+ */
+const Releve = composantALaDemande(() => import('./Releve').then((m) => m.Releve), true);
 
 export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats = {}) {
   const faits = useFaits((e) => e.faits);
@@ -182,7 +194,11 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
         <PanneauOnglet idGroupe={idGroupe} id="releve" actif={section === 'releve'}>
           {/* Monté seulement à l'ouverture : lire un relevé et calculer les
               candidats n'a pas à peser sur l'affichage des dépenses. */}
-          {section === 'releve' && <Releve />}
+          {section === 'releve' && (
+            <Suspense fallback={<p role="status">Chargement…</p>}>
+              <Releve />
+            </Suspense>
+          )}
         </PanneauOnglet>
 
         <PanneauOnglet idGroupe={idGroupe} id="depenses" actif={section === 'depenses'}>
