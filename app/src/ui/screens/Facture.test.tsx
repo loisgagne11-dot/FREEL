@@ -512,3 +512,45 @@ describe('la réédition d’une facture émise', () => {
     expect(await revoir(emise({ lignes: null }))).toMatch(/tient en une désignation/);
   });
 });
+
+/**
+ * L'ÉDITEUR REPREND LE BROUILLON DU MOIS.
+ *
+ * Hors franchise, le brouillon ne s'émet plus en un clic : il ouvre l'éditeur
+ * prérempli, où le taux se choisit. L'adresse ne porte que le mois et le
+ * client ; les lignes se recalculent ici depuis le planning.
+ */
+describe('la rédaction reprise d’un brouillon', () => {
+  const missionDeJuillet = {
+    id: 'm1', clientId: null, clientNom: 'Client France', description: 'Mission A',
+    tjm: euros(500), debut: '2026-01-01', fin: '2026-12-31', statut: 'active' as const,
+    entites: [{
+      id: 'm1-co', nom: 'Client France', couleur: '', adresse: '', contact: '', email: '', telephone: '',
+      rythmes: [{ du: '2026-01-01', au: '2026-12-31', parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: euros(500) }],
+      ajustements: {}
+    }]
+  } as unknown as Faits['missions'][number];
+
+  it('préremplit le client et une ligne par mission, en jours × prix journalier', async () => {
+    semer({ clients: [client()], missions: [missionDeJuillet], entreprise: { ...ENTREPRISE, tvaDepuis: mois('2026-01') } });
+    window.location.hash = '#/facture/brouillon:2026-07:Client%20France';
+    render(<Facture />);
+
+    expect((await screen.findByLabelText<HTMLInputElement>('Client')).value).toBe('Client France');
+    expect(screen.getByLabelText<HTMLInputElement>('Désignation').value).toBe('Mission A');
+    expect(screen.getByLabelText<HTMLInputElement>('Prix unitaire HT').value).toBe('500');
+    // Juillet 2026 : 23 jours du lundi au vendredi, moins le 14 juillet, férié.
+    expect(screen.getByLabelText<HTMLInputElement>('Quantité').value).toBe('22');
+    expect(screen.getByText(/Reprise du brouillon de juillet 2026 pour Client France/)).toBeTruthy();
+    expect(screen.getByText(/Vérifie le taux de TVA/)).toBeTruthy();
+  });
+
+  it('dit que le brouillon n’existe plus, et part d’une page vierge', async () => {
+    semer({ clients: [client()] });
+    window.location.hash = '#/facture/brouillon:2026-07:Client%20France';
+    render(<Facture />);
+
+    expect((await screen.findByLabelText<HTMLInputElement>('Client')).value).toBe('');
+    expect(screen.getByText(/n’existe plus/)).toBeTruthy();
+  });
+});

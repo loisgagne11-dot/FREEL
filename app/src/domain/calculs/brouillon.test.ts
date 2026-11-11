@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { euros, mois } from '../types';
+import { euros, mois, ratio } from '../types';
 import type { LigneDeBrouillon } from './brouillon';
-import { brouillonsDuMois, libelleDeLaFacture, lignesDuBrouillonEnFranchise } from './brouillon';
+import { brouillonsDuMois, libelleDeLaFacture, lignesDuBrouillon } from './brouillon';
 
 const M = mois('2026-07');
 
@@ -160,17 +160,17 @@ describe('libellé de la facture', () => {
  * une quantité, les jours dans la désignation — un prix arrondi dont le
  * produit ne retomberait pas sur le total contredirait le livre.
  */
-describe('lignes du brouillon, en franchise', () => {
+describe('lignes du brouillon', () => {
   it('écrit jours × prix journalier, au taux zéro', () => {
     const b = brouillonsDuMois(M, [ligne({ libelle: 'Refonte', jours: 10, montant: euros(5000) })]);
-    expect(lignesDuBrouillonEnFranchise(b[0] as never)).toEqual([
+    expect(lignesDuBrouillon(b[0] as never, ratio(0))).toEqual([
       { designation: 'Refonte', quantite: 10, prixUnitaireHt: 500, tauxTva: 0 }
     ]);
   });
 
   it('garde le montant entier quand la division ne tombe pas juste', () => {
     const b = brouillonsDuMois(M, [ligne({ libelle: 'Refonte', jours: 3, montant: euros(1000) })]);
-    expect(lignesDuBrouillonEnFranchise(b[0] as never)).toEqual([
+    expect(lignesDuBrouillon(b[0] as never, ratio(0))).toEqual([
       { designation: 'Refonte — 3 j', quantite: 1, prixUnitaireHt: 1000, tauxTva: 0 }
     ]);
   });

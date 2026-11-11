@@ -5,7 +5,7 @@ import { ajouterRecette, annulerRecette, attacherJustificatifRecette, consignerR
 import { brouillonsDeFacture, emetteurDe, etatFacturier } from '../../state/selecteurs.facture';
 import { dernierModeDeReglement } from '../../state/selecteurs.encaissement';
 import type { EcartDeFacturation } from '../../domain/calculs/brouillon';
-import { euros } from '../../domain/types';
+import { euros, ratio } from '../../domain/types';
 import type { Euros } from '../../domain/types';
 import {
   LIBELLE_STATUT, montantsDeLaFacture,
@@ -36,9 +36,10 @@ import { decalerMois } from '../../domain/calculs/periode';
 import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import { detteDeRetard, redigerRelance } from '../../domain/calculs/relance';
 import {
-  type BrouillonDeFacture, libelleDeLaFacture, lignesDuBrouillonEnFranchise
+  type BrouillonDeFacture, libelleDeLaFacture, lignesDuBrouillon
 } from '../../domain/calculs/brouillon';
 import styles from './Facturier.module.css';
+import { sousRouteDuBrouillon } from '../adresseBrouillon';
 
 /**
  * Le facturier — toutes les factures, et ce qu'on peut en faire.
@@ -975,15 +976,14 @@ function BrouillonDuMois(
   const mois = moisChoisi ?? moisLocal;
   const setMois = onMois ?? setMoisLocal;
   const brouillons = useMemo(() => brouillonsDeFacture(faits, mois), [faits, mois]);
+  const enFranchise = emetteurDe(faits).enFranchise;
 
   if (brouillons.length === 0) return null;
 
   function emettre(b: BrouillonDeFacture): void {
-    // En franchise, la TVA de la facture est CONNUE — zéro — et ses lignes
-    // aussi. Sans elles, la facture ne pouvait pas être revue, et le dossier
-    // de TVA la signalait « TVA inconnue ». Hors franchise, le taux n'est pas
-    // choisi ici : on n'en suppose pas un.
-    const enFranchise = emetteurDe(faits).enFranchise;
+    // Appelée en franchise seulement (voir le bouton) : la TVA de la facture y
+    // est CONNUE — zéro — et ses lignes aussi. Sans elles, la facture ne
+    // pouvait pas être revue, et le dossier de TVA la signalait « inconnue ».
     ajouterRecette({
       clientNom: b.clientNom,
       libelle: libelleDeLaFacture(b),
@@ -991,7 +991,8 @@ function BrouillonDuMois(
       emiseLe: dateDuJour(),
       encaisseeLe: null,
       modeReglement: null,
-      ...(enFranchise ? { tvaCollectee: euros(0), lignes: lignesDuBrouillonEnFranchise(b) } : { lignes: null })
+      tvaCollectee: euros(0),
+      lignes: lignesDuBrouillon(b, ratio(0))
     });
     signaler(`Facture émise pour ${b.clientNom}. Elle porte un numéro et entre au registre.`);
   }
@@ -1051,22 +1052,42 @@ function BrouillonDuMois(
                 Le faire disparaître empêcherait de voir qu'on a facturé douze
                 jours là où le planning en compte quatorze — l'écart qu'on veut
                 constater avant que le client le constate. */}
-            {b.dejaEmise === null
-              ? (
+            {/*
+              * EN UN CLIC SEULEMENT QUAND TOUT EST CONNU.
+              *
+              * En franchise, la TVA est nulle et les lignes se déduisent du
+              * planning : l'émission en un clic porte au livre une facture
+              * complète (lot 18). Hors franchise, le taux n'est pas choisi ici,
+              * et émettre d'ici portait au livre une facture sans TVA ni
+              * lignes — impossible ensuite à revoir ou à télécharger. Le
+              * brouillon ouvre alors l'éditeur prérempli, où le taux se choisit.
+              */}
+            {b.dejaEmise === null && enFranchise && (
+              <span className={styles.actionsBrouillon}>
                 <button type="button" className={styles.actionPrincipale}
                   onClick={() => emettre(b)}>
                   Émettre cette facture
                 </button>
-              )
-              : (
-                <>
-                  <p className={styles.dejaEmise}>
-                    Facture {b.dejaEmise} déjà émise pour {moisLisible(mois)},
-                    pour <Montant>{eur(b.ecart?.facture ?? euros(0))}</Montant>.
-                  </p>
-                  <EcartDeFacture ecart={b.ecart} />
-                </>
-              )}
+                <a className={styles.actionLigne}
+                  href={`#/facture/${sousRouteDuBrouillon(b)}`}>
+                  Ajuster avant d’émettre
+                </a>
+              </span>
+            )}
+            {b.dejaEmise === null && !enFranchise && (
+              <a className={styles.actionPrincipale} href={`#/facture/${sousRouteDuBrouillon(b)}`}>
+                Rédiger cette facture
+              </a>
+            )}
+            {b.dejaEmise !== null && (
+              <>
+                <p className={styles.dejaEmise}>
+                  Facture {b.dejaEmise} déjà émise pour {moisLisible(mois)},
+                  pour <Montant>{eur(b.ecart?.facture ?? euros(0))}</Montant>.
+                </p>
+                <EcartDeFacture ecart={b.ecart} />
+              </>
+            )}
           </li>
         ))}
       </ul>

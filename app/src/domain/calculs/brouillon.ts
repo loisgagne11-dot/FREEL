@@ -1,5 +1,5 @@
-import type { Euros, Mois } from '../types';
-import { euros, ratio } from '../types';
+import type { Euros, Mois, Ratio } from '../types';
+import { euros } from '../types';
 import type { LigneFacture } from './facture';
 
 /**
@@ -173,27 +173,24 @@ export function libelleDeLaFacture(b: BrouillonDeFacture): string {
 }
 
 /**
- * Les lignes d'une facture émise depuis son brouillon, en FRANCHISE.
- *
- * « Émettre » depuis le facturier ne gardait que le total : la facture ne
- * pouvait plus être revue telle qu'elle était partie. Une ligne par mission,
- * en jours × prix journalier — le détail que le client lit.
+ * Les lignes d'une facture tirée de son brouillon : une par mission, en jours
+ * × prix journalier — le détail que le client lit.
  *
  * Le prix journalier se retrouve en divisant ; quand la division ne tombe pas
  * juste au centime (un montant ajusté à la main), la ligne garde le montant en
  * une seule quantité, et les jours dans sa désignation : un prix arrondi dont le
  * produit ne retomberait pas sur le total contredirait le livre.
  *
- * Taux zéro : en franchise, aucune ligne ne porte de TVA. Hors franchise, le
- * taux n'est pas connu ici, et l'appelant ne conserve pas de lignes plutôt que
- * d'en supposer un.
+ * Le taux vient de l'appelant, parce qu'il n'est pas le même partout : zéro
+ * pour l'émission en un clic d'une franchise, qui le sait ; le taux proposé
+ * par l'éditeur pour le préremplissage, où il se choisit avant d'émettre.
  */
-export function lignesDuBrouillonEnFranchise(b: BrouillonDeFacture): readonly LigneFacture[] {
+export function lignesDuBrouillon(b: BrouillonDeFacture, tauxTva: Ratio): readonly LigneFacture[] {
   return b.lignes.map((l) => {
     const prix = Math.round((l.montant / l.jours) * 100) / 100;
     const juste = l.jours > 0 && Math.abs(prix * l.jours - l.montant) < 0.005;
     return juste
-      ? { designation: l.libelle, quantite: l.jours, prixUnitaireHt: euros(prix), tauxTva: ratio(0) }
-      : { designation: `${l.libelle} — ${l.jours} j`, quantite: 1, prixUnitaireHt: l.montant, tauxTva: ratio(0) };
+      ? { designation: l.libelle, quantite: l.jours, prixUnitaireHt: euros(prix), tauxTva }
+      : { designation: `${l.libelle} — ${l.jours} j`, quantite: 1, prixUnitaireHt: l.montant, tauxTva };
   });
 }

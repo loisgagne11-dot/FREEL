@@ -209,6 +209,24 @@
 .actionSecondaire { color: var(--muted); border-color: var(--line); }
 .actionSecondaire:hover { border-color: var(--red-line); color: var(--text); }
 
+/* Les gestes du brouillon du mois. Deux sont des LIENS — ils mènent à
+   l'éditeur prérempli, une adresse qu'on peut rouvrir —, habillés comme les
+   boutons voisins pour ne pas avoir l'air d'une note de bas de page. */
+.actionsBrouillon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+a.actionPrincipale,
+a.actionLigne {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+a.actionPrincipale:focus-visible,
+a.actionLigne:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
 /* ── Panneau d'encaissement ─────────────────────────────────────────────── */
 
 .panneau { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
