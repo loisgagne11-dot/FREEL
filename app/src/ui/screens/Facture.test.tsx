@@ -501,7 +501,7 @@ describe('la réédition d’une facture émise', () => {
     const lignes = [
       { designation: 'Développement', quantite: 8, prixUnitaireHt: euros(400), tauxTva: 0 },
       { designation: 'Recette', quantite: 2, prixUnitaireHt: euros(400), tauxTva: 0 }
-    ] as unknown as Faits['recettes'][number]['lignes'];
+    ] as unknown as NonNullable<Faits['recettes'][number]['lignes']>;
     const bandeau = await revoir(emise({ lignes }));
     expect(bandeau).toMatch(/lignes conservées/);
     expect(bandeau).not.toMatch(/tient en une désignation/);
