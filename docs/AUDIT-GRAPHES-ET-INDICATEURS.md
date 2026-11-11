@@ -710,3 +710,9 @@ solde − provisions − réserve.
 |---|---|---|---|
 | Quantités, prix unitaires, totaux par taux d'une facture rééditée | Facturier › Revoir la facture | Une ligne « 1 × total » ; refus à deux taux | Les lignes émises ; refus si elles ne retombent pas sur le montant et la TVA du livre |
 | TVA des factures émises depuis le brouillon du mois en franchise | Dossier de TVA, facturier | « inconnue » (non portée) | Zéro, connue |
+
+## Lot 19 (11/11) — brouillon du mois
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Jours et prix journalier préremplis | Nouvelle facture, depuis le brouillon | — | Une ligne par mission, recalculée depuis le planning (jours fériés exclus) |

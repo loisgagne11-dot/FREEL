@@ -5,6 +5,7 @@ import { etatFacture, reediterFacture } from '../../state/selecteurs.facture';
 import styles from './Facture.module.css';
 import { useRoute } from '../useRoute';
 import { Apercu, useSortieDocument } from '../documents/Apercu';
+import { brouillonDeLaSousRoute } from '../adresseBrouillon';
 
 /**
  * La rédaction et le document arrivent à la demande.
@@ -42,10 +43,18 @@ export function Facture() {
    */
   const { sousRoute, naviguerVers } = useRoute();
 
-  if (sousRoute === 'nouvelle') {
+  /* `#/facture/brouillon:<mois>:<client>` ouvre la même rédaction, préremplie
+     depuis le brouillon du mois : voir `adresseBrouillon`. La clé force un
+     nouvel état quand on passe d'un brouillon à un autre sans quitter l'écran. */
+  const brouillon = sousRoute === null ? null : brouillonDeLaSousRoute(sousRoute);
+  if (sousRoute === 'nouvelle' || brouillon !== null) {
     return (
       <Suspense fallback={<EnAttente />}>
-        <NouvelleFacture onListe={() => naviguerVers('activite', 'factures')} />
+        <NouvelleFacture
+          key={sousRoute}
+          depuisBrouillon={brouillon}
+          onListe={() => naviguerVers('activite', 'factures')}
+        />
       </Suspense>
     );
   }

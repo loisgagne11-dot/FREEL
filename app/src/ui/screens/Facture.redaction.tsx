@@ -35,12 +35,14 @@ import { useFaits } from '../../state/store';
 import { dateDuJour } from '../../state/selecteurs';
 import { ajouterRecette } from '../../state/ecritures.recettes';
 import {
-  destinataireDe, emetteurDe, etatFacture, numeroSuivant
+  brouillonsDeFacture, destinataireDe, emetteurDe, etatFacture, numeroSuivant
 } from '../../state/selecteurs.facture';
+import { lignesDuBrouillon } from '../../domain/calculs/brouillon';
+import type { DesignationBrouillon } from '../adresseBrouillon';
 import { type Facture as FactureDomaine, type LigneFacture, lignesAConserver } from '../../domain/calculs/facture';
 import { dateISO, euros, ratio } from '../../domain/types';
 import { Info } from '../components/Info';
-import { dateCourte, eurExact } from '../format';
+import { dateCourte, eurExact, moisLong } from '../format';
 import styles from './Facture.module.css';
 import { Montant } from '../components/Montant';
 import { Apercu, useSortieDocument } from '../documents/Apercu';
@@ -68,13 +70,31 @@ const ligneVide = (): LigneFacture => ({
  * factures ailleurs, et l'ailleurs en question (Argent, sous-onglet livre des
  * recettes) n'était pas trouvable.
  */
-export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
+export function NouvelleFacture(
+  { onListe, depuisBrouillon = null }: {
+    readonly onListe: () => void;
+    /**
+     * Le brouillon du mois à reprendre : le client et une ligne par mission,
+     * recalculés ici depuis les faits. Le taux proposé est celui d'une ligne
+     * vierge — c'est ici qu'il se choisit, avant d'émettre.
+     */
+    readonly depuisBrouillon?: DesignationBrouillon | null;
+  }
+) {
   const faits = useFaits((e) => e.faits);
   const idChamp = useId();
 
-  const [clientNom, setClientNom] = useState('');
+  // Lu UNE fois, à l'ouverture : la saisie appartient ensuite à l'utilisateur,
+  // et un planning corrigé pendant qu'il rédige ne doit pas réécrire ses lignes.
+  const [repris] = useState(() => (depuisBrouillon === null
+    ? null
+    : brouillonsDeFacture(faits, depuisBrouillon.mois)
+      .find((b) => b.clientNom === depuisBrouillon.clientNom) ?? null));
+  const [clientNom, setClientNom] = useState(() => repris?.clientNom ?? '');
   const [emiseLe, setEmiseLe] = useState<string>(() => dateDuJour());
-  const [lignes, setLignes] = useState<readonly LigneFacture[]>([ligneVide()]);
+  const [lignes, setLignes] = useState<readonly LigneFacture[]>(
+    () => (repris === null ? [ligneVide()] : lignesDuBrouillon(repris, ligneVide().tauxTva))
+  );
   /**
    * La facture émise, FIGÉE.
    *
@@ -215,6 +235,22 @@ export function NouvelleFacture({ onListe }: { readonly onListe: () => void }) {
           Retour aux factures
         </button>
       </header>
+
+      {/* Ouverte depuis un brouillon : on dit d'où viennent les lignes, et que
+          le taux reste à choisir — c'est pour cela qu'on passe par ici plutôt
+          que d'émettre en un clic. Un brouillon disparu (planning corrigé,
+          facture déjà émise ailleurs) ne s'ouvre pas vide en silence. */}
+      {depuisBrouillon !== null && (
+        <p className={styles.bandeau} role="status">
+          {repris !== null
+            ? <>Reprise du brouillon de {moisLong(depuisBrouillon.mois).toLowerCase()} pour {repris.clientNom}&nbsp;:
+              une ligne par mission, en jours × prix journalier.
+              {!facture.emetteur.enFranchise && <> Vérifie le taux de TVA de chaque ligne avant d’émettre.</>}</>
+            : <>Le brouillon de {moisLong(depuisBrouillon.mois).toLowerCase()} pour {depuisBrouillon.clientNom}
+              n’existe plus — le planning a changé, ou rien n’y est facturable. La facture
+              part d’une page vierge.</>}
+        </p>
+      )}
 
       {aCommence && etat.manques.length > 0 && (
         <div className={`${styles.bandeau} ${styles.bandeauDanger}`} role="status">

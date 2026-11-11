@@ -583,6 +583,34 @@ describe('la facture du mois, avant qu’elle existe', () => {
   });
 
   /**
+   * HORS FRANCHISE, LE TAUX SE CHOISIT DANS L'ÉDITEUR.
+   *
+   * Émettre d'ici portait au livre une facture sans TVA ni lignes, qu'on ne
+   * pouvait ensuite ni revoir ni télécharger. Le brouillon ouvre l'éditeur
+   * prérempli à la place.
+   */
+  it('hors franchise, propose de rédiger la facture dans l’éditeur au lieu de l’émettre', () => {
+    semer([], {
+      missions: [missionPlanifiee],
+      entreprise: { ...faitsVides().entreprise, tvaDepuis: mois('2026-01') }
+    });
+    rendre();
+
+    expect(screen.queryByRole('button', { name: 'Émettre cette facture' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Rédiger cette facture' }).getAttribute('href'))
+      .toBe('#/facture/brouillon:2026-08:Client%20France');
+  });
+
+  it('en franchise, émet en un clic et propose d’ajuster avant', () => {
+    semer([], { missions: [missionPlanifiee] });
+    rendre();
+
+    expect(screen.getByRole('button', { name: 'Émettre cette facture' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ajuster avant d’émettre' }).getAttribute('href'))
+      .toBe('#/facture/brouillon:2026-08:Client%20France');
+  });
+
+  /**
    * Le brouillon d'un client déjà facturé reste affiché, marqué. Le faire
    * disparaître empêcherait de voir qu'on a facturé douze jours là où le
    * planning en compte quatorze.

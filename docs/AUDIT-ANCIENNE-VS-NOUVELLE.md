@@ -439,3 +439,10 @@ chiffre faux.
 | Conserver le détail d'une facture émise | 🟢 | Schéma 20 : les lignes (désignation, quantité, prix unitaire, taux appliqué) sont gardées à l'émission, depuis l'éditeur comme depuis le brouillon du mois en franchise |
 | Rééditer une facture à plusieurs taux | 🟢 | Refusée faute de détail ; rétablie depuis ses lignes |
 | Émettre depuis le brouillon du mois, en franchise | 🟢 | TVA non portée (« inconnue ») : la facture ne se revoyait pas. TVA nulle et lignes conservées |
+
+## Lot 19 (11/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Émettre la facture du mois hors franchise | 🟢 | Portait au livre une facture sans TVA ni lignes, impossible ensuite à revoir ou à télécharger ; ouvre l'éditeur prérempli, où le taux se choisit |
+| Ajuster le brouillon du mois avant de l'émettre | 🟢 | Aucun chemin : il fallait tout ressaisir dans une facture vierge |
