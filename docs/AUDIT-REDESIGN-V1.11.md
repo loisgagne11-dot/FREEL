@@ -1107,3 +1107,4 @@ icônes, sous-ligne de franchise). Captures regénérées et relues.
 | Zone | Avant | Après |
 |---|---|---|
 | Facturier › Revoir la facture | Une seule ligne au prix du total ; refus pour une facture à deux taux ; refus pour toute facture de la démonstration (TVA « inconnue ») | Les lignes du document émis, telles que le client les a reçues ; les factures d'avant le schéma 20 gardent l'ancien comportement |
+| Bandeau de la réédition | « le détail des lignes n'est pas conservé » toujours | Deux phrases : « avec les lignes conservées à l'émission : c'est celui que ton client a reçu », ou l'aveu du détail perdu pour une facture d'avant le schéma 20 (trouvé au contrôle visuel : le bandeau mentait sur un document à deux lignes) |

@@ -154,7 +154,17 @@ const TAUX_TVA_CONNUS: readonly number[] = [0.2, 0.1, 0.055, 0.021, 0];
  * l'original, donc indiscernable de lui. On refuse, et on dit pourquoi.
  */
 export type ReeditionFacture =
-  | { readonly cas: 'reeditee'; readonly facture: Facture }
+  | {
+    readonly cas: 'reeditee';
+    readonly facture: Facture;
+    /**
+     * Vrai quand le document vient des lignes conservées (schéma 20) ; faux
+     * quand il se rétablit en une seule désignation. L'écran le dit : une
+     * facture d'origine à plusieurs lignes ne se présente pas pareil dans les
+     * deux cas.
+     */
+    readonly lignesConservees: boolean;
+  }
   | { readonly cas: 'impossible'; readonly motif: string };
 
 /**
@@ -241,7 +251,7 @@ export function factureDepuisRecette(
           + 'imprimerait un total qui contredit le registre.'
       };
     }
-    return { cas: 'reeditee', facture };
+    return { cas: 'reeditee', facture, lignesConservees: true };
   }
 
   const taux = tauxReconnu(recette.montant, tva);
@@ -256,6 +266,7 @@ export function factureDepuisRecette(
 
   return {
     cas: 'reeditee',
+    lignesConservees: false,
     facture: {
       numero: recette.numero,
       emiseLe: recette.emiseLe,

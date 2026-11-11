@@ -152,14 +152,19 @@ function FactureEmise(
         </div>
       </header>
 
-      {/* Le détail des lignes n'est pas conservé : le document se rétablit en
-          UNE désignation, celle qui a été enregistrée à l'émission. On le dit,
-          parce qu'une facture d'origine à plusieurs lignes ne se présentera
-          pas ici comme elle est partie. */}
+      {/* Deux phrases, parce que deux cas. Depuis le schéma 20 les lignes se
+          conservent, et le document est celui qui est parti. Avant, il se
+          rétablit en UNE désignation : on le dit, parce qu'une facture
+          d'origine à plusieurs lignes ne se présente pas ici comme elle est
+          partie. Le dire aussi d'une facture dont les lignes sont gardées
+          serait faux — et apprendrait à ne plus lire ce bandeau. */}
       <p className={styles.bandeau} role="status">
-        Document rétabli depuis ton livre des recettes. Les montants sont ceux
-        qui ont été enregistrés à l’émission&nbsp;; le détail des lignes, lui,
-        n’est pas conservé et tient en une désignation.
+        {reedition.lignesConservees
+          ? <>Document rétabli depuis ton livre des recettes, avec les lignes
+            conservées à l’émission&nbsp;: c’est celui que ton client a reçu.</>
+          : <>Document rétabli depuis ton livre des recettes. Les montants sont
+            ceux qui ont été enregistrés à l’émission&nbsp;; le détail des
+            lignes, lui, n’a pas été conservé et tient en une désignation.</>}
       </p>
 
       <Suspense fallback={<EnAttente />}>

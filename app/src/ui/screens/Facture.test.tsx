@@ -475,3 +475,40 @@ describe('le fichier téléchargé', () => {
     vi.unstubAllGlobals();
   });
 });
+
+/**
+ * LE BANDEAU DE LA RÉÉDITION DIT CE QUI EST VRAI.
+ *
+ * Il annonçait toujours « le détail des lignes n'est pas conservé ». Depuis le
+ * schéma 20, c'est faux d'une facture émise avec ses lignes — et un bandeau
+ * qui ment une fois cesse d'être lu.
+ */
+describe('la réédition d’une facture émise', () => {
+  const emise = (m: Partial<Faits['recettes'][number]> = {}) => ({
+    id: 'r1', clientNom: 'Client France', libelle: 'Développement', montant: euros(4000),
+    emiseLe: '2026-07-01', encaisseeLe: null, modeReglement: null, numero: '2026-001',
+    tvaCollectee: euros(0), ...m
+  }) as Faits['recettes'][number];
+
+  async function revoir(recette: Faits['recettes'][number]): Promise<string> {
+    semer({ clients: [client()], recettes: [recette] });
+    window.location.hash = '#/facture/2026-001';
+    render(<Facture />);
+    return (await screen.findByRole('status')).textContent ?? '';
+  }
+
+  it('dit que le document est celui qu’a reçu le client quand ses lignes sont conservées', async () => {
+    const lignes = [
+      { designation: 'Développement', quantite: 8, prixUnitaireHt: euros(400), tauxTva: 0 },
+      { designation: 'Recette', quantite: 2, prixUnitaireHt: euros(400), tauxTva: 0 }
+    ] as unknown as Faits['recettes'][number]['lignes'];
+    const bandeau = await revoir(emise({ lignes }));
+    expect(bandeau).toMatch(/lignes conservées/);
+    expect(bandeau).not.toMatch(/tient en une désignation/);
+    expect(screen.getByText('Recette')).toBeTruthy();
+  });
+
+  it('avoue le détail perdu d’une facture émise avant le schéma 20', async () => {
+    expect(await revoir(emise({ lignes: null }))).toMatch(/tient en une désignation/);
+  });
+});
