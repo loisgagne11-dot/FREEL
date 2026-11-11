@@ -12,7 +12,7 @@ import { FormulaireEncaissement } from './FormulaireEncaissement';
 import { Montant } from './Montant';
 import { Sheet } from './Sheet';
 import { useToast } from './Toasts';
-import styles from './Encaissements.module.css';
+import styles from './Pointage.module.css';
 
 /**
  * Le panneau « Encaissements » du Pilote : pointer une facture comme payée.

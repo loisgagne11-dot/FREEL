@@ -106,13 +106,13 @@ describe('enregistrer un paiement', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer le paiement' }));
     await utilisateur.clear(screen.getByLabelText('Date du débit'));
-    await utilisateur.type(screen.getByLabelText('Date du débit'), '2026-09-08');
+    await utilisateur.type(screen.getByLabelText('Date du débit'), '2026-08-08');
     await utilisateur.click(
       screen.getAllByRole('button', { name: 'Enregistrer le paiement' }).at(-1)!
     );
 
     expect(etatPilote(useFaits.getState().faits).voletConstate).toBe(0);
-    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-09-08');
+    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-08-08');
     // Toujours affichée : c'est l'historique de ce qui a été appelé.
     expect(screen.getByText('Payée')).toBeTruthy();
   });
@@ -129,7 +129,7 @@ describe('enregistrer un paiement', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer le paiement' }));
     await utilisateur.clear(screen.getByLabelText('Date du débit'));
-    await utilisateur.type(screen.getByLabelText('Date du débit'), '2026-09-08');
+    await utilisateur.type(screen.getByLabelText('Date du débit'), '2026-08-08');
     const montant = screen.getByLabelText('Montant réellement débité (€)');
     await utilisateur.clear(montant);
     await utilisateur.type(montant, '2512.40');
@@ -149,12 +149,30 @@ describe('enregistrer un paiement', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer le paiement' }));
     await utilisateur.clear(screen.getByLabelText('Date du débit'));
-    await utilisateur.type(screen.getByLabelText('Date du débit'), '2026-09-08');
+    await utilisateur.type(screen.getByLabelText('Date du débit'), '2026-08-08');
     await utilisateur.click(
       screen.getAllByRole('button', { name: 'Enregistrer le paiement' }).at(-1)!
     );
 
     expect(useFaits.getState().faits.echeances[0]?.montantPaye).toBeNull();
+  });
+
+  // Un débit à venir n'est pas un débit : le pointer d'avance sortirait
+  // l'échéance des provisions avant que l'argent ait quitté le compte.
+  it('refuse une date de débit qui n’est pas encore arrivée', async () => {
+    semer([echeance({ id: 'e1' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer le paiement' }));
+    await utilisateur.clear(screen.getByLabelText('Date du débit'));
+    await utilisateur.type(screen.getByLabelText('Date du débit'), '2026-09-08');
+    await utilisateur.click(
+      screen.getAllByRole('button', { name: 'Enregistrer le paiement' }).at(-1)!
+    );
+
+    expect(screen.getByRole('alert').textContent).toMatch(/pas encore arrivée/);
+    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBeNull();
   });
 
   // Sans date, on ne peut ni rapprocher le paiement, ni savoir de quel mois

@@ -1,6 +1,8 @@
-/* Le panneau « Encaissements » : à gauche ce qui reste à rentrer, à droite les
-   factures à pointer. Sur téléphone, le reste passe au-dessus de la liste —
-   deux colonnes n'y tiennent pas, et le total se lit avant les lignes. */
+/* Les deux panneaux de pointage du Pilote — « Encaissements » et « Sorties » :
+   à gauche ce qui reste, à droite les lignes à pointer. Une seule feuille, pour
+   que les deux gestes jumeaux se ressemblent. Sur téléphone, le reste passe
+   au-dessus de la liste — deux colonnes n'y tiennent pas, et le total se lit
+   avant les lignes. */
 
 .plan {
   display: grid;
@@ -281,4 +283,17 @@
   .pastille { justify-self: end; }
 
   .montant { align-items: flex-end; }
+}
+
+/* Le renvoi vers l'échéancier : un lien dans une phrase, souligné pour se
+   distinguer du texte qui l'entoure. */
+.lien {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lien:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
 }

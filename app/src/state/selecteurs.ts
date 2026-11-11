@@ -631,6 +631,56 @@ export const LIBELLE_NATURE: Readonly<Record<NatureDette, string>> = {
   cfp: 'Contribution à la formation'
 };
 
+/** Une échéance qui attend son paiement, et si son jour est passé. */
+export interface EcheanceAPayer extends Echeance {
+  readonly enRetard: boolean;
+}
+
+export interface EcheancesAPayer {
+  /** Jusqu'à la fin du mois courant, retards compris : la plus ancienne d'abord. */
+  readonly maintenant: readonly EcheanceAPayer[];
+  /** Plus tard : un échéancier annuel saisi d'un coup n'a pas à remplir l'écran. */
+  readonly plusTard: readonly Echeance[];
+}
+
+/**
+ * Les échéances non payées : celles du mois et les retards, puis le reste.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN APPEL IMPAYÉ N'APPARTIENT À AUCUN MOIS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le flux ne listait que les échéances DU MOIS. Un prélèvement URSSAF de mai
+ * resté impayé disparaissait de la colonne Sorties le 1ᵉʳ juin — alors que le
+ * total, tiré des provisions, le comptait toujours. La colonne montrait donc
+ * un chiffre sans la ligne qui le faisait, et cachait précisément la sortie
+ * qui demande un geste. Côté Entrées, la règle est la même depuis le début :
+ * une facture impayée ne quitte pas l'écran parce que le mois a changé.
+ *
+ * Le flux et le panneau qui pointe un paiement lisent cette liste ; aucun des
+ * deux ne la recalcule.
+ */
+export function echeancesAPayer(
+  echeances: readonly Echeance[],
+  aujourdhui: DateISO = dateDuJour(),
+  /** Le mois jusqu'au bout duquel on regarde : celui du flux affiché. */
+  jusquA: Mois = aujourdhui.slice(0, 7) as Mois
+): EcheancesAPayer {
+  // Borne haute en texte : « 2026-06-31 » n'existe pas, mais il suit bien
+  // toutes les dates de juin et précède toutes celles de juillet.
+  const finDuMois = `${jusquA}-31`;
+  const ouvertes = echeances
+    .filter((e) => !estPayee(e))
+    .sort((a, b) => a.echeanceLe.localeCompare(b.echeanceLe));
+  return {
+    // Strictement : une échéance n'est pas en retard LE jour où elle tombe.
+    maintenant: ouvertes
+      .filter((e) => e.echeanceLe <= finDuMois)
+      .map((e) => ({ ...e, enRetard: aujourdhui > e.echeanceLe })),
+    plusTard: ouvertes.filter((e) => e.echeanceLe > finDuMois)
+  };
+}
+
 /**
  * Le flux du mois : ce qui rentre, ce qui sort, ce qui reste.
  *
@@ -709,13 +759,25 @@ export function fluxDuMois(
       total: etat.tresorerie.provisions,
       constate: etat.voletConstate,
       aProvisionner: etat.voletAProvisionner,
-      lignes: echeancesDuMois.map((e) => ({
-        id: e.id,
-        libelle: LIBELLE_NATURE[e.nature],
-        montant: e.montant,
-        date: e.echeanceLe,
-        regle: estPayee(e)
-      }))
+      // Les payées du mois, puis tout ce qui reste à payer d'ici la fin du
+      // mois, retards des mois passés compris : voir `echeancesAPayer`.
+      lignes: [
+        ...echeancesDuMois.filter(estPayee).map((e) => ({
+          id: e.id,
+          libelle: LIBELLE_NATURE[e.nature],
+          montant: e.montant,
+          date: e.echeanceLe,
+          regle: true
+        })),
+        ...echeancesAPayer(echeances, aujourdhui, m).maintenant.map((e) => ({
+          id: e.id,
+          libelle: LIBELLE_NATURE[e.nature],
+          montant: e.montant,
+          date: e.echeanceLe,
+          regle: false,
+          enRetard: e.enRetard
+        }))
+      ]
     },
     remuneration: {
       versable: etat.tresorerie.versable,

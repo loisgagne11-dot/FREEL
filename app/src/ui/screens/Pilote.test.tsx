@@ -166,3 +166,24 @@ describe('pointer un encaissement', () => {
     await waitFor(() => expect(window.location.hash).toBe('#/pilote'));
   });
 });
+
+/** Le même geste côté Sorties : un prélèvement est parti, on le pointe d'ici. */
+describe('pointer un paiement', () => {
+  it('ouvre le panneau depuis la pastille d’une échéance en retard, et la colonne suit', async () => {
+    semer({
+      echeances: [{
+        id: 'mai', nature: 'urssaf', montant: 800, echeanceLe: '2026-05-05', payeeLe: null, montantPaye: null
+      }] as unknown as Faits['echeances']
+    });
+    render(<Pilote />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Cotisations URSSAF.*en retard.*pointer le paiement/ }));
+    const panneau = await screen.findByRole('dialog', { name: /Sorties/ });
+    fireEvent.click(within(panneau).getByRole('button', { name: 'Confirmer le paiement' }));
+
+    expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-06-10');
+    fireEvent.click(within(panneau).getByRole('button', { name: 'Terminé' }));
+    const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
+    expect(within(sorties).queryByRole('button', { name: /pointer le paiement/ })).toBeNull();
+  });
+});

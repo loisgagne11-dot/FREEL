@@ -19,7 +19,7 @@ import { Montant } from './Montant';
  * « Clique un statut » : la pastille d'une facture qui attend son argent ouvre
  * le panneau qui la pointe, ICI — l'aller-retour au facturier pour un virement
  * reçu était le geste le plus long de l'outil pour le plus fréquent. Celle
- * d'une échéance mène encore à l'échéancier.
+ * d'une échéance ouvre de même le panneau qui pointe son paiement.
  *
  * Sur téléphone, une colonne fait une centaine de pixels : une liste n'y tient
  * pas. Les colonnes n'y gardent que leurs totaux, et « Voir le détail » rend
@@ -51,7 +51,7 @@ export const VERS_FACTURES = '#/activite/factures';
 const VERS_ECHEANCIER = '#/argent';
 
 export function FluxCard(
-  { flux, periode, onVersable, onPointer, dejaVerse, besoinMensuel }: {
+  { flux, periode, onVersable, onPointer, onPayer, dejaVerse, besoinMensuel }: {
     readonly flux: FluxDuMois;
     readonly periode: string;
     /** Ouvre la composition du versable. */
@@ -62,6 +62,8 @@ export function FluxCard(
      * sans Pilote.
      */
     readonly onPointer?: (idRecette: string) => void;
+    /** Ouvre le panneau des sorties sur une échéance. Même règle que `onPointer`. */
+    readonly onPayer?: (idEcheance: string) => void;
     /** Ce qui est déjà sorti vers soi ce mois-ci, ou `null` sans relevé. */
     readonly dejaVerse: Euros | null;
     readonly besoinMensuel: Euros;
@@ -86,7 +88,7 @@ export function FluxCard(
 
   const detaillables = [
     { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes, vers: VERS_FACTURES, onPointer },
-    { cle: 'sorties', titre: 'Sorties', lignes: sorties, vers: VERS_ECHEANCIER }
+    { cle: 'sorties', titre: 'Sorties', lignes: sorties, vers: VERS_ECHEANCIER, onPointer: onPayer }
   ].filter((d) => d.lignes.length > 0);
 
   return (
@@ -129,7 +131,7 @@ export function FluxCard(
               ? <><Montant>{eur(payees as Euros)}</Montant> payé · <Montant>{eur(flux.sorties.total)}</Montant> à venir</>
               : 'Rien à mettre de côté'}
           </p>
-          <Lignes lignes={sorties} vers={VERS_ECHEANCIER} />
+          <Lignes lignes={sorties} vers={VERS_ECHEANCIER} onPointer={onPayer} />
         </div>
 
         <div className={styles.colonne}>
@@ -206,6 +208,21 @@ export function Pastille({ ligne, vers }: { ligne: LigneFlux; vers: string }) {
   return <span className={`${styles.pastille} ${classe}`}>{texte}</span>;
 }
 
+/**
+ * Une ligne se pointe d'ici quand quelque chose reste à régler ET qu'il y a un
+ * fait à régler. « Charges sur encaissements » n'en a pas : c'est une
+ * estimation, qui devient une échéance quand la période est déclarée — elle
+ * garde son lien vers l'écran qui l'explique.
+ */
+export function pointable(l: LigneFlux): boolean {
+  return !l.regle && l.id !== 'a-provisionner';
+}
+
+/** Ce que fait le bouton, pour qui ne voit pas la colonne. */
+export function gesteDe(vers: string): string {
+  return vers === VERS_FACTURES ? 'pointer l’encaissement' : 'pointer le paiement';
+}
+
 /** Les premières lignes d'une colonne, en grand écran seulement. */
 function Lignes(
   { lignes, vers, onPointer }: {
@@ -219,12 +236,12 @@ function Lignes(
     <ul className={styles.items}>
       {lignes.slice(0, LIGNES_PAR_COLONNE).map((l) => (
         <li key={l.id}>
-          {onPointer !== undefined && !l.regle
+          {onPointer !== undefined && pointable(l)
             ? (
               <button type="button" className={styles.item} onClick={() => onPointer(l.id)}>
                 <span className={styles.itemNom}>{l.libelle}</span>
                 <Pastille ligne={l} vers={vers} />
-                <span className={styles.horsEcran}> — pointer l’encaissement</span>
+                <span className={styles.horsEcran}> — {gesteDe(vers)}</span>
               </button>
             )
             : (

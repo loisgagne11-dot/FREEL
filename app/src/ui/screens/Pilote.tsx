@@ -33,6 +33,10 @@ const Composition = lazy(() => import('../components/Composition')
 const Encaissements = lazy(() => import('../components/Encaissements')
   .then((m) => ({ default: m.Encaissements })));
 
+/** Son jumeau pour la colonne Sorties : pointer une échéance payée. Même motif. */
+const Sorties = lazy(() => import('../components/Sorties')
+  .then((m) => ({ default: m.Sorties })));
+
 import { Montant } from '../components/Montant';
 import type { CleComposition } from '../../domain/calculs/composition';
 import type { Mois } from '../../domain/types';
@@ -89,6 +93,9 @@ export function Pilote({ mois: moisChoisi, onMois }: {
   // chaque pointage change les faits, donc rend le Pilote : le focus sautait
   // en tête du panneau à chaque facture pointée.
   const fermerPointage = useCallback(() => setPointage(null), []);
+  /* Le panneau des sorties, ouvert sur l'échéance dont on a cliqué la pastille. */
+  const [paiement, setPaiement] = useState<string | null>(null);
+  const fermerPaiement = useCallback(() => setPaiement(null), []);
   const { ecran, sousRoute } = useRoute();
   /* `#/pilote/encaissements` est un GESTE, comme `#/argent/livre` : l'action
      rapide et « + Nouveau » l'ouvrent de n'importe où, puis l'adresse redevient
@@ -185,6 +192,7 @@ export function Pilote({ mois: moisChoisi, onMois }: {
             periode={moisLong(mois).toLowerCase()}
             onVersable={() => setCompose('versable')}
             onPointer={setPointage}
+            onPayer={setPaiement}
             dejaVerse={soldeEstSuivi(faits) ? verseCeMois : null}
             besoinMensuel={faits.besoinMensuel}
           />
@@ -225,6 +233,12 @@ export function Pilote({ mois: moisChoisi, onMois }: {
       {pointage !== null && (
         <Suspense fallback={null}>
           <Encaissements cible={pointage === '' ? null : pointage} onFermer={fermerPointage} />
+        </Suspense>
+      )}
+
+      {paiement !== null && (
+        <Suspense fallback={null}>
+          <Sorties cible={paiement} onFermer={fermerPaiement} />
         </Suspense>
       )}
 

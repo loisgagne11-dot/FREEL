@@ -423,3 +423,11 @@ chiffre faux.
 | Pointer un encaissement depuis le Pilote | 🟢 | L'ancienne application basculait la facture « payée » d'un clic, sans date ni mode. La nouvelle le faisait seulement dans le facturier ; le Pilote le fait désormais, avec les deux mentions du livre des recettes |
 | Encaisser une facture annulée par un avoir | 🟢 | Accepté jusqu'ici par l'écriture, et proposé par le rapprochement bancaire pour un virement du même montant ; le rapprochement ne la propose plus, et l'écriture la refuse, comme son écriture d'annulation |
 | Date d'encaissement dans le futur | 🟢 | Acceptée ; refusée par le formulaire, au facturier comme au Pilote |
+
+## Lot 17 (11/11) — ce qui change dans les fonctions
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Pointer une échéance payée depuis le Pilote | 🟢 | Seulement à l'échéancier et dans le détail de la dette jusqu'ici ; aussi depuis la colonne Sorties du flux |
+| Date du paiement dans le détail de la dette | 🟢 | « Payé aujourd'hui » seulement : un débit d'hier tombait dans le mauvais mois le premier du mois. Date et montant saisis, comme à l'échéancier |
+| Date de débit dans le futur | 🟢 | Acceptée à l'échéancier ; refusée partout |

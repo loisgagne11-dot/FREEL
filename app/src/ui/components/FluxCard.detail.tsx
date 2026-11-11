@@ -1,7 +1,7 @@
 import type { LigneFlux } from '../../state/selecteurs';
 import { dateCourte, eur } from '../format';
 import { Montant } from './Montant';
-import { Pastille } from './FluxCard';
+import { Pastille, gesteDe, pointable } from './FluxCard';
 import styles from './FluxCard.module.css';
 
 /** Le détail déplié du flux : toutes les lignes, sur la largeur. Différé — voir `FluxCard`. */
@@ -24,7 +24,7 @@ export function DetailDuFlux(
 
 /**
  * Sur téléphone, c'est ici qu'on voit les lignes : la pastille d'une facture en
- * attente y ouvre le même panneau d'encaissement qu'en grand écran.
+ * attente ou d'une échéance à payer y ouvre le même panneau qu'en grand écran.
  */
 function Detail(
   { titre, lignes, vers, onPointer }: {
@@ -44,11 +44,11 @@ function Detail(
             </span>
             <span className={styles.ligneDroite}>
               <span className={styles.ligneMontant}><Montant>{eur(l.montant)}</Montant></span>
-              {onPointer !== undefined && !l.regle
+              {onPointer !== undefined && pointable(l)
                 ? (
                   <button type="button" className={styles.boutonPastille} onClick={() => onPointer(l.id)}>
                     <Pastille ligne={l} vers={vers} />
-                    <span className={styles.horsEcran}> — pointer l’encaissement de {l.libelle}</span>
+                    <span className={styles.horsEcran}> — {gesteDe(vers)} : {l.libelle}</span>
                   </button>
                 )
                 : <a href={vers} className={styles.lienPastille}><Pastille ligne={l} vers={vers} /></a>}

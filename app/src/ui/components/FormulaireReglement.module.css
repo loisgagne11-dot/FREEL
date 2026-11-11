@@ -1,5 +1,6 @@
-/* La date et le mode d'un encaissement. Cibles de 44 px : on pointe un virement
-   au pouce autant qu'à la souris. */
+/* Les deux formulaires de règlement — encaissement d'une facture, paiement
+   d'une échéance — partagent leur allure : même geste, même place des champs.
+   Cibles de 44 px : on pointe un virement au pouce autant qu'à la souris. */
 
 .formulaire { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { DetailDette, LigneDette, StatutLigneDette } from '../../domain/calculs/detailDette';
-import { dateDuJour } from '../../state/selecteurs';
 import { enregistrerPaiement, marquerPeriodeDeclaree } from '../../state/ecritures.echeances';
-import { dateISO } from '../../domain/types';
+import type { DateISO, Euros } from '../../domain/types';
+import { FormulairePaiement } from './FormulairePaiement';
 import { Montant } from './Montant';
 import { useToast } from './Toasts';
 import { dateCourte, eur, moisLong } from '../format';
@@ -133,13 +133,9 @@ function Ligne({ ligne }: { readonly ligne: LigneDette }) {
     );
   }
 
-  function payer(): void {
+  function payer(payeeLe: DateISO, montantPaye: Euros | null): void {
     if (ligne.echeanceId === null) return;
-    // Le montant réellement parti est celui de l'appel, faute de mieux : c'est
-    // le cas ordinaire, et l'écart éventuel se corrige à l'échéancier, où le
-    // montant payé se saisit. Ne rien enregistrer tant qu'on n'a pas les deux
-    // laisserait la dette ouverte pour une différence de quelques centimes.
-    enregistrerPaiement(ligne.echeanceId, dateISO(dateDuJour()), ligne.montant);
+    enregistrerPaiement(ligne.echeanceId, payeeLe, montantPaye);
     signaler(`Paiement enregistré. Le solde s’en trouve allégé d’autant.`);
   }
 
@@ -183,15 +179,20 @@ function Ligne({ ligne }: { readonly ligne: LigneDette }) {
           Enregistrer le paiement
         </button>
       )}
+      {/* « Payé aujourd'hui » ne laissait ni la date ni le montant : un
+          prélèvement passé hier tombait dans le mauvais mois le premier du
+          mois, et l'écart à l'appel partait à l'échéancier. Le formulaire de
+          l'échéancier, le même partout. */}
       {ligne.statut === 'a_payer' && confirme && (
-        <span className={styles.confirmation}>
-          <button type="button" className={styles.actionPrincipale} onClick={payer}>
-            Payé aujourd’hui
-          </button>
-          <button type="button" className={styles.action} onClick={() => setConfirme(false)}>
-            Annuler
-          </button>
-        </span>
+        <div className={styles.confirmation}>
+          <FormulairePaiement
+            focaliser
+            montantAppele={ligne.montant}
+            libelleValider="Confirmer le paiement"
+            onValider={payer}
+            onAnnuler={() => setConfirme(false)}
+          />
+        </div>
       )}
     </li>
   );
