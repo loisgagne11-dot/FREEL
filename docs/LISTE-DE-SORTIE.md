@@ -405,7 +405,8 @@ déclaré à l'URSSAF.
 | « Retirer » une période URSSAF saisie : confirmé, la période reprend le taux connu de l'application | ✅ confirmation SOUS le tableau (`BlocConfirmation`) : dans la cellule, elle poussait les premières colonnes hors de la carte |
 | « Revenir au rythme sur cette semaine » : confirmé, en comptant les corrections qui partent | ✅ compte les journées corrigées |
 | Une seule confirmation (`ConfirmationSurPlace`), que le relevé du lot 21 reprend : le focus va sur « Garder », et revient au bouton quand on garde — au lot 21, le bouton disparaissait sous le focus, qui retombait au début de la page | ✅ Échap renonce sans fermer le panneau qui la contient ; le groupe est nommé par la conséquence |
-| Contrôle visuel : facturier, détail d'une dépense, échéancier, barème, relevé — sombre 1440 et clair 390, jeu de démonstration | ✅ aucun débordement, focus sur « Garder » partout, aucune erreur JS |
+| « Détacher » une pièce (dépense, facture) : un clic, et le fichier ne se rattache qu'en le redéposant ; sur une dépense, la TVA récupérable part avec | ✅ trouvé à la relecture du lot : confirmé, la TVA perdue chiffrée |
+| Contrôle visuel : facturier, livre, détail d'une dépense (suppression, détachement), échéancier, barème, relevé, carnet (mission), semaine (revenir au rythme) — sombre 1440 et clair 390, jeu de démonstration | ✅ aucun débordement, focus sur « Garder » partout, aucune erreur JS |
 
 ## Reste fonctionnel par écran
 

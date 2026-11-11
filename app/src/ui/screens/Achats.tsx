@@ -582,14 +582,26 @@ function DetailDepense(
             <button type="button" className={styles.action} disabled={enCours} onClick={() => void verifier()}>
               Vérifier l’intégrité
             </button>
-            <button
-              type="button"
-              className={styles.action}
-              disabled={enCours}
-              onClick={() => { onAttacher(null); setRetour(null); }}
-            >
-              Détacher
-            </button>
+            {/* Détacher fait perdre la TVA récupérable, et le fichier ne se
+                rattache qu'en le redéposant : confirmé, comme le reste de ce
+                qui ne se défait pas d'un clic. */}
+            <ConfirmationSurPlace
+              libelle="Détacher"
+              precision="la pièce de cette dépense"
+              classeDeclencheur={styles.action}
+              consequence={(
+                <>
+                  La pièce ne sera plus rattachée à cette dépense
+                  {tva.recuperable > 0 && (
+                    <>&nbsp;: ses <Montant>{eurExact(tva.recuperable)}</Montant> de TVA ne seront plus récupérables</>
+                  )}. Le fichier reste dans l’archive des justificatifs, parmi les
+                  pièces sans fait&nbsp;; pour le rattacher, il faudra le redéposer.
+                </>
+              )}
+              libelleConfirmer="Détacher la pièce"
+              desactive={enCours}
+              onConfirmer={() => { onAttacher(null); setRetour(null); }}
+            />
           </div>
         )}
 

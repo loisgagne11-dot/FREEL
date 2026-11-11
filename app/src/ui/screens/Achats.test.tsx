@@ -90,6 +90,24 @@ describe('dépôt d’une pièce', () => {
     await screen.findByText(/Pièce conservée : facture\.pdf/);
   });
 
+  /**
+   * Détacher fait perdre la TVA récupérable, et le fichier ne se rattache
+   * qu'en le redéposant : un clic suffisait.
+   */
+  it('ne détache la pièce qu’après avoir dit la TVA qui part', async () => {
+    semer({ depenses: [depense({ justificatifId: 'j1' })] });
+    rendre();
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: /Abonnement/ }));
+    await utilisateur.click(screen.getByRole('button', { name: /^Détacher/ }));
+
+    expect(useFaits.getState().faits.depenses[0]?.justificatifId).toBe('j1');
+    const confirmation = screen.getByRole('group', { name: /ne sera plus rattachée/ });
+    expect(confirmation.textContent).toMatch(/20,00.*de TVA ne seront plus récupérables/su);
+    await utilisateur.click(screen.getByRole('button', { name: 'Détacher la pièce' }));
+    expect(useFaits.getState().faits.depenses[0]?.justificatifId).toBeNull();
+  });
+
   // Un fichier refusé ne doit surtout pas rendre la TVA récupérable : c'est
   // exactement le `piece: true` sans fichier de l'ancienne version.
   it('refuse un format non accepté sans rien rattacher, et dit pourquoi', async () => {
