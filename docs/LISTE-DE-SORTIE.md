@@ -337,8 +337,22 @@ premier critère d'ordre, l'irréversible.
 | « Émettre » depuis le brouillon du mois (facturier) conserve ses lignes (jours × TJM) — et sa TVA en franchise (zéro, connue), qu'il ne portait pas : la facture ne pouvait pas être revue et le dossier de TVA la signalait « inconnue » | ✅ en franchise ; montant entier en une quantité quand la division ne tombe pas juste |
 | « Revoir la facture » rétablit les lignes conservées, plusieurs taux compris ; refuse si elles ne retombent pas sur le montant et la TVA du livre ; une facture d'avant le schéma 20 garde le comportement actuel | ✅ |
 | Ventiler la TVA d'une facture à plusieurs taux dans le dossier de déclaration | ⬜ hors lot : les lignes le permettront |
-| « Émettre » depuis le brouillon du mois HORS franchise : ni TVA ni lignes conservées (le taux n'est pas choisi), donc pas de réédition possible | ⬜ hors lot : passer par l'éditeur prérempli plutôt que de supposer un taux |
+| « Émettre » depuis le brouillon du mois HORS franchise : ni TVA ni lignes conservées (le taux n'est pas choisi), donc pas de réédition possible | ⬜ lot 19 : passer par l'éditeur prérempli plutôt que de supposer un taux |
 | Le jeu de démonstration portait une TVA « inconnue » sur toutes ses factures alors qu'il est en franchise : aucune ne pouvait être revue | ✅ trouvé en cours de lot : TVA nulle et lignes fictives (deux factures à deux lignes) |
+
+### Lot 19 — Le brouillon du mois s'émet par l'éditeur hors franchise (priorité 2 : le faux)
+
+Hors franchise, « Émettre cette facture » depuis le brouillon du mois porte au
+livre une facture sans TVA ni lignes : le taux n'est pas choisi à cet endroit.
+Elle ne peut ensuite ni être revue ni être téléchargée — le client a reçu un
+document que l'application ne sait plus produire —, et le dossier de TVA la
+compte « inconnue ».
+
+| Ligne | État |
+|---|---|
+| `#/facture/brouillon:<mois>:<client>` ouvre l'éditeur prérempli depuis le brouillon : client, une ligne par mission en jours × prix journalier ; recalculé depuis les faits (rien de stocké, un rechargement le retrouve) ; un brouillon disparu ouvre l'éditeur vide et le dit | ⬜ |
+| Hors franchise, le brouillon propose « Rédiger cette facture » (l'éditeur prérempli, où le taux se choisit) à la place de « Émettre » | ⬜ |
+| En franchise, « Émettre cette facture » reste en un clic (lot 18), et « Ajuster avant d'émettre » ouvre l'éditeur prérempli | ⬜ |
 
 ## Reste fonctionnel par écran
 
