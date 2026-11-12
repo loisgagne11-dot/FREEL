@@ -74,6 +74,35 @@ export interface MouvementBancaire {
    * suis-je versé ce mois-ci », que rien ne savait dire.
    */
   readonly sansContrepartie: MotifSansContrepartie | null;
+  /**
+   * L'utilisateur a écarté cette opération : elle ne regarde pas l'activité.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * « IGNORÉE » N'EST PAS « SANS CONTREPARTIE »
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * « Sans contrepartie » dit : l'argent a bougé, aucune écriture ne le porte,
+   * donc le mouvement COMPTE dans le solde calculé — des frais bancaires, une
+   * rémunération. « Ignorée » dit l'inverse : cette ligne ne change rien à ce
+   * que l'application compte — un virement vers un autre de tes comptes, une
+   * opération annulée et sa contre-passation. Elle sort de la file à traiter
+   * et n'entre dans aucun total.
+   *
+   * Le motif `autre` servait aux deux, et c'était faux dans un sens ou dans
+   * l'autre : 5 000 € mis de côté sur un livret, pointés « sans
+   * contrepartie », faisaient baisser le solde calculé de 5 000 € qui n'ont
+   * pas été dépensés.
+   *
+   * Un booléen et non une date : rien ne se calcule sur le jour où l'on a
+   * écarté une ligne. Exclusif des deux autres états — les écritures le
+   * tiennent (`ecritures.achats`).
+   */
+  readonly ignoree: boolean;
+}
+
+/** Ni rapprochée, ni pointée sans contrepartie, ni ignorée : elle attend une décision. */
+export function estATraiter(m: MouvementBancaire): boolean {
+  return m.rapprocheAvec === null && m.sansContrepartie === null && !m.ignoree;
 }
 
 /**
@@ -131,7 +160,8 @@ export function importerMouvements(
       libelle: ligne.libelle,
       montant: ligne.montant,
       rapprocheAvec: null,
-      sansContrepartie: null
+      sansContrepartie: null,
+      ignoree: false
     });
     ajoutes += 1;
   }
@@ -189,7 +219,7 @@ export function candidatsPour(
   ecritures: readonly EcritureRapprochable[],
   fenetreJours: number = FENETRE_JOURS
 ): readonly EcritureRapprochable[] {
-  if (mouvement.rapprocheAvec !== null || mouvement.sansContrepartie !== null) return [];
+  if (!estATraiter(mouvement)) return [];
 
   const natureAttendue = mouvement.montant < 0 ? 'depense' : 'recette';
   const cible = Math.abs(mouvement.montant);
@@ -212,6 +242,8 @@ export interface ResumeRapprochement {
   readonly total: number;
   readonly rapproches: number;
   readonly sansContrepartie: number;
+  /** Opérations écartées par l'utilisateur : hors file, hors totaux. */
+  readonly ignorees: number;
   /** Mouvements pour lesquels exactement une écriture correspond. */
   readonly propositionsEvidentes: number;
   /** Mouvements pour lesquels plusieurs écritures correspondent. */
@@ -235,6 +267,7 @@ export function resumerRapprochement(
 ): ResumeRapprochement {
   let rapproches = 0;
   let sansContrepartie = 0;
+  let ignorees = 0;
   let evidentes = 0;
   let ambigus = 0;
   let sansCandidat = 0;
@@ -242,6 +275,7 @@ export function resumerRapprochement(
   for (const m of mouvements) {
     if (m.rapprocheAvec !== null) { rapproches += 1; continue; }
     if (m.sansContrepartie !== null) { sansContrepartie += 1; continue; }
+    if (m.ignoree) { ignorees += 1; continue; }
     const n = candidatsPour(m, ecritures, fenetreJours).length;
     if (n === 0) sansCandidat += 1;
     else if (n === 1) evidentes += 1;
@@ -252,6 +286,7 @@ export function resumerRapprochement(
     total: mouvements.length,
     rapproches,
     sansContrepartie,
+    ignorees,
     propositionsEvidentes: evidentes,
     ambigus,
     sansCandidat

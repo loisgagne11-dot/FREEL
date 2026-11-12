@@ -1,6 +1,6 @@
 {
   "_lisezMoi": "Jeu d’essai à FORME RÉELLE, entièrement fictif : mêmes structures qu’un compte réel (ACRE qui s’éteint, TVA franchie en cours d’année, avoir, foyer à deux parts, passage du 31 décembre), aucune donnée personnelle. Il sert aux tests d’intégration (src/integration) et à capturer-app.mjs --jeu=essai, jamais à la démonstration.",
-  "version": 20,
+  "version": 21,
   "entreprise": {
     "nom": "Entreprise Démo Indépendant",
     "prenom": "",
@@ -666,7 +666,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-02",
@@ -674,7 +675,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-03",
@@ -682,7 +684,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-04",
@@ -690,7 +693,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-05",
@@ -698,7 +702,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-06",
@@ -706,7 +711,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-07",
@@ -714,7 +720,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-08",
@@ -722,7 +729,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-09",
@@ -730,7 +738,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-10",
@@ -738,7 +747,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     },
     {
       "id": "mv-remuneration-2026-11",
@@ -746,7 +756,8 @@
       "libelle": "VIR VERS COMPTE PERSONNEL DEMO",
       "montant": -3000,
       "rapprocheAvec": null,
-      "sansContrepartie": "remuneration"
+      "sansContrepartie": "remuneration",
+      "ignoree": false
     }
   ],
   "periodesUrssafAjoutees": [],
@@ -757,21 +768,66 @@
   "partGardeeAuVersement": 0.1,
   "objectifCaAnnuel": 80000,
   "periodesDeclarees": [
-    "2025-04",
-    "2025-05",
-    "2025-06",
-    "2025-07",
-    "2025-08",
-    "2025-09",
-    "2025-10",
-    "2025-11",
-    "2025-12",
-    "2026-01",
-    "2026-02",
-    "2026-03",
-    "2026-04",
-    "2026-05",
-    "2026-06"
+    {
+      "mois": "2025-04",
+      "declareeLe": "2025-07-31"
+    },
+    {
+      "mois": "2025-05",
+      "declareeLe": "2025-07-31"
+    },
+    {
+      "mois": "2025-06",
+      "declareeLe": "2025-07-31"
+    },
+    {
+      "mois": "2025-07",
+      "declareeLe": "2025-10-31"
+    },
+    {
+      "mois": "2025-08",
+      "declareeLe": "2025-10-31"
+    },
+    {
+      "mois": "2025-09",
+      "declareeLe": "2025-10-31"
+    },
+    {
+      "mois": "2025-10",
+      "declareeLe": "2026-01-30"
+    },
+    {
+      "mois": "2025-11",
+      "declareeLe": "2026-01-30"
+    },
+    {
+      "mois": "2025-12",
+      "declareeLe": "2026-01-30"
+    },
+    {
+      "mois": "2026-01",
+      "declareeLe": "2026-04-30"
+    },
+    {
+      "mois": "2026-02",
+      "declareeLe": "2026-04-30"
+    },
+    {
+      "mois": "2026-03",
+      "declareeLe": "2026-04-30"
+    },
+    {
+      "mois": "2026-04",
+      "declareeLe": "2026-07-31"
+    },
+    {
+      "mois": "2026-05",
+      "declareeLe": "2026-07-31"
+    },
+    {
+      "mois": "2026-06",
+      "declareeLe": "2026-07-31"
+    }
   ],
   "echeances": [
     {

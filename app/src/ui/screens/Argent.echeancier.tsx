@@ -1,11 +1,14 @@
 import { useId, useMemo } from 'react';
 import { useFaits } from '../../state/store';
-import { annulerPeriodeDeclaree, marquerPeriodeDeclaree } from '../../state/ecritures.echeances';
-import type { Euros, Mois, Resolution } from '../../domain/types';
+import { annulerDeclaration, declarerPeriode } from '../../state/ecritures.echeances';
+import type { DateISO, Euros, Mois, Resolution } from '../../domain/types';
+import { estPayee } from '../../domain/calculs/provisions';
 import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
 import { soldeImpotPrevuDe } from '../../state/selecteurs.impotCalendrier';
 import { montantDeclaration } from '../../state/selecteurs.aTraiter';
-import { type PeriodeADeclarer, periodesADeclarer } from '../../domain/calculs/declarations';
+import {
+  type PeriodeADeclarer, appelsDeLaPeriode, dateDeDeclaration, moisDeclares, periodesADeclarer
+} from '../../domain/calculs/declarations';
 import { Echeances } from '../components/Echeances';
 import { FriseEcheances } from '../components/FriseEcheances';
 import { Info } from '../components/Info';
@@ -96,7 +99,7 @@ export function Echeancier({ annee }: { readonly annee: number }) {
  * et ce qui est dû sur des recettes encaissées mais pas encore déclaré. Le
  * second bascule dans le premier au moment de la déclaration.
  *
- * `marquerPeriodeDeclaree` existait dans le magasin. Aucun écran ne l'appelait.
+ * L'écriture existait dans le magasin. Aucun écran ne l'appelait.
  * Une période déclarée restait donc à jamais dans le volet « à provisionner » :
  * les provisions montaient sans jamais redescendre, et le versable baissait
  * d'autant. On mettait de côté deux fois la même dette.
@@ -111,8 +114,6 @@ export function Echeancier({ annee }: { readonly annee: number }) {
  */
 function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
   const faits = useFaits((e) => e.faits);
-  const marquer = marquerPeriodeDeclaree;
-  const annuler = annulerPeriodeDeclaree;
   const signaler = useToast();
 
   // Le début d'activité fait apparaître les périodes closes SANS recette : la
@@ -120,7 +121,7 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
   const periodes = useMemo(() => periodesADeclarer(
     recettesEncaissees(faits),
     faits.entreprise.urssafPeriodicite,
-    faits.periodesDeclarees,
+    moisDeclares(faits.periodesDeclarees),
     dateDuJour(),
     faits.entreprise.debutActivite === null ? null : faits.entreprise.debutActivite.slice(0, 7) as Mois
   ), [faits]);
@@ -165,11 +166,31 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
               ? (
                 <span className={styles.declarationActions}>
                   <Statut libelle="Déclarée" ton="ok" />
+                  {/* La date se lit ET se corrige au même endroit : un champ
+                      vide dit « date non enregistrée » — le cas de toute
+                      période cochée avant qu'elle existe — sans phrase de
+                      plus, et le remplir est le geste qui la complète. Pas
+                      de date future : on ne déclare pas demain. */}
+                  <label className={styles.declarationDate}>
+                    <span>le</span>
+                    <input
+                      type="date"
+                      aria-label={`Date de déclaration de ${p.libelle}`}
+                      value={dateDeDeclaration(p.mois, faits.periodesDeclarees) ?? ''}
+                      max={dateDuJour()}
+                      onChange={(e) => {
+                        const saisie = e.target.value;
+                        if (saisie !== '' && saisie > dateDuJour()) return;
+                        declarerPeriode(p.mois, saisie === '' ? null : saisie as DateISO);
+                      }}
+                    />
+                  </label>
+                  <SuiteDuCycle periode={p} />
                   <button
                     type="button"
                     className={styles.actionLigne}
                     onClick={() => {
-                      for (const m of p.mois) annuler(m);
+                      annulerDeclaration(p.mois);
                       signaler(`${p.libelle} n’est plus marquée déclarée.`);
                     }}
                   >
@@ -183,8 +204,10 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
                     type="button"
                     className={styles.actionLigne}
                     onClick={() => {
-                      for (const m of p.mois) marquer(m);
-                      signaler(`${p.libelle} marquée déclarée.`);
+                      // Datée du jour : on la coche en sortant du site de
+                      // l'URSSAF. Le champ qui apparaît la corrige.
+                      declarerPeriode(p.mois, dateDuJour());
+                      signaler(`${p.libelle} marquée déclarée aujourd’hui.`);
                     }}
                   >
                     Marquer déclarée
@@ -204,6 +227,33 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
       </ul>
     </section>
   );
+}
+
+/**
+ * La dernière étape du cycle « à déclarer → déclarée le … → payée le … ».
+ *
+ * Elle se lit sur l'appel de cotisations saisi pour la période, quand il y en
+ * a un. Sans appel, rien n'est dit plutôt qu'un « non payée » : l'absence
+ * d'échéance saisie ne prouve pas l'absence de paiement — une déclaration à
+ * zéro n'en a pas, et une période reprise de l'ancienne application non plus.
+ */
+function SuiteDuCycle({ periode: p }: { periode: PeriodeADeclarer }) {
+  const echeances = useFaits((e) => e.faits.echeances);
+  const appels = appelsDeLaPeriode(p.limite, echeances);
+  if (appels.length === 0) return null;
+
+  const impayes = appels.filter((e) => !estPayee(e));
+  if (impayes.length > 0) {
+    const limite = impayes.map((e) => e.echeanceLe).sort()[0] as DateISO;
+    const depassee = limite < dateDuJour();
+    return (
+      <span className={depassee ? styles.declarationSuiteRetard : styles.declarationSuiteAFaire}>
+        {depassee ? `à payer depuis le ${dateCourte(limite)}` : `à payer avant le ${dateCourte(limite)}`}
+      </span>
+    );
+  }
+  const payeeLe = appels.map((e) => e.payeeLe as DateISO).sort().at(-1) as DateISO;
+  return <span className={styles.declarationSuite}>payée le {dateCourte(payeeLe)}</span>;
 }
 
 /** « À payer 1 970 € · avant le 31 juillet » — ou « date limite dépassée ». */

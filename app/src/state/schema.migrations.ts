@@ -28,8 +28,9 @@
  * schémas que `VERSION_SCHEMA` a dépassés depuis longtemps.
  */
 
-import type { DateISO, Euros } from '../domain/types';
+import type { DateISO, Euros, Mois } from '../domain/types';
 import type { MotifSansContrepartie, MouvementBancaire } from '../domain/calculs/banque';
+import type { PeriodeDeclaree } from '../domain/calculs/declarations';
 import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
 import {
@@ -224,7 +225,15 @@ function mouvementsDuSchema4(brut: unknown): readonly MouvementBancaire[] {
         // Le requalifier en rémunération inventerait une information.
         : ancien === true ? 'autre'
           : null;
-    return [{ ...(o as unknown as MouvementBancaire), sansContrepartie: motif }];
+    /* v20 → v21 : `ignoree`, apparu dans un élément de liste. Comblé à
+       `false` — personne n'a pu écarter une ligne avant que le geste existe.
+       Laissé `undefined`, il se lirait « pas ignorée » par chance, jusqu'au
+       jour où quelqu'un écrirait `ignoree === false`. */
+    return [{
+      ...(o as unknown as MouvementBancaire),
+      sansContrepartie: motif,
+      ignoree: o['ignoree'] === true
+    }];
   });
 }
 
@@ -431,6 +440,45 @@ function recettesDuSchema19(recettes: readonly Recette[]): readonly Recette[] {
 }
 
 /**
+ * v20 → v21 : la période déclarée porte sa date.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA LISTE EST LÀ, DONC LA FUSION DE SURFACE LA LAISSE PASSER — FAUSSE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * `periodesDeclarees` valait `['2026-04', …]` ; elle vaut désormais
+ * `[{ mois, declareeLe }]`. Sans conversion, `p.mois` vaudrait `undefined`
+ * sur chaque élément : plus aucune période ne serait reconnue déclarée, le
+ * Pilote les réclamerait toutes à nouveau et les provisions remonteraient de
+ * toute la dette déjà déclarée — donc déjà appelée, donc comptée deux fois.
+ *
+ * La date est `null`, jamais devinée : ni la date limite (ce serait affirmer
+ * que tout a été déclaré à l'heure), ni le jour de la migration. Un mois en
+ * double n'est gardé qu'une fois, et celui qui porte une date l'emporte.
+ */
+function periodesDeclareesDuSchema20(brut: unknown): readonly PeriodeDeclaree[] {
+  if (!Array.isArray(brut)) return [];
+  const parMois = new Map<string, PeriodeDeclaree>();
+  for (const p of brut) {
+    let periode: PeriodeDeclaree | null = null;
+    if (typeof p === 'string') periode = { mois: p as Mois, declareeLe: null };
+    else if (typeof p === 'object' && p !== null) {
+      const o = p as Record<string, unknown>;
+      if (typeof o['mois'] === 'string') {
+        periode = {
+          mois: o['mois'] as Mois,
+          declareeLe: typeof o['declareeLe'] === 'string' ? o['declareeLe'] as DateISO : null
+        };
+      }
+    }
+    if (periode === null) continue;
+    const deja = parMois.get(periode.mois);
+    if (deja === undefined || deja.declareeLe === null) parMois.set(periode.mois, periode);
+  }
+  return [...parMois.values()].sort((a, b) => a.mois.localeCompare(b.mois));
+}
+
+/**
  * Complète un bloc validé avec les valeurs par défaut des champs absents, et
  * CONVERTIT les formats des schémas antérieurs.
  *
@@ -514,6 +562,11 @@ function recettesDuSchema19(recettes: readonly Recette[]): readonly Recette[] {
  * SOUS-OBJET, pas d'une liste : `{ ...entrepriseVide(), ...entreprise }`
  * ci-dessous le comble à la chaîne vide. Test nommé : « un compte de schéma
  * 18 reçoit un prénom vide, et non `undefined` ».
+ *
+ * v20 → v21 : deux champs qui bougent DANS des listes — la période déclarée
+ * devient un enregistrement daté (`periodesDeclareesDuSchema20`), l'opération
+ * du relevé gagne `ignoree` (`mouvementsDuSchema4`, qui parcourt déjà chaque
+ * mouvement).
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
@@ -540,6 +593,7 @@ export function completerFaits(brut: unknown): Faits {
     missions: missionsDuSchema1(o['missions']),
     mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires']),
     echeances: echeancesDuSchema5(o['echeances']),
+    periodesDeclarees: periodesDeclareesDuSchema20(o['periodesDeclarees']),
     recettes: recettesDuSchema19(recettesDuSchema15(
       recettesDuSchema12(recettesDuSchema6(o['recettes']), o['clients'])
     ))

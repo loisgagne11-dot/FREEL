@@ -1,9 +1,11 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { marquerSansContrepartie, rapprocherMouvement, retirerMouvement, viderReleve } from '../../state/ecritures.achats';
+import {
+  ignorerMouvement, marquerSansContrepartie, rapprocherMouvement, retirerMouvement, viderReleve
+} from '../../state/ecritures.achats';
 import { importerReleve } from '../../state/ecritures.carnet';
 import { etatAchats } from '../../state/selecteurs.achats';
-import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calculs/banque';
+import { type EcritureRapprochable, type MouvementBancaire, estATraiter } from '../../domain/calculs/banque';
 import { decoderFichier, lireReleve, type RapportLecture } from '../../infra/releveCsv';
 import { Info } from '../components/Info';
 import { CartePliable } from '../components/CartePliable';
@@ -181,6 +183,13 @@ export function Releve() {
                   application appariait seule et n’en laissait aucune
                   trace&nbsp;: un appariement faux devenait invisible, et
                   « tout est rapproché » ne renvoyait à aucun fait vérifiable.
+                  {' '}Une opération qu’aucune écriture ne porte se classe de
+                  deux façons. « Sans contrepartie »&nbsp;: l’argent a bien
+                  bougé — des frais bancaires, un remboursement — et elle
+                  compte dans ton solde calculé. « Ignorer »&nbsp;: elle ne
+                  regarde pas ton activité — un virement vers un autre de tes
+                  comptes, une opération annulée — et elle ne compte nulle
+                  part. Les deux se reprennent.
                 </Info>}
             resume={syntheseRapprochement(etat.mouvements)}
           >
@@ -231,9 +240,9 @@ function Interpretation({ rapport }: { rapport: RapportLecture }) {
   );
 }
 
-/** Les opérations sur lesquelles on a déjà tranché : rapprochées, ou pointées sans contrepartie. */
+/** Les opérations sur lesquelles on a déjà tranché : rapprochées, pointées sans contrepartie, ou ignorées. */
 function pointees(mouvements: readonly MouvementBancaire[]): number {
-  return mouvements.filter((m) => m.rapprocheAvec !== null || m.sansContrepartie !== null).length;
+  return mouvements.filter((m) => !estATraiter(m)).length;
 }
 
 function LigneMouvement(
@@ -244,6 +253,7 @@ function LigneMouvement(
 ) {
   const rapprocher = rapprocherMouvement;
   const marquerSans = marquerSansContrepartie;
+  const ignorer = ignorerMouvement;
   const debit = mouvement.montant < 0;
 
   return (
@@ -290,6 +300,21 @@ function LigneMouvement(
               </button>
             </span>
           )
+          : mouvement.ignoree
+            ? (
+              <span className={styles.actions}>
+                {/* Dit ce que l'état fait au solde : c'est toute la différence
+                    avec « sans contrepartie », et elle ne se devine pas. */}
+                <span className={styles.etat}>Ignorée — ne compte pas dans ton solde</span>
+                <button
+                  type="button"
+                  className={styles.action}
+                  onClick={() => ignorer(mouvement.id, false)}
+                >
+                  Reprendre
+                </button>
+              </span>
+            )
           : (
             <>
               {candidats.length === 0
@@ -335,6 +360,17 @@ function LigneMouvement(
                   onClick={() => marquerSans(mouvement.id, 'autre')}
                 >
                   Sans contrepartie
+                </button>
+                {/* Ce que le geste fait au solde est dit dans l'aide de la
+                    carte, puis sur la ligne une fois ignorée : des frais
+                    bancaires ignorés laisseraient le solde calculé trop haut
+                    de leur montant, et rien d'autre ne le signalerait. */}
+                <button
+                  type="button"
+                  className={styles.action}
+                  onClick={() => ignorer(mouvement.id, true)}
+                >
+                  Ignorer
                 </button>
               </span>
             </>
@@ -390,13 +426,15 @@ function Chiffre(
  * attente suffit à décider, et il se lit sans démasquer l'écran.
  */
 function syntheseRapprochement(mouvements: readonly MouvementBancaire[]): string {
-  const enAttente = mouvements.filter(
-    (m) => m.rapprocheAvec === null && m.sansContrepartie === null
-  ).length;
+  const enAttente = mouvements.filter(estATraiter).length;
   if (mouvements.length === 0) return 'Aucune opération importée.';
+  // Les ignorées se disent : « toutes traitées » ne doit pas laisser croire
+  // que tout a été rapproché quand une part a été écartée.
+  const ignorees = mouvements.filter((m) => m.ignoree).length;
+  const suite = ignorees === 0 ? '' : ` ${ignorees} ignorée${ignorees > 1 ? 's' : ''}.`;
   if (enAttente === 0) {
-    return `${mouvements.length} opération${mouvements.length > 1 ? 's' : ''}, toutes traitées.`;
+    return `${mouvements.length} opération${mouvements.length > 1 ? 's' : ''}, toutes traitées.${suite}`;
   }
   return `${enAttente} opération${enAttente > 1 ? 's' : ''} à rapprocher `
-    + `sur ${mouvements.length}.`;
+    + `sur ${mouvements.length}.${suite}`;
 }

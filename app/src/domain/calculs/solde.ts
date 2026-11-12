@@ -40,7 +40,7 @@
  * COMMENT ÇA ÉVITE LE DOUBLE COMPTAGE — Y COMPRIS PENDANT LE RAPPROCHEMENT
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Un mouvement bancaire a trois états, mutuellement exclusifs par
+ * Un mouvement bancaire a quatre états, mutuellement exclusifs par
  * construction (voir `MouvementBancaire`) :
  *
  *   - RAPPROCHÉ (`rapprocheAvec` posé)   : sa somme est DÉJÀ comptée, via le
@@ -52,6 +52,10 @@
  *     déjà compté ou représente un mouvement inconnu. Le compter par défaut
  *     recréerait exactement le risque que ce calcul doit éviter ; l'écran
  *     Relevé existe pour lever cette ambiguïté, pas ce module.
+ *   - IGNORÉ (`ignoree`) : l'utilisateur a dit que la ligne ne regarde pas
+ *     l'activité — un virement vers un autre de ses comptes. Elle ne compte
+ *     pas : c'est précisément ce qui la distingue de « sans contrepartie ».
+ *     Classée, elle ne retient plus le solde dans l'état « dérivé ».
  *
  * Seul le second cas contribue au solde. Le premier est exclu — le fait
  * associé porte déjà sa valeur. Le troisième est exclu aussi, ce qui répond
@@ -61,7 +65,7 @@
  */
 
 import { type DateISO, type Euros, euros } from '../types';
-import type { MouvementBancaire } from './banque';
+import { type MouvementBancaire, estATraiter } from './banque';
 import { soldeBancaire } from './banque.solde';
 import type { Depense } from './depenses';
 import { type Echeance, type RecetteEncaissee, estPayee } from './provisions';
@@ -222,9 +226,7 @@ export function provenanceSolde(
 
   if (!aDesFaits && !aUnReleve) return 'saisi';
 
-  const toutClasse = mouvements.every(
-    (m) => m.rapprocheAvec !== null || m.sansContrepartie !== null
-  );
+  const toutClasse = mouvements.every((m) => !estATraiter(m));
   if (aUnReleve && toutClasse) return 'rapproche';
 
   return 'derive';
@@ -292,7 +294,9 @@ export function soldeDerive(
    */
   const mouvementsRetenus = soldeInitialAu === null
     ? mouvements
-    : mouvements.filter((m) => m.sansContrepartie !== null);
+    // Une opération ignorée ne porte pas de motif : elle reste dehors, et
+    // c'est la règle — voir `MouvementBancaire['ignoree']`.
+    : mouvements.filter((m) => m.sansContrepartie !== null && !m.ignoree);
   const partBanque = soldeBancaire(soldeInitial, mouvementsRetenus);
 
   // Sans date, aucun fait n'est retenu : voir l'en-tête de la fonction. Avec

@@ -259,7 +259,7 @@ describe('données', () => {
   }
 
   it('dit combien de faits sont conservés, et où', async () => {
-    await ouvrirDonnees({ periodesDeclarees: [mois('2026-06')] });
+    await ouvrirDonnees({ periodesDeclarees: [{ mois: mois('2026-06'), declareeLe: null }] });
     // Le normaliseur de Testing Library ramène l'espace insécable à une espace.
     expect(screen.getByText(/1 période déclarée/)).toBeTruthy();
     expect(screen.getByText('freel.faits.v1')).toBeTruthy();
@@ -403,7 +403,7 @@ describe('trésorerie', () => {
       ...faitsVides(),
       mouvementsBancaires: [{
         id: 'mv1', date: dateISO('2026-08-01'), libelle: 'Virement',
-        montant: euros(1000), rapprocheAvec: null, sansContrepartie: null
+        montant: euros(1000), rapprocheAvec: null, sansContrepartie: null, ignoree: false
       }]
     };
     useFaits.setState({ faits });

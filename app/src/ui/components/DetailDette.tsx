@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { DetailDette, LigneDette, StatutLigneDette } from '../../domain/calculs/detailDette';
-import { enregistrerPaiement, marquerPeriodeDeclaree } from '../../state/ecritures.echeances';
+import { declarerPeriode, enregistrerPaiement } from '../../state/ecritures.echeances';
+import { dateDuJour } from '../../state/selecteurs';
 import type { DateISO, Euros } from '../../domain/types';
 import { FormulairePaiement } from './FormulairePaiement';
 import { Montant } from './Montant';
@@ -126,7 +127,9 @@ function Ligne({ ligne }: { readonly ligne: LigneDette }) {
   const [confirme, setConfirme] = useState(false);
 
   function declarer(): void {
-    marquerPeriodeDeclaree(ligne.mois);
+    // Datée du jour : c'est en sortant du site de l'URSSAF qu'on la coche.
+    // La date se corrige dans l'échéancier.
+    declarerPeriode([ligne.mois], dateDuJour());
     signaler(
       `${moisLong(ligne.mois)} marqué déclaré. Sa dette quitte l’estimation `
       + 'et attend son appel.'
@@ -169,7 +172,7 @@ function Ligne({ ligne }: { readonly ligne: LigneDette }) {
       {/*
         * ENREGISTRER UN PAIEMENT DEMANDE UNE CONFIRMATION.
         *
-        * Déclarer une période se défait (`annulerPeriodeDeclaree`). Un
+        * Déclarer une période se défait (`annulerDeclaration`). Un
         * paiement enregistré fait bouger le solde et le disponible, donc ce
         * qu'on croit pouvoir se verser. Un clic malencontreux sur une liste
         * qu'on parcourt coûterait plus cher que le clic de confirmation.

@@ -19,19 +19,37 @@ import { ecrireFaits, useFaits } from './store';
 const faitsCourants = (): Faits => useFaits.getState().faits;
 
 /**
- * Marque une période comme déclarée. C'est ce fait qui fait basculer la dette
- * du volet « à provisionner » vers le volet « constaté » — sans lui, les
- * provisions surestiment la dette (voir `calculs/provisions.ts`).
+ * Marque une période déclarée, À UNE DATE — ou corrige cette date.
+ *
+ * C'est ce fait qui fait basculer la dette du volet « à provisionner » vers le
+ * volet « constaté » — sans lui, les provisions surestiment la dette (voir
+ * `calculs/provisions.ts`).
+ *
+ * Tous les mois de la période en UNE écriture : un trimestre marqué mois par
+ * mois faisait trois écritures, et une interruption entre deux laissait un
+ * trimestre déclaré aux deux tiers — que la règle lit « pas déclaré », pendant
+ * que les provisions en avaient déjà sorti deux mois.
+ *
+ * Un mois déjà déclaré prend la nouvelle date : c'est ainsi que se complète
+ * une période cochée avant que la date existe (`null`), et que se corrige une
+ * date mal saisie.
  */
-export function marquerPeriodeDeclaree(m: Mois): void {
+export function declarerPeriode(mois: readonly Mois[], declareeLe: DateISO | null): void {
   const actuel = faitsCourants();
-  if (actuel.periodesDeclarees.includes(m)) return; // idempotent
-  ecrireFaits({ ...actuel, periodesDeclarees: [...actuel.periodesDeclarees, m].sort() });
+  const autres = actuel.periodesDeclarees.filter((p) => !mois.includes(p.mois));
+  const nouvelles = mois.map((m) => ({ mois: m, declareeLe }));
+  ecrireFaits({
+    ...actuel,
+    periodesDeclarees: [...autres, ...nouvelles].sort((a, b) => a.mois.localeCompare(b.mois))
+  });
 }
 
-export function annulerPeriodeDeclaree(m: Mois): void {
+export function annulerDeclaration(mois: readonly Mois[]): void {
   const actuel = faitsCourants();
-  ecrireFaits({ ...actuel, periodesDeclarees: actuel.periodesDeclarees.filter((p) => p !== m) });
+  ecrireFaits({
+    ...actuel,
+    periodesDeclarees: actuel.periodesDeclarees.filter((p) => !mois.includes(p.mois))
+  });
 }
 
 /**

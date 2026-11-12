@@ -97,7 +97,8 @@ export function rapprocherMouvement(mouvementId: string, ecritureId: string | nu
   ecrireFaits({
     ...actuel,
     mouvementsBancaires: actuel.mouvementsBancaires.map((m) =>
-      (m.id === mouvementId ? { ...m, rapprocheAvec: ecritureId, sansContrepartie: null } : m))
+      (m.id === mouvementId
+        ? { ...m, rapprocheAvec: ecritureId, sansContrepartie: null, ignoree: false } : m))
   });
 }
 
@@ -113,7 +114,27 @@ export function marquerSansContrepartie(mouvementId: string, motif: MotifSansCon
   ecrireFaits({
     ...actuel,
     mouvementsBancaires: actuel.mouvementsBancaires.map((m) =>
-      (m.id === mouvementId ? { ...m, sansContrepartie: motif, rapprocheAvec: null } : m))
+      (m.id === mouvementId
+        ? { ...m, sansContrepartie: motif, rapprocheAvec: null, ignoree: false } : m))
+  });
+}
+
+/**
+ * Écarte une opération qui ne regarde pas l'activité — ou la reprend avec
+ * `false`, ce qui la remet dans la file « à traiter ».
+ *
+ * Ignorer lève le rapprochement et le motif : une ligne à la fois ignorée et
+ * « sans contrepartie » compterait dans le solde calculé tout en étant dite
+ * hors de tout total. Les trois états s'excluent ici, à l'écriture, pour que
+ * les lecteurs n'aient jamais à départager.
+ */
+export function ignorerMouvement(mouvementId: string, ignoree: boolean): void {
+  const actuel = faitsCourants();
+  ecrireFaits({
+    ...actuel,
+    mouvementsBancaires: actuel.mouvementsBancaires.map((m) =>
+      (m.id === mouvementId
+        ? { ...m, ignoree, rapprocheAvec: null, sansContrepartie: null } : m))
   });
 }
 

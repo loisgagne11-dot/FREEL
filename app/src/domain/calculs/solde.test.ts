@@ -22,7 +22,7 @@ const echeance = (m: Partial<Echeance> = {}): Echeance => ({
 
 const mouvement = (m: Partial<MouvementBancaire> = {}): MouvementBancaire => ({
   id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR',
-  montant: euros(4000), rapprocheAvec: null, sansContrepartie: null, ...m
+  montant: euros(4000), rapprocheAvec: null, sansContrepartie: null, ignoree: false, ...m
 });
 
 // Date de solde de départ commune aux tests hérités : antérieure à tous les
@@ -142,7 +142,7 @@ describe('solde dérivé — le piège du double comptage', () => {
   it('ajoute un mouvement sans contrepartie (versement, frais bancaires)', () => {
     const r = soldeDerive(
       euros(5000), AVANT_TOUT, [], [], [],
-      [mouvement({ montant: euros(-2000), sansContrepartie: 'remuneration' })]
+      [mouvement({ montant: euros(-2000), sansContrepartie: 'remuneration', ignoree: false })]
     );
     expect(r.montant).toBe(3000);
   });
@@ -155,7 +155,7 @@ describe('solde dérivé — le piège du double comptage', () => {
       [echeance()],
       [
         mouvement({ id: 'rapproche', rapprocheAvec: 'r1', montant: euros(4000) }),
-        mouvement({ id: 'sans-contrepartie', sansContrepartie: 'remuneration', montant: euros(-500) }),
+        mouvement({ id: 'sans-contrepartie', sansContrepartie: 'remuneration', ignoree: false, montant: euros(-500) }),
         mouvement({ id: 'a-traiter', montant: euros(999) })
       ]
     );
@@ -236,7 +236,7 @@ describe('solde dérivé — le point dur : dater le solde de départ', () => {
       [recette('r1', 5000, '2026-08-10')],
       [depense()],
       [echeance()],
-      [mouvement({ montant: euros(-2000), sansContrepartie: 'remuneration' })]
+      [mouvement({ montant: euros(-2000), sansContrepartie: 'remuneration', ignoree: false })]
     );
     // 10000 − 2000 (le seul mouvement sans contrepartie) : ni la recette, ni
     // la dépense, ni l'échéance ne contribuent.
@@ -261,7 +261,7 @@ describe('solde dérivé — sans date, le relevé fait foi tout seul', () => {
   it('compte les mouvements rapprochés quand aucune date n’est posée', () => {
     const releve = [
       mouvement({ id: 'm1', montant: euros(4000), rapprocheAvec: 'r1' }),
-      mouvement({ id: 'm2', montant: euros(-300), sansContrepartie: 'autre' }),
+      mouvement({ id: 'm2', montant: euros(-300), sansContrepartie: 'autre', ignoree: false }),
       mouvement({ id: 'm3', montant: euros(-100) })
     ];
     // 1 000 + 4 000 − 300 − 100 : le relevé entier, sans rien retrancher.
@@ -275,7 +275,7 @@ describe('solde dérivé — sans date, le relevé fait foi tout seul', () => {
   it('trie de nouveau les mouvements dès qu’une date est posée', () => {
     const releve = [
       mouvement({ id: 'm1', montant: euros(4000), rapprocheAvec: 'r1' }),
-      mouvement({ id: 'm2', montant: euros(-300), sansContrepartie: 'autre' }),
+      mouvement({ id: 'm2', montant: euros(-300), sansContrepartie: 'autre', ignoree: false }),
       mouvement({ id: 'm3', montant: euros(-100) })
     ];
     // 1 000 − 300 (sans contrepartie) + 4 000 (le FAIT, une seule fois).
@@ -314,7 +314,7 @@ describe('provenance du solde', () => {
   it('« rapproche » quand un relevé existe et que tout y est classé', () => {
     const p = provenanceSolde(
       AVANT_TOUT, [recette('r1', 4000, '2026-07-10')], [], [],
-      [mouvement({ rapprocheAvec: 'r1' }), mouvement({ id: 'mvt-2', sansContrepartie: 'autre' })]
+      [mouvement({ rapprocheAvec: 'r1' }), mouvement({ id: 'mvt-2', sansContrepartie: 'autre', ignoree: false })]
     );
     expect(p).toBe('rapproche');
   });
@@ -333,7 +333,7 @@ describe('provenance du solde', () => {
   // Un relevé qui n'a QUE des mouvements sans contrepartie, sans aucun fait
   // par ailleurs, est tout de même rapproché : rien n'y attend de décision.
   it('« rapproche » même sans fait, si le relevé est entièrement classé', () => {
-    expect(provenanceSolde(AVANT_TOUT, [], [], [], [mouvement({ sansContrepartie: 'autre' })]))
+    expect(provenanceSolde(AVANT_TOUT, [], [], [], [mouvement({ sansContrepartie: 'autre', ignoree: false })]))
       .toBe('rapproche');
   });
 

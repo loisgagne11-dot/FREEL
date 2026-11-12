@@ -140,7 +140,7 @@ describe('solde dérivé des faits', () => {
       recettes: [recette('r1', 4000, '2026-07-10')],
       mouvementsBancaires: [{
         id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR CLIENT',
-        montant: euros(4000), rapprocheAvec: 'r1', sansContrepartie: null
+        montant: euros(4000), rapprocheAvec: 'r1', sansContrepartie: null, ignoree: false
       }]
     });
     expect(solde(f)).toBe(5000);
@@ -151,7 +151,7 @@ describe('solde dérivé des faits', () => {
       soldeInitial: euros(1000),
       mouvementsBancaires: [{
         id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR INCONNU',
-        montant: euros(4000), rapprocheAvec: null, sansContrepartie: null
+        montant: euros(4000), rapprocheAvec: null, sansContrepartie: null, ignoree: false
       }]
     });
     expect(solde(f)).toBe(1000);
@@ -162,7 +162,7 @@ describe('solde dérivé des faits', () => {
       soldeInitial: euros(5000),
       mouvementsBancaires: [{
         id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR COMPTE PERSO',
-        montant: euros(-2000), rapprocheAvec: null, sansContrepartie: 'remuneration'
+        montant: euros(-2000), rapprocheAvec: null, sansContrepartie: 'remuneration', ignoree: false
       }]
     });
     expect(solde(f)).toBe(3000);
@@ -183,7 +183,7 @@ describe('solde dérivé des faits', () => {
         recettes: [recette('r1', 4000, '2026-07-10')],
         mouvementsBancaires: [{
           id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR CLIENT',
-          montant: euros(4000), rapprocheAvec: 'r1', sansContrepartie: null
+          montant: euros(4000), rapprocheAvec: 'r1', sansContrepartie: null, ignoree: false
         }]
       });
       expect(provenanceSoldeDe(f)).toBe('rapproche');
@@ -194,7 +194,7 @@ describe('solde dérivé des faits', () => {
         recettes: [recette('r1', 4000, '2026-07-10')],
         mouvementsBancaires: [{
           id: 'mvt-1', date: dateISO('2026-07-12'), libelle: 'VIR INCONNU',
-          montant: euros(150), rapprocheAvec: null, sansContrepartie: null
+          montant: euros(150), rapprocheAvec: null, sansContrepartie: null, ignoree: false
         }]
       });
       expect(provenanceSoldeDe(f)).toBe('derive');
@@ -293,7 +293,7 @@ describe('état de l\'écran Pilote', () => {
   it('cesse de provisionner une période déclarée', () => {
     const base = { soldeInitial: euros(20000), recettes: [recette('a', 10000, '2026-07-10')] };
     const avant = etatPilote(faits(base), [], maintenant);
-    const apres = etatPilote(faits({ ...base, periodesDeclarees: [mois('2026-07')] }), [], maintenant);
+    const apres = etatPilote(faits({ ...base, periodesDeclarees: [{ mois: mois('2026-07'), declareeLe: null }] }), [], maintenant);
     expect(avant.voletAProvisionner).toBeGreaterThan(0);
     expect(apres.voletAProvisionner).toBe(0);
   });
@@ -458,7 +458,7 @@ describe('écran Achats', () => {
     // rapprochement possible.
     mouvementsBancaires: [{
       id: 'mvt-1', date: dateISO('2026-09-10'), libelle: 'PRLV',
-      montant: euros(-120), rapprocheAvec: null, sansContrepartie: null
+      montant: euros(-120), rapprocheAvec: null, sansContrepartie: null, ignoree: false
     }]
   });
 
@@ -630,7 +630,7 @@ describe('rémunération versée', () => {
   const mouvement = (m: Partial<Faits['mouvementsBancaires'][number]> = {}) => ({
     id: 'mv1', date: dateISO('2026-08-05'), libelle: 'VIR COMPTE PERSO',
     montant: euros(-2500), rapprocheAvec: null,
-    sansContrepartie: 'remuneration' as const, ...m
+    sansContrepartie: 'remuneration' as const, ignoree: false, ...m
   });
 
   it('totalise les virements nommés « rémunération » du mois', () => {
@@ -661,14 +661,14 @@ describe('rémunération versée', () => {
    */
   it('ne compte pas les autres mouvements sans contrepartie', () => {
     const f = faits({
-      mouvementsBancaires: [mouvement({ sansContrepartie: 'autre', montant: euros(-12) })]
+      mouvementsBancaires: [mouvement({ sansContrepartie: 'autre', ignoree: false, montant: euros(-12) })]
     });
     expect(remunerationDuMois(f, mois('2026-08'))).toBe(0);
   });
 
   it('ne compte pas un mouvement rapproché d’une dépense', () => {
     const f = faits({
-      mouvementsBancaires: [mouvement({ sansContrepartie: null, rapprocheAvec: 'd1' })]
+      mouvementsBancaires: [mouvement({ sansContrepartie: null, ignoree: false, rapprocheAvec: 'd1' })]
     });
     expect(remunerationDuMois(f, mois('2026-08'))).toBe(0);
   });

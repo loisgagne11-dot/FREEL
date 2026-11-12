@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
-import { periodesADeclarer } from '../domain/calculs/declarations';
+import { moisDeclares, periodesADeclarer } from '../domain/calculs/declarations';
 import { type Faits, faitsVides } from './schema';
 import { etatPilote, recettesEncaissees } from './selecteurs';
 import { aTraiter, montantDeclaration } from './selecteurs.aTraiter';
@@ -38,7 +38,7 @@ describe('accord du Pilote et de l’échéancier', () => {
   it('compte autant de périodes à déclarer que l’échéancier en propose', () => {
     const sujet = aTraiter(faits, maintenant).find((s) => s.id === 'periodes-a-declarer');
     const declarables = periodesADeclarer(
-      recettesEncaissees(faits), 'trimestriel', faits.periodesDeclarees, '2026-08-15', mois('2025-10')
+      recettesEncaissees(faits), 'trimestriel', moisDeclares(faits.periodesDeclarees), '2026-08-15', mois('2025-10')
     ).filter((p) => p.close && !p.declaree);
 
     // T4 2025 et T1 2026 à zéro, T2 2026 avec la recette : trois périodes.
@@ -51,7 +51,7 @@ describe('accord du Pilote et de l’échéancier', () => {
       ...faits,
       periodesDeclarees: periodesADeclarer(
         recettesEncaissees(faits), 'trimestriel', [], '2026-08-15', mois('2025-10')
-      ).filter((p) => p.close).flatMap((p) => p.mois)
+      ).filter((p) => p.close).flatMap((p) => p.mois).map((m) => ({ mois: m, declareeLe: null }))
     };
     expect(aTraiter(toutDeclare, maintenant).some((s) => s.id === 'periodes-a-declarer')).toBe(false);
   });
@@ -92,7 +92,8 @@ describe('montant d’une déclaration', () => {
 
   it('arrive avec le sujet de la déclaration', () => {
     const declarees = ['2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06', '2025-07',
-      '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03'].map(mois);
+      '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03']
+      .map((m) => ({ mois: mois(m), declareeLe: null }));
     const s = aTraiter({ ...base(), periodesDeclarees: declarees }, new Date('2026-07-10T09:00:00Z'))
       .find((x) => x.id === 'periodes-a-declarer');
     expect(s?.gravite).toBe('a_faire');

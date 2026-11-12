@@ -214,7 +214,7 @@ describe('rapprochement bancaire', () => {
       depenses: [depense()],
       mouvementsBancaires: [{
         id: 'mvt-1', date: dateISO('2026-09-10'), libelle: 'PRLV',
-        montant: euros(-999), rapprocheAvec: null, sansContrepartie: null
+        montant: euros(-999), rapprocheAvec: null, sansContrepartie: null, ignoree: false
       }]
     });
     rendre();
@@ -402,7 +402,7 @@ describe('supprimer une dépense', () => {
     depenses: [depense({ justificatifId: 'j1', rapprochement: 'rapproche' })],
     mouvementsBancaires: [{
       id: 'm1', date: dateISO('2026-09-10'), libelle: 'PRLV FOURNISSEUR', montant: euros(-120),
-      rapprocheAvec: 'd1', sansContrepartie: null
+      rapprocheAvec: 'd1', sansContrepartie: null, ignoree: false
     }]
   });
 
@@ -518,7 +518,7 @@ describe('le mois choisi ancre la période', () => {
 
 const mouvement = (m: Partial<Faits['mouvementsBancaires'][number]> = {}) => ({
   id: 'm1', date: dateISO('2026-09-12'), libelle: 'PRLV GITHUB INC', montant: euros(-24),
-  rapprocheAvec: null, sansContrepartie: null, ...m
+  rapprocheAvec: null, sansContrepartie: null, ignoree: false, ...m
 });
 
 describe('repère et tuiles', () => {

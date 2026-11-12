@@ -216,7 +216,7 @@ describe('capacité de versement par mois', () => {
     ],
     mouvementsBancaires: [{
       id: 'mv1', date: dateISO('2026-03-25'), libelle: 'Virement perso',
-      montant: euros(-2500), sansContrepartie: 'remuneration', rapprocheAvec: null
+      montant: euros(-2500), sansContrepartie: 'remuneration', ignoree: false, rapprocheAvec: null
     }]
   });
   const parMois = capaciteParMois(f, LE_15_DECEMBRE);

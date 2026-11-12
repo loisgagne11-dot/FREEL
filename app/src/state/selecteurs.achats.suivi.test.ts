@@ -17,7 +17,7 @@ const dep = (m: Partial<Depense> = {}): Depense => ({
 });
 const mvt = (m: Partial<MouvementBancaire> = {}): MouvementBancaire => ({
   id: 'm1', date: dateISO('2026-06-12'), libelle: 'CB BOUTIQUE PARIS', montant: euros(-62),
-  rapprocheAvec: null, sansContrepartie: null, ...m
+  rapprocheAvec: null, sansContrepartie: null, ignoree: false, ...m
 });
 const facture = (m: Partial<Recette> = {}): Recette => ({
   id: 'r1', clientNom: 'Client Fictif', libelle: 'Prestation', montant: euros(4160),
@@ -76,7 +76,7 @@ describe('propositions de rapprochement', () => {
 
   it('écarte les opérations déjà rapprochées ou sans contrepartie', () => {
     const s = suiviRapprochement(faits({
-      mouvementsBancaires: [mvt({ id: 'a', rapprocheAvec: 'x' }), mvt({ id: 'b', sansContrepartie: 'autre' })]
+      mouvementsBancaires: [mvt({ id: 'a', rapprocheAvec: 'x' }), mvt({ id: 'b', sansContrepartie: 'autre', ignoree: false })]
     }), JUIN);
     expect(s.aTraiter).toBe(0);
   });
