@@ -250,6 +250,20 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     await attendreTresorerie();
     expect(screen.queryAllByText(/non provisionné/)).toHaveLength(0);
     expect(screen.queryAllByText(/à\s+mettre de côté\s+aujourd/)).toHaveLength(0);
+    expect(screen.queryByText(/Mois par mois/)).toBeNull();
+  });
+
+  // « Combien aurais-je dû avoir mis de côté à la fin de chaque mois ? » : le
+  // total du jour n'y répond pas, l'ancienne application si.
+  it('se déplie mois par mois, de janvier au mois courant', async () => {
+    semer({ recettes: [recette(60000)], partsFiscales: 1 });
+    render(<Argent />);
+    await attendreTresorerie();
+    await userEvent.setup().click(screen.getByText('Mois par mois, en 2026'));
+    const table = await screen.findByRole('table');
+    expect(within(table).getAllByRole('row')).toHaveLength(1 + 7);
+    expect(within(table).getByRole('rowheader', { name: 'juillet' })).toBeTruthy();
+    expect(within(table).queryByRole('columnheader', { name: 'Acomptes prélevés' })).toBeNull();
   });
 });
 

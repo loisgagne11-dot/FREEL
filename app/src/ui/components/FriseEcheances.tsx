@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import type { DateISO } from '../../domain/types';
 import type { Echeance, NatureDette } from '../../domain/calculs/provisions';
+import type { PrelevementPrevu } from '../../state/selecteurs.impotCalendrier';
 import { Montant } from './Montant';
 import styles from './FriseEcheances.module.css';
 
@@ -66,8 +67,14 @@ const NOM_COURT: Readonly<Record<NatureDette, string>> = {
 const ORDRE_LEGENDE: readonly NatureDette[] = ['urssaf', 'tva', 'impot', 'cfe'];
 
 export function FriseEcheances(
-  { echeances, annee, aujourdhui, formater }: {
+  { echeances, prevus = [], annee, aujourdhui, formater }: {
     readonly echeances: readonly Echeance[];
+    /**
+     * Ce qui tombera sans être encore appelé : le solde d'impôt de l'an
+     * passé tant que l'avis manque. Sans lui, l'automne paraissait vide à qui
+     * n'avait pas reçu l'avis — la saison la plus chargée de l'année.
+     */
+    readonly prevus?: readonly PrelevementPrevu[];
     readonly annee: number;
     readonly aujourdhui: DateISO;
     readonly formater: (valeur: number) => string;
@@ -75,32 +82,41 @@ export function FriseEcheances(
 ) {
   const idTitre = useId();
 
-  const jalons = echeances
+  const jalons = [
+    ...echeances.map((e) => ({ ...e, estime: false })),
+    ...prevus.map((p) => ({
+      id: p.id, nature: 'impot' as const, montant: p.montant, echeanceLe: p.date, payeeLe: null, estime: true
+    }))
+  ]
     .filter((e) => e.echeanceLe.startsWith(String(annee)))
     .map((e) => ({
       id: e.id,
       nature: e.nature,
       montant: e.montant,
       date: e.echeanceLe,
+      estime: e.estime,
       payee: e.payeeLe !== null,
       // Une échéance passée et non payée est un RETARD, pas une échéance « à
       // venir » comme les autres : c'est l'information la plus importante de
       // la frise, et elle se perdrait si on la confondait avec l'une des deux
       // autres. Le jour même reste « à payer » — comparaison stricte, comme
       // `statutDe` dans `Echeances.tsx` : on a la journée pour régler.
-      enRetard: e.payeeLe === null && e.echeanceLe < aujourdhui,
+      // Un prélèvement estimé n'est pas un appel : passé, il n'est pas « en
+      // retard », il attend que l'avis soit saisi.
+      enRetard: !e.estime && e.payeeLe === null && e.echeanceLe < aujourdhui,
       part: partDeLAnnee(e.echeanceLe)
     }))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  if (jalons.length === 0) {
-    return (
-      <p className={styles.vide}>
-        Aucune échéance enregistrée pour {annee}. Tant qu’il n’y en a pas, le
-        disponible et le versable sont <strong>surestimés</strong>.
-      </p>
-    );
-  }
+  // Des prélèvements estimés ne sont pas des appels : l'avertissement tient
+  // tant qu'aucune échéance réelle n'est saisie, frise ou pas.
+  const aucunAppel = (
+    <p className={styles.vide}>
+      Aucune échéance enregistrée pour {annee}. Tant qu’il n’y en a pas, le
+      disponible et le versable sont <strong>surestimés</strong>.
+    </p>
+  );
+  if (jalons.length === 0) return aucunAppel;
 
   /*
    * Deux jalons proches se chevaucheraient. On les décale d'un rang, en
@@ -148,6 +164,11 @@ export function FriseEcheances(
             <span className={`${styles.pastille} ${styles[n]}`} />{NOM_COURT[n]}
           </span>
         ))}
+        {jalons.some((j) => j.estime) && (
+          <span className={styles.entreeLegende}>
+            <span className={`${styles.pastille} ${styles.pastilleEstimee}`} />estimé, avis à venir
+          </span>
+        )}
       </div>
 
       <div className={styles.frise}>
@@ -167,6 +188,7 @@ export function FriseEcheances(
                   suffit pas à qui ne la distingue pas, et c'est justement
                   l'information qui ne doit pas se perdre. */}
               {j.enRetard && <span className={styles.enRetard}> en retard</span>}
+              {j.estime && <span className={styles.estime}> estimé</span>}
             </span>
             <span className={styles.jalonMontant}>
               <Montant>{formater(j.montant)}</Montant>
@@ -189,7 +211,7 @@ export function FriseEcheances(
              */}
             <span
               className={`${styles.point} ${styles[j.nature]} `
-                + (j.enRetard ? styles.pointRetard : j.payee ? '' : styles.pointAVenir)}
+                + (j.estime ? styles.pointEstime : j.enRetard ? styles.pointRetard : j.payee ? '' : styles.pointAVenir)}
               aria-hidden="true"
             />
           </span>
@@ -219,6 +241,7 @@ export function FriseEcheances(
       <div className={styles.axeMois} aria-hidden="true">
         {MOIS_AXE.map((m) => <span key={m} className={styles.moisAxe}>{m}</span>)}
       </div>
+      {jalons.every((j) => j.estime) && aucunAppel}
     </figure>
   );
 }

@@ -133,3 +133,49 @@ describe('le segment écoulé de l’axe', () => {
     expect(segment?.style.width).toBe('100%');
   });
 });
+
+/**
+ * LE SOLDE DE L'AN PASSÉ, TANT QUE L'AVIS MANQUE.
+ *
+ * Sans lui, l'automne paraissait vide à qui n'avait pas encore reçu son
+ * avis — la saison la plus chargée de l'année. Mais un prélèvement estimé
+ * n'est pas un appel : il ne doit se lire ni comme à payer, ni comme en
+ * retard une fois sa date passée.
+ */
+describe('les prélèvements estimés', () => {
+  const prevus = [
+    { id: 'p1', montant: euros(600), date: dateISO('2026-09-25') },
+    { id: 'p2', montant: euros(600), date: dateISO('2026-10-26') }
+  ];
+  const rendrePrevus = (echeances: readonly Echeance[], aujourdhui = dateISO('2026-10-01')) => render(
+    <FriseEcheances echeances={echeances} prevus={prevus} annee={2026} aujourdhui={aujourdhui} formater={formater} />
+  );
+
+  it('se placent à leur date, marqués « estimé », d’un point en pointillé', () => {
+    rendrePrevus([echeance({ id: 'e1' })]);
+    expect(screen.getAllByText(/estimé$/)).toHaveLength(2);
+    expect(document.querySelectorAll(`.${classe(styles.pointEstime)}`)).toHaveLength(2);
+    expect(screen.getByText('estimé, avis à venir')).toBeTruthy();
+  });
+
+  it('ne passent pas en retard une fois leur date passée', () => {
+    rendrePrevus([echeance({ id: 'e1', echeanceLe: dateISO('2026-12-05') })]);
+    expect(screen.queryByText(/en retard/)).toBeNull();
+    expect(document.querySelectorAll(`.${classe(styles.pointRetard)}`)).toHaveLength(0);
+  });
+
+  // Des estimations ne remplacent pas un appel : sans échéance réelle, le
+  // disponible reste surestimé et la frise doit continuer de le dire.
+  it('laissent dire qu’aucune échéance n’est enregistrée', () => {
+    rendrePrevus([]);
+    expect(screen.getAllByText(/estimé$/)).toHaveLength(2);
+    expect(screen.getByText(/Aucune échéance enregistrée pour 2026/)).toBeTruthy();
+  });
+
+  it('restent hors d’une autre année', () => {
+    render(
+      <FriseEcheances echeances={[]} prevus={prevus} annee={2027} aujourdhui={dateISO('2026-10-01')} formater={formater} />
+    );
+    expect(screen.queryByText(/estimé$/)).toBeNull();
+  });
+});

@@ -1,0 +1,25 @@
+/* La provision d'impôt, mois par mois. Aucune couleur en dur. */
+
+/* Le tableau défile dans son cadre sur un téléphone étroit, jamais la page. */
+.defilement { overflow-x: auto; max-width: 100%; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table thead th { font-weight: 500; color: var(--muted-2); font-size: 11px; }
+.table tbody th { text-align: left; font-weight: 500; color: var(--text); }
+.table td:last-child { color: var(--text); font-weight: 600; }
+
+.aide { margin: 8px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--muted); }

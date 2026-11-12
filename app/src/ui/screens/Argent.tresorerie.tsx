@@ -82,6 +82,18 @@ const Echeancier = composantALaDemande(() => import('./Argent.echeancier')
 const Composition = lazy(() => import('../components/Composition')
   .then((m) => ({ default: m.Composition })));
 
+/**
+ * La provision d'impôt, mois par mois.
+ *
+ * Différée, parce que le budget de l'écran différé le plus lourd a dépassé de
+ * 270 octets en la gagnant. Repliée sous la note d'impôt, elle répond à une
+ * question de fin de mois — « combien aurais-je dû mettre de côté ? » — et pas
+ * à celle qu'on pose en ouvrant l'écran chaque matin. Téléchargée au repos :
+ * le pli s'ouvre sans attente.
+ */
+const ImpotMoisParMois = composantALaDemande(() => import('../components/ImpotMoisParMois')
+  .then((m) => m.ImpotMoisParMois), true);
+
 /** Les mois de l'axe, sur trois lettres comme partout ailleurs dans l'écran. */
 const MOIS_COURTS = [
   'JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEP', 'OCT', 'NOV', 'DÉC'
@@ -1258,6 +1270,14 @@ function NoteImpotRevenu(
       </li>
       {ligneSolde}
       {p.ignore.map((r) => <li key={r}>{LIBELLE_IGNORE_IR[r]}</li>)}
+      <li>
+        <details className={styles.moisParMois}>
+          <summary>Mois par mois, en {p.annee}</summary>
+          <Suspense fallback={<p className={styles.aide}>Chargement…</p>}>
+            <ImpotMoisParMois />
+          </Suspense>
+        </details>
+      </li>
     </ul>
   );
 }
