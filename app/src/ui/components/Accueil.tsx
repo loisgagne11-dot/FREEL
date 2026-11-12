@@ -316,3 +316,16 @@ export function BandeauDemonstration() {
     </p>
   );
 }
+
+/**
+ * Les deux, sous un seul chargement différé : chaque `lazy` de plus coûte au
+ * paquet d'entrée sa table de dépendances, et ces deux-là arrivent ensemble.
+ */
+export function AccueilEtDemonstration() {
+  return (
+    <>
+      <BandeauDemonstration />
+      <Accueil />
+    </>
+  );
+}

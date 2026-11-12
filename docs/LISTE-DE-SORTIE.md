@@ -83,12 +83,13 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 | Ce qui reste dit : l'identifiant de connexion ne se supprime qu'avec la clé de service, qui ne doit jamais être dans le client ; la marche à suivre est écrite | ✅ à l'écran : tableau de bord Supabase (Authentication, puis Users) ; données de cet appareil : Données, « Repartir de zéro » |
 | Contrôle visuel : Compte connecté (serveur simulé), confirmation et bilan, sombre 1440 et clair 390 | ✅ focus sur « Garder », aucune erreur JS |
 
-### Lot 26 — L'accueil à la première ouverture — PR à ouvrir
+### Lot 26 — L'accueil à la première ouverture — PR #322
 
 | Ligne | État |
 |---|---|
-| Trois chemins : reprendre l'ancienne application (si ses données sont là ou sur le compte), restaurer une sauvegarde, commencer — profil minimal (prénom, activité, début d'activité, ACRE, versement libératoire, TVA) | ⬜ |
-| Le jeu de démonstration se charge depuis l'accueil, marqué « démonstration » tant qu'il est là | ⬜ |
+| Trois chemins : reprendre l'ancienne application (si ses données sont là ou sur le compte), restaurer une sauvegarde, commencer — profil minimal (prénom, activité, début d'activité, ACRE, versement libératoire, TVA) | ✅ `Accueil`, différé : s'ouvre sur un dossier vide une fois le chargement fini — constaté, jamais stocké ; la reprise depuis ce navigateur étant automatique, elle n'y passe pas ; écarté, il revient seulement si le dossier se remplit puis se vide |
+| Le jeu de démonstration se charge depuis l'accueil, marqué « démonstration » tant qu'il est là | ✅ recalé sur la date du jour ; bandeau sur tous les écrans, même reconnaissance que le garde-fou de l'envoi |
+| Contrôle visuel : accueil, profil, démonstration, sombre 1440 et clair 390 | ✅ aucun débordement, aucune erreur JS |
 
 ### Lot 27 — L'impôt sur le revenu suit ses échéances réelles, mois par mois
 
@@ -272,7 +273,7 @@ le test mord.
 | Test Playwright « zéro écriture depuis `/legacy/` » | ✅ | `verifier:bascule` | 24 |
 | Harnais différentiel contre l'application actuelle | ⬜ | Aucun script | 45 |
 | Retirer les méta anti-cache de l'ancienne version | ✅ | Sur la copie publiée | 24 |
-| Onboarding de première ouverture | ⬜ | Aucun en UI | 26 |
+| Onboarding de première ouverture | ✅ | Accueil et bandeau de démonstration | 26 |
 | Recherche globale | ✅ | ⌘K / Ctrl K : factures (brouillons compris), clients, missions, dépenses ; montant par valeur | 6 |
 | Raccourcis clavier | ⬜ | Seulement dans les composants d'accessibilité | 45 |
 | Conseils automatiques (`getInsights`) | ⬜ | Aucun | 36 |

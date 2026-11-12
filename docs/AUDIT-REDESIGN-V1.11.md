@@ -1161,3 +1161,14 @@ dépense, échéancier, barème, relevé — aucun débordement, aucune erreur.
 | Zone | Avant | Après |
 |---|---|---|
 | Config › Compte & synchronisation | Aucun moyen d'effacer le compte | Section « Effacer mes données du compte », sous un filet, après les gestes courants : deux boutons, chacun confirmé sur place ; bilan sous les boutons ; ce qui reste (identifiant, données de l'appareil) dit en clair |
+
+## Lot 26 (12/11) — l'accueil à la première ouverture
+
+Le handoff n'a pas d'écran d'accueil : celui-ci reprend le panneau « atelier »
+des encaissements, trois cartes de chemin et un lien discret vers la
+démonstration.
+
+| Zone | Avant | Après |
+|---|---|---|
+| Première ouverture (dossier vide) | Pilote à zéro, aucune piste | Panneau « Bienvenue dans Freel » : commencer (six questions), reprendre l'ancienne application, restaurer une sauvegarde ; « Voir la démonstration » |
+| Tous les écrans, jeu de démonstration chargé | Rien ne le distinguait d'un vrai dossier | Bandeau pointillé « Démonstration : ces données sont fictives », lien vers Données |

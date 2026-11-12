@@ -486,3 +486,10 @@ chiffre faux.
 | Fonction | Verdict | Détail |
 |---|---|---|
 | Effacer ses données du compte (RGPD) | 🟢 nouveau | L'ancienne application n'en avait pas. Copie par copie, confirmé, prouvé par relecture ; la règle de suppression manquante est détectée au lieu d'un faux « effacé » |
+
+## Lot 26 (12/11) — l'accueil à la première ouverture
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Onboarding de première ouverture | 🟢 | L'ancienne application avait un parcours en quatre étapes ; la nouvelle propose trois chemins et un profil minimal de six questions — celles dont dépendent cotisations, impôts et TVA |
+| Signaler la démonstration | 🟢 nouveau | Bandeau tant que le jeu livré est là |

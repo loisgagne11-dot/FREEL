@@ -123,9 +123,8 @@ const AlerteConservation = lazy(() => import('./ui/components/AlerteConservation
  * différés comme l'alerte : ils ne servent qu'à un dossier vide ou fictif, et
  * n'ont rien à faire dans le paquet que télécharge un dossier en cours.
  */
-const Accueil = lazy(() => import('./ui/components/Accueil').then((m) => ({ default: m.Accueil })));
-const BandeauDemonstration = lazy(() => import('./ui/components/Accueil')
-  .then((m) => ({ default: m.BandeauDemonstration })));
+const Accueil = lazy(() => import('./ui/components/Accueil')
+  .then((m) => ({ default: m.AccueilEtDemonstration })));
 
 export function App() {
   const initialiser = useFaits((e) => e.initialiser);
@@ -188,7 +187,6 @@ export function App() {
         )}
       >
         <Suspense fallback={null}><AlerteConservation /></Suspense>
-        <Suspense fallback={null}><BandeauDemonstration /></Suspense>
         <Suspense fallback={null}><Accueil /></Suspense>
         <Suspense fallback={<EnChargement />}>
           {Ecran(etatMois)}
