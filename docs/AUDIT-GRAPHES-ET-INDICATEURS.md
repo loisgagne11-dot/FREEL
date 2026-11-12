@@ -748,3 +748,7 @@ leurs calculs.
 ## Lot 25 (11/11) — compte
 
 Aucun nombre lu ne change.
+
+## Lot 26 (12/11) — accueil
+
+Aucun nombre lu ne change.
