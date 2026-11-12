@@ -7,6 +7,7 @@ import { dateISO, euros } from '../../domain/types';
 import type { DateISO, Euros } from '../../domain/types';
 import { dateDuJour } from '../../state/selecteurs';
 import { type Cadence, REPETITIONS_MAX, datesRepetees } from '../../domain/calculs/echeancier';
+import { prelevementsDuSolde } from '../../domain/bareme/soldeImpot';
 import { Info } from './Info';
 import { Montant } from './Montant';
 import { FormulairePaiement } from './FormulairePaiement';
@@ -16,7 +17,7 @@ import { useToast } from './Toasts';
 import { Vide } from './Vide';
 import { CartePliable } from './CartePliable';
 import { ConfirmationSurPlace } from './ConfirmationSurPlace';
-import { dateCourte, eur, moisLong } from '../format';
+import { dateCourte, eur, eurExact, moisLong } from '../format';
 import styles from './Echeances.module.css';
 
 /**
@@ -236,6 +237,7 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
         {panneau.type === 'saisie' && (
           <Formulaire
             initiale={enSaisie}
+            aujourdhui={jour}
             onValider={(serie) => {
               if (enSaisie !== null) {
                 modifier(enSaisie.id, serie[0] as Champs);
@@ -478,9 +480,22 @@ function ConsequenceSuppression({ echeance: e }: { readonly echeance: Echeance }
 
 type Champs = Omit<Echeance, 'id'>;
 
+/**
+ * L'année de revenus dont l'avis est le plus récent à la date du jour.
+ *
+ * La déclaration en ligne donne le montant dès mai ; avant, le dernier avis
+ * reçu est celui de l'année d'avant. En mars 2027, l'avis en main est celui
+ * des revenus 2025, pas 2026.
+ */
+function revenusDuDernierAvis(jour: DateISO): number {
+  const annee = Number(jour.slice(0, 4));
+  return Number(jour.slice(5, 7)) >= 5 ? annee - 1 : annee - 2;
+}
+
 function Formulaire(
-  { initiale, onValider, onSupprimer }: {
+  { initiale, aujourdhui, onValider, onSupprimer }: {
     readonly initiale: Echeance | null;
+    readonly aujourdhui: DateISO;
     readonly onValider: (serie: readonly Champs[]) => void;
     readonly onSupprimer?: () => void;
   }
@@ -497,13 +512,40 @@ function Formulaire(
   // série ne doit pas en recréer une autre.
   const [cadence, setCadence] = useState<Cadence | 'aucune'>('aucune');
   const [repetitions, setRepetitions] = useState('4');
+  const [revenus, setRevenus] = useState(() => revenusDuDernierAvis(aujourdhui));
+  const [tardif, setTardif] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+
+  /*
+   * À la création, le solde se saisit tel qu'il est écrit sur l'avis : un
+   * montant. Le découper en quatre, retrouver les dates et ne pas se tromper
+   * d'exercice revenait à la personne, et une erreur d'exercice faisait passer
+   * le solde pour un acompte — compté deux fois par la provision.
+   */
+  const depuisLAvis = initiale === null && nature === 'impot' && solde;
+  const valeurSaisie = Number.parseFloat(montant.replace(',', '.'));
+  const prelevements = depuisLAvis && Number.isFinite(valeurSaisie) && valeurSaisie > 0
+    ? prelevementsDuSolde(euros(valeurSaisie), revenus + 1, tardif)
+    : null;
+  const nombre = prelevements !== null && prelevements.statut !== 'refuse' ? prelevements.valeur.length : null;
 
   function soumettre(evenement: React.FormEvent): void {
     evenement.preventDefault();
-    const valeur = Number.parseFloat(montant.replace(',', '.'));
+    const valeur = valeurSaisie;
     if (!Number.isFinite(valeur) || valeur <= 0) {
       setErreur('Le montant doit être un nombre supérieur à zéro.');
+      return;
+    }
+    if (depuisLAvis) {
+      if (prelevements === null || prelevements.statut === 'refuse') {
+        setErreur(prelevements?.motif ?? 'Le solde de l’avis doit être un montant positif.');
+        return;
+      }
+      setErreur(null);
+      onValider(prelevements.valeur.map((p) => ({
+        nature: 'impot', montant: p.montant, echeanceLe: p.date,
+        payeeLe: null, montantPaye: null, exercice: revenus
+      })));
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -563,18 +605,44 @@ function Formulaire(
           >
             <option value="acompte">Un acompte de l’année (prélèvement à la source)</option>
             <option value="solde">
-              Le solde de l’impôt {/^\d{4}/.test(date) ? Number(date.slice(0, 4)) - 1 : 'de l’année précédente'} (avis d’imposition)
+              {initiale === null
+                ? 'Le solde d’une année passée (avis d’imposition)'
+                : `Le solde de l’impôt ${/^\d{4}/.test(date) ? Number(date.slice(0, 4)) - 1 : 'de l’année précédente'} (avis d’imposition)`}
             </option>
           </select>
           <span className={styles.aide}>
-            À l’automne, les deux se prélèvent. Saisir le solde comme tel le fait
-            sortir des provisions, où il était gardé estimé depuis le 1er janvier.
+            {solde
+              ? <>À l’automne, le solde et les acomptes de l’année se prélèvent ensemble.
+                Saisir le solde comme tel le fait sortir des provisions, où il était
+                gardé estimé depuis le 1er janvier.</>
+              : <>L’acompte des indépendants tombe le 15 de chaque mois — ou le 15
+                février, mai, août et novembre au trimestre. La première année
+                d’activité, il n’y en a pas&nbsp;: ils démarrent en septembre de
+                l’année suivante, avec l’avis.</>}
           </span>
         </p>
       )}
 
+      {depuisLAvis && (
+        <p className={styles.champ}>
+          <label className={styles.libelle} htmlFor={`${id}-revenus`}>Revenus de l’année</label>
+          <select
+            id={`${id}-revenus`}
+            className={styles.saisie}
+            value={revenus}
+            onChange={(e) => setRevenus(Number(e.target.value))}
+          >
+            {[revenusDuDernierAvis(aujourdhui), revenusDuDernierAvis(aujourdhui) - 1].map((a) => (
+              <option key={a} value={a}>{a} — avis reçu en {a + 1}</option>
+            ))}
+          </select>
+        </p>
+      )}
+
       <p className={styles.champ}>
-        <label className={styles.libelle} htmlFor={`${id}-montant`}>Montant appelé (€)</label>
+        <label className={styles.libelle} htmlFor={`${id}-montant`}>
+          {depuisLAvis ? 'Reste à payer sur l’avis (€)' : 'Montant appelé (€)'}
+        </label>
         <input
           id={`${id}-montant`}
           inputMode="decimal"
@@ -583,9 +651,30 @@ function Formulaire(
           onChange={(e) => setMontant(e.target.value)}
           required
         />
+        {depuisLAvis && (
+          <span className={styles.aide}>
+            Le montant total, une fois déduits les acomptes déjà prélevés&nbsp;: Freel
+            le découpe selon la règle de l’administration.
+          </span>
+        )}
       </p>
 
-      <p className={styles.champ}>
+      {depuisLAvis && (
+        <>
+          <p className={styles.case}>
+            <input
+              id={`${id}-tardif`}
+              type="checkbox"
+              checked={tardif}
+              onChange={(e) => setTardif(e.target.checked)}
+            />
+            <label htmlFor={`${id}-tardif`}>Avis reçu tardivement, à l’automne</label>
+          </p>
+          <ApercuDuSolde prelevements={prelevements} revenus={revenus} />
+        </>
+      )}
+
+      {!depuisLAvis && <p className={styles.champ}>
         <label className={styles.libelle} htmlFor={`${id}-date`}>Date d’échéance</label>
         <input
           id={`${id}-date`}
@@ -595,9 +684,9 @@ function Formulaire(
           onChange={(e) => setDate(e.target.value)}
           required
         />
-      </p>
+      </p>}
 
-      {initiale === null && (
+      {initiale === null && !depuisLAvis && (
         <>
           <p className={styles.champ}>
             <label className={styles.libelle} htmlFor={`${id}-cadence`}>Répéter</label>
@@ -648,6 +737,8 @@ function Formulaire(
       <button type="submit" className={styles.actionPrincipale}>
         {initiale !== null
           ? 'Enregistrer la correction'
+          : depuisLAvis
+            ? nombre === 1 ? 'Enregistrer le prélèvement' : `Enregistrer les ${nombre ?? ''} prélèvements`.replace('  ', ' ')
           : cadence === 'aucune'
             ? 'Enregistrer l’échéance'
             : 'Enregistrer les échéances'}
@@ -663,5 +754,50 @@ function Formulaire(
         />
       )}
     </form>
+  );
+}
+
+/**
+ * Ce que l'avis donnera, avant de l'enregistrer : le nombre de prélèvements,
+ * leurs dates et leurs montants. Une série de quatre échéances créée sans
+ * l'avoir vue serait une surprise à défaire une à une.
+ */
+function ApercuDuSolde(
+  { prelevements, revenus }: {
+    readonly prelevements: ReturnType<typeof prelevementsDuSolde> | null;
+    readonly revenus: number;
+  }
+) {
+  if (prelevements === null || prelevements.statut === 'refuse') {
+    return (
+      <p className={styles.apercu} aria-live="polite">
+        Saisis le reste à payer de l’avis&nbsp;: les dates de prélèvement suivront.
+      </p>
+    );
+  }
+  const p = prelevements.valeur;
+  return (
+    <div className={styles.apercu} aria-live="polite">
+      <p className={styles.apercuTitre}>
+        {p.length === 1
+          ? `Prélevé en une fois — jusqu’à 300 €, le solde ne s’étale pas`
+          : `Prélevé en ${p.length} fois`}
+        {` · impôt des revenus ${revenus}`}
+      </p>
+      <ul className={styles.apercuListe}>
+        {p.map((x) => (
+          <li key={x.date}>
+            <span>{dateCourte(x.date)}</span>
+            <Montant>{eurExact(x.montant)}</Montant>
+          </li>
+        ))}
+      </ul>
+      <p className={styles.aide}>
+        {prelevements.statut === 'hypothese'
+          ? `Freel n’a pas relevé les dates officielles de ${revenus + 1} : le 25 du mois, ou le jour ouvré suivant. Corrige-les d’après ton avis si elles diffèrent.`
+          : 'Dates publiées par l’administration fiscale.'}
+        {' '}Un prélèvement déjà passé se marque payé ensuite, avec ce qui est réellement parti.
+      </p>
+    </div>
   );
 }

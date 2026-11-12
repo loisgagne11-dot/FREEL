@@ -176,6 +176,34 @@
 
 .aide { font-size: 11.5px; color: var(--muted-2); line-height: 1.45; font-weight: 400; }
 
+/* L'aperçu du solde : ce que l'avis donnera, avant de l'enregistrer. */
+.apercu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel-2);
+  font-size: 12.5px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.apercuTitre { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--text); }
+
+.apercuListe { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+
+.apercuListe li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
 .refus {
   margin: 0;
   padding: 9px 11px;

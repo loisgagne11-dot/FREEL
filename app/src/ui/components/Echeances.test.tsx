@@ -385,6 +385,87 @@ describe('répéter une échéance', () => {
 });
 
 /**
+ * LE SOLDE DE L'AVIS SE SAISIT TEL QU'IL EST ÉCRIT.
+ *
+ * Avant, il fallait découper l'avis en quatre, retrouver les dates et choisir
+ * « solde » sur chacune : un oubli, et le quart de solde passait pour un
+ * acompte de l'année — retranché de la provision de l'année en cours, et la
+ * provision de l'année passée gardée en double.
+ */
+describe('saisir le solde d’un avis d’imposition', () => {
+  async function solde(utilisateur: ReturnType<typeof userEvent.setup>, montant: string) {
+    await utilisateur.click(screen.getByRole('button', { name: 'Saisir une échéance' }));
+    await utilisateur.selectOptions(screen.getByLabelText('Nature'), 'impot');
+    await utilisateur.selectOptions(screen.getByLabelText('Ce qu’elle règle'), 'solde');
+    await utilisateur.type(screen.getByLabelText('Reste à payer sur l’avis (€)'), montant);
+  }
+
+  it('le découpe en quatre prélèvements aux dates publiées, sur l’exercice des revenus', async () => {
+    rendre();
+    const u = userEvent.setup();
+    await solde(u, '1200');
+    // Ni date ni répétition à inventer : la règle les donne.
+    expect(screen.queryByLabelText('Date d’échéance')).toBeNull();
+    expect(screen.queryByLabelText('Répéter')).toBeNull();
+    expect(screen.getByText(/Prélevé en 4 fois · impôt des revenus 2025/)).toBeTruthy();
+    await u.click(screen.getByRole('button', { name: 'Enregistrer les 4 prélèvements' }));
+
+    expect(useFaits.getState().faits.echeances.map((e) => [e.echeanceLe, e.montant, e.exercice])).toEqual([
+      ['2026-09-25', 300, 2025], ['2026-10-26', 300, 2025], ['2026-11-26', 300, 2025], ['2026-12-28', 300, 2025]
+    ]);
+  });
+
+  it('ne l’étale pas jusqu’à 300 €', async () => {
+    rendre();
+    const u = userEvent.setup();
+    await solde(u, '280');
+    await u.click(screen.getByRole('button', { name: 'Enregistrer le prélèvement' }));
+    expect(useFaits.getState().faits.echeances.map((e) => e.echeanceLe)).toEqual(['2026-09-25']);
+  });
+
+  it('le prélève en novembre et décembre pour un avis tardif', async () => {
+    rendre();
+    const u = userEvent.setup();
+    await solde(u, '900');
+    await u.click(screen.getByLabelText('Avis reçu tardivement, à l’automne'));
+    await u.click(screen.getByRole('button', { name: 'Enregistrer les 2 prélèvements' }));
+    expect(useFaits.getState().faits.echeances.map((e) => [e.echeanceLe, e.montant])).toEqual([
+      ['2026-11-25', 450], ['2026-12-28', 450]
+    ]);
+  });
+
+  it('dit qu’il suppose les dates d’une année qu’il n’a pas relevée', async () => {
+    rendre();
+    const u = userEvent.setup();
+    await solde(u, '1200');
+    await u.selectOptions(screen.getByLabelText('Revenus de l’année'), '2024');
+    expect(screen.getByText(/pas relevé les dates officielles de 2025/)).toBeTruthy();
+  });
+
+  // L'acompte, lui, garde sa date et sa répétition : il tombe le 15, chaque
+  // mois, et c'est l'année de sa date qu'il règle.
+  it('laisse l’acompte se saisir à la date, sur l’exercice de sa date', async () => {
+    rendre();
+    const u = userEvent.setup();
+    await u.click(screen.getByRole('button', { name: 'Saisir une échéance' }));
+    await u.selectOptions(screen.getByLabelText('Nature'), 'impot');
+    expect(screen.getByText(/le 15 de chaque mois/)).toBeTruthy();
+    await u.type(screen.getByLabelText('Montant appelé (€)'), '150');
+    await u.type(screen.getByLabelText('Date d’échéance'), '2026-09-15');
+    await u.click(screen.getByRole('button', { name: 'Enregistrer l’échéance' }));
+    expect(useFaits.getState().faits.echeances[0]?.exercice).toBeUndefined();
+  });
+
+  it('se corrige prélèvement par prélèvement, sans redécouper l’avis', async () => {
+    semer([echeance({ id: 'e1', nature: 'impot', montant: euros(300), echeanceLe: dateISO('2026-09-25'), exercice: 2025 })]);
+    rendre();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Corriger' }));
+    expect(screen.getByLabelText('Date d’échéance')).toBeTruthy();
+    expect(screen.queryByLabelText('Reste à payer sur l’avis (€)')).toBeNull();
+  });
+});
+
+/**
  * LE SECOND MÉCANISME STRUCTURANT DU HANDOFF.
  *
  * L'annexe en nomme deux à conserver : le pli à synthèse, et « la couleur fixe
