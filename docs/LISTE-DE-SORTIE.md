@@ -34,7 +34,11 @@ Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 | 12 | Données réelles | ✅ accordé le 11/11 : elles servent à vérifier les chiffres, **dans le dossier temporaire de la session seulement**. Rien de réel dans le dépôt (tests, démo, docs, commits) ; les identifiants Supabase ne sont jamais manipulés | Lot 32 |
 | 13 | Mission à plusieurs clients | ✅ demandé le 11/11 : arrêter un client sur une mission (« arrêté le … ») et continuer avec un autre, sans clore la mission | Lot 31 |
 | 14 | Une mission à plusieurs clients se facture-t-elle séparément | ✅ répondu le 12/11 : « actuellement non, mais ça doit pouvoir arriver ». Par défaut **une facture commune** (le cas actuel) ; le choix « une facture commune » / « une facture par client » se fait mission par mission | Lot 31 ; le second cas demande un client de facturation par plage (schéma 22, après le 21 du lot 28) |
-| 15 | Audit du produit et de l'interface | ⏳ demandé le 12/11, rendu le 12/11 dans `AUDIT-PRODUIT-ET-INTERFACE.md` : le design du handoff devient contestable (« tout est ouvert, tu valides »), la cible reste « toi d'abord, micro ouvert ». **Le plan révisé qu'il propose (§9) n'est pas adopté** : le plan ci-dessous vaut tant que les cinq questions de son §10 ne sont pas tranchées | Rien ne s'exécute de ce rapport avant validation |
+| 15 | Audit du produit et de l'interface | ✅ rendu le 12/11 dans `AUDIT-PRODUIT-ET-INTERFACE.md` et **validé le 12/11** : la nouvelle navigation, le retrait des lignes de son §F9, l'ordre d'exécution. Le design du handoff n'est plus la référence. **La direction visuelle reste à choisir** : une première proposition (« Registre ») a été écartée le 12/11 — propre mais terne ; une planche unique déclinée en quatre styles (A Nuit menthe, B Graphite citron, C Marine, D Jour vif) est soumise au propriétaire | Plan ci-dessous, « Ordre d'exécution adopté » |
+| 16 | Plateforme agréée de facturation électronique | ✅ répondu le 12/11 : le propriétaire en a choisi une (son nom reste hors du dépôt). Elle s'inscrit dans l'application comme un fait ; le lot 47 vise le dépôt sur cette plateforme — à vérifier d'abord : qu'elle figure sur la liste officielle, et ce qu'elle accepte à l'import | Lots 46 et 47 |
+| 17 | Où vont les provisions | ✅ répondu le 12/11 : il vire de son compte professionnel vers son compte personnel sa rémunération **et de quoi payer l'impôt sur le revenu**, qui se règle depuis le compte personnel. Un virement « pour l'impôt » n'est donc pas une rémunération, et il doit solder la provision d'impôt — sans quoi elle reste retenue sur un compte dont l'argent est déjà sorti, et le versable est sous-évalué | Lot 35, redéfini et avancé |
+| 18 | Intermédiaire | ✅ répondu le 12/11 : ses missions passent par une société de services, qui est facturée ; le client final signe le compte rendu. Le modèle le porte déjà (client de la mission, client opérationnel). Il manque la référence de commande, la période du contrat et sa reconduction | Lots 46 et 48 |
+| 19 | Usage sur téléphone | ✅ répondu le 12/11 : tout — consulter, tenir le planning et les congés, créer et télécharger compte rendu et facture, ajouter un achat en le photographiant (TVA comprise), voir les obligations et quoi déclarer, voir le versable et ce qu'il faut mettre de côté. Le téléphone est un usage complet : **chaque lot d'écran se livre à 390 px**, gestes compris | Tous les lots d'interface |
 
 ## Dates officielles relevées (11/11/2026)
 
@@ -53,12 +57,154 @@ reste une `hypothese` pour les années non publiées.
 | TVA, régime simplifié | **Supprimé au 1er janvier 2027** (loi de finances 2025, art. 38) : passage automatique au réel normal (CA3) ; dernière CA12 au 4 mai 2027 pour 2026 ; aucun acompte en décembre 2027, ni en juillet 2027 pour un exercice civil | impots.gouv.fr, actualité du 22/09/2026 |
 | TVA autoliquidée d'un franchisé (service acheté à un prestataire de l'Union) | Obligation confirmée : demander un numéro de TVA intracommunautaire, autoliquider, **déclarer et verser en France** (CA3, ligne A3). **Aucun texte lu ne fixe une échéance propre au franchisé** : le calendrier de la CA3 ci-dessus est le seul publié ; il s'appliquera en `hypothese`, source citée, et l'écran le dira | impots.gouv.fr, « Je suis micro-entrepreneur… Ai-je des obligations déclaratives en matière de TVA ? » (modifiée le 14/10/2026) ; notice 3310-CA3 |
 
-## Plan jusqu'à « fini » — 22 lots estimés (24 à 45)
+## Ordre d'exécution adopté le 12/11 — 26 lots restants
+
+Validé par le propriétaire (décision 15). **L'ordre est celui de ce tableau,
+pas celui des numéros** : les lots 28 à 45 gardent leur nom, les nouveaux
+prennent la suite (46 à 55), puisqu'un nom de lot ne se réutilise jamais. Le
+détail des lots 28 à 34 est plus bas, celui des lots 46 à 55 juste après ce
+tableau. Les motifs sont dans `AUDIT-PRODUIT-ET-INTERFACE.md`.
 
 Une PR par lot, ouverte au premier commit, fusionnée seulement une fois finie
-au sens de `CLAUDE.md`. Les sept premiers lots suivent l'ordre imposé par le
-propriétaire (décision 7) ; les suivants, l'ordre irréversible → faux → laid.
-Le lot 27 a tenu en une seule PR : l'estimation est de **22 lots**.
+au sens de `CLAUDE.md`. Tout lot d'interface part d'une maquette validée et se
+livre à 390 px (décision 19).
+
+| Ordre | Lot | Contenu | État |
+|---|---|---|---|
+| 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ◐ écrit en local le 12/11 ; restent tests nommés, mutations, contrôle visuel, inventaires |
+| 2 | 29 | « Enregistrer en brouillon » | ⬜ |
+| 3 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
+| 4 | 46 | Facture conforme 2026-2027 | ⬜ |
+| 5 | 33 | « Reste à sortir » : un seul total | ⬜ |
+| 6 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ⬜ |
+| 7 | — | Direction visuelle : choix du propriétaire entre les quatre styles de la planche, puis maquettes des écrans dans le style retenu | ◐ planche proposée le 12/11 |
+| 8 | 51 | Nouvelle navigation et jetons de style | ⬜ |
+| 9 | 53 + 34 | Écran Obligations, frise aux dates officielles | ⬜ |
+| 10 | 31 | Une mission à plusieurs clients | ⬜ |
+| 11 | 48 | Mission enrichie et carnet de commandes | ⬜ |
+| 12 | 49 | Trésorerie à douze mois | ⬜ |
+| 13 | 50 | Ce que je gagne vraiment | ⬜ |
+| 14 | 52 | Le Pilote en quatre réponses | ⬜ |
+| 15 | 54 | Graphiques | ⬜ |
+| 16 | 55 | Listes, formulaires, clôture du mois | ⬜ |
+| 17 | 47 | Facture électronique : émission — **avant le 01/09/2027** | ⬜ |
+| 18 | 37 | Lieu par défaut du client ; état d'un compte rendu | ⬜ |
+| 19 | 39 | Achats : catégorie et compte d'une dépense, filtre, import OFX, achat en photo | ⬜ |
+| 20 | 40 | Justificatifs : synchronisation, suppression encadrée, archive annuelle | ⬜ |
+| 21 | 41 | Réglages de facturation : numérotation, mentions (le coffre est passé au lot 53) | ⬜ |
+| 22 | 42 | Hors ligne, retard affiché, synchronisation automatique à l'ouverture — **sans temps réel** | ⬜ |
+| 23 | 43 | Comparateur micro-BNC / déclaration contrôlée, poids des frais réels — **sans l'onglet banque** | ⬜ |
+| 24 | 44 | Envoi du compte rendu par courriel ; la semaine sur le Pilote ; la facture ne part plus par courriel (lot 47) | ⬜ |
+| 25 | 45 | Raccourcis clavier — **sans le harnais différentiel** | ⬜ |
+| 26 | 30 | Contrôle visuel final, contre les maquettes validées : deux thèmes, quatre largeurs, clavier, lecteur d'écran | ⬜ |
+
+**Sortis du plan le 12/11** : le lot 36 (ses lignes sont reprises par les lots
+48, 50 et 52) ; le lot 38 (actions rapides personnalisables — remplacé par
+« À faire » du lot 52) ; le harnais différentiel du lot 45 ; la
+synchronisation en temps réel du lot 42 ; l'onglet « Compte pro & banque » du
+lot 43 (la banque passe sous Trésorerie au lot 51).
+
+### Lot 46 — Facture conforme 2026-2027 (schéma suivant)
+
+| Ligne | État |
+|---|---|
+| Mention de franchise : « TVA non applicable, art. L. 223 et s. du code des impositions sur les biens et services (CIBS) », applicable depuis le 01/09/2026 ; l'ancienne (293 B du CGI) tolérée jusqu'au 31/12/2027. Datée et sourcée dans le barème (Service public, F23208) | ⬜ |
+| « Entrepreneur individuel » ou « EI » accolé au nom ; « Escompte pour paiement anticipé : néant » ; référence de commande portée par la mission et reprise sur chaque facture | ⬜ |
+| Fait « ma plateforme agréée » (nom, depuis le) en Réglages ; le rappel « réception obligatoire » devient un état, plus un compte à rebours | ⬜ |
+| Champs des quatre mentions du 01/09/2027, saisis dès maintenant et imprimés à la date : SIREN du client (dérivé du SIRET, contrôlé), adresse de livraison si différente, nature de l'opération, option pour la TVA sur les débits | ⬜ |
+
+### Lot 35 — Mis de côté pour l'impôt (redéfini, décision 17)
+
+| Ligne | État |
+|---|---|
+| Un virement vers le compte personnel se nomme : rémunération, **mise de côté pour l'impôt**, ou autre. Seule la rémunération compte dans « ce que je me suis versé » | ⬜ |
+| La provision d'impôt se réduit de ce qui a été viré pour lui, par exercice ; rien n'est compté deux fois avec un acompte ou un solde saisi en échéance (test d'intégration) | ⬜ |
+| « À mettre de côté » se lit à côté du versable : ce qui reste à virer pour l'impôt, après chaque encaissement | ⬜ |
+
+### Lot 51 — Nouvelle navigation et jetons de style
+
+| Ligne | État |
+|---|---|
+| Rail : Pilote, Activité, Factures, Trésorerie, Obligations, Achats ; Simulateurs et Réglages en pied. Les anciennes adresses redirigent | ⬜ |
+| Le compte rendu d'activité passe sous Activité ; l'import du relevé et le rapprochement sous Trésorerie ; l'analyse du chiffre d'affaires sous Activité › Analyse | ⬜ |
+| Une seule commande de période par écran, dans son en-tête ; le thème en Réglages ; barre du haut : recherche, « Nouveau », synchronisation libellée | ⬜ |
+| Cinq mots pour l'argent, partout : solde, dû, disponible, réserve, à te verser — passe relue à l'œil | ⬜ |
+| Jetons de la direction visuelle retenue, consignés dans `design/DIRECTION-VISUELLE.md` (à écrire une fois le style choisi) ; la police tient dans les budgets ou cède à la pile système | ⬜ |
+
+### Lot 53 — Obligations (avec le lot 34)
+
+| Ligne | État |
+|---|---|
+| Une frise de l'année, une ligne par nature (URSSAF, TVA, impôt, CFE, formalités), obligations saisies ET prévues, aux dates officielles | ⬜ |
+| Une seule liste à cycle daté — à déclarer, déclarée le, payée le — à la place de « Échéances reçues » et « Périodes URSSAF » | ⬜ |
+| Chaque ligne ouvre son dossier : URSSAF, TVA, déclaration européenne, CFE, impôt, et la déclaration de revenus (cases relevées sur le formulaire de l'année, en `hypothese` sinon) | ⬜ |
+| Pièces à fournir, chacune avec sa date de validité et son rappel : attestation de vigilance, responsabilité civile, avis de situation (seuils et périodicité à relever sur source officielle) | ⬜ |
+| Calendrier à s'abonner (`.ics`) : échéances, fins de mission, pièces qui expirent | ⬜ |
+
+### Lot 48 — Mission enrichie et carnet de commandes
+
+| Ligne | État |
+|---|---|
+| Champs de la mission : volume commandé (jours), préavis d'alerte de fin, période du contrat et reconduction, probabilité facultative d'un prospect ; migration qui descend dans la liste | ⬜ |
+| Carnet de commandes (jours, euros), fin de visibilité, couverture des mois à venir ; une mission sans fin se dit « sans fin fixée » | ⬜ |
+| Écran Missions : frise sur douze mois, table (jours faits / commandés, facturé, encaissé, fin, état), filtres par statut | ⬜ |
+| Fin de mission annoncée dans « À faire », au préavis choisi | ⬜ |
+
+### Lot 49 — Trésorerie à douze mois
+
+| Ligne | État |
+|---|---|
+| Douze mois glissants par défaut, bascule « année » pour relire le passé ; deux graphes alignés — le disponible, puis entrées et sorties — au lieu d'un | ⬜ |
+| Le point bas annoté ; le versement tenable en titre | ⬜ |
+| Les charges posées à leur date d'échéance dans le solde prévu | ⬜ |
+| Deux « et si », sur des faits : compter les prospects ; arrêter une mission à une date | ⬜ |
+| Franchissement des seuils par le pipeline (factures émises, planning au délai de paiement) ; jours facturables avant le seuil | ⬜ |
+
+### Lot 50 — Ce que je gagne vraiment
+
+| Ligne | État |
+|---|---|
+| Net de poche (année, mois lissé sur douze mois) et taux de prélèvement, composition au clic ; « avant impôt » quand l'impôt n'est pas calculable | ⬜ |
+| Jours nécessaires par mois, tarif plancher, objectif exprimé en net | ⬜ |
+| Encours par ancienneté ; comparaison avec l'an passé | ⬜ |
+
+### Lot 52 — Le Pilote en quatre réponses
+
+| Ligne | État |
+|---|---|
+| En tête, seul : ce que tu peux te verser, avec l'équation du solde en une barre et le versement tenable | ⬜ |
+| Quatre cases : douze mois, activité (carnet, couverture), prochaines échéances, à faire | ⬜ |
+| « À faire » porte le client et le montant sur chaque ligne ; il remplace les actions rapides ; les remarques automatiques y entrent par des règles écrites | ⬜ |
+| Sur téléphone : les gestes fréquents (ma journée, achat en photo, compte rendu, facture du mois) sous le chiffre | ⬜ |
+
+### Lot 54 — Graphiques
+
+| Ligne | État |
+|---|---|
+| Palette des charges validée au script dans les deux thèmes ; un état se dit en un signe et un mot ; les couleurs d'état ne servent jamais de série | ⬜ |
+| Enveloppes en liste (repliée quand tout est couvert) ; plus de donut | ⬜ |
+| Chaque graphique lisible à 390 px ; aucun texte sous 12 px hors étiquettes d'axe | ⬜ |
+
+### Lot 55 — Listes, formulaires, clôture du mois
+
+| Ligne | État |
+|---|---|
+| Factures en table dense, une action visible par ligne, le reste dans le détail | ⬜ |
+| Simulateurs en deux colonnes : saisie à gauche, résultat à droite | ⬜ |
+| « Clôturer le mois » : vérifier les journées, compte rendu par client, factures du mois, dépôt et envoi — depuis un seul endroit | ⬜ |
+
+### Lot 47 — Facture électronique : émission (avant le 01/09/2027)
+
+| Ligne | État |
+|---|---|
+| Relever ce que la plateforme du propriétaire accepte à l'import et ce que les spécifications officielles exigent (format, états obligatoires) ; consigner les sources | ⬜ |
+| Export de la facture au format structuré, contrôlé par un validateur | ⬜ |
+| Cycle de vie à côté de « envoyée » : déposée le, rejetée (motif), encaissée | ⬜ |
+| Import d'une facture reçue structurée vers Achats, sans ressaisie | ⬜ |
+
+## Lots livrés ou détaillés avant le 12/11 (24 à 45)
+
+Le détail d'origine. L'ordre et le périmètre sont ceux du tableau ci-dessus.
 
 ### Lot 23 — Plan de sortie final, et « Détacher » confirmé (PR #319, fusionnée)
 
