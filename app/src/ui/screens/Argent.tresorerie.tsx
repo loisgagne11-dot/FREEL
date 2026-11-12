@@ -1257,6 +1257,7 @@ function NoteImpotRevenu(
 
   const p = provision.valeur;
   return (
+    <>
     <ul className={styles.hypotheses}>
       <li>
         <strong>Impôt sur le revenu&nbsp;: {eur(p.resteAProvisionner)}</strong> à mettre de
@@ -1270,15 +1271,14 @@ function NoteImpotRevenu(
       </li>
       {ligneSolde}
       {p.ignore.map((r) => <li key={r}>{LIBELLE_IGNORE_IR[r]}</li>)}
-      <li>
-        <details className={styles.moisParMois}>
-          <summary>Mois par mois, en {p.annee}</summary>
-          <Suspense fallback={<p className={styles.aide}>Chargement…</p>}>
-            <ImpotMoisParMois />
-          </Suspense>
-        </details>
-      </li>
     </ul>
+    <details className={styles.moisParMois}>
+      <summary>L’impôt {p.annee}, mois par mois</summary>
+      <Suspense fallback={<p className={styles.aide}>Chargement…</p>}>
+        <ImpotMoisParMois />
+      </Suspense>
+    </details>
+    </>
   );
 }
 

@@ -140,7 +140,7 @@ un trou qui ne fait échouer aucun test.
 | `getUrssafRate`, `getUrssafRateAt`, `getUrssafPeriod` | 🟢 | Barème **par intervalle de dates**, avec source et date de vérification. L'ancienne tronquait le mois à son année — juillet 2026 était calculé au mauvais taux |
 | Ajouter une période de barème | 🟢 | Depuis l'application, avec sa source. L'ancienne exigeait un redéploiement |
 | `calculateIR`, `getIRForYear`, `getTranche`, `showIRDetail` | ✅ | Simulateur dans Outils, détail par tranche |
-| `addIRMonthlyProvisions` | ⚠️ | En versement libératoire, les 2,2 % sont intégrés ; au barème, l'acompte PAS est **saisi** et non calculé (décision D2 — le montant est notifié par la DGFiP). Pas de provision mensuelle automatique |
+| `addIRMonthlyProvisions` | 🟢 (lot 27) | En versement libératoire, les 2,2 % sont intégrés ; au barème, l'acompte PAS est **saisi** et non calculé (décision D2 — le montant est notifié par la DGFiP). La provision de l'année se déplie mois par mois depuis le lot 27 (Argent › note d'impôt), avec la même règle que le total |
 | `computeCFEEstimate`, `showCFESimulator`, `renderCFEResult` | ✅ | **Fait le 14/08, en refusant la grille.** `bareme/cfe.ts` porte les RÈGLES — exonération de création, base réduite de moitié la 1ʳᵉ année d'imposition, dispense sous 5 000 € de recettes N−2, calendrier, déclaration 1447-C. Aucune fourchette de base minimum n'est écrite : elle est fixée par la commune, et la grille en dur de l'ancienne était jugée non conforme par l'audit comptable. La carte demande l'avis et calcule base × taux, ou ne dit rien |
 | Comparateur versement libératoire / barème | 🟢 | **Ajouté le 13/08. N'existait pas dans l'ancienne.** Le seul arbitrage du projet qui porte une date : l'option s'exerce avant le 30/09 pour l'année suivante. Il mesure ce que l'activité AJOUTE à l'impôt du foyer, et compare ce surcroît aux 2,2 %. L'éligibilité — plafond de revenu fiscal de référence — n'est **pas** vérifiée, faute d'un nombre officiel daté, et l'écran le dit |
 | `getAcreInfo` | ⚠️ | L'ACRE s'applique au calcul ; pas de grille par période (noté au journal comme non traité) |
@@ -493,3 +493,13 @@ chiffre faux.
 |---|---|---|
 | Onboarding de première ouverture | 🟢 | L'ancienne application avait un parcours en quatre étapes ; la nouvelle propose trois chemins et un profil minimal de six questions — celles dont dépendent cotisations, impôts et TVA |
 | Signaler la démonstration | 🟢 nouveau | Bandeau tant que le jeu livré est là |
+
+## Lot 27 (12/11) — l'impôt sur le revenu suit ses échéances réelles
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Provision d'impôt répartie par mois (`addIRMonthlyProvisions`) | 🟢 | L'ancienne posait une ligne « IR Estimé » par mois encaissé, au prorata du CA HT. La nouvelle déplie la provision mois par mois (encaissé, impôt du mois, acomptes prélevés, à garder fin de mois) ; le dernier mois retombe sur la provision du jour, acomptes appelés compris. Pas de case « payé » par mois : c'est l'acompte saisi qui règle, pas la ligne de provision |
+| Solde de l'avis d'impôt | 🟢 nouveau | Saisi tel qu'il est écrit (reste à payer) ; découpé selon la règle officielle — une fois sous 300 €, quatre prélèvements de septembre à décembre au-delà, deux pour un avis tardif ; enregistré sur l'exercice qu'il règle |
+| Première année BNC, puis l'automne suivant | 🟢 nouveau | Aucun acompte la première année ; à l'automne suivant, solde de N-1 et acomptes de N les mêmes mois, chacun sur son exercice — test d'intégration de bout en bout |
+| Solde estimé de l'an passé dans la frise | 🟢 nouveau | Aux dates officielles, tant que l'avis manque |
+

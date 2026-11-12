@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { type RefObject, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { DateISO } from '../../domain/types';
 import type { Echeance, NatureDette } from '../../domain/calculs/provisions';
 import type { PrelevementPrevu } from '../../state/selecteurs.impotCalendrier';
@@ -81,6 +81,8 @@ export function FriseEcheances(
   }
 ) {
   const idTitre = useId();
+  const refFrise = useRef<HTMLDivElement>(null);
+  const largeur = useLargeur(refFrise);
 
   const jalons = [
     ...echeances.map((e) => ({ ...e, estime: false })),
@@ -119,17 +121,23 @@ export function FriseEcheances(
   if (jalons.length === 0) return aucunAppel;
 
   /*
-   * Deux jalons proches se chevaucheraient. On les décale d'un rang, en
-   * alternance, plutôt que de les serrer : une étiquette tronquée ne se lit
-   * plus, et c'est justement quand deux échéances sont proches qu'on a besoin
-   * de les lire toutes les deux.
+   * Deux jalons proches se chevaucheraient. On les décale d'un rang plutôt que
+   * de les serrer : une étiquette tronquée ne se lit plus, et c'est justement
+   * quand deux échéances sont proches qu'on a besoin de les lire toutes les
+   * deux.
+   *
+   * L'écart se mesure en PIXELS, pas en fraction d'année. Un mois sépare deux
+   * jalons de 95 px en grand écran et de 27 px sur téléphone : avec un écart
+   * fixé en fraction, quatre prélèvements mensuels s'empilaient en une bouillie
+   * illisible sur 390 px. Quand aucun des deux rangs n'a la place, l'étiquette
+   * se tait à l'écran — le point reste, et le texte reste lu par un lecteur
+   * d'écran et écrit en toutes lettres dans la liste juste en dessous.
    */
-  const ECART_MINIMAL = 0.075;
-  let precedent = -1;
-  let rang = 0;
+  const ecart = largeur === null ? ECART_SANS_MESURE : LARGEUR_ETIQUETTE / largeur;
+  const derniers = [-Infinity, -Infinity];
   const places = jalons.map((j) => {
-    rang = precedent >= 0 && j.part - precedent < ECART_MINIMAL ? (rang + 1) % 2 : 0;
-    precedent = j.part;
+    const rang = derniers.findIndex((d) => j.part - d >= ecart);
+    if (rang >= 0) derniers[rang] = j.part;
     return { ...j, rang };
   });
 
@@ -171,11 +179,11 @@ export function FriseEcheances(
         )}
       </div>
 
-      <div className={styles.frise}>
+      <div className={styles.frise} ref={refFrise}>
         {places.map((j) => (
           <span
             key={j.id}
-            className={`${styles.jalon} ${j.rang === 1 ? styles.jalonHaut : ''}`}
+            className={`${styles.jalon} ${j.rang === 1 ? styles.jalonHaut : j.rang < 0 ? styles.jalonMuet : ''}`}
             style={{ left: `${j.part * 100}%` }}
           >
             <span className={styles.jalonNom}>
@@ -244,6 +252,29 @@ export function FriseEcheances(
       {jalons.every((j) => j.estime) && aucunAppel}
     </figure>
   );
+}
+
+/** La place d'une étiquette, nom ou montant le plus long, police comprise. */
+const LARGEUR_ETIQUETTE = 84;
+/** Sans mesure (rendu de test), l'écart d'un grand écran : ~84 px sur 1 150. */
+const ECART_SANS_MESURE = 0.075;
+
+/**
+ * La largeur de la frise, suivie quand la fenêtre change. `null` tant qu'elle
+ * n'est pas mesurée — ou là où rien ne se mesure.
+ */
+function useLargeur(ref: RefObject<HTMLDivElement | null>): number | null {
+  const [largeur, setLargeur] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return undefined;
+    const mesurer = () => setLargeur(el.clientWidth > 0 ? el.clientWidth : null);
+    mesurer();
+    const observateur = new ResizeObserver(mesurer);
+    observateur.observe(el);
+    return () => observateur.disconnect();
+  }, [ref]);
+  return largeur;
 }
 
 /**

@@ -1172,3 +1172,18 @@ démonstration.
 |---|---|---|
 | Première ouverture (dossier vide) | Pilote à zéro, aucune piste | Panneau « Bienvenue dans Freel » : commencer (six questions), reprendre l'ancienne application, restaurer une sauvegarde ; « Voir la démonstration » |
 | Tous les écrans, jeu de démonstration chargé | Rien ne le distinguait d'un vrai dossier | Bandeau pointillé « Démonstration : ces données sont fictives », lien vers Données |
+
+## Lot 27 (12/11) — l'impôt sur le revenu suit ses échéances réelles
+
+| Zone | Avant | Après |
+|---|---|---|
+| Argent › Échéancier, frise | L'automne paraissait vide tant que l'avis de l'an passé n'était pas saisi | Le solde estimé de l'an passé posé à ses dates officielles, point en pointillé, étiquette « estimé », entrée de légende « estimé, avis à venir » ; jamais « en retard » |
+| Argent › Échéancier, frise sur téléphone | Des jalons mensuels s'empilaient en une bouillie illisible (écart fixé en fraction d'année) | Écart mesuré en pixels ; deux rangs ; une étiquette qui ne tient nulle part se tait à l'écran (le point reste, le texte reste lu). Le point d'un jalon du second rang reste sur l'axe, relié à son étiquette par un trait pointillé — la référence pose les points sur l'axe |
+| Argent › Provisions, note d'impôt | Un total, sans d'où il vient | Pli « L'impôt AAAA, mois par mois » : encaissé, impôt du mois, acomptes prélevés (s'il y en a), à garder fin de mois ; chargé au repos, dans son propre module |
+| Saisir une échéance › Impôt › solde | Montant et date à saisir à la main, quatre fois | « Revenus de l'année », « Reste à payer sur l'avis », « Avis reçu tardivement » et l'aperçu des prélèvements (dates, montants) avant d'enregistrer ; bouton « Enregistrer les 4 prélèvements » |
+| Saisir une échéance › Impôt › acompte | — | L'aide dit le 15 de chaque mois (ou au trimestre) et l'absence d'acompte la première année |
+
+Le handoff n'a ni ce formulaire ni ce tableau ; la frise du handoff ne montre
+aucun cas de jalons rapprochés. Contrôle visuel : sondes dans les deux thèmes
+et à 390 px (frise, pli mois par mois, formulaire de l'avis).
+

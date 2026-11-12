@@ -441,6 +441,8 @@
 
 /* La provision d'impôt, mois par mois : repliée, elle répond à une question
    qu'on se pose en fin de mois, pas tous les matins. */
+.moisParMois { margin: -6px 0 14px; }
+
 .moisParMois summary {
   cursor: pointer;
   min-height: 44px;

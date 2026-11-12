@@ -5,6 +5,8 @@
 
 .table {
   width: 100%;
+  /* Au-delà, les colonnes s'écartent tant que l'œil ne suit plus la ligne. */
+  max-width: 680px;
   border-collapse: collapse;
   font-size: 12.5px;
   font-variant-numeric: tabular-nums;

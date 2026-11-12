@@ -250,7 +250,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     await attendreTresorerie();
     expect(screen.queryAllByText(/non provisionné/)).toHaveLength(0);
     expect(screen.queryAllByText(/à\s+mettre de côté\s+aujourd/)).toHaveLength(0);
-    expect(screen.queryByText(/Mois par mois/)).toBeNull();
+    expect(screen.queryByText(/^L’impôt \d{4}, mois par mois$/)).toBeNull();
   });
 
   // « Combien aurais-je dû avoir mis de côté à la fin de chaque mois ? » : le
@@ -259,7 +259,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     semer({ recettes: [recette(60000)], partsFiscales: 1 });
     render(<Argent />);
     await attendreTresorerie();
-    await userEvent.setup().click(screen.getByText('Mois par mois, en 2026'));
+    await userEvent.setup().click(screen.getByText('L’impôt 2026, mois par mois'));
     const table = await screen.findByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(1 + 7);
     expect(within(table).getByRole('rowheader', { name: 'juillet' })).toBeTruthy();
