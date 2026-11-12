@@ -33,6 +33,8 @@ Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 | 11 | Impôt sur le revenu de première année | ✅ décidé le 11/11 : le cas réel du propriétaire (pas d'acompte la première année, puis solde de N-1 étalé ET acomptes de N à partir de septembre) se saisit et se provisionne : solde et acomptes séparés, rien de compté deux fois | Lot 27 |
 | 12 | Données réelles | ✅ accordé le 11/11 : elles servent à vérifier les chiffres, **dans le dossier temporaire de la session seulement**. Rien de réel dans le dépôt (tests, démo, docs, commits) ; les identifiants Supabase ne sont jamais manipulés | Lot 32 |
 | 13 | Mission à plusieurs clients | ✅ demandé le 11/11 : arrêter un client sur une mission (« arrêté le … ») et continuer avec un autre, sans clore la mission | Lot 31 |
+| 14 | Une mission à plusieurs clients se facture-t-elle séparément | ✅ répondu le 12/11 : « actuellement non, mais ça doit pouvoir arriver ». Par défaut **une facture commune** (le cas actuel) ; le choix « une facture commune » / « une facture par client » se fait mission par mission | Lot 31 ; le second cas demande un client de facturation par plage (schéma 22, après le 21 du lot 28) |
+| 15 | Audit du produit et de l'interface | ⏳ demandé le 12/11, rendu le 12/11 dans `AUDIT-PRODUIT-ET-INTERFACE.md` : le design du handoff devient contestable (« tout est ouvert, tu valides »), la cible reste « toi d'abord, micro ouvert ». **Le plan révisé qu'il propose (§9) n'est pas adopté** : le plan ci-dessous vaut tant que les cinq questions de son §10 ne sont pas tranchées | Rien ne s'exécute de ce rapport avant validation |
 
 ## Dates officielles relevées (11/11/2026)
 
@@ -135,7 +137,7 @@ l'affichage et la reprise.
 | Le client arrêté se lit « arrêté le … » dans la mission ; le planning, le CRA et le brouillon du mois ne lui comptent plus de jours après cette date | ⬜ |
 | « Retirer » un client opérationnel du formulaire emporte ses plages et ses corrections : confirmé, et « Arrêter le … » proposé à la place | ⬜ |
 | Reprise : l'ancienne application disait QUEL client travaillait QUEL jour (`lignes[].entiteByDay`) ; la reprise l'ignore aujourd'hui, en silence — chaque client garde sa semaine type sur toute la mission (un client arrêté continue donc au planning) et toutes les corrections vont au premier. À reprendre jour par jour, ou à lister dans le rapport | ⬜ |
-| À trancher avec le propriétaire si les deux clients se FACTURENT séparément : la facture suit aujourd'hui le client de la mission ; facturer par client opérationnel demanderait un client de facturation par plage (schéma 21 ou 22) | ⬜ à décider |
+| Facturation d'une mission à plusieurs clients — tranché le 12/11 (décision 14) : par défaut une facture commune ; le choix « une facture commune » / « une facture par client » se fait mission par mission ; dans le second cas le brouillon du mois découpe les jours selon les plages de chaque client, ce qui demande un client de facturation par plage (schéma 22) | ⬜ |
 
 ### Lot 32 — Vérification sur les données réelles (hors dépôt)
 
@@ -158,7 +160,7 @@ l'affichage et la reprise.
 |---|---|
 | Jalons réglementaires dans la frise (et plus seulement les échéances saisies), aux dates du relevé ci-dessus, source citée dans le code, report au jour ouvré | ⬜ |
 | TVA : calendrier de la CA3 (entreprise individuelle par initiale), fin du régime simplifié au 01/01/2027 ; TVA autoliquidée d'un franchisé à la date de la CA3, en hypothèse dite | ⬜ |
-| Barèmes restants de L10 : profil CIPAV (demande un type d'activité au schéma), plafond de revenu fiscal de référence du versement libératoire, seuils de TVA spécifiques ; **mention « article 293 B du CGI » à remplacer au 01/01/2027 par l'article du CIBS** — daté : à livrer avant le 1er janvier, quitte à sortir ce point en avance | ⬜ |
+| Barèmes restants de L10 : profil CIPAV (demande un type d'activité au schéma), plafond de revenu fiscal de référence du versement libératoire, seuils de TVA spécifiques ; **mention « article 293 B du CGI » à remplacer par « TVA non applicable, art. L. 223 et s. du code des impositions sur les biens et services (CIBS) »** — date corrigée le 12/11 sur la fiche officielle (Service public, F23208, vérifiée le 07/08/2026) : la nouvelle mention s'applique **depuis le 01/09/2026**, l'ancienne reste tolérée **jusqu'au 31/12/2027**. Plus d'échéance au 1er janvier ; à relire sur la fiche au moment de coder | ⬜ |
 
 ### Lots 35 à 45 — Le reste, sans coupe
 
