@@ -118,6 +118,15 @@ function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], mois: Mois
 const AlerteConservation = lazy(() => import('./ui/components/AlerteConservation')
   .then((m) => ({ default: m.AlerteConservation })));
 
+/**
+ * L'accueil de la première ouverture et le bandeau de la démonstration,
+ * différés comme l'alerte : ils ne servent qu'à un dossier vide ou fictif, et
+ * n'ont rien à faire dans le paquet que télécharge un dossier en cours.
+ */
+const Accueil = lazy(() => import('./ui/components/Accueil').then((m) => ({ default: m.Accueil })));
+const BandeauDemonstration = lazy(() => import('./ui/components/Accueil')
+  .then((m) => ({ default: m.BandeauDemonstration })));
+
 export function App() {
   const initialiser = useFaits((e) => e.initialiser);
   const faits = useFaits((e) => e.faits);
@@ -179,6 +188,8 @@ export function App() {
         )}
       >
         <Suspense fallback={null}><AlerteConservation /></Suspense>
+        <Suspense fallback={null}><BandeauDemonstration /></Suspense>
+        <Suspense fallback={null}><Accueil /></Suspense>
         <Suspense fallback={<EnChargement />}>
           {Ecran(etatMois)}
         </Suspense>

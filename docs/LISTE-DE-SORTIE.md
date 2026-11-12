@@ -74,7 +74,7 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 | La reprise depuis l'ancienne version continue de fonctionner (même origine, même stockage) — testé | ✅ dans `verifier:bascule`, sur le site assemblé |
 | Contrôle visuel de la copie publiée (1440 et 390, au repos et en défilement) | ✅ |
 
-### Lot 25 — Effacer le compte distant (RGPD) — PR #321
+### Lot 25 — Effacer le compte distant (RGPD) — PR #321, fusionnée
 
 | Ligne | État |
 |---|---|
@@ -83,7 +83,7 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 | Ce qui reste dit : l'identifiant de connexion ne se supprime qu'avec la clé de service, qui ne doit jamais être dans le client ; la marche à suivre est écrite | ✅ à l'écran : tableau de bord Supabase (Authentication, puis Users) ; données de cet appareil : Données, « Repartir de zéro » |
 | Contrôle visuel : Compte connecté (serveur simulé), confirmation et bilan, sombre 1440 et clair 390 | ✅ focus sur « Garder », aucune erreur JS |
 
-### Lot 26 — L'accueil à la première ouverture
+### Lot 26 — L'accueil à la première ouverture — PR à ouvrir
 
 | Ligne | État |
 |---|---|
