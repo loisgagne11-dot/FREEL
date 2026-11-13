@@ -24,7 +24,9 @@ import { existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 
 const RACINE = new URL('../dist/', import.meta.url).pathname;
-const CHROMIUM_FOURNI = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// Le lien stable, pas le dossier versionné : « chromium-1194 » a disparu de
+// l'image le 13/11, et ce contrôle tombait avant d'avoir rien vérifié.
+const CHROMIUM_FOURNI = '/opt/pw-browsers/chromium';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',

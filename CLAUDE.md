@@ -5,15 +5,30 @@ Poste de pilotage d'un indépendant en micro-BNC. L'application vit dans `app/`
 version, à conserver** : elle sert de référence fonctionnelle, elle ne se
 supprime pas.
 
-## La référence visuelle : `docs/design/captures/`
+## La référence visuelle : `docs/design/direction/`
 
-**Avant de dessiner ou de modifier un écran, regarder la capture correspondante.**
-Le dossier contient un rendu de chaque écran du handoff produit avec Claude
-Design, dans les deux thèmes, panneaux et modales compris. `INDEX.md` fait la
-correspondance capture → écran.
+**Avant de dessiner ou de modifier un écran, regarder la maquette correspondante.**
+Le propriétaire a retenu le 13/11 la direction « Calme, graphiques retravaillés » :
+ses quatre thèmes tels quels, un dessin plus fin. `docs/design/DIRECTION-VISUELLE.md`
+dit les règles ; `docs/design/direction/` porte les maquettes, leur feuille de
+style — qui fait foi pour les mesures — et leurs captures.
 
-C'est la référence, pas une illustration. Elle a plusieurs fois contredit ce que
-la lecture du code du handoff laissait supposer :
+```
+cd app && node scripts/capturer-direction.mjs              # calme, + planche en nuit
+cd app && node scripts/capturer-direction.mjs --mode=tous  # les quatre thèmes
+```
+
+Un écran sans maquette se dessine d'après la planche et les règles, **et se
+soumet au propriétaire avant d'être codé** : deux directions ont été écartées
+avant celle-ci, sur l'allure seule.
+
+### Le handoff : mémoire, plus référence
+
+`docs/design/captures/` rend chaque écran du handoff produit avec Claude Design
+(`INDEX.md` fait la correspondance). Il n'est plus la référence de style depuis
+le 12/11 ; il sert à retrouver ce qu'un écran montrait. La leçon qu'il a donnée
+vaut toujours pour les maquettes : **une image contredit ce que la lecture du
+code laisse supposer.** Elle l'a fait plusieurs fois :
 
 - l'écran Argent porte **un graphe combiné entrées / sorties / solde**, pas deux
   graphes de barres séparés ;
@@ -25,15 +40,9 @@ la lecture du code du handoff laissait supposer :
 - le rythme d'une mission se saisit **une ligne par mois**, avec jours et CA
   calculés en regard.
 
-Regénérer après toute modification du handoff :
-
-```
-cd app && node scripts/capturer-handoff.mjs          # les deux thèmes
-cd app && node scripts/capturer-handoff.mjs --theme=clair
-```
-
-Les captures ne se retouchent pas à la main : elles cesseraient de dire la
-vérité sur le handoff dont elles sont tirées.
+Les captures, celles des maquettes comme celles du handoff
+(`node scripts/capturer-handoff.mjs`), ne se retouchent pas à la main : elles
+cesseraient de dire la vérité sur le fichier dont elles sont tirées.
 
 ## Les trois axes de contrôle
 
@@ -96,6 +105,26 @@ d'arbitrer entre deux conceptions. Ce qui reste à faire vit dans
    un prénom n'a pas de forme et lui échappe : à vérifier à l'œil.
 7. Les budgets de performance ne se relèvent pas. Quand un budget dépasse, on
    **extrait** le module qui n'a rien à faire dans le lot.
+
+## Sécurité
+
+L'application va être publiée (décision 21). `docs/AUDIT-SECURITE.md` porte les
+constats ; les lots 56 à 62 de la liste de sortie, ce qui reste. Cinq règles,
+qui valent pour tout lot :
+
+1. **Rien d'externe à l'exécution.** Ni CDN, ni traceur, ni police distante. La
+   politique de contenu de `app/index.html` est le garde-fou, et elle ne
+   s'assouplit pas plus qu'un budget ne se relève : on change le code, pas elle.
+2. **Ce qui vient d'un fichier ou du réseau est hostile.** Validé par le schéma
+   à l'entrée ; échappé à la sortie, selon la sortie — HTML, CSV, XML, adresse.
+   Un libellé de relevé bancaire est choisi par un tiers.
+3. **Aucun secret dans une page servie.** Ni clé de service, ni adresse de
+   projet dans le dépôt. La clé publique ne protège rien : ce sont les règles
+   d'accès qui protègent, et la sonde qui le constate.
+4. **Le SQL est exécuté par l'utilisateur lui-même.** L'application constate
+   par relecture ; un « succès » du serveur ne prouve rien (lot 25).
+5. **L'ancienne version ne se supprime pas, elle se bride** — sur la copie
+   publiée, jamais sur l'original.
 
 ## Vérification
 

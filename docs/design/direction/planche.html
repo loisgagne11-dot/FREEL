@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction visuelle — planche de référence (Pilote)</title>
+<!-- Maquette, pas l'application : ici les polices viennent d'un CDN pour que
+     le fichier s'ouvre seul. L'application, elle, les embarque (lot 51) : sa
+     politique de contenu ne s'ouvre à aucun domaine tiers. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="./calme.css">
+<style>body{margin:0}</style>
+</head>
+<body>
+<div class="ec m-calme" style="width: 1400px; height: 1700px">
+
+<nav class="e-rail" aria-label="Navigation principale">
+<div class="e-logo">fre<b>e</b>l</div>
+<a class="e-nav on" href="#pilote"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h4l3-8 4 16 3-8h6"></path></svg>Pilote</a>
+<a class="e-nav" href="#activite"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Activité</a>
+<a class="e-nav" href="#factures"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"></path></svg>Factures</a>
+<a class="e-nav" href="#tresorerie"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"></rect><path d="M16 12.5h2M3 9.5h14"></path></svg>Trésorerie</a>
+<a class="e-nav" href="#obligations"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.5 2.5L16 9.5"></path></svg>Obligations<span class="e-count">2</span></a>
+<a class="e-nav" href="#achats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2zM9 8V6a3 3 0 0 1 6 0v2"></path></svg>Achats</a>
+<div class="e-id"><span class="e-av k1">C</span><div>Camille Demo<small>Micro-BNC · données fictives</small></div></div>
+</nav>
+
+<main class="e-main">
+
+<header class="e-top">
+<div>
+<h1>Bonjour Camille — trois choses à faire.</h1>
+<p>Mardi 10 juin 2026. Rien d’urgent, une facture à relancer.</p>
+</div>
+<div class="e-tools">
+<div class="e-search">Rechercher une facture, un client…</div>
+<a class="e-btn go" href="#nouveau">+ Nouveau</a>
+</div>
+</header>
+
+<section class="e-card e-hero" aria-label="Ce que tu peux te verser">
+<div class="e-hero-l">
+<div>
+<div class="e-lab">Tu peux te verser</div>
+<div class="e-big">7&nbsp;527<small>€</small></div>
+</div>
+<div class="e-split" role="img" aria-label="Sur 11 996 euros de solde : 7 527 à te verser, 2 470 de réserve, 1 999 dus">
+<i style="flex: 7527 1 0; background: var(--green)"></i>
+<i style="flex: 2470 1 0; background: var(--bar-soft)"></i>
+<i style="flex: 285 1 0; background: var(--c-impot)"></i>
+<i style="flex: 1685 1 0; background: var(--c-urssaf)"></i>
+<i style="flex: 29 1 4px; background: var(--c-tva)"></i>
+</div>
+<div class="e-leg">
+<div><span><span class="e-dot" style="background: var(--green)"></span>À te verser</span><b>7&nbsp;527&nbsp;€</b></div>
+<div><span><span class="e-dot" style="background: var(--bar-soft)"></span>Réserve gardée</span><b>2&nbsp;470&nbsp;€</b></div>
+<div><span><span class="e-dot" style="background: var(--c-urssaf)"></span>Dû à l’URSSAF et au fisc</span><b>1&nbsp;999&nbsp;€</b></div>
+<div><span>Solde du compte</span><b>11&nbsp;996&nbsp;€</b></div>
+</div>
+</div>
+<div class="e-aside">
+<div>
+<div class="e-lab">Tenable chaque mois</div>
+<div class="v">1&nbsp;896&nbsp;€ <small>par mois</small></div>
+<p class="e-hint" style="margin-top: 6px">jusqu’en mai 2027 — c’est ce mois-là qui limite</p>
+</div>
+<a class="e-btn go" href="#verser">Verser sur mon compte</a>
+</div>
+</section>
+
+<div class="e-grid3">
+<section class="e-card e-tile">
+<div>
+<div class="e-lab">Disponible</div>
+<div class="e-num">9&nbsp;997&nbsp;€</div>
+<p class="e-hint">à toi, le dû mis de côté</p>
+</div>
+<svg class="e-spark" viewBox="0 0 120 36" aria-hidden="true"><path d="M4.0,30.0 C7.7,29.4 18.9,27.4 26.4,26.1 C33.9,24.8 41.3,23.8 48.8,22.2 C56.3,20.6 63.7,18.6 71.2,16.4 C78.7,14.1 86.1,10.3 93.6,8.6 C101.1,6.9 112.3,6.4 116.0,6.0" style="fill: none; stroke: var(--green); stroke-width: 2.5; stroke-linecap: round"></path><circle cx="116" cy="6" r="3.5" style="fill: var(--green)"></circle></svg>
+</section>
+<section class="e-card e-tile">
+<div>
+<div class="e-lab">Carnet signé</div>
+<div class="e-num">46&nbsp;jours</div>
+<p class="e-hint">23&nbsp;220&nbsp;€ · jusqu’au 28 août</p>
+</div>
+<svg class="e-spark" viewBox="0 0 120 36" aria-hidden="true"><path d="M4.0,6.0 C7.7,7.0 18.9,11.5 26.4,12.0 C33.9,12.5 41.3,8.3 48.8,9.0 C56.3,9.8 63.7,13.8 71.2,16.5 C78.7,19.3 86.1,23.3 93.6,25.5 C101.1,27.8 112.3,29.3 116.0,30.0" style="fill: none; stroke: var(--c-urssaf); stroke-width: 2.5; stroke-linecap: round"></path><circle cx="116" cy="30" r="3.5" style="fill: var(--c-urssaf)"></circle></svg>
+</section>
+<section class="e-card e-tile">
+<div>
+<div class="e-lab">Occupation de juin</div>
+<div class="e-num">98&nbsp;%</div>
+<p class="e-hint">19,5 jours sur 20 ouvrés</p>
+</div>
+<svg class="e-spark" viewBox="0 0 120 36" aria-hidden="true"><path d="M4.0,25.1 C7.7,24.0 18.9,17.9 26.4,18.7 C33.9,19.5 41.3,30.9 48.8,30.0 C56.3,29.1 63.7,16.1 71.2,13.1 C78.7,10.0 86.1,12.8 93.6,11.6 C101.1,10.5 112.3,6.9 116.0,6.0" style="fill: none; stroke: var(--green-lite); stroke-width: 2.5; stroke-linecap: round"></path><circle cx="116" cy="6" r="3.5" style="fill: var(--green-lite)"></circle></svg>
+</section>
+</div>
+
+<div class="e-row">
+<section class="e-card" style="flex: 8 1 0">
+<div class="e-h">
+<h3>Ton disponible, douze mois devant</h3>
+<div class="e-seg" role="group" aria-label="Période"><a class="on" href="#12">12 mois</a><a href="#2026">2026</a></div>
+</div>
+<svg viewBox="0 0 760 330" role="img" aria-label="Disponible : 7 500 euros en mars, 10 000 aujourd’hui, 13 400 prévus en août, puis une baisse jusqu’à 2 500 en mai 2027, au niveau de la réserve" style="width: 100%; height: auto; display: block">
+<defs>
+<linearGradient id="e-g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--green); stop-opacity: 0.30"></stop><stop offset="1" style="stop-color: var(--green); stop-opacity: 0"></stop></linearGradient>
+<linearGradient id="e-g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color: var(--green); stop-opacity: 0.13"></stop><stop offset="1" style="stop-color: var(--green); stop-opacity: 0"></stop></linearGradient>
+</defs>
+<line x1="48" y1="30" x2="740" y2="30" style="stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 1 5; stroke-linecap: round"></line>
+<line x1="48" y1="116.7" x2="740" y2="116.7" style="stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 1 5; stroke-linecap: round"></line>
+<line x1="48" y1="203.3" x2="740" y2="203.3" style="stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 1 5; stroke-linecap: round"></line>
+<line x1="48" y1="290" x2="740" y2="290" style="stroke: var(--line-2); stroke-width: 1"></line>
+<text x="40" y="34" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: end">15k</text>
+<text x="40" y="121" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: end">10k</text>
+<text x="40" y="207" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: end">5k</text>
+<path d="M48.0,160.0 C56.2,157.4 81.0,150.5 97.4,144.4 C113.9,138.3 130.4,128.2 146.9,123.6 C163.3,119.0 188.0,117.8 196.3,116.7 L196.3,290 L48,290 Z" style="fill: url(#e-g1)"></path>
+<path d="M196.3,116.7 C204.5,110.6 229.2,90.1 245.7,80.3 C262.2,70.4 278.7,56.3 295.1,57.7 C311.6,59.2 328.1,78.5 344.6,88.9 C361.0,99.3 377.5,109.7 394.0,120.1 C410.5,130.5 427.0,141.2 443.4,151.3 C459.9,161.4 476.4,171.0 492.9,180.8 C509.3,190.6 525.8,203.3 542.3,210.3 C558.8,217.2 575.2,218.4 591.7,222.4 C608.2,226.4 624.7,231.4 641.1,234.5 C657.6,237.7 674.1,239.4 690.6,241.5 C707.0,243.5 731.8,245.8 740.0,246.7 L740,290 L196.3,290 Z" style="fill: url(#e-g2)"></path>
+<line x1="48" y1="247.2" x2="740" y2="247.2" style="stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 2 5; stroke-linecap: round"></line>
+<text x="52" y="266" style="font-size: 12.5px; font-weight: 600; fill: var(--amber)">réserve 2 470 €</text>
+<path d="M48.0,160.0 C56.2,157.4 81.0,150.5 97.4,144.4 C113.9,138.3 130.4,128.2 146.9,123.6 C163.3,119.0 188.0,117.8 196.3,116.7" style="fill: none; stroke: var(--green); stroke-width: 3; stroke-linecap: round"></path>
+<path d="M196.3,116.7 C204.5,110.6 229.2,90.1 245.7,80.3 C262.2,70.4 278.7,56.3 295.1,57.7 C311.6,59.2 328.1,78.5 344.6,88.9 C361.0,99.3 377.5,109.7 394.0,120.1 C410.5,130.5 427.0,141.2 443.4,151.3 C459.9,161.4 476.4,171.0 492.9,180.8 C509.3,190.6 525.8,203.3 542.3,210.3 C558.8,217.2 575.2,218.4 591.7,222.4 C608.2,226.4 624.7,231.4 641.1,234.5 C657.6,237.7 674.1,239.4 690.6,241.5 C707.0,243.5 731.8,245.8 740.0,246.7" style="fill: none; stroke: var(--green); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 2 7"></path>
+<line x1="196.3" y1="34" x2="196.3" y2="290" style="stroke: var(--line-2); stroke-width: 1"></line>
+<rect x="155" y="8" width="83" height="24" rx="12" style="fill: var(--text)"></rect>
+<text x="196.5" y="24.5" style="font-size: 12px; font-weight: 600; fill: var(--bg); text-anchor: middle">aujourd’hui</text>
+<circle cx="196.3" cy="116.7" r="6.5" style="fill: var(--green); stroke: var(--card-a); stroke-width: 3"></circle>
+<circle cx="295.1" cy="57.7" r="5" style="fill: var(--card-a); stroke: var(--green); stroke-width: 2.5"></circle>
+<g style="filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.14))">
+<rect x="316" y="2" width="136" height="50" rx="13" style="fill: var(--card-a); stroke: var(--line-2); stroke-width: 1"></rect>
+</g>
+<text x="331" y="22" style="font-size: 12px; fill: var(--muted)">fin août, prévu</text>
+<text x="331" y="41" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600; fill: var(--text)">13 400 €</text>
+<circle cx="740" cy="246.7" r="5" style="fill: var(--card-a); stroke: var(--amber); stroke-width: 2.5"></circle>
+<text x="734" y="266" style="font-size: 12.5px; font-weight: 600; fill: var(--amber); text-anchor: end">point bas · 2 500 € en mai</text>
+<text x="48" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">mars</text>
+<text x="97" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">avr.</text>
+<text x="147" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">mai</text>
+<text x="196" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; fill: var(--text); text-anchor: middle">juin</text>
+<text x="246" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">juil.</text>
+<text x="295" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">août</text>
+<text x="345" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">sept.</text>
+<text x="394" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">oct.</text>
+<text x="443" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">nov.</text>
+<text x="493" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">déc.</text>
+<text x="542" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">janv.</text>
+<text x="592" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">févr.</text>
+<text x="641" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">mars</text>
+<text x="691" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">avr.</text>
+<text x="740" y="318" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: end">mai</text>
+</svg>
+<div class="e-legend" style="margin-top: 6px"><span><svg viewBox="0 0 26 6" style="width: 26px; height: 6px" aria-hidden="true"><line x1="2" y1="3" x2="24" y2="3" style="stroke: var(--green); stroke-width: 3; stroke-linecap: round"></line></svg>constaté</span><span><svg viewBox="0 0 26 6" style="width: 26px; height: 6px" aria-hidden="true"><line x1="2" y1="3" x2="24" y2="3" style="stroke: var(--green); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 2 6"></line></svg>prévu, si tu te verses 1&nbsp;896&nbsp;€ par mois</span></div>
+</section>
+
+<section class="e-card" style="flex: 4 1 0">
+<div class="e-h">
+<h3>Ce qui est dû</h3>
+<span class="e-chip ok">● Couvert</span>
+</div>
+<div class="e-num" style="margin-top: 0">1&nbsp;999&nbsp;€</div>
+<div class="e-split" style="height: 10px; margin: 10px 0 8px" role="img" aria-label="Répartition du dû : impôt 285, URSSAF 1 685, TVA 29">
+<i style="flex: 285 1 0; background: var(--c-impot)"></i>
+<i style="flex: 1685 1 0; background: var(--c-urssaf)"></i>
+<i style="flex: 29 1 5px; background: var(--c-tva)"></i>
+</div>
+<div class="e-li first"><span class="e-dot" style="background: var(--c-urssaf)"></span><div class="n">URSSAF et formation<small>à payer le 31 juillet</small></div><span class="v">1&nbsp;685&nbsp;€</span></div>
+<div class="e-li"><span class="e-dot" style="background: var(--c-impot)"></span><div class="n">Impôt sur le revenu<small>payé avec l’URSSAF</small></div><span class="v">285&nbsp;€</span></div>
+<div class="e-li"><span class="e-dot" style="background: var(--c-tva)"></span><div class="n">TVA à reverser<small>31 juillet</small></div><span class="v">29&nbsp;€</span></div>
+<div class="e-li" style="gap: 16px; padding-top: 16px">
+<svg viewBox="0 0 84 84" role="img" aria-label="61 pour cent du seuil de franchise de TVA" style="width: 84px; height: 84px; flex: 0 0 auto">
+<circle cx="42" cy="42" r="34" style="fill: none; stroke: var(--tint-3); stroke-width: 8"></circle>
+<circle cx="42" cy="42" r="34" style="fill: none; stroke: var(--c-tva); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 130.3 213.6; transform: rotate(-90deg); transform-origin: 42px 42px"></circle>
+<text x="42" y="47.5" style="font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 600; fill: var(--text); text-anchor: middle">61%</text>
+</svg>
+<div class="n">Franchise de TVA<small><span class="mono">22&nbsp;720</span> sur <span class="mono">37&nbsp;500&nbsp;€</span></small><span class="e-chip warn" style="margin-top: 8px">◇ encore 28 jours facturables</span></div>
+</div>
+</section>
+</div>
+
+<div class="e-row">
+<section class="e-card" style="flex: 5 1 0">
+<div class="e-h">
+<h3>Facturé et encaissé</h3>
+<div class="e-legend"><span><span class="e-dot" style="background: var(--bar-soft)"></span>facturé</span><span><span class="e-dot" style="background: var(--green)"></span>encaissé</span></div>
+</div>
+<div class="e-bars" role="img" aria-label="Facturé et encaissé de janvier à juin 2026, avec l’objectif de 6 000 euros par mois">
+<div class="e-goal"><span>objectif 6k</span></div>
+<div class="e-pair" title="Janvier : 3,4 k€ facturés, 4,3 k€ encaissés"><i class="f" style="height: 54px"></i><i class="g" style="height: 69px"></i></div>
+<div class="e-pair" title="Février : 2,1 k€ facturés, 3,4 k€ encaissés"><i class="f" style="height: 34px"></i><i class="g" style="height: 54px"></i></div>
+<div class="e-pair" title="Mars : 5,2 k€ facturés, 2,1 k€ encaissés"><i class="f" style="height: 83px"></i><i class="g" style="height: 34px"></i></div>
+<div class="e-pair" title="Avril : 9 k€ facturés, 5,2 k€ encaissés"><i class="f" style="height: 144px"></i><i class="g" style="height: 83px"></i></div>
+<div class="e-pair" title="Mai : 2,4 k€ facturés, 3,6 k€ encaissés"><i class="f" style="height: 38px"></i><i class="g" style="height: 58px"></i></div>
+<div class="e-pair now" title="Juin : 2,4 k€ facturés, 4,2 k€ encaissés"><span class="e-val">4,2k</span><i class="f" style="height: 38px"></i><i class="g" style="height: 67px"></i></div>
+</div>
+<div class="e-months"><span>janv.</span><span>févr.</span><span>mars</span><span>avr.</span><span>mai</span><span class="now">juin</span></div>
+<div class="e-leg" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line)">
+<div><span>Facturé en 2026</span><b>24&nbsp;430&nbsp;€</b></div>
+<div><span>Encaissé</span><b>22&nbsp;720&nbsp;€</b></div>
+<div><span>Écart à l’objectif</span><b>46&nbsp;jours</b></div>
+</div>
+</section>
+
+<section class="e-card" style="flex: 7 1 0">
+<div class="e-h">
+<h3>Factures</h3>
+<a class="e-more" href="#factures">Tout voir</a>
+</div>
+<table class="e-t">
+<thead><tr><th>Client</th><th>Échéance</th><th class="d">Montant</th><th>État</th></tr></thead>
+<tbody>
+<tr><td><div class="e-who"><span class="e-av k1">SL</span><div>Studio Lumen<small>2026-006 · ajustements</small></div></div></td><td>21 mai</td><td class="d mono">1&nbsp;200&nbsp;€</td><td><span class="e-chip late">▲ En retard · 11 j</span></td></tr>
+<tr><td><div class="e-who"><span class="e-av k1">SL</span><div>Studio Lumen<small>2026-008 · lot 2</small></div></div></td><td>30 juil.</td><td class="d mono">2&nbsp;410&nbsp;€</td><td><span class="e-chip">→ Envoyée</span></td></tr>
+<tr><td><div class="e-who"><span class="e-av k2">AN</span><div>Atelier Novak<small>2026-007 · lot 2</small></div></div></td><td>14 juil.</td><td class="d mono">2&nbsp;400&nbsp;€</td><td><span class="e-chip">→ Envoyée</span></td></tr>
+<tr><td><div class="e-who"><span class="e-av k3">BV</span><div>Brasserie Vent d’Ouest<small>brouillon de juin</small></div></div></td><td>—</td><td class="d mono">1&nbsp;380&nbsp;€</td><td><span class="e-chip warn">◇ À émettre</span></td></tr>
+<tr class="last"><td><div class="e-who"><span class="e-av k1">SL</span><div>Studio Lumen<small>2026-005 · lot 1</small></div></div></td><td>—</td><td class="d mono">4&nbsp;160&nbsp;€</td><td><span class="e-chip ok">● Encaissée le 4 juin</span></td></tr>
+</tbody>
+</table>
+</section>
+</div>
+
+<div class="e-row">
+<section class="e-card" style="flex: 7 1 0">
+<div class="e-h">
+<h3>L’année en obligations</h3>
+<div class="e-legend"><span><span class="e-dot" style="background: var(--c-urssaf)"></span>URSSAF</span><span><span class="e-dot" style="background: var(--c-tva)"></span>TVA</span><span><span class="e-dot" style="background: var(--c-impot)"></span>Impôt</span><span><span class="e-dot" style="background: var(--c-cfe)"></span>CFE</span></div>
+</div>
+<svg viewBox="0 0 700 150" role="img" aria-label="Frise 2026 : URSSAF payée en janvier et en avril, déclaration de revenus faite en mai ; à venir, TVA et URSSAF fin juillet, URSSAF fin octobre, CFE mi-décembre" style="width: 100%; height: auto; display: block">
+<line x1="20" y1="100" x2="680" y2="100" style="stroke: var(--line-2); stroke-width: 3; stroke-linecap: round"></line>
+<line x1="20" y1="100" x2="313" y2="100" style="stroke: var(--green); stroke-width: 3; stroke-linecap: round"></line>
+<g style="filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.14))">
+<rect x="352" y="10" width="232" height="52" rx="13" style="fill: var(--card-a); stroke: var(--line-2); stroke-width: 1"></rect>
+</g>
+<text x="368" y="31" style="font-size: 13px; font-weight: 600; fill: var(--text)">31 juil. · URSSAF, 2ᵉ trimestre</text>
+<text x="368" y="49" style="font-size: 12px; fill: var(--muted)">≈ 1 970 € · déclarable le 1ᵉʳ juillet</text>
+<line x1="405" y1="62" x2="405" y2="90" style="stroke: var(--line-2); stroke-width: 1.5; stroke-dasharray: 2 4; stroke-linecap: round"></line>
+<circle cx="75" cy="100" r="7.5" style="fill: var(--c-urssaf); stroke: var(--card-a); stroke-width: 3"></circle>
+<circle cx="240" cy="100" r="7.5" style="fill: var(--c-urssaf); stroke: var(--card-a); stroke-width: 3"></circle>
+<circle cx="278" cy="100" r="7.5" style="fill: var(--c-impot); stroke: var(--card-a); stroke-width: 3"></circle>
+<rect x="291" y="66" width="44" height="22" rx="11" style="fill: var(--text)"></rect>
+<text x="313" y="81.5" style="font-size: 12px; font-weight: 600; fill: var(--bg); text-anchor: middle">auj.</text>
+<circle cx="313" cy="100" r="4.5" style="fill: var(--text)"></circle>
+<circle cx="386" cy="100" r="6.5" style="fill: var(--card-a); stroke: var(--c-tva); stroke-width: 3"></circle>
+<circle cx="405" cy="100" r="6.5" style="fill: var(--card-a); stroke: var(--c-urssaf); stroke-width: 3"></circle>
+<circle cx="570" cy="100" r="6.5" style="fill: var(--card-a); stroke: var(--c-urssaf); stroke-width: 3"></circle>
+<circle cx="652" cy="100" r="6.5" style="fill: var(--card-a); stroke: var(--c-cfe); stroke-width: 3"></circle>
+<text x="47" y="134" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">janv.</text>
+<text x="157" y="134" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">mars</text>
+<text x="267" y="134" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">mai</text>
+<text x="377" y="134" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">juil.</text>
+<text x="487" y="134" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">sept.</text>
+<text x="597" y="134" style="font-family: 'JetBrains Mono', monospace; font-size: 12px; fill: var(--muted-2); text-anchor: middle">nov.</text>
+</svg>
+<p class="e-hint">Rond plein : fait. Rond creux : à venir. Deux choses à faire d’ici fin juillet.</p>
+</section>
+
+<section class="e-card" style="flex: 5 1 0">
+<div class="e-h">
+<h3>Semaine du 8 juin</h3>
+<span class="e-hint">4,5 jours travaillés</span>
+</div>
+<div class="e-week">
+<div class="e-day"><span class="j">Lun. 8</span><div class="e-slot k1">Studio L.<small>sur site</small></div><div class="e-slot k1">Studio L.<small>sur site</small></div></div>
+<div class="e-day"><span class="j">Mar. 9</span><div class="e-slot k1">Studio L.<small>télétravail</small></div><div class="e-slot k1">Studio L.<small>télétravail</small></div></div>
+<div class="e-day"><span class="j now">Mer. 10</span><div class="e-slot k0">Congé</div><div class="e-slot k0">Congé</div></div>
+<div class="e-day"><span class="j">Jeu. 11</span><div class="e-slot k2">Atelier N.<small>télétravail</small></div><div class="e-slot k2">Atelier N.<small>télétravail</small></div></div>
+<div class="e-day"><span class="j">Ven. 12</span><div class="e-slot k2">Atelier N.<small>télétravail</small></div><div class="e-slot k3">Brasserie<small>sur site</small></div></div>
+</div>
+</section>
+</div>
+
+</main>
+</div>
+<script>
+/* ?mode=calme|nuit|sombre|clair — les quatre thèmes de l'application. */
+(function () {
+  var mode = new URLSearchParams(location.search).get('mode');
+  if (['calme', 'nuit', 'sombre', 'clair'].indexOf(mode) === -1) return;
+  document.querySelector('.ec').className = 'ec m-' + mode;
+})();
+</script>
+</body>
+</html>
