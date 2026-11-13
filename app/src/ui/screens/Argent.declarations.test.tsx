@@ -107,7 +107,7 @@ describe('périodes URSSAF', () => {
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Marquer déclarée' }));
-    await utilisateur.click(screen.getByRole('button', { name: 'Annuler' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Annuler la déclaration' }));
 
     expect(useFaits.getState().faits.periodesDeclarees).toEqual([]);
   });

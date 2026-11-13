@@ -137,6 +137,9 @@ const VUES = [
   { hash: '#/argent', nom: 'argent-tresorerie' },
   { hash: '#/argent', nom: 'argent-performance', ouvrir: ['Performance'] },
   { hash: '#/achats', nom: 'achats' },
+  /* Le relevé n'avait pas de capture : un écran que rien ne photographie ne
+     se compare à rien, et c'est sur lui que le lot 28 a posé « ignorée ». */
+  { hash: '#/achats/releve', nom: 'achats-releve', attendre: 'text=Relevé bancaire' },
   { hash: '#/outils', nom: 'outils-impot' },
   /* L'onglet CRA, puis l'atelier lui-même.
      Deux vues et non une : la carte s'apparie à `outils-cra` du handoff, et
@@ -193,13 +196,26 @@ for (let essai = 0; essai < 60; essai += 1) {
 
 mkdirSync(SORTIE, { recursive: true });
 
-const navigateur = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+/* La langue du navigateur, pas seulement celle du contexte : le format d'un
+   champ de date suit la langue du processus (`LANG`), et `locale` seul le
+   laissait en « 04/28/2026 ». Essayé : `--lang=fr-FR` ne suffit pas. */
+const navigateur = await chromium.launch({
+  executablePath: '/opt/pw-browsers/chromium',
+  args: ['--lang=fr'],
+  env: { ...process.env, LANG: 'fr_FR.UTF-8', LANGUAGE: 'fr' }
+});
 const manquees = [];
 let capturees = 0;
 
 for (const theme of THEMES) {
   const LARGEUR = Number(argument('largeur') ?? 1440) || 1440;
-  const contexte = await navigateur.newContext({ viewport: { width: LARGEUR, height: 960 } });
+  /* En français : le navigateur du bac à sable est en anglais, et les champs
+     de date s'y photographiaient « mm/dd/yyyy » — ce que l'utilisateur ne
+     voit jamais. Une capture qui ne montre pas l'écran réel ne prouve rien.
+     Voir aussi le lancement, plus haut. */
+  const contexte = await navigateur.newContext({
+    viewport: { width: LARGEUR, height: 960 }, locale: 'fr-FR', timezoneId: 'Europe/Paris'
+  });
   await contexte.addInitScript(
     ({ palette, faits, cle, maintenant }) => {
       window.localStorage.setItem('freel-v111-theme', palette);

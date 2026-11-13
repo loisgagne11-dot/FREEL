@@ -503,3 +503,11 @@ chiffre faux.
 | Première année BNC, puis l'automne suivant | 🟢 nouveau | Aucun acompte la première année ; à l'automne suivant, solde de N-1 et acomptes de N les mêmes mois, chacun sur son exercice — test d'intégration de bout en bout |
 | Solde estimé de l'an passé dans la frise | 🟢 nouveau | Aux dates officielles, tant que l'avis manque |
 
+
+## Lot 28 (13/11) — déclaration datée, opération ignorée (schéma 21)
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Statut d'une période déclarée | 🟢 | L'ancienne cochait « déclaré » sans date. La nouvelle date la déclaration (du jour par défaut, corrigeable, jamais future) et lit le cycle à déclarer → déclarée le … → payée le … ; « Annuler la déclaration » la défait |
+| Écarter une opération du relevé | 🟢 nouveau | « Ignorer » : un virement entre ses comptes, une opération annulée. Distinct de « sans contrepartie » : l'une compte au solde, l'autre nulle part. Se reprend |
+| Migration 20 → 21 | 🟢 | Descend dans les listes : les mois déclarés deviennent des périodes à date inconnue (aucune date inventée, doublons fondus), chaque mouvement reçoit `ignoree: false` ; un mois nu est refusé au schéma courant |

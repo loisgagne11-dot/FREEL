@@ -762,3 +762,16 @@ Aucun nombre lu ne change.
 | Nombre, dates et montants des prélèvements d'un avis | Saisir une échéance › Impôt › solde, aperçu | — | `prelevementsDuSolde` : 1 (≤ 300 €), 4 ou 2 (avis tardif) ; parts égales au centime, le reste au dernier. Dates 2026 relevées (`publie`) ; autre année : le 25 ou le jour ouvré suivant (`hypothese`, dit à l'écran) |
 | Acomptes retranchés de la provision de l'année | Argent › note d'impôt | Inchangé (par exercice depuis le lot L4) | Inchangé — désormais traversé par le test du cas « première année puis automne suivant » |
 
+
+## Lot 28 (13/11) — déclaration datée, opération ignorée
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Solde du compte (et tout ce qui en descend : versable, autonomie, composition) | Pilote, Argent | Une opération écartée ne pouvait être que « sans contrepartie » (motif `autre`) et **comptait** : 5 000 € virés sur un livret baissaient le solde de 5 000 € | Une opération **ignorée** ne compte dans aucun total, que le solde de départ soit daté ou non (le relevé seul la reprenait aussi : corrigé avant livraison). Tenu par trois tests nommés et deux mutations |
+| Provenance du solde (« rapproché » / « dérivé ») | Pilote, Argent | Une ligne écartée restait « à traiter » ou faussement pointée | Ignorée, elle est classée : elle ne retient plus le solde dans l'état « dérivé » |
+| Opérations, rapprochées, à trancher, sans candidat | Achats › Relevé, tuiles | — | Inchangées dans leur forme ; une ignorée sort de « à trancher » et de « sans candidat ». Le résumé du relevé ajoute « N ignorée(s) » |
+| « À rapprocher » | Achats, compteur | Comptait une ligne qu'on voulait seulement écarter | Ne la compte plus (`estATraiter`, source unique) |
+| Date de déclaration d'une période | Argent › Échéancier, Périodes URSSAF | « Déclarée », sans date : une déclaration en retard se lisait comme une à l'heure | « Déclarée le … » (champ de date, vide si inconnue — toute période cochée avant le schéma 21) puis « payée le … » / « à payer avant le … » / « à payer depuis le … » lus sur l'appel de la période. La date ne s'invente jamais |
+
+Le retard lui-même (« deux jours après la limite ») n'est pas encore dit : la
+maquette Obligations le montre, il revient au lot 53.

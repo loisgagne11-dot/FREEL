@@ -195,7 +195,10 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
                       signaler(`${p.libelle} n’est plus marquée déclarée.`);
                     }}
                   >
-                    Annuler
+                    {/* « Annuler » seul, posé juste après « payée le … », se
+                        lisait « annuler le paiement » : il défait la
+                        déclaration, et le paiement reste. */}
+                    Annuler la déclaration
                   </button>
                 </span>
               )
