@@ -109,7 +109,9 @@ const base = `http://127.0.0.1:${port}/`;
 // Chromium est préinstallé dans l'environnement, à une version qui ne
 // correspond pas forcément à celle attendue par le paquet Playwright. On
 // pointe explicitement le binaire fourni au lieu d'en télécharger un autre.
-const CHROMIUM_FOURNI = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// Le lien stable, pas le dossier versionné : « chromium-1194 » a disparu de
+// l'image le 13/11, et ce contrôle tombait avant d'avoir rien vérifié.
+const CHROMIUM_FOURNI = '/opt/pw-browsers/chromium';
 const { existsSync } = await import('node:fs');
 const navigateur = await chromium.launch(
   existsSync(CHROMIUM_FOURNI) ? { executablePath: CHROMIUM_FOURNI } : {}

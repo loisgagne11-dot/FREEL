@@ -98,7 +98,9 @@ function servir({ perimeJusqua }) {
   });
 }
 
-const BIN = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// Le lien stable, pas le dossier versionné : « chromium-1194 » a disparu de
+// l'image le 13/11, et ce contrôle tombait avant d'avoir rien vérifié.
+const BIN = '/opt/pw-browsers/chromium';
 const navigateur = await chromium.launch(existsSync(BIN) ? { executablePath: BIN } : {});
 
 /* ── 1. Un index périmé se rattrape ────────────────────────────────────── */

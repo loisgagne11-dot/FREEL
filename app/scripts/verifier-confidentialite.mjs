@@ -149,7 +149,9 @@ const constate = (ok, message) => {
 
 const { serveur, port } = await servir();
 const base = `http://127.0.0.1:${port}/`;
-const BIN = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// Le lien stable, pas le dossier versionné : « chromium-1194 » a disparu de
+// l'image le 13/11, et ce contrôle tombait avant d'avoir rien vérifié.
+const BIN = '/opt/pw-browsers/chromium';
 const navigateur = await chromium.launch(existsSync(BIN) ? { executablePath: BIN } : {});
 
 const contexte = await navigateur.newContext({ viewport: { width: 1440, height: 900 } });
