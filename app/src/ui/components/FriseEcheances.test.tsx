@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { dateISO, euros } from '../../domain/types';
 import type { Echeance } from '../../domain/calculs/provisions';
@@ -131,5 +131,91 @@ describe('le segment écoulé de l’axe', () => {
     rendre([echeance({ id: 'e1' })], dateISO('2027-01-01'));
     const segment = document.querySelector(`.${classe(styles.axeEcoule)}`) as HTMLElement | null;
     expect(segment?.style.width).toBe('100%');
+  });
+});
+
+/**
+ * LE SOLDE DE L'AN PASSÉ, TANT QUE L'AVIS MANQUE.
+ *
+ * Sans lui, l'automne paraissait vide à qui n'avait pas encore reçu son
+ * avis — la saison la plus chargée de l'année. Mais un prélèvement estimé
+ * n'est pas un appel : il ne doit se lire ni comme à payer, ni comme en
+ * retard une fois sa date passée.
+ */
+describe('les prélèvements estimés', () => {
+  const prevus = [
+    { id: 'p1', montant: euros(600), date: dateISO('2026-09-25') },
+    { id: 'p2', montant: euros(600), date: dateISO('2026-10-26') }
+  ];
+  const rendrePrevus = (echeances: readonly Echeance[], aujourdhui = dateISO('2026-10-01')) => render(
+    <FriseEcheances echeances={echeances} prevus={prevus} annee={2026} aujourdhui={aujourdhui} formater={formater} />
+  );
+
+  it('se placent à leur date, marqués « estimé », d’un point en pointillé', () => {
+    rendrePrevus([echeance({ id: 'e1' })]);
+    expect(screen.getAllByText(/estimé$/)).toHaveLength(2);
+    expect(document.querySelectorAll(`.${classe(styles.pointEstime)}`)).toHaveLength(2);
+    expect(screen.getByText('estimé, avis à venir')).toBeTruthy();
+  });
+
+  it('ne passent pas en retard une fois leur date passée', () => {
+    rendrePrevus([echeance({ id: 'e1', echeanceLe: dateISO('2026-12-05') })]);
+    expect(screen.queryByText(/en retard/)).toBeNull();
+    expect(document.querySelectorAll(`.${classe(styles.pointRetard)}`)).toHaveLength(0);
+  });
+
+  // Des estimations ne remplacent pas un appel : sans échéance réelle, le
+  // disponible reste surestimé et la frise doit continuer de le dire.
+  it('laissent dire qu’aucune échéance n’est enregistrée', () => {
+    rendrePrevus([]);
+    expect(screen.getAllByText(/estimé$/)).toHaveLength(2);
+    expect(screen.getByText(/Aucune échéance enregistrée pour 2026/)).toBeTruthy();
+  });
+
+  it('restent hors d’une autre année', () => {
+    render(
+      <FriseEcheances echeances={[]} prevus={prevus} annee={2027} aujourdhui={dateISO('2026-10-01')} formater={formater} />
+    );
+    expect(screen.queryByText(/estimé$/)).toBeNull();
+  });
+});
+
+/**
+ * UN MOIS VAUT 95 PIXELS EN GRAND ÉCRAN, 27 SUR TÉLÉPHONE.
+ *
+ * L'écart minimal était fixé en fraction d'année : quatre prélèvements
+ * mensuels s'empilaient alors en une bouillie illisible sur 390 px, alors
+ * qu'ils se lisaient très bien sur un écran large.
+ */
+describe('la place des étiquettes', () => {
+  const mensuels = ['2026-09-25', '2026-10-26', '2026-11-26', '2026-12-28']
+    .map((d, i) => echeance({ id: `m${i}`, nature: 'impot', echeanceLe: dateISO(d) }));
+
+  function aLargeur(px: number) {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+    const avant = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => px });
+    return () => {
+      if (avant !== undefined) Object.defineProperty(HTMLElement.prototype, 'clientWidth', avant);
+      vi.unstubAllGlobals();
+    };
+  }
+
+  it('tait à l’écran celle qu’aucun rang ne loge, sans l’ôter du document', () => {
+    const retablir = aLargeur(330);
+    try {
+      rendre(mensuels);
+      expect(document.querySelectorAll(`.${classe(styles.jalonMuet)}`).length).toBeGreaterThan(0);
+      // Le texte reste lu : les quatre montants sont toujours là.
+      expect(screen.getAllByText('2400 €')).toHaveLength(4);
+    } finally { retablir(); }
+  });
+
+  it('les montre toutes quand la frise a la place', () => {
+    const retablir = aLargeur(1150);
+    try {
+      rendre(mensuels);
+      expect(document.querySelectorAll(`.${classe(styles.jalonMuet)}`)).toHaveLength(0);
+    } finally { retablir(); }
   });
 });

@@ -439,6 +439,19 @@
   color: var(--muted-2);
 }
 
+/* La provision d'impôt, mois par mois : repliée, elle répond à une question
+   qu'on se pose en fin de mois, pas tous les matins. */
+.moisParMois { margin: -6px 0 14px; }
+
+.moisParMois summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--text);
+}
+
 .aide {
   margin-top: 10px;
   font-size: 12.5px;

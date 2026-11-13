@@ -752,3 +752,13 @@ Aucun nombre lu ne change.
 ## Lot 26 (12/11) — accueil
 
 Aucun nombre lu ne change.
+
+## Lot 27 (12/11) — impôt sur le revenu
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Encaissé, impôt du mois, acomptes prélevés, à garder fin de mois — de janvier au mois courant | Argent › Provisions, pli « L'impôt AAAA, mois par mois » | — (le total seul) | `repartitionMensuelleImpot` : la règle du total (impôt de l'année projetée × part encaissée), cumul arrondi une fois ; le dernier mois = provision du jour + acomptes appelés non prélevés, tenu par un test |
+| Montant et date de chaque prélèvement du solde estimé de l'an passé | Argent › Échéancier, frise | — | Le solde estimé (`soldeImpotPrecedentDe`) découpé par `prelevementsDuSolde` ; la somme retombe au centime sur l'estimation, tenu par un test. Affichage seul : la provision le compte déjà, une fois |
+| Nombre, dates et montants des prélèvements d'un avis | Saisir une échéance › Impôt › solde, aperçu | — | `prelevementsDuSolde` : 1 (≤ 300 €), 4 ou 2 (avis tardif) ; parts égales au centime, le reste au dernier. Dates 2026 relevées (`publie`) ; autre année : le 25 ou le jour ouvré suivant (`hypothese`, dit à l'écran) |
+| Acomptes retranchés de la provision de l'année | Argent › note d'impôt | Inchangé (par exercice depuis le lot L4) | Inchangé — désormais traversé par le test du cas « première année puis automne suivant » |
+

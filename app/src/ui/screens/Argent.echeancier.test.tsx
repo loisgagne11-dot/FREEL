@@ -107,4 +107,25 @@ describe('la frise de l’échéancier', () => {
     expect(dans.getByText('5 juil')).toBeTruthy();
     expect(dans.queryByText('15 déc')).toBeNull();
   });
+
+  /**
+   * L'automne de qui n'a pas encore son avis : le solde de l'an passé, que la
+   * provision garde déjà, posé aux dates où l'administration le prélèvera.
+   */
+  it('place le solde estimé de l’an passé à ses dates officielles', () => {
+    poser({
+      recettes: [{
+        id: 'r1', clientNom: 'Client démo', libelle: 'Mission', montant: euros(40_000),
+        emiseLe: dateISO('2025-06-01'), encaisseeLe: dateISO('2025-06-10'),
+        modeReglement: 'virement', numero: '2025-001'
+      }],
+      partsFiscales: 1, autresRevenusFoyer: euros(0), versementPerDeductible: euros(0)
+    });
+
+    const carte = screen.getByText(/Échéancier/).closest('section');
+    const dans = within(carte as HTMLElement);
+    expect(dans.getAllByText(/estimé$/)).toHaveLength(4);
+    expect(dans.getByText('25 sep')).toBeTruthy();
+    expect(dans.getByText('28 déc')).toBeTruthy();
+  });
 });

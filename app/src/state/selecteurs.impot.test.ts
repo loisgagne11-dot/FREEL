@@ -3,6 +3,7 @@ import { dateISO, euros } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Faits, faitsVides } from './schema';
 import { etatPilote, provisionIrDe, soldeImpotPrecedentDe } from './selecteurs';
+import { prelevementsDuSolde } from '../domain/bareme/soldeImpot';
 
 /*
  * Un foyer d'une part, sans autre revenu, qui a encaissé 60 000 € en 2026 au
@@ -113,5 +114,69 @@ describe('avis de solde saisi', () => {
     const r = provisionIrDe(f, new Date('2027-10-15T10:00:00'));
     if (r === null || r.statut === 'refuse') throw new Error('provision attendue');
     expect(r.valeur.acomptesPasSaisis).toBe(0);
+  });
+});
+
+/**
+ * LA PREMIÈRE ANNÉE D'ACTIVITÉ, PUIS L'AUTOMNE SUIVANT.
+ *
+ * Le cas du propriétaire, en chiffres fictifs. Aucun acompte la première
+ * année (2025) : le prélèvement à la source d'un indépendant ne démarre
+ * qu'en septembre de l'année suivante (BOFiP, BOI-IR-PAS-20-20-20). À
+ * l'automne 2026, deux séries se prélèvent les mêmes mois :
+ *
+ *   · le solde de 2025, révélé par l'avis — 2 400 €, en quatre fois ;
+ *   · l'acompte de 2026, qui vient de s'activer — 350 € le 15 de chaque mois.
+ *
+ * Si l'exercice se perdait, les 2 400 € de solde passaient pour des acomptes
+ * de 2026 : retranchés de la provision de 2026, ils la faisaient fondre, et
+ * l'estimation de 2025 restait en plus — compté deux fois, d'un côté, oublié
+ * de l'autre.
+ */
+describe('première année d’activité, puis l’automne suivant', () => {
+  const recettes2025 = {
+    id: 'r0', clientNom: 'Client démo', libelle: 'Mission', montant: euros(40000),
+    emiseLe: dateISO('2025-06-01'), encaisseeLe: dateISO('2025-06-10'),
+    modeReglement: 'virement' as const, numero: '2025-001'
+  };
+  const juin = new Date('2026-06-10T10:00:00');
+  const octobre = new Date('2026-10-20T10:00:00');
+
+  const soldeR = prelevementsDuSolde(euros(2400), 2026);
+  if (soldeR.statut === 'refuse') throw new Error('prélèvements attendus');
+  const solde2025 = soldeR.valeur.map((p, i) => impot(`s${i}`, p.montant, p.date, 2025));
+  const acomptes2026 = ['2026-09-15', '2026-10-15', '2026-11-15', '2026-12-15']
+    .map((le, i) => impot(`a${i}`, 350, le));
+  const paye = (e: Echeance): Echeance => ({ ...e, payeeLe: e.echeanceLe, montantPaye: e.montant });
+
+  // Au 20 octobre : septembre réglé des deux côtés, l'acompte d'octobre aussi.
+  const echeances = [
+    paye(solde2025[0]!), solde2025[1]!, solde2025[2]!, solde2025[3]!,
+    paye(acomptes2026[0]!), paye(acomptes2026[1]!), acomptes2026[2]!, acomptes2026[3]!
+  ];
+  const avantLAvis = foyer({ recettes: [recettes2025, ...foyer().recettes] });
+  const apresLAvis = { ...avantLAvis, echeances };
+
+  it('garde l’impôt de 2025 estimé tant que l’avis manque, sans acompte à retrancher', () => {
+    expect(reste(soldeImpotPrecedentDe(avantLAvis, juin))).toBeGreaterThan(0);
+    const r = provisionIrDe(avantLAvis, juin);
+    if (r === null || r.statut === 'refuse') throw new Error('provision attendue');
+    expect(r.valeur.acomptesPasSaisis).toBe(0);
+  });
+
+  it('remplace l’estimation de 2025 par l’avis, et ne retranche de 2026 que ses acomptes', () => {
+    expect(soldeImpotPrecedentDe(apresLAvis, octobre)).toBeNull();
+    const r = provisionIrDe(apresLAvis, octobre);
+    if (r === null || r.statut === 'refuse') throw new Error('provision attendue');
+    // Les quatre acomptes de 2026, payés ou non — et pas un euro du solde.
+    expect(r.valeur.acomptesPasSaisis).toBe(1400);
+  });
+
+  it('compte chaque euro une fois : ce qui reste appelé, plus ce que 2026 coûtera encore', () => {
+    const r = provisionIrDe(apresLAvis, octobre);
+    if (r === null || r.statut === 'refuse') throw new Error('provision attendue');
+    const appeleNonPaye = 3 * 600 + 2 * 350;
+    expect(etatPilote(apresLAvis, echeances, octobre).provisionsParNature.impot)
+      .toBeCloseTo(appeleNonPaye + r.valeur.resteAProvisionner, 2);
   });
 });

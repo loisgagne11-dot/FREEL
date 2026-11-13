@@ -70,6 +70,31 @@
    deux échéances sont proches qu'on a besoin de lire les deux. */
 .jalonHaut { padding-bottom: 46px; }
 
+/* Le point, lui, reste sur l'axe : c'est sa position qui dit la date. Monté
+   avec l'étiquette, il flottait au-dessus de l'année, à une date qui
+   n'existait pas. Un trait fin le rattache à son étiquette. */
+.jalonHaut .point { position: relative; transform: translateY(46px); }
+
+.jalonHaut .point::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  height: 40px;
+  border-left: 1px dotted var(--line-2);
+}
+
+/* Ni l'un ni l'autre rang n'a la place : le texte se retire de l'écran sans
+   quitter le document — même technique que `.horsEcran`. Le point reste. */
+.jalonMuet > :not(.point) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .jalonNom { font-size: 11.5px; font-weight: 620; color: var(--text); }
 
 .reglee { font-weight: 400; color: var(--muted-2); }
@@ -120,6 +145,16 @@
  * (vide) sans ambiguïté possible, même sans lire l'étiquette « en retard ».
  */
 .pointRetard { background: var(--red) !important; border-color: var(--red) !important; }
+
+/*
+ * Estimé : un prélèvement que rien n'appelle encore — le solde de l'an passé
+ * tant que l'avis manque. Creux comme ce qui vient, mais en POINTILLÉ : il
+ * n'est pas une dette constatée, et il ne doit pas se lire comme un appel
+ * qu'on aurait oublié de payer.
+ */
+.pointEstime { background: var(--panel) !important; border-style: dashed; }
+.pastilleEstimee { border: 1.5px dashed var(--c-ir); }
+.estime { font-weight: 400; color: var(--muted-2); }
 
 /* ── Le repère du jour ─────────────────────────────────────────────────── */
 

@@ -3,6 +3,7 @@ import { useFaits } from '../../state/store';
 import { annulerPeriodeDeclaree, marquerPeriodeDeclaree } from '../../state/ecritures.echeances';
 import type { Euros, Mois, Resolution } from '../../domain/types';
 import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
+import { soldeImpotPrevuDe } from '../../state/selecteurs.impotCalendrier';
 import { montantDeclaration } from '../../state/selecteurs.aTraiter';
 import { type PeriodeADeclarer, periodesADeclarer } from '../../domain/calculs/declarations';
 import { Echeances } from '../components/Echeances';
@@ -45,6 +46,7 @@ import styles from './Argent.module.css';
 export function Echeancier({ annee }: { readonly annee: number }) {
   const faits = useFaits((e) => e.faits);
   const idGroupe = useId();
+  const prevus = useMemo(() => soldeImpotPrevuDe(faits), [faits]);
 
   return (
     <>
@@ -65,6 +67,7 @@ export function Echeancier({ annee }: { readonly annee: number }) {
       </h2>
       <FriseEcheances
         echeances={faits.echeances}
+        prevus={prevus}
         annee={annee}
         aujourdhui={dateDuJour()}
         /* En euros pleins, et non abrégés : « 2 k€ » pour 1 980 € perd le

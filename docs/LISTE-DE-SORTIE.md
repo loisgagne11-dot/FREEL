@@ -56,7 +56,7 @@ reste une `hypothese` pour les années non publiées.
 Une PR par lot, ouverte au premier commit, fusionnée seulement une fois finie
 au sens de `CLAUDE.md`. Les sept premiers lots suivent l'ordre imposé par le
 propriétaire (décision 7) ; les suivants, l'ordre irréversible → faux → laid.
-Le lot 27 peut se couper en deux PR : l'estimation est de **22 à 23 lots**.
+Le lot 27 a tenu en une seule PR : l'estimation est de **22 lots**.
 
 ### Lot 23 — Plan de sortie final, et « Détacher » confirmé (PR #319, fusionnée)
 
@@ -83,7 +83,7 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 | Ce qui reste dit : l'identifiant de connexion ne se supprime qu'avec la clé de service, qui ne doit jamais être dans le client ; la marche à suivre est écrite | ✅ à l'écran : tableau de bord Supabase (Authentication, puis Users) ; données de cet appareil : Données, « Repartir de zéro » |
 | Contrôle visuel : Compte connecté (serveur simulé), confirmation et bilan, sombre 1440 et clair 390 | ✅ focus sur « Garder », aucune erreur JS |
 
-### Lot 26 — L'accueil à la première ouverture — PR #322
+### Lot 26 — L'accueil à la première ouverture — PR #322, fusionnée
 
 | Ligne | État |
 |---|---|
@@ -91,14 +91,15 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 | Le jeu de démonstration se charge depuis l'accueil, marqué « démonstration » tant qu'il est là | ✅ recalé sur la date du jour ; bandeau sur tous les écrans, même reconnaissance que le garde-fou de l'envoi |
 | Contrôle visuel : accueil, profil, démonstration, sombre 1440 et clair 390 | ✅ aucun débordement, aucune erreur JS |
 
-### Lot 27 — L'impôt sur le revenu suit ses échéances réelles, mois par mois
+### Lot 27 — L'impôt sur le revenu suit ses échéances réelles, mois par mois — PR #323
 
 | Ligne | État |
 |---|---|
-| Provision d'impôt calée sur les échéances réelles : acomptes du 15 et solde de N-1 lus dans l'échéancier, prévus à leurs dates officielles quand ils ne sont pas encore saisis | ⬜ |
-| Répartition mois par mois (l'ancien `addIRMonthlyProvisions`) : ce qu'il faut avoir mis de côté à chaque fin de mois | ⬜ |
-| Solde de N-1 : une fois fin septembre sous 300 €, en quatre de septembre à décembre au-dessus, deux pour un avis d'octobre | ⬜ |
-| Première année BNC : aucun acompte jusqu'au 31 août N+1, acomptes de N+1 dès septembre ; le cas du propriétaire — solde de N étalé ET acomptes de N+1 chaque mois à partir de septembre — se saisit en deux séries distinctes (l'échéance porte l'exercice qu'elle règle, déjà au schéma) ; test d'intégration qui traverse septembre-décembre et prouve que rien n'est compté deux fois | ⬜ |
+| Provision d'impôt calée sur les échéances réelles : acomptes du 15 et solde de N-1 lus dans l'échéancier, prévus à leurs dates officielles quand ils ne sont pas encore saisis | ✅ — les acomptes saisis se retranchent par exercice ; le solde estimé de N-1 est posé dans la frise à ses dates officielles (« estimé », pointillé) tant que l'avis manque. Un acompte NON saisi n'est pas prévu : son montant est notifié par la DGFiP et ne se reconstitue pas (décision D2) |
+| Répartition mois par mois (l'ancien `addIRMonthlyProvisions`) : ce qu'il faut avoir mis de côté à chaque fin de mois | ✅ — pli « L'impôt AAAA, mois par mois » sous la note d'impôt d'Argent ; même règle que le total, le dernier mois retombe sur la provision du jour |
+| Solde de N-1 : une fois fin septembre sous 300 €, en quatre de septembre à décembre au-dessus, deux pour un avis d'octobre | ✅ — `bareme/soldeImpot.ts`, source citée ; le formulaire prend le reste à payer de l'avis, montre les prélèvements, les enregistre sur l'exercice qu'ils règlent |
+| Première année BNC : aucun acompte jusqu'au 31 août N+1, acomptes de N+1 dès septembre ; le cas du propriétaire — solde de N étalé ET acomptes de N+1 chaque mois à partir de septembre — se saisit en deux séries distinctes (l'échéance porte l'exercice qu'elle règle, déjà au schéma) ; test d'intégration qui traverse septembre-décembre et prouve que rien n'est compté deux fois | ✅ — `selecteurs.impot.test.ts`, « première année d'activité, puis l'automne suivant » |
+| Hors plan, trouvé au contrôle visuel : sur téléphone, des jalons mensuels de la frise s'empilaient ; un jalon du second rang emportait son point loin de l'axe | ✅ — écart mesuré en pixels, étiquette qui ne tient pas se tait à l'écran (lue par les lecteurs d'écran) ; le point reste sur l'axe |
 
 ### Lot 28 — « Déclarée » datée, et « ignorée » au rapprochement (schéma 21)
 
@@ -194,14 +195,14 @@ le test mord.
 
 | Élément | État | Ce qui manque | Lot |
 |---|---|---|---|
-| Provision d'impôt alignée sur les échéances réelles | ◐ | La provision d'IR ne lit pas les acomptes et le solde à leurs dates | 27 |
+| Provision d'impôt alignée sur les échéances réelles | ✅ | Acomptes et solde lus par exercice ; solde de N-1 découpé selon la règle officielle, et posé dans la frise tant que l'avis manque | 27 |
 | Cycle d'échéance enrichi (à déclarer, déclarée, payée, daté) | ◐ | `Echeance` ne porte que `payeeLe` et `montantPaye` ; « déclarée » est un fait distinct, sans date | 28 |
 | Frise des jalons réglementaires | ◐ | La frise trace les échéances saisies, pas les jalons | 34 |
 | Détail de la projection d'autonomie | ◐ | Seul `autonomieMois` est affiché | 35 |
 | Mention de la durée de conservation | ✅ | Lue en Données (ligne de l'archive) et dans le LISEZMOI de l'archive : 6 ans (LPF L102 B), 10 pour une activité commerciale | 10 |
 | Grille ACRE par période | ✅ | `PERIODES_ABATTEMENT_ACRE`, par date de création | 7 (L10) |
 | Abattement ACRE à 25 % au 01/07/2026 | ✅ | Confirmé par le décret 2026-69 ; appliqué aux créations à partir de cette date, lu sous l'interrupteur (lot 9) | 7 (L10) |
-| Provision mensuelle de l'IR (`addIRMonthlyProvisions`) | ◐ | Plancher existant, non réparti mois par mois | 27 |
+| Provision mensuelle de l'IR (`addIRMonthlyProvisions`) | ✅ | Répartie mois par mois sous la note d'impôt d'Argent | 27 |
 | Provisions automatiques : enveloppes remplies à chaque encaissement, ordre de virement préparé | ⬜ | Aucun code | 35 |
 | Comparaison N−1 / tendance | ⬜ | Plus de report (décision 7) | 44 |
 
@@ -474,7 +475,7 @@ d'un argent pas encore arrivé) ; au 31 décembre, c'est l'impôt entier.
 | Résolution : la part constatée reste `publie` ; dès que le pipeline contribue, l'ensemble est une `hypothese` avec sa source (« factures émises et planning ») | ✅ fait |
 | Pilote, composition et dette lisent le même chiffre (`impotRevenuAProvisionner`) ; test d'accord des trois et test chiffré du cas fictif ci-dessus | ✅ fait pour Pilote et composition (test d'accord) ; *le détail de la dette « impôt » ne montre pas la provision d'IR — il ne lit que le taux sur les encaissements : à reprendre* |
 | L'écran dit, là où l'impôt se lit (composition du versable, Argent), qu'il est calculé au taux de l'année projetée, et sur quelle projection | ✅ fait |
-| Répartition mois par mois de l'ancienne application (`addIRMonthlyProvisions`) | ⬜ → lot 27 |
+| Répartition mois par mois de l'ancienne application (`addIRMonthlyProvisions`) | ✅ lot 27 |
 | Budget d'entrée : lire le planning dans le premier rendu le portait à 84,7 / 80 Ko. Rien n'est relevé : les sujets « à traiter » (pastilles du rail, indicateur de la barre, décisions du Pilote — aucun ne porte le versable) se calculent dans un module chargé à la demande ; prévision, planification et calendrier sortent dans des modules à eux. Entrée à 73,8 Ko | ✅ fait. Pendant le chargement, aucun « 0 » ni « rien ne réclame ton attention » : la salutation reste neutre, la phrase de santé vide (`aria-busy`), la carte en place |
 | Le solde de l'année précédente disait « l'impôt montera si d'autres recettes arrivent » d'une année close | ✅ corrigé (`anneeClose`) |
 | Contrôle visuel du lot 12 (Pilote sur la démonstration, Argent sur le jeu d'essai au barème) | ✅ fait : le Pilote, une fois le calcul « à traiter » arrivé, est identique (pastilles, décisions, santé). Argent dit « 9 665 € à mettre de côté aujourd'hui… taux moyen de l'année projetée… 11 285 € d'impôt sur 79 680 € de chiffre d'affaires projeté… moins 600 € d'acomptes ; il restera 1 020 € » — recalculé hors écran : 11 284,62 × 0,9096 − 600 = 9 664,93 € |
