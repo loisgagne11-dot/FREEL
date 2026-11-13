@@ -350,7 +350,7 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 | Le jeu de démonstration se charge depuis l'accueil, marqué « démonstration » tant qu'il est là | ✅ recalé sur la date du jour ; bandeau sur tous les écrans, même reconnaissance que le garde-fou de l'envoi |
 | Contrôle visuel : accueil, profil, démonstration, sombre 1440 et clair 390 | ✅ aucun débordement, aucune erreur JS |
 
-### Lot 27 — L'impôt sur le revenu suit ses échéances réelles, mois par mois — PR #323
+### Lot 27 — L'impôt sur le revenu suit ses échéances réelles, mois par mois — PR #323, fusionnée le 13/11
 
 | Ligne | État |
 |---|---|
