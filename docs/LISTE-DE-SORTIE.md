@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 11 novembre 2026.** Schéma des faits : v20. Branche de travail : PR #302.
+**Date : 13 novembre 2026.** Schéma des faits : v20 en ligne, v21 en cours (lot 28).
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -34,11 +34,15 @@ Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 | 12 | Données réelles | ✅ accordé le 11/11 : elles servent à vérifier les chiffres, **dans le dossier temporaire de la session seulement**. Rien de réel dans le dépôt (tests, démo, docs, commits) ; les identifiants Supabase ne sont jamais manipulés | Lot 32 |
 | 13 | Mission à plusieurs clients | ✅ demandé le 11/11 : arrêter un client sur une mission (« arrêté le … ») et continuer avec un autre, sans clore la mission | Lot 31 |
 | 14 | Une mission à plusieurs clients se facture-t-elle séparément | ✅ répondu le 12/11 : « actuellement non, mais ça doit pouvoir arriver ». Par défaut **une facture commune** (le cas actuel) ; le choix « une facture commune » / « une facture par client » se fait mission par mission | Lot 31 ; le second cas demande un client de facturation par plage (schéma 22, après le 21 du lot 28) |
-| 15 | Audit du produit et de l'interface | ✅ rendu le 12/11 dans `AUDIT-PRODUIT-ET-INTERFACE.md` et **validé le 12/11** : la nouvelle navigation, le retrait des lignes de son §F9, l'ordre d'exécution. Le design du handoff n'est plus la référence. **La direction visuelle reste à choisir** : une première proposition (« Registre ») a été écartée le 12/11 — propre mais terne ; une planche unique déclinée en quatre styles (A Nuit menthe, B Graphite citron, C Marine, D Jour vif) est soumise au propriétaire | Plan ci-dessous, « Ordre d'exécution adopté » |
+| 15 | Audit du produit et de l'interface | ✅ rendu le 12/11 dans `AUDIT-PRODUIT-ET-INTERFACE.md` et **validé le 12/11** : la nouvelle navigation, le retrait des lignes de son §F9, l'ordre d'exécution. Le design du handoff n'est plus la référence. La direction visuelle a été choisie le 13/11 : décision 20 | Plan ci-dessous, « Ordre d'exécution adopté » |
 | 16 | Plateforme agréée de facturation électronique | ✅ répondu le 12/11 : le propriétaire en a choisi une (son nom reste hors du dépôt). Elle s'inscrit dans l'application comme un fait ; le lot 47 vise le dépôt sur cette plateforme — à vérifier d'abord : qu'elle figure sur la liste officielle, et ce qu'elle accepte à l'import | Lots 46 et 47 |
 | 17 | Où vont les provisions | ✅ répondu le 12/11 : il vire de son compte professionnel vers son compte personnel sa rémunération **et de quoi payer l'impôt sur le revenu**, qui se règle depuis le compte personnel. Un virement « pour l'impôt » n'est donc pas une rémunération, et il doit solder la provision d'impôt — sans quoi elle reste retenue sur un compte dont l'argent est déjà sorti, et le versable est sous-évalué | Lot 35, redéfini et avancé |
 | 18 | Intermédiaire | ✅ répondu le 12/11 : ses missions passent par une société de services, qui est facturée ; le client final signe le compte rendu. Le modèle le porte déjà (client de la mission, client opérationnel). Il manque la référence de commande, la période du contrat et sa reconduction | Lots 46 et 48 |
 | 19 | Usage sur téléphone | ✅ répondu le 12/11 : tout — consulter, tenir le planning et les congés, créer et télécharger compte rendu et facture, ajouter un achat en le photographiant (TVA comprise), voir les obligations et quoi déclarer, voir le versable et ce qu'il faut mettre de côté. Le téléphone est un usage complet : **chaque lot d'écran se livre à 390 px**, gestes compris | Tous les lots d'interface |
+| 20 | Direction visuelle | ✅ choisie le 13/11 : **« Calme, graphiques retravaillés »**. Deux propositions écartées d'abord (« Registre », terne ; quatre styles nouveaux, il préférait ses couleurs). Ses quatre thèmes restent tels quels, Calme est son préféré ; ce qui change est le dessin : courbes lissées, barres fines, anneau, frise, tuiles à tendance. Les quatre couleurs de charges sont ajustées pour rester distinctes pour un daltonien. **Reste à confirmer** : Calme comme thème par défaut d'un nouvel utilisateur | `design/DIRECTION-VISUELLE.md` et les maquettes de `design/direction/` ; lot 51 |
+| 21 | Publication | ✅ annoncée le 13/11 : l'application sera ouverte à d'autres ; la sécurité doit être bonne avant. **Reste à trancher** : le modèle — A « chacun chez soi » (données sur l'appareil, synchronisation facultative vers son propre projet) ou B « comptes hébergés » par le propriétaire. Tant que rien n'est dit, le plan suit A | `AUDIT-SECURITE.md` ; lots 56 à 62. Recommandation : A d'abord — en B, le propriétaire détient les finances de tiers et en répond |
+| 22 | Nom de domaine et hébergeur | ⬜ à décider avant le lot 60. L'hébergement actuel ne pose aucun en-tête et partage son origine | Un hébergeur de fichiers statiques qui pose des en-têtes, et un nom de domaine propre |
+| 23 | Identité de l'éditeur pour les mentions légales | ⬜ à fournir avant le lot 61, **hors dépôt** (variables de construction). À mesurer : publier en tant que professionnel affiche son nom et son adresse de domiciliation sur le site | `AUDIT-SECURITE.md` §8 |
 
 ## Dates officielles relevées (11/11/2026)
 
@@ -57,7 +61,7 @@ reste une `hypothese` pour les années non publiées.
 | TVA, régime simplifié | **Supprimé au 1er janvier 2027** (loi de finances 2025, art. 38) : passage automatique au réel normal (CA3) ; dernière CA12 au 4 mai 2027 pour 2026 ; aucun acompte en décembre 2027, ni en juillet 2027 pour un exercice civil | impots.gouv.fr, actualité du 22/09/2026 |
 | TVA autoliquidée d'un franchisé (service acheté à un prestataire de l'Union) | Obligation confirmée : demander un numéro de TVA intracommunautaire, autoliquider, **déclarer et verser en France** (CA3, ligne A3). **Aucun texte lu ne fixe une échéance propre au franchisé** : le calendrier de la CA3 ci-dessus est le seul publié ; il s'appliquera en `hypothese`, source citée, et l'écran le dira | impots.gouv.fr, « Je suis micro-entrepreneur… Ai-je des obligations déclaratives en matière de TVA ? » (modifiée le 14/10/2026) ; notice 3310-CA3 |
 
-## Ordre d'exécution adopté le 12/11 — 26 lots restants
+## Ordre d'exécution adopté le 12/11, complété le 13/11 — 33 lots restants
 
 Validé par le propriétaire (décision 15). **L'ordre est celui de ce tableau,
 pas celui des numéros** : les lots 28 à 45 gardent leur nom, les nouveaux
@@ -67,36 +71,50 @@ tableau. Les motifs sont dans `AUDIT-PRODUIT-ET-INTERFACE.md`.
 
 Une PR par lot, ouverte au premier commit, fusionnée seulement une fois finie
 au sens de `CLAUDE.md`. Tout lot d'interface part d'une maquette validée et se
-livre à 390 px (décision 19).
+livre à 390 px (décision 19). Tout lot qui touche une entrée, une sortie ou le
+compte relit `AUDIT-SECURITE.md` — son §7 porte les exigences des lots déjà
+prévus.
+
+Les lots 56 à 62 (sécurité avant publication, décision 21) sont placés selon la
+règle du projet — l'irréversible d'abord : la chaîne qui publie et la mémoire
+du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 
 | Ordre | Lot | Contenu | État |
 |---|---|---|---|
-| 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ◐ écrit en local le 12/11 ; restent tests nommés, mutations, contrôle visuel, inventaires |
-| 2 | 29 | « Enregistrer en brouillon » | ⬜ |
-| 3 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
-| 4 | 46 | Facture conforme 2026-2027 | ⬜ |
-| 5 | 33 | « Reste à sortir » : un seul total | ⬜ |
-| 6 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ⬜ |
-| 7 | — | Direction visuelle : choix du propriétaire entre les quatre styles de la planche, puis maquettes des écrans dans le style retenu | ◐ planche proposée le 12/11 |
-| 8 | 51 | Nouvelle navigation et jetons de style | ⬜ |
-| 9 | 53 + 34 | Écran Obligations, frise aux dates officielles | ⬜ |
-| 10 | 31 | Une mission à plusieurs clients | ⬜ |
-| 11 | 48 | Mission enrichie et carnet de commandes | ⬜ |
-| 12 | 49 | Trésorerie à douze mois | ⬜ |
-| 13 | 50 | Ce que je gagne vraiment | ⬜ |
-| 14 | 52 | Le Pilote en quatre réponses | ⬜ |
-| 15 | 54 | Graphiques | ⬜ |
-| 16 | 55 | Listes, formulaires, clôture du mois | ⬜ |
-| 17 | 47 | Facture électronique : émission — **avant le 01/09/2027** | ⬜ |
-| 18 | 37 | Lieu par défaut du client ; état d'un compte rendu | ⬜ |
-| 19 | 39 | Achats : catégorie et compte d'une dépense, filtre, import OFX, achat en photo | ⬜ |
-| 20 | 40 | Justificatifs : synchronisation, suppression encadrée, archive annuelle | ⬜ |
-| 21 | 41 | Réglages de facturation : numérotation, mentions (le coffre est passé au lot 53) | ⬜ |
-| 22 | 42 | Hors ligne, retard affiché, synchronisation automatique à l'ouverture — **sans temps réel** | ⬜ |
-| 23 | 43 | Comparateur micro-BNC / déclaration contrôlée, poids des frais réels — **sans l'onglet banque** | ⬜ |
-| 24 | 44 | Envoi du compte rendu par courriel ; la semaine sur le Pilote ; la facture ne part plus par courriel (lot 47) | ⬜ |
-| 25 | 45 | Raccourcis clavier — **sans le harnais différentiel** | ⬜ |
-| 26 | 30 | Contrôle visuel final, contre les maquettes validées : deux thèmes, quatre largeurs, clavier, lecteur d'écran | ⬜ |
+| 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ◐ écrit en local le 12/11 ; restent tests nommés, mutations, contrôle visuel, inventaires. **Le `verifier` du 13/11 tombe sur le budget d'entrée : 81,42 Ko pour 80** — extraire un module, ne pas relever ; les autres contrôles passent |
+| 2 | 56 | **Sécurité** — la chaîne qui publie est verrouillée | ⬜ |
+| 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ⬜ |
+| 4 | 29 | « Enregistrer en brouillon » | ⬜ |
+| 5 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
+| 6 | 46 | Facture conforme 2026-2027 | ⬜ |
+| 7 | 33 | « Reste à sortir » : un seul total | ⬜ |
+| 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ⬜ |
+| 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ⬜ |
+| 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ⬜ |
+| — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
+| 11 | 51 | Nouvelle navigation et jetons de style | ⬜ |
+| 12 | 53 + 34 | Écran Obligations, frise aux dates officielles | ⬜ |
+| 13 | 31 | Une mission à plusieurs clients | ⬜ |
+| 14 | 48 | Mission enrichie et carnet de commandes | ⬜ |
+| 15 | 49 | Trésorerie à douze mois | ⬜ |
+| 16 | 50 | Ce que je gagne vraiment | ⬜ |
+| 17 | 52 | Le Pilote en quatre réponses | ⬜ |
+| 18 | 54 | Graphiques | ⬜ |
+| 19 | 55 | Listes, formulaires, clôture du mois | ⬜ |
+| 20 | 47 | Facture électronique : émission — **avant le 01/09/2027** | ⬜ |
+| 21 | 37 | Lieu par défaut du client ; état d'un compte rendu | ⬜ |
+| 22 | 39 | Achats : catégorie et compte d'une dépense, filtre, import OFX, achat en photo | ⬜ |
+| 23 | 40 | Justificatifs : synchronisation, suppression encadrée, archive annuelle | ⬜ |
+| 24 | 41 | Réglages de facturation : numérotation, mentions (le coffre est passé au lot 53) | ⬜ |
+| 25 | 42 | Hors ligne, retard affiché, synchronisation automatique à l'ouverture — **sans temps réel** | ⬜ |
+| 26 | 43 | Comparateur micro-BNC / déclaration contrôlée, poids des frais réels — **sans l'onglet banque** | ⬜ |
+| 27 | 44 | Envoi du compte rendu par courriel ; la semaine sur le Pilote ; la facture ne part plus par courriel (lot 47) | ⬜ |
+| 28 | 45 | Raccourcis clavier — **sans le harnais différentiel** | ⬜ |
+| 29 | 60 | **Sécurité** — une origine à soi, des en-têtes | ⬜ attend la décision 22 |
+| 30 | 61 | **Sécurité** — ce qu'un site public doit dire | ⬜ attend la décision 23 |
+| 31 | 30 | Contrôle visuel final, contre les maquettes de `design/direction/` : Calme et un thème sombre au moins, quatre largeurs, clavier, lecteur d'écran | ⬜ |
+| 32 | 62 | **Sécurité** — revue avant ouverture ; le propriétaire dit « on publie » | ⬜ |
+| hors plan | 63 à 65 | Comptes hébergés — seulement si la décision 21 retient le modèle B | ⬜ non engagé |
 
 **Sortis du plan le 12/11** : le lot 36 (ses lignes sont reprises par les lots
 48, 50 et 52) ; le lot 38 (actions rapides personnalisables — remplacé par
@@ -129,7 +147,9 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Le compte rendu d'activité passe sous Activité ; l'import du relevé et le rapprochement sous Trésorerie ; l'analyse du chiffre d'affaires sous Activité › Analyse | ⬜ |
 | Une seule commande de période par écran, dans son en-tête ; le thème en Réglages ; barre du haut : recherche, « Nouveau », synchronisation libellée | ⬜ |
 | Cinq mots pour l'argent, partout : solde, dû, disponible, réserve, à te verser — passe relue à l'œil | ⬜ |
-| Jetons de la direction visuelle retenue, consignés dans `design/DIRECTION-VISUELLE.md` (à écrire une fois le style choisi) ; la police tient dans les budgets ou cède à la pile système | ⬜ |
+| Jetons ajoutés par `design/DIRECTION-VISUELLE.md` (couleurs de charges validées, série en retrait, pastilles, clients du planning), dans les quatre thèmes à la fois ; composants communs de la planche : carte, tuile à tendance, pastille signe + mot, barre de répartition | ⬜ |
+| Polices embarquées (`woff2`, sous-ensemble latin, licence vérifiée), jamais par un CDN : aujourd'hui aucune n'est chargée et l'écran s'affiche en police système. Si le poids ne tient pas dans les budgets, la pile système reste | ⬜ |
+| Thème par défaut selon la décision 20 | ⬜ |
 
 ### Lot 53 — Obligations (avec le lot 34)
 
@@ -201,6 +221,97 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Export de la facture au format structuré, contrôlé par un validateur | ⬜ |
 | Cycle de vie à côté de « envoyée » : déposée le, rejetée (motif), encaissée | ⬜ |
 | Import d'une facture reçue structurée vers Achats, sans ressaisie | ⬜ |
+
+### Lots 56 à 62 — Sécurité avant publication (décision 21)
+
+Les constats, leurs preuves et les sources sont dans `AUDIT-SECURITE.md` ; les
+renvois S1 à S12 y mènent. **Le SQL est exécuté par le propriétaire lui-même** :
+l'application constate par relecture, elle ne suppose jamais. Chaque correction
+porte son test nommé, et l'inverser le fait tomber.
+
+#### Lot 56 — La chaîne qui publie est verrouillée (S2, S3, S12)
+
+| Ligne | État |
+|---|---|
+| Chaque action des deux flux est épinglée par son empreinte complète, la version en commentaire ; `validate.yml` reçoit `permissions: contents: read` | ⬜ |
+| `.github/dependabot.yml` : veille hebdomadaire de `app/` et des actions | ⬜ |
+| Outillage monté jusqu'à `npm audit` = 0 (16 alertes le 13/11, dont 2 critiques) ; `verifier` vert après la montée | ⬜ |
+| La validation échoue dès que `npm audit --omit=dev` signale quoi que ce soit ; l'audit complet s'affiche sans bloquer | ⬜ |
+| Le déploiement lance le `verifier` complet, navigateur installé dans la chaîne : aujourd'hui seuls le typage et les tests y passent | ⬜ |
+| `SECURITY.md` : signaler une faille par le signalement privé de GitHub, sans adresse de courriel | ⬜ |
+| Réglages du dépôt (`AUDIT-SECURITE.md` §6) faits par le propriétaire, et **constatés** : une poussée directe sur `main` est refusée | ⬜ propriétaire |
+
+#### Lot 57 — Le compte garde la mémoire (S5, S6)
+
+| Ligne | État |
+|---|---|
+| `docs/supabase.sql` : règles limitées au rôle connecté (`to authenticated`), `auth.uid()` enveloppé ; taille de `faits` bornée (dix fois le jeu d'essai le plus lourd, valeur citée dans le SQL) ; une écriture qui ne fait pas passer `version` de n à n + 1 est refusée par le serveur | ⬜ |
+| Table d'historique alimentée par déclencheur à chaque remplacement : l'état d'avant, sa version, son schéma, l'heure du serveur ; vingt états par compte ; lisible et effaçable par son seul propriétaire, jamais modifiable | ⬜ |
+| Écran Compte, « États précédents du compte » : liste datée, « Revenir à cet état » confirmé sur place, copie locale d'abord (lot 1), refus si le schéma est postérieur | ⬜ |
+| SQL non exécuté : l'application le constate et le dit, SQL copiable — comme au lot 25 ; la sonde anonyme couvre la nouvelle table | ⬜ |
+| « Effacer mes données du compte » efface aussi l'historique, et le prouve par relecture : un effacement qui laisserait vingt copies n'en serait pas un | ⬜ |
+| Limite dite à l'écran : l'historique protège d'un écrasement par erreur, pas d'un voleur de session qui efface tout — les appareils gardent alors leur copie | ⬜ |
+
+#### Lot 58 — L'ancienne version est bridée, l'application refuse le cadre (S1, S4)
+
+Sur l'hébergement actuel, sans attendre la décision 22. **L'original
+`index.html` n'est jamais touché** : tout se pose sur la copie publiée, dans
+`assembler-site.mjs`, comme la lecture seule du lot 24.
+
+| Ligne | État |
+|---|---|
+| Les en-têtes servis par le site en ligne sont mesurés et consignés dans `AUDIT-SECURITE.md` : on sait d'où l'on part | ⬜ |
+| Copie publiée de l'ancienne version : politique de contenu en `<meta>` — scripts de l'origine et des hôtes exacts qu'elle charge, connexions vers le seul projet du compte, `object-src`, `base-uri` et `form-action` fermés. `verifier:bascule` prouve qu'elle s'affiche encore, et qu'un script d'un autre hôte est refusé | ⬜ |
+| Un script tiers modifié ne s'exécute pas : empreinte d'intégrité posée sur la copie, ou bibliothèques servies depuis l'origine ; prouvé par un essai | ⬜ |
+| La nouvelle application refuse de s'afficher dans un cadre : contrôle dans le premier script de la page, empreinte de la politique mise à jour, `csp.test.ts` vert ; essai dans un navigateur — cadrée par une autre origine, elle reste vide | ⬜ |
+| `<meta name="referrer" content="no-referrer">` : l'adresse de la page ne part plus chez les tiers | ⬜ |
+
+#### Lot 59 — Appareil perdu, fichier piégé (S7, S8, S9)
+
+| Ligne | État |
+|---|---|
+| « Se déconnecter et effacer cet appareil » : propose d'abord l'archive complète, efface faits, pièces, session et réglages, prouve par relecture ; la déconnexion simple dit ce qui reste sur l'appareil | ⬜ |
+| Réglages : une phrase vraie sur ce qui protège (le verrouillage de l'appareil), ce qui est où (appareil, compte) et ce qui n'est pas chiffré | ⬜ |
+| Imports bornés : taille maximale par type de fichier, et taille **décompressée** pour une archive ; le refus est dit avant lecture | ⬜ |
+| Corpus d'essais hostiles joué sur chaque import : clés `__proto__` et `constructor`, nombres extrêmes et non finis, 100 000 lignes, balises et formules dans chaque champ texte, archive aux chemins piégés ou qui gonfle à l'ouverture | ⬜ |
+| Session : un seul onglet renouvelle à la fois (verrou entre onglets) ; une session sans échéance valide est refusée à la lecture ; essai à deux onglets | ⬜ |
+
+#### Lot 60 — Une origine à soi, des en-têtes (S1, S4) — attend la décision 22
+
+| Ligne | État |
+|---|---|
+| Nom de domaine et hébergeur choisis par le propriétaire ; l'ancienne version sur son propre sous-domaine : une faille chez elle ne lit plus rien de la nouvelle | ⬜ |
+| En-têtes servis, et vérifiés par un script sur l'adresse publiée : politique de contenu en en-tête avec `frame-ancestors 'none'`, HSTS, `nosniff`, référent coupé, permissions fermées, isolation de l'ouverture ; `index.html` jamais gardé en cache, fichiers à empreinte gardés indéfiniment | ⬜ |
+| Déménagement sans perte : l'ancienne adresse affiche « l'application a déménagé », propose l'archive complète, mène à la nouvelle qui la restaure ; essai de bout en bout dans un navigateur ; l'ancienne adresse reste tant que le propriétaire n'a pas confirmé son propre déménagement | ⬜ |
+| `connect-src` réduit au seul projet quand son adresse est fournie à la construction ; les secrets de déploiement vivent dans l'environnement de la chaîne, jamais dans le dépôt | ⬜ |
+
+#### Lot 61 — Ce qu'un site public doit dire (S11) — attend la décision 23
+
+| Ligne | État |
+|---|---|
+| Trois pages, ouvertes depuis l'accueil et les Réglages : mentions légales ; confidentialité (ce qui est conservé, où, combien de temps ; aucun traceur ; l'hébergeur) ; limites de l'outil (des estimations, pas un conseil ; pas une plateforme agréée de facturation électronique) | ⬜ |
+| L'identité de l'éditeur vient de variables de construction, jamais du dépôt ; sans elles, la construction « publication » échoue et la construction ordinaire affiche « non renseigné » | ⬜ |
+| `verifier:confidentialite` prouve que ni le dépôt ni le paquet ordinaire ne portent d'identité | ⬜ |
+| Le texte de la loi du 21 juin 2004 est lu (l'anonymat d'un éditeur non professionnel n'est pas confirmé par la fiche officielle) ; textes relus par le propriétaire — ce ne sont pas des conseils juridiques | ⬜ propriétaire |
+
+#### Lot 62 — Revue de sécurité avant ouverture
+
+| Ligne | État |
+|---|---|
+| Chaque constat S1 à S12 est relu contre le code : corrigé avec son test, ou accepté par écrit avec son motif, dans `AUDIT-SECURITE.md` | ⬜ |
+| Revue de tout le code changé depuis le 13/11 qui touche une entrée, une sortie ou le compte | ⬜ |
+| Sur le site publié : en-têtes mesurés, application non cadrable, ancienne version sur son origine, `npm audit` à zéro | ⬜ |
+| Essai de restauration complet : exporter, effacer l'appareil, restaurer, retrouver les mêmes chiffres | ⬜ |
+| Sur son projet, par le propriétaire : sonde anonyme « protégée » sur chaque table ; inscriptions fermées (modèle A) | ⬜ propriétaire |
+| Le propriétaire dit « on publie » | ⬜ propriétaire |
+
+#### Lots 63 à 65 — Comptes hébergés (hors plan tant que la décision 21 ne retient pas le modèle B)
+
+| Lot | Contenu |
+|---|---|
+| 63 — S'inscrire, se retrouver | Inscription avec confirmation du courriel ; mot de passe oublié (les jetons de l'adresse sont effacés de la barre) ; second facteur par code temporaire ; CAPTCHA ; adresse du projet fixée à la construction, saisie libre retirée |
+| 64 — Partir pour de bon | Suppression de l'identifiant par une fonction côté serveur, jamais par une clé de service dans la page ; quotas par compte ; journal des accès |
+| 65 — Tenir les données d'autrui | Registre des traitements ; contrat de sous-traitance et région européenne ; information des personnes ; procédure de violation sous 72 h ; sauvegardes restaurables (offre payante) ; supervision et coût |
 
 ## Lots livrés ou détaillés avant le 12/11 (24 à 45)
 

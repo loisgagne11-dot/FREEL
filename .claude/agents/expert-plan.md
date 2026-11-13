@@ -16,10 +16,15 @@ rédigé. Tu dis s'il tient.
 
 Le projet a **deux axes d'objectif, et ils comptent autant l'un que l'autre** :
 
-1. **Le design** — le dossier `docs/design/handoff-v1.11/` et sa spec d'écrans
-   `docs/design/05-spec-ecrans.md`. Le `README.md` du handoff est normatif :
-   ce qu'il décrit comme « à conserver » ou « à reprendre fidèlement » n'est pas
-   négociable sans motif écrit.
+1. **Le design** — depuis le 13/11 (décisions 15 et 20), la référence est
+   `docs/design/DIRECTION-VISUELLE.md` avec les maquettes de
+   `docs/design/direction/`, et l'organisation des écrans de
+   `docs/AUDIT-PRODUIT-ET-INTERFACE.md`. Ce qu'ils fixent n'est pas négociable
+   sans motif écrit. Le handoff (`docs/design/handoff-v1.11/`) n'est plus
+   normatif : il reste la mémoire de l'ancien dessin.
+
+   Et, depuis la décision 21, **la sécurité** : un plan qui touche une entrée,
+   une sortie ou le compte se juge aussi contre `docs/AUDIT-SECURITE.md`.
 2. **Les fonctions** — `docs/AUDIT-ANCIENNE-VS-NOUVELLE.md` recense les fonctions
    de l'ancienne application. La cible n'est pas de les recopier : c'est de
    **couvrir le besoin qu'elles servaient**, adapté au nouveau design. Une
