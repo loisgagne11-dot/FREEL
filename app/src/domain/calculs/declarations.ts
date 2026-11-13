@@ -1,5 +1,6 @@
 import type { DateISO, Euros, Mois } from '../types';
 import { euros } from '../types';
+import type { PeriodeDeclaree } from './declarations.declarees';
 
 /**
  * Les périodes à déclarer à l'URSSAF, et celles qui l'ont été.
@@ -32,38 +33,6 @@ import { euros } from '../types';
  */
 
 export type Periodicite = 'mensuel' | 'trimestriel';
-
-/**
- * Un mois déclaré, et le jour où il l'a été.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * UNE DATE, PAS UNE CASE COCHÉE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Jusqu'au schéma 20, `periodesDeclarees` était une liste de mois nus : la
- * période était déclarée ou ne l'était pas. Le cycle réel d'une obligation est
- * « à déclarer → déclarée le … → payée le … », et la seule étape datée était
- * la dernière. Une déclaration faite le 2 août pour une limite au 31 juillet
- * se lisait donc « Déclarée », exactement comme une déclaration faite à
- * l'heure — le retard, qui coûte une majoration, n'avait aucune trace.
- *
- * `null` quand la date n'est pas connue : toute période cochée avant le
- * schéma 21. On ne pose ni la date limite ni le jour de la migration — aucune
- * des deux n'est le jour où la déclaration a été faite, et une date inventée
- * serait indiscernable d'une vraie. Elle se complète depuis l'échéancier.
- */
-export interface PeriodeDeclaree {
-  readonly mois: Mois;
-  readonly declareeLe: DateISO | null;
-}
-
-/**
- * Les mois déclarés, sans leur date — ce que lisent les provisions et la
- * règle des périodes à déclarer, qui n'ont besoin que de savoir SI.
- */
-export function moisDeclares(declarees: readonly PeriodeDeclaree[]): readonly Mois[] {
-  return declarees.map((p) => p.mois);
-}
 
 /**
  * Le jour où une période a été déclarée, ou `null` s'il n'est pas connu.

@@ -65,7 +65,8 @@
  */
 
 import { type DateISO, type Euros, euros } from '../types';
-import { type MouvementBancaire, estATraiter } from './banque';
+import type { MouvementBancaire } from './banque';
+import { estATraiter } from './banque.etat';
 import { soldeBancaire } from './banque.solde';
 import type { Depense } from './depenses';
 import { type Echeance, type RecetteEncaissee, estPayee } from './provisions';
@@ -292,10 +293,15 @@ export function soldeDerive(
    * leur fait, les « à traiter » restent ambigus, seuls les « sans
    * contrepartie » s'ajoutent au brut.
    */
+  /*
+   * Une opération IGNORÉE reste dehors dans les deux cas. Sans date, « tous
+   * les mouvements » la reprenait : 5 000 € virés sur un livret et écartés
+   * par l'utilisateur faisaient baisser le solde du relevé seul, quand le même
+   * geste ne changeait rien dès qu'une date était saisie — un même fait, deux
+   * soldes selon un réglage sans rapport. Voir `MouvementBancaire['ignoree']`.
+   */
   const mouvementsRetenus = soldeInitialAu === null
-    ? mouvements
-    // Une opération ignorée ne porte pas de motif : elle reste dehors, et
-    // c'est la règle — voir `MouvementBancaire['ignoree']`.
+    ? mouvements.filter((m) => !m.ignoree)
     : mouvements.filter((m) => m.sansContrepartie !== null && !m.ignoree);
   const partBanque = soldeBancaire(soldeInitial, mouvementsRetenus);
 

@@ -427,3 +427,27 @@ describe('solde de fin de mois — un fait figé, pas une photo qui bouge', () =
     expect(soldeFinJuillet).toBe(1500);
   });
 });
+
+/**
+ * L'OPÉRATION IGNORÉE (lot 28).
+ *
+ * « Sans contrepartie » compte, « ignorée » ne compte pas : c'est toute leur
+ * différence. Le motif `autre` servait aux deux, et 5 000 € mis de côté sur un
+ * livret faisaient baisser le solde de 5 000 € qui n'avaient pas été dépensés.
+ */
+describe('solde — l’opération ignorée n’entre dans aucun total', () => {
+  const livret = mouvement({ id: 'livret', montant: euros(-5000), ignoree: true });
+
+  it('avec une date de départ, elle ne retire rien au solde', () => {
+    expect(soldeDerive(euros(8000), AVANT_TOUT, [], [], [], [livret]).montant).toBe(8000);
+  });
+
+  it('sans date de départ non plus : le relevé seul ne la reprend pas', () => {
+    const frais = mouvement({ id: 'frais', montant: euros(-12) });
+    expect(soldeDerive(euros(8000), null, [], [], [], [livret, frais]).montant).toBe(7988);
+  });
+
+  it('classée, elle ne retient plus le solde dans l’état « derive »', () => {
+    expect(provenanceSolde(AVANT_TOUT, [], [], [], [livret])).toBe('rapproche');
+  });
+});

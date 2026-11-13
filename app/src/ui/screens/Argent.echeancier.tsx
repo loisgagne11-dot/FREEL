@@ -7,8 +7,9 @@ import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
 import { soldeImpotPrevuDe } from '../../state/selecteurs.impotCalendrier';
 import { montantDeclaration } from '../../state/selecteurs.aTraiter';
 import {
-  type PeriodeADeclarer, appelsDeLaPeriode, dateDeDeclaration, moisDeclares, periodesADeclarer
+  type PeriodeADeclarer, appelsDeLaPeriode, dateDeDeclaration, periodesADeclarer
 } from '../../domain/calculs/declarations';
+import { moisDeclares } from '../../domain/calculs/declarations.declarees';
 import { Echeances } from '../components/Echeances';
 import { FriseEcheances } from '../components/FriseEcheances';
 import { Info } from '../components/Info';

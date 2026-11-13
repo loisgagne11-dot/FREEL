@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
-import { moisDeclares, periodesADeclarer } from '../domain/calculs/declarations';
+import { periodesADeclarer } from '../domain/calculs/declarations';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import { type Faits, faitsVides } from './schema';
 import { etatPilote, recettesEncaissees } from './selecteurs';
 import { aTraiter, montantDeclaration } from './selecteurs.aTraiter';

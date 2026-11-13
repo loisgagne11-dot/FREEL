@@ -30,6 +30,7 @@
 
 import type { DateISO, Euros } from '../types';
 import { joursEntre } from '../dates';
+import { estATraiter } from './banque.etat';
 
 /**
  * Pourquoi un mouvement n'a aucune écriture en face.
@@ -98,11 +99,6 @@ export interface MouvementBancaire {
    * tiennent (`ecritures.achats`).
    */
   readonly ignoree: boolean;
-}
-
-/** Ni rapprochée, ni pointée sans contrepartie, ni ignorée : elle attend une décision. */
-export function estATraiter(m: MouvementBancaire): boolean {
-  return m.rapprocheAvec === null && m.sansContrepartie === null && !m.ignoree;
 }
 
 /**

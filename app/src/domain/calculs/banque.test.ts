@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros } from '../types';
+import { estATraiter } from './banque.etat';
 import {
   type EcritureRapprochable, type MouvementBancaire,
   candidatsPour, empreinteMouvement, importerMouvements, resumerRapprochement,
@@ -187,5 +188,22 @@ describe('résumé du rapprochement', () => {
 
   it('sur un relevé vide, ne compte rien', () => {
     expect(resumerRapprochement([], [])).toMatchObject({ total: 0, sansCandidat: 0 });
+  });
+});
+
+/** Ignorée, une ligne sort de la file : ni candidate au rapprochement, ni « à traiter ». */
+describe('rapprochement — l’opération ignorée', () => {
+  it('n’est plus à traiter, et ne se voit proposer aucune écriture', () => {
+    const m = mouvement({ ignoree: true });
+    expect(estATraiter(m)).toBe(false);
+    expect(candidatsPour(m, [ecriture()])).toEqual([]);
+  });
+
+  it('se compte à part, hors des « sans contrepartie »', () => {
+    const resume = resumerRapprochement([
+      mouvement({ id: 'livret', ignoree: true }),
+      mouvement({ id: 'frais', sansContrepartie: 'autre' })
+    ], []);
+    expect(resume).toMatchObject({ ignorees: 1, sansContrepartie: 1, sansCandidat: 0 });
   });
 });

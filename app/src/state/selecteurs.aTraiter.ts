@@ -22,7 +22,8 @@ import {
 import {
   acompteCfe, cfeDue, declaration1447C, paiementCfe, regimeCfe
 } from '../domain/bareme/cfe';
-import { moisDeLaPeriode, moisDeclares } from '../domain/calculs/declarations';
+import { moisDeLaPeriode } from '../domain/calculs/declarations';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
 import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';

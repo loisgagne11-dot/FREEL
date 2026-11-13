@@ -10,7 +10,7 @@
  * testent sans React et sans magasin.
  */
 
-import { moisDeclares } from '../domain/calculs/declarations';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import {
   type DateISO, type Euros, type Mois, type Resolution, type TypeActivite,
   euros, moisDe

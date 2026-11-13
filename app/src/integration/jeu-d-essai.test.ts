@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { moisDeclares, periodesADeclarer } from '../domain/calculs/declarations';
+import { periodesADeclarer } from '../domain/calculs/declarations';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import { ecritureDAnnulation } from '../domain/calculs/ecritureRecette';
 import type { EcritureRecette } from '../domain/calculs/livreRecettes';
 import { type DateISO, type Mois, dateISO, euros, mois } from '../domain/types';

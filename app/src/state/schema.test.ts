@@ -965,3 +965,49 @@ describe('schéma 19 → 20 : les lignes des factures', () => {
     expect(motifRefusFaits(bloc)).toMatch(/recettes/);
   });
 });
+
+/**
+ * LA DATE DE DÉCLARATION ET L'OPÉRATION IGNORÉE (schéma 21).
+ *
+ * Deux champs apparus dans des ÉLÉMENTS de liste. Une période cochée avant le
+ * schéma 21 ressort avec une date `null` — inconnue —, jamais avec la date
+ * limite ni le jour de la migration : une date inventée ne se distinguerait
+ * plus d'une vraie, et un retard réel se lirait « à l'heure ». Un mouvement
+ * bancaire ressort `ignoree: false` : le geste n'existait pas.
+ */
+describe('schéma 20 → 21 : la déclaration datée, l’opération ignorée', () => {
+  it('une période déclarée de schéma 20 devient une période à date inconnue', () => {
+    const f = completerFaits({ version: 20, periodesDeclarees: ['2026-05', '2026-04'] });
+    expect(f.periodesDeclarees).toEqual([
+      { mois: '2026-04', declareeLe: null },
+      { mois: '2026-05', declareeLe: null }
+    ]);
+  });
+
+  /** Un mois présent deux fois serait compté déclaré deux fois — et une fois annulé, encore déclaré. */
+  it('un mois en double ne fait qu’une période, et garde la date connue', () => {
+    const f = completerFaits({
+      version: 20,
+      periodesDeclarees: ['2026-05', { mois: '2026-05', declareeLe: '2026-06-12' }]
+    });
+    expect(f.periodesDeclarees).toEqual([{ mois: '2026-05', declareeLe: '2026-06-12' }]);
+  });
+
+  it('un mouvement de schéma 20 reçoit `ignoree: false`, et non `undefined`', () => {
+    const mvt = {
+      id: 'm1', date: '2026-05-02', libelle: 'VIR DEMO', montant: -50,
+      rapprocheAvec: null, sansContrepartie: null
+    };
+    const f = completerFaits({ version: 20, mouvementsBancaires: [mvt] });
+    expect(f.mouvementsBancaires[0]).toHaveProperty('ignoree', false);
+  });
+
+  /** Plus rien ne convertit au schéma courant : un mois nu y serait une période sans mois. */
+  it('refuse au schéma courant une période déclarée réduite à un mois nu', () => {
+    expect(motifRefusFaits({ ...faitsVides(), periodesDeclarees: ['2026-05'] }))
+      .toMatch(/periodesDeclarees/);
+    expect(motifRefusFaits({
+      ...faitsVides(), periodesDeclarees: [{ mois: '2026-05', declareeLe: null }]
+    })).toBeNull();
+  });
+});

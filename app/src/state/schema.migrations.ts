@@ -30,7 +30,7 @@
 
 import type { DateISO, Euros, Mois } from '../domain/types';
 import type { MotifSansContrepartie, MouvementBancaire } from '../domain/calculs/banque';
-import type { PeriodeDeclaree } from '../domain/calculs/declarations';
+import type { PeriodeDeclaree } from '../domain/calculs/declarations.declarees';
 import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
 import {

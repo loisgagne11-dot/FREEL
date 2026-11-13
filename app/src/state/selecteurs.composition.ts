@@ -29,7 +29,7 @@
  * leur somme signée est le montant par construction.
  */
 
-import { moisDeclares } from '../domain/calculs/declarations';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import type { CleComposition, Composition } from '../domain/calculs/composition';
 import {
   compositionDisponible, compositionProvisions, compositionSolde, compositionVersable

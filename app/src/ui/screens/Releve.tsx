@@ -5,7 +5,8 @@ import {
 } from '../../state/ecritures.achats';
 import { importerReleve } from '../../state/ecritures.carnet';
 import { etatAchats } from '../../state/selecteurs.achats';
-import { type EcritureRapprochable, type MouvementBancaire, estATraiter } from '../../domain/calculs/banque';
+import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calculs/banque';
+import { estATraiter } from '../../domain/calculs/banque.etat';
 import { decoderFichier, lireReleve, type RapportLecture } from '../../infra/releveCsv';
 import { Info } from '../components/Info';
 import { CartePliable } from '../components/CartePliable';

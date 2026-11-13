@@ -18,7 +18,7 @@ import type { Depense } from '../domain/calculs/depenses';
 import type { PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import type { MouvementBancaire } from '../domain/calculs/banque';
-import type { PeriodeDeclaree } from '../domain/calculs/declarations';
+import type { PeriodeDeclaree } from '../domain/calculs/declarations.declarees';
 import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
 import type { FormuleDelai } from '../domain/calculs/delaiPaiement';

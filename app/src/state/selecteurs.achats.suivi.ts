@@ -14,7 +14,8 @@
  * plus parmi cinq boutons identiques, il confirme ou corrige une proposition.
  */
 
-import { type MouvementBancaire, candidatsPour, estATraiter } from '../domain/calculs/banque';
+import { type MouvementBancaire, candidatsPour } from '../domain/calculs/banque';
+import { estATraiter } from '../domain/calculs/banque.etat';
 import { type Periode, dansLaPeriode } from '../domain/calculs/periode';
 import { rapprochementEffectif } from '../domain/calculs/depenses';
 import { contexteDepense, ecrituresRapprochables, type EtatAchats } from './selecteurs.achats';

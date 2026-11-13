@@ -29,7 +29,7 @@
  * l'écart avec la vignette était exactement elle, et rien ne le disait.
  */
 
-import { moisDeclares } from '../domain/calculs/declarations';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import type { NatureDette } from '../domain/calculs/provisions';
 import { type DetailDette, detailDette } from '../domain/calculs/detailDette';
 import type { Faits } from './schema';
