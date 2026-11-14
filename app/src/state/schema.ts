@@ -35,7 +35,7 @@ import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 21 as const;
+export const VERSION_SCHEMA = 22 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -84,6 +84,27 @@ export interface Entreprise {
   readonly telephone: string;
   readonly urssafPeriodicite: 'mensuel' | 'trimestriel';
   readonly onboardingFait: boolean;
+  /**
+   * La plateforme agréée choisie pour RECEVOIR les factures électroniques
+   * (obligatoire pour toute entreprise depuis le 01/09/2026), et depuis quand
+   * (schéma 22). `null` : non renseignée.
+   *
+   * Un fait, et non une case « c'est fait » : le rappel « réception
+   * obligatoire » était un compte à rebours qui ne savait jamais si l'on était
+   * prêt — il disait « en vigueur » un mois, puis se taisait, prêt ou pas.
+   * Le nom est saisi par l'utilisateur, jamais proposé par le code : aucune
+   * plateforme n'a à figurer dans un dépôt public.
+   */
+  readonly plateformeAgreee: { readonly nom: string; readonly depuis: DateISO | null } | null;
+  /**
+   * Option pour le paiement de la TVA d'après les débits (schéma 22).
+   *
+   * Un prestataire de services acquitte la TVA à l'encaissement, sauf option.
+   * L'option change l'exigibilité, et elle se porte sur la facture : c'est
+   * l'une des quatre mentions ajoutées par la réforme de la facturation
+   * électronique. Sans objet en franchise en base.
+   */
+  readonly optionTvaDebits: boolean;
 }
 
 export interface Client {
@@ -176,6 +197,14 @@ export interface Mission {
    * plutôt qu'en réécrivant quarante jeux d'essai.
    */
   readonly delaiPaiement?: FormuleDelai | null;
+  /**
+   * La référence de commande du client — bon de commande, numéro d'achat
+   * (schéma 22). Mention obligatoire quand le client en émet une : une facture
+   * sans elle part souvent en rejet chez les services comptables des grands
+   * comptes et des sociétés de portage, et le paiement attend. Reprise sur
+   * chaque facture de la mission. Facultative, comme `delaiPaiement`.
+   */
+  readonly referenceCommande?: string | null;
 }
 
 /**
@@ -291,6 +320,14 @@ export interface Recette {
   readonly tvaCollectee?: Euros | null;
   /** Recette globalisée en fin de journée, sans identité de client. */
   readonly globalisee?: boolean;
+  /**
+   * La référence de commande imprimée sur CETTE facture (schéma 22).
+   *
+   * Figée à l'émission, comme l'échéance : corriger la référence de la mission
+   * ne doit pas réécrire un document que le client a déjà reçu. Facultative :
+   * une facture d'avant le schéma 22 n'en portait pas.
+   */
+  readonly referenceCommande?: string | null;
   /**
    * Les dates auxquelles cette facture a été relancée.
    *
@@ -639,7 +676,8 @@ export function entrepriseVide(): Entreprise {
     nom: '', prenom: '', siret: '', debutActivite: null, typeActivite: 'BNC', acre: false,
     versementLiberatoire: false, tvaDepuis: null, tvaIntracom: '', iban: '',
     bic: '', adresse: '', codePostal: '', ville: '', codeApe: '', email: '',
-    telephone: '', urssafPeriodicite: 'mensuel', onboardingFait: false
+    telephone: '', urssafPeriodicite: 'mensuel', onboardingFait: false,
+    plateformeAgreee: null, optionTvaDebits: false
   };
 }
 
@@ -782,6 +820,24 @@ export function motifRefusFaits(brut: unknown): string | null {
   if ('entreprise' in o
     && (typeof entreprise !== 'object' || entreprise === null || Array.isArray(entreprise))) {
     return 'Le champ « entreprise » devrait être un objet.';
+  }
+
+  /* Schéma 22. Une plateforme qui n'est pas un objet lisible ferait lever
+     l'écran Réglages et le rappel « réception obligatoire » à chaque
+     ouverture : un fichier hostile n'a pas à pouvoir rendre l'application
+     inutilisable. Absente ou nulle : non renseignée. */
+  if (estEnregistrement(entreprise)) {
+    const plateforme = entreprise['plateformeAgreee'];
+    if (plateforme !== undefined && plateforme !== null && (!estEnregistrement(plateforme)
+      || typeof plateforme['nom'] !== 'string'
+      || (plateforme['depuis'] !== null && plateforme['depuis'] !== undefined
+        && (typeof plateforme['depuis'] !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(plateforme['depuis']))))) {
+      return 'Le champ « entreprise.plateformeAgreee » devrait porter un nom et une date, ou être nul.';
+    }
+    const debits = entreprise['optionTvaDebits'];
+    if (debits !== undefined && typeof debits !== 'boolean') {
+      return 'Le champ « entreprise.optionTvaDebits » devrait être vrai ou faux.';
+    }
   }
 
   return null;

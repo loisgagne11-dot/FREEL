@@ -3,6 +3,8 @@ import { useFaits } from '../../state/store';
 import { controlerIban } from '../../domain/calculs/identifiants';
 import { mentionsDuRegime } from '../../domain/calculs/facture';
 import { emetteurDe } from '../../state/selecteurs.facture';
+import { dateDuJour } from '../../state/selecteurs';
+import type { DateISO } from '../../domain/types';
 import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
 
@@ -42,6 +44,47 @@ export function Facturation() {
             value={entreprise.bic}
             onChange={(e) => modifier({ bic: e.target.value })} />
         </Champ>
+
+        {/* LA PLATEFORME AGRÉÉE, UN FAIT (lot 46). Toute entreprise doit pouvoir
+            RECEVOIR des factures électroniques depuis le 01/09/2026, par une
+            plateforme agréée qu'elle choisit. Le rappel du Pilote ne savait pas
+            si c'était fait : il se règle ici, et s'éteint. Le nom est le tien,
+            saisi — l'application n'en propose aucune. */}
+        <Champ id={`${idChamp}-plateforme`} libelle="Ma plateforme agréée"
+          aide="Celle par laquelle tu reçois tes factures électroniques. Laisse vide si tu n’en as pas encore choisi.">
+          <input id={`${idChamp}-plateforme`} autoComplete="off"
+            value={entreprise.plateformeAgreee?.nom ?? ''}
+            onChange={(e) => modifier({
+              plateformeAgreee: e.target.value.trim() === ''
+                ? null
+                : { nom: e.target.value, depuis: entreprise.plateformeAgreee?.depuis ?? null }
+            })} />
+        </Champ>
+        {entreprise.plateformeAgreee !== null && (
+          <Champ id={`${idChamp}-plateforme-depuis`} libelle="Inscrit depuis le">
+            <input id={`${idChamp}-plateforme-depuis`} type="date" max={dateDuJour()}
+              value={entreprise.plateformeAgreee.depuis ?? ''}
+              onChange={(e) => modifier({
+                plateformeAgreee: {
+                  nom: entreprise.plateformeAgreee?.nom ?? '',
+                  depuis: e.target.value === '' ? null : e.target.value as DateISO
+                }
+              })} />
+          </Champ>
+        )}
+
+        {/* L'option pour la TVA d'après les débits se porte sur la facture
+            (réforme 2026-2027). Sans objet en franchise : sans TVA facturée,
+            elle ne règle rien, et la proposer ferait croire le contraire. */}
+        {!emetteurDe(faits).enFranchise && (
+          <p className={styles.champ}>
+            <label>
+              <input type="checkbox" checked={entreprise.optionTvaDebits}
+                onChange={(e) => modifier({ optionTvaDebits: e.target.checked })} />
+              {' '}J’ai opté pour le paiement de la TVA d’après les débits
+            </label>
+          </p>
+        )}
       </div>
 
       {/* Le handoff montre ici la mention de franchise dans un champ. Elle
@@ -54,8 +97,11 @@ export function Facturation() {
           Mentions portées sur chaque facture à un client en France
         </p>
         <ul>
-          {mentionsDuRegime(emetteurDe(faits).enFranchise ? 'franchise' : 'tva_francaise')
-            .map((m) => <li key={m}>{m}</li>)}
+          {mentionsDuRegime(
+            emetteurDe(faits).enFranchise ? 'franchise' : 'tva_francaise',
+            dateDuJour(),
+            entreprise.optionTvaDebits
+          ).map((m) => <li key={m}>{m}</li>)}
         </ul>
       </div>
 

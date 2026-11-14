@@ -1052,14 +1052,16 @@ describe('navigation entre les sections', () => {
    */
   it('Facturation : montre la mention de franchise tant qu’on y est, et plus après', async () => {
     await afficher('facturation');
-    expect(screen.getByText('TVA non applicable, article 293 B du CGI.')).toBeTruthy();
+    // L'horloge de ces tests est au 20/01/2027 : la mention est celle du CIBS
+    // (voir `MENTIONS_FRANCHISE`).
+    expect(screen.getByText(/^TVA non applicable, article L\. 223-3 du code des impositions/)).toBeTruthy();
     cleanup();
 
     useFaits.setState({
       faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, tvaDepuis: mois('2020-01') } }
     });
     await afficher('facturation');
-    expect(screen.queryByText(/293 B/)).toBeNull();
+    expect(screen.queryByText(/TVA non applicable/)).toBeNull();
     expect(screen.getByText(/pénalités sont dues/)).toBeTruthy();
   });
 

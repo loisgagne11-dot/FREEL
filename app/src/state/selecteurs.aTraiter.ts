@@ -131,13 +131,24 @@ export const ECHEANCES_REGLEMENTAIRES: readonly {
    * rappels : celui-ci dit « en vigueur » pendant un mois, puis se tait.
    */
   readonly rappelApresJours: number;
+  /**
+   * Le fait qui dit l'obligation remplie (lot 46). Quand il existe, le rappel
+   * n'est plus un compte à rebours mais un ÉTAT : il reste tant que le fait
+   * manque — date passée comprise — et s'éteint dès qu'il est saisi.
+   */
+  readonly remplie?: (faits: Faits) => boolean;
+  readonly action?: string;
 }[] = [
   {
     id: 'facturation-electronique-reception',
     intitule: 'Facturation électronique : réception obligatoire',
     date: '2026-09-01' as DateISO,
     preavisJours: 120,
-    rappelApresJours: 30
+    rappelApresJours: 30,
+    remplie: (faits) => faits.entreprise.plateformeAgreee !== null,
+    // Court : le lien ne revient pas à la ligne, et « (Réglages → Facturation) »
+    // le portait à 381 px — le Pilote débordait à 390.
+    action: 'Renseigner ma plateforme'
   }
 ];
 
@@ -157,8 +168,15 @@ export function echeancesReglementairesActives(
     (new Date(date).getTime() - new Date(aujourdhui).getTime()) / 86400000
   );
   const fixes = ECHEANCES_REGLEMENTAIRES
-    .filter((e) => dansLePreavis(e.date, e.preavisJours) && joursAvant(e.date) >= -e.rappelApresJours)
-    .map((e) => ({ id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true }));
+    .filter((e) => dansLePreavis(e.date, e.preavisJours))
+    // Un rappel qui a son fait s'éteint quand le fait est là, et SEULEMENT
+    // alors ; les autres se taisent un mois après leur date (voir plus haut).
+    .filter((e) => (e.remplie === undefined
+      ? joursAvant(e.date) >= -e.rappelApresJours
+      : !e.remplie(faits)))
+    .map((e) => (e.remplie === undefined
+      ? { id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true }
+      : { id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true, ecran: 'config' as const, action: e.action ?? '' }));
 
   const cfe = echeancesCfe(faits, maintenant)
     .filter((e) => dansLePreavis(e.date, e.preavisJours))

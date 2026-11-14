@@ -67,7 +67,7 @@ export function ajouterRecette(saisie: SaisieRecette): string {
 }
 
 /** Ce qu'un brouillon garde de la rédaction : tout, sauf la date et le numéro. */
-export type SaisieBrouillon = Pick<Recette, 'clientNom' | 'libelle' | 'montant' | 'tvaCollectee' | 'lignes'>;
+export type SaisieBrouillon = Pick<Recette, 'clientNom' | 'libelle' | 'montant' | 'tvaCollectee' | 'lignes' | 'referenceCommande'>;
 
 /**
  * Enregistre la rédaction en BROUILLON — crée-le (`id` nul) ou remplace-le.

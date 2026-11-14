@@ -140,3 +140,26 @@ describe('« Enregistrer en brouillon » dans la rédaction', () => {
     expect((screen.getByLabelText('Client') as HTMLInputElement).value).toBe('');
   });
 });
+
+/**
+ * La référence de commande (lot 46) : portée par la mission, reprise sur la
+ * facture, figée à l'émission.
+ */
+describe('référence de commande', () => {
+  it('se saisit, s’imprime et se fige sur la recette émise', async () => {
+    window.location.hash = '#/facture/nouvelle';
+    render(<Facture />);
+    await screen.findByLabelText('Client');
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await u.type(screen.getByLabelText('Client'), 'Client France');
+    await u.type(screen.getByLabelText('Référence de commande'), 'BC-DEMO-42');
+    await u.type(screen.getByLabelText('Désignation'), 'Audit');
+    const pu = screen.getByLabelText('Prix unitaire HT');
+    await u.clear(pu);
+    await u.type(pu, '500');
+    expect(screen.getByRole('article').textContent).toMatch(/Référence de commande BC-DEMO-42/);
+    await u.click(screen.getByRole('button', { name: 'Émettre la facture' }));
+    await screen.findByRole('heading', { name: /Facture 2026-002/ });
+    expect(recettes().find((r) => r.numero === '2026-002')?.referenceCommande).toBe('BC-DEMO-42');
+  });
+});

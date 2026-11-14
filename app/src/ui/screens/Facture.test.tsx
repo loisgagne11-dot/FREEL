@@ -271,7 +271,8 @@ describe('émission', () => {
     await utilisateur.click(screen.getByRole('button', { name: 'Émettre la facture' }));
 
     const document_ = screen.getByRole('article', { name: /Facture 2026-001/ });
-    expect(within(document_).getByText('Mon Entreprise')).toBeTruthy();
+    // « EI » accolé au nom : mention obligatoire de l'entrepreneur individuel.
+    expect(within(document_).getByText('Mon Entreprise EI')).toBeTruthy();
     expect(within(document_).getByText('Développement')).toBeTruthy();
     // Dues de plein droit, mais réclamables seulement si la facture les annonce.
     expect(within(document_).getByText(/indemnité forfaitaire de 40 €/)).toBeTruthy();
@@ -543,6 +544,14 @@ describe('la rédaction reprise d’un brouillon', () => {
     expect(screen.getByLabelText<HTMLInputElement>('Quantité').value).toBe('22');
     expect(screen.getByText(/Reprise du brouillon de juillet 2026 pour Client France/)).toBeTruthy();
     expect(screen.getByText(/Vérifie le taux de TVA/)).toBeTruthy();
+  });
+
+  /** Le bon de commande couvre la mission : le ressaisir chaque mois finit par l'oublier (lot 46). */
+  it('reprend la référence de commande de la mission', async () => {
+    semer({ clients: [client()], missions: [{ ...missionDeJuillet, referenceCommande: 'BC-DEMO-7' }] });
+    window.location.hash = '#/facture/brouillon:2026-07:Client%20France';
+    render(<Facture />);
+    expect((await screen.findByLabelText<HTMLInputElement>('Référence de commande')).value).toBe('BC-DEMO-7');
   });
 
   it('dit que le brouillon n’existe plus, et part d’une page vierge', async () => {

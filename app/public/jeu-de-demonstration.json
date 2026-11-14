@@ -19,7 +19,7 @@
     "invalide) — invariant n°6 : le dépôt est public, aucune donnée personnelle",
     "n'y entre."
   ],
-  "version": 21,
+  "version": 22,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "prenom": "Camille",
@@ -39,7 +39,9 @@
     "email": "contact@atelier-demo.fr",
     "telephone": "",
     "urssafPeriodicite": "trimestriel",
-    "onboardingFait": true
+    "onboardingFait": true,
+    "plateformeAgreee": null,
+    "optionTvaDebits": false
   },
   "clients": [
     {
