@@ -153,10 +153,10 @@ export function EtatsPrecedents(
         <ul className={styles.operations} aria-label="États précédents du compte">
           {liste.etats.map((e) => (
             <li key={e.id} className={styles.operation}>
-              <span>
-                Remplacé le {quand(e.remplaceLe)}
-                <span className={styles.consequence}> · enregistrement n°&nbsp;{e.version}</span>
-              </span>
+              {/* Le numéro sous la date, et non à sa suite : à 390 px, « n° 12 »
+                  tombait seul à la ligne. */}
+              <span>Remplacé le {quand(e.remplaceLe)}</span>
+              <span className={styles.consequence}>enregistrement n°&nbsp;{e.version}</span>
               {e.schema > VERSION_SCHEMA
                 ? (
                   <p className={styles.consequence}>

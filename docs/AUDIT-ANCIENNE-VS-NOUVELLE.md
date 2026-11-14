@@ -518,3 +518,11 @@ chiffre faux.
 |---|---|---|
 | Publication du site | 🟢 | L'ancienne application se publiait sans contrôle. Désormais : actions épinglées par empreinte, jeton en lecture seule, audit bloquant des dépendances servies, `verifier` complet avant toute fusion et tout déploiement |
 | Signaler une faille | 🟢 nouveau | `SECURITY.md` : signalement privé de GitHub, aucune adresse de courriel publiée |
+
+## Lot 57 (14/11) — le compte garde la mémoire
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Revenir à un état précédent du compte | 🟢 nouveau | L'ancienne application écrasait sa ligne (`upsert`, dernier écrit gagne) sans rien garder. Le serveur garde les 20 états remplacés ; « Revenir à cet état » écrit le compte puis l'appareil, chacun gardant son filet |
+| Effacer ses données du compte | 🟢 | Emporte aussi les états précédents, relecture à l'appui |
+| Règles d'accès | 🟢 | Rôle connecté nommé, taille bornée, version imposée par le serveur. Actif une fois le SQL exécuté par le propriétaire |
