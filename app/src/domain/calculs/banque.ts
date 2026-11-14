@@ -39,8 +39,15 @@ import { estATraiter } from './banque.etat';
  * il se compare au besoin mensuel, et c'est la question qu'on se pose en fin
  * de mois. Les autres — frais, remboursements — n'ont besoin que d'être
  * écartés de la file « à traiter ».
+ *
+ * `impot` (lot 35, décision 17) : un virement vers le compte personnel POUR
+ * PAYER L'IMPÔT SUR LE REVENU, qui s'y règle. Ce n'est pas une rémunération —
+ * le compter dans « ce que je me suis versé » faisait croire le besoin
+ * mensuel couvert par de l'argent déjà promis au fisc — et il solde la
+ * provision d'impôt de son exercice : sans lui, elle restait retenue sur un
+ * compte dont l'argent était déjà sorti, et le versable était sous-évalué.
  */
-export type MotifSansContrepartie = 'remuneration' | 'autre';
+export type MotifSansContrepartie = 'remuneration' | 'impot' | 'autre';
 
 export interface MouvementBancaire {
   /** Empreinte stable : le même mouvement réimporté garde le même identifiant. */

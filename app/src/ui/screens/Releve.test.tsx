@@ -294,3 +294,25 @@ describe('rémunération versée', () => {
       .every((m) => m.sansContrepartie === null)).toBe(true);
   });
 });
+
+/**
+ * MIS DE CÔTÉ POUR L'IMPÔT (lot 35, décision 17) : un virement vers le compte
+ * personnel pour payer l'impôt sur le revenu, qui s'y règle. Ni rémunération,
+ * ni « sans contrepartie » quelconque : il solde la provision d'impôt.
+ */
+describe('mis de côté pour l’impôt', () => {
+  it('se nomme sur un débit, et se lit sur la ligne', async () => {
+    render(<Releve />);
+    const utilisateur = await importer();
+    await utilisateur.click(screen.getAllByRole('button', { name: 'Mis de côté pour l’impôt' })[0]!);
+    expect(useFaits.getState().faits.mouvementsBancaires
+      .some((m) => m.sansContrepartie === 'impot')).toBe(true);
+    expect(screen.getAllByText('Mis de côté pour l’impôt').length).toBeGreaterThan(0);
+  });
+
+  it('n’est pas proposé sur un crédit', async () => {
+    render(<Releve />);
+    await importer(['Date;Libellé;Montant', '15/07/2026;VIR RECU CLIENT;+4200,00'].join('\n'));
+    expect(screen.queryByRole('button', { name: 'Mis de côté pour l’impôt' })).toBeNull();
+  });
+});

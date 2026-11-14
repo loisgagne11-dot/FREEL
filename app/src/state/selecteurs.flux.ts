@@ -2,7 +2,7 @@ import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Faits } from './schema';
 import {
-  type LigneFlux, LIBELLE_NATURE, dateDuJour, remunerationDuMois, soldeEstSuivi
+  type LigneFlux, LIBELLE_NATURE, dateDuJour, remunerationDuMois, soldeEstSuivi, echeancesDuComptePro
 } from './selecteurs';
 import { facturesAEncaisser } from './selecteurs.pipeline';
 import { estPayee } from '../domain/calculs/provisions';
@@ -64,7 +64,8 @@ export function fluxDUnAutreMois(
   // une facture annulée par un avoir n'est plus attendue nulle part.
   const attendues = facturesAEncaisser(faits, aujourdhui)
     .filter((f) => f.echeanceLe?.startsWith(m) === true);
-  const echeances = faits.echeances.filter((e) => e.echeanceLe.startsWith(m));
+  // Les sorties du compte pro seulement : voir `echeancesDuComptePro`.
+  const echeances = echeancesDuComptePro(faits).filter((e) => e.echeanceLe.startsWith(m));
   const reglees = echeances.filter((e) => estPayee(e));
 
   return {

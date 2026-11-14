@@ -29,8 +29,7 @@ import { soldeAuDernierJourDe } from '../domain/calculs/solde';
 import { decalerMois } from '../domain/calculs/periode';
 import type { Faits } from './schema';
 import {
-  etatPilote, moisCourant, recettesEncaissees, remunerationDuMois
-} from './selecteurs';
+  etatPilote, moisCourant, recettesEncaissees, remunerationDuMois, echeancesDuComptePro } from './selecteurs';
 import { tauxDeChargesAu } from './selecteurs.activite';
 import {
   type ProjectionSolde, depensesMensuellesMoyennes, projeterDisponible
@@ -538,7 +537,7 @@ function soldeFinDeMois(faits: Faits, finDeMois: DateISO): Euros | null {
   return soldeAuDernierJourDe(
     finDeMois,
     faits.soldeInitial, faits.soldeInitialAu,
-    recettesEncaissees(faits), faits.depenses, faits.echeances,
+    recettesEncaissees(faits), faits.depenses, echeancesDuComptePro(faits),
     faits.mouvementsBancaires
   );
 }
@@ -644,7 +643,9 @@ export function evolutionCompte(
       const depensesPayees = faits.depenses
         .filter((d) => d.payeeLe !== null && d.payeeLe.startsWith(m))
         .reduce<number>((s, d) => s + d.montantTtc, 0);
-      const echeancesPayees = faits.echeances
+      // Les sorties du compte PRO : l'impôt réglé depuis le compte personnel
+      // n'en est pas une (voir `echeancesDuComptePro`).
+      const echeancesPayees = echeancesDuComptePro(faits)
         .filter((e) => estPayee(e) && (e.payeeLe as DateISO).startsWith(m))
         .reduce<number>((s, e) => s + (e.montantPaye ?? e.montant), 0);
 
