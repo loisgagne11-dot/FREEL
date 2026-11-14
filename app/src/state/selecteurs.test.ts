@@ -1047,7 +1047,7 @@ describe('obligations réglementaires datées', () => {
 
   it('reste tant que la plateforme manque, date passée comprise, et mène aux Réglages', () => {
     expect(fe('2026-09-20')).toMatchObject({ sansSuivi: true, ecran: 'config' });
-    expect(fe('2026-11-14')).toMatchObject({ action: expect.stringMatching(/plateforme agréée/) });
+    expect(fe('2026-11-14')).toMatchObject({ action: 'Renseigner ma plateforme' });
   });
 
   it('s’éteint dès que la plateforme est renseignée', () => {

@@ -157,7 +157,7 @@ describe('référence de commande', () => {
     const pu = screen.getByLabelText('Prix unitaire HT');
     await u.clear(pu);
     await u.type(pu, '500');
-    expect(screen.getByRole('article').textContent).toMatch(/Votre référence BC-DEMO-42/);
+    expect(screen.getByRole('article').textContent).toMatch(/Référence de commande BC-DEMO-42/);
     await u.click(screen.getByRole('button', { name: 'Émettre la facture' }));
     await screen.findByRole('heading', { name: /Facture 2026-002/ });
     expect(recettes().find((r) => r.numero === '2026-002')?.referenceCommande).toBe('BC-DEMO-42');

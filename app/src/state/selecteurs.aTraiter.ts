@@ -146,7 +146,9 @@ export const ECHEANCES_REGLEMENTAIRES: readonly {
     preavisJours: 120,
     rappelApresJours: 30,
     remplie: (faits) => faits.entreprise.plateformeAgreee !== null,
-    action: 'Renseigner ma plateforme agréée (Réglages → Facturation)'
+    // Court : le lien ne revient pas à la ligne, et « (Réglages → Facturation) »
+    // le portait à 381 px — le Pilote débordait à 390.
+    action: 'Renseigner ma plateforme'
   }
 ];
 

@@ -7,11 +7,11 @@ import {
 } from './facture';
 
 const EMETTEUR: Emetteur = {
-  nom: 'Mon Entreprise', siret: '12345678200010', adresse: '1 rue Exemple',
+  nom: 'Mon Entreprise', siret: '00000000000000', adresse: '1 rue Exemple',
   codePostal: '75001', ville: 'Paris', tvaIntracom: '', enFranchise: true, iban: '', bic: ''
 };
 const CLIENT: Destinataire = {
-  nom: 'Client démo', adresse: '2 rue Exemple', siret: '11111111800012',
+  nom: 'Client démo', adresse: '2 rue Exemple', siret: '00000000000012',
   pays: 'FR', tvaIntracom: '', delaiPaiement: 'net_30'
 };
 const facture = (m: Partial<Facture> = {}): Facture => ({
@@ -82,7 +82,7 @@ describe('SIREN du client', () => {
     const manque = (siret: string) => mentionsManquantes(facture({ destinataire: { ...CLIENT, siret } }))
       .some((m) => m.mention === 'siren_destinataire');
     expect(manque('12345678900012')).toBe(true);
-    expect(manque('11111111800012')).toBe(false);
+    expect(manque('00000000000012')).toBe(false);
     expect(manque('')).toBe(false);
   });
 });

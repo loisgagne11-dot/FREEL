@@ -80,7 +80,7 @@ export function DocumentFacture({ etat, brouillon }: ProprietesDocumentFacture) 
             Échéance {dateCourte(t.echeanceLe)}
             {/* Le service comptable d'un grand compte rapproche par elle :
                 sans elle, la facture attend dans une file de rejet. */}
-            {(f.referenceCommande ?? '').trim() !== '' && <><br />Votre référence {f.referenceCommande}</>}
+            {(f.referenceCommande ?? '').trim() !== '' && <><br />Référence de commande {f.referenceCommande}</>}
           </p>
         </div>
       </header>
