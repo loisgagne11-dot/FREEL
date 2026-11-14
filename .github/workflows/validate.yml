@@ -1,3 +1,10 @@
+# Chaque action est épinglée par l'empreinte complète de son commit, la version
+# en commentaire. Une étiquette (`@v5`) se déplace : qui la réécrit fait
+# exécuter son code ici, avec le droit de publier le site — c'est arrivé à
+# `tj-actions/changed-files` en mars 2025, sur des milliers de dépôts. Une
+# empreinte ne bouge pas ; la veille de `.github/dependabot.yml` propose les
+# montées, une à une, en revue.
+
 name: Validate
 
 on:
@@ -6,12 +13,22 @@ on:
   pull_request:
     branches: [main]
 
+# Lire le dépôt, rien d'autre. Sans ce bloc, le jeton du flux recevait les
+# droits par défaut du dépôt — écriture comprise selon son réglage — pendant
+# qu'il exécute `npm ci`, donc le code de chaque dépendance installée.
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Le jeton ne reste pas dans `.git/config` après l'extraction :
+          # aucune étape n'a à pousser, et une dépendance pourrait le lire.
+          persist-credentials: false
 
       - name: Check file size
         run: |
@@ -53,7 +70,7 @@ jobs:
           echo "HTML structure validation passed"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '22'
           cache: npm
@@ -70,13 +87,33 @@ jobs:
         working-directory: app
         run: npm ci
 
-      - name: Typecheck and test the new app
+      # Ce qui est SERVI ne porte aucune vulnérabilité connue : bloquant. Le
+      # moindre signalement arrête la validation — React, Zustand et ce
+      # qu'ils tirent finissent dans la page de l'utilisateur.
+      - name: Audit des dépendances servies (bloquant)
         working-directory: app
-        run: npm run typecheck && npm test
+        run: npm audit --omit=dev
 
-      - name: Build the new app
+      # L'outillage (Vite, Vitest, ESLint) ne part pas en ligne : son audit
+      # s'affiche sans bloquer. Le bloquer arrêterait toute fusion le jour où
+      # une alerte paraît sur un outil sans correctif — la veille de
+      # Dependabot propose la montée, la revue la tranche.
+      - name: Audit de l'outillage (informatif)
         working-directory: app
-        run: npm run build
+        run: npm audit || echo "::warning::npm audit signale des alertes dans l'outillage (voir ci-dessus)"
+
+      # Le navigateur de la version de Playwright verrouillée : les contrôles
+      # responsive, vitesse, bascule et migration s'exécutent dans une page.
+      - name: Install the browser for the checks
+        working-directory: app
+        run: npx playwright install --with-deps chromium
+
+      # Le `verifier` complet, et non plus le typage et les tests seuls : un
+      # budget dépassé, un écran qui déborde à 390 px ou une fuite de donnée
+      # n'étaient vus qu'en local — par qui pensait à le lancer.
+      - name: Verifier (typage, tests, build, budgets, responsive, confidentialité…)
+        working-directory: app
+        run: npm run verifier
 
       - name: Check no secrets committed
         run: |

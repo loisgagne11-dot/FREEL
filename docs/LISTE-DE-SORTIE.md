@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 13 novembre 2026.** Schéma des faits : v20 en ligne, v21 livré par le lot 28 (PR #325, à fusionner).
+**Date : 14 novembre 2026.** Schéma des faits : v21 (lot 28, fusionné le 14/11).
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -81,8 +81,8 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 
 | Ordre | Lot | Contenu | État |
 |---|---|---|---|
-| 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ✅ fini le 13/11, PR #325 à fusionner |
-| 2 | 56 | **Sécurité** — la chaîne qui publie est verrouillée | ⬜ |
+| 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ✅ fusionné le 14/11 (PR #325) |
+| 2 | 56 | **Sécurité** — la chaîne qui publie est verrouillée | ◐ PR ouverte le 14/11 ; reste les réglages du dépôt (§6), au propriétaire |
 | 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ⬜ |
 | 4 | 29 | « Enregistrer en brouillon » | ⬜ |
 | 5 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
@@ -235,12 +235,12 @@ porte son test nommé, et l'inverser le fait tomber.
 
 | Ligne | État |
 |---|---|
-| Chaque action des deux flux est épinglée par son empreinte complète, la version en commentaire ; `validate.yml` reçoit `permissions: contents: read` | ⬜ |
-| `.github/dependabot.yml` : veille hebdomadaire de `app/` et des actions | ⬜ |
-| Outillage monté jusqu'à `npm audit` = 0 (16 alertes le 13/11, dont 2 critiques) ; `verifier` vert après la montée | ⬜ |
-| La validation échoue dès que `npm audit --omit=dev` signale quoi que ce soit ; l'audit complet s'affiche sans bloquer | ⬜ |
-| Le déploiement lance le `verifier` complet, navigateur installé dans la chaîne : aujourd'hui seuls le typage et les tests y passent | ⬜ |
-| `SECURITY.md` : signaler une faille par le signalement privé de GitHub, sans adresse de courriel | ⬜ |
+| Chaque action des deux flux est épinglée par son empreinte complète, la version en commentaire ; `validate.yml` reçoit `permissions: contents: read` | ✅ 14/11 — et `persist-credentials: false` aux deux extractions |
+| `.github/dependabot.yml` : veille hebdomadaire de `app/` et des actions | ✅ 14/11 — l'outillage groupé en une PR, les dépendances servies à part |
+| Outillage monté jusqu'à `npm audit` = 0 (16 alertes le 13/11, dont 2 critiques) ; `verifier` vert après la montée | ✅ 14/11 — vitest 4 ; minimatch 11 forcé sous `typescript-estree` (son correctif n'existe pas encore en amont) |
+| La validation échoue dès que `npm audit --omit=dev` signale quoi que ce soit ; l'audit complet s'affiche sans bloquer | ✅ 14/11 — le déploiement aussi |
+| Le déploiement lance le `verifier` complet, navigateur installé dans la chaîne : aujourd'hui seuls le typage et les tests y passent | ✅ 14/11 — la validation des PR aussi |
+| `SECURITY.md` : signaler une faille par le signalement privé de GitHub, sans adresse de courriel | ✅ 14/11 |
 | Réglages du dépôt (`AUDIT-SECURITE.md` §6) faits par le propriétaire, et **constatés** : une poussée directe sur `main` est refusée | ⬜ propriétaire |
 
 #### Lot 57 — Le compte garde la mémoire (S5, S6)

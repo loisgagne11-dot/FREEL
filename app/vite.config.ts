@@ -1,4 +1,6 @@
-import { defineConfig } from 'vite';
+// Depuis `vitest/config` et non `vite` : à partir de vitest 4, la clé `test`
+// n'est plus connue du type de Vite, et le typage refusait la configuration.
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({

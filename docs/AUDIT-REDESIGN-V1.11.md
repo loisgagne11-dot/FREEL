@@ -1206,3 +1206,9 @@ les champs de date « mm/dd/yyyy ». Le relevé a sa capture (`achats-releve`).
 
 Relevé en passant, hors du lot : les opérations du relevé ne sont pas triées
 par date (ordre d'import) — à reprendre au lot 55 (listes).
+
+## Lot 56 (14/11) — la chaîne qui publie
+
+Aucun écran ne change : le lot ne touche pas le code servi. Pas de contrôle
+visuel à faire ; les captures du `verifier` (responsive, bascule) passent
+désormais aussi dans la chaîne, à chaque PR.
