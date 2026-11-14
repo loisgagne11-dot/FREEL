@@ -17,7 +17,8 @@ import { Compte } from './Compte';
 vi.mock('../../infra/supabase.acces', async (original) => ({
   ...(await original<typeof import('../../infra/supabase.acces')>()),
   sonderAccesAnonyme: async () => ({
-    faits: { statut: 'protegee' }, legacy: { statut: 'protegee' }, le: '2026-11-08T10:00:00.000Z'
+    faits: { statut: 'protegee' }, legacy: { statut: 'protegee' }, historique: { statut: 'protegee' },
+    le: '2026-11-08T10:00:00.000Z'
   })
 }));
 
@@ -657,14 +658,16 @@ describe('effacer mes données du compte', () => {
 
     await utilisateur.click(await screen.findByRole('button', { name: 'Effacer la copie de cette version' }));
     expect(ecritures(appel)).toEqual([]);
-    expect(screen.getByRole('group', { name: /relue pour le prouver/ })).toBeTruthy();
+    expect(screen.getByRole('group', { name: /états précédents, seront effacés, puis relus pour le prouver/ })).toBeTruthy();
     await utilisateur.click(screen.getByRole('button', { name: 'Effacer du compte' }));
 
-    await screen.findByText(/Données de cette version effacées du compte\. Relu après coup/);
+    await screen.findByText(/Données de cette version et états précédents effacés du compte\. Relu après coup/);
+    // La copie, PUIS ses états précédents : vingt copies laissées sur le
+    // serveur feraient de l'effacement un mensonge.
     const effacements = ecritures(appel);
-    expect(effacements).toHaveLength(1);
-    expect(effacements[0]?.methode).toBe('DELETE');
+    expect(effacements.map((e) => e.methode)).toEqual(['DELETE', 'DELETE']);
     expect(effacements[0]?.url).toContain('freel_faits?user_id=eq.user-1');
+    expect(effacements[1]?.url).toContain('freel_faits_historique?user_id=eq.user-1');
   });
 
   it('ne dit pas « effacé » quand la ligne est toujours là : la règle de suppression manque', async () => {
