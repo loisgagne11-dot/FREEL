@@ -511,3 +511,10 @@ chiffre faux.
 | Statut d'une période déclarée | 🟢 | L'ancienne cochait « déclaré » sans date. La nouvelle date la déclaration (du jour par défaut, corrigeable, jamais future) et lit le cycle à déclarer → déclarée le … → payée le … ; « Annuler la déclaration » la défait |
 | Écarter une opération du relevé | 🟢 nouveau | « Ignorer » : un virement entre ses comptes, une opération annulée. Distinct de « sans contrepartie » : l'une compte au solde, l'autre nulle part. Se reprend |
 | Migration 20 → 21 | 🟢 | Descend dans les listes : les mois déclarés deviennent des périodes à date inconnue (aucune date inventée, doublons fondus), chaque mouvement reçoit `ignoree: false` ; un mois nu est refusé au schéma courant |
+
+## Lot 56 (14/11) — la chaîne qui publie est verrouillée
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Publication du site | 🟢 | L'ancienne application se publiait sans contrôle. Désormais : actions épinglées par empreinte, jeton en lecture seule, audit bloquant des dépendances servies, `verifier` complet avant toute fusion et tout déploiement |
+| Signaler une faille | 🟢 nouveau | `SECURITY.md` : signalement privé de GitHub, aucune adresse de courriel publiée |

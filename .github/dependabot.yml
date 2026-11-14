@@ -1,0 +1,27 @@
+# Veille des dépendances (lot 56, constat S2 de `docs/AUDIT-SECURITE.md`).
+#
+# Les actions sont épinglées par empreinte : sans veille, elles ne bougeraient
+# plus jamais, correctifs de sécurité compris. Dependabot propose chaque
+# montée en pull request, que la validation éprouve et que le propriétaire
+# fusionne — rien ne monte tout seul.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: weekly
+    # Les outils montent ensemble, en une PR : une par paquet noierait les
+    # alertes qui comptent — celles des dépendances servies, qui restent
+    # séparées.
+    groups:
+      outillage:
+        dependency-type: development
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

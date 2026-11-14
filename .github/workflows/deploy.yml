@@ -1,3 +1,10 @@
+# Chaque action est épinglée par l'empreinte complète de son commit, la version
+# en commentaire. Une étiquette (`@v5`) se déplace : qui la réécrit fait
+# exécuter son code ici, avec le droit de publier le site — c'est arrivé à
+# `tj-actions/changed-files` en mars 2025, sur des milliers de dépôts. Une
+# empreinte ne bouge pas ; la veille de `.github/dependabot.yml` propose les
+# montées, une à une, en revue.
+
 name: Deploy to GitHub Pages
 
 on:
@@ -23,13 +30,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@1f0c5cde4bc74cd7e1254d0cb4de8d49e9068c7d # v4.0.0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '22'
           cache: npm
@@ -39,13 +48,25 @@ jobs:
         working-directory: app
         run: npm ci
 
-      # Le noyau fiscal et la migration passent avant le déploiement. Publier
-      # une version dont les calculs échouent serait pire que ne rien publier :
-      # les chiffres se retrouvent dans des déclarations.
-      - name: Typecheck and test the new app
+      - name: Audit des dépendances servies (bloquant)
         working-directory: app
-        run: npm run typecheck && npm test
+        run: npm audit --omit=dev
 
+      - name: Install the browser for the checks
+        working-directory: app
+        run: npx playwright install --with-deps chromium
+
+      # Le `verifier` COMPLET passe avant le déploiement. Publier une version
+      # dont les calculs échouent serait pire que ne rien publier : les
+      # chiffres se retrouvent dans des déclarations. Jusqu'au lot 56, seuls le
+      # typage et les tests passaient ici — la politique de contenu, les
+      # budgets et la confidentialité n'étaient contrôlés qu'en local.
+      - name: Verifier
+        working-directory: app
+        run: npm run verifier
+
+      # Reconstruit après les contrôles : le site publié est tiré d'un `dist`
+      # produit par le build ordinaire, pas de ce qu'un contrôle aurait laissé.
       - name: Build the new app
         working-directory: app
         run: npm run build
@@ -66,10 +87,10 @@ jobs:
           find _site -maxdepth 2 -type f -name '*.html' | sort
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

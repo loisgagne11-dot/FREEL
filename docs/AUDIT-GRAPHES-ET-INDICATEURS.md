@@ -775,3 +775,9 @@ Aucun nombre lu ne change.
 
 Le retard lui-même (« deux jours après la limite ») n'est pas encore dit : la
 maquette Obligations le montre, il revient au lot 53.
+
+## Lot 56 (14/11) — la chaîne qui publie
+
+Aucun nombre lu ne change : le lot touche la chaîne de construction et
+l'outillage de test (vitest 3 → 4), pas le code servi. Les 2 627 tests passent
+à l'identique.
