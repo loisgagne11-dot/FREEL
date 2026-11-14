@@ -1212,3 +1212,19 @@ par date (ordre d'import) — à reprendre au lot 55 (listes).
 Aucun écran ne change : le lot ne touche pas le code servi. Pas de contrôle
 visuel à faire ; les captures du `verifier` (responsive, bascule) passent
 désormais aussi dans la chaîne, à chaque PR.
+
+## Lot 57 (14/11) — le compte garde la mémoire
+
+| Zone | Avant | Après |
+|---|---|---|
+| Config › Compte, connecté | Envoyer, charger, reprendre, effacer | Section « États précédents du compte » entre les gestes et l'effacement : la limite dite d'abord (écrasement par erreur, pas session volée), « Voir les états précédents » à la demande, une ligne par état (date du serveur, numéro dessous), « Revenir à cet état » confirmé sur place ; un état d'un schéma postérieur se dit, sans bouton |
+| Config › Compte, SQL non exécuté | — | Alerte « Le serveur ne garde pas encore les états précédents », SQL copiable |
+| Bloc SQL à copier (toutes les alertes) | Hauteur libre | Hauteur bornée, défile : le script de la mémoire passe cent lignes et repoussait « Copier le SQL » trois écrans plus bas |
+| Règles d'accès | Deux tables | Trois : « États précédents du compte » |
+
+Pas de maquette pour Compte : la section reprend les gestes de l'écran
+(liste d'opérations, confirmation sur place). Contrôle visuel à 390 px, deux
+thèmes, serveur simulé (liste avec un état confirmé et un état d'un schéma
+postérieur ; table absente). Deux écarts corrigés au contrôle : le numéro
+d'enregistrement qui tombait seul à la ligne, le SQL qui repoussait son
+bouton.

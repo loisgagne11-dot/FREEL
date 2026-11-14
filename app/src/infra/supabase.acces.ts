@@ -29,7 +29,7 @@
  * le reste est « inconnu », avec la raison.
  */
 import {
-  DELAI_MAX_MS, TABLE_FAITS, TABLE_LEGACY, motifUrlRefusee, type ConfigSupabase
+  DELAI_MAX_MS, TABLE_FAITS, TABLE_HISTORIQUE, TABLE_LEGACY, motifUrlRefusee, type ConfigSupabase
 } from './supabase';
 
 export type VerdictTable =
@@ -41,6 +41,8 @@ export type VerdictTable =
 export interface VerdictAcces {
   readonly faits: VerdictTable;
   readonly legacy: VerdictTable;
+  /** Les états précédents du compte (lot 57) : vingt copies du dossier, à protéger autant que lui. */
+  readonly historique: VerdictTable;
   /** Horodatage ISO de la vérification. */
   readonly le: string;
 }
@@ -107,11 +109,12 @@ export async function sonderAccesAnonyme(
   config: ConfigSupabase,
   maintenant: Date = new Date()
 ): Promise<VerdictAcces> {
-  const [faits, legacy] = await Promise.all([
+  const [faits, legacy, historique] = await Promise.all([
     sonderTable(config, TABLE_FAITS),
-    sonderTable(config, TABLE_LEGACY)
+    sonderTable(config, TABLE_LEGACY),
+    sonderTable(config, TABLE_HISTORIQUE)
   ]);
-  return { faits, legacy, le: maintenant.toISOString() };
+  return { faits, legacy, historique, le: maintenant.toISOString() };
 }
 
 /**
@@ -126,31 +129,35 @@ export function sqlProtectionLegacy(): string {
     `drop policy if exists "${TABLE_LEGACY} — chacun les siens" on public.${TABLE_LEGACY};`,
     `create policy "${TABLE_LEGACY} — chacun les siens"`,
     `  on public.${TABLE_LEGACY} for all`,
-    '  using (auth.uid() = user_id)',
-    '  with check (auth.uid() = user_id);'
+    '  to authenticated',
+    '  using ((select auth.uid()) = user_id)',
+    '  with check ((select auth.uid()) = user_id);'
   ].join('\n');
 }
 
-/** Les règles de `freel_faits`, identiques à la section ACCÈS de `docs/supabase.sql`. */
+/**
+ * Les règles de `freel_faits`, identiques à la section ACCÈS de
+ * `docs/supabase.sql` — suppression comprise (lot 25), rôle nommé (lot 57).
+ */
 export function sqlProtectionFaits(): string {
   const t = TABLE_FAITS;
+  const soi = '((select auth.uid()) = user_id)';
+  const regle = (nom: string, pour: string, clauses: readonly string[]): string[] => [
+    `drop policy if exists "${t} — ${nom}" on public.${t};`,
+    `create policy "${t} — ${nom}"`,
+    `  on public.${t} for ${pour}`,
+    '  to authenticated',
+    ...clauses.map((c, i) => `  ${c}${i === clauses.length - 1 ? ';' : ''}`)
+  ];
   return [
     `alter table public.${t} enable row level security;`,
     '',
-    `drop policy if exists "${t} — lire les siens" on public.${t};`,
-    `create policy "${t} — lire les siens"`,
-    `  on public.${t} for select`,
-    '  using (auth.uid() = user_id);',
+    ...regle('lire les siens', 'select', [`using ${soi}`]),
     '',
-    `drop policy if exists "${t} — créer les siens" on public.${t};`,
-    `create policy "${t} — créer les siens"`,
-    `  on public.${t} for insert`,
-    '  with check (auth.uid() = user_id);',
+    ...regle('créer les siens', 'insert', [`with check ${soi}`]),
     '',
-    `drop policy if exists "${t} — modifier les siens" on public.${t};`,
-    `create policy "${t} — modifier les siens"`,
-    `  on public.${t} for update`,
-    '  using (auth.uid() = user_id)',
-    '  with check (auth.uid() = user_id);'
+    ...regle('modifier les siens', 'update', [`using ${soi}`, `with check ${soi}`]),
+    '',
+    ...regle('supprimer les siens', 'delete', [`using ${soi}`])
   ].join('\n');
 }

@@ -6,13 +6,15 @@ import userEvent from '@testing-library/user-event';
 import type { VerdictAcces, VerdictTable } from '../../infra/supabase.acces';
 import { sqlProtectionLegacy } from '../../infra/supabase.acces';
 import { ReglesDAcces } from './Compte.acces';
+import { sqlMemoireDuCompte } from '../../infra/supabase.memoire';
 
 afterEach(() => { cleanup(); });
 
 const CONFIG = { url: 'https://exemple-demo.supabase.co', cleAnon: 'cle-anon-factice' };
 
-const verdict = (faits: VerdictTable, legacy: VerdictTable): VerdictAcces =>
-  ({ faits, legacy, le: '2026-11-08T10:00:00.000Z' });
+const verdict = (
+  faits: VerdictTable, legacy: VerdictTable, historique: VerdictTable = { statut: 'protegee' }
+): VerdictAcces => ({ faits, legacy, historique, le: '2026-11-08T10:00:00.000Z' });
 
 const PROTEGEE: VerdictTable = { statut: 'protegee' };
 
@@ -25,7 +27,7 @@ function monter(v: VerdictAcces) {
 describe('règles d’accès', () => {
   it('une table protégée se dit en toutes lettres, et la vérification part au montage', async () => {
     const sonder = monter(verdict(PROTEGEE, PROTEGEE));
-    expect((await screen.findAllByText('ne se lisent pas sans connexion'))).toHaveLength(2);
+    expect((await screen.findAllByText('ne se lisent pas sans connexion'))).toHaveLength(3);
     expect(sonder).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -40,7 +42,7 @@ describe('règles d’accès', () => {
     // Afficher le vert ici ferait croire sûr un projet qu'on n'a pas pu interroger.
     monter(verdict({ statut: 'inconnu', motif: 'Le projet n’a pas répondu.' }, PROTEGEE));
     expect(await screen.findByText('vérification impossible : Le projet n’a pas répondu.')).toBeTruthy();
-    expect(screen.getAllByText('ne se lisent pas sans connexion')).toHaveLength(1);
+    expect(screen.getAllByText('ne se lisent pas sans connexion')).toHaveLength(2);
   });
 
   it('l’exposition de l’ancienne table montre l’alerte et le SQL à appliquer', async () => {
@@ -59,7 +61,14 @@ describe('règles d’accès', () => {
     await screen.findByRole('alert');
     await userEvent.setup().click(screen.getByRole('button', { name: 'Vérifier' }));
     expect(sonder).toHaveBeenCalledTimes(2);
-    expect(await screen.findAllByText('ne se lisent pas sans connexion')).toHaveLength(2);
+    expect(await screen.findAllByText('ne se lisent pas sans connexion')).toHaveLength(3);
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('l’exposition des états précédents montre le SQL de la mémoire du compte', async () => {
+    monter(verdict(PROTEGEE, PROTEGEE, { statut: 'exposee', lignes: 20 }));
+    const alerte = await screen.findByRole('alert');
+    expect(alerte.textContent).toMatch(/états précédents du compte sont lisibles/);
+    expect(alerte.textContent).toContain(sqlMemoireDuCompte());
   });
 });
