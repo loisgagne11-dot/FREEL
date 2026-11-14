@@ -1,6 +1,7 @@
 import type { EtatFacture } from '../../state/selecteurs.facture';
 import { euros } from '../../domain/types';
 import { formaterIban } from '../../domain/calculs/identifiants';
+import { nomAvecStatut, sirenDe } from '../../domain/calculs/facture';
 import { Montant } from '../components/Montant';
 import { dateCourte, eurExact } from '../format';
 
@@ -62,7 +63,8 @@ export function DocumentFacture({ etat, brouillon }: ProprietesDocumentFacture) 
 
       <header className="doc-entete">
         <div>
-          <p className="doc-marque">{em.nom}</p>
+          {/* « EI » accolé au nom : voir `nomAvecStatut`. */}
+          <p className="doc-marque">{nomAvecStatut(em.nom)}</p>
           <p className="doc-emetteur">
             {em.adresse !== '' && <>{em.adresse}<br /></>}
             {[em.codePostal, em.ville].filter((x) => x !== '').join(' ')}
@@ -76,6 +78,9 @@ export function DocumentFacture({ etat, brouillon }: ProprietesDocumentFacture) 
           <p className="doc-destinataire">
             Émise le {dateCourte(f.emiseLe)}<br />
             Échéance {dateCourte(t.echeanceLe)}
+            {/* Le service comptable d'un grand compte rapproche par elle :
+                sans elle, la facture attend dans une file de rejet. */}
+            {(f.referenceCommande ?? '').trim() !== '' && <><br />Votre référence {f.referenceCommande}</>}
           </p>
         </div>
       </header>
@@ -92,7 +97,13 @@ export function DocumentFacture({ etat, brouillon }: ProprietesDocumentFacture) 
             : <strong>{de.nom}</strong>}
         </p>
         {de.adresse !== '' && <p>{de.adresse}</p>}
-        {de.siret !== '' && <p>SIRET {de.siret}</p>}
+        {/* Le SIREN du client, mention de la réforme : dérivé du SIRET et
+            contrôlé (voir `sirenDe`). Un SIRET illisible bloque l'émission. */}
+        {de.siret !== '' && (
+          <p>
+            {sirenDe(de.siret) !== null && <>SIREN {sirenDe(de.siret)} · </>}SIRET {de.siret}
+          </p>
+        )}
         {de.tvaIntracom !== '' && <p>TVA {de.tvaIntracom}</p>}
       </section>
 

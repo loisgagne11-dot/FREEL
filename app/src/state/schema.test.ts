@@ -1011,3 +1011,28 @@ describe('schéma 20 → 21 : la déclaration datée, l’opération ignorée', 
     })).toBeNull();
   });
 });
+
+/**
+ * LA PLATEFORME AGRÉÉE ET L'OPTION DÉBITS (schéma 22).
+ *
+ * Deux champs du profil, comblés à la lecture : `null` — non renseignée — et
+ * `false` — pas d'option. Un fichier hostile n'a pas à pouvoir faire lever les
+ * Réglages avec une plateforme qui n'est pas un objet.
+ */
+describe('schéma 21 → 22 : plateforme agréée, option débits', () => {
+  it('un compte de schéma 21 reçoit une plateforme nulle et pas d’option', () => {
+    const f = completerFaits({ version: 21, entreprise: { nom: 'Atelier' } });
+    expect(f.entreprise.plateformeAgreee).toBeNull();
+    expect(f.entreprise.optionTvaDebits).toBe(false);
+  });
+
+  it('accepte une plateforme lisible, refuse une plateforme illisible', () => {
+    const avec = (plateformeAgreee: unknown, optionTvaDebits: unknown = false) =>
+      motifRefusFaits({ ...faitsVides(), entreprise: { ...entrepriseVide(), plateformeAgreee, optionTvaDebits } });
+    expect(avec({ nom: 'Plateforme démo', depuis: '2026-09-01' })).toBeNull();
+    expect(avec(null)).toBeNull();
+    expect(avec('Plateforme démo')).toMatch(/plateformeAgreee/);
+    expect(avec({ nom: 'Plateforme démo', depuis: 'hier' })).toMatch(/plateformeAgreee/);
+    expect(avec(null, 'oui')).toMatch(/optionTvaDebits/);
+  });
+});

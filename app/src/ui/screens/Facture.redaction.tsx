@@ -107,6 +107,20 @@ export function NouvelleFacture(
   const [garde, setGarde] = useState<string | null>(null);
   const [clientNom, setClientNom] = useState(() => enregistre?.clientNom ?? repris?.clientNom ?? '');
   const [emiseLe, setEmiseLe] = useState<string>(() => dateDuJour());
+  /*
+   * La référence de commande (lot 46) : celle du brouillon gardé, sinon celle
+   * des missions du brouillon du mois. Plusieurs missions d'un même client
+   * peuvent en porter chacune une : elles sont toutes reprises, la facture
+   * couvrant toutes ces lignes.
+   */
+  const [referenceCommande, setReferenceCommande] = useState<string>(() => {
+    if (enregistre !== null) return enregistre.referenceCommande ?? '';
+    if (repris === null) return '';
+    const refs = repris.lignes
+      .map((l) => faits.missions.find((m) => m.id === l.missionId)?.referenceCommande?.trim() ?? '')
+      .filter((r) => r !== '');
+    return [...new Set(refs)].join(', ');
+  });
   const [lignes, setLignes] = useState<readonly LigneFacture[]>(() => {
     if (enregistre !== null) {
       if (enregistre.lignes != null && enregistre.lignes.length > 0) return enregistre.lignes;
@@ -145,8 +159,9 @@ export function NouvelleFacture(
         delaiPaiement: 'net_30'
       }
       : destinataireDe(client),
-    lignes
-  }), [numero, emiseLe, faits, client, clientNom, lignes]);
+    lignes,
+    referenceCommande
+  }), [numero, emiseLe, faits, client, clientNom, lignes, referenceCommande]);
 
   const etat = useMemo(() => etatFacture(facture), [facture]);
   const emissionPossible = etat.manques.length === 0;
@@ -192,7 +207,8 @@ export function NouvelleFacture(
     libelle: lignes.map((l) => l.designation).filter((d) => d !== '').join(', '),
     montant: etat.totaux.totalHt,
     tvaCollectee: etat.totaux.totalTva,
-    lignes: lignesAConserver(facture)
+    lignes: lignesAConserver(facture),
+    referenceCommande: referenceCommande.trim() === '' ? null : referenceCommande.trim()
   });
 
   /*
@@ -232,6 +248,8 @@ export function NouvelleFacture(
       // Et ses lignes, depuis le schéma 20 : sans elles, « Revoir la facture »
       // rendait une seule ligne au prix du total — voir `Recette.lignes`.
       lignes: lignesAConserver(facture),
+      // Figée à l'émission, comme l'échéance : voir `Recette.referenceCommande`.
+      referenceCommande: referenceCommande.trim() === '' ? null : referenceCommande.trim(),
       emiseLe: facture.emiseLe,
       // L'encaissement viendra plus tard : porter une recette comme encaissée
       // à l'émission ferait déclarer un revenu qui n'est pas rentré.
@@ -363,6 +381,15 @@ export function NouvelleFacture(
           <datalist id={`${idChamp}-clients`}>
             {faits.clients.map((c) => <option key={c.id} value={c.nom} />)}
           </datalist>
+
+          <p className={styles.champ}>
+            <label htmlFor={`${idChamp}-reference`}>Référence de commande</label>
+            <input id={`${idChamp}-reference`} value={referenceCommande}
+              onChange={(e) => setReferenceCommande(e.target.value)} />
+            <span className={styles.aide}>
+              Le numéro de bon de commande du client, s’il t’en a donné un. Facultatif.
+            </span>
+          </p>
 
           <p className={styles.champ}>
             <label htmlFor={`${idChamp}-date`}>Date d’émission</label>

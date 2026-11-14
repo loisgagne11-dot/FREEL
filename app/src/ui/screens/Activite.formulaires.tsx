@@ -220,6 +220,7 @@ export function FormulaireMission(
     description: existante?.description ?? '',
     tjm: existante?.tjm ?? euros(0),
     delaiPaiement: existante?.delaiPaiement ?? null,
+    referenceCommande: existante?.referenceCommande ?? null,
     debut: existante?.debut ?? null,
     fin: existante?.fin ?? null,
     statut: existante?.statut ?? 'active',
@@ -308,6 +309,15 @@ export function FormulaireMission(
         avecHeritage
         onChange={(delaiPaiement) => setSaisie({ ...saisie, delaiPaiement })}
       />
+
+      {/* Portée par la mission et reprise sur chaque facture (lot 46) : le bon
+          de commande couvre toute la mission, et le ressaisir chaque mois finit
+          par l'oublier une fois — la facture qui part alors en rejet. */}
+      <Champ id={`${idChamp}-reference`} libelle="Référence de commande du client"
+        aide="Son numéro de bon de commande, s’il en a émis un. Repris sur chaque facture de la mission.">
+        <input id={`${idChamp}-reference`} value={saisie.referenceCommande ?? ''}
+          onChange={(e) => setSaisie({ ...saisie, referenceCommande: e.target.value === '' ? null : e.target.value })} />
+      </Champ>
 
       <EditeurEntites
         entites={saisie.entites}

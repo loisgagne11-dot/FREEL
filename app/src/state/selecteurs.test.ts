@@ -1030,20 +1030,27 @@ describe('années proposables au sélecteur de période', () => {
 });
 
 /**
- * LE RAPPEL DE LA FACTURATION ÉLECTRONIQUE SE TAIT UN MOIS APRÈS SA DATE.
+ * LE RAPPEL DE LA FACTURATION ÉLECTRONIQUE EST UN ÉTAT, PLUS UN COMPTE À
+ * REBOURS (lot 46).
  *
- * Aucun fait ne dit qu'on est prêt : sans fin, le rappel restait pour
- * toujours — et un rappel qu'on ne peut pas traiter apprend à les ignorer.
+ * Aucun fait ne disait qu'on était prêt : le rappel disait « en vigueur » un
+ * mois, puis se taisait — prêt ou pas. La plateforme agréée est désormais un
+ * fait : le rappel reste tant qu'elle manque, et s'éteint quand elle est là.
  */
 describe('obligations réglementaires datées', () => {
-  const fe = (quand: string) => echeancesReglementairesActives(faitsVides(), new Date(`${quand}T09:00:00Z`))
+  const fe = (quand: string, f = faitsVides()) => echeancesReglementairesActives(f, new Date(`${quand}T09:00:00Z`))
     .find((e) => e.id === 'facturation-electronique-reception');
-
-  it('reste un mois après sa date, sans suivi possible', () => {
-    expect(fe('2026-09-20')).toMatchObject({ sansSuivi: true });
+  const avecPlateforme = (): ReturnType<typeof faitsVides> => ({
+    ...faitsVides(),
+    entreprise: { ...faitsVides().entreprise, plateformeAgreee: { nom: 'Plateforme démo', depuis: null } }
   });
 
-  it('disparaît passé ce mois', () => {
-    expect(fe('2026-10-05')).toBeUndefined();
+  it('reste tant que la plateforme manque, date passée comprise, et mène aux Réglages', () => {
+    expect(fe('2026-09-20')).toMatchObject({ sansSuivi: true, ecran: 'config' });
+    expect(fe('2026-11-14')).toMatchObject({ action: expect.stringMatching(/plateforme agréée/) });
+  });
+
+  it('s’éteint dès que la plateforme est renseignée', () => {
+    expect(fe('2026-11-14', avecPlateforme())).toBeUndefined();
   });
 });

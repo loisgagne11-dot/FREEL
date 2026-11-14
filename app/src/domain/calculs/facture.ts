@@ -87,6 +87,12 @@ export interface Emetteur {
    */
   readonly iban: string;
   readonly bic: string;
+  /**
+   * Option pour le paiement de la TVA d'après les débits — portée sur la
+   * facture quand elle porte de la TVA (lot 46). Facultative : absente, pas
+   * d'option, le régime de droit commun des prestations de services.
+   */
+  readonly optionTvaDebits?: boolean;
 }
 
 /** Le destinataire. */
@@ -120,6 +126,96 @@ export interface Facture {
   readonly emetteur: Emetteur;
   readonly destinataire: Destinataire;
   readonly lignes: readonly LigneFacture[];
+  /** La référence de commande du client, quand il en a émis une (lot 46). */
+  readonly referenceCommande?: string;
+}
+
+/* ── Mentions de la réforme 2026-2027 (lot 46) ─────────────────────────── */
+
+/**
+ * La mention de franchise en base, DATÉE.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX SOURCES OFFICIELLES QUI NE DISENT PAS LA MÊME CHOSE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * La TVA passe du code général des impôts au code des impositions sur les
+ * biens et services (CIBS). Relevé le 14/11/2026 :
+ *   - impots.gouv.fr (« Je suis micro-entrepreneur… Ai-je des obligations
+ *     déclaratives en matière de TVA ? », modifiée le 14/10/2026) : « TVA non
+ *     applicable, article L. 223-3 du CIBS », article en vigueur au
+ *     01/01/2027 ; « 293 B du CGI » reste la référence d'ici là ;
+ *   - service-public (F23208, vérifiée le 07/08/2026) : « art. L. 223 et s.
+ *     du CIBS » dès le 01/09/2026, « 293 B du CGI » toléré jusqu'au
+ *     31/12/2027.
+ *
+ * La seule règle juste DANS LES DEUX lectures : 293 B jusqu'au 31/12/2026 —
+ * en vigueur pour l'une, toléré pour l'autre —, la formule CIBS de la DGFiP
+ * ensuite. Celle-ci reste une `hypothese` tant que les deux sources n'ont pas
+ * convergé : à revérifier avant le 01/01/2027 (liste de sortie).
+ */
+export const MENTIONS_FRANCHISE: readonly {
+  readonly depuis: DateISO;
+  readonly texte: string;
+  readonly statut: 'publie' | 'hypothese';
+  readonly source: string;
+}[] = [
+  {
+    depuis: '1970-01-01' as DateISO,
+    texte: 'TVA non applicable, article 293 B du CGI.',
+    statut: 'publie',
+    source: 'CGI, art. 293 B ; impots.gouv.fr (14/10/2026) et service-public F23208 (07/08/2026)'
+  },
+  {
+    depuis: '2027-01-01' as DateISO,
+    texte: 'TVA non applicable, article L. 223-3 du code des impositions sur les biens et services (CIBS).',
+    statut: 'hypothese',
+    source: 'impots.gouv.fr, page micro-entrepreneur et TVA, modifiée le 14/10/2026 — '
+      + 'service-public F23208 écrit « art. L. 223 et s. » et date la bascule au 01/09/2026'
+  }
+];
+
+/** La mention de franchise à porter sur une facture émise ce jour-là. */
+export function mentionFranchise(le: DateISO): string {
+  let retenue = MENTIONS_FRANCHISE[0]?.texte ?? '';
+  for (const m of MENTIONS_FRANCHISE) if (le >= m.depuis) retenue = m.texte;
+  return retenue;
+}
+
+/**
+ * Le nom de l'émetteur suivi de « EI ».
+ *
+ * Depuis le 15/05/2022, l'entrepreneur individuel fait suivre ou précéder son
+ * nom de « entrepreneur individuel » ou « EI » sur ses factures (code de
+ * commerce, art. R123-237 ; service-public F23208). Un micro-entrepreneur EST
+ * un entrepreneur individuel : la mention se dérive, elle ne se saisit pas.
+ * Pas de doublon quand le nom la porte déjà.
+ */
+export function nomAvecStatut(nom: string): string {
+  const n = nom.trim();
+  if (n === '' || /(^|[\s,(—-])(EI|E\.I\.|entrepreneur individuel)(?=$|[\s,)—-])/i.test(n)) return n;
+  return `${n} EI`;
+}
+
+/**
+ * Le SIREN tiré d'un SIRET, ou `null` s'il n'est pas lisible.
+ *
+ * Le SIREN du client est l'une des quatre mentions de la réforme. Il se
+ * DÉRIVE du SIRET déjà saisi — deux champs à tenir d'accord finiraient par
+ * se contredire — et se contrôle par sa clé de Luhn : un chiffre tapé de
+ * travers donnerait sur la facture l'identité d'une autre entreprise.
+ */
+export function sirenDe(siret: string): string | null {
+  const chiffres = siret.replace(/\s/g, '');
+  if (!/^\d{14}$/.test(chiffres) && !/^\d{9}$/.test(chiffres)) return null;
+  const siren = chiffres.slice(0, 9);
+  let somme = 0;
+  for (let i = 0; i < 9; i++) {
+    let c = Number(siren[8 - i]);
+    if (i % 2 === 1) { c *= 2; if (c > 9) c -= 9; }
+    somme += c;
+  }
+  return somme % 10 === 0 ? siren : null;
 }
 
 
@@ -177,10 +273,14 @@ export function factureDepuisRecette(
     readonly tvaCollectee?: Euros | null;
     /** Les lignes du document émis, depuis le schéma 20 ; `null` avant. */
     readonly lignes?: readonly LigneFacture[] | null;
+    /** Figée à l'émission (schéma 22) : réimprimée telle quelle. */
+    readonly referenceCommande?: string | null;
   },
   emetteur: Emetteur,
   destinataire: Destinataire
 ): ReeditionFacture {
+  const reference = (recette.referenceCommande ?? '').trim();
+  const avecReference = reference === '' ? {} : { referenceCommande: reference };
   if (recette.emiseLe === null) {
     return {
       cas: 'impossible',
@@ -233,7 +333,8 @@ export function factureDepuisRecette(
   const conservees = recette.lignes ?? null;
   if (conservees !== null && conservees.length > 0) {
     const facture: Facture = {
-      numero: recette.numero, emiseLe: recette.emiseLe, emetteur, destinataire, lignes: conservees
+      numero: recette.numero, emiseLe: recette.emiseLe, emetteur, destinataire, lignes: conservees,
+      ...avecReference
     };
     const t = totaux(facture);
     if (Math.abs(t.totalHt - recette.montant) >= 0.005 || Math.abs(t.totalTva - tva) >= 0.005) {
@@ -277,6 +378,7 @@ export function factureDepuisRecette(
       emiseLe: recette.emiseLe,
       emetteur,
       destinataire,
+      ...avecReference,
       lignes: [{
         designation: recette.libelle,
         // Une quantité de 1 au prix du total : le détail « 18 j × 430 € »
@@ -405,7 +507,8 @@ export type MentionManquante =
   | 'designation'
   | 'montant'
   | 'tva_intracom_emetteur'
-  | 'tva_intracom_destinataire';
+  | 'tva_intracom_destinataire'
+  | 'siren_destinataire';
 
 export interface Manque {
   readonly mention: MentionManquante;
@@ -449,6 +552,12 @@ export function mentionsManquantes(facture: Facture): readonly Manque[] {
     'Le nom du client est absent.');
   exiger(destinataire.adresse.trim() !== '', 'adresse_destinataire',
     'L’adresse du client est absente : elle est obligatoire sur la facture.');
+  // Un SIRET saisi mais illisible : la facture porterait l'identité d'une
+  // autre entreprise. Absent, il n'est pas exigé ici — un particulier ou un
+  // client étranger n'en a pas.
+  exiger(destinataire.siret.trim() === '' || sirenDe(destinataire.siret) !== null, 'siren_destinataire',
+    'Le SIRET du client est invalide (sa clé de contrôle ne correspond pas) : '
+    + 'corrige-le dans Activité → Clients.');
 
   const lignesUtiles = facture.lignes.filter((l) => l.designation.trim() !== '');
   exiger(lignesUtiles.length > 0, 'designation',
@@ -495,7 +604,11 @@ export function amendeMentions(
  * de gabarit pourrait en faire disparaître une.
  */
 export function mentionsAPorter(facture: Facture): readonly string[] {
-  return mentionsDuRegime(regimeDeLaFacture(facture.emetteur, facture.destinataire));
+  return mentionsDuRegime(
+    regimeDeLaFacture(facture.emetteur, facture.destinataire),
+    facture.emiseLe,
+    facture.emetteur.optionTvaDebits === true
+  );
 }
 
 /**
@@ -506,11 +619,18 @@ export function mentionsAPorter(facture: Facture): readonly string[] {
  * qu'en émettant une facture. Même fonction que l'impression — un texte
  * recopié dans l'écran finirait par différer de celui qui part chez le client.
  */
-export function mentionsDuRegime(regime: RegimeFacture): readonly string[] {
+export function mentionsDuRegime(
+  regime: RegimeFacture, le: DateISO, optionTvaDebits = false
+): readonly string[] {
   const mentions: string[] = [];
 
   if (regime === 'franchise') {
-    mentions.push('TVA non applicable, article 293 B du CGI.');
+    mentions.push(mentionFranchise(le));
+  }
+  // Une des quatre mentions de la réforme. L'option n'a de sens que sur une
+  // facture qui porte de la TVA française : sans TVA, elle ne règle rien.
+  if (regime === 'tva_francaise' && optionTvaDebits) {
+    mentions.push('Option pour le paiement de la taxe d’après les débits.');
   }
   if (regime === 'autoliquidation_ue') {
     mentions.push(
@@ -527,6 +647,15 @@ export function mentionsDuRegime(regime: RegimeFacture): readonly string[] {
     + `${INDEMNITE_RECOUVREMENT.valeur} € pour frais de recouvrement `
     + '(articles L441-10 et L441-11 du code de commerce).'
   );
+  // Obligatoire même sans escompte (code de commerce, art. L441-9) : son
+  // absence est la mention la plus souvent relevée sur une facture d'indépendant.
+  mentions.push('Escompte pour paiement anticipé : néant.');
+  /* La nature des opérations, autre mention de la réforme (biens, services,
+     ou les deux). Un micro-BNC ne vend que des services : elle se dérive, et
+     s'imprime dès maintenant — l'écrire avant qu'elle soit exigée ne coûte
+     rien, l'oublier ensuite ferait rejeter la facture. L'adresse de livraison,
+     quatrième mention, ne vise que les livraisons de BIENS : sans objet ici. */
+  mentions.push('Nature des opérations : prestations de services.');
 
   return mentions;
 }

@@ -60,6 +60,7 @@ export function emetteurDe(faits: Faits, maintenant: Date = new Date()): Emetteu
     enFranchise: debutTva === null || dateDuJour(maintenant).slice(0, 7) < debutTva,
     // Ils existaient au schéma et n'atteignaient jamais le document : la
     // facture partait sans dire où payer.
+    optionTvaDebits: e.optionTvaDebits,
     iban: e.iban,
     bic: e.bic
   };
