@@ -31,25 +31,85 @@ const faitsCourants = (): Faits => useFaits.getState().faits;
 const avecRecettes = (actuel: Faits, recettes: readonly Recette[]): Faits =>
   ({ ...actuel, recettes });
 
+type SaisieRecette = Omit<Recette, 'id' | 'numero'> & { readonly numero?: string };
+
+const nouvelId = (): string =>
+  `rec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/**
+ * Le numéro d'une recette : celui fourni, sinon le suivant de l'année — sauf
+ * pour un BROUILLON, qui n'en reçoit pas.
+ *
+ * Un brouillon numéroté réservait son numéro : la facture émise entre-temps
+ * passait au-dessus. Abandonné, le brouillon laissait un trou au registre ;
+ * émis plus tard, il portait un numéro plus petit qu'une facture antérieure,
+ * et la chronologie que la numérotation doit montrer était rompue. Le numéro
+ * naît à l'émission, dans l'ordre des émissions (lot 29).
+ */
+function numeroDe(saisie: SaisieRecette, autres: readonly Recette[]): string {
+  const fourni = saisie.numero?.trim() ?? '';
+  if (fourni !== '' || (saisie.emiseLe === null && saisie.encaisseeLe === null)) return fourni;
+  const annee = Number((saisie.emiseLe ?? saisie.encaisseeLe ?? '').slice(0, 4)) || new Date().getFullYear();
+  return prochainNumero(autres, annee);
+}
+
 /**
  * Ajoute une recette. Le numéro est attribué ici s'il n'est pas fourni : la
  * continuité de la numérotation est une exigence du registre, pas une
- * commodité d'affichage.
+ * commodité d'affichage. Un brouillon n'en reçoit pas : voir `numeroDe`.
  */
-export function ajouterRecette(
-  saisie: Omit<Recette, 'id' | 'numero'> & { readonly numero?: string }
-): string {
+export function ajouterRecette(saisie: SaisieRecette): string {
   const actuel = faitsCourants();
-  const id = `rec-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const annee = Number((saisie.emiseLe ?? saisie.encaisseeLe ?? '')
-    .slice(0, 4)) || new Date().getFullYear();
-  const recette: Recette = {
-    ...saisie,
-    id,
-    numero: saisie.numero?.trim() || prochainNumero(actuel.recettes, annee)
-  };
+  const id = nouvelId();
+  const recette: Recette = { ...saisie, id, numero: numeroDe(saisie, actuel.recettes) };
   ecrireFaits(avecRecettes(actuel, [...actuel.recettes, recette]));
   return id;
+}
+
+/** Ce qu'un brouillon garde de la rédaction : tout, sauf la date et le numéro. */
+export type SaisieBrouillon = Pick<Recette, 'clientNom' | 'libelle' | 'montant' | 'tvaCollectee' | 'lignes'>;
+
+/**
+ * Enregistre la rédaction en BROUILLON — crée-le (`id` nul) ou remplace-le.
+ *
+ * Pas de numéro, pas de date d'émission : rien n'est sorti. Rend l'id du
+ * brouillon, ou un motif quand l'id désigne une facture déjà émise — la
+ * réécrire changerait un document qu'un client a peut-être déjà reçu.
+ */
+export function enregistrerBrouillon(
+  id: string | null, saisie: SaisieBrouillon
+): { readonly id: string } | { readonly motif: string } {
+  const actuel = faitsCourants();
+  const brouillon = { ...saisie, emiseLe: null, encaisseeLe: null, modeReglement: null, numero: '' };
+  if (id === null) {
+    const nouveau: Recette = { ...brouillon, id: nouvelId() };
+    ecrireFaits(avecRecettes(actuel, [...actuel.recettes, nouveau]));
+    return { id: nouveau.id };
+  }
+  const existant = actuel.recettes.find((r) => r.id === id);
+  if (existant === undefined) return { motif: 'Ce brouillon n’existe plus : il a été supprimé entre-temps.' };
+  if (existant.emiseLe !== null) return { motif: 'Cette facture a déjà été émise : elle ne redevient pas un brouillon.' };
+  ecrireFaits(avecRecettes(actuel, actuel.recettes.map((r) => (r.id === id ? { ...r, ...brouillon } : r))));
+  return { id };
+}
+
+/**
+ * Émet un brouillon enregistré, SOUS SON IDENTIFIANT.
+ *
+ * Ajouter une recette émise puis supprimer le brouillon aurait perdu ce qui
+ * lui est déjà rattaché — la pièce jointe — et, entre les deux écritures,
+ * compté la facture deux fois. Le numéro est attribué maintenant : c'est
+ * l'émission qui le fait naître.
+ */
+export function emettreBrouillon(id: string, saisie: SaisieRecette): string | null {
+  const actuel = faitsCourants();
+  const existant = actuel.recettes.find((r) => r.id === id);
+  if (existant === undefined) return 'Ce brouillon n’existe plus : il a été supprimé entre-temps.';
+  if (existant.emiseLe !== null) return 'Ce brouillon a déjà été émis.';
+  const autres = actuel.recettes.filter((r) => r.id !== id);
+  const emise: Recette = { ...existant, ...saisie, id, numero: numeroDe(saisie, autres) };
+  ecrireFaits(avecRecettes(actuel, actuel.recettes.map((r) => (r.id === id ? emise : r))));
+  return null;
 }
 
 /**

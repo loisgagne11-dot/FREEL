@@ -29,6 +29,11 @@
 
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
+/* Le pied des totaux : « Émettre » porte sa marge haute, et le second bouton,
+   étiré par la rangée, en prenait la hauteur — 56 px contre 44. Alignés par
+   le bas, les deux font 44. */
+.piedTotaux { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+
 .actionPrincipale {
   min-height: 44px;
   padding: 0 15px;

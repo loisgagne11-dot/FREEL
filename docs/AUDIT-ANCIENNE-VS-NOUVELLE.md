@@ -526,3 +526,9 @@ chiffre faux.
 | Revenir à un état précédent du compte | 🟢 nouveau | L'ancienne application écrasait sa ligne (`upsert`, dernier écrit gagne) sans rien garder. Le serveur garde les 20 états remplacés ; « Revenir à cet état » écrit le compte puis l'appareil, chacun gardant son filet |
 | Effacer ses données du compte | 🟢 | Emporte aussi les états précédents, relecture à l'appui |
 | Règles d'accès | 🟢 | Rôle connecté nommé, taille bornée, version imposée par le serveur. Actif une fois le SQL exécuté par le propriétaire |
+
+## Lot 29 (14/11) — « Enregistrer en brouillon »
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Garder une facture en cours de rédaction | 🟢 | L'ancienne gardait un brouillon numéroté. La nouvelle le garde avec ses lignes, sans numéro ; il se reprend depuis le facturier et s'émet sous son identifiant (pièce jointe comprise). Supprimer reste confirmé |

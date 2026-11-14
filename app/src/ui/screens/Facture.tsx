@@ -5,7 +5,7 @@ import { etatFacture, reediterFacture } from '../../state/selecteurs.facture';
 import styles from './Facture.module.css';
 import { useRoute } from '../useRoute';
 import { Apercu, useSortieDocument } from '../documents/Apercu';
-import { brouillonDeLaSousRoute } from '../adresseBrouillon';
+import { brouillonDeLaSousRoute, brouillonEnregistreDeLaSousRoute } from '../adresseBrouillon';
 
 /**
  * La rédaction et le document arrivent à la demande.
@@ -47,12 +47,15 @@ export function Facture() {
      depuis le brouillon du mois : voir `adresseBrouillon`. La clé force un
      nouvel état quand on passe d'un brouillon à un autre sans quitter l'écran. */
   const brouillon = sousRoute === null ? null : brouillonDeLaSousRoute(sousRoute);
-  if (sousRoute === 'nouvelle' || brouillon !== null) {
+  // `#/facture/reprendre:<id>` rouvre un brouillon ENREGISTRÉ (lot 29).
+  const enregistre = sousRoute === null ? null : brouillonEnregistreDeLaSousRoute(sousRoute);
+  if (sousRoute === 'nouvelle' || brouillon !== null || enregistre !== null) {
     return (
       <Suspense fallback={<EnAttente />}>
         <NouvelleFacture
           key={sousRoute}
           depuisBrouillon={brouillon}
+          brouillonEnregistre={enregistre}
           onListe={() => naviguerVers('activite', 'factures')}
         />
       </Suspense>

@@ -36,6 +36,7 @@ import { decalerMois } from '../../domain/calculs/periode';
 import styles from './Activite.module.css';
 import { Montant } from '../components/Montant';
 import { useRoute } from '../useRoute';
+import { sousRouteDuBrouillonEnregistre } from '../adresseBrouillon';
 
 /**
  * Les formulaires arrivent à l'ouverture de leur panneau.
@@ -823,6 +824,7 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
             <FacturierDiffere
               onNouvelle={() => naviguerVers('facture', 'nouvelle')}
               onRevoir={(numero) => naviguerVers('facture', encodeURIComponent(numero))}
+              onReprendre={(id) => naviguerVers('facture', sousRouteDuBrouillonEnregistre(id))}
               annee={annee}
               mois={mois}
               onMois={setMois}

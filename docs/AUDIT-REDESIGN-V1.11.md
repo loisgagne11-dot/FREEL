@@ -1228,3 +1228,16 @@ thèmes, serveur simulé (liste avec un état confirmé et un état d'un schéma
 postérieur ; table absente). Deux écarts corrigés au contrôle : le numéro
 d'enregistrement qui tombait seul à la ligne, le SQL qui repoussait son
 bouton.
+
+## Lot 29 (14/11) — « Enregistrer en brouillon »
+
+| Zone | Avant | Après |
+|---|---|---|
+| Rédaction › Totaux | « Émettre la facture » seul | « Enregistrer en brouillon » à côté (inactif sur une page vierge), puis « Enregistrer le brouillon » ; message sous les boutons. Les deux boutons alignés par le bas, 44 px chacun |
+| Rédaction rouverte | — | Titre « Brouillon de facture », client et lignes repris ; un brouillon disparu le dit |
+| Facturier, ligne d'un brouillon | « Supprimer le brouillon », « Joindre une pièce » | « Reprendre le brouillon » en tête ; « Sans numéro » à la place du numéro |
+
+Contrôle visuel à 390 px, deux thèmes, jeu de démonstration complété le temps
+de la capture d’un brouillon enregistré (capture ponctuelle, hors du script).
+Deux écarts corrigés au contrôle : un bouton étiré à 56 px par la rangée, et
+un brouillon déjà numéroté qui aurait été émis sous le numéro suivant.

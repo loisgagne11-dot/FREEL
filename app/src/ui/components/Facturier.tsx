@@ -130,8 +130,13 @@ const FILTRES: readonly { readonly id: StatutFacture | 'tout'; readonly libelle:
 const stockageParDefaut = stockageIndexedDB();
 
 export function Facturier(
-  { onNouvelle, onRevoir, stockage = stockageParDefaut, annee, mois, onMois }: {
+  { onNouvelle, onRevoir, onReprendre, stockage = stockageParDefaut, annee, mois, onMois }: {
     readonly onNouvelle: () => void;
+    /**
+     * Rouvre un brouillon enregistré dans la rédaction, par son identifiant
+     * (lot 29). Même règle que `onRevoir` : sans navigation, pas de bouton.
+     */
+    readonly onReprendre?: (id: string) => void;
     /**
      * Le mois de la barre du haut, et de quoi le changer : c'est le mois dont
      * le brouillon propose la facture. `undefined` retombe sur un état local —
@@ -223,7 +228,9 @@ export function Facturier(
 
   function jeter(f: FactureSuivie<Recette>): void {
     const motif = supprimerBrouillon(f.recette.id);
-    signaler(motif ?? 'Brouillon supprimé, son numéro est de nouveau libre.');
+    signaler(motif ?? (f.recette.numero === ''
+      ? 'Brouillon supprimé.'
+      : `Brouillon supprimé, son numéro ${f.recette.numero} est de nouveau libre.`));
   }
 
   return (
@@ -327,6 +334,7 @@ export function Facturier(
                   onRevoir={onRevoir === undefined || f.recette.numero === ''
                     ? undefined
                     : () => onRevoir(f.recette.numero)}
+                  onReprendre={onReprendre === undefined ? undefined : () => onReprendre(f.recette.id)}
                   onJustifier={() => setAJustifier(f)}
                 />
               ))}
@@ -397,7 +405,7 @@ export function Facturier(
 }
 
 function Ligne(
-  { facture, onEncaisser, onAnnuler, onJeter, onRelancer, onEnvoyer, onJustifier, onRevoir }: {
+  { facture, onEncaisser, onAnnuler, onJeter, onRelancer, onEnvoyer, onJustifier, onRevoir, onReprendre }: {
     readonly facture: FactureSuivie<Recette>;
     readonly onEncaisser: () => void;
     readonly onAnnuler: () => void;
@@ -406,6 +414,7 @@ function Ligne(
     readonly onEnvoyer: () => void;
     /** `undefined` quand le facturier est monté sans navigation. */
     readonly onRevoir?: (() => void) | undefined;
+    readonly onReprendre?: (() => void) | undefined;
     readonly onJustifier: () => void;
   }
 ) {
@@ -514,6 +523,14 @@ function Ligne(
             libelleGarder="Garder la facture"
             onConfirmer={onAnnuler}
           />
+        )}
+        {/* Un brouillon gardé se FINIT : sans ce chemin, « Enregistrer en
+            brouillon » rangeait la facture là où l'on ne pouvait que la
+            supprimer. */}
+        {onReprendre !== undefined && statut === 'brouillon' && (
+          <button type="button" className={styles.actionLigne} onClick={onReprendre}>
+            Reprendre le brouillon
+          </button>
         )}
         {statut === 'brouillon' && (
           <ConfirmationSurPlace
