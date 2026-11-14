@@ -122,6 +122,18 @@ describe('« Enregistrer en brouillon » dans la rédaction', () => {
     expect(recettes().find((x) => x.id === r.id)).toMatchObject({ numero: '2026-002', emiseLe: '2026-07-15', montant: 4000 });
   });
 
+  /** Un brouillon numéroté avant le lot 29 a réservé son numéro : émis sous le suivant, il laisserait un trou. */
+  it('un brouillon déjà numéroté s’émet sous SON numéro', async () => {
+    useFaits.setState({ faits: { ...useFaits.getState().faits, recettes: [...recettes(), {
+      id: 'r-ancien', clientNom: 'Client France', libelle: 'Cadrage', montant: euros(600),
+      emiseLe: null, encaisseeLe: null, modeReglement: null, numero: '2026-002', lignes: [LIGNE]
+    }, { ...EMISE, id: 'r-apres', numero: '2026-003' }] } });
+    const u = await rediger(`#/facture/${sousRouteDuBrouillonEnregistre('r-ancien')}`);
+    await u.click(screen.getByRole('button', { name: 'Émettre la facture' }));
+    await screen.findByRole('heading', { name: /Facture 2026-002/ });
+    expect(recettes().find((x) => x.id === 'r-ancien')?.numero).toBe('2026-002');
+  });
+
   it('un brouillon qui n’existe plus le dit, et repart d’une page vierge', async () => {
     await rediger(`#/facture/${sousRouteDuBrouillonEnregistre('rec-disparu')}`);
     expect(screen.getByText(/Ce brouillon n’existe plus/)).toBeTruthy();

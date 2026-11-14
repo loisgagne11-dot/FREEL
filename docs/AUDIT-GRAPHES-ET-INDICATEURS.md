@@ -789,3 +789,10 @@ l'outillage de test (vitest 3 → 4), pas le code servi. Les 2 627 tests passent
 | Date et numéro d'enregistrement d'un état précédent | Config › Compte, « États précédents du compte » | — | Heure du **serveur** au remplacement (jamais l'horloge d'un appareil) ; numéro = compteur d'écritures que portait l'état. 20 au plus |
 
 Aucun chiffre du dossier ne change.
+
+## Lot 29 (14/11) — « Enregistrer en brouillon »
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Numéro d'un brouillon | Factures, filtre « Brouillons » ; rédaction | Le numéro suivant, réservé dès la création | « Sans numéro » : il naît à l'émission. Un brouillon numéroté avant le lot garde le sien |
+| Numéro de la facture suivante | Rédaction, en-tête et document | Comptait les brouillons numérotés | Inchangé dans son calcul ; les nouveaux brouillons n'y pèsent plus |

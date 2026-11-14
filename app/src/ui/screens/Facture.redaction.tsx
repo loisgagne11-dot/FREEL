@@ -125,7 +125,14 @@ export function NouvelleFacture(
   const [emise, setEmise] = useState<ReturnType<typeof etatFacture> | null>(null);
 
   const sortie = useSortieDocument();
-  const numero = useMemo(() => numeroSuivant(faits), [faits]);
+  /*
+   * Un brouillon numéroté AVANT le lot 29 garde son numéro : il l'a réservé,
+   * et l'émettre sous le suivant laisserait ce numéro-là en trou au registre.
+   */
+  const numero = useMemo(
+    () => (enregistre !== null && enregistre.numero !== '' ? enregistre.numero : numeroSuivant(faits)),
+    [faits, enregistre]
+  );
   const client = faits.clients.find((c) => c.nom === clientNom);
 
   const facture: FactureDomaine = useMemo(() => ({
@@ -430,7 +437,7 @@ export function NouvelleFacture(
       <section className={styles.carte} aria-labelledby={`${idChamp}-totaux`}>
         <h2 id={`${idChamp}-totaux`} className={styles.titreCarte}>Totaux</h2>
         <Totaux etat={etat} />
-        <div className={styles.actions}>
+        <div className={styles.piedTotaux}>
           <button type="button" className={styles.actionPrincipale}
             disabled={!emissionPossible} onClick={emettre}>
             {emissionPossible ? 'Émettre la facture' : 'Compléter les mentions manquantes'}

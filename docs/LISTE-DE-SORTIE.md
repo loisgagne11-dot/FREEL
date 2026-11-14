@@ -83,8 +83,8 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 |---|---|---|---|
 | 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ✅ fusionné le 14/11 (PR #325) |
 | 2 | 56 | **Sécurité** — la chaîne qui publie est verrouillée | ✅ fusionné le 14/11 (PR #326) ; reste les réglages du dépôt (§6), au propriétaire |
-| 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ✅ fini le 14/11, PR #332 à fusionner ; le SQL reste à exécuter par le propriétaire |
-| 4 | 29 | « Enregistrer en brouillon » | ⬜ |
+| 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ✅ fusionné le 14/11 (PR #332) ; le SQL reste à exécuter par le propriétaire |
+| 4 | 29 | « Enregistrer en brouillon » | ✅ fini le 14/11, PR #335 à fusionner |
 | 5 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
 | 6 | 46 | Facture conforme 2026-2027 | ⬜ |
 | 7 | 33 | « Reste à sortir » : un seul total | ⬜ |
@@ -375,7 +375,7 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 
 | Ligne | État |
 |---|---|
-| L'éditeur de facture enregistre un brouillon avec ses lignes (schéma 20), sans réserver de numéro ; il se rouvre, s'émet ou se supprime (confirmé, lot 22) | ⬜ |
+| L'éditeur de facture enregistre un brouillon avec ses lignes (schéma 20), sans réserver de numéro ; il se rouvre, s'émet ou se supprime (confirmé, lot 22) | ✅ 14/11 — « Reprendre le brouillon » au facturier ; émis sous son identifiant (pièce jointe gardée) ; un brouillon numéroté avant le lot garde son numéro |
 
 ### Lot 30 — Derniers contrôles visuels
 
