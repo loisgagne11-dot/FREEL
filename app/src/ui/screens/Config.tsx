@@ -115,7 +115,7 @@ export function Config() {
     { id: 'profil', titre: 'Profil & statut', sousTitre: sousTitreProfil },
     { id: 'fiscal', titre: 'Paramètres fiscaux', sousTitre: 'Abattement, cotisations, TVA' },
     { id: 'reserve', titre: 'Réserve & versements', sousTitre: 'Matelas, seuil de sécurité' },
-    { id: 'facturation', titre: 'Facturation', sousTitre: 'RIB, mentions' },
+    { id: 'facturation', titre: 'Facturation', sousTitre: 'RIB, mentions, plateforme agréée' },
     { id: 'livre', titre: 'Livre des recettes', sousTitre: 'Registre obligatoire' },
     { id: 'compte', titre: 'Compte & synchronisation', sousTitre: 'Multi-appareils · pièces' },
     { id: 'donnees', titre: 'Données & export', sousTitre: 'Livre CSV, sauvegarde, restauration' }

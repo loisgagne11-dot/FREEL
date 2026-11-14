@@ -796,3 +796,12 @@ Aucun chiffre du dossier ne change.
 |---|---|---|---|
 | Numéro d'un brouillon | Factures, filtre « Brouillons » ; rédaction | Le numéro suivant, réservé dès la création | « Sans numéro » : il naît à l'émission. Un brouillon numéroté avant le lot garde le sien |
 | Numéro de la facture suivante | Rédaction, en-tête et document | Comptait les brouillons numérotés | Inchangé dans son calcul ; les nouveaux brouillons n'y pèsent plus |
+
+## Lot 46 (14/11) — facture conforme 2026-2027
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| SIREN du client | Document de facture | — (SIRET seul) | Dérivé du SIRET, contrôlé par la clé de Luhn ; absent s'il ne se contrôle pas — et l'émission est alors bloquée |
+| Référence de commande | Document de facture, rédaction | — | Celle de la mission (plusieurs missions : toutes), figée sur la recette |
+
+Aucun montant ne change.

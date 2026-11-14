@@ -532,3 +532,11 @@ chiffre faux.
 | Fonction | Verdict | Détail |
 |---|---|---|
 | Garder une facture en cours de rédaction | 🟢 | L'ancienne gardait un brouillon numéroté. La nouvelle le garde avec ses lignes, sans numéro ; il se reprend depuis le facturier et s'émet sous son identifiant (pièce jointe comprise). Supprimer reste confirmé |
+
+## Lot 46 (14/11) — facture conforme 2026-2027 (schéma 22)
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Mentions légales de la facture | 🟢 | L'ancienne imprimait « 293 B du CGI » en dur. La nouvelle date la mention (CIBS au 01/01/2027, hypothèse sourcée), accole « EI », porte l'escompte, la nature des opérations, l'option débits et le SIREN du client |
+| Référence de commande | 🟢 nouveau | Portée par la mission, reprise et figée sur chaque facture |
+| Facturation électronique : réception | 🟢 | Rappel devenu état : « ma plateforme agréée » en Réglages l'éteint |

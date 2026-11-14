@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 14 novembre 2026.** Schéma des faits : v21 (lot 28, fusionné le 14/11).
+**Date : 14 novembre 2026.** Schéma des faits : v21 en ligne, v22 livré par le lot 46 (PR #336).
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -84,9 +84,9 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ✅ fusionné le 14/11 (PR #325) |
 | 2 | 56 | **Sécurité** — la chaîne qui publie est verrouillée | ✅ fusionné le 14/11 (PR #326) ; reste les réglages du dépôt (§6), au propriétaire |
 | 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ✅ fusionné le 14/11 (PR #332) ; le SQL reste à exécuter par le propriétaire |
-| 4 | 29 | « Enregistrer en brouillon » | ✅ fini le 14/11, PR #335 à fusionner |
+| 4 | 29 | « Enregistrer en brouillon » | ✅ fusionné le 14/11 (PR #335) |
 | 5 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
-| 6 | 46 | Facture conforme 2026-2027 | ⬜ |
+| 6 | 46 | Facture conforme 2026-2027 | ✅ fini le 14/11, PR #336 à fusionner (schéma 22) |
 | 7 | 33 | « Reste à sortir » : un seul total | ⬜ |
 | 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ⬜ |
 | 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ⬜ |
@@ -126,10 +126,11 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 
 | Ligne | État |
 |---|---|
-| Mention de franchise : « TVA non applicable, art. L. 223 et s. du code des impositions sur les biens et services (CIBS) », applicable depuis le 01/09/2026 ; l'ancienne (293 B du CGI) tolérée jusqu'au 31/12/2027. Datée et sourcée dans le barème (Service public, F23208) | ⬜ |
-| « Entrepreneur individuel » ou « EI » accolé au nom ; « Escompte pour paiement anticipé : néant » ; référence de commande portée par la mission et reprise sur chaque facture | ⬜ |
-| Fait « ma plateforme agréée » (nom, depuis le) en Réglages ; le rappel « réception obligatoire » devient un état, plus un compte à rebours | ⬜ |
-| Champs des quatre mentions du 01/09/2027, saisis dès maintenant et imprimés à la date : SIREN du client (dérivé du SIRET, contrôlé), adresse de livraison si différente, nature de l'opération, option pour la TVA sur les débits | ⬜ |
+| Mention de franchise : « TVA non applicable, art. L. 223 et s. du code des impositions sur les biens et services (CIBS) », applicable depuis le 01/09/2026 ; l'ancienne (293 B du CGI) tolérée jusqu'au 31/12/2027. Datée et sourcée dans le barème (Service public, F23208) | ✅ 14/11 — **les sources officielles divergent** (impots.gouv.fr du 14/10/2026 : « L. 223-3 », au 01/01/2027) : 293 B jusqu'au 31/12/2026, juste dans les deux lectures, puis la formule DGFiP en `hypothese` |
+| Revérifier la formule CIBS sur Légifrance ou le BOFiP **avant le 01/01/2027**, et passer `MENTIONS_FRANCHISE` en `publie` | ⬜ |
+| « Entrepreneur individuel » ou « EI » accolé au nom ; « Escompte pour paiement anticipé : néant » ; référence de commande portée par la mission et reprise sur chaque facture | ✅ 14/11 — « EI » dérivé, sans doublon ; référence figée sur la recette à l'émission |
+| Fait « ma plateforme agréée » (nom, depuis le) en Réglages ; le rappel « réception obligatoire » devient un état, plus un compte à rebours | ✅ 14/11 — Réglages › Facturation ; le rappel reste tant qu'elle manque |
+| Champs des quatre mentions du 01/09/2027, saisis dès maintenant et imprimés à la date : SIREN du client (dérivé du SIRET, contrôlé), adresse de livraison si différente, nature de l'opération, option pour la TVA sur les débits | ✅ 14/11 — imprimées **dès maintenant** (les sources ne s'accordent pas sur la date ; les porter plus tôt ne coûte rien) ; l'adresse de livraison ne vise que les biens : sans objet pour un BNC ; un SIRET client illisible bloque l'émission |
 
 ### Lot 35 — Mis de côté pour l'impôt (redéfini, décision 17)
 

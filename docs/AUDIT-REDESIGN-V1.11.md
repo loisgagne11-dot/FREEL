@@ -1241,3 +1241,17 @@ Contrôle visuel à 390 px, deux thèmes, jeu de démonstration complété le te
 de la capture d’un brouillon enregistré (capture ponctuelle, hors du script).
 Deux écarts corrigés au contrôle : un bouton étiré à 56 px par la rangée, et
 un brouillon déjà numéroté qui aurait été émis sous le numéro suivant.
+
+## Lot 46 (14/11) — facture conforme 2026-2027
+
+| Zone | Avant | Après |
+|---|---|---|
+| Document de facture | Nom seul ; trois mentions | « Nom EI » ; mentions datées, escompte, nature des opérations, option débits s'il y a lieu ; « SIREN … · SIRET … » pour le client ; « Référence de commande … » sous les dates |
+| Rédaction › Destinataire | Client, date | + « Référence de commande » (facultative, préremplie depuis la mission) |
+| Mission (formulaire) | — | « Référence de commande du client » |
+| Réglages › Facturation | IBAN, BIC, mentions | + « Ma plateforme agréée » (et « Inscrit depuis le ») ; case « option débits » hors franchise ; sous-titre de section « RIB, mentions, plateforme agréée » |
+| Pilote › Décisions | « Réception obligatoire », se taisait un mois après le 01/09 | Reste tant que la plateforme manque, lien « Renseigner ma plateforme » |
+
+Contrôle visuel à 390 px, deux thèmes : rédaction (document), Réglages ›
+Facturation, Pilote. Écart corrigé avant livraison : le lien d'action du
+rappel débordait le Pilote (381 px, contrôle responsive).
