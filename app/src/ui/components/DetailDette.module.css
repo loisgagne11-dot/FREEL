@@ -121,8 +121,13 @@
   color: var(--text);
   /* Le mois vient du domaine en minuscule, comme on l'écrit au milieu d'une
      phrase. En tête de ligne, la capitale est une mise en forme — elle ne
-     devient jamais une valeur stockée. */
-  text-transform: capitalize;
+     devient jamais une valeur stockée. La PREMIÈRE lettre seulement :
+     `capitalize` en mettait une à chaque mot, « CA Encaissé En 2026-04 ». */
+  display: block;
+}
+
+.ligneLibelle::first-letter {
+  text-transform: uppercase;
 }
 
 .ligneMeta {

@@ -153,7 +153,8 @@ function Ligne({ ligne }: { readonly ligne: LigneDette }) {
   return (
     <li className={`${styles.ligne} ${styles[ligne.statut]}`}>
       <span className={styles.ligneTexte}>
-        <span className={styles.ligneLibelle}>{ligne.libelle}</span>
+        {/* Le mois en toutes lettres : « 2026-04 » est une clé, pas un mot. */}
+        <span className={styles.ligneLibelle}>{ligne.libelle.replace(ligne.mois, moisLong(ligne.mois))}</span>
         <span className={styles.ligneMeta}>
           <span className={`${styles.statut} ${styles[`statut_${ligne.statut}`]}`}>
             {LIBELLE_STATUT[ligne.statut]}

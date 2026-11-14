@@ -540,3 +540,9 @@ chiffre faux.
 | Mentions légales de la facture | 🟢 | L'ancienne imprimait « 293 B du CGI » en dur. La nouvelle date la mention (CIBS au 01/01/2027, hypothèse sourcée), accole « EI », porte l'escompte, la nature des opérations, l'option débits et le SIREN du client |
 | Référence de commande | 🟢 nouveau | Portée par la mission, reprise et figée sur chaque facture |
 | Facturation électronique : réception | 🟢 | Rappel devenu état : « ma plateforme agréée » en Réglages l'éteint |
+
+## Lot 33 (14/11) — « Reste à sortir » : un seul total
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Détail d'une dette par nature | 🟢 | L'ancienne n'avait pas de détail. La nouvelle en avait un dont le total différait de la vignette pour l'impôt, la TVA et la CFP ; il lit désormais la même source |

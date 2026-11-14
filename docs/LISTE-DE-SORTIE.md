@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 14 novembre 2026.** Schéma des faits : v21 en ligne, v22 livré par le lot 46 (PR #336).
+**Date : 14 novembre 2026.** Schéma des faits : v22 (lot 46, fusionné le 14/11).
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -86,8 +86,8 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ✅ fusionné le 14/11 (PR #332) ; le SQL reste à exécuter par le propriétaire |
 | 4 | 29 | « Enregistrer en brouillon » | ✅ fusionné le 14/11 (PR #335) |
 | 5 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
-| 6 | 46 | Facture conforme 2026-2027 | ✅ fini le 14/11, PR #336 à fusionner (schéma 22) |
-| 7 | 33 | « Reste à sortir » : un seul total | ⬜ |
+| 6 | 46 | Facture conforme 2026-2027 | ✅ fusionné le 14/11 (PR #336, schéma 22) |
+| 7 | 33 | « Reste à sortir » : un seul total | ✅ fini le 14/11, PR #337 à fusionner |
 | 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ⬜ |
 | 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ⬜ |
 | 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ⬜ |
@@ -413,8 +413,8 @@ l'affichage et la reprise.
 
 | Ligne | État |
 |---|---|
-| Une seule source (`resteASortir`) : URSSAF et CFP, TVA, impôt sur le revenu, CFE, appelés ou courus ; ventilée par nature | ⬜ |
-| La vignette et le détail de la dette lisent ce même total ; test d'accord | ⬜ |
+| Une seule source (`resteASortir`) : URSSAF et CFP, TVA, impôt sur le revenu, CFE, appelés ou courus ; ventilée par nature | ✅ 14/11 — le total de provisions du Pilote et sa ventilation ; le détail le lit, ses lignes l'expliquent (IR et TVA courue « dont », compris) |
+| La vignette et le détail de la dette lisent ce même total ; test d'accord | ✅ 14/11 — nature par nature, sur les deux jeux complets ; un écart restant s'affiche |
 
 ### Lot 34 — La frise aux dates officielles
 
@@ -422,7 +422,7 @@ l'affichage et la reprise.
 |---|---|
 | Jalons réglementaires dans la frise (et plus seulement les échéances saisies), aux dates du relevé ci-dessus, source citée dans le code, report au jour ouvré | ⬜ |
 | TVA : calendrier de la CA3 (entreprise individuelle par initiale), fin du régime simplifié au 01/01/2027 ; TVA autoliquidée d'un franchisé à la date de la CA3, en hypothèse dite | ⬜ |
-| Barèmes restants de L10 : profil CIPAV (demande un type d'activité au schéma), plafond de revenu fiscal de référence du versement libératoire, seuils de TVA spécifiques ; **mention « article 293 B du CGI » à remplacer par « TVA non applicable, art. L. 223 et s. du code des impositions sur les biens et services (CIBS) »** — date corrigée le 12/11 sur la fiche officielle (Service public, F23208, vérifiée le 07/08/2026) : la nouvelle mention s'applique **depuis le 01/09/2026**, l'ancienne reste tolérée **jusqu'au 31/12/2027**. Plus d'échéance au 1er janvier ; à relire sur la fiche au moment de coder | ⬜ |
+| Barèmes restants de L10 : profil CIPAV (demande un type d'activité au schéma), plafond de revenu fiscal de référence du versement libératoire, seuils de TVA spécifiques ; mention de franchise : **faite au lot 46** (datée, sources divergentes, revérification avant le 01/01/2027) | ⬜ |
 
 ### Lots 35 à 45 — Le reste, sans coupe
 
@@ -762,7 +762,7 @@ que le versable retient pourtant.
 | Pilote, composition, enveloppes et dette tombent d'accord (test d'accord) | ✅ fait, TVA et impôt |
 | Rappel de déclaration de la TVA autoliquidée à une date précise | ⬜ → lot 34 : aucune échéance propre au franchisé n'est publiée ; calendrier de la CA3 en hypothèse (relevé du 11/11) |
 | Le dossier de déclaration de TVA du trimestre (`dossierTvaDuTrimestre`) ignore la TVA autoliquidée d'un franchisé devenu redevable en cours d'année | ✅ lot 15 |
-| « Reste à sortir » du détail de la dette ne compte que l'appelé : l'impôt sur le revenu et la TVA s'affichent à côté, en blocs | ⬜ → lot 33, tranché le 11/11 (décision 8) |
+| « Reste à sortir » du détail de la dette ne compte que l'appelé : l'impôt sur le revenu et la TVA s'affichent à côté, en blocs | ✅ lot 33 (14/11) |
 
 ### Lot 14 — Les écrans s'ouvrent d'un coup (priorité 3 : le contrôle de vitesse échouait une fois sur deux)
 

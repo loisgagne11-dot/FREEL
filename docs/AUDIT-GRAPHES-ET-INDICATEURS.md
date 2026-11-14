@@ -805,3 +805,13 @@ Aucun chiffre du dossier ne change.
 | Référence de commande | Document de facture, rédaction | — | Celle de la mission (plusieurs missions : toutes), figée sur la recette |
 
 Aucun montant ne change.
+
+## Lot 33 (14/11) — « Reste à sortir » : un seul total
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Reste à sortir, impôt | Argent › enveloppe « Impôt », détail | Lignes × taux complet (CFP comprise), impôt sur le revenu « en plus des lignes » : un autre chiffre que la vignette | Le total de la vignette ; lignes au taux hors CFP ; l'impôt sur le revenu de l'année « dont », compris |
+| Reste à sortir, TVA | Détail « TVA » | Appels seuls | + « dont TVA collectée, pas encore déclarée » |
+| Reste à sortir, CFP | Détail « CFP » | 0 € (appels seuls) | Estimée mois par mois, comme la vignette |
+| Reste à sortir, URSSAF et CFE | Détails | Déjà d'accord | Inchangé, désormais lu de la source |
+| Écart entre le total et les lignes | Détail | — | Affiché s'il dépasse un centime (faute de calcul, jamais absorbée) |
