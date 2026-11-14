@@ -297,6 +297,43 @@
 .declarationLimite { color: var(--amber); }
 .declarationRetard { color: var(--red); }
 
+/* La date de déclaration : « le » et son champ, au gabarit du bouton voisin
+   (34 px) plutôt qu'à celui d'un formulaire — c'est une précision sur une
+   ligne, pas une saisie à part. */
+.declarationDate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.declarationDate input {
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.declarationDate input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+/* La suite du cycle — « payée le … », « à payer avant le … » — dans le rang
+   des gestes : les tons de la limite, sans leur retour à la ligne. */
+.declarationSuite,
+.declarationSuiteAFaire,
+.declarationSuiteRetard {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.declarationSuiteAFaire { color: var(--amber); font-weight: 560; }
+.declarationSuiteRetard { color: var(--red); font-weight: 560; }
+
 /* En paysage, le geste et son libellé tiennent sur un rang : la liste est
    une suite de décisions courtes, pas un tableau à parcourir. */
 @media (min-width: 761px) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros } from '../types';
+import { estATraiter } from './banque.etat';
 import {
   type EcritureRapprochable, type MouvementBancaire,
   candidatsPour, empreinteMouvement, importerMouvements, resumerRapprochement,
@@ -12,7 +13,7 @@ const ligne = (date: string, libelle: string, montant: number) =>
 function mouvement(m: Partial<MouvementBancaire> = {}): MouvementBancaire {
   return {
     id: 'mvt-1', date: dateISO('2026-07-16'), libelle: 'PRLV ABONNEMENT',
-    montant: euros(-120), rapprocheAvec: null, sansContrepartie: null, ...m
+    montant: euros(-120), rapprocheAvec: null, sansContrepartie: null, ignoree: false, ...m
   };
 }
 
@@ -143,7 +144,7 @@ describe('candidats de rapprochement', () => {
 
   it('n’en propose aucune pour un mouvement déjà tranché', () => {
     expect(candidatsPour(mouvement({ rapprocheAvec: 'dep-1' }), [ecriture()])).toEqual([]);
-    expect(candidatsPour(mouvement({ sansContrepartie: 'autre' }), [ecriture()])).toEqual([]);
+    expect(candidatsPour(mouvement({ sansContrepartie: 'autre', ignoree: false }), [ecriture()])).toEqual([]);
   });
 
   it('met la date la plus proche en tête', () => {
@@ -179,7 +180,7 @@ describe('résumé du rapprochement', () => {
   // éternellement « à traiter », et l'écran finirait par ne plus être regardé.
   it('compte à part ce que l’utilisateur a déclaré sans contrepartie', () => {
     const resume = resumerRapprochement([
-      mouvement({ id: 'frais', sansContrepartie: 'autre' }),
+      mouvement({ id: 'frais', sansContrepartie: 'autre', ignoree: false }),
       mouvement({ id: 'fait', rapprocheAvec: 'dep-1' })
     ], []);
     expect(resume).toMatchObject({ sansContrepartie: 1, rapproches: 1, sansCandidat: 0 });
@@ -187,5 +188,22 @@ describe('résumé du rapprochement', () => {
 
   it('sur un relevé vide, ne compte rien', () => {
     expect(resumerRapprochement([], [])).toMatchObject({ total: 0, sansCandidat: 0 });
+  });
+});
+
+/** Ignorée, une ligne sort de la file : ni candidate au rapprochement, ni « à traiter ». */
+describe('rapprochement — l’opération ignorée', () => {
+  it('n’est plus à traiter, et ne se voit proposer aucune écriture', () => {
+    const m = mouvement({ ignoree: true });
+    expect(estATraiter(m)).toBe(false);
+    expect(candidatsPour(m, [ecriture()])).toEqual([]);
+  });
+
+  it('se compte à part, hors des « sans contrepartie »', () => {
+    const resume = resumerRapprochement([
+      mouvement({ id: 'livret', ignoree: true }),
+      mouvement({ id: 'frais', sansContrepartie: 'autre' })
+    ], []);
+    expect(resume).toMatchObject({ ignorees: 1, sansContrepartie: 1, sansCandidat: 0 });
   });
 });

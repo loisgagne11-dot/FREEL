@@ -15,6 +15,7 @@
  */
 
 import { type MouvementBancaire, candidatsPour } from '../domain/calculs/banque';
+import { estATraiter } from '../domain/calculs/banque.etat';
 import { type Periode, dansLaPeriode } from '../domain/calculs/periode';
 import { rapprochementEffectif } from '../domain/calculs/depenses';
 import { contexteDepense, ecrituresRapprochables, type EtatAchats } from './selecteurs.achats';
@@ -77,8 +78,7 @@ export function fournisseurDepuisLibelle(libelle: string): string {
     .join(' ');
 }
 
-const estEnAttente = (m: MouvementBancaire): boolean =>
-  m.rapprocheAvec === null && m.sansContrepartie === null;
+const estEnAttente = estATraiter;
 
 /**
  * Ce qui reste à traiter entre le relevé et les dépenses, sur la période.

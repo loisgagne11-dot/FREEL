@@ -18,6 +18,7 @@ import type { Depense } from '../domain/calculs/depenses';
 import type { PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import type { MouvementBancaire } from '../domain/calculs/banque';
+import type { PeriodeDeclaree } from '../domain/calculs/declarations.declarees';
 import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
 import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
@@ -34,7 +35,7 @@ import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 20 as const;
+export const VERSION_SCHEMA = 21 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -567,8 +568,12 @@ export interface Faits {
    * passer.
    */
   readonly objectifCaAnnuel: Euros | null;
-  /** Mois dont la déclaration a été faite. Opère la bascule entre volets de provisions. */
-  readonly periodesDeclarees: readonly Mois[];
+  /**
+   * Les mois dont la déclaration a été faite, chacun avec sa date (schéma 21 ;
+   * une liste de mois nus jusque-là). Opère la bascule entre volets de
+   * provisions. Voir `PeriodeDeclaree` pour ce que vaut une date `null`.
+   */
+  readonly periodesDeclarees: readonly PeriodeDeclaree[];
   /**
    * Les échéances émises : appels de cotisations, avis d'impôt, CFE.
    *
@@ -804,7 +809,9 @@ const illisible = (cle: string, i: number): string =>
  * manuel du stockage en sortait — en effaçant tout.
  *
  * Les listes d'enregistrements le sont à toutes les versions. Deux exceptions
- * de forme : `periodesDeclarees` est une liste de mois (des chaînes), et
+ * de forme : `periodesDeclarees` a été une liste de mois (des chaînes)
+ * jusqu'au schéma 20 — la migration les convertit, il ne faut donc pas les
+ * refuser avant elle ; au schéma courant, chaque élément porte son mois —, et
  * `conges` a été une liste de dates nues jusqu'au schéma 1 — la migration les
  * convertit, il ne faut donc pas les refuser avant elle.
  *
@@ -832,7 +839,14 @@ function motifRefusElements(o: Record<string, unknown>, version: number): string
   }
   const declarees = o['periodesDeclarees'];
   if (Array.isArray(declarees)) {
-    const i = declarees.findIndex((m) => typeof m !== 'string');
+    /* Au schéma courant, plus rien ne reconstruit la liste : un mois nu y
+       passerait pour une période dont `mois` vaut `undefined`, que la règle
+       ne retrouverait jamais — la période redeviendrait « à déclarer » et sa
+       dette, provisionnée une seconde fois, sans un mot. */
+    const lisible = (m: unknown): boolean => (version === VERSION_SCHEMA
+      ? estEnregistrement(m) && typeof (m as { mois?: unknown }).mois === 'string'
+      : typeof m === 'string' || estEnregistrement(m));
+    const i = declarees.findIndex((m) => !lisible(m));
     if (i !== -1) return illisible('periodesDeclarees', i);
   }
 

@@ -126,15 +126,17 @@ export function recalerDemonstration(faits: Faits, aujourdhui: DateISO): Faits {
   ).filter((p) => p.close);
 
   const veille = decalerDate(aujourdhui, -1);
+  // Déclarée et payée d'un geste, deux jours avant la limite — ou hier si la
+  // limite n'est pas encore passée.
+  const faiteLe = (limite: DateISO): DateISO =>
+    dateISO(limite < aujourdhui ? decalerDate(limite, -2) : veille);
   const paiements: Echeance[] = closes.flatMap((p) => {
     // Le montant que le Pilote annonce pour la déclaration : une seule règle.
     const calcul = montantDeclaration(avecRecettes, p.mois);
     const montant = calcul.statut === 'refuse' ? 0 : calcul.valeur;
     if (montant <= 0) return [];
     const limite = p.limite;
-    // Payée deux jours avant la limite, ou hier si la limite n'est pas
-    // encore passée : une période close se déclare et se paie d'un geste.
-    const payee = dateISO(limite < aujourdhui ? decalerDate(limite, -2) : veille);
+    const payee = faiteLe(limite);
     return [{
       id: `ech-urssaf-${p.id}`, nature: 'urssaf', montant: euros(montant),
       echeanceLe: limite, payeeLe: payee, montantPaye: euros(montant)
@@ -163,7 +165,9 @@ export function recalerDemonstration(faits: Faits, aujourdhui: DateISO): Faits {
 
   return {
     ...avecRecettes,
-    periodesDeclarees: closes.flatMap((p) => p.mois).sort(),
+    periodesDeclarees: closes
+      .flatMap((p) => p.mois.map((m) => ({ mois: m, declareeLe: faiteLe(p.limite) })))
+      .sort((a, b) => a.mois.localeCompare(b.mois)),
     echeances: [...decale.echeances.filter((e) => e.nature !== 'urssaf'), ...paiements, ...cfe]
   };
 }

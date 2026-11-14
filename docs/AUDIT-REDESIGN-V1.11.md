@@ -1187,3 +1187,22 @@ Le handoff n'a ni ce formulaire ni ce tableau ; la frise du handoff ne montre
 aucun cas de jalons rapprochés. Contrôle visuel : sondes dans les deux thèmes
 et à 390 px (frise, pli mois par mois, formulaire de l'avis).
 
+
+## Lot 28 (13/11) — déclaration datée, opération ignorée
+
+| Zone | Avant | Après |
+|---|---|---|
+| Argent › Échéancier, Périodes URSSAF | Pastille « Déclarée » et « Annuler » | Pastille « Déclarée », « le » et un champ de date ; dessous, « payée le … » ou « à payer avant / depuis le … » ; « Annuler la déclaration » — « Annuler » seul, collé à « payée le … », se lisait « annuler le paiement » |
+| Achats › Relevé, une opération à traiter | Rémunération, sans contrepartie | Un troisième geste, « Ignorer » ; l'aide de la carte dit la différence avec « sans contrepartie » |
+| Achats › Relevé, une opération ignorée | — | « Ignorée — ne compte pas dans ton solde » et « Reprendre » |
+
+Pas de maquette pour le relevé ; l'échéancier sera redessiné au lot 53 d'après
+`design/direction/obligations.html`, qui dit aussi l'avance ou le retard
+(« deux jours avant la limite »). Contrôle visuel à 390 px, deux thèmes, sur
+un jeu de démonstration complété le temps de la capture d'une ligne ignorée,
+d'une ligne à traiter et d'une période à date inconnue. Les captures se
+prennent désormais en français : le navigateur du bac à sable photographiait
+les champs de date « mm/dd/yyyy ». Le relevé a sa capture (`achats-releve`).
+
+Relevé en passant, hors du lot : les opérations du relevé ne sont pas triées
+par date (ordre d'import) — à reprendre au lot 55 (listes).

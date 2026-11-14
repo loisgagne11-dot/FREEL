@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { periodesADeclarer } from '../domain/calculs/declarations';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import { ecritureDAnnulation } from '../domain/calculs/ecritureRecette';
 import type { EcritureRecette } from '../domain/calculs/livreRecettes';
 import { type DateISO, type Mois, dateISO, euros, mois } from '../domain/types';
@@ -376,7 +377,8 @@ describe('les périodes à déclarer', () => {
     const sujet = aTraiter(faits, date).find((s) => s.id === 'periodes-a-declarer');
     const debut = faits.entreprise.debutActivite;
     const echeancier = periodesADeclarer(
-      recettesEncaissees(faits), faits.entreprise.urssafPeriodicite, faits.periodesDeclarees,
+      recettesEncaissees(faits), faits.entreprise.urssafPeriodicite,
+      moisDeclares(faits.periodesDeclarees),
       dateDuJour(date), debut === null ? null : debut.slice(0, 7) as Mois
     ).filter((p) => p.close && !p.declaree);
     expect(sujet?.nombre ?? 0).toBe(echeancier.length);
@@ -394,7 +396,10 @@ describe('les périodes à déclarer', () => {
   it('s’éteint quand on déclare le trimestre proposé', () => {
     const declare = {
       ...jeu,
-      periodesDeclarees: [...jeu.periodesDeclarees, '2026-07', '2026-08', '2026-09'] as Mois[]
+      periodesDeclarees: [
+        ...jeu.periodesDeclarees,
+        ...(['2026-07', '2026-08', '2026-09'] as Mois[]).map((m) => ({ mois: m, declareeLe: null }))
+      ]
     };
     expect(aTraiter(declare, le(2026, 12, 15)).some((s) => s.id === 'periodes-a-declarer')).toBe(false);
   });

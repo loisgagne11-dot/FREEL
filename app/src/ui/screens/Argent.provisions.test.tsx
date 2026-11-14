@@ -332,7 +332,7 @@ describe('le détail d’une enveloppe', () => {
     const panneau = within(await screen.findByRole('dialog'));
     await utilisateur().click(panneau.getByRole('button', { name: 'Marquer déclaré' }));
 
-    expect(useFaits.getState().faits.periodesDeclarees).toEqual(['2026-05']);
+    expect(useFaits.getState().faits.periodesDeclarees.map((p) => p.mois)).toEqual(['2026-05']);
   });
 
   /**

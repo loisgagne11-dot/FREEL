@@ -86,6 +86,6 @@ export function faitsAu(faits: Faits, date: Date): Faits {
       .filter((e) => e.echeanceLe <= jour)
       .map((e) => (e.payeeLe !== null && e.payeeLe > jour ? { ...e, payeeLe: null } : e)),
     mouvementsBancaires: faits.mouvementsBancaires.filter((m) => m.date <= jour),
-    periodesDeclarees: faits.periodesDeclarees.filter((m) => m < moisDuJour)
+    periodesDeclarees: faits.periodesDeclarees.filter((p) => p.mois < moisDuJour)
   };
 }

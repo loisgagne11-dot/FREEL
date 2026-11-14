@@ -145,7 +145,7 @@ describe('la composition du solde reste collée au calcul du solde', () => {
   });
   const mouvement = (montant: number): MouvementBancaire => ({
     id: 'm1', date: dateISO('2026-03-02'), libelle: 'frais',
-    montant: euros(montant), rapprocheAvec: null, sansContrepartie: 'autre'
+    montant: euros(montant), rapprocheAvec: null, sansContrepartie: 'autre', ignoree: false
   });
 
   it('rend une colonne qui somme au montant que le calcul annonce', () => {

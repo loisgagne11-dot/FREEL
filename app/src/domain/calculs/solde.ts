@@ -40,7 +40,7 @@
  * COMMENT ÇA ÉVITE LE DOUBLE COMPTAGE — Y COMPRIS PENDANT LE RAPPROCHEMENT
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Un mouvement bancaire a trois états, mutuellement exclusifs par
+ * Un mouvement bancaire a quatre états, mutuellement exclusifs par
  * construction (voir `MouvementBancaire`) :
  *
  *   - RAPPROCHÉ (`rapprocheAvec` posé)   : sa somme est DÉJÀ comptée, via le
@@ -52,6 +52,10 @@
  *     déjà compté ou représente un mouvement inconnu. Le compter par défaut
  *     recréerait exactement le risque que ce calcul doit éviter ; l'écran
  *     Relevé existe pour lever cette ambiguïté, pas ce module.
+ *   - IGNORÉ (`ignoree`) : l'utilisateur a dit que la ligne ne regarde pas
+ *     l'activité — un virement vers un autre de ses comptes. Elle ne compte
+ *     pas : c'est précisément ce qui la distingue de « sans contrepartie ».
+ *     Classée, elle ne retient plus le solde dans l'état « dérivé ».
  *
  * Seul le second cas contribue au solde. Le premier est exclu — le fait
  * associé porte déjà sa valeur. Le troisième est exclu aussi, ce qui répond
@@ -62,6 +66,7 @@
 
 import { type DateISO, type Euros, euros } from '../types';
 import type { MouvementBancaire } from './banque';
+import { estATraiter } from './banque.etat';
 import { soldeBancaire } from './banque.solde';
 import type { Depense } from './depenses';
 import { type Echeance, type RecetteEncaissee, estPayee } from './provisions';
@@ -222,9 +227,7 @@ export function provenanceSolde(
 
   if (!aDesFaits && !aUnReleve) return 'saisi';
 
-  const toutClasse = mouvements.every(
-    (m) => m.rapprocheAvec !== null || m.sansContrepartie !== null
-  );
+  const toutClasse = mouvements.every((m) => !estATraiter(m));
   if (aUnReleve && toutClasse) return 'rapproche';
 
   return 'derive';
@@ -290,9 +293,16 @@ export function soldeDerive(
    * leur fait, les « à traiter » restent ambigus, seuls les « sans
    * contrepartie » s'ajoutent au brut.
    */
+  /*
+   * Une opération IGNORÉE reste dehors dans les deux cas. Sans date, « tous
+   * les mouvements » la reprenait : 5 000 € virés sur un livret et écartés
+   * par l'utilisateur faisaient baisser le solde du relevé seul, quand le même
+   * geste ne changeait rien dès qu'une date était saisie — un même fait, deux
+   * soldes selon un réglage sans rapport. Voir `MouvementBancaire['ignoree']`.
+   */
   const mouvementsRetenus = soldeInitialAu === null
-    ? mouvements
-    : mouvements.filter((m) => m.sansContrepartie !== null);
+    ? mouvements.filter((m) => !m.ignoree)
+    : mouvements.filter((m) => m.sansContrepartie !== null && !m.ignoree);
   const partBanque = soldeBancaire(soldeInitial, mouvementsRetenus);
 
   // Sans date, aucun fait n'est retenu : voir l'en-tête de la fonction. Avec

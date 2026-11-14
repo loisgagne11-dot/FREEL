@@ -29,6 +29,7 @@
  * l'écart avec la vignette était exactement elle, et rien ne le disait.
  */
 
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import type { NatureDette } from '../domain/calculs/provisions';
 import { type DetailDette, detailDette } from '../domain/calculs/detailDette';
 import type { Faits } from './schema';
@@ -56,7 +57,7 @@ export function detailDeLaDette(
     nature,
     faits.echeances,
     recettesEncaissees(faits),
-    { mois: faits.periodesDeclarees },
+    { mois: moisDeclares(faits.periodesDeclarees) },
     {
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),

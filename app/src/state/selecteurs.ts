@@ -10,6 +10,7 @@
  * testent sans React et sans magasin.
  */
 
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import {
   type DateISO, type Euros, type Mois, type Resolution, type TypeActivite,
   euros, moisDe
@@ -553,7 +554,7 @@ export function etatPilote(
   const detail = calculerProvisions(
     echeances,
     recettesEncaissees(faits),
-    { mois: faits.periodesDeclarees },
+    { mois: moisDeclares(faits.periodesDeclarees) },
     {
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),

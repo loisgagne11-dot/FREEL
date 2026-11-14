@@ -1,5 +1,6 @@
 import type { DateISO, Euros, Mois } from '../types';
 import { euros } from '../types';
+import type { PeriodeDeclaree } from './declarations.declarees';
 
 /**
  * Les périodes à déclarer à l'URSSAF, et celles qui l'ont été.
@@ -32,6 +33,42 @@ import { euros } from '../types';
  */
 
 export type Periodicite = 'mensuel' | 'trimestriel';
+
+/**
+ * Le jour où une période a été déclarée, ou `null` s'il n'est pas connu.
+ *
+ * Un trimestre se déclare d'un geste : ses trois mois portent la même date.
+ * S'ils en portaient plusieurs — un dossier modifié à la main —, la plus
+ * tardive est retenue : la période n'était pas déclarée en entier avant elle.
+ * Un seul mois sans date suffit à rendre `null` : on ne sait pas.
+ */
+export function dateDeDeclaration(
+  mois: readonly Mois[], declarees: readonly PeriodeDeclaree[]
+): DateISO | null {
+  let derniere: DateISO | null = null;
+  for (const m of mois) {
+    const le = declarees.find((p) => p.mois === m)?.declareeLe ?? null;
+    if (le === null) return null;
+    if (derniere === null || le > derniere) derniere = le;
+  }
+  return derniere;
+}
+
+/**
+ * Les appels de cotisations qui règlent une période : ceux dont l'échéance
+ * tombe dans le mois de la date limite — la déclaration et le paiement se
+ * font ensemble, le mois qui suit la période.
+ *
+ * Dérivé, et non un lien stocké : une échéance ne porte pas sa période, et
+ * lui en ajouter une aurait fait deux vérités à tenir d'accord (sa date, sa
+ * période). Le rapprochement par le mois est celui que l'URSSAF applique.
+ */
+export function appelsDeLaPeriode<E extends { readonly nature: string; readonly echeanceLe: string }>(
+  limite: DateISO, echeances: readonly E[]
+): readonly E[] {
+  const moisLimite = limite.slice(0, 7);
+  return echeances.filter((e) => e.nature === 'urssaf' && e.echeanceLe.startsWith(moisLimite));
+}
 
 export interface PeriodeADeclarer {
   /** Clé stable : `2026-07` en mensuel, `2026-T3` en trimestriel. */

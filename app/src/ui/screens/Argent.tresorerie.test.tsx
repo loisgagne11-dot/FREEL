@@ -157,7 +157,7 @@ describe('les quatre tuiles de trésorerie', () => {
         soldeInitial: euros(10_000), soldeInitialAu: dateISO('2026-06-01'),
         mouvementsBancaires: [{
           id: 'mv1', date: dateISO('2026-06-05'), libelle: 'VIR',
-          montant: euros(500), rapprocheAvec: null, sansContrepartie: 'autre'
+          montant: euros(500), rapprocheAvec: null, sansContrepartie: 'autre', ignoree: false
         }]
       });
 

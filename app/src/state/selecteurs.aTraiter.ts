@@ -23,6 +23,7 @@ import {
   acompteCfe, cfeDue, declaration1447C, paiementCfe, regimeCfe
 } from '../domain/bareme/cfe';
 import { moisDeLaPeriode } from '../domain/calculs/declarations';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
 import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';
@@ -65,7 +66,7 @@ export function entreeATraiter(
       clientNom: r.clientNom,
       echeanceLe: echeance(r)
     })),
-    periodesDeclarees: faits.periodesDeclarees,
+    periodesDeclarees: moisDeclares(faits.periodesDeclarees),
     echeancesSaisies: faits.echeances.length,
     periodicite: faits.entreprise.urssafPeriodicite,
     periodesUrssaf: periodesUrssafEffectives(faits),

@@ -79,8 +79,13 @@ describe('périodes URSSAF', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Marquer déclarée' }));
 
-    expect([...useFaits.getState().faits.periodesDeclarees].sort())
-      .toEqual(['2026-04', '2026-05', '2026-06']);
+    // Les trois mois, et la date du jour sur chacun : on coche en sortant du
+    // site de l'URSSAF (horloge du test : 13 août 2026).
+    expect(useFaits.getState().faits.periodesDeclarees).toEqual([
+      { mois: '2026-04', declareeLe: '2026-08-13' },
+      { mois: '2026-05', declareeLe: '2026-08-13' },
+      { mois: '2026-06', declareeLe: '2026-08-13' }
+    ]);
   });
 
   it('fait basculer la dette d’un volet à l’autre', async () => {
@@ -102,7 +107,7 @@ describe('périodes URSSAF', () => {
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Marquer déclarée' }));
-    await utilisateur.click(screen.getByRole('button', { name: 'Annuler' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Annuler la déclaration' }));
 
     expect(useFaits.getState().faits.periodesDeclarees).toEqual([]);
   });

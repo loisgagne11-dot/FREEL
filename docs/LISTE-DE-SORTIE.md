@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 13 novembre 2026.** Schéma des faits : v20 en ligne, v21 en cours (lot 28).
+**Date : 13 novembre 2026.** Schéma des faits : v20 en ligne, v21 livré par le lot 28 (PR #325, à fusionner).
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -81,7 +81,7 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 
 | Ordre | Lot | Contenu | État |
 |---|---|---|---|
-| 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ◐ écrit en local le 12/11 ; restent tests nommés, mutations, contrôle visuel, inventaires. **Le `verifier` du 13/11 tombe sur le budget d'entrée : 81,42 Ko pour 80** — extraire un module, ne pas relever ; les autres contrôles passent |
+| 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ✅ fini le 13/11, PR #325 à fusionner |
 | 2 | 56 | **Sécurité** — la chaîne qui publie est verrouillée | ⬜ |
 | 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ⬜ |
 | 4 | 29 | « Enregistrer en brouillon » | ⬜ |
@@ -157,6 +157,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 |---|---|
 | Une frise de l'année, une ligne par nature (URSSAF, TVA, impôt, CFE, formalités), obligations saisies ET prévues, aux dates officielles | ⬜ |
 | Une seule liste à cycle daté — à déclarer, déclarée le, payée le — à la place de « Échéances reçues » et « Périodes URSSAF » | ⬜ |
+| L'avance ou le retard d'une déclaration, comme la maquette (« deux jours avant la limite ») : la date existe depuis le lot 28, rien ne la compare encore à la limite | ⬜ |
 | Chaque ligne ouvre son dossier : URSSAF, TVA, déclaration européenne, CFE, impôt, et la déclaration de revenus (cases relevées sur le formulaire de l'année, en `hypothese` sinon) | ⬜ |
 | Pièces à fournir, chacune avec sa date de validité et son rappel : attestation de vigilance, responsabilité civile, avis de situation (seuils et périodicité à relever sur source officielle) | ⬜ |
 | Calendrier à s'abonner (`.ics`) : échéances, fins de mission, pièces qui expirent | ⬜ |
@@ -212,6 +213,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Factures en table dense, une action visible par ligne, le reste dans le détail | ⬜ |
 | Simulateurs en deux colonnes : saisie à gauche, résultat à droite | ⬜ |
 | « Clôturer le mois » : vérifier les journées, compte rendu par client, factures du mois, dépôt et envoi — depuis un seul endroit | ⬜ |
+| Les opérations du relevé dans l'ordre des dates : elles suivent l'ordre d'import (vu au contrôle du lot 28) | ⬜ |
 
 ### Lot 47 — Facture électronique : émission (avant le 01/09/2027)
 
@@ -364,8 +366,9 @@ Ce document, réécrit selon les décisions du 11/11 ; et la confirmation de
 
 | Ligne | État |
 |---|---|
-| Une période se déclare À UNE DATE (`declareeLe`) ; le cycle à déclarer → déclarée le … → payée le … se lit dans l'échéancier ; migration 20 → 21 qui descend dans la liste | ⬜ |
-| Une opération du relevé peut être « ignorée » (frais bancaires, virement interne), distincte de « sans contrepartie » ; elle sort de la file à traiter et se reprend | ⬜ |
+| Une période se déclare À UNE DATE (`declareeLe`) ; le cycle à déclarer → déclarée le … → payée le … se lit dans l'échéancier ; migration 20 → 21 qui descend dans la liste | ✅ 13/11 — date inconnue laissée vide, jamais inventée ; « Annuler la déclaration » |
+| Une opération du relevé peut être « ignorée » (frais bancaires, virement interne), distincte de « sans contrepartie » ; elle sort de la file à traiter et se reprend | ✅ 13/11 — hors de tout total, solde daté ou non |
+| Budget d'entrée tenu sans le relever : `estATraiter` et `moisDeclares` isolés (`banque.etat.ts`, `declarations.declarees.ts`), 81,42 → 78,55 Ko | ✅ 13/11 |
 
 ### Lot 29 — « Enregistrer en brouillon »
 

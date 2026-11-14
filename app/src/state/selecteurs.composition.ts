@@ -29,6 +29,7 @@
  * leur somme signée est le montant par construction.
  */
 
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import type { CleComposition, Composition } from '../domain/calculs/composition';
 import {
   compositionDisponible, compositionProvisions, compositionSolde, compositionVersable
@@ -96,7 +97,7 @@ function detailProvisionsDe(faits: Faits, maintenant: Date) {
   return calculerProvisions(
     faits.echeances,
     recettesEncaissees(faits),
-    { mois: faits.periodesDeclarees },
+    { mois: moisDeclares(faits.periodesDeclarees) },
     {
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),

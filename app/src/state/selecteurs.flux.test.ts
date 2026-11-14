@@ -70,7 +70,7 @@ describe('le flux d’un mois passé', () => {
     const avecReleve = faits({
       mouvementsBancaires: [{
         id: 'mv', date: dateISO('2026-05-06'), libelle: 'Virement à soi', montant: euros(-1800),
-        rapprocheAvec: null, sansContrepartie: 'remuneration'
+        rapprocheAvec: null, sansContrepartie: 'remuneration', ignoree: false
       }]
     });
     expect(fluxDUnAutreMois(avecReleve, mois('2026-05'), AUJOURDHUI).verse).toBe(1800);
