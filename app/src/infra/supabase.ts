@@ -121,7 +121,8 @@ export function configDeBuild(): ConfigSupabase | null {
 
 /* ── Appels ────────────────────────────────────────────────────────────── */
 
-async function appeler(
+/** Exportée pour `supabase.memoire.ts` : un second client HTTP dirait les erreurs autrement. */
+export async function appeler(
   config: ConfigSupabase,
   chemin: string,
   options: RequestInit & { readonly jeton?: string } = {}
@@ -376,6 +377,13 @@ export function bundleDepuisLegacy(donnees: DonneesLegacy): Record<string, unkno
  */
 export const TABLE_FAITS = 'freel_faits';
 
+/**
+ * Les états précédents du compte (lot 57), remplis par le SERVEUR à chaque
+ * remplacement — voir `docs/supabase.sql`. L'application n'y écrit jamais ;
+ * elle les lit, en revient, et les efface avec le reste.
+ */
+export const TABLE_HISTORIQUE = 'freel_faits_historique';
+
 export interface InstantaneDistant {
   /** Le bloc de faits, non validé : c'est au schéma de dire s'il est lisible. */
   readonly faits: unknown;
@@ -414,7 +422,7 @@ export type ResultatEcriture =
   }
   | { readonly statut: 'erreur'; readonly motif: string };
 
-function instantaneDepuis(ligne: Record<string, unknown>): InstantaneDistant {
+export function instantaneDepuis(ligne: Record<string, unknown>): InstantaneDistant {
   const version = ligne['version'];
   const schema = ligne['schema'];
   return {
@@ -549,7 +557,9 @@ export type ResultatEffacement =
 async function effacerLigne(
   config: ConfigSupabase,
   session: Session,
-  table: string
+  table: string,
+  /** Une table que le SQL n'a pas encore créée ne contient rien à effacer. */
+  absenteVautVide = false
 ): Promise<ResultatEffacement> {
   const chemin = `/rest/v1/${table}?user_id=eq.${encodeURIComponent(session.utilisateurId)}`;
   const r = await appeler(config, chemin, {
@@ -557,7 +567,10 @@ async function effacerLigne(
     jeton: session.jeton,
     headers: { Prefer: 'return=representation' }
   });
-  if (r.statut === 'erreur') return { statut: 'erreur', motif: r.motif };
+  if (r.statut === 'erreur') {
+    if (absenteVautVide && r.code === 404) return { statut: 'deja-vide' };
+    return { statut: 'erreur', motif: r.motif };
+  }
 
   // La relecture est la seule preuve : voir ci-dessus.
   const relu = await appeler(config, `${chemin}&select=user_id`, { jeton: session.jeton });
@@ -580,8 +593,19 @@ async function effacerLigne(
  * supprimer demande la clé de service du projet, qui n'a rien à faire dans
  * une page servie à tous.
  */
-export function effacerFaitsDuCompte(config: ConfigSupabase, session: Session): Promise<ResultatEffacement> {
-  return effacerLigne(config, session, TABLE_FAITS);
+export async function effacerFaitsDuCompte(config: ConfigSupabase, session: Session): Promise<ResultatEffacement> {
+  const faits = await effacerLigne(config, session, TABLE_FAITS);
+  if (faits.statut === 'regle-absente' || faits.statut === 'erreur') return faits;
+  /*
+   * Les états précédents partent avec la copie, et la relecture le prouve
+   * pour eux aussi : un effacement qui laisserait vingt copies du dossier sur
+   * le serveur n'en serait pas un. Après la copie, pas avant — c'est son
+   * REMPLACEMENT qui archive, jamais sa suppression : rien ne se recrée.
+   */
+  const historique = await effacerLigne(config, session, TABLE_HISTORIQUE, true);
+  if (historique.statut === 'regle-absente' || historique.statut === 'erreur') return historique;
+  return faits.statut === 'efface' || historique.statut === 'efface'
+    ? { statut: 'efface' } : { statut: 'deja-vide' };
 }
 
 /**

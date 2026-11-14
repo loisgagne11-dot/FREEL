@@ -25,6 +25,7 @@ import { Info } from '../components/Info';
 import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { dateCourte } from '../format';
 import { ReglesDAcces } from './Compte.acces';
+import { EtatsPrecedents } from './Compte.historique';
 import styles from './Compte.module.css';
 
 /**
@@ -436,7 +437,14 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     const copie = quoi === 'faits' ? 'de cette version' : 'de l’ancienne application';
     switch (r.statut) {
       case 'efface':
-        setEffacement({ echec: false, texte: `Données ${copie} effacées du compte. Relu après coup : il n’en reste rien.` });
+        // Les états précédents partent avec la copie de cette version : le
+        // dire, sinon on croirait qu'ils restent, prêts à la ramener.
+        setEffacement({
+          echec: false,
+          texte: quoi === 'faits'
+            ? 'Données de cette version et états précédents effacés du compte. Relu après coup : il n’en reste rien.'
+            : `Données ${copie} effacées du compte. Relu après coup : il n’en reste rien.`
+        });
         return;
       case 'deja-vide':
         setEffacement({ echec: false, texte: `Le compte ne contenait aucune donnée ${copie} : rien à effacer.` });
@@ -554,6 +562,17 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
                 </li>
               </ul>
 
+              <EtatsPrecedents
+                config={config}
+                session={etat.session}
+                distant={distant}
+                desactive={enCours}
+                onCompteModifie={(i) => {
+                  if (i !== null) setDistant(i);
+                  else void relireEtatDistant(etat.session);
+                }}
+              />
+
               {/*
                 * LE DROIT À L'EFFACEMENT, DEPUIS L'APPLICATION.
                 *
@@ -573,8 +592,9 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
                     desactive={enCours}
                     consequence={(
                       <>
-                        La copie de cette version enregistrée sur le compte sera
-                        effacée, puis relue pour le prouver. Rien ne la ramène,
+                        La copie de cette version enregistrée sur le compte, et
+                        ses états précédents, seront effacés, puis relus pour le
+                        prouver. Rien ne les ramène,
                         sinon un nouvel envoi depuis un appareil. Cet appareil
                         garde ses données&nbsp;: une sauvegarde JSON (Données)
                         d’abord reste prudente.

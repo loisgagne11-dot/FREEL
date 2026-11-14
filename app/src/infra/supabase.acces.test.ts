@@ -78,10 +78,13 @@ describe('sonde d’accès anonyme', () => {
     // à la place d'un inconnu.
     const appel = simuler(reponse(200, '*/0'));
     await sonderAccesAnonyme(CONFIG);
-    expect(appel).toHaveBeenCalledTimes(2);
+    // Trois tables : les états précédents (lot 57) sont vingt copies du
+    // dossier, à protéger autant que lui.
+    expect(appel).toHaveBeenCalledTimes(3);
     const urls = appel.mock.calls.map((c) => (c as unknown as [string])[0]).sort();
     expect(urls).toEqual([
       'https://exemple-demo.supabase.co/rest/v1/freel_faits?select=user_id',
+      'https://exemple-demo.supabase.co/rest/v1/freel_faits_historique?select=user_id',
       'https://exemple-demo.supabase.co/rest/v1/user_data?select=user_id'
     ]);
     for (const c of appel.mock.calls) {

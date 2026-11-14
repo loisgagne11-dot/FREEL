@@ -10,12 +10,22 @@ updates:
     directory: /app
     schedule:
       interval: weekly
-    # Les outils montent ensemble, en une PR : une par paquet noierait les
-    # alertes qui comptent — celles des dépendances servies, qui restent
-    # séparées.
     groups:
+      # React et React DOM montent ENSEMBLE : React refuse de tourner quand
+      # leurs versions diffèrent. Montés chacun dans sa PR (14/11, #330 et
+      # #331), chacun était rouge par construction, et aucun ne pouvait
+      # passer seul.
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      # Les outils montent ensemble, en une PR : une par paquet noierait les
+      # alertes qui comptent — celles des dépendances servies, qui restent
+      # séparées. Mineures et correctifs seulement : une version majeure
+      # mêlée au groupe (#328) cassait la résolution des pairs de
+      # typescript-eslint, et bloquait avec elle huit montées sans risque.
+      # Une majeure arrive seule, et se lit seule.
       outillage:
         dependency-type: development
+        update-types: ['minor', 'patch']
     open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions

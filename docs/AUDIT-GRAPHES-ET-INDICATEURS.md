@@ -781,3 +781,11 @@ maquette Obligations le montre, il revient au lot 53.
 Aucun nombre lu ne change : le lot touche la chaîne de construction et
 l'outillage de test (vitest 3 → 4), pas le code servi. Les 2 627 tests passent
 à l'identique.
+
+## Lot 57 (14/11) — le compte garde la mémoire
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Date et numéro d'enregistrement d'un état précédent | Config › Compte, « États précédents du compte » | — | Heure du **serveur** au remplacement (jamais l'horloge d'un appareil) ; numéro = compteur d'écritures que portait l'état. 20 au plus |
+
+Aucun chiffre du dossier ne change.

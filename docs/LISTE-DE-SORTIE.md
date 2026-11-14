@@ -82,8 +82,8 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | Ordre | Lot | Contenu | État |
 |---|---|---|---|
 | 1 | 28 | « Déclarée » datée, « ignorée » au rapprochement (schéma 21) | ✅ fusionné le 14/11 (PR #325) |
-| 2 | 56 | **Sécurité** — la chaîne qui publie est verrouillée | ◐ PR ouverte le 14/11 ; reste les réglages du dépôt (§6), au propriétaire |
-| 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ⬜ |
+| 2 | 56 | **Sécurité** — la chaîne qui publie est verrouillée | ✅ fusionné le 14/11 (PR #326) ; reste les réglages du dépôt (§6), au propriétaire |
+| 3 | 57 | **Sécurité** — le compte garde la mémoire : historique côté serveur, règles durcies | ✅ fini le 14/11, PR #332 à fusionner ; le SQL reste à exécuter par le propriétaire |
 | 4 | 29 | « Enregistrer en brouillon » | ⬜ |
 | 5 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
 | 6 | 46 | Facture conforme 2026-2027 | ⬜ |
@@ -247,12 +247,13 @@ porte son test nommé, et l'inverser le fait tomber.
 
 | Ligne | État |
 |---|---|
-| `docs/supabase.sql` : règles limitées au rôle connecté (`to authenticated`), `auth.uid()` enveloppé ; taille de `faits` bornée (dix fois le jeu d'essai le plus lourd, valeur citée dans le SQL) ; une écriture qui ne fait pas passer `version` de n à n + 1 est refusée par le serveur | ⬜ |
-| Table d'historique alimentée par déclencheur à chaque remplacement : l'état d'avant, sa version, son schéma, l'heure du serveur ; vingt états par compte ; lisible et effaçable par son seul propriétaire, jamais modifiable | ⬜ |
-| Écran Compte, « États précédents du compte » : liste datée, « Revenir à cet état » confirmé sur place, copie locale d'abord (lot 1), refus si le schéma est postérieur | ⬜ |
-| SQL non exécuté : l'application le constate et le dit, SQL copiable — comme au lot 25 ; la sonde anonyme couvre la nouvelle table | ⬜ |
-| « Effacer mes données du compte » efface aussi l'historique, et le prouve par relecture : un effacement qui laisserait vingt copies n'en serait pas un | ⬜ |
-| Limite dite à l'écran : l'historique protège d'un écrasement par erreur, pas d'un voleur de session qui efface tout — les appareils gardent alors leur copie | ⬜ |
+| `docs/supabase.sql` : règles limitées au rôle connecté (`to authenticated`), `auth.uid()` enveloppé ; taille de `faits` bornée (dix fois le jeu d'essai le plus lourd, valeur citée dans le SQL) ; une écriture qui ne fait pas passer `version` de n à n + 1 est refusée par le serveur | ✅ 14/11 — **borne à 4 Mo, pas 185 Ko** : un compte chargé pèse ≈ 150 Ko par an (mesuré sur le jeu), la borne du plan l'aurait bloqué au bout d'un an ; un test tient dix ans × 2 |
+| Table d'historique alimentée par déclencheur à chaque remplacement : l'état d'avant, sa version, son schéma, l'heure du serveur ; vingt états par compte ; lisible et effaçable par son seul propriétaire, jamais modifiable | ✅ 14/11 |
+| Écran Compte, « États précédents du compte » : liste datée, « Revenir à cet état » confirmé sur place, copie locale d'abord (lot 1), refus si le schéma est postérieur | ✅ 14/11 — le compte d'abord, à la version lue, puis l'appareil : un compte qui a bougé refuse, rien ne change nulle part |
+| SQL non exécuté : l'application le constate et le dit, SQL copiable — comme au lot 25 ; la sonde anonyme couvre la nouvelle table | ✅ 14/11 |
+| « Effacer mes données du compte » efface aussi l'historique, et le prouve par relecture : un effacement qui laisserait vingt copies n'en serait pas un | ✅ 14/11 |
+| Limite dite à l'écran : l'historique protège d'un écrasement par erreur, pas d'un voleur de session qui efface tout — les appareils gardent alors leur copie | ✅ 14/11 |
+| `docs/supabase.sql` exécuté par le propriétaire (il porte aussi la règle d'effacement du lot 25) ; l'écran Compte constate s'il manque | ⬜ propriétaire |
 
 #### Lot 58 — L'ancienne version est bridée, l'application refuse le cadre (S1, S4)
 
