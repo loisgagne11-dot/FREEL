@@ -64,18 +64,26 @@ export function PanneauDetailDette({ detail }: { readonly detail: DetailDette })
         </p>
       )}
 
-      {detail.impotRevenu !== null && (
+      {/* Les parts du reste qui ne tiennent pas dans un mois. COMPRISES dans
+          le total ci-dessus (lot 33) : « en plus des lignes » faisait du
+          détail un second total, qui ne retombait pas sur la vignette. */}
+      {detail.horsLignes.map((h) => (
+        <p key={h.libelle} className={styles.provisionIr} role="status">
+          dont {h.libelle.charAt(0).toLowerCase() + h.libelle.slice(1)}&nbsp;:{' '}
+          <strong><Montant>{eur(h.montant)}</Montant></strong>
+          {h.hypothese && ' (estimation)'}
+        </p>
+      ))}
+      {detail.impotRevenu !== null && detail.impotRevenu.statut === 'refuse' && (
         <p className={styles.provisionIr} role="status">
-          {detail.impotRevenu.statut === 'refuse'
-            ? <>Impôt sur le revenu non provisionné&nbsp;: {detail.impotRevenu.motif}</>
-            : (
-              <>
-                Impôt sur le revenu à mettre de côté&nbsp;:{' '}
-                <strong><Montant>{eur(detail.impotRevenu.valeur)}</Montant></strong>
-                {' '}en plus des lignes ci-dessous
-                {detail.impotRevenu.statut === 'hypothese' && ' (estimation)'}
-              </>
-            )}
+          Impôt sur le revenu non provisionné&nbsp;: {detail.impotRevenu.motif}
+        </p>
+      )}
+      {/* Un écart entre le total et ce que les lignes expliquent est une
+          faute de calcul, pas un arrondi : il se montre, il ne s'absorbe pas. */}
+      {Math.abs(detail.ecart) >= 0.01 && (
+        <p className={styles.abstention} role="status">
+          {eur(Math.abs(detail.ecart))} du total ne s’expliquent pas par les lignes ci-dessous.
         </p>
       )}
 
@@ -145,7 +153,8 @@ function Ligne({ ligne }: { readonly ligne: LigneDette }) {
   return (
     <li className={`${styles.ligne} ${styles[ligne.statut]}`}>
       <span className={styles.ligneTexte}>
-        <span className={styles.ligneLibelle}>{ligne.libelle}</span>
+        {/* Le mois en toutes lettres : « 2026-04 » est une clé, pas un mot. */}
+        <span className={styles.ligneLibelle}>{ligne.libelle.replace(ligne.mois, moisLong(ligne.mois))}</span>
         <span className={styles.ligneMeta}>
           <span className={`${styles.statut} ${styles[`statut_${ligne.statut}`]}`}>
             {LIBELLE_STATUT[ligne.statut]}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../types';
 import type { ContexteProvisions, Echeance, RecetteEncaissee } from './provisions';
-import { provisions } from './provisions';
+import { NATURES_DETTE, provisions } from './provisions';
 import { detailDette } from './detailDette';
 import { PERIODES_URSSAF } from '../bareme/urssaf';
 
@@ -40,13 +40,13 @@ describe('détail d’une dette, mois par mois', () => {
     const declarees = { mois: [] };
     const p = provisions([], recettes, declarees, CTX);
 
-    const urssaf = detailDette('urssaf', [], recettes, declarees, CTX);
-    const impot = detailDette('impot', [], recettes, declarees, CTX);
-
-    // La provision d'IR annuelle n'est pas ventilée par mois — elle n'a pas de
-    // mois d'encaissement. Le contexte n'en pose pas ici, les deux totaux
-    // doivent donc coïncider au centime.
-    expect(urssaf.reste + impot.reste).toBeCloseTo(p.total, 2);
+    // NATURE PAR NATURE, et non plus la somme de deux : la CFP était comptée
+    // dans l'impôt, et l'addition URSSAF + impôt retombait juste pendant que
+    // chaque ligne était fausse — la vignette CFP disait 26 €, le détail 0
+    // (lot 33).
+    for (const nature of NATURES_DETTE) {
+      expect(detailDette(nature, [], recettes, declarees, CTX).reste).toBeCloseTo(p.parNature[nature], 2);
+    }
   });
 
   /** Un mois par ligne, et non une ligne par recette : c'est le mois qu'on

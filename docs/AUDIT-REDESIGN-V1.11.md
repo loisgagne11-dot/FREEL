@@ -1255,3 +1255,13 @@ un brouillon déjà numéroté qui aurait été émis sous le numéro suivant.
 Contrôle visuel à 390 px, deux thèmes : rédaction (document), Réglages ›
 Facturation, Pilote. Écart corrigé avant livraison : le lien d'action du
 rappel débordait le Pilote (381 px, contrôle responsive).
+
+## Lot 33 (14/11) — « Reste à sortir » : un seul total
+
+| Zone | Avant | Après |
+|---|---|---|
+| Argent › détail d'une enveloppe | « Reste à sortir » différent de la vignette (impôt, TVA, CFP) ; « Impôt sur le revenu à mettre de côté : X en plus des lignes » | Même total que la vignette ; « dont … » pour les parts hors lignes ; écart affiché s'il existe |
+| Lignes du détail | « CA Encaissé En 2026-04 » (une capitale par mot, mois en clé) | « CA encaissé en avril 2026 » |
+
+Contrôle visuel à 390 px, deux thèmes, démonstration : détails « Impôt »
+(285 €, comme la vignette) et « URSSAF » (1 659 €, comme la vignette).

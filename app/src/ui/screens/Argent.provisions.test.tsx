@@ -290,6 +290,35 @@ describe('le détail d’une enveloppe', () => {
   });
 
   /**
+   * UN SEUL TOTAL (lot 33). Le détail de l'impôt additionnait ses lignes et
+   * posait l'impôt sur le revenu « en plus » : la vignette disait une somme,
+   * le détail une autre. Il dit désormais celle de la vignette, impôt sur le
+   * revenu COMPRIS.
+   */
+  it('le détail dit le reste à sortir de la vignette, impôt sur le revenu compris', async () => {
+    semer({
+      recettes: [{
+        id: 'r1', clientNom: 'C', libelle: 'Mission', montant: euros(60000),
+        emiseLe: dateISO('2026-06-30'), encaisseeLe: dateISO('2026-07-10'),
+        modeReglement: 'virement', numero: '2026-001'
+      }],
+      partsFiscales: 1
+    });
+    render(<Argent />);
+    await attendreTresorerie();
+    const vignette = screen.getByRole('button', { name: /Impôt sur le revenu/i });
+    // La vignette dit « X € [mis de côté] sur Y € » : Y est le reste à sortir.
+    const montantVignette = /sur ([\d\s\u202f]+?)\s*€/.exec(vignette.textContent ?? '')?.[1]?.trim();
+    await utilisateur().click(vignette);
+
+    const reste = (await screen.findByText('Reste à sortir')).parentElement?.textContent ?? '';
+    expect(montantVignette).toBeTruthy();
+    expect(reste.replace(/\s|\u202f/g, '')).toContain((montantVignette ?? '').replace(/\s|\u202f/g, ''));
+    expect(screen.getByText(/dont impôt sur le revenu de l’année/)).toBeTruthy();
+    expect(screen.queryByText(/en plus des lignes/)).toBeNull();
+  });
+
+  /**
    * LE GESTE SUIT L'ORIGINE DE LA LIGNE. Une dette estimée avance en déclarant
    * sa période ; une dette appelée se solde en enregistrant son paiement.
    * Proposer « enregistrer le paiement » sur une dette que personne n'a

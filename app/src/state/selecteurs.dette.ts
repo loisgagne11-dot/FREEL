@@ -30,15 +30,30 @@
  */
 
 import { moisDeclares } from '../domain/calculs/declarations.declarees';
-import type { NatureDette } from '../domain/calculs/provisions';
+import type { NatureDette, VentilationProvisions } from '../domain/calculs/provisions';
+import type { Euros } from '../domain/types';
 import { type DetailDette, detailDette } from '../domain/calculs/detailDette';
 import type { Faits } from './schema';
 import {
-  impotRevenuAProvisionner, moisCourant, tvaAReverserDe, tvaAutoliqueeProvisionnee,
+  etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, tvaAutoliqueeProvisionnee,
   periodesUrssafEffectives, recettesEncaissees,
   regimeDe, sousAcreLe
 } from './selecteurs';
 import { tauxImpotEtContributions } from '../domain/bareme';
+
+/**
+ * « Reste à sortir » : tout ce qui est sur le compte et dû à quelqu'un d'autre
+ * — cotisations URSSAF et CFP, TVA, impôt sur le revenu, CFE —, appelé ou
+ * couru (décision 8). LA source unique : le total de provisions du Pilote et
+ * sa ventilation, que lisent la vignette des enveloppes, la composition et le
+ * détail de la dette. Rien ne le recalcule ailleurs.
+ */
+export function resteASortir(
+  faits: Faits, maintenant: Date = new Date()
+): { readonly total: Euros; readonly parNature: VentilationProvisions } {
+  const pilote = etatPilote(faits, faits.echeances, maintenant);
+  return { total: pilote.tresorerie.provisions, parNature: pilote.provisionsParNature };
+}
 
 export function detailDeLaDette(
   faits: Faits,
@@ -67,6 +82,7 @@ export function detailDeLaDette(
       tvaAReverser: tvaAReverserDe(faits),
       tvaAutoliquidee: tvaAutoliqueeProvisionnee(faits, maintenant),
       periodesUrssaf: periodesUrssafEffectives(faits)
-    }
+    },
+    resteASortir(faits, maintenant).parNature[nature]
   );
 }

@@ -46,6 +46,7 @@
 import type { DateISO, Euros, Mois, Resolution } from '../types';
 import { euros } from '../types';
 import { tauxCotisations } from '../bareme/urssaf';
+import { tauxCfp } from '../bareme/impot';
 import type {
   ContexteProvisions, Echeance, NatureDette, PeriodesDeclarees, RecetteEncaissee
 } from './provisions';
@@ -96,10 +97,43 @@ export interface AnneeDette {
   readonly lignes: readonly LigneDette[];
 }
 
+/**
+ * Une part du reste à sortir qui ne tient pas dans un mois : l'impôt sur le
+ * revenu de l'année (dette annuelle du foyer), la TVA collectée pas encore
+ * déclarée. Elle est COMPRISE dans `reste` (lot 33).
+ */
+export interface PartHorsLignes {
+  readonly libelle: string;
+  readonly montant: Euros;
+  readonly hypothese: boolean;
+}
+
 export interface DetailDette {
   readonly nature: NatureDette;
-  /** Ce qui reste dû, toutes années confondues. */
+  /**
+   * Ce qui reste à sortir pour cette nature, toutes années confondues — LU
+   * dans la source unique (les provisions par nature), jamais recalculé ici.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * DEUX TOTAUX POUR UNE NOTION (lot 33, décision 8)
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Le détail additionnait ses lignes ; la vignette lisait les provisions.
+   * Pour l'impôt, le détail comptait la CFP et taisait l'impôt sur le revenu
+   * (« en plus des lignes ») ; pour la TVA, il ignorait la TVA collectée pas
+   * encore déclarée ; pour la CFP, il ne comptait rien. Même mot, deux
+   * chiffres, sur deux écrans voisins. Les lignes expliquent désormais le
+   * total au lieu de le refaire, et ce qui ne s'explique pas se dit
+   * (`ecart`).
+   */
   readonly reste: Euros;
+  /** Les parts du reste qui ne se rangent pas dans un mois. */
+  readonly horsLignes: readonly PartHorsLignes[];
+  /**
+   * `reste` moins ce que les lignes et les parts hors lignes expliquent. Zéro
+   * à l'arrondi près ; au-delà, l'écran le dit plutôt que de le cacher.
+   */
+  readonly ecart: Euros;
   /** Ce qui est déjà sorti du compte. */
   readonly paye: Euros;
   /** De la plus récente à la plus ancienne : on regarde l'année en cours. */
@@ -139,7 +173,13 @@ export function detailDette(
   echeances: readonly Echeance[],
   recettes: readonly RecetteEncaissee[],
   declarees: PeriodesDeclarees,
-  ctx: ContexteProvisions
+  ctx: ContexteProvisions,
+  /**
+   * Le reste à sortir de cette nature, tel que la source le donne. Absent,
+   * le reste est ce que les lignes expliquent — le cas des tests du calcul
+   * lui-même, qui n'ont pas de provisions à lire.
+   */
+  resteSource?: Euros
 ): DetailDette {
   const lignes: LigneDette[] = [];
   const nonCalculables: { mois: Mois; motif: string }[] = [];
@@ -158,7 +198,7 @@ export function detailDette(
   }
 
   // ── Volet 2 : ce qui est estimé, mois par mois ───────────────────────────
-  if (nature === 'urssaf' || nature === 'impot') {
+  if (nature === 'urssaf' || nature === 'impot' || nature === 'cfp') {
     for (const [mois, part] of estimationParMois(nature, recettes, declarees, ctx, nonCalculables)) {
       if (part <= 0) continue;
       lignes.push({
@@ -172,8 +212,36 @@ export function detailDette(
     }
   }
 
+  // ── Hors lignes : ce que la source compte sans le ranger dans un mois ───
+  // Les MÊMES termes que `voletAProvisionner`, et pas d'autres : la moindre
+  // différence de règle referait deux totaux.
+  const horsLignes: PartHorsLignes[] = [];
+  const ir = ctx.impotRevenu;
+  if (nature === 'impot' && ir !== undefined && ir.statut !== 'refuse' && ir.valeur > 0) {
+    horsLignes.push({
+      libelle: 'Impôt sur le revenu de l’année, à mettre de côté',
+      montant: ir.valeur,
+      hypothese: ir.statut === 'hypothese'
+    });
+  }
+  const tvaCourue = Math.max(0, ctx.tvaAReverser ?? 0);
+  if (nature === 'tva' && tvaCourue > 0) {
+    horsLignes.push({
+      libelle: 'TVA collectée, pas encore déclarée',
+      montant: euros(tvaCourue),
+      hypothese: false
+    });
+  }
+
+  const assemble = assembler(nature, lignes, nonCalculables);
+  const explique = assemble.resteDesLignes + horsLignes.reduce((t, h) => t + h.montant, 0);
+  const reste = resteSource ?? euros(explique);
+  const { resteDesLignes: _, ...sansResteDesLignes } = assemble;
   return {
-    ...assembler(nature, lignes, nonCalculables),
+    ...sansResteDesLignes,
+    reste,
+    horsLignes,
+    ecart: euros(Math.round((reste - explique) * 100) / 100),
     impotRevenu: nature === 'impot' ? ctx.impotRevenu ?? null : null,
     tvaAutoliquidee: nature === 'tva' ? ctx.tvaAutoliquidee ?? null : null
   };
@@ -188,7 +256,7 @@ export function detailDette(
  * novembre.
  */
 function estimationParMois(
-  nature: 'urssaf' | 'impot',
+  nature: 'urssaf' | 'impot' | 'cfp',
   recettes: readonly RecetteEncaissee[],
   declarees: PeriodesDeclarees,
   ctx: ContexteProvisions,
@@ -214,9 +282,15 @@ function estimationParMois(
       continue;
     }
 
+    // Le partage de `voletAProvisionner`, à l'identique : la CFP est prise sur
+    // le taux « impôt et contributions », et n'en est plus comptée en impôt.
+    const cfp = tauxCfp(m, ctx.typeActivite);
+    const partCfp = Math.min(ctx.tauxImpotEtContributions, cfp.statut === 'refuse' ? 0 : cfp.valeur);
     const part = nature === 'urssaf'
       ? r.montant * taux.valeur
-      : r.montant * ctx.tauxImpotEtContributions;
+      : nature === 'cfp'
+        ? r.montant * partCfp
+        : r.montant * (ctx.tauxImpotEtContributions - partCfp);
     parMois.set(m, (parMois.get(m) ?? 0) + part);
   }
 
@@ -240,7 +314,7 @@ function assembler(
   nature: NatureDette,
   lignes: readonly LigneDette[],
   nonCalculables: readonly { readonly mois: Mois; readonly motif: string }[]
-): Omit<DetailDette, 'impotRevenu' | 'tvaAutoliquidee'> {
+): Omit<DetailDette, 'impotRevenu' | 'tvaAutoliquidee' | 'reste' | 'horsLignes' | 'ecart'> & { readonly resteDesLignes: number } {
   const parAnnee = new Map<number, LigneDette[]>();
   for (const l of lignes) {
     const a = Number(l.mois.slice(0, 4));
@@ -262,8 +336,8 @@ function assembler(
 
   return {
     nature,
-    reste: euros(lignes.filter((l) => l.statut !== 'payee')
-      .reduce((s, l) => s + l.montant, 0)),
+    resteDesLignes: lignes.filter((l) => l.statut !== 'payee')
+      .reduce((s, l) => s + l.montant, 0),
     paye: euros(lignes.filter((l) => l.statut === 'payee')
       .reduce((s, l) => s + l.montant, 0)),
     annees,
