@@ -112,6 +112,22 @@ describe('états affichés', () => {
     expect(screen.getByRole('button', { name: /^Supprimer le brouillon/ })).toBeTruthy();
   });
 
+  /** Un brouillon gardé se finit (lot 29) : sans ce chemin, on ne pouvait que le supprimer. */
+  it('propose de reprendre un brouillon, et seulement un brouillon', async () => {
+    semer([recette({ id: 'r1', emiseLe: null, numero: '' }), recette({ id: 'r2' })]);
+    const onReprendre = vi.fn();
+    render(
+      <FournisseurToasts>
+        <Facturier onNouvelle={() => { /* testé ailleurs */ }} onReprendre={onReprendre}
+          stockage={stockageMemoireJustificatifs()} />
+      </FournisseurToasts>
+    );
+    const boutons = screen.getAllByRole('button', { name: 'Reprendre le brouillon' });
+    expect(boutons).toHaveLength(1);
+    await userEvent.setup().click(boutons[0] as HTMLElement);
+    expect(onReprendre).toHaveBeenCalledWith('r1');
+  });
+
   /**
    * Une facture émise a circulé : retirer son numéro laisserait un trou que le
    * contrôle lit comme une facture escamotée. Elle s'annule par un avoir.

@@ -33,7 +33,7 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour } from '../../state/selecteurs';
-import { ajouterRecette } from '../../state/ecritures.recettes';
+import { ajouterRecette, emettreBrouillon, enregistrerBrouillon } from '../../state/ecritures.recettes';
 import {
   brouillonsDeFacture, destinataireDe, emetteurDe, etatFacture, numeroSuivant
 } from '../../state/selecteurs.facture';
@@ -71,8 +71,10 @@ const ligneVide = (): LigneFacture => ({
  * recettes) n'était pas trouvable.
  */
 export function NouvelleFacture(
-  { onListe, depuisBrouillon = null }: {
+  { onListe, depuisBrouillon = null, brouillonEnregistre = null }: {
     readonly onListe: () => void;
+    /** L'identifiant d'un brouillon ENREGISTRÉ à reprendre (lot 29). */
+    readonly brouillonEnregistre?: string | null;
     /**
      * Le brouillon du mois à reprendre : le client et une ligne par mission,
      * recalculés ici depuis les faits. Le taux proposé est celui d'une ligne
@@ -90,11 +92,28 @@ export function NouvelleFacture(
     ? null
     : brouillonsDeFacture(faits, depuisBrouillon.mois)
       .find((b) => b.clientNom === depuisBrouillon.clientNom) ?? null));
-  const [clientNom, setClientNom] = useState(() => repris?.clientNom ?? '');
+  /*
+   * Le brouillon enregistré, lu lui aussi UNE fois. Ses lignes sont celles
+   * qu'il a gardées ; un brouillon d'avant le schéma 20 (ou repris de
+   * l'ancienne version) n'en a pas : il rouvre sur une ligne portant son
+   * libellé et son montant, plutôt que sur une page vierge qui ferait croire
+   * le brouillon perdu.
+   */
+  const [enregistre] = useState(() => (brouillonEnregistre === null
+    ? null
+    : faits.recettes.find((r) => r.id === brouillonEnregistre && r.emiseLe === null) ?? null));
+  /** L'identifiant sous lequel « Enregistrer » et « Émettre » écrivent : nul tant que rien n'est gardé. */
+  const [idBrouillon, setIdBrouillon] = useState<string | null>(() => enregistre?.id ?? null);
+  const [garde, setGarde] = useState<string | null>(null);
+  const [clientNom, setClientNom] = useState(() => enregistre?.clientNom ?? repris?.clientNom ?? '');
   const [emiseLe, setEmiseLe] = useState<string>(() => dateDuJour());
-  const [lignes, setLignes] = useState<readonly LigneFacture[]>(
-    () => (repris === null ? [ligneVide()] : lignesDuBrouillon(repris, ligneVide().tauxTva))
-  );
+  const [lignes, setLignes] = useState<readonly LigneFacture[]>(() => {
+    if (enregistre !== null) {
+      if (enregistre.lignes != null && enregistre.lignes.length > 0) return enregistre.lignes;
+      return [{ ...ligneVide(), designation: enregistre.libelle, prixUnitaireHt: enregistre.montant }];
+    }
+    return repris === null ? [ligneVide()] : lignesDuBrouillon(repris, ligneVide().tauxTva);
+  });
   /**
    * La facture émise, FIGÉE.
    *
@@ -160,8 +179,40 @@ export function NouvelleFacture(
     sortie(action, `Brouillon de facture ${numero}`,
       ['Brouillon', 'facture', numero, clientNom]);
 
+  /** Ce que la rédaction contient, hors date et numéro : ce que garde un brouillon. */
+  const contenu = () => ({
+    clientNom: facture.destinataire.nom,
+    libelle: lignes.map((l) => l.designation).filter((d) => d !== '').join(', '),
+    montant: etat.totaux.totalHt,
+    tvaCollectee: etat.totaux.totalTva,
+    lignes: lignesAConserver(facture)
+  });
+
+  /*
+   * « Enregistrer en brouillon » : sans numéro, sans date d'émission, sans
+   * contrôle des mentions — un brouillon sert justement à finir plus tard.
+   * Fermer l'onglet en pleine rédaction perdait tout, et l'on émettait
+   * parfois une facture incomplète faute de pouvoir la garder de côté.
+   */
+  function garderEnBrouillon(): void {
+    const r = enregistrerBrouillon(idBrouillon, contenu());
+    if ('motif' in r) { setGarde(r.motif); return; }
+    setIdBrouillon(r.id);
+    setGarde('Brouillon enregistré, sans numéro : il t’attend dans tes factures, filtre « Brouillons ». '
+      + 'Le numéro lui sera donné à l’émission.');
+  }
+
   function emettre(): void {
     if (!emissionPossible) return;
+    if (idBrouillon !== null) {
+      // Le brouillon devient la facture, sous son identifiant : voir `emettreBrouillon`.
+      const motif = emettreBrouillon(idBrouillon, {
+        ...contenu(), emiseLe: facture.emiseLe, encaisseeLe: null, modeReglement: null, numero
+      });
+      if (motif !== null) { setGarde(motif); return; }
+      setEmise(etat);
+      return;
+    }
     ajouterRecette({
       clientNom: facture.destinataire.nom,
       libelle: lignes.map((l) => l.designation).filter((d) => d !== '').join(', '),
@@ -200,6 +251,7 @@ export function NouvelleFacture(
             </button>
             <button type="button" className={styles.action} onClick={() => {
               setEmise(null); setLignes([ligneVide()]); setClientNom('');
+              setIdBrouillon(null); setGarde(null);
             }}>
               Nouvelle facture
             </button>
@@ -229,7 +281,7 @@ export function NouvelleFacture(
   return (
     <>
       <header className={styles.entete}>
-        <h1 className={styles.titre}>Nouvelle facture</h1>
+        <h1 className={styles.titre}>{idBrouillon === null ? 'Nouvelle facture' : 'Brouillon de facture'}</h1>
         <span className={styles.numero}>{numero}</span>
         <button type="button" className={styles.action} onClick={onListe}>
           Retour aux factures
@@ -249,6 +301,12 @@ export function NouvelleFacture(
             : <>Le brouillon de {moisLong(depuisBrouillon.mois).toLowerCase()} pour {depuisBrouillon.clientNom}
               n’existe plus — le planning a changé, ou rien n’y est facturable. La facture
               part d’une page vierge.</>}
+        </p>
+      )}
+
+      {brouillonEnregistre !== null && enregistre === null && (
+        <p className={styles.bandeau} role="status">
+          Ce brouillon n’existe plus — supprimé ou déjà émis. La facture part d’une page vierge.
         </p>
       )}
 
@@ -372,10 +430,17 @@ export function NouvelleFacture(
       <section className={styles.carte} aria-labelledby={`${idChamp}-totaux`}>
         <h2 id={`${idChamp}-totaux`} className={styles.titreCarte}>Totaux</h2>
         <Totaux etat={etat} />
-        <button type="button" className={styles.actionPrincipale}
-          disabled={!emissionPossible} onClick={emettre}>
-          {emissionPossible ? 'Émettre la facture' : 'Compléter les mentions manquantes'}
-        </button>
+        <div className={styles.actions}>
+          <button type="button" className={styles.actionPrincipale}
+            disabled={!emissionPossible} onClick={emettre}>
+            {emissionPossible ? 'Émettre la facture' : 'Compléter les mentions manquantes'}
+          </button>
+          <button type="button" className={styles.action}
+            disabled={!aCommence} onClick={garderEnBrouillon}>
+            {idBrouillon === null ? 'Enregistrer en brouillon' : 'Enregistrer le brouillon'}
+          </button>
+        </div>
+        {garde !== null && <p className={styles.note} role="status">{garde}</p>}
       </section>
         </div>
 

@@ -59,15 +59,15 @@ describe('numérotation', () => {
     expect(recettes()[0]?.numero).toBe('FA-2026/17');
   });
 
-  // Un brouillon n'a jamais circulé : réserver son numéro créerait le trou
-  // qu'on cherche justement à éviter.
-  it('libère le numéro d’un brouillon supprimé', () => {
-    ajouter({ emiseLe: null });
-    const second = ajouter({ emiseLe: null });
-    supprimerBrouillon(second);
-    const troisieme = ajouter({ emiseLe: null });
-    expect(recettes().find((r) => r.id === troisieme)?.numero)
-      .toBe(recettes()[0]?.numero.replace(/\d+$/, '002'));
+  // Un brouillon n'a jamais circulé : réserver son numéro créait un trou s'il
+  // était abandonné, et rompait la chronologie s'il était émis plus tard
+  // (lot 29). Le numéro naît à l'émission.
+  it('ne numérote pas un brouillon : le numéro naît à l’émission', () => {
+    const brouillon = ajouter({ emiseLe: null });
+    ajouter();
+    supprimerBrouillon(brouillon);
+    ajouter();
+    expect(recettes().map((r) => r.numero)).toEqual(['2026-001', '2026-002']);
   });
 });
 

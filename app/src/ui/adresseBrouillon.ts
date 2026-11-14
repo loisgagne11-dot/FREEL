@@ -43,3 +43,25 @@ export function brouillonDeLaSousRoute(sousRoute: string): DesignationBrouillon 
     return null;
   }
 }
+
+/*
+ * Un brouillon ENREGISTRÉ (lot 29) se désigne par son identifiant : il n'a ni
+ * numéro — l'émission le lui donnera — ni mois propre. Préfixe distinct de
+ * celui du brouillon du mois, qui se recalcule depuis le planning : les
+ * confondre rouvrirait un calcul là où l'utilisateur a saisi des lignes.
+ */
+const PREFIXE_ENREGISTRE = 'reprendre:';
+
+export function sousRouteDuBrouillonEnregistre(id: string): string {
+  return `${PREFIXE_ENREGISTRE}${encodeURIComponent(id)}`;
+}
+
+export function brouillonEnregistreDeLaSousRoute(sousRoute: string): string | null {
+  if (!sousRoute.startsWith(PREFIXE_ENREGISTRE)) return null;
+  try {
+    const id = decodeURIComponent(sousRoute.slice(PREFIXE_ENREGISTRE.length));
+    return id === '' ? null : id;
+  } catch {
+    return null;
+  }
+}
