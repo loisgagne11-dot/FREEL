@@ -1265,3 +1265,14 @@ rappel débordait le Pilote (381 px, contrôle responsive).
 
 Contrôle visuel à 390 px, deux thèmes, démonstration : détails « Impôt »
 (285 €, comme la vignette) et « URSSAF » (1 659 €, comme la vignette).
+
+## Lot 35 (15/11) — mis de côté pour l'impôt
+
+| Zone | Avant | Après |
+|---|---|---|
+| Achats › Relevé, un débit à traiter | Rémunération, Sans contrepartie, Ignorer | + « Mis de côté pour l'impôt » ; la ligne classée se lit ainsi |
+| Pilote › Flux, colonne Rémunération | Versable, déjà versé | + « À mettre de côté pour l'impôt : X » sous le versable |
+
+Contrôle visuel à 390 px, deux thèmes : relevé (démonstration complétée le
+temps de la capture d'un virement « impôt » et d'un débit à traiter), Pilote
+du jeu d'essai (impôt au barème).

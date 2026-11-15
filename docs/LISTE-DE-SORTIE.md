@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 14 novembre 2026.** Schéma des faits : v22 (lot 46, fusionné le 14/11).
+**Date : 15 novembre 2026.** Schéma des faits : v22 en ligne, v23 livré par le lot 35 (PR #338).
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -87,8 +87,8 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 4 | 29 | « Enregistrer en brouillon » | ✅ fusionné le 14/11 (PR #335) |
 | 5 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
 | 6 | 46 | Facture conforme 2026-2027 | ✅ fusionné le 14/11 (PR #336, schéma 22) |
-| 7 | 33 | « Reste à sortir » : un seul total | ✅ fini le 14/11, PR #337 à fusionner |
-| 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ⬜ |
+| 7 | 33 | « Reste à sortir » : un seul total | ✅ fusionné le 14/11 (PR #337) |
+| 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ✅ fini le 15/11, PR #338 à fusionner (schéma 23) |
 | 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ⬜ |
 | 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ⬜ |
 | — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
@@ -136,9 +136,9 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 
 | Ligne | État |
 |---|---|
-| Un virement vers le compte personnel se nomme : rémunération, **mise de côté pour l'impôt**, ou autre. Seule la rémunération compte dans « ce que je me suis versé » | ⬜ |
-| La provision d'impôt se réduit de ce qui a été viré pour lui, par exercice ; rien n'est compté deux fois avec un acompte ou un solde saisi en échéance (test d'intégration) | ⬜ |
-| « À mettre de côté » se lit à côté du versable : ce qui reste à virer pour l'impôt, après chaque encaissement | ⬜ |
+| Un virement vers le compte personnel se nomme : rémunération, **mise de côté pour l'impôt**, ou autre. Seule la rémunération compte dans « ce que je me suis versé » | ✅ 15/11 — motif `impot` (schéma 23), débits seulement |
+| La provision d'impôt se réduit de ce qui a été viré pour lui, par exercice ; rien n'est compté deux fois avec un acompte ou un solde saisi en échéance (test d'intégration) | ✅ 15/11 — un exercice qui porte un virement « impôt » est réglé depuis le compte personnel : ses échéances d'impôt ne sortent plus du compte pro (`echeancesDuComptePro`, seule porte), la provision se réduit du seul virement. Rattachement par la date du virement (limite dite) |
+| « À mettre de côté » se lit à côté du versable : ce qui reste à virer pour l'impôt, après chaque encaissement | ✅ 15/11 — Pilote, colonne Rémunération |
 
 ### Lot 51 — Nouvelle navigation et jetons de style
 
