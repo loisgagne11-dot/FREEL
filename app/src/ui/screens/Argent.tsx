@@ -145,12 +145,12 @@ export function Argent({ annee }: ProprietesArgent = {}) {
         titre="Ton argent"
         sousTitre="Ce qui est rentré, ce qui reste à rentrer, et ce que la période doit."
         repere={(
-          /* La couverture des provisions, et non le solde : le solde est déjà
+          /* La couverture du dû, et non le solde : le solde est déjà
              sur le pilier Trésorerie juste dessous, et le répéter n'apprend
              rien. Ce que l'en-tête ajoute, c'est la réponse à « si tout tombait
              demain, le compte suivrait-il ? ». */
           <Etiquette ton={couverture >= 100 ? 'ok' : 'attention'}>
-            Provisions · {couverture}&nbsp;% couvertes
+            Dû · {couverture}&nbsp;% couvert
           </Etiquette>
         )}
       />

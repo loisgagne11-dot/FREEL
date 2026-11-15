@@ -129,7 +129,7 @@ export function Donut(
         ))}
         {deficit > 0 && (
           <li className={styles.manque}>
-            Il manque <Montant>{fr(deficit)}</Montant> pour couvrir les provisions&nbsp;:
+            Il manque <Montant>{fr(deficit)}</Montant> pour couvrir le dû&nbsp;:
             une partie de l’argent dû a déjà été dépensée.
           </li>
         )}

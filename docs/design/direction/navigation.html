@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction visuelle — Navigation (proposition du lot 51)</title>
+<!-- Maquette, pas l'application : ici les polices viennent d'un CDN pour que
+     le fichier s'ouvre seul. L'application n'en charge aucune de l'extérieur.
+     PROPOSITION soumise au propriétaire avant d'être codée : les zones que
+     ni la planche ni les autres maquettes ne dessinent — pied du rail, barre
+     du haut, « Plus » au téléphone, thème dans les Réglages. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="./calme.css">
+<style>
+body{margin:0}
+.nv-ensemble { display: flex; gap: 40px; align-items: flex-start; padding: 32px; }
+.nv-bureau { display: flex; width: 940px; height: 700px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.nv-filet { height: 1px; background: var(--line); margin: 10px 12px; }
+.nv-pied { font-size: 14px; }
+.nv-pied.e-nav { min-height: 42px; }
+.nv-icone { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--card-a); color: var(--muted); }
+.nv-icone svg, .nv-tel-top svg, .nv-plus svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.nv-synchro { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--green-deep); color: var(--chip-ok); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.nv-synchro i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.nv-vide { border: 1.5px dashed var(--line-2); border-radius: var(--r); padding: 28px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.nv-tel { position: relative; width: 390px; height: 760px; border: 1px solid var(--line); border-radius: 26px; overflow: hidden; background: var(--bg); }
+.nv-tel-top { display: flex; align-items: center; gap: 8px; padding: 16px 16px 0; }
+.nv-tel-top .e-logo { padding: 0; font-size: 24px; margin-right: auto; }
+.nv-tel-top .nv-icone { width: 44px; height: 44px; }
+.nv-tel-top .e-btn { min-height: 44px; padding: 0 16px; }
+.nv-voile { position: absolute; inset: 0; background: rgba(20, 22, 16, .32); }
+.nv-plus { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 16px 24px; border-radius: 24px 24px 0 0; background: var(--card-a); box-shadow: 0 -18px 40px -20px rgba(0, 0, 0, .45); }
+.nv-poignee { width: 40px; height: 4px; border-radius: 2px; background: var(--line-2); margin: 0 auto 12px; }
+.nv-plus a { display: flex; align-items: center; gap: 14px; min-height: 54px; padding: 0 6px; border-top: 1px solid var(--line); font-weight: 600; }
+.nv-plus a:first-of-type { border-top: 0; }
+.nv-plus a small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.nv-plus a svg { color: var(--green); }
+.nv-plus a .e-count { margin-left: auto; }
+.nv-bascule { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 54px; padding: 0 6px; border-top: 1px solid var(--line); font-weight: 600; }
+.nv-interrupteur { border: 0; padding: 0; width: 46px; height: 28px; border-radius: 999px; background: var(--tint-3); position: relative; flex: 0 0 auto; }
+.nv-interrupteur::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--card-a); box-shadow: var(--sh-1); }
+.nv-themes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 4px; }
+.nv-theme { font: inherit; color: inherit; background: none; text-align: left; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; border: 1px solid var(--line-2); font-weight: 600; font-size: 14px; }
+.nv-theme.on { border: 2px solid var(--green); padding: 11px; }
+.nv-theme small { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.nv-pastilles { display: flex; gap: 5px; }
+.nv-pastilles i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .12); }
+.nv-legende { margin-top: 10px; font-size: 12.5px; color: var(--muted); max-width: 390px; }
+</style>
+</head>
+<body>
+<div class="ec m-calme" style="width: 1880px">
+<div class="nv-ensemble">
+
+<!-- ── 1. Bureau : le rail et son pied, la barre du haut ─────────────── -->
+<div>
+<div class="nv-bureau">
+<nav class="e-rail" aria-label="Navigation principale">
+<div class="e-logo">fre<b>e</b>l</div>
+<a class="e-nav on" href="#pilote"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h4l3-8 4 16 3-8h6"></path></svg>Pilote</a>
+<a class="e-nav" href="#activite"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Activité</a>
+<a class="e-nav" href="#factures"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"></path></svg>Factures</a>
+<a class="e-nav" href="#tresorerie"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3"></rect><path d="M16 12.5h2M3 9.5h14"></path></svg>Trésorerie</a>
+<a class="e-nav" href="#obligations"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.5 2.5L16 9.5"></path></svg>Obligations<span class="e-count">2</span></a>
+<a class="e-nav" href="#achats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2zM9 8V6a3 3 0 0 1 6 0v2"></path></svg>Achats</a>
+<div class="nv-filet" role="separator"></div>
+<a class="e-nav nv-pied" href="#simulateurs"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"></rect><path d="M8.5 7.5h7M8.5 12h1M12 12h1M15.5 12h0M8.5 16h1M12 16h1M15.5 16h0"></path></svg>Simulateurs</a>
+<a class="e-nav nv-pied" href="#reglages"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"></path></svg>Réglages</a>
+<a class="e-id" href="#reglages"><span class="e-av k1">C</span><div>Camille Demo<small>Micro-BNC · données fictives</small></div></a>
+</nav>
+<main class="e-main">
+<header class="e-top">
+<div><h1>Bonjour Camille — trois choses à faire.</h1><p>Mardi 10 juin 2026. Rien d’urgent, une facture à relancer.</p></div>
+</header>
+<div class="e-tools" role="group" aria-label="Barre du haut">
+<span class="e-search"><svg viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>Rechercher une facture, un client…</span>
+<span class="nv-synchro" role="status"><i></i>Synchronisé à 9 h 41</span>
+<a class="nv-icone" href="#masquer" aria-label="Masquer les montants"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="2.8"></circle></svg></a>
+<a class="e-btn go" href="#nouveau">+ Nouveau</a>
+</div>
+<div class="nv-vide">Le contenu de l’écran. Chaque écran porte sa commande de période <strong>dans son en-tête</strong>, et une seule : la barre du haut n’en a plus.</div>
+</main>
+</div>
+<p class="nv-legende" style="max-width: 940px">Bureau. Six entrées pour ce qu’on vient faire ; Simulateurs et Réglages sous un filet ; la carte d’identité mène aux Réglages. Barre du haut : recherche, synchronisation <em>écrite</em>, masquer les montants, « + Nouveau ». « Exporter » et la pastille « à traiter » la quittent : les exports vivent là où sont leurs données, et ce qui est à traiter se lit aux compteurs du rail et dans « À faire » du Pilote.</p>
+</div>
+
+<!-- ── 2. Téléphone : la barre du haut, et « Plus » ouvert ────────────── -->
+<div>
+<div class="nv-tel">
+<header class="nv-tel-top">
+<div class="e-logo">fre<b>e</b>l</div>
+<a class="nv-icone" href="#rechercher" aria-label="Rechercher"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg></a>
+<span class="nv-icone" role="status" aria-label="Synchronisé à 9 h 41" style="color: var(--green)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.2 4.4 4.4 0 0 0 7 18z"></path><path d="M9.5 13.5l2 2 3.5-4"></path></svg></span>
+<a class="e-btn go" href="#nouveau">+ Nouveau</a>
+</header>
+<div class="nv-voile" aria-hidden="true"></div>
+<div class="nv-plus" role="dialog" aria-label="Plus">
+<div class="nv-poignee" aria-hidden="true"></div>
+<a href="#obligations"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.5 2.5L16 9.5"></path></svg><div>Obligations<small>déclarer, payer, fournir</small></div><span class="e-count">2</span></a>
+<a href="#achats"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12H6.2zM9 8V6a3 3 0 0 1 6 0v2"></path></svg><div>Achats<small>dépenses et justificatifs</small></div></a>
+<a href="#simulateurs"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"></rect><path d="M8.5 7.5h7M8.5 12h1M12 12h1M8.5 16h1M12 16h1"></path></svg><div>Simulateurs<small>impôt, régime, CFE</small></div></a>
+<a href="#reglages"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"></path></svg><div>Réglages<small>profil, barèmes, données, compte, affichage</small></div></a>
+<div class="nv-bascule">Masquer les montants<button type="button" class="nv-interrupteur" role="switch" aria-checked="false" aria-label="Masquer les montants"></button></div>
+</div>
+</div>
+<p class="nv-legende">Téléphone. La barre basse garde les cinq entrées de la maquette, toutes nommées : Pilote, Activité, Factures, Trésorerie, Plus. « Plus » ouvre ce volet. En haut : la recherche et la synchronisation en icônes (nommées pour le lecteur d’écran), « + Nouveau » écrit.</p>
+</div>
+
+<!-- ── 3. Réglages › Affichage ────────────────────────────────────────── -->
+<div>
+<div class="nv-tel">
+<header class="nv-tel-top"><div class="e-logo">fre<b>e</b>l</div><a class="e-btn go" href="#nouveau">+ Nouveau</a></header>
+<main class="e-main" style="padding: 14px 16px; gap: 14px">
+<p class="e-hint"><a href="#reglages" style="color: var(--green); font-weight: 600">Réglages</a> › Affichage</p>
+<section class="e-card" aria-labelledby="nv-theme" style="padding: 18px; border-radius: 20px">
+<div class="e-h" style="margin-bottom: 6px"><h3 id="nv-theme">Thème</h3></div>
+<div class="nv-themes" role="group" aria-labelledby="nv-theme">
+<button type="button" class="nv-theme on" aria-pressed="true"><span class="nv-pastilles"><i style="background: #f1efe6"></i><i style="background: #59734e"></i><i style="background: #8a6224"></i></span>Calme<small>clair, doux</small></button>
+<button type="button" class="nv-theme" aria-pressed="false"><span class="nv-pastilles"><i style="background: #15170f"></i><i style="background: #a3c489"></i><i style="background: #dcb578"></i></span>Nuit<small>le calme, en sombre</small></button>
+<button type="button" class="nv-theme" aria-pressed="false"><span class="nv-pastilles"><i style="background: #090c0a"></i><i style="background: #5fd39a"></i><i style="background: #e0b672"></i></span>Sombre<small>contrasté</small></button>
+<button type="button" class="nv-theme" aria-pressed="false"><span class="nv-pastilles"><i style="background: #eef2ee"></i><i style="background: #167c55"></i><i style="background: #8d6413"></i></span>Clair<small>blanc, net</small></button>
+</div>
+</section>
+<section class="e-card" aria-label="Montants" style="padding: 8px 18px; border-radius: 20px">
+<div class="nv-bascule" style="border-top: 0">Masquer les montants<button type="button" class="nv-interrupteur" role="switch" aria-checked="false" aria-label="Masquer les montants"></button></div>
+<p class="e-hint" style="padding: 0 6px 10px">Pour ouvrir l’application dans un lieu public : les chiffres deviennent des points, jusqu’à ce que tu les rendes.</p>
+</section>
+</main>
+</div>
+<p class="nv-legende">Réglages › Affichage, une section nouvelle : le thème quitte la barre du haut pour s’y ranger, avec « Masquer les montants ». Le thème choisi reste mémorisé.</p>
+</div>
+
+</div>
+</div>
+<script>
+/* ?mode=calme|nuit|sombre|clair — les quatre thèmes de l'application. */
+(function () {
+  var mode = new URLSearchParams(location.search).get('mode');
+  if (['calme', 'nuit', 'sombre', 'clair'].indexOf(mode) === -1) return;
+  document.querySelector('.ec').className = document.querySelector('.ec').className.replace(/m-\w+/, 'm-' + mode);
+})();
+</script>
+</body>
+</html>

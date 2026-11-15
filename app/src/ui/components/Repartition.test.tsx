@@ -7,9 +7,9 @@ import { Repartition, type PartSolde } from './Repartition';
 afterEach(cleanup);
 
 const PARTS: readonly PartSolde[] = [
-  { libelle: 'Provisions', montant: 8000, ton: 'provisions' },
+  { libelle: 'Dû', montant: 8000, ton: 'provisions' },
   { libelle: 'Réserve', montant: 2000, ton: 'reserve' },
-  { libelle: 'Versable', montant: 5000, ton: 'versable' }
+  { libelle: 'À te verser', montant: 5000, ton: 'versable' }
 ];
 
 describe('répartition du solde', () => {
@@ -20,18 +20,18 @@ describe('répartition du solde', () => {
    */
   it('écrit chaque montant, sans compter sur la barre', () => {
     render(<Repartition parts={PARTS} total={15000} deficit={0} />);
-    expect(screen.getByText('Provisions')).toBeTruthy();
+    expect(screen.getByText('Dû')).toBeTruthy();
     expect(screen.getByText(/8\s?000/u)).toBeTruthy();
     expect(screen.getByText(/5\s?000/u)).toBeTruthy();
   });
 
   it('donne un nom accessible à la barre', () => {
     render(<Repartition parts={PARTS} total={15000} deficit={0} />);
-    expect(screen.getByRole('img', { name: /Provisions 8000 euros/ })).toBeTruthy();
+    expect(screen.getByRole('img', { name: /Dû 8000 euros/ })).toBeTruthy();
   });
 
   /**
-   * Les provisions qui dépassent le solde ne sont pas une nuance
+   * Un dû qui dépasse le solde n'est pas une nuance
    * d'affichage : l'argent des cotisations a déjà été dépensé. Une barre
    * n'exprime que des parts d'un tout — elle ne peut pas montrer un manque.
    */
@@ -52,6 +52,6 @@ describe('répartition du solde', () => {
     render(<Repartition parts={PARTS} total={0} deficit={0} />);
     expect(screen.queryByRole('img')).toBeNull();
     // Les montants, eux, restent lisibles.
-    expect(screen.getByText('Provisions')).toBeTruthy();
+    expect(screen.getByText('Dû')).toBeTruthy();
   });
 });

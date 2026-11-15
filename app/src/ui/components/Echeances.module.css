@@ -304,7 +304,7 @@
 
 .teinte[data-charge='urssaf'] { background: var(--c-urssaf); }
 .teinte[data-charge='tva'] { background: var(--c-tva); }
-.teinte[data-charge='impot'] { background: var(--c-ir); }
+.teinte[data-charge='impot'] { background: var(--c-impot); }
 .teinte[data-charge='cfe'] { background: var(--c-cfe); }
 /* La CFP est due avec les cotisations : elle partage leur teinte plutôt que
    d'introduire une cinquième couleur pour une ligne qui suit la même échéance. */

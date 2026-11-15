@@ -431,7 +431,7 @@ function Ligne(
       </span>
 
       <span className={styles.ligneMeta}>
-        <Statut libelle={LIBELLE_STATUT[statut]} ton={TONS[statut]} />
+        <Statut libelle={LIBELLE_STATUT[statut]} ton={TONS[statut]} signe={statut === 'envoyee' ? '→' : undefined} />
         <span>{r.clientNom || 'Client non renseigné'}</span>
         <span aria-hidden="true">·</span>
         <span>{r.numero || 'Sans numéro'}</span>

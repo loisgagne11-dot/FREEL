@@ -58,7 +58,7 @@ function FoyerFiscal() {
         id={`${idChamp}-parts`}
         libelle="Parts fiscales du foyer"
         aide="Le quotient familial de ton avis d’imposition. Tant qu’il est vide,
-              l’impôt sur le revenu n’est pas provisionné — et l’application le dit
+              l’impôt sur le revenu n’est pas compté dans le dû — et l’application le dit
               plutôt que d’en supposer une."
       >
         <input

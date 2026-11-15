@@ -114,7 +114,7 @@ export function Config() {
   const entrees: readonly { id: Section; titre: string; sousTitre: string }[] = [
     { id: 'profil', titre: 'Profil & statut', sousTitre: sousTitreProfil },
     { id: 'fiscal', titre: 'Paramètres fiscaux', sousTitre: 'Abattement, cotisations, TVA' },
-    { id: 'reserve', titre: 'Réserve & versements', sousTitre: 'Matelas, seuil de sécurité' },
+    { id: 'reserve', titre: 'Réserve & versements', sousTitre: 'Solde, réserve, part gardée' },
     { id: 'facturation', titre: 'Facturation', sousTitre: 'RIB, mentions, plateforme agréée' },
     { id: 'livre', titre: 'Livre des recettes', sousTitre: 'Registre obligatoire' },
     { id: 'compte', titre: 'Compte & synchronisation', sousTitre: 'Multi-appareils · pièces' },
@@ -319,7 +319,7 @@ function Profil() {
               Discriminant exclusif&nbsp;: avec le versement libératoire, l’impôt
               est payé à chaque déclaration et rien n’est dû au barème
               progressif. L’ancienne version cumulait les deux, et
-              surestimait l’impôt à provisionner.
+              surestimait l’impôt dû.
             </>
           }
         />

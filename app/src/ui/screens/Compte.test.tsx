@@ -733,7 +733,13 @@ describe('le renouvellement de session', () => {
     const local = CONFIGURE();
     local.contenu['freel.session.supabase.v1'] = sessionExpiree();
     render(<Compte stockage={local} />);
-    await vi.waitFor(() => expect(local.contenu['freel.session.supabase.v1']).toBeUndefined());
+    // Avant d'effacer, un refus laisse 1,5 s à un autre onglet pour écrire la
+    // session qu'il vient de renouveler (`reprendreSession`) : l'effacement
+    // arrive donc après ce délai, pas avant.
+    await vi.waitFor(
+      () => expect(local.contenu['freel.session.supabase.v1']).toBeUndefined(),
+      { timeout: 3000 }
+    );
   });
 });
 

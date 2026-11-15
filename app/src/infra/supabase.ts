@@ -312,7 +312,8 @@ const VERROU_SESSION = 'freel.session';
  * n'efface que si la session conservée est encore celle qu'on a présentée.
  */
 export async function reprendreSession(
-  config: ConfigSupabase, stockage: StockageLocal, verrou: Verrou = verrouDuNavigateur
+  config: ConfigSupabase, stockage: StockageLocal, verrou: Verrou = verrouDuNavigateur,
+  attenteMs: number = ATTENTE_AUTRE_ONGLET_MS
 ): Promise<Session | null> {
   return verrou(VERROU_SESSION, async () => {
     const session = lireSession(stockage);
@@ -325,12 +326,44 @@ export async function reprendreSession(
     }
     // Seul un REFUS du serveur (400, 401) périme la session. Effacer sur
     // toute erreur déconnectait l'utilisateur à chaque coupure de wifi.
-    if (estRefusDAuthentification(r)
-      && lireSession(stockage)?.jetonRafraichissement === session.jetonRafraichissement) {
+    if (!estRefusDAuthentification(r)) return null;
+    const remplacee = await sessionRemplacee(stockage, session.jetonRafraichissement, attenteMs);
+    if (remplacee !== undefined) return remplacee;
+    if (lireSession(stockage)?.jetonRafraichissement === session.jetonRafraichissement) {
       ecrireSession(stockage, null);
     }
     return null;
   });
+}
+
+/**
+ * Le temps laissé à l'écriture d'un autre onglet pour arriver jusqu'ici.
+ *
+ * Le verrou ne suffisait pas : dans Chromium, l'annonce « verrou libre » et
+ * la session que l'autre onglet vient d'écrire voyagent par deux canaux
+ * distincts, sans ordre garanti. Trois fois sur dix, le second onglet lisait
+ * encore l'ancienne session, la renouvelait, se faisait refuser — le jeton
+ * venait de servir — et l'effaçait : déconnecté (constaté par
+ * `verifier:onglets`). Un refus, juste après un renouvellement ailleurs, est
+ * justement le signe que la bonne session est en route.
+ */
+const ATTENTE_AUTRE_ONGLET_MS = 1500;
+const PAS_ATTENTE_MS = 50;
+
+/**
+ * La session qu'un autre onglet a écrite à la place de celle qu'on a
+ * présentée ; `null` si elle n'est plus valable ; `undefined` si rien n'est
+ * venu dans le délai — la session présentée était bien la dernière.
+ */
+async function sessionRemplacee(
+  stockage: StockageLocal, presente: string, attenteMs: number
+): Promise<Session | null | undefined> {
+  for (let attendu = 0; ; attendu += PAS_ATTENTE_MS) {
+    const lue = lireSession(stockage);
+    if (lue !== null && lue.jetonRafraichissement !== presente) return sessionValide(lue) ? lue : null;
+    if (attendu >= attenteMs) return undefined;
+    await new Promise((r) => setTimeout(r, PAS_ATTENTE_MS));
+  }
 }
 
 /** Une session encore valable, avec une marge pour l'appel en cours. */

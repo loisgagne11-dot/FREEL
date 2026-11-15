@@ -6,9 +6,9 @@
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Quatre chiffres commandent toutes les décisions de l'application : le solde,
- * ce qu'il faut garder de côté, ce qui reste disponible, et ce qu'on peut se
- * verser. Ils s'enchaînent — le total de l'un est un terme du suivant — mais
- * l'écran ne montrait que les quatre résultats. Un utilisateur qui reprenait
+ * le dû, ce qui reste disponible, et ce qu'on peut se verser. Ils
+ * s'enchaînent — le total de l'un est un terme du suivant — mais l'écran ne
+ * montrait que les quatre résultats. Un utilisateur qui reprenait
  * ses données trouvait quatre nombres sans moyen de les recouper, et concluait
  * qu'il ne comprenait pas les données. Il avait raison : rien ne les
  * expliquait.
@@ -243,7 +243,7 @@ export function compositionSolde(
     formule: 'solde de départ + encaissements − dépenses − échéances réglées',
     lecture:
       'Ce que la banque doit afficher aujourd’hui. Ce n’est pas ce que tu peux '
-      + 'dépenser : une partie est due, et se lit sur « À garder de côté ».',
+      + 'dépenser : une partie est due, et se lit sur « Dû ».',
     termes,
     total,
     reserves: soldeInitialAu === null
@@ -258,7 +258,7 @@ export function compositionSolde(
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Ce qu'il faut garder de côté
+   Le dû
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
@@ -284,7 +284,7 @@ export function compositionProvisions(detail: DetailProvisions): Composition {
       // « dont » : la nature mêle les acomptes appelés (un fait) et la
       // provision (une estimation). Dire « au taux de l'année projetée » de
       // l'ensemble ferait croire qu'un acompte notifié est estimé.
-      precision: n === 'impot' ? 'dont provision au taux de l’année projetée' : null,
+      precision: n === 'impot' ? 'dont estimation au taux de l’année projetée' : null,
       date: null
     }));
 
@@ -301,7 +301,7 @@ export function compositionProvisions(detail: DetailProvisions): Composition {
   ];
 
   return composer({
-    titre: 'À garder de côté',
+    titre: 'Dû',
     formule: 'somme de ce qui est dû, appelé ou non',
     lecture:
       'Ce que tu dois, à qui. Chaque ligne mêle ce qui a déjà été appelé et ce '
@@ -331,9 +331,9 @@ export function compositionDisponible(
 ): Composition {
   return composer({
     titre: 'Disponible',
-    formule: 'solde du compte − à garder de côté',
+    formule: 'solde du compte − dû',
     lecture:
-      'Ce qui reste une fois tes dettes mises de côté. Négatif, il dit que ce '
+      'Ce qui reste une fois le dû retiré. Négatif, il dit que ce '
       + 'que tu dois dépasse ce que tu as — et le montant manquant est celui-là.',
     termes: [
       {
@@ -341,7 +341,7 @@ export function compositionDisponible(
         precision: null, date: null
       },
       {
-        libelle: 'À garder de côté', montant: provisions, signe: 'moins',
+        libelle: 'Dû', montant: provisions, signe: 'moins',
         precision: null, date: null
       }
     ],
@@ -351,10 +351,10 @@ export function compositionDisponible(
 }
 
 /**
- * Versable = max(0, disponible − seuil de sécurité).
+ * À te verser = max(0, disponible − réserve).
  *
  * La borne se dit à l'écran quand elle mord, et pas seulement dans le code :
- * sans elle, un disponible de 800 € et un seuil de 2 000 € donneraient « 0 € »
+ * sans elle, un disponible de 800 € et une réserve de 2 000 € donneraient « 0 € »
  * sans aucune explication, ce qui se lit comme une panne.
  */
 export function compositionVersable(
@@ -365,16 +365,16 @@ export function compositionVersable(
   const bornee = dispo - reserve < 0;
 
   return composer({
-    titre: 'Je peux me verser',
-    formule: 'disponible − seuil de sécurité, jamais négatif',
+    titre: 'À te verser',
+    formule: 'disponible − réserve, jamais négatif',
     lecture:
-      'Ce que tu peux te virer aujourd’hui sans entamer ni tes dettes ni ton '
-      + 'matelas. Se verser de l’argent n’est pas une opération comptable en '
+      'Ce que tu peux te virer aujourd’hui sans entamer ni ce qui est dû ni ta '
+      + 'réserve. Se verser de l’argent n’est pas une opération comptable en '
       + 'micro : la personne et l’entreprise sont la même.',
     termes: [
       { libelle: 'Disponible', montant: dispo, signe: 'depart', precision: null, date: null },
       {
-        libelle: 'Seuil de sécurité',
+        libelle: 'Réserve',
         montant: reserve,
         signe: 'moins',
         precision: 'réglé dans Config',
@@ -385,9 +385,9 @@ export function compositionVersable(
     borne: 'plancher_zero',
     reserves: bornee
       ? [
-        'Ton disponible est inférieur à ton seuil de sécurité : la différence '
+        'Ton disponible est inférieur à ta réserve : la différence '
         + 'est ramenée à zéro plutôt que d’afficher un versement négatif. Il n’y '
-        + 'a rien à te verser sans entamer ton matelas.'
+        + 'a rien à te verser sans entamer ta réserve.'
       ]
       : []
   });

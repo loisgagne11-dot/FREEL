@@ -14,24 +14,24 @@ const SAIN = {
 const constat = (i: ReturnType<typeof indicateursDeSante>, id: string) => i.find((x) => x.id === id);
 
 describe('constats de santé', () => {
-  it('dit que les provisions sont couvertes quand le disponible tient', () => {
+  it('dit que le dû est couvert quand le disponible tient', () => {
     expect(constat(indicateursDeSante(SAIN), 'provisions')?.etat).toBe('bon');
   });
 
   /**
-   * Un disponible négatif signifie que les provisions dépassent le solde :
+   * Un disponible négatif signifie que le dû dépasse le solde :
    * l'argent des cotisations a déjà été dépensé. Ce n'est pas une nuance,
    * c'est une alerte.
    */
-  it('alerte quand le disponible ne couvre plus les provisions', () => {
+  it('alerte quand le disponible ne couvre plus le dû', () => {
     const p = constat(indicateursDeSante({ ...SAIN, dispo: -1200 }), 'provisions');
     expect(p?.etat).toBe('alerte');
     expect(p?.valeur).toMatch(/il manque/);
   });
 
-  it('distingue « rien à provisionner » de « couvert »', () => {
+  it('distingue « rien n’est dû » de « couvert »', () => {
     const p = constat(indicateursDeSante({ ...SAIN, provisions: 0 }), 'provisions');
-    expect(p?.valeur).toMatch(/rien à provisionner/);
+    expect(p?.valeur).toMatch(/rien n’est dû/);
     expect(p?.etat).toBe('bon');
   });
 
@@ -78,7 +78,7 @@ describe('barre santé', () => {
 
   it('affiche les trois constats', () => {
     render(<SanteCard indicateurs={indicateursDeSante(SAIN)} autonomie={4.2} reserve={2470} />);
-    expect(screen.getByText('Provisions couvertes')).toBeTruthy();
+    expect(screen.getByText('Dû couvert')).toBeTruthy();
     expect(screen.getByText('Factures à jour')).toBeTruthy();
     expect(screen.getByText('Déclarations à jour')).toBeTruthy();
   });
@@ -105,16 +105,16 @@ describe('phrase de synthèse', () => {
   });
 
   /**
-   * L'ordre est une GRAVITÉ : une provision à découvert est le seul constat
+   * L'ordre est une GRAVITÉ : un dû non couvert est le seul constat
    * DÉJÀ dépensé, et passe devant tout le reste.
    */
-  it('nomme la provision à découvert avant tout le reste', () => {
+  it('nomme le dû non couvert avant tout le reste', () => {
     const s = syntheseDeSante(indicateursDeSante({
       ...SAIN, dispo: -1240, facturesEnRetard: 3, montantEnRetard: 9000,
       declarationsEnRetard: 2, regime: 'TVA due'
     }));
     expect(s.ton).toBe('alerte');
-    expect(s.phrase).toMatch(/Provisions à découvert/);
+    expect(s.phrase).toMatch(/Dû non couvert/);
     expect(s.phrase).toMatch(/1\s*240/u);
   });
 

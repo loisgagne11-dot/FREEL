@@ -80,7 +80,7 @@ interface MagasinFaits {
   /** Charge depuis le stockage, en migrant l'ancien format si nécessaire. */
   readonly initialiser: (stockage?: Stockage | null) => void;
 
-  /** Seul écrivain du seuil de sécurité — le fait s'appelle `reserve` (D4). */
+  /** Seul écrivain de la réserve — le fait s'appelle `reserve` (D4). */
   readonly definirReserve: (montant: Euros) => void;
   /**
    * Seul écrivain de la part gardée au versement.
@@ -223,9 +223,12 @@ function persister(stockage: Stockage | null, faits: Faits): void {
   if (!stockage) return;
   try {
     const surLeDisque = stockage.getItem(CLE_STOCKAGE);
-    // Le dossier a disparu du disque alors que cet onglet l'y avait lu ou
-    // écrit : voir `dossierEfface`.
-    if (surLeDisque === null && dernierConnu !== undefined) { dossierEfface(); return; }
+    // Le dossier a disparu du disque alors que cet onglet l'y avait VU — lu
+    // ou écrit : voir `dossierEfface`. `null` veut dire « jamais écrit », pas
+    // « effacé » : la première version de ce contrôle les confondait, et sur
+    // un appareil neuf la première saisie rechargeait la page au lieu de
+    // s'écrire, à chaque fois.
+    if (surLeDisque === null && typeof dernierConnu === 'string') { dossierEfface(); return; }
     if (surLeDisque !== null && dernierConnu !== undefined && surLeDisque !== dernierConnu) {
       reprendreDuDisque(surLeDisque);
       useFaits.setState((e) => ({ saisiesEcartees: e.saisiesEcartees + 1 }));

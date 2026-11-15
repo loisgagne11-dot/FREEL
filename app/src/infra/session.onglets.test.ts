@@ -85,9 +85,11 @@ describe('deux onglets sur une session expirée', () => {
     expect(lireSession(stockage)?.jetonRafraichissement).toBe('renouv-2');
   });
 
-  // Navigateur sans API de verrous : le second onglet est refusé, mais ne
-  // doit pas effacer la session neuve que le premier vient d'écrire.
-  it('sans verrou, le refus du second n’efface pas la session du premier', async () => {
+  // Navigateur sans API de verrous — ou verrou rendu AVANT que la session
+  // neuve ne soit lisible ici, ce que Chromium fait trois fois sur dix : le
+  // second onglet est refusé (le jeton vient de servir). Il ne doit ni
+  // effacer la session neuve, ni rester déconnecté : il l'adopte.
+  it('sans verrou, le second, refusé, adopte la session du premier', async () => {
     vi.stubGlobal('fetch', serveurARotation());
     const stockage = stockageMemoire();
     ecrireSession(stockage, EXPIREE);
@@ -98,15 +100,28 @@ describe('deux onglets sur une session expirée', () => {
     ]);
 
     expect(onglet1?.jeton).toBe('jeton-2');
-    expect(onglet2).toBeNull();
+    expect(onglet2?.jeton).toBe('jeton-2');
     expect(lireSession(stockage)?.jetonRafraichissement).toBe('renouv-2');
+  });
+
+  // La session neuve arrive APRÈS le refus : c'est le cas réel entre deux
+  // processus. L'attente la laisse arriver.
+  it('attend la session écrite ailleurs avant de conclure au refus', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => '{}' }));
+    const stockage = stockageMemoire();
+    ecrireSession(stockage, EXPIREE);
+    setTimeout(() => {
+      ecrireSession(stockage, { ...EXPIREE, jeton: 'jeton-9', jetonRafraichissement: 'renouv-9', expireLe: Date.now() + 3_600_000 });
+    }, 120);
+    expect((await reprendreSession(CONFIG, stockage, sansVerrou, 1000))?.jeton).toBe('jeton-9');
+    expect(lireSession(stockage)?.jetonRafraichissement).toBe('renouv-9');
   });
 
   it('un refus de la session qu’on a présentée l’efface', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => '{}' }));
     const stockage = stockageMemoire();
     ecrireSession(stockage, EXPIREE);
-    expect(await reprendreSession(CONFIG, stockage, sansVerrou)).toBeNull();
+    expect(await reprendreSession(CONFIG, stockage, sansVerrou, 100)).toBeNull();
     expect(lireSession(stockage)).toBeNull();
   });
 

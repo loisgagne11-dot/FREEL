@@ -193,7 +193,7 @@ export function provisionImpotRevenu(
   if (partsFiscales === null || partsFiscales <= 0) {
     return {
       statut: 'refuse',
-      motif: 'Impôt sur le revenu non provisionné : le nombre de parts fiscales n’est pas '
+      motif: 'Impôt sur le revenu non compté dans le dû : le nombre de parts fiscales n’est pas '
         + 'renseigné (Config). Une part supposée surestimerait l’impôt d’un foyer qui en '
         + 'compte plusieurs.'
     };

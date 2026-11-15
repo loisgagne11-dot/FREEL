@@ -16,9 +16,34 @@ export type TonStatut = 'ok' | 'attente' | 'retard' | 'neutre';
  *
  * Le libellé est donc toujours écrit. La couleur ne fait que le renforcer.
  */
-export function Statut({ libelle, ton }: { readonly libelle: string; readonly ton: TonStatut }) {
-  return <span className={`${styles.statut} ${styles[ton]}`}>{libelle}</span>;
+export function Statut(
+  { libelle, ton, signe = SIGNES[ton] }: {
+    readonly libelle: string;
+    readonly ton: TonStatut;
+    /** Le signe du ton, sauf quand l'état en a un plus juste (« → Envoyée »). */
+    readonly signe?: string | undefined;
+  }
+) {
+  return (
+    <span className={`${styles.statut} ${styles[ton]}`}>
+      <span className={styles.signe} aria-hidden="true">{signe}</span>
+      {libelle}
+    </span>
+  );
 }
+
+/**
+ * Le signe de chaque ton (direction visuelle, règle 4) : un état ne se lit
+ * jamais par la couleur seule — imprimé en noir et blanc, « Encaissée » et
+ * « En retard » ne différaient plus que par le mot. Le signe est décoratif
+ * pour le lecteur d'écran (`aria-hidden`) : le mot suffit à l'oreille.
+ */
+const SIGNES: Readonly<Record<TonStatut, string>> = {
+  ok: '●',
+  attente: '◇',
+  retard: '▲',
+  neutre: '○'
+};
 
 /**
  * Le statut d'une recette au livre.

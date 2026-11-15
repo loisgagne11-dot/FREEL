@@ -153,7 +153,7 @@
  * qu'on aurait oublié de payer.
  */
 .pointEstime { background: var(--panel) !important; border-style: dashed; }
-.pastilleEstimee { border: 1.5px dashed var(--c-ir); }
+.pastilleEstimee { border: 1.5px dashed var(--c-impot); }
 .estime { font-weight: 400; color: var(--muted-2); }
 
 /* ── Le repère du jour ─────────────────────────────────────────────────── */
@@ -197,7 +197,7 @@
    même dette garde sa couleur d'un écran à l'autre. */
 .urssaf { background: var(--c-urssaf); border-color: var(--c-urssaf); }
 .tva { background: var(--c-tva); border-color: var(--c-tva); }
-.impot { background: var(--c-ir); border-color: var(--c-ir); }
+.impot { background: var(--c-impot); border-color: var(--c-impot); }
 .cfe { background: var(--c-cfe); border-color: var(--c-cfe); }
 .cfp { background: var(--c-urssaf); border-color: var(--c-urssaf); }
 

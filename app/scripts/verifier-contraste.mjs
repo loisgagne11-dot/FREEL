@@ -35,6 +35,21 @@ const JETONS = {
 };
 const FONDS = ['--bg', '--panel', '--card-a'];
 
+/**
+ * Lot 51 : les couleurs de charges sont des APLATS (frise, barres, filets) —
+ * 1.4.11, 3:1 sur la carte qui les porte. Les textes de pastille et des
+ * clients du planning sont du texte sur LEUR fond — 4,5:1. Un fond `rgba` se
+ * compose sur `--card-a`, où il est posé ; le refuser comme « illisible »
+ * aurait laissé ces paires hors contrôle dans trois thèmes sur quatre.
+ */
+const SEUIL_GRAPHIQUE = 3;
+const PAIRES = [
+  ['--c-impot', '--card-a', SEUIL_GRAPHIQUE], ['--c-urssaf', '--card-a', SEUIL_GRAPHIQUE],
+  ['--c-tva', '--card-a', SEUIL_GRAPHIQUE], ['--c-cfe', '--card-a', SEUIL_GRAPHIQUE],
+  ['--chip-ok', '--green-deep', SEUIL_TEXTE], ['--chip-warn', '--amber-soft', SEUIL_TEXTE],
+  ['--k1t', '--k1', SEUIL_TEXTE], ['--k2t', '--k2', SEUIL_TEXTE], ['--k3t', '--k3', SEUIL_TEXTE]
+];
+
 /** Une palette = un bloc dont le sélecteur porte `data-theme` (ou `:root` pour sombre). */
 function lirePalettes(css) {
   const palettes = {};
@@ -63,6 +78,16 @@ function rgb(hex) {
   const m = /^#([0-9a-f]{6})$/i.exec(hex ?? '');
   if (!m) return undefined;
   return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255);
+}
+
+/** Une couleur `#rrggbb`, ou `rgba(…)` composée sur `dessous` (déjà en [0;1]). */
+function rgbSur(valeur, dessous) {
+  const plein = rgb(valeur);
+  if (plein) return plein;
+  const m = /^rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)$/.exec(valeur ?? '');
+  if (!m || !dessous) return undefined;
+  const a = Number(m[4]);
+  return [1, 2, 3].map((i, k) => (Number(m[i]) / 255) * a + dessous[k] * (1 - a));
 }
 
 function luminance([r, g, b]) {
@@ -101,8 +126,24 @@ for (const nom of attendues) {
   }
 }
 
+for (const nom of attendues) {
+  const jetons = palettes[nom];
+  if (!jetons) continue;
+  const carte = rgb(resoudre(jetons, '--card-a'));
+  for (const [avant, fond, seuil] of PAIRES) {
+    const c = rgb(resoudre(jetons, avant));
+    const f = rgbSur(resoudre(jetons, fond), carte);
+    if (!c || !f) {
+      echecs.push(`${nom} : ${avant} ou ${fond} est absent ou illisible.`);
+      continue;
+    }
+    const r = ratio(c, f);
+    if (r < seuil) echecs.push(`${nom} : ${avant} sur ${fond} = ${r.toFixed(2)}:1 (minimum ${seuil}:1).`);
+  }
+}
+
 if (echecs.length > 0) {
   console.error('✗ Contraste insuffisant :\n' + echecs.map((e) => '  · ' + e).join('\n'));
   process.exit(1);
 }
-console.log(`✓ Contraste : ${Object.keys(JETONS).length} jetons × ${FONDS.length} fonds × ${attendues.length} palettes, tous au-dessus du seuil.`);
+console.log(`✓ Contraste : ${Object.keys(JETONS).length} jetons × ${FONDS.length} fonds, et ${PAIRES.length} paires de la direction, × ${attendues.length} palettes, tous au-dessus du seuil.`);

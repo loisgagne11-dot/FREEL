@@ -26,10 +26,10 @@ import { Montant } from './Montant';
  * toutes les lignes sur la largeur.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * LE VERSABLE VIT ICI, ET NULLE PART AILLEURS SUR LE PILOTE
+ * L'« À TE VERSER » VIT ICI, ET NULLE PART AILLEURS SUR LE PILOTE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Il avait sa propre carte au-dessus, et la colonne « Rémunération » le
+ * Il avait sa propre carte au-dessus, et la colonne « À te verser » le
  * répétait : deux fois le même chiffre, et une demi-largeur vide à côté de la
  * carte. Il s'ouvre sur sa composition, comme la carte le faisait.
  */
@@ -129,22 +129,24 @@ export function FluxCard(
           <p className={styles.note}>
             {sorties.length > 0
               ? <><Montant>{eur(payees as Euros)}</Montant> payé · <Montant>{eur(flux.sorties.total)}</Montant> à venir</>
-              : 'Rien à mettre de côté'}
+              : 'Rien n’est dû'}
           </p>
           <Lignes lignes={sorties} vers={VERS_ECHEANCIER} onPointer={onPayer} />
         </div>
 
         <div className={styles.colonne}>
-          <span className={`${styles.libelle} ${styles.entree}`}>Rémunération</span>
+          <span className={`${styles.libelle} ${styles.entree}`}>À te verser</span>
           <button type="button" className={`${styles.montant} ${styles.versable}`} onClick={onVersable}>
             <Montant>{eur(flux.remuneration.versable)}</Montant>
             {' '}<span className={styles.horsEcran}>— d’où vient ce chiffre</span>
             <span className={styles.chevron} aria-hidden="true">›</span>
           </button>
           <p className={styles.note}>
+            {/* « hors provisions » se lisait dans les deux sens — comprises ou
+                retirées ? La note dit ce qui est déjà ôté, et avec quels mots. */}
             {versementPossible
-              ? <>Ce que tu peux te verser, <strong>hors provisions</strong>.</>
-              : 'Rien n’est versable ce mois-ci.'}
+              ? <>une fois le dû et la réserve <strong>retirés</strong></>
+              : 'Rien à te verser ce mois-ci.'}
           </p>
           {/* Ce qui est DÉJÀ sorti ce mois-ci : sans cette ligne, « 3 000 »
               se lit « en plus », alors qu'on s'est peut-être versé 2 500 le 5. */}
@@ -156,9 +158,12 @@ export function FluxCard(
               )}
             </p>
           )}
-          {/* À côté du versable, ce qui reste à mettre de côté pour l'impôt
-              (lot 35) : il se paie depuis le compte personnel, et le virer au
-              fil des encaissements évite la marche d'escalier de l'automne. */}
+          {/* À côté de l'« à te verser », ce qui reste à mettre de côté pour
+              l'impôt (lot 35) : il se paie depuis le compte personnel, et le
+              virer au fil des encaissements évite la marche d'escalier de
+              l'automne. Pour l'argent, « de côté » ne nomme plus que l'impôt
+              (lot 51) : le dû a son propre mot, et les deux ne se confondent
+              plus. */}
           {flux.remuneration.impotAMettreDeCote !== null && (
             <p className={styles.note}>
               À mettre de côté pour l’impôt&nbsp;: <Montant>{eur(flux.remuneration.impotAMettreDeCote)}</Montant>
@@ -211,7 +216,7 @@ export function Pastille({ ligne, vers }: { ligne: LigneFlux; vers: string }) {
     : ligne.enRetard === true
       ? [styles.retard, 'en retard']
       : ligne.id === 'a-provisionner'
-        ? [styles.attente, 'à provisionner']
+        ? [styles.attente, 'non appelé']
         : [styles.attente, vers === VERS_FACTURES ? 'en attente' : 'à venir'];
   return <span className={`${styles.pastille} ${classe}`}>{texte}</span>;
 }

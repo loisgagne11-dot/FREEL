@@ -835,3 +835,12 @@ sélecteur, aucun calcul, aucun nombre lu à l'écran ne change.
 Lot de sécurité : aucun sélecteur ni aucun nombre lu à l'écran ne change. Un
 relevé dont une ligne porte un montant démesuré écarte cette ligne, et le
 compte rendu d'import le dit.
+
+## Lot 51 (en cours, 15/11) — les couleurs des charges
+
+Aucun nombre ne change. Les teintes qui les distinguent, si : impôt, URSSAF,
+TVA et CFE prennent celles de la direction visuelle, distinctes pour un
+lecteur daltonien (l'URSSAF n'emprunte plus l'ambre « à surveiller », ni la
+TVA le bleu générique). Partout où une charge a sa couleur — enveloppes de
+Trésorerie, frise et liste de l'échéancier, anneau de composition — et dans
+les quatre thèmes. Relu sur capture à 390 px, clair et sombre.

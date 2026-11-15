@@ -559,7 +559,7 @@ function PanneauComposition({ composition }: { readonly composition: Composition
       <p className={styles.piedBloc}>
         <span>Reste à encaisser sur les factures de ce mois</span>
         {/* Le signe « + » dit le SENS : c'est de l'argent qui va rentrer, pas
-            une dette. Sans lui, le montant se range à côté des provisions et
+            une dette. Sans lui, le montant se range à côté du dû et
             des échéances, qui sortent du compte. */}
         <span className={a.resteAEncaisser > 0 ? styles.attente : ''}>
           {a.resteAEncaisser > 0 && '+'}<Montant>{eur(a.resteAEncaisser)}</Montant>
@@ -593,9 +593,9 @@ function PanneauComposition({ composition }: { readonly composition: Composition
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Le prototype applique la part au DISPONIBLE. À 0 %, il propose alors de
- * verser le seuil de sécurité avec — c'est-à-dire de vider précisément le
- * matelas qu'on s'était donné. Le versable est le disponible une fois ce seuil
- * retiré : c'est sur lui que la part s'applique.
+ * verser la réserve avec — c'est-à-dire de vider précisément le plancher
+ * qu'on s'était donné. Le versable est le disponible une fois la réserve
+ * retirée : c'est sur lui que la part s'applique.
  *
  * Le défaut est **0 %**, et non les 50 % du prototype : un défaut à 50 %
  * couperait en deux, sans un geste, le versable de tout compte existant.
@@ -634,7 +634,7 @@ function CarteVersement(
     <section className={styles.carte} aria-labelledby="versement">
       <header className={styles.enteteCarte}>
         <h2 id="versement" className={styles.titreCarte}>Tu peux te verser</h2>
-        <span className={styles.badge}>versable − part gardée</span>
+        <span className={styles.badge}>à te verser − part gardée</span>
       </header>
 
       {/* Le grand nombre porte son libellé, lisible par les technologies
@@ -674,22 +674,22 @@ function CarteVersement(
       />
 
       {/* Un disponible négatif ne se raconte pas comme une soustraction : à
-          −2 669 €, « le seuil de sécurité en retient 2 470 € » suggérerait un
-          reste de −5 139 €, alors que le versable est zéro et que le seuil
-          n'est pas constitué du tout. Ce n'est pas le même fait, et c'est
+          −2 669 €, « la réserve en retient 2 470 € » suggérerait un
+          reste de −5 139 €, alors que le versable est zéro et que la réserve
+          n'est pas constituée du tout. Ce n'est pas le même fait, et c'est
           celui-là qu'il faut dire — sinon la carte affiche « 0 € » sans qu'on
           sache si c'est le réglage ou le compte qui l'impose. */}
       {dispo < 0 ? (
         <p className={styles.explication}>
           Ton disponible est <strong>négatif</strong> (<Montant>{eur(dispo)}</Montant>)&nbsp;:
-          les provisions dépassent ce qu’il y a sur le compte. Il n’y a rien à
-          te verser, et le seuil de sécurité n’est pas constitué non plus.
+          le dû dépasse ce qu’il y a sur le compte. Il n’y a rien à
+          te verser, et la réserve n’est pas constituée non plus.
         </p>
       ) : (
         <p className={styles.explication}>
-          Sur <Montant>{eur(dispo)}</Montant> de disponible, le seuil de sécurité
+          Sur <Montant>{eur(dispo)}</Montant> de disponible, la réserve
           en retient <Montant>{eur(euros(Math.min(reserve, dispo)))}</Montant>&nbsp;: reste{' '}
-          <Montant>{eur(base)}</Montant> de versable. Tu en gardes{' '}
+          <Montant>{eur(base)}</Montant> à te verser. Tu en gardes{' '}
           <strong>{pourcent}&nbsp;%</strong> (<Montant>{eur(gardee)}</Montant>) et
           tu verses le reste.
         </p>
@@ -757,7 +757,7 @@ function CarteCapacite(
             La barre dit ce que le mois <em>autorisait</em>&nbsp;: encaissé, moins
             les cotisations au taux de <em>ce</em> mois-là, moins les dépenses.
             Au barème, l’impôt sur le revenu n’y est pas déduit&nbsp;: il se met
-            de côté à part, dans les provisions. Le plein dit ce que tu as pris. Les mois à venir sont hachurés et
+            de côté à part, et compte dans le dû. Le plein dit ce que tu as pris. Les mois à venir sont hachurés et
             n’ont aucun plein&nbsp;— rien n’en est encore sorti.
           </Info>
         </h2>

@@ -230,14 +230,14 @@ describe('ce que la composition avoue', () => {
   /**
    * LA BORNE À ZÉRO SE DIT, SINON ELLE RESSEMBLE À UNE PANNE.
    *
-   * Un disponible de 800 € et un seuil de 2 000 € donnent « 0 € ». Sans
+   * Un disponible de 800 € et une réserve de 2 000 € donnent « 0 € ». Sans
    * explication, ce zéro se lit comme un calcul qui n'a pas abouti.
    */
-  it('explique un versable ramené à zéro par le seuil de sécurité', () => {
+  it('explique un « à te verser » ramené à zéro par la réserve', () => {
     const c = compositionVersable(euros(800), euros(2_000), euros(0));
     expect(c.ecart).toBe(0);
     expect(c.reserves).toHaveLength(1);
-    expect(c.reserves[0]).toMatch(/seuil de sécurité/);
+    expect(c.reserves[0]).toMatch(/inférieur à ta réserve/);
   });
 
   it('ne l’explique pas quand la borne ne mord pas', () => {

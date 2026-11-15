@@ -76,7 +76,7 @@ export function PanneauDetailDette({ detail }: { readonly detail: DetailDette })
       ))}
       {detail.impotRevenu !== null && detail.impotRevenu.statut === 'refuse' && (
         <p className={styles.provisionIr} role="status">
-          Impôt sur le revenu non provisionné&nbsp;: {detail.impotRevenu.motif}
+          Impôt sur le revenu non compté dans le dû&nbsp;: {detail.impotRevenu.motif}
         </p>
       )}
       {/* Un écart entre le total et ce que les lignes expliquent est une

@@ -4,8 +4,8 @@ import styles from './Repartition.module.css';
 /**
  * Les teintes disponibles.
  *
- * Les trois premières découpent le SOLDE — ce qui n'est pas à vous, le
- * matelas, le reste. Les cinq suivantes découpent la PROVISION par nature de
+ * Les trois premières découpent le SOLDE — le dû, la réserve, ce qui est à
+ * te verser. Les cinq suivantes découpent le DÛ par nature de
  * dette, et reprennent les couleurs déjà employées par l'échéancier : une même
  * dette doit avoir la même couleur d'un écran à l'autre, sinon la couleur
  * cesse d'être une information.
@@ -49,7 +49,7 @@ export function Repartition(
     readonly parts: readonly PartSolde[];
     readonly total: number;
     /**
-     * Ce qui manque quand les provisions dépassent le solde.
+     * Ce qui manque quand le dû dépasse le solde.
      *
      * Ce cas n'est pas une nuance d'affichage : l'argent des cotisations a
      * déjà été dépensé. La barre ne peut pas le représenter — elle
@@ -92,8 +92,8 @@ export function Repartition(
 
       {deficit > 0 && (
         <p className={styles.deficit}>
-          Il manque <strong><Montant>{montant(deficit)}</Montant></strong> pour couvrir les
-          provisions&nbsp;: une partie de l’argent dû a déjà été dépensée.
+          Il manque <strong><Montant>{montant(deficit)}</Montant></strong> pour couvrir
+          le dû&nbsp;: une partie de l’argent dû a déjà été dépensée.
         </p>
       )}
     </div>

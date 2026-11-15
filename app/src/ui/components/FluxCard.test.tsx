@@ -37,7 +37,7 @@ describe('le flux du mois', () => {
     render(<FluxCard flux={FLUX} periode="août 2026" {...RIEN} />);
     expect(screen.getByText('Entrées')).toBeTruthy();
     expect(screen.getByText('Sorties')).toBeTruthy();
-    expect(screen.getByText('Rémunération')).toBeTruthy();
+    expect(screen.getByText('À te verser')).toBeTruthy();
   });
 
   it('chiffre ce qui reste en attente de règlement', () => {
@@ -54,20 +54,20 @@ describe('le flux du mois', () => {
    */
   it('chiffre les sorties même sans aucune échéance listée', () => {
     render(<FluxCard flux={FLUX} periode="août 2026" {...RIEN} />);
-    expect(screen.getAllByText(/à provisionner/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/non appelé/).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Charges sur encaissements').length).toBeGreaterThan(0);
   });
 
-  // Un bouton actif alors que le versable est nul invite à un geste qui ne
-  // peut pas aboutir.
-  it('ne propose pas de verser quand rien n’est versable', () => {
+  // Un bouton actif alors que l'« à te verser » est nul invite à un geste qui
+  // ne peut pas aboutir.
+  it('ne propose pas de verser quand il n’y a rien à te verser', () => {
     const rien: FluxDuMois = {
       ...FLUX,
       remuneration: { versable: euros(0), provisions: euros(980), impotAMettreDeCote: null }
     };
     render(<FluxCard flux={rien} periode="août 2026" {...RIEN} />);
     expect(screen.queryAllByRole('link', { name: /Verser/ })).toHaveLength(0);
-    expect(screen.getByText(/Rien n’est versable/)).toBeTruthy();
+    expect(screen.getByText(/Rien à te verser/)).toBeTruthy();
   });
 
   it('propose de verser quand il y a de quoi', () => {
@@ -223,19 +223,19 @@ describe('les lignes et leurs pastilles', () => {
 });
 
 /**
- * LE VERSABLE VIT DANS LA COLONNE RÉMUNÉRATION, ET S'OUVRE SUR SA COMPOSITION.
+ * L'« À TE VERSER » VIT DANS SA COLONNE, ET S'OUVRE SUR SA COMPOSITION.
  *
  * Il avait sa propre carte au-dessus du flux, que la colonne répétait.
  */
-describe('la rémunération', () => {
-  it('ouvre la composition du versable', async () => {
+describe('l’« à te verser »', () => {
+  it('ouvre sa composition', async () => {
     const ouvrir = vi.fn();
     render(<FluxCard flux={FLUX} periode="août 2026" {...RIEN} onVersable={ouvrir} />);
     await userEvent.setup().click(screen.getByRole('button', { name: /d’où vient ce chiffre/ }));
     expect(ouvrir).toHaveBeenCalledOnce();
   });
 
-  // « Je peux me verser 2 500 » se lirait « en plus » sans ce qui est déjà
+  // « À te verser 2 500 » se lirait « en plus » sans ce qui est déjà
   // parti ce mois-ci.
   it('dit ce qui est déjà versé, et ce qui manque au besoin', () => {
     render(<FluxCard flux={FLUX} periode="août 2026" {...RIEN} dejaVerse={euros(800)} besoinMensuel={euros(2300)} />);

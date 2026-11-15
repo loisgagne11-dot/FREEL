@@ -141,8 +141,8 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         return {
           intitule: pluriel(sujet.nombre, 'période à déclarer', 'périodes à déclarer'),
           contexte: `Depuis ${moisLisible(texte(d['depuis']))}. Tant qu’une période n’est `
-            + 'pas déclarée, sa charge reste provisionnée et le versable est minoré '
-            + 'd’autant.',
+            + 'pas déclarée, sa charge reste estimée dans le dû, et ce qui est à te '
+            + 'verser est minoré d’autant.',
           action: 'Déclarer',
           levier
         };
@@ -165,9 +165,10 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         intitule: 'Aucune échéance enregistrée',
         contexte: 'Tu encaisses depuis plusieurs mois sans qu’aucun appel de '
           + 'cotisations, avis d’impôt ou CFE ne soit saisi. Tant qu’ils manquent, '
-          + 'le disponible et le versable sont SURESTIMÉS — c’est le sens qui coûte cher.',
+          + 'le disponible et ce qui est à te verser sont SURESTIMÉS — c’est le sens '
+          + 'qui coûte cher.',
         action: 'Saisir mes échéances',
-        levier: 'saisir un avis prend une minute, et rend le versable juste'
+        levier: 'saisir un avis prend une minute, et rend juste ce qui est à te verser'
       };
 
     case 'tva-a-regulariser':

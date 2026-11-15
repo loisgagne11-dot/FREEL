@@ -111,7 +111,7 @@ export function ProjectionPanneau() {
           l'écran — même série, même source — dans une autre forme et sur un
           axe d'une seule lettre. Deux dessins du même nombre sur un écran
           finissent par ne pas dire la même chose ; celui du haut porte en
-          plus les entrées, les sorties et le seuil, donc c'est lui qui reste.
+          plus les entrées, les sorties et la réserve, donc c'est lui qui reste.
 
           Ce qui n'était QUE dans cette carte est conservé : la phrase du
           versement soutenable et les trois hypothèses sont juste au-dessus, et

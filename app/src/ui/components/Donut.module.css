@@ -135,7 +135,7 @@
 .versable { stroke: var(--green); background: var(--green); }
 .urssaf { stroke: var(--c-urssaf); background: var(--c-urssaf); }
 .tva { stroke: var(--c-tva); background: var(--c-tva); }
-.impot { stroke: var(--c-ir); background: var(--c-ir); }
+.impot { stroke: var(--c-impot); background: var(--c-impot); }
 .cfe { stroke: var(--c-cfe); background: var(--c-cfe); }
 .cfp { stroke: var(--c-urssaf); background: var(--c-urssaf); }
 

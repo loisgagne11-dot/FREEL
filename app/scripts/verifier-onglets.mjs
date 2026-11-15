@@ -8,9 +8,12 @@
  * refusé et effaçait la session neuve du premier : les deux se retrouvaient
  * déconnectés.
  *
- * Deux passes : avec l'API de verrous du navigateur (un seul renouvellement,
- * deux onglets connectés) ; puis sans elle, comme un navigateur ancien (le
- * second onglet est refusé, mais la session du premier reste).
+ * Deux passes : avec l'API de verrous du navigateur, puis sans elle, comme un
+ * navigateur ancien. Dans les deux, aucun onglet ne finit déconnecté et la
+ * session neuve reste. Le verrou ne suffit pas à lui seul : Chromium rend
+ * parfois le verrou avant que la session écrite par l'autre onglet soit
+ * lisible (3 passages sur 10, mesuré) — le second onglet, refusé, doit alors
+ * ADOPTER la session neuve au lieu de l'effacer (`reprendreSession`).
  *
  * Usage : npm run build && node scripts/verifier-onglets.mjs
  */
@@ -63,6 +66,7 @@ async function deuxOnglets(base, navigateur, { sansVerrou }) {
   const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 } });
   const consommes = new Set();
   let renouvellements = 0;
+  let acceptes = 0;
   let suivant = 1;
   await contexte.route(`${PROJET}/**`, async (route) => {
     const url = route.request().url();
@@ -79,6 +83,7 @@ async function deuxOnglets(base, navigateur, { sansVerrou }) {
         return route.fulfill({ status: 400, headers: entetes, body: JSON.stringify({ error_description: 'Invalid Refresh Token: Already Used' }) });
       }
       consommes.add(jeton);
+      acceptes++;
       suivant++;
       return route.fulfill({
         status: 200, headers: entetes, body: JSON.stringify({
@@ -106,6 +111,7 @@ async function deuxOnglets(base, navigateur, { sansVerrou }) {
   const connecte = async (p) => (await p.getByRole('button', { name: 'Se déconnecter', exact: true }).count()) > 0;
   const resultat = {
     renouvellements,
+    acceptes,
     connectes: [await connecte(a), await connecte(b)],
     conservee: await a.evaluate(() => JSON.parse(localStorage.getItem('freel.session.supabase.v1') ?? 'null')?.jetonRafraichissement ?? null)
   };
@@ -120,13 +126,13 @@ const navigateur = await chromium.launch(existsSync(CHROMIUM_FOURNI) ? { executa
 try {
   console.log('\n🔐 Deux onglets, une session expirée — verrou du navigateur');
   const avec = await deuxOnglets(base, navigateur, { sansVerrou: false });
-  constate(avec.renouvellements === 1, 'un seul renouvellement', `${avec.renouvellements}`);
+  constate(avec.acceptes === 1, 'un seul renouvellement accepté', `${avec.acceptes} accepté(s) sur ${avec.renouvellements} demande(s)`);
   constate(avec.connectes.every(Boolean), 'les deux onglets restent connectés', JSON.stringify(avec.connectes));
   constate(avec.conservee === 'renouv-2', 'la session neuve est conservée', String(avec.conservee));
 
   console.log('\n🔐 Même essai sans verrou (navigateur ancien)');
   const sans = await deuxOnglets(base, navigateur, { sansVerrou: true });
-  constate(sans.connectes.some(Boolean), 'au moins un onglet reste connecté', JSON.stringify(sans.connectes));
+  constate(sans.connectes.every(Boolean), 'les deux onglets restent connectés : le refusé adopte la session neuve', JSON.stringify(sans.connectes));
   constate(sans.conservee === 'renouv-2', 'le refus du second n’efface pas la session du premier', String(sans.conservee));
 } finally {
   await navigateur.close();

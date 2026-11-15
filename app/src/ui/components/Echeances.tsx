@@ -221,7 +221,7 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
             onValider={(payeeLe, montantPaye) => {
               enregistrerPaiement(enPaiement.id, payeeLe, montantPaye);
               signaler(montantPaye === null
-                ? 'Paiement enregistré. L’échéance sort des provisions.'
+                ? 'Paiement enregistré. L’échéance sort du dû.'
                 : 'Paiement enregistré, avec son écart au montant appelé.');
               setPanneau({ type: 'ferme' });
             }}
@@ -245,7 +245,7 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
               } else {
                 const n = ajouterSerie(serie);
                 signaler(n === 1
-                  ? 'Échéance enregistrée. Elle entre dans les provisions.'
+                  ? 'Échéance enregistrée. Elle entre dans le dû.'
                   : `${n} échéances enregistrées. Chacune se corrige séparément.`);
               }
               setPanneau({ type: 'ferme' });
@@ -347,7 +347,7 @@ function Ligne(
                 <>
                   Le paiement du {dateCourte(echeance.payeeLe)}
                   {' '}(<Montant>{eur(echeance.montantPaye ?? echeance.montant)}</Montant>)
-                  {' '}sera oublié&nbsp;: l’échéance redevient due, et revient dans les provisions.
+                  {' '}sera oublié&nbsp;: l’échéance redevient due, et revient dans le dû.
                 </>
               )}
               libelleConfirmer="Repasser à payer"
@@ -449,11 +449,11 @@ function statutDe(
 /**
  * Ce que la suppression d'une échéance change — selon qu'elle est payée.
  *
- * Non payée, elle est l'appel que les provisions retiennent : la supprimer
- * les fait baisser d'autant, et le versable monte — à ne faire que pour une
- * saisie en double ou erronée. Payée, elle n'est plus provisionnée, mais son
+ * Non payée, elle est l'appel que le dû retient : la supprimer le fait
+ * baisser d'autant, et l'« à te verser » monte — à ne faire que pour une
+ * saisie en double ou erronée. Payée, elle n'est plus dans le dû, mais son
  * paiement disparaît avec elle : la sortie quitte le flux de son mois, et pour
- * la TVA et l'impôt, ce qui était réglé ne l'est plus — la provision remonte.
+ * la TVA et l'impôt, ce qui était réglé ne l'est plus — le dû remonte.
  */
 function ConsequenceSuppression({ echeance: e }: { readonly echeance: Echeance }) {
   const libelle = DE_NATURE[e.nature];
@@ -461,7 +461,7 @@ function ConsequenceSuppression({ echeance: e }: { readonly echeance: Echeance }
     return (
       <>
         L’appel {libelle} de <Montant>{eur(e.montant)}</Montant> du
-        {' '}{dateCourte(e.echeanceLe)} quitte l’échéancier et les provisions&nbsp;:
+        {' '}{dateCourte(e.echeanceLe)} quitte l’échéancier et le dû&nbsp;:
         ce que tu peux te verser monte d’autant. À ne faire que pour une saisie
         en double ou erronée.
       </>
@@ -473,7 +473,7 @@ function ConsequenceSuppression({ echeance: e }: { readonly echeance: Echeance }
       L’échéance {libelle} du {dateCourte(e.echeanceLe)} quitte l’échéancier,
       avec son paiement du {dateCourte(e.payeeLe)}&nbsp;: il ne comptera plus
       dans les sorties de son mois
-      {regle && <>, ni dans ce qui est déjà réglé — la provision remontera d’autant</>}.
+      {regle && <>, ni dans ce qui est déjà réglé — le dû remontera d’autant</>}.
     </>
   );
 }
@@ -551,7 +551,7 @@ function Formulaire(
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       // Sans date, l'échéance ne peut être rattachée à aucun mois : elle
       // n'apparaîtrait dans aucun flux, tout en pesant sur les provisions.
-      setErreur('La date d’échéance est obligatoire : sans elle, la somme pèse sur les provisions sans apparaître dans aucun mois.');
+      setErreur('La date d’échéance est obligatoire : sans elle, la somme pèse sur le dû sans apparaître dans aucun mois.');
       return;
     }
     setErreur(null);
@@ -613,8 +613,8 @@ function Formulaire(
           <span className={styles.aide}>
             {solde
               ? <>À l’automne, le solde et les acomptes de l’année se prélèvent ensemble.
-                Saisir le solde comme tel le fait sortir des provisions, où il était
-                gardé estimé depuis le 1er janvier.</>
+                Saisir le solde comme tel remplace, dans le dû, l’estimation
+                gardée depuis le 1er janvier.</>
               : <>L’acompte des indépendants tombe le 15 de chaque mois — ou le 15
                 février, mai, août et novembre au trimestre. La première année
                 d’activité, il n’y en a pas&nbsp;: ils démarrent en septembre de

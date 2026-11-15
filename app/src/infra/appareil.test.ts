@@ -78,6 +78,17 @@ describe('effacer cet appareil', () => {
  * saisie, et le dossier effacé revenait sur l'appareil.
  */
 describe('le dossier effacé ailleurs', () => {
+  // La garde du lot 59 confondait « jamais écrit » et « effacé » : sur un
+  // appareil neuf, la première saisie rechargeait la page au lieu de
+  // s'écrire — et la suivante aussi. Aucun essai ne partait d'un stockage vide.
+  it('laisse s’écrire la première saisie d’un appareil neuf', () => {
+    const s = stockage({});
+    useFaits.getState().initialiser(s);
+    expect(s.getItem(CLE_STOCKAGE)).toBeNull();
+    useFaits.getState().definirReserve(euros(100));
+    expect(s.getItem(CLE_STOCKAGE)).not.toBeNull();
+  });
+
   it('n’est pas réécrit par la saisie suivante', () => {
     const s = stockage({ [CLE_STOCKAGE]: JSON.stringify(faitsVides()) });
     useFaits.getState().initialiser(s);

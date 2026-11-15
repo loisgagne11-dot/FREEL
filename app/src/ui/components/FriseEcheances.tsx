@@ -115,7 +115,7 @@ export function FriseEcheances(
   const aucunAppel = (
     <p className={styles.vide}>
       Aucune échéance enregistrée pour {annee}. Tant qu’il n’y en a pas, le
-      disponible et le versable sont <strong>surestimés</strong>.
+      disponible et ce qui est à te verser sont <strong>surestimés</strong>.
     </p>
   );
   if (jalons.length === 0) return aucunAppel;

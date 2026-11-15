@@ -103,15 +103,15 @@ export function Echeancier({ annee }: { readonly annee: number }) {
  * L'écriture existait dans le magasin. Aucun écran ne l'appelait.
  * Une période déclarée restait donc à jamais dans le volet « à provisionner » :
  * les provisions montaient sans jamais redescendre, et le versable baissait
- * d'autant. On mettait de côté deux fois la même dette.
+ * d'autant. Le dû comptait deux fois la même dette.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * DÉCLARÉ N'EST PAS PAYÉ
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Cocher ici ne dit pas que la somme est réglée : elle passe de « à
- * provisionner » à « appelé, à payer ». Elle reste donc dans le total à garder
- * de côté — c'est justement pour la payer qu'on la garde.
+ * provisionner » à « appelé, à payer ». Elle reste donc dans le dû — c'est
+ * justement pour la payer qu'on la garde.
  */
 function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
   const faits = useFaits((e) => e.faits);
@@ -135,9 +135,10 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
         Périodes URSSAF
         <Info libelle="À quoi sert de cocher une période">
           Tant qu’une période n’est pas déclarée, les cotisations dues dessus
-          restent dans le volet «&nbsp;à provisionner&nbsp;». La déclarer les
-          fait basculer dans «&nbsp;échéances émises&nbsp;»&nbsp;: la somme
-          reste à garder de côté, mais elle cesse d’être comptée deux fois.
+          restent estimées, dans les «&nbsp;charges sur recettes
+          encaissées&nbsp;». La déclarer les fait basculer dans «&nbsp;échéances
+          émises&nbsp;»&nbsp;: la somme reste due, mais elle cesse d’être
+          comptée deux fois.
           Cocher ne veut pas dire payé.
         </Info>
       </h2>
