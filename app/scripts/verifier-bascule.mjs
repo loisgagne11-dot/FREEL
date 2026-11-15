@@ -26,7 +26,7 @@ import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
-import { assembler } from './assembler-site.mjs';
+import { POLITIQUE_ANCIENNE, SUPABASE_EPINGLE, assembler } from './assembler-site.mjs';
 
 const CHROMIUM_FOURNI = '/opt/pw-browsers/chromium';
 
@@ -105,6 +105,17 @@ try {
     premierScript !== -1 && copie.slice(premierScript, premierScript + 40).includes('data-freel-lecture-seule'),
     'le garde est le premier script de la page'
   );
+  // Lot 58 : la copie est bridée — politique en tête, source épinglée.
+  const politique = copie.indexOf('http-equiv="Content-Security-Policy"');
+  constate(politique !== -1 && politique < premierScript, 'la politique de contenu précède tout script');
+  for (const fermee of ["object-src 'none'", "base-uri 'none'", "form-action 'none'"]) {
+    constate(POLITIQUE_ANCIENNE.includes(fermee), `la politique ferme ${fermee.split(' ')[0]}`);
+  }
+  constate(copie.includes('<meta name="referrer" content="no-referrer">'), 'aucun référent ne part chez les tiers');
+  constate(
+    !copie.includes('unpkg.com') && !copie.includes('supabase-js@2/dist') && copie.includes(SUPABASE_EPINGLE.integrite),
+    'Supabase vient d’une seule source épinglée, avec son empreinte'
+  );
 
   /* ── 1 et 2. Zéro écriture depuis /legacy/ ───────────────────────────── */
   console.log('\n🔒 Ancienne version sous /legacy/');
@@ -113,6 +124,16 @@ try {
   await contexte.route('**/*', (route) => {
     const rq = route.request();
     if (!/^(GET|HEAD|OPTIONS)$/i.test(rq.method())) ecrituresReseau.push(`${rq.method()} ${rq.url()}`);
+    // Lot 58 : la source épinglée est servie MODIFIÉE. Son empreinte ne
+    // correspond plus : le navigateur doit refuser de l'exécuter. L'en-tête
+    // CORS est posé pour que le refus vienne de l'empreinte, et de rien d'autre.
+    if (rq.url() === SUPABASE_EPINGLE.url) {
+      return route.fulfill({
+        status: 200, contentType: 'application/javascript',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: 'window.__freelPirate = true;'
+      });
+    }
     // Hermétique : rien ne sort de la machine, lecture comprise.
     if (!rq.url().startsWith(base)) return route.abort();
     return route.continue();
@@ -147,6 +168,20 @@ try {
 
   const bandeau = page.locator('#freel-lecture-seule');
   constate(await bandeau.isVisible(), 'le bandeau « lecture seule » est visible');
+  constate(
+    await page.evaluate(() => window.__freelPirate !== true),
+    'une copie modifiée de la bibliothèque n’est pas exécutée (empreinte)'
+  );
+  // Un script d'un autre hôte : la politique le refuse avant même de le
+  // demander au réseau, et le dit par un événement de violation.
+  const refuse = await page.evaluate(() => new Promise((resoudre) => {
+    document.addEventListener('securitypolicyviolation', (e) => resoudre(e.blockedURI), { once: true });
+    const s = document.createElement('script');
+    s.src = 'https://hote-tiers.invalid/espion.js';
+    document.head.appendChild(s);
+    setTimeout(() => resoudre(null), 1500);
+  }));
+  constate(typeof refuse === 'string' && refuse.includes('hote-tiers.invalid'), 'un script d’un autre hôte est refusé', String(refuse));
   const lien = bandeau.locator('a');
   constate(
     (await lien.count()) === 1 && (await lien.getAttribute('href')) === '../',
@@ -226,6 +261,29 @@ try {
   constate(repris.clients.includes('ClientTest'), 'la reprise lit les données de l’ancienne version', repris.clients.join(', '));
   constate(repris.legacyIntact, 'les données de l’ancienne version restent en place');
   await ctxRacine.close();
+
+  /* ── 6. Le cadre est refusé (lot 58, constat S4) ─────────────────────── */
+  // Une page d'une AUTRE origine (about:blank, ici) affiche l'application
+  // dans un cadre : elle doit rester vide — rien à cliquer sous un calque.
+  console.log('\n🖼️  Les deux versions affichées dans un cadre par une autre page');
+  const ctxCadre = await navigateur.newContext({ viewport: { width: 1000, height: 800 } });
+  for (const [adresse, nom] of [[base, 'la nouvelle version'], [`${base}legacy/`, 'l’ancienne version']]) {
+    const pCadre = await ctxCadre.newPage();
+    await pCadre.setContent(`<iframe id="cible" src="${adresse}" width="900" height="700"></iframe>`);
+    await pCadre.waitForTimeout(2500);
+    const cadre = pCadre.frames().find((f) => f.url() === adresse);
+    const contenu = cadre === undefined ? null : await cadre.evaluate(() => ({
+      noeuds: document.documentElement.childElementCount,
+      texte: (document.body?.innerText ?? '').trim().length
+    })).catch(() => null);
+    constate(
+      contenu !== null && contenu.noeuds === 0 && contenu.texte === 0,
+      `cadrée par une autre origine, ${nom} reste vide`,
+      JSON.stringify(contenu)
+    );
+    await pCadre.close();
+  }
+  await ctxCadre.close();
 } finally {
   await navigateur.close();
   serveur.close();

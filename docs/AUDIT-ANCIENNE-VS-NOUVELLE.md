@@ -552,3 +552,10 @@ chiffre faux.
 | Fonction | Verdict | Détail |
 |---|---|---|
 | Virement vers le compte personnel « pour l'impôt » | 🟢 nouveau | L'ancienne ne distinguait que le salaire simulé. Se nomme dans le relevé ; solde la provision d'impôt de son exercice ; n'est pas une rémunération |
+
+## Lot 58 (15/11) — l'ancienne version bridée, le cadre refusé
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Consulter l'ancienne application | 🟢 | Toujours sous `/legacy/`, en lecture seule, et désormais sous politique de contenu : Supabase d'une seule source épinglée avec empreinte (elle en essayait trois, en `@2` flottant ; deux répondaient 404), aucun script d'un autre hôte. L'original `index.html` n'est pas touché, seule la copie publiée l'est |
+| Affichage dans un cadre par une autre page | 🟢 | Ni l'ancienne ni la nouvelle ne s'y affichent : elles restent vides. L'ancienne n'avait aucune protection |

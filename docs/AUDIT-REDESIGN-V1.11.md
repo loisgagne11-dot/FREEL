@@ -1276,3 +1276,11 @@ Contrôle visuel à 390 px, deux thèmes, démonstration : détails « Impôt »
 Contrôle visuel à 390 px, deux thèmes : relevé (démonstration complétée le
 temps de la capture d'un virement « impôt » et d'un débit à traiter), Pilote
 du jeu d'essai (impôt au barème).
+
+## Lot 58 (15/11) — aucun écran touché
+
+Le lot pose une politique de contenu sur la copie publiée de l'ancienne
+version et un refus du cadre dans le premier script des deux versions. Aucun
+écran ne change : `verifier:bascule` constate que l'ancienne s'affiche
+toujours, bandeau de lecture seule compris, et que la nouvelle se charge comme
+avant à la racine.
