@@ -290,7 +290,9 @@ function LigneMouvement(
               <span className={styles.etat}>
                 {mouvement.sansContrepartie === 'remuneration'
                   ? 'Rémunération versée'
-                  : 'Sans contrepartie'}
+                  : mouvement.sansContrepartie === 'impot'
+                    ? 'Mis de côté pour l’impôt'
+                    : 'Sans contrepartie'}
               </span>
               <button
                 type="button"
@@ -353,6 +355,18 @@ function LigneMouvement(
                     onClick={() => marquerSans(mouvement.id, 'remuneration')}
                   >
                     Rémunération que je me suis versée
+                  </button>
+                )}
+                {/* Décision 17 : on vire aussi de quoi payer l'impôt, qui se
+                    règle depuis le compte personnel. Ce n'est pas une
+                    rémunération, et cela solde la provision d'impôt. */}
+                {debit && (
+                  <button
+                    type="button"
+                    className={styles.action}
+                    onClick={() => marquerSans(mouvement.id, 'impot')}
+                  >
+                    Mis de côté pour l’impôt
                   </button>
                 )}
                 <button

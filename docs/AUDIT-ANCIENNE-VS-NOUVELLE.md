@@ -546,3 +546,9 @@ chiffre faux.
 | Fonction | Verdict | Détail |
 |---|---|---|
 | Détail d'une dette par nature | 🟢 | L'ancienne n'avait pas de détail. La nouvelle en avait un dont le total différait de la vignette pour l'impôt, la TVA et la CFP ; il lit désormais la même source |
+
+## Lot 35 (15/11) — mis de côté pour l'impôt (schéma 23)
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Virement vers le compte personnel « pour l'impôt » | 🟢 nouveau | L'ancienne ne distinguait que le salaire simulé. Se nomme dans le relevé ; solde la provision d'impôt de son exercice ; n'est pas une rémunération |

@@ -40,8 +40,7 @@ import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';
 import {
   etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, periodesUrssafEffectives, recettesEncaissees,
-  regimeDe, sousAcreLe
-} from './selecteurs';
+  regimeDe, sousAcreLe, echeancesDuComptePro } from './selecteurs';
 
 export function compositionDe(
   faits: Faits,
@@ -58,7 +57,7 @@ export function compositionDe(
       // la porte à deux chiffres pour une seule notion.
       const detaille = soldeDerive(
         faits.soldeInitial, faits.soldeInitialAu,
-        recettesEncaissees(faits), faits.depenses, faits.echeances,
+        recettesEncaissees(faits), faits.depenses, echeancesDuComptePro(faits),
         faits.mouvementsBancaires
       );
       return compositionSolde(detaille.parts, detaille.montant, faits.soldeInitialAu);
@@ -95,7 +94,7 @@ function detailProvisionsDe(faits: Faits, maintenant: Date) {
   const tauxR = tauxImpotEtContributions(regimeDe(faits), m, type);
 
   return calculerProvisions(
-    faits.echeances,
+    echeancesDuComptePro(faits),
     recettesEncaissees(faits),
     { mois: moisDeclares(faits.periodesDeclarees) },
     {

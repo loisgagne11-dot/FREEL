@@ -220,7 +220,7 @@ function mouvementsDuSchema4(brut: unknown): readonly MouvementBancaire[] {
     const o = mv as Record<string, unknown>;
     const ancien = o['sansContrepartie'];
     const motif: MotifSansContrepartie | null =
-      ancien === 'remuneration' || ancien === 'autre' ? ancien
+      ancien === 'remuneration' || ancien === 'impot' || ancien === 'autre' ? ancien
         // Un `true` d'hier ne disait pas pourquoi : il devient « autre ».
         // Le requalifier en rémunération inventerait une information.
         : ancien === true ? 'autre'

@@ -35,7 +35,13 @@ import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
 
-export const VERSION_SCHEMA = 22 as const;
+/*
+ * 23 (lot 35) : le motif « impot » d'un mouvement bancaire. Une version
+ * antérieure le lirait comme un « sans contrepartie » quelconque et
+ * provisionnerait une seconde fois l'impôt déjà viré : elle doit REFUSER
+ * ce dossier plutôt que d'en sous-estimer le versable.
+ */
+export const VERSION_SCHEMA = 23 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.

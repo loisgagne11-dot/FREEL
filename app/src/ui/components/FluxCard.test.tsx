@@ -29,7 +29,7 @@ const FLUX: FluxDuMois = {
   sorties: {
     total: euros(980), constate: euros(200), aProvisionner: euros(780), lignes: []
   },
-  remuneration: { versable: euros(2500), provisions: euros(980) }
+  remuneration: { versable: euros(2500), provisions: euros(980), impotAMettreDeCote: null }
 };
 
 describe('le flux du mois', () => {
@@ -63,7 +63,7 @@ describe('le flux du mois', () => {
   it('ne propose pas de verser quand rien n’est versable', () => {
     const rien: FluxDuMois = {
       ...FLUX,
-      remuneration: { versable: euros(0), provisions: euros(980) }
+      remuneration: { versable: euros(0), provisions: euros(980), impotAMettreDeCote: null }
     };
     render(<FluxCard flux={rien} periode="août 2026" {...RIEN} />);
     expect(screen.queryAllByRole('link', { name: /Verser/ })).toHaveLength(0);

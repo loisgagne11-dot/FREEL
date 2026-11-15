@@ -1,7 +1,7 @@
 import { dernierMoisAcre } from '../domain/bareme';
 import { type Mois, type Resolution, moisDe } from '../domain/types';
 import type { Faits } from './schema';
-import { recettesEncaissees } from './selecteurs';
+import { recettesEncaissees, echeancesDuComptePro } from './selecteurs';
 import { type ProvenanceSolde, soldeDerive } from '../domain/calculs/solde';
 
 /*
@@ -34,7 +34,7 @@ export function finAcreDe(faits: Faits): Resolution<Mois> | null {
 export function provenanceSoldeDe(faits: Faits): ProvenanceSolde {
   return soldeDerive(
     faits.soldeInitial, faits.soldeInitialAu,
-    recettesEncaissees(faits), faits.depenses, faits.echeances,
+    recettesEncaissees(faits), faits.depenses, echeancesDuComptePro(faits),
     faits.mouvementsBancaires
   ).provenance;
 }

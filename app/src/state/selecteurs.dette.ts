@@ -35,7 +35,7 @@ import type { Euros } from '../domain/types';
 import { type DetailDette, detailDette } from '../domain/calculs/detailDette';
 import type { Faits } from './schema';
 import {
-  etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, tvaAutoliqueeProvisionnee,
+  echeancesDuComptePro, etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, tvaAutoliqueeProvisionnee,
   periodesUrssafEffectives, recettesEncaissees,
   regimeDe, sousAcreLe
 } from './selecteurs';
@@ -70,7 +70,9 @@ export function detailDeLaDette(
 
   return detailDette(
     nature,
-    faits.echeances,
+    // Les mêmes échéances que la source : l'impôt réglé depuis le compte
+    // personnel n'y est pas, il n'a rien à faire dans le détail non plus.
+    echeancesDuComptePro(faits),
     recettesEncaissees(faits),
     { mois: moisDeclares(faits.periodesDeclarees) },
     {

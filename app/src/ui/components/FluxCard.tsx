@@ -156,6 +156,14 @@ export function FluxCard(
               )}
             </p>
           )}
+          {/* À côté du versable, ce qui reste à mettre de côté pour l'impôt
+              (lot 35) : il se paie depuis le compte personnel, et le virer au
+              fil des encaissements évite la marche d'escalier de l'automne. */}
+          {flux.remuneration.impotAMettreDeCote !== null && (
+            <p className={styles.note}>
+              À mettre de côté pour l’impôt&nbsp;: <Montant>{eur(flux.remuneration.impotAMettreDeCote)}</Montant>
+            </p>
+          )}
           {versementPossible && (
             <a className={`${styles.action} ${styles.principale} ${styles.dansLaColonne}`} href="#/argent">
               Verser sur mon compte

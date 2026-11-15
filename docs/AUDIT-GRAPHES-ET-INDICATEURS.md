@@ -815,3 +815,12 @@ Aucun montant ne change.
 | Reste à sortir, CFP | Détail « CFP » | 0 € (appels seuls) | Estimée mois par mois, comme la vignette |
 | Reste à sortir, URSSAF et CFE | Détails | Déjà d'accord | Inchangé, désormais lu de la source |
 | Écart entre le total et les lignes | Détail | — | Affiché s'il dépasse un centime (faute de calcul, jamais absorbée) |
+
+## Lot 35 (15/11) — mis de côté pour l'impôt (décision 17)
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Solde du compte (et versable, autonomie, composition, évolution) | Pilote, Argent | Un acompte d'impôt saisi payé était retranché, même prélevé sur le compte personnel avec l'argent d'un virement déjà retranché : deux fois la même somme | Un exercice qui porte un virement « mis de côté pour l'impôt » est réglé depuis le compte personnel : ses échéances d'impôt ne sortent plus du compte pro |
+| Provision d'impôt sur le revenu | Pilote, Argent, détail « Impôt » | Réduite des acomptes saisis | Réduite de ce qui a été viré pour l'exercice, quand il y en a ; des acomptes sinon. Jamais des deux |
+| « Déjà versé » | Pilote, Rémunération | Rémunérations seules | Inchangé : un virement « impôt » n'en est pas une |
+| À mettre de côté pour l'impôt | Pilote, Rémunération | — | La provision d'impôt restante (barème ; rien sous versement libératoire) |

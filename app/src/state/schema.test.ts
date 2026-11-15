@@ -1036,3 +1036,16 @@ describe('schéma 21 → 22 : plateforme agréée, option débits', () => {
     expect(avec(null, 'oui')).toMatch(/optionTvaDebits/);
   });
 });
+
+/** Schéma 23 : le motif « impot ». Une version antérieure le lirait comme un « autre » et provisionnerait l'impôt deux fois. */
+describe('schéma 22 → 23 : le motif « mis de côté pour l’impôt »', () => {
+  it('un motif « impot » traverse la migration tel quel', () => {
+    const mv = { id: 'm1', date: '2026-05-02', libelle: 'VIR DEMO', montant: -50, rapprocheAvec: null, sansContrepartie: 'impot' };
+    expect(completerFaits({ version: 20, mouvementsBancaires: [mv] }).mouvementsBancaires[0]?.sansContrepartie).toBe('impot');
+  });
+
+  it('un dossier d’un schéma postérieur est refusé', () => {
+    expect(motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 })).not.toBeNull();
+    expect(VERSION_SCHEMA).toBe(23);
+  });
+});

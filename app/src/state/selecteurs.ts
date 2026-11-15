@@ -240,9 +240,53 @@ export function caEncaisseAnnee(faits: Faits, annee: number): Euros {
 export function solde(faits: Faits): Euros {
   return soldeDerive(
     faits.soldeInitial, faits.soldeInitialAu,
-    recettesEncaissees(faits), faits.depenses, faits.echeances,
+    recettesEncaissees(faits), faits.depenses, echeancesDuComptePro(faits),
     faits.mouvementsBancaires
   ).montant;
+}
+
+/* ── L'impôt réglé depuis le compte personnel (lot 35, décision 17) ─────── */
+
+/**
+ * Ce qui a été viré vers le compte personnel POUR L'IMPÔT d'un exercice —
+ * mouvements « mis de côté pour l'impôt », rattachés par leur date.
+ *
+ * Par la date, faute de mieux : un virement ne dit pas quel exercice il
+ * finance. Celui de janvier pour le solde de l'an passé compterait pour
+ * l'année nouvelle ; le cas est dit à l'écran du relevé, et un avis saisi
+ * le corrige de toute façon (voir `soldeImpotPrecedentDe`).
+ */
+export function virementsImpotDe(faits: Faits, annee: number): Euros {
+  const prefixe = String(annee);
+  return euros(faits.mouvementsBancaires
+    .filter((m) => m.sansContrepartie === 'impot' && !m.ignoree && m.date.startsWith(prefixe))
+    .reduce((t, m) => t - m.montant, 0));
+}
+
+/**
+ * L'impôt de cet exercice est-il réglé depuis le compte PERSONNEL ?
+ *
+ * Oui dès qu'un virement « pour l'impôt » de cet exercice existe : c'est le
+ * geste qui le dit, et il n'y a rien d'autre à régler. Un acompte prélevé sur
+ * le compte personnel ne sort alors pas du compte professionnel — le
+ * retrancher du solde en plus du virement qui l'a financé comptait la même
+ * somme deux fois. Sans virement de ce type, rien ne change : l'impôt est
+ * réputé payé depuis le compte professionnel, comme avant.
+ */
+function impotRegleDepuisLePerso(faits: Faits, annee: number): boolean {
+  return virementsImpotDe(faits, annee) > 0;
+}
+
+/**
+ * Les échéances qui sortent du compte PROFESSIONNEL : toutes, sauf l'impôt
+ * sur le revenu d'un exercice réglé depuis le compte personnel. La SEULE
+ * porte par laquelle solde, provisions et flux lisent les échéances : deux
+ * filtres écrits à part finiraient par ne pas exclure les mêmes.
+ */
+export function echeancesDuComptePro(
+  faits: Faits, echeances: readonly Echeance[] = faits.echeances
+): readonly Echeance[] {
+  return echeances.filter((e) => e.nature !== 'impot' || !impotRegleDepuisLePerso(faits, exerciceDe(e)));
 }
 
 
@@ -342,6 +386,10 @@ export function echeanceDesFactures(faits: Faits): (r: Recette) => DateISO | nul
  * c'est lui qui est sorti du compte.
  */
 function acomptesPasDeLAnnee(faits: Faits, annee: number): Euros {
+  // Réglé depuis le compte personnel : ce qui est déjà parti pour l'impôt est
+  // ce qui a été VIRÉ, pas ce qui a été prélevé — les acomptes l'ont été avec
+  // cet argent-là. Retrancher les deux comptait la même somme deux fois.
+  if (impotRegleDepuisLePerso(faits, annee)) return virementsImpotDe(faits, annee);
   // Par l'exercice réglé, pas par la date : le solde de l'an dernier, prélevé
   // à l'automne, n'est pas un acompte de cette année (voir `Echeance.exercice`).
   return euros(faits.echeances
@@ -535,9 +583,12 @@ export interface EtatPilote {
  */
 export function etatPilote(
   faits: Faits,
-  echeances: readonly Echeance[] = faits.echeances,
+  toutesEcheances: readonly Echeance[] = faits.echeances,
   maintenant: Date = new Date()
 ): EtatPilote {
+  // L'impôt réglé depuis le compte personnel ne pèse pas sur le compte pro :
+  // voir `echeancesDuComptePro`.
+  const echeances = echeancesDuComptePro(faits, toutesEcheances);
   const m = moisCourant(maintenant);
   const type: TypeActivite = faits.entreprise.typeActivite;
   const regime = regimeDe(faits);
@@ -621,6 +672,13 @@ export interface FluxDuMois {
     readonly versable: Euros;
     /** Ce qui reste de côté, et qui explique l'écart avec le solde. */
     readonly provisions: Euros;
+    /**
+     * Dont l'impôt sur le revenu encore à mettre de côté — à virer vers le
+     * compte personnel quand c'est de là qu'il se paie (décision 17). Il
+     * grandit à chaque encaissement et baisse à chaque virement « pour
+     * l'impôt ». `null` sous versement libératoire ou sans provision.
+     */
+    readonly impotAMettreDeCote: Euros | null;
   };
 }
 
@@ -708,9 +766,12 @@ export function fluxDuMois(
   faits: Faits,
   m: Mois,
   etat: EtatPilote,
-  echeances: readonly Echeance[] = faits.echeances,
+  toutesEcheances: readonly Echeance[] = faits.echeances,
   aujourdhui: DateISO = dateDuJour()
 ): FluxDuMois {
+  // Un acompte d'impôt prélevé sur le compte personnel n'est pas une sortie
+  // du compte pro : voir `echeancesDuComptePro`.
+  const echeances = echeancesDuComptePro(faits, toutesEcheances);
   const encaisseesDuMois = faits.recettes.filter(
     (r) => r.encaisseeLe !== null && r.encaisseeLe.startsWith(m)
   );
@@ -782,7 +843,16 @@ export function fluxDuMois(
     },
     remuneration: {
       versable: etat.tresorerie.versable,
-      provisions: etat.tresorerie.provisions
+      provisions: etat.tresorerie.provisions,
+      // Les deux parts que lit le versable, et rien d'autre : la même règle
+      // que `impotRevenuAProvisionner`, sur l'état déjà calculé.
+      impotAMettreDeCote: (() => {
+        const parts = [etat.provisionImpotRevenu, etat.soldeImpotPrecedent]
+          .map(resteAProvisionnerDe)
+          .filter((r): r is Resolution<Euros> => r !== undefined && r.statut !== 'refuse');
+        const total = parts.reduce((t, r) => t + (r.statut === 'refuse' ? 0 : r.valeur), 0);
+        return total > 0 ? euros(total) : null;
+      })()
     }
   };
 }
