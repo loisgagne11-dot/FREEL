@@ -52,7 +52,7 @@ import type { Mois } from '../../domain/types';
  * LE PILOTE AFFICHE, IL NE RÈGLE PAS
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Le curseur de seuil de sécurité vivait ici. Il est parti dans Config, où le
+ * Le curseur de la réserve vivait ici. Il est parti dans Config, où le
  * handoff le place — avec la part gardée, qui est arrivée en même temps. Deux
  * raisons, et la seconde a tranché :
  *
@@ -211,7 +211,7 @@ export function Pilote({ mois: moisChoisi, onMois }: {
         * SANS DOUBLONS.
         *
         * Le Pilote répétait trois fois les mêmes chiffres : une carte « Je
-        * peux me verser » (la colonne Rémunération le dit), quatre tuiles
+        * peux me verser » (la colonne « À te verser » le dit), quatre tuiles
         * Solde · À garder · Disponible · Seuil (l'en-tête de l'écran Argent,
         * à un clic), et « Ce que je dois » (la colonne Sorties). Le handoff
         * n'en a aucun : le flux, la santé, puis les décisions.

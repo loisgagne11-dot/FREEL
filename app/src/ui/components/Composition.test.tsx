@@ -52,10 +52,10 @@ describe('le panneau dit la formule avant les montants', () => {
 
   it('écrit la formule du disponible', () => {
     poser({}, 'disponible');
-    expect(panneau().getByText(/solde du compte − à garder de côté/i)).toBeTruthy();
+    expect(panneau().getByText(/solde du compte − dû/i)).toBeTruthy();
   });
 
-  it('écrit la formule du versable, borne comprise', () => {
+  it('écrit la formule de l’« à te verser », borne comprise', () => {
     poser({}, 'versable');
     expect(panneau().getByText(/jamais négatif/i)).toBeTruthy();
   });
@@ -115,9 +115,9 @@ describe('le panneau dit ce que le chiffre tait', () => {
     expect(panneau().getByText(/Config › Réserve & versements/)).toBeTruthy();
   });
 
-  it('explique un versable ramené à zéro par le seuil de sécurité', () => {
+  it('explique un « à te verser » ramené à zéro par la réserve', () => {
     poser({ soldeInitial: euros(800), soldeInitialAu: dateISO('2025-12-31'), reserve: euros(2_000) }, 'versable');
-    expect(panneau().getByText(/inférieur à ton seuil de sécurité/)).toBeTruthy();
+    expect(panneau().getByText(/inférieur à ta réserve/)).toBeTruthy();
   });
 });
 

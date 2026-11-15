@@ -177,13 +177,13 @@ export interface EtatArgent {
    * BORNÉE À 1, ET ZÉRO PROVISION VAUT 1
    * ─────────────────────────────────────────────────────────────────────
    *
-   * C'est l'étiquette du haut de l'écran — « Provisions · N % couvertes ». Elle
+   * C'est l'étiquette du haut de l'écran — « Dû · N % couvert ». Elle
    * répond à une seule question : si tout tombait demain, le compte suivrait-il ?
    *
    * Au-delà de 1, il n'y a rien de plus à dire : avoir deux fois de quoi payer
    * ne rend pas la dette « 200 % couverte », et afficher un tel chiffre ferait
-   * lire un excédent là où il n'y a qu'un matelas. Rien à provisionner rend 1
-   * et non 0 : une division par zéro rendrait « 0 % couvertes » sur un compte
+   * lire un excédent là où il n'y a qu'une réserve. Rien de dû rend 1
+   * et non 0 : une division par zéro rendrait « 0 % couvert » sur un compte
    * qui ne doit rien — l'alerte exactement à l'envers.
    */
   readonly couvertureProvisions: number;

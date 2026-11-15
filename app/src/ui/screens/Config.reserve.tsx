@@ -134,7 +134,7 @@ export function Reserve() {
 
 /**
  * L'objectif de chiffre d'affaires, rangé avec la réserve : c'est le handoff
- * qui l'y met, et il se règle au même moment que le matelas — quand on décide
+ * qui l'y met, et il se règle au même moment que la réserve — quand on décide
  * de ce que l'année doit rapporter et de ce qu'on en garde.
  */
 function Objectif() {
@@ -178,7 +178,7 @@ function Objectif() {
  * UN PLANCHER EN EUROS N'EST PAS UNE PART EN POURCENTAGE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Le SEUIL DE SÉCURITÉ est un montant absolu : la ligne sous laquelle le compte
+ * La RÉSERVE est un montant absolu : la ligne sous laquelle le compte
  * ne descend pas (D4, fait `reserve`). La PART GARDÉE est une fraction du
  * versable qu'on choisit de ne pas prendre ce mois-ci.
  *
@@ -223,7 +223,7 @@ function ReservesEtVersements() {
           pourrait pas se fixer un plancher à 5 000 €. */}
       <Champ
         id={`${idChamp}-seuil`}
-        libelle="Seuil de sécurité"
+        libelle="Réserve"
         aide="Le montant que tu gardes sur le compte quoi qu’il arrive. Il est
               retiré du disponible pour obtenir ce que tu peux te verser,
               et c’est le plancher tracé sur tes courbes."
@@ -261,17 +261,17 @@ function ReservesEtVersements() {
           <output className={styles.curseurValeur}>{pourcent}&nbsp;%</output>
         </span>
         <span className={styles.aide}>
-          Ce que tu laisses sur le compte <strong>au-dessus du seuil</strong>,
+          Ce que tu laisses sur le compte <strong>au-dessus de la réserve</strong>,
           à chaque versement. À 0&nbsp;% rien ne change&nbsp;: c’est le réglage
           par défaut, et il ne décide rien à ta place.
         </span>
       </p>
 
-      {/* La phrase dit le calcul, seuil compris. Le prototype du handoff écrit
-          « sur ta part disponible, tu gardes N % » — sans le seuil, ce qui à
-          0 % proposerait de verser le matelas avec. */}
+      {/* La phrase dit le calcul, réserve comprise. Le prototype du handoff
+          écrit « sur ta part disponible, tu gardes N % » — sans la réserve, ce
+          qui à 0 % proposerait de la verser avec. */}
       <p className={styles.explication}>
-        Sur un solde de <Montant>{eur(soldeInitial)}</Montant>, le seuil en garde{' '}
+        Sur un solde de <Montant>{eur(soldeInitial)}</Montant>, la réserve en garde{' '}
         <Montant>{eur(reserve)}</Montant>&nbsp;; des{' '}
         <Montant>{eur(versable)}</Montant> restants tu en laisses{' '}
         {pourcent}&nbsp;%, soit{' '}

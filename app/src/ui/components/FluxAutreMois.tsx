@@ -11,7 +11,7 @@ import styles from './FluxCard.module.css';
  *
  * Même carte, mêmes trois colonnes que `FluxCard`, mais d'autres chiffres :
  * un mois passé se lit en constat (encaissé, payé, versé), un mois à venir en
- * échéances (attendu, dû). Aucun des deux n'a de versable — voir l'en-tête de
+ * échéances (attendu, dû). Aucun des deux n'a d'« à te verser » — voir l'en-tête de
  * `fluxDUnAutreMois` —, et la colonne le dit au lieu de recopier celui du jour.
  */
 export function FluxAutreMois(
@@ -63,7 +63,10 @@ export function FluxAutreMois(
         </div>
 
         <div className={styles.colonne}>
-          <span className={`${styles.libelle} ${styles.entree}`}>Rémunération</span>
+          {/* Un mois passé montre ce qui a été VERSÉ, un fait du relevé : ce
+              n'est pas l'« à te verser » du jour, et le titre ne lui prête pas
+              ce nom. Un mois à venir n'a pas de montant, et dit pourquoi. */}
+          <span className={`${styles.libelle} ${styles.entree}`}>{passe ? 'Rémunération' : 'À te verser'}</span>
           <span className={`${styles.montant} ${styles.versable}`}>
             {flux.verse === null ? '—' : <Montant>{eur(flux.verse)}</Montant>}
           </span>
@@ -72,7 +75,7 @@ export function FluxAutreMois(
               ? (flux.verse === null
                 ? 'Sans relevé bancaire, ce qui a été versé ce mois-là ne se lit pas.'
                 : 'versé sur ton compte ce mois-là')
-              : 'Le versable se calcule au jour le jour, sur ce qui est réellement entré.'}
+              : 'Il se calcule au jour le jour, sur ce qui est réellement entré.'}
           </p>
           <button type="button" className={`${styles.action} ${styles.dansLaColonne}`} onClick={onRevenir}>
             Revenir à {courant}

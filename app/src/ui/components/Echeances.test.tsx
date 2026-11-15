@@ -211,7 +211,7 @@ describe('enregistrer un paiement', () => {
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('button', { name: /^Repasser à payer/ }));
     const confirmation = screen.getByRole('group', { name: /sera oublié/ });
-    expect(confirmation.textContent).toMatch(/5 sept\. 2026.*2\s450.*revient dans les provisions/su);
+    expect(confirmation.textContent).toMatch(/5 sept\. 2026.*2\s450.*revient dans le dû/su);
 
     await utilisateur.click(within(confirmation).getByRole('button', { name: 'Garder le paiement' }));
     expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-09-05');
@@ -277,16 +277,16 @@ describe('corriger', () => {
   });
 
   /**
-   * Non payée, l'échéance est l'appel que les provisions retiennent : la
-   * supprimer fait monter le versable. Payée, elle emporte son paiement.
+   * Non payée, l'échéance est l'appel que le dû retient : la
+   * supprimer fait monter l'« à te verser ». Payée, elle emporte son paiement.
    */
-  it('dit d’un appel non payé qu’il quitte les provisions', async () => {
+  it('dit d’un appel non payé qu’il quitte le dû', async () => {
     semer([echeance({ id: 'e1', nature: 'tva', montant: euros(300) })]);
     rendre();
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('button', { name: 'Corriger' }));
     await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette échéance' }));
-    const confirmation = screen.getByRole('group', { name: /quitte l’échéancier et les provisions/ });
+    const confirmation = screen.getByRole('group', { name: /quitte l’échéancier et le dû/ });
     expect(confirmation.textContent).toMatch(/L’appel de TVA de 300/);
     expect(confirmation.textContent).toMatch(/te verser monte/);
   });
@@ -299,7 +299,7 @@ describe('corriger', () => {
     await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette échéance' }));
     const confirmation = screen.getByRole('group', { name: /avec son paiement du 5 sept\. 2026/ });
     expect(confirmation.textContent).toMatch(/L’échéance d’impôt/);
-    expect(confirmation.textContent).toMatch(/la provision remontera/);
+    expect(confirmation.textContent).toMatch(/le dû remontera/);
   });
 });
 

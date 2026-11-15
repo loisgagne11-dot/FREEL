@@ -41,12 +41,12 @@ export function BandeauxDuPilote(
       )}
 
       {/* Un calcul incomplet n'est jamais présenté comme un résultat : un
-          versable trop élevé conduirait à se verser de l'argent déjà dû. */}
+          « à te verser » trop élevé conduirait à se verser de l'argent déjà dû. */}
       {motifsIncomplets !== null && (
         <Bandeau ton="alerte" titre="Montants sous-évalués">
           {/* Chaque motif se dit lui-même : « recette hors barème » nommait
               une cause qui n'était pas toujours la bonne. */}
-          Une partie de ce qui est dû n’a pas pu être provisionnée. Les montants
+          Une partie de ce qui est dû n’a pas pu être chiffrée. Les montants
           ci-dessous sont donc <strong>plus élevés que la réalité</strong>.
           <ul className={styles.motifs}>
             {motifsIncomplets.map((m) => <li key={m}>{m}</li>)}

@@ -306,7 +306,10 @@ export function GrapheEvolution(
       {seuil !== null && (
         <p className={styles.libelleSeuil}>
           <span className={styles.traitSeuil} aria-hidden="true" />
-          seuil <Montant>{formater(seuil)}</Montant>
+          {/* « réserve » et non « seuil » : le seul seuil tracé ici est la
+              réserve du compte, et « seuil » nomme ailleurs les plafonds du
+              micro et de la TVA (lot 51). */}
+          réserve <Montant>{formater(seuil)}</Montant>
         </p>
       )}
 

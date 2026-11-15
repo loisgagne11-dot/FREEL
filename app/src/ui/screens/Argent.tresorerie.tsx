@@ -126,9 +126,9 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             </span>}
         resume={(
           <>
-            <Montant>{eur(etat.tresorerie.versable)}</Montant> à toi
-            {' · '}<Montant>{eur(etat.tresorerie.provisions)}</Montant> de côté
-            {' · '}<Montant>{eur(etat.tresorerie.reserve)}</Montant> de seuil de sécurité
+            <Montant>{eur(etat.tresorerie.versable)}</Montant> à te verser
+            {' · '}<Montant>{eur(etat.tresorerie.provisions)}</Montant> dus
+            {' · '}<Montant>{eur(etat.tresorerie.reserve)}</Montant> de réserve
           </>
         )}
       >
@@ -145,13 +145,13 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
         *
         * Un renvoi cassé coûte plus qu'une carte mal rangée. Il apprend à ne
         * plus suivre les renvois, et c'est celui-ci qui porte la seule
-        * explication de ce que « provisions » recouvre.
+        * explication de ce que « dû » recouvre.
         */}
       <CartePliable
         id="enveloppes"
         ecran="argent"
-        titre="Enveloppes de provision"
-        aide={<Info libelle="Explication des deux volets de provision">
+        titre="Enveloppes du dû"
+        aide={<Info libelle="Explication des deux volets du dû">
               Les échéances émises sont ce que l’URSSAF ou le fisc ont déjà
               appelé. Les charges sur recettes encaissées sont dues mais pas
               encore appelées&nbsp;: la dette naît à l’encaissement, pas à
@@ -165,7 +165,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
         actions={<span className={styles.indication}>clic = détail</span>}
         resume={(
           <>
-            <Montant>{eur(etat.tresorerie.provisions)}</Montant> à garder de côté
+            <Montant>{eur(etat.tresorerie.provisions)}</Montant> dus
             {' · dont '}<Montant>{eur(etat.voletConstate)}</Montant> déjà appelés
           </>
         )}
@@ -180,7 +180,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             <dd><Montant>{eur(etat.voletAProvisionner)}</Montant></dd>
           </div>
           <div className={`${styles.ligne} ${styles.total}`}>
-            <dt>Total à garder de côté</dt>
+            <dt>Total dû</dt>
             <dd><Montant>{eur(etat.tresorerie.provisions)}</Montant></dd>
           </div>
         </dl>
@@ -190,8 +190,8 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             faire : il ne permet ni de rapprocher une provision de l'avis
             reçu, ni de savoir ce qui se libère après une déclaration. */}
         <h3 className={styles.sousTitre}>
-          Combien est mis de côté, enveloppe par enveloppe
-          <Info libelle="D’où vient la ventilation, et ce que « mis de côté » veut dire">
+          Combien est couvert, enveloppe par enveloppe
+          <Info libelle="D’où vient la ventilation, et ce que « couvert » veut dire">
             Les échéances déjà émises portent chacune leur nature. Les
             charges sur recettes encaissées n’ont pas encore d’échéance à
             qui la demander&nbsp;: elles se répartissent selon la règle qui
@@ -401,11 +401,11 @@ function EvolutionDuCompte({ annee }: { readonly annee: number }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   B4 — les enveloppes de provision
+   B4 — les enveloppes du dû
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * Une vignette par nature de dette : mis de côté, dû, et la date qui vient.
+ * Une vignette par nature de dette : couvert, dû, et la date qui vient.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI DES VIGNETTES PLUTÔT QU'UNE BARRE SEGMENTÉE
@@ -466,17 +466,16 @@ function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
   const dettes = toutes.filter((e) => e.nature !== 'tva' && e.du > 0);
 
   /*
-   * LE SEUIL DE SÉCURITÉ, EN QUATRIÈME VIGNETTE.
+   * LA RÉSERVE, EN QUATRIÈME VIGNETTE.
    *
-   * Ce n'est pas une nature de dette — `enveloppesDeProvision` ne le connaît
+   * Ce n'est pas une nature de dette — `enveloppesDeProvision` ne la connaît
    * pas — mais le dessin en fait la quatrième enveloppe, à côté de l'URSSAF,
-   * de l'impôt et de la TVA. Le fait s'appelle `reserve` dans le schéma et
-   * l'application l'appelle partout ailleurs « seuil de sécurité » (Config
-   * comprise) : la vignette garde ce nom plutôt que « réserve matelas » du
-   * dessin — deux noms pour une même notion coûteraient plus qu'un écart de
-   * libellé. Masquée à zéro, comme les autres natures sans montant : un seuil
-   * qu'on n'a pas réglé n'a rien à montrer, ce n'est pas une TVA en attente
-   * d'appel.
+   * de l'impôt et de la TVA. L'application l'appelle partout « réserve »
+   * (Config comprise, lot 51) : la vignette garde ce mot seul plutôt que
+   * « réserve matelas » du dessin — deux noms pour une même notion
+   * coûteraient plus qu'un écart de libellé. Masquée à zéro, comme les autres
+   * natures sans montant : une réserve qu'on n'a pas réglée n'a rien à
+   * montrer, ce n'est pas une TVA en attente d'appel.
    */
   const seuilDu = etat.tresorerie.reserve;
   const seuilCouvert = euros(Math.min(etat.tresorerie.reserve, Math.max(0, etat.tresorerie.dispo)));
@@ -488,8 +487,8 @@ function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
           <VignetteDette key={e.nature} e={e} onOuvrir={() => setOuverte(e.nature)} />
         ))}
         <VignetteTva e={tva} onOuvrir={() => setOuverte('tva')} />
-        {/* Le seuil de sécurité n'est pas une dette : il n'a ni mois, ni
-            échéance, ni geste pour le régulariser. Il ne s'ouvre donc pas. */}
+        {/* La réserve n'est pas une dette : elle n'a ni mois, ni
+            échéance, ni geste pour la régulariser. Elle ne s'ouvre donc pas. */}
         {seuilDu > 0 && <VignetteReserve du={seuilDu} couvert={seuilCouvert} />}
       </ul>
 
@@ -506,7 +505,7 @@ function Enveloppes({ etat }: { readonly etat: EtatArgent }) {
   );
 }
 
-/** Une nature de dette : ce qui est mis de côté, face à ce qui est dû. */
+/** Une nature de dette : ce que le solde couvre, face à ce qui est dû. */
 function VignetteDette(
   { e, onOuvrir }: {
     readonly e: EnveloppeProvision;
@@ -613,7 +612,7 @@ function VignetteTva(
 }
 
 /**
- * Le seuil de sécurité, en enveloppe — voir l'explication dans `Enveloppes`.
+ * La réserve, en enveloppe — voir l'explication dans `Enveloppes`.
  */
 function VignetteReserve({ du, couvert }: { readonly du: Euros; readonly couvert: Euros }) {
   const part = du <= 0 ? 1 : Math.min(1, couvert / du);
@@ -622,7 +621,7 @@ function VignetteReserve({ du, couvert }: { readonly du: Euros; readonly couvert
     <li className={styles.enveloppe}>
       <span className={styles.enveloppeTitre}>
         <span className={`${styles.puce} ${styles.reserve}`} aria-hidden="true" />
-        Seuil de sécurité
+        Réserve
       </span>
       <span className={complet ? styles.enveloppeCouvert : styles.enveloppeManque}>
         <Montant>{eur(couvert)}</Montant>
@@ -637,8 +636,9 @@ function VignetteReserve({ du, couvert }: { readonly du: Euros; readonly couvert
         />
       </span>
       {/* Pas d'échéance : ce n'est pas une dette qui tombe un jour donné,
-          c'est un matelas qu'on constitue au fil des versements. */}
-      <span className={styles.enveloppeEcheance}>matelas, pas une échéance</span>
+          c'est une réserve qu'on constitue au fil des versements. Le titre
+          dit déjà « Réserve » : la ligne dit ce qui la distingue d'une dette. */}
+      <span className={styles.enveloppeEcheance}>gardée, sans échéance</span>
     </li>
   );
 }
@@ -659,8 +659,8 @@ function VignetteReserve({ du, couvert }: { readonly du: Euros; readonly couvert
  * / À encaisser / Autonomie : deux constats, puis deux réponses à des questions
  * différentes — « qu'est-ce qui va rentrer » et « combien de temps je tiens ».
  *
- * Ni « à garder de côté » ni « versable » ne disparaissent : le premier est le
- * total des enveloppes de provision, juste dessous, et le second est au centre
+ * Ni le dû ni l'« à te verser » ne disparaissent : le premier est le
+ * total des enveloppes du dû, juste dessous, et le second est au centre
  * de l'anneau et sur l'autre pilier. Les répéter dans la rangée du haut
  * coûtait les deux seules cases où l'écran pouvait dire autre chose.
  *
@@ -733,7 +733,7 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
         libelle="Disponible"
         valeur={eur(etat.tresorerie.dispo)}
         ton={etat.tresorerie.dispo < 0 ? 'danger' : 'accent'}
-        note="à toi, hors provisions"
+        note="une fois le dû retiré"
         onOuvrir={() => setCompose('disponible')}
       />
       <Chiffre
@@ -749,7 +749,7 @@ function TuilesTresorerie({ etat }: { readonly etat: EtatArgent }) {
         valeur={moisTexte(autonomie)}
         note={autonomie === null
           ? 'besoin mensuel non renseigné'
-          : 'ton versable, à ton train de vie'}
+          : 'ce qui est à te verser, à ton train de vie'}
       />
 
       {compose !== null && (
@@ -806,16 +806,16 @@ function noteProvenanceSolde(
  * LES PARTS SONT BORNÉES, ET C'EST TOUT LE SUJET
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Le seuil de sécurité n'est constitué qu'à hauteur de ce qui reste APRÈS les
- * provisions : l'afficher plein sur un disponible insuffisant ferait croire à
- * un matelas qui n'existe pas. Même chose pour les provisions elles-mêmes,
- * bornées au solde — au-delà, ce n'est plus une part, c'est un manque, et il se
- * dit en toutes lettres sous la légende.
+ * La réserve n'est constituée qu'à hauteur de ce qui reste APRÈS le dû :
+ * l'afficher pleine sur un disponible insuffisant ferait croire à une réserve
+ * qui n'existe pas. Même chose pour le dû lui-même, borné au solde — au-delà,
+ * ce n'est plus une part, c'est un manque, et il se dit en toutes lettres sous
+ * la légende.
  *
- * « Seuil de sécurité » et non « réserve » : le mot vient du dessin, et il
- * libère « réserve » pour l'autre notion — la part gardée au versement, qui est
- * un pourcentage. Un seul mot couvrait deux idées, et c'est ainsi qu'un
- * plancher fixe finit par être exprimé en pourcentage du disponible.
+ * « Réserve » nomme le plancher en euros, et lui seul ; la part retenue au
+ * versement, qui est un pourcentage, s'appelle « part gardée ». Un seul mot
+ * couvrait autrefois les deux idées, et c'est ainsi qu'un plancher fixe finit
+ * par être exprimé en pourcentage du disponible.
  */
 function RepartitionDuSolde({ etat }: { readonly etat: EtatArgent }) {
   const t = etat.tresorerie;
@@ -829,13 +829,13 @@ function RepartitionDuSolde({ etat }: { readonly etat: EtatArgent }) {
         total={t.solde}
         deficit={manque}
         centre={eur(t.dispo)}
-        legendeCentre="à toi, hors provisions"
+        legendeCentre="une fois le dû retiré"
         parts={[
           {
             /*
              * Le libellé change quand le montant est BORNÉ.
              *
-             * L'anneau découpe le solde : la part de provisions y est plafonnée
+             * L'anneau découpe le solde : la part du dû y est plafonnée
              * à ce que le compte contient. Sur un compte qui doit 7 607 € et
              * n'en porte que 4 938, la légende affichait « Provisions dues :
              * 4 938 € » — trois lignes au-dessus d'une carte qui en annonce
@@ -846,11 +846,11 @@ function RepartitionDuSolde({ etat }: { readonly etat: EtatArgent }) {
              * représente ; c'est le NOM qui dit ce qu'on regarde. Le reste dû
              * est sur la ligne de manque, juste dessous.
              */
-            libelle: manque > 0 ? 'Provisions couvertes par le solde' : 'Provisions dues',
+            libelle: manque > 0 ? 'Dû couvert par le solde' : 'Dû',
             montant: provisionsCouvertes,
             ton: 'provisions'
           },
-          { libelle: 'Seuil de sécurité', montant: seuilConstitue, ton: 'reserve' },
+          { libelle: 'Réserve', montant: seuilConstitue, ton: 'reserve' },
           { libelle: 'À te verser', montant: t.versable, ton: 'versable' }
         ]}
       />
@@ -885,7 +885,7 @@ function RepartitionDuSolde({ etat }: { readonly etat: EtatArgent }) {
         <PhraseRepartition>
           Sur les <strong><Montant>{eur(t.solde)}</Montant></strong> du compte,{' '}
           <strong><Montant>{eur(t.dispo)}</Montant></strong> sont à toi —{' '}
-          <Montant>{eur(euros(seuilConstitue))}</Montant> de seuil gardé
+          <Montant>{eur(euros(seuilConstitue))}</Montant> de réserve
           {' + '}<Montant>{eur(t.versable)}</Montant> que tu peux te verser. Les{' '}
           <strong><Montant>{eur(euros(provisionsCouvertes))}</Montant></strong> restants
           sont <strong>dus</strong> (URSSAF, impôt, TVA) — détaillés dans les
@@ -1234,12 +1234,12 @@ function NoteImpotRevenu(
 ) {
   if (provision === null) return null;
   // Le solde de l'an dernier se dit à part : c'est une autre année, qui se
-  // paie à une autre date, et qui sort des provisions d'une autre façon — à la
+  // paie à une autre date, et qui sort du dû d'une autre façon — à la
   // saisie de son avis.
   const ligneSolde = solde !== null && solde.statut !== 'refuse' && solde.valeur.resteAProvisionner > 0 && (
     <li>
       <strong>Solde de l’impôt {solde.valeur.annee}&nbsp;: {eur(solde.valeur.resteAProvisionner)}</strong>{' '}
-      estimés, prélevés à l’automne {solde.valeur.annee + 1}. Ils restent de côté jusqu’à ce que
+      estimés, prélevés à l’automne {solde.valeur.annee + 1}. Ils restent dans le dû jusqu’à ce que
       tu saisisses l’avis, en échéance « Solde de l’impôt {solde.valeur.annee} ».
     </li>
   );

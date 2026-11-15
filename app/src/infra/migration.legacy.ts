@@ -1023,8 +1023,8 @@ export function analyser(stockage: Stockage): RapportMigration {
   anomalies.push({
     gravite: 'avertissement',
     message: 'Aucune période déclarée n\'existe dans l\'ancien modèle. Tant qu\'elles ne '
-      + 'sont pas renseignées, les provisions surestiment la dette : les recettes déjà '
-      + 'déclarées sont comptées comme restant à provisionner.'
+      + 'sont pas renseignées, le dû est surestimé : les recettes déjà déclarées y sont '
+      + 'encore comptées.'
   });
 
   return {

@@ -146,7 +146,7 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
             ? (
               <p className={styles.attente}>
                 Recopie les deux valeurs de ton avis pour obtenir le montant.
-                Tant qu’il n’est pas connu, il n’est pas provisionné.
+                Tant qu’il n’est pas connu, il ne compte pas dans le dû.
               </p>
             )
             : (
@@ -160,11 +160,11 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
               </p>
             )}
 
-          {/* Le calcul ne sert à rien s'il ne devient pas une provision : la
+          {/* Le calcul ne sert à rien s'il n'entre pas dans le dû : la
               CFE ne pèse sur le disponible que portée en échéance. */}
           <p className={styles.suite}>
             {dejaSaisie
-              ? 'Une échéance de CFE est enregistrée pour cette année : elle est déjà comptée dans tes provisions.'
+              ? 'Une échéance de CFE est enregistrée pour cette année : elle est déjà comptée dans le dû.'
               : (
                 <>
                   Rien n’est enregistré tant que tu ne portes pas ce montant en

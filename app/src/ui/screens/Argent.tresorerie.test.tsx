@@ -81,7 +81,7 @@ describe('la composition d’un chiffre, au clic sur sa tuile', () => {
     await utilisateur.click(screen.getByRole('button', { name: /^Disponible/ }));
 
     const panneau = await screen.findByRole('dialog');
-    expect(within(panneau).getByText(/solde du compte − à garder de côté/i)).toBeTruthy();
+    expect(within(panneau).getByText(/solde du compte − dû/i)).toBeTruthy();
   });
 
   it('laisse « À encaisser » et « Autonomie » sans bouton', () => {
@@ -105,8 +105,10 @@ describe('les quatre tuiles de trésorerie', () => {
 
     // Deux fois à l'écran, et c'est ce que fait le dessin : sous la tuile
     // Disponible, et au centre de l'anneau. La même phrase pour le même nombre.
-    expect(screen.getAllByText('à toi, hors provisions').length).toBeGreaterThan(0);
-    expect(screen.getByText('ton versable, à ton train de vie')).toBeTruthy();
+    // « à toi, hors provisions » disait le disponible avec les mots de l'« à te
+    // verser » (lot 51) : la phrase dit désormais ce qui en est retiré.
+    expect(screen.getAllByText('une fois le dû retiré').length).toBeGreaterThan(0);
+    expect(screen.getByText('ce qui est à te verser, à ton train de vie')).toBeTruthy();
   });
 
   /**
@@ -197,9 +199,9 @@ describe('les quatre tuiles de trésorerie', () => {
 /**
  * La carte de répartition, prise par son titre.
  *
- * « Seuil de sécurité » est un nom PARTAGÉ : il nomme la part de l'anneau ici,
+ * « Réserve » est un nom PARTAGÉ : il nomme la part de l'anneau ici,
  * et depuis le lot F-A il nomme aussi la quatrième vignette de la carte
- * « Enveloppes de provision », juste en dessous — voir `Argent.provisions.test.tsx`.
+ * « Enveloppes du dû », juste en dessous — voir `Argent.provisions.test.tsx`.
  * Un `getByText` sans portée trouverait les deux et échouerait pour la
  * mauvaise raison ; il faut se limiter à CETTE carte.
  */
@@ -212,25 +214,25 @@ describe('la répartition du solde', () => {
     poser({ soldeInitial: euros(10_000), reserve: euros(3_000) });
 
     const dans = within(carteRepartition());
-    expect(dans.getByText('Provisions dues')).toBeTruthy();
-    expect(dans.getByText('Seuil de sécurité')).toBeTruthy();
+    expect(dans.getByText('Dû')).toBeTruthy();
+    expect(dans.getByText('Réserve')).toBeTruthy();
     expect(dans.getByText('À te verser')).toBeTruthy();
   });
 
   /**
-   * LE SEUIL N'EST CONSTITUÉ QU'À HAUTEUR DE CE QUI RESTE.
+   * LA RÉSERVE N'EST CONSTITUÉE QU'À HAUTEUR DE CE QUI RESTE.
    *
-   * Solde 5 000 €, provisions 4 000 €, seuil voulu 3 000 € : il ne reste que
-   * 1 000 € de disponible, donc 1 000 € de seuil réellement constitué.
-   * L'afficher plein ferait croire à un matelas qui n'existe pas — et c'est
-   * précisément sur ce matelas qu'on se croit couvert.
+   * Solde 5 000 €, dû 4 000 €, réserve voulue 3 000 € : il ne reste que
+   * 1 000 € de disponible, donc 1 000 € de réserve réellement constituée.
+   * L'afficher pleine ferait croire à une réserve qui n'existe pas — et c'est
+   * précisément sur elle qu'on se croit couvert.
    */
-  it('borne le seuil de sécurité à ce que le disponible permet', () => {
+  it('borne la réserve à ce que le disponible permet', () => {
     poser({
       soldeInitial: euros(5_000), reserve: euros(3_000), echeances: [echeance(4_000)]
     });
 
-    const ligne = within(carteRepartition()).getByText('Seuil de sécurité').parentElement;
+    const ligne = within(carteRepartition()).getByText('Réserve').parentElement;
     expect(ligne?.textContent).toContain(eur(1_000));
     expect(ligne?.textContent).not.toContain(eur(3_000));
   });
@@ -238,17 +240,18 @@ describe('la répartition du solde', () => {
   /**
    * DEUX MONTANTS POUR LA MÊME NOTION SUR LE MÊME ÉCRAN.
    *
-   * L'anneau découpe le solde : la part de provisions y est plafonnée à ce que
+   * L'anneau découpe le solde : la part du dû y est plafonnée à ce que
    * le compte contient. Sur un compte qui doit 4 000 € et n'en porte que 3 000,
    * la légende annonçait « Provisions dues : 3 000 € » — au-dessus d'une carte
    * qui en compte 4 000. Le montant reste borné, c'est le NOM qui dit ce qu'on
    * regarde.
    */
-  it('dit que les provisions affichées sont celles que le solde couvre', () => {
+  it('dit que le dû affiché est celui que le solde couvre', () => {
     poser({ soldeInitial: euros(3_000), echeances: [echeance(4_000)] });
 
-    expect(screen.getByText('Provisions couvertes par le solde')).toBeTruthy();
-    expect(screen.queryByText('Provisions dues')).toBeNull();
+    const dans = within(carteRepartition());
+    expect(dans.getByText('Dû couvert par le solde')).toBeTruthy();
+    expect(dans.queryByText('Dû')).toBeNull();
   });
 
   /**
@@ -275,7 +278,7 @@ describe('la répartition du solde', () => {
    * dessine pas. Il est donc dit — et ce n'est pas une nuance d'affichage :
    * l'argent des cotisations a déjà été dépensé.
    */
-  it('dit ce qui manque quand les provisions dépassent le solde', () => {
+  it('dit ce qui manque quand le dû dépasse le solde', () => {
     poser({ soldeInitial: euros(3_000), echeances: [echeance(4_000)] });
 
     expect(screen.getByText(/Il manque/).textContent).toContain(eur(1_000));
@@ -285,7 +288,7 @@ describe('la répartition du solde', () => {
     poser({ soldeInitial: euros(10_000), reserve: euros(3_000) });
 
     const phrase = phraseDeRepartition();
-    expect(phrase.textContent).toContain('de seuil gardé');
+    expect(phrase.textContent).toContain('de réserve');
     expect(phrase.textContent).toContain('que tu peux te verser');
   });
 
@@ -393,15 +396,15 @@ describe('l’évolution du compte', () => {
     poser({ soldeInitial: euros(10_000) });
 
     const carte = screen.getByText(/Évolution du compte/).closest('section');
-    expect(within(carte as HTMLElement).queryByText(/^seuil/)).toBeNull();
+    expect(within(carte as HTMLElement).queryByText(/^réserve/)).toBeNull();
   });
 
-  it('trace le seuil de sécurité dès qu’il est réglé', () => {
+  it('trace la réserve dès qu’elle est réglée', () => {
     poser({ soldeInitial: euros(10_000), reserve: euros(4_000) });
 
     const carte = screen.getByText(/Évolution du compte/).closest('section');
     const dans = within(carte as HTMLElement);
-    expect(dans.getByText(/^seuil/).textContent).toContain(eur(4_000));
+    expect(dans.getByText(/^réserve/).textContent).toContain(eur(4_000));
   });
 
   /**
@@ -461,7 +464,7 @@ describe('l’ordre des cartes', () => {
    *
    * Un renvoi cassé coûte plus qu'une carte mal rangée — il apprend à ne plus
    * suivre les renvois, et c'est celui-ci qui porte la seule explication de ce
-   * que « provisions » recouvre.
+   * que « dû » recouvre.
    *
    * Le test lit l'ORDRE DU DOCUMENT et non des pixels : c'est lui que suivent
    * le défilement, la tabulation et un lecteur d'écran.
@@ -477,7 +480,7 @@ describe('l’ordre des cartes', () => {
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
 
     const repartition = screen.getByText('Ton solde n’est pas tout à toi');
-    const enveloppes = screen.getByText('Enveloppes de provision');
+    const enveloppes = screen.getByText('Enveloppes du dû');
     const seuils = screen.getByText(/^Seuils/);
 
     expect(avant(repartition, enveloppes)).toBe(true);
@@ -505,7 +508,7 @@ describe('l’ordre des cartes', () => {
  * identique sur les trois cartes.
  *
  * La plus coûteuse est « clic = détail » : c'est la seule indication que la
- * carte « Enveloppes de provision » a un contenu de plus que son résumé plié.
+ * carte « Enveloppes du dû » a un contenu de plus que son résumé plié.
  * `CartePliable` le fait déjà (voir son en-tête) — l'indication ne fait que
  * le dire, elle n'invente pas un geste que l'écran ne sait pas faire.
  */
@@ -525,7 +528,7 @@ describe('les indications d’en-tête du dessin', () => {
   it('annonce que la carte des enveloppes s’ouvre sur un détail', () => {
     poser({ soldeInitial: euros(10_000) });
 
-    const carte = screen.getByText('Enveloppes de provision').closest('section');
+    const carte = screen.getByText('Enveloppes du dû').closest('section');
     expect(within(carte as HTMLElement).getByText('clic = détail')).toBeTruthy();
   });
 

@@ -552,8 +552,8 @@ export interface Faits {
   /**
    * Matelas de sécurité, montant absolu. Source unique (D4).
    *
-   * Le fait garde son nom ; l'écran, lui, l'appelle « seuil de sécurité »,
-   * comme le dessin. Renommer le champ aurait obligé à une migration pour un
+   * Le fait garde son nom ; l'écran, lui, l'appelle « réserve » depuis le
+   * lot 51 (« seuil de sécurité » avant), comme la direction visuelle. Renommer le champ aurait obligé à une migration pour un
    * gain nul — et aurait fait passer le vocabulaire de l'interface dans le
    * stockage, où il n'a rien à faire.
    */

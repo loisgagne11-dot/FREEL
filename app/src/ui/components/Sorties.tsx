@@ -65,7 +65,7 @@ export function Sorties(
     enregistrerPaiement(id, payeeLe, montantPaye);
     setOuverte(null);
     signaler(montantPaye === null
-      ? 'Paiement enregistré. L’échéance sort des provisions.'
+      ? 'Paiement enregistré. L’échéance sort du dû.'
       : 'Paiement enregistré, avec son écart au montant appelé.');
     // La ligne disparaît avec le bouton qui avait le focus : voir le panneau
     // d'encaissement.
@@ -85,7 +85,7 @@ export function Sorties(
       pied={(
         <>
           <p className={styles.rappelPied}>
-            Payée, l’échéance sort des <strong>provisions</strong> — le solde la reflète déjà
+            Payée, l’échéance sort du <strong>dû</strong> — le solde la reflète déjà
           </p>
           <button ref={termine} type="button" className={styles.termine} onClick={onFermer}>
             Terminé

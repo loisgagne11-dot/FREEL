@@ -50,7 +50,7 @@ export function SanteCard(
     /** Mois d'autonomie, ou `null` quand le besoin mensuel n'est pas renseigné. */
     readonly autonomie: number | null;
     /**
-     * Le seuil de sécurité, que l'autonomie ne touche pas. Nommé avec son
+     * La réserve, que l'autonomie ne touche pas. Nommée avec son
      * montant : c'est le seul endroit du Pilote où il paraît, depuis que les
      * tuiles en double sont parties.
      */
@@ -65,12 +65,12 @@ export function SanteCard(
         Santé
         <Info libelle="Pourquoi aucune note globale">
           La maquette affichait un score sur 100. Il aurait fallu en inventer
-          la formule&nbsp;: quel poids donner aux provisions, aux impayés, aux
+          la formule&nbsp;: quel poids donner au dû, aux impayés, aux
           déclarations&nbsp;? Chaque réponse est défendable, aucune n’est
           vérifiable — et une note se retient, se compare, puis commande des
           décisions. La phrase, elle, ne pondère rien&nbsp;: elle nomme le plus
-          grave des constats, dans un ordre écrit — une provision déjà
-          dépensée, puis une déclaration en retard, puis un changement de
+          grave des constats, dans un ordre écrit — de l’argent dû déjà
+          dépensé, puis une déclaration en retard, puis un changement de
           régime, puis une facture en retard, puis une déclaration à faire.
         </Info>
       </h2>
@@ -94,8 +94,8 @@ export function SanteCard(
       </ul>
 
       {/* L'assiette est NOMMÉE : « 4,2 mois » ne dit pas sur quoi l'on tient.
-          Ici sur le versable, réserve exclue — un chiffre de confort, avec du
-          matelas derrière lui, et non de survie. Inconnue sans besoin
+          Ici sur l’« à te verser », réserve exclue — un chiffre de confort,
+          avec la réserve derrière lui, et non de survie. Inconnue sans besoin
           mensuel : « 0 mois » ferait croire à une trésorerie à sec. */}
       <p className={styles.autonomie}>
         {autonomie === null
@@ -115,7 +115,7 @@ export function SanteCard(
 /**
  * Les constats, tirés des mêmes sujets que les décisions du jour.
  *
- * Aucun seuil n'est inventé : « couvertes », c'est un disponible qui n'est pas
+ * Aucun seuil n'est inventé : « couvert », c'est un disponible qui n'est pas
  * négatif ; « en retard », une échéance ou une date limite passée. Le constat
  * « Factures » compte les factures EN RETARD — il comptait les factures en
  * attente, et une facture à trente jours, normale, y passait pour un problème.
@@ -138,10 +138,10 @@ export function indicateursDeSante(
   const constats: Indicateur[] = [
     dispo >= 0
       ? {
-        id: 'provisions', libelle: 'Provisions couvertes', etat: 'bon',
-        valeur: provisions === 0 ? 'rien à provisionner' : `${eur(provisions)} de côté`
+        id: 'provisions', libelle: 'Dû couvert', etat: 'bon',
+        valeur: provisions === 0 ? 'rien n’est dû' : `${eur(provisions)} dus`
       }
-      : { id: 'provisions', libelle: 'Provisions à découvert', etat: 'alerte', valeur: `il manque ${eur(-dispo)}` },
+      : { id: 'provisions', libelle: 'Dû non couvert', etat: 'alerte', valeur: `il manque ${eur(-dispo)}` },
     facturesEnRetard === 0
       ? { id: 'factures', libelle: 'Factures à jour', etat: 'bon', valeur: '' }
       : {
@@ -175,7 +175,7 @@ export function indicateursDeSante(
  *
  * On n'attribue aucun poids ; on classe des conséquences :
  *
- *  1. PROVISIONS à découvert — l'argent dû a déjà été dépensé. C'est le seul
+ *  1. DÛ non couvert — l'argent dû a déjà été dépensé. C'est le seul
  *     constat déjà consommé : il ne se rattrape qu'en trouvant la somme
  *     ailleurs, et les majorations courent pendant ce temps.
  *  2. DÉCLARATIONS en retard — la pénalité est automatique et croît seule,

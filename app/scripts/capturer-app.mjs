@@ -127,7 +127,7 @@ const VUES = [
      le premier passage a produit un chevron collé au montant comme une
      virgule, que rien d'autre qu'un œil ne pouvait voir. */
   /* Depuis le lot 5, la composition s'ouvre sur le versable de la colonne
-     Rémunération : les tuiles (« Solde »…) sont parties avec les doublons.
+     « À te verser » : les tuiles (« Solde »…) sont parties avec les doublons.
      Le libellé est un motif — le nom du bouton commence par le montant. */
   { hash: '#/pilote', nom: 'pilote-composition', ouvrir: ['.*d’où vient ce chiffre'] },
   /* Le panneau s'ouvre par son adresse, comme l'action rapide et « + Nouveau »
@@ -153,7 +153,7 @@ const VUES = [
      du handoff. Chacune arrive à la demande : sans `attendre`, la photo
      montrait « Chargement… » et le contrôle visuel ne pouvait rien juger. */
   { hash: '#/config/fiscal', nom: 'config-fiscal', attendre: 'text=Périodicité des cotisations' },
-  { hash: '#/config/reserve', nom: 'config-reserve', attendre: 'text=Seuil de sécurité' },
+  { hash: '#/config/reserve', nom: 'config-reserve', attendre: 'text=Part gardée à chaque versement' },
   { hash: '#/config/facturation', nom: 'config-facturation', attendre: 'label:has-text("IBAN")' },
   { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
   { hash: '#/config/compte', nom: 'config-cloud', attendre: 'text=Relier un compte' }

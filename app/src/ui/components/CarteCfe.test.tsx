@@ -128,8 +128,8 @@ describe('régime annoncé', () => {
  * Un montant calculé ne pèse sur le disponible que porté en échéance. Sans ce
  * pont, la carte donnerait un chiffre juste et le versable resterait faux.
  */
-describe('le lien avec les provisions', () => {
-  it('dit que rien n’est provisionné tant que l’échéance n’est pas saisie', () => {
+describe('le lien avec le dû', () => {
+  it('dit que rien n’entre dans le dû tant que l’échéance n’est pas saisie', () => {
     semer('2020-01-01', { recettes: [recette(40000, '2024-05-01')] });
     rendre();
     expect(screen.getByRole('link', { name: 'Saisir l’échéance' })).toBeTruthy();
@@ -140,7 +140,7 @@ describe('le lien avec les provisions', () => {
       recettes: [recette(40000, '2024-05-01')], echeances: [echeanceCfe]
     });
     rendre();
-    expect(screen.getByText(/déjà comptée dans tes provisions/)).toBeTruthy();
+    expect(screen.getByText(/déjà comptée dans le dû/)).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Saisir l’échéance' })).toBeNull();
   });
 });

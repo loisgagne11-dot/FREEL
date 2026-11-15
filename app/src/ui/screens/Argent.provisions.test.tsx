@@ -53,7 +53,7 @@ describe('ventilation des provisions à l’écran', () => {
     render(<Argent />);
     await attendreTresorerie();
 
-    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
     expect(enveloppes).toBeTruthy();
     const dans = within(enveloppes as HTMLElement);
 
@@ -87,7 +87,7 @@ describe('ventilation des provisions à l’écran', () => {
     render(<Argent />);
     await attendreTresorerie();
 
-    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
     const dans = within(enveloppes as HTMLElement);
     expect(dans.getByText('URSSAF — cotisations sociales')).toBeTruthy();
     expect(dans.queryByText('CFP — formation professionnelle')).toBeNull();
@@ -105,7 +105,7 @@ describe('ventilation des provisions à l’écran', () => {
     render(<Argent />);
     await attendreTresorerie();
 
-    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
     const dans = within(enveloppes as HTMLElement);
     // 1 000 € sur le compte, 4 100 € dus : l'enveloppe n'est pas couverte.
     const vignette = dans.getByText('URSSAF — cotisations sociales').parentElement?.parentElement;
@@ -124,7 +124,7 @@ describe('ventilation des provisions à l’écran', () => {
     render(<Argent />);
     await attendreTresorerie();
 
-    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
     for (const texte of ['4 100 €', '1 800 €']) {
       const noeud = within(enveloppes as HTMLElement).getByText(texte);
       expect(noeud.closest('[data-montant]')).toBeTruthy();
@@ -148,7 +148,7 @@ describe('ventilation des provisions à l’écran', () => {
     render(<Argent />);
     await attendreTresorerie();
 
-    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
     const dans = within(enveloppes as HTMLElement);
     const vignette = dans.getByText('TVA à reverser').closest('li');
     expect(vignette).toBeTruthy();
@@ -163,7 +163,7 @@ describe('ventilation des provisions à l’écran', () => {
     render(<Argent />);
     await attendreTresorerie();
 
-    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
     const dans = within(enveloppes as HTMLElement);
     const vignette = dans.getByText('TVA à reverser').closest('li');
     expect(vignette).toBeTruthy();
@@ -173,32 +173,33 @@ describe('ventilation des provisions à l’écran', () => {
   });
 
   /**
-   * LE SEUIL DE SÉCURITÉ EST LA QUATRIÈME VIGNETTE DU DESSIN.
+   * LA RÉSERVE EST LA QUATRIÈME VIGNETTE DU DESSIN.
    *
-   * Il n'est pas une dette — il n'a ni échéance ni « nature » au sens du
-   * domaine — mais le dessin le pose à côté des trois autres, et le fait
-   * porte déjà un nom dans l'application : « seuil de sécurité », jamais
-   * « réserve matelas ». Masqué à zéro comme les enveloppes de dette, pour la
-   * même raison : personne n'a réglé de cible, il n'y a rien à montrer.
+   * Elle n'est pas une dette — elle n'a ni échéance ni « nature » au sens du
+   * domaine — mais le dessin la pose à côté des trois autres, et la notion
+   * porte un seul nom dans l'application : « réserve », jamais « seuil de
+   * sécurité » ni « réserve matelas ». Masquée à zéro comme les enveloppes de
+   * dette, pour la même raison : personne n'a réglé de cible, il n'y a rien à
+   * montrer.
    */
-  it('ajoute une vignette « Seuil de sécurité » quand une réserve est réglée', async () => {
+  it('ajoute une vignette « Réserve » quand une réserve est réglée', async () => {
     semer({ soldeInitial: euros(10_000), reserve: euros(2_500) });
     render(<Argent />);
     await attendreTresorerie();
 
-    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
+    const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
     const dans = within(enveloppes as HTMLElement);
-    const vignette = dans.getByText('Seuil de sécurité').parentElement?.parentElement;
+    const vignette = dans.getByText('Réserve').parentElement?.parentElement;
     expect(vignette?.textContent).toContain(`sur ${eur(2_500)}`);
   });
 
-  it('ne montre pas de vignette « Seuil de sécurité » quand aucune réserve n’est réglée', async () => {
+  it('ne montre pas de vignette « Réserve » quand aucune réserve n’est réglée', async () => {
     semer({ soldeInitial: euros(10_000) }); // `reserve` reste à zéro, comme `faitsVides()`
     render(<Argent />);
     await attendreTresorerie();
 
-    const enveloppes = screen.getByText(/Enveloppes de provision/).closest('section');
-    expect(within(enveloppes as HTMLElement).queryByText('Seuil de sécurité')).toBeNull();
+    const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
+    expect(within(enveloppes as HTMLElement).queryByText('Réserve')).toBeNull();
   });
 });
 
@@ -217,13 +218,13 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     modeReglement: 'virement' as const, numero: '2026-001'
   });
 
-  it('dit pourquoi elle n’est pas provisionnée quand les parts manquent', async () => {
+  it('dit pourquoi elle n’est pas comptée dans le dû quand les parts manquent', async () => {
     semer({ recettes: [recette(60000)] });
     render(<Argent />);
     await attendreTresorerie();
     // `getAllBy` : le titre en gras et la ligne qui le contient répondent tous
     // deux au motif. C'est un détail de rendu, pas deux endroits.
-    expect(screen.getAllByText(/non provisionné/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/non compté dans le dû/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/parts fiscales/).length).toBeGreaterThan(0);
   });
 
@@ -248,7 +249,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
     });
     render(<Argent />);
     await attendreTresorerie();
-    expect(screen.queryAllByText(/non provisionné/)).toHaveLength(0);
+    expect(screen.queryAllByText(/non compté dans le dû/)).toHaveLength(0);
     expect(screen.queryAllByText(/à\s+mettre de côté\s+aujourd/)).toHaveLength(0);
     expect(screen.queryByText(/^L’impôt \d{4}, mois par mois$/)).toBeNull();
   });
@@ -307,7 +308,7 @@ describe('le détail d’une enveloppe', () => {
     render(<Argent />);
     await attendreTresorerie();
     const vignette = screen.getByRole('button', { name: /Impôt sur le revenu/i });
-    // La vignette dit « X € [mis de côté] sur Y € » : Y est le reste à sortir.
+    // La vignette dit « X € [couverts] sur Y € » : Y est le reste à sortir.
     const montantVignette = /sur ([\d\s\u202f]+?)\s*€/.exec(vignette.textContent ?? '')?.[1]?.trim();
     await utilisateur().click(vignette);
 

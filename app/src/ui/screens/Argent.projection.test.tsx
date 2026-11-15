@@ -128,7 +128,7 @@ describe('projection du disponible', () => {
   });
 
   /** Zéro veut dire « rien, pour l'instant » — et c'est une réponse. */
-  it('le dit quand rien n’est versable', () => {
+  it('le dit quand il n’y a rien à te verser', () => {
     semer({ soldeInitial: euros(0), reserve: euros(5000) });
     render(<ProjectionPanneau />);
 

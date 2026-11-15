@@ -81,15 +81,19 @@ describe('la salutation', () => {
  * Le versable avait sa carte ET sa colonne ; quatre tuiles répétaient
  * l'en-tête de l'écran Argent ; « Ce que je dois » répétait la colonne
  * Sorties. Le handoff : le flux, la santé, les décisions.
+ *
+ * Les noms cherchés sont ceux du vocabulaire du lot 51 (« À te verser »,
+ * « Réserve », « Dû ») : chercher les anciens ne trouverait plus rien, quoi
+ * qu'on rajoute, et le test ne tiendrait plus aucun doublon.
  */
 describe('la composition du Pilote', () => {
-  it('ne répète plus le versable, les tuiles d’Argent ni « Ce que je dois »', () => {
+  it('ne répète plus l’« à te verser », les tuiles d’Argent ni « Ce que je dois »', () => {
     semer();
     render(<Pilote />);
-    expect(screen.queryByRole('heading', { name: 'Je peux me verser' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'À te verser' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Ce que je dois' })).toBeNull();
-    expect(screen.queryByText('Seuil de sécurité')).toBeNull();
-    expect(screen.queryByText('À garder de côté')).toBeNull();
+    expect(screen.queryByText('Réserve')).toBeNull();
+    expect(screen.queryByText('Dû')).toBeNull();
   });
 
   it('montre le flux, la santé, puis les décisions du jour', async () => {

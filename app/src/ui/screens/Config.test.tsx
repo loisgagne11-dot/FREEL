@@ -746,7 +746,7 @@ describe('jeu de démonstration', () => {
 /**
  * LES DEUX RÉGLAGES DE PRUDENCE SONT DEUX NOTIONS, PAS DEUX ÉCRITURES DU MÊME.
  *
- * Le seuil de sécurité est un PLANCHER en euros ; la part gardée est une
+ * La réserve est un PLANCHER en euros ; la part gardée est une
  * FRACTION du versable. Les exprimer tous deux en pourcentage du disponible —
  * ce que fait le prototype du handoff — fabrique une boucle : le plancher
  * descend à mesure qu'on vide le compte, et le versement soutenable finit par
@@ -756,25 +756,25 @@ describe('jeu de démonstration', () => {
  * parce que le Pilote est le seul écran du paquet d'entrée : le second curseur
  * lui a fait franchir son plafond.
  */
-describe('seuil de sécurité et part gardée', () => {
+describe('réserve et part gardée', () => {
   const champSeuil = () =>
-    screen.getByRole('spinbutton', { name: /Seuil de sécurité/ }) as HTMLInputElement;
+    screen.getByRole('spinbutton', { name: /^Réserve/ }) as HTMLInputElement;
   const curseurPart = () =>
     screen.getByRole('slider', { name: /Part gardée/ }) as HTMLInputElement;
 
-  it('écrit le seuil de sécurité dans les faits', async () => {
+  it('écrit la réserve dans les faits', async () => {
     await afficher('reserve');
     fireEvent.change(champSeuil(), { target: { value: '3500' } });
     expect(useFaits.getState().faits.reserve).toBe(3500);
   });
 
   /**
-   * Le seuil est un CHAMP et non un curseur, contrairement à la part. Une
+   * La réserve est un CHAMP et non un curseur, contrairement à la part. Une
    * plage aurait eu besoin d'une borne haute, et la seule disponible est le
    * solde : quelqu'un qui a 8 000 € en banque mais n'a pas encore saisi son
    * solde de départ n'aurait pas pu se fixer un plancher à 5 000 €.
    */
-  it('n’enferme pas le seuil dans la borne d’un curseur', async () => {
+  it('n’enferme pas la réserve dans la borne d’un curseur', async () => {
     await afficher('reserve');
     fireEvent.change(champSeuil(), { target: { value: '5000' } });
     expect(useFaits.getState().faits.reserve).toBe(5000);
@@ -782,11 +782,11 @@ describe('seuil de sécurité et part gardée', () => {
 
   /**
    * Le prototype du handoff écrit « sur ta part disponible, tu gardes N % » —
-   * sans le seuil. À 0 % il propose donc de verser le matelas avec. La phrase
+   * sans la réserve. À 0 % il propose donc de la verser avec. La phrase
    * doit dire les DEUX réglages, sinon elle décrit un autre calcul que celui
    * qui s'applique.
    */
-  it('dit le calcul complet, seuil compris', async () => {
+  it('dit le calcul complet, réserve comprise', async () => {
     useFaits.setState({
       faits: { ...faitsVides(), soldeInitial: euros(8000), reserve: euros(5000) }
     });
@@ -795,7 +795,7 @@ describe('seuil de sécurité et part gardée', () => {
 
     const phrase = screen.getByText(/Sur un solde de/).textContent ?? '';
     expect(phrase).toMatch(/8\s?000/u);   // le solde
-    expect(phrase).toMatch(/5\s?000/u);   // ce que le seuil garde
+    expect(phrase).toMatch(/5\s?000/u);   // ce que la réserve garde
     expect(phrase).toMatch(/3\s?000/u);   // le versable
     expect(phrase).toMatch(/1\s?500/u);   // ce qu'il reste à se verser
   });
@@ -825,7 +825,7 @@ describe('seuil de sécurité et part gardée', () => {
    * Un plancher négatif n'existe pas : il autoriserait un versement supérieur
    * au disponible.
    */
-  it('refuse un seuil négatif plutôt que de l’enregistrer', async () => {
+  it('refuse une réserve négative plutôt que de l’enregistrer', async () => {
     await afficher('reserve');
     fireEvent.change(champSeuil(), { target: { value: '-400' } });
     expect(useFaits.getState().faits.reserve).toBe(0);
@@ -961,7 +961,7 @@ describe('navigation entre les sections', () => {
   it('suit l’adresse : #/config/reserve ouvre la réserve', async () => {
     await afficher('reserve');
     expect(screen.getByRole('heading', { level: 2, name: 'Réserve & versements' })).toBeTruthy();
-    expect(screen.getByLabelText('Seuil de sécurité')).toBeTruthy();
+    expect(screen.getByLabelText('Réserve')).toBeTruthy();
     expect(within(nav()).getByRole('button', { name: /Réserve & versements/ })
       .getAttribute('aria-current')).toBe('page');
   });
@@ -1026,7 +1026,7 @@ describe('navigation entre les sections', () => {
     expect(screen.getByRole('table')).toBeTruthy();
   });
 
-  it('Réserve : solde, besoin, seuil, part gardée et objectif', async () => {
+  it('Réserve : solde, besoin, réserve, part gardée et objectif', async () => {
     await afficher('reserve');
     expect(screen.getByLabelText('Solde de ton compte')).toBeTruthy();
     expect(screen.getByLabelText('Besoin mensuel')).toBeTruthy();

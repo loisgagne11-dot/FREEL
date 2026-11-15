@@ -305,12 +305,12 @@ describe('tu peux te verser', () => {
   /**
    * LA PART S'APPLIQUE AU VERSABLE, PAS AU DISPONIBLE.
    *
-   * Le prototype l'applique au disponible : à 0 % il propose alors de verser le
-   * seuil de sécurité avec, c'est-à-dire de vider précisément le matelas qu'on
-   * s'était donné. Solde 10 000 €, seuil 4 000 €, aucune provision : le
-   * versable est 6 000 € et c'est lui qu'on peut prendre en entier — pas 10 000.
+   * Le prototype l'applique au disponible : à 0 % il propose alors de verser la
+   * réserve avec, c'est-à-dire de vider précisément le plancher qu'on s'était
+   * donné. Solde 10 000 €, réserve 4 000 €, rien de dû : le versable est
+   * 6 000 € et c'est lui qu'on peut prendre en entier — pas 10 000.
    */
-  it('propose le versable entier à 0 %, jamais le seuil de sécurité avec', () => {
+  it('propose le versable entier à 0 %, jamais la réserve avec', () => {
     poser({ soldeInitial: euros(10_000), reserve: euros(4_000) });
 
     const grand = screen.getByText(/Montant que tu peux te verser/).parentElement;
@@ -346,9 +346,9 @@ describe('tu peux te verser', () => {
   /**
    * UN DISPONIBLE NÉGATIF NE SE RACONTE PAS COMME UNE SOUSTRACTION.
    *
-   * « Sur −2 669 € de disponible, le seuil de sécurité en retient 2 470 € »
-   * suggère un reste de −5 139 €, alors que le versable est zéro et que le
-   * seuil n'est pas constitué. Sans cette phrase, la carte affiche « 0 € » sans
+   * « Sur −2 669 € de disponible, la réserve en retient 2 470 € »
+   * suggère un reste de −5 139 €, alors que le versable est zéro et que la
+   * réserve n'est pas constituée. Sans cette phrase, la carte affiche « 0 € » sans
    * qu'on sache si c'est le réglage ou le compte qui l'impose.
    */
   it('dit qu’un disponible négatif est la cause, au lieu de laisser lire zéro', () => {
@@ -363,7 +363,9 @@ describe('tu peux te verser', () => {
     });
 
     expect(screen.getByText(/disponible est/).textContent).toContain('négatif');
-    expect(screen.queryByText(/de versable/)).toBeNull();
+    // La soustraction, reconnue à son verbe : « rien à te verser » appartient
+    // aussi à la phrase du cas négatif, et ne distinguerait plus les deux.
+    expect(screen.queryByText(/en retient/)).toBeNull();
   });
 
   /**
