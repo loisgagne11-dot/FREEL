@@ -824,3 +824,8 @@ Aucun montant ne change.
 | Provision d'impôt sur le revenu | Pilote, Argent, détail « Impôt » | Réduite des acomptes saisis | Réduite de ce qui a été viré pour l'exercice, quand il y en a ; des acomptes sinon. Jamais des deux |
 | « Déjà versé » | Pilote, Rémunération | Rémunérations seules | Inchangé : un virement « impôt » n'en est pas une |
 | À mettre de côté pour l'impôt | Pilote, Rémunération | — | La provision d'impôt restante (barème ; rien sous versement libératoire) |
+
+## Lot 58 (15/11) — aucun nombre touché
+
+Lot de sécurité sur la page et la copie publiée de l'ancienne version : aucun
+sélecteur, aucun calcul, aucun nombre lu à l'écran ne change.

@@ -88,8 +88,8 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 5 | 32 | Vérification sur les données réelles (hors dépôt) | ⬜ attend l'export du propriétaire |
 | 6 | 46 | Facture conforme 2026-2027 | ✅ fusionné le 14/11 (PR #336, schéma 22) |
 | 7 | 33 | « Reste à sortir » : un seul total | ✅ fusionné le 14/11 (PR #337) |
-| 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ✅ fini le 15/11, PR #338 à fusionner (schéma 23) |
-| 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ⬜ |
+| 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ✅ fusionné le 15/11 (PR #338, schéma 23) |
+| 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ✅ fini le 15/11, PR à fusionner |
 | 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ⬜ |
 | — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
 | 11 | 51 | Nouvelle navigation et jetons de style | ⬜ |
@@ -264,11 +264,11 @@ Sur l'hébergement actuel, sans attendre la décision 22. **L'original
 
 | Ligne | État |
 |---|---|
-| Les en-têtes servis par le site en ligne sont mesurés et consignés dans `AUDIT-SECURITE.md` : on sait d'où l'on part | ⬜ |
-| Copie publiée de l'ancienne version : politique de contenu en `<meta>` — scripts de l'origine et des hôtes exacts qu'elle charge, connexions vers le seul projet du compte, `object-src`, `base-uri` et `form-action` fermés. `verifier:bascule` prouve qu'elle s'affiche encore, et qu'un script d'un autre hôte est refusé | ⬜ |
-| Un script tiers modifié ne s'exécute pas : empreinte d'intégrité posée sur la copie, ou bibliothèques servies depuis l'origine ; prouvé par un essai | ⬜ |
-| La nouvelle application refuse de s'afficher dans un cadre : contrôle dans le premier script de la page, empreinte de la politique mise à jour, `csp.test.ts` vert ; essai dans un navigateur — cadrée par une autre origine, elle reste vide | ⬜ |
-| `<meta name="referrer" content="no-referrer">` : l'adresse de la page ne part plus chez les tiers | ⬜ |
+| Les en-têtes servis par le site en ligne sont mesurés et consignés dans `AUDIT-SECURITE.md` : on sait d'où l'on part | ✅ 15/11 — §4 bis : HSTS et cache seulement ; ni politique, ni refus du cadre, ni référent |
+| Copie publiée de l'ancienne version : politique de contenu en `<meta>` — scripts de l'origine et des hôtes exacts qu'elle charge, connexions vers le seul projet du compte, `object-src`, `base-uri` et `form-action` fermés. `verifier:bascule` prouve qu'elle s'affiche encore, et qu'un script d'un autre hôte est refusé | ✅ 15/11 |
+| Un script tiers modifié ne s'exécute pas : empreinte d'intégrité posée sur la copie, ou bibliothèques servies depuis l'origine ; prouvé par un essai | ✅ 15/11 — Supabase d'une seule source épinglée (2.47.12) avec empreinte ; l'essai sert une copie modifiée, elle ne s'exécute pas |
+| La nouvelle application refuse de s'afficher dans un cadre : contrôle dans le premier script de la page, empreinte de la politique mise à jour, `csp.test.ts` vert ; essai dans un navigateur — cadrée par une autre origine, elle reste vide | ✅ 15/11 — et l'ancienne version aussi, sur sa copie |
+| `<meta name="referrer" content="no-referrer">` : l'adresse de la page ne part plus chez les tiers | ✅ 15/11, sur les deux versions |
 
 #### Lot 59 — Appareil perdu, fichier piégé (S7, S8, S9)
 

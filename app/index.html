@@ -20,7 +20,10 @@
          · frame-src 'self' : le cadre d'impression est un about:blank rempli par
            document.write, sans src, que la politique ne bloque pas.
          · object-src 'none', base-uri 'self', form-action 'self'. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-v0VED4C+psJSOdt4IirMvZ7olWpuGhJ7wXQcyLQGoKw=' 'sha256-GoZ1zuL3CoRltQ+dbOPcHTR6wIi5O+60siJAyEDh8KU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-src 'self' blob: about:; child-src 'self' blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-J2QAq/Nt9jGJxqt23ixAOlG7QDdybU7ajmJNZp6/4cE=' 'sha256-GoZ1zuL3CoRltQ+dbOPcHTR6wIi5O+60siJAyEDh8KU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-src 'self' blob: about:; child-src 'self' blob: about:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <!-- Aucun référent : l'adresse de la page, et l'écran qu'elle désigne,
+         ne partent pas chez les tiers que l'on ouvre depuis elle (lot 58). -->
+    <meta name="referrer" content="no-referrer" />
     <title>Freel</title>
     <link rel="stylesheet" href="/src/styles/tokens.css" />
     <link rel="stylesheet" href="/src/styles/base.css" />
@@ -29,6 +32,17 @@
          reprise à l'identique du design (README du handoff §thème) :
          mêmes clé de stockage et repli que ui/theme.ts. -->
     <script>
+      // Lot 58 : AFFICHÉE DANS UN CADRE PAR UNE AUTRE PAGE, ELLE RESTE VIDE.
+      // Un site tiers pouvait l'afficher sous un calque transparent et faire
+      // cliquer « Effacer » ou « Écraser » à qui croyait cliquer chez lui.
+      // L'en-tête qui l'interdit (frame-ancestors) est sans effet en <meta>,
+      // et l'hébergement actuel n'en pose aucun : ce contrôle-ci tient en
+      // attendant (lot 60). Il passe avant tout le reste de la page.
+      if (window.top !== window.self) {
+        window.stop();
+        document.documentElement.replaceChildren();
+        throw new Error('Freel refuse de s’afficher dans un cadre.');
+      }
       try {
         document.documentElement.setAttribute('data-theme', localStorage.getItem('freel-v111-theme') || 'sombre');
         // Le mode confidentialité DOIT être posé ici aussi. Attendre le

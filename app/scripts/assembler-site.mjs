@@ -57,10 +57,18 @@ const DEPOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
  *   application sait déjà afficher.
  * - Un bandeau dit, en haut de chaque écran, que rien n'est enregistré, et
  *   mène à la nouvelle version.
+ * - Cadre (lot 58) : affichée dans un cadre par une autre page, elle s'arrête
+ *   et reste vide, comme la nouvelle. Lecture seule ou non, ses boutons
+ *   d'export et de navigation restaient cliquables sous un calque tiers.
  */
 export const GARDE_LECTURE_SEULE = `<script data-freel-lecture-seule>
 (function () {
   'use strict';
+  if (window.top !== window.self) {
+    window.stop();
+    document.documentElement.replaceChildren();
+    throw new Error('Freel refuse de s’afficher dans un cadre.');
+  }
   var LECTURE = /^(GET|HEAD|OPTIONS)$/i;
   var ECRITURES = { setItem: 1, removeItem: 1, clear: 1 };
   try {
@@ -153,16 +161,82 @@ const ANTI_CACHE = [
   /\s*<meta http-equiv="Expires"[^>]*>/i
 ];
 
-/** La copie publiée de l'ancienne application : gardée, et sans anti-cache. */
+/*
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA COPIE PUBLIÉE EST BRIDÉE (lot 58, constat S1)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne version vit sur la MÊME origine que la nouvelle : elle lit ce
+ * que la nouvelle stocke — jetons de session, faits, pièces. Elle chargeait
+ * le client Supabase depuis trois CDN, en version flottante (`@2`) et sans
+ * empreinte : qui corrompait l'un d'eux exécutait son code ici, avec accès à
+ * tout. Le troisième répondait 404 depuis des mois.
+ *
+ * L'original ne change pas (règle du dépôt) : tout se pose sur la copie.
+ *   - Une seule source, épinglée, avec son empreinte : un fichier modifié est
+ *     refusé par le navigateur. Le fichier vient de npm tel quel (jsDelivr ne
+ *     le reminifie pas), son empreinte est donc stable.
+ *   - Une politique de contenu : scripts de l'origine et des deux FICHIERS
+ *     qu'elle charge (chemins exacts, pas des hôtes entiers) ; connexions
+ *     vers Supabase seulement ; objets, base et formulaires fermés.
+ *     `'unsafe-inline'` reste : l'ancienne version pose des `onclick` dans
+ *     son HTML, et la priver de ses scripts en ligne l'éteindrait. Le
+ *     projet Supabase est saisi à l'exécution : le nommer ici mettrait son
+ *     adresse dans le dépôt, d'où le joker du domaine.
+ *   - Aucun référent : l'adresse de la page ne part pas chez les tiers.
+ */
+export const SUPABASE_EPINGLE = {
+  url: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.12/dist/umd/supabase.min.js',
+  integrite: 'sha384-AvvgxQvsvq3Z0cl73ZPiMA8faxkbYol1FE5ZYWzhS249M5K0Dm42BvVGzf9Zo06P'
+};
+
+/** Le visualiseur de PDF, déjà chargé par l'original avec son empreinte. */
+const PDFOBJECT = 'https://cdnjs.cloudflare.com/ajax/libs/pdfobject/2.1.1/pdfobject.min.js';
+
+export const POLITIQUE_ANCIENNE = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline' ${SUPABASE_EPINGLE.url} ${PDFOBJECT}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  // Le manifeste de l'original est une adresse data: ; sans cette ligne,
+  // chaque ouverture laisse une erreur en console.
+  "manifest-src 'self' data:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "frame-src 'self' data: blob:",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'"
+].join('; ');
+
+const CHARGEUR_ORIGINAL = /var cdns = \[\s*'https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2\/dist\/umd\/supabase\.min\.js',\s*'https:\/\/unpkg\.com[^']*',\s*'https:\/\/cdnjs\.cloudflare\.com[^']*'\s*\];/;
+
+/** Remplace le chargeur aux trois sources flottantes par la source épinglée. */
+export function epinglerSupabase(html) {
+  if (!CHARGEUR_ORIGINAL.test(html) || !html.includes("s.crossOrigin = 'anonymous';")) {
+    // L'original a changé : on s'arrête plutôt que de publier une copie dont
+    // le chargeur ne serait plus bridé, sans que rien ne le dise.
+    throw new Error('Chargeur Supabase de l’ancienne version introuvable : la copie ne peut pas être épinglée.');
+  }
+  return html
+    .replace(CHARGEUR_ORIGINAL, `var cdns = ['${SUPABASE_EPINGLE.url}'];`)
+    .replace("s.crossOrigin = 'anonymous';", `s.crossOrigin = 'anonymous'; s.integrity = '${SUPABASE_EPINGLE.integrite}';`);
+}
+
+/** La copie publiée de l'ancienne application : gardée, bridée, et sans anti-cache. */
 export function ancienneEnLectureSeule(html) {
-  let sortie = html;
+  let sortie = epinglerSupabase(html);
   for (const motif of ANTI_CACHE) sortie = sortie.replace(motif, '');
   const tete = sortie.match(/<head[^>]*>/i);
   if (tete === null || tete.index === undefined) {
     throw new Error('Ancienne application sans <head> : le garde ne peut pas passer avant ses scripts.');
   }
   const apres = tete.index + tete[0].length;
-  return `${sortie.slice(0, apres)}\n${GARDE_LECTURE_SEULE}${sortie.slice(apres)}`;
+  // En TÊTE de <head> : une politique en <meta> ne vaut que pour ce qui la
+  // suit, et le garde de lecture seule doit passer avant tout autre script.
+  const bride = `<meta http-equiv="Content-Security-Policy" content="${POLITIQUE_ANCIENNE}">\n`
+    + '<meta name="referrer" content="no-referrer">\n';
+  return `${sortie.slice(0, apres)}\n${bride}${GARDE_LECTURE_SEULE}${sortie.slice(apres)}`;
 }
 
 /**
