@@ -16,6 +16,26 @@ describe('étiquette de statut', () => {
     render(<Statut libelle="En retard" ton="retard" />);
     expect(screen.getByText('En retard')).toBeTruthy();
   });
+
+  // Direction visuelle, règle 4 : un signe ET un mot. Sans signe, une liste
+  // imprimée en noir et blanc ne distinguait plus « Encaissée » de « En retard »
+  // que par la lecture du mot.
+  it('porte un signe propre à chaque ton, caché au lecteur d’écran', () => {
+    const signes = (['ok', 'attente', 'retard', 'neutre'] as const).map((ton) => {
+      const { container } = render(<Statut libelle="État" ton={ton} />);
+      const signe = container.querySelector('[aria-hidden="true"]');
+      cleanup();
+      return signe?.textContent ?? '';
+    });
+    expect(signes.every((s) => s !== '')).toBe(true);
+    expect(new Set(signes).size).toBe(4);
+  });
+
+  it('laisse un état préciser son signe', () => {
+    const { container } = render(<Statut libelle="Envoyée" ton="attente" signe="→" />);
+    expect(container.querySelector('[aria-hidden="true"]')?.textContent).toBe('→');
+    expect(screen.getByText('Envoyée')).toBeTruthy();
+  });
 });
 
 describe('statut d’une recette', () => {
