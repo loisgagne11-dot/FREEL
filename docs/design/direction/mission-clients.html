@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction visuelle — Une mission à plusieurs clients (proposition du lot 31)</title>
+<!-- Maquette, pas l'application : polices d'un CDN pour que le fichier
+     s'ouvre seul. PROPOSITION soumise au propriétaire avant d'être codée :
+     arrêter un client, le lire « arrêté le … », retirer avec confirmation,
+     choisir la facturation. Données fictives. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="./calme.css">
+<style>
+body{margin:0}
+.mc-ensemble { display: flex; gap: 40px; align-items: flex-start; padding: 32px; }
+.mc-tel { width: 390px; border: 1px solid var(--line); border-radius: 26px; overflow: hidden; background: var(--bg); padding: 18px 16px 24px; display: flex; flex-direction: column; gap: 14px; }
+.mc-titre { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.mc-sous { font-size: 13px; color: var(--muted); }
+.mc-client { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+.mc-client:first-of-type { border-top: 0; padding-top: 4px; }
+.mc-ligne { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mc-nom { font-weight: 650; }
+.mc-nom small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.mc-arrete { color: var(--muted); }
+.mc-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mc-bouton { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--card-a); color: var(--text); font: inherit; font-weight: 600; font-size: 14px; }
+.mc-bouton.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.mc-bouton.plein { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+.mc-champ { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.mc-champ span.valeur { display: flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--card-a); color: var(--text); font-weight: 500; font-size: 15px; }
+.mc-confirmation { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; border: 1px solid var(--amber); background: var(--amber-soft); }
+.mc-confirmation p { font-size: 14px; line-height: 1.5; }
+.mc-confirmation .e-hint { font-size: 13px; }
+.mc-legende { margin-top: 10px; font-size: 12.5px; color: var(--muted); max-width: 390px; line-height: 1.5; }
+.mc-table-ligne { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
+</style>
+</head>
+<body>
+<div class="ec m-calme" style="width: 1400px">
+<div class="mc-ensemble">
+
+<!-- ── 1. Le formulaire : deux clients, l'un arrêté ───────────────────── -->
+<div>
+<div class="mc-tel">
+<div><div class="mc-titre">Refonte catalogue</div><div class="mc-sous">Mission facturée à Agence Demo · 1 mars – 30 juin 2026</div></div>
+<section class="e-card" aria-label="Clients de la mission" style="padding: 16px; border-radius: 20px">
+<div class="e-h" style="margin-bottom: 4px"><h3>Clients de la mission</h3></div>
+<div class="mc-client">
+<div class="mc-ligne"><div class="mc-nom mc-arrete">Atelier Démo<small>arrêté le 13 mars · lun., mar., mer.</small></div><span class="e-chip">○ Arrêté</span></div>
+</div>
+<div class="mc-client">
+<div class="mc-ligne"><div class="mc-nom">Studio Exemple<small>depuis le 14 mars · lun., mar., mer.</small></div><span class="e-chip ok">● En cours</span></div>
+<div class="mc-actions"><button type="button" class="mc-bouton">Arrêter ce client le…</button><button type="button" class="mc-bouton danger">Retirer</button></div>
+</div>
+<button type="button" class="mc-bouton" style="align-self: flex-start">+ Ajouter un client</button>
+</section>
+<div class="mc-table-ligne e-card" style="padding: 14px 16px; border-radius: 16px"><div class="e-who" style="flex: 1">Refonte catalogue<small>Pour Atelier Démo jusqu’au 13 mars, puis Studio Exemple</small></div></div>
+</div>
+<p class="mc-legende">« Arrêté le … » se lit sous le nom, et dans la liste des missions. Un client ajouté en cours de mission commence au lendemain du dernier arrêt, pas au début de la mission : sinon ses jours recouvraient ceux du client qu’il remplace.</p>
+</div>
+
+<!-- ── 2. Arrêter : la date, puis ce que ça change ─────────────────────── -->
+<div>
+<div class="mc-tel">
+<div class="mc-titre">Arrêter Studio Exemple</div>
+<label class="mc-champ">Arrêter ce client le<span class="valeur">13/05/2026</span></label>
+<div class="mc-confirmation" role="group" aria-label="Ce que l’arrêt change">
+<p><strong>À partir du 14 mai</strong>, Studio Exemple ne compte plus aucun jour : 2 journées corrigées seront retirées, et 22 jours prévus jusqu’au 30 juin ne compteront plus — au planning, au compte rendu et au brouillon du mois.</p>
+<p class="e-hint">Une facture déjà émise couvre mai (2026-012) : elle ne change pas. Si elle compte des jours après le 13, un avoir la corrige.</p>
+<div class="mc-actions"><button type="button" class="mc-bouton plein">Arrêter le 13 mai</button><button type="button" class="mc-bouton">Garder</button></div>
+</div>
+<p class="e-hint">La mission continue avec ses autres clients. L’arrêt se défait en rallongeant les dates du client.</p>
+</div>
+<p class="mc-legende">La date proposée est aujourd’hui ; une date passée reste permise, avec l’avertissement sur ce qui a déjà été facturé. Le passé avant l’arrêt n’est jamais touché.</p>
+</div>
+
+<!-- ── 3. Retirer, et la facturation ───────────────────────────────────── -->
+<div>
+<div class="mc-tel">
+<div class="mc-confirmation" role="group" aria-label="Retirer Atelier Démo">
+<p><strong>Retirer Atelier Démo</strong> efface aussi son passé : ses 42 jours, dont 3 corrigés, quittent le planning, les comptes rendus et les factures à venir.</p>
+<div class="mc-actions"><button type="button" class="mc-bouton plein">L’arrêter le 13 mars à la place</button><button type="button" class="mc-bouton danger">Retirer quand même</button><button type="button" class="mc-bouton">Garder</button></div>
+</div>
+<section class="e-card" aria-label="Facturation" style="padding: 16px; border-radius: 20px">
+<div class="e-h" style="margin-bottom: 8px"><h3>Facturation</h3></div>
+<div class="e-seg" role="group" aria-label="Facturation de la mission"><a class="on" href="#commune">Une facture commune</a><a href="#par-client">Une par client</a></div>
+<p class="e-hint" style="margin-top: 10px">Par défaut, une facture commune au payeur de la mission, avec une ligne par client. « Une par client » découpe le mois selon les dates de chaque client :</p>
+<label class="mc-champ" style="margin-top: 10px">Atelier Démo — facturée à<span class="valeur">Agence Demo ▾</span></label>
+<label class="mc-champ" style="margin-top: 10px">Studio Exemple — facturée à<span class="valeur">Studio Exemple ▾</span></label>
+<p class="e-hint" style="margin-top: 8px">Le choix se fait parmi les clients du carnet : une facture doit pouvoir être rééditée.</p>
+</section>
+</div>
+<p class="mc-legende">Retirer un client qui a déjà travaillé demande confirmation et propose l’arrêt à sa place. Un client ajouté pendant la saisie se retire sans rien demander.</p>
+</div>
+
+</div>
+</div>
+<script>
+/* ?mode=calme|nuit|sombre|clair — les quatre thèmes de l'application. */
+(function () {
+  var mode = new URLSearchParams(location.search).get('mode');
+  if (['calme', 'nuit', 'sombre', 'clair'].indexOf(mode) === -1) return;
+  document.querySelector('.ec').className = document.querySelector('.ec').className.replace(/m-\w+/, 'm-' + mode);
+})();
+</script>
+</body>
+</html>
