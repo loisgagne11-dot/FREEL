@@ -470,7 +470,7 @@ describe('saisir le solde d’un avis d’imposition', () => {
  *
  * L'annexe en nomme deux à conserver : le pli à synthèse, et « la couleur fixe
  * par type de charge — une charge garde sa couleur partout ». Les jetons
- * `--c-urssaf`, `--c-tva`, `--c-ir`, `--c-cfe` existaient dans les quatre
+ * `--c-urssaf`, `--c-tva`, `--c-impot`, `--c-cfe` existaient dans les quatre
  * palettes et n'étaient câblés nulle part.
  */
 describe('couleur par type de charge', () => {
@@ -526,7 +526,7 @@ describe('câblage des jetons de couleur', () => {
     const attendus: readonly [string, string][] = [
       ['urssaf', '--c-urssaf'],
       ['tva', '--c-tva'],
-      ['impot', '--c-ir'],
+      ['impot', '--c-impot'],
       ['cfe', '--c-cfe'],
       // La CFP est due avec les cotisations : elle partage leur teinte plutôt
       // que d'introduire une cinquième couleur pour la même échéance.

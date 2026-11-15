@@ -621,7 +621,7 @@
    couleur d'un écran à l'autre, sinon la couleur cesse d'être une information. */
 .urssaf { background: var(--c-urssaf); }
 .tva { background: var(--c-tva); }
-.impot { background: var(--c-ir); }
+.impot { background: var(--c-impot); }
 .cfe { background: var(--c-cfe); }
 .cfp { background: var(--c-urssaf); }
 
