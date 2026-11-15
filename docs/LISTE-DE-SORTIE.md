@@ -89,7 +89,7 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 6 | 46 | Facture conforme 2026-2027 | ✅ fusionné le 14/11 (PR #336, schéma 22) |
 | 7 | 33 | « Reste à sortir » : un seul total | ✅ fusionné le 14/11 (PR #337) |
 | 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ✅ fusionné le 15/11 (PR #338, schéma 23) |
-| 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ✅ fini le 15/11, PR à fusionner |
+| 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ✅ fusionné le 15/11 (PR #339) |
 | 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ✅ fini le 15/11, PR à fusionner |
 | — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
 | 11 | 51 | Nouvelle navigation et jetons de style | ⬜ |
