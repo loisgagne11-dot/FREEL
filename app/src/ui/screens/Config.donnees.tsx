@@ -3,6 +3,7 @@ import { useToast } from '../components/Toasts';
 import { instantaneAvantRemplacement, useFaits } from '../../state/store';
 import { dateDuJour } from '../../state/selecteurs';
 import { CLE_STOCKAGE, faitsVides, type Recette } from '../../state/schema';
+import { motifRefusExterieur } from '../../state/schema.exterieur';
 import { livreRecettesCsv } from '../../domain/calculs/livreRecettesCsv';
 import { dateCourte } from '../format';
 import { nomSauvegarde, telecharger } from '../../infra/telechargement';
@@ -12,7 +13,9 @@ import {
 import type { lireArchive } from '../../infra/justificatifs.archive';
 import { lireDerniereArchive } from '../../infra/archive.derniere';
 import { ErreurArchive } from '../../infra/archive.zip';
+import { TAILLE_MAX_SAUVEGARDE, motifTropVolumineux } from '../../infra/bornes';
 import { RangeeArchive } from './Config.donnees.archive';
+import { PanneauEffacerAppareil } from './EffacerAppareil';
 import styles from './Config.module.css';
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -84,6 +87,9 @@ export function Donnees(
     stockage.lister().then(setMetas, () => setMetas(null));
   }, [stockage]);
   useEffect(() => { relirePieces(); }, [relirePieces]);
+  /** « Effacer cet appareil » ouvert sous la liste (lot 59), et son bouton, pour y rendre le focus. */
+  const [effacerOuvert, setEffacerOuvert] = useState(false);
+  const boutonEffacer = useRef<HTMLButtonElement>(null);
   /** Les pièces qu'une restauration a refusées : elles se disent, une par une. */
   const [refusPieces, setRefusPieces] =
     useState<readonly { readonly nomFichier: string; readonly motif: string }[] | null>(null);
@@ -248,6 +254,22 @@ export function Donnees(
           </div>
         </li>
 
+        {/* Lot 59 (S7) : une phrase VRAIE sur ce qui protège. Rien ne le
+            disait, et « Repartir de zéro » pouvait passer pour un effacement. */}
+        <li className={styles.rangee}>
+          <div className={styles.rangeeTexte}>
+            <span className={styles.rangeeTitre}>Ce qui protège tes données</span>
+            <span className={styles.rangeeAide}>
+              Tes données et tes pièces sont enregistrées dans ce navigateur,
+              sans chiffrement&nbsp;: qui ouvre cet appareil les lit. Ce qui les
+              protège, c’est le verrouillage de l’appareil (code, empreinte).
+              Relié à un compte, une copie de tes données — pas de tes pièces —
+              est aussi sur le serveur du projet&nbsp;: elle n’y est lisible que
+              par ton compte, mais elle n’est pas chiffrée de bout en bout.
+            </span>
+          </div>
+        </li>
+
         {/* Le handoff porte « Effacer toutes les données — suppression
             définitive (RGPD) ». Rien ici n'efface le compte distant, et une
             suppression sans retour juste après avoir chargé la démonstration
@@ -273,7 +295,39 @@ export function Donnees(
             </button>
           </div>
         </li>
+        <li className={`${styles.rangee} ${styles.rangeeDanger}`}>
+          <div className={styles.rangeeTexte}>
+            <span className={styles.rangeeTitre}>Effacer cet appareil</span>
+            <span className={styles.rangeeAide}>
+              Avant de prêter, de revendre ou de quitter cet appareil&nbsp;: retire
+              de ce navigateur tout ce que Freel y garde, et te déconnecte. Ce qui
+              est sur un compte relié n’est pas touché.
+            </span>
+          </div>
+          <div className={styles.rangeeAction}>
+            <button
+              ref={boutonEffacer}
+              type="button"
+              className={`${styles.action} ${styles.actionDanger}`}
+              aria-expanded={effacerOuvert}
+              onClick={() => setEffacerOuvert(true)}
+            >
+              Effacer…
+            </button>
+          </div>
+        </li>
       </ul>
+
+      {effacerOuvert && (
+        <div className={styles.effacerAppareil}>
+          <PanneauEffacerAppareil
+            metas={metas}
+            stockage={stockage}
+            classes={{ action: styles.action, succes: styles.succes, echec: styles.echec }}
+            onGarder={() => { setEffacerOuvert(false); boutonEffacer.current?.focus(); }}
+          />
+        </div>
+      )}
 
       {aRestaurer !== null && (
         <div ref={refConfirmation} tabIndex={-1} className={styles.confirmation} role="alert">
@@ -401,7 +455,8 @@ export function Donnees(
       <p className={styles.explication}>
         Les faits vivent dans ce navigateur, sous la clé{' '}
         <span className={styles.source}>{CLE_STOCKAGE}</span>. Les données de
-        l’ancienne version restent en place et ne sont jamais effacées.
+        l’ancienne version restent en place&nbsp;: seul «&nbsp;Effacer cet
+        appareil&nbsp;» les retire, avec tout le reste.
       </p>
     </div>
   );
@@ -502,6 +557,10 @@ async function lireSauvegarde(
   fichier: File, metas: readonly MetaJustificatif[] | null
 ): Promise<Restauration> {
   if (/\.zip$/i.test(fichier.name) || /zip/.test(fichier.type)) return lireArchiveComplete(fichier, metas);
+  // Avant lecture : un fichier choisi par erreur se chargeait en mémoire en
+  // entier pour être refusé ensuite (lot 59).
+  const tropLourd = motifTropVolumineux(fichier.size, TAILLE_MAX_SAUVEGARDE, 'fichier');
+  if (tropLourd !== null) return { statut: 'illisible', motif: tropLourd };
   let texte: string;
   try {
     texte = await fichier.text();
@@ -596,6 +655,12 @@ function resumerBloc(brut: unknown): Restauration {
       motif: 'Ce fichier ne contient pas un bloc de faits exploitable.'
     };
   }
+
+  // Le refus que l'adoption opposerait se dit dès l'annonce (lot 59) :
+  // annoncer « 12 factures » d'un fichier qui sera refusé à la confirmation
+  // ferait croire qu'il est bon.
+  const motif = motifRefusExterieur(brut);
+  if (motif !== null) return { statut: 'illisible', motif };
 
   const o = brut as Record<string, unknown>;
   const compter = (cle: string) => (Array.isArray(o[cle]) ? (o[cle] as unknown[]).length : 0);

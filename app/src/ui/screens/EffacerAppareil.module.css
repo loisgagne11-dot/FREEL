@@ -1,0 +1,4 @@
+/* Le bouton d'archive sur sa ligne : suivant le texte, il tombait au milieu
+   d'une phrase à 390 px. Une portée et non un bloc : il vit dans le <p> de
+   la conséquence. */
+.archive { display: flex; margin-top: 10px; }

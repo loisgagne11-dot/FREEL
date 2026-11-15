@@ -30,6 +30,33 @@ import styles from './Config.module.css';
  *
  * Le module d'archive est chargé au clic : il ne sert que ce jour-là.
  */
+/**
+ * Crée l'archive complète, la télécharge, note sa date ; rend son bilan.
+ *
+ * Partagée avec « Effacer cet appareil » (lot 59), qui la propose avant
+ * d'effacer : deux constructions de la même archive finiraient par différer.
+ */
+export async function creerArchiveComplete(
+  faits: Faits, stockage: StockageJustificatifs
+): Promise<BilanArchive> {
+  const module = await import('../../infra/justificatifs.archive');
+  const maintenant = new Date();
+  const resultat = await module.construireArchive(faits, stockage, maintenant);
+  telecharger(module.nomDeLArchive(faits.entreprise.nom, dateDuJour()), resultat.archive, 'application/zip');
+  noterArchive(maintenant);
+  return resultat.bilan;
+}
+
+/**
+ * Le motif d'une ErreurArchive est écrit pour l'utilisateur ; celui d'une
+ * autre erreur (quota, navigateur) ne l'est pas, souvent en anglais.
+ */
+export function motifEchecArchive(e: unknown): string {
+  return e instanceof ErreurArchive
+    ? e.message
+    : 'L’archive n’a pas pu être créée. Réessaie ; si l’échec se répète, exporte au moins la sauvegarde JSON.';
+}
+
 export function RangeeArchive(
   { faits, stockage, metas, derniere, onFaite }: {
     readonly faits: Faits;
@@ -49,24 +76,13 @@ export function RangeeArchive(
   async function archiver(): Promise<void> {
     setEnCours(true);
     setEchec(null);
-    let module: typeof import('../../infra/justificatifs.archive') | null = null;
     try {
-      module = await import('../../infra/justificatifs.archive');
-      const maintenant = new Date();
-      const resultat = await module.construireArchive(faits, stockage, maintenant);
-      telecharger(
-        module.nomDeLArchive(faits.entreprise.nom, dateDuJour()), resultat.archive, 'application/zip'
-      );
-      noterArchive(maintenant);
-      setBilan(resultat.bilan);
-      signaler(`Archive créée : ${compte(resultat.bilan.pieces, 'justificatif')}.`);
+      const bilanFait = await creerArchiveComplete(faits, stockage);
+      setBilan(bilanFait);
+      signaler(`Archive créée : ${compte(bilanFait.pieces, 'justificatif')}.`);
       onFaite();
     } catch (e) {
-      // Le motif d'une ErreurArchive est écrit pour l'utilisateur ; celui
-      // d'une autre erreur (quota, navigateur) ne l'est pas, souvent en anglais.
-      setEchec(e instanceof ErreurArchive
-        ? e.message
-        : 'L’archive n’a pas pu être créée. Réessaie ; si l’échec se répète, exporte au moins la sauvegarde JSON.');
+      setEchec(motifEchecArchive(e));
     } finally {
       setEnCours(false);
     }

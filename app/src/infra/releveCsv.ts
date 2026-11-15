@@ -27,6 +27,7 @@
  */
 
 import { type DateISO, type Euros, euros } from '../domain/types';
+import { MONTANT_MAX, OPERATIONS_MAX_RELEVE, TAILLE_MAX_RELEVE, motifTropVolumineux } from './bornes';
 
 export interface LigneReleve {
   readonly date: DateISO;
@@ -217,7 +218,10 @@ export function lireMontant(brut: string): number | null {
   // qu'une ligne refusée, car le refus, lui, est dit dans le compte rendu.
   if (!/^(\d+\.?\d*|\.\d+)$/.test(texte)) return null;
   const valeur = Number(texte);
-  return Number.isFinite(valeur) ? signe * valeur : null;
+  // Un montant que les flottants ne comptent plus au centime ferait refuser
+  // le dossier entier au prochain envoi vers le compte : la ligne est écartée,
+  // et le compte rendu le dit.
+  return Number.isFinite(valeur) && valeur <= MONTANT_MAX ? signe * valeur : null;
 }
 
 export type FormatDate = 'JJ/MM/AAAA' | 'AAAA-MM-JJ' | 'JJ-MM-AA';
@@ -282,6 +286,16 @@ const LIGNES_ENTETE_TOLEREES = 12;
  */
 export function lireReleve(contenu: string): ResultatLecture {
   const enregistrements = decouperEnregistrements(contenu);
+  // Lot 59 : 100 000 lignes s'importaient, et le dossier dépassait ensuite ce
+  // que le compte et le navigateur acceptent d'enregistrer — les saisies
+  // suivantes se perdaient, loin de leur cause. Le refus se dit ici.
+  if (enregistrements.length > OPERATIONS_MAX_RELEVE + LIGNES_ENTETE_TOLEREES) {
+    return {
+      statut: 'refuse',
+      motif: `Ce relevé compte plus de ${OPERATIONS_MAX_RELEVE.toLocaleString('fr-FR')} lignes : `
+        + 'importe-le par périodes plus courtes, une année par exemple.'
+    };
+  }
   const lignes = enregistrements.map((e) => e.texte);
   const numeros = enregistrements.map((e) => e.ligne);
   const limite = Math.min(LIGNES_ENTETE_TOLEREES, lignes.length);
@@ -429,6 +443,14 @@ function montantDeLigne(
   if (debit !== null && debit !== 0) return -Math.abs(debit);
   if (credit !== null && credit !== 0) return Math.abs(credit);
   return null;
+}
+
+/**
+ * Le refus d'un relevé trop lourd, AVANT de le lire : la taille annoncée par
+ * le navigateur suffit, le fichier n'est pas chargé en mémoire.
+ */
+export function motifReleveTropVolumineux(fichier: Blob): string | null {
+  return motifTropVolumineux(fichier.size, TAILLE_MAX_RELEVE, 'relevé');
 }
 
 /**

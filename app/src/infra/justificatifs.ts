@@ -256,7 +256,8 @@ export async function supprimerJustificatif(
    Implémentation IndexedDB
    ───────────────────────────────────────────────────────────────────────── */
 
-const NOM_BASE = 'freel-justificatifs';
+/** Exporté pour l'effacement de l'appareil (lot 59), qui supprime la base entière. */
+export const NOM_BASE = 'freel-justificatifs';
 const NOM_MAGASIN = 'pieces';
 /**
  * Version du magasin IndexedDB.

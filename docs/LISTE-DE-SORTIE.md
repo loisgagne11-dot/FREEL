@@ -89,8 +89,8 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 6 | 46 | Facture conforme 2026-2027 | ✅ fusionné le 14/11 (PR #336, schéma 22) |
 | 7 | 33 | « Reste à sortir » : un seul total | ✅ fusionné le 14/11 (PR #337) |
 | 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ✅ fusionné le 15/11 (PR #338, schéma 23) |
-| 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ✅ fini le 15/11, PR à fusionner |
-| 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ⬜ |
+| 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ✅ fusionné le 15/11 (PR #339) |
+| 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ✅ fini le 15/11, PR à fusionner |
 | — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
 | 11 | 51 | Nouvelle navigation et jetons de style | ⬜ |
 | 12 | 53 + 34 | Écran Obligations, frise aux dates officielles | ⬜ |
@@ -274,11 +274,11 @@ Sur l'hébergement actuel, sans attendre la décision 22. **L'original
 
 | Ligne | État |
 |---|---|
-| « Se déconnecter et effacer cet appareil » : propose d'abord l'archive complète, efface faits, pièces, session et réglages, prouve par relecture ; la déconnexion simple dit ce qui reste sur l'appareil | ⬜ |
-| Réglages : une phrase vraie sur ce qui protège (le verrouillage de l'appareil), ce qui est où (appareil, compte) et ce qui n'est pas chiffré | ⬜ |
-| Imports bornés : taille maximale par type de fichier, et taille **décompressée** pour une archive ; le refus est dit avant lecture | ⬜ |
-| Corpus d'essais hostiles joué sur chaque import : clés `__proto__` et `constructor`, nombres extrêmes et non finis, 100 000 lignes, balises et formules dans chaque champ texte, archive aux chemins piégés ou qui gonfle à l'ouverture | ⬜ |
-| Session : un seul onglet renouvelle à la fois (verrou entre onglets) ; une session sans échéance valide est refusée à la lecture ; essai à deux onglets | ⬜ |
+| « Se déconnecter et effacer cet appareil » : propose d'abord l'archive complète, efface faits, pièces, session et réglages, prouve par relecture ; la déconnexion simple dit ce qui reste sur l'appareil | ✅ 15/11 — dans Compte et dans Données ; l'ancienne version comprise, les autres sites de l'origine épargnés ; un onglet resté ouvert se recharge au lieu de réécrire |
+| Réglages : une phrase vraie sur ce qui protège (le verrouillage de l'appareil), ce qui est où (appareil, compte) et ce qui n'est pas chiffré | ✅ 15/11 — Données › « Ce qui protège tes données » ; la note qui disait l'ancienne version « jamais effacée » est corrigée |
+| Imports bornés : taille maximale par type de fichier, et taille **décompressée** pour une archive ; le refus est dit avant lecture | ✅ 15/11 — `infra/bornes.ts` ; l'archive ne se décompresse pas (entrées stockées) : c'est la somme annoncée qui est bornée par le fichier |
+| Corpus d'essais hostiles joué sur chaque import : clés `__proto__` et `constructor`, nombres extrêmes et non finis, 100 000 lignes, balises et formules dans chaque champ texte, archive aux chemins piégés ou qui gonfle à l'ouverture | ✅ 15/11 — 23 essais ; dix mutations, dix essais tombés. Le contrôle des valeurs ne s'applique qu'à ce qui vient d'ailleurs : au chargement local, un montant démesuré saisi par erreur aurait fait refuser tout le dossier |
+| Session : un seul onglet renouvelle à la fois (verrou entre onglets) ; une session sans échéance valide est refusée à la lecture ; essai à deux onglets | ✅ 15/11 — `verifier:onglets`, dans un vrai navigateur, avec et sans l'API de verrous |
 
 #### Lot 60 — Une origine à soi, des en-têtes (S1, S4) — attend la décision 22
 

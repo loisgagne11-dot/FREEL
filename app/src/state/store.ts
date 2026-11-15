@@ -223,6 +223,9 @@ function persister(stockage: Stockage | null, faits: Faits): void {
   if (!stockage) return;
   try {
     const surLeDisque = stockage.getItem(CLE_STOCKAGE);
+    // Le dossier a disparu du disque alors que cet onglet l'y avait lu ou
+    // écrit : voir `dossierEfface`.
+    if (surLeDisque === null && dernierConnu !== undefined) { dossierEfface(); return; }
     if (surLeDisque !== null && dernierConnu !== undefined && surLeDisque !== dernierConnu) {
       reprendreDuDisque(surLeDisque);
       useFaits.setState((e) => ({ saisiesEcartees: e.saisiesEcartees + 1 }));
@@ -241,6 +244,18 @@ function persister(stockage: Stockage | null, faits: Faits): void {
     ecritureEnEchec = true;
     useFaits.setState({ chargement: { phase: 'sans-persistance', motif: MOTIF_PLEIN } });
   }
+}
+
+/**
+ * « Effacer cet appareil » est passé, ici ou dans un autre onglet (lot 59).
+ *
+ * Réécrire l'état en mémoire — ce que faisait `persister` — ramenait sur
+ * l'appareil, à la première saisie d'un onglet resté ouvert, tout ce qu'on
+ * venait d'en effacer. Cet onglet cesse d'écrire et repart du disque, vide.
+ */
+function dossierEfface(): void {
+  stockageActif = null;
+  globalThis.location?.reload();
 }
 
 /**
@@ -375,10 +390,9 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     if (s !== null && !ecouteOnglets && typeof window !== 'undefined') {
       ecouteOnglets = true;
       window.addEventListener('storage', (e) => {
-        if (e.key === CLE_STOCKAGE && e.newValue !== null && stockageActif !== null
-          && e.storageArea === stockageActif) {
-          reprendreDuDisque(e.newValue);
-        }
+        if (e.key !== CLE_STOCKAGE || stockageActif === null || e.storageArea !== stockageActif) return;
+        if (e.newValue !== null) reprendreDuDisque(e.newValue);
+        else dossierEfface();
       });
     }
 
@@ -516,22 +530,26 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
     // Le convertisseur est chargé à la demande : restaurer une sauvegarde de
     // l'ancienne application est un geste rare, et son code n'a rien à faire
     // dans le paquet d'entrée.
-    const { convertirBundle } = await import('../infra/migration.legacy');
+    const { convertirBundle, motifRefusExterieur } = await import('../infra/migration.legacy');
+    const faits = convertirBundle(bundle).faits;
+    // Le convertisseur recopie les montants tels quels : un bundle fabriqué
+    // en apporterait d'infinis (lot 59). Refusé AVANT la copie de côté.
+    const motif = motifRefusExterieur(faits);
+    if (motif !== null) return motif;
     const refus = garderInstantane();
     if (refus !== null) return refus;
-    const faits = convertirBundle(bundle).faits;
     set({ faits });
     persister(stockageActif, faits);
     return null;
   },
 
   adopterFaitsDistants: async (brut) => {
-    const motif = motifRefusFaits(brut);
+    // Chargé à la demande : voir le commentaire de la déclaration ci-dessus.
+    const { completerFaits, motifRefusExterieur } = await import('./schema.migrations');
+    const motif = motifRefusExterieur(brut);
     if (motif !== null) return motif;
     const refus = garderInstantane();
     if (refus !== null) return refus;
-    // Chargé à la demande : voir le commentaire de la déclaration ci-dessus.
-    const { completerFaits } = await import('./schema.migrations');
     const faits = completerFaits(brut);
     set({ faits });
     persister(stockageActif, faits);

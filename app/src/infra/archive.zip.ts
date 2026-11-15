@@ -213,6 +213,8 @@ export async function ecrireZip(
 // ── Lecture ─────────────────────────────────────────────────────────────
 
 const NON_ZIP = 'Ce fichier n’est pas une archive ZIP lisible (ou elle est tronquée).';
+const GONFLEE =
+  'Cette archive annonce plus de contenu qu’elle n’en porte : elle a été fabriquée pour gonfler à l’ouverture. Rien n’a été lu.';
 const COMPRESSEE =
   'Cette archive est compressée : seules celles produites par l’application se relisent ici.';
 
@@ -279,6 +281,11 @@ export async function lireZip(archive: Blob): Promise<readonly EntreeLue[]> {
   const va = vue(annuaire);
   const entrees: EntreeLue[] = [];
   let p = 0;
+  // Ce que les entrées annoncent, additionné. Sans compression, il ne peut pas
+  // dépasser le fichier : des entrées qui pointent toutes vers les mêmes
+  // octets feraient d'une archive de 10 Mo des milliers de pièces de 10 Mo à
+  // l'ouverture — c'est la forme sans compression de la « bombe ZIP ».
+  let annonce = 0;
   for (let n = 0; n < total; n++) {
     if (p + TAILLE_CENTRAL > annuaire.length || va.getUint32(p, true) !== SIG_CENTRAL) {
       throw new ErreurArchive(NON_ZIP);
@@ -301,6 +308,8 @@ export async function lireZip(archive: Blob): Promise<readonly EntreeLue[]> {
     }
     if (methode !== 0) throw new ErreurArchive(COMPRESSEE);
     if (tailleComp !== taille) throw new ErreurArchive(NON_ZIP);
+    annonce += taille;
+    if (annonce > archive.size) throw new ErreurArchive(GONFLEE);
 
     const nom = decoderNom(
       annuaire.subarray(p + TAILLE_CENTRAL, p + TAILLE_CENTRAL + lNom),

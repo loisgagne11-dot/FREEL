@@ -19,8 +19,9 @@
 
 import { ErreurArchive, type EntreeLue, ecrireZip, lireZip, nomDeFichierSur } from './archive.zip';
 import {
-  type MetaJustificatif, type StockageJustificatifs, empreinteDe
+  type MetaJustificatif, type StockageJustificatifs, TAILLE_MAX_OCTETS, empreinteDe, typeAccepte
 } from './justificatifs';
+import { TAILLE_MAX_SAUVEGARDE, motifTropVolumineux } from './bornes';
 import type { EntreeZip } from './archive.zip';
 import type { Faits } from '../state/schema';
 import { ANNEES_CONSERVATION } from '../domain/bareme/recettes';
@@ -317,6 +318,12 @@ export async function lireArchive(
   const eManifeste = entrees.get(CHEMIN_MANIFESTE);
   const eFaits = entrees.get(CHEMIN_FAITS);
   if (!eManifeste || !eFaits) throw new ErreurArchive(PAS_UNE_ARCHIVE);
+  // Lot 59 : le manifeste et les faits sont lus en mémoire, en entier ; leur
+  // taille se vérifie AVANT, sur ce que l'annuaire annonce.
+  for (const e of [eManifeste, eFaits]) {
+    const motif = motifTropVolumineux(e.taille, TAILLE_MAX_SAUVEGARDE, `fichier « ${e.nom} » de l’archive`);
+    if (motif !== null) throw new ErreurArchive(motif);
+  }
 
   const brut = await jsonDe(eManifeste);
   if (!estObjet(brut) || typeof brut['format'] !== 'number') {
@@ -372,6 +379,11 @@ export async function restaurerPieces(
       }
       const entree = archive.entrees.get(p.chemin);
       if (!entree) { refuser('absente de l’archive.'); continue; }
+      // Les règles du dépôt valent pour la restauration (lot 59) : une archive
+      // fabriquée déposait sinon une pièce de n'importe quel type et de
+      // n'importe quelle taille, que le dépôt direct aurait refusée.
+      if (!typeAccepte(p.typeMime)) { refuser(`format non accepté (${p.typeMime}).`); continue; }
+      if (entree.taille > TAILLE_MAX_OCTETS) { refuser('fichier trop volumineux.'); continue; }
       const contenu = await entree.lire();
       if ((await empreinteDe(contenu)) !== p.empreinte) {
         // Couvre deux cas distincts : un fichier modifié depuis l'archive, et
@@ -388,7 +400,7 @@ export async function restaurerPieces(
         continue;
       }
       await stockage.deposer({
-        id: p.id, nomFichier: p.nomFichier, typeMime: p.typeMime, taille: p.taille,
+        id: p.id, nomFichier: p.nomFichier, typeMime: p.typeMime, taille: contenu.size,
         empreinte: p.empreinte, deposeLe: p.deposeLe,
         fait: { nature: p.fait.nature, id: p.fait.id },
         contenu: new Blob([contenu], { type: p.typeMime })

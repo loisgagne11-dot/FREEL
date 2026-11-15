@@ -48,7 +48,7 @@
  */
 
 import {
-  CLE_INSTANTANE_AVANT_MIGRATION, CLE_STOCKAGE, VERSION_SCHEMA,
+  CLE_STOCKAGE, VERSION_SCHEMA,
   type Faits, completerFaitsCourants, faitsVides, motifRefusFaits
 } from '../state/schema';
 
@@ -97,19 +97,6 @@ export interface RapportMigration {
   readonly anomalies: readonly Anomalie[];
   /** Champs de l'ancienne structure qu'aucun champ du nouveau schéma n'accueille. */
   readonly champsNonRepris: readonly string[];
-}
-
-/** Copie toutes les clés de l'ancienne application, avant toute écriture. */
-export function prendreInstantane(stockage: Stockage): Record<string, string> {
-  const instantane: Record<string, string> = {};
-  for (let i = 0; i < stockage.length; i++) {
-    const cle = stockage.key(i);
-    if (cle === null) continue;
-    if (!cle.startsWith(PREFIXE_LEGACY) && !CLES_ANNEXES_LEGACY.includes(cle as never)) continue;
-    const v = stockage.getItem(cle);
-    if (v !== null) instantane[cle] = v;
-  }
-  return instantane;
 }
 
 export type ResultatMigration =
@@ -229,28 +216,6 @@ export function migrer(stockage: Stockage): ResultatMigration {
 
   if (!presenceLegacy(stockage)) return { statut: 'rien-a-migrer', faits: faitsVides() };
   return { statut: 'reprise-requise' };
-}
-
-/**
- * Archive l'intégralité des clés de l'ancienne application.
- *
- * Écrit AVANT toute conversion. Cet ordre n'est pas négociable : si l'écriture
- * des faits échoue ensuite (quota dépassé, par exemple), l'archive de l'état
- * d'origine existe déjà. Rend le motif d'échec, ou `null` si tout va bien.
- */
-export function archiverAvantReprise(stockage: Stockage): string | null {
-  try {
-    if (stockage.getItem(CLE_INSTANTANE_AVANT_MIGRATION) === null) {
-      stockage.setItem(
-        CLE_INSTANTANE_AVANT_MIGRATION,
-        JSON.stringify({ pris: new Date().toISOString(), cles: prendreInstantane(stockage) })
-      );
-    }
-    return null;
-  } catch {
-    return 'Impossible d\'archiver l\'état d\'origine (stockage plein ?). Migration '
-      + 'interrompue : on ne migre pas sans filet.';
-  }
 }
 
 /** Implémentation de `Stockage` en mémoire, pour les tests et le mode lecture seule. */

@@ -1284,3 +1284,14 @@ version et un refus du cadre dans le premier script des deux versions. Aucun
 écran ne change : `verifier:bascule` constate que l'ancienne s'affiche
 toujours, bandeau de lecture seule compris, et que la nouvelle se charge comme
 avant à la racine.
+
+## Lot 59 (15/11) — Données et Compte
+
+| Zone | Avant | Après |
+|---|---|---|
+| Données | « Repartir de zéro » seul en zone sensible ; note « l'ancienne version n'est jamais effacée » | + « Ce qui protège tes données » (phrase sur le verrouillage et le chiffrement) ; + « Effacer cet appareil », panneau sous la liste (archive proposée d'abord) ; note corrigée |
+| Compte, connecté | « Se déconnecter » | + « Se déconnecter et effacer cet appareil » ; une ligne dit ce que la déconnexion simple laisse |
+
+Contrôle visuel à 390 px, deux thèmes, panneau ouvert : un écart corrigé avant
+livraison (le panneau de Données s'encadrait dans un second cadre ; « tes 0
+pièce » quand il n'y en a pas). Aucun débordement horizontal.

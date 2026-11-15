@@ -829,3 +829,9 @@ Aucun montant ne change.
 
 Lot de sécurité sur la page et la copie publiée de l'ancienne version : aucun
 sélecteur, aucun calcul, aucun nombre lu à l'écran ne change.
+
+## Lot 59 (15/11) — aucun nombre touché
+
+Lot de sécurité : aucun sélecteur ni aucun nombre lu à l'écran ne change. Un
+relevé dont une ligne porte un montant démesuré écarte cette ligne, et le
+compte rendu d'import le dit.

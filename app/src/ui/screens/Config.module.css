@@ -433,6 +433,10 @@
 
 .confirmation p { margin: 0; }
 
+/* Le panneau porte déjà son encadré (celui de toute confirmation) : le
+   reprendre ici faisait un cadre dans un cadre. */
+.effacerAppareil { margin-top: 12px; }
+
 /* Dans une confirmation, chaque bouton est un vrai choix : gris pâle, ils
    passaient pour désactivés (« Ajouter seulement les pièces manquantes »,
    « Annuler »). Le texte reprend sa couleur pleine. */
