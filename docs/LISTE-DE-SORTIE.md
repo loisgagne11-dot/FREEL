@@ -90,9 +90,9 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 7 | 33 | « Reste à sortir » : un seul total | ✅ fusionné le 14/11 (PR #337) |
 | 8 | 35 | Mis de côté pour l'impôt, sur le compte personnel (redéfini, décision 17) | ✅ fusionné le 15/11 (PR #338, schéma 23) |
 | 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ✅ fusionné le 15/11 (PR #339) |
-| 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ✅ fini le 15/11, PR à fusionner |
+| 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ✅ fusionné le 15/11 (PR #340) |
 | — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
-| 11 | 51 | Nouvelle navigation et jetons de style | ⬜ |
+| 11 | 51 | Nouvelle navigation et jetons de style | 🔶 en cours : jetons posés ; navigation dessinée (`design/direction/navigation.html`), attend la validation du propriétaire |
 | 12 | 53 + 34 | Écran Obligations, frise aux dates officielles | ⬜ |
 | 13 | 31 | Une mission à plusieurs clients | ⬜ |
 | 14 | 48 | Mission enrichie et carnet de commandes | ⬜ |
@@ -148,7 +148,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Le compte rendu d'activité passe sous Activité ; l'import du relevé et le rapprochement sous Trésorerie ; l'analyse du chiffre d'affaires sous Activité › Analyse | ⬜ |
 | Une seule commande de période par écran, dans son en-tête ; le thème en Réglages ; barre du haut : recherche, « Nouveau », synchronisation libellée | ⬜ |
 | Cinq mots pour l'argent, partout : solde, dû, disponible, réserve, à te verser — passe relue à l'œil | ⬜ |
-| Jetons ajoutés par `design/DIRECTION-VISUELLE.md` (couleurs de charges validées, série en retrait, pastilles, clients du planning), dans les quatre thèmes à la fois ; composants communs de la planche : carte, tuile à tendance, pastille signe + mot, barre de répartition | ⬜ |
+| Jetons ajoutés par `design/DIRECTION-VISUELLE.md` (couleurs de charges validées, série en retrait, pastilles, clients du planning), dans les quatre thèmes à la fois ; composants communs de la planche : carte, tuile à tendance, pastille signe + mot, barre de répartition | 🔶 jetons ✅ 15/11 (contraste contrôlé : aplats 3:1, textes 4,5:1) ; composants à faire |
 | Polices embarquées (`woff2`, sous-ensemble latin, licence vérifiée), jamais par un CDN : aujourd'hui aucune n'est chargée et l'écran s'affiche en police système. Si le poids ne tient pas dans les budgets, la pile système reste | ⬜ |
 | Thème par défaut selon la décision 20 | ⬜ |
 
