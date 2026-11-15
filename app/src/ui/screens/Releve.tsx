@@ -7,7 +7,7 @@ import { importerReleve } from '../../state/ecritures.carnet';
 import { etatAchats } from '../../state/selecteurs.achats';
 import type { EcritureRapprochable, MouvementBancaire } from '../../domain/calculs/banque';
 import { estATraiter } from '../../domain/calculs/banque.etat';
-import { decoderFichier, lireReleve, type RapportLecture } from '../../infra/releveCsv';
+import { decoderFichier, lireReleve, motifReleveTropVolumineux, type RapportLecture } from '../../infra/releveCsv';
 import { Info } from '../components/Info';
 import { CartePliable } from '../components/CartePliable';
 import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
@@ -56,8 +56,10 @@ export function Releve() {
   const resume = etat.resumeBanque;
 
   async function importer(fichier: File): Promise<void> {
-    setEnCours(true);
     setRetour(null);
+    const tropLourd = motifReleveTropVolumineux(fichier);
+    if (tropLourd !== null) { setRetour({ ton: 'echec', texte: tropLourd }); return; }
+    setEnCours(true);
     try {
       const lecture = lireReleve(await decoderFichier(fichier));
       if (lecture.statut === 'refuse') {

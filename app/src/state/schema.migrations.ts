@@ -28,6 +28,10 @@
  * schémas que `VERSION_SCHEMA` a dépassés depuis longtemps.
  */
 
+/* Le contrôle de ce qui vient d'ailleurs voyage avec les migrations : le
+   magasin les charge au même moment, et un second chargement à la demande
+   coûtait au paquet d'entrée ce qui le faisait dépasser (lot 59). */
+export { motifRefusExterieur } from './schema.exterieur';
 import type { DateISO, Euros, Mois } from '../domain/types';
 import type { MotifSansContrepartie, MouvementBancaire } from '../domain/calculs/banque';
 import type { PeriodeDeclaree } from '../domain/calculs/declarations.declarees';

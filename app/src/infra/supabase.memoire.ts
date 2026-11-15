@@ -27,23 +27,13 @@ import {
   type ConfigSupabase, type InstantaneDistant, type Resultat, type Session,
   TABLE_FAITS, TABLE_HISTORIQUE, appeler, instantaneDepuis
 } from './supabase';
+import { TAILLE_MAX_FAITS } from './bornes';
 
 /** Combien d'états précédents le serveur garde par compte. */
 export const ETATS_GARDES = 20;
 
-/**
- * La taille maximale d'un dossier, en octets de son texte JSON.
- *
- * Le plan disait « dix fois le jeu d'essai » : 185 Ko. Mesuré sur ce jeu,
- * élément par élément (une opération bancaire ≈ 200 octets, une dépense ≈
- * 260, une facture ≈ 360), un compte chargé — 40 opérations bancaires par
- * mois, 150 dépenses et 24 factures par an — pèse ≈ 150 Ko PAR AN. La borne
- * du plan aurait refusé sa synchronisation au bout d'un an, sans que rien ne
- * soit anormal. Dix ans d'une telle activité font ≈ 1,5 Mo ; la borne est
- * à plus du double. Ce qu'elle arrête : un envoi qui n'est plus un dossier
- * — une boucle, un fichier collé par erreur, un abus.
- */
-export const TAILLE_MAX_FAITS = 4_000_000;
+/** La borne vit avec celles des imports : une seule source (`bornes.ts`). */
+export { TAILLE_MAX_FAITS };
 
 /** Un état précédent, SANS ses faits : la liste ne télécharge pas vingt dossiers. */
 export interface EtatPrecedent {

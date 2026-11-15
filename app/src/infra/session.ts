@@ -37,13 +37,26 @@ export interface Session {
 /** Clé de conservation de la session. Distincte de celle des faits. */
 export const CLE_SESSION = 'freel.session.supabase.v1' as const;
 
+/**
+ * La session conservée, ou `null` si elle manque ou ne se lit pas EN ENTIER.
+ *
+ * Seuls le jeton et l'utilisateur étaient contrôlés : une session sans
+ * échéance lisible passait, et `sessionValide` comparait alors `undefined` à
+ * l'heure — toujours faux, si bien qu'elle partait en renouvellement à chaque
+ * ouverture, ou, avec une échéance en texte, valait pour toujours (lot 59, S9).
+ */
 export function lireSession(stockage: StockageLocal): Session | null {
   try {
     const brut = stockage.getItem(CLE_SESSION);
     if (brut === null) return null;
     const o = JSON.parse(brut) as Record<string, unknown>;
-    if (typeof o['jeton'] !== 'string' || typeof o['utilisateurId'] !== 'string') return null;
-    return o as unknown as Session;
+    const { jeton, jetonRafraichissement, expireLe, utilisateurId, email } = o;
+    if (typeof jeton !== 'string' || jeton === '' || typeof utilisateurId !== 'string'
+      || typeof jetonRafraichissement !== 'string' || typeof email !== 'string'
+      || typeof expireLe !== 'number' || !Number.isFinite(expireLe) || expireLe <= 0) {
+      return null;
+    }
+    return { jeton, jetonRafraichissement, expireLe, utilisateurId, email };
   } catch {
     return null;
   }

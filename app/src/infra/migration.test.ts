@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { CLE_INSTANTANE_AVANT_MIGRATION, CLE_STOCKAGE } from '../state/schema';
 import {
   CLE_BUNDLE_LEGACY, PREFIXE_LEGACY, type ResultatMigration, type Stockage,
-  migrer as detecter, prendreInstantane, presenceLegacy, stockageMemoire
+  migrer as detecter, presenceLegacy, stockageMemoire
 } from './migration';
-import { analyser, reprendreLegacy, verifierAbsenceDePerte } from './migration.legacy';
+import { analyser, prendreInstantane, reprendreLegacy, verifierAbsenceDePerte } from './migration.legacy';
 
 /**
  * La migration complète : détection, puis reprise.

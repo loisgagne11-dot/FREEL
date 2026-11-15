@@ -26,6 +26,9 @@
  * Ce module ne SUPPRIME jamais les anciennes clés.
  */
 
+/* Réexporté pour le magasin, qui charge ce module à la demande et doit
+   contrôler ce qu'il convertit sans un second chargement (lot 59). */
+export { motifRefusExterieur } from '../state/schema.exterieur';
 import { type DateISO, type Mois, type TypeActivite, euros, ratio } from '../domain/types';
 import {
   CLE_STOCKAGE, VERSION_SCHEMA,
@@ -37,11 +40,52 @@ import { formuleDepuisJours } from '../domain/calculs/delaiPaiement';
 import type { ClientOperationnel } from '../state/schema';
 import { completerFaits } from '../state/schema.migrations';
 import type { Echeance, NatureDette } from '../domain/calculs/provisions';
+import { CLE_INSTANTANE_AVANT_MIGRATION } from '../state/schema';
 import {
-  CLE_BUNDLE_LEGACY, CLE_OBJECTIF_LEGACY, PREFIXE_LEGACY,
-  type Anomalie, type RapportMigration, type ResultatMigration, type Stockage,
-  archiverAvantReprise
+  CLE_BUNDLE_LEGACY, CLE_OBJECTIF_LEGACY, CLES_ANNEXES_LEGACY, PREFIXE_LEGACY,
+  type Anomalie, type RapportMigration, type ResultatMigration, type Stockage
 } from './migration';
+
+/* L'instantané et l'archive avant reprise vivaient dans le noyau
+   (`migration.ts`), donc dans le paquet d'entrée, alors que seule la reprise
+   les appelle — et elle est chargée à la demande. Ils sont ici depuis le lot
+   59, dont les ajouts faisaient passer l'entrée au-dessus de 80 Ko. L'ordre
+   qui compte ne change pas : `reprendreLegacy` archive AVANT de convertir. */
+
+/** Copie toutes les clés de l'ancienne application, avant toute écriture. */
+export function prendreInstantane(stockage: Stockage): Record<string, string> {
+  const instantane: Record<string, string> = {};
+  for (let i = 0; i < stockage.length; i++) {
+    const cle = stockage.key(i);
+    if (cle === null) continue;
+    if (!cle.startsWith(PREFIXE_LEGACY) && !CLES_ANNEXES_LEGACY.includes(cle as never)) continue;
+    const v = stockage.getItem(cle);
+    if (v !== null) instantane[cle] = v;
+  }
+  return instantane;
+}
+
+/**
+ * Archive l'intégralité des clés de l'ancienne application.
+ *
+ * Écrit AVANT toute conversion. Cet ordre n'est pas négociable : si l'écriture
+ * des faits échoue ensuite (quota dépassé, par exemple), l'archive de l'état
+ * d'origine existe déjà. Rend le motif d'échec, ou `null` si tout va bien.
+ */
+export function archiverAvantReprise(stockage: Stockage): string | null {
+  try {
+    if (stockage.getItem(CLE_INSTANTANE_AVANT_MIGRATION) === null) {
+      stockage.setItem(
+        CLE_INSTANTANE_AVANT_MIGRATION,
+        JSON.stringify({ pris: new Date().toISOString(), cles: prendreInstantane(stockage) })
+      );
+    }
+    return null;
+  } catch {
+    return 'Impossible d\'archiver l\'état d\'origine (stockage plein ?). Migration '
+      + 'interrompue : on ne migre pas sans filet.';
+  }
+}
 
 type Inconnu = Record<string, unknown>;
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useFaits } from '../../state/store';
-import { VERSION_SCHEMA, motifRefusFaits } from '../../state/schema';
+import { VERSION_SCHEMA } from '../../state/schema';
+import { motifRefusExterieur } from '../../state/schema.exterieur';
 import { completerFaits } from '../../state/schema.migrations';
 import {
   type ConfigSupabase, type InstantaneDistant, type Session, pousserFaits
@@ -86,7 +87,7 @@ export function EtatsPrecedents(
     // sait pas lire.
     const motif = lu.valeur.schema > VERSION_SCHEMA
       ? 'Cet état a été écrit par une version plus récente de l’application : mets-la à jour pour y revenir.'
-      : motifRefusFaits(lu.valeur.faits);
+      : motifRefusExterieur(lu.valeur.faits);
     if (motif !== null) { echec(motif); return; }
     const faits = completerFaits(lu.valeur.faits);
 

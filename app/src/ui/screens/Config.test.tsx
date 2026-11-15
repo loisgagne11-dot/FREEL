@@ -605,19 +605,17 @@ describe('restauration d’une sauvegarde', () => {
    * Le refus de fond — schéma plus récent que ce code — appartient à
    * `adopterFaitsDistants`, et il est RENDU à l'utilisateur plutôt qu'avalé.
    */
-  it('relaie le refus d’un bloc écrit par une version plus récente', async () => {
+  // Depuis le lot 59, le refus se dit à l'annonce : proposer « Remplacer »
+  // pour un fichier que l'adoption refusera ferait croire qu'il est bon.
+  it('relaie le refus d’un bloc écrit par une version plus récente, dès l’annonce', async () => {
     const utilisateur = await ouvrirDonnees();
     await utilisateur.upload(
       screen.getByLabelText('Restaurer une sauvegarde'),
       sauvegarde({ ...bloc, version: 999 })
     );
-    await waitFor(() => screen.getByRole('alert'));
-    await utilisateur.click(
-      screen.getByRole('button', { name: 'Remplacer mes données par cette sauvegarde' })
-    );
-
-    expect(useFaits.getState().faits.clients).toEqual([]);
     await waitFor(() => expect(screen.getByText(/plus récente/i)).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'Remplacer mes données par cette sauvegarde' })).toBeNull();
+    expect(useFaits.getState().faits.clients).toEqual([]);
   });
 });
 

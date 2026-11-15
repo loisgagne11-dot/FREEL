@@ -1,14 +1,14 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
   type ConfigSupabase, type DonneesLegacy, type InstantaneDistant, type ResultatEffacement,
   type Session, bundleDepuisLegacy, chargerDonneesLegacy, configDeBuild, configEffective,
   effacerDonneesLegacy, effacerFaitsDuCompte,
-  ecrireConfig, ecrireSession, estRefusDAuthentification, lireSession, motifUrlRefusee,
-  pousserFaits, rafraichir,
-  seConnecter, seDeconnecter, sessionValide, tirerFaits
+  ecrireConfig, ecrireSession, motifUrlRefusee, pousserFaits, reprendreSession,
+  seConnecter, seDeconnecter, tirerFaits
 } from '../../infra/supabase';
-import { VERSION_SCHEMA, type Faits, motifRefusFaits } from '../../state/schema';
+import { VERSION_SCHEMA, type Faits } from '../../state/schema';
+import { motifRefusExterieur } from '../../state/schema.exterieur';
 /**
  * `completerFaits` est importé STATIQUEMENT ici, contrairement à
  * `state/store.ts` : cet écran est déjà chargé à la demande (voir `App.tsx`,
@@ -26,6 +26,7 @@ import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { dateCourte } from '../format';
 import { ReglesDAcces } from './Compte.acces';
 import { EtatsPrecedents } from './Compte.historique';
+import { PanneauEffacerAppareil } from './EffacerAppareil';
 import styles from './Compte.module.css';
 
 /**
@@ -183,7 +184,7 @@ function resumeCourt(r: Resume): string {
  * le bloc est illisible, ou il vient d'une version qu'on ne sait pas lire.
  */
 function resumeDistant(instantane: InstantaneDistant): Resume | null {
-  return motifRefusFaits(instantane.faits) === null
+  return motifRefusExterieur(instantane.faits) === null
     ? resumer(completerFaits(instantane.faits))
     : null;
 }
@@ -239,31 +240,21 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
   // le geste le plus grave de l'écran restait sans réponse visible.
   const [effacement, setEffacement] = useState<{ readonly echec: boolean; readonly texte: string } | null>(null);
   const [enCours, setEnCours] = useState(false);
+  const [effacerOuvert, setEffacerOuvert] = useState(false);
+  const boutonEffacer = useRef<HTMLButtonElement>(null);
   const idChamp = useId();
 
   // Une session conservée est reprise au chargement, et renouvelée si elle
   // approche de son terme : sans cela, il faudrait se reconnecter à chaque
   // ouverture de l'application.
+  // Le renouvellement passe par un verrou commun aux onglets : voir
+  // `reprendreSession`, et pourquoi deux onglets se déconnectaient.
   useEffect(() => {
-    const session = lireSession(local);
-    if (session === null || config === null) return;
-
-    if (sessionValide(session)) {
+    if (config === null) return;
+    void reprendreSession(config, local).then((session) => {
+      if (session === null) return;
       setEtat({ phase: 'connecte', session });
       void relireEtatDistant(session);
-      return;
-    }
-    void rafraichir(config, session).then((r) => {
-      if (r.statut === 'ok') {
-        ecrireSession(local, r.valeur);
-        setEtat({ phase: 'connecte', session: r.valeur });
-        void relireEtatDistant(r.valeur);
-      } else if (estRefusDAuthentification(r)) {
-        // Seul un REFUS du serveur (400, 401) périme la session. Effacer sur
-        // toute erreur déconnectait l'utilisateur à chaque coupure de wifi ou
-        // panne passagère du serveur : il devait se reconnecter pour rien.
-        ecrireSession(local, null);
-      }
     });
     // `local` et `config` sont stables sur la durée de vie de l'écran.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -378,7 +369,7 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     // Un bloc écrit par une version plus récente est refusé ici, avant tout
     // remplacement : le charger reviendrait à effacer ce que ce code ne sait
     // pas lire dès le premier renvoi.
-    const motif = motifRefusFaits(instantane.faits);
+    const motif = motifRefusExterieur(instantane.faits);
     if (motif !== null) { setErreur(motif); return; }
 
     setEtat({
@@ -467,7 +458,8 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     ecrireSession(local, null);
     setEtat({ phase: 'deconnecte' });
     setDistant('inconnu');
-    setMessage(null);
+    setMessage('Déconnecté. Tes données restent sur cet appareil : « Effacer cet appareil », '
+      + 'dans Configuration › Données & export, les en retire.');
   }
 
   return (
@@ -559,8 +551,28 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
                   >
                     Se déconnecter
                   </button>
+                  <button
+                    ref={boutonEffacer}
+                    type="button"
+                    className={styles.action}
+                    aria-expanded={effacerOuvert}
+                    onClick={() => setEffacerOuvert(true)}
+                  >
+                    Se déconnecter et effacer cet appareil
+                  </button>
+                  {/* Lot 59 (S7) : se déconnecter laissait tout sur l'appareil, sans le dire. */}
+                  <p className={styles.consequence}>
+                    Se déconnecter laisse tes données et tes pièces sur cet
+                    appareil, lisibles par qui l’ouvre.
+                  </p>
                 </li>
               </ul>
+              {effacerOuvert && (
+                <PanneauEffacerAppareil
+                  classes={{ action: styles.action, succes: styles.succes, echec: styles.echec }}
+                  onGarder={() => { setEffacerOuvert(false); boutonEffacer.current?.focus(); }}
+                />
+              )}
 
               <EtatsPrecedents
                 config={config}
@@ -633,8 +645,8 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
                 projet Supabase (Authentication, puis Users). C’est le seul
                 endroit où la clé de service — celle qui permet tout — a sa
                 place&nbsp;; elle n’en a aucune dans une page servie à tous.
-                Les données de <strong>cet appareil</strong> s’effacent dans
-                Données, «&nbsp;Repartir de zéro&nbsp;».
+                Les données de <strong>cet appareil</strong> s’effacent avec
+                «&nbsp;Se déconnecter et effacer cet appareil&nbsp;», plus haut.
               </p>
             </>
           )}
@@ -814,7 +826,7 @@ function Conflit(
     onAbandonner: () => void;
   }
 ) {
-  const lisible = distant !== null && motifRefusFaits(distant.faits) === null;
+  const lisible = distant !== null && motifRefusExterieur(distant.faits) === null;
   const cote = lisible && distant !== null ? resumer(completerFaits(distant.faits)) : null;
   // Le conflit peut révéler qu'un appareil plus récent a écrit entre-temps :
   // « écraser » retomberait alors exactement dans le cas que l'envoi refuse.

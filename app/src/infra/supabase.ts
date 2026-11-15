@@ -38,7 +38,7 @@ export {
   CLE_SESSION, type Session, type StockageLocal,
   ecrireSession, lireSession, sessionValide
 } from './session';
-import type { Session, StockageLocal } from './session';
+import { type Session, type StockageLocal, ecrireSession, lireSession, sessionValide } from './session';
 
 /** Où se connecter. Ni l'un ni l'autre n'est écrit dans le code. */
 export interface ConfigSupabase {
@@ -270,6 +270,67 @@ export async function rafraichir(
     body: JSON.stringify({ refresh_token: session.jetonRafraichissement })
   });
   return r.statut === 'erreur' ? r : sessionDepuis(r.valeur);
+}
+
+/**
+ * Un verrou partagé par les onglets du navigateur : `travail` ne s'exécute
+ * qu'une fois le précédent terminé, dans quelque onglet que ce soit.
+ */
+export type Verrou = <T>(nom: string, travail: () => Promise<T>) => Promise<T>;
+
+/**
+ * L'API Web Locks quand le navigateur la porte. Sans elle (navigateur ancien),
+ * le travail part sans attendre : la relecture sous `reprendreSession` limite
+ * alors le dégât à l'onglet qui arrive second, sans toucher à l'autre.
+ */
+export const verrouDuNavigateur: Verrou = (nom, travail) => {
+  const verrous = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  // `request` rend la promesse du rappel : le type de la bibliothèque DOM
+  // l'enveloppe une fois de trop.
+  return verrous === undefined ? travail() : verrous.request(nom, travail) as Promise<never>;
+};
+
+const VERROU_SESSION = 'freel.session';
+
+/**
+ * La session conservée, renouvelée si elle approche de son terme ; `null` si
+ * elle manque, est refusée, ou si le serveur ne répond pas.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DEUX ONGLETS SE DÉCONNECTAIENT L'UN L'AUTRE (lot 59, S9)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Deux onglets ouverts sur une session expirée renouvelaient en même temps,
+ * avec le MÊME jeton de renouvellement. Le serveur n'en accepte l'usage
+ * qu'une fois : le premier recevait une session neuve et l'écrivait ; le
+ * second, refusé, effaçait la session… que le premier venait d'écrire. Les
+ * deux onglets étaient déconnectés, et le mot de passe à ressaisir.
+ *
+ * Le renouvellement passe donc sous un verrou commun aux onglets, et la
+ * session est RELUE une fois le verrou obtenu : le second onglet trouve celle
+ * que le premier a écrite, valide, et ne renouvelle pas. Sans verrou, un refus
+ * n'efface que si la session conservée est encore celle qu'on a présentée.
+ */
+export async function reprendreSession(
+  config: ConfigSupabase, stockage: StockageLocal, verrou: Verrou = verrouDuNavigateur
+): Promise<Session | null> {
+  return verrou(VERROU_SESSION, async () => {
+    const session = lireSession(stockage);
+    if (session === null) return null;
+    if (sessionValide(session)) return session;
+    const r = await rafraichir(config, session);
+    if (r.statut === 'ok') {
+      ecrireSession(stockage, r.valeur);
+      return r.valeur;
+    }
+    // Seul un REFUS du serveur (400, 401) périme la session. Effacer sur
+    // toute erreur déconnectait l'utilisateur à chaque coupure de wifi.
+    if (estRefusDAuthentification(r)
+      && lireSession(stockage)?.jetonRafraichissement === session.jetonRafraichissement) {
+      ecrireSession(stockage, null);
+    }
+    return null;
+  });
 }
 
 /** Une session encore valable, avec une marge pour l'appel en cours. */

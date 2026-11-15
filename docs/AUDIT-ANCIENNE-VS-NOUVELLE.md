@@ -559,3 +559,13 @@ chiffre faux.
 |---|---|---|
 | Consulter l'ancienne application | 🟢 | Toujours sous `/legacy/`, en lecture seule, et désormais sous politique de contenu : Supabase d'une seule source épinglée avec empreinte (elle en essayait trois, en `@2` flottant ; deux répondaient 404), aucun script d'un autre hôte. L'original `index.html` n'est pas touché, seule la copie publiée l'est |
 | Affichage dans un cadre par une autre page | 🟢 | Ni l'ancienne ni la nouvelle ne s'y affichent : elles restent vides. L'ancienne n'avait aucune protection |
+
+## Lot 59 (15/11) — appareil perdu, fichier piégé
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Effacer ses données d'un appareil | 🟢 nouveau | L'ancienne n'avait que « vider » le navigateur à la main. « Effacer cet appareil » (Données) et « Se déconnecter et effacer cet appareil » (Compte) proposent l'archive, déconnectent, effacent données, pièces, session, réglages — ceux de l'ancienne version compris — et le prouvent en relisant |
+| Se déconnecter | 🟢 | Dit désormais ce qui reste sur l'appareil |
+| Importer un relevé, une sauvegarde, une archive, une pièce | 🟢 | Bornés avant lecture, contrôlés en profondeur ; un fichier fabriqué est refusé avec le champ en cause. L'ancienne lisait tout, sans borne |
+| Rester connecté sur deux onglets | 🟢 | Les deux onglets ne se déconnectent plus l'un l'autre au renouvellement de la session |
+| Annonce d'une sauvegarde à restaurer | 🟢 | Un fichier que l'adoption refuserait est refusé dès l'annonce, sans proposer « Remplacer » |
