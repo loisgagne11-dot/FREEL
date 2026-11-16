@@ -844,3 +844,11 @@ lecteur daltonien (l'URSSAF n'emprunte plus l'ambre « à surveiller », ni la
 TVA le bleu générique). Partout où une charge a sa couleur — enveloppes de
 Trésorerie, frise et liste de l'échéancier, anneau de composition — et dans
 les quatre thèmes. Relu sur capture à 390 px, clair et sombre.
+
+## Lot 31 (16/11) — les brouillons de facture du mois
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Montant du brouillon du mois | Factures, Pilote | Un brouillon par payeur de mission, tous clients confondus | Inchangé en « facture commune » (par défaut) ; en « une par client », un brouillon par client et par payeur, dont la somme égale le brouillon commun (tenu par un essai) |
+| Jours d'un client arrêté | Planning, CRA, brouillon | Comptés jusqu'à la fin de la mission | Plus aucun après la date d'arrêt |
+| Jours repris de l'ancienne version | Planning, CRA | Tous au premier client, double comptage possible | Jour par jour, à chaque client ; la vérification d'absence de perte compare mois par mois |

@@ -20,7 +20,7 @@ import {
   congeApresSaisie, creneauxDeLaPortee, creneauxOccupes, planifier, saisirSurPortee
 } from '../../domain/calculs/planning';
 import type { JourPlanifie } from '../../domain/calculs/planning';
-import { arretDuClient } from '../../domain/calculs/clientsOperationnels';
+import { arretDuClient } from '../../domain/calculs/clientsOperationnels.lecture';
 import type { Affectation, SaisieDemiJournee } from '../components/EditeurDemiJournee';
 import {
   previsionDuMoisParMission, rapportParMission, tarifDeLaJournee

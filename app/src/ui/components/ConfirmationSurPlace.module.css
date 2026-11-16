@@ -51,6 +51,52 @@
 .confirmer:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 .garder:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 
+/* Ce qui reste en l'état : en retrait de la conséquence, qui seule nomme le
+   groupe. */
+.complement { margin: 0; color: var(--muted); }
+
+/* Prudence — direction visuelle, maquette `mission-clients.html` : un geste
+   qui change la suite sans effacer le passé ne porte pas l'alarme rouge d'une
+   suppression. Le geste conseillé est le bouton plein, en vert. */
+.prudence {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.prudence .confirmer,
+.aLaPlace {
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: var(--on-accent);
+  font-weight: 620;
+}
+
+.prudence .confirmer:focus-visible,
+.aLaPlace:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* Le geste demandé, quand un plus sûr passe devant : toujours possible, plus
+   en tête. */
+.confirmerContour {
+  border: 1px solid var(--red-line);
+  background: transparent;
+  color: var(--red);
+  font-weight: 620;
+}
+
+.aLaPlace,
+.confirmerContour {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.confirmerContour:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
 .horsEcran {
   position: absolute;
   width: 1px;

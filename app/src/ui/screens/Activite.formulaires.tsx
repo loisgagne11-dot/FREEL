@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { dateISO, euros } from '../../domain/types';
 import type { DateISO } from '../../domain/types';
 import { useFaits } from '../../state/store';
+import { dateDuJour } from '../../state/selecteurs';
 import { ajouterMission, modifierMission } from '../../state/ecritures.activite';
 import {
   ajouterClient, modifierClient, supprimerClient, supprimerMission
@@ -18,6 +19,12 @@ import {
 import {
   FORMULE_PAR_DEFAUT, type FormuleDelai
 } from '../../domain/calculs/delaiPaiement';
+import { arretDuClient } from '../../domain/calculs/clientsOperationnels.lecture';
+import { modeDeFacturation } from '../../domain/calculs/brouillon';
+import {
+  ChoixFacturation, type ContexteDesGestes, GestesDuClient, SituationDuClient
+} from './Activite.clientsMission';
+import { lendemain, nomDuClient } from './Activite.clientsMission.lecture';
 import {
   FORMULES_DELAI, depassementLegal, libelleDelai
 } from '../../domain/calculs/delaiPaiement.libelles';
@@ -231,9 +238,19 @@ export function FormulaireMission(
     // Le RYTHME, lui, se déclare ici — c'est le fait qui remplit le planning,
     // et jusqu'au 13/08 aucun écran ne permettait de le saisir. Une mission
     // créée dans l'application avait donc un planning vide à jamais.
-    entites: existante?.entites ?? [{ ...entiteVide(), id: `co-${Date.now()}` }]
+    entites: existante?.entites ?? [{ ...entiteVide(), id: `co-${Date.now()}` }],
+    // Repris seulement s'il a été choisi : l'écrire d'office marquerait la
+    // mission d'un choix que personne n'a fait (absent vaut « commune »).
+    ...(existante?.facturation !== undefined ? { facturation: existante.facturation } : {})
   }));
   const [erreur, setErreur] = useState<string | null>(null);
+  const facturation = modeDeFacturation(saisie);
+  const contexte: ContexteDesGestes = {
+    aujourdhui: dateDuJour(),
+    conges: Object.fromEntries(faits.conges.map((c) => [c.date, c.quotite])),
+    livre: faits.recettes,
+    payeur: saisie.clientNom
+  };
 
   function soumettre(evenement: React.FormEvent): void {
     evenement.preventDefault();
@@ -321,12 +338,39 @@ export function FormulaireMission(
 
       <EditeurEntites
         entites={saisie.entites}
+        enregistrees={existante?.entites ?? []}
         clientNom={saisie.clientNom}
         debut={saisie.debut}
         fin={saisie.fin}
+        enCours={saisie.statut === 'active'}
         tjmMission={saisie.tjm}
+        contexte={contexte}
         onChange={(entites) => setSaisie({ ...saisie, entites })}
       />
+
+      {/* Le choix ne se pose qu'à partir de deux clients — et reste visible
+          tant qu'il vaut « par client », pour qu'il puisse se défaire. */}
+      {(saisie.entites.length > 1 || facturation === 'par_client') && (
+        <ChoixFacturation
+          mode={facturation}
+          payeur={saisie.clientNom}
+          carnet={faits.clients}
+          clients={saisie.entites.map((e, i) => ({
+            nom: nomDuClient(e, i, saisie.clientNom), rythmes: e.rythmes
+          }))}
+          onMode={(mode) => setSaisie({ ...saisie, facturation: mode })}
+          onPayeur={(rang, facturerA) => setSaisie({
+            ...saisie,
+            entites: saisie.entites.map((e, i) => (i !== rang ? e : {
+              ...e,
+              // Un client sans plage n'aurait nulle part où porter son payeur :
+              // la première plage se crée ici, comme la première semaine type.
+              rythmes: (e.rythmes.length === 0 ? [PERIODE_VIDE] : e.rythmes)
+                .map((r) => ({ ...r, facturerA }))
+            }))
+          })}
+        />
+      )}
 
       {erreur !== null && <p role="alert" className={styles.echec}>{erreur}</p>}
 
@@ -405,22 +449,75 @@ function Champ(
  * commence à vouloir dire quelque chose.
  */
 function EditeurEntites(
-  { entites, clientNom, debut, fin, tjmMission, onChange }: {
+  { entites, enregistrees, clientNom, debut, fin, enCours, tjmMission, contexte, onChange }: {
     readonly entites: readonly ClientOperationnel[];
+    /** Les clients tels qu'enregistrés avant cette saisie : eux seuls ont un passé. */
+    readonly enregistrees: readonly ClientOperationnel[];
     readonly clientNom: string;
     /** Les bornes de la mission. Sans elles, le rythme n'a aucune plage où se poser. */
     readonly debut: DateISO | null;
     readonly fin: DateISO | null;
+    /** La mission est en cours : ses clients non arrêtés le sont aussi. */
+    readonly enCours: boolean;
     /** Le TJM de la mission, affiché comme valeur par défaut d'une période. */
     readonly tjmMission: number;
+    readonly contexte: ContexteDesGestes;
     readonly onChange: (entites: readonly ClientOperationnel[]) => void;
   }
 ) {
   const plusieurs = entites.length > 1;
   const datees = debut !== null && fin !== null;
+  const dejaLa = new Set(enregistrees.map((e) => e.id));
+  // Les débuts posés d'office aux clients ajoutés pendant cette saisie : tant
+  // qu'on n'y a pas touché, un arrêt les fait suivre (voir `arreter`).
+  const [proposes, setProposes] = useState<Readonly<Record<string, DateISO | null>>>({});
+  // L'état d'un client se lit sur les bornes réelles : une borne à poser
+  // (« 0000-00-00 ») passerait pour une fin au premier jour de l'an zéro, et
+  // le client pour arrêté avant d'avoir commencé.
+  const bornees = datees ? poserLesBornes(entites, debut, fin) : entites;
 
   function modifier(i: number, champs: Partial<ClientOperationnel>): void {
     onChange(entites.map((e, j) => (j === i ? { ...e, ...champs } : e)));
+  }
+
+  /**
+   * Un client ajouté à une mission qui a déjà travaillé commence au lendemain
+   * de l'arrêt le plus récent, ou aujourd'hui — jamais au début de la mission :
+   * ses jours recouvriraient ceux du client qu'il remplace, et le planning,
+   * le CRA et la facture compteraient deux fois les mêmes semaines.
+   */
+  function ajouter(): void {
+    const id = `co-${Date.now()}-${entites.length}`;
+    const depart = datees && bornees.some((e) => dejaLa.has(e.id))
+      ? dansLaMission(apresLeDernierArret(bornees) ?? contexte.aujourdhui, debut, fin)
+      : null;
+    setProposes({ ...proposes, [id]: depart });
+    onChange([...entites, {
+      ...entiteVide(),
+      id,
+      couleur: TEINTES[entites.length % TEINTES.length] as string,
+      rythmes: depart === null ? [] : [{ ...PERIODE_VIDE, du: depart }]
+    }]);
+  }
+
+  /**
+   * L'arrêt écrit dans la saisie, et le client ajouté pour prendre la suite
+   * le suit : « Arrêter » ne s'offre qu'à partir de deux clients, donc on
+   * ajoute le remplaçant AVANT d'arrêter l'autre, et il serait parti
+   * d'aujourd'hui — un trou si l'arrêt est passé, un doublon le jour même.
+   * Seul un début que personne n'a retouché se déplace.
+   */
+  function arreter(i: number, arrete: ClientOperationnel, le: DateISO): void {
+    const depart = dansLaMission(lendemain(le), debut, fin);
+    const suivants = { ...proposes };
+    onChange(entites.map((e, j) => {
+      if (j === i) return { ...e, rythmes: arrete.rythmes, ajustements: arrete.ajustements };
+      const propose = proposes[e.id];
+      if (propose === undefined || !debutIntact(e, propose)) return e;
+      suivants[e.id] = depart;
+      return { ...e, rythmes: [{ ...(e.rythmes[0] ?? PERIODE_VIDE), du: depart ?? BORNE_A_POSER }] };
+    }));
+    setProposes(suivants);
   }
 
   return (
@@ -445,59 +542,99 @@ function EditeurEntites(
         </p>
       )}
 
-      {entites.map((entite, i) => (
-        <div key={entite.id} className={styles.entite}>
-          {plusieurs && (
-            <div className={styles.entiteEntete}>
-              <input
-                type="color"
-                className={styles.teinte}
-                aria-label={`Couleur du client ${i + 1}`}
-                value={entite.couleur !== '' ? entite.couleur : (TEINTES[i % TEINTES.length] as string)}
-                onChange={(e) => modifier(i, { couleur: e.target.value })}
-              />
-              <input
-                className={styles.entiteNom}
-                aria-label={`Nom du client opérationnel ${i + 1}`}
-                placeholder={i === 0 && clientNom !== '' ? clientNom : 'Nom du client final'}
-                value={entite.nom}
-                onChange={(e) => modifier(i, { nom: e.target.value })}
-              />
-              {/* Le dernier ne se retire pas : une mission sans client
-                  opérationnel n'a plus de rythme, donc plus de planning. */}
-              <button
-                type="button"
-                className={styles.retirer}
-                onClick={() => onChange(entites.filter((_, j) => j !== i))}
-              >
-                Retirer
-              </button>
-            </div>
-          )}
+      {entites.map((entite, i) => {
+        const lisible = bornees[i] as ClientOperationnel;
+        const arret = plusieurs && datees ? arretDuClient({ entites: bornees }, lisible) : null;
+        const premier = premierJour(lisible);
+        return (
+          <div key={entite.id} className={styles.entite}>
+            {plusieurs && (
+              <>
+                <div className={styles.entiteEntete}>
+                  <input
+                    type="color"
+                    className={styles.teinte}
+                    aria-label={`Couleur du client ${i + 1}`}
+                    value={entite.couleur !== '' ? entite.couleur : (TEINTES[i % TEINTES.length] as string)}
+                    onChange={(e) => modifier(i, { couleur: e.target.value })}
+                  />
+                  <input
+                    className={styles.entiteNom}
+                    aria-label={`Nom du client opérationnel ${i + 1}`}
+                    placeholder={i === 0 && clientNom !== '' ? clientNom : 'Nom du client final'}
+                    value={entite.nom}
+                    onChange={(e) => modifier(i, { nom: e.target.value })}
+                  />
+                </div>
+                <SituationDuClient
+                  arret={arret}
+                  depuis={arret === null && datees && premier !== null && premier > (debut as DateISO) ? premier : null}
+                  rythmes={entite.rythmes}
+                  enCours={enCours}
+                />
+                {/* Le dernier ne se retire pas : une mission sans client
+                    opérationnel n'a plus de rythme, donc plus de planning. */}
+                <GestesDuClient
+                  entite={lisible}
+                  nom={nomDuClient(entite, i, clientNom)}
+                  enregistre={dejaLa.has(entite.id)}
+                  peutArreter={datees && dejaLa.has(entite.id) && arret === null}
+                  contexte={contexte}
+                  onArreter={(arrete, le) => arreter(i, arrete, le)}
+                  onRetirer={() => onChange(entites.filter((_, j) => j !== i))}
+                />
+              </>
+            )}
 
-          <EditeurRythmes
-            rythmes={entite.rythmes}
-            tjmMission={tjmMission}
-            debut={debut}
-            fin={fin}
-            onChange={(rythmes) => modifier(i, { rythmes })}
-          />
-        </div>
-      ))}
+            <EditeurRythmes
+              rythmes={entite.rythmes}
+              tjmMission={tjmMission}
+              debut={debut}
+              fin={fin}
+              onChange={(rythmes) => modifier(i, { rythmes })}
+            />
+          </div>
+        );
+      })}
 
-      <button
-        type="button"
-        className={styles.ajouterEntite}
-        onClick={() => onChange([...entites, {
-          ...entiteVide(),
-          id: `co-${Date.now()}-${entites.length}`,
-          couleur: TEINTES[entites.length % TEINTES.length] as string
-        }])}
-      >
+      <button type="button" className={styles.ajouterEntite} onClick={ajouter}>
         Ajouter un client opérationnel
       </button>
     </fieldset>
   );
+}
+
+/** Le premier jour d'une plage posée, ou `null`. */
+function premierJour(e: ClientOperationnel): DateISO | null {
+  const dates = e.rythmes.map((r) => r.du).filter((d) => d !== BORNE_A_POSER);
+  return dates.length === 0 ? null : dates.reduce((a, b) => (a < b ? a : b));
+}
+
+/** Le lendemain de l'arrêt le plus récent parmi les clients de la mission, ou `null`. */
+function apresLeDernierArret(entites: readonly ClientOperationnel[]): DateISO | null {
+  const arrets = entites
+    .map((e) => arretDuClient({ entites }, e))
+    .filter((d): d is DateISO => d !== null);
+  return arrets.length === 0 ? null : lendemain(arrets.reduce((a, b) => (a > b ? a : b)));
+}
+
+/**
+ * Un début proposé, ramené dans la mission — `null` pour « son début ».
+ *
+ * Avant le début, un client poserait des journées hors contrat ; après la fin,
+ * il n'en aurait aucune, et sa période ne se découperait même pas pour qu'on
+ * la corrige. Dans les deux cas, il part du début de la mission.
+ */
+function dansLaMission(jour: DateISO, debut: DateISO | null, fin: DateISO | null): DateISO | null {
+  if (debut === null || jour <= debut) return null;
+  if (fin !== null && jour > fin) return null;
+  return jour;
+}
+
+/** Le client n'a qu'une période, qui part encore du début qu'on lui a proposé. */
+function debutIntact(e: ClientOperationnel, propose: DateISO | null): boolean {
+  if (e.rythmes.length === 0) return propose === null;
+  return e.rythmes.length === 1 && e.rythmes[0]?.du === (propose ?? BORNE_A_POSER);
 }
 
 /**
@@ -719,7 +856,13 @@ const PERIODE_VIDE: Rythme = {
  */
 const MOIS_MAXIMUM_DECOUPES = 36;
 
-function parMois(modele: Rythme, debut: DateISO, fin: DateISO): readonly Rythme[] {
+function parMois(modele: Rythme, debutMission: DateISO, finMission: DateISO): readonly Rythme[] {
+  // La plage garde ses propres bornes quand elle en a. Celle d'un client
+  // arrêté le 13 mars, découpée sur la mission entière, le remettait au
+  // travail jusqu'à la fin — l'arrêt défait d'un clic, sans un mot ; celle
+  // d'un client arrivé le 14 recouvrait le client qu'il remplace.
+  const debut = modele.du !== BORNE_A_POSER && modele.du > debutMission ? modele.du : debutMission;
+  const fin = modele.au !== BORNE_A_POSER && modele.au < finMission ? modele.au : finMission;
   const mois: Rythme[] = [];
   let curseur = premierDuMois(debut);
 

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros } from '../types';
 import type { AjustementJour, Rythme } from './planning';
 import {
-  type FaitsDuClient, arretDuClient, arreterClient, bilanDuRetrait, finDuClient, joursPerdusApres
+  type FactureDuLivre, type FaitsDuClient, arretDuClient, arreterClient, bilanDuRetrait,
+  facturesTouchees, finDuClient, joursPerdusApres
 } from './clientsOperationnels';
 
 const plage = (du: string, au: string, parJour: Rythme['parJour'] = { lun: 1, mar: 1 }): Rythme => ({
@@ -142,5 +143,48 @@ describe('ce qu’un arrêt ou un retrait emporte', () => {
     // rien. Aujourd'hui, mardi 10, compte au passé : la journée est faite.
     expect(bilanDuRetrait(e, dateISO('2026-03-10'), sansFerie, {}))
       .toEqual({ joursPasses: 3.5, corrections: 2, joursAVenir: 5 });
+  });
+});
+
+/**
+ * UNE FACTURE PARTIE NE SE RÉÉCRIT PAS.
+ *
+ * Arrêter un client au 13 mai retire ses jours du 14 au 31 du brouillon de mai,
+ * pas de la facture de mai déjà émise. Si l'écran ne la nommait pas, on
+ * croirait le geste suffisant, et l'écart ne se verrait qu'au rapprochement —
+ * ou chez le client.
+ */
+describe('les factures qu’un arrêt laisse en l’état', () => {
+  const facture = (o: Partial<FactureDuLivre>): FactureDuLivre => ({
+    id: 'r-fictive', numero: '2026-012', clientNom: 'Agence Fictive', emiseLe: dateISO('2026-05-28'), ...o
+  });
+  const payeurs = new Set(['Agence Fictive']);
+
+  it('nomme la facture émise au payeur sur un mois touché après le jour dit', () => {
+    const livre = [
+      facture({ id: 'r-avril', numero: '2026-009', emiseLe: dateISO('2026-04-30') }),
+      facture({}),
+      facture({ id: 'r-juin', numero: '2026-015', emiseLe: dateISO('2026-06-30') })
+    ];
+    expect(facturesTouchees(livre, payeurs, dateISO('2026-05-13'), dateISO('2026-06-30')))
+      .toEqual([{ numero: '2026-012', mois: '2026-05' }, { numero: '2026-015', mois: '2026-06' }]);
+  });
+
+  /** Arrêté le 31 mai, le client ne perd rien en mai : la facture de mai n'a rien à corriger. */
+  it('commence au mois du lendemain, pas à celui du jour dit', () => {
+    expect(facturesTouchees([facture({})], payeurs, dateISO('2026-05-31'), dateISO('2026-06-30'))).toEqual([]);
+  });
+
+  it('ignore un autre payeur, une annulation et une facture déjà annulée', () => {
+    const livre = [
+      facture({ id: 'r-autre', numero: '2026-013', clientNom: 'Studio Fictif' }),
+      facture({ id: 'r-annulee', numero: '2026-014' }),
+      facture({ id: 'r-avoir', numero: 'AV-2026-001', annuleEcriture: 'r-annulee' })
+    ];
+    expect(facturesTouchees(livre, payeurs, dateISO('2026-05-13'), dateISO('2026-06-30'))).toEqual([]);
+  });
+
+  it('ne dit rien quand rien n’est prévu après le jour dit', () => {
+    expect(facturesTouchees([facture({})], payeurs, dateISO('2026-05-13'), dateISO('2026-05-13'))).toEqual([]);
   });
 });

@@ -1,6 +1,9 @@
-import type { DateISO } from '../types';
-import type { AjustementJour, Ajustements, Quotite, Rythme } from './planning';
+import type { DateISO, Mois } from '../types';
+import type { AjustementJour, Quotite, Rythme } from './planning';
 import { planifier } from './planification';
+import { type FaitsDuClient, finDuClient, plageActive } from './clientsOperationnels.lecture';
+
+export { type FaitsDuClient, arretDuClient, finDuClient } from './clientsOperationnels.lecture';
 
 /**
  * Arrêter un client opérationnel, et savoir qu'il l'est.
@@ -22,16 +25,10 @@ import { planifier } from './planification';
  * pas d'elle-même les plages déjà saisies. Lire l'arrêt sur `mission.fin`
  * donnerait pour arrêté un client qui travaille encore.
  *
- * Ce module est chargé à la demande : seul l'écran Activité et la reprise de
- * l'ancienne application le lisent, jamais le premier rendu.
+ * Ce module est chargé à la demande, avec le formulaire de mission. La
+ * lecture de l'arrêt, seule dont l'écran Activité ait besoin, vit à part dans
+ * `clientsOperationnels.lecture` — voir pourquoi là-bas.
  */
-
-/** Ce qu'un client opérationnel porte et que ce module lit : ses faits datés. */
-export interface FaitsDuClient {
-  readonly id: string;
-  readonly rythmes: readonly Rythme[];
-  readonly ajustements: Ajustements;
-}
 
 /** Ce que l'arrêt a changé, pour pouvoir le dire avant de l'écrire. */
 export interface BilanDeLArret {
@@ -49,10 +46,6 @@ export type ResultatArret<E extends FaitsDuClient> =
   | { readonly entite: E; readonly bilan: BilanDeLArret }
   | { readonly refus: string };
 
-/** Une plage qui produit des journées : une semaine type non vide. */
-const plageActive = (r: Rythme): boolean =>
-  Object.values(r.parJour).some((q) => (q ?? 0) > 0);
-
 /** Le premier jour où le client a quelque chose, ou `null`. */
 function debutDuClient(e: FaitsDuClient): DateISO | null {
   const dates = [
@@ -60,44 +53,6 @@ function debutDuClient(e: FaitsDuClient): DateISO | null {
     ...Object.entries(e.ajustements).filter(([, a]) => a.quotite > 0).map(([d]) => d as DateISO)
   ];
   return dates.length === 0 ? null : dates.reduce((a, b) => (a < b ? a : b));
-}
-
-/**
- * Le dernier jour où un client opérationnel a quelque chose, ou `null`.
- *
- * La fin des plages qui prévoient du travail, ou une correction positive
- * posée plus tard — une journée déclarée à la main après la dernière plage
- * prouve que le client n'était pas fini. Une plage vide ne compte pas : elle
- * ne remplit rien. Un zéro non plus : il dit justement qu'on n'y était pas.
- */
-export function finDuClient(e: FaitsDuClient): DateISO | null {
-  const dates = [
-    ...e.rythmes.filter(plageActive).map((r) => r.au),
-    ...Object.entries(e.ajustements).filter(([, a]) => a.quotite > 0).map(([d]) => d as DateISO)
-  ];
-  return dates.length === 0 ? null : dates.reduce((a, b) => (a > b ? a : b));
-}
-
-/**
- * La date à laquelle ce client s'est arrêté, ou `null` s'il ne l'est pas.
- *
- * Un client SEUL n'est jamais « arrêté » : sa fin est celle de la mission, et
- * c'est la mission qui se termine. Deux clients qui finissent le même jour ne
- * le sont pas davantage — rien ne continue sans eux. Il faut qu'un autre
- * client de la même mission travaille encore après lui.
- */
-export function arretDuClient(
-  mission: { readonly entites: readonly FaitsDuClient[] },
-  e: FaitsDuClient
-): DateISO | null {
-  const fin = finDuClient(e);
-  if (fin === null) return null;
-  const unAutreContinue = mission.entites.some((autre) => {
-    if (autre.id === e.id) return false;
-    const finAutre = finDuClient(autre);
-    return finAutre !== null && finAutre > fin;
-  });
-  return unAutreContinue ? fin : null;
 }
 
 /**
@@ -193,6 +148,63 @@ export function joursPerdusApres(
   return planifier(datesApres(le, jusquA), {
     rythmes: entite.rythmes, ajustements: entite.ajustements, feries, conges
   }).reduce((s, j) => s + j.retenu, 0);
+}
+
+/** Ce qu'une écriture du livre porte et que l'avertissement d'un arrêt lit. */
+export interface FactureDuLivre {
+  readonly id: string;
+  readonly numero: string;
+  readonly clientNom: string;
+  readonly emiseLe: DateISO | null;
+  readonly annuleEcriture?: string | null;
+}
+
+/** Une facture déjà émise sur un mois dont l'arrêt retire des jours. */
+export interface FactureTouchee {
+  readonly numero: string;
+  readonly mois: Mois;
+}
+
+/**
+ * Les factures déjà émises, à l'un des payeurs, sur un mois où l'arrêt au jour
+ * dit retire des jours — du lendemain jusqu'à la fin connue du client.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * L'ARRÊT NE RÉÉCRIT PAS UNE FACTURE PARTIE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Arrêter un client le 13 mai retire ses jours du 14 au 31 du brouillon de mai.
+ * Si la facture de mai est déjà partie, elle les porte encore : elle a un
+ * numéro, le client l'a reçue, seul un avoir la corrige. Le dire avant l'arrêt
+ * évite de découvrir l'écart au rapprochement — ou de croire la facture
+ * corrigée par le geste.
+ *
+ * « La facture d'un mois » est celle ÉMISE ce mois-là, au payeur : la règle du
+ * brouillon, qui la met en regard du planning du même mois. Une écriture
+ * d'annulation n'en est pas une ; une facture déjà annulée non plus — elle ne
+ * porte plus rien qu'un avoir aurait à corriger.
+ */
+export function facturesTouchees(
+  livre: readonly FactureDuLivre[],
+  payeurs: ReadonlySet<string>,
+  le: DateISO,
+  jusquA: DateISO
+): readonly FactureTouchee[] {
+  if (jusquA <= le) return [];
+  const lendemain = new Date(`${le}T00:00:00Z`);
+  lendemain.setUTCDate(lendemain.getUTCDate() + 1);
+  const premier = lendemain.toISOString().slice(0, 7);
+  const dernier = jusquA.slice(0, 7);
+  const annulees = new Set(livre.flatMap((r) =>
+    (typeof r.annuleEcriture === 'string' ? [r.annuleEcriture] : [])));
+  return livre
+    .flatMap((r): FactureTouchee[] => {
+      if (r.emiseLe === null || typeof r.annuleEcriture === 'string' || annulees.has(r.id)) return [];
+      const mois = r.emiseLe.slice(0, 7);
+      if (!payeurs.has(r.clientNom) || mois < premier || mois > dernier) return [];
+      return [{ numero: r.numero, mois: mois as Mois }];
+    })
+    .sort((a, b) => a.mois.localeCompare(b.mois) || a.numero.localeCompare(b.numero));
 }
 
 /** Ce que retirer un client de la mission emporterait avec lui. */
