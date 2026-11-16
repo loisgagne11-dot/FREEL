@@ -1365,7 +1365,7 @@ tant que les pièces à fournir n'existent pas (lot 53).
 
 | Zone | Avant | Après |
 |---|---|---|
-| Onglets d'Activité, téléphone | Le quatrième (« Analyse ») coupé à 390 px | Les quatre tiennent à 390 et 360 px, cibles de 44 px ; `verifier-responsive` refuse en portrait une rangée d'onglets qui glisse |
+| Onglets d'Activité, téléphone | Le quatrième (« Analyse ») coupé à 390 px | En portrait, les onglets se partagent la rangée et un libellé passe sur deux lignes si la police de l'appareil l'exige (mesuré avec une police plus large à 360 et 320 px) ; cibles de 44 px ; `verifier-responsive` refuse en portrait une rangée d'onglets qui glisse |
 | Libellés d'argent | « Sorties », « dus », deux « tu peux te verser » | Les cinq mots ; un contrôle de lexique lit le texte rendu de chaque écran et de ses onglets |
 
 Relu sur capture à 390 px, Calme : Pilote, Trésorerie, Activité › Analyse,
