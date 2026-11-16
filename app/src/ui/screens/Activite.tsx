@@ -37,7 +37,7 @@ import { decalerMois } from '../../domain/calculs/periode';
 import styles from './Activite.module.css';
 import { Montant } from '../components/Montant';
 import { useRoute } from '../useRoute';
-import { sousRouteDuBrouillonEnregistre } from '../adresseBrouillon';
+import { ChoixAnnee } from '../components/ChoixAnnee';
 
 /**
  * Les formulaires arrivent à l'ouverture de leur panneau.
@@ -46,31 +46,19 @@ import { sousRouteDuBrouillonEnregistre } from '../adresseBrouillon';
  * de cet écran. Consulter son planning, ce qu'on fait dix fois pour une
  * modification, n'a pas à payer leur téléchargement.
  */
-const FormulaireClient = lazy(() => import('./Activite.formulaires')
-  .then((m) => ({ default: m.FormulaireClient })));
 const FormulaireMission = lazy(() => import('./Activite.formulaires')
   .then((m) => ({ default: m.FormulaireMission })));
-
-/**
- * L'onglet Clients arrive à l'ouverture de son onglet.
- *
- * Même motif que les formulaires : le carnet se consulte à la création d'un
- * client puis rarement, et le plan de charge — ce qu'on ouvre dix fois par
- * semaine — n'a aucune raison d'en payer le téléchargement.
- */
-const OngletClients = composantALaDemande(() => import('./Activite.clients')
-  .then((m) => m.OngletClients), true);
 
 /** L'onglet Missions, même motif : une liste qu'on ouvre pour modifier. */
 const OngletMissions = composantALaDemande(() => import('./Activite.missions')
   .then((m) => m.OngletMissions), true);
 
 /**
- * Les trois cartes d'analyse arrivent APRÈS le plan de charge.
+ * Les cartes de l'onglet Analyse, à son ouverture.
  *
- * Elles sont sous la ligne de flottaison et répondent à une autre question que
- * celle qui amène sur l'écran : leur chargement se lit comme un bas de page qui
- * se remplit, et l'ouverture du plan de charge ne le paie plus.
+ * Elles répondent à une autre question que celle qui amène sur l'écran —
+ * « combien ça rapporte », pas « qu'ai-je travaillé » —, et l'ouverture du
+ * planning n'a pas à les payer.
  */
 const CartePrevision = composantALaDemande(() => import('./Activite.analyse')
   .then((m) => m.CartePrevision), true);
@@ -83,15 +71,23 @@ const CarteRapportParMission = composantALaDemande(() => import('./Activite.anal
  * charge tous les matins : voir l'en-tête de son module.
  */
 /**
- * La liste des factures, rangée sous Activité (formule A du rail).
- *
- * C'est le même facturier que l'écran Facture montrait : un seul composant,
- * deux portes d'entrée auraient fini par diverger. Il arrive à l'ouverture de
- * son onglet — il pèse plus lourd que tout le reste de l'écran, et le plan de
- * charge, qu'on ouvre tous les jours, n'a pas à l'attendre.
+ * L'analyse du chiffre d'affaires de l'année — tuiles, graphe, composition —,
+ * venue de l'écran Argent (lot 51) : c'est une analyse de l'activité, pas de
+ * la trésorerie. Voir l'en-tête de `Argent.performance`.
  */
-const FacturierDiffere = composantALaDemande(() => import('../components/Facturier')
-  .then((m) => m.Facturier), true);
+const AnalyseDeLAnnee = composantALaDemande(() => import('./Argent.performance')
+  .then((m) => m.AnalyseDeLAnnee), true);
+
+/**
+ * Le compte rendu d'activité, venu des Outils (lot 51) : il découle du
+ * planning qu'on regarde ici, et c'était le seul outil qui ne simulait rien.
+ * La carte arrive avec son onglet ; l'atelier, qui emporte le document et sa
+ * feuille autonome, à son ouverture seulement.
+ */
+const CarteCra = composantALaDemande(() => import('./Outils.craCarte')
+  .then((m) => m.CarteCra), true);
+const GenerateurCra = composantALaDemande(() => import('./Outils.cra')
+  .then((m) => m.GenerateurCra), false);
 
 /**
  * L'éditeur d'une demi-journée n'existe qu'après un clic sur la grille : il
@@ -118,7 +114,7 @@ function EnAttenteDeFormulaire() {
 }
 
 /**
- * Écran Activité — plan de charge, missions et délais de paiement.
+ * Écran Activité — le planning, les missions, le compte rendu et l’analyse.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LE CALENDRIER EST DANS LA PAGE, PAS DANS UNE FENÊTRE
@@ -134,7 +130,7 @@ function EnAttenteDeFormulaire() {
  * viennent de `domain/calculs/activite.ts`.
  */
 
-type Section = 'charge' | 'missions' | 'clients' | 'factures';
+type Section = 'charge' | 'missions' | 'compte-rendu' | 'analyse';
 
 /**
  * L'onglet que désigne l'adresse.
@@ -143,10 +139,10 @@ type Section = 'charge' | 'missions' | 'clients' | 'factures';
  * L'ONGLET VIT DANS L'URL
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Un état local rouvrait toujours le plan de charge : le lien « Factures »
- * du rail, l'action rapide « Télécharger une facture » et le bouton
- * « retour » d'une facture rouverte ne pouvaient pas désigner l'onglet où
- * elles mènent. `nouvelle-mission` et `conges` sont des GESTES, pas des
+ * Un état local rouvrait toujours le planning : l'action rapide
+ * « Télécharger le CRA » et la carte « Ce que le mois a produit » ne
+ * pouvaient pas désigner l'onglet où elles mènent. `nouvelle-mission` et
+ * `conges` sont des GESTES, pas des
  * onglets : ils ouvrent le panneau ou descendent à la carte, puis l'adresse
  * redevient celle de l'onglet — un rechargement ne doit pas rouvrir un
  * formulaire qu'on a fermé.
@@ -155,8 +151,8 @@ export function sectionDeLaRoute(sousRoute: string): Section {
   switch (sousRoute) {
     case 'missions':
     case 'nouvelle-mission': return 'missions';
-    case 'clients': return 'clients';
-    case 'factures': return 'factures';
+    case 'compte-rendu': return 'compte-rendu';
+    case 'analyse': return 'analyse';
     default: return 'charge';
   }
 }
@@ -165,24 +161,41 @@ export function sectionDeLaRoute(sousRoute: string): Section {
 export const ID_CARTE_CONGES = 'carte-conges';
 
 /**
- * Les onglets, et ce que chacun contient.
+ * Les onglets, et ce que chacun contient — ceux de la maquette `activite.html`
+ * (lot 51) : Planning, Missions, Compte rendu, Analyse. Les factures et les
+ * clients ont leur écran.
  *
  * Le compte est calculé À L'AFFICHAGE (`sections()` ci-dessous) : le mettre ici
  * en dur donnerait un nombre figé, et le mettre dans l'état en ferait une
  * valeur dérivée persistée — ce que l'invariant n°1 interdit.
  *
- * « Plan de charge » n'a pas de compte : ce n'est pas une liste. Une pastille
- * y afficherait un nombre dont on chercherait ce qu'il dénombre.
+ * Le planning n'a pas de compte : ce n'est pas une liste. Une pastille y
+ * afficherait un nombre dont on chercherait ce qu'il dénombre.
  */
-const sections = (nbMissions: number, nbClients: number) => [
-  { id: 'charge' as Section, libelle: 'Plan de charge' },
+const sections = (nbMissions: number) => [
+  { id: 'charge' as Section, libelle: 'Planning' },
   { id: 'missions' as Section, libelle: 'Missions', compte: nbMissions },
-  /* Entre Missions et Clients, comme le handoff : la facture suit la mission
-     qu'elle facture. Sans compte : le facturier compte lui-même ce qui reste
-     à encaisser, et un total de factures émises dénombrerait surtout le passé. */
-  { id: 'factures' as Section, libelle: 'Factures' },
-  { id: 'clients' as Section, libelle: 'Clients', compte: nbClients }
+  { id: 'compte-rendu' as Section, libelle: 'Compte rendu' },
+  { id: 'analyse' as Section, libelle: 'Analyse' }
 ];
+
+/** Le titre de l'écran suit l'onglet : il dit ce qu'on regarde, pas où l'on est. */
+const PLANNING = {
+  titre: 'Ton plan de charge',
+  sousTitre: 'Les congés posés sortent du dénominateur : le même travail sur moins de jours fait monter l’occupation.'
+};
+const TITRES: Readonly<Record<Section, { readonly titre: string; readonly sousTitre: string }>> = {
+  charge: PLANNING,
+  missions: PLANNING,
+  'compte-rendu': {
+    titre: 'Tes comptes rendus',
+    sousTitre: 'Le document que tu remets à ton client, tiré du planning : rien à ressaisir.'
+  },
+  analyse: {
+    titre: 'Ce que ton activité rapporte',
+    sousTitre: 'Le chiffre d’affaires de l’année, d’où il vient, et ce que chaque mission rapporte.'
+  }
+};
 
 export interface ProprietesActivite {
   /**
@@ -204,20 +217,34 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
 
   const { ecran, sousRoute, naviguerVers } = useRoute();
   // Monté seul (les tests), l'écran ne lit pas l'adresse d'un autre écran.
-  const routeIci = ecran.id === 'activite' ? sousRoute
-    : ecran.id === 'factures' ? (sousRoute === 'clients' ? 'clients' : 'factures') : '';
+  const routeIci = ecran.id === 'activite' ? sousRoute : '';
   /* L'état local suit l'adresse, et non l'inverse : `hashchange` arrive après
      le clic, et l'onglet ne doit pas attendre l'événement pour s'afficher. */
   const [section, setSection] = useState<Section>(() => sectionDeLaRoute(routeIci));
-  useEffect(() => { setSection(sectionDeLaRoute(routeIci)); }, [routeIci]);
+  /*
+   * `#/activite/compte-rendu` ouvre l'onglet ET l'atelier — quand on y vient
+   * d'ailleurs. Une action rapide qui dépose sur l'onglet sans rien ouvrir ne
+   * fait pas gagner le second geste, elle le déplace : « Télécharger le CRA »
+   * doit ouvrir l'atelier. Mais le clic sur l'onglet écrit la même adresse, et
+   * lui ne doit RIEN ouvrir : il a déjà changé la section quand l'adresse
+   * arrive, et c'est à cela qu'on le reconnaît.
+   */
+  const [craOuvert, setCraOuvert] = useState(() => sectionDeLaRoute(routeIci) === 'compte-rendu');
+  useEffect(() => {
+    const cible = sectionDeLaRoute(routeIci);
+    if (cible === 'compte-rendu' && section !== 'compte-rendu') setCraOuvert(true);
+    setSection(cible);
+    // Volontaire : seule l'ADRESSE doit déclencher ce recalage ; la section
+    // n'est lue que pour savoir d'où vient le changement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeIci]);
   const [panneau, setPanneau] = useState<Panneau>(
     () => (routeIci === 'nouvelle-mission' ? { type: 'mission', id: null } : { type: 'ferme' })
   );
 
   function changerDeSection(cible: Section): void {
     setSection(cible);
-    if (cible === 'factures' || cible === 'clients') naviguerVers('factures', cible === 'clients' ? 'clients' : '');
-    else naviguerVers('activite', cible === 'charge' ? '' : cible);
+    naviguerVers('activite', cible === 'charge' ? '' : cible);
   }
 
   const [versConges, setVersConges] = useState(false);
@@ -252,11 +279,11 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
   const annee = Number(mois.slice(0, 4));
 
   /*
-   * Changer d'année (en tête d'Argent ou d'Outils) déplace ce mois-ci (même
-   * mois, autre millésime) : c'est `App` qui le fait, pour tous les
-   * écrans. L'effet qui le faisait ici, et ne valait que pour Activité, est
-   * parti avec le mois local.
+   * Changer d'année — en tête de l'onglet Analyse, comme de la Trésorerie —
+   * garde le mois et n'en change que le millésime : de mars 2026, choisir 2025
+   * donne mars 2025. C'est le mois qu'on regardait, dans l'année demandée.
    */
+  const changerAnnee = (a: number): void => setMois(`${a}${mois.slice(4)}` as Mois);
   const idGroupe = useId();
 
   const etat = useMemo(() => etatActivite(faits, mois), [faits, mois]);
@@ -444,12 +471,7 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
   return (
     <>
       <Greet
-        {...(section === 'factures'
-          ? { titre: 'Tes factures', sousTitre: 'Ce qui est parti, ce qui reste à encaisser, et qui relancer.' }
-          : {
-            titre: 'Ton plan de charge',
-            sousTitre: 'Les congés posés sortent du dénominateur : le même travail sur moins de jours fait monter l’occupation.'
-          })}
+        {...TITRES[section]}
         {...(section === 'charge' ? { repere: <ResumeDuMois chiffres={chiffres} /> } : {})}
         actions={(
           <>
@@ -459,12 +481,10 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
                 Ajouter une mission
               </button>
             )}
-            {section === 'clients' && faits.clients.length > 0 && (
-              <button type="button" className={styles.actionPrincipale}
-                onClick={() => setPanneau({ type: 'client', id: null })}>
-                Ajouter un client
-              </button>
-            )}
+            {/* L'Analyse raisonne à l'année : sa commande est l'année, dans
+                l'en-tête, comme la Trésorerie. Le planning garde ses flèches
+                dans sa carte — une seule commande de période par vue. */}
+            {section === 'analyse' && <ChoixAnnee annee={annee} onAnnee={changerAnnee} />}
           </>
         )}
       />
@@ -472,7 +492,7 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
       <div className={styles.sections}>
         <Onglets
           idGroupe={idGroupe}
-          onglets={sections(etat.missions.length, faits.clients.length)}
+          onglets={sections(etat.missions.length)}
           actif={section}
           onChange={changerDeSection}
           libelle="Sections de l’écran Activité"
@@ -709,28 +729,6 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
                 <Suspense fallback={null}><PlageDeConges /></Suspense>
               </section>
 
-              {/*
-                * L'ANALYSE VIENT APRÈS LE PLAN DE CHARGE, ET À LA DEMANDE.
-                *
-                * Ces trois cartes répondent à « combien ça rapporte », une question
-                * commerciale qu'on se pose en fin de mois. Elles étaient AU-DESSUS
-                * de la grille : il fallait les dépasser pour arriver à ce qu'on
-                * venait consulter. Le dessin met le plan de charge en tête.
-                *
-                * Elles restent dans l'onglet du plan de charge et non sous Missions :
-                * « ce que ce mois-ci devrait rapporter » est une question de MOIS,
-                * même si sa source est la mission. Rangée sous Missions, la première
-                * n'était visible qu'en changeant d'onglet.
-                */}
-              <Suspense fallback={<EnAttenteDeFormulaire />}>
-                <CartePrevision previsions={previsions} mois={mois} />
-                <CarteRapportParMission rapports={rapports} annee={annee} />
-                <CarteTarifJournalier
-                  tarif={tarif}
-                  annee={annee}
-                  auBareme={!faits.entreprise.versementLiberatoire}
-                />
-              </Suspense>
             </div>
 
             <aside className={styles.laterale} aria-label="Chiffres du mois">
@@ -760,6 +758,55 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
               </section>
 
               <CraCard cras={cras} periode={moisLong(mois)} />
+
+            </aside>
+          </div>
+
+        </PanneauOnglet>
+
+        <PanneauOnglet idGroupe={idGroupe} id="missions" actif={section === 'missions'}>
+          <Suspense fallback={<EnAttenteDeFormulaire />}>
+            <OngletMissions
+              idGroupe={idGroupe}
+              missions={etat.missions}
+              onOuvrirMission={(id) => setPanneau({ type: 'mission', id })}
+            />
+          </Suspense>
+        </PanneauOnglet>
+
+        <PanneauOnglet idGroupe={idGroupe} id="compte-rendu" actif={section === 'compte-rendu'}>
+          <Suspense fallback={<EnAttenteDeFormulaire />}>
+            <CarteCra annee={annee} onOuvrir={() => setCraOuvert(true)} />
+          </Suspense>
+        </PanneauOnglet>
+
+        {/* L'atelier n'est MONTÉ qu'une fois ouvert : il parcourt les douze mois
+            de l'année pour proposer ceux qui portent des journées, et ce
+            parcours n'a pas à se faire tant que personne ne le demande. */}
+        {craOuvert && (
+          <Suspense fallback={<EnAttenteDeFormulaire />}>
+            <GenerateurCra ouvert annee={annee} onFermer={() => setCraOuvert(false)} />
+          </Suspense>
+        )}
+
+        {/*
+          * L'ANALYSE A SON ONGLET (lot 51).
+          *
+          * Ces cartes répondent à « combien ça rapporte », une question
+          * commerciale qu'on se pose en fin de mois. Elles étaient sous la
+          * grille du planning, qu'il fallait dépasser pour les lire ; le
+          * chiffre d'affaires de l'année, sa composition et la dépendance
+          * client étaient sous Argent, loin de l'activité qui les produit. Les
+          * voici ensemble — l'année d'abord, puis le mois.
+          */}
+        <PanneauOnglet idGroupe={idGroupe} id="analyse" actif={section === 'analyse'}>
+          {/* Une colonne à intervalles réguliers : les cartes viennent de deux
+              écrans, chacune avec ses marges, et collées elles se lisaient
+              comme une seule. */}
+          <div className={styles.principale}>
+            <Suspense fallback={<EnAttenteDeFormulaire />}>
+              <AnalyseDeLAnnee annee={annee} />
+            </Suspense>
 
               {/*
                 * DEUX RÉPARTITIONS CLIENT, ET CE N'EST PAS UN DOUBLON.
@@ -802,52 +849,19 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
                   )
                   : <DependanceClients poids={etat.poidsClients} />}
               </section>
-            </aside>
+
+            <Suspense fallback={<EnAttenteDeFormulaire />}>
+              <CartePrevision previsions={previsions} mois={mois} />
+              <CarteRapportParMission rapports={rapports} annee={annee} />
+              <CarteTarifJournalier
+                tarif={tarif}
+                annee={annee}
+                auBareme={!faits.entreprise.versementLiberatoire}
+              />
+            </Suspense>
           </div>
-
-        </PanneauOnglet>
-
-        <PanneauOnglet idGroupe={idGroupe} id="missions" actif={section === 'missions'}>
-          <Suspense fallback={<EnAttenteDeFormulaire />}>
-            <OngletMissions
-              idGroupe={idGroupe}
-              missions={etat.missions}
-              onOuvrirMission={(id) => setPanneau({ type: 'mission', id })}
-            />
-          </Suspense>
-        </PanneauOnglet>
-
-        <PanneauOnglet idGroupe={idGroupe} id="clients" actif={section === 'clients'}>
-          <Suspense fallback={<EnAttenteDeFormulaire />}>
-            <OngletClients idGroupe={idGroupe} onOuvrirClient={(id) => setPanneau({ type: 'client', id })} delais={etat.delais} />
-          </Suspense>
-        </PanneauOnglet>
-
-        <PanneauOnglet idGroupe={idGroupe} id="factures" actif={section === 'factures'}>
-          <Suspense fallback={<EnAttenteDeFormulaire />}>
-            <FacturierDiffere
-              onNouvelle={() => naviguerVers('facture', 'nouvelle')}
-              onRevoir={(numero) => naviguerVers('facture', encodeURIComponent(numero))}
-              onReprendre={(id) => naviguerVers('facture', sousRouteDuBrouillonEnregistre(id))}
-              annee={annee}
-              mois={mois}
-              onMois={setMois}
-            />
-          </Suspense>
         </PanneauOnglet>
       </div>
-
-      <Sheet
-        ouvert={panneau.type === 'client'}
-        titre={panneau.type === 'client' && panneau.id !== null ? 'Modifier le client' : 'Nouveau client'}
-        onFermer={() => setPanneau({ type: 'ferme' })}
-      >
-        {panneau.type === 'client' && (
-          <Suspense fallback={<EnAttenteDeFormulaire />}>
-            <FormulaireClient id={panneau.id} onFini={() => setPanneau({ type: 'ferme' })} />
-          </Suspense>
-        )}
-      </Sheet>
 
       <Sheet
         ouvert={panneau.type === 'mission'}
@@ -889,7 +903,6 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
 /** Ce qu'un panneau latéral affiche. `id` à `null` pour une création. */
 type Panneau =
   | { readonly type: 'ferme' }
-  | { readonly type: 'client'; readonly id: string | null }
   | { readonly type: 'mission'; readonly id: string | null };
 
 /**

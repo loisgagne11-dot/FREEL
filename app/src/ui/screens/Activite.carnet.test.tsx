@@ -7,6 +7,7 @@ import { dateISO, euros } from '../../domain/types';
 import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Activite } from './Activite';
+import { Factures } from './Factures';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -39,7 +40,9 @@ function semer(modifications: Partial<Faits> = {}): void {
  * « Chargement… » du Suspense.
  */
 async function ouvrir(onglet: 'Clients' | 'Missions') {
-  render(<Activite />);
+  // Les clients ont quitté Activité pour l'écran Factures (lot 51) : ils
+  // suivent la facture, dont leur fiche porte le délai et l'adresse.
+  render(onglet === 'Clients' ? <Factures /> : <Activite />);
   const utilisateur = userEvent.setup();
   /* Le nom de l'onglet porte désormais son COMPTE — « Clients 4 » — parce que
      la pastille n'est pas masquée aux lecteurs d'écran : elle rejoint

@@ -24,10 +24,14 @@ import { composantALaDemande } from './composantALaDemande';
  * écrans eux-mêmes (`auRepos`), et un changement d'écran n'attend plus rien.
  */
 const Activite = composantALaDemande(() => import('./screens/Activite').then((m) => m.Activite), true);
-const Argent = composantALaDemande(() => import('./screens/Argent').then((m) => m.Argent), true);
+const Factures = composantALaDemande(() => import('./screens/Factures').then((m) => m.Factures), true);
+const Tresorerie = composantALaDemande(() => import('./screens/Tresorerie').then((m) => m.Tresorerie), true);
+const Obligations = composantALaDemande(() => import('./screens/Obligations').then((m) => m.Obligations), true);
 const Achats = composantALaDemande(() => import('./screens/Achats').then((m) => m.Achats), true);
-const Outils = composantALaDemande(() => import('./screens/Outils').then((m) => m.Outils), true);
-const Config = composantALaDemande(() => import('./screens/Config').then((m) => m.Config), true);
+/* Simulateurs et Réglages gardent leurs fichiers d'avant le lot 51 — `Outils`,
+   `Config` —, avec les modules de leurs sections qui portent ce préfixe. */
+const Simulateurs = composantALaDemande(() => import('./screens/Outils').then((m) => m.Outils), true);
+const Reglages = composantALaDemande(() => import('./screens/Config').then((m) => m.Config), true);
 const Facture = composantALaDemande(() => import('./screens/Facture').then((m) => m.Facture), true);
 
 export interface ProprietesEcranDiffere {
@@ -44,8 +48,9 @@ export interface ProprietesEcranDiffere {
  * `never`, donc ajouter un écran à la navigation sans le router ici ne
  * compile pas. Un `return null` final aurait laissé passer un écran blanc.
  *
- * Le MOIS va à Activité (sa grille) et à Achats (l'ancre de sa barre de
- * période) ; son ANNÉE aux écrans qui raisonnent à l'année. Chacun reçoit AVEC
+ * Le MOIS va à Activité (sa grille), à Factures (le facturier) et à Achats
+ * (l'ancre de sa barre de période) ; son ANNÉE aux écrans qui raisonnent à
+ * l'année — Trésorerie, Obligations, Simulateurs. Chacun reçoit AVEC
  * la valeur de quoi la changer, et porte la commande dans son en-tête — une
  * seule par écran (lot 51) : la barre du haut n'en a plus. La rédaction d'une
  * facture n'a pas de période, les Réglages non plus.
@@ -57,14 +62,14 @@ export function EcranDiffere({ id, mois, onMois }: ProprietesEcranDiffere) {
      regardait, dans l'année qu'on vient de demander. */
   const changerAnnee = (a: number): void => onMois(`${a}${mois.slice(4)}` as Mois);
   switch (id) {
-    case 'activite':
-    case 'factures': return <Activite mois={mois} onMois={onMois} />;
-    case 'tresorerie':
-    case 'obligations': return <Argent annee={annee} onAnnee={changerAnnee} />;
+    case 'activite': return <Activite mois={mois} onMois={onMois} />;
+    case 'factures': return <Factures mois={mois} onMois={onMois} />;
+    case 'tresorerie': return <Tresorerie annee={annee} onAnnee={changerAnnee} />;
+    case 'obligations': return <Obligations annee={annee} onAnnee={changerAnnee} />;
     case 'facture': return <Facture />;
     case 'achats': return <Achats mois={mois} onMois={onMois} />;
-    case 'simulateurs': return <Outils annee={annee} onAnnee={changerAnnee} />;
-    case 'reglages': return <Config />;
+    case 'simulateurs': return <Simulateurs annee={annee} onAnnee={changerAnnee} />;
+    case 'reglages': return <Reglages />;
     default: {
       const jamais: never = id;
       return jamais;

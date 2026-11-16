@@ -111,14 +111,14 @@ export function construireIndex(faits: SourcesRecherche): readonly EntreeIndex[]
       titre: emise ? `Facture ${numero}` : `Brouillon — ${r.libelle || r.clientNom || 'sans titre'}`,
       detail: [r.clientNom, r.libelle].filter((s) => s.trim() !== '').join(' · '),
       montant: r.montant,
-      href: emise ? `#/facture/${encodeURIComponent(numero)}` : '#/activite/factures'
+      href: emise ? `#/facture/${encodeURIComponent(numero)}` : '#/factures'
     }, [numero, r.clientNom, r.libelle]));
   }
 
   for (const c of faits.clients) {
     index.push(entree({
       nature: 'client', id: c.id, titre: c.nom, detail: '', montant: null,
-      href: '#/activite/clients'
+      href: '#/factures/clients'
     }, [c.nom]));
   }
 

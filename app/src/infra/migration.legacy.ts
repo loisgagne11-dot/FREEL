@@ -832,7 +832,7 @@ function extraireEcheances(mouvements: unknown[], anomalies: Anomalie[]): Echean
       message: `${echeances.length} charge(s) fiscale(s) ou sociale(s) reprise(s) en `
         + 'échéances PAYÉES, et non en dépenses : une cotisation n\'est pas un achat, '
         + 'elle n\'est pas déductible en micro et ne porte aucune TVA. Les échéances '
-        + 'encore à payer sont à saisir depuis l\'écran Argent.'
+        + 'encore à payer sont à saisir depuis l\'écran Obligations.'
     });
   }
   return echeances;

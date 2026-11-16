@@ -33,22 +33,21 @@ import { enKiloEuros } from '../format.kilo';
 import styles from './Argent.module.css';
 
 /**
- * Le pilier « Trésorerie » de l'écran Argent — « combien j'ai là, pour de vrai ».
+ * Le corps de l'écran Trésorerie — « combien j'ai là, pour de vrai ». C'était
+ * le pilier « Trésorerie » de l'écran Argent, jusqu'au lot 51.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * POURQUOI LUI AUSSI EST DIFFÉRÉ
+ * POURQUOI IL EST DIFFÉRÉ
  * ─────────────────────────────────────────────────────────────────────────
  *
- * C'est le pilier ouvert par défaut : le différer coûte une frame au premier
- * affichage d'Argent, ce qui est un vrai prix et non un détail. Il est payé
- * pour une raison mesurée : à lui seul, ce pilier occupait 39,36 des 40 Ko du
- * budget de l'écran, et le lot qui le refait — donut, graphe combiné, frise —
- * l'aurait fait dépasser à la première carte.
+ * Le différer coûte une frame au premier affichage de l'écran, ce qui est un
+ * vrai prix et non un détail. Il est payé pour une raison mesurée : à lui
+ * seul, ce corps occupait 39,36 des 40 Ko du budget d'un écran. `Tresorerie.tsx`
+ * n'est qu'une coquille — en-tête, versement, banque —, et ce module a la
+ * place de grandir sans qu'elle en paie le poids.
  *
- * Les deux piliers étant désormais différés, `Argent.tsx` n'est plus qu'une
- * coquille : en-tête, piliers, registres. Chacun des deux a la place de
- * grandir sans que l'autre en paie le poids — ce qui est le vrai gain, plus
- * encore que les kilo-octets d'aujourd'hui.
+ * L'échéancier, qui en était le dernier bloc, est parti dans Obligations
+ * (lot 51) : c'est ce qu'on doit faire, pas ce qu'on a.
  */
 
 /**
@@ -60,15 +59,6 @@ import styles from './Argent.module.css';
  */
 const ProjectionPanneau = composantALaDemande(() => import('./Argent.projection')
   .then((m) => m.ProjectionPanneau), true);
-
-/**
- * L'échéancier : frise de l'année, liste des appels, périodes URSSAF.
- *
- * Différé, et seul bloc du pilier à l'être. Il est sous la ligne de flottaison
- * et ne s'ouvre que pour payer ou déclarer. Voir l'en-tête de son module.
- */
-const Echeancier = composantALaDemande(() => import('./Argent.echeancier')
-  .then((m) => m.Echeancier), true);
 
 /**
  * La composition d'un chiffre, au clic sur sa tuile.
@@ -236,17 +226,6 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
           <ProjectionPanneau />
         </Suspense>
       </CartePliable>
-
-
-      {/* L'échéancier est DIFFÉRÉ, et c'est le seul bloc du pilier à l'être.
-          Il est en bas de l'écran, sous la ligne de flottaison : son
-          chargement se lit comme un bas de page qui se remplit, pas comme un
-          écran vide qu'on attend. Même arbitrage que la carte « À traiter » du
-          Pilote, et pour la même raison — le pilier venait de dépasser son
-          budget de cent quatre-vingts octets, et un budget ne se relève pas. */}
-      <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-        <Echeancier annee={etat.annee} />
-      </Suspense>
     </>
   );
 }
@@ -791,7 +770,7 @@ function noteProvenanceSolde(
     case 'saisi':
       return `saisi le ${dateCourte(soldeInitialAu as DateISO)}, rien à dériver`;
     case 'sansDate':
-      return 'date-le en Config pour qu’il suive tes entrées et tes sorties';
+      return 'date-le dans Réglages pour qu’il suive tes entrées et tes sorties';
   }
 }
 

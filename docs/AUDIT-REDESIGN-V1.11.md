@@ -1330,3 +1330,33 @@ Contrôle visuel du Pilote et d'Affichage à 390 et 1 440 px, Calme et Nuit.
 Écarts assumés : la synchronisation écrit l'état du compte, pas une heure
 (aucune heure n'est conservée) ; « Masquer » reste en icône au téléphone en
 attendant le volet « Plus » (phase 2) ; l'année se choisit dans un menu.
+
+## Lot 51, phase 2 (16/11) — le rail, le volet « Plus », chaque contenu à sa place
+
+Maquette `design/direction/navigation.html`, validée le 16/11. Les contenus
+déménagent sans être redessinés : la composition de chaque écran selon sa
+maquette appartient à son lot.
+
+| Écran | Avant | Après |
+|---|---|---|
+| Rail | Pilote, Activité, Argent, Achats, Outils ; Config et le livre en pied | Pilote, Activité, Factures, Trésorerie, Obligations, Achats ; sous un filet, Simulateurs et Réglages ; la carte d'identité mène aux Réglages |
+| Téléphone | Barre basse, un seul libellé en portrait | Pilote, Activité, Factures, Trésorerie, Plus — cinq entrées nommées ; « Plus » ouvre Obligations (compteur), Achats, Simulateurs, Réglages et l'interrupteur « Masquer les montants » |
+| Activité | Planning, Missions, Factures, Clients | Planning, Missions, Compte rendu (venu des Outils), Analyse (venue d'Argent › Performance, avec les cartes d'analyse) ; l'année de l'Analyse dans l'en-tête de l'onglet |
+| Factures | Deux onglets d'Activité | Un écran : Facturier, Clients |
+| Trésorerie | Argent › Trésorerie | Le même corps, puis « Tu peux te verser » et la capacité de versement, puis une carte Banque (relevé et rapprochement, venus d'Achats) |
+| Obligations | Argent › Échéancier | Un écran : frise, échéances, périodes URSSAF, l'année dans l'en-tête, liens vers la TVA, le livre des recettes, la DES |
+| Achats | Dépenses, Relevé | Dépenses seules |
+| Simulateurs | Outils : CRA, Impôt & CFE | Impôt & CFE |
+| Réglages | Config, avec un lien seul « Livre des recettes » | Réglages, sans ce lien |
+
+Contrôle visuel des huit écrans à 390 et 1 440 px en Calme, du Pilote en Nuit
+et du volet « Plus » ouvert ; aucun débordement. Trois écarts corrigés avant
+livraison : l'Analyse débordait au téléphone (422 px pour 390 — le texte replié
+d'une note de tuile échappait au rognage ; le défaut existait sous Argent, rien
+ne mesurait cet onglet au téléphone) ; la frise et la liste d'Obligations se
+touchaient ; les cartes venues de deux écrans se collaient dans l'Analyse.
+Écarts assumés : la composition des maquettes de Trésorerie (lot 49),
+d'Obligations (lot 53) et d'Activité (lots 48 et 50) se fait dans leurs lots ;
+« Échéances reçues » reste tronqué au téléphone par son bouton (la liste
+disparaît au lot 53) ; le volet dit « déclarer, payer, tenir les registres »
+tant que les pièces à fournir n'existent pas (lot 53).

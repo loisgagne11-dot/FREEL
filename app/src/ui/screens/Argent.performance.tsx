@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant, soldeEstSuivi } from '../../state/selecteurs';
-import { etatProjection, type EtatArgent } from '../../state/selecteurs.argent';
+import { etatArgent, etatProjection, type EtatArgent } from '../../state/selecteurs.argent';
 import {
   capaciteParMois, compositionDuMois, resultatProjete,
   type CompositionDuMois, type ResultatProjete
@@ -20,32 +20,38 @@ import { enKiloEuros } from '../format.kilo';
 import styles from './Argent.performance.module.css';
 
 /**
- * Le pilier « Performance » de l'écran Argent — « combien je gagne, je me verse ».
+ * Ce qui était le pilier « Performance » de l'écran Argent — « combien je
+ * gagne, je me verse » —, désormais en DEUX morceaux qui vivent sur deux écrans
+ * (lot 51) :
+ *
+ *  · `AnalyseDuCa` — tuiles, graphe et composition du chiffre d'affaires — est
+ *    une analyse de l'activité : Activité › Analyse ;
+ *  · `VersementEtCapacite` — « Tu peux te verser » et la capacité mois par
+ *    mois — découle du solde : il vit sous la Trésorerie.
+ *
+ * Ils restent dans un même module : ils partagent la projection, son calcul
+ * et leurs styles, et chaque écran n'en télécharge que ce qu'il affiche déjà —
+ * le module est différé des deux côtés.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI IL VIT DANS SON PROPRE MODULE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Argent était à 39,83 Ko sur un budget de 40 : le lot qui remplit ce pilier
- * l'aurait fait dépasser à la première carte. La règle du projet est de ne
- * jamais relever un budget mais d'EXTRAIRE ce qui n'a rien à faire dans le lot,
- * et la coupure était ici toute trouvée : on ouvre Argent pour regarder son
- * solde — la trésorerie — bien plus souvent que pour lire l'année.
- *
- * `PanneauOnglet` ne rend rien quand son pilier est inactif : le module n'est
- * donc demandé qu'au moment où l'on bascule dessus.
+ * Argent était à 39,83 Ko sur un budget de 40 : le lot qui remplissait ce
+ * pilier l'aurait fait dépasser à la première carte. La règle du projet est de
+ * ne jamais relever un budget mais d'EXTRAIRE ce qui n'a rien à faire dans le
+ * lot ; la coupure tient toujours — Activité comme Trésorerie l'ouvrent à la
+ * demande.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * CE QUI EST CALCULÉ ICI, ET CE QUI ARRIVE DÉJÀ FAIT
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `EtatArgent` arrive en paramètre : l'écran le calcule pour ses deux piliers,
- * et le refaire ici afficherait deux fois le même chiffre d'affaires calculé
- * deux fois — la meilleure façon qu'ils finissent par différer.
+ * `EtatArgent` arrive en paramètre sous la Trésorerie, qui le calcule pour son
+ * propre corps : le refaire ici afficherait deux fois le même disponible
+ * calculé deux fois — la meilleure façon qu'ils finissent par différer.
  *
- * La projection, elle, est calculée ici et **une seule fois**, puis passée à
- * `capaciteParMois` et à `resultatProjete`. Douze passages de planning par
- * appelant, sur un écran qui en compte deux, se verraient à l'ouverture.
+ * La projection, elle, est calculée ici, une fois par carte qui en a besoin.
  */
 
 /**
@@ -69,7 +75,21 @@ const MOIS_COURTS = [
   'JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛT', 'SEP', 'OCT', 'NOV', 'DÉC'
 ];
 
-export function Performance({ etat }: { readonly etat: EtatArgent }) {
+/**
+ * L'analyse du chiffre d'affaires d'une année, pour Activité › Analyse.
+ *
+ * Elle calcule son `EtatArgent` elle-même : l'écran Activité n'en a pas
+ * d'autre usage, et le lui faire calculer pour le passer ici le tirerait dans
+ * son paquet pour une carte qu'on n'ouvre pas tous les jours.
+ */
+export function AnalyseDeLAnnee({ annee }: { readonly annee: number }) {
+  const faits = useFaits((e) => e.faits);
+  const etat = useMemo(() => etatArgent(faits, faits.echeances, new Date(), annee), [faits, annee]);
+  return <AnalyseDuCa etat={etat} />;
+}
+
+/** Tuiles, graphe et composition du chiffre d'affaires de `etat.annee`. */
+export function AnalyseDuCa({ etat }: { readonly etat: EtatArgent }) {
   const faits = useFaits((e) => e.faits);
   const m0 = moisCourant();
   const indexCourant = Number(m0.slice(5, 7)) - 1;
@@ -77,7 +97,7 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
   /**
    * `etat.annee` est un CHOIX ; l'année réelle ne l'est pas. Elles ne
    * coïncident QUE quand personne n'a touché au sélecteur — c'est le cas le
-   * plus courant, mais deux calculs de cet écran doivent savoir le
+   * plus courant, mais deux calculs de cette carte doivent savoir le
    * distinguer : voir juste en dessous.
    */
   const anneeReelle = Number(m0.slice(0, 4));
@@ -86,9 +106,6 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
   const projection = useMemo(() => etatProjection(faits), [faits]);
   const resultat = useMemo(
     () => resultatProjete(faits, new Date(), projection), [faits, projection]
-  );
-  const capacites = useMemo(
-    () => capaciteParMois(faits, new Date(), projection), [faits, projection]
   );
 
   /**
@@ -187,15 +204,35 @@ export function Performance({ etat }: { readonly etat: EtatArgent }) {
         <PanneauComposition composition={composition} />
       </div>
 
-      <div className={styles.deuxColonnes}>
-        <CarteVersement versable={etat.tresorerie.versable} dispo={etat.tresorerie.dispo} />
-        <CarteCapacite
-          capacites={capacites}
-          indexCourant={indexCourant}
-          verseConnu={soldeEstSuivi(faits)}
-        />
-      </div>
     </>
+  );
+}
+
+/**
+ * « Tu peux te verser » et la capacité de versement mois par mois, sous la
+ * Trésorerie : ils découlent du solde qu'elle affiche.
+ *
+ * La projection est calculée ici et **une seule fois**, puis passée à
+ * `capaciteParMois`. Douze passages de planning par appelant se verraient à
+ * l'ouverture.
+ */
+export function VersementEtCapacite({ etat }: { readonly etat: EtatArgent }) {
+  const faits = useFaits((e) => e.faits);
+  const indexCourant = Number(moisCourant().slice(5, 7)) - 1;
+  const projection = useMemo(() => etatProjection(faits), [faits]);
+  const capacites = useMemo(
+    () => capaciteParMois(faits, new Date(), projection), [faits, projection]
+  );
+
+  return (
+    <div className={`${styles.deuxColonnes} ${styles.versement}`}>
+      <CarteVersement versable={etat.tresorerie.versable} dispo={etat.tresorerie.dispo} />
+      <CarteCapacite
+        capacites={capacites}
+        indexCourant={indexCourant}
+        verseConnu={soldeEstSuivi(faits)}
+      />
+    </div>
   );
 }
 

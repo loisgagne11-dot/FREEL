@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
-import { Argent } from './Argent';
+import { Obligations } from './Obligations';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -38,7 +38,7 @@ function semer(modifications: Partial<Faits> = {}): void {
  * tomberait sur le « Chargement… » du Suspense.
  */
 async function ouvrirDes() {
-  render(<Argent />);
+  render(<Obligations />);
   await userEvent.setup().click(screen.getByRole('button', { name: 'Déclaration européenne de services' }));
   await screen.findByRole('heading', { name: /Prestations à déclarer/ });
 }
@@ -103,7 +103,7 @@ describe('prestations à déclarer', () => {
       clients: [client()],
       recettes: [recette({ emiseLe: dateISO('2026-06-10') })]
     });
-    render(<Argent />);
+    render(<Obligations />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('button', { name: 'Déclaration européenne de services' }));
 

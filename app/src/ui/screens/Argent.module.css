@@ -510,9 +510,9 @@
 
 /* ── Les registres, sous les piliers ───────────────────────────────────── */
 
-/* Une rangée discrète, et non des onglets : ce sont des obligations qu'on
+/* Une rangée discrète, et non des onglets : ce sont des registres qu'on
    ouvre pour justifier ou déclarer, pas des questions qu'on se pose tous les
-   jours. Voir l'en-tête de `Section` dans Argent.tsx. */
+   jours. Voir l'en-tête de `Obligations.tsx`. */
 .registres {
   display: flex;
   flex-wrap: wrap;
@@ -523,7 +523,9 @@
 }
 
 .lienRegistre {
-  min-height: 38px;
+  /* 44 px : la cible tactile minimale — ces boutons sont désormais la seule
+     porte des registres (lot 51), et le pied du rail ne les double plus. */
+  min-height: 44px;
   padding: 0 13px;
   border-radius: var(--r-sm);
   border: 1px solid var(--line);
@@ -685,3 +687,24 @@
 }
 
 .enveloppeOuvrable:hover .enveloppeIndice { color: var(--green); }
+
+/* ── Obligations ───────────────────────────────────────────────────────── */
+
+/* La frise, puis les échéances reçues : sous la Trésorerie, une carte les
+   précédait et l'intervalle venait d'elle. En tête d'écran, elles se
+   touchaient et se lisaient comme une seule carte. */
+.obligations > :first-child { margin-bottom: 12px; }
+
+/* ── La banque, au pied de la Trésorerie ───────────────────────────────── */
+
+/* Une ligne et sa porte, comme la maquette `tresorerie.html` : le relevé
+   s'ouvre en plan de travail, il ne s'étale pas sous les cartes. */
+.banque {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.banque .titreCarte { margin-bottom: 4px; }

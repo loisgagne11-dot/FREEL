@@ -404,7 +404,7 @@ describe('affichage', () => {
    * rendrait en croyant les cacher, devant l'écran qu'on partage.
    */
   it('masque les montants, et la barre du haut le sait', async () => {
-    window.location.hash = '#/config/affichage';
+    window.location.hash = '#/reglages/affichage';
     render(<><PastillesSysteme /><Config /></>);
     const interrupteur = await screen.findByRole('switch', { name: 'Masquer les montants' });
     await utilisateurTest().click(interrupteur);
@@ -1015,7 +1015,7 @@ describe('fenêtre d’ACRE', () => {
 /**
  * LA SECTION OUVERTE VIT DANS L'ADRESSE.
  *
- * La pastille Cloud envoie vers `#/config/compte` : si l'adresse ne désignait
+ * La pastille Cloud envoie vers `#/reglages/compte` : si l'adresse ne désignait
  * pas la section, quelqu'un dont la session a expiré atterrirait sur Profil
  * et chercherait où se reconnecter. Et un rechargement doit retomber sur la
  * section qu'on réglait.
@@ -1035,7 +1035,7 @@ describe('navigation entre les sections', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Profil & statut' })).toBeTruthy();
   });
 
-  it('suit l’adresse : #/config/reserve ouvre la réserve', async () => {
+  it('suit l’adresse : #/reglages/reserve ouvre la réserve', async () => {
     await afficher('reserve');
     expect(screen.getByRole('heading', { level: 2, name: 'Réserve & versements' })).toBeTruthy();
     expect(screen.getByLabelText('Réserve')).toBeTruthy();
@@ -1045,7 +1045,7 @@ describe('navigation entre les sections', () => {
 
   it('change de section quand l’adresse change, sans clic', async () => {
     await afficher('profil');
-    window.location.hash = '#/config/facturation';
+    window.location.hash = '#/reglages/facturation';
     expect(await screen.findByLabelText('IBAN')).toBeTruthy();
   });
 

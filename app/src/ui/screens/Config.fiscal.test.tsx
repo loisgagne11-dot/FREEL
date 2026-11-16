@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 
 async function ouvrirFiscal() {
-  window.location.hash = '#/config/fiscal';
+  window.location.hash = '#/reglages/fiscal';
   render(<FournisseurToasts><Config /></FournisseurToasts>);
   await waitFor(() => expect(screen.queryByText('Chargement…')).toBeNull());
   return screen.findByRole('region', { name: /Barèmes 2026 en vigueur/ });

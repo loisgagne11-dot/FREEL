@@ -46,6 +46,9 @@ const PALETTES = ['sombre', 'nuit', 'clair', 'calme'];
 const ECRANS = [
   { hash: '#/pilote', nom: 'pilote' },
   { hash: '#/activite', nom: 'activite' },
+  // L'Analyse porte les graphes venus d'Argent (lot 51) — le graphe du CA et
+  // sa composition étaient mesurés sous Argent ; ils le sont là où ils vivent.
+  { hash: '#/activite/analyse', nom: 'activite-analyse', attendre: 'text=CA facturé' },
   { hash: '#/factures', nom: 'factures' },
   { hash: '#/tresorerie', nom: 'tresorerie' },
   { hash: '#/obligations', nom: 'obligations' },
@@ -54,7 +57,7 @@ const ECRANS = [
   { hash: '#/reglages', nom: 'reglages' },
   // Chaque section des Réglages arrive à la demande, APRÈS le titre de
   // l'écran : sans attendre son contenu, on mesurait un panneau vide. Seul
-  // `#/config` (Profil) était visité, et l'adresse Légifrance des Paramètres
+  // Profil était visité, et l'adresse Légifrance des Paramètres
   // fiscaux élargissait la page à 609 px sur téléphone sans que rien ne le voie.
   { hash: '#/reglages/fiscal', nom: 'reglages-fiscal', attendre: 'text=Ajouter une période' },
   { hash: '#/reglages/reserve', nom: 'reglages-reserve', attendre: 'text=Part gardée à chaque versement' },

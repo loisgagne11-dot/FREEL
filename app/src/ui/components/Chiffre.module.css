@@ -40,6 +40,12 @@
    quatre tuiles côte à côte doivent garder la même largeur, sinon la
    comparaison des montants — leur seule raison d'être alignés — se perd. */
 .note {
+  /* Le bloc de référence de ce qu'elle contient : le texte replié d'un « i »
+     posé dans la note est masqué en `position: absolute`, et sans ce point
+     d'ancrage il échappait au rognage — la tuile « Résultat projeté »
+     élargissait la page de 32 px au téléphone, une fois la tuile coupée
+     (constaté au lot 51, quand l'Analyse est entrée dans la mesure). */
+  position: relative;
   font-size: 11px;
   line-height: 1.4;
   color: var(--muted-2);

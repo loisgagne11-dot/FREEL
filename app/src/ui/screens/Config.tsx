@@ -15,7 +15,9 @@ import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
 
 /**
- * Écran Config — les réglages, en huit sections.
+ * Écran Réglages — en sept sections. Le fichier garde son nom d'avant le
+ * lot 51, comme ses sections (`Config.fiscal`, `Config.reserve`…) : renommer
+ * vingt fichiers n'apprendrait rien à personne.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI LA PLUPART DES SECTIONS SONT DANS D'AUTRES FICHIERS
@@ -127,7 +129,7 @@ export function Config() {
   return (
     <>
       <Greet
-        titre="Configuration"
+        titre="Réglages"
         sousTitre="Ton régime, tes barèmes, tes données. Chaque champ s’enregistre à la frappe."
       />
 

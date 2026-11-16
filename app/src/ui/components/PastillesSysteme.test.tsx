@@ -116,7 +116,7 @@ describe('état du compte', () => {
     localStorage.setItem(CLE_SESSION, session(Date.now() - 1000));
     render(<PastillesSysteme />);
     const lien = screen.getByRole('link', { name: /Session expirée/ });
-    expect(lien.getAttribute('href')).toBe('#/config/compte');
+    expect(lien.getAttribute('href')).toBe('#/reglages/compte');
   });
 
   /**

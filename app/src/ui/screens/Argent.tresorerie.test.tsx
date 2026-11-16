@@ -128,7 +128,7 @@ describe('les quatre tuiles de trésorerie', () => {
       poser({ soldeInitial: euros(10_000), soldeInitialAu: null });
 
       const tuile = screen.getByText('Solde du compte').parentElement;
-      expect(tuile?.textContent).toContain('date-le en Config');
+      expect(tuile?.textContent).toContain('date-le dans Réglages');
     });
 
     it('dit « saisi » et la date, quand rien n’a encore contribué', () => {

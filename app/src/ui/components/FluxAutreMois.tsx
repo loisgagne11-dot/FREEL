@@ -65,7 +65,7 @@ export function FluxAutreMois(
               ? 'Aucune échéance ce mois-là'
               : <><Montant>{eur(flux.sorties.regle)}</Montant> payé · <Montant>{eur(aPayer)}</Montant> {passe ? 'impayé' : 'à venir'}</>}
           </p>
-          <Lignes lignes={flux.sorties.lignes} vers="#/argent" />
+          <Lignes lignes={flux.sorties.lignes} vers="#/obligations" />
         </div>
 
         <div className={styles.colonne}>

@@ -641,11 +641,13 @@ describe('registre en tableau', () => {
     expect(screen.getByText(/de dépenses récurrentes sur la période/)).toBeTruthy();
   });
 
-  it('pointe le suivi de TVA vers #/argent/tva', () => {
+  // Vers Obligations, où vit le dossier de TVA depuis le lot 51 — et par la
+  // nouvelle adresse, pas par une redirection.
+  it('pointe le suivi de TVA vers #/obligations/tva', () => {
     semer({ depenses: [depense()] });
     rendre();
     expect(screen.getByRole('link', { name: /Suivi & déclaration TVA/ }).getAttribute('href'))
-      .toBe('#/argent/tva');
+      .toBe('#/obligations/tva');
   });
 
   it('ouvre la dépense au clic sur sa ligne', async () => {

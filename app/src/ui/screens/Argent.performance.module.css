@@ -34,9 +34,9 @@
 
 @media (min-width: 981px) {
   .deuxColonnes { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-  /* Le second rang inverse les proportions : « Tu peux te verser » est un
-     chiffre unique, la capacité est un graphe de douze mois. */
-  .deuxColonnes + .deuxColonnes { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  /* Le rang du versement inverse les proportions : « Tu peux te verser » est
+     un chiffre unique, la capacité est un graphe de douze mois. */
+  .versement { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
 }
 
 .carte {

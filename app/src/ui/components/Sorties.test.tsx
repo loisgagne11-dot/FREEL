@@ -64,7 +64,7 @@ describe('ce qui reste à payer', () => {
     // 980 + 420 + 30
     expect(screen.getByText(/1\s430/)).toBeTruthy();
     expect(screen.getByRole('link', { name: /2 autres plus tard.*voir l’échéancier/ }).getAttribute('href'))
-      .toBe('#/argent');
+      .toBe('#/obligations');
   });
 });
 

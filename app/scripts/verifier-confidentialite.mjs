@@ -34,8 +34,11 @@ const TYPES = {
 
 // Les adresses du lot 51 : une ancienne n'est plus qu'une redirection, et
 // mesurer à travers elle ne prouverait rien de plus sur l'écran d'arrivée.
+// L'Analyse d'Activité porte le chiffre d'affaires venu d'Argent : un onglet
+// que l'écran n'ouvre pas d'emblée, donc une adresse à part.
 const ECRANS = [
-  'pilote', 'activite', 'factures', 'tresorerie', 'obligations', 'achats', 'simulateurs', 'reglages'
+  'pilote', 'activite', 'activite/analyse', 'factures', 'tresorerie', 'obligations', 'achats',
+  'simulateurs', 'reglages'
 ];
 
 /**

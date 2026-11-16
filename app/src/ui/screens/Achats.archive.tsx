@@ -33,7 +33,7 @@ export default function RappelArchive({ stockage }: { readonly stockage: Stockag
         {nombre}&nbsp;justificatif{nombre > 1 ? 's' : ''} pas encore archivé{nombre > 1 ? 's' : ''}&nbsp;:
         {nombre > 1 ? ' ils n’existent' : ' il n’existe'} que dans ce navigateur.
       </span>
-      <a className={styles.lien} href="#/config/donnees">Créer une archive</a>
+      <a className={styles.lien} href="#/reglages/donnees">Créer une archive</a>
     </p>
   );
 }

@@ -16,7 +16,13 @@ import { chargerJeuBrut, le } from '../test/jeu-d-essai';
  * filet attrape. Sans ce test, il ne s'attrape qu'en ouvrant l'écran à la main.
  */
 
-const ECRANS = ['#/pilote', '#/activite', '#/argent', '#/achats', '#/outils', '#/config', '#/facture'] as const;
+// Les huit écrans du rail (lot 51), et les onglets déménagés que le seul
+// écran ne montre pas d'emblée : l'Analyse et le Compte rendu d'Activité, les
+// Clients sous Factures.
+const ECRANS = [
+  '#/pilote', '#/activite', '#/activite/analyse', '#/activite/compte-rendu', '#/factures',
+  '#/factures/clients', '#/tresorerie', '#/obligations', '#/achats', '#/simulateurs', '#/reglages'
+] as const;
 const NOMS_ECRANS = ECRANS.map((h) => h.slice(2));
 
 // Deux dates : le jour de référence du jeu, et le lendemain du 31 décembre

@@ -144,11 +144,11 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 
 | Ligne | État |
 |---|---|
-| Rail : Pilote, Activité, Factures, Trésorerie, Obligations, Achats ; Simulateurs et Réglages en pied. Les anciennes adresses redirigent | ⬜ |
-| Le compte rendu d'activité passe sous Activité ; l'import du relevé et le rapprochement sous Trésorerie ; l'analyse du chiffre d'affaires sous Activité › Analyse | ⬜ |
+| Rail : Pilote, Activité, Factures, Trésorerie, Obligations, Achats ; Simulateurs et Réglages en pied. Les anciennes adresses redirigent | ✅ 16/11 — Factures et Obligations sont des écrans ; au téléphone, cinq entrées nommées et le volet « Plus » ; chaque ancienne adresse tenue par une ligne de test ; « à traiter » mène à l'écran qui règle l'alerte |
+| Le compte rendu d'activité passe sous Activité ; l'import du relevé et le rapprochement sous Trésorerie ; l'analyse du chiffre d'affaires sous Activité › Analyse | ✅ 16/11 — et « Tu peux te verser » avec la capacité de versement sous Trésorerie ; l'échéancier sous Obligations ; Achats garde les dépenses, Simulateurs l'impôt et la CFE. Contenus déplacés, pas encore recomposés selon les maquettes (lots 48, 49, 50, 53) |
 | Une seule commande de période par écran, dans son en-tête ; le thème en Réglages ; barre du haut : recherche, « Nouveau », synchronisation libellée | ✅ 16/11 — barre : recherche, synchronisation écrite (icône nommée au téléphone), masquer les montants, « + Nouveau » ; « Exporter » et « à traiter » en sont partis ; période dans l'en-tête de chaque écran, mois partagé ; Réglages › Affichage (thème, masquer) |
 | Cinq mots pour l'argent, partout : solde, dû, disponible, réserve, à te verser — passe relue à l'œil | ⬜ |
-| Jetons ajoutés par `design/DIRECTION-VISUELLE.md` (couleurs de charges validées, série en retrait, pastilles, clients du planning), dans les quatre thèmes à la fois ; composants communs de la planche : carte, tuile à tendance, pastille signe + mot, barre de répartition | 🔶 jetons ✅ 15/11 (contraste contrôlé : aplats 3:1, textes 4,5:1) ; composants à faire |
+| Jetons ajoutés par `design/DIRECTION-VISUELLE.md` (couleurs de charges validées, série en retrait, pastilles, clients du planning), dans les quatre thèmes à la fois ; composants communs de la planche : carte, tuile à tendance, pastille signe + mot, barre de répartition | ✅ jetons 15/11 (contraste contrôlé : aplats 3:1, textes 4,5:1) ; pastille signe + mot 16/11 (`Statut`). **La carte héros, la tuile à tendance et la barre de répartition passent au premier lot qui les affiche** (49 : « Ce qui est dû » ; 52 : le héros et les tuiles du Pilote) : un composant sans écran qui l'importe est refusé par `verifier-code-mort`, et le dessiner sans son premier usage, c'est le dessiner à l'aveugle |
 | Polices embarquées (`woff2`, sous-ensemble latin, licence vérifiée), jamais par un CDN : aujourd'hui aucune n'est chargée et l'écran s'affiche en police système. Si le poids ne tient pas dans les budgets, la pile système reste || ✅ 16/11 — tranché : la pile système reste (≈ 75 Ko de polices pour 9,7 Ko de marge), consigné dans `DIRECTION-VISUELLE.md` |
 | Thème par défaut selon la décision 20 | ✅ 16/11 — Calme pour un nouvel utilisateur (theme.ts, script en ligne et son empreinte, repli des jetons) ; le thème mémorisé reste ; « Nuit » remplace « Calme sombre » |
 
@@ -181,6 +181,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Les charges posées à leur date d'échéance dans le solde prévu | ⬜ |
 | Deux « et si », sur des faits : compter les prospects ; arrêter une mission à une date | ⬜ |
 | Franchissement des seuils par le pipeline (factures émises, planning au délai de paiement) ; jours facturables avant le seuil | ⬜ |
+| Composant commun « barre de répartition » de la planche (`e-split`), venu du lot 51, construit ici avec son premier usage : « Ce qui est dû », une barre par charge | ⬜ |
 
 ### Lot 50 — Ce que je gagne vraiment
 
@@ -198,6 +199,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Quatre cases : douze mois, activité (carnet, couverture), prochaines échéances, à faire | ⬜ |
 | « À faire » porte le client et le montant sur chaque ligne ; il remplace les actions rapides ; les remarques automatiques y entrent par des règles écrites | ⬜ |
 | Sur téléphone : les gestes fréquents (ma journée, achat en photo, compte rendu, facture du mois) sous le chiffre | ⬜ |
+| Composants communs de la planche venus du lot 51, construits ici avec leur premier usage : carte héros (`e-hero`), tuile à tendance (`e-tile`, courbe sur douze mois) | ⬜ |
 
 ### Lot 54 — Graphiques
 

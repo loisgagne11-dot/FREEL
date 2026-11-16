@@ -9,7 +9,7 @@ import { entiteVide } from '../../state/schema.entite';
 import { etatArgent } from '../../state/selecteurs.argent';
 import { useFaits } from '../../state/store';
 import { eur } from '../format';
-import { Performance } from './Argent.performance';
+import { AnalyseDuCa, VersementEtCapacite } from './Argent.performance';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -69,7 +69,10 @@ function missionPleine(du: string, au: string, tjm = 600): Mission {
 function poser(m: Partial<Faits> = {}): void {
   const faits = { ...faitsVides(), ...m } as Faits;
   useFaits.setState({ faits });
-  render(<Performance etat={etatArgent(faits)} />);
+  // Les deux moitiés de l'ancien pilier vivent sur deux écrans (lot 51) ; les
+  // monter ensemble garde chaque test sur le chiffre qu'il vise.
+  const etat = etatArgent(faits);
+  render(<><AnalyseDuCa etat={etat} /><VersementEtCapacite etat={etat} /></>);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -173,7 +176,7 @@ describe('le graphe du chiffre d’affaires', () => {
   it('trace les douze mois d’une année passée choisie au sélecteur', () => {
     const faits = { ...faitsVides(), recettes: [recette({ emiseLe: dateISO('2025-11-05') })] };
     useFaits.setState({ faits });
-    render(<Performance etat={etatArgent(faits, undefined, undefined, 2025)} />);
+    render(<AnalyseDuCa etat={etatArgent(faits, undefined, undefined, 2025)} />);
 
     expect(screen.getByRole('button', { name: /^JUIN/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /^DÉC/ })).toBeTruthy();

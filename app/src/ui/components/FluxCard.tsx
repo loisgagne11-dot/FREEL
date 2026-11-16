@@ -46,9 +46,9 @@ const DetailDuFlux = lazy(() => import('./FluxCard.detail').then((m) => ({ defau
 const LIGNES_PAR_COLONNE = 4;
 
 /** Là où le statut d'un encaissement se met à jour : la liste des factures. */
-export const VERS_FACTURES = '#/activite/factures';
-/** Là où le statut d'une sortie se met à jour : l'échéancier. */
-const VERS_ECHEANCIER = '#/argent';
+export const VERS_FACTURES = '#/factures';
+/** Là où le statut d'une sortie se met à jour : l'échéancier, sous Obligations. */
+const VERS_ECHEANCIER = '#/obligations';
 
 export function FluxCard(
   { flux, periode, navigation, onVersable, onPointer, onPayer, dejaVerse, besoinMensuel }: {
@@ -178,7 +178,7 @@ export function FluxCard(
             </p>
           )}
           {versementPossible && (
-            <a className={`${styles.action} ${styles.principale} ${styles.dansLaColonne}`} href="#/argent">
+            <a className={`${styles.action} ${styles.principale} ${styles.dansLaColonne}`} href="#/tresorerie">
               Verser sur mon compte
             </a>
           )}
@@ -187,7 +187,7 @@ export function FluxCard(
 
       <div className={styles.pied}>
         {versementPossible && (
-          <a className={`${styles.action} ${styles.principale} ${styles.sousLesColonnes}`} href="#/argent">
+          <a className={`${styles.action} ${styles.principale} ${styles.sousLesColonnes}`} href="#/tresorerie">
             Verser sur mon compte
           </a>
         )}

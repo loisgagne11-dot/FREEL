@@ -202,7 +202,7 @@ describe('ce que la composition avoue', () => {
     const c = compositionSolde(parts(), euros(1_000), null);
     expect(c.reserves).toHaveLength(1);
     expect(c.reserves[0]).toMatch(/date/i);
-    expect(c.reserves[0]).toMatch(/Config/);
+    expect(c.reserves[0]).toMatch(/Réglages/);
   });
 
   it('ne dit rien de tel quand la date est posée', () => {

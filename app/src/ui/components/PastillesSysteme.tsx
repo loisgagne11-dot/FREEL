@@ -90,13 +90,13 @@ export function PastillesSysteme() {
  * ce qu'elle indique. Le rafraîchissement du jeton reste le travail de
  * l'écran Compte, qui le fait quand on s'y rend.
  *
- * C'est un lien vers `#/config/compte` : dire qu'une session a expiré sans
+ * C'est un lien vers `#/reglages/compte` : dire qu'une session a expiré sans
  * offrir le chemin pour s'y reconnecter serait un reproche, pas un outil.
  */
 function PastilleCloud() {
   const etat = etatDuCompte();
   return (
-    <a className={`${styles.cloud} ${styles[etat.ton]}`} href="#/config/compte" title={etat.detail}>
+    <a className={`${styles.cloud} ${styles[etat.ton]}`} href="#/reglages/compte" title={etat.detail}>
       <span className={styles.etiquette} data-role="libelle-synchro">
         <span className={styles.point} aria-hidden="true" />
         <span>{etat.libelle}</span>
@@ -133,7 +133,7 @@ function etatDuCompte(): EtatCompte {
     return {
       ton: 'local',
       libelle: 'Non synchronisé',
-      detail: 'Tes données restent sur cet appareil. Ouvrir Config › Compte & synchronisation pour les '
+      detail: 'Tes données restent sur cet appareil. Ouvrir Réglages › Compte & synchronisation pour les '
         + 'synchroniser.'
     };
   }
@@ -142,7 +142,7 @@ function etatDuCompte(): EtatCompte {
       ton: 'expire',
       libelle: 'Session expirée',
       detail: `Session expirée pour ${session.email}. Tes saisies ne remontent plus : `
-        + 'ouvrir Config › Compte & synchronisation pour se reconnecter.'
+        + 'ouvrir Réglages › Compte & synchronisation pour se reconnecter.'
     };
   }
   return { ton: 'relie', libelle: 'Compte relié', detail: `Compte relié — ${session.email}` };

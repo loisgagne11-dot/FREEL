@@ -1,11 +1,9 @@
-import { Suspense, useEffect, useId, useMemo, useState } from 'react';
-import { adresseCourante, sousRouteSiEcran, composantALaDemande } from '../composantALaDemande';
+import { useMemo, useState } from 'react';
 import { euros, mois as moisDe } from '../../domain/types';
 import {
   irParTranches, revenuApresAbattement, tauxAbattement, tranchesIR
 } from '../../domain/bareme';
 import { useFaits } from '../../state/store';
-import { useRoute } from '../useRoute';
 import { moisCourant } from '../../state/selecteurs';
 import { ancreDeLAnnee } from '../../domain/calculs/periode';
 import { Greet } from '../components/Greet';
@@ -17,30 +15,15 @@ import styles from './Outils.module.css';
 import { Montant } from '../components/Montant';
 import { ComparateurVl } from '../components/ComparateurVl';
 import { CarteCfe } from '../components/CarteCfe';
-import { Onglets, PanneauOnglet, type Onglet } from '../components/Onglets';
-import { CarteCra } from './Outils.craCarte';
 
 /**
- * Le générateur de CRA est chargé À L'OUVERTURE, et non avec l'écran.
+ * Écran Simulateurs — l'impôt, le régime, la CFE (ex Outils › Impôt & CFE).
  *
- * Il emporte le document, sa feuille de style autonome et la synthèse
- * hebdomadaire — pour une action qu'on fait une fois par mois. Collé dans
- * l'écran Outils, il aurait fait franchir le budget de l'écran différé le plus
- * lourd sans qu'aucun simulateur en profite. C'est l'invariant n°7 appliqué
- * avant que le budget ne dépasse plutôt qu'après.
- */
-const GenerateurCra = composantALaDemande(() => import('./Outils.cra')
-  .then((m) => m.GenerateurCra), false);
-
-type SectionOutils = 'impot' | 'cra';
-
-const SECTIONS: readonly Onglet<SectionOutils>[] = [
-  { id: 'impot', libelle: 'Impôt & CFE' },
-  { id: 'cra', libelle: 'CRA' }
-];
-
-/**
- * Écran Outils — simulateurs.
+ * Le fichier garde son nom d'avant le lot 51, comme ses modules voisins
+ * (`Outils.cra`, `Outils.craCarte`) : le compte rendu d'activité, qui en était
+ * le second onglet, est parti dans Activité — il découle du planning, et
+ * c'était le seul « outil » qui ne simulait rien. Les deux onglets n'en
+ * faisant plus qu'un, l'écran n'a plus d'onglets du tout.
  *
  * Cet écran est volontairement le deuxième construit : c'est le moins coûteux,
  * et il met le noyau fiscal à l'épreuve de bout en bout — abattement, tranches,
@@ -73,30 +56,6 @@ export function Outils({ annee, onAnnee }: ProprietesOutils = {}) {
   const faits = useFaits((e) => e.faits);
   const [caSaisi, setCaSaisi] = useState('');
   const [detailOuvert, setDetailOuvert] = useState(false);
-  /*
-   * `#/outils/cra` ouvre l'onglet ET l'atelier.
-   *
-   * Une action rapide qui dépose sur l'écran sans rien ouvrir ne fait pas
-   * gagner le second geste, elle le déplace — c'est la règle que la rangée
-   * d'actions rapides s'est donnée, et « Télécharger le CRA » doit la tenir.
-   */
-  const { sousRoute } = useRoute();
-  const versCra = sousRoute === 'cra';
-  const [section, setSection] = useState<SectionOutils>(versCra ? 'cra' : 'impot');
-  const [craOuvert, setCraOuvert] = useState(versCra);
-  const idGroupe = useId();
-
-  /*
-   * L'état initial ne suffit pas : depuis l'écran Outils lui-même, suivre
-   * `#/outils/cra` change le hash sans remonter le composant, et l'atelier ne
-   * s'ouvrirait pas. C'est le cas exact de l'action rapide du Pilote quand
-   * l'utilisateur revient dessus par le rail — le lien aurait l'air mort.
-   */
-  useEffect(() => {
-    if (!versCra) return;
-    setSection('cra');
-    setCraOuvert(true);
-  }, [versCra]);
 
   /* Le barème suit l'année choisie : un abattement, des tranches et un
      plafond changent d'une année à l'autre, et simuler 2025 au barème 2026
@@ -132,7 +91,7 @@ export function Outils({ annee, onAnnee }: ProprietesOutils = {}) {
   return (
     <>
       <Greet
-        titre="Outils"
+        titre="Simulateurs"
         sousTitre="Des simulations, jamais des déclarations : rien de ce qui est calculé ici n’est enregistré."
         repere={`Barème de ${moisLong(m)}`}
         {...(onAnnee === undefined ? {} : {
@@ -140,32 +99,6 @@ export function Outils({ annee, onAnnee }: ProprietesOutils = {}) {
         })}
       />
 
-      <Onglets
-        idGroupe={idGroupe}
-        onglets={SECTIONS}
-        actif={section}
-        onChange={setSection}
-        libelle="Sections de l’écran Outils"
-      />
-
-      <PanneauOnglet idGroupe={idGroupe} id="cra" actif={section === 'cra'}>
-        <CarteCra annee={annee ?? new Date().getFullYear()} onOuvrir={() => setCraOuvert(true)} />
-      </PanneauOnglet>
-
-      {/* L'atelier n'est MONTÉ qu'une fois ouvert : il parcourt les douze mois
-          de l'année pour proposer ceux qui portent des journées, et ce
-          parcours n'a pas à se faire tant que personne ne le demande. */}
-      {craOuvert && (
-        <Suspense fallback={<p className={styles.attente} role="status">Chargement…</p>}>
-          <GenerateurCra
-            ouvert
-            annee={annee ?? new Date().getFullYear()}
-            onFermer={() => setCraOuvert(false)}
-          />
-        </Suspense>
-      )}
-
-      <PanneauOnglet idGroupe={idGroupe} id="impot" actif={section === 'impot'}>
       {/* Le comparateur AVANT le simulateur : il porte une date limite, le
           simulateur non. Ce qui périme se met devant. Et la CFE juste après :
           elle aussi porte une date — le 15 décembre — mais chaque année. */}
@@ -249,8 +182,6 @@ export function Outils({ annee, onAnnee }: ProprietesOutils = {}) {
         )}
       </section>
 
-      </PanneauOnglet>
-
       <Sheet
         ouvert={detailOuvert}
         titre="Détail par tranche"
@@ -311,7 +242,3 @@ export function Outils({ annee, onAnnee }: ProprietesOutils = {}) {
     </>
   );
 }
-
-// Le CRA ne s'ouvre que par `#/outils/cra` : n'en charger le module que si
-// l'adresse le désigne, pour que l'écran et lui arrivent d'un même mouvement.
-if (sousRouteSiEcran('simulateurs', adresseCourante()) === 'cra') GenerateurCra.lancer();

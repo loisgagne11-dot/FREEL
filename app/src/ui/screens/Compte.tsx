@@ -459,7 +459,7 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
     setEtat({ phase: 'deconnecte' });
     setDistant('inconnu');
     setMessage('Déconnecté. Tes données restent sur cet appareil : « Effacer cet appareil », '
-      + 'dans Configuration › Données & export, les en retire.');
+      + 'dans Réglages › Données & export, les en retire.');
   }
 
   return (
