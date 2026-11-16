@@ -698,7 +698,7 @@ function CarteVersement(
       <button
         type="button"
         className={styles.action}
-        onClick={() => naviguerVers('achats', 'releve')}
+        onClick={() => naviguerVers('tresorerie', 'releve')}
       >
         Pointer le versement au relevé
       </button>

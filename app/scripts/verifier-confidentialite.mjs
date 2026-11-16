@@ -32,7 +32,11 @@ const TYPES = {
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json'
 };
 
-const ECRANS = ['pilote', 'argent', 'outils', 'achats', 'activite', 'config', 'facture'];
+// Les adresses du lot 51 : une ancienne n'est plus qu'une redirection, et
+// mesurer à travers elle ne prouverait rien de plus sur l'écran d'arrivée.
+const ECRANS = [
+  'pilote', 'activite', 'factures', 'tresorerie', 'obligations', 'achats', 'simulateurs', 'reglages'
+];
 
 /**
  * Des faits qui produisent des montants sur TOUS les écrans.

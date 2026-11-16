@@ -2,7 +2,7 @@
 
 .pile {
   position: fixed;
-  /* Au-dessus du dock flottant en portrait, encoche comprise : une
+  /* Au-dessus de la barre basse en portrait, encoche comprise : une
      confirmation qui passe sous la barre de navigation n'est jamais lue. */
   bottom: calc(84px + env(safe-area-inset-bottom));
   left: 50%;
@@ -42,7 +42,7 @@
 }
 
 @media (min-width: 761px) {
-  /* En desktop, le rail est latéral : le dock ne masque plus le bas. */
+  /* Au bureau, le rail est latéral : la barre basse ne masque plus le bas. */
   .pile { bottom: 24px; }
 }
 

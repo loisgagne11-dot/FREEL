@@ -1295,7 +1295,7 @@ describe('Activité — les onglets suivent l’adresse', () => {
     window.location.hash = '#/activite';
     render(<Activite />);
     await userEvent.click(screen.getByRole('tab', { name: /Clients/ }));
-    expect(window.location.hash).toBe('#/activite/clients');
+    expect(window.location.hash).toBe('#/factures/clients');
     await userEvent.click(screen.getByRole('tab', { name: /Plan de charge/ }));
     expect(window.location.hash).toBe('#/activite');
   });

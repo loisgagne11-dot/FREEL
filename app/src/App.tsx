@@ -20,12 +20,11 @@ import { useFaits } from './state/store';
 import { Pilote } from './ui/screens/Pilote';
 import { composantALaDemande } from './ui/composantALaDemande';
 
-const Argent = composantALaDemande(() => import('./ui/screens/Argent').then((m) => m.Argent), true);
-const Outils = composantALaDemande(() => import('./ui/screens/Outils').then((m) => m.Outils), true);
-const Achats = composantALaDemande(() => import('./ui/screens/Achats').then((m) => m.Achats), true);
-const Activite = composantALaDemande(() => import('./ui/screens/Activite').then((m) => m.Activite), true);
-const Config = composantALaDemande(() => import('./ui/screens/Config').then((m) => m.Config), true);
-const Facture = composantALaDemande(() => import('./ui/screens/Facture').then((m) => m.Facture), true);
+/**
+ * Les autres écrans, par une table elle-même différée : voir l'en-tête de
+ * `ui/ecrans`. Téléchargée au repos, comme les écrans qu'elle désigne.
+ */
+const EcranDiffere = composantALaDemande(() => import('./ui/ecrans').then((m) => m.EcranDiffere), true);
 import { moisCourant } from './state/selecteurs';
 import { useCompteursATraiter } from './ui/useATraiter';
 import type { Mois } from './domain/types';
@@ -54,20 +53,10 @@ function EnChargement() {
 /**
  * L'écran courant.
  *
- * L'exhaustivité est vérifiée par le compilateur : `jamais` est de type
- * `never`, donc ajouter un écran à la navigation sans le router ici ne
- * compile pas. Un `return null` final aurait laissé passer un écran blanc.
- *
- * Le MOIS va au Pilote (son flux du mois), à Activité (sa grille) et à
- * Achats (l'ancre de sa barre de période) ; son ANNÉE aux deux écrans qui
- * raisonnent à l'année. Chacun reçoit AVEC la valeur de quoi la changer, et
- * porte la commande dans son en-tête — une seule par écran (lot 51) : la
- * barre du haut n'en a plus. Facture ne reçoit rien : la liste des factures
- * est un onglet d'Activité, et ce qui reste sous `#/facture/…` — rédiger,
- * rouvrir une facture — n'a pas de période. Config ne reçoit rien non plus :
- * il ne porte que des réglages. Le Pilote reçoit le mois mais n'en tire que
- * son flux : santé et décisions restent celles d'aujourd'hui — « combien je
- * peux me verser » n'a pas de mois passé.
+ * Le Pilote est rendu ici, les autres par `EcranDiffere`, qui en tient la
+ * table et vérifie qu'aucun n'est oublié. Le Pilote reçoit le mois mais n'en
+ * tire que son flux : santé et décisions restent celles d'aujourd'hui —
+ * « combien je peux me verser » n'a pas de mois passé.
  *
  * Appelée comme une fonction ordinaire depuis `App` (`Ecran(etatMois)`), pas
  * comme un élément JSX (`<Ecran mois={mois} />`) : les deux sont
@@ -81,28 +70,13 @@ function EnChargement() {
  */
 function Ecran([mois, setMois]: EtatMois) {
   const { ecran } = useRoute();
-  return <FiletErreur key={ecran.id} portee="ecran">{contenuEcran(ecran.id, mois, setMois)}</FiletErreur>;
-}
-
-function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], mois: Mois, setMois: (m: Mois) => void) {
-  const annee = Number(mois.slice(0, 4));
-  /* Changer d'année garde le mois et n'en change que le millésime : de mars
-     2026, choisir 2025 donne mars 2025, et non décembre — c'est le mois qu'on
-     regardait, dans l'année qu'on vient de demander. */
-  const changerAnnee = (a: number): void => setMois(`${a}${mois.slice(4)}` as Mois);
-  switch (id) {
-    case 'pilote': return <Pilote mois={mois} onMois={setMois} />;
-    case 'activite': return <Activite mois={mois} onMois={setMois} />;
-    case 'argent': return <Argent annee={annee} onAnnee={changerAnnee} />;
-    case 'facture': return <Facture />;
-    case 'achats': return <Achats mois={mois} onMois={setMois} />;
-    case 'outils': return <Outils annee={annee} onAnnee={changerAnnee} />;
-    case 'config': return <Config />;
-    default: {
-      const jamais: never = id;
-      return jamais;
-    }
-  }
+  return (
+    <FiletErreur key={ecran.id} portee="ecran">
+      {ecran.id === 'pilote'
+        ? <Pilote mois={mois} onMois={setMois} />
+        : <EcranDiffere id={ecran.id} mois={mois} onMois={setMois} />}
+    </FiletErreur>
+  );
 }
 
 /**

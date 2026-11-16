@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { ACTIONS_RAPIDES, ActionsRapides } from './ActionsRapides';
-import { resoudreRoute } from '../navigation';
+import { redirection, resoudreRoute } from '../navigation';
 
 afterEach(cleanup);
 
@@ -37,6 +37,10 @@ describe('actions rapides', () => {
       // pointage d'un encaissement, qui ouvre SON panneau par une sous-route.
       // Le Pilote nu serait le repli d'une adresse inconnue.
       if (route.ecran.id === 'pilote') expect(route.sousRoute).toBe('encaissements');
+      // Ni par une ancienne adresse : la redirection la rattraperait, mais au
+      // prix d'un aller-retour dans l'historique, et le lien mentirait sur sa
+      // destination à qui le copie (lot 51).
+      expect(redirection(action.href)).toBeNull();
     }
   });
 

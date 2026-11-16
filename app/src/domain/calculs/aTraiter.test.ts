@@ -59,7 +59,10 @@ describe('factures en retard', () => {
     const s = sujetsATraiter(e).find((x) => x.id === 'factures-en-retard');
     expect(s).toBeDefined();
     expect(s?.gravite).toBe('retard');
-    expect(s?.ecran).toBe('activite');
+    // Factures, l'écran de la liste où l'on relance (lot 51) — et non plus
+    // Activité, qui l'accueillait en onglet : le compteur du rail s'allumerait
+    // sur une entrée où la facture n'est plus.
+    expect(s?.ecran).toBe('factures');
   });
 
   // La borne : une facture dont l'échéance est aujourd'hui n'est pas en retard.
@@ -106,7 +109,8 @@ describe('périodes à déclarer', () => {
     });
     const s = sujetsATraiter(e).find((x) => x.id === 'periodes-a-declarer');
     expect(s).toBeDefined();
-    expect(s?.ecran).toBe('argent');
+    // Obligations : c'est là que vivent les périodes URSSAF (lot 51).
+    expect(s?.ecran).toBe('obligations');
     // La prose est destinée à l'utilisateur : « juin 2026 », pas « 2026-06 ».
     const f = s === undefined ? null : formuler(s);
     expect(`${f?.intitule} ${f?.contexte}`).toContain('juin 2026');
@@ -292,7 +296,7 @@ describe('échéances réglementaires', () => {
 describe('ordre, compteurs et filtrage', () => {
   const chargee = entree({
     recettes: [
-      recette({ id: 'retard', emiseLe: dateISO('2026-05-01') }),
+      recette({ id: 'retard', emiseLe: dateISO('2026-05-01'), echeanceLe: dateISO('2026-05-31') }),
       recette({ id: 'ok', encaisseeLe: dateISO('2026-06-10'), modeReglement: null })
     ],
     echeancesReglementaires: [
@@ -317,9 +321,10 @@ describe('ordre, compteurs et filtrage', () => {
 
   it('un écran ne voit que ses propres sujets', () => {
     const sujets = sujetsATraiter(chargee);
-    const activite = sujetsDeLEcran(sujets, 'activite');
-    expect(activite.every((s) => s.ecran === 'activite')).toBe(true);
-    expect(activite.length).toBeLessThan(sujets.length);
+    const obligations = sujetsDeLEcran(sujets, 'obligations');
+    expect(obligations.length).toBeGreaterThan(0);
+    expect(obligations.every((s) => s.ecran === 'obligations')).toBe(true);
+    expect(obligations.length).toBeLessThan(sujets.length);
   });
 
   // La règle du design : Pilote est le poste de pilotage, il montre tout.

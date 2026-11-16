@@ -176,7 +176,7 @@ export function echeancesReglementairesActives(
       : !e.remplie(faits)))
     .map((e) => (e.remplie === undefined
       ? { id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true }
-      : { id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true, ecran: 'config' as const, action: e.action ?? '' }));
+      : { id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true, ecran: 'obligations' as const, action: e.action ?? '' }));
 
   const cfe = echeancesCfe(faits, maintenant)
     .filter((e) => dansLePreavis(e.date, e.preavisJours))
@@ -233,7 +233,7 @@ function echeancesCfe(faits: Faits, maintenant: Date): readonly EcheanceCfeDatee
   if (declaration !== null) {
     sujets.push({
       ...declaration,
-      ecran: 'config',
+      ecran: 'obligations',
       action: 'Se préparer',
       contexte: 'C’est elle qui établit ta base d’imposition ; l’omettre fait perdre '
         + 'l’exonération de première année.'
@@ -252,7 +252,7 @@ function echeancesCfe(faits: Faits, maintenant: Date): readonly EcheanceCfeDatee
     const paiement = paiementCfe(annee);
     sujets.push({
       ...paiement,
-      ecran: 'argent',
+      ecran: 'obligations',
       action: 'Saisir l’échéance',
       contexte: regime.type === 'base-reduite-moitie'
         ? 'Première année d’imposition : la base est réduite de moitié, mais la CFE est '
@@ -269,7 +269,7 @@ function echeancesCfe(faits: Faits, maintenant: Date): readonly EcheanceCfeDatee
     .reduce((t, e) => t + e.montant, 0));
   const acompte = acompteCfe(annee, cfePrecedente);
   if (acompte !== null) {
-    sujets.push({ ...acompte, ecran: 'argent', action: 'Voir les échéances' });
+    sujets.push({ ...acompte, ecran: 'obligations', action: 'Voir les échéances' });
   }
 
   return sujets;

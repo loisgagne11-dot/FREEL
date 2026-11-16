@@ -6,7 +6,8 @@ import { type Faits, entrepriseVide, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { Pilote, salutation } from './Pilote';
 import { mois } from '../../domain/types';
-import { ATraiter } from './Pilote.decisions';
+import { ATraiter, adresseDuSujet } from './Pilote.decisions';
+import { resoudreRoute } from '../navigation';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -189,5 +190,30 @@ describe('pointer un paiement', () => {
     fireEvent.click(within(panneau).getByRole('button', { name: 'Terminé' }));
     const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
     expect(within(sorties).queryByRole('button', { name: /pointer le paiement/ })).toBeNull();
+  });
+});
+
+/**
+ * L'ACTION D'UN SUJET MÈNE OÙ LE GESTE SE FAIT (lot 51).
+ *
+ * Le compteur d'un sujet s'allume sur l'écran qui en porte la liste ; son
+ * action, elle, doit ouvrir l'endroit où l'on agit. « Renseigner ma
+ * plateforme » qui ouvrirait Obligations ferait chercher le réglage une
+ * seconde fois — c'est dans Réglages › Facturation qu'il se saisit.
+ */
+describe('où mène l’action d’un sujet', () => {
+  it('mène la plateforme agréée à Réglages › Facturation, bien que comptée sous Obligations', () => {
+    expect(adresseDuSujet('echeance-facturation-electronique-reception', 'obligations'))
+      .toBe('#/reglages/facturation');
+  });
+
+  it('mène un barème à vérifier à la section qui le porte', () => {
+    expect(adresseDuSujet('bareme-a-verifier', 'reglages')).toBe('#/reglages/fiscal');
+  });
+
+  it('mène les autres sujets à leur écran, qui existe', () => {
+    for (const ecran of ['factures', 'tresorerie', 'obligations'] as const) {
+      expect(resoudreRoute(adresseDuSujet('x', ecran)).ecran.id).toBe(ecran);
+    }
   });
 });

@@ -381,7 +381,7 @@ describe('tu peux te verser', () => {
     await userEvent.setup().click(
       screen.getByRole('button', { name: /Pointer le versement au relevé/ })
     );
-    expect(window.location.hash).toBe('#/achats/releve');
+    expect(window.location.hash).toBe('#/tresorerie/releve');
   });
 });
 

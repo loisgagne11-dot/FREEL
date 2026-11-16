@@ -105,12 +105,16 @@ function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
 /**
  * Où mène l'action d'un sujet.
  *
- * L'écran seul ne suffit plus pour les factures : elles ont leur onglet sous
- * Activité, et « Relancer » qui ouvrirait le plan de charge obligerait à
- * chercher l'onglet une seconde fois — le reproche fait aux actions rapides.
+ * L'écran du sujet, sauf quand le geste vit ailleurs que son compteur : le
+ * rappel de la facturation électronique se compte sous Obligations, avec les
+ * autres échéances, mais la plateforme se renseigne dans Réglages ›
+ * Facturation — « Renseigner ma plateforme » qui ouvrirait Obligations
+ * obligerait à chercher le réglage une seconde fois, le reproche fait aux
+ * actions rapides. De même, un barème à vérifier s'ouvre sur la section qui le
+ * porte, pas sur le profil.
  */
 export function adresseDuSujet(id: string, ecran: string): string {
-  return id === 'factures-en-retard' || id === 'tva-a-regulariser'
-    ? '#/activite/factures'
-    : `#/${ecran}`;
+  return id === 'echeance-facturation-electronique-reception' ? '#/reglages/facturation'
+    : id === 'bareme-a-verifier' ? '#/reglages/fiscal'
+      : `#/${ecran}`;
 }

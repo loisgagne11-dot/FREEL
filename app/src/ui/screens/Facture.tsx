@@ -56,7 +56,7 @@ export function Facture() {
           key={sousRoute}
           depuisBrouillon={brouillon}
           brouillonEnregistre={enregistre}
-          onListe={() => naviguerVers('activite', 'factures')}
+          onListe={() => naviguerVers('factures')}
         />
       </Suspense>
     );
@@ -74,7 +74,7 @@ export function Facture() {
     return (
       <FactureEmise
         numero={decodeURIComponent(sousRoute)}
-        onListe={() => naviguerVers('activite', 'factures')}
+        onListe={() => naviguerVers('factures')}
       />
     );
   }
@@ -83,14 +83,15 @@ export function Facture() {
 }
 
 /**
- * `#/facture` seul ne désigne plus rien : la liste vit sous Activité.
+ * `#/facture` seul ne désigne plus rien : la liste a son écran, Factures.
  *
- * L'adresse survit dans les favoris et dans les liens déjà collés ailleurs ;
- * elle mène donc à l'onglet, par `replace` — sinon « retour » ramènerait ici,
- * qui renverrait aussitôt là-bas, et l'utilisateur ne pourrait plus reculer.
+ * `redirection` le rattrape avant qu'on arrive ici ; ce repli ne sert qu'à
+ * l'écran monté seul. Par `replace`, pour la même raison qu'elle : sinon
+ * « retour » ramènerait ici, qui renverrait aussitôt là-bas, et
+ * l'utilisateur ne pourrait plus reculer.
  */
 function VersLesFactures() {
-  useEffect(() => { window.location.replace('#/activite/factures'); }, []);
+  useEffect(() => { window.location.replace('#/factures'); }, []);
   return <p className={styles.bandeau} role="status">Ouverture de tes factures…</p>;
 }
 

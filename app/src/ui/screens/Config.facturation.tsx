@@ -116,21 +116,3 @@ export function Facturation() {
     </div>
   );
 }
-
-/**
- * Le livre des recettes n'a rien à régler : il se remplit tout seul, à
- * l'encaissement. La section existe parce que le handoff la place ici, et
- * parce qu'on la cherche dans les réglages avant de la chercher dans Argent.
- */
-export function LivreDesRecettes() {
-  return (
-    <div className={styles.carte}>
-      <p className={styles.explication}>
-        Le registre des recettes est obligatoire. Il se remplit à
-        l’encaissement&nbsp;: une facture émise mais non payée n’y figure pas
-        encore.
-      </p>
-      <a className={styles.lien} href="#/argent/livre">Ouvrir le livre des recettes</a>
-    </div>
-  );
-}

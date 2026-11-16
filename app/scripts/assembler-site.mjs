@@ -241,7 +241,8 @@ export function ancienneEnLectureSeule(html) {
 
 /**
  * /v2/ : l'adresse qu'on a utilisée pendant toute la refonte, et qu'on a
- * peut-être en favori. Elle mène à la racine en gardant l'écran (#/argent).
+ * peut-être en favori. Elle mène à la racine en gardant l'écran (#/argent),
+ * que l'application ramène ensuite à son nom d'aujourd'hui (#/tresorerie).
  * `replace` plutôt qu'un lien : le bouton « précédent » ne doit pas ramener
  * sur une page qui renvoie aussitôt ailleurs.
  */

@@ -9,7 +9,7 @@ import { App } from './App';
 beforeEach(() => {
   localStorage.clear();
   localStorage.setItem(CLE_STOCKAGE, JSON.stringify(faitsVides()));
-  window.location.hash = '#/argent';
+  window.location.hash = '#/tresorerie';
   useFaits.setState({ faits: faitsVides(), chargement: { phase: 'initial' }, saisiesEcartees: 0 });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -81,9 +81,12 @@ describe('la navigation du lot 51', () => {
    * période de l'écran. « Exporter » et la pastille « à traiter » en sont
    * partis avec eux — les exports vivent là où sont leurs données, et ce qui
    * attend se lit aux compteurs du rail et dans les décisions du Pilote. Le
-   * thème est parti dans Config › Affichage.
+   * thème est parti dans Réglages › Affichage.
    */
-  it.each(['#/pilote', '#/argent', '#/achats', '#/outils', '#/activite', '#/config'])(
+  it.each([
+    '#/pilote', '#/activite', '#/factures', '#/tresorerie', '#/obligations', '#/achats',
+    '#/simulateurs', '#/reglages'
+  ])(
     'la barre du haut de %s ne porte que la recherche, la synchronisation, le masquage et « Nouveau »',
     async (adresse) => {
       const barre = within(await ouvrir(adresse));
@@ -102,7 +105,7 @@ describe('la navigation du lot 51', () => {
    * UNE SEULE COMMANDE DE PÉRIODE PAR ÉCRAN, DANS SON EN-TÊTE.
    *
    * Le Pilote : le mois, sur la carte du flux — le seul bloc qui le suit.
-   * Argent et Outils : l'année. Achats : sa barre de période. Deux commandes
+   * Trésorerie et Simulateurs : l'année. Achats : sa barre de période. Deux commandes
    * sur un même écran pouvaient se contredire ; aucune l'aurait laissé sans
    * moyen de changer de période.
    */
@@ -115,7 +118,7 @@ describe('la navigation du lot 51', () => {
     expect(screen.queryByRole('combobox', { name: 'Année' })).toBeNull();
   });
 
-  it.each(['#/argent', '#/outils'])('%s porte l’année dans son en-tête, et rien d’autre', async (adresse) => {
+  it.each(['#/tresorerie', '#/simulateurs'])('%s porte l’année dans son en-tête, et rien d’autre', async (adresse) => {
     await ouvrir(adresse);
     expect(await screen.findAllByRole('combobox', { name: 'Année' })).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Mois précédent' })).toBeNull();
@@ -145,9 +148,36 @@ describe('la navigation du lot 51', () => {
     expect(await screen.findByText(/Dépenses · mai 2026/)).toBeTruthy();
 
     // Changer d'année garde le mois : mai 2026 → mai 2025, pas décembre.
-    await allerA('#/argent');
+    await allerA('#/tresorerie');
     fireEvent.change(await screen.findByRole('combobox', { name: 'Année' }), { target: { value: '2025' } });
     await allerA('#/pilote');
     expect(await screen.findByRole('heading', { name: /Le flux du mois · mai 2025/ })).toBeTruthy();
+  });
+});
+
+/**
+ * UNE ANCIENNE ADRESSE MÈNE À LA NOUVELLE, SANS LAISSER DE TRACE (lot 51).
+ *
+ * `replace` et non une affectation : l'ancienne adresse resterait sinon dans
+ * l'historique, et « retour » y ramènerait — pour être aussitôt renvoyé ici,
+ * si bien qu'on ne pourrait plus reculer du tout.
+ */
+describe('les anciennes adresses', () => {
+  it('ouvre la Trésorerie sur `#/argent`, sans ajouter d’entrée à l’historique', async () => {
+    window.location.hash = '#/argent';
+    const avant = window.history.length;
+    render(<App />);
+    await waitFor(() => expect(window.location.hash).toBe('#/tresorerie'));
+    expect(window.history.length).toBe(avant);
+    expect(await screen.findByRole('heading', { level: 1, name: /Ton argent|Ta trésorerie/ })).toBeTruthy();
+  });
+
+  /* La paire passe avant l'écran : Activité existe toujours, et la résoudre
+     d'abord ouvrirait le planning au lieu de la liste des factures. */
+  it('ouvre la liste des factures sur `#/activite/factures`, pas le planning', async () => {
+    window.location.hash = '#/activite/factures';
+    render(<App />);
+    await waitFor(() => expect(window.location.hash).toBe('#/factures'));
+    expect(await screen.findByRole('button', { name: 'Nouvelle facture' })).toBeTruthy();
   });
 });

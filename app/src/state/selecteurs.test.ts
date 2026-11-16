@@ -757,7 +757,8 @@ describe('obligations de CFE', () => {
     const sujets = aTraiter(faits({ entreprise: entreprise('2026-02-01') }), enOctobre);
     const d = sujets.find((s) => s.id.includes('1447c'));
     expect(d === undefined ? '' : formuler(d).intitule).toMatch(/1447-C/);
-    expect(d?.ecran).toBe('config');
+    // Sous Obligations, avec les autres échéances (lot 51).
+    expect(d?.ecran).toBe('obligations');
   });
 
   it('ne rappelle plus la déclaration initiale les années suivantes', () => {
@@ -766,13 +767,14 @@ describe('obligations de CFE', () => {
   });
 
   // Le sujet se règle en saisissant une échéance : il doit mener là où on la
-  // saisit, pas sur Config.
+  // saisit — l'échéancier, sous Obligations depuis le lot 51 —, pas sur les
+  // Réglages.
   it('mène là où l’échéance se saisit', () => {
     const sujets = aTraiter(
       faits({ entreprise: entreprise('2020-01-01'), recettes: [recette('r', 40000, '2024-05-01')] }),
       enOctobre
     );
-    expect(sujets.find((s) => s.id.includes('cfe-paiement'))?.ecran).toBe('argent');
+    expect(sujets.find((s) => s.id.includes('cfe-paiement'))?.ecran).toBe('obligations');
   });
 
   /**
@@ -1045,8 +1047,10 @@ describe('obligations réglementaires datées', () => {
     entreprise: { ...faitsVides().entreprise, plateformeAgreee: { nom: 'Plateforme démo', depuis: null } }
   });
 
-  it('reste tant que la plateforme manque, date passée comprise, et mène aux Réglages', () => {
-    expect(fe('2026-09-20')).toMatchObject({ sansSuivi: true, ecran: 'config' });
+  /* Son compteur s'allume sur Obligations, où vivent les échéances (lot 51) ;
+     son action, elle, mène aux Réglages — voir `adresseDuSujet`. */
+  it('reste tant que la plateforme manque, date passée comprise, compté sous Obligations', () => {
+    expect(fe('2026-09-20')).toMatchObject({ sansSuivi: true, ecran: 'obligations' });
     expect(fe('2026-11-14')).toMatchObject({ action: 'Renseigner ma plateforme' });
   });
 

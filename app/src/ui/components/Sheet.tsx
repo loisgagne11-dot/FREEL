@@ -37,12 +37,17 @@ export interface ProprietesSheet {
    * contexte n'a plus d'intérêt — on ne regarde plus que ce qu'on construit —
    * et 580 px ne suffisent pas à poser les deux côte à côte.
    *
+   * `volet` — un volet qui monte du bas, au téléphone : le « Plus » de la
+   * barre basse (lot 51). Il ne recouvre que ce qu'il contient, et sa poignée
+   * EST le bouton de fermeture — un ✕ en plus d'une poignée en ferait deux
+   * pour le même geste, et la maquette n'en dessine qu'une.
+   *
    * La variante ne change QUE l'habillage : le piège de focus, la fermeture
    * par Échap, le verrou de défilement et la restitution du focus sont les
    * mêmes. Deux composants de dialogue auraient fini par n'en respecter qu'un
    * sur deux.
    */
-  readonly variante?: 'panneau' | 'atelier';
+  readonly variante?: 'panneau' | 'atelier' | 'volet';
   /** Une précision à côté du titre, sur la même ligne. */
   readonly sousTitre?: string;
   /**
@@ -138,7 +143,7 @@ export function Sheet(
       <div className={styles.voile} onClick={onFermer} aria-hidden="true" />
       <aside
         ref={panneau}
-        className={`${styles.panneau} ${variante === 'atelier' ? styles.atelier : ''}`}
+        className={`${styles.panneau} ${variante === 'panneau' ? '' : styles[variante]}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={idTitre}

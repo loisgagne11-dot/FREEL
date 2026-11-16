@@ -9,7 +9,10 @@
  *   2. le bandeau « lecture seule » est là, et mène à la nouvelle version ;
  *   3. la copie publiée a perdu ses balises anti-cache, et le garde passe
  *      AVANT tout autre script de la page ;
- *   4. /v2/#/argent mène à /#/argent — les favoris de la refonte survivent ;
+ *   4. /v2/#/argent mène à /#/tresorerie — les favoris de la refonte
+ *      survivent à DEUX déménagements : la racine (bascule), puis le nom de
+ *      l'écran (lot 51). Deux redirections enchaînées, dont aucune ne doit
+ *      perdre l'écran que l'autre lui transmet ;
  *   5. la nouvelle version, à la racine, reprend toujours les données de
  *      l'ancienne : même origine, même stockage.
  *
@@ -236,8 +239,8 @@ try {
   const ctxV2 = await navigateur.newContext();
   const pV2 = await ctxV2.newPage();
   await pV2.goto(`${base}v2/#/argent`, { waitUntil: 'load' });
-  await pV2.waitForURL(`${base}#/argent`, { timeout: 5000 }).catch(() => {});
-  constate(pV2.url() === `${base}#/argent`, '/v2/#/argent mène à /#/argent', pV2.url());
+  await pV2.waitForURL(`${base}#/tresorerie`, { timeout: 5000 }).catch(() => {});
+  constate(pV2.url() === `${base}#/tresorerie`, '/v2/#/argent mène à /#/tresorerie', pV2.url());
   await ctxV2.close();
 
   /* ── 5. La reprise à la racine ───────────────────────────────────────── */

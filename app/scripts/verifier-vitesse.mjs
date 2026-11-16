@@ -60,14 +60,14 @@ const PLAFOND_MS = 600;
 const PASSAGES = 5;
 
 /*
- * Les ADRESSES réelles, pas les identifiants d'écran : la liste des factures
- * est un onglet d'Activité depuis le lot 6, et `#/facture` seul n'est plus
- * qu'une redirection — la mesurer chronométrerait deux chargements d'écran à
- * la suite pour un lien que plus rien dans l'application ne produit. La
- * rédaction reste sous `#/facture/nouvelle`.
+ * Les ADRESSES réelles, pas les anciennes : `#/argent` ou `#/facture` ne sont
+ * plus que des redirections (lot 51) — les mesurer chronométrerait deux
+ * résolutions d'adresse à la suite pour un lien que plus rien dans
+ * l'application ne produit. La rédaction reste sous `#/facture/nouvelle`.
  */
 const ECRANS = [
-  'pilote', 'argent', 'activite', 'activite/factures', 'facture/nouvelle', 'achats', 'outils', 'config'
+  'pilote', 'activite', 'factures', 'facture/nouvelle', 'tresorerie', 'obligations', 'achats',
+  'simulateurs', 'reglages'
 ];
 
 /* ── Le jeu d'essai : trois ans d'activité ────────────────────────────────
