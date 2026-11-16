@@ -306,14 +306,14 @@ describe('l’adresse de la rédaction', () => {
   });
 
   /**
-   * `#/facture` seul ne désigne plus la liste : elle est un onglet d'Activité.
+   * `#/facture` seul ne désigne plus la liste : elle a son écran, Factures.
    * L'adresse survit dans les favoris ; elle y mène, par `replace`.
    */
-  it('renvoie l’adresse de la liste vers l’onglet Factures d’Activité', async () => {
+  it('renvoie l’adresse de la liste vers l’écran Factures', async () => {
     semer({ clients: [client()] });
     window.location.hash = '#/facture';
     render(<Facture />);
-    await vi.waitFor(() => expect(window.location.hash).toBe('#/activite/factures'));
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/factures'));
   });
 });
 

@@ -80,8 +80,8 @@
 .contenu {
   flex: 1;
   padding: 14px;
-  /* Réserve la place du dock flottant ET de la safe-area iOS. Sans
-     `env(safe-area-inset-bottom)`, le dock chevauche la barre système sur
+  /* Réserve la place de la barre basse ET de la safe-area iOS. Sans
+     `env(safe-area-inset-bottom)`, la barre chevauche la barre système sur
      iPhone et le dernier élément de la page devient inatteignable. */
   padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   min-width: 0;
@@ -132,7 +132,7 @@
 
   .contenu {
     padding: 18px 20px;
-    /* Plus de dock en desktop : la réserve de place n'a plus lieu d'être. */
+    /* Plus de barre basse au bureau : la réserve de place n'a plus lieu d'être. */
     padding-bottom: 24px;
     /* Grille 12 colonnes du design, à la disposition des écrans. */
     display: grid;
@@ -161,8 +161,8 @@
  * reste permis : une session expirée ou un libellé plus long ne doit jamais
  * pousser un contrôle hors de l'écran.
  *
- * La barre cesse d'être collante : en portrait, la navigation est le dock du
- * bas, et rien de ce qu'on atteint en défilant ne vit ici.
+ * La barre cesse d'être collante : en portrait, la navigation est la barre
+ * du bas, et rien de ce qu'on atteint en défilant ne vit ici.
  */
 @media (max-width: 760px) {
   .topbar {

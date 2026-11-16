@@ -117,7 +117,7 @@ export function Argent({ annee, onAnnee }: ProprietesArgent = {}) {
   const faits = useFaits((e) => e.faits);
   const [section, setSection] = useState<Section>('tresorerie');
   const { ecran, sousRoute } = useRoute();
-  const routeIci = ecran.id === 'argent' ? sousRoute : '';
+  const routeIci = ecran.id === 'tresorerie' || ecran.id === 'obligations' ? sousRoute : '';
   const [registre, setRegistre] = useState<Registre>(
     () => (routeIci === 'livre' ? 'livre' : routeIci === 'tva' ? 'tva' : null)
   );
@@ -130,8 +130,8 @@ export function Argent({ annee, onAnnee }: ProprietesArgent = {}) {
   useEffect(() => {
     if (routeIci !== 'livre' && routeIci !== 'tva') return;
     setRegistre(routeIci);
-    window.location.replace('#/argent');
-  }, [routeIci]);
+    window.location.replace(ecran.chemin);
+  }, [routeIci, ecran.chemin]);
   /* `#/argent/tva` est le lien « Suivi & déclaration TVA » du registre des
      achats : même geste, même raison — la déclaration se prépare depuis la
      dépense qu'on vient de justifier, pas en cherchant le bouton ici. */

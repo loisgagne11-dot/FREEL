@@ -23,7 +23,7 @@ beforeEach(() => {
  */
 describe('la sous-route du générateur', () => {
   it('ouvre l’onglet ET l’atelier depuis #/outils/cra', async () => {
-    window.location.hash = '#/outils/cra';
+    window.location.hash = '#/simulateurs/cra';
     render(<Outils annee={2026} />);
 
     expect(screen.getByRole('tab', { name: /CRA/ }).getAttribute('aria-selected'))
@@ -41,7 +41,7 @@ describe('la sous-route du générateur', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
 
     await act(async () => {
-      window.location.hash = '#/outils/cra';
+      window.location.hash = '#/simulateurs/cra';
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
@@ -55,7 +55,7 @@ describe('la sous-route du générateur', () => {
   });
 
   it('se referme sans quitter l’onglet', async () => {
-    window.location.hash = '#/outils/cra';
+    window.location.hash = '#/simulateurs/cra';
     render(<Outils annee={2026} />);
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
 

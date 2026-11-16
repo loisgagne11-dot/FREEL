@@ -1,5 +1,5 @@
 import { lazy, useState, type ComponentType } from 'react';
-import { resoudreRoute } from './navigation';
+import { redirection, resoudreRoute } from './navigation';
 import type { IdEcran } from './navigation';
 
 /**
@@ -88,7 +88,9 @@ export function composantALaDemande<C extends ComponentType<never>>(
  * finirait par lire autrement les adresses mal formées.
  */
 export function sousRouteSiEcran(id: IdEcran, hash: string): string | null {
-  const route = resoudreRoute(hash);
+  // Une ancienne adresse se lit comme la nouvelle : `#/config/fiscal` doit
+  // lancer la section fiscale des Réglages, même lue avant sa redirection.
+  const route = resoudreRoute(redirection(hash) ?? hash);
   return route.ecran.id === id ? route.sousRoute : null;
 }
 

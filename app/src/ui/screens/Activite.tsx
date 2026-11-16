@@ -204,7 +204,8 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
 
   const { ecran, sousRoute, naviguerVers } = useRoute();
   // Monté seul (les tests), l'écran ne lit pas l'adresse d'un autre écran.
-  const routeIci = ecran.id === 'activite' ? sousRoute : '';
+  const routeIci = ecran.id === 'activite' ? sousRoute
+    : ecran.id === 'factures' ? (sousRoute === 'clients' ? 'clients' : 'factures') : '';
   /* L'état local suit l'adresse, et non l'inverse : `hashchange` arrive après
      le clic, et l'onglet ne doit pas attendre l'événement pour s'afficher. */
   const [section, setSection] = useState<Section>(() => sectionDeLaRoute(routeIci));
@@ -215,7 +216,8 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
 
   function changerDeSection(cible: Section): void {
     setSection(cible);
-    naviguerVers('activite', cible === 'charge' ? '' : cible);
+    if (cible === 'factures' || cible === 'clients') naviguerVers('factures', cible === 'clients' ? 'clients' : '');
+    else naviguerVers('activite', cible === 'charge' ? '' : cible);
   }
 
   const [versConges, setVersConges] = useState(false);

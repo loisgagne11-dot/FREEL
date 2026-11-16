@@ -28,7 +28,9 @@ import { PERIODES_URSSAF, type PeriodeBareme } from '../bareme/urssaf';
 import { type PeriodeADeclarer, periodesADeclarer } from './declarations';
 
 /** L'écran qui règle le sujet. Sert au badge de navigation et au lien. */
-export type EcranCible = 'pilote' | 'activite' | 'argent' | 'achats' | 'outils' | 'config';
+export type EcranCible =
+  | 'pilote' | 'activite' | 'factures' | 'tresorerie' | 'obligations' | 'achats'
+  | 'simulateurs' | 'reglages';
 
 export type Gravite = 'retard' | 'a_faire' | 'information';
 
@@ -262,7 +264,7 @@ export function sujetsATraiter(
       .reduce((a, b) => Math.max(a, b), 0);
     sujets.push({
       id: 'factures-en-retard',
-      ecran: 'activite',
+      ecran: 'factures',
       gravite: 'retard',
       nombre: enRetard.length,
       donnees: { total, plusAncienne }
@@ -280,7 +282,7 @@ export function sujetsATraiter(
     const amende = euros(e.desEnRetard.length * 750);
     sujets.push({
       id: 'des-en-retard',
-      ecran: 'argent',
+      ecran: 'obligations',
       gravite: 'retard',
       nombre: e.desEnRetard.length,
       donnees: { depuis: plusAncien?.mois ?? null, amende }
@@ -300,7 +302,7 @@ export function sujetsATraiter(
     const enRetard = aDeclarer.some((p) => p.limite < e.aujourdhui);
     sujets.push({
       id: 'periodes-a-declarer',
-      ecran: 'argent',
+      ecran: 'obligations',
       gravite: enRetard ? 'retard' : 'a_faire',
       nombre: aDeclarer.length,
       donnees: {
@@ -327,7 +329,7 @@ export function sujetsATraiter(
   if ((e.echeancesSaisies ?? 0) === 0 && moisAvecEncaissement.size >= 3) {
     sujets.push({
       id: 'aucune-echeance',
-      ecran: 'argent',
+      ecran: 'obligations',
       gravite: 'retard',
       nombre: 1,
       donnees: {}
@@ -350,7 +352,7 @@ export function sujetsATraiter(
     if ((e.facturesSansTva ?? 0) > 0) {
       sujets.push({
         id: 'tva-a-regulariser',
-        ecran: 'activite',
+        ecran: 'factures',
         gravite: 'retard',
         nombre: e.facturesSansTva ?? 0,
         donnees: { depuis: tvaDue }
@@ -362,7 +364,7 @@ export function sujetsATraiter(
       const franchi = resteTva.valeur <= 0;
       sujets.push({
         id: 'seuil-tva',
-        ecran: 'argent',
+        ecran: 'tresorerie',
         gravite: franchi ? 'retard' : 'a_faire',
         nombre: 1,
         donnees: { franchi, reste: resteTva.valeur }
@@ -376,7 +378,7 @@ export function sujetsATraiter(
       && caAnnee >= plafond.valeur * seuils.partPlafond) {
     sujets.push({
       id: 'plafond-micro',
-      ecran: 'argent',
+      ecran: 'tresorerie',
       gravite: caAnnee > plafond.valeur ? 'retard' : 'a_faire',
       nombre: 1,
       donnees: { depasse: caAnnee > plafond.valeur, ca: caAnnee, plafond: plafond.valeur }
@@ -391,7 +393,7 @@ export function sujetsATraiter(
   if (sansMention.length > 0) {
     sujets.push({
       id: 'livre-recettes-incomplet',
-      ecran: 'argent',
+      ecran: 'obligations',
       gravite: 'a_faire',
       nombre: sansMention.length,
       donnees: {}
@@ -403,7 +405,7 @@ export function sujetsATraiter(
   if (verifieLe !== null && ajouterMois(verifieLe, seuils.moisFraicheurBareme) < moisCourant) {
     sujets.push({
       id: 'bareme-a-verifier',
-      ecran: 'config',
+      ecran: 'reglages',
       gravite: 'a_faire',
       nombre: 1,
       donnees: { verifieLe }
@@ -415,7 +417,7 @@ export function sujetsATraiter(
     const jours = joursEntre(e.aujourdhui, ech.date);
     sujets.push({
       id: `echeance-${ech.id}`,
-      ecran: ech.ecran ?? 'config',
+      ecran: ech.ecran ?? 'obligations',
       gravite: jours < 0
         ? (ech.sansSuivi === true ? 'a_faire' : 'retard')
         : jours <= 30 ? 'a_faire' : 'information',

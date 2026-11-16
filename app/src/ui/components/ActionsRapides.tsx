@@ -56,7 +56,7 @@ export const ACTIONS_RAPIDES: readonly ActionRapide[] = [
        dépense : c'est le livrable qu'on remet à un client, et le seul geste du
        mois qui a une échéance. Une dépense se saisit quand on veut. */
     libelle: 'Télécharger le CRA',
-    href: '#/outils/cra',
+    href: '#/activite/compte-rendu',
     icone: 'M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M9 12 H15 M9 16 H13'
   },
   {
@@ -66,17 +66,17 @@ export const ACTIONS_RAPIDES: readonly ActionRapide[] = [
   },
   {
     /* Le handoff ouvre sa rangée sur « Télécharger une facture ». Chez nous
-       elle mène à la LISTE des factures (l'onglet Factures d'Activité) et
+       elle mène à la LISTE des factures (l'écran Factures) et
        non à la rédaction : télécharger, c'est reprendre une facture déjà
        émise, et la liste est le seul endroit qui les montre. « Nouvelle
        facture », juste au-dessus, couvre l'autre geste. */
     libelle: 'Télécharger une facture',
-    href: '#/activite/factures',
+    href: '#/factures',
     icone: 'M6 3 H15 L19 7 V21 H6 Z M15 3 V7 H19 M12 10 V17 M9 14 L12 17 L15 14'
   },
   {
     libelle: 'Importer un relevé',
-    href: '#/achats/releve',
+    href: '#/tresorerie/releve',
     icone: 'M12 3 V14 M8 10 L12 14 L16 10 M4 17 V20 H20 V17'
   },
   {
@@ -86,7 +86,7 @@ export const ACTIONS_RAPIDES: readonly ActionRapide[] = [
   },
   {
     libelle: 'Mes données',
-    href: '#/config',
+    href: '#/reglages/donnees',
     icone: 'M8 3 H16 L21 8 V16 L16 21 H8 L3 16 V8 Z M10 12 H14 M12 10 V14'
   }
 ];

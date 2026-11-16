@@ -37,7 +37,7 @@ const utilisateurTest = () => userEvent.setup();
 async function afficher(
   section: string, ecran: React.ReactElement = <Config />
 ) {
-  window.location.hash = `#/config/${section}`;
+  window.location.hash = `#/reglages/${section}`;
   render(ecran);
   await waitFor(() => expect(screen.queryByText('Chargement…')).toBeNull());
 }
@@ -364,7 +364,7 @@ describe('affichage', () => {
     render(<Config />);
     await utilisateurTest().click(screen.getByRole('button', { name: /Affichage/ }));
     expect(await screen.findByRole('group', { name: 'Thème' })).toBeTruthy();
-    expect(window.location.hash).toBe('#/config/affichage');
+    expect(window.location.hash).toBe('#/reglages/affichage');
   });
 
   it('montre les quatre thèmes, « Nuit » compris, et ouvre sur Calme sans choix mémorisé', async () => {
@@ -1052,7 +1052,7 @@ describe('navigation entre les sections', () => {
   it('écrit l’adresse au clic sur une entrée', async () => {
     await afficher('profil');
     await utilisateurTest().click(within(nav()).getByRole('button', { name: /Facturation/ }));
-    expect(window.location.hash).toBe('#/config/facturation');
+    expect(window.location.hash).toBe('#/reglages/facturation');
     expect(await screen.findByLabelText('IBAN')).toBeTruthy();
   });
 
@@ -1064,11 +1064,13 @@ describe('navigation entre les sections', () => {
     expect(ouvertes[0]?.textContent).toMatch(/Données & export/);
   });
 
-  // Huit depuis le lot 51 : Affichage (thème, montants masqués) s'est ajouté
-  // aux sept, quand le thème a quitté la barre du haut.
-  it('liste les huit sections, sous-titre compris', async () => {
+  // Sept depuis le lot 51 : Affichage (thème, montants masqués) s'est ajouté
+  // quand le thème a quitté la barre du haut, et le livre des recettes — un
+  // lien seul, rien à régler — est parti vivre dans Obligations.
+  it('liste les sept sections, sous-titre compris, sans le livre des recettes', async () => {
     await afficher('profil');
-    expect(within(nav()).getAllByRole('button')).toHaveLength(8);
+    expect(within(nav()).getAllByRole('button')).toHaveLength(7);
+    expect(within(nav()).queryByRole('button', { name: /^Livre des recettes/ })).toBeNull();
     expect(within(nav()).getByText('Abattement, cotisations, TVA')).toBeTruthy();
     expect(within(nav()).getByText('Livre CSV, sauvegarde, restauration')).toBeTruthy();
     expect(within(nav()).getByText('Thème, montants masqués')).toBeTruthy();
@@ -1141,12 +1143,6 @@ describe('navigation entre les sections', () => {
     await afficher('facturation');
     expect(screen.queryByText(/TVA non applicable/)).toBeNull();
     expect(screen.getByText(/pénalités sont dues/)).toBeTruthy();
-  });
-
-  it('Livre des recettes : renvoie vers le registre dans Argent', async () => {
-    await afficher('livre');
-    const lien = screen.getByRole('link', { name: 'Ouvrir le livre des recettes' });
-    expect(lien.getAttribute('href')).toBe('#/argent/livre');
   });
 
   it('Données : l’export et la restauration', async () => {

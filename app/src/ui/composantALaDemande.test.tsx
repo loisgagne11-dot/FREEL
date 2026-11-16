@@ -36,13 +36,21 @@ describe('composantALaDemande — plus de repli une fois le code arrivé', () =>
 
 describe('sousRouteSiEcran — ne précharger que ce que l’adresse désigne', () => {
   it('rend la sous-route quand l’adresse désigne l’écran', () => {
-    expect(sousRouteSiEcran('config', '#/config/fiscal')).toBe('fiscal');
-    expect(sousRouteSiEcran('config', '#/config')).toBe('');
+    expect(sousRouteSiEcran('reglages', '#/reglages/fiscal')).toBe('fiscal');
+    expect(sousRouteSiEcran('reglages', '#/reglages')).toBe('');
   });
 
   it('rend null quand l’adresse désigne un autre écran', () => {
-    // Le module de Config peut arriver au repos pendant qu'on lit Argent :
-    // charger alors la section « fiscal » téléchargerait ce qu'on ne regarde pas.
-    expect(sousRouteSiEcran('config', '#/argent/fiscal')).toBeNull();
+    // Le module des Réglages peut arriver au repos pendant qu'on lit la
+    // Trésorerie : charger alors la section « fiscal » téléchargerait ce
+    // qu'on ne regarde pas.
+    expect(sousRouteSiEcran('reglages', '#/tresorerie/fiscal')).toBeNull();
+  });
+
+  /* Le module d'un écran peut s'évaluer avant que `useRoute` ait remplacé une
+     ancienne adresse : `#/config/fiscal`, lu tel quel, ne désignerait aucun
+     écran, et la section ouverte d'emblée arriverait après l'écran. */
+  it('lit une ancienne adresse comme la nouvelle', () => {
+    expect(sousRouteSiEcran('reglages', '#/config/fiscal')).toBe('fiscal');
   });
 });

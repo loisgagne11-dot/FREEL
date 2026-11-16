@@ -9,7 +9,8 @@
  *
  * Ce qui est vérifié, sur chaque taille et chaque palette :
  *   1. aucun débordement horizontal de la page ;
- *   2. le rail est latéral en desktop et le dock flottant en portrait ;
+ *   2. le rail est latéral au bureau, huit entrées nommées ; la barre basse
+ *      fixée en portrait, cinq entrées TOUTES nommées (lot 51, décision 3) ;
  *   3. les cibles tactiles de navigation atteignent 44 px en portrait ;
  *   4. le thème est appliqué avant le premier rendu (pas de flash) ;
  *   5. chaque contrôle de la barre du haut reste dans la fenêtre, et la
@@ -44,39 +45,47 @@ const PALETTES = ['sombre', 'nuit', 'clair', 'calme'];
  */
 const ECRANS = [
   { hash: '#/pilote', nom: 'pilote' },
-  { hash: '#/argent', nom: 'argent' },
-  { hash: '#/outils', nom: 'outils' },
-  { hash: '#/achats', nom: 'achats' },
   { hash: '#/activite', nom: 'activite' },
-  { hash: '#/config', nom: 'config' },
+  { hash: '#/factures', nom: 'factures' },
+  { hash: '#/tresorerie', nom: 'tresorerie' },
+  { hash: '#/obligations', nom: 'obligations' },
+  { hash: '#/achats', nom: 'achats' },
+  { hash: '#/simulateurs', nom: 'simulateurs' },
+  { hash: '#/reglages', nom: 'reglages' },
   // Chaque section des Réglages arrive à la demande, APRÈS le titre de
   // l'écran : sans attendre son contenu, on mesurait un panneau vide. Seul
   // `#/config` (Profil) était visité, et l'adresse Légifrance des Paramètres
   // fiscaux élargissait la page à 609 px sur téléphone sans que rien ne le voie.
-  { hash: '#/config/fiscal', nom: 'config-fiscal', attendre: 'text=Ajouter une période' },
-  { hash: '#/config/reserve', nom: 'config-reserve', attendre: 'text=Part gardée à chaque versement' },
-  { hash: '#/config/facturation', nom: 'config-facturation', attendre: 'text=Mentions portées' },
-  { hash: '#/config/livre', nom: 'config-livre', attendre: 'text=Ouvrir le livre des recettes' },
-  { hash: '#/config/compte', nom: 'config-compte', attendre: 'h2:has-text("Compte & synchronisation")' },
-  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
+  { hash: '#/reglages/fiscal', nom: 'reglages-fiscal', attendre: 'text=Ajouter une période' },
+  { hash: '#/reglages/reserve', nom: 'reglages-reserve', attendre: 'text=Part gardée à chaque versement' },
+  { hash: '#/reglages/facturation', nom: 'reglages-facturation', attendre: 'text=Mentions portées' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte', attendre: 'h2:has-text("Compte & synchronisation")' },
+  { hash: '#/reglages/donnees', nom: 'reglages-donnees', attendre: 'text=Archive complète (ZIP)' },
   // Le thème et le masquage des montants y vivent depuis le lot 51 : quatre
   // cartes côte à côte au bureau, deux par deux au téléphone.
-  { hash: '#/config/affichage', nom: 'config-affichage', attendre: 'text=Le thème choisi reste mémorisé' },
-  // La liste des factures est un onglet d'Activité (formule A du rail) ; la
-  // rédaction reste sous `#/facture/…`, et c'est l'un des écrans les plus denses.
-  { hash: '#/activite/factures', nom: 'factures' },
+  { hash: '#/reglages/affichage', nom: 'reglages-affichage', attendre: 'text=Le thème choisi reste mémorisé' },
+  // La rédaction reste sous `#/facture/…`, et c'est l'un des écrans les plus denses.
   { hash: '#/facture/nouvelle', nom: 'facture-nouvelle' }
 ];
 
 /**
- * Les entrées du rail : six, comme le handoff (décision n° 2, formule A).
+ * Les entrées du rail : huit au bureau (décision 1 du 16/11) — six pour ce
+ * qu'on vient faire, Simulateurs et Réglages sous un filet.
  *
- * Ce n'est plus le nombre d'écrans : la liste des factures vit sous Activité,
- * et le pied du rail porte deux liens de plus (livre des recettes, carte de
- * l'utilisateur) qui ne sont pas des entrées — masqués sur téléphone, ils
- * tiraient la plus petite cible tactile à 0 px.
+ * Ce n'est pas le nombre d'écrans : la rédaction d'une facture n'a pas
+ * d'entrée, et la carte de l'utilisateur, en pied, n'en est pas une —
+ * masquée sur téléphone, elle tirait la plus petite cible tactile à 0 px.
  */
-const ENTREES_DU_RAIL = 6;
+const ENTREES_DU_RAIL = 8;
+
+/**
+ * La barre basse du téléphone : Pilote, Activité, Factures, Trésorerie et
+ * « Plus », toutes nommées (décision 3 du 16/11, maquette
+ * `pilote-telephone.html`). La règle d'avant — un seul libellé, celui de
+ * l'onglet actif — tenait six icônes dans une pilule de 340 px ; elle obligeait
+ * à reconnaître six dessins, et la maquette l'a remplacée.
+ */
+const ENTREES_DU_TELEPHONE = 5;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -196,7 +205,12 @@ for (const taille of TAILLES) {
       // premier nav de la page », pas « le rail de navigation ».
       const nav = document.querySelector('nav[aria-label="Navigation principale"]');
       const style = nav ? getComputedStyle(nav) : null;
-      const liens = nav ? [...nav.querySelectorAll('a[data-role="entree"]')] : [];
+      // Les entrées VISIBLES : au téléphone, Obligations, Achats, Simulateurs
+      // et Réglages sont dans le volet « Plus » ; au bureau, « Plus » est
+      // masqué. `getClientRects` est vide pour un `display: none`.
+      const liens = nav
+        ? [...nav.querySelectorAll('[data-role="entree"]')].filter((x) => x.getClientRects().length > 0)
+        : [];
       const hauteurs = liens.map((a) => a.getBoundingClientRect().height);
       return {
         theme: document.documentElement.getAttribute('data-theme'),
@@ -212,9 +226,6 @@ for (const taille of TAILLES) {
         nbLibellesVisibles: liens.filter(
           (a) => a.querySelector('[data-role="libelle"]')?.offsetParent != null
         ).length,
-        libelleSurLActif: liens
-          .filter((a) => a.querySelector('[data-role="libelle"]')?.offsetParent != null)
-          .every((a) => a.getAttribute('aria-current') === 'page'),
         hauteurMiniLien: hauteurs.length > 0 ? Math.min(...hauteurs) : 0,
         contenuPresent: document.getElementById('contenu-principal') !== null,
         /*
@@ -260,9 +271,10 @@ for (const taille of TAILLES) {
       mesures.largeurDocument <= mesures.largeurFenetre + 1,
       `${prefixe} aucun débordement horizontal (${mesures.largeurDocument} ≤ ${mesures.largeurFenetre})`
     );
+    const attendues = taille.portrait ? ENTREES_DU_TELEPHONE : ENTREES_DU_RAIL;
     constate(
-      mesures.navPresente && mesures.nbLiens === ENTREES_DU_RAIL,
-      `${prefixe} ${ENTREES_DU_RAIL} entrées de navigation (${mesures.nbLiens})`
+      mesures.navPresente && mesures.nbLiens === attendues,
+      `${prefixe} ${attendues} entrées de navigation (${mesures.nbLiens})`
     );
     constate(mesures.contenuPresent, `${prefixe} contenu principal présent et ciblable`);
     constate(
@@ -278,17 +290,13 @@ for (const taille of TAILLES) {
     );
 
     if (taille.portrait) {
-      constate(mesures.navPosition === 'fixed', `${prefixe} dock flottant en portrait`);
-      // Exigence de la cible : six onglets dans ~340 px ne tiennent que si
-      // un seul porte son libellé. La règle vit en CSS ; sans assertion, une
-      // refonte de la feuille la casserait sans que rien ne le signale.
+      constate(mesures.navPosition === 'fixed', `${prefixe} barre basse fixée en portrait`);
+      // Toutes nommées : une icône seule obligerait à la reconnaître. La règle
+      // vit en CSS ; sans assertion, une refonte de la feuille la casserait
+      // sans que rien ne le signale.
       constate(
-        mesures.nbLibellesVisibles === 1,
-        `${prefixe} un seul libellé d'onglet en portrait (${mesures.nbLibellesVisibles})`
-      );
-      constate(
-        mesures.libelleSurLActif,
-        `${prefixe} le libellé visible est celui de l'onglet actif`
+        mesures.nbLibellesVisibles === ENTREES_DU_TELEPHONE,
+        `${prefixe} les ${ENTREES_DU_TELEPHONE} entrées nommées en portrait (${mesures.nbLibellesVisibles})`
       );
       constate(
         mesures.hauteurMiniLien >= 44,

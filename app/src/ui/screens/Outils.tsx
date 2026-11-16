@@ -314,4 +314,4 @@ export function Outils({ annee, onAnnee }: ProprietesOutils = {}) {
 
 // Le CRA ne s'ouvre que par `#/outils/cra` : n'en charger le module que si
 // l'adresse le désigne, pour que l'écran et lui arrivent d'un même mouvement.
-if (sousRouteSiEcran('outils', adresseCourante()) === 'cra') GenerateurCra.lancer();
+if (sousRouteSiEcran('simulateurs', adresseCourante()) === 'cra') GenerateurCra.lancer();

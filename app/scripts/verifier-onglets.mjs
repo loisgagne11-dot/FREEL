@@ -105,7 +105,7 @@ async function deuxOnglets(base, navigateur, { sansVerrou }) {
     await contexte.addInitScript(() => { Object.defineProperty(navigator, 'locks', { value: undefined }); });
   }
   const [a, b] = await Promise.all([contexte.newPage(), contexte.newPage()]);
-  await Promise.all([a.goto(`${base}#/config/compte`), b.goto(`${base}#/config/compte`)]);
+  await Promise.all([a.goto(`${base}#/reglages/compte`), b.goto(`${base}#/reglages/compte`)]);
   await Promise.all([a.waitForTimeout(2500), b.waitForTimeout(2500)]);
 
   const connecte = async (p) => (await p.getByRole('button', { name: 'Se déconnecter', exact: true }).count()) > 0;

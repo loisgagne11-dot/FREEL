@@ -1,56 +1,68 @@
 /* ============================================================
    RailNav — une seule structure DOM, deux formes pilotées par media
-   query : dock flottant en pilule (mobile, base) puis rail latéral fixe
-   (desktop, min-width). Mobile-first en couches min-width, comme partout
-   dans cette coquille — jamais de disposition recalculée en JS (invariant
-   n°7 du projet).
+   query : barre basse au téléphone (base) puis rail latéral (bureau,
+   min-width). Mobile-first en couches min-width, comme partout dans
+   cette coquille — jamais de disposition recalculée en JS (invariant
+   n°7 du projet). Mesures : maquettes `pilote-telephone.html`
+   (.tel-bar) et `navigation.html` (.e-rail), calme.css faisant foi.
    ============================================================ */
 
+/* ---------- téléphone : la barre basse, cinq entrées nommées ---------- */
+
+/*
+ * UNE BARRE, PLUS UNE PILULE FLOTTANTE (lot 51, décision 3).
+ *
+ * Le dock flottait au-dessus du contenu, six icônes dont seule l'active portait
+ * son nom. La maquette pose une barre pleine largeur de cinq entrées toutes
+ * nommées : on lit « Factures » au lieu d'apprendre un dessin de document.
+ *
+ * Pas de `backdrop-filter`, et ce n'est pas un oubli : il ferait de la barre
+ * le bloc conteneur de tout descendant en `position: fixed`. Le dégradé des
+ * jetons `--rail-a`/`--rail-b` est opaque, il n'y a rien à flouter au travers.
+ */
 .rail {
   position: fixed;
-  left: 50%;
-  right: auto;
-  bottom: calc(13px + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 60;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 2px;
-  max-width: calc(100vw - 20px);
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 100px;
-  background: var(--dock);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  box-shadow: var(--sh-2);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.rail::-webkit-scrollbar {
-  display: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* La barre système de l'iPhone sous les entrées, jamais dessus. */
+  padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, var(--rail-a), var(--rail-b));
+  border-top: 1px solid var(--line-2);
 }
 
 .lien {
   position: relative;
-  flex: 0 0 auto;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  /* Cible tactile 44px minimum, y compris pour les onglets icône seule. */
-  min-width: 44px;
-  min-height: 44px;
-  padding: 10px 13px;
-  border-radius: 100px;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  /* 50 px, comme la maquette — au-dessus des 44 px d'une cible tactile. */
+  min-height: 50px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--muted);
-  transition: background .16s, color .16s;
+  cursor: pointer;
+  transition: color .16s;
 }
 
-.lien:hover {
-  color: var(--text);
-}
+.lien:hover { color: var(--text); }
+
+.actif,
+.actif:hover { color: var(--green); }
+
+/* Obligations, Achats, Simulateurs et Réglages : dans le volet « Plus ». */
+.horsBarre,
+.filet { display: none; }
 
 .icone {
   position: relative;
@@ -66,91 +78,34 @@
 }
 
 .libelle {
-  display: none;
-  font-size: 13px;
-  letter-spacing: -.01em;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Seul l'onglet actif porte son libellé en portrait — contrainte des six
-   onglets dans une largeur de dock étroite (~340px). */
-.actif .libelle {
-  display: inline;
-}
-
-.actif {
-  background: var(--text);
-  color: var(--bg);
-}
-
-/* En portrait (base mobile-first), le badge se pose au coin de l'icône :
-   le libellé est masqué pour la plupart des onglets, il n'y a pas de fin
-   de ligne où l'accrocher comme en desktop. */
+/* Le compteur se pose au coin de l'icône : le libellé est dessous, il n'y a
+   pas de fin de ligne où l'accrocher comme au bureau. */
 .badge {
   position: absolute;
-  top: -2px;
-  left: 24px;
-  min-width: 15px;
-  height: 15px;
+  top: 2px;
+  left: calc(50% + 6px);
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
-  border-radius: 20px;
+  border-radius: 8px;
   display: inline-grid;
   place-items: center;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
   background: var(--amber-soft);
-  color: var(--amber);
-  box-shadow: inset 0 0 0 1px var(--amber-line);
+  color: var(--chip-warn);
 }
 
-/* ---------- desktop : rail latéral fixe, 212px, tous les libellés visibles ---------- */
-/* Le pied n'existe qu'en grand écran : voir `PiedDuRail`. */
-.pied { display: none; }
-
-@media (min-width: 761px) {
-  .pied {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: auto;
-    padding-top: 14px;
-    border-top: 1px solid var(--line);
-  }
-
-  .qui {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 44px;
-    padding: 6px 8px;
-    border-radius: 14px;
-    color: var(--text);
-    text-decoration: none;
-  }
-  .qui:hover { background: var(--panel-2); }
-
-  .avatar {
-    flex: none;
-    width: 34px;
-    height: 34px;
-    /* Un disque, comme le handoff. */
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-size: 12px;
-    font-weight: 650;
-    color: var(--green);
-    background: var(--green-glow);
-    box-shadow: inset 0 0 0 1px var(--green-line);
-  }
-
-  .quiTexte { display: flex; flex-direction: column; min-width: 0; }
-  .quiNom { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .quiRegime { font-size: 11.5px; color: var(--muted); }
-}
+/* ---------- bureau : le rail latéral, 212 px ---------- */
+/* La carte de l'utilisateur n'existe qu'en grand écran : voir `PiedDuRail`. */
+.carte { display: none; }
 
 @media (min-width: 761px) {
   /*
@@ -159,57 +114,47 @@
    * En `static` avec `height: 100dvh`, il s'arrêtait à la hauteur d'ÉCRAN : sur
    * une page de trois mille six cents pixels — la Trésorerie déployée — sa
    * colonne perdait son fond et sa bordure aux deux tiers, et le gris de page
-   * apparaissait dessous. Le défaut sautait aux yeux en thème clair, où le fond
-   * du rail est blanc, et passait presque inaperçu en sombre.
-   *
-   * `sticky` corrige les deux d'un coup : la colonne reste peinte sur toute la
-   * hauteur puisqu'elle ne quitte jamais l'écran, et la navigation demeure
-   * atteignable sans remonter — ce qu'un rail latéral doit faire de toute façon.
+   * apparaissait dessous. `sticky` corrige les deux d'un coup : la colonne
+   * reste peinte sur toute la hauteur puisqu'elle ne quitte jamais l'écran, et
+   * la navigation demeure atteignable sans remonter.
    */
   .rail {
     position: sticky;
     top: 0;
     left: auto;
+    right: auto;
     bottom: auto;
-    transform: none;
     align-self: start;
+    display: flex;
     flex-direction: column;
-    align-items: stretch;
     gap: 4px;
+    flex: 0 0 212px;
     width: 212px;
-    max-width: none;
     height: 100dvh;
-    padding: 24px 14px;
-    border: none;
+    padding: 26px 14px 22px;
+    border-top: 0;
     border-right: 1px solid var(--line);
-    border-radius: 0;
-    background: linear-gradient(180deg, var(--rail-a), var(--rail-b) 70%);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: none;
-    overflow-x: visible;
     overflow-y: auto;
   }
 
   /*
-   * Le mot « freel » en tête du rail, comme le handoff — l'avant-dernière
+   * Le mot « freel » en tête du rail, comme la maquette — l'avant-dernière
    * lettre en vert.
    *
-   * En CSS et non en JSX : le paquet d'entrée est à 0,1 Ko de son budget, et
-   * un logo n'a rien à y faire. Le dégradé, découpé à la forme du texte, pose
-   * le vert sur le quatrième caractère ; les deux couleurs sont des tokens,
-   * donc le mot suit les quatre palettes. Décoratif : le nom de l'application
-   * est déjà dans le titre de la page, rien n'est perdu pour un lecteur
-   * d'écran.
+   * En CSS et non en JSX : un logo n'a rien à faire dans le paquet d'entrée.
+   * Le dégradé, découpé à la forme du texte, pose le vert sur le quatrième
+   * caractère ; les deux couleurs sont des jetons, donc le mot suit les quatre
+   * thèmes. Décoratif : le nom de l'application est déjà dans le titre de la
+   * page, rien n'est perdu pour un lecteur d'écran.
    */
   .rail::before {
     content: 'freel';
     display: block;
     width: max-content;
-    margin: 0 13px 18px;
-    font-size: 23px;
+    margin: 0 12px 22px;
+    font-size: 26px;
     font-weight: 700;
-    letter-spacing: -0.04em;
+    letter-spacing: -0.03em;
     line-height: 1;
     background: linear-gradient(90deg, var(--text) 0 57%, var(--green) 57% 84%, var(--text) 84%);
     -webkit-background-clip: text;
@@ -217,28 +162,86 @@
     color: transparent;
   }
 
-  .lien {
-    min-width: 0;
-    padding: 11px 13px;
+  .lien,
+  .horsBarre {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: 46px;
+    padding: 0 12px;
     border-radius: 14px;
+    border: 1px solid transparent;
+    font-size: 15px;
+    font-weight: 500;
   }
 
-  .libelle {
-    display: inline;
+  .actif,
+  .actif:hover {
+    background: var(--card-a);
+    border-color: var(--line);
+    box-shadow: var(--sh-1);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .icone {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Sous le filet, un cran plus discret : on y vient régler, pas travailler. */
+  .pied {
+    min-height: 42px;
     font-size: 14px;
   }
 
-  .actif {
-    background: linear-gradient(180deg, var(--panel-3), var(--panel-2));
-    color: var(--text);
-    box-shadow: inset 0 0 0 1px var(--line-2);
+  .filet {
+    display: block;
+    height: 1px;
+    margin: 10px 12px;
+    background: var(--line);
   }
+
+  /* « Plus » n'a pas de sens quand tout tient dans le rail. */
+  .plus { display: none; }
 
   .badge {
     position: static;
     margin-left: auto;
-    min-width: 19px;
-    height: 19px;
-    font-size: 10.5px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    font-size: 12px;
   }
+
+  .carte {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: auto;
+    min-height: 44px;
+    padding: 14px 12px 0;
+    border-top: 1px solid var(--line);
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .avatar {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--k1t);
+    background: var(--k1);
+  }
+
+  .quiTexte { display: flex; flex-direction: column; min-width: 0; }
+  .quiNom { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .quiRegime { font-size: 12.5px; color: var(--muted); }
 }

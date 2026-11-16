@@ -125,6 +125,11 @@
     background: var(--card-a);
   }
 
+  /* Le masquage passe dans le volet « Plus » de la barre basse (décision 3) :
+     la barre du haut garde le logo, la recherche, la synchronisation et
+     « + Nouveau », chacun à 44 px — une cinquième icône les aurait serrés. */
+  .icone { display: none; }
+
   .etiquette { display: none; }
   .iconeCloud { display: block; }
   .relie { color: var(--green); }

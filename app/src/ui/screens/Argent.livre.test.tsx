@@ -169,21 +169,31 @@ describe('livre vide', () => {
 describe('l’adresse du livre', () => {
   afterEach(() => { window.location.hash = ''; });
 
-  it('ouvre le registre sur `#/argent/livre`, puis rend l’adresse de l’écran', async () => {
+  it('ouvre le registre sur `#/obligations/livre`, puis rend l’adresse de l’écran', async () => {
+    semer({ recettes: [recette()] });
+    window.location.hash = '#/obligations/livre';
+    render(<Argent />);
+    expect(await screen.findByRole('heading', { name: /^Écritures/ })).toBeTruthy();
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/obligations'));
+  });
+
+  /* L'ancienne porte du pied du rail survit dans les favoris : elle doit
+     toujours ouvrir le registre, et non l'écran nu. */
+  it('ouvre encore le registre depuis l’ancienne adresse `#/argent/livre`', async () => {
     semer({ recettes: [recette()] });
     window.location.hash = '#/argent/livre';
     render(<Argent />);
     expect(await screen.findByRole('heading', { name: /^Écritures/ })).toBeTruthy();
-    await vi.waitFor(() => expect(window.location.hash).toBe('#/argent'));
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/obligations'));
   });
 
   // Le registre des achats renvoie ici : sans ce geste, le lien « Suivi &
-  // déclaration TVA » atterrirait sur Argent sans rien ouvrir.
-  it('ouvre le dossier de TVA sur `#/argent/tva`, puis rend l’adresse de l’écran', async () => {
+  // déclaration TVA » atterrirait sur l'écran sans rien ouvrir.
+  it('ouvre le dossier de TVA sur `#/obligations/tva`, puis rend l’adresse de l’écran', async () => {
     semer({ recettes: [recette()] });
-    window.location.hash = '#/argent/tva';
+    window.location.hash = '#/obligations/tva';
     render(<Argent />);
     expect(await screen.findByRole('dialog', { name: 'Déclaration de TVA' })).toBeTruthy();
-    await vi.waitFor(() => expect(window.location.hash).toBe('#/argent'));
+    await vi.waitFor(() => expect(window.location.hash).toBe('#/obligations'));
   });
 });
