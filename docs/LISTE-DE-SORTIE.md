@@ -43,6 +43,7 @@ Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 | 21 | Publication | ✅ annoncée le 13/11 : l'application sera ouverte à d'autres ; la sécurité doit être bonne avant. **Reste à trancher** : le modèle — A « chacun chez soi » (données sur l'appareil, synchronisation facultative vers son propre projet) ou B « comptes hébergés » par le propriétaire. Tant que rien n'est dit, le plan suit A | `AUDIT-SECURITE.md` ; lots 56 à 62. Recommandation : A d'abord — en B, le propriétaire détient les finances de tiers et en répond |
 | 22 | Nom de domaine et hébergeur | ⬜ à décider avant le lot 60. L'hébergement actuel ne pose aucun en-tête et partage son origine | Un hébergeur de fichiers statiques qui pose des en-têtes, et un nom de domaine propre |
 | 23 | Identité de l'éditeur pour les mentions légales | ⬜ à fournir avant le lot 61, **hors dépôt** (variables de construction). À mesurer : publier en tant que professionnel affiche son nom et son adresse de domiciliation sur le site | `AUDIT-SECURITE.md` §8 |
+| 24 | Un seul « à te verser » | ✅ tranché le 16/11 : la « part gardée à chaque versement » **se fond dans la réserve**. Deux montants portaient le nom « à te verser » — disponible − réserve (Pilote, anneau) et ce même montant moins la part gardée (carte de la Trésorerie) — et ne coïncidaient que parce que la démo garde 0 %. Il n'en reste qu'un | Lot 49 : retrait du fait `partGardeeAuVersement`, migration, Réglages › Réserve |
 
 ## Dates officielles relevées (11/11/2026)
 
@@ -92,9 +93,9 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 9 | 58 | **Sécurité** — l'ancienne version est bridée, l'application refuse le cadre | ✅ fusionné le 15/11 (PR #339) |
 | 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ✅ fusionné le 15/11 (PR #340) |
 | — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
-| 11 | 51 | Nouvelle navigation et jetons de style | 🔶 en cours : jetons posés ; navigation dessinée (`design/direction/navigation.html`), attend la validation du propriétaire |
+| 11 | 51 | Nouvelle navigation et jetons de style | ✅ fini le 16/11 : navigation validée et posée (PR #341, #345, #346, #347 à fusionner) ; composants de la planche reportés à leur premier écran (lots 49, 52) |
 | 12 | 53 + 34 | Écran Obligations, frise aux dates officielles | ⬜ |
-| 13 | 31 | Une mission à plusieurs clients | ✅ fini le 16/11 : calcul (PR #343, schéma 24), écrans (PR #344, à fusionner) |
+| 13 | 31 | Une mission à plusieurs clients | ✅ fini le 16/11 : calcul (PR #343, schéma 24), écrans (PR #344) |
 | 14 | 48 | Mission enrichie et carnet de commandes | ⬜ |
 | 15 | 49 | Trésorerie à douze mois | ⬜ |
 | 16 | 50 | Ce que je gagne vraiment | ⬜ |
@@ -147,7 +148,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Rail : Pilote, Activité, Factures, Trésorerie, Obligations, Achats ; Simulateurs et Réglages en pied. Les anciennes adresses redirigent | ✅ 16/11 — Factures et Obligations sont des écrans ; au téléphone, cinq entrées nommées et le volet « Plus » ; chaque ancienne adresse tenue par une ligne de test ; « à traiter » mène à l'écran qui règle l'alerte |
 | Le compte rendu d'activité passe sous Activité ; l'import du relevé et le rapprochement sous Trésorerie ; l'analyse du chiffre d'affaires sous Activité › Analyse | ✅ 16/11 — et « Tu peux te verser » avec la capacité de versement sous Trésorerie ; l'échéancier sous Obligations ; Achats garde les dépenses, Simulateurs l'impôt et la CFE. Contenus déplacés, pas encore recomposés selon les maquettes (lots 48, 49, 50, 53) |
 | Une seule commande de période par écran, dans son en-tête ; le thème en Réglages ; barre du haut : recherche, « Nouveau », synchronisation libellée | ✅ 16/11 — barre : recherche, synchronisation écrite (icône nommée au téléphone), masquer les montants, « + Nouveau » ; « Exporter » et « à traiter » en sont partis ; période dans l'en-tête de chaque écran, mois partagé ; Réglages › Affichage (thème, masquer) |
-| Cinq mots pour l'argent, partout : solde, dû, disponible, réserve, à te verser — passe relue à l'œil | ⬜ |
+| Cinq mots pour l'argent, partout : solde, dû, disponible, réserve, à te verser — passe relue à l'œil | ✅ 16/11 — « sorties » et « dus » deviennent « dû » là où c'est le dû ; la capacité mensuelle devient « versement tenable » ; un contrôle de lexique lit le texte rendu de chaque écran et de ses onglets et refuse « versable », « provisions », « matelas », « reste à sortir », « hors provisions ». Le second « à te verser » (moins la part gardée) disparaît au lot 49, décision 24 |
 | Jetons ajoutés par `design/DIRECTION-VISUELLE.md` (couleurs de charges validées, série en retrait, pastilles, clients du planning), dans les quatre thèmes à la fois ; composants communs de la planche : carte, tuile à tendance, pastille signe + mot, barre de répartition | ✅ jetons 15/11 (contraste contrôlé : aplats 3:1, textes 4,5:1) ; pastille signe + mot 16/11 (`Statut`). **La carte héros, la tuile à tendance et la barre de répartition passent au premier lot qui les affiche** (49 : « Ce qui est dû » ; 52 : le héros et les tuiles du Pilote) : un composant sans écran qui l'importe est refusé par `verifier-code-mort`, et le dessiner sans son premier usage, c'est le dessiner à l'aveugle |
 | Polices embarquées (`woff2`, sous-ensemble latin, licence vérifiée), jamais par un CDN : aujourd'hui aucune n'est chargée et l'écran s'affiche en police système. Si le poids ne tient pas dans les budgets, la pile système reste || ✅ 16/11 — tranché : la pile système reste (≈ 75 Ko de polices pour 9,7 Ko de marge), consigné dans `DIRECTION-VISUELLE.md` |
 | Thème par défaut selon la décision 20 | ✅ 16/11 — Calme pour un nouvel utilisateur (theme.ts, script en ligne et son empreinte, repli des jetons) ; le thème mémorisé reste ; « Nuit » remplace « Calme sombre » |
@@ -181,6 +182,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Les charges posées à leur date d'échéance dans le solde prévu | ⬜ |
 | Deux « et si », sur des faits : compter les prospects ; arrêter une mission à une date | ⬜ |
 | Franchissement des seuils par le pipeline (factures émises, planning au délai de paiement) ; jours facturables avant le seuil | ⬜ |
+| Décision 24 : la part gardée se fond dans la réserve. Retirer le fait `partGardeeAuVersement` et son réglage ; la migration ne convertit pas un pourcentage en montant (il n'y a pas d'équivalent exact) : elle le retire et l'écran le dit une fois, avec la réserve à relever si l'utilisateur gardait plus ; la carte « Tu peux te verser » montre alors le seul « à te verser » | ⬜ |
 | Composant commun « barre de répartition » de la planche (`e-split`), venu du lot 51, construit ici avec son premier usage : « Ce qui est dû », une barre par charge | ⬜ |
 
 ### Lot 50 — Ce que je gagne vraiment

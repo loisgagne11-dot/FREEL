@@ -595,3 +595,9 @@ chiffre faux.
 | Livre des recettes, TVA, DES | 🟢 | Depuis Obligations (`#/obligations/livre`, `#/obligations/tva`) ; le lien seul du pied du rail et de Config disparaît |
 | Masquer les montants au téléphone | 🟢 | Interrupteur du volet « Plus » |
 | « À traiter » | 🟢 | Les compteurs du rail et du volet ; chaque alerte mène à l'écran qui la règle : échéances → Obligations, factures en retard → Factures, seuils → Trésorerie, barème → Réglages |
+
+## Lot 51, les cinq mots (16/11)
+
+Aucune fonction ne change. L'ancienne version nommait le même montant de six
+façons (constat E3) ; la nouvelle n'en garde qu'une par grandeur, et un
+contrôle de lexique sur le texte rendu empêche les anciens noms de revenir.
