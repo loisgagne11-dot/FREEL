@@ -262,6 +262,12 @@ for (const taille of TAILLES) {
           const r = e.getBoundingClientRect();
           return r.width > 20 && r.height > 0 && getComputedStyle(e).display !== 'none';
         })(),
+        /* Les rangées d'onglets qui doivent glisser pour montrer leur dernier
+           onglet : à 390 px, « Analyse » d'Activité sortait du cadre (lot 51),
+           et un onglet coupé ne dit pas qu'il existe. */
+        ongletsCoupes: [...document.querySelectorAll('[role="tablist"]')]
+          .filter((l) => l.getClientRects().length > 0 && l.scrollWidth > l.clientWidth + 1)
+          .map((l) => `${l.getAttribute('aria-label') ?? 'onglets'} (${l.scrollWidth} > ${l.clientWidth})`),
         couleurFond: getComputedStyle(document.body).backgroundColor
       };
     });
@@ -300,6 +306,11 @@ for (const taille of TAILLES) {
       constate(
         mesures.nbLibellesVisibles === ENTREES_DU_TELEPHONE,
         `${prefixe} les ${ENTREES_DU_TELEPHONE} entrées nommées en portrait (${mesures.nbLibellesVisibles})`
+      );
+      constate(
+        mesures.ongletsCoupes.length === 0,
+        `${prefixe} chaque rangée d'onglets tient sans glisser`
+          + (mesures.ongletsCoupes.length > 0 ? ` (${mesures.ongletsCoupes.join(', ')})` : '')
       );
       constate(
         mesures.hauteurMiniLien >= 44,

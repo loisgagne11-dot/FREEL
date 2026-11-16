@@ -139,7 +139,9 @@ export function indicateursDeSante(
     dispo >= 0
       ? {
         id: 'provisions', libelle: 'Dû couvert', etat: 'bon',
-        valeur: provisions === 0 ? 'rien n’est dû' : `${eur(provisions)} dus`
+        // Le libellé dit déjà « Dû » : le montant seul, sans un « dus » qui
+        // redirait le mot au pluriel (règle des cinq mots, lot 51).
+        valeur: provisions === 0 ? 'rien n’est dû' : eur(provisions)
       }
       : { id: 'provisions', libelle: 'Dû non couvert', etat: 'alerte', valeur: `il manque ${eur(-dispo)}` },
     facturesEnRetard === 0

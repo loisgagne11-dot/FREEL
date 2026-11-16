@@ -95,7 +95,7 @@ export function FluxCard(
 
   const detaillables = [
     { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes, vers: VERS_FACTURES, onPointer },
-    { cle: 'sorties', titre: 'Sorties', lignes: sorties, vers: VERS_ECHEANCIER, onPointer: onPayer }
+    { cle: 'sorties', titre: 'Dû', lignes: sorties, vers: VERS_ECHEANCIER, onPointer: onPayer }
   ].filter((d) => d.lignes.length > 0);
 
   return (
@@ -130,7 +130,11 @@ export function FluxCard(
         </div>
 
         <div className={styles.colonne}>
-          <span className={`${styles.libelle} ${styles.sortie}`}>Sorties</span>
+          {/* « Dû » et non « Sorties » : le total est le dû du jour, charges
+              des encaissements non déclarés comprises — de l'argent qui n'a
+              pas encore quitté le compte. L'appeler « sorties » faisait lire
+              une dépense là où il y a une dette (règle des cinq mots, E3). */}
+          <span className={`${styles.libelle} ${styles.sortie}`}>Dû</span>
           <span className={`${styles.montant} ${styles.sortie}`}>
             <Montant>{eur(flux.sorties.total)}</Montant>
           </span>

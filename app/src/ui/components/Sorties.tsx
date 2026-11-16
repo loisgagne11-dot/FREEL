@@ -79,7 +79,7 @@ export function Sorties(
     <Sheet
       ouvert
       variante="atelier"
-      titre="Sorties"
+      titre="Ce qui est dû"
       sousTitre="pointe une échéance comme payée"
       onFermer={onFermer}
       pied={(

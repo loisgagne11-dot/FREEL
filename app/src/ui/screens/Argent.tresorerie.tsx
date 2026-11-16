@@ -116,9 +116,11 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             </span>}
         resume={(
           <>
-            <Montant>{eur(etat.tresorerie.versable)}</Montant> à te verser
-            {' · '}<Montant>{eur(etat.tresorerie.provisions)}</Montant> dus
-            {' · '}<Montant>{eur(etat.tresorerie.reserve)}</Montant> de réserve
+            {/* Le mot, puis le montant : « 2 350 € dus » accordait le dû au
+                pluriel des euros, et le dû est un nom (règle des cinq mots). */}
+            à te verser <Montant>{eur(etat.tresorerie.versable)}</Montant>
+            {' · dû '}<Montant>{eur(etat.tresorerie.provisions)}</Montant>
+            {' · réserve '}<Montant>{eur(etat.tresorerie.reserve)}</Montant>
           </>
         )}
       >
@@ -155,7 +157,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
         actions={<span className={styles.indication}>clic = détail</span>}
         resume={(
           <>
-            <Montant>{eur(etat.tresorerie.provisions)}</Montant> dus
+            dû <Montant>{eur(etat.tresorerie.provisions)}</Montant>
             {' · dont '}<Montant>{eur(etat.voletConstate)}</Montant> déjà appelés
           </>
         )}
@@ -211,7 +213,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
       <CartePliable
         id="projection"
         ecran="argent"
-        titre="Où va ton disponible, et combien tu peux te verser"
+        titre="Où va ton disponible, et le versement tenable chaque mois"
         aide={<Info libelle="Ce que cette projection montre">
               Douze mois à venir, dans deux scénarios&nbsp;: sans rien te
               verser, et en te versant chaque mois le maximum qui ne fasse
@@ -220,7 +222,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
               réglées et du revenu prévu au planning — aucune tendance n’est
               devinée.
             </Info>}
-        resume="Projection sur douze mois, et versement mensuel soutenable"
+        resume="Projection sur douze mois, et versement tenable chaque mois"
       >
         <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
           <ProjectionPanneau />
@@ -854,20 +856,21 @@ function RepartitionDuSolde({ etat }: { readonly etat: EtatArgent }) {
       {t.dispo < 0 ? (
         <PhraseRepartition>
           Sur les <strong><Montant>{eur(t.solde)}</Montant></strong> du compte,{' '}
-          <strong>rien n’est à toi</strong>&nbsp;: les{' '}
-          <strong><Montant>{eur(t.provisions)}</Montant></strong> dus (URSSAF, impôt, TVA)
-          dépassent le solde de <strong><Montant>{eur(euros(manque))}</Montant></strong>.
+          <strong>ton disponible est négatif</strong>&nbsp;: le dû
+          (<strong><Montant>{eur(t.provisions)}</Montant></strong> — URSSAF, impôt, TVA)
+          dépasse le solde de <strong><Montant>{eur(euros(manque))}</Montant></strong>.
           Une partie de l’argent des cotisations a déjà été dépensée — le détail
           est dans les enveloppes ci-dessous.
         </PhraseRepartition>
       ) : (
         <PhraseRepartition>
           Sur les <strong><Montant>{eur(t.solde)}</Montant></strong> du compte,{' '}
-          <strong><Montant>{eur(t.dispo)}</Montant></strong> sont à toi —{' '}
+          <strong><Montant>{eur(t.dispo)}</Montant></strong> sont ton{' '}
+          <strong>disponible</strong> —{' '}
           <Montant>{eur(euros(seuilConstitue))}</Montant> de réserve
-          {' + '}<Montant>{eur(t.versable)}</Montant> que tu peux te verser. Les{' '}
+          {' + '}<Montant>{eur(t.versable)}</Montant> à te verser. Les{' '}
           <strong><Montant>{eur(euros(provisionsCouvertes))}</Montant></strong> restants
-          sont <strong>dus</strong> (URSSAF, impôt, TVA) — détaillés dans les
+          forment le <strong>dû</strong> (URSSAF, impôt, TVA), détaillé dans les
           enveloppes ci-dessous.
         </PhraseRepartition>
       )}

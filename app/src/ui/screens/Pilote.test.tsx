@@ -94,7 +94,9 @@ describe('la composition du Pilote', () => {
     expect(screen.queryByRole('heading', { name: 'À te verser' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Ce que je dois' })).toBeNull();
     expect(screen.queryByText('Réserve')).toBeNull();
-    expect(screen.queryByText('Dû')).toBeNull();
+    // « Dû » nomme la colonne du milieu du flux depuis la règle des cinq mots
+    // (lot 51), et seulement elle : une tuile qui le répéterait est un doublon.
+    expect(screen.getAllByText('Dû')).toHaveLength(1);
   });
 
   it('montre le flux, la santé, puis les décisions du jour', async () => {
@@ -183,12 +185,12 @@ describe('pointer un paiement', () => {
     render(<Pilote />);
 
     fireEvent.click(screen.getByRole('button', { name: /Cotisations URSSAF.*en retard.*pointer le paiement/ }));
-    const panneau = await screen.findByRole('dialog', { name: /Sorties/ });
+    const panneau = await screen.findByRole('dialog', { name: /Ce qui est dû/ });
     fireEvent.click(within(panneau).getByRole('button', { name: 'Confirmer le paiement' }));
 
     expect(useFaits.getState().faits.echeances[0]?.payeeLe).toBe('2026-06-10');
     fireEvent.click(within(panneau).getByRole('button', { name: 'Terminé' }));
-    const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
+    const sorties = screen.getByText('Dû').parentElement as HTMLElement;
     expect(within(sorties).queryByRole('button', { name: /pointer le paiement/ })).toBeNull();
   });
 });
