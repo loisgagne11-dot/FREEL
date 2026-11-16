@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { valeurPubliee } from '../test/resolution';
 import { type DateISO, type Mois, dateISO, euros, mois } from '../domain/types';
-import { type Faits, type Mission, type Recette, entiteVide, faitsVides } from './schema';
+import { type Faits, type Mission, type Recette, faitsVides } from './schema';
+import { entiteVide } from './schema.entite';
 import {
   capaciteParMois, compositionDuMois, resteAEncaisserDuMois, resultatProjete
 } from './selecteurs.performance';

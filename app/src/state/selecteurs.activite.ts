@@ -48,6 +48,7 @@ import { delaisParClient, type DelaiClient } from '../domain/calculs/activite';
 import type { DateISO, Euros, Mois, Resolution } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Faits, Mission } from './schema';
+import { payeursDeLaMission } from '../domain/calculs/brouillon';
 import {
   dateDuJour, periodesUrssafEffectives, regimeDe, sousAcreLe
 } from './selecteurs';
@@ -251,23 +252,26 @@ function dansLaFenetre(mission: Mission, date: DateISO): boolean {
  *
  * Les brouillons sont exclus : sans date d'émission, une facture n'a pas été
  * envoyée, et un devis en attente n'est pas du chiffre d'affaires.
+ *
+ * Le « client » d'une mission, ce sont tous ceux à qui elle peut facturer : son
+ * payeur, et ceux de ses plages quand elle se facture client par client
+ * (schéma 24). Sans eux, les journées payées en direct par un client final
+ * disparaîtraient du facturé de la mission qui les a produites.
  */
 function lignesDeMission(faits: Faits): readonly LigneMission[] {
   const missions = [...faits.missions].sort(prioriteMission);
+  const payeurs = new Map(missions.map((m) => [m, payeursDeLaMission(m)]));
+  const facturable = (m: Mission, r: Faits['recettes'][number]): boolean =>
+    payeurs.get(m)?.has(r.clientNom) === true && r.emiseLe !== null && dansLaFenetre(m, r.emiseLe);
 
   return missions.map((mission) => {
-    const siennes = faits.recettes.filter((r) =>
-      r.clientNom === mission.clientNom
-      && r.emiseLe !== null
-      && dansLaFenetre(mission, r.emiseLe)
-    );
+    const siennes = faits.recettes.filter((r) => facturable(mission, r));
 
-    // Les missions du même client dont la fenêtre couvre au moins une de ces
-    // factures — celle-ci comprise. Au-delà de une, le montant est celui du
-    // client et l'écran l'annonce.
+    // Les missions qui peuvent facturer au même client et dont la fenêtre
+    // couvre au moins une de ces factures — celle-ci comprise. Au-delà de une,
+    // le montant est celui du client et l'écran l'annonce.
     const missionsQuiPartagent = missions.filter((autre) =>
-      autre.clientNom === mission.clientNom
-      && siennes.some((r) => r.emiseLe !== null && dansLaFenetre(autre, r.emiseLe))
+      siennes.some((r) => facturable(autre, r))
     ).length;
 
     const facture = siennes.reduce<number>((s, r) => s + r.montant, 0);

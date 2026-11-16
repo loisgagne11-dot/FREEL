@@ -297,6 +297,36 @@ describe('carnet — clients', () => {
     expect(faits.recettes[0]?.clientNom).toBe('Dupont SARL');
   });
 
+  /**
+   * Le payeur d'une plage est un NOM (schéma 24). Sans propagation, renommer
+   * le client direct laisserait la plage payée par un nom que plus personne ne
+   * porte : le brouillon du mois partirait à un client absent du carnet.
+   */
+  it('renomme aussi le payeur des plages de rythme', () => {
+    ajouterClient(saisieClient('Client direct fictif'));
+    const idClient = clients()[0]?.id as string;
+    const plage = (facturerA: string | null) => ({
+      du: dateISO('2026-01-01'), au: dateISO('2026-12-31'), parJour: { lun: 1 }, tjm: null, facturerA
+    });
+    ajouterMission({
+      clientId: null, clientNom: 'Agence fictive', description: 'Mission via agence',
+      tjm: euros(400), debut: dateISO('2026-01-01'), fin: null, statut: 'active',
+      facturation: 'par_client',
+      entites: [{
+        id: 'co-1', nom: 'Client final', couleur: '', adresse: '', contact: '', email: '',
+        telephone: '', ajustements: {}, rythmes: [plage('Client direct fictif'), plage(null)]
+      }]
+    });
+
+    modifierClient(idClient, { nom: 'Client direct renommé' });
+
+    const mission = useFaits.getState().faits.missions[0];
+    expect(mission?.entites[0]?.rythmes.map((r) => r.facturerA))
+      .toEqual(['Client direct renommé', null]);
+    // Le payeur de la mission, lui, n'avait rien à voir avec ce client.
+    expect(mission?.clientNom).toBe('Agence fictive');
+  });
+
   // Corriger la casse est un renommage : sans propagation, l'ancienne casse
   // subsisterait dans les recettes.
   it('propage aussi une simple correction de casse', () => {

@@ -15,6 +15,7 @@
 import type { ZoneFeries } from '../domain/calculs/calendrier';
 import { joursDuMois, joursFeries } from '../domain/calculs/calendrier';
 import { planifier } from '../domain/calculs/planification';
+import type { JourPlanifie } from '../domain/calculs/planning';
 import { type PrevisionDuMois, previsionDuMois } from '../domain/calculs/prevision';
 import type { Mois } from '../domain/types';
 import type { ClientOperationnel, Faits, Mission } from './schema';
@@ -49,6 +50,29 @@ export function previsionDuMoisParMission(
   m: Mois,
   zone: ZoneFeries = 'general'
 ): readonly PrevisionDeMission[] {
+  return planningsDuMois(faits, m, zone)
+    .map(({ mission, entite, planning }) => ({
+      missionId: mission.id,
+      entiteId: entite.id,
+      libelle: libelleDeLaLigne(mission, entite),
+      prevision: previsionDuMois(m, planning, entite.rythmes, mission.tjm)
+    }))
+    .filter((x) => x.prevision.joursPrevus > 0 || x.prevision.joursRetenus > 0);
+}
+
+/**
+ * Le planning du mois de chaque client opérationnel des missions en cours.
+ *
+ * Exporté pour le brouillon de facture par payeur, qui doit répartir les
+ * journées une à une : recalculer le planning à côté — fériés, congés,
+ * missions retenues — en aurait fait une seconde source, et la facture d'un
+ * client aurait pu cesser de coller à la prévision du même mois.
+ */
+export function planningsDuMois(
+  faits: Faits,
+  m: Mois,
+  zone: ZoneFeries = 'general'
+): readonly { readonly mission: Mission; readonly entite: ClientOperationnel; readonly planning: readonly JourPlanifie[] }[] {
   const dates = joursDuMois(m);
   const feries = new Set<string>(joursFeries(Number(m.slice(0, 4)), zone));
 
@@ -58,19 +82,12 @@ export function previsionDuMoisParMission(
   return faits.missions
     .filter((mission) => mission.statut === 'active' || mission.statut === 'terminee')
     .flatMap((mission) => mission.entites.map((entite) => ({
-      missionId: mission.id,
-      entiteId: entite.id,
-      libelle: libelleDeLaLigne(mission, entite),
-      prevision: previsionDuMois(
-        m,
-        planifier(dates, {
-          rythmes: entite.rythmes, ajustements: entite.ajustements, feries, conges
-        }),
-        entite.rythmes,
-        mission.tjm
-      )
-    })))
-    .filter((x) => x.prevision.joursPrevus > 0 || x.prevision.joursRetenus > 0);
+      mission,
+      entite,
+      planning: planifier(dates, {
+        rythmes: entite.rythmes, ajustements: entite.ajustements, feries, conges
+      })
+    })));
 }
 
 /**

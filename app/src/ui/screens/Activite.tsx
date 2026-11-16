@@ -20,6 +20,7 @@ import {
   congeApresSaisie, creneauxDeLaPortee, creneauxOccupes, planifier, saisirSurPortee
 } from '../../domain/calculs/planning';
 import type { JourPlanifie } from '../../domain/calculs/planning';
+import { arretDuClient } from '../../domain/calculs/clientsOperationnels';
 import type { Affectation, SaisieDemiJournee } from '../components/EditeurDemiJournee';
 import {
   previsionDuMoisParMission, rapportParMission, tarifDeLaJournee
@@ -329,7 +330,7 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
    * journée éditée — jamais autrement.
    */
   const affectations = useMemo(
-    () => affectationsPossibles(faits, occupantsDuJour(jourEdite)),
+    () => affectationsPossibles(faits, occupantsDuJour(jourEdite), jourEdite?.date ?? null),
     [faits, jourEdite]
   );
 
@@ -1000,14 +1001,30 @@ function DependanceClients({ poids }: { poids: readonly PoidsClient[] }) {
  *
  * La teinte voyage avec le libellé : c'est elle qui fait le lien entre la
  * liste de l'éditeur et la bande colorée qu'on vient de cliquer sur la grille.
+ *
+ * Un client ARRÊTÉ avant la date éditée n'est plus proposé (lot 31) : l'arrêt
+ * borne ses plages et retire ses corrections postérieures, et le choisir ici
+ * recréerait une correction après l'arrêt — une journée chez un client parti,
+ * que le CRA et la facture compteraient.
+ *
+ * Il ne peut pas tenir la case qu'on édite : toute journée qu'il tient — par
+ * une plage ou par une correction — repousse sa fin d'autant (`finDuClient`).
+ * L'exception faite à la mission terminée n'a donc pas lieu d'être ici, et le
+ * pré-remplissage ne peut pas retomber sur un autre à sa place.
  */
 function affectationsPossibles(
   faits: { readonly missions: readonly Mission[] },
-  dejaLa: ReadonlySet<string>
+  dejaLa: ReadonlySet<string>,
+  date: DateISO | null
 ): readonly Affectation[] {
+  const arreteAvant = (m: Mission, e: Mission['entites'][number]): boolean => {
+    if (date === null) return false;
+    const arret = arretDuClient(m, e);
+    return arret !== null && arret < date;
+  };
   return faits.missions
     .filter((m) => m.statut === 'active' || m.entites.some((e) => dejaLa.has(cleAffectation(m.id, e.id))))
-    .flatMap((m) => m.entites.map((e) => ({
+    .flatMap((m) => m.entites.filter((e) => !arreteAvant(m, e)).map((e) => ({
       missionId: m.id,
       entiteId: e.id,
       couleur: e.couleur,

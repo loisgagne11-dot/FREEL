@@ -19,7 +19,7 @@
     "invalide) — invariant n°6 : le dépôt est public, aucune donnée personnelle",
     "n'y entre."
   ],
-  "version": 23,
+  "version": 24,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "prenom": "Camille",
@@ -95,6 +95,7 @@
       "debut": "2025-10-01",
       "fin": "2026-01-30",
       "statut": "terminee",
+      "facturation": "commune",
       "entites": [
         {
           "id": "mis-lancement-co1",
@@ -112,7 +113,8 @@
                 "mar": 1,
                 "jeu": 0.5
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             }
           ],
           "ajustements": {}
@@ -128,6 +130,7 @@
       "debut": "2026-05-01",
       "fin": "2026-07-31",
       "statut": "active",
+      "facturation": "commune",
       "entites": [
         {
           "id": "mis-refonte-co1",
@@ -146,7 +149,8 @@
                 "mar": 1,
                 "mer": 1
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             },
             {
               "du": "2026-06-01",
@@ -156,7 +160,8 @@
                 "mar": 1,
                 "mer": 0.5
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             },
             {
               "du": "2026-07-01",
@@ -165,7 +170,8 @@
                 "lun": 1,
                 "mar": 1
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             }
           ],
           "ajustements": {
@@ -260,6 +266,7 @@
       "debut": "2026-03-02",
       "fin": "2026-06-30",
       "statut": "active",
+      "facturation": "commune",
       "entites": [
         {
           "id": "mis-identite-co1",
@@ -277,7 +284,8 @@
                 "jeu": 1,
                 "ven": 0.5
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             }
           ],
           "ajustements": {
@@ -347,6 +355,7 @@
       "debut": "2026-06-01",
       "fin": "2026-06-30",
       "statut": "active",
+      "facturation": "commune",
       "entites": [
         {
           "id": "mis-carte-co1",
@@ -363,7 +372,8 @@
               "parJour": {
                 "ven": 0.5
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             }
           ],
           "ajustements": {
@@ -396,6 +406,7 @@
       "debut": "2026-09-01",
       "fin": "2026-10-31",
       "statut": "prospect",
+      "facturation": "commune",
       "entites": [
         {
           "id": "mis-catalogue-co1",
@@ -419,6 +430,7 @@
       "debut": "2026-02-01",
       "fin": "2026-02-28",
       "statut": "perdue",
+      "facturation": "commune",
       "entites": [
         {
           "id": "mis-charte-co1",

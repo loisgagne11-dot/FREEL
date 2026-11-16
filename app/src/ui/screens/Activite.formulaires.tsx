@@ -10,7 +10,7 @@ import { useToast } from '../components/Toasts';
 import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { peutSupprimerClient, peutSupprimerMission } from '../../domain/calculs/carnet';
 import { Info } from '../components/Info';
-import { entiteVide } from '../../state/schema';
+import { entiteVide } from '../../state/schema.entite';
 import type { Client, ClientOperationnel, Mission } from '../../state/schema';
 import {
   JOURS_SEMAINE as JOURS_DE_LA_SEMAINE, type JourDeSemaine, type Rythme
@@ -729,7 +729,10 @@ function parMois(modele: Rythme, debut: DateISO, fin: DateISO): readonly Rythme[
       du: curseur < debut ? debut : curseur,
       au: finDuMois > fin ? fin : finDuMois,
       parJour: modele.parJour,
-      tjm: modele.tjm
+      tjm: modele.tjm,
+      // Découper au mois ne change pas qui paie : oublier le payeur ici
+      // renverrait en silence chaque mois au payeur de la mission.
+      ...(modele.facturerA !== undefined ? { facturerA: modele.facturerA } : {})
     });
     curseur = lendemainDe(finDuMois);
   }

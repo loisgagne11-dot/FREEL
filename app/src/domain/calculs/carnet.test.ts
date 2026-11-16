@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { dateISO } from '../types';
 import {
   type ClientCarnet,
   nomAPropager, peutSupprimerClient, peutSupprimerMission, rattachementsDe,
@@ -36,7 +37,7 @@ describe('rattachements', () => {
 
   it('compte ce qui pointe vers un client', () => {
     expect(rattachementsDe('Dupont', missions, recettes))
-      .toEqual({ missions: 1, recettes: 2 });
+      .toEqual({ missions: 1, recettes: 2, plages: 0 });
   });
 
   it('ignore la casse, comme le fait le rattachement', () => {
@@ -45,7 +46,7 @@ describe('rattachements', () => {
 
   it('ne compte rien pour un nom inconnu', () => {
     expect(rattachementsDe('Inconnu', missions, recettes))
-      .toEqual({ missions: 0, recettes: 0 });
+      .toEqual({ missions: 0, recettes: 0, plages: 0 });
   });
 });
 
@@ -74,9 +75,42 @@ describe('suppression d’un client', () => {
     );
     expect(refus?.message).toMatch(/1 mission et 2 recettes/);
   });
+
+  /**
+   * Un client qui paie une plage de rythme (schéma 24) n'est le payeur d'aucune
+   * mission ni d'aucune recette encore : sans ce compte, il se supprimait, et
+   * le brouillon du mois partait à un nom absent du carnet — que la rédaction
+   * refuse, faute d'adresse à imprimer.
+   */
+  it('refuse tant qu’une plage de rythme le désigne comme payeur', () => {
+    const mission = {
+      clientNom: 'Agence fictive',
+      entites: [{ rythmes: [{ facturerA: null }, { facturerA: 'Client direct fictif' }] }]
+    };
+    const refus = peutSupprimerClient('Client direct fictif', [mission], []);
+    expect(refus?.message).toMatch(/1 période de rythme facturée à son nom/);
+  });
 });
 
 describe('suppression d’une mission', () => {
+  /**
+   * Les factures payées en direct par un client final sont justifiées par la
+   * mission comme celles de l'agence : la supprimer les laisserait au registre
+   * sans rien qui les explique.
+   */
+  it('refuse quand une facture d’un payeur de ses plages tombe dans la période', () => {
+    const parClient = {
+      clientNom: 'Agence fictive', debut: '2026-01-01', fin: '2026-12-31', facturation: 'par_client' as const,
+      entites: [{ rythmes: [{
+        du: dateISO('2026-01-01'), au: dateISO('2026-12-31'), parJour: { lun: 1 }, tjm: null,
+        facturerA: 'Client direct fictif'
+      }] }]
+    };
+    expect(peutSupprimerMission(
+      parClient, [{ clientNom: 'Client direct fictif', emiseLe: '2026-06-01' }]
+    )?.motif).toBe('rattachements_existants');
+  });
+
   const mission = { clientNom: 'Dupont', debut: '2026-01-01', fin: '2026-12-31' };
 
   it('autorise la suppression sans recette du client', () => {

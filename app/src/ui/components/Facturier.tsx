@@ -1077,7 +1077,7 @@ function BrouillonDuMois(
 
       <ul className={styles.liste}>
         {brouillons.map((b) => (
-          <li key={b.clientNom} className={styles.ligneBrouillon}>
+          <li key={b.cle} className={styles.ligneBrouillon}>
             <div className={styles.brouillonTitre}>
               <span className={styles.brouillonClient}>{b.clientNom}</span>
               <span className={styles.brouillonTotal}>

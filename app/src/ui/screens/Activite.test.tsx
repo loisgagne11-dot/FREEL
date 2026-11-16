@@ -744,6 +744,52 @@ describe('journée déclarée sur un créneau vide', () => {
     expect(screen.getByRole('button', { name: 'Mission finie' })).toBeTruthy();
   });
 
+  /**
+   * UN CLIENT ARRÊTÉ NE SE VOIT PLUS PROPOSER LA SUITE (lot 31).
+   *
+   * L'arrêt borne ses plages au 16 juillet. Le proposer pour le 17 laisserait
+   * l'éditeur recréer une correction après l'arrêt : une journée chez un client
+   * parti, que le CRA et la facture du mois compteraient.
+   */
+  describe('client opérationnel arrêté en cours de mission', () => {
+    const agence = () => mission({
+      id: 'mis-ag', description: 'Mission via agence',
+      entites: [
+        entite({
+          id: 'fa', nom: 'Client final A',
+          rythmes: [{ du: dateISO('2026-01-01'), au: dateISO('2026-12-31'), parJour: { mar: 1 }, tjm: euros(400) }]
+        }),
+        entite({
+          id: 'fb', nom: 'Client final B',
+          rythmes: [{ du: dateISO('2026-01-01'), au: dateISO('2026-07-16'), parJour: { lun: 1 }, tjm: euros(400) }]
+        })
+      ]
+    });
+
+    it('l’éditeur ne propose plus un client arrêté pour une journée après son arrêt', async () => {
+      semer({ missions: [agence()] });
+      render(<Activite />);
+      const utilisateur = await ouvrirSemaine();
+
+      await utilisateur.click(screen.getAllByRole('button', { name: /17 juil\. 2026, matin/ })[0]!);
+      await screen.findByRole('button', { name: 'Enregistrer' });
+
+      expect(screen.getByRole('button', { name: 'Mission via agence — Client final A' })).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Mission via agence — Client final B' })).toBeNull();
+    });
+
+    it('le propose encore pour une journée avant son arrêt', async () => {
+      semer({ missions: [agence()] });
+      render(<Activite />);
+      const utilisateur = await ouvrirSemaine();
+
+      await utilisateur.click(screen.getAllByRole('button', { name: /15 juil\. 2026, matin/ })[0]!);
+      await screen.findByRole('button', { name: 'Enregistrer' });
+
+      expect(screen.getByRole('button', { name: 'Mission via agence — Client final B' })).toBeTruthy();
+    });
+  });
+
   /** Le lieu ne se pose pas d'office : « 78 % de télétravail » se calcule sur
       les demi-journées DOCUMENTÉES, et un lieu inventé la fausserait. */
   it('n’enregistre aucun lieu tant qu’on n’en choisit pas', async () => {

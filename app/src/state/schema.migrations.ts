@@ -42,9 +42,10 @@ import {
 } from '../domain/calculs/delaiPaiement';
 import {
   type Client, type ClientOperationnel, type Conge, type Entreprise, type Faits,
-  type FoyerFiscal, type Mission, type Recette, VERSION_SCHEMA,
-  entiteVide, entrepriseVide, faitsVides, foyerFiscalDepuisConfigImpot, nombreOuNull
+  type Mission, type Recette, VERSION_SCHEMA,
+  entrepriseVide, faitsVides
 } from './schema';
+import { entiteVide } from './schema.entite';
 
 /**
  * Convertit les congés du schéma 1 vers le schéma 2.
@@ -104,6 +105,10 @@ function missionsDuSchema1(brut: unknown): readonly Mission[] {
     const { rythmes: _r, ajustements: _a, ...reste } = o;
     return [{
       ...(reste as unknown as Mission),
+      /* v23 → v24 : comblé à `commune`, ce que toute mission d'avant faisait.
+         Une valeur qui n'est pas `par_client` ne vient d'aucun écran : la
+         prendre pour un choix ferait éclater une facture d'agence. */
+      facturation: o['facturation'] === 'par_client' ? 'par_client' : 'commune',
       entites: entitesDuSchema3(o)
     }];
   });
@@ -141,7 +146,8 @@ function entitesDuSchema3(o: Record<string, unknown>): readonly ClientOperationn
            convertit pas — c'est exactement le piège de l'invariant n°5, déjà
            rencontré sur `partsFiscales` : le champ existe, donc il passe, et
            il passe faux. */
-        ajustements: ajustementsDuSchema13(c['ajustements'])
+        ajustements: ajustementsDuSchema13(c['ajustements']),
+        rythmes: rythmesDuSchema23(c['rythmes'])
       }];
     });
   }
@@ -150,9 +156,31 @@ function entitesDuSchema3(o: Record<string, unknown>): readonly ClientOperationn
     ...entiteVide(),
     id: `${typeof o['id'] === 'string' ? o['id'] : 'mission'}-co1`,
     nom: typeof o['clientNom'] === 'string' ? o['clientNom'] : '',
-    rythmes: Array.isArray(o['rythmes']) ? o['rythmes'] as readonly Rythme[] : [],
+    rythmes: rythmesDuSchema23(o['rythmes']),
     ajustements: ajustementsDuSchema13(o['ajustements'])
   }];
+}
+
+/**
+ * v23 → v24 : la plage de rythme porte son payeur, `facturerA`.
+ *
+ * Un champ apparu DANS une plage, elle-même dans un client opérationnel,
+ * lui-même dans une mission : trois listes sous la surface, que la fusion de
+ * `completerFaits` n'atteint pas. Comblé à `null` — le payeur de la mission,
+ * qui recevait jusqu'ici toutes les journées. Laissé `undefined`, il se
+ * lirait de même par chance, jusqu'au jour où quelqu'un écrirait
+ * `facturerA === null` pour reconnaître une plage sans payeur propre.
+ */
+function rythmesDuSchema23(brut: unknown): readonly Rythme[] {
+  if (!Array.isArray(brut)) return [];
+  return brut.flatMap((r): Rythme[] => {
+    if (typeof r !== 'object' || r === null) return [];
+    const o = r as Record<string, unknown>;
+    return [{
+      ...(o as unknown as Rythme),
+      facturerA: typeof o['facturerA'] === 'string' ? o['facturerA'] : null
+    }];
+  });
 }
 
 /**
@@ -284,11 +312,73 @@ function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
 }
 
 /**
- * v11 → v12 : le foyer fiscal sort de `configImpotBrute`, au moment de la
- * migration de schéma.
+ * v11 → v12 : le foyer fiscal sort de `configImpotBrute`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * REPRENDRE PLUTÔT QUE REDEMANDER
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * L'ancienne application tenait ces trois valeurs dans un objet indexé PAR
+ * ANNÉE : `{ '2025': { parts, autresRevenus, perAnnuel }, '2026': {…} }`. La
+ * reprise l'a conservé tel quel, sans jamais l'interpréter — d'où
+ * `configImpotBrute`. Les redemander à la saisie alors qu'ils sont là
+ * ferait retaper une information déjà donnée, et la provision d'impôt
+ * refuserait de se calculer jusqu'à ce que ce soit fait.
+ *
+ * L'ANNÉE LA PLUS RÉCENTE l'emporte : c'est la seule qui décrit la situation
+ * actuelle du foyer. La dimension annuelle est perdue, et c'est assumé — un
+ * historique des parts ne sert à rien tant qu'aucun écran ne recalcule une
+ * année passée, et le porter demanderait une table que personne ne tiendrait
+ * à jour. Le jour où un tel écran existe, la donnée brute est toujours là.
+ *
+ * Un zéro de l'ancienne application reste un zéro : il a été saisi. Seule une
+ * clé absente devient `null`, qui veut dire « pas renseigné ».
+ *
+ * Ces lectures vivaient dans `schema.ts`, donc dans le paquet d'entrée, alors
+ * que leurs deux seuls lecteurs — ce module et la reprise de l'ancienne
+ * application — sont chargés à la demande (lot 31, entrée à 79,59 / 80 Ko).
+ */
+export interface FoyerFiscal {
+  readonly partsFiscales: number | null;
+  readonly autresRevenusFoyer: Euros | null;
+  readonly versementPerDeductible: Euros | null;
+}
+
+const nombreOuNull = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null;
+
+/**
+ * Extrait le foyer fiscal de l'ancienne configuration d'IR.
+ *
+ * Exporté pour que la reprise du legacy et la migration de schéma lisent la
+ * MÊME règle : deux lectures de la même structure finiraient par diverger, et
+ * l'application dirait alors deux nombres de parts selon l'origine du compte.
+ */
+export function foyerFiscalDepuisConfigImpot(brute: unknown): FoyerFiscal {
+  const parAnnee = (typeof brute === 'object' && brute !== null && !Array.isArray(brute))
+    ? brute as Record<string, unknown>
+    : {};
+  const derniereAnnee = Object.keys(parAnnee)
+    .filter((cle) => /^\d{4}$/.test(cle))
+    .sort()
+    .pop();
+  const ancien = derniereAnnee !== undefined
+    && typeof parAnnee[derniereAnnee] === 'object' && parAnnee[derniereAnnee] !== null
+    ? parAnnee[derniereAnnee] as Record<string, unknown>
+    : {};
+
+  return {
+    partsFiscales: nombreOuNull(ancien['parts']),
+    autresRevenusFoyer: nombreOuNull(ancien['autresRevenus']) as Euros | null,
+    versementPerDeductible: nombreOuNull(ancien['perAnnuel']) as Euros | null
+  };
+}
+
+/**
+ * La même lecture, au moment de la migration de schéma.
  *
  * La règle d'extraction elle-même vit dans `foyerFiscalDepuisConfigImpot`
- * (`schema.ts`), partagée avec la reprise de l'ancienne application : deux
+ * (ci-dessus), partagée avec la reprise de l'ancienne application : deux
  * lectures de la même structure finiraient par diverger, et l'application
  * dirait alors deux nombres de parts selon l'origine du compte. Cette
  * fonction-ci ne fait que l'appliquer ici, en laissant la priorité à ce qui
@@ -571,6 +661,13 @@ function periodesDeclareesDuSchema20(brut: unknown): readonly PeriodeDeclaree[] 
  * devient un enregistrement daté (`periodesDeclareesDuSchema20`), l'opération
  * du relevé gagne `ignoree` (`mouvementsDuSchema4`, qui parcourt déjà chaque
  * mouvement).
+ *
+ * v23 → v24 : la facturation par client. `Mission.facturation` vit dans un
+ * élément de liste (`missionsDuSchema1` le comble à `commune`), et
+ * `Rythme.facturerA` trois listes plus bas — mission, client opérationnel,
+ * plage (`rythmesDuSchema23`, appelé par `entitesDuSchema3`, le comble à
+ * `null`). La migration descend jusqu'à la plage, parce que c'est là que le
+ * champ a bougé.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;

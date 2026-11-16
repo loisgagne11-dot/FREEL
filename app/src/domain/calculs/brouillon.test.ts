@@ -5,9 +5,11 @@ import { brouillonsDuMois, libelleDeLaFacture, lignesDuBrouillon } from './broui
 
 const M = mois('2026-07');
 
+/* La clé suit le payeur tant qu'un test ne la pose pas : c'est la facturation
+   commune, celle de toute mission d'avant le schéma 24. */
 const ligne = (o: Partial<LigneDeBrouillon> = {}): LigneDeBrouillon => ({
   missionId: 'm', entiteId: 'e', libelle: 'Mission', clientNom: 'Client',
-  jours: 10, montant: euros(5000), ...o
+  jours: 10, montant: euros(5000), ...o, cle: o.cle ?? o.clientNom ?? 'Client'
 });
 
 /**

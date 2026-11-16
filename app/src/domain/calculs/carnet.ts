@@ -30,6 +30,9 @@
  * Le nom reste donc la clé, et la propagation la remplace.
  */
 
+import { type PayeurDeMission, payeursDeLaMission } from './brouillon';
+import type { Rythme } from './planning';
+
 /** Ce qu'un client doit porter pour être exploitable. */
 export interface ClientCarnet {
   readonly id: string;
@@ -82,19 +85,36 @@ export function validerNomClient(
 export interface RattachementsClient {
   readonly missions: number;
   readonly recettes: number;
+  /** Plages de rythme qui le désignent comme payeur (schéma 24). */
+  readonly plages: number;
+}
+
+/**
+ * Une mission telle que le carnet la lit : son payeur et, depuis le schéma 24,
+ * les plages qui peuvent en désigner un autre.
+ */
+export interface MissionDuCarnet {
+  readonly clientNom: string;
+  readonly entites?: readonly { readonly rythmes: readonly { readonly facturerA?: string | null }[] }[];
 }
 
 /** Ce qui pointe vers un client, par son nom. */
 export function rattachementsDe(
   nomClient: string,
-  missions: readonly { readonly clientNom: string }[],
+  missions: readonly MissionDuCarnet[],
   recettes: readonly { readonly clientNom: string }[]
 ): RattachementsClient {
   const cible = nomClient.trim().toLowerCase();
   const correspond = (n: string) => n.trim().toLowerCase() === cible;
   return {
     missions: missions.filter((m) => correspond(m.clientNom)).length,
-    recettes: recettes.filter((r) => correspond(r.clientNom)).length
+    recettes: recettes.filter((r) => correspond(r.clientNom)).length,
+    /* Quel que soit le mode de facturation : une plage qui nomme ce client est
+       un fait enregistré, et repasser la mission en facturation par client le
+       ferait payer à un nom absent du carnet. */
+    plages: (missions.flatMap((m) => m.entites ?? []))
+      .flatMap((e) => e.rythmes)
+      .filter((r) => typeof r.facturerA === 'string' && correspond(r.facturerA)).length
   };
 }
 
@@ -108,11 +128,11 @@ export function rattachementsDe(
  */
 export function peutSupprimerClient(
   nomClient: string,
-  missions: readonly { readonly clientNom: string }[],
+  missions: readonly MissionDuCarnet[],
   recettes: readonly { readonly clientNom: string }[]
 ): RefusCarnet | null {
   const liens = rattachementsDe(nomClient, missions, recettes);
-  if (liens.missions === 0 && liens.recettes === 0) return null;
+  if (liens.missions === 0 && liens.recettes === 0 && liens.plages === 0) return null;
 
   const parties: string[] = [];
   if (liens.missions > 0) {
@@ -121,10 +141,15 @@ export function peutSupprimerClient(
   if (liens.recettes > 0) {
     parties.push(`${liens.recettes} recette${liens.recettes > 1 ? 's' : ''}`);
   }
+  if (liens.plages > 0) {
+    parties.push(`${liens.plages} période${liens.plages > 1 ? 's' : ''} de rythme facturée`
+      + `${liens.plages > 1 ? 's' : ''} à son nom`);
+  }
 
   return {
     motif: 'rattachements_existants',
-    message: `${parties.join(' et ')} sont rattachées à ce client. Le supprimer les `
+    message: `${parties.slice(0, -1).join(', ')}${parties.length > 1 ? ' et ' : ''}`
+      + `${parties[parties.length - 1] ?? ''} sont rattachées à ce client. Le supprimer les `
       + 'laisserait attachées à un nom qui n’existe plus : elles sortiraient des '
       + 'délais de paiement et de la déclaration européenne de services sans que '
       + 'rien ne le signale.'
@@ -137,14 +162,24 @@ export function peutSupprimerClient(
  * Non si des recettes ont été émises pour son client sur sa période : une
  * facture émise ne se retire pas du registre, et supprimer la mission qui la
  * justifie rendrait sa présence inexplicable en contrôle.
+ *
+ * « Son client », ce sont tous ceux qui peuvent recevoir une facture de la
+ * mission : son payeur, et ceux des plages quand elle se facture client par
+ * client (schéma 24). Les factures envoyées en direct à un client final sont
+ * justifiées par cette mission comme celles de l'agence.
  */
 export function peutSupprimerMission(
-  mission: { readonly clientNom: string; readonly debut: string | null; readonly fin: string | null },
+  mission: PayeurDeMission & {
+    readonly debut: string | null;
+    readonly fin: string | null;
+    readonly entites?: readonly { readonly rythmes: readonly Rythme[] }[];
+  },
   recettes: readonly { readonly clientNom: string; readonly emiseLe: string | null }[]
 ): RefusCarnet | null {
-  const cible = mission.clientNom.trim().toLowerCase();
+  const payeurs = new Set([...payeursDeLaMission({ ...mission, entites: mission.entites ?? [] })]
+    .map((n) => n.trim().toLowerCase()));
   const liees = recettes.filter((r) => {
-    if (r.clientNom.trim().toLowerCase() !== cible) return false;
+    if (!payeurs.has(r.clientNom.trim().toLowerCase())) return false;
     if (r.emiseLe === null) return true;
     if (mission.debut !== null && r.emiseLe < mission.debut) return false;
     if (mission.fin !== null && r.emiseLe > mission.fin) return false;

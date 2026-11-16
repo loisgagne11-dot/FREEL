@@ -93,7 +93,7 @@ un trou qui ne fait échouer aucun test.
 | Fonction de l'ancienne | Verdict | Détail |
 |---|---|---|
 | `buildMission`, `showMissionModal`, statuts | ✅ | Carnet complet, statuts `active` / `terminee` / `prospect` / `perdue` |
-| **`mission.entites[]` — clients opérationnels** | ✅ | **Corrigé le 13/08** (schéma v4). Chaque client opérationnel porte son nom, sa teinte, ses coordonnées et **son rythme**. `entiteByDay` n'a pas été repris et n'a pas à l'être : chacun ayant ses propres journées, il n'y a plus rien à arbitrer — l'ancienne application avait trois sources pour une même journée, et rien n'indiquait laquelle faisait foi |
+| **`mission.entites[]` — clients opérationnels** | ✅ | **Corrigé le 13/08** (schéma v4). Chaque client opérationnel porte son nom, sa teinte, ses coordonnées et **son rythme**. `entiteByDay` — QUEL client travaillait QUEL jour — n'était pas repris : chaque client gardait sa semaine type sur toute la mission (un client arrêté continuait au planning), toutes les corrections allaient au premier, et un client sans semaine type recevait le rythme entier (jours comptés deux fois). **Repris jour par jour depuis le lot 31 (16/11)** : plages partagées sans recouvrement, journées attribuées en corrections, jour partagé à une demi-journée chacun, client évincé lu « arrêté », rapport qui compte et nomme |
 | Déclarer le rythme d'une mission | ✅ | **Ajouté le 13/08.** Il n'existait AUCUN écran pour le saisir : `rythmes` ne pouvait venir que de la migration, donc toute mission créée dans l'application avait un planning vide, définitivement. Semaine type à sept boutons, tour journée → demi-journée → rien, le même geste qu'au planning |
 | Capacité de versement d'un mois à venir | ✅ | **Lot R.** Elle s'abstient tant que rien n'y est attendu, au lieu d'afficher un négatif né de dépenses projetées. L'ancienne application n'avait pas cet indicateur du tout |
 | `getScheduledDaysForMonth`, `joursParSemaine` | ✅ | `rythmes[]` par plages de dates, demi-journées comprises |
@@ -569,3 +569,11 @@ chiffre faux.
 | Importer un relevé, une sauvegarde, une archive, une pièce | 🟢 | Bornés avant lecture, contrôlés en profondeur ; un fichier fabriqué est refusé avec le champ en cause. L'ancienne lisait tout, sans borne |
 | Rester connecté sur deux onglets | 🟢 | Les deux onglets ne se déconnectent plus l'un l'autre au renouvellement de la session |
 | Annonce d'une sauvegarde à restaurer | 🟢 | Un fichier que l'adoption refuserait est refusé dès l'annonce, sans proposer « Remplacer » |
+
+## Lot 31 (16/11, logique) — une mission à plusieurs clients
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Reprendre les journées attribuées par client (`entiteByDay`) | 🟢 | Voir la ligne des clients opérationnels ; la vérification d'absence de perte compare désormais les journées mission par mission, mois par mois |
+| Arrêter un client à une date | 🟡 calcul fait | Borner ses plages et ses corrections ; « arrêté le … » dérivé. L'écran attend la validation de la maquette |
+| Facturer une mission à plusieurs clients | 🟡 calcul fait | Schéma 24 : facture commune par défaut, ou une par client avec le payeur de chaque plage ; le brouillon du mois se découpe par payeur. L'écran attend la validation de la maquette |

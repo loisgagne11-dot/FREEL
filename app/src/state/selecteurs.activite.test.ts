@@ -6,6 +6,9 @@ import {
   planningDuMois,
   rapportParMission
 } from './selecteurs.activite';
+import { journeesDuMois } from './selecteurs.cra';
+import { brouillonsDeFacture } from './selecteurs.facture';
+import { arreterClient } from '../domain/calculs/clientsOperationnels';
 
 const D = (s: string) => dateISO(s);
 
@@ -205,6 +208,37 @@ describe('clients opérationnels', () => {
     expect(cras[0]?.cra.totalJours).toBe(9);
     expect(cras[1]?.cra.totalJours).toBe(8);
   });
+
+  /**
+   * ARRÊTER UN CLIENT SE VOIT PARTOUT OÙ SES JOURNÉES COMPTENT (lot 31).
+   *
+   * L'arrêt ne pose aucun drapeau : il borne les faits. C'est ce qui garantit
+   * que le planning, le CRA et le brouillon cessent ENSEMBLE de lui compter des
+   * journées. Une correction posée le 20 mars qui survivrait à l'arrêt du 13
+   * ferait facturer une journée chez un client parti — et le CRA signé par ce
+   * client ne la porterait pas.
+   */
+  it('après l’arrêt du 13/03, planning, CRA et brouillon ne lui comptent plus rien', () => {
+    const mission = via();
+    const [a, b] = mission.entites;
+    if (a === undefined || b === undefined) throw new Error('deux clients attendus');
+    const arret = arreterClient(
+      { ...b, ajustements: { '2026-03-20': { quotite: 1 } } }, D('2026-03-13')
+    );
+    if ('refus' in arret) throw new Error(arret.refus);
+    const faits = avec({ missions: [{ ...mission, entites: [a, arret.entite] }] });
+
+    const apres = planningDuMois(faits, mois('2026-03')).jours.filter((j) => j.date > '2026-03-13');
+    expect(apres.flatMap((j) => j.parMission).map((l) => l.entiteId)).not.toContain('co-b');
+    // Mars 2026 avant l'arrêt : mercredis 4 et 11, jeudis 5 et 12.
+    expect(journeesDuMois(faits, mois('2026-03'))
+      .filter((j) => j.client === 'Client B').map((j) => j.date))
+      .toEqual(['2026-03-04', '2026-03-05', '2026-03-11', '2026-03-12']);
+    expect(craDuMoisParMission(faits, mois('2026-04')).map((c) => c.clientNom))
+      .toEqual(['Client A']);
+    expect(brouillonsDeFacture(faits, mois('2026-03'))
+      .flatMap((br) => br.lignes).find((l) => l.entiteId === 'co-b')?.jours).toBe(4);
+  });
 });
 
 /**
@@ -299,6 +333,33 @@ describe('ce que chaque mission a produit', () => {
   });
 
   /** Deux clients ne se mélangent jamais, quelles que soient les dates. */
+  /**
+   * Facturée client par client (schéma 24), une mission envoie aussi des
+   * factures en direct aux payeurs de ses plages. Ne compter que celles de son
+   * payeur ferait disparaître ces journées-là de ce qu'elle a produit.
+   */
+  it('compte dans le facturé d’une mission les factures aux payeurs de ses plages', () => {
+    const parClient = {
+      ...MISSION, id: 'm-pc', clientNom: 'Agence fictive', facturation: 'par_client' as const,
+      entites: [{
+        ...(MISSION.entites[0] as (typeof MISSION)['entites'][number]),
+        rythmes: [{
+          du: D('2026-01-01'), au: D('2026-12-31'), parJour: { lun: 1 }, tjm: null,
+          facturerA: 'Client direct fictif'
+        }]
+      }]
+    };
+    const facture = (clientNom: string, montant: number) => ({
+      id: `r-${clientNom}`, clientNom, libelle: 'Facture', montant: euros(montant),
+      emiseLe: D('2026-06-30'), encaisseeLe: null, modeReglement: null, numero: `N-${clientNom}`
+    });
+    const etat = etatActivite(avec({
+      missions: [parClient],
+      recettes: [facture('Agence fictive', 1000), facture('Client direct fictif', 600), facture('Autre fictif', 99)]
+    }), mois('2026-06'));
+    expect(etat.missions[0]?.facture).toBe(1600);
+  });
+
   it('ne mélange pas deux clients', () => {
     const f = avec({
       missions: [M('a', null, null), M('b', null, null, 'Autre client')],
