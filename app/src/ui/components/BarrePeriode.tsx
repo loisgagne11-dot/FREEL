@@ -33,19 +33,16 @@ const CHOIX: readonly { readonly id: Granularite; readonly libelle: string }[] =
  * cesse de les essayer là où elles marchent.
  */
 export function BarrePeriode(
-  { periode, onGranularite, onDecaler, navigation = true }: {
+  { periode, onGranularite, onDecaler }: {
     readonly periode: Periode;
     readonly onGranularite: (g: Granularite) => void;
     readonly onDecaler: (pas: number) => void;
-    /**
-     * `false` quand la période est ancrée sur le mois de la barre du haut : ses
-     * flèches y font déjà ce travail, et une seconde paire ici déplaçait une
-     * autre période que celle de la barre (lot 8, Achats).
-     */
-    readonly navigation?: boolean;
   }
 ) {
-  const navigable = navigation && periode.granularite !== 'tout';
+  /* Elle se taisait sur Achats quand la barre du haut portait le mois, pour ne
+     pas montrer deux paires de flèches qui déplaçaient deux périodes. La barre
+     du haut n'en porte plus (lot 51) : ses flèches sont les seules, partout. */
+  const navigable = periode.granularite !== 'tout';
 
   return (
     <div className={styles.barre}>

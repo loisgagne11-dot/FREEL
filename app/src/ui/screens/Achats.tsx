@@ -25,7 +25,7 @@ import {
 import { Greet } from '../components/Greet';
 import { BarrePeriode } from '../components/BarrePeriode';
 import {
-  type Granularite, ancreDuMois, periodeCourante
+  type Granularite, ancreDuMois, decalerMois, periodeCourante
 } from '../../domain/calculs/periode';
 import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
@@ -67,14 +67,30 @@ export interface ProprietesAchats {
    */
   readonly stockage?: StockageJustificatifs;
   /**
-   * Le mois choisi dans la barre du haut : il ANCRE la période de l'écran,
-   * elle ne s'y ajoute pas. Voir `ancreDuMois`.
+   * Le mois partagé par les écrans, tenu par `App` : il ANCRE la période de
+   * l'écran, elle ne s'y ajoute pas. Voir `ancreDuMois`.
    *
-   * `undefined` retombe sur le mois courant — le cas des tests qui montent
-   * cet écran seul, sans la coquille qui porte la barre.
+   * `undefined` retombe sur un mois local, ouvert sur le mois courant — le cas
+   * des tests qui montent cet écran seul.
    */
   readonly mois?: Mois;
+  /**
+   * De quoi le déplacer : les flèches de la barre de période. Le mois reste
+   * celui de toute l'application — passer de l'écran Achats au Pilote ne le
+   * remet pas au mois courant.
+   */
+  readonly onMois?: (m: Mois) => void;
 }
+
+/**
+ * Combien de mois fait un pas de flèche, selon la maille : la flèche de
+ * « Trimestre » doit mener au trimestre précédent, pas au mois précédent — qui
+ * tomberait deux fois sur trois dans le même trimestre, et donnerait une
+ * flèche qui ne fait rien.
+ */
+const MOIS_PAR_PAS: Readonly<Record<Granularite, number>> = {
+  mois: 1, trimestre: 3, annee: 12, tout: 0
+};
 
 type Section = 'depenses' | 'releve';
 
@@ -106,7 +122,7 @@ const RappelArchive = lazy(() => import('./Achats.archive'));
  */
 const Releve = composantALaDemande(() => import('./Releve').then((m) => m.Releve), true);
 
-export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats = {}) {
+export function Achats({ stockage = stockageParDefaut, mois: moisChoisi, onMois }: ProprietesAchats = {}) {
   const faits = useFaits((e) => e.faits);
 
   /**
@@ -131,25 +147,22 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
     if (sousRoute === 'depense') { setSection('depenses'); setPanneau({ type: 'ajout' }); }
   }, [sousRoute]);
   const idGroupe = useId();
-  /**
-   * La granularité et le décalage sont deux faits d'écran distincts : changer
-   * de maille doit repartir de la période courante, pas conserver un décalage
+  const [granularite, setGranularite] = useState<Granularite>('mois');
+  const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
+  const mois = moisChoisi ?? moisLocal;
+  const changerMois = onMois ?? setMoisLocal;
+  /*
+   * LE MOIS PARTAGÉ EST L'ANCRE, PAS UN FILTRE DE PLUS.
+   *
+   * La barre de période dit QUELLE FINESSE, et ses flèches déplacent LE mois
+   * de l'application — il n'y a plus de second mois en haut de page (lot 51).
+   * Deux mois empilés en deux filtres donnaient « le mois d'août, dans le
+   * mois de mars » : un ensemble vide présenté comme un résultat. Et changer
+   * de maille repart du mois qu'on regardait, au lieu de garder un décalage
    * de « trois mois en arrière » devenu « trois ans en arrière ».
    */
-  const [granularite, setGranularite] = useState<Granularite>('mois');
-  const [decalage, setDecalage] = useState(0);
-  /*
-   * LE MOIS CHOISI EST L'ANCRE, PAS UN FILTRE DE PLUS.
-   *
-   * La barre du haut dit QUEL MOIS, la barre de période dit QUELLE FINESSE.
-   * Les empiler en deux filtres donnerait « le mois d'août, dans le mois de
-   * mars » : un ensemble vide présenté comme un résultat. Voir `ancreDuMois`.
-   */
-  const ancre = useMemo(() => ancreDuMois(mois ?? moisCourant()), [mois]);
-  const periode = useMemo(
-    () => periodeCourante(granularite, ancre, decalage),
-    [granularite, ancre, decalage]
-  );
+  const ancre = useMemo(() => ancreDuMois(mois), [mois]);
+  const periode = useMemo(() => periodeCourante(granularite, ancre), [granularite, ancre]);
 
   const etat = useMemo(() => etatAchats(faits, new Date(), periode), [faits, periode]);
   const suivi = useMemo(() => suiviRapprochement(faits, periode), [faits, periode]);
@@ -204,13 +217,11 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
 
         <PanneauOnglet idGroupe={idGroupe} id="depenses" actif={section === 'depenses'}>
 
+      {/* La seule commande de période de l'écran, en tête de ses dépenses. */}
       <BarrePeriode
         periode={periode}
-        onGranularite={(g) => { setGranularite(g); setDecalage(0); }}
-        onDecaler={(pas) => setDecalage((d) => d + pas)}
-        // Le mois se choisit dans la barre du haut : pas de seconde paire de
-        // flèches qui déplacerait une autre période que la sienne.
-        navigation={false}
+        onGranularite={setGranularite}
+        onDecaler={(pas) => changerMois(decalerMois(mois, pas * MOIS_PAR_PAS[granularite]))}
       />
 
       <div className={styles.grille}>
@@ -229,7 +240,7 @@ export function Achats({ stockage = stockageParDefaut, mois }: ProprietesAchats 
           )}
           {/* « 0 € » seul se lit comme un oubli ; en franchise, c'est la règle. */}
           {tuiles.tva.nonRecuperable === 0 && tuiles.tva.deductible === 0
-            && regimeTvaAu(faits, mois ?? moisCourant()) === 'franchise' && (
+            && regimeTvaAu(faits, mois) === 'franchise' && (
             <span className={styles.tuileSous}>franchise : aucune TVA à déduire</span>
           )}
         </Tuile>

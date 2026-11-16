@@ -1,92 +1,96 @@
-/* Indicateurs système de la barre du haut.
-   Aucune couleur en dur : tout passe par les tokens, pour que les 4 palettes
-   s'appliquent aussi au sélecteur qui permet d'en changer. */
+/* Indicateurs système de la barre du haut : synchronisation et masquage.
+   Aucune couleur en dur : tout passe par les tokens. Mesures de la maquette
+   `docs/design/direction/navigation.html` (`.nv-synchro`, `.nv-icone`). */
 
 .pastilles {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
+  flex: none;
 }
 
-.pastille {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
+/* ── Masquer les montants : une icône nommée ───────────────────────────── */
 
-.libelle {
-  font-size: 10.5px;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--muted-2);
-  white-space: nowrap;
-}
-
-.choix {
-  box-sizing: border-box;
-  /* 44 px : la cible minimale au doigt, y compris dans la barre du haut. */
-  min-height: 44px;
-  padding: 0 9px;
-  border-radius: 100px;
-  border: 1px solid var(--line-2);
-  background: var(--panel-2);
-  color: var(--text);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  max-width: 100%;
-}
-
-.choix:hover { border-color: var(--green); }
-.choix:focus-visible { border-color: var(--green); outline: none; }
-
-.bouton {
+.icone {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 11px;
-  border-radius: 100px;
+  justify-content: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border-radius: 999px;
   border: 1px solid var(--line-2);
-  background: var(--panel-2);
+  background: var(--card-a);
   color: var(--muted);
-  font-size: 12.5px;
-  font-family: inherit;
   cursor: pointer;
+}
+
+.icone svg,
+.iconeCloud {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icone:hover { color: var(--text); border-color: var(--green); }
+.icone:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.actif { color: var(--green); border-color: var(--green-line); }
+
+/* ── La synchronisation ────────────────────────────────────────────────── */
+
+/* Le LIEN fait 44 px de haut — la cible au doigt — et l'étiquette visible les
+   32 px de la maquette : on vise une pastille, on clique une bande. */
+.cloud {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-height: 44px;
+  min-width: 44px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.cloud:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 999px; }
+
+.etiquette {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-.bouton:hover { color: var(--text); border-color: var(--green); }
-.bouton:focus-visible { border-color: var(--green); outline: none; }
-
-.actif { color: var(--text); border-color: var(--green); }
-
-/* La pastille du compte est un LIEN : elle ne doit pas se souligner comme un
-   lien de texte, mais elle en garde le comportement. */
-.bouton { text-decoration: none; }
-
-/* ── L'état du compte ───────────────────────────────────────────────────── */
-
-/* Un point de couleur, pas un fond teinté : la barre du haut porte déjà
-   plusieurs contrôles, et trois pastilles pleines s'y disputeraient l'œil. */
 .point {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--muted-2);
+  background: currentColor;
 }
 
-.point[data-ton='relie'] { background: var(--green); }
-.point[data-ton='expire'] { background: var(--amber); }
-.point[data-ton='local'] { background: var(--muted-2); }
+/* Chaque ton est une paire de jetons dont `verifier-contraste` garantit le
+   4,5:1 — sauf « non synchronisé », qui n'a rien de vert ni d'urgent : un texte
+   courant sur la teinte neutre des contrôles. */
+.relie .etiquette { background: var(--green-deep); color: var(--chip-ok); }
+.expire .etiquette { background: var(--amber-soft); color: var(--chip-warn); }
+.local .etiquette { background: var(--tint-2); color: var(--muted); }
 
-/* Une session expirée est le cas dangereux — on croit être synchronisé et on
-   ne l'est plus. Elle se signale au-delà du seul point. */
-.expire { border-color: var(--amber-line, var(--amber)); color: var(--text); }
-.relie { color: var(--text); }
+.cloud:hover .etiquette { box-shadow: inset 0 0 0 1px var(--line-2); }
+
+/* L'icône ne sert qu'au téléphone. */
+.iconeCloud { display: none; }
 
 /* Le détail complet, pour les lecteurs d'écran et les infobulles. Jamais
    affiché : le libellé visuel doit tenir dans la barre. */
@@ -102,40 +106,30 @@
   border: 0;
 }
 
-/* Exigence de la cible : sous 1320 px — 1680 depuis le lot 6, la barre portant
-   désormais le mois, la recherche, « Exporter » et « + Nouveau » ; à 1 440 px
-   la palette passait sous la recherche —, les libellés des pastilles système
-   disparaissent — la place revient au titre de l'écran. Le nom accessible
-   du champ, lui, doit survivre : on ne peut donc pas le retirer du DOM. */
-@media (max-width: 1679px) {
-  .libelleBouton {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  .libelle {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    margin: -1px;
-    padding: 0;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-    border: 0;
-  }
-}
-
-/* Sur téléphone, la palette tient dans une largeur fixe : libre, le menu
-   s'étalait dès que la barre passait sur deux rangées et repoussait la
-   recherche et « + Nouveau » sur une troisième. */
+/*
+ * Au téléphone, la synchronisation devient une icône nommée (décision 2) : à
+ * 390 px, le logo, la recherche, l'état du compte, le masquage et « + Nouveau »
+ * ne tiennent qu'en icônes, sauf le dernier — c'est l'action. L'état reste
+ * lisible sans le nom : le tracé dans le nuage change avec lui, et sa couleur
+ * le redouble.
+ */
 @media (max-width: 760px) {
-  .choix { width: 84px; }
+  .pastilles { gap: 8px; }
+
+  .icone,
+  .cloud {
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid var(--line-2);
+    background: var(--card-a);
+  }
+
+  .etiquette { display: none; }
+  .iconeCloud { display: block; }
+  .relie { color: var(--green); }
+  .expire { color: var(--amber); }
+  .local { color: var(--muted); }
 }
+
+@media print { .pastilles { display: none; } }

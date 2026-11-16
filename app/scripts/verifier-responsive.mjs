@@ -11,7 +11,9 @@
  *   1. aucun débordement horizontal de la page ;
  *   2. le rail est latéral en desktop et le dock flottant en portrait ;
  *   3. les cibles tactiles de navigation atteignent 44 px en portrait ;
- *   4. le thème est appliqué avant le premier rendu (pas de flash).
+ *   4. le thème est appliqué avant le premier rendu (pas de flash) ;
+ *   5. chaque contrôle de la barre du haut reste dans la fenêtre, et la
+ *      synchronisation y est ÉCRITE au bureau (lot 51, décision 2).
  *
  * Usage : node scripts/verifier-responsive.mjs [--captures]
  */
@@ -57,6 +59,9 @@ const ECRANS = [
   { hash: '#/config/livre', nom: 'config-livre', attendre: 'text=Ouvrir le livre des recettes' },
   { hash: '#/config/compte', nom: 'config-compte', attendre: 'h2:has-text("Compte & synchronisation")' },
   { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
+  // Le thème et le masquage des montants y vivent depuis le lot 51 : quatre
+  // cartes côte à côte au bureau, deux par deux au téléphone.
+  { hash: '#/config/affichage', nom: 'config-affichage', attendre: 'text=Le thème choisi reste mémorisé' },
   // La liste des factures est un onglet d'Activité (formule A du rail) ; la
   // rédaction reste sous `#/facture/…`, et c'est l'un des écrans les plus denses.
   { hash: '#/activite/factures', nom: 'factures' },
@@ -133,12 +138,12 @@ for (const taille of TAILLES) {
       /*
        * Une facture en retard, et rien d'autre.
        *
-       * Elle ne sert qu'à faire EXISTER la pastille « à traiter » : sur un
-       * stockage vierge il n'y a aucun sujet, la pastille disparaît — ce qui
-       * est le comportement voulu — et l'assertion qui vérifie sa position ne
-       * s'exécutait jamais. Un contrôle qui ne s'exécute pas ne protège de
-       * rien : c'est ainsi qu'un `backdrop-filter` a pu l'expédier à −72 px
-       * sans que ces 140 combinaisons s'en aperçoivent.
+       * Elle faisait EXISTER la pastille « à traiter » de la barre du haut,
+       * dont la position était contrôlée — un `backdrop-filter` l'avait
+       * expédiée à −72 px sans que personne le voie. La pastille est partie au
+       * lot 51 ; la facture fait toujours exister un compteur du rail, et une
+       * année de plus dans les menus d'années — de quoi élargir ce qu'on
+       * mesure, plutôt que de mesurer un écran vide.
        *
        * Émise en 2020 : en retard quelle que soit la date à laquelle ce script
        * est relancé, sans horloge à figer.
@@ -176,6 +181,10 @@ for (const taille of TAILLES) {
     // titre fantôme, puis expire en l'attendant visible.
     await page.waitForSelector('h1:visible', { timeout: 10000 });
     if (ecran.attendre) await page.waitForSelector(ecran.attendre, { state: 'visible', timeout: 10000 });
+    // La barre du haut arrive à la demande, après l'écran : sans l'attendre, on
+    // mesurerait une barre vide et le contrôle de ses boutons ne dirait rien.
+    await page.waitForSelector('header[aria-label="Barre du haut"] [data-role="libelle-synchro"]',
+      { state: 'attached', timeout: 10000 });
 
     const mesures = await page.evaluate(() => {
       // La navigation PRINCIPALE, désignée par son nom accessible.
@@ -209,25 +218,35 @@ for (const taille of TAILLES) {
         hauteurMiniLien: hauteurs.length > 0 ? Math.min(...hauteurs) : 0,
         contenuPresent: document.getElementById('contenu-principal') !== null,
         /*
-         * La pastille « à traiter », si elle est là, est-elle DANS la fenêtre ?
+         * Les contrôles de la barre du haut sont-ils DANS la fenêtre ?
          *
-         * Elle flotte en `position: fixed`. Un ancêtre portant un `filter`,
-         * un `transform` ou un `backdrop-filter` devient son bloc conteneur —
-         * et elle part alors hors écran sans qu'aucune erreur ne soit levée.
-         * C'est arrivé : douze pixels de flou invisibles sur la barre du haut
-         * l'expédiaient à −72 px. On mesure, plutôt que de faire confiance.
-         *
-         * Rendu conditionnel : l'absence de sujet à traiter est un état
-         * normal, et la pastille disparaît alors — ce que ce contrôle ne doit
-         * pas confondre avec un échec.
+         * Un débordement de la barre ne se voit pas forcément dans la largeur
+         * du document : un contrôle poussé hors du bord, ou une barre qui ne
+         * se replie pas, et « + Nouveau » devient inatteignable sans aucune
+         * erreur. La pastille « à traiter » avait été envoyée à −72 px par un
+         * `backdrop-filter` invisible. La barre ne porte plus de période ni
+         * d'export (lot 51), mais elle ÉCRIT désormais la synchronisation au
+         * bureau — « Session expirée » est plus long que l'ancien point.
          */
-        pastilleDansLaFenetre: (() => {
-          const b = [...document.querySelectorAll('button')]
-            .find((x) => /à traiter/.test(x.textContent || ''));
-          if (!b) return null;
-          const r = b.getBoundingClientRect();
-          return r.top >= 0 && r.left >= 0
-            && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+        controlesHorsFenetre: (() => {
+          const barre = document.querySelector('header[aria-label="Barre du haut"]');
+          if (!barre) return ['barre du haut introuvable'];
+          return [...barre.querySelectorAll('a, button')]
+            .filter((x) => x.getClientRects().length > 0)
+            .filter((x) => {
+              const r = x.getBoundingClientRect();
+              return r.left < 0 || r.right > window.innerWidth + 1 || r.top < 0;
+            })
+            .map((x) => (x.getAttribute('aria-label') || x.textContent || x.tagName).trim().slice(0, 40));
+        })(),
+        nbControlesBarre: document.querySelectorAll('header[aria-label="Barre du haut"] a, header[aria-label="Barre du haut"] button').length,
+        /* La synchronisation est-elle LISIBLE, et pas seulement présente dans
+           l'arbre ? Le libellé passait en hors-écran sous 1 680 px. */
+        synchroEcrite: (() => {
+          const e = document.querySelector('header[aria-label="Barre du haut"] [data-role="libelle-synchro"]');
+          if (!e) return null;
+          const r = e.getBoundingClientRect();
+          return r.width > 20 && r.height > 0 && getComputedStyle(e).display !== 'none';
         })(),
         couleurFond: getComputedStyle(document.body).backgroundColor
       };
@@ -246,12 +265,17 @@ for (const taille of TAILLES) {
       `${prefixe} ${ENTREES_DU_RAIL} entrées de navigation (${mesures.nbLiens})`
     );
     constate(mesures.contenuPresent, `${prefixe} contenu principal présent et ciblable`);
-    if (mesures.pastilleDansLaFenetre !== null) {
-      constate(
-        mesures.pastilleDansLaFenetre,
-        `${prefixe} la pastille « à traiter » reste dans la fenêtre`
-      );
-    }
+    constate(
+      mesures.nbControlesBarre >= 4 && mesures.controlesHorsFenetre.length === 0,
+      `${prefixe} les ${mesures.nbControlesBarre} contrôles de la barre du haut restent dans la fenêtre`
+        + (mesures.controlesHorsFenetre.length > 0 ? ` (hors : ${mesures.controlesHorsFenetre.join(', ')})` : '')
+    );
+    // Au bureau, la synchronisation se LIT (décision 2) ; au téléphone, c'est
+    // une icône nommée — le libellé s'efface, le nom accessible reste.
+    constate(
+      mesures.synchroEcrite === !taille.portrait,
+      `${prefixe} synchronisation ${taille.portrait ? 'en icône' : 'écrite'} (${mesures.synchroEcrite})`
+    );
 
     if (taille.portrait) {
       constate(mesures.navPosition === 'fixed', `${prefixe} dock flottant en portrait`);

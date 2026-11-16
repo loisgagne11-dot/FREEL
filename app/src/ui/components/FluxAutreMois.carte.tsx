@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import type { Mois } from '../../domain/types';
 import { useFaits } from '../../state/store';
 import { fluxDUnAutreMois } from '../../state/selecteurs.flux';
@@ -10,10 +10,11 @@ import { FluxAutreMois } from './FluxAutreMois';
  * Pilote. Le sélecteur vit dans ce paquet, pas dans celui de l'entrée.
  */
 export function FluxAutreMoisCarte(
-  { mois, courant, onRevenir }: {
+  { mois, courant, onRevenir, navigation }: {
     readonly mois: Mois;
     readonly courant: Mois;
     readonly onRevenir: () => void;
+    readonly navigation?: ReactNode;
   }
 ) {
   const faits = useFaits((e) => e.faits);
@@ -24,6 +25,7 @@ export function FluxAutreMoisCarte(
       periode={moisLong(mois)}
       courant={moisLong(courant)}
       onRevenir={onRevenir}
+      {...(navigation === undefined ? {} : { navigation })}
     />
   );
 }

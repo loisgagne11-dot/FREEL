@@ -1,31 +1,8 @@
-import { type MouseEvent, type ReactNode, Suspense, lazy } from 'react';
+import { type MouseEvent, type ReactNode } from 'react';
 import { RailNav } from './components/RailNav';
 import { useRoute } from './useRoute';
 import type { IdEcran } from './navigation';
 import styles from './Shell.module.css';
-
-/**
- * Les pastilles système (stockage, mode confidentiel, palette), chargées à la
- * demande — comme le sélecteur d'année.
- *
- * Le paquet d'entrée a dépassé son budget au lot 3 (80,08 / 80 Ko) et
- * l'invariant n°7 dit d'extraire. Elles sont sûres à différer : le mode
- * confidentiel est appliqué AVANT React par le script de `index.html`, et ces
- * pastilles ne font que le basculer. Les montants ne sont donc jamais visibles
- * le temps qu'elles arrivent ; seuls les boutons apparaissent quelques
- * millisecondes plus tard.
- */
-/**
- * La pastille « à traiter », différée pour la même raison que les pastilles
- * système : le paquet d'entrée a franchi son budget au lot 7 (barèmes datés
- * et sourcés), et une pastille de la barre peut arriver quelques millisecondes
- * après l'écran — le Pilote, lui, montre déjà les mêmes décisions.
- */
-const IndicateurATraiter = lazy(() =>
-  import('./components/IndicateurATraiter').then((m) => ({ default: m.IndicateurATraiter })));
-
-const PastillesSysteme = lazy(() =>
-  import('./components/PastillesSysteme').then((m) => ({ default: m.PastillesSysteme })));
 
 export interface ProprietesShell {
   readonly children: ReactNode;
@@ -36,18 +13,9 @@ export interface ProprietesShell {
    */
   readonly compteurs?: Partial<Record<IdEcran, number>>;
   /**
-   * Le sélecteur de période de l'écran courant, ou rien.
-   *
-   * La coquille ne sait pas ce qu'une période représente — année, mois,
-   * trimestre — ni quel écran en a besoin : seul l'appelant, qui connaît la
-   * route active, peut en décider. Elle se contente de lui réserver la place
-   * prévue par le dessin, en tête de barre.
-   */
-  readonly periode?: ReactNode;
-  /**
-   * Les services transverses de la barre : recherche, export, création.
-   * Fournis par l'appelant pour la même raison que `periode` — ils lisent
-   * l'année choisie, que la coquille n'a pas à connaître.
+   * Les services transverses de la barre : recherche, synchronisation,
+   * masquage des montants, création. Fournis par l'appelant, qui les charge à
+   * la demande — voir l'en-tête de `BarreActions`.
    */
   readonly actions?: ReactNode;
 }
@@ -75,8 +43,22 @@ function surClicEvitement(evenement: MouseEvent<HTMLAnchorElement>): void {
  * et zone de contenu. Ne connaît aucune donnée métier — `ecran` vient
  * uniquement de `useRoute`, qui lit la même source (`navigation.ts`) que
  * RailNav, donc les deux ne peuvent jamais diverger sur « quel écran ».
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LA BARRE DU HAUT NE PORTE PLUS DE PÉRIODE (lot 51, décision 2)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Elle portait « ‹ juin 2026 › » et l'année au-dessus de tous les écrans. Deux
+ * défauts : sur Config ou la rédaction d'une facture, elle ne commandait rien ;
+ * sur Achats ou Activité, elle doublait la commande que l'écran portait déjà, et
+ * les deux pouvaient se contredire. Chaque écran porte désormais la sienne,
+ * dans son en-tête, et une seule. Le mois reste PARTAGÉ — il vit dans `App` —
+ * pour qu'un changement d'écran ne le remette pas au mois courant.
+ *
+ * Le nom de l'écran n'y est plus non plus : le rail le dit au bureau, et le
+ * titre de chaque écran le situe mieux qu'un mot.
  */
-export function Shell({ children, compteurs, periode, actions }: ProprietesShell) {
+export function Shell({ children, compteurs, actions }: ProprietesShell) {
   const { ecran } = useRoute();
 
   return (
@@ -88,18 +70,8 @@ export function Shell({ children, compteurs, periode, actions }: ProprietesShell
       <RailNav ecranActif={ecran.id} {...(compteurs ? { compteurs } : {})} />
 
       <div className={styles.colonne}>
-        <header className={styles.topbar}>
-          {/* La période en tête de barre, comme le handoff (« ‹ juin 2026 › »).
-              Son contenu est fourni par l'appelant, qui seul sait quelle route
-              est active ; quand il ne rend rien (Config, rédaction d'une
-              facture), le nom de l'écran reprend la place — voir la feuille. */}
-          <div data-emplacement="selecteur-periode" className={styles.periode}>{periode}</div>
-          <span className={styles.titre}>{ecran.libelle}</span>
+        <header className={styles.topbar} aria-label="Barre du haut">
           <div className={styles.grow} />
-          {/* En tête des pastilles, jamais au-dessus d'un contrôle : en
-              portrait il flotte au-dessus du dock, en paysage il vit ici. */}
-          <Suspense fallback={null}><IndicateurATraiter ecranActif={ecran.id} /></Suspense>
-          <Suspense fallback={null}><PastillesSysteme /></Suspense>
           <div data-emplacement="actions" className={styles.actions}>{actions}</div>
         </header>
 

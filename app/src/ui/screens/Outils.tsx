@@ -9,6 +9,7 @@ import { useRoute } from '../useRoute';
 import { moisCourant } from '../../state/selecteurs';
 import { ancreDeLAnnee } from '../../domain/calculs/periode';
 import { Greet } from '../components/Greet';
+import { ChoixAnnee } from '../components/ChoixAnnee';
 import { Info } from '../components/Info';
 import { Sheet } from '../components/Sheet';
 import { eur, eurExact, moisLong, pct } from '../format';
@@ -53,16 +54,22 @@ const SECTIONS: readonly Onglet<SectionOutils>[] = [
  */
 export interface ProprietesOutils {
   /**
-   * L'année choisie dans la barre du haut.
+   * L'année affichée — celle du mois partagé par les écrans, tenu par `App`.
    *
    * Elle commande le BARÈME du simulateur : simuler son impôt 2025 se fait au
    * barème 2025, pas à celui de l'année en cours. `undefined` retombe sur
    * l'année de l'horloge — le cas des tests qui montent cet écran seul.
    */
   readonly annee?: number;
+  /**
+   * De quoi la changer, depuis l'en-tête de l'écran (lot 51 : la barre du
+   * haut ne porte plus de période). Absent, l'écran n'affiche pas de menu
+   * qu'on tournerait sans effet.
+   */
+  readonly onAnnee?: (annee: number) => void;
 }
 
-export function Outils({ annee }: ProprietesOutils = {}) {
+export function Outils({ annee, onAnnee }: ProprietesOutils = {}) {
   const faits = useFaits((e) => e.faits);
   const [caSaisi, setCaSaisi] = useState('');
   const [detailOuvert, setDetailOuvert] = useState(false);
@@ -128,6 +135,9 @@ export function Outils({ annee }: ProprietesOutils = {}) {
         titre="Outils"
         sousTitre="Des simulations, jamais des déclarations : rien de ce qui est calculé ici n’est enregistré."
         repere={`Barème de ${moisLong(m)}`}
+        {...(onAnnee === undefined ? {} : {
+          actions: <ChoixAnnee annee={annee ?? new Date().getFullYear()} onAnnee={onAnnee} />
+        })}
       />
 
       <Onglets

@@ -565,12 +565,12 @@ describe('la facture du mois, avant qu’elle existe', () => {
   };
 
   /**
-   * LE MOIS FACTURÉ EST CELUI DE LA BARRE.
+   * LE MOIS FACTURÉ EST CELUI DE L'APPLICATION.
    *
    * Le brouillon avait ses propres flèches : on regardait mai en haut et la
    * facture de juin en bas, sans que rien ne le signale.
    */
-  it('propose la facture du mois de la barre, et ses flèches déplacent ce mois-là', async () => {
+  it('propose la facture du mois partagé, et ses flèches déplacent ce mois-là', async () => {
     semer([], { missions: [missionPlanifiee] });
     const onMois = vi.fn();
     render(

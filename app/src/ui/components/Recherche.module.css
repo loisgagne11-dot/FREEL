@@ -1,29 +1,45 @@
 /* Le bouton de recherche de la barre du haut. Seul ce fichier est dans l'entrée ;
-   la palette a sa propre feuille, chargée avec elle. */
+   la palette a sa propre feuille, chargée avec elle. Mesures de la maquette
+   `docs/design/direction/navigation.html` (`.e-search`, `.nv-icone`). */
 
 .champ {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: 46px;
   min-width: 44px;
-  padding: 0 12px;
-  /* Un champ et un bouton, pas des pastilles : le handoff les distingue
-     ainsi des pastilles d'état qui les précèdent. */
-  border-radius: var(--r-sm);
+  /* La seule pièce de la barre qui cède de la place : son libellé se tronque
+     pour que la synchronisation reste ÉCRITE à toute largeur de bureau. */
+  flex: 0 1 auto;
+  padding: 0 18px;
+  /* Un champ arrondi comme la maquette : on le lit comme l'endroit où l'on
+     tape, pas comme un bouton de plus. */
+  border-radius: 999px;
   border: 1px solid var(--line-2);
-  background: var(--panel);
-  color: var(--muted);
+  background: var(--card-a);
+  color: var(--muted-2);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 14px;
+  text-align: left;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .champ:hover { border-color: var(--green); color: var(--text); }
+.champ:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 
-.icone { width: 15px; height: 15px; flex-shrink: 0; }
+.icone { width: 16px; height: 16px; flex-shrink: 0; }
+
+.libelle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .raccourci {
+  flex-shrink: 0;
   padding: 1px 6px;
   border-radius: 6px;
   border: 1px solid var(--line-2);
@@ -33,11 +49,24 @@
   color: var(--muted-2);
 }
 
-/* Sur téléphone la place est comptée : l'icône suffit, le bouton garde son nom
-   accessible. Le raccourci clavier n'y a d'ailleurs pas de sens. */
+/* Sous 1 100 px, le libellé n'a plus la place de dire ce qu'on cherche ET le
+   raccourci : c'est le raccourci qui part, il ne sert qu'à qui le connaît. */
+@media (max-width: 1099px) {
+  .raccourci { display: none; }
+}
+
+/* Sur téléphone, une icône ronde de 44 px, comme la maquette : le bouton garde
+   son nom accessible, et le raccourci clavier n'y a pas de sens. */
 @media (max-width: 760px) {
   .libelle, .raccourci { display: none; }
-  .champ { justify-content: center; padding: 0; }
+  .champ {
+    flex: none;
+    justify-content: center;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  .icone { width: 18px; height: 18px; }
 }
 
 @media print { .champ { display: none; } }

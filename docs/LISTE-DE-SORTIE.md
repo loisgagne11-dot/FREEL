@@ -146,11 +146,11 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 |---|---|
 | Rail : Pilote, Activité, Factures, Trésorerie, Obligations, Achats ; Simulateurs et Réglages en pied. Les anciennes adresses redirigent | ⬜ |
 | Le compte rendu d'activité passe sous Activité ; l'import du relevé et le rapprochement sous Trésorerie ; l'analyse du chiffre d'affaires sous Activité › Analyse | ⬜ |
-| Une seule commande de période par écran, dans son en-tête ; le thème en Réglages ; barre du haut : recherche, « Nouveau », synchronisation libellée | ⬜ |
+| Une seule commande de période par écran, dans son en-tête ; le thème en Réglages ; barre du haut : recherche, « Nouveau », synchronisation libellée | ✅ 16/11 — barre : recherche, synchronisation écrite (icône nommée au téléphone), masquer les montants, « + Nouveau » ; « Exporter » et « à traiter » en sont partis ; période dans l'en-tête de chaque écran, mois partagé ; Réglages › Affichage (thème, masquer) |
 | Cinq mots pour l'argent, partout : solde, dû, disponible, réserve, à te verser — passe relue à l'œil | ⬜ |
 | Jetons ajoutés par `design/DIRECTION-VISUELLE.md` (couleurs de charges validées, série en retrait, pastilles, clients du planning), dans les quatre thèmes à la fois ; composants communs de la planche : carte, tuile à tendance, pastille signe + mot, barre de répartition | 🔶 jetons ✅ 15/11 (contraste contrôlé : aplats 3:1, textes 4,5:1) ; composants à faire |
-| Polices embarquées (`woff2`, sous-ensemble latin, licence vérifiée), jamais par un CDN : aujourd'hui aucune n'est chargée et l'écran s'affiche en police système. Si le poids ne tient pas dans les budgets, la pile système reste | ⬜ |
-| Thème par défaut selon la décision 20 | ⬜ — Calme, confirmé le 16/11 |
+| Polices embarquées (`woff2`, sous-ensemble latin, licence vérifiée), jamais par un CDN : aujourd'hui aucune n'est chargée et l'écran s'affiche en police système. Si le poids ne tient pas dans les budgets, la pile système reste || ✅ 16/11 — tranché : la pile système reste (≈ 75 Ko de polices pour 9,7 Ko de marge), consigné dans `DIRECTION-VISUELLE.md` |
+| Thème par défaut selon la décision 20 | ✅ 16/11 — Calme pour un nouvel utilisateur (theme.ts, script en ligne et son empreinte, repli des jetons) ; le thème mémorisé reste ; « Nuit » remplace « Calme sombre » |
 
 ### Lot 53 — Obligations (avec le lot 34)
 

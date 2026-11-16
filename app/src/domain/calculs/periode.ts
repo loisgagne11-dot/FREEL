@@ -126,12 +126,12 @@ export function moisDeLaPeriode(periode: Periode): Mois | null {
  * POURQUOI UNE ANCRE ET NON UN FILTRE DE PLUS
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Le sélecteur d'année de la barre du haut et les barres de période des écrans
- * (Mois / Trimestre / Année / Tout) répondent à deux questions différentes :
- * l'un dit QUELLE ANNÉE, l'autre QUELLE FINESSE. Les empiler en deux filtres
- * successifs donnerait des états qui ne veulent rien dire — « le mois d'août,
- * dans l'année 2025 » alors que la barre pointe sur août 2026, donc un
- * ensemble vide présenté comme un résultat.
+ * L'année partagée par les écrans et les barres de période (Mois / Trimestre
+ * / Année / Tout) répondent à deux questions différentes : l'une dit QUELLE
+ * ANNÉE, l'autre QUELLE FINESSE. Les empiler en deux filtres successifs
+ * donnerait des états qui ne veulent rien dire — « le mois d'août, dans
+ * l'année 2025 » alors qu'on regarde août 2026, donc un ensemble vide présenté
+ * comme un résultat.
  *
  * L'année déplace donc l'ANCRE à partir de laquelle `periodeCourante` compte
  * son décalage. Une seule source pour l'année, une seule pour la granularité,
@@ -161,9 +161,9 @@ export function ancreDeLAnnee(annee: number, maintenant: Date = new Date()): Dat
 /**
  * La date depuis laquelle une période se compte, pour un MOIS choisi.
  *
- * Le mois de la barre du haut est LE mois de l'application : il ancre la
+ * Le mois partagé par les écrans est LE mois de l'application : il ancre la
  * période des écrans au lieu de se contenter de l'année. Avec l'ancre d'année,
- * choisir « mars » dans la barre laissait Achats sur décembre.
+ * choisir « mars » laissait Achats sur décembre.
  *
  * Même règle que `ancreDeLAnnee` : le mois courant garde `maintenant` (rien
  * n'est avancé ni reculé), un autre mois prend son DERNIER jour à midi UTC.

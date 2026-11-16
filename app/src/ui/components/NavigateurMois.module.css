@@ -1,5 +1,5 @@
-/* Le mois en tête de barre, comme le handoff : le mois en titre, les flèches
-   en petits carrés de part et d'autre. */
+/* Le mois, comme le handoff le dessinait : le mois en titre, les flèches en
+   petits carrés de part et d'autre. */
 
 .navigateur {
   display: flex;
@@ -63,23 +63,8 @@
 
 .retour:hover { text-decoration: underline; }
 
-/* Sur téléphone la barre est comptée : le mois se resserre, le retour reste —
+/* Sur téléphone la place est comptée : le mois se resserre, le retour reste —
    c'est lui qu'on cherche quand on s'est perdu dans les mois. */
 @media (max-width: 760px) {
   .mois { font-size: 15px; }
-}
-
-/* Le mois et l'année côte à côte ; sur téléphone l'année s'efface — les
-   flèches traversent les années, et la barre n'a pas la place des deux. */
-.periode {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  /* Le mois ne se comprime pas : comprimé, il passait sous ses propres
-     flèches. C'est le nom de l'écran, ailleurs, qui sait tronquer. */
-  flex: none;
-}
-
-@media (max-width: 760px) {
-  .periode > :not(.navigateur) { display: none; }
 }

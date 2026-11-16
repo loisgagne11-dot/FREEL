@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois, ratio } from '../../domain/types';
@@ -37,8 +37,8 @@ function semer(modifications: Partial<Faits> = {}): void {
 
 beforeEach(() => semer());
 
-// Les dépenses de test sont de septembre 2026 : l'écran s'ouvre désormais sur
-// le mois de la barre du haut, pas sur « Tout ».
+// Les dépenses de test sont de septembre 2026 : l'écran s'ouvre sur le mois
+// partagé par les écrans, pas sur « Tout ».
 const MOIS_TEST = mois('2026-09');
 
 function rendre(stockage = stockageMemoireJustificatifs()) {
@@ -315,17 +315,40 @@ describe('période d’observation', () => {
   });
 
   /**
-   * PAS DE SECONDE PAIRE DE FLÈCHES.
+   * UNE SEULE COMMANDE DE PÉRIODE, DANS L'ÉCRAN (lot 51, décision 2).
    *
-   * La période d'Achats est ancrée sur le mois de la barre du haut : ses
-   * flèches à elle déplaçaient une autre période que celle de la barre, et
-   * l'écran affichait deux « ‹ juin 2026 › » qui pouvaient se contredire.
+   * La barre du haut portait le mois, et la barre de période se taisait pour
+   * ne pas montrer deux « ‹ juin 2026 › » qui pouvaient se contredire. La
+   * barre du haut n'en porte plus : sans ses flèches, l'écran Achats n'aurait
+   * plus eu AUCUN moyen de changer de mois.
+   *
+   * Et ses flèches déplacent LE mois de l'application, pas un décalage à elle :
+   * un mois choisi ici doit être celui qu'on retrouve en passant au Pilote.
    */
-  it('laisse la navigation au mois de la barre du haut', async () => {
+  it('porte la navigation, et elle déplace le mois de toute l’application', async () => {
     semer();
-    render(<Achats />);
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Mois' }));
-    expect(screen.queryByRole('button', { name: 'Période précédente' })).toBeNull();
+    const onMois = vi.fn();
+    render(<Achats mois={mois('2026-06')} onMois={onMois} />);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Période précédente' }));
+    expect(onMois).toHaveBeenLastCalledWith('2026-05');
+  });
+
+  /**
+   * Un pas de flèche vaut une maille : un mois de recul en « Trimestre »
+   * tomberait deux fois sur trois dans le même trimestre — une flèche qui ne
+   * fait rien.
+   */
+  it('recule d’un trimestre entier en maille « Trimestre », d’un an en « Année »', async () => {
+    semer();
+    const onMois = vi.fn();
+    render(<Achats mois={mois('2026-06')} onMois={onMois} />);
+    const utilisateur = userEvent.setup();
+    await utilisateur.click(screen.getByRole('button', { name: 'Trimestre' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Période précédente' }));
+    expect(onMois).toHaveBeenLastCalledWith('2026-03');
+    await utilisateur.click(screen.getByRole('button', { name: 'Année' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Période suivante' }));
+    expect(onMois).toHaveBeenLastCalledWith('2027-06');
   });
 });
 
@@ -468,14 +491,14 @@ describe('supprimer une dépense', () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Le mois de la barre du haut ancre la période de l'écran
+   Le mois partagé ancre la période de l'écran
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
  * LE MOIS ANCRE, IL NE FILTRE PAS.
  *
- * Avec l'ancre d'année, choisir « mars » dans la barre du haut laissait
- * Achats sur décembre. Le mois choisi est LE mois de l'application.
+ * Avec l'ancre d'année, choisir « mars » ailleurs laissait Achats sur
+ * décembre. Le mois choisi est LE mois de l'application.
  */
 describe('le mois choisi ancre la période', () => {
   it('ouvre sur le mois choisi, en maille « Mois » par défaut', () => {
@@ -493,8 +516,8 @@ describe('le mois choisi ancre la période', () => {
     expect(screen.getByText(`Dépenses · ${attendu}`)).toBeTruthy();
   });
 
-  /** Ce sont les flèches de la barre du haut qui déplacent la période. */
-  it('suit le mois de la barre quand il change', () => {
+  /** Le mois partagé, déplacé sur un autre écran, déplace la période d'ici. */
+  it('suit le mois partagé quand il change', () => {
     semer();
     const rendu = render(<Achats mois={mois('2025-03')} />);
     rendu.rerender(<Achats mois={mois('2025-02')} />);

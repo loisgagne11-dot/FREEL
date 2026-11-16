@@ -7,16 +7,19 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 44px;
+  min-height: 46px;
   min-width: 44px;
-  padding: 0 15px;
-  border-radius: var(--r-sm);
+  padding: 0 22px;
+  /* La pastille pleine de la maquette (`.e-btn.go`) : le seul aplat de la
+     barre, et la seule forme qu'on y reconnaît d'un coup d'œil. */
+  border-radius: 999px;
   border: 1px solid var(--green);
   background: var(--green);
-  color: var(--bg);
+  color: var(--on-accent);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 620;
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -25,17 +28,12 @@
 
 .plus { font-size: 16px; line-height: 1; }
 
-/* Sur téléphone, le « + » seul : le nom accessible vient du texte, qui reste
-   dans le DOM. */
+/* Sur téléphone, « + Nouveau » reste ÉCRIT (maquette) : c'est l'action, et
+   la barre en a la place depuis que la période et l'export l'ont quittée
+   (lot 51) — à 360 px, le logo, trois icônes et ce bouton tiennent sur une
+   rangée. */
 @media (max-width: 760px) {
-  .bouton { justify-content: center; padding: 0; }
-  .libelle {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
+  .bouton { min-height: 44px; padding: 0 16px; font-size: 14px; }
 }
 
 @media print { .enveloppe { display: none; } }

@@ -48,7 +48,8 @@ import {
 export { facturesSuivies };
 
 /**
- * Les années que le sélecteur de la barre du haut peut proposer.
+ * Les années que le sélecteur d'année d'un écran peut proposer — voir
+ * `ChoixAnnee`, qui le pose dans l'en-tête d'Argent et d'Outils.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * UNE BORNE SE LIT DANS LES FAITS, ELLE NE S'INVENTE PAS
@@ -228,7 +229,7 @@ export interface EtatSeuils {
  * l'autonomie. Ces chiffres viennent tous de `pilote.tresorerie`, calculé
  * ci-dessous sur `maintenant` et sur RIEN d'autre.
  *
- * `annee` est un CHOIX : celle que le sélecteur de la barre du haut affiche.
+ * `annee` est un CHOIX : celle que l'en-tête de l'écran affiche.
  * Elle gouverne le chiffre d'affaires, les seuils et les provisions de
  * l'année — tout ce qui se compte « sur 2025 » plutôt qu'« à cet instant ».
  *
@@ -599,7 +600,7 @@ export interface MoisEvolutionCompte {
  * DOUZE MOIS DE L'ANNÉE CHOISIE, PAS DOUZE MOIS GLISSANTS
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Le graphe suit la bascule d'année de la barre du haut — janvier à décembre
+ * Le graphe suit l'année choisie en tête de l'écran — janvier à décembre
  * de l'année regardée, jamais un rouleau de douze mois depuis aujourd'hui. Sur
  * une année déjà terminée, tous les mois sont des faits ; sur l'année en
  * cours, les mois après le mois courant sont projetés ; sur une année future

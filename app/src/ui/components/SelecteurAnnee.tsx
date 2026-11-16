@@ -9,7 +9,7 @@ export interface ProprietesSelecteurAnnee {
 }
 
 /**
- * La bascule d'année de la barre du haut.
+ * La bascule d’année d’un écran, dans son en-tête — voir `ChoixAnnee`, qui la borne.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * CE QU'ELLE CHANGE, ET CE QU'ELLE NE CHANGE PAS
@@ -28,7 +28,7 @@ export interface ProprietesSelecteurAnnee {
  *
  * Un dossier neuf n'a que l'année courante à proposer. Un menu à une seule
  * entrée n'apprend rien et n'offre rien à faire : il se masque plutôt que
- * d'occuper la barre pour rien.
+ * d'occuper l'en-tête pour rien.
  */
 export function SelecteurAnnee({ annees, valeur, onChange }: ProprietesSelecteurAnnee) {
   const idChamp = useId();

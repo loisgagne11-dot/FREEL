@@ -4,17 +4,19 @@ import { moisLong } from '../format';
 import styles from './NavigateurMois.module.css';
 
 /**
- * « ‹ juin 2026 › » — le mois qu'on regarde, en tête de la barre du haut.
+ * « ‹ juin 2026 › » — le mois qu'on regarde, dans l'en-tête de ce qu'il
+ * commande : la carte du flux, sur le Pilote.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * UN SEUL MOIS POUR TOUTE L'APPLICATION
+ * UN SEUL MOIS POUR TOUTE L'APPLICATION, UNE COMMANDE PAR ÉCRAN
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Activité avait ses propres flèches, le Pilote n'en avait pas, Argent ne
  * connaissait que l'année : trois périodes indépendantes, et en passant
- * d'un écran à l'autre on ne savait plus ce qu'on regardait. Le handoff met
- * le mois en tête de barre, au-dessus de tous les écrans ; il vit dans `App`
- * et chaque écran en tire ce qui le concerne (le mois, ou son année).
+ * d'un écran à l'autre on ne savait plus ce qu'on regardait. Le mois vit donc
+ * dans `App`, et chaque écran en tire ce qui le concerne (le mois, ou son
+ * année). Il a été affiché un temps en tête de la barre du haut ; depuis le
+ * lot 51, chaque écran porte sa commande dans son en-tête, et une seule.
  *
  * « Aujourd'hui » n'apparaît que loin du mois courant : c'est le chemin du
  * retour, inutile quand on y est déjà.

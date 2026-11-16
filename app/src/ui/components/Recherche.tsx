@@ -66,7 +66,7 @@ export function Recherche() {
           <path d="M11 4 a7 7 0 1 0 0.01 0 M16 16 L21 21" fill="none" stroke="currentColor"
             strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className={styles.libelle}>Rechercher…</span>
+        <span className={styles.libelle}>Rechercher une facture, un client…</span>
         <kbd className={styles.raccourci}>{raccourci}</kbd>
       </button>
       {ouverte && (

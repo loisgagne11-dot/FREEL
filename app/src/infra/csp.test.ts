@@ -18,6 +18,18 @@ describe('politique de sécurité du contenu de index.html', () => {
     }
   });
 
+  /**
+   * Modifier un script en ligne change son empreinte (lot 51 : le thème par
+   * défaut). AJOUTER la nouvelle sans retirer l'ancienne laisserait la
+   * politique autoriser un script qui n'existe plus — une porte de plus pour
+   * qui saurait le réinjecter, et un assouplissement que personne n'a décidé.
+   */
+  it('ne garde aucune empreinte périmée', () => {
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+    const empreintes = politique.match(/'sha256-[^']+'/g) ?? [];
+    expect(empreintes).toHaveLength(scripts.length);
+  });
+
   it('interdit les objets, fige la base et exclut unsafe-inline des scripts', () => {
     expect(politique).toContain("object-src 'none'");
     expect(politique).toContain("base-uri 'self'");

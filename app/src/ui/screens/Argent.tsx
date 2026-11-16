@@ -6,6 +6,7 @@ import { Greet } from '../components/Greet';
 import { PanneauOnglet } from '../components/Onglets';
 import { Etiquette, Piliers } from '../components/Piliers';
 import { Sheet } from '../components/Sheet';
+import { ChoixAnnee } from '../components/ChoixAnnee';
 import { eur } from '../format';
 import styles from './Argent.module.css';
 import { useRoute } from '../useRoute';
@@ -99,14 +100,20 @@ type Registre = 'livre' | 'des' | 'tva' | null;
 
 export interface ProprietesArgent {
   /**
-   * L'année choisie au sélecteur de la barre du haut. `undefined` retombe sur
-   * l'année de l'horloge — le cas des tests qui montent cet écran seul, sans
-   * la coquille qui porte le sélecteur.
+   * L'année affichée — celle du mois partagé par les écrans, tenu par `App`.
+   * `undefined` retombe sur l'année de l'horloge : le cas des tests qui montent
+   * cet écran seul.
    */
   readonly annee?: number;
+  /**
+   * De quoi la changer. L'écran porte sa commande d'année dans son en-tête
+   * (lot 51 : la barre du haut n'en a plus) ; sans ce rappel, il n'en
+   * affiche pas — plutôt qu'un menu qu'on tournerait sans effet.
+   */
+  readonly onAnnee?: (annee: number) => void;
 }
 
-export function Argent({ annee }: ProprietesArgent = {}) {
+export function Argent({ annee, onAnnee }: ProprietesArgent = {}) {
   const faits = useFaits((e) => e.faits);
   const [section, setSection] = useState<Section>('tresorerie');
   const { ecran, sousRoute } = useRoute();
@@ -153,6 +160,11 @@ export function Argent({ annee }: ProprietesArgent = {}) {
             Dû · {couverture}&nbsp;% couvert
           </Etiquette>
         )}
+        // La seule commande de période de l'écran : l'année. Le solde n'en
+        // dépend pas — c'est un état, pas une période.
+        {...(onAnnee === undefined ? {} : {
+          actions: <ChoixAnnee annee={annee ?? new Date().getFullYear()} onAnnee={onAnnee} />
+        })}
       />
 
       <div className={styles.sections}>

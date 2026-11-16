@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react';
 import type { Euros } from '../../domain/types';
 import type { LigneFlux } from '../../state/selecteurs';
 import type { FluxDUnAutreMois } from '../../state/selecteurs.flux';
-import { Pastille, VERS_FACTURES } from './FluxCard';
+import { Pastille, TitreMois, VERS_FACTURES } from './FluxCard';
 import { eur } from '../format';
 import { Montant } from './Montant';
 import styles from './FluxCard.module.css';
@@ -15,9 +16,11 @@ import styles from './FluxCard.module.css';
  * `fluxDUnAutreMois` —, et la colonne le dit au lieu de recopier celui du jour.
  */
 export function FluxAutreMois(
-  { flux, periode, courant, onRevenir }: {
+  { flux, periode, navigation, courant, onRevenir }: {
     readonly flux: FluxDUnAutreMois;
     readonly periode: string;
+    /** La commande du mois, comme sur la carte du mois courant. */
+    readonly navigation?: ReactNode;
     /** Le mois courant, en toutes lettres : « Revenir à juin 2026 ». */
     readonly courant: string;
     readonly onRevenir: () => void;
@@ -29,8 +32,11 @@ export function FluxAutreMois(
   return (
     <section className={styles.carte} aria-labelledby="titre-flux">
       <header className={styles.entete}>
-        <h2 id="titre-flux" className={styles.titreCarte}>Le flux du mois · {periode}</h2>
+        <h2 id="titre-flux" className={styles.titreCarte}>
+          Le flux du mois<TitreMois periode={periode} navigation={navigation} />
+        </h2>
         <p className={styles.indice}>{passe ? 'ce qui s’est passé' : 'ce qui est prévu'}</p>
+        {navigation !== undefined && <div className={styles.navigation}>{navigation}</div>}
       </header>
 
       <div className={styles.colonnes}>

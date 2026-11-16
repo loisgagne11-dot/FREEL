@@ -1,0 +1,64 @@
+/* Réglages › Affichage : les quatre cartes de thème.
+   Mesures de la maquette `docs/design/direction/navigation.html`
+   (`.nv-themes`, `.nv-theme`, `.nv-pastilles`). Aucune couleur écrite : les
+   pastilles lisent les jetons du thème qu'elles montrent. */
+
+.themes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Au bureau, le panneau des Réglages a la place des quatre côte à côte : les
+   comparer d'un regard est tout l'intérêt de les montrer. */
+@media (min-width: 1100px) {
+  .themes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.theme {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line-2);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.theme:hover { border-color: var(--green-line); }
+.theme:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* Le cadre s'épaissit d'un pixel ; le retrait le compense, pour que la carte
+   choisie ne déplace pas ses voisines. */
+.choisi { border: 2px solid var(--green); padding: 11px; }
+
+.pastilles { display: flex; gap: 5px; }
+
+.pastilles i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+}
+
+.fond { background: var(--bg); }
+.accent { background: var(--green); }
+.alerte { background: var(--amber); }
+
+.nom { min-width: 0; }
+
+.description {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+}

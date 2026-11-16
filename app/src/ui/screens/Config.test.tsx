@@ -11,6 +11,8 @@ import { stockageMemoire } from '../../infra/migration';
 import { useFaits } from '../../state/store';
 import { periodesUrssafEffectives } from '../../state/selecteurs';
 import { FournisseurToasts } from '../components/Toasts';
+import { PastillesSysteme } from '../components/PastillesSysteme';
+import { CLE_STOCKAGE_THEME } from '../theme';
 import { Config } from './Config';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -340,6 +342,81 @@ describe('données', () => {
 });
 
 // D5 : elle proposait des actions que rien ne rattachait aux faits.
+/**
+ * RÉGLAGES › AFFICHAGE (lot 51, décision 4).
+ *
+ * Le thème a quitté la barre du haut pour s'y ranger, avec « Masquer les
+ * montants » — maquette `docs/design/direction/navigation.html`. Les quatre
+ * palettes existaient longtemps sans aucun bouton pour en changer : une
+ * fonction sans porte d'entrée n'existe pas pour celui qui s'en sert. Ces tests
+ * tiennent la porte, à sa nouvelle place.
+ */
+describe('affichage', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute('data-confidentiel');
+  });
+
+  const groupeTheme = () => within(screen.getByRole('group', { name: 'Thème' }));
+
+  it('s’ouvre depuis la liste des sections', async () => {
+    render(<Config />);
+    await utilisateurTest().click(screen.getByRole('button', { name: /Affichage/ }));
+    expect(await screen.findByRole('group', { name: 'Thème' })).toBeTruthy();
+    expect(window.location.hash).toBe('#/config/affichage');
+  });
+
+  it('montre les quatre thèmes, « Nuit » compris, et ouvre sur Calme sans choix mémorisé', async () => {
+    await afficher('affichage');
+    const boutons = groupeTheme().getAllByRole('button');
+    expect(boutons.map((b) => b.textContent)).toEqual([
+      expect.stringMatching(/^Calme/), expect.stringMatching(/^Nuit/),
+      expect.stringMatching(/^Sombre/), expect.stringMatching(/^Clair/)
+    ]);
+    expect(groupeTheme().getByRole('button', { name: /^Calme/ }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  // Sans persistance, le choix serait à refaire à chaque ouverture — et le
+  // script en ligne de index.html, qui pose le thème avant React, n'aurait
+  // rien à lire.
+  it('applique le thème choisi au document, et le mémorise', async () => {
+    await afficher('affichage');
+    await utilisateurTest().click(groupeTheme().getByRole('button', { name: /^Nuit/ }));
+    expect(document.documentElement.getAttribute('data-theme')).toBe('nuit');
+    expect(localStorage.getItem(CLE_STOCKAGE_THEME)).toBe('nuit');
+    expect(groupeTheme().getByRole('button', { name: /^Nuit/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(groupeTheme().getByRole('button', { name: /^Calme/ }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('part du thème déjà mémorisé, pas du défaut', async () => {
+    localStorage.setItem(CLE_STOCKAGE_THEME, 'sombre');
+    await afficher('affichage');
+    expect(groupeTheme().getByRole('button', { name: /^Sombre/ }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  /**
+   * DEUX COMMANDES, UN SEUL ÉTAT.
+   *
+   * L'icône de la barre du haut et l'interrupteur des Réglages basculent le
+   * même mode. Si l'icône ignorait la bascule faite ici, elle dirait encore
+   * « Masquer les montants » sur des montants masqués — et un clic les
+   * rendrait en croyant les cacher, devant l'écran qu'on partage.
+   */
+  it('masque les montants, et la barre du haut le sait', async () => {
+    window.location.hash = '#/config/affichage';
+    render(<><PastillesSysteme /><Config /></>);
+    const interrupteur = await screen.findByRole('switch', { name: 'Masquer les montants' });
+    await utilisateurTest().click(interrupteur);
+    expect(document.documentElement.getAttribute('data-confidentiel')).toBe('oui');
+    expect(screen.getByRole('button', { name: /Montants masqués/ }).getAttribute('aria-pressed')).toBe('true');
+
+    await utilisateurTest().click(screen.getByRole('button', { name: /Montants masqués/ }));
+    expect((screen.getByRole('switch', { name: 'Masquer les montants' }) as HTMLInputElement).checked)
+      .toBe(false);
+  });
+});
+
 describe('propositions retirées', () => {
   it('ne comporte plus de section « Propositions Claude Code »', () => {
     render(<Config />);
@@ -987,11 +1064,14 @@ describe('navigation entre les sections', () => {
     expect(ouvertes[0]?.textContent).toMatch(/Données & export/);
   });
 
-  it('liste les sept sections, sous-titre compris', async () => {
+  // Huit depuis le lot 51 : Affichage (thème, montants masqués) s'est ajouté
+  // aux sept, quand le thème a quitté la barre du haut.
+  it('liste les huit sections, sous-titre compris', async () => {
     await afficher('profil');
-    expect(within(nav()).getAllByRole('button')).toHaveLength(7);
+    expect(within(nav()).getAllByRole('button')).toHaveLength(8);
     expect(within(nav()).getByText('Abattement, cotisations, TVA')).toBeTruthy();
     expect(within(nav()).getByText('Livre CSV, sauvegarde, restauration')).toBeTruthy();
+    expect(within(nav()).getByText('Thème, montants masqués')).toBeTruthy();
   });
 
   it('construit le sous-titre du profil depuis les faits', async () => {

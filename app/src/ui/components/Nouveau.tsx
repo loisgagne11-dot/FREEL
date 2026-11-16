@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import styles from './Nouveau.module.css';
-import menu from './Exporter.menu.module.css';
+import menu from './Nouveau.menu.module.css';
 
 /**
  * Le bouton « + Nouveau » de la barre du haut : créer, d'où que l'on soit.
@@ -79,7 +79,7 @@ export function Nouveau() {
         onClick={() => setOuvert((o) => !o)}
       >
         <span className={styles.plus} aria-hidden="true">+</span>
-        <span className={styles.libelle}>Nouveau</span>
+        <span>Nouveau</span>
       </button>
       {ouvert && (
         <div className={menu.menu} role="menu" aria-label="Créer" ref={liste} onKeyDown={surTouche}>

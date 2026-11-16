@@ -10,10 +10,8 @@ afterEach(() => { cleanup(); });
 const ANCRE = new Date('2026-06-10T09:00:00Z');
 
 /**
- * Les flèches de la barre de période — encore servies par le facturier.
- *
- * Elles n'étaient testées qu'à travers Achats, qui ne les affiche plus depuis
- * que sa période suit le mois de la barre du haut (lot 8).
+ * Les flèches de la barre de période — celles du facturier, et de nouveau
+ * celles d'Achats depuis que la barre du haut ne porte plus de mois (lot 51).
  */
 describe('la barre de période', () => {
   it('offre la navigation dès qu’une maille est bornée', () => {
@@ -26,14 +24,6 @@ describe('la barre de période', () => {
   // Naviguer dans un ensemble qui contient déjà tout ne mène nulle part.
   it('n’offre pas de navigation sur « Tout »', () => {
     render(<BarrePeriode periode={periodeCourante('tout', ANCRE, 0)} onGranularite={() => {}} onDecaler={() => {}} />);
-    expect(screen.queryByRole('button', { name: 'Période précédente' })).toBeNull();
-  });
-
-  it('se tait quand un autre contrôle porte la navigation', () => {
-    render(
-      <BarrePeriode periode={periodeCourante('mois', ANCRE, 0)} onGranularite={() => {}} onDecaler={() => {}}
-        navigation={false} />
-    );
     expect(screen.queryByRole('button', { name: 'Période précédente' })).toBeNull();
   });
 });

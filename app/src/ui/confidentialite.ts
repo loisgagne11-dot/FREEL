@@ -9,6 +9,17 @@
 
 export const CLE_CONFIDENTIALITE = 'freel.confidentialite.v1';
 
+/**
+ * Émis sur `window` à chaque bascule.
+ *
+ * Deux commandes basculent le même mode depuis le lot 51 — l'icône de la barre
+ * du haut et l'interrupteur de Réglages › Affichage — et chacune garde son état
+ * affiché. Sans signal, basculer dans les Réglages laissait l'icône dire
+ * « Masquer les montants » sur des montants déjà masqués : un second clic les
+ * aurait rendus en croyant les cacher.
+ */
+export const EVENEMENT_CONFIDENTIALITE = 'freel:confidentialite';
+
 export function lireConfidentialite(): boolean {
   try {
     return localStorage.getItem(CLE_CONFIDENTIALITE) === 'oui';
@@ -33,4 +44,6 @@ export function appliquerConfidentialite(actif: boolean): void {
     // Le rendu de la session en cours reste correct ; seule la mémorisation
     // pour la prochaine visite est perdue.
   }
+
+  window.dispatchEvent(new Event(EVENEMENT_CONFIDENTIALITE));
 }

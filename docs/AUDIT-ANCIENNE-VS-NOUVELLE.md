@@ -577,3 +577,10 @@ chiffre faux.
 | Reprendre les journées attribuées par client (`entiteByDay`) | 🟢 | Voir la ligne des clients opérationnels ; la vérification d'absence de perte compare désormais les journées mission par mission, mois par mois |
 | Arrêter un client à une date | 🟢 nouveau | L'ancienne ne savait pas arrêter un client sans réécrire son passé. Borner ses plages et ses corrections, avec une confirmation chiffrée ; « arrêté le … » dérivé ; « Retirer » confirmé propose l'arrêt à la place |
 | Facturer une mission à plusieurs clients | 🟢 nouveau | Schéma 24 : facture commune par défaut, ou une par client avec le payeur choisi dans le carnet ; le brouillon du mois se découpe par payeur |
+
+## Lot 51, phase 1 (16/11)
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Exporter (menu de la barre) | 🟢 | Le menu quitte la barre ; chaque export vit avec ses données : livre CSV, sauvegarde et archive dans Données, factures dans le facturier, compte rendu dans Outils |
+| Choisir le thème | 🟢 | Dans Réglages › Affichage, avec masquer les montants ; Calme par défaut |

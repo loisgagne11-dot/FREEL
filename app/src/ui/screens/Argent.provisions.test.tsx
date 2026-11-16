@@ -286,8 +286,27 @@ describe('le détail d’une enveloppe', () => {
 
     await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
 
-    expect(await screen.findByText('Reste à sortir')).toBeTruthy();
+    expect(await screen.findByText('Ce qui est dû')).toBeTruthy();
     expect(screen.getByText('Déjà payé')).toBeTruthy();
+  });
+
+  /**
+   * DÉCISION 8 (16/11) : « CE QUI EST DÛ », PLUS « RESTE À SORTIR ».
+   *
+   * « Dû » est le mot de cette notion partout ailleurs — l'anneau de
+   * répartition, l'en-tête « Dû · 80 % couvert ». Un second nom pour le même total, dans le
+   * panneau qui détaille ce total, faisait chercher la différence entre les
+   * deux là où il n'y en a aucune.
+   */
+  it('nomme le total du détail « Ce qui est dû », comme le reste de l’écran', async () => {
+    semer({ echeances: [ech('e1', 'urssaf', 2000)] });
+    render(<Argent />);
+    await attendreTresorerie();
+    await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
+
+    const panneau = within(await screen.findByRole('dialog'));
+    expect(panneau.getByText('Ce qui est dû')).toBeTruthy();
+    expect(panneau.queryByText(/reste à sortir/i)).toBeNull();
   });
 
   /**
@@ -296,7 +315,7 @@ describe('le détail d’une enveloppe', () => {
    * le détail une autre. Il dit désormais celle de la vignette, impôt sur le
    * revenu COMPRIS.
    */
-  it('le détail dit le reste à sortir de la vignette, impôt sur le revenu compris', async () => {
+  it('le détail dit le dû de la vignette, impôt sur le revenu compris', async () => {
     semer({
       recettes: [{
         id: 'r1', clientNom: 'C', libelle: 'Mission', montant: euros(60000),
@@ -308,11 +327,11 @@ describe('le détail d’une enveloppe', () => {
     render(<Argent />);
     await attendreTresorerie();
     const vignette = screen.getByRole('button', { name: /Impôt sur le revenu/i });
-    // La vignette dit « X € [couverts] sur Y € » : Y est le reste à sortir.
+    // La vignette dit « X € [couverts] sur Y € » : Y est ce qui est dû.
     const montantVignette = /sur ([\d\s\u202f]+?)\s*€/.exec(vignette.textContent ?? '')?.[1]?.trim();
     await utilisateur().click(vignette);
 
-    const reste = (await screen.findByText('Reste à sortir')).parentElement?.textContent ?? '';
+    const reste = (await screen.findByText('Ce qui est dû')).parentElement?.textContent ?? '';
     expect(montantVignette).toBeTruthy();
     expect(reste.replace(/\s|\u202f/g, '')).toContain((montantVignette ?? '').replace(/\s|\u202f/g, ''));
     expect(screen.getByText(/dont impôt sur le revenu de l’année/)).toBeTruthy();
@@ -428,7 +447,7 @@ describe('TVA autoliquidée, à l’écran', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: /TVA à reverser/i }));
 
     const panneau = within(await screen.findByRole('dialog'));
-    expect(panneau.getByText('Reste à sortir')).toBeTruthy();
+    expect(panneau.getByText('Ce qui est dû')).toBeTruthy();
     expect(panneau.queryByText(/TVA autoliquidée/)).toBeNull();
   });
 });

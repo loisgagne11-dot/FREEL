@@ -75,9 +75,23 @@ const BandeauxDuPilote = lazy(() => import('./Pilote.bandeaux')
 const FluxAutreMois = lazy(() => import('../components/FluxAutreMois.carte')
   .then((m) => ({ default: m.FluxAutreMoisCarte })));
 
+/**
+ * La commande du mois, dans l'en-tête de la carte du flux — différée comme
+ * elle l'était dans la barre du haut.
+ *
+ * Importée d'emblée, elle tirait dans le paquet d'ENTRÉE tout
+ * `calculs/periode.ts` — mailles, trimestres, ancres, que seuls les écrans
+ * différés emploient — pour une fonction de trois lignes : 2 Ko de plus, et le
+ * budget franchi (lot 51). Elle arrive quelques millisecondes après la carte ;
+ * sa place est réservée, rien ne bouge à son arrivée.
+ */
+const NavigateurMois = lazy(() => import('../components/NavigateurMois')
+  .then((m) => ({ default: m.NavigateurMois })));
+
 export function Pilote({ mois: moisChoisi, onMois }: {
-  /** Le mois de la barre du haut ; le mois courant quand l'écran est monté seul. */
+  /** Le mois partagé par les écrans, tenu par `App` ; le mois courant quand l'écran est monté seul. */
   readonly mois?: Mois;
+  /** De quoi le changer. Absent, la carte du flux n'affiche pas de commande du mois. */
   readonly onMois?: (m: Mois) => void;
 } = {}) {
   const faits = useFaits((e) => e.faits);
@@ -109,12 +123,21 @@ export function Pilote({ mois: moisChoisi, onMois }: {
   }, [routeEncaissements]);
 
   /*
-   * Le flux suit le mois de la barre ; la santé et les décisions, non : elles
+   * Le flux suit le mois choisi ; la santé et les décisions, non : elles
    * disent où l'on en est AUJOURD'HUI, et « combien je peux me verser » n'a
-   * pas de mois passé.
+   * pas de mois passé. C'est pourquoi la commande du mois vit dans l'en-tête
+   * de la carte du flux, et nulle part ailleurs sur l'écran (lot 51) : posée
+   * en haut de page, elle laissait croire que tout l'écran la suivait.
    */
   const mois = moisCourant();
   const moisVu = moisChoisi ?? mois;
+  const navigation = onMois === undefined
+    ? undefined
+    : (
+      <Suspense fallback={null}>
+        <NavigateurMois mois={moisVu} courant={mois} onMois={onMois} />
+      </Suspense>
+    );
   // Recalculé à chaque changement de faits, jamais stocké.
   const etat = useMemo(() => etatPilote(faits), [faits]);
   // `null` tant que le calcul n'est pas chargé : inconnu, pas « aucun sujet ».
@@ -190,6 +213,7 @@ export function Pilote({ mois: moisChoisi, onMois }: {
           <FluxCard
             flux={flux}
             periode={moisLong(mois).toLowerCase()}
+            {...(navigation === undefined ? {} : { navigation })}
             onVersable={() => setCompose('versable')}
             onPointer={setPointage}
             onPayer={setPaiement}
@@ -199,7 +223,12 @@ export function Pilote({ mois: moisChoisi, onMois }: {
         )
         : (
           <Suspense fallback={null}>
-            <FluxAutreMois mois={moisVu} courant={mois} onRevenir={() => onMois?.(mois)} />
+            <FluxAutreMois
+              mois={moisVu}
+              courant={mois}
+              onRevenir={() => onMois?.(mois)}
+              {...(navigation === undefined ? {} : { navigation })}
+            />
           </Suspense>
         )}
 

@@ -7,7 +7,7 @@ import { SelecteurAnnee } from './SelecteurAnnee';
 
 afterEach(cleanup);
 
-describe('sélecteur d’année de la barre du haut', () => {
+describe('sélecteur d’année de l’en-tête d’un écran', () => {
   it('propose toutes les années reçues, dans l’ordre', () => {
     render(<SelecteurAnnee annees={[2023, 2024, 2025]} valeur={2024} onChange={() => {}} />);
     const choix = screen.getByRole('combobox', { name: 'Année' });
@@ -32,8 +32,8 @@ describe('sélecteur d’année de la barre du haut', () => {
 
   /**
    * Un dossier neuf n'a que l'année courante à proposer : un menu à une seule
-   * entrée n'offre rien à choisir, et l'afficher quand même occuperait la
-   * barre du haut pour un contrôle qui ne fait jamais rien.
+   * entrée n'offre rien à choisir, et l'afficher quand même occuperait
+   * l'en-tête de l'écran pour un contrôle qui ne fait jamais rien.
    */
   it('ne s’affiche pas quand une seule année est proposable', () => {
     render(<SelecteurAnnee annees={[2026]} valeur={2026} onChange={() => {}} />);
