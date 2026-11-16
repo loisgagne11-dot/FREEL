@@ -8,8 +8,8 @@ afterEach(cleanup);
 
 /**
  * L'en-tête d'écran de la spec de design. Les écrans portaient un `<h1>` nu —
- * or le nom de l'écran figure déjà dans le rail et dans la barre du haut : le
- * répéter une troisième fois n'apprend rien.
+ * or le nom de l'écran figure déjà dans le rail, et figurait alors dans la
+ * barre du haut : le répéter n'apprend rien.
  */
 describe('en-tête d’écran', () => {
   /**

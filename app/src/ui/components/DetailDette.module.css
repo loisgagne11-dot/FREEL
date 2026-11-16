@@ -4,7 +4,7 @@
 
 /* ── Les deux totaux ───────────────────────────────────────────────────── */
 
-/* Côte à côte, comme l'ancienne application les montrait : « reste à sortir »
+/* Côte à côte, comme l'ancienne application les montrait : « ce qui est dû »
    et « déjà payé » sont les deux moitiés d'une même question, et les empiler
    ferait lire la seconde comme un détail de la première. */
 .totaux {

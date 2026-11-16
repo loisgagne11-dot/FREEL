@@ -5,13 +5,23 @@
    [data-theme] sur <html>, posé avant le premier rendu par le script
    inline de index.html pour éviter le flash.
 
-   Le sélecteur du bloc "sombre" est ":root,[data-theme=\"sombre\"]" à
-   dessein : il sert de valeur par défaut tant qu'aucun data-theme n'est
-   encore posé sur <html> (avant hydratation, tests, etc.), et sert aussi
-   le thème sombre explicite.
+   Le bloc "calme" porte aussi le repli `:where(:root)` : il vaut tant
+   qu'aucun data-theme n'est posé sur <html> (avant hydratation, tests), ou
+   quand l'attribut porte une valeur qu'aucun bloc ne connaît. Calme est le
+   thème par défaut depuis le 16/11 (décision 5) ; ce repli, le script en
+   ligne de index.html et THEME_PAR_DEFAUT de ui/theme.ts disent la même
+   chose, et ui/theme.test.ts les relit tous les trois.
+
+   Pourquoi `:where(:root)` et pas `:root` : les deux sélecteurs `:root` et
+   `[data-theme=…]` ont la même spécificité, c'est donc l'ORDRE du fichier
+   qui tranche entre eux. Le repli vivait sur le premier bloc, où il cédait à
+   tous les suivants ; posé tel quel sur le dernier, il aurait écrasé les
+   trois autres thèmes partout. `:where()` ramène sa spécificité à zéro : il
+   cède à n'importe quel thème posé, quelle que soit sa place. Les quatre
+   blocs déclarent les mêmes 57 propriétés, si bien qu'aucune valeur du
+   repli ne transparaît sous un autre thème.
    ============================================================ */
 
-:root,
 [data-theme="sombre"] {
   --bg: #090c0a;
   --bg-tint: #121a14;
@@ -233,7 +243,8 @@
   --blue-soft: rgba(43, 107, 166, .14);
 }
 
-/* ---------- palette CALME (sauge / argile) ---------- */
+/* ---------- palette CALME (sauge / argile) — et repli par défaut ---------- */
+:where(:root),
 [data-theme="calme"] {
   --bg: #f1efe6;
   --bg-tint: #e4e6d4;

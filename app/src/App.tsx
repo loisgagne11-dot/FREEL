@@ -5,15 +5,6 @@ import { useRoute } from './ui/useRoute';
 import { useFaits } from './state/store';
 
 /**
- * Chargé à la demande, comme les six écrans plus bas : il ne sert qu'à
- * l'écran Argent — bornes comprises, voir son en-tête — et le charger
- * d'emblée avait fait franchir le budget du code d'entrée pour un contrôle
- * que cinq écrans sur six n'affichent jamais.
- */
-const SelecteurPeriode = lazy(() => import('./ui/components/SelecteurPeriode')
-  .then((m) => ({ default: m.SelecteurPeriode })));
-
-/**
  * Les écrans sont chargés à la demande.
  *
  * Le budget de performance est fixé à 250 Ko (voir `vite.config.ts`), et
@@ -39,11 +30,11 @@ import { moisCourant } from './state/selecteurs';
 import { useCompteursATraiter } from './ui/useATraiter';
 import type { Mois } from './domain/types';
 
-/** Le mois choisi dans la barre du haut, tel que `useState` le rend. */
+/** Le mois partagé par les écrans, tel que `useState` le rend. */
 type EtatMois = readonly [Mois, (m: Mois) => void];
 import { FiletErreur } from './ui/components/FiletErreur';
 
-/** Recherche et export : différés, voir l'en-tête de `BarreActions`. */
+/** La barre du haut : différée, voir l'en-tête de `BarreActions`. */
 const BarreActions = lazy(() => import('./ui/components/BarreActions')
   .then((m) => ({ default: m.BarreActions })));
 
@@ -67,17 +58,16 @@ function EnChargement() {
  * `never`, donc ajouter un écran à la navigation sans le router ici ne
  * compile pas. Un `return null` final aurait laissé passer un écran blanc.
  *
- * Le MOIS va au Pilote (son flux du mois) et à Activité (sa grille) ; son
- * ANNÉE aux trois écrans qui raisonnent à l'année. Facture ne reçoit rien :
- * la liste des factures est un onglet d'Activité, et ce qui reste sous
- * `#/facture/…` — rédiger, rouvrir une facture — n'a pas de période.
- * Config ne reçoit rien non plus : il ne porte que des réglages. Le Pilote
- * reçoit le mois mais n'en tire que son flux : santé et décisions restent
- * celles d'aujourd'hui — « combien je peux me verser » n'a pas de mois
- * passé. C'est la même liste que `ECRANS_DATES` dans `SelecteurPeriode`,
- * qui décide d'afficher le contrôle ou non ; les deux doivent rester
- * d'accord, faute de quoi on afficherait un sélecteur sans effet ou un effet
- * sans sélecteur.
+ * Le MOIS va au Pilote (son flux du mois), à Activité (sa grille) et à
+ * Achats (l'ancre de sa barre de période) ; son ANNÉE aux deux écrans qui
+ * raisonnent à l'année. Chacun reçoit AVEC la valeur de quoi la changer, et
+ * porte la commande dans son en-tête — une seule par écran (lot 51) : la
+ * barre du haut n'en a plus. Facture ne reçoit rien : la liste des factures
+ * est un onglet d'Activité, et ce qui reste sous `#/facture/…` — rédiger,
+ * rouvrir une facture — n'a pas de période. Config ne reçoit rien non plus :
+ * il ne porte que des réglages. Le Pilote reçoit le mois mais n'en tire que
+ * son flux : santé et décisions restent celles d'aujourd'hui — « combien je
+ * peux me verser » n'a pas de mois passé.
  *
  * Appelée comme une fonction ordinaire depuis `App` (`Ecran(etatMois)`), pas
  * comme un élément JSX (`<Ecran mois={mois} />`) : les deux sont
@@ -96,13 +86,17 @@ function Ecran([mois, setMois]: EtatMois) {
 
 function contenuEcran(id: ReturnType<typeof useRoute>['ecran']['id'], mois: Mois, setMois: (m: Mois) => void) {
   const annee = Number(mois.slice(0, 4));
+  /* Changer d'année garde le mois et n'en change que le millésime : de mars
+     2026, choisir 2025 donne mars 2025, et non décembre — c'est le mois qu'on
+     regardait, dans l'année qu'on vient de demander. */
+  const changerAnnee = (a: number): void => setMois(`${a}${mois.slice(4)}` as Mois);
   switch (id) {
     case 'pilote': return <Pilote mois={mois} onMois={setMois} />;
     case 'activite': return <Activite mois={mois} onMois={setMois} />;
-    case 'argent': return <Argent annee={annee} />;
+    case 'argent': return <Argent annee={annee} onAnnee={changerAnnee} />;
     case 'facture': return <Facture />;
-    case 'achats': return <Achats mois={mois} />;
-    case 'outils': return <Outils annee={annee} />;
+    case 'achats': return <Achats mois={mois} onMois={setMois} />;
+    case 'outils': return <Outils annee={annee} onAnnee={changerAnnee} />;
     case 'config': return <Config />;
     default: {
       const jamais: never = id;
@@ -137,8 +131,8 @@ export function App() {
   const compteurs = useCompteursATraiter(faits);
 
   /**
-   * Le mois affiché par le navigateur de la barre du haut — et, par lui,
-   * l'année des écrans qui raisonnent à l'année.
+   * Le mois que regardent les écrans — et, par lui, l'année de ceux qui
+   * raisonnent à l'année. Chaque écran en porte la commande dans son en-tête.
    *
    * ─────────────────────────────────────────────────────────────────────
    * UNE PRÉFÉRENCE D'AFFICHAGE, PAS UN FAIT
@@ -153,10 +147,10 @@ export function App() {
    *
    * Ce que ce composant ignore volontairement : les BORNES de ce mois.
    * `anneesDisponibles` et le repli quand le choix sort des bornes vivent
-   * dans `SelecteurPeriode`, chargé à la demande — voir son en-tête.
+   * dans `ChoixAnnee`, qui voyage avec les écrans à l'année — voir son
+   * en-tête.
    */
   const etatMois: EtatMois = useState<Mois>(() => moisCourant());
-  const [moisChoisi] = etatMois;
 
   // Chargement et migration au démarrage, une seule fois. `initialiser` est
   // idempotent côté migration : un second appel ne réécrit rien.
@@ -166,23 +160,13 @@ export function App() {
     <FournisseurToasts>
       <Shell
         {...(compteurs ? { compteurs } : {})}
-        // Monté sur les sept écrans : c'est `SelecteurPeriode` lui-même qui
-        // décide de se taire sur Pilote et Config (voir son en-tête) — Shell ne
-        // doit pas apprendre le nom d'un écran pour rester ignorante du
-        // métier (voir la doc de sa prop `periode`), et `App` n'a donc pas
-        // besoin de connaître la route pour ce seul contrôle.
-        periode={(
-          // Suspense sans texte : c'est un contrôle de la barre du haut, pas
-          // un écran — un « Chargement… » y clignoterait pour quelques
-          // dizaines de millisecondes sur une connexion correcte, plus
-          // dérangeant que l'absence du contrôle le temps qu'il arrive.
-          <Suspense fallback={null}>
-            <SelecteurPeriode etat={etatMois} />
-          </Suspense>
-        )}
         actions={(
+          // Suspense sans texte : ce sont des contrôles de la barre du haut,
+          // pas un écran — un « Chargement… » y clignoterait pour quelques
+          // dizaines de millisecondes sur une connexion correcte, plus
+          // dérangeant que l'absence des boutons le temps qu'ils arrivent.
           <Suspense fallback={null}>
-            <BarreActions annee={Number(moisChoisi.slice(0, 4))} />
+            <BarreActions />
           </Suspense>
         )}
       >

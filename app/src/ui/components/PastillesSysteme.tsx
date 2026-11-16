@@ -1,13 +1,10 @@
-import { useId, useState } from 'react';
-import {
-  type Theme, appliquerTheme, lireTheme, themesDisponibles
-} from '../theme';
-import { appliquerConfidentialite, lireConfidentialite } from '../confidentialite';
+import { useConfidentialite } from '../useConfidentialite';
 import { type StockageLocal, lireSession, sessionValide } from '../../infra/session';
 import styles from './PastillesSysteme.module.css';
 
 /**
- * Les indicateurs système de la barre du haut.
+ * Les indicateurs système de la barre du haut : la synchronisation, et le
+ * masquage des montants.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI DEUX PASTILLES, ET PAS QUATRE
@@ -15,83 +12,49 @@ import styles from './PastillesSysteme.module.css';
  *
  * La cible en prévoit quatre : Cloud, Documents, Qonto, Palette.
  *
- * Cloud a désormais quelque chose derrière elle — le compte distant, sa
- * session, sa synchronisation — et elle est donc posée. Documents et Qonto,
- * non : l'audit relevait « 0 intégration : ni Drive, ni OneDrive, ni Dropbox,
- * ni coffre », et aucune connexion bancaire n'existe.
+ * Cloud a quelque chose derrière elle — le compte distant, sa session, sa
+ * synchronisation. Documents et Qonto, non : l'audit relevait « 0 intégration :
+ * ni Drive, ni OneDrive, ni Dropbox, ni coffre », et aucune connexion bancaire
+ * n'existe. Une pastille qui n'ouvre rien apprend que les pastilles ne servent à
+ * rien, et on cesse aussi de regarder celles qui marchent.
  *
- * Les afficher quand même donnerait une barre conforme en apparence et
- * mensongère en pratique : une pastille « Documents » qui n'ouvre rien
- * apprend à l'utilisateur que les pastilles ne servent à rien, et il cessera
- * aussi de regarder celles qui marchent.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LA PALETTE ÉTAIT INACCESSIBLE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Les quatre palettes existent, sont testées, et le vérificateur responsive
- * les parcourt toutes — mais uniquement en écrivant dans `localStorage`.
- * Aucun bouton de l'application n'en changeait. Une fonction sans porte
- * d'entrée n'existe pas pour celui qui s'en sert.
+ * La palette est partie dans Réglages › Affichage (lot 51, décision 4) : on
+ * choisit son thème une fois, et la barre du haut se garde pour ce qu'on
+ * touche tous les jours.
  */
 export function PastillesSysteme() {
-  const [theme, setTheme] = useState<Theme>(() => lireTheme());
-  const [confidentiel, setConfidentiel] = useState<boolean>(() => lireConfidentialite());
-  const idChamp = useId();
-
-  function choisir(valeur: Theme): void {
-    appliquerTheme(valeur);
-    setTheme(valeur);
-  }
-
-  function basculerConfidentialite(): void {
-    const actif = !confidentiel;
-    appliquerConfidentialite(actif);
-    setConfidentiel(actif);
-  }
+  const [confidentiel, setConfidentiel] = useConfidentialite();
 
   return (
     <div className={styles.pastilles}>
       <PastilleCloud />
 
-      {/* Le libellé du bouton dit l'ACTION, pas l'état : « masquer les
-          montants » indique ce qui va se passer, là où « confidentialité »
-          laisse deviner dans quel sens on bascule. `aria-pressed` porte
-          l'état, qui est le rôle de l'attribut. */}
+      {/* Une icône, nommée (maquette `navigation.html`). Le nom dit l'ACTION,
+          pas l'état : « masquer les montants » dit ce qui va se passer, là où
+          « confidentialité » laisse deviner dans quel sens on bascule.
+          `aria-pressed` porte l'état, qui est le rôle de l'attribut. */}
       <button
         type="button"
-        className={`${styles.bouton} ${confidentiel ? styles.actif : ''}`}
+        className={`${styles.icone} ${confidentiel ? styles.actif : ''}`}
         aria-pressed={confidentiel}
-        onClick={basculerConfidentialite}
+        title={confidentiel ? 'Montants masqués' : 'Masquer les montants'}
+        onClick={() => setConfidentiel(!confidentiel)}
       >
-        <span aria-hidden="true">{confidentiel ? '🙈' : '👁'}</span>
-        <span className={styles.libelleBouton}>
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+          <circle cx="12" cy="12" r="2.8" />
+          {confidentiel && <path d="M4 4l16 16" />}
+        </svg>
+        <span className={styles.horsEcran}>
           {confidentiel ? 'Montants masqués' : 'Masquer les montants'}
         </span>
       </button>
-
-      <div className={styles.pastille}>
-        {/* Le libellé disparaît sous 1320 px (exigence de la cible), mais
-            reste dans l'arbre d'accessibilité : un `display: none` priverait
-            le champ de son nom accessible. */}
-        <label htmlFor={`${idChamp}-theme`} className={styles.libelle}>Palette</label>
-        <select
-          id={`${idChamp}-theme`}
-          className={styles.choix}
-          value={theme}
-          onChange={(e) => choisir(e.target.value as Theme)}
-        >
-          {themesDisponibles.map((t) => (
-            <option key={t.id} value={t.id}>{t.libelle}</option>
-          ))}
-        </select>
-      </div>
     </div>
   );
 }
 
 /**
- * L'état du compte distant.
+ * L'état du compte : la synchronisation, ÉCRITE au bureau.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * TROIS ÉTATS, PAS DEUX
@@ -104,11 +67,25 @@ export function PastillesSysteme() {
  * avertissement, et il porte la couleur des avertissements.
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * ÉCRITE À TOUTE LARGEUR DE BUREAU, ICÔNE AU TÉLÉPHONE (décision 2)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le libellé disparaissait sous 1 680 px, c'est-à-dire sur presque tous les
+ * écrans de bureau : il restait un point de huit pixels dont la couleur seule
+ * portait l'état. La barre ne porte plus ni période, ni « Exporter », ni
+ * « à traiter » : la place existe. Au téléphone, une icône dont le tracé change
+ * avec l'état, et dont le nom accessible porte le détail.
+ *
+ * La maquette écrit « Synchronisé à 9 h 41 ». Aucune heure de dernière
+ * synchronisation n'est conservée aujourd'hui : l'écrire serait l'inventer. La
+ * pastille dit donc l'état du compte, qui est connu.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
  * CE QU'ELLE NE FAIT PAS
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Aucune requête. La pastille lit une clé de stockage et compare une date :
- * elle vit dans la barre du haut, présente sur les sept écrans, et une
+ * elle vit dans la barre du haut, présente sur tous les écrans, et une
  * pastille qui interroge le réseau à chaque montage coûterait plus cher que
  * ce qu'elle indique. Le rafraîchissement du jeton reste le travail de
  * l'écran Compte, qui le fait quand on s'y rend.
@@ -119,19 +96,29 @@ export function PastillesSysteme() {
 function PastilleCloud() {
   const etat = etatDuCompte();
   return (
-    <a
-      className={`${styles.bouton} ${styles[etat.ton]}`}
-      href="#/config/compte"
-      title={etat.detail}
-    >
-      <span className={styles.point} data-ton={etat.ton} aria-hidden="true" />
-      <span className={styles.libelleBouton}>{etat.libelle}</span>
+    <a className={`${styles.cloud} ${styles[etat.ton]}`} href="#/config/compte" title={etat.detail}>
+      <span className={styles.etiquette} data-role="libelle-synchro">
+        <span className={styles.point} aria-hidden="true" />
+        <span>{etat.libelle}</span>
+      </span>
+      <svg className={styles.iconeCloud} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.2 4.4 4.4 0 0 0 7 18z" />
+        <path d={MARQUES[etat.ton]} />
+      </svg>
       {/* Le nom accessible porte le DÉTAIL, que le libellé visuel doit
-          abréger pour tenir dans la barre. */}
+          abréger pour tenir dans la barre — et qui est seul à parler au
+          téléphone, où le libellé cède la place à l'icône. */}
       <span className={styles.horsEcran}>{etat.detail}</span>
     </a>
   );
 }
+
+/** Ce que l'icône porte dans son nuage : une coche, un point d'exclamation, un trait. */
+const MARQUES: Readonly<Record<EtatCompte['ton'], string>> = {
+  relie: 'M9.5 13.5l2 2 3.5-4',
+  expire: 'M12 10.5v3M12 16v.01',
+  local: 'M9.5 13.5h5'
+};
 
 type EtatCompte = {
   readonly ton: 'relie' | 'expire' | 'local';
@@ -145,7 +132,7 @@ function etatDuCompte(): EtatCompte {
   if (session === null) {
     return {
       ton: 'local',
-      libelle: 'Local',
+      libelle: 'Non synchronisé',
       detail: 'Tes données restent sur cet appareil. Ouvrir Config › Compte & synchronisation pour les '
         + 'synchroniser.'
     };

@@ -49,7 +49,7 @@ import styles from './Outils.cra.module.css';
 export interface ProprietesGenerateurCra {
   readonly ouvert: boolean;
   readonly onFermer: () => void;
-  /** L'année de la barre du haut : elle borne les mois proposés. */
+  /** L'année affichée par l'écran (celle du mois partagé) : elle borne les mois proposés. */
   readonly annee: number;
 }
 

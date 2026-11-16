@@ -1,4 +1,5 @@
-/* Le menu Exporter. Chargé à la demande, hors du paquet d'entrée. */
+/* Le menu de « + Nouveau ». Il servait aussi à « Exporter », parti de la
+   barre du haut au lot 51 : les exports vivent là où sont leurs données. */
 
 .menu {
   position: absolute;
@@ -13,16 +14,6 @@
   background: var(--panel-2);
   box-shadow: var(--sh-3);
 }
-
-.legende {
-  padding: 8px 12px 4px;
-  font-size: 9px;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-  color: var(--muted-2);
-}
-
-.separateur { height: 1px; margin: 6px 4px; background: var(--line); }
 
 .entree {
   display: flex;

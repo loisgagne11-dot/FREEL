@@ -39,8 +39,13 @@ export function PanneauDetailDette({ detail }: { readonly detail: DetailDette })
   return (
     <div className={styles.detail}>
       <dl className={styles.totaux}>
+        {/* « Ce qui est dû » et non plus « Reste à sortir » (décision 8,
+            16/11) : « dû » est le mot de l'argent pour cette notion partout
+            ailleurs — l'anneau de répartition, l'en-tête d'Argent —, et
+            « sortir » se lisait comme un mouvement du compte, pas comme une
+            dette. */}
         <div className={styles.totalBloc}>
-          <dt>Reste à sortir</dt>
+          <dt>Ce qui est dû</dt>
           <dd className={styles.resteValeur}><Montant>{eur(detail.reste)}</Montant></dd>
         </div>
         <div className={styles.totalBloc}>

@@ -1237,18 +1237,19 @@ describe('ce qu’une journée rapporte', () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Le mois de la barre du haut est celui de l'écran
+   Le mois partagé par les écrans est celui de la grille
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
  * UN SEUL MOIS POUR TOUTE L'APPLICATION.
  *
  * Activité avait ses propres flèches et son propre mois : en revenant du
- * Pilote, on ne savait plus ce qu'on regardait. Le mois vient de la barre du
- * haut, et les flèches de la grille le DÉPLACENT — elles ne tiennent plus un
- * second mois à elles.
+ * Pilote, on ne savait plus ce qu'on regardait. Le mois vient d'`App`, partagé
+ * par les écrans, et les flèches de la grille le DÉPLACENT — elles ne tiennent
+ * plus un second mois à elles. Depuis le lot 51, ce sont aussi les seules : la
+ * barre du haut ne porte plus de période.
  */
-describe('le mois de la barre du haut', () => {
+describe('le mois partagé par les écrans', () => {
   const periode = () =>
     screen.getByRole('status', { name: 'Période affichée' }).textContent;
 
@@ -1259,13 +1260,13 @@ describe('le mois de la barre du haut', () => {
     return utilisateur;
   };
 
-  it('affiche le mois choisi dans la barre', async () => {
+  it('affiche le mois partagé', async () => {
     render(<Activite mois={mois('2025-07')} onMois={() => {}} />);
     await enVueMois();
     expect(periode()).toBe('juillet 2025');
   });
 
-  it('fait déplacer par ses flèches le mois de la barre, pas un mois à elle', async () => {
+  it('fait déplacer par ses flèches le mois partagé, pas un mois à elle', async () => {
     const onMois = vi.fn();
     render(<Activite mois={mois('2026-07')} onMois={onMois} />);
     const utilisateur = await enVueMois();

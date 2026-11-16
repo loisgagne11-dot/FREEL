@@ -117,16 +117,36 @@ toute cible fait 44 px au moins.
 
 ## Polices
 
-Hanken Grotesk (texte) et JetBrains Mono (chiffres), toutes deux sous licence
-libre OFL. **Constat du 13/11 : l'application ne les embarque pas** — aucun
-`@font-face`, donc l'écran s'affiche dans la police du système. Le lot 51 les
-embarque en `woff2`, sous-ensemble latin, `font-display: swap`. Jamais par un
-CDN : la politique de contenu ne s'ouvre à aucun domaine tiers. Si le poids ne
-tient pas dans les budgets, c'est la pile système qui reste — le budget ne se
-relève pas.
+Les maquettes sont dessinées en Hanken Grotesk (texte) et JetBrains Mono
+(chiffres), toutes deux sous licence libre OFL, chargées d'un CDN pour que le
+fichier s'ouvre seul. **L'application ne les embarque pas, et ne les embarquera
+pas : c'est la pile système qui reste** (décision 6, 16/11).
+
+La mesure qui a tranché : les deux familles, en `woff2`, sous-ensemble latin,
+pèsent **≈ 75 Ko** — pour **9,7 Ko de marge** dans le budget du premier rendu.
+Elles ne tiennent pas, et le budget ne se relève pas (invariant n° 7). Les
+charger d'un CDN est exclu : la politique de contenu ne s'ouvre à aucun domaine
+tiers.
+
+Conséquence pour qui compare une capture de l'application à une maquette : la
+police diffère, c'est attendu et ce n'est pas un écart à corriger. Les mesures
+(tailles, graisses, interlignes) de `calme.css` valent quand même ; seule la
+fonte change. Rouvrir la question demanderait d'abord de libérer la place dans
+le budget — pas de le relever.
 
 ## Thème par défaut
 
-Aujourd'hui « sombre ». Proposition : **« calme »** pour un nouvel utilisateur,
-puisque c'est le préféré du propriétaire ; le thème choisi reste mémorisé.
-À confirmer par lui avant le lot 51.
+**« Calme »** pour un nouvel utilisateur (décision 5, confirmée le 16/11) : c'est
+le préféré du propriétaire, et la direction est dessinée dans ce thème d'abord.
+Il était « sombre ». Le thème déjà choisi reste mémorisé : le défaut ne vaut que
+pour qui n'a rien choisi.
+
+Le défaut est écrit à trois endroits qui ne peuvent pas partager une constante —
+`THEME_PAR_DEFAUT` dans `app/src/ui/theme.ts`, le script en ligne de
+`app/index.html` (qui le pose avant React ; son empreinte est dans la politique
+de contenu) et le repli `:where(:root)` de `app/src/styles/tokens.css`.
+`app/src/ui/theme.test.ts` les relit tous les trois.
+
+Le thème se choisit dans **Réglages › Affichage** (décision 4), quatre cartes dans
+l'ordre Calme, Nuit, Sombre, Clair ; « Calme sombre » s'appelle désormais
+**« Nuit »** (décision 7) — l'identifiant mémorisé, `nuit`, ne change pas.

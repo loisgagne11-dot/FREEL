@@ -1314,3 +1314,19 @@ arrêté ; passer à « Une par client » faisait disparaître la facture commun
 repérage. Écarts assumés à la maquette : libellés « Clients opérationnels » et
 « Ajouter un client opérationnel » gardés (le carnet a déjà « Ajouter un
 client »), libellés de champ en capitales comme le reste du formulaire.
+
+## Lot 51, phase 1 (16/11) — la barre du haut, Réglages › Affichage
+
+Maquette `design/direction/navigation.html`, validée le 16/11.
+
+| Zone | Avant | Après |
+|---|---|---|
+| Barre du haut | Mois et année, thème, Exporter, « à traiter », recherche, + | Recherche, synchronisation écrite (icône nommée au téléphone), masquer les montants, « + Nouveau » |
+| Période | Dans la barre, pour tous les écrans | Une seule par écran, dans son en-tête (Pilote : carte du flux ; Argent, Outils : l'année ; Achats : sa barre ; Activité : la grille) ; le mois reste partagé |
+| Thème | Menu de la barre | Réglages › Affichage : quatre cartes Calme, Nuit, Sombre, Clair ; « Masquer les montants » ; Calme par défaut |
+| Détail du dû | « Reste à sortir » | « Ce qui est dû » |
+
+Contrôle visuel du Pilote et d'Affichage à 390 et 1 440 px, Calme et Nuit.
+Écarts assumés : la synchronisation écrit l'état du compte, pas une heure
+(aucune heure n'est conservée) ; « Masquer » reste en icône au téléphone en
+attendant le volet « Plus » (phase 2) ; l'année se choisit dans un menu.

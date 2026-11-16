@@ -12,11 +12,24 @@
 
 .entete {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   flex-wrap: wrap;
   gap: 6px 12px;
   margin-bottom: 14px;
+}
+
+/* La commande du mois, à droite de l'en-tête : le mois se choisit là où il
+   change quelque chose (lot 51 — la barre du haut n'en porte plus). Sa
+   hauteur est réservée : elle arrive à la demande, et l'en-tête ne doit pas
+   pousser les colonnes en la recevant. */
+.navigation { margin-left: auto; min-height: 44px; }
+
+/* Au téléphone, le titre et la commande ne tiennent pas sur une ligne : la
+   commande passe juste sous le titre, avant l'indice — on lit ce qu'on
+   regarde, puis comment s'en servir. */
+@media (max-width: 760px) {
+  .navigation { margin-left: -10px; flex-basis: 100%; }
+  .indice { order: 1; }
 }
 
 /* En surtitre, comme le handoff (« → LE FLUX DU MOIS · JUIN 2026 ») : la

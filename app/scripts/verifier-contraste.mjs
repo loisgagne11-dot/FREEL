@@ -50,7 +50,7 @@ const PAIRES = [
   ['--k1t', '--k1', SEUIL_TEXTE], ['--k2t', '--k2', SEUIL_TEXTE], ['--k3t', '--k3', SEUIL_TEXTE]
 ];
 
-/** Une palette = un bloc dont le sélecteur porte `data-theme` (ou `:root` pour sombre). */
+/** Une palette = un bloc dont le sélecteur porte `data-theme` (le repli `:root` est sur calme). */
 function lirePalettes(css) {
   const palettes = {};
   const blocs = css.matchAll(/([^{}]+)\{([^{}]*(?:\/\*[\s\S]*?\*\/[^{}]*)*)\}/g);

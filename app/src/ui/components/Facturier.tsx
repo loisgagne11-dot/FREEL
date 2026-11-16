@@ -138,17 +138,17 @@ export function Facturier(
      */
     readonly onReprendre?: (id: string) => void;
     /**
-     * Le mois de la barre du haut, et de quoi le changer : c'est le mois dont
+     * Le mois partagé par les écrans, et de quoi le changer : c'est le mois dont
      * le brouillon propose la facture. `undefined` retombe sur un état local —
      * le cas des tests qui montent ce composant seul.
      */
     readonly mois?: Mois;
     readonly onMois?: (m: Mois) => void;
     /**
-     * L'année choisie dans la barre du haut.
+     * L'année du mois partagé par les écrans.
      *
      * `undefined` retombe sur l'année de l'horloge — le cas des tests qui
-     * montent ce composant seul, sans la coquille qui porte le sélecteur.
+     * montent ce composant seul.
      */
     readonly annee?: number;
     /**
@@ -179,10 +179,10 @@ export function Facturier(
   /*
    * L'ANNÉE CHOISIE EST L'ANCRE, PAS UN FILTRE DE PLUS.
    *
-   * La barre du haut dit QUELLE ANNÉE, la barre de période dit QUELLE FINESSE.
+   * Le mois partagé dit QUELLE ANNÉE, la barre de période dit QUELLE FINESSE.
    * Les empiler en deux filtres successifs donnerait « le mois d'août, dans
-   * l'année 2025 » alors que la barre pointe sur août 2026 — un ensemble vide
-   * présenté comme un résultat. Voir `ancreDeLAnnee`.
+   * l'année 2025 » alors qu'on regarde août 2026 — un ensemble vide présenté
+   * comme un résultat. Voir `ancreDeLAnnee`.
    */
   const ancre = useMemo(() => ancreDeLAnnee(annee ?? new Date().getFullYear()), [annee]);
   const periode: Periode = useMemo(
@@ -1012,13 +1012,13 @@ function BrouillonDuMois(
   const signaler = useToast();
 
   /*
-   * LE MOIS FACTURÉ EST CELUI DE LA BARRE.
+   * LE MOIS FACTURÉ EST CELUI DE L'APPLICATION.
    *
-   * Le brouillon avait ses propres flèches, à côté du « ‹ juin 2026 › » de la
-   * barre du haut : on pouvait regarder mai en haut et la facture de juin en
-   * bas, sans que rien ne le signale. Ses flèches déplacent désormais le mois
-   * de l'application — elles restent là parce que c'est ici qu'on cherche la
-   * facture du mois précédent, le jour où on l'émet.
+   * Le brouillon avait ses propres flèches, à côté du « ‹ juin 2026 › » que
+   * portait alors la barre du haut : on pouvait regarder mai en haut et la
+   * facture de juin en bas, sans que rien ne le signale. Ses flèches déplacent
+   * désormais le mois de l'application — elles restent là parce que c'est ici
+   * qu'on cherche la facture du mois précédent, le jour où on l'émet.
    */
   const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
   const mois = moisChoisi ?? moisLocal;

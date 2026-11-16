@@ -15,7 +15,7 @@ import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
 
 /**
- * Écran Config — les réglages, en sept sections.
+ * Écran Config — les réglages, en huit sections.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI LA PLUPART DES SECTIONS SONT DANS D'AUTRES FICHIERS
@@ -42,7 +42,7 @@ import styles from './Config.module.css';
  * (décision D5) : elle proposait des actions que rien ne rattachait aux faits.
  */
 
-type Section = 'profil' | 'fiscal' | 'reserve' | 'facturation' | 'livre' | 'compte' | 'donnees';
+type Section = 'profil' | 'fiscal' | 'reserve' | 'facturation' | 'livre' | 'compte' | 'donnees' | 'affichage';
 
 const Fiscal = composantALaDemande(() => import('./Config.fiscal')
   .then((m) => m.Fiscal), false);
@@ -59,6 +59,10 @@ const Donnees = composantALaDemande(() => import('./Config.donnees')
 // ne l'ouvre que pour synchroniser (invariant n°7 : on extrait).
 const Compte = composantALaDemande(() => import('./Compte')
   .then((m) => m.Compte), false);
+// Le thème et le masquage des montants (lot 51, décision 4) : réglés une fois,
+// ils n'ont rien à faire dans ce que télécharge chaque ouverture des Réglages.
+const Affichage = composantALaDemande(() => import('./Config.affichage')
+  .then((m) => m.Affichage), false);
 
 const TYPES_ACTIVITE: readonly { readonly id: TypeActivite; readonly libelle: string }[] = [
   { id: 'BNC', libelle: 'BNC — prestations libérales' },
@@ -74,7 +78,8 @@ const ICONES: Record<Section, string> = {
   facturation: 'M4 2h6l3 3v9H4zM10 2v3h3',
   livre: 'M4 2.5h8v11H4zM4 11h8',
   compte: 'M4.5 12a3 3 0 01.3-6A4 4 0 0112 7a2.5 2.5 0 01-.5 5z',
-  donnees: 'M8 2v8M5 7l3 3 3-3M3 13h10'
+  donnees: 'M8 2v8M5 7l3 3 3-3M3 13h10',
+  affichage: 'M8 2.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM8 2.5v11'
 };
 
 export function Config() {
@@ -118,7 +123,8 @@ export function Config() {
     { id: 'facturation', titre: 'Facturation', sousTitre: 'RIB, mentions, plateforme agréée' },
     { id: 'livre', titre: 'Livre des recettes', sousTitre: 'Registre obligatoire' },
     { id: 'compte', titre: 'Compte & synchronisation', sousTitre: 'Multi-appareils · pièces' },
-    { id: 'donnees', titre: 'Données & export', sousTitre: 'Livre CSV, sauvegarde, restauration' }
+    { id: 'donnees', titre: 'Données & export', sousTitre: 'Livre CSV, sauvegarde, restauration' },
+    { id: 'affichage', titre: 'Affichage', sousTitre: 'Thème, montants masqués' }
   ];
   const courante = entrees.find((x) => x.id === section) ?? entrees[0]!;
   const attente = <p role="status" className={styles.aide}>Chargement…</p>;
@@ -133,7 +139,7 @@ export function Config() {
       {/* Liste au-dessus du panneau sur téléphone, plutôt qu'une liste seule
           qui ouvrirait le panneau à part : `#/config` doit ouvrir Profil, et
           une page de navigation sans contenu ferait un clic de plus pour le
-          réglage le plus courant. Le coût — sept entrées avant le formulaire —
+          réglage le plus courant. Le coût — huit entrées avant le formulaire —
           est celui de la lisibilité ; en grand écran la liste passe à gauche. */}
       <div className={styles.mise}>
         <nav aria-label="Sections des réglages" className={styles.liste}>
@@ -176,6 +182,7 @@ export function Config() {
             {section === 'livre' && <LivreDesRecettes />}
             {section === 'compte' && <Compte />}
             {section === 'donnees' && <Donnees />}
+            {section === 'affichage' && <Affichage />}
           </Suspense>
         </section>
       </div>
@@ -185,7 +192,7 @@ export function Config() {
 
 const SECTIONS: readonly { id: Section }[] = [
   { id: 'profil' }, { id: 'fiscal' }, { id: 'reserve' }, { id: 'facturation' },
-  { id: 'livre' }, { id: 'compte' }, { id: 'donnees' }
+  { id: 'livre' }, { id: 'compte' }, { id: 'donnees' }, { id: 'affichage' }
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -436,7 +443,7 @@ function Interrupteur(
  * dès l'évaluation du module, en même temps que l'écran s'affiche : sans cela,
  * `#/config/fiscal` ouvert d'emblée montrait l'écran, PUIS « Chargement… »
  * pendant le téléchargement de la section, et les deux replis s'additionnent
- * (React retient chacun 300 ms). Pas les sept : un lien vers Profil n'a pas à
+ * (React retient chacun 300 ms). Pas les huit : un lien vers Profil n'a pas à
  * télécharger le barème. Profil n'est pas à la demande, il part avec l'écran.
  */
 const routeConfig = sousRouteSiEcran('config', adresseCourante());
@@ -448,6 +455,7 @@ if (routeConfig !== null) {
     case 'livre': LivreDesRecettes.lancer(); break;
     case 'compte': Compte.lancer(); break;
     case 'donnees': Donnees.lancer(); break;
+    case 'affichage': Affichage.lancer(); break;
     default: break;
   }
 }

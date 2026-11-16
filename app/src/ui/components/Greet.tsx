@@ -9,8 +9,7 @@ import styles from './Greet.module.css';
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Les écrans portaient un `<h1>` nu — « Pilote », « Argent ». Le nom de
- * l'écran est déjà dans le rail et dans la barre du haut : le répéter une
- * troisième fois n'apprend rien. La spec y met autre chose — une phrase qui
+ * l'écran est déjà dans le rail : le répéter n'apprend rien. La spec y met autre chose — une phrase qui
  * dit ce qui attend, et un repère chiffré à droite.
  *
  * C'est ce qui fait la différence entre un écran qu'on ouvre et un écran qui

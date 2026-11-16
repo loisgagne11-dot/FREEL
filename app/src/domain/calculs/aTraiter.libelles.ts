@@ -7,9 +7,8 @@ import type { SujetATraiter } from './aTraiter';
  * POURQUOI CE N'EST PAS DANS `aTraiter.ts`
  * ─────────────────────────────────────────────────────────────────────────
  *
- * La détection vit dans le paquet d'entrée : la pastille de la barre du haut
- * l'appelle au premier rendu, et elle n'a besoin que d'un nombre et d'une
- * gravité. Les phrases, elles, ne servent qu'au panneau — qui s'ouvre au clic,
+ * La détection est appelée au premier rendu par les compteurs du rail, qui
+ * n'ont besoin que d'un nombre et d'une gravité. Les phrases, elles, ne servent qu'au panneau — qui s'ouvre au clic,
  * et dont la coquille est déjà chargée à la demande.
  *
  * Ces dix kilo-octets de français voyageaient donc chez tout le monde, à chaque

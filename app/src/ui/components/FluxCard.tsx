@@ -1,4 +1,4 @@
-import { Suspense, lazy, useId, useState } from 'react';
+import { type ReactNode, Suspense, lazy, useId, useState } from 'react';
 import type { Euros } from '../../domain/types';
 import type { FluxDuMois, LigneFlux } from '../../state/selecteurs';
 import { Info } from './Info';
@@ -51,9 +51,16 @@ export const VERS_FACTURES = '#/activite/factures';
 const VERS_ECHEANCIER = '#/argent';
 
 export function FluxCard(
-  { flux, periode, onVersable, onPointer, onPayer, dejaVerse, besoinMensuel }: {
+  { flux, periode, navigation, onVersable, onPointer, onPayer, dejaVerse, besoinMensuel }: {
     readonly flux: FluxDuMois;
     readonly periode: string;
+    /**
+     * La commande du mois — « ‹ juin 2026 › » —, dans l'en-tête de la carte :
+     * c'est le flux qui suit le mois, pas la santé ni les décisions, et la
+     * commande se pose sur ce qu'elle commande (lot 51). Absente, le titre
+     * écrit le mois lui-même.
+     */
+    readonly navigation?: ReactNode;
     /** Ouvre la composition du versable. */
     readonly onVersable: () => void;
     /**
@@ -95,7 +102,7 @@ export function FluxCard(
     <section className={styles.carte} aria-labelledby="titre-flux">
       <header className={styles.entete}>
         <h2 id="titre-flux" className={styles.titreCarte}>
-          Le flux du mois · {periode}
+          Le flux du mois<TitreMois periode={periode} navigation={navigation} />
           <Info libelle="Ce que montrent les trois colonnes">
             Ce qui est <strong>entré</strong> sur le mois, ce qui doit en
             <strong> sortir</strong>, et ce qu’il reste pour toi. L’argent en
@@ -105,6 +112,7 @@ export function FluxCard(
           </Info>
         </h2>
         <p className={styles.indice}>clique un statut pour le mettre à jour</p>
+        {navigation !== undefined && <div className={styles.navigation}>{navigation}</div>}
       </header>
 
       <div className={styles.colonnes}>
@@ -207,6 +215,22 @@ export function FluxCard(
       </div>
     </section>
   );
+}
+
+/**
+ * Le mois dans le titre — écrit quand rien d'autre ne le dit, hors écran quand
+ * la commande du mois l'affiche juste à côté : deux « juin 2026 » sur une même
+ * ligne se liraient comme deux informations. Le titre garde le mois dans son
+ * nom accessible, qui est ce qu'un lecteur d'écran annonce en y arrivant.
+ */
+export function TitreMois(
+  { periode, navigation }: { readonly periode: string; readonly navigation?: ReactNode }
+) {
+  // L'espace hors du `span` : à l'intérieur, le calcul du nom accessible la
+  // rogne, et le titre s'annonçait « Le flux du mois· juin 2026 ».
+  return navigation === undefined
+    ? <> · {periode}</>
+    : <>{' '}<span className={styles.horsEcran}>· {periode}</span></>;
 }
 
 /** La pastille d'une ligne : ce qui est fait, ce qui attend, ce qui est en retard. */

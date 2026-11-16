@@ -186,12 +186,13 @@ const sections = (nbMissions: number, nbClients: number) => [
 
 export interface ProprietesActivite {
   /**
-   * Le mois choisi dans la barre du haut, et de quoi le changer.
+   * Le mois partagé par les écrans, tenu par `App`, et de quoi le changer.
    *
    * Les flèches de la grille le déplacent : c'est LE mois de l'application,
-   * pas un second. `undefined` retombe sur un état local ouvert sur le mois
-   * de l'horloge — le cas des tests qui montent cet écran seul, sans la
-   * coquille qui porte le navigateur.
+   * pas un second — et la seule commande de période de l'écran depuis que la
+   * barre du haut n'en porte plus (lot 51). `undefined` retombe sur un état
+   * local ouvert sur le mois de l'horloge — le cas des tests qui montent cet
+   * écran seul.
    */
   readonly mois?: Mois;
   readonly onMois?: (m: Mois) => void;
@@ -249,8 +250,8 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
   const annee = Number(mois.slice(0, 4));
 
   /*
-   * Changer d'année au sélecteur de la barre déplace ce mois-ci (même mois,
-   * autre millésime) : c'est désormais `App` qui le fait, pour tous les
+   * Changer d'année (en tête d'Argent ou d'Outils) déplace ce mois-ci (même
+   * mois, autre millésime) : c'est `App` qui le fait, pour tous les
    * écrans. L'effet qui le faisait ici, et ne valait que pour Activité, est
    * parti avec le mois local.
    */

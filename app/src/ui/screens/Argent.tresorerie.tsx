@@ -301,7 +301,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
  * L'ANNÉE CHOISIE, PAS DOUZE MOIS GLISSANTS
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Le graphe suit désormais la bascule d'année de la barre du haut — janvier à
+ * Le graphe suit désormais l'année choisie en tête de l'écran — janvier à
  * décembre de l'année regardée. Ce n'est PAS une contradiction avec le solde
  * affiché en tuile, qui ne dépend jamais de l'année (voir `evolutionCompte`) :
  * la tuile dit un état instantané, cette carte une évolution sur la période
