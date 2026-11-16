@@ -127,22 +127,50 @@ export function ConfirmationSurPlace(
  * tableau, et c'est l'appelant qui rend le focus au bouton.
  */
 export function BlocConfirmation(
-  { consequence, libelleConfirmer, libelleGarder = 'Garder', onConfirmer, onGarder }: {
+  {
+    consequence, complement, libelleConfirmer, libelleGarder = 'Garder', onConfirmer, onGarder,
+    ton = 'danger', aLaPlace, prendreLeFocus = true
+  }: {
     readonly consequence: ReactNode;
+    /**
+     * Ce que le geste laisse en l'état et qu'il faut savoir — une facture déjà
+     * émise qui ne changera pas. Lu après la conséquence, hors du nom du
+     * groupe : le nom dit ce qui change, pas ce qui reste.
+     */
+    readonly complement?: ReactNode;
     readonly libelleConfirmer: string;
     readonly libelleGarder?: string;
     readonly onConfirmer: () => void;
     readonly onGarder: () => void;
+    /**
+     * Rouge quand le geste efface ; ambre quand il change la suite sans
+     * effacer ce qui a eu lieu — arrêter un client —, ou quand un geste plus
+     * sûr est proposé à sa place. Une même alarme sur les deux apprendrait à
+     * ne plus la lire.
+     */
+    readonly ton?: 'danger' | 'prudence';
+    /**
+     * Le geste plus sûr, proposé avant celui qu'on a demandé : « L'arrêter à
+     * la place » plutôt que « Retirer ». Il prend le premier rang et le bouton
+     * plein ; le geste demandé reste possible, en contour rouge.
+     */
+    readonly aLaPlace?: { readonly libelle: string; readonly onChoisir: () => void };
+    /**
+     * Faux quand un champ précède la confirmation et garde la main : la
+     * conséquence d'une date se recalcule à chaque frappe, et la
+     * confirmation qui reparaît ne doit pas arracher le focus du champ.
+     */
+    readonly prendreLeFocus?: boolean;
   }
 ) {
   const garder = useRef<HTMLButtonElement | null>(null);
   const id = useId();
 
-  useEffect(() => { garder.current?.focus(); }, []);
+  useEffect(() => { if (prendreLeFocus) garder.current?.focus(); }, [prendreLeFocus]);
 
   return (
     <div
-      className={styles.confirmation}
+      className={ton === 'prudence' ? `${styles.confirmation} ${styles.prudence}` : styles.confirmation}
       role="group"
       aria-labelledby={`${id}-consequence`}
       onKeyDown={(e) => {
@@ -155,8 +183,18 @@ export function BlocConfirmation(
       }}
     >
       <p id={`${id}-consequence`} className={styles.consequence}>{consequence}</p>
+      {complement !== undefined && <p className={styles.complement}>{complement}</p>}
       <span className={styles.actions}>
-        <button type="button" className={styles.confirmer} onClick={onConfirmer}>
+        {aLaPlace !== undefined && (
+          <button type="button" className={styles.aLaPlace} onClick={aLaPlace.onChoisir}>
+            {aLaPlace.libelle}
+          </button>
+        )}
+        <button
+          type="button"
+          className={aLaPlace !== undefined ? styles.confirmerContour : styles.confirmer}
+          onClick={onConfirmer}
+        >
           {libelleConfirmer}
         </button>
         <button ref={garder} type="button" className={styles.garder} onClick={onGarder}>

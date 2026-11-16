@@ -94,7 +94,7 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
 | 11 | 51 | Nouvelle navigation et jetons de style | 🔶 en cours : jetons posés ; navigation dessinée (`design/direction/navigation.html`), attend la validation du propriétaire |
 | 12 | 53 + 34 | Écran Obligations, frise aux dates officielles | ⬜ |
-| 13 | 31 | Une mission à plusieurs clients | ⬜ |
+| 13 | 31 | Une mission à plusieurs clients | ✅ fini le 16/11 : calcul (PR #343, schéma 24), écrans (PR #344, à fusionner) |
 | 14 | 48 | Mission enrichie et carnet de commandes | ⬜ |
 | 15 | 49 | Trésorerie à douze mois | ⬜ |
 | 16 | 50 | Ce que je gagne vraiment | ⬜ |
@@ -396,11 +396,11 @@ l'affichage et la reprise.
 
 | Ligne | État |
 |---|---|
-| « Arrêter ce client le … » : borne ses plages à la date, retire ses corrections postérieures (confirmé, en les comptant) ; la mission continue avec les autres | 🔶 16/11 calcul fait (`clientsOperationnels.ts`) ; écran à coder après validation de `design/direction/mission-clients.html` |
-| Le client arrêté se lit « arrêté le … » dans la mission ; le planning, le CRA et le brouillon du mois ne lui comptent plus de jours après cette date | 🔶 16/11 dérivé et compté (essai sur planning, CRA, brouillon ; l'éditeur ne le propose plus après sa date) ; la lecture à l'écran attend la maquette |
-| « Retirer » un client opérationnel du formulaire emporte ses plages et ses corrections : confirmé, et « Arrêter le … » proposé à la place | 🔶 16/11 bilan du retrait calculé ; écran à coder après validation |
+| « Arrêter ce client le … » : borne ses plages à la date, retire ses corrections postérieures (confirmé, en les comptant) ; la mission continue avec les autres | ✅ 16/11 — maquette validée ; confirmation chiffrée (corrections retirées, jours prévus perdus, facture déjà émise nommée avec l'avoir) ; le geste ne s'écrit qu'à « Enregistrer » |
+| Le client arrêté se lit « arrêté le … » dans la mission ; le planning, le CRA et le brouillon du mois ne lui comptent plus de jours après cette date | ✅ 16/11 — « arrêté le … » et pastille « ○ Arrêté » dans la mission ; « Pour X jusqu'au …, puis Y » dans la liste ; rien de stocké |
+| « Retirer » un client opérationnel du formulaire emporte ses plages et ses corrections : confirmé, et « Arrêter le … » proposé à la place | ✅ 16/11 — confirmation chiffrée quand le client a un passé, avec « L'arrêter le … à la place » ; un client ajouté pendant la saisie se retire sans question |
 | Reprise : l'ancienne application disait QUEL client travaillait QUEL jour (`lignes[].entiteByDay`) ; la reprise l'ignore aujourd'hui, en silence — chaque client garde sa semaine type sur toute la mission (un client arrêté continue donc au planning) et toutes les corrections vont au premier. À reprendre jour par jour, ou à lister dans le rapport | ✅ 16/11 — reconstruit jour par jour, sans plage par jour : plages partagées sans recouvrement, journées en corrections, rapport ; la vérification d'absence de perte compare les journées mois par mois |
-| Facturation d'une mission à plusieurs clients — tranché le 12/11 (décision 14) : par défaut une facture commune ; le choix « une facture commune » / « une facture par client » se fait mission par mission ; dans le second cas le brouillon du mois découpe les jours selon les plages de chaque client, ce qui demande un client de facturation par plage (schéma 24) | 🔶 16/11 schéma 24 et brouillon par payeur faits (somme des brouillons par client = brouillon commun, tenue par un essai) ; choix à l'écran après validation |
+| Facturation d'une mission à plusieurs clients — tranché le 12/11 (décision 14) : par défaut une facture commune ; le choix « une facture commune » / « une facture par client » se fait mission par mission ; dans le second cas le brouillon du mois découpe les jours selon les plages de chaque client, ce qui demande un client de facturation par plage (schéma 24) | ✅ 16/11 — schéma 24, brouillon par payeur (somme = brouillon commun, tenue par un essai) ; choix « Une facture commune / Une par client » et payeur de chaque client pris dans le carnet |
 
 ### Lot 32 — Vérification sur les données réelles (hors dépôt)
 

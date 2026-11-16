@@ -4,6 +4,7 @@ import { Info } from '../components/Info';
 import { Montant } from '../components/Montant';
 import { Vide } from '../components/Vide';
 import { eur } from '../format';
+import { suiteDesClients } from './Activite.clientsMission.lecture';
 import styles from './Activite.module.css';
 
 /**
@@ -64,6 +65,7 @@ function LigneMissionAffichee(
   { ligne, onOuvrir }: { ligne: LigneMission; onOuvrir: () => void }
 ) {
   const { mission } = ligne;
+  const suite = suiteDesClients(mission);
   return (
     <li className={styles.ligneListe}>
       <button type="button" className={styles.ouvrir} onClick={onOuvrir}>
@@ -77,6 +79,12 @@ function LigneMissionAffichee(
         </span>
         <span className={styles.ligneMontant}><Montant>{eur(ligne.facture)}</Montant></span>
       </span>
+      {/* Une mission qui a changé de client en route se lit d'une ligne : sans
+          elle, la liste montre un seul nom — celui du payeur — et il faut
+          ouvrir la mission pour apprendre que le client final a changé. */}
+      {suite !== null && (
+        <span className={styles.ligneMeta}><span>{suite}</span></span>
+      )}
       <span className={styles.ligneMeta}>
         <span>{mission.clientNom || 'Client non renseigné'}</span>
         <span aria-hidden="true">·</span>

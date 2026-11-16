@@ -1295,3 +1295,22 @@ avant à la racine.
 Contrôle visuel à 390 px, deux thèmes, panneau ouvert : un écart corrigé avant
 livraison (le panneau de Données s'encadrait dans un second cadre ; « tes 0
 pièce » quand il n'y en a pas). Aucun débordement horizontal.
+
+## Lot 31 (16/11) — Activité › formulaire de mission, liste des missions
+
+Maquette `design/direction/mission-clients.html`, validée par le propriétaire
+le 16/11.
+
+| Zone | Avant | Après |
+|---|---|---|
+| Clients d'une mission | « Retirer » immédiat, sans retour ; aucun arrêt | « Arrêter ce client le… » avec confirmation chiffrée ; « arrêté le … » / « depuis le … » et pastille ; « Retirer » confirmé, « L'arrêter à la place » |
+| Facturation (≥ 2 clients) | — | « Une facture commune » / « Une par client », payeur de chaque client pris dans le carnet |
+| Liste des missions | Le client, seul | « Pour X jusqu'au 13 mars, puis Y » quand un client est arrêté |
+
+Contrôle visuel à 390 et 1150 px, clair et sombre (formulaire, retrait, retrait
+à trois choix, liste). Deux écarts corrigés avant livraison : « Retirer quand
+même » prenait le bouton plein d'un geste conseillé sur un client déjà
+arrêté ; passer à « Une par client » faisait disparaître la facture commune du
+repérage. Écarts assumés à la maquette : libellés « Clients opérationnels » et
+« Ajouter un client opérationnel » gardés (le carnet a déjà « Ajouter un
+client »), libellés de champ en capitales comme le reste du formulaire.

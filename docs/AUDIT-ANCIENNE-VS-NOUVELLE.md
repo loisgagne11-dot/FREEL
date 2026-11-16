@@ -575,5 +575,5 @@ chiffre faux.
 | Fonction | Verdict | Détail |
 |---|---|---|
 | Reprendre les journées attribuées par client (`entiteByDay`) | 🟢 | Voir la ligne des clients opérationnels ; la vérification d'absence de perte compare désormais les journées mission par mission, mois par mois |
-| Arrêter un client à une date | 🟡 calcul fait | Borner ses plages et ses corrections ; « arrêté le … » dérivé. L'écran attend la validation de la maquette |
-| Facturer une mission à plusieurs clients | 🟡 calcul fait | Schéma 24 : facture commune par défaut, ou une par client avec le payeur de chaque plage ; le brouillon du mois se découpe par payeur. L'écran attend la validation de la maquette |
+| Arrêter un client à une date | 🟢 nouveau | L'ancienne ne savait pas arrêter un client sans réécrire son passé. Borner ses plages et ses corrections, avec une confirmation chiffrée ; « arrêté le … » dérivé ; « Retirer » confirmé propose l'arrêt à la place |
+| Facturer une mission à plusieurs clients | 🟢 nouveau | Schéma 24 : facture commune par défaut, ou une par client avec le payeur choisi dans le carnet ; le brouillon du mois se découpe par payeur |
