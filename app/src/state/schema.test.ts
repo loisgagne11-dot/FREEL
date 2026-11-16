@@ -1046,6 +1046,86 @@ describe('schéma 22 → 23 : le motif « mis de côté pour l’impôt »', () 
 
   it('un dossier d’un schéma postérieur est refusé', () => {
     expect(motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 })).not.toBeNull();
-    expect(VERSION_SCHEMA).toBe(23);
+    // 24 depuis le lot 31 : la facturation par client. L'attente suit le
+    // numéro, elle ne le fige pas — ce test dit qu'un saut se voit.
+    expect(VERSION_SCHEMA).toBe(24);
+  });
+});
+
+/**
+ * Schéma 24 (lot 31, décision 14) : la facturation par client.
+ *
+ * `facturerA` vit dans une PLAGE, dans un client opérationnel, dans une
+ * mission : trois listes sous la surface. Une migration qui s'arrêterait à la
+ * mission laisserait `undefined` là où le brouillon par payeur lit `null` — le
+ * piège de l'invariant n° 5, rencontré déjà sur les ajustements et les congés.
+ */
+describe('schéma 23 → 24 : la facturation par client', () => {
+  const missionDuSchema23 = () => ({
+    id: 'mis-fictive', clientId: null, clientNom: 'Agence fictive', description: 'Mission',
+    tjm: 400, debut: '2026-01-01', fin: '2026-12-31', statut: 'active',
+    entites: [{
+      id: 'co-1', nom: 'Client final fictif', couleur: '', adresse: '', contact: '',
+      email: '', telephone: '', ajustements: {},
+      rythmes: [
+        { du: '2026-01-01', au: '2026-06-30', parJour: { lun: 1 }, tjm: null },
+        { du: '2026-07-01', au: '2026-12-31', parJour: { mar: 1 }, tjm: null }
+      ]
+    }]
+  });
+
+  it('descend jusque dans chaque plage, et y pose le payeur de la mission', () => {
+    const faits = completerFaits({ version: 23, missions: [missionDuSchema23()] });
+    const [mission] = faits.missions;
+    expect(mission?.facturation).toBe('commune');
+    expect(mission?.entites[0]?.rythmes.map((r) => r.facturerA)).toEqual([null, null]);
+    expect(faits.version).toBe(24);
+  });
+
+  it('garde un payeur et un mode déjà posés', () => {
+    const m = missionDuSchema23();
+    const avecPayeur = {
+      ...m, facturation: 'par_client',
+      entites: [{ ...m.entites[0], rythmes: [{ ...m.entites[0]!.rythmes[0], facturerA: 'Client direct fictif' }] }]
+    };
+    const [mission] = completerFaits({ version: 24, missions: [avecPayeur] }).missions;
+    expect(mission?.facturation).toBe('par_client');
+    expect(mission?.entites[0]?.rythmes[0]?.facturerA).toBe('Client direct fictif');
+  });
+
+  it('refuse, au schéma courant, un mode de facturation inconnu', () => {
+    const m = { ...missionDuSchema23(), facturation: 'au_hasard' };
+    expect(motifRefusFaits({ ...faitsVides(), missions: [m] })).toMatch(/missions/);
+  });
+
+  it('refuse, au schéma courant, un payeur qui n’est pas un nom', () => {
+    const m = missionDuSchema23();
+    const payeurNombre = {
+      ...m, entites: [{ ...m.entites[0], rythmes: [{ ...m.entites[0]!.rythmes[0], facturerA: 42 }] }]
+    };
+    expect(motifRefusFaits({ ...faitsVides(), missions: [payeurNombre] })).toMatch(/missions/);
+  });
+
+  it('refuse, au schéma courant, une plage sans bornes lisibles', () => {
+    const m = missionDuSchema23();
+    const sansFin = {
+      ...m, entites: [{ ...m.entites[0], rythmes: [{ ...m.entites[0]!.rythmes[0], au: null }] }]
+    };
+    expect(motifRefusFaits({ ...faitsVides(), missions: [sansFin] })).toMatch(/missions/);
+  });
+
+  it('accepte au schéma courant un mode et un payeur absents, nuls ou nommés', () => {
+    const m = missionDuSchema23();
+    expect(motifRefusFaits({ ...faitsVides(), missions: [m] })).toBeNull();
+    const nomme = {
+      ...m, facturation: 'par_client',
+      entites: [{ ...m.entites[0], rythmes: [{ ...m.entites[0]!.rythmes[0], facturerA: null }, { ...m.entites[0]!.rythmes[1], facturerA: 'Client direct fictif' }] }]
+    };
+    expect(motifRefusFaits({ ...faitsVides(), missions: [nomme] })).toBeNull();
+  });
+
+  /** Une version 24 qui chargerait un dossier 25 en effacerait ce qu'elle ne sait pas lire. */
+  it('refuse un dossier au schéma 25', () => {
+    expect(motifRefusFaits({ ...faitsVides(), version: 25 })).toMatch(/schéma 25/);
   });
 });

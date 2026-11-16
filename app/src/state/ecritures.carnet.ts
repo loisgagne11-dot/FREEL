@@ -82,6 +82,11 @@ export function ajouterClient(saisie: Omit<Client, 'id'>): string | null {
  * attachées à un nom que plus aucun client ne porte : elles sortiraient des
  * délais de paiement et de la déclaration européenne de services sans que
  * rien ne le signale.
+ *
+ * Les plages qui le désignent comme payeur suivent aussi (schéma 24) : leur
+ * `facturerA` est un nom, et un nom que plus personne ne porte ferait partir
+ * le brouillon du mois à un client absent du carnet — que la rédaction
+ * refuserait faute d'adresse.
  */
 export function modifierClient(
   id: string, modification: Partial<Omit<Client, 'id'>>
@@ -109,8 +114,17 @@ export function modifierClient(
     : {
       ...actuel,
       clients,
-      missions: actuel.missions.map((m) =>
-        (m.clientNom === existant.nom ? { ...m, clientNom: nouveauNom, clientId: id } : m)),
+      missions: actuel.missions.map((m) => {
+        const renommee = m.clientNom === existant.nom ? { ...m, clientNom: nouveauNom, clientId: id } : m;
+        return {
+          ...renommee,
+          entites: renommee.entites.map((e) => ({
+            ...e,
+            rythmes: e.rythmes.map((r) =>
+              (r.facturerA === existant.nom ? { ...r, facturerA: nouveauNom } : r))
+          }))
+        };
+      }),
       recettes: actuel.recettes.map((r) =>
         (r.clientNom === existant.nom ? { ...r, clientNom: nouveauNom } : r))
     });

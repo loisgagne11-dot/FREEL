@@ -36,9 +36,11 @@ import type { Client, Faits, Recette } from './schema';
 import { dateDuJour, debutTvaEffectif } from './selecteurs';
 import type { Mois } from '../domain/types';
 import {
-  type BrouillonDeFacture, type FactureEmise, type LigneDeBrouillon, brouillonsDuMois
+  type BrouillonDeFacture, type FactureEmise, type LigneDeBrouillon, brouillonsDuMois,
+  cleDuBrouillon, ventilerParFacturation
 } from '../domain/calculs/brouillon';
-import { previsionDuMoisParMission } from './selecteurs.activite';
+import { previsionDuMois } from '../domain/calculs/prevision';
+import { libelleDeLaLigne, planningsDuMois } from './selecteurs.prevision';
 import {
   FORMULE_PAR_DEFAUT, echeanceDe
 } from '../domain/calculs/delaiPaiement';
@@ -274,24 +276,37 @@ function parDateDecroissante(
  *
  * Les journées valorisées sont les journées RETENUES — ajustements compris —
  * et non les journées prévues : on facture ce qui a été fait.
+ *
+ * Une mission facturée en commun rend une ligne par client opérationnel, au
+ * payeur de la mission — comme avant le schéma 24. Facturée client par client,
+ * elle rend une ligne par client opérationnel ET par payeur : les journées sont
+ * réparties selon la plage qui les couvre, puis valorisées par la même
+ * `previsionDuMois` que la prévision du mois — la somme des parts retombe donc
+ * sur le tout, au centime.
  */
 export function brouillonsDeFacture(
   faits: Faits,
   m: Mois
 ): readonly BrouillonDeFacture[] {
-  const parMission = new Map(faits.missions.map((mi) => [mi.id, mi]));
-
-  const lignes: LigneDeBrouillon[] = previsionDuMoisParMission(faits, m)
-    .map((p) => ({
-      missionId: p.missionId,
-      entiteId: p.entiteId,
-      libelle: p.libelle,
+  const lignes: LigneDeBrouillon[] = planningsDuMois(faits, m)
+    .flatMap(({ mission, entite, planning }) => {
+      const libelle = libelleDeLaLigne(mission, entite);
       // Le client qui REÇOIT la facture, et non celui chez qui l'on travaille :
       // une mission passée par une agence a les deux, et c'est l'agence qui paie.
-      clientNom: parMission.get(p.missionId)?.clientNom ?? '',
-      jours: p.prevision.joursRetenus,
-      montant: p.prevision.montantRetenu
-    }))
+      return [...ventilerParFacturation(planning, entite.rythmes, mission)]
+        .map(([clientNom, jours]) => {
+          const p = previsionDuMois(m, jours, entite.rythmes, mission.tjm);
+          return {
+            missionId: mission.id,
+            entiteId: entite.id,
+            libelle,
+            clientNom,
+            cle: cleDuBrouillon(clientNom, mission, entite.id),
+            jours: p.joursRetenus,
+            montant: p.montantRetenu
+          };
+        });
+    })
     .filter((l) => l.clientNom !== '');
 
   return brouillonsDuMois(m, lignes, facturesEmisesDuMois(faits, m));

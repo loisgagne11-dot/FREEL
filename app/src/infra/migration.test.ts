@@ -4,7 +4,14 @@ import {
   CLE_BUNDLE_LEGACY, PREFIXE_LEGACY, type ResultatMigration, type Stockage,
   migrer as detecter, presenceLegacy, stockageMemoire
 } from './migration';
-import { analyser, prendreInstantane, reprendreLegacy, verifierAbsenceDePerte } from './migration.legacy';
+import {
+  analyser, convertirBundle, prendreInstantane, reprendreLegacy, verifierAbsenceDePerte
+} from './migration.legacy';
+import { dateISO } from '../domain/types';
+import { planifier } from '../domain/calculs/planning';
+import { decaler, joursFeries } from '../domain/calculs/calendrier';
+import { arretDuClient } from '../domain/calculs/clientsOperationnels';
+import type { ClientOperationnel } from '../state/schema';
 
 /**
  * La migration complète : détection, puis reprise.
@@ -791,13 +798,19 @@ describe('clients opérationnels repris du legacy', () => {
   });
 
   /**
-   * Chacun garde SON rythme. Reprendre en plus celui de la mission — qui était
-   * la somme approximative des deux — compterait les journées deux fois.
+   * Chacun reçoit les jours de la MISSION dont il est l'attributaire, à la
+   * quotité de la mission.
+   *
+   * Ce test attendait `{ mer: 1, jeu: 0.5 }` pour B : la reprise lisait sa
+   * semaine type comme un rythme. L'ancienne application ne s'en servait que
+   * pour attribuer — le jeudi valait ce que la mission disait, 1, et revenait
+   * à B. Le « jeudi 0,5 » n'avait jamais été compté nulle part : la reprise
+   * retirait une demi-journée par semaine au CRA et à la facture de B (lot 31).
    */
-  it('donne à chacun son propre rythme', () => {
+  it('donne à chacun les jours de la mission dont il est l’attributaire', () => {
     const [a, b] = mission3().entites;
     expect(a?.rythmes[0]?.parJour).toEqual({ lun: 1, mar: 1 });
-    expect(b?.rythmes[0]?.parJour).toEqual({ mer: 1, jeu: 0.5 });
+    expect(b?.rythmes[0]?.parJour).toEqual({ mer: 1, jeu: 1 });
   });
 
   it('étend leur semaine type à la durée de la mission', () => {
@@ -915,5 +928,167 @@ describe('reprise de l’objectif de chiffre d’affaires', () => {
     const s = stockageMemoire({ freel_goal_ca: '65000' });
     expect(presenceLegacy(s)).toBe(false);
     expect(detecter(s).statut).toBe('rien-a-migrer');
+  });
+});
+
+/**
+ * L'ATTRIBUTION JOUR PAR JOUR DE L'ANCIENNE APPLICATION (lot 31).
+ *
+ * Une mission fictive à quatre clients finaux, lundi à vendredi. A tient les
+ * lundis et mardis, B les mercredis et jeudis, C les vendredis ; D n'a pas de
+ * semaine type. `entiteByDay` partage un mercredi entre B et D, donne un lundi
+ * à B, nomme un client inconnu, et, en avril, donne à A les vendredis de C —
+ * qui a cessé fin mars.
+ *
+ * Le total d'un jour vient de la MISSION ; la semaine type des clients ne sert
+ * qu'à attribuer. La lire comme un rythme comptait des journées qui n'avaient
+ * pas existé, et un client sans semaine type recevait le rythme entier : chaque
+ * jour compté deux fois, au CRA comme à la facture.
+ */
+describe('reprise de l’attribution jour par jour', () => {
+  const bundle = () => ({
+    c: { nom: 'Exemple', debut: '2025-01-01', typeActivite: 'BNC' },
+    cl: [{ id: 'CLI-AG', nom: 'Agence fictive', adresse: '', siret: '', email: '', delaiPaiement: 30 }],
+    t: { mouvements: [] },
+    m: [{
+      id: 'MIS-EBD', client: 'Agence fictive', description: 'Mission à quatre', tjm: 500,
+      debut: '2026-01-05', fin: '2026-06-30', statut: 'en_cours', factures: [],
+      periodes: [{
+        debut: '2026-01-05', fin: '2026-06-30',
+        joursMap: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: 500
+      }],
+      entites: [
+        { id: 'e-a', nom: 'Client final A', joursParSemaine: { lun: 1, mar: 1 } },
+        { id: 'e-b', nom: 'Client final B', joursParSemaine: { mer: 1, jeu: 1 } },
+        { id: 'e-c', nom: 'Client final C', joursParSemaine: { ven: 1 } },
+        { id: 'e-d', nom: 'Client final D', joursParSemaine: null }
+      ],
+      congesDates: ['2026-03-20'],
+      lignes: [
+        {
+          ym: '2026-02', ajustements: { '2026-02-18': 0 },
+          workLocation: { '2026-02-11': 'tt' },
+          entiteByDay: { '2026-02-11': 'SPLIT:e-b:e-d', '2026-02-13': 'e-c', '2026-02-16': 'e-b' }
+        },
+        {
+          ym: '2026-03', ajustements: { '2026-03-07': 1, '2026-03-10': 0.5, '2026-03-11': 0.5 },
+          entiteByDay: { '2026-03-25': 'e-inconnu', '2026-03-27': 'e-c' }
+        },
+        { ym: '2026-04', entiteByDay: { '2026-04-03': 'e-a', '2026-04-10': 'e-a' } }
+      ]
+    }]
+  });
+
+  const reprise = () => convertirBundle(bundle());
+  const clientsDe = () => {
+    const m = reprise().faits.missions[0];
+    if (m === undefined) throw new Error('mission attendue');
+    return m;
+  };
+  const conges = { '2026-03-20': 1 };
+  const feries = new Set<string>(joursFeries(2026));
+  const retenu = (e: ClientOperationnel | undefined, date: string): number =>
+    planifier([dateISO(date)], {
+      rythmes: e?.rythmes ?? [], ajustements: e?.ajustements ?? {}, feries, conges
+    })[0]?.retenu ?? Number.NaN;
+
+  it('rend à chaque client ses journées', () => {
+    const [a, b, c] = clientsDe().entites;
+    // Le lundi 16 février donné à B ; le mercredi 25 mars nommé d'un inconnu,
+    // qui retombe sur B, l'attributaire du mercredi — et non sur le premier.
+    expect([retenu(a, '2026-02-16'), retenu(b, '2026-02-16')]).toEqual([0, 1]);
+    expect([retenu(a, '2026-03-25'), retenu(b, '2026-03-25')]).toEqual([0, 1]);
+    // Les corrections de la mission : le samedi 7 mars travaillé va au premier,
+    // la demi-journée du mardi 10 à A, celle du mercredi 11 à B — et non toutes
+    // au premier client, comme la reprise le faisait —, le zéro du 18 février
+    // à B, qui le prévoyait.
+    expect([retenu(a, '2026-03-07'), retenu(a, '2026-03-10'), retenu(b, '2026-02-18')]).toEqual([1, 0.5, 0]);
+    expect([retenu(a, '2026-03-11'), retenu(b, '2026-03-11')]).toEqual([0, 0.5]);
+    // Les vendredis : à C jusqu'en mars, à A ensuite.
+    expect([retenu(c, '2026-03-13'), retenu(c, '2026-04-17'), retenu(a, '2026-04-17')]).toEqual([1, 0, 1]);
+  });
+
+  it('partage un jour en une demi-journée chacun', () => {
+    const [, b, , d] = clientsDe().entites;
+    expect([retenu(b, '2026-02-11'), retenu(d, '2026-02-11')]).toEqual([0.5, 0.5]);
+  });
+
+  /**
+   * La somme des clients, jour par jour, est le total de la mission d'hier :
+   * son rythme, ses corrections, ses fériés et ses congés.
+   */
+  it('ne compte aucun jour deux fois', () => {
+    const mission = clientsDe();
+    const ancien = planifier(
+      [...Array(177).keys()].map((n) => decaler(dateISO('2026-01-05'), n)),
+      {
+        rythmes: [{
+          du: dateISO('2026-01-05'), au: dateISO('2026-06-30'),
+          parJour: { lun: 1, mar: 1, mer: 1, jeu: 1, ven: 1 }, tjm: null
+        }],
+        ajustements: {
+          '2026-02-18': { quotite: 0 }, '2026-03-07': { quotite: 1 },
+          '2026-03-10': { quotite: 0.5 }, '2026-03-11': { quotite: 0.5 }
+        },
+        feries, conges
+      }
+    );
+    const ecarts = ancien.filter((j) =>
+      Math.abs(mission.entites.reduce((s, e) => s + retenu(e, j.date), 0) - j.retenu) > 0.001
+    ).map((j) => j.date);
+    expect(ecarts).toEqual([]);
+    expect(verifierAbsenceDePerte(bundle() as never, reprise().faits)).toEqual([]);
+  });
+
+  /**
+   * Le rythme se partage, il ne se recopie pas : chaque jour de semaine de la
+   * mission revient aux plages d'un seul client. Recopier le rythme entier à D,
+   * qui n'a pas de semaine type, ne se verrait pas au total — une correction à
+   * zéro rattraperait chaque jour —, mais remplirait son planning de centaines
+   * de zéros, et son rythme dirait une mission qu'il n'a jamais eue.
+   */
+  it('partage le rythme de la mission entre les plages, sans recouvrement', () => {
+    const mission = clientsDe();
+    const prevu = (e: ClientOperationnel, date: string) => planifier([dateISO(date)], {
+      rythmes: e.rythmes, ajustements: {}, feries, conges
+    })[0]?.prevu ?? 0;
+    const recouvrements = [...Array(177).keys()]
+      .map((n) => decaler(dateISO('2026-01-05'), n))
+      .filter((d) => mission.entites.filter((e) => prevu(e, d) > 0).length > 1);
+    expect(recouvrements).toEqual([]);
+    expect(mission.entites[3]?.rythmes.every((r) => Object.keys(r.parJour).length === 0)).toBe(true);
+  });
+
+  /** Ses vendredis passés à A en avril : C a cessé le dernier jour qui lui revenait. */
+  it('lit arrêté, à son dernier jour, un client que l’ancienne application n’attribuait plus', () => {
+    const mission = clientsDe();
+    const [a, b, c] = mission.entites;
+    if (a === undefined || b === undefined || c === undefined) throw new Error('clients attendus');
+    expect(arretDuClient(mission, c)).toBe('2026-03-27');
+    expect(c.rythmes.every((r) => r.au <= '2026-03-27')).toBe(true);
+    expect([arretDuClient(mission, a), arretDuClient(mission, b)]).toEqual([null, null]);
+  });
+
+  it('le rapport compte les journées attribuées, nomme l’inconnu et le lieu non repris', () => {
+    const { rapport } = reprise();
+    const messages = rapport.anomalies.map((x) => x.message).join('\n');
+    expect(messages).toMatch(/7 journée\(s\) attribuée\(s\) jour par jour.*dont 1 partagée/s);
+    expect(messages).toMatch(/« e-inconnu »/);
+    expect(rapport.champsNonRepris).toContain('mission.lignes[].workLocation');
+  });
+
+  /** Une journée retirée d'un client doit se voir au contrôle, au mois près. */
+  it('le contrôle d’absence de perte voit une journée perdue, mois par mois', () => {
+    const faits = reprise().faits;
+    const [mission] = faits.missions;
+    if (mission === undefined) throw new Error('mission attendue');
+    const ampute = {
+      ...faits,
+      missions: [{
+        ...mission,
+        entites: mission.entites.map((e, i) => (i === 1 ? { ...e, ajustements: {} } : e))
+      }]
+    };
+    expect(verifierAbsenceDePerte(bundle() as never, ampute).join('\n')).toMatch(/2026-02/);
   });
 });

@@ -14,6 +14,12 @@ import type { Mois } from '../domain/types';
  * alors vide sans dire pourquoi. Dans l'adresse, il ne voyage que ce qui le
  * désigne (le mois, le client) ; l'éditeur le recalcule, et un rechargement le
  * retrouve.
+ *
+ * Un troisième segment, facultatif, porte la clé du brouillon quand le nom du
+ * client ne suffit plus à le désigner : une mission facturée client par client
+ * peut en rendre deux au même payeur (lot 31). Il n'est écrit que dans ce cas,
+ * de sorte que les adresses d'avant — deux segments — restent celles qu'on
+ * écrit encore, et se lisent toujours.
  */
 
 const PREFIXE = 'brouillon:';
@@ -21,23 +27,29 @@ const PREFIXE = 'brouillon:';
 export interface DesignationBrouillon {
   readonly mois: Mois;
   readonly clientNom: string;
+  /** La clé du brouillon, quand elle diffère du nom du client. */
+  readonly cle?: string;
 }
 
 /** La sous-route de l'écran Facture qui désigne ce brouillon. */
 export function sousRouteDuBrouillon(d: DesignationBrouillon): string {
-  return `${PREFIXE}${d.mois}:${encodeURIComponent(d.clientNom)}`;
+  const cle = d.cle !== undefined && d.cle !== d.clientNom ? `:${encodeURIComponent(d.cle)}` : '';
+  return `${PREFIXE}${d.mois}:${encodeURIComponent(d.clientNom)}${cle}`;
 }
 
 /** Le brouillon que désigne une sous-route, ou `null` si elle n'en désigne pas. */
 export function brouillonDeLaSousRoute(sousRoute: string): DesignationBrouillon | null {
   if (!sousRoute.startsWith(PREFIXE)) return null;
-  const reste = sousRoute.slice(PREFIXE.length);
-  const separateur = reste.indexOf(':');
-  if (separateur === -1) return null;
-  const mois = reste.slice(0, separateur);
-  if (!/^\d{4}-\d{2}$/.test(mois)) return null;
+  // Les segments sont encodés : un « : » dans un nom de client n'y figure
+  // qu'écrit `%3A`, et ne peut pas passer pour un séparateur.
+  const [mois, client, cle] = sousRoute.slice(PREFIXE.length).split(':');
+  if (mois === undefined || client === undefined || !/^\d{4}-\d{2}$/.test(mois)) return null;
   try {
-    return { mois: mois as Mois, clientNom: decodeURIComponent(reste.slice(separateur + 1)) };
+    return {
+      mois: mois as Mois,
+      clientNom: decodeURIComponent(client),
+      ...(cle !== undefined ? { cle: decodeURIComponent(cle) } : {})
+    };
   } catch {
     // Un « % » isolé collé à la main dans l'adresse : rien ne s'y désigne.
     return null;

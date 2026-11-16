@@ -396,11 +396,11 @@ l'affichage et la reprise.
 
 | Ligne | État |
 |---|---|
-| « Arrêter ce client le … » : borne ses plages à la date, retire ses corrections postérieures (confirmé, en les comptant) ; la mission continue avec les autres | ⬜ |
-| Le client arrêté se lit « arrêté le … » dans la mission ; le planning, le CRA et le brouillon du mois ne lui comptent plus de jours après cette date | ⬜ |
-| « Retirer » un client opérationnel du formulaire emporte ses plages et ses corrections : confirmé, et « Arrêter le … » proposé à la place | ⬜ |
-| Reprise : l'ancienne application disait QUEL client travaillait QUEL jour (`lignes[].entiteByDay`) ; la reprise l'ignore aujourd'hui, en silence — chaque client garde sa semaine type sur toute la mission (un client arrêté continue donc au planning) et toutes les corrections vont au premier. À reprendre jour par jour, ou à lister dans le rapport | ⬜ |
-| Facturation d'une mission à plusieurs clients — tranché le 12/11 (décision 14) : par défaut une facture commune ; le choix « une facture commune » / « une facture par client » se fait mission par mission ; dans le second cas le brouillon du mois découpe les jours selon les plages de chaque client, ce qui demande un client de facturation par plage (schéma 22) | ⬜ |
+| « Arrêter ce client le … » : borne ses plages à la date, retire ses corrections postérieures (confirmé, en les comptant) ; la mission continue avec les autres | 🔶 16/11 calcul fait (`clientsOperationnels.ts`) ; écran à coder après validation de `design/direction/mission-clients.html` |
+| Le client arrêté se lit « arrêté le … » dans la mission ; le planning, le CRA et le brouillon du mois ne lui comptent plus de jours après cette date | 🔶 16/11 dérivé et compté (essai sur planning, CRA, brouillon ; l'éditeur ne le propose plus après sa date) ; la lecture à l'écran attend la maquette |
+| « Retirer » un client opérationnel du formulaire emporte ses plages et ses corrections : confirmé, et « Arrêter le … » proposé à la place | 🔶 16/11 bilan du retrait calculé ; écran à coder après validation |
+| Reprise : l'ancienne application disait QUEL client travaillait QUEL jour (`lignes[].entiteByDay`) ; la reprise l'ignore aujourd'hui, en silence — chaque client garde sa semaine type sur toute la mission (un client arrêté continue donc au planning) et toutes les corrections vont au premier. À reprendre jour par jour, ou à lister dans le rapport | ✅ 16/11 — reconstruit jour par jour, sans plage par jour : plages partagées sans recouvrement, journées en corrections, rapport ; la vérification d'absence de perte compare les journées mois par mois |
+| Facturation d'une mission à plusieurs clients — tranché le 12/11 (décision 14) : par défaut une facture commune ; le choix « une facture commune » / « une facture par client » se fait mission par mission ; dans le second cas le brouillon du mois découpe les jours selon les plages de chaque client, ce qui demande un client de facturation par plage (schéma 24) | 🔶 16/11 schéma 24 et brouillon par payeur faits (somme des brouillons par client = brouillon commun, tenue par un essai) ; choix à l'écran après validation |
 
 ### Lot 32 — Vérification sur les données réelles (hors dépôt)
 

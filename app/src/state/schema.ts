@@ -40,8 +40,13 @@ export type { AjustementJour, Ajustements, Rythme };
  * antérieure le lirait comme un « sans contrepartie » quelconque et
  * provisionnerait une seconde fois l'impôt déjà viré : elle doit REFUSER
  * ce dossier plutôt que d'en sous-estimer le versable.
+ *
+ * 24 (lot 31) : la facturation par client — `Mission.facturation` et
+ * `Rythme.facturerA`. Une version antérieure les ignorerait et ferait une seule
+ * facture au payeur de la mission pour des journées qu'un autre doit payer ;
+ * puis, au premier renvoi, les effacerait. Elle doit refuser le dossier.
  */
-export const VERSION_SCHEMA = 23 as const;
+export const VERSION_SCHEMA = 24 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -211,6 +216,20 @@ export interface Mission {
    * chaque facture de la mission. Facultative, comme `delaiPaiement`.
    */
   readonly referenceCommande?: string | null;
+  /**
+   * Comment la mission se facture quand elle a plusieurs clients
+   * opérationnels (schéma 24, décision 14).
+   *
+   * `commune` : une facture au payeur de la mission, une ligne par client
+   * opérationnel — le cas de l'agence, qui reçoit tout. `par_client` : chaque
+   * journée part au payeur de la plage qui la couvre (`Rythme.facturerA`), et
+   * chaque client opérationnel a son brouillon.
+   *
+   * Absent vaut `commune`, et c'est voulu : c'est ce que l'application faisait
+   * jusqu'ici. Un défaut à `par_client` couperait en deux, sans qu'un geste ait
+   * été fait, la facture d'une agence qui en attend une.
+   */
+  readonly facturation?: 'commune' | 'par_client';
 }
 
 /**
@@ -924,10 +943,21 @@ function motifRefusElements(o: Record<string, unknown>, version: number): string
   if (!Array.isArray(o['missions'])) return null;
   for (const [i, m] of (o['missions'] as Record<string, unknown>[]).entries()) {
     const entites = m['entites'];
-    const entitesLisibles = Array.isArray(entites) && entites.every((e) =>
-      estEnregistrement(e)
-      && Array.isArray(e['rythmes']) && e['rythmes'].every(estEnregistrement)
-      && estEnregistrement(e['ajustements']));
+    /* Schéma 24. Un mode inconnu se lirait « commune » par défaut et ferait
+       une facture au payeur de la mission pour des journées qu'un autre doit
+       payer ; un payeur qui n'est pas un nom ne se retrouverait dans aucun
+       carnet, et le brouillon partirait sans destinataire. Une plage sans
+       bornes lisibles ne couvre aucun jour : ses journées disparaîtraient du
+       planning, du CRA et de la facture sans un mot. */
+    const facturation = m['facturation'];
+    const entitesLisibles = Array.isArray(entites)
+      && (facturation === undefined || facturation === 'commune' || facturation === 'par_client')
+      && entites.every((e) =>
+        estEnregistrement(e)
+        && Array.isArray(e['rythmes']) && e['rythmes'].every((r) => estEnregistrement(r)
+          && typeof r['du'] === 'string' && typeof r['au'] === 'string'
+          && (r['facturerA'] == null || typeof r['facturerA'] === 'string'))
+        && estEnregistrement(e['ajustements']));
     if (!entitesLisibles) return illisible('missions', i);
   }
   return null;
@@ -995,71 +1025,3 @@ export function completerFaitsCourants(brut: Record<string, unknown>): Faits {
     entreprise: { ...entrepriseVide(), ...entreprise }
   } as Faits;
 }
-
-export function entiteVide(): ClientOperationnel {
-  return {
-    id: '', nom: '', couleur: '', adresse: '', contact: '', email: '',
-    telephone: '', rythmes: [], ajustements: {}
-  };
-}
-
-/**
- * v11 → v12 : le foyer fiscal sort de `configImpotBrute`.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * REPRENDRE PLUTÔT QUE REDEMANDER
- * ─────────────────────────────────────────────────────────────────────────
- *
- * L'ancienne application tenait ces trois valeurs dans un objet indexé PAR
- * ANNÉE : `{ '2025': { parts, autresRevenus, perAnnuel }, '2026': {…} }`. La
- * reprise l'a conservé tel quel, sans jamais l'interpréter — d'où
- * `configImpotBrute`. Les redemander à la saisie alors qu'ils sont là
- * ferait retaper une information déjà donnée, et la provision d'impôt
- * refuserait de se calculer jusqu'à ce que ce soit fait.
- *
- * L'ANNÉE LA PLUS RÉCENTE l'emporte : c'est la seule qui décrit la situation
- * actuelle du foyer. La dimension annuelle est perdue, et c'est assumé — un
- * historique des parts ne sert à rien tant qu'aucun écran ne recalcule une
- * année passée, et le porter demanderait une table que personne ne tiendrait
- * à jour. Le jour où un tel écran existe, la donnée brute est toujours là.
- *
- * Un zéro de l'ancienne application reste un zéro : il a été saisi. Seule une
- * clé absente devient `null`, qui veut dire « pas renseigné ».
- */
-export interface FoyerFiscal {
-  readonly partsFiscales: number | null;
-  readonly autresRevenusFoyer: Euros | null;
-  readonly versementPerDeductible: Euros | null;
-}
-
-/** Exporté : `schema.migrations.ts` réutilise cette lecture prudente d'un nombre. */
-export const nombreOuNull = (v: unknown): number | null =>
-  typeof v === 'number' && Number.isFinite(v) ? v : null;
-
-/**
- * Extrait le foyer fiscal de l'ancienne configuration d'IR.
- *
- * Exporté pour que la reprise du legacy et la migration de schéma lisent la
- * MÊME règle : deux lectures de la même structure finiraient par diverger, et
- * l'application dirait alors deux nombres de parts selon l'origine du compte.
- */
-export function foyerFiscalDepuisConfigImpot(brute: unknown): FoyerFiscal {
-  const parAnnee = (typeof brute === 'object' && brute !== null && !Array.isArray(brute))
-    ? brute as Record<string, unknown>
-    : {};
-  const derniereAnnee = Object.keys(parAnnee)
-    .filter((cle) => /^\d{4}$/.test(cle))
-    .sort()
-    .pop();
-  const ancien = derniereAnnee !== undefined
-    && typeof parAnnee[derniereAnnee] === 'object' && parAnnee[derniereAnnee] !== null
-    ? parAnnee[derniereAnnee] as Record<string, unknown>
-    : {};
-
-  return {
-    partsFiscales: nombreOuNull(ancien['parts']),
-    autresRevenusFoyer: nombreOuNull(ancien['autresRevenus']) as Euros | null,
-    versementPerDeductible: nombreOuNull(ancien['perAnnuel']) as Euros | null
-  };
-}
-

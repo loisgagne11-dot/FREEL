@@ -58,6 +58,18 @@ export interface Rythme {
   readonly parJour: Readonly<Partial<Record<JourDeSemaine, Quotite>>>;
   /** TJM de la période. `null` quand celui de la mission s'applique. */
   readonly tjm: Euros | null;
+  /**
+   * Qui reçoit la facture des journées de cette plage, quand la mission se
+   * facture client par client (schéma 24, décision 14) : le NOM d'un client du
+   * carnet — le nom, parce que c'est lui qui rattache les recettes —, ou `null`
+   * pour le payeur de la mission.
+   *
+   * Sur la plage et non sur le client opérationnel : un donneur d'ordre qui
+   * passe en direct en septembre ne réécrit pas qui a payé l'été. Ignoré quand
+   * la mission se facture en commun — une facture, un payeur. Absent sur toute
+   * plage d'avant le schéma 24 : la migration le comble à `null`.
+   */
+  readonly facturerA?: string | null;
 }
 
 /** Les deux moitiés d'une journée. Le dessin ne connaît qu'elles. */

@@ -1,6 +1,6 @@
 {
   "_lisezMoi": "Jeu d’essai à FORME RÉELLE, entièrement fictif : mêmes structures qu’un compte réel (ACRE qui s’éteint, TVA franchie en cours d’année, avoir, foyer à deux parts, passage du 31 décembre), aucune donnée personnelle. Il sert aux tests d’intégration (src/integration) et à capturer-app.mjs --jeu=essai, jamais à la démonstration.",
-  "version": 23,
+  "version": 24,
   "entreprise": {
     "nom": "Entreprise Démo Indépendant",
     "prenom": "",
@@ -57,6 +57,7 @@
       "fin": null,
       "statut": "active",
       "delaiPaiement": null,
+      "facturation": "commune",
       "entites": [
         {
           "id": "ent-client-final",
@@ -76,7 +77,8 @@
                 "mer": 1,
                 "jeu": 1
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             },
             {
               "du": "2026-01-01",
@@ -87,7 +89,8 @@
                 "mer": 1,
                 "jeu": 1
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             },
             {
               "du": "2027-01-01",
@@ -98,7 +101,8 @@
                 "mer": 1,
                 "jeu": 1
               },
-              "tjm": 500
+              "tjm": 500,
+              "facturerA": null
             }
           ],
           "ajustements": {
@@ -155,6 +159,7 @@
       "fin": "2026-05-08",
       "statut": "terminee",
       "delaiPaiement": null,
+      "facturation": "commune",
       "entites": [
         {
           "id": "ent-direct",
@@ -172,7 +177,8 @@
                 "mar": 1,
                 "ven": 0.5
               },
-              "tjm": null
+              "tjm": null,
+              "facturerA": null
             }
           ],
           "ajustements": {}

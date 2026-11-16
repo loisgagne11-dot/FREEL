@@ -33,12 +33,15 @@ import { type DateISO, type Mois, type TypeActivite, euros, ratio } from '../dom
 import {
   CLE_STOCKAGE, VERSION_SCHEMA,
   type Client, type Conge, type Depense, type Faits, type Mission, type Recette,
-  type Rythme, entrepriseVide, foyerFiscalDepuisConfigImpot
+  type Rythme, entrepriseVide
 } from '../state/schema';
-import { JOURS_SEMAINE, type AjustementJour } from '../domain/calculs/planning';
+import {
+  JOURS_SEMAINE, type AjustementJour, type JourDeSemaine, jourDeSemaine, planifier
+} from '../domain/calculs/planning';
+import { decaler, joursFeries } from '../domain/calculs/calendrier';
 import { formuleDepuisJours } from '../domain/calculs/delaiPaiement';
 import type { ClientOperationnel } from '../state/schema';
-import { completerFaits } from '../state/schema.migrations';
+import { completerFaits, foyerFiscalDepuisConfigImpot } from '../state/schema.migrations';
 import type { Echeance, NatureDette } from '../domain/calculs/provisions';
 import { CLE_INSTANTANE_AVANT_MIGRATION } from '../state/schema';
 import {
@@ -384,90 +387,265 @@ function congesDesMissions(missions: readonly unknown[]): Conge[] {
  * L'ANCIENNE APPLICATION AVAIT TROIS SOURCES POUR UNE MÊME JOURNÉE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Elle portait un rythme sur la mission (`periodes[].joursMap`), un rythme
- * par entité (`entites[].joursParSemaine`), et une table `entiteByDay` pour
- * arbitrer entre les deux. Trois sources pour une même journée finissent
- * toujours par se contredire, et rien n'indiquait laquelle faisait foi.
+ * Elle portait un rythme sur la mission (`periodes[].joursMap`), une semaine
+ * type par entité (`entites[].joursParSemaine`), et une table `entiteByDay`
+ * qui disait, jour travaillé par jour travaillé, à qui il revenait. Le nouveau
+ * schéma n'en garde qu'une : le rythme appartient au client opérationnel.
  *
- * Le nouveau schéma n'en garde qu'une : le rythme appartient au client
- * opérationnel. La reprise applique donc une règle simple et vérifiable —
+ * Pas d'entité, ou une seule : un client opérationnel qui reprend le rythme et
+ * les ajustements de la mission tels quels. Le planning d'hier redonne
+ * exactement les mêmes journées.
  *
- *   · pas d'entité, ou une seule : un client opérationnel qui reprend le
- *     rythme de la mission tel quel. Le planning d'hier redonne exactement
- *     les mêmes journées.
- *   · plusieurs entités : chacune garde SON rythme (`joursParSemaine`), et
- *     celui de la mission est ignoré — il était la somme approximative des
- *     autres, et le conserver compterait les journées deux fois.
- *
- * Les ajustements restent au niveau de la mission dans l'ancien format
- * (`lignes[].ajustements`, sans entité) : ils sont donnés au PREMIER client
- * opérationnel. Les répartir au jugé serait inventer une information que
- * l'ancienne application n'a jamais eue.
+ * Plusieurs : voir `repartirEntreClients`. La reprise lisait jusqu'ici
+ * `joursParSemaine` comme un RYTHME, alors que l'ancienne application ne s'en
+ * servait que pour ATTRIBUER une journée dont la mission fixait le total — un
+ * « jeudi 0,5 » y apparaissait que personne n'avait jamais compté, un client
+ * sans semaine type recevait le rythme entier (chaque journée comptée deux
+ * fois), toutes les corrections allaient au premier client, et `entiteByDay`
+ * était ignorée sans un mot.
  */
-function entitesDeLaMission(m: Inconnu, prefixe: string): ClientOperationnel[] {
+function entitesDeLaMission(
+  m: Inconnu, prefixe: string, contexte: ContexteDeReprise,
+  anomalies: Anomalie[], champsNonRepris: string[]
+): ClientOperationnel[] {
   const brutes = tableau(m['entites'])
     .map((e) => objet(e))
     .filter((e) => texte(e['nom']) !== '');
 
   const ajustements = ajustementsDeLaMission(m);
   const rythmeMission = rythmesDeLaMission(m);
+  const coordonnees = (e: Inconnu | undefined, i: number) => ({
+    id: `${prefixe}-co${i + 1}`,
+    nom: e ? texte(e['nom']) : texte(m['client']),
+    couleur: e ? texte(e['couleur']) : '',
+    adresse: e ? texte(e['adresse']) : '',
+    contact: e ? texte(e['contact']) : '',
+    email: e ? texte(e['email']) : '',
+    telephone: e ? texte(e['telephone']) : ''
+  });
 
-  if (brutes.length <= 1) {
-    const seule = brutes[0];
-    return [{
-      id: `${prefixe}-co1`,
-      nom: seule ? texte(seule['nom']) : texte(m['client']),
-      couleur: seule ? texte(seule['couleur']) : '',
-      adresse: seule ? texte(seule['adresse']) : '',
-      contact: seule ? texte(seule['contact']) : '',
-      email: seule ? texte(seule['email']) : '',
-      telephone: seule ? texte(seule['telephone']) : '',
-      rythmes: rythmeMission,
-      ajustements
-    }];
+  /* Le lieu de chaque journée (`lignes[].workLocation`) n'est pas repris : le
+     nouveau schéma le porte par demi-journée, et l'ancienne application ne
+     disait pas laquelle. Il est NOMMÉ plutôt que perdu en silence. */
+  if (tableau(m['lignes']).some((l) => Object.keys(objet(objet(l)['workLocation'])).length > 0)
+    && !champsNonRepris.includes('mission.lignes[].workLocation')) {
+    champsNonRepris.push('mission.lignes[].workLocation');
   }
 
-  const debut = dateOuNull(m['debut']);
-  const fin = dateOuNull(m['fin']);
+  if (brutes.length <= 1) {
+    return [{ ...coordonnees(brutes[0], 0), rythmes: rythmeMission, ajustements }];
+  }
 
+  const reparti = repartirEntreClients(m, brutes, rythmeMission, ajustements, contexte);
+  const nomMission = texte(m['description']) || texte(m['client']);
+  if (reparti.attribuees > 0) {
+    anomalies.push({
+      gravite: 'avertissement',
+      message: `Mission « ${nomMission} » : ${reparti.attribuees} journée(s) attribuée(s) `
+        + `jour par jour dans l'ancienne application, dont ${reparti.partagees} partagée(s) `
+        + 'entre deux clients — reprises une demi-journée chacun.'
+    });
+  }
+  if (reparti.inconnus.length > 0) {
+    anomalies.push({
+      gravite: 'avertissement',
+      message: `Mission « ${nomMission} » : identifiant(s) de client inconnu(s) `
+        + `${reparti.inconnus.map((id) => `« ${id} »`).join(', ')} dans l'attribution jour par jour. `
+        + 'Leurs journées vont au client qui tenait ce jour de la semaine par défaut.'
+    });
+  }
   return brutes.map((e, i) => ({
-    id: `${prefixe}-co${i + 1}`,
-    nom: texte(e['nom']),
-    couleur: texte(e['couleur']),
-    adresse: texte(e['adresse']),
-    contact: texte(e['contact']),
-    email: texte(e['email']),
-    telephone: texte(e['telephone']),
-    rythmes: rythmeDeLEntite(e, debut, fin, rythmeMission),
-    // Seul le premier reçoit les ajustements : l'ancien format ne disait pas
-    // à quelle entité chacun appartenait.
-    ajustements: i === 0 ? ajustements : {}
+    ...coordonnees(e, i),
+    rythmes: reparti.rythmes[i] ?? [],
+    ajustements: reparti.ajustements[i] ?? {}
   }));
 }
 
-/**
- * Le rythme propre d'une entité, sur toute la durée de la mission.
- *
- * `joursParSemaine` est une semaine type sans bornes de dates : on l'étend à
- * la durée de la mission. Sans dates de mission, on retombe sur le rythme
- * de la mission — mieux vaut une plage approchée qu'un planning vide.
- */
-function rythmeDeLEntite(
-  e: Inconnu, debut: DateISO | null, fin: DateISO | null, repli: Rythme[]
-): Rythme[] {
-  const brut = objet(e['joursParSemaine']);
-  const parJour: Record<string, number> = {};
-  for (const j of JOURS_SEMAINE) {
-    const q = nombre(brut[j]);
-    if (q > 0) parJour[j] = q;
+/** Les jours fériés et les congés, tels que la reprise les a déjà lus. */
+interface ContexteDeReprise {
+  readonly conges: Readonly<Record<string, number>>;
+}
+
+/** Les fériés des années que couvrent ces dates. */
+function feriesDe(dates: readonly DateISO[]): ReadonlySet<string> {
+  const feries = new Set<string>();
+  for (const a of new Set(dates.map((d) => Number(d.slice(0, 4))))) {
+    for (const f of joursFeries(a)) feries.add(f);
   }
-  if (Object.keys(parJour).length === 0) return repli;
+  return feries;
+}
 
-  const du = debut ?? repli[0]?.du;
-  const au = fin ?? repli[repli.length - 1]?.au;
-  if (du === undefined || au === undefined) return repli;
+/** Toutes les dates de `du` à `au` inclus. */
+function datesDe(du: DateISO, au: DateISO): DateISO[] {
+  const dates: DateISO[] = [];
+  for (let d = du; d <= au; d = decaler(d, 1)) dates.push(d);
+  return dates;
+}
 
-  return [{ du, au, parJour, tjm: null }];
+/** L'attribution jour par jour de l'ancienne application, toutes lignes confondues. */
+function attributionsDeLaMission(m: Inconnu): Map<string, string> {
+  const parDate = new Map<string, string>();
+  for (const l of tableau(m['lignes'])) {
+    for (const [date, qui] of Object.entries(objet(objet(l)['entiteByDay']))) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date) && typeof qui === 'string') parDate.set(date, qui);
+    }
+  }
+  return parDate;
+}
+
+/**
+ * Rend à chaque client opérationnel ses journées, sans en compter une deux fois.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE TOTAL VIENT DE LA MISSION, `joursParSemaine` NE FAIT QU'ATTRIBUER
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * C'est ce que faisait l'ancienne application : un jour valait ce que le
+ * rythme de la mission et ses corrections disaient (fériés et congés déduits),
+ * et revenait au client nommé par `entiteByDay` s'il y en avait un, sinon au
+ * premier client dont la semaine type couvre ce jour, sinon au premier. La
+ * reprise reconstruit exactement cela, avec les faits du nouveau schéma :
+ *
+ *  1. chaque période de la mission devient une plage par client, restreinte
+ *     aux jours de semaine dont il est l'attributaire par défaut — un partage
+ *     sans recouvrement. Une plage peut être vide : elle porte le TJM de la
+ *     période, et l'emporte comme elle sur une période antérieure ;
+ *  2. là où `entiteByDay` attribue le jour — un client, ou `SPLIT:a:b`, une
+ *     demi-journée chacun —, chaque client a pour cible sa part du total ; une
+ *     correction n'est posée que si la cible diffère de ce que ses plages
+ *     prévoient déjà ;
+ *  3. une correction de la mission hors `entiteByDay` va à l'attributaire par
+ *     défaut du jour ; un zéro, à tous ceux qui prévoyaient ce jour ;
+ *  4. un client que l'ancienne application a cessé d'attribuer — ses jours
+ *     donnés à un autre après son dernier jour — n'a plus de plage au-delà :
+ *     `arretDuClient` le lit arrêté, et ses jours de semaine passent au client
+ *     suivant.
+ *
+ * La somme des clients, jour par jour, est le total d'hier : c'est ce que
+ * `verifierAbsenceDePerte` contrôle, mois par mois.
+ */
+function repartirEntreClients(
+  m: Inconnu,
+  brutes: readonly Inconnu[],
+  rythmeMission: readonly Rythme[],
+  ajustementsMission: Readonly<Record<string, AjustementJour>>,
+  contexte: ContexteDeReprise
+): {
+  readonly rythmes: readonly Rythme[][];
+  readonly ajustements: readonly Record<string, AjustementJour>[];
+  readonly attribuees: number;
+  readonly partagees: number;
+  readonly inconnus: readonly string[];
+} {
+  const rang = new Map(brutes.map((e, i) => [texte(e['id']), i] as const).filter(([id]) => id !== ''));
+  const semaines = brutes.map((e) => objet(e['joursParSemaine']));
+  const tous = brutes.map((_, i) => i);
+  const parDefaut = (jour: JourDeSemaine, actifs: readonly number[]): number =>
+    actifs.find((i) => nombre(semaines[i]?.[jour]) > 0) ?? actifs[0] ?? 0;
+  const sansSemaine = (i: number) => !JOURS_SEMAINE.some((js) => nombre(semaines[i]?.[js]) > 0);
+
+  const attributions = attributionsDeLaMission(m);
+  const bornes = [
+    ...rythmeMission.flatMap((r) => [r.du, r.au]),
+    ...Object.keys(ajustementsMission), ...attributions.keys()
+  ].sort() as DateISO[];
+  if (bornes.length === 0) {
+    return {
+      rythmes: brutes.map(() => []), ajustements: brutes.map(() => ({})),
+      attribuees: 0, partagees: 0, inconnus: []
+    };
+  }
+  const dates = datesDe(bornes[0] as DateISO, bornes[bornes.length - 1] as DateISO);
+  const feries = feriesDe(dates);
+  const total = planifier(dates, {
+    rythmes: rythmeMission, ajustements: ajustementsMission, feries, conges: contexte.conges
+  });
+
+  const inconnus = new Set<string>();
+  /** Qui reçoit quelle part d'un jour travaillé, parmi les clients encore actifs. */
+  const partsDuJour = (date: DateISO, actifs: readonly number[]): [number, number][] => {
+    const qui = attributions.get(date);
+    const jour = jourDeSemaine(date);
+    if (qui === undefined) return [[parDefaut(jour, actifs), 1]];
+    const ids = qui.startsWith('SPLIT:') ? qui.slice(6).split(':') : [qui];
+    return ids.map((id) => {
+      const i = rang.get(id);
+      if (i === undefined) inconnus.add(id);
+      return [i ?? parDefaut(jour, actifs), 1 / ids.length];
+    });
+  };
+
+  /* Premier passage, tous actifs : le dernier jour de chacun jusqu'à la
+     dernière journée attribuée, et les jours où un autre a pris le sien. */
+  const derniereAttribuee = [...attributions.keys()].sort().pop() ?? '';
+  const dernierJour: (DateISO | undefined)[] = brutes.map(() => undefined);
+  const evinces: [number, DateISO][] = [];
+  let attribuees = 0;
+  let partagees = 0;
+  for (const j of total) {
+    if (j.retenu <= 0 || j.date > derniereAttribuee) continue;
+    const parts = partsDuJour(j.date, tous);
+    for (const [i] of parts) dernierJour[i] = j.date;
+    if (!attributions.has(j.date)) continue;
+    attribuees += 1;
+    if (parts.length > 1) partagees += 1;
+    /* Évincé : un autre a pris un jour qui lui revenait par défaut — ou, sans
+       semaine type, n'importe quel jour attribué où il n'est plus. */
+    const attendu = parDefaut(jourDeSemaine(j.date), tous);
+    for (const i of tous) {
+      if (parts.some(([k]) => k === i)) continue;
+      if (i === attendu || sansSemaine(i)) evinces.push([i, j.date]);
+    }
+  }
+  const arret = tous.map((i) => {
+    const fin = dernierJour[i];
+    return fin !== undefined && evinces.some(([k, d]) => k === i && d > fin) ? fin : undefined;
+  });
+  const actifsLe = (date: DateISO) =>
+    tous.filter((i) => arret[i] === undefined || date <= (arret[i] as DateISO));
+
+  /* (1) Les plages : chaque période, coupée au lendemain de chaque arrêt. */
+  const coupures = [...new Set(arret.filter((d): d is DateISO => d !== undefined)
+    .map((d) => decaler(d, 1)))].sort();
+  const rythmes: Rythme[][] = brutes.map(() => []);
+  for (const p of rythmeMission) {
+    const debuts = [p.du, ...coupures.filter((c) => c > p.du && c <= p.au)];
+    debuts.forEach((du, k) => {
+      const au = k + 1 < debuts.length ? decaler(debuts[k + 1] as DateISO, -1) : p.au;
+      const actifs = actifsLe(au);
+      for (const i of actifs) {
+        const parJour: Record<string, number> = {};
+        for (const js of JOURS_SEMAINE) {
+          const q = p.parJour[js] ?? 0;
+          if (q > 0 && parDefaut(js, actifs) === i) parJour[js] = q;
+        }
+        rythmes[i]?.push({ du, au, parJour, tjm: p.tjm });
+      }
+    });
+  }
+
+  /* (2)(3) Les corrections : la part de chacun, là où ses plages ne la prévoient pas. */
+  const cibles: Record<string, number>[] = brutes.map(() => ({}));
+  for (const j of total) {
+    if (j.retenu <= 0) continue;
+    for (const [i, part] of partsDuJour(j.date, actifsLe(j.date))) {
+      const c = cibles[i] as Record<string, number>;
+      c[j.date] = (c[j.date] ?? 0) + j.retenu * part;
+    }
+  }
+  const ajustements = brutes.map((_, i) => {
+    const prevu = planifier(dates, {
+      rythmes: rythmes[i] ?? [], ajustements: {}, feries, conges: contexte.conges
+    });
+    const poses: Record<string, AjustementJour> = {};
+    for (const j of prevu) {
+      const cible = cibles[i]?.[j.date] ?? 0;
+      if (cible !== j.retenu) poses[j.date] = { quotite: cible };
+    }
+    return poses;
+  });
+
+  return { rythmes, ajustements, attribuees, partagees, inconnus: [...inconnus] };
 }
 
 function rythmesDeLaMission(m: Inconnu): Rythme[] {
@@ -755,6 +933,17 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
   });
 
   const parNom = new Map(clients.map((cli) => [cli.nom, cli.id]));
+  // Les deux sources sont réunies : `mission.congesDates` est celle que
+  // l'application alimente, `treasury.conges` un format plus ancien qu'on
+  // ne perd pas pour rien. Lus AVANT les missions : la répartition des
+  // journées entre clients opérationnels compte un jour de congé comme le
+  // planning le comptera.
+  const conges = fusionnerConges(
+    congesDesMissions(missionsBrutes), extraireConges(objet(t['conges']))
+  );
+  const contexte: ContexteDeReprise = {
+    conges: Object.fromEntries(conges.map((c) => [c.date, c.quotite]))
+  };
 
   const missions: Mission[] = missionsBrutes.map((mBrut, i) => {
     const m = objet(mBrut);
@@ -777,7 +966,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       clientNom: nom,
       description: texte(m['description']),
       tjm: euros(nombre(m['tjm'])),
-      entites: entitesDeLaMission(m, `mission-${i}`),
+      entites: entitesDeLaMission(m, `mission-${i}`, contexte, anomalies, champsNonRepris),
       debut: dateOuNull(m['debut']),
       fin: dateOuNull(m['fin']),
       statut: statutMission(statutBrut)
@@ -833,12 +1022,7 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
     missions,
     recettes,
     depenses,
-    // Les deux sources sont réunies : `mission.congesDates` est celle que
-    // l'application alimente, `treasury.conges` un format plus ancien qu'on
-    // ne perd pas pour rien.
-    conges: fusionnerConges(
-      congesDesMissions(missionsBrutes), extraireConges(objet(t['conges']))
-    ),
+    conges,
     // L'ancienne application produisait un CRA en liste de numéros de jours,
     // sans phrase de tâches accomplies : il n'y a rien à reprendre, et une
     // note inventée depuis la description de mission dirait la même chose pour
@@ -1101,6 +1285,51 @@ export function verifierAbsenceDePerte(legacy: Inconnu, faits: Faits): readonly 
     );
   }
 
+  pertes.push(...journeesPerdues(missionsBrutes, faits));
+  return pertes;
+}
+
+/**
+ * Les journées d'hier et d'aujourd'hui, mission par mission et mois par mois.
+ *
+ * Les comptes ci-dessus ne voyaient pas les journées : une mission à deux
+ * clients pouvait en gagner une demie par semaine, ou les compter toutes deux
+ * fois, et le contrôle concluait « aucune perte ». Le total d'hier se lit sur
+ * la mission — son rythme et ses corrections, fériés et congés déduits —,
+ * celui d'aujourd'hui sur la somme de ses clients opérationnels.
+ */
+function journeesPerdues(missionsBrutes: readonly unknown[], faits: Faits): string[] {
+  const pertes: string[] = [];
+  const conges = Object.fromEntries(faits.conges.map((c) => [c.date, c.quotite]));
+  missionsBrutes.forEach((mBrut, i) => {
+    const m = objet(mBrut);
+    const migree = faits.missions.find((x) => x.id === (texte(m['id']) || `mis-${i}`));
+    if (migree === undefined) return;
+    const ancien = { rythmes: rythmesDeLaMission(m), ajustements: ajustementsDeLaMission(m) };
+    const bornes = [ancien, ...migree.entites]
+      .flatMap((f) => [...f.rythmes.flatMap((r) => [r.du, r.au]), ...Object.keys(f.ajustements)])
+      .sort() as DateISO[];
+    if (bornes.length === 0) return;
+    const dates = datesDe(bornes[0] as DateISO, bornes[bornes.length - 1] as DateISO);
+    const feries = feriesDe(dates);
+    const parMois = new Map<string, [number, number]>();
+    const compter = (f: Pick<ClientOperationnel, 'rythmes' | 'ajustements'>, cote: 0 | 1) => {
+      for (const j of planifier(dates, { ...f, feries, conges })) {
+        const mois = j.date.slice(0, 7);
+        const acc = parMois.get(mois) ?? [0, 0];
+        acc[cote] += j.retenu;
+        parMois.set(mois, acc);
+      }
+    };
+    compter(ancien, 0);
+    for (const e of migree.entites) compter(e, 1);
+    for (const [mois, [avant, apres]] of parMois) {
+      if (Math.abs(avant - apres) > 0.001) {
+        pertes.push(`Journées de la mission « ${migree.description || migree.clientNom} », ${mois} : `
+          + `${avant} en entrée, ${apres} en sortie.`);
+      }
+    }
+  });
   return pertes;
 }
 

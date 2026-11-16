@@ -91,7 +91,11 @@ export function NouvelleFacture(
   const [repris] = useState(() => (depuisBrouillon === null
     ? null
     : brouillonsDeFacture(faits, depuisBrouillon.mois)
-      .find((b) => b.clientNom === depuisBrouillon.clientNom) ?? null));
+      // La clé quand l'adresse la porte : deux brouillons peuvent partir au
+      // même payeur. Sinon le nom, comme les adresses d'avant le lot 31.
+      .find((b) => (depuisBrouillon.cle !== undefined
+        ? b.cle === depuisBrouillon.cle
+        : b.clientNom === depuisBrouillon.clientNom)) ?? null));
   /*
    * Le brouillon enregistré, lu lui aussi UNE fois. Ses lignes sont celles
    * qu'il a gardées ; un brouillon d'avant le schéma 20 (ou repris de

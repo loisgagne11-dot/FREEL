@@ -1,6 +1,8 @@
-import type { Euros, Mois, Ratio } from '../types';
+import type { DateISO, Euros, Mois, Ratio } from '../types';
 import { euros } from '../types';
 import type { LigneFacture } from './facture';
+import type { Rythme } from './planning';
+import { rythmePour } from './planification';
 
 /**
  * La facture du mois, avant qu'elle existe.
@@ -40,7 +42,100 @@ import type { LigneFacture } from './facture';
  * mission passée par une agence a les deux. Le regroupement suit donc celui
  * qui reçoit la facture, tandis que le détail des lignes garde le nom de qui
  * a occupé les journées.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * SAUF QUAND LA MISSION SE FACTURE CLIENT PAR CLIENT (décision 14)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une mission à plusieurs clients opérationnels peut aussi se facturer à
+ * chacun : B passe en direct en septembre, A reste derrière l'agence. Chaque
+ * journée part alors au payeur de la PLAGE qui la couvre, et chaque client
+ * opérationnel a son brouillon — même quand deux d'entre eux paient au même
+ * nom : la facture de l'un ne doit pas porter le volume de l'autre, pour la
+ * raison qui fait déjà un CRA par client. D'où la clé : le nom du payeur en
+ * commun, le payeur, la mission et le client opérationnel sinon.
  */
+
+/** Comment une mission à plusieurs clients se facture. Voir `Mission.facturation`. */
+export type ModeDeFacturation = 'commune' | 'par_client';
+
+/** Ce qu'une mission porte et que la lecture du payeur demande. */
+export interface PayeurDeMission {
+  /** Le payeur de la mission : celui qui reçoit la facture commune. */
+  readonly clientNom: string;
+  readonly facturation?: ModeDeFacturation;
+}
+
+/** Ce qu'une mission porte et que la facturation lit. */
+export interface MissionFacturee extends PayeurDeMission {
+  readonly id: string;
+}
+
+/**
+ * Le mode de facturation d'une mission — le seul lecteur du champ.
+ *
+ * Absent vaut `commune` : c'est ce que toute mission faisait avant le schéma
+ * 24. Lire l'absence ailleurs, à la main, finirait par la lire autrement.
+ */
+export function modeDeFacturation(m: { readonly facturation?: ModeDeFacturation }): ModeDeFacturation {
+  return m.facturation ?? 'commune';
+}
+
+/**
+ * Qui paie les journées d'une plage — le seul lecteur de `facturerA`.
+ *
+ * En commun, toujours le payeur de la mission : le champ est ignoré, et le
+ * lire quand même ferait éclater la facture qu'une agence attend unique. Par
+ * client, le payeur de la plage s'il en a un, celui de la mission sinon. Une
+ * journée qu'aucune plage ne couvre — une correction posée hors rythme — n'a
+ * pas d'autre payeur que celui de la mission.
+ */
+export function payeurDeLaPlage(r: Rythme | undefined, m: PayeurDeMission): string {
+  if (modeDeFacturation(m) === 'commune') return m.clientNom;
+  const payeur = r?.facturerA?.trim() ?? '';
+  return payeur !== '' ? payeur : m.clientNom;
+}
+
+/** Tous ceux qui peuvent recevoir une facture de cette mission, payeur de la mission compris. */
+export function payeursDeLaMission(
+  m: PayeurDeMission & { readonly entites: readonly { readonly rythmes: readonly Rythme[] }[] }
+): ReadonlySet<string> {
+  const payeurs = new Set([m.clientNom]);
+  for (const e of m.entites) for (const r of e.rythmes) payeurs.add(payeurDeLaPlage(r, m));
+  return payeurs;
+}
+
+/**
+ * Les journées d'un client opérationnel, réparties entre leurs payeurs.
+ *
+ * Chaque journée va au payeur de la plage qui la couvre — `rythmePour`, la
+ * même règle que le planning, pour que la plage qui paie soit celle qui a
+ * rempli la journée. En commun, une seule entrée : le payeur de la mission,
+ * avec toutes les journées.
+ *
+ * Une partition, jamais un partage : la somme des brouillons par client doit
+ * retomber exactement sur le brouillon commun, sans quoi passer d'un mode à
+ * l'autre ferait apparaître ou disparaître du chiffre d'affaires.
+ */
+export function ventilerParFacturation<J extends { readonly date: DateISO }>(
+  jours: readonly J[],
+  rythmes: readonly Rythme[],
+  m: MissionFacturee
+): ReadonlyMap<string, readonly J[]> {
+  const parPayeur = new Map<string, J[]>();
+  for (const j of jours) {
+    const payeur = payeurDeLaPlage(rythmePour(j.date, rythmes), m);
+    const groupe = parPayeur.get(payeur);
+    if (groupe === undefined) parPayeur.set(payeur, [j]);
+    else groupe.push(j);
+  }
+  return parPayeur;
+}
+
+/** La clé d'un brouillon : le payeur en commun ; payeur, mission et client opérationnel sinon. */
+export function cleDuBrouillon(payeur: string, m: MissionFacturee, entiteId: string): string {
+  return modeDeFacturation(m) === 'commune' ? payeur : `${payeur}\u00b7${m.id}\u00b7${entiteId}`;
+}
 
 /** Une ligne de facture, telle que le planning la produit. */
 export interface LigneDeBrouillon {
@@ -50,6 +145,8 @@ export interface LigneDeBrouillon {
   readonly libelle: string;
   /** Le client qui reçoit la facture — celui qui paie. */
   readonly clientNom: string;
+  /** Le brouillon où la ligne se range. Voir `cleDuBrouillon`. */
+  readonly cle: string;
   readonly jours: number;
   readonly montant: Euros;
 }
@@ -57,6 +154,11 @@ export interface LigneDeBrouillon {
 /** La facture du mois pour un client, telle qu'elle se présenterait. */
 export interface BrouillonDeFacture {
   readonly mois: Mois;
+  /**
+   * Ce qui désigne ce brouillon parmi ceux du mois. Le nom du payeur ne suffit
+   * plus : par client, deux brouillons peuvent partir au même nom.
+   */
+  readonly cle: string;
   readonly clientNom: string;
   readonly lignes: readonly LigneDeBrouillon[];
   readonly jours: number;
@@ -109,11 +211,16 @@ export interface FactureEmise {
 }
 
 /**
- * Rassemble les journées du mois en brouillons de facture, un par client.
+ * Rassemble les journées du mois en brouillons de facture, un par clé.
  *
  * `emisesParClient` associe un nom de client à la facture déjà émise pour ce
  * mois — son numéro ET son montant. Un brouillon dont le client y figure est
  * marqué, pas supprimé, et l'écart entre les deux montants est calculé.
+ *
+ * L'écart se mesure sur l'ENSEMBLE des brouillons d'un même payeur : une
+ * facture émise ne dit pas de quel client opérationnel elle portait les
+ * journées, et la comparer à un seul des brouillons du même nom ferait lire
+ * un écart qui n'existe pas.
  *
  * Les lignes sans journée ne produisent rien : facturer zéro jour n'est pas
  * une facture à zéro euro, c'est une facture qui n'a pas lieu d'être.
@@ -123,21 +230,25 @@ export function brouillonsDuMois(
   lignes: readonly LigneDeBrouillon[],
   emisesParClient: ReadonlyMap<string, FactureEmise> = new Map()
 ): readonly BrouillonDeFacture[] {
-  const parClient = new Map<string, LigneDeBrouillon[]>();
+  const parCle = new Map<string, LigneDeBrouillon[]>();
+  const parPayeur = new Map<string, number>();
 
   for (const l of lignes) {
     if (l.jours <= 0) continue;
-    const groupe = parClient.get(l.clientNom);
-    if (groupe === undefined) parClient.set(l.clientNom, [l]);
+    const groupe = parCle.get(l.cle);
+    if (groupe === undefined) parCle.set(l.cle, [l]);
     else groupe.push(l);
+    parPayeur.set(l.clientNom, (parPayeur.get(l.clientNom) ?? 0) + l.montant);
   }
 
-  return [...parClient.entries()]
-    .map(([clientNom, sesLignes]) => {
+  return [...parCle.entries()]
+    .map(([cle, sesLignes]) => {
+      const clientNom = (sesLignes[0] as LigneDeBrouillon).clientNom;
       const total = euros(sesLignes.reduce((s, l) => s + l.montant, 0));
       const emise = emisesParClient.get(clientNom);
       return {
         mois,
+        cle,
         clientNom,
         lignes: sesLignes,
         jours: sesLignes.reduce((s, l) => s + l.jours, 0),
@@ -145,7 +256,10 @@ export function brouillonsDuMois(
         dejaEmise: emise?.numero ?? null,
         ecart: emise === undefined
           ? null
-          : { facture: emise.montant, montant: euros(total - emise.montant) }
+          : {
+            facture: emise.montant,
+            montant: euros((parPayeur.get(clientNom) ?? 0) - emise.montant)
+          }
       };
     })
     // Le plus gros montant d'abord : c'est celui qu'on veut envoyer en premier,
