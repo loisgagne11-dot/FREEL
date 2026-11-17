@@ -44,6 +44,7 @@ Légende : ✅ fait · ◐ partiel · ⬜ pas fait.
 | 22 | Nom de domaine et hébergeur | ⬜ à décider avant le lot 60. L'hébergement actuel ne pose aucun en-tête et partage son origine | Un hébergeur de fichiers statiques qui pose des en-têtes, et un nom de domaine propre |
 | 23 | Identité de l'éditeur pour les mentions légales | ⬜ à fournir avant le lot 61, **hors dépôt** (variables de construction). À mesurer : publier en tant que professionnel affiche son nom et son adresse de domiciliation sur le site | `AUDIT-SECURITE.md` §8 |
 | 24 | Un seul « à te verser » | ✅ tranché le 16/11 : la « part gardée à chaque versement » **se fond dans la réserve**. Deux montants portaient le nom « à te verser » — disponible − réserve (Pilote, anneau) et ce même montant moins la part gardée (carte de la Trésorerie) — et ne coïncidaient que parce que la démo garde 0 %. Il n'en reste qu'un | Lot 49 : retrait du fait `partGardeeAuVersement`, migration, Réglages › Réserve |
+| 25 | Obligations : maquettes et périmètre du lot 53 | ✅ tranché le 17/11 : maquette téléphone (`design/direction/obligations-telephone.html`) validée, avec ses écarts appliqués au bureau (« + Saisir », faites repliées, ▲ en retard, SIRENE sans validité, vigilance « obtenue le », registres en pied, dossier de la prochaine obligation ouvert, « Déclarée le … pour … € » en un geste) ; date de la TVA autoliquidée corrigée sur la maquette validée (CA3 du mois suivant, pas le 31). Les dossiers non dessinés suivent le modèle URSSAF, montrés en capture avant la fusion. Le calendrier `.ics` porte les montants estimés, sans nom de client, avec un rappel 3 jours avant. Le profil Cipav sort du lot (lot 34-bis) ; aucun seuil de TVA propre aux avocats et auteurs (hors micro-social) ; le plafond de revenu fiscal du versement libératoire va dans Simulateurs | Lots 53, 34, 34-bis |
 
 ## Dates officielles relevées (11/11/2026)
 
@@ -163,6 +164,19 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Chaque ligne ouvre son dossier : URSSAF, TVA, déclaration européenne, CFE, impôt, et la déclaration de revenus (cases relevées sur le formulaire de l'année, en `hypothese` sinon) | ⬜ |
 | Pièces à fournir, chacune avec sa date de validité et son rappel : attestation de vigilance, responsabilité civile, avis de situation (seuils et périodicité à relever sur source officielle) | ⬜ |
 | Calendrier à s'abonner (`.ics`) : échéances, fins de mission, pièces qui expirent | ⬜ |
+
+### Lot 34-bis — Profil de cotisations Cipav (après le lot 53)
+
+| Ligne | État |
+|---|---|
+| « Ta caisse de retraite : Sécurité sociale des indépendants / Cipav » en Réglages, SSI par défaut, aide « indiquée sur ton attestation d'affiliation » ; barème Cipav en périodes datées et sourcées (23,2 % depuis le 01/07/2024, décret 2025-943) ; migration ; tests sur les deux profils et inventaire des indicateurs — sans liste de professions codée | ⬜ |
+| Plafond de revenu fiscal de référence du versement libératoire (2026 : 29 315 € par part, RFR 2024 ; majorations), en aide dans le comparateur des Simulateurs, publié année par année | ⬜ |
+
+### Hors lot, à ne pas perdre
+
+| Ligne | État |
+|---|---|
+| Trimestres de retraite validés par le chiffre d'affaires de l'année (`AUDIT-PRODUIT-ET-INTERFACE.md` §5, §F6) : aucun lot ne les porte | ⬜ à placer |
 
 ### Lot 48 — Mission enrichie et carnet de commandes
 
