@@ -43,6 +43,7 @@
 
 import { type DateISO, type Euros, type Mois, euros } from '../types';
 import { joursEntre } from '../dates';
+import { nemeJourOuvrable } from './calendrier.ouvres';
 
 /**
  * Les 27 États membres, par code ISO.
@@ -68,8 +69,19 @@ export const AMENDE_PAR_DECLARATION = {
   verifieLe: '2026-08-12' as DateISO
 };
 
-/** Jour du mois suivant avant lequel la déclaration doit être déposée. */
-export const JOUR_LIMITE = 10;
+/**
+ * Le rang du jour limite de dépôt : le DIXIÈME JOUR OUVRABLE du mois qui suit
+ * celui où la taxe est devenue exigible — CGI ann. III art. 96 N, pris pour
+ * l'application de CGI 289 B III, en vigueur depuis le 15/07/2010 ; relevé le
+ * 17/11/2026 :
+ * https://www.legifrance.gouv.fr/codes/section_lc/LEGITEXT000006069574/LEGISCTA000022496071/
+ *
+ * Ce module disait « le 10 du mois suivant », en jours calendaires. Le
+ * dixième jour ouvrable tombe toujours après le 10 — entre le 11 et le 15 en
+ * 2025 et en 2026 —, et l'écran annonçait donc la limite d'un à cinq jours
+ * trop tôt, puis comptait en retard une DES déposée à l'heure.
+ */
+export const RANG_JOUR_LIMITE = 10;
 
 export function estDansLUe(pays: string): boolean {
   return (ETATS_MEMBRES_UE.codes as readonly string[]).includes(pays.trim().toUpperCase());
@@ -128,18 +140,21 @@ export interface DeclarationDes {
    * quelque chose d'incomplet.
    */
   readonly anomalies: readonly AnomalieDes[];
-  /** Date limite de dépôt, au 10 du mois suivant. */
+  /** Date limite de dépôt : le dixième jour ouvrable du mois suivant. */
   readonly limiteLe: DateISO;
   /** `true` s'il n'y a ni ligne ni anomalie : aucune déclaration n'est due. */
   readonly sansObjet: boolean;
 }
 
-/** Le 10 du mois suivant celui déclaré. */
+/**
+ * Le dixième jour ouvrable du mois suivant celui déclaré, du lundi au SAMEDI :
+ * un samedi limite n'est pas reporté (le 11/07/2026 au calendrier de la
+ * douane). Voir `calendrier.ouvres`.
+ */
 export function limiteDepot(m: Mois): DateISO {
   const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) + 1;
-  const annee = Math.floor(total / 12);
-  const mois = String((total % 12) + 1).padStart(2, '0');
-  return `${annee}-${mois}-${String(JOUR_LIMITE).padStart(2, '0')}` as DateISO;
+  const suivant = `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;
+  return nemeJourOuvrable(suivant, RANG_JOUR_LIMITE);
 }
 
 /**

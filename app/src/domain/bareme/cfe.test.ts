@@ -141,6 +141,23 @@ describe('calendrier', () => {
   it('appelle l’acompte pile au seuil', () => {
     expect(acompteCfe(2026, euros(3000))).not.toBeNull();
   });
+
+  /**
+   * CGI ann. IV art. 199-0 : une date de paiement qui tombe un samedi, un
+   * dimanche ou un férié est prorogée au premier jour ouvrable suivant. Sans
+   * le report, la CFE de 2029 passait en retard le lundi 17 décembre — jour
+   * où elle est encore payable — et le rappel annonçait une majoration qui
+   * n'existe pas.
+   */
+  it('reporte au lundi un 15 décembre qui tombe un samedi, et le dit dans l’intitulé', () => {
+    expect(paiementCfe(2029).date).toBe('2029-12-17');
+    expect(paiementCfe(2029).intitule).toMatch(/17 décembre/);
+  });
+
+  it('reporte au lundi un acompte du 15 juin qui tombe un dimanche', () => {
+    expect(acompteCfe(2025, euros(3000))?.date).toBe('2025-06-16');
+    expect(acompteCfe(2031, euros(3000))?.date).toBe('2031-06-16');
+  });
 });
 
 /**

@@ -74,8 +74,9 @@ export function DeclarationServices({ idGroupe }: { idGroupe: string }) {
             Elle est due par celui qui <strong>vend</strong> un service à un
             professionnel établi dans un autre État membre — pas par celui qui
             en achète. Aucun seuil&nbsp;: une prestation de{' '}
-            <Montant>50&nbsp;€</Montant> suffit. Dépôt
-            au plus tard le 10 du mois suivant, sur le portail de la douane.
+            <Montant>50&nbsp;€</Montant> suffit. Dépôt au plus tard le
+            dixième jour ouvrable du mois suivant — samedis compris, et un
+            samedi limite n’est pas reporté —, sur le portail de la douane.
           </Info>
         </h2>
 
@@ -104,7 +105,9 @@ export function DeclarationServices({ idGroupe }: { idGroupe: string }) {
             <>
               <dl className={styles.detail}>
                 <div className={styles.ligne}>
-                  <dt>À déposer avant le</dt>
+                  {/* « Au plus tard », pas « avant » : le texte (CGI ann. III art. 96 N)
+                      compte le jour limite, et « avant le 12 » se lisait « le 11 ». */}
+                  <dt>À déposer au plus tard le</dt>
                   <dd>{dateCourte(declaration.limiteLe)}</dd>
                 </div>
                 <div className={`${styles.ligne} ${styles.total}`}>

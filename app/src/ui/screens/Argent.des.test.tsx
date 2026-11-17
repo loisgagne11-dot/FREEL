@@ -53,8 +53,9 @@ describe('prestations à déclarer', () => {
     // d'internationalisation : la comparer à une espace ordinaire ferait
     // échouer un affichage pourtant correct.
     expect(screen.getByText('Total à déclarer').nextSibling?.textContent).toMatch(/4\s000/u);
-    expect(screen.getByText('À déposer avant le').nextSibling?.textContent)
-      .toMatch(/10 août 2026/);
+    // Le dixième jour ouvrable d'août 2026, et non le 10 : CGI ann. III art. 96 N.
+    expect(screen.getByText('À déposer au plus tard le').nextSibling?.textContent)
+      .toMatch(/12 août 2026/);
   });
 
   // La DES est due par le vendeur : un achat à un prestataire étranger relève

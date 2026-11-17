@@ -1,4 +1,6 @@
 import { type DateISO, type Euros, type Resolution, dateISO, euros, mois } from '../types';
+import { dateDe } from '../calculs/calendrier';
+import { reporterAuJourOuvre } from '../calculs/calendrier.ouvres';
 
 /**
  * Le paiement du solde de l'impôt sur le revenu : combien de prélèvements, et
@@ -57,14 +59,16 @@ const VERIFIE_LE = dateISO('2026-11-11');
 
 /**
  * Une date approchée pour une année non relevée : le 25 du mois, ou le jour
- * ouvré suivant (samedi, dimanche, 25 décembre). Une hypothèse, dite comme
- * telle : la date exacte est sur l'avis.
+ * ouvré suivant. Une hypothèse, dite comme telle : la date exacte est sur
+ * l'avis.
+ *
+ * Le report passe par la source commune des jours ouvrés : cette fonction
+ * portait sa propre liste de fériés, réduite au 25 décembre — juste pour les
+ * quatre mois qu'elle sert, mais une deuxième définition du même jour finit
+ * toujours par servir ailleurs, et par y être fausse.
  */
 function vingtCinqOuvre(annee: number, mois: number): DateISO {
-  const d = new Date(Date.UTC(annee, mois - 1, 25));
-  const ferie = (x: Date) => x.getUTCMonth() === 11 && x.getUTCDate() === 25;
-  while (d.getUTCDay() === 0 || d.getUTCDay() === 6 || ferie(d)) d.setUTCDate(d.getUTCDate() + 1);
-  return dateISO(d.toISOString().slice(0, 10));
+  return reporterAuJourOuvre(dateDe(annee, mois, 25));
 }
 
 export interface PrelevementDuSolde {
