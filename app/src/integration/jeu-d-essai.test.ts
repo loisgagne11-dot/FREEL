@@ -398,7 +398,8 @@ describe('les périodes à déclarer', () => {
       ...jeu,
       periodesDeclarees: [
         ...jeu.periodesDeclarees,
-        ...(['2026-07', '2026-08', '2026-09'] as Mois[]).map((m) => ({ mois: m, declareeLe: null }))
+        ...(['2026-07', '2026-08', '2026-09'] as Mois[])
+          .map((m) => ({ nature: 'urssaf' as const, periode: m as string, declareeLe: null }))
       ]
     };
     expect(aTraiter(declare, le(2026, 12, 15)).some((s) => s.id === 'periodes-a-declarer')).toBe(false);

@@ -293,7 +293,7 @@ describe('état de l\'écran Pilote', () => {
   it('cesse de provisionner une période déclarée', () => {
     const base = { soldeInitial: euros(20000), recettes: [recette('a', 10000, '2026-07-10')] };
     const avant = etatPilote(faits(base), [], maintenant);
-    const apres = etatPilote(faits({ ...base, periodesDeclarees: [{ mois: mois('2026-07'), declareeLe: null }] }), [], maintenant);
+    const apres = etatPilote(faits({ ...base, periodesDeclarees: [{ nature: 'urssaf', periode: '2026-07', declareeLe: null }] }), [], maintenant);
     expect(avant.voletAProvisionner).toBeGreaterThan(0);
     expect(apres.voletAProvisionner).toBe(0);
   });

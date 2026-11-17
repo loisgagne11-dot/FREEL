@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Mois } from '../types';
-import { dateLimiteDeclaration, periodesADeclarer } from './declarations';
+import { appelsDeLaPeriode, dateLimiteDeclaration, periodesADeclarer } from './declarations';
 
 const enc = (encaisseeLe: string, montant = 1000) => ({ encaisseeLe, montant });
 const AUJOURDHUI = '2026-08-13';
@@ -145,3 +145,32 @@ describe('date limite de déclaration', () => {
   });
 });
 
+/**
+ * UN APPEL RÈGLE UNE PÉRIODE, PAR SON LIEN (schéma 25).
+ *
+ * Rapprochés par le mois de la limite, les appels de juin 2026 étaient
+ * revendiqués à la fois par avril (limite du dimanche 31 mai reportée au
+ * lundi 1er juin) et par mai (30 juin) : le « payée le » de l'un s'affichait
+ * sous l'autre, et une période impayée se lisait réglée.
+ */
+describe('les appels d’une période', () => {
+  const appel = (id: string, echeanceLe: string, periode: string | null) =>
+    ({ id, nature: 'urssaf', echeanceLe, periode });
+
+  it('avril et mai 2026 ne revendiquent plus les mêmes appels de juin', () => {
+    const juin = [appel('avril', '2026-06-01', '2026-04'), appel('mai', '2026-06-30', '2026-05')];
+    expect(appelsDeLaPeriode('2026-04', juin).map((a) => a.id)).toEqual(['avril']);
+    expect(appelsDeLaPeriode('2026-05', juin).map((a) => a.id)).toEqual(['mai']);
+  });
+
+  it('un appel du T4 2026 saisi au 31 janvier 2027 reste à sa période', () => {
+    expect(appelsDeLaPeriode('2026-T4', [appel('t4', '2027-01-31', '2026-T4')])).toHaveLength(1);
+  });
+
+  /* Un appel saisi à la main ne règle aucune période tant qu'on ne le dit pas :
+     son mois ne suffit plus à le rattacher. */
+  it('ignore un appel sans période et une échéance d’une autre nature', () => {
+    const autres = [appel('libre', '2026-06-01', null), { ...appel('tva', '2026-06-01', '2026-04'), nature: 'tva' }];
+    expect(appelsDeLaPeriode('2026-04', autres)).toEqual([]);
+  });
+});

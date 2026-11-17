@@ -52,7 +52,8 @@ describe('accord du Pilote et de l’échéancier', () => {
       ...faits,
       periodesDeclarees: periodesADeclarer(
         recettesEncaissees(faits), 'trimestriel', [], '2026-08-15', mois('2025-10')
-      ).filter((p) => p.close).flatMap((p) => p.mois).map((m) => ({ mois: m, declareeLe: null }))
+      ).filter((p) => p.close).flatMap((p) => p.mois)
+        .map((m) => ({ nature: 'urssaf' as const, periode: m as string, declareeLe: null }))
     };
     expect(aTraiter(toutDeclare, maintenant).some((s) => s.id === 'periodes-a-declarer')).toBe(false);
   });
@@ -94,7 +95,7 @@ describe('montant d’une déclaration', () => {
   it('arrive avec le sujet de la déclaration', () => {
     const declarees = ['2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06', '2025-07',
       '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03']
-      .map((m) => ({ mois: mois(m), declareeLe: null }));
+      .map((m) => ({ nature: 'urssaf' as const, periode: mois(m) as string, declareeLe: null }));
     const s = aTraiter({ ...base(), periodesDeclarees: declarees }, new Date('2026-07-10T09:00:00Z'))
       .find((x) => x.id === 'periodes-a-declarer');
     expect(s?.gravite).toBe('a_faire');

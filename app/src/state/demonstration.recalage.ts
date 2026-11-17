@@ -1,5 +1,5 @@
 import { type DateISO, dateISO, euros, mois } from '../domain/types';
-import { periodesADeclarer } from '../domain/calculs/declarations';
+import { ordreDesDeclarees, periodesADeclarer } from '../domain/calculs/declarations';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Faits, type Recette, motifRefusFaits } from './schema';
 import { completerFaits } from './schema.migrations';
@@ -139,7 +139,7 @@ export function recalerDemonstration(faits: Faits, aujourdhui: DateISO): Faits {
     const payee = faiteLe(limite);
     return [{
       id: `ech-urssaf-${p.id}`, nature: 'urssaf', montant: euros(montant),
-      echeanceLe: limite, payeeLe: payee, montantPaye: euros(montant)
+      echeanceLe: limite, payeeLe: payee, montantPaye: euros(montant), periode: p.id
     }];
   });
 
@@ -166,8 +166,10 @@ export function recalerDemonstration(faits: Faits, aujourdhui: DateISO): Faits {
   return {
     ...avecRecettes,
     periodesDeclarees: closes
-      .flatMap((p) => p.mois.map((m) => ({ mois: m, declareeLe: faiteLe(p.limite) })))
-      .sort((a, b) => a.mois.localeCompare(b.mois)),
+      .flatMap((p) => p.mois.map((m) => ({
+        nature: 'urssaf' as const, periode: m as string, declareeLe: faiteLe(p.limite)
+      })))
+      .sort(ordreDesDeclarees),
     echeances: [...decale.echeances.filter((e) => e.nature !== 'urssaf'), ...paiements, ...cfe]
   };
 }

@@ -47,27 +47,59 @@ export function dateDeDeclaration(
 ): DateISO | null {
   let derniere: DateISO | null = null;
   for (const m of mois) {
-    const le = declarees.find((p) => p.mois === m)?.declareeLe ?? null;
+    const le = declarees.find((p) => p.nature === 'urssaf' && p.periode === m)?.declareeLe ?? null;
     if (le === null) return null;
     if (derniere === null || le > derniere) derniere = le;
   }
   return derniere;
 }
 
+/** Un ordre stable des déclarations : par nature, puis par période. */
+export const ordreDesDeclarees = (a: PeriodeDeclaree, b: PeriodeDeclaree): number =>
+  a.nature.localeCompare(b.nature) || a.periode.localeCompare(b.periode);
+
 /**
- * Les appels de cotisations qui règlent une période : ceux dont l'échéance
- * tombe dans le mois de la date limite — la déclaration et le paiement se
- * font ensemble, le mois qui suit la période.
+ * Les appels de cotisations qui règlent une période : ceux qui la portent
+ * (`Echeance.periode`, schéma 25).
  *
- * Dérivé, et non un lien stocké : une échéance ne porte pas sa période, et
- * lui en ajouter une aurait fait deux vérités à tenir d'accord (sa date, sa
- * période). Le rapprochement par le mois est celui que l'URSSAF applique.
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN LIEN STOCKÉ, PARCE QUE LE MOIS NE SUFFIT PLUS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Jusqu'au schéma 24, l'appel se rapprochait par le mois de la date limite :
+ * la déclaration et le paiement se font ensemble, le mois qui suit la
+ * période. C'était juste tant que la limite ne bougeait pas. Reportée au jour
+ * ouvré, elle change de mois : la limite d'avril 2026 (dimanche 31 mai) passe
+ * au lundi 1er juin, celle de mai tombe le 30 juin — et les deux périodes
+ * revendiquaient les mêmes appels de juin, dont le « payée le » se lisait
+ * deux fois. Celle du T4 2026 (dimanche 31 janvier 2027) passe en février,
+ * et l'appel saisi au 31 janvier n'appartenait plus à personne.
+ *
+ * Un appel règle UNE période : c'est un fait de l'appel, posé quand la
+ * déclaration le crée, et non une déduction de sa date.
  */
-export function appelsDeLaPeriode<E extends { readonly nature: string; readonly echeanceLe: string }>(
-  limite: DateISO, echeances: readonly E[]
+export function appelsDeLaPeriode<E extends { readonly nature: string; readonly periode?: string | null }>(
+  periode: string, echeances: readonly E[]
 ): readonly E[] {
-  const moisLimite = limite.slice(0, 7);
-  return echeances.filter((e) => e.nature === 'urssaf' && e.echeanceLe.startsWith(moisLimite));
+  return echeances.filter((e) => e.nature === 'urssaf' && e.periode === periode);
+}
+
+/**
+ * La période qu'un appel réglait sous la règle d'avant le schéma 25 : celle
+ * dont la limite — dernier jour du mois suivant, sans report — tombait dans
+ * le mois de l'appel. Ne sert qu'à la migration, pour poser le lien que
+ * l'ancienne règle faisait à la lecture : rien de ce qu'on voyait ne change.
+ *
+ * `null` quand aucune période ne finissait le mois d'avant — un appel de mai
+ * en trimestriel : l'ancienne règle ne le rattachait à rien, la migration non
+ * plus.
+ */
+export function periodeSelonLeMoisDeLAppel(echeanceLe: string, periodicite: Periodicite): string | null {
+  const total = Number(echeanceLe.slice(0, 4)) * 12 + (Number(echeanceLe.slice(5, 7)) - 1) - 1;
+  if (!Number.isFinite(total)) return null;
+  const precedent = `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+  if (periodicite === 'mensuel') return precedent;
+  return (total % 12) % 3 === 2 ? clePeriode(precedent, 'trimestriel') : null;
 }
 
 export interface PeriodeADeclarer {

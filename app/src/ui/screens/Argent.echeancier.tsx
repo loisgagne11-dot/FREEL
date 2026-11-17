@@ -183,7 +183,7 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
                       onChange={(e) => {
                         const saisie = e.target.value;
                         if (saisie !== '' && saisie > dateDuJour()) return;
-                        declarerPeriode(p.mois, saisie === '' ? null : saisie as DateISO);
+                        declarerPeriode('urssaf', p.mois, saisie === '' ? null : saisie as DateISO);
                       }}
                     />
                   </label>
@@ -192,7 +192,7 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
                     type="button"
                     className={styles.actionLigne}
                     onClick={() => {
-                      annulerDeclaration(p.mois);
+                      annulerDeclaration('urssaf', p.mois);
                       signaler(`${p.libelle} n’est plus marquée déclarée.`);
                     }}
                   >
@@ -211,7 +211,7 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
                     onClick={() => {
                       // Datée du jour : on la coche en sortant du site de
                       // l'URSSAF. Le champ qui apparaît la corrige.
-                      declarerPeriode(p.mois, dateDuJour());
+                      declarerPeriode('urssaf', p.mois, dateDuJour());
                       signaler(`${p.libelle} marquée déclarée aujourd’hui.`);
                     }}
                   >
@@ -244,7 +244,7 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
  */
 function SuiteDuCycle({ periode: p }: { periode: PeriodeADeclarer }) {
   const echeances = useFaits((e) => e.faits.echeances);
-  const appels = appelsDeLaPeriode(p.limite, echeances);
+  const appels = appelsDeLaPeriode(p.id, echeances);
   if (appels.length === 0) return null;
 
   const impayes = appels.filter((e) => !estPayee(e));

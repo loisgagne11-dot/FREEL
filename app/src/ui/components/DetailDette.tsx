@@ -142,7 +142,7 @@ function Ligne({ ligne }: { readonly ligne: LigneDette }) {
   function declarer(): void {
     // Datée du jour : c'est en sortant du site de l'URSSAF qu'on la coche.
     // La date se corrige dans l'échéancier.
-    declarerPeriode([ligne.mois], dateDuJour());
+    declarerPeriode('urssaf', [ligne.mois], dateDuJour());
     signaler(
       `${moisLong(ligne.mois)} marqué déclaré. Sa dette quitte l’estimation `
       + 'et attend son appel.'

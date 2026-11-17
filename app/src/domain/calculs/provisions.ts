@@ -110,6 +110,27 @@ export interface Echeance {
    * entiers) et retrouve son ancien comportement.
    */
   readonly exercice?: number | undefined;
+  /**
+   * La période URSSAF que cet appel règle (schéma 25) : `AAAA-MM` en mensuel,
+   * `AAAA-Tn` en trimestriel — l'identifiant de `PeriodeADeclarer`.
+   *
+   * Un LIEN, et non plus un rapprochement par le mois de la date limite : une
+   * limite reportée au jour ouvré change de mois, et deux périodes se
+   * disputaient alors les mêmes appels (voir `appelsDeLaPeriode`).
+   *
+   * Trois états, qui ne se confondent pas :
+   *  · une période — l'appel que sa déclaration a créé, ou que la migration a
+   *    rattaché par l'ancienne règle ;
+   *  · `null` — un appel URSSAF qui ne règle aucune période : saisi à la main
+   *    (régularisation, majoration), ou que l'ancienne règle ne rattachait à
+   *    rien ;
+   *  · absent — une échéance d'une autre nature, ou un appel URSSAF d'avant le
+   *    schéma 25 que la migration n'a pas encore vu. `null` et absent ne
+   *    sont pas le même fait : seul l'absent se rattache à la migration, et un
+   *    appel volontairement sans période ne doit pas se retrouver rattaché
+   *    parce qu'un compte a été relu.
+   */
+  readonly periode?: string | null;
 }
 
 /** L'année de revenus qu'une échéance règle : son exercice, sinon l'année de sa date. */

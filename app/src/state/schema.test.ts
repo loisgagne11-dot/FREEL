@@ -976,11 +976,12 @@ describe('schéma 19 → 20 : les lignes des factures', () => {
  * bancaire ressort `ignoree: false` : le geste n'existait pas.
  */
 describe('schéma 20 → 21 : la déclaration datée, l’opération ignorée', () => {
+  /* Le mois nu traverse aussi le schéma 25 : il en sort déclaration URSSAF. */
   it('une période déclarée de schéma 20 devient une période à date inconnue', () => {
     const f = completerFaits({ version: 20, periodesDeclarees: ['2026-05', '2026-04'] });
     expect(f.periodesDeclarees).toEqual([
-      { mois: '2026-04', declareeLe: null },
-      { mois: '2026-05', declareeLe: null }
+      { nature: 'urssaf', periode: '2026-04', declareeLe: null },
+      { nature: 'urssaf', periode: '2026-05', declareeLe: null }
     ]);
   });
 
@@ -990,7 +991,7 @@ describe('schéma 20 → 21 : la déclaration datée, l’opération ignorée', 
       version: 20,
       periodesDeclarees: ['2026-05', { mois: '2026-05', declareeLe: '2026-06-12' }]
     });
-    expect(f.periodesDeclarees).toEqual([{ mois: '2026-05', declareeLe: '2026-06-12' }]);
+    expect(f.periodesDeclarees).toEqual([{ nature: 'urssaf', periode: '2026-05', declareeLe: '2026-06-12' }]);
   });
 
   it('un mouvement de schéma 20 reçoit `ignoree: false`, et non `undefined`', () => {
@@ -1007,7 +1008,7 @@ describe('schéma 20 → 21 : la déclaration datée, l’opération ignorée', 
     expect(motifRefusFaits({ ...faitsVides(), periodesDeclarees: ['2026-05'] }))
       .toMatch(/periodesDeclarees/);
     expect(motifRefusFaits({
-      ...faitsVides(), periodesDeclarees: [{ mois: '2026-05', declareeLe: null }]
+      ...faitsVides(), periodesDeclarees: [{ nature: 'urssaf', periode: '2026-05', declareeLe: null }]
     })).toBeNull();
   });
 });
@@ -1046,9 +1047,9 @@ describe('schéma 22 → 23 : le motif « mis de côté pour l’impôt »', () 
 
   it('un dossier d’un schéma postérieur est refusé', () => {
     expect(motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 })).not.toBeNull();
-    // 24 depuis le lot 31 : la facturation par client. L'attente suit le
+    // 25 depuis le lot 53 : la déclaration généralisée. L'attente suit le
     // numéro, elle ne le fige pas — ce test dit qu'un saut se voit.
-    expect(VERSION_SCHEMA).toBe(24);
+    expect(VERSION_SCHEMA).toBe(25);
   });
 });
 
@@ -1079,7 +1080,7 @@ describe('schéma 23 → 24 : la facturation par client', () => {
     const [mission] = faits.missions;
     expect(mission?.facturation).toBe('commune');
     expect(mission?.entites[0]?.rythmes.map((r) => r.facturerA)).toEqual([null, null]);
-    expect(faits.version).toBe(24);
+    expect(faits.version).toBe(VERSION_SCHEMA);
   });
 
   it('garde un payeur et un mode déjà posés', () => {
@@ -1124,8 +1125,99 @@ describe('schéma 23 → 24 : la facturation par client', () => {
     expect(motifRefusFaits({ ...faitsVides(), missions: [nomme] })).toBeNull();
   });
 
-  /** Une version 24 qui chargerait un dossier 25 en effacerait ce qu'elle ne sait pas lire. */
-  it('refuse un dossier au schéma 25', () => {
-    expect(motifRefusFaits({ ...faitsVides(), version: 25 })).toMatch(/schéma 25/);
+});
+
+/**
+ * Schéma 25 (lot 53) : la déclaration généralisée, le lien d'un appel à sa
+ * période, les faits de TVA, les pièces à fournir.
+ *
+ * La période déclarée et le lien vivent dans des ÉLÉMENTS de liste : la
+ * fusion de surface les laisserait passer faux. Et le lien doit redonner
+ * EXACTEMENT ce que l'ancienne règle montrait — sinon un « payée le » affiché
+ * hier disparaît à la mise à jour, sans un mot.
+ */
+describe('schéma 24 → 25 : déclarations, appels liés, TVA, pièces', () => {
+  const appel = (id: string, echeanceLe: string, autres: Record<string, unknown> = {}) => ({
+    id, nature: 'urssaf', montant: 900, echeanceLe, payeeLe: null, montantPaye: null, ...autres
+  });
+  const trimestriel = { nom: 'Atelier', urssafPeriodicite: 'trimestriel' };
+
+  it('une période déclarée de schéma 24 devient une déclaration URSSAF, au mois, sa date gardée', () => {
+    const f = completerFaits({
+      version: 24, periodesDeclarees: [{ mois: '2026-05', declareeLe: '2026-06-28' }, { mois: '2026-04', declareeLe: null }]
+    });
+    expect(f.periodesDeclarees).toEqual([
+      { nature: 'urssaf', periode: '2026-04', declareeLe: null },
+      { nature: 'urssaf', periode: '2026-05', declareeLe: '2026-06-28' }
+    ]);
+  });
+
+  /* Une nature qu'aucune version n'écrit ne serait jamais relue : elle ne
+     ferait que voyager d'un appareil à l'autre. */
+  it('écarte une nature inconnue, et ne garde qu’une fois une déclaration en double', () => {
+    const f = completerFaits({
+      version: 24,
+      periodesDeclarees: [
+        { nature: 'tva_imaginaire', periode: '2026-05', declareeLe: null },
+        { nature: 'des', periode: '2026-05', declareeLe: null },
+        { nature: 'des', periode: '2026-05', declareeLe: '2026-06-10' }
+      ]
+    });
+    expect(f.periodesDeclarees).toEqual([{ nature: 'des', periode: '2026-05', declareeLe: '2026-06-10' }]);
+  });
+
+  /**
+   * L'ancienne règle, appliquée une fois et écrite. Le T4 2026 se déclarait
+   * jusqu'au dimanche 31 janvier 2027 : reportée au jour ouvré, sa limite
+   * passe en février, et un rapprochement par le mois aurait laissé l'appel
+   * du 31 janvier sans période. Le lien, lui, ne bouge pas.
+   */
+  it('rattache chaque appel URSSAF à la période que l’ancienne règle lui donnait', () => {
+    const t = completerFaits({
+      version: 24, entreprise: trimestriel,
+      echeances: [appel('t4', '2027-01-31'), appel('t1', '2026-04-30'), appel('mai', '2026-05-05')]
+    }).echeances;
+    expect(t.map((e) => e.periode)).toEqual(['2026-T4', '2026-T1', null]);
+    const m = completerFaits({ version: 24, echeances: [appel('juin', '2026-06-01'), appel('jan', '2027-01-15')] }).echeances;
+    expect(m.map((e) => e.periode)).toEqual(['2026-05', '2026-12']);
+  });
+
+  /* `null` est un choix — un appel saisi à la main, qui ne règle aucune
+     période. Le relire ne doit pas le rattacher par l'ancienne règle. */
+  it('ne rattache pas de nouveau un appel déjà lié, ni un appel volontairement sans période', () => {
+    const f = completerFaits({
+      version: 25, entreprise: trimestriel,
+      echeances: [appel('lie', '2026-07-31', { periode: '2026-T1' }), appel('libre', '2026-07-31', { periode: null })]
+    });
+    expect(f.echeances.map((e) => e.periode)).toEqual(['2026-T1', null]);
+  });
+
+  it('ne donne aucune période à une échéance d’une autre nature', () => {
+    const f = completerFaits({ version: 24, echeances: [{ ...appel('cfe', '2026-12-15'), nature: 'cfe' }] });
+    expect(f.echeances[0]).not.toHaveProperty('periode');
+  });
+
+  /* Le nom de l'exploitant n'est pas deviné depuis l'enseigne : vide, il se
+     demande. Le régime simplifié est celui d'un micro-entrepreneur qui
+     devient redevable ; un réel normal ne se suppose pas. */
+  it('un compte de schéma 24 reçoit le régime simplifié, aucune option, un nom vide, aucune pièce', () => {
+    const f = completerFaits({ version: 24, entreprise: { nom: 'Atelier de démonstration' } });
+    expect(f.entreprise).toMatchObject({ regimeTva: 'simplifie', ca3Mensuelle: false, nomExploitant: '' });
+    expect(f.pieces).toEqual([]);
+  });
+
+  it('refuse, au schéma courant, une période déclarée d’avant le schéma 25', () => {
+    expect(motifRefusFaits({ ...faitsVides(), periodesDeclarees: [{ mois: '2026-05', declareeLe: null }] }))
+      .toMatch(/periodesDeclarees/);
+  });
+
+  it('refuse, au schéma courant, une pièce qui n’est pas un enregistrement', () => {
+    expect(motifRefusFaits({ ...faitsVides(), pieces: ['vigilance'] })).toMatch(/pieces/);
+    expect(motifRefusFaits({ ...faitsVides(), pieces: {} })).toMatch(/pieces/);
+  });
+
+  /** Une version 25 qui chargerait un dossier 26 en effacerait ce qu'elle ne sait pas lire. */
+  it('refuse un dossier au schéma 26', () => {
+    expect(motifRefusFaits({ ...faitsVides(), version: 26 })).toMatch(/schéma 26/);
   });
 });

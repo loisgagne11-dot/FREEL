@@ -19,7 +19,7 @@
     "invalide) — invariant n°6 : le dépôt est public, aucune donnée personnelle",
     "n'y entre."
   ],
-  "version": 24,
+  "version": 25,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "prenom": "Camille",
@@ -41,7 +41,10 @@
     "urssafPeriodicite": "trimestriel",
     "onboardingFait": true,
     "plateformeAgreee": null,
-    "optionTvaDebits": false
+    "optionTvaDebits": false,
+    "regimeTva": "simplifie",
+    "ca3Mensuelle": false,
+    "nomExploitant": ""
   },
   "clients": [
     {
@@ -941,27 +944,33 @@
   "objectifCaAnnuel": 72000,
   "periodesDeclarees": [
     {
-      "mois": "2025-10",
+      "nature": "urssaf",
+      "periode": "2025-10",
       "declareeLe": "2026-01-29"
     },
     {
-      "mois": "2025-11",
+      "nature": "urssaf",
+      "periode": "2025-11",
       "declareeLe": "2026-01-29"
     },
     {
-      "mois": "2025-12",
+      "nature": "urssaf",
+      "periode": "2025-12",
       "declareeLe": "2026-01-29"
     },
     {
-      "mois": "2026-01",
+      "nature": "urssaf",
+      "periode": "2026-01",
       "declareeLe": "2026-04-28"
     },
     {
-      "mois": "2026-02",
+      "nature": "urssaf",
+      "periode": "2026-02",
       "declareeLe": "2026-04-28"
     },
     {
-      "mois": "2026-03",
+      "nature": "urssaf",
+      "periode": "2026-03",
       "declareeLe": "2026-04-28"
     }
   ],
@@ -972,7 +981,8 @@
       "montant": 840.84,
       "echeanceLe": "2026-01-31",
       "payeeLe": "2026-01-29",
-      "montantPaye": 840.84
+      "montantPaye": 840.84,
+      "periode": "2025-T4"
     },
     {
       "id": "ech-urssaf-t1",
@@ -980,7 +990,8 @@
       "montant": 1483.52,
       "echeanceLe": "2026-04-30",
       "payeeLe": "2026-04-28",
-      "montantPaye": 1483.52
+      "montantPaye": 1483.52,
+      "periode": "2026-T1"
     }
   ],
   "configImpotBrute": {},
@@ -988,5 +999,31 @@
   "partsFiscales": null,
   "autresRevenusFoyer": null,
   "versementPerDeductible": null,
-  "impositionCommune": null
+  "impositionCommune": null,
+  "pieces": [
+    {
+      "id": "piece-vigilance",
+      "sorte": "vigilance",
+      "libelle": "Attestation de vigilance URSSAF",
+      "obtenueLe": "2026-05-04",
+      "valableJusquau": null,
+      "provisoire": false
+    },
+    {
+      "id": "piece-rc-pro",
+      "sorte": "rc_pro",
+      "libelle": "Responsabilité civile professionnelle — assureur de démonstration",
+      "obtenueLe": "2026-01-05",
+      "valableJusquau": "2026-12-31",
+      "provisoire": false
+    },
+    {
+      "id": "piece-sirene",
+      "sorte": "sirene",
+      "libelle": "Avis de situation SIRENE",
+      "obtenueLe": "2026-04-15",
+      "valableJusquau": null,
+      "provisoire": false
+    }
+  ]
 }

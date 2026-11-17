@@ -32,9 +32,10 @@
    magasin les charge au même moment, et un second chargement à la demande
    coûtait au paquet d'entrée ce qui le faisait dépasser (lot 59). */
 export { motifRefusExterieur } from './schema.exterieur';
-import type { DateISO, Euros, Mois } from '../domain/types';
+import type { DateISO, Euros } from '../domain/types';
 import type { MotifSansContrepartie, MouvementBancaire } from '../domain/calculs/banque';
-import type { PeriodeDeclaree } from '../domain/calculs/declarations.declarees';
+import type { NatureDeclaration, PeriodeDeclaree } from '../domain/calculs/declarations.declarees';
+import { ordreDesDeclarees, periodeSelonLeMoisDeLAppel } from '../domain/calculs/declarations';
 import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
 import {
@@ -289,7 +290,9 @@ function mouvementsDuSchema4(brut: unknown): readonly MouvementBancaire[] {
  * des mouvements. La règle est acquise et se vérifie à chaque fois : une
  * migration descend jusqu'où les champs ont bougé.
  */
-function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
+function echeancesDuSchema5(
+  brut: unknown, periodicite: 'mensuel' | 'trimestriel'
+): readonly Echeance[] {
   if (!Array.isArray(brut)) return [];
   return brut.flatMap((e): Echeance[] => {
     if (typeof e !== 'object' || e === null) return [];
@@ -306,9 +309,38 @@ function echeancesDuSchema5(brut: unknown): readonly Echeance[] {
       payeeLe,
       montantPaye: typeof o['montantPaye'] === 'number' && Number.isFinite(o['montantPaye'])
         ? o['montantPaye'] as Euros
-        : null
+        : null,
+      ...periodeDuSchema24(o, echeanceLe, periodicite)
     }];
   });
+}
+
+/**
+ * v24 → v25 : l'appel URSSAF porte la période qu'il règle.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POSER LE LIEN QUE L'ANCIENNE RÈGLE FAISAIT À LA LECTURE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Jusqu'ici, la période d'un appel se devinait à chaque lecture : celle dont
+ * la limite tombait dans le mois de l'appel. La migration applique UNE fois
+ * cette même règle et l'écrit (`periodeSelonLeMoisDeLAppel`) : chaque « payée
+ * le … » affiché hier l'est encore demain, au même endroit. Ensuite, plus rien
+ * ne se rapproche par le mois — la limite reportée au jour ouvré en change, et
+ * deux périodes se disputaient les mêmes appels.
+ *
+ * Seul un appel URSSAF SANS le champ est rattaché. Un `null` est un choix
+ * (appel saisi à la main, qui ne règle aucune période) : le relire ne doit pas
+ * le rattacher. Une autre nature ne règle aucune période URSSAF ; le champ
+ * reste absent. Une valeur qui n'est pas une chaîne vient d'un fichier abîmé :
+ * `null`, plutôt qu'un lien qui ne mènerait nulle part.
+ */
+function periodeDuSchema24(
+  o: Record<string, unknown>, echeanceLe: DateISO | null, periodicite: 'mensuel' | 'trimestriel'
+): Pick<Echeance, 'periode'> {
+  if (o['nature'] !== 'urssaf') return {};
+  if ('periode' in o) return { periode: typeof o['periode'] === 'string' ? o['periode'] : null };
+  return { periode: echeanceLe === null ? null : periodeSelonLeMoisDeLAppel(echeanceLe, periodicite) };
 }
 
 /**
@@ -535,41 +567,54 @@ function recettesDuSchema19(recettes: readonly Recette[]): readonly Recette[] {
 
 /**
  * v20 → v21 : la période déclarée porte sa date.
+ * v24 → v25 : et sa nature — la DES, la TVA, la déclaration de revenus
+ * se déclarent aussi.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LA LISTE EST LÀ, DONC LA FUSION DE SURFACE LA LAISSE PASSER — FAUSSE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * `periodesDeclarees` valait `['2026-04', …]` ; elle vaut désormais
- * `[{ mois, declareeLe }]`. Sans conversion, `p.mois` vaudrait `undefined`
- * sur chaque élément : plus aucune période ne serait reconnue déclarée, le
- * Pilote les réclamerait toutes à nouveau et les provisions remonteraient de
- * toute la dette déjà déclarée — donc déjà appelée, donc comptée deux fois.
+ * `periodesDeclarees` valait `['2026-04', …]`, puis `[{ mois, declareeLe }]` ;
+ * elle vaut désormais `[{ nature, periode, declareeLe }]`. Sans conversion,
+ * `p.nature` vaudrait `undefined` sur chaque élément : plus aucune période ne
+ * serait reconnue déclarée, le Pilote les réclamerait toutes à nouveau et les
+ * provisions remonteraient de toute la dette déjà déclarée — donc déjà
+ * appelée, donc comptée deux fois. Tout ce qui précède le schéma 25 était une
+ * déclaration URSSAF, au mois : c'est ce qu'elle devient.
  *
  * La date est `null`, jamais devinée : ni la date limite (ce serait affirmer
- * que tout a été déclaré à l'heure), ni le jour de la migration. Un mois en
- * double n'est gardé qu'une fois, et celui qui porte une date l'emporte.
+ * que tout a été déclaré à l'heure), ni le jour de la migration. Une période
+ * en double n'est gardée qu'une fois, et celle qui porte une date l'emporte.
+ * Une nature inconnue — un fichier fabriqué — est écartée : elle ne serait
+ * jamais relue, et ne ferait que voyager.
  */
-function periodesDeclareesDuSchema20(brut: unknown): readonly PeriodeDeclaree[] {
+const NATURES_CONNUES: ReadonlySet<string> = new Set<NatureDeclaration>(
+  ['urssaf', 'des', 'ca3', 'ca12', 'revenus', 'cfe_1447c']
+);
+
+function periodesDeclareesDuSchema24(brut: unknown): readonly PeriodeDeclaree[] {
   if (!Array.isArray(brut)) return [];
-  const parMois = new Map<string, PeriodeDeclaree>();
+  const parCle = new Map<string, PeriodeDeclaree>();
   for (const p of brut) {
     let periode: PeriodeDeclaree | null = null;
-    if (typeof p === 'string') periode = { mois: p as Mois, declareeLe: null };
+    if (typeof p === 'string') periode = { nature: 'urssaf', periode: p, declareeLe: null };
     else if (typeof p === 'object' && p !== null) {
       const o = p as Record<string, unknown>;
-      if (typeof o['mois'] === 'string') {
-        periode = {
-          mois: o['mois'] as Mois,
-          declareeLe: typeof o['declareeLe'] === 'string' ? o['declareeLe'] as DateISO : null
-        };
+      const declareeLe = typeof o['declareeLe'] === 'string' ? o['declareeLe'] as DateISO : null;
+      if (typeof o['nature'] === 'string' && typeof o['periode'] === 'string') {
+        if (NATURES_CONNUES.has(o['nature'])) {
+          periode = { nature: o['nature'] as NatureDeclaration, periode: o['periode'], declareeLe };
+        }
+      } else if (typeof o['mois'] === 'string') {
+        periode = { nature: 'urssaf', periode: o['mois'], declareeLe };
       }
     }
     if (periode === null) continue;
-    const deja = parMois.get(periode.mois);
-    if (deja === undefined || deja.declareeLe === null) parMois.set(periode.mois, periode);
+    const cle = `${periode.nature} ${periode.periode}`;
+    const deja = parCle.get(cle);
+    if (deja === undefined || deja.declareeLe === null) parCle.set(cle, periode);
   }
-  return [...parMois.values()].sort((a, b) => a.mois.localeCompare(b.mois));
+  return [...parCle.values()].sort(ordreDesDeclarees);
 }
 
 /**
@@ -658,7 +703,7 @@ function periodesDeclareesDuSchema20(brut: unknown): readonly PeriodeDeclaree[] 
  * 18 reçoit un prénom vide, et non `undefined` ».
  *
  * v20 → v21 : deux champs qui bougent DANS des listes — la période déclarée
- * devient un enregistrement daté (`periodesDeclareesDuSchema20`), l'opération
+ * devient un enregistrement daté (`periodesDeclareesDuSchema24`), l'opération
  * du relevé gagne `ignoree` (`mouvementsDuSchema4`, qui parcourt déjà chaque
  * mouvement).
  *
@@ -668,6 +713,15 @@ function periodesDeclareesDuSchema20(brut: unknown): readonly PeriodeDeclaree[] 
  * plage (`rythmesDuSchema23`, appelé par `entitesDuSchema3`, le comble à
  * `null`). La migration descend jusqu'à la plage, parce que c'est là que le
  * champ a bougé.
+ *
+ * v24 → v25 : trois choses dans des listes, deux au profil. La période
+ * déclarée gagne sa nature (`periodesDeclareesDuSchema24`) ; l'appel URSSAF,
+ * la période qu'il règle (`periodeDuSchema24`, depuis `echeancesDuSchema5`,
+ * qui parcourt déjà chaque échéance) ; `pieces` est une liste de PREMIER
+ * niveau, comblée vide par la fusion de surface — aucun compte d'avant n'en
+ * portait. `regimeTva`, `ca3Mensuelle` et `nomExploitant` sont des champs du
+ * profil, comblés par `entrepriseVide()` : régime simplifié, pas d'option,
+ * nom vide — à demander, jamais deviné.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
@@ -693,8 +747,11 @@ export function completerFaits(brut: unknown): Faits {
        pour une valeur qu'aucun d'eux n'a encore saisie. */
     missions: missionsDuSchema1(o['missions']),
     mouvementsBancaires: mouvementsDuSchema4(o['mouvementsBancaires']),
-    echeances: echeancesDuSchema5(o['echeances']),
-    periodesDeclarees: periodesDeclareesDuSchema20(o['periodesDeclarees']),
+    echeances: echeancesDuSchema5(
+      o['echeances'],
+      (entreprise as { urssafPeriodicite?: unknown }).urssafPeriodicite === 'trimestriel' ? 'trimestriel' : 'mensuel'
+    ),
+    periodesDeclarees: periodesDeclareesDuSchema24(o['periodesDeclarees']),
     recettes: recettesDuSchema19(recettesDuSchema15(
       recettesDuSchema12(recettesDuSchema6(o['recettes']), o['clients'])
     ))

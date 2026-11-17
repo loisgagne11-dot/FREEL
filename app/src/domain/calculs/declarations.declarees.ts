@@ -11,7 +11,27 @@ import type { DateISO, Mois } from '../types';
  */
 
 /**
- * Un mois déclaré, et le jour où il l'a été.
+ * Ce qu'une déclaration déclare, et la forme de sa période (schéma 25) :
+ *
+ *  · `urssaf` — un mois `AAAA-MM` ; un trimestre se déclare en ses trois mois,
+ *    parce que c'est au mois que les provisions basculent (voir plus bas) ;
+ *  · `des` — un mois, celui de l'exigibilité de la prestation ;
+ *  · `ca3` — un mois, ou un trimestre `AAAA-Tn` (TVA au réel normal) ;
+ *  · `ca12`, `revenus`, `cfe_1447c` — une année `AAAA`.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * POURQUOI LA DES AVAIT BESOIN DE CE FAIT
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Jusqu'au schéma 24, seule une période URSSAF pouvait être « déclarée le … ».
+ * Rien ne disait qu'une DES avait été déposée : passé sa limite, tout mois de
+ * prestation à l'Union se comptait en retard pour deux ans, avec « 750 € ×
+ * N encourus » — un montant faux affiché à qui déclarait à l'heure.
+ */
+export type NatureDeclaration = 'urssaf' | 'des' | 'ca3' | 'ca12' | 'revenus' | 'cfe_1447c';
+
+/**
+ * Une période déclarée, et le jour où elle l'a été.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * UNE DATE, PAS UNE CASE COCHÉE
@@ -30,14 +50,19 @@ import type { DateISO, Mois } from '../types';
  * serait indiscernable d'une vraie. Elle se complète depuis l'échéancier.
  */
 export interface PeriodeDeclaree {
-  readonly mois: Mois;
+  readonly nature: NatureDeclaration;
+  readonly periode: string;
   readonly declareeLe: DateISO | null;
 }
 
 /**
- * Les mois déclarés, sans leur date — ce que lisent les provisions et la
- * règle des périodes à déclarer, qui n'ont besoin que de savoir SI.
+ * Les mois déclarés À L'URSSAF, sans leur date — ce que lisent les provisions
+ * et la règle des périodes à déclarer, qui n'ont besoin que de savoir SI.
+ *
+ * Le filtre sur la nature n'est pas une précaution : une DES de mai déposée
+ * ferait sinon basculer les cotisations de mai hors du volet « à
+ * provisionner », sans qu'aucune déclaration URSSAF n'ait été faite.
  */
 export function moisDeclares(declarees: readonly PeriodeDeclaree[]): readonly Mois[] {
-  return declarees.map((p) => p.mois);
+  return declarees.filter((p) => p.nature === 'urssaf').map((p) => p.periode as Mois);
 }

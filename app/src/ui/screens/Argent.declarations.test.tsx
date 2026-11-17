@@ -80,9 +80,9 @@ describe('périodes URSSAF', () => {
     // Les trois mois, et la date du jour sur chacun : on coche en sortant du
     // site de l'URSSAF (horloge du test : 13 août 2026).
     expect(useFaits.getState().faits.periodesDeclarees).toEqual([
-      { mois: '2026-04', declareeLe: '2026-08-13' },
-      { mois: '2026-05', declareeLe: '2026-08-13' },
-      { mois: '2026-06', declareeLe: '2026-08-13' }
+      { nature: 'urssaf', periode: '2026-04', declareeLe: '2026-08-13' },
+      { nature: 'urssaf', periode: '2026-05', declareeLe: '2026-08-13' },
+      { nature: 'urssaf', periode: '2026-06', declareeLe: '2026-08-13' }
     ]);
   });
 
