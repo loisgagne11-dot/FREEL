@@ -16,8 +16,9 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { dateISO, euros } from '../domain/types';
+import { dateISO, euros, ratio } from '../domain/types';
 import { livreRecettesCsv } from '../domain/calculs/livreRecettesCsv';
+import { calendrierDesObligations } from '../state/selecteurs.calendrier';
 import type { EcritureRecette } from '../domain/calculs/livreRecettes';
 import { VERSION_SCHEMA, faitsVides } from '../state/schema';
 import { motifRefusExterieur } from '../state/schema.exterieur';
@@ -311,7 +312,7 @@ describe('pièce déposée', () => {
 
 /* ── Ce qui sort ───────────────────────────────────────────────────────── */
 
-describe('ce qui sort : livre CSV et document HTML', () => {
+describe('ce qui sort : livre CSV, document HTML, calendrier .ics', () => {
   const ecriture = (modif: Partial<EcritureRecette>): EcritureRecette => ({
     id: 'r1', clientNom: 'Agence Démo', libelle: 'Conseil', montant: euros(100),
     emiseLe: dateISO('2026-03-01'), encaisseeLe: dateISO('2026-03-15'), modeReglement: 'virement',
@@ -333,5 +334,40 @@ describe('ce qui sort : livre CSV et document HTML', () => {
   it('échappe le titre du document téléchargé', () => {
     const html = documentAutonome('</title><script>window.__freelXss=1</script>', '', '');
     expect(html).not.toContain('<script>');
+  });
+
+  /*
+   * Le calendrier `.ics` (lot 53) : tout champ que l'utilisateur — ou un
+   * fichier importé — remplit et qui pourrait y passer reçoit un texte qui
+   * tente d'ouvrir un événement. Le fichier garde sa forme : chaque ligne
+   * dépliée est une propriété connue, les événements s'ouvrent et se ferment
+   * par paires, et aucun texte saisi n'y entre (ni client, ni libellé).
+   */
+  it('garde au calendrier sa forme, et n’y laisse entrer aucun texte saisi', () => {
+    const injection = 'Pirate\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nSUMMARY:injecté;,\\';
+    const faits = {
+      ...faitsVides(),
+      entreprise: {
+        ...faitsVides().entreprise, nom: injection, nomExploitant: `Durand ${injection}`, codePostal: '33000',
+        debutActivite: dateISO('2020-01-01')
+      },
+      clients: [{ id: 'c', nom: injection, adresse: '', siret: '', email: '', delaiPaiement: 'net_30' as const, pays: 'DE', tvaIntracom: '' }],
+      recettes: [{ id: 'r', clientNom: injection, libelle: injection, montant: euros(9000),
+        emiseLe: dateISO('2026-10-10'), encaisseeLe: dateISO('2026-10-10'), modeReglement: 'virement' as const, numero: injection }],
+      missions: [{ id: injection, clientId: null, clientNom: injection, description: injection, tjm: euros(500),
+        statut: 'active' as const, entites: [], debut: dateISO('2026-09-01'), fin: dateISO('2027-01-29') }],
+      pieces: [{ id: injection, sorte: 'autre' as const, libelle: injection, obtenueLe: dateISO('2026-01-01'),
+        valableJusquau: dateISO('2027-03-01'), provisoire: false }],
+      depenses: [{ id: 'd', libelle: injection, fournisseur: injection, provenance: 'ue' as const, montantTtc: euros(145),
+        tauxTva: ratio(0), payeeLe: dateISO('2026-11-05'), justificatifId: null, rapprochement: 'sans_banque' as const }]
+    };
+    const ics = calendrierDesObligations(faits, new Date('2026-11-17T09:00:00Z'), dateISO('2026-11-17'));
+    const logiques = ics.replace(/\r\n /gu, '').split('\r\n').slice(0, -1);
+    expect(logiques.filter((l) => l === 'BEGIN:VEVENT').length).toBeGreaterThan(0);
+    expect(logiques.filter((l) => l === 'BEGIN:VEVENT').length).toBe(logiques.filter((l) => l === 'END:VEVENT').length);
+    for (const l of logiques) {
+      expect(l).toMatch(/^(BEGIN|END|VERSION|PRODID|CALSCALE|UID|DTSTAMP|DTSTART;VALUE=DATE|DTEND;VALUE=DATE|SUMMARY|DESCRIPTION|TRANSP|ACTION|TRIGGER)[:;]/u);
+    }
+    expect(ics).not.toMatch(/Pirate|injecté/u);
   });
 });

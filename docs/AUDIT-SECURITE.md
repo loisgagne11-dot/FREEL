@@ -155,6 +155,7 @@ le modèle A est retenu ; lancer la sonde depuis l'écran Compte.
 | 44 — envoi par courriel | Adresse et objet encodés ; aucun retour à la ligne ne passe dans un en-tête |
 | 47 — facture électronique | Chaque valeur saisie est échappée dans le fichier produit ; le fichier est validé contre son schéma avant d'être proposé |
 | 51 — jetons de style | Polices embarquées dans l'application, sous licence libre vérifiée ; la politique de contenu ne s'ouvre à aucun domaine |
+| 53 — calendrier `.ics` | Chaque valeur texte échappée selon la RFC 5545 (`\` `;` `,` et tout saut de ligne ; contrôles retirés) ; lignes en CRLF, pliées à 75 octets sans couper un caractère ; aucun texte saisi n'y entre — ni nom de client, ni libellé de pièce, ni description de mission —, identifiants condensés plutôt que recopiés ; un fichier à importer, aucun abonnement ni serveur. Essai hostile au corpus `fichiers-hostiles` (`calendrierIcs.test`, `selecteurs.calendrier.test`) |
 
 ## 8. Sources
 
