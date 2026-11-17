@@ -135,21 +135,24 @@ export interface Entreprise {
    * option, et le simplifié est le régime de droit commun d'un micro-
    * entrepreneur qui devient redevable. Défaut `simplifie` pour cette raison.
    * Le régime simplifié est supprimé au 01/01/2027 (loi 2025-127, art. 38 ;
-   * annonce DGFiP du 22/09/2026) : le fait garde ce qui valait avant, la
-   * règle datée dira ce qui vaut après.
+   * annonce DGFiP du 22/09/2026, relevée le 17/11/2026 :
+   * https://www.impots.gouv.fr/actualite/le-regime-simplifie-dimposition-la-tva-est-supprime-compter-du-1er-janvier-2027) :
+   * le fait garde ce qui valait avant, la règle datée dira ce qui vaut après.
    */
   readonly regimeTva: 'simplifie' | 'reel_normal';
   /**
    * L'option pour une CA3 MENSUELLE au réel normal (schéma 25). Sans option,
    * la CA3 est trimestrielle à partir de 2027 pour qui ne dépasse pas
-   * 1 000 000 € (CGI 287, version au 01/01/2027) : `false` par défaut, ce qui
-   * ne change rien tant qu'aucune option n'a été prise.
+   * 1 000 000 € (CGI 287, version au 01/01/2027 ; même page de la DGFiP) :
+   * `false` par défaut, ce qui ne change rien tant qu'aucune option n'a été
+   * prise.
    */
   readonly ca3Mensuelle: boolean;
   /**
    * Le nom de famille de l'exploitant, pour son INITIALE (schéma 25) : le jour
    * de dépôt d'une CA3 d'entreprise individuelle en dépend (CIBS A161-29 —
-   * A à H, ou I à Z).
+   * A à H, ou I à Z ; relevé le 17/11/2026 :
+   * https://www.legifrance.gouv.fr/codes/id/LEGISCTA000049803706/).
    *
    * Vide par défaut, et il le reste tant qu'il n'est pas saisi : on le
    * demande, on ne le devine pas. Le nom de l'entreprise est souvent une
