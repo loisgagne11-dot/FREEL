@@ -174,13 +174,13 @@ describe('obligations à traiter', () => {
   // douanes, pas d'un rappel quotidien.
   it('laisse les DES de plus de deux ans à la régularisation', () => {
     const { paiement: _, ...sansPaiement } = avec('en_retard');
-    const vieille: Obligation = {
-      ...sansPaiement,
-      dossier: 'des',
-      declaration: { limite: limite('2024-02-12'), mois: mois('2024-02'), faiteLe: null, etat: 'en_retard', avance: null }
-    };
-    const recente = { ...vieille, id: 'recente',
-      declaration: { limite: limite('2026-02-12'), mois: mois('2026-02'), faiteLe: null, etat: 'en_retard' as const, avance: null } };
-    expect(obligationsATraiter([vieille, recente], dateISO('2026-11-17')).map((o) => o.id)).toEqual(['recente']);
+    // Le 17/11/2026, le panneau DES regarde d'octobre 2026 à novembre 2024.
+    const des = (id: string, periode: string, limiteLe: string): Obligation => ({
+      ...sansPaiement, id, dossier: 'des', periode,
+      declaration: { limite: limite(limiteLe), mois: mois(limiteLe.slice(0, 7)), faiteLe: null, etat: 'en_retard', avance: null }
+    });
+    const toutes = [des('2024-10', '2024-10', '2024-11-15'), des('2024-11', '2024-11', '2024-12-13'),
+      des('2026-02', '2026-02', '2026-03-12')];
+    expect(obligationsATraiter(toutes, dateISO('2026-11-17')).map((o) => o.id)).toEqual(['2024-11', '2026-02']);
   });
 });

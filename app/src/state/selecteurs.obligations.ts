@@ -397,6 +397,18 @@ function tva(faits: Faits, depuis: Mois, jusquA: Mois, aujourdhui: DateISO): rea
     // à la réalisation de la prestation. L'application ne connaît que le
     // jour du paiement : elle le retient pour le mois de la prestation, et le
     // dit. Une CA3 pour ce seul mois ; aucune les autres mois.
+    //
+    // Les deux maquettes la dataient du 31 juillet : c'était la fin du mois
+    // suivant, une date qu'aucun texte ne donne. Le micro-entrepreneur doit
+    // « auto-liquider, déclarer et verser en France la TVA relative à ses
+    // achats de [...] prestations de services intracommunautaires » —
+    // impots.gouv.fr, page micro-entrepreneur et TVA, modifiée le 14/10/2026,
+    // relue le 17/11/2026 :
+    // https://www.impots.gouv.fr/professionnel/questions/je-suis-micro-entrepreneur-ou-la-tete-dune-micro-entreprise-ai-je-des
+    // L'exigibilité à la réalisation tient à la directive 2006/112, art. 66
+    // et 196, et au CGI art. 269 : cités d'après l'avis du 17/11, NON relus —
+    // Légifrance et EUR-Lex refusent la lecture automatisée. Le calcul reste
+    // donc une hypothèse, et le dit.
     for (const m of moisDeLAnnee) {
       if (regimeTvaAu(faits, m) !== 'franchise') continue;
       const d = dossier(`${m}-01`, finDuMois(m));
@@ -562,7 +574,9 @@ function formalites(faits: Faits, aujourdhui: DateISO): readonly Prevue[] {
         libelle: r.intitule, detail: r.detail, periode: r.date,
         // Passée, elle est « en vigueur », pas « en retard » : aucune
         // sanction n'est datée, et le rappel dure tant que le fait manque.
-        formalite: etapeDatee(publie(r.date, 'loi 2022-1726 et suivantes — calendrier de la réforme'),
+        // La date est celle que l'application retient depuis le lot 46 ; le
+        // texte qui la fixe n'a pas été relu dans ce lot — la source le dit.
+        formalite: etapeDatee(publie(r.date, 'réforme de la facturation électronique — date retenue au lot 46'),
           r.date.slice(0, 7) as Mois, aujourdhui, {
             suivi: false, retardPossible: false, faite: remplie !== false,
             faiteLe: remplie === false ? null : remplie

@@ -229,10 +229,17 @@ export const ouvertureParPreavis = (limite: DateISO): DateISO => decaler(limite,
 
 /**
  * Au-delà de deux ans, une DES omise relève d'une régularisation avec les
- * douanes, pas d'un rappel dans une liste de tâches — la règle que
- * `declarationsEnRetard` appliquait déjà.
+ * douanes, pas d'un rappel dans une liste de tâches. La fenêtre est celle de
+ * `declarationsEnRetard`, que lit le panneau DES : les vingt-quatre mois qui
+ * précèdent le mois courant — compter en jours depuis la limite y aurait
+ * ajouté un mois, et l'amende du Pilote aurait dépassé celle du panneau.
  */
 const MOIS_DES_A_TRAITER = 24;
+
+const moisAvant = (m: string, n: number): string => {
+  const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) - n;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+};
 
 const enCours = (e: Etape | undefined): boolean =>
   e !== undefined && (e.etat === 'a_faire' || e.etat === 'en_retard');
@@ -247,11 +254,10 @@ export function obligationsATraiter(
   obligations: readonly Obligation[],
   aujourdhui: DateISO
 ): readonly Obligation[] {
-  const plancherDes = decaler(aujourdhui, -Math.round(MOIS_DES_A_TRAITER * 30.44));
+  const plancherDes = moisAvant(aujourdhui.slice(0, 7), MOIS_DES_A_TRAITER);
   return obligations.filter((o) => {
     if (!enCours(o.declaration) && !enCours(o.paiement) && !enCours(o.formalite)) return false;
-    if (o.dossier !== 'des') return true;
-    return dateDeLEtape(etapePrincipale(o)) >= plancherDes;
+    return o.dossier !== 'des' || o.periode >= plancherDes;
   });
 }
 
