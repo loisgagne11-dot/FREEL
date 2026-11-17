@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { moisCourant } from '../../state/selecteurs';
-import { etatDes } from '../../state/selecteurs.livre';
-import type { Mois } from '../../domain/types';
+import { dateDuJour, moisCourant } from '../../state/selecteurs';
+import { type EtatDes, etatDes } from '../../state/selecteurs.livre';
+import { annulerDeclaration, declarerPeriode } from '../../state/ecritures.echeances';
+import type { DateISO, Mois } from '../../domain/types';
 import { Info } from '../components/Info';
 import { Montant } from '../components/Montant';
+import { Statut } from '../components/Statut';
+import { useToast } from '../components/Toasts';
 import { dateCourte, eur } from '../format';
 import styles from './Argent.module.css';
 
@@ -116,6 +119,8 @@ export function DeclarationServices({ idGroupe }: { idGroupe: string }) {
                 </div>
               </dl>
 
+              <DepotDuMois etat={etat} libelle={moisLisible(moisAffiche)} />
+
               {declaration.lignes.length > 0 && (
                 <ul className={styles.liste}>
                   {declaration.lignes.map((l) => (
@@ -155,6 +160,88 @@ export function DeclarationServices({ idGroupe }: { idGroupe: string }) {
     </>
   );
 }
+/**
+ * Le dépôt de la DES du mois : « Déposée le … », sur le modèle de la
+ * déclaration URSSAF.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * SANS CE GESTE, L'AMENDE AFFICHÉE ÉTAIT FAUSSE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Rien ne permettait de dire qu'une DES avait été déposée : passé sa limite,
+ * chaque mois de prestation à l'Union devenait un retard, et le bandeau
+ * annonçait 750 € par mois à qui déposait à l'heure. Le geste daté du jour —
+ * on le fait en sortant du portail de la douane —, la date se lit et se
+ * corrige au même endroit : vide, elle dit « date non enregistrée » sans
+ * phrase de plus, et jamais demain. Il se défait.
+ *
+ * Un mois en cours ne se marque pas : la douane n'ouvre le dépôt qu'au
+ * premier jour du mois suivant, et le marquer d'avance éteindrait un retard
+ * qui n'a pas commencé — pour des prestations encore à venir ce mois-là.
+ */
+function DepotDuMois({ etat, libelle }: { readonly etat: EtatDes; readonly libelle: string }) {
+  const signaler = useToast();
+  const jour = dateDuJour();
+  const m = etat.moisAffiche;
+
+  if (etat.depot !== null) {
+    return (
+      <p className={styles.declarationActions}>
+        <Statut libelle="Déposée" ton="ok" />
+        <label className={styles.declarationDate}>
+          <span>le</span>
+          <input
+            type="date"
+            aria-label={`Date de dépôt de la DES de ${libelle}`}
+            value={etat.depot.le ?? ''}
+            max={jour}
+            onChange={(e) => {
+              const saisie = e.target.value;
+              if (saisie !== '' && saisie > jour) return;
+              declarerPeriode('des', [m], saisie === '' ? null : saisie as DateISO);
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className={styles.actionLigne}
+          onClick={() => {
+            annulerDeclaration('des', [m]);
+            signaler(`La DES de ${libelle} n’est plus marquée déposée.`);
+          }}
+        >
+          {/* Ce qui se défait, c'est la marque : le dépôt fait auprès de la
+              douane, lui, ne s'annule pas d'ici. */}
+          Annuler le dépôt
+        </button>
+      </p>
+    );
+  }
+
+  if (!etat.deposable) {
+    return (
+      <p className={styles.declarationAttente}>
+        Mois en cours&nbsp;: la DES se dépose à partir du 1er du mois suivant.
+      </p>
+    );
+  }
+
+  return (
+    <p className={styles.declarationActions}>
+      <button
+        type="button"
+        className={styles.actionLigne}
+        onClick={() => {
+          declarerPeriode('des', [m], jour);
+          signaler(`DES de ${libelle} marquée déposée aujourd’hui.`);
+        }}
+      >
+        Marquer déposée
+      </button>
+    </p>
+  );
+}
+
 function moisPrecedentDe(m: Mois): Mois {
   const total = Number(m.slice(0, 4)) * 12 + (Number(m.slice(5, 7)) - 1) - 1;
   return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}` as Mois;

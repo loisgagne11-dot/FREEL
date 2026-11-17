@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
@@ -133,8 +133,79 @@ describe('retards', () => {
   it('n’annonce aucun retard quand tout est dans les temps', async () => {
     semer({ clients: [client()], recettes: [recette()] });
     await ouvrirDes();
-    // Émise en juillet, limite au 10 août, on est le 5 : rien n'est en retard.
+    // Émise en juillet, limite au 12 août, on est le 5 : rien n'est en retard.
     expect(screen.queryByText(/en retard/)).toBeNull();
+  });
+});
+
+/**
+ * « DÉPOSÉE LE … » (schéma 25).
+ *
+ * Sans ce geste, rien ne disait qu'une DES avait été déposée : le bandeau
+ * annonçait 1 500 € d'amende à qui avait déposé mai et juin à l'heure. Le
+ * geste éteint le retard et l'amende ; la date se corrige, jamais vers
+ * demain ; il se défait.
+ */
+describe('dépôt de la déclaration', () => {
+  const deuxMois = () => semer({
+    clients: [client()],
+    recettes: [
+      recette({ id: 'a', emiseLe: dateISO('2026-05-10') }),
+      recette({ id: 'b', emiseLe: dateISO('2026-06-10') })
+    ]
+  });
+
+  it('marquer juin déposée retire juin du retard, et 750 € de l’amende', async () => {
+    deuxMois();
+    await ouvrirDes();
+    const u = userEvent.setup();
+    expect(screen.getByText(/déclaration.* en retard/).textContent)
+      .toMatch(/^2 déclarations en retard, soit 1\s500\s€/u);
+
+    await u.click(screen.getByRole('button', { name: 'Mois précédent' })); // juin
+    await u.click(screen.getByRole('button', { name: 'Marquer déposée' }));
+
+    expect(useFaits.getState().faits.periodesDeclarees)
+      .toEqual([{ nature: 'des', periode: '2026-06', declareeLe: '2026-08-05' }]);
+    // Le début du bandeau seulement : son aide cite « 750 € par déclaration »,
+    // et une recherche sur tout le texte trouverait toujours 750.
+    expect(screen.getByText(/déclaration.* en retard/).textContent)
+      .toMatch(/^1 déclaration en retard, soit 750\s€/u);
+    expect(screen.getByText('Déposée')).toBeTruthy();
+  });
+
+  it('corrige la date du dépôt, refuse une date future, et se défait', async () => {
+    deuxMois();
+    useFaits.setState({
+      faits: {
+        ...useFaits.getState().faits,
+        periodesDeclarees: [{ nature: 'des', periode: '2026-06', declareeLe: null }]
+      }
+    });
+    await ouvrirDes();
+    const u = userEvent.setup();
+    await u.click(screen.getByRole('button', { name: 'Mois précédent' }));
+    const champ = screen.getByLabelText(/Date de dépôt de la DES de juin 2026/);
+    // Vide : déposée, à une date non enregistrée — et elle ne compte pas en retard.
+    expect((champ as HTMLInputElement).value).toBe('');
+
+    fireEvent.change(champ, { target: { value: '2026-07-09' } });
+    expect(useFaits.getState().faits.periodesDeclarees[0]?.declareeLe).toBe('2026-07-09');
+    fireEvent.change(champ, { target: { value: '2026-09-01' } });
+    expect(useFaits.getState().faits.periodesDeclarees[0]?.declareeLe).toBe('2026-07-09');
+
+    await u.click(screen.getByRole('button', { name: 'Annuler le dépôt' }));
+    expect(useFaits.getState().faits.periodesDeclarees).toEqual([]);
+  });
+
+  /* La douane n'ouvre le dépôt qu'au premier jour du mois suivant : marquer
+     août déposé le 5 août éteindrait un retard qui n'a pas commencé. */
+  it('ne propose pas de marquer déposé le mois en cours', async () => {
+    semer({ clients: [client()], recettes: [recette({ emiseLe: dateISO('2026-08-03') })] });
+    await ouvrirDes();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Mois suivant' })); // août
+    expect(screen.queryByRole('button', { name: 'Marquer déposée' })).toBeNull();
+    expect(screen.getByText(/Mois en cours/)).toBeTruthy();
   });
 });
 

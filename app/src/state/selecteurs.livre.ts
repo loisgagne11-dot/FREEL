@@ -27,7 +27,7 @@ import {
 } from '../domain/calculs/livreRecettes';
 import {
   type DeclarationDes, type DeclarationEnRetard,
-  amendeEncourue, declarationDuMois, declarationsEnRetard
+  amendeEncourue, declarationDuMois, declarationsEnRetard, moisDeposes
 } from '../domain/calculs/des';
 import { dateDuJour } from './selecteurs';
 import { facturesAEncaisser } from './selecteurs.pipeline';
@@ -51,6 +51,18 @@ export interface EtatDes {
    * déclaration qu'on ne pourra pas transmettre.
    */
   readonly sansNumeroIntracom: boolean;
+  /**
+   * Le dépôt de la DES du mois affiché : `null` tant qu'elle n'est pas
+   * marquée déposée ; sinon le jour du dépôt, lui-même `null` quand il n'a pas
+   * été saisi — déposée, à une date non enregistrée.
+   */
+  readonly depot: { readonly le: DateISO | null } | null;
+  /**
+   * Le mois affiché est-il terminé ? Une DES ne se dépose qu'à partir du
+   * premier jour du mois qui suit (calendrier de la douane) : la marquer
+   * déposée d'avance éteindrait un retard qui n'a pas encore commencé.
+   */
+  readonly deposable: boolean;
 }
 
 export function etatDes(
@@ -59,14 +71,20 @@ export function etatDes(
   maintenant: Date = new Date()
 ): EtatDes {
   const preneurs = preneursDeServices(faits);
-  const retards = declarationsEnRetard(faits.recettes, preneurs, dateDuJour(maintenant));
+  const jour = dateDuJour(maintenant);
+  const retards = declarationsEnRetard(
+    faits.recettes, preneurs, jour, moisDeposes(faits.periodesDeclarees)
+  );
+  const depot = faits.periodesDeclarees.find((p) => p.nature === 'des' && p.periode === m);
 
   return {
     moisAffiche: m,
     declaration: declarationDuMois(faits.recettes, preneurs, m),
     retards,
     amendeEncourue: amendeEncourue(retards),
-    sansNumeroIntracom: faits.entreprise.tvaIntracom.trim() === ''
+    sansNumeroIntracom: faits.entreprise.tvaIntracom.trim() === '',
+    depot: depot === undefined ? null : { le: depot.declareeLe },
+    deposable: m < jour.slice(0, 7)
   };
 }
 

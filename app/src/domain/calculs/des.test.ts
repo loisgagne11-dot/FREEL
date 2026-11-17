@@ -4,7 +4,7 @@ import {
   type PreneurService, type RecetteDeclarable,
   AMENDE_PAR_DECLARATION, ETATS_MEMBRES_UE,
   amendeEncourue, declarationDuMois, declarationsEnRetard, estDansLUe,
-  limiteDepot, motifExclusion, verifierIntegriteDes
+  limiteDepot, moisDeposes, motifExclusion, verifierIntegriteDes
 } from './des';
 
 const recette = (m: Partial<RecetteDeclarable> = {}): RecetteDeclarable => ({
@@ -158,14 +158,14 @@ describe('retards', () => {
   // une alerte permanente que l'utilisateur finirait par ignorer.
   it('ne réclame rien pour un mois sans prestation intracommunautaire', () => {
     const retards = declarationsEnRetard(
-      [recette({ clientNom: 'ClientFR' })], preneurs(FRANCAIS), dateISO('2026-10-01')
+      [recette({ clientNom: 'ClientFR' })], preneurs(FRANCAIS), dateISO('2026-10-01'), []
     );
     expect(retards).toEqual([]);
   });
 
   it('signale une déclaration dont la date limite est passée', () => {
     const retards = declarationsEnRetard(
-      [recette()], preneurs(ALLEMAND), dateISO('2026-09-15')
+      [recette()], preneurs(ALLEMAND), dateISO('2026-09-15'), []
     );
     expect(retards).toHaveLength(1);
     expect(retards[0]).toMatchObject({ mois: '2026-07', limiteLe: '2026-08-12' });
@@ -174,7 +174,7 @@ describe('retards', () => {
 
   it('ne réclame pas une déclaration dont la limite n’est pas encore atteinte', () => {
     const retards = declarationsEnRetard(
-      [recette()], preneurs(ALLEMAND), dateISO('2026-08-05')
+      [recette()], preneurs(ALLEMAND), dateISO('2026-08-05'), []
     );
     expect(retards).toEqual([]);
   });
@@ -182,7 +182,7 @@ describe('retards', () => {
   /* Le 11 août, le « 10 du mois » la disait en retard depuis la veille : la
      limite de juillet 2026 est le 12. */
   it('ne compte pas en retard la veille du dixième jour ouvrable', () => {
-    expect(declarationsEnRetard([recette()], preneurs(ALLEMAND), dateISO('2026-08-11'))).toEqual([]);
+    expect(declarationsEnRetard([recette()], preneurs(ALLEMAND), dateISO('2026-08-11'), [])).toEqual([]);
   });
 
   // Une prestation sans numéro de TVA reste une prestation à déclarer :
@@ -190,7 +190,7 @@ describe('retards', () => {
   it('compte aussi les mois dont les lignes sont bloquées faute de numéro', () => {
     const sansNumero: PreneurService = { ...ALLEMAND, tvaIntracom: '' };
     const retards = declarationsEnRetard(
-      [recette()], preneurs(sansNumero), dateISO('2026-09-15')
+      [recette()], preneurs(sansNumero), dateISO('2026-09-15'), []
     );
     expect(retards).toHaveLength(1);
     expect(retards[0]?.nombreLignes).toBe(1);
@@ -200,7 +200,7 @@ describe('retards', () => {
     const retards = declarationsEnRetard([
       recette({ id: 'a', emiseLe: dateISO('2026-05-10') }),
       recette({ id: 'b', emiseLe: dateISO('2026-07-10') })
-    ], preneurs(ALLEMAND), dateISO('2026-09-15'));
+    ], preneurs(ALLEMAND), dateISO('2026-09-15'), []);
     expect(retards.map((r) => r.mois)).toEqual(['2026-05', '2026-07']);
   });
 
@@ -208,7 +208,7 @@ describe('retards', () => {
   it('ne remonte pas au-delà de la fenêtre examinée', () => {
     const retards = declarationsEnRetard(
       [recette({ emiseLe: dateISO('2020-01-10') })], preneurs(ALLEMAND),
-      dateISO('2026-09-15')
+      dateISO('2026-09-15'), []
     );
     expect(retards).toEqual([]);
   });
@@ -221,11 +221,36 @@ describe('coût de l’omission', () => {
     const retards = declarationsEnRetard([
       recette({ id: 'a', emiseLe: dateISO('2026-05-10') }),
       recette({ id: 'b', emiseLe: dateISO('2026-06-10') })
-    ], preneurs(ALLEMAND), dateISO('2026-09-15'));
+    ], preneurs(ALLEMAND), dateISO('2026-09-15'), []);
     expect(amendeEncourue(retards)).toBe(2 * AMENDE_PAR_DECLARATION.valeur);
   });
 
   it('ne chiffre rien sans retard', () => {
     expect(amendeEncourue([])).toBe(0);
+  });
+
+  /**
+   * LE MONTANT FAUX QUE L'ÉCRAN AFFICHAIT.
+   *
+   * Rien ne disait qu'une DES avait été déposée : tout mois de prestation à
+   * l'Union passé sa limite se comptait en retard, et l'écran annonçait
+   * 1 500 € d'amende à qui avait déposé mai et juin à l'heure. Déposée — même
+   * à une date non enregistrée —, une DES sort des retards et de l'amende.
+   */
+  it('ne compte plus en retard, ni dans l’amende, une DES déposée', () => {
+    const recettes = [
+      recette({ id: 'a', emiseLe: dateISO('2026-05-10') }),
+      recette({ id: 'b', emiseLe: dateISO('2026-06-10') })
+    ];
+    const retards = declarationsEnRetard(recettes, preneurs(ALLEMAND), dateISO('2026-09-15'), [mois('2026-05')]);
+    expect(retards.map((r) => r.mois)).toEqual(['2026-06']);
+    expect(amendeEncourue(retards)).toBe(AMENDE_PAR_DECLARATION.valeur);
+  });
+
+  it('ne lit, parmi les déclarations, que les DES', () => {
+    expect(moisDeposes([
+      { nature: 'des', periode: '2026-05', declareeLe: null },
+      { nature: 'urssaf', periode: '2026-06', declareeLe: dateISO('2026-07-28') }
+    ])).toEqual(['2026-05']);
   });
 });

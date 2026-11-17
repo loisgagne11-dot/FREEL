@@ -44,6 +44,7 @@
 import { type DateISO, type Euros, type Mois, euros } from '../types';
 import { joursEntre } from '../dates';
 import { nemeJourOuvrable } from './calendrier.ouvres';
+import type { PeriodeDeclaree } from './declarations.declarees';
 
 /**
  * Les 27 États membres, par code ISO.
@@ -252,12 +253,32 @@ function moisPrecedent(m: Mois): Mois {
 }
 
 /**
- * Les déclarations dont la date limite est passée.
+ * Les mois dont la DES est déposée (schéma 25) — date connue ou non : déposée
+ * « à une date non enregistrée » reste déposée.
+ */
+export function moisDeposes(declarees: readonly PeriodeDeclaree[]): readonly Mois[] {
+  return declarees.filter((p) => p.nature === 'des').map((p) => p.periode as Mois);
+}
+
+/**
+ * Les déclarations dont la date limite est passée, et qui n'ont pas été
+ * déposées.
  *
  * Une déclaration ne peut être « en retard » que si des prestations la
  * rendaient exigible : un mois sans prestation intracommunautaire n'appelle
  * aucun dépôt, et le réclamer produirait une alerte permanente que
  * l'utilisateur finirait par ignorer.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * SANS LES DÉPÔTS, CHAQUE MOIS PASSÉ ÉTAIT UNE AMENDE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Rien ne permettait de dire qu'une DES avait été déposée : passé sa limite,
+ * tout mois de prestation à l'Union se comptait en retard, pour deux ans, et
+ * l'écran annonçait « 750 € × N d'amende encourue » à quelqu'un qui
+ * déclarait chaque mois à l'heure. `deposees` est OBLIGATOIRE : un défaut à
+ * la liste vide laisserait un appelant oublier les dépôts, et le montant faux
+ * reviendrait sans que rien ne le signale.
  *
  * On ne remonte pas indéfiniment : au-delà de `moisExamines`, une omission
  * ancienne relève d'une régularisation avec le service des douanes, pas d'un
@@ -267,16 +288,18 @@ export function declarationsEnRetard(
   recettes: readonly RecetteDeclarable[],
   preneurs: ReadonlyMap<string, PreneurService>,
   aujourdhui: DateISO,
+  deposees: readonly Mois[],
   moisExamines = 24
 ): readonly DeclarationEnRetard[] {
   const retards: DeclarationEnRetard[] = [];
+  const deposes = new Set<string>(deposees);
   let m = moisPrecedent(moisDeDate(aujourdhui));
 
   for (let i = 0; i < moisExamines; i++) {
     const declaration = declarationDuMois(recettes, preneurs, m);
     const exigible = declaration.lignes.length > 0 || declaration.anomalies.length > 0;
 
-    if (exigible && declaration.limiteLe < aujourdhui) {
+    if (exigible && !deposes.has(m) && declaration.limiteLe < aujourdhui) {
       retards.push({
         mois: m,
         limiteLe: declaration.limiteLe,

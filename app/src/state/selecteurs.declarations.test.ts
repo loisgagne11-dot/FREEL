@@ -102,3 +102,33 @@ describe('montant d’une déclaration', () => {
     expect(typeof s?.donnees['montant']).toBe('number');
   });
 });
+
+/**
+ * LE PILOTE LIT LES DES DÉPOSÉES, COMME LE PANNEAU.
+ *
+ * La requête « à traiter » nourrit le rail et le Pilote : si elle ignorait
+ * les dépôts, « 750 € encourus » resterait sur le Pilote après que le panneau
+ * DES a cessé de l'afficher — deux réponses à la même question.
+ */
+describe('DES déposée, vue du Pilote', () => {
+  const faits: Faits = {
+    ...faitsVides(),
+    clients: [{
+      id: 'c1', nom: 'Client UE fictif', adresse: '', siret: '', email: '',
+      delaiPaiement: 'net_30', pays: 'DE', tvaIntracom: 'DE000000000'
+    }],
+    recettes: [{
+      id: 'r1', clientNom: 'Client UE fictif', libelle: 'Mission', montant: euros(4000),
+      emiseLe: dateISO('2026-06-10'), encaisseeLe: null, modeReglement: null, numero: '2026-001'
+    }]
+  };
+  const maintenant = new Date('2026-08-15T10:00:00');
+
+  it('réclame la DES de juin passé sa limite, et plus du tout une fois déposée', () => {
+    expect(aTraiter(faits, maintenant).some((s) => s.id === 'des-en-retard')).toBe(true);
+    const deposee: Faits = {
+      ...faits, periodesDeclarees: [{ nature: 'des', periode: '2026-06', declareeLe: null }]
+    };
+    expect(aTraiter(deposee, maintenant).some((s) => s.id === 'des-en-retard')).toBe(false);
+  });
+});
