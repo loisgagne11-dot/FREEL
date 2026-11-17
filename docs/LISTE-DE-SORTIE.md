@@ -158,12 +158,12 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 
 | Ligne | État |
 |---|---|
-| Une frise de l'année, une ligne par nature (URSSAF, TVA, impôt, CFE, formalités), obligations saisies ET prévues, aux dates officielles | ⬜ |
-| Une seule liste à cycle daté — à déclarer, déclarée le, payée le — à la place de « Échéances reçues » et « Périodes URSSAF » | ⬜ |
-| L'avance ou le retard d'une déclaration, comme la maquette (« deux jours avant la limite ») : la date existe depuis le lot 28, rien ne la compare encore à la limite | ⬜ |
-| Chaque ligne ouvre son dossier : URSSAF, TVA, déclaration européenne, CFE, impôt, et la déclaration de revenus (cases relevées sur le formulaire de l'année, en `hypothese` sinon) | ⬜ |
-| Pièces à fournir, chacune avec sa date de validité et son rappel : attestation de vigilance, responsabilité civile, avis de situation (seuils et périodicité à relever sur source officielle) | ⬜ |
-| Calendrier à s'abonner (`.ics`) : échéances, fins de mission, pièces qui expirent | ⬜ |
+| Une frise de l'année, une ligne par nature (URSSAF, TVA, impôt, CFE, formalités), obligations saisies ET prévues, aux dates officielles | ◐ 17/11 — la source est faite : `obligationsEntre` (chargé à la demande) rassemble prévues et saisies, fusionnées par clé (une ligne par obligation), aux dates reportées ; la frise elle-même est en phase 3 |
+| Une seule liste à cycle daté — à déclarer, déclarée le, payée le — à la place de « Échéances reçues » et « Périodes URSSAF » | ◐ 17/11 — étapes déclaration / paiement / formalité et leurs états calculés (« à pointer » pour un prélèvement, « non suivie » pour ce qu'on ne savait pas noter avant le schéma 25) ; test d'accord ligne pour ligne avec les deux cartes actuelles sur la démonstration et le jeu d'essai ; « à traiter » lit cette source, et le rail compte une chose par obligation, comme le titre comptera. L'écran est en phase 3 |
+| L'avance ou le retard d'une déclaration, comme la maquette (« deux jours avant la limite ») : la date existe depuis le lot 28, rien ne la compare encore à la limite | ◐ 17/11 — calculée contre la limite reportée, `null` quand la date de déclaration manque ; l'affichage est en phase 3 |
+| Chaque ligne ouvre son dossier : URSSAF, TVA, déclaration européenne, CFE, impôt, et la déclaration de revenus (cases relevées sur le formulaire de l'année, en `hypothese` sinon) | ◐ 17/11 — les faits des dossiers sont calculés : cases 5TE / 5HQ hors taxes de la 2042-C-PRO 2026 (rien de déduit), date par zone en hypothèse (le domicile fait foi), CA12 et acomptes, CA3 au jour de A161-29 (refusée sans nom), TVA autoliquidée à la CA3 du mois suivant, CFE sans montant tant qu'aucun avis n'est saisi ; les dossiers sont en phase 3. Le partage 5TE / 5HQ en cours d'année est écrit et testé, mais le schéma ne garde pas l'histoire de l'option : il ne s'applique pas encore |
+| Pièces à fournir, chacune avec sa date de validité et son rappel : attestation de vigilance, responsabilité civile, avis de situation (seuils et périodicité à relever sur source officielle) | ◐ 17/11 — états dérivés : vigilance « à jour » six mois après l'obtention sans déborder du mois (31/08 → 28 ou 29/02), provisoire jusqu'à la première échéance, RC pro sur sa date, SIRENE jamais « à jour », rappel quinze jours avant, une attestation remplacée ne réclame plus rien ; la saisie et la grille sont en phase 3 |
+| Calendrier à importer (`.ics`) : échéances, fins de mission, pièces qui expirent. **Pas d'abonnement** : sans serveur, l'agenda importe le fichier du jour et ne le relit pas — l'écran le dira, et un second import remplace les événements (identifiants stables) | ◐ 17/11 — le fichier est produit (RFC 5545 : échappement, CRLF, pliage à 75 octets sans couper un caractère, journée entière, DTSTAMP en UTC, rappel trois jours avant, montants estimés « ≈ », « date calculée », aucun nom de client, identifiants condensés) ; essai hostile au corpus ; le bouton est en phase 3 |
 
 ### Lot 34-bis — Profil de cotisations Cipav (après le lot 53)
 
@@ -439,8 +439,8 @@ l'affichage et la reprise.
 
 | Ligne | État |
 |---|---|
-| Jalons réglementaires dans la frise (et plus seulement les échéances saisies), aux dates du relevé ci-dessus, source citée dans le code, report au jour ouvré | ⬜ |
-| TVA : calendrier de la CA3 (entreprise individuelle par initiale), fin du régime simplifié au 01/01/2027 ; TVA autoliquidée d'un franchisé à la date de la CA3, en hypothèse dite | ⬜ |
+| Jalons réglementaires dans la frise (et plus seulement les échéances saisies), aux dates du relevé ci-dessus, source citée dans le code, report au jour ouvré | ◐ 17/11 — dans `obligationsEntre`, sources citées, report au jour ouvré ; la frise est au lot 53, phase 3 |
+| TVA : calendrier de la CA3 (entreprise individuelle par initiale), fin du régime simplifié au 01/01/2027 ; TVA autoliquidée d'un franchisé à la date de la CA3, en hypothèse dite | ◐ 17/11 — calculé (CIBS A161-29, CA12 au 04/05/2027 puis CA3 trimestrielle, mensuelle sur option ; acomptes au-delà de 1 000 €, sans jour inventé) ; l'écran est au lot 53, phase 3. CGI 269 et les articles 66 et 196 de la directive cités sans avoir été ouverts : Légifrance et EUR-Lex refusent la lecture automatisée |
 | Barèmes restants de L10 : profil CIPAV (demande un type d'activité au schéma), plafond de revenu fiscal de référence du versement libératoire, seuils de TVA spécifiques ; mention de franchise : **faite au lot 46** (datée, sources divergentes, revérification avant le 01/01/2027) | ⬜ |
 
 ### Lots 35 à 45 — Le reste, sans coupe
