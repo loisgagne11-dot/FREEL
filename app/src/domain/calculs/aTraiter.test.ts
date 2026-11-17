@@ -140,6 +140,19 @@ describe('périodes à déclarer', () => {
     expect(s === undefined ? '' : formuler(s).intitule).toMatch(/date limite dépassée/);
   });
 
+  /* Le Pilote lit la MÊME limite que l'échéancier : le dimanche 31 mai 2026
+     se reporte au lundi 1er juin, et ce jour-là avril se déclare encore. Le
+     dire en retard ferait déclarer dans l'urgence ce qui ne l'est pas. */
+  it('ne dit pas en retard, le lundi du report, une période dont la limite tombait un dimanche', () => {
+    const s = sujetsATraiter(entree({
+      aujourdhui: dateISO('2026-06-01'),
+      recettes: [recette({ encaisseeLe: dateISO('2026-04-15') })]
+    })).find((x) => x.id === 'periodes-a-declarer');
+    expect(s?.gravite).toBe('a_faire');
+    // « 1 juin » plutôt que « 1er juin » : la typographie du jour est hors de ce lot.
+    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/avant le 1(er)? juin/);
+  });
+
   it('annonce la base encaissée et le montant à payer, ou « à vérifier »', () => {
     const s = sujetsATraiter(entree({ recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })] }))
       .find((x) => x.id === 'periodes-a-declarer');

@@ -1,6 +1,7 @@
 import type { DateISO, Euros, Mois } from '../types';
 import { euros } from '../types';
 import type { PeriodeDeclaree } from './declarations.declarees';
+import { reporterAuJourOuvre } from './calendrier.ouvres';
 
 /**
  * Les périodes à déclarer à l'URSSAF, et celles qui l'ont été.
@@ -122,8 +123,10 @@ export interface PeriodeADeclarer {
   readonly close: boolean;
   /**
    * La date limite de déclaration : le dernier jour du mois qui suit la
-   * période — 30 avril, 31 juillet, 31 octobre, 31 janvier en trimestriel.
-   * Avant elle, une période close est « à déclarer » ; après, « en retard ».
+   * période — 30 avril, 31 juillet, 31 octobre, 31 janvier en trimestriel —,
+   * reportée au jour ouvré, sauf exception annoncée (voir
+   * `dateLimiteDeclaration`). Avant elle, une période close est « à
+   * déclarer » ; après, « en retard ».
    */
   readonly limite: DateISO;
 }
@@ -221,16 +224,56 @@ function clePeriode(mois: string, periodicite: Periodicite): string {
 }
 
 /**
- * Le dernier jour du mois qui suit `dernierMois`.
+ * Les échéances que l'Urssaf a fixées autrement que la règle, par DERNIER
+ * mois de la période — un mois en mensuel, le dernier du trimestre sinon.
+ * Une annonce ne vaut que pour l'échéance qu'elle nomme : elle s'écrit ici,
+ * datée et sourcée, et ne devient jamais une règle.
  *
- * Par le jour zéro du mois d'après — le calendrier fait le travail — et non
- * par un « + 1 mois » sur une date, qui tombe à côté dès qu'un mois a moins
- * de jours que le précédent (31 janvier + 1 mois n'existe pas).
+ *  · `2026-09` — septembre et T3 2026 : « L'échéance du samedi 31 octobre ne
+ *    sera pas reportée au 2 novembre ». Le report l'aurait annoncée au lundi,
+ *    et une déclaration du 1er novembre se serait lue à l'heure alors qu'elle
+ *    était en retard. Actualité Urssaf du 27/10/2026, relevée le 17/11/2026 :
+ *    https://www.autoentrepreneur.urssaf.fr/portail/accueil/sinformer-sur-le-statut/toutes-les-actualites/campagne-nationale-de-fiabilis-3.html
+ *  · `2026-08` — août 2026, en mensuel : après la panne du 25/09 au
+ *    19/10/2026, « aucune majoration de retard » pour la déclaration d'août si
+ *    elle est faite en octobre 2026. La limite officielle restait le
+ *    30 septembre ; celle qui décide d'une majoration — donc d'un « en
+ *    retard » — est le 31 octobre. Sans elle, une déclaration faite le
+ *    15 octobre, que l'Urssaf n'a pas sanctionnée, s'affichait en retard.
+ *    Actualité Urssaf du 21/10/2026, relevée le 17/11/2026 :
+ *    https://www.autoentrepreneur.urssaf.fr/portail/accueil/sinformer-sur-le-statut/toutes-les-actualites/resolution-des-difficultes-renco.html
+ */
+const ECHEANCES_ANNONCEES: Readonly<Record<string, DateISO>> = {
+  '2026-09': '2026-10-31' as DateISO,
+  '2026-08': '2026-10-31' as DateISO
+};
+
+/**
+ * La date limite de déclaration d'une période qui finit avec `dernierMois` :
+ * le dernier jour du mois qui suit, REPORTÉ au premier jour ouvré quand il
+ * tombe un samedi, un dimanche ou un jour férié — sauf échéance annoncée
+ * autrement (`ECHEANCES_ANNONCEES`). La SEULE règle de la limite URSSAF : le
+ * Pilote, la requête « à traiter » et l'échéancier la lisent tous ici.
+ *
+ * Le report est la doctrine de l'Urssaf — « si la date d'exigibilité est un
+ * samedi, un dimanche, ou un jour férié, la date d'exigibilité est reportée
+ * au jour qui suit » (exemple donné : le 31/08/2025 reporté au 01/09/2025) ;
+ * aucun article du code de la sécurité sociale n'a été trouvé qui le pose.
+ * Relevée le 17/11/2026 :
+ * https://www.autoentrepreneur.urssaf.fr/portail/accueil/une-question/toutes-les-fiches-pratiques/declarer-et-payer-mes-cotisation.html
+ * Sans lui, le T4 2026 passait en retard le lundi 1er février 2027, jour où il
+ * se déclare encore — la limite du dimanche 31 janvier ayant glissé.
+ *
+ * Le dernier jour se trouve par le jour zéro du mois d'après — le calendrier
+ * fait le travail — et non par un « + 1 mois » sur une date, qui tombe à côté
+ * dès qu'un mois a moins de jours que le précédent.
  */
 export function dateLimiteDeclaration(dernierMois: Mois): DateISO {
+  const annoncee = ECHEANCES_ANNONCEES[dernierMois];
+  if (annoncee !== undefined) return annoncee;
   const annee = Number(dernierMois.slice(0, 4));
   const mois = Number(dernierMois.slice(5, 7)); // 1 à 12 ; l'index 0-based du mois d'après
-  return new Date(Date.UTC(annee, mois + 1, 0)).toISOString().slice(0, 10) as DateISO;
+  return reporterAuJourOuvre(new Date(Date.UTC(annee, mois + 1, 0)).toISOString().slice(0, 10) as DateISO);
 }
 
 export function moisDeLaPeriode(id: string, periodicite: Periodicite): readonly Mois[] {

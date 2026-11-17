@@ -120,20 +120,40 @@ describe('déclarations à zéro', () => {
 });
 
 /**
- * LA DATE LIMITE : LE DERNIER JOUR DU MOIS SUIVANT.
+ * LA DATE LIMITE : LE DERNIER JOUR DU MOIS SUIVANT, REPORTÉE AU JOUR OUVRÉ.
  *
  * Par le calendrier, pas par « + 1 mois » : le 31 janvier + 1 mois n'existe
- * pas, et février change de longueur.
+ * pas, et février change de longueur. Puis reportée quand elle tombe un
+ * samedi, un dimanche ou un férié (doctrine Urssaf) : le T4 2026 et février
+ * 2027 finissent un dimanche, et s'affichaient en retard le lundi, jour où ils
+ * se déclarent encore. L'ancienne attente (31 janvier, 28 février) disait la
+ * règle sans son report.
  */
 describe('date limite de déclaration', () => {
   it.each([
-    ['2026-03', '2026-04-30'], // T1
-    ['2026-06', '2026-07-31'], // T2
-    ['2026-09', '2026-10-31'], // T3
-    ['2026-12', '2027-01-31'], // T4 : l'année change
-    ['2027-01', '2027-02-28'], // mensuel, février
-    ['2028-01', '2028-02-29'] // année bissextile
+    ['2026-03', '2026-04-30'], // T1, un jeudi
+    ['2026-06', '2026-07-31'], // T2, un vendredi
+    ['2026-04', '2026-06-01'], // avril : le dimanche 31 mai passe au lundi
+    ['2026-12', '2027-02-01'], // T4 : l'année change, et le dimanche 31 janvier passe en février
+    ['2027-01', '2027-03-01'], // mensuel, février : le dimanche 28 passe au lundi
+    ['2027-09', '2027-11-02'], // T3 2027 : dimanche 31 octobre, Toussaint le lundi
+    ['2028-01', '2028-02-29'] // année bissextile, un mardi
   ])('%s se déclare jusqu’au %s', (m, limite) => {
+    expect(dateLimiteDeclaration(m as Mois)).toBe(limite);
+  });
+
+  /**
+   * Une échéance annoncée l'emporte sur la règle, et pour elle seule. Le
+   * samedi 31 octobre 2026 n'a PAS été reporté (actualité Urssaf du
+   * 27/10/2026) ; reportée quand même, une déclaration du 1er novembre se
+   * serait lue à l'heure. Août 2026, après la panne, se déclarait sans
+   * majoration jusqu'à fin octobre (21/10/2026) : sans l'exception, une
+   * déclaration du 15 octobre s'affichait en retard.
+   */
+  it.each([
+    ['2026-09', '2026-10-31'], // septembre et T3 2026 : samedi maintenu
+    ['2026-08', '2026-10-31'] // août 2026 : tolérance de la panne
+  ])('%s suit l’échéance annoncée par l’Urssaf, le %s', (m, limite) => {
     expect(dateLimiteDeclaration(m as Mois)).toBe(limite);
   });
 
