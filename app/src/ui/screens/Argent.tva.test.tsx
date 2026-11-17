@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
-import { Argent } from './Argent';
+import { Obligations } from './Obligations';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -43,7 +43,7 @@ const recette = (
  * le contenu.
  */
 async function ouvrirDossier(): Promise<HTMLElement> {
-  render(<Argent />);
+  render(<Obligations />);
   await userEvent.setup().click(
     screen.getByRole('button', { name: 'Préparer ma déclaration de TVA' })
   );

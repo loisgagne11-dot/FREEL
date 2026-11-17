@@ -6,7 +6,7 @@ import { dateISO, euros, mois } from '../../domain/types';
 import { plafondMicro } from '../../domain/bareme';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
-import { Argent } from './Argent';
+import { Tresorerie } from './Tresorerie';
 
 /**
  * Le pilier Trésorerie est chargé à la demande depuis le lot B : on attend son
@@ -47,7 +47,7 @@ describe('repère de date et projection sur les seuils', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-06-30T09:00:00Z'));
     semer([{ montant: 30_000, le: '2026-03-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     expect(screen.getAllByText(/seuil atteint vers/).length).toBeGreaterThan(0);
@@ -62,7 +62,7 @@ describe('repère de date et projection sur les seuils', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-02-10T09:00:00Z'));
     semer([{ montant: 30_000, le: '2026-01-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     expect(screen.getAllByText(/Pas de projection/).length).toBeGreaterThan(0);
@@ -77,7 +77,7 @@ describe('repère de date et projection sur les seuils', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-11-15T09:00:00Z'));
     semer([{ montant: 30_000, le: '2026-03-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const jauge = screen.getAllByRole('img', { name: /Plafond micro-BNC/ })[0];
@@ -89,7 +89,7 @@ describe('repère de date et projection sur les seuils', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-11-15T09:00:00Z'));
     semer([{ montant: 90_000, le: '2026-03-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     expect(screen.queryByText(/seuil atteint vers/)).toBeNull();
@@ -126,7 +126,7 @@ describe('les trois chiffres sous chaque jauge de seuil', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-06-30T09:00:00Z'));
     semer([{ montant: 30_000, le: '2026-03-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     // Le plafond vient du barème daté, jamais recopié en dur ici : la table
@@ -153,7 +153,7 @@ describe('les trois chiffres sous chaque jauge de seuil', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-02-10T09:00:00Z'));
     semer([{ montant: 30_000, le: '2026-01-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const ligne = ligneChiffree(jaugeParLibelle(/^Plafond micro-BNC/));
@@ -165,7 +165,7 @@ describe('les trois chiffres sous chaque jauge de seuil', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-06-30T09:00:00Z'));
     semer([{ montant: 30_000, le: '2026-03-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     // Le plafond micro n'est pas franchi cette année au rythme constaté :
@@ -179,7 +179,7 @@ describe('les trois chiffres sous chaque jauge de seuil', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-06-30T09:00:00Z'));
     semer([{ montant: 30_000, le: '2026-03-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     // La franchise de TVA (37 500 €), elle, tombe cette année au même rythme.
@@ -203,7 +203,7 @@ describe('redevabilité de TVA, le CA de l’année précédente compris', () =>
     // Encaissé en NOVEMBRE DE L'AN DERNIER : rien en 2026, et pourtant déjà
     // redevable — c'est exactement ce que l'ancien calcul ne pouvait pas voir.
     semer([{ montant: 39_000, le: '2025-11-20' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     expect(screen.getAllByText(/Redevable de la TVA depuis/).length).toBeGreaterThan(0);
@@ -214,7 +214,7 @@ describe('redevabilité de TVA, le CA de l’année précédente compris', () =>
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-03-10T09:00:00Z'));
     semer([{ montant: 5_000, le: '2025-11-20' }, { montant: 3_000, le: '2026-01-15' }]);
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     expect(screen.queryByText(/Redevable de la TVA depuis/)).toBeNull();
@@ -228,7 +228,7 @@ describe('redevabilité de TVA, le CA de l’année précédente compris', () =>
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-03-10T09:00:00Z'));
     semer([{ montant: 39_000, le: '2026-02-01' }]); // > 37 500, ≤ 41 250, rien en 2025
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     expect(screen.getAllByText(/Franchise perdue à compter du/).length).toBeGreaterThan(0);

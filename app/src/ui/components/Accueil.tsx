@@ -150,7 +150,7 @@ function ContenuAccueil({ onFini }: { readonly onFini: () => void }) {
             «&nbsp;Reprendre les données de l’ancienne application&nbsp;». Si elles
             étaient dans ce navigateur, elles auraient déjà été reprises.
           </p>
-          <button type="button" className={styles.secondaire} onClick={() => aller('#/config/compte')}>
+          <button type="button" className={styles.secondaire} onClick={() => aller('#/reglages/compte')}>
             Aller au compte
           </button>
         </li>
@@ -160,7 +160,7 @@ function ContenuAccueil({ onFini }: { readonly onFini: () => void }) {
             Un fichier JSON ou une archive ZIP exportés de Freel, sur un autre
             appareil ou avant une réinstallation.
           </p>
-          <button type="button" className={styles.secondaire} onClick={() => aller('#/config/donnees')}>
+          <button type="button" className={styles.secondaire} onClick={() => aller('#/reglages/donnees')}>
             Aller aux données
           </button>
         </li>
@@ -226,7 +226,7 @@ function ProfilMinimal({ onFini, onRetour }: { readonly onFini: () => void; read
       versementLiberatoire: vl,
       tvaDepuis: depuis
     });
-    signaler('Profil enregistré. Le SIRET, l’adresse et l’IBAN se règlent dans Config.');
+    signaler('Profil enregistré. Le SIRET, l’adresse et l’IBAN se règlent dans Réglages.');
     onFini();
   }
 
@@ -234,7 +234,7 @@ function ProfilMinimal({ onFini, onRetour }: { readonly onFini: () => void; read
     <form className={styles.formulaire} onSubmit={valider}>
       <p className={styles.chapeau}>
         Ce sont les réponses dont dépendent tes cotisations, tes impôts et ta
-        TVA. Tout se corrige ensuite dans Config.
+        TVA. Tout se corrige ensuite dans Réglages.
       </p>
 
       <p className={styles.champ}>
@@ -312,7 +312,7 @@ export function BandeauDemonstration() {
   return (
     <p className={styles.bandeau} role="note">
       <span>Démonstration&nbsp;: ces données sont fictives.</span>
-      <a className={styles.bandeauLien} href="#/config/donnees">Commencer avec mes données</a>
+      <a className={styles.bandeauLien} href="#/reglages/donnees">Commencer avec mes données</a>
     </p>
   );
 }

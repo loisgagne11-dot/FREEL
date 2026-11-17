@@ -36,7 +36,8 @@ describe('le flux du mois', () => {
   it('montre les trois chiffres côte à côte', () => {
     render(<FluxCard flux={FLUX} periode="août 2026" {...RIEN} />);
     expect(screen.getByText('Entrées')).toBeTruthy();
-    expect(screen.getByText('Sorties')).toBeTruthy();
+    // La colonne du milieu porte le dû du jour : « Dû », pas « Sorties » (E3).
+    expect(screen.getByText('Dû')).toBeTruthy();
     expect(screen.getByText('À te verser')).toBeTruthy();
   });
 
@@ -163,9 +164,9 @@ describe('les lignes et leurs pastilles', () => {
   it('mène une facture à la liste des factures, une sortie à l’échéancier', () => {
     render(<FluxCard flux={avecRetard} periode="août 2026" {...RIEN} />);
     const entrees = screen.getByText('Entrées').parentElement as HTMLElement;
-    const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
-    expect(within(entrees).getByText('Autre client').closest('a')?.getAttribute('href')).toBe('#/activite/factures');
-    expect(within(sorties).getByText('Charges sur encaissements').closest('a')?.getAttribute('href')).toBe('#/argent');
+    const sorties = screen.getByText('Dû').parentElement as HTMLElement;
+    expect(within(entrees).getByText('Autre client').closest('a')?.getAttribute('href')).toBe('#/factures');
+    expect(within(sorties).getByText('Charges sur encaissements').closest('a')?.getAttribute('href')).toBe('#/obligations');
   });
 
   /**
@@ -181,8 +182,8 @@ describe('les lignes et leurs pastilles', () => {
     await userEvent.click(within(entrees).getByRole('button', { name: /Client en retard.*pointer l’encaissement/ }));
     expect(onPointer).toHaveBeenCalledWith('r3');
 
-    expect(within(entrees).getByText('Client de démo').closest('a')?.getAttribute('href')).toBe('#/activite/factures');
-    const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
+    expect(within(entrees).getByText('Client de démo').closest('a')?.getAttribute('href')).toBe('#/factures');
+    const sorties = screen.getByText('Dû').parentElement as HTMLElement;
     expect(within(sorties).queryByRole('button')).toBeNull();
   });
 
@@ -204,12 +205,12 @@ describe('les lignes et leurs pastilles', () => {
       }
     };
     render(<FluxCard flux={avecEcheances} periode="août 2026" {...RIEN} onPayer={onPayer} />);
-    const sorties = screen.getByText('Sorties').parentElement as HTMLElement;
+    const sorties = screen.getByText('Dû').parentElement as HTMLElement;
 
     await userEvent.click(within(sorties).getByRole('button', { name: /Cotisations URSSAF.*pointer le paiement/ }));
     expect(onPayer).toHaveBeenCalledWith('e-retard');
-    expect(within(sorties).getByText('TVA').closest('a')?.getAttribute('href')).toBe('#/argent');
-    expect(within(sorties).getByText('Charges sur encaissements').closest('a')?.getAttribute('href')).toBe('#/argent');
+    expect(within(sorties).getByText('TVA').closest('a')?.getAttribute('href')).toBe('#/obligations');
+    expect(within(sorties).getByText('Charges sur encaissements').closest('a')?.getAttribute('href')).toBe('#/obligations');
   });
 
   it('fait de même dans le détail déplié, la seule vue des lignes sur téléphone', async () => {

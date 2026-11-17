@@ -1,11 +1,12 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois } from '../../domain/types';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
+import { Factures } from './Factures';
 import { Activite } from './Activite';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -25,6 +26,19 @@ function figerHorloge(): void {
 
 function semer(modifications: Partial<Faits> = {}): void {
   useFaits.setState({ faits: { ...faitsVides(), ...modifications } });
+}
+
+/**
+ * L'onglet Analyse, désigné par l'adresse : depuis le lot 51, la dépendance
+ * client, la prévision du mois, le rapport par mission et le tarif journalier
+ * y vivent, et non plus sous la grille du planning. L'adresse est posée AVANT
+ * le premier rendu — l'écran lit son onglet à l'initialisation —, et l'appel
+ * rend des options vides : `render(<Activite />, analyse())` se lit comme
+ * l'onglet qu'on ouvre.
+ */
+function analyse() {
+  window.location.hash = '#/activite/analyse';
+  return {};
 }
 
 beforeEach(() => {
@@ -339,6 +353,8 @@ describe('missions', () => {
   });
 });
 
+/* Les clients et leurs délais vivent sous Factures depuis le lot 51 : le délai
+   réel d'un client est une question de facturation. */
 describe('délais de paiement', () => {
   it('affiche le délai médian et l’encours par client', async () => {
     semer({
@@ -348,7 +364,7 @@ describe('délais de paiement', () => {
         recette({ id: 'r3', montant: euros(5000), emiseLe: dateISO('2026-04-01'), encaisseeLe: null })
       ]
     });
-    render(<Activite />);
+    render(<Factures />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: /^Clients/ }));
     // L'onglet est chargé à la demande : attendre son arrivée.
@@ -362,7 +378,7 @@ describe('délais de paiement', () => {
   // Accuser un client sans référence serait pire que se taire.
   it('ne mesure rien quand aucune facture n’a été réglée', async () => {
     semer({ recettes: [recette({ encaisseeLe: null })] });
-    render(<Activite />);
+    render(<Factures />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: /^Clients/ }));
     await screen.findByRole('heading', { name: /Carnet/ });
@@ -379,7 +395,7 @@ describe('délais de paiement', () => {
  * un trimestre. C'est une des rares choses qu'une application de comptabilité
  * peut voir venir — à condition de la mesurer et de la montrer.
  */
-describe('le mois en chiffres', () => {
+describe('la dépendance client, dans l’Analyse', () => {
   it('mesure le poids de chaque client dans l’année', () => {
     semer({
       recettes: [
@@ -387,7 +403,7 @@ describe('le mois en chiffres', () => {
         recette({ id: 'r2', clientNom: 'Client B', montant: euros(2500), encaisseeLe: dateISO('2026-04-10') })
       ]
     });
-    render(<Activite />);
+    render(<Activite />, analyse());
 
     expect(screen.getByText('Client A')).toBeTruthy();
     expect(screen.getByText('75 %')).toBeTruthy();
@@ -405,7 +421,7 @@ describe('le mois en chiffres', () => {
         recette({ id: 'r1', clientNom: 'Client A', montant: euros(5000), encaisseeLe: dateISO('2026-01-15') })
       ]
     });
-    render(<Activite />);
+    render(<Activite />, analyse());
     expect(screen.getByText('Client A')).toBeTruthy();
     expect(screen.getByText('100 %')).toBeTruthy();
   });
@@ -414,7 +430,7 @@ describe('le mois en chiffres', () => {
   // client suggérerait qu'il en a un.
   it('dit que la dépendance ne se mesure pas encore', () => {
     semer({ recettes: [] });
-    render(<Activite />);
+    render(<Activite />, analyse());
     expect(screen.getByText(/ne se mesure pas encore/)).toBeTruthy();
   });
 });
@@ -561,7 +577,7 @@ describe('compte rendu d’activité', () => {
     render(<Activite />);
     expect(screen.queryByRole('button', { name: /Imprimer/ })).toBeNull();
     const lien = screen.getByRole('link', { name: /Générer le compte-rendu/ });
-    expect(lien.getAttribute('href')).toBe('#/outils/cra');
+    expect(lien.getAttribute('href')).toBe('#/activite/compte-rendu');
   });
 
   /*
@@ -1023,7 +1039,7 @@ describe('prévision de revenu du mois', () => {
 
   it('chiffre ce que le mois devrait rapporter', () => {
     semer({ missions: [avecRythme()] });
-    render(<Activite />);
+    render(<Activite />, analyse());
     // Juillet 2026 : 22 jours ouvrables à 400 € = 8 800 €. Le montant paraît
     // deux fois — prévu et retenu — puisqu'aucun ajustement n'a été posé.
     expect(screen.getAllByText(/8\s*800/u).length).toBeGreaterThan(0);
@@ -1039,7 +1055,7 @@ describe('prévision de revenu du mois', () => {
    */
   it('montre le retenu en face du prévu, mission par mission', () => {
     semer({ missions: [avecRythme()] });
-    render(<Activite />);
+    render(<Activite />, analyse());
     // 22 jours retenus sur 22 prévus : aucun ajustement n'a été posé.
     expect(screen.getByText('22 / 22 j')).toBeTruthy();
   });
@@ -1050,7 +1066,7 @@ describe('prévision de revenu du mois', () => {
    */
   it('résume les deux totaux une fois repliée', async () => {
     semer({ missions: [avecRythme()] });
-    render(<Activite />);
+    render(<Activite />, analyse());
     await userEvent.setup().click(
       screen.getByRole('button', { name: /devrait rapporter/ })
     );
@@ -1063,7 +1079,7 @@ describe('prévision de revenu du mois', () => {
   // s'affiche pas plutôt que d'annoncer zéro.
   it('ne s’affiche pas sans rythme saisi', () => {
     semer({ missions: [mission()] });
-    render(<Activite />);
+    render(<Activite />, analyse());
     expect(screen.queryByText(/devrait rapporter/)).toBeNull();
   });
 });
@@ -1108,7 +1124,7 @@ describe('rapport et charge par mission', () => {
    */
   it('trie les missions du meilleur euro-jour au moins bon', () => {
     semer({ missions: [missionB, missionA] });
-    render(<Activite />);
+    render(<Activite />, analyse());
 
     const lignes = screen.getAllByRole('row').filter(
       (l) => l.textContent?.includes('Studio Lumen') || l.textContent?.includes('Atelier Novak')
@@ -1120,7 +1136,7 @@ describe('rapport et charge par mission', () => {
   /** Les deux moitiés de la question, côte à côte : le rapport et la charge. */
   it('met la part du temps en face de l’euro-jour', () => {
     semer({ missions: [missionA, missionB] });
-    render(<Activite />);
+    render(<Activite />, analyse());
 
     const table = screen.getByRole('table');
     expect(within(table).getByRole('columnheader', { name: '€ / jour' })).toBeTruthy();
@@ -1131,7 +1147,7 @@ describe('rapport et charge par mission', () => {
   /** Sans mission planifiée, la carte ne s'invente pas un tableau vide. */
   it('ne montre rien sans mission planifiée', () => {
     semer({ missions: [] });
-    render(<Activite />);
+    render(<Activite />, analyse());
     expect(screen.queryByRole('table')).toBeNull();
   });
 
@@ -1141,7 +1157,7 @@ describe('rapport et charge par mission', () => {
    */
   it('rend les montants masquables', () => {
     semer({ missions: [missionA] });
-    render(<Activite />);
+    render(<Activite />, analyse());
 
     const table = screen.getByRole('table');
     expect(within(table).getByText('800 €').closest('[data-montant]')).toBeTruthy();
@@ -1181,7 +1197,7 @@ describe('ce qu’une journée rapporte', () => {
       // Janvier 2026 : 22 jours ouvrés, soit 11 000 € au tarif du contrat.
       recettes: [recette({ montant: euros(8800), emiseLe: dateISO('2026-01-31') })]
     });
-    render(<Activite />);
+    render(<Activite />, analyse());
 
     expect(screen.getByText(/Tarif des contrats/)).toBeTruthy();
     expect(screen.getByText('Tarif effectif, facturé')).toBeTruthy();
@@ -1194,7 +1210,7 @@ describe('ce qu’une journée rapporte', () => {
       missions: [missionTarifee],
       recettes: [recette({ montant: euros(11_000), emiseLe: dateISO('2026-01-31') })]
     });
-    render(<Activite />);
+    render(<Activite />, analyse());
 
     const reste = screen.getByText(/Ce qu’il te reste, charges déduites/);
     const montant = reste.parentElement?.querySelector('dd')?.textContent ?? '';
@@ -1217,12 +1233,12 @@ describe('ce qu’une journée rapporte', () => {
       recettes: [recette({ montant: euros(11_000), emiseLe: dateISO('2026-01-31') })]
     };
     semer(avecMission);
-    const { unmount } = render(<Activite />);
+    const { unmount } = render(<Activite />, analyse());
     expect(screen.getByText(/charges déduites, avant impôt sur le revenu/)).toBeTruthy();
     unmount();
 
     semer({ ...avecMission, entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } });
-    render(<Activite />);
+    render(<Activite />, analyse());
     // La ligne est bien là — seule la mention disparaît.
     expect(screen.getByText(/Ce qu’il te reste, charges déduites/)).toBeTruthy();
     expect(screen.queryByText(/avant impôt sur le revenu/)).toBeNull();
@@ -1231,7 +1247,7 @@ describe('ce qu’une journée rapporte', () => {
   /** Sans journée travaillée, il n'y a pas de moyenne à montrer. */
   it('ne montre rien sans journée travaillée', () => {
     semer({ missions: [] });
-    render(<Activite />);
+    render(<Activite />, analyse());
     expect(screen.queryByText(/Tarif des contrats/)).toBeNull();
   });
 });
@@ -1277,34 +1293,64 @@ describe('le mois partagé par les écrans', () => {
 });
 
 /**
- * L'ONGLET VIT DANS L'ADRESSE (formule A du rail).
+ * L'ONGLET VIT DANS L'ADRESSE.
  *
- * La liste des factures est un onglet d'Activité, et le lien « Factures »,
- * l'action rapide et le retour d'une facture rouverte doivent pouvoir le
- * DÉSIGNER. Un état local rouvrait toujours le plan de charge.
+ * L'action rapide « Télécharger le CRA » et la carte « Ce que le mois a
+ * produit » doivent pouvoir DÉSIGNER l'onglet où elles mènent. Un état local
+ * rouvrait toujours le planning.
  */
 describe('Activité — les onglets suivent l’adresse', () => {
-  it('ouvre l’onglet Factures quand l’adresse le désigne', async () => {
-    window.location.hash = '#/activite/factures';
+  it('porte les quatre onglets de la maquette, sans les factures ni les clients', () => {
     render(<Activite />);
-    expect(screen.getByRole('tab', { name: /Factures/ }).getAttribute('aria-selected')).toBe('true');
-    expect(await screen.findByRole('button', { name: 'Nouvelle facture' })).toBeTruthy();
+    expect(screen.getAllByRole('tab').map((t) => t.textContent?.replace(/\s*\d+$/u, '')))
+      .toEqual(['Planning', 'Missions', 'Compte rendu', 'Analyse']);
   });
 
   it('écrit l’onglet choisi dans l’adresse', async () => {
     window.location.hash = '#/activite';
     render(<Activite />);
-    await userEvent.click(screen.getByRole('tab', { name: /Clients/ }));
-    expect(window.location.hash).toBe('#/factures/clients');
-    await userEvent.click(screen.getByRole('tab', { name: /Plan de charge/ }));
+    await userEvent.click(screen.getByRole('tab', { name: /Analyse/ }));
+    expect(window.location.hash).toBe('#/activite/analyse');
+    await userEvent.click(screen.getByRole('tab', { name: /Planning/ }));
     expect(window.location.hash).toBe('#/activite');
   });
 
-  it('mène « Nouvelle facture » à la rédaction', async () => {
-    window.location.hash = '#/activite/factures';
+  /*
+   * « Télécharger le CRA » ouvre l'onglet ET l'atelier : une action rapide qui
+   * dépose sur l'onglet sans rien ouvrir déplacerait le second geste au lieu
+   * de l'épargner. Le clic sur l'onglet, lui, n'ouvre rien.
+   */
+  it('ouvre le compte rendu ET son atelier depuis `#/activite/compte-rendu`', async () => {
+    window.location.hash = '#/activite/compte-rendu';
     render(<Activite />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Nouvelle facture' }));
-    expect(window.location.hash).toBe('#/facture/nouvelle');
+    expect(screen.getByRole('tab', { name: /Compte rendu/ }).getAttribute('aria-selected')).toBe('true');
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
+
+  it('ouvre l’atelier quand on suit le lien depuis l’écran lui-même', async () => {
+    render(<Activite />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await act(async () => {
+      window.location.hash = '#/activite/compte-rendu';
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
+
+  it('n’ouvre pas l’atelier au clic sur l’onglet', async () => {
+    render(<Activite />);
+    await userEvent.click(screen.getByRole('tab', { name: /Compte rendu/ }));
+    expect(await screen.findByRole('heading', { name: /Générer un compte-rendu/ })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('referme l’atelier sans quitter l’onglet', async () => {
+    window.location.hash = '#/activite/compte-rendu';
+    render(<Activite />);
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: /Fermer/ }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('tab', { name: /Compte rendu/ }).getAttribute('aria-selected')).toBe('true');
   });
 
   /**

@@ -111,7 +111,7 @@ export function Pilote({ mois: moisChoisi, onMois }: {
   const [paiement, setPaiement] = useState<string | null>(null);
   const fermerPaiement = useCallback(() => setPaiement(null), []);
   const { ecran, sousRoute } = useRoute();
-  /* `#/pilote/encaissements` est un GESTE, comme `#/argent/livre` : l'action
+  /* `#/pilote/encaissements` est un GESTE, comme `#/obligations/livre` : l'action
      rapide et « + Nouveau » l'ouvrent de n'importe où, puis l'adresse redevient
      celle de l'écran — fermer le panneau puis recharger ne doit pas le
      rouvrir. */

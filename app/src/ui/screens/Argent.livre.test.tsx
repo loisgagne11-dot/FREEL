@@ -6,7 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Faits, type Recette, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
-import { Argent } from './Argent';
+import { Obligations } from './Obligations';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -38,7 +38,7 @@ function semer(modifications: Partial<Faits> = {}): void {
  * le « Chargement… » du Suspense.
  */
 async function ouvrirLivre() {
-  render(<Argent />);
+  render(<Obligations />);
   await userEvent.setup().click(screen.getByRole('button', { name: 'Livre des recettes' }));
   await screen.findByRole('heading', { name: /^Écritures/ });
 }
@@ -159,10 +159,10 @@ describe('livre vide', () => {
 });
 
 /**
- * LA PORTE DU PIED DU RAIL.
+ * L'ADRESSE DU LIVRE.
  *
- * `#/argent/livre` ouvre le registre directement : le chercher sous une
- * rangée de liens au bas d'Argent demandait de savoir qu'il y était. L'adresse
+ * `#/obligations/livre` ouvre le registre directement : le chercher sous une
+ * rangée de boutons demandait de savoir qu'il y était. L'adresse
  * redevient ensuite celle de l'écran — recharger après avoir fermé le panneau
  * ne doit pas le rouvrir.
  */
@@ -172,7 +172,7 @@ describe('l’adresse du livre', () => {
   it('ouvre le registre sur `#/obligations/livre`, puis rend l’adresse de l’écran', async () => {
     semer({ recettes: [recette()] });
     window.location.hash = '#/obligations/livre';
-    render(<Argent />);
+    render(<Obligations />);
     expect(await screen.findByRole('heading', { name: /^Écritures/ })).toBeTruthy();
     await vi.waitFor(() => expect(window.location.hash).toBe('#/obligations'));
   });
@@ -182,7 +182,7 @@ describe('l’adresse du livre', () => {
   it('ouvre encore le registre depuis l’ancienne adresse `#/argent/livre`', async () => {
     semer({ recettes: [recette()] });
     window.location.hash = '#/argent/livre';
-    render(<Argent />);
+    render(<Obligations />);
     expect(await screen.findByRole('heading', { name: /^Écritures/ })).toBeTruthy();
     await vi.waitFor(() => expect(window.location.hash).toBe('#/obligations'));
   });
@@ -192,7 +192,7 @@ describe('l’adresse du livre', () => {
   it('ouvre le dossier de TVA sur `#/obligations/tva`, puis rend l’adresse de l’écran', async () => {
     semer({ recettes: [recette()] });
     window.location.hash = '#/obligations/tva';
-    render(<Argent />);
+    render(<Obligations />);
     expect(await screen.findByRole('dialog', { name: 'Déclaration de TVA' })).toBeTruthy();
     await vi.waitFor(() => expect(window.location.hash).toBe('#/obligations'));
   });

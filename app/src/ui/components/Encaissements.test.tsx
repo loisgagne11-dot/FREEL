@@ -77,7 +77,7 @@ describe('ce qui reste à encaisser', () => {
     const { liste } = afficher();
     const brouillon = ligneDe(liste, '2026-027');
     expect(within(brouillon).queryByRole('button')).toBeNull();
-    expect(within(brouillon).getByRole('link').getAttribute('href')).toBe('#/activite/factures');
+    expect(within(brouillon).getByRole('link').getAttribute('href')).toBe('#/factures');
   });
 });
 

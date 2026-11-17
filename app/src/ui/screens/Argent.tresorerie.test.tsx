@@ -128,7 +128,7 @@ describe('les quatre tuiles de trésorerie', () => {
       poser({ soldeInitial: euros(10_000), soldeInitialAu: null });
 
       const tuile = screen.getByText('Solde du compte').parentElement;
-      expect(tuile?.textContent).toContain('date-le en Config');
+      expect(tuile?.textContent).toContain('date-le dans Réglages');
     });
 
     it('dit « saisi » et la date, quand rien n’a encore contribué', () => {
@@ -266,9 +266,9 @@ describe('la répartition du solde', () => {
     poser({ soldeInitial: euros(3_000), echeances: [echeance(4_000)] });
 
     const phrase = phraseDeRepartition();
-    expect(phrase.textContent).toContain('rien n’est à toi');
+    expect(phrase.textContent).toContain('ton disponible est négatif');
     expect(phrase.textContent).toContain(eur(1_000));
-    expect(phrase.textContent).not.toContain('0 € sont à toi');
+    expect(phrase.textContent).not.toContain('0 € sont ton disponible');
   });
 
   /**
@@ -288,8 +288,11 @@ describe('la répartition du solde', () => {
     poser({ soldeInitial: euros(10_000), reserve: euros(3_000) });
 
     const phrase = phraseDeRepartition();
+    // Les cinq mots (lot 51) : « à te verser » et non « que tu peux te
+    // verser », qui est le titre d'une autre carte.
     expect(phrase.textContent).toContain('de réserve');
-    expect(phrase.textContent).toContain('que tu peux te verser');
+    expect(phrase.textContent).toContain('à te verser');
+    expect(phrase.textContent).toContain('forment le dû');
   });
 
   /**

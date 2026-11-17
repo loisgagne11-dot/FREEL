@@ -113,7 +113,7 @@ describe('recherche — où mène un résultat', () => {
       construireIndex(sources({ recettes: [recette('a', 100, { emiseLe: null, numero: '' })] })),
       'prestation'
     );
-    expect(r?.href).toBe('#/activite/factures');
+    expect(r?.href).toBe('#/factures');
     expect(r?.titre).toMatch(/^Brouillon/);
   });
 });

@@ -8,7 +8,7 @@ import type { Echeance } from '../../domain/calculs/provisions';
 import { type Faits, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { eur } from '../format';
-import { Argent } from './Argent';
+import { Tresorerie } from './Tresorerie';
 
 /**
  * Le pilier Trésorerie est chargé à la demande depuis le lot B : on attend son
@@ -50,7 +50,7 @@ const ech = (id: string, nature: Echeance['nature'], montant: number): Echeance 
 describe('ventilation des provisions à l’écran', () => {
   it('affiche chaque nature avec son montant', async () => {
     semer({ echeances: [ech('a', 'urssaf', 4100), ech('b', 'tva', 1800), ech('c', 'cfe', 300)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
@@ -84,7 +84,7 @@ describe('ventilation des provisions à l’écran', () => {
    */
   it('n’affiche pas d’enveloppe pour une nature qui ne doit rien', async () => {
     semer({ echeances: [ech('a', 'urssaf', 4100)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
@@ -102,7 +102,7 @@ describe('ventilation des provisions à l’écran', () => {
    */
   it('met la couverture en face du dû, avec la date qui vient', async () => {
     semer({ soldeInitial: euros(1_000), echeances: [ech('a', 'urssaf', 4100)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
@@ -121,7 +121,7 @@ describe('ventilation des provisions à l’écran', () => {
    */
   it('rend chaque montant masquable', async () => {
     semer({ echeances: [ech('a', 'urssaf', 4100), ech('b', 'tva', 1800)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
@@ -145,7 +145,7 @@ describe('ventilation des provisions à l’écran', () => {
    */
   it('garde une vignette TVA même sans appel émis, en disant pourquoi', async () => {
     semer({ echeances: [ech('a', 'urssaf', 4100)] }); // aucune échéance de nature TVA
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
@@ -160,7 +160,7 @@ describe('ventilation des provisions à l’écran', () => {
 
   it('affiche le montant réel dès qu’un appel de TVA existe', async () => {
     semer({ echeances: [ech('a', 'tva', 950)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
@@ -184,7 +184,7 @@ describe('ventilation des provisions à l’écran', () => {
    */
   it('ajoute une vignette « Réserve » quand une réserve est réglée', async () => {
     semer({ soldeInitial: euros(10_000), reserve: euros(2_500) });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
@@ -195,7 +195,7 @@ describe('ventilation des provisions à l’écran', () => {
 
   it('ne montre pas de vignette « Réserve » quand aucune réserve n’est réglée', async () => {
     semer({ soldeInitial: euros(10_000) }); // `reserve` reste à zéro, comme `faitsVides()`
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     const enveloppes = screen.getByText(/Enveloppes du dû/).closest('section');
@@ -220,7 +220,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
 
   it('dit pourquoi elle n’est pas comptée dans le dû quand les parts manquent', async () => {
     semer({ recettes: [recette(60000)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     // `getAllBy` : le titre en gras et la ligne qui le contient répondent tous
     // deux au motif. C'est un détail de rendu, pas deux endroits.
@@ -230,7 +230,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
 
   it('affiche le reste à mettre de côté et nomme ce qu’il ignore', async () => {
     semer({ recettes: [recette(60000)], partsFiscales: 1 });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     expect(screen.getAllByText(/à\s+mettre de côté\s+aujourd/).length).toBeGreaterThan(0);
     // Autres revenus et PER non renseignés : deux réserves qui vont dans des
@@ -247,7 +247,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
       recettes: [recette(60000)],
       entreprise: { ...faitsVides().entreprise, versementLiberatoire: true }
     });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     expect(screen.queryAllByText(/non compté dans le dû/)).toHaveLength(0);
     expect(screen.queryAllByText(/à\s+mettre de côté\s+aujourd/)).toHaveLength(0);
@@ -258,7 +258,7 @@ describe('provision d’impôt sur le revenu à l’écran', () => {
   // total du jour n'y répond pas, l'ancienne application si.
   it('se déplie mois par mois, de janvier au mois courant', async () => {
     semer({ recettes: [recette(60000)], partsFiscales: 1 });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     await userEvent.setup().click(screen.getByText('L’impôt 2026, mois par mois'));
     const table = await screen.findByRole('table');
@@ -281,7 +281,7 @@ describe('le détail d’une enveloppe', () => {
 
   it('ouvre le détail au clic sur la vignette', async () => {
     semer({ echeances: [ech('e1', 'urssaf', 2000)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
 
     await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
@@ -300,7 +300,7 @@ describe('le détail d’une enveloppe', () => {
    */
   it('nomme le total du détail « Ce qui est dû », comme le reste de l’écran', async () => {
     semer({ echeances: [ech('e1', 'urssaf', 2000)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
 
@@ -324,7 +324,7 @@ describe('le détail d’une enveloppe', () => {
       }],
       partsFiscales: 1
     });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     const vignette = screen.getByRole('button', { name: /Impôt sur le revenu/i });
     // La vignette dit « X € [couverts] sur Y € » : Y est ce qui est dû.
@@ -353,7 +353,7 @@ describe('le détail d’une enveloppe', () => {
         modeReglement: null, numero: '2026-001'
       }]
     });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
 
@@ -375,7 +375,7 @@ describe('le détail d’une enveloppe', () => {
         modeReglement: null, numero: '2026-001'
       }]
     });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
     const panneau = within(await screen.findByRole('dialog'));
@@ -392,7 +392,7 @@ describe('le détail d’une enveloppe', () => {
    */
   it('ne règle rien avant confirmation', async () => {
     semer({ echeances: [ech('e1', 'urssaf', 2000)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
     const panneau = within(await screen.findByRole('dialog'));
@@ -431,7 +431,7 @@ describe('TVA autoliquidée, à l’écran', () => {
 
   it('affiche la ligne « dont TVA autoliquidée » quand il y en a', async () => {
     semer({ depenses: [achatUe] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     await userEvent.setup().click(screen.getByRole('button', { name: /TVA à reverser/i }));
 
@@ -442,7 +442,7 @@ describe('TVA autoliquidée, à l’écran', () => {
 
   it('n’affiche pas la ligne quand aucun achat n’est autoliquidé', async () => {
     semer({ echeances: [ech('t1', 'tva', 500)] });
-    render(<Argent />);
+    render(<Tresorerie />);
     await attendreTresorerie();
     await userEvent.setup().click(screen.getByRole('button', { name: /TVA à reverser/i }));
 

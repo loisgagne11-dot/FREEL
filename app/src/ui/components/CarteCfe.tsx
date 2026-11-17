@@ -168,7 +168,7 @@ export function CarteCfe({ maintenant = new Date() }: { readonly maintenant?: Da
               : (
                 <>
                   Rien n’est enregistré tant que tu ne portes pas ce montant en
-                  échéance. <a className={styles.lien} href="#/argent">Saisir l’échéance</a>
+                  échéance. <a className={styles.lien} href="#/obligations">Saisir l’échéance</a>
                 </>
               )}
           </p>

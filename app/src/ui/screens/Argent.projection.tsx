@@ -63,8 +63,12 @@ export function ProjectionPanneau() {
     <div className={styles.dossier}>
       {/* La réponse, en toutes lettres, avant les barres. Un graphe se lit
           d'un coup d'œil mais ne dit pas de combien il s'agit. */}
+      {/* « Versement tenable » et non « Tu peux te verser » : c'est une autre
+          grandeur que l'« à te verser » du jour — ce qu'on peut prendre CHAQUE
+          mois sans passer sous la réserve —, et le même mot pour les deux
+          faisait lire deux montants différents comme un seul (E3). */}
       <p className={styles.reponse}>
-        Tu peux te verser <strong><Montant>{eur(projection.versementMensuel)}</Montant></strong> par
+        Versement tenable&nbsp;: <strong><Montant>{eur(projection.versementMensuel)}</Montant></strong> par
         mois pendant un an.
         {projection.moisContraignant !== null && (
           <> C’est <strong>{moisLong(projection.moisContraignant)}</strong> qui

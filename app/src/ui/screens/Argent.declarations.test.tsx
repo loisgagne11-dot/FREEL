@@ -7,7 +7,8 @@ import { dateISO, euros } from '../../domain/types';
 import { type Faits, type Recette, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { FournisseurToasts } from '../components/Toasts';
-import { Argent } from './Argent';
+import { Obligations } from './Obligations';
+import { Tresorerie } from './Tresorerie';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -36,21 +37,18 @@ function semer(modifications: Partial<Faits> = {}): void {
 }
 
 const rendre = async (): Promise<void> => {
-  render(<FournisseurToasts><Argent /></FournisseurToasts>);
+  render(<FournisseurToasts><Obligations /></FournisseurToasts>);
   /*
-   * DEUX MODULES DIFFÉRÉS, DONC DEUX ATTENTES.
+   * L'ÉCHÉANCIER EST DIFFÉRÉ : ON L'ATTEND.
    *
-   * Le pilier Trésorerie est différé depuis le lot B, et l'échéancier — qui
-   * porte cette carte — l'est À SON TOUR depuis le lot B aussi. N'attendre que
-   * le premier laissait le second arriver « en général assez vite », ce qui est
-   * une autre façon de dire que le test passait par chance : sous charge, les
-   * cinq assertions tombaient sur un `Chargement…`.
-   *
-   * L'échec ne ressemblait à rien de connu — « avril 2026 introuvable » — et il
-   * a coûté un aller-retour complet à travers trois lots avant qu'on remonte à
-   * la vraie cause. On attend donc explicitement la carte qu'on interroge.
+   * N'attendre que l'écran laissait le module de l'échéancier arriver « en
+   * général assez vite », ce qui est une autre façon de dire que le test
+   * passait par chance : sous charge, les assertions tombaient sur un
+   * `Chargement…`. L'échec ne ressemblait à rien de connu — « avril 2026
+   * introuvable » — et il a coûté un aller-retour à travers trois lots avant
+   * qu'on remonte à la vraie cause. On attend donc explicitement sa carte.
    */
-  await screen.findByText(/n’est pas tout à toi/);
+  await screen.findByRole('heading', { name: /Échéancier/ });
 };
 
 /**
@@ -88,8 +86,12 @@ describe('périodes URSSAF', () => {
     ]);
   });
 
+  /* La période se marque sous Obligations, la dette se lit sous la Trésorerie
+     (lot 51) : les deux écrans montés ensemble, pour voir l'une suivre l'autre. */
   it('fait basculer la dette d’un volet à l’autre', async () => {
     semer({ recettes: [encaissee('r1', '2026-04-10')] });
+    render(<FournisseurToasts><Tresorerie /></FournisseurToasts>);
+    await screen.findByText(/n’est pas tout à toi/);
     await rendreAvecUrssaf();
 
     const avant = screen.getByText('Charges sur recettes encaissées non déclarées')
@@ -133,7 +135,7 @@ describe('périodes URSSAF', () => {
     expect(screen.queryByText('Périodes URSSAF')).toBeNull();
   });
 
-  it('suit la périodicité déclarée en Config', async () => {
+  it('suit la périodicité déclarée dans Réglages', async () => {
     semer({
       entreprise: { ...faitsVides().entreprise, urssafPeriodicite: 'mensuel' },
       recettes: [encaissee('r1', '2026-04-10')]

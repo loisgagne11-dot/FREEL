@@ -46,6 +46,9 @@ const PALETTES = ['sombre', 'nuit', 'clair', 'calme'];
 const ECRANS = [
   { hash: '#/pilote', nom: 'pilote' },
   { hash: '#/activite', nom: 'activite' },
+  // L'Analyse porte les graphes venus d'Argent (lot 51) — le graphe du CA et
+  // sa composition étaient mesurés sous Argent ; ils le sont là où ils vivent.
+  { hash: '#/activite/analyse', nom: 'activite-analyse', attendre: 'text=CA facturé' },
   { hash: '#/factures', nom: 'factures' },
   { hash: '#/tresorerie', nom: 'tresorerie' },
   { hash: '#/obligations', nom: 'obligations' },
@@ -54,7 +57,7 @@ const ECRANS = [
   { hash: '#/reglages', nom: 'reglages' },
   // Chaque section des Réglages arrive à la demande, APRÈS le titre de
   // l'écran : sans attendre son contenu, on mesurait un panneau vide. Seul
-  // `#/config` (Profil) était visité, et l'adresse Légifrance des Paramètres
+  // Profil était visité, et l'adresse Légifrance des Paramètres
   // fiscaux élargissait la page à 609 px sur téléphone sans que rien ne le voie.
   { hash: '#/reglages/fiscal', nom: 'reglages-fiscal', attendre: 'text=Ajouter une période' },
   { hash: '#/reglages/reserve', nom: 'reglages-reserve', attendre: 'text=Part gardée à chaque versement' },
@@ -259,6 +262,12 @@ for (const taille of TAILLES) {
           const r = e.getBoundingClientRect();
           return r.width > 20 && r.height > 0 && getComputedStyle(e).display !== 'none';
         })(),
+        /* Les rangées d'onglets qui doivent glisser pour montrer leur dernier
+           onglet : à 390 px, « Analyse » d'Activité sortait du cadre (lot 51),
+           et un onglet coupé ne dit pas qu'il existe. */
+        ongletsCoupes: [...document.querySelectorAll('[role="tablist"]')]
+          .filter((l) => l.getClientRects().length > 0 && l.scrollWidth > l.clientWidth + 1)
+          .map((l) => `${l.getAttribute('aria-label') ?? 'onglets'} (${l.scrollWidth} > ${l.clientWidth})`),
         couleurFond: getComputedStyle(document.body).backgroundColor
       };
     });
@@ -297,6 +306,11 @@ for (const taille of TAILLES) {
       constate(
         mesures.nbLibellesVisibles === ENTREES_DU_TELEPHONE,
         `${prefixe} les ${ENTREES_DU_TELEPHONE} entrées nommées en portrait (${mesures.nbLibellesVisibles})`
+      );
+      constate(
+        mesures.ongletsCoupes.length === 0,
+        `${prefixe} chaque rangée d'onglets tient sans glisser`
+          + (mesures.ongletsCoupes.length > 0 ? ` (${mesures.ongletsCoupes.join(', ')})` : '')
       );
       constate(
         mesures.hauteurMiniLien >= 44,

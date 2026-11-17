@@ -17,6 +17,17 @@
  * C'est le seul contrôle du projet dont l'échec révèle une fuite de données
  * plutôt qu'un défaut d'affichage.
  *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE LEXIQUE DE L'ARGENT, AU PASSAGE (lot 51)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Il parcourt déjà chaque écran du rail et chacun de ses onglets, cartes
+ * dépliées puis repliées : il lit aussi le texte rendu, et refuse les mots que
+ * la règle des cinq mots a retirés (`AUDIT-PRODUIT-ET-INTERFACE.md`, E3 et
+ * §8.7) — solde, dû, disponible, réserve, à te verser, et rien d'autre. Deux
+ * grandeurs portaient six noms ; un ancien libellé qui revient, et l'écran
+ * recommence à dire la même chose de deux façons.
+ *
  * Usage : node scripts/verifier-confidentialite.mjs
  */
 
@@ -34,8 +45,11 @@ const TYPES = {
 
 // Les adresses du lot 51 : une ancienne n'est plus qu'une redirection, et
 // mesurer à travers elle ne prouverait rien de plus sur l'écran d'arrivée.
+// L'Analyse d'Activité porte le chiffre d'affaires venu d'Argent : un onglet
+// que l'écran n'ouvre pas d'emblée, donc une adresse à part.
 const ECRANS = [
-  'pilote', 'activite', 'factures', 'tresorerie', 'obligations', 'achats', 'simulateurs', 'reglages'
+  'pilote', 'activite', 'activite/analyse', 'factures', 'tresorerie', 'obligations', 'achats',
+  'simulateurs', 'reglages'
 ];
 
 /**
@@ -225,14 +239,19 @@ async function replierLesCartes(page) {
 async function parcourirEtMesurer(page, mesurer) {
   const echecs = [];
   const exposes = [];
+  const mots = new Set();
   let replies = 0;
 
+  /* Le lexique se lit AVANT le repli — le corps des cartes n'existe que
+     déplié — et après, quand seuls les résumés restent. */
   async function passe() {
+    for (const m of await motsRetires(page)) mots.add(m);
     const r = await replierLesCartes(page);
     replies += r.replies;
     echecs.push(...r.echecs);
     await page.waitForTimeout(60);
     exposes.push(...await mesurer());
+    for (const m of await motsRetires(page)) mots.add(m);
   }
 
   await passe();
@@ -244,7 +263,49 @@ async function parcourirEtMesurer(page, mesurer) {
     await page.waitForTimeout(120);
     await passe();
   }
-  return { replies, echecs, exposes };
+  return { replies, echecs, exposes, mots: [...mots] };
+}
+
+/**
+ * Les mots que la règle des cinq mots a retirés du texte visible.
+ *
+ * Chacun avec ce qu'il remplaçait : « provisions » et « reste à sortir »
+ * disaient le DÛ, « versable » ce qui est À TE VERSER, « matelas » la
+ * RÉSERVE. Les motifs sont des mots entiers : « provisionné » dans un nom de
+ * classe ne compte pas, et le texte lu est celui du document — infobulles
+ * repliées comprises —, plus les noms accessibles et les titres.
+ */
+const MOTS_RETIRES = [
+  ['versable', /\bversables?\b/iu],
+  ['provision(s)', /\bprovisions?\b/iu],
+  ['matelas', /\bmatelas\b/iu],
+  ['reste à sortir', /reste à sortir/iu],
+  ['hors provisions', /hors provisions/iu]
+];
+
+async function motsRetires(page) {
+  return page.evaluate((motifs) => {
+    const morceaux = [];
+    const parcours = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n = parcours.nextNode(); n !== null; n = parcours.nextNode()) {
+      const parent = n.parentElement;
+      if (parent === null || ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(parent.tagName)) continue;
+      morceaux.push(n.textContent ?? '');
+    }
+    for (const e of document.body.querySelectorAll('[aria-label], [title], [placeholder]')) {
+      for (const a of ['aria-label', 'title', 'placeholder']) {
+        const v = e.getAttribute(a);
+        if (v) morceaux.push(v);
+      }
+    }
+    const texte = morceaux.join(' ').replace(/\s+/gu, ' ');
+    const trouves = [];
+    for (const [nom, source] of motifs) {
+      const m = new RegExp(source, 'iu').exec(texte);
+      if (m) trouves.push(`${nom} : « …${texte.slice(Math.max(0, m.index - 40), m.index + m[0].length + 30).trim()}… »`);
+    }
+    return trouves;
+  }, MOTS_RETIRES.map(([nom, motif]) => [nom, motif.source]));
 }
 
 const page = await contexte.newPage();
@@ -328,6 +389,11 @@ for (const ecran of ECRANS) {
   if (passe.echecs.length > 0) {
     constate(false, `#/${ecran} — carte impossible à replier : ${passe.echecs[0]}`);
   }
+  constate(
+    passe.mots.length === 0,
+    `#/${ecran} — lexique de l’argent : aucun mot retiré`
+      + (passe.mots.length > 0 ? ` (${passe.mots.join(' ; ')})` : '')
+  );
   const exposes = passe.exposes;
   constate(
     exposes.length === 0,
@@ -335,6 +401,25 @@ for (const ecran of ECRANS) {
       + (exposes.length > 0
         ? ` (${exposes.length} exposé(s) : ${exposes.slice(0, 4).map((e) => `« ${e.texte} »`).join(', ')})`
         : '')
+  );
+}
+
+/* ── Les sections des Réglages : le lexique seul ─────────────────────── */
+
+/* Elles ne sont pas des onglets — une liste de boutons qui change l'adresse —,
+   et la boucle ci-dessus n'ouvre que Profil. Le lexique y passe aussi ; la
+   confidentialité, non : les plafonds et seuils du barème sont des montants
+   publics, pas des données du dossier. */
+console.log('\n📖 lexique de l’argent — les sections des Réglages');
+for (const section of ['fiscal', 'reserve', 'facturation', 'compte', 'donnees', 'affichage']) {
+  await page.goto(`${base}#/reglages/${section}`, { waitUntil: 'networkidle' });
+  await page.waitForSelector('h1:visible', { timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(250);
+  const mots = await motsRetires(page);
+  constate(
+    mots.length === 0,
+    `#/reglages/${section} — lexique de l’argent : aucun mot retiré`
+      + (mots.length > 0 ? ` (${mots.join(' ; ')})` : '')
   );
 }
 
@@ -369,9 +454,9 @@ serveur.close();
 
 console.log(`\n${'═'.repeat(52)}`);
 if (echecs.length === 0) {
-  console.log('✅ confidentialité : aucun montant ne fuit');
+  console.log('✅ confidentialité : aucun montant ne fuit, aucun mot retiré ne reparaît');
 } else {
-  console.log(`❌ ${echecs.length} fuite(s) :`);
+  console.log(`❌ ${echecs.length} échec(s) — fuite ou mot retiré :`);
   echecs.forEach((e) => console.log(`   · ${e}`));
 }
 console.log('═'.repeat(52));

@@ -264,7 +264,7 @@ function Brouillon({ recette: r, teinte }: { readonly recette: Recette; readonly
           <span className={styles.meta}>{r.numero || 'Sans numéro'} · brouillon, pas encore émise</span>
         </span>
         <span className={styles.montant}><Montant>{eur(r.montant)}</Montant></span>
-        <a className={styles.emettre} href="#/activite/factures">
+        <a className={styles.emettre} href="#/factures">
           à émettre
           {' '}<span className={styles.horsEcran}>— {r.numero || 'sans numéro'}, {client}, dans le facturier</span>
         </a>

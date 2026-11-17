@@ -38,7 +38,10 @@ describe('projection du disponible', () => {
     semer({ soldeInitial: euros(24_000) });
     render(<ProjectionPanneau />);
 
-    expect(screen.getByText(/Tu peux te verser/)).toBeTruthy();
+    // « Versement tenable » : la capacité mensuelle n'est pas l'« à te verser »
+    // du jour, et ne porte pas son nom (règle des cinq mots, lot 51).
+    expect(screen.getByText(/Versement tenable/)).toBeTruthy();
+    expect(screen.queryByText(/Tu peux te verser/)).toBeNull();
   });
 
   /**
@@ -176,7 +179,7 @@ describe('projection du disponible', () => {
     semer({ soldeInitial: euros(24_000) });
     render(<ProjectionPanneau />);
 
-    const phrase = screen.getByText(/Tu peux te verser/);
+    const phrase = screen.getByText(/Versement tenable/);
     expect(phrase.querySelector('[data-montant]')).toBeTruthy();
   });
 });

@@ -46,9 +46,9 @@ const DetailDuFlux = lazy(() => import('./FluxCard.detail').then((m) => ({ defau
 const LIGNES_PAR_COLONNE = 4;
 
 /** Là où le statut d'un encaissement se met à jour : la liste des factures. */
-export const VERS_FACTURES = '#/activite/factures';
-/** Là où le statut d'une sortie se met à jour : l'échéancier. */
-const VERS_ECHEANCIER = '#/argent';
+export const VERS_FACTURES = '#/factures';
+/** Là où le statut d'une sortie se met à jour : l'échéancier, sous Obligations. */
+const VERS_ECHEANCIER = '#/obligations';
 
 export function FluxCard(
   { flux, periode, navigation, onVersable, onPointer, onPayer, dejaVerse, besoinMensuel }: {
@@ -95,7 +95,7 @@ export function FluxCard(
 
   const detaillables = [
     { cle: 'entrees', titre: 'Encaissements', lignes: flux.entrees.lignes, vers: VERS_FACTURES, onPointer },
-    { cle: 'sorties', titre: 'Sorties', lignes: sorties, vers: VERS_ECHEANCIER, onPointer: onPayer }
+    { cle: 'sorties', titre: 'Dû', lignes: sorties, vers: VERS_ECHEANCIER, onPointer: onPayer }
   ].filter((d) => d.lignes.length > 0);
 
   return (
@@ -130,7 +130,11 @@ export function FluxCard(
         </div>
 
         <div className={styles.colonne}>
-          <span className={`${styles.libelle} ${styles.sortie}`}>Sorties</span>
+          {/* « Dû » et non « Sorties » : le total est le dû du jour, charges
+              des encaissements non déclarés comprises — de l'argent qui n'a
+              pas encore quitté le compte. L'appeler « sorties » faisait lire
+              une dépense là où il y a une dette (règle des cinq mots, E3). */}
+          <span className={`${styles.libelle} ${styles.sortie}`}>Dû</span>
           <span className={`${styles.montant} ${styles.sortie}`}>
             <Montant>{eur(flux.sorties.total)}</Montant>
           </span>
@@ -178,7 +182,7 @@ export function FluxCard(
             </p>
           )}
           {versementPossible && (
-            <a className={`${styles.action} ${styles.principale} ${styles.dansLaColonne}`} href="#/argent">
+            <a className={`${styles.action} ${styles.principale} ${styles.dansLaColonne}`} href="#/tresorerie">
               Verser sur mon compte
             </a>
           )}
@@ -187,7 +191,7 @@ export function FluxCard(
 
       <div className={styles.pied}>
         {versementPossible && (
-          <a className={`${styles.action} ${styles.principale} ${styles.sousLesColonnes}`} href="#/argent">
+          <a className={`${styles.action} ${styles.principale} ${styles.sousLesColonnes}`} href="#/tresorerie">
             Verser sur mon compte
           </a>
         )}

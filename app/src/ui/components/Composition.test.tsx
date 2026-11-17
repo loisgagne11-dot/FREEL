@@ -112,7 +112,7 @@ describe('le panneau dit ce que le chiffre tait', () => {
       recettes: [recette(4_000, '2026-01-15')]
     }, 'solde');
 
-    expect(panneau().getByText(/Config › Réserve & versements/)).toBeTruthy();
+    expect(panneau().getByText(/Réglages › Réserve & versements/)).toBeTruthy();
   });
 
   it('explique un « à te verser » ramené à zéro par la réserve', () => {

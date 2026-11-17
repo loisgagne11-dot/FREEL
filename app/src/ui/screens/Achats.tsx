@@ -31,13 +31,11 @@ import { Info } from '../components/Info';
 import { Vide } from '../components/Vide';
 import { useRoute } from '../useRoute';
 import { CartePliable } from '../components/CartePliable';
-import { Onglets, PanneauOnglet } from '../components/Onglets';
 import { Sheet } from '../components/Sheet';
 import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { dateCourte, eur, eurExact } from '../format';
 import styles from './Achats.module.css';
 import { Montant } from '../components/Montant';
-import { composantALaDemande } from '../composantALaDemande';
 
 /**
  * Écran Achats — dépenses, justificatifs et TVA déductible.
@@ -92,13 +90,6 @@ const MOIS_PAR_PAS: Readonly<Record<Granularite, number>> = {
   mois: 1, trimestre: 3, annee: 12, tout: 0
 };
 
-type Section = 'depenses' | 'releve';
-
-const SECTIONS = [
-  { id: 'depenses' as Section, libelle: 'Dépenses' },
-  { id: 'releve' as Section, libelle: 'Relevé bancaire' }
-];
-
 /** Ce qu'un panneau latéral affiche à un instant donné. */
 type Panneau =
   | { readonly type: 'ferme' }
@@ -110,43 +101,28 @@ type Panneau =
 const stockageParDefaut = stockageIndexedDB();
 const RappelArchive = lazy(() => import('./Achats.archive'));
 
-/**
- * Le relevé et son rapprochement, chargés à la demande.
- *
- * L'onglet ne se monte qu'à son ouverture, mais le module voyageait dans le
- * paquet de l'écran : la confirmation de l'effacement et le retrait d'une
- * ligne (lot 21) l'ont fait passer à 41,4 Ko, au-dessus des 40 du budget. On
- * importe un relevé une fois par mois ; consulter ses dépenses n'a pas à en
- * payer le téléchargement. Préchargé au repos, il s'affiche sans attente quand
- * on ouvre l'onglet.
- */
-const Releve = composantALaDemande(() => import('./Releve').then((m) => m.Releve), true);
-
 export function Achats({ stockage = stockageParDefaut, mois: moisChoisi, onMois }: ProprietesAchats = {}) {
   const faits = useFaits((e) => e.faits);
 
   /**
-   * L'URL peut désigner une section et ouvrir la saisie.
+   * L'URL peut ouvrir la saisie.
    *
-   * `#/achats/depense` ouvre le panneau d'ajout, `#/achats/releve` la section
-   * relevé. C'est ce qui permet aux actions rapides du Pilote de faire ce
-   * qu'elles annoncent : « ajouter une dépense » doit ouvrir le formulaire, pas
-   * déposer sur un écran où il faut encore trouver le bouton.
+   * `#/achats/depense` ouvre le panneau d'ajout. C'est ce qui permet aux
+   * actions rapides du Pilote de faire ce qu'elles annoncent : « ajouter une
+   * dépense » doit ouvrir le formulaire, pas déposer sur un écran où il faut
+   * encore trouver le bouton.
    *
-   * L'état d'écran reste local et modifiable à la main : la sous-route ne fait
-   * que l'AMORCER. Sans cela, cliquer sur l'onglet « Dépenses » depuis
-   * `#/achats/releve` serait aussitôt annulé par l'URL.
+   * Le relevé bancaire, qui était le second onglet de cet écran, est parti
+   * sous la Trésorerie (lot 51) : il est la source du solde qu'elle affiche.
+   * `#/achats/releve` y mène — voir `redirection`.
    */
   const { sousRoute } = useRoute();
   const [panneau, setPanneau] = useState<Panneau>(
     sousRoute === 'depense' ? { type: 'ajout' } : { type: 'ferme' }
   );
-  const [section, setSection] = useState<Section>(sousRoute === 'releve' ? 'releve' : 'depenses');
   useEffect(() => {
-    if (sousRoute === 'releve') setSection('releve');
-    if (sousRoute === 'depense') { setSection('depenses'); setPanneau({ type: 'ajout' }); }
+    if (sousRoute === 'depense') setPanneau({ type: 'ajout' });
   }, [sousRoute]);
-  const idGroupe = useId();
   const [granularite, setGranularite] = useState<Granularite>('mois');
   const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
   const mois = moisChoisi ?? moisLocal;
@@ -183,7 +159,7 @@ export function Achats({ stockage = stockageParDefaut, mois: moisChoisi, onMois 
         titre="Achats & justificatifs"
         sousTitre="Une dépense sans pièce ne récupère pas sa TVA : c’est la règle, et elle n’est pas contournable."
         repere={n === 0 ? 'Tout est justifié' : `${n} justificatif${n > 1 ? 's' : ''} manquant${n > 1 ? 's' : ''}`}
-        actions={section === 'depenses' && faits.depenses.length > 0 ? (
+        actions={faits.depenses.length > 0 ? (
           <button
             type="button"
             className={styles.actionPrincipale}
@@ -195,27 +171,6 @@ export function Achats({ stockage = stockageParDefaut, mois: moisChoisi, onMois 
       />
 
       <Suspense fallback={null}><RappelArchive stockage={stockage} /></Suspense>
-
-      <div className={styles.sections}>
-        <Onglets
-          idGroupe={idGroupe}
-          onglets={SECTIONS}
-          actif={section}
-          onChange={setSection}
-          libelle="Sections de l’écran Achats"
-        />
-
-        <PanneauOnglet idGroupe={idGroupe} id="releve" actif={section === 'releve'}>
-          {/* Monté seulement à l'ouverture : lire un relevé et calculer les
-              candidats n'a pas à peser sur l'affichage des dépenses. */}
-          {section === 'releve' && (
-            <Suspense fallback={<p role="status">Chargement…</p>}>
-              <Releve />
-            </Suspense>
-          )}
-        </PanneauOnglet>
-
-        <PanneauOnglet idGroupe={idGroupe} id="depenses" actif={section === 'depenses'}>
 
       {/* La seule commande de période de l'écran, en tête de ses dépenses. */}
       <BarrePeriode
@@ -372,12 +327,9 @@ export function Achats({ stockage = stockageParDefaut, mois: moisChoisi, onMois 
         )}
 
         <p className={styles.piedRegistre}>
-          <a className={styles.lienTva} href="#/argent/tva"><span aria-hidden="true">→</span>Suivi &amp; déclaration TVA</a>
+          <a className={styles.lienTva} href="#/obligations/tva"><span aria-hidden="true">→</span>Suivi &amp; déclaration TVA</a>
         </p>
       </CartePliable>
-
-        </PanneauOnglet>
-      </div>
 
       <Sheet
         ouvert={selection !== null}

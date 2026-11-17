@@ -79,7 +79,7 @@ export function Sorties(
     <Sheet
       ouvert
       variante="atelier"
-      titre="Sorties"
+      titre="Ce qui est dû"
       sousTitre="pointe une échéance comme payée"
       onFermer={onFermer}
       pied={(
@@ -106,7 +106,7 @@ export function Sorties(
           </p>
           {plusTard.length > 0 && (
             <p className={styles.precision}>
-              <a className={styles.lien} href="#/argent">
+              <a className={styles.lien} href="#/obligations">
                 {plusTard.length} autre{plusTard.length > 1 ? 's' : ''} plus tard
                 {' '}(<Montant>{eur(totalPlusTard)}</Montant>) — voir l’échéancier
               </a>

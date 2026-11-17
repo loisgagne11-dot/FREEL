@@ -56,7 +56,9 @@ export function FluxAutreMois(
         </div>
 
         <div className={styles.colonne}>
-          <span className={`${styles.libelle} ${styles.sortie}`}>Sorties</span>
+          {/* Les échéances du mois — ce qui était, ou sera, dû —, payées ou
+              non : le même mot que la colonne du mois courant. */}
+          <span className={`${styles.libelle} ${styles.sortie}`}>Dû</span>
           <span className={`${styles.montant} ${styles.sortie}`}>
             <Montant>{eur(flux.sorties.total)}</Montant>
           </span>
@@ -65,7 +67,7 @@ export function FluxAutreMois(
               ? 'Aucune échéance ce mois-là'
               : <><Montant>{eur(flux.sorties.regle)}</Montant> payé · <Montant>{eur(aPayer)}</Montant> {passe ? 'impayé' : 'à venir'}</>}
           </p>
-          <Lignes lignes={flux.sorties.lignes} vers="#/argent" />
+          <Lignes lignes={flux.sorties.lignes} vers="#/obligations" />
         </div>
 
         <div className={styles.colonne}>

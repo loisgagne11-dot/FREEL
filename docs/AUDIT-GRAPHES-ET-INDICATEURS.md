@@ -852,3 +852,27 @@ les quatre thèmes. Relu sur capture à 390 px, clair et sombre.
 | Montant du brouillon du mois | Factures, Pilote | Un brouillon par payeur de mission, tous clients confondus | Inchangé en « facture commune » (par défaut) ; en « une par client », un brouillon par client et par payeur, dont la somme égale le brouillon commun (tenu par un essai) |
 | Jours d'un client arrêté | Planning, CRA, brouillon | Comptés jusqu'à la fin de la mission | Plus aucun après la date d'arrêt |
 | Jours repris de l'ancienne version | Planning, CRA | Tous au premier client, double comptage possible | Jour par jour, à chaque client ; la vérification d'absence de perte compare mois par mois |
+
+## Lot 51, phase 2 (16/11) — des nombres qui changent d'écran
+
+Aucun calcul ne change ; des nombres déménagent, et un s'ajoute.
+
+| Nombre lu | Avant | Après |
+|---|---|---|
+| CA facturé, encaissé, à encaisser, résultat projeté ; graphe facturé / encaissé ; composition du mois ; dépendance client | Argent › Performance | Activité › Analyse, pour l'année choisie dans l'en-tête de l'onglet (tenu par un essai : l'année choisie, pas celle de l'horloge) |
+| « Tu peux te verser », part gardée, capacité de versement par mois | Argent › Performance | Trésorerie |
+| Frise de l'échéancier, reste à payer, périodes URSSAF | Argent › Échéancier | Obligations |
+| Opérations du relevé, opérations à rapprocher | Achats › Relevé | Trésorerie › Banque : « N opérations au relevé, toutes traitées » ou « · N à rapprocher », compté à l'affichage |
+| Compteurs du rail | Argent, Activité | Factures (factures en retard, TVA à régulariser), Obligations (échéances, périodes à déclarer, livre incomplet), Trésorerie (seuils), Réglages (barème à vérifier) |
+
+## Lot 51, les cinq mots (16/11) — des nombres renommés
+
+Aucun calcul ne change ; un nombre ne porte plus qu'un nom, et un nom ne
+désigne plus qu'un nombre.
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Le dû du jour (charges des échéances et des encaissements non déclarés) | Flux du Pilote, mois passés, détail | « Sorties » — ce ne sont pas des sorties, rien n'est encore sorti | « Dû » ; le détail s'intitule « Ce qui est dû » |
+| Le dû | Santé, anneau et enveloppes de la Trésorerie | « 2 350 € dus » | « dû 2 350 € » |
+| La capacité de versement mensuelle sur un an | Trésorerie, projection | « Tu peux te verser 1 643 € par mois » — un second « tu peux te verser », pour un autre montant | « Versement tenable : 1 643 € par mois » |
+| À te verser moins la part gardée | Trésorerie, carte « Tu peux te verser » | Même nom que disponible − réserve ; égal à lui seulement si la part gardée vaut 0 % (cas de la démo) | Inchangé ici ; la part gardée se fond dans la réserve au lot 49 (décision 24), et ce second montant disparaît |

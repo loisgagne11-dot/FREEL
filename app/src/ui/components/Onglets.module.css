@@ -41,6 +41,28 @@
   .onglet { transition: none; }
 }
 
+/* Au téléphone, quatre onglets doivent tenir sans glisser : le quatrième
+   d'Activité, « Analyse », sortait du cadre à 390 px et n'était qu'à moitié
+   lisible — un onglet coupé ne dit pas qu'il en existe un. Le retrait
+   latéral cède la place ; la hauteur, elle, garde ses 44 px de cible. */
+/* En portrait, les onglets se partagent la rangée et un libellé peut passer
+   sur deux lignes, plutôt que de glisser hors de l'écran. Un retrait réduit au
+   pixel près ne suffisait pas : l'application prend la police de l'appareil,
+   et la même rangée qui tenait ici (362 px sur 362) débordait de 3 px sur la
+   machine d'intégration, de 11 à 360 px de large. La largeur minimale d'un
+   onglet est alors son mot le plus long, pas son libellé entier — une marge
+   que la police ne mange pas. La taille du texte et la hauteur ne bougent pas. */
+@media (max-width: 420px) {
+  .rangee { gap: 2px; }
+  .onglet {
+    flex: 1 1 auto;
+    padding: 4px 6px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+  }
+}
+
 /* La pastille de compte, comme le dessin. En `--mono` et à chiffres tabulaires :
    trois onglets côte à côte dont les comptes passent de 9 à 10 décaleraient
    sinon les libellés d'un demi-caractère à chaque saisie. */

@@ -33,22 +33,21 @@ import { enKiloEuros } from '../format.kilo';
 import styles from './Argent.module.css';
 
 /**
- * Le pilier « Trésorerie » de l'écran Argent — « combien j'ai là, pour de vrai ».
+ * Le corps de l'écran Trésorerie — « combien j'ai là, pour de vrai ». C'était
+ * le pilier « Trésorerie » de l'écran Argent, jusqu'au lot 51.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * POURQUOI LUI AUSSI EST DIFFÉRÉ
+ * POURQUOI IL EST DIFFÉRÉ
  * ─────────────────────────────────────────────────────────────────────────
  *
- * C'est le pilier ouvert par défaut : le différer coûte une frame au premier
- * affichage d'Argent, ce qui est un vrai prix et non un détail. Il est payé
- * pour une raison mesurée : à lui seul, ce pilier occupait 39,36 des 40 Ko du
- * budget de l'écran, et le lot qui le refait — donut, graphe combiné, frise —
- * l'aurait fait dépasser à la première carte.
+ * Le différer coûte une frame au premier affichage de l'écran, ce qui est un
+ * vrai prix et non un détail. Il est payé pour une raison mesurée : à lui
+ * seul, ce corps occupait 39,36 des 40 Ko du budget d'un écran. `Tresorerie.tsx`
+ * n'est qu'une coquille — en-tête, versement, banque —, et ce module a la
+ * place de grandir sans qu'elle en paie le poids.
  *
- * Les deux piliers étant désormais différés, `Argent.tsx` n'est plus qu'une
- * coquille : en-tête, piliers, registres. Chacun des deux a la place de
- * grandir sans que l'autre en paie le poids — ce qui est le vrai gain, plus
- * encore que les kilo-octets d'aujourd'hui.
+ * L'échéancier, qui en était le dernier bloc, est parti dans Obligations
+ * (lot 51) : c'est ce qu'on doit faire, pas ce qu'on a.
  */
 
 /**
@@ -60,15 +59,6 @@ import styles from './Argent.module.css';
  */
 const ProjectionPanneau = composantALaDemande(() => import('./Argent.projection')
   .then((m) => m.ProjectionPanneau), true);
-
-/**
- * L'échéancier : frise de l'année, liste des appels, périodes URSSAF.
- *
- * Différé, et seul bloc du pilier à l'être. Il est sous la ligne de flottaison
- * et ne s'ouvre que pour payer ou déclarer. Voir l'en-tête de son module.
- */
-const Echeancier = composantALaDemande(() => import('./Argent.echeancier')
-  .then((m) => m.Echeancier), true);
 
 /**
  * La composition d'un chiffre, au clic sur sa tuile.
@@ -126,9 +116,11 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
             </span>}
         resume={(
           <>
-            <Montant>{eur(etat.tresorerie.versable)}</Montant> à te verser
-            {' · '}<Montant>{eur(etat.tresorerie.provisions)}</Montant> dus
-            {' · '}<Montant>{eur(etat.tresorerie.reserve)}</Montant> de réserve
+            {/* Le mot, puis le montant : « 2 350 € dus » accordait le dû au
+                pluriel des euros, et le dû est un nom (règle des cinq mots). */}
+            à te verser <Montant>{eur(etat.tresorerie.versable)}</Montant>
+            {' · dû '}<Montant>{eur(etat.tresorerie.provisions)}</Montant>
+            {' · réserve '}<Montant>{eur(etat.tresorerie.reserve)}</Montant>
           </>
         )}
       >
@@ -165,7 +157,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
         actions={<span className={styles.indication}>clic = détail</span>}
         resume={(
           <>
-            <Montant>{eur(etat.tresorerie.provisions)}</Montant> dus
+            dû <Montant>{eur(etat.tresorerie.provisions)}</Montant>
             {' · dont '}<Montant>{eur(etat.voletConstate)}</Montant> déjà appelés
           </>
         )}
@@ -221,7 +213,7 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
       <CartePliable
         id="projection"
         ecran="argent"
-        titre="Où va ton disponible, et combien tu peux te verser"
+        titre="Où va ton disponible, et le versement tenable chaque mois"
         aide={<Info libelle="Ce que cette projection montre">
               Douze mois à venir, dans deux scénarios&nbsp;: sans rien te
               verser, et en te versant chaque mois le maximum qui ne fasse
@@ -230,23 +222,12 @@ export function Tresorerie({ etat }: { readonly etat: EtatArgent }) {
               réglées et du revenu prévu au planning — aucune tendance n’est
               devinée.
             </Info>}
-        resume="Projection sur douze mois, et versement mensuel soutenable"
+        resume="Projection sur douze mois, et versement tenable chaque mois"
       >
         <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
           <ProjectionPanneau />
         </Suspense>
       </CartePliable>
-
-
-      {/* L'échéancier est DIFFÉRÉ, et c'est le seul bloc du pilier à l'être.
-          Il est en bas de l'écran, sous la ligne de flottaison : son
-          chargement se lit comme un bas de page qui se remplit, pas comme un
-          écran vide qu'on attend. Même arbitrage que la carte « À traiter » du
-          Pilote, et pour la même raison — le pilier venait de dépasser son
-          budget de cent quatre-vingts octets, et un budget ne se relève pas. */}
-      <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-        <Echeancier annee={etat.annee} />
-      </Suspense>
     </>
   );
 }
@@ -791,7 +772,7 @@ function noteProvenanceSolde(
     case 'saisi':
       return `saisi le ${dateCourte(soldeInitialAu as DateISO)}, rien à dériver`;
     case 'sansDate':
-      return 'date-le en Config pour qu’il suive tes entrées et tes sorties';
+      return 'date-le dans Réglages pour qu’il suive tes entrées et tes sorties';
   }
 }
 
@@ -875,20 +856,21 @@ function RepartitionDuSolde({ etat }: { readonly etat: EtatArgent }) {
       {t.dispo < 0 ? (
         <PhraseRepartition>
           Sur les <strong><Montant>{eur(t.solde)}</Montant></strong> du compte,{' '}
-          <strong>rien n’est à toi</strong>&nbsp;: les{' '}
-          <strong><Montant>{eur(t.provisions)}</Montant></strong> dus (URSSAF, impôt, TVA)
-          dépassent le solde de <strong><Montant>{eur(euros(manque))}</Montant></strong>.
+          <strong>ton disponible est négatif</strong>&nbsp;: le dû
+          (<strong><Montant>{eur(t.provisions)}</Montant></strong> — URSSAF, impôt, TVA)
+          dépasse le solde de <strong><Montant>{eur(euros(manque))}</Montant></strong>.
           Une partie de l’argent des cotisations a déjà été dépensée — le détail
           est dans les enveloppes ci-dessous.
         </PhraseRepartition>
       ) : (
         <PhraseRepartition>
           Sur les <strong><Montant>{eur(t.solde)}</Montant></strong> du compte,{' '}
-          <strong><Montant>{eur(t.dispo)}</Montant></strong> sont à toi —{' '}
+          <strong><Montant>{eur(t.dispo)}</Montant></strong> sont ton{' '}
+          <strong>disponible</strong> —{' '}
           <Montant>{eur(euros(seuilConstitue))}</Montant> de réserve
-          {' + '}<Montant>{eur(t.versable)}</Montant> que tu peux te verser. Les{' '}
+          {' + '}<Montant>{eur(t.versable)}</Montant> à te verser. Les{' '}
           <strong><Montant>{eur(euros(provisionsCouvertes))}</Montant></strong> restants
-          sont <strong>dus</strong> (URSSAF, impôt, TVA) — détaillés dans les
+          forment le <strong>dû</strong> (URSSAF, impôt, TVA), détaillé dans les
           enveloppes ci-dessous.
         </PhraseRepartition>
       )}

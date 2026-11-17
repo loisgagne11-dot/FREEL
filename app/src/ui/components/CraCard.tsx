@@ -46,12 +46,12 @@ export function CraCard(
             Ils ne sont pas saisis&nbsp;: ils découlent du rythme de tes
             missions et des journées posées au planning. Corriger une journée
             ici met à jour le compte rendu d’activité, qui se génère depuis
-            Outils. La valeur au tarif journalier est pour toi&nbsp;: le
+            l’onglet Compte rendu. La valeur au tarif journalier est pour toi&nbsp;: le
             document remis au client ne porte aucun montant.
           </Info>
         </h2>
         {cras.length > 0 && (
-          <a className={styles.action} href="#/outils/cra">
+          <a className={styles.action} href="#/activite/compte-rendu">
             Générer le compte-rendu
           </a>
         )}

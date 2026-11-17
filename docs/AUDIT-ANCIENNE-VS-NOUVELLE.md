@@ -584,3 +584,20 @@ chiffre faux.
 |---|---|---|
 | Exporter (menu de la barre) | 🟢 | Le menu quitte la barre ; chaque export vit avec ses données : livre CSV, sauvegarde et archive dans Données, factures dans le facturier, compte rendu dans Outils |
 | Choisir le thème | 🟢 | Dans Réglages › Affichage, avec masquer les montants ; Calme par défaut |
+
+## Lot 51, phase 2 (16/11) — le rail et les contenus
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Retrouver un écran par une ancienne adresse (favori, lien) | 🟢 | `#/argent`, `#/outils`, `#/config/…`, `#/activite/factures`, `#/achats/releve`… mènent au nouvel écran, une ligne de test par adresse ; `/v2/#/argent` finit sur `#/tresorerie` |
+| Importer un relevé, rapprocher | 🟢 | Sous Trésorerie › Banque (`#/tresorerie/releve`), plus sous Achats |
+| Compte rendu d'activité | 🟢 | Sous Activité › Compte rendu ; un lien venu d'ailleurs ouvre l'atelier, le clic sur l'onglet ne l'ouvre pas |
+| Livre des recettes, TVA, DES | 🟢 | Depuis Obligations (`#/obligations/livre`, `#/obligations/tva`) ; le lien seul du pied du rail et de Config disparaît |
+| Masquer les montants au téléphone | 🟢 | Interrupteur du volet « Plus » |
+| « À traiter » | 🟢 | Les compteurs du rail et du volet ; chaque alerte mène à l'écran qui la règle : échéances → Obligations, factures en retard → Factures, seuils → Trésorerie, barème → Réglages |
+
+## Lot 51, les cinq mots (16/11)
+
+Aucune fonction ne change. L'ancienne version nommait le même montant de six
+façons (constat E3) ; la nouvelle n'en garde qu'une par grandeur, et un
+contrôle de lexique sur le texte rendu empêche les anciens noms de revenir.

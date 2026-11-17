@@ -124,7 +124,7 @@ describe('l’accueil', () => {
   it('mène au compte pour reprendre l’ancienne application', async () => {
     rendre();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Aller au compte' }));
-    expect(window.location.hash).toBe('#/config/compte');
+    expect(window.location.hash).toBe('#/reglages/compte');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -159,7 +159,7 @@ describe('le bandeau de la démonstration', () => {
     });
     render(<BandeauDemonstration />);
     expect(screen.getByRole('note').textContent).toMatch(/Démonstration.*fictives/);
-    expect(screen.getByRole('link', { name: 'Commencer avec mes données' }).getAttribute('href')).toBe('#/config/donnees');
+    expect(screen.getByRole('link', { name: 'Commencer avec mes données' }).getAttribute('href')).toBe('#/reglages/donnees');
   });
 
   it('se tait sur un vrai dossier', () => {

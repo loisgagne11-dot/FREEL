@@ -14,9 +14,12 @@
  * barre, un graphe combiné pris pour deux, un découpage mensuel pris pour des
  * plages libres. Les tests étaient verts à chaque fois.
  *
- * Les deux dossiers emploient le MÊME nom de fichier pour le même écran :
- * c'est ce qui permet à `controleur-visuel` d'ouvrir la paire sans avoir à
- * deviner la correspondance.
+ * Depuis le lot 51, une capture porte le nom de l'ÉCRAN de l'application —
+ * `tresorerie`, `factures-clients` — et non plus celui du handoff, dont la
+ * navigation a été refaite : `argent-performance` désignait un pilier qui
+ * n'existe plus. La paire n'est pas perdue pour autant : la vue dit son
+ * homonyme du handoff (`handoff`), et `INDEX.md` l'écrit en regard. C'est ce
+ * qui permet à `controleur-visuel` d'ouvrir la paire sans deviner.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LE MÊME JEU DE DONNÉES DES DEUX CÔTÉS
@@ -31,7 +34,12 @@
  * bouge ferait bouger la moitié des chiffres d'une capture à l'autre, et on ne
  * saurait plus distinguer une régression d'un jour qui passe.
  *
- * Usage : node scripts/capturer-app.mjs [--theme=clair|sombre] [--ecran=argent] [--jeu=essai] [--largeur=390]
+ * Usage : node scripts/capturer-app.mjs [--theme=calme|nuit|clair|sombre] [--ecran=tresorerie]
+ *                                        [--jeu=essai] [--largeur=390]
+ *
+ * Sans `--theme`, Calme et Nuit : la direction retenue le 13/11, et le thème
+ * par défaut d'un nouvel utilisateur depuis le lot 51. Les deux autres se
+ * demandent un par un.
  *
  * `--largeur` photographie à une autre largeur (téléphone : 390). Le contrôle
  * responsive charge les écrans VIDES : un tableau qui ne s'affiche qu'avec des
@@ -103,65 +111,73 @@ const AUJOURDHUI = JEU_ESSAI ? '2026-12-15T09:00:00Z' : '2026-06-10T09:00:00Z';
  * pendant que le fragment arrive encore, et rend une image qui a l'air normale.
  */
 const VUES = [
-  { hash: '#/pilote', nom: 'pilote' },
+  { hash: '#/pilote', nom: 'pilote', handoff: 'pilote' },
   /* Rien à ouvrir : l'écran s'ouvre sur la vue SEMAINE, comme le handoff.
      Il a porté `ouvrir: ['Semaine']` le temps que le mois reste la vue par
      défaut — et ce clic est devenu nuisible le jour où il ne l'a plus été :
      voir la note sur l'ancrage exact des libellés, plus bas. */
-  { hash: '#/activite', nom: 'activite-plan-de-charge' },
-  { hash: '#/activite', nom: 'activite-mois', ouvrir: ['Mois'] },
-  { hash: '#/activite', nom: 'activite-missions', ouvrir: ['Missions'] },
-  /* L'onglet Factures d'Activité, comme le handoff : depuis le lot 6 (rail en
-     formule A), la liste des factures n'est plus un écran à part. */
-  { hash: '#/activite/factures', nom: 'activite-factures', attendre: 'button:has-text("Nouvelle facture")' },
+  { hash: '#/activite', nom: 'activite-planning', handoff: 'activite-plan-de-charge' },
+  { hash: '#/activite', nom: 'activite-mois', handoff: 'activite-mois', ouvrir: ['Mois'] },
+  { hash: '#/activite', nom: 'activite-missions', handoff: 'activite-missions', ouvrir: ['Missions'] },
+  /* Le compte rendu a quitté les Outils pour Activité (lot 51). La carte, puis
+     l'atelier : un panneau qui ne s'ouvre qu'au clic n'apparaît sur aucune
+     capture d'écran, et c'est justement là que les défauts se logent. */
+  { hash: '#/activite', nom: 'activite-compte-rendu', handoff: 'outils-cra', ouvrir: ['Compte rendu'] },
+  /* L'Analyse porte ce qui était le pilier Performance d'Argent. */
+  { hash: '#/activite/analyse', nom: 'activite-analyse', handoff: 'argent-performance', attendre: 'text=CA facturé' },
+  /* APRÈS l'Analyse, et pas juste après l'onglet Compte rendu : cliquer
+     l'onglet écrit déjà `#/activite/compte-rendu`, et une adresse identique
+     ne change rien — l'atelier ne s'ouvrait pas. Il s'ouvre quand on vient
+     d'ailleurs, ce que fait l'action rapide du Pilote. */
+  { hash: '#/activite/compte-rendu', nom: 'activite-compte-rendu-atelier', handoff: 'pilote-cra', attendre: '[role="dialog"]' },
+  { hash: '#/factures', nom: 'factures', handoff: 'activite-factures', attendre: 'button:has-text("Nouvelle facture")' },
+  { hash: '#/factures/clients', nom: 'factures-clients', handoff: 'activite-clients', attendre: 'h2:has-text("Carnet")' },
   /* La rédaction, avec son aperçu vivant : elle s'apparie à
      `pilote-nouvelle-facture` du handoff. L'écran n'est pas une modale chez
-     nous — le facturier est un écran à part entière —, mais c'est le même
-     atelier : saisie à gauche, document à droite. */
-  { hash: '#/facture/nouvelle', nom: 'pilote-nouvelle-facture' },
-  { hash: '#/activite', nom: 'activite-clients', ouvrir: ['Clients'] },
+     nous, mais c'est le même atelier : saisie à gauche, document à droite. */
+  { hash: '#/facture/nouvelle', nom: 'facture-nouvelle', handoff: 'pilote-nouvelle-facture' },
   /* La composition d'un chiffre, panneau ouvert.
      Une vue à part, et non un détail de l'écran Pilote : le panneau ne s'ouvre
      qu'au clic, donc la capture de l'écran ne le montre jamais. C'est
      exactement le cas où « les tests sont verts et personne n'a regardé » — et
      le premier passage a produit un chevron collé au montant comme une
-     virgule, que rien d'autre qu'un œil ne pouvait voir. */
-  /* Depuis le lot 5, la composition s'ouvre sur le versable de la colonne
-     « À te verser » : les tuiles (« Solde »…) sont parties avec les doublons.
-     Le libellé est un motif — le nom du bouton commence par le montant. */
-  { hash: '#/pilote', nom: 'pilote-composition', ouvrir: ['.*d’où vient ce chiffre'] },
+     virgule, que rien d'autre qu'un œil ne pouvait voir. Le libellé est un
+     motif — le nom du bouton commence par le montant. */
+  { hash: '#/pilote', nom: 'pilote-composition', handoff: 'pilote-composition', ouvrir: ['.*d’où vient ce chiffre'] },
   /* Le panneau s'ouvre par son adresse, comme l'action rapide et « + Nouveau »
      l'ouvrent : c'est le chemin que prend l'utilisateur, et il ne dépend pas de
      la présence d'une facture en retard dans la démo. */
-  { hash: '#/pilote/encaissements', nom: 'pilote-encaissements', attendre: 'text=Reste à encaisser' },
-  { hash: '#/argent', nom: 'argent-tresorerie' },
-  { hash: '#/argent', nom: 'argent-performance', ouvrir: ['Performance'] },
-  { hash: '#/achats', nom: 'achats' },
+  { hash: '#/pilote/encaissements', nom: 'pilote-encaissements', handoff: 'pilote-encaissements', attendre: 'text=Reste à encaisser' },
+  { hash: '#/tresorerie', nom: 'tresorerie', handoff: 'argent-tresorerie' },
   /* Le relevé n'avait pas de capture : un écran que rien ne photographie ne
-     se compare à rien, et c'est sur lui que le lot 28 a posé « ignorée ». */
-  { hash: '#/achats/releve', nom: 'achats-releve', attendre: 'text=Relevé bancaire' },
-  { hash: '#/outils', nom: 'outils-impot' },
-  /* L'onglet CRA, puis l'atelier lui-même.
-     Deux vues et non une : la carte s'apparie à `outils-cra` du handoff, et
-     l'atelier à `pilote-cra`. C'est le même appariement que pour la
-     composition — un panneau qui ne s'ouvre qu'au clic n'apparaît sur aucune
-     capture d'écran, et c'est justement là que les défauts se logent. */
-  { hash: '#/outils', nom: 'outils-cra', ouvrir: ['CRA'] },
-  { hash: '#/outils/cra', nom: 'pilote-cra', attendre: '[role="dialog"]' },
-  { hash: '#/config', nom: 'config-profil' },
+     se compare à rien, et c'est sur lui que le lot 28 a posé « ignorée ». Il
+     vit sous la Trésorerie depuis le lot 51, en plan de travail. */
+  { hash: '#/tresorerie/releve', nom: 'tresorerie-releve', attendre: '[role="dialog"] h2:has-text("Importer un relevé")' },
+  /* Obligations n'a pas d'homonyme au handoff : sa référence est la maquette
+     `docs/design/direction/obligations.html`. */
+  { hash: '#/obligations', nom: 'obligations', attendre: 'text=Échéancier' },
+  { hash: '#/achats', nom: 'achats', handoff: 'achats' },
+  { hash: '#/simulateurs', nom: 'simulateurs', handoff: 'outils-impot' },
+  { hash: '#/reglages', nom: 'reglages-profil', handoff: 'config-profil' },
   /* Les autres sections des Réglages (lot 9), chacune appariée à sa capture
      du handoff. Chacune arrive à la demande : sans `attendre`, la photo
      montrait « Chargement… » et le contrôle visuel ne pouvait rien juger. */
-  { hash: '#/config/fiscal', nom: 'config-fiscal', attendre: 'text=Périodicité des cotisations' },
-  { hash: '#/config/reserve', nom: 'config-reserve', attendre: 'text=Part gardée à chaque versement' },
-  { hash: '#/config/facturation', nom: 'config-facturation', attendre: 'label:has-text("IBAN")' },
-  { hash: '#/config/donnees', nom: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
-  { hash: '#/config/compte', nom: 'config-cloud', attendre: 'text=Relier un compte' }
+  { hash: '#/reglages/fiscal', nom: 'reglages-fiscal', handoff: 'config-fiscal', attendre: 'text=Périodicité des cotisations' },
+  { hash: '#/reglages/reserve', nom: 'reglages-reserve', handoff: 'config-reserve', attendre: 'text=Part gardée à chaque versement' },
+  { hash: '#/reglages/facturation', nom: 'reglages-facturation', handoff: 'config-facturation', attendre: 'label:has-text("IBAN")' },
+  { hash: '#/reglages/donnees', nom: 'reglages-donnees', handoff: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte', handoff: 'config-cloud', attendre: 'text=Relier un compte' },
+  /* Affichage (lot 51) : la maquette `navigation.html` en est la référence. */
+  { hash: '#/reglages/affichage', nom: 'reglages-affichage', attendre: 'text=Le thème choisi reste mémorisé' }
 ];
 
 const themeDemande = argument('theme');
-const THEMES = themeDemande === 'clair' ? ['clair']
-  : themeDemande === 'sombre' ? ['sombre'] : ['clair', 'sombre'];
+const PALETTES = ['calme', 'nuit', 'clair', 'sombre'];
+if (themeDemande !== undefined && themeDemande !== '' && !PALETTES.includes(themeDemande)) {
+  console.error(`Thème inconnu : « ${themeDemande} » (attendu : ${PALETTES.join(', ')}).`);
+  process.exit(1);
+}
+const THEMES = themeDemande ? [themeDemande] : ['calme', 'nuit'];
 const ecranDemande = argument('ecran');
 const vues = ecranDemande ? VUES.filter((v) => v.nom.includes(ecranDemande)) : VUES;
 
@@ -326,13 +342,14 @@ writeFileSync(join(SORTIE, 'INDEX.md'),
       + 'handoff, il se REGARDE — champs vides, libellés qui débordent, graphes aplatis.\n\n'
     : 'Générées par `app/scripts/capturer-app.mjs` sur\n'
       + '`docs/design/jeu-de-demonstration.json`, horloge figée au 10 juin 2026.\n\n')
-  + 'Chaque fichier a un homonyme dans `docs/design/captures/` : c’est la paire\n'
-  + 'que `controleur-visuel` compare. Une capture absente ici et présente là\n'
-  + 'signifie que l’écran n’est pas encore fait — c’est une information, pas une\n'
-  + 'panne.\n\n'
+  + 'Les captures portent le nom de l’écran de l’application (lot 51). La colonne\n'
+  + '« Handoff » donne son homonyme dans `docs/design/captures/` : c’est la paire\n'
+  + 'que `controleur-visuel` compare. Sans homonyme, la référence est la maquette\n'
+  + 'de `docs/design/direction/`.\n\n'
   + '**Ne pas retoucher à la main.**\n\n'
-  + '| Capture | Écran |\n|---|---|\n'
-  + VUES.map((v) => `| \`${v.nom}\` | ${v.hash}${v.ouvrir ? ` › ${v.ouvrir.join(' › ')}` : ''} |`).join('\n')
+  + '| Capture | Écran | Handoff |\n|---|---|---|\n'
+  + VUES.map((v) => `| \`${v.nom}\` | ${v.hash}${v.ouvrir ? ` › ${v.ouvrir.join(' › ')}` : ''} | `
+    + `${v.handoff ? `\`${v.handoff}\`` : '—'} |`).join('\n')
   + '\n');
 
 console.log(`\n${capturees} captures dans ${SORTIE}`);
