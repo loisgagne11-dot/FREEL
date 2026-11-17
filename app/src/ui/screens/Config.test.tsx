@@ -261,9 +261,16 @@ describe('données', () => {
   }
 
   it('dit combien de faits sont conservés, et où', async () => {
-    await ouvrirDonnees({ periodesDeclarees: [{ nature: 'urssaf', periode: '2026-06', declareeLe: null }] });
+    await ouvrirDonnees({
+      periodesDeclarees: [
+        { nature: 'urssaf', periode: '2026-06', declareeLe: null },
+        { nature: 'des', periode: '2026-06', declareeLe: null }
+      ]
+    });
     // Le normaliseur de Testing Library ramène l'espace insécable à une espace.
-    expect(screen.getByText(/1 période déclarée/)).toBeTruthy();
+    // Une DES déposée est une déclaration, pas une « période » : l'ancien
+    // libellé comptait les deux en « 2 périodes déclarées ».
+    expect(screen.getByText(/2 déclarations/)).toBeTruthy();
     expect(screen.getByText('freel.faits.v1')).toBeTruthy();
   });
 

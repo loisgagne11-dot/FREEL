@@ -51,12 +51,16 @@ function pluriel(n: number, singulier: string, plurielMot: string): string {
   return `${n} ${n > 1 ? plurielMot : singulier}`;
 }
 
-/** « 2026-03 » → « mars 2026 ». */
-/** « 31 juillet » : la date limite d'une déclaration, sans l'année. */
+/**
+ * « 31 juillet », « 1ᵉʳ juin » : la date limite d'une déclaration, sans
+ * l'année. Le premier du mois s'écrit en ordinal — « avant le 1 juin » se
+ * lisait comme une coquille, et c'est la date que le report produit le plus
+ * souvent (une fin de mois tombée un week-end).
+ */
 function jourLisible(d: string): string {
-  return new Date(`${d}T00:00:00Z`).toLocaleDateString('fr-FR', {
-    day: 'numeric', month: 'long', timeZone: 'UTC'
-  });
+  const mois = new Date(`${d}T00:00:00Z`).toLocaleDateString('fr-FR', { month: 'long', timeZone: 'UTC' });
+  const jour = Number(d.slice(8, 10));
+  return `${jour === 1 ? '1ᵉʳ' : String(jour)} ${mois}`;
 }
 
 const euro = (n: number): string =>

@@ -142,6 +142,14 @@ describe('périodes à déclarer', () => {
     expect(s === undefined ? '' : formuler(s).intitule).toMatch(/périodes à déclarer/);
   });
 
+  /* Le report produit souvent un premier du mois (une fin de mois tombée un
+     dimanche) : « avant le 1 juin » se lisait comme une coquille. */
+  it('écrit le premier du mois en ordinal', () => {
+    const s = sujetsATraiter(entree({ periodesADeclarer: [periode({ limite: dateISO('2026-06-01') })] }))
+      .find((x) => x.id === 'periodes-a-declarer');
+    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/avant le 1ᵉʳ juin/);
+  });
+
   it('annonce la base encaissée et le montant à payer, ou « à vérifier »', () => {
     const avec = sujetsATraiter(entree({ periodesADeclarer: [periode({ montant: euros(412) })] }))
       .find((x) => x.id === 'periodes-a-declarer');
