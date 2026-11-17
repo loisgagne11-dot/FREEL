@@ -189,4 +189,14 @@ describe('déclaration initiale 1447-C', () => {
   it('ne s’invente pas sans date de début', () => {
     expect(declaration1447C(null, 2026)).toBeNull();
   });
+
+  /* Le 31/12/2028 est un dimanche et le 1ᵉʳ janvier férié : sans le report,
+     la déclaration d'une entreprise créée en 2028 se dirait en retard le
+     mardi 2 janvier, jour où elle se dépose encore. */
+  it('se reporte au premier jour ouvré quand le 31 décembre ne l’est pas', () => {
+    const d = declaration1447C(dateISO('2028-03-01'), 2028);
+    expect(d?.date).toBe('2029-01-02');
+    expect(d?.intitule).toMatch(/2 janvier 2029/);
+    expect(declaration1447C(dateISO('2026-04-02'), 2026)?.intitule).toMatch(/31 décembre 2026/);
+  });
 });

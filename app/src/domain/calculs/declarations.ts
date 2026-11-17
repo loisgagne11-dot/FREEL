@@ -281,6 +281,22 @@ const ECHEANCES_ANNONCEES: Readonly<Record<string, DateISO>> = {
   '2026-08': '2026-10-31' as DateISO
 };
 
+/** Les échéances de `ECHEANCES_ANNONCEES` qui sont des TOLÉRANCES : la limite officielle reste due. */
+const TOLERANCES = new Set<string>(['2026-08']);
+
+/**
+ * La limite officielle d'une période que l'Urssaf a tolérée au-delà, ou
+ * `null` sans tolérance. Décision du propriétaire du 17/11 : la tolérance
+ * s'affiche avec la date officielle, « tolérée jusqu'au 31 octobre » — la
+ * date qui décide d'un retard reste celle de `dateLimiteDeclaration`.
+ */
+export function limiteOfficielleToleree(dernierMois: Mois): DateISO | null {
+  if (!TOLERANCES.has(dernierMois)) return null;
+  const annee = Number(dernierMois.slice(0, 4));
+  const mois = Number(dernierMois.slice(5, 7));
+  return reporterAuJourOuvre(new Date(Date.UTC(annee, mois + 1, 0)).toISOString().slice(0, 10) as DateISO);
+}
+
 /**
  * La date limite de déclaration d'une période qui finit avec `dernierMois` :
  * le dernier jour du mois qui suit, REPORTÉ au premier jour ouvré quand il
