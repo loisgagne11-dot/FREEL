@@ -366,8 +366,11 @@ describe('le détail d’une enveloppe', () => {
   });
 
   /** Le geste ÉCRIT vraiment : sans cela le panneau ne serait qu'un affichage
-      de plus, et la dette resterait où elle était. */
-  it('déclare la période, et la dette quitte l’estimation', async () => {
+      de plus, et la dette resterait où elle était. C'est le MÊME geste que la
+      liste des périodes — « déclarée le … pour … € » : la dette quitte
+      l'estimation et entre comme appel, au lieu de « attendre son appel »
+      hors du dû. */
+  it('déclare la période avec son appel, et la dette passe de l’estimation à l’appel', async () => {
     semer({
       recettes: [{
         id: 'r1', clientNom: 'C', libelle: 'F', montant: euros(10_000),
@@ -380,8 +383,32 @@ describe('le détail d’une enveloppe', () => {
     await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
     const panneau = within(await screen.findByRole('dialog'));
     await utilisateur().click(panneau.getByRole('button', { name: 'Marquer déclaré' }));
+    await utilisateur().click(panneau.getByRole('button', { name: 'Enregistrer la déclaration' }));
 
     expect(useFaits.getState().faits.periodesDeclarees.map((p) => p.periode)).toEqual(['2026-05']);
+    expect(useFaits.getState().faits.echeances).toMatchObject([
+      { nature: 'urssaf', periode: '2026-05', echeanceLe: '2026-06-30', payeeLe: null }
+    ]);
+  });
+
+  /* Le détail raisonne au mois d'encaissement ; la période, elle, peut être
+     un trimestre. Déclarer un mois d'un trimestre en cours, c'était sortir de
+     l'estimation des recettes qu'on va encore encaisser dessus. */
+  it('ne propose pas de déclarer un mois d’une période encore en cours', async () => {
+    semer({
+      entreprise: { ...faitsVides().entreprise, urssafPeriodicite: 'trimestriel' },
+      recettes: [{
+        id: 'r1', clientNom: 'C', libelle: 'F', montant: euros(10_000),
+        emiseLe: dateISO('2026-07-01'), encaisseeLe: dateISO('2026-07-03'),
+        modeReglement: null, numero: '2026-001'
+      }]
+    });
+    render(<Tresorerie />);
+    await attendreTresorerie();
+    await utilisateur().click(screen.getByRole('button', { name: /URSSAF/i }));
+    const panneau = within(await screen.findByRole('dialog'));
+    expect(panneau.queryByRole('button', { name: 'Marquer déclaré' })).toBeNull();
+    expect(panneau.getByText(/T3 2026 en cours, pas encore déclarable/)).toBeTruthy();
   });
 
   /**

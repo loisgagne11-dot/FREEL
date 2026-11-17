@@ -1,7 +1,9 @@
 import type { DateISO, Euros } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
-import type { NatureDeclaration } from '../domain/calculs/declarations.declarees';
-import { ordreDesDeclarees } from '../domain/calculs/declarations';
+import type { NatureDeclaration, PeriodeDeclaree } from '../domain/calculs/declarations.declarees';
+import {
+  type PeriodeUrssaf, idAppelDeDeclaration, ordreDesDeclarees
+} from '../domain/calculs/declarations';
 import type { Faits } from './schema';
 import { ecrireFaits, useFaits } from './store';
 
@@ -43,12 +45,90 @@ export function declarerPeriode(
   nature: NatureDeclaration, periodes: readonly string[], declareeLe: DateISO | null
 ): void {
   const actuel = faitsCourants();
-  const autres = actuel.periodesDeclarees
-    .filter((p) => !(p.nature === nature && periodes.includes(p.periode)));
-  const nouvelles = periodes.map((periode) => ({ nature, periode, declareeLe }));
   ecrireFaits({
     ...actuel,
-    periodesDeclarees: [...autres, ...nouvelles].sort(ordreDesDeclarees)
+    periodesDeclarees: avecDeclarees(actuel.periodesDeclarees, nature, periodes, declareeLe)
+  });
+}
+
+function avecDeclarees(
+  declarees: readonly PeriodeDeclaree[], nature: NatureDeclaration,
+  periodes: readonly string[], declareeLe: DateISO | null
+): readonly PeriodeDeclaree[] {
+  const autres = declarees.filter((p) => !(p.nature === nature && periodes.includes(p.periode)));
+  const nouvelles = periodes.map((periode) => ({ nature, periode, declareeLe }));
+  return [...autres, ...nouvelles].sort(ordreDesDeclarees);
+}
+
+/**
+ * Le geste URSSAF : « déclarée le … pour … € » — la déclaration ET l'appel
+ * qu'elle produit, en une écriture.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * DÉCLARER SANS L'APPEL FAISAIT BAISSER LE DÛ
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une période déclarée quitte aussitôt le volet « à provisionner »
+ * (`provisions.ts`) : sa dette est censée passer au volet « constaté », sous
+ * forme d'appel. Tant que personne ne saisissait l'appel, elle n'était plus
+ * nulle part — le dû baissait de toute la déclaration, et « à te verser »
+ * montait d'autant : l'application invitait à se verser des cotisations
+ * déclarées, donc dues. Le détail de la dette l'écrivait lui-même : « attend
+ * son appel ».
+ *
+ * Le montant est celui que le site de l'Urssaf a calculé, prérempli et
+ * corrigeable par l'écran. L'appel est daté de la limite de la période : en
+ * micro, le prélèvement a lieu à l'échéance. Il n'est pas payé — le
+ * prélèvement est un fait distinct, qui se pointe, jamais une conséquence de
+ * la déclaration.
+ *
+ * Un seul appel par période : une période qui en porte déjà un — saisi à la
+ * main, ou rattaché par la migration — n'en reçoit pas un second ; l'appel
+ * qu'une déclaration précédente avait créé est corrigé s'il n'est pas payé.
+ * Une déclaration à zéro n'appelle rien.
+ */
+export function declarerUrssaf(periode: PeriodeUrssaf, declareeLe: DateISO, montant: Euros): void {
+  const actuel = faitsCourants();
+  const id = idAppelDeDeclaration(periode.id);
+  const cree = actuel.echeances.find((e) => e.id === id);
+  const dejaAppelee = actuel.echeances
+    .some((e) => e.id !== id && e.nature === 'urssaf' && e.periode === periode.id);
+
+  let echeances = actuel.echeances;
+  if (cree === undefined) {
+    if (montant > 0 && !dejaAppelee) {
+      echeances = [...echeances, {
+        id, nature: 'urssaf', montant, echeanceLe: periode.limite,
+        payeeLe: null, montantPaye: null, periode: periode.id
+      }];
+    }
+  } else if (cree.payeeLe === null) {
+    echeances = montant > 0
+      ? echeances.map((e) => (e.id === id ? { ...e, montant, echeanceLe: periode.limite } : e))
+      : echeances.filter((e) => e.id !== id);
+  }
+
+  ecrireFaits({
+    ...actuel,
+    echeances,
+    periodesDeclarees: avecDeclarees(actuel.periodesDeclarees, 'urssaf', periode.mois, declareeLe)
+  });
+}
+
+/**
+ * Défait le geste : la période redevient à déclarer, et l'appel que la
+ * déclaration avait créé s'en va avec elle, s'il n'est pas payé — sinon le
+ * dû le compterait en plus de l'estimation qui revient. Un appel payé reste :
+ * l'argent est parti, et son pointage ne se perd pas sur un clic.
+ */
+export function annulerDeclarationUrssaf(periode: Pick<PeriodeUrssaf, 'id' | 'mois'>): void {
+  const actuel = faitsCourants();
+  const id = idAppelDeDeclaration(periode.id);
+  ecrireFaits({
+    ...actuel,
+    echeances: actuel.echeances.filter((e) => !(e.id === id && e.payeeLe === null)),
+    periodesDeclarees: actuel.periodesDeclarees
+      .filter((p) => !(p.nature === 'urssaf' && (periode.mois as readonly string[]).includes(p.periode)))
   });
 }
 

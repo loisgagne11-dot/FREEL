@@ -1,15 +1,17 @@
 import { useId, useMemo } from 'react';
 import { useFaits } from '../../state/store';
-import { annulerDeclaration, declarerPeriode } from '../../state/ecritures.echeances';
+import { annulerDeclarationUrssaf, declarerPeriode } from '../../state/ecritures.echeances';
 import type { DateISO, Euros, Mois, Resolution } from '../../domain/types';
 import { estPayee } from '../../domain/calculs/provisions';
 import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
 import { soldeImpotPrevuDe } from '../../state/selecteurs.impotCalendrier';
 import { montantDeclaration } from '../../state/selecteurs.aTraiter';
 import {
-  type PeriodeADeclarer, appelsDeLaPeriode, dateDeDeclaration, periodesADeclarer
+  type PeriodeADeclarer, appelsDeLaPeriode, dateDeDeclaration, idAppelDeDeclaration, periodesADeclarer
 } from '../../domain/calculs/declarations';
 import { moisDeclares } from '../../domain/calculs/declarations.declarees';
+import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
+import { DeclarationUrssaf } from '../components/DeclarationUrssaf';
 import { Echeances } from '../components/Echeances';
 import { FriseEcheances } from '../components/FriseEcheances';
 import { Info } from '../components/Info';
@@ -109,8 +111,9 @@ export function Echeancier({ annee }: { readonly annee: number }) {
  * DÉCLARÉ N'EST PAS PAYÉ
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Cocher ici ne dit pas que la somme est réglée : elle passe de « à
- * provisionner » à « appelé, à payer ». Elle reste donc dans le dû — c'est
+ * Déclarer ici ne dit pas que la somme est réglée : elle passe de « à
+ * provisionner » à « appelé, à payer », sous forme de l'appel que la
+ * déclaration crée (`DeclarationUrssaf`). Elle reste donc dans le dû — c'est
  * justement pour la payer qu'on la garde.
  */
 function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
@@ -188,35 +191,19 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
                     />
                   </label>
                   <SuiteDuCycle periode={p} />
-                  <button
-                    type="button"
-                    className={styles.actionLigne}
-                    onClick={() => {
-                      annulerDeclaration('urssaf', p.mois);
-                      signaler(`${p.libelle} n’est plus marquée déclarée.`);
-                    }}
-                  >
-                    {/* « Annuler » seul, posé juste après « payée le … », se
-                        lisait « annuler le paiement » : il défait la
-                        déclaration, et le paiement reste. */}
-                    Annuler la déclaration
-                  </button>
+                  <AnnulerDeclaration periode={p} onAnnulee={signaler} />
                 </span>
               )
               : p.close
                 ? (
-                  <button
-                    type="button"
-                    className={styles.actionLigne}
-                    onClick={() => {
-                      // Datée du jour : on la coche en sortant du site de
-                      // l'URSSAF. Le champ qui apparaît la corrige.
-                      declarerPeriode('urssaf', p.mois, dateDuJour());
-                      signaler(`${p.libelle} marquée déclarée aujourd’hui.`);
-                    }}
-                  >
-                    Marquer déclarée
-                  </button>
+                  /* Datée du jour et au montant calculé, les deux corrigeables :
+                     on la remplit en sortant du site de l'URSSAF. */
+                  <DeclarationUrssaf
+                    periode={p}
+                    libelle="Marquer déclarée"
+                    classeDeclencheur={styles.actionLigne}
+                    classeConteneur={styles.declarationFormulaire}
+                  />
                 )
                 : (
                   /* Une période en cours ne se déclare pas : l'URSSAF ouvre la
@@ -231,6 +218,53 @@ function CarteDeclarations({ idGroupe }: { idGroupe: string }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * Défaire une déclaration — et l'appel qu'elle a créé, s'il n'est pas payé.
+ *
+ * Sans appel à retirer, le geste ne perd rien : il part d'un clic, comme
+ * avant. Avec, il fait disparaître un montant recopié du site de l'URSSAF, et
+ * ce qu'on peut se verser bouge : la conséquence se dit avant.
+ */
+function AnnulerDeclaration(
+  { periode: p, onAnnulee }: { periode: PeriodeADeclarer; onAnnulee: (message: string) => void }
+) {
+  const echeances = useFaits((e) => e.faits.echeances);
+  const appel = echeances.find((e) => e.id === idAppelDeDeclaration(p.id) && !estPayee(e));
+  const annuler = (): void => {
+    annulerDeclarationUrssaf(p);
+    onAnnulee(appel === undefined
+      ? `${p.libelle} n’est plus marquée déclarée.`
+      : `${p.libelle} n’est plus marquée déclarée, et son appel quitte le dû.`);
+  };
+
+  // « Annuler » seul, posé juste après « payée le … », se lisait « annuler le
+  // paiement » : il défait la déclaration, et un paiement reste.
+  if (appel === undefined) {
+    return (
+      <button type="button" className={styles.actionLigne} onClick={annuler}>
+        Annuler la déclaration
+      </button>
+    );
+  }
+  return (
+    <ConfirmationSurPlace
+      libelle="Annuler la déclaration"
+      precision={p.libelle}
+      classeDeclencheur={styles.actionLigne}
+      consequence={(
+        <>
+          L’appel de <Montant>{eur(appel.montant)}</Montant> créé par la déclaration,
+          pas encore payé, quitte le dû&nbsp;; les cotisations de {p.libelle} redeviennent
+          estimées.
+        </>
+      )}
+      libelleConfirmer="Annuler la déclaration"
+      libelleGarder="Garder la déclaration"
+      onConfirmer={annuler}
+    />
   );
 }
 

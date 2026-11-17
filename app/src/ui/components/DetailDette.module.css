@@ -215,3 +215,7 @@
   padding-top: 8px;
   border-top: 1px solid var(--line);
 }
+
+/* Une période en cours ne se déclare pas : le dire à la place du geste, sur
+   toute la ligne, au ton des métadonnées. */
+.attente { grid-column: 1 / -1; font-size: 11px; color: var(--muted-2); }

@@ -86,6 +86,39 @@ export function appelsDeLaPeriode<E extends { readonly nature: string; readonly 
 }
 
 /**
+ * L'identifiant de l'appel qu'une déclaration URSSAF crée : un par période.
+ *
+ * Il dit la provenance sans champ de plus au schéma. « Annuler la
+ * déclaration » ne retire que CET appel — jamais un appel saisi à la main ou
+ * rattaché par la migration, que l'utilisateur a recopié d'un vrai courrier —,
+ * et déclarer de nouveau la même période le corrige au lieu d'en créer un
+ * second, qui ferait compter la dette deux fois.
+ */
+export const idAppelDeDeclaration = (periode: string): string => `ech-declaration-urssaf-${periode}`;
+
+/** Une période URSSAF, sans ce que les encaissements et les déclarations en disent. */
+export type PeriodeUrssaf = Pick<PeriodeADeclarer, 'id' | 'libelle' | 'mois' | 'close' | 'limite'>;
+
+/**
+ * La période qui contient un mois, selon la périodicité : ce que le détail
+ * d'une dette, qui raisonne au mois d'encaissement, doit déclarer. Un mois
+ * d'un trimestre se déclare avec son trimestre — le déclarer seul laissait
+ * une période déclarée aux deux tiers, que la règle lit « pas déclarée ».
+ */
+export function periodeDuMois(m: Mois, periodicite: Periodicite, aujourdhui: string): PeriodeUrssaf {
+  const id = clePeriode(m, periodicite);
+  const couverts = moisDeLaPeriode(id, periodicite);
+  const dernier = couverts[couverts.length - 1] as Mois;
+  return {
+    id,
+    libelle: libelleDe(id, periodicite),
+    mois: couverts,
+    close: dernier < aujourdhui.slice(0, 7),
+    limite: dateLimiteDeclaration(dernier)
+  };
+}
+
+/**
  * La période qu'un appel réglait sous la règle d'avant le schéma 25 : celle
  * dont la limite — dernier jour du mois suivant, sans report — tombait dans
  * le mois de l'appel. Ne sert qu'à la migration, pour poser le lien que

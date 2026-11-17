@@ -158,8 +158,9 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
             sur des recettes encaissées mais pas encore déclarées sont déjà
             estimées juste au-dessus, dans «&nbsp;charges sur recettes
             encaissées&nbsp;». Saisir les deux compterait deux fois la même
-            somme&nbsp;; c’est «&nbsp;marquer la période déclarée&nbsp;» qui
-            fait passer l’une dans l’autre.
+            somme&nbsp;; c’est la déclaration de la période, dans
+            «&nbsp;Périodes URSSAF&nbsp;», qui fait passer l’une dans l’autre —
+            et qui crée son appel&nbsp;: ne le saisis pas une seconde fois ici.
           </Info>}
     >
 
