@@ -13,26 +13,27 @@
  * dû y lire le planning ; relever le seuil aurait masqué la cause.
  */
 
-import type { DateISO, Euros, Mois, Resolution } from '../domain/types';
-import { euros, moisDe } from '../domain/types';
-import { voletAProvisionner } from '../domain/calculs/provisions';
+import type { DateISO, Mois } from '../domain/types';
+import { euros } from '../domain/types';
 import {
-  type EcranCible, type EntreeATraiter, type SujetATraiter, compteursParEcran, sujetsATraiter
+  type EcranCible, type EntreeATraiter, type Gravite, type PeriodeATraiter, type SujetATraiter,
+  compteursParEcran, sujetsATraiter
 } from '../domain/calculs/aTraiter';
+import { decaler } from '../domain/calculs/calendrier';
+import { moisDeLaPeriode, periodeDuMois } from '../domain/calculs/declarations';
 import {
-  acompteCfe, cfeDue, declaration1447C, paiementCfe, regimeCfe
-} from '../domain/bareme/cfe';
-import { moisDeLaPeriode } from '../domain/calculs/declarations';
-import { moisDeclares } from '../domain/calculs/declarations.declarees';
-import { type PreneurService, declarationsEnRetard, moisDeposes } from '../domain/calculs/des';
-import { tauxImpotEtContributions } from '../domain/bareme';
+  type Etape, type Obligation, dateDeLEtape, estPrevue, etapePrincipale, obligationsATraiter
+} from '../domain/calculs/obligations';
 import type { Faits } from './schema';
+import { montantDeclaration, obligationsEntre, preneursDeServices } from './selecteurs.obligations';
 
 // Servi ici pour que le rail le calcule avec les sujets, dans le même paquet différé.
 export { compteursParEcran };
+// Déplacés dans `selecteurs.obligations`, qui ne peut pas importer ce module ;
+// leurs lecteurs les trouvent toujours ici.
+export { montantDeclaration, preneursDeServices };
 import {
-  caEncaisseAnnee, echeanceDesFactures, periodesUrssafEffectives, recettesEncaissees, regimeDe,
-  sousAcreLe, tvaDueDepuisDe
+  echeanceDesFactures, periodesUrssafEffectives, tvaDueDepuisDe
 } from './selecteurs';
 
 /**
@@ -49,13 +50,14 @@ import {
 
 export function entreeATraiter(
   faits: Faits,
-  echeancesReglementaires: EntreeATraiter['echeancesReglementaires'] = [],
+  obligations: readonly Obligation[],
   maintenant: Date = new Date()
 ): EntreeATraiter {
   const echeance = echeanceDesFactures(faits);
   const tvaDue = tvaDueDepuisDe(faits);
+  const aujourdhui = dateISOde(maintenant);
   return {
-    aujourdhui: dateISOde(maintenant),
+    aujourdhui,
     typeActivite: faits.entreprise.typeActivite,
     recettes: faits.recettes.map((r) => ({
       id: r.id,
@@ -66,21 +68,106 @@ export function entreeATraiter(
       clientNom: r.clientNom,
       echeanceLe: echeance(r)
     })),
-    periodesDeclarees: moisDeclares(faits.periodesDeclarees),
     echeancesSaisies: faits.echeances.length,
-    periodicite: faits.entreprise.urssafPeriodicite,
     periodesUrssaf: periodesUrssafEffectives(faits),
-    desEnRetard: declarationsEnRetard(
-      faits.recettes, preneursDeServices(faits), dateISOde(maintenant),
-      moisDeposes(faits.periodesDeclarees)
-    ),
     debutActiviteLe: faits.entreprise.debutActivite,
-    debutActivite: faits.entreprise.debutActivite === null
-      ? null
-      : moisDe(faits.entreprise.debutActivite),
-    echeancesReglementaires,
+    ...sujetsDesObligations(faits, obligations, aujourdhui),
     tvaDueDepuis: tvaDue,
     facturesSansTva: tvaDue === null ? 0 : facturesEmisesSansTva(faits, tvaDue)
+  };
+}
+
+const enCours = (e: Etape | undefined): e is Etape =>
+  e !== undefined && (e.etat === 'a_faire' || e.etat === 'en_retard');
+
+/**
+ * Ce que les obligations disent à la requête « à traiter » — la seule source
+ * de ce qui est à déclarer, à payer ou à fournir.
+ *
+ *  · les périodes URSSAF à déclarer, réunies en un sujet sur le Pilote (qui
+ *    en lit le nombre et la première limite) ;
+ *  · les DES en retard, réunies : l'amende est par déclaration ;
+ *  · toute autre obligation à traiter, un sujet chacune ;
+ *  · les obligations à venir qui méritent d'être annoncées (une CFE sans
+ *    avis saisi, en octobre) : de l'information, que le compteur ne compte pas.
+ *
+ * L'ensemble des trois premiers pèse au compteur exactement
+ * `obligationsATraiter` — la même liste que le titre d'Obligations.
+ */
+function sujetsDesObligations(
+  faits: Faits,
+  obligations: readonly Obligation[],
+  aujourdhui: DateISO
+): Pick<EntreeATraiter, 'periodesADeclarer' | 'desEnRetard' | 'echeancesReglementaires'> {
+  const periodicite = faits.entreprise.urssafPeriodicite;
+  const periodes: PeriodeATraiter[] = [];
+  const desEnRetard: { mois: Mois }[] = [];
+  const autres: EntreeATraiter['echeancesReglementaires'][number][] = [];
+  const aTraiter = new Set(obligationsATraiter(obligations, aujourdhui));
+
+  for (const o of obligations) {
+    if (aTraiter.has(o)) {
+      if (o.dossier === 'urssaf' && enCours(o.declaration)) {
+        const limite = dateDeLEtape(o.declaration);
+        periodes.push({
+          id: o.periode,
+          libelle: periodeDuMois(moisDeLaPeriode(o.periode, periodicite)[0] as Mois, periodicite, aujourdhui).libelle,
+          premierMois: moisDeLaPeriode(o.periode, periodicite)[0] as Mois,
+          limite,
+          encaisse: o.assiette ?? euros(0),
+          montant: o.montant === null || o.montant.statut === 'refuse' ? null : o.montant.valeur,
+          enRetard: o.declaration.etat === 'en_retard'
+        });
+        continue;
+      }
+      if (o.dossier === 'des' && o.declaration?.etat === 'en_retard') {
+        desEnRetard.push({ mois: o.periode as Mois });
+        continue;
+      }
+      autres.push(sujetDeLObligation(o, aujourdhui));
+      continue;
+    }
+    // À venir : annoncée seulement dans son préavis, et seulement si rien
+    // n'est saisi (la règle de `preavisJours`).
+    const principale = etapePrincipale(o);
+    if (o.preavisJours !== undefined && principale.etat === 'a_venir' && principale.limite.statut !== 'refuse'
+        && principale.limite.valeur <= decaler(aujourdhui, o.preavisJours)) {
+      autres.push({ ...sujetDeLObligation(o, aujourdhui), gravite: 'information' });
+    }
+  }
+  return {
+    periodesADeclarer: periodes.sort((a, b) => a.id.localeCompare(b.id)),
+    desEnRetard: desEnRetard.sort((a, b) => a.mois.localeCompare(b.mois)),
+    echeancesReglementaires: autres
+  };
+}
+
+/** Le geste qu'une obligation attend, selon l'étape en cours. */
+function actionDe(o: Obligation): string {
+  if (o.id === 'facturation-electronique-reception') return 'Renseigner ma plateforme';
+  if (o.dossier === 'piece') return 'Renouveler';
+  if (enCours(o.declaration)) return o.dossier === 'des' ? 'Déposer' : 'Déclarer';
+  // Une CFE sans avis saisi se règle en saisissant l'échéance : c'est elle
+  // qui fait entrer la dette dans les provisions.
+  if (estPrevue(o) && o.dossier === 'cfe') return 'Saisir l’échéance';
+  return 'Payer';
+}
+
+/** Une obligation en sujet générique — ses textes viennent d'elle, pas d'ici. */
+function sujetDeLObligation(o: Obligation, aujourdhui: DateISO): EntreeATraiter['echeancesReglementaires'][number] {
+  const etape = [o.declaration, o.paiement, o.formalite].find(enCours) ?? etapePrincipale(o);
+  const gravite: Gravite = etape.etat === 'en_retard' ? 'retard' : 'a_faire';
+  const date = etape.limite.statut === 'refuse' ? null : etape.limite.valeur;
+  return {
+    id: o.id,
+    intitule: o.libelle,
+    date,
+    gravite,
+    ecran: 'obligations',
+    action: actionDe(o),
+    // Le jour qui manque se dit : « indique ton nom », « fin mai ».
+    contexte: etape.limite.statut === 'refuse' ? `${etape.limite.motif} ${o.detail}`.trim() : o.detail,
+    sansSuivi: etape.etat === 'a_faire' && date !== null && date < aujourdhui
   };
 }
 
@@ -112,258 +199,27 @@ function dateISOde(d: Date): DateISO {
 }
 
 /**
- * Échéances réglementaires à date fixe, filtrées sur leur préavis.
- *
- * Ces obligations ne dépendent d'aucun calcul : elles tombent à une date, que
- * l'utilisateur soit prêt ou non.
+ * Jusqu'où regarder devant : une année. Une CA12 se déclare dès janvier pour
+ * une limite en mai, et une CFE s'annonce soixante-quinze jours avant.
  */
-export const ECHEANCES_REGLEMENTAIRES: readonly {
-  readonly id: string;
-  readonly intitule: string;
-  readonly date: DateISO;
-  readonly preavisJours: number;
-  /**
-   * Combien de jours le rappel survit à sa date.
-   *
-   * Aucun fait ne dit qu'une de ces obligations est remplie : rien ne
-   * l'efface. La date passée, le rappel devenait « en retard » pour toujours —
-   * en rouge sur le Pilote de tout le monde depuis le 1er septembre 2026, prêt
-   * ou pas. Un rappel qu'on ne peut pas traiter apprend à ignorer les
-   * rappels : celui-ci dit « en vigueur » pendant un mois, puis se tait.
-   */
-  readonly rappelApresJours: number;
-  /**
-   * Le fait qui dit l'obligation remplie (lot 46). Quand il existe, le rappel
-   * n'est plus un compte à rebours mais un ÉTAT : il reste tant que le fait
-   * manque — date passée comprise — et s'éteint dès qu'il est saisi.
-   */
-  readonly remplie?: (faits: Faits) => boolean;
-  readonly action?: string;
-}[] = [
-  {
-    id: 'facturation-electronique-reception',
-    intitule: 'Facturation électronique : réception obligatoire',
-    date: '2026-09-01' as DateISO,
-    preavisJours: 120,
-    rappelApresJours: 30,
-    remplie: (faits) => faits.entreprise.plateformeAgreee !== null,
-    // Court : le lien ne revient pas à la ligne, et « (Réglages → Facturation) »
-    // le portait à 381 px — le Pilote débordait à 390.
-    action: 'Renseigner ma plateforme'
-  }
-];
-
-export function echeancesReglementairesActives(
-  faits: Faits,
-  maintenant: Date = new Date()
-): EntreeATraiter['echeancesReglementaires'] {
-  const aujourdhui = dateISOde(maintenant);
-  const dansLePreavis = (date: DateISO, preavisJours: number): boolean => {
-    const jours = Math.round(
-      (new Date(date).getTime() - new Date(aujourdhui).getTime()) / 86400000
-    );
-    return jours <= preavisJours;
-  };
-
-  const joursAvant = (date: DateISO): number => Math.round(
-    (new Date(date).getTime() - new Date(aujourdhui).getTime()) / 86400000
-  );
-  const fixes = ECHEANCES_REGLEMENTAIRES
-    .filter((e) => dansLePreavis(e.date, e.preavisJours))
-    // Un rappel qui a son fait s'éteint quand le fait est là, et SEULEMENT
-    // alors ; les autres se taisent un mois après leur date (voir plus haut).
-    .filter((e) => (e.remplie === undefined
-      ? joursAvant(e.date) >= -e.rappelApresJours
-      : !e.remplie(faits)))
-    .map((e) => (e.remplie === undefined
-      ? { id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true }
-      : { id: e.id, intitule: e.intitule, date: e.date, sansSuivi: true, ecran: 'obligations' as const, action: e.action ?? '' }));
-
-  const cfe = echeancesCfe(faits, maintenant)
-    .filter((e) => dansLePreavis(e.date, e.preavisJours))
-    // `preavisJours` a servi au filtrage : il n'a plus rien à dire au sujet.
-    .map(({ preavisJours: _, ...reste }) => reste);
-
-  return [...fixes, ...cfe];
-}
-
-/**
- * Les obligations de CFE, déduites de la situation.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LA CHARGE QUE L'APPLICATION IGNORAIT
- * ─────────────────────────────────────────────────────────────────────────
- *
- * La CFE est annuelle, payable au 15 décembre, et n'apparaît nulle part avant
- * la parution de l'avis en novembre. Rien ne la signalait : quelqu'un qui se
- * verse tout son disponible en octobre se verse la CFE de décembre. C'est
- * l'erreur qui va dans le sens dangereux — celle qui invite à se verser de
- * l'argent déjà dû.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LE SUJET DISPARAÎT QUAND IL EST RÉGLÉ
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Le rappel de paiement n'apparaît que si AUCUNE échéance de nature `cfe` n'est
- * enregistrée pour l'année. Dès qu'elle l'est, la dette entre dans les
- * provisions par le chemin normal et le sujet s'efface. Un rappel qui reste
- * affiché après avoir été traité apprend à ignorer les rappels.
- *
- * Aucun MONTANT n'est avancé ici : la base minimum est fixée par la commune, le
- * taux voté par elle, et seul l'avis les porte. Voir `bareme/cfe.ts`.
- */
-interface EcheanceCfeDatee {
-  readonly id: string;
-  readonly intitule: string;
-  readonly date: DateISO;
-  readonly preavisJours: number;
-  readonly ecran?: EcranCible;
-  readonly action?: string;
-  readonly contexte?: string;
-}
-
-function echeancesCfe(faits: Faits, maintenant: Date): readonly EcheanceCfeDatee[] {
-  const annee = maintenant.getFullYear();
-  const debut = faits.entreprise.debutActivite;
-
-  const sujets: EcheanceCfeDatee[] = [];
-
-  // La déclaration initiale, l'année de la création. Ne pas la déposer ne
-  // supprime pas la CFE : cela fait perdre l'exonération de première année.
-  const declaration = declaration1447C(debut, annee);
-  if (declaration !== null) {
-    sujets.push({
-      ...declaration,
-      ecran: 'obligations',
-      action: 'Se préparer',
-      contexte: 'C’est elle qui établit ta base d’imposition ; l’omettre fait perdre '
-        + 'l’exonération de première année.'
-    });
-  }
-
-  const regime = regimeCfe(debut, annee, caDeReferenceCfe(faits, annee));
-  if (!cfeDue(regime)) return sujets;
-
-  // « Provisionnée » veut dire : une échéance de nature `cfe` existe pour cette
-  // année. Son montant, lui, vient de l'avis — jamais d'un calcul d'ici.
-  const provisionnee = faits.echeances.some(
-    (e) => e.nature === 'cfe' && e.echeanceLe.startsWith(String(annee))
-  );
-  if (!provisionnee) {
-    const paiement = paiementCfe(annee);
-    sujets.push({
-      ...paiement,
-      ecran: 'obligations',
-      action: 'Saisir l’échéance',
-      contexte: regime.type === 'base-reduite-moitie'
-        ? 'Première année d’imposition : la base est réduite de moitié, mais la CFE est '
-          + 'due. Sans montant saisi, ton disponible est surestimé.'
-        : 'L’avis paraît en novembre sur ton espace professionnel. Sans montant saisi, '
-          + 'ton disponible est surestimé.'
-    });
-  }
-
-  // L'acompte de juin découle de la CFE de l'an passé, telle qu'elle a été
-  // saisie — pas d'une estimation.
-  const cfePrecedente = euros(faits.echeances
-    .filter((e) => e.nature === 'cfe' && e.echeanceLe.startsWith(String(annee - 1)))
-    .reduce((t, e) => t + e.montant, 0));
-  const acompte = acompteCfe(annee, cfePrecedente);
-  if (acompte !== null) {
-    sujets.push({ ...acompte, ecran: 'obligations', action: 'Voir les échéances' });
-  }
-
-  return sujets;
-}
-
-/**
- * Le chiffre d'affaires de référence pour situer la base minimum : celui de
- * l'année N−2.
- *
- * Rend `null` quand l'entreprise est trop jeune pour en avoir un : une
- * entreprise sans N−2 n'a pas « 0 € de recettes en N−2 », elle n'a pas de N−2.
- * La traiter comme un zéro la dispenserait à tort de cotisation minimum, en
- * surestimant son disponible.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * CE GARDE-FOU EST AUJOURD'HUI INATTEIGNABLE, ET C'EST ASSUMÉ
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Vérifié par mutation : le supprimer ne casse aucun test, et ce n'est pas une
- * lacune des tests. Quand le N−2 manque, l'entreprise a été créée l'année
- * courante ou la précédente — donc `regimeCfe` a déjà conclu à l'exonération de
- * création ou à la base réduite de moitié, sans jamais regarder le chiffre de
- * référence. Les deux conditions ne peuvent pas être vraies en même temps.
- *
- * Il est gardé quand même : il rend cette fonction juste PRISE SEULE, sans
- * rien supposer des branches de `regimeCfe`. Le jour où l'une d'elles change,
- * un zéro passerait ici pour une absence — et la dispense de cotisation
- * minimum s'appliquerait à tort, dans le sens dangereux. La règle elle-même est
- * couverte, côté domaine, par `regimeCfe(…, null)`.
- */
-function caDeReferenceCfe(faits: Faits, annee: number): Euros | null {
-  const debut = faits.entreprise.debutActivite;
-  if (debut === null) return null;
-  const reference = annee - 2;
-  if (Number(debut.slice(0, 4)) > reference) return null;
-  return caEncaisseAnnee(faits, reference);
-}
+const HORIZON_JOURS = 366;
 
 /** Les sujets à traiter, calculés depuis les faits. Jamais stockés. */
 export function aTraiter(
   faits: Faits,
   maintenant: Date = new Date()
 ): readonly SujetATraiter[] {
-  return sujetsATraiter(
-    entreeATraiter(faits, echeancesReglementairesActives(faits, maintenant), maintenant)
-  ).map((s) => {
-    // La déclaration arrive avec ce qu'il faut payer : c'est la question qu'on
-    // se pose en ouvrant le site de l'URSSAF. Calculé ici et non dans le
-    // domaine des sujets, qui ne connaît pas les barèmes.
-    if (s.id !== 'periodes-a-declarer' || typeof s.donnees['periode'] !== 'string') return s;
-    const m = montantDeclaration(
-      faits, moisDeLaPeriode(s.donnees['periode'], faits.entreprise.urssafPeriodicite)
-    );
-    return { ...s, donnees: { ...s.donnees, montant: m.statut === 'refuse' ? null : m.valeur } };
-  });
+  const aujourdhui = dateISOde(maintenant);
+  const obligations = obligationsEntre(
+    faits, '1970-01-01' as DateISO, decaler(aujourdhui, HORIZON_JOURS), aujourdhui
+  );
+  return sujetsATraiter(entreeATraiter(faits, obligations, maintenant));
 }
 
 /**
- * Ce que coûte la déclaration d'une période : cotisations, plus le versement
- * libératoire s'il y a lieu, plus la CFP, sur les encaissements de la période
- * — la même règle que le volet « à provisionner », taux au mois de chaque
- * encaissement.
- *
- * Refusé si un taux manque : un montant calculé avec un taux à zéro se lirait
- * comme un fait, et se recopierait sur le formulaire. Une période sans
- * encaissement, elle, coûte un vrai zéro — elle se déclare quand même.
+ * Le nombre de choses à faire sous Obligations : ce que dit la pastille du
+ * rail, et ce que dira le titre de l'écran. La même fonction pour les deux.
  */
-export function montantDeclaration(faits: Faits, mois: readonly Mois[]): Resolution<Euros> {
-  const dans = new Set<string>(mois);
-  const dernier = mois[mois.length - 1];
-  if (dernier === undefined) return { statut: 'refuse', motif: 'Période vide.' };
-  const taux = tauxImpotEtContributions(regimeDe(faits), dernier, faits.entreprise.typeActivite);
-  if (taux.statut === 'refuse') return taux;
-  const calcul = voletAProvisionner(
-    recettesEncaissees(faits).filter((r) => dans.has(r.encaisseeLe.slice(0, 7))),
-    { mois: [] },
-    {
-      typeActivite: faits.entreprise.typeActivite,
-      sousAcreLe: sousAcreLe(faits),
-      debutActivite: faits.entreprise.debutActivite,
-      periodesUrssaf: periodesUrssafEffectives(faits),
-      tauxImpotEtContributions: taux.valeur
-    }
-  );
-  const refus = calcul.nonCalculables[0];
-  if (refus !== undefined) return { statut: 'refuse', motif: refus.motif };
-  return { statut: 'publie', valeur: calcul.montant, source: taux.source, verifieLe: taux.verifieLe };
-}
-
-/** Les clients, indexés par nom, au format attendu par le calcul de DES. */
-export function preneursDeServices(faits: Faits): ReadonlyMap<string, PreneurService> {
-  return new Map(faits.clients.map((c) => [
-    c.nom,
-    { nom: c.nom, pays: c.pays, tvaIntracom: c.tvaIntracom }
-  ]));
+export function nombreAFaire(faits: Faits, ecran: EcranCible = 'obligations', maintenant: Date = new Date()): number {
+  return compteursParEcran(aTraiter(faits, maintenant))[ecran] ?? 0;
 }

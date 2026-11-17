@@ -83,7 +83,9 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
 
   if (sujet.id.startsWith('echeance-')) {
     const jours = nombre(d['jours']);
-    const delai = jours >= 0
+    // Un jour inconnu (« indique ton nom », « fin mai ») ne se compte pas :
+    // « dans 0 jour » serait une date inventée.
+    const delai = d['jours'] === null ? '' : jours >= 0
       ? `Dans ${pluriel(jours, 'jour', 'jours')}.`
       : d['enVigueur'] === true
         ? `En vigueur depuis ${pluriel(-jours, 'jour', 'jours')}.`
@@ -91,7 +93,7 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
     const complement = texte(d['contexte']);
     return {
       intitule: texte(d['intitule']),
-      contexte: complement === '' ? delai : `${delai} ${complement}`,
+      contexte: complement === '' ? delai : `${delai} ${complement}`.trim(),
       action: texte(d['action']) === '' ? 'Se préparer' : texte(d['action']),
       levier: null
     };

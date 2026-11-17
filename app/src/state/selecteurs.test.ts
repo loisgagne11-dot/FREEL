@@ -4,7 +4,7 @@ import { dateISO, euros, mois, ratio } from '../domain/types';
 import type { Echeance } from '../domain/calculs/provisions';
 import { type Depense, type Faits, faitsVides } from './schema';
 import { caEncaisseAnnee, etatPilote, moisCourant, recettesEncaissees, regimeDe, remunerationDuMois, solde, sousAcreLe } from './selecteurs';
-import { aTraiter, echeancesReglementairesActives } from './selecteurs.aTraiter';
+import { aTraiter } from './selecteurs.aTraiter';
 import { finAcreDe, provenanceSoldeDe } from './selecteurs.reglages';
 import { periodeCourante } from '../domain/calculs/periode';
 import { anneesDisponibles, etatArgent } from './selecteurs.argent';
@@ -1040,8 +1040,10 @@ describe('années proposables au sélecteur de période', () => {
  * fait : le rappel reste tant qu'elle manque, et s'éteint quand elle est là.
  */
 describe('obligations réglementaires datées', () => {
-  const fe = (quand: string, f = faitsVides()) => echeancesReglementairesActives(f, new Date(`${quand}T09:00:00Z`))
-    .find((e) => e.id === 'facturation-electronique-reception');
+  // Lue sur les obligations (`selecteurs.obligations`) : le sujet, comme la
+  // ligne de l'écran, vient de la même source.
+  const fe = (quand: string, f = faitsVides()) => aTraiter(f, new Date(`${quand}T09:00:00Z`))
+    .find((s) => s.id === 'echeance-facturation-electronique-reception');
   const avecPlateforme = (): ReturnType<typeof faitsVides> => ({
     ...faitsVides(),
     entreprise: { ...faitsVides().entreprise, plateformeAgreee: { nom: 'Plateforme démo', depuis: null } }
@@ -1050,8 +1052,11 @@ describe('obligations réglementaires datées', () => {
   /* Son compteur s'allume sur Obligations, où vivent les échéances (lot 51) ;
      son action, elle, mène aux Réglages — voir `adresseDuSujet`. */
   it('reste tant que la plateforme manque, date passée comprise, compté sous Obligations', () => {
-    expect(fe('2026-09-20')).toMatchObject({ sansSuivi: true, ecran: 'obligations' });
-    expect(fe('2026-11-14')).toMatchObject({ action: 'Renseigner ma plateforme' });
+    const passee = fe('2026-09-20');
+    expect(passee).toMatchObject({ ecran: 'obligations', gravite: 'a_faire' });
+    expect(passee?.donnees['enVigueur']).toBe(true);
+    const plusTard = fe('2026-11-14');
+    expect(plusTard === undefined ? '' : formuler(plusTard).action).toBe('Renseigner ma plateforme');
   });
 
   it('s’éteint dès que la plateforme est renseignée', () => {
