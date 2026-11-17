@@ -153,7 +153,10 @@ function Formulaire({ periode, onFermer }: { readonly periode: PeriodeUrssaf; re
         <button type="button" className={styles.valider} onClick={valider}>
           Enregistrer la déclaration
         </button>
-        <button type="button" className={styles.annuler} onClick={onFermer}>Annuler</button>
+        {/* « Fermer », comme la maquette validée (décision 25) : « Annuler »,
+            à côté d'une période déjà déclarée, se lisait « annuler la
+            déclaration ». */}
+        <button type="button" className={styles.annuler} onClick={onFermer}>Fermer</button>
       </div>
     </div>
   );
