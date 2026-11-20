@@ -1,7 +1,8 @@
 import { useId, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { caEncaisseAnnee, moisCourant } from '../../state/selecteurs';
+import { caEncaisseAnnee, dateDuJour, moisCourant } from '../../state/selecteurs';
 import { comparerRegimes } from '../../domain/calculs/comparateurVl';
+import { anneeDOptionVl, plafondRfrVersementLiberatoire } from '../../domain/bareme/plafondVl';
 import { euros, mois as moisDe } from '../../domain/types';
 import { Info } from './Info';
 import { Montant } from './Montant';
@@ -39,9 +40,11 @@ import styles from './ComparateurVl.module.css';
  * ─────────────────────────────────────────────────────────────────────────
  *
  * L'éligibilité — l'option n'est ouverte que sous un plafond de revenu fiscal
- * de référence — n'est pas vérifiée : ce plafond est un nombre officiel daté
- * que l'application ne porte pas, et l'invariant n°1 interdit de l'écrire au
- * jugé. L'écran rend l'arithmétique, jamais le droit d'opter.
+ * de référence — se dit, elle ne se vérifie pas : le plafond se lit sur le
+ * barème de l'impôt (`bareme/plafondVl`), le revenu fiscal de référence du
+ * foyer est sur son avis, que l'application ne lit pas. L'écran rend
+ * l'arithmétique et le seuil, jamais le droit d'opter. L'année dont le barème
+ * manque, il se tait plutôt que de reconduire le précédent.
  *
  * Deux simplifications sont dites, avec le SENS de chaque écart : sans elles,
  * un résultat serré se lirait comme un verdict. La décote, elle, est
@@ -72,6 +75,13 @@ export function ComparateurVl() {
 
   const ca = Number(caSaisi.replace(',', '.'));
   const caValide = caSaisi.trim() !== '' && Number.isFinite(ca) && ca >= 0;
+
+  // Le plafond suit les parts du comparatif : celles du foyer qu'on compare.
+  // Illisibles, ce sont celles d'une part, et la phrase le dit.
+  const partsLues = Number(parts.replace(',', '.'));
+  const partsConnues = parts.trim() !== '' && Number.isFinite(partsLues) && partsLues > 0 ? partsLues : null;
+  const anneeOption = anneeDOptionVl(dateDuJour(), faits.entreprise.debutActivite);
+  const plafond = plafondRfrVersementLiberatoire(anneeOption, partsConnues);
 
   const resultat = useMemo(() => {
     if (!caValide) return null;
@@ -255,14 +265,34 @@ export function ComparateurVl() {
         </>
       )}
 
+      <p className={styles.plafond} role="note">
+        {plafond.statut === 'refuse'
+          ? plafond.motif
+          : (
+            <>
+              Le versement libératoire n’est ouvert en {anneeOption} que si ton
+              revenu fiscal de référence de {anneeOption - 2} ne dépasse
+              pas{' '}
+              {/* Arrondi à l'euro INFÉRIEUR : le revenu fiscal de référence
+                  est en euros entiers, et 73 287,50 € arrondis à 73 288 €
+                  diraient « ouvert » à qui le dépasse d'un euro. */}
+              <Montant>{eur(Math.floor(plafond.valeur))}</Montant>{' '}
+              ({partsConnues === null
+                ? 'pour une part'
+                : `${String(partsConnues).replace('.', ',')} ${partsConnues >= 2 ? 'parts' : 'part'}`})
+              {' '}— ligne 25 de ton avis d’impôt {anneeOption - 1}.
+            </>
+          )}
+      </p>
+
       <details className={styles.limites}>
         <summary>Ce que ce calcul ne dit pas</summary>
         <ul>
           <li>
-            <strong>L’éligibilité n’est pas vérifiée.</strong> L’option n’est
-            ouverte que si le revenu fiscal de référence du foyer, deux ans plus
-            tôt, ne dépasse pas un plafond. Ce plafond est un nombre officiel
-            que l’application ne porte pas&nbsp;: à vérifier avant de décider.
+            <strong>L’éligibilité n’est pas vérifiée.</strong> Le plafond est
+            dit plus haut&nbsp;; ton revenu fiscal de référence, lui, est sur
+            ton avis d’impôt, que l’application ne lit pas&nbsp;: à comparer
+            avant de décider.
           </li>
           <li>
             <strong>Pas de plafonnement du quotient familial</strong>, qui le
