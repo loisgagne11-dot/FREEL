@@ -40,7 +40,7 @@ import styles from './CartePliable.module.css';
  * doit pas rouvrir toutes les cartes de quelqu'un.
  */
 export function CartePliable(
-  { id, ecran, titre, aide, resume, actions, children, deplieeParDefaut = true, classe }: {
+  { id, ecran, titre, aide, resume, actions, children, deplieeParDefaut = true }: {
     /** Identité stable de la carte. Ne change pas quand le titre change. */
     readonly id: string;
     /** L'écran auquel elle appartient — l'état est conservé par écran. */
@@ -75,12 +75,6 @@ export function CartePliable(
     readonly actions?: ReactNode;
     readonly children: ReactNode;
     readonly deplieeParDefaut?: boolean;
-    /**
-     * Une classe de plus sur la carte : un écran redessiné d'après la
-     * direction (Obligations, lot 53) y pose ses mesures sans réécrire le
-     * pliage — deux cartes pliables auraient fini par ne plus plier pareil.
-     */
-    readonly classe?: string | undefined;
   }
 ) {
   const [pliee, setPliee] = useState(() => lireEtat(ecran, id, !deplieeParDefaut));
@@ -91,7 +85,7 @@ export function CartePliable(
   const basculer = useCallback(() => setPliee((p) => !p), []);
 
   return (
-    <section className={`${styles.carte} ${pliee ? styles.pliee : ''} ${classe ?? ''}`}>
+    <section className={`${styles.carte} ${pliee ? styles.pliee : ''}`}>
       <header className={styles.entete}>
         {/*
           * Le bouton porte le TITRE, et rien d'autre.

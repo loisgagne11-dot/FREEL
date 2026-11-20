@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react';
 import type { DateISO } from '../../domain/types';
 import { decaler } from '../../domain/calculs/calendrier';
 import { type Obligation, duSaisi } from '../../domain/calculs/obligations';
@@ -16,7 +16,8 @@ import { useToast } from '../components/Toasts';
 import { useRoute } from '../useRoute';
 import { eur } from '../format';
 import {
-  anneesDuSegment, dateDe, etapeEnCours, jourMois, listeDeLAnnee, titreObligations
+  anneesDuSegment, dateDe, dossierParDefaut, etapeEnCours, jourMois, listeDeLAnnee, obligationDeLaCle,
+  titreObligations
 } from './Obligations.lecture';
 import { FriseObligations, LegendeFrise } from './Obligations.frise';
 import { ListeObligations } from './Obligations.liste';
@@ -51,6 +52,37 @@ const DossierTvaPanneau = lazy(() => import('./Argent.tva')
  */
 const PanneauSaisie = lazy(() => import('./Obligations.saisie')
   .then((m) => ({ default: m.PanneauSaisie })));
+
+/**
+ * Le dossier d'une obligation, au clic — au bureau, avec la première ligne
+ * qu'il montre par défaut. Ses gestes et leurs formulaires n'ont rien à faire
+ * dans le paquet d'un écran qu'on ouvre pour lire.
+ */
+const Dossier = lazy(() => import('./Obligations.dossier')
+  .then((m) => ({ default: m.Dossier })));
+
+/**
+ * Le téléphone, au sens de la feuille de style : en dessous de 761 px, le
+ * dossier quitte la colonne de droite pour un panneau. Hors navigateur
+ * (tests), le bureau.
+ */
+const TELEPHONE = '(max-width: 760px)';
+function useTelephone(): boolean {
+  return useSyncExternalStore(
+    (rappel) => {
+      if (typeof window.matchMedia !== 'function') return () => undefined;
+      const requete = window.matchMedia(TELEPHONE);
+      requete.addEventListener('change', rappel);
+      return () => requete.removeEventListener('change', rappel);
+    },
+    () => typeof window.matchMedia === 'function' && window.matchMedia(TELEPHONE).matches
+  );
+}
+
+/** Une clé d'adresse lisible : `#/obligations/urssaf-2026-T2`, encodée à l'aller. */
+function decoder(cle: string): string {
+  try { return decodeURIComponent(cle); } catch { return cle; }
+}
 
 /** Ce que le panneau de saisie reçoit : l'échéance à corriger, ou ce qu'un dossier sait déjà. */
 type Saisie = { readonly initiale: Echeance | null; readonly prerempli?: Partial<ChampsEcheance> };
@@ -151,6 +183,17 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
     setRegistre(routeIci);
     window.location.replace('#/obligations');
   }, [routeIci]);
+  /* `#/obligations/<obligation>` est un geste du même ordre : il ouvre le
+     dossier — celui d'une période, ou de l'obligation qui porte une
+     échéance (`saisie-<id>`). La Trésorerie, le flux du Pilote, la carte de
+     la CFE et les sujets « à traiter » y mènent : arriver en haut de l'écran
+     obligeait à chercher la ligne une seconde fois. */
+  const [demandee, setDemandee] = useState<string | null>(null);
+  useEffect(() => {
+    if (routeIci === '' || estRegistre(routeIci)) return;
+    setDemandee(decoder(routeIci));
+    window.location.replace('#/obligations');
+  }, [routeIci]);
   const idGroupe = useId();
 
   const aujourdhui = dateDuJour();
@@ -169,7 +212,42 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
   const liste = useMemo(() => listeDeLAnnee(toutes, anneeVue, aujourdhui), [toutes, anneeVue, aujourdhui]);
   const [choisie, setChoisie] = useState<string | null>(null);
   const [saisie, setSaisie] = useState<Saisie | null>(null);
+  const telephone = useTelephone();
+  const [panneauDossier, setPanneauDossier] = useState(false);
   reprendreLePli();
+
+  // L'obligation qu'une adresse demande : on la retrouve, on montre son année,
+  // on ouvre son dossier — en panneau au téléphone.
+  useEffect(() => {
+    if (demandee === null) return;
+    const o = obligationDeLaCle(toutes, demandee);
+    setDemandee(null);
+    if (o === undefined) return;
+    setChoisie(o.id);
+    if (telephone) setPanneauDossier(true);
+    const a = Number(dateDe(o).slice(0, 4));
+    if (onAnnee !== undefined && a !== anneeVue) onAnnee(a);
+  }, [demandee, toutes, telephone, onAnnee, anneeVue]);
+
+  const ouverte = (choisie === null ? undefined : toutes.find((o) => o.id === choisie)) ?? dossierParDefaut(liste);
+  const ouvrir = (o: Obligation): void => {
+    setChoisie(o.id);
+    if (telephone) setPanneauDossier(true);
+  };
+  const dossier = (enPanneau: boolean) => ouverte !== null && (
+    <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+      <Dossier
+        key={ouverte.id}
+        obligation={ouverte}
+        aujourdhui={aujourdhui}
+        enPanneau={enPanneau}
+        /* Un panneau ne s'ouvre pas sur un autre : deux pièges de focus se
+           disputeraient la tabulation. Le volet du dossier se ferme d'abord. */
+        onSaisir={(s) => { setPanneauDossier(false); setSaisie(s); }}
+        onRegistre={(r) => { setPanneauDossier(false); setRegistre(r); }}
+      />
+    </Suspense>
+  );
 
   /* Le calendrier se fabrique au clic : son générateur et le téléchargement
      n'ont rien à faire dans le paquet de l'écran, qu'on ouvre pour lire. */
@@ -236,10 +314,14 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
           <FriseObligations obligations={deLAnnee} annee={anneeVue} aujourdhui={aujourdhui} />
         </section>
 
+        <div className={ob.rangee}>
+        {/* L'enveloppe pose les mesures de `.e-card` sur la carte pliable
+            commune, sans toucher au composant : il est au premier rendu, et
+            son budget est plein. */}
+        <div className={ob.pliable}>
         <CartePliable
           id="echeancier"
           ecran="obligations"
-          classe={ob.pliable}
           titre="À faire et à venir"
           resume={<ResumeReplie toutes={toutes} aFaire={liste.aFaire} />}
           actions={(
@@ -252,8 +334,8 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
             aFaire={liste.aFaire}
             faites={liste.faites}
             aujourdhui={aujourdhui}
-            ouverte={choisie}
-            onOuvrir={(o) => setChoisie(o.id)}
+            ouverte={telephone ? null : ouverte?.id ?? null}
+            onOuvrir={ouvrir}
           />
           {/* Une liste sans échéance saisie n'est pas une bonne nouvelle : le
               dû ne connaît alors que des estimations. */}
@@ -264,6 +346,19 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
             </p>
           )}
         </CartePliable>
+        </div>
+
+        {/* Au bureau, le dossier se lit à droite de la liste — celui de la
+            prochaine chose à faire tant que rien n'est choisi. Au téléphone,
+            il s'ouvre en panneau, au toucher d'une ligne. */}
+        {!telephone && (
+          <section className={`${ob.carte} ${ob.colonneDossier}`} aria-label="Dossier">
+            {ouverte === null
+              ? <p className={ob.vide}>Rien à ouvrir cette année.</p>
+              : dossier(false)}
+          </section>
+        )}
+        </div>
 
         <div className={`${styles.sections} ${styles.obligations}`}>
           <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
@@ -286,6 +381,15 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
           Déclaration européenne de services
         </button>
       </div>
+
+      <Sheet
+        ouvert={telephone && panneauDossier && ouverte !== null}
+        titre={ouverte?.libelle ?? ''}
+        variante="volet"
+        onFermer={() => setPanneauDossier(false)}
+      >
+        {telephone && panneauDossier && dossier(true)}
+      </Sheet>
 
       <Sheet
         ouvert={saisie !== null}

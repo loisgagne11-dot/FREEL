@@ -31,7 +31,7 @@ import { casesDeclarationRevenus, limiteDeclarationRevenus } from '../domain/bar
 import {
   type DateCfe, acompteCfe, cfeDue, declaration1447C, paiementCfe, regimeCfe
 } from '../domain/bareme/cfe';
-import { type PieceAFournir, etatDePiece } from '../domain/calculs/pieces';
+import { type EtatDePiece, type PieceAFournir, etatDePiece } from '../domain/calculs/pieces';
 import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';
 import {
@@ -70,6 +70,27 @@ const VERIFIE_LE = dateISO('2026-11-17');
  * encaissement, elle, coûte un vrai zéro — elle se déclare quand même.
  */
 export function montantDeclaration(faits: Faits, mois: readonly Mois[]): Resolution<Euros> {
+  const v = ventilationDeclaration(faits, mois);
+  if (v.statut === 'refuse') return v;
+  return { statut: 'publie', valeur: v.valeur.total, source: v.source, verifieLe: v.verifieLe };
+}
+
+/** Ce qu'une déclaration URSSAF réunit : les cotisations, le versement libératoire, la CFP. */
+export interface VentilationDeclaration {
+  readonly cotisations: Euros;
+  /** Le versement libératoire ; zéro sans l'option. */
+  readonly impot: Euros;
+  readonly cfp: Euros;
+  readonly total: Euros;
+}
+
+/**
+ * Le montant d'une déclaration, ligne par ligne — ce que le dossier URSSAF
+ * montre « tel que le site le demande ». La même règle que
+ * `montantDeclaration`, qui en est le total : deux calculs du même montant
+ * auraient fini par différer d'un euro, et c'est celui-là qu'on recopie.
+ */
+export function ventilationDeclaration(faits: Faits, mois: readonly Mois[]): Resolution<VentilationDeclaration> {
   const dans = new Set<string>(mois);
   const dernier = mois[mois.length - 1];
   if (dernier === undefined) return { statut: 'refuse', motif: 'Période vide.' };
@@ -88,7 +109,13 @@ export function montantDeclaration(faits: Faits, mois: readonly Mois[]): Resolut
   );
   const refus = calcul.nonCalculables[0];
   if (refus !== undefined) return { statut: 'refuse', motif: refus.motif };
-  return { statut: 'publie', valeur: calcul.montant, source: taux.source, verifieLe: taux.verifieLe };
+  const { urssaf, impot, cfp } = calcul.parNature;
+  return {
+    statut: 'publie',
+    valeur: { cotisations: urssaf, impot, cfp, total: calcul.montant },
+    source: taux.source,
+    verifieLe: taux.verifieLe
+  };
 }
 
 /** Les clients, indexés par nom, au format attendu par le calcul de DES. */
@@ -614,6 +641,26 @@ function remplacee(piece: PieceAFournir, toutes: readonly PieceAFournir[]): bool
   if (piece.sorte === 'autre' || piece.obtenueLe === null) return false;
   const obtenueLe = piece.obtenueLe;
   return toutes.some((p) => p.sorte === piece.sorte && p.obtenueLe !== null && p.obtenueLe > obtenueLe);
+}
+
+/**
+ * Les pièces telles que la grille les montre : chacune avec son état du
+ * jour — la même règle que les échéances qu'elles produisent, la première
+ * limite URSSAF comprise pour une attestation provisoire. Une pièce
+ * remplacée par une plus récente de la même sorte n'y est plus.
+ */
+export function etatDesPieces(
+  faits: Faits, aujourdhui: DateISO
+): readonly { readonly piece: PieceAFournir; readonly etat: EtatDePiece }[] {
+  return faits.pieces
+    .filter((piece) => !remplacee(piece, faits.pieces))
+    .map((piece) => ({
+      piece,
+      etat: etatDePiece(
+        piece, aujourdhui,
+        piece.obtenueLe === null ? null : premiereEcheanceUrssaf(faits, piece.obtenueLe, aujourdhui)
+      )
+    }));
 }
 
 function pieces(faits: Faits, aujourdhui: DateISO): readonly Prevue[] {

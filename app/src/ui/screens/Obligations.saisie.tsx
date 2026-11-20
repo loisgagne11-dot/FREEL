@@ -63,11 +63,10 @@ export function periodesProposees(periodicite: 'mensuel' | 'trimestriel', aujour
  * montre et que l'utilisateur change : le report au jour ouvré a rendu cette
  * règle ambiguë (avril et mai 2026 revendiquaient les mêmes appels de juin).
  */
-export function periodeSuggeree(
-  date: string, periodes: readonly PeriodeUrssaf[]
-): string | null {
+export function periodeSuggeree(date: string, periodicite: 'mensuel' | 'trimestriel'): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  return periodes.find((p) => p.limite.slice(0, 7) === date.slice(0, 7))?.id ?? null;
+  return periodesProposees(periodicite, date as DateISO)
+    .find((p) => p.limite.slice(0, 7) === date.slice(0, 7))?.id ?? null;
 }
 
 /**
@@ -184,7 +183,7 @@ export function SaisieEcheance(
   const [periodeChoisie, setPeriodeChoisie] = useState<string | null | undefined>(
     initiale !== null && initiale.periode !== undefined ? initiale.periode : prerempli?.periode
   );
-  const periode = periodeChoisie === undefined ? periodeSuggeree(date, periodes) : periodeChoisie;
+  const periode = periodeChoisie === undefined ? periodeSuggeree(date, periodicite) : periodeChoisie;
   // La répétition n'a de sens qu'à la création : corriger une échéance d'une
   // série ne doit pas en recréer une autre.
   const [cadence, setCadence] = useState<Cadence | 'aucune'>('aucune');
@@ -254,7 +253,7 @@ export function SaisieEcheance(
       datesRepetees(dateISO(date), cadence, Number.isFinite(n) ? n : 1)
         .map((echeanceLe, i) => ({
           ...modele, echeanceLe,
-          ...(urssaf ? { periode: i === 0 ? periode : periodeSuggeree(echeanceLe, periodesProposees(periodicite, echeanceLe)) } : {})
+          ...(urssaf ? { periode: i === 0 ? periode : periodeSuggeree(echeanceLe, periodicite) } : {})
         }))
     );
   }

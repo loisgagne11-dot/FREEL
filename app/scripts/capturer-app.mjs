@@ -156,6 +156,10 @@ const VUES = [
   /* Obligations n'a pas d'homonyme au handoff : sa référence est la maquette
      `docs/design/direction/obligations.html`. */
   { hash: '#/obligations', nom: 'obligations', attendre: 'text=À faire et à venir' },
+  /* Un dossier ouvert par son adresse, comme le flux du Pilote l'ouvre : au
+     bureau, à droite de la liste ; au téléphone (`--largeur=390`), en volet
+     — un panneau que la capture de l'écran ne montre jamais. */
+  { hash: '#/obligations/urssaf-2026-T2', nom: 'obligations-dossier', attendre: 'text=Recettes à déclarer' },
   { hash: '#/achats', nom: 'achats', handoff: 'achats' },
   { hash: '#/simulateurs', nom: 'simulateurs', handoff: 'outils-impot' },
   { hash: '#/reglages', nom: 'reglages-profil', handoff: 'config-profil' },

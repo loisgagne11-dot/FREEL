@@ -97,7 +97,7 @@ function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
             « levier → » du handoff. */}
         {levier !== null && <span className={styles.sujetLevier}>levier → {levier}</span>}
       </div>
-      <a className={styles.sujetAction} href={adresseDuSujet(s.id, s.ecran)}>{action}</a>
+      <a className={styles.sujetAction} href={adresseDuSujet(s.id, s.ecran, s.donnees)}>{action}</a>
     </li>
   );
 }
@@ -111,10 +111,20 @@ function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
  * Facturation — « Renseigner ma plateforme » qui ouvrirait Obligations
  * obligerait à chercher le réglage une seconde fois, le reproche fait aux
  * actions rapides. De même, un barème à vérifier s'ouvre sur la section qui le
- * porte, pas sur le profil.
+ * porte, pas sur le profil, et une obligation sur son dossier.
  */
-export function adresseDuSujet(id: string, ecran: string): string {
-  return id === 'echeance-facturation-electronique-reception' ? '#/reglages/facturation'
-    : id === 'bareme-a-verifier' ? '#/reglages/fiscal'
-      : `#/${ecran}`;
+export function adresseDuSujet(id: string, ecran: string, donnees: SujetATraiter['donnees'] = {}): string {
+  if (id === 'echeance-facturation-electronique-reception') return '#/reglages/facturation';
+  if (id === 'bareme-a-verifier') return '#/reglages/fiscal';
+  // Sous Obligations, le dossier de l'obligation, pas le haut de l'écran
+  // (lot 53) : la première période à déclarer, la plus ancienne DES en
+  // retard, l'obligation elle-même.
+  if (ecran === 'obligations') {
+    const cle = id.startsWith('echeance-') ? id.slice('echeance-'.length)
+      : id === 'periodes-a-declarer' && typeof donnees['periode'] === 'string' ? `urssaf-${donnees['periode']}`
+        : id === 'des-en-retard' && typeof donnees['depuis'] === 'string' ? `des-${donnees['depuis']}`
+          : id === 'livre-recettes-incomplet' ? 'livre' : null;
+    if (cle !== null) return `#/obligations/${encodeURIComponent(cle)}`;
+  }
+  return `#/${ecran}`;
 }

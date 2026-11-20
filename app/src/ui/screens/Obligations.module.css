@@ -186,14 +186,17 @@
 
 /* La carte pliable prend les mesures de `.e-card` ; le pliage, le résumé et
    leur clé restent ceux du composant commun. */
-.pliable {
+.pliable { display: flex; flex-direction: column; min-width: 0; }
+
+.pliable > section {
+  flex: 1 1 auto;
   background: linear-gradient(180deg, var(--card-a), var(--card-b));
   box-shadow: var(--sh-2);
   padding: 18px;
   margin-bottom: 0;
 }
 
-.pliable > header > button[aria-expanded] {
+.pliable > section > header > button[aria-expanded] {
   font-size: 16.5px;
   font-weight: 650;
   letter-spacing: -0.01em;
@@ -336,8 +339,128 @@
 .alerte strong { color: var(--chip-warn); }
 
 @media (min-width: 761px) {
-  .pliable { padding: 22px 24px; }
+  .pliable > section { padding: 22px 24px; }
   .sansMontant { display: inline; }
   .pastilleLongue { display: inline-flex; }
   .pastilleCourte { display: none; }
+}
+
+/* ── La rangée : la liste, et le dossier à droite au bureau ─────────────── */
+
+.rangee { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.colonneDossier { display: flex; flex-direction: column; }
+
+/* ── Le dossier ─────────────────────────────────────────────────────────── */
+
+.dossier { display: flex; flex-direction: column; gap: 12px; min-width: 0; flex: 1 1 auto; }
+
+.dossier .entete { margin-bottom: 0; align-items: flex-start; }
+
+/* Le titre visible du volet (`.ob-panneau h2`) : le dialogue a le sien. */
+.titrePanneau { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: -0.01em; color: var(--text); }
+
+/* `.e-lab` : étiquette en capitales Mono. */
+.etiquette {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/* `.e-num` : la valeur à reporter, en Mono 30 px. */
+.grandChiffre {
+  font-family: var(--mono);
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chiffres { display: flex; flex-direction: column; }
+
+.chiffre {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.chiffres .chiffre:first-child { border-top: 0; }
+
+/* `.ob-case` : la case du formulaire fiscal, comme imprimée. */
+.caseFiscale {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--tint-2);
+  font-family: var(--mono);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* `.e-foot` : ce qui part, et quand — poussé au bas de la colonne. */
+.pied {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.piedMontant { font-family: var(--mono); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.lienVert {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.lienVert:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.factures { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+
+.factures li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.factures small { display: block; font-size: 12.5px; color: var(--muted); }
+
+.appels { display: flex; flex-direction: column; gap: 6px; }
+
+.appel { display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; }
+
+.formulairePlein { flex: 1 1 100%; min-width: 0; }
+
+@media (min-width: 761px) {
+  .rangee { flex-direction: row; align-items: stretch; gap: 20px; }
+  .rangee > :first-child { flex: 8 1 0; min-width: 0; }
+  .colonneDossier { flex: 5 1 0; min-width: 0; }
 }

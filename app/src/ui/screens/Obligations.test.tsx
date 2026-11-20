@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
-import { type Faits, type Recette, faitsVides } from '../../state/schema';
+import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { chargerJeu, faitsAu, le } from '../../test/jeu-d-essai';
 import { useCompteursATraiter } from '../useATraiter';
@@ -18,7 +18,9 @@ vi.mock('../../infra/telechargement', async (original) => ({
   telecharger: (...args: unknown[]) => { telecharger(...args); }
 }));
 
-afterEach(() => { cleanup(); vi.useRealTimers(); window.location.hash = ''; telecharger.mockReset(); });
+afterEach(() => {
+  cleanup(); vi.useRealTimers(); window.location.hash = ''; telecharger.mockReset(); window.localStorage.clear();
+});
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date('2026-12-15T09:00:00Z'));
@@ -246,5 +248,141 @@ describe('le pli de la liste', () => {
     poser(essai());
     expect(within(carteListe()).queryByRole('list')).toBeNull();
     window.localStorage.clear();
+  });
+});
+
+const dossier = () => screen.getByRole('region', { name: 'Dossier' });
+const titreDuDossier = async (): Promise<string> =>
+  (await within(dossier()).findByRole('heading', { level: 2 })).textContent ?? '';
+
+/**
+ * LE DOSSIER (lot 53, 3d) : à droite au bureau, celui de la prochaine chose
+ * à faire tant que rien n'est choisi ; ouvert par son adresse depuis les
+ * autres écrans.
+ */
+describe('le dossier', () => {
+  // L'écran s'ouvrait sur la dernière chose faite : on lisait le passé avant
+  // ce qui attend.
+  it('montre par défaut la prochaine chose à faire', async () => {
+    poser(essai());
+    expect(await titreDuDossier()).toBe('Facturation électronique : réception obligatoire');
+  });
+
+  it('montre celui de la ligne choisie, et la marque', async () => {
+    poser(essai());
+    const u = userEvent.setup();
+    const ligne = within(carteListe()).getByRole('button', { name: /URSSAF, T3 2026/u });
+    await u.click(ligne);
+    expect(await titreDuDossier()).toBe('URSSAF, T3 2026');
+    expect(ligne.getAttribute('aria-current')).toBe('true');
+  });
+
+  /*
+   * L'ADRESSE D'UN DOSSIER.
+   *
+   * Le flux du Pilote et la Trésorerie ne connaissent que l'échéance : leur
+   * lien `#/obligations/saisie-<id>` doit ouvrir l'obligation qui la porte.
+   * Arriver en haut de l'écran obligeait à chercher la ligne une seconde fois.
+   */
+  it('s’ouvre par son adresse — une obligation, ou l’échéance qu’elle porte —, puis rend l’adresse de l’écran', async () => {
+    window.location.hash = '#/obligations/urssaf-2026-T2';
+    const { unmount } = poser(essai());
+    expect(await titreDuDossier()).toBe('URSSAF, T2 2026');
+    await waitFor(() => expect(window.location.hash).toBe('#/obligations'));
+    unmount();
+    window.location.hash = '#/obligations/saisie-ech-cfe-2026';
+    poser(essai());
+    expect(await titreDuDossier()).toBe('CFE 2026');
+  });
+
+  it('change d’année pour montrer le dossier demandé', async () => {
+    const onAnnee = vi.fn();
+    window.location.hash = '#/obligations/urssaf-2025-T3';
+    useFaits.setState({ faits: essai() });
+    render(<FournisseurToasts><Obligations annee={2026} onAnnee={onAnnee} /></FournisseurToasts>);
+    await waitFor(() => expect(onAnnee).toHaveBeenCalledWith(2025));
+  });
+});
+
+const clientDe = (): Client => ({
+  id: 'c1', nom: 'ClientDE', adresse: '', siret: '', email: '',
+  delaiPaiement: 'net_30', pays: 'DE', tvaIntracom: 'DE123456789'
+});
+
+/** Ouvre une ligne et rend son dossier. */
+async function ouvrirLigne(nom: RegExp): Promise<HTMLElement> {
+  await userEvent.click(within(carteListe()).getByRole('button', { name: nom }));
+  await within(dossier()).findByRole('heading', { name: nom });
+  return dossier();
+}
+
+/** Chaque nature a son dossier, sur le modèle URSSAF, et son geste daté. */
+describe('les dossiers des autres natures', () => {
+  // L'amende est par déclaration manquante : « Marquer déposée » l'éteint.
+  it('DES : marque déposée à la date du jour', async () => {
+    vi.setSystemTime(new Date('2026-08-05T09:00:00Z'));
+    poser({
+      ...faitsVides(), clients: [clientDe()],
+      recettes: [{ ...recetteSansMode(), clientNom: 'ClientDE', emiseLe: dateISO('2026-07-15'), encaisseeLe: null, montant: euros(4000) }]
+    } as Faits);
+    const d = await ouvrirLigne(/Déclaration européenne de services, juillet 2026/u);
+    await userEvent.click(within(d).getByRole('button', { name: 'Marquer déposée' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Enregistrer' }));
+    expect(useFaits.getState().faits.periodesDeclarees).toEqual([{ nature: 'des', periode: '2026-07', declareeLe: '2026-08-05' }]);
+  });
+
+  // La case du formulaire, le montant brut, et rien de déduit.
+  it('déclaration de revenus : la case, le montant brut, et « Je l’ai déclarée le… »', async () => {
+    vi.setSystemTime(new Date('2027-05-10T09:00:00Z'));
+    const faits = essai();
+    poser({ ...faits, entreprise: { ...faits.entreprise, codePostal: '69001' } }, 2027);
+    const d = await ouvrirLigne(/Déclaration des revenus 2026/u);
+    expect(within(d).getByText(/5HQ|5TE/u)).toBeTruthy();
+    expect(within(d).getByText(/Ne déduis rien/u)).toBeTruthy();
+    await userEvent.click(within(d).getByRole('button', { name: 'Je l’ai déclarée le…' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Enregistrer' }));
+    expect(useFaits.getState().faits.periodesDeclarees).toContainEqual({ nature: 'revenus', periode: '2027', declareeLe: '2027-05-10' });
+  });
+
+  // Saisie, la CFE entre dans le dû ; le dossier prépare la saisie.
+  it('CFE : « Saisir l’avis » ouvre la saisie, nature et date posées', async () => {
+    vi.setSystemTime(new Date('2026-11-20T09:00:00Z'));
+    const faits = essai();
+    poser({ ...faits, echeances: faits.echeances.filter((e) => e.nature !== 'cfe') });
+    const d = await ouvrirLigne(/CFE 2026/u);
+    await userEvent.click(within(d).getByRole('button', { name: 'Saisir l’avis' }));
+    const panneau = await screen.findByRole('dialog', { name: 'Saisir une échéance' });
+    expect((await within(panneau).findByLabelText<HTMLSelectElement>('Nature')).value).toBe('cfe');
+    expect(within(panneau).getByLabelText<HTMLInputElement>('Date d’échéance').value).toBe('2026-12-15');
+  });
+
+  // Le jour de la CA3 dépend de l'initiale du nom : demandée, jamais devinée.
+  it('TVA : demande le nom qui date la CA3, là où il manque', async () => {
+    vi.setSystemTime(new Date('2027-04-02T09:00:00Z'));
+    const faits = essai();
+    poser({ ...faits, entreprise: { ...faits.entreprise, nomExploitant: '' } }, 2027);
+    const d = await ouvrirLigne(/TVA, T1 2027 \(CA3\)/u);
+    await userEvent.type(within(d).getByLabelText('Ton nom de famille'), 'Essai');
+    await userEvent.click(within(d).getByRole('button', { name: 'Enregistrer le nom' }));
+    expect(useFaits.getState().faits.entreprise.nomExploitant).toBe('Essai');
+  });
+
+  // Une attestation se renouvelle en changeant sa date, pas en en empilant une.
+  it('pièce : se modifie sur place', async () => {
+    poser(essai(), 2027);
+    const d = await ouvrirLigne(/Attestation de vigilance URSSAF/u);
+    const champ = within(d).getByLabelText('Obtenue le');
+    await userEvent.clear(champ);
+    await userEvent.type(champ, '2026-12-01');
+    await userEvent.click(within(d).getByRole('button', { name: 'Enregistrer' }));
+    const vigilance = useFaits.getState().faits.pieces.find((p) => p.id === 'piece-vigilance');
+    expect(vigilance?.obtenueLe).toBe('2026-12-01');
+    expect(useFaits.getState().faits.pieces).toHaveLength(essai().pieces.length);
+  });
+
+  it('formalité : mène au réglage de la plateforme', async () => {
+    poser(essai());
+    const d = await ouvrirLigne(/Facturation électronique/u);
+    expect(within(d).getByRole('link', { name: 'Renseigner ma plateforme' }).getAttribute('href')).toBe('#/reglages/facturation');
   });
 });

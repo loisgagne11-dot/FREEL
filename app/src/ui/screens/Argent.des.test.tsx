@@ -165,7 +165,8 @@ describe('dépôt de la déclaration', () => {
       .toMatch(/^2 déclarations en retard, soit 1\s500\s€/u);
 
     await u.click(screen.getByRole('button', { name: 'Mois précédent' })); // juin
-    await u.click(screen.getByRole('button', { name: 'Marquer déposée' }));
+    // Dans le panneau : derrière lui, le dossier de la DES offre le même geste.
+    await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Marquer déposée' }));
 
     expect(useFaits.getState().faits.periodesDeclarees)
       .toEqual([{ nature: 'des', periode: '2026-06', declareeLe: '2026-08-05' }]);

@@ -8,6 +8,19 @@ import { Montant } from './Montant';
 import styles from './FluxCard.module.css';
 
 /**
+ * Où mène une ligne : une sortie ouvre le dossier de l'obligation qui porte
+ * son échéance (`#/obligations/saisie-<id>`, lot 53) — arriver en haut de
+ * l'écran faisait chercher la ligne une seconde fois. L'estimation « à
+ * provisionner » n'est pas une échéance : elle garde l'écran. Écrite ici et
+ * dans le flux d'un autre mois plutôt que partagée : un module commun aux
+ * deux paquets différés s'inscrivait dans la liste de préchargement du
+ * premier rendu, dont le budget est plein.
+ */
+const versLaLigne = (vers: string, l: LigneFlux): string =>
+  (vers === '#/obligations' && l.id !== 'a-provisionner' ? `${vers}/saisie-${encodeURIComponent(l.id)}` : vers);
+
+
+/**
  * Le flux d'un mois passé ou à venir — chargé quand on quitte le mois courant.
  *
  * Même carte, mêmes trois colonnes que `FluxCard`, mais d'autres chiffres :
@@ -109,7 +122,7 @@ function Lignes({ lignes, vers }: { readonly lignes: readonly LigneFlux[]; reado
     <ul className={styles.items}>
       {lignes.map((l) => (
         <li key={l.id}>
-          <a className={styles.item} href={vers}>
+          <a className={styles.item} href={versLaLigne(vers, l)}>
             <span className={styles.itemNom}>{l.libelle}</span>
             <Pastille ligne={l} vers={vers} />
           </a>
