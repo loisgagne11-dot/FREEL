@@ -21,6 +21,7 @@ import {
 } from './Obligations.lecture';
 import { FriseObligations, LegendeFrise } from './Obligations.frise';
 import { ListeObligations } from './Obligations.liste';
+import { PiecesAFournir } from './Obligations.pieces';
 import type { ChampsEcheance } from './Obligations.saisie';
 import styles from './Argent.module.css';
 import ob from './Obligations.module.css';
@@ -359,6 +360,8 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
           </section>
         )}
         </div>
+
+        <PiecesAFournir faits={faits} aujourdhui={aujourdhui} />
 
         <div className={`${styles.sections} ${styles.obligations}`}>
           <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>

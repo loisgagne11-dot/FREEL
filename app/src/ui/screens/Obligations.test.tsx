@@ -386,3 +386,69 @@ describe('les dossiers des autres natures', () => {
     expect(within(d).getByRole('link', { name: 'Renseigner ma plateforme' }).getAttribute('href')).toBe('#/reglages/facturation');
   });
 });
+
+/**
+ * « PIÈCES À FOURNIR À TES CLIENTS » (lot 53, 3e).
+ */
+describe('les pièces à fournir', () => {
+  const pieces = () => screen.getByRole('heading', { name: 'Pièces à fournir à tes clients' }).closest('section') as HTMLElement;
+  const demo = (): Faits => ({
+    ...faitsVides(),
+    pieces: [
+      { id: 'v', sorte: 'vigilance', libelle: 'Attestation', obtenueLe: dateISO('2026-05-04'), valableJusquau: null, provisoire: false },
+      { id: 'rc', sorte: 'rc_pro', libelle: 'RC', obtenueLe: dateISO('2026-01-05'), valableJusquau: dateISO('2026-12-31'), provisoire: false },
+      { id: 's', sorte: 'sirene', libelle: 'Avis', obtenueLe: dateISO('2026-04-15'), valableJusquau: null, provisoire: false }
+    ]
+  } as Faits);
+
+  // L'avis SIRENE n'a aucune durée officielle : « à jour » serait affirmer ce
+  // que personne n'a dit (décision 25). La vigilance se juge à sa date
+  // d'obtention, pas à une fin qu'elle ne porte pas.
+  it('dit chaque pièce telle que sa règle la lit — et jamais l’avis SIRENE « à jour »', () => {
+    vi.setSystemTime(new Date('2026-06-10T09:00:00Z'));
+    poser(demo());
+    const boutons = within(pieces()).getAllByRole('button');
+    expect(boutons[0]?.textContent).toMatch(/Obtenue le 4 mai 2026 · à refaire tous les six mois.*À jour/u);
+    expect(boutons[1]?.textContent).toMatch(/Valable jusqu’au 31 décembre 2026.*À jour/u);
+    expect(boutons[2]?.textContent).toMatch(/Téléchargé le 15 avril 2026.*Pas de validité/u);
+    expect(boutons[2]?.textContent).not.toMatch(/À jour/u);
+    const plateforme = within(pieces()).getByRole('link');
+    expect(plateforme.textContent).toMatch(/Obligatoire au 1ᵉʳ septembre 2026 pour recevoir.*À inscrire/u);
+    expect(plateforme.getAttribute('href')).toBe('#/reglages/facturation');
+  });
+
+  // Six mois et un jour : le client la redemande.
+  it('passe une attestation de plus de six mois en « expirée »', () => {
+    vi.setSystemTime(new Date('2026-11-05T09:00:00Z'));
+    poser(demo());
+    expect(within(pieces()).getAllByRole('button')[0]?.textContent).toMatch(/Expirée/u);
+  });
+
+  // Une pièce se modifie sur place : la carte devient son formulaire.
+  it('se modifie sur place', async () => {
+    vi.setSystemTime(new Date('2026-06-10T09:00:00Z'));
+    poser(demo());
+    const u = userEvent.setup();
+    await u.click(within(pieces()).getAllByRole('button')[0] as HTMLElement);
+    const champ = await within(pieces()).findByLabelText('Obtenue le');
+    await u.clear(champ);
+    await u.type(champ, '2026-06-01');
+    await u.click(within(pieces()).getByRole('button', { name: 'Enregistrer' }));
+    expect(useFaits.getState().faits.pieces.find((p) => p.id === 'v')?.obtenueLe).toBe('2026-06-01');
+    expect(within(pieces()).getAllByRole('button')[0]?.textContent).toMatch(/Obtenue le 1ᵉʳ juin 2026/u);
+  });
+
+  // Une pièce qu'on n'a pas n'est pas en retard : rien n'oblige à l'avoir
+  // avant qu'un client la demande.
+  it('crée la pièce qui manque', async () => {
+    vi.setSystemTime(new Date('2026-06-10T09:00:00Z'));
+    poser(faitsVides());
+    const u = userEvent.setup();
+    const sirene = within(pieces()).getAllByRole('button')[2] as HTMLElement;
+    expect(sirene.textContent).toMatch(/À télécharger/u);
+    await u.click(sirene);
+    await u.type(await within(pieces()).findByLabelText('Téléchargé le'), '2026-06-09');
+    await u.click(within(pieces()).getByRole('button', { name: 'Enregistrer' }));
+    expect(useFaits.getState().faits.pieces).toMatchObject([{ sorte: 'sirene', obtenueLe: '2026-06-09' }]);
+  });
+});

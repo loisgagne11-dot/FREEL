@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { type DateISO, dateISO } from '../../domain/types';
-import type { PieceAFournir } from '../../domain/calculs/pieces';
+import { NOM_DE_PIECE, type PieceAFournir } from '../../domain/calculs/pieces';
 import { enregistrerPiece } from '../../state/ecritures.pieces';
 import { etatDesPieces } from '../../state/selecteurs.obligations';
 import { useFaits } from '../../state/store';
@@ -19,12 +19,6 @@ import g from './Obligations.gestes.module.css';
 
 export type SortePiece = PieceAFournir['sorte'];
 
-export const NOM_PIECE: Readonly<Record<SortePiece, string>> = {
-  vigilance: 'Attestation de vigilance URSSAF',
-  rc_pro: 'Responsabilité civile professionnelle',
-  sirene: 'Avis de situation au répertoire SIRENE',
-  autre: 'Pièce à fournir'
-};
 
 const AIDE: Readonly<Record<SortePiece, string>> = {
   vigilance: 'Un client qui te confie 5 000 € ou plus doit te la demander à la signature, puis tous les six '
@@ -73,12 +67,12 @@ export function EditeurPiece(
     enregistrerPiece({
       ...(piece === null ? {} : { id: piece.id }),
       sorte: s,
-      libelle: piece?.libelle ?? NOM_PIECE[s],
+      libelle: piece?.libelle ?? NOM_DE_PIECE[s],
       obtenueLe: date === null ? null : dateISO(date),
       valableJusquau: fin === null ? null : dateISO(fin),
       provisoire: s === 'vigilance' && provisoire
     });
-    signaler(`${NOM_PIECE[s]} : enregistrée.`);
+    signaler(`${NOM_DE_PIECE[s]} : enregistrée.`);
     onFini?.();
   }
 

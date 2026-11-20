@@ -11,7 +11,7 @@ import { type DateISO, type Resolution, type Euros } from '../domain/types';
 import { decaler } from '../domain/calculs/calendrier';
 import { type EvenementIcs, calendrierIcs } from '../domain/calculs/calendrierIcs';
 import type { Etape, Obligation } from '../domain/calculs/obligations';
-import type { PieceAFournir } from '../domain/calculs/pieces';
+import { NOM_DE_PIECE } from '../domain/calculs/pieces';
 import type { Faits } from './schema';
 import { obligationsEntre } from './selecteurs.obligations';
 
@@ -39,13 +39,6 @@ export function uidMuet(id: string): string {
   return `freel-${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
 }
 
-/** Le nom d'une pièce, sans son libellé saisi — qui nomme parfois le client qui la demande. */
-const NOM_DE_PIECE: Readonly<Record<PieceAFournir['sorte'], string>> = {
-  vigilance: 'Attestation de vigilance URSSAF',
-  rc_pro: 'Responsabilité civile professionnelle',
-  sirene: 'Avis de situation SIRENE',
-  autre: 'Pièce à fournir'
-};
 
 const euro = (n: number): string =>
   `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n)} €`;
