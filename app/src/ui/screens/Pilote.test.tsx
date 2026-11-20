@@ -213,6 +213,17 @@ describe('où mène l’action d’un sujet', () => {
     expect(adresseDuSujet('bareme-a-verifier', 'reglages')).toBe('#/reglages/fiscal');
   });
 
+  // Arriver en haut d'Obligations faisait chercher la ligne une seconde fois.
+  it('mène une obligation à son dossier', () => {
+    expect(adresseDuSujet('echeance-cfe-paiement-2026', 'obligations')).toBe('#/obligations/cfe-paiement-2026');
+    expect(adresseDuSujet('periodes-a-declarer', 'obligations', { periode: '2026-T3' }))
+      .toBe('#/obligations/urssaf-2026-T3');
+    expect(adresseDuSujet('des-en-retard', 'obligations', { depuis: '2026-05' })).toBe('#/obligations/des-2026-05');
+    expect(adresseDuSujet('livre-recettes-incomplet', 'obligations')).toBe('#/obligations/livre');
+    expect(resoudreRoute(adresseDuSujet('periodes-a-declarer', 'obligations', { periode: '2026-T3' })).ecran.id)
+      .toBe('obligations');
+  });
+
   it('mène les autres sujets à leur écran, qui existe', () => {
     for (const ecran of ['factures', 'tresorerie', 'obligations'] as const) {
       expect(resoudreRoute(adresseDuSujet('x', ecran)).ecran.id).toBe(ecran);

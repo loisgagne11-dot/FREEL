@@ -50,6 +50,18 @@ export interface PieceAFournir {
 }
 
 /**
+ * Le nom de chaque sorte, dit une fois : la grille d'Obligations, le dossier
+ * d'une pièce et le calendrier `.ics` — qui n'écrit jamais le libellé saisi,
+ * parce qu'il nomme parfois le client qui la demande.
+ */
+export const NOM_DE_PIECE: Readonly<Record<PieceAFournir['sorte'], string>> = {
+  vigilance: 'Attestation de vigilance URSSAF',
+  rc_pro: 'Responsabilité civile professionnelle',
+  sirene: 'Avis de situation au répertoire SIRENE',
+  autre: 'Pièce à fournir'
+};
+
+/**
  * Où en est une pièce, dérivé de ses dates et de la règle de sa sorte.
  *
  *  · `a_obtenir` — aucune date d'obtention : la pièce n'est pas en main ;

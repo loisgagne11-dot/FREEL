@@ -11,12 +11,12 @@ import styles from './RailNav.plus.module.css';
  * rail entier autour d'elle pour se situer : « Obligations » seul ne dit pas
  * qu'on y trouve la TVA.
  *
- * « Pièces à fournir » n'y est pas, alors que la maquette écrit « déclarer,
- * payer, fournir » : elles arrivent au lot 53. Promettre un contenu absent
- * apprendrait à ne plus lire ces lignes.
+ * « déclarer, payer, fournir », comme la maquette, depuis que les pièces à
+ * fournir sont arrivées (lot 53) : jusque-là, la ligne disait « tenir les
+ * registres » — promettre un contenu absent apprend à ne plus lire ces lignes.
  */
 const CONTENU: Partial<Record<IdEcran, string>> = {
-  obligations: 'déclarer, payer, tenir les registres',
+  obligations: 'déclarer, payer, fournir',
   achats: 'dépenses et justificatifs',
   simulateurs: 'impôt, régime, CFE',
   reglages: 'profil, barèmes, données, compte, affichage'

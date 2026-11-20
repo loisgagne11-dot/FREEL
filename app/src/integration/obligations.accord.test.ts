@@ -4,22 +4,21 @@ import { type DateISO, type Mois, dateISO } from '../domain/types';
 import { appelsDeLaPeriode, dateDeDeclaration, periodesADeclarer } from '../domain/calculs/declarations';
 import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import { type Etape, type Obligation, obligationsATraiter } from '../domain/calculs/obligations';
+import type { Echeance } from '../domain/calculs/provisions';
 import type { Faits } from '../state/schema';
 import { completerFaits } from '../state/schema.migrations';
 import { recettesEncaissees } from '../state/selecteurs';
 import { aTraiter, nombreAFaire } from '../state/selecteurs.aTraiter';
 import { montantDeclaration, obligationsEntre } from '../state/selecteurs.obligations';
 import { ANCRE_DEMONSTRATION, recalerDemonstration } from '../state/demonstration.recalage';
-import { statutDe } from '../ui/components/Echeances';
 import { chargerJeu, faitsAu, isoDe, le } from '../test/jeu-d-essai';
 
 /**
  * L'ACCORD ENTRE LES DEUX CARTES D'AUJOURD'HUI ET LA SOURCE DE DEMAIN.
  *
- * L'écran Obligations va remplacer « Échéances reçues » et « Périodes
- * URSSAF » par une liste unique, lue sur `obligationsEntre`. Avant d'y
- * toucher, ce que les deux cartes montrent doit s'y retrouver LIGNE POUR
- * LIGNE — dates, montants, états — sur des comptes entiers et non sur trois
+ * L'écran Obligations a remplacé « Échéances reçues » et « Périodes
+ * URSSAF » par une liste unique, lue sur `obligationsEntre` (lot 53, 3g).
+ * Ce que les deux cartes montraient doit s'y retrouver LIGNE POUR LIGNE — dates, montants, états — sur des comptes entiers et non sur trois
  * recettes : la démonstration à sa date d'ancrage et recalée, le jeu d'essai
  * à ses dates de référence. Une ligne perdue ici serait une fonction perdue
  * à l'écran.
@@ -41,6 +40,18 @@ const COMPTES: readonly { readonly nom: string; readonly faits: Faits; readonly 
   ...[le(2026, 1, 2), le(2026, 4, 30), le(2026, 6, 30), le(2026, 12, 15), le(2027, 1, 2)]
     .map((d) => ({ nom: `le jeu d’essai au ${isoDe(d)}`, faits: faitsAu(jeu, d), jour: isoDe(d) }))
 ];
+
+/**
+ * Ce que la carte « Échéances reçues » disait d'une échéance, avant que la
+ * liste des obligations ne la remplace (lot 53, 3g) : sa règle est gardée
+ * ici, telle quelle, pour que l'accord reste vérifié une fois la carte
+ * partie. Le jour même, on a la journée pour payer.
+ */
+function statutDe(e: Echeance, jour: string): { readonly libelle: 'Payée' | 'En retard' | 'À payer' } {
+  if (e.payeeLe !== null) return { libelle: 'Payée' };
+  if (jour > e.echeanceLe) return { libelle: 'En retard' };
+  return { libelle: 'À payer' };
+}
 
 const obligationsDe = (f: Faits, jour: DateISO) =>
   obligationsEntre(f, dateISO('1970-01-01'), dateISO('2028-12-31'), jour);

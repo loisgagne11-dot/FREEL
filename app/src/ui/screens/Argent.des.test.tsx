@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
@@ -39,7 +39,7 @@ function semer(modifications: Partial<Faits> = {}): void {
  */
 async function ouvrirDes() {
   render(<Obligations />);
-  await userEvent.setup().click(screen.getByRole('button', { name: 'Déclaration européenne de services' }));
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Déclaration européenne de services (DES)' }));
   await screen.findByRole('heading', { name: /Prestations à déclarer/ });
 }
 
@@ -106,7 +106,7 @@ describe('prestations à déclarer', () => {
     });
     render(<Obligations />);
     const utilisateur = userEvent.setup();
-    await utilisateur.click(screen.getByRole('button', { name: 'Déclaration européenne de services' }));
+    await utilisateur.click(screen.getByRole('button', { name: 'Déclaration européenne de services (DES)' }));
 
     expect(screen.getByText(/Aucune prestation intracommunautaire/)).toBeTruthy();
     await utilisateur.click(screen.getByRole('button', { name: 'Mois précédent' }));
@@ -134,7 +134,9 @@ describe('retards', () => {
     semer({ clients: [client()], recettes: [recette()] });
     await ouvrirDes();
     // Émise en juillet, limite au 12 août, on est le 5 : rien n'est en retard.
-    expect(screen.queryByText(/en retard/)).toBeNull();
+    // Dans le panneau : la légende de la frise, derrière, dit « ▲ en retard »
+    // — un signe à reconnaître, pas un retard annoncé.
+    expect(within(screen.getByRole('dialog')).queryByText(/en retard/)).toBeNull();
   });
 });
 
@@ -163,7 +165,8 @@ describe('dépôt de la déclaration', () => {
       .toMatch(/^2 déclarations en retard, soit 1\s500\s€/u);
 
     await u.click(screen.getByRole('button', { name: 'Mois précédent' })); // juin
-    await u.click(screen.getByRole('button', { name: 'Marquer déposée' }));
+    // Dans le panneau : derrière lui, le dossier de la DES offre le même geste.
+    await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Marquer déposée' }));
 
     expect(useFaits.getState().faits.periodesDeclarees)
       .toEqual([{ nature: 'des', periode: '2026-06', declareeLe: '2026-08-05' }]);

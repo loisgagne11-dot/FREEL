@@ -1371,3 +1371,42 @@ tant que les pièces à fournir n'existent pas (lot 53).
 Relu sur capture à 390 px, Calme : Pilote, Trésorerie, Activité › Analyse,
 Obligations. Écart assumé : le titre de la carte de projection reste tronqué
 au téléphone, comme l'était le précédent (lot 49).
+
+## Lot 53, phase 3 (20/11) — Obligations, d'après ses deux maquettes
+
+Maquettes `design/direction/obligations.html` (bureau) et
+`obligations-telephone.html` (téléphone), validées le 17/11 avec leurs écarts
+appliqués au bureau (décision 25). Captures `captures-app/{calme,nuit}-obligations{,-390}.png`
+et `…-obligations-dossier{,-390}.png` (le dossier ouvert par son adresse ; au
+téléphone, le volet), plus le jeu d'essai au 15/12 (`essai/calme-obligations*.png`)
+qui montre ▲ et ◇.
+
+| Zone | Avant | Après |
+|---|---|---|
+| En-tête | « Tes obligations », menu des années | Titre dérivé de la pastille du rail (« Trois choses à faire, dont une en retard. »), sous-titre de la maquette, segment des années, « Ajouter au calendrier » |
+| Frise | Jalons nommés sur un axe, repère « auj. » | Une ligne par nature, un signe par mois, bande du mois courant, trait tenu, légende des quatre signes (en tête de carte au bureau, dessous au téléphone), mois en une lettre au téléphone |
+| Liste | « Échéances reçues » par mois + « Périodes URSSAF » | « À faire et à venir » : bloc date (ambré le mois de la limite), intitulé et détail, montant (≈), pastille ; « + Saisir » en tête ; faites repliées |
+| Dossier | Aucun (registres seulement) | À droite au bureau (5 contre 8), en volet au téléphone ; celui de la prochaine chose à faire par défaut |
+| Pièces | Absentes | Grille de quatre au bureau, liste au téléphone, chacune modifiée sur place |
+| Registres | Trois boutons en rangée | « Registres : livre des recettes · TVA · DES » en pied |
+
+Relu sur capture, 390 et 1 440 px, Calme et Nuit, contre les deux maquettes.
+Écarts corrigés avant livraison : « déclarable du 1ᵉʳ juillet au 31 juillet »
+(la maquette : « du 1ᵉʳ au 31 juillet ») ; « de avril » ; le volet du dossier
+photographié en pleine page flottait au milieu de l'image (le script prend
+désormais l'écran). Écarts assumés, avec leur motif :
+
+- la police est la pile système, pas Hanken Grotesk ni JetBrains Mono (décision 6) ;
+- « URSSAF, T2 2026 » et non « 2ᵉ trimestre 2026 » : le libellé est celui du
+  domaine, partagé avec le Pilote et « à traiter » — le changer est un lot de mots ;
+- la liste ne porte pas la couleur de chaque charge : la maquette ne la dessine
+  pas, la frise la porte (le filet de l'ancienne carte est parti avec elle) ;
+- l'en-tête de la liste garde le chevron du pli : le résumé replié (reste à
+  payer, prochaine limite) était une fonction de l'ancienne carte ;
+- la date de la TVA autoliquidée et l'état « non suivi » (rond gris) viennent
+  des règles, pas de la maquette : sur la démonstration figée au 10 juin, ce
+  que l'application ne savait pas noter avant le 17/11 se lit gris, ni fait
+  ni en retard ;
+- au téléphone, ouvrir le volet par son adresse pose le focus sur sa poignée,
+  dont l'anneau se voit sur la capture : c'est le `Sheet` commun, qui focalise
+  son premier élément.

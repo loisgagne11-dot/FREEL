@@ -39,7 +39,7 @@ function semer(modifications: Partial<Faits> = {}): void {
  */
 async function ouvrirLivre() {
   render(<Obligations />);
-  await userEvent.setup().click(screen.getByRole('button', { name: 'Livre des recettes' }));
+  await userEvent.setup().click(screen.getByRole('button', { name: 'livre des recettes' }));
   await screen.findByRole('heading', { name: /^Écritures/ });
 }
 

@@ -45,7 +45,7 @@ const recette = (
 async function ouvrirDossier(): Promise<HTMLElement> {
   render(<Obligations />);
   await userEvent.setup().click(
-    screen.getByRole('button', { name: 'Préparer ma déclaration de TVA' })
+    screen.getByRole('button', { name: 'Déclaration de TVA' })
   );
   const trimestre = await screen.findByLabelText('Trimestre déclaré');
   return trimestre.closest('div[class]')?.parentElement as HTMLElement;

@@ -25,6 +25,7 @@ Donc : **les couleurs ne changent pas, le dessin change.**
 | `direction/planche.html` | Pilote — planche de référence : tous les types de composants y figurent | `planche-calme.png`, `planche-nuit.png` |
 | `direction/tresorerie.html` | Trésorerie | `tresorerie-calme.png` |
 | `direction/obligations.html` | Obligations | `obligations-calme.png` |
+| `direction/obligations-telephone.html` | Obligations à 390 px, un dossier en volet, une pièce modifiée (validée le 17/11, ses écarts appliqués au bureau) | `obligations-telephone-calme.png` |
 | `direction/activite.html` | Activité — missions et carnet | `activite-calme.png` |
 | `direction/pilote-telephone.html` | Pilote à 390 px | `pilote-telephone-calme.png` |
 

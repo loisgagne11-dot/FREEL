@@ -97,8 +97,10 @@ export function jourCa3(moisDepot: Mois, nomExploitant: string, codePostal: stri
   if (initiale === null) {
     return {
       statut: 'refuse',
-      motif: 'Indique ton nom de famille dans Réglages : le jour de dépôt dépend de son '
-        + 'initiale (de A à H, ou de I à Z).'
+      // Demandé dans le dossier de la TVA, sous Obligations : Réglages n'a
+      // pas (encore) ce champ, et y renvoyer promettait un réglage absent.
+      motif: 'Indique ton nom de famille dans le dossier de la TVA, sous Obligations : le jour de dépôt '
+        + 'dépend de son initiale (de A à H, ou de I à Z).'
     };
   }
   const groupe = groupeDuDepartement(codePostal);

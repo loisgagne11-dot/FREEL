@@ -61,7 +61,9 @@ const ECRITURES = [
   join(RACINE, 'state/ecritures.recettes.ts'),
   join(RACINE, 'state/ecritures.echeances.ts'),
   join(RACINE, 'state/ecritures.achats.ts'),
-  join(RACINE, 'state/ecritures.activite.ts')
+  join(RACINE, 'state/ecritures.activite.ts'),
+  // Les pièces à fournir (lot 53) : la grille et le dossier d'une pièce.
+  join(RACINE, 'state/ecritures.pieces.ts')
 ];
 const SOURCES = [MAGASIN, ...ECRITURES];
 

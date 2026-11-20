@@ -247,55 +247,11 @@
    leurs échelles n'ont rien à voir. */
 .jauges { display: flex; flex-direction: column; gap: 16px; }
 
-/* ── Périodes URSSAF ────────────────────────────────────────────────────── */
-
-.listeDeclarations { list-style: none; margin: 0; padding: 0; }
-
-.ligneDeclaration {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--line);
-  min-width: 0;
-}
-
-.ligneDeclaration:last-child { border-bottom: none; }
-
-.declarationTitre {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 13.5px;
-  font-weight: 560;
-  color: var(--text);
-}
-
-.declarationMontant {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
+/* ── Le dépôt d'une DES ─────────────────────────────────────────────────── */
 
 .declarationActions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .declarationAttente { font-size: 11.5px; color: var(--muted-2); }
-
-/* Le montant à payer d'une période close : ambre dans la fenêtre de
-   déclaration, rouge une fois la date limite passée — les deux tons du Pilote
-   pour « à faire » et « en retard ». */
-.declarationLimite,
-.declarationRetard {
-  flex-basis: 100%;
-  font-size: 12px;
-  font-weight: 560;
-  font-variant-numeric: tabular-nums;
-}
-.declarationLimite { color: var(--amber); }
-.declarationRetard { color: var(--red); }
 
 /* La date de déclaration : « le » et son champ, au gabarit du bouton voisin
    (34 px) plutôt qu'à celui d'un formulaire — c'est une précision sur une
@@ -321,35 +277,6 @@
 }
 
 .declarationDate input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
-
-/* La suite du cycle — « payée le … », « à payer avant le … » — dans le rang
-   des gestes : les tons de la limite, sans leur retour à la ligne. */
-.declarationSuite,
-.declarationSuiteAFaire,
-.declarationSuiteRetard {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-.declarationSuiteAFaire { color: var(--amber); font-weight: 560; }
-.declarationSuiteRetard { color: var(--red); font-weight: 560; }
-
-/* En paysage, le geste et son libellé tiennent sur un rang : la liste est
-   une suite de décisions courtes, pas un tableau à parcourir. */
-@media (min-width: 761px) {
-  .ligneDeclaration {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .declarationTitre { flex: 1 1 auto; }
-}
-
-/* Le formulaire « déclarée le … pour … € » prend la ligne entière, sous
-   l'intitulé de la période : coincé à droite, ses champs s'écrasaient. */
-.declarationFormulaire { flex: 1 1 100%; min-width: 0; padding-top: 4px; }
 
 /* Un second niveau à l'intérieur d'une carte : la ventilation détaille le
    total qui la précède, elle n'ouvre pas un autre sujet. Plus discret que le
@@ -513,23 +440,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Les registres, sous les piliers ───────────────────────────────────── */
+/* ── La porte du relevé, au pied de la Trésorerie ──────────────────────── */
 
-/* Une rangée discrète, et non des onglets : ce sont des registres qu'on
-   ouvre pour justifier ou déclarer, pas des questions qu'on se pose tous les
-   jours. Voir l'en-tête de `Obligations.tsx`. */
-.registres {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-}
+/* Un bouton discret : le relevé s'ouvre pour pointer, pas tous les jours.
+   Les registres d'Obligations, qui portaient la même classe, sont passés en
+   pied d'écran au lot 53 (`Obligations.module.css`). */
 
 .lienRegistre {
-  /* 44 px : la cible tactile minimale — ces boutons sont désormais la seule
-     porte des registres (lot 51), et le pied du rail ne les double plus. */
+  /* 44 px : la cible tactile minimale. */
   min-height: 44px;
   padding: 0 13px;
   border-radius: var(--r-sm);
@@ -692,13 +610,6 @@
 }
 
 .enveloppeOuvrable:hover .enveloppeIndice { color: var(--green); }
-
-/* ── Obligations ───────────────────────────────────────────────────────── */
-
-/* La frise, puis les échéances reçues : sous la Trésorerie, une carte les
-   précédait et l'intervalle venait d'elle. En tête d'écran, elles se
-   touchaient et se lisaient comme une seule carte. */
-.obligations > :first-child { margin-bottom: 12px; }
 
 /* ── La banque, au pied de la Trésorerie ───────────────────────────────── */
 

@@ -162,7 +162,7 @@ describe('le dû des obligations', () => {
 describe('obligations à traiter', () => {
   const avec = (etat: 'a_faire' | 'en_retard' | 'a_venir' | 'fait' | 'a_pointer', m: Partial<Obligation> = {}) =>
     prevue(`o-${etat}`, {
-      paiement: { limite: limite('2026-12-15'), mois: mois('2026-12'), faiteLe: null, etat, avance: null }, ...m
+      paiement: { limite: limite('2026-12-15'), mois: mois('2026-12'), ouverture: dateISO('2026-11-15'), faiteLe: null, etat, avance: null }, ...m
     });
 
   it('retient ce qui est à faire ou en retard, et rien d’autre', () => {
@@ -177,7 +177,7 @@ describe('obligations à traiter', () => {
     // Le 17/11/2026, le panneau DES regarde d'octobre 2026 à novembre 2024.
     const des = (id: string, periode: string, limiteLe: string): Obligation => ({
       ...sansPaiement, id, dossier: 'des', periode,
-      declaration: { limite: limite(limiteLe), mois: mois(limiteLe.slice(0, 7)), faiteLe: null, etat: 'en_retard', avance: null }
+      declaration: { limite: limite(limiteLe), mois: mois(limiteLe.slice(0, 7)), ouverture: dateISO(`${limiteLe.slice(0, 7)}-01`), faiteLe: null, etat: 'en_retard', avance: null }
     });
     const toutes = [des('2024-10', '2024-10', '2024-11-15'), des('2024-11', '2024-11', '2024-12-13'),
       des('2026-02', '2026-02', '2026-03-12')];
