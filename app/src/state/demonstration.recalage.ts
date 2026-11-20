@@ -163,13 +163,24 @@ export function recalerDemonstration(faits: Faits, aujourdhui: DateISO): Faits {
     });
   }
 
+  // La déclaration de revenus, faite chaque année le 15 mai — avant la limite
+  // de toute zone. Le recalage avance tout sauf le début d'activité : sans
+  // elle, la démonstration ouverte en juillet 2027 annonçait « Déclaration des
+  // revenus 2026 » à faire, limite passée — un sujet fabriqué, ce que ce
+  // recalage est là pour éviter. La période est l'année où l'on déclare.
+  const revenus: { nature: 'revenus'; periode: string; declareeLe: DateISO }[] = [];
+  for (let annee = creation + 1; `${annee}-05-15` < aujourdhui; annee += 1) {
+    revenus.push({ nature: 'revenus', periode: String(annee), declareeLe: dateISO(`${annee}-05-15`) });
+  }
+
   return {
     ...avecRecettes,
-    periodesDeclarees: closes
-      .flatMap((p) => p.mois.map((m) => ({
+    periodesDeclarees: [
+      ...closes.flatMap((p) => p.mois.map((m) => ({
         nature: 'urssaf' as const, periode: m as string, declareeLe: faiteLe(p.limite)
-      })))
-      .sort(ordreDesDeclarees),
+      }))),
+      ...revenus
+    ].sort(ordreDesDeclarees),
     echeances: [...decale.echeances.filter((e) => e.nature !== 'urssaf'), ...paiements, ...cfe]
   };
 }

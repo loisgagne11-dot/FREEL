@@ -8,6 +8,7 @@ import { motifRefusFaits, type Faits } from './schema';
 import { completerFaits } from './schema.migrations';
 import { etatPilote, periodesUrssafEffectives, recettesEncaissees, regimeDe, sousAcreLe } from './selecteurs';
 import { aTraiter } from './selecteurs.aTraiter';
+import { obligationsEntre } from './selecteurs.obligations';
 import { ANCRE_DEMONSTRATION, recalerDemonstration, recalerJeuBrut } from './demonstration.recalage';
 
 /** Le jeu RÉEL, tel qu'il est servi — pas une copie écrite dans le test. */
@@ -27,13 +28,19 @@ const sujets = (f: Faits, j: string) => aTraiter(f, a9h(j)).map((s) => s.id);
  * seconde fois en provision sur les mêmes encaissements.
  */
 describe('le jeu de démonstration, au 10 juin 2026', () => {
-  it('n’a qu’un sujet à traiter : la facture à relancer', () => {
+  /*
+   * Deux sujets, ceux de la maquette d'Obligations : la facture à relancer, et
+   * la TVA de l'achat hors de France de mai, à déclarer en juin. Cette CA3 ne
+   * se voyait pas : « non suivie », parce que sa limite précédait le schéma 25
+   * — alors qu'au 10 juin elle n'était pas encore passée.
+   */
+  it('a deux sujets à traiter : la facture à relancer, la TVA d’un achat hors de France', () => {
     const ids = sujets(demo, ANCRE_DEMONSTRATION);
     expect(ids).toContain('factures-en-retard');
     expect(ids).not.toContain('periodes-a-declarer');
     // Le reste est de l'information réglementaire, datée par la loi.
-    expect(aTraiter(demo, a9h(ANCRE_DEMONSTRATION)).filter((s) => s.gravite !== 'information'))
-      .toHaveLength(1);
+    expect(aTraiter(demo, a9h(ANCRE_DEMONSTRATION)).filter((s) => s.gravite !== 'information').map((s) => s.id))
+      .toEqual(['factures-en-retard', 'echeance-ca3-2026-05']);
   });
 
   it('laisse plusieurs mois d’autonomie, provisions couvertes', () => {
@@ -111,6 +118,18 @@ describe('recaler la démonstration sur la date du jour', () => {
     const e = etatPilote(f, f.echeances, a9h(jour));
     expect(e.tresorerie.versable).toBeGreaterThan(0);
     expect(e.autonomie).toBeGreaterThanOrEqual(1.5);
+  });
+
+  /**
+   * Le recalage avance tout sauf le début d'activité : sans déclaration de
+   * revenus recalée, la démonstration ouverte en juillet 2027 annonçait celle
+   * des revenus 2026 à faire, limite passée — un sujet fabriqué.
+   */
+  it.each(jours)('le %s : chaque déclaration de revenus passée est faite', (jour) => {
+    const f = recalerDemonstration(demo, jour);
+    const passees = obligationsEntre(f, dateISO('2026-01-01'), jour, jour)
+      .filter((o) => o.dossier === 'revenus' && o.declaration?.etat !== 'a_venir');
+    for (const o of passees) expect([o.id, o.declaration?.etat]).toEqual([o.id, 'fait']);
   });
 
   /**
