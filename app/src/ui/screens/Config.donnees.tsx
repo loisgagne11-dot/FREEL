@@ -177,7 +177,10 @@ export function Donnees(
             <span className={styles.rangeeAide}>
               {compte(faits.recettes.length, 'recette')}, {compte(faits.depenses.length, 'dépense')},
               {' '}{compte(faits.missions.length, 'mission')}, {compte(faits.clients.length, 'client')} et
-              {' '}{compte(faits.periodesDeclarees.length, 'période déclarée', 'périodes déclarées')}&nbsp;:
+              {/* « Déclarations », et non plus « périodes déclarées » : depuis le
+                  schéma 25, la liste porte aussi les DES déposées — trois DES
+                  se comptaient en « trois périodes ». */}
+              {' '}{compte(faits.periodesDeclarees.length, 'déclaration')}&nbsp;:
               un fichier léger, réimportable à tout moment. Les justificatifs n’y sont
               pas&nbsp;: seule l’archive complète les emporte.
             </span>

@@ -64,11 +64,21 @@ export function moisCourant(maintenant: Date = new Date()): Mois {
  * l'a jamais été ou si les seuils manquent pour en juger.
  */
 export function tvaDueDepuisDe(faits: Faits): Mois | null {
+  /* Gardé par objet de faits. `regimeTvaAu` le demande pour chaque dépense
+     de chaque période de TVA : sur trois ans d'historique, les obligations du
+     lot 53 recalculaient le franchissement des seuils des centaines de fois,
+     et chaque écran mettait 600 à 850 ms à s'afficher au lieu de 25 à 140.
+     Les faits sont immuables : une écriture donne un nouvel objet, donc un
+     calcul neuf. */
+  if (memoTvaDue.has(faits)) return memoTvaDue.get(faits) ?? null;
   const r = tvaDueDepuis(
     recettesEncaissees(faits), faits.entreprise.typeActivite, faits.entreprise.debutActivite
   );
-  return r.statut === 'refuse' ? null : r.valeur;
+  const v = r.statut === 'refuse' ? null : r.valeur;
+  memoTvaDue.set(faits, v);
+  return v;
 }
+const memoTvaDue = new WeakMap<Faits, Mois | null>();
 
 /**
  * Le mois depuis lequel l'entreprise applique la TVA : l'OPTION saisie dans

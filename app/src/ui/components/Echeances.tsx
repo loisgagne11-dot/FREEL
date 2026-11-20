@@ -156,8 +156,8 @@ export function Echeances({ aujourdhui = new Date() }: { readonly aujourdhui?: D
             Les appels que tu as réellement reçus&nbsp;: échéancier URSSAF,
             avis d’impôt, CFE. Ce n’est pas une prévision — les cotisations dues
             sur des recettes encaissées mais pas encore déclarées sont déjà
-            estimées juste au-dessus, dans «&nbsp;charges sur recettes
-            encaissées&nbsp;». Saisir les deux compterait deux fois la même
+            estimées dans le dû, à la ligne «&nbsp;charges sur recettes
+            encaissées non déclarées&nbsp;» de Trésorerie. Saisir les deux compterait deux fois la même
             somme&nbsp;; c’est la déclaration de la période, dans
             «&nbsp;Périodes URSSAF&nbsp;», qui fait passer l’une dans l’autre —
             et qui crée son appel&nbsp;: ne le saisis pas une seconde fois ici.
@@ -438,8 +438,12 @@ function grouperParMois(echeances: readonly Echeance[]): readonly {
  *
  * Le jour même de l'échéance, elle n'est pas en retard : on a la journée pour
  * payer. La marquer en retard ce jour-là ferait courir pour rien.
+ *
+ * Exporté pour le test d'accord avec les obligations (lot 53) : ce que cette
+ * liste montre doit s'y retrouver, ligne pour ligne, avant qu'elle ne cède la
+ * place à l'écran qui les lit.
  */
-function statutDe(
+export function statutDe(
   e: Echeance, jour: string
 ): { readonly libelle: string; readonly ton: TonStatut } {
   if (e.payeeLe !== null) return { libelle: 'Payée', ton: 'ok' };

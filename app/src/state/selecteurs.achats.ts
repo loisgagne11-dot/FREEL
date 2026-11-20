@@ -21,9 +21,8 @@
  * rien.
  */
 
-import { moisDe } from '../domain/types';
 import {
-  type ContexteDepenses, type EtatRapprochement, type RegimeTva,
+  type EtatRapprochement, type RegimeTva,
   type ResumeDepenses, type TvaDepense,
   rapprochementEffectif, resumerDepenses, tvaDeDepense
 } from '../domain/calculs/depenses';
@@ -32,30 +31,17 @@ import {
 } from '../domain/calculs/banque';
 import type { MouvementBancaire, ResumeRapprochement } from '../domain/calculs/banque';
 import { type Periode, dansLaPeriode, periodeCourante } from '../domain/calculs/periode';
-import { moisCourant, regimeTvaAu, soldeEstSuivi } from './selecteurs';
+import { soldeEstSuivi } from './selecteurs';
 import type { Depense, Faits } from './schema';
 
 /* `regimeTvaAu` vit dans `selecteurs` : la provision de TVA en a besoin, et
    ce module importe déjà celui-là. Réexporté pour ses lecteurs d'ici. */
 export { regimeTvaAu } from './selecteurs';
 
-/**
- * Le contexte d'une dépense : régime à sa date de paiement, et disponibilité
- * d'un relevé bancaire.
- *
- * Une dépense sans date est rattachée au régime courant : c'est la seule
- * hypothèse défendable, et l'écran signale par ailleurs que la date manque.
- */
-export function contexteDepense(
-  faits: Faits,
-  maintenant: Date = new Date()
-): (d: Depense) => ContexteDepenses {
-  const courant = moisCourant(maintenant);
-  return (d) => ({
-    regimeTva: regimeTvaAu(faits, d.payeeLe === null ? courant : moisDe(d.payeeLe)),
-    banqueSynchronisee: soldeEstSuivi(faits)
-  });
-}
+// Le contexte d'une dépense vit avec le dossier de TVA, que lisent aussi les
+// obligations : voir `selecteurs.dossierTva`.
+export { contexteDepense } from './selecteurs.dossierTva';
+import { contexteDepense } from './selecteurs.dossierTva';
 
 /** Une dépense accompagnée de ce que le domaine en dit. */
 export interface LigneDepense {

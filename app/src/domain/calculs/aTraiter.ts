@@ -25,7 +25,6 @@ import {
 import { resteAvantMajore } from '../bareme/tva';
 import { plafondMicro } from '../bareme/plafonds';
 import { PERIODES_URSSAF, type PeriodeBareme } from '../bareme/urssaf';
-import { type PeriodeADeclarer, periodesADeclarer } from './declarations';
 
 /** L'écran qui règle le sujet. Sert au badge de navigation et au lien. */
 export type EcranCible =
@@ -40,6 +39,16 @@ export interface SujetATraiter {
   readonly gravite: Gravite;
   /** Quantité concernée : 3 factures, 2 périodes… Toujours ≥ 1. */
   readonly nombre: number;
+  /**
+   * Ce que le sujet pèse au compteur de son écran : le nombre d'OBLIGATIONS
+   * qu'il rassemble — quatre périodes à déclarer sont quatre choses à faire,
+   * même dites en une ligne sur le Pilote. Absent : un sujet, une chose.
+   *
+   * Sans lui, le rail aurait dit « 1 » et le titre d'Obligations « quatre
+   * choses à faire » pour le même compte : deux décomptes qui divergent au
+   * premier cas (avis du 17/11, point 7).
+   */
+  readonly compte?: number;
   /**
    * Les chiffres dont la mise en mots a besoin — rien de plus.
    *
@@ -83,15 +92,28 @@ export interface RecetteVue {
   readonly echeanceLe: DateISO | null;
 }
 
+/**
+ * Une période URSSAF à déclarer, telle que les obligations la disent — close,
+ * non déclarée. Ce module ne refait pas la règle : il la reçoit
+ * (`selecteurs.obligations`), comme le Pilote et l'écran Obligations.
+ */
+export interface PeriodeATraiter {
+  readonly id: string;
+  readonly libelle: string;
+  readonly premierMois: Mois;
+  readonly limite: DateISO;
+  readonly encaisse: Euros;
+  /** Ce qu'il faut payer en la déclarant ; `null` quand un taux manque. */
+  readonly montant: Euros | null;
+  readonly enRetard: boolean;
+}
+
 export interface EntreeATraiter {
   readonly aujourdhui: DateISO;
   readonly typeActivite: TypeActivite;
   readonly recettes: readonly RecetteVue[];
-  readonly periodesDeclarees: readonly Mois[];
-  /** Périodicité déclarative, qui détermine ce qu'est « une période ». */
-  readonly periodicite: 'mensuel' | 'trimestriel';
-  /** Mois de début d'activité : rien n'est dû avant. */
-  readonly debutActivite: Mois | null;
+  /** Les périodes URSSAF closes et non déclarées, la plus ancienne d'abord. */
+  readonly periodesADeclarer?: readonly PeriodeATraiter[];
   /** Date exacte du début : le plafond du micro est proratisé au jour près l'année de création. */
   readonly debutActiviteLe?: DateISO | null;
   /** Mois depuis lequel la TVA est due d'après les seuils (`null` : jamais, ou inconnu). */
@@ -134,7 +156,14 @@ export interface EntreeATraiter {
   readonly echeancesReglementaires: readonly {
     readonly id: string;
     readonly intitule: string;
-    readonly date: DateISO;
+    /** `null` quand le jour n'est pas connu : aucun « dans N jours » ne s'invente alors. */
+    readonly date: DateISO | null;
+    /**
+     * La gravité, quand l'appelant la sait : une obligation porte son état
+     * (`calculs/obligations`), et le recalculer ici depuis la date ferait
+     * deux règles pour une. Absente, elle se déduit de la date.
+     */
+    readonly gravite?: Gravite;
     /**
      * L'écran qui règle le sujet, et l'action qui l'y attend.
      *
@@ -211,25 +240,6 @@ function ajouterMois(m: Mois, n: number): Mois {
    `aTraiter.libelles` avec les phrases qu'ils servaient : ce module ne produit
    plus de prose, seulement des chiffres et des gravités. */
 
-/**
- * Les périodes déclaratives closes et non déclarées, représentées par leur
- * premier mois.
- *
- * La règle vit dans `declarations.periodesADeclarer`, la même que celle de
- * l'échéancier : deux règles du même nom faisaient réclamer ici des périodes
- * que l'échéancier ne montrait pas, et l'alerte ne pouvait jamais s'éteindre.
- */
-function periodesCloses(e: EntreeATraiter): readonly PeriodeADeclarer[] {
-  const encaissements = e.recettes
-    .filter((r) => r.encaisseeLe !== null)
-    .map((r) => ({ encaisseeLe: r.encaisseeLe as DateISO, montant: r.montant }));
-  return periodesADeclarer(
-    encaissements, e.periodicite, e.periodesDeclarees, e.aujourdhui, e.debutActivite
-  )
-    .filter((p) => p.close && !p.declaree)
-    .sort((a, b) => a.id.localeCompare(b.id));
-}
-
 /** Le mois de la dernière vérification de barème la plus ancienne. */
 function fraicheurBaremeLaPlusAncienne(
   periodes: readonly PeriodeBareme[]
@@ -285,6 +295,7 @@ export function sujetsATraiter(
       ecran: 'obligations',
       gravite: 'retard',
       nombre: e.desEnRetard.length,
+      compte: e.desEnRetard.length,
       donnees: { depuis: plusAncien?.mois ?? null, amende }
     });
   }
@@ -295,22 +306,24 @@ export function sujetsATraiter(
   // déclare jusqu'au dernier jour du mois suivant. Le Pilote l'annonçait
   // « en retard » dès le 1er juillet pour un trimestre dû le 31 — l'alerte
   // rouge la plus fréquente de l'application était fausse un mois sur trois.
-  // « À faire » avant la date limite, « en retard » après.
-  const aDeclarer = periodesCloses(e);
-  if (aDeclarer.length > 0) {
-    const premiere = aDeclarer[0] as PeriodeADeclarer;
-    const enRetard = aDeclarer.some((p) => p.limite < e.aujourdhui);
+  // « À faire » avant la date limite, « en retard » après — l'état vient des
+  // obligations (`etatEtape`), la seule règle.
+  const aDeclarer = e.periodesADeclarer ?? [];
+  const premiere = aDeclarer[0];
+  if (premiere !== undefined) {
     sujets.push({
       id: 'periodes-a-declarer',
       ecran: 'obligations',
-      gravite: enRetard ? 'retard' : 'a_faire',
+      gravite: aDeclarer.some((p) => p.enRetard) ? 'retard' : 'a_faire',
       nombre: aDeclarer.length,
+      compte: aDeclarer.length,
       donnees: {
-        depuis: premiere.mois[0] as Mois,
+        depuis: premiere.premierMois,
         periode: premiere.id,
         libelle: premiere.libelle,
         limite: premiere.limite,
-        base: premiere.encaisse
+        base: premiere.encaisse,
+        montant: premiere.montant
       }
     });
   }
@@ -414,19 +427,19 @@ export function sujetsATraiter(
 
   /* ---------- échéances réglementaires ---------- */
   for (const ech of e.echeancesReglementaires) {
-    const jours = joursEntre(e.aujourdhui, ech.date);
+    const jours = ech.date === null ? null : joursEntre(e.aujourdhui, ech.date);
     sujets.push({
       id: `echeance-${ech.id}`,
       ecran: ech.ecran ?? 'obligations',
-      gravite: jours < 0
+      gravite: ech.gravite ?? (jours === null ? 'a_faire' : jours < 0
         ? (ech.sansSuivi === true ? 'a_faire' : 'retard')
-        : jours <= 30 ? 'a_faire' : 'information',
+        : jours <= 30 ? 'a_faire' : 'information'),
       nombre: 1,
       /* Ces trois textes viennent de l'APPELANT, pas d'ici : les recopier
          tels quels n'ajoute aucune phrase au paquet d'entrée. */
       donnees: {
         jours,
-        enVigueur: ech.sansSuivi === true && jours < 0,
+        enVigueur: ech.sansSuivi === true && jours !== null && jours < 0,
         intitule: ech.intitule,
         contexte: ech.contexte ?? null,
         action: ech.action ?? null
@@ -439,17 +452,25 @@ export function sujetsATraiter(
 }
 
 /**
- * Compteurs par écran, pour les badges de navigation.
+ * Compteurs par écran : les pastilles du rail, et le titre d'Obligations
+ * (« Deux choses à faire »), qui lisent CETTE fonction et nulle autre.
  *
- * Le badge porte le nombre de SUJETS, pas la somme des quantités : « 2 » sur
- * Argent signifie deux choses à régler, pas deux factures.
+ * Le badge porte le nombre de choses à faire, pas la somme des quantités :
+ * « 2 » sur Factures signifie deux sujets, pas deux factures. Une obligation
+ * est une chose : un sujet qui en rassemble plusieurs pèse leur nombre
+ * (`compte`).
+ *
+ * Une information ne compte pas : « la CFE tombe dans soixante jours » n'est
+ * pas une chose à faire aujourd'hui, et un titre qui dirait « une chose à
+ * faire » au-dessus d'une liste où rien n'est à faire se contredirait.
  */
 export function compteursParEcran(
   sujets: readonly SujetATraiter[]
 ): Readonly<Partial<Record<EcranCible, number>>> {
   const compteurs: Partial<Record<EcranCible, number>> = {};
   for (const s of sujets) {
-    compteurs[s.ecran] = (compteurs[s.ecran] ?? 0) + 1;
+    if (s.gravite === 'information') continue;
+    compteurs[s.ecran] = (compteurs[s.ecran] ?? 0) + (s.compte ?? 1);
   }
   return compteurs;
 }

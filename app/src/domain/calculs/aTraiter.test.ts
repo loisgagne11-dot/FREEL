@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formuler } from './aTraiter.libelles';
 import { dateISO, euros, mois } from '../types';
 import {
-  type EntreeATraiter, type RecetteVue,
+  type EntreeATraiter, type PeriodeATraiter, type RecetteVue,
   compteursParEcran, sujetsATraiter, sujetsDeLEcran
 } from './aTraiter';
 
@@ -13,9 +13,6 @@ function entree(modifications: Partial<EntreeATraiter> = {}): EntreeATraiter {
     aujourdhui: AUJOURDHUI,
     typeActivite: 'BNC',
     recettes: [],
-    periodesDeclarees: [],
-    periodicite: 'mensuel',
-    debutActivite: null,
     echeancesReglementaires: [],
     ...modifications
   };
@@ -43,8 +40,7 @@ describe('rien n\'est inventé', () => {
 
   it('une facture encaissée et complète ne produit aucun sujet', () => {
     const e = entree({
-      recettes: [recette({ encaisseeLe: dateISO('2026-07-10'), modeReglement: 'virement' })],
-      periodesDeclarees: [mois('2026-07')]
+      recettes: [recette({ encaisseeLe: dateISO('2026-07-10'), modeReglement: 'virement' })]
     });
     expect(idsDe(e)).not.toContain('factures-en-retard');
     expect(idsDe(e)).not.toContain('livre-recettes-incomplet');
@@ -102,106 +98,76 @@ describe('factures en retard', () => {
   });
 });
 
+/**
+ * Les périodes à déclarer arrivent des obligations (`selecteurs.obligations`),
+ * qui en tiennent la règle — close, non déclarée, en retard passé la limite
+ * reportée ; ces règles sont éprouvées dans `selecteurs.obligations.test`.
+ * Ici, ce que la requête en fait : UN sujet sur le Pilote, qui pèse au
+ * compteur autant que de périodes.
+ */
 describe('périodes à déclarer', () => {
-  it('réclame une période échue où des recettes ont été encaissées', () => {
-    const e = entree({
-      recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })]
-    });
-    const s = sujetsATraiter(e).find((x) => x.id === 'periodes-a-declarer');
-    expect(s).toBeDefined();
-    // Obligations : c'est là que vivent les périodes URSSAF (lot 51).
-    expect(s?.ecran).toBe('obligations');
-    // La prose est destinée à l'utilisateur : « juin 2026 », pas « 2026-06 ».
-    const f = s === undefined ? null : formuler(s);
-    expect(`${f?.intitule} ${f?.contexte}`).toContain('juin 2026');
+  const periode = (m: Partial<PeriodeATraiter> = {}): PeriodeATraiter => ({
+    id: '2026-06', libelle: 'juin 2026', premierMois: mois('2026-06'), limite: dateISO('2026-07-31'),
+    encaisse: euros(1000), montant: null, enRetard: false, ...m
   });
 
-  /**
-   * UNE PÉRIODE CLOSE N'EST PAS EN RETARD LE LENDEMAIN DE SA CLÔTURE.
-   *
-   * Elle se déclare jusqu'au dernier jour du mois suivant. Le Pilote
-   * l'annonçait en rouge dès le 1er : l'alerte la plus fréquente de
-   * l'application était fausse un mois sur trois.
-   */
-  it('dit « à faire, avant le … » dans la fenêtre de déclaration', () => {
-    // Juin, déclaré jusqu'au 31 juillet ; on est le 28.
-    const s = sujetsATraiter(entree({ recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })] }))
+  it('réunit les périodes en un sujet sous Obligations, qui pèse leur nombre au compteur', () => {
+    const e = entree({
+      periodesADeclarer: [periode({ id: '2026-05', libelle: 'mai 2026', premierMois: mois('2026-05') }), periode()]
+    });
+    const s = sujetsATraiter(e).find((x) => x.id === 'periodes-a-declarer');
+    // Obligations : c'est là que vivent les périodes URSSAF (lot 51).
+    expect(s?.ecran).toBe('obligations');
+    expect(s?.nombre).toBe(2);
+    // Deux périodes sont deux choses à faire : le rail et le titre
+    // d'Obligations le disent, même quand le Pilote les dit en une ligne.
+    expect(compteursParEcran(sujetsATraiter(e)).obligations).toBe(2);
+    // La prose est destinée à l'utilisateur : « mai 2026 », pas « 2026-05 ».
+    const f = s === undefined ? null : formuler(s);
+    expect(`${f?.intitule} ${f?.contexte}`).toContain('mai 2026');
+  });
+
+  it('dit « à faire, avant le … » tant qu’aucune n’est en retard', () => {
+    const s = sujetsATraiter(entree({ periodesADeclarer: [periode()] }))
       .find((x) => x.id === 'periodes-a-declarer');
     expect(s?.gravite).toBe('a_faire');
     expect(s === undefined ? '' : formuler(s).intitule).toMatch(/avant le 31 juillet/);
   });
 
-  it('passe en retard le lendemain de la date limite', () => {
+  it('passe en retard dès qu’une période l’est', () => {
     const s = sujetsATraiter(entree({
-      aujourdhui: dateISO('2026-08-01'),
-      recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })]
+      periodesADeclarer: [periode({ enRetard: true }), periode({ id: '2026-07' })]
     })).find((x) => x.id === 'periodes-a-declarer');
     expect(s?.gravite).toBe('retard');
-    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/date limite dépassée/);
+    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/périodes à déclarer/);
   });
 
-  /* Le Pilote lit la MÊME limite que l'échéancier : le dimanche 31 mai 2026
-     se reporte au lundi 1er juin, et ce jour-là avril se déclare encore. Le
-     dire en retard ferait déclarer dans l'urgence ce qui ne l'est pas. */
-  it('ne dit pas en retard, le lundi du report, une période dont la limite tombait un dimanche', () => {
-    const s = sujetsATraiter(entree({
-      aujourdhui: dateISO('2026-06-01'),
-      recettes: [recette({ encaisseeLe: dateISO('2026-04-15') })]
-    })).find((x) => x.id === 'periodes-a-declarer');
-    expect(s?.gravite).toBe('a_faire');
-    // « 1 juin » plutôt que « 1er juin » : la typographie du jour est hors de ce lot.
-    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/avant le 1(er)? juin/);
+  /* Le report produit souvent un premier du mois (une fin de mois tombée un
+     dimanche) : « avant le 1 juin » se lisait comme une coquille. */
+  it('écrit le premier du mois en ordinal', () => {
+    const s = sujetsATraiter(entree({ periodesADeclarer: [periode({ limite: dateISO('2026-06-01') })] }))
+      .find((x) => x.id === 'periodes-a-declarer');
+    expect(s === undefined ? '' : formuler(s).intitule).toMatch(/avant le 1ᵉʳ juin/);
   });
 
   it('annonce la base encaissée et le montant à payer, ou « à vérifier »', () => {
-    const s = sujetsATraiter(entree({ recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })] }))
+    const avec = sujetsATraiter(entree({ periodesADeclarer: [periode({ montant: euros(412) })] }))
       .find((x) => x.id === 'periodes-a-declarer');
-    if (s === undefined) throw new Error('sujet attendu');
-    expect(formuler({ ...s, donnees: { ...s.donnees, montant: 412 } }).contexte).toMatch(/à payer 412 €/);
-    expect(formuler(s).contexte).toMatch(/à payer à vérifier/);
+    const sans = sujetsATraiter(entree({ periodesADeclarer: [periode()] }))
+      .find((x) => x.id === 'periodes-a-declarer');
+    if (avec === undefined || sans === undefined) throw new Error('sujets attendus');
+    expect(formuler(avec).contexte).toMatch(/à payer 412 €/);
+    expect(formuler(sans).contexte).toMatch(/à payer à vérifier/);
   });
 
-  // Réclamer la déclaration du mois courant serait un faux positif quotidien.
-  it('ne réclame pas la période en cours, non échue', () => {
-    const e = entree({ recettes: [recette({ encaisseeLe: dateISO('2026-07-10') })] });
-    expect(idsDe(e)).not.toContain('periodes-a-declarer');
-  });
-
-  it('cesse de réclamer une période déclarée', () => {
-    const e = entree({
-      recettes: [recette({ encaisseeLe: dateISO('2026-06-15') })],
-      periodesDeclarees: [mois('2026-06')]
-    });
-    expect(idsDe(e)).not.toContain('periodes-a-declarer');
-  });
-
-  // L'obligation de déclarer existe même sans recette : la déclaration à zéro
-  // est due, et son oubli est sanctionné mécaniquement.
-  it('réclame les périodes sans recette depuis le début d\'activité', () => {
-    const e = entree({ debutActivite: mois('2026-04') });
-    const s = sujetsATraiter(e).find((x) => x.id === 'periodes-a-declarer');
-    expect(s).toBeDefined();
-    // avril, mai, juin — pas juillet, non échu
-    expect(s?.nombre).toBe(3);
-  });
-
-  it('en trimestriel, ne réclame que les trimestres entièrement clos', () => {
-    const e = entree({
-      periodicite: 'trimestriel',
-      recettes: [
-        recette({ id: 'a', encaisseeLe: dateISO('2026-02-15') }), // T1, clos
-        recette({ id: 'b', encaisseeLe: dateISO('2026-07-05') })  // T3, en cours
-      ]
-    });
-    const s = sujetsATraiter(e).find((x) => x.id === 'periodes-a-declarer');
-    expect(s?.nombre).toBe(1);
+  it('ne dit rien quand aucune période n’est à déclarer', () => {
+    expect(idsDe(entree({ periodesADeclarer: [] }))).not.toContain('periodes-a-declarer');
   });
 });
 
 describe('seuil majoré de TVA', () => {
   const gros = (montant: number) => entree({
     recettes: [recette({ encaisseeLe: dateISO('2026-03-01'), montant: euros(montant) })],
-    periodesDeclarees: [mois('2026-03')]
   });
 
   it('reste silencieux loin du seuil', () => {
@@ -230,7 +196,6 @@ describe('plafond du régime micro', () => {
   it('reste silencieux loin du plafond', () => {
     const e = entree({
       recettes: [recette({ encaisseeLe: dateISO('2026-03-01'), montant: euros(20000) })],
-      periodesDeclarees: [mois('2026-03')]
     });
     expect(idsDe(e)).not.toContain('plafond-micro');
   });
@@ -238,11 +203,9 @@ describe('plafond du régime micro', () => {
   it('prévient à l\'approche, et signale le dépassement', () => {
     const proche = entree({
       recettes: [recette({ encaisseeLe: dateISO('2026-03-01'), montant: euros(75000) })],
-      periodesDeclarees: [mois('2026-03')]
     });
     const depasse = entree({
       recettes: [recette({ encaisseeLe: dateISO('2026-03-01'), montant: euros(90000) })],
-      periodesDeclarees: [mois('2026-03')]
     });
     expect(sujetsATraiter(proche).find((x) => x.id === 'plafond-micro')?.gravite).toBe('a_faire');
     expect(sujetsATraiter(depasse).find((x) => x.id === 'plafond-micro')?.gravite).toBe('retard');
@@ -253,7 +216,6 @@ describe('livre des recettes', () => {
   it('signale une recette encaissée sans mode de règlement', () => {
     const e = entree({
       recettes: [recette({ encaisseeLe: dateISO('2026-06-10'), modeReglement: null })],
-      periodesDeclarees: [mois('2026-06')]
     });
     const s = sujetsATraiter(e).find((x) => x.id === 'livre-recettes-incomplet');
     expect(s).toBeDefined();
@@ -324,12 +286,19 @@ describe('ordre, compteurs et filtrage', () => {
     expect(rangs).toEqual([...rangs].sort((a, b) => a - b));
   });
 
-  // Le badge porte le nombre de SUJETS, pas la somme des quantités.
-  it('compte les sujets par écran, non les quantités', () => {
+  /*
+   * Le badge porte le nombre de choses À FAIRE, pas la somme des quantités.
+   * Il comptait aussi l'information (« la facturation électronique dans cent
+   * jours ») : le titre d'Obligations, qui dit « N choses à faire », lit la
+   * même fonction, et un titre qui annonce une chose à faire au-dessus d'une
+   * liste où rien ne l'est se contredirait.
+   */
+  it('compte les choses à faire par écran — ni les quantités, ni l’information', () => {
     const sujets = sujetsATraiter(chargee);
     const compteurs = compteursParEcran(sujets);
-    const totalSujets = Object.values(compteurs).reduce<number>((s, n) => s + (n ?? 0), 0);
-    expect(totalSujets).toBe(sujets.length);
+    const total = Object.values(compteurs).reduce<number>((s, n) => s + (n ?? 0), 0);
+    expect(sujets.some((s) => s.gravite === 'information')).toBe(true);
+    expect(total).toBe(sujets.filter((s) => s.gravite !== 'information').length);
   });
 
   it('un écran ne voit que ses propres sujets', () => {

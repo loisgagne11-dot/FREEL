@@ -208,15 +208,27 @@ export function acompteCfe(annee: number, cfeAnneePrecedente: Euros): DateCfe | 
  *
  * Rendue `null` hors de l'année de création : une échéance passée qui reste
  * affichée devient un reproche permanent, et on cesse de lire les autres.
+ *
+ * Le 31 décembre qui tombe un samedi, un dimanche ou un jour férié se reporte
+ * au premier jour ouvré : la règle de CGI ann. IV art. 199-0, écrite pour les
+ * paiements, que la doctrine étend aux dépôts (BOI-TVA-DECLA-20-20-10-10
+ * § 220, relevé le 17/11/2026). Le 31/12/2028 est un dimanche, le 1ᵉʳ janvier
+ * férié : la limite passe au mardi 2 janvier 2029. Aucun texte propre à la
+ * 1447-C n'a été lu qui le dise ou le contredise — le calendrier fiscal la
+ * range au 31 décembre, un jour ouvré en 2026 comme en 2027.
  */
 export function declaration1447C(debutActivite: DateISO | null, annee: number): DateCfe | null {
   if (debutActivite === null) return null;
   const anneeCreation = Number(debutActivite.slice(0, 4));
   if (annee !== anneeCreation) return null;
+  const date = reporterAuJourOuvre(`${anneeCreation}-12-31` as DateISO);
+  const lisible = date.slice(5, 7) === '12'
+    ? jourEnLettres(date, 'décembre')
+    : `${jourEnLettres(date, 'janvier')} ${date.slice(0, 4)}`;
   return {
     id: `cfe-1447c-${anneeCreation}`,
-    intitule: `Déclaration initiale de CFE (1447-C) avant le 31 décembre ${anneeCreation}`,
-    date: `${anneeCreation}-12-31` as DateISO,
+    intitule: `Déclaration initiale de CFE (1447-C) — au plus tard le ${lisible}${date.slice(5, 7) === '12' ? ` ${anneeCreation}` : ''}`,
+    date,
     // Large : c'est une formalité de création, et la découvrir le 20 décembre
     // laisse peu de marge pour réunir les éléments de l'établissement.
     preavisJours: 120
