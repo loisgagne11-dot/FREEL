@@ -370,20 +370,28 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
         </div>
       </div>
 
-      {/* Les registres : atteints d'ici, ouverts par-dessus. Un panneau plutôt
-          qu'une carte : on ne les consulte qu'au moment de justifier ou de
+      {/* Les registres, en pied d'écran (maquette téléphone, décision 25) :
+          ils se tiennent, ils ne se « font » pas à une date — une ligne de la
+          liste les aurait rangés parmi ce qui attend un geste. Ouverts
+          par-dessus : on ne les consulte qu'au moment de justifier ou de
           déclarer, et ils tiennent alors tout l'écran. */}
-      <div className={styles.registres} role="group" aria-label="Registres">
-        <button type="button" className={styles.lienRegistre} onClick={() => setRegistre('tva')}>
-          Préparer ma déclaration de TVA
+      <p className={ob.registres} role="group" aria-label="Registres">
+        Registres&nbsp;:{' '}
+        <button type="button" className={ob.registre} onClick={() => setRegistre('livre')}>livre des recettes</button>
+        <span aria-hidden="true"> · </span>
+        <button type="button" className={ob.registre} aria-label="Déclaration de TVA" onClick={() => setRegistre('tva')}>
+          TVA
         </button>
-        <button type="button" className={styles.lienRegistre} onClick={() => setRegistre('livre')}>
-          Livre des recettes
+        <span aria-hidden="true"> · </span>
+        <button
+          type="button"
+          className={ob.registre}
+          aria-label="Déclaration européenne de services (DES)"
+          onClick={() => setRegistre('des')}
+        >
+          DES
         </button>
-        <button type="button" className={styles.lienRegistre} onClick={() => setRegistre('des')}>
-          Déclaration européenne de services
-        </button>
-      </div>
+      </p>
 
       <Sheet
         ouvert={telephone && panneauDossier && ouverte !== null}

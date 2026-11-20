@@ -100,10 +100,11 @@ describe('l’en-tête d’Obligations', () => {
 });
 
 describe('les registres', () => {
+  // En pied d'écran : ils se tiennent, ils ne se font pas à une date.
   it.each([
-    ['Préparer ma déclaration de TVA', 'Déclaration de TVA'],
-    ['Livre des recettes', 'Livre des recettes'],
-    ['Déclaration européenne de services', 'Déclaration européenne de services']
+    ['Déclaration de TVA', 'Déclaration de TVA'],
+    ['livre des recettes', 'Livre des recettes'],
+    ['Déclaration européenne de services (DES)', 'Déclaration européenne de services']
   ])('ouvre « %s » en panneau', async (bouton, titre) => {
     vi.setSystemTime(new Date('2026-06-10T09:00:00Z'));
     render(<Obligations annee={2026} />);
