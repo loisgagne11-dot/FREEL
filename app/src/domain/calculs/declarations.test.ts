@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Mois } from '../types';
-import { dateLimiteDeclaration, periodesADeclarer } from './declarations';
+import { appelsDeLaPeriode, dateLimiteDeclaration, periodesADeclarer } from './declarations';
 
 const enc = (encaisseeLe: string, montant = 1000) => ({ encaisseeLe, montant });
 const AUJOURDHUI = '2026-08-13';
@@ -120,20 +120,40 @@ describe('déclarations à zéro', () => {
 });
 
 /**
- * LA DATE LIMITE : LE DERNIER JOUR DU MOIS SUIVANT.
+ * LA DATE LIMITE : LE DERNIER JOUR DU MOIS SUIVANT, REPORTÉE AU JOUR OUVRÉ.
  *
  * Par le calendrier, pas par « + 1 mois » : le 31 janvier + 1 mois n'existe
- * pas, et février change de longueur.
+ * pas, et février change de longueur. Puis reportée quand elle tombe un
+ * samedi, un dimanche ou un férié (doctrine Urssaf) : le T4 2026 et février
+ * 2027 finissent un dimanche, et s'affichaient en retard le lundi, jour où ils
+ * se déclarent encore. L'ancienne attente (31 janvier, 28 février) disait la
+ * règle sans son report.
  */
 describe('date limite de déclaration', () => {
   it.each([
-    ['2026-03', '2026-04-30'], // T1
-    ['2026-06', '2026-07-31'], // T2
-    ['2026-09', '2026-10-31'], // T3
-    ['2026-12', '2027-01-31'], // T4 : l'année change
-    ['2027-01', '2027-02-28'], // mensuel, février
-    ['2028-01', '2028-02-29'] // année bissextile
+    ['2026-03', '2026-04-30'], // T1, un jeudi
+    ['2026-06', '2026-07-31'], // T2, un vendredi
+    ['2026-04', '2026-06-01'], // avril : le dimanche 31 mai passe au lundi
+    ['2026-12', '2027-02-01'], // T4 : l'année change, et le dimanche 31 janvier passe en février
+    ['2027-01', '2027-03-01'], // mensuel, février : le dimanche 28 passe au lundi
+    ['2027-09', '2027-11-02'], // T3 2027 : dimanche 31 octobre, Toussaint le lundi
+    ['2028-01', '2028-02-29'] // année bissextile, un mardi
   ])('%s se déclare jusqu’au %s', (m, limite) => {
+    expect(dateLimiteDeclaration(m as Mois)).toBe(limite);
+  });
+
+  /**
+   * Une échéance annoncée l'emporte sur la règle, et pour elle seule. Le
+   * samedi 31 octobre 2026 n'a PAS été reporté (actualité Urssaf du
+   * 27/10/2026) ; reportée quand même, une déclaration du 1er novembre se
+   * serait lue à l'heure. Août 2026, après la panne, se déclarait sans
+   * majoration jusqu'à fin octobre (21/10/2026) : sans l'exception, une
+   * déclaration du 15 octobre s'affichait en retard.
+   */
+  it.each([
+    ['2026-09', '2026-10-31'], // septembre et T3 2026 : samedi maintenu
+    ['2026-08', '2026-10-31'] // août 2026 : tolérance de la panne
+  ])('%s suit l’échéance annoncée par l’Urssaf, le %s', (m, limite) => {
     expect(dateLimiteDeclaration(m as Mois)).toBe(limite);
   });
 
@@ -145,3 +165,32 @@ describe('date limite de déclaration', () => {
   });
 });
 
+/**
+ * UN APPEL RÈGLE UNE PÉRIODE, PAR SON LIEN (schéma 25).
+ *
+ * Rapprochés par le mois de la limite, les appels de juin 2026 étaient
+ * revendiqués à la fois par avril (limite du dimanche 31 mai reportée au
+ * lundi 1er juin) et par mai (30 juin) : le « payée le » de l'un s'affichait
+ * sous l'autre, et une période impayée se lisait réglée.
+ */
+describe('les appels d’une période', () => {
+  const appel = (id: string, echeanceLe: string, periode: string | null) =>
+    ({ id, nature: 'urssaf', echeanceLe, periode });
+
+  it('avril et mai 2026 ne revendiquent plus les mêmes appels de juin', () => {
+    const juin = [appel('avril', '2026-06-01', '2026-04'), appel('mai', '2026-06-30', '2026-05')];
+    expect(appelsDeLaPeriode('2026-04', juin).map((a) => a.id)).toEqual(['avril']);
+    expect(appelsDeLaPeriode('2026-05', juin).map((a) => a.id)).toEqual(['mai']);
+  });
+
+  it('un appel du T4 2026 saisi au 31 janvier 2027 reste à sa période', () => {
+    expect(appelsDeLaPeriode('2026-T4', [appel('t4', '2027-01-31', '2026-T4')])).toHaveLength(1);
+  });
+
+  /* Un appel saisi à la main ne règle aucune période tant qu'on ne le dit pas :
+     son mois ne suffit plus à le rattacher. */
+  it('ignore un appel sans période et une échéance d’une autre nature', () => {
+    const autres = [appel('libre', '2026-06-01', null), { ...appel('tva', '2026-06-01', '2026-04'), nature: 'tva' }];
+    expect(appelsDeLaPeriode('2026-04', autres)).toEqual([]);
+  });
+});

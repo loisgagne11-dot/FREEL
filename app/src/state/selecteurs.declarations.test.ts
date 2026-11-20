@@ -52,7 +52,8 @@ describe('accord du Pilote et de l’échéancier', () => {
       ...faits,
       periodesDeclarees: periodesADeclarer(
         recettesEncaissees(faits), 'trimestriel', [], '2026-08-15', mois('2025-10')
-      ).filter((p) => p.close).flatMap((p) => p.mois).map((m) => ({ mois: m, declareeLe: null }))
+      ).filter((p) => p.close).flatMap((p) => p.mois)
+        .map((m) => ({ nature: 'urssaf' as const, periode: m as string, declareeLe: null }))
     };
     expect(aTraiter(toutDeclare, maintenant).some((s) => s.id === 'periodes-a-declarer')).toBe(false);
   });
@@ -94,10 +95,40 @@ describe('montant d’une déclaration', () => {
   it('arrive avec le sujet de la déclaration', () => {
     const declarees = ['2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06', '2025-07',
       '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03']
-      .map((m) => ({ mois: mois(m), declareeLe: null }));
+      .map((m) => ({ nature: 'urssaf' as const, periode: mois(m) as string, declareeLe: null }));
     const s = aTraiter({ ...base(), periodesDeclarees: declarees }, new Date('2026-07-10T09:00:00Z'))
       .find((x) => x.id === 'periodes-a-declarer');
     expect(s?.gravite).toBe('a_faire');
     expect(typeof s?.donnees['montant']).toBe('number');
+  });
+});
+
+/**
+ * LE PILOTE LIT LES DES DÉPOSÉES, COMME LE PANNEAU.
+ *
+ * La requête « à traiter » nourrit le rail et le Pilote : si elle ignorait
+ * les dépôts, « 750 € encourus » resterait sur le Pilote après que le panneau
+ * DES a cessé de l'afficher — deux réponses à la même question.
+ */
+describe('DES déposée, vue du Pilote', () => {
+  const faits: Faits = {
+    ...faitsVides(),
+    clients: [{
+      id: 'c1', nom: 'Client UE fictif', adresse: '', siret: '', email: '',
+      delaiPaiement: 'net_30', pays: 'DE', tvaIntracom: 'DE000000000'
+    }],
+    recettes: [{
+      id: 'r1', clientNom: 'Client UE fictif', libelle: 'Mission', montant: euros(4000),
+      emiseLe: dateISO('2026-06-10'), encaisseeLe: null, modeReglement: null, numero: '2026-001'
+    }]
+  };
+  const maintenant = new Date('2026-08-15T10:00:00');
+
+  it('réclame la DES de juin passé sa limite, et plus du tout une fois déposée', () => {
+    expect(aTraiter(faits, maintenant).some((s) => s.id === 'des-en-retard')).toBe(true);
+    const deposee: Faits = {
+      ...faits, periodesDeclarees: [{ nature: 'des', periode: '2026-06', declareeLe: null }]
+    };
+    expect(aTraiter(deposee, maintenant).some((s) => s.id === 'des-en-retard')).toBe(false);
   });
 });

@@ -12,6 +12,7 @@
  * Avant ce lot, rien ne prouvait la robustesse : aucune exécution n'avait été
  * constatée, mais rien ne l'aurait signalée si une modification en ouvrait une.
  */
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -70,6 +71,8 @@ const TEXTES_HOSTILES = [
   'javascript:window.__freelXss=1'
 ] as const;
 
+const blocHostile = (champs: Record<string, unknown>): string => JSON.stringify({ ...faitsVides(), ...champs });
+
 const recetteHostile = (champs: Record<string, unknown>): string => JSON.stringify({
   ...faitsVides(),
   recettes: [{ id: 'r1', montant: 0, ...champs }]
@@ -92,7 +95,30 @@ const BLOCS_HOSTILES: readonly (readonly [string, string, RegExp])[] = [
   ['un montant négatif démesuré',
     recetteHostile({ montant: '§' }).replace('"§"', '-1e18'), /hors de portée/],
   ['une imbrication sans fond',
-    recetteHostile({ note: '§' }).replace('"§"', `${'['.repeat(50_000)}${']'.repeat(50_000)}`), /imbriqué/]
+    recetteHostile({ note: '§' }).replace('"§"', `${'['.repeat(50_000)}${']'.repeat(50_000)}`), /imbriqué/],
+  /* Schéma 25 : chaque nouveau champ commande une date ou un retard affiché.
+     Une nature inconnue ne se relirait jamais — la DES déposée resterait en
+     retard ; un lien vers `42` ferait disparaître un « payée le » ; une pièce
+     datée « demain » ferait lever l'écran qui la compare au jour. */
+  ['une période déclarée d’une nature inconnue',
+    blocHostile({ periodesDeclarees: [{ nature: 'tva_imaginaire', periode: '2026-05', declareeLe: null }] }),
+    /période déclarée n° 1/],
+  ['une DES déposée pour une période sans forme',
+    blocHostile({ periodesDeclarees: [{ nature: 'des', periode: 'mai', declareeLe: null }] }),
+    /période déclarée n° 1/],
+  ['un appel lié à une période qui n’est pas un texte',
+    blocHostile({ echeances: [{ id: 'e1', nature: 'urssaf', montant: 1, echeanceLe: '2026-06-01', payeeLe: null, montantPaye: null, periode: 42 }] }),
+    /échéance n° 1/],
+  ['une pièce à fournir datée « demain »',
+    blocHostile({ pieces: [{ id: 'p1', sorte: 'vigilance', libelle: 'Attestation', obtenueLe: 'demain', valableJusquau: null, provisoire: false }] }),
+    /pièce à fournir n° 1/],
+  ['une pièce d’une sorte inconnue, dans un bloc qui se dit au schéma 24',
+    JSON.stringify({ version: 24, pieces: [{ id: 'p1', sorte: '<script>', libelle: '', obtenueLe: null, valableJusquau: null, provisoire: false }] }),
+    /pièce à fournir n° 1/],
+  ['un régime de TVA inconnu',
+    blocHostile({ entreprise: { ...faitsVides().entreprise, regimeTva: 'au_hasard' } }), /regimeTva/],
+  ['un nom d’exploitant qui n’est pas un texte',
+    blocHostile({ entreprise: { ...faitsVides().entreprise, nomExploitant: { initiale: 'A' } } }), /nomExploitant/]
 ];
 
 describe('sauvegarde JSON, compte, archive : le bloc de faits', () => {
@@ -104,6 +130,14 @@ describe('sauvegarde JSON, compte, archive : le bloc de faits', () => {
     expect(await useFaits.getState().adopterFaitsDistants(brut)).toMatch(motif);
     expect(useFaits.getState().faits).toBe(avant);
     expect(pollue()).toBeUndefined();
+  });
+
+  /* Le contrôle ne doit pas refuser ce que l'application livre elle-même : la
+     démonstration se charge par la même porte qu'une sauvegarde. */
+  it('laisse passer le jeu de démonstration et le jeu d’essai, au schéma courant', () => {
+    for (const chemin of ['public/jeu-de-demonstration.json', 'src/test/jeu-d-essai.json']) {
+      expect(motifRefusExterieur(JSON.parse(readFileSync(chemin, 'utf8')))).toBeNull();
+    }
   });
 
   it('laisse passer un dossier ordinaire, même chargé de textes hostiles', () => {

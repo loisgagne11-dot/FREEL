@@ -1,6 +1,7 @@
 import type { DateISO, Euros, Mois } from '../types';
 import { euros } from '../types';
 import type { PeriodeDeclaree } from './declarations.declarees';
+import { reporterAuJourOuvre } from './calendrier.ouvres';
 
 /**
  * Les périodes à déclarer à l'URSSAF, et celles qui l'ont été.
@@ -47,27 +48,92 @@ export function dateDeDeclaration(
 ): DateISO | null {
   let derniere: DateISO | null = null;
   for (const m of mois) {
-    const le = declarees.find((p) => p.mois === m)?.declareeLe ?? null;
+    const le = declarees.find((p) => p.nature === 'urssaf' && p.periode === m)?.declareeLe ?? null;
     if (le === null) return null;
     if (derniere === null || le > derniere) derniere = le;
   }
   return derniere;
 }
 
+/** Un ordre stable des déclarations : par nature, puis par période. */
+export const ordreDesDeclarees = (a: PeriodeDeclaree, b: PeriodeDeclaree): number =>
+  a.nature.localeCompare(b.nature) || a.periode.localeCompare(b.periode);
+
 /**
- * Les appels de cotisations qui règlent une période : ceux dont l'échéance
- * tombe dans le mois de la date limite — la déclaration et le paiement se
- * font ensemble, le mois qui suit la période.
+ * Les appels de cotisations qui règlent une période : ceux qui la portent
+ * (`Echeance.periode`, schéma 25).
  *
- * Dérivé, et non un lien stocké : une échéance ne porte pas sa période, et
- * lui en ajouter une aurait fait deux vérités à tenir d'accord (sa date, sa
- * période). Le rapprochement par le mois est celui que l'URSSAF applique.
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN LIEN STOCKÉ, PARCE QUE LE MOIS NE SUFFIT PLUS
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Jusqu'au schéma 24, l'appel se rapprochait par le mois de la date limite :
+ * la déclaration et le paiement se font ensemble, le mois qui suit la
+ * période. C'était juste tant que la limite ne bougeait pas. Reportée au jour
+ * ouvré, elle change de mois : la limite d'avril 2026 (dimanche 31 mai) passe
+ * au lundi 1er juin, celle de mai tombe le 30 juin — et les deux périodes
+ * revendiquaient les mêmes appels de juin, dont le « payée le » se lisait
+ * deux fois. Celle du T4 2026 (dimanche 31 janvier 2027) passe en février,
+ * et l'appel saisi au 31 janvier n'appartenait plus à personne.
+ *
+ * Un appel règle UNE période : c'est un fait de l'appel, posé quand la
+ * déclaration le crée, et non une déduction de sa date.
  */
-export function appelsDeLaPeriode<E extends { readonly nature: string; readonly echeanceLe: string }>(
-  limite: DateISO, echeances: readonly E[]
+export function appelsDeLaPeriode<E extends { readonly nature: string; readonly periode?: string | null }>(
+  periode: string, echeances: readonly E[]
 ): readonly E[] {
-  const moisLimite = limite.slice(0, 7);
-  return echeances.filter((e) => e.nature === 'urssaf' && e.echeanceLe.startsWith(moisLimite));
+  return echeances.filter((e) => e.nature === 'urssaf' && e.periode === periode);
+}
+
+/**
+ * L'identifiant de l'appel qu'une déclaration URSSAF crée : un par période.
+ *
+ * Il dit la provenance sans champ de plus au schéma. « Annuler la
+ * déclaration » ne retire que CET appel — jamais un appel saisi à la main ou
+ * rattaché par la migration, que l'utilisateur a recopié d'un vrai courrier —,
+ * et déclarer de nouveau la même période le corrige au lieu d'en créer un
+ * second, qui ferait compter la dette deux fois.
+ */
+export const idAppelDeDeclaration = (periode: string): string => `ech-declaration-urssaf-${periode}`;
+
+/** Une période URSSAF, sans ce que les encaissements et les déclarations en disent. */
+export type PeriodeUrssaf = Pick<PeriodeADeclarer, 'id' | 'libelle' | 'mois' | 'close' | 'limite'>;
+
+/**
+ * La période qui contient un mois, selon la périodicité : ce que le détail
+ * d'une dette, qui raisonne au mois d'encaissement, doit déclarer. Un mois
+ * d'un trimestre se déclare avec son trimestre — le déclarer seul laissait
+ * une période déclarée aux deux tiers, que la règle lit « pas déclarée ».
+ */
+export function periodeDuMois(m: Mois, periodicite: Periodicite, aujourdhui: string): PeriodeUrssaf {
+  const id = clePeriode(m, periodicite);
+  const couverts = moisDeLaPeriode(id, periodicite);
+  const dernier = couverts[couverts.length - 1] as Mois;
+  return {
+    id,
+    libelle: libelleDe(id, periodicite),
+    mois: couverts,
+    close: dernier < aujourdhui.slice(0, 7),
+    limite: dateLimiteDeclaration(dernier)
+  };
+}
+
+/**
+ * La période qu'un appel réglait sous la règle d'avant le schéma 25 : celle
+ * dont la limite — dernier jour du mois suivant, sans report — tombait dans
+ * le mois de l'appel. Ne sert qu'à la migration, pour poser le lien que
+ * l'ancienne règle faisait à la lecture : rien de ce qu'on voyait ne change.
+ *
+ * `null` quand aucune période ne finissait le mois d'avant — un appel de mai
+ * en trimestriel : l'ancienne règle ne le rattachait à rien, la migration non
+ * plus.
+ */
+export function periodeSelonLeMoisDeLAppel(echeanceLe: string, periodicite: Periodicite): string | null {
+  const total = Number(echeanceLe.slice(0, 4)) * 12 + (Number(echeanceLe.slice(5, 7)) - 1) - 1;
+  if (!Number.isFinite(total)) return null;
+  const precedent = `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, '0')}`;
+  if (periodicite === 'mensuel') return precedent;
+  return (total % 12) % 3 === 2 ? clePeriode(precedent, 'trimestriel') : null;
 }
 
 export interface PeriodeADeclarer {
@@ -90,8 +156,10 @@ export interface PeriodeADeclarer {
   readonly close: boolean;
   /**
    * La date limite de déclaration : le dernier jour du mois qui suit la
-   * période — 30 avril, 31 juillet, 31 octobre, 31 janvier en trimestriel.
-   * Avant elle, une période close est « à déclarer » ; après, « en retard ».
+   * période — 30 avril, 31 juillet, 31 octobre, 31 janvier en trimestriel —,
+   * reportée au jour ouvré, sauf exception annoncée (voir
+   * `dateLimiteDeclaration`). Avant elle, une période close est « à
+   * déclarer » ; après, « en retard ».
    */
   readonly limite: DateISO;
 }
@@ -189,16 +257,56 @@ function clePeriode(mois: string, periodicite: Periodicite): string {
 }
 
 /**
- * Le dernier jour du mois qui suit `dernierMois`.
+ * Les échéances que l'Urssaf a fixées autrement que la règle, par DERNIER
+ * mois de la période — un mois en mensuel, le dernier du trimestre sinon.
+ * Une annonce ne vaut que pour l'échéance qu'elle nomme : elle s'écrit ici,
+ * datée et sourcée, et ne devient jamais une règle.
  *
- * Par le jour zéro du mois d'après — le calendrier fait le travail — et non
- * par un « + 1 mois » sur une date, qui tombe à côté dès qu'un mois a moins
- * de jours que le précédent (31 janvier + 1 mois n'existe pas).
+ *  · `2026-09` — septembre et T3 2026 : « L'échéance du samedi 31 octobre ne
+ *    sera pas reportée au 2 novembre ». Le report l'aurait annoncée au lundi,
+ *    et une déclaration du 1er novembre se serait lue à l'heure alors qu'elle
+ *    était en retard. Actualité Urssaf du 27/10/2026, relevée le 17/11/2026 :
+ *    https://www.autoentrepreneur.urssaf.fr/portail/accueil/sinformer-sur-le-statut/toutes-les-actualites/campagne-nationale-de-fiabilis-3.html
+ *  · `2026-08` — août 2026, en mensuel : après la panne du 25/09 au
+ *    19/10/2026, « aucune majoration de retard » pour la déclaration d'août si
+ *    elle est faite en octobre 2026. La limite officielle restait le
+ *    30 septembre ; celle qui décide d'une majoration — donc d'un « en
+ *    retard » — est le 31 octobre. Sans elle, une déclaration faite le
+ *    15 octobre, que l'Urssaf n'a pas sanctionnée, s'affichait en retard.
+ *    Actualité Urssaf du 21/10/2026, relevée le 17/11/2026 :
+ *    https://www.autoentrepreneur.urssaf.fr/portail/accueil/sinformer-sur-le-statut/toutes-les-actualites/resolution-des-difficultes-renco.html
+ */
+const ECHEANCES_ANNONCEES: Readonly<Record<string, DateISO>> = {
+  '2026-09': '2026-10-31' as DateISO,
+  '2026-08': '2026-10-31' as DateISO
+};
+
+/**
+ * La date limite de déclaration d'une période qui finit avec `dernierMois` :
+ * le dernier jour du mois qui suit, REPORTÉ au premier jour ouvré quand il
+ * tombe un samedi, un dimanche ou un jour férié — sauf échéance annoncée
+ * autrement (`ECHEANCES_ANNONCEES`). La SEULE règle de la limite URSSAF : le
+ * Pilote, la requête « à traiter » et l'échéancier la lisent tous ici.
+ *
+ * Le report est la doctrine de l'Urssaf — « si la date d'exigibilité est un
+ * samedi, un dimanche, ou un jour férié, la date d'exigibilité est reportée
+ * au jour qui suit » (exemple donné : le 31/08/2025 reporté au 01/09/2025) ;
+ * aucun article du code de la sécurité sociale n'a été trouvé qui le pose.
+ * Relevée le 17/11/2026 :
+ * https://www.autoentrepreneur.urssaf.fr/portail/accueil/une-question/toutes-les-fiches-pratiques/declarer-et-payer-mes-cotisation.html
+ * Sans lui, le T4 2026 passait en retard le lundi 1er février 2027, jour où il
+ * se déclare encore — la limite du dimanche 31 janvier ayant glissé.
+ *
+ * Le dernier jour se trouve par le jour zéro du mois d'après — le calendrier
+ * fait le travail — et non par un « + 1 mois » sur une date, qui tombe à côté
+ * dès qu'un mois a moins de jours que le précédent.
  */
 export function dateLimiteDeclaration(dernierMois: Mois): DateISO {
+  const annoncee = ECHEANCES_ANNONCEES[dernierMois];
+  if (annoncee !== undefined) return annoncee;
   const annee = Number(dernierMois.slice(0, 4));
   const mois = Number(dernierMois.slice(5, 7)); // 1 à 12 ; l'index 0-based du mois d'après
-  return new Date(Date.UTC(annee, mois + 1, 0)).toISOString().slice(0, 10) as DateISO;
+  return reporterAuJourOuvre(new Date(Date.UTC(annee, mois + 1, 0)).toISOString().slice(0, 10) as DateISO);
 }
 
 export function moisDeLaPeriode(id: string, periodicite: Periodicite): readonly Mois[] {

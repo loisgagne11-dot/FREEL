@@ -8,7 +8,9 @@
  * l'entrée de 80 Ko ; le magasin le charge à la demande, comme les migrations.
  */
 import { MONTANT_MAX } from '../infra/bornes';
-import { motifRefusFaits } from './schema';
+import type { NatureDeclaration } from '../domain/calculs/declarations.declarees';
+import type { PieceAFournir } from '../domain/calculs/pieces';
+import { VERSION_SCHEMA, motifRefusFaits } from './schema';
 
 /** Le dossier le plus profond (mission › entité › rythme › champ) en a six. */
 const PROFONDEUR_MAX = 16;
@@ -32,7 +34,99 @@ const CLES_INTERDITES: ReadonlySet<string> = new Set(['__proto__', 'constructor'
  * remplace rien tant qu'il n'est pas accepté — et le refus dit quel champ.
  */
 export function motifRefusExterieur(brut: unknown): string | null {
-  return motifRefusFaits(brut) ?? motifRefusValeurs(brut);
+  return motifRefusFaits(brut) ?? motifRefusChampsDuSchema25(brut) ?? motifRefusValeurs(brut);
+}
+
+/*
+ * Les listes exhaustives tirées des types : le compilateur refuse une nature
+ * ou une sorte oubliée ici, et une nature retirée du type ne peut pas y
+ * survivre. Ce n'est pas une seconde source, c'est la première, relue.
+ */
+const NATURES_DECLARATION: Readonly<Record<NatureDeclaration, RegExp>> = {
+  urssaf: /^\d{4}-\d{2}$/u,
+  des: /^\d{4}-\d{2}$/u,
+  ca3: /^\d{4}-(\d{2}|T[1-4])$/u,
+  ca12: /^\d{4}$/u,
+  revenus: /^\d{4}$/u,
+  cfe_1447c: /^\d{4}$/u
+};
+const SORTES_PIECE: Readonly<Record<PieceAFournir['sorte'], true>> = {
+  vigilance: true, rc_pro: true, sirene: true, autre: true
+};
+const FORME_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const FORME_PERIODE_URSSAF = /^\d{4}-(\d{2}|T[1-4])$/u;
+
+const estObjet = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+const dateOuNul = (v: unknown): boolean => v === null || (typeof v === 'string' && FORME_DATE.test(v));
+const elements = (v: unknown): readonly unknown[] => (Array.isArray(v) ? v : []);
+
+/**
+ * La valeur des champs apparus au schéma 25, quand un bloc vient d'ailleurs.
+ *
+ * Chacun commande une date ou un montant affiché : une période déclarée d'une
+ * nature inconnue, ou d'une forme qu'aucun mois n'a, ne serait jamais
+ * retrouvée — la DES déposée resterait en retard, la période URSSAF
+ * redeviendrait due ; un appel lié à `42` ne réglerait aucune période, et son
+ * « payée le » disparaîtrait ; une pièce sans date lisible ferait lever
+ * l'écran qui la compare à aujourd'hui.
+ *
+ * Absents, ces champs sont légitimes avant le schéma 25 : la migration les
+ * comble. Présents, ils sont contrôlés QUELLE QUE SOIT la version annoncée —
+ * un fichier fabriqué peut se dire au schéma 24 et les porter quand même, et
+ * la fusion de surface les recopierait. Seules les périodes déclarées
+ * dépendent de la version : avant le schéma 25, elles ont une autre forme, et
+ * c'est la migration qui écarte une nature inconnue.
+ */
+function motifRefusChampsDuSchema25(brut: unknown): string | null {
+  if (!estObjet(brut)) return null;
+
+  const declarees = brut['version'] === VERSION_SCHEMA ? elements(brut['periodesDeclarees']) : [];
+  for (const [i, p] of declarees.entries()) {
+    const forme = estObjet(p) && typeof p['nature'] === 'string'
+      && Object.hasOwn(NATURES_DECLARATION, p['nature'])
+      ? NATURES_DECLARATION[p['nature'] as NatureDeclaration]
+      : null;
+    if (forme === null || !estObjet(p) || typeof p['periode'] !== 'string'
+      || !forme.test(p['periode']) || !dateOuNul(p['declareeLe'])) {
+      return `La période déclarée n° ${i + 1} n’a pas une nature, une période et une date `
+        + 'lisibles : rien n’a été chargé.';
+    }
+  }
+
+  for (const [i, e] of elements(brut['echeances']).entries()) {
+    const periode = estObjet(e) ? e['periode'] : undefined;
+    if (periode !== undefined && periode !== null
+      && (typeof periode !== 'string' || !FORME_PERIODE_URSSAF.test(periode))) {
+      return `L’échéance n° ${i + 1} est rattachée à une période illisible : rien n’a été chargé.`;
+    }
+  }
+
+  for (const [i, p] of elements(brut['pieces']).entries()) {
+    if (!estObjet(p) || typeof p['id'] !== 'string' || typeof p['libelle'] !== 'string'
+      || typeof p['sorte'] !== 'string' || !Object.hasOwn(SORTES_PIECE, p['sorte'])
+      || !dateOuNul(p['obtenueLe']) || !dateOuNul(p['valableJusquau'])
+      || typeof p['provisoire'] !== 'boolean') {
+      return `La pièce à fournir n° ${i + 1} est illisible : rien n’a été chargé.`;
+    }
+  }
+
+  const entreprise = brut['entreprise'];
+  if (estObjet(entreprise)) {
+    const regime = entreprise['regimeTva'];
+    if (regime !== undefined && regime !== 'simplifie' && regime !== 'reel_normal') {
+      return 'Le champ « entreprise.regimeTva » devrait être « simplifie » ou « reel_normal ».';
+    }
+    const mensuelle = entreprise['ca3Mensuelle'];
+    if (mensuelle !== undefined && typeof mensuelle !== 'boolean') {
+      return 'Le champ « entreprise.ca3Mensuelle » devrait être vrai ou faux.';
+    }
+    const nom = entreprise['nomExploitant'];
+    if (nom !== undefined && typeof nom !== 'string') {
+      return 'Le champ « entreprise.nomExploitant » devrait être un texte.';
+    }
+  }
+  return null;
 }
 
 /**

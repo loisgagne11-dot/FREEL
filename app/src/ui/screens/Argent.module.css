@@ -339,12 +339,17 @@
 @media (min-width: 761px) {
   .ligneDeclaration {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
   }
 
   .declarationTitre { flex: 1 1 auto; }
 }
+
+/* Le formulaire « déclarée le … pour … € » prend la ligne entière, sous
+   l'intitulé de la période : coincé à droite, ses champs s'écrasaient. */
+.declarationFormulaire { flex: 1 1 100%; min-width: 0; padding-top: 4px; }
 
 /* Un second niveau à l'intérieur d'une carte : la ventilation détaille le
    total qui la précède, elle n'ouvre pas un autre sujet. Plus discret que le

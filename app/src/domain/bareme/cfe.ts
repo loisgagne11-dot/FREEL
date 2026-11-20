@@ -1,5 +1,6 @@
 import type { DateISO, Euros } from '../types';
 import { euros } from '../types';
+import { reporterAuJourOuvre } from '../calculs/calendrier.ouvres';
 
 /**
  * Cotisation foncière des entreprises (CFE).
@@ -69,13 +70,27 @@ export type RegimeCfe =
  */
 export const CA_SANS_COTISATION_MINIMUM = euros(5000);
 
-/** Montant de CFE de l'année précédente à partir duquel un acompte est dû au 15/06.
- * Aucune source trouvée : non recoupé au 07/11/2026. */
+/**
+ * Montant de CFE de l'année précédente à partir duquel un acompte est dû.
+ *
+ * CGI art. 1679 quinquies, al. 2 et suivants : un acompte est dû par le
+ * redevable non mensualisé dont la CFE (et l'IFER) de l'année précédente
+ * atteint 3 000 €, seuil apprécié PAR ÉTABLISSEMENT. Lu au BOFiP le
+ * 17/11/2026 (BOI-IF-CFE-40-10 du 25/09/2024) — l'article du CGI lui-même
+ * n'a pas été ouvert :
+ * https://bofip.impots.gouv.fr/bofip/291-PGP.html/identifiant=BOI-IF-CFE-40-10-20240925
+ *
+ * Un micro-entrepreneur n'atteint presque jamais ce seuil : la règle reste
+ * écrite pour qu'un avis exceptionnel ne passe pas sans son acompte, et
+ * n'a pas d'écran à elle.
+ */
 export const CFE_DECLENCHANT_ACOMPTE = euros(3000);
 
-/** Part de la CFE de l'année précédente appelée en acompte.
- * Aucune source trouvée : non recoupé au 07/11/2026. */
+/** Part de la CFE de l'année précédente appelée en acompte : 50 % (même source). */
 export const PART_ACOMPTE = 0.5;
+
+/** « 15 décembre », « 17 décembre » : le jour réellement retenu, report compris. */
+const jourEnLettres = (d: DateISO, mois: string): string => `${Number(d.slice(8, 10))} ${mois}`;
 
 /**
  * Le régime CFE applicable, pour une année et une entreprise données.
@@ -142,12 +157,21 @@ export interface DateCfe {
   readonly preavisJours: number;
 }
 
-/** Le 15 décembre, date de paiement de la CFE. */
+/**
+ * Le paiement du solde : le 15 décembre, reporté au premier jour ouvré quand
+ * il tombe un samedi, un dimanche ou un jour férié — CGI ann. IV art. 199-0
+ * (« prorogée jusqu'au premier jour ouvrable suivant »), relevé le 17/11/2026 :
+ * https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006301997
+ *
+ * Le 15/12/2029 est un samedi : sans le report, la CFE se serait affichée en
+ * retard le lundi 17, jour où elle est encore payable.
+ */
 export function paiementCfe(annee: number): DateCfe {
+  const date = reporterAuJourOuvre(`${annee}-12-15` as DateISO);
   return {
     id: `cfe-paiement-${annee}`,
-    intitule: `CFE ${annee} — paiement au 15 décembre`,
-    date: `${annee}-12-15` as DateISO,
+    intitule: `CFE ${annee} — paiement au ${jourEnLettres(date, 'décembre')}`,
+    date,
     // Un mois et demi : l'avis paraît en novembre, et provisionner en octobre
     // suppose de savoir dès octobre qu'il y aura quelque chose à payer.
     preavisJours: 75
@@ -155,17 +179,20 @@ export function paiementCfe(annee: number): DateCfe {
 }
 
 /**
- * L'acompte du 15 juin, dû quand la CFE de l'année précédente atteint 3 000 €.
+ * L'acompte de juin, dû quand la CFE de l'année précédente atteint 3 000 €
+ * (CGI 1679 quinquies, voir `CFE_DECLENCHANT_ACOMPTE`) : exigible le 31 mai,
+ * payable au plus tard le 15 juin, reporté comme le solde (ann. IV 199-0).
  *
  * Rendu `null` en dessous : annoncer un acompte qui n'est pas dû ferait
  * provisionner deux fois la même CFE.
  */
 export function acompteCfe(annee: number, cfeAnneePrecedente: Euros): DateCfe | null {
   if (cfeAnneePrecedente < CFE_DECLENCHANT_ACOMPTE) return null;
+  const date = reporterAuJourOuvre(`${annee}-06-15` as DateISO);
   return {
     id: `cfe-acompte-${annee}`,
-    intitule: `CFE ${annee} — acompte de 50 % au 15 juin`,
-    date: `${annee}-06-15` as DateISO,
+    intitule: `CFE ${annee} — acompte de 50 % au ${jourEnLettres(date, 'juin')}`,
+    date,
     preavisJours: 45
   };
 }

@@ -22,6 +22,7 @@ import type { PeriodeDeclaree } from '../domain/calculs/declarations.declarees';
 import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/planning';
 import type { Echeance } from '../domain/calculs/provisions';
 import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
+import type { PieceAFournir } from '../domain/calculs/pieces';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -34,6 +35,7 @@ import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
  */
 export type { Depense };
 export type { AjustementJour, Ajustements, Rythme };
+export type { PieceAFournir };
 
 /*
  * 23 (lot 35) : le motif « impot » d'un mouvement bancaire. Une version
@@ -45,8 +47,16 @@ export type { AjustementJour, Ajustements, Rythme };
  * `Rythme.facturerA`. Une version antérieure les ignorerait et ferait une seule
  * facture au payeur de la mission pour des journées qu'un autre doit payer ;
  * puis, au premier renvoi, les effacerait. Elle doit refuser le dossier.
+ *
+ * 25 (lot 53) : la déclaration généralisée (`PeriodeDeclaree.nature`,
+ * `.periode`), le lien d'un appel URSSAF à sa période (`Echeance.periode`),
+ * les faits de TVA (`regimeTva`, `ca3Mensuelle`, `nomExploitant`) et les
+ * pièces à fournir. Une version antérieure lirait une période déclarée sans
+ * `mois` comme illisible, ou perdrait au premier renvoi les DES déposées, les
+ * pièces et les liens — et chaque appel redeviendrait disputé entre deux
+ * périodes. Elle doit refuser le dossier.
  */
-export const VERSION_SCHEMA = 24 as const;
+export const VERSION_SCHEMA = 25 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -116,6 +126,40 @@ export interface Entreprise {
    * électronique. Sans objet en franchise en base.
    */
   readonly optionTvaDebits: boolean;
+  /**
+   * Le régime de TVA d'un redevable (schéma 25) : `simplifie` — une CA12
+   * annuelle et deux acomptes — ou `reel_normal` — des CA3. Sans objet en
+   * franchise en base.
+   *
+   * Un FAIT, parce que rien ne le déduit : le réel normal se choisit sur
+   * option, et le simplifié est le régime de droit commun d'un micro-
+   * entrepreneur qui devient redevable. Défaut `simplifie` pour cette raison.
+   * Le régime simplifié est supprimé au 01/01/2027 (loi 2025-127, art. 38 ;
+   * annonce DGFiP du 22/09/2026, relevée le 17/11/2026 :
+   * https://www.impots.gouv.fr/actualite/le-regime-simplifie-dimposition-la-tva-est-supprime-compter-du-1er-janvier-2027) :
+   * le fait garde ce qui valait avant, la règle datée dira ce qui vaut après.
+   */
+  readonly regimeTva: 'simplifie' | 'reel_normal';
+  /**
+   * L'option pour une CA3 MENSUELLE au réel normal (schéma 25). Sans option,
+   * la CA3 est trimestrielle à partir de 2027 pour qui ne dépasse pas
+   * 1 000 000 € (CGI 287, version au 01/01/2027 ; même page de la DGFiP) :
+   * `false` par défaut, ce qui ne change rien tant qu'aucune option n'a été
+   * prise.
+   */
+  readonly ca3Mensuelle: boolean;
+  /**
+   * Le nom de famille de l'exploitant, pour son INITIALE (schéma 25) : le jour
+   * de dépôt d'une CA3 d'entreprise individuelle en dépend (CIBS A161-29 —
+   * A à H, ou I à Z ; relevé le 17/11/2026 :
+   * https://www.legifrance.gouv.fr/codes/id/LEGISCTA000049803706/).
+   *
+   * Vide par défaut, et il le reste tant qu'il n'est pas saisi : on le
+   * demande, on ne le devine pas. Le nom de l'entreprise est souvent une
+   * enseigne (« Atelier … ») dont l'initiale n'a rien à voir, et le prénom
+   * n'est pas le nom. Jamais écrit dans le code : le dépôt est public.
+   */
+  readonly nomExploitant: string;
 }
 
 export interface Client {
@@ -694,6 +738,12 @@ export interface Faits {
    * deviner ferait appliquer la décote d'un couple à qui n'en est pas un.
    */
   readonly impositionCommune: boolean | null;
+  /**
+   * Les pièces que les clients demandent : attestation de vigilance,
+   * assurance, avis SIRENE (schéma 25). Leur état — à jour, à renouveler —
+   * se dérive des dates, jamais stocké. Voir `PieceAFournir`.
+   */
+  readonly pieces: readonly PieceAFournir[];
 }
 
 export function entrepriseVide(): Entreprise {
@@ -702,7 +752,8 @@ export function entrepriseVide(): Entreprise {
     versementLiberatoire: false, tvaDepuis: null, tvaIntracom: '', iban: '',
     bic: '', adresse: '', codePostal: '', ville: '', codeApe: '', email: '',
     telephone: '', urssafPeriodicite: 'mensuel', onboardingFait: false,
-    plateformeAgreee: null, optionTvaDebits: false
+    plateformeAgreee: null, optionTvaDebits: false,
+    regimeTva: 'simplifie', ca3Mensuelle: false, nomExploitant: ''
   };
 }
 
@@ -717,7 +768,7 @@ export function faitsVides(): Faits {
     objectifCaAnnuel: null,
     periodesDeclarees: [], echeances: [], configImpotBrute: {},
     partsFiscales: null, autresRevenusFoyer: null, versementPerDeductible: null,
-    impositionCommune: null
+    impositionCommune: null, pieces: []
   };
 }
 
@@ -771,7 +822,7 @@ export function motifRefusFaits(brut: unknown): string | null {
   // faisait tomber l'échéancier au premier `filter`.
   const listes = [
     'clients', 'missions', 'recettes', 'depenses', 'conges', 'notesCra',
-    'mouvementsBancaires', 'periodesUrssafAjoutees', 'periodesDeclarees', 'echeances'
+    'mouvementsBancaires', 'periodesUrssafAjoutees', 'periodesDeclarees', 'echeances', 'pieces'
   ] as const;
   for (const cle of listes) {
     if (cle in o && !Array.isArray(o[cle])) return `Le champ « ${cle} » devrait être une liste.`;
@@ -892,19 +943,24 @@ const illisible = (cle: string, i: number): string =>
  * Les listes d'enregistrements le sont à toutes les versions. Deux exceptions
  * de forme : `periodesDeclarees` a été une liste de mois (des chaînes)
  * jusqu'au schéma 20 — la migration les convertit, il ne faut donc pas les
- * refuser avant elle ; au schéma courant, chaque élément porte son mois —, et
- * `conges` a été une liste de dates nues jusqu'au schéma 1 — la migration les
- * convertit, il ne faut donc pas les refuser avant elle.
+ * refuser avant elle ; au schéma courant, chaque élément porte sa nature et sa
+ * période —, et `conges` a été une liste de dates nues jusqu'au schéma 1 — la
+ * migration les convertit, il ne faut donc pas les refuser avant elle.
  *
  * Les listes IMBRIQUÉES des missions ne sont contrôlées qu'au schéma courant :
  * c'est le seul cas où rien ne les reconstruit (`completerFaitsCourants` ne
  * descend pas), alors que la migration réécrit les entités des schémas
  * antérieurs de toute façon.
+ *
+ * La VALEUR des champs du schéma 25 — nature connue, période à la bonne
+ * forme, pièce lisible — se contrôle à l'entrée de ce qui vient d'ailleurs
+ * (`schema.exterieur`), pas ici : ce module est lu à chaque ouverture, et un
+ * dossier local ne contient que ce que l'application a écrit.
  */
 function motifRefusElements(o: Record<string, unknown>, version: number): string | null {
   const enregistrements = [
     'clients', 'missions', 'recettes', 'depenses', 'notesCra',
-    'mouvementsBancaires', 'periodesUrssafAjoutees', 'echeances'
+    'mouvementsBancaires', 'periodesUrssafAjoutees', 'echeances', 'pieces'
   ] as const;
   for (const cle of enregistrements) {
     const liste = o[cle];
@@ -920,12 +976,13 @@ function motifRefusElements(o: Record<string, unknown>, version: number): string
   }
   const declarees = o['periodesDeclarees'];
   if (Array.isArray(declarees)) {
-    /* Au schéma courant, plus rien ne reconstruit la liste : un mois nu y
-       passerait pour une période dont `mois` vaut `undefined`, que la règle
-       ne retrouverait jamais — la période redeviendrait « à déclarer » et sa
+    /* Au schéma courant, plus rien ne reconstruit la liste : un mois nu, ou
+       une période d'avant le schéma 25 (`mois` sans `nature`), y passerait
+       pour une période dont la nature vaut `undefined`, que la règle ne
+       retrouverait jamais — la période redeviendrait « à déclarer » et sa
        dette, provisionnée une seconde fois, sans un mot. */
     const lisible = (m: unknown): boolean => (version === VERSION_SCHEMA
-      ? estEnregistrement(m) && typeof (m as { mois?: unknown }).mois === 'string'
+      ? estEnregistrement(m) && typeof m['nature'] === 'string' && typeof m['periode'] === 'string'
       : typeof m === 'string' || estEnregistrement(m));
     const i = declarees.findIndex((m) => !lisible(m));
     if (i !== -1) return illisible('periodesDeclarees', i);

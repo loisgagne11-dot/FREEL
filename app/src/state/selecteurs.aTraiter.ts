@@ -24,7 +24,7 @@ import {
 } from '../domain/bareme/cfe';
 import { moisDeLaPeriode } from '../domain/calculs/declarations';
 import { moisDeclares } from '../domain/calculs/declarations.declarees';
-import { type PreneurService, declarationsEnRetard } from '../domain/calculs/des';
+import { type PreneurService, declarationsEnRetard, moisDeposes } from '../domain/calculs/des';
 import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';
 
@@ -71,7 +71,8 @@ export function entreeATraiter(
     periodicite: faits.entreprise.urssafPeriodicite,
     periodesUrssaf: periodesUrssafEffectives(faits),
     desEnRetard: declarationsEnRetard(
-      faits.recettes, preneursDeServices(faits), dateISOde(maintenant)
+      faits.recettes, preneursDeServices(faits), dateISOde(maintenant),
+      moisDeposes(faits.periodesDeclarees)
     ),
     debutActiviteLe: faits.entreprise.debutActivite,
     debutActivite: faits.entreprise.debutActivite === null

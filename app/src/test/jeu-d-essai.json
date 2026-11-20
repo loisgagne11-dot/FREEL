@@ -1,6 +1,6 @@
 {
   "_lisezMoi": "Jeu d’essai à FORME RÉELLE, entièrement fictif : mêmes structures qu’un compte réel (ACRE qui s’éteint, TVA franchie en cours d’année, avoir, foyer à deux parts, passage du 31 décembre), aucune donnée personnelle. Il sert aux tests d’intégration (src/integration) et à capturer-app.mjs --jeu=essai, jamais à la démonstration.",
-  "version": 24,
+  "version": 25,
   "entreprise": {
     "nom": "Entreprise Démo Indépendant",
     "prenom": "",
@@ -22,7 +22,10 @@
     "urssafPeriodicite": "trimestriel",
     "onboardingFait": true,
     "plateformeAgreee": null,
-    "optionTvaDebits": false
+    "optionTvaDebits": false,
+    "regimeTva": "simplifie",
+    "ca3Mensuelle": false,
+    "nomExploitant": ""
   },
   "clients": [
     {
@@ -777,63 +780,78 @@
   "objectifCaAnnuel": 80000,
   "periodesDeclarees": [
     {
-      "mois": "2025-04",
+      "nature": "urssaf",
+      "periode": "2025-04",
       "declareeLe": "2025-07-31"
     },
     {
-      "mois": "2025-05",
+      "nature": "urssaf",
+      "periode": "2025-05",
       "declareeLe": "2025-07-31"
     },
     {
-      "mois": "2025-06",
+      "nature": "urssaf",
+      "periode": "2025-06",
       "declareeLe": "2025-07-31"
     },
     {
-      "mois": "2025-07",
+      "nature": "urssaf",
+      "periode": "2025-07",
       "declareeLe": "2025-10-31"
     },
     {
-      "mois": "2025-08",
+      "nature": "urssaf",
+      "periode": "2025-08",
       "declareeLe": "2025-10-31"
     },
     {
-      "mois": "2025-09",
+      "nature": "urssaf",
+      "periode": "2025-09",
       "declareeLe": "2025-10-31"
     },
     {
-      "mois": "2025-10",
+      "nature": "urssaf",
+      "periode": "2025-10",
       "declareeLe": "2026-01-30"
     },
     {
-      "mois": "2025-11",
+      "nature": "urssaf",
+      "periode": "2025-11",
       "declareeLe": "2026-01-30"
     },
     {
-      "mois": "2025-12",
+      "nature": "urssaf",
+      "periode": "2025-12",
       "declareeLe": "2026-01-30"
     },
     {
-      "mois": "2026-01",
+      "nature": "urssaf",
+      "periode": "2026-01",
       "declareeLe": "2026-04-30"
     },
     {
-      "mois": "2026-02",
+      "nature": "urssaf",
+      "periode": "2026-02",
       "declareeLe": "2026-04-30"
     },
     {
-      "mois": "2026-03",
+      "nature": "urssaf",
+      "periode": "2026-03",
       "declareeLe": "2026-04-30"
     },
     {
-      "mois": "2026-04",
+      "nature": "urssaf",
+      "periode": "2026-04",
       "declareeLe": "2026-07-31"
     },
     {
-      "mois": "2026-05",
+      "nature": "urssaf",
+      "periode": "2026-05",
       "declareeLe": "2026-07-31"
     },
     {
-      "mois": "2026-06",
+      "nature": "urssaf",
+      "periode": "2026-06",
       "declareeLe": "2026-07-31"
     }
   ],
@@ -844,7 +862,8 @@
       "montant": 915,
       "echeanceLe": "2025-07-31",
       "payeeLe": "2025-07-31",
-      "montantPaye": null
+      "montantPaye": null,
+      "periode": "2025-T2"
     },
     {
       "id": "ech-urssaf-2025-t3",
@@ -852,7 +871,8 @@
       "montant": 1063,
       "echeanceLe": "2025-10-31",
       "payeeLe": "2025-10-31",
-      "montantPaye": null
+      "montantPaye": null,
+      "periode": "2025-T3"
     },
     {
       "id": "ech-urssaf-2025-t4",
@@ -860,7 +880,8 @@
       "montant": 1417,
       "echeanceLe": "2026-01-31",
       "payeeLe": "2026-01-30",
-      "montantPaye": null
+      "montantPaye": null,
+      "periode": "2025-T4"
     },
     {
       "id": "ech-urssaf-2026-t1",
@@ -868,7 +889,8 @@
       "montant": 2335,
       "echeanceLe": "2026-04-30",
       "payeeLe": "2026-04-30",
-      "montantPaye": null
+      "montantPaye": null,
+      "periode": "2026-T1"
     },
     {
       "id": "ech-urssaf-2026-t2",
@@ -876,7 +898,8 @@
       "montant": 6021,
       "echeanceLe": "2026-07-31",
       "payeeLe": "2026-07-31",
-      "montantPaye": null
+      "montantPaye": null,
+      "periode": "2026-T2"
     },
     {
       "id": "ech-tva-2026-t3",
@@ -940,5 +963,31 @@
   "partsFiscales": 2,
   "autresRevenusFoyer": 31000,
   "versementPerDeductible": 0,
-  "impositionCommune": true
+  "impositionCommune": true,
+  "pieces": [
+    {
+      "id": "piece-vigilance-provisoire",
+      "sorte": "vigilance",
+      "libelle": "Attestation de vigilance provisoire (début d’activité)",
+      "obtenueLe": "2025-04-10",
+      "valableJusquau": null,
+      "provisoire": true
+    },
+    {
+      "id": "piece-vigilance",
+      "sorte": "vigilance",
+      "libelle": "Attestation de vigilance URSSAF",
+      "obtenueLe": "2026-08-03",
+      "valableJusquau": null,
+      "provisoire": false
+    },
+    {
+      "id": "piece-autre",
+      "sorte": "autre",
+      "libelle": "Extrait d’immatriculation demandé par un client de démonstration",
+      "obtenueLe": null,
+      "valableJusquau": null,
+      "provisoire": false
+    }
+  ]
 }

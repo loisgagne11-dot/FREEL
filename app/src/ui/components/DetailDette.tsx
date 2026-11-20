@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import type { DetailDette, LigneDette, StatutLigneDette } from '../../domain/calculs/detailDette';
-import { declarerPeriode, enregistrerPaiement } from '../../state/ecritures.echeances';
+import { enregistrerPaiement } from '../../state/ecritures.echeances';
 import { dateDuJour } from '../../state/selecteurs';
-import type { DateISO, Euros } from '../../domain/types';
+import { useFaits } from '../../state/store';
+import { type Periodicite, periodeDuMois } from '../../domain/calculs/declarations';
+import { DeclarationUrssaf } from './DeclarationUrssaf';
+import type { DateISO, Euros, Mois } from '../../domain/types';
 import { FormulairePaiement } from './FormulairePaiement';
 import { Montant } from './Montant';
 import { useToast } from './Toasts';
@@ -128,6 +131,30 @@ export function PanneauDetailDette({ detail }: { readonly detail: DetailDette })
   );
 }
 
+/**
+ * Le geste « Déclarée le … pour … € », le même que la liste des périodes.
+ *
+ * Le mois d'encaissement se déclare avec SA période : un mois d'un trimestre
+ * déclaré seul laissait le trimestre déclaré aux deux tiers, et sa dette
+ * quittait l'estimation sans qu'aucun appel la porte — « attend son appel »,
+ * disait le message, pendant que ce qu'on pouvait se verser montait. Une
+ * période pas encore close ne se déclare pas, ici non plus.
+ */
+function Declarer({ mois, periodicite }: { readonly mois: Mois; readonly periodicite: Periodicite }) {
+  const periode = periodeDuMois(mois, periodicite, dateDuJour());
+  if (!periode.close) {
+    return <span className={styles.attente}>{periode.libelle} en cours, pas encore déclarable</span>;
+  }
+  return (
+    <DeclarationUrssaf
+      periode={periode}
+      libelle="Marquer déclaré"
+      classeDeclencheur={styles.action}
+      classeConteneur={styles.confirmation}
+    />
+  );
+}
+
 const LIBELLE_STATUT: Readonly<Record<StatutLigneDette, string>> = {
   a_declarer: 'à déclarer',
   a_payer: 'à payer',
@@ -138,16 +165,7 @@ const LIBELLE_STATUT: Readonly<Record<StatutLigneDette, string>> = {
 function Ligne({ ligne }: { readonly ligne: LigneDette }) {
   const signaler = useToast();
   const [confirme, setConfirme] = useState(false);
-
-  function declarer(): void {
-    // Datée du jour : c'est en sortant du site de l'URSSAF qu'on la coche.
-    // La date se corrige dans l'échéancier.
-    declarerPeriode([ligne.mois], dateDuJour());
-    signaler(
-      `${moisLong(ligne.mois)} marqué déclaré. Sa dette quitte l’estimation `
-      + 'et attend son appel.'
-    );
-  }
+  const periodicite = useFaits((e) => e.faits.entreprise.urssafPeriodicite);
 
   function payer(payeeLe: DateISO, montantPaye: Euros | null): void {
     if (ligne.echeanceId === null) return;
@@ -178,9 +196,7 @@ function Ligne({ ligne }: { readonly ligne: LigneDette }) {
       {/* Le geste n'apparaît que là où il a un sens. Un bouton présent qui ne
           ferait rien apprend à ne plus le regarder. */}
       {ligne.statut === 'a_declarer' && (
-        <button type="button" className={styles.action} onClick={declarer}>
-          Marquer déclaré
-        </button>
+        <Declarer mois={ligne.mois} periodicite={periodicite} />
       )}
 
       {/*

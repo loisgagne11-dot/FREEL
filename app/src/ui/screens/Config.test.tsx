@@ -261,7 +261,7 @@ describe('données', () => {
   }
 
   it('dit combien de faits sont conservés, et où', async () => {
-    await ouvrirDonnees({ periodesDeclarees: [{ mois: mois('2026-06'), declareeLe: null }] });
+    await ouvrirDonnees({ periodesDeclarees: [{ nature: 'urssaf', periode: '2026-06', declareeLe: null }] });
     // Le normaliseur de Testing Library ramène l'espace insécable à une espace.
     expect(screen.getByText(/1 période déclarée/)).toBeTruthy();
     expect(screen.getByText('freel.faits.v1')).toBeTruthy();

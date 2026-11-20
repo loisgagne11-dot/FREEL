@@ -50,23 +50,40 @@ describe('déclaration — datée, d’un geste par période', () => {
   const T2 = ['2026-04', '2026-05', '2026-06'].map(mois);
 
   it('pose la même date sur les mois de la période', () => {
-    declarerPeriode(T2, dateISO('2026-07-28'));
+    declarerPeriode('urssaf', T2, dateISO('2026-07-28'));
     expect(useFaits.getState().faits.periodesDeclarees).toEqual(
-      T2.map((mois) => ({ mois, declareeLe: '2026-07-28' })));
+      T2.map((periode) => ({ nature: 'urssaf', periode, declareeLe: '2026-07-28' })));
   });
 
   it('redéclarer remplace la date au lieu de doubler les mois', () => {
-    declarerPeriode(T2, null);
-    declarerPeriode(T2, dateISO('2026-08-02'));
+    declarerPeriode('urssaf', T2, null);
+    declarerPeriode('urssaf', T2, dateISO('2026-08-02'));
     const d = useFaits.getState().faits.periodesDeclarees;
     expect(d).toHaveLength(3);
     expect(d.every((p) => p.declareeLe === '2026-08-02')).toBe(true);
   });
 
   it('annuler retire la période entière, et elle seule', () => {
-    declarerPeriode([mois('2026-03')], dateISO('2026-04-20'));
-    declarerPeriode(T2, dateISO('2026-07-28'));
-    annulerDeclaration(T2);
-    expect(useFaits.getState().faits.periodesDeclarees.map((p) => p.mois)).toEqual(['2026-03']);
+    declarerPeriode('urssaf', [mois('2026-03')], dateISO('2026-04-20'));
+    declarerPeriode('urssaf', T2, dateISO('2026-07-28'));
+    annulerDeclaration('urssaf', T2);
+    expect(useFaits.getState().faits.periodesDeclarees.map((p) => p.periode)).toEqual(['2026-03']);
+  });
+
+  /**
+   * La DES de mai et la déclaration URSSAF de mai sont deux faits. Annuler
+   * l'une en effaçant l'autre remettrait une DES déposée en retard — 750 €
+   * annoncés —, ou ferait remonter dans le dû des cotisations déclarées.
+   */
+  it('ne touche que la nature visée : annuler l’URSSAF de mai laisse la DES de mai', () => {
+    declarerPeriode('des', [mois('2026-05')], dateISO('2026-06-10'));
+    declarerPeriode('urssaf', T2, dateISO('2026-07-28'));
+    annulerDeclaration('urssaf', T2);
+    expect(useFaits.getState().faits.periodesDeclarees)
+      .toEqual([{ nature: 'des', periode: '2026-05', declareeLe: '2026-06-10' }]);
+    declarerPeriode('urssaf', T2, dateISO('2026-07-28'));
+    annulerDeclaration('des', [mois('2026-05')]);
+    expect(useFaits.getState().faits.periodesDeclarees.map((p) => p.nature))
+      .toEqual(['urssaf', 'urssaf', 'urssaf']);
   });
 });
