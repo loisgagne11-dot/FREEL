@@ -80,8 +80,19 @@
   white-space: nowrap;
 }
 
+/* Au téléphone, le segment défile plutôt que d'élargir la page : sept ans
+   d'activité font huit années, 572 px pour 390 (mesuré par le contrôle
+   responsive). Sa largeur ne peut pas se lire sur l'en-tête commun, dont la
+   colonne d'actions prend la taille de son contenu : on la borne à l'écran. */
+@media (max-width: 760px) {
+  .outils, .segment { max-width: calc(100vw - 32px); }
+}
+
 @media (min-width: 761px) {
   .outils { width: auto; justify-content: flex-end; }
+  /* Au bureau étroit, huit années passent à la ligne plutôt que de pousser
+     la page : l'en-tête n'a pas la largeur d'un écran entier à côté du rail. */
+  .segment { flex-wrap: wrap; border-radius: 24px; overflow-x: visible; }
   .bouton { min-height: 46px; padding: 0 22px; font-size: 14.5px; }
 }
 

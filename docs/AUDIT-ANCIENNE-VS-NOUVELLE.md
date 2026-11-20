@@ -150,7 +150,7 @@ un trou qui ne fait échouer aucun test.
 | Déclaration européenne de services (DES) | 🟢 | **N'existe pas dans l'ancienne.** 750 € d'amende par déclaration manquante, sans seuil |
 | `exportFEC` | 🚫 | Décision D6, hors périmètre. Code conservé sur la branche de sauvegarde |
 | `exportLivreRecettes`, `exportLivreRecettesPDF` | ✅ | Livre imprimable, et **conforme** — mentions obligatoires constatées une par une. **Lot 6 :** en CSV aussi, depuis « Exporter », pour un tableur français (`;`, BOM, virgule décimale), filtré sur l'année d'ENCAISSEMENT ; un nom de client qui commence comme une formule est neutralisé |
-| `computeEcheancesReglementaires`, `getLegalMilestones`, `renderLegalTimeline` | ⚠️ | Les échéances réglementaires alertent (facturation électronique au 01/09/2026) ; pas de frise chronologique |
+| `computeEcheancesReglementaires`, `getLegalMilestones`, `renderLegalTimeline` | 🟢 | Les échéances réglementaires alertent (facturation électronique au 01/09/2026) ; **depuis le lot 53, la frise de l'année les place** sur la ligne Formalités, avec les pièces qui expirent, et le calendrier `.ics` les exporte |
 
 ## 5. Achats, banque, justificatifs
 
@@ -601,3 +601,37 @@ chiffre faux.
 Aucune fonction ne change. L'ancienne version nommait le même montant de six
 façons (constat E3) ; la nouvelle n'en garde qu'une par grandeur, et un
 contrôle de lexique sur le texte rendu empêche les anciens noms de revenir.
+
+## Lot 53, phase 3 (20/11) — l'écran Obligations
+
+« Échéances reçues » et « Périodes URSSAF » sont retirées. Contrôle ligne à
+ligne : chaque fonction des deux cartes est ATTEINTE ailleurs, et son test a
+été repris à travers l'écran (`Obligations.gestes.test.tsx`) avant le retrait.
+
+| Fonction des anciennes cartes | Verdict | Où elle vit maintenant |
+|---|---|---|
+| Saisir une échéance (cinq natures), `getChargesData` & co. | 🟢 | « + Saisir » en tête de « À faire et à venir » : le même formulaire, chargé au clic ; un dossier sans avis offre « Saisir l'avis » / « Saisir le paiement », nature et date posées |
+| Échéance récurrente (`showChargeRecurrente`) | 🟢 | La répétition du formulaire (douze au plus), inchangée ; chaque appel d'une série URSSAF reçoit sa période |
+| Ce qu'elle règle — acompte ou solde (impôt) ; solde de l'avis découpé, avis tardif, aperçu | 🟢 | Le formulaire, inchangé |
+| Période réglée par un appel URSSAF saisi à la main | 🆕 | Champ « Période réglée », proposé d'après la date, « Aucune — une régularisation » possible |
+| Suivi du paiement : date et montant réellement parti, écart conservé, date future refusée | 🟢 | Dossier de l'obligation : « Enregistrer le paiement » (« Pointer le prélèvement » pour l'impôt) sur chaque appel |
+| Repasser à payer (confirmé) | 🟢 | Dossier, sur l'appel payé |
+| Corriger, supprimer (confirmé, conséquence chiffrée) | 🟢 | Dossier › « Corriger » ouvre le formulaire, « Supprimer cette échéance » y reste confirmé |
+| Périodes déclarées, déclarer à une date — le geste unique « Déclarée le … pour … € » | 🟢 | Dossier URSSAF : « Je l'ai déclarée le… », montant prérempli, appel créé |
+| Déclaration à zéro | 🟢 | Dossier URSSAF : « Rien encaissé : à déclarer à zéro, c'est obligatoire » |
+| Période en cours, pas encore déclarable | 🟢 | Dossier URSSAF ; la ligne dit « Déclarable le 1ᵉʳ juillet » dans le mois qui vient |
+| Date de déclaration corrigeable, jamais future, vide = non enregistrée | 🟢 | Dossier URSSAF (et DES, TVA, revenus, 1447-C pour leur propre date) |
+| Annuler la déclaration (confirmé quand l'appel créé part) | 🟢 | Dossier URSSAF ; « Annuler la déclaration » pour les autres natures |
+| Montant à payer « taux manquant » | 🟢 | Dossier URSSAF, et « — » sur la ligne |
+| « À faire avant le … » / « en retard », base encaissée | 🟢 | Pastille de la ligne, détail « … € encaissés », titre de l'écran |
+| Résumé replié (reste à payer, prochaine date) et message du vide | 🟢 | Liste repliée : dû saisi et prochaine limite ; « Aucune échéance saisie : … surestimés » sous la liste |
+| Couleur fixe par type de charge | 🟢 | Sur la ligne de la frise ; la liste suit la maquette, sans filet |
+| Pointer une échéance depuis le Pilote, la Trésorerie | 🟢 | Inchangé ; et le détail du flux, le flux d'un autre mois, la carte CFE et les sujets « à traiter » ouvrent le dossier concerné (`#/obligations/<id>`) |
+
+| Fonction nouvelle | Verdict | Détail |
+|---|---|---|
+| Frise de l'année par nature | 🆕 | URSSAF, TVA (DES comprise), Impôt, CFE, Formalités ; ● ◇ ○ ▲ |
+| Dossier par obligation | 🆕 | URSSAF, TVA, DES, CFE, impôt, déclaration de revenus (5TE / 5HQ), formalité, pièce |
+| Pièces à fournir | 🆕 | Vigilance, RC pro, avis SIRENE, plateforme ; modifiées sur place |
+| Calendrier `.ics` | 🆕 | « Ajouter au calendrier » : un fichier, pas un abonnement |
+| Nom de l'exploitant (jour de la CA3) | 🆕 | Demandé dans le dossier TVA quand il manque — il n'a pas encore de champ dans Réglages |

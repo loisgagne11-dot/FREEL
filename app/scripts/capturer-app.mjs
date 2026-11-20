@@ -159,7 +159,7 @@ const VUES = [
   /* Un dossier ouvert par son adresse, comme le flux du Pilote l'ouvre : au
      bureau, à droite de la liste ; au téléphone (`--largeur=390`), en volet
      — un panneau que la capture de l'écran ne montre jamais. */
-  { hash: '#/obligations/urssaf-2026-T2', nom: 'obligations-dossier', attendre: 'text=Recettes à déclarer' },
+  { hash: '#/obligations/urssaf-2026-T2', nom: 'obligations-dossier', attendre: 'text=Recettes à déclarer', cadreAuTelephone: true },
   { hash: '#/achats', nom: 'achats', handoff: 'achats' },
   { hash: '#/simulateurs', nom: 'simulateurs', handoff: 'outils-impot' },
   { hash: '#/reglages', nom: 'reglages-profil', handoff: 'config-profil' },
@@ -324,7 +324,11 @@ for (const theme of THEMES) {
     }
 
     const suffixe = LARGEUR === 1440 ? '' : `-${LARGEUR}`;
-    await page.screenshot({ path: join(SORTIE, `${theme}-${vue.nom}${suffixe}.png`), fullPage: true });
+    /* Un volet du téléphone est fixé à l'écran : photographié en pleine page,
+       il flotte au milieu d'une image de trois écrans de haut. On prend alors
+       ce que l'œil voit — l'écran, le volet ouvert dessus. */
+    const pleinePage = !(vue.cadreAuTelephone === true && LARGEUR < 761);
+    await page.screenshot({ path: join(SORTIE, `${theme}-${vue.nom}${suffixe}.png`), fullPage: pleinePage });
     capturees += 1;
     if (erreurs.length > 0) {
       manquees.push(`${theme}-${vue.nom} capturé MAIS erreur JS : ${erreurs[0]}`);

@@ -123,7 +123,7 @@ pour laquelle ce document a été ouvert.
 | V3 | Répartition du solde | ✅ donut | ✅ donut | ✅ **donut livré** (lot B) — la barre segmentée disait le partage, pas la part&nbsp;; le donut porte le disponible en son centre, la phrase explicative à côté, et chaque part son montant en clair |
 | V4 | Provisions **par catégorie** | ✅ | ✅ | ✅ **ajouté depuis** |
 | V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis** |
-| V6 | Frise de l'échéancier | ✅ | ✅ | ✅ **frise livrée** (lot B) — chaque obligation à sa date réelle sur l'année, repère « auj. ». Elle ne remplace pas la liste, elle la précède&nbsp;: la frise répond à « qu'est-ce qui vient », la liste à « qu'est-ce que j'en fais » |
+| V6 | Frise de l'échéancier | ✅ | ✅ | ✅ **frise livrée** (lot B), **refaite au lot 53** d'après la maquette Obligations — une ligne par nature présente (URSSAF, TVA avec la DES, Impôt, CFE, Formalités), un signe par mois (● fait, ◇ à faire, ○ à venir, ▲ en retard ; le plus pressant quand plusieurs tombent le même mois, tous nommés dans l'infobulle), bande du mois courant, trait plein jusqu'au dernier fait, une phrase pour qui ne la voit pas. Elle précède la liste, qui porte les montants et les dates en clair |
 | V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **graphe combiné, sur le SOLDE réel** (lot B, refait lot L1) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Couvre janvier à décembre de l'année CHOISIE (plus de « douze mois glissants »)&nbsp;: les mois clos tracent le solde réel en trait plein (un fait, dérivé des faits jusqu'à leur fin de mois), les mois à venir le disponible projeté en pointillés, annoncés « prévu » — jamais un solde deviné, pour la raison que l'infobulle détaille |
 | V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
 | V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau. **Lot R** : un mois à venir où rien n'est attendu s'ABSTIENT désormais au lieu d'afficher un négatif — voir §8 |
@@ -758,7 +758,7 @@ Aucun nombre lu ne change.
 | Nombre lu | Où | Avant | Après |
 |---|---|---|---|
 | Encaissé, impôt du mois, acomptes prélevés, à garder fin de mois — de janvier au mois courant | Argent › Provisions, pli « L'impôt AAAA, mois par mois » | — (le total seul) | `repartitionMensuelleImpot` : la règle du total (impôt de l'année projetée × part encaissée), cumul arrondi une fois ; le dernier mois = provision du jour + acomptes appelés non prélevés, tenu par un test |
-| Montant et date de chaque prélèvement du solde estimé de l'an passé | Argent › Échéancier, frise | — | Le solde estimé (`soldeImpotPrecedentDe`) découpé par `prelevementsDuSolde` ; la somme retombe au centime sur l'estimation, tenu par un test. Affichage seul : la provision le compte déjà, une fois |
+| Montant et date de chaque prélèvement du solde estimé de l'an passé | Argent › Échéancier, frise — depuis le lot 53, Obligations : une ligne « ≈ » par prélèvement, et la ligne Impôt de la frise | — | Le solde estimé (`soldeImpotPrecedentDe`) découpé par `prelevementsDuSolde` ; la somme retombe au centime sur l'estimation, tenu par un test. Affichage seul : la provision le compte déjà, une fois |
 | Nombre, dates et montants des prélèvements d'un avis | Saisir une échéance › Impôt › solde, aperçu | — | `prelevementsDuSolde` : 1 (≤ 300 €), 4 ou 2 (avis tardif) ; parts égales au centime, le reste au dernier. Dates 2026 relevées (`publie`) ; autre année : le 25 ou le jour ouvré suivant (`hypothese`, dit à l'écran) |
 | Acomptes retranchés de la provision de l'année | Argent › note d'impôt | Inchangé (par exercice depuis le lot L4) | Inchangé — désormais traversé par le test du cas « première année puis automne suivant » |
 
@@ -771,7 +771,7 @@ Aucun nombre lu ne change.
 | Provenance du solde (« rapproché » / « dérivé ») | Pilote, Argent | Une ligne écartée restait « à traiter » ou faussement pointée | Ignorée, elle est classée : elle ne retient plus le solde dans l'état « dérivé » |
 | Opérations, rapprochées, à trancher, sans candidat | Achats › Relevé, tuiles | — | Inchangées dans leur forme ; une ignorée sort de « à trancher » et de « sans candidat ». Le résumé du relevé ajoute « N ignorée(s) » |
 | « À rapprocher » | Achats, compteur | Comptait une ligne qu'on voulait seulement écarter | Ne la compte plus (`estATraiter`, source unique) |
-| Date de déclaration d'une période | Argent › Échéancier, Périodes URSSAF | « Déclarée », sans date : une déclaration en retard se lisait comme une à l'heure | « Déclarée le … » (champ de date, vide si inconnue — toute période cochée avant le schéma 21) puis « payée le … » / « à payer avant le … » / « à payer depuis le … » lus sur l'appel de la période. La date ne s'invente jamais |
+| Date de déclaration d'une période | Argent › Échéancier, Périodes URSSAF — depuis le lot 53, le dossier URSSAF d'Obligations, avec l'avance sur la limite | « Déclarée », sans date : une déclaration en retard se lisait comme une à l'heure | « Déclarée le … » (champ de date, vide si inconnue — toute période cochée avant le schéma 21) puis « payée le … » / « à payer avant le … » / « à payer depuis le … » lus sur l'appel de la période. La date ne s'invente jamais |
 
 Le retard lui-même (« deux jours après la limite ») n'est pas encore dit : la
 maquette Obligations le montre, il revient au lot 53.
@@ -861,7 +861,7 @@ Aucun calcul ne change ; des nombres déménagent, et un s'ajoute.
 |---|---|---|
 | CA facturé, encaissé, à encaisser, résultat projeté ; graphe facturé / encaissé ; composition du mois ; dépendance client | Argent › Performance | Activité › Analyse, pour l'année choisie dans l'en-tête de l'onglet (tenu par un essai : l'année choisie, pas celle de l'horloge) |
 | « Tu peux te verser », part gardée, capacité de versement par mois | Argent › Performance | Trésorerie |
-| Frise de l'échéancier, reste à payer, périodes URSSAF | Argent › Échéancier | Obligations |
+| Frise de l'échéancier, reste à payer, périodes URSSAF | Argent › Échéancier | Obligations (refaite au lot 53 : frise, liste unique, dossiers) |
 | Opérations du relevé, opérations à rapprocher | Achats › Relevé | Trésorerie › Banque : « N opérations au relevé, toutes traitées » ou « · N à rapprocher », compté à l'affichage |
 | Compteurs du rail | Argent, Activité | Factures (factures en retard, TVA à régulariser), Obligations (échéances, périodes à déclarer, livre incomplet), Trésorerie (seuils), Réglages (barème à vérifier) |
 
@@ -894,4 +894,31 @@ s'ajoutent. Chacun est tenu par un test nommé, prouvé par mutation.
 
 **Pas encore à l'écran** (phase 3) : l'avance sur la limite, les cases 5TE /
 5HQ, les états des pièces, le calendrier `.ics` — calculés et testés, sans
-lecteur visible.
+lecteur visible. *Tous à l'écran depuis la phase 3, ci-dessous.*
+
+## Lot 53, phase 3 (20/11) — l'écran Obligations
+
+L'écran est refait d'après les deux maquettes validées. « Échéances reçues »
+et « Périodes URSSAF » partent ; chacun de leurs nombres se lit ailleurs, et
+le dit ci-dessous. Chaque ligne est tenue par un test nommé ; celles marquées
+† ont été éprouvées par mutation.
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Titre « N choses à faire d'ici … » † | Obligations, en-tête | « Tes obligations », sans nombre | `nombreAFaire` — la fonction de la pastille du rail, test d'accord rendu côte à côte ; daté par la limite la plus lointaine de ce qui est à faire (« fin juillet » au dernier jour du mois), un retard à la place de la date, « Rien à faire avant le … » sur la prochaine limite |
+| Années du segment | Obligations, en-tête | Années des faits (`anneesDisponibles`, celles d'Argent) | Années qui portent une obligation jusqu'à l'année courante, l'année courante, l'année de la prochaine obligation à venir, l'année affichée |
+| Signe d'un mois sur la frise | Obligations › L'année | Un jalon par échéance saisie, nom, date et montant écrits dessous | Un signe par nature et par mois ; « déclarée, à payer » est ◇ ; un prélèvement non pointé ◇ (à pointer), jamais ▲ |
+| Montant d'une ligne † (fusion) | Obligations › À faire et à venir | Deux cartes : l'appel saisi d'un côté, la période de l'autre | Une ligne par obligation, prévue et saisie réunies (une CFE et son avis : une ligne) ; « ≈ » quand estimé, « — » quand rien n'est dit ou qu'un taux manque |
+| « Déclarable le 1ᵉʳ juillet » | Obligations, pastille | « Période en cours, pas encore déclarable » | L'ouverture de l'étape, dans le mois qui vient ; « À venir » au-delà |
+| Avance d'une déclaration † | Obligations, faites dépliées et dossier | Absente | « déclarée le 28 avril, deux jours avant la limite », contre la limite reportée ; rien quand la date manque |
+| Reste à payer, prochaine limite | Obligations, liste repliée | « Échéances reçues » repliée : appels non payés, prochaine date | `duSaisi` (au centime le volet des appels) et la prochaine limite de la liste |
+| Recettes à déclarer, cotisations, VL, CFP | Dossier URSSAF | Montant total seul (« À payer … ») | Ligne par ligne, taux effectif, « avec l'ACRE » ; `ventilationDeclaration`, dont `montantDeclaration` est le total ; « taux manquant » plutôt qu'un montant |
+| TVA collectée, déductible, autoliquidée, à payer | Dossier TVA (CA3, CA12) | Registre de TVA seulement, par trimestre | Sur la période de la déclaration ; « date calculée » et sa règle sur une CA3 |
+| Cases 5TE / 5HQ et leur montant | Dossier déclaration de revenus | Absentes | Montant brut (hors taxes pour un redevable), rien de déduit |
+| État d'une pièce † | Obligations › Pièces à fournir | Absent | Vigilance « obtenue le … » et à jour six mois (provisoire dite), RC pro « valable jusqu'au … », SIRENE « téléchargé le … » et « Pas de validité » — jamais « à jour » ; une pièce absente est « à obtenir », pas en retard |
+| Calendrier `.ics` | Obligations, « Ajouter au calendrier » | Absent | Téléchargé au clic ; « un fichier à importer dans ton agenda ; sans serveur, il ne se met pas à jour seul » dit avant et après |
+
+**Retiré, avec sa raison** : le repère « auj. » en pastille de l'ancienne
+frise — la maquette met le mois courant en bande ; le nom, la date et le
+montant écrits sous chaque jalon — la liste juste en dessous les porte, et
+la frise ne pose plus qu'un signe par mois.

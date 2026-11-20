@@ -296,6 +296,14 @@ describe('le dossier', () => {
     expect(await titreDuDossier()).toBe('CFE 2026');
   });
 
+  // Une adresse vient de n'importe où : mal formée, elle ne casse rien, et
+  // l'écran s'ouvre sur son dossier par défaut.
+  it('ignore une adresse mal formée', async () => {
+    window.location.hash = '#/obligations/%E0%A4%A';
+    poser(essai());
+    expect(await titreDuDossier()).toBe('Facturation électronique : réception obligatoire');
+  });
+
   it('change d’année pour montrer le dossier demandé', async () => {
     const onAnnee = vi.fn();
     window.location.hash = '#/obligations/urssaf-2025-T3';
