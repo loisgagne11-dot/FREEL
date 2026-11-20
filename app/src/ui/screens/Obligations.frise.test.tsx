@@ -101,3 +101,25 @@ describe('la frise de l’année', () => {
     expect(screen.getByText('Aucune obligation en 2024.')).toBeTruthy();
   });
 });
+
+/**
+ * UNE CHARGE GARDE SA COULEUR PARTOUT — ICI, SUR SA LIGNE DE FRISE.
+ *
+ * Le mécanisme venait du handoff ; la carte « Échéances reçues » le portait
+ * par un filet, et elle est partie (lot 53). Les jetons `--c-urssaf`,
+ * `--c-tva`, `--c-impot`, `--c-cfe` ont longtemps existé sans être câblés
+ * nulle part : jsdom n'applique pas les modules CSS, on lit donc la feuille —
+ * un plancher, mais qui échoue si quelqu'un décâble.
+ */
+describe('câblage des jetons de couleur de la frise', () => {
+  it('lie chaque ligne à son jeton de charge', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const feuille = await readFile('src/ui/screens/Obligations.module.css', 'utf8');
+    for (const [ligne, jeton] of [['urssaf', '--c-urssaf'], ['tva', '--c-tva'], ['impot', '--c-impot'], ['cfe', '--c-cfe']]) {
+      expect(new RegExp(`\\.${ligne} \\{ --teinte: var\\(${jeton}\\); \\}`, 'u').test(feuille), `${ligne} → ${jeton}`).toBe(true);
+    }
+    // Le signe plein et le trait tenu prennent la teinte de leur ligne.
+    expect(/\.plein \{ fill: var\(--teinte\)/u.test(feuille)).toBe(true);
+    expect(/\.tenu \{ stroke: var\(--teinte\)/u.test(feuille)).toBe(true);
+  });
+});
