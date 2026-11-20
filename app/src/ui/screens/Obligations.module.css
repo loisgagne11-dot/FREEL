@@ -181,3 +181,163 @@
   .legendeHaut { display: flex; margin: 0; }
   .legendeBas { display: none; }
 }
+
+/* ── « À faire et à venir » ─────────────────────────────────────────────── */
+
+/* La carte pliable prend les mesures de `.e-card` ; le pliage, le résumé et
+   leur clé restent ceux du composant commun. */
+.pliable {
+  background: linear-gradient(180deg, var(--card-a), var(--card-b));
+  box-shadow: var(--sh-2);
+  padding: 18px;
+  margin-bottom: 0;
+}
+
+.pliable > header > button[aria-expanded] {
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: -8px;
+}
+
+/* `.e-more` : un lien vert, mais une cible de 44 px. */
+.saisir {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saisir:focus-visible, .replie:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.liste { list-style: none; margin: 8px 0 0; padding: 0; }
+
+.liste li + li .ligne { border-top: 1px solid var(--line); }
+
+/* `.e-li` : une ligne entière est la porte de son dossier. */
+.ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ligne:hover .intitule { color: var(--green); }
+.ligne:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 10px; }
+
+/* Le dossier ouvert à droite, au bureau : sa ligne le dit. */
+.ligneOuverte .intitule { color: var(--green); }
+
+/* `.e-date` : 62 × 50, le jour en Mono, le mois en capitales. */
+.date {
+  flex: 0 0 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+  border-radius: 14px;
+  background: var(--tint-2);
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.date sup { font-size: 10px; }
+
+.date small {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.dateCeMois { background: var(--amber-soft); color: var(--chip-warn); }
+.dateCeMois small { color: var(--chip-warn); }
+
+.intitule {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+/* Le détail tient en deux lignes : le reste est dans le dossier. */
+.intitule small {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 2px;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.droite {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+}
+
+.montant { font-family: var(--mono); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Au téléphone, une ligne sans montant ne montre que sa pastille (maquette). */
+.sansMontant { display: none; }
+.pastilleLongue { display: none; }
+
+/* `.ob-replie` : « Voir les 4 faites cette année ». */
+.replie {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.alerte {
+  margin: 12px 0 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--amber-soft);
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.alerte strong { color: var(--chip-warn); }
+
+@media (min-width: 761px) {
+  .pliable { padding: 22px 24px; }
+  .sansMontant { display: inline; }
+  .pastilleLongue { display: inline-flex; }
+  .pastilleCourte { display: none; }
+}

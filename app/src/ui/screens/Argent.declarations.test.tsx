@@ -48,7 +48,7 @@ const rendre = async (): Promise<void> => {
    * introuvable » — et il a coûté un aller-retour à travers trois lots avant
    * qu'on remonte à la vraie cause. On attend donc explicitement sa carte.
    */
-  await screen.findByRole('heading', { name: /Échéancier/ });
+  await screen.findByText('Échéances reçues');
 };
 
 /**

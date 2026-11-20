@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Client, type Faits, type Recette, faitsVides } from '../../state/schema';
@@ -134,7 +134,9 @@ describe('retards', () => {
     semer({ clients: [client()], recettes: [recette()] });
     await ouvrirDes();
     // Émise en juillet, limite au 12 août, on est le 5 : rien n'est en retard.
-    expect(screen.queryByText(/en retard/)).toBeNull();
+    // Dans le panneau : la légende de la frise, derrière, dit « ▲ en retard »
+    // — un signe à reconnaître, pas un retard annoncé.
+    expect(within(screen.getByRole('dialog')).queryByText(/en retard/)).toBeNull();
   });
 });
 

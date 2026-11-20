@@ -1,17 +1,26 @@
 import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
 import type { DateISO } from '../../domain/types';
 import { decaler } from '../../domain/calculs/calendrier';
+import { type Obligation, duSaisi } from '../../domain/calculs/obligations';
+import type { Echeance } from '../../domain/calculs/provisions';
 import { useFaits } from '../../state/store';
 import { dateDuJour } from '../../state/selecteurs';
 import { obligationsEntre } from '../../state/selecteurs.obligations';
 import { nombreAFaire } from '../../state/selecteurs.aTraiter';
 import { composantALaDemande } from '../composantALaDemande';
+import { CartePliable } from '../components/CartePliable';
 import { Greet } from '../components/Greet';
+import { Montant } from '../components/Montant';
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toasts';
 import { useRoute } from '../useRoute';
-import { anneesDuSegment, dateDe, titreObligations } from './Obligations.lecture';
+import { eur } from '../format';
+import {
+  anneesDuSegment, dateDe, etapeEnCours, jourMois, listeDeLAnnee, titreObligations
+} from './Obligations.lecture';
 import { FriseObligations, LegendeFrise } from './Obligations.frise';
+import { ListeObligations } from './Obligations.liste';
+import type { ChampsEcheance } from './Obligations.saisie';
 import styles from './Argent.module.css';
 import ob from './Obligations.module.css';
 
@@ -35,6 +44,46 @@ const DeclarationServices = lazy(() => import('./Argent.des')
   .then((m) => ({ default: m.DeclarationServices })));
 const DossierTvaPanneau = lazy(() => import('./Argent.tva')
   .then((m) => ({ default: m.DossierTvaPanneau })));
+
+/**
+ * La saisie d'une échéance, au clic : huit champs, un aperçu du solde de
+ * l'avis, la répétition — rien que l'écran n'ait à porter pour qu'on le lise.
+ */
+const PanneauSaisie = lazy(() => import('./Obligations.saisie')
+  .then((m) => ({ default: m.PanneauSaisie })));
+
+/** Ce que le panneau de saisie reçoit : l'échéance à corriger, ou ce qu'un dossier sait déjà. */
+type Saisie = { readonly initiale: Echeance | null; readonly prerempli?: Partial<ChampsEcheance> };
+
+/**
+ * Le pli de la liste vivait sous la clé de la Trésorerie, d'où venait
+ * l'échéancier (`freel.pli.argent`, « echeancier ») : il passe sous celle de
+ * l'écran qui le porte, une fois, sans perdre l'état choisi — une liste
+ * repliée exprès ne se rouvre pas d'elle-même au changement d'écran.
+ */
+let pliRepris = false;
+export const reprendreLePli = Object.assign((): void => {
+  if (pliRepris) return;
+  pliRepris = true;
+  try {
+    const ancien: unknown = JSON.parse(window.localStorage.getItem('freel.pli.argent') ?? 'null');
+    if (typeof ancien !== 'object' || ancien === null) return;
+    const valeur = (ancien as Record<string, unknown>)['echeancier'];
+    if (typeof valeur !== 'boolean') return;
+    const brut: unknown = JSON.parse(window.localStorage.getItem('freel.pli.obligations') ?? '{}');
+    const nouveau = typeof brut === 'object' && brut !== null ? brut as Record<string, unknown> : {};
+    if (typeof nouveau['echeancier'] !== 'boolean') {
+      window.localStorage.setItem('freel.pli.obligations', JSON.stringify({ ...nouveau, echeancier: valeur }));
+    }
+    const { echeancier: _, ...reste } = ancien as Record<string, unknown>;
+    window.localStorage.setItem('freel.pli.argent', JSON.stringify(reste));
+  } catch {
+    // Stockage indisponible : la liste s'ouvre dépliée, rien n'est perdu.
+  }
+}, {
+  /** Pour les tests : la reprise se fait une fois par chargement de page. */
+  reinitialiser: (): void => { pliRepris = false; }
+});
 
 /** Le registre ouvert par-dessus l'écran, ou aucun. */
 type Registre = 'livre' | 'des' | 'tva';
@@ -117,6 +166,10 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
     () => toutes.filter((o) => dateDe(o).startsWith(String(anneeVue))),
     [toutes, anneeVue]
   );
+  const liste = useMemo(() => listeDeLAnnee(toutes, anneeVue, aujourdhui), [toutes, anneeVue, aujourdhui]);
+  const [choisie, setChoisie] = useState<string | null>(null);
+  const [saisie, setSaisie] = useState<Saisie | null>(null);
+  reprendreLePli();
 
   /* Le calendrier se fabrique au clic : son générateur et le téléchargement
      n'ont rien à faire dans le paquet de l'écran, qu'on ouvre pour lire. */
@@ -183,6 +236,35 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
           <FriseObligations obligations={deLAnnee} annee={anneeVue} aujourdhui={aujourdhui} />
         </section>
 
+        <CartePliable
+          id="echeancier"
+          ecran="obligations"
+          classe={ob.pliable}
+          titre="À faire et à venir"
+          resume={<ResumeReplie toutes={toutes} aFaire={liste.aFaire} />}
+          actions={(
+            <button type="button" className={ob.saisir} onClick={() => setSaisie({ initiale: null })}>
+              + Saisir
+            </button>
+          )}
+        >
+          <ListeObligations
+            aFaire={liste.aFaire}
+            faites={liste.faites}
+            aujourdhui={aujourdhui}
+            ouverte={choisie}
+            onOuvrir={(o) => setChoisie(o.id)}
+          />
+          {/* Une liste sans échéance saisie n'est pas une bonne nouvelle : le
+              dû ne connaît alors que des estimations. */}
+          {faits.echeances.length === 0 && (
+            <p className={ob.alerte}>
+              Aucune échéance saisie&nbsp;: tant qu’il n’y en a pas, ton disponible et ce qui est à te
+              verser sont <strong>surestimés</strong>.
+            </p>
+          )}
+        </CartePliable>
+
         <div className={`${styles.sections} ${styles.obligations}`}>
           <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
             <Echeancier />
@@ -206,6 +288,23 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
       </div>
 
       <Sheet
+        ouvert={saisie !== null}
+        titre={saisie?.initiale === null || saisie === null ? 'Saisir une échéance' : 'Corriger l’échéance'}
+        onFermer={() => setSaisie(null)}
+      >
+        {saisie !== null && (
+          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+            <PanneauSaisie
+              initiale={saisie.initiale}
+              prerempli={saisie.prerempli}
+              aujourdhui={aujourdhui}
+              onFermer={() => setSaisie(null)}
+            />
+          </Suspense>
+        )}
+      </Sheet>
+
+      <Sheet
         ouvert={registre !== null}
         titre={registre === null ? '' : TITRES[registre]}
         onFermer={() => setRegistre(null)}
@@ -218,6 +317,26 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
           </Suspense>
         )}
       </Sheet>
+    </>
+  );
+}
+
+/**
+ * Ce que la liste dit une fois repliée : ce qui reste à payer et la
+ * prochaine limite — les deux questions qu'on se pose sans la déplier. Le
+ * reste à payer est le dû saisi (`duSaisi`), au centime le volet des appels :
+ * une obligation prévue n'y entre pas, la provision la porte déjà.
+ */
+function ResumeReplie({ toutes, aFaire }: { readonly toutes: readonly Obligation[]; readonly aFaire: readonly Obligation[] }) {
+  const du = duSaisi(toutes);
+  const prochaine = aFaire.map(etapeEnCours).find((e) => e !== null && e.limite.statut !== 'refuse');
+  if (du === 0 && prochaine === undefined) return <>Rien à faire ni à venir.</>;
+  return (
+    <>
+      {du > 0 && <><Montant>{eur(du)}</Montant> à payer</>}
+      {du > 0 && prochaine !== undefined && ' · '}
+      {prochaine !== undefined && prochaine !== null && prochaine.limite.statut !== 'refuse'
+        && <>prochaine limite le {jourMois(prochaine.limite.valeur)}</>}
     </>
   );
 }

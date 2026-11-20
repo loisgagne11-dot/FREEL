@@ -155,7 +155,7 @@ const VUES = [
   { hash: '#/tresorerie/releve', nom: 'tresorerie-releve', attendre: '[role="dialog"] h2:has-text("Importer un relevé")' },
   /* Obligations n'a pas d'homonyme au handoff : sa référence est la maquette
      `docs/design/direction/obligations.html`. */
-  { hash: '#/obligations', nom: 'obligations', attendre: 'text=Échéancier' },
+  { hash: '#/obligations', nom: 'obligations', attendre: 'text=À faire et à venir' },
   { hash: '#/achats', nom: 'achats', handoff: 'achats' },
   { hash: '#/simulateurs', nom: 'simulateurs', handoff: 'outils-impot' },
   { hash: '#/reglages', nom: 'reglages-profil', handoff: 'config-profil' },

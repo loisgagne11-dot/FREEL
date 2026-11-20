@@ -1,0 +1,127 @@
+/* Les gestes d'Obligations : la saisie d'une échéance, les dossiers, une
+   pièce. Chargés au clic, avec leurs formulaires. Aucune couleur en dur ;
+   toute cible fait 44 px au moins. */
+
+.formulaire { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.champ { display: flex; flex-direction: column; gap: 6px; margin: 0; min-width: 0; }
+
+/* `.ob-champ` de la maquette téléphone : l'étiquette au-dessus, en clair. */
+.libelle { font-size: 13px; font-weight: 600; color: var(--muted); }
+
+.saisie {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-2);
+  background: var(--card-a);
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.saisie:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+.case { display: flex; align-items: flex-start; gap: 9px; margin: 0; }
+
+/* 20 px de case dans une zone de 44 : la cible reste au doigt sans qu'une
+   case géante déséquilibre la ligne. */
+.case input {
+  width: 20px;
+  height: 20px;
+  margin: 12px 0;
+  flex: 0 0 auto;
+  accent-color: var(--green);
+}
+
+.case label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  font-size: 13.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.aide { font-size: 12.5px; color: var(--muted); line-height: 1.45; font-weight: 400; margin: 0; }
+
+.apercu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--tint-2);
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.apercuTitre { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+
+.apercuListe { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+
+.apercuListe li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.refus {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--red-line);
+  background: var(--red-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* `.ob-bouton` : pilule de 44 px ; la pleine est réservée au geste du dossier. */
+.bouton,
+.actionPrincipale,
+.supprimer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--card-a);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.actionPrincipale { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+.bouton:hover, .supprimer:hover { border-color: var(--green); }
+.actionPrincipale:hover { filter: brightness(1.05); }
+.supprimer { color: var(--muted); border-color: var(--line); }
+.supprimer:hover { border-color: var(--red-line); color: var(--text); }
+
+.bouton:focus-visible,
+.actionPrincipale:focus-visible,
+.supprimer:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* L'écart au montant appelé : une information, celle qui explique un solde
+   qui ne tombe pas juste — pas une erreur. */
+.ecart { color: var(--amber); }
+
+@media print {
+  .formulaire, .actions { display: none !important; }
+}
