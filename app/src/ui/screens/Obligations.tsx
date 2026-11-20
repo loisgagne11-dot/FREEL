@@ -10,7 +10,8 @@ import { Greet } from '../components/Greet';
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toasts';
 import { useRoute } from '../useRoute';
-import { anneesDuSegment, titreObligations } from './Obligations.lecture';
+import { anneesDuSegment, dateDe, titreObligations } from './Obligations.lecture';
+import { FriseObligations, LegendeFrise } from './Obligations.frise';
 import styles from './Argent.module.css';
 import ob from './Obligations.module.css';
 
@@ -112,6 +113,10 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
   );
   const nombre = useMemo(() => nombreAFaire(faits, 'obligations'), [faits]);
   const annees = anneesDuSegment(toutes, aujourdhui, anneeVue);
+  const deLAnnee = useMemo(
+    () => toutes.filter((o) => dateDe(o).startsWith(String(anneeVue))),
+    [toutes, anneeVue]
+  );
 
   /* Le calendrier se fabrique au clic : son générateur et le téléchargement
      n'ont rien à faire dans le paquet de l'écran, qu'on ouvre pour lire. */
@@ -169,10 +174,20 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
         )}
       />
 
-      <div className={`${styles.sections} ${styles.obligations}`}>
-        <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-          <Echeancier annee={anneeVue} />
-        </Suspense>
+      <div className={ob.page}>
+        <section className={ob.carte} aria-labelledby={`${idGroupe}-annee`}>
+          <div className={ob.entete}>
+            <h2 id={`${idGroupe}-annee`} className={ob.titreCarte}>L’année {anneeVue}</h2>
+            <LegendeFrise classe={ob.legendeHaut} />
+          </div>
+          <FriseObligations obligations={deLAnnee} annee={anneeVue} aujourdhui={aujourdhui} />
+        </section>
+
+        <div className={`${styles.sections} ${styles.obligations}`}>
+          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+            <Echeancier />
+          </Suspense>
+        </div>
       </div>
 
       {/* Les registres : atteints d'ici, ouverts par-dessus. Un panneau plutôt

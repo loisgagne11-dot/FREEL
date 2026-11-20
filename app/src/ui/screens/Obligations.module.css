@@ -84,3 +84,100 @@
   .outils { width: auto; justify-content: flex-end; }
   .bouton { min-height: 46px; padding: 0 22px; font-size: 14.5px; }
 }
+
+/* ── Cartes ─────────────────────────────────────────────────────────────── */
+
+/* `.e-card` : dégradé, filet, ombre ; 18 px au téléphone, 22 × 24 au bureau. */
+.carte {
+  background: linear-gradient(180deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--sh-2);
+  padding: 18px;
+  min-width: 0;
+}
+
+/* `.e-h` : titre à gauche, ce qui le précise à droite. */
+.entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-height: 40px;
+  margin-bottom: 6px;
+}
+
+.titreCarte {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.indice { font-size: 13.5px; color: var(--muted); }
+.vide { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* ── La frise ───────────────────────────────────────────────────────────── */
+
+.frise { display: block; max-width: 100%; height: auto; }
+
+.bande { fill: var(--tint-2); }
+
+.mois {
+  font-family: var(--mono);
+  fill: var(--muted-2);
+  text-anchor: middle;
+}
+
+.moisCourant { fill: var(--text); font-weight: 600; }
+
+/* La couleur d'une ligne : un jeton de charge, posé une fois sur le groupe. */
+.urssaf { --teinte: var(--c-urssaf); }
+.tva { --teinte: var(--c-tva); }
+.impot { --teinte: var(--c-impot); }
+.cfe { --teinte: var(--c-cfe); }
+.formalite { --teinte: var(--muted); }
+
+.teinte { fill: var(--teinte); }
+.nomLigne { font-weight: 500; fill: var(--text); }
+.axe { stroke: var(--line-2); stroke-width: 1; }
+.tenu { stroke: var(--teinte); stroke-width: 2.5; stroke-linecap: round; }
+
+/* ● fait : plein, cerné de la carte pour se détacher du trait. */
+.plein { fill: var(--teinte); stroke: var(--card-a); stroke-width: 2; }
+/* ○ à venir : creux, de la couleur de la ligne. */
+.creux { fill: var(--card-a); stroke: var(--teinte); stroke-width: 2.5; }
+/* ◇ à faire : losange ambre, quelle que soit la ligne — c'est l'état qui parle. */
+.losange { fill: var(--amber-soft); stroke: var(--amber); stroke-width: 2.5; }
+/* ▲ en retard : rouge, et une forme qu'aucun autre état ne prend. */
+.triangle { fill: var(--red-soft); stroke: var(--red); stroke-width: 2.5; stroke-linejoin: round; }
+/* Non suivi : un rond gris — ni fait, ni en retard ; on ne sait pas. */
+.inconnu { fill: var(--card-a); stroke: var(--line-2); stroke-width: 2.5; }
+
+.legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.legendeHaut { display: none; }
+
+@media (min-width: 761px) {
+  .carte { padding: 22px 24px; }
+  .entete { margin-bottom: 12px; }
+  .page { gap: 20px; }
+  .legendeHaut { display: flex; margin: 0; }
+  .legendeBas { display: none; }
+}

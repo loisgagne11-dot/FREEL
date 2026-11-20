@@ -4,7 +4,6 @@ import { annulerDeclarationUrssaf, declarerPeriode } from '../../state/ecritures
 import type { DateISO, Euros, Mois, Resolution } from '../../domain/types';
 import { estPayee } from '../../domain/calculs/provisions';
 import { dateDuJour, recettesEncaissees } from '../../state/selecteurs';
-import { soldeImpotPrevuDe } from '../../state/selecteurs.impotCalendrier';
 import { montantDeclaration } from '../../state/selecteurs.aTraiter';
 import {
   type PeriodeADeclarer, appelsDeLaPeriode, dateDeDeclaration, idAppelDeDeclaration, periodesADeclarer
@@ -13,7 +12,6 @@ import { moisDeclares } from '../../domain/calculs/declarations.declarees';
 import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
 import { DeclarationUrssaf } from '../components/DeclarationUrssaf';
 import { Echeances } from '../components/Echeances';
-import { FriseEcheances } from '../components/FriseEcheances';
 import { Info } from '../components/Info';
 import { Montant } from '../components/Montant';
 import { Statut } from '../components/Statut';
@@ -49,41 +47,11 @@ import styles from './Argent.module.css';
  * « qu'est-ce que je dois déclarer » — et leur case à cocher fait basculer une
  * dette d'un volet de provision à l'autre, ce qui ne se lit nulle part ailleurs.
  */
-export function Echeancier({ annee }: { readonly annee: number }) {
-  const faits = useFaits((e) => e.faits);
+export function Echeancier() {
   const idGroupe = useId();
-  const prevus = useMemo(() => soldeImpotPrevuDe(faits), [faits]);
 
   return (
     <>
-    {/* La frise PRÉCÈDE la liste, elle ne la remplace pas. Elle répond à
-        « qu'est-ce qui vient cette année » ; la liste, à « qu'est-ce que
-        j'en fais » — et elle porte les seuls boutons de l'écran. */}
-    <section className={styles.carte} aria-labelledby="echeancier">
-      <h2 id="echeancier" className={styles.titreCarte}>
-        Échéancier &amp; obligations {annee}
-        <Info libelle="Ce que la frise montre de plus que la liste">
-          Une liste ne montre pas les <em>intervalles</em>. Deux échéances à
-          trois semaines l’une de l’autre en octobre sont un problème de
-          trésorerie&nbsp;; les mêmes réparties sur six mois n’en sont pas un,
-          et une liste les présente identiquement. La frise place chaque
-          obligation à sa date&nbsp;: on voit les grappes, les trous, et où
-          l’on en est.
-        </Info>
-      </h2>
-      <FriseEcheances
-        echeances={faits.echeances}
-        prevus={prevus}
-        annee={annee}
-        aujourdhui={dateDuJour()}
-        /* En euros pleins, et non abrégés : « 2 k€ » pour 1 980 € perd le
-           seul chiffre qui compte sur une somme qu'on va se faire prélever
-           à l'euro près. Un jalon a la place d'une ligne, contrairement aux
-           douze colonnes du graphe. */
-        formater={eur}
-      />
-    </section>
-
     <Echeances />
 
     <CarteDeclarations idGroupe={idGroupe} />
