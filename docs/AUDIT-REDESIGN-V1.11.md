@@ -1413,6 +1413,9 @@ désormais l'écran). Écarts assumés, avec leur motif :
   et sur l'impôt — des limites qui n'étaient pas passées, ou une déclaration
   que la démonstration n'avait pas faite. Elle montre maintenant ce que dessine
   la maquette : la TVA de mai ◇ à déclarer, la déclaration de revenus ● faite ;
+- **Pilote, au téléphone, corrigé à la relecture** : l'action d'une décision
+  passe sous son texte sous 480 px — « Renseigner ma plateforme », à côté,
+  réduisait le corps à un mot par ligne. Le Pilote reste à refaire au lot 52 ;
 - au téléphone, ouvrir le volet par son adresse pose le focus sur sa poignée,
   dont l'anneau se voit sur la capture : c'est le `Sheet` commun, qui focalise
   son premier élément.

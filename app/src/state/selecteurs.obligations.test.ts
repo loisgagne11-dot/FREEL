@@ -297,6 +297,15 @@ describe('TVA autoliquidée d’un franchisé', () => {
     expect(o?.detail).toMatch(/date calculée/);
   });
 
+  // Sans nom, pas de jour : la ligne ne dit pas « date calculée » d'une date
+  // qu'elle ne montre pas.
+  it('ne dit « date calculée » que s’il y a une date', () => {
+    const sansNom = faits({ depenses: [depenseUe('logiciel', '2026-06-03', 145)] }, { nomExploitant: '', codePostal: '33000' });
+    const o = parId(sansNom, '2026-06-10', 'ca3-2026-06');
+    expect(o?.declaration?.limite.statut).toBe('refuse');
+    expect(o?.detail).not.toMatch(/date calculée/);
+  });
+
   it('n’appelle aucune CA3 les mois sans achat hors de France', () => {
     expect(toutes(franchise, '2026-11-20').filter((o) => o.dossier === 'tva').map((o) => o.id)).toEqual(['ca3-2026-06']);
   });
