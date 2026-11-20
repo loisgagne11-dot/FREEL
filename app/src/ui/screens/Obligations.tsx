@@ -1,10 +1,18 @@
-import { Suspense, lazy, useEffect, useId, useState } from 'react';
+import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
+import type { DateISO } from '../../domain/types';
+import { decaler } from '../../domain/calculs/calendrier';
+import { useFaits } from '../../state/store';
+import { dateDuJour } from '../../state/selecteurs';
+import { obligationsEntre } from '../../state/selecteurs.obligations';
+import { nombreAFaire } from '../../state/selecteurs.aTraiter';
 import { composantALaDemande } from '../composantALaDemande';
 import { Greet } from '../components/Greet';
 import { Sheet } from '../components/Sheet';
-import { ChoixAnnee } from '../components/ChoixAnnee';
+import { useToast } from '../components/Toasts';
 import { useRoute } from '../useRoute';
+import { anneesDuSegment, titreObligations } from './Obligations.lecture';
 import styles from './Argent.module.css';
+import ob from './Obligations.module.css';
 
 /**
  * L'échéancier : frise de l'année, liste des appels, périodes URSSAF — le
@@ -38,6 +46,14 @@ const TITRES: Readonly<Record<Registre, string>> = {
 
 const estRegistre = (r: string): r is Registre => r === 'livre' || r === 'des' || r === 'tva';
 
+/**
+ * Jusqu'où l'écran lit les obligations : la fin de l'année affichée, et au
+ * moins une année devant soi — l'horizon de « à traiter ». Une limite plus
+ * courte aurait caché, en décembre, l'URSSAF du quatrième trimestre que le
+ * titre annonce pour janvier.
+ */
+const HORIZON_JOURS = 366;
+
 export interface ProprietesObligations {
   /**
    * L'année affichée — celle du mois partagé par les écrans, tenu par `App`.
@@ -50,28 +66,25 @@ export interface ProprietesObligations {
 }
 
 /**
- * Écran Obligations — ce qu'on doit déclarer et payer (lot 51, décision 1).
+ * Écran Obligations — ce qu'on doit déclarer, payer ou fournir (lots 51, 53).
  *
  * ─────────────────────────────────────────────────────────────────────────
- * POURQUOI L'ÉCHÉANCIER QUITTE LA TRÉSORERIE
+ * UNE SOURCE, `obligationsEntre`
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Il en était le dernier bloc, sous la ligne de flottaison : on y arrivait en
- * défilant la question « combien j'ai », alors qu'il répond à une autre —
- * « qu'est-ce que je dois faire, et pour quand ». La maquette lui donne son
- * entrée, avec un compteur : ce qui est en retard se voit du rail, sans ouvrir
- * l'écran.
+ * Le titre, la frise, la liste et les dossiers lisent la même liste
+ * d'obligations — prévues par les règles et saisies, fusionnées. Le NOMBRE
+ * du titre, lui, vient de `nombreAFaire` : la fonction de la pastille du
+ * rail. Un titre qui compterait de son côté aurait dit « une chose » sous une
+ * pastille « 4 » dès quatre périodes à déclarer réunies en un sujet.
  *
- * Les REGISTRES le rejoignent : le livre des recettes (qui quitte le pied du
- * rail et les Réglages), la TVA et la DES. Ce sont ceux qu'on présente à un
- * contrôle, et on les cherche au même endroit que ce qu'on déclare avec eux.
- *
- * Rien d'autre n'arrive ici dans ce lot : les pièces à fournir aux clients,
- * l'export vers un calendrier et les dossiers de déclaration sont au lot 53.
- * La mise en page fine — la frise sur toute la largeur, le détail d'une
- * période à côté de la liste — viendra avec lui.
+ * Les registres restent ici : le livre des recettes, la TVA et la DES sont
+ * ceux qu'on présente à un contrôle, et on les cherche au même endroit que
+ * ce qu'on déclare avec eux.
  */
 export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
+  const faits = useFaits((e) => e.faits);
+  const signaler = useToast();
   const { ecran, sousRoute } = useRoute();
   const routeIci = ecran.id === 'obligations' ? sousRoute : '';
   const [registre, setRegistre] = useState<Registre | null>(
@@ -89,16 +102,71 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
     window.location.replace('#/obligations');
   }, [routeIci]);
   const idGroupe = useId();
-  const anneeVue = annee ?? new Date().getFullYear();
+
+  const aujourdhui = dateDuJour();
+  const anneeVue = annee ?? Number(aujourdhui.slice(0, 4));
+  const fin = [`${anneeVue}-12-31`, decaler(aujourdhui, HORIZON_JOURS)].sort().at(-1) as DateISO;
+  const toutes = useMemo(
+    () => obligationsEntre(faits, '1970-01-01' as DateISO, fin, aujourdhui),
+    [faits, fin, aujourdhui]
+  );
+  const nombre = useMemo(() => nombreAFaire(faits, 'obligations'), [faits]);
+  const annees = anneesDuSegment(toutes, aujourdhui, anneeVue);
+
+  /* Le calendrier se fabrique au clic : son générateur et le téléchargement
+     n'ont rien à faire dans le paquet de l'écran, qu'on ouvre pour lire. */
+  async function ajouterAuCalendrier(): Promise<void> {
+    const [{ calendrierDesObligations }, { telecharger }] = await Promise.all([
+      import('../../state/selecteurs.calendrier'),
+      import('../../infra/telechargement')
+    ]);
+    const maintenant = new Date();
+    telecharger(
+      `freel-obligations-${aujourdhui}.ics`,
+      calendrierDesObligations(faits, maintenant, aujourdhui),
+      'text/calendar;charset=utf-8'
+    );
+    signaler(PHRASE_CALENDRIER);
+  }
 
   return (
     <>
       <Greet
-        titre="Tes obligations"
-        sousTitre="Ce que tu dois déclarer et payer, avec les chiffres pour le faire."
-        {...(onAnnee === undefined ? {} : {
-          actions: <ChoixAnnee annee={anneeVue} onAnnee={onAnnee} />
-        })}
+        titre={titreObligations(nombre, toutes, aujourdhui)}
+        sousTitre="Ce que tu dois déclarer, payer ou fournir — avec les chiffres pour le faire."
+        actions={(
+          <div className={ob.outils}>
+            {onAnnee !== undefined && (
+              /* Un segment, comme la maquette : les années se comptent sur
+                 une main, et un menu déroulant cachait celle qu'on regarde. */
+              <div className={ob.segment} role="group" aria-label="Année">
+                {annees.map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    className={a === anneeVue ? `${ob.option} ${ob.choisie}` : ob.option}
+                    aria-pressed={a === anneeVue}
+                    onClick={() => onAnnee(a)}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              className={ob.bouton}
+              aria-describedby={`${idGroupe}-calendrier`}
+              onClick={() => { void ajouterAuCalendrier(); }}
+            >
+              Ajouter au calendrier
+            </button>
+            {/* La promesse se dit AVANT le clic : sans serveur, rien ne
+                s'abonne, et un agenda qui ne se met plus à jour seul serait
+                une surprise découverte en retard. */}
+            <span id={`${idGroupe}-calendrier`} className={ob.horsEcran}>{PHRASE_CALENDRIER}</span>
+          </div>
+        )}
       />
 
       <div className={`${styles.sections} ${styles.obligations}`}>
@@ -138,3 +206,6 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
     </>
   );
 }
+
+/** Décision du propriétaire du 17/11 (décision 25) : un fichier, pas un abonnement. */
+const PHRASE_CALENDRIER = 'Un fichier à importer dans ton agenda ; sans serveur, il ne se met pas à jour seul.';

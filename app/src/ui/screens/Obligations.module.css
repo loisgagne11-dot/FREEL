@@ -1,0 +1,86 @@
+/* Écran Obligations — maquettes `docs/design/direction/obligations.html`
+   (bureau) et `obligations-telephone.html` (téléphone) ; `calme.css` fait foi
+   pour les mesures. Aucune couleur en dur : les quatre palettes s'y
+   appliquent. Mobile d'abord, le bureau à partir de 761 px. */
+
+/* ── En-tête : le segment des années, le calendrier ─────────────────────── */
+
+/* Au téléphone, segment et bouton sur une ligne, aux deux bords (maquette
+   `.ob-outils`) ; au bureau, côte à côte à droite du titre. */
+.outils {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+/* `.e-seg` : 3 px de marge, l'année choisie en relief. 44 px et non 40 :
+   c'est une cible au doigt. Il défile plutôt que de déborder si les années
+   s'accumulent. */
+.segment {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--tint-2);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.option {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.option:hover { color: var(--text); }
+.option:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.choisie { background: var(--card-a); box-shadow: var(--sh-1); color: var(--text); }
+
+/* `.e-btn` : pilule de 46 px au bureau, 44 au téléphone. */
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--card-a);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bouton:hover { border-color: var(--green); }
+.bouton:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.horsEcran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (min-width: 761px) {
+  .outils { width: auto; justify-content: flex-end; }
+  .bouton { min-height: 46px; padding: 0 22px; font-size: 14.5px; }
+}

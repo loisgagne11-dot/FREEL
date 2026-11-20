@@ -87,6 +87,13 @@ export interface Etape {
   readonly limite: Resolution<DateISO>;
   /** Le mois de la limite, connu même quand son jour ne l'est pas : de quoi placer l'étape. */
   readonly mois: Mois;
+  /**
+   * Le premier jour où l'étape peut être faite — le lendemain de la période
+   * déclarée, ou le préavis d'un paiement. L'écran en tire « Déclarable le
+   * 1ᵉʳ juillet » : sans lui, une période close demain se lisait « à venir »
+   * comme une autre dans six mois, et rien ne disait quand ouvrir le site.
+   */
+  readonly ouverture: DateISO;
   /** Le jour où l'étape a été faite ; `null` s'il n'est pas connu, faite ou non. */
   readonly faiteLe: DateISO | null;
   readonly etat: EtatEtape;
@@ -210,6 +217,7 @@ export function etape(p: Parameters<typeof etatEtape>[0] & { readonly faiteLe: D
   return {
     limite: p.limite,
     mois: p.mois,
+    ouverture: p.ouverture,
     faiteLe: p.faiteLe,
     etat: etatEtape(p),
     avance: avanceSur(p.faiteLe, p.limite)
