@@ -7,7 +7,6 @@ import { useFaits } from '../../state/store';
 import { dateDuJour } from '../../state/selecteurs';
 import { obligationsEntre } from '../../state/selecteurs.obligations';
 import { nombreAFaire } from '../../state/selecteurs.aTraiter';
-import { composantALaDemande } from '../composantALaDemande';
 import { CartePliable } from '../components/CartePliable';
 import { Greet } from '../components/Greet';
 import { Montant } from '../components/Montant';
@@ -25,14 +24,6 @@ import { PiecesAFournir } from './Obligations.pieces';
 import type { ChampsEcheance } from './Obligations.saisie';
 import styles from './Argent.module.css';
 import ob from './Obligations.module.css';
-
-/**
- * L'échéancier : frise de l'année, liste des appels, périodes URSSAF — le
- * corps de l'écran. Dans son propre module depuis qu'il vivait sous la
- * Trésorerie ; il arrive avec l'écran, téléchargé au repos.
- */
-const Echeancier = composantALaDemande(() => import('./Argent.echeancier')
-  .then((m) => m.Echeancier), true);
 
 /**
  * Les trois registres, chacun à l'ouverture de son panneau : on les ouvre
@@ -363,11 +354,6 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
 
         <PiecesAFournir faits={faits} aujourdhui={aujourdhui} />
 
-        <div className={`${styles.sections} ${styles.obligations}`}>
-          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-            <Echeancier />
-          </Suspense>
-        </div>
       </div>
 
       {/* Les registres, en pied d'écran (maquette téléphone, décision 25) :
