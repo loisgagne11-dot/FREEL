@@ -876,3 +876,22 @@ désigne plus qu'un nombre.
 | Le dû | Santé, anneau et enveloppes de la Trésorerie | « 2 350 € dus » | « dû 2 350 € » |
 | La capacité de versement mensuelle sur un an | Trésorerie, projection | « Tu peux te verser 1 643 € par mois » — un second « tu peux te verser », pour un autre montant | « Versement tenable : 1 643 € par mois » |
 | À te verser moins la part gardée | Trésorerie, carte « Tu peux te verser » | Même nom que disponible − réserve ; égal à lui seulement si la part gardée vaut 0 % (cas de la démo) | Inchangé ici ; la part gardée se fond dans la réserve au lot 49 (décision 24), et ce second montant disparaît |
+
+## Lot 53, phase 2 (17/11) — une source pour ce qui est à faire
+
+Les obligations deviennent une source (`obligationsEntre`), et « à traiter »
+la lit. Aucun écran n'est redessiné ; des nombres lus changent de sens ou
+s'ajoutent. Chacun est tenu par un test nommé, prouvé par mutation.
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Pastille d'Obligations | Rail | Un par sujet, information comprise : quatre périodes à déclarer pesaient 1, une CFE à soixante jours aussi | Une par **obligation à traiter** (étape à faire ou en retard) plus les autres sujets de l'écran (livre incomplet, aucune échéance) ; l'information ne compte plus. Le titre d'Obligations lira la même fonction (`nombreAFaire`) — test d'accord sur la démonstration et le jeu d'essai |
+| Sujets « à traiter » | Pilote, rail | Périodes URSSAF, DES en retard, CFE sans avis, 1447-C, facturation électronique | S'ajoutent, quand ils sont à faire : la DES du mois écoulé avant sa limite, la CA3 ou la CA12 d'un redevable, la TVA autoliquidée d'un franchisé (CA3 du mois suivant), la déclaration de revenus (à partir de 2027), l'appel URSSAF ou l'avis de CFE à payer, la pièce à renouveler. Ce que l'application ne savait pas noter avant le 17/11 n'est pas « en retard » |
+| Contexte d'une échéance réglementaire | Pilote | « Dans N jours » toujours | Rien quand le jour n'est pas connu (CA3 sans nom : « Indique ton nom… ») |
+| Limite d'une déclaration | Pilote | « avant le 1 juin » | « avant le 1ᵉʳ juin » |
+| Nombre de déclarations conservées | Réglages › Données | « N périodes déclarées », DES déposées comprises | « N déclarations » |
+| DES en retard | Pilote, panneau DES | Pilote : fenêtre en jours depuis la limite | Les vingt-quatre mois qui précèdent le mois courant, comme le panneau : la même amende des deux côtés |
+
+**Pas encore à l'écran** (phase 3) : l'avance sur la limite, les cases 5TE /
+5HQ, les états des pièces, le calendrier `.ics` — calculés et testés, sans
+lecteur visible.
