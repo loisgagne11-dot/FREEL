@@ -66,6 +66,18 @@ describe('la frise de l’année', () => {
     expect(dessin().querySelectorAll(`.${classe('triangle')}`)).toHaveLength(1);
   });
 
+  // Un rond gris que la légende ne nommait pas : une année d'avant le
+  // schéma 25 en était couverte, sans un mot pour le lire.
+  it('nomme « non suivi » dans la légende quand la frise en porte un, et seulement alors', () => {
+    const { rerender } = render(<FriseObligations obligations={annee} annee={2026} aujourdhui={AUJ} />);
+    expect(screen.queryByText('◌ non suivi')).toBeNull();
+    rerender(
+      <FriseObligations obligations={[...annee, ob('ca12', 'tva', 'non_suivi', '2026-05-05')]} annee={2026} aujourdhui={AUJ} />
+    );
+    expect(dessin().querySelectorAll(`.${classe('inconnu')}`)).toHaveLength(1);
+    expect(screen.getByText('◌ non suivi')).toBeTruthy();
+  });
+
   // Douze acomptes d'impôt et une CA3 au même mois se recouvraient en un
   // pâté : le mois prend le plus pressant, et son infobulle les nomme tous.
   it('ne pose qu’un signe par mois et par ligne, le plus pressant', () => {

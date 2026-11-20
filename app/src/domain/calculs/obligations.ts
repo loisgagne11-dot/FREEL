@@ -200,7 +200,10 @@ export function etatEtape(p: {
     return limite !== null && p.aujourdhui > limite ? 'a_pointer' : 'a_venir';
   }
   const repere = limite ?? finDuMois(p.mois);
-  if (p.suiviDepuis !== undefined && repere < p.suiviDepuis) return 'non_suivi';
+  // « Passée avant qu'on sache la noter » : passée AUSSI au jour regardé. La
+  // démonstration, figée au 10 juin 2026, montrait « non suivie » une TVA de
+  // juillet — une limite à venir, qu'on peut très bien noter le moment venu.
+  if (p.suiviDepuis !== undefined && repere < p.suiviDepuis && repere < p.aujourdhui) return 'non_suivi';
   if (p.aujourdhui < p.ouverture) return 'a_venir';
   if (limite !== null && p.aujourdhui > limite && p.retardPossible !== false) return 'en_retard';
   return 'a_faire';

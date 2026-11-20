@@ -39,11 +39,20 @@ describe('le titre d’Obligations', () => {
     expect(titreObligations(1, [tva], AUJ)).toBe('Une chose à faire d’ici le 16 juillet.');
   });
 
-  // « Rien à faire » sans date se lirait « plus rien de l'année ».
-  it('rien à faire : dit jusqu’à quand, et le dit aussi quand rien n’est prévu', () => {
+  // « Rien à faire » sans date se lirait « plus rien de l'année ». Et la date
+  // est l'OUVERTURE : « avant le 31 octobre » le 30 septembre, puis « Une
+  // chose à faire » le 1ᵉʳ octobre, le titre se contredisait d'un jour à l'autre.
+  it('rien à faire : dit jusqu’au jour où quelque chose s’ouvre, et le dit aussi quand rien n’est prévu', () => {
     const t3 = obligation('t3', { declaration: etape('a_venir', '2026-10-31') });
-    expect(titreObligations(0, [t3], AUJ)).toBe('Rien à faire avant le 31 octobre.');
+    expect(titreObligations(0, [t3], AUJ)).toBe('Rien à faire avant le 1ᵉʳ octobre.');
     expect(titreObligations(0, [], AUJ)).toBe('Rien à faire, et rien de prévu.');
+  });
+
+  // Un prélèvement à venir dont l'ouverture est passée : rien ne s'ouvre
+  // avant sa date, c'est elle que le titre dit.
+  it('rien à faire : prend la limite quand l’ouverture est déjà passée', () => {
+    const preleve = obligation('solde', { paiement: etape('a_venir', '2026-09-15', { ouverture: dateISO('2026-06-01') }) });
+    expect(titreObligations(0, [preleve], AUJ)).toBe('Rien à faire avant le 15 septembre.');
   });
 
   // « d'ici fin juillet » au-dessus d'une déclaration de mars promettrait

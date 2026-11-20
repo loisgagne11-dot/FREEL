@@ -13,6 +13,7 @@
 import { type DateISO, type Euros, type Mois, type Resolution, dateISO, euros, moisDe } from '../domain/types';
 import { type Echeance, exerciceDe } from '../domain/calculs/provisions';
 import { voletAProvisionner } from '../domain/calculs/provisions';
+import { decaler } from '../domain/calculs/calendrier';
 import {
   type Periodicite, type PeriodeUrssaf, dateDeDeclaration, limiteOfficielleToleree,
   moisDeLaPeriode, periodeDuMois, periodesADeclarer
@@ -506,7 +507,10 @@ function impotPrevu(faits: Faits, aujourdhui: DateISO): readonly Prevue[] {
         detail: 'Estimé tant que l’avis n’est pas saisi.',
         periode: String(exercice),
         paiement: etape({
-          limite, mois: p.date.slice(0, 7) as Mois, ouverture: ouvertureParPreavis(p.date),
+          // Un prélèvement se pointe le lendemain de son jour, pas avant (`a_pointer`) :
+          // l'ouvrir au préavis faisait dire au titre « rien à faire avant le
+          // 1ᵉʳ septembre » pour un prélèvement qu'on ne peut constater que le 16.
+          limite, mois: p.date.slice(0, 7) as Mois, ouverture: decaler(p.date, 1),
           faite: false, faiteLe: null, aujourdhui, prelevee: true
         }),
         montant: {

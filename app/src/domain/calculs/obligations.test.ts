@@ -64,6 +64,14 @@ describe('état d’une étape', () => {
     expect(etatEtape({ ...suivi, limite: limite('2026-12-15'), aujourdhui: dateISO('2026-12-16') }))
       .toBe('en_retard');
   });
+
+  // La démonstration est figée au 10 juin 2026 : une limite de juillet y est à
+  // venir, pas « non suivie » — rien n'est passé, rien n'a manqué d'être noté.
+  it('suit une étape dont la limite n’est pas encore passée au jour regardé', () => {
+    const suivi = { ...base, suiviDepuis: dateISO('2026-11-17') };
+    expect(etatEtape({ ...suivi, aujourdhui: dateISO('2026-06-10') })).toBe('a_venir');
+    expect(etatEtape({ ...suivi, aujourdhui: dateISO('2026-07-31') })).toBe('a_faire');
+  });
 });
 
 /**

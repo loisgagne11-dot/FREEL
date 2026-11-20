@@ -209,7 +209,9 @@ export function FriseObligations(
             })}
           </svg>
         )}
-      {lignes.length > 0 && <LegendeFrise classe={styles.legendeBas} />}
+      {lignes.length > 0 && (
+        <LegendeFrise classe={styles.legendeBas} nonSuivi={porteUnNonSuivi(obligations)} />
+      )}
     </div>
   );
 }
@@ -218,14 +220,23 @@ export function FriseObligations(
  * Les quatre signes. Au bureau dans l'en-tête de la carte, au téléphone sous
  * la frise — comme les deux maquettes ; la feuille de style montre l'une ou
  * l'autre, jamais les deux.
+ *
+ * Le cinquième, « non suivi », seulement quand la frise le porte : une année
+ * d'avant le schéma 25 se couvrait de ronds gris que rien n'expliquait, et
+ * l'annoncer partout parlerait d'un cas que presque personne ne voit.
  */
-export function LegendeFrise({ classe }: { readonly classe: string | undefined }) {
+export function LegendeFrise({ classe, nonSuivi = false }: { readonly classe: string | undefined; readonly nonSuivi?: boolean }) {
   return (
     <p className={`${styles.legende} ${classe ?? ''}`}>
       <span>● fait</span><span>◇ à faire</span><span>○ à venir</span><span>▲ en retard</span>
+      {nonSuivi && <span>◌ non suivi</span>}
     </p>
   );
 }
+
+/** La frise porte-t-elle un signe « non suivi » ? La légende le dit alors. */
+export const porteUnNonSuivi = (obligations: readonly Obligation[]): boolean =>
+  LIGNES_FRISE.some((l) => marquesDeLaLigne(obligations, l).some((m) => m.signe === 'non_suivi'));
 
 /** Le signe d'un mois, et son infobulle : chaque obligation qu'il recouvre. */
 function SigneDuMois({ marque, x, y, g }: { readonly marque: Marque; readonly x: number; readonly y: number; readonly g: Gabarit }) {

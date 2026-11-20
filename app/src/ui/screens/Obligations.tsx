@@ -18,7 +18,7 @@ import {
   anneesDuSegment, dateDe, dossierParDefaut, etapeEnCours, jourMois, listeDeLAnnee, obligationDeLaCle,
   titreObligations
 } from './Obligations.lecture';
-import { FriseObligations, LegendeFrise } from './Obligations.frise';
+import { FriseObligations, LegendeFrise, porteUnNonSuivi } from './Obligations.frise';
 import { ListeObligations } from './Obligations.liste';
 import { PiecesAFournir } from './Obligations.pieces';
 import type { ChampsEcheance } from './Obligations.saisie';
@@ -301,7 +301,7 @@ export function Obligations({ annee, onAnnee }: ProprietesObligations = {}) {
         <section className={ob.carte} aria-labelledby={`${idGroupe}-annee`}>
           <div className={ob.entete}>
             <h2 id={`${idGroupe}-annee`} className={ob.titreCarte}>L’année {anneeVue}</h2>
-            <LegendeFrise classe={ob.legendeHaut} />
+            <LegendeFrise classe={ob.legendeHaut} nonSuivi={porteUnNonSuivi(deLAnnee)} />
           </div>
           <FriseObligations obligations={deLAnnee} annee={anneeVue} aujourdhui={aujourdhui} />
         </section>
