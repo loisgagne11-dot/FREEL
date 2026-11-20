@@ -211,15 +211,20 @@ export function titreObligations(
   };
 
   if (nombre === 0) {
+    // Le jour où quelque chose DEVIENT à faire — l'ouverture, pas la limite.
+    // « Rien à faire avant le 31 juillet » le 30 juin, puis « Une chose à
+    // faire d'ici fin juillet » le 1ᵉʳ : le titre se contredisait d'un jour à
+    // l'autre, quand le dossier d'à côté disait « Déclarable le 1ᵉʳ juillet ».
+    // Une ouverture déjà passée sans que rien soit à faire se date à la limite.
     const prochaine = obligations
       .filter((o) => signeDe(o) === 'a_venir')
       .map((o) => etapeEnCours(o))
       .filter((e): e is Etape => e !== null && e.limite.statut !== 'refuse')
-      .map((e) => dateDeLEtape(e))
+      .map((e) => (e.ouverture > aujourdhui ? e.ouverture : dateDeLEtape(e)))
       .filter((d) => d >= aujourdhui)
       .sort()[0];
-    // « avant le 31 octobre », jamais « avant fin octobre » : la limite est
-    // un jour, et c'est ce jour-là que rien ne presse avant.
+    // « avant le 1ᵉʳ juillet », jamais « avant début juillet » : c'est un
+    // jour, et c'est ce jour-là que quelque chose s'ouvre.
     if (prochaine === undefined) return 'Rien à faire, et rien de prévu.';
     const an = prochaine.slice(0, 4) === annee ? '' : ` ${prochaine.slice(0, 4)}`;
     return `Rien à faire avant le ${jourMois(prochaine)}${an}.`;

@@ -67,7 +67,7 @@ describe('l’en-tête d’Obligations', () => {
   it('dit jusqu’à quand rien ne presse', () => {
     vi.setSystemTime(new Date('2026-06-10T09:00:00Z'));
     render(<Obligations annee={2026} onAnnee={() => {}} />);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Rien à faire avant le 31 juillet.');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Rien à faire avant le 1ᵉʳ juillet.');
   });
 
   // Un menu déroulant cachait l'année regardée ; le segment la montre.

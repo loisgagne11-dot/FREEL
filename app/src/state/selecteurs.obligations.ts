@@ -13,6 +13,7 @@
 import { type DateISO, type Euros, type Mois, type Resolution, dateISO, euros, moisDe } from '../domain/types';
 import { type Echeance, exerciceDe } from '../domain/calculs/provisions';
 import { voletAProvisionner } from '../domain/calculs/provisions';
+import { decaler } from '../domain/calculs/calendrier';
 import {
   type Periodicite, type PeriodeUrssaf, dateDeDeclaration, limiteOfficielleToleree,
   moisDeLaPeriode, periodeDuMois, periodesADeclarer
@@ -315,10 +316,17 @@ function tva(faits: Faits, depuis: Mois, jusquA: Mois, aujourdhui: DateISO): rea
   const maintenant = new Date(`${aujourdhui}T12:00:00`);
   const dossier = (du: string, au: string) => dossierTvaDuTrimestre(faits, du as DateISO, au as DateISO, maintenant);
   const prevues: Prevue[] = [];
-  const ca3 = (periode: string, mois: readonly Mois[], libelle: string, detail: string, montant: Resolution<Euros> | null) => {
+  const ca3 = (
+    periode: string, mois: readonly Mois[], libelle: string, texte: string, montant: Resolution<Euros> | null,
+    direLaDate = false
+  ) => {
     const dernier = mois[mois.length - 1] as Mois;
     const depot = ajouterMois(dernier, 1);
     const limite = jourCa3(depot, e.nomExploitant, e.codePostal);
+    // « date calculée » seulement quand il y a une date : sans nom, la ligne
+    // disait « — juin … date calculée », et le Pilote « Indique ton nom … date
+    // calculée » — une date qu'on venait de dire ne pas connaître.
+    const detail = direLaDate && limite.statut !== 'refuse' ? `${texte} · date calculée` : texte;
     const fait = declaree(faits, 'ca3', periode);
     const commun = { mois: depot, aujourdhui, ouverture: premierJour(depot) };
     const declaration = etapeDatee(limite, depot, aujourdhui, {
@@ -444,11 +452,12 @@ function tva(faits: Faits, depuis: Mois, jusquA: Mois, aujourdhui: DateISO): rea
         m, [m],
         'TVA sur un achat hors de France',
         `CA3 ${deMois(m)} ${m.slice(0, 4)}, au titre de ce seul mois · mois du paiement retenu pour celui `
-          + 'de la prestation · date calculée',
+          + 'de la prestation',
         {
           statut: 'hypothese', valeur: d.autoliquideeDue, verifieLe: VERIFIE_LE, depuis: m,
           source: 'TVA due par l’acheteur d’un service venu d’un autre État (autoliquidation)'
-        }
+        },
+        true
       );
     }
   }
@@ -506,7 +515,10 @@ function impotPrevu(faits: Faits, aujourdhui: DateISO): readonly Prevue[] {
         detail: 'Estimé tant que l’avis n’est pas saisi.',
         periode: String(exercice),
         paiement: etape({
-          limite, mois: p.date.slice(0, 7) as Mois, ouverture: ouvertureParPreavis(p.date),
+          // Un prélèvement se pointe le lendemain de son jour, pas avant (`a_pointer`) :
+          // l'ouvrir au préavis faisait dire au titre « rien à faire avant le
+          // 1ᵉʳ septembre » pour un prélèvement qu'on ne peut constater que le 16.
+          limite, mois: p.date.slice(0, 7) as Mois, ouverture: decaler(p.date, 1),
           faite: false, faiteLe: null, aujourdhui, prelevee: true
         }),
         montant: {

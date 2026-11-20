@@ -235,3 +235,10 @@
   outline: 2px solid var(--green);
   outline-offset: 2px;
 }
+
+/* Au téléphone, l'action passe sous le texte : « Renseigner ma plateforme »,
+   à côté, réduisait le corps à un mot par ligne (vu à 390 px le 20/11). */
+@media (max-width: 480px) {
+  .sujet { grid-template-columns: auto minmax(0, 1fr); }
+  .sujetAction { grid-column: 2; justify-self: start; }
+}

@@ -634,4 +634,5 @@ ligne : chaque fonction des deux cartes est ATTEINTE ailleurs, et son test a
 | Dossier par obligation | 🆕 | URSSAF, TVA, DES, CFE, impôt, déclaration de revenus (5TE / 5HQ), formalité, pièce |
 | Pièces à fournir | 🆕 | Vigilance, RC pro, avis SIRENE, plateforme ; modifiées sur place |
 | Calendrier `.ics` | 🆕 | « Ajouter au calendrier » : un fichier, pas un abonnement |
-| Nom de l'exploitant (jour de la CA3) | 🆕 | Demandé dans le dossier TVA quand il manque — il n'a pas encore de champ dans Réglages |
+| Nom de l'exploitant (jour de la CA3) | 🆕 | Demandé dans le dossier TVA quand il manque — il n'a pas encore de champ dans Réglages (lot 41) |
+| Jeu de démonstration, recalé à la date du jour | 🟢 | Déclare aussi ses revenus des années passées, le 15 mai : recalé en juillet 2027, il annonçait la déclaration des revenus 2026 à faire, limite passée |

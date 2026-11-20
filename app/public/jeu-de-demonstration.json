@@ -944,6 +944,11 @@
   "objectifCaAnnuel": 72000,
   "periodesDeclarees": [
     {
+      "nature": "revenus",
+      "periode": "2026",
+      "declareeLe": "2026-05-15"
+    },
+    {
       "nature": "urssaf",
       "periode": "2025-10",
       "declareeLe": "2026-01-29"

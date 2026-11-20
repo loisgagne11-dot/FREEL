@@ -171,8 +171,10 @@
 .losange { fill: var(--amber-soft); stroke: var(--amber); stroke-width: 2.5; }
 /* ▲ en retard : rouge, et une forme qu'aucun autre état ne prend. */
 .triangle { fill: var(--red-soft); stroke: var(--red); stroke-width: 2.5; stroke-linejoin: round; }
-/* Non suivi : un rond gris — ni fait, ni en retard ; on ne sait pas. */
-.inconnu { fill: var(--card-a); stroke: var(--line-2); stroke-width: 2.5; }
+/* Non suivi : un rond gris en pointillé — ni fait, ni en retard ; on ne sait
+   pas. Plein, il ne se distinguait d'« à venir » que par la couleur, ce qui
+   ne suffit pas (une forme par état, comme le triangle du retard). */
+.inconnu { fill: var(--card-a); stroke: var(--muted); stroke-width: 2; stroke-dasharray: 2.5 2.5; }
 
 .legende {
   display: flex;

@@ -205,6 +205,30 @@ describe('le dû des obligations', () => {
 });
 
 /**
+ * UN PRÉLÈVEMENT S'OUVRE LE LENDEMAIN DE SON JOUR.
+ *
+ * Ouvert au préavis, le solde d'impôt prélevé faisait dire au titre « rien à
+ * faire avant le 1ᵉʳ septembre » alors qu'il ne se pointe qu'après le 15.
+ */
+describe('le solde d’impôt prélevé', () => {
+  it('s’ouvre le lendemain de son prélèvement, le jour où il devient à pointer', () => {
+    const f = faits(
+      { recettes: [recette('r', '2025-05-01', 40000)], partsFiscales: 1 },
+      { debutActivite: dateISO('2020-01-01'), versementLiberatoire: false }
+    );
+    const soldes = toutes(f, '2026-06-10').filter((o) => o.libelle.startsWith('Impôt sur le revenu, solde'));
+    expect(soldes.length).toBeGreaterThan(0);
+    for (const o of soldes) {
+      const l = o.paiement?.limite;
+      if (l === undefined || l.statut === 'refuse') throw new Error('limite attendue');
+      const lendemain = new Date(`${l.valeur}T12:00:00Z`);
+      lendemain.setUTCDate(lendemain.getUTCDate() + 1);
+      expect(o.paiement?.ouverture).toBe(lendemain.toISOString().slice(0, 10));
+    }
+  });
+});
+
+/**
  * LA TVA D'UN REDEVABLE — CA12 ET ACOMPTES EN 2026, CA3 ENSUITE.
  */
 describe('TVA d’un redevable', () => {
@@ -271,6 +295,15 @@ describe('TVA autoliquidée d’un franchisé', () => {
     expect(o?.declaration?.limite.statut).toBe('hypothese');
     expect(o?.montant).toMatchObject({ statut: 'hypothese', valeur: 29 });
     expect(o?.detail).toMatch(/date calculée/);
+  });
+
+  // Sans nom, pas de jour : la ligne ne dit pas « date calculée » d'une date
+  // qu'elle ne montre pas.
+  it('ne dit « date calculée » que s’il y a une date', () => {
+    const sansNom = faits({ depenses: [depenseUe('logiciel', '2026-06-03', 145)] }, { nomExploitant: '', codePostal: '33000' });
+    const o = parId(sansNom, '2026-06-10', 'ca3-2026-06');
+    expect(o?.declaration?.limite.statut).toBe('refuse');
+    expect(o?.detail).not.toMatch(/date calculée/);
   });
 
   it('n’appelle aucune CA3 les mois sans achat hors de France', () => {
