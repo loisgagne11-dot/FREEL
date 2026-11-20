@@ -1403,10 +1403,16 @@ désormais l'écran). Écarts assumés, avec leur motif :
   pas, la frise la porte (le filet de l'ancienne carte est parti avec elle) ;
 - l'en-tête de la liste garde le chevron du pli : le résumé replié (reste à
   payer, prochaine limite) était une fonction de l'ancienne carte ;
-- la date de la TVA autoliquidée et l'état « non suivi » (rond gris) viennent
-  des règles, pas de la maquette : sur la démonstration figée au 10 juin, ce
-  que l'application ne savait pas noter avant le 17/11 se lit gris, ni fait
-  ni en retard ;
+- la date de la TVA autoliquidée vient des règles, pas de la maquette : sans
+  nom d'exploitant, la démonstration la laisse sans jour (« — juin ») et
+  demande le nom dans le dossier, plutôt que d'inventer l'initiale ;
+- l'état « non suivi » (rond gris en pointillé, nommé par la légende quand la
+  frise en porte un) vient des règles : une limite passée avant le 17/11, que
+  l'application ne savait pas noter. **Corrigé à la relecture** : la
+  démonstration figée au 10 juin en montrait sur une TVA de juin et de juillet
+  et sur l'impôt — des limites qui n'étaient pas passées, ou une déclaration
+  que la démonstration n'avait pas faite. Elle montre maintenant ce que dessine
+  la maquette : la TVA de mai ◇ à déclarer, la déclaration de revenus ● faite ;
 - au téléphone, ouvrir le volet par son adresse pose le focus sur sa poignée,
   dont l'anneau se voit sur la capture : c'est le `Sheet` commun, qui focalise
   son premier élément.

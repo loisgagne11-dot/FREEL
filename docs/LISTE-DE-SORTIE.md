@@ -95,7 +95,7 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 10 | 59 | **Sécurité** — appareil perdu, fichier piégé | ✅ fusionné le 15/11 (PR #340) |
 | — | — | Direction visuelle | ✅ retenue le 13/11 (décision 20) : `design/DIRECTION-VISUELLE.md`, maquettes dans `design/direction/` |
 | 11 | 51 | Nouvelle navigation et jetons de style | ✅ fini le 16/11 : navigation validée et posée (PR #341, #345, #346, #347 à fusionner) ; composants de la planche reportés à leur premier écran (lots 49, 52) |
-| 12 | 53 + 34 | Écran Obligations, frise aux dates officielles | ◐ 20/11 — phases 1 à 3 faites (PR #349) ; restent les champs de régime de TVA et l'histoire de l'option VL |
+| 12 | 53 + 34 | Écran Obligations, frise aux dates officielles | ✅ fini le 20/11 : calcul (PR #348, #349), écran (PR #350) ; quatre restes rangés dans leur lot — champs de TVA en Réglages (41), histoire de l'option VL (34-bis), flux du Pilote vers le dossier (52), pièce « autre » à l'écran (55) |
 | 13 | 31 | Une mission à plusieurs clients | ✅ fini le 16/11 : calcul (PR #343, schéma 24), écrans (PR #344) |
 | 14 | 48 | Mission enrichie et carnet de commandes | ⬜ |
 | 15 | 49 | Trésorerie à douze mois | ⬜ |
@@ -163,6 +163,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | L'avance ou le retard d'une déclaration, comme la maquette (« deux jours avant la limite ») : la date existe depuis le lot 28, rien ne la compare encore à la limite | ✅ 20/11 — sur les faites dépliées et dans le dossier ; rien quand la date manque (mutation : signe inversé, deux tests tombent) |
 | Chaque ligne ouvre son dossier : URSSAF, TVA, déclaration européenne, CFE, impôt, et la déclaration de revenus (cases relevées sur le formulaire de l'année, en `hypothese` sinon) | ✅ 20/11 — à droite au bureau, en volet au téléphone, celui de la prochaine chose à faire par défaut ; adresse `#/obligations/<id>` (ou `saisie-<échéance>`) suivie par le Pilote, le détail du flux, le flux d'un autre mois et la carte CFE. Tous sur le modèle URSSAF, capturés avant la fusion (décision 25). URSSAF ligne par ligne (cotisations, VL, CFP) ; TVA (collectée, déductible, autoliquidée ; le nom qui date la CA3 demandé là où il manque) ; DES ; CFE (« Saisir l'avis ») ; impôt (« à pointer ») ; revenus (5TE / 5HQ, brut) ; formalité ; pièce. *Reste* : le partage 5TE / 5HQ en cours d'année attend l'histoire de l'option au schéma ; les trois lignes du flux du mois sur le Pilote (paquet d'entrée, budget plein) mènent encore au haut de l'écran — son détail et le flux d'un autre mois mènent au dossier — ainsi que « N autres plus tard » de la Trésorerie, qui en désigne plusieurs |
 | Pièces à fournir, chacune avec sa date de validité et son rappel : attestation de vigilance, responsabilité civile, avis de situation (seuils et périodicité à relever sur source officielle) | ✅ 20/11 — grille de quatre au bureau, liste au téléphone (vigilance « obtenue le », RC pro « valable jusqu'au », SIRENE « Pas de validité », plateforme lue sur l'entreprise) ; chacune modifiée sur place ; les pièces qui expirent sont dans la liste et sur la frise. *Reste* : une pièce « autre » (demande d'un client) ne se crée pas encore à l'écran — elle n'arrive que par import |
+| Relu avant fusion : « non suivie » seulement pour une limite **passée** avant le 17/11 (la démonstration figée au 10 juin montrait grises une TVA de juin et de juillet) ; le rond gris prend une forme à lui, en pointillé, nommée par la légende quand la frise en porte un ; le titre « Rien à faire avant le … » se date au jour où quelque chose **s'ouvre**, pas à sa limite (il se contredisait d'un jour à l'autre) ; la démonstration déclare ses revenus (et son recalage aussi : ouverte en juillet 2027, elle annonçait la déclaration des revenus 2026 à faire, limite passée) | ✅ 20/11 — chacune tenue par un test nommé, éprouvé par mutation |
 | Calendrier à importer (`.ics`) : échéances, fins de mission, pièces qui expirent. **Pas d'abonnement** : sans serveur, l'agenda importe le fichier du jour et ne le relit pas — l'écran le dira, et un second import remplace les événements (identifiants stables) | ✅ 20/11 — « Ajouter au calendrier » télécharge le fichier, son générateur chargé au clic ; « un fichier à importer dans ton agenda ; sans serveur, il ne se met pas à jour seul » dit avant le clic (description du bouton) et après (message) |
 
 ### Lot 34-bis — Profil de cotisations Cipav (après le lot 53)
@@ -171,6 +172,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 |---|---|
 | « Ta caisse de retraite : Sécurité sociale des indépendants / Cipav » en Réglages, SSI par défaut, aide « indiquée sur ton attestation d'affiliation » ; barème Cipav en périodes datées et sourcées (23,2 % depuis le 01/07/2024, décret 2025-943) ; migration ; tests sur les deux profils et inventaire des indicateurs — sans liste de professions codée | ⬜ |
 | Plafond de revenu fiscal de référence du versement libératoire (2026 : 29 315 € par part, RFR 2024 ; majorations), en aide dans le comparateur des Simulateurs, publié année par année | ⬜ |
+| **Venu du lot 53** : l'histoire de l'option pour le versement libératoire au schéma (prise ou quittée en cours d'année), pour partager les cases 5TE / 5HQ de la déclaration de revenus — elles suivent aujourd'hui l'option du jour | ⬜ |
 
 ### Hors lot, à ne pas perdre
 
@@ -216,6 +218,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | « À faire » porte le client et le montant sur chaque ligne ; il remplace les actions rapides ; les remarques automatiques y entrent par des règles écrites | ⬜ |
 | Sur téléphone : les gestes fréquents (ma journée, achat en photo, compte rendu, facture du mois) sous le chiffre | ⬜ |
 | Composants communs de la planche venus du lot 51, construits ici avec leur premier usage : carte héros (`e-hero`), tuile à tendance (`e-tile`, courbe sur douze mois) | ⬜ |
+| **Venu du lot 53** : les trois lignes du flux du mois mènent au dossier de leur obligation (`#/obligations/<id>`), et non plus au haut d'Obligations — à faire quand le Pilote est refait, le paquet d'entrée n'ayant pas la place aujourd'hui | ⬜ |
 
 ### Lot 54 — Graphiques
 
@@ -233,6 +236,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Simulateurs en deux colonnes : saisie à gauche, résultat à droite | ⬜ |
 | « Clôturer le mois » : vérifier les journées, compte rendu par client, factures du mois, dépôt et envoi — depuis un seul endroit | ⬜ |
 | Les opérations du relevé dans l'ordre des dates : elles suivent l'ordre d'import (vu au contrôle du lot 28) | ⬜ |
+| **Venu du lot 53** : créer une pièce « autre » (celle qu'un client demande) depuis Pièces à fournir — elle n'arrive aujourd'hui que par import | ⬜ |
 
 ### Lot 47 — Facture électronique : émission (avant le 01/09/2027)
 
@@ -453,7 +457,7 @@ l'affichage et la reprise.
 | 38 | Pilote : actions rapides personnalisables (catalogue, « + », persistance) |
 | 39 | Achats : filtre par compte (le compte porté par l'opération et la dépense — schéma) ; import OFX |
 | 40 | Justificatifs : synchronisation avec le compte (stockage de fichiers) ; suppression d'une pièce orpheline, refusée pendant la durée de conservation ; archive annuelle « pour le comptable » |
-| 41 | Réglages : numérotation et mentions des factures ; coffre des documents |
+| 41 | Réglages : numérotation et mentions des factures ; coffre des documents ; **venu du lot 53** : régime de TVA de 2026 (`regimeTva`), option CA3 mensuelle (`ca3Mensuelle`) et nom de l'exploitant, qui n'ont pas de champ — le nom se demande aujourd'hui dans le dossier TVA (écran sans maquette : à dessiner et soumettre) |
 | 42 | Synchronisation : mode hors ligne et retard affiché ; synchronisation en temps réel entre appareils |
 | 43 | Outils : onglet « Compte pro & banque » ; comparateur micro-BNC / déclaration contrôlée |
 | 44 | Envoi par courriel de la facture et du CRA ; comparaison N−1 et tendance ; brief du lundi |
