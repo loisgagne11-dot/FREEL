@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, mois, ratio, type TypeActivite } from '../types';
 import {
   PERIODES_URSSAF, fusionnerPeriodes, libelleHypothese,
-  periodePour, tauxCotisations, validerAjout, verifierIntegrite
+  periodePour, tauxCotisations, verifierIntegrite
 } from './urssaf';
+import { validerAjout } from './urssaf.ajout';
 
 /** Raccourci de lecture : le taux, ou null si le barème refuse. */
 function taux(m: string, type: TypeActivite = 'BNC', acre = false): number | null {

@@ -34,7 +34,8 @@ const CLES_INTERDITES: ReadonlySet<string> = new Set(['__proto__', 'constructor'
  * remplace rien tant qu'il n'est pas accepté — et le refus dit quel champ.
  */
 export function motifRefusExterieur(brut: unknown): string | null {
-  return motifRefusFaits(brut) ?? motifRefusChampsDuSchema25(brut) ?? motifRefusValeurs(brut);
+  return motifRefusFaits(brut) ?? motifRefusChampsDuSchema25(brut) ?? motifRefusChampsDuSchema26(brut)
+    ?? motifRefusValeurs(brut);
 }
 
 /*
@@ -125,6 +126,21 @@ function motifRefusChampsDuSchema25(brut: unknown): string | null {
     if (nom !== undefined && typeof nom !== 'string') {
       return 'Le champ « entreprise.nomExploitant » devrait être un texte.';
     }
+  }
+  return null;
+}
+
+/**
+ * Les champs apparus au schéma 26, contrôlés comme ceux du 25 : quelle que
+ * soit la version annoncée. Une caisse inconnue se lirait « SSI » sans un
+ * mot — un affilié Cipav cotiserait au mauvais taux sans l'avoir choisi.
+ */
+function motifRefusChampsDuSchema26(brut: unknown): string | null {
+  const entreprise = estObjet(brut) ? brut['entreprise'] : undefined;
+  if (!estObjet(entreprise)) return null;
+  const caisse = entreprise['caisseRetraite'];
+  if (caisse !== undefined && caisse !== 'ssi' && caisse !== 'cipav') {
+    return 'Le champ « entreprise.caisseRetraite » devrait être « ssi » ou « cipav ».';
   }
   return null;
 }

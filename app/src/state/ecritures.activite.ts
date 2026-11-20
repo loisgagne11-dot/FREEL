@@ -1,10 +1,10 @@
 import type { DateISO, Mois } from '../domain/types';
 import type { AjustementJour } from '../domain/calculs/planning';
-import {
-  PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes, validerAjout
-} from '../domain/bareme/urssaf';
+import type { PeriodeBareme } from '../domain/bareme/urssaf';
+import { validerAjout } from '../domain/bareme/urssaf.ajout';
 import type { Faits, Mission } from './schema';
 import { ecrireFaits, useFaits } from './store';
+import { periodesUrssafEffectives } from './selecteurs';
 
 /**
  * Les écritures d'Activité (missions, planning, congés, notes de CRA) et du
@@ -157,7 +157,10 @@ export function noterSemaineCra(semaine: DateISO, destinataire: string, texte: s
  */
 export function ajouterPeriodeUrssaf(periode: PeriodeBareme): string | null {
   const actuel = faitsCourants();
-  const refus = validerAjout(fusionnerPeriodes(PERIODES_URSSAF, actuel.periodesUrssafAjoutees), periode);
+  // La table de la caisse, et non celle de la SSI : un affilié Cipav qui
+  // corrige une période de sa caisse serait jugé sur des bornes qui ne sont
+  // pas les siennes.
+  const refus = validerAjout(periodesUrssafEffectives(actuel), periode);
   if (refus !== null) return refus;
   const ajoutees = [
     ...actuel.periodesUrssafAjoutees.filter((p) => p.du !== periode.du), periode

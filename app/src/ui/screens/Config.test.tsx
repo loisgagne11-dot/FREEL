@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois } from '../../domain/types';
-import { PERIODES_URSSAF } from '../../domain/bareme/urssaf';
+import { PERIODES_CIPAV, PERIODES_URSSAF } from '../../domain/bareme/urssaf';
 import { CLE_STOCKAGE, PART_GARDEE_MAX, type Faits, faitsVides } from '../../state/schema';
 import { stockageMemoire } from '../../infra/migration';
 import { useFaits } from '../../state/store';
@@ -80,6 +80,20 @@ describe('profil', () => {
     expect(useFaits.getState().faits.entreprise.typeActivite).toBe('BIC_service');
   });
 
+  // La Cipav n'affilie que des libéraux : montré en BIC, le choix se croirait
+  // appliqué alors que le barème de la SSI s'applique quoi qu'il dise.
+  it('demande la caisse de retraite en BNC, et seulement en BNC', async () => {
+    await afficher('profil');
+    const utilisateur = utilisateurTest();
+    const caisse = screen.getByLabelText('Ta caisse de retraite');
+    expect(caisse).toHaveProperty('value', 'ssi');
+    await utilisateur.selectOptions(caisse, 'cipav');
+    expect(useFaits.getState().faits.entreprise.caisseRetraite).toBe('cipav');
+
+    await utilisateur.selectOptions(screen.getByLabelText('Type d’activité'), 'BIC_vente');
+    expect(screen.queryByLabelText('Ta caisse de retraite')).toBeNull();
+  });
+
   // Discriminant exclusif : l'ancienne version cumulait versement libératoire
   // et barème progressif, et surestimait l'impôt à provisionner.
   it('bascule le versement libératoire', async () => {
@@ -125,6 +139,21 @@ describe('barème affiché', () => {
     for (const p of PERIODES_URSSAF) {
       expect(within(table).getByText(new RegExp(`^${p.du} →`))).toBeTruthy();
     }
+  });
+
+  // La table que lisent les calculs d'un affilié Cipav est la sienne : montrer
+  // celle de la SSI lui ferait croire à 25,6 % appliqués pour 23,2 %.
+  it('montre à un affilié Cipav la table de sa caisse, et le dit', async () => {
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, caisseRetraite: 'cipav' } }
+    });
+    await ouvrirBareme();
+    const table = screen.getByRole('table');
+    for (const p of PERIODES_CIPAV) {
+      expect(within(table).getByText(new RegExp(`^${p.du} →`))).toBeTruthy();
+    }
+    expect(within(table).queryByText(/^2026-01 →/)).toBeNull();
+    expect(screen.getByText(/Ta caisse de retraite est la Cipav/)).toBeTruthy();
   });
 
   it('affiche la source et la date de vérification de chaque période', async () => {

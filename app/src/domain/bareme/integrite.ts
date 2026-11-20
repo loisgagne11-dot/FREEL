@@ -26,7 +26,7 @@ import { verifierIntegriteAcre } from './acre';
 import { verifierIntegriteImpot } from './impot';
 import { verifierIntegritePlafonds } from './plafonds';
 import { verifierIntegriteTva } from './tva';
-import { verifierIntegrite as verifierIntegriteUrssaf } from './urssaf';
+import { PERIODES_CIPAV, verifierIntegrite as verifierIntegriteUrssaf } from './urssaf';
 import { verifierIntegriteRecettes } from './recettes';
 import { verifierIntegriteDes } from '../calculs/des';
 import { verifierIntegriteFacture } from '../calculs/facture';
@@ -38,6 +38,7 @@ import { verifierIntegriteFacture } from '../calculs/facture';
 export function verifierIntegriteBareme(): readonly string[] {
   return [
     ...verifierIntegriteUrssaf().map((a) => `[cotisations] ${a}`),
+    ...verifierIntegriteUrssaf(PERIODES_CIPAV).map((a) => `[cotisations Cipav] ${a}`),
     ...verifierIntegriteAbattement().map((a) => `[abattement] ${a}`),
     ...verifierIntegriteAcre().map((a) => `[acre] ${a}`),
     ...verifierIntegritePlafonds().map((a) => `[plafonds] ${a}`),

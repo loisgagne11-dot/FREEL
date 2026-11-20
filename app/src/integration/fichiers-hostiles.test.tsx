@@ -119,7 +119,11 @@ const BLOCS_HOSTILES: readonly (readonly [string, string, RegExp])[] = [
   ['un régime de TVA inconnu',
     blocHostile({ entreprise: { ...faitsVides().entreprise, regimeTva: 'au_hasard' } }), /regimeTva/],
   ['un nom d’exploitant qui n’est pas un texte',
-    blocHostile({ entreprise: { ...faitsVides().entreprise, nomExploitant: { initiale: 'A' } } }), /nomExploitant/]
+    blocHostile({ entreprise: { ...faitsVides().entreprise, nomExploitant: { initiale: 'A' } } }), /nomExploitant/],
+  /* Schéma 26 : une caisse inconnue se lirait « SSI » sans un mot, et un
+     affilié Cipav cotiserait au mauvais taux sans l'avoir choisi. */
+  ['une caisse de retraite inconnue',
+    blocHostile({ entreprise: { ...faitsVides().entreprise, caisseRetraite: 'carpimko' } }), /caisseRetraite/]
 ];
 
 describe('sauvegarde JSON, compte, archive : le bloc de faits', () => {

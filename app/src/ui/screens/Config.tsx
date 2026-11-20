@@ -292,6 +292,24 @@ function Profil() {
           </select>
         </Champ>
 
+        {/* En BNC seulement : la Cipav n'affilie que des libéraux, et une
+            activité BIC relève de la SSI quoi qu'on choisisse ici — un choix
+            montré sans effet se croirait appliqué. Aucune liste de
+            professions : c'est l'attestation qui le dit. */}
+        {entreprise.typeActivite === 'BNC' && (
+          <Champ
+            id={`${idChamp}-caisse`}
+            libelle="Ta caisse de retraite"
+            aide="Indiquée sur ton attestation d’affiliation. La Cipav ne concerne que certaines professions libérales réglementées."
+          >
+            <select id={`${idChamp}-caisse`} value={entreprise.caisseRetraite}
+              onChange={(e) => modifier({ caisseRetraite: e.target.value === 'cipav' ? 'cipav' : 'ssi' })}>
+              <option value="ssi">Sécurité sociale des indépendants (SSI)</option>
+              <option value="cipav">Cipav</option>
+            </select>
+          </Champ>
+        )}
+
         <Champ
           id={`${idChamp}-intracom`}
           libelle="Numéro de TVA intracommunautaire"

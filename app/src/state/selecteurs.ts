@@ -16,7 +16,7 @@ import {
   euros, moisDe
 } from '../domain/types';
 import { moisSousAcre, tauxImpotEtContributions } from '../domain/bareme';
-import { AUTOLIQUIDATION_TVA, tvaDueDepuis } from '../domain/bareme/tva';
+import { tvaDueDepuis } from '../domain/bareme/tva';
 import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
@@ -28,28 +28,30 @@ import {
   type ProvisionImpotRevenu, provisionImpotRevenu
 } from '../domain/calculs/provisionImpotRevenu';
 import {
-  PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
+  type PeriodeBareme, baremeDeLaCaisse, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
 import { soldeDerive } from '../domain/calculs/solde';
 import type { RegimeTva } from '../domain/calculs/depenses';
 import { tvaDeDepense } from '../domain/calculs/depenses.tva';
-import type { Faits, Recette } from './schema';
+import type { Faits } from './schema';
 import { encaissementsAttendusDeLAnnee, facturesAEncaisser } from './selecteurs.pipeline';
-import {
-  FORMULE_PAR_DEFAUT, echeanceDe
-} from '../domain/calculs/delaiPaiement';
 
 /**
  * Le barème URSSAF effectivement appliqué.
  *
  * Une seule source pour toute l'application : les périodes livrées avec le
- * code, complétées par celles que l'utilisateur a saisies. Tout calcul qui
- * lirait `PERIODES_URSSAF` directement verrait un barème différent de celui
- * affiché dans Config — exactement le genre de divergence que la refonte
- * cherche à rendre impossible.
+ * code pour la caisse de l'entreprise, complétées par celles que l'utilisateur
+ * a saisies. Tout calcul qui lirait `PERIODES_URSSAF` directement verrait un
+ * barème différent de celui affiché dans Config — exactement le genre de
+ * divergence que la refonte cherche à rendre impossible —, et un affilié
+ * Cipav y cotiserait au taux de la SSI.
+ *
+ * Les périodes saisies s'appliquent à la caisse du moment : elles se lisent
+ * sur l'avis d'appel de sa propre caisse.
  */
 export function periodesUrssafEffectives(faits: Faits): readonly PeriodeBareme[] {
-  return fusionnerPeriodes(PERIODES_URSSAF, faits.periodesUrssafAjoutees);
+  const { caisseRetraite, typeActivite } = faits.entreprise;
+  return fusionnerPeriodes(baremeDeLaCaisse(caisseRetraite, typeActivite), faits.periodesUrssafAjoutees);
 }
 
 /** Le mois courant, dérivé de l'horloge et jamais codé en dur. */
@@ -175,7 +177,7 @@ export function tvaAReverserDe(faits: Faits): Euros {
 }
 
 /** La TVA déductible et la TVA autoliquidée des dépenses payées : une règle, un passage. */
-function tvaDesDepensesPayees(faits: Faits): { deductible: number; autoliquidee: number } {
+export function tvaDesDepensesPayees(faits: Faits): { deductible: number; autoliquidee: number } {
   const banqueSynchronisee = soldeEstSuivi(faits);
   let deductible = 0;
   let autoliquidee = 0;
@@ -191,33 +193,6 @@ function tvaDesDepensesPayees(faits: Faits): { deductible: number; autoliquidee:
     if (regime === 'franchise') autoliquidee += tva.aAutoliquider;
   }
   return { deductible, autoliquidee };
-}
-
-/**
- * La part de la provision de TVA qui vient d'achats autoliquidés, pour la dire
- * à l'écran — `null` quand il n'y en a pas, ou plus.
- *
- * Plafonnée à la provision elle-même : un « dont » ne peut pas dépasser son
- * total, et quand des échéances payées ont réglé une partie seulement, on ne
- * sait pas laquelle des deux TVA elles ont réglée. Afficher les 20 € quand il
- * ne reste que 5 € provisionnés serait annoncer une somme que rien ne retient.
- *
- * Une `hypothese`, jamais un `publie` : le montant est sûr, la date de dépôt
- * ne l'est pas, et aucune échéance n'est inventée.
- */
-export function tvaAutoliqueeProvisionnee(
-  faits: Faits,
-  maintenant: Date = new Date()
-): Resolution<Euros> | null {
-  const part = Math.min(tvaDesDepensesPayees(faits).autoliquidee, tvaAReverserDe(faits));
-  if (part <= 0) return null;
-  return {
-    statut: 'hypothese',
-    valeur: euros(part),
-    source: AUTOLIQUIDATION_TVA.source,
-    verifieLe: AUTOLIQUIDATION_TVA.verifieLe,
-    depuis: moisCourant(maintenant)
-  };
 }
 
 /** Chiffre d'affaires encaissé sur une année civile. */
@@ -367,22 +342,6 @@ export function sousAcreLe(faits: Faits): (m: Mois) => boolean {
   return (m) => moisSousAcre(moisDebut, m);
 }
 
-
-/**
- * L'échéance d'une facture, pour le sujet « en retard » comme pour la
- * pastille du flux : une seule règle.
- *
- * Elle vient de la recette : elle est imprimée sur le document. Le secours ne
- * sert qu'à une facture qu'aucune migration n'aurait comblée — une facture
- * émise sans échéance serait réputée jamais échue, et les retards les plus
- * anciens seraient précisément ceux qu'on ne verrait pas.
- */
-export function echeanceDesFactures(faits: Faits): (r: Recette) => DateISO | null {
-  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
-  return (r) => (r.emiseLe === null
-    ? null
-    : r.echeanceLe ?? echeanceDe(r.emiseLe, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT));
-}
 
 /**
  * Les acomptes de prélèvement à la source déjà saisis pour l'année.

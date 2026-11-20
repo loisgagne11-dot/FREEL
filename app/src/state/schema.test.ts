@@ -1047,9 +1047,10 @@ describe('schéma 22 → 23 : le motif « mis de côté pour l’impôt »', () 
 
   it('un dossier d’un schéma postérieur est refusé', () => {
     expect(motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 })).not.toBeNull();
-    // 25 depuis le lot 53 : la déclaration généralisée. L'attente suit le
-    // numéro, elle ne le fige pas — ce test dit qu'un saut se voit.
-    expect(VERSION_SCHEMA).toBe(25);
+    // 26 depuis le lot 34-bis : la caisse de retraite et l'histoire de
+    // l'option VL. L'attente suit le numéro, elle ne le fige pas — ce test dit
+    // qu'un saut se voit.
+    expect(VERSION_SCHEMA).toBe(26);
   });
 });
 
@@ -1215,9 +1216,28 @@ describe('schéma 24 → 25 : déclarations, appels liés, TVA, pièces', () => 
     expect(motifRefusFaits({ ...faitsVides(), pieces: ['vigilance'] })).toMatch(/pieces/);
     expect(motifRefusFaits({ ...faitsVides(), pieces: {} })).toMatch(/pieces/);
   });
+});
 
-  /** Une version 25 qui chargerait un dossier 26 en effacerait ce qu'elle ne sait pas lire. */
-  it('refuse un dossier au schéma 26', () => {
-    expect(motifRefusFaits({ ...faitsVides(), version: 26 })).toMatch(/schéma 26/);
+/**
+ * v25 → v26 : la caisse de retraite. Comblée à `ssi`, ce que valait tout
+ * dossier d'avant : un `undefined` ferait servir à un affilié SSI le barème
+ * d'aucune caisse — et l'application refuserait chaque cotisation.
+ */
+describe('schéma 25 → 26 : la caisse de retraite', () => {
+  it('un compte de schéma 25 reçoit la caisse SSI, et non `undefined`', () => {
+    const f = completerFaits({ version: 25, entreprise: { nom: 'Atelier de démonstration', typeActivite: 'BNC' } });
+    expect(f.version).toBe(26);
+    expect(f.entreprise.caisseRetraite).toBe('ssi');
+  });
+
+  it('garde la Cipav d’un compte qui l’a choisie', () => {
+    const f = completerFaits({ ...faitsVides(), entreprise: { ...faitsVides().entreprise, caisseRetraite: 'cipav' } });
+    expect(f.entreprise.caisseRetraite).toBe('cipav');
+  });
+
+  /** Une version 26 qui chargerait un dossier 27 en effacerait ce qu'elle ne sait pas lire.
+      Il disait « 26 » au schéma 25 ; le numéro a suivi la version. */
+  it('refuse un dossier au schéma 27', () => {
+    expect(motifRefusFaits({ ...faitsVides(), version: 27 })).toMatch(/schéma 27/);
   });
 });

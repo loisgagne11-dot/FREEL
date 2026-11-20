@@ -60,6 +60,50 @@ export const PERIODES_URSSAF: readonly PeriodeBareme[] = [
 ];
 
 /**
+ * La caisse de retraite d'un libéral : la Sécurité sociale des indépendants
+ * (`ssi`), ou la Cipav pour certaines professions réglementées. Un FAIT, lu
+ * sur l'attestation d'affiliation : rien ne la déduit de l'activité, et aucune
+ * liste de professions n'est codée ici — elle change, et une liste périmée
+ * affilierait d'office à la mauvaise caisse.
+ */
+export type CaisseRetraite = 'ssi' | 'cipav';
+
+/**
+ * Le barème de la Cipav : seule sa colonne BNC diffère. Les colonnes BIC
+ * reprennent celles de la SSI au même mois — la Cipav n'affilie que des
+ * libéraux, `baremeDeLaCaisse` ne la sert donc jamais à une activité BIC, et
+ * ces colonnes ne servent qu'à garder la table du même type que l'autre.
+ * Elles ne sont pas réécrites : une seconde copie des taux BIC finirait par
+ * diverger de la première.
+ *
+ * Mêmes règles d'édition que `PERIODES_URSSAF`. La marche du 1er juillet 2024
+ * est la même que celle de la SSI, d'un point plus haut : 21,2 % puis 23,2 %
+ * (décret n° 2024-484), toujours 23,2 % en 2026 (25,4 % avec le versement
+ * libératoire, d'après la même fiche).
+ */
+const cipav = (du: string, au: string | null, bnc: number, source: string): PeriodeBareme => {
+  const ssi = p(du, au, bnc, 0, 0, source, '2026-11-20');
+  return { ...ssi, taux: { ...(periodePour(ssi.du)?.taux ?? ssi.taux), BNC: ratio(bnc) } };
+};
+
+export const PERIODES_CIPAV: readonly PeriodeBareme[] = [
+  cipav('2024-01', '2024-06', 0.212,
+    'décret n° 2024-484 du 30/05/2024 ; service-public.fr A17464 du 27/06/2024'),
+  cipav('2024-07', null, 0.232,
+    'décret n° 2024-484 du 30/05/2024 ; service-public.fr A17464 et F36232 (vérifiée le 01/01/2026)')
+];
+
+/**
+ * Le barème livré pour une caisse et une activité. La caisse n'a de sens qu'en
+ * BNC : un affilié Cipav qui passe en BIC relève de la SSI, et lui servir le
+ * taux libéral ferait cotiser une vente de marchandises à 23,2 % au lieu de
+ * 12,3 %.
+ */
+export function baremeDeLaCaisse(caisse: CaisseRetraite, type: TypeActivite): readonly PeriodeBareme[] {
+  return caisse === 'cipav' && type === 'BNC' ? PERIODES_CIPAV : PERIODES_URSSAF;
+}
+
+/**
  * Fusionne le barème livré avec le code et les périodes saisies par
  * l'utilisateur.
  *
@@ -79,7 +123,8 @@ export const PERIODES_URSSAF: readonly PeriodeBareme[] = [
  *
  * Une période saisie qui recouvre exactement une période livrée l'emporte :
  * c'est le seul moyen de corriger une valeur livrée fausse sans attendre un
- * déploiement. Toute autre superposition est refusée par `validerAjout`.
+ * déploiement. Toute autre superposition est refusée par `validerAjout`
+ * (`urssaf.ajout.ts`).
  */
 export function fusionnerPeriodes(
   base: readonly PeriodeBareme[],
@@ -106,33 +151,6 @@ function moisPrecedent(m: Mois): Mois {
   const annee = Math.floor(total / 12);
   const mm = String((total % 12) + 1).padStart(2, '0');
   return `${annee}-${mm}` as Mois;
-}
-
-/** Refus motivé d'un ajout, ou `null` quand l'ajout est recevable. */
-export function validerAjout(
-  existantes: readonly PeriodeBareme[],
-  nouvelle: { readonly du: Mois; readonly source: string }
-): string | null {
-  if (nouvelle.source.trim() === '') {
-    return 'Une source est obligatoire : d\'où vient ce taux ? '
-      + 'Un taux sans provenance ne peut pas être vérifié plus tard.';
-  }
-
-  const derniereConnue = existantes[existantes.length - 1];
-  if (derniereConnue === undefined) return null;
-
-  // Le point dur : recalculer un trimestre passé doit redonner le montant
-  // réellement déclaré à l'époque. Réécrire une période close le rendrait
-  // impossible, et ferait diverger l'application des déclarations envoyées.
-  const couvre = existantes.find((per) => nouvelle.du > per.du && (per.au === null || nouvelle.du <= per.au));
-  if (couvre !== undefined && couvre.au !== null) {
-    return `La période ${nouvelle.du} tombe à l'intérieur d'une période close `
-      + `(${couvre.du} à ${couvre.au}). Modifier un barème passé ferait diverger `
-      + 'les recalculs des déclarations déjà envoyées. Seul un début de période '
-      + 'existant peut être corrigé, à l\'identique.';
-  }
-
-  return null;
 }
 
 /** La période couvrant ce mois, ou `undefined` si aucune ne le couvre. */
@@ -215,25 +233,27 @@ export function libelleHypothese(r: Resolution<Ratio>): string | null {
 }
 
 /**
- * Contrôle d'intégrité de la table, exécuté par les tests.
- * Renvoie la liste des anomalies ; vide si la table est saine.
+ * Contrôle d'intégrité d'une table — celle de la SSI par défaut, celle de la
+ * Cipav aussi : une table trouée rend un refus pour des mois qui ont un taux.
+ * Exécuté par les tests. Renvoie la liste des anomalies ; vide si la table est
+ * saine.
  */
-export function verifierIntegrite(): readonly string[] {
+export function verifierIntegrite(table: readonly PeriodeBareme[] = PERIODES_URSSAF): readonly string[] {
   const anomalies: string[] = [];
 
-  PERIODES_URSSAF.forEach((per, i) => {
+  table.forEach((per, i) => {
     if (!per.source) anomalies.push(`Période ${per.du} : source manquante.`);
     if (per.au !== null && per.au < per.du) {
       anomalies.push(`Période ${per.du} : fin (${per.au}) antérieure au début.`);
     }
-    const estDerniere = i === PERIODES_URSSAF.length - 1;
+    const estDerniere = i === table.length - 1;
     if (!estDerniere && per.au === null) {
       anomalies.push(`Période ${per.du} : seule la dernière période peut rester ouverte.`);
     }
     if (estDerniere && per.au !== null) {
       anomalies.push(`Période ${per.du} : la dernière période doit rester ouverte.`);
     }
-    const suivante = PERIODES_URSSAF[i + 1];
+    const suivante = table[i + 1];
     if (suivante !== undefined && per.au !== null && !(per.au < suivante.du)) {
       anomalies.push(`Périodes ${per.du} et ${suivante.du} : chevauchement ou désordre.`);
     }
