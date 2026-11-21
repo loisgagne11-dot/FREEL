@@ -922,3 +922,20 @@ le dit ci-dessous. Chaque ligne est tenue par un test nommé ; celles marquées
 frise — la maquette met le mois courant en bande ; le nom, la date et le
 montant écrits sous chaque jalon — la liste juste en dessous les porte, et
 la frise ne pose plus qu'un signe par mois.
+
+## Lot 34-bis (21/11) — la caisse de retraite, le plafond du versement libératoire, l'histoire de l'option
+
+Aucun écran n'est redessiné. Des nombres changent de source, un s'ajoute.
+Chaque ligne est tenue par un test nommé ; celles marquées † ont été
+éprouvées par mutation.
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Taux de cotisations † | Réglages › Paramètres fiscaux (« Barèmes en vigueur », taux plein et avec l'ACRE) ; derrière lui le dû du Pilote et de la Trésorerie, les charges d'Activité, le dossier URSSAF | Celui de la SSI pour tous : 25,6 % en 2026 | Celui de la caisse (`periodesUrssafEffectives` ← `baremeDeLaCaisse`) : Cipav 23,2 % en BNC (21,2 % jusqu'au 30/06/2024 ; 11,6 % sous ACRE à 50 %), SSI sinon — et toujours en BIC |
+| Table des cotisations par période | Réglages › Paramètres fiscaux | Celle de la SSI | Celle de la caisse ; « Ta caisse de retraite est la Cipav : la colonne BNC porte son barème » pour un affilié Cipav |
+| Plafond de revenu fiscal de référence du versement libératoire † | Simulateurs, sous le comparatif | Absent : « un nombre officiel que l'application ne porte pas » | Limite haute de la deuxième tranche du barème des revenus Y−2, fois les parts du comparatif, arrondie à l'euro inférieur : 29 315 € pour 2026, 29 579 € pour 2027 ; Y l'année suivante, ou celle du début dans les trois mois qui suivent la création ; refus motivé, sans montant, quand le barème manque |
+| Cases 5TE / 5HQ † | Dossier de la déclaration de revenus | L'option du jour pour toutes les années : quittée en 2026, elle faisait déclarer 2025 en 5HQ | L'option du mois d'encaissement (`vlAu`) |
+| Solde estimé de l'impôt de l'année précédente † ; provision d'impôt de l'année † | Pilote, Trésorerie, composition, détail de la dette, Obligations | Nuls ou au barème selon l'option du jour : quittée en janvier, elle inventait un solde 2025 que le versement libératoire avait payé | Par année : sous l'option toute l'année, rien ; année partagée, l'assiette hors option (la case 5HQ) |
+| Versement libératoire au dû † | Pilote, Trésorerie, détail de la dette | Au taux du mois courant pour tout l'encaissé non déclaré : un décembre encore à déclarer perdait ses 2,2 % au 1er janvier | Au taux du mois d'encaissement (`tauxImpotAu`) |
+| Versement libératoire d'une déclaration URSSAF † | Dossier URSSAF | Option du jour | Option du dernier mois de la période : le quatrième trimestre 2025, déclaré en janvier 2026 après avoir quitté l'option, garde ses 2,2 % |
+| « VL » au pied du rail † ; « avant impôt » du tarif journalier ; aide « Tu as opté » | Rail, Activité › Analyse, Réglages › Paramètres fiscaux | Le booléen : une option prise en novembre pour janvier s'affichait en novembre | L'option du mois ; Réglages › Profil dit « À partir du 1ᵉʳ janvier … » tant qu'un changement n'a pas pris effet |
