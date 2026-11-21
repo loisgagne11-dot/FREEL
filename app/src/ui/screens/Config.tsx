@@ -3,10 +3,14 @@ import { adresseCourante, sousRouteSiEcran, composantALaDemande } from '../compo
 import { useFaits } from '../../state/store';
 import { finAcreDe } from '../../state/selecteurs.reglages';
 import { finDuMois } from '../../domain/calculs/periode';
-import { dateISO, type TypeActivite } from '../../domain/types';
+import { dateISO, type Mois, type TypeActivite } from '../../domain/types';
 import { exonerationAcre, tauxVersementLiberatoire } from '../../domain/bareme';
+import {
+  type DepuisQuand, changerOptionVl, prochainChangementVl
+} from '../../domain/calculs/optionVl.changement';
 import { moisCourant } from '../../state/selecteurs';
-import { pct } from '../format';
+import { moisLong, pct } from '../format';
+import { BlocConfirmation } from '../components/ConfirmationSurPlace';
 import { Greet } from '../components/Greet';
 import { Info } from '../components/Info';
 import { controlerSiret } from '../../domain/calculs/identifiants';
@@ -110,6 +114,7 @@ export function Config() {
   // régime puisqu'il est recalculé à chaque rendu.
   const sousTitreProfil = [
     entreprise.typeActivite === 'BNC' ? 'Micro-BNC' : 'Micro-BIC',
+    entreprise.typeActivite === 'BNC' && entreprise.caisseRetraite === 'cipav' ? 'Cipav' : null,
     entreprise.acre ? 'ACRE' : null,
     entreprise.siret.trim() === '' ? 'SIRET à saisir' : 'SIRET'
   ].filter((x) => x !== null).join(' · ');
@@ -292,6 +297,26 @@ function Profil() {
           </select>
         </Champ>
 
+        {/* En BNC seulement : la Cipav n'affilie que des libéraux, et une
+            activité BIC relève de la SSI quoi qu'on choisisse ici — un choix
+            montré sans effet se croirait appliqué. Aucune liste de
+            professions : c'est l'attestation qui le dit. Le sigle « (SSI) »
+            est parti du libellé : il le faisait couper dans la colonne de
+            267 px du bureau (« … indépendants (S »). */}
+        {entreprise.typeActivite === 'BNC' && (
+          <Champ
+            id={`${idChamp}-caisse`}
+            libelle="Ta caisse de retraite"
+            aide="Indiquée sur ton attestation d’affiliation. La Cipav ne concerne que certaines professions libérales réglementées."
+          >
+            <select id={`${idChamp}-caisse`} value={entreprise.caisseRetraite}
+              onChange={(e) => modifier({ caisseRetraite: e.target.value === 'cipav' ? 'cipav' : 'ssi' })}>
+              <option value="ssi">Sécurité sociale des indépendants</option>
+              <option value="cipav">Cipav</option>
+            </select>
+          </Champ>
+        )}
+
         <Champ
           id={`${idChamp}-intracom`}
           libelle="Numéro de TVA intracommunautaire"
@@ -311,21 +336,7 @@ function Profil() {
           onChange={(v) => modifier({ acre: v })}
           aide={<FenetreAcre />}
         />
-        <Interrupteur
-          id={`${idChamp}-vl`}
-          libelle="Versement libératoire de l’impôt"
-          resume={<ResumeVl type={entreprise.typeActivite} />}
-          coche={entreprise.versementLiberatoire}
-          onChange={(v) => modifier({ versementLiberatoire: v })}
-          aide={
-            <>
-              Discriminant exclusif&nbsp;: avec le versement libératoire, l’impôt
-              est payé à chaque déclaration et rien n’est dû au barème
-              progressif. L’ancienne version cumulait les deux, et
-              surestimait l’impôt dû.
-            </>
-          }
-        />
+        <OptionVl id={`${idChamp}-vl`} />
       </div>
     </div>
   );
@@ -354,15 +365,115 @@ function ResumeAcre() {
   );
 }
 
-/** Ce que le versement libératoire change, avec le taux du barème. */
-function ResumeVl({ type }: { readonly type: TypeActivite }) {
-  const taux = tauxVersementLiberatoire(moisCourant(), type);
+/**
+ * L'option pour le versement libératoire, et DEPUIS QUAND.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE CASE NE DISAIT PAS SI L'ON CORRIGE OU SI L'ON CHANGE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Décocher la case en 2026 réécrivait 2025 : la déclaration des revenus
+ * passait en 5HQ, et un solde d'impôt 2025 apparaissait, que le versement
+ * libératoire avait déjà payé. Or décocher veut dire deux choses : « je n'ai
+ * jamais opté » — corriger, tout se recalcule — ou « je renonce » — ce qui ne
+ * vaut qu'au 1er janvier suivant. La question se pose sur place, à la bascule ;
+ * rien n'est écrit avant la réponse.
+ *
+ * Le geste qui ne réécrit rien passe devant ; la correction, qui réécrit les
+ * années passées, reste possible en second. L'année de création, seule la
+ * correction a un sens : l'option demandée dans les trois mois vaut dès le
+ * début.
+ *
+ * La case montre la dernière option choisie ; tant qu'elle ne vaut pas
+ * encore, le résumé dit à partir de quand.
+ */
+function OptionVl({ id }: { readonly id: string }) {
+  const entreprise = useFaits((e) => e.faits.entreprise);
+  const modifier = useFaits((e) => e.modifierEntreprise);
+  const [demande, setDemande] = useState<boolean | null>(null);
+  const courant = moisCourant();
+  const annee = Number(courant.slice(0, 4));
+  const actuelle = { versementLiberatoire: entreprise.versementLiberatoire, historiqueVl: entreprise.historiqueVl };
+  const creation = entreprise.debutActivite?.startsWith(String(annee)) === true;
+  // Passé le 30 septembre, un changement demandé maintenant ne vaut qu'au
+  // 1ᵉʳ janvier de l'année d'après : proposer « 1ᵉʳ janvier prochain » en
+  // novembre faisait noter une option que l'administration n'appliquera pas.
+  // Celui qui enregistre une option demandée à temps garde ce choix-là.
+  const tardif = courant >= `${annee}-10`;
+  const anneeDeFin = tardif ? annee + 1 : annee;
+
+  /** `fin` : la dernière année qui garde l'ancienne option. */
+  function choisir(depuis: DepuisQuand, fin: number = annee): void {
+    if (demande !== null) modifier(changerOptionVl(actuelle, demande, depuis, fin));
+    setDemande(null);
+  }
+
   return (
     <>
-      Impôt payé à chaque déclaration
-      {taux.statut !== 'refuse' && <> ({pct(taux.valeur)} du chiffre d’affaires)</>}, plutôt qu’au barème.
+      <Interrupteur
+        id={id}
+        libelle="Versement libératoire de l’impôt"
+        resume={<ResumeVl type={entreprise.typeActivite} prochain={prochainChangementVl(actuelle, courant)} />}
+        coche={demande ?? entreprise.versementLiberatoire}
+        onChange={(v) => setDemande(v === entreprise.versementLiberatoire ? null : v)}
+        aide={
+          <>
+            Discriminant exclusif&nbsp;: avec le versement libératoire, l’impôt
+            est payé à chaque déclaration et rien n’est dû au barème
+            progressif. L’ancienne version cumulait les deux, et
+            surestimait l’impôt dû.
+          </>
+        }
+      />
+      {demande !== null && (
+        <BlocConfirmation
+          ton="prudence"
+          consequence={<>Depuis quand&nbsp;?</>}
+          complement={creation
+            ? <>L’année de création, l’option demandée dans les trois mois qui suivent vaut dès le début de l’activité.</>
+            : tardif
+              ? (
+                <>
+                  Tu optes ou tu renonces au plus tard le 30&nbsp;septembre&nbsp;: demandé
+                  maintenant, le changement prend effet au 1<sup>er</sup>&nbsp;janvier {annee + 2}.{' '}
+                  <button type="button" className={styles.lienBouton} onClick={() => choisir('janvier', annee)}>
+                    Demandé avant le 30&nbsp;septembre&nbsp;: à partir du 1<sup>er</sup>&nbsp;janvier {annee + 1}
+                  </button>
+                </>
+              )
+              : <>Tu optes ou tu renonces au plus tard le 30&nbsp;septembre&nbsp;; le changement prend effet au 1<sup>er</sup>&nbsp;janvier suivant.</>}
+          {...(creation ? {} : {
+            aLaPlace: {
+              libelle: `À partir du 1ᵉʳ janvier ${anneeDeFin + 1} (je change d’option)`,
+              onChoisir: () => choisir('janvier', anneeDeFin)
+            }
+          })}
+          libelleConfirmer="Depuis le début de mon activité (je corrige une erreur)"
+          libelleGarder="Annuler"
+          onConfirmer={() => choisir('debut')}
+          onGarder={() => setDemande(null)}
+        />
+      )}
     </>
   );
+}
+
+/** Ce que le versement libératoire change, avec le taux du barème — et à partir de quand. */
+function ResumeVl(
+  { type, prochain }: {
+    readonly type: TypeActivite;
+    readonly prochain: { readonly le: Mois; readonly actif: boolean } | null;
+  }
+) {
+  const taux = tauxVersementLiberatoire(moisCourant(), type);
+  const part = taux.statut !== 'refuse' && <> ({pct(taux.valeur)} du chiffre d’affaires)</>;
+  if (prochain === null) {
+    return <>Impôt payé à chaque déclaration{part}, plutôt qu’au barème.</>;
+  }
+  const le = `1ᵉʳ ${moisLong(prochain.le)}`;
+  return prochain.actif
+    ? <>À partir du {le}, impôt payé à chaque déclaration{part}&nbsp;; d’ici là, au barème.</>
+    : <>À partir du {le}, impôt au barème&nbsp;; d’ici là, payé à chaque déclaration{part}.</>;
 }
 
 /**

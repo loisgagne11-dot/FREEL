@@ -1419,3 +1419,37 @@ désormais l'écran). Écarts assumés, avec leur motif :
 - au téléphone, ouvrir le volet par son adresse pose le focus sur sa poignée,
   dont l'anneau se voit sur la capture : c'est le `Sheet` commun, qui focalise
   son premier élément.
+
+## Lot 34-bis (21/11) — Réglages › Profil, Paramètres fiscaux ; Simulateurs
+
+Aucune maquette ne dessine ces trois ajouts : ils prennent les composants
+existants de l'écran où ils se posent (`Champ`, `Interrupteur`,
+`BlocConfirmation` en prudence, la note du comparateur), sans style nouveau
+qu'une marge. Captures `captures-app/{calme,nuit}-reglages-profil{,-390}.png`,
+`…-reglages-fiscal{,-390}.png` et `…-simulateurs{,-390}.png`. Les états qu'aucune
+capture de démonstration ne montre — la question ouverte, le changement à venir,
+un affilié Cipav — ont été photographiés à part, en Calme et Nuit, 1 440 et
+390 px, et relus.
+
+| Zone | Avant | Après |
+|---|---|---|
+| Réglages › Profil | Type d'activité, puis le numéro de TVA | + « Ta caisse de retraite » (SSI / Cipav) sous le type d'activité, en BNC seulement, avec l'aide de l'attestation d'affiliation |
+| Réglages › Profil, versement libératoire | L'interrupteur écrivait au clic | La bascule ouvre sur place « Depuis quand ? », la règle du 30 septembre en une phrase, « À partir du 1ᵉʳ janvier … (je change d'option) » en bouton plein, « Depuis le début de mon activité (je corrige une erreur) » en contour, « Annuler » ; le résumé dit « À partir du 1ᵉʳ janvier … » tant que le changement n'a pas pris effet |
+| Réglages › Paramètres fiscaux | Table de la SSI | Table de la caisse, et une phrase pour un affilié Cipav |
+| Simulateurs › comparateur | « Ce que ce calcul ne dit pas » disait le plafond inconnu | Une note sous le comparatif : « Le versement libératoire n'est ouvert en 2027 que si ton revenu fiscal de référence de 2025 ne dépasse pas 29 579 € (1 part) — il figure en première page de ton avis d'impôt 2026. » ; la limite repliée ne parle plus que du revenu, que l'application ne lit pas |
+| Réglages › Profil, « Depuis quand ? » (relu) | « À partir du 1ᵉʳ janvier suivant » en toute saison | Passé le 30 septembre : « À partir du 1ᵉʳ janvier » de l'année d'après, et « Demandé avant le 30 septembre » en lien dans la phrase |
+| Pied du rail, sous-titre de Profil (relu) | « Micro-BNC · ACRE » | « Micro-BNC · Cipav · ACRE » pour un libéral de la Cipav |
+
+Écarts assumés, avec leur motif :
+
+- la caisse est dans Profil, à côté du type d'activité, de l'ACRE et du
+  versement libératoire, et non dans Paramètres fiscaux : c'est là que vivent
+  ces trois réglages (la feuille de route les plaçait dans `Config.fiscal`),
+  et c'est le type d'activité qui la fait paraître ;
+- l'option s'intitule « Sécurité sociale des indépendants », sans « (SSI) » :
+  dans la colonne de 267 px du bureau, le sigle faisait couper le libellé
+  (« … indépendants (S ») — **corrigé à la relecture de la capture** ;
+- l'ordre des deux réponses est l'inverse de la feuille de route : le geste qui
+  ne réécrit rien passe devant et plein, la correction — qui réécrit les années
+  passées — reste possible en contour, comme les autres confirmations de
+  l'application.

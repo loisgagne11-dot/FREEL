@@ -79,6 +79,42 @@ describe('carte des barèmes en vigueur', () => {
   });
 });
 
+/*
+ * La caisse se choisit dans Profil, le taux se lit ici : la carte relit le
+ * barème de la caisse. Si elle relisait celui de la SSI, un affilié Cipav
+ * verrait 25,6 % affiché pour 23,2 % appliqués — ou l'inverse, selon le
+ * lecteur oublié.
+ */
+describe('la caisse de retraite change le taux affiché', () => {
+  it('passe de 25,6 % à 23,2 % quand on choisit la Cipav dans Profil', async () => {
+    const carte = await ouvrirFiscal();
+    expect(ligne(carte, 'Taux de cotisations').valeur).toBe(pct(0.256));
+
+    const utilisateur = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await utilisateur.click(screen.getByRole('button', { name: /Profil & statut/ }));
+    await utilisateur.selectOptions(await screen.findByLabelText('Ta caisse de retraite'), 'cipav');
+    await utilisateur.click(screen.getByRole('button', { name: /Paramètres fiscaux/ }));
+
+    const apres = await screen.findByRole('region', { name: /Barèmes 2026 en vigueur/ });
+    expect(ligne(apres, 'Taux de cotisations').valeur).toBe(pct(0.232));
+  });
+
+  it('applique l’ACRE au taux de la Cipav : 11,6 %, taux plein 23,2 %', async () => {
+    useFaits.setState((e) => ({
+      faits: {
+        ...e.faits,
+        entreprise: {
+          ...e.faits.entreprise, caisseRetraite: 'cipav', acre: true, debutActivite: dateISO('2026-03-01')
+        }
+      }
+    }));
+    const carte = await ouvrirFiscal();
+    const { valeur, aide } = ligne(carte, 'Taux de cotisations');
+    expect(valeur).toBe(pct(0.116));
+    expect(aide).toContain(`Taux plein ${pct(0.232)}`);
+  });
+});
+
 describe('périodicité', () => {
   // Même valeur stockée que l'ancienne liste : l'échéancier en dépend.
   it('change la périodicité stockée au clic', async () => {

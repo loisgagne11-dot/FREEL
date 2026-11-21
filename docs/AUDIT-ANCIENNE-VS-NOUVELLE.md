@@ -142,7 +142,7 @@ un trou qui ne fait échouer aucun test.
 | `calculateIR`, `getIRForYear`, `getTranche`, `showIRDetail` | ✅ | Simulateur dans Outils, détail par tranche |
 | `addIRMonthlyProvisions` | 🟢 (lot 27) | En versement libératoire, les 2,2 % sont intégrés ; au barème, l'acompte PAS est **saisi** et non calculé (décision D2 — le montant est notifié par la DGFiP). La provision de l'année se déplie mois par mois depuis le lot 27 (Argent › note d'impôt), avec la même règle que le total |
 | `computeCFEEstimate`, `showCFESimulator`, `renderCFEResult` | ✅ | **Fait le 14/08, en refusant la grille.** `bareme/cfe.ts` porte les RÈGLES — exonération de création, base réduite de moitié la 1ʳᵉ année d'imposition, dispense sous 5 000 € de recettes N−2, calendrier, déclaration 1447-C. Aucune fourchette de base minimum n'est écrite : elle est fixée par la commune, et la grille en dur de l'ancienne était jugée non conforme par l'audit comptable. La carte demande l'avis et calcule base × taux, ou ne dit rien |
-| Comparateur versement libératoire / barème | 🟢 | **Ajouté le 13/08. N'existait pas dans l'ancienne.** Le seul arbitrage du projet qui porte une date : l'option s'exerce avant le 30/09 pour l'année suivante. Il mesure ce que l'activité AJOUTE à l'impôt du foyer, et compare ce surcroît aux 2,2 %. L'éligibilité — plafond de revenu fiscal de référence — n'est **pas** vérifiée, faute d'un nombre officiel daté, et l'écran le dit |
+| Comparateur versement libératoire / barème | 🟢 | **Ajouté le 13/08. N'existait pas dans l'ancienne.** Le seul arbitrage du projet qui porte une date : l'option s'exerce avant le 30/09 pour l'année suivante. Il mesure ce que l'activité AJOUTE à l'impôt du foyer, et compare ce surcroît aux 2,2 %. L'éligibilité — plafond de revenu fiscal de référence — n'est **pas** vérifiée, et l'écran le dit ; **depuis le lot 34-bis**, le plafond lui-même est dit, lu sur le barème de l'impôt |
 | `getAcreInfo` | ⚠️ | L'ACRE s'applique au calcul ; pas de grille par période (noté au journal comme non traité) |
 | `renderTVAModule`, seuils, franchise | ✅ | Jauges de seuils dans Argent |
 | `projectTVADate` — date de franchissement projetée | ✅ | **Présente**, contrairement à ce que cette ligne annonçait jusqu'au bilan du 24/08 — `franchissementPrevu` est calculée et affichée sur Argent&nbsp;› Trésorerie. Même contradiction que la ligne « objectif de CA » ci-dessus&nbsp;: l'inventaire des indicateurs la donnait pour livrée, celui-ci pour absente |
@@ -636,3 +636,19 @@ ligne : chaque fonction des deux cartes est ATTEINTE ailleurs, et son test a
 | Calendrier `.ics` | 🆕 | « Ajouter au calendrier » : un fichier, pas un abonnement |
 | Nom de l'exploitant (jour de la CA3) | 🆕 | Demandé dans le dossier TVA quand il manque — il n'a pas encore de champ dans Réglages (lot 41) |
 | Jeu de démonstration, recalé à la date du jour | 🟢 | Déclare aussi ses revenus des années passées, le 15 mai : recalé en juillet 2027, il annonçait la déclaration des revenus 2026 à faire, limite passée |
+
+## Lot 34-bis (21/11) — caisse de retraite, plafond du versement libératoire, histoire de l'option (schéma 26)
+
+L'ancienne application ne connaissait ni la Cipav, ni le plafond, ni l'histoire
+de l'option : rien n'est perdu, tout est nouveau. La reprise de l'ancienne
+version pose la SSI et une histoire vide — l'option reprise vaut depuis le
+début, ce qu'elle disait.
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Caisse de retraite (`Entreprise.caisseRetraite`) | 🆕 | Réglages › Profil, en BNC seulement ; SSI par défaut et à la migration ; aucune liste de professions |
+| Barème de la Cipav (`PERIODES_CIPAV`, `baremeDeLaCaisse`) | 🆕 | Daté et sourcé (décret n° 2024-484) ; seule source du barème appliqué avec les périodes saisies (`periodesUrssafEffectives`) ; l'ajout d'une période, le formulaire du barème et la fraîcheur d'« à traiter » ne lisent plus la table de la SSI |
+| Plafond de revenu fiscal de référence du versement libératoire | 🆕 | `plafondRfrVersementLiberatoire`, lu sur `PERIODES_IR` ; refus motivé pour une année dont le barème manque ; sous le comparatif des Simulateurs |
+| Option pour le versement libératoire | 🟢 | La case demande « Depuis quand ? » : « À partir du 1ᵉʳ janvier … (je change d'option) » garde l'année en cours ; « Depuis le début de mon activité (je corrige une erreur) » fait ce que faisait la case ; l'année de création, seulement la seconde. Passé le 30 septembre, le 1ᵉʳ janvier proposé est celui de l'année d'après, et « Demandé avant le 30 septembre » garde le suivant. Rien n'est écrit avant la réponse |
+| Histoire de l'option (`Entreprise.historiqueVl`, `vlAu`) | 🆕 | Une lecture par mois pour la déclaration de revenus, la provision et le solde d'impôt, le versement libératoire au dû et à la déclaration URSSAF, le rail, Activité, Réglages |
+| Contrôle d'un bloc venu d'ailleurs | 🟢 | Refuse une caisse inconnue, une histoire qui n'est pas une liste, une période sans mois lisible, des périodes dans le désordre |

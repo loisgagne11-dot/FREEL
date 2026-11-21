@@ -15,7 +15,7 @@
 import type { DateISO, Euros, Mois, Ratio, TypeActivite } from '../domain/types';
 import { ratio } from '../domain/types';
 import type { Depense } from '../domain/calculs/depenses';
-import type { PeriodeBareme } from '../domain/bareme/urssaf';
+import type { CaisseRetraite, PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import type { MouvementBancaire } from '../domain/calculs/banque';
 import type { PeriodeDeclaree } from '../domain/calculs/declarations.declarees';
@@ -23,6 +23,7 @@ import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/plan
 import type { Echeance } from '../domain/calculs/provisions';
 import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 import type { PieceAFournir } from '../domain/calculs/pieces';
+import type { PeriodeOptionVl } from '../domain/calculs/optionVl';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -55,8 +56,15 @@ export type { PieceAFournir };
  * `mois` comme illisible, ou perdrait au premier renvoi les DES déposées, les
  * pièces et les liens — et chaque appel redeviendrait disputé entre deux
  * périodes. Elle doit refuser le dossier.
+ *
+ * 26 (lot 34-bis) : la caisse de retraite (`Entreprise.caisseRetraite`) et
+ * l'histoire de l'option pour le versement libératoire
+ * (`Entreprise.historiqueVl`). Une version antérieure calculerait les
+ * cotisations d'un affilié Cipav au taux de la SSI, et recalculerait au
+ * barème une année passée sous versement libératoire — puis, au premier
+ * renvoi, effacerait les deux. Elle doit refuser le dossier.
  */
-export const VERSION_SCHEMA = 25 as const;
+export const VERSION_SCHEMA = 26 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -89,9 +97,28 @@ export interface Entreprise {
   /** Début d'activité. Détermine notamment la période d'ACRE. */
   readonly debutActivite: DateISO | null;
   readonly typeActivite: TypeActivite;
+  /**
+   * La caisse de retraite (schéma 26). Sans objet hors BNC : voir
+   * `baremeDeLaCaisse`. Défaut `ssi`, la caisse de droit commun — c'est aussi
+   * ce que valait tout dossier d'avant, et l'ancienne application ne la
+   * portait pas.
+   */
+  readonly caisseRetraite: CaisseRetraite;
   readonly acre: boolean;
-  /** Régime d'imposition. Discriminant EXCLUSIF (voir bareme/impot). */
+  /**
+   * Régime d'imposition. Discriminant EXCLUSIF (voir bareme/impot).
+   *
+   * La DERNIÈRE option choisie : celle qui vaut après la dernière période de
+   * `historiqueVl` — au 1er janvier prochain, peut-être. Aucun calcul ne la lit
+   * directement : ils passent par `vlAu`, qui dit l'option d'un mois.
+   */
   readonly versementLiberatoire: boolean;
+  /**
+   * Ce que valait l'option AVANT (schéma 26) : des périodes closes, triées,
+   * sans chevauchement. Vide, l'option du jour vaut depuis toujours — ce que
+   * disait tout dossier d'avant. Voir `calculs/optionVl`.
+   */
+  readonly historiqueVl: readonly PeriodeOptionVl[];
   /** Mois d'assujettissement à la TVA, `null` si en franchise. */
   readonly tvaDepuis: Mois | null;
   readonly tvaIntracom: string;
@@ -748,8 +775,8 @@ export interface Faits {
 
 export function entrepriseVide(): Entreprise {
   return {
-    nom: '', prenom: '', siret: '', debutActivite: null, typeActivite: 'BNC', acre: false,
-    versementLiberatoire: false, tvaDepuis: null, tvaIntracom: '', iban: '',
+    nom: '', prenom: '', siret: '', debutActivite: null, typeActivite: 'BNC', caisseRetraite: 'ssi', acre: false,
+    versementLiberatoire: false, historiqueVl: [], tvaDepuis: null, tvaIntracom: '', iban: '',
     bic: '', adresse: '', codePostal: '', ville: '', codeApe: '', email: '',
     telephone: '', urssafPeriodicite: 'mensuel', onboardingFait: false,
     plateformeAgreee: null, optionTvaDebits: false,

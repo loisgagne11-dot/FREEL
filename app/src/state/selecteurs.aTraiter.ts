@@ -24,17 +24,34 @@ import { moisDeLaPeriode, periodeDuMois } from '../domain/calculs/declarations';
 import {
   type Etape, type Obligation, dateDeLEtape, estPrevue, etapePrincipale, obligationsATraiter
 } from '../domain/calculs/obligations';
-import type { Faits } from './schema';
+import type { Faits, Recette } from './schema';
 import { montantDeclaration, obligationsEntre, preneursDeServices } from './selecteurs.obligations';
+import { FORMULE_PAR_DEFAUT, echeanceDe } from '../domain/calculs/delaiPaiement';
 
 // Servi ici pour que le rail le calcule avec les sujets, dans le même paquet différé.
 export { compteursParEcran };
 // Déplacés dans `selecteurs.obligations`, qui ne peut pas importer ce module ;
 // leurs lecteurs les trouvent toujours ici.
 export { montantDeclaration, preneursDeServices };
-import {
-  echeanceDesFactures, periodesUrssafEffectives, tvaDueDepuisDe
-} from './selecteurs';
+import { periodesUrssafEffectives, tvaDueDepuisDe } from './selecteurs';
+
+/**
+ * L'échéance d'une facture, pour le sujet « en retard » : une seule règle.
+ *
+ * Elle vient de la recette : elle est imprimée sur le document. Le secours ne
+ * sert qu'à une facture qu'aucune migration n'aurait comblée — une facture
+ * émise sans échéance serait réputée jamais échue, et les retards les plus
+ * anciens seraient précisément ceux qu'on ne verrait pas.
+ *
+ * Venue de `selecteurs.ts` au lot 34-bis : ce module en est le seul lecteur,
+ * et le paquet d'entrée, qui a franchi son plafond, n'en a pas l'usage.
+ */
+export function echeanceDesFactures(faits: Faits): (r: Recette) => DateISO | null {
+  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
+  return (r) => (r.emiseLe === null
+    ? null
+    : r.echeanceLe ?? echeanceDe(r.emiseLe, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT));
+}
 
 /**
  * Construit l'entrée de la requête « à traiter » depuis les faits.

@@ -31,15 +31,46 @@
 
 import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import type { NatureDette, VentilationProvisions } from '../domain/calculs/provisions';
-import type { Euros } from '../domain/types';
+import { type Euros, type Resolution, euros } from '../domain/types';
 import { type DetailDette, detailDette } from '../domain/calculs/detailDette';
 import type { Faits } from './schema';
 import {
-  echeancesDuComptePro, etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, tvaAutoliqueeProvisionnee,
-  periodesUrssafEffectives, recettesEncaissees,
-  regimeDe, sousAcreLe
+  echeancesDuComptePro, etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, tvaDesDepensesPayees,
+  periodesUrssafEffectives, recettesEncaissees, sousAcreLe, tauxImpotAu
 } from './selecteurs';
-import { tauxImpotEtContributions } from '../domain/bareme';
+import { AUTOLIQUIDATION_TVA } from '../domain/bareme/tva.reconnus';
+
+/* La part autoliquidée de la provision de TVA vivait dans `selecteurs.ts`,
+   donc au premier rendu, pour le seul détail de la dette qui la lit. Le
+   paquet d'entrée a franchi son plafond au lot 34-bis : elle a rejoint son
+   lecteur. */
+
+/**
+ * La part de la provision de TVA qui vient d'achats autoliquidés, pour la dire
+ * à l'écran — `null` quand il n'y en a pas, ou plus.
+ *
+ * Plafonnée à la provision elle-même : un « dont » ne peut pas dépasser son
+ * total, et quand des échéances payées ont réglé une partie seulement, on ne
+ * sait pas laquelle des deux TVA elles ont réglée. Afficher les 20 € quand il
+ * ne reste que 5 € provisionnés serait annoncer une somme que rien ne retient.
+ *
+ * Une `hypothese`, jamais un `publie` : le montant est sûr, la date de dépôt
+ * ne l'est pas, et aucune échéance n'est inventée.
+ */
+export function tvaAutoliqueeProvisionnee(
+  faits: Faits,
+  maintenant: Date = new Date()
+): Resolution<Euros> | null {
+  const part = Math.min(tvaDesDepensesPayees(faits).autoliquidee, tvaAReverserDe(faits));
+  if (part <= 0) return null;
+  return {
+    statut: 'hypothese',
+    valeur: euros(part),
+    source: AUTOLIQUIDATION_TVA.source,
+    verifieLe: AUTOLIQUIDATION_TVA.verifieLe,
+    depuis: moisCourant(maintenant)
+  };
+}
 
 /**
  * « Reste à sortir » : tout ce qui est sur le compte et dû à quelqu'un d'autre
@@ -61,12 +92,6 @@ export function detailDeLaDette(
   maintenant: Date = new Date()
 ): DetailDette {
   const type = faits.entreprise.typeActivite;
-  // Le taux du MOIS COURANT, comme `etatArgent` : c'est celui qui s'applique
-  // aux encaissements qu'on est en train de provisionner.
-  const tauxR = tauxImpotEtContributions(regimeDe(faits), moisCourant(maintenant), type);
-  // Un taux refusé vaut zéro ici, comme dans `etatArgent` : on ne fabrique pas
-  // de taux, et la ligne d'impôt manquera plutôt que d'être fausse.
-  const taux = tauxR.statut === 'refuse' ? 0 : tauxR.valeur;
 
   return detailDette(
     nature,
@@ -79,7 +104,11 @@ export function detailDeLaDette(
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
       debutActivite: faits.entreprise.debutActivite,
-      tauxImpotEtContributions: taux,
+      // Le taux de chaque mois d'encaissement, comme `etatPilote` — l'option
+      // pour le versement libératoire a pu changer au 1er janvier. Un taux
+      // refusé y vaut zéro : on ne fabrique pas de taux, et la ligne d'impôt
+      // manquera plutôt que d'être fausse.
+      tauxImpotEtContributions: tauxImpotAu(faits),
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       tvaAReverser: tvaAReverserDe(faits),
       tvaAutoliquidee: tvaAutoliqueeProvisionnee(faits, maintenant),

@@ -1,5 +1,5 @@
 import { useFaits } from '../../state/store';
-import { moisCourant, sousAcreLe } from '../../state/selecteurs';
+import { moisCourant, sousAcreLe, vlAu } from '../../state/selecteurs';
 import styles from './RailNav.module.css';
 
 /**
@@ -23,8 +23,12 @@ export function PiedDuRail() {
     .map((m) => m[0]?.toUpperCase() ?? '').join('');
   const regime = [
     `Micro-${entreprise.typeActivite === 'BNC' ? 'BNC' : 'BIC'}`,
+    // La caisse change le taux (23,2 % contre 25,6 % en 2026) : elle se lit
+    // avec le régime, sinon un taux Cipav passait pour une erreur de barème.
+    ...(entreprise.typeActivite === 'BNC' && entreprise.caisseRetraite === 'cipav' ? ['Cipav'] : []),
     ...(sousAcreLe(faits)(moisCourant()) ? ['ACRE'] : []),
-    ...(entreprise.versementLiberatoire ? ['VL'] : [])
+    // L'option de ce mois : prise en novembre pour janvier, elle ne se dit pas avant.
+    ...(vlAu(faits, moisCourant()) ? ['VL'] : [])
   ].join(' · ');
 
   return (

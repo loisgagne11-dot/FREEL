@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import {
-  moisCourant, periodesUrssafEffectives, tvaDueDepuisDe
+  moisCourant, periodesUrssafEffectives, tvaDueDepuisDe, vlAu
 } from '../../state/selecteurs';
 import { euros, estUtilisable, mois, moisDe, type Resolution } from '../../domain/types';
 import {
@@ -266,8 +266,9 @@ function ValeurBareme(
  */
 function BaremesEnVigueur() {
   const faits = useFaits((e) => e.faits);
-  const { typeActivite, debutActivite, acre, versementLiberatoire } = faits.entreprise;
+  const { typeActivite, debutActivite, acre } = faits.entreprise;
   const courant = moisCourant();
+  const versementLiberatoire = vlAu(faits, courant);
   const periodes = periodesUrssafEffectives(faits);
 
   const sousAcre = acre && debutActivite !== null

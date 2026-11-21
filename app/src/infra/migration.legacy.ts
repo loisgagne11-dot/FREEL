@@ -1003,6 +1003,9 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       siret: texte(c['siret']),
       debutActivite: dateOuNull(c['debut']),
       typeActivite: typeActivite(c['typeActivite']),
+      // Pas de `caisseRetraite` : l'ancienne version ne connaissait que la SSI
+      // (aucune Cipav dans `index.html`), et `entrepriseVide` la pose. Une
+      // caisse devinée d'après l'activité affilierait à la mauvaise.
       acre: booleen(c['acre']),
       versementLiberatoire: booleen(c['prelevementLiberatoire']),
       tvaDepuis: moisOuNull(c['tvaDepuis']),

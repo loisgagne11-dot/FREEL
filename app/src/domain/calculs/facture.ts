@@ -34,7 +34,7 @@
 import { type DateISO, type Euros, type Ratio, euros, ratio } from '../types';
 import { estDansLUe } from './des';
 import { type FormuleDelai, echeanceDe } from './delaiPaiement';
-import { tauxReconnu } from '../bareme/tva';
+import { tauxReconnu } from '../bareme/tva.reconnus';
 
 /**
  * Indemnité forfaitaire pour frais de recouvrement.

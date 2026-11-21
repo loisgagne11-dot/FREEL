@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { dateISO } from '../../domain/types';
+import { dateISO, mois } from '../../domain/types';
 import { entrepriseVide, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
 import { RailNav } from './RailNav';
@@ -125,6 +125,40 @@ describe('le pied du rail', () => {
     const carte = await within(rail()).findByRole('link', { name: /^Camille — / });
     expect(carte.getAttribute('aria-label')).toBe('Camille — Micro-BNC · ACRE');
     expect(carte.getAttribute('href')).toBe('#/reglages');
+  });
+
+  /* L'option du MOIS : prise en juin pour le 1er janvier, elle ne vaut pas
+     encore. Lue sur le booléen, le rail dirait « VL » six mois trop tôt, à
+     côté de taux qui ne la comptent pas. */
+  it('ne dit « VL » qu’à partir du mois où l’option vaut', async () => {
+    useFaits.setState({
+      faits: {
+        ...faitsVides(),
+        entreprise: {
+          ...entrepriseVide(), versementLiberatoire: true, historiqueVl: [{ jusquA: mois('2026-12'), actif: false }]
+        }
+      }
+    });
+    render(<RailNav ecranActif="pilote" />);
+    expect(await within(rail()).findByRole('link', { name: 'Ton profil — Micro-BNC' })).toBeTruthy();
+    cleanup();
+    vi.setSystemTime(new Date('2027-01-04T09:00:00Z'));
+    render(<RailNav ecranActif="pilote" />);
+    expect(await within(rail()).findByRole('link', { name: 'Ton profil — Micro-BNC · VL' })).toBeTruthy();
+  });
+
+  // La caisse change le taux : un 23,2 % lu sans « Cipav » passait pour une
+  // erreur de barème. En BIC, la caisse ne veut rien dire et ne se dit pas.
+  it('dit « Cipav » pour un libéral de la Cipav, jamais en BIC', async () => {
+    useFaits.setState({ faits: { ...faitsVides(), entreprise: { ...entrepriseVide(), caisseRetraite: 'cipav' } } });
+    render(<RailNav ecranActif="pilote" />);
+    expect(await within(rail()).findByRole('link', { name: 'Ton profil — Micro-BNC · Cipav' })).toBeTruthy();
+    cleanup();
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...entrepriseVide(), caisseRetraite: 'cipav', typeActivite: 'BIC_service' } }
+    });
+    render(<RailNav ecranActif="pilote" />);
+    expect(await within(rail()).findByRole('link', { name: 'Ton profil — Micro-BIC' })).toBeTruthy();
   });
 
   it('retombe sur « Ton profil » sans nom ni prénom', async () => {

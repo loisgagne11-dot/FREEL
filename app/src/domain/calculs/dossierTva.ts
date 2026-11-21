@@ -1,6 +1,6 @@
 import type { DateISO, Euros } from '../types';
 import { euros } from '../types';
-import { tauxReconnu } from '../bareme/tva';
+import { tauxReconnu } from '../bareme/tva.reconnus';
 
 /**
  * Le dossier de déclaration de TVA — tout ce qu'il faut pour remplir le

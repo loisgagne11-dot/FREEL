@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formuler } from './aTraiter.libelles';
 import { dateISO, euros, mois } from '../types';
+import { PERIODES_URSSAF } from '../bareme/urssaf';
 import {
   type EntreeATraiter, type PeriodeATraiter, type RecetteVue,
   compteursParEcran, sujetsATraiter, sujetsDeLEcran
@@ -14,6 +15,7 @@ function entree(modifications: Partial<EntreeATraiter> = {}): EntreeATraiter {
     typeActivite: 'BNC',
     recettes: [],
     echeancesReglementaires: [],
+    periodesUrssaf: PERIODES_URSSAF,
     ...modifications
   };
 }

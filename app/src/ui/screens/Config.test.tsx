@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois } from '../../domain/types';
-import { PERIODES_URSSAF } from '../../domain/bareme/urssaf';
+import { PERIODES_CIPAV, PERIODES_URSSAF } from '../../domain/bareme/urssaf';
 import { CLE_STOCKAGE, PART_GARDEE_MAX, type Faits, faitsVides } from '../../state/schema';
 import { stockageMemoire } from '../../infra/migration';
 import { useFaits } from '../../state/store';
@@ -80,15 +80,112 @@ describe('profil', () => {
     expect(useFaits.getState().faits.entreprise.typeActivite).toBe('BIC_service');
   });
 
+  // La Cipav n'affilie que des libéraux : montré en BIC, le choix se croirait
+  // appliqué alors que le barème de la SSI s'applique quoi qu'il dise.
+  it('demande la caisse de retraite en BNC, et seulement en BNC', async () => {
+    await afficher('profil');
+    const utilisateur = utilisateurTest();
+    const caisse = screen.getByLabelText('Ta caisse de retraite');
+    expect(caisse).toHaveProperty('value', 'ssi');
+    await utilisateur.selectOptions(caisse, 'cipav');
+    expect(useFaits.getState().faits.entreprise.caisseRetraite).toBe('cipav');
+
+    await utilisateur.selectOptions(screen.getByLabelText('Type d’activité'), 'BIC_vente');
+    expect(screen.queryByLabelText('Ta caisse de retraite')).toBeNull();
+  });
+
   // Discriminant exclusif : l'ancienne version cumulait versement libératoire
   // et barème progressif, et surestimait l'impôt à provisionner.
-  it('bascule le versement libératoire', async () => {
+  //
+  // La bascule écrivait au clic. Elle demande désormais « depuis quand » : une
+  // case seule réécrivait les années passées. Corriger, c'est l'option du jour
+  // depuis toujours, sans histoire — ce que faisait le clic.
+  it('bascule le versement libératoire, depuis le début quand on corrige', async () => {
     await afficher('profil');
     const utilisateur = utilisateurTest();
     await utilisateur.click(
       screen.getByRole('switch', { name: /Versement libératoire/ })
     );
-    expect(useFaits.getState().faits.entreprise.versementLiberatoire).toBe(true);
+    expect(useFaits.getState().faits.entreprise.versementLiberatoire).toBe(false);
+    await utilisateur.click(screen.getByRole('button', { name: /Depuis le début de mon activité/ }));
+    expect(useFaits.getState().faits.entreprise).toMatchObject({ versementLiberatoire: true, historiqueVl: [] });
+  });
+
+  /*
+   * CHANGER D'OPTION NE RÉÉCRIT PAS LE PASSÉ. Renoncer en janvier 2027, c'est
+   * pour 2028 : 2027 reste sous l'option, et ses déclarations aussi. Sans la
+   * question, la case réécrivait l'année en cours au barème.
+   */
+  it('garde l’option de l’année quand on la change pour le 1er janvier suivant, et le dit', async () => {
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } }
+    });
+    await afficher('profil');
+    const utilisateur = utilisateurTest();
+    await utilisateur.click(screen.getByRole('switch', { name: /Versement libératoire/ }));
+    const question = screen.getByRole('group', { name: /^Depuis quand/ });
+    expect(question.textContent).toMatch(/au plus tard le 30\u00a0septembre/);
+    await utilisateur.click(within(question).getByRole('button', { name: /À partir du 1ᵉʳ janvier 2028/ }));
+
+    expect(useFaits.getState().faits.entreprise).toMatchObject({
+      versementLiberatoire: false, historiqueVl: [{ jusquA: '2027-12', actif: true }]
+    });
+    expect(screen.getByText(/À partir du 1ᵉʳ janvier 2028, impôt au barème/)).toBeTruthy();
+  });
+
+  /*
+   * Passé le 30 septembre, un changement demandé ne vaut qu'au 1er janvier de
+   * l'année d'après. Proposer « 1er janvier prochain » en novembre faisait
+   * noter une option que l'administration n'appliquera pas ; celui qui note
+   * une option demandée à temps garde ce choix.
+   */
+  it('après le 30 septembre, propose le 1er janvier de l’année d’après, et garde celui de l’option demandée à temps', async () => {
+    vi.setSystemTime(new Date('2027-11-20T09:00:00Z'));
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } }
+    });
+    await afficher('profil');
+    const utilisateur = utilisateurTest();
+    await utilisateur.click(screen.getByRole('switch', { name: /Versement libératoire/ }));
+    const question = screen.getByRole('group', { name: /^Depuis quand/ });
+    expect(question.textContent).toMatch(/prend effet au 1er\u00a0janvier 2029/);
+    await utilisateur.click(within(question).getByRole('button', { name: /À partir du 1ᵉʳ janvier 2029/ }));
+    expect(useFaits.getState().faits.entreprise).toMatchObject({
+      versementLiberatoire: false, historiqueVl: [{ jusquA: '2028-12', actif: true }]
+    });
+
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } }
+    });
+    await utilisateur.click(screen.getByRole('switch', { name: /Versement libératoire/ }));
+    await utilisateur.click(screen.getByRole('button', { name: /Demandé avant le 30\u00a0septembre/ }));
+    expect(useFaits.getState().faits.entreprise).toMatchObject({
+      versementLiberatoire: false, historiqueVl: [{ jusquA: '2027-12', actif: true }]
+    });
+  });
+
+  it('n’écrit rien quand on annule la question', async () => {
+    await afficher('profil');
+    const utilisateur = utilisateurTest();
+    const bascule = screen.getByRole('switch', { name: /Versement libératoire/ });
+    await utilisateur.click(bascule);
+    await utilisateur.click(screen.getByRole('button', { name: 'Annuler' }));
+    expect(screen.queryByRole('group', { name: /^Depuis quand/ })).toBeNull();
+    expect(bascule).toHaveProperty('checked', false);
+    expect(useFaits.getState().faits.entreprise).toMatchObject({ versementLiberatoire: false, historiqueVl: [] });
+  });
+
+  // L'année de création, l'option demandée dans les trois mois vaut dès le
+  // début : proposer le 1er janvier suivant lui ferait payer un an au barème.
+  it('ne propose que « depuis le début » l’année de création', async () => {
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, debutActivite: dateISO('2027-01-05') } }
+    });
+    await afficher('profil');
+    await utilisateurTest().click(screen.getByRole('switch', { name: /Versement libératoire/ }));
+    const question = screen.getByRole('group', { name: /^Depuis quand/ });
+    expect(within(question).queryByRole('button', { name: /À partir du 1ᵉʳ janvier/ })).toBeNull();
+    expect(within(question).getByRole('button', { name: /Depuis le début de mon activité/ })).toBeTruthy();
   });
 
   it('laisse l’option pour la TVA vide en franchise en base', async () => {
@@ -125,6 +222,21 @@ describe('barème affiché', () => {
     for (const p of PERIODES_URSSAF) {
       expect(within(table).getByText(new RegExp(`^${p.du} →`))).toBeTruthy();
     }
+  });
+
+  // La table que lisent les calculs d'un affilié Cipav est la sienne : montrer
+  // celle de la SSI lui ferait croire à 25,6 % appliqués pour 23,2 %.
+  it('montre à un affilié Cipav la table de sa caisse, et le dit', async () => {
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, caisseRetraite: 'cipav' } }
+    });
+    await ouvrirBareme();
+    const table = screen.getByRole('table');
+    for (const p of PERIODES_CIPAV) {
+      expect(within(table).getByText(new RegExp(`^${p.du} →`))).toBeTruthy();
+    }
+    expect(within(table).queryByText(/^2026-01 →/)).toBeNull();
+    expect(screen.getByText(/Ta caisse de retraite est la Cipav/)).toBeTruthy();
   });
 
   it('affiche la source et la date de vérification de chaque période', async () => {

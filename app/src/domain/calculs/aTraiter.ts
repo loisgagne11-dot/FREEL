@@ -24,7 +24,7 @@ import {
 } from '../types';
 import { resteAvantMajore } from '../bareme/tva';
 import { plafondMicro } from '../bareme/plafonds';
-import { PERIODES_URSSAF, type PeriodeBareme } from '../bareme/urssaf';
+import type { PeriodeBareme } from '../bareme/urssaf';
 
 /** L'écran qui règle le sujet. Sert au badge de navigation et au lien. */
 export type EcranCible =
@@ -125,8 +125,11 @@ export interface EntreeATraiter {
    * l'utilisateur comprises. L'alerte de fraîcheur doit porter sur la table
    * réellement utilisée : sans cela, ajouter une période à jour laisserait
    * l'alerte allumée, et l'utilisateur cesserait de la croire.
+   *
+   * Obligatoire : son défaut était le barème de la SSI, celui d'un affilié
+   * Cipav n'aurait jamais été jugé.
    */
-  readonly periodesUrssaf?: readonly PeriodeBareme[];
+  readonly periodesUrssaf: readonly PeriodeBareme[];
   /**
    * Déclarations européennes de services dont la date limite est passée.
    *
@@ -414,7 +417,7 @@ export function sujetsATraiter(
   }
 
   /* ---------- fraîcheur du barème ---------- */
-  const verifieLe = fraicheurBaremeLaPlusAncienne(e.periodesUrssaf ?? PERIODES_URSSAF);
+  const verifieLe = fraicheurBaremeLaPlusAncienne(e.periodesUrssaf);
   if (verifieLe !== null && ajouterMois(verifieLe, seuils.moisFraicheurBareme) < moisCourant) {
     sujets.push({
       id: 'bareme-a-verifier',

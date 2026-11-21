@@ -36,7 +36,7 @@ import { type EtatDePiece, type PieceAFournir, etatDePiece } from '../domain/cal
 import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';
 import {
-  caEncaisseAnnee, periodesUrssafEffectives, recettesEncaissees, regimeDe, regimeTvaAu, sousAcreLe
+  caEncaisseAnnee, periodesUrssafEffectives, recettesEncaissees, regimeDe, regimeTvaAu, sousAcreLe, vlAu
 } from './selecteurs';
 import { dossierTvaDuTrimestre } from './selecteurs.dossierTva';
 import { soldeImpotPrevuDe } from './selecteurs.impotCalendrier';
@@ -95,7 +95,9 @@ export function ventilationDeclaration(faits: Faits, mois: readonly Mois[]): Res
   const dans = new Set<string>(mois);
   const dernier = mois[mois.length - 1];
   if (dernier === undefined) return { statut: 'refuse', motif: 'Période vide.' };
-  const taux = tauxImpotEtContributions(regimeDe(faits), dernier, faits.entreprise.typeActivite);
+  // L'option du dernier mois de la période : elle ne change qu'au 1er janvier,
+  // et une période ne passe pas d'une année à l'autre.
+  const taux = tauxImpotEtContributions(regimeDe(faits, dernier), dernier, faits.entreprise.typeActivite);
   if (taux.statut === 'refuse') return taux;
   const calcul = voletAProvisionner(
     recettesEncaissees(faits).filter((r) => dans.has(r.encaisseeLe.slice(0, 7))),
@@ -489,10 +491,10 @@ function revenus(faits: Faits, depuis: Mois, jusquA: Mois, aujourdhui: DateISO):
         periode: String(annee),
         declaration: etapeDatee(limite, mois, aujourdhui, { faite: fait !== undefined, faiteLe: fait?.declareeLe ?? null }),
         montant: null,
-        // L'option se lit telle qu'elle est aujourd'hui : le schéma ne garde
-        // pas son histoire, et une option prise ou quittée en cours d'année ne
-        // se partagerait pas ici sans elle.
-        cases: casesDeclarationRevenus(encaissees, precedente, () => e.versementLiberatoire),
+        // L'option de chaque mois d'encaissement, et non celle du jour :
+        // quitter le versement libératoire en 2026 faisait déclarer en 5HQ les
+        // recettes de 2025, déjà imposées à chaque déclaration.
+        cases: casesDeclarationRevenus(encaissees, precedente, (d) => vlAu(faits, moisDe(d))),
         saisies: []
       }
     });

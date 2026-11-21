@@ -3,7 +3,7 @@ import { useFaits } from '../../state/store';
 import { ajouterPeriodeUrssaf, retirerPeriodeUrssaf } from '../../state/ecritures.activite';
 import { BlocConfirmation } from '../components/ConfirmationSurPlace';
 import { dateDuJour, periodesUrssafEffectives } from '../../state/selecteurs';
-import { PERIODES_URSSAF, type PeriodeBareme } from '../../domain/bareme/urssaf';
+import { PERIODES_CIPAV, type PeriodeBareme, baremeDeLaCaisse } from '../../domain/bareme/urssaf';
 import { type Mois, mois, ratio } from '../../domain/types';
 import { Info } from '../components/Info';
 import { Champ } from '../components/Champ';
@@ -68,10 +68,10 @@ export function Bareme() {
           Cotisations sociales, par période
           <Info libelle="Pourquoi par période et non par année">
             Le taux applicable aux BNC a augmenté au 1<sup>er</sup> juillet
-            2024, puis de nouveau au 1<sup>er</sup> juillet 2026. Une table par
-            année civile appliquerait un taux unique à des mois relevant de deux
-            barèmes&nbsp;: c’est le défaut qui faisait calculer juillet 2026 à
-            25,6 % au lieu de 26,1 %.
+            2024, en cours d’année. Une table par année civile appliquerait un
+            taux unique à des mois relevant de deux barèmes&nbsp;: c’est le
+            défaut qui faisait calculer le second semestre 2024 à 21,1 % au lieu
+            de 23,1 %.
           </Info>
         </h2>
 
@@ -79,6 +79,10 @@ export function Bareme() {
           Cette table est celle que les calculs appliquent réellement. Un taux
           d’un mois écoulé est un fait&nbsp;: il ne s’extrapole pas, et une
           période close ne se réécrit pas.
+          {/* Sans ce mot, un affilié Cipav lirait ses 23,2 % comme une
+              table fausse : la SSI en demande 25,6 %. */}
+          {baremeDeLaCaisse(faits.entreprise.caisseRetraite, faits.entreprise.typeActivite) === PERIODES_CIPAV
+            && ' Ta caisse de retraite est la Cipav : la colonne BNC porte son barème.'}
         </p>
 
         <div className={styles.tableDefilante}>
@@ -165,7 +169,7 @@ export function Bareme() {
 
       <FormulairePeriode
         onAjouter={ajouter}
-        derniere={effectives[effectives.length - 1] ?? PERIODES_URSSAF[0]}
+        derniere={effectives[effectives.length - 1]}
       />
     </>
   );

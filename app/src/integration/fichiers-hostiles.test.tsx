@@ -119,7 +119,22 @@ const BLOCS_HOSTILES: readonly (readonly [string, string, RegExp])[] = [
   ['un régime de TVA inconnu',
     blocHostile({ entreprise: { ...faitsVides().entreprise, regimeTva: 'au_hasard' } }), /regimeTva/],
   ['un nom d’exploitant qui n’est pas un texte',
-    blocHostile({ entreprise: { ...faitsVides().entreprise, nomExploitant: { initiale: 'A' } } }), /nomExploitant/]
+    blocHostile({ entreprise: { ...faitsVides().entreprise, nomExploitant: { initiale: 'A' } } }), /nomExploitant/],
+  /* Schéma 26 : une caisse inconnue se lirait « SSI » sans un mot, et un
+     affilié Cipav cotiserait au mauvais taux sans l'avoir choisi. */
+  ['une caisse de retraite inconnue',
+    blocHostile({ entreprise: { ...faitsVides().entreprise, caisseRetraite: 'carpimko' } }), /caisseRetraite/],
+  /* Une histoire dans le désordre laisserait la première période masquer la
+     seconde : une année sous versement libératoire redeviendrait imposée au
+     barème. Une liste qui n'en est pas une ferait lever chaque écran d'impôt. */
+  ['une histoire de l’option dans le désordre',
+    blocHostile({ entreprise: { ...faitsVides().entreprise, historiqueVl: [{ jusquA: '2026-12', actif: true }, { jusquA: '2025-12', actif: false }] } }),
+    /historiqueVl/],
+  ['une histoire de l’option qui n’est pas une liste',
+    blocHostile({ entreprise: { ...faitsVides().entreprise, historiqueVl: { jusquA: '2025-12' } } }), /historiqueVl/],
+  ['une période de l’option sans mois lisible',
+    blocHostile({ entreprise: { ...faitsVides().entreprise, historiqueVl: [{ jusquA: 'décembre', actif: true }] } }),
+    /historiqueVl/]
 ];
 
 describe('sauvegarde JSON, compte, archive : le bloc de faits', () => {

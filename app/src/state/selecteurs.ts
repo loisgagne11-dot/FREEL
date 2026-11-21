@@ -16,7 +16,7 @@ import {
   euros, moisDe
 } from '../domain/types';
 import { moisSousAcre, tauxImpotEtContributions } from '../domain/bareme';
-import { AUTOLIQUIDATION_TVA, tvaDueDepuis } from '../domain/bareme/tva';
+import { tvaDueDepuis } from '../domain/bareme/tva';
 import type { RegimeImposition } from '../domain/bareme';
 import {
   type Echeance, type NatureDette, type RecetteEncaissee,
@@ -28,28 +28,31 @@ import {
   type ProvisionImpotRevenu, provisionImpotRevenu
 } from '../domain/calculs/provisionImpotRevenu';
 import {
-  PERIODES_URSSAF, type PeriodeBareme, fusionnerPeriodes
+  type PeriodeBareme, baremeDeLaCaisse, fusionnerPeriodes
 } from '../domain/bareme/urssaf';
 import { soldeDerive } from '../domain/calculs/solde';
+import { optionVlAu } from '../domain/calculs/optionVl';
 import type { RegimeTva } from '../domain/calculs/depenses';
 import { tvaDeDepense } from '../domain/calculs/depenses.tva';
-import type { Faits, Recette } from './schema';
+import type { Faits } from './schema';
 import { encaissementsAttendusDeLAnnee, facturesAEncaisser } from './selecteurs.pipeline';
-import {
-  FORMULE_PAR_DEFAUT, echeanceDe
-} from '../domain/calculs/delaiPaiement';
 
 /**
  * Le barème URSSAF effectivement appliqué.
  *
  * Une seule source pour toute l'application : les périodes livrées avec le
- * code, complétées par celles que l'utilisateur a saisies. Tout calcul qui
- * lirait `PERIODES_URSSAF` directement verrait un barème différent de celui
- * affiché dans Config — exactement le genre de divergence que la refonte
- * cherche à rendre impossible.
+ * code pour la caisse de l'entreprise, complétées par celles que l'utilisateur
+ * a saisies. Tout calcul qui lirait `PERIODES_URSSAF` directement verrait un
+ * barème différent de celui affiché dans Config — exactement le genre de
+ * divergence que la refonte cherche à rendre impossible —, et un affilié
+ * Cipav y cotiserait au taux de la SSI.
+ *
+ * Les périodes saisies s'appliquent à la caisse du moment : elles se lisent
+ * sur l'avis d'appel de sa propre caisse.
  */
 export function periodesUrssafEffectives(faits: Faits): readonly PeriodeBareme[] {
-  return fusionnerPeriodes(PERIODES_URSSAF, faits.periodesUrssafAjoutees);
+  const { caisseRetraite, typeActivite } = faits.entreprise;
+  return fusionnerPeriodes(baremeDeLaCaisse(caisseRetraite, typeActivite), faits.periodesUrssafAjoutees);
 }
 
 /** Le mois courant, dérivé de l'horloge et jamais codé en dur. */
@@ -95,11 +98,36 @@ export function debutTvaEffectif(faits: Faits): Mois | null {
   return option !== null && option < due ? option : due;
 }
 
-/** Le régime d'imposition, tel qu'il découle des faits (discriminant D2). */
-export function regimeDe(faits: Faits, acomptePasSaisi: Euros = euros(0)): RegimeImposition {
-  return faits.entreprise.versementLiberatoire
+/**
+ * L'option pour le versement libératoire à un mois : la SEULE lecture de
+ * l'option. Le booléen de l'entreprise est la dernière choisie, qui peut ne
+ * valoir qu'au 1er janvier prochain ; le lire directement faisait recalculer
+ * l'année passée sous l'option du jour (voir `calculs/optionVl`).
+ */
+export function vlAu(faits: Faits, m: Mois): boolean {
+  return optionVlAu(faits.entreprise.historiqueVl, faits.entreprise.versementLiberatoire, m);
+}
+
+/** Le régime d'imposition d'un mois, tel qu'il découle des faits (discriminant D2). */
+export function regimeDe(faits: Faits, m: Mois, acomptePasSaisi: Euros = euros(0)): RegimeImposition {
+  return vlAu(faits, m)
     ? { regime: 'versement_liberatoire' }
     : { regime: 'bareme', acomptePasSaisi };
+}
+
+/**
+ * Le taux d'impôt et de contributions de chaque mois, pour le volet « à
+ * provisionner » : versement libératoire compris ou non selon l'option de CE
+ * mois. Au taux du mois courant, un décembre sous l'option encore à déclarer
+ * en janvier — l'option quittée au 1er — perdait ses 2,2 %, et l'année
+ * écoulée, toute sous l'option, n'avait pas d'impôt au barème pour les
+ * reprendre : le dû baissait d'autant. Refusé, il vaut zéro, comme avant.
+ */
+export function tauxImpotAu(faits: Faits): (m: Mois) => number {
+  return (m) => {
+    const r = tauxImpotEtContributions(regimeDe(faits, m), m, faits.entreprise.typeActivite);
+    return r.statut === 'refuse' ? 0 : r.valeur;
+  };
 }
 
 /**
@@ -175,7 +203,7 @@ export function tvaAReverserDe(faits: Faits): Euros {
 }
 
 /** La TVA déductible et la TVA autoliquidée des dépenses payées : une règle, un passage. */
-function tvaDesDepensesPayees(faits: Faits): { deductible: number; autoliquidee: number } {
+export function tvaDesDepensesPayees(faits: Faits): { deductible: number; autoliquidee: number } {
   const banqueSynchronisee = soldeEstSuivi(faits);
   let deductible = 0;
   let autoliquidee = 0;
@@ -193,41 +221,30 @@ function tvaDesDepensesPayees(faits: Faits): { deductible: number; autoliquidee:
   return { deductible, autoliquidee };
 }
 
-/**
- * La part de la provision de TVA qui vient d'achats autoliquidés, pour la dire
- * à l'écran — `null` quand il n'y en a pas, ou plus.
- *
- * Plafonnée à la provision elle-même : un « dont » ne peut pas dépasser son
- * total, et quand des échéances payées ont réglé une partie seulement, on ne
- * sait pas laquelle des deux TVA elles ont réglée. Afficher les 20 € quand il
- * ne reste que 5 € provisionnés serait annoncer une somme que rien ne retient.
- *
- * Une `hypothese`, jamais un `publie` : le montant est sûr, la date de dépôt
- * ne l'est pas, et aucune échéance n'est inventée.
- */
-export function tvaAutoliqueeProvisionnee(
-  faits: Faits,
-  maintenant: Date = new Date()
-): Resolution<Euros> | null {
-  const part = Math.min(tvaDesDepensesPayees(faits).autoliquidee, tvaAReverserDe(faits));
-  if (part <= 0) return null;
-  return {
-    statut: 'hypothese',
-    valeur: euros(part),
-    source: AUTOLIQUIDATION_TVA.source,
-    verifieLe: AUTOLIQUIDATION_TVA.verifieLe,
-    depuis: moisCourant(maintenant)
-  };
-}
-
 /** Chiffre d'affaires encaissé sur une année civile. */
 export function caEncaisseAnnee(faits: Faits, annee: number): Euros {
+  return encaisseDeLAnnee(faits, annee, () => true);
+}
+
+function encaisseDeLAnnee(faits: Faits, annee: number, retenir: (m: Mois) => boolean): Euros {
   const prefixe = String(annee);
   return euros(
     recettesEncaissees(faits)
-      .filter((r) => r.encaisseeLe.startsWith(prefixe))
+      .filter((r) => r.encaisseeLe.startsWith(prefixe) && retenir(moisDe(r.encaisseeLe)))
       .reduce<number>((somme, r) => somme + r.montant, 0)
   );
+}
+
+/**
+ * Ce qu'une année a encaissé HORS versement libératoire : l'assiette de
+ * l'impôt au barème, la case 5HQ de la déclaration. `null` quand l'option a
+ * couvert l'année entière — il n'y a alors pas d'impôt au barème du tout, et
+ * l'estimer recompterait un impôt déjà payé à chaque déclaration.
+ */
+function encaisseAuBareme(faits: Faits, annee: number): Euros | null {
+  const mois = Array.from({ length: 12 }, (_, i) => `${annee}-${String(i + 1).padStart(2, '0')}` as Mois);
+  if (mois.every((m) => vlAu(faits, m))) return null;
+  return encaisseDeLAnnee(faits, annee, (m) => !vlAu(faits, m));
 }
 
 /**
@@ -369,22 +386,6 @@ export function sousAcreLe(faits: Faits): (m: Mois) => boolean {
 
 
 /**
- * L'échéance d'une facture, pour le sujet « en retard » comme pour la
- * pastille du flux : une seule règle.
- *
- * Elle vient de la recette : elle est imprimée sur le document. Le secours ne
- * sert qu'à une facture qu'aucune migration n'aurait comblée — une facture
- * émise sans échéance serait réputée jamais échue, et les retards les plus
- * anciens seraient précisément ceux qu'on ne verrait pas.
- */
-export function echeanceDesFactures(faits: Faits): (r: Recette) => DateISO | null {
-  const formules = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
-  return (r) => (r.emiseLe === null
-    ? null
-    : r.echeanceLe ?? echeanceDe(r.emiseLe, formules.get(r.clientNom) ?? FORMULE_PAR_DEFAUT));
-}
-
-/**
  * Les acomptes de prélèvement à la source déjà saisis pour l'année.
  *
  * Payés ou non, et c'est ce qui rend les deux volets étanches : le volet 1
@@ -436,16 +437,20 @@ export function provisionIrDe(
   maintenant: Date = new Date(),
   caAttendu?: Euros | null
 ): Resolution<ProvisionImpotRevenu> | null {
-  if (faits.entreprise.versementLiberatoire) return null;
-
   const m = moisCourant(maintenant);
   const annee = Number(m.slice(0, 4));
+  const assiette = encaisseAuBareme(faits, annee);
+  if (assiette === null) return null;
+
   return provisionImpotRevenu({
     annee,
     moisCourant: m,
     typeActivite: faits.entreprise.typeActivite,
-    caEncaisseConstate: caEncaisseAnnee(faits, annee),
-    caAttendu: caAttendu === undefined ? encaissementsAttendusDeLAnnee(faits, maintenant) : caAttendu,
+    caEncaisseConstate: assiette,
+    // Le reste de l'année suit l'option de ce mois : elle ne change qu'au
+    // 1er janvier.
+    caAttendu: vlAu(faits, m) ? euros(0)
+      : caAttendu === undefined ? encaissementsAttendusDeLAnnee(faits, maintenant) : caAttendu,
     foyer: {
       partsFiscales: faits.partsFiscales,
       autresRevenusFoyer: faits.autresRevenusFoyer,
@@ -481,10 +486,12 @@ export function soldeImpotPrecedentDe(
   faits: Faits,
   maintenant: Date = new Date()
 ): Resolution<ProvisionImpotRevenu> | null {
-  if (faits.entreprise.versementLiberatoire) return null;
   const precedente = Number(moisCourant(maintenant).slice(0, 4)) - 1;
-  const assiette = caEncaisseAnnee(faits, precedente);
-  if (assiette <= 0) return null;
+  // L'option de CETTE année-là, pas celle du jour : quitter le versement
+  // libératoire en janvier inventait un solde d'impôt sur une année déjà
+  // imposée à chaque déclaration.
+  const assiette = encaisseAuBareme(faits, precedente);
+  if (assiette === null || assiette <= 0) return null;
   if (faits.echeances.some((e) => e.nature === 'impot' && e.exercice === precedente)) return null;
 
   return provisionImpotRevenu({
@@ -601,12 +608,9 @@ export function etatPilote(
   const echeances = echeancesDuComptePro(faits, toutesEcheances);
   const m = moisCourant(maintenant);
   const type: TypeActivite = faits.entreprise.typeActivite;
-  const regime = regimeDe(faits);
+  const tauxImpotR = tauxImpotEtContributions(regimeDe(faits, m), m, type);
 
-  const tauxImpotR = tauxImpotEtContributions(regime, m, type);
-  const tauxImpot = tauxImpotR.statut === 'refuse' ? 0 : tauxImpotR.valeur;
-
-  // Sous le barème, `tauxImpot` ne vaut que la CFP : l'impôt sur le revenu
+  // Sous le barème, le taux d'impôt ne vaut que la CFP : l'impôt sur le revenu
   // entre séparément, en montant annuel. Sans lui, le versable était surévalué
   // de tout l'impôt de l'année pour qui n'a pas opté pour le versement
   // libératoire.
@@ -620,7 +624,7 @@ export function etatPilote(
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
       debutActivite: faits.entreprise.debutActivite,
-      tauxImpotEtContributions: tauxImpot,
+      tauxImpotEtContributions: tauxImpotAu(faits),
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       tvaAReverser: tvaAReverserDe(faits),
       periodesUrssaf: periodesUrssafEffectives(faits)

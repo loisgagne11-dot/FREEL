@@ -223,7 +223,10 @@ function ProfilMinimal({ onFini, onRetour }: { readonly onFini: () => void; read
       typeActivite: activite,
       debutActivite: debut === '' ? null : dateISO(debut),
       acre,
+      // Répondu à l'ouverture du compte : l'option vaut depuis le début, sans
+      // histoire — celle qu'un essai précédent aurait laissée ne dirait plus rien.
       versementLiberatoire: vl,
+      historiqueVl: [],
       tvaDepuis: depuis
     });
     signaler('Profil enregistré. Le SIRET, l’adresse et l’IBAN se règlent dans Réglages.');

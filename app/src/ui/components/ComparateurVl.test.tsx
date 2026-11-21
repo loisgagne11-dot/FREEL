@@ -130,11 +130,50 @@ describe('comparaison', () => {
   });
 });
 
+/*
+ * LE PLAFOND DE REVENU FISCAL DE RÉFÉRENCE, SOUS LE COMPARATIF.
+ *
+ * Sans lui, le comparatif conseillait le versement libératoire à un foyer qui
+ * n'y a pas droit — l'arithmétique sans la condition d'accès. Le plafond se
+ * lit sur le barème de l'impôt : celui des revenus de Y−2, Y étant l'année où
+ * l'option vaudrait. Une année dont le barème manque se tait, motif dit.
+ */
+describe('plafond du versement libératoire', () => {
+  const note = (): string => screen.getByText(/revenu fiscal de référence de|n’est pas dans l’application/).textContent ?? '';
+
+  it('annonce le plafond de l’an prochain, lu sur le barème des revenus de deux ans plus tôt', () => {
+    semer();
+    render(<ComparateurVl />);
+    expect(note()).toMatch(/ouvert en 2027 .*référence de 2025 ne dépasse pas 29\u202f579\s€ \(1 part\) — il figure en première page de ton avis d’impôt 2026\./);
+  });
+
+  it('le multiplie par les parts du foyer, arrondi à l’euro inférieur', () => {
+    semer({ partsFiscales: 2.5 });
+    render(<ComparateurVl />);
+    expect(note()).toMatch(/73\u202f947\s€ \(2,5 parts\)/);
+  });
+
+  // L'année de création, l'option vaut dès le début si elle est demandée avant
+  // la fin du troisième mois qui suit : c'est le revenu de 2024 qui compte.
+  it('annonce le plafond de l’année en cours dans les premiers mois d’activité', () => {
+    semer({ entreprise: { ...faitsVides().entreprise, debutActivite: dateISO('2026-06-01') } });
+    render(<ComparateurVl />);
+    expect(note()).toMatch(/ouvert en 2026 .*référence de 2024 ne dépasse pas 29\u202f315\s€/);
+  });
+
+  it('se tait quand le barème de l’année manque, et dit pourquoi', () => {
+    vi.setSystemTime(new Date('2027-08-13T09:00:00Z'));
+    semer();
+    render(<ComparateurVl />);
+    expect(note()).toMatch(/revenus 2026 n’est pas dans l’application/);
+    expect(note()).not.toMatch(/€/);
+  });
+});
+
 /**
  * Cacher les limites ferait passer le résultat pour un verdict. L'éligibilité
- * en particulier n'est PAS vérifiée : le plafond de revenu fiscal de référence
- * est un nombre officiel que l'application ne porte pas, et l'invariant n°1
- * interdit de l'écrire au jugé.
+ * en particulier n'est PAS vérifiée : le plafond est dit, mais le revenu fiscal
+ * de référence du foyer est sur son avis, que l'application ne lit pas.
  */
 describe('ce que le calcul ne dit pas', () => {
   it('avertit que l’éligibilité n’est pas vérifiée', () => {

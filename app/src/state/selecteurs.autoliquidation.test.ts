@@ -5,10 +5,10 @@ import { type Echeance, LIBELLE_NATURE } from '../domain/calculs/provisions';
 import { enveloppesDeProvision } from '../domain/calculs/enveloppes';
 import { type Faits, faitsVides } from './schema';
 import {
-  etatPilote, impotRevenuAProvisionner, tvaAReverserDe, tvaAutoliqueeProvisionnee
+  etatPilote, impotRevenuAProvisionner, tvaAReverserDe
 } from './selecteurs';
 import { compositionDe } from './selecteurs.composition';
-import { detailDeLaDette } from './selecteurs.dette';
+import { detailDeLaDette, tvaAutoliqueeProvisionnee } from './selecteurs.dette';
 
 /*
  * Lot 13 — la TVA autoliquidée entre dans la provision de TVA, et le détail de
