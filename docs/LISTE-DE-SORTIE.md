@@ -211,9 +211,11 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 
 | Ligne | État |
 |---|---|
-| Net de poche (année, mois lissé sur douze mois) et taux de prélèvement, composition au clic ; « avant impôt » quand l'impôt n'est pas calculable | ⬜ |
-| Jours nécessaires par mois, tarif plancher, objectif exprimé en net | ⬜ |
-| Encours par ancienneté ; comparaison avec l'an passé | ⬜ |
+| Net de poche (année, mois lissé sur douze mois) et taux de prélèvement, composition au clic ; « avant impôt » quand l'impôt n'est pas calculable | ◐ calculs posés, écran après validation de la maquette — 21/11, `selecteurs.analyse` : encaissé hors taxes − cotisations et formation (la règle du dû) − impôt (versement libératoire, ou provision de l'année au taux de l'année) − CFE (avis saisis) − dépenses (TVA récupérable retirée, autoliquidée d'un franchisé ajoutée) ; mois lissé sur les douze derniers mois **entiers**, divisé par les mois d'activité (démonstration : 2 500 € sur huit mois) ; « avant impôt » en `hypothese`, l'impôt à `null`, jamais à zéro. Taux : (cotisations + formation + impôt + CFE) ÷ encaissé, dépenses à part (démonstration : 15 %) |
+| Jours nécessaires par mois, tarif plancher, objectif exprimé en net | ◐ calculs posés, écran après validation de la maquette — 21/11 : jours = (besoin + dépenses du mois) ÷ (tarif des contrats × (1 − taux)) — *les dépenses y sont, la formule de l'audit les oubliait* (démonstration : 5,6 jours) ; plancher = (besoin + dépenses) annuels ÷ (jours de l'occupation × (1 − taux)), refusé sous trois mois (134 €) ; objectif 72 000 € → 5 018 € net par mois, et l'inverse par les jours nécessaires (test d'accord des deux sens). `objectifCaAnnuel` reste en chiffre d'affaires |
+| Encours par ancienneté ; comparaison avec l'an passé | ◐ calculs posés, écran après validation de la maquette — 21/11 : quatre tranches (non échues, 1–30, 31–60, au-delà), leur somme est le reste à encaisser (démonstration : 4 810 € + 1 200 €) ; même période l'an passé, encaissé et jours au planning, refusée sous douze mois (« la comparaison viendra en octobre 2026 ») |
+| L'écran Activité › Analyse, d'après la maquette `direction/analyse.html` | ⬜ à valider par le propriétaire (maquette du 21/11), puis à coder dans une seconde PR |
+| **Venu du lot 50** : le « tarif effectif » de « Ce qu'une journée te rapporte » (`tarifDeLaJournee`) divise ce qui est déjà facturé par les journées du planning de toute l'année, à venir comprises : la démonstration lit 400 € et « 102 € perdus par journée » au 10 juin, quand juin et juillet ne sont simplement pas encore facturés. Antérieur, non corrigé ici ; les calculs du lot 50 lisent le tarif des contrats | ⬜ à placer (avec l'écran Analyse) |
 
 ### Lot 52 — Le Pilote en quatre réponses
 

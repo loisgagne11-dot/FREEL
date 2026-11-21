@@ -1061,3 +1061,36 @@ TVA aux encaissements qui le suivent — la projection ne lit la redevabilité q
 sur les faits (`regimeTvaAu`). Les acomptes de prélèvement à la source de
 l'année suivante, s'ils sont saisis d'avance, s'ajoutent à l'impôt né des
 encaissements de cette année-là (erreur dans le sens prudent).
+
+## Lot 50, phase B (21/11) — sept indicateurs calculés, pas encore affichés
+
+Calculés et testés (`selecteurs.analyse`), sur la démonstration et le jeu
+d'essai ; **aucun n'est encore à l'écran** — l'écran Analyse attend la
+validation de sa maquette (`direction/analyse.html`). La colonne « Actuelle »
+du §3 ne les compte donc pas : un calcul sans écran n'est pas un indicateur
+livré (la leçon de V9).
+
+| Indicateur | Formule retenue | Démonstration, 10/06/2026 | Jeu d'essai, 15/12/2026 |
+|---|---|---|---|
+| Net de poche de l'année | Encaissé HT − cotisations − formation − impôt − CFE − dépenses ; impôt `null` (« avant impôt ») quand il ne se calcule pas | 18 077 € (22 720 − 2 908 − 45 − 500 − 0 − 1 190) | 44 324 € |
+| Mois lissé, et sa tendance | Net des douze derniers mois entiers ÷ mois d'activité comptés ; net de chacun | 2 500 € par mois, sur huit mois | 3 961 € par mois, sur douze |
+| Taux de prélèvement | (Cotisations + formation + impôt + CFE) ÷ encaissé | 15 % | 37 % (au barème, foyer à deux parts) |
+| Jours nécessaires par mois | (Besoin + dépenses du mois) ÷ (tarif des contrats × (1 − taux)) | 5,6 jours (2 300 € à 502 €) | 10 jours |
+| Tarif plancher | (Besoin + dépenses) annuels ÷ (jours de l'occupation × (1 − taux)) ; refusé sous trois mois | 134 € (250 jours) | 238 € |
+| Objectif en net | (Objectif × (1 − taux) − dépenses annuelles) ÷ 12 | 72 000 € → 5 018 € par mois | 80 000 € → 4 157 € |
+| Encours par ancienneté | Non échues, 1–30, 31–60, au-delà ; somme = reste à encaisser | 4 810 € (2) · 1 200 € (1) · 0 · 0 | 9 000 € non échus |
+| Comparaison avec l'an passé | Même période, encaissé et jours au planning ; refusée sous douze mois | Refusée : « viendra en octobre 2026 » | 72 480 € et 197 jours, contre 23 760 € et 134 |
+
+Deux écarts à la formule de `AUDIT-PRODUIT-ET-INTERFACE.md` §5, dits ici :
+les **dépenses** entrent dans les jours nécessaires (sans elles, le net du
+mois tombait sous le besoin de leur montant) et l'objectif inverse se calcule
+`(net + dépenses) ÷ (1 − taux)` et non `net ÷ (1 − taux) + dépenses` (les
+dépenses se paient sur un chiffre d'affaires déjà prélevé). Le **tarif** est
+celui des contrats sur les journées du planning, pas le « tarif effectif » :
+voir la note qui suit.
+
+**Rencontré, non corrigé (hors lot)** : le « tarif effectif » de « Ce qu'une
+journée te rapporte » divise ce qui est déjà facturé par les journées du
+planning de **toute** l'année, à venir comprises — la démonstration lit
+400 € « effectifs » et « 102 € perdus par journée » au 10 juin, quand rien
+n'est perdu : juin et juillet ne sont simplement pas encore facturés.
