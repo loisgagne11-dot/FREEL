@@ -348,7 +348,6 @@ export function projectionDuScenario(
 function lignesDuDu(
   faits: Faits, p: EtatProjection, parNature: VentilationProvisions, maintenant: Date
 ): readonly LigneDuDu[] {
-  const aujourdhui = dateDuJour(maintenant);
   const declares = new Set(moisDeclares(faits.periodesDeclarees));
   const nonDeclares = recettesEncaissees(faits)
     .map((r) => r.encaisseeLe.slice(0, 7) as Mois)
@@ -360,8 +359,11 @@ function lignesDuDu(
       cle,
       natures,
       montant: somme(natures.map((n) => parNature[n])),
-      // La prochaine qui vient ; à défaut — tout est en retard —, la plus ancienne.
-      prochaine: dates.find((d) => d >= aujourdhui) ?? dates[0] ?? null,
+      /* La plus proche, en retard comprise : un trimestre dont la limite est
+         passée presse plus que le suivant. Le jeu d'essai l'a montré — le
+         troisième trimestre, non déclaré au 15 décembre, se cachait derrière
+         « à payer le 1ᵉʳ février ». */
+      prochaine: dates[0] ?? null,
       depuis: cle === 'urssaf' ? nonDeclares[0] ?? null : null,
       avecUrssaf: cle === 'impot' && vlAu(faits, moisCourant(maintenant)),
       autoliquidee: cle === 'tva' && tvaDesDepensesPayees(faits).autoliquidee > 0

@@ -389,7 +389,8 @@ export function CourbeDuDisponible(
 
         {montrerPic && pic !== undefined && (
           <Annotation x={pic.x} y={y(pic.valeur)} largeur={largeur}
-            haut={`fin ${moisSeul(pic.mois)}, prévu`} bas={eur(pic.valeur)} />
+            haut={`fin ${moisSeul(pic.mois)}, prévu`} bas={eur(pic.valeur)}
+            eviter={xAujourdhui === null ? null : Math.min(Math.max(xAujourdhui - 41.5, 0), largeur - 83)} />
         )}
 
         {bas_ !== undefined && pointBas !== null && (
@@ -444,11 +445,20 @@ export function CourbeDuDisponible(
 
 /** Une petite carte posée près d'un point : le pic. */
 function Annotation(
-  { x, y, largeur, haut, bas }: { readonly x: number; readonly y: number; readonly largeur: number; readonly haut: string; readonly bas: string }
+  { x, y, largeur, haut, bas, eviter }: {
+    readonly x: number; readonly y: number; readonly largeur: number; readonly haut: string; readonly bas: string;
+    /** Le bord gauche de la pastille « aujourd'hui » (83 × 24, en haut) : la carte ne la recouvre pas. */
+    readonly eviter: number | null;
+  }
 ) {
   const l = 136;
   const gauche = Math.min(Math.max(x + 16, 4), largeur - l - 4);
-  const sommet = Math.max(4, y - 54);
+  const auDessus = Math.max(4, y - 54);
+  /* Un pic tout près d'aujourd'hui posait sa carte sur la pastille — le jeu
+     d'essai, en décembre, n'avait plus de « aujourd'hui » lisible : la carte
+     passe alors sous le point. */
+  const recouvre = eviter !== null && auDessus < 36 && gauche < eviter + 83 && gauche + l > eviter;
+  const sommet = recouvre ? y + 14 : auDessus;
   return (
     <>
       <circle className={tr.pointRepere} cx={x} cy={y} r={5} />

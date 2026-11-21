@@ -292,7 +292,10 @@ describe('les « et si »', () => {
   it('se remettent à zéro en quittant l’écran', async () => {
     avecProspect();
     const { unmount } = render(<Tresorerie />);
-    await userEvent.click(await screen.findByRole('button', { name: '+ Compter le prospect' }));
+    const bouton = await screen.findByRole('button', { name: '+ Compter le prospect' });
+    expect(bouton.getAttribute('aria-pressed')).toBe('false');
+    await userEvent.click(bouton);
+    expect(bouton.getAttribute('aria-pressed')).toBe('true');
     unmount();
     render(<Tresorerie />);
     expect((await screen.findByRole('button', { name: '+ Compter le prospect' })).getAttribute('aria-pressed')).toBe('false');
@@ -368,5 +371,28 @@ describe('les seuils', () => {
     poser({ recettes: [encaisse(10_000, '2026-03-10')] });
     render(<Tresorerie />);
     expect((await carte()).textContent).toMatch(/Jours facturables\s?: pas de calcul, aucune mission signée/u);
+  });
+});
+
+/*
+ * Un trimestre dont la limite est passée presse plus que le suivant : la
+ * ligne le dit en premier. Le jeu d'essai, au 15 décembre, cachait son
+ * troisième trimestre non déclaré derrière « à payer le 1ᵉʳ février ».
+ */
+describe('une charge en retard', () => {
+  it('se dit « était à payer », avant la suivante', async () => {
+    vi.setSystemTime(new Date('2026-12-15T09:00:00Z'));
+    poser({
+      recettes: [
+        { id: 'r1', clientNom: 'Client', libelle: 'Prestation', montant: euros(3_000), emiseLe: dateISO('2026-08-01'),
+          encaisseeLe: dateISO('2026-08-10'), modeReglement: 'virement', numero: 'F1' },
+        { id: 'r2', clientNom: 'Client', libelle: 'Prestation', montant: euros(3_000), emiseLe: dateISO('2026-11-01'),
+          encaisseeLe: dateISO('2026-11-10'), modeReglement: 'virement', numero: 'F2' }
+      ]
+    });
+    render(<Tresorerie />);
+    await attendreLaVue();
+    expect(screen.getByRole('button', { name: /^URSSAF et formation/ }).textContent)
+      .toMatch(/Sur tes encaissements depuis août · ▲ était à payer le 31 octobre/u);
   });
 });

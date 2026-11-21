@@ -1502,3 +1502,65 @@ carte la porte entière. Écarts assumés, avec leur motif :
 - la courbe du carnet est la rangée des jours signés des douze mois à venir :
   la maquette ne dit pas ce qu'elle trace, et l'histoire du carnet ne se
   reconstitue pas (le statut d'une mission n'est pas daté).
+
+## Lot 49 (21/11) — la Trésorerie, d'après sa maquette
+
+Maquette `design/direction/tresorerie.html` (capture `direction/captures/tresorerie-calme.png`).
+Captures `captures-app/{calme,nuit}-tresorerie{,-390}.png`, la vue Année
+`captures-app/{calme,nuit}-tresorerie-annee{,-390}.png`, et le jeu d'essai au
+15/12 (`essai/…tresorerie…`), qui montre le bandeau de la part gardée (10 %), un
+trimestre URSSAF en retard sorti le mois courant et l'impôt prélevé à l'automne.
+
+| Zone | Avant | Après |
+|---|---|---|
+| En-tête | « Ta trésorerie », étiquette « Dû · 100 % couvert », menu d'année | « Ton solde n'est pas tout à toi. », sous-titre de la maquette, bascule « 12 mois à venir \| Année 2026 » (segment de 44 px) |
+| Tête de l'écran | Quatre tuiles, anneau du solde, enveloppes en vignettes | Rangée de la maquette : « Du solde à ce que tu peux te verser » (cascade de cinq lignes, barres de 12 px posées sur le solde, « 7 527 € » en vert 20 px, pied et bouton vert plein) et « Ce qui est dû » (total Mono 30 px, pastille, barre de répartition, quatre lignes à puce) |
+| Projection | Graphe combiné de l'année, puis une carte pliée de projection | « Tu peux te verser 1 896 € par mois jusqu'en mai 2027 » : courbe monotone du disponible, constaté plein et prévu en pointillé, dégradés, réserve en pointillé ambre étiquetée, pastille « aujourd'hui », pic en carte, point bas en ambre, trois graduations en Mono ; les deux « et si » à droite du titre ; légende et « Voir en tableau » en pied |
+| Entrées et sorties | Barres du graphe combiné | Carte à part, la maquette : barres de 14 px vers le haut et vers le bas, mois choisi sur fond teinté avec « +11,7 k€ / −4,1 k€ », phrase du mois et « Le détail de juillet » |
+| Seuils †† | Carte pliée, trois jauges en barre | « Tes seuils de l'année » : trois anneaux de la planche (l. 168), réalisé sur seuil, dates, pastille « ◇ encore N jours facturables » |
+| Capacité de versement †† | Carte sous la Trésorerie | Vue Année, colonnes de 14 px, versé à l'intérieur, futur hachuré |
+| Banque | Carte titrée, bouton carré | Pied de la maquette : avatar « B », « Relevé du 4 juin · 4 opérations, toutes traitées. », « Ouvrir le relevé » en pilule |
+| Téléphone | Les cartes empilées | Une colonne ; la cascade garde ses cinq lignes, la barre sous chaque libellé, montants à droite ; graphes à la même hauteur, mois en une lettre, graduations réduites ; les « et si » sous le titre ; titres qui passent à la ligne ; cibles de 44 px (libellés ouvrables compris) |
+
+†† : sans maquette, dans le style de la planche — à montrer au propriétaire.
+
+Relu sur capture, 1 440 et 390 px, Calme et Nuit, démonstration et jeu
+d'essai, contre la maquette. Écarts corrigés avant livraison : un pic à
+20 435 € montait l'axe à 30k (pas de graduation plus fin que 1, 2, 5 — la
+courbe n'occupait que les deux tiers bas) ; au bureau, les deux « et si » se
+rangeaient l'un sous l'autre à côté du titre ; dans le jeu d'essai, le troisième
+trimestre non déclaré au 15 décembre se cachait derrière « à payer le 1ᵉʳ
+février » (la ligne dit désormais la plus proche, « ▲ était à payer le
+31 octobre ») ; dans la vue Année en décembre, la carte du pic recouvrait la
+pastille « aujourd'hui » (elle passe sous le point). La capture pleine page du
+téléphone montre la barre basse, fixée, au milieu de l'écran : c'est la
+photographie, pas la page.
+
+Écarts assumés, avec leur motif :
+
+- la police est la pile système (décision 6) ;
+- la courbe et les barres ne reprennent pas les nombres de la maquette au-delà de
+  ceux de la démonstration : « fin août, prévu 13 400 € » y est un dessin ; la
+  démonstration prévoit 20 435 € (la refonte est payée en juillet et août),
+  « 6 010 € de factures » en juillet sont 4 810 € (la facture de 1 200 € tombe en
+  juin) plus 6 840 € de planning, « 1 970 € d'URSSAF » sont 2 152 € (les
+  cotisations du revenu de juin partent avec celles du trimestre), « 134 € de
+  dépenses » sont 100 € (la moyenne des six derniers mois) ;
+- le point bas : « 2 471 € » et non « 2 500 € » — le montant, pas un arrondi ;
+- la TVA à reverser : « 30 juin » et non « 31 juillet » — la CA3 du mois
+  suivant l'achat, comme la décision 25 l'a corrigé sur la maquette
+  d'Obligations ;
+- « aujourd'hui » se place à son jour (le 10 juin, au tiers entre la fin de mai
+  et celle de juin), et non sur l'étiquette de juin : les points sont des fins
+  de mois ;
+- l'indication de la cascade et la banque disent « relevé du 4 juin » : c'est
+  le dernier mouvement de la démonstration (la maquette dit le 9) ;
+- les quatre lignes du dû s'ouvrent sur un détail (chevron « › ») : la maquette
+  ne le dessine pas, les enveloppes d'avant le portaient ;
+- « Verser sur mon compte » ouvre l'aide « le virement figure déjà sur ton
+  relevé » avant de mener au relevé : se verser n'est pas une écriture ;
+- les libellés « Solde du compte », « Disponible », « À te verser » sont des
+  boutons soulignés en pointillé (la formule du chiffre) ;
+- « + Compter le prospect » n'apparaît que si un prospect existe, « Et si une
+  mission s'arrête… » que si une mission signée court : un geste qui ne ferait
+  rien ne s'affiche pas (le jeu d'essai, sans prospect, n'a que le second).

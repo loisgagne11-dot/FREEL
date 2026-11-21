@@ -120,13 +120,13 @@ pour laquelle ce document a été ouvert.
 |---|---|---|---|---|
 | V1 | CA réalisé vs encaissé, mois par mois | ✅ | ✅ | ✅ graphe propre au pilier Performance&nbsp;: **mois écoulés seulement**, valeurs en k€, mois courant encadré, cumul en pied |
 | V2 | Composition d'un mois de CA, au clic | ✅ | ✅ | ✅ **livrée** — chaque mois est un `<button>`, le panneau Composition suit ; réalisé par mission avec `j × TJM`, encaissé par facture |
-| V3 | Répartition du solde | ✅ donut | ✅ donut | ✅ **donut livré** (lot B) — la barre segmentée disait le partage, pas la part&nbsp;; le donut porte le disponible en son centre, la phrase explicative à côté, et chaque part son montant en clair |
+| V3 | Répartition du solde | ✅ donut | ✅ donut | ✅ **donut livré** (lot B) — la barre segmentée disait le partage, pas la part&nbsp;; le donut porte le disponible en son centre, la phrase explicative à côté, et chaque part son montant en clair. **Lot 49 : remplacé par la cascade** de `direction/tresorerie.html` — solde, − dû, = disponible, − réserve, = à te verser, une barre par ligne posée sur le solde — et, pour le dû, la barre de répartition de la planche (`BarreRepartition`) |
 | V4 | Provisions **par catégorie** | ✅ | ✅ | ✅ **ajouté depuis** |
-| V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis** |
+| V5 | Jauges de seuils | ✅ | ✅ | ✅ mieux nommées, + **repère de date ajouté depuis**. **Lot 49 : trois anneaux de la planche** (`AnneauSeuil`), avec la date de franchissement par le pipeline et les jours facturables |
 | V6 | Frise de l'échéancier | ✅ | ✅ | ✅ **frise livrée** (lot B), **refaite au lot 53** d'après la maquette Obligations — une ligne par nature présente (URSSAF, TVA avec la DES, Impôt, CFE, Formalités), un signe par mois (● fait, ◇ à faire, ○ à venir, ▲ en retard ; le plus pressant quand plusieurs tombent le même mois, tous nommés dans l'infobulle), bande du mois courant, trait plein jusqu'au dernier fait, une phrase pour qui ne la voit pas. Elle précède la liste, qui porte les montants et les dates en clair |
-| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **graphe combiné, sur le SOLDE réel** (lot B, refait lot L1) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Couvre janvier à décembre de l'année CHOISIE (plus de « douze mois glissants »)&nbsp;: les mois clos tracent le solde réel en trait plein (un fait, dérivé des faits jusqu'à leur fin de mois), les mois à venir le disponible projeté en pointillés, annoncés « prévu » — jamais un solde deviné, pour la raison que l'infobulle détaille |
+| V7 | Courbe de solde / trésorerie | ✅ | ✅ | ✅ **Lot 49 : deux graphes alignés sur douze mois glissants** — le disponible (trois mois constatés, prévu versement tenable déduit, réserve, point bas) puis ce qui entre et ce qui sort, le dû à sa date ; la vue Année relit l'année civile. *Avant :* **graphe combiné, sur le SOLDE réel** (lot B, refait lot L1) — entrées, sorties et niveau sur un même repère, net écrit sous chaque mois. Couvre janvier à décembre de l'année CHOISIE (plus de « douze mois glissants »)&nbsp;: les mois clos tracent le solde réel en trait plein (un fait, dérivé des faits jusqu'à leur fin de mois), les mois à venir le disponible projeté en pointillés, annoncés « prévu » — jamais un solde deviné, pour la raison que l'infobulle détaille |
 | V8 | Jours par mission, mois par mois | ✅ | ⚠️ | ✅ **tableau rapport / charge ajouté depuis**, trié par euro-jour |
-| V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau. **Lot R** : un mois à venir où rien n'est attendu s'ABSTIENT désormais au lieu d'afficher un négatif — voir §8 |
+| V9 | Capacité de versement par mois | ✅ | ✅ | ✅ **affichée** (lot 49 : dans la vue Année de la Trésorerie, restylée planche) — versé à l'intérieur de la barre de capacité, futur hachuré sans plein. Était ✅ à tort&nbsp;: voir la note sous le tableau. **Lot R** : un mois à venir où rien n'est attendu s'ABSTIENT désormais au lieu d'afficher un négatif — voir §8 |
 | V10 | Cascade CA → charges → net | ✅ (deux fois) | ❌ | 🚫 §5.5 |
 | V11 | Donut de destination du CA | ✅ | ❌ | 🚫 §5.5 |
 | V12 | Sparklines dans les tuiles | ✅ | ❌ | 🚫 §5.5 |
@@ -975,3 +975,58 @@ droite du nom — devenu la colonne Facturé.
 sa fenêtre de dates. Une facture émise après la fin (l'audit ponctuel du jeu
 d'essai, fini le 8 mai, facturé le 12) n'est rattachée à aucune mission —
 défaut antérieur au lot, signalé, non corrigé ici (`lignesDeMission`).
+
+## Lot 49 (21/11) — la Trésorerie à douze mois
+
+L'écran est refait d'après `direction/tresorerie.html`. Il portait quatre
+tuiles, un anneau, des enveloppes, trois jauges en barre, un graphe combiné sur
+l'année et une carte de projection ; chacun de leurs nombres est ci-dessous —
+dans la maquette, placé sans maquette (†† : à montrer au propriétaire), ou lu
+ailleurs. Chaque ligne est tenue par un test nommé ; celles marquées † ont été
+éprouvées par mutation. Les calculs : `selecteurs.tresorerie`, `selecteurs.sorties`,
+`etatProjection` étendu, `calculs/seuilsPipeline`, `calculs/sortiesDeCharges`.
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Solde du compte, sa provenance | Cascade, ligne 1 ; indication en tête (« relevé du 4 juin », « solde saisi le … », « date-le dans Réglages ») | Tuile « Solde du compte », note dessous | Même nombre (`etatPilote`), même provenance ; la formule s'ouvre au clic sur le libellé |
+| Dû | Cascade, ligne 2 ; total de « Ce qui est dû » | Anneau, total des enveloppes, résumé replié | Même nombre, deux fois sur l'écran comme dans la maquette |
+| Disponible | Cascade, ligne 3 | Tuile, centre de l'anneau | Même nombre ; négatif en rouge, jamais borné, et la phrase « ton disponible est négatif : le dû dépasse le solde de … » |
+| Réserve | Cascade, ligne 4 | Part de l'anneau, vignette « Réserve » (constituée / réglée) | Constituée seulement (« constituée sur 2 470 € » quand le disponible ne la couvre pas) |
+| À te verser † | Cascade, ligne 5 | Part de l'anneau ; carte « Tu peux te verser » = à te verser × (1 − part gardée) | **Un seul « à te verser »** (décision 24) : disponible − réserve. La part gardée est retirée du schéma (28) ; le bandeau la dit une fois |
+| Déjà versé ce mois | Pied de la cascade | Absent de la Trésorerie (versé dans la capacité seulement) | « Déjà versé en juin : 0 € », lu au relevé ; « à lire sur ton relevé » sans relevé — inconnu, pas nul |
+| Autonomie | Pied de la cascade | Tuile « Autonomie 3,3 mois » | « Ton besoin est de 2 300 € par mois — de quoi tenir 3,3 mois. » ; besoin à zéro : ni besoin ni autonomie |
+| À encaisser (6 010 €, 3 factures) | **Quitte la Trésorerie** | Tuile | Lu sur Factures (« Reste à rentrer », même `encoursDe`), au Pilote (flux du mois, « en attente ») et dans Activité › Analyse ; ici, les factures attendues sont dans les entrées de chaque mois (« 4 810 € de factures à échéance ») |
+| Couverture du dû | Pastille de « Ce qui est dû » | Étiquette d'en-tête « Dû · 100 % couvert » | « ● Tout est couvert », ou « ▲ N € non couverts » (le montant, plus un pourcentage) |
+| Dû par charge, sa base et sa date † | « Ce qui est dû », quatre lignes | Vignettes par nature (couvert / dû, « éch. … ») ; la CFP à part | URSSAF et formation (URSSAF + CFP, qui partent ensemble), impôt, TVA, CFE — même à zéro ; « Sur tes encaissements depuis avril · à payer le 31 juillet », « Versement libératoire, payé avec l'URSSAF », « Sur un achat hors de France · 30 juin » (la CA3 du mois suivant, décision 25), « Avis en novembre · rien à garder avant » ; dates lues sur le dû posé à ses échéances |
+| Volets du dû, couvert par enveloppe, détail mois par mois, note d'impôt, impôt mois par mois | Détail d'une ligne (au clic) | Carte « Enveloppes du dû » dépliée | Le même contenu, dans le volet de la ligne : les deux volets, « Couvert par le solde : … sur … » et la règle « la plus proche servie d'abord », la note d'impôt et ses réserves, le détail (`PanneauDetailDette`) |
+| Versement tenable, mois qui limite | Titre de la carte de la courbe | Phrase de la carte de projection, repliée | « Tu peux te verser 1 896 € par mois jusqu'en mai 2027 » ; « Rien à te verser chaque mois pour l'instant » à zéro |
+| Disponible, trois mois constatés † | Courbe, trait plein | Graphe combiné : le SOLDE réel des mois clos de l'année | Le disponible de chaque fin de mois, recalculé depuis les faits de ce soir-là (`faitsAu`) — jamais stocké ; rien avant le solde de départ |
+| Disponible prévu, versement déduit † | Courbe, pointillé | Disponible « hypothèse » sans versement, jusqu'en décembre | Douze mois glissants (mois courant + 11), versement tenable pris chaque mois ; « aujourd'hui » à son jour |
+| Point bas † | Annotation de la courbe | Absent | « point bas · 2 471 € en mai » : le mois le plus bas, versement déduit (`pointBas`) |
+| Pic | Annotation de la courbe | Absent (valeurs écrites au-dessus de chaque mois) | « fin août, prévu · 20 435 € » ; le reste à l'infobulle (survol, doigt, clavier) |
+| Solde prévu, dû prévu par mois † | Infobulle ; « Voir en tableau » | Absents | Le dû quitte le compte à sa date (URSSAF à la limite de sa déclaration, TVA à sa CA3, impôt à ses prélèvements, CFE avec son avis) ; solde − dû = disponible chaque mois (test) |
+| Dans un an : sans rien te verser / en t'étant versé / versé cumulé | « Voir en tableau » | Carte de projection | Inchangé (même dernier mois) |
+| Taux de charges, dépenses courantes moyennes, sources du prévu | « Voir en tableau », légende | Trois hypothèses de la projection | « Charges retenues sur chaque encaissement : 15 % » devient « Le dû grandit de 15 % de chaque encaissement — le disponible le retire ce jour-là — et quitte le compte à l'échéance de sa déclaration » : l'ancienne phrase ne disait plus quand il sort ; dépenses : inchangé |
+| Entrées et sorties d'un mois † | « Ce qui entre et ce qui sort » (douze mois prévus) ; vue Année (constatés et prévus) | Barres du graphe combiné, net sous chaque mois | Entrées attendues (factures émises, planning signé) vers le haut ; sorties le jour où elles quittent le compte vers le bas ; le mois choisi en relief avec ses deux valeurs ; sa phrase (« Juillet — 4 810 € de factures à échéance et 6 840 € du planning signé. Il sort 1 896 € pour toi, 2 152 € d'URSSAF le 31 et 100 € de dépenses ») ; « Le détail de juillet » en tableau, net du mois compris |
+| Solde de fin de mois d'un mois clos | Vue Année, infobulle et tableau | Courbe du graphe combiné | Inchangé (`soldeAuDernierJourDe`) — relu au mois constaté |
+| Capacité de versement par mois, versé dans la barre | Vue Année †† | Carte sous la Trésorerie | Même calcul (`capaciteParMois`, année relue en paramètre) ; le versé à l'intérieur de la barre, futur hachuré, abstention dite |
+| Plafond, franchise, seuil majoré : réalisé / seuil, reste | « Tes seuils de l'année » †† | Trois jauges en barre, repliées | Trois anneaux de la planche, « 22 720 € sur 37 500 € », « Il reste 14 780 € avant le seuil » |
+| Franchissement par le pipeline † | « Tes seuils de l'année » †† | Absent | « Par ce qui est émis et signé : franchi en août 2026 » — factures à leur échéance, planning au délai du client, aucun prospect (`franchissementParLePipeline`) |
+| Franchissement au rythme, projection annuelle, abstention | « Tes seuils de l'année » | Sous chaque jauge | Inchangés (`franchissementPrevu`, `projectionAnnuelle`) |
+| Jours facturables avant le seuil † | « Tes seuils de l'année », pastille †† | Absent | « ◇ encore 29 jours facturables » : (seuil − encaissé) / tarif moyen des missions signées de l'année, à l'inférieur ; refusé avec motif sans tarif |
+| Repère « N % de l'année écoulée » | En-tête de « Tes seuils de l'année » | Sur chaque jauge | Une fois, en tête |
+| Redevabilité de TVA (année précédente, perte de franchise) | Sous les anneaux | Sous les jauges | Inchangée |
+
+**Retiré, avec sa raison** : l'anneau du solde et sa phrase (la cascade dit la
+même chose, enchaînée) ; les quatre tuiles (leurs nombres sont dans la cascade,
+sauf « À encaisser », lu sur Factures et au Pilote) ; le graphe combiné de
+l'année (ses deux graphes le remplacent, alignés, et la vue Année relit le
+passé) ; le résumé replié de chaque carte (les cartes ne se replient plus) ; la
+part gardée (décision 24).
+
+**Reste** : sous le versement libératoire, l'impôt des encaissements à venir
+part avec l'URSSAF ; au barème, l'impôt de l'année prochaine sur ces
+encaissements n'entre pas dans la projection (le taux ne porte que la
+formation) — antérieur au lot, inchangé. Les entrées prévues sont hors taxes,
+comme le pipeline l'a toujours été : pour un redevable de la TVA, l'entrée réelle
+est plus haute d'autant — antérieur, signalé.
