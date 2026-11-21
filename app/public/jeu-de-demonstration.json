@@ -19,7 +19,7 @@
     "invalide) — invariant n°6 : le dépôt est public, aucune donnée personnelle",
     "n'y entre."
   ],
-  "version": 26,
+  "version": 27,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "prenom": "Camille",
@@ -101,6 +101,10 @@
       "fin": "2026-01-30",
       "statut": "terminee",
       "facturation": "commune",
+      "joursCommandes": 24,
+      "preavisFinJours": null,
+      "reconduction": null,
+      "probabilite": null,
       "entites": [
         {
           "id": "mis-lancement-co1",
@@ -136,6 +140,10 @@
       "fin": "2026-07-31",
       "statut": "active",
       "facturation": "commune",
+      "joursCommandes": 32,
+      "preavisFinJours": null,
+      "reconduction": null,
+      "probabilite": null,
       "entites": [
         {
           "id": "mis-refonte-co1",
@@ -272,6 +280,12 @@
       "fin": "2026-06-30",
       "statut": "active",
       "facturation": "commune",
+      "joursCommandes": null,
+      "preavisFinJours": null,
+      "reconduction": {
+        "dureeMois": 1
+      },
+      "probabilite": null,
       "entites": [
         {
           "id": "mis-identite-co1",
@@ -361,6 +375,10 @@
       "fin": "2026-06-30",
       "statut": "active",
       "facturation": "commune",
+      "joursCommandes": 3,
+      "preavisFinJours": 7,
+      "reconduction": null,
+      "probabilite": null,
       "entites": [
         {
           "id": "mis-carte-co1",
@@ -412,6 +430,10 @@
       "fin": "2026-10-31",
       "statut": "prospect",
       "facturation": "commune",
+      "joursCommandes": 25,
+      "preavisFinJours": null,
+      "reconduction": null,
+      "probabilite": 60,
       "entites": [
         {
           "id": "mis-catalogue-co1",
@@ -436,6 +458,10 @@
       "fin": "2026-02-28",
       "statut": "perdue",
       "facturation": "commune",
+      "joursCommandes": null,
+      "preavisFinJours": null,
+      "reconduction": null,
+      "probabilite": null,
       "entites": [
         {
           "id": "mis-charte-co1",

@@ -1047,10 +1047,9 @@ describe('schéma 22 → 23 : le motif « mis de côté pour l’impôt »', () 
 
   it('un dossier d’un schéma postérieur est refusé', () => {
     expect(motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 })).not.toBeNull();
-    // 26 depuis le lot 34-bis : la caisse de retraite et l'histoire de
-    // l'option VL. L'attente suit le numéro, elle ne le fige pas — ce test dit
-    // qu'un saut se voit.
-    expect(VERSION_SCHEMA).toBe(26);
+    // 27 depuis le lot 48 : le carnet de commandes. L'attente suit le
+    // numéro, elle ne le fige pas — ce test dit qu'un saut se voit.
+    expect(VERSION_SCHEMA).toBe(27);
   });
 });
 
@@ -1227,7 +1226,7 @@ describe('schéma 24 → 25 : déclarations, appels liés, TVA, pièces', () => 
 describe('schéma 25 → 26 : la caisse de retraite, l’histoire de l’option VL', () => {
   it('un compte de schéma 25 reçoit la caisse SSI, et non `undefined`', () => {
     const f = completerFaits({ version: 25, entreprise: { nom: 'Atelier de démonstration', typeActivite: 'BNC' } });
-    expect(f.version).toBe(26);
+    expect(f.version).toBe(VERSION_SCHEMA);
     expect(f.entreprise.caisseRetraite).toBe('ssi');
   });
 
@@ -1245,9 +1244,54 @@ describe('schéma 25 → 26 : la caisse de retraite, l’histoire de l’option 
     expect(f.entreprise.caisseRetraite).toBe('cipav');
   });
 
-  /** Une version 26 qui chargerait un dossier 27 en effacerait ce qu'elle ne sait pas lire.
-      Il disait « 26 » au schéma 25 ; le numéro a suivi la version. */
-  it('refuse un dossier au schéma 27', () => {
-    expect(motifRefusFaits({ ...faitsVides(), version: 27 })).toMatch(/schéma 27/);
+  /** Une version 27 qui chargerait un dossier 28 en effacerait ce qu'elle ne sait pas lire.
+      Il disait « 27 » au schéma 26 ; le numéro a suivi la version (lot 48). */
+  it('refuse un dossier au schéma 28', () => {
+    expect(motifRefusFaits({ ...faitsVides(), version: 28 })).toMatch(/schéma 28/);
+  });
+});
+
+/**
+ * v26 → v27 : le carnet de commandes. Quatre champs DANS chaque mission — la
+ * fusion de surface ne les atteint pas. Laissés `undefined`, ils se liraient
+ * « absents » par chance, jusqu'au jour où quelqu'un écrirait
+ * `joursCommandes === null` pour reconnaître une mission sans volume : chaque
+ * mission migrée deviendrait alors une commande de `undefined` jours.
+ */
+describe('schéma 26 → 27 : le carnet de commandes, dans chaque mission', () => {
+  const missionDuSchema26 = (id: string) => ({
+    id, clientId: null, clientNom: 'Client Démo', description: 'Mission', tjm: 500,
+    debut: '2026-01-05', fin: '2026-06-30', statut: 'active', facturation: 'commune',
+    entites: [{ id: `${id}-co1`, nom: '', couleur: '', adresse: '', contact: '', email: '', telephone: '', rythmes: [], ajustements: {} }]
+  });
+
+  it('la migration descend dans la liste : chaque mission reçoit les quatre champs à `null`', () => {
+    const f = completerFaits({ version: 26, missions: [missionDuSchema26('m1'), missionDuSchema26('m2')] });
+    expect(f.version).toBe(27);
+    for (const m of f.missions) {
+      expect(m).toMatchObject({ joursCommandes: null, preavisFinJours: null, reconduction: null, probabilite: null });
+    }
+  });
+
+  /* Un zéro dirait autre chose que l'absence : zéro jour commandé solderait
+     la mission, un préavis de zéro n'annoncerait jamais sa fin. */
+  it('garde un volume, un préavis, une reconduction et une probabilité déjà saisis — demi-journée comprise', () => {
+    const f = completerFaits({ version: 26, missions: [{
+      ...missionDuSchema26('m1'), joursCommandes: 12.5, preavisFinJours: 30,
+      reconduction: { dureeMois: 3 }, probabilite: 40
+    }] });
+    expect(f.missions[0]).toMatchObject({
+      joursCommandes: 12.5, preavisFinJours: 30, reconduction: { dureeMois: 3 }, probabilite: 40
+    });
+  });
+
+  it('ramène à l’absence une valeur hors de forme, jamais à un nombre deviné', () => {
+    const f = completerFaits({ version: 26, missions: [{
+      ...missionDuSchema26('m1'), joursCommandes: 'soixante', preavisFinJours: -5,
+      reconduction: { dureeMois: 0 }, probabilite: null
+    }] });
+    expect(f.missions[0]).toMatchObject({
+      joursCommandes: null, preavisFinJours: null, reconduction: null, probabilite: null
+    });
   });
 });

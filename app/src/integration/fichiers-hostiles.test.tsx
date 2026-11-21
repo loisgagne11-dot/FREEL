@@ -74,6 +74,14 @@ const TEXTES_HOSTILES = [
 
 const blocHostile = (champs: Record<string, unknown>): string => JSON.stringify({ ...faitsVides(), ...champs });
 
+/** Une mission lisible au schéma courant, à laquelle on ajoute le champ fautif. */
+const missionHostile = (champs: Record<string, unknown>): Record<string, unknown> => ({
+  id: 'm1', clientId: null, clientNom: 'Client Démo', description: 'Mission', tjm: 500,
+  debut: '2026-01-05', fin: '2026-06-30', statut: 'active',
+  entites: [{ id: 'm1-co1', nom: '', couleur: '', adresse: '', contact: '', email: '', telephone: '', rythmes: [], ajustements: {} }],
+  ...champs
+});
+
 const recetteHostile = (champs: Record<string, unknown>): string => JSON.stringify({
   ...faitsVides(),
   recettes: [{ id: 'r1', montant: 0, ...champs }]
@@ -134,7 +142,21 @@ const BLOCS_HOSTILES: readonly (readonly [string, string, RegExp])[] = [
     blocHostile({ entreprise: { ...faitsVides().entreprise, historiqueVl: { jusquA: '2025-12' } } }), /historiqueVl/],
   ['une période de l’option sans mois lisible',
     blocHostile({ entreprise: { ...faitsVides().entreprise, historiqueVl: [{ jusquA: 'décembre', actif: true }] } }),
-    /historiqueVl/]
+    /historiqueVl/],
+  /* Schéma 27 : un volume négatif ferait un carnet qui baisse quand on signe,
+     un « 0,3 jour » une commande qu'aucune demi-journée ne solde ; un préavis
+     négatif n'annoncerait jamais la fin ; une reconduction sans durée ferait
+     tourner l'échéance sans fin ; 250 % se lirait comme une certitude. */
+  ['un volume commandé négatif',
+    blocHostile({ missions: [missionHostile({ joursCommandes: -5 })] }), /mission n° 1/],
+  ['un volume commandé qui n’est pas en demi-journées',
+    blocHostile({ missions: [missionHostile({ joursCommandes: 0.3 })] }), /mission n° 1/],
+  ['un préavis négatif',
+    blocHostile({ missions: [missionHostile({ preavisFinJours: -1 })] }), /mission n° 1/],
+  ['une reconduction sans durée lisible',
+    blocHostile({ missions: [missionHostile({ reconduction: { dureeMois: 'trois' } })] }), /mission n° 1/],
+  ['une probabilité de 250 %, dans un bloc qui se dit au schéma 26',
+    JSON.stringify({ ...faitsVides(), version: 26, missions: [missionHostile({ probabilite: 250 })] }), /mission n° 1/]
 ];
 
 describe('sauvegarde JSON, compte, archive : le bloc de faits', () => {

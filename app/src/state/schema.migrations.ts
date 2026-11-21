@@ -110,9 +110,40 @@ function missionsDuSchema1(brut: unknown): readonly Mission[] {
          Une valeur qui n'est pas `par_client` ne vient d'aucun écran : la
          prendre pour un choix ferait éclater une facture d'agence. */
       facturation: o['facturation'] === 'par_client' ? 'par_client' : 'commune',
+      ...carnetDuSchema26(o),
       entites: entitesDuSchema3(o)
     }];
   });
+}
+
+/**
+ * v26 → v27 : le carnet de commandes, quatre champs DANS chaque mission.
+ *
+ * La fusion de surface ne les atteint pas — c'est l'invariant n° 5, une
+ * septième fois. Comblés à `null` : aucune mission d'avant n'avait de volume
+ * commandé, de préavis choisi, de reconduction ni de probabilité, et un zéro
+ * dirait autre chose — « zéro jour commandé » ferait de chaque mission un
+ * contrat déjà soldé, « préavis zéro » n'annoncerait jamais une fin.
+ *
+ * Une valeur hors de sa forme vient d'un fichier abîmé (le contrôle de ce qui
+ * vient d'ailleurs l'a déjà refusée) : elle redevient l'absence, jamais une
+ * valeur devinée.
+ */
+function carnetDuSchema26(o: Record<string, unknown>): Pick<
+  Mission, 'joursCommandes' | 'preavisFinJours' | 'reconduction' | 'probabilite'
+> {
+  const nombre = (v: unknown): number | null =>
+    (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  const reconduction = o['reconduction'];
+  const duree = typeof reconduction === 'object' && reconduction !== null
+    ? nombre((reconduction as Record<string, unknown>)['dureeMois'])
+    : null;
+  return {
+    joursCommandes: nombre(o['joursCommandes']),
+    preavisFinJours: nombre(o['preavisFinJours']),
+    reconduction: duree === null || duree < 1 ? null : { dureeMois: duree },
+    probabilite: nombre(o['probabilite'])
+  };
 }
 
 /**
@@ -722,6 +753,11 @@ function periodesDeclareesDuSchema24(brut: unknown): readonly PeriodeDeclaree[] 
  * portait. `regimeTva`, `ca3Mensuelle` et `nomExploitant` sont des champs du
  * profil, comblés par `entrepriseVide()` : régime simplifié, pas d'option,
  * nom vide — à demander, jamais deviné.
+ *
+ * v26 → v27 : le volume commandé, le préavis de fin, la reconduction tacite et
+ * la probabilité d'un prospect — quatre champs d'un élément de liste, comblés
+ * à `null` par `carnetDuSchema26`, depuis `missionsDuSchema1` qui parcourt
+ * déjà chaque mission.
  */
 export function completerFaits(brut: unknown): Faits {
   const o = brut as Record<string, unknown>;
