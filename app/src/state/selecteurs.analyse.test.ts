@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { dateISO, euros, mois } from '../domain/types';
+import { dateISO, euros, mois, ratio } from '../domain/types';
+import type { Depense } from '../domain/calculs/depenses';
+import type { Echeance } from '../domain/calculs/provisions';
 import { planDeCharge } from '../domain/calculs/activite';
 import { encoursDe } from '../domain/calculs/facturier';
 import { type Faits, completerFaitsCourants, faitsVides } from './schema';
@@ -47,11 +49,15 @@ const encaissee = (id: string, montant: number, le_: string, tva = 0) => ({
   echeanceLe: dateISO(le_), tvaCollectee: euros(tva)
 });
 
-const depense = (id: string, ttc: number, le_: string, autre: Record<string, unknown> = {}) => ({
-  id, libelle: 'Achat', fournisseur: 'Fournisseur fictif', provenance: 'france' as const,
-  montantTtc: euros(ttc), tauxTva: 0.2, payeeLe: dateISO(le_), justificatifId: 'piece', rapprochement: 'en_attente' as const,
+const depense = (id: string, ttc: number, le_: string, autre: Partial<Depense> = {}): Depense => ({
+  id, libelle: 'Achat', fournisseur: 'Fournisseur fictif', provenance: 'france',
+  montantTtc: euros(ttc), tauxTva: ratio(0.2), payeeLe: dateISO(le_), justificatifId: 'piece', rapprochement: 'en_attente',
   ...autre
 });
+
+const avisCfe: Echeance = {
+  id: 'cfe', nature: 'cfe', montant: euros(300), echeanceLe: dateISO('2026-03-15'), payeeLe: null, montantPaye: null
+};
 
 describe('le net de poche', () => {
   /*
@@ -62,8 +68,8 @@ describe('le net de poche', () => {
   it('retire de l’encaissé les cotisations, la formation, l’impôt, la CFE et les dépenses', () => {
     const faits = poser({
       recettes: [encaissee('r', 10_000, '2026-03-15')],
-      depenses: [depense('d', 500, '2026-03-20')] as Faits['depenses'],
-      echeances: [{ id: 'cfe', nature: 'cfe', montant: euros(300), echeanceLe: dateISO('2026-03-15'), payeeLe: null }] as Faits['echeances']
+      depenses: [depense('d', 500, '2026-03-20')],
+      echeances: [avisCfe]
     });
     const n = valeurPubliee(netDePocheEntre(faits, mois('2026-03'), mois('2026-03'), JUIN));
     const c = n.composition;
@@ -135,12 +141,12 @@ describe('le net de poche', () => {
   it('compte une dépense à ce qu’elle coûte vraiment, selon le régime de TVA', () => {
     const redevable = poser({
       entreprise: { ...poser().entreprise, tvaDepuis: mois('2026-01') },
-      depenses: [depense('d', 120, '2026-03-20')] as Faits['depenses']
+      depenses: [depense('d', 120, '2026-03-20')]
     });
     expect(valeurPubliee(netDePocheEntre(redevable, mois('2026-03'), mois('2026-03'), JUIN)).composition.depenses)
       .toBeCloseTo(100, 2);
     const franchise = poser({
-      depenses: [depense('d', 100, '2026-03-20', { provenance: 'ue' })] as Faits['depenses']
+      depenses: [depense('d', 100, '2026-03-20', { provenance: 'ue' })]
     });
     expect(valeurPubliee(netDePocheEntre(franchise, mois('2026-03'), mois('2026-03'), JUIN)).composition.depenses)
       .toBeCloseTo(120, 2);
