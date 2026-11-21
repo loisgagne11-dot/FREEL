@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { dateISO, euros, ratio } from '../../domain/types';
+import { dateISO, euros } from '../../domain/types';
 import { type Faits, type Mission, type Recette, faitsVides } from '../../state/schema';
 import { entiteVide } from '../../state/schema.entite';
 import { etatArgent } from '../../state/selecteurs.argent';
@@ -322,29 +322,12 @@ describe('tu peux te verser', () => {
     expect(grand?.textContent).not.toContain(eur(10_000));
   });
 
-  it('retient la part gardée sur le versable', () => {
-    poser({
-      soldeInitial: euros(10_000), reserve: euros(4_000), partGardeeAuVersement: ratio(0.5)
-    });
-
-    const grand = screen.getByText(/Montant que tu peux te verser/).parentElement;
-    expect(grand?.textContent).toContain(eur(3_000));
-  });
-
-  /**
-   * UNE SEULE SOURCE POUR LA PART GARDÉE.
-   *
-   * Le même fait se règle ici et dans Config. Si le curseur gardait sa valeur
-   * en local sans l'écrire, les deux écrans afficheraient deux parts
-   * différentes — et la carte « Tu peux te verser » du Pilote, une troisième.
-   */
-  it('écrit la part dans le magasin, pas dans l’écran', () => {
+  /* Décision 24 : un seul « à te verser ». Un curseur de part gardée
+     referait le second montant sous le même nom. */
+  it('ne propose plus de part gardée : le seul « à te verser » est disponible moins réserve', () => {
     poser({ soldeInitial: euros(10_000), reserve: euros(4_000) });
-
-    const curseur = screen.getByRole('slider', { name: /Part gardée/ });
-    fireEvent.change(curseur, { target: { value: '25' } });
-
-    expect(useFaits.getState().faits.partGardeeAuVersement).toBe(0.25);
+    expect(screen.queryByRole('slider')).toBeNull();
+    expect(screen.queryByText(/part gardée/i)).toBeNull();
   });
 
   /**

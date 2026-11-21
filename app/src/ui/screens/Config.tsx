@@ -122,7 +122,7 @@ export function Config() {
   const entrees: readonly { id: Section; titre: string; sousTitre: string }[] = [
     { id: 'profil', titre: 'Profil & statut', sousTitre: sousTitreProfil },
     { id: 'fiscal', titre: 'Paramètres fiscaux', sousTitre: 'Abattement, cotisations, TVA' },
-    { id: 'reserve', titre: 'Réserve & versements', sousTitre: 'Solde, réserve, part gardée' },
+    { id: 'reserve', titre: 'Réserve & versements', sousTitre: 'Solde, besoin, réserve, objectif' },
     { id: 'facturation', titre: 'Facturation', sousTitre: 'RIB, mentions, plateforme agréée' },
     { id: 'compte', titre: 'Compte & synchronisation', sousTitre: 'Multi-appareils · pièces' },
     { id: 'donnees', titre: 'Données & export', sousTitre: 'Livre CSV, sauvegarde, restauration' },

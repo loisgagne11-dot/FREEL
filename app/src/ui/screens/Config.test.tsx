@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros, mois } from '../../domain/types';
 import { PERIODES_CIPAV, PERIODES_URSSAF } from '../../domain/bareme/urssaf';
-import { CLE_STOCKAGE, PART_GARDEE_MAX, type Faits, faitsVides } from '../../state/schema';
+import { CLE_STOCKAGE, type Faits, faitsVides } from '../../state/schema';
 import { stockageMemoire } from '../../infra/migration';
 import { useFaits } from '../../state/store';
 import { periodesUrssafEffectives } from '../../state/selecteurs';
@@ -940,23 +940,15 @@ describe('jeu de démonstration', () => {
 });
 
 /**
- * LES DEUX RÉGLAGES DE PRUDENCE SONT DEUX NOTIONS, PAS DEUX ÉCRITURES DU MÊME.
+ * UN SEUL RÉGLAGE DE PRUDENCE : LA RÉSERVE, EN EUROS (décision 24).
  *
- * La réserve est un PLANCHER en euros ; la part gardée est une
- * FRACTION du versable. Les exprimer tous deux en pourcentage du disponible —
- * ce que fait le prototype du handoff — fabrique une boucle : le plancher
- * descend à mesure qu'on vide le compte, et le versement soutenable finit par
- * tout autoriser.
- *
- * Ils vivaient sur le Pilote. Ils sont ici parce que le handoff les y range, et
- * parce que le Pilote est le seul écran du paquet d'entrée : le second curseur
- * lui a fait franchir son plafond.
+ * La part gardée à chaque versement s'y est fondue au schéma 28 : deux
+ * réglages faisaient deux « à te verser » sous le même nom. Le curseur ne doit
+ * pas revenir — il referait le second montant.
  */
-describe('réserve et part gardée', () => {
+describe('la réserve', () => {
   const champSeuil = () =>
     screen.getByRole('spinbutton', { name: /^Réserve/ }) as HTMLInputElement;
-  const curseurPart = () =>
-    screen.getByRole('slider', { name: /Part gardée/ }) as HTMLInputElement;
 
   it('écrit la réserve dans les faits', async () => {
     await afficher('reserve');
@@ -965,10 +957,10 @@ describe('réserve et part gardée', () => {
   });
 
   /**
-   * La réserve est un CHAMP et non un curseur, contrairement à la part. Une
-   * plage aurait eu besoin d'une borne haute, et la seule disponible est le
-   * solde : quelqu'un qui a 8 000 € en banque mais n'a pas encore saisi son
-   * solde de départ n'aurait pas pu se fixer un plancher à 5 000 €.
+   * La réserve est un CHAMP et non un curseur. Une plage aurait eu besoin
+   * d'une borne haute, et la seule disponible est le solde : quelqu'un qui a
+   * 8 000 € en banque mais n'a pas encore saisi son solde de départ n'aurait
+   * pas pu se fixer un plancher à 5 000 €.
    */
   it('n’enferme pas la réserve dans la borne d’un curseur', async () => {
     await afficher('reserve');
@@ -976,45 +968,10 @@ describe('réserve et part gardée', () => {
     expect(useFaits.getState().faits.reserve).toBe(5000);
   });
 
-  /**
-   * Le prototype du handoff écrit « sur ta part disponible, tu gardes N % » —
-   * sans la réserve. À 0 % il propose donc de la verser avec. La phrase
-   * doit dire les DEUX réglages, sinon elle décrit un autre calcul que celui
-   * qui s'applique.
-   */
-  it('dit le calcul complet, réserve comprise', async () => {
-    useFaits.setState({
-      faits: { ...faitsVides(), soldeInitial: euros(8000), reserve: euros(5000) }
-    });
+  it('ne propose plus de part gardée à chaque versement', async () => {
     await afficher('reserve');
-    fireEvent.change(curseurPart(), { target: { value: '50' } });
-
-    const phrase = screen.getByText(/Sur un solde de/).textContent ?? '';
-    expect(phrase).toMatch(/8\s?000/u);   // le solde
-    expect(phrase).toMatch(/5\s?000/u);   // ce que la réserve garde
-    expect(phrase).toMatch(/3\s?000/u);   // le versable
-    expect(phrase).toMatch(/1\s?500/u);   // ce qu'il reste à se verser
-  });
-
-  it('écrit la part gardée en ratio, pas en pourcentage', async () => {
-    await afficher('reserve');
-    fireEvent.change(curseurPart(), { target: { value: '25' } });
-    expect(useFaits.getState().faits.partGardeeAuVersement).toBeCloseTo(0.25, 10);
-  });
-
-  /**
-   * Un défaut à 50 %, comme dans le prototype, couperait en deux le versable de
-   * tout compte existant sans qu'un geste ait été fait.
-   */
-  it('part de zéro pour cent, qui ne décide rien', async () => {
-    await afficher('reserve');
-    expect(curseurPart().value).toBe('0');
-    expect(useFaits.getState().faits.partGardeeAuVersement).toBe(0);
-  });
-
-  it('ne laisse pas régler une part au-delà du maximum du schéma', async () => {
-    await afficher('reserve');
-    expect(Number(curseurPart().max)).toBe(PART_GARDEE_MAX * 100);
+    expect(screen.queryByRole('slider')).toBeNull();
+    expect(screen.queryByText(/Part gardée/)).toBeNull();
   });
 
   /**
@@ -1227,11 +1184,11 @@ describe('navigation entre les sections', () => {
     expect(screen.getByRole('table')).toBeTruthy();
   });
 
-  it('Réserve : solde, besoin, réserve, part gardée et objectif', async () => {
+  it('Réserve : solde, besoin, réserve et objectif', async () => {
     await afficher('reserve');
     expect(screen.getByLabelText('Solde de ton compte')).toBeTruthy();
     expect(screen.getByLabelText('Besoin mensuel')).toBeTruthy();
-    expect(screen.getByLabelText('Part gardée à chaque versement')).toBeTruthy();
+    expect(screen.getByRole('spinbutton', { name: /^Réserve/ })).toBeTruthy();
     expect(screen.getByLabelText(/Objectif de chiffre d’affaires/)).toBeTruthy();
   });
 

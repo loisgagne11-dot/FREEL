@@ -1,0 +1,40 @@
+/* Écran Trésorerie — maquette `docs/design/direction/tresorerie.html` ;
+   `calme.css` fait foi pour les mesures. Aucune couleur en dur : les quatre
+   palettes s'y appliquent. Mobile d'abord, le bureau à partir de 761 px. */
+
+/* ── Le bandeau de la part gardée retirée (décision 24) — `.e-alerte` ──── */
+
+.bandeau {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--amber-soft);
+  color: var(--chip-warn);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bandeau p { flex: 1 1 320px; margin: 0; }
+.bandeau p span { font-weight: 400; color: var(--text); }
+
+.bandeauGestes { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.lien,
+.compris {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lien { color: var(--green); text-decoration: none; border: 1px solid transparent; }
+.compris { border: 1px solid var(--line-2); background: var(--card-a); color: var(--text); }
+.lien:focus-visible, .compris:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }

@@ -649,6 +649,35 @@ function periodesDeclareesDuSchema24(brut: unknown): readonly PeriodeDeclaree[] 
 }
 
 /**
+ * v27 → v28 : la part gardée au versement quitte le dossier (décision 24).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * RETIRÉE, PAS CONVERTIE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Un pourcentage du versable n'a pas d'équivalent en euros de réserve : 10 %
+ * valaient 750 € sur un compte à 7 527 € à te verser, 30 € le mois où il n'en
+ * restait que 300. Toute conversion choisirait un jour au hasard et le
+ * figerait. Le champ part donc ; ce qu'il valait reste, en pourcentage, pour
+ * que la Trésorerie le DISE une fois — sans quoi « à te verser » monterait de
+ * 10 % au premier chargement, sans un mot, chez quelqu'un qui croyait garder
+ * une marge.
+ *
+ * Zéro, absent ou illisible : rien n'était gardé, rien n'est à dire — `null`.
+ * Une part au-delà de 1 n'a jamais été écrite par un écran (le curseur
+ * s'arrêtait à 80 %) : elle vient d'un fichier abîmé, et ne se raconte pas.
+ * Un bloc déjà au 28 qui repasse par ici garde ce qui reste à dire.
+ */
+function partGardeeDuSchema27(part: unknown, dejaRetiree: unknown): number | null {
+  if (typeof part === 'number' && Number.isFinite(part) && part > 0 && part <= 1) {
+    return Math.round(part * 100);
+  }
+  return typeof dejaRetiree === 'number' && Number.isInteger(dejaRetiree) && dejaRetiree > 0 && dejaRetiree <= 100
+    ? dejaRetiree
+    : null;
+}
+
+/**
  * Complète un bloc validé avec les valeurs par défaut des champs absents, et
  * CONVERTIT les formats des schémas antérieurs.
  *
@@ -679,18 +708,8 @@ function periodesDeclareesDuSchema24(brut: unknown): readonly PeriodeDeclaree[] 
  *
  * La valeur comblée est `null` et non zéro : voir `objectifCaAnnuel`.
  *
- * v10 → v11 : la part gardée au versement.
- *
- * Même conclusion, et vérifiée de la même façon plutôt que supposée : le champ
- * est de PREMIER NIVEAU, donc `{ ...defauts, ...o }` le comble depuis
- * `faitsVides()` dès lors qu'un bloc de schéma 10 ne porte pas la clé. La
- * vérification n'est pas une lecture du code mais un test nommé —
- * « un compte de schéma 10 reçoit une part gardée nulle, et non `undefined` » —
- * qui échoue si la fusion cesse de suffire. C'est ce qui distingue ce cas des
- * cinq migrations imbriquées ci-dessus : leurs champs, eux, vivaient dans des
- * éléments de liste, que la fusion de surface n'atteint pas.
- *
- * La valeur comblée est zéro, et jamais 0,5 : voir `partGardeeAuVersement`.
+ * v10 → v11 : la part gardée au versement — retirée au schéma 28, voir
+ * plus bas.
  *
  * v11 → v12 : les trois faits du foyer fiscal. Ceux-là, la fusion de surface
  * ne suffit PAS à combler — non parce qu'ils vivent dans une liste, mais parce
@@ -758,9 +777,12 @@ function periodesDeclareesDuSchema24(brut: unknown): readonly PeriodeDeclaree[] 
  * la probabilité d'un prospect — quatre champs d'un élément de liste, comblés
  * à `null` par `carnetDuSchema26`, depuis `missionsDuSchema1` qui parcourt
  * déjà chaque mission.
+ *
+ * v27 → v28 : la part gardée se fond dans la réserve (décision 24) — voir
+ * `partGardeeDuSchema27`.
  */
 export function completerFaits(brut: unknown): Faits {
-  const o = brut as Record<string, unknown>;
+  const { partGardeeAuVersement: partGardee, ...o } = brut as Record<string, unknown>;
   const defauts = faitsVides();
   const entreprise = (typeof o['entreprise'] === 'object' && o['entreprise'] !== null)
     ? o['entreprise'] as Partial<Entreprise>
@@ -773,7 +795,11 @@ export function completerFaits(brut: unknown): Faits {
     // Le numéro de schéma devient celui de CE code : les champs manquants
     // viennent d'être comblés, le bloc n'est plus à l'ancien format.
     version: VERSION_SCHEMA,
-    entreprise: { ...entrepriseVide(), ...entreprise },
+    entreprise: {
+      ...entrepriseVide(),
+      ...entreprise,
+      partGardeeRetiree: partGardeeDuSchema27(partGardee, entreprise.partGardeeRetiree)
+    },
     conges: congesDuSchema1(o['conges']),
     clients: clientsDuSchema12(o['clients']),
     /* Pas de normalisation du délai de mission ici : le champ est FACULTATIF,

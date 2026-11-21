@@ -1,10 +1,7 @@
-import { useId, useState } from 'react';
+import { useId } from 'react';
 import { useFaits } from '../../state/store';
 import { soldeEstSuivi } from '../../state/selecteurs';
-import { dateISO, euros, ratio } from '../../domain/types';
-import { PART_GARDEE_MAX } from '../../state/schema';
-import { Montant } from '../components/Montant';
-import { eur } from '../format';
+import { dateISO, euros } from '../../domain/types';
 import { Info } from '../components/Info';
 import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
@@ -172,61 +169,41 @@ function Objectif() {
 }
 
 /**
- * Les deux réglages de prudence — sources uniques, et deux notions distinctes.
+ * La réserve — le seul réglage de prudence depuis le schéma 28 (décision 24).
  *
  * ─────────────────────────────────────────────────────────────────────────
- * UN PLANCHER EN EUROS N'EST PAS UNE PART EN POURCENTAGE
+ * UN PLANCHER EN EUROS, ET PLUS DE PART EN POURCENTAGE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * La RÉSERVE est un montant absolu : la ligne sous laquelle le compte
- * ne descend pas (D4, fait `reserve`). La PART GARDÉE est une fraction du
- * versable qu'on choisit de ne pas prendre ce mois-ci.
+ * La RÉSERVE est un montant absolu : la ligne sous laquelle le compte ne
+ * descend pas (D4, fait `reserve`). Une « part gardée à chaque versement » se
+ * réglait à côté, au curseur, et faisait un second « à te verser » sous le
+ * même nom, égal au premier seulement à 0 %. Elle s'est fondue dans la
+ * réserve : qui veut garder plus relève le plancher, et l'écran ne porte plus
+ * qu'un montant à se verser.
  *
- * Les confondre — c'est-à-dire exprimer le plancher en pourcentage du
- * disponible, comme le fait le prototype du handoff — fabrique une boucle : le
- * plancher descend à mesure qu'on vide le compte, et le versement soutenable
- * finit par tout autoriser. Ce n'est pas une préférence de conception, c'est
- * une rétroaction.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * POURQUOI ILS SONT ICI ET PLUS SUR LE PILOTE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Le handoff les range dans « Réserve & versements », et le Pilote n'y montre
- * que le montant qui en résulte. Le second motif a tranché : le Pilote est le
- * seul écran du paquet d'entrée, et le second curseur lui a fait franchir son
- * plafond. La règle du projet est d'extraire ce qui n'a rien à faire là.
- *
- * L'état local ne sert qu'à la fluidité du glissement ; la valeur part dans le
- * magasin à chaque changement, de sorte qu'il n'existe jamais deux vérités.
+ * Elle reste un plancher, jamais un pourcentage du disponible : un plancher
+ * qui descend à mesure qu'on vide le compte laisserait le versement tenable
+ * tout autoriser.
  */
 function ReservesEtVersements() {
   const reserve = useFaits((e) => e.faits.reserve);
-  const partGardee = useFaits((e) => e.faits.partGardeeAuVersement);
-  const soldeInitial = useFaits((e) => e.faits.soldeInitial);
   const definirReserve = useFaits((e) => e.definirReserve);
-  const definirPartGardee = useFaits((e) => e.definirPartGardee);
   const idChamp = useId();
-
-  const [saisiePart, setSaisiePart] = useState<number | null>(null);
-  const pourcent = Math.round((saisiePart ?? partGardee) * 100);
-  // Le versable qui résulte des deux réglages, pour que la phrase dise le
-  // calcul plutôt que de le laisser deviner. Dérivé, jamais stocké.
-  const versable = Math.max(0, soldeInitial - reserve);
 
   return (
     <div className={styles.formulaire}>
-      {/* Un CHAMP et non un curseur, contrairement à la part : c'est ce que
-          montre la capture, et c'est juste. Une plage a besoin d'une borne
-          haute, et la seule disponible ici est le solde — quelqu'un qui a
-          8 000 € en banque mais n'a pas encore saisi son solde de départ ne
-          pourrait pas se fixer un plancher à 5 000 €. */}
+      {/* Un CHAMP et non un curseur : une plage a besoin d'une borne haute, et
+          la seule disponible ici est le solde — quelqu'un qui a 8 000 € en
+          banque mais n'a pas encore saisi son solde de départ ne pourrait pas
+          se fixer un plancher à 5 000 €. */}
       <Champ
         id={`${idChamp}-seuil`}
         libelle="Réserve"
         aide="Le montant que tu gardes sur le compte quoi qu’il arrive. Il est
-              retiré du disponible pour obtenir ce que tu peux te verser,
-              et c’est le plancher tracé sur tes courbes."
+              retiré du disponible pour obtenir ce que tu peux te verser, et
+              c’est le plancher tracé sur tes courbes. Pour garder plus à chaque
+              versement, relève-le."
       >
         <input
           id={`${idChamp}-seuil`}
@@ -238,46 +215,6 @@ function ReservesEtVersements() {
           onChange={(e) => definirReserve(euros(Math.max(0, Number(e.target.value) || 0)))}
         />
       </Champ>
-
-      <p className={styles.champ}>
-        <label htmlFor={`${idChamp}-part`}>Part gardée à chaque versement</label>
-        <span className={styles.curseurRangee}>
-          <input
-            id={`${idChamp}-part`}
-            type="range"
-            className={styles.curseur}
-            min={0}
-            max={PART_GARDEE_MAX * 100}
-            step={5}
-            value={pourcent}
-            aria-valuetext={`${pourcent} %`}
-            onChange={(e) => {
-              const v = Number(e.target.value) / 100;
-              setSaisiePart(v);
-              definirPartGardee(ratio(v));
-            }}
-            onBlur={() => setSaisiePart(null)}
-          />
-          <output className={styles.curseurValeur}>{pourcent}&nbsp;%</output>
-        </span>
-        <span className={styles.aide}>
-          Ce que tu laisses sur le compte <strong>au-dessus de la réserve</strong>,
-          à chaque versement. À 0&nbsp;% rien ne change&nbsp;: c’est le réglage
-          par défaut, et il ne décide rien à ta place.
-        </span>
-      </p>
-
-      {/* La phrase dit le calcul, réserve comprise. Le prototype du handoff
-          écrit « sur ta part disponible, tu gardes N % » — sans la réserve, ce
-          qui à 0 % proposerait de la verser avec. */}
-      <p className={styles.explication}>
-        Sur un solde de <Montant>{eur(soldeInitial)}</Montant>, la réserve en garde{' '}
-        <Montant>{eur(reserve)}</Montant>&nbsp;; des{' '}
-        <Montant>{eur(versable)}</Montant> restants tu en laisses{' '}
-        {pourcent}&nbsp;%, soit{' '}
-        <Montant>{eur(Math.round(versable * (1 - pourcent / 100)))}</Montant> à
-        te verser.
-      </p>
     </div>
   );
 }

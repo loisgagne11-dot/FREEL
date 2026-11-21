@@ -78,3 +78,40 @@ describe('l’écran Trésorerie', () => {
     expect(await screen.findByRole('dialog', { name: 'Relevé bancaire' })).toBeTruthy();
   });
 });
+
+/**
+ * DÉCISION 24 : LA PART GARDÉE SE FOND DANS LA RÉSERVE, ET L'ÉCRAN LE DIT UNE FOIS.
+ *
+ * Si le bandeau ne s'affichait pas, « à te verser » monterait de 10 % sans un
+ * mot chez qui gardait une marge ; s'il ne se taisait pas après « Compris », on
+ * cesserait de lire les bandeaux de cet écran.
+ */
+describe('la part gardée retirée', () => {
+  const avecPart = (partGardeeRetiree: number | null) => useFaits.setState({
+    faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, partGardeeRetiree } }
+  });
+
+  it('dit le pourcentage d’avant, et renvoie à la réserve', () => {
+    avecPart(10);
+    render(<Tresorerie />);
+    const bandeau = screen.getByRole('status', { name: 'Part gardée retirée' });
+    expect(bandeau.textContent).toMatch(/Tu gardais 10\s%\sde chaque versement/u);
+    expect(bandeau.textContent).toMatch(/un seul «\s?à te verser\s?» désormais/u);
+    expect(within(bandeau).getByRole('link', { name: 'Relever ma réserve' }).getAttribute('href'))
+      .toBe('#/reglages/reserve');
+  });
+
+  it('se tait après « Compris », pour toujours', async () => {
+    avecPart(10);
+    render(<Tresorerie />);
+    await userEvent.click(screen.getByRole('button', { name: 'Compris' }));
+    expect(useFaits.getState().faits.entreprise.partGardeeRetiree).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Part gardée retirée' })).toBeNull();
+  });
+
+  it('ne dit rien à qui ne gardait rien', () => {
+    avecPart(null);
+    render(<Tresorerie />);
+    expect(screen.queryByRole('status', { name: 'Part gardée retirée' })).toBeNull();
+  });
+});

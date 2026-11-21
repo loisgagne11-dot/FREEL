@@ -9,6 +9,7 @@ import { Sheet } from '../components/Sheet';
 import { ChoixAnnee } from '../components/ChoixAnnee';
 import { useRoute } from '../useRoute';
 import styles from './Argent.module.css';
+import tr from './Tresorerie.module.css';
 
 /**
  * Le corps de la trésorerie — solde, répartition, enveloppes du dû, seuils,
@@ -112,6 +113,7 @@ export function Tresorerie({ annee, onAnnee }: ProprietesTresorerie = {}) {
       />
 
       <div className={styles.sections}>
+        <PartGardeeRetiree />
         <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
           <CorpsTresorerie etat={etat} />
           <VersementEtCapacite etat={etat} />
@@ -151,6 +153,44 @@ export function Tresorerie({ annee, onAnnee }: ProprietesTresorerie = {}) {
         )}
       </Sheet>
     </>
+  );
+}
+
+/**
+ * Le bandeau de la décision 24, dit UNE fois : la part gardée à chaque
+ * versement s'est fondue dans la réserve.
+ *
+ * Sans lui, chez qui gardait 10 %, « à te verser » monte de 10 % au premier
+ * chargement de la nouvelle version, sans un mot — et il croit garder encore
+ * une marge qu'aucun calcul ne retient plus. La migration ne convertit pas le
+ * pourcentage en euros (aucune conversion n'est exacte) : c'est à lui de
+ * relever sa réserve s'il veut garder plus. « Compris » pose `null` par la
+ * seule écriture du profil, et le bandeau ne revient pas.
+ */
+function PartGardeeRetiree() {
+  const part = useFaits((e) => e.faits.entreprise.partGardeeRetiree);
+  const modifierEntreprise = useFaits((e) => e.modifierEntreprise);
+  if (part === null) return null;
+  return (
+    <section className={tr.bandeau} role="status" aria-label="Part gardée retirée">
+      <p>
+        ◇ Tu gardais {part}&nbsp;% de chaque versement.{' '}
+        <span>
+          Ce réglage disparaît&nbsp;: un seul «&nbsp;à te verser&nbsp;» désormais. Si tu
+          veux garder plus, relève ta réserve.
+        </span>
+      </p>
+      <div className={tr.bandeauGestes}>
+        <a className={tr.lien} href="#/reglages/reserve">Relever ma réserve</a>
+        <button
+          type="button"
+          className={tr.compris}
+          onClick={() => modifierEntreprise({ partGardeeRetiree: null })}
+        >
+          Compris
+        </button>
+      </div>
+    </section>
   );
 }
 

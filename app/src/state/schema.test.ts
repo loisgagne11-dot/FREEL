@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { dateISO } from '../domain/types';
 import { planifier } from '../domain/calculs/planning';
 import { VERSION_SCHEMA, entrepriseVide, faitsVides, motifRefusFaits } from './schema';
-import { completerFaits } from './schema.migrations';
+import { completerFaits, motifRefusExterieur } from './schema.migrations';
 
 /**
  * Validation d'un bloc de faits.
@@ -409,62 +409,61 @@ describe('recettes d’un bloc au schéma 7', () => {
 });
 
 /**
- * v10 → v11 : LA PART GARDÉE AU VERSEMENT.
+ * v27 → v28 : LA PART GARDÉE SE FOND DANS LA RÉSERVE (décision 24).
  *
- * Le champ est de PREMIER NIVEAU. La fusion de surface de `completerFaits`
- * suffit donc à le combler — mais c'est ce que ces tests VÉRIFIENT, plutôt que
- * ce que le code suppose : le jour où le champ descendrait dans un élément de
- * liste, la fusion cesserait de suffire en silence, exactement comme pour les
- * congés du schéma 1 et les rythmes du schéma 2.
+ * Le champ de premier niveau `partGardeeAuVersement` (schémas 11 à 27) quitte
+ * le dossier. Il n'est PAS converti en réserve — un pourcentage du versable
+ * n'a pas d'équivalent en euros — mais gardé, en pourcentage, sur
+ * l'entreprise, pour que la Trésorerie le dise une fois.
  */
-describe('schéma 10 → 11 : la part gardée au versement', () => {
-  it('comble un compte de schéma 10 à zéro, jamais à undefined', () => {
+describe('schéma 27 → 28 : la part gardée se fond dans la réserve', () => {
+  /*
+   * Si ce test sautait, « à te verser » monterait de 10 % au premier
+   * chargement chez qui gardait une marge, sans qu'aucune phrase ne le dise :
+   * il croirait la garder encore.
+   */
+  it('une part de 10 % quitte le dossier et reste dite, en pourcentage, sur l’entreprise', () => {
+    const f = completerFaits({ version: 27, reserve: 3000, partGardeeAuVersement: 0.1 });
+    expect(f.version).toBe(28);
+    expect(f).not.toHaveProperty('partGardeeAuVersement');
+    expect(f.entreprise.partGardeeRetiree).toBe(10);
+    // Pas convertie : la réserve est celle que l'utilisateur avait réglée.
+    expect(f.reserve).toBe(3000);
+  });
+
+  /* Rien n'était gardé : rien n'est à dire, et le bandeau ne s'affiche pas. */
+  it('une part de 0 % ne laisse rien à dire', () => {
+    const f = completerFaits({ version: 27, partGardeeAuVersement: 0 });
+    expect(f).not.toHaveProperty('partGardeeAuVersement');
+    expect(f.entreprise.partGardeeRetiree).toBeNull();
+  });
+
+  it('un dossier sans part — d’avant le schéma 11 — ne laisse rien à dire, et pas `undefined`', () => {
     const f = completerFaits({ version: 10, reserve: 3000 });
-    expect(f).toHaveProperty('partGardeeAuVersement');
-    expect(f.partGardeeAuVersement).toBe(0);
-    expect(f.partGardeeAuVersement).not.toBeUndefined();
+    expect(f.entreprise.partGardeeRetiree).toBeNull();
+    expect(faitsVides().entreprise.partGardeeRetiree).toBeNull();
   });
 
-  /**
-   * LE DÉFAUT EST ZÉRO, ET SÛREMENT PAS 0,5.
-   *
-   * Si ce test sautait et que le défaut passait à 50 %, le versable de TOUT
-   * compte existant serait coupé en deux au premier chargement, sans qu'un
-   * geste ait été fait. Un réglage par défaut qui change un montant affiché est
-   * un chiffre faux.
-   */
-  it('ne propose aucune part gardée tant que personne n’a réglé le curseur', () => {
-    expect(faitsVides().partGardeeAuVersement).toBe(0);
-    expect(completerFaits({ version: 0 }).partGardeeAuVersement).toBe(0);
+  /* Le curseur s'arrêtait à 80 % : une part au-delà de 1, ou qui n'est pas un
+     nombre, vient d'un fichier abîmé, et ne se raconte pas. */
+  it('une part illisible ne se raconte pas', () => {
+    for (const part of [1.5, -0.1, '0,3', Number.NaN]) {
+      expect(completerFaits({ version: 27, partGardeeAuVersement: part }).entreprise.partGardeeRetiree).toBeNull();
+    }
   });
 
-  it('conserve une part déjà réglée', () => {
-    expect(completerFaits({ version: 11, partGardeeAuVersement: 0.3 }).partGardeeAuVersement)
-      .toBe(0.3);
+  it('un pourcentage à dire venu d’ailleurs est contrôlé', () => {
+    const avec = (partGardeeRetiree: unknown) =>
+      motifRefusExterieur({ ...faitsVides(), entreprise: { ...entrepriseVide(), partGardeeRetiree } });
+    expect(avec(null)).toBeNull();
+    expect(avec(10)).toBeNull();
+    expect(avec(4000)).toMatch(/partGardeeRetiree/);
+    expect(avec('10 %')).toMatch(/partGardeeRetiree/);
   });
 
-  /**
-   * LE CONTRÔLE PORTE SUR CE QUI ENGAGE.
-   *
-   * Au-delà de 1, `versable × (1 − part)` devient négatif : l'écran proposerait
-   * de se verser une dette. En dessous de 0, il proposerait plus que le
-   * versable. Ce sont les deux erreurs qu'un bloc venu d'ailleurs peut porter.
-   */
-  it('refuse une part qui n’est pas un ratio', () => {
-    expect(motifRefusFaits({ ...faitsVides(), partGardeeAuVersement: '0,3' }))
-      .toMatch(/partGardeeAuVersement/);
-    expect(motifRefusFaits({ ...faitsVides(), partGardeeAuVersement: 1.5 }))
-      .toMatch(/partGardeeAuVersement/);
-    expect(motifRefusFaits({ ...faitsVides(), partGardeeAuVersement: -0.1 }))
-      .toMatch(/partGardeeAuVersement/);
-    expect(motifRefusFaits({ ...faitsVides(), partGardeeAuVersement: Number.NaN }))
-      .toMatch(/partGardeeAuVersement/);
-  });
-
-  // Aucun compte d'avant le schéma 11 ne la porte : la refuser pour absence les
-  // rejetterait tous.
-  it('accepte son absence', () => {
-    expect(motifRefusFaits({ version: 10, reserve: 3000 })).toBeNull();
+  /* Une version 28 qui chargerait un dossier 29 en effacerait ce qu'elle ne sait pas lire. */
+  it('refuse un dossier au schéma 29', () => {
+    expect(motifRefusFaits({ ...faitsVides(), version: 29 })).toMatch(/schéma 29/);
   });
 });
 
@@ -1047,9 +1046,9 @@ describe('schéma 22 → 23 : le motif « mis de côté pour l’impôt »', () 
 
   it('un dossier d’un schéma postérieur est refusé', () => {
     expect(motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 })).not.toBeNull();
-    // 27 depuis le lot 48 : le carnet de commandes. L'attente suit le
-    // numéro, elle ne le fige pas — ce test dit qu'un saut se voit.
-    expect(VERSION_SCHEMA).toBe(27);
+    // 28 depuis le lot 49 : la part gardée fondue dans la réserve. L'attente
+    // suit le numéro, elle ne le fige pas — ce test dit qu'un saut se voit.
+    expect(VERSION_SCHEMA).toBe(28);
   });
 });
 
@@ -1244,10 +1243,10 @@ describe('schéma 25 → 26 : la caisse de retraite, l’histoire de l’option 
     expect(f.entreprise.caisseRetraite).toBe('cipav');
   });
 
-  /** Une version 27 qui chargerait un dossier 28 en effacerait ce qu'elle ne sait pas lire.
-      Il disait « 27 » au schéma 26 ; le numéro a suivi la version (lot 48). */
-  it('refuse un dossier au schéma 28', () => {
-    expect(motifRefusFaits({ ...faitsVides(), version: 28 })).toMatch(/schéma 28/);
+  /** Une version qui chargerait un dossier plus récent en effacerait ce qu'elle ne sait pas lire.
+      Il disait « 28 » au schéma 27 ; le numéro suit la version (lots 48, 49). */
+  it('refuse un dossier d’un schéma postérieur', () => {
+    expect(motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 })).toMatch(new RegExp(`schéma ${VERSION_SCHEMA + 1}`));
   });
 });
 
@@ -1267,7 +1266,7 @@ describe('schéma 26 → 27 : le carnet de commandes, dans chaque mission', () =
 
   it('la migration descend dans la liste : chaque mission reçoit les quatre champs à `null`', () => {
     const f = completerFaits({ version: 26, missions: [missionDuSchema26('m1'), missionDuSchema26('m2')] });
-    expect(f.version).toBe(27);
+    expect(f.version).toBe(VERSION_SCHEMA);
     for (const m of f.missions) {
       expect(m).toMatchObject({ joursCommandes: null, preavisFinJours: null, reconduction: null, probabilite: null });
     }

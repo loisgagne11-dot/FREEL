@@ -19,7 +19,7 @@
     "invalide) — invariant n°6 : le dépôt est public, aucune donnée personnelle",
     "n'y entre."
   ],
-  "version": 27,
+  "version": 28,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "prenom": "Camille",
@@ -46,7 +46,8 @@
     "optionTvaDebits": false,
     "regimeTva": "simplifie",
     "ca3Mensuelle": false,
-    "nomExploitant": ""
+    "nomExploitant": "",
+    "partGardeeRetiree": null
   },
   "clients": [
     {
@@ -1029,7 +1030,6 @@
     }
   ],
   "configImpotBrute": {},
-  "partGardeeAuVersement": 0,
   "partsFiscales": null,
   "autresRevenusFoyer": null,
   "versementPerDeductible": null,

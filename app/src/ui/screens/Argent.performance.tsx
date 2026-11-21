@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { dateDuJour, moisCourant, soldeEstSuivi } from '../../state/selecteurs';
 import { etatArgent, etatProjection, type EtatArgent } from '../../state/selecteurs.argent';
@@ -8,9 +8,8 @@ import {
 } from '../../state/selecteurs.performance';
 import type { CapaciteDuMois } from '../../domain/calculs/capaciteVersement';
 import { allureObjectif } from '../../domain/calculs/objectif';
-import { PART_GARDEE_MAX } from '../../state/schema';
 import type { Mois, Resolution } from '../../domain/types';
-import { euros, ratio } from '../../domain/types';
+import { euros } from '../../domain/types';
 import { useRoute } from '../useRoute';
 import { Chiffre } from '../components/Chiffre';
 import { Info } from '../components/Info';
@@ -623,19 +622,8 @@ function PanneauComposition({ composition }: { readonly composition: Composition
    ───────────────────────────────────────────────────────────────────────── */
 
 /**
- * « Tu peux te verser », et le curseur qui en décide.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * `versable × (1 − part)`, ET NON `disponible × (1 − part)`
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Le prototype applique la part au DISPONIBLE. À 0 %, il propose alors de
- * verser la réserve avec — c'est-à-dire de vider précisément le plancher
- * qu'on s'était donné. Le versable est le disponible une fois la réserve
- * retirée : c'est sur lui que la part s'applique.
- *
- * Le défaut est **0 %**, et non les 50 % du prototype : un défaut à 50 %
- * couperait en deux, sans un geste, le versable de tout compte existant.
+ * « Tu peux te verser » : le seul « à te verser », disponible moins réserve
+ * (décision 24 — la part gardée s'est fondue dans la réserve).
  *
  * ─────────────────────────────────────────────────────────────────────────
  * LE BOUTON NE CRÉE PAS DE FAIT
@@ -646,76 +634,25 @@ function PanneauComposition({ composition }: { readonly composition: Composition
  * Le saisir une seconde fois le compterait deux fois. Ce qui manque n'est pas
  * un fait mais un NOM — savoir lequel des mouvements sortants est une
  * rémunération — et ce nom se pose au relevé.
- *
- * Le libellé s'écarte donc du dessin, qui dit « Enregistrer le versement ». Un
- * bouton qui promet d'enregistrer et qui emmène ailleurs est un petit
- * mensonge&nbsp;; celui-ci dit où il va.
  */
 function CarteVersement(
   { versable, dispo }: { readonly versable: number; readonly dispo: number }
 ) {
-  const partGardee = useFaits((e) => e.faits.partGardeeAuVersement);
   const reserve = useFaits((e) => e.faits.reserve);
-  const definirPartGardee = useFaits((e) => e.definirPartGardee);
   const { naviguerVers } = useRoute();
-  const idPart = useId();
-
-  const [saisie, setSaisie] = useState<number | null>(null);
-  const part = saisie ?? partGardee;
-  const pourcent = Math.round(part * 100);
   const base = Math.max(0, versable);
-  const gardee = euros(Math.round(base * part));
-  const aVerser = euros(base - gardee);
 
   return (
     <section className={styles.carte} aria-labelledby="versement">
       <header className={styles.enteteCarte}>
         <h2 id="versement" className={styles.titreCarte}>Tu peux te verser</h2>
-        <span className={styles.badge}>à te verser − part gardée</span>
       </header>
 
-      {/* Le grand nombre porte son libellé, lisible par les technologies
-          d'assistance : annoncé seul, « 2 470 € » ne dit pas de quoi il s'agit,
-          et c'est le chiffre le plus engageant de l'écran. */}
       <p className={styles.grandChiffre}>
         <span className={styles.horsEcran}>Montant que tu peux te verser&nbsp;: </span>
-        <Montant>{eur(aVerser)}</Montant>
+        <Montant>{eur(base)}</Montant>
       </p>
 
-      <p className={styles.curseurRangee}>
-        <label htmlFor={idPart} className={styles.curseurLibelle}>
-          Part gardée à chaque versement
-        </label>
-        <output className={styles.curseurValeur} htmlFor={idPart}>
-          {pourcent}&nbsp;%
-        </output>
-      </p>
-      <input
-        id={idPart}
-        type="range"
-        className={styles.curseur}
-        min={0}
-        max={PART_GARDEE_MAX * 100}
-        step={5}
-        value={pourcent}
-        aria-valuetext={`${pourcent} %`}
-        onChange={(e) => {
-          const v = Number(e.target.value) / 100;
-          setSaisie(v);
-          // Écrit dans le magasin à chaque changement : le réglage de Config et
-          // ce curseur sont le MÊME fait, et deux vérités qui se rejoindraient
-          // « au relâchement » n'en font pas une.
-          definirPartGardee(ratio(v));
-        }}
-        onBlur={() => setSaisie(null)}
-      />
-
-      {/* Un disponible négatif ne se raconte pas comme une soustraction : à
-          −2 669 €, « la réserve en retient 2 470 € » suggérerait un
-          reste de −5 139 €, alors que le versable est zéro et que la réserve
-          n'est pas constituée du tout. Ce n'est pas le même fait, et c'est
-          celui-là qu'il faut dire — sinon la carte affiche « 0 € » sans qu'on
-          sache si c'est le réglage ou le compte qui l'impose. */}
       {dispo < 0 ? (
         <p className={styles.explication}>
           Ton disponible est <strong>négatif</strong> (<Montant>{eur(dispo)}</Montant>)&nbsp;:
@@ -726,9 +663,7 @@ function CarteVersement(
         <p className={styles.explication}>
           Sur <Montant>{eur(dispo)}</Montant> de disponible, la réserve
           en retient <Montant>{eur(euros(Math.min(reserve, dispo)))}</Montant>&nbsp;: reste{' '}
-          <Montant>{eur(base)}</Montant> à te verser. Tu en gardes{' '}
-          <strong>{pourcent}&nbsp;%</strong> (<Montant>{eur(gardee)}</Montant>) et
-          tu verses le reste.
+          <Montant>{eur(base)}</Montant> à te verser.
         </p>
       )}
 

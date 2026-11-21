@@ -63,7 +63,7 @@ const ECRANS = [
   // Profil était visité, et l'adresse Légifrance des Paramètres
   // fiscaux élargissait la page à 609 px sur téléphone sans que rien ne le voie.
   { hash: '#/reglages/fiscal', nom: 'reglages-fiscal', attendre: 'text=Ajouter une période' },
-  { hash: '#/reglages/reserve', nom: 'reglages-reserve', attendre: 'text=Part gardée à chaque versement' },
+  { hash: '#/reglages/reserve', nom: 'reglages-reserve', attendre: 'text=Besoin mensuel' },
   { hash: '#/reglages/facturation', nom: 'reglages-facturation', attendre: 'text=Mentions portées' },
   { hash: '#/reglages/compte', nom: 'reglages-compte', attendre: 'h2:has-text("Compte & synchronisation")' },
   { hash: '#/reglages/donnees', nom: 'reglages-donnees', attendre: 'text=Archive complète (ZIP)' },

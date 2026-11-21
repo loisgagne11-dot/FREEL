@@ -1,6 +1,6 @@
 {
   "_lisezMoi": "Jeu d’essai à FORME RÉELLE, entièrement fictif : mêmes structures qu’un compte réel (ACRE qui s’éteint, TVA franchie en cours d’année, avoir, foyer à deux parts, passage du 31 décembre), aucune donnée personnelle. Il sert aux tests d’intégration (src/integration) et à capturer-app.mjs --jeu=essai, jamais à la démonstration.",
-  "version": 27,
+  "version": 28,
   "entreprise": {
     "nom": "Entreprise Démo Indépendant",
     "prenom": "",
@@ -27,7 +27,8 @@
     "optionTvaDebits": false,
     "regimeTva": "simplifie",
     "ca3Mensuelle": false,
-    "nomExploitant": ""
+    "nomExploitant": "",
+    "partGardeeRetiree": 10
   },
   "clients": [
     {
@@ -786,7 +787,6 @@
   "soldeInitialAu": "2025-12-31",
   "reserve": 8000,
   "besoinMensuel": 3000,
-  "partGardeeAuVersement": 0.1,
   "objectifCaAnnuel": 80000,
   "periodesDeclarees": [
     {

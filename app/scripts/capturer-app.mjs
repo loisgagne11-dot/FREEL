@@ -170,7 +170,7 @@ const VUES = [
      du handoff. Chacune arrive à la demande : sans `attendre`, la photo
      montrait « Chargement… » et le contrôle visuel ne pouvait rien juger. */
   { hash: '#/reglages/fiscal', nom: 'reglages-fiscal', handoff: 'config-fiscal', attendre: 'text=Périodicité des cotisations' },
-  { hash: '#/reglages/reserve', nom: 'reglages-reserve', handoff: 'config-reserve', attendre: 'text=Part gardée à chaque versement' },
+  { hash: '#/reglages/reserve', nom: 'reglages-reserve', handoff: 'config-reserve', attendre: 'text=Besoin mensuel' },
   { hash: '#/reglages/facturation', nom: 'reglages-facturation', handoff: 'config-facturation', attendre: 'label:has-text("IBAN")' },
   { hash: '#/reglages/donnees', nom: 'reglages-donnees', handoff: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
   { hash: '#/reglages/compte', nom: 'reglages-compte', handoff: 'config-cloud', attendre: 'text=Relier un compte' },
