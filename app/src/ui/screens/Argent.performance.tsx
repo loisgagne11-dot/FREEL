@@ -1,17 +1,13 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFaits } from '../../state/store';
-import { dateDuJour, moisCourant, soldeEstSuivi } from '../../state/selecteurs';
+import { dateDuJour, moisCourant } from '../../state/selecteurs';
 import { etatArgent, etatProjection, type EtatArgent } from '../../state/selecteurs.argent';
 import {
-  capaciteParMois, compositionDuMois, resultatProjete,
-  type CompositionDuMois, type ResultatProjete
+  compositionDuMois, resultatProjete, type CompositionDuMois, type ResultatProjete
 } from '../../state/selecteurs.performance';
-import type { CapaciteDuMois } from '../../domain/calculs/capaciteVersement';
 import { allureObjectif } from '../../domain/calculs/objectif';
-import { PART_GARDEE_MAX } from '../../state/schema';
-import type { Mois, Resolution } from '../../domain/types';
-import { euros, ratio } from '../../domain/types';
-import { useRoute } from '../useRoute';
+import type { Mois } from '../../domain/types';
+import { euros } from '../../domain/types';
 import { Chiffre } from '../components/Chiffre';
 import { Info } from '../components/Info';
 import { Montant } from '../components/Montant';
@@ -21,17 +17,10 @@ import styles from './Argent.performance.module.css';
 
 /**
  * Ce qui était le pilier « Performance » de l'écran Argent — « combien je
- * gagne, je me verse » —, désormais en DEUX morceaux qui vivent sur deux écrans
- * (lot 51) :
- *
- *  · `AnalyseDuCa` — tuiles, graphe et composition du chiffre d'affaires — est
- *    une analyse de l'activité : Activité › Analyse ;
- *  · `VersementEtCapacite` — « Tu peux te verser » et la capacité mois par
- *    mois — découle du solde : il vit sous la Trésorerie.
- *
- * Ils restent dans un même module : ils partagent la projection, son calcul
- * et leurs styles, et chaque écran n'en télécharge que ce qu'il affiche déjà —
- * le module est différé des deux côtés.
+ * gagne » — : tuiles, graphe et composition du chiffre d'affaires, une
+ * analyse de l'activité qui vit sous Activité › Analyse (lot 51). « Tu peux te
+ * verser » et la capacité de versement, qui découlent du solde, ont rejoint la
+ * Trésorerie redessinée (lot 49) : la cascade et la vue Année.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI IL VIT DANS SON PROPRE MODULE
@@ -43,15 +32,6 @@ import styles from './Argent.performance.module.css';
  * lot ; la coupure tient toujours — Activité comme Trésorerie l'ouvrent à la
  * demande.
  *
- * ─────────────────────────────────────────────────────────────────────────
- * CE QUI EST CALCULÉ ICI, ET CE QUI ARRIVE DÉJÀ FAIT
- * ─────────────────────────────────────────────────────────────────────────
- *
- * `EtatArgent` arrive en paramètre sous la Trésorerie, qui le calcule pour son
- * propre corps : le refaire ici afficherait deux fois le même disponible
- * calculé deux fois — la meilleure façon qu'ils finissent par différer.
- *
- * La projection, elle, est calculée ici, une fois par carte qui en a besoin.
  */
 
 /**
@@ -205,34 +185,6 @@ export function AnalyseDuCa({ etat }: { readonly etat: EtatArgent }) {
       </div>
 
     </>
-  );
-}
-
-/**
- * « Tu peux te verser » et la capacité de versement mois par mois, sous la
- * Trésorerie : ils découlent du solde qu'elle affiche.
- *
- * La projection est calculée ici et **une seule fois**, puis passée à
- * `capaciteParMois`. Douze passages de planning par appelant se verraient à
- * l'ouverture.
- */
-export function VersementEtCapacite({ etat }: { readonly etat: EtatArgent }) {
-  const faits = useFaits((e) => e.faits);
-  const indexCourant = Number(moisCourant().slice(5, 7)) - 1;
-  const projection = useMemo(() => etatProjection(faits), [faits]);
-  const capacites = useMemo(
-    () => capaciteParMois(faits, new Date(), projection), [faits, projection]
-  );
-
-  return (
-    <div className={`${styles.deuxColonnes} ${styles.versement}`}>
-      <CarteVersement versable={etat.tresorerie.versable} dispo={etat.tresorerie.dispo} />
-      <CarteCapacite
-        capacites={capacites}
-        indexCourant={indexCourant}
-        verseConnu={soldeEstSuivi(faits)}
-      />
-    </div>
   );
 }
 
@@ -615,262 +567,5 @@ function PanneauComposition({ composition }: { readonly composition: Composition
         </p>
       )}
     </aside>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   A4 — ce qu'on peut se verser
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * « Tu peux te verser », et le curseur qui en décide.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * `versable × (1 − part)`, ET NON `disponible × (1 − part)`
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Le prototype applique la part au DISPONIBLE. À 0 %, il propose alors de
- * verser la réserve avec — c'est-à-dire de vider précisément le plancher
- * qu'on s'était donné. Le versable est le disponible une fois la réserve
- * retirée : c'est sur lui que la part s'applique.
- *
- * Le défaut est **0 %**, et non les 50 % du prototype : un défaut à 50 %
- * couperait en deux, sans un geste, le versable de tout compte existant.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LE BOUTON NE CRÉE PAS DE FAIT
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Se verser de l'argent n'est pas une opération comptable en micro&nbsp;: la
- * personne et l'entreprise sont la même, et le virement figure déjà au relevé.
- * Le saisir une seconde fois le compterait deux fois. Ce qui manque n'est pas
- * un fait mais un NOM — savoir lequel des mouvements sortants est une
- * rémunération — et ce nom se pose au relevé.
- *
- * Le libellé s'écarte donc du dessin, qui dit « Enregistrer le versement ». Un
- * bouton qui promet d'enregistrer et qui emmène ailleurs est un petit
- * mensonge&nbsp;; celui-ci dit où il va.
- */
-function CarteVersement(
-  { versable, dispo }: { readonly versable: number; readonly dispo: number }
-) {
-  const partGardee = useFaits((e) => e.faits.partGardeeAuVersement);
-  const reserve = useFaits((e) => e.faits.reserve);
-  const definirPartGardee = useFaits((e) => e.definirPartGardee);
-  const { naviguerVers } = useRoute();
-  const idPart = useId();
-
-  const [saisie, setSaisie] = useState<number | null>(null);
-  const part = saisie ?? partGardee;
-  const pourcent = Math.round(part * 100);
-  const base = Math.max(0, versable);
-  const gardee = euros(Math.round(base * part));
-  const aVerser = euros(base - gardee);
-
-  return (
-    <section className={styles.carte} aria-labelledby="versement">
-      <header className={styles.enteteCarte}>
-        <h2 id="versement" className={styles.titreCarte}>Tu peux te verser</h2>
-        <span className={styles.badge}>à te verser − part gardée</span>
-      </header>
-
-      {/* Le grand nombre porte son libellé, lisible par les technologies
-          d'assistance : annoncé seul, « 2 470 € » ne dit pas de quoi il s'agit,
-          et c'est le chiffre le plus engageant de l'écran. */}
-      <p className={styles.grandChiffre}>
-        <span className={styles.horsEcran}>Montant que tu peux te verser&nbsp;: </span>
-        <Montant>{eur(aVerser)}</Montant>
-      </p>
-
-      <p className={styles.curseurRangee}>
-        <label htmlFor={idPart} className={styles.curseurLibelle}>
-          Part gardée à chaque versement
-        </label>
-        <output className={styles.curseurValeur} htmlFor={idPart}>
-          {pourcent}&nbsp;%
-        </output>
-      </p>
-      <input
-        id={idPart}
-        type="range"
-        className={styles.curseur}
-        min={0}
-        max={PART_GARDEE_MAX * 100}
-        step={5}
-        value={pourcent}
-        aria-valuetext={`${pourcent} %`}
-        onChange={(e) => {
-          const v = Number(e.target.value) / 100;
-          setSaisie(v);
-          // Écrit dans le magasin à chaque changement : le réglage de Config et
-          // ce curseur sont le MÊME fait, et deux vérités qui se rejoindraient
-          // « au relâchement » n'en font pas une.
-          definirPartGardee(ratio(v));
-        }}
-        onBlur={() => setSaisie(null)}
-      />
-
-      {/* Un disponible négatif ne se raconte pas comme une soustraction : à
-          −2 669 €, « la réserve en retient 2 470 € » suggérerait un
-          reste de −5 139 €, alors que le versable est zéro et que la réserve
-          n'est pas constituée du tout. Ce n'est pas le même fait, et c'est
-          celui-là qu'il faut dire — sinon la carte affiche « 0 € » sans qu'on
-          sache si c'est le réglage ou le compte qui l'impose. */}
-      {dispo < 0 ? (
-        <p className={styles.explication}>
-          Ton disponible est <strong>négatif</strong> (<Montant>{eur(dispo)}</Montant>)&nbsp;:
-          le dû dépasse ce qu’il y a sur le compte. Il n’y a rien à
-          te verser, et la réserve n’est pas constituée non plus.
-        </p>
-      ) : (
-        <p className={styles.explication}>
-          Sur <Montant>{eur(dispo)}</Montant> de disponible, la réserve
-          en retient <Montant>{eur(euros(Math.min(reserve, dispo)))}</Montant>&nbsp;: reste{' '}
-          <Montant>{eur(base)}</Montant> à te verser. Tu en gardes{' '}
-          <strong>{pourcent}&nbsp;%</strong> (<Montant>{eur(gardee)}</Montant>) et
-          tu verses le reste.
-        </p>
-      )}
-
-      <button
-        type="button"
-        className={styles.action}
-        onClick={() => naviguerVers('tresorerie', 'releve')}
-      >
-        Pointer le versement au relevé
-      </button>
-      <p className={styles.aide}>
-        Le virement figure déjà sur ton relevé&nbsp;: il n’y a rien à saisir, il
-        n’y a qu’à le nommer. Le saisir ici le compterait deux fois.
-      </p>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   A5 — la capacité de versement, mois par mois
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * Ce que chaque mois autorisait, et ce qu'on s'est effectivement versé.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LE VERSÉ EST À L'INTÉRIEUR DE LA BARRE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * C'est ce que montre la référence, et ce n'est pas cosmétique&nbsp;: deux
- * barres côte à côte laissent l'œil faire la comparaison, imbriquées elles
- * répondent d'un coup à « me suis-je versé plus que ce mois-là ne rapportait ».
- *
- * ─────────────────────────────────────────────────────────────────────────
- * UN MOIS À VENIR N'A AUCUN VERSÉ, ET LE HACHURÉ NE REMPLIT RIEN
- * ─────────────────────────────────────────────────────────────────────────
- *
- * `capaciteDuMois` rend `verse: null` sur un mois projeté — jamais zéro, qui
- * serait un constat. Dessiner un plein sur une barre hachurée ferait lire « je
- * me suis versé » alors que rien n'est sorti du compte.
- *
- * Un mois dont le taux de charges se dérobe rend `refuse` : sa colonne reste en
- * place, vide, avec son motif. La retirer décalerait les onze autres d'une case
- * et personne ne verrait le trou.
- */
-function CarteCapacite(
-  { capacites, indexCourant, verseConnu }: {
-    readonly capacites: readonly Resolution<CapaciteDuMois>[];
-    readonly indexCourant: number;
-    readonly verseConnu: boolean;
-  }
-) {
-  const valeurs = capacites.flatMap((c) => (c.statut === 'refuse' ? [] : [c.valeur]));
-  const maximum = Math.max(1, ...valeurs.map((v) => Math.max(v.capacite, v.verse ?? 0)));
-  const hauteur = (v: number): string => `${Math.max(0, (v / maximum) * 100)}%`;
-
-  return (
-    <section className={styles.carte} aria-labelledby="capacite">
-      <header className={styles.enteteCarte}>
-        <h2 id="capacite" className={styles.titreCarte}>
-          Capacité de versement par mois
-          <Info libelle="Comment lire ces barres">
-            La barre dit ce que le mois <em>autorisait</em>&nbsp;: encaissé, moins
-            les cotisations au taux de <em>ce</em> mois-là, moins les dépenses.
-            Au barème, l’impôt sur le revenu n’y est pas déduit&nbsp;: il se met
-            de côté à part, et compte dans le dû. Le plein dit ce que tu as pris. Les mois à venir sont hachurés et
-            n’ont aucun plein&nbsp;— rien n’en est encore sorti.
-          </Info>
-        </h2>
-        <span className={styles.noteCarte}>barre = capacité · plein = versé</span>
-      </header>
-
-      <div className={styles.trace}>
-        {capacites.map((c, i) => {
-          const mois = MOIS_COURTS[i] ?? String(i + 1);
-          if (c.statut === 'refuse') {
-            return (
-              <div key={mois} className={styles.colonneStatique} title={c.motif}>
-                <span className={styles.valeurs}><span className={styles.valeurRefus}>—</span></span>
-                <span className={styles.barres} aria-hidden="true" />
-                <span className={styles.moisAxe}>
-                  {mois}
-                  {/* Le motif était porté par un `title` seul : une infobulle
-                      de survol, que rien n'annonce à qui écoute la page et que
-                      personne ne voit au doigt. Le tiret disait « — » et rien
-                      d'autre. */}
-                  <span className={styles.horsEcran}> : {c.motif}</span>
-                </span>
-              </div>
-            );
-          }
-
-          const v = c.valeur;
-          const futur = v.nature === 'projete';
-          return (
-            <div key={mois} className={styles.colonneStatique}>
-              <span className={styles.valeurs}>
-                <span className={v.capacite < 0 ? styles.valeurNegative : styles.valeurCapacite}>
-                  <Montant>{enKiloEuros(v.capacite)}</Montant>
-                </span>
-              </span>
-              <span className={styles.barres}>
-                <span
-                  className={`${styles.barreCapacite} ${futur ? styles.hachure : ''}`}
-                  style={{ height: hauteur(v.capacite) }}
-                >
-                  {/* Le versé est un enfant de la capacité : sa hauteur est un
-                      pourcentage de la barre qui le contient, ce qui le garde
-                      dedans même quand l'échelle change. Au-delà de 100 % il
-                      déborde, et c'est exactement ce qu'il faut voir. */}
-                  {v.verse !== null && v.verse > 0 && (
-                    <span
-                      className={styles.barreVerse}
-                      style={{ height: `${Math.min(200, (v.verse / Math.max(1, v.capacite)) * 100)}%` }}
-                    />
-                  )}
-                </span>
-              </span>
-              <span
-                className={`${styles.moisAxe} ${i === indexCourant ? styles.moisCourantAxe : ''}`}
-              >
-                {mois}
-                {/* Le texte lu par les lecteurs d'écran porte les montants : en
-                    mode discret il les masque comme le reste de l'écran. Écrits
-                    en clair, ils se lisaient encore dans le document (lot 14 :
-                    révélé quand ce graphe s'est mis à paraître d'emblée). */}
-                <span className={styles.horsEcran}>
-                  {' '}: <Montant>{eur(v.capacite)}</Montant> de capacité
-                  {v.verse === null ? ', mois à venir' : <>, <Montant>{eur(v.verse)}</Montant> versés</>}
-                </span>
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {!verseConnu && (
-        <p className={styles.aide}>
-          Aucun relevé bancaire n’est importé&nbsp;: le versé est <strong>inconnu</strong>,
-          et non nul. Les barres n’ont donc pas encore de plein à montrer.
-        </p>
-      )}
-    </section>
   );
 }

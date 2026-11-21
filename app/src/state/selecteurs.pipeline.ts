@@ -129,8 +129,24 @@ export function encaissementsAttendusParMois(
   horizon: readonly Mois[],
   maintenant: Date
 ): Map<Mois, number> {
-  const attendu = new Map<Mois, number>(horizon.map((m) => [m, 0]));
-  if (horizon.length === 0) return attendu;
+  const { factures, planning } = encaissementsAttendusDetailles(faits, horizon, maintenant);
+  return new Map(horizon.map((m) => [m, (factures.get(m) ?? 0) + (planning.get(m) ?? 0)]));
+}
+
+/**
+ * Les mêmes encaissements attendus, en deux parts : les factures émises, le
+ * planning signé. La Trésorerie dit « 6 010 € de factures à échéance » d'un
+ * mois : un fait — le document est parti — qui ne se lit pas comme une
+ * intention de planning. Une seule règle, deux colonnes.
+ */
+export function encaissementsAttendusDetailles(
+  faits: Faits,
+  horizon: readonly Mois[],
+  maintenant: Date
+): { readonly factures: Map<Mois, number>; readonly planning: Map<Mois, number> } {
+  const factures = new Map<Mois, number>(horizon.map((m) => [m, 0]));
+  const planning = new Map<Mois, number>(horizon.map((m) => [m, 0]));
+  if (horizon.length === 0) return { factures, planning };
   const plancher = horizon[0] as Mois;
 
   /* Le décalage de l'encaissement attendu suit la FORMULE, pas un nombre de
@@ -139,7 +155,7 @@ export function encaissementsAttendusParMois(
      prévision de trésorerie, dix-neuf jours changent le mois. */
   const formulesClient = new Map(faits.clients.map((c) => [c.nom, c.delaiPaiement]));
 
-  const ajouter = (m: Mois, montant: number): void => {
+  const ajouter = (attendu: Map<Mois, number>, m: Mois, montant: number): void => {
     // Hors fenêtre : ni avant le plancher — l'argent d'hier est déjà au
     // solde — ni au-delà de l'horizon.
     if (attendu.has(m)) attendu.set(m, (attendu.get(m) ?? 0) + montant);
@@ -150,7 +166,7 @@ export function encaissementsAttendusParMois(
   for (const f of facturesSuivies(faits, maintenant)) {
     if (f.statut !== 'emise' && f.statut !== 'envoyee' && f.statut !== 'en_retard') continue;
     const echeance = (f.echeanceLe ?? plancher).slice(0, 7) as Mois;
-    ajouter(echeance < plancher ? plancher : echeance, f.recette.montant);
+    ajouter(factures, echeance < plancher ? plancher : echeance, f.recette.montant);
   }
 
   /* 2. Le revenu prévu au planning, daté à son ÉCHÉANCE réelle.
@@ -168,11 +184,11 @@ export function encaissementsAttendusParMois(
       const emiseLe = finDuMoisISO(m);
       const formule = formuleOuNull(mission?.delaiPaiement)
         ?? formulesClient.get(nom) ?? FORMULE_PAR_DEFAUT;
-      ajouter(echeanceDe(emiseLe, formule).slice(0, 7) as Mois, p.prevision.montantRetenu);
+      ajouter(planning, echeanceDe(emiseLe, formule).slice(0, 7) as Mois, p.prevision.montantRetenu);
     }
   }
 
-  return attendu;
+  return { factures, planning };
 }
 
 /**

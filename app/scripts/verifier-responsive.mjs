@@ -53,7 +53,10 @@ const ECRANS = [
   // l'attendre on mesurait le « Chargement… » du planning.
   { hash: '#/activite/missions', nom: 'activite-missions', attendre: 'h2:has-text("Toutes les missions")' },
   { hash: '#/factures', nom: 'factures' },
-  { hash: '#/tresorerie', nom: 'tresorerie' },
+  // La Trésorerie redessinée (lot 49) : ses cartes arrivent à la demande, la
+  // dernière est celle des seuils ; la vue Année a son adresse et ses graphes.
+  { hash: '#/tresorerie', nom: 'tresorerie', attendre: 'h2:has-text("Tes seuils de l’année")' },
+  { hash: '#/tresorerie/annee', nom: 'tresorerie-annee', attendre: 'h2:has-text("Ce que chaque mois te permettait de te verser")' },
   { hash: '#/obligations', nom: 'obligations' },
   { hash: '#/achats', nom: 'achats' },
   { hash: '#/simulateurs', nom: 'simulateurs' },
@@ -63,7 +66,7 @@ const ECRANS = [
   // Profil était visité, et l'adresse Légifrance des Paramètres
   // fiscaux élargissait la page à 609 px sur téléphone sans que rien ne le voie.
   { hash: '#/reglages/fiscal', nom: 'reglages-fiscal', attendre: 'text=Ajouter une période' },
-  { hash: '#/reglages/reserve', nom: 'reglages-reserve', attendre: 'text=Part gardée à chaque versement' },
+  { hash: '#/reglages/reserve', nom: 'reglages-reserve', attendre: 'text=Besoin mensuel' },
   { hash: '#/reglages/facturation', nom: 'reglages-facturation', attendre: 'text=Mentions portées' },
   { hash: '#/reglages/compte', nom: 'reglages-compte', attendre: 'h2:has-text("Compte & synchronisation")' },
   { hash: '#/reglages/donnees', nom: 'reglages-donnees', attendre: 'text=Archive complète (ZIP)' },

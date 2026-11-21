@@ -89,10 +89,12 @@ function depensesDuMois(faits: Faits, m: Mois): Euros {
 export function capaciteParMois(
   faits: Faits,
   maintenant: Date = new Date(),
-  projection: EtatProjection = etatProjection(faits, maintenant)
+  projection: EtatProjection = etatProjection(faits, maintenant),
+  /* L'année relue — la vue Année de la Trésorerie (lot 49) relit aussi le
+     passé ; l'année de l'horloge par défaut. */
+  annee: number = maintenant.getFullYear()
 ): readonly Resolution<CapaciteDuMois>[] {
   const m0 = moisCourant(maintenant);
-  const annee = maintenant.getFullYear();
   const attendu = new Map(projection.projection.mois.map((p) => [p.mois, p.encaissements]));
 
   return Array.from({ length: 12 }, (_, i) => {

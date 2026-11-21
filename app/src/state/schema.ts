@@ -13,7 +13,6 @@
  */
 
 import type { DateISO, Euros, Mois, Ratio, TypeActivite } from '../domain/types';
-import { ratio } from '../domain/types';
 import type { Depense } from '../domain/calculs/depenses';
 import type { CaisseRetraite, PeriodeBareme } from '../domain/bareme/urssaf';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
@@ -69,19 +68,14 @@ export type { PieceAFournir };
  * ne compterait pas le volume commandé, n'annoncerait pas une fin au préavis
  * choisi, prendrait l'échéance d'un contrat reconduit pour sa fin — puis, au
  * premier renvoi, effacerait les quatre. Elle doit refuser le dossier.
- */
-export const VERSION_SCHEMA = 27 as const;
-
-/**
- * Part maximale du versable qu'on peut choisir de garder.
  *
- * Au-delà de 80 %, le curseur ne dit plus « je garde une marge », il dit « je
- * ne me verse rien » — et cette décision-là se prend en ne se versant rien, pas
- * en réglant un curseur qu'on oubliera d'avoir mis là. La borne existe aussi
- * pour que `versable × (1 − part)` reste une somme qu'on peut afficher : à 100 %
- * l'écran proposerait toujours zéro, sans dire pourquoi.
+ * 28 (lot 49, décision 24) : la part gardée au versement se fond dans la
+ * réserve — `partGardeeAuVersement` disparaît, `Entreprise.partGardeeRetiree`
+ * garde une fois le pourcentage d'avant pour le dire. Une version antérieure
+ * relirait un dossier sans part comme « 0 % » et le renverrait avec : un
+ * réglage retiré reviendrait d'un autre appareil. Elle doit refuser le dossier.
  */
-export const PART_GARDEE_MAX = 0.8;
+export const VERSION_SCHEMA = 28 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -193,6 +187,18 @@ export interface Entreprise {
    * n'est pas le nom. Jamais écrit dans le code : le dépôt est public.
    */
   readonly nomExploitant: string;
+  /**
+   * La part gardée à chaque versement que portait le dossier avant le schéma
+   * 28, en pourcentage — `null` quand il n'y en avait pas, ou qu'elle a été
+   * dite (décision 24).
+   *
+   * Un pourcentage du versable n'a pas d'équivalent en euros de réserve : il
+   * valait 10 % de 7 527 € un jour, 10 % de 300 € le mois suivant. La
+   * migration ne le convertit donc pas — elle le garde pour le DIRE une fois,
+   * avec la réserve à relever pour qui gardait plus. Sans ce fait, « à te
+   * verser » monterait de 10 % au premier chargement, sans un mot.
+   */
+  readonly partGardeeRetiree: number | null;
 }
 
 export interface Client {
@@ -683,38 +689,13 @@ export interface Faits {
    * lot 51 (« seuil de sécurité » avant), comme la direction visuelle. Renommer le champ aurait obligé à une migration pour un
    * gain nul — et aurait fait passer le vocabulaire de l'interface dans le
    * stockage, où il n'a rien à faire.
+   *
+   * Depuis le schéma 28, elle porte seule la prudence : la part gardée à
+   * chaque versement s'y est fondue (décision 24). Deux réglages faisaient
+   * deux « à te verser » sous le même nom, qui ne tombaient d'accord qu'à 0 %.
    */
   readonly reserve: Euros;
   readonly besoinMensuel: Euros;
-  /**
-   * Part du versable qu'on choisit de laisser sur le compte, entre 0 et 0,8.
-   *
-   * ───────────────────────────────────────────────────────────────────────
-   * DEUX NOTIONS, PAS DEUX FAÇONS DE DIRE LA MÊME CHOSE
-   * ───────────────────────────────────────────────────────────────────────
-   *
-   * `reserve` est un PLANCHER en euros — le seuil de sécurité, la ligne sous
-   * laquelle les courbes ne doivent pas descendre. Celui-ci est une PART du
-   * versable, une prudence qu'on renouvelle à chaque versement.
-   *
-   * Les confondre — c'est-à-dire exprimer le plancher en pourcentage du
-   * disponible — fabriquerait une boucle : le plancher descendrait à mesure
-   * qu'on vide le compte, et le versement soutenable finirait par tout
-   * autoriser. Ce n'est pas une préférence d'affichage, c'est une erreur de
-   * modèle.
-   *
-   * ───────────────────────────────────────────────────────────────────────
-   * LE DÉFAUT EST ZÉRO, ET CE N'EST PAS UN OUBLI
-   * ───────────────────────────────────────────────────────────────────────
-   *
-   * Le prototype propose 50 %. Repris tel quel, il couperait en deux, sans
-   * qu'un geste ait été fait, le versable de tout compte existant. Un réglage
-   * par défaut qui change un montant affiché est un chiffre faux : zéro ne
-   * change rien tant que personne n'a bougé le curseur.
-   *
-   * Le montant gardé, lui, ne se stocke jamais — il se dérive (invariant 1).
-   */
-  readonly partGardeeAuVersement: Ratio;
   /**
    * L'objectif de chiffre d'affaires encaissé sur l'année civile, ou `null`.
    *
@@ -817,7 +798,7 @@ export function entrepriseVide(): Entreprise {
     bic: '', adresse: '', codePostal: '', ville: '', codeApe: '', email: '',
     telephone: '', urssafPeriodicite: 'mensuel', onboardingFait: false,
     plateformeAgreee: null, optionTvaDebits: false,
-    regimeTva: 'simplifie', ca3Mensuelle: false, nomExploitant: ''
+    regimeTva: 'simplifie', ca3Mensuelle: false, nomExploitant: '', partGardeeRetiree: null
   };
 }
 
@@ -828,7 +809,6 @@ export function faitsVides(): Faits {
     clients: [], missions: [], recettes: [], depenses: [], conges: [], notesCra: [],
     mouvementsBancaires: [], periodesUrssafAjoutees: [],
     soldeInitial: 0 as Euros, soldeInitialAu: null, reserve: 0 as Euros, besoinMensuel: 0 as Euros,
-    partGardeeAuVersement: ratio(0),
     objectifCaAnnuel: null,
     periodesDeclarees: [], echeances: [], configImpotBrute: {},
     partsFiscales: null, autresRevenusFoyer: null, versementPerDeductible: null,
@@ -920,24 +900,6 @@ export function motifRefusFaits(brut: unknown): string | null {
   if ('objectifCaAnnuel' in o && objectif !== null
     && (typeof objectif !== 'number' || !Number.isFinite(objectif))) {
     return 'Le champ « objectifCaAnnuel » devrait être un montant ou être absent.';
-  }
-
-  // La part gardée est un RATIO, pas un montant : elle ne peut donc pas voyager
-  // avec `soldeInitial` et consorts. Son absence est légitime — aucun compte
-  // d'avant le schéma 11 ne la porte — et la refuser rejetterait tous les
-  // comptes existants.
-  //
-  // Le contrôle borne à [0 ; 1] et non à [0 ; PART_GARDEE_MAX] : au-delà de 1,
-  // `versable × (1 − part)` devient NÉGATIF et l'écran proposerait de se verser
-  // une dette ; en dessous de 0, il proposerait plus que le versable. Ce sont
-  // les deux erreurs qui engagent. Entre 0,8 et 1, le chiffre reste juste et
-  // seulement trop prudent : le magasin le ramène dans la plage utile plutôt
-  // que de refuser le compte entier pour un curseur mal réglé.
-  const part = o['partGardeeAuVersement'];
-  if ('partGardeeAuVersement' in o
-    && (typeof part !== 'number' || !Number.isFinite(part) || part < 0 || part > 1)) {
-    return 'Le champ « partGardeeAuVersement » devrait être une part entre 0 et 1, '
-      + 'ou être absent.';
   }
 
   // Les trois faits du foyer fiscal ont le droit d'être absents — aucun compte

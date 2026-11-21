@@ -21,22 +21,23 @@ import { euros, mois } from '../domain/types';
 import { assujettissementTva, plafondMicro, seuilsTvaPourAnnee } from '../domain/bareme';
 import type { SeuilsTva, StatutAssujettissementTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
-import { type Echeance, type VentilationProvisions, estPayee } from '../domain/calculs/provisions';
+import type { Echeance, VentilationProvisions } from '../domain/calculs/provisions';
 import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
 import type { ProvisionImpotRevenu } from '../domain/calculs/provisionImpotRevenu';
 import { encoursDe } from '../domain/calculs/facturier';
-import { soldeAuDernierJourDe } from '../domain/calculs/solde';
 import { decalerMois } from '../domain/calculs/periode';
 import type { Faits } from './schema';
-import {
-  etatPilote, moisCourant, recettesEncaissees, remunerationDuMois, echeancesDuComptePro } from './selecteurs';
+import { dateDuJour, etatPilote, moisCourant, remunerationDuMois } from './selecteurs';
 import { tauxDeChargesAu } from './selecteurs.activite';
 import {
   type ProjectionSolde, depensesMensuellesMoyennes, projeterDisponible
 } from '../domain/calculs/projectionSolde';
-import {
-  encaissementsAttendusParMois, facturesSuivies, finDuMoisISO
-} from './selecteurs.pipeline';
+import { encaissementsAttendusDetailles, facturesSuivies } from './selecteurs.pipeline';
+import { type SortieDeCharge, sortiesParMois, totalDesSorties } from '../domain/calculs/sortiesDeCharges';
+import { dateDeLEtape } from '../domain/calculs/obligations';
+import { decaler } from '../domain/calculs/calendrier';
+import { sortiesAVenir, sortiesDuDu } from './selecteurs.sorties';
+import { obligationsEntre } from './selecteurs.obligations';
 
 // Réexport : les lecteurs existants (performance) importent d'ici.
 export { facturesSuivies };
@@ -337,6 +338,17 @@ export interface EtatProjection {
   readonly tauxDeCharges: number | null;
   /** Ce qu'on s'est réellement versé, mois par mois, sur l'année écoulée. */
   readonly versementsPasses: readonly { readonly mois: Mois; readonly montant: Euros }[];
+  /**
+   * Les encaissements attendus de chaque mois, en deux parts — les factures
+   * émises, le planning signé —, alignés sur `projection.mois`.
+   */
+  readonly attendus: readonly { readonly factures: Euros; readonly planning: Euros }[];
+  /** Ce qui quitte le compte pour le dû, mois par mois, aligné sur `projection.mois`. */
+  readonly sorties: readonly (readonly SortieDeCharge[])[];
+  /** Le dû d'aujourd'hui, posé à ses dates — au-delà de l'horizon compris. */
+  readonly duDate: readonly SortieDeCharge[];
+  /** Le solde du compte aujourd'hui, le point de départ du solde prévu. */
+  readonly solde: Euros;
 }
 
 /**
@@ -346,8 +358,7 @@ export interface EtatProjection {
  * Six mois à zéro ne sont pas six mois d'historique : sans AUCUNE dépense
  * enregistrée, on ne sait pas ce que coûte le mois — on ne sait pas non plus
  * qu'il ne coûte rien. Moyenner des zéros répondrait « zéro » à une question
- * qui n'a pas de réponse. Partagée par `etatProjection` et `evolutionCompte` :
- * les deux projettent depuis le même mois courant, sur le même historique.
+ * qui n'a pas de réponse.
  */
 function depensesMoyennesRecentes(faits: Faits, m0: Mois): Euros | null {
   if (faits.depenses.length === 0) return null;
@@ -388,11 +399,19 @@ export function etatProjection(
 ): EtatProjection {
   const m0 = moisCourant(maintenant);
   const moisProjetes = Array.from({ length: MOIS_PROJETES }, (_, i) => decalerMois(m0, i));
-  const attendu = encaissementsAttendusParMois(faits, moisProjetes, maintenant);
+  const { factures, planning } = encaissementsAttendusDetailles(faits, moisProjetes, maintenant);
 
   const pilote = etatPilote(faits, faits.echeances, maintenant);
   const taux = tauxDeChargesAu(faits, m0);
   const depenses = depensesMoyennesRecentes(faits, m0);
+  // Faute de barème, zéro : la projection est alors trop haute d'un quart,
+  // et `tauxDeCharges` à `null` oblige l'écran à le dire.
+  const tauxRetenu = taux.statut === 'refuse' ? 0 : taux.valeur;
+  const entrees = moisProjetes.map((m) => ({
+    mois: m, encaissements: euros((factures.get(m) ?? 0) + (planning.get(m) ?? 0))
+  }));
+  const duDate = sortiesDuDu(faits, pilote, maintenant, () => prochaineLimiteDeTva(faits, maintenant));
+  const sorties = sortiesParMois([...duDate, ...sortiesAVenir(faits, entrees, tauxRetenu, maintenant)], moisProjetes);
 
   return {
     depensesMensuelles: depenses,
@@ -400,14 +419,18 @@ export function etatProjection(
     projection: projeterDisponible({
       depart: pilote.tresorerie.dispo,
       reserve: pilote.tresorerie.reserve,
-      entrees: moisProjetes.map((m) => ({
-        mois: m, encaissements: euros(attendu.get(m) ?? 0)
-      })),
-      // Faute de barème, zéro : la projection est alors trop haute d'un quart,
-      // et `tauxDeCharges` à `null` oblige l'écran à le dire.
-      tauxDeCharges: taux.statut === 'refuse' ? 0 : taux.valeur,
-      depensesMensuelles: depenses ?? euros(0)
+      entrees,
+      tauxDeCharges: tauxRetenu,
+      depensesMensuelles: depenses ?? euros(0),
+      soldeDepart: pilote.tresorerie.solde,
+      chargesPayees: sorties.map(totalDesSorties)
     }),
+    attendus: moisProjetes.map((m) => ({
+      factures: euros(factures.get(m) ?? 0), planning: euros(planning.get(m) ?? 0)
+    })),
+    sorties,
+    duDate,
+    solde: pilote.tresorerie.solde,
     // Sur l'année écoulée, mois courant inclus : c'est la question « est-ce
     // que je me verse plus ou moins que ce que je peux ? ».
     versementsPasses: Array.from({ length: 12 }, (_, i) => {
@@ -419,203 +442,18 @@ export function etatProjection(
 
 
 
-/** Nombre de mois entre `a` et `b` — positif si `b` est postérieur à `a`. */
-function differenceMois(a: Mois, b: Mois): number {
-  const indice = (m: Mois) => Number(m.slice(0, 4)) * 12 + Number(m.slice(5, 7)) - 1;
-  return indice(b) - indice(a);
-}
-
 /**
- * Le solde de fin de mois, tel que les faits du dossier le disent — jamais
- * recalculé autrement que par `soldeAuDernierJourDe` (voir `domain/calculs/solde.ts`).
+ * Le jour où la TVA à reverser quitte le compte : la prochaine déclaration de
+ * TVA à payer — CA3, CA12 ou celle d'un achat autoliquidé —, lue sur les
+ * obligations (lot 53), qui seules connaissent ces calendriers. Une
+ * déclaration en retard compte : elle se paie maintenant. `null` quand aucune
+ * n'est prévue sur l'année qui vient.
  */
-/**
- * Le solde à la fin d'un mois, ou `null` quand il n'est pas connu.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * AVANT LE SOLDE DE DÉPART, IL N'Y A RIEN À SAVOIR
- * ─────────────────────────────────────────────────────────────────────────
- *
- * La dérivation ne compte que les faits POSTÉRIEURS à `soldeInitialAu` : ceux
- * d'avant sont réputés déjà contenus dans le montant saisi. C'est juste pour
- * le solde d'aujourd'hui, et faux pour un mois antérieur à cette date — la
- * fonction rendait alors le solde de départ, tel quel.
- *
- * Sur un graphe annuel, cela traçait une ligne PLATE au montant de départ sur
- * les douze mois d'une année d'avant. Un dossier réel l'a montré : des barres
- * d'encaissement bien visibles de juillet à décembre, et une courbe immobile
- * au-dessus — deux séries qui se contredisent sur le même dessin, sans que
- * rien n'explique laquelle croire.
- *
- * Aucune ne mentait : les encaissements ont eu lieu, et le solde de ces
- * mois-là est simplement INCONNU. C'est cela qu'il faut dire. Tracer le
- * montant de départ à leur place affirme que le compte portait cette
- * somme-là toute l'année, ce que personne n'a jamais saisi.
- */
-function soldeFinDeMois(faits: Faits, finDeMois: DateISO): Euros | null {
-  // La borne est celle de `soldeDerive` : un fait du jour même de l'ancrage
-  // est déjà dedans, donc un mois qui s'achève ce jour-là n'apprend rien.
-  if (faits.soldeInitialAu !== null && finDeMois <= faits.soldeInitialAu) return null;
-
-  return soldeAuDernierJourDe(
-    finDeMois,
-    faits.soldeInitial, faits.soldeInitialAu,
-    recettesEncaissees(faits), faits.depenses, echeancesDuComptePro(faits),
-    faits.mouvementsBancaires
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   L'évolution du compte, mois par mois, sur l'année choisie
-   ───────────────────────────────────────────────────────────────────────── */
-
-export interface MoisEvolutionCompte {
-  readonly mois: Mois;
-  readonly entrees: Euros;
-  readonly sorties: Euros;
-  /**
-   * Le niveau que la courbe trace pour ce mois. Ce n'est PAS toujours la même
-   * grandeur — voir `estProjete`, qui dit laquelle.
-   *
-   * `null` quand le mois s'achève avant la date du solde de départ : son
-   * solde n'est alors pas connu, et la courbe ne doit rien y tracer. Voir
-   * `soldeFinDeMois`.
-   */
-  readonly niveau: Euros | null;
-  /**
-   * `false` : ce mois est clos (passé, ou le mois courant), et `niveau` est
-   * le SOLDE RÉEL de fin de mois — un fait, dérivé des écritures déjà
-   * enregistrées, qui ne bougera plus.
-   *
-   * `true` : aucune écriture n'existe encore pour ce mois. `niveau` est alors
-   * le DISPONIBLE projeté (voir `etatProjection` et son en-tête) — jamais un
-   * solde projeté, pour la raison que l'infobulle de la carte détaille : on ne
-   * peut pas deviner QUAND une dette déjà due mais pas encore appelée sortira
-   * du compte. Le disponible, lui, l'a déjà retirée, ce qui rend l'hypothèse
-   * sûre plutôt qu'optimiste.
-   */
-  readonly estProjete: boolean;
-}
-
-/**
- * Ce que le compte a fait, mois par mois, sur l'ANNÉE CHOISIE — la carte
- * « Évolution du compte » de l'écran Argent.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LE PASSÉ EST UN FAIT, L'AVENIR UNE HYPOTHÈSE — ET LE CALCUL LE SUIT
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Un mois clos a un solde EXACT : le solde initial daté, plus tout ce que les
- * faits disent être entré ou sorti jusqu'à sa fin (voir `soldeFinDeMois`).
- * Rien n'y est deviné, donc rien n'empêche de tracer le solde lui-même.
- *
- * Un mois à venir n'a pas ce luxe : la moitié de ce qu'on doit — les charges
- * sur des recettes déjà encaissées mais pas encore déclarées — n'a pas de
- * date. Tracer un solde qui les ignorerait monterait joliment jusqu'au
- * trimestre où il s'effondrerait, exactement l'écueil que ce projet refuse.
- * Ces mois-là tracent donc le DISPONIBLE projeté (voir `etatProjection`), qui
- * a déjà retiré tout ce qui est dû, daté ou non — une hypothèse plus basse,
- * mais sûre. `estProjete` porte cette distinction jusqu'à l'écran, qui doit
- * la dessiner différemment plutôt que la taire.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * DOUZE MOIS DE L'ANNÉE CHOISIE, PAS DOUZE MOIS GLISSANTS
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Le graphe suit l'année choisie en tête de l'écran — janvier à décembre
- * de l'année regardée, jamais un rouleau de douze mois depuis aujourd'hui. Sur
- * une année déjà terminée, tous les mois sont des faits ; sur l'année en
- * cours, les mois après le mois courant sont projetés ; sur une année future
- * déjà annoncée par un fait (une mission planifiée, par exemple), tout est
- * projeté.
- *
- * Ceci NE CONTREDIT PAS le solde affiché en tuile, qui ne dépend jamais de
- * l'année regardée (voir `etatArgent` et son test « ne change pas le solde du
- * compte quand on change l'année regardée ») : la tuile dit un état instantané
- * — combien il y a AUJOURD'HUI —, ce graphe dit une évolution SUR l'année
- * choisie. Les deux se recalculent depuis les mêmes faits sans jamais devoir
- * s'accorder, puisqu'ils ne répondent pas à la même question.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * POURQUOI LA PROJECTION NE S'ARRÊTE PAS FORCÉMENT À DOUZE MOIS
- * ─────────────────────────────────────────────────────────────────────────
- *
- * `etatProjection` (la carte « Où va ton disponible ») fixe son horizon à
- * douze mois glissants — au-delà, elle l'assume, « tout est fiction ». Ce
- * graphe-ci doit pouvoir couvrir une année ENTIÈRE, même future : le cumul du
- * disponible doit alors être simulé mois par mois depuis AUJOURD'HUI jusqu'à
- * la fin de cette année-là, sans quoi les mois sautés fausseraient le niveau
- * de départ des mois affichés. `encaissementsAttendusParMois` est appelée sur
- * cet horizon complet ; seuls les mois de l'année choisie sont ensuite gardés.
- */
-export function evolutionCompte(
-  faits: Faits,
-  annee: number,
-  maintenant: Date = new Date()
-): readonly MoisEvolutionCompte[] {
-  const m0 = moisCourant(maintenant);
-  const moisAnnee = Array.from(
-    { length: 12 }, (_, i) => mois(`${annee}-${String(i + 1).padStart(2, '0')}`)
-  );
-  const parMoisAnnee = chiffreParMois(faits, annee);
-
-  const resultats: MoisEvolutionCompte[] = moisAnnee
-    .filter((m) => m <= m0)
-    .map((m) => {
-      const encaisse = parMoisAnnee.find((mc) => mc.mois === m)?.encaisse ?? euros(0);
-      const depensesPayees = faits.depenses
-        .filter((d) => d.payeeLe !== null && d.payeeLe.startsWith(m))
-        .reduce<number>((s, d) => s + d.montantTtc, 0);
-      // Les sorties du compte PRO : l'impôt réglé depuis le compte personnel
-      // n'en est pas une (voir `echeancesDuComptePro`).
-      const echeancesPayees = echeancesDuComptePro(faits)
-        .filter((e) => estPayee(e) && (e.payeeLe as DateISO).startsWith(m))
-        .reduce<number>((s, e) => s + (e.montantPaye ?? e.montant), 0);
-
-      return {
-        mois: m,
-        entrees: encaisse,
-        sorties: euros(depensesPayees + echeancesPayees),
-        niveau: soldeFinDeMois(faits, finDuMoisISO(m)),
-        estProjete: false
-      };
-    });
-
-  const moisAProjeter = moisAnnee.filter((m) => m > m0);
-  if (moisAProjeter.length > 0) {
-    const dernierMoisNecessaire = moisAProjeter[moisAProjeter.length - 1] as Mois;
-    const horizon = Array.from(
-      { length: differenceMois(m0, dernierMoisNecessaire) },
-      (_, i) => decalerMois(m0, i + 1)
-    );
-    const attendu = encaissementsAttendusParMois(faits, horizon, maintenant);
-    const pilote = etatPilote(faits, faits.echeances, maintenant);
-    const taux = tauxDeChargesAu(faits, m0);
-    const depenses = depensesMoyennesRecentes(faits, m0);
-
-    const projection = projeterDisponible({
-      depart: pilote.tresorerie.dispo,
-      reserve: pilote.tresorerie.reserve,
-      entrees: horizon.map((m) => ({ mois: m, encaissements: euros(attendu.get(m) ?? 0) })),
-      tauxDeCharges: taux.statut === 'refuse' ? 0 : taux.valeur,
-      depensesMensuelles: depenses ?? euros(0)
-    });
-    const parMoisProjection = new Map(projection.mois.map((mp) => [mp.mois, mp]));
-
-    for (const m of moisAProjeter) {
-      const mp = parMoisProjection.get(m);
-      // Ne devrait jamais manquer : `horizon` couvre par construction jusqu'à
-      // `dernierMoisNecessaire`, qui est le dernier élément de `moisAProjeter`.
-      if (mp === undefined) continue;
-      resultats.push({
-        mois: m,
-        entrees: mp.encaissements,
-        sorties: euros(mp.charges + mp.depenses),
-        niveau: mp.sansVersement,
-        estProjete: true
-      });
-    }
-  }
-
-  return resultats;
+function prochaineLimiteDeTva(faits: Faits, maintenant: Date): DateISO | null {
+  const aujourdhui = dateDuJour(maintenant);
+  return obligationsEntre(faits, decaler(aujourdhui, -120), decaler(aujourdhui, 400), aujourdhui)
+    .flatMap((o) => (o.nature === 'tva' && o.paiement !== undefined && o.paiement.etat !== 'fait'
+      ? [dateDeLEtape(o.paiement)]
+      : []))
+    .sort()[0] ?? null;
 }

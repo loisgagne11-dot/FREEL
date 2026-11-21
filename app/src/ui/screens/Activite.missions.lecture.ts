@@ -3,9 +3,9 @@ import type { DateISO, Mois } from '../../domain/types';
 import type { Mission } from '../../state/schema';
 import { formaterJours } from '../format';
 import { enumeration, suiteDesClients } from './Activite.clientsMission.lecture';
-import { MOIS_LONGS, annee, jour, jourEtMoisLong, rangDuMois } from './Activite.missions.titre';
+import { MOIS_COURTS, MOIS_LONGS, annee, jour, jourEtMoisLong, rangDuMois } from './Activite.missions.titre';
 
-export { jourEtMoisLong };
+export { MOIS_COURTS, MOIS_LETTRES, jourEtMoisLong } from './Activite.missions.titre';
 
 /**
  * Ce que l'onglet Missions DIT — dates, titres, états, phrases —, sans React.
@@ -14,11 +14,6 @@ export { jourEtMoisLong };
  * en mots. Le titre de l'écran, lu avant que l'onglet ne soit chargé, vit à
  * part (`Activite.missions.titre`).
  */
-
-export const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août',
-  'sept.', 'oct.', 'nov.', 'déc.'] as const;
-/** Les mois en une lettre : la frise au téléphone réduit ses graduations, pas sa hauteur. */
-export const MOIS_LETTRES = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'] as const;
 
 export const jourEtMoisCourt = (d: DateISO, aujourdhui: DateISO): string =>
   `${jour(d)} ${MOIS_COURTS[rangDuMois(d)] ?? ''}${annee(d, aujourdhui)}`;

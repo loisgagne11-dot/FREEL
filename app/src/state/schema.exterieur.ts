@@ -35,7 +35,20 @@ const CLES_INTERDITES: ReadonlySet<string> = new Set(['__proto__', 'constructor'
  */
 export function motifRefusExterieur(brut: unknown): string | null {
   return motifRefusFaits(brut) ?? motifRefusChampsDuSchema25(brut) ?? motifRefusChampsDuSchema26(brut)
-    ?? motifRefusChampsDuSchema27(brut) ?? motifRefusValeurs(brut);
+    ?? motifRefusChampsDuSchema27(brut) ?? motifRefusChampsDuSchema28(brut) ?? motifRefusValeurs(brut);
+}
+
+/**
+ * Le champ apparu au schéma 28 : la part gardée d'avant, en pourcentage, que
+ * la Trésorerie dit une fois (décision 24). Une valeur hors de 1 à 100 ne
+ * vient d'aucune migration — « Tu gardais 4 000 % de chaque versement » se
+ * lirait comme une panne de l'application, pas comme un fichier abîmé.
+ */
+function motifRefusChampsDuSchema28(brut: unknown): string | null {
+  const entreprise = estObjet(brut) ? brut['entreprise'] : undefined;
+  const part = estObjet(entreprise) ? entreprise['partGardeeRetiree'] : undefined;
+  if (part == null || (typeof part === 'number' && Number.isInteger(part) && part >= 1 && part <= 100)) return null;
+  return 'Le champ « entreprise.partGardeeRetiree » devrait être un pourcentage entier, de 1 à 100, ou être nul.';
 }
 
 /**

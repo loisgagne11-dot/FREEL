@@ -17,9 +17,9 @@
  */
 
 import { create } from 'zustand';
-import { type DateISO, type Euros, type Ratio, euros, ratio } from '../domain/types';
+import { type DateISO, type Euros, euros } from '../domain/types';
 import {
-  CLE_AVANT_REMPLACEMENT, CLE_STOCKAGE, PART_GARDEE_MAX, type Entreprise,
+  CLE_AVANT_REMPLACEMENT, CLE_STOCKAGE, type Entreprise,
   VERSION_SCHEMA, type Faits, completerFaitsCourants, faitsVides, motifRefusFaits
 } from './schema';
 import { type ResultatMigration, type Stockage, migrer } from '../infra/migration';
@@ -82,16 +82,6 @@ interface MagasinFaits {
 
   /** Seul écrivain de la réserve — le fait s'appelle `reserve` (D4). */
   readonly definirReserve: (montant: Euros) => void;
-  /**
-   * Seul écrivain de la part gardée au versement.
-   *
-   * Le bornage est ICI et non dans l'écran : un curseur borné côté interface
-   * laisse passer tout ce qui n'est pas saisi au curseur — un import, un compte
-   * distant, un jeu de démonstration. Une part supérieure à 1 rendrait
-   * `versable × (1 − part)` négatif, c'est-à-dire un versement proposé à
-   * l'envers.
-   */
-  readonly definirPartGardee: (part: Ratio) => void;
   readonly definirBesoinMensuel: (montant: Euros) => void;
   readonly definirSoldeInitial: (montant: Euros) => void;
   /**
@@ -478,17 +468,6 @@ export const useFaits = create<MagasinFaits>((set, get) => ({
 
   definirReserve: (montant) => {
     const faits: Faits = { ...get().faits, reserve: euros(Math.max(0, montant)) };
-    set({ faits });
-    persister(stockageActif, faits);
-  },
-
-  definirPartGardee: (part) => {
-    // `NaN` retombe à zéro plutôt qu'à la borne haute : une saisie illisible
-    // ne doit pas se traduire par « je garde tout », qui est une décision.
-    const borne = Number.isFinite(part)
-      ? Math.min(PART_GARDEE_MAX, Math.max(0, part))
-      : 0;
-    const faits: Faits = { ...get().faits, partGardeeAuVersement: ratio(borne) };
     set({ faits });
     persister(stockageActif, faits);
   },

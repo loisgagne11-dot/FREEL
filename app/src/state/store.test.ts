@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dateISO, euros, ratio } from '../domain/types';
+import { dateISO, euros } from '../domain/types';
 import { totaliser } from '../domain/calculs/livreRecettes';
-import { CLE_STOCKAGE, PART_GARDEE_MAX, VERSION_SCHEMA, faitsVides, type Recette } from './schema';
+import { CLE_STOCKAGE, VERSION_SCHEMA, faitsVides, type Recette } from './schema';
 import { stockageMemoire } from '../infra/migration';
 import { useFaits } from './store';
 import { ajouterRecette, annulerRecette, encaisserRecette, supprimerBrouillon } from './ecritures.recettes';
@@ -417,40 +417,19 @@ describe('carnet — missions', () => {
 });
 
 /**
- * LA PART GARDÉE EST BORNÉE DANS LE MAGASIN, PAS DANS L'ÉCRAN.
+ * « COMPRIS » EFFACE CE QUI RESTAIT À DIRE DE LA PART GARDÉE (décision 24).
  *
- * Un curseur borné côté interface laisse passer tout ce qui n'est pas saisi au
- * curseur : un import, un compte distant, un jeu de démonstration. Si ce
- * bornage sautait, une part supérieure à 1 rendrait `versable × (1 − part)`
- * négatif — l'application proposerait un versement à l'envers.
+ * Le bandeau de la Trésorerie n'a pas d'action à lui : il passe par la seule
+ * écriture du profil. S'il cessait de poser `null`, le bandeau reviendrait à
+ * chaque ouverture — et une phrase qu'on ne peut pas faire taire cesse d'être
+ * lue.
  */
-describe('part gardée au versement', () => {
-  const part = () => useFaits.getState().faits.partGardeeAuVersement;
-
-  it('vaut zéro tant que personne n’a réglé le curseur', () => {
-    expect(part()).toBe(0);
-  });
-
-  it('enregistre une part réglée', () => {
-    useFaits.getState().definirPartGardee(ratio(0.3));
-    expect(part()).toBe(0.3);
-  });
-
-  it('borne à 80 % : au-delà, le curseur ne dit plus « je garde »', () => {
-    useFaits.getState().definirPartGardee(ratio(0.95));
-    expect(part()).toBe(PART_GARDEE_MAX);
-  });
-
-  it('refuse une part négative, qui ferait verser plus que le versable', () => {
-    useFaits.getState().definirPartGardee(ratio(-0.2));
-    expect(part()).toBe(0);
-  });
-
-  // Une saisie illisible ne doit pas se traduire par « je garde tout », qui est
-  // une décision que personne n'a prise.
-  it('retombe à zéro sur une valeur illisible, pas sur la borne haute', () => {
-    useFaits.getState().definirPartGardee(ratio(Number.NaN));
-    expect(part()).toBe(0);
+describe('la part gardée retirée', () => {
+  it('se dit jusqu’à ce que « Compris » pose `null`', () => {
+    useFaits.getState().modifierEntreprise({ partGardeeRetiree: 10 });
+    expect(useFaits.getState().faits.entreprise.partGardeeRetiree).toBe(10);
+    useFaits.getState().modifierEntreprise({ partGardeeRetiree: null });
+    expect(useFaits.getState().faits.entreprise.partGardeeRetiree).toBeNull();
   });
 });
 

@@ -1,0 +1,9 @@
+/* `.e-split` de la planche : 12 px, segments à bouts ronds séparés de 3 px. */
+.barre { display: flex; gap: 3px; height: 12px; margin: 10px 0 8px; }
+.barre i { display: block; height: 100%; border-radius: 6px; }
+.impot { background: var(--c-impot); }
+.urssaf { background: var(--c-urssaf); }
+.tva { background: var(--c-tva); }
+.cfe { background: var(--c-cfe); }
+.vert { background: var(--green); }
+.retrait { background: var(--bar-soft); }
