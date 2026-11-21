@@ -33,14 +33,18 @@ describe('le jeu de démonstration, au 10 juin 2026', () => {
    * la TVA de l'achat hors de France de mai, à déclarer en juin. Cette CA3 ne
    * se voyait pas : « non suivie », parce que sa limite précédait le schéma 25
    * — alors qu'au 10 juin elle n'était pas encore passée.
+   *
+   * Un troisième depuis le lot 48, celui de la maquette d'Activité : la refonte
+   * du site s'arrête dans 51 jours, dans son préavis. L'attente disait deux ;
+   * elle suit le carnet de commandes, que la démonstration porte désormais.
    */
-  it('a deux sujets à traiter : la facture à relancer, la TVA d’un achat hors de France', () => {
+  it('a trois sujets à traiter : la facture à relancer, la TVA d’un achat hors de France, une fin de mission', () => {
     const ids = sujets(demo, ANCRE_DEMONSTRATION);
     expect(ids).toContain('factures-en-retard');
     expect(ids).not.toContain('periodes-a-declarer');
     // Le reste est de l'information réglementaire, datée par la loi.
     expect(aTraiter(demo, a9h(ANCRE_DEMONSTRATION)).filter((s) => s.gravite !== 'information').map((s) => s.id))
-      .toEqual(['factures-en-retard', 'echeance-ca3-2026-05']);
+      .toEqual(['factures-en-retard', 'echeance-ca3-2026-05', 'fin-mission-mis-refonte']);
   });
 
   it('laisse plusieurs mois d’autonomie, provisions couvertes', () => {

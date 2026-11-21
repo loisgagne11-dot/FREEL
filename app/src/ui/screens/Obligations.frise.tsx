@@ -1,4 +1,5 @@
-import { type RefObject, useLayoutEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
+import { useLargeur } from '../useLargeur';
 import type { DateISO } from '../../domain/types';
 import type { Obligation } from '../../domain/calculs/obligations';
 import {
@@ -264,22 +265,4 @@ function SigneDuMois({ marque, x, y, g }: { readonly marque: Marque; readonly x:
     }
   })();
   return <g><title>{infobulle}</title>{forme}</g>;
-}
-
-/**
- * La largeur de la carte, suivie quand la fenêtre change ; `null` tant
- * qu'elle n'est pas mesurée — ou là où rien ne se mesure (tests).
- */
-function useLargeur(ref: RefObject<HTMLDivElement | null>): number | null {
-  const [largeur, setLargeur] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (el === null || typeof ResizeObserver === 'undefined') return undefined;
-    const mesurer = () => setLargeur(el.clientWidth > 0 ? el.clientWidth : null);
-    mesurer();
-    const observateur = new ResizeObserver(mesurer);
-    observateur.observe(el);
-    return () => observateur.disconnect();
-  }, [ref]);
-  return largeur;
 }

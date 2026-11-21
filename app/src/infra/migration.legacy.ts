@@ -969,7 +969,11 @@ function convertir(legacy: Inconnu, anomalies: Anomalie[], champsNonRepris: stri
       entites: entitesDeLaMission(m, `mission-${i}`, contexte, anomalies, champsNonRepris),
       debut: dateOuNull(m['debut']),
       fin: dateOuNull(m['fin']),
-      statut: statutMission(statutBrut)
+      statut: statutMission(statutBrut),
+      // Schéma 27 : l'ancienne version ne connaissait ni volume commandé, ni
+      // préavis, ni reconduction, ni probabilité. L'absence se dit `null`,
+      // comme à la migration de schéma — jamais un zéro qui solderait la mission.
+      joursCommandes: null, preavisFinJours: null, reconduction: null, probabilite: null
     };
   });
 

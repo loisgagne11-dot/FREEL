@@ -939,3 +939,39 @@ Chaque ligne est tenue par un test nommé ; celles marquées † ont été
 | Versement libératoire au dû † | Pilote, Trésorerie, détail de la dette | Au taux du mois courant pour tout l'encaissé non déclaré : un décembre encore à déclarer perdait ses 2,2 % au 1er janvier | Au taux du mois d'encaissement (`tauxImpotAu`) |
 | Versement libératoire d'une déclaration URSSAF † | Dossier URSSAF | Option du jour | Option du dernier mois de la période : le quatrième trimestre 2025, déclaré en janvier 2026 après avoir quitté l'option, garde ses 2,2 % |
 | « VL » au pied du rail † ; « avant impôt » du tarif journalier ; aide « Tu as opté » | Rail, Activité › Analyse, Réglages › Paramètres fiscaux | Le booléen : une option prise en novembre pour janvier s'affichait en novembre | L'option du mois ; Réglages › Profil dit « À partir du 1ᵉʳ janvier … » tant qu'un changement n'a pas pris effet |
+
+## Lot 48 (21/11) — le carnet de commandes, Activité › Missions
+
+L'onglet Missions est refait d'après la maquette `direction/activite.html`.
+L'ancienne liste portait, par mission, le facturé, l'encaissé et le reste ; ils
+y sont encore, et sept nombres s'y ajoutent. Les jours viennent tous du
+planning (`planningsDuMois`, la source du CRA et de la facture du mois) ; les
+règles, de `calculs/carnetDeCommandes`. Chaque ligne est tenue par un test
+nommé ; celles marquées † ont été éprouvées par mutation.
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Titre « Couvert jusqu'au … » † | Activité › Missions, en-tête | « Ton plan de charge » (le titre du planning) | La plus tardive des échéances des missions signées (`finDeVisibilite`) ; « Couvert, sans fin fixée. » dès qu'une signée n'a pas de fin ; « Rien de signé. » sans signée à venir — un prospect n'y entre jamais |
+| Carnet signé, en jours et en euros † | Tuile « Carnet signé » | Absent | Σ reste à produire des missions signées : volume commandé − jours faits, ou jours planifiés jusqu'à l'échéance ; euros = jours × TJM de la mission. Une signée sans fin ni volume est NOMMÉE (« hors …, sans fin fixée »), jamais comptée pour zéro ; tout sans fin : « Sans fin ». Prospect jamais compté |
+| Tendance du carnet | Tuile « Carnet signé », courbe | Absente | Les jours signés des douze mois à venir (la rangée de la frise), courbe monotone qui ne dépasse jamais ses points |
+| Fin de visibilité, « Dans N jours, plus rien n'est signé », « ◇ À préparer » † | Tuile « Fin de visibilité » | Absente | La même échéance que le titre ; « sauf reconduction » quand la mission qui la porte se reconduit ; la pastille quand elle est dans son préavis sans reconduction |
+| Occupation du mois, « x jours sur y ouvrés, z jours de congé retirés » † | Tuile « Occupation de <mois> » | Planning › en-tête (« % occupé ») et « Le mois en chiffres » | Même source (`moisEnChiffres`) : le même nombre aux trois endroits ; « équivalent-jours » quand il est déduit des factures ; la rangée des jours signés du mois courant dit le même nombre de jours (test d'accord) |
+| Tendance de l'occupation | Tuile « Occupation », courbe | Absente | L'occupation des douze derniers mois ; un mois sans jour ouvrable n'a pas de point |
+| Barres des missions sur douze mois | « Les douze mois à venir » | Absentes | Une ligne par signée ou prospect, de son début (ou du mois courant) à son échéance, rond au bout ; pas de rond sans fin ; prospect en pointillé « non compté » ; bande du mois courant, trait « aujourd'hui » |
+| Jours signés par mois † | « Les douze mois à venir », rangée du bas | Absents | Jours du planning des missions au planning (signées, et terminées dans le mois : ceux de l'occupation), mois courant entier ; « 0 » tant qu'une signée ou un prospect court, « — » au-delà. Dits en texte dans la phrase de la frise (`aria-label`) |
+| Fin annoncée, reconduction † | Bandeau sous la frise | Absente | « ◇ X se termine dans N jours », au préavis (60 jours par défaut, ou celui de la mission) ; « ◇ X se reconduit le … sauf dénonciation » |
+| Jours faits / commandés et barre † | Toutes les missions, « Jours faits » | Absents | Jours retenus au planning jusqu'à aujourd'hui inclus (les mêmes que le CRA d'un mois clos, test d'accord) ; « / commandés » et la barre quand un volume est dit, ambre au-delà ; « — / 25 » pour un prospect |
+| Facturé, encaissé, reste | Toutes les missions | Ligne de la liste : facturé, « Encaissé … · Reste … », « Chiffre du client, partagé avec N autre(s) » | Inchangés (`lignesDeMission`) : colonnes Facturé et Encaissé, « reste … » sous l'encaissé d'une mission non terminée, « partagé avec N autre(s) » sous le facturé |
+| Tarif | Toutes les missions | « 520 € / jour », « TJM non renseigné » | Colonne Tarif ; « TJM non renseigné » quand il manque |
+| État d'une mission † | Toutes les missions, « État » | Le statut seul (« En cours ») | Dérivé (`etatDeLaMission`) : ● En cours ; ◇ Fin dans N jours ; ◇ Reconduite le … ; ◇ Finie le …, à clore ; ◇ … € à facturer (travail achevé — volume atteint ou échéance passée — moins le facturé) ; ○ Prospect, N % ; ● Terminée, soldée / … € à encaisser / Terminée ; × Perdue |
+| Nombres des filtres | Toutes les missions | Absents (le compte de l'onglet seul) | Toutes / En cours / Prospects / Terminées (perdues comprises) |
+| Fin d'une mission annoncée † | « À faire » (Pilote), pastille du rail sous Activité | Absente | Un sujet « à faire » par mission signée dans son préavis, sans reconduction : « X se termine dans N jours », « Préparer la suite » → la mission |
+
+**Retiré, avec sa raison** : le titre « Ton plan de charge » sur l'onglet
+Missions — il décrivait le planning ; le montant de chaque ligne aligné à
+droite du nom — devenu la colonne Facturé.
+
+**Reste** : le facturé d'une mission ne compte que les factures émises dans
+sa fenêtre de dates. Une facture émise après la fin (l'audit ponctuel du jeu
+d'essai, fini le 8 mai, facturé le 12) n'est rattachée à aucune mission —
+défaut antérieur au lot, signalé, non corrigé ici (`lignesDeMission`).

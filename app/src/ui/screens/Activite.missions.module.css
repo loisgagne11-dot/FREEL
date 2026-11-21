@@ -1,0 +1,318 @@
+/* Activité › Missions — mesures de docs/design/direction/calme.css
+   (`e-card`, `e-h`, `e-grid3`, `e-legend`, `e-alerte`, `e-filtres`, `e-t`,
+   `e-who`, `e-av`, `e-av2`, `e-chip`), maquette `activite.html`. */
+
+.onglet { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+
+.tuiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; min-width: 0; }
+
+.carte {
+  min-width: 0;
+  padding: 22px 24px;
+  background: linear-gradient(180deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--sh-2);
+}
+
+.entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 40px;
+  margin-bottom: 12px;
+}
+
+.titreCarte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.vide { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--card-a);
+  color: var(--text);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bouton:hover { border-color: var(--green); }
+.bouton:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* ── La légende et la frise ─────────────────────────────────────────── */
+
+.legende { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 0; font-size: 13px; color: var(--muted); }
+.legende span { display: inline-flex; align-items: center; gap: 7px; }
+
+.cadreFrise { min-width: 0; }
+.frise { display: block; max-width: 100%; height: auto; overflow: visible; }
+.bande { fill: var(--tint-2); }
+.mois { font-family: var(--mono); fill: var(--muted-2); text-anchor: middle; }
+.moisCourant { fill: var(--text); font-weight: 600; }
+.colonne { stroke: var(--line); stroke-width: 1; }
+.nomRangee { font-weight: 600; fill: var(--text); }
+.lisere { paint-order: stroke; stroke: var(--card-a); stroke-width: 5px; stroke-linejoin: round; }
+.sousRangee { fill: var(--muted); }
+.barre { fill: var(--k1t); }
+.barre.k1 { fill: var(--k1t); }
+.barre.k2 { fill: var(--k2t); }
+.barre.k3 { fill: var(--k3t); }
+.barre.k0 { fill: var(--muted-2); }
+.barreProspect { fill: none; stroke: var(--muted-2); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.bout { fill: var(--card-a); }
+.aujourdhui { stroke: var(--text); stroke-width: 1.5; }
+.filetBas { stroke: var(--line-2); stroke-width: 1; }
+.libelleSignes { fill: var(--muted); }
+.valeur { font-family: var(--mono); fill: var(--muted-2); text-anchor: middle; }
+.valeurForte { fill: var(--text); font-weight: 600; }
+
+.alerte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 14px 0 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--amber-soft);
+  color: var(--chip-warn);
+  font-size: 14px;
+}
+.alerte strong { font-weight: 600; }
+.alerte span { color: var(--text); }
+
+/* ── Les filtres ─────────────────────────────────────────────────────── */
+
+.filtres { display: flex; flex-wrap: wrap; gap: 8px; }
+.filtre {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.filtre b { font-family: var(--mono); font-weight: 600; }
+.filtre:hover { color: var(--text); }
+.filtre:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.filtreActif { background: var(--text); border-color: var(--text); color: var(--bg); }
+.filtreActif:hover { color: var(--bg); }
+
+/* ── Le tableau ──────────────────────────────────────────────────────── */
+
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  padding: 0 12px 10px 0;
+  border-bottom: 1px solid var(--line-2);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+.table td {
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  white-space: nowrap;
+  color: var(--text);
+}
+.table tbody tr:last-child td { border-bottom: 0; }
+.table td small { display: block; font-size: 12.5px; color: var(--muted); white-space: normal; }
+.table .d { text-align: right; }
+.table .decale { padding-left: 16px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.qui { display: flex; align-items: center; gap: 10px; }
+.nom { display: flex; flex-direction: column; min-width: 0; max-width: 24ch; }
+.nom small { max-width: 26ch; }
+/* Un nom long passe à la ligne plutôt que d'élargir le tableau hors de sa carte. */
+.table .cMission, .table .cClient { white-space: normal; }
+.table .cClient { max-width: 18ch; }
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+}
+.avatar.k1 { background: var(--k1); color: var(--k1t); }
+.avatar.k2 { background: var(--k2); color: var(--k2t); }
+.avatar.k3 { background: var(--k3); color: var(--k3t); }
+.avatar.k0 {
+  background: repeating-linear-gradient(135deg, var(--tint-2) 0 6px, transparent 6px 12px);
+  border: 1px dashed var(--line-2);
+  color: var(--muted);
+}
+
+/* Le nom ouvre la mission : le geste de l'ancienne ligne, sur une cible qui
+   se voit. 44 px au doigt. */
+.ouvrir {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.ouvrir:hover { color: var(--green); text-decoration: underline; text-underline-offset: 3px; }
+.ouvrir:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; border-radius: 6px; }
+
+.avancement { display: flex; flex-direction: column; gap: 5px; min-width: 96px; font-family: var(--mono); font-size: 13px; }
+.piste { display: block; height: 5px; border-radius: 3px; background: var(--tint-3); overflow: hidden; }
+.piste b { display: block; height: 100%; border-radius: 3px; background: var(--green-lite); }
+.piste b.depasse { background: var(--amber); }
+
+.discret { color: var(--muted); font-family: inherit; font-size: 13px; }
+.note { color: var(--muted); }
+.table td small.reste { color: var(--amber); }
+
+.pastille {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: var(--tint-2);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ok { background: var(--green-deep); color: var(--chip-ok); }
+.attention { background: var(--amber-soft); color: var(--chip-warn); }
+
+/* ── Au bureau étroit, les tuiles passent l'une sous l'autre ─────────── */
+
+@media (max-width: 1100px) and (min-width: 761px) {
+  .tuiles { grid-template-columns: 1fr; }
+}
+
+/* ── Au téléphone (décision 19) ──────────────────────────────────────────
+   Les tuiles défilent à l'horizontale, la frise garde sa hauteur ; toute
+   cible fait 44 px. */
+
+@media (max-width: 760px) {
+  .carte { padding: 18px 16px; }
+
+  .tuiles {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 4px;
+  }
+  .tuiles > * { flex: 0 0 84%; scroll-snap-align: start; }
+
+  .filtre { min-height: 44px; }
+  .ouvrir { min-height: 44px; font-weight: 600; font-size: 15px; }
+}
+
+/* ── Le tableau devient une liste de cartes ──────────────────────────────
+   Sur la largeur de SA carte, et non de la fenêtre : au bureau de 1 150 px,
+   le rail pris, huit colonnes ne tiennent pas davantage qu'au téléphone, et
+   la page débordait de 80 px. La requête de conteneur bascule là où le
+   tableau cesse de tenir, quelle que soit la fenêtre. */
+
+.carteTable { container-type: inline-size; }
+
+@container (max-width: 940px) {
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .table, .table tbody { display: block; }
+  .table tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      "mission mission mission"
+      "client client client"
+      "etat etat etat"
+      "jours jours fin"
+      "tarif facture encaisse";
+    gap: 10px 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .table tbody tr:last-child { border-bottom: 0; }
+  .table td { display: block; padding: 0; border: 0; white-space: normal; min-width: 0; }
+  .table .d { text-align: left; }
+  .table .decale { padding-left: 0; }
+  .cMission { grid-area: mission; }
+  .cClient { grid-area: client; }
+  .table td.cClient { color: var(--muted); font-size: 13px; }
+  .cEtat { grid-area: etat; }
+  .cJours { grid-area: jours; }
+  .cFin { grid-area: fin; }
+  .cTarif { grid-area: tarif; }
+  .cFacture { grid-area: facture; }
+  .cEncaisse { grid-area: encaisse; }
+  .cJours::before, .cFin::before, .cTarif::before, .cFacture::before, .cEncaisse::before {
+    content: attr(data-libelle);
+    display: block;
+    margin-bottom: 3px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-2);
+  }
+  .nom small { max-width: none; }
+  .nom { max-width: none; }
+  .table .cClient { max-width: none; }
+  .avancement { min-width: 0; }
+  .pastille { white-space: normal; }
+}
+
+/* Au bureau étroit, la carte a la place de deux rangées : la mission, son
+   client et son état ; puis les chiffres côte à côte. */
+@container (min-width: 600px) and (max-width: 940px) {
+  .table tr {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-areas:
+      "mission mission client client etat etat"
+      "jours jours fin tarif facture encaisse";
+    align-items: start;
+  }
+}

@@ -35,7 +35,50 @@ const CLES_INTERDITES: ReadonlySet<string> = new Set(['__proto__', 'constructor'
  */
 export function motifRefusExterieur(brut: unknown): string | null {
   return motifRefusFaits(brut) ?? motifRefusChampsDuSchema25(brut) ?? motifRefusChampsDuSchema26(brut)
-    ?? motifRefusValeurs(brut);
+    ?? motifRefusChampsDuSchema27(brut) ?? motifRefusValeurs(brut);
+}
+
+/**
+ * Les bornes du carnet de commandes (schéma 27). Au-delà, aucune saisie ne
+ * produit la valeur : dix ans de jours ouvrés, un préavis de plus d'un an,
+ * une reconduction par périodes de plus de dix ans.
+ */
+const JOURS_COMMANDES_MAX = 2500;
+const PREAVIS_MAX = 366;
+const RECONDUCTION_MAX_MOIS = 120;
+
+/**
+ * Les quatre champs du carnet, dans chaque mission, contrôlés quelle que soit
+ * la version annoncée — comme ceux du 25 et du 26.
+ *
+ * Chacun commande un nombre affiché ou une alerte : un volume négatif ferait
+ * un carnet signé qui DIMINUE quand on signe, un « 0,3 jour » une commande
+ * qu'aucune demi-journée ne solde ; un préavis négatif n'annoncerait jamais la
+ * fin ; une reconduction sans durée lisible ferait tourner le calcul de
+ * l'échéance sans fin ; une probabilité de 250 % se lirait comme une
+ * certitude. Absents ou nuls, ils sont légitimes : la migration les comble.
+ */
+function motifRefusChampsDuSchema27(brut: unknown): string | null {
+  const entier = (v: unknown, min: number, max: number): boolean =>
+    typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max;
+  for (const [i, m] of elements(estObjet(brut) ? brut['missions'] : undefined).entries()) {
+    if (!estObjet(m)) continue;
+    const jours = m['joursCommandes'];
+    const preavis = m['preavisFinJours'];
+    const reconduction = m['reconduction'];
+    const probabilite = m['probabilite'];
+    const lisible = (jours == null
+        || (typeof jours === 'number' && jours > 0 && jours <= JOURS_COMMANDES_MAX && Number.isInteger(jours * 2)))
+      && (preavis == null || entier(preavis, 0, PREAVIS_MAX))
+      && (reconduction == null
+        || (estObjet(reconduction) && entier(reconduction['dureeMois'], 1, RECONDUCTION_MAX_MOIS)))
+      && (probabilite == null || entier(probabilite, 0, 100));
+    if (!lisible) {
+      return `La mission n° ${i + 1} porte un volume commandé, un préavis, une reconduction ou une `
+        + 'probabilité hors de leurs bornes : rien n’a été chargé.';
+    }
+  }
+  return null;
 }
 
 /*

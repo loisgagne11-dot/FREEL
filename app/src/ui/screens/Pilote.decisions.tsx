@@ -116,6 +116,10 @@ function Sujet({ sujet: s }: { readonly sujet: SujetATraiter }) {
 export function adresseDuSujet(id: string, ecran: string, donnees: SujetATraiter['donnees'] = {}): string {
   if (id === 'echeance-facturation-electronique-reception') return '#/reglages/facturation';
   if (id === 'bareme-a-verifier') return '#/reglages/fiscal';
+  // « Préparer la suite » ouvre la mission elle-même (lot 48), pas la liste.
+  if (id.startsWith('fin-mission-') && typeof donnees['missionId'] === 'string') {
+    return `#/activite/mission-${encodeURIComponent(donnees['missionId'])}`;
+  }
   // Sous Obligations, le dossier de l'obligation, pas le haut de l'écran
   // (lot 53) : la première période à déclarer, la plus ancienne DES en
   // retard, l'obligation elle-même.

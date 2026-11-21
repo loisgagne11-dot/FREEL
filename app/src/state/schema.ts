@@ -63,8 +63,14 @@ export type { PieceAFournir };
  * cotisations d'un affilié Cipav au taux de la SSI, et recalculerait au
  * barème une année passée sous versement libératoire — puis, au premier
  * renvoi, effacerait les deux. Elle doit refuser le dossier.
+ *
+ * 27 (lot 48) : le carnet de commandes — `Mission.joursCommandes`,
+ * `.preavisFinJours`, `.reconduction`, `.probabilite`. Une version antérieure
+ * ne compterait pas le volume commandé, n'annoncerait pas une fin au préavis
+ * choisi, prendrait l'échéance d'un contrat reconduit pour sa fin — puis, au
+ * premier renvoi, effacerait les quatre. Elle doit refuser le dossier.
  */
-export const VERSION_SCHEMA = 26 as const;
+export const VERSION_SCHEMA = 27 as const;
 
 /**
  * Part maximale du versable qu'on peut choisir de garder.
@@ -301,6 +307,37 @@ export interface Mission {
    * été fait, la facture d'une agence qui en attend une.
    */
   readonly facturation?: 'commune' | 'par_client';
+  /**
+   * Le volume du bon de commande, en jours — demi-journées permises
+   * (schéma 27). `null` : aucun volume n'est commandé, la mission court au
+   * rythme du planning.
+   *
+   * Un FAIT, et non le total du planning : « 60 jours commandés » est ce que
+   * le client a signé, le planning ce qu'on a prévu d'en faire. Les confondre
+   * ferait disparaître l'écart qui compte — vingt jours commandés que plus
+   * aucune semaine ne porte, et qu'on découvre à la fin de la mission.
+   */
+  readonly joursCommandes?: number | null;
+  /**
+   * Combien de jours avant la fin l'annoncer (schéma 27) ; `null` pour le
+   * défaut, `PREAVIS_FIN_PAR_DEFAUT_JOURS` (`calculs/carnetDeCommandes`).
+   * `null` et non 60 écrit sur chaque mission : changer le défaut un jour ne
+   * doit pas demander de réécrire des dossiers.
+   */
+  readonly preavisFinJours?: number | null;
+  /**
+   * La reconduction tacite, par périodes de `dureeMois` (schéma 27). `fin`
+   * reste l'échéance de la période EN COURS ; les suivantes se dérivent à la
+   * lecture, jamais écrites — une échéance recopiée chaque trimestre finirait
+   * par contredire celle d'où elle part.
+   */
+  readonly reconduction?: { readonly dureeMois: number } | null;
+  /**
+   * La probabilité d'un PROSPECT, de 0 à 100, facultative (schéma 27). Elle se
+   * lit à côté de la mission et n'entre dans aucun total : un carnet pondéré
+   * par des pourcentages saisis au jugé se lirait comme un carnet signé.
+   */
+  readonly probabilite?: number | null;
 }
 
 /**

@@ -27,6 +27,7 @@ import {
 import type { Faits, Recette } from './schema';
 import { montantDeclaration, obligationsEntre, preneursDeServices } from './selecteurs.obligations';
 import { FORMULE_PAR_DEFAUT, echeanceDe } from '../domain/calculs/delaiPaiement';
+import { finAnnoncee } from '../domain/calculs/carnetDeCommandes.echeance';
 
 // Servi ici pour que le rail le calcule avec les sujets, dans le même paquet différé.
 export { compteursParEcran };
@@ -90,8 +91,28 @@ export function entreeATraiter(
     debutActiviteLe: faits.entreprise.debutActivite,
     ...sujetsDesObligations(faits, obligations, aujourdhui),
     tvaDueDepuis: tvaDue,
-    facturesSansTva: tvaDue === null ? 0 : facturesEmisesSansTva(faits, tvaDue)
+    facturesSansTva: tvaDue === null ? 0 : facturesEmisesSansTva(faits, tvaDue),
+    finsAnnoncees: finsAnnonceesDe(faits, aujourdhui)
   };
+}
+
+/**
+ * Les fins de mission à préparer : la règle du préavis est celle de l'écran
+ * (`finAnnoncee`), et une seule. Une reconduction tacite dite n'est pas une
+ * fin — le contrat continue sans geste —, elle n'entre donc pas ici ; le
+ * bandeau de l'onglet Missions, lui, la rappelle.
+ */
+function finsAnnonceesDe(faits: Faits, aujourdhui: DateISO): NonNullable<EntreeATraiter['finsAnnoncees']> {
+  return faits.missions.flatMap((m) => {
+    const f = finAnnoncee(m, aujourdhui);
+    if (f === null || f.reconduitLe !== null) return [];
+    return [{
+      missionId: m.id,
+      nom: m.description || m.clientNom || 'Mission sans description',
+      echeance: f.echeance,
+      jours: f.jours
+    }];
+  });
 }
 
 const enCours = (e: Etape | undefined): e is Etape =>

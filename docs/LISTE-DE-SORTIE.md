@@ -1,6 +1,6 @@
 # Liste de sortie — ce qui reste avant de dire « l'application est finie »
 
-**Date : 15 novembre 2026.** Schéma des faits : v22 en ligne, v23 livré par le lot 35 (PR #338) ; v26 par le lot 34-bis (21/11).
+**Date : 15 novembre 2026.** Schéma des faits : v22 en ligne, v23 livré par le lot 35 (PR #338) ; v26 par le lot 34-bis (21/11) ; v27 par le lot 48 (21/11).
 
 Cette liste est **la seule** : elle remplace `AVANCEMENT.md` comme état
 d'avancement et les quatre plans (archivés dans `docs/archives/`). Elle existe
@@ -98,7 +98,7 @@ du compte avant tout nouveau changement de schéma, le reste avant l'ouverture.
 | 12 | 53 + 34 | Écran Obligations, frise aux dates officielles | ✅ fini le 20/11 : calcul (PR #348, #349), écran (PR #350) ; quatre restes rangés dans leur lot — champs de TVA en Réglages (41), histoire de l'option VL (34-bis), flux du Pilote vers le dossier (52), pièce « autre » à l'écran (55) |
 | 12 bis | 34-bis | Profil Cipav, plafond du versement libératoire, histoire de l'option (schéma 26) | ✅ fini le 21/11 (PR #352) |
 | 13 | 31 | Une mission à plusieurs clients | ✅ fini le 16/11 : calcul (PR #343, schéma 24), écrans (PR #344) |
-| 14 | 48 | Mission enrichie et carnet de commandes | ⬜ |
+| 14 | 48 | Mission enrichie et carnet de commandes | ✅ livré le 21/11, en commits locaux (A schéma 27 et règles, B écran, C téléphone, D « à faire ») ; deux restes rangés ci-dessous — le facturé hors fenêtre, « Devis envoyé le » |
 | 15 | 49 | Trésorerie à douze mois | ⬜ |
 | 16 | 50 | Ce que je gagne vraiment | ⬜ |
 | 17 | 52 | Le Pilote en quatre réponses | ⬜ |
@@ -186,10 +186,12 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 
 | Ligne | État |
 |---|---|
-| Champs de la mission : volume commandé (jours), préavis d'alerte de fin, période du contrat et reconduction, probabilité facultative d'un prospect ; migration qui descend dans la liste | ⬜ |
-| Carnet de commandes (jours, euros), fin de visibilité, couverture des mois à venir ; une mission sans fin se dit « sans fin fixée » | ⬜ |
-| Écran Missions : frise sur douze mois, table (jours faits / commandés, facturé, encaissé, fin, état), filtres par statut | ⬜ |
-| Fin de mission annoncée dans « À faire », au préavis choisi | ⬜ |
+| Champs de la mission : volume commandé (jours), préavis d'alerte de fin, période du contrat et reconduction, probabilité facultative d'un prospect ; migration qui descend dans la liste | ✅ 21/11 — schéma 27 : `joursCommandes` (demi-journées), `preavisFinJours` (`null` = 60 jours, `PREAVIS_FIN_PAR_DEFAUT_JOURS`), `reconduction.dureeMois` (`fin` = échéance de la période en cours, les suivantes dérivées), `probabilite` ; migration 26 → 27 dans chaque mission (`carnetDuSchema26`), reprise de l'ancienne version à `null`, bloc venu d'ailleurs refusé hors bornes ; formulaire : quatre champs, la probabilité au seul prospect ; démonstration et jeu d'essai au 27. *La « période du contrat » est `debut` → `fin`, sans champ de plus* |
+| Carnet de commandes (jours, euros), fin de visibilité, couverture des mois à venir ; une mission sans fin se dit « sans fin fixée » | ✅ 21/11 — `calculs/carnetDeCommandes` (règles) et `selecteurs.carnet` (jours lus sur `planningsDuMois`, la source du CRA) : reste à produire (volume − jours faits, ou planning jusqu'à l'échéance, `refuse` « sans fin fixée »), carnet signé (prospect jamais compté), fin de visibilité, jours signés par mois (« 0 » tant qu'un contrat court, « — » au-delà) ; mutations : quatorze règles inversées, chacune fait tomber un test nommé |
+| Écran Missions : frise sur douze mois, table (jours faits / commandés, facturé, encaissé, fin, état), filtres par statut | ✅ 21/11 — d'après `direction/activite.html` : titre « Couvert jusqu'au … », trois tuiles (tuile à tendance de la planche construite commune, `components/Tuile`), frise, bandeaux de fin et de reconduction, tableau filtré ; au téléphone, tuiles qui défilent, frise serrée, cartes ; le tableau bascule en cartes sur la largeur de SA carte (il débordait la page à 1 150 px). Aucun geste de l'ancienne liste perdu (`AUDIT-ANCIENNE-VS-NOUVELLE.md`, lot 48) |
+| Fin de mission annoncée dans « À faire », au préavis choisi | ✅ 21/11 — sujet « à faire » sous Activité, « Préparer la suite » → `#/activite/mission-<id>` ; sort quand la fin est prolongée, la mission arrêtée ou la reconduction dite ; pastille du rail par la règle des compteurs |
+| **Venu du lot 48** : le facturé d'une mission ne compte que les factures émises dans sa fenêtre de dates (`lignesDeMission`, et sa copie `dansLaFenetre` de `selecteurs.performance`) : une facture émise quelques jours après la fin n'est rattachée à rien — l'audit ponctuel du jeu d'essai, fini le 8 mai, facturé le 12, se lit « Terminée » sans facturé. Antérieur au lot, non corrigé ici | ⬜ à placer (lot 50, « ce que je gagne vraiment », ou un lot de calcul) |
+| **Venu du lot 48** : « Devis envoyé le … » de la maquette, sous un prospect, demande un fait que le schéma n'a pas (la date du devis) ; l'écran dit « À partir de <mois> » à la place | ⬜ à trancher par le propriétaire : un cinquième champ, ou rien |
 
 ### Lot 49 — Trésorerie à douze mois
 
@@ -219,7 +221,7 @@ lot 43 (la banque passe sous Trésorerie au lot 51).
 | Quatre cases : douze mois, activité (carnet, couverture), prochaines échéances, à faire | ⬜ |
 | « À faire » porte le client et le montant sur chaque ligne ; il remplace les actions rapides ; les remarques automatiques y entrent par des règles écrites | ⬜ |
 | Sur téléphone : les gestes fréquents (ma journée, achat en photo, compte rendu, facture du mois) sous le chiffre | ⬜ |
-| Composants communs de la planche venus du lot 51, construits ici avec leur premier usage : carte héros (`e-hero`), tuile à tendance (`e-tile`, courbe sur douze mois) | ⬜ |
+| Composants communs de la planche venus du lot 51, construits ici avec leur premier usage : carte héros (`e-hero`), tuile à tendance (`e-tile`, courbe sur douze mois) | ◐ la tuile à tendance est construite au lot 48 (`components/Tuile`, courbe monotone `components/courbe`), à reprendre ici ; reste la carte héros |
 | **Venu du lot 53** : les trois lignes du flux du mois mènent au dossier de leur obligation (`#/obligations/<id>`), et non plus au haut d'Obligations — à faire quand le Pilote est refait, le paquet d'entrée n'ayant pas la place aujourd'hui | ⬜ |
 
 ### Lot 54 — Graphiques

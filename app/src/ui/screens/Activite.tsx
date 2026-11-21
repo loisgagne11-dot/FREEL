@@ -38,6 +38,8 @@ import styles from './Activite.module.css';
 import { Montant } from '../components/Montant';
 import { useRoute } from '../useRoute';
 import { ChoixAnnee } from '../components/ChoixAnnee';
+import { finDeVisibilite } from '../../domain/calculs/carnetDeCommandes.echeance';
+import { titreDuCarnet } from './Activite.missions.titre';
 
 /**
  * Les formulaires arrivent à l'ouverture de leur panneau.
@@ -49,7 +51,7 @@ import { ChoixAnnee } from '../components/ChoixAnnee';
 const FormulaireMission = lazy(() => import('./Activite.formulaires')
   .then((m) => ({ default: m.FormulaireMission })));
 
-/** L'onglet Missions, même motif : une liste qu'on ouvre pour modifier. */
+/** L'onglet Missions — le carnet de commandes (lot 48) —, même motif : il ne sert pas au planning. */
 const OngletMissions = composantALaDemande(() => import('./Activite.missions')
   .then((m) => m.OngletMissions), true);
 
@@ -148,6 +150,7 @@ type Section = 'charge' | 'missions' | 'compte-rendu' | 'analyse';
  * formulaire qu'on a fermé.
  */
 export function sectionDeLaRoute(sousRoute: string): Section {
+  if (sousRoute.startsWith(PREFIXE_MISSION)) return 'missions';
   switch (sousRoute) {
     case 'missions':
     case 'nouvelle-mission': return 'missions';
@@ -159,6 +162,15 @@ export function sectionDeLaRoute(sousRoute: string): Section {
 
 /** L'ancre stable de la carte des congés, que vise `#/activite/conges`. */
 export const ID_CARTE_CONGES = 'carte-conges';
+
+/**
+ * `#/activite/mission-<id>` : un GESTE, comme `nouvelle-mission` — il ouvre la
+ * mission, puis l'adresse redevient celle de l'onglet. C'est là que mène
+ * « Préparer la suite » d'une fin annoncée (lot 48) : prolonger la fin, dire
+ * la reconduction ou arrêter la mission se font dans son formulaire, et y
+ * déposer l'utilisateur sur la liste lui ferait chercher la ligne.
+ */
+export const PREFIXE_MISSION = 'mission-';
 
 /**
  * Les onglets, et ce que chacun contient — ceux de la maquette `activite.html`
@@ -186,7 +198,12 @@ const PLANNING = {
 };
 const TITRES: Readonly<Record<Section, { readonly titre: string; readonly sousTitre: string }>> = {
   charge: PLANNING,
-  missions: PLANNING,
+  /* Le titre de l'onglet Missions est calculé (`titreDuCarnet`) : « Couvert
+     jusqu'au 31 juillet. » Celui-ci ne sert que de sous-titre. */
+  missions: {
+    titre: '',
+    sousTitre: 'Tes missions : ce qui est signé, ce qui reste à produire, ce qui s’arrête.'
+  },
   'compte-rendu': {
     titre: 'Tes comptes rendus',
     sousTitre: 'Le document que tu remets à ton client, tiré du planning : rien à ressaisir.'
@@ -239,7 +256,9 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeIci]);
   const [panneau, setPanneau] = useState<Panneau>(
-    () => (routeIci === 'nouvelle-mission' ? { type: 'mission', id: null } : { type: 'ferme' })
+    () => (routeIci === 'nouvelle-mission' ? { type: 'mission', id: null }
+      : routeIci.startsWith(PREFIXE_MISSION) ? { type: 'mission', id: missionDeLaRoute(routeIci) }
+        : { type: 'ferme' })
   );
 
   function changerDeSection(cible: Section): void {
@@ -254,6 +273,9 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
   useEffect(() => {
     if (routeIci === 'nouvelle-mission') {
       setPanneau({ type: 'mission', id: null });
+      window.location.replace('#/activite/missions');
+    } else if (routeIci.startsWith(PREFIXE_MISSION)) {
+      setPanneau({ type: 'mission', id: missionDeLaRoute(routeIci) });
       window.location.replace('#/activite/missions');
     } else if (routeIci === 'conges') {
       setVersConges(true);
@@ -472,13 +494,18 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
     <>
       <Greet
         {...TITRES[section]}
+        {...(section === 'missions'
+          ? { titre: titreDuCarnet(finDeVisibilite(faits.missions, dateDuJour()), dateDuJour()) }
+          : {})}
         {...(section === 'charge' ? { repere: <ResumeDuMois chiffres={chiffres} /> } : {})}
         actions={(
           <>
+            {/* Contour et non vert plein : « + Nouveau », dans la barre du
+                haut, est déjà l'action pleine de l'écran (une seule par écran). */}
             {section === 'missions' && etat.missions.length > 0 && (
-              <button type="button" className={styles.actionPrincipale}
+              <button type="button" className={styles.actionPilule}
                 onClick={() => setPanneau({ type: 'mission', id: null })}>
-                Ajouter une mission
+                <span aria-hidden="true">+</span>Ajouter une mission
               </button>
             )}
             {/* L'Analyse raisonne à l'année : sa commande est l'année, dans
@@ -768,7 +795,6 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
           <Suspense fallback={<EnAttenteDeFormulaire />}>
             <OngletMissions
               idGroupe={idGroupe}
-              missions={etat.missions}
               onOuvrirMission={(id) => setPanneau({ type: 'mission', id })}
             />
           </Suspense>
@@ -899,6 +925,10 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
     </>
   );
 }
+
+/** L'identifiant d'une mission dans `#/activite/mission-<id>`. */
+const missionDeLaRoute = (sousRoute: string): string =>
+  decodeURIComponent(sousRoute.slice(PREFIXE_MISSION.length));
 
 /** Ce qu'un panneau latéral affiche. `id` à `null` pour une création. */
 type Panneau =

@@ -103,6 +103,20 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
     };
   }
 
+  /* Lot 48 : la fin d'une mission, au préavis. Le geste ouvre la mission —
+     prolonger, dire la reconduction ou l'arrêter se font dans son formulaire. */
+  if (sujet.id.startsWith('fin-mission-')) {
+    const jours = nombre(d['jours']);
+    const quand = jours <= 0 ? 'aujourd’hui' : jours === 1 ? 'demain' : `dans ${pluriel(jours, 'jour', 'jours')}`;
+    return {
+      intitule: `${texte(d['mission'])} se termine ${quand}`,
+      contexte: `Le ${jourLisible(texte(d['echeance']))}. C’est le moment d’en parler au client : `
+        + 'une suite, ou une autre mission à trouver.',
+      action: 'Préparer la suite',
+      levier: 'la mission s’ouvre sur son formulaire : prolonge sa fin, dis sa reconduction, ou arrête-la'
+    };
+  }
+
   switch (sujet.id) {
     case 'factures-en-retard':
       return {

@@ -231,6 +231,11 @@ export function FormulaireMission(
     debut: existante?.debut ?? null,
     fin: existante?.fin ?? null,
     statut: existante?.statut ?? 'active',
+    // Le carnet de commandes (schéma 27) : `null` tant que rien n'est dit.
+    joursCommandes: existante?.joursCommandes ?? null,
+    preavisFinJours: existante?.preavisFinJours ?? null,
+    reconduction: existante?.reconduction ?? null,
+    probabilite: existante?.probabilite ?? null,
     // Les AJUSTEMENTS ne se touchent pas ici : ils se posent au planning. Les
     // reprendre tels quels évite qu'une modification de description efface
     // l'activité d'un trimestre.
@@ -244,6 +249,9 @@ export function FormulaireMission(
     ...(existante?.facturation !== undefined ? { facturation: existante.facturation } : {})
   }));
   const [erreur, setErreur] = useState<string | null>(null);
+  /* Le volume se tape « 12,5 » : la saisie garde le texte, le fait garde le
+     nombre — sans quoi la virgule disparaîtrait à la frappe. */
+  const [volume, setVolume] = useState(() => (saisie.joursCommandes == null ? '' : String(saisie.joursCommandes).replace('.', ',')));
   const facturation = modeDeFacturation(saisie);
   const contexte: ContexteDesGestes = {
     aujourdhui: dateDuJour(),
@@ -254,10 +262,20 @@ export function FormulaireMission(
 
   function soumettre(evenement: React.FormEvent): void {
     evenement.preventDefault();
+    const joursCommandes = volumeSaisi(volume);
+    if (joursCommandes === undefined) {
+      setErreur('Le volume commandé se compte en jours ou en demi-journées : 12, ou 12,5.');
+      return;
+    }
     // Le rythme se saisit avant que les dates soient forcément connues : on
     // remplace ici ses bornes provisoires par la plage réelle de la mission.
     const complete = {
-      ...saisie, entites: poserLesBornes(saisie.entites, saisie.debut, saisie.fin)
+      ...saisie,
+      joursCommandes,
+      // Une probabilité ne vaut que pour un prospect : signée ou perdue, la
+      // mission n'a plus de chance d'aboutir à estimer.
+      probabilite: saisie.statut === 'prospect' ? saisie.probabilite ?? null : null,
+      entites: poserLesBornes(saisie.entites, saisie.debut, saisie.fin)
     };
     if (id === null) ajouter(complete); else modifier(id, complete);
     signaler(id === null ? 'Mission ajoutée.' : 'Mission enregistrée.');
@@ -336,6 +354,14 @@ export function FormulaireMission(
           onChange={(e) => setSaisie({ ...saisie, referenceCommande: e.target.value === '' ? null : e.target.value })} />
       </Champ>
 
+      <CarnetDeLaMission
+        id={idChamp}
+        saisie={saisie}
+        volume={volume}
+        onVolume={setVolume}
+        onChange={(champs) => setSaisie({ ...saisie, ...champs })}
+      />
+
       <EditeurEntites
         entites={saisie.entites}
         enregistrees={existante?.entites ?? []}
@@ -409,6 +435,96 @@ export function FormulaireMission(
         />
       )}
     </form>
+  );
+}
+
+/**
+ * Le volume saisi : `null` quand le champ est vide, `undefined` quand il ne se
+ * compte pas en demi-journées — refusé plutôt qu'arrondi : « 12,3 jours »
+ * arrondis en 12,5 feraient facturer une demi-journée que le bon ne porte pas.
+ */
+function volumeSaisi(texte: string): number | null | undefined {
+  const propre = texte.trim().replace(',', '.');
+  if (propre === '') return null;
+  const n = Number(propre);
+  return Number.isFinite(n) && n > 0 && Number.isInteger(n * 2) && n <= 2500 ? n : undefined;
+}
+
+/** Un nombre entier saisi, borné ; vide ou illisible : `null`. */
+function entierSaisi(texte: string, min: number, max: number): number | null {
+  if (texte.trim() === '') return null;
+  const n = Math.round(Number(texte));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : null;
+}
+
+/**
+ * Le carnet de la mission (lot 48) : le volume commandé, le préavis de fin, la
+ * reconduction tacite et, pour un prospect, sa probabilité.
+ *
+ * Quatre champs facultatifs : une mission sans aucun d'eux reste ce qu'elle
+ * était, et c'est le cas courant d'une mission au temps passé. Chacun dit en
+ * une ligne ce qu'il change à l'écran, parce qu'aucun ne se devine.
+ */
+function CarnetDeLaMission(
+  { id, saisie, volume, onVolume, onChange }: {
+    readonly id: string;
+    readonly saisie: Omit<Mission, 'id'>;
+    readonly volume: string;
+    readonly onVolume: (v: string) => void;
+    readonly onChange: (champs: Partial<Omit<Mission, 'id'>>) => void;
+  }
+) {
+  const reconduite = saisie.reconduction != null;
+  /* La période se tape comme le volume : un champ vidé pour taper « 3 » ne
+     doit pas se remplir d'office d'un 1 qui ferait lire « 13 ». */
+  const [periode, setPeriode] = useState(() => String(saisie.reconduction?.dureeMois ?? 12));
+  return (
+    <fieldset className={styles.groupe}>
+      <legend className={styles.legendeGroupe}>Carnet de commandes</legend>
+
+      <Champ id={`${id}-volume`} libelle="Jours commandés"
+        aide="Le volume du bon de commande, demi-journées permises. Vide : la mission suit son planning.">
+        <input id={`${id}-volume`} inputMode="decimal" placeholder="Pas de volume" value={volume}
+          onChange={(e) => onVolume(e.target.value)} />
+      </Champ>
+
+      <Champ id={`${id}-preavis`} libelle="Préavis de fin (jours)"
+        aide="Combien de jours avant la fin te l’annoncer. Vide : 60 jours, le temps de négocier une suite.">
+        <input id={`${id}-preavis`} type="number" inputMode="numeric" min={0} max={366} placeholder="60"
+          value={saisie.preavisFinJours ?? ''}
+          onChange={(e) => onChange({ preavisFinJours: entierSaisi(e.target.value, 0, 366) })} />
+      </Champ>
+
+      <p className={styles.champ}>
+        <label className={styles.caseACocher}>
+          <input type="checkbox" checked={reconduite}
+            onChange={(e) => onChange({ reconduction: e.target.checked ? { dureeMois: entierSaisi(periode, 1, 120) ?? 12 } : null })} />
+          Reconduction tacite
+        </label>
+        <span className={styles.aide}>
+          La fin devient l’échéance de la période en cours : la mission continue, sauf dénonciation.
+        </span>
+      </p>
+      {reconduite && (
+        <Champ id={`${id}-periode`} libelle="Par périodes de (mois)">
+          <input id={`${id}-periode`} type="number" inputMode="numeric" min={1} max={120} value={periode}
+            onChange={(e) => {
+              setPeriode(e.target.value);
+              const n = entierSaisi(e.target.value, 1, 120);
+              if (n !== null) onChange({ reconduction: { dureeMois: n } });
+            }} />
+        </Champ>
+      )}
+
+      {saisie.statut === 'prospect' && (
+        <Champ id={`${id}-probabilite`} libelle="Probabilité (%)"
+          aide="Ton estimation, pour toi seul : un prospect n’entre jamais dans le carnet signé.">
+          <input id={`${id}-probabilite`} type="number" inputMode="numeric" min={0} max={100}
+            value={saisie.probabilite ?? ''}
+            onChange={(e) => onChange({ probabilite: entierSaisi(e.target.value, 0, 100) })} />
+        </Champ>
+      )}
+    </fieldset>
   );
 }
 

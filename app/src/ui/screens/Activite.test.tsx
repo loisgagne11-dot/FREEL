@@ -333,15 +333,18 @@ describe('missions', () => {
     render(<Activite />);
     const utilisateur = userEvent.setup();
     await utilisateur.click(screen.getByRole('tab', { name: /^Missions/ }));
-    await screen.findByRole('heading', { name: /^Missions/ });
+    await screen.findByRole('heading', { name: /^Toutes les missions/ });
 
-    const liste = screen.getByRole('list');
-    expect(within(liste).getByText('Mission A')).toBeTruthy();
+    // La liste est devenue le tableau du carnet (lot 48) : une ligne par
+    // mission, le facturé, l'encaissé, et le reste sous l'encaissé.
+    const ligne = within(screen.getByRole('table')).getByRole('button', { name: 'Mission A' }).closest('tr') as HTMLElement;
     // Les montants sont marqués pour le mode confidentialité, donc portés par
-    // leur propre élément : on interroge le texte de la ligne entière plutôt
+    // leur propre élément : on interroge le texte de la cellule entière plutôt
     // qu'un nœud unique.
-    expect(liste.textContent).toMatch(/Encaissé\s*4\s000/u);
-    expect(liste.textContent).toMatch(/Reste\s*2\s000/u);
+    const cellule = (libelle: string) => ligne.querySelector(`[data-libelle="${libelle}"]`)?.textContent ?? '';
+    expect(cellule('Facturé')).toMatch(/6\s000/u);
+    expect(cellule('Encaissé')).toMatch(/4\s000/u);
+    expect(cellule('Encaissé')).toMatch(/reste\s*2\s000/u);
   });
 
   it('signale un TJM absent au lieu d’en supposer un', async () => {

@@ -652,3 +652,38 @@ début, ce qu'elle disait.
 | Option pour le versement libératoire | 🟢 | La case demande « Depuis quand ? » : « À partir du 1ᵉʳ janvier … (je change d'option) » garde l'année en cours ; « Depuis le début de mon activité (je corrige une erreur) » fait ce que faisait la case ; l'année de création, seulement la seconde. Passé le 30 septembre, le 1ᵉʳ janvier proposé est celui de l'année d'après, et « Demandé avant le 30 septembre » garde le suivant. Rien n'est écrit avant la réponse |
 | Histoire de l'option (`Entreprise.historiqueVl`, `vlAu`) | 🆕 | Une lecture par mois pour la déclaration de revenus, la provision et le solde d'impôt, le versement libératoire au dû et à la déclaration URSSAF, le rail, Activité, Réglages |
 | Contrôle d'un bloc venu d'ailleurs | 🟢 | Refuse une caisse inconnue, une histoire qui n'est pas une liste, une période sans mois lisible, des périodes dans le désordre |
+
+## Lot 48 (21/11) — le carnet de commandes, Activité › Missions (schéma 27)
+
+La liste des missions devient le tableau « Toutes les missions », sous trois
+tuiles et la frise des douze mois. Contrôle ligne à ligne : chaque geste et
+chaque lecture de l'ancienne liste est ATTEINT, et son test a été repris à
+travers le tableau (`Activite.carnet.test.tsx`, `Activite.clientsMission.test.tsx`,
+`Activite.test.tsx`) avant le remplacement.
+
+| Fonction de l'ancienne liste | Verdict | Où elle vit maintenant |
+|---|---|---|
+| Ouvrir une mission (la ligne entière était le bouton) | 🟢 | Le nom de la mission, dans sa ligne ; au téléphone, une cible de 44 px |
+| Modifier une mission (client, description, TJM, dates, délai, référence de commande, rythme) | 🟢 | Le formulaire, inchangé, ouvert depuis le nom |
+| Arrêter une mission (statut terminée), la marquer perdue ou prospect | 🟢 | Le statut du formulaire ; la ligne passe sous « Terminées » |
+| Supprimer une mission (refus motivé si une facture en relève, confirmation chiffrée) | 🟢 | Le formulaire, inchangé |
+| Clients opérationnels : ajouter, arrêter à une date, retirer, facturer à part (lot 31) | 🟢 | Le formulaire, inchangé |
+| « Pour A jusqu'au 13 mai, puis B » (lot 31) | 🟢 | Sous le nom de la mission, quand aucune référence de commande ne passe avant |
+| Ajouter une mission | 🟢 | « + Ajouter une mission » en tête de l'écran ; le vide de l'onglet le propose ; « + Nouveau » et `#/activite/nouvelle-mission` inchangés |
+| Facturé, encaissé, reste à rentrer | 🟢 | Colonnes Facturé et Encaissé ; « reste … » sous l'encaissé |
+| « Chiffre du client, partagé avec N autre(s) » | 🟢 | « partagé avec N autre(s) » sous le facturé ; l'infobulle « Comment les montants sont rattachés » est gardée |
+| Tarif, « TJM non renseigné » | 🟢 | Colonne Tarif |
+| Statut | 🟢 | Colonne État, dérivée et plus riche (fin annoncée, à facturer, soldée…) |
+| Compte de l'onglet (« Missions 6 ») | 🟢 | Inchangé |
+
+| Fonction nouvelle | Verdict | Détail |
+|---|---|---|
+| Volume commandé (`Mission.joursCommandes`) | 🆕 | Demi-journées permises, refusé sinon ; vide = la mission suit son planning |
+| Préavis de fin (`preavisFinJours`) | 🆕 | Vide = 60 jours (`PREAVIS_FIN_PAR_DEFAUT_JOURS`, la seule constante) |
+| Reconduction tacite (`reconduction.dureeMois`) | 🆕 | `fin` reste l'échéance de la période en cours ; les suivantes se dérivent, jamais écrites |
+| Probabilité d'un prospect (`probabilite`) | 🆕 | Demandée au seul prospect, effacée quand la mission n'en est plus un ; n'entre dans aucun total |
+| Carnet signé, fin de visibilité, occupation du mois | 🆕 | Trois tuiles ; un prospect n'est jamais compté |
+| Frise des douze mois et jours signés par mois | 🆕 | « 0 » tant qu'un contrat court, « — » au-delà |
+| Filtres Toutes / En cours / Prospects / Terminées | 🆕 | Une perdue est rangée avec les terminées |
+| Fin de mission annoncée | 🆕 | Bandeau de l'onglet ; sujet « à faire » sous Activité, « Préparer la suite » → `#/activite/mission-<id>` ; sort quand la fin est prolongée, la mission arrêtée ou la reconduction dite |
+| Migration 26 → 27 | 🟢 | Descend dans chaque mission, quatre champs à `null` ; la reprise de l'ancienne version les pose à `null` ; un bloc venu d'ailleurs est refusé hors des bornes |

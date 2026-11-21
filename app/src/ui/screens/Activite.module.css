@@ -408,6 +408,27 @@
 
 .actionPrincipale:hover { border-color: var(--green); }
 
+/* Le bouton de la maquette (`e-btn`) : une pilule de 46 px. */
+.actionPilule {
+  display: inline-flex;
+  align-items: center;
+  /* L'écart du « + » : une espace en bout d'élément flexible est rognée. */
+  gap: 6px;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--card-a);
+  color: var(--text);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.actionPilule:hover { border-color: var(--green); }
+.actionPilule:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
 /* La ligne entière est le bouton : une seule cible plutôt qu'un chevron à
    viser. */
 .ouvrir {
@@ -456,6 +477,13 @@
 .champ select:focus-visible { border-color: var(--green); outline: none; }
 
 .aide { font-size: 11.5px; line-height: 1.5; color: var(--muted-2); }
+
+/* Une case et son libellé sur une ligne, cible de 44 px au doigt. */
+.champ .caseACocher {
+  display: flex; align-items: center; gap: 10px; min-height: 44px;
+  font-size: 13px; letter-spacing: 0; text-transform: none; color: var(--text); cursor: pointer;
+}
+.champ .caseACocher input { width: 18px; min-height: 0; height: 18px; padding: 0; accent-color: var(--green); }
 
 .avertissement {
   font-size: 12.5px;

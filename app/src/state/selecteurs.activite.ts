@@ -257,8 +257,12 @@ function dansLaFenetre(mission: Mission, date: DateISO): boolean {
  * payeur, et ceux de ses plages quand elle se facture client par client
  * (schéma 24). Sans eux, les journées payées en direct par un client final
  * disparaîtraient du facturé de la mission qui les a produites.
+ *
+ * Exportée pour le carnet de commandes (lot 48), qui en lit le facturé et
+ * l'encaissé : une seconde attribution des factures aux missions aurait donné
+ * deux « facturé » pour la même ligne.
  */
-function lignesDeMission(faits: Faits): readonly LigneMission[] {
+export function lignesDeMission(faits: Faits): readonly LigneMission[] {
   const missions = [...faits.missions].sort(prioriteMission);
   const payeurs = new Map(missions.map((m) => [m, payeursDeLaMission(m)]));
   const facturable = (m: Mission, r: Faits['recettes'][number]): boolean =>
