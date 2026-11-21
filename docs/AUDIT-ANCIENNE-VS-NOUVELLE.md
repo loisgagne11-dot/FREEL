@@ -687,3 +687,32 @@ travers le tableau (`Activite.carnet.test.tsx`, `Activite.clientsMission.test.ts
 | Filtres Toutes / En cours / Prospects / Terminées | 🆕 | Une perdue est rangée avec les terminées |
 | Fin de mission annoncée | 🆕 | Bandeau de l'onglet ; sujet « à faire » sous Activité, « Préparer la suite » → `#/activite/mission-<id>` ; sort quand la fin est prolongée, la mission arrêtée ou la reconduction dite |
 | Migration 26 → 27 | 🟢 | Descend dans chaque mission, quatre champs à `null` ; la reprise de l'ancienne version les pose à `null` ; un bloc venu d'ailleurs est refusé hors des bornes |
+
+## Lot 49 (21/11) — la Trésorerie à douze mois (schéma 28)
+
+L'écran est refait d'après `direction/tresorerie.html`. Contrôle ligne à ligne :
+chaque geste de l'ancien écran est ATTEINT, son test repris à travers le nouveau
+(`Tresorerie.test.tsx`, `Tresorerie.douze.test.tsx`, `Tresorerie.annee.test.tsx`,
+`Obligations.gestes.test.tsx`) avant le retrait des modules (`Argent.tresorerie`,
+`Argent.projection`, la moitié « versement » d'`Argent.performance`).
+
+| Fonction de l'ancien écran | Verdict | Où elle vit maintenant |
+|---|---|---|
+| Ouvrir la formule du solde, du disponible (Composition) | 🟢 | Le libellé de la ligne de la cascade, et celui de « À te verser » en plus |
+| « Pointer le versement au relevé », avec son aide | 🟢 | « Verser sur mon compte » ouvre l'aide et mène au relevé (`#/tresorerie/releve`) ; rien n'est enregistré |
+| Régler la part gardée au curseur (carte « Tu peux te verser », Réglages › Réserve) | 🔴 retirée, décision 24 | Le fait `partGardeeAuVersement` quitte le schéma (28) ; la réserve porte seule la prudence ; un bandeau dit une fois l'ancien pourcentage, « Relever ma réserve » mène à Réglages › Réserve, « Compris » le fait taire (`modifierEntreprise`) |
+| Ouvrir le détail d'une enveloppe du dû (déclarer un mois estimé, payer un appel) | 🟢 | Une ligne de « Ce qui est dû » ouvre le même détail (`PanneauDetailDette`), avec les volets et la couverture |
+| Choisir l'année (menu « Année ») | 🟢 autrement | La bascule « 12 mois à venir \| Année N » ; dans la vue Année, « ‹ 2025 » et « 2027 › » quand l'année existe dans les faits |
+| Déplier / replier les cartes (Répartition, Enveloppes, Seuils, Projection) | 🔴 retiré | Les cartes de la maquette ne se replient pas ; le détail du dû est à un clic, le tableau des douze mois aussi |
+| Ouvrir le relevé, l'importer (carte Banque, `#/tresorerie/releve`) | 🟢 | Inchangé, en pied |
+| L'impôt mois par mois (pli sous la note d'impôt) | 🟢 | Dans le détail de la ligne « Impôt sur le revenu » |
+
+| Fonction nouvelle | Verdict | Détail |
+|---|---|---|
+| Douze mois glissants, trois mois constatés | 🆕 | Le passé recalculé depuis les faits de ce soir-là (`faitsAu`), jamais stocké |
+| Le dû posé à sa date dans le solde prévu | 🆕 | URSSAF, formation et versement libératoire à la limite de la déclaration de leur période ; impôt au barème à ses prélèvements ; TVA à sa déclaration (lue sur les obligations) ; CFE avec son avis |
+| Point bas annoté | 🆕 | Le mois le plus bas, versement tenable déduit |
+| « + Compter le prospect », « Et si une mission s'arrête… » | 🆕 | État d'écran, jamais un fait, remis à zéro en quittant l'écran ; prospect compté en entier, jamais pondéré ; l'arrêt coupe le planning après la date |
+| Seuils franchis par le pipeline, jours facturables | 🆕 | Factures émises à leur échéance, planning signé au délai du client ; jours au tarif moyen des missions signées de l'année, refusés sans tarif |
+| Vue Année | 🆕 | Disponible de chaque fin de mois, entrées et sorties, capacité de versement |
+| Migration 27 → 28 | 🟢 | Retire `partGardeeAuVersement`, pose `entreprise.partGardeeRetiree` (le pourcentage) quand il valait plus que 0 ; la reprise de l'ancienne version n'en pose aucune ; un pourcentage venu d'ailleurs hors de 1 à 100 est refusé ; un dossier 29 est refusé |

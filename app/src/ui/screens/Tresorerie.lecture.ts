@@ -61,7 +61,8 @@ export const NOM_LIGNE_DU: Readonly<Record<LigneDuDu['cle'], string>> = {
  */
 export function detailDeLaLigne(l: LigneDuDu, aujourdhui: DateISO): string {
   const quand = l.prochaine === null || l.prochaine.startsWith('9999') ? null
-    : l.prochaine < aujourdhui ? `était à payer le ${jourEtMoisLong(l.prochaine, aujourdhui)}`
+    // Un retard se dit par un signe ET un mot, jamais par la couleur seule.
+    : l.prochaine < aujourdhui ? `▲ était à payer le ${jourEtMoisLong(l.prochaine, aujourdhui)}`
       : `à payer le ${jourEtMoisLong(l.prochaine, aujourdhui)}`;
   const avec = (base: string): string => (quand === null ? base : `${base} · ${quand}`);
   switch (l.cle) {
