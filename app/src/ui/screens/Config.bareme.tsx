@@ -68,10 +68,10 @@ export function Bareme() {
           Cotisations sociales, par période
           <Info libelle="Pourquoi par période et non par année">
             Le taux applicable aux BNC a augmenté au 1<sup>er</sup> juillet
-            2024, puis de nouveau au 1<sup>er</sup> juillet 2026. Une table par
-            année civile appliquerait un taux unique à des mois relevant de deux
-            barèmes&nbsp;: c’est le défaut qui faisait calculer juillet 2026 à
-            25,6 % au lieu de 26,1 %.
+            2024, en cours d’année. Une table par année civile appliquerait un
+            taux unique à des mois relevant de deux barèmes&nbsp;: c’est le
+            défaut qui faisait calculer le second semestre 2024 à 21,1 % au lieu
+            de 23,1 %.
           </Info>
         </h2>
 

@@ -280,7 +280,7 @@ export function ComparateurVl() {
               ({partsConnues === null
                 ? 'pour une part'
                 : `${String(partsConnues).replace('.', ',')} ${partsConnues >= 2 ? 'parts' : 'part'}`})
-              {' '}— ligne 25 de ton avis d’impôt {anneeOption - 1}.
+              {' '}— il figure en première page de ton avis d’impôt {anneeOption - 1}.
             </>
           )}
       </p>

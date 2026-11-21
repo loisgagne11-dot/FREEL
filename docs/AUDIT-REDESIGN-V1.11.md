@@ -1436,7 +1436,9 @@ un affilié Cipav — ont été photographiés à part, en Calme et Nuit, 1 440 
 | Réglages › Profil | Type d'activité, puis le numéro de TVA | + « Ta caisse de retraite » (SSI / Cipav) sous le type d'activité, en BNC seulement, avec l'aide de l'attestation d'affiliation |
 | Réglages › Profil, versement libératoire | L'interrupteur écrivait au clic | La bascule ouvre sur place « Depuis quand ? », la règle du 30 septembre en une phrase, « À partir du 1ᵉʳ janvier … (je change d'option) » en bouton plein, « Depuis le début de mon activité (je corrige une erreur) » en contour, « Annuler » ; le résumé dit « À partir du 1ᵉʳ janvier … » tant que le changement n'a pas pris effet |
 | Réglages › Paramètres fiscaux | Table de la SSI | Table de la caisse, et une phrase pour un affilié Cipav |
-| Simulateurs › comparateur | « Ce que ce calcul ne dit pas » disait le plafond inconnu | Une note sous le comparatif : « Le versement libératoire n'est ouvert en 2027 que si ton revenu fiscal de référence de 2025 ne dépasse pas 29 579 € (1 part) — ligne 25 de ton avis d'impôt 2026. » ; la limite repliée ne parle plus que du revenu, que l'application ne lit pas |
+| Simulateurs › comparateur | « Ce que ce calcul ne dit pas » disait le plafond inconnu | Une note sous le comparatif : « Le versement libératoire n'est ouvert en 2027 que si ton revenu fiscal de référence de 2025 ne dépasse pas 29 579 € (1 part) — il figure en première page de ton avis d'impôt 2026. » ; la limite repliée ne parle plus que du revenu, que l'application ne lit pas |
+| Réglages › Profil, « Depuis quand ? » (relu) | « À partir du 1ᵉʳ janvier suivant » en toute saison | Passé le 30 septembre : « À partir du 1ᵉʳ janvier » de l'année d'après, et « Demandé avant le 30 septembre » en lien dans la phrase |
+| Pied du rail, sous-titre de Profil (relu) | « Micro-BNC · ACRE » | « Micro-BNC · Cipav · ACRE » pour un libéral de la Cipav |
 
 Écarts assumés, avec leur motif :
 

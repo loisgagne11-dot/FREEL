@@ -114,6 +114,7 @@ export function Config() {
   // régime puisqu'il est recalculé à chaque rendu.
   const sousTitreProfil = [
     entreprise.typeActivite === 'BNC' ? 'Micro-BNC' : 'Micro-BIC',
+    entreprise.typeActivite === 'BNC' && entreprise.caisseRetraite === 'cipav' ? 'Cipav' : null,
     entreprise.acre ? 'ACRE' : null,
     entreprise.siret.trim() === '' ? 'SIRET à saisir' : 'SIRET'
   ].filter((x) => x !== null).join(' · ');
@@ -394,9 +395,16 @@ function OptionVl({ id }: { readonly id: string }) {
   const annee = Number(courant.slice(0, 4));
   const actuelle = { versementLiberatoire: entreprise.versementLiberatoire, historiqueVl: entreprise.historiqueVl };
   const creation = entreprise.debutActivite?.startsWith(String(annee)) === true;
+  // Passé le 30 septembre, un changement demandé maintenant ne vaut qu'au
+  // 1ᵉʳ janvier de l'année d'après : proposer « 1ᵉʳ janvier prochain » en
+  // novembre faisait noter une option que l'administration n'appliquera pas.
+  // Celui qui enregistre une option demandée à temps garde ce choix-là.
+  const tardif = courant >= `${annee}-10`;
+  const anneeDeFin = tardif ? annee + 1 : annee;
 
-  function choisir(depuis: DepuisQuand): void {
-    if (demande !== null) modifier(changerOptionVl(actuelle, demande, depuis, annee));
+  /** `fin` : la dernière année qui garde l'ancienne option. */
+  function choisir(depuis: DepuisQuand, fin: number = annee): void {
+    if (demande !== null) modifier(changerOptionVl(actuelle, demande, depuis, fin));
     setDemande(null);
   }
 
@@ -423,11 +431,21 @@ function OptionVl({ id }: { readonly id: string }) {
           consequence={<>Depuis quand&nbsp;?</>}
           complement={creation
             ? <>L’année de création, l’option demandée dans les trois mois qui suivent vaut dès le début de l’activité.</>
-            : <>Tu optes ou tu renonces au plus tard le 30&nbsp;septembre&nbsp;; le changement prend effet au 1<sup>er</sup>&nbsp;janvier suivant.</>}
+            : tardif
+              ? (
+                <>
+                  Tu optes ou tu renonces au plus tard le 30&nbsp;septembre&nbsp;: demandé
+                  maintenant, le changement prend effet au 1<sup>er</sup>&nbsp;janvier {annee + 2}.{' '}
+                  <button type="button" className={styles.lienBouton} onClick={() => choisir('janvier', annee)}>
+                    Demandé avant le 30&nbsp;septembre&nbsp;: à partir du 1<sup>er</sup>&nbsp;janvier {annee + 1}
+                  </button>
+                </>
+              )
+              : <>Tu optes ou tu renonces au plus tard le 30&nbsp;septembre&nbsp;; le changement prend effet au 1<sup>er</sup>&nbsp;janvier suivant.</>}
           {...(creation ? {} : {
             aLaPlace: {
-              libelle: `À partir du 1ᵉʳ janvier ${annee + 1} (je change d’option)`,
-              onChoisir: () => choisir('janvier')
+              libelle: `À partir du 1ᵉʳ janvier ${anneeDeFin + 1} (je change d’option)`,
+              onChoisir: () => choisir('janvier', anneeDeFin)
             }
           })}
           libelleConfirmer="Depuis le début de mon activité (je corrige une erreur)"

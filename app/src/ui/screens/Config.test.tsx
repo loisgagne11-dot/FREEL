@@ -133,6 +133,37 @@ describe('profil', () => {
     expect(screen.getByText(/À partir du 1ᵉʳ janvier 2028, impôt au barème/)).toBeTruthy();
   });
 
+  /*
+   * Passé le 30 septembre, un changement demandé ne vaut qu'au 1er janvier de
+   * l'année d'après. Proposer « 1er janvier prochain » en novembre faisait
+   * noter une option que l'administration n'appliquera pas ; celui qui note
+   * une option demandée à temps garde ce choix.
+   */
+  it('après le 30 septembre, propose le 1er janvier de l’année d’après, et garde celui de l’option demandée à temps', async () => {
+    vi.setSystemTime(new Date('2027-11-20T09:00:00Z'));
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } }
+    });
+    await afficher('profil');
+    const utilisateur = utilisateurTest();
+    await utilisateur.click(screen.getByRole('switch', { name: /Versement libératoire/ }));
+    const question = screen.getByRole('group', { name: /^Depuis quand/ });
+    expect(question.textContent).toMatch(/prend effet au 1er\u00a0janvier 2029/);
+    await utilisateur.click(within(question).getByRole('button', { name: /À partir du 1ᵉʳ janvier 2029/ }));
+    expect(useFaits.getState().faits.entreprise).toMatchObject({
+      versementLiberatoire: false, historiqueVl: [{ jusquA: '2028-12', actif: true }]
+    });
+
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } }
+    });
+    await utilisateur.click(screen.getByRole('switch', { name: /Versement libératoire/ }));
+    await utilisateur.click(screen.getByRole('button', { name: /Demandé avant le 30\u00a0septembre/ }));
+    expect(useFaits.getState().faits.entreprise).toMatchObject({
+      versementLiberatoire: false, historiqueVl: [{ jusquA: '2027-12', actif: true }]
+    });
+  });
+
   it('n’écrit rien quand on annule la question', async () => {
     await afficher('profil');
     const utilisateur = utilisateurTest();

@@ -93,6 +93,23 @@
   font-weight: 560;
 }
 
+/* Un geste en ligne, dans une phrase : l'allure de `.lien`, sans le cadre
+   d'un bouton — un quatrième bouton plein aurait noyé le choix principal. */
+.lienBouton {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-weight: 560;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.lienBouton:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
 .carte {
   background: linear-gradient(160deg, var(--card-a), var(--card-b));
   border: 1px solid var(--line);

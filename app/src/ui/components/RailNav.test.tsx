@@ -147,6 +147,20 @@ describe('le pied du rail', () => {
     expect(await within(rail()).findByRole('link', { name: 'Ton profil — Micro-BNC · VL' })).toBeTruthy();
   });
 
+  // La caisse change le taux : un 23,2 % lu sans « Cipav » passait pour une
+  // erreur de barème. En BIC, la caisse ne veut rien dire et ne se dit pas.
+  it('dit « Cipav » pour un libéral de la Cipav, jamais en BIC', async () => {
+    useFaits.setState({ faits: { ...faitsVides(), entreprise: { ...entrepriseVide(), caisseRetraite: 'cipav' } } });
+    render(<RailNav ecranActif="pilote" />);
+    expect(await within(rail()).findByRole('link', { name: 'Ton profil — Micro-BNC · Cipav' })).toBeTruthy();
+    cleanup();
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...entrepriseVide(), caisseRetraite: 'cipav', typeActivite: 'BIC_service' } }
+    });
+    render(<RailNav ecranActif="pilote" />);
+    expect(await within(rail()).findByRole('link', { name: 'Ton profil — Micro-BIC' })).toBeTruthy();
+  });
+
   it('retombe sur « Ton profil » sans nom ni prénom', async () => {
     render(<RailNav ecranActif="pilote" />);
     expect(await within(rail()).findByRole('link', { name: 'Ton profil — Micro-BNC' })).toBeTruthy();

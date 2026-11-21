@@ -144,7 +144,7 @@ describe('plafond du versement libératoire', () => {
   it('annonce le plafond de l’an prochain, lu sur le barème des revenus de deux ans plus tôt', () => {
     semer();
     render(<ComparateurVl />);
-    expect(note()).toMatch(/ouvert en 2027 .*référence de 2025 ne dépasse pas 29\u202f579\s€ \(1 part\) — ligne 25 de ton avis d’impôt 2026\./);
+    expect(note()).toMatch(/ouvert en 2027 .*référence de 2025 ne dépasse pas 29\u202f579\s€ \(1 part\) — il figure en première page de ton avis d’impôt 2026\./);
   });
 
   it('le multiplie par les parts du foyer, arrondi à l’euro inférieur', () => {
