@@ -445,7 +445,19 @@
           "contact": "",
           "email": "",
           "telephone": "",
-          "rythmes": [],
+          "rythmes": [
+            {
+              "du": "2026-09-01",
+              "au": "2026-10-31",
+              "parJour": {
+                "mar": 1,
+                "mer": 1,
+                "jeu": 1
+              },
+              "tjm": null,
+              "facturerA": null
+            }
+          ],
           "ajustements": {}
         }
       ]

@@ -55,6 +55,29 @@ export interface MoisProjete {
   readonly avecVersement: Euros;
   /** Total versé depuis le début de la projection, dans ce scénario. */
   readonly verseCumule: Euros;
+  /**
+   * Ce qui quitte le compte ce mois-ci pour régler le dû — l'URSSAF à la
+   * limite de sa déclaration, la TVA à sa CA3, l'impôt à son prélèvement, la
+   * CFE en décembre. Zéro quand l'appelant n'a pas daté le dû.
+   */
+  readonly chargesPayees: Euros;
+  /**
+   * Le SOLDE du compte à la fin du mois, le versement tenable pris chaque
+   * mois — `null` quand l'appelant ne donne pas le solde de départ.
+   *
+   * ───────────────────────────────────────────────────────────────────────
+   * LE DÛ NAÎT À L'ENCAISSEMENT, LE SOLDE BAISSE À L'ÉCHÉANCE
+   * ───────────────────────────────────────────────────────────────────────
+   *
+   * Le disponible retire la charge le jour où l'argent entre ; le solde, lui,
+   * ne la perd que le jour où elle quitte le compte. Les deux se rejoignent
+   * par construction — solde − dû = disponible, chaque mois —, et c'est ce
+   * qui rend la courbe du solde sûre : elle porte les marches que l'URSSAF
+   * fait au compte, sans qu'aucune date ne fasse bouger le disponible.
+   */
+  readonly solde: Euros | null;
+  /** Le dû à la fin du mois : celui d'aujourd'hui, plus ce qui naît, moins ce qui sort. */
+  readonly du: Euros | null;
 }
 
 export interface ProjectionSolde {
@@ -73,6 +96,13 @@ export interface ProjectionSolde {
    * « pourquoi si peu ? », qui est la première qu'on se pose.
    */
   readonly moisContraignant: Mois | null;
+  /**
+   * Le mois où le disponible, versement tenable pris chaque mois, est le plus
+   * bas — et ce qu'il vaut alors. C'est lui que la courbe annote : « jusqu'en
+   * mai » dit quel mois limite, le point bas dit de combien il passe.
+   * `null` sans aucun mois projeté.
+   */
+  readonly pointBas: { readonly mois: Mois; readonly montant: Euros } | null;
 }
 
 /** Ce qu'on sait d'un mois à venir, avant tout calcul. */
@@ -132,12 +162,16 @@ export function versementSoutenable(
  * dépense future, et l'appelant doit dire d'où vient son chiffre.
  */
 export function projeterDisponible(
-  { depart, reserve, entrees, tauxDeCharges, depensesMensuelles }: {
+  { depart, reserve, entrees, tauxDeCharges, depensesMensuelles, soldeDepart, chargesPayees }: {
     readonly depart: Euros;
     readonly reserve: Euros;
     readonly entrees: readonly EntreeMois[];
     readonly tauxDeCharges: number;
     readonly depensesMensuelles: Euros;
+    /** Le solde du compte aujourd'hui : sans lui, la projection ne dit que le disponible. */
+    readonly soldeDepart?: Euros;
+    /** Ce qui quitte le compte pour le dû, mois par mois, aligné sur `entrees`. */
+    readonly chargesPayees?: readonly Euros[];
   }
 ): ProjectionSolde {
   // Première passe : le disponible cumulé sans se verser quoi que ce soit.
@@ -154,21 +188,41 @@ export function projeterDisponible(
     sansVersement.map((d) => euros(d)), reserve
   );
 
+  /* Le solde suit les mêmes mouvements que le disponible, sauf la charge :
+     elle n'en sort qu'à l'échéance. Le dû se déduit des deux, il ne se
+     calcule pas une seconde fois. */
+  let solde: number | null = soldeDepart ?? null;
+  const mois = detail.map(({ entree, charges }, i) => {
+    const payees = chargesPayees?.[i] ?? 0;
+    const avecVersement = (sansVersement[i] ?? 0) - montant * (i + 1);
+    if (solde !== null) solde += entree.encaissements - payees - depensesMensuelles - montant;
+    return {
+      mois: entree.mois,
+      encaissements: entree.encaissements,
+      charges: euros(Math.round(charges)),
+      depenses: depensesMensuelles,
+      sansVersement: euros(Math.round(sansVersement[i] ?? 0)),
+      avecVersement: euros(Math.round(avecVersement)),
+      verseCumule: euros(montant * (i + 1)),
+      chargesPayees: euros(Math.round(payees)),
+      solde: solde === null ? null : euros(Math.round(solde)),
+      du: solde === null ? null : euros(Math.round(solde - avecVersement))
+    };
+  });
+
+  /* Le premier des plus bas : à égalité, c'est le plus proche qui presse. */
+  const bas = mois.reduce<MoisProjete | null>(
+    (pire, m) => (pire === null || m.avecVersement < pire.avecVersement ? m : pire), null
+  );
+
   return {
     depart,
     versementMensuel: montant,
     moisContraignant: moisLimitant === null
       ? null
       : entrees[moisLimitant]?.mois ?? null,
-    mois: detail.map(({ entree, charges }, i) => ({
-      mois: entree.mois,
-      encaissements: entree.encaissements,
-      charges: euros(Math.round(charges)),
-      depenses: depensesMensuelles,
-      sansVersement: euros(Math.round(sansVersement[i] ?? 0)),
-      avecVersement: euros(Math.round((sansVersement[i] ?? 0) - montant * (i + 1))),
-      verseCumule: euros(montant * (i + 1))
-    }))
+    pointBas: bas === null ? null : { mois: bas.mois, montant: bas.avecVersement },
+    mois
   };
 }
 

@@ -29,14 +29,20 @@ import { soldeAuDernierJourDe } from '../domain/calculs/solde';
 import { decalerMois } from '../domain/calculs/periode';
 import type { Faits } from './schema';
 import {
-  etatPilote, moisCourant, recettesEncaissees, remunerationDuMois, echeancesDuComptePro } from './selecteurs';
+  dateDuJour, etatPilote, moisCourant, recettesEncaissees, remunerationDuMois, echeancesDuComptePro
+} from './selecteurs';
 import { tauxDeChargesAu } from './selecteurs.activite';
 import {
   type ProjectionSolde, depensesMensuellesMoyennes, projeterDisponible
 } from '../domain/calculs/projectionSolde';
 import {
-  encaissementsAttendusParMois, facturesSuivies, finDuMoisISO
+  encaissementsAttendusDetailles, encaissementsAttendusParMois, facturesSuivies, finDuMoisISO
 } from './selecteurs.pipeline';
+import { type SortieDeCharge, sortiesParMois, totalDesSorties } from '../domain/calculs/sortiesDeCharges';
+import { dateDeLEtape } from '../domain/calculs/obligations';
+import { decaler } from '../domain/calculs/calendrier';
+import { sortiesAVenir, sortiesDuDu } from './selecteurs.sorties';
+import { obligationsEntre } from './selecteurs.obligations';
 
 // Réexport : les lecteurs existants (performance) importent d'ici.
 export { facturesSuivies };
@@ -337,6 +343,15 @@ export interface EtatProjection {
   readonly tauxDeCharges: number | null;
   /** Ce qu'on s'est réellement versé, mois par mois, sur l'année écoulée. */
   readonly versementsPasses: readonly { readonly mois: Mois; readonly montant: Euros }[];
+  /**
+   * Les encaissements attendus de chaque mois, en deux parts — les factures
+   * émises, le planning signé —, alignés sur `projection.mois`.
+   */
+  readonly attendus: readonly { readonly factures: Euros; readonly planning: Euros }[];
+  /** Ce qui quitte le compte pour le dû, mois par mois, aligné sur `projection.mois`. */
+  readonly sorties: readonly (readonly SortieDeCharge[])[];
+  /** Le solde du compte aujourd'hui, le point de départ du solde prévu. */
+  readonly solde: Euros;
 }
 
 /**
@@ -388,11 +403,21 @@ export function etatProjection(
 ): EtatProjection {
   const m0 = moisCourant(maintenant);
   const moisProjetes = Array.from({ length: MOIS_PROJETES }, (_, i) => decalerMois(m0, i));
-  const attendu = encaissementsAttendusParMois(faits, moisProjetes, maintenant);
+  const { factures, planning } = encaissementsAttendusDetailles(faits, moisProjetes, maintenant);
 
   const pilote = etatPilote(faits, faits.echeances, maintenant);
   const taux = tauxDeChargesAu(faits, m0);
   const depenses = depensesMoyennesRecentes(faits, m0);
+  // Faute de barème, zéro : la projection est alors trop haute d'un quart,
+  // et `tauxDeCharges` à `null` oblige l'écran à le dire.
+  const tauxRetenu = taux.statut === 'refuse' ? 0 : taux.valeur;
+  const entrees = moisProjetes.map((m) => ({
+    mois: m, encaissements: euros((factures.get(m) ?? 0) + (planning.get(m) ?? 0))
+  }));
+  const sorties = sortiesParMois([
+    ...sortiesDuDu(faits, pilote, maintenant, () => prochaineLimiteDeTva(faits, maintenant)),
+    ...sortiesAVenir(faits, entrees, tauxRetenu, maintenant)
+  ], moisProjetes);
 
   return {
     depensesMensuelles: depenses,
@@ -400,14 +425,17 @@ export function etatProjection(
     projection: projeterDisponible({
       depart: pilote.tresorerie.dispo,
       reserve: pilote.tresorerie.reserve,
-      entrees: moisProjetes.map((m) => ({
-        mois: m, encaissements: euros(attendu.get(m) ?? 0)
-      })),
-      // Faute de barème, zéro : la projection est alors trop haute d'un quart,
-      // et `tauxDeCharges` à `null` oblige l'écran à le dire.
-      tauxDeCharges: taux.statut === 'refuse' ? 0 : taux.valeur,
-      depensesMensuelles: depenses ?? euros(0)
+      entrees,
+      tauxDeCharges: tauxRetenu,
+      depensesMensuelles: depenses ?? euros(0),
+      soldeDepart: pilote.tresorerie.solde,
+      chargesPayees: sorties.map(totalDesSorties)
     }),
+    attendus: moisProjetes.map((m) => ({
+      factures: euros(factures.get(m) ?? 0), planning: euros(planning.get(m) ?? 0)
+    })),
+    sorties,
+    solde: pilote.tresorerie.solde,
     // Sur l'année écoulée, mois courant inclus : c'est la question « est-ce
     // que je me verse plus ou moins que ce que je peux ? ».
     versementsPasses: Array.from({ length: 12 }, (_, i) => {
@@ -418,6 +446,22 @@ export function etatProjection(
 }
 
 
+
+/**
+ * Le jour où la TVA à reverser quitte le compte : la prochaine déclaration de
+ * TVA à payer — CA3, CA12 ou celle d'un achat autoliquidé —, lue sur les
+ * obligations (lot 53), qui seules connaissent ces calendriers. Une
+ * déclaration en retard compte : elle se paie maintenant. `null` quand aucune
+ * n'est prévue sur l'année qui vient.
+ */
+function prochaineLimiteDeTva(faits: Faits, maintenant: Date): DateISO | null {
+  const aujourdhui = dateDuJour(maintenant);
+  return obligationsEntre(faits, decaler(aujourdhui, -120), decaler(aujourdhui, 400), aujourdhui)
+    .flatMap((o) => (o.nature === 'tva' && o.paiement !== undefined && o.paiement.etat !== 'fait'
+      ? [dateDeLEtape(o.paiement)]
+      : []))
+    .sort()[0] ?? null;
+}
 
 /** Nombre de mois entre `a` et `b` — positif si `b` est postérieur à `a`. */
 function differenceMois(a: Mois, b: Mois): number {

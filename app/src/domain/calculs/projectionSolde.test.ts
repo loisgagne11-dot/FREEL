@@ -192,3 +192,81 @@ describe('hypothèse de dépenses courantes', () => {
     expect(depensesMensuellesMoyennes([])).toBeNull();
   });
 });
+
+/**
+ * LE SOLDE PRÉVU : LE DÛ NAÎT À L'ENCAISSEMENT, IL QUITTE LE COMPTE À L'ÉCHÉANCE (lot 49).
+ *
+ * Le disponible ne change pas : c'est le contrat de la projection, et le
+ * versement tenable en dépend. Le solde, lui, garde la charge jusqu'au jour où
+ * elle sort — la marche que le relevé fera le 31 juillet.
+ */
+describe('le solde prévu', () => {
+  const avecSolde = (chargesPayees: readonly number[]) => projeterDisponible({
+    // Une réserve au-dessus du disponible : aucun versement, les nombres se lisent.
+    depart: euros(8_000), reserve: euros(20_000),
+    entrees: [entree('2026-06', 1_000), entree('2026-07', 0), entree('2026-08', 0)],
+    tauxDeCharges: 0.25, depensesMensuelles: euros(0),
+    soldeDepart: euros(10_000), chargesPayees: chargesPayees.map((c) => euros(c))
+  });
+
+  /*
+   * Si la charge sortait à l'encaissement, le solde de juin vaudrait 10 750 €
+   * au lieu de 11 000 — et celui de juillet ne ferait pas sa marche : la courbe
+   * mentirait au moment précis où le relevé baisse.
+   */
+  it('baisse le mois où la charge quitte le compte, pas celui où elle naît', () => {
+    // Dû d'aujourd'hui 2 000 € + 250 € nés en juin, réglés ensemble en juillet.
+    const p = avecSolde([0, 2_250, 0]);
+    expect(p.mois.map((m) => m.solde)).toEqual([11_000, 8_750, 8_750]);
+  });
+
+  it('ne fait pas bouger le disponible ce jour-là', () => {
+    const sansCalendrier = projeter([entree('2026-06', 1_000), entree('2026-07', 0), entree('2026-08', 0)],
+      { depart: 8_000, taux: 0.25, reserve: 20_000 });
+    const p = avecSolde([0, 2_250, 0]);
+    expect(p.mois.map((m) => m.avecVersement)).toEqual(sansCalendrier.mois.map((m) => m.avecVersement));
+    expect(p.versementMensuel).toBe(sansCalendrier.versementMensuel);
+  });
+
+  /* Le dû se déduit, il ne se recalcule pas : solde − dû = disponible, chaque mois. */
+  it('tient solde − dû = disponible, chaque mois', () => {
+    const p = avecSolde([0, 2_250, 0]);
+    for (const m of p.mois) expect((m.solde ?? 0) - (m.du ?? 0)).toBe(m.avecVersement);
+    expect(p.mois.map((m) => m.du)).toEqual([2_250, 0, 0]);
+  });
+
+  it('ne dit rien du solde sans solde de départ', () => {
+    expect(projeter([entree('2026-06', 0)]).mois[0]?.solde).toBeNull();
+  });
+});
+
+/**
+ * LE POINT BAS : LE MOIS OÙ LE DISPONIBLE, VERSEMENT TENABLE PRIS CHAQUE MOIS,
+ * EST LE PLUS BAS — CELUI QUE LA COURBE ANNOTE.
+ */
+describe('le point bas', () => {
+  /*
+   * S'il tombait sur le dernier mois, la courbe annoterait un creux qui n'est
+   * pas le sien : ici, juillet est le plus bas — 6 000 € n'arrivent qu'en
+   * août —, et c'est lui que le versement tenable doit respecter.
+   */
+  it('est le mois le plus bas, versement déduit, avec son montant', () => {
+    const p = projeter(
+      [entree('2026-06', 0), entree('2026-07', 0), entree('2026-08', 6_000)],
+      { depart: 3_000, reserve: 0, depenses: 500 }
+    );
+    expect(p.versementMensuel).toBe(1_000);
+    expect(p.mois.map((m) => m.avecVersement)).toEqual([1_500, 0, 4_500]);
+    expect(p.pointBas).toEqual({ mois: '2026-07', montant: 0 });
+  });
+
+  it('sans versement possible, est le plus bas du disponible tel quel', () => {
+    const p = projeter([entree('2026-06', 0), entree('2026-07', 0)], { depart: 1_000, reserve: 2_000, depenses: 300 });
+    expect(p.versementMensuel).toBe(0);
+    expect(p.pointBas).toEqual({ mois: '2026-07', montant: 400 });
+  });
+
+  it('n’existe pas sans mois projeté', () => {
+    expect(projeter([]).pointBas).toBeNull();
+  });
+});
