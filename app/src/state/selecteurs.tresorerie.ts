@@ -162,11 +162,16 @@ export interface MoisDeTresorerie {
   readonly mois: Mois;
   /** `constate` : un mois clos, lu dans les faits ; `prevu` : la projection. */
   readonly nature: 'constate' | 'prevu';
-  /** Encaissé (constaté) ou attendu (prévu), hors taxes comme le pipeline. */
+  /**
+   * Ce qui entre sur le compte : encaissé (constaté) ou attendu (prévu), TVA
+   * comprise chez un redevable (lot 50). Hors taxes, un mois qui reversait sa
+   * TVA à la CA3 se lisait plus pauvre que le relevé, et le solde prévu
+   * baissait d'une TVA qu'aucune entrée n'avait apportée.
+   */
   readonly entrees: Euros;
-  /** Prévu : la part des factures émises, à leur échéance. */
+  /** Prévu : la part des factures émises, à leur échéance, TVA comprise. */
   readonly entreesFactures: Euros;
-  /** Prévu : la part du planning signé, au délai de paiement du client. */
+  /** Prévu : la part du planning signé, au délai de paiement du client, TVA comprise. */
   readonly entreesPlanning: Euros;
   /** Le dû qui quitte le compte ce mois-ci, ligne par ligne. */
   readonly charges: readonly SortieDeCharge[];
@@ -190,7 +195,8 @@ const somme = (xs: readonly number[]): Euros => euros(xs.reduce((t, x) => t + x,
 /** Un mois clos, tel que les faits le disent. */
 export function moisConstate(faits: Faits, m: Mois): MoisDeTresorerie {
   const dans = (d: DateISO | null | undefined): boolean => d != null && d.startsWith(m);
-  const entrees = somme(recettesEncaissees(faits).filter((r) => dans(r.encaisseeLe)).map((r) => r.montant));
+  // La TVA encaissée avec : le solde la compte (`soldeDerive`), l'entrée aussi.
+  const entrees = somme(recettesEncaissees(faits).filter((r) => dans(r.encaisseeLe)).map((r) => r.montant + (r.tva ?? 0)));
   const charges: SortieDeCharge[] = echeancesDuComptePro(faits)
     .filter((e) => estPayee(e) && dans(e.payeeLe))
     .map((e) => ({
@@ -228,7 +234,7 @@ function moisPrevus(p: EtatProjection): readonly MoisDeTresorerie[] {
     return {
       mois: m.mois,
       nature: 'prevu',
-      entrees: m.encaissements,
+      entrees: euros(m.encaissements + m.tva),
       entreesFactures: p.attendus[i]?.factures ?? euros(0),
       entreesPlanning: p.attendus[i]?.planning ?? euros(0),
       charges,
@@ -290,6 +296,13 @@ export interface TresorerieDouzeMois extends ResumeDeProjection {
   readonly mois: readonly MoisDeTresorerie[];
   readonly depensesMensuelles: Euros | null;
   readonly tauxDeCharges: number | null;
+  /**
+   * Ce que le dû prend en plus du taux sur les douze mois (lot 50) : l'impôt
+   * sur le revenu au barème, la TVA d'un redevable. L'hypothèse « le dû grandit
+   * de 15 % » les tairait sinon.
+   */
+  readonly impotAVenir: Euros;
+  readonly tvaAVenir: Euros;
   /** Le dernier mois prévu, dans les deux scénarios — « Dans un an : … ». */
   readonly dansUnAn: { readonly sansVersement: Euros; readonly avecVersement: Euros; readonly verseCumule: Euros } | null;
   /** Ce qui est dû, par charge, avec ses dates — dans l'ordre de la maquette. */
@@ -321,6 +334,8 @@ export function tresorerieDouzeMois(faits: Faits, maintenant: Date = new Date())
     mois: [...constates, ...moisPrevus(p)],
     depensesMensuelles: p.depensesMensuelles,
     tauxDeCharges: p.tauxDeCharges,
+    impotAVenir: somme(p.projection.mois.map((m) => m.impot)),
+    tvaAVenir: somme(p.projection.mois.map((m) => m.tva)),
     dansUnAn: dernier === undefined ? null : {
       sansVersement: dernier.sansVersement, avecVersement: dernier.avecVersement, verseCumule: dernier.verseCumule
     },

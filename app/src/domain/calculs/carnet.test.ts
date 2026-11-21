@@ -93,6 +93,12 @@ describe('suppression d’un client', () => {
 });
 
 describe('suppression d’une mission', () => {
+  /** Une mission signée, sans rythme : la règle ne lit que ses dates et ses payeurs. */
+  const signee = (id: string, debut: string | null, fin: string | null, clientNom = 'Dupont') =>
+    ({ id, statut: 'active', clientNom, debut, fin, entites: [] });
+  const facture = (id: string, emiseLe: string | null, clientNom = 'Dupont') => ({ id, clientNom, emiseLe });
+  const mission = signee('m', '2026-01-01', '2026-12-31');
+
   /**
    * Les factures payées en direct par un client final sont justifiées par la
    * mission comme celles de l'agence : la supprimer les laisserait au registre
@@ -100,51 +106,54 @@ describe('suppression d’une mission', () => {
    */
   it('refuse quand une facture d’un payeur de ses plages tombe dans la période', () => {
     const parClient = {
-      clientNom: 'Agence fictive', debut: '2026-01-01', fin: '2026-12-31', facturation: 'par_client' as const,
+      ...signee('pc', '2026-01-01', '2026-12-31', 'Agence fictive'), facturation: 'par_client' as const,
       entites: [{ rythmes: [{
         du: dateISO('2026-01-01'), au: dateISO('2026-12-31'), parJour: { lun: 1 }, tjm: null,
         facturerA: 'Client direct fictif'
       }] }]
     };
     expect(peutSupprimerMission(
-      parClient, [{ clientNom: 'Client direct fictif', emiseLe: '2026-06-01' }]
+      parClient, [parClient], [facture('r', '2026-06-01', 'Client direct fictif')]
     )?.motif).toBe('rattachements_existants');
   });
 
-  const mission = { clientNom: 'Dupont', debut: '2026-01-01', fin: '2026-12-31' };
-
   it('autorise la suppression sans recette du client', () => {
-    expect(peutSupprimerMission(mission, [{ clientNom: 'Autre', emiseLe: '2026-06-01' }]))
+    expect(peutSupprimerMission(mission, [mission], [facture('r', '2026-06-01', 'Autre')]))
       .toBeNull();
   });
 
   // Une facture émise ne se retire pas du registre : supprimer la mission qui
   // la justifie rendrait sa présence inexplicable en contrôle.
   it('refuse quand une recette du client tombe dans la période', () => {
-    const refus = peutSupprimerMission(
-      mission, [{ clientNom: 'Dupont', emiseLe: '2026-06-01' }]
-    );
+    const refus = peutSupprimerMission(mission, [mission], [facture('r', '2026-06-01')]);
     expect(refus?.motif).toBe('rattachements_existants');
   });
 
   it('autorise quand les recettes du client sont hors période', () => {
-    expect(peutSupprimerMission(
-      mission, [{ clientNom: 'Dupont', emiseLe: '2025-06-01' }]
-    )).toBeNull();
+    expect(peutSupprimerMission(mission, [mission], [facture('r', '2025-06-01')])).toBeNull();
+  });
+
+  /*
+   * L'audit du jeu d'essai, fini le 8 mai, facturé le 12. Avec la fenêtre de
+   * dates, la mission se supprimait et laissait sa facture au registre sans
+   * rien qui l'explique. Revenir à la fenêtre fait tomber ce test.
+   */
+  it('refuse quand la facture qui lui revient est partie après sa fin', () => {
+    const audit = signee('audit', '2026-04-01', '2026-05-08');
+    expect(peutSupprimerMission(audit, [audit], [facture('r', '2026-05-12')])?.motif)
+      .toBe('rattachements_existants');
   });
 
   // Faute de date, on ne peut pas écarter le rattachement : on s'abstient.
   it('refuse quand une recette du client n’a pas de date', () => {
-    expect(peutSupprimerMission(
-      mission, [{ clientNom: 'Dupont', emiseLe: null }]
-    )?.motif).toBe('rattachements_existants');
+    expect(peutSupprimerMission(mission, [mission], [facture('r', null)])?.motif)
+      .toBe('rattachements_existants');
   });
 
   it('traite une mission ouverte comme couvrant tout ce qui suit son début', () => {
-    const ouverte = { clientNom: 'Dupont', debut: '2026-01-01', fin: null };
-    expect(peutSupprimerMission(
-      ouverte, [{ clientNom: 'Dupont', emiseLe: '2030-01-01' }]
-    )?.motif).toBe('rattachements_existants');
+    const ouverte = signee('o', '2026-01-01', null);
+    expect(peutSupprimerMission(ouverte, [ouverte], [facture('r', '2030-01-01')])?.motif)
+      .toBe('rattachements_existants');
   });
 });
 

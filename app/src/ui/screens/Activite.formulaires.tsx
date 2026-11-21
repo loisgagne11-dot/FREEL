@@ -409,7 +409,7 @@ export function FormulaireMission(
           libelle="Supprimer cette mission"
           classeDeclencheur={styles.supprimer}
           peutOuvrir={() => {
-            const refus = peutSupprimerMission(existante, faits.recettes);
+            const refus = peutSupprimerMission(existante, faits.missions, faits.recettes);
             setErreur(refus?.message ?? null);
             return refus === null;
           }}

@@ -322,6 +322,32 @@ describe('le tableau', () => {
     expect(screen.getByText(/Dépenses courantes/)).toBeTruthy();
   });
 
+  /*
+   * Au barème et redevable (le jeu d'essai, au 15 décembre), le dû grandit de
+   * plus que le taux : l'impôt sur le revenu et la TVA des encaissements à
+   * venir (lot 50). La phrase du taux seule les tairait ; la démonstration,
+   * sous le versement libératoire et en franchise, n'en dit rien.
+   */
+  it('dit l’impôt et la TVA que les encaissements à venir ajoutent au dû', async () => {
+    vi.setSystemTime(new Date('2026-12-15T09:00:00Z'));
+    useFaits.setState({
+      faits: completerFaitsCourants(JSON.parse(readFileSync('src/test/jeu-d-essai.json', 'utf8')) as Record<string, unknown>)
+    });
+    render(<Tresorerie />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Voir en tableau' }));
+    expect((await screen.findByText(/S’y ajoute l’impôt sur le revenu/)).textContent).toMatch(/à l’automne suivant/);
+    expect(screen.getByText(/La TVA encaissée/).textContent).toMatch(/déclaration qui la reverse/);
+  });
+
+  it('n’en dit rien sous le versement libératoire et en franchise', async () => {
+    useFaits.setState({ faits: DEMO });
+    render(<Tresorerie />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Voir en tableau' }));
+    await screen.findByRole('table', { name: /Trésorerie, mois par mois/ });
+    expect(screen.queryByText(/S’y ajoute l’impôt/)).toBeNull();
+    expect(screen.queryByText(/La TVA encaissée/)).toBeNull();
+  });
+
   /* Sans trois mois d'historique, la projection ignore les dépenses : elle est trop haute, et le dit. */
   it('dit que les dépenses courantes ne sont pas estimées, faute d’historique', async () => {
     poser();
