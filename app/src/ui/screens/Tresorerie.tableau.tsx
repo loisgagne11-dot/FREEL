@@ -64,6 +64,15 @@ export function TableauDouzeMois({ t }: { readonly t: TresorerieDouzeMois }) {
               sur les encaissements à venir, le disponible prévu est donc trop haut.</span>
             : <>Le dû grandit de {Math.round(t.tauxDeCharges * 100)}&nbsp;% de chaque encaissement — le
               disponible le retire ce jour-là — et quitte le compte à l’échéance de sa déclaration.</>}
+          {t.impotAVenir > 0 && (
+            <> S’y ajoute l’impôt sur le revenu de ces encaissements, <Montant>{eur(t.impotAVenir)}</Montant> sur
+              douze mois, lu sur ta provision d’impôt&nbsp;: il part avec le solde de son année, à l’automne
+              suivant.</>
+          )}
+          {t.tvaAVenir > 0 && (
+            <> La TVA encaissée, <Montant>{eur(t.tvaAVenir)}</Montant>, entre avec la facture et quitte le compte à
+              la déclaration qui la reverse.</>
+          )}
         </li>
         <li>
           {t.depensesMensuelles === null

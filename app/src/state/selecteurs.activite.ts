@@ -48,7 +48,7 @@ import { delaisParClient, type DelaiClient } from '../domain/calculs/activite';
 import type { DateISO, Euros, Mois, Resolution } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Faits, Mission } from './schema';
-import { payeursDeLaMission } from '../domain/calculs/brouillon';
+import { rattacherFactures } from '../domain/calculs/rattachementFactures';
 import {
   dateDuJour, periodesUrssafEffectives, regimeDe, sousAcreLe
 } from './selecteurs';
@@ -223,13 +223,6 @@ function chargeDuMoisPlanifiee(faits: Faits, m: Mois): ChargeDuMois | null {
   return jours > 0 ? { jours, source: 'planning', recettesSansTarif: 0 } : null;
 }
 
-/** La facture tombe-t-elle dans la fenêtre de la mission ? */
-function dansLaFenetre(mission: Mission, date: DateISO): boolean {
-  if (mission.debut !== null && date < mission.debut) return false;
-  if (mission.fin !== null && date > mission.fin) return false;
-  return true;
-}
-
 /**
  * Ce que chaque mission a produit.
  *
@@ -238,25 +231,20 @@ function dansLaFenetre(mission: Mission, date: DateISO): boolean {
  * ─────────────────────────────────────────────────────────────────────────
  *
  * Une facture ne porte pas le nom de la mission qui l'a produite : le modèle
- * ne relie que le CLIENT. Le rattachement précédent donnait donc l'intégralité
+ * ne relie que le CLIENT. Le rattachement d'origine donnait donc l'intégralité
  * du chiffre d'affaires du client à la PREMIÈRE de ses missions, et zéro aux
  * suivantes — un écran qui affichait « 0 € » en face d'une mission qui
  * facturait, sans rien dire de l'approximation.
  *
- * Le rattachement se fait maintenant par client ET par FENÊTRE DE DATES.
- * Deux missions successives chez le même client — le cas courant — se
- * séparent alors correctement, chacune prenant les factures émises pendant
- * qu'elle courait. Il ne reste d'ambiguïté que pour deux missions d'un même
- * client actives EN MÊME TEMPS : là, aucune date ne peut trancher, et
- * `missionsQuiPartagent` le dit plutôt que de choisir au hasard.
+ * Le rattachement est celui de `rattacherFactures` (lot 50) : la référence de
+ * commande quand la facture la porte, sinon la période qu'elle facture. Deux
+ * missions successives chez le même client se séparent, et la facture émise
+ * après la fin d'une mission lui revient encore. Quand deux missions courent
+ * dans la même période facturée, aucune date ne tranche : la facture revient
+ * aux deux, et `missionsQuiPartagent` le dit plutôt que de choisir au hasard.
  *
  * Les brouillons sont exclus : sans date d'émission, une facture n'a pas été
  * envoyée, et un devis en attente n'est pas du chiffre d'affaires.
- *
- * Le « client » d'une mission, ce sont tous ceux à qui elle peut facturer : son
- * payeur, et ceux de ses plages quand elle se facture client par client
- * (schéma 24). Sans eux, les journées payées en direct par un client final
- * disparaîtraient du facturé de la mission qui les a produites.
  *
  * Exportée pour le carnet de commandes (lot 48), qui en lit le facturé et
  * l'encaissé : une seconde attribution des factures aux missions aurait donné
@@ -264,19 +252,15 @@ function dansLaFenetre(mission: Mission, date: DateISO): boolean {
  */
 export function lignesDeMission(faits: Faits): readonly LigneMission[] {
   const missions = [...faits.missions].sort(prioriteMission);
-  const payeurs = new Map(missions.map((m) => [m, payeursDeLaMission(m)]));
-  const facturable = (m: Mission, r: Faits['recettes'][number]): boolean =>
-    payeurs.get(m)?.has(r.clientNom) === true && r.emiseLe !== null && dansLaFenetre(m, r.emiseLe);
+  const rattachees = rattacherFactures(faits.missions, faits.recettes);
 
   return missions.map((mission) => {
-    const siennes = faits.recettes.filter((r) => facturable(mission, r));
+    const siennes = faits.recettes.filter((r) => rattachees.get(r.id)?.includes(mission.id) === true);
 
-    // Les missions qui peuvent facturer au même client et dont la fenêtre
-    // couvre au moins une de ces factures — celle-ci comprise. Au-delà de une,
-    // le montant est celui du client et l'écran l'annonce.
-    const missionsQuiPartagent = missions.filter((autre) =>
-      siennes.some((r) => facturable(autre, r))
-    ).length;
+    // Les missions qui se partagent au moins une de ces factures — celle-ci
+    // comprise. Au-delà de une, le montant est celui du client et l'écran
+    // l'annonce.
+    const missionsQuiPartagent = new Set(siennes.flatMap((r) => rattachees.get(r.id) ?? [])).size;
 
     const facture = siennes.reduce<number>((s, r) => s + r.montant, 0);
     const encaisse = siennes

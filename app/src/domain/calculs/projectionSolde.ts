@@ -43,9 +43,20 @@ import { euros } from '../types';
 /** Ce qu'un mois futur apporte, et ce qu'il coûte. */
 export interface MoisProjete {
   readonly mois: Mois;
-  /** Encaissements attendus, avant charges. */
+  /** Encaissements attendus, avant charges, hors taxes : le chiffre d'affaires. */
   readonly encaissements: Euros;
-  /** Part de ces encaissements qui part en cotisations et impôt. */
+  /**
+   * La TVA qui arrive avec eux, chez un redevable : elle entre sur le compte et
+   * n'est pas à soi — le disponible la retire aussitôt, le solde la garde
+   * jusqu'à sa déclaration. Zéro en franchise.
+   */
+  readonly tva: Euros;
+  /** La part de `charges` qui est l'impôt sur le revenu au barème (lot 50). */
+  readonly impot: Euros;
+  /**
+   * Le dû que ces encaissements font naître : cotisations et contributions au
+   * taux, l'impôt sur le revenu au barème, la TVA encaissée.
+   */
   readonly charges: Euros;
   /** Dépenses courantes attendues. Hypothèse, jamais un fait. */
   readonly depenses: Euros;
@@ -108,8 +119,16 @@ export interface ProjectionSolde {
 /** Ce qu'on sait d'un mois à venir, avant tout calcul. */
 export interface EntreeMois {
   readonly mois: Mois;
-  /** Encaissements attendus : factures échues ce mois, revenu prévu au planning. */
+  /** Encaissements attendus, hors taxes : factures échues ce mois, revenu prévu au planning. */
   readonly encaissements: Euros;
+  /** La TVA encaissée avec eux ; zéro, ou absente, en franchise. */
+  readonly tva?: Euros;
+  /**
+   * L'impôt sur le revenu au barème qu'ils font naître (lot 50) — un montant et
+   * non un taux : il se lit sur la provision d'impôt de l'année, qui n'est pas
+   * proportionnelle d'un mois sur l'autre une fois les acomptes retranchés.
+   */
+  readonly impot?: Euros;
 }
 
 /**
@@ -178,8 +197,11 @@ export function projeterDisponible(
   let courant = depart as number;
   const sansVersement: number[] = [];
   const detail = entrees.map((e) => {
-    const charges = e.encaissements * tauxDeCharges;
-    courant += e.encaissements - charges - depensesMensuelles;
+    // La TVA et l'impôt naissent avec l'encaissement, comme les cotisations :
+    // le disponible les retire ce jour-là, le solde à leur échéance.
+    const tva = e.tva ?? 0;
+    const charges = e.encaissements * tauxDeCharges + (e.impot ?? 0) + tva;
+    courant += e.encaissements + tva - charges - depensesMensuelles;
     sansVersement.push(courant);
     return { entree: e, charges };
   });
@@ -195,10 +217,12 @@ export function projeterDisponible(
   const mois = detail.map(({ entree, charges }, i) => {
     const payees = chargesPayees?.[i] ?? 0;
     const avecVersement = (sansVersement[i] ?? 0) - montant * (i + 1);
-    if (solde !== null) solde += entree.encaissements - payees - depensesMensuelles - montant;
+    if (solde !== null) solde += entree.encaissements + (entree.tva ?? 0) - payees - depensesMensuelles - montant;
     return {
       mois: entree.mois,
       encaissements: entree.encaissements,
+      tva: entree.tva ?? euros(0),
+      impot: entree.impot ?? euros(0),
       charges: euros(Math.round(charges)),
       depenses: depensesMensuelles,
       sansVersement: euros(Math.round(sansVersement[i] ?? 0)),

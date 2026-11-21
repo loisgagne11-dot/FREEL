@@ -975,6 +975,8 @@ droite du nom — devenu la colonne Facturé.
 sa fenêtre de dates. Une facture émise après la fin (l'audit ponctuel du jeu
 d'essai, fini le 8 mai, facturé le 12) n'est rattachée à aucune mission —
 défaut antérieur au lot, signalé, non corrigé ici (`lignesDeMission`).
+**→ Corrigé au lot 50, phase A** (voir plus bas) : la période facturée
+rattache la facture du 12 mai à l'audit.
 
 ## Lot 49 (21/11) — la Trésorerie à douze mois
 
@@ -1030,3 +1032,65 @@ encaissements n'entre pas dans la projection (le taux ne porte que la
 formation) — antérieur au lot, inchangé. Les entrées prévues sont hors taxes,
 comme le pipeline l'a toujours été : pour un redevable de la TVA, l'entrée réelle
 est plus haute d'autant — antérieur, signalé.
+**→ Corrigés tous deux au lot 50, phase A** (ci-dessous).
+
+## Lot 50, phase A (21/11) — trois justesses, avant l'écran Analyse
+
+Trois nombres faux avant d'être laids, venus des lots 48 et 49. Aucun écran
+redessiné. La démonstration (versement libératoire, franchise, factures émises
+pendant leurs missions) garde tous ses nombres — les tests qui les tiennent
+sont inchangés ; c'est le jeu d'essai (au barème, redevable depuis juin, un
+audit facturé après sa fin) qui bouge. Chaque ligne est tenue par un test
+nommé, toutes éprouvées par mutation (code inversé, test qui tombe : compte
+rendu du lot).
+
+| Nombre lu | Où | Avant | Après |
+|---|---|---|---|
+| Facturé, encaissé, reste, état d'une mission † | Activité › Missions (tableau), carnet de commandes | Factures émises entre le début et la fin de la mission : l'audit du jeu d'essai (fini le 8 mai, facturé le 12) — 0 €, « Terminée » | Une seule règle, `rattacherFactures` : la référence de commande de la facture quand une mission la porte ; un avoir suit la facture qu'il annule ; sinon la **période facturée** — depuis la facture précédente au même client jusqu'à l'émission —, aux missions signées qui la touchent. L'audit : **2 400 € facturés, 2 400 € encaissés, « Terminée, soldée »** ; l'atelier de formation, son avoir et l'atelier de suivi, hors mission, ne lui reviennent pas |
+| « partagé avec N autre(s) » † | Activité › Missions, sous le facturé | Deux missions actives en même temps | Deux missions dans la même période facturée : simultanées, ou la dernière facture de l'une partie après le début de l'autre (la fenêtre la donnait à la seconde seule, sans le dire) |
+| Réalisé d'un mois, par mission † | Activité › Analyse, composition d'un mois | Copie de la fenêtre de dates (`dansLaFenetre`), qui ne voyait ni la facture d'après la fin, ni les payeurs des plages | La même règle que le facturé de la mission — la copie a disparu |
+| Disponible prévu, versement tenable, point bas † | Trésorerie, courbe et titre | Au barème, le taux de charges ne portait que la formation : l'impôt des encaissements à venir n'entrait nulle part | Le disponible retire, mois par mois, l'impôt que la provision chiffre déjà pour l'année (`resteSurEncaissementsAVenir`, réparti au prorata) ; l'année suivante, au taux moyen de l'impôt de l'année. Jeu d'essai au 15 décembre : **4 551 → 3 770 € par mois**, toujours jusqu'en novembre 2027 (point bas 8 007 → 8 005 €) |
+| Impôt sorti du solde prévu † | Trésorerie, sorties d'un mois | Le reste de l'impôt de l'année seul, daté sur son propre calendrier | Le solde de l'année entier (reste + à venir) posé à ses prélèvements de l'automne suivant ; la part due aujourd'hui et la part à venir suivent un calendrier (au-delà de 300 €, quatre prélèvements) |
+| Solde prévu d'un redevable † | Trésorerie, courbe (infobulle), tableau | Entrées hors taxes : la TVA sortait à sa déclaration sans être entrée | La TVA entre avec l'encaissement (celle de la facture émise ; le taux normal du barème pour le planning, rien pour un client établi hors de France) et sort à la déclaration qui couvre son mois — CA3 du mois ou du trimestre, CA12 de l'année (régime simplifié : acomptes sans montant, toute la TVA posée à la CA12). Le disponible ne la voit jamais. Jeu d'essai, fin décembre : **32 345 → 34 566 €** |
+| Entrées d'un mois † | Trésorerie, « Ce qui entre et ce qui sort », phrase et tableau | Hors taxes, prévues comme constatées | TVA comprise — ce qui entre sur le compte, comme le solde dérivé la compte : jeu d'essai, janvier « 2 160 € de factures à échéance et 8 928 € du planning signé » (1 800 et 7 440 hors taxes) ; « Net du mois » juste chez un redevable |
+| Hypothèses de la projection † | Trésorerie, « Voir en tableau » | « Le dû grandit de N % de chaque encaissement » seulement | La même phrase, plus — quand ils existent — l'impôt sur le revenu des douze mois (« lu sur ta provision d'impôt : il part avec le solde de son année, à l'automne suivant ») et la TVA encaissée (« quitte le compte à la déclaration qui la reverse ») ; rien de plus sur la démonstration |
+
+**Reste** : le franchissement du seuil de TVA *prévu* par le pipeline
+(« franchi en août 2026 » sur la démonstration) ne fait pas encore porter de
+TVA aux encaissements qui le suivent — la projection ne lit la redevabilité que
+sur les faits (`regimeTvaAu`). Les acomptes de prélèvement à la source de
+l'année suivante, s'ils sont saisis d'avance, s'ajoutent à l'impôt né des
+encaissements de cette année-là (erreur dans le sens prudent).
+
+## Lot 50, phase B (21/11) — sept indicateurs calculés, pas encore affichés
+
+Calculés et testés (`selecteurs.analyse`), sur la démonstration et le jeu
+d'essai ; **aucun n'est encore à l'écran** — l'écran Analyse attend la
+validation de sa maquette (`direction/analyse.html`). La colonne « Actuelle »
+du §3 ne les compte donc pas : un calcul sans écran n'est pas un indicateur
+livré (la leçon de V9).
+
+| Indicateur | Formule retenue | Démonstration, 10/06/2026 | Jeu d'essai, 15/12/2026 |
+|---|---|---|---|
+| Net de poche de l'année | Encaissé HT − cotisations − formation − impôt − CFE − dépenses ; impôt `null` (« avant impôt ») quand il ne se calcule pas | 18 077 € (22 720 − 2 908 − 45 − 500 − 0 − 1 190) | 44 324 € |
+| Mois lissé, et sa tendance | Net des douze derniers mois entiers ÷ mois d'activité comptés ; net de chacun | 2 500 € par mois, sur huit mois | 3 961 € par mois, sur douze |
+| Taux de prélèvement | (Cotisations + formation + impôt + CFE) ÷ encaissé | 15 % | 37 % (au barème, foyer à deux parts) |
+| Jours nécessaires par mois | (Besoin + dépenses du mois) ÷ (tarif des contrats × (1 − taux)) | 5,6 jours (2 300 € à 502 €) | 10 jours |
+| Tarif plancher | (Besoin + dépenses) annuels ÷ (jours de l'occupation × (1 − taux)) ; refusé sous trois mois | 134 € (250 jours) | 238 € |
+| Objectif en net | (Objectif × (1 − taux) − dépenses annuelles) ÷ 12 | 72 000 € → 5 018 € par mois | 80 000 € → 4 157 € |
+| Encours par ancienneté | Non échues, 1–30, 31–60, au-delà ; somme = reste à encaisser | 4 810 € (2) · 1 200 € (1) · 0 · 0 | 9 000 € non échus |
+| Comparaison avec l'an passé | Même période, encaissé et jours au planning ; refusée sous douze mois | Refusée : « viendra en octobre 2026 » | 72 480 € et 197 jours, contre 23 760 € et 134 |
+
+Deux écarts à la formule de `AUDIT-PRODUIT-ET-INTERFACE.md` §5, dits ici :
+les **dépenses** entrent dans les jours nécessaires (sans elles, le net du
+mois tombait sous le besoin de leur montant) et l'objectif inverse se calcule
+`(net + dépenses) ÷ (1 − taux)` et non `net ÷ (1 − taux) + dépenses` (les
+dépenses se paient sur un chiffre d'affaires déjà prélevé). Le **tarif** est
+celui des contrats sur les journées du planning, pas le « tarif effectif » :
+voir la note qui suit.
+
+**Rencontré, non corrigé (hors lot)** : le « tarif effectif » de « Ce qu'une
+journée te rapporte » divise ce qui est déjà facturé par les journées du
+planning de **toute** l'année, à venir comprises — la démonstration lit
+400 € « effectifs » et « 102 € perdus par journée » au 10 juin, quand rien
+n'est perdu : juin et juillet ne sont simplement pas encore facturés.

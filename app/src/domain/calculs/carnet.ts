@@ -30,8 +30,8 @@
  * Le nom reste donc la clé, et la propagation la remplace.
  */
 
-import { type PayeurDeMission, payeursDeLaMission } from './brouillon';
-import type { Rythme } from './planning';
+import { payeursDeLaMission } from './brouillon';
+import { type FactureARattacher, type MissionARattacher, rattacherFactures } from './rattachementFactures';
 
 /** Ce qu'un client doit porter pour être exploitable. */
 export interface ClientCarnet {
@@ -159,38 +159,34 @@ export function peutSupprimerClient(
 /**
  * Une mission peut-elle être supprimée ?
  *
- * Non si des recettes ont été émises pour son client sur sa période : une
- * facture émise ne se retire pas du registre, et supprimer la mission qui la
- * justifie rendrait sa présence inexplicable en contrôle.
+ * Non si une facture lui revient : une facture émise ne se retire pas du
+ * registre, et supprimer la mission qui la justifie rendrait sa présence
+ * inexplicable en contrôle. « Lui revient » se lit par `rattacherFactures`, la
+ * règle du facturé de la mission : la fenêtre de dates qui vivait ici laissait
+ * supprimer l'audit du jeu d'essai, dont la facture est partie quatre jours
+ * après la fin.
  *
- * « Son client », ce sont tous ceux qui peuvent recevoir une facture de la
- * mission : son payeur, et ceux des plages quand elle se facture client par
- * client (schéma 24). Les factures envoyées en direct à un client final sont
- * justifiées par cette mission comme celles de l'agence.
+ * Un brouillon d'un de ses payeurs — le payeur de la mission, ceux des plages
+ * quand elle se facture client par client — la retient aussi : sans date
+ * d'émission, rien ne permet d'écarter le rattachement.
  */
 export function peutSupprimerMission(
-  mission: PayeurDeMission & {
-    readonly debut: string | null;
-    readonly fin: string | null;
-    readonly entites?: readonly { readonly rythmes: readonly Rythme[] }[];
-  },
-  recettes: readonly { readonly clientNom: string; readonly emiseLe: string | null }[]
+  mission: MissionARattacher,
+  missions: readonly MissionARattacher[],
+  recettes: readonly FactureARattacher[]
 ): RefusCarnet | null {
-  const payeurs = new Set([...payeursDeLaMission({ ...mission, entites: mission.entites ?? [] })]
-    .map((n) => n.trim().toLowerCase()));
-  const liees = recettes.filter((r) => {
-    if (!payeurs.has(r.clientNom.trim().toLowerCase())) return false;
-    if (r.emiseLe === null) return true;
-    if (mission.debut !== null && r.emiseLe < mission.debut) return false;
-    if (mission.fin !== null && r.emiseLe > mission.fin) return false;
-    return true;
-  });
+  const payeurs = new Set([...payeursDeLaMission(mission)].map((n) => n.trim().toLowerCase()));
+  const toutes = missions.some((m) => m.id === mission.id) ? missions : [...missions, mission];
+  const rattachees = rattacherFactures(toutes, recettes);
+  const liees = recettes.filter((r) => (r.emiseLe === null
+    ? payeurs.has(r.clientNom.trim().toLowerCase())
+    : rattachees.get(r.id)?.includes(mission.id) === true));
 
   if (liees.length === 0) return null;
   return {
     motif: 'rattachements_existants',
     message: `${liees.length} recette${liees.length > 1 ? 's' : ''} de ce client `
-      + 'relève(nt) de la période de cette mission. Une facture émise ne se retire '
+      + `${liees.length > 1 ? 'reviennent' : 'revient'} à cette mission. Une facture émise ne se retire `
       + 'pas du registre, et supprimer la mission qui la justifie rendrait sa '
       + 'présence inexplicable en contrôle.'
   };

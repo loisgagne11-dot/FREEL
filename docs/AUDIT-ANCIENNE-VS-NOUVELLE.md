@@ -716,3 +716,14 @@ chaque geste de l'ancien écran est ATTEINT, son test repris à travers le nouve
 | Seuils franchis par le pipeline, jours facturables | 🆕 | Factures émises à leur échéance, planning signé au délai du client ; jours au tarif moyen des missions signées de l'année, refusés sans tarif |
 | Vue Année | 🆕 | Disponible de chaque fin de mois, entrées et sorties, capacité de versement |
 | Migration 27 → 28 | 🟢 | Retire `partGardeeAuVersement`, pose `entreprise.partGardeeRetiree` (le pourcentage) quand il valait plus que 0 ; la reprise de l'ancienne version n'en pose aucune ; un pourcentage venu d'ailleurs hors de 1 à 100 est refusé ; un dossier 29 est refusé |
+
+## Lot 50, phase A (21/11) — ce qui change dans les fonctions
+
+Aucun écran, aucun geste retiré. Une règle déplacée, et la suppression d'une
+mission qui la suit.
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Supprimer une mission (refus motivé si une facture en relève) | 🟢 plus juste | Le refus lit la règle du facturé (`rattacherFactures`) au lieu de sa propre fenêtre de dates : une facture partie après la fin retient la mission (l'audit du jeu d'essai se supprimait en laissant sa facture au registre sans rien qui l'explique) ; une facture qu'une référence de commande donne à une autre mission ne la retient plus ; un brouillon d'un de ses payeurs la retient toujours. Message : « N recette(s) de ce client revient/reviennent à cette mission » |
+| Le facturé d'une mission, la composition d'un mois | 🟢 une source | Une seule fonction (`calculs/rattachementFactures`) ; la copie de `selecteurs.performance` a disparu |
+| Projection de trésorerie | 🟢 plus juste | Au barème, l'impôt des encaissements à venir ; chez un redevable, la TVA encaissée et sortie à sa déclaration (voir `AUDIT-GRAPHES-ET-INDICATEURS.md`, lot 50) |

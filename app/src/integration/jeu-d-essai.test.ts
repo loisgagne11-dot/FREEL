@@ -8,7 +8,8 @@ import { VERSION_SCHEMA, type Faits, motifRefusFaits } from '../state/schema';
 import { debutTvaEffectif, dateDuJour, etatPilote, fluxDuMois, moisCourant, provisionIrDe, recettesEncaissees, sousAcreLe, soldeImpotPrecedentDe, solde, caEncaisseAnnee, tvaDueDepuisDe } from '../state/selecteurs';
 import { aTraiter } from '../state/selecteurs.aTraiter';
 import { finAcreDe } from '../state/selecteurs.reglages';
-import { etatActivite, craDuMoisParMission, tauxCotisationsAu } from '../state/selecteurs.activite';
+import { etatActivite, craDuMoisParMission, lignesDeMission, tauxCotisationsAu } from '../state/selecteurs.activite';
+import { rattacherFactures } from '../domain/calculs/rattachementFactures';
 import { dossierTvaDuTrimestre, etatArgent } from '../state/selecteurs.argent';
 import { journeesDuMois } from '../state/selecteurs.cra';
 import { chargerJeu, chargerJeuBrut, faitsAu, le } from '../test/jeu-d-essai';
@@ -549,6 +550,29 @@ describe('la mission via agence', () => {
     const janvier = final('2027-01');
     expect(decembre?.cra.montant).toBeCloseTo((decembre?.cra.totalJours ?? 0) * 480, 2);
     expect(janvier?.cra.montant).toBeCloseTo((janvier?.cra.totalJours ?? 0) * 500, 2);
+  });
+});
+
+/*
+ * Le facturé d'une mission (lot 50). L'audit ponctuel finit le 8 mai et part
+ * en facture le 12 : la fenêtre de dates ne le rattachait à rien, et la
+ * mission se lisait « Terminée » sans un euro facturé. Les deux ateliers que
+ * le même client achète ensuite, hors mission, ne lui reviennent pas.
+ */
+describe('le facturé de l’audit ponctuel', () => {
+  const audit = () => lignesDeMission(jeu).find((l) => l.mission.id === 'mis-audit');
+
+  it('compte la facture émise quatre jours après la fin de la mission', () => {
+    expect(audit()?.facture).toBe(2400);
+    expect(audit()?.encaisse).toBe(2400);
+    expect(audit()?.missionsQuiPartagent).toBe(1);
+  });
+
+  it('laisse l’atelier de formation, son avoir et l’atelier de suivi hors de la mission', () => {
+    const rattachees = rattacherFactures(jeu.missions, jeu.recettes);
+    for (const id of ['rec-formation', 'rec-avoir-formation', 'rec-suivi-decembre']) {
+      expect(rattachees.get(id), id).toEqual([]);
+    }
   });
 });
 

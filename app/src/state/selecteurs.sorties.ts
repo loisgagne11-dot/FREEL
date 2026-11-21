@@ -24,10 +24,12 @@ import { periodeDuMois } from '../domain/calculs/declarations';
 import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import { prelevementsDuSolde } from '../domain/bareme/soldeImpot';
 import type { SortieDeCharge } from '../domain/calculs/sortiesDeCharges';
+import type { EntreeMois } from '../domain/calculs/projectionSolde';
+import type { ProvisionImpotRevenu } from '../domain/calculs/provisionImpotRevenu';
 import type { Faits } from './schema';
 import {
   type EtatPilote, dateDuJour, echeancesDuComptePro, periodesUrssafEffectives, recettesEncaissees,
-  sousAcreLe, tauxImpotAu
+  sousAcreLe, tauxImpotAu, vlAu
 } from './selecteurs';
 import { soldeImpotPrevuDe } from './selecteurs.impotCalendrier';
 
@@ -97,15 +99,11 @@ export function sortiesDuDu(
   /* Un refus d'une des deux parts retire TOUT l'impôt du dû
      (`impotRevenuAProvisionner`) : le calendrier ne date que ce que le dû
      compte, sinon le solde prévu baisserait d'un impôt que le dû n'a pas. */
-  const ir = pilote.provisionImpotRevenu;
-  const irRefuse = ir?.statut === 'refuse' || pilote.soldeImpotPrecedent?.statut === 'refuse';
-  if (!irRefuse && ir !== null && ir.valeur.resteAProvisionner > 0) {
-    const reste = ir.valeur.resteAProvisionner;
-    const p = prelevementsDuSolde(reste, ir.valeur.annee + 1);
-    if (p.statut === 'refuse') ajouter('impot', SANS_DATE, reste);
-    else for (const x of p.valeur) ajouter('impot', x.date, x.montant);
+  const ir = provisionComptee(pilote);
+  if (ir !== null) {
+    for (const x of calendrierDuSolde(ir)) ajouter('impot', x.le, ir.resteAProvisionner * x.part);
+    for (const x of soldeImpotPrevuDe(faits, maintenant)) ajouter('impot', x.date, x.montant);
   }
-  if (!irRefuse) for (const x of soldeImpotPrevuDe(faits, maintenant)) ajouter('impot', x.date, x.montant);
 
   const tva = pilote.provisionsParNature.tva - voletConstateTva(echeancesDuComptePro(faits));
   if (tva > 0.004) ajouter('tva', limiteTva() ?? SANS_DATE, tva);
@@ -119,28 +117,126 @@ function voletConstateTva(echeances: readonly Echeance[]): number {
 }
 
 /**
- * Ce que les encaissements attendus feront naître, et quand cela sortira : la
- * part de charges — celle que le disponible retire déjà — à la limite de la
- * déclaration URSSAF de leur mois. Sous le versement libératoire, l'impôt
- * part avec ; au barème, le taux ne porte que la formation (l'impôt de
- * l'année suivante n'est pas une sortie de ces douze mois).
+ * La provision d'impôt de l'année, quand le dû la compte. Un refus d'une des
+ * deux parts retire TOUT l'impôt du dû (`impotRevenuAProvisionner`) : le
+ * calendrier ne date que ce que le dû compte, sinon le solde prévu baisserait
+ * d'un impôt que le dû n'a pas. `null` aussi sous le versement libératoire.
+ */
+function provisionComptee(pilote: EtatPilote): ProvisionImpotRevenu | null {
+  const ir = pilote.provisionImpotRevenu;
+  if (ir === null || ir.statut === 'refuse' || pilote.soldeImpotPrecedent?.statut === 'refuse') return null;
+  return ir.valeur;
+}
+
+/**
+ * Le solde de l'impôt d'une année, posé à ses prélèvements de l'automne
+ * suivant — en parts du total, pour que la part due aujourd'hui et celle des
+ * encaissements à venir suivent UN calendrier.
+ *
+ * Le calendrier se calcule sur le solde ENTIER : au-delà de 300 €, il se
+ * prélève en quatre fois. Daté part par part, un reste de 200 € et 250 € à
+ * venir tombaient chacun en une fois en septembre, quand l'avis en fera
+ * quatre prélèvements de 112,50 €.
+ */
+function calendrierDuSolde(ir: ProvisionImpotRevenu): readonly { readonly le: DateISO; readonly part: number }[] {
+  const total = ir.resteAProvisionner + ir.resteSurEncaissementsAVenir;
+  if (total <= 0) return [];
+  const p = prelevementsDuSolde(euros(total), ir.annee + 1);
+  return p.statut === 'refuse'
+    ? [{ le: SANS_DATE, part: 1 }]
+    : p.valeur.map((x) => ({ le: x.date, part: x.montant / total }));
+}
+
+/**
+ * L'impôt sur le revenu au barème que chaque mois d'encaissements attendus
+ * fait naître — lu sur la provision de l'année, jamais recalculé (lot 50).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE DISPONIBLE PRÉVU NE RETIRAIT QUE LA FORMATION
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Au barème, le taux de charges ne porte que la CFP : l'impôt des
+ * encaissements à venir n'entrait nulle part. Le disponible prévu — et le
+ * versement tenable qui en sort — étaient trop hauts de tout l'impôt de
+ * l'année encore à encaisser.
+ *
+ * L'année en cours : la provision le chiffre déjà, `resteSurEncaissementsAVenir`
+ * — l'impôt de l'année projetée, acomptes et part déjà encaissée retirés —,
+ * réparti au prorata des mois. L'année suivante, qu'aucune provision ne couvre
+ * encore : le taux moyen de l'impôt de l'année en cours sur son chiffre
+ * d'affaires projeté, une hypothèse. Ses acomptes de prélèvement à la source
+ * ne sont pas retranchés — aucun avis ne les a encore fixés ; saisis d'avance,
+ * ils compteraient deux fois, dans le sens qui retient trop, pas trop peu.
+ *
+ * Un mois sous le versement libératoire n'en fait naître aucun : l'impôt y
+ * part avec l'URSSAF, au taux.
+ */
+export function impotDesAttendus(
+  faits: Faits,
+  pilote: EtatPilote,
+  attendus: readonly { readonly mois: Mois; readonly encaissements: Euros }[]
+): readonly Euros[] {
+  const ir = provisionComptee(pilote);
+  if (ir === null) return attendus.map(() => euros(0));
+  const auBareme = (m: Mois) => !vlAu(faits, m);
+  const annee = String(ir.annee);
+  const deLAnnee = attendus
+    .filter((a) => a.mois.startsWith(annee) && auBareme(a.mois))
+    .reduce((t, a) => t + a.encaissements, 0);
+  const tauxSuivante = ir.assiette > 0 ? ir.impotAnneeProjetee / ir.assiette : 0;
+  return attendus.map((a) => {
+    if (!auBareme(a.mois) || a.encaissements <= 0) return euros(0);
+    if (a.mois.startsWith(annee)) {
+      return euros(deLAnnee > 0 ? ir.resteSurEncaissementsAVenir * (a.encaissements / deLAnnee) : 0);
+    }
+    return euros(a.mois > annee ? a.encaissements * tauxSuivante : 0);
+  });
+}
+
+/**
+ * Ce que les encaissements attendus feront naître, et quand cela sortira :
+ *
+ *  · les cotisations et contributions au taux — celles que le disponible
+ *    retire déjà —, à la limite de la déclaration URSSAF de leur mois ; sous le
+ *    versement libératoire, l'impôt part avec ;
+ *  · l'impôt sur le revenu au barème (`impotDesAttendus`), avec le solde de
+ *    son année, à l'automne suivant ;
+ *  · la TVA encaissée par un redevable, à la déclaration qui la reverse — CA3
+ *    du mois ou du trimestre, CA12 de l'année (`limiteTva`, lue sur les
+ *    obligations). Sous le régime simplifié, les acomptes de juillet et de
+ *    décembre n'ont pas de montant connu : toute la TVA de l'année est posée à
+ *    la CA12, ce que l'avis d'acompte corrige.
  */
 export function sortiesAVenir(
   faits: Faits,
-  attendus: readonly { readonly mois: Mois; readonly encaissements: Euros }[],
+  pilote: EtatPilote,
+  attendus: readonly EntreeMois[],
   tauxDeCharges: number,
-  maintenant: Date
+  maintenant: Date,
+  limiteTva: (m: Mois) => DateISO | null
 ): readonly SortieDeCharge[] {
   const aujourdhui = dateDuJour(maintenant);
   const periodicite = faits.entreprise.urssafPeriodicite;
-  return attendus.flatMap((a) => {
-    const montant = a.encaissements * tauxDeCharges;
-    if (montant <= 0.004) return [];
-    return [{
-      nature: 'urssaf' as const,
-      le: periodeDuMois(a.mois, periodicite, aujourdhui).limite,
-      montant: euros(montant),
-      origine: 'a_venir' as const
-    }];
-  });
+  const sorties: SortieDeCharge[] = [];
+  const ajouter = (nature: SortieDeCharge['nature'], le: DateISO, montant: number): void => {
+    if (montant > 0.004) sorties.push({ nature, le, montant: euros(montant), origine: 'a_venir' });
+  };
+
+  for (const a of attendus) {
+    ajouter('urssaf', periodeDuMois(a.mois, periodicite, aujourdhui).limite, a.encaissements * tauxDeCharges);
+    if ((a.tva ?? 0) > 0.004) ajouter('tva', limiteTva(a.mois) ?? SANS_DATE, a.tva ?? 0);
+  }
+
+  const ir = provisionComptee(pilote);
+  if (ir !== null) {
+    const annee = String(ir.annee);
+    const impot = (garder: (m: Mois) => boolean) =>
+      attendus.filter((a) => garder(a.mois)).reduce((t, a) => t + (a.impot ?? 0), 0);
+    const cetteAnnee = impot((m) => m.startsWith(annee));
+    for (const x of calendrierDuSolde(ir)) ajouter('impot', x.le, cetteAnnee * x.part);
+    // L'année suivante se paie à l'automne d'après : au-delà des douze mois,
+    // elle reste dans le dû de la fin, où le dessin la montre.
+    ajouter('impot', SANS_DATE, impot((m) => !m.startsWith(annee)));
+  }
+  return sorties;
 }

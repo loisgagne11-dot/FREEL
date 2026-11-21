@@ -144,13 +144,13 @@ export function supprimerClient(id: string): string | null {
   return null;
 }
 
-/** Supprime une mission, si aucune recette de son client ne relève de sa période. */
+/** Supprime une mission, si aucune facture ne lui revient (`rattacherFactures`). */
 export function supprimerMission(id: string): string | null {
   const actuel = faitsCourants();
   const existante = actuel.missions.find((m) => m.id === id);
   if (existante === undefined) return 'Mission introuvable.';
 
-  const refus = peutSupprimerMission(existante, actuel.recettes);
+  const refus = peutSupprimerMission(existante, actuel.missions, actuel.recettes);
   if (refus !== null) return refus.message;
 
   ecrireFaits({ ...actuel, missions: actuel.missions.filter((m) => m.id !== id) });

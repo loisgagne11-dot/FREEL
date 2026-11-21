@@ -32,6 +32,7 @@ import type { DateISO, Euros, Mois, Resolution } from '../domain/types';
 import { euros } from '../domain/types';
 import { tauxImpotEtContributions } from '../domain/bareme';
 import { encoursDe } from '../domain/calculs/facturier';
+import { rattacherFactures } from '../domain/calculs/rattachementFactures';
 import { type CapaciteDuMois, capaciteDuMois } from '../domain/calculs/capaciteVersement';
 import type { Faits, Mission } from './schema';
 import { moisCourant, regimeDe, remunerationDuMois } from './selecteurs';
@@ -357,10 +358,10 @@ export function resteAEncaisserDuMois(
  * ─────────────────────────────────────────────────────────────────────────
  *
  * `Recette` ne porte pas de `missionId` : le modèle ne relie qu'un nom de
- * client. Le rattachement se reconstruit par client ET par fenêtre de dates, ce
- * qui sépare correctement deux missions successives d'un même client — le cas
- * courant. Il reste un cas que rien ne départage : deux missions d'un même
- * client qui couraient EN MÊME TEMPS. Aucune date ne tranche.
+ * client. Le rattachement est celui de `rattacherFactures` — la référence de
+ * commande, sinon la période facturée —, qui sépare deux missions successives
+ * d'un même client. Il reste un cas que rien ne départage : deux missions d'un
+ * même client qui courent dans la même période facturée.
  *
  * Choisir au hasard donnerait « 0 € » en face d'une mission qui facture.
  * Donner le même montant aux deux ferait un total supérieur au réalisé du mois.
@@ -431,13 +432,6 @@ export interface CompositionDuMois {
   readonly aEncaisser: ResteAEncaisserDuMois;
 }
 
-/** La facture tombe-t-elle dans la fenêtre de la mission ? */
-function dansLaFenetre(mission: Mission, date: DateISO): boolean {
-  if (mission.debut !== null && date < mission.debut) return false;
-  if (mission.fin !== null && date > mission.fin) return false;
-  return true;
-}
-
 /**
  * Ce qui compose le réalisé et l'encaissé d'un mois.
  *
@@ -457,6 +451,11 @@ export function compositionDuMois(
   const emises = faits.recettes.filter(
     (r) => r.emiseLe !== null && r.emiseLe.startsWith(m)
   );
+  // La règle du facturé d'une mission (`rattacherFactures`), et non une copie :
+  // la fenêtre de dates qui vivait ici ne voyait ni la facture émise après la
+  // fin, ni les payeurs des plages — la composition d'un mois et la ligne de la
+  // mission disaient deux facturés différents.
+  const rattachees = rattacherFactures(faits.missions, faits.recettes);
 
   // Les journées du planning, par mission. Même source que le CRA et que la
   // prévision : en produire une seconde garantirait qu'elles divergent.
@@ -476,11 +475,7 @@ export function compositionDuMois(
   const groupes = new Map<string, Groupe>();
 
   for (const r of emises) {
-    const emiseLe = r.emiseLe as DateISO;
-    const candidates = missions
-      .filter((mi) => mi.clientNom === r.clientNom && dansLaFenetre(mi, emiseLe))
-      .map((mi) => mi.id)
-      .sort();
+    const candidates = rattachees.get(r.id) ?? [];
     const cle = `${r.clientNom}\u0000${candidates.join('|')}`;
     const existant = groupes.get(cle);
     if (existant === undefined) {

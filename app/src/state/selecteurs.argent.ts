@@ -19,6 +19,7 @@
 import type { DateISO, Euros, Mois } from '../domain/types';
 import { euros, mois } from '../domain/types';
 import { assujettissementTva, plafondMicro, seuilsTvaPourAnnee } from '../domain/bareme';
+import { TAUX_TVA_NORMAL } from '../domain/bareme/tva';
 import type { SeuilsTva, StatutAssujettissementTva } from '../domain/bareme';
 import type { Resolution } from '../domain/types';
 import type { Echeance, VentilationProvisions } from '../domain/calculs/provisions';
@@ -27,16 +28,16 @@ import type { ProvisionImpotRevenu } from '../domain/calculs/provisionImpotReven
 import { encoursDe } from '../domain/calculs/facturier';
 import { decalerMois } from '../domain/calculs/periode';
 import type { Faits } from './schema';
-import { dateDuJour, etatPilote, moisCourant, remunerationDuMois } from './selecteurs';
+import { dateDuJour, etatPilote, moisCourant, regimeTvaAu, remunerationDuMois } from './selecteurs';
 import { tauxDeChargesAu } from './selecteurs.activite';
 import {
   type ProjectionSolde, depensesMensuellesMoyennes, projeterDisponible
 } from '../domain/calculs/projectionSolde';
 import { encaissementsAttendusDetailles, facturesSuivies } from './selecteurs.pipeline';
 import { type SortieDeCharge, sortiesParMois, totalDesSorties } from '../domain/calculs/sortiesDeCharges';
-import { dateDeLEtape } from '../domain/calculs/obligations';
+import { type Obligation, dateDeLEtape } from '../domain/calculs/obligations';
 import { decaler } from '../domain/calculs/calendrier';
-import { sortiesAVenir, sortiesDuDu } from './selecteurs.sorties';
+import { impotDesAttendus, sortiesAVenir, sortiesDuDu } from './selecteurs.sorties';
 import { obligationsEntre } from './selecteurs.obligations';
 
 // Réexport : les lecteurs existants (performance) importent d'ici.
@@ -340,7 +341,9 @@ export interface EtatProjection {
   readonly versementsPasses: readonly { readonly mois: Mois; readonly montant: Euros }[];
   /**
    * Les encaissements attendus de chaque mois, en deux parts — les factures
-   * émises, le planning signé —, alignés sur `projection.mois`.
+   * émises, le planning signé —, alignés sur `projection.mois`. TVA comprise :
+   * c'est ce qui entre sur le compte ; le chiffre d'affaires hors taxes est
+   * `projection.mois[i].encaissements`.
    */
   readonly attendus: readonly { readonly factures: Euros; readonly planning: Euros }[];
   /** Ce qui quitte le compte pour le dû, mois par mois, aligné sur `projection.mois`. */
@@ -399,7 +402,9 @@ export function etatProjection(
 ): EtatProjection {
   const m0 = moisCourant(maintenant);
   const moisProjetes = Array.from({ length: MOIS_PROJETES }, (_, i) => decalerMois(m0, i));
-  const { factures, planning } = encaissementsAttendusDetailles(faits, moisProjetes, maintenant);
+  const { factures, planning, tvaFactures, tvaPlanning } = encaissementsAttendusDetailles(
+    faits, moisProjetes, maintenant, tauxTvaDuPlanning(faits)
+  );
 
   const pilote = etatPilote(faits, faits.echeances, maintenant);
   const taux = tauxDeChargesAu(faits, m0);
@@ -407,11 +412,24 @@ export function etatProjection(
   // Faute de barème, zéro : la projection est alors trop haute d'un quart,
   // et `tauxDeCharges` à `null` oblige l'écran à le dire.
   const tauxRetenu = taux.statut === 'refuse' ? 0 : taux.valeur;
-  const entrees = moisProjetes.map((m) => ({
+  const hors = moisProjetes.map((m) => ({
     mois: m, encaissements: euros((factures.get(m) ?? 0) + (planning.get(m) ?? 0))
   }));
-  const duDate = sortiesDuDu(faits, pilote, maintenant, () => prochaineLimiteDeTva(faits, maintenant));
-  const sorties = sortiesParMois([...duDate, ...sortiesAVenir(faits, entrees, tauxRetenu, maintenant)], moisProjetes);
+  const impots = impotDesAttendus(faits, pilote, hors);
+  const entrees = hors.map((e, i) => ({
+    ...e,
+    tva: euros((tvaFactures.get(e.mois) ?? 0) + (tvaPlanning.get(e.mois) ?? 0)),
+    impot: impots[i] ?? euros(0)
+  }));
+  // Les obligations ne se lisent qu'une fois, et seulement s'il y a de la TVA
+  // à dater : un franchisé sans achat hors de France n'en a jamais besoin.
+  let obligations: readonly Obligation[] | null = null;
+  const tvas = (): readonly Obligation[] => (obligations ??= obligationsDeTva(faits, maintenant));
+  const duDate = sortiesDuDu(faits, pilote, maintenant, () => prochaineLimiteDeTva(tvas()));
+  const sorties = sortiesParMois([
+    ...duDate,
+    ...sortiesAVenir(faits, pilote, entrees, tauxRetenu, maintenant, (m) => limiteDeLaTvaDuMois(tvas(), m))
+  ], moisProjetes);
 
   return {
     depensesMensuelles: depenses,
@@ -425,8 +443,10 @@ export function etatProjection(
       soldeDepart: pilote.tresorerie.solde,
       chargesPayees: sorties.map(totalDesSorties)
     }),
+    // Ce qui entre sur le compte : la TVA d'un redevable arrive avec.
     attendus: moisProjetes.map((m) => ({
-      factures: euros(factures.get(m) ?? 0), planning: euros(planning.get(m) ?? 0)
+      factures: euros((factures.get(m) ?? 0) + (tvaFactures.get(m) ?? 0)),
+      planning: euros((planning.get(m) ?? 0) + (tvaPlanning.get(m) ?? 0))
     })),
     sorties,
     duDate,
@@ -443,17 +463,57 @@ export function etatProjection(
 
 
 /**
- * Le jour où la TVA à reverser quitte le compte : la prochaine déclaration de
- * TVA à payer — CA3, CA12 ou celle d'un achat autoliquidé —, lue sur les
- * obligations (lot 53), qui seules connaissent ces calendriers. Une
- * déclaration en retard compte : elle se paie maintenant. `null` quand aucune
- * n'est prévue sur l'année qui vient.
+ * Les déclarations de TVA de l'année qui vient — CA3, CA12, celle d'un achat
+ * autoliquidé —, lues sur les obligations (lot 53), qui seules connaissent ces
+ * calendriers. Une déclaration en retard compte : elle se paie maintenant.
  */
-function prochaineLimiteDeTva(faits: Faits, maintenant: Date): DateISO | null {
+function obligationsDeTva(faits: Faits, maintenant: Date): readonly Obligation[] {
   const aujourdhui = dateDuJour(maintenant);
   return obligationsEntre(faits, decaler(aujourdhui, -120), decaler(aujourdhui, 400), aujourdhui)
-    .flatMap((o) => (o.nature === 'tva' && o.paiement !== undefined && o.paiement.etat !== 'fait'
-      ? [dateDeLEtape(o.paiement)]
-      : []))
+    .filter((o) => o.nature === 'tva');
+}
+
+/**
+ * Le jour où la TVA à reverser quitte le compte : la prochaine déclaration de
+ * TVA à payer. `null` quand aucune n'est prévue sur l'année qui vient.
+ */
+function prochaineLimiteDeTva(tvas: readonly Obligation[]): DateISO | null {
+  return tvas
+    .flatMap((o) => (o.paiement !== undefined && o.paiement.etat !== 'fait' ? [dateDeLEtape(o.paiement)] : []))
     .sort()[0] ?? null;
+}
+
+/**
+ * Le jour où la TVA encaissée un mois donné quitte le compte : la déclaration
+ * dont la période le couvre — la CA3 du mois ou du trimestre, la CA12 de
+ * l'année. Une période à venir n'a pas encore de paiement (rien n'y est
+ * encaissé) : sa déclaration porte la même limite. Les acomptes du régime
+ * simplifié portent aussi un mois, mais pas de montant : ils ne règlent pas
+ * la TVA d'un mois désigné, et ne sont pas lus ici.
+ */
+function limiteDeLaTvaDuMois(tvas: readonly Obligation[], m: Mois): DateISO | null {
+  const trimestre = `${m.slice(0, 4)}-T${Math.floor((Number(m.slice(5, 7)) - 1) / 3) + 1}`;
+  const o = tvas.find((x) => (x.id.startsWith('ca3-') || x.id.startsWith('ca12-'))
+    && [m, trimestre, m.slice(0, 4)].includes(x.periode));
+  const etape = o?.paiement ?? o?.declaration;
+  return etape === undefined ? null : dateDeLEtape(etape);
+}
+
+/**
+ * Le taux de TVA auquel le planning sera facturé : le taux normal du barème
+ * quand l'entreprise est redevable au mois de la facture, rien sinon.
+ *
+ * Rien non plus pour un client établi hors de France : une prestation de
+ * services à un professionnel étranger se facture hors taxes, la TVA étant
+ * due par le preneur (CGI, art. 259 et 283-2). Lui prêter 20 % ferait entrer
+ * puis sortir une TVA qui n'existe pas.
+ */
+function tauxTvaDuPlanning(faits: Faits): (clientNom: string, emiseLe: DateISO) => number {
+  const pays = new Map(faits.clients.map((c) => [c.nom, c.pays.trim().toUpperCase()]));
+  return (clientNom, emiseLe) => {
+    const p = pays.get(clientNom) ?? '';
+    return regimeTvaAu(faits, emiseLe.slice(0, 7) as Mois) === 'assujetti' && (p === '' || p === 'FR')
+      ? TAUX_TVA_NORMAL.taux
+      : 0;
+  };
 }

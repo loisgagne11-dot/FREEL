@@ -269,13 +269,19 @@ describe('ce que chaque mission a produit', () => {
 
   /**
    * LE CAS QUI COMPTE. Deux missions successives chez le même client : chacune
-   * prend les factures émises pendant qu'elle courait. C'est la situation
+   * prend les factures de la période qu'elle a travaillée. C'est la situation
    * courante, et c'est celle qui affichait 0 €.
+   *
+   * La facture de printemps part le jour de sa fin (lot 50). Elle partait le
+   * 10 mars : sept semaines de printemps restaient alors sans facture jusqu'à
+   * celle du 10 juin, que la fenêtre de dates donnait à l'été seul — une
+   * certitude que les faits n'avaient pas. La période facturée la partage, et
+   * `rattachementFactures.test.ts` le tient.
    */
   it('sépare deux missions successives d’un même client par leurs dates', () => {
     const f = avec({
       missions: [M('printemps', '2026-01-01', '2026-04-30'), M('été', '2026-05-01', '2026-08-31')],
-      recettes: [R('a', 3000, '2026-03-10', null), R('b', 5000, '2026-06-10', null)]
+      recettes: [R('a', 3000, '2026-04-30', null), R('b', 5000, '2026-06-10', null)]
     });
     const [printemps, ete] = [
       lignes(f).find((l) => l.mission.id === 'printemps'),

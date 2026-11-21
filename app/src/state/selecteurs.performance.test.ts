@@ -444,7 +444,13 @@ describe('composition d’un mois', () => {
     expect(c.realiseParMission.reduce((s, l) => s + l.facture, 0)).toBe(c.realiseFacture);
   });
 
-  // Deux missions SUCCESSIVES du même client, elles, se séparent par les dates.
+  /*
+   * Deux missions SUCCESSIVES du même client, elles, se séparent par la période
+   * que chaque facture règle (lot 50). La phase 1 est facturée à son terme : la
+   * facture de juin ne règle que la phase 2. Sans cette facture du 31 mai, cinq
+   * mois de phase 1 restaient sans facture jusqu'au 30 juin, que la fenêtre de
+   * dates donnait à la phase 2 seule — rien ne le disait.
+   */
   it('sépare deux missions successives d’un même client', () => {
     const f = faits({
       missions: [
@@ -457,7 +463,10 @@ describe('composition d’un mois', () => {
           debut: dateISO('2026-06-01'), fin: dateISO('2026-12-31')
         })
       ],
-      recettes: [recette({ montant: euros(9000), emiseLe: dateISO('2026-06-30') })]
+      recettes: [
+        recette({ id: 'r-mai', montant: euros(7000), emiseLe: dateISO('2026-05-31') }),
+        recette({ id: 'r-juin', montant: euros(9000), emiseLe: dateISO('2026-06-30') })
+      ]
     });
     const c = compositionDuMois(f, mois('2026-06'), LE_15_DECEMBRE);
     expect(c.realiseParMission[0]?.missionIds).toEqual(['m2']);

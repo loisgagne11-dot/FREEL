@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
 import { type Faits, type Mission, completerFaitsCourants, faitsVides } from './schema';
 import { entiteVide } from './schema.entite';
-import { etatPilote } from './selecteurs';
+import { etatPilote, provisionIrDe } from './selecteurs';
+import { TAUX_TVA_NORMAL } from '../domain/bareme/tva';
+import { valeurPubliee } from '../test/resolution';
 import { etatProjection } from './selecteurs.argent';
 import { encaissementsAttendusDetailles, encaissementsAttendusParMois } from './selecteurs.pipeline';
 import { sortiesDuDu } from './selecteurs.sorties';
@@ -307,5 +309,210 @@ describe('la vue Année', () => {
     const annee = tresorerieDeLAnnee(DEMO, 2027, MAINTENANT);
     expect(annee.slice(0, 5).every((m) => m.disponible !== null)).toBe(true);
     expect(annee.slice(5).every((m) => m.disponible === null)).toBe(true);
+  });
+});
+
+/**
+ * L'IMPÔT AU BARÈME DES ENCAISSEMENTS À VENIR (lot 50, venu du lot 49).
+ *
+ * Le taux de charges ne porte, au barème, que la formation : sans cette part,
+ * le disponible prévu — et le versement tenable — restaient trop hauts de tout
+ * l'impôt de l'année encore à encaisser.
+ */
+describe('l’impôt des encaissements à venir', () => {
+  const foyer = {
+    partsFiscales: 1, autresRevenusFoyer: euros(0), versementPerDeductible: euros(0), impositionCommune: false
+  };
+  const auBareme = (m: Partial<Faits> = {}) => poser({
+    ...foyer,
+    recettes: [recette('r1', 60_000, '2026-03-31', '2026-04-15')],
+    missions: [mission('m', 'active', '2026-06-01', '2026-12-31')],
+    ...m
+  });
+  /** Ce que le disponible retire d'un mois au-delà du taux et de la TVA. */
+  const impotDuMois = (p: ReturnType<typeof etatProjection>, i: number): number => {
+    const m = p.projection.mois[i];
+    return m === undefined ? 0 : m.charges - m.encaissements * (p.tauxDeCharges ?? 0) - m.tva;
+  };
+
+  /*
+   * La provision de l'année chiffre déjà l'impôt des encaissements à venir
+   * (`resteSurEncaissementsAVenir`) : le disponible prévu le retire mois par
+   * mois, et le total retombe dessus. Ne pas passer l'impôt à la projection
+   * fait tomber ce test.
+   */
+  it('retire du disponible prévu, sur l’année, l’impôt que la provision chiffre', () => {
+    const faits = auBareme();
+    const p = etatProjection(faits, MAINTENANT);
+    const ir = valeurPubliee(provisionIrDe(faits, MAINTENANT));
+    expect(ir.resteSurEncaissementsAVenir).toBeGreaterThan(500);
+    const deLAnnee = p.projection.mois
+      .map((m, i) => (m.mois.startsWith('2026') ? impotDuMois(p, i) : 0))
+      .reduce((t, x) => t + x, 0);
+    // Chaque charge est arrondie à l'euro : sept mois, sept demi-euros au plus.
+    expect(Math.abs(deLAnnee - ir.resteSurEncaissementsAVenir)).toBeLessThan(4);
+  });
+
+  /*
+   * L'impôt de 2026 se paie avec le solde, à l'automne 2027 : il ne quitte
+   * pas le compte avant. Le poser à l'encaissement creuserait le solde de
+   * juillet d'un impôt qui sort quatorze mois plus tard.
+   */
+  it('le fait sortir avec le solde de l’année, à l’automne suivant', () => {
+    const faits = auBareme();
+    const novembre = new Date(2026, 10, 10, 12);
+    const p = etatProjection(faits, novembre);
+    const aVenir = p.sorties.flat().filter((s) => s.nature === 'impot' && s.origine === 'a_venir');
+    expect(aVenir.length).toBeGreaterThan(0);
+    expect(new Set(aVenir.map((s) => s.le.slice(0, 7)))).toEqual(new Set(['2027-09', '2027-10']));
+  });
+
+  /*
+   * Sous le versement libératoire, l'impôt part avec l'URSSAF, au taux : en
+   * ajouter un au barème le compterait deux fois.
+   */
+  it('n’ajoute rien sous le versement libératoire', () => {
+    const faits = auBareme({ entreprise: { ...poser().entreprise, versementLiberatoire: true } });
+    const p = etatProjection(faits, MAINTENANT);
+    for (let i = 0; i < p.projection.mois.length; i++) expect(Math.abs(impotDuMois(p, i))).toBeLessThan(1);
+    expect(p.sorties.flat().filter((s) => s.nature === 'impot' && s.origine === 'a_venir')).toEqual([]);
+  });
+
+  /*
+   * Janvier 2027 n'a pas encore de provision : il naît au taux moyen de
+   * l'impôt de 2026 sur son chiffre d'affaires projeté — jeu d'essai, au
+   * 15 décembre.
+   */
+  it('fait naître l’impôt de l’année suivante au taux moyen de l’année en cours', () => {
+    const maintenant = new Date(2026, 11, 15, 12);
+    const p = etatProjection(ESSAI, maintenant);
+    const ir = valeurPubliee(provisionIrDe(ESSAI, maintenant));
+    const i = p.projection.mois.findIndex((m) => m.mois === '2027-01');
+    const janvier = p.projection.mois[i];
+    expect(janvier?.encaissements).toBeGreaterThan(0);
+    const attendu = (janvier?.encaissements ?? 0) * (ir.impotAnneeProjetee / ir.assiette);
+    expect(Math.abs(impotDuMois(p, i) - attendu)).toBeLessThan(1);
+  });
+
+  /*
+   * Le solde d'une année se prélève en quatre fois au-delà de 300 €. Daté
+   * part par part, un reste de 200 € et 250 € à venir partaient chacun en une
+   * fois en septembre ; ensemble, l'avis en fera quatre prélèvements.
+   */
+  it('date la part due aujourd’hui sur le calendrier du solde entier', () => {
+    const faits = poser();
+    const pilote = etatPilote(faits, faits.echeances, MAINTENANT);
+    const valeur = {
+      annee: 2026, assiette: euros(10_000), caProjete: euros(10_000), revenuImposableMicro: euros(6_600),
+      revenuImposableFoyer: euros(6_600), impotFoyer: euros(450), impotMicro: euros(450),
+      impotAnneeProjetee: euros(450), partEncaissee: 0.45, acomptesPasSaisis: euros(0),
+      resteAProvisionner: euros(200), moisRestants: 7, resteSurEncaissementsAVenir: euros(250), ignore: []
+    };
+    const avecIr = {
+      ...pilote, soldeImpotPrecedent: null,
+      provisionImpotRevenu: { statut: 'publie' as const, valeur, source: 'essai', verifieLe: dateISO('2026-11-11') }
+    };
+    const impot = sortiesDuDu(faits, avecIr, MAINTENANT, () => null).filter((s) => s.nature === 'impot');
+    expect(impot.map((s) => s.le.slice(0, 7))).toEqual(['2027-09', '2027-10', '2027-11', '2027-12']);
+    expect(impot.reduce((t, s) => t + s.montant, 0)).toBeCloseTo(200, 2);
+  });
+});
+
+/**
+ * LA TVA D'UN REDEVABLE ENTRE AVEC L'ENCAISSEMENT (lot 50, venu du lot 49).
+ *
+ * Les entrées prévues étaient hors taxes : le solde prévu d'un redevable
+ * restait trop bas de toute la TVA entre l'encaissement et sa déclaration, puis
+ * la voyait sortir sans l'avoir vue entrer.
+ */
+describe('la TVA des encaissements à venir', () => {
+  const redevable = (tva: number, clients: Faits['clients'] = []) => poser({
+    entreprise: {
+      ...poser().entreprise, tvaDepuis: mois('2026-01'), regimeTva: 'reel_normal',
+      nomExploitant: 'Durand', codePostal: '69001'
+    },
+    clients,
+    recettes: [{
+      ...recette('f', 10_000, '2026-06-05', null), echeanceLe: dateISO('2026-07-05'),
+      tvaCollectee: euros(tva)
+    }]
+  });
+
+  /*
+   * Facture de 10 000 € HT et 2 000 € de TVA, réglée en juillet : le solde
+   * monte de 12 000 € en juillet, la TVA sort à la CA3 de juillet, déposée en
+   * août. Le disponible, lui, ne voit jamais la TVA. Retirer la TVA du solde,
+   * la sortir à l'encaissement ou la laisser au disponible fait tomber ce test.
+   */
+  it('entre au solde avec l’encaissement, en sort à sa CA3, sans toucher le disponible', () => {
+    const p = etatProjection(redevable(2_000), MAINTENANT);
+    const sans = etatProjection(redevable(0), MAINTENANT);
+    expect(p.projection.mois[1]?.tva).toBe(2_000);
+    expect(p.projection.mois.map((m) => m.sansVersement)).toEqual(sans.projection.mois.map((m) => m.sansVersement));
+    const ecart = (i: number) => (p.projection.mois[i]?.solde ?? 0) - (sans.projection.mois[i]?.solde ?? 0);
+    expect([ecart(0), ecart(1), ecart(2), ecart(3)]).toEqual([0, 2_000, 0, 0]);
+    const tva = (p.sorties[2] ?? []).filter((s) => s.nature === 'tva' && s.origine === 'a_venir');
+    expect(tva.map((s) => [s.le.slice(0, 7), s.montant])).toEqual([['2026-08', 2_000]]);
+  });
+
+  it('se lit dans les entrées du mois, factures et planning TVA comprise', () => {
+    const p = etatProjection(redevable(2_000), MAINTENANT);
+    expect(p.attendus[1]?.factures).toBe(12_000);
+    const juillet = tresorerieDouzeMois(redevable(2_000), MAINTENANT).mois.find((m) => m.mois === '2026-07');
+    expect(juillet?.entrees).toBe(12_000);
+  });
+
+  /*
+   * Le planning d'un redevable se facturera au taux normal du barème ; celui
+   * d'un client établi hors de France, hors taxes — la TVA est due par lui.
+   */
+  it('prête au planning le taux normal, et rien à un client établi hors de France', () => {
+    const client = (nom: string, pays: string) => ({
+      id: nom, nom, adresse: '', siret: '', email: '', delaiPaiement: 'net_30' as const, pays, tvaIntracom: ''
+    });
+    const avecMission = (pays: string) => ({
+      ...redevable(0, [client('Client d’essai', pays)]),
+      recettes: [],
+      missions: [mission('m', 'active', '2026-06-01', '2026-08-31')]
+    });
+    const france = etatProjection(avecMission('FR'), MAINTENANT);
+    const etranger = etatProjection(avecMission('DE'), MAINTENANT);
+    const i = france.projection.mois.findIndex((m) => m.encaissements > 0 && m.tva > 0);
+    const m = france.projection.mois[i];
+    expect(m?.tva).toBeCloseTo((m?.encaissements ?? 0) * TAUX_TVA_NORMAL.taux, 2);
+    expect(etranger.projection.mois.every((x) => x.tva === 0)).toBe(true);
+  });
+
+  /* En franchise, rien ne change : la démonstration garde ses nombres. */
+  it('n’existe pas en franchise', () => {
+    const p = etatProjection(DEMO, MAINTENANT);
+    expect(p.projection.mois.every((m) => m.tva === 0)).toBe(true);
+    expect(p.sorties.flat().some((s) => s.nature === 'tva' && s.origine === 'a_venir')).toBe(false);
+  });
+
+  /*
+   * Jeu d'essai, au 15 décembre : redevable depuis juin, au régime simplifié
+   * en 2026 puis à la CA3 trimestrielle (le régime simplifié disparaît au
+   * 1ᵉʳ janvier 2027). La TVA encaissée en décembre attend la CA12 de mai ;
+   * celle de janvier, la CA3 du premier trimestre, à la fin avril faute de nom.
+   */
+  it('jeu d’essai : décembre à la CA12 de mai 2027, janvier à la CA3 du premier trimestre', () => {
+    const p = etatProjection(ESSAI, new Date(2026, 11, 15, 12));
+    const tva = p.sorties.flat().filter((s) => s.nature === 'tva' && s.origine === 'a_venir');
+    const decembre = p.projection.mois[0]?.tva ?? 0;
+    const janvier = p.projection.mois[1]?.tva ?? 0;
+    expect(decembre).toBeGreaterThan(0);
+    expect(janvier).toBeGreaterThan(0);
+    expect(tva.filter((s) => s.le === '2027-05-04').map((s) => s.montant)).toContain(decembre);
+    expect(tva.filter((s) => s.le === '2027-04-30').map((s) => s.montant)).toContain(janvier);
+  });
+
+  /* Un mois constaté aussi : le solde dérivé compte la TVA encaissée. */
+  it('compte la TVA encaissée dans les entrées d’un mois constaté', () => {
+    const faits = poser({
+      recettes: [{ ...recette('r', 5_000, '2026-04-01', '2026-04-20'), tvaCollectee: euros(1_000) }]
+    });
+    const avril = tresorerieDouzeMois(faits, MAINTENANT).mois.find((m) => m.mois === '2026-04');
+    expect(avril?.entrees).toBe(6_000);
   });
 });

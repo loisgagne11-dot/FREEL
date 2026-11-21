@@ -1564,3 +1564,17 @@ photographie, pas la page.
 - « + Compter le prospect » n'apparaît que si un prospect existe, « Et si une
   mission s'arrête… » que si une mission signée court : un geste qui ne ferait
   rien ne s'affiche pas (le jeu d'essai, sans prospect, n'a que le second).
+
+## Lot 50, phase A (21/11) — aucun écran redessiné
+
+Trois justesses de calcul (`AUDIT-GRAPHES-ET-INDICATEURS.md`, lot 50). Les
+captures de la démonstration (`captures-app/{calme,nuit}-tresorerie{,-390}.png`,
+`…-activite-missions{,-390}.png`, `calme-activite-analyse.png`) sont regénérées :
+mêmes nombres — versement libératoire, franchise, factures émises pendant leurs
+missions. Celles du jeu d'essai (`essai/…tresorerie…`, `essai/…activite-missions…`)
+changent de nombres, pas de dessin, relues : l'audit ponctuel porte 2 400 €
+facturés et encaissés, « Terminée, soldée » ; la Trésorerie dit « 3 770 € par
+mois jusqu'en novembre 2027 », les entrées TVA comprise (« 2 160 € de factures
+à échéance et 8 928 € du planning signé » en janvier). Sous « Voir en tableau »,
+deux phrases conditionnelles (l'impôt et la TVA des encaissements à venir),
+absentes de la démonstration.
