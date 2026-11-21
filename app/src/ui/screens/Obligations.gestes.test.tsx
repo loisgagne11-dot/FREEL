@@ -101,16 +101,19 @@ describe('le dossier URSSAF', () => {
 
   /* La période se déclare sous Obligations, la dette se lit sous la
      Trésorerie : les deux écrans montés ensemble, pour voir l'une suivre l'autre. */
+  /* Lu sur la Trésorerie (lot 49) : la ligne « URSSAF et formation » dit
+     d'où vient sa dette — des encaissements pas encore déclarés, puis l'appel
+     que la déclaration a créé. */
   it('fait basculer la dette d’un volet à l’autre', async () => {
     semer({ recettes: [encaissee('r1', '2026-04-10')] });
     render(<FournisseurToasts><Tresorerie /></FournisseurToasts>);
-    await screen.findByText(/n’est pas tout à toi/u);
+    const ligne = () => screen.getByRole('button', { name: /^URSSAF et formation/u });
+    await screen.findByRole('heading', { name: 'Ce qui est dû' });
     rendre();
     const d = await ouvrir(/URSSAF, T2 2026/u);
-    const avant = screen.getByText('Charges sur recettes encaissées non déclarées').nextElementSibling?.textContent;
+    expect(ligne().textContent).toMatch(/Sur tes encaissements depuis avril/u);
     await declarerTelQuel(d);
-    const apres = screen.getByText('Charges sur recettes encaissées non déclarées').nextElementSibling?.textContent;
-    expect(avant).not.toBe(apres);
+    expect(ligne().textContent).toMatch(/Appel reçu/u);
   });
 
   /* L'appel créé par la déclaration part avec elle — sinon il resterait dans

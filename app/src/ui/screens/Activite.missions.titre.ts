@@ -13,6 +13,13 @@ import type { DateISO } from '../../domain/types';
 export const MOIS_LONGS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août',
   'septembre', 'octobre', 'novembre', 'décembre'] as const;
 
+/* Les mois de l'axe, comme les maquettes ; partagés par les frises
+   d'Activité et les graphes de la Trésorerie (lot 49), d'où ce module neutre. */
+export const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août',
+  'sept.', 'oct.', 'nov.', 'déc.'] as const;
+/** Les mois en une lettre : un graphe au téléphone réduit ses graduations, pas sa hauteur. */
+export const MOIS_LETTRES = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'] as const;
+
 export const rangDuMois = (d: string): number => Number(d.slice(5, 7)) - 1;
 
 /** « 1ᵉʳ » : « le 1 juillet » se lit comme une coquille. */

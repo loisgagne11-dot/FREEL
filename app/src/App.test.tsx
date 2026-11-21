@@ -118,9 +118,20 @@ describe('la navigation du lot 51', () => {
     expect(screen.queryByRole('combobox', { name: 'Année' })).toBeNull();
   });
 
-  it.each(['#/tresorerie', '#/simulateurs'])('%s porte l’année dans son en-tête, et rien d’autre', async (adresse) => {
-    await ouvrir(adresse);
+  it('#/simulateurs porte l’année dans son en-tête, et rien d’autre', async () => {
+    await ouvrir('#/simulateurs');
     expect(await screen.findAllByRole('combobox', { name: 'Année' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Mois précédent' })).toBeNull();
+  });
+
+  /* Lot 49 : la bascule « 12 mois à venir | Année N » remplace le sélecteur
+     d'année de la Trésorerie — une seule commande de période, comme la maquette. */
+  it('#/tresorerie porte sa bascule de période, et elle seule', async () => {
+    await ouvrir('#/tresorerie');
+    const periode = await screen.findByRole('navigation', { name: 'Période' });
+    expect(within(periode).getByRole('link', { name: '12 mois à venir' })).toBeTruthy();
+    expect(within(periode).getByRole('link', { name: /^Année \d{4}$/u })).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: 'Année' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Mois précédent' })).toBeNull();
   });
 
@@ -148,7 +159,7 @@ describe('la navigation du lot 51', () => {
     expect(await screen.findByText(/Dépenses · mai 2026/)).toBeTruthy();
 
     // Changer d'année garde le mois : mai 2026 → mai 2025, pas décembre.
-    await allerA('#/tresorerie');
+    await allerA('#/simulateurs');
     fireEvent.change(await screen.findByRole('combobox', { name: 'Année' }), { target: { value: '2025' } });
     await allerA('#/pilote');
     expect(await screen.findByRole('heading', { name: /Le flux du mois · mai 2025/ })).toBeTruthy();
@@ -169,7 +180,7 @@ describe('les anciennes adresses', () => {
     render(<App />);
     await waitFor(() => expect(window.location.hash).toBe('#/tresorerie'));
     expect(window.history.length).toBe(avant);
-    expect(await screen.findByRole('heading', { level: 1, name: /Ton argent|Ta trésorerie/ })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: /Ton solde n’est pas tout à toi/ })).toBeTruthy();
   });
 
   /* La paire passe avant l'écran : Activité existe toujours, et la résoudre

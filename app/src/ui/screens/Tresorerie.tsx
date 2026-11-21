@@ -1,27 +1,25 @@
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { adresseCourante, composantALaDemande, sousRouteSiEcran } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
-import { etatArgent } from '../../state/selecteurs.argent';
 import { estATraiter } from '../../domain/calculs/banque.etat';
+import type { DateISO } from '../../domain/types';
 import { Greet } from '../components/Greet';
-import { Etiquette } from '../components/Etiquette';
 import { Sheet } from '../components/Sheet';
-import { ChoixAnnee } from '../components/ChoixAnnee';
+import { dateDuJour } from '../../state/selecteurs';
+import { jourEtMoisLong } from './Activite.missions.titre';
 import { useRoute } from '../useRoute';
-import styles from './Argent.module.css';
 import tr from './Tresorerie.module.css';
 
 /**
- * Le corps de la trésorerie — solde, répartition, enveloppes du dû, seuils,
- * projection —, différé : à lui seul il occupait 39,36 des 40 Ko du budget
- * d'un écran. Voir l'en-tête de son module.
+ * La vue « douze mois à venir » : la cascade du solde, ce qui est dû, le
+ * versement tenable et sa courbe, ce qui entre et ce qui sort, les seuils.
+ * Différée : c'est elle qui porte le calcul et les graphes, et l'écran le plus
+ * lourd du projet tenait à 37,48 Ko sur 40 avant d'être redessiné (lot 49).
  */
-const CorpsTresorerie = composantALaDemande(() => import('./Argent.tresorerie')
-  .then((m) => m.Tresorerie), true);
+const DouzeMois = composantALaDemande(() => import('./Tresorerie.douze').then((m) => m.DouzeMois), true);
 
-/** « Tu peux te verser » et la capacité de versement : voir `Argent.performance`. */
-const VersementEtCapacite = composantALaDemande(() => import('./Argent.performance')
-  .then((m) => m.VersementEtCapacite), true);
+/** La vue « Année » : on y relit le passé, capacité de versement comprise. */
+const VueAnnee = composantALaDemande(() => import('./Tresorerie.annee').then((m) => m.VueAnnee), false);
 
 /**
  * Le relevé bancaire et son rapprochement : on importe un relevé une fois par
@@ -31,44 +29,34 @@ const Releve = composantALaDemande(() => import('./Releve').then((m) => m.Releve
 
 export interface ProprietesTresorerie {
   /**
-   * L'année affichée — celle du mois partagé par les écrans, tenu par `App`.
-   * `undefined` retombe sur l'année de l'horloge : le cas des tests qui
+   * L'année de la vue Année — celle du mois partagé par les écrans, tenu par
+   * `App`. `undefined` retombe sur l'année de l'horloge : le cas des tests qui
    * montent cet écran seul.
    */
   readonly annee?: number;
-  /**
-   * De quoi la changer. L'écran porte sa commande d'année dans son en-tête
-   * (lot 51 : la barre du haut n'en a plus) ; sans ce rappel, il n'en
-   * affiche pas — plutôt qu'un menu qu'on tournerait sans effet.
-   */
+  /** De quoi la changer, depuis la vue Année. */
   readonly onAnnee?: (annee: number) => void;
 }
 
 /**
  * Écran Trésorerie — « combien j'ai là, pour de vrai, et combien je peux me
- * verser » (lot 51, décision 1).
+ * verser » (lot 51, décision 1), redessiné d'après `direction/tresorerie.html`
+ * (lot 49).
  *
  * ─────────────────────────────────────────────────────────────────────────
- * CE QUI A DÉMÉNAGÉ, ET POURQUOI
+ * DOUZE MOIS GLISSANTS PAR DÉFAUT, L'ANNÉE POUR RELIRE LE PASSÉ
  * ─────────────────────────────────────────────────────────────────────────
  *
- * L'écran Argent portait deux piliers, Trésorerie et Performance. Le second
- * mêlait deux questions : « combien je gagne » — le chiffre d'affaires, sa
- * composition, la dépendance client —, qui est une analyse de l'activité et
- * part dans Activité › Analyse ; et « combien je me verse », qui est de la
- * trésorerie et reste ici, sous le solde dont il découle.
- *
- * L'échéancier part dans Obligations, avec les registres : c'est ce qu'on
- * doit faire, pas ce qu'on a. La BANQUE arrive d'Achats : le relevé est la
- * source du solde que cet écran affiche, et son rapprochement se faisait sous
- * les dépenses, loin du chiffre qu'il corrige.
- *
- * Le contenu n'est pas redessiné : ce sont les mêmes cartes, déménagées. La
- * mise en page de la maquette `tresorerie.html` viendra avec leur lot.
+ * La question de l'écran porte sur ce qui VIENT : de quoi tiendra le compte
+ * en mai prochain. Une année civile coupait la projection au 31 décembre —
+ * en novembre, elle ne voyait plus qu'un mois. La vue Année reste, pour relire
+ * ce que le compte a fait ; le choix vit dans l'adresse (`#/tresorerie/annee`),
+ * pas dans les faits : ce n'est pas une préférence à synchroniser, c'est où
+ * l'on regarde.
  */
 export function Tresorerie({ annee, onAnnee }: ProprietesTresorerie = {}) {
   const faits = useFaits((e) => e.faits);
-  const { ecran, sousRoute } = useRoute();
+  const { ecran, sousRoute, naviguerVers } = useRoute();
   const routeIci = ecran.id === 'tresorerie' ? sousRoute : '';
   const [releveOuvert, setReleveOuvert] = useState(() => routeIci === 'releve');
   /* `#/tresorerie/releve` est un GESTE — l'action rapide « Importer un
@@ -80,59 +68,69 @@ export function Tresorerie({ annee, onAnnee }: ProprietesTresorerie = {}) {
     window.location.replace('#/tresorerie');
   }, [routeIci]);
 
-  // `undefined` explicite : `etatArgent` retombe alors sur sa propre valeur
-  // par défaut (l'année de `maintenant`), au lieu qu'on la recalcule ici une
-  // seconde fois avec le risque qu'elle diverge de celle du domaine.
-  const etat = useMemo(
-    () => etatArgent(faits, faits.echeances, new Date(), annee),
-    [faits, annee]
-  );
-  const couverture = Math.round(etat.couvertureProvisions * 100);
+  const vueAnnee = routeIci === 'annee';
+  const anneeVue = annee ?? new Date().getFullYear();
   const operations = faits.mouvementsBancaires.length;
   const aRapprocher = faits.mouvementsBancaires.filter(estATraiter).length;
+  const dernierReleve = faits.mouvementsBancaires.reduce<DateISO | null>(
+    (d, m) => (d === null || m.date > d ? m.date : d), null
+  );
 
   return (
     <>
       <Greet
-        titre="Ta trésorerie"
+        titre="Ton solde n’est pas tout à toi."
         sousTitre="Ce que tu as, ce que tu dois, ce que tu peux te verser — aujourd’hui et sur douze mois."
-        repere={(
-          /* La couverture du dû, et non le solde : le solde est déjà sur la
-             première tuile, et le répéter n'apprend rien. Ce que l'en-tête
-             ajoute, c'est la réponse à « si tout tombait demain, le compte
-             suivrait-il ? ». */
-          <Etiquette ton={couverture >= 100 ? 'ok' : 'attention'}>
-            Dû · {couverture}&nbsp;% couvert
-          </Etiquette>
+        actions={(
+          /* La seule commande de période de l'écran, comme la maquette. Des
+             liens et non des onglets : chaque vue a son adresse, et « retour »
+             doit y ramener. */
+          <nav className={tr.segment} aria-label="Période">
+            <a
+              href="#/tresorerie"
+              className={vueAnnee ? tr.option : `${tr.option} ${tr.choisie}`}
+              aria-current={vueAnnee ? undefined : 'page'}
+              onClick={(e) => { e.preventDefault(); naviguerVers('tresorerie'); }}
+            >
+              12 mois à venir
+            </a>
+            <a
+              href="#/tresorerie/annee"
+              className={vueAnnee ? `${tr.option} ${tr.choisie}` : tr.option}
+              aria-current={vueAnnee ? 'page' : undefined}
+              onClick={(e) => { e.preventDefault(); naviguerVers('tresorerie', 'annee'); }}
+            >
+              Année {anneeVue}
+            </a>
+          </nav>
         )}
-        // La seule commande de période de l'écran : l'année. Le solde n'en
-        // dépend pas — c'est un état, pas une période.
-        {...(onAnnee === undefined ? {} : {
-          actions: <ChoixAnnee annee={annee ?? new Date().getFullYear()} onAnnee={onAnnee} />
-        })}
       />
 
-      <div className={styles.sections}>
+      <div className={tr.page}>
         <PartGardeeRetiree />
-        <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
-          <CorpsTresorerie etat={etat} />
-          <VersementEtCapacite etat={etat} />
+        <Suspense fallback={<p role="status" className={tr.vide}>Chargement…</p>}>
+          {vueAnnee
+            ? <VueAnnee annee={anneeVue} {...(onAnnee === undefined ? {} : { onAnnee })} />
+            : <DouzeMois />}
         </Suspense>
 
-        {/* La banque, en bas, comme la maquette : une ligne qui dit où en est
-            le relevé, et la porte pour l'ouvrir. Le nombre d'opérations à
-            rapprocher se lit sans démasquer : ce n'est pas un montant. */}
-        <section className={`${styles.carte} ${styles.banque}`} aria-labelledby="titre-banque">
-          <div>
-            <h2 id="titre-banque" className={styles.titreCarte}>Banque</h2>
-            <p className={styles.vide}>
-              {operations === 0
-                ? 'Aucun relevé importé : ton solde reste celui que tu as saisi.'
-                : `${operations} opération${operations > 1 ? 's' : ''} au relevé`
-                  + (aRapprocher === 0 ? ', toutes traitées.' : ` · ${aRapprocher} à rapprocher`)}
-            </p>
+        {/* La banque, en bas, comme la maquette : où en est le relevé, et la
+            porte pour l'ouvrir. Le nombre d'opérations à rapprocher se lit sans
+            démasquer : ce n'est pas un montant. */}
+        <section className={`${tr.carte} ${tr.banque}`} aria-labelledby="titre-banque">
+          <div className={tr.qui}>
+            <span className={tr.avatar} aria-hidden="true">B</span>
+            <div>
+              <h2 id="titre-banque" className={tr.titreCarte}>Banque</h2>
+              <small>
+                {operations === 0 || dernierReleve === null
+                  ? 'Aucun relevé importé : ton solde reste celui que tu as saisi.'
+                  : `Relevé du ${jourEtMoisLong(dernierReleve, dateDuJour())} · ${operations} opération${operations > 1 ? 's' : ''}`
+                    + (aRapprocher === 0 ? ', toutes traitées.' : ` · ${aRapprocher} à rapprocher`)}
+              </small>
+            </div>
           </div>
-          <button type="button" className={styles.lienRegistre} onClick={() => setReleveOuvert(true)}>
+          <button type="button" className={tr.bouton} onClick={() => setReleveOuvert(true)}>
             {operations === 0 ? 'Importer un relevé' : 'Ouvrir le relevé'}
           </button>
         </section>
@@ -147,7 +145,7 @@ export function Tresorerie({ annee, onAnnee }: ProprietesTresorerie = {}) {
         onFermer={() => setReleveOuvert(false)}
       >
         {releveOuvert && (
-          <Suspense fallback={<p role="status" className={styles.vide}>Chargement…</p>}>
+          <Suspense fallback={<p role="status" className={tr.vide}>Chargement…</p>}>
             <Releve />
           </Suspense>
         )}

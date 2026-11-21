@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Faits, type Mission, type Recette, faitsVides } from '../../state/schema';
@@ -9,7 +9,7 @@ import { entiteVide } from '../../state/schema.entite';
 import { etatArgent } from '../../state/selecteurs.argent';
 import { useFaits } from '../../state/store';
 import { eur } from '../format';
-import { AnalyseDuCa, VersementEtCapacite } from './Argent.performance';
+import { AnalyseDuCa } from './Argent.performance';
 
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -72,7 +72,7 @@ function poser(m: Partial<Faits> = {}): void {
   // Les deux moitiés de l'ancien pilier vivent sur deux écrans (lot 51) ; les
   // monter ensemble garde chaque test sur le chiffre qu'il vise.
   const etat = etatArgent(faits);
-  render(<><AnalyseDuCa etat={etat} /><VersementEtCapacite etat={etat} /></>);
+  render(<AnalyseDuCa etat={etat} />);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -298,140 +298,5 @@ describe('la composition du mois', () => {
     });
 
     expect(screen.getByText(/encaissé d’avance, aucune facture émise/)).toBeTruthy();
-  });
-});
-
-/* ─────────────────────────────────────────────────────────────────────────
-   A4 — ce qu'on peut se verser
-   ───────────────────────────────────────────────────────────────────────── */
-
-describe('tu peux te verser', () => {
-  /**
-   * LA PART S'APPLIQUE AU VERSABLE, PAS AU DISPONIBLE.
-   *
-   * Le prototype l'applique au disponible : à 0 % il propose alors de verser la
-   * réserve avec, c'est-à-dire de vider précisément le plancher qu'on s'était
-   * donné. Solde 10 000 €, réserve 4 000 €, rien de dû : le versable est
-   * 6 000 € et c'est lui qu'on peut prendre en entier — pas 10 000.
-   */
-  it('propose le versable entier à 0 %, jamais la réserve avec', () => {
-    poser({ soldeInitial: euros(10_000), reserve: euros(4_000) });
-
-    const grand = screen.getByText(/Montant que tu peux te verser/).parentElement;
-    expect(grand?.textContent).toContain(eur(6_000));
-    expect(grand?.textContent).not.toContain(eur(10_000));
-  });
-
-  /* Décision 24 : un seul « à te verser ». Un curseur de part gardée
-     referait le second montant sous le même nom. */
-  it('ne propose plus de part gardée : le seul « à te verser » est disponible moins réserve', () => {
-    poser({ soldeInitial: euros(10_000), reserve: euros(4_000) });
-    expect(screen.queryByRole('slider')).toBeNull();
-    expect(screen.queryByText(/part gardée/i)).toBeNull();
-  });
-
-  /**
-   * UN DISPONIBLE NÉGATIF NE SE RACONTE PAS COMME UNE SOUSTRACTION.
-   *
-   * « Sur −2 669 € de disponible, la réserve en retient 2 470 € »
-   * suggère un reste de −5 139 €, alors que le versable est zéro et que la
-   * réserve n'est pas constituée. Sans cette phrase, la carte affiche « 0 € » sans
-   * qu'on sache si c'est le réglage ou le compte qui l'impose.
-   */
-  it('dit qu’un disponible négatif est la cause, au lieu de laisser lire zéro', () => {
-    // Une échéance appelée plus grosse que le solde rend le disponible négatif.
-    poser({
-      soldeInitial: euros(500),
-      echeances: [{
-        id: 'e1', nature: 'urssaf',
-        montant: euros(3_000), montantPaye: euros(0),
-        echeanceLe: dateISO('2026-07-05'), payeeLe: null
-      }]
-    });
-
-    expect(screen.getByText(/disponible est/).textContent).toContain('négatif');
-    // La soustraction, reconnue à son verbe : « rien à te verser » appartient
-    // aussi à la phrase du cas négatif, et ne distinguerait plus les deux.
-    expect(screen.queryByText(/en retient/)).toBeNull();
-  });
-
-  /**
-   * LE BOUTON NE CRÉE PAS DE FAIT.
-   *
-   * Le virement figure déjà au relevé : le saisir une seconde fois le
-   * compterait deux fois. Ce qui manque est un NOM, et il se pose au relevé.
-   */
-  it('renvoie au relevé au lieu d’enregistrer un versement', async () => {
-    poser({ soldeInitial: euros(10_000) });
-
-    await userEvent.setup().click(
-      screen.getByRole('button', { name: /Pointer le versement au relevé/ })
-    );
-    expect(window.location.hash).toBe('#/tresorerie/releve');
-  });
-});
-
-/* ─────────────────────────────────────────────────────────────────────────
-   A5 — la capacité de versement
-   ───────────────────────────────────────────────────────────────────────── */
-
-describe('la capacité de versement par mois', () => {
-  /**
-   * LES DOUZE MOIS RESTENT, MÊME VIDES.
-   *
-   * Contrairement au graphe du chiffre d'affaires, celui-ci porte la projection :
-   * les mois à venir ont une capacité, et c'est justement ce qu'on vient y lire.
-   */
-  it('porte les douze mois de l’année', () => {
-    poser({ recettes: [recette({ encaisseeLe: dateISO('2026-03-10') })] });
-
-    const carte = screen.getByRole('region', { name: /Capacité de versement/ });
-    expect(within(carte).getByText('JAN')).toBeTruthy();
-    expect(within(carte).getByText('DÉC')).toBeTruthy();
-  });
-
-  /**
-   * UN MOIS À VENIR N'A AUCUN VERSÉ.
-   *
-   * `capaciteDuMois` rend `verse: null` sur un mois projeté — jamais zéro, qui
-   * serait un constat. L'écran doit le dire au lieu d'annoncer « 0 € versés »,
-   * qui se lirait comme une privation qu'on ne s'est pas imposée.
-   */
-  it('ne prête aucun versé à un mois à venir', () => {
-    poser({ recettes: [recette({ encaisseeLe: dateISO('2026-03-10') })] });
-
-    const carte = screen.getByRole('region', { name: /Capacité de versement/ });
-    expect(within(carte).getByText(/SEP/).textContent).not.toContain('versés');
-  });
-
-  /*
-   * SIX MOIS À « −0,1 k€ » NE SONT PAS UN DIAGNOSTIC.
-   *
-   * Le contrôle visuel a montré la fin d'année entière en négatif : aucun de
-   * ces mois n'attendait quoi que ce soit, et le nombre ne venait que de
-   * dépenses projetées. Six colonnes rouges d'affilée se lisent « le reste de
-   * mon année est dans le rouge » — une conclusion que rien ne soutient.
-   */
-  it('s’abstient sur un mois à venir où rien n’est attendu, plutôt que d’afficher un négatif', () => {
-    poser({ recettes: [recette({ encaisseeLe: dateISO('2026-03-10') })] });
-
-    const carte = screen.getByRole('region', { name: /Capacité de versement/ });
-    expect(within(carte).getByText(/SEP/).textContent).toMatch(/Rien n’est encore attendu/);
-    // La colonne reste EN PLACE : la retirer décalerait les onze autres et
-    // personne ne verrait le trou.
-    expect(within(carte).getByText('DÉC')).toBeTruthy();
-  });
-
-  /**
-   * SANS RELEVÉ, LE VERSÉ EST INCONNU — PAS NUL.
-   *
-   * `remunerationDuMois` rend zéro tant qu'aucun mouvement bancaire n'est
-   * importé. Des barres sans plein se liraient « je ne me suis rien versé de
-   * l'année », ce qu'aucun fait ne soutient.
-   */
-  it('signale qu’aucun relevé n’est importé plutôt que de laisser lire zéro', () => {
-    poser({ recettes: [recette({ encaisseeLe: dateISO('2026-03-10') })] });
-
-    expect(screen.getByText(/le versé est/).textContent).toContain('inconnu');
   });
 });

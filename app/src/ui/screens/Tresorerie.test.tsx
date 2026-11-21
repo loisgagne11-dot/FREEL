@@ -17,20 +17,36 @@ beforeEach(() => {
 });
 
 /**
- * TRÉSORERIE (lot 51, décision 1) : LE SOLDE, CE QU'ON PEUT SE VERSER, LA BANQUE.
+ * TRÉSORERIE (lot 51, décision 1 ; redessinée au lot 49) : LE SOLDE, CE QU'ON
+ * PEUT SE VERSER, LA BANQUE.
  *
- * L'écran Argent mêlait deux questions dans son pilier Performance : le
- * chiffre d'affaires est parti dans Activité › Analyse, « Tu peux te verser »
- * reste ici, sous le solde dont il découle. L'échéancier est parti dans
- * Obligations ; le relevé bancaire arrive d'Achats — il est la source du
- * solde que l'écran affiche.
+ * Le chiffre d'affaires est parti dans Activité › Analyse, l'échéancier dans
+ * Obligations ; le relevé bancaire est ici — il est la source du solde que
+ * l'écran affiche.
  */
 describe('l’écran Trésorerie', () => {
-  it('porte le versement sous le solde, et plus le chiffre d’affaires ni l’échéancier', async () => {
+  it('ouvre sur la cascade du solde et ce qui est dû, plus le chiffre d’affaires ni l’échéancier', async () => {
     render(<Tresorerie />);
-    expect(await screen.findByRole('heading', { name: 'Tu peux te verser' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: 'Ton solde n’est pas tout à toi.' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Du solde à ce que tu peux te verser' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Ce qui est dû' })).toBeTruthy();
     expect(screen.queryByText(/CA facturé/)).toBeNull();
     expect(screen.queryByRole('heading', { name: /Échéancier/ })).toBeNull();
+  });
+
+  /*
+   * La vue vit dans l'adresse, pas dans les faits : « retour » y ramène, et un
+   * lien partagé ouvre la même vue. Si la bascule écrivait un fait, elle
+   * voyagerait d'un appareil à l'autre.
+   */
+  it('bascule entre douze mois à venir et l’année, par l’adresse', async () => {
+    render(<Tresorerie annee={2026} />);
+    const periode = screen.getByRole('navigation', { name: 'Période' });
+    expect(within(periode).getByRole('link', { name: '12 mois à venir' }).getAttribute('aria-current')).toBe('page');
+    await userEvent.click(within(periode).getByRole('link', { name: 'Année 2026' }));
+    expect(window.location.hash).toBe('#/tresorerie/annee');
+    expect(await screen.findByRole('heading', { name: 'Ton disponible en 2026' })).toBeTruthy();
+    expect(useFaits.getState().faits).toEqual(faitsVides());
   });
 
   it('dit qu’aucun relevé n’est importé, et offre de le faire', () => {
@@ -57,7 +73,7 @@ describe('l’écran Trésorerie', () => {
       }
     });
     render(<Tresorerie />);
-    expect(within(screen.getByRole('region', { name: 'Banque' })).getByText(/2 opérations au relevé · 1 à rapprocher/))
+    expect(within(screen.getByRole('region', { name: 'Banque' })).getByText(/2 opérations · 1 à rapprocher/))
       .toBeTruthy();
   });
 

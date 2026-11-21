@@ -15,7 +15,8 @@
  */
 
 import { type DateISO, type Euros, type Mois, type Resolution, euros } from '../domain/types';
-import { estPayee } from '../domain/calculs/provisions';
+import { type NatureDette, type VentilationProvisions, estPayee } from '../domain/calculs/provisions';
+import type { ResultatTresorerie } from '../domain/calculs/tresorerie';
 import type { SortieDeCharge } from '../domain/calculs/sortiesDeCharges';
 import { decalerMois } from '../domain/calculs/periode';
 import { type Franchissement, franchissementPrevu } from '../domain/calculs/allure';
@@ -24,8 +25,10 @@ import {
 } from '../domain/calculs/seuilsPipeline';
 import type { Faits, Mission } from './schema';
 import {
-  dateDuJour, echeancesDuComptePro, etatPilote, moisCourant, recettesEncaissees, remunerationDuMois, solde
+  dateDuJour, echeancesDuComptePro, etatPilote, moisCourant, recettesEncaissees, remunerationDuMois, solde,
+  tvaDesDepensesPayees, vlAu
 } from './selecteurs';
+import { moisDeclares } from '../domain/calculs/declarations.declarees';
 import { type EtatProjection, type EtatSeuils, etatArgent, etatProjection } from './selecteurs.argent';
 import { encaissementsAttendusParMois, finDuMoisISO } from './selecteurs.pipeline';
 
@@ -255,20 +258,42 @@ export interface ResumeDeProjection {
   readonly disponibles: readonly Euros[];
 }
 
+/**
+ * Une ligne de « Ce qui est dû » : une charge telle qu'on la paie — l'URSSAF
+ * et la formation ensemble, puisqu'elles partent ensemble.
+ */
+export interface LigneDuDu {
+  readonly cle: 'urssaf' | 'impot' | 'tva' | 'cfe';
+  readonly natures: readonly NatureDette[];
+  readonly montant: Euros;
+  /** Le prochain jour où une part en sort ; `null` quand rien n'est daté. */
+  readonly prochaine: DateISO | null;
+  /** URSSAF : le premier mois encaissé et pas encore déclaré. */
+  readonly depuis: Mois | null;
+  /** Impôt : payé avec l'URSSAF (versement libératoire au mois courant). */
+  readonly avecUrssaf: boolean;
+  /** TVA : une part vient d'un achat autoliquidé. */
+  readonly autoliquidee: boolean;
+}
+
 export interface TresorerieDouzeMois extends ResumeDeProjection {
   readonly aujourdhui: DateISO;
   readonly moisCourant: Mois;
   readonly disponible: Euros;
   readonly solde: Euros;
   readonly reserve: Euros;
+  /** Le solde d'aujourd'hui découpé — dû, disponible, réserve, à te verser : celui du Pilote. */
+  readonly tresorerie: ResultatTresorerie;
+  /** Ce qu'on s'est versé ce mois-ci, lu au relevé. */
+  readonly verseCeMois: Euros;
   /** Trois mois constatés, puis le mois courant et les onze suivants, prévus. */
   readonly mois: readonly MoisDeTresorerie[];
   readonly depensesMensuelles: Euros | null;
   readonly tauxDeCharges: number | null;
   /** Le dernier mois prévu, dans les deux scénarios — « Dans un an : … ». */
   readonly dansUnAn: { readonly sansVersement: Euros; readonly avecVersement: Euros; readonly verseCumule: Euros } | null;
-  /** Le même calcul sur les faits d'un « et si », quand il y en a un. */
-  readonly scenario: ResumeDeProjection | null;
+  /** Ce qui est dû, par charge, avec ses dates — dans l'ordre de la maquette. */
+  readonly du: readonly LigneDuDu[];
 }
 
 const resume = (p: EtatProjection): ResumeDeProjection => ({
@@ -278,13 +303,10 @@ const resume = (p: EtatProjection): ResumeDeProjection => ({
   disponibles: p.projection.mois.map((m) => m.avecVersement)
 });
 
-export function tresorerieDouzeMois(
-  faits: Faits,
-  maintenant: Date = new Date(),
-  scenario: ScenarioTresorerie = SANS_SCENARIO
-): TresorerieDouzeMois {
+export function tresorerieDouzeMois(faits: Faits, maintenant: Date = new Date()): TresorerieDouzeMois {
   const m0 = moisCourant(maintenant);
   const p = etatProjection(faits, maintenant);
+  const pilote = etatPilote(faits, faits.echeances, maintenant);
   const constates = Array.from({ length: MOIS_CONSTATES }, (_, i) => moisConstate(faits, decalerMois(m0, i - MOIS_CONSTATES)));
   const dernier = p.projection.mois[p.projection.mois.length - 1];
   return {
@@ -294,14 +316,58 @@ export function tresorerieDouzeMois(
     disponible: p.projection.depart,
     solde: p.solde,
     reserve: faits.reserve,
+    tresorerie: pilote.tresorerie,
+    verseCeMois: remunerationDuMois(faits, m0),
     mois: [...constates, ...moisPrevus(p)],
     depensesMensuelles: p.depensesMensuelles,
     tauxDeCharges: p.tauxDeCharges,
     dansUnAn: dernier === undefined ? null : {
       sansVersement: dernier.sansVersement, avecVersement: dernier.avecVersement, verseCumule: dernier.verseCumule
     },
-    scenario: scenarioActif(scenario) ? resume(etatProjection(faitsDuScenario(faits, scenario), maintenant)) : null
+    du: lignesDuDu(faits, p, pilote.provisionsParNature, maintenant)
   };
+}
+
+/**
+ * La même projection, sur les faits d'un « et si » — `null` sans « et si ».
+ * Séparée de `tresorerieDouzeMois` : basculer un « et si » ne refait pas le
+ * passé ni le dû, qui n'en dépendent pas.
+ */
+export function projectionDuScenario(
+  faits: Faits, scenario: ScenarioTresorerie, maintenant: Date = new Date()
+): ResumeDeProjection | null {
+  return scenarioActif(scenario) ? resume(etatProjection(faitsDuScenario(faits, scenario), maintenant)) : null;
+}
+
+/**
+ * Les quatre lignes de « Ce qui est dû », chacune avec ce qui la date. Les
+ * montants viennent de la ventilation du dû (`provisionsParNature`), les dates
+ * du même dû posé à ses échéances : la ligne et la marche du solde prévu
+ * lisent le même calcul.
+ */
+function lignesDuDu(
+  faits: Faits, p: EtatProjection, parNature: VentilationProvisions, maintenant: Date
+): readonly LigneDuDu[] {
+  const aujourdhui = dateDuJour(maintenant);
+  const declares = new Set(moisDeclares(faits.periodesDeclarees));
+  const nonDeclares = recettesEncaissees(faits)
+    .map((r) => r.encaisseeLe.slice(0, 7) as Mois)
+    .filter((m) => !declares.has(m))
+    .sort();
+  const ligne = (cle: LigneDuDu['cle'], natures: readonly NatureDette[]): LigneDuDu => {
+    const dates = p.duDate.filter((s) => natures.includes(s.nature)).map((s) => s.le).sort();
+    return {
+      cle,
+      natures,
+      montant: somme(natures.map((n) => parNature[n])),
+      // La prochaine qui vient ; à défaut — tout est en retard —, la plus ancienne.
+      prochaine: dates.find((d) => d >= aujourdhui) ?? dates[0] ?? null,
+      depuis: cle === 'urssaf' ? nonDeclares[0] ?? null : null,
+      avecUrssaf: cle === 'impot' && vlAu(faits, moisCourant(maintenant)),
+      autoliquidee: cle === 'tva' && tvaDesDepensesPayees(faits).autoliquidee > 0
+    };
+  };
+  return [ligne('urssaf', ['urssaf', 'cfp']), ligne('impot', ['impot']), ligne('tva', ['tva']), ligne('cfe', ['cfe'])];
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

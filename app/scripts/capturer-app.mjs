@@ -151,7 +151,12 @@ const VUES = [
      l'ouvrent : c'est le chemin que prend l'utilisateur, et il ne dépend pas de
      la présence d'une facture en retard dans la démo. */
   { hash: '#/pilote/encaissements', nom: 'pilote-encaissements', handoff: 'pilote-encaissements', attendre: 'text=Reste à encaisser' },
-  { hash: '#/tresorerie', nom: 'tresorerie', handoff: 'argent-tresorerie' },
+  /* La Trésorerie se compare à `direction/tresorerie.html` (lot 49). Ses
+     cartes arrivent à la demande : on attend la dernière, les seuils. */
+  { hash: '#/tresorerie', nom: 'tresorerie', handoff: 'argent-tresorerie', attendre: 'h2:has-text("Tes seuils de l’année")' },
+  /* La vue Année, par son adresse : sans elle, aucune capture ne montrerait la
+     capacité de versement, qui n'y vit plus que là. */
+  { hash: '#/tresorerie/annee', nom: 'tresorerie-annee', attendre: 'h2:has-text("Ce que chaque mois te permettait de te verser")' },
   /* Le relevé n'avait pas de capture : un écran que rien ne photographie ne
      se compare à rien, et c'est sur lui que le lot 28 a posé « ignorée ». Il
      vit sous la Trésorerie depuis le lot 51, en plan de travail. */

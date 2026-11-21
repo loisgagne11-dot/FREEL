@@ -38,3 +38,434 @@
 .lien { color: var(--green); text-decoration: none; border: 1px solid transparent; }
 .compris { border: 1px solid var(--line-2); background: var(--card-a); color: var(--text); }
 .lien:focus-visible, .compris:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* ── La page ─────────────────────────────────────────────────────────────── */
+
+.page { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.rangee { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+/* `.e-card` : dégradé, filet, rayon, ombre ; 22 × 24 au bureau, 18 au téléphone. */
+.carte {
+  min-width: 0;
+  padding: 18px;
+  background: linear-gradient(180deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--sh-2);
+}
+
+.carteColonne { display: flex; flex-direction: column; }
+
+/* `.e-h` : titre à gauche, indication ou pastille à droite. */
+.entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-height: 40px;
+  margin-bottom: 6px;
+}
+
+.enteteHaut { align-items: flex-start; margin-bottom: 14px; }
+
+.titreCarte {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  /* Un titre ne se tronque jamais : il passe à la ligne (défaut connu du
+     titre de la projection, coupé à 390 px). */
+  overflow-wrap: anywhere;
+}
+
+.indication { margin: 0; font-size: 13.5px; color: var(--muted); }
+.indication strong { color: var(--text); font-weight: 600; }
+.vide { margin: 0; font-size: 13.5px; color: var(--muted); }
+.horsEcran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* `.e-segment` de l'en-tête : la vue douze mois ou l'année. */
+.segment {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--tint-2);
+  max-width: 100%;
+}
+
+.option {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.option:hover { color: var(--text); }
+.option:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.choisie { background: var(--card-a); box-shadow: var(--sh-1); color: var(--text); }
+
+/* ── Pied de carte, boutons, liens — `.e-foot`, `.e-btn`, `.e-more` ─────── */
+
+.pied {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.pied .indication { flex: 1 1 260px; }
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: var(--card-a);
+  color: var(--text);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bouton:hover { border-color: var(--green); }
+.bouton:focus-visible, .plus:focus-visible, .filtre:focus-visible, .ligneDu:focus-visible,
+.libelleOuvrable:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.boutonVert { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+
+.plus {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Du solde à ce que tu peux te verser — `.e-casc`, `.e-track` ─────────── */
+
+.cascade {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  /* Dense : chaque ligne écrit libellé, montant, barre — dans cet ordre pour
+     qui lit le texte —, et la barre revient se ranger entre les deux au
+     bureau. */
+  grid-auto-flow: row dense;
+  gap: 6px 12px;
+  align-items: center;
+  margin: 6px 0 0;
+}
+
+.cascade > div { display: contents; }
+
+.cascade dt { font-size: 14.5px; color: var(--muted); grid-column: 1; }
+.cascade dt.fort { color: var(--text); font-weight: 600; }
+.cascade dd { margin: 0; grid-column: 2; text-align: right; font-family: var(--mono); font-weight: 600;
+  font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text); }
+.cascade dd.fin { font-size: 20px; color: var(--green); }
+.cascade dd.negatif { color: var(--red); }
+/* Au téléphone, la barre passe sous son libellé, sur toute la largeur : cinq
+   lignes lisibles, montants compris, plutôt que des barres de 40 px. */
+.cascade .piste { grid-column: 1 / -1; margin-bottom: 8px; }
+
+.piste { position: relative; height: 12px; border-radius: 6px; background: var(--tint-2); }
+.piste i { position: absolute; top: 0; bottom: 0; border-radius: 6px; }
+.pisteSolde { background: var(--bar-soft); }
+.pisteDu { background: var(--c-urssaf); }
+.pisteDispo { background: var(--green-lite); }
+.pisteReserve { background: var(--muted-2); }
+.pisteVerser { background: var(--green); }
+
+.libelleOuvrable {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline dotted var(--line-2);
+  text-underline-offset: 4px;
+}
+
+/* ── Ce qui est dû — `.e-num`, `.e-split`, `.e-li`, `.e-chip` ─────────────── */
+
+.total {
+  margin: 0 0 4px;
+  font-family: var(--mono);
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.pastille {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--tint-2);
+  color: var(--muted);
+}
+
+.pastilleOk { background: var(--green-deep); color: var(--chip-ok); }
+.pastilleAttention { background: var(--amber-soft); color: var(--chip-warn); }
+.pastilleRetard { background: var(--red-soft); color: var(--red); }
+
+.lignesDu { list-style: none; margin: 10px 0 0; padding: 0; }
+
+.ligneDu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 0;
+  border: none;
+  border-top: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lignesDu li:first-child .ligneDu { border-top: 0; }
+.ligneDu:hover .nomDu { color: var(--green); }
+
+.point { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.urssaf { background: var(--c-urssaf); }
+.impot { background: var(--c-impot); }
+.tva { background: var(--c-tva); }
+.cfe { background: var(--c-cfe); }
+
+.nomDu { flex: 1 1 auto; min-width: 0; font-weight: 500; }
+.nomDu small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+.valeurDu { font-family: var(--mono); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chevron { color: var(--muted-2); flex: none; }
+
+/* ── Les graphes ──────────────────────────────────────────────────────────── */
+
+.cadre { position: relative; min-width: 0; }
+.graphe { display: block; width: 100%; height: auto; overflow: visible; }
+.graduation { stroke: var(--line-2); stroke-width: 1; stroke-dasharray: 1 5; stroke-linecap: round; }
+.axe { stroke: var(--line-2); stroke-width: 1; }
+.texteAxe { font-family: var(--mono); font-size: 12px; fill: var(--muted-2); }
+.texteAxeCourant { fill: var(--text); font-weight: 600; }
+.reserve { stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 2 5; stroke-linecap: round; fill: none; }
+.texteReserve { font-size: 12.5px; font-weight: 600; fill: var(--amber); }
+.constate { fill: none; stroke: var(--green); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.prevu { fill: none; stroke: var(--green); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 2 7; }
+.scenario { fill: none; stroke: var(--c-tva); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 8 6; }
+.aire { fill: var(--green); opacity: 0.14; }
+.airePrevue { fill: var(--green); opacity: 0.06; }
+.filetAujourdhui { stroke: var(--line-2); stroke-width: 1; }
+.pastilleAujourdhui { fill: var(--text); }
+.texteAujourdhui { font-size: 12px; font-weight: 600; fill: var(--bg); }
+.pointAujourdhui { fill: var(--green); stroke: var(--card-a); stroke-width: 3; }
+.pointRepere { fill: var(--card-a); stroke: var(--green); stroke-width: 2.5; }
+.pointBas { fill: var(--card-a); stroke: var(--amber); stroke-width: 2.5; }
+.texteBas { font-size: 12.5px; font-weight: 600; fill: var(--amber); }
+.etiquetteFond { fill: var(--card-a); stroke: var(--line-2); stroke-width: 1; }
+.etiquetteMuet { font-size: 12px; fill: var(--muted); }
+.etiquetteFort { font-family: var(--mono); font-size: 15px; font-weight: 600; fill: var(--text); }
+.repereMois { fill: transparent; cursor: pointer; }
+.repereMois:focus { outline: none; }
+.repereMois:focus-visible, .repereMois.actif { fill: var(--tint-2); }
+.bande { fill: var(--tint-2); }
+.barreEntree { fill: var(--green-lite); }
+.barreEntreeForte { fill: var(--green); }
+.barreSortie { fill: var(--bar-soft); }
+.barreSortieForte { fill: var(--muted-2); }
+.barreConstatee { opacity: 0.55; }
+.valeurBarre { font-family: var(--mono); font-size: 12.5px; font-weight: 600; fill: var(--text); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .constate, .prevu, .scenario { animation: trace 400ms ease-out both; }
+}
+@keyframes trace { from { opacity: 0; } to { opacity: 1; } }
+
+/* L'infobulle : au survol ET au clavier — le même état. */
+.bulle {
+  position: absolute;
+  z-index: 1;
+  min-width: 150px;
+  padding: 9px 12px;
+  border-radius: 13px;
+  background: var(--card-a);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--sh-2);
+  font-size: 12.5px;
+  color: var(--muted);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.bulle strong { display: block; color: var(--text); font-size: 13px; }
+.bulle span { display: block; font-family: var(--mono); color: var(--text); white-space: nowrap; }
+
+/* `.e-legend` */
+.legende { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 0; font-size: 13px; color: var(--muted); }
+.legende span { display: inline-flex; align-items: center; gap: 7px; }
+
+/* `.e-filtres` : les deux « et si », sous le titre au téléphone. */
+.filtres { display: flex; gap: 8px; flex-wrap: wrap; }
+.notePied { margin: 14px 0 0; font-size: 13.5px; color: var(--muted); }
+
+.filtre {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-2);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filtre[aria-pressed='true'] { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+.arret {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--tint-2);
+}
+
+.arret label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+.arret select, .arret input {
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line-2);
+  background: var(--card-a);
+  color: var(--text);
+  font: inherit;
+}
+
+.sousTitre { margin: 4px 0 0; font-size: 13.5px; color: var(--muted); }
+
+/* ── Tableau : les mêmes nombres, en texte ────────────────────────────────── */
+
+.tableau { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tableau th, .tableau td { padding: 9px 8px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.tableau th:first-child, .tableau td:first-child { text-align: left; }
+.tableau thead th { border-top: 0; color: var(--muted); font-weight: 600; font-size: 12.5px; }
+.tableau td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.tableau td:first-child { font-family: inherit; }
+.defile { overflow-x: auto; }
+.hypotheses { margin: 12px 0 0; padding-left: 18px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+.manquant { color: var(--amber); }
+
+/* ── Seuils — trois anneaux de la planche ─────────────────────────────────── */
+
+.seuils { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.seuil { display: flex; gap: 16px; align-items: flex-start; min-width: 0; }
+.seuilTexte { min-width: 0; flex: 1 1 auto; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+.seuilTexte b { display: block; color: var(--text); font-size: 14.5px; font-weight: 600; }
+.seuilTexte p { margin: 4px 0 0; }
+.seuilTexte .pastille { margin-top: 8px; }
+.mono { font-family: var(--mono); color: var(--text); }
+.attention { color: var(--chip-warn); font-weight: 600; }
+.alerte { color: var(--red); font-weight: 600; }
+
+/* ── Banque ──────────────────────────────────────────────────────────────── */
+
+.banque { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 16px; }
+.qui { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+.qui small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.avatar { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border-radius: 50%; background: var(--k2); color: var(--k2t); font-size: 12px; font-weight: 700; flex: none; }
+
+/* ── Le détail d'une ligne du dû ──────────────────────────────────────────── */
+
+.volets { margin: 0 0 14px; }
+.volets div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.volets div:first-child { border-top: 0; }
+.volets dt { color: var(--muted); }
+.volets dd { margin: 0; font-family: var(--mono); font-weight: 600; }
+.volets .totalVolets { font-weight: 600; }
+
+/* ── Capacité de versement (vue Année) ────────────────────────────────────── */
+
+.capacite { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; align-items: end; height: 200px; margin-top: 8px; }
+.colonne { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%; min-width: 0; }
+.barres { position: relative; display: flex; align-items: flex-end; justify-content: center; width: 100%; flex: 1 1 auto; }
+.barreCapacite { position: relative; width: 14px; border-radius: 7px; background: var(--bar-soft); overflow: visible; }
+.barreCapaciteFuture { background: repeating-linear-gradient(135deg, var(--bar-soft) 0 3px, transparent 3px 6px); border: 1px solid var(--bar-soft); }
+.barreVerse { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 7px; background: var(--green); }
+.moisCapacite { font-family: var(--mono); font-size: 12px; color: var(--muted-2); }
+.moisCapaciteCourant { color: var(--text); font-weight: 600; }
+.valeurCapacite { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+
+/* ── Au bureau ────────────────────────────────────────────────────────────── */
+
+@media (min-width: 761px) {
+  .page { gap: 20px; }
+  .rangee { flex-direction: row; align-items: stretch; gap: 20px; }
+  .rangee > :first-child { flex: 7 1 0; }
+  .rangee > :last-child { flex: 5 1 0; }
+  .carte { padding: 22px 24px; border-radius: var(--r); }
+  .entete { margin-bottom: 12px; }
+  .enteteHaut { flex-wrap: nowrap; margin-bottom: 18px; }
+  /* Les deux « et si » côte à côte, comme la maquette : à côté d'un titre
+     long, le partage de la ligne les mettait l'un sous l'autre. */
+  .enteteHaut .filtres { flex: none; flex-wrap: nowrap; }
+  .cascade { grid-template-columns: 172px minmax(0, 1fr) 96px; gap: 26px 16px; margin-top: 8px; }
+  .cascade dt { grid-column: 1; }
+  .cascade .piste { grid-column: 2; grid-row: auto; margin: 0; }
+  .cascade dd { grid-column: 3; }
+  .seuils { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .banque { padding: 16px 24px; }
+}

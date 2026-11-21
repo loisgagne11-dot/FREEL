@@ -44,10 +44,6 @@ function semer(m: Partial<Faits> = {}): void {
   });
 }
 
-/** Le libellé d'une tuile, et ce qu'elle affiche : la tuile entière. */
-async function tuile(libelle: string): Promise<string | null | undefined> {
-  return (await screen.findByText(libelle)).parentElement?.textContent;
-}
 
 describe('bascule d’année, vue depuis les écrans', () => {
   it('affiche le CA facturé de l’année choisie, pas celle de l’horloge', async () => {
@@ -80,13 +76,19 @@ describe('bascule d’année, vue depuis les écrans', () => {
       ]
     });
 
-    const { unmount } = render(<Tresorerie annee={2025} />);
-    const disponible2025 = await tuile('Disponible');
-    unmount();
+    /* Le disponible de la cascade (lot 49) : la valeur qui suit son libellé. */
+    const disponible = async (): Promise<string | null | undefined> =>
+      (await screen.findByRole('button', { name: /^Disponible : d’où vient ce chiffre/ }))
+        .closest('dt')?.nextElementSibling?.textContent;
+    window.location.hash = '#/tresorerie';
+    render(<Tresorerie annee={2025} />);
+    const disponible2025 = await disponible();
+    cleanup();
 
     render(<Tresorerie annee={2026} />);
-    const disponible2026 = await tuile('Disponible');
+    const disponible2026 = await disponible();
 
+    expect(disponible2025).toMatch(/\d/u);
     expect(disponible2025).toBe(disponible2026);
   });
 

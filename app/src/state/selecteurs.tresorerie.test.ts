@@ -8,7 +8,7 @@ import { etatProjection } from './selecteurs.argent';
 import { encaissementsAttendusDetailles, encaissementsAttendusParMois } from './selecteurs.pipeline';
 import { sortiesDuDu } from './selecteurs.sorties';
 import {
-  faitsAu, faitsDuScenario, seuilsDeLAnnee, tresorerieDeLAnnee, tresorerieDouzeMois
+  faitsAu, faitsDuScenario, projectionDuScenario, seuilsDeLAnnee, tresorerieDeLAnnee, tresorerieDouzeMois
 } from './selecteurs.tresorerie';
 
 const MAINTENANT = new Date(2026, 5, 10, 12);
@@ -193,8 +193,9 @@ describe('les « et si »', () => {
       { prospects: true, arret: null });
     expect(total(signe) - total(sansProspect)).toBe(total(seulLeProspect));
     expect(total(seulLeProspect)).toBeGreaterThan(0);
-    const t = tresorerieDouzeMois(avecProspect, MAINTENANT, { prospects: true, arret: null });
-    expect(t.scenario?.versementTenable).toBeGreaterThan(t.versementTenable);
+    const scenario = projectionDuScenario(avecProspect, { prospects: true, arret: null }, MAINTENANT);
+    expect(scenario?.versementTenable).toBeGreaterThan(tresorerieDouzeMois(avecProspect, MAINTENANT).versementTenable);
+    expect(projectionDuScenario(avecProspect, { prospects: false, arret: null }, MAINTENANT)).toBeNull();
   });
 
   it('arrêtent une mission à une date : son planning d’après disparaît, celui d’avant reste', () => {
@@ -253,7 +254,49 @@ describe('les seuils de l’année', () => {
   });
 });
 
+/**
+ * LA VUE ANNÉE — reprise des règles de l'ancienne « évolution du compte » (lot
+ * L1) : le passé est un fait, l'avenir une hypothèse, et avant le solde de
+ * départ il n'y a rien à savoir.
+ */
 describe('la vue Année', () => {
+  it('couvre janvier à décembre de l’année choisie, pas un rouleau de douze mois', () => {
+    const faits = poser();
+    expect(tresorerieDeLAnnee(faits, 2025, MAINTENANT).map((m) => m.mois)[0]).toBe('2025-01');
+    expect(tresorerieDeLAnnee(faits, 2026, MAINTENANT).map((m) => m.mois)).toHaveLength(12);
+    expect(tresorerieDeLAnnee(faits, 2026, MAINTENANT)[11]?.mois).toBe('2026-12');
+  });
+
+  it('compte les dépenses, les échéances payées et le versé dans les sorties d’un mois clos', () => {
+    const faits = poser({
+      depenses: [{
+        id: 'd1', libelle: 'Matériel', fournisseur: 'Fournisseur d’essai', provenance: 'france',
+        montantTtc: euros(500), tauxTva: 0.2 as never, payeeLe: dateISO('2026-02-10'),
+        justificatifId: null, rapprochement: 'en_attente'
+      }] as never,
+      echeances: [{
+        id: 'e1', nature: 'urssaf', montant: euros(800), montantPaye: euros(800),
+        echeanceLe: dateISO('2026-02-05'), payeeLe: dateISO('2026-02-05')
+      }]
+    });
+    const fevrier = tresorerieDeLAnnee(faits, 2026, MAINTENANT).find((m) => m.mois === '2026-02');
+    expect(fevrier?.nature).toBe('constate');
+    expect(fevrier?.sorties).toBe(1_300);
+  });
+
+  /*
+   * Avant le solde de départ, le solde d'un mois est INCONNU : une courbe
+   * immobile au montant de départ affirmerait que le compte l'a porté toute
+   * l'année. Les flux, eux, sont des écritures datées : ils restent.
+   */
+  it('ne prétend connaître aucun solde avant le solde de départ, mais montre les encaissements', () => {
+    const faits = poser({ soldeInitialAu: dateISO('2026-01-29'), recettes: [recette('r1', 5_000, '2025-07-01', '2025-07-15')] });
+    const annee = tresorerieDeLAnnee(faits, 2025, MAINTENANT);
+    expect(annee.every((m) => m.disponible === null && m.solde === null)).toBe(true);
+    expect(annee.find((m) => m.mois === '2025-07')?.entrees).toBe(5_000);
+    expect(tresorerieDeLAnnee(faits, 2026, MAINTENANT).find((m) => m.mois === '2026-01')?.solde).not.toBeNull();
+  });
+
   it('relit une année passée en entier, constatée', () => {
     const annee = tresorerieDeLAnnee(ESSAI, 2026, new Date(2027, 1, 10, 12));
     expect(annee.every((m) => m.nature === 'constate')).toBe(true);
