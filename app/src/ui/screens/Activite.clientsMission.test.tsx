@@ -88,8 +88,8 @@ async function ouvrirLaMission() {
   render(<Activite />);
   const utilisateur = userEvent.setup();
   await utilisateur.click(screen.getByRole('tab', { name: /^Missions/ }));
-  await screen.findByRole('heading', { name: /^Missions/ });
-  await utilisateur.click(within(screen.getByRole('list')).getByRole('button', { name: /Refonte catalogue/ }));
+  await screen.findByRole('heading', { name: /^Toutes les missions/ });
+  await utilisateur.click(within(screen.getByRole('table')).getByRole('button', { name: /Refonte catalogue/ }));
   await screen.findByRole('button', { name: /^Retirer — Atelier Fictif/ });
   return utilisateur;
 }
@@ -241,8 +241,8 @@ describe('arrêter un client de la mission', () => {
     render(<Activite />);
     const u = userEvent.setup();
     await u.click(screen.getByRole('tab', { name: /^Missions/ }));
-    await screen.findByRole('heading', { name: /^Missions/ });
-    await u.click(within(screen.getByRole('list')).getByRole('button', { name: /Refonte catalogue/ }));
+    await screen.findByRole('heading', { name: /^Toutes les missions/ });
+    await u.click(within(screen.getByRole('table')).getByRole('button', { name: /Refonte catalogue/ }));
     await screen.findByLabelText('Description');
 
     expect(screen.queryByRole('button', { name: /^Arrêter ce client le/ })).toBeNull();
@@ -284,7 +284,7 @@ describe('lire l’état des clients', () => {
     render(<Activite />);
     const u = userEvent.setup();
     await u.click(screen.getByRole('tab', { name: /^Missions/ }));
-    await screen.findByRole('heading', { name: /^Missions/ });
+    await screen.findByRole('heading', { name: /^Toutes les missions/ });
 
     expect(screen.getByText('Pour Atelier Fictif jusqu’au 13 mai, puis Studio Fictif')).toBeTruthy();
   });
@@ -294,7 +294,7 @@ describe('lire l’état des clients', () => {
     render(<Activite />);
     const u = userEvent.setup();
     await u.click(screen.getByRole('tab', { name: /^Missions/ }));
-    await screen.findByRole('heading', { name: /^Missions/ });
+    await screen.findByRole('heading', { name: /^Toutes les missions/ });
     expect(screen.queryByText(/^Pour .* jusqu’au/)).toBeNull();
   });
 
@@ -455,8 +455,8 @@ describe('ajouter un client à une mission qui a travaillé', () => {
     render(<Activite />);
     const u = userEvent.setup();
     await u.click(screen.getByRole('tab', { name: /^Missions/ }));
-    await screen.findByRole('heading', { name: /^Missions/ });
-    await u.click(within(screen.getByRole('list')).getByRole('button', { name: /Refonte catalogue/ }));
+    await screen.findByRole('heading', { name: /^Toutes les missions/ });
+    await u.click(within(screen.getByRole('table')).getByRole('button', { name: /Refonte catalogue/ }));
     await u.click(await screen.findByRole('button', { name: 'Ajouter un client opérationnel' }));
     await u.click(screen.getByRole('button', { name: /^Arrêter ce client le… — Atelier Fictif/ }));
     const champ = screen.getByLabelText('Arrêter ce client le');

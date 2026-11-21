@@ -51,7 +51,9 @@ async function ouvrir(onglet: 'Clients' | 'Missions') {
   await utilisateur.click(screen.getByRole('tab', { name: new RegExp(`^${onglet}`) }));
   // Les deux onglets sont chargés à la demande : attendre leur arrivée.
   await screen.findByRole('heading', {
-    name: onglet === 'Clients' ? /Carnet/ : /^Missions/
+    // Le carnet de commandes (lot 48) : la liste est devenue le tableau
+    // « Toutes les missions », sous la frise.
+    name: onglet === 'Clients' ? /Carnet/ : /^Toutes les missions/
   });
   return utilisateur;
 }
@@ -225,7 +227,7 @@ describe('missions', () => {
       recettes: [recette()]
     });
     const utilisateur = await ouvrir('Missions');
-    const liste = screen.getByRole('list');
+    const liste = screen.getByRole('table');
     await utilisateur.click(within(liste).getByRole('button', { name: /Mission/ }));
     await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette mission' }));
 
@@ -245,7 +247,7 @@ describe('missions', () => {
       }]
     });
     const utilisateur = await ouvrir('Missions');
-    await utilisateur.click(within(screen.getByRole('list')).getByRole('button', { name: /Mission/ }));
+    await utilisateur.click(within(screen.getByRole('table')).getByRole('button', { name: /Mission/ }));
     await utilisateur.click(screen.getByRole('button', { name: 'Supprimer cette mission' }));
     expect(useFaits.getState().faits.missions).toHaveLength(1);
     const confirmation = screen.getByRole('group', { name: /quitte le carnet/ });
@@ -263,7 +265,7 @@ describe('missions', () => {
       }]
     });
     const utilisateur = await ouvrir('Missions');
-    await utilisateur.click(within(screen.getByRole('list')).getByRole('button', { name: /Mission/ }));
+    await utilisateur.click(within(screen.getByRole('table')).getByRole('button', { name: /Mission/ }));
     await utilisateur.selectOptions(screen.getByLabelText('Statut'), 'perdue');
     await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
 

@@ -1,0 +1,56 @@
+/* La tuile à tendance de la planche (`e-card e-tile`), mesures de
+   docs/design/direction/calme.css : carte 22 × 24 px, étiquette Mono 12 px en
+   capitales, valeur Mono 30 px, explication 13,5 px, courbe 124 × 42. */
+
+.tuile {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
+  padding: 22px 24px;
+  background: linear-gradient(180deg, var(--card-a), var(--card-b));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--sh-2);
+}
+
+.texte { min-width: 0; }
+
+.etiquette {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+.valeur {
+  margin: 8px 0 4px;
+  font-family: var(--mono);
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.explication { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
+
+.courbe { flex: 0 0 auto; width: 124px; height: 42px; }
+.vert { --teinte: var(--green-lite); }
+.urssaf { --teinte: var(--c-urssaf); }
+.trait { fill: none; stroke: var(--teinte); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.point { fill: var(--teinte); }
+
+/* Le tracé en 400 ms à l'apparition — et rien si l'on a demandé moins de
+   mouvement (direction, « Mouvement »). */
+@media (prefers-reduced-motion: no-preference) {
+  .trait { stroke-dasharray: 1; stroke-dashoffset: 1; animation: tracer 400ms ease-out forwards; }
+}
+
+@keyframes tracer { to { stroke-dashoffset: 0; } }
+
+.pastille { flex: 0 0 auto; margin-bottom: 4px; }

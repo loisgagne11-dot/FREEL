@@ -140,6 +140,7 @@
       "fin": "2026-07-31",
       "statut": "active",
       "facturation": "commune",
+      "referenceCommande": "BC-0142",
       "joursCommandes": 32,
       "preavisFinJours": null,
       "reconduction": null,
