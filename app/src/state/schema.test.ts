@@ -1219,15 +1219,25 @@ describe('schéma 24 → 25 : déclarations, appels liés, TVA, pièces', () => 
 });
 
 /**
- * v25 → v26 : la caisse de retraite. Comblée à `ssi`, ce que valait tout
- * dossier d'avant : un `undefined` ferait servir à un affilié SSI le barème
- * d'aucune caisse — et l'application refuserait chaque cotisation.
+ * v25 → v26 : la caisse de retraite et l'histoire de l'option VL. La caisse
+ * est comblée à `ssi`, ce que valait tout dossier d'avant : un `undefined`
+ * ferait servir à un affilié SSI le barème d'aucune caisse — et l'application
+ * refuserait chaque cotisation.
  */
-describe('schéma 25 → 26 : la caisse de retraite', () => {
+describe('schéma 25 → 26 : la caisse de retraite, l’histoire de l’option VL', () => {
   it('un compte de schéma 25 reçoit la caisse SSI, et non `undefined`', () => {
     const f = completerFaits({ version: 25, entreprise: { nom: 'Atelier de démonstration', typeActivite: 'BNC' } });
     expect(f.version).toBe(26);
     expect(f.entreprise.caisseRetraite).toBe('ssi');
+  });
+
+  /* L'histoire de l'option : vide, l'option du jour vaut depuis toujours —
+     ce que disait le booléen seul. Un `undefined` ferait lever chaque écran
+     qui calcule un impôt. */
+  it('un compte de schéma 25 reçoit une histoire de l’option vide, son option intacte', () => {
+    const f = completerFaits({ version: 25, entreprise: { versementLiberatoire: true } });
+    expect(f.entreprise.historiqueVl).toEqual([]);
+    expect(f.entreprise.versementLiberatoire).toBe(true);
   });
 
   it('garde la Cipav d’un compte qui l’a choisie', () => {

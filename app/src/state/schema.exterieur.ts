@@ -56,6 +56,7 @@ const SORTES_PIECE: Readonly<Record<PieceAFournir['sorte'], true>> = {
 };
 const FORME_DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const FORME_PERIODE_URSSAF = /^\d{4}-(\d{2}|T[1-4])$/u;
+const FORME_MOIS = /^\d{4}-(0[1-9]|1[0-2])$/u;
 
 const estObjet = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -134,6 +135,13 @@ function motifRefusChampsDuSchema25(brut: unknown): string | null {
  * Les champs apparus au schéma 26, contrôlés comme ceux du 25 : quelle que
  * soit la version annoncée. Une caisse inconnue se lirait « SSI » sans un
  * mot — un affilié Cipav cotiserait au mauvais taux sans l'avoir choisi.
+ *
+ * L'histoire de l'option se lit par une recherche de la première période qui
+ * couvre un mois : une liste qui n'en est pas une ferait lever chaque écran qui
+ * calcule un impôt, une période sans mois lisible couvrirait des mois au
+ * hasard, et deux périodes dans le désordre laisseraient la première masquer
+ * la seconde — une année passée sous versement libératoire redeviendrait
+ * imposée au barème.
  */
 function motifRefusChampsDuSchema26(brut: unknown): string | null {
   const entreprise = estObjet(brut) ? brut['entreprise'] : undefined;
@@ -142,7 +150,15 @@ function motifRefusChampsDuSchema26(brut: unknown): string | null {
   if (caisse !== undefined && caisse !== 'ssi' && caisse !== 'cipav') {
     return 'Le champ « entreprise.caisseRetraite » devrait être « ssi » ou « cipav ».';
   }
-  return null;
+  const historique = entreprise['historiqueVl'];
+  if (historique === undefined) return null;
+  const lisible = Array.isArray(historique) && historique.every((p, i) =>
+    estObjet(p) && typeof p['jusquA'] === 'string' && FORME_MOIS.test(p['jusquA'])
+    && typeof p['actif'] === 'boolean'
+    && (i === 0 || String((historique[i - 1] as Record<string, unknown>)['jusquA']) < p['jusquA']));
+  return lisible ? null
+    : 'Le champ « entreprise.historiqueVl » devrait être une liste de périodes datées, dans l’ordre : '
+      + 'rien n’a été chargé.';
 }
 
 /**

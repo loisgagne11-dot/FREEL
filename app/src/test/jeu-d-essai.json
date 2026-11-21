@@ -10,6 +10,7 @@
     "caisseRetraite": "ssi",
     "acre": true,
     "versementLiberatoire": false,
+    "historiqueVl": [],
     "tvaDepuis": null,
     "tvaIntracom": "",
     "iban": "FR00 0000 0000 0000 0000 0000 000",

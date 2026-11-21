@@ -96,13 +96,65 @@ describe('profil', () => {
 
   // Discriminant exclusif : l'ancienne version cumulait versement libératoire
   // et barème progressif, et surestimait l'impôt à provisionner.
-  it('bascule le versement libératoire', async () => {
+  //
+  // La bascule écrivait au clic. Elle demande désormais « depuis quand » : une
+  // case seule réécrivait les années passées. Corriger, c'est l'option du jour
+  // depuis toujours, sans histoire — ce que faisait le clic.
+  it('bascule le versement libératoire, depuis le début quand on corrige', async () => {
     await afficher('profil');
     const utilisateur = utilisateurTest();
     await utilisateur.click(
       screen.getByRole('switch', { name: /Versement libératoire/ })
     );
-    expect(useFaits.getState().faits.entreprise.versementLiberatoire).toBe(true);
+    expect(useFaits.getState().faits.entreprise.versementLiberatoire).toBe(false);
+    await utilisateur.click(screen.getByRole('button', { name: /Depuis le début de mon activité/ }));
+    expect(useFaits.getState().faits.entreprise).toMatchObject({ versementLiberatoire: true, historiqueVl: [] });
+  });
+
+  /*
+   * CHANGER D'OPTION NE RÉÉCRIT PAS LE PASSÉ. Renoncer en janvier 2027, c'est
+   * pour 2028 : 2027 reste sous l'option, et ses déclarations aussi. Sans la
+   * question, la case réécrivait l'année en cours au barème.
+   */
+  it('garde l’option de l’année quand on la change pour le 1er janvier suivant, et le dit', async () => {
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } }
+    });
+    await afficher('profil');
+    const utilisateur = utilisateurTest();
+    await utilisateur.click(screen.getByRole('switch', { name: /Versement libératoire/ }));
+    const question = screen.getByRole('group', { name: /^Depuis quand/ });
+    expect(question.textContent).toMatch(/au plus tard le 30\u00a0septembre/);
+    await utilisateur.click(within(question).getByRole('button', { name: /À partir du 1ᵉʳ janvier 2028/ }));
+
+    expect(useFaits.getState().faits.entreprise).toMatchObject({
+      versementLiberatoire: false, historiqueVl: [{ jusquA: '2027-12', actif: true }]
+    });
+    expect(screen.getByText(/À partir du 1ᵉʳ janvier 2028, impôt au barème/)).toBeTruthy();
+  });
+
+  it('n’écrit rien quand on annule la question', async () => {
+    await afficher('profil');
+    const utilisateur = utilisateurTest();
+    const bascule = screen.getByRole('switch', { name: /Versement libératoire/ });
+    await utilisateur.click(bascule);
+    await utilisateur.click(screen.getByRole('button', { name: 'Annuler' }));
+    expect(screen.queryByRole('group', { name: /^Depuis quand/ })).toBeNull();
+    expect(bascule).toHaveProperty('checked', false);
+    expect(useFaits.getState().faits.entreprise).toMatchObject({ versementLiberatoire: false, historiqueVl: [] });
+  });
+
+  // L'année de création, l'option demandée dans les trois mois vaut dès le
+  // début : proposer le 1er janvier suivant lui ferait payer un an au barème.
+  it('ne propose que « depuis le début » l’année de création', async () => {
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, debutActivite: dateISO('2027-01-05') } }
+    });
+    await afficher('profil');
+    await utilisateurTest().click(screen.getByRole('switch', { name: /Versement libératoire/ }));
+    const question = screen.getByRole('group', { name: /^Depuis quand/ });
+    expect(within(question).queryByRole('button', { name: /À partir du 1ᵉʳ janvier/ })).toBeNull();
+    expect(within(question).getByRole('button', { name: /Depuis le début de mon activité/ })).toBeTruthy();
   });
 
   it('laisse l’option pour la TVA vide en franchise en base', async () => {

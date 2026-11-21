@@ -58,11 +58,11 @@ describe('mois courant', () => {
 describe('régime d\'imposition dérivé des faits', () => {
   it('versement libératoire quand l\'option est prise', () => {
     const f = faits({ entreprise: { ...faitsVides().entreprise, versementLiberatoire: true } });
-    expect(regimeDe(f).regime).toBe('versement_liberatoire');
+    expect(regimeDe(f, mois('2026-05')).regime).toBe('versement_liberatoire');
   });
 
   it('barème sinon, avec l\'acompte saisi', () => {
-    const r = regimeDe(faits(), euros(620));
+    const r = regimeDe(faits(), mois('2026-05'), euros(620));
     expect(r.regime).toBe('bareme');
     expect(r.regime === 'bareme' && r.acomptePasSaisi).toBe(620);
   });

@@ -170,6 +170,10 @@ export interface PeriodesDeclarees {
 
 export const estDeclare = (p: PeriodesDeclarees, m: Mois): boolean => p.mois.includes(m);
 
+/** Le taux d'impôt et de contributions d'un mois d'encaissement : voir `ContexteProvisions`. */
+export const tauxImpotDuMois = (ctx: ContexteProvisions, m: Mois): number =>
+  (typeof ctx.tauxImpotEtContributions === 'number' ? ctx.tauxImpotEtContributions : ctx.tauxImpotEtContributions(m));
+
 export interface ContexteProvisions {
   readonly typeActivite: TypeActivite;
   readonly sousAcreLe: (m: Mois) => boolean;
@@ -196,8 +200,12 @@ export interface ContexteProvisions {
    * ATTENTION : sous le régime du BARÈME, ce taux ne vaut que la CFP — 0,2 %.
    * L'impôt sur le revenu, lui, n'est pas un taux sur les recettes ; il entre
    * par `impotRevenu` ci-dessous.
+   *
+   * Un taux par MOIS d'encaissement quand l'option a changé : l'option vaut au
+   * 1er janvier, et un décembre encore à déclarer garde la sienne. Un nombre
+   * seul vaut pour tous les mois.
    */
-  readonly tauxImpotEtContributions: number;
+  readonly tauxImpotEtContributions: number | ((m: Mois) => number);
   /**
    * L'impôt sur le revenu restant à mettre de côté pour l'année, en euros.
    *
@@ -433,7 +441,8 @@ export function voletAProvisionner(
       nonCalculables.push({ id: r.id, motif: taux.motif });
       continue;
     }
-    somme += r.montant * (taux.valeur + ctx.tauxImpotEtContributions);
+    const impot = tauxImpotDuMois(ctx, m);
+    somme += r.montant * (taux.valeur + impot);
     parNature.urssaf += r.montant * taux.valeur;
     // La CFP se paie à l'URSSAF avec la déclaration : rangée en « impôt », elle
     // faisait afficher une ligne URSSAF 0,2 % sous ce que l'URSSAF demande, et
@@ -442,9 +451,9 @@ export function voletAProvisionner(
     // libératoire, s'il y a lieu) demeure de l'impôt. `min` : un taux refusé
     // arrive ici à zéro, et rien ne doit alors être attribué à la CFP.
     const cfp = tauxCfp(m, ctx.typeActivite);
-    const partCfp = Math.min(ctx.tauxImpotEtContributions, cfp.statut === 'refuse' ? 0 : cfp.valeur);
+    const partCfp = Math.min(impot, cfp.statut === 'refuse' ? 0 : cfp.valeur);
     parNature.cfp += r.montant * partCfp;
-    parNature.impot += r.montant * (ctx.tauxImpotEtContributions - partCfp);
+    parNature.impot += r.montant * (impot - partCfp);
   }
 
   // L'impôt sur le revenu s'ajoute UNE FOIS, pas recette par recette : c'est

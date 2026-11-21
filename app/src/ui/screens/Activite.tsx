@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
 import { composantALaDemande } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
 import { poserAjustement, poserPlageDeConges, retirerAjustements } from '../../state/ecritures.activite';
-import { dateDuJour, moisCourant } from '../../state/selecteurs';
+import { dateDuJour, moisCourant, vlAu } from '../../state/selecteurs';
 import {
   type PoidsClient,
   type MoisEnChiffres as ChiffresDuMois,
@@ -856,7 +856,7 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
               <CarteTarifJournalier
                 tarif={tarif}
                 annee={annee}
-                auBareme={!faits.entreprise.versementLiberatoire}
+                auBareme={!vlAu(faits, mois)}
               />
             </Suspense>
           </div>

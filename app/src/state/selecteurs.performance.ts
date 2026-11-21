@@ -201,7 +201,6 @@ export function resultatProjete(
   const annee = maintenant.getFullYear();
   const m0 = moisCourant(maintenant);
   const type = faits.entreprise.typeActivite;
-  const regime = regimeDe(faits);
   const attendu = new Map(projection.projection.mois.map((p) => [p.mois, p.encaissements]));
 
   let dejaEncaisse = 0;
@@ -226,7 +225,9 @@ export function resultatProjete(
 
     const cotis = tauxCotisationsAu(faits, m);
     if (cotis.statut === 'refuse') return null;
-    const imp = tauxImpotEtContributions(regime, m, type);
+    // L'option de ce mois : quittée au 1er janvier, elle ne vaut plus pour
+    // l'année projetée, même si elle valait pour la précédente.
+    const imp = tauxImpotEtContributions(regimeDe(faits, m), m, type);
     if (imp.statut === 'refuse') return null;
 
     cotisations += assiette * cotis.valeur;
@@ -243,7 +244,8 @@ export function resultatProjete(
 
   const caProjete = euros(dejaEncaisse + caAttendu);
   const reserves: ReserveDuResultat[] = ['abattement_non_applique'];
-  if (regime.regime === 'bareme') reserves.push('avant_impot_sur_le_revenu');
+  // L'option du mois courant vaut pour l'année : elle ne change qu'au 1er janvier.
+  if (regimeDe(faits, m0).regime === 'bareme') reserves.push('avant_impot_sur_le_revenu');
   if (depenses > 0) reserves.push('depenses_professionnelles_retirees');
   if (projection.depensesMensuelles === null && moisRestants > 0) {
     reserves.push('depenses_a_venir_inconnues');

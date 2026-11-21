@@ -23,6 +23,7 @@ import type { AjustementJour, Ajustements, Rythme } from '../domain/calculs/plan
 import type { Echeance } from '../domain/calculs/provisions';
 import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 import type { PieceAFournir } from '../domain/calculs/pieces';
+import type { PeriodeOptionVl } from '../domain/calculs/optionVl';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -104,8 +105,20 @@ export interface Entreprise {
    */
   readonly caisseRetraite: CaisseRetraite;
   readonly acre: boolean;
-  /** Régime d'imposition. Discriminant EXCLUSIF (voir bareme/impot). */
+  /**
+   * Régime d'imposition. Discriminant EXCLUSIF (voir bareme/impot).
+   *
+   * La DERNIÈRE option choisie : celle qui vaut après la dernière période de
+   * `historiqueVl` — au 1er janvier prochain, peut-être. Aucun calcul ne la lit
+   * directement : ils passent par `vlAu`, qui dit l'option d'un mois.
+   */
   readonly versementLiberatoire: boolean;
+  /**
+   * Ce que valait l'option AVANT (schéma 26) : des périodes closes, triées,
+   * sans chevauchement. Vide, l'option du jour vaut depuis toujours — ce que
+   * disait tout dossier d'avant. Voir `calculs/optionVl`.
+   */
+  readonly historiqueVl: readonly PeriodeOptionVl[];
   /** Mois d'assujettissement à la TVA, `null` si en franchise. */
   readonly tvaDepuis: Mois | null;
   readonly tvaIntracom: string;
@@ -763,7 +776,7 @@ export interface Faits {
 export function entrepriseVide(): Entreprise {
   return {
     nom: '', prenom: '', siret: '', debutActivite: null, typeActivite: 'BNC', caisseRetraite: 'ssi', acre: false,
-    versementLiberatoire: false, tvaDepuis: null, tvaIntracom: '', iban: '',
+    versementLiberatoire: false, historiqueVl: [], tvaDepuis: null, tvaIntracom: '', iban: '',
     bic: '', adresse: '', codePostal: '', ville: '', codeApe: '', email: '',
     telephone: '', urssafPeriodicite: 'mensuel', onboardingFait: false,
     plateformeAgreee: null, optionTvaDebits: false,

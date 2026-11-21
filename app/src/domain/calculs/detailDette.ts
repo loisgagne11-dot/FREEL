@@ -50,7 +50,7 @@ import { tauxCfp } from '../bareme/impot';
 import type {
   ContexteProvisions, Echeance, NatureDette, PeriodesDeclarees, RecetteEncaissee
 } from './provisions';
-import { estDeclare, estPayee } from './provisions';
+import { estDeclare, estPayee, tauxImpotDuMois } from './provisions';
 
 /** Le mois d'une date ISO. */
 const moisDe = (d: DateISO): Mois => d.slice(0, 7) as Mois;
@@ -285,12 +285,13 @@ function estimationParMois(
     // Le partage de `voletAProvisionner`, à l'identique : la CFP est prise sur
     // le taux « impôt et contributions », et n'en est plus comptée en impôt.
     const cfp = tauxCfp(m, ctx.typeActivite);
-    const partCfp = Math.min(ctx.tauxImpotEtContributions, cfp.statut === 'refuse' ? 0 : cfp.valeur);
+    const impot = tauxImpotDuMois(ctx, m);
+    const partCfp = Math.min(impot, cfp.statut === 'refuse' ? 0 : cfp.valeur);
     const part = nature === 'urssaf'
       ? r.montant * taux.valeur
       : nature === 'cfp'
         ? r.montant * partCfp
-        : r.montant * (ctx.tauxImpotEtContributions - partCfp);
+        : r.montant * (impot - partCfp);
     parMois.set(m, (parMois.get(m) ?? 0) + part);
   }
 

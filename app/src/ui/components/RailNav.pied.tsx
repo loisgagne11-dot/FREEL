@@ -1,5 +1,5 @@
 import { useFaits } from '../../state/store';
-import { moisCourant, sousAcreLe } from '../../state/selecteurs';
+import { moisCourant, sousAcreLe, vlAu } from '../../state/selecteurs';
 import styles from './RailNav.module.css';
 
 /**
@@ -24,7 +24,8 @@ export function PiedDuRail() {
   const regime = [
     `Micro-${entreprise.typeActivite === 'BNC' ? 'BNC' : 'BIC'}`,
     ...(sousAcreLe(faits)(moisCourant()) ? ['ACRE'] : []),
-    ...(entreprise.versementLiberatoire ? ['VL'] : [])
+    // L'option de ce mois : prise en novembre pour janvier, elle ne se dit pas avant.
+    ...(vlAu(faits, moisCourant()) ? ['VL'] : [])
   ].join(' · ');
 
   return (

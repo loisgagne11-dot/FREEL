@@ -750,7 +750,7 @@ export function tauxDeChargesAu(faits: Faits, m: Mois): Resolution<number> {
   const cotis = tauxCotisationsAu(faits, m);
   if (cotis.statut === 'refuse') return cotis;
 
-  const impot = tauxImpotEtContributions(regimeDe(faits), m, type);
+  const impot = tauxImpotEtContributions(regimeDe(faits, m), m, type);
   if (impot.statut === 'refuse') return impot;
 
   const somme = cotis.valeur + impot.valeur;

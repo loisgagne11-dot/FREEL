@@ -36,11 +36,9 @@ import { type DetailDette, detailDette } from '../domain/calculs/detailDette';
 import type { Faits } from './schema';
 import {
   echeancesDuComptePro, etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, tvaDesDepensesPayees,
-  periodesUrssafEffectives, recettesEncaissees,
-  regimeDe, sousAcreLe
+  periodesUrssafEffectives, recettesEncaissees, sousAcreLe, tauxImpotAu
 } from './selecteurs';
-import { tauxImpotEtContributions } from '../domain/bareme';
-import { AUTOLIQUIDATION_TVA } from '../domain/bareme/tva';
+import { AUTOLIQUIDATION_TVA } from '../domain/bareme/tva.reconnus';
 
 /* La part autoliquidée de la provision de TVA vivait dans `selecteurs.ts`,
    donc au premier rendu, pour le seul détail de la dette qui la lit. Le
@@ -94,12 +92,6 @@ export function detailDeLaDette(
   maintenant: Date = new Date()
 ): DetailDette {
   const type = faits.entreprise.typeActivite;
-  // Le taux du MOIS COURANT, comme `etatArgent` : c'est celui qui s'applique
-  // aux encaissements qu'on est en train de provisionner.
-  const tauxR = tauxImpotEtContributions(regimeDe(faits), moisCourant(maintenant), type);
-  // Un taux refusé vaut zéro ici, comme dans `etatArgent` : on ne fabrique pas
-  // de taux, et la ligne d'impôt manquera plutôt que d'être fausse.
-  const taux = tauxR.statut === 'refuse' ? 0 : tauxR.valeur;
 
   return detailDette(
     nature,
@@ -112,7 +104,11 @@ export function detailDeLaDette(
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
       debutActivite: faits.entreprise.debutActivite,
-      tauxImpotEtContributions: taux,
+      // Le taux de chaque mois d'encaissement, comme `etatPilote` — l'option
+      // pour le versement libératoire a pu changer au 1er janvier. Un taux
+      // refusé y vaut zéro : on ne fabrique pas de taux, et la ligne d'impôt
+      // manquera plutôt que d'être fausse.
+      tauxImpotEtContributions: tauxImpotAu(faits),
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       tvaAReverser: tvaAReverserDe(faits),
       tvaAutoliquidee: tvaAutoliqueeProvisionnee(faits, maintenant),

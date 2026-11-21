@@ -64,7 +64,7 @@ describe('le jeu de démonstration, au 10 juin 2026', () => {
         return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
       });
       const base = recettesEncaissees(demo).filter((r) => trimestre.includes(r.encaisseeLe.slice(0, 7)));
-      const taux = tauxImpotEtContributions(regimeDe(demo), mois(trimestre[2] as string), 'BNC');
+      const taux = tauxImpotEtContributions(regimeDe(demo, mois(trimestre[2] as string)), mois(trimestre[2] as string), 'BNC');
       const attendu = voletAProvisionner(base, { mois: [] }, {
         typeActivite: 'BNC', sousAcreLe: sousAcreLe(demo),
         debutActivite: demo.entreprise.debutActivite,

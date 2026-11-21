@@ -36,11 +36,10 @@ import {
 } from '../domain/calculs/composition';
 import { provisions as calculerProvisions } from '../domain/calculs/provisions';
 import { soldeDerive } from '../domain/calculs/solde';
-import { tauxImpotEtContributions } from '../domain/bareme';
 import type { Faits } from './schema';
 import {
-  etatPilote, impotRevenuAProvisionner, moisCourant, tvaAReverserDe, periodesUrssafEffectives, recettesEncaissees,
-  regimeDe, sousAcreLe, echeancesDuComptePro } from './selecteurs';
+  etatPilote, impotRevenuAProvisionner, tvaAReverserDe, periodesUrssafEffectives, recettesEncaissees,
+  sousAcreLe, echeancesDuComptePro, tauxImpotAu } from './selecteurs';
 
 export function compositionDe(
   faits: Faits,
@@ -89,9 +88,7 @@ export function compositionDe(
  * de barème.
  */
 function detailProvisionsDe(faits: Faits, maintenant: Date) {
-  const m = moisCourant(maintenant);
   const type = faits.entreprise.typeActivite;
-  const tauxR = tauxImpotEtContributions(regimeDe(faits), m, type);
 
   return calculerProvisions(
     echeancesDuComptePro(faits),
@@ -101,9 +98,10 @@ function detailProvisionsDe(faits: Faits, maintenant: Date) {
       typeActivite: type,
       sousAcreLe: sousAcreLe(faits),
       debutActivite: faits.entreprise.debutActivite,
-      // Un taux refusé vaut zéro ici, comme dans `etatPilote` : on ne fabrique
-      // pas de taux, et la réserve dira que le total est sous-évalué.
-      tauxImpotEtContributions: tauxR.statut === 'refuse' ? 0 : tauxR.valeur,
+      // Le taux de chaque mois, comme `etatPilote` : un taux refusé y vaut
+      // zéro, on ne fabrique pas de taux, et la réserve dira que le total est
+      // sous-évalué.
+      tauxImpotEtContributions: tauxImpotAu(faits),
       impotRevenu: impotRevenuAProvisionner(faits, maintenant),
       tvaAReverser: tvaAReverserDe(faits),
       periodesUrssaf: periodesUrssafEffectives(faits)
