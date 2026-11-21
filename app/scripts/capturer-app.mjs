@@ -118,7 +118,10 @@ const VUES = [
      voir la note sur l'ancrage exact des libellés, plus bas. */
   { hash: '#/activite', nom: 'activite-planning', handoff: 'activite-plan-de-charge' },
   { hash: '#/activite', nom: 'activite-mois', handoff: 'activite-mois', ouvrir: ['Mois'] },
-  { hash: '#/activite', nom: 'activite-missions', handoff: 'activite-missions', ouvrir: ['Missions'] },
+  /* Le carnet de commandes (lot 48) arrive avec son onglet, à la demande :
+     sans l'attendre, la photo pouvait montrer « Chargement… ». */
+  { hash: '#/activite', nom: 'activite-missions', handoff: 'activite-missions', ouvrir: ['Missions'],
+    attendre: 'h2:has-text("Toutes les missions")' },
   /* Le compte rendu a quitté les Outils pour Activité (lot 51). La carte, puis
      l'atelier : un panneau qui ne s'ouvre qu'au clic n'apparaît sur aucune
      capture d'écran, et c'est justement là que les défauts se logent. */

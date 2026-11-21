@@ -161,7 +161,10 @@ export function FriseDuCarnet(
   const yRangee = (i: number): number => g.yPremier + g.pas * i;
   const yBas = yRangee(Math.max(rangees.length - 1, 0)) + (g.nomAuDessus ? 20 : 28);
   const yValeurs = yBas + (g.nomAuDessus ? 40 : 22);
-  const hauteur = yValeurs + (g.nomAuDessus ? 12 : 14);
+  /* Sous 30 px de colonne, « 15,5 » touche son voisin : un mois sur deux
+     descend d'une ligne, plutôt que de rogner la demi-journée. */
+  const enQuinconce = g.nomAuDessus && (x1 - g.x0) / 12 < 30;
+  const hauteur = yValeurs + (g.nomAuDessus ? 12 : 14) + (enQuinconce ? 12 : 0);
   const xAujourdhui = xDe(aujourdhui, 'debut') + colonne / joursDuMois(aujourdhui) / 2;
   const maxNom = Math.floor((g.x0 - 24) / (g.policeNom * 0.56));
   const maxSous = Math.floor((g.x0 - 24) / (g.policeSous * 0.55));
@@ -242,7 +245,7 @@ export function FriseDuCarnet(
         {g.nomAuDessus && rangees.map((r, i) => (
           <text key={r.ligne.mission.id} className={`${styles.nomRangee} ${styles.lisere}`}
             x={0} y={yRangee(i) - 11} fontSize={g.policeNom}>
-            {couper(r.ligne.nom, 34)}
+            {couper(r.ligne.nom, Math.floor(large / (g.policeNom * 0.56)))}
           </text>
         ))}
         <line className={styles.filetBas} x1={0} y1={yBas} x2={x1} y2={yBas} />
@@ -250,7 +253,7 @@ export function FriseDuCarnet(
           fontSize={g === LARGE ? 13.5 : 12}>Jours signés</text>
         {joursSignes.map((j, i) => (
           <text key={i} className={j !== null && j > 0 ? `${styles.valeur} ${styles.valeurForte}` : styles.valeur}
-            x={centre(i)} y={yValeurs} fontSize={g === LARGE ? 13 : 10.5}>
+            x={centre(i)} y={yValeurs + (enQuinconce && i % 2 === 1 ? 12 : 0)} fontSize={g === LARGE ? 13 : 10.5}>
             {j === null ? '—' : formaterJours(j)}
           </text>
         ))}

@@ -1453,3 +1453,52 @@ un affilié Cipav — ont été photographiés à part, en Calme et Nuit, 1 440 
   ne réécrit rien passe devant et plein, la correction — qui réécrit les années
   passées — reste possible en contour, comme les autres confirmations de
   l'application.
+
+## Lot 48 (21/11) — Activité › Missions, le carnet de commandes
+
+Maquette `design/direction/activite.html` (capture `direction/captures/activite-calme.png`).
+Captures `captures-app/{calme,nuit}-activite-missions{,-390}.png`, et le jeu
+d'essai au 15/12 (`essai/{calme,nuit}-activite-missions.png`), qui montre
+« Couvert, sans fin fixée. » et une mission terminée sans facture rattachée.
+Les autres captures changent d'un seul détail : la pastille « 1 » d'Activité
+au rail (la fin de la refonte, à préparer).
+
+| Zone | Avant | Après |
+|---|---|---|
+| En-tête | « Ton plan de charge » (le titre du planning), « Ajouter une mission » en bouton carré | « Couvert jusqu'au 31 juillet. » (ou « Couvert, sans fin fixée. », « Rien de signé. »), sous-titre de la maquette, « + Ajouter une mission » en pilule de 46 px |
+| Tuiles | Aucune | Carnet signé (courbe des jours signés), Fin de visibilité (« ◇ À préparer »), Occupation du mois (courbe sur douze mois) — `components/Tuile`, la tuile à tendance de la planche, construite commune |
+| Douze mois | Aucun | Frise : nom, client (« X, par Y » pour un intermédiaire), tarif ; barre de la teinte `--k1t`…`--k3t` jusqu'à l'échéance, rond au bout ; prospect en pointillé ; bande du mois courant, trait « aujourd'hui » ; rangée « Jours signés » ; légende en tête de carte ; bandeaux de fin annoncée et de reconduction |
+| Liste | Une liste : nom, montant à droite, méta en ligne | Tableau « Toutes les missions » : filtres avec nombres, avatar teinté aux initiales du client, sous-titre (commande, clients finaux ou suite des clients, « Terminée en … », « À partir de … »), Facturée à (« intermédiaire »), Tarif, Jours faits et barre, Facturé, Encaissé, Fin, État ; chiffres en Mono, alignés à droite |
+| Téléphone | La liste, pleine largeur | Tuiles qui défilent (84 %, accrochées) ; frise au gabarit serré (mois en une lettre, noms au-dessus des barres sur un liseré, même hauteur de ligne) ; tableau en cartes : nom, client, état, jours et fin, puis tarif · facturé · encaissé ; cibles de 44 px |
+| Bureau étroit | — | Le tableau passe en cartes de deux rangées quand SA carte a moins de 940 px (requête de conteneur) : à 1 150 px de fenêtre, il débordait la page de 82 px |
+
+Relu sur capture, 1 440 et 390 px, Calme et Nuit, démonstration et jeu
+d'essai, contre la maquette. Écarts corrigés avant livraison : l'espace du
+« + » rognée dans la pilule ; au téléphone, les filets de la frise et le trait
+« aujourd'hui » barraient les noms (liseré de la carte, noms posés après), et
+« 15,5 15,5 » se lisait « 15,515,5 » sous 30 px de colonne (un mois sur deux
+descend d'une ligne) ; un nom coupé à 34 signes là où la carte en tenait 43 ;
+le débordement à 1 150 px. La capture pleine page du téléphone montre la barre
+basse, fixée, par-dessus la rangée des jours signés : photographiée seule, la
+carte la porte entière. Écarts assumés, avec leur motif :
+
+- la police est la pile système (décision 6) ;
+- « + Ajouter une mission » en contour, pas en vert plein : « + Nouveau », dans
+  la barre du haut que la maquette ne dessine pas, est déjà l'action pleine de
+  l'écran (une seule par écran, `DIRECTION-VISUELLE.md`) ;
+- la démonstration n'est pas celle de la maquette : la refonte finit le
+  31 juillet (pas le 28 août), l'identité de marque est un client direct
+  reconduit au mois, la carte & menus a fait une demi-journée sur trois au
+  10 juin — d'où deux bandeaux (une fin, une reconduction) au lieu d'un ;
+  changer les dates de la démonstration aurait changé tous les autres écrans ;
+- « Commande n° BC-0142 » est porté par la démonstration ; « Devis envoyé le
+  2 juin » ne l'est pas : le schéma n'a pas la date d'un devis, l'écran dit
+  « À partir de septembre » (question au propriétaire, liste de sortie) ;
+- sous l'encaissé, « reste … » en ambre et, sous le facturé, « partagé avec N
+  autre(s) » : la maquette ne les dessine pas, l'ancienne liste les portait —
+  aucun nombre ne se perd ;
+- « Missions 6 » garde son compte dans l'onglet : la maquette n'en dessine sur
+  aucun onglet, la règle de l'application en pose un sur les listes ;
+- la courbe du carnet est la rangée des jours signés des douze mois à venir :
+  la maquette ne dit pas ce qu'elle trace, et l'histoire du carnet ne se
+  reconstitue pas (le statut d'une mission n'est pas daté).
