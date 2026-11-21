@@ -187,6 +187,17 @@ export interface EntreeATraiter {
      */
     readonly sansSuivi?: boolean;
   }[];
+  /**
+   * Les missions signées dont la fin tombe dans leur préavis, sans
+   * reconduction (lot 48) : déjà filtrées par `calculs/carnetDeCommandes`,
+   * la seule règle du préavis — ce module ne la refait pas.
+   */
+  readonly finsAnnoncees?: readonly {
+    readonly missionId: string;
+    readonly nom: string;
+    readonly echeance: DateISO;
+    readonly jours: number;
+  }[];
 }
 
 export interface SeuilsAlerte {
@@ -447,6 +458,23 @@ export function sujetsATraiter(
         contexte: ech.contexte ?? null,
         action: ech.action ?? null
       }
+    });
+  }
+
+  /* ---------- fins de mission annoncées ---------- */
+  //
+  // Une suite se négocie avant la fin, pas après : au préavis de la mission
+  // (soixante jours par défaut), c'est une chose à faire — en parler au
+  // client, ou en chercher une autre. Elle sort d'elle-même quand la fin est
+  // prolongée, la mission arrêtée ou la reconduction dite : la liste reçue ne
+  // la porte plus.
+  for (const f of e.finsAnnoncees ?? []) {
+    sujets.push({
+      id: `fin-mission-${f.missionId}`,
+      ecran: 'activite',
+      gravite: 'a_faire',
+      nombre: 1,
+      donnees: { missionId: f.missionId, mission: f.nom, echeance: f.echeance, jours: f.jours }
     });
   }
 
