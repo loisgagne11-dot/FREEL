@@ -49,6 +49,9 @@ const ECRANS = [
   // L'Analyse porte les graphes venus d'Argent (lot 51) — le graphe du CA et
   // sa composition étaient mesurés sous Argent ; ils le sont là où ils vivent.
   { hash: '#/activite/analyse', nom: 'activite-analyse', attendre: 'text=CA facturé' },
+  // Le carnet de commandes (lot 48) : son onglet arrive à la demande, et sans
+  // l'attendre on mesurait le « Chargement… » du planning.
+  { hash: '#/activite/missions', nom: 'activite-missions', attendre: 'h2:has-text("Toutes les missions")' },
   { hash: '#/factures', nom: 'factures' },
   { hash: '#/tresorerie', nom: 'tresorerie' },
   { hash: '#/obligations', nom: 'obligations' },
