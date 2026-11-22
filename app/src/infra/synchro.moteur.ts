@@ -126,8 +126,12 @@ export interface MoteurSynchro {
   readonly arreter: () => void;
   /** Un cycle complet : relit la base, le compte, applique la règle. */
   readonly synchroniser: (declencheur: Declencheur) => Promise<EtatSynchroAppareil>;
-  /** Tranche un « à choisir » : garder ce qu'il y a ici, ou prendre le compte. */
-  readonly trancher: (choix: 'garder-ici' | 'prendre-compte') => Promise<EtatSynchroAppareil>;
+  /**
+   * Tranche un « à choisir » : garder ce qu'il y a ici, ou prendre le compte.
+   * `versionVue` : celle du compte que montrait la question — la réponse ne
+   * vaut que pour elle.
+   */
+  readonly trancher: (choix: 'garder-ici' | 'prendre-compte', versionVue: number) => Promise<EtatSynchroAppareil>;
   /** Quitter la page : envoyer au mieux la modification qui n'est pas encore partie. */
   readonly partir: () => void;
   /** Le changement des faits, tel que l'écoute du magasin le transmet. */
@@ -329,8 +333,9 @@ export function creerMoteur(ports: PortsSynchro): MoteurSynchro {
     return ports.verrou(VERROU_SYNCHRO, () => cycle(declencheur));
   }
 
-  async function trancher(choix: 'garder-ici' | 'prendre-compte'): Promise<EtatSynchroAppareil> {
-    const vu = dernier;
+  async function trancher(
+    choix: 'garder-ici' | 'prendre-compte', versionVue: number
+  ): Promise<EtatSynchroAppareil> {
     return ports.verrou(VERROU_SYNCHRO, async () => {
       const ctx = await contexte();
       if (!ctx.ok) return publier(ctx.etat);
@@ -338,9 +343,7 @@ export function creerMoteur(ports: PortsSynchro): MoteurSynchro {
       if (lu.statut === 'erreur') return echec(lu, true);
       // Le compte a encore bougé depuis la question : la réponse portait sur
       // un état qui n'existe plus. On repose la question, sur le nouvel état.
-      if (vu.phase !== 'a-choisir' || lu.valeur === null || lu.valeur.version !== vu.distant.version) {
-        return appliquer(ctx, lu.valeur);
-      }
+      if (lu.valeur === null || lu.valeur.version !== versionVue) return appliquer(ctx, lu.valeur);
       if (choix === 'prendre-compte') return adopter(ctx.base, lu.valeur);
       // « Garder ce que j'ai ici » : l'envoi par-dessus, à la version qu'on
       // vient de lire — le serveur range celle qu'il remplace dans ses états
@@ -476,14 +479,8 @@ export function portsDuMagasin(): Pick<PortsSynchro, 'faits' | 'pret' | 'adopter
   };
 }
 
-let moteur: MoteurSynchro | null = null;
-
-/** Le moteur de cet onglet, créé au premier appel. `null` sans stockage : rien à synchroniser. */
-export function moteurDuNavigateur(): MoteurSynchro | null {
-  if (moteur !== null) return moteur;
-  const stockage = stockageDuNavigateur();
-  if (stockage === null) return null;
-  moteur = creerMoteur({
+function portsDuNavigateur(stockage: StockageLocal): PortsSynchro {
+  return {
     stockage,
     config: () => configEffective(stockage),
     ...portsDuMagasin(),
@@ -493,7 +490,39 @@ export function moteurDuNavigateur(): MoteurSynchro | null {
     saisieEnCours: () => saisieEnCoursDans(document),
     maintenant: () => new Date(),
     publier: publierEtatSynchro
-  });
+  };
+}
+
+let moteur: MoteurSynchro | null = null;
+let stockageDuMoteur: StockageLocal | null = null;
+const moteursDeGestes = new WeakMap<StockageLocal, MoteurSynchro>();
+
+/**
+ * Le moteur qui sert les gestes de l'écran Compte (« Synchroniser maintenant »,
+ * trancher un « à choisir ») pour ce stockage : celui de l'onglet quand c'est
+ * le sien, sinon un moteur sans écoutes. L'écran reçoit son stockage en
+ * paramètre ; un moteur lu ailleurs lirait une autre session et une autre base
+ * que celles que l'écran affiche.
+ */
+export function moteurPour(stockage: StockageLocal): MoteurSynchro {
+  const m = moteurDuNavigateur();
+  if (m !== null && stockageDuMoteur === stockage) return m;
+  const connu = moteursDeGestes.get(stockage);
+  if (connu !== undefined) return connu;
+  // Il ne démarre jamais : ses écoutes doubleraient celles du moteur de
+  // l'onglet, et ses cycles partiraient d'eux-mêmes sur une autre session.
+  const cree: MoteurSynchro = { ...creerMoteur(portsDuNavigateur(stockage)), demarrer: () => undefined };
+  moteursDeGestes.set(stockage, cree);
+  return cree;
+}
+
+/** Le moteur de cet onglet, créé au premier appel. `null` sans stockage : rien à synchroniser. */
+export function moteurDuNavigateur(): MoteurSynchro | null {
+  if (moteur !== null) return moteur;
+  const stockage = stockageDuNavigateur();
+  if (stockage === null) return null;
+  stockageDuMoteur = stockage;
+  moteur = creerMoteur(portsDuNavigateur(stockage));
   const m = moteur;
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') m.partir();

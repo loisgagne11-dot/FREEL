@@ -286,7 +286,7 @@ describe('deux appareils sur un même compte', () => {
     await a.moteur.synchroniser('ecriture');
     await b.moteur.synchroniser('ecriture');
 
-    const etat = await b.moteur.trancher('garder-ici');
+    const etat = await b.moteur.trancher('garder-ici', 2);
     expect(etat.phase).toBe('a-jour');
     expect(nomsDesClients(completerFaits(s.etat.ligne?.faits))).toEqual(['Client exemple', 'Saisi sur B']);
     expect(nomsDesClients(completerFaits(s.etat.historique.at(-1)?.faits))).toEqual(['Client exemple', 'Saisi sur A']);
@@ -301,7 +301,7 @@ describe('deux appareils sur un même compte', () => {
     await a.moteur.synchroniser('ecriture');
     await b.moteur.synchroniser('ecriture');
 
-    const etat = await b.moteur.trancher('prendre-compte');
+    const etat = await b.moteur.trancher('prendre-compte', 2);
     expect(etat.phase).toBe('a-jour');
     expect(nomsDesClients(b.faits)).toEqual(['Client exemple', 'Saisi sur A']);
     expect(s.compter('PATCH')).toBe(1);
@@ -318,7 +318,7 @@ describe('deux appareils sur un même compte', () => {
     await b.moteur.synchroniser('ecriture');
     s.ecrireAilleurs(avecClient(AVEC_DONNEES, 'c4', 'Saisi sur C'));
 
-    const etat = await b.moteur.trancher('garder-ici');
+    const etat = await b.moteur.trancher('garder-ici', 2);
     expect(etat.phase).toBe('a-choisir');
     expect(etat.phase === 'a-choisir' && etat.distant.version).toBe(3);
     expect(nomsDesClients(completerFaits(s.etat.ligne?.faits))).toContain('Saisi sur C');

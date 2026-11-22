@@ -35,7 +35,7 @@
  * saurait plus distinguer une régression d'un jour qui passe.
  *
  * Usage : node scripts/capturer-app.mjs [--theme=calme|nuit|clair|sombre] [--ecran=tresorerie]
- *                                        [--jeu=essai] [--largeur=390]
+ *                                        [--jeu=essai] [--largeur=390] [--port=4174]
  *
  * Sans `--theme`, Calme et Nuit : la direction retenue le 13/11, et le thème
  * par défaut d'un nouvel utilisateur depuis le lot 51. Les deux autres se
@@ -91,7 +91,7 @@ const JEU = JSON.parse(readFileSync(
     : join(RACINE, 'app/public/jeu-de-demonstration.json'),
   'utf8'
 ));
-const PORT = 4174;
+const PORT = Number(argument('port') ?? 4174) || 4174;
 
 /** Le 10 juin 2026, comme le handoff. Voir l'en-tête. Le jeu d'essai, lui, est
     daté du 15 décembre 2026 : rien n'y est postérieur, et le CFE, le troisième
@@ -194,6 +194,28 @@ const VUES = [
   { hash: '#/reglages/compte', nom: 'reglages-compte-inscriptions', compte: { guide: 5, relie: true, connecte: true, projet: 'inscriptions-ouvertes' },
     attendre: 'text=Inscriptions encore ouvertes' },
   { hash: '#/reglages/compte', nom: 'reglages-compte-relie', compte: { relie: true, connecte: true, aJour: true }, attendre: 'text=Un inconnu ne lit rien' },
+  /* La synchronisation automatique (lot 42) : la pastille du haut dans ses
+     états, et « À choisir ». Rien n'est simulé dans la page : c'est le VRAI
+     moteur, face au faux projet, qui produit chaque état — l'appareil a déjà
+     synchronisé (`base`), et le projet répond selon `projet`. */
+  { hash: '#/pilote', nom: 'synchro-a-jour', compte: { relie: true, connecte: true, aJour: true, base: true },
+    attendre: '[data-etat="a-jour"]' },
+  { hash: '#/pilote', nom: 'synchro-envoi', compte: { relie: true, connecte: true, aJour: true, base: true, projet: 'envoi-lent' },
+    attendre: '[data-etat="envoi"]', reseauEnSuspens: true },
+  { hash: '#/pilote', nom: 'synchro-hors-ligne', compte: { relie: true, connecte: true, aJour: true, base: true, projet: 'coupe' },
+    attendre: '[data-etat="hors-ligne"]' },
+  { hash: '#/pilote', nom: 'synchro-a-choisir', compte: { relie: true, connecte: true, aJour: true, base: true, projet: 'conflit' },
+    attendre: '[data-etat="a-choisir"]' },
+  { hash: '#/pilote', nom: 'synchro-reconnecte-toi',
+    compte: { relie: true, connecte: true, expiree: true, aJour: true, base: true, projet: 'refus-session' },
+    attendre: '[data-etat="reconnecter"]' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte-a-choisir',
+    compte: { relie: true, connecte: true, aJour: true, base: true, projet: 'conflit' }, attendre: 'h3:has-text("À choisir")' },
+  /* La question posée : avant de trancher, télécharger ce qu'on écarte. */
+  { hash: '#/reglages/compte', nom: 'reglages-compte-a-choisir-garder',
+    compte: { relie: true, connecte: true, aJour: true, base: true, projet: 'conflit' },
+    avantDOuvrir: 'h3:has-text("À choisir")', ouvrir: ['Garder ce que j’ai ici'],
+    attendre: 'text=Télécharger la version que tu écartes' },
   /* Affichage (lot 51) : la maquette `navigation.html` en est la référence. */
   { hash: '#/reglages/affichage', nom: 'reglages-affichage', attendre: 'text=Le thème choisi reste mémorisé' }
 ];
@@ -210,12 +232,13 @@ let projetCourant = 'pret';
  * des faits qui ne sont PAS la démonstration — reconnue, elle ne compte pas
  * comme des données, et l'écran relié dirait « rien à sauvegarder ».
  */
-function preparerCompte({ guide, relie, connecte, aJour, jeu, projet }) {
+function preparerCompte({ guide, relie, connecte, expiree, aJour, base, jeu, projet }) {
   if (guide !== undefined) sessionStorage.setItem('freel.compte.guide', String(guide));
   if (relie) localStorage.setItem('freel.config.supabase.v1', JSON.stringify({ url: projet, cleAnon: 'eyJ.factice.anon' }));
   if (connecte) {
     localStorage.setItem('freel.session.supabase.v1', JSON.stringify({
-      jeton: 'jeton-factice', jetonRafraichissement: 'renouv-factice', expireLe: Date.now() + 3_600_000,
+      jeton: 'jeton-factice', jetonRafraichissement: 'renouv-factice',
+      expireLe: expiree ? Date.now() - 1000 : Date.now() + 3_600_000,
       utilisateurId: '00000000-0000-0000-0000-000000000001', email: 'camille@exemple.test'
     }));
   }
@@ -223,12 +246,23 @@ function preparerCompte({ guide, relie, connecte, aJour, jeu, projet }) {
     sessionStorage.setItem('capture.faits', '1');
     localStorage.setItem('freel.faits.v1', JSON.stringify({ ...jeu, entreprise: { ...jeu.entreprise, nom: 'Atelier Exemple' } }));
   }
+  /* Déjà synchronisé à la version 3, à 9 h 41. L'empreinte ne correspond à
+     rien : le dossier compte comme « modifié depuis », ce qui fait envoyer,
+     choisir ou attendre le réseau selon le projet — et, face à un compte
+     identique, aligner sans rien écrire (« Synchronisé »). */
+  if (base) {
+    localStorage.setItem('freel.synchro.appareil.v1', JSON.stringify({
+      compte: '00000000-0000-0000-0000-000000000001', version: 3, le: '2026-06-10T07:41:00.000Z',
+      empreinte: 'capture', modifieLe: null
+    }));
+  }
 }
 
 function oublierCompte() {
   sessionStorage.clear();
   localStorage.removeItem('freel.config.supabase.v1');
   localStorage.removeItem('freel.session.supabase.v1');
+  localStorage.removeItem('freel.synchro.appareil.v1');
 }
 
 /**
@@ -246,6 +280,14 @@ async function repondreCommeLeProjet(route, page) {
   if (requete.method() === 'OPTIONS') {
     return route.fulfill({ status: 204, headers: { ...entetes, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
   }
+  // Lot 42 : un renouvellement refusé (jeton révoqué) — « Reconnecte-toi ».
+  if (url.includes('/auth/v1/token') && projetCourant === 'refus-session') {
+    return route.fulfill({ status: 400, headers: entetes, body: JSON.stringify({ error_description: 'Invalid Refresh Token' }) });
+  }
+  // Lot 42 : le réseau coupé, pour les faits seulement — « Hors ligne ».
+  if (url.includes('/rest/v1/freel_faits?') && projetCourant === 'coupe') return route.abort('internetdisconnected');
+  // Lot 42 : un envoi qui n'arrive pas avant la photo — « Envoi… ».
+  if (url.includes('/rest/v1/freel_faits?') && requete.method() === 'PATCH' && projetCourant === 'envoi-lent') return undefined;
   if (url.includes('/auth/v1/settings')) {
     return route.fulfill({ status: 200, headers: entetes, body: JSON.stringify({
       disable_signup: projetCourant !== 'inscriptions-ouvertes', mailer_autoconfirm: false
@@ -257,8 +299,16 @@ async function repondreCommeLeProjet(route, page) {
   }
   if (url.includes('/rest/v1/freel_faits?') && requete.method() === 'GET') {
     const faits = JSON.parse(await page.evaluate(() => localStorage.getItem('freel.faits.v1')) ?? 'null');
+    /* Lot 42 : « conflit », le compte a avancé (version 4) avec un client
+       saisi ailleurs ; « envoi-lent », il n'a pas bougé mais ne porte pas la
+       même chose — l'appareil, modifié, envoie. */
+    const ailleurs = faits === null ? null
+      : { ...faits, clients: [...(faits.clients ?? []), { id: 'capture-ailleurs', nom: 'Client saisi au téléphone' }] };
+    const ligne = projetCourant === 'conflit'
+      ? { version: 4, faits: ailleurs }
+      : projetCourant === 'envoi-lent' ? { version: 3, faits: ailleurs } : { version: 3, faits };
     return route.fulfill({ status: 200, headers: entetes, body: JSON.stringify(
-      faits === null ? [] : [{ version: 3, schema: faits.version, faits, maj_le: '2026-06-10T07:41:00Z' }]
+      faits === null ? [] : [{ ...ligne, schema: faits.version, maj_le: '2026-06-10T07:41:00Z' }]
     ) });
   }
   return route.fulfill({ status: 200, headers: entetes, body: '[]' });
@@ -288,10 +338,21 @@ await new Promise((resoudre, rejeter) => {
   build.on('exit', (code) => (code === 0 ? resoudre() : rejeter(new Error(`build : ${code}`))));
 });
 
-const apercu = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'],
-  { cwd: join(RACINE, 'app'), stdio: 'ignore' });
-
 const base = `http://127.0.0.1:${PORT}/`;
+/*
+ * LE PORT PRIS PAR UN AUTRE APERÇU. Avec `--strictPort`, notre aperçu meurt
+ * aussitôt ; l'attente ci-dessous trouvait alors le serveur DÉJÀ là — celui
+ * d'une autre copie du dépôt — et photographiait son build sans un mot : au
+ * lot 42, la pastille capturée disait « Compte relié », le code d'avant.
+ * On s'arrête, et `--port=` en choisit un autre.
+ */
+const occupe = await fetch(base).then(() => true, () => false);
+if (occupe) {
+  console.error(`Le port ${PORT} répond déjà : un autre aperçu l’occupe. Relance avec --port=<libre>.`);
+  process.exit(1);
+}
+const apercu = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'],
+  { cwd: join(RACINE, 'app'), stdio: 'ignore', detached: true });
 // On attend que le serveur réponde plutôt que de dormir une durée choisie au
 // hasard : trop courte elle rend le script instable, trop longue elle le rend
 // pénible, et aucune des deux n'est juste sur toutes les machines.
@@ -359,13 +420,17 @@ for (const theme of THEMES) {
   for (const vue of vues) {
     erreurs.length = 0;
     projetCourant = vue.compte?.projet ?? 'pret';
+    /* Un envoi qui ne finit pas (« Envoi… ») garde une requête ouverte :
+       `networkidle` l'attendait jusqu'à ce que l'application l'abandonne, et
+       la photo montrait « Hors ligne ». Cette vue-là n'attend que la page. */
+    const jusqua = vue.reseauEnSuspens === true ? 'load' : 'networkidle';
     if (vue.compte !== undefined) {
       await page.goto(`${base}#/`, { waitUntil: 'networkidle' });
       await page.evaluate(preparerCompte, { ...vue.compte, jeu: JEU, projet: PROJET_FACTICE });
-      await page.goto(base + vue.hash, { waitUntil: 'networkidle' });
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.goto(base + vue.hash, { waitUntil: jusqua });
+      await page.reload({ waitUntil: jusqua });
     }
-    await page.goto(base + vue.hash, { waitUntil: 'networkidle' });
+    await page.goto(base + vue.hash, { waitUntil: jusqua });
     // Les écrans sont chargés à la demande : on attend le titre, sinon on
     // capturerait l'écran d'attente. `h1:visible` parce qu'un changement de
     // hash laisse le précédent monté en `display: none` pendant la suspension.
@@ -376,6 +441,10 @@ for (const theme of THEMES) {
       await champ.waitFor({ timeout: 15000 }).catch(() => {});
       await champ.fill(valeur).catch(() => {});
     }
+
+    // Ce qui doit être là AVANT de cliquer : la carte « À choisir » n'apparaît
+    // qu'une fois le compte lu, et le clic la cherchait trop tôt (lot 42).
+    if (vue.avantDOuvrir) await page.waitForSelector(vue.avantDOuvrir, { timeout: 15000 }).catch(() => {});
 
     let ouverte = true;
     for (const libelle of vue.ouvrir ?? []) {
@@ -424,7 +493,9 @@ for (const theme of THEMES) {
       const arrive = await page.waitForSelector(vue.attendre, { timeout: 15000 })
         .then(() => true).catch(() => false);
       if (!arrive) {
-        manquees.push(`${theme}-${vue.nom} (« ${vue.attendre} » n’est jamais apparu)`);
+        const etat = await page.locator('[data-etat]').first().getAttribute('data-etat', { timeout: 1000 }).catch(() => null);
+        if (process.env.CAPTURE_ECHEC) await page.screenshot({ path: process.env.CAPTURE_ECHEC });
+        manquees.push(`${theme}-${vue.nom} (« ${vue.attendre} » n’est jamais apparu${etat === null ? '' : ` ; synchronisation : ${etat}`})`);
         continue;
       }
       await page.waitForTimeout(400);
@@ -447,7 +518,9 @@ for (const theme of THEMES) {
 }
 
 await navigateur.close();
-apercu.kill();
+// Le groupe entier : `npx` tué seul laissait `vite preview` tenir le port —
+// c'est ainsi qu'un aperçu d'une autre copie occupait 4174 (voir plus haut).
+try { process.kill(-apercu.pid); } catch { apercu.kill(); }
 
 writeFileSync(join(SORTIE, 'INDEX.md'),
   '# Captures de l’application\n\n'
