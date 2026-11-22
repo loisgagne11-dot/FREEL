@@ -566,6 +566,7 @@ chiffre faux.
 |---|---|---|
 | Effacer ses données d'un appareil | 🟢 nouveau | L'ancienne n'avait que « vider » le navigateur à la main. « Effacer cet appareil » (Données) et « Se déconnecter et effacer cet appareil » (Compte) proposent l'archive, déconnectent, effacent données, pièces, session, réglages — ceux de l'ancienne version compris — et le prouvent en relisant |
 | Se déconnecter | 🟢 | Dit désormais ce qui reste sur l'appareil |
+| Relier un compte, changer de projet | 🟢 22/11 | L'adresse collée avec le chemin de l'API (`/rest/v1/`) est ramenée à son origine — elle rendait la connexion impossible et ne se corrigeait plus ; l'écran dit le projet relié et offre « Changer de projet » (déconnecté seulement) |
 | Importer un relevé, une sauvegarde, une archive, une pièce | 🟢 | Bornés avant lecture, contrôlés en profondeur ; un fichier fabriqué est refusé avec le champ en cause. L'ancienne lisait tout, sans borne |
 | Rester connecté sur deux onglets | 🟢 | Les deux onglets ne se déconnectent plus l'un l'autre au renouvellement de la session |
 | Annonce d'une sauvegarde à restaurer | 🟢 | Un fichier que l'adoption refuserait est refusé dès l'annonce, sans proposer « Remplacer » |

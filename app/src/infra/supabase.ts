@@ -89,6 +89,23 @@ export function motifUrlRefusee(url: string): string | null {
 }
 
 /**
+ * L'adresse d'un projet ramenée à son origine : `https://<projet>.supabase.co`.
+ *
+ * Tout appel ajoute lui-même son chemin (`/rest/v1/…`, `/auth/v1/…`) : une
+ * adresse qui en porte déjà un les double. Le tableau de bord de Supabase
+ * montre aussi l'adresse de l'API REST, `…supabase.co/rest/v1/` — collée
+ * telle quelle le 21/11, elle a fait demander `/rest/v1/rest/v1/freel_faits` et
+ * `/rest/v1/auth/v1/token` : 404 partout, « table absente » sur les trois
+ * tables d'un projet pourtant préparé, connexion impossible, et aucun champ
+ * pour corriger. Ramenée à l'origine, l'adresse collée avec ou sans chemin
+ * fonctionne, et une configuration déjà enregistrée ainsi se répare à la
+ * lecture, sans rien ressaisir.
+ */
+export function adresseDuProjet(url: string): string {
+  try { return new URL(url.trim()).origin; } catch { return url.trim(); }
+}
+
+/**
  * La réponse est-elle un REFUS d'authentification ?
  *
  * C'est le seul cas où la session locale doit être effacée : 400 (jeton de
@@ -115,7 +132,7 @@ export function configDeBuild(): ConfigSupabase | null {
   const cle = import.meta.env['VITE_SUPABASE_ANON_KEY'];
   return typeof url === 'string' && url !== '' && typeof cle === 'string' && cle !== ''
     && motifUrlRefusee(url) === null
-    ? { url: url.replace(/\/+$/, ''), cleAnon: cle }
+    ? { url: adresseDuProjet(url), cleAnon: cle.trim() }
     : null;
 }
 
@@ -722,7 +739,7 @@ export function lireConfig(stockage: StockageLocal): ConfigSupabase | null {
     const o = JSON.parse(brut) as Record<string, unknown>;
     return typeof o['url'] === 'string' && typeof o['cleAnon'] === 'string'
       && motifUrlRefusee(o['url']) === null
-      ? { url: o['url'].replace(/\/+$/, ''), cleAnon: o['cleAnon'] }
+      ? { url: adresseDuProjet(o['url']), cleAnon: o['cleAnon'].trim() }
       : null;
   } catch {
     return null;

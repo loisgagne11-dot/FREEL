@@ -1578,3 +1578,12 @@ mois jusqu'en novembre 2027 », les entrées TVA comprise (« 2 160 € de factu
 à échéance et 8 928 € du planning signé » en janvier). Sous « Voir en tableau »,
 deux phrases conditionnelles (l'impôt et la TVA des encaissements à venir),
 absentes de la démonstration.
+
+## Correctif du 22/11 — Réglages › Compte & synchronisation
+
+| Élément | Avant | Après |
+|---|---|---|
+| Projet relié | Rien ne le disait : l'écran ne montrait que courriel et mot de passe | « Projet relié : `<identifiant>.supabase.co` » au-dessus du formulaire, avec « Changer de projet » (bouton secondaire de l'écran, 44 px), déconnecté seulement, absent quand le projet est fixé au build |
+| Saisie du projet | « URL du projet », aide renvoyant à un menu de Supabase qui a changé de nom | « Adresse du projet » ; l'explication dit les trois étapes ; l'aide dit la forme attendue (`https://identifiant.supabase.co`) — une adresse collée avec `/rest/v1/` est ramenée à son origine |
+
+Pas de maquette pour cet écran : la ligne reprend les styles existants de la carte (`explication`, `action`). Le parcours complet de première connexion reste à dessiner (liste de sortie, « Hors lot »).
