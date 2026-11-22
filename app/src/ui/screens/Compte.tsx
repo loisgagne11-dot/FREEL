@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useFaits } from '../../state/store';
 import {
   type ConfigSupabase, type DonneesLegacy, type InstantaneDistant, type ResultatEffacement,
-  type Session, bundleDepuisLegacy, chargerDonneesLegacy, configDeBuild, configEffective,
+  type Session, adresseDuProjet, bundleDepuisLegacy, chargerDonneesLegacy, configDeBuild, configEffective,
   effacerDonneesLegacy, effacerFaitsDuCompte,
   ecrireConfig, ecrireSession, motifUrlRefusee, pousserFaits, reprendreSession,
   seConnecter, seDeconnecter, tirerFaits
@@ -474,6 +474,27 @@ export function Compte({ stockage }: ProprietesCompte = {}) {
           lecture seule.
         </Info>
       </h2>
+
+      {/* Le projet relié se dit, et se change. Sans cette ligne, une adresse
+          enregistrée par erreur ne se corrigeait plus : l'écran ne montrait que
+          courriel et mot de passe, et chaque connexion échouait sans que rien
+          n'indique où (21/11). On ne change de projet que déconnecté : une
+          session ouverte appartient au projet d'avant. */}
+      {etat.phase === 'deconnecte' && (
+        <p className={styles.explication}>
+          Projet relié&nbsp;: <strong>{new URL(config.url).host}</strong>
+          {configDeBuild() === null && (
+            <>
+              {' '}
+              <button type="button" className={styles.action} onClick={() => {
+                ecrireConfig(local, null);
+                setErreur(null);
+                setConfig(null);
+              }}>Changer de projet</button>
+            </>
+          )}
+        </p>
+      )}
 
       {etat.phase === 'deconnecte' && (
         <FormulaireConnexion idChamp={idChamp} enCours={enCours} onConnecter={connecter} />
@@ -1040,19 +1061,20 @@ function SaisieConfig(
       <h2 id={`${idChamp}-config`} className={styles.titreCarte}>
         Relier un compte
         <Info libelle="Où trouver ces informations">
-          Dans le tableau de bord Supabase, section <em>Project Settings → API</em>
-          &nbsp;: l’URL du projet et la clé <em>anon public</em>. Cette clé est
-          faite pour être publique&nbsp;; ce qui protège les données, ce sont les
-          règles d’accès définies sur le serveur. La base doit être préparée une
-          fois&nbsp;: copie le <strong>contenu</strong> du fichier
-          <em> docs/supabase.sql</em> du dépôt dans l’éditeur SQL du projet, et
-          exécute-le.
+          Dans le tableau de bord Supabase, réglages du projet&nbsp;: l’adresse du
+          projet (de la forme <em>https://identifiant.supabase.co</em>) et la clé
+          publique <em>anon</em>. Cette clé est faite pour être publique&nbsp;; ce
+          qui protège les données, ce sont les règles d’accès définies sur le
+          serveur. La base doit être préparée une fois&nbsp;: copie le
+          <strong> contenu</strong> du fichier <em>docs/supabase.sql</em> du dépôt
+          dans l’éditeur SQL du projet, et exécute-le.
         </Info>
       </h2>
 
       <p className={styles.explication}>
         {configDeBuild() === null
-          ? 'Aucun compte n’est relié à cette installation. Renseigne l’adresse du projet pour te connecter.'
+          ? 'Aucun projet n’est relié à cet appareil. Trois étapes : l’adresse du projet et sa clé '
+            + 'publique ici, puis ton courriel et ton mot de passe à l’écran suivant.'
           : 'Un compte est configuré à la compilation.'}
       </p>
 
@@ -1062,12 +1084,12 @@ function SaisieConfig(
           e.preventDefault();
           const motif = motifUrlRefusee(url.trim());
           setRefus(motif);
-          if (motif === null) onValider({ url: url.trim(), cleAnon: cle.trim() });
+          if (motif === null) onValider({ url: adresseDuProjet(url), cleAnon: cle.trim() });
         }}
       >
         {refus !== null && <p className={styles.echec} role="alert">{refus}</p>}
         <p className={styles.champ}>
-          <label htmlFor={`${idChamp}-url`}>URL du projet</label>
+          <label htmlFor={`${idChamp}-url`}>Adresse du projet</label>
           <input id={`${idChamp}-url`} type="url" placeholder="https://exemple.supabase.co"
             value={url} onChange={(e) => setUrl(e.target.value)} required />
         </p>

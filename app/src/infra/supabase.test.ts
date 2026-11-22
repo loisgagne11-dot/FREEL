@@ -3,7 +3,7 @@ import {
   type ConfigSupabase, type Session, type StockageLocal,
   DELAI_MAX_MS, TABLE_FAITS, bundleDepuisLegacy, chargerDonneesLegacy, configEffective,
   effacerDonneesLegacy, effacerFaitsDuCompte,
-  ecrireConfig, ecrireSession, estRefusDAuthentification, lireConfig, lireSession, pousserFaits,
+  adresseDuProjet, ecrireConfig, ecrireSession, estRefusDAuthentification, lireConfig, lireSession, pousserFaits,
   motifUrlRefusee, rafraichir, seConnecter, sessionValide, tirerFaits
 } from './supabase';
 
@@ -369,6 +369,20 @@ describe('conservation locale', () => {
 
   it('ignore une session corrompue plutôt que d’échouer au démarrage', () => {
     expect(lireSession(stockageMemoire({ 'freel.session.supabase.v1': '{ cassé' }))).toBeNull();
+  });
+
+  // 21/11 : l'adresse de l'API REST collée depuis le tableau de bord faisait
+  // demander `/rest/v1/rest/v1/freel_faits` — 404, connexion impossible.
+  it('répare à la lecture une adresse enregistrée avec le chemin de l’API', () => {
+    const s = stockageMemoire();
+    ecrireConfig(s, { url: 'https://projet-demo.supabase.co/rest/v1/', cleAnon: ' k ' });
+    expect(lireConfig(s)).toEqual({ url: 'https://projet-demo.supabase.co', cleAnon: 'k' });
+  });
+
+  it('ramène toute adresse de projet à son origine', () => {
+    expect(adresseDuProjet(' https://projet-demo.supabase.co/rest/v1 ')).toBe('https://projet-demo.supabase.co');
+    expect(adresseDuProjet('https://projet-demo.supabase.co/auth/v1/')).toBe('https://projet-demo.supabase.co');
+    expect(adresseDuProjet('https://projet-demo.supabase.co')).toBe('https://projet-demo.supabase.co');
   });
 
   it('normalise la barre oblique finale de l’URL', () => {

@@ -122,7 +122,7 @@ describe('configuration du compte', () => {
     render(<Compte stockage={stockage()} />);
     // Ciblé par rôle : le nom accessible de la section englobante reprend le
     // texte de son explication, qui parle elle aussi de l'URL du projet.
-    expect(screen.getByRole('textbox', { name: /URL du projet/ })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: /Adresse du projet/ })).toBeTruthy();
     expect(screen.queryByLabelText(/Mot de passe/)).toBeNull();
   });
 
@@ -132,13 +132,42 @@ describe('configuration du compte', () => {
     const utilisateur = userEvent.setup();
 
     await utilisateur.type(
-      screen.getByRole('textbox', { name: /URL du projet/ }), 'https://exemple.supabase.co'
+      screen.getByRole('textbox', { name: /Adresse du projet/ }), 'https://exemple.supabase.co'
     );
     await utilisateur.type(screen.getByRole('textbox', { name: /Clé publique/ }), 'cle-anon');
     await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
     expect(local.contenu[CLE_CONFIG]).toContain('exemple.supabase.co');
     expect(screen.getByLabelText(/Mot de passe/)).toBeTruthy();
+  });
+
+  it('enregistre l’adresse sans le chemin de l’API collé avec elle', async () => {
+    const local = stockage();
+    render(<Compte stockage={local} />);
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.type(
+      screen.getByRole('textbox', { name: /Adresse du projet/ }), 'https://exemple.supabase.co/rest/v1/'
+    );
+    await utilisateur.type(screen.getByRole('textbox', { name: /Clé publique/ }), 'cle-anon');
+    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
+
+    expect(JSON.parse(local.contenu[CLE_CONFIG] ?? '{}')).toEqual(
+      { url: 'https://exemple.supabase.co', cleAnon: 'cle-anon' }
+    );
+  });
+
+  // Une adresse enregistrée par erreur ne se corrigeait plus : l'écran ne
+  // montrait que courriel et mot de passe (21/11).
+  it('dit le projet relié et permet d’en changer', async () => {
+    const local = CONFIGURE();
+    render(<Compte stockage={local} />);
+    expect(screen.getByText('exemple.test')).toBeTruthy();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Changer de projet' }));
+
+    expect(local.contenu[CLE_CONFIG]).toBeUndefined();
+    expect(screen.getByRole('textbox', { name: /Adresse du projet/ })).toBeTruthy();
   });
 });
 
@@ -754,7 +783,7 @@ describe('l’adresse du projet', () => {
     const local = stockage();
     render(<Compte stockage={local} />);
     const utilisateur = userEvent.setup();
-    await utilisateur.type(screen.getByRole('textbox', { name: /URL du projet/ }), 'http://exemple.test');
+    await utilisateur.type(screen.getByRole('textbox', { name: /Adresse du projet/ }), 'http://exemple.test');
     await utilisateur.type(screen.getByRole('textbox', { name: /Clé publique/ }), 'cle-anon');
     await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
 
