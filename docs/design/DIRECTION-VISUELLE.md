@@ -28,6 +28,7 @@ Donc : **les couleurs ne changent pas, le dessin change.**
 | `direction/obligations-telephone.html` | Obligations à 390 px, un dossier en volet, une pièce modifiée (validée le 17/11, ses écarts appliqués au bureau) | `obligations-telephone-calme.png` |
 | `direction/activite.html` | Activité — missions et carnet | `activite-calme.png` |
 | `direction/pilote-telephone.html` | Pilote à 390 px | `pilote-telephone-calme.png` |
+| `direction/compte.html` | Réglages › Compte & synchronisation : le parcours de première connexion en cinq étapes vérifiées, puis l'état d'un compte relié — **proposition du 22/11, à valider** | `compte-calme.png` |
 
 Chaque maquette s'ouvre seule dans un navigateur ; `?mode=nuit` (ou `sombre`,
 `clair`) change de thème. `direction/calme.css` **fait foi pour les mesures** :
