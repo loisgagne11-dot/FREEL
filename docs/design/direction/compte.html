@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Direction visuelle — Compte et synchronisation (proposition)</title>
+<!-- Maquette, pas l'application : ici les polices viennent d'un CDN pour que
+     le fichier s'ouvre seul. L'application n'en charge aucune de l'extérieur.
+     PROPOSITION soumise au propriétaire avant d'être codée (22/11) : le
+     parcours de première connexion de Réglages › Compte & synchronisation.
+     Demandé après une connexion impossible : « la procédure n'est pas claire,
+     même pour moi ». Les valeurs sont factices. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="./calme.css">
+<style>
+body { margin: 0; }
+.cp-ensemble { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; padding: 32px; }
+.cp-tel { width: 390px; min-height: 760px; border: 1px solid var(--line); border-radius: 26px; overflow: hidden; background: var(--bg); }
+.cp-top { display: flex; align-items: center; gap: 8px; padding: 16px 16px 0; }
+.cp-top .e-logo { padding: 0; font-size: 24px; margin-right: auto; }
+.cp-top .e-btn { min-height: 44px; padding: 0 16px; }
+.cp-main { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px 20px; }
+.cp-carte { padding: 18px; border-radius: 20px; }
+.cp-carte h3 { margin: 0 0 6px; font-size: 17px; }
+.cp-carte p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.cp-carte p strong { color: var(--text); }
+.cp-choix { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.cp-choix .e-btn { width: 100%; }
+.cp-etapes { list-style: none; margin: 6px 0 0; padding: 0; counter-reset: etape; }
+.cp-etapes > li { position: relative; padding: 12px 0 12px 40px; border-top: 1px solid var(--line); }
+.cp-etapes > li:first-child { border-top: 0; }
+.cp-etapes > li::before { counter-increment: etape; content: counter(etape); position: absolute; left: 0; top: 12px; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; background: var(--tint-2); color: var(--muted); }
+.cp-etapes > li.fait::before { content: "✓"; background: var(--green-deep); color: var(--chip-ok); }
+.cp-etapes > li.ici::before { background: var(--green); color: var(--on-accent); }
+.cp-etapes > li.plus-tard { opacity: .55; }
+.cp-etapes b { display: block; font-size: 15px; margin-bottom: 3px; }
+.cp-etapes small { display: block; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.cp-lien { display: inline-flex; align-items: center; min-height: 44px; color: var(--green); font-weight: 600; font-size: 14px; }
+.cp-champ { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.cp-champ label { font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-2); }
+.cp-champ input { min-height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--card-a); font: inherit; font-size: 14px; color: var(--text); }
+.cp-champ small { font-size: 12.5px; color: var(--muted); }
+.cp-verif { list-style: none; margin: 8px 0 0; padding: 0; }
+.cp-verif li { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.cp-verif li:first-child { border-top: 0; }
+.cp-verif .s { flex: 0 0 18px; font-weight: 700; }
+.cp-verif .ok .s { color: var(--green); }
+.cp-verif .ko .s { color: var(--red); }
+.cp-verif .av .s { color: var(--chip-warn); }
+.cp-verif small { display: block; color: var(--muted); font-size: 12.5px; line-height: 1.45; margin-top: 2px; }
+.cp-onglets { display: flex; gap: 6px; padding: 4px; border-radius: 999px; background: var(--tint-2); margin: 6px 0 4px; }
+.cp-onglets span { flex: 1; text-align: center; min-height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 999px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.cp-onglets span.on { background: var(--card-a); color: var(--text); box-shadow: var(--sh-1, 0 1px 2px rgba(0,0,0,.08)); }
+.cp-ligne { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.cp-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.cp-legende { margin-top: 10px; font-size: 12.5px; color: var(--muted); max-width: 390px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="ec m-calme" style="width: 1340px">
+<div class="cp-ensemble">
+
+<!-- ── 1. Rien n'est relié ─────────────────────────────────────────────── -->
+<div>
+<div class="cp-tel">
+<header class="cp-top"><div class="e-logo">fre<b>e</b>l</div><a class="e-btn go" href="#nouveau">+ Nouveau</a></header>
+<main class="cp-main">
+<p class="e-hint"><a href="#reglages" style="color: var(--green); font-weight: 600">Réglages</a> › Compte &amp; synchronisation</p>
+<section class="e-card cp-carte" aria-labelledby="cp1">
+<h3 id="cp1">Tes données sont sur cet appareil</h3>
+<p>Si ce navigateur est effacé, elles partent avec lui. Pour les <strong>sauvegarder</strong> et les retrouver <strong>sur ton téléphone</strong>, relie FREEL à ton propre espace Supabase&nbsp;: gratuit, à ton nom. FREEL n’y a pas accès, et personne d’autre.</p>
+<div class="cp-choix">
+<a class="e-btn go" href="#guide">Me guider pas à pas</a>
+<a class="e-btn" href="#relier">J’ai déjà un projet Supabase</a>
+</div>
+</section>
+<section class="e-card cp-carte" aria-labelledby="cp1b">
+<h3 id="cp1b">Sans compte</h3>
+<p>Une sauvegarde en fichier, à ranger où tu veux (ton Drive, une clé USB).</p>
+<a class="cp-lien" href="#donnees">Réglages › Données &amp; export ›</a>
+</section>
+</main>
+</div>
+<p class="cp-legende">1. L’écran commence par le pourquoi, en une phrase, et deux portes. Plus de champs techniques d’emblée.</p>
+</div>
+
+<!-- ── 2. Le guide : créer et préparer ─────────────────────────────────── -->
+<div>
+<div class="cp-tel">
+<header class="cp-top"><div class="e-logo">fre<b>e</b>l</div><a class="e-btn go" href="#nouveau">+ Nouveau</a></header>
+<main class="cp-main">
+<p class="e-hint"><a href="#reglages" style="color: var(--green); font-weight: 600">Réglages</a> › Compte &amp; synchronisation</p>
+<section class="e-card cp-carte" aria-labelledby="cp2">
+<h3 id="cp2">Relier FREEL en cinq étapes</h3>
+<p>Dix minutes, une seule fois. Chaque étape est vérifiée avant la suivante.</p>
+<ol class="cp-etapes">
+<li class="fait"><b>Créer ton projet</b><small>Sur supabase.com&nbsp;: un compte, puis «&nbsp;New project&nbsp;», région <strong>Europe (Paris ou Francfort)</strong>. Note le mot de passe de la base, FREEL n’en a pas besoin.</small><a class="cp-lien" href="#supabase">Ouvrir supabase.com ↗</a></li>
+<li class="ici"><b>Préparer la base</b><small>Dans ton projet&nbsp;: <strong>SQL Editor › New query</strong>, colle le script, puis <strong>Run</strong>. Il crée la table de tes données et les règles qui la protègent.</small>
+<div class="cp-actions"><a class="e-btn go" href="#copier">Copier le script</a><a class="e-btn" href="#fait">C’est fait</a></div></li>
+<li class="plus-tard"><b>Relier FREEL</b><small>L’adresse du projet et sa clé publique.</small></li>
+<li class="plus-tard"><b>Ton compte</b><small>Ton courriel et un mot de passe.</small></li>
+<li class="plus-tard"><b>Fermer les inscriptions</b><small>Pour que personne d’autre ne s’installe chez toi.</small></li>
+</ol>
+</section>
+</main>
+</div>
+<p class="cp-legende">2. Un fil d’étapes numérotées : ce qui est fait passe en ✓, l’étape en cours est verte, les suivantes attendent. Le script se copie d’un geste, sans aller le chercher dans le dépôt.</p>
+</div>
+
+<!-- ── 3. Relier : la vérification dit où ça coince ─────────────────────── -->
+<div>
+<div class="cp-tel">
+<header class="cp-top"><div class="e-logo">fre<b>e</b>l</div><a class="e-btn go" href="#nouveau">+ Nouveau</a></header>
+<main class="cp-main">
+<p class="e-hint"><a href="#reglages" style="color: var(--green); font-weight: 600">Réglages</a> › Compte &amp; synchronisation</p>
+<section class="e-card cp-carte" aria-labelledby="cp3">
+<h3 id="cp3">3. Relier FREEL</h3>
+<p>Dans ton projet&nbsp;: <strong>Project Settings › API</strong>.</p>
+<p class="cp-champ"><label for="cp-url">Adresse du projet</label><input id="cp-url" value="https://projet-demo.supabase.co"><small>Celle qui finit par <span class="mono">.supabase.co</span> — si tu colles l’adresse avec <span class="mono">/rest/v1</span>, FREEL la raccourcit.</small></p>
+<p class="cp-champ"><label for="cp-cle">Clé publique (anon)</label><input id="cp-cle" value="eyJhbGciOiJIUzI1NiIs…"><small>La longue, qui commence par <span class="mono">eyJ</span>. Jamais la clé <span class="mono">service_role</span>.</small></p>
+<a class="e-btn go" href="#verifier" style="width: 100%">Vérifier</a>
+<ul class="cp-verif" aria-label="Vérification">
+<li class="ok"><span class="s">✓</span><div>Projet joignable</div></li>
+<li class="ok"><span class="s">✓</span><div>Clé acceptée</div></li>
+<li class="ko"><span class="s">✗</span><div>Base pas encore préparée<small>La table de tes données manque. Refais l’étape 2&nbsp;: colle le script entier, puis Run.</small></div></li>
+<li class="av"><span class="s">·</span><div>Règles d’accès<small>vérifiées une fois la base prête</small></div></li>
+</ul>
+</section>
+</main>
+</div>
+<p class="cp-legende">3. «&nbsp;Vérifier&nbsp;» teste chaque maillon et dit lequel casse, avec le geste qui répare — au lieu d’un message d’erreur générique à la connexion. Les autres refus prévus&nbsp;: adresse injoignable (forme attendue), clé refusée (prendre la clé anon), projet en pause (le rouvrir depuis supabase.com).</p>
+</div>
+
+<!-- ── 4. Ton compte, puis fermer la porte ──────────────────────────────── -->
+<div>
+<div class="cp-tel">
+<header class="cp-top"><div class="e-logo">fre<b>e</b>l</div><a class="e-btn go" href="#nouveau">+ Nouveau</a></header>
+<main class="cp-main">
+<p class="e-hint"><a href="#reglages" style="color: var(--green); font-weight: 600">Réglages</a> › Compte &amp; synchronisation</p>
+<section class="e-card cp-carte" aria-labelledby="cp4">
+<h3 id="cp4">4. Ton compte</h3>
+<div class="cp-onglets" role="tablist"><span class="on" role="tab" aria-selected="true">Me connecter</span><span role="tab" aria-selected="false">Créer mon compte</span></div>
+<p class="cp-champ"><label for="cp-mail">Courriel</label><input id="cp-mail" value="camille@exemple.test"></p>
+<p class="cp-champ"><label for="cp-mdp">Mot de passe</label><input id="cp-mdp" type="password" value="motdepasse"></p>
+<a class="e-btn go" href="#connecter" style="width: 100%">Me connecter</a>
+<a class="cp-lien" href="#oublie">Mot de passe oublié&nbsp;?</a>
+<p style="font-size: 12.5px">Ce sont les identifiants de <strong>ton compte dans le projet</strong>, pas ceux du site supabase.com.</p>
+</section>
+<section class="e-card cp-carte" aria-labelledby="cp5">
+<h3 id="cp5">5. Fermer les inscriptions</h3>
+<p>Ton compte existe&nbsp;: plus personne n’a à en créer. Dans ton projet, <strong>Authentication › Sign In / Providers</strong>, décoche «&nbsp;Allow new users to sign up&nbsp;».</p>
+<ul class="cp-verif"><li class="ko"><span class="s">✗</span><div>Inscriptions encore ouvertes<small>vérifié à l’instant — FREEL relit ce réglage</small></div></li></ul>
+<div class="cp-actions"><a class="e-btn" href="#reverifier">Vérifier à nouveau</a></div>
+</section>
+</main>
+</div>
+<p class="cp-legende">4. Les deux comptes ne se confondent plus. «&nbsp;Mot de passe oublié&nbsp;» envoie le lien de Supabase et ramène dans FREEL pour choisir le nouveau. La fermeture des inscriptions se constate par relecture, comme les règles d’accès.</p>
+</div>
+
+<!-- ── 5. Relié : l'état du compte en un coup d'œil ─────────────────────── -->
+<div>
+<div class="cp-tel">
+<header class="cp-top"><div class="e-logo">fre<b>e</b>l</div><a class="e-btn go" href="#nouveau">+ Nouveau</a></header>
+<main class="cp-main">
+<p class="e-hint"><a href="#reglages" style="color: var(--green); font-weight: 600">Réglages</a> › Compte &amp; synchronisation</p>
+<section class="e-card cp-carte" aria-labelledby="cp6">
+<div class="e-h" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px"><h3 id="cp6" style="margin: 0">Sauvegardé</h3><span class="e-chip ok">● à jour</span></div>
+<p>Dernier envoi à <strong>9&nbsp;h&nbsp;41</strong>. Tes autres appareils le reçoivent à leur prochaine ouverture.</p>
+<div class="cp-ligne"><span>Projet</span><span class="mono">projet-demo.supabase.co</span></div>
+<div class="cp-ligne"><span>Connecté</span><span>camille@exemple.test</span></div>
+<div class="cp-actions"><a class="e-btn go" href="#synchroniser">Synchroniser maintenant</a><a class="e-btn" href="#deconnecter">Me déconnecter</a></div>
+</section>
+<section class="e-card cp-carte" aria-labelledby="cp7">
+<h3 id="cp7">Santé du projet</h3>
+<ul class="cp-verif">
+<li class="ok"><span class="s">✓</span><div>Base préparée</div></li>
+<li class="ok"><span class="s">✓</span><div>Un inconnu ne lit rien<small>règles d’accès vérifiées le 22/11 à 9&nbsp;h&nbsp;40</small></div></li>
+<li class="ok"><span class="s">✓</span><div>Inscriptions fermées</div></li>
+<li class="av"><span class="s">i</span><div>Offre gratuite<small>Supabase met en pause un projet sans activité pendant une semaine&nbsp;; tes données restent sur l’appareil, il suffit de le rouvrir depuis supabase.com.</small></div></li>
+</ul>
+<div class="cp-actions"><a class="e-btn" href="#changer">Changer de projet</a><a class="e-btn" href="#historique">États précédents</a></div>
+</section>
+</main>
+</div>
+<p class="cp-legende">5. Relié&nbsp;: d’abord la réponse («&nbsp;Sauvegardé, à jour&nbsp;»), puis la santé du projet en quatre lignes vérifiées. Les gestes rares (changer de projet, états précédents, effacer le compte) descendent en pied de carte.</p>
+</div>
+
+</div>
+</div>
+<script>
+/* ?mode=calme|nuit|sombre|clair — les quatre thèmes de l'application. */
+(function () {
+  var mode = new URLSearchParams(location.search).get('mode');
+  if (['calme', 'nuit', 'sombre', 'clair'].indexOf(mode) === -1) return;
+  document.querySelector('.ec').className = document.querySelector('.ec').className.replace(/m-\w+/, 'm-' + mode);
+})();
+</script>
+</body>
+</html>
