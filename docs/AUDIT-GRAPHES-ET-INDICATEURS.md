@@ -1094,3 +1094,17 @@ journée te rapporte » divise ce qui est déjà facturé par les journées du
 planning de **toute** l'année, à venir comprises — la démonstration lit
 400 € « effectifs » et « 102 € perdus par journée » au 10 juin, quand rien
 n'est perdu : juin et juillet ne sont simplement pas encore facturés.
+
+## 22/11 — Réglages › Compte & synchronisation, le parcours de première connexion
+
+Aucun graphe. Ce que l'écran donne à lire, et d'où il le tient : rien n'est
+stocké, tout se relit ou se dérive à l'ouverture.
+
+| Nombre ou état lu | Où | Avant | Après |
+|---|---|---|---|
+| Heure du dernier envoi | Carte « Sauvegardé » | « Compte enregistré le » + date courte | « Dernier envoi à **9 h 41** » (le jour même) ou « le 21/11 à 18 h 05 » : l'horloge de l'appareil qui a écrit (`maj_le`), indicative — elle n'arbitre jamais rien |
+| État de la synchronisation | Pastille de la carte | — | « à jour », « à envoyer », « à recevoir », « diffère », « vide », « état inconnu », « illisible ici » — dérivé des faits des deux côtés (`selecteurs.synchro`, comparaison canonique : `jsonb` range les clés autrement). « À envoyer » et « à recevoir » seulement quand un côté est vide ; la démonstration ne compte pas comme des données |
+| Ce que contient l'appareil | Carte « Sauvegardé » | « Cet appareil : N recette(s), M dépense(s) » | Inchangé |
+| Lignes lisibles sans connexion | Santé du projet | Par table, dans le bloc « Règles d'accès » | Le total des tables exposées dans le constat (« 3 ligne(s) se lisent sans connexion »), et par table sous « Le détail, table par table » — compté par le serveur (`Content-Range`), jamais lu ; un total absent reste « non vérifié », jamais 0 |
+| Heure de la vérification | Santé ; étape 5 | « vérifié le 22/11/2026 10:00 » | « règles d'accès vérifiées à 9 h 40 » ; « vérifié à … — FREEL relit ce réglage » |
+| Projet joignable, clé acceptée, base, règles, inscriptions | Étape 3 ; santé | — | Un constat par maillon (✓, ✗ avec le geste, ? non vérifié, · en attente) ; lus sur des codes HTTP et des booléens (`disable_signup`), jamais sur un texte du serveur |

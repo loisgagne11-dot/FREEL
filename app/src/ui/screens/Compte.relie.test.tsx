@@ -83,7 +83,9 @@ describe('relié : la réponse d’abord', () => {
     monter();
     const carte = (await screen.findByRole('heading', { name: /^Sauvegardé/ })).closest('section') as HTMLElement;
     expect(await within(carte).findByText('à jour')).toBeTruthy();
-    expect(within(carte).getByText(/^Dernier envoi (à|le) /)).toBeTruthy();
+    // L'heure du dernier envoi, en gras comme sur la maquette : la réponse à « est-ce parti ? ».
+    const heure = within(carte).getByText(/^(à|le \d\d\/\d\d à) \d{1,2} h \d\d$/, { selector: 'strong' });
+    expect(heure.closest('p')?.textContent).toMatch(/^Dernier envoi (à|le) .*\. Le compte porte exactement/);
     expect(within(carte).getByText('projet-demo.supabase.co')).toBeTruthy();
     expect(within(carte).getByText('demo@exemple.test')).toBeTruthy();
     expect(within(carte).getByRole('button', { name: 'Synchroniser maintenant' })).toBeTruthy();
