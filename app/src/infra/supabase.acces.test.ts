@@ -124,4 +124,19 @@ describe('SQL de protection', () => {
   it('le SQL proposé pour freel_faits figure tel quel dans docs/supabase.sql', () => {
     expect(script).toContain(sqlProtectionFaits());
   });
+
+  /**
+   * UN PROJET NEUF N'A PAS `user_data`. Posée sans condition, sa règle
+   * échouait, et l'éditeur SQL — qui exécute le script d'un bloc — annulait
+   * aussi la création de la table des faits : l'étape 2 du guide ne passait
+   * sur aucun projet créé pour cette version (constaté sur un Postgres 16
+   * local, le 22/11).
+   */
+  it('le script passe sur un projet neuf : rien ne touche user_data hors de sa condition d’existence', () => {
+    const code = script.split('\n').filter((l) => !l.trimStart().startsWith('--')).join('\n');
+    const garde = /if to_regclass\('public\.user_data'\) is not null then\n([\s\S]*?)\nend if;/.exec(code);
+    expect(garde).not.toBeNull();
+    expect(garde?.[1]).toContain(sqlProtectionLegacy());
+    expect(code.replace(garde?.[0] ?? '', '')).not.toMatch(/public\.user_data/);
+  });
 });
