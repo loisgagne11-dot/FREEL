@@ -59,6 +59,24 @@ export type Resultat<T> =
      * traiter. Distinguer les deux sur le texte du message serait fragile.
      */
     readonly code?: number;
+    /**
+     * Le code d'erreur de GoTrue (`error_code` : `weak_password`,
+     * `signup_disabled`…), quand la réponse en porte un de forme sage.
+     *
+     * Le corps d'une réponse est HOSTILE : son texte est choisi par le serveur,
+     * ou par quiconque se fait passer pour lui à cette adresse. On en lit un
+     * code, qu'on compare à une liste connue pour choisir NOTRE phrase — jamais
+     * un texte qu'on afficherait tel quel.
+     */
+    readonly codeErreur?: string;
+    /**
+     * Aucune réponse : `reseau` (rien n'a répondu), `delai` (trop lent).
+     *
+     * La vérification d'un projet ne dit pas la même chose des deux : une
+     * adresse qui ne répond pas est mal saisie ; un projet qui tarde est
+     * peut-être en pause. Comparer le texte du motif serait fragile.
+     */
+    readonly panne?: 'reseau' | 'delai';
   };
 
 /**
@@ -172,17 +190,22 @@ export async function appeler(
     }
 
     if (!reponse.ok) {
-      return { statut: 'erreur', motif: messageDErreur(reponse.status, corps), code: reponse.status };
+      return {
+        statut: 'erreur', motif: messageDErreur(reponse.status, corps), code: reponse.status,
+        ...codeErreurDe(corps)
+      };
     }
     return { statut: 'ok', valeur: corps };
   } catch {
     // Une panne réseau et un refus du serveur n'appellent pas la même
     // réaction : l'un se réessaie, l'autre demande une correction.
+    const delai = controle.signal.aborted;
     return {
       statut: 'erreur',
-      motif: controle.signal.aborted
+      motif: delai
         ? 'Le serveur met trop de temps à répondre. Vérifie ta connexion, puis réessaie.'
-        : 'Le serveur est injoignable. Vérifie ta connexion, puis réessaie.'
+        : 'Le serveur est injoignable. Vérifie ta connexion, puis réessaie.',
+      panne: delai ? 'delai' : 'reseau'
     };
   } finally {
     clearTimeout(minuteur);
@@ -212,7 +235,10 @@ function messageDErreur(code: number, corps: unknown): string {
     return 'Adresse ou mot de passe incorrect.';
   }
   if (code === 400 && /email not confirmed/i.test(brut)) {
-    return 'Adresse non confirmée : ouvrez le courriel de confirmation reçu à l’inscription.';
+    // Tutoyé : `infra/` échappe à `verifier:tutoiement`, et ce « ouvrez »
+    // s'affichait sur l'écran Compte, seul vouvoiement de l'application.
+    return 'Adresse non confirmée : ouvre le courriel de confirmation reçu à l’inscription, '
+      + 'clique le lien, puis reviens te connecter.';
   }
   if (code === 401 || code === 403) {
     return 'Accès refusé. La session a peut-être expiré : reconnecte-toi.';
@@ -233,7 +259,15 @@ function messageDErreur(code: number, corps: unknown): string {
   return brut !== '' ? brut : `Erreur ${code}.`;
 }
 
-function sessionDepuis(corps: unknown): Resultat<Session> {
+/** Le `error_code` de GoTrue, s'il a la forme d'un identifiant — rien d'autre ne passe. */
+function codeErreurDe(corps: unknown): { readonly codeErreur?: string } {
+  const c = typeof corps === 'object' && corps !== null
+    ? (corps as Record<string, unknown>)['error_code'] : undefined;
+  return typeof c === 'string' && /^[a-z0-9_]{1,64}$/.test(c) ? { codeErreur: c } : {};
+}
+
+/** Exportée pour `supabase.inscription.ts` : une inscription ou un lien rendent la même session. */
+export function sessionDepuis(corps: unknown): Resultat<Session> {
   const o = (corps ?? {}) as Record<string, unknown>;
   const utilisateur = (o['user'] ?? {}) as Record<string, unknown>;
   const jeton = o['access_token'];

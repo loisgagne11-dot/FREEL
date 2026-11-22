@@ -12,8 +12,8 @@
 -- données restent telles quelles : tant que les deux versions coexistent,
 -- l'ancienne doit continuer de fonctionner exactement comme avant. La
 -- nouvelle la LIT pour reprendre les données, et n'y écrit jamais. La seule
--- chose que ce script y fait est d'y poser les règles d'accès (section
--- finale) : voir pourquoi là-bas.
+-- chose que ce script y fait est d'y poser les règles d'accès, quand elle
+-- existe (section `user_data`) : voir pourquoi là-bas.
 --
 -- ───────────────────────────────────────────────────────────────────────────
 -- POURQUOI UN COMPTEUR `version`
@@ -110,7 +110,21 @@ create policy "freel_faits — supprimer les siens"
 --
 -- Ce bloc ne change ni colonne ni donnée. Il est idempotent, et c'est la règle
 -- que l'ancienne application documentait : elle continue de fonctionner.
+--
+-- SEULEMENT SI LA TABLE EXISTE (22/11). Un projet neuf, créé pour cette
+-- version, n'a jamais eu `user_data` : la règle posée sans condition
+-- échouait (« relation public.user_data does not exist »), et l'éditeur SQL,
+-- qui exécute le script d'un bloc, annulait AUSSI tout ce qui précède — la
+-- table des faits comprise. Le guide de première connexion fait coller ce
+-- script dans un projet neuf : il doit y passer en entier.
+--
+-- Les lignes du bloc ne sont pas indentées : ce sont, mot pour mot, celles que
+-- l'écran propose quand la table est exposée (`sqlProtectionLegacy`), et un
+-- test vérifie qu'elles figurent ici telles quelles.
 
+do $$
+begin
+if to_regclass('public.user_data') is not null then
 alter table public.user_data enable row level security;
 
 drop policy if exists "user_data — chacun les siens" on public.user_data;
@@ -119,6 +133,9 @@ create policy "user_data — chacun les siens"
   to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);
+end if;
+end;
+$$;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- MÉMOIRE DU COMPTE (lot 57)
