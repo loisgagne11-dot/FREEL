@@ -60,6 +60,18 @@ describe('santé du projet', () => {
     expect((screen.getByText('Le détail, table par table').closest('details') as HTMLDetailsElement).open).toBe(true);
   });
 
+  /**
+   * En `display: flex`, un <summary> perd le triangle du navigateur : sans
+   * chevron, « Le détail, table par table » se lisait comme une phrase, et rien
+   * ne disait qu'il s'ouvre (relu sur la capture du 22/11).
+   */
+  it('le détail table par table s’annonce par un chevron, replié quand tout va bien', async () => {
+    monter(async () => verification());
+    const resume = (await screen.findByText('Le détail, table par table')).closest('summary') as HTMLElement;
+    expect(resume.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    expect((resume.closest('details') as HTMLDetailsElement).open).toBe(false);
+  });
+
   /** Le verdict ne se garde pas : une règle posée entre-temps doit se voir au clic. */
   it('« Vérifier à nouveau » relance la vérification et affiche le nouveau verdict', async () => {
     const verifier = vi.fn()

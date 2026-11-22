@@ -186,6 +186,19 @@
   min-height: 44px;
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+/* En `display: flex`, un <summary> perd le triangle du navigateur : « Le
+   détail, table par table » se lisait comme une phrase, rien ne disait qu'il
+   s'ouvre (relu sur la capture du 22/11). Le chevron le dit, et tourne
+   quand le volet est ouvert. */
+.chevron { flex: none; width: 0.9em; text-align: center; transition: transform 120ms ease; }
+.chevron::before { content: "›"; font-weight: 700; }
+.repli[open] > summary .chevron { transform: rotate(90deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron { transition: none; }
 }
 
 .anomalies {

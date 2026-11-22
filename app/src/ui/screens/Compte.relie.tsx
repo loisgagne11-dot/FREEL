@@ -752,7 +752,10 @@ function PhraseDuCompte(
     );
   }
   if (refus !== null) return <p className={styles.avertissement}>{refus}</p>;
-  const envoi = distant !== null && distant.majLe !== null ? `Dernier envoi ${quandFr(distant.majLe)}. ` : '';
+  // L'heure en gras, comme la maquette : c'est la réponse à « est-ce parti ? ».
+  const envoi = distant !== null && distant.majLe !== null
+    ? <>Dernier envoi <strong>{quandFr(distant.majLe)}</strong>. </>
+    : null;
   const suite: Record<EtatSynchro, string> = {
     'a-jour': 'Le compte porte exactement ce qu’il y a sur cet appareil. Sur un autre appareil, '
       + '« Charger le compte sur cet appareil » le récupère.',
@@ -983,7 +986,10 @@ function Apercu(
 
       {rapport.anomalies.length > 0 && (
         <details className={styles.repli}>
-          <summary>{rapport.anomalies.length} point(s) à connaître</summary>
+          <summary>
+            <span className={styles.chevron} aria-hidden="true" />
+            {rapport.anomalies.length} point(s) à connaître
+          </summary>
           <ul className={styles.anomalies}>
             {rapport.anomalies.slice(0, 15).map((a, i) => (
               <li key={`${a.gravite}-${i}`}>{a.message}</li>

@@ -136,7 +136,7 @@ export function SanteDuProjet({ config, pied, suite, verifier = verifierProjet }
           {/* Le détail table par table, ouvert d'office quand quelque chose
               cloche : c'est là qu'on lit laquelle. */}
           <details className={styles.repli} open={accesEnDefaut}>
-            <summary>Le détail, table par table</summary>
+            <summary><span className={styles.chevron} aria-hidden="true" />Le détail, table par table</summary>
             <LignesAcces verdict={acces} />
           </details>
         </>
